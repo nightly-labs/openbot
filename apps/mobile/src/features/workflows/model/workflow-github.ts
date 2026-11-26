@@ -15,19 +15,14 @@ import {
   type WorkflowGraph,
   type WorkflowNode,
   workflowGitHubEventItemKind,
+  workflowGitHubTriggerRepositories,
   workflowListField,
 } from "@openbot/contracts/ipc";
 import { isOneOf } from "@openbot/contracts/runtime-values";
 import type { MobileTextKey } from "@openbot/i18n/mobile";
+import { fieldOneOf, fieldText } from "./workflow-node-fields";
 
-/**
- * The GitHub settings of a trigger and of an output, as the desktop cards read and write them. The
- * host reads the same field names (`WorkflowFields`).
- */
-
-/** The fields that a GitHub trigger stores when the person chooses it, as on desktop. */
 export const GITHUB_TRIGGER_DEFAULTS = { event: "issue.opened", filters: "notBot" } as const;
-/** The fields that a GitHub output stores when the person chooses it, as on desktop. */
 export const GITHUB_OUTPUT_DEFAULTS = { action: "comment" } as const;
 
 export const GITHUB_EVENT_LABEL = {
@@ -78,24 +73,17 @@ export const GITHUB_SKIP_LABEL = {
   refused: "mobile.workflow.github.skip.refused",
 } as const satisfies Record<WorkflowGitHubSkipReason, MobileTextKey>;
 
-/** `repository` of an output that acts on the repository of the trigger's event. */
 export const SAME_REPOSITORY = "trigger";
-/** `person` of an output whose agent chooses the person. */
 export const AGENT_CHOOSES = "agent";
 
 export type GitHubOutputItem = "event" | "input";
 type GitHubLabelsFrom = "agent" | "list";
 
-const text = (node: WorkflowNode | undefined, name: string): string => {
-  const value = node?.fields[name];
-  return typeof value === "string" ? value : "";
-};
-
 export interface GitHubTriggerSettings {
   repository: string;
+  repositories: string[];
   event: WorkflowGitHubEvent;
   labels: string[];
-  /** The filters that the event can have: the base branch is a filter of pull requests only. */
   filterOptions: WorkflowGitHubFilter[];
   filters: WorkflowGitHubFilter[];
   titleText: string;
@@ -103,26 +91,26 @@ export interface GitHubTriggerSettings {
 }
 
 export function githubTrigger(node: WorkflowNode | undefined): GitHubTriggerSettings {
-  const stored = text(node, "event");
-  const event = isOneOf(WORKFLOW_GITHUB_EVENTS, stored) ? stored : GITHUB_TRIGGER_DEFAULTS.event;
+  const event = fieldOneOf(node, "event", WORKFLOW_GITHUB_EVENTS, GITHUB_TRIGGER_DEFAULTS.event);
   const filterOptions = WORKFLOW_GITHUB_FILTERS.filter(
     (filter) => filter !== "branch" || workflowGitHubEventItemKind(event) === "pullRequest",
   );
   const filters = workflowListField(node?.fields.filters).filter((filter): filter is WorkflowGitHubFilter =>
     isOneOf(filterOptions, filter),
   );
+  const repositories = workflowGitHubTriggerRepositories(node?.fields ?? {});
   return {
-    repository: text(node, "repository"),
+    repository: repositories[0] ?? fieldText(node, "repository"),
+    repositories,
     event,
     labels: workflowListField(node?.fields.labels),
     filterOptions,
     filters,
-    titleText: text(node, "titleText"),
-    branch: text(node, "branch"),
+    titleText: fieldText(node, "titleText"),
+    branch: fieldText(node, "branch"),
   };
 }
 
-/** The GitHub triggers that lead to a node, nearest first. A GitHub output acts on their events. */
 function githubTriggersBefore(graph: WorkflowGraph, nodeId: string): WorkflowNode[] {
   const byId = new Map(graph.nodes.map((node) => [node.id, node]));
   const found: WorkflowNode[] = [];
@@ -143,9 +131,7 @@ function githubTriggersBefore(graph: WorkflowGraph, nodeId: string): WorkflowNod
 }
 
 export interface GitHubOutputSettings {
-  /** The stored repository: `SAME_REPOSITORY` for the trigger's. */
   repository: string;
-  /** The repository that the action changes. Empty when it is the trigger's and no GitHub trigger leads here. */
   target: string;
   item: GitHubOutputItem;
   action: WorkflowGitHubAction;
@@ -154,18 +140,14 @@ export interface GitHubOutputSettings {
   person: string;
   reason: WorkflowGitHubCloseReason;
   title: string;
-  /** A GitHub trigger leads to the output, so it can act on the item of the event. */
   fromEvent: boolean;
   triggerEvent: WorkflowGitHubEvent;
   creates: boolean;
-  /** The action uses the trigger's repository or its item, but no GitHub trigger leads to it. */
   noEvent: boolean;
-  /** The event starts on issues only, so actions of pull requests cannot act on it. */
   issuesOnly: boolean;
   pullRequestOnly: boolean;
   usesLabels: boolean;
   usesPerson: boolean;
-  /** "Not planned" exists only on issues. */
   hasReason: boolean;
 }
 
@@ -177,13 +159,11 @@ export function githubOutput(node: WorkflowNode, graph: WorkflowGraph): GitHubOu
   const trigger = githubTriggersBefore(graph, node.id)[0];
   const triggerSettings = githubTrigger(trigger);
   const fromEvent = trigger !== undefined;
-  const repository = text(node, "repository") || SAME_REPOSITORY;
-  const storedItem = text(node, "item");
+  const repository = fieldText(node, "repository") || SAME_REPOSITORY;
+  const storedItem = fieldText(node, "item");
   const item: GitHubOutputItem = storedItem === "input" ? "input" : "event";
-  const storedAction = text(node, "action");
-  const action = isOneOf(WORKFLOW_GITHUB_ACTIONS, storedAction) ? storedAction : GITHUB_OUTPUT_DEFAULTS.action;
-  const storedReason = text(node, "reason");
-  const reason = isOneOf(WORKFLOW_GITHUB_CLOSE_REASONS, storedReason) ? storedReason : "completed";
+  const action = fieldOneOf(node, "action", WORKFLOW_GITHUB_ACTIONS, GITHUB_OUTPUT_DEFAULTS.action);
+  const reason = fieldOneOf(node, "reason", WORKFLOW_GITHUB_CLOSE_REASONS, "completed");
   const creates = action === "issue.create";
   const issuesOnly =
     fromEvent && !creates && item === "event" && workflowGitHubEventItemKind(triggerSettings.event) === "issue";
@@ -193,10 +173,10 @@ export function githubOutput(node: WorkflowNode, graph: WorkflowGraph): GitHubOu
     item,
     action,
     labels: workflowListField(node.fields.labels),
-    labelsFrom: text(node, "labelsFrom") === "agent" ? "agent" : "list",
-    person: text(node, "person"),
+    labelsFrom: fieldText(node, "labelsFrom") === "agent" ? "agent" : "list",
+    person: fieldText(node, "person"),
     reason,
-    title: text(node, "title"),
+    title: fieldText(node, "title"),
     fromEvent,
     triggerEvent: triggerSettings.event,
     creates,
@@ -211,7 +191,6 @@ export function githubOutput(node: WorkflowNode, graph: WorkflowGraph): GitHubOu
   };
 }
 
-/** What stops a GitHub step on a repository, or null when it can act or the host still reads. */
 export type GitHubAccessProblem = "missing" | "readOnly" | "eventsOff";
 
 export function githubAccessProblem(
@@ -238,17 +217,14 @@ export function githubItemUrl(item: WorkflowGitHubItem): string {
   return `https://github.com/${item.repository}/${item.pullRequest ? "pull" : "issues"}/${item.number}`;
 }
 
-/** `#12 Title`, as GitHub names an issue or a pull request. */
 export function githubItemLabel(item: WorkflowGitHubItem): string {
   return `#${item.number} ${item.title}`;
 }
 
-/** Whether two items are the same issue or pull request. GitHub names repositories without case. */
 export function sameGitHubItem(left: WorkflowGitHubItem, right: WorkflowGitHubItem): boolean {
   return left.number === right.number && left.repository.toLowerCase() === right.repository.toLowerCase();
 }
 
-/** The events of one trigger, newest first, as the host keeps them. */
 export function triggerDeliveries(deliveries: readonly WorkflowGitHubDelivery[], nodeId: string) {
   return deliveries.filter((delivery) => delivery.nodeId === nodeId);
 }

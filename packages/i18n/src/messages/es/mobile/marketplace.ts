@@ -62,6 +62,7 @@ export const messages = {
   "mobile.marketplace.facts.accessSignIn": "Inicio de sesión",
   "mobile.marketplace.facts.accessLocal": "Este ordenador",
   "mobile.marketplace.facts.accessNone": "Sin inicio de sesión",
+  "mobile.marketplace.facts.accessMac": "Solo Mac",
   "mobile.marketplace.permission.admin":
     "Solo los propietarios y administradores pueden instalar desde el marketplace.",
   "mobile.marketplace.permission.unavailable":
@@ -97,6 +98,7 @@ export const messages = {
   "mobile.marketplace.skill.doc": "SKILL.md",
   "mobile.marketplace.skill.examplePrompt": "Ayúdame a usar esta habilidad.",
   "mobile.marketplace.app.add": "Añadir app",
+  "mobile.marketplace.app.addCustom": "Añadir personalizada",
   "mobile.marketplace.app.connect": "Conectar",
   "mobile.marketplace.app.connectTitle": "Conectar {name}",
   "mobile.marketplace.app.keyIntro": "Pega la clave de tu cuenta. El servidor la prueba antes de guardar la app.",
@@ -105,6 +107,9 @@ export const messages = {
   "mobile.marketplace.app.stepOpen": "Abre la página de inicio de sesión de {name}.",
   "mobile.marketplace.app.stepAllow": "Inicia sesión y permite el acceso.",
   "mobile.marketplace.app.stepReturn": "Vuelve aquí. {name} se conecta en tu servidor.",
+  "mobile.marketplace.app.stepBlank": "La última página no carga. Es lo correcto.",
+  "mobile.marketplace.app.stepCopy": "Toca la barra de direcciones y copia la dirección completa.",
+  "mobile.marketplace.app.stepPaste": "Vuelve a OpenBot y pega la dirección abajo.",
   "mobile.marketplace.app.openSignIn": "Abrir inicio de sesión",
   "mobile.marketplace.app.keySecure": "La clave solo va a tu servidor, por una conexión cifrada.",
   "mobile.marketplace.app.connecting": "Conectando",
@@ -115,12 +120,12 @@ export const messages = {
   "mobile.marketplace.app.linkInvalid": "Usa un enlace https de {hostname}.",
   "mobile.marketplace.app.docs": "Obtener clave",
   "mobile.marketplace.app.local": "Esta app se ejecuta en el ordenador con OpenBot. Configúrala en ese ordenador.",
+  "mobile.marketplace.app.needsMac":
+    "Esta app solo funciona en un Mac que ejecuta OpenBot, y este servidor no es un Mac.",
   "mobile.marketplace.app.relayUnsupported":
     "Esta app pide iniciar sesión en el navegador. Actualiza OpenBot en el servidor o conecta la app en el ordenador.",
   "mobile.marketplace.app.waiting": "Esperando la página de inicio de sesión…",
   "mobile.marketplace.app.openAgain": "Abrir de nuevo la página de inicio de sesión",
-  "mobile.marketplace.app.pasteHint":
-    "Al final, la página abre una dirección que no carga. Copia esa dirección y pégala abajo.",
   "mobile.marketplace.app.pasteLabel": "Dirección tras iniciar sesión",
   "mobile.marketplace.app.pasteInvalid": "Esta dirección no es el final de este inicio de sesión.",
   "mobile.marketplace.app.finishSignIn": "Terminar",

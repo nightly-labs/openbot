@@ -1,9 +1,3 @@
-/**
- * What a story needs to mount the real agent chat: the app providers it reads, a mocked bridge,
- * and a complete set of `Conversation` props. `Conversation.stories.tsx` builds its variants on
- * these, and the diagram workspace story shows the same chat when an agent is open.
- */
-
 import { serializeAttachmentReference } from "@openbot/contracts/attachment-references";
 import type { AvatarImageInput, UpdateAgentInput } from "@openbot/contracts/ipc";
 import type { AgentMessage as RendererAgentMessage } from "@openbot/ui/data";
@@ -69,10 +63,6 @@ export const CONVERSATION_STORY_MESSAGES: RendererAgentMessage[] = STORY_CONVERS
   ...(message.plan ? { plan: { ...message.plan, stopped: false } } : {}),
 }));
 
-/**
- * The domains `ConversationView` and its panels read through `use*()`, nested in the order
- * `app-providers.tsx` uses. Each one talks to the mocked `window.openbot` the story installs.
- */
 export function StoryAppProviders(props: ParentProps) {
   return (
     <PlatformProvider>
@@ -142,10 +132,6 @@ export const CONVERSATION_STORY_ARGS: Parameters<typeof Conversation>[0] = {
   onStop: fn(),
 };
 
-/**
- * The conversation view as the app shows it, on a mocked bridge, for a story that composes screens
- * or shows a channel. The props replace the story defaults.
- */
 export function StoryConversation(props: Partial<Parameters<typeof ConversationView>[0]>) {
   const previousApi = window.openbot;
   const mock = createMockOpenBot();

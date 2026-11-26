@@ -5,6 +5,7 @@ import { Typography } from "heroui-native";
 import { useThemeColor } from "heroui-native/hooks";
 import type { ReactNode, RefObject } from "react";
 import { StyleSheet, View, type ViewInstance } from "react-native";
+import Animated, { type SharedValue, useAnimatedProps, useSharedValue } from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import Svg, { Defs, LinearGradient, Rect, Stop } from "react-native-svg";
 import { useUniwind } from "uniwind";
@@ -12,21 +13,13 @@ import { AndroidStackBackButton } from "@/shared/components/android-header-butto
 import { ANDROID_BLUR } from "@/shared/components/glass-capsule";
 import { typeScale } from "@/shared/lib/type-scale";
 
-/** The blur strength. With the default reduction factor of 4, the native radius is 40 px. */
 const BLUR_INTENSITY = 40;
-/** The surface color over the blur, so the title reads over any content. */
 const SURFACE_OPACITY = 0.8;
-/**
- * How far the blur reaches below the bar, and the part of it that is at full strength before the eased
- * fade. A sheet bar is short and has no status bar. A full screen bar is taller, and its title sits
- * lower, so its blur reaches further and stays full longer.
- */
 const BLUR_SHAPES = {
   sheet: { belowBar: 28, full: 0.45 },
   screen: { belowBar: 32, full: 0.68 },
 } as const;
 
-/** The mask is full from the top to `full`, then eases out to nothing at the bottom. */
 function maskStops(full: number) {
   const fade = Array.from({ length: 13 }, (_, index) => {
     const progress = index / 12;
@@ -35,16 +28,11 @@ function maskStops(full: number) {
   return [{ offset: 0, opacity: 1 }, ...fade];
 }
 
-/** The Material 3 small top app bar. */
+const AnimatedRect = Animated.createAnimatedComponent(Rect);
+
 const BAR_HEIGHT = 64;
-/** The title starts on the 72 dp line after a navigation button, and 16 dp from the edge without one. */
 const TITLE_INSET = 72;
 
-/**
- * Android blurs only the content of a `BlurTargetView`. On Android 12 and later, with `enabled`, the
- * children go into one, on the surface color: a clear part of the target blurs as the window background.
- * Elsewhere they render as they are.
- */
 export function AndroidBlurTarget({
   target,
   surface,
@@ -64,23 +52,23 @@ export function AndroidBlurTarget({
   );
 }
 
-/**
- * The backdrop of an Android bar over scrolling content, the usual Expo progressive blur: a `BlurView`
- * of the target with the surface color over it, in a `MaskedView` whose gradient keeps it full at the
- * top and fades it out a little below the bar. `height` is the bar's; without it the bar is the parent.
- */
 export function AndroidHeaderBlur({
   target,
   height,
   surface = "sheet",
   shape,
+  progress,
 }: {
   target: RefObject<ViewInstance | null>;
   height?: number;
   surface?: "canvas" | "sheet";
   shape: keyof typeof BLUR_SHAPES;
+  progress?: SharedValue<number>;
 }) {
   const { theme } = useUniwind();
+  const fullBar = useSharedValue(1);
+  const shown = progress ?? fullBar;
+  const maskProps = useAnimatedProps(() => ({ opacity: shown.get() }));
   const { belowBar, full } = BLUR_SHAPES[shape];
   return (
     <MaskedView
@@ -100,7 +88,7 @@ export function AndroidHeaderBlur({
               ))}
             </LinearGradient>
           </Defs>
-          <Rect fill="url(#android-header-mask)" height="100%" width="100%" />
+          <AnimatedRect fill="url(#android-header-mask)" height="100%" width="100%" animatedProps={maskProps} />
         </Svg>
       }
     >
@@ -119,11 +107,6 @@ export function AndroidHeaderBlur({
   );
 }
 
-/**
- * The header that a page draws on Android in place of the native one, over the blur of its content:
- * the Material 3 small top app bar, with the page's `headerLeft`, title and `headerRight`. The stack
- * measures it, so the content clears exactly its height. A sheet header does not reach the status bar.
- */
 export function AndroidBlurHeader({
   options,
   back,
@@ -137,8 +120,6 @@ export function AndroidBlurHeader({
   const insets = useSafeAreaInsets();
   const foreground = String(useThemeColor("foreground"));
   const itemProps = { tintColor: foreground, canGoBack: back !== undefined };
-  // A stack without `androidBackOptions` (such as `SheetPageStack`) relies on the native back arrow, so
-  // an inner page gets the same round back button here. Full screens put it in the glass circle.
   const left =
     options.headerLeft?.(itemProps) ??
     (back && options.headerBackVisible !== false ? (

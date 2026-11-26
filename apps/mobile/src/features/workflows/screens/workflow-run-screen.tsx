@@ -1,19 +1,25 @@
+import type { WorkflowStep } from "@openbot/contracts/ipc";
 import { Stack, useLocalSearchParams } from "expo-router";
 import { Typography } from "heroui-native";
 import Square from "lucide-react-native/icons/square";
+import { useMemo, useState } from "react";
 import { Alert, Linking, View } from "react-native";
 import { SettingsRow, SettingsSection } from "@/features/settings/components/settings-content";
+import { WorkflowFlowView } from "@/features/workflows/components/workflow-flow-view";
 import { WorkflowRunStepRow } from "@/features/workflows/components/workflow-run-step-row";
+import { FlowRowNote } from "@/features/workflows/components/workflow-steps-list";
 import { useWorkflowStepActions } from "@/features/workflows/model/use-workflow-step-actions";
 import { useWorkflowDetail, useWorkflowGitHubHistory, useWorkflowRun } from "@/features/workflows/model/use-workflows";
 import { formatRunDuration } from "@/features/workflows/model/workflow-duration";
+import { useWorkflowEditorView } from "@/features/workflows/model/workflow-editor-view";
+import { flowRows, workflowFlowTree } from "@/features/workflows/model/workflow-flow-tree";
 import { githubItemLabel, githubItemUrl } from "@/features/workflows/model/workflow-github";
-import { readingOrder } from "@/features/workflows/model/workflow-outline";
 import {
   isActiveRun,
   latestSteps,
   RUN_STATUS_LABEL,
   STEP_STATUS_LABEL,
+  stepLabel,
 } from "@/features/workflows/model/workflow-steps";
 import { useMobileWorkspaceSelector } from "@/features/workspace/context/mobile-workspace-context";
 import { AndroidHeaderButton } from "@/shared/components/android-header-button";
@@ -24,10 +30,6 @@ import { isAndroid } from "@/shared/lib/platform";
 import { useText } from "@/shared/lib/text";
 import { typeScale } from "@/shared/lib/type-scale";
 
-/**
- * Drawer > Workflows > a workflow > a run: each step with its status and output. The person approves
- * or declines a step that waits, retries a step that failed, and stops a run that goes on.
- */
 export function WorkflowRunScreen() {
   const { t, format, errorMessage } = useText();
   const { serverId, workflowId, runId } = useLocalSearchParams<{
@@ -44,14 +46,25 @@ export function WorkflowRunScreen() {
   const busy = steps.busy;
 
   const run = runDetail?.run;
-  /** The issue or the pull request of a run that a GitHub event started. */
   const githubItem = run ? github.data?.runs.find((entry) => entry.runId === run.id)?.item : undefined;
   const title = run ? t("mobile.workflow.run.title", { number: run.number }) : t("mobile.app.route.workflowRun");
   const latest = latestSteps(runDetail?.steps ?? []);
   const graph = detail.data?.graph;
-  // The steps of the graph in reading order, then any step whose node the workflow no longer has.
-  const nodes = graph ? readingOrder(graph) : [];
-  const known = new Set(nodes.map((node) => node.id));
+  const rows = useMemo(() => (graph ? flowRows(workflowFlowTree(graph)) : []), [graph]);
+  const byId = new Map(graph?.nodes.map((node) => [node.id, node]) ?? []);
+  const known = new Set(rows.flatMap((row) => (row.type === "step" ? [row.id] : [])));
+  const labelOf = (id: string) => {
+    const node = byId.get(id);
+    return node ? stepLabel(node, serverAgents, t) : "";
+  };
+  const view = useWorkflowEditorView((state) => state.view);
+  const [chosen, setChosen] = useState<string | null>(null);
+  const runOrder = rows.flatMap((row) => (row.type === "step" ? [row.id] : []));
+  const attention = (status: WorkflowStep["status"]) =>
+    runOrder.find((id) => latest.get(id)?.status === status) ?? null;
+  const selectedId = chosen ?? attention("approval") ?? attention("failed") ?? attention("running");
+  const selectedNode = selectedId ? byId.get(selectedId) : undefined;
+  const removed = [...latest.values()].filter((step) => !known.has(step.nodeId));
   const canStop = run ? isActiveRun(run.status) && run.status !== "stopping" : false;
   const stop = () => {
     if (!run) return;
@@ -140,29 +153,78 @@ export function WorkflowRunScreen() {
                 </SettingsRow>
               </SettingsSection>
             ) : null}
-            <SettingsSection title={t("mobile.workflow.detail.stepsTitle")}>
-              {nodes.map((node) => (
-                <WorkflowRunStepRow
-                  key={node.id}
-                  node={node}
-                  step={latest.get(node.id)}
-                  agents={serverAgents}
-                  busy={busy}
-                  onDecide={steps.decide}
-                  onRetry={steps.retry}
-                  onStop={steps.stop}
-                />
-              ))}
-              {[...latest.values()]
-                .filter((step) => !known.has(step.nodeId))
-                .map((step) => (
+            {view === "flow" && graph ? (
+              <>
+                <View className="gap-2">
+                  <Typography type="body-xs" className="px-4 text-grouped-secondary">
+                    {t("mobile.workflow.detail.stepsTitle")}
+                  </Typography>
+                  <WorkflowFlowView
+                    serverId={serverId}
+                    graph={graph}
+                    agents={serverAgents}
+                    run={{
+                      steps: latest,
+                      selectedId,
+                      onSelect: (node) => {
+                        void haptics.selection();
+                        setChosen(node.id);
+                      },
+                    }}
+                  />
+                </View>
+                {selectedNode ? (
+                  <SettingsSection title={labelOf(selectedNode.id)}>
+                    <WorkflowRunStepRow
+                      node={selectedNode}
+                      step={latest.get(selectedNode.id)}
+                      agents={serverAgents}
+                      busy={busy}
+                      onDecide={steps.decide}
+                      onRetry={steps.retry}
+                      onStop={steps.stop}
+                    />
+                  </SettingsSection>
+                ) : (
+                  <Typography.Paragraph className="px-4 text-grouped-secondary" style={typeScale.caption}>
+                    {t("mobile.workflow.run.selectHint")}
+                  </Typography.Paragraph>
+                )}
+              </>
+            ) : null}
+            {view !== "flow" || removed.length > 0 ? (
+              <SettingsSection title={view === "flow" ? undefined : t("mobile.workflow.detail.stepsTitle")}>
+                {view === "flow"
+                  ? null
+                  : rows.map((row) => {
+                      if (row.type !== "step")
+                        return (
+                          <FlowRowNote key={row.type === "loose" ? "loose" : row.key} row={row} labelOf={labelOf} />
+                        );
+                      const node = byId.get(row.id);
+                      return node ? (
+                        <WorkflowRunStepRow
+                          key={node.id}
+                          node={node}
+                          step={latest.get(node.id)}
+                          agents={serverAgents}
+                          busy={busy}
+                          onDecide={steps.decide}
+                          onRetry={steps.retry}
+                          onStop={steps.stop}
+                          depth={row.depth}
+                        />
+                      ) : null;
+                    })}
+                {removed.map((step) => (
                   <View key={step.id} className="px-4 py-3">
                     <Typography.Paragraph className="text-text-secondary" style={typeScale.caption}>
                       {t("mobile.workflow.run.removedStep", { status: t(STEP_STATUS_LABEL[step.status]) })}
                     </Typography.Paragraph>
                   </View>
                 ))}
-            </SettingsSection>
+              </SettingsSection>
+            ) : null}
           </>
         )}
       </LargeTitleScrollView>

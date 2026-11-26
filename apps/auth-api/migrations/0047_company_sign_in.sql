@@ -1,17 +1,9 @@
--- Company sign-in: a server owner connects the company's OpenID Connect provider, such as Microsoft
--- Entra ID, Okta or Google Workspace. A person whose email is at one of its domains then signs in
--- there, not with an email code. SCIM from the same provider turns off a person who leaves.
--- New tables only: the deployed Worker does not read them.
-
--- One connection for each server. The client secret is stored encrypted, the SCIM token as a hash.
 CREATE TABLE company_sign_in_connections (
   host_id TEXT PRIMARY KEY REFERENCES remote_hosts(host_id) ON DELETE CASCADE,
   issuer TEXT NOT NULL,
   client_id TEXT NOT NULL,
   client_secret_ciphertext TEXT NOT NULL,
-  -- 1: email codes are refused for the domains, and people sign in with the provider.
   enabled INTEGER NOT NULL DEFAULT 0 CHECK (enabled IN (0, 1)),
-  -- The owner who saved the connection. SCIM acts for this account.
   updated_by_user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
   tested_at INTEGER NOT NULL,
   scim_token_hash TEXT UNIQUE,
@@ -20,7 +12,6 @@ CREATE TABLE company_sign_in_connections (
   updated_at INTEGER NOT NULL
 );
 
--- An email domain belongs to one connection at most.
 CREATE TABLE company_sign_in_domains (
   domain TEXT PRIMARY KEY,
   host_id TEXT NOT NULL REFERENCES company_sign_in_connections(host_id) ON DELETE CASCADE
@@ -28,7 +19,6 @@ CREATE TABLE company_sign_in_domains (
 
 CREATE INDEX company_sign_in_domains_host ON company_sign_in_domains(host_id);
 
--- The account that a person at the provider signs in to. The subject never changes for a person.
 CREATE TABLE company_sign_in_identities (
   issuer TEXT NOT NULL,
   subject TEXT NOT NULL,
@@ -39,7 +29,6 @@ CREATE TABLE company_sign_in_identities (
 
 CREATE INDEX company_sign_in_identities_user ON company_sign_in_identities(user_id);
 
--- The people that the provider manages through SCIM. An inactive person cannot sign in.
 CREATE TABLE company_sign_in_users (
   host_id TEXT NOT NULL REFERENCES company_sign_in_connections(host_id) ON DELETE CASCADE,
   user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
@@ -51,13 +40,10 @@ CREATE TABLE company_sign_in_users (
 
 CREATE INDEX company_sign_in_users_user ON company_sign_in_users(user_id);
 
--- A sign-in or a test at the provider in progress. The flow holds the values it was started with,
--- so a change to the connection during the flow does not change it. Only the hash of the state.
 CREATE TABLE company_sign_in_flows (
   state_hash TEXT PRIMARY KEY,
   purpose TEXT NOT NULL CHECK (purpose IN ('sign_in', 'test')),
   host_id TEXT NOT NULL,
-  -- The owner who started a test. NULL for a sign-in.
   user_id TEXT REFERENCES users(id) ON DELETE CASCADE,
   issuer TEXT NOT NULL,
   client_id TEXT NOT NULL,
@@ -74,7 +60,6 @@ CREATE TABLE company_sign_in_flows (
 
 CREATE INDEX company_sign_in_flows_expires_at ON company_sign_in_flows(expires_at);
 
--- One-time codes that the app exchanges for a session after a sign-in. Only the hash of a code.
 CREATE TABLE company_sign_in_codes (
   code_hash TEXT PRIMARY KEY,
   user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,

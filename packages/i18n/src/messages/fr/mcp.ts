@@ -28,7 +28,10 @@ export const messages = {
   "mcp.signIn.waiting": "En attente du navigateur…",
   "mcp.signIn.continue": "Continuer vers {name}",
   "mcp.signIn.pageDescription": "Cette page est ouverte dans le navigateur de {host}. Connectez-vous ici.",
-  "mcp.server.loadFailed": "Impossible de charger les serveurs MCP.",
+  "mcp.signIn.copyHint": "Si la page ne se charge pas, copiez le lien et ouvrez-le dans un autre navigateur.",
+  "mcp.signIn.copyLink": "Copier le lien",
+  "mcp.signIn.pasteHint":
+    "Si vous vous connectez sur un autre appareil, copiez l’adresse que son navigateur affiche à la fin et collez-la ici.",
   "mcp.test.connected": { one: "Connecté · {count} outil", other: "Connecté · {count} outils" },
   "mcp.status.testing": "Test…",
   "mcp.status.failed": "Échec",
@@ -37,6 +40,7 @@ export const messages = {
   "mcp.status.signedIn": "Connecté",
   "mcp.status.signingIn": "Connexion…",
   "mcp.status.signInNeeded": "Connexion requise",
+  "mcp.status.signInAppNeeded": "App de connexion requise",
   "mcp.status.refused": "Refusé",
   "mcp.status.checkUrl": "Vérifiez l’URL",
   "mcp.status.noAnswer": "Pas de réponse",
@@ -54,12 +58,6 @@ export const messages = {
   "mcp.panel.noAnswer": "Ce serveur n’a pas répondu.",
   "mcp.panel.connectTitle": "Connecter un MCP personnalisé",
   "mcp.panel.editTitle": "Modifier le serveur MCP",
-  "mcp.panel.changesNotSaved": "Modifications non enregistrées",
-  "mcp.panel.title": "Serveurs MCP",
-  "mcp.panel.description":
-    "Les serveurs Model Context Protocol donnent des outils supplémentaires aux agents de ce serveur. Les agents Claude et Codex reçoivent uniquement les serveurs de cette liste ; les agents OpenCode et Grok peuvent aussi démarrer des serveurs depuis leurs propres fichiers de configuration.",
-  "mcp.panel.connectCustom": "Connecter un MCP personnalisé",
-  "mcp.panel.empty": "Aucun serveur MCP pour le moment.",
   "mcp.panel.enable": "Activer {name}",
   "mcp.panel.detailsTitle": "Détails",
   "mcp.panel.detailsDescription": "Nommez ce serveur et choisissez comment OpenBot le joint.",
@@ -101,17 +99,11 @@ export const messages = {
     "Se connecte une fois avec ces réglages et indique les outils proposés. Rien n’est enregistré ni conservé.",
   "mcp.panel.testConnection": "Tester la connexion",
   "mcp.panel.notTested": "Pas encore testé.",
-  "mcp.panel.removeTitle": "Supprimer {name} ?",
-  "mcp.panel.removeDescription":
-    "Ses outils ne sont plus proposés aux agents de ce serveur. La configuration n’est pas conservée.",
-  "mcp.panel.removeConfirm": "Supprimer le serveur MCP",
-  "mcp.panel.actionsFor": "Actions pour {name}",
-  "mcp.panel.testUnavailable": "Ce serveur ne peut pas être testé ici.",
   "mcp.panel.signIn": "Se connecter",
   "mcp.panel.signOut": "Se déconnecter",
   "mcp.panel.cancelSignIn": "Annuler la connexion",
+  "mcp.panel.useAddress": "Utiliser cette adresse",
   "mcp.panel.signInTo": "Se connecter à {name}",
-  "mcp.panel.cancelSignInTo": "Annuler la connexion à {name}",
   "mcp.panel.signInWaiting": {
     one: "Terminez la connexion dans votre navigateur. OpenBot cesse d’attendre après {count} minute.",
     other: "Terminez la connexion dans votre navigateur. OpenBot cesse d’attendre après {count} minutes.",
@@ -152,6 +144,7 @@ export const messages = {
   "mcp.signIn.relayDeviceDescription":
     "Connectez-vous sur {page} dans votre navigateur et terminez-y la connexion. {host} détecte la connexion lui-même.",
   "mcp.signIn.relayOpen": "Ouvrir la page de connexion",
+  "mcp.signIn.relayCopy": "Copier le lien",
   "mcp.signIn.relayPasteHint":
     "Si le navigateur ne revient pas vers OpenBot, copiez l’adresse qu’il affiche et collez-la ici.",
   "mcp.signIn.relayPasteRequired":

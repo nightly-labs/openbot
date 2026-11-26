@@ -1,17 +1,4 @@
 import {
-  HOST_MEMBER_UPDATE_CAPABILITY,
-  memberUpdateRoute,
-} from "@openbot/contracts/team-protocol/host-member-update-v1";
-import { HOST_RELEASE_CAPABILITY, HOST_RELEASE_ROUTES } from "@openbot/contracts/team-protocol/host-release-v1";
-import { Effect, Result } from "effect";
-import type { RemoteWorkflowError } from "../remote-service-effects";
-// The server name, logo, timezone, agent memory limit, memory review, prompt cache time, model list
-// and app update of one server's host. On a joined server the request goes to the host. Identity,
-// timezone, memory limit, memory review, prompt cache time, model list, settings, cancellation, and
-// forced restarts require an owner or admin.
-// Ordinary members can check and request an idle update through host-member-update-v1.
-
-import {
   type AgentAccessChange,
   type AgentAccessSnapshot,
   type AgentProviderRef,
@@ -20,31 +7,46 @@ import {
   decodeHostBrowsingMemory,
   decodeHostMemoryReview,
   decodeHostPersonality,
+  decodeHostSignalHomeSettings,
   decodeHostSkillLearning,
   decodeHostTimezoneSettings,
+  decodeHostTurnLimits,
   decodeHostUpdateStatus,
+  decodeHostVoiceModel,
   decodeMachineAlertSettings,
   decodePromptCacheTtlSetting,
   decodeProviderModelVisibility,
   decodeServerAuditLog,
   type HostPersonality,
+  type HostTurnLimitsInput,
   type HostUpdateSettingsChange,
   type HostUpdateStatus,
+  type HostVoiceModelChange,
   hostAgentMemoryLimit,
   hostBrowsingMemory,
   hostMemoryReview,
   hostSkillLearning,
   isClaudeCompactWindowTokens,
   isPromptCacheTtl,
+  isProviderEnvironmentProvider,
   isSkillLearningMode,
   LEGACY_RESPONSE_STYLE,
   LOCAL_SERVER_ID,
   type MachineAlertSettings,
+  type MediaApprovalCreditsUpdate,
+  PROVIDER_ENVIRONMENT_LIMITS,
   type PromptCacheTtl,
+  type ProviderEnvironmentProvider,
+  type ProviderEnvironmentUpdate,
+  type ProviderEnvironmentVariableInput,
   type ProviderModelVisibilityChange,
   parseAgentAccessChange,
+  parseHostTurnLimitsInput,
+  parseHostVoiceModelChange,
+  parseMediaApprovalCreditsUpdate,
   parseProviderModelVisibilityChange,
   parseProviderModelVisibilityProvider,
+  parseSignalHomeChoice,
   type ServerAuditLog,
   type ServerAuditName,
   type ServerSummary,
@@ -63,6 +65,11 @@ import {
   BROWSING_MEMORY_ROUTES,
 } from "@openbot/contracts/team-protocol/browsing-memory-v1";
 import {
+  CACHE_EXPIRY_COMPACTION_CAPABILITY,
+  CACHE_EXPIRY_COMPACTION_ROUTES,
+  decodeCacheExpiryCompactionResponse,
+} from "@openbot/contracts/team-protocol/cache-expiry-compaction-v1";
+import {
   CLAUDE_COMPACT_WINDOW_CAPABILITY,
   CLAUDE_COMPACT_WINDOW_ROUTES,
   decodeClaudeCompactWindowResponse,
@@ -75,19 +82,47 @@ import {
 import type { TeamCurrentCapability } from "@openbot/contracts/team-protocol/current";
 import { HOST_ADMIN_CAPABILITY, HOST_ADMIN_ROUTES } from "@openbot/contracts/team-protocol/host-admin-v1";
 import {
+  HOST_APPEARANCE_CAPABILITY,
+  HOST_APPEARANCE_ROUTES,
+  type ServerAppearance,
+} from "@openbot/contracts/team-protocol/host-appearance-v1";
+import {
   HOST_KEY_ROTATION_CAPABILITY,
   HOST_KEY_ROTATION_ROUTES,
 } from "@openbot/contracts/team-protocol/host-key-rotation-v1";
 import {
+  HOST_MEMBER_UPDATE_CAPABILITY,
+  memberUpdateRoute,
+} from "@openbot/contracts/team-protocol/host-member-update-v1";
+import {
   HOST_PERSONALITY_CAPABILITY,
   HOST_PERSONALITY_ROUTES,
 } from "@openbot/contracts/team-protocol/host-personality-v1";
+import { HOST_RELEASE_CAPABILITY, HOST_RELEASE_ROUTES } from "@openbot/contracts/team-protocol/host-release-v1";
+import { HOST_RESTART_CAPABILITY, HOST_RESTART_ROUTES } from "@openbot/contracts/team-protocol/host-restart-v1";
+import {
+  HOST_SIGNAL_HOME_CAPABILITY,
+  HOST_SIGNAL_HOME_ROUTES,
+} from "@openbot/contracts/team-protocol/host-signal-home-v1";
 import { HOST_TIMEZONE_CAPABILITY, HOST_TIMEZONE_ROUTES } from "@openbot/contracts/team-protocol/host-timezone-v1";
+import {
+  HOST_TURN_LIMITS_CAPABILITY,
+  HOST_TURN_LIMITS_ROUTES,
+} from "@openbot/contracts/team-protocol/host-turn-limits-v1";
 import { HOST_UPDATE_CAPABILITY, HOST_UPDATE_ROUTES } from "@openbot/contracts/team-protocol/host-update-v1";
+import {
+  HOST_VOICE_MODEL_CAPABILITY,
+  HOST_VOICE_MODEL_ROUTES,
+} from "@openbot/contracts/team-protocol/host-voice-model-v1";
 import {
   MACHINE_RESOURCES_CAPABILITY,
   MACHINE_RESOURCES_ROUTES,
 } from "@openbot/contracts/team-protocol/machine-resources-v1";
+import {
+  decodeMediaApprovalCreditsResponse,
+  MEDIA_APPROVAL_CREDITS_CAPABILITY,
+  MEDIA_APPROVAL_CREDITS_ROUTES,
+} from "@openbot/contracts/team-protocol/media-approval-credits-v1";
 import { MEMORY_REVIEW_CAPABILITY, MEMORY_REVIEW_ROUTES } from "@openbot/contracts/team-protocol/memory-review-v1";
 import {
   MODEL_VISIBILITY_CAPABILITY,
@@ -97,22 +132,35 @@ import {
   PROMPT_CACHE_TTL_CAPABILITY,
   PROMPT_CACHE_TTL_ROUTES,
 } from "@openbot/contracts/team-protocol/prompt-cache-ttl-v1";
+import {
+  decodeProviderEnvironmentResponse,
+  PROVIDER_ENVIRONMENT_CAPABILITY,
+  PROVIDER_ENVIRONMENT_ROUTES,
+} from "@openbot/contracts/team-protocol/provider-environment-v1";
 import { SERVER_AUDIT_CAPABILITY, SERVER_AUDIT_ROUTES } from "@openbot/contracts/team-protocol/server-audit-v1";
 import { SKILL_LEARNING_CAPABILITY, SKILL_LEARNING_ROUTES } from "@openbot/contracts/team-protocol/skill-learning-v1";
 import { sourceText } from "@openbot/i18n/source";
+import { Effect, Result } from "effect";
 import { runCauseEffect } from "../../backend/effect-boundary";
 import { type AgentAccessStore, agentAccessSnapshot } from "../agent-access-store";
 import type { AgentMemoryLimitSetting } from "../agent-memory-limit-preference-store";
 import type { BrowsingMemoryPreferenceStore } from "../browsing-memory-preference-store";
+import type { CacheExpiryCompactionControl } from "../cache-expiry-compaction-preference-store";
 import type { ClaudeCompactWindowControl } from "../claude-compact-window-preference-store";
 import type { ClaudeUserSetupControl } from "../claude-user-setup-preference-store";
 import type { HostService } from "../host-service";
+import type { HostSignalHomeService } from "../host-signal-home";
+import type { HostTurnLimitsPreferenceStore } from "../host-turn-limits-preference-store";
+import type { HostVoiceModelService } from "../host-voice-model";
 import type { MachineAlertMonitor } from "../machine-alerts";
+import type { MediaApprovalCreditsControl } from "../media-approval-credits-preference-store";
 import type { MemoryReviewPreferenceStore } from "../memory-review-preference-store";
 import type { ModelVisibility } from "../model-visibility";
 import type { PromptCacheTtlPreferenceStore } from "../prompt-cache-ttl-preference-store";
+import type { ProviderEnvironmentControl } from "../provider-environment-store";
 import { acceptEmpty, decodeHostReleaseStatusFromHost, type ResponseDecoder } from "../remote-host-decoding";
 import type { RemoteRequestInit } from "../remote-server-client";
+import type { RemoteWorkflowError } from "../remote-service-effects";
 import type { ServerAuditStore } from "../server-audit-store";
 import { parseServerPersonality, type ServerPersonalityPreferenceStore } from "../server-personality-preference-store";
 import { parseServerTimezone, type ServerTimezonePreferenceStore } from "../server-timezone-preference-store";
@@ -122,6 +170,7 @@ import type { IpcGroupHandlers } from "./define-ipc-group";
 import { scopedHandler, scopedQueryHandler } from "./scoped-handler";
 import { parseHostIdentity } from "./server-inputs";
 import { withLocalHostSummary } from "./team-handlers";
+import { isObject } from "./validation";
 
 interface HostAdminRemoteServers {
   list(): ServerSummary[];
@@ -133,12 +182,19 @@ interface HostAdminRemoteServers {
     init?: RemoteRequestInit,
   ): Effect.Effect<T, RemoteWorkflowError>;
   refreshIdentity(serverId: string): Effect.Effect<ServerSummary, RemoteWorkflowError>;
+  applyAppearance(
+    serverId: string,
+    appearance: ServerAppearance | null,
+  ): Effect.Effect<ServerSummary, RemoteWorkflowError>;
 }
 
 interface HostAdminIpcDependencies {
   host: Pick<HostService, "updateIdentity" | "rotateIdentityKey">;
   remoteServers: HostAdminRemoteServers;
   serverTimezone: Pick<ServerTimezonePreferenceStore, "get" | "set">;
+  voiceModel: Pick<HostVoiceModelService, "snapshot" | "change">;
+  signalHome: Pick<HostSignalHomeService, "snapshot" | "set">;
+  hostTurnLimits: Pick<HostTurnLimitsPreferenceStore, "get" | "set">;
   serverPersonality: Pick<ServerPersonalityPreferenceStore, "get" | "set">;
   agentMemoryLimit: AgentMemoryLimitSetting;
   memoryReview: MemoryReviewPreferenceStore;
@@ -147,27 +203,29 @@ interface HostAdminIpcDependencies {
   machineAlerts: Pick<MachineAlertMonitor, "alerts" | "setAlerts" | "canBeResponsible">;
   promptCacheTtl: Pick<PromptCacheTtlPreferenceStore, "get" | "set">;
   claudeUserSetup: ClaudeUserSetupControl;
+  cacheExpiryCompaction: CacheExpiryCompactionControl;
+  mediaApprovalCredits: MediaApprovalCreditsControl;
   claudeCompactWindow: ClaudeCompactWindowControl;
+  providerEnvironment: Pick<ProviderEnvironmentControl, "get" | "set">;
   modelVisibility: Pick<ModelVisibility, "settings" | "set">;
   agentAccess: Pick<AgentAccessStore, "levels" | "set">;
   serverAudit: Pick<ServerAuditStore, "read">;
-  /** The server ID of this computer's host, when it has one. Roles are stored by it. */
   localServerId: () => string | undefined;
   localAgentIds: () => string[];
-  /** The owner member of this computer's host, who makes each local change, for the audit log. */
   localOwner: () => ServerAuditName | null;
 }
 
-// The user of this computer owns its server, so the roles give them every agent.
-const LOCAL_OWNER = { id: "local-owner", role: "owner" } as const;
+export const LOCAL_OWNER = { id: "local-owner", role: "owner" } as const;
 
-/** The body of a `host-update-v1` route: `start` carries the mode, `settings` the switches. */
 type HostUpdateBody = Record<string, never> | { restart: UpdateRestartMode } | HostUpdateSettingsChange;
 
 export function hostAdminIpcHandlers({
   host,
   remoteServers,
   serverTimezone,
+  voiceModel,
+  signalHome,
+  hostTurnLimits,
   serverPersonality,
   agentMemoryLimit,
   memoryReview,
@@ -176,7 +234,10 @@ export function hostAdminIpcHandlers({
   machineAlerts,
   promptCacheTtl,
   claudeUserSetup,
+  cacheExpiryCompaction,
+  mediaApprovalCredits,
   claudeCompactWindow,
+  providerEnvironment,
   modelVisibility,
   agentAccess,
   serverAudit,
@@ -200,6 +261,23 @@ export function hostAdminIpcHandlers({
     if (!remoteServers.supportsCapability(serverId, HOST_TIMEZONE_CAPABILITY))
       throw new Error(sourceText("error.team.hostTimezoneUnsupported"));
     return runCauseEffect(remoteServers.request(serverId, route, decodeHostTimezoneSettings, { method: "POST", body }));
+  }
+  function remoteSignalHome(serverId: string, route: string, body: { home?: string | null }) {
+    if (!remoteServers.supportsCapability(serverId, HOST_SIGNAL_HOME_CAPABILITY))
+      throw new Error(sourceText("error.team.hostSignalHomeUnsupported"));
+    return runCauseEffect(
+      remoteServers.request(serverId, route, decodeHostSignalHomeSettings, { method: "POST", body }),
+    );
+  }
+  function remoteVoiceModel(serverId: string, route: string, body: Record<string, never> | HostVoiceModelChange) {
+    if (!remoteServers.supportsCapability(serverId, HOST_VOICE_MODEL_CAPABILITY))
+      throw new Error(sourceText("error.team.hostVoiceModelUnsupported"));
+    return runCauseEffect(remoteServers.request(serverId, route, decodeHostVoiceModel, { method: "POST", body }));
+  }
+  function remoteTurnLimits(serverId: string, route: string, body: Record<string, never> | HostTurnLimitsInput) {
+    if (!remoteServers.supportsCapability(serverId, HOST_TURN_LIMITS_CAPABILITY))
+      throw new Error(sourceText("error.team.hostTurnLimitsUnsupported"));
+    return runCauseEffect(remoteServers.request(serverId, route, decodeHostTurnLimits, { method: "POST", body }));
   }
   function remotePersonality(serverId: string, route: string, body: Record<string, never> | HostPersonality) {
     return runCauseEffect(remoteServers.request(serverId, route, decodeHostPersonality, { method: "POST", body }));
@@ -243,11 +321,36 @@ export function hostAdminIpcHandlers({
       remoteServers.request(serverId, route, decodeClaudeUserSetupResponse, { method: "POST", body }),
     );
   }
+  function remoteCacheExpiryCompaction(serverId: string, route: string, body: { enabled?: boolean }) {
+    if (!remoteServers.supportsCapability(serverId, CACHE_EXPIRY_COMPACTION_CAPABILITY))
+      throw new Error(sourceText("error.team.cacheExpiryCompactionUnsupported"));
+    return runCauseEffect(
+      remoteServers.request(serverId, route, decodeCacheExpiryCompactionResponse, { method: "POST", body }),
+    );
+  }
+  function remoteMediaApprovalCredits(serverId: string, route: string, body: MediaApprovalCreditsUpdate) {
+    if (!remoteServers.supportsCapability(serverId, MEDIA_APPROVAL_CREDITS_CAPABILITY))
+      throw new Error(sourceText("error.team.mediaApprovalCreditsUnsupported"));
+    return runCauseEffect(
+      remoteServers.request(serverId, route, decodeMediaApprovalCreditsResponse, { method: "POST", body }),
+    );
+  }
   function remoteClaudeCompactWindow(serverId: string, route: string, body: { tokens?: number | null }) {
     if (!remoteServers.supportsCapability(serverId, CLAUDE_COMPACT_WINDOW_CAPABILITY))
       throw new Error(sourceText("error.team.claudeCompactWindowUnsupported"));
     return runCauseEffect(
       remoteServers.request(serverId, route, decodeClaudeCompactWindowResponse, { method: "POST", body }),
+    );
+  }
+  function remoteProviderEnvironment(
+    serverId: string,
+    route: string,
+    body: ProviderEnvironmentUpdate | { provider: ProviderEnvironmentProvider },
+  ) {
+    if (!remoteServers.supportsCapability(serverId, PROVIDER_ENVIRONMENT_CAPABILITY))
+      throw new Error(sourceText("error.team.providerEnvironmentUnsupported"));
+    return runCauseEffect(
+      remoteServers.request(serverId, route, decodeProviderEnvironmentResponse, { method: "POST", body }),
     );
   }
   function remoteModelVisibility(
@@ -275,7 +378,6 @@ export function hostAdminIpcHandlers({
       throw new Error(sourceText("error.team.agentAccessUnsupported"));
     return runCauseEffect(remoteServers.request(serverId, route, decodeAgentAccessSnapshot, { method: "POST", body }));
   }
-  // This computer updates from Settings. The renderer shows the tab for a joined server only.
   const localUpdate = (): never => {
     throw new Error(sourceText("error.team.hostUpdateUnsupported"));
   };
@@ -291,23 +393,49 @@ export function hostAdminIpcHandlers({
           return summary;
         },
         remote: async (input, serverId) => {
-          if (!remoteServers.supportsCapability(serverId, HOST_ADMIN_CAPABILITY))
+          const { appearance, ...identity } = input;
+          const changesIdentity = identity.serverName !== undefined || identity.logo !== undefined;
+          if (changesIdentity && !remoteServers.supportsCapability(serverId, HOST_ADMIN_CAPABILITY))
             throw new Error(sourceText("error.host.identityLocalOnly"));
-          await runCauseEffect(
-            remoteServers.request(serverId, HOST_ADMIN_ROUTES.identity, acceptEmpty, {
-              method: "POST",
-              body: wireIdentity(input),
-            }),
-          );
-          // The host has published the change before it answered, so this reads the new name and logo.
+          if (appearance !== undefined && !remoteServers.supportsCapability(serverId, HOST_APPEARANCE_CAPABILITY))
+            throw new Error(sourceText("error.team.hostIdentityUnsupported"));
+          if (changesIdentity) {
+            await runCauseEffect(
+              remoteServers.request(serverId, HOST_ADMIN_ROUTES.identity, acceptEmpty, {
+                method: "POST",
+                body: wireIdentity(identity),
+              }),
+            );
+          }
+          if (appearance !== undefined) {
+            await runCauseEffect(
+              remoteServers.request(serverId, HOST_APPEARANCE_ROUTES.appearance, acceptEmpty, {
+                method: "POST",
+                body: { appearance },
+              }),
+            );
+            if (!changesIdentity) return runCauseEffect(remoteServers.applyAppearance(serverId, appearance));
+            await runCauseEffect(remoteServers.applyAppearance(serverId, appearance));
+          }
           return runCauseEffect(remoteServers.refreshIdentity(serverId));
+        },
+      }),
+      restartHost: scopedQueryHandler({
+        local: () => {
+          throw new Error(sourceText("error.team.hostRestartUnsupported"));
+        },
+        remote: async (serverId) => {
+          if (!remoteServers.supportsCapability(serverId, HOST_RESTART_CAPABILITY))
+            throw new Error(sourceText("error.team.hostRestartUnsupported"));
+          await runCauseEffect(
+            remoteServers.request(serverId, HOST_RESTART_ROUTES.restart, acceptEmpty, { method: "POST", body: {} }),
+          );
         },
       }),
       rotateHostKey: scopedQueryHandler({
         local: async () => {
           await runCauseEffect(host.rotateIdentityKey());
         },
-        // Owner only: the host refuses an admin or a member with 403.
         remote: async (serverId) => {
           if (!remoteServers.supportsCapability(serverId, HOST_KEY_ROTATION_CAPABILITY))
             throw new Error(sourceText("error.team.hostKeyRotationUnsupported"));
@@ -317,9 +445,6 @@ export function hostAdminIpcHandlers({
               body: {},
             }),
           );
-          // The answer does not make the new key trusted. The directory carries the handover that the
-          // previous key signed, and this read follows it. The key is changed, so a failed read is not
-          // a failure of the change: the next read follows it.
           await runCauseEffect(remoteServers.refreshIdentity(serverId)).catch(() => undefined);
         },
       }),
@@ -375,7 +500,30 @@ export function hostAdminIpcHandlers({
         local: (timezone) => runCauseEffect(serverTimezone.set(timezone)),
         remote: (timezone, serverId) => remoteTimezone(serverId, HOST_TIMEZONE_ROUTES.update, { timezone }),
       }),
-      // A host before host-personality-v1 uses the classic prompt.
+      getVoiceModel: scopedQueryHandler({
+        local: () => runCauseEffect(voiceModel.snapshot()),
+        remote: (serverId) => remoteVoiceModel(serverId, HOST_VOICE_MODEL_ROUTES.settings, {}),
+      }),
+      changeVoiceModel: scopedHandler(parseHostVoiceModelChange, {
+        local: (change) => runCauseEffect(voiceModel.change(change)),
+        remote: (change, serverId) => remoteVoiceModel(serverId, HOST_VOICE_MODEL_ROUTES.change, change),
+      }),
+      getSignalHome: scopedQueryHandler({
+        local: () => runCauseEffect(signalHome.snapshot()),
+        remote: (serverId) => remoteSignalHome(serverId, HOST_SIGNAL_HOME_ROUTES.settings, {}),
+      }),
+      setSignalHome: scopedHandler(parseSignalHomeChoice, {
+        local: (home) => runCauseEffect(signalHome.set(home)),
+        remote: (home, serverId) => remoteSignalHome(serverId, HOST_SIGNAL_HOME_ROUTES.update, { home }),
+      }),
+      getTurnLimits: scopedQueryHandler({
+        local: () => hostTurnLimits.get(),
+        remote: (serverId) => remoteTurnLimits(serverId, HOST_TURN_LIMITS_ROUTES.settings, {}),
+      }),
+      setTurnLimits: scopedHandler(parseHostTurnLimitsInput, {
+        local: (input) => runCauseEffect(hostTurnLimits.set(input)),
+        remote: (input, serverId) => remoteTurnLimits(serverId, HOST_TURN_LIMITS_ROUTES.update, input),
+      }),
       getPersonality: scopedQueryHandler({
         local: () => serverPersonality.get(),
         remote: async (serverId) =>
@@ -395,7 +543,6 @@ export function hostAdminIpcHandlers({
         local: () => hostAgentMemoryLimit(agentMemoryLimit.get()),
         remote: (serverId) => remoteMemoryLimit(serverId, AGENT_MEMORY_LIMIT_ROUTES.settings, {}),
       }),
-      // The host checks the value against its own choices, so a remote limit is any positive count.
       setAgentMemoryLimit: scopedHandler(parseMemoryLimitCount, {
         local: async (limit) =>
           hostAgentMemoryLimit(await runCauseEffect(agentMemoryLimit.set(parseAgentMemoryLimitPreference({ limit })))),
@@ -405,7 +552,6 @@ export function hostAdminIpcHandlers({
         local: () => hostMemoryReview(memoryReview.get()),
         remote: (serverId) => remoteMemoryReview(serverId, MEMORY_REVIEW_ROUTES.settings, {}),
       }),
-      // The host checks the value against its own choices, so a remote value is any count; 0 is off.
       setMemoryReview: scopedHandler(parseMemoryReviewCount, {
         local: async (interval) =>
           hostMemoryReview(await runCauseEffect(memoryReview.set(parseMemoryReviewPreference({ interval })))),
@@ -415,7 +561,6 @@ export function hostAdminIpcHandlers({
         local: () => hostSkillLearning(skillLearning.get()),
         remote: (serverId) => remoteSkillLearning(serverId, SKILL_LEARNING_ROUTES.settings, {}),
       }),
-      // The host checks the value against its own choices, so a remote value is any short text.
       setSkillLearning: scopedHandler(parseSkillLearningText, {
         local: async (mode) => {
           if (!isSkillLearningMode(mode)) throw new Error("Skill learning mode is required.");
@@ -435,7 +580,6 @@ export function hostAdminIpcHandlers({
         local: () => machineAlerts.alerts(),
         remote: (serverId) => remoteMachineAlerts(serverId, MACHINE_RESOURCES_ROUTES.alerts, {}),
       }),
-      // The host checks the member, so a remote change is checked only for its shape here.
       setMachineAlerts: scopedHandler(decodeMachineAlertSettings, {
         local: (settings) => {
           if (!machineAlerts.canBeResponsible(settings.responsibleMemberId))
@@ -460,6 +604,24 @@ export function hostAdminIpcHandlers({
         local: (enabled) => runCauseEffect(claudeUserSetup.set(enabled)),
         remote: (enabled, serverId) => remoteClaudeUserSetup(serverId, CLAUDE_USER_SETUP_ROUTES.update, { enabled }),
       }),
+      getCacheExpiryCompaction: scopedQueryHandler({
+        local: () => cacheExpiryCompaction.get(),
+        remote: (serverId) => remoteCacheExpiryCompaction(serverId, CACHE_EXPIRY_COMPACTION_ROUTES.settings, {}),
+      }),
+      setCacheExpiryCompaction: scopedHandler(parseCacheExpiryCompaction, {
+        local: (enabled) => runCauseEffect(cacheExpiryCompaction.set(enabled)),
+        remote: (enabled, serverId) =>
+          remoteCacheExpiryCompaction(serverId, CACHE_EXPIRY_COMPACTION_ROUTES.update, { enabled }),
+      }),
+      getMediaApprovalCredits: scopedQueryHandler({
+        local: () => mediaApprovalCredits.get(),
+        remote: (serverId) => remoteMediaApprovalCredits(serverId, MEDIA_APPROVAL_CREDITS_ROUTES.settings, {}),
+      }),
+      setMediaApprovalCredits: scopedHandler(parseMediaApprovalCredits, {
+        local: (update) => runCauseEffect(mediaApprovalCredits.set(update)),
+        remote: (update, serverId) =>
+          remoteMediaApprovalCredits(serverId, MEDIA_APPROVAL_CREDITS_ROUTES.update, update),
+      }),
       getClaudeCompactWindow: scopedQueryHandler({
         local: () => claudeCompactWindow.get(),
         remote: (serverId) => remoteClaudeCompactWindow(serverId, CLAUDE_COMPACT_WINDOW_ROUTES.settings, {}),
@@ -468,6 +630,15 @@ export function hostAdminIpcHandlers({
         local: (tokens) => runCauseEffect(claudeCompactWindow.set(tokens)),
         remote: (tokens, serverId) =>
           remoteClaudeCompactWindow(serverId, CLAUDE_COMPACT_WINDOW_ROUTES.update, { tokens }),
+      }),
+      getProviderEnvironment: scopedHandler(parseProviderEnvironmentProvider, {
+        local: (provider) => providerEnvironment.get(provider),
+        remote: (provider, serverId) =>
+          remoteProviderEnvironment(serverId, PROVIDER_ENVIRONMENT_ROUTES.settings, { provider }),
+      }),
+      setProviderEnvironment: scopedHandler(parseProviderEnvironmentUpdate, {
+        local: (update) => runCauseEffect(providerEnvironment.set(update)),
+        remote: (update, serverId) => remoteProviderEnvironment(serverId, PROVIDER_ENVIRONMENT_ROUTES.update, update),
       }),
       getModelVisibility: scopedHandler(parseProviderModelVisibilityProvider, {
         local: (provider) => runCauseEffect(modelVisibility.settings(provider)),
@@ -487,7 +658,6 @@ export function hostAdminIpcHandlers({
       setAgentAccess: scopedHandler(parseAgentAccessChange, {
         local: async (change) => {
           const serverId = localAccessServerId();
-          // The local owner sees every agent of this host.
           const shown = new Set(localAgentIds());
           const saved = await Effect.runPromise(
             Effect.result(agentAccess.set(serverId, change, shown, shown, localOwner())),
@@ -501,7 +671,6 @@ export function hostAdminIpcHandlers({
         remote: (change, serverId) => remoteAccess(serverId, AGENT_ACCESS_ROUTES.set, change),
       }),
       getAuditLog: scopedQueryHandler({
-        // A computer that does not host a server has no changes to show.
         local: (): ServerAuditLog => {
           const serverId = localServerId();
           return serverId ? serverAudit.read(serverId) : { entries: [] };
@@ -539,9 +708,47 @@ function parseClaudeUserSetup(value: unknown): boolean {
   return value;
 }
 
+function parseCacheExpiryCompaction(value: unknown): boolean {
+  if (typeof value !== "boolean") throw new Error("Invalid cache expiry compaction setting.");
+  return value;
+}
+
+function parseMediaApprovalCredits(value: unknown): MediaApprovalCreditsUpdate {
+  const update = parseMediaApprovalCreditsUpdate(value);
+  if (!update) throw new Error("Invalid media approval credits.");
+  return update;
+}
+
 function parseClaudeCompactWindow(value: unknown): number | null {
   if (!isClaudeCompactWindowTokens(value)) throw new Error("Invalid Claude compaction size.");
   return value;
+}
+
+function parseProviderEnvironmentProvider(value: unknown): ProviderEnvironmentProvider {
+  if (!isProviderEnvironmentProvider(value)) throw new Error("A provider with variables is required.");
+  return value;
+}
+
+function parseProviderEnvironmentUpdate(value: unknown): ProviderEnvironmentUpdate {
+  if (
+    !isObject(value) ||
+    !Array.isArray(value.variables) ||
+    value.variables.length > PROVIDER_ENVIRONMENT_LIMITS.variables
+  )
+    throw new Error("Invalid provider variables.");
+  const provider = parseProviderEnvironmentProvider(value.provider);
+  const variables: ProviderEnvironmentVariableInput[] = value.variables.map((item: unknown) => {
+    if (
+      !isObject(item) ||
+      typeof item.name !== "string" ||
+      item.name.length > PROVIDER_ENVIRONMENT_LIMITS.name ||
+      typeof item.sensitive !== "boolean" ||
+      (item.value !== null && (typeof item.value !== "string" || item.value.length > PROVIDER_ENVIRONMENT_LIMITS.value))
+    )
+      throw new Error("Invalid provider variables.");
+    return { name: item.name, value: item.value, sensitive: item.sensitive };
+  });
+  return { provider, variables };
 }
 
 function parsePromptCacheTtl(value: unknown): PromptCacheTtl {

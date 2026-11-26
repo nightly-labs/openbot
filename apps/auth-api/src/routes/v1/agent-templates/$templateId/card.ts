@@ -3,7 +3,6 @@ import { Effect } from "effect";
 import { runApiResponse } from "../../../../server/effect-runtime";
 import { marketplaceErrorResponse, requestAgentTemplates } from "../../../../server/request-auth";
 
-/** The share card a link preview shows. It is public, like the page it describes. */
 export const Route = createFileRoute("/v1/agent-templates/$templateId/card")({
   server: {
     handlers: {
@@ -14,12 +13,9 @@ export const Route = createFileRoute("/v1/agent-templates/$templateId/card")({
             const headers = new Headers();
             object.writeHttpMetadata(headers);
             headers.set("Content-Type", "image/png");
-            // Stored but checked on each use (a cheap 304 by ETag), so after an unpublish no cache
-            // keeps showing the image.
             headers.set("Cache-Control", "public, no-cache");
             headers.set("ETag", object.httpEtag);
             headers.set("X-Content-Type-Options", "nosniff");
-            // R2 leaves out the body when If-None-Match still matches: the image has not changed.
             if (!("body" in object)) return new Response(null, { status: 304, headers });
             return new Response(object.body, { headers });
           }),

@@ -15,6 +15,9 @@ export const HOSTED_SITE_LIMITS = {
   uploadAttemptMultiplier: 2,
   creationsPerHour: 20,
   creationsPerDay: 100,
+  activationsPerHour: 20,
+  activationsPerDay: 100,
+  idleUploadMs: 60_000,
   accountSites: HOSTED_SITE_ACCOUNT_LIMIT,
   ...HOSTED_SITE_UPLOAD_LIMITS,
   siteLifetimeMs: 30 * 24 * 60 * 60_000,
@@ -48,9 +51,10 @@ export class HostedSiteInputError extends Schema.TaggedError<HostedSiteInputErro
   status: Schema.Literals([400, 401, 404, 409, 413, 429]),
   code: Schema.String,
   message: Schema.String,
+  retryAfterSeconds: Schema.optional(Schema.Number),
 }) {
-  constructor(status: 400 | 401 | 404 | 409 | 413 | 429, code: string, message: string) {
-    super({ status, code, message });
+  constructor(status: 400 | 401 | 404 | 409 | 413 | 429, code: string, message: string, retryAfterSeconds?: number) {
+    super({ status, code, message, ...(retryAfterSeconds === undefined ? {} : { retryAfterSeconds }) });
   }
 }
 

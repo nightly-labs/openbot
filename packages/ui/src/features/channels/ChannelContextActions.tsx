@@ -14,16 +14,10 @@ import { errorReference, type UserErrorDetails } from "@openbot/user-errors";
 import { createSignal, Show } from "solid-js";
 import { useText } from "../../text";
 
-/**
- * "New conversation", "Compact now" and "Delete history" for a channel, as the agent settings offer
- * them for an agent's own chat. A new conversation and a delete ask first; a failure stays in the
- * dialog. A compaction failure shows under its row.
- */
 export function ChannelContextActions(props: {
   channelName: string;
   startNewConversation: () => Promise<void>;
-  compact: () => Promise<void>;
-  /** Left out when the host cannot delete the history. */
+  compact?: (() => Promise<void>) | undefined;
   deleteHistory?: (() => Promise<void>) | undefined;
 }) {
   const { t, errorMessage } = useText();
@@ -62,11 +56,11 @@ export function ChannelContextActions(props: {
     }
   }
 
-  async function compact(): Promise<void> {
+  async function compact(run: () => Promise<void>): Promise<void> {
     setCompactFailure(null);
     setCompacting(true);
     try {
-      await props.compact();
+      await run();
     } catch (error) {
       setCompactFailure({
         message: errorMessage(error, t("channel.settings.compact.failed")),
@@ -99,17 +93,27 @@ export function ChannelContextActions(props: {
             </Button>
           </ItemActions>
         </Item>
-        <Item>
-          <ItemContent>
-            <ItemTitle>{t("channel.settings.compact.title")}</ItemTitle>
-            <ItemDescription>{t("channel.settings.compact.description")}</ItemDescription>
-          </ItemContent>
-          <ItemActions>
-            <Button size="sm" variant="outline" type="button" disabled={compacting()} onClick={() => void compact()}>
-              {t("composer.context.compact")}
-            </Button>
-          </ItemActions>
-        </Item>
+        <Show when={props.compact}>
+          {(run) => (
+            <Item>
+              <ItemContent>
+                <ItemTitle>{t("channel.settings.compact.title")}</ItemTitle>
+                <ItemDescription>{t("channel.settings.compact.description")}</ItemDescription>
+              </ItemContent>
+              <ItemActions>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  type="button"
+                  disabled={compacting()}
+                  onClick={() => void compact(run())}
+                >
+                  {t("composer.context.compact")}
+                </Button>
+              </ItemActions>
+            </Item>
+          )}
+        </Show>
         <Show when={props.deleteHistory}>
           <Item>
             <ItemContent>

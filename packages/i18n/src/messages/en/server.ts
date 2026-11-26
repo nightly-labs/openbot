@@ -18,6 +18,8 @@ export const messages = defineMessages("server", {
   "server.connection.planHint": "Open account settings to check the server plan.",
   "server.connection.loadingHint": "You can select another server while this one loads.",
   "server.connection.cachedHint": "Loaded content and drafts are kept. Server actions will resume after reconnection.",
+  "server.connection.computerOffline":
+    "{name} is offline. Make sure that its computer is on, OpenBot is open, and Publish this server is on in Server settings > Members.",
   "server.connection.conversationFailed": "The conversation could not load. Try again.",
   "server.connection.panelsFailed": "Some workspace panels could not load. Try again.",
   "server.connection.retry": "Retry",
@@ -45,6 +47,7 @@ export const messages = defineMessages("server", {
   "server.compatibility.updateHostTitle": "Update OpenBot on {name}",
   "server.compatibility.unsafeDataTitle": "The host returned unsafe data",
   "server.compatibility.cannotConnectTitle": "Cannot connect to {name}",
+  "server.compatibility.safeModeTitle": "{name} does not start",
   "server.compatibility.updateClientDescription":
     "This app supports only older protocols than the host. Update this app, then try again.",
   "server.compatibility.updateHostDescription":
@@ -77,7 +80,6 @@ export const messages = defineMessages("server", {
   "server.join.account": "Account",
   "server.join.emailBound": "This invitation only works for its email recipient.",
   "server.join.unknownDate": "Unknown",
-  // The dialog that the plus button on the server rail opens. {price} is a formatted amount, such as "€20".
   "server.add.title": "Run OpenBot 24/7 on an external server",
   "server.add.description":
     "OpenBot Servers keep your agents and routines running, even when your computer is off. We handle the infrastructure and maintenance, so your server is ready to use without any technical setup.",
@@ -86,92 +88,68 @@ export const messages = defineMessages("server", {
   "server.add.billing.monthly": "Monthly",
   "server.add.billing.yearly": "Yearly",
   "server.add.billing.save": "Save {percent}%",
-  // The switch left of the billing period, when the account has no license. Work adds a license to the server.
   "server.add.use.label": "Use",
   "server.add.use.personal": "Personal",
   "server.add.use.work": "Work",
-  // The row under the plans that sets the users of the license. It is disabled for personal use.
   "server.add.license.people": "People at work",
-  // A toast when "Fewer members" is at the people who use the account's servers now. The license must include them.
   "server.add.license.minimum": {
     one: "{count} person uses your servers now, so you cannot choose fewer.",
     other: "{count} people use your servers now, so you cannot choose fewer.",
   },
-  // On each plan that the people fit, for work. {percent} is a whole number, such as 20.
   "server.add.license.bundle": "Bundle −{percent}%",
-  // The plan summary for work: the price includes the license. {license} is the license line, such as
-  // "Team license, 5 members".
   "server.add.license.included": "Includes {license}",
   "server.add.license.includedTrial": "Includes {license}, free until {date}",
   "server.add.billedMonthly": "Billed monthly",
   "server.add.billedYearly": "{price} billed yearly",
-  // {amount} is a formatted amount, such as "€120". It follows the yearly price.
   "server.add.yearlySaving": "Save {amount}",
-  // Visually hidden. It comes before the struck-through monthly price on yearly billing.
   "server.add.regularPrice": "Regular price {price}",
   "server.add.choosePlan": "Choose {plan}",
-  // The footer under the plans, for needs that the plans do not cover.
   "server.add.custom.title": "Need more power or a custom solution?",
   "server.add.custom.description":
     "Get dedicated infrastructure, additional storage, or features tailored to your workflow.",
   "server.add.custom.action": "Contact us",
   "server.add.join.action": "Join a server",
-  // A small menu in the top corner of the hosted server plans, with the ways to add a server without a plan.
   "server.add.otherOptions": "Other options",
-  // An item in the "Other options" menu of the hosted server plans. The server runs on this computer, with its own agents, chats and files.
   "server.local.createTitle": "New server on this computer",
   "server.local.createDescription": "The server has its own agents, chats and files. It runs on this computer.",
   "server.local.nameLabel": "Server name",
   "server.local.create": "Create server",
   "server.local.creating": "Creating server…",
   "server.local.createFailed": "Could not create the server.",
+  "server.local.createFailedRetry": "Something went wrong. Try again. If it fails again, restart OpenBot.",
   "server.local.limitReached": "You can have at most {limit} servers on this computer. Delete one to create another.",
   "server.local.deleteConfirmTitle": "Delete {name}?",
   "server.local.deleteConfirmDescription":
     "OpenBot stops the server and moves its agents, chats and files to the trash.",
   "server.local.deleting": "Deleting server…",
   "server.local.deletedTitle": "Deleted {name}",
-  // A server that the user installs on a Linux computer or VPS of their own with one command.
   "server.install.title": "New server on another computer",
   "server.install.description":
     "Run this command on a Linux computer or VPS that you own. It installs OpenBot and adds the server to this account.",
   "server.install.making": "Making a command for this account…",
   "server.install.failed": "OpenBot could not make a command. Check the internet connection.",
-  // Copies the command with the instructions that an AI agent needs.
   "server.install.copyForAgent": "Copy for an AI agent",
-  // {time} is minutes and seconds, such as 14:52.
   "server.install.expiresIn": "Works once. Expires in {time}.",
   "server.install.newCommand": "New command",
   "server.install.waiting": "Waiting for the command to run on your server…",
-  // {name} is the new server.
   "server.install.starting": "{name} signed in. Starting the server…",
   "server.install.connected": "{name} is connected.",
-  // {name} is a server that signed in earlier with the command. The app is not connected to it now.
   "server.install.offline": "{name} is offline.",
   "server.install.expired": "This command expired. Make a new one.",
-  // The text that "Copy for an AI agent" copies. The last line of the command output stays in English.
   "server.install.agentPrompt":
     'Install OpenBot on this Linux server and sign it in to my OpenBot account.\nRun this command as root. It asks no questions and takes a few minutes:\n\n{command}\n\nIt ends with the line "OpenBot is connected to your account." and exit code 0.\nThe command works once, for 15 minutes. Do not save it anywhere.',
-  // Puts an SSH task into the composer of the open chat.
   "server.install.setUpWithAgent": "Set up with an agent",
-  // The task that "Set up with an agent" puts into the composer. The user adds the SSH address at the end.
-  // The agent gets the command from OpenBot, after the user approves it.
   "server.install.sshAgentPrompt":
     "Connect over SSH to my Linux server and install OpenBot on it as a server.\n\nSSH address (user@host):",
-  // Shown over the plans when the account has the maximum number of hosted servers. The plans are disabled.
   "server.add.limit.title": "This account has the maximum number of servers",
   "server.add.limit.description": {
     one: "An account can have {count} paid server. To add a server, delete one first.",
     other: "An account can have {count} paid servers. To add a server, delete one first.",
   },
-  // Opens the list of the account's hosted servers, where the user can delete one.
   "server.add.limit.manage": "Manage servers",
-  // The offer of a hosted server after a new routine that depends on the user's computer.
   "server.upsell.modal.title": "Routines stop when your computer sleeps",
-  // {name} is the routine.
   "server.upsell.modal.description":
     "{name} runs only while your computer is on. An OpenBot server keeps it running 24/7.",
-  // Labels in the small picture above the modal text: a laptop and a server, each with a status.
   "server.upsell.modal.computer": "Your computer",
   "server.upsell.modal.server": "OpenBot server",
   "server.upsell.modal.running": "Running",
@@ -185,28 +163,19 @@ export const messages = defineMessages("server", {
     other: "{count} routines need {server} on",
   },
   "server.upsell.notice.description": "An OpenBot server runs them 24/7.",
-  // One line under the notice that the user's computer is offline.
   "server.upsell.offline": "An OpenBot server stays on 24/7, so routines keep running.",
   "server.upsell.seePlans": "See plans",
   "server.upsell.notNow": "Not now",
-  // The dialog that offers the next plan when the disk of a hosted server is almost full.
   "server.upgrade.title": "Your agents are running out of space",
   "server.upgrade.description":
     "{server} has little free space left. Upgrade to keep your agents working without interruptions.",
-  // Under the disk meter, for example "11 GB of 12 GB used".
   "server.upgrade.used": "{used} of {total} used",
-  // The column of the plan that the server has now, for example "Starter (now)".
-  "server.upgrade.current": "{plan} (now)",
-  "server.upgrade.price": "Price",
-  "server.upgrade.action": "Upgrade to {plan}",
   "server.hosted.progressTitle": "Setting up {name}",
-  // The setup waits for the first payment on the Stripe page in the browser.
   "server.hosted.paymentTitle": "Finish the payment in your browser",
   "server.hosted.paymentDescription": "The setup starts when Stripe confirms the payment.",
   "server.hosted.openPayment": "Open the payment page again",
   "server.hosted.openingPayment": "Opening…",
   "server.hosted.paymentFailed": "Could not open the payment page.",
-  // The name of a new server. {number} is a number, such as 2.
   "server.hosted.defaultName": "Cloud server",
   "server.hosted.defaultNameNumbered": "Cloud server {number}",
   "server.hosted.step.create": "Create the machine",
@@ -216,6 +185,7 @@ export const messages = defineMessages("server", {
   "server.hosted.detail.create.copy": "Copying OpenBot to the machine",
   "server.hosted.detail.create.key": "Adding a one-time sign-in key",
   "server.hosted.detail.start.boot": "Turning on the machine",
+  "server.hosted.detail.start.restore": "Restoring data",
   "server.hosted.detail.start.app": "Starting OpenBot",
   "server.hosted.detail.start.wait": "Waiting for OpenBot to answer",
   "server.hosted.detail.connect.signIn": "Signing in as you",
@@ -259,7 +229,6 @@ export const messages = defineMessages("server", {
   "server.rail.addRemote": "Add remote server",
   "server.rail.add": "Add a server",
   "server.rail.buttonLabel": "{name} server",
-  // Added to the tooltip of a server that runs on this computer, after its name.
   "server.rail.thisComputer": "on this computer",
   "server.rail.notificationsMuted": "notifications muted",
   "server.rail.actions": "Server actions",
@@ -267,15 +236,50 @@ export const messages = defineMessages("server", {
   "server.rail.mute": "Mute server",
   "server.rail.notificationSettings": "Notification settings",
   "server.rail.settings": "Server settings",
-  // The last items of the server menu. Leave is for a joined server; restart and delete are for a hosted server that the user owns.
   "server.rail.remove": "Remove server",
   "server.rail.restart": "Restart server",
   "server.rail.leave": "Leave server",
   "server.rail.delete": "Delete server",
-  // Hides the server on this computer from the server list while the user has other servers.
   "server.rail.hide": "Hide server",
-  // Brings the hidden server on this computer back to the server list. {name} is its name, "Local".
   "server.rail.showLocal": "Show {name}",
+  "server.rail.hiddenServers": "Hidden servers",
+  "server.rail.hideFailed": "Could not hide {name}",
+  "server.rail.showFailed": "Could not show {name}",
+  "server.plan.daysLeft": {
+    one: "{count} day",
+    other: "{count} days",
+  },
+  "server.plan.ended": "Plan ended",
+  "server.plan.status": "plan ended, deleted on {date}",
+  "server.plan.deletedOn": "Deleted on {date}",
+  "server.plan.dialogTitle": "Don't let your agents go",
+  "server.plan.dialogDescription":
+    "{name} stopped because its plan ended. On {date}, OpenBot deletes its agents, with all their chats and files.",
+  "server.plan.dialogDaysLeft": {
+    one: "{count} day left",
+    other: "{count} days left",
+  },
+  "server.plan.later": "Later",
+  "server.plan.keepAgents": "Keep my agents",
+  "server.plan.ownerRenews": "The agents of {name} are not available until the server owner renews the plan.",
+  "server.paywall.ready": "{name} is ready",
+  "server.paywall.wakeUp": "Your agents wake up when you subscribe.",
+  "server.paywall.yourPlan": "Your plan",
+  "server.paywall.vcpu": "{value} vCPU",
+  "server.paywall.memory": "{value} GB memory",
+  "server.paywall.storage": "{value} GB storage",
+  "server.paywall.support": "Personalized support",
+  "server.paywall.perYear": "a year",
+  "server.paywall.subscribe": "Subscribe",
+  "server.paywall.checkoutFailed": "Checkout did not open",
+  "server.paywall.checkoutTitle": "Finish the payment in your browser",
+  "server.paywall.checkoutDescription": "Your agents are getting ready.",
+  "server.paywall.openCheckoutAgain": "Open checkout again",
+  "server.paywall.active": "{name} is active",
+  "server.paywall.activeDescription": "Thanks. Your agents are awake.",
+  "server.paywall.open": "Open {name}",
+  "server.paywall.almostReady": "{name} is almost ready",
+  "server.paywall.ownerSubscribes": "The owner of {name} must subscribe before your agents can start.",
   "server.select.failedTitle": "Could not select the server",
   "server.select.failedDescription": "Could not switch servers. Try again.",
   "server.select.openAgentFailed": "Could not open {name}. Find it in the sidebar.",
@@ -304,14 +308,11 @@ export const messages = defineMessages("server", {
   "server.settings.generalTitle": "General",
   "server.settings.generalDescription": "Manage this server’s name, logo, and preferences.",
   "server.settings.vaultTitle": "Vault",
-  "server.settings.vaultDescription":
-    "Save logins, cards and contact info that every agent on this server can fill in.",
+  "server.settings.vaultDescription": "Save logins, cards, contact info and API keys for the agents on this server.",
   "server.settings.membersTitle": "Members",
   "server.settings.membersDescription": "Publish this server, invite people, and manage access.",
   "server.settings.desktopTitle": "Remote desktop",
   "server.settings.desktopDescription": "Configure or connect to this server’s desktop.",
-  "server.settings.mcpTitle": "MCP",
-  "server.settings.mcpDescription": "Connect MCP servers and choose which ones this server’s agents can use.",
   "server.settings.storageTitle": "Storage",
   "server.settings.storageDescription": "See what OpenBot keeps on this server’s disk, and free space.",
   "server.settings.hostedSitesTitle": "Sites",
@@ -353,10 +354,25 @@ export const messages = defineMessages("server", {
   "server.settings.copyFailedTitle": "Copy failed",
   "server.settings.copyFailed": "OpenBot could not copy this value.",
   "server.settings.unavailableTitle": "Server settings unavailable",
-  "server.settings.unsavedMcpChanges": "Unsaved MCP changes",
   "server.settings.reset": "Reset",
   "server.settings.unsavedChanges": "Unsaved changes",
   "server.settings.changesNotSaved": "Changes not saved",
+  "server.settings.group.agents": "Agents",
+  "server.settings.group.people": "People",
+  "server.settings.group.server": "Server",
+  "server.settings.experimentalTitle": "Experimental",
+  "server.settings.experimentalDescription": "Turn on features that are not complete yet.",
+  "server.settings.experimentalFeatures": "Features",
+  "server.settings.experimentalCrm": "CRM",
+  "server.settings.experimentalCrmDescription":
+    "Show the CRM page to owners and admins, let agents read the CRM, and sync Stripe. When you turn it off, the data stays.",
+  "server.settings.agentDefaultsTitle": "Agent defaults",
+  "server.settings.threadsCard": "Threads and timezone",
+  "server.settings.creditsCard": "Credits",
+  "server.settings.memoryTitle": "Memory",
+  "server.settings.memoryDescription": "Choose what agents on this server remember and learn.",
+  "server.settings.memoriesCard": "Memories",
+  "server.settings.learningCard": "Learning",
   "server.settings.sections": "Server settings sections",
   "server.settings.identity": "Identity",
   "server.settings.logo": "Server logo",
@@ -369,6 +385,13 @@ export const messages = defineMessages("server", {
   "server.settings.editLogo": "Edit server logo",
   "server.settings.addLogo": "Add server logo",
   "server.settings.removeLogo": "Remove server logo",
+  "server.settings.appearance": "Shape and color",
+  "server.settings.appearanceShapes": "Server shapes",
+  "server.settings.appearanceShapeOption": "Shape {number}",
+  "server.settings.appearanceColors": "Server color",
+  "server.settings.appearanceAutoColor": "Automatic server color",
+  "server.settings.appearanceColorOption": "{color} server color",
+  "server.settings.appearanceReset": "Reset shape and color",
   "server.settings.access": "Access",
   "server.companySignIn.title": "Company sign-in",
   "server.companySignIn.sso": "Single sign-on",
@@ -418,11 +441,53 @@ export const messages = defineMessages("server", {
   "server.settings.later": "Later",
   "server.settings.setUp": "Set up",
   "server.settings.agents": "Agents",
+  "server.settings.agentsDescription":
+    "Choose what the agents on this server can do when you do not set it for an agent.",
   "server.settings.timezone": "Timezone",
   "server.settings.timezoneDescription":
-    "New routines use this timezone when the message does not give the sender's timezone.",
+    "New routines use this timezone when the message does not give the sender's timezone. On a server, the browser also uses it after the next restart.",
   "server.settings.timezoneAutomatic": "Automatic ({zone})",
   "server.settings.timezoneLoadFailed": "Could not load the server timezone.",
+  "server.settings.connectionTitle": "Connection",
+  "server.settings.signalHome": "Signal server",
+  "server.settings.signalHomeDescription":
+    "Members connect to this server through this Signal server. A Signal server with a lower latency gives faster connections.",
+  "server.settings.signalHomeFallback":
+    "{chosen} does not answer. The server uses {name} until {chosen} answers again.",
+  "server.settings.signalHomeMoving": "The server moves to {name}. Members connect again in a few seconds.",
+  "server.settings.signalHomeLoadFailed": "Could not load the Signal servers.",
+  "server.settings.signalHomeAutomatic": "Automatic (nearest)",
+  "server.settings.signalHomeAutomaticUsing": "Automatic ({name})",
+  "server.settings.signalHomeOption": "{name} · {latency}",
+  "server.settings.signalHomeLatency": "{latency} ms",
+  "server.settings.signalHomeNoAnswer": "No answer",
+  "server.settings.signalHomePlaceHelsinki1": "Helsinki 1",
+  "server.settings.signalHomePlaceHelsinki2": "Helsinki 2",
+  "server.settings.signalHomePlaceSanJose": "San Jose",
+  "server.settings.signalHomePlaceSydney": "Sydney",
+  "server.settings.signalHomePlaceSingapore": "Singapore",
+  "server.settings.voiceModel.section": "Speech recognition",
+  "server.settings.voiceModel.description":
+    "Agents on this server use this model to transcribe the sound of videos that have no captions.",
+  "server.settings.voiceModel.loadFailed": "Could not load the speech recognition model of the server.",
+  "server.settings.voiceModel.group": "On this server",
+  "server.settings.voiceModel.removeLabel": "Remove {name} from this server",
+  "server.settings.turnLimit": "Threads at the same time",
+  "server.settings.turnLimitDescription":
+    "How many agent threads can run at the same time on this server. More threads use more memory.",
+  "server.settings.turnLimitAutomatic": "Automatic ({count})",
+  "server.settings.turnLimitAutomaticUnlimited": "Automatic (no limit)",
+  "server.settings.turnLimitUnlimited": "Unlimited",
+  "server.settings.turnLimitsLoadFailed": "Could not load the thread limits of this server.",
+  "server.settings.agentTaskLimit": "Parallel threads per agent",
+  "server.settings.agentTaskLimitDescription":
+    "How many threads each agent can run at the same time when the agent has no limit of its own.",
+  "server.settings.agentTaskLimitDefault": "Default ({count})",
+  "server.settings.mediaApprovalCredits": "Ask before spending more than",
+  "server.settings.mediaApprovalCreditsUnit": "credits",
+  "server.settings.mediaApprovalCreditsLoadFailed": "Could not load the credit approval limit of this server.",
+  "server.settings.mediaApprovalAgents": "Agents can use credits",
+  "server.settings.mediaApprovalAsk": "Ask when credits are needed",
   "server.settings.memoryLimit": "Memories per agent",
   "server.settings.memoryLimitDescription": "How many memories each agent on this server can keep.",
   "server.settings.memoryLimitLoadFailed": "Could not load the memory limit of this server.",
@@ -453,7 +518,6 @@ export const messages = defineMessages("server", {
   "server.settings.reachable": "Reachable online. Only invited people can sign in.",
   "server.settings.notReachable": "Not reachable online. Existing members and invitations remain.",
   "server.settings.notPublished": "Not reachable online.",
-  // A name for a server that the user publishes before naming it. {name} is the first word of the account name.
   "server.settings.generatedName": "{name}’s server",
   "server.settings.hostKeyTitle": "Server key",
   "server.settings.hostKeyRotate": "Change the server key",
@@ -465,7 +529,6 @@ export const messages = defineMessages("server", {
     "The current key and the new key both sign a handover. Apps of members change to the new key when they connect again. Do this if the key file was copied or exposed.",
   "server.settings.hostKeyRotated": "Server key changed",
   "server.settings.hostKeyChanged": "Last change",
-  // {date} is the date and time of the change.
   "server.settings.hostKeyChangedDescription": "{date}. The previous key and the new key both signed this change.",
   "server.settings.hostKeyOwnerOnly": "Only the owner can change the server key.",
   "server.settings.removeTitle": "Remove server",
@@ -606,7 +669,6 @@ export const messages = defineMessages("server", {
   "server.invite.pendingTitle": "Pending invitations",
   "server.invite.pendingCount": "{total} pending",
   "server.invite.noPending": "No pending invitations.",
-  // The empty pending list. {word} is the one handwritten word of the title.
   "server.invite.emptyTitle": "Send the first {word}.",
   "server.invite.emptyWord": "one",
   "server.invite.neverExpires": { one: "Never expires · {count} join", other: "Never expires · {count} joins" },
@@ -619,6 +681,7 @@ export const messages = defineMessages("server", {
     "There is no separate remote desktop password. The settings below choose who can control this computer.",
   "server.desktop.componentInstalled": "Host component installed",
   "server.desktop.componentNotInstalled": "Host component not installed",
+  "server.desktop.needsX11Session": "Needs an X11 session",
   "server.desktop.sessions": "Unattended: {unattended} · Active sessions: {active}/{max}",
   "server.desktop.unattendedEnabled": "enabled",
   "server.desktop.unattendedUnavailable": "not available",
@@ -654,7 +717,6 @@ export const messages = defineMessages("server", {
   "server.settings.providersDescription": "Manage the AI providers of the computer that runs this server.",
   "server.settings.providersSwitchNote": "Switch to {name} to manage its AI providers.",
   "server.settings.providersSwitch": "Switch to this server",
-  // Server Settings > Updates: the OpenBot update of a joined server's host. {name} is the server.
   "server.settings.updatesTitle": "Updates",
   "server.settings.updatesDescription": "Update OpenBot on the computer that runs this server.",
   "server.update.hostTitle": "OpenBot on {name}",
@@ -662,9 +724,7 @@ export const messages = defineMessages("server", {
   "server.update.status.idle": "Check for updates to find the latest release.",
   "server.update.status.checking": "Checking for updates…",
   "server.update.status.available": "{version} is available.",
-  // {progress} is a percent, such as 42%.
   "server.update.status.downloading": "Downloading {version} · {progress}",
-  // Before the host knows the size, or while it waits to start the download.
   "server.update.status.downloadingUnknown": "Downloading {version}…",
   "server.update.status.ready": "{version} is downloaded.",
   "server.update.status.installing": "{name} is restarting to install the update.",
@@ -706,7 +766,7 @@ export const messages = defineMessages("server", {
   "server.update.waitingFor": "Waiting for {reasons}.",
   "server.update.disabledTitle": "Remote updates are off",
   "server.update.disabledDescription":
-    "The user of {name} turned off updates from server members. Ask them to update OpenBot or to turn the setting on.",
+    "The user of {name} turned off updates from server members. Ask them to update OpenBot, or to open Settings > Updates on that computer and turn on “Allow updates from server members”.",
   "server.update.managedTitle": "A Host Manager controls updates",
   "server.update.managedDescription": "OpenBot Host Manager updates {name}. Contact the host administrator.",
   "server.update.unsupportedTitle": "{name} cannot update itself",
@@ -714,7 +774,6 @@ export const messages = defineMessages("server", {
   "server.update.restarting": "Restarting…",
   "server.update.loadFailed": "The update status of {name} did not load.",
   "server.update.hostAction": "Update host",
-  // The update dialog: the download, the restart and the server back online.
   "server.update.dialog.offerTitle": "Update {name} to OpenBot {version}",
   "server.update.dialog.offerDescription":
     "{name} uses OpenBot {current}. It downloads the update first, then restarts.",
@@ -752,10 +811,8 @@ export const messages = defineMessages("server", {
   "server.update.dialog.cancelRestart": "Cancel restart",
   "server.update.dialog.later": "Later",
   "server.update.dialog.hide": "Hide",
-  // The notice of an update whose dialog the user hid.
   "server.update.dialog.hiddenTitle": "Update for {name}",
   "server.update.dialog.show": "Show",
-  // The work that a restart waits for, in "Waiting for {reasons}".
   "server.update.reason.agentTurn": "an agent turn",
   "server.update.reason.queuedDelivery": "a queued message",
   "server.update.reason.drainTask": "background agent work",
@@ -769,7 +826,6 @@ export const messages = defineMessages("server", {
   "server.update.reason.updateOperation": "another update step",
   "server.update.reason.initialization": "the start of OpenBot",
   "server.update.reason.other": "other work",
-  // A notice to every member when a joined server restarts into an update. {name} is the server.
   "server.restartNotice.waitingTitle": "{name} restarts to install an update",
   "server.restartNotice.waitingVersionTitle": "{name} restarts to install OpenBot {version}",
   "server.restartNotice.waitingDescription":
@@ -785,4 +841,46 @@ export const messages = defineMessages("server", {
   "server.settings.responseStyleNatural": "Natural",
   "server.settings.responseStyleClassic": "Classic",
   "server.settings.personalityLoadFailed": "Could not load the server personality.",
+  "server.setup.pageTitle": "OpenBot server",
+  "server.setup.signedInAs": "Signed in as {email}",
+  "server.setup.online": "{name} is online",
+  "server.setup.starting": "{name} is starting",
+  "server.setup.openApp": "Open OpenBot",
+  "server.setup.signOutDescription": "To use another account, run openbot logout in a terminal of the container.",
+  "server.setup.errorCompany": "This email signs in through your company. Use another email.",
+  "server.setup.errorRefused": "OpenBot refused the request.",
+  "server.setup.errorNoAnswer": "OpenBot does not answer. Reload the page.",
+  "server.ownerTransfer.title": "Ownership",
+  "server.ownerTransfer.ownerTitle": "You own this server",
+  "server.ownerTransfer.ownerDescription": "Make another person the owner. You lose access when they accept.",
+  "server.ownerTransfer.start": "Transfer ownership…",
+  "server.ownerTransfer.pending": "Ownership transfer to {email} is pending",
+  "server.ownerTransfer.expires": "Expires {date}",
+  "server.ownerTransfer.cancel": "Cancel request",
+  "server.ownerTransfer.emailTitle": "Transfer ownership of {server}",
+  "server.ownerTransfer.emailDescription":
+    "Enter the email of the new owner. They must accept while signed in with this email.",
+  "server.ownerTransfer.email": "Email of the new owner",
+  "server.ownerTransfer.confirmTitle": "Make {email} the owner?",
+  "server.ownerTransfer.confirmDescription": "When {email} accepts:",
+  "server.ownerTransfer.confirmLoseAccess": "You lose access to {server}.",
+  "server.ownerTransfer.confirmStays":
+    "Agents, routines, chats, provider sign-ins, saved keys, Vault logins, browser sign-ins and connected apps stay on the server. The new owner can use them.",
+  "server.ownerTransfer.confirmExpiry": "The request expires after 7 days.",
+  "server.ownerTransfer.send": "Send request",
+  "server.ownerTransfer.sendFailed": "Could not send the ownership transfer.",
+  "server.ownerTransfer.incomingTitle": "Become the owner of {server}?",
+  "server.ownerTransfer.incomingDescription": "{name} wants to make you the owner of {server}.",
+  "server.ownerTransfer.incomingYours": "The server, its agents, routines and data become yours.",
+  "server.ownerTransfer.incomingPrevious": "{name} loses access to the server.",
+  "server.ownerTransfer.incomingStays":
+    "Provider sign-ins, saved keys, Vault logins, browser sign-ins and connected apps on the server stay there, and you can use them.",
+  "server.ownerTransfer.incomingMachine":
+    "Anyone who can still sign in to the computer that runs the server can use your OpenBot account. Change its passwords and SSH keys.",
+  "server.ownerTransfer.later": "Later",
+  "server.ownerTransfer.decline": "Decline",
+  "server.ownerTransfer.accept": "Accept",
+  "server.ownerTransfer.accepted": "You are now the owner of {server}",
+  "server.ownerTransfer.acceptFailed": "Could not accept the ownership transfer.",
+  "server.ownerTransfer.declineFailed": "Could not decline the ownership transfer.",
 });

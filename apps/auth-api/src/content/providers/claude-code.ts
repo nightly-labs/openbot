@@ -1,9 +1,5 @@
 import type { ProviderPage } from "./provider-page";
 
-// Every statement about Claude Code here is taken from code.claude.com and
-// claude.com. Each page used is in `sources`. Check them again, and move
-// `checkedAt`, whenever this file changes.
-
 const DOCS = "https://code.claude.com/docs/en";
 
 export const CLAUDE_CODE_PROVIDER: ProviderPage = {

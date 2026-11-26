@@ -2,7 +2,6 @@ import type { PartialTranslation } from "../../../message";
 import type { messages as source } from "../../en/error/skill";
 
 export const messages = {
-  // Skill package, library, and marketplace errors.
   "error.skill.symlinks": "スキルパッケージにシンボリックリンクを含めることはできません。",
   "error.skill.expandedTooLarge": "展開後のスキルは 10 MB 未満である必要があります。",
   "error.skill.irregularEntry": "スキルパッケージに含められるのは通常のファイルとフォルダーのみです。",
@@ -46,12 +45,18 @@ export const messages = {
   "error.skill.publishUntracked":
     "{name} は正確なバージョン追跡の導入前にインストールされました。公開する前にアップデートまたは修復してください。",
   "error.skill.tooManySkills": "エージェントに追加できるスキルは {limit} 個までです。",
-  "error.skill.unmanagedExists": "管理されていないスキルが {path} にすでに存在します。",
+  "error.skill.ownSkillExists":
+    "このエージェントには {slug} という名前の独自のスキルがすでにあります。エージェントにそのスキルの名前の変更か削除を頼んでから、このスキルをもう一度追加してください。",
   "error.skill.managedSlug":
     "OpenBot はすべてのエージェントに独自の {slug} スキルを提供します。このスキルには別の名前を付けてください。",
   "error.skill.templateMarkdownTooLarge": "{name}: SKILL.md が 64 KB を超えています。公開する前に短くしてください。",
   "error.skill.localNoRevisions": "ローカルスキルに公開済みのリビジョンがありません。",
+  "error.skill.localNotFound": "このローカルスキルは存在しません。ローカルスキルの一覧で ID を確認してください。",
+  "error.skill.localRevisionNotFound":
+    "このローカルスキルにはリビジョン {revision} がありません。最新のリビジョンは {latest} です。",
   "error.skill.localNameTaken": "この名前のローカルスキルはすでに存在します。代わりにそのスキルを改訂してください。",
+  "error.skill.localNameClash":
+    "この名前とローカルスキル「{name}」は、どちらも「{slug}」になります。そのスキルを変更するには、改訂してください。新しいスキルを追加するには、この名前の英字または数字を変更してください。",
   "error.skill.localKeepName": "スキルを改訂するときは、スキル名を変更しないでください。",
   "error.skill.localRelativeFolder":
     "現在のエージェントのワークスペース内にある、相対パスのスキルフォルダーを使用してください。",
@@ -61,4 +66,14 @@ export const messages = {
   "error.skill.pathSymlink": "スキルのパスにシンボリックリンクを含めることはできません。",
   "error.skill.folderNotRead":
     "{provider} は {folder} を読み込みません。このフォルダーを {target} にコピーしてください。",
+  "error.skill.githubLinkInvalid": "GitHub のリポジトリかフォルダーへのリンクを貼り付けてください。",
+  "error.skill.githubNotFound": "OpenBot は {repository} を開けません。リポジトリが非公開か、存在しません。",
+  "error.skill.githubNoSkills": "{folder} に SKILL.md がありません。",
+  "error.skill.githubUnavailable": "OpenBot は現在 GitHub を読み込めません。しばらくしてからもう一度お試しください。",
+  "error.skill.githubRateLimited":
+    "GitHub はアカウントなしで OpenBot が読み込める回数を制限しています。1 時間後にもう一度お試しください。",
+  "error.skill.githubTooLarge":
+    "OpenBot は {repository} のすべてのファイルを読み取れません。リポジトリが大きすぎます。",
+  "error.skill.githubHostTooOld": "GitHub からスキルを追加するには、このサーバーを更新してください。",
+  "error.skill.publishGithub": "{name} は GitHub のスキルです。公開できるのは自分で作成したスキルだけです。",
 } as const satisfies PartialTranslation<typeof source>;

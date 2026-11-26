@@ -1,6 +1,5 @@
 import { isDynamicRecord, isString } from "@openbot/contracts/runtime-values";
 
-/** The part of a host browser tab that the phone uses. */
 export interface MobileBrowserTab {
   id: string;
   title: string;
@@ -11,8 +10,15 @@ export interface MobileBrowserTab {
 
 export interface MobileBrowserTabs {
   tabs: MobileBrowserTab[];
-  /** The tab the host's browser shows, which can belong to any agent. */
   activeTabId: string | null;
+}
+
+export type MobileHttpSignIns = Record<string, { origin: string; refused: boolean }>;
+
+export function mobileHttpSignIns(
+  prompts: readonly { tabId: string; origin: string; refused: boolean }[],
+): MobileHttpSignIns {
+  return Object.fromEntries(prompts.map(({ tabId, origin, refused }) => [tabId, { origin, refused }]));
 }
 
 function mobileBrowserTab(value: unknown): MobileBrowserTab | null {
@@ -26,14 +32,12 @@ function mobileBrowserTab(value: unknown): MobileBrowserTab | null {
   };
 }
 
-/** The tab that `POST /v1/browser/open` answers with. */
 export function decodeMobileBrowserTab(value: unknown): MobileBrowserTab {
   const tab = mobileBrowserTab(value);
   if (!tab) throw new Error("The host returned an invalid browser tab.");
   return tab;
 }
 
-/** The tab list of `GET /v1/browser/tabs` or a `browser-changed` event. A tab the phone cannot read is left out. */
 export function decodeMobileBrowserTabs(value: unknown): MobileBrowserTab[] {
   if (!Array.isArray(value)) throw new Error("The host returned an invalid browser tab list.");
   return value.flatMap((tab) => {
@@ -42,10 +46,6 @@ export function decodeMobileBrowserTabs(value: unknown): MobileBrowserTab[] {
   });
 }
 
-/**
- * The agent's tabs, oldest first: the tabs with the agent's ID as their owner, and, as on the desktop,
- * a tab with no agent owner that belongs to the agent's thread.
- */
 export function agentBrowserTabs(
   state: MobileBrowserTabs | undefined,
   agentId: string,
@@ -57,14 +57,12 @@ export function agentBrowserTabs(
   );
 }
 
-/** The list with a tab the phone opened, before the host's next list arrives. */
 export function withBrowserTab(state: MobileBrowserTabs | undefined, tab: MobileBrowserTab): MobileBrowserTabs {
   const tabs = state?.tabs ?? [];
   if (tabs.some((candidate) => candidate.id === tab.id)) return state ?? { tabs, activeTabId: null };
   return { tabs: [...tabs, tab], activeTabId: state?.activeTabId ?? null };
 }
 
-/** The list without a tab the phone closed. */
 export function withoutBrowserTab(state: MobileBrowserTabs | undefined, tabId: string): MobileBrowserTabs {
   return {
     tabs: (state?.tabs ?? []).filter((tab) => tab.id !== tabId),
@@ -72,11 +70,6 @@ export function withoutBrowserTab(state: MobileBrowserTabs | undefined, tabId: s
   };
 }
 
-/**
- * The tab an agent works in: `preferredTabId` when it is the agent's, such as the tab of a takeover
- * or the tab the user chose, then the host's active tab when it is the agent's, otherwise the agent's
- * newest tab.
- */
 export function agentBrowserTab(
   state: MobileBrowserTabs | undefined,
   agentId: string,
@@ -93,16 +86,18 @@ export function agentBrowserTab(
   );
 }
 
-/** A tab's title, or the site it shows when the page has no title yet. */
 export function browserTabTitle(tab: MobileBrowserTab, untitled: string): string {
   if (tab.title.trim()) return tab.title;
   return browserTabHost(tab) || untitled;
 }
 
-/** The site of a tab's address, or an empty string for an address with no host. */
 export function browserTabHost(tab: MobileBrowserTab): string {
+  return urlHost(tab.url);
+}
+
+export function urlHost(url: string): string {
   try {
-    return new URL(tab.url).host;
+    return new URL(url).host;
   } catch {
     return "";
   }
@@ -110,10 +105,6 @@ export function browserTabHost(tab: MobileBrowserTab): string {
 
 const SEARCH_URL = "https://www.google.com/search?q=";
 
-/**
- * The page that the text in the address field opens: a web address, or a Google search. The same
- * rule as the desktop address bar (`browserAddressUrl` in `@openbot/ui`, which mobile cannot import).
- */
 export function browserAddressUrl(value: string): string {
   const hasProtocol = /^https?:\/\//i.test(value);
   const candidate = hasProtocol ? value : `https://${value}`;
@@ -125,8 +116,6 @@ export function browserAddressUrl(value: string): string {
     ) {
       return candidate;
     }
-  } catch {
-    // Text that is not a web address is a search query.
-  }
+  } catch {}
   return `${SEARCH_URL}${encodeURIComponent(value.replace(/^https?:\/\//i, ""))}`;
 }

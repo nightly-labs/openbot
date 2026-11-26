@@ -1,27 +1,47 @@
-import { VaultPanel } from "@openbot/ui/features/vault/VaultPanel";
+import type { SettingsCrumb } from "@openbot/ui/features/settings/SettingsDialogShell";
+import type { NearWalletAgent } from "@openbot/ui/features/vault/VaultNearWallet";
+import { type VaultAgentChoice, VaultPanel } from "@openbot/ui/features/vault/VaultPanel";
 import { useText } from "@openbot/ui/text";
-import { onSettled, Show } from "solid-js";
+import { createEffect, createSignal, onSettled, Show } from "solid-js";
 import { actionToast } from "../../action-toast";
 import type { LinkAccountStore } from "./stores/link-account-store";
+import type { NearWalletStore } from "./stores/near-wallet-store";
 import type { VaultStore } from "./stores/vault-store";
 
+type VaultAgent = VaultAgentChoice & NearWalletAgent;
+
 export interface ServerVaultOptions {
-  /** The Vault of this computer, or of a joined server for its owner or admin. */
   store: VaultStore;
-  /** False for a joined server without `vault-v2`: it cannot keep API keys. */
   apiKeys: boolean;
-  /** False for a joined server without `vault-v3`: it cannot keep two-step keys. */
   twoStep: boolean;
-  /** The Link account of this computer. Absent for a joined server: its host has no Link. */
   link?: LinkAccountStore | undefined;
+  near?: NearWalletStore | undefined;
+  nearAgents?: (() => readonly NearWalletAgent[] | undefined) | undefined;
+  listAgents?: (() => Promise<readonly VaultAgent[]>) | undefined;
 }
 
-/**
- * The Vault section of the server settings. It lists the items each time it opens, and shows each
- * list that main sends while it is open.
- */
-export function ServerVaultPanel(props: ServerVaultOptions & { menuMount: HTMLElement | undefined }) {
+export function ServerVaultPanel(
+  props: ServerVaultOptions & {
+    menuMount: HTMLElement | undefined;
+    onDetailChange?: ((detail: SettingsCrumb | null) => void) | undefined;
+  },
+) {
   const { t, errorMessage } = useText();
+  const [agents, setAgents] = createSignal<readonly VaultAgent[]>([]);
+  let request = 0;
+  createEffect(
+    () => props.listAgents,
+    (listAgents) => {
+      const current = ++request;
+      setAgents([]);
+      listAgents?.().then(
+        (list) => {
+          if (current === request) setAgents(list);
+        },
+        () => undefined,
+      );
+    },
+  );
   onSettled(() => {
     const store = props.store;
     const unsubscribe = store.subscribe();
@@ -29,9 +49,13 @@ export function ServerVaultPanel(props: ServerVaultOptions & { menuMount: HTMLEl
     const link = props.link;
     const stopLink = link?.subscribe();
     link?.refresh().catch((error: unknown) => actionToast.error(errorMessage(error, t("vault.link.failed"))));
+    const near = props.near;
+    const stopNear = near?.subscribe();
+    near?.refresh().catch((error: unknown) => actionToast.error(errorMessage(error, t("vault.near.failed"))));
     return () => {
       unsubscribe();
       stopLink?.();
+      stopNear?.();
     };
   });
   const linkAccount = () => {
@@ -44,6 +68,11 @@ export function ServerVaultPanel(props: ServerVaultOptions & { menuMount: HTMLEl
       onDisconnect: link.disconnect,
     };
   };
+  const nearWallet = () => {
+    const near = props.near;
+    if (!near) return undefined;
+    return { status: near.state.status, agents: props.nearAgents?.() ?? agents(), actions: near.actions };
+  };
   const onCodes = () => (props.twoStep ? props.store.codes : undefined);
   return (
     <Show when={props.store.state.vault}>
@@ -51,6 +80,7 @@ export function ServerVaultPanel(props: ServerVaultOptions & { menuMount: HTMLEl
         <VaultPanel
           state={vault()}
           apiKeys={props.apiKeys}
+          agents={agents()}
           onCodes={onCodes()}
           onSave={props.store.save}
           onDelete={props.store.remove}
@@ -67,6 +97,8 @@ export function ServerVaultPanel(props: ServerVaultOptions & { menuMount: HTMLEl
           onReset={props.store.reset}
           menuMount={props.menuMount}
           link={linkAccount()}
+          near={nearWallet()}
+          onDetailChange={props.onDetailChange}
         />
       )}
     </Show>

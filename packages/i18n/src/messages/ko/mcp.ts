@@ -28,7 +28,10 @@ export const messages = {
   "mcp.signIn.waiting": "브라우저를 기다리는 중…",
   "mcp.signIn.continue": "{name}(으)로 계속",
   "mcp.signIn.pageDescription": "이 페이지는 {host}의 브라우저에서 열려 있어요. 여기에서 로그인하세요.",
-  "mcp.server.loadFailed": "MCP 서버를 불러오지 못했어요.",
+  "mcp.signIn.copyHint": "페이지가 열리지 않으면 링크를 복사해 다른 브라우저에서 여세요.",
+  "mcp.signIn.copyLink": "링크 복사",
+  "mcp.signIn.pasteHint":
+    "다른 기기에서 로그인했다면 마지막에 그 브라우저에 표시된 주소를 복사해 여기에 붙여 넣으세요.",
   "mcp.test.connected": { other: "연결됨 · 도구 {count}개" },
   "mcp.status.testing": "테스트 중…",
   "mcp.status.failed": "실패",
@@ -37,6 +40,7 @@ export const messages = {
   "mcp.status.signedIn": "로그인됨",
   "mcp.status.signingIn": "로그인 중…",
   "mcp.status.signInNeeded": "로그인 필요",
+  "mcp.status.signInAppNeeded": "로그인 앱 필요",
   "mcp.status.refused": "거부됨",
   "mcp.status.checkUrl": "URL을 확인하세요",
   "mcp.status.noAnswer": "응답 없음",
@@ -53,12 +57,6 @@ export const messages = {
   "mcp.panel.noAnswer": "해당 서버가 응답하지 않았어요.",
   "mcp.panel.connectTitle": "사용자 지정 MCP 연결",
   "mcp.panel.editTitle": "MCP 서버 편집",
-  "mcp.panel.changesNotSaved": "변경 사항이 저장되지 않았어요",
-  "mcp.panel.title": "MCP 서버",
-  "mcp.panel.description":
-    "Model Context Protocol 서버는 이 서버의 에이전트에게 추가 도구를 제공해요. Claude와 Codex 에이전트는 이 목록에 있는 서버만 사용하고, OpenCode와 Grok 에이전트는 자체 설정 파일에서도 서버를 시작할 수 있어요.",
-  "mcp.panel.connectCustom": "사용자 지정 MCP 연결",
-  "mcp.panel.empty": "아직 MCP 서버가 없어요.",
   "mcp.panel.enable": "{name} 사용",
   "mcp.panel.detailsTitle": "세부 정보",
   "mcp.panel.detailsDescription": "서버 이름을 정하고 OpenBot이 연결하는 방식을 선택하세요.",
@@ -100,16 +98,11 @@ export const messages = {
     "이 설정으로 한 번 연결해 제공하는 도구를 알려줘요. 아무것도 저장되거나 보관되지 않아요.",
   "mcp.panel.testConnection": "연결 테스트",
   "mcp.panel.notTested": "아직 테스트하지 않았어요.",
-  "mcp.panel.removeTitle": "{name}을(를) 삭제할까요?",
-  "mcp.panel.removeDescription": "이 서버의 도구가 더 이상 에이전트에게 제공되지 않아요. 구성은 저장되지 않아요.",
-  "mcp.panel.removeConfirm": "MCP 서버 삭제",
-  "mcp.panel.actionsFor": "{name} 작업",
-  "mcp.panel.testUnavailable": "여기에서는 이 서버를 테스트할 수 없어요.",
   "mcp.panel.signIn": "로그인",
   "mcp.panel.signOut": "로그아웃",
   "mcp.panel.cancelSignIn": "로그인 취소",
+  "mcp.panel.useAddress": "이 주소 사용",
   "mcp.panel.signInTo": "{name}에 로그인",
-  "mcp.panel.cancelSignInTo": "{name} 로그인 취소",
   "mcp.panel.signInWaiting": {
     other: "브라우저에서 로그인을 완료하세요. OpenBot은 {count}분 후 대기를 중지해요.",
   },
@@ -147,6 +140,7 @@ export const messages = {
   "mcp.signIn.relayDeviceDescription":
     "브라우저에서 {page}에 로그인하고 그곳에서 완료하세요. {host}가 로그인을 자동으로 인식해요.",
   "mcp.signIn.relayOpen": "로그인 페이지 열기",
+  "mcp.signIn.relayCopy": "링크 복사",
   "mcp.signIn.relayPasteHint":
     "브라우저가 OpenBot으로 돌아오지 않으면 브라우저에 표시되는 주소를 복사해 여기에 붙여넣으세요.",
   "mcp.signIn.relayPasteRequired":

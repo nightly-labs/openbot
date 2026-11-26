@@ -1,24 +1,30 @@
-// Runs turns on the real Cursor driver against a fake `cursor-agent acp` that, as Cursor
-// 2026.10.22-27dcf5f does, sends "Error: RetriableError: WritableIterable is closed" as one answer
-// chunk after a turn that succeeded (#3334). Checks that the reply is only the answer and that the
-// turn completes, and that an answer that quotes the error keeps it.
-// `bun run test:cursor-stream-closed`. Writes .openbot-build/cursor-stream-closed-e2e/report.json.
 import assert from "node:assert/strict";
 import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
+import { sourceText } from "@openbot/i18n/source";
 import type { AgentClient } from "../src/backend/agent-client";
 import type { AgentCliInfo } from "../src/backend/cli";
+import { type AppServerNotification, getString } from "../src/backend/protocol";
 import { NO_PROVIDER_CREDENTIALS, requireProviderDriver } from "../src/backend/provider-drivers";
 import { installFakeAgent, runTurn, startThread, stopClients, type TurnResult } from "./provider-fakes/host";
 
 const OUT = resolve(import.meta.dirname, "../.openbot-build/cursor-stream-closed-e2e");
 const QUOTED_ANSWER = "Cursor said: Error: RetriableError: WritableIterable is closed";
+const INTERNAL_FAILURE = "Error: RetriableError: [internal] The agent loop failed.";
+
+interface CanceledTurn extends TurnResult {
+  causeCode: string | null;
+}
 
 interface Report {
   passed: boolean;
   noise?: TurnResult;
   quote?: TurnResult;
+  canceledChunk?: CanceledTurn;
+  canceledReject?: CanceledTurn;
+  canceledRecovered?: TurnResult;
+  internal?: TurnResult;
 }
 
 const root = await mkdtemp(join(tmpdir(), "openbot-cursor-stream-closed-e2e-"));
@@ -44,6 +50,44 @@ try {
   report.quote = await runTurn(client, thread, { text: "quote-case" });
   assert.equal(report.quote.reply, QUOTED_ANSWER, "An answer that quotes the error keeps it.");
   assert.equal(report.quote.status, "completed", "The quoting turn completes.");
+
+  const connectionLost = sourceText("error.provider.acpServerLost", { provider: "Cursor" });
+  const runWithCause = async (text: string): Promise<CanceledTurn> => {
+    let causeCode: string | null = null;
+    const listener = (notification: AppServerNotification) => {
+      if (notification.method === "error" && getString(notification.params, "threadId") === thread)
+        causeCode = getString(notification.params, "causeCode");
+    };
+    client.on("notification", listener);
+    try {
+      return { ...(await runTurn(client, thread, { text })), causeCode };
+    } finally {
+      client.off("notification", listener);
+    }
+  };
+
+  report.canceledChunk = await runWithCause("canceled-chunk-case");
+  assert.equal(report.canceledChunk.reply, "Checking the webhook.", "The reply keeps the answer and drops the error.");
+  assert.equal(report.canceledChunk.status, "failed", "A canceled stream fails the turn.");
+  assert.equal(report.canceledChunk.error, connectionLost, "The error says that Cursor lost its connection.");
+  assert.equal(report.canceledChunk.causeCode, "network", "A canceled stream is a network failure.");
+
+  report.canceledReject = await runWithCause("canceled-reject-case");
+  assert.equal(report.canceledReject.status, "failed", "A refused prompt fails the turn.");
+  assert.equal(report.canceledReject.error, connectionLost, "The refused prompt says that Cursor lost its connection.");
+  assert.equal(
+    report.canceledReject.causeCode,
+    "network",
+    "A refused prompt with a canceled stream is a network failure.",
+  );
+
+  report.canceledRecovered = await runTurn(client, thread, { text: "canceled-recovered-case" });
+  assert.equal(report.canceledRecovered.reply, "Done.", "Cursor recovered, so the reply is the answer.");
+  assert.equal(report.canceledRecovered.status, "completed", "A turn that continues after the error completes.");
+  assert.equal(report.canceledRecovered.error, null, "A recovered turn reports no error.");
+
+  report.internal = await runTurn(client, thread, { text: "internal-case" });
+  assert.equal(report.internal.reply.trim(), INTERNAL_FAILURE, "An internal Cursor failure keeps its text.");
 
   report.passed = true;
 } finally {

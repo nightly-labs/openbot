@@ -8,6 +8,7 @@ import type {
 import type { OpenBotDatabase } from "./openbot-database";
 import {
   type DueRoutine,
+  type ImportedRoutineRun,
   type OwnedRoutine,
   type OwnedRoutineRun,
   type ReceivedWebhookEvent,
@@ -24,11 +25,6 @@ export interface DueChannelRoutine {
   schedule: DueRoutine["schedule"];
 }
 
-/**
- * The channel-shaped names over the shared store: `ownerId` reads as `channelId` and the run handle
- * reads as `requestMessageId` - the id of the message the fire posted, which is also the key that
- * joins a run to the tasks it produced.
- */
 export class ChannelRoutineStore extends RoutineStore {
   constructor(database: OpenBotDatabase) {
     super(database, ROUTINE_TABLES.channel);
@@ -53,6 +49,10 @@ export class ChannelRoutineStore extends RoutineStore {
     return toChannelRoutine(this.updateRoutine(channelId, fields, now));
   }
 
+  importRuns(channelId: string, routineId: string, runs: readonly ImportedRoutineRun[]): string[] {
+    return this.importRunRows(routineId, channelId, runs);
+  }
+
   listRuns(channelId: string, routineId: string, limit = 50, withSkipped = false): ChannelRoutineRun[] {
     return this.listRunRows(channelId, routineId, limit, withSkipped).map(toChannelRun);
   }
@@ -65,7 +65,6 @@ export class ChannelRoutineStore extends RoutineStore {
     return this.activeRunRows(channelId, routineId).map(toChannelRun);
   }
 
-  /** `excludedChannelIds` carries the archived channels: they must not fire and must not wake the timer. */
   due(now = new Date(), excludedChannelIds: ReadonlySet<string> = new Set()): DueChannelRoutine[] {
     return this.dueRoutines(now, excludedChannelIds).map((entry) => ({
       routine: toChannelRoutine(entry.routine),
@@ -91,6 +90,16 @@ export class ChannelRoutineStore extends RoutineStore {
   ): WebhookReceiveResult<ChannelRoutineRun> {
     const result = this.receiveWebhookRow(channelId, routineId, event);
     return result.kind === "started" ? { kind: "started", run: toChannelRun(result.run) } : result;
+  }
+
+  skipOccurrences(
+    { channelId, ...fields }: ChannelRoutine,
+    due: Date,
+    scheduledFor: Date,
+    nextRunAt: Date,
+    reason: string,
+  ): void {
+    this.skipOccurrenceRow({ ...fields, ownerId: channelId }, due, scheduledFor, nextRunAt, reason);
   }
 
   attachRequest(runId: string, requestMessageId: string): ChannelRoutineRun {
@@ -132,10 +141,6 @@ function runSource({
   return { id, ownerId: channelId, name, instruction };
 }
 
-/**
- * The run table's `status` CHECK omits `interrupted`, so a stored row cannot carry it. The shared
- * store still reads the wider agent union, and this is where the narrower channel one is proved.
- */
 function toChannelRun({ ownerId, handleId, status, ...fields }: OwnedRoutineRun): ChannelRoutineRun {
   if (status === "interrupted") throw new Error("The stored channel routine run status is invalid.");
   return { ...fields, channelId: ownerId, requestMessageId: handleId, status };

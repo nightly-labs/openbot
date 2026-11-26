@@ -8,9 +8,15 @@ export const messages = {
   "status.agent.instructionsChanged": "指示を更新しました",
   "status.agent.modelSwitchedForLimit": "使用量の上限に達しました。{model} に切り替えました。",
   "status.agent.modelReturnedAfterLimit": "使用量の上限が解除されました。{model} に戻しました。",
+  "status.agent.routineSkippedRunOpen": "スキップ: 前回の実行がまだ終わっていませんでした",
+  "status.agent.routineSkippedUsageLimit": "スキップ: 使用量の上限に達しました",
   "status.agent.modelSwitchedForError": "プロバイダーのエラーが発生しました。{model} に切り替えました。",
+  "status.agent.modelSwitchedForSpentBalance":
+    "{previous} のクレジットがなくなりました。{model} に切り替えました。再び使うには、クレジットを追加してから選択してください。",
   "status.agent.modelReturnedAfterError": "プロバイダーのエラーの後、{model} に戻しました。",
+  "status.agent.modelSwitchedForRemovedModel": "{previous} は利用できなくなりました。{model} に切り替えました。",
   "status.agent.marketplaceSuggested": "マーケットプレイスのアプリを提案しました: {app}。",
+  "status.agent.settingShown": "設定を表示しました: {setting}。",
   "status.agent.channelMemberAdded": "{agent} が {member} をチャンネルに追加しました。{person} の依頼です。",
   "status.agent.channelMemberRemoved": "{agent} が {member} をチャンネルから外しました。{person} の依頼です。",
   "status.agent.channelInstructionsChanged": "{agent} がチャンネルの指示を変更しました。{person} の依頼です。",
@@ -22,6 +28,13 @@ export const messages = {
   "status.agent.screenCaptureScreen": "メイン画面をキャプチャし、その画像をエージェントのモデルに送信します。",
   "status.agent.screenCaptureChannel":
     "画像はチャンネル {channel} に表示され、このサーバーでチャンネルを読むメンバー全員が見ることができます。",
+  "status.agent.creditImageApproval": "{model} で画像を生成します。{credits} クレジットを使います。",
+  "status.agent.creditVideoApproval": "{model} で動画を生成します。{credits} クレジットを使います。",
+  "status.agent.creditMediaChannel":
+    "結果はチャンネル {channel} に表示され、このサーバーでチャンネルを読むすべてのメンバーが見られます。",
+  "status.agent.creditsHoldBalance": "{credits} クレジットを使い、残高は {balance} クレジットです。",
+  "status.agent.creditsHoldAgentsOff": "このサーバーのエージェントはクレジットを使えません。",
+  "status.agent.screenCapturePermissionNext": "その後、macOS が OpenBot に画面収録を許可するよう求めることがあります。",
   "status.agent.screenCaptureDisplay":
     "ディスプレイ {name} をキャプチャし、その画像をエージェントのモデルに送信します。",
   "status.agent.screenCaptureWindow": "ウィンドウ {name} をキャプチャし、その画像をエージェントのモデルに送信します。",
@@ -29,16 +42,49 @@ export const messages = {
     "画面の {x}, {y}, {width} × {height} ポイントの領域をキャプチャし、その画像をエージェントのモデルに送信します。",
   "status.agent.reportProblem":
     "アプリのバージョンとシステム情報付きで、公開の GitHub issue になります。あなたの名前は表示されません。",
+  "status.agent.reportPhoneProblem":
+    "アプリのバージョンとシステム情報に加え、スマートフォンのバージョン、システム情報、サポートログ付きで、公開の GitHub issue になります。あなたの名前は表示されません。",
   "status.agent.sendIdea": "公開の GitHub issue になります。あなたの名前は表示されません。",
   "status.agent.feedbackRecentErrors": "チャットの最近のエラー:",
   "status.agent.feedbackSameAs": "issue #{issue} に追加します",
   "status.agent.feedbackSent": "OpenBot チームに送信しました: {title}",
+  "status.agent.feedbackWithdrawn": "GitHub から削除しました: {title}",
+  "status.agent.feedbackWithdrawCommand": "レポート #{issue} を GitHub から削除",
+  "status.agent.feedbackWithdrawReason":
+    "このレポートは GitHub で誰も見られなくなります。元に戻せません。修正するには、エージェントが修正したレポートを送信できます。",
+  "status.agent.feedbackWithdrawing": "レポートを GitHub から削除しています…",
   "status.agent.serverInstallCommand":
     "別のコンピューターに OpenBot をサーバー {name} としてインストールし、あなたのアカウントにサインインさせる 1 回限りのコマンドを作成します。エージェントがそこで実行します。",
   "status.agent.serverInstallCard": "サーバー {name} のインストールコマンド",
+  "status.agent.browserProfileNamed":
+    "{agents} をブラウザープロファイル {profile} に移動します。そのログイン情報と Cookie を使えるようになります。開いているタブは閉じます。",
+  "status.agent.commitCoAuthorOff": "すべてのエージェントのコミットに OpenBot を共同作成者として追加するのをやめます。",
+  "status.agent.commitCoAuthorOn": "すべてのエージェントのコミットに OpenBot を共同作成者として再び追加します。",
+  "status.agent.browserProfileNew":
+    "新しいブラウザープロファイル {profile} を作成し、{agents} を移動します。ログイン情報はありません。開いているタブは閉じます。",
+  "status.agent.browserProfileShared":
+    "{agents} を共有のブラウザープロファイルに移動します。そのログイン情報と Cookie を使えるようになります。開いているタブは閉じます。",
+  "status.agent.browserProfileOwn":
+    "{agents} にそれぞれ専用のブラウザープロファイルを与えます。開いているタブは閉じます。",
   "status.agent.feedbackSending": "フィードバックを OpenBot チームに送信しています…",
   "status.agent.workflowDelete":
     "ワークフロー {title} を実行履歴とバージョンごと削除します。実行中のステップは停止します。",
+  "status.agent.deleteAgents": "{agents} をチャットとファイルごと削除します。元に戻せません。",
+  "status.agent.nearSignatureReceived": "OpenBot が署名を受け取りました。このタブは閉じてかまいません。",
+  "status.agent.nearSignatureUnknown": "OpenBot はこの署名を待っていません。OpenBot でもう一度始めてください。",
+  "status.agent.nearPayment":
+    "{domain} のため、暗号資産ウォレットから {recipient} に {amount} {symbol} を支払います: {reason}",
+  "status.agent.nearSummaryCreate":
+    "すべてのエージェントが 1 日あたり最大 {amount} USD まで支払えます。あとで OpenBot で変更できます。",
+  "status.agent.nearSummaryGrant":
+    "この OpenBot アプリが、あなたのルールの範囲内で {days} 日間ウォレットから支払えるようにします。",
+  "status.agent.nearSummaryBudget": "ウォレットの 1 日の予算を {amount} USD に変更します。",
+  "status.agent.nearSummaryAutoPay":
+    "支払いルールで許可されている場合は、OpenBot があなたの署名なしで支払えるようにします。その他の支払いは引き続きチャットで確認します。",
+  "status.agent.nearSummaryPayment": "{recipient} への {amount} の支払いを承認します。",
+  "status.agent.nearSummaryFreeze": "支払いを再開するまで、エージェントはこのウォレットから支払えません。",
+  "status.agent.nearSummaryUnfreeze":
+    "エージェントは、あなたのルールの範囲内で再びこのウォレットから支払えるようになります。",
   "status.agent.screenCaptureProgress": "画面のキャプチャを要求しています…",
   "status.agent.screenCaptureReviewing": "画面のキャプチャを確認しています…",
   "status.agent.browserOpening": "Web ページを開いています…",
@@ -46,11 +92,14 @@ export const messages = {
   "status.agent.browserClicking": "Web ページをクリックしています…",
   "status.agent.browserTyping": "Web ページに入力しています…",
   "status.agent.browserActing": "Web ページを操作しています…",
+  "status.agent.browserPaying": "支払いを送信しています…",
   "status.agent.browserReviewing": "Web ページを確認しています…",
   "status.agent.memoriesSearching": "メモリーを検索しています…",
+  "status.agent.chatsSearching": "過去のチャットを検索しています…",
   "status.agent.memoriesSearched": { other: "メモリーを検索しました: {count} 件見つかりました" },
   "status.agent.memoriesUpdating": "メモリーを更新しています…",
   "status.agent.skillUsing": "スキル {name} を使用しています…",
+  "status.agent.backdropSetting": "背景を変更しています…",
   "status.agent.skillReading": "スキルを読み込んでいます…",
   "status.agent.toolStepFailed": "ツールのステップが失敗しました。結果を確認し、次に試すことを判断しています…",
   "status.agent.toolResultReviewing": "最新のツール結果を確認しています…",
@@ -82,9 +131,20 @@ export const messages = {
   "status.agent.memoryChanges": "メモリー: {saved} 件保存、{updated} 件更新、{forgotten} 件忘却。",
   "status.agent.memoryChangesWithConflicts":
     "メモリー: {saved} 件保存、{updated} 件更新、{forgotten} 件忘却、{notChanged} 件は別のスレッドが先に変更したため未変更。",
+  "status.agent.mcpToolCall": "MCP サーバー {name} のツール {tool} を実行します。",
+  "status.agent.uiBlockClosedByMessage": "新しいメッセージで閉じられました",
+  "status.agent.location.field": "現在地",
+  "status.agent.location.placeholder": "市区町村、住所、場所",
+  "status.agent.location.submit": "共有",
+  "status.agent.location.shared": "位置情報を共有しました",
   "status.agent.nextStepContinues": "エージェントが次のステップの前で止まりました。続けます（{current}/{limit}）。",
   "status.agent.planContinues": "プランに未完了のステップがあります。エージェントが続けます（{current}/{limit}）。",
+  "status.agent.planStopped":
+    "プランに未完了のステップを残してエージェントが停止しました。続けるにはメッセージを送信してください。",
+  "status.agent.continuationLimitReached":
+    "リクエストが完了する前にエージェントが停止しました。エージェントはこれ以上自動で続けられません。続けるにはメッセージを送信してください。",
   "status.agent.compactionContinues":
     "エージェントがコンテキストを圧縮している間に接続が切れました。エージェントは続行します。",
+  "status.agent.providerExitContinues": "エージェントは回答を終える前に停止しました。エージェントは続行します。",
   "status.agent.branchTitle": "分岐したチャット",
 } as const satisfies PartialTranslation<typeof source>;

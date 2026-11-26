@@ -1,23 +1,78 @@
 import { defineMessages } from "../../../message";
 
-/** Errors that the workflow store and runtime send. */
 export const messages = defineMessages("error.workflow", {
   "error.workflow.missing": "This workflow no longer exists.",
   "error.workflow.versionMissing": "This version of the workflow no longer exists.",
   "error.workflow.annotation": "Text, notes and shapes cannot have connections.",
   "error.workflow.port": "A step cannot take this type of input.",
+  "error.workflow.unknownValue": "This OpenBot does not know a setting of a step. Update OpenBot, then try again.",
   "error.workflow.branch": "Only a condition can have yes and no connections.",
   "error.workflow.conditionBranch": "Each connection from a condition must be yes or no.",
   "error.workflow.duplicateEdge": "These two steps already have this connection.",
   "error.workflow.serverTooOld": "This server does not support workflows. Update OpenBot on the computer that runs it.",
+  "error.workflow.newerSteps": "This workflow has steps from a newer OpenBot. Update OpenBot to change it.",
   "error.workflow.nodeUnsupported": "This version of OpenBot cannot run image, file and message steps yet.",
   "error.workflow.interrupted": "OpenBot stopped while this step ran. Run it again.",
   "error.workflow.agentMissing": "Choose an agent for this step.",
   "error.workflow.handoffFailed": "OpenBot could not send this step to its agent.",
   "error.workflow.agentStepEnded": "The agent's message for this step was removed before it answered.",
+  "error.workflow.agentStepStopped": "The agent stopped before it answered this step. Run the step again.",
   "error.workflow.conditionUnclear": "The model did not answer yes or no.",
+  "error.workflow.answerInvalid":
+    "The answer did not have the fields that this step asks for: {fields}. Run the step again.",
+  "error.workflow.answerSetup":
+    "The answer fields of this workflow have a problem here: {fields}. Correct the workflow, then run the step again.",
+  "error.workflow.answerSourceEnded":
+    "These fields have no value, because the step that gives them did not finish: {fields}. Run that step again first.",
+  "error.workflow.runInputInvalid":
+    "The run input does not fit the answer fields of the trigger: {fields}. Send one JSON object with these fields.",
+  "error.workflow.sourceNotDone":
+    "A step before this one failed or stopped the last time it ran. Run that step again first.",
+  "error.workflow.checkInvalid": "The check of this step is not valid. Correct it, then run the step again.",
   "error.workflow.modelFailed": "The model could not answer. Run the step again.",
+  "error.workflow.modelTimedOut":
+    "The model did not answer in time. Choose a lower effort or a faster model for this step, then run it again.",
+  "error.workflow.modelToolUse":
+    "The model tried to use a tool, but this step can only answer with text. Run the step again, or choose a different model for it.",
+  "error.workflow.modelImageUnsupported":
+    "The model of this step cannot read pictures. Choose a model that can, or remove the picture connection.",
+  "error.workflow.modelImageType":
+    "A model step can read only PNG, JPEG, GIF and WebP pictures. Connect a picture of one of these types.",
+  "error.workflow.modelUnavailable": "The model of this step is not available. Choose a different model for this step.",
+  "error.workflow.providerBusy": "The provider is busy. Wait a few minutes, then run the step again.",
+  "error.workflow.providerOffline":
+    "OpenBot could not reach the provider. Check the internet connection, then run the step again.",
+  "error.workflow.providerBilling":
+    "The account has no credit, or its plan does not include this model. Check the plan, or choose a different model.",
+  "error.workflow.modelRefused": "The provider does not permit this model for this account. Choose a different model.",
+  "error.workflow.modelRefusedReason":
+    'Choose a different model. The provider does not permit this model for this account: "{reason}"',
+  "error.workflow.contentBlocked":
+    "The provider blocked the input. Change the input or the prompt, then run the step again.",
+  "error.workflow.inputTooLong": "The input is too long for this model. Make it shorter, or choose a different model.",
+  "error.workflow.requestRefused": "The provider did not accept this step. Choose a different model.",
+  "error.workflow.requestRefusedReason": 'Choose a different model. The provider did not accept this step: "{reason}"',
+  "error.workflow.providerRefused": 'Choose a different model, or run the step again. The provider said: "{reason}"',
   "error.workflow.modelBusy": "Another model request is running. Run the step again soon.",
+  "error.workflow.mediaFailed": "The model could not make the image or video. Run the step again.",
+  "error.workflow.mediaNotMade": "The model did not make the image or video. It said: {answer}",
+  "error.workflow.pictureMissing": "The picture is no longer on the server. Send it again.",
+  "error.workflow.pictureType": "Use a PNG, JPEG or WebP picture.",
+  "error.workflow.mediaInputMissing": "A picture from a step before this one is not available. Run that step again.",
+  "error.workflow.mediaEmptyRequest":
+    "Write a description, or run the steps before this one so that a text or a picture comes in.",
+  "error.workflow.mediaInputNotImage":
+    "This step takes only pictures, not videos. Remove the connection from the video.",
+  "error.workflow.mediaInputTooLarge":
+    "A picture for this step is too large. Use pictures of 7 MB or less each, and 14 MB or less together.",
+  "error.workflow.mediaInputType":
+    "This model takes only PNG, JPEG and WebP pictures. Connect a picture of one of these types.",
+  "error.workflow.creditMediaPictureRequired":
+    "This model needs a picture. Connect a picture step to this step, then run it again.",
+  "error.workflow.creditMediaPromptRequired":
+    "This model needs a description. Write one in this step, or connect a text step to it.",
+  "error.workflow.mediaInputNotClip":
+    "This input takes only videos and audio files. Remove the connection from the file.",
   "error.workflow.stepMissing": "This step no longer exists.",
   "error.workflow.nodeMissing": "This step is not in the workflow.",
   "error.workflow.runMissing": "This run no longer exists.",
@@ -63,4 +118,24 @@ export const messages = defineMessages("error.workflow", {
   "error.workflow.githubUncertain":
     "The change stopped on its way. It can be on GitHub. Look there before you run the step again.",
   "error.workflow.githubNoEvent": "GitHub has no issue or pull request that this trigger starts on.",
+  "error.workflow.sunraSignIn": "Sign in to Sunra in Apps to use Sunra models.",
+  "error.workflow.sunraNoCredits":
+    "Your Sunra account does not have sufficient credits. Add credits at sunra.ai/pricing, then run the step again.",
+  "error.workflow.sunraNeedsPlan":
+    "This Sunra model needs a Sunra plan. Get a plan at sunra.ai/pricing, or select a different model.",
+  "error.workflow.sunraTeamInputs":
+    "Sunra uses input pictures only with a Personal account. Select your Personal account in Sunra, or remove the picture connections.",
+  "error.workflow.sunraFailed": "Sunra could not make the file: {reason}",
+  "error.workflow.sunraTimeout":
+    "Sunra did not finish the file in time. Look in the OpenBot project on sunra.ai before you run the step again.",
+  "error.workflow.higgsfieldSignIn": "Sign in to Higgsfield in Apps to use Higgsfield models.",
+  "error.workflow.higgsfieldNoCredits":
+    "Your Higgsfield account does not have sufficient credits. Add credits at higgsfield.ai/pricing, then run the step again.",
+  "error.workflow.higgsfieldNeedsPlan":
+    "This Higgsfield model needs a Higgsfield plan. Get a plan at higgsfield.ai/pricing, or select a different model.",
+  "error.workflow.higgsfieldBlocked":
+    "Higgsfield did not make the file because its content check stopped it. Change the prompt or the input pictures, then run the step again.",
+  "error.workflow.higgsfieldFailed": "Higgsfield could not make the file: {reason}",
+  "error.workflow.higgsfieldTimeout":
+    "Higgsfield did not finish the file in time. Look in your history on higgsfield.ai before you run the step again.",
 });

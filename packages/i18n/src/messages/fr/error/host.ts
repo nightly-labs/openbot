@@ -2,7 +2,6 @@ import type { PartialTranslation } from "../../../message";
 import type { messages as source } from "../../en/error/host";
 
 export const messages = {
-  // Errors from host setup, publishing, and host maintenance.
   "error.host.iceServersMissing": "Remote Signal n’a pas fourni de serveurs ICE.",
   "error.host.keyRotationUnavailable": "Ce serveur ne peut pas changer sa clé sans le service de comptes.",
   "error.host.keyRotationRefused":
@@ -20,10 +19,13 @@ export const messages = {
   "error.host.publishFailed": "Impossible de publier cet OpenBot.",
   "error.host.mobileConnectPublishFailed": "Impossible de publier cet OpenBot pour Mobile Connect.",
   "error.host.mobileConnectHostChanged": "L’hôte Mobile Connect a changé. Réessayez.",
+  "error.host.mobileConnectHostMismatch": "Votre compte a une autre clé pour ce serveur. Réessayez.",
   "error.host.noServer": "Cet ordinateur n’a aucun serveur à modifier.",
   "error.host.identityLocalOnly":
     "Le nom et le logo du serveur ne peuvent être modifiés que sur l’ordinateur qui l’exécute.",
   "error.host.timezoneInvalid": "Ce fuseau horaire est inconnu.",
+  "error.host.signalHomeUnknown": "Ce serveur Signal n'est pas disponible.",
+  "error.host.turnLimitInvalid": "Cette limite de fils n’est pas valide.",
   "error.host.maintenanceInterrupted":
     "La maintenance de l’hôte a été interrompue. Vérifiez l’application et réinitialisez l’état de l’hôte avant de réessayer.",
   "error.host.updateFailed":

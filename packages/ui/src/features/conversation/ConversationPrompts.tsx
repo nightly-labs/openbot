@@ -1,136 +1,39 @@
-import { INPUT_LIMITS } from "@openbot/contracts/input-limits";
 import type {
   AgentApproval,
+  BrowserPermissionRequest,
   BrowserPreview,
   BrowserTab,
   BrowserTakeoverRequest,
   LocalBrowserSecretResponse,
+  MediaApprovalChoice,
+  MediaApprovalRead,
 } from "@openbot/contracts/ipc";
+import { browserPermissionSite } from "@openbot/contracts/team-protocol/browser-permissions-v1";
+import { type FeedbackApproval, feedbackApproval } from "@openbot/team-client/feedback-approval";
+import { approvalIsCut } from "@openbot/team-client/runtime-attention";
 import { classifyFailure } from "@openbot/telemetry";
-import { Badge, Button, Input, LoaderCircle, LogIn, Maximize2, Monitor, RadioGroup, toast } from "@openbot/ui";
+import { Button, LogIn, Maximize2, Monitor, toast } from "@openbot/ui";
 import { StandingApprovalConfirmation } from "@openbot/ui/components/StandingApprovalConfirmation";
 import { BrowserSecretCard, type BrowserSecretVault } from "@openbot/ui/features/conversation/BrowserSecretCard";
 import { BrowserTakeoverPreview } from "@openbot/ui/features/conversation/BrowserTakeoverPreview";
+import {
+  MediaApprovalCard,
+  type MediaApprovalControls,
+  mediaApprovalCandidate,
+} from "@openbot/ui/features/conversation/MediaApprovalCard";
 import { type TextValue, useText } from "@openbot/ui/text";
-import { createMemo, createSignal, For, Show } from "solid-js";
-import { type FeedbackApproval, feedbackApproval } from "./feedback-approval";
-import { isSendShortcutKey, type SendShortcut, sendShortcutAriaKey } from "./send-shortcut";
+import { createEffect, createMemo, createSignal, For, Show, untrack } from "solid-js";
+import { CreditsHoldCard } from "./CreditsHoldCard";
 import { UiBlockCard } from "./ui-blocks/UiBlockCard";
-
-export function ChoiceCard(props: {
-  title: string;
-  hint?: string;
-  choices: string[];
-  customChoice?: string;
-  pending?: boolean;
-  /**
-   * Which chord submits a custom answer. Enter keeps the current behavior; in the modifier mode
-   * plain Enter does not submit and the single-line field adds no line.
-   */
-  sendShortcut?: SendShortcut;
-  onSubmit: (answer: string) => Promise<boolean>;
-}) {
-  const { t } = useText();
-  const [answer, setAnswer] = createSignal("");
-  const [customSelected, setCustomSelected] = createSignal(false);
-  let customInput: HTMLInputElement | undefined;
-  const selectedChoice = () => (customSelected() ? (props.customChoice ?? "") : answer());
-  const submit = async () => {
-    const value = answer().trim();
-    if (value && !props.pending) await props.onSubmit(value);
-  };
-  return (
-    <div class="choice-card conversation-interaction-card" aria-busy={props.pending ? "true" : undefined}>
-      <header class="conversation-interaction-header">
-        <strong>{props.title}</strong>
-        <Badge variant="warning-light" class="conversation-interaction-status" role="status">
-          <LoaderCircle class="conversation-interaction-spinner" data-icon="inline-start" aria-hidden="true" />
-          {props.pending ? t("common.sending") : t("prompt.inputRequired")}
-        </Badge>
-      </header>
-      <p class="choice-card-hint">{props.hint ?? t("prompt.choice.hint")}</p>
-      <RadioGroup.Root
-        class="choice-options"
-        aria-label={props.title}
-        value={selectedChoice()}
-        disabled={props.pending ?? false}
-        onChange={(choice) => {
-          if (choice === props.customChoice) {
-            setAnswer("");
-            setCustomSelected(true);
-            queueMicrotask(() => customInput?.focus());
-            return;
-          }
-          setCustomSelected(false);
-          setAnswer(choice);
-          void props.onSubmit(choice);
-        }}
-      >
-        <For each={props.choices}>
-          {(choice, index) => (
-            <RadioGroup.Item class="choice-option-item" value={choice} disabled={props.pending ?? false}>
-              <RadioGroup.ItemInput aria-label={choice} />
-              <RadioGroup.ItemControl
-                class={[
-                  "choice-option",
-                  {
-                    "choice-option-selected": choice === props.customChoice ? customSelected() : answer() === choice,
-                  },
-                ]}
-              >
-                <span class="choice-key">{String.fromCharCode(65 + index())}</span>
-                <span>{choice}</span>
-              </RadioGroup.ItemControl>
-            </RadioGroup.Item>
-          )}
-        </For>
-      </RadioGroup.Root>
-      <Input
-        ref={(element) => (customInput = element)}
-        class="choice-input"
-        value={answer()}
-        placeholder={t("prompt.customPlaceholder")}
-        aria-label={t("prompt.choice.customLabel")}
-        aria-keyshortcuts={sendShortcutAriaKey(props.sendShortcut ?? "enter")}
-        maxlength={INPUT_LIMITS.promptAnswerText}
-        disabled={props.pending}
-        onValueChange={(value) => {
-          setCustomSelected(true);
-          setAnswer(value);
-        }}
-        onKeyDown={(event) => {
-          // The browser owns the key that commits an IME composition. Safari sends it
-          // after `compositionend` without `isComposing`; keyCode 229 marks it.
-          if (event.isComposing || event.keyCode === 229) return;
-          const sendShortcut = props.sendShortcut ?? "enter";
-          // Enter to send keeps the previous chord: every Enter sends.
-          if (sendShortcut === "enter") {
-            if (event.key !== "Enter") return;
-          } else if (!isSendShortcutKey(event, sendShortcut)) return;
-          void submit();
-        }}
-      />
-    </div>
-  );
-}
 
 export function ApprovalCard(props: {
   approval: AgentApproval;
   onApprove: () => Promise<boolean>;
   onReject: () => Promise<boolean>;
-  /**
-   * Moves this agent from Ask first to Full access, then accepts the request in hand. Absent at any
-   * other level, and where the user may not change the agent's Permissions. The card then reads
-   * exactly as it did before this option existed.
-   */
   onAlwaysAllow?: (() => Promise<boolean>) | undefined;
-  /** The agent this grant would cover, for the confirmation the grant deserves. */
   agentName?: string | undefined;
-  /**
-   * Set while approved feedback is on its way. The approval is answered at once, so the chat keeps the
-   * card with its loader until the thank-you card arrives.
-   */
   sending?: boolean | undefined;
+  media?: MediaApprovalControls | undefined;
 }) {
   const { t, errorMessage, sourceText } = useText();
   const [submitting, setSubmitting] = createSignal(false);
@@ -138,12 +41,59 @@ export function ApprovalCard(props: {
   const [confirmingAlways, setConfirmingAlways] = createSignal(false);
   let alwaysAllowButton: HTMLButtonElement | undefined;
   const report = createMemo(() => feedbackApproval(props.approval));
-  const submit = async (decision: "accept" | "decline") => {
+  const cut = () => approvalIsCut(props.approval);
+  const mediaSource = () => {
+    const media = props.media;
+    const approval = props.approval;
+    return media && mediaApprovalCandidate(approval) && !approvalIsCut(approval)
+      ? { read: media.read, approval: { ...approval } }
+      : null;
+  };
+  const [mediaRead, setMediaRead] = createSignal<MediaApprovalRead | null | undefined>(
+    untrack(() => (mediaSource() ? undefined : null)),
+  );
+  createEffect(mediaSource, (source) => {
+    if (!source) {
+      setMediaRead(null);
+      return;
+    }
+    let live = true;
+    void source.read(source.approval).then(
+      (read) => {
+        if (live) setMediaRead(read);
+      },
+      () => {
+        if (live) setMediaRead(null);
+      },
+    );
+    return () => {
+      live = false;
+    };
+  });
+  const mediaOffer = () => mediaRead()?.media ?? null;
+  const creditsHold = () => {
+    const hold = mediaRead()?.hold;
+    const controls = props.media?.hold;
+    return hold && controls ? { hold, controls } : null;
+  };
+  const genericCard = () => mediaRead() !== undefined && !mediaOffer() && !creditsHold();
+  const setMediaDefault = () => {
+    const save = props.media?.setDefault;
+    const kind = mediaOffer()?.kind;
+    if (!save || !kind) return undefined;
+    return (model: string | null) => save(kind, model);
+  };
+  const submit = async (decision: "accept" | "decline", choice?: MediaApprovalChoice) => {
     if (submitting()) return;
     setSubmitting(true);
     setAccepting(decision === "accept");
+    const allowMedia = props.media?.allow;
     try {
-      const completed = await (decision === "accept" ? props.onApprove() : props.onReject());
+      const completed = await (decision === "decline"
+        ? props.onReject()
+        : choice && allowMedia
+          ? allowMedia(props.approval, choice)
+          : props.onApprove());
       if (!completed) setSubmitting(false);
     } catch (error) {
       toast.error(errorMessage(error, t("prompt.approval.answerFailed")), {
@@ -173,83 +123,108 @@ export function ApprovalCard(props: {
       when={report()}
       fallback={
         <>
-          <UiBlockCard
-            class="approval-card"
-            status="pending"
-            title={t(approvalTitle(props.approval))}
-            subtitle={props.approval.reason ? sourceText(props.approval.reason) : undefined}
-            busy={submitting()}
-            waiting
-            actions={
-              <>
-                <Button
-                  variant="secondary"
-                  size="sm"
-                  type="button"
-                  disabled={submitting()}
-                  data-cuelume-tap="close"
-                  data-cuelume-emphasis="normal"
-                  onClick={() => void submit("decline")}
-                >
-                  {t("prompt.approval.deny")}
-                </Button>
-                <Show when={props.onAlwaysAllow}>
+          <Show when={creditsHold()}>
+            {(credits) => (
+              <CreditsHoldCard approval={props.approval} hold={credits().hold} controls={credits().controls} />
+            )}
+          </Show>
+          <Show when={mediaOffer()}>
+            {(offer) => (
+              <MediaApprovalCard
+                offer={offer()}
+                agentName={props.agentName}
+                submitting={submitting()}
+                onDeny={() => void submit("decline")}
+                onAllow={(choice) => void submit("accept", choice)}
+                onSetDefault={setMediaDefault()}
+              />
+            )}
+          </Show>
+          <Show when={genericCard()}>
+            <UiBlockCard
+              class="approval-card"
+              status="pending"
+              title={t(approvalTitle(props.approval))}
+              subtitle={props.approval.reason ? sourceText(props.approval.reason) : undefined}
+              busy={submitting()}
+              waiting
+              actions={
+                <>
                   <Button
-                    ref={alwaysAllowButton}
                     variant="secondary"
                     size="sm"
                     type="button"
                     disabled={submitting()}
-                    onClick={() => setConfirmingAlways(true)}
+                    data-cuelume-tap="close"
+                    data-cuelume-emphasis="normal"
+                    onClick={() => void submit("decline")}
                   >
-                    {t("prompt.approval.alwaysAllow")}
+                    {t("prompt.approval.deny")}
                   </Button>
-                </Show>
-                <Button
-                  variant="default"
-                  size="sm"
-                  type="button"
-                  disabled={submitting()}
-                  onClick={() => void submit("accept")}
-                >
-                  {t("prompt.approval.allow")}
-                </Button>
-              </>
-            }
-          >
-            <Show when={props.approval.command}>
-              {(command) => (
-                <div class="approval-command-block">
-                  <Show when={props.approval.cwd}>
-                    <div class="approval-cwd">{props.approval.cwd}</div>
+                  <Show when={props.onAlwaysAllow && !cut()}>
+                    <Button
+                      ref={alwaysAllowButton}
+                      variant="secondary"
+                      size="sm"
+                      type="button"
+                      disabled={submitting()}
+                      onClick={() => setConfirmingAlways(true)}
+                    >
+                      {t("prompt.approval.alwaysAllow")}
+                    </Button>
                   </Show>
-                  <code>{command()}</code>
+                  <Show when={!cut()}>
+                    <Button
+                      variant="default"
+                      size="sm"
+                      type="button"
+                      disabled={submitting()}
+                      onClick={() => void submit("accept")}
+                    >
+                      {t("prompt.approval.allow")}
+                    </Button>
+                  </Show>
+                </>
+              }
+            >
+              <Show when={props.approval.command}>
+                {(command) => (
+                  <div class="approval-command-block">
+                    <Show when={props.approval.cwd}>
+                      <div class="approval-cwd">{props.approval.cwd}</div>
+                    </Show>
+                    <code>{command()}</code>
+                  </div>
+                )}
+              </Show>
+              <Show when={props.approval.kind === "file-change"}>
+                <div class="approval-detail-row">
+                  <span class="approval-detail-label">{t("prompt.approval.files")}</span>
+                  <strong>{props.approval.grantRoot ?? t("prompt.approval.agentWorkspace")}</strong>
                 </div>
-              )}
-            </Show>
-            <Show when={props.approval.kind === "file-change"}>
-              <div class="approval-detail-row">
-                <span class="approval-detail-label">{t("prompt.approval.files")}</span>
-                <strong>{props.approval.grantRoot ?? t("prompt.approval.agentWorkspace")}</strong>
-              </div>
-            </Show>
-            <Show when={props.approval.kind === "permissions"}>
-              <PermissionDetails permissions={props.approval.permissions} />
-            </Show>
-          </UiBlockCard>
-          <StandingApprovalConfirmation
-            open={confirmingAlways()}
-            agentName={props.agentName}
-            onCancel={() => setConfirmingAlways(false)}
-            onConfirm={() => void alwaysAllow()}
-            restoreFocusTarget={alwaysAllowButton}
-          />
+              </Show>
+              <Show when={props.approval.kind === "permissions"}>
+                <PermissionDetails permissions={props.approval.permissions} />
+              </Show>
+              <Show when={cut()}>
+                <p class="approval-cut-note">{t("prompt.approval.cut")}</p>
+              </Show>
+            </UiBlockCard>
+            <StandingApprovalConfirmation
+              open={confirmingAlways()}
+              agentName={props.agentName}
+              onCancel={() => setConfirmingAlways(false)}
+              onConfirm={() => void alwaysAllow()}
+              restoreFocusTarget={alwaysAllowButton}
+            />
+          </Show>
         </>
       }
     >
       {(offer) => (
         <FeedbackOffer
           report={offer()}
+          cut={cut()}
           submitting={submitting()}
           sending={(submitting() && accepting()) || props.sending === true}
           onSend={() => void submit("accept")}
@@ -260,12 +235,9 @@ export function ApprovalCard(props: {
   );
 }
 
-/**
- * The agent's offer to send a bug report or an idea to the OpenBot team. It reads as a message, not
- * as a grant: the report is a quote, and Send keeps its loader until the thank-you card replaces it.
- */
 function FeedbackOffer(props: {
   report: FeedbackApproval;
+  cut: boolean;
   submitting: boolean;
   sending: boolean;
   onSend: () => void;
@@ -273,7 +245,6 @@ function FeedbackOffer(props: {
 }) {
   const { t, sourceText } = useText();
   const idea = () => props.report.kind === "idea";
-  // The host writes its notes, such as the recent errors, as source text paragraphs.
   const text = () =>
     props.report.text
       .split("\n\n")
@@ -295,6 +266,12 @@ function FeedbackOffer(props: {
         <strong>{props.report.title}</strong>
         <Show when={text()}>{(body) => <p>{body()}</p>}</Show>
       </blockquote>
+      <Show when={props.cut}>
+        <p class="approval-cut-note">{t("prompt.approval.cut")}</p>
+      </Show>
+      <Show when={props.report.phone}>
+        <p class="approval-cut-note">{t("prompt.approval.report.phoneOnly")}</p>
+      </Show>
       <div class="feedback-offer-actions">
         <Button
           variant="secondary"
@@ -307,17 +284,19 @@ function FeedbackOffer(props: {
         >
           {t("prompt.approval.report.dontSend")}
         </Button>
-        <Button
-          variant="default"
-          type="button"
-          class="approval-button"
-          disabled={props.submitting && !props.sending}
-          loading={props.sending}
-          loadingLabel={t("common.sending")}
-          onClick={() => props.onSend()}
-        >
-          {t("prompt.approval.report.send")}
-        </Button>
+        <Show when={!props.cut && !props.report.phone}>
+          <Button
+            variant="default"
+            type="button"
+            class="approval-button"
+            disabled={props.submitting && !props.sending}
+            loading={props.sending}
+            loadingLabel={t("common.sending")}
+            onClick={() => props.onSend()}
+          >
+            {t("prompt.approval.report.send")}
+          </Button>
+        </Show>
       </div>
     </section>
   );
@@ -330,19 +309,14 @@ interface BrowserTakeoverCardProps {
   preview: BrowserPreview | null;
   previewStatus: "idle" | "loading" | "ready" | "failed";
   decision?: "complete" | "cancel" | null;
-  onOpen?: () => void;
-  onComplete: () => Promise<boolean>;
+  onOpen?: (() => void) | undefined;
+  onComplete?: (() => Promise<boolean>) | undefined;
   onCancel: () => Promise<boolean>;
-  /** A sign-in on this computer for the tab, when the page refuses a sign-in from the server. */
   onSignInLocally?: (() => void) | undefined;
-  /**
-   * The agent found that the page refused the sign-in from `server`. The card then asks only for the
-   * sign-in on this computer; `signingIn` is true while that sign-in is open.
-   */
   signInBlocked?: { server: string; signingIn: boolean } | undefined;
+  signInOnDesktop?: boolean | undefined;
   browserSecret?: {
     loadPreview?: (tabId: string) => Promise<BrowserPreview>;
-    /** Offer "Save to Vault" for a password. */
     vault?: BrowserSecretVault | undefined;
     onRespond: (input: LocalBrowserSecretResponse) => Promise<void>;
   };
@@ -373,6 +347,22 @@ export function BrowserTakeoverCard(props: BrowserTakeoverCardProps) {
 function BrowserManualTakeoverCard(props: BrowserTakeoverCardProps) {
   const { t } = useText();
   const [submitting, setSubmitting] = createSignal<"complete" | "cancel" | null>(null);
+  const [openedRequest, setOpenedRequest] = createSignal<BrowserTakeoverRequest>();
+  const opened = () => {
+    const done = openedRequest();
+    const request = props.request;
+    return (
+      done !== undefined &&
+      request !== undefined &&
+      done.requestId === request.requestId &&
+      done.agentId === request.agentId &&
+      done.threadId === request.threadId
+    );
+  };
+  const openPage = () => {
+    setOpenedRequest(props.request);
+    props.onOpen?.();
+  };
   const pageDetails = createMemo(() => browserPageDetails(props.tab, t));
   const completed = () => props.decision === "complete";
   const cancelled = () => props.decision === "cancel";
@@ -396,12 +386,14 @@ function BrowserManualTakeoverCard(props: BrowserTakeoverCardProps) {
     const blocked = props.signInBlocked;
     if (completed()) return t("prompt.browser.continuing", { name: props.agentName });
     if (cancelled()) return t(blocked ? "prompt.browser.signInBlocked.cancelledBody" : "prompt.browser.cancelledBody");
-    return blocked
-      ? t("prompt.browser.signInBlocked.body", {
-          host: pageDetails().host,
-          server: blocked.server,
-          name: props.agentName,
-        })
+    if (blocked)
+      return t("prompt.browser.signInBlocked.body", {
+        host: pageDetails().host,
+        server: blocked.server,
+        name: props.agentName,
+      });
+    return props.signInOnDesktop
+      ? t("prompt.browser.signInBlocked.desktopBody", { host: pageDetails().host, name: props.agentName })
       : t("prompt.browser.pendingBody", { name: props.agentName });
   };
   const pageHost = () => {
@@ -411,9 +403,10 @@ function BrowserManualTakeoverCard(props: BrowserTakeoverCardProps) {
       : pageDetails().host;
   };
   const submit = async (decision: "complete" | "cancel") => {
-    if (submitting() || props.decision) return;
+    const respond = decision === "complete" ? props.onComplete : props.onCancel;
+    if (submitting() || props.decision || !respond) return;
     setSubmitting(decision);
-    const completed = await (decision === "complete" ? props.onComplete() : props.onCancel());
+    const completed = await respond();
     if (!completed) setSubmitting(null);
   };
 
@@ -457,15 +450,29 @@ function BrowserManualTakeoverCard(props: BrowserTakeoverCardProps) {
                     </Button>
                   )}
                 </Show>
-                <Button
-                  variant="default"
-                  size="sm"
-                  type="button"
-                  disabled={Boolean(submitting())}
-                  onClick={() => void submit("complete")}
-                >
-                  {t("prompt.browser.done")}
-                </Button>
+                <Show when={props.onOpen}>
+                  <Button
+                    variant={opened() ? "secondary" : "default"}
+                    size="sm"
+                    type="button"
+                    disabled={Boolean(submitting())}
+                    onClick={openPage}
+                  >
+                    <Maximize2 data-icon="inline-start" aria-hidden="true" />
+                    {t("common.open")}
+                  </Button>
+                </Show>
+                <Show when={props.onComplete}>
+                  <Button
+                    variant={props.onOpen && !opened() ? "secondary" : "default"}
+                    size="sm"
+                    type="button"
+                    disabled={Boolean(submitting())}
+                    onClick={() => void submit("complete")}
+                  >
+                    {t("prompt.browser.done")}
+                  </Button>
+                </Show>
               </>
             }
           >
@@ -513,7 +520,7 @@ function BrowserManualTakeoverCard(props: BrowserTakeoverCardProps) {
             type="button"
             class="browser-takeover-preview-viewport browser-takeover-preview-open"
             aria-label={t("prompt.browser.openPage", { title: pageDetails().title })}
-            onClick={() => props.onOpen?.()}
+            onClick={openPage}
           >
             <BrowserTakeoverPreview preview={props.preview} previewStatus={props.previewStatus} page={pageDetails()} />
             <span class="browser-takeover-preview-open-label" aria-hidden="true">
@@ -558,5 +565,54 @@ function PermissionDetails(props: { permissions: AgentApproval["permissions"] })
     <section class="approval-permissions" aria-label={t("prompt.approval.permissions")}>
       <For each={details()}>{(detail) => <span>{detail}</span>}</For>
     </section>
+  );
+}
+
+export function BrowserLocationCard(props: {
+  request: BrowserPermissionRequest;
+  pending: boolean;
+  onAnswer: (allow: boolean, always: boolean) => void;
+}) {
+  const { t } = useText();
+  return (
+    <UiBlockCard
+      class="approval-card"
+      status="pending"
+      title={t("browser.location.title", { site: browserPermissionSite(props.request.origin) })}
+      subtitle={t("browser.location.description")}
+      busy={props.pending}
+      waiting
+      actions={
+        <>
+          <Button
+            variant="secondary"
+            size="sm"
+            type="button"
+            disabled={props.pending}
+            onClick={() => props.onAnswer(false, false)}
+          >
+            {t("browser.location.block")}
+          </Button>
+          <Button
+            variant="secondary"
+            size="sm"
+            type="button"
+            disabled={props.pending}
+            onClick={() => props.onAnswer(true, true)}
+          >
+            {t("browser.location.allowAlways")}
+          </Button>
+          <Button
+            variant="default"
+            size="sm"
+            type="button"
+            disabled={props.pending}
+            onClick={() => props.onAnswer(true, false)}
+          >
+            {t("browser.location.allow")}
+          </Button>
+        </>
+      }
+    />
   );
 }

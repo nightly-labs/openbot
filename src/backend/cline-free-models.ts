@@ -5,26 +5,23 @@ import type { AcpModel } from "./acp-configuration";
 
 const logger = createOpenBotLogger("provider-runtime");
 
-/**
- * Cline's own list of the models it recommends, free ones included. It is public: the CLI reads it
- * without the account, and so does OpenBot.
- */
 export const CLINE_RECOMMENDED_MODELS_URL = "https://api.cline.bot/api/v1/ai/cline/recommended-models";
 
-/** Below the 5 s of the `model/list` that waits for it, which also waits for the CLI's own list. */
 const FETCH_TIMEOUT_MS = 3_000;
 
-const RecommendedModels = Schema.Struct({
-  free: Schema.Array(
-    Schema.Struct({
-      id: Schema.String,
-      name: Schema.optional(Schema.String),
-      description: Schema.optional(Schema.String),
-    }),
-  ),
+const RecommendedModel = Schema.Struct({
+  id: Schema.String,
+  name: Schema.optional(Schema.String),
+  description: Schema.optional(Schema.String),
 });
 
-/** The free tier on 2026-10-19, for when Cline's list cannot be read. */
+const RecommendedModels = Schema.Struct({
+  free: Schema.Array(RecommendedModel),
+  clinePass: Schema.optional(Schema.Array(RecommendedModel)),
+});
+
+type RecommendedModel = typeof RecommendedModel.Type;
+
 const CLINE_FREE_MODEL_FALLBACKS = [
   { id: "cline-free/minimax-m3.1-flash", name: "Minimax M3.1 Flash" },
   { id: "cline-free/nemotron-3.5-super-vl", name: "Nemotron 3.5 Super VL" },
@@ -33,18 +30,25 @@ const CLINE_FREE_MODEL_FALLBACKS = [
   { id: "cline-free/solar-mini4", name: "Solar Mini 4" },
 ];
 
-/**
- * Reads Cline's free models, which `cline --acp` does not list: its ACP agent lists the OpenRouter
- * catalog bundled into the CLI, and only the CLI's own picker reads the free tier from Cline. The
- * agent takes a model it did not list, so OpenBot lists them and the agent runs them.
- *
- * Never fails. A list that cannot be read gives the last one that could, then the bundled one.
- */
+const CLINE_PASS_MODEL_FALLBACKS = [
+  "cline-pass/deepseek-v4.1-flash-1017",
+  "cline-pass/deepseek-v4-pro",
+  "cline-pass/glm-5.3",
+  "cline-pass/glm-5.3-flash",
+  "cline-pass/kimi-k3.1-pro",
+  "cline-pass/muse-spark-1.3-contributor",
+  "cline-pass/kimi-k3",
+  "cline-pass/qwen3.8-max",
+  "cline-pass/minimax-m3.1-flash",
+].map((id) => ({ id }));
+
 export function clineFreeModels(): () => Effect.Effect<AcpModel[]> {
-  let last: AcpModel[] = CLINE_FREE_MODEL_FALLBACKS.map(freeModel);
+  let last: AcpModel[] = [
+    ...CLINE_PASS_MODEL_FALLBACKS.map(clinePassModel),
+    ...CLINE_FREE_MODEL_FALLBACKS.map(freeModel),
+  ];
   return Effect.fn("ClineFreeModels.read")(
     function* () {
-      // One deadline for the headers and the body: a body that stalls must not hold the model list.
       const body = yield* Effect.tryPromise({
         try: async (signal) => {
           const response = await fetch(CLINE_RECOMMENDED_MODELS_URL, {
@@ -56,9 +60,11 @@ export function clineFreeModels(): () => Effect.Effect<AcpModel[]> {
         },
         catch: (cause) => cause,
       }).pipe(Effect.timeout(FETCH_TIMEOUT_MS));
-      const { free } = yield* Schema.decodeUnknownEffect(RecommendedModels)(body);
-      // An empty free tier is an answer: Cline can end it, and the picker must not keep the old one.
-      last = free.filter((entry) => isAgentModel(entry.id)).map(freeModel);
+      const { free, clinePass = [] } = yield* Schema.decodeUnknownEffect(RecommendedModels)(body);
+      last = [
+        ...clinePass.filter((entry) => isAgentModel(entry.id)).map(clinePassModel),
+        ...free.filter((entry) => isAgentModel(entry.id)).map(freeModel),
+      ];
       return last;
     },
     Effect.catch((cause) => {
@@ -68,19 +74,26 @@ export function clineFreeModels(): () => Effect.Effect<AcpModel[]> {
   );
 }
 
-function freeModel(entry: { id: string; name?: string | undefined; description?: string | undefined }): AcpModel {
-  const name = entry.name?.trim() || entry.id;
+function freeModel(entry: RecommendedModel): AcpModel {
+  return tierModel(entry, "free", "cline");
+}
+
+function clinePassModel(entry: RecommendedModel): AcpModel {
+  return tierModel(entry, "ClinePass", "cline-pass");
+}
+
+function tierModel(entry: RecommendedModel, tier: string, provider: string): AcpModel {
+  const given = entry.name?.trim();
+  const name = given && given !== entry.id ? given : entry.id.slice(entry.id.indexOf("/") + 1);
   return {
     id: entry.id,
-    // As the Cline CLI names them, and what the picker's search for "free" finds.
-    name: /\(free\)$/i.test(name) ? name : `${name} (free)`,
+    name: name.toLowerCase().endsWith(`(${tier.toLowerCase()})`) ? name : `${name} (${tier})`,
     description: entry.description?.trim() ?? "",
     defaultReasoningEffort: "medium",
     supportedReasoningEfforts: ["medium"],
     reasoningEffortConfigurable: false,
     reasoningEffortWireValues: new Map([["medium", "medium"]]),
     usesModelReasoningEffort: null,
-    // The free tier is on Cline's own billing, so the session uses the `cline` provider for it.
-    unlisted: { config: { provider: "cline" } },
+    unlisted: { config: { provider } },
   };
 }

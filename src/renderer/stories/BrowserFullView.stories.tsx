@@ -1,6 +1,7 @@
 import type {
   BrowserControlSession,
   BrowserDockIsland,
+  BrowserLiveViewDialog,
   BrowserLiveViewEvent,
   BrowserTab,
 } from "@openbot/contracts/ipc";
@@ -94,10 +95,8 @@ const meta = {
 export default meta;
 type Story = StoryObj<typeof meta>;
 
-/** Four tabs: three of the agent, one of the user, one loading. */
 export const Tabs: Story = {};
 
-/** A tab of a remote server: the page menu has "Sign in on this computer". */
 export const SignInOnThisComputer: Story = {
   args: {
     activeTab: { ...tab, title: "Log in to X / X", url: "https://x.com/i/flow/login" },
@@ -106,16 +105,10 @@ export const SignInOnThisComputer: Story = {
   },
 };
 
-/** On macOS the traffic lights are over the top row, so the tabs start clear of them. */
 export const MacWindowControls: Story = { args: { macWindowControls: true } };
 
-/** The page loads: Stop is in place of Reload. */
 export const Loading: Story = { args: { activeTab: tabs[2] } };
 
-/**
- * The dock of Chief over the page, with `island` above the composer. After the user answers a question or an
- * approval, the card goes and Chief works again.
- */
 function StoryDock(props: { island: BrowserDockIsland; working: boolean }) {
   const [answered, setAnswered] = createSignal(false);
   const answer = async () => {
@@ -150,7 +143,6 @@ function StoryDock(props: { island: BrowserDockIsland; working: boolean }) {
   );
 }
 
-/** The agent clicks on the page. Its tab shows that it acts, and the dock shows the step. */
 export const AgentActing: Story = {
   args: {
     controlForTab: (entry: BrowserTab) => (entry.id === tab.id ? control : undefined),
@@ -159,7 +151,6 @@ export const AgentActing: Story = {
   },
 };
 
-/** The agent asks a question with choices. The user answers it over the page and does not go to the chat. */
 export const AgentAsks: Story = {
   args: {
     dock: (
@@ -188,7 +179,6 @@ export const AgentAsks: Story = {
   },
 };
 
-/** The agent waits for an approval. The user approves or declines it over the page. */
 export const AgentNeedsApproval: Story = {
   args: {
     dock: (
@@ -215,7 +205,6 @@ export const AgentNeedsApproval: Story = {
   },
 };
 
-/** A tab outside the shared profile names its profile beside the address and in its tab tooltip. */
 export const NamedProfile: Story = {
   args: {
     profileForTab: (entry: BrowserTab) =>
@@ -223,7 +212,6 @@ export const NamedProfile: Story = {
   },
 };
 
-/** Recording and diagnostic errors show beside the address. */
 export const RecordingWithDiagnosticErrors: Story = {
   args: { activeTab: { ...tab, recording: true, diagnosticErrorCount: 12 } },
 };
@@ -240,14 +228,48 @@ export const PopupBlocked: Story = {
   },
 };
 
-/** No tab is open. */
+const siteSignInTab = {
+  ...tab,
+  title: "401 Unauthorized",
+  url: "https://files.example.com/remote.php/dav/",
+  httpSignIn: { origin: "https://files.example.com" },
+};
+
+export const SiteSignIn: Story = {
+  args: {
+    activeTab: siteSignInTab,
+    tabs: [siteSignInTab, ...tabs.slice(1)],
+    onHttpSignIn: fn(async () => undefined),
+  },
+};
+
+export const SiteSignInRefused: Story = {
+  args: {
+    activeTab: { ...siteSignInTab, httpSignIn: { ...siteSignInTab.httpSignIn, refused: true } },
+    tabs: [{ ...siteSignInTab, httpSignIn: { ...siteSignInTab.httpSignIn, refused: true } }, ...tabs.slice(1)],
+    onHttpSignIn: fn(async () => undefined),
+  },
+};
+
+const teach = { agentName: chief.name, pending: false, onStart: fn(), onSave: fn(), onClose: fn() };
+
+export const TeachTask: Story = { args: { teach: { ...teach, startedAt: null } } };
+
+export const TeachTaskRecording: Story = { args: { teach: { ...teach, startedAt: Date.now() - 6000 } } };
+
 export const Empty: Story = { args: { tabs: [], activeTab: undefined, canReopen: false } };
 
-/** A host that sends one 4:3 frame, drawn in the theme's colors. */
-function remoteLiveViewRuntime(): BrowserViewRuntime {
+function remoteLiveViewRuntime(
+  question?: { dialog: BrowserLiveViewDialog; showsPage: boolean } | undefined,
+): BrowserViewRuntime {
   const listeners = new Set<(event: BrowserLiveViewEvent) => void>();
+  const emit = (event: BrowserLiveViewEvent) => {
+    for (const listener of listeners) listener(event);
+  };
   return {
     async startLiveView(tabId) {
+      if (question) emit({ type: "dialog", tabId, dialog: question.dialog });
+      if (question && !question.showsPage) return;
       const width = 1024;
       const height = 768;
       const canvas = new OffscreenCanvas(width, height);
@@ -261,10 +283,12 @@ function remoteLiveViewRuntime(): BrowserViewRuntime {
         context.fillText("Page on the host", 64, 128);
       }
       const image = new Uint8Array(await (await canvas.convertToBlob({ type: "image/jpeg" })).arrayBuffer());
-      for (const listener of listeners) listener({ type: "frame", tabId, sequence: 1, width, height, image });
+      emit({ type: "frame", tabId, sequence: 1, width, height, image });
     },
     stopLiveView: async () => undefined,
-    sendLiveViewInput: async () => undefined,
+    async sendLiveViewInput(input) {
+      if (input.type === "dialog") emit({ type: "dialog", tabId: tab.id, dialog: null });
+    },
     onLiveViewEvent(listener) {
       listeners.add(listener);
       return () => {
@@ -274,14 +298,34 @@ function remoteLiveViewRuntime(): BrowserViewRuntime {
   };
 }
 
-/**
- * A remote host's tab, as the web app and a desktop connected to a host show it. The page is a frame of
- * the host's shape, the keys stay with the user's browser, and there is no Picture in Picture.
- */
 export const RemoteLiveView: Story = {
   args: {
     liveViewTabId: tab.id,
     liveViewRuntime: remoteLiveViewRuntime(),
+    canEnterPip: false,
+    shortcuts: undefined,
+  },
+};
+
+export const RemoteLiveViewPageDialog: Story = {
+  args: {
+    liveViewTabId: tab.id,
+    liveViewRuntime: remoteLiveViewRuntime({
+      dialog: { id: "dialog-1", type: "confirm", message: "Leave this page? The changes that you made are not saved." },
+      showsPage: true,
+    }),
+    canEnterPip: false,
+    shortcuts: undefined,
+  },
+};
+
+export const RemoteLiveViewPageAlertBeforeFirstFrame: Story = {
+  args: {
+    liveViewTabId: tab.id,
+    liveViewRuntime: remoteLiveViewRuntime({
+      dialog: { id: "dialog-2", type: "alert", message: "Your session ends in 2 minutes." },
+      showsPage: false,
+    }),
     canEnterPip: false,
     shortcuts: undefined,
   },

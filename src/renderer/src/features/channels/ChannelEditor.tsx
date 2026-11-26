@@ -1,5 +1,5 @@
 import { INPUT_LIMITS } from "@openbot/contracts/input-limits";
-import type { Channel, ChannelDraft, ChannelIcon } from "@openbot/contracts/ipc";
+import type { Channel, ChannelBrowser, ChannelDraft, ChannelIcon } from "@openbot/contracts/ipc";
 import {
   Button,
   buttonVariants,
@@ -11,6 +11,11 @@ import {
   Plus,
   Popover,
   Search,
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
   SwitchField,
   Tooltip,
 } from "@openbot/ui";
@@ -20,11 +25,12 @@ import { SettingsField, SettingsLinkGroup, SettingsLinkRow } from "@openbot/ui/c
 import { AgentAvatar } from "@openbot/ui/features/agents/AgentAvatar";
 import { InstructionsLimit, instructionsTooLong } from "@openbot/ui/features/agents/InstructionsLimit";
 import { ChannelContextActions } from "@openbot/ui/features/channels/ChannelContextActions";
+import { type ChannelFolders, ChannelFoldersRow } from "@openbot/ui/features/channels/ChannelFolders";
 import { ChannelMemberRow } from "@openbot/ui/features/channels/ChannelMemberRow";
 import { ChannelPictureEditor } from "@openbot/ui/features/channels/ChannelPictureEditor";
 import { ContentExitMotion } from "@openbot/ui/menu-motion";
 import { useText } from "@openbot/ui/text";
-import { createEffect, createStore, For, onSettled, Show } from "solid-js";
+import { createEffect, createMemo, createSignal, createStore, For, onSettled, Show } from "solid-js";
 import { useChannels } from "./channels-context";
 import { matchesAgentSearch, toggleChannelMember } from "./channels-draft";
 
@@ -33,31 +39,46 @@ interface ChannelEditorProps {
   routineCount: number;
   onOpenMemories: () => void;
   onOpenRoutines: () => void;
+  folders?: ChannelFolders | undefined;
+  onOpenFolders: () => void;
 }
 
-/**
- * Channel settings save themselves, the way agent settings do: the two text fields commit when
- * they are left and every member action commits at once, so there is nothing to confirm or
- * discard.
- *
- * That is why there is no draft of the channel here. Members and the lead are read live from the
- * open page, and only the text fields hold state, because a field must not be overwritten while
- * someone is typing in it - the `dirty` flags below are what protect an unsaved edit from the
- * refresh that follows every save.
- *
- * The two nav rows below the fields carry no state of their own: the host owns the counts and the
- * open flags, because the routines overlay covers the whole panel, not only this editor.
- */
 export function ChannelEditor(props: ChannelEditorProps) {
   const channels = useChannels();
   const { t } = useText();
   const agentList = channels.agents;
   const channel = () => channels.state.page?.channel;
-  /** "Delete history" for the settings, or nothing when the host cannot delete it. */
   function deleteHistoryAction(channelId: string): (() => Promise<void>) | undefined {
     if (!channels.historyDeletionSupported()) return undefined;
     return () => channels.deleteHistory(channelId);
   }
+  const [compactBlocked, setCompactBlocked] = createSignal<string | null>(null);
+  let compactSignature = "";
+  createEffect(
+    () => {
+      const current = channel();
+      if (!current) return undefined;
+      const providers = new Map(agentList().map((agent) => [agent.id, agent.provider]));
+      const members = current.members.map((member) => `${member.agentId}:${providers.get(member.agentId) ?? ""}`);
+      return { id: current.id, members: members.join(",") };
+    },
+    (next) => {
+      const signature = next ? `${next.id}:${next.members}` : "";
+      if (signature === compactSignature) return;
+      compactSignature = signature;
+      if (!next) return;
+      void channels.compactAvailable(next.id).then(
+        (available) => {
+          if (compactSignature === signature) setCompactBlocked(available ? null : next.id);
+        },
+        () => {
+          if (compactSignature !== signature) return;
+          compactSignature = "";
+          setCompactBlocked(null);
+        },
+      );
+    },
+  );
   const [fields, setFields] = createStore({ name: "", title: "", instructions: "" });
   const [dirty, setDirty] = createStore({ name: false, title: false, instructions: false });
   let lastSignature = "";
@@ -80,8 +101,6 @@ export function ChannelEditor(props: ChannelEditorProps) {
       if (!next) return;
       const signature = JSON.stringify([next.id, next.revision, next.name, next.title, next.instructions]);
       if (signature === lastSignature) return;
-      // Read the flags before writing them, so a different channel clears them here and replaces
-      // every field, while the same channel keeps whatever is still uncommitted.
       const changed = next.id !== lastChannelId;
       const keep = {
         name: !changed && dirty.name,
@@ -112,10 +131,6 @@ export function ChannelEditor(props: ChannelEditorProps) {
   const available = () =>
     agentList().filter((agent) => !channel()?.members.some((member) => member.agentId === agent.id));
 
-  /**
-   * The Add member picker. A team can hold more agents than the window has rows, so the picker
-   * filters by the search field the way the New channel dialog does, and its list scrolls.
-   */
   const [picker, setPicker] = createStore<{ open: boolean; search: string; placement: "bottom-start" | "top-start" }>({
     open: false,
     search: "",
@@ -125,18 +140,12 @@ export function ChannelEditor(props: ChannelEditorProps) {
   let pickerPanel: HTMLElement | undefined;
   const pickerFades = createScrollFades();
   onSettled(() => pickerFades.stop);
-  // A filter changes what overflows without always changing the list's own height.
   createEffect(
     () => matching(),
     () => pickerFades.remeasure(),
   );
   let pickerSearch: HTMLInputElement | undefined;
   let pickerTrigger: HTMLButtonElement | undefined;
-  /**
-   * Typing while an option has focus goes on in the search field. Kobalte's own typeahead cannot
-   * take a name with a space: the focused option takes Space as its select key before the
-   * typeahead sees it, so typing "Scale 9" would add whichever agent "Scale" had reached.
-   */
   function typeIntoSearch(event: KeyboardEvent) {
     const erase = event.key === "Backspace";
     if ((event.key.length !== 1 && !erase) || event.ctrlKey || event.metaKey || event.altKey) return;
@@ -147,10 +156,6 @@ export function ChannelEditor(props: ChannelEditorProps) {
     });
     pickerSearch?.focus();
   }
-  /**
-   * ArrowDown from the search field focuses the first option itself. Focusing the list would let
-   * Kobalte go back to the option it last focused, which a search may have taken off the list.
-   */
   function focusFirstOption(): boolean {
     const option = pickerPanel?.querySelector<HTMLElement>(".channel-member-option");
     option?.focus();
@@ -158,15 +163,10 @@ export function ChannelEditor(props: ChannelEditorProps) {
   }
   function addMember(agentId: string) {
     setPickerOpen(false);
-    // Kobalte gives focus back only when it closes the popover itself. The focus waits a frame: the
-    // Enter that picked would otherwise press the trigger too and open the popover again.
     requestAnimationFrame(() => pickerTrigger?.focus());
     void commit((draft) => toggleChannelMember(draft, agentId, true));
   }
   function setPickerOpen(open: boolean) {
-    // The side is chosen once, where the window has more room. The menu stops at the room it has,
-    // so it never overflows and Kobalte would never flip it back: a search that shrinks the list
-    // would move it below the trigger, and clearing the search would leave it there, a few rows tall.
     const trigger = pickerTrigger?.getBoundingClientRect();
     setPicker((state) => {
       state.open = open;
@@ -174,21 +174,10 @@ export function ChannelEditor(props: ChannelEditorProps) {
       if (open && trigger)
         state.placement = window.innerHeight - trigger.bottom >= trigger.top ? "bottom-start" : "top-start";
     });
-    // A popover that is not modal does not move focus, so the search field takes it once it is on
-    // the page.
     if (open) requestAnimationFrame(() => pickerSearch?.focus({ preventScroll: true }));
     else pickerFades.stop();
   }
 
-  /**
-   * The command carries a whole draft, so every save sends the fields as they are on screen. That
-   * is deliberate: removing a member commits the instructions the user can see, rather than
-   * reviving the stored ones. Instructions over the limit are the exception: they stay in the field,
-   * unsaved, and the stored ones go with the other fields until the user shortens them.
-   *
-   * `isolated` is not in the draft: only its switch sends it. A draft without it keeps the stored
-   * value, so a rename here cannot undo a change that another client or an agent made (#5380).
-   */
   function draftFrom(current: Channel): ChannelDraft {
     return {
       name: fields.name.trim() || current.name,
@@ -199,33 +188,17 @@ export function ChannelEditor(props: ChannelEditorProps) {
     };
   }
 
-  /**
-   * One save at a time, and each draft built after the one before it has landed.
-   *
-   * The member controls stay enabled while a save is in flight, and a draft carries the whole
-   * member list. Two removals started together would both read the list as it was before either
-   * of them, so the second save would put the first member back.
-   */
   let saving: Promise<unknown> = Promise.resolve();
-  /** The draft the save before this one sent, for the channel it was sent to. */
   let sent: { channelId: string; draft: ChannelDraft } | null = null;
   function commit(patch?: (draft: ChannelDraft) => void): Promise<boolean> {
     const target = channel();
     if (!target) return Promise.resolve(false);
-    // The edit belongs to the channel that is open now, and the panel is open in the workspace the
-    // sidebar shares: the reader can leave for another channel while this save waits for the one
-    // before it. A queued save therefore keeps the channel and the fields it was made in, or it
-    // would send this channel's members and text to the one the reader went to.
     const targetId = target.id;
     const captured = draftFrom(target);
     const next = saving
       .catch(() => undefined)
       .then(() => {
         const current = channel();
-        // The live page first, because the save before this one landed in it: two removals in a
-        // row build on each other. Away from the channel, the members come from the save before
-        // this one and the text from this one, because each save carries the fields as they were
-        // when the reader left them.
         const previous = sent?.channelId === targetId ? sent.draft : captured;
         const draft =
           current?.id === targetId
@@ -249,7 +222,6 @@ export function ChannelEditor(props: ChannelEditorProps) {
     return next;
   }
 
-  /** An empty name is not a name the service accepts, so leaving the field blank restores it. */
   function saveName(): void {
     const current = channel();
     if (!current) return;
@@ -265,7 +237,6 @@ export function ChannelEditor(props: ChannelEditorProps) {
     });
   }
 
-  /** One saver for both free-text fields: the dirty flag clears only if that field still matches. */
   function saveText(key: "title" | "instructions"): () => void {
     return () => {
       const current = channel();
@@ -281,13 +252,36 @@ export function ChannelEditor(props: ChannelEditorProps) {
     };
   }
 
-  /** The picture editor shows only where the channel picture is kept: on this computer, or on a host with `channel-picture-v1`. */
+  const browserOptions = createMemo(
+    () => ["kind:members", ...(channel()?.members ?? []).map((member) => `agent:${member.agentId}`), "kind:none"],
+    {
+      equals: (before, after) => before.length === after.length && before.every((item, index) => item === after[index]),
+    },
+  );
+  const browserValue = () => {
+    const browser = channel()?.browser;
+    if (browser?.kind === "member") return `agent:${browser.agentId}`;
+    return `kind:${browser?.kind ?? "members"}`;
+  };
+  function browserLabel(value: string): string {
+    if (value === "kind:members") return t("channel.settings.browserEveryone");
+    if (value === "kind:none") return t("channel.settings.browserNone");
+    const agentId = value.slice("agent:".length);
+    return agentList().find((agent) => agent.id === agentId)?.name ?? t("channel.members.unavailable", { id: agentId });
+  }
+  function chooseBrowser(value: string | null): void {
+    if (!value || value === browserValue()) return;
+    const browser: ChannelBrowser =
+      value === "kind:members" || value === "kind:none"
+        ? { kind: value === "kind:members" ? "members" : "none" }
+        : { kind: "member", agentId: value.slice("agent:".length) };
+    void commit((draft) => {
+      draft.browser = browser;
+    });
+  }
+
   const pictureChannel = () => (channels.pictureSupported() ? channel() : undefined);
 
-  /**
-   * An icon replaces an uploaded image, as a face replaces an agent's photo. The icon is saved first,
-   * and the image shows over it until its removal: when a step fails, the image is not lost.
-   */
   async function selectIcon(icon: ChannelIcon): Promise<void> {
     const current = channel();
     if (!current) return;
@@ -297,7 +291,6 @@ export function ChannelEditor(props: ChannelEditorProps) {
     if (saved && current.imageUrl) await channels.setImage(current.id, null);
   }
 
-  /** Removes the icon and the image, so the channel shows its member faces again. */
   async function resetPicture(): Promise<void> {
     const current = channel();
     if (!current) return;
@@ -379,6 +372,29 @@ export function ChannelEditor(props: ChannelEditorProps) {
         />
         <InstructionsLimit text={fields.instructions} />
       </SettingsField>
+      <Show when={channels.browserSupported()}>
+        <SettingsField label={t("channel.settings.browser")}>
+          <Select<string>
+            options={browserOptions()}
+            value={browserValue()}
+            onChange={chooseBrowser}
+            disabled={channel()?.archived === true}
+            itemComponent={(selectProps) => (
+              <SelectItem item={selectProps.item}>{browserLabel(selectProps.item.rawValue)}</SelectItem>
+            )}
+          >
+            <SelectTrigger aria-label={t("channel.settings.browser")}>
+              <SelectValue<string>>
+                {(state) => {
+                  const value = state.selectedOption();
+                  return value && browserLabel(value);
+                }}
+              </SelectValue>
+            </SelectTrigger>
+            <SelectContent />
+          </Select>
+        </SettingsField>
+      </Show>
       <Show when={channels.isolationSupported()}>
         <SwitchField
           checked={channel()?.isolated === true}
@@ -402,14 +418,16 @@ export function ChannelEditor(props: ChannelEditorProps) {
           value={t("channel.settings.routineCount", { count: props.routineCount })}
           onClick={props.onOpenRoutines}
         />
+        <Show when={props.folders}>
+          {(folders) => <ChannelFoldersRow folders={folders()} onOpen={props.onOpenFolders} />}
+        </Show>
       </SettingsLinkGroup>
-      {/* The host refuses both for an archived channel. */}
       <Show when={channels.contextActionsSupported() && !channel()?.archived && channel()}>
         {(current) => (
           <ChannelContextActions
             channelName={current().name}
             startNewConversation={() => channels.clearContext(current().id)}
-            compact={() => channels.compactContext(current().id)}
+            compact={compactBlocked() === current().id ? undefined : () => channels.compactContext(current().id)}
             deleteHistory={deleteHistoryAction(current().id)}
           />
         )}
@@ -427,9 +445,6 @@ export function ChannelEditor(props: ChannelEditorProps) {
                     <Show when={entry.agent}>
                       {(agent) => (
                         <Tooltip.Root openDelay={250} closeDelay={75} placement="top" gutter={8}>
-                          {/* The trigger is the button itself, the way `ServerRail` does it: an
-                            `IconButton` inside a trigger would carry a `title` as well, and the
-                            crown would answer twice, once styled and once by the platform. */}
                           <Tooltip.Trigger
                             type="button"
                             class={buttonVariants({
@@ -538,8 +553,6 @@ export function ChannelEditor(props: ChannelEditorProps) {
                     optionTextValue="name"
                     selectionMode="single"
                     shouldFocusWrap
-                    // A pick on pointerdown would close the popover under the pointer, and the click
-                    // would land on whatever was below it, such as a member's Remove button.
                     shouldSelectOnPressUp
                     onChange={(keys) => {
                       const agentId = keys.values().next().value;

@@ -4,38 +4,22 @@ export const OPENBOT_INVITE_ORIGIN = "https://openbot.run";
 export const OPENBOT_INVITE_PATH = "/join";
 export const OPENBOT_CONTROL_PLANE_ORIGIN = "https://api.openbot.run";
 
-/**
- * The finite deadline a permanent invitation carries. Invitation expiry travels the
- * released Team API and D1 schemas as a plain timestamp, so "never expires" is a
- * Date-compatible maximum rather than null. Matches `PERSISTENT_SESSION_EXPIRES_AT`.
- */
 export const PERMANENT_INVITE_EXPIRES_AT_MS = 8_640_000_000_000_000;
 
 export function permanentInviteExpiresAt(): string {
   return new Date(PERMANENT_INVITE_EXPIRES_AT_MS).toISOString();
 }
 
-/**
- * Whether an expiry timestamp is the never-expires sentinel. The frozen Team API
- * projections strip the `permanent` flag on the wire, so a client that only sees the
- * timestamp still recognizes a permanent link by its deadline.
- */
 export function isNeverExpiringInvite(value: string): boolean {
   const parsed = Date.parse(value);
   return Number.isFinite(parsed) && parsed >= PERMANENT_INVITE_EXPIRES_AT_MS;
 }
 
-/**
- * Whether a decoded invitation is permanent. An older Worker or host sends no `permanent` flag,
- * and the frozen Team API projections strip it, so the never-expires deadline also counts.
- * `expiresAt` is epoch milliseconds from the account directory or an ISO date from a host.
- */
 export function isPermanentInvite(permanent: unknown, expiresAt: number | string): boolean {
   if (permanent === true) return true;
   return typeof expiresAt === "number" ? expiresAt >= PERMANENT_INVITE_EXPIRES_AT_MS : isNeverExpiringInvite(expiresAt);
 }
 
-/** The join count of a decoded invitation. A missing or invalid count, from an older sender, is 0. */
 export function inviteUseCount(value: unknown): number {
   return typeof value === "number" && Number.isSafeInteger(value) && value >= 0 ? value : 0;
 }
@@ -54,17 +38,9 @@ export interface InviteLinkPayload {
 
 export interface InviteLinkOptions {
   allowLocalDevelopmentApiUrl?: boolean;
-  /**
-   * The one self-hosted account service that this client uses. Only an origin from the client's
-   * own configuration goes here, never one read from an invitation.
-   */
   selfHostedApiOrigin?: string | undefined;
 }
 
-/**
- * The origin of a self-hosted account service, or undefined for a service that invitations already
- * accept (ours, a tunnel, a team host), for a local development one, and for a value that is not a URL.
- */
 export function selfHostedApiOrigin(apiUrl: string | undefined): string | undefined {
   if (!apiUrl) return undefined;
   try {
@@ -79,7 +55,6 @@ export function selfHostedApiOrigin(apiUrl: string | undefined): string | undefi
 
 export function createInviteUrl(payload: InviteLinkPayload, options: InviteLinkOptions = {}): string {
   validatePayload(payload, options);
-  // Our website does not open a self-hosted invitation, and must not receive its token.
   if (isSelfHostedApiUrl(new URL(payload.apiUrl), options)) return createOpenBotInviteUrl(payload, options);
   const url = new URL(OPENBOT_INVITE_PATH, OPENBOT_INVITE_ORIGIN);
   writePayload(url, payload);
@@ -97,23 +72,14 @@ export function toOpenBotInviteUrl(value: string, options: InviteLinkOptions = {
   return createOpenBotInviteUrl(parseInviteUrl(value, options), options);
 }
 
-/**
- * The browser client's entry for an invitation: `/app` with the same four fields as `/join`, on the
- * same origin. The client removes them after it reads them and still asks before it joins.
- */
 export function createWebAppInvitePath(value: string, options: InviteLinkOptions = {}): string {
   const url = new URL("/app", OPENBOT_INVITE_ORIGIN);
   writePayload(url, parseInviteUrl(value, options));
   return `${url.pathname}${url.search}`;
 }
 
-/** The query fields of an invitation, which the browser client removes from `/app` after it reads them. */
 export const WEB_APP_INVITE_FIELDS: readonly string[] = INVITE_FIELDS;
 
-/**
- * The canonical invitation link in a `/app` query, or null when the query names none or an invalid
- * one. Only the four invitation fields are read, so another `/app` parameter does not make it invalid.
- */
 export function inviteUrlFromWebAppSearch(search: string, options: InviteLinkOptions = {}): string | null {
   const params = new URLSearchParams(search);
   if (!INVITE_FIELDS.some((field) => params.has(field))) return null;

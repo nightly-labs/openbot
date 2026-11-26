@@ -28,7 +28,10 @@ export const messages = {
   "mcp.signIn.waiting": "ブラウザーを待機中…",
   "mcp.signIn.continue": "{name} に進む",
   "mcp.signIn.pageDescription": "このページは {host} のブラウザーで開いています。ここでサインインしてください。",
-  "mcp.server.loadFailed": "MCP サーバーを読み込めませんでした。",
+  "mcp.signIn.copyHint": "ページが読み込まれない場合は、リンクをコピーして別のブラウザーで開いてください。",
+  "mcp.signIn.copyLink": "リンクをコピー",
+  "mcp.signIn.pasteHint":
+    "別のデバイスでサインインした場合は、最後にそのブラウザーに表示されたアドレスをコピーしてここに貼り付けてください。",
   "mcp.test.connected": { other: "接続済み · ツール {count} 個" },
   "mcp.status.testing": "テスト中…",
   "mcp.status.failed": "失敗",
@@ -37,6 +40,7 @@ export const messages = {
   "mcp.status.signedIn": "サインイン済み",
   "mcp.status.signingIn": "サインイン中…",
   "mcp.status.signInNeeded": "サインインが必要",
+  "mcp.status.signInAppNeeded": "サインインアプリが必要",
   "mcp.status.refused": "拒否されました",
   "mcp.status.checkUrl": "URL を確認",
   "mcp.status.noAnswer": "応答なし",
@@ -54,12 +58,6 @@ export const messages = {
   "mcp.panel.noAnswer": "そのサーバーから応答がありませんでした。",
   "mcp.panel.connectTitle": "カスタム MCP に接続",
   "mcp.panel.editTitle": "MCP サーバーを編集",
-  "mcp.panel.changesNotSaved": "変更は保存されていません",
-  "mcp.panel.title": "MCP サーバー",
-  "mcp.panel.description":
-    "Model Context Protocol サーバーは、このサーバーのエージェントにツールを追加します。Claude と Codex のエージェントはこのリストのサーバーだけを使います。OpenCode と Grok のエージェントは、自身の設定ファイルからもサーバーを起動できます。",
-  "mcp.panel.connectCustom": "カスタム MCP に接続",
-  "mcp.panel.empty": "MCP サーバーはまだありません。",
   "mcp.panel.enable": "{name} を有効にする",
   "mcp.panel.detailsTitle": "詳細",
   "mcp.panel.detailsDescription": "このサーバーに名前を付け、OpenBot の接続方法を選んでください。",
@@ -100,16 +98,11 @@ export const messages = {
   "mcp.panel.testDescription": "この設定で一度接続し、提供されるツールを表示します。何も保存されません。",
   "mcp.panel.testConnection": "接続をテスト",
   "mcp.panel.notTested": "まだテストしていません。",
-  "mcp.panel.removeTitle": "{name} を削除しますか？",
-  "mcp.panel.removeDescription": "このサーバーのエージェントにそのツールが提供されなくなります。設定は保持されません。",
-  "mcp.panel.removeConfirm": "MCP サーバーを削除",
-  "mcp.panel.actionsFor": "{name} の操作",
-  "mcp.panel.testUnavailable": "このサーバーはここではテストできません。",
   "mcp.panel.signIn": "サインイン",
   "mcp.panel.signOut": "サインアウト",
   "mcp.panel.cancelSignIn": "サインインをキャンセル",
+  "mcp.panel.useAddress": "このアドレスを使う",
   "mcp.panel.signInTo": "{name} にサインイン",
-  "mcp.panel.cancelSignInTo": "{name} へのサインインをキャンセル",
   "mcp.panel.signInWaiting": {
     other: "ブラウザーでサインインを完了してください。OpenBot は {count} 分後に待機をやめます。",
   },
@@ -147,6 +140,7 @@ export const messages = {
   "mcp.signIn.relayDeviceDescription":
     "ブラウザーで {page} にサインインし、そこで完了してください。{host} はサインインを自動で検出します。",
   "mcp.signIn.relayOpen": "サインインページを開く",
+  "mcp.signIn.relayCopy": "リンクをコピー",
   "mcp.signIn.relayPasteHint":
     "ブラウザーが OpenBot に戻らない場合は、表示されているアドレスをコピーしてここに貼り付けてください。",
   "mcp.signIn.relayPasteRequired":

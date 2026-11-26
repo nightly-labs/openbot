@@ -7,18 +7,15 @@ import type { MobileAgentActivity } from "@/features/workspace/model/agent-activ
 import { haptics } from "@/shared/lib/haptics";
 import { useText } from "@/shared/lib/text";
 
-/**
- * Under the agent chat, while the agent works in a channel: the channel turn does not show in this
- * chat, as on desktop, so this card says where the agent works. A tap opens the channel, where the
- * person answers a question, an approval or a browser step of that work.
- */
 export function ChatChannelWorkRow({
   channel,
   activity,
+  agentId,
   serverId,
 }: {
   channel: ChannelSummary;
   activity: MobileAgentActivity;
+  agentId: string;
   serverId: string;
 }) {
   const { t } = useText();
@@ -38,7 +35,13 @@ export function ChatChannelWorkRow({
         style={({ pressed }) => ({ borderCurve: "continuous", opacity: pressed ? 0.6 : 1 })}
         onPress={() => {
           void haptics.selection();
-          router.push({ pathname: "/channel/[channelId]", params: { channelId: channel.id, serverId } });
+          router.push({
+            pathname: "/channel/[channelId]",
+            params:
+              activity.phase === "waiting" && activity.reason === "question"
+                ? { channelId: channel.id, serverId, questionAgentId: agentId }
+                : { channelId: channel.id, serverId },
+          });
         }}
       >
         {activity.phase === "waiting" ? null : <Spinner size="sm" color={String(accent)} />}

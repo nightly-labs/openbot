@@ -1,23 +1,24 @@
-import { DEFAULT_VOICE_SETTINGS, isVoiceLanguage, isVoiceModelId, type VoiceSettings } from "@openbot/contracts/ipc";
+import {
+  DEFAULT_VOICE_SETTINGS,
+  isVoiceLanguage,
+  isVoiceModelId,
+  type VoiceSettings,
+  type VoiceSettingsState,
+} from "@openbot/contracts/ipc";
 import { isDynamicRecord } from "@openbot/contracts/runtime-values";
 import { Effect, Result, Semaphore } from "effect";
 import { isMissingFileError } from "../backend/file-errors";
 import { type PreferenceFileFailure, readPreferenceFile, writePreferenceFile } from "./preference-file";
 
-/**
- * The dictation model and language. Transcription reads it about once per second while the user
- * speaks, so it is held in memory after `load`.
- *
- * A file that is missing, unreadable as JSON or names an unknown model or language reads as
- * Parakeet with automatic language, which is what dictation did before the setting existed.
- */
 export class VoicePreferenceStore {
   readonly #path: string;
-  #settings: VoiceSettings = { ...DEFAULT_VOICE_SETTINGS };
+  readonly #defaults: () => VoiceSettings;
+  #settings: VoiceSettings | null = null;
   #writes = Semaphore.makeUnsafe(1);
 
-  constructor(path: string) {
+  constructor(path: string, defaults: () => VoiceSettings = () => DEFAULT_VOICE_SETTINGS) {
     this.#path = path;
+    this.#defaults = defaults;
   }
 
   load(): Effect.Effect<void, PreferenceFileFailure> {
@@ -39,8 +40,8 @@ export class VoicePreferenceStore {
     });
   }
 
-  get(): VoiceSettings {
-    return { ...this.#settings };
+  get(): VoiceSettingsState {
+    return { ...(this.#settings ?? this.#defaults()), saved: this.#settings !== null };
   }
 
   readonly set = Effect.fn("VoicePreference.set")(function* (

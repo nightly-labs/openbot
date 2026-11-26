@@ -9,7 +9,6 @@ import { createFakeConnection } from "./provider-connection-fixture";
 
 type InitialSetupArgs = Parameters<typeof InitialSetup>[0];
 
-/** OpenCode installed with no account of its own: enough to run an endpoint that brings its own key. */
 const openCodeInstalledAgentStatus: AgentStatus = {
   ...STORY_AGENT_STATUS,
   providers: [
@@ -65,5 +64,4 @@ const meta = {
 export default meta;
 type Story = StoryObj<typeof meta>;
 
-/** First-run choice between this computer and a remote server. */
 export const FirstRun: Story = {};

@@ -17,8 +17,8 @@ Report a finding when the diff:
 - Adds a token to one palette only. `--openbot-*` is declared separately in
   `src/renderer/src/styles.css`, `apps/auth-api/src/styles.css`, and `apps/mobile/global.css`. Flag
   this only when the change plainly needs the token on more than one surface.
-- Adds an inline SVG or a local icon component where a `lucide-solid` icon exists, without a comment
-  explaining why Lucide does not fit.
+- Adds an inline SVG or a local icon component where a `lucide-solid` icon exists, without a reason
+  in the PR description for why Lucide does not fit.
 - Duplicates a primitive that already exists in `src/renderer/src/components/ui`, or copies a shared
   primitive into a feature component instead of extending the shared one.
 - Changes an IPC-facing renderer surface without the matching update to

@@ -1,6 +1,3 @@
-// Attachments, and the shared and workspace files an agent can open or preview.
-// Every path here crosses to the local filesystem, so the parsers are the boundary.
-
 import { createHash, randomUUID } from "node:crypto";
 import { constants } from "node:fs";
 import { chmod, copyFile, mkdir, readFile, rename, rm, stat, writeFile } from "node:fs/promises";
@@ -41,12 +38,14 @@ import {
 } from "@openbot/contracts/team-protocol/workspace-directory-v1";
 import type { AppTranslate } from "@openbot/i18n";
 import { sourceText } from "@openbot/i18n/source";
+import { createOpenBotLogger, toLogValue } from "@openbot/logging";
 import { Effect, Schema } from "effect";
 import { app, type BrowserWindow, dialog, type OpenDialogOptions, shell } from "electron";
 import { type Zippable, zip } from "fflate";
 import type { AgentService } from "../../backend/agent-service";
 import { causeHelpers, runCauseEffect } from "../../backend/effect-boundary";
 import type { MailboxStore } from "../../backend/mailbox-store";
+import { openWithXdg } from "../external-link-opener";
 import { filePreviewFromBytes, localFilePreview, mimeTypeForName } from "../file-preview";
 import { filePreviewPages } from "../file-preview-pages";
 import { AttachmentDownloadStopped } from "../remote-attachment-cache";
@@ -64,12 +63,15 @@ import {
   parseOpenAttachment,
   parseOpenSharedFile,
   parseOpenWorkspaceFile,
+  parsePreviewPageHtml,
   parsePreviewSharedFile,
   parsePreviewWorkspaceFile,
 } from "./agent-inputs";
 import { type IpcGroupHandlers, payloadHandler } from "./define-ipc-group";
 import { routeToServer } from "./route-to-server";
 import { scopedHandler } from "./scoped-handler";
+
+const logger = createOpenBotLogger("attachments");
 
 export interface AttachmentIpcDependencies {
   service: Pick<
@@ -103,7 +105,6 @@ export function attachmentIpcHandlers({
   getMainWindow,
   translate,
 }: AttachmentIpcDependencies): Pick<IpcGroupHandlers, "agentAttachments" | "attachmentImports"> {
-  // Reveal and save act on the file itself; only "open" depends on where the file is.
   async function deliverLocalFile(
     path: string,
     name: string,
@@ -151,6 +152,11 @@ export function attachmentIpcHandlers({
         remote: (data, serverId) => runCauseEffect(uploadRemoteImports(remoteServers, serverId, { paths: [], data })),
       }),
       releaseFilePreview: payloadHandler(parseFilePreviewPageUrl, (pageUrl) => filePreviewPages.release(pageUrl)),
+      addPreviewPage: payloadHandler(
+        parsePreviewPageHtml,
+        (html) =>
+          filePreviewPages.add("text/html", new TextEncoder().encode(html), filePreviewPages.generation) ?? null,
+      ),
       chooseAttachments: payloadHandler(agentRequest(parseChooseAttachments), async (parsed) => {
         const mainWindow = getMainWindow();
         const {
@@ -171,7 +177,6 @@ export function attachmentIpcHandlers({
           serverId === LOCAL_SERVER_ID ||
           remoteServers.supportsCapability(serverId, TEAM_ANY_FILE_ATTACHMENTS_CAPABILITY);
         const options: OpenDialogOptions = { properties: ["openFile", "multiSelections"] };
-        // A host that takes any file gets no file filter, so the dialog shows every file.
         if (filter === "images") {
           options.filters = [{ name: translate("dialog.filter.images"), extensions: [...IMAGE_ATTACHMENT_EXTENSIONS] }];
         } else if (!supportsAnyFile) {
@@ -210,7 +215,6 @@ export function attachmentIpcHandlers({
           saveAttachmentArchive(
             parsed,
             () => archiveIO(() => chooseSavePath(getMainWindow(), translate, "attachments.zip")),
-            // `routeToServer` answers a Promise, and this port takes an Effect, so the branch is written out.
             (item) =>
               scoped.serverId === LOCAL_SERVER_ID
                 ? Effect.gen(function* () {
@@ -233,17 +237,14 @@ export function attachmentIpcHandlers({
         openAttachmentForServer({ mailbox, remoteServers, getMainWindow, translate }, scoped.serverId, scoped.payload),
       ),
       stopAttachmentDownload: scopedHandler(parseAttachmentId, {
-        // A local file needs no download.
         local: async () => undefined,
         remote: async (attachmentId, serverId) => remoteServers.stopAttachmentDownload(attachmentId, serverId),
       }),
       openSharedFile: scopedHandler(parseOpenSharedFile, {
         local: async (parsed) => {
-          // A chat link can name a folder. The file manager shows it; nothing opens it.
           const sharedFile = await runCauseEffect(
-            service.resolveSharedFile(parsed.path, { allowDirectory: parsed.action === "reveal" }),
+            service.resolveSharedFile(parsed.path, { allowDirectory: parsed.action === "reveal", followLinks: true }),
           );
-          // A member upload lands in the shared folder too, so a shared file opens only when its type is safe.
           await deliverLocalFile(sharedFile.path, sharedFile.name, parsed.action, () =>
             openOrRevealPath(sharedFile.path),
           );
@@ -256,8 +257,6 @@ export function attachmentIpcHandlers({
       openWorkspaceFile: scopedHandler(parseOpenWorkspaceFile, {
         local: async (parsed) => {
           const workspaceFile = await runCauseEffect(service.resolveLocalWorkspaceFile(parsed.agentId, parsed.path));
-          // A file outside the workspace can be anything on the computer, including a program, so it is
-          // shown in the file manager rather than run.
           await deliverLocalFile(workspaceFile.path, workspaceFile.name, parsed.action, async () => {
             if (workspaceFile.insideWorkspace) await openPath(workspaceFile.path);
             else shell.showItemInFolder(workspaceFile.path);
@@ -287,16 +286,17 @@ export function attachmentIpcHandlers({
       previewSharedFile: scopedHandler(parsePreviewSharedFile, {
         local: async (parsed) => {
           const generation = filePreviewPages.generation;
-          const sharedFile = await runCauseEffect(service.resolveSharedFile(parsed.path));
+          const sharedFile = await runCauseEffect(service.resolveSharedFile(parsed.path, { followLinks: true }));
           return runCauseEffect(
             localFilePreview(sharedFile.path, sharedFile.name, sharedFile.size, generation, parsed.maxBytes),
           );
         },
         remote: async (parsed, serverId) => {
+          const generation = filePreviewPages.generation;
           const downloaded = await runCauseEffect(
             remoteServers.downloadSharedFile(parsed.path, serverId, parsed.maxBytes),
           );
-          return filePreviewFromBytes(downloaded.name, downloaded.bytes);
+          return filePreviewFromBytes(downloaded.name, downloaded.bytes, generation);
         },
       }),
       previewWorkspaceFile: scopedHandler(parsePreviewWorkspaceFile, {
@@ -310,10 +310,17 @@ export function attachmentIpcHandlers({
           );
         },
         remote: async (parsed, serverId) => {
+          const generation = filePreviewPages.generation;
           const downloaded = await runCauseEffect(
-            remoteServers.downloadWorkspaceFile(parsed.agentId, parsed.path, serverId, parsed.maxBytes),
+            remoteServers.downloadWorkspaceFile(
+              parsed.agentId,
+              parsed.path,
+              serverId,
+              parsed.maxBytes,
+              parsed.exactPath === true,
+            ),
           );
-          return filePreviewFromBytes(downloaded.name, downloaded.bytes);
+          return filePreviewFromBytes(downloaded.name, downloaded.bytes, generation);
         },
       }),
     },
@@ -325,11 +332,6 @@ export type OpenAttachmentDependencies = Pick<AttachmentIpcDependencies, "getMai
   remoteServers: Pick<RemoteServerManager, "downloadAttachment">;
 };
 
-/**
- * Opens, reveals or saves one sent or generated file of the local host or a joined server. The
- * chat and the storage surfaces both reach a file by its attachment id, so they share this. Only the
- * storage surface sends `save`.
- */
 export function openAttachmentForServer(
   { mailbox, remoteServers, getMainWindow, translate }: OpenAttachmentDependencies,
   serverId: string,
@@ -361,7 +363,6 @@ export function openAttachmentForServer(
       const downloaded = await runCauseEffect(
         remoteServers.downloadAttachment(input.attachmentId, target, false, input.size),
       ).catch((error: unknown) => {
-        // A stopped save wrote no file, so the batch must count it as a failure.
         if (error instanceof AttachmentDownloadStopped && input.action !== "save") return null;
         throw error;
       });
@@ -387,9 +388,6 @@ export function openAttachmentForServer(
   });
 }
 
-// A remote file has to land on disk before the OS can open it. Owner-only, under a per-server and
-// per-path digest so two servers sharing a file name cannot overwrite each other. The host supplies
-// the name, so it is made safe for every file system first.
 async function cacheRemoteFile(
   directory: string,
   cacheKeyInput: string,
@@ -404,21 +402,23 @@ async function cacheRemoteFile(
   return target;
 }
 
-// `shell.openPath` reports failure by resolving with the message rather than rejecting.
 async function openPath(path: string): Promise<void> {
+  if (process.platform === "linux") {
+    await openWithXdg(path).catch((cause: unknown) => {
+      logger.warn("No app on this computer opened the file.", toLogValue(cause));
+      throw new Error(sourceText("error.attachment.noApp"));
+    });
+    return;
+  }
   const error = await shell.openPath(path);
   if (error) throw new Error(error);
 }
 
-// Another member or a remote host chose this file and its name. The OS can run some types when it
-// opens them, so only a document, image or media file opens. The file manager shows other types.
 async function openOrRevealPath(path: string): Promise<void> {
   if (isOpenableAttachmentName(path)) await openPath(path);
   else shell.showItemInFolder(path);
 }
 
-// The last segment of a name, without characters that Windows does not permit in a file name, and
-// without the trailing dots and spaces that Windows removes.
 function safeFileName(name: string): string {
   return (
     name
@@ -430,12 +430,8 @@ function safeFileName(name: string): string {
   );
 }
 
-// The most numbered names that a save tries before it fails.
 const SAVE_NAME_ATTEMPTS = 1000;
 
-// Writes a file into the Downloads folder with no dialog. The renderer names only the attachment, and
-// main chooses the folder and makes the name safe. `write` must fail with EEXIST when the path exists,
-// so a file that is there already is never replaced: the new file gets " (2)", " (3)", and so on.
 async function saveInDownloads(name: string, write: (path: string) => Promise<void>): Promise<void> {
   const safeName = safeFileName(name) || "attachment";
   const extension = extname(safeName);
@@ -453,7 +449,6 @@ async function saveInDownloads(name: string, write: (path: string) => Promise<vo
   }
 }
 
-// Returns the chosen path, or undefined when the user cancelled.
 async function chooseSavePath(
   mainWindow: BrowserWindow | null,
   translate: AppTranslate,
@@ -539,10 +534,6 @@ const uploadRemoteImports = Effect.fn("AttachmentIpc.uploadRemoteImports")(funct
   return yield* uploadRemoteFiles(remoteServers, serverId, files, input.requestId);
 });
 
-/**
- * Checks the sizes, then uploads every file at once, as one import. With `requestId`, the
- * import reports the bytes of a single file; several files at once would mix their progress.
- */
 function uploadRemoteFiles(
   remoteServers: AttachmentIpcDependencies["remoteServers"],
   serverId: string,
@@ -568,7 +559,6 @@ function uploadRemoteFiles(
   );
 }
 
-/** A host without `any-file-attachments` refuses a name with no known type. */
 function assertRemoteAttachmentNames(
   remoteServers: AttachmentIpcDependencies["remoteServers"],
   serverId: string,
@@ -617,7 +607,6 @@ function assertRemoteAttachmentSupport(
   throw new Error(sourceText("error.attachment.emlUnsupported"));
 }
 
-/** A ZIP download that failed. The cause is the error the renderer reads. */
 class AttachmentArchiveFailed extends Schema.TaggedError<AttachmentArchiveFailed>()("AttachmentArchiveFailed", {
   cause: Schema.Defect(),
 }) {}
@@ -628,7 +617,6 @@ function archiveFailure(message: string): Effect.Effect<never, AttachmentArchive
   return Effect.fail(new AttachmentArchiveFailed({ cause: new Error(message) }));
 }
 
-// Names are archive labels only; file access always uses a managed attachment ID.
 const saveAttachmentArchive = Effect.fn("Attachments.saveArchive")(function* (
   input: DownloadAttachmentsInput,
   chooseDestination: () => Effect.Effect<string | undefined, AttachmentArchiveFailed>,
@@ -657,7 +645,6 @@ const saveAttachmentArchive = Effect.fn("Attachments.saveArchive")(function* (
       name = `${stem} (${suffix++})${extension}`;
     }
     usedNames.add(name.toLowerCase());
-    // A prefix prevents numeric filenames from being reordered by object enumeration.
     files[`./${name}`] = bytes;
   }
   const archive = yield* Effect.callback<Uint8Array, AttachmentArchiveFailed>((resume) => {

@@ -1,14 +1,9 @@
-// Drives the MCP probe and McpOAuth against a local MCP server for issue #5440.
-// bun scripts/mcp-sign-in-client-metadata-document-e2e.ts
-// The authorization server acts as ElevenLabs' does: it has no registration endpoint and sets
-// `client_id_metadata_document_supported`. OpenBot must send its client metadata document URL as
-// the `client_id`, with no secret, and keep a record that the encrypted store can read again after
-// a restart. A server that offers registration as well must keep the registration.
 import assert from "node:assert/strict";
 import { mkdir, writeFile } from "node:fs/promises";
 import { createServer, type IncomingMessage, type Server, type ServerResponse } from "node:http";
 import { resolve } from "node:path";
 import type { McpServerConfig } from "@openbot/contracts/ipc";
+import { sourceText } from "@openbot/i18n/source";
 import { Effect } from "effect";
 import { z } from "zod";
 import { runCauseEffect } from "../src/backend/effect-boundary";
@@ -18,7 +13,6 @@ import { testMcpServer } from "../src/backend/mcp-probe";
 const out = resolve(import.meta.dirname, "../.openbot-build/mcp-sign-in-client-metadata-document-e2e");
 const CLIENT_METADATA_URL = "https://openbot.run/oauth/mcp-client.json";
 const REDIRECT_URL = "http://127.0.0.1:28417/mcp-auth";
-/** The address when another program holds the preferred port. */
 const OTHER_REDIRECT_URL = "http://127.0.0.1:28418/mcp-auth";
 const ACCESS_TOKEN = "e2e-access-token";
 const REGISTERED_CLIENT = "e2e-registered-client";
@@ -27,13 +21,9 @@ const rpcRequest = z.object({ id: z.union([z.number(), z.string()]).optional(), 
 
 interface FakeServer {
   url: string;
-  /** The `client_id` of each authorization page that the sign-in opened, in order. */
   pageClientIds: (string | null)[];
-  /** The `redirect_uri` of each authorization page that the sign-in opened, in order. */
   pageRedirectUris: (string | null)[];
-  /** The `client_id` of each token request, in order. */
   tokenClientIds: (string | null)[];
-  /** Whether each token request carried a client secret, in order. */
   tokenRequestsWithSecret: boolean[];
   registrations: number;
   toolLists: number;
@@ -48,10 +38,8 @@ interface Case {
   tokenRequestsWithSecret: boolean[];
   registrations: number;
   toolLists: number;
-  /** The stored client, after a round trip through the store's schema, as a restart reads it. */
   storedClient: { clientId: string; redirectUris: string[] } | null;
   signedIn: boolean;
-  /** The result of a probe from a new McpOAuth on the same records, as after a restart. */
   afterRestart: { toolCount: number; error: string | null } | null;
   failures: string[];
 }
@@ -73,8 +61,9 @@ function json(response: ServerResponse, status: number, value: unknown, headers:
   response.end(JSON.stringify(value));
 }
 
-/** `registration` adds an RFC 7591 endpoint next to the client metadata document support. */
-async function fakeServer(registration: boolean): Promise<FakeServer> {
+type Refusal = false | "access" | "redirect";
+
+async function fakeServer(registration: boolean, refused: Refusal = false, document = true): Promise<FakeServer> {
   const state: Omit<FakeServer, "url" | "close"> = {
     pageClientIds: [],
     pageRedirectUris: [],
@@ -99,10 +88,20 @@ async function fakeServer(registration: boolean): Promise<FakeServer> {
           code_challenge_methods_supported: ["S256"],
           grant_types_supported: ["authorization_code", "refresh_token"],
           token_endpoint_auth_methods_supported: ["none", "client_secret_post"],
-          client_id_metadata_document_supported: true,
+          client_id_metadata_document_supported: document,
         });
       if (request.method === "POST" && path === "/register") {
         state.registrations++;
+        if (refused === "redirect")
+          return json(response, 400, {
+            error: "invalid_redirect_uri",
+            error_description: "Redirect URI is not an allowed MCP client",
+          });
+        if (refused)
+          return json(response, 403, {
+            error: "access_denied",
+            error_description: "Dynamic client registration is disabled",
+          });
         const asked = z.object({ redirect_uris: z.array(z.string()) }).parse(JSON.parse(await body(request)));
         return json(response, 201, {
           client_id: REGISTERED_CLIENT,
@@ -162,7 +161,6 @@ async function fakeServer(registration: boolean): Promise<FakeServer> {
   const address = server.address();
   assert.ok(address !== null && typeof address === "object", "the server listens on a TCP port");
   base = `http://127.0.0.1:${address.port}`;
-  // The counters change after this returns, so the state object itself is the result, not a copy.
   return Object.assign(state, {
     url: `${base}/mcp`,
     close: () => new Promise<void>((done) => server.close(() => done())),
@@ -185,10 +183,6 @@ function httpConfig(url: string): McpServerConfig {
   };
 }
 
-/**
- * The records go through JSON and `mcpOAuthRecordSchema` on each write, as the encrypted store does
- * when it loads them. A record that the schema refuses fails the case.
- */
 function oauthOn(records: Map<string, McpOAuthRecord>, server: FakeServer, redirectUrl = REDIRECT_URL): McpOAuth {
   const oauth: McpOAuth = new McpOAuth({
     storage: {
@@ -197,7 +191,6 @@ function oauthOn(records: Map<string, McpOAuthRecord>, server: FakeServer, redir
         Effect.sync(() => void records.set(resource, mcpOAuthRecordSchema.parse(JSON.parse(JSON.stringify(record))))),
       clear: (resource) => Effect.sync(() => void records.delete(resource)),
     },
-    // The browser: the authorization server sends the grant straight back.
     openExternal: async (page) => {
       const url = new URL(page);
       server.pageClientIds.push(url.searchParams.get("client_id"));
@@ -220,9 +213,26 @@ function probe(oauth: McpOAuth, url: string): Promise<{ toolCount: number; error
   return runCauseEffect(testMcpServer(httpConfig(url), 10_000, undefined, authority, "here"));
 }
 
-async function runCase(name: string, registration: boolean): Promise<Case> {
-  const server = await fakeServer(registration);
+async function runCase(
+  name: string,
+  registration: boolean,
+  refused: Refusal = false,
+  document = true,
+  storedDocument = false,
+): Promise<Case> {
+  const server = await fakeServer(registration, refused, document);
   const records = new Map<string, McpOAuthRecord>();
+  const issuer = new URL(server.url).origin;
+  if (storedDocument)
+    records.set(server.url, {
+      client: {
+        client_id: CLIENT_METADATA_URL,
+        redirect_uris: [REDIRECT_URL],
+        token_endpoint_auth_method: "none",
+        issuer,
+      },
+      discovery: { authorizationServerUrl: issuer },
+    });
   const oauth = oauthOn(records, server);
   let restarted: McpOAuth | null = null;
   try {
@@ -260,11 +270,6 @@ interface PortChangeCase {
   failures: string[];
 }
 
-/**
- * A sign-in, a sign-out, and a sign-in after a restart on another port. The stored client names the
- * first address, so the second sign-in must use the document again with the new address. It must
- * not try to register with a server that has no registration endpoint.
- */
 async function runPortChange(): Promise<PortChangeCase> {
   const server = await fakeServer(false);
   const records = new Map<string, McpOAuthRecord>();
@@ -298,7 +303,6 @@ function check(entry: { failures: string[] }, condition: boolean, text: string):
 async function main(): Promise<void> {
   await mkdir(out, { recursive: true });
   try {
-    // ElevenLabs: no registration endpoint. The document URL is the client, and the sign-in works.
     const document = await runCase("client-metadata-document", false);
     check(document, document.attempts[0]?.error === null, `the sign-in failed: ${document.attempts[0]?.error}`);
     check(document, document.attempts[0]?.toolCount === 1, "the tools were not listed after the sign-in");
@@ -326,7 +330,6 @@ async function main(): Promise<void> {
     check(document, document.signedIn, "no token is stored after the sign-in");
     report.cases.push(document);
 
-    // Another port after a restart: the document again, with the new address, and no registration.
     const port = await runPortChange();
     for (const [index, attempt] of port.attempts.entries())
       check(port, attempt.error === null, `attempt ${index + 1} failed: ${attempt.error}`);
@@ -348,7 +351,6 @@ async function main(): Promise<void> {
     );
     report.cases.push(port);
 
-    // A server that offers registration as well keeps the registration.
     const both = await runCase("registration-preferred", true);
     check(both, both.attempts[0]?.error === null, `the sign-in failed: ${both.attempts[0]?.error}`);
     check(both, both.registrations === 1, `the sign-in registered ${both.registrations} times`);
@@ -356,6 +358,90 @@ async function main(): Promise<void> {
     check(both, both.afterRestart?.error === null, `after a restart: ${both.afterRestart?.error}`);
     check(both, both.signedIn, "no token is stored after the sign-in");
     report.cases.push(both);
+
+    const refused = await runCase("registration-refused", true, "access");
+    check(refused, refused.attempts[0]?.error === null, `the sign-in failed: ${refused.attempts[0]?.error}`);
+    check(refused, refused.attempts[0]?.toolCount === 1, "the tools were not listed after the sign-in");
+    check(refused, refused.registrations === 2, `the sign-in registered ${refused.registrations} times`);
+    check(
+      refused,
+      refused.pageClientIds.join() === CLIENT_METADATA_URL,
+      `the pages named ${refused.pageClientIds.join()}`,
+    );
+    check(
+      refused,
+      refused.tokenClientIds.join() === CLIENT_METADATA_URL,
+      `the token requests named ${refused.tokenClientIds.join()}`,
+    );
+    check(refused, refused.tokenRequestsWithSecret.join() === "false", "a token request carried a client secret");
+    check(
+      refused,
+      refused.storedClient?.clientId === CLIENT_METADATA_URL &&
+        refused.storedClient.redirectUris.join() === REDIRECT_URL,
+      `the stored client is ${JSON.stringify(refused.storedClient)}`,
+    );
+    check(refused, refused.afterRestart?.error === null, `after a restart: ${refused.afterRestart?.error}`);
+    check(refused, refused.pageClientIds.length === 1, "a restart opened the sign-in page again");
+    check(refused, refused.signedIn, "no token is stored after the sign-in");
+    report.cases.push(refused);
+
+    const noDocument = await runCase("registration-refused-no-document", true, "access", false);
+    check(
+      noDocument,
+      noDocument.attempts[0]?.error?.startsWith("The sign-in server does not accept OpenBot as an app yet.") ?? false,
+      `the sign-in said: ${noDocument.attempts[0]?.error}`,
+    );
+    check(noDocument, noDocument.pageClientIds.length === 0, `the pages named ${noDocument.pageClientIds.join()}`);
+    check(
+      noDocument,
+      noDocument.storedClient === null,
+      `the stored client is ${JSON.stringify(noDocument.storedClient)}`,
+    );
+    check(noDocument, !noDocument.signedIn, "a token is stored after a refused registration");
+    report.cases.push(noDocument);
+
+    for (const document of [true, false]) {
+      const redirect = await runCase(
+        document ? "redirect-refused" : "redirect-refused-no-document",
+        true,
+        "redirect",
+        document,
+      );
+      check(
+        redirect,
+        redirect.attempts[0]?.error?.startsWith("The sign-in server does not accept OpenBot as an app yet.") ?? false,
+        `the sign-in said: ${redirect.attempts[0]?.error}`,
+      );
+      check(redirect, redirect.pageClientIds.length === 0, `the pages named ${redirect.pageClientIds.join()}`);
+      check(redirect, redirect.storedClient === null, `the stored client is ${JSON.stringify(redirect.storedClient)}`);
+      check(redirect, !redirect.signedIn, "a token is stored after a refused registration");
+      report.cases.push(redirect);
+    }
+
+    const stored = await runCase("redirect-refused-stored-document", true, "redirect", true, true);
+    check(
+      stored,
+      stored.attempts[0]?.error?.startsWith("The sign-in server does not accept OpenBot as an app yet.") ?? false,
+      `the sign-in said: ${stored.attempts[0]?.error}`,
+    );
+    check(stored, stored.pageClientIds.length === 0, `the pages named ${stored.pageClientIds.join()}`);
+    check(stored, stored.registrations > 0, "the sign-in did not register again");
+    check(stored, !stored.signedIn, "a token is stored after a refused registration");
+    report.cases.push(stored);
+
+    const noRegistration = await runCase("no-registration-no-document", false, false, false);
+    check(
+      noRegistration,
+      noRegistration.attempts[0]?.error === sourceText("error.backend.mcpSignInAppNeeded"),
+      `the sign-in said: ${noRegistration.attempts[0]?.error}`,
+    );
+    check(
+      noRegistration,
+      noRegistration.registrations === 0,
+      `the sign-in registered ${noRegistration.registrations} times`,
+    );
+    check(noRegistration, !noRegistration.signedIn, "a token is stored with no client");
+    report.cases.push(noRegistration);
   } catch (error) {
     report.failures.push(error instanceof Error ? error.message : String(error));
   }

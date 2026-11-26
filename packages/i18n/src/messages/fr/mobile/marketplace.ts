@@ -62,6 +62,7 @@ export const messages = {
   "mobile.marketplace.facts.accessSignIn": "Connexion",
   "mobile.marketplace.facts.accessLocal": "Cet ordinateur",
   "mobile.marketplace.facts.accessNone": "Sans connexion",
+  "mobile.marketplace.facts.accessMac": "Mac uniquement",
   "mobile.marketplace.permission.admin":
     "Seuls les propriétaires et les administrateurs peuvent installer depuis la Marketplace.",
   "mobile.marketplace.permission.unavailable":
@@ -97,6 +98,7 @@ export const messages = {
   "mobile.marketplace.skill.doc": "SKILL.md",
   "mobile.marketplace.skill.examplePrompt": "Aidez-moi à utiliser cette compétence.",
   "mobile.marketplace.app.add": "Ajouter l’app",
+  "mobile.marketplace.app.addCustom": "Ajout personnalisé",
   "mobile.marketplace.app.connect": "Connecter",
   "mobile.marketplace.app.connectTitle": "Connecter {name}",
   "mobile.marketplace.app.keyIntro": "Collez la clé de votre compte. Le serveur la teste avant d’enregistrer l’app.",
@@ -105,6 +107,9 @@ export const messages = {
   "mobile.marketplace.app.stepOpen": "Ouvrez la page de connexion de {name}.",
   "mobile.marketplace.app.stepAllow": "Connectez-vous et autorisez l’accès.",
   "mobile.marketplace.app.stepReturn": "Revenez ici. {name} se connecte sur votre serveur.",
+  "mobile.marketplace.app.stepBlank": "La dernière page ne se charge pas. C'est normal.",
+  "mobile.marketplace.app.stepCopy": "Touchez la barre d'adresse et copiez l'adresse complète.",
+  "mobile.marketplace.app.stepPaste": "Revenez dans OpenBot et collez l'adresse ci-dessous.",
   "mobile.marketplace.app.openSignIn": "Ouvrir la connexion",
   "mobile.marketplace.app.keySecure": "La clé va uniquement à votre serveur, par une connexion chiffrée.",
   "mobile.marketplace.app.connecting": "Connexion",
@@ -116,12 +121,12 @@ export const messages = {
   "mobile.marketplace.app.docs": "Obtenir une clé",
   "mobile.marketplace.app.local":
     "Cette app s’exécute sur l’ordinateur avec OpenBot. Configurez-la sur cet ordinateur.",
+  "mobile.marketplace.app.needsMac":
+    "Cette app fonctionne uniquement sur un Mac qui exécute OpenBot, et ce serveur n’est pas un Mac.",
   "mobile.marketplace.app.relayUnsupported":
     "Cette app demande une connexion dans le navigateur. Mettez à jour OpenBot sur le serveur ou connectez l’app sur l’ordinateur.",
   "mobile.marketplace.app.waiting": "En attente de la page de connexion…",
   "mobile.marketplace.app.openAgain": "Rouvrir la page de connexion",
-  "mobile.marketplace.app.pasteHint":
-    "À la fin, la page ouvre une adresse qui ne se charge pas. Copiez cette adresse et collez-la ci-dessous.",
   "mobile.marketplace.app.pasteLabel": "Adresse après la connexion",
   "mobile.marketplace.app.pasteInvalid": "Cette adresse n’est pas la fin de cette connexion.",
   "mobile.marketplace.app.finishSignIn": "Terminer",

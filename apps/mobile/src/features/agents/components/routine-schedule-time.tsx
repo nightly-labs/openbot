@@ -3,8 +3,10 @@ import { Typography } from "heroui-native";
 import { useState } from "react";
 import { useUniwind } from "uniwind";
 import { SettingsRow } from "@/features/settings/components/settings-content";
+import { localDay } from "@/shared/lib/local-day";
 import { isAndroid } from "@/shared/lib/platform";
 import { useText } from "@/shared/lib/text";
+import { localDate } from "./usage-date";
 
 export function RoutineTimePicker({
   time,
@@ -13,7 +15,6 @@ export function RoutineTimePicker({
   onChange,
 }: {
   time: string;
-  /** The row label. Defaults to "Time". */
   label?: string;
   disabled: boolean;
   onChange: (time: string) => void;
@@ -23,7 +24,6 @@ export function RoutineTimePicker({
   const { theme } = useUniwind();
   const [open, setOpen] = useState(false);
   const [hour, minute] = time.split(":").map(Number);
-  // This is a wall-clock time in the routine's zone, not an instant to convert to the phone's zone.
   const value = new Date(2000, 0, 1, hour, minute);
   const picker = (
     <DateTimePicker
@@ -51,6 +51,55 @@ export function RoutineTimePicker({
         }
       >
         <Typography.Paragraph>{title}</Typography.Paragraph>
+      </SettingsRow>
+      {isAndroid && open ? picker : null}
+    </>
+  );
+}
+
+export function RoutineDatePicker({
+  date,
+  disabled,
+  onChange,
+}: {
+  date: string;
+  disabled: boolean;
+  onChange: (date: string) => void;
+}) {
+  const { t, format } = useText();
+  const { theme } = useUniwind();
+  const [open, setOpen] = useState(false);
+  const picker = (
+    <DateTimePicker
+      value={localDate(date)}
+      mode="date"
+      display={isAndroid ? "default" : "compact"}
+      disabled={disabled}
+      themeVariant={theme === "dark" ? "dark" : "light"}
+      onDismiss={() => setOpen(false)}
+      onChange={(event, next) => {
+        setOpen(false);
+        if (event.type === "set" && next) onChange(localDay(next));
+      }}
+    />
+  );
+  return (
+    <>
+      <SettingsRow
+        disabled={disabled}
+        disclosure={false}
+        onPress={isAndroid ? () => setOpen(true) : undefined}
+        trailing={
+          isAndroid ? (
+            <Typography.Paragraph className="text-grouped-secondary">
+              {format.date(localDate(date), { year: "numeric", month: "short", day: "numeric" })}
+            </Typography.Paragraph>
+          ) : (
+            picker
+          )
+        }
+      >
+        <Typography.Paragraph>{t("mobile.agent.record.date")}</Typography.Paragraph>
       </SettingsRow>
       {isAndroid && open ? picker : null}
     </>

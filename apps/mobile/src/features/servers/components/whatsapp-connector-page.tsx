@@ -15,8 +15,9 @@ import { Fragment } from "react";
 import { Alert } from "react-native";
 import { useCSSVariable, useUniwind } from "uniwind";
 import { BloubAvatarThumbnail } from "@/features/agents/components/bloub-avatar";
-import { ConnectorError, ConnectorHeader } from "@/features/servers/components/connector-header";
+import { ConnectorError, ConnectorHeader, ConnectorLoading } from "@/features/servers/components/connector-header";
 import {
+  CONNECTION_KIND_KEYS,
   CONNECTOR_STATUS_KEYS,
   connectionKind,
   maskedWhatsAppNumber,
@@ -27,38 +28,25 @@ import {
   whatsappStatus,
 } from "@/features/servers/model/connectors";
 import { useConnectorAction } from "@/features/servers/model/use-server-connectors";
-import {
-  SettingsContent,
-  SettingsNote,
-  SettingsRow,
-  SettingsSection,
-} from "@/features/settings/components/settings-content";
+import { SettingsContent, SettingsRow, SettingsSection } from "@/features/settings/components/settings-content";
 import { SettingsSwitch } from "@/features/settings/components/settings-controls";
 import { useMobileWorkspaceActions } from "@/features/workspace/context/mobile-workspace-context";
 import type { MobileAgent, MobileServer } from "@/features/workspace/model/workspace-types";
 import { type MobileText, useText } from "@/shared/lib/text";
 
-const KIND_KEYS = {
-  live: "mobile.server.connectors.statusConnected",
-  paused: "mobile.server.connectors.statusPaused",
-  setup: "mobile.server.connectors.statusConnecting",
-  attention: "mobile.server.connectors.statusAttention",
-} as const;
-
 const AVATAR_SIZE = 32;
 const ICON_SIZE = 20;
 
-/** What to do about a stopped number, or the note of its kind. */
 function numberNote({ t, format }: MobileText, connection: MessagingConnection, account: WhatsAppAccount | undefined) {
   if (connection.retryAt)
     return t("mobile.server.connectors.whatsapp.retryAt", {
       time: format.date(new Date(connection.retryAt), { hour: "numeric", minute: "2-digit" }),
     });
   switch (connection.state) {
-    // WhatsApp removed the linked device: only a new link brings the number back.
     case "invalid_token":
       return t("mobile.server.connectors.whatsapp.helpLoggedOut");
     case "secret_storage_unavailable":
+      return t("mobile.server.connectors.whatsapp.helpKeysUnreadable");
     case "error":
       return t("mobile.server.connectors.whatsapp.helpError");
     default:
@@ -68,12 +56,6 @@ function numberNote({ t, format }: MobileText, connection: MessagingConnection, 
   }
 }
 
-/**
- * Marketplace › Apps › WhatsApp of a joined server (`whatsapp-connector-v1`). Each number
- * links the host as a device from WhatsApp on a phone, and one WhatsApp Orchestrator answers all
- * numbers. Only the allowed contacts and groups reach it. On a number only for OpenBot, an unknown
- * person gets a code that the owner approves here. The host keeps the WhatsApp session and its keys.
- */
 export function WhatsAppConnectorPage({
   server,
   query,
@@ -92,29 +74,22 @@ export function WhatsAppConnectorPage({
     reconnectWhatsAppNumber,
     setWhatsAppEnabled,
     setWhatsAppOwnNumber,
+    setWhatsAppWorkingMessage,
+    setWhatsAppStatusReactions,
+    setWhatsAppSenderReadOnly,
     addWhatsAppOrchestrator,
     removeWhatsAppSender,
     answerWhatsAppRequest,
   } = useMobileWorkspaceActions();
   const action = useConnectorAction(query.refetch);
   const overview = query.data;
-  if (!overview)
-    return (
-      <SettingsContent>
-        <SettingsNote>
-          {query.isError
-            ? errorMessage(query.error, t("mobile.server.connectors.readFailed"))
-            : t("mobile.server.connectors.loading")}
-        </SettingsNote>
-      </SettingsContent>
-    );
+  if (!overview) return <ConnectorLoading query={query} />;
   const { connections, accounts } = overview;
   const serverId = server.id;
   const status = whatsappStatus(connections, agents);
   const attention = whatsappAttentionCount(connections, agents);
   const orchestrator = telegramOrchestrator(connections, agents);
   const account = (workspaceId: string) => accounts.find((entry) => entry.workspaceId === workspaceId);
-  /** The numbers whose settings are known, in the order of the number list. */
   const linked = connections.flatMap((connection) => {
     const settings = account(connection.workspaceId);
     return settings ? [{ connection, account: settings }] : [];
@@ -128,7 +103,6 @@ export function WhatsAppConnectorPage({
 
   const disconnect = (connection: MessagingConnection) => {
     const number = whatsappNumberName(connection);
-    // The last linked number: its disconnect deletes the WhatsApp Orchestrator.
     const deletes = connections.length === 1 && orchestrator !== null;
     const body = [
       t("mobile.server.connectors.whatsapp.disconnectBody", { number }),
@@ -148,12 +122,27 @@ export function WhatsAppConnectorPage({
       },
     ]);
   };
-  const removeSender = (workspaceId: string, sender: WhatsAppSender, name: string) =>
-    Alert.alert(name, undefined, [
-      { text: t("common.cancel"), style: "cancel" },
+  const senderOptions = (workspaceId: string, sender: WhatsAppSender, name: string) =>
+    Alert.alert(name, sender.readOnly ? t("mobile.server.connectors.whatsapp.readOnlyDetail") : undefined, [
+      { text: t("common.cancel"), style: "cancel" as const },
+      ...(sender.readOnly === undefined
+        ? []
+        : [
+            {
+              text: t(
+                sender.readOnly
+                  ? "mobile.server.connectors.whatsapp.allowWork"
+                  : "mobile.server.connectors.whatsapp.makeReadOnly",
+              ),
+              onPress: () =>
+                run(() =>
+                  setWhatsAppSenderReadOnly({ workspaceId, senderId: sender.id, readOnly: !sender.readOnly }, serverId),
+                ),
+            },
+          ]),
       {
         text: t("mobile.server.connectors.whatsapp.removeSender"),
-        style: "destructive",
+        style: "destructive" as const,
         onPress: () => run(() => removeWhatsAppSender({ workspaceId, senderId: sender.id }, serverId)),
       },
     ]);
@@ -212,7 +201,7 @@ export function WhatsAppConnectorPage({
                   type="body-xs"
                   className={kind === "attention" ? "text-warning-text" : "text-grouped-secondary"}
                 >
-                  {t(KIND_KEYS[kind])}
+                  {t(CONNECTION_KIND_KEYS[kind])}
                 </Typography.Paragraph>
               }
             >
@@ -244,8 +233,37 @@ export function WhatsAppConnectorPage({
                 />
               </SettingsRow>
             ) : null}
-            {/* WhatsApp removed the device. Only a new link from the phone brings the number back. */}
-            {connection.state === "invalid_token" ? (
+            {settings && settings.workingMessage !== undefined ? (
+              <SettingsRow supportingText={t("mobile.server.connectors.whatsapp.workingMessageDescription")}>
+                <SettingsSwitch
+                  value={settings.workingMessage}
+                  disabled={action.busy}
+                  label={t("mobile.server.connectors.whatsapp.workingMessage")}
+                  dark={theme === "dark"}
+                  onValueChange={(workingMessage) =>
+                    run(() =>
+                      setWhatsAppWorkingMessage({ workspaceId: connection.workspaceId, workingMessage }, serverId),
+                    )
+                  }
+                />
+              </SettingsRow>
+            ) : null}
+            {settings && settings.statusReactions !== undefined ? (
+              <SettingsRow supportingText={t("mobile.server.connectors.whatsapp.statusReactionsDescription")}>
+                <SettingsSwitch
+                  value={settings.statusReactions}
+                  disabled={action.busy}
+                  label={t("mobile.server.connectors.whatsapp.statusReactions")}
+                  dark={theme === "dark"}
+                  onValueChange={(statusReactions) =>
+                    run(() =>
+                      setWhatsAppStatusReactions({ workspaceId: connection.workspaceId, statusReactions }, serverId),
+                    )
+                  }
+                />
+              </SettingsRow>
+            ) : null}
+            {connection.state === "invalid_token" || connection.state === "secret_storage_unavailable" ? (
               <SettingsRow
                 disclosure={false}
                 disabled={action.busy}
@@ -323,7 +341,6 @@ export function WhatsAppConnectorPage({
             <SettingsRow
               disclosure={false}
               disabled={action.busy}
-              // The host starts it on its default provider and model, as the Telegram page does.
               onPress={() => run(() => addWhatsAppOrchestrator(serverId))}
             >
               <Typography.Paragraph className="text-accent">
@@ -353,24 +370,32 @@ export function WhatsAppConnectorPage({
               {senders.map((sender) => {
                 const name = sender.name || whatsappPhoneNumber(sender.id);
                 const Icon = sender.kind === "group" ? UsersRound : UserRound;
+                const kind =
+                  sender.kind === "group"
+                    ? t("mobile.server.connectors.whatsapp.senderGroup")
+                    : whatsappPhoneNumber(sender.id);
                 return (
                   <SettingsRow
                     key={sender.id}
-                    disclosure={false}
+                    disclosure={sender.readOnly !== undefined}
                     disabled={action.busy}
-                    accessibilityLabel={rowLabel(t("mobile.server.connectors.whatsapp.removeSender"), name)}
+                    accessibilityLabel={
+                      sender.readOnly === undefined
+                        ? rowLabel(t("mobile.server.connectors.whatsapp.removeSender"), name)
+                        : name
+                    }
                     leading={<Icon size={ICON_SIZE} color={muted} strokeWidth={1.75} />}
                     supportingText={
-                      sender.kind === "group"
-                        ? t("mobile.server.connectors.whatsapp.senderGroup")
-                        : whatsappPhoneNumber(sender.id)
+                      sender.readOnly ? t("mobile.server.connectors.whatsapp.senderReadOnlyRow", { kind }) : kind
                     }
                     trailing={
-                      <Typography.Paragraph type="body-xs" className="text-danger-text">
-                        {t("mobile.server.connectors.whatsapp.removeSender")}
-                      </Typography.Paragraph>
+                      sender.readOnly === undefined ? (
+                        <Typography.Paragraph type="body-xs" className="text-danger-text">
+                          {t("mobile.server.connectors.whatsapp.removeSender")}
+                        </Typography.Paragraph>
+                      ) : undefined
                     }
-                    onPress={() => removeSender(workspaceId, sender, name)}
+                    onPress={() => senderOptions(workspaceId, sender, name)}
                   >
                     <Typography.Paragraph>{name}</Typography.Paragraph>
                   </SettingsRow>
@@ -402,7 +427,6 @@ export function WhatsAppConnectorPage({
                 </Typography.Paragraph>
               </SettingsRow>
             </SettingsSection>
-            {/* A personal number answers no stranger, so it shows requests only when some still wait. */}
             {!settings.ownNumber || settings.pendingRequests.length > 0 ? (
               <SettingsSection
                 title={t("mobile.server.connectors.whatsapp.requestsTitle", { number })}

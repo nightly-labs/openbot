@@ -21,6 +21,17 @@ A final SDK filter replaces properties to remove SDK-added Android referrers and
 The SDK's optional persistent queue and screen tracking are not enabled. Configuration, event
 semantics and native verification steps are in [the mobile README](../../apps/mobile/README.md#openpanel-product-analytics).
 
+## Chrome extension analytics
+
+`apps/browser-extension/src/analytics.ts` owns the extension's events, their allowlists and the
+link preference. The side panel and the background service worker call it; the offscreen page does
+not, because it has no `chrome.storage`. Each event posts straight to the OpenPanel `/track` route
+with the public client ID, with no SDK and no queue, so a send never blocks a UI action and a failed
+send is dropped. The build sets `VITE_OPENBOT_ANALYTICS_URL`: OpenPanel for a production build
+against `https://api.openbot.run`, the loopback `OPENBOT_ANALYTICS_CAPTURE_URL` when that is set,
+and empty (no sends) otherwise. `scripts/browser-extension-e2e.ts` builds with a capture server and
+checks the event names, the surface, the opt-out and that no user content is sent.
+
 ## Website analytics
 
 Public website tracking lives in `apps/auth-api/src/lib/analytics.ts`. It runs only on the
@@ -103,7 +114,14 @@ with no `exit` span and no dump was stopped from outside OpenBot (#2675).
 the single-instance lock. It writes `running` at the start, the time of the last sign of life once a
 minute and at sleep and wake, `quitting` with the reason in `recordExit`, `quit_timeout` before the
 shutdown deadline exit, and `clean` after `teardown.runAll()`. It adds no teardown step, so the
-ordinals do not change. The writes are synchronous, so a late write cannot replace a later state. At
+ordinals do not change. The heartbeat and the wake write the newest record asynchronously, through
+`openbot-run-marker-v1.json.pending`, so a slow disk, a file lock or an antivirus scan on Windows does
+not stop the main thread. One write runs at a time; records that come during a write are not written,
+only the newest one after it. The start, sleep, `shutdown` event, `quitting`, `quit_timeout` and
+`clean` writes are synchronous, because the process can stop right after them. An asynchronous write
+does not rename its file when a synchronous write came after its record. When its rename ends after a
+synchronous write, it writes the newest record again synchronously, so a late write cannot replace a
+later state. At
 the next start, `RunMarker.start` reads the file before it writes the new one. A `running`,
 `quitting` or `quit_timeout` file is an unclean exit, except a quit for `update` or `session_end`
 and a run that saw the `powerMonitor` `shutdown` event. It counts the `.dmp` files in
@@ -112,6 +130,28 @@ that time with the boot time. `HostAnalytics` sends the result once as `system_u
 keeps it in memory only. `scripts/unclean-exit-e2e.ts` kills the dev app's main process, quits
 it with SIGTERM, and checks the event and the marker on each start. `bun run dev:stop` sends SIGKILL
 to the process group after 3 s, so a dev stop can count as `quitting`.
+
+`start-attempts.ts` keeps `openbot-start-attempts-v1.json` beside the run marker. It counts the
+starts of one app version that did not finish. It writes `starting` before the database host and
+the migrations, and clears the attempt when the main window has loaded with the database open. A
+start error, an uncaught exception before that point, and a `starting` attempt with a new `.dmp`
+file in `crashDumps` count as a failure. A quit (`recordExit` writes `quitting`), an OS shutdown or
+restart (the `powerMonitor` event, or a boot time after the attempt) with no error and no dump, and a
+kill from outside (no dump) do not count and keep the count. A new version starts from zero. After 3 failures in a row,
+the desktop shows `start-recovery-window.ts` before the start continues. The window has its own
+in-memory session, no preload and no IPC: the page is a `data:` URL whose links go to fixed
+`https://openbot.invalid/recovery/<action>` URLs, and `will-navigate` stops each navigation and runs
+only an exact action URL. The page needs a renderer, and a renderer that security software stops at
+launch cannot show it. When the renderer of the window stops, its page does not load, or it does not
+show in 15 seconds, the window stays hidden and a native message box shows the same text and choices.
+A second launch during recovery brings the window to the front.
+The first load of the main window is tried 3 times when it fails with `ERR_FAILED (-2)`, and each
+renderer exit of the main window writes its reason and exit code to `main.log`. After a failed start, macOS gets the in-memory default
+`ApplePersistenceIgnoreState`: else AppKit asks with a modal alert, before `ready`, whether to reopen
+the windows, and the start waits for that answer. A server or a hosted server shows no window; it
+logs the loop and starts as before. `scripts/start-recovery-e2e.ts` forces crashes and a hang with
+`OPENBOT_E2E_FORCE_START_FAILURE`, and stops a renderer with `OPENBOT_E2E_STOP_RENDERER`
+(`first-load` or `recovery`). A packaged app ignores both.
 
 The pure part (`resource-summary.ts`) keeps each day as sparse histograms with two significant digits,
 peaks and counters, so p95 stays exact enough without a sample list. The summary file holds the
@@ -149,7 +189,8 @@ the trace file and gives `HostAnalytics` one summary, sent as `system_remote_con
 makes its first request, and for the first failed attempt after a connection or a cancel. Later
 failures are counted in the next connection. An attempt is keyed by the id that `begin` returns, so
 an old attempt that ends late does not change a newer one. The host id stays in memory and is never
-sent. `RemoteServerManager` adds the time since its hosted start request. The account service times
+sent. The Signal home is the `signal` claim of the ticket (`signalHomeOf`), `entry` when there is
+no claim; the Signal address and the ticket are not sent. `RemoteServerManager` adds the time since its hosted start request. The account service times
 the hosted start itself: `start_requested_at` on `hosted_servers` holds the request time, and the
 first observation of a usable sandbox clears it and sends the `ready` action once.
 
@@ -169,9 +210,11 @@ counted, task requests from before task metering, and requests from before migra
 count. The last request counts, also in a session from before migration 15. An update with no
 `last` or no turn ID establishes a baseline.
 Claude uses per-model query totals and a separate counter identity for each query process. ACP usage
-is optional. Missing fields remain unknown. ACP usage is a session total, with one counter for each
-session, except from Antigravity: from 1.4.3 it sends the tokens of one prompt, so each prompt result has its
-own counter, and its `thoughtTokens` count as output. Completed assistant messages exclude commentary and tool
+is optional. Missing fields remain unknown. Built-in ACP agents without their own rule book usage as a session
+total, with one counter for each session. Antigravity (from 1.4.3), OpenCode, Grok and custom agents send the
+tokens of one prompt, so each prompt result has its own counter. Antigravity's `thoughtTokens` count as output.
+The session cost of a custom agent stays cumulative in a separate counter, which keeps the ID of the old session
+counter, so a session that started before the per-prompt counters keeps its cost history. Completed assistant messages exclude commentary and tool
 output. Only post-install messages enter activity counts.
 
 `agent:get-analytics` and the capability-gated `GET /v1/agents/:agentId/analytics` return aggregates.

@@ -1,7 +1,3 @@
-// `isAgentEvent` is the one guard that reaches across every domain in this package: an agent event
-// is a union over the payloads the other modules own. It imports their guards rather than restating
-// their rules, which is what lets each guard live beside the type it validates.
-
 import { type AgentProviderId, isAgentProvider } from "./agent-providers";
 import { INPUT_LIMITS } from "./input-limits";
 import { type AgentColorEntry, isAgentColors } from "./ipc-agent-colors";
@@ -38,12 +34,6 @@ import { isBoolean, isDynamicRecord, isNumber, isString } from "./runtime-values
 
 export type AgentTurnOrigin = "user" | "routine" | "agent" | "unknown";
 
-/**
- * What a tool step of a turn does, on its `turn-progress` event: `reviewing` when the step ended and
- * the model reads its result. A client shows it on the agent's avatar. A host before this field
- * leaves it out, and so does a step that is not a tool step. The event keeps it as text, so that a
- * client still takes the progress of a later host that sends an activity it does not know.
- */
 export const AGENT_STEP_ACTIVITIES = [
   "searching",
   "browsing",
@@ -56,7 +46,6 @@ export const AGENT_STEP_ACTIVITIES = [
 ] as const;
 export type AgentStepActivity = (typeof AGENT_STEP_ACTIVITIES)[number];
 
-/** The activity of a `turn-progress` event, or null when it has none or one that this client does not know. */
 export function agentStepActivity(value: string | undefined): AgentStepActivity | null {
   return AGENT_STEP_ACTIVITIES.find((activity) => activity === value) ?? null;
 }
@@ -65,7 +54,6 @@ function isAgentTurnOrigin(value: unknown): value is AgentTurnOrigin {
   return value === "user" || value === "routine" || value === "agent" || value === "unknown";
 }
 
-/** The end of a turn. */
 export interface AgentTurnCompletedEvent {
   type: "turn-completed";
   agentId: string;
@@ -73,17 +61,7 @@ export interface AgentTurnCompletedEvent {
   turnId: string;
   status: string;
   origin?: AgentTurnOrigin;
-  /**
-   * A routine run that had nothing to report and posted no message. It is not news, so it shows
-   * no notification. The Team API carries it through the optional `quiet-turn-v1` capability.
-   * Peers without that capability receive the released completion event.
-   */
   quiet?: true;
-  /**
-   * The turn ended with open plan steps, and OpenBot continues the request with one more turn.
-   * The request is not done, so this completion shows no notification, plays no sound, and is
-   * not read aloud. Only local listeners receive it; the Team API adapters leave it out.
-   */
   continues?: true;
 }
 
@@ -95,43 +73,30 @@ export type AgentEvent =
   | { type: "memories-changed"; agentId: string }
   | { type: "routines-changed"; agentId: string }
   | { type: "skills-changed"; agentId: string }
-  /** The routine canvas of this agent changed, so the views showing it read it again. */
   | { type: "routine-flows-changed"; agentId: string }
-  /**
-   * A workflow of this server changed: its graph, its title, a run or a step. Views showing it read it
-   * again. `agentId`: the agent whose tool call made or saved it, so an open canvas shows its build.
-   * Only this computer's event has it: `workflows-v1` sends the workflow id only.
-   */
   | { type: "workflows-changed"; workflowId: string; agentId?: string }
-  /** The Vault of this server changed. Server settings of a joined server read it again. */
+  | { type: "crm-changed" }
   | { type: "vault-changed" }
-  /** The named browser profiles of this server, or the profile of one of its agents, changed. */
   | { type: "browser-profiles-changed" }
+  | { type: "host-turn-limits-changed" }
+  | { type: "library-folders-changed" }
+  | { type: "workflow-folders-changed" }
+  | { type: "usage-credits-changed" }
+  | { type: "openbot-credits-changed" }
   | { type: "agent-session-settings-changed"; agentId: string }
+  | { type: "message-pins-changed"; agentId: string }
   | { type: "channel-memories-changed"; channelId: string }
   | { type: "channel-routines-changed"; channelId: string }
   | { type: "sidebar-layout-changed"; layout: SidebarLayoutSnapshot }
-  /** The whole hidden list, in the `agent-hidden-v1` wire shape, so the Team API sends it as it is. */
   | { type: "hidden-agents-changed"; agents: HiddenAgent[] }
-  /** The whole list of exact agent colours, in the `agent-colors-v1` wire shape. */
   | { type: "agent-colors-changed"; agents: AgentColorEntry[] }
-  /** The whole list of agent and member chat colours, in the `chat-colors-v1` wire shape. */
   | { type: "chat-colors-changed"; agents: AgentChatColorEntry[]; members: MemberChatColorEntry[] }
-  /**
-   * The user's own notification levels on this server changed on one of their devices. Only the
-   * connections of that member get it (`agent-notification-levels-v1`), with all of their levels.
-   */
   | {
       type: "agent-notification-levels-changed";
       server: ServerNotificationLevel | null;
       agents: AgentNotificationLevelEntry[];
     }
-  /**
-   * The user's own pinned chats on this server changed on one of their devices. Only the connections
-   * of that member get it (`sidebar-pins-v1`), with the whole list.
-   */
   | { type: "sidebar-pins-changed"; items: SidebarPin[]; updatedAt: string | null }
-  /** The roles changed. A client reads `/v1/agent-access` again for its own levels. */
   | { type: "agent-access-changed"; revision: number }
   | { type: "conversation"; snapshot: ConversationSnapshot }
   | { type: "conversation-invalidated"; agentId: string; revision: number }
@@ -148,11 +113,8 @@ export type AgentEvent =
     }
   | { type: "queue-invalidated"; agentId: string }
   | { type: "queue-changed"; snapshot: QueueSnapshot }
-  /** Local only: the Team API has no wait events, so a remote server never sends one. */
   | { type: "waits-changed"; snapshot: AgentWaitsSnapshot }
-  /** The Team API sends the three task events below only to a peer with `agent-tasks-v1`, in this shape. */
   | { type: "agent-tasks-changed"; snapshot: AgentTasksSnapshot }
-  /** The conversation of one task. Its turns never reach the agent's own chat events. */
   | { type: "agent-task-conversation"; taskId: string; snapshot: ConversationSnapshot }
   | {
       type: "agent-task-conversation-delta";
@@ -171,28 +133,12 @@ export type AgentEvent =
       threadId: string;
       turnId: string;
       detail: string;
-      /**
-       * True while a tool step of the turn runs, such as a long command. The turn then works, it does not wait
-       * for its provider. A host before this field leaves it out, and the client counts silence as before.
-       */
       running?: boolean;
-      /** An `AgentStepActivity`, read with `agentStepActivity`. */
       activity?: string;
-      /**
-       * On the line of a failed tool step: its error text, with known secrets removed. A host before
-       * this field leaves it out, and the client shows the line with no error.
-       */
       error?: string;
     }
   | { type: "turn-started"; agentId: string; threadId: string; turnId: string; origin?: AgentTurnOrigin }
   | AgentTurnCompletedEvent
-  /**
-   * A non-quiet turn in a side thread ended. `AgentTasks` keeps the turn's own `turn-completed`, so
-   * the state of the agent's chat does not change. `routine` is true for the thread of a routine: the
-   * desktop notification, the phone notification and the completion sound read `turn` from this event,
-   * and a click opens the routine thread. For another side thread, only the phone notification reads
-   * it, and a tap opens the thread. Local only: the released Team API event adapters do not carry it.
-   */
   | { type: "thread-turn-completed"; taskId: string; routine: boolean; turn: AgentTurnCompletedEvent }
   | {
       type: "prompt";
@@ -201,6 +147,7 @@ export type AgentEvent =
       threadId: string;
       turnId: string;
       questions: AgentPromptQuestion[];
+      detached?: true;
     }
   | {
       type: "agent-input-resolved";
@@ -214,18 +161,16 @@ export type AgentEvent =
   | { type: "runtime-snapshot"; snapshot: AgentRuntimeSnapshot }
   | { type: "browser-changed"; tabs: BrowserTab[]; activeTabId: string | null }
   | { type: "browser-control-changed"; state: BrowserControlState }
-  /** The whole list of tabs that a person controls, in the `browser-user-control` wire shape. */
   | { type: "browser-user-control-changed"; tabIds: string[] }
-  /** The history state of every tab, in the `browser-page-state` wire shape. */
   | {
       type: "browser-page-state-changed";
       tabs: { tabId: string; canGoBack: boolean; canGoForward: boolean }[];
     }
-  /**
-   * `provider` and `model` name the run that failed, for the banner. `link` is the Google page where
-   * the user fixes the account that failed the turn, which the banner opens. Local only: the Team API
-   * event projection drops them.
-   */
+  | { type: "browser-http-sign-in-changed"; tabs: { tabId: string; origin: string; refused: boolean }[] }
+  | {
+      type: "browser-permissions-changed";
+      requests: { tabId: string; id: string; origin: string; permission: "geolocation" }[];
+    }
   | {
       type: "error";
       agentId?: string;
@@ -235,10 +180,6 @@ export type AgentEvent =
       model?: string;
       link?: string;
     }
-  /**
-   * A provider plan refused a turn, once per limit. The queues of its agents wait for the reset.
-   * Local only: the released Team API event adapters do not carry it. `resetsAt` is in epoch seconds.
-   */
   | {
       type: "usage-limit-reached";
       agentId: string;
@@ -246,11 +187,6 @@ export type AgentEvent =
       resetsAt: number | null;
       agentCount: number;
     }
-  /**
-   * A subagent of a turn failed, once per subagent. `title` is the task the card shows. Local only:
-   * the released Team API event adapters do not carry it, and a remote client reads the failure in the
-   * subagent list of the conversation (`subagents-v1`).
-   */
   | {
       type: "subagent-failed";
       agentId: string;
@@ -285,13 +221,20 @@ export function isAgentEvent(value: unknown): value is AgentEvent {
     case "routines-changed":
       return isString(value.agentId) && value.agentId.length > 0 && value.agentId.length <= INPUT_LIMITS.identifier;
     case "agent-session-settings-changed":
+    case "message-pins-changed":
     case "skills-changed":
     case "routine-flows-changed":
       return isIdentifier(value.agentId);
     case "workflows-changed":
       return isIdentifier(value.workflowId) && (value.agentId === undefined || isIdentifier(value.agentId));
+    case "crm-changed":
     case "vault-changed":
     case "browser-profiles-changed":
+    case "host-turn-limits-changed":
+    case "library-folders-changed":
+    case "workflow-folders-changed":
+    case "usage-credits-changed":
+    case "openbot-credits-changed":
       return true;
     case "channel-memories-changed":
     case "channel-routines-changed":
@@ -405,7 +348,8 @@ export function isAgentEvent(value: unknown): value is AgentEvent {
         isString(value.turnId) &&
         Array.isArray(value.questions) &&
         value.questions.length <= INPUT_LIMITS.promptQuestions &&
-        value.questions.every(isAgentPromptQuestion)
+        value.questions.every(isAgentPromptQuestion) &&
+        (value.detached === undefined || value.detached === true)
       );
     case "agent-input-resolved":
       return (
@@ -433,6 +377,25 @@ export function isAgentEvent(value: unknown): value is AgentEvent {
         value.tabs.every(
           (tab) =>
             isDynamicRecord(tab) && isString(tab.tabId) && isBoolean(tab.canGoBack) && isBoolean(tab.canGoForward),
+        )
+      );
+    case "browser-permissions-changed":
+      return (
+        Array.isArray(value.requests) &&
+        value.requests.every(
+          (request) =>
+            isDynamicRecord(request) &&
+            isString(request.tabId) &&
+            isString(request.id) &&
+            isString(request.origin) &&
+            request.permission === "geolocation",
+        )
+      );
+    case "browser-http-sign-in-changed":
+      return (
+        Array.isArray(value.tabs) &&
+        value.tabs.every(
+          (tab) => isDynamicRecord(tab) && isString(tab.tabId) && isString(tab.origin) && isBoolean(tab.refused),
         )
       );
     case "error":

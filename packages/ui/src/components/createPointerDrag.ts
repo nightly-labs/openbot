@@ -2,20 +2,12 @@ import { createSignal } from "solid-js";
 
 interface PointerDragOptions {
   axis: "x" | "y";
-  /** The class on the root element while the drag runs, for the cursor and transitions. */
   rootClass: string;
-  /** Called when a drag starts. Read the start value here. */
   onStart: () => void;
-  /** The distance from the start position, in pixels along the axis. */
   onMove: (delta: number) => void;
-  /** The last distance. A cancelled drag ends at the last move. */
   onEnd?: (delta: number) => void;
 }
 
-/**
- * The pointer lifecycle of a drag handle: pointer capture, window listeners, and the root class.
- * Call `cancel` when the owner unmounts.
- */
 export function createPointerDrag(options: PointerDragOptions) {
   let cleanup: (() => void) | undefined;
   const [isDragging, setIsDragging] = createSignal(false);

@@ -27,10 +27,18 @@ and state which default you set aside. Do not argue by citing this file.
 
 - **Migrations are irreversible.** No backup of `openbot.db` is made before an upgrade. Preserve all
   user data and support every shipped source schema. Never assume a backup exists.
-- **Released Team API adapters are permanent.** Do not change a shipped wire protocol's meaning.
+- **Team API support window.** Hosts and clients support the releases of the last 2 months (60 days);
+  mobile has at least 2 months. Do not change the meaning of a wire protocol that a release in the
+  window speaks. A peer outside the window gets "update required", and its adapter, capabilities and
+  fixtures can be deleted. The minimum app version does not move by itself: the PR that needs it raises
+  it, and CI refuses a minimum that is less than 60 days old. Decided by the developer on 2026-11-17
+  (plan 011).
 - **Keep the renderer-to-main trust boundary:** Electron sandboxing, context isolation, navigation
   policy, IPC sender validation, and their tests. Coding agents already have `danger-full-access`.
 - **Redact secrets** on every log, export, and send path, including diagnostics and analytics.
+  Exception: an agent's chat-app post (`redactPostText`) masks known key formats and a saved secret
+  only as a whole token, not inside a word, an email address or a domain, and not labeled passwords
+  that are not saved. Decided by the developer on 2026-11-22.
 - **Keep PolyForm Noncommercial 1.0.0.** Do not add incompatible dependencies or relicense files.
 
 Read [CONTRIBUTING.md](CONTRIBUTING.md#security-sensitive-changes) when a change touches the trust
@@ -44,9 +52,28 @@ adding a module or moving ownership between workspaces.
   phone keeps an encrypted, read-only copy of the agents, sections, recent chats, channels and drawer
   values of its servers (`apps/mobile/src/features/workspace/model/workspace-cache.ts`). The copy stays
   on that phone, the host stays the source of truth, and sign-out, session expiry and server removal delete it.
+  The phone also keeps the newest backdrop page that an agent set for its user with `set_backdrop`
+  (`apps/mobile/src/features/settings/model/chat-backdrop.ts`); sign-out, session expiry and server
+  removal delete it too.
+  A desktop or browser client also keeps a copy of the agent and channel pictures that it loaded from a
+  joined server (`src/main/remote-picture-cache.ts`,
+  `src/renderer/src/features/web-client/web-agent-pictures.ts`), so the saved workspace shows the agent
+  pictures while the host is offline. Sign-out, server removal and the end of access delete it.
 - Cloudflare holds accounts, avatars, host configuration, memberships, invitations, and logical
   sessions; it does not hold chats, files, or commands. It also holds the signed JavaScript bundles
   of mobile over-the-air updates (`apps/mobile-updates`), which are public code and have no user data.
+  Exception: a workflow step with an OpenBot credits model sends its prompt and input pictures through
+  the account service (`/v1/media/*`) and the private media gateway Worker (`openbot-media-gateway`,
+  service binding `MEDIA_GATEWAY`) to the media generation processor, and the result file comes back
+  the same way. Both pass them through in transit only: they do not store or log them, and the
+  account service keeps only the credit hold record. The processor adapters, routes, upstream model
+  IDs and keys are in the private repository
+  [`nightly-labs/openbot-media-gateway`](https://github.com/nightly-labs/openbot-media-gateway) and
+  its Worker secrets, never in this repository. To change a processor, a route, a welcome route or
+  the active upstream, work in that repository and deploy its Worker as its README says.
+  Exception: the crypto wallet sends its NEAR Intents Agent API calls through the account service
+  (`/v1/near/*`), which adds the partner key (`NEAR_INTENTS_PARTNER_KEY`, a secret). It passes them
+  through in transit only, and keeps only the wallet ID, its owner and its creation time in D1.
 - The user's SQLite database is the source of truth, not a remote cache.
 - Agents keep their workspace, thread, and identity across provider switches and restarts.
   Do not reset an agent to simplify state.
@@ -64,14 +91,15 @@ windows, its OS dialogs or its native notifications.
   handler, and each client: the desktop with a joined server, the web client
   (`src/renderer/src/features/web-client/`), and mobile (`apps/mobile`) when the action fits a phone.
 - Do not add a `remote` branch that always throws or returns empty data, or a `kind === "local"`
-  gate, for a feature that can work on a server. When a part must stay local, write the reason at
-  the gate and in the PR.
+  gate, for a feature that can work on a server. When a part must stay local, write the reason in
+  the PR.
 - Gate the client on the host capability. Hide the action while the host does not have it; do not
-  show an action that then fails. An older host keeps working without the feature.
+  show an action that then fails. A host in the support window keeps working without the feature.
 - Test the host route through the Team API (as `scripts/team-api-routes-e2e.ts` does), not only the
   local IPC path.
-- A server installs a staged release only at its next boot, or when an owner, an admin or a permitted
-  member installs it in Server Settings > Updates. When a feature needs the new host, the release
+- A server installs a staged release at its next boot, or when an owner, an admin or a permitted
+  member installs it in Server Settings > Updates. A hosted server, and a server with the automatic
+  update switch on, also installs it when idle. When a feature needs the new host, the release
   notes say that the server must also be on the new version.
 
 ## Effect
@@ -113,6 +141,42 @@ UI, styles, and behavior unless the user requests a design change. Native mobile
 tokens and contracts; it does not render SolidJS DOM components.
 
 Read [packages/ui/AGENTS.md](packages/ui/AGENTS.md) before changing shared UI.
+
+## Phone screens
+
+Phones use the native app (`apps/mobile`). The desktop renderer, the web client and `packages/ui`
+are designed for a computer screen only.
+
+- Do not design, style, write stories or take screenshots for these surfaces at a phone width, and
+  do not list phone gaps in reports. A narrow desktop window and the compact sidebar stay in scope.
+  The narrowest window is the `minWidth` in `src/main/main-window.ts`: 960 px for the main window
+  and 380 px for a separate chat window. Design the web client for 960 px and wider too.
+  On a tiling Linux desktop (`src/main/linux-tiling-desktop.ts`) the compositor sets the size and
+  the windows have no minimum. Below 721 px the main window zooms out, so its layout stays at
+  least 721 CSS px wide and keeps the desktop layout.
+- On a phone (narrow screen and touch pointer), the web client opens on `WebPhoneAppScreen`, which
+  links to the App Store and Google Play. "Continue in browser" keeps the old phone layout
+  (`WebMobileNavigation` and the `max-width: 720px` rules in `web-client.css`). Keep it working;
+  do not add to it.
+- Put a phone feature in `apps/mobile`. [Joined servers](#joined-servers) says when one is needed.
+- The public site (`apps/auth-api` pages other than `/app`) stays responsive: phone visitors read it.
+
+## Comments
+
+Never add comments to code or configuration files. This includes line, block, doc (JSDoc and
+TSDoc), JSX, HTML, CSS, SQL, YAML and shell comments. Do not keep a comment in a line that you
+change. Show intent with names, types and small functions. Put the reason for a change in the
+commit message, the PR description or `docs/`.
+
+Only these remain, because a tool reads them: license headers, shebangs, `/// <reference>`,
+`@vitest-environment`, `@ts-expect-error`, `biome-ignore`, `#__PURE__`, `# shellcheck`,
+`# syntax=`, JSDoc types in plain `.js` files, file headers that a generator writes, the
+`// scope:` line of each GritQL rule, the `// flag` markers of lint fixtures, and the `# openbot-boat-pre-stop:` marker. Comments that are data
+in a string stay too, such as a sample file or a task for a model.
+
+These files keep their comments: vendored code, fixtures, released schemas, released migrations
+(`check:migrations` compares them byte for byte), and the native build inputs of `apps/mobile`
+(a change makes a new runtime version, see `apps/mobile/AGENTS.md`).
 
 ## Interface text
 
@@ -164,7 +228,7 @@ State which surfaces a change touches. Check all affected consumers and reverse 
 - IPC contracts (`packages/contracts`) and their preview implementation
   (`src/renderer/src/preview/mock-openbot.ts`).
 - Reverse actions: snooze/unsnooze, pause/resume, revoke/reconnect, mute/unmute.
-- Migrations and the separate latest schema for new databases.
+- Migrations, which also build each new database.
 - Documentation: `README.md` commands, `docs/architecture/`, and `PRIVACY.md` when outbound data
   changes.
 
@@ -197,8 +261,47 @@ State which surfaces a change touches. Check all affected consumers and reverse 
   Load it with `bunx @dotenvx/dotenvx@2.38.2 run -f apps/auth-api/.env.dev -fk <root>/.env.keys --
   <command>`; `bun run dev` does not pass it on. Never print it. Ask before a benchmark or a run of many
   turns: the token budget is small.
+- For NEAR Intents wallet smoke checks, `apps/auth-api/.env.dev` holds `NEAR_INTENTS_PARTNER_KEY`
+  (an `agent-api` partner key for the production Agent API, `https://api.agentsonintents.com`; the
+  demo API refuses it) and `NEAR_TEST_WALLET_OWNER_KEY` (the P-256 key of the passkey that owns the
+  test wallets). Load them the same way as `INCEPTION_API_KEY`, and never print them. The partner key
+  holds no funds; each wallet holds its own. The test funds stay in the wallet "OpenBot mainnet test
+  wallet" (`NEAR_TEST_WALLET_ACCOUNT`). Send test payments to "OpenBot mainnet test recipient"
+  (`NEAR_TEST_RECIPIENT_ACCOUNT`); move them back after the test. Both wallets have the test key as
+  owner and need its vote for each payment. It is a shared test wallet: each person or agent with the
+  dev key controls its funds. Keep only a few dollars in it.
+  `bun run smoke:near-wallet-live` drives the real wallet service against production on the test
+  wallet: it signs a grant with the owner key, changes the budget, freezes and unfreezes the wallet,
+  and keeps its encrypted state in `.openbot-build/near-wallet-live/`. It moves no funds. Wait 5
+  minutes between two runs: the Agent API refuses a second rule change sooner. The Agent API has no
+  testnet: ask before any call that moves funds.
+- For development and manual tests, the team has one test Google account. `apps/auth-api/.env.dev`
+  holds `DEV_TEST_GMAIL_ADDRESS` and `DEV_TEST_GMAIL_PASSWORD`. Use it to sign in to Gmail and to
+  third-party services ("Sign in with Google") for development and smoke checks, never for a
+  personal or production account. Load it the same way as `INCEPTION_API_KEY`, and never print it.
+  Its X account uses the same email and password. A Google sign-in from a new browser gets a phone
+  check that only the developer can do. To skip it, load the saved session into a new browser
+  context (Playwright `storageState`) from `~/.config/openbot/test-google-account.storage.json` on
+  the developer's Mac. For the OpenBot browser, open a tab over CDP and set the same cookies with
+  `Network.setCookies` on that tab: agents share that session. If that session has expired, ask the
+  developer to do the phone check, then save the session again.
 
 See [account service setup](apps/auth-api/README.md) for loading and deployment details.
+
+### Leaseweb servers
+
+Take only a Leaseweb VPS that has no reference, and set its reference before any other work on it.
+Never take a VPS that has a reference, also `pool`. The reference scheme is in
+[Leaseweb references](docs/hosted-servers.md#leaseweb-references). To set up a VPS as the server of one
+customer, use the [custom-server](.agents/skills/custom-server/SKILL.md) skill. The customer is the
+owner, through a server claim; never sign the server in to an operator account.
+
+The VPS with the reference `internal-store-review` is the server of the app store reviewers (Chrome
+Web Store, Google Play and App Store). The review account owns it. That account signs in with the
+email `STORE_REVIEW_EMAIL` and the fixed code `STORE_REVIEW_CODE`: Worker secrets, also encrypted in
+`apps/auth-api/.env.production`. Do not take, reinstall, erase or move this VPS, and do not sign it
+in to another account. When you change the review email or code, also change the test instructions
+in each store. Tests use the `pool-test-<NN>` machines.
 
 ### Local processes
 

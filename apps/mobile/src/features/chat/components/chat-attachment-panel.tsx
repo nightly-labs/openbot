@@ -5,8 +5,9 @@ import Camera from "lucide-react-native/icons/camera";
 import Images from "lucide-react-native/icons/images";
 import Paperclip from "lucide-react-native/icons/paperclip";
 import Sparkles from "lucide-react-native/icons/sparkles";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { type ReactNode, useCallback, useEffect, useRef, useState } from "react";
 import { BackHandler, Keyboard, Pressable, StyleSheet, useWindowDimensions, View, type ViewStyle } from "react-native";
+import { Pressable as GesturePressable } from "react-native-gesture-handler";
 import Animated, {
   cubicBezier,
   Extrapolation,
@@ -19,66 +20,66 @@ import Animated, {
 } from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { scheduleOnRN } from "react-native-worklets";
+import { useFullScreenCameraPreference } from "@/features/settings/model/camera-mode";
 import { useColumnWidth } from "@/shared/components/adaptive-split";
 import { haptics } from "@/shared/lib/haptics";
 import { useReducedMotion } from "@/shared/lib/motion";
+import { isAndroid } from "@/shared/lib/platform";
 import { useText } from "@/shared/lib/text";
 import { END_X } from "@/shared/lib/text-direction";
 import { ChatCameraContent } from "./chat-camera-panel";
+import { type ComposerContextMeter, ComposerContextRing } from "./composer-context-ring";
+import { FullScreenCameraTip } from "./full-screen-camera-tip";
 import type { ChatAttachmentAnchor, ChatAttachments } from "./use-chat-attachments";
 
-// iOS presents a SwiftUI `Menu` in a window of its own: it cannot be measured,
-// transformed, or reopened, and with the keyboard up it refuses to sit on the
-// control it belongs to. The attachment menu has to become the camera and come
-// back, so it is ours. This is the documented exception to the native
-// system-chrome rule in apps/mobile/AGENTS.md, taken as a product decision.
 const OPTION_ROW = 48;
-// The list is at least this wide and grows to its longest label, so a long
-// translation is read in full. Past the camera's width a label wraps.
 const OPTIONS_MIN_WIDTH = 236;
 const OPTIONS_PADDING = 8;
-// Room the list leaves to the right of the safe area.
 const OPTIONS_EDGE_GAP = 12;
-// A row's width besides its label: the side padding, the icon and the gap.
 const ROW_PADDING = 16;
 const ROW_ICON = 21;
 const ROW_GAP = 14;
 const ROW_CHROME = ROW_PADDING * 2 + ROW_ICON + ROW_GAP;
-/** The list's height before it is measured: Files, Photos and Camera, and Use skill when the chat has skills. */
-const optionsHeight = (rows: number) => OPTION_ROW * rows + OPTIONS_PADDING * 2;
+const DIVIDER_SPACE = 9;
+const optionsHeight = (rows: number, divided: boolean) =>
+  OPTION_ROW * rows + OPTIONS_PADDING * 2 + (divided ? DIVIDER_SPACE : 0);
+const BAR_INSET = 16;
+const MENU_GAP = 8;
 const SURFACE_RADIUS = 28;
-// One shape change, no overshoot: there is no finger on the card, and a card
-// that springs past its own size reads as a toy. `ReduceMotion.System` lets
-// Reanimated land every one of these on the spot when the setting is on.
 const MORPH = { duration: 320, dampingRatio: 1, reduceMotion: ReduceMotion.System };
-// Room the camera leaves below the top safe area.
 const CAMERA_TOP_GAP = 12;
-// The material's own fade. An opacity on the card is what broke the glass, so
-// the card leaves by dissolving its material instead, through the animated
-// style the library itself exposes.
+const MIN_CAMERA_HEIGHT = 240;
 const GLASS_FADE = 0.22;
 const PRESS_FADE = 120;
 const PRESS_EASING = cubicBezier(0.23, 1, 0.32, 1);
-// Each row starts this much later than the one below it. Only opacity and a
-// short rise, so a row is pressable from the first frame it is drawn.
 const ROW_STAGGER = 0.1;
 
+const RowPressable = isAndroid ? GesturePressable : Pressable;
+
 function AttachmentOption({
+  accessibilityLabel,
+  busy,
   disabled,
   foreground,
+  glyph,
   icon: Icon,
   index,
   label,
   onPress,
   progress,
+  value,
 }: {
+  accessibilityLabel?: string;
+  busy?: boolean;
   disabled: boolean;
   foreground: ViewStyle["backgroundColor"];
-  icon: LucideIcon;
+  glyph?: ReactNode;
+  icon?: LucideIcon;
   index: number;
   label: string;
   onPress: () => void;
   progress: SharedValue<number>;
+  value?: string;
 }) {
   const [pressed, setPressed] = useState(false);
   const reduceMotion = useReducedMotion();
@@ -89,8 +90,6 @@ function AttachmentOption({
   });
   return (
     <Animated.View style={entryStyle}>
-      {/* The press scale lives on its own node: a CSS transition and an
-          animated style must not share one. */}
       <Animated.View
         style={{
           transform: [{ scale: pressed ? 0.97 : 1 }],
@@ -99,10 +98,10 @@ function AttachmentOption({
           transitionTimingFunction: PRESS_EASING,
         }}
       >
-        <Pressable
+        <RowPressable
           accessibilityRole="button"
-          accessibilityLabel={label}
-          accessibilityState={{ disabled }}
+          accessibilityLabel={accessibilityLabel ?? label}
+          accessibilityState={{ disabled, busy }}
           disabled={disabled}
           pressRetentionOffset={12}
           style={{
@@ -120,22 +119,24 @@ function AttachmentOption({
           onPressOut={() => setPressed(false)}
           onPress={onPress}
         >
-          <Icon color={String(foreground)} size={ROW_ICON} strokeWidth={1.9} />
+          {glyph ?? (Icon ? <Icon color={String(foreground)} size={ROW_ICON} strokeWidth={1.9} /> : null)}
           <Typography.Paragraph className="min-w-0 shrink">{label}</Typography.Paragraph>
-        </Pressable>
+          {value ? (
+            <Typography.Paragraph className="ms-auto text-muted" style={{ fontVariant: ["tabular-nums"] }}>
+              {value}
+            </Typography.Paragraph>
+          ) : null}
+        </RowPressable>
       </Animated.View>
     </Animated.View>
   );
 }
 
-/**
- * The attachment card. It grows out of the plus, holds the options, morphs into
- * the camera and back, and collapses into the plus again.
- */
 export function ChatAttachmentPanel({
   anchor,
   appActive,
   attachments,
+  context,
   fallbackBackground,
   foreground,
   keyboardHeight,
@@ -145,78 +146,65 @@ export function ChatAttachmentPanel({
   onUseSkill,
   progress,
 }: {
-  /**
-   * The plus the card grows out of, from the screen's left and bottom edges,
-   * before the keyboard lifts the composer.
-   */
   anchor: ChatAttachmentAnchor;
-  /** False while a system prompt or another app holds the foreground. */
   appActive: boolean;
   attachments: ChatAttachments;
+  context?: ComposerContextMeter;
   fallbackBackground: ViewStyle["backgroundColor"];
   foreground: ViewStyle["backgroundColor"];
-  /** The composer's own lift. The card rides it, so it stays on the plus. */
   keyboardHeight: SharedValue<number>;
   keyboardOffset: number;
   liquidGlassAvailable: boolean;
   onClose: () => void;
-  /** Present when the chat's agent has skills: the row writes `@` in the field and offers them. */
   onUseSkill?: () => void;
-  /**
-   * 0 with the card gone, 1 with it open. Shared with the composer, so the
-   * plus comes back on the same frame the card stops covering it.
-   */
   progress: SharedValue<number>;
 }) {
   const { height } = useWindowDimensions();
   const insets = useSafeAreaInsets();
-  // The camera centres between the side insets: the rail of iPhone Duo and the edges in landscape.
   const safeWidth = useColumnWidth() - insets.left - insets.right;
-  // The anchor and the card count from the start edge: the right in a right-to-left layout.
   const startInset = END_X === 1 ? insets.left : insets.right;
-  const { t } = useText();
+  const { t, format } = useText();
   const [mode, setMode] = useState<"options" | "camera">("options");
   const [closing, setClosing] = useState(false);
   const closingRef = useRef(false);
   const busyRef = useRef(false);
   const reduceMotion = useReducedMotion();
-  // The material is lit for as long as the card is staying. It dissolves the
-  // moment the card is told to leave, so the rows, the material and the size
-  // all finish together and nothing is left sitting on the plus.
   const [glassLit, setGlassLit] = useState(true);
-  // A photo taken but not yet held. It waits for the card to be gone.
+  const [cameraFailed, setCameraFailed] = useState(false);
   const captured = useRef<string | null>(null);
   const morph = useSharedValue(0);
-  const cameraWidth = Math.min(440, safeWidth - 24);
-  // Read once, for this card's whole life: the keyboard is not dismissed for
-  // the camera any more, and the glass behind the card must never be resized.
-  // The card already rides the keyboard's lift, so the camera takes the room
-  // that is left above it.
+  const cameraWidth = Math.min(440, safeWidth - BAR_INSET * 2);
   const [keyboardInset] = useState(() => Math.max(0, (Keyboard.metrics()?.height ?? 0) - keyboardOffset));
-  const cameraHeight = Math.min(height * 0.58, height - insets.top - anchor.bottom - keyboardInset - CAMERA_TOP_GAP);
-  // The card keeps the plus's left edge while it is the options list, and
-  // centres itself once it is the camera.
+  const rowCount = 3 + (onUseSkill ? 1 : 0) + (context ? 1 : 0);
+  const roomTop = height - insets.top - keyboardInset - CAMERA_TOP_GAP;
+  const openBottom = Math.max(
+    anchor.bottom,
+    Math.min(
+      anchor.barTop + MENU_GAP,
+      roomTop - Math.max(MIN_CAMERA_HEIGHT, optionsHeight(rowCount, Boolean(context))),
+    ),
+  );
+  const rise = openBottom - anchor.bottom;
+  const cameraHeight = Math.min(height * 0.58, roomTop - openBottom);
+  const optionsShift = anchor.barStart - anchor.left;
   const cameraShift = startInset + (safeWidth - cameraWidth) / 2 - anchor.left;
   const maxListWidth = Math.max(
     OPTIONS_MIN_WIDTH,
-    Math.min(cameraWidth, startInset + safeWidth - anchor.left - OPTIONS_EDGE_GAP),
+    Math.min(cameraWidth, startInset + safeWidth - anchor.barStart - OPTIONS_EDGE_GAP),
   );
+  const contextValue =
+    context && !context.compacting ? format.percent(context.share, { maximumFractionDigits: 0 }) : undefined;
   const labels = {
     useSkill: t("mobile.chat.attachment.useSkill"),
     files: t("mobile.chat.attachment.files"),
     photos: t("mobile.chat.attachment.photos"),
     camera: t("mobile.chat.attachment.camera"),
+    context: t("mobile.chat.context.title"),
   };
-  // The list's width comes from its longest label, measured once off the card.
-  // The list must have a width of its own: inside the card it would be laid
-  // out against the card's animated width on every frame. The card starts to
-  // grow once the list's height is known, so it grows in one motion.
   const [listWidth, setListWidth] = useState<number | null>(null);
-  const listHeight = useSharedValue(optionsHeight(onUseSkill ? 4 : 3));
+  const listHeight = useSharedValue(optionsHeight(rowCount, Boolean(context)));
   const openedRef = useRef(false);
 
-  // Runs once the card has finished leaving, so the heavy part of holding a
-  // photo has the thread to itself.
   const finish = useCallback(() => {
     const uri = captured.current;
     captured.current = null;
@@ -251,35 +239,24 @@ export function ChatAttachmentPanel({
     return () => back.remove();
   }, [dismiss, mode, showOptions]);
 
-  // No opacity here, and none on anything above the glass. An animated
-  // opacity on a GlassView's ancestor makes iOS composite that subtree
-  // offscreen, and UIVisualEffectView cannot sample a backdrop through it: the
-  // card then draws as a plain view with no material at all.
-  // https://github.com/expo/expo/issues/41024
-  // The card grows out of the plus, so it needs no fade of its own; what has
-  // to cross-fade is the content, which sits beside the glass, not above it.
   const surfaceStyle = useAnimatedStyle(() => {
     const presented = progress.get();
     const shape = morph.get();
     const openWidth = interpolate(shape, [0, 1], [listWidth ?? OPTIONS_MIN_WIDTH, cameraWidth]);
     const openHeight = interpolate(shape, [0, 1], [listHeight.get(), cameraHeight]);
     return {
-      // The card is the plus until it is anything else, so it never appears
-      // from nothing and never has to travel to reach its own corner.
       width: interpolate(presented, [0, 1], [anchor.size, openWidth]),
       height: interpolate(presented, [0, 1], [anchor.size, openHeight]),
-      transform: [{ translateX: END_X * interpolate(presented, [0, 1], [0, cameraShift * shape]) }],
+      opacity: liquidGlassAvailable ? 1 : interpolate(presented, [0, 0.35], [0, 1], Extrapolation.CLAMP),
+      transform: [
+        { translateX: END_X * presented * (optionsShift + (cameraShift - optionsShift) * shape) },
+        { translateY: -rise },
+      ],
     };
   });
-  // The composer is lifted by the keyboard and this overlay is not, so the
-  // card takes the same lift. Reading the height rather than a copy keeps the
-  // two together through an interactive dismissal, frame by frame.
   const liftStyle = useAnimatedStyle(() => ({
     transform: [{ translateY: -Math.max(0, keyboardHeight.get() - keyboardOffset) }],
   }));
-  // The options scale with the card from the same corner. Revealing them
-  // through the growing clip alone read as the list unrolling to the right,
-  // because the card widens from the plus while the rows kept their full size.
   const optionsStyle = useAnimatedStyle(() => ({
     opacity: 1 - morph.get(),
     transform: [{ scale: interpolate(progress.get(), [0, 1], [anchor.size / (listWidth ?? OPTIONS_MIN_WIDTH), 1]) }],
@@ -287,13 +264,15 @@ export function ChatAttachmentPanel({
   const cameraStyle = useAnimatedStyle(() => ({ opacity: morph.get() }));
 
   function choose(run: () => unknown) {
-    // The picker presents itself over the card, so the card leaves at the same
-    // time instead of holding the user for the length of its own exit.
     dismiss();
     void run();
   }
 
   async function chooseCamera() {
+    if (useFullScreenCameraPreference.getState().fullScreen) {
+      choose(attachments.takePhoto);
+      return;
+    }
     if (!(await attachments.requestCamera())) {
       dismiss();
       return;
@@ -322,6 +301,12 @@ export function ChatAttachmentPanel({
             {(onUseSkill ? [labels.useSkill] : []).concat(labels.files, labels.photos, labels.camera).map((label) => (
               <Typography.Paragraph key={label}>{label}</Typography.Paragraph>
             ))}
+            {context ? (
+              <View style={{ flexDirection: "row", gap: ROW_GAP }}>
+                <Typography.Paragraph>{labels.context}</Typography.Paragraph>
+                <Typography.Paragraph>{format.percent(1, { maximumFractionDigits: 0 })}</Typography.Paragraph>
+              </View>
+            ) : null}
           </View>
         </View>
       ) : null}
@@ -334,11 +319,6 @@ export function ChatAttachmentPanel({
         <Animated.View
           style={[{ borderRadius: SURFACE_RADIUS, borderCurve: "continuous", overflow: "hidden" }, surfaceStyle]}
         >
-          {/* The glass keeps one size for its whole life. It is the only glass
-              surface in the app that was resized, and resizing it every frame
-              down to the plus's own 32 pt left it with no material at all.
-              The window above carries the morph instead, and reveals more of
-              the same material as it opens. */}
           <GlassView
             glassEffectStyle={{
               style: liquidGlassAvailable && glassLit ? "regular" : "none",
@@ -354,11 +334,6 @@ export function ChatAttachmentPanel({
               backgroundColor: liquidGlassAvailable ? "transparent" : fallbackBackground,
             }}
           />
-          {/* The card's own width and height carry the morph: a scale would
-              smear its corner radius and its text. Both contents keep their
-              own size while it resizes around them, so nothing inside the card
-              re-lays-out on a frame, and the card is out of flow, so nothing
-              outside it does either. */}
           <Animated.View
             pointerEvents={mode === "options" ? "auto" : "none"}
             onLayout={({ nativeEvent }) => {
@@ -373,10 +348,8 @@ export function ChatAttachmentPanel({
                 left: 0,
                 bottom: 0,
                 width: listWidth ?? OPTIONS_MIN_WIDTH,
-                // Hidden until it has its width, so it is laid out only once.
                 display: listWidth === null ? "none" : "flex",
                 paddingVertical: OPTIONS_PADDING,
-                // The card grows from its own bottom corner at the plus, so the rows do too.
                 transformOrigin: END_X === 1 ? "0% 100%" : "100% 100%",
               },
               optionsStyle,
@@ -384,7 +357,7 @@ export function ChatAttachmentPanel({
           >
             {onUseSkill ? (
               <AttachmentOption
-                index={3}
+                index={context ? 4 : 3}
                 icon={Sparkles}
                 label={labels.useSkill}
                 foreground={foreground}
@@ -394,7 +367,7 @@ export function ChatAttachmentPanel({
               />
             ) : null}
             <AttachmentOption
-              index={2}
+              index={context ? 3 : 2}
               icon={Paperclip}
               label={labels.files}
               foreground={foreground}
@@ -403,7 +376,7 @@ export function ChatAttachmentPanel({
               onPress={() => choose(attachments.chooseFiles)}
             />
             <AttachmentOption
-              index={1}
+              index={context ? 2 : 1}
               icon={Images}
               label={labels.photos}
               foreground={foreground}
@@ -412,7 +385,7 @@ export function ChatAttachmentPanel({
               onPress={() => choose(attachments.choosePhotos)}
             />
             <AttachmentOption
-              index={0}
+              index={context ? 1 : 0}
               icon={Camera}
               label={labels.camera}
               foreground={foreground}
@@ -420,6 +393,30 @@ export function ChatAttachmentPanel({
               disabled={attachments.preparing}
               onPress={() => void chooseCamera()}
             />
+            {context ? (
+              <>
+                <View
+                  className="bg-separator"
+                  style={{
+                    height: StyleSheet.hairlineWidth,
+                    marginVertical: (DIVIDER_SPACE - StyleSheet.hairlineWidth) / 2,
+                    marginHorizontal: ROW_PADDING,
+                  }}
+                />
+                <AttachmentOption
+                  index={0}
+                  glyph={<ComposerContextRing meter={context} />}
+                  label={labels.context}
+                  accessibilityLabel={context.label}
+                  busy={context.compacting}
+                  value={contextValue}
+                  foreground={foreground}
+                  progress={progress}
+                  disabled={false}
+                  onPress={() => choose(context.onPress)}
+                />
+              </>
+            ) : null}
           </Animated.View>
           <Animated.View
             pointerEvents={mode === "camera" && !closing && appActive ? "auto" : "none"}
@@ -428,22 +425,24 @@ export function ChatAttachmentPanel({
               cameraStyle,
             ]}
           >
-            {/* The preview stops the moment the card is told to leave, and
-                for as long as the app is not in front. A live capture session
-                inside a view that changes size every frame and is clipped by a
-                mask makes iOS composite the card offscreen on each of those
-                frames, which is why only this exit stuttered and the one from
-                the options never did. */}
             {mode === "camera" && !closing && appActive ? (
               <ChatCameraContent
                 onBusyChange={(busy) => {
                   busyRef.current = busy;
                 }}
                 onCancel={showOptions}
+                onFailedChange={setCameraFailed}
                 onCaptured={(uri) => {
                   captured.current = uri;
                   dismiss();
                 }}
+              />
+            ) : null}
+            {mode === "camera" && !closing && appActive && !cameraFailed ? (
+              <FullScreenCameraTip
+                outerRadius={SURFACE_RADIUS}
+                canSwitch={() => !busyRef.current && !closingRef.current}
+                onUseFullScreen={() => choose(attachments.takePhoto)}
               />
             ) : null}
           </Animated.View>

@@ -2,7 +2,6 @@ import type { PartialTranslation } from "../../message";
 import type { messages as source } from "../en/billing";
 
 export const messages = {
-  // The Billing tab in Settings and the Billing dialog in the web client.
   "billing.title": "Facturation",
   "billing.description": "Chaque serveur a sa propre offre. Stripe gère le paiement.",
   "billing.loading": "Chargement de la facturation…",
@@ -30,10 +29,13 @@ export const messages = {
   "billing.status.paused": "En pause",
   "billing.otherServers": "Autres serveurs",
   "billing.action.menu": "Actions de l’offre pour {server}",
-  "billing.action.change": "Changer d’offre",
+  "billing.action.addStorage": "Ajouter du stockage",
   "billing.action.cancel": "Résilier l’offre",
   "billing.action.renew": "Renouveler l’offre",
   "billing.action.updatePayment": "Changer de moyen de paiement",
+  "billing.storage.title": "Plus d’espace pour {server}",
+  "billing.storage.add": "Ajouter {size}",
+  "billing.storage.failed": "Impossible d’ajouter du stockage.",
   "billing.lifecycle.cancelRenewal": "Annuler le renouvellement",
   "billing.lifecycle.cancelTitle": "Annuler le renouvellement de {name} ?",
   "billing.lifecycle.cancelDescription":
@@ -42,8 +44,6 @@ export const messages = {
     "Le renouvellement automatique reprendra pour ce serveur. Ses agents, conversations et fichiers sont conservés.",
   "billing.lifecycle.dataStays": "Le renouvellement est désactivé. Vos données sont conservées à la fin de l’offre.",
   "billing.lifecycle.deleteServer": "Supprimer le serveur…",
-  "billing.lifecycle.whenDelete": "Quand supprimer ce serveur ?",
-  "billing.lifecycle.atPeriodEnd": "À la fin de la période · {date}",
   "billing.lifecycle.planEndsLabel": "Fin de l’offre",
   "billing.lifecycle.plansDescription":
     "Gérez chaque serveur séparément. Annuler le renouvellement conserve ses données.",
@@ -52,15 +52,12 @@ export const messages = {
   "billing.lifecycle.renewalLabel": "Prochain renouvellement",
   "billing.lifecycle.deletionLabel": "Date de suppression",
   "billing.lifecycle.billingLabel": "Facturation",
-  "billing.lifecycle.immediately": "Immédiatement",
   "billing.lifecycle.automatic": "Le renouvellement automatique reprend",
-  "billing.lifecycle.noRefund": "Aucun remboursement du temps non utilisé",
   "billing.lifecycle.noRenewal": "Aucun autre renouvellement",
   "billing.lifecycle.dateUtc": "{date} UTC",
   "billing.lifecycle.renews": "Le renouvellement automatique est activé.",
   "billing.lifecycle.schedule": "Supprimer à la fin de la période",
   "billing.lifecycle.keep": "Conserver le serveur",
-  "billing.lifecycle.deleteNow": "Supprimer maintenant",
   "billing.lifecycle.deletesOn": "Suppression le {date}",
   "billing.lifecycle.scheduledDescription":
     "Le renouvellement est désactivé. Votre serveur et vos données seront supprimés.",
@@ -70,14 +67,10 @@ export const messages = {
   "billing.lifecycle.keepDescription":
     "Votre serveur et ses données sont conservés. La suppression planifiée s’arrête et le renouvellement automatique reprend.",
   "billing.lifecycle.deleteTitle": "Supprimer {name} ?",
-  "billing.lifecycle.deleteDescription":
-    "Supprimez définitivement ce serveur, ses agents, conversations et fichiers. Votre abonnement prend fin maintenant. Cette action est irréversible.",
   "billing.lifecycle.saving": "Enregistrement…",
   "billing.lifecycle.failed": "La modification n’a pas pu être confirmée. Actualisez la facturation et réessayez.",
-  "billing.lifecycle.deleted": "{name} a été supprimé. Son abonnement a pris fin.",
   "billing.lifecycle.label": "Aperçu de conception · Actions fictives uniquement",
   "billing.lifecycle.reset": "Réinitialiser l’aperçu",
-  // The commercial license of the account, above the server plans.
   "billing.license.title": "Licence",
   "billing.license.description": "Pour le travail en entreprise. Elle n’inclut pas de serveur.",
   "billing.license.loadFailed": "Impossible de charger la licence.",
@@ -151,7 +144,6 @@ export const messages = {
   "billing.license.cancel.descriptionNow":
     "La licence prend fin à la fin de la période payée. Vos serveurs ne sont pas concernés.",
   "billing.license.cancel.keep": "Garder la licence",
-  // The order form: a hosted server and a license in one order. The pricing page and Billing show it.
   "billing.order.billing": "Période de facturation",
   "billing.order.currency": "Devise",
   "billing.order.monthly": "Mensuel",
@@ -161,6 +153,7 @@ export const messages = {
   "billing.order.server.summary": "Nous hébergeons OpenBot pour votre équipe.",
   "billing.order.server.none": "Aucun serveur",
   "billing.order.server.noneDetail": "Exécutez OpenBot sur votre propre ordinateur",
+  "billing.order.server.thisComputer": "Votre ordinateur",
   "billing.order.server.bestValue": "Meilleure offre",
   "billing.order.server.bestFor.starter": "Idéal pour une personne",
   "billing.order.server.bestFor.standard": "Idéal pour une petite équipe",
@@ -202,7 +195,7 @@ export const messages = {
   "billing.order.cta.server": "Créer un serveur",
   "billing.order.cta.license": "Acheter une licence",
   "billing.order.cta.download": "Télécharger",
-  // Shown before an invite that makes the license too small.
+  "billing.order.cta.keepComputer": "Rester sur cet ordinateur",
   "billing.license.invite.title": "Ajouter un utilisateur à la licence ?",
   "billing.license.invite.description":
     "Cette invitation ajoute 1 utilisateur à votre licence : {price} de plus par mois.",
@@ -215,4 +208,36 @@ export const messages = {
     other:
       "Votre licence a {count} utilisateurs, le maximum. Contactez-nous pour une licence plus grande. Les nouvelles personnes ne peuvent pas rejoindre vos serveurs.",
   },
+  "billing.details.country": "Pays de facturation",
+  "billing.details.countryPlaceholder": "Choisir un pays",
+  "billing.details.vatId": "N° de TVA UE (facultatif)",
+  "billing.details.vatIdInvalid": "Ce n’est pas un numéro de TVA du pays choisi.",
+  "billing.details.countryMissing": "Choisissez votre pays de facturation.",
+  "billing.details.saveFailed": "Impossible d’enregistrer les informations de facturation",
+  "billing.credits.explainer.title": "Que sont les crédits ?",
+  "billing.credits.explainer.page": "{page} sur {total}",
+  "billing.credits.explainer.pages": "Pages",
+  "billing.credits.explainer.mediaTitle": "Les crédits paient les médias",
+  "billing.credits.explainer.mediaText":
+    "Quand un agent crée une image, une vidéo ou une voix, il utilise des crédits.",
+  "billing.credits.explainer.chatTitle": "Les chats restent gratuits",
+  "billing.credits.explainer.chatText":
+    "Les chats utilisent votre propre fournisseur d’IA. Parler à vos agents n’utilise pas de crédits.",
+  "billing.credits.explainer.chatFree": "0 crédit",
+  "billing.credits.explainer.modelsTitle": "Chaque modèle a un prix",
+  "billing.credits.explainer.modelsText":
+    "Les meilleurs modèles coûtent plus cher. Une image utilise {pictureMin}–{pictureMax} crédits, une vidéo de {seconds} s {videoMin}–{videoMax}.",
+  "billing.credits.explainer.perPicture": "/ image",
+  "billing.credits.explainer.perClip": "/ vidéo de {seconds} s",
+  "billing.credits.explainer.getTitle": "Obtenir des crédits",
+  "billing.credits.explainer.getText":
+    "Achetez un pack quand il vous en faut plus. Les gros packs offrent un meilleur prix par crédit.",
+  "billing.credits.explainer.freeEnd": "Les crédits gratuits mensuels ont une date de fin",
+  "billing.credits.explainer.welcome":
+    "Les nouveaux comptes reçoivent {amount} crédits gratuits pour essayer certains modèles",
+  "billing.credits.welcomeIncluded": "Crédits gratuits : {amount}",
+  "billing.credits.explainer.allPrices": "Les {count} modèles",
+  "billing.credits.explainer.next": "Suivant",
+  "billing.credits.explainer.gotIt": "Compris",
+  "billing.credits.explainer.place": "OpenBot",
 } as const satisfies PartialTranslation<typeof source>;

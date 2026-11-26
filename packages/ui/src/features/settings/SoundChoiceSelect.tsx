@@ -14,28 +14,18 @@ const CHOICE_NAME = {
   press: "settings.soundTheme.press",
 } as const satisfies Record<TaskSoundChoice, AppTextKey>;
 
-/** How long the playing icon shows. The cues are shorter than this. */
 const PLAYING_MS = 600;
-/** Keys that do not move the focus in the menu. Arrow keys, Home, End and typeahead letters do. */
 const NO_MOVE_KEYS = new Set(["Enter", " ", "Escape", "Tab"]);
 
 export interface SoundChoiceSelectProps<Choice extends TaskSoundChoice> {
-  /** The accessible name of the menu button. */
   label: string;
   choices: readonly Choice[];
   value: Choice;
-  /** The app saves the choice and plays it. */
   onChange: (value: Choice) => void;
-  /** Plays a sound without choosing it, from the play icon or the arrow keys. "off" is never played. */
   onPreview: (value: Choice) => void;
-  /** The dialog element the popover portals into, as the other Settings selects receive it. */
   mount?: HTMLElement | undefined;
 }
 
-/**
- * A sound menu. Each sound has a play icon before its name, so the user can listen to it before
- * choosing it. The arrow keys also play each sound, for keyboard and screen reader users.
- */
 export function SoundChoiceSelect<Choice extends TaskSoundChoice>(props: SoundChoiceSelectProps<Choice>): JSX.Element {
   const { t } = useText();
   const name = (choice: TaskSoundChoice) => t(CHOICE_NAME[choice]);
@@ -47,8 +37,6 @@ export function SoundChoiceSelect<Choice extends TaskSoundChoice>(props: SoundCh
     setPlaying(() => choice);
     playingTimer = window.setTimeout(() => setPlaying(undefined), PLAYING_MS);
   };
-  // Kobalte also focuses an item on hover and when the menu opens. Only a key that moves the focus
-  // plays the sound. The mouse moves first when the user goes back to the pointer.
   let keyMove = false;
   const readKey = (event: KeyboardEvent) => {
     keyMove = !NO_MOVE_KEYS.has(event.key);
@@ -82,12 +70,8 @@ export function SoundChoiceSelect<Choice extends TaskSoundChoice>(props: SoundCh
         >
           <span class="sound-choice-item">
             {itemProps.item.rawValue === "off" ? (
-              // Off has no sound to play. The empty slot keeps the names in line.
               <span class="ui-button-size-icon-xs sound-choice-item-play" />
             ) : (
-              // A button in a listbox option breaks the listbox (axe `nested-interactive`), so the icon
-              // is hidden from assistive technology. It stops the press, so the menu stays open and
-              // the choice does not change.
               <span
                 class="ui-button ui-button-variant-ghost ui-button-size-icon-xs ui-icon-button sound-choice-item-play"
                 aria-hidden="true"

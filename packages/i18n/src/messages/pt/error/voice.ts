@@ -12,6 +12,10 @@ export const messages = {
   "error.voice.prepareRequired":
     "A transcrição de voz local está indisponível. Execute `bun run voice:prepare` e reinicie o OpenBot.",
   "error.voice.transcriptionFailed": "O OpenBot não conseguiu transcrever esta gravação.",
+  "error.voice.videoModelMissing":
+    "Nenhum modelo de reconhecimento de fala para gravações está configurado em Configurações → Voz.",
+  "error.voice.videoModelMissingServer":
+    "Nenhum modelo de reconhecimento de fala está configurado neste servidor. Um proprietário ou um administrador pode configurar um modelo nas configurações do servidor, em Reconhecimento de fala.",
   "error.voice.cloud.keyRequired": "Adicione sua chave de API da {provider} em Configurações → Voz.",
   "error.voice.cloud.keyRejected": "A {provider} não aceitou a chave de API. Confira a chave em Configurações → Voz.",
   "error.voice.cloud.quotaExceeded": "Sua cota da {provider} acabou.",
@@ -24,16 +28,23 @@ export const messages = {
   "error.voice.speech.modelRequired": "Baixe o modelo de voz em Configurações → Voz.",
   "error.voice.speech.timedOut": "A leitura da resposta em voz alta expirou.",
   "error.voice.speech.failed": "O OpenBot não conseguiu ler a resposta em voz alta.",
+  "error.voice.speech.providerRefused": "{provider} recusou-se a criar o áudio: {reason}",
   "error.voice.recordingNotKept": "O OpenBot não conseguiu guardar a gravação de voz.",
   "error.voice.live.timedOut": "A voz ao vivo do Codex não começou a tempo. Tente novamente.",
   "error.voice.live.failed": "A voz ao vivo parou: {reason}",
   "error.voice.live.disconnected": "A voz ao vivo foi desligada.",
+  "error.voice.live.startFailed":
+    "Não foi possível iniciar a voz ao vivo. Atualize o Codex e entre com o ChatGPT no computador que executa o agente, e tente novamente. Motivo: {reason}",
   "error.voice.live.hostFailed":
     "O Codex no servidor não conseguiu iniciar a voz ao vivo. Peça ao proprietário para atualizar o Codex nesse computador e entrar com o ChatGPT, e tente novamente.",
   "error.voice.live.signIn": "Inicie sessão no Codex com a sua conta ChatGPT para usar a voz ao vivo.",
+  "error.voice.live.chooseAccount":
+    "Esta conta ChatGPT não pode usar a voz ao vivo. Em Definições → Voz, escolha uma conta cujo plano inclua voz.",
   "error.voice.live.unavailable":
     "A OpenAI não conseguiu iniciar a voz ao vivo. O problema é da OpenAI. Tente novamente mais tarde.",
   "error.voice.live.refused":
     "A OpenAI recusou iniciar a voz ao vivo. Tente novamente mais tarde ou desative a voz ao vivo em Definições para falar por voz.",
   "error.voice.live.off": "A voz ao vivo do Codex está desativada. Ative-a em Definições → Voz.",
+  "error.voice.server.modelUnsupported":
+    "{host} não consegue transcrever com {model}. Em Definições → Voz, escolha outro modelo de ditado para o servidor de voz.",
 } as const satisfies PartialTranslation<typeof source>;

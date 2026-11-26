@@ -3,7 +3,6 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue, Text } f
 import { For } from "solid-js";
 import { useText } from "../../text";
 
-/** A place to send to. The connection's name and platform come from the host when it saves. */
 export interface RoutineResultChoice {
   connectionId: string;
   placeId: string;
@@ -11,35 +10,25 @@ export interface RoutineResultChoice {
 }
 
 interface RoutineResultDestinationFieldProps {
-  /** The enabled connections and their places. */
   options: RoutineResultConnectionOption[];
-  /** The saved place. It stays in the list when its connection is off now. */
   saved: RoutineResultDestination | null;
-  /** The place in the draft, which is the saved one until the user picks another. */
   value: RoutineResultChoice | null;
   onChange: (choice: RoutineResultChoice | null) => void;
 }
 
-/** Kobalte shows an empty key as no selection. A place key always holds a `/`, so it is never this one. */
 const NONE = "none";
 
 interface PlaceEntry {
   key: string;
   choice: RoutineResultChoice;
   connectionName: string;
-  /** False for a saved place that its connection does not offer now. */
   available: boolean;
 }
 
-/**
- * Kobalte puts the key in a `[data-key="…"]` selector without escaping it, so the key must not hold a
- * quote or a backslash. `encodeURIComponent` encodes both, and the `/` between the parts.
- */
 function placeKey(choice: { connectionId: string; placeId: string }): string {
   return `${encodeURIComponent(choice.connectionId)}/${encodeURIComponent(choice.placeId)}`;
 }
 
-/** Where an agent routine sends each answer, as well as to its chat. */
 export function RoutineResultDestinationField(props: RoutineResultDestinationFieldProps) {
   const { t } = useText();
   const entries = (): PlaceEntry[] => {
@@ -83,7 +72,6 @@ export function RoutineResultDestinationField(props: RoutineResultDestinationFie
         options={[NONE, ...entries().map((candidate) => candidate.key)]}
         value={selected()}
         onChange={(key) => {
-          // Kobalte selects the same key again when the options load; only a new place is a change.
           if ((key ?? NONE) === selected()) return;
           props.onChange(key ? (entry(key)?.choice ?? null) : null);
         }}

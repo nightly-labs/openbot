@@ -42,11 +42,16 @@ export const messages = {
   "error.skill.publishNeedsRepair": "ב-{name} יש שינויים מקומיים או שהוא דורש תיקון לפני הפרסום.",
   "error.skill.publishUntracked": "{name} הותקן לפני מעקב אחר גרסה מדויקת. יש לעדכן או לתקן אותו לפני הפרסום.",
   "error.skill.tooManySkills": "לסוכן יכולות להיות עד {limit} מיומנויות.",
-  "error.skill.unmanagedExists": "כבר קיימת מיומנות לא מנוהלת ב-{path}.",
+  "error.skill.ownSkillExists":
+    "לסוכן הזה כבר יש מיומנות משלו בשם {slug}. יש לבקש מהסוכן לשנות את שם המיומנות הזו או למחוק אותה, ואז להוסיף את המיומנות הזו שוב.",
   "error.skill.managedSlug": "OpenBot נותן לכל סוכן מיומנות {slug} משלו. יש לתת למיומנות הזו שם אחר.",
   "error.skill.templateMarkdownTooLarge": "{name}: SKILL.md גדול מ-64 KB. יש לקצר אותו לפני הפרסום.",
   "error.skill.localNoRevisions": "למיומנות מקומית אין גרסאות שפורסמו.",
+  "error.skill.localNotFound": "המיומנות המקומית הזו לא קיימת. יש לבדוק את המזהה שלה ברשימת המיומנויות המקומיות.",
+  "error.skill.localRevisionNotFound": "למיומנות המקומית הזו אין גרסה {revision}. הגרסה האחרונה שלה היא {latest}.",
   "error.skill.localNameTaken": "כבר קיימת מיומנות מקומית בשם הזה. יש לערוך אותה במקום זאת.",
+  "error.skill.localNameClash":
+    'השם הזה והמיומנות המקומית "{name}" הופכים שניהם ל-"{slug}". כדי לשנות את המיומנות הזו, יש לערוך אותה. כדי להוסיף מיומנות חדשה, יש לשנות את האותיות הלטיניות או הספרות בשם הזה.',
   "error.skill.localKeepName": "יש להשאיר את שם המיומנות ללא שינוי בעת עריכתה.",
   "error.skill.localRelativeFolder": "יש להשתמש בתיקיית מיומנות יחסית בתוך סביבת העבודה של הסוכן הנוכחי.",
   "error.skill.localSourceOutside": "מקור המיומנות חייב להיות בתוך סביבת העבודה של הסוכן.",
@@ -54,4 +59,13 @@ export const messages = {
   "error.skill.localMissingSkillFile": "תיקיית המיומנות דורשת SKILL.md בשורש שלה.",
   "error.skill.pathSymlink": "נתיבי מיומנות אינם יכולים להכיל קישורים סמליים.",
   "error.skill.folderNotRead": "{provider} אינו קורא את {folder}. יש להעתיק את התיקייה הזו אל {target}.",
+  "error.skill.githubLinkInvalid": "יש להדביק קישור למאגר או לתיקייה ב-GitHub.",
+  "error.skill.githubNotFound": "OpenBot לא יכול לפתוח את {repository}. המאגר פרטי או שהוא לא קיים.",
+  "error.skill.githubNoSkills": "אין SKILL.md בתיקייה {folder}.",
+  "error.skill.githubUnavailable": "OpenBot לא יכול לקרוא את GitHub כרגע. יש לנסות שוב מאוחר יותר.",
+  "error.skill.githubRateLimited":
+    "GitHub מגביל את מספר הפעמים ש-OpenBot יכול לקרוא אותו בלי חשבון. יש לנסות שוב בעוד שעה.",
+  "error.skill.githubTooLarge": "OpenBot לא יכול לקרוא את כל הקבצים של {repository}. המאגר גדול מדי.",
+  "error.skill.githubHostTooOld": "יש לעדכן את השרת הזה כדי להוסיף מיומנויות מ-GitHub.",
+  "error.skill.publishGithub": "{name} מגיעה מ-GitHub. אפשר לפרסם רק מיומנויות שיצרת.",
 } as const satisfies PartialTranslation<typeof source>;

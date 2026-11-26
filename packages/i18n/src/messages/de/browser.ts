@@ -39,7 +39,8 @@ export const messages = {
   "browser.tab.closeNamed": "{name} schließen",
   "browser.tab.closeUnnamed": "Browser-Tab schließen",
   "browser.newTab": "Neuer Browser-Tab",
-  "browser.hide": "Browser ausblenden",
+  "browser.backToChat": "Zurück zum Chat",
+  "browser.fullView.open": "In Vollansicht öffnen",
   "browser.goBack": "Zurück",
   "browser.goForward": "Vorwärts",
   "browser.reload": "Seite neu laden",
@@ -58,6 +59,8 @@ export const messages = {
   "browser.pip.close": "Browser-Popup schließen",
   "browser.pip.reattachFailed": "OpenBot konnte den Browser nicht wieder andocken.",
   "browser.pip.closeFailed": "OpenBot konnte das Browser-Popup nicht schließen.",
+  "browser.window.open": "Browser in neuem Fenster öffnen",
+  "browser.window.openFailed": "OpenBot konnte das Browserfenster nicht öffnen.",
   "browser.popupBlocked.title": "Popup blockiert",
   "browser.popupBlocked.dismiss": "Popup-Meldung schließen",
   "browser.liveView.label": "Live-Ansicht der Seite auf dem Server",
@@ -68,6 +71,12 @@ export const messages = {
   "browser.liveView.pasteTooLong": "Dieser Text ist zu lang zum Einfügen. Füge weniger als 100.000 Zeichen ein.",
   "browser.liveView.copyTooLarge": "Die Auswahl ist zu lang zum Kopieren. Wähle weniger Text aus.",
   "browser.liveView.copyFailed": "Der Text konnte nicht kopiert werden. Klicke auf die Seite und versuche es erneut.",
+  "browser.liveView.pageCopied":
+    "Die Seite hat Text kopiert. Wähle „Kopieren“, um ihn in deine Zwischenablage zu legen.",
+  "browser.liveView.dialog.site": "{site} meldet",
+  "browser.liveView.dialog.page": "Diese Seite meldet",
+  "browser.liveView.dialog.waiting": "Die Seite wartet auf deine Antwort.",
+  "browser.liveView.dialog.ok": "OK",
   "browser.previews.label": "Browser-Vorschauen",
   "browser.previews.resize": "Größe des rechten Bereichs ändern",
   "browser.previews.empty": "Keine Browser-Tabs",
@@ -93,10 +102,41 @@ export const messages = {
   "browser.secret.takeOver": "Übernehmen",
   "browser.secret.failed":
     "Die Anfrage konnte nicht abgeschlossen werden. Prüfe die Verbindung und versuche es erneut.",
+  "browser.secret.ended": "Diese Anmeldeanfrage ist beendet. Bitte den Agenten, es noch einmal zu versuchen.",
+  "browser.secret.vaultSkip.agentScript":
+    "OpenBot hat deine gespeicherten Zugangsdaten nicht verwendet, weil der Agent ein Skript auf dieser Seite ausgeführt hat. Bitte den Agenten, die Seite neu zu laden und es noch einmal zu versuchen.",
+  "browser.secret.vaultSkip.fieldKind":
+    "OpenBot hat deine gespeicherten Zugangsdaten nicht verwendet, weil der Agent das falsche Feld auf der Seite gewählt hat.",
+  "browser.secret.vaultSkip.loginChoice":
+    "OpenBot hat keine gespeicherten Zugangsdaten verwendet, weil der Agent keine der für diese Website gespeicherten Zugangsdaten gewählt hat. Sag dem Agenten, welches Konto er verwenden soll.",
+  "browser.secret.vaultSkip.noPassword":
+    "OpenBot hat deine gespeicherten Zugangsdaten nicht verwendet, weil sie kein Passwort für diese Website enthalten.",
+  "browser.secret.vaultSkip.noAuthenticatorKey":
+    "OpenBot hat deine gespeicherten Zugangsdaten nicht verwendet, weil sie keinen Authenticator-Schlüssel enthalten.",
+  "browser.secret.vaultSkip.vaultUnreadable":
+    "OpenBot hat keine gespeicherten Zugangsdaten verwendet, weil dein Passwort-Manager nicht gelesen werden konnte.",
   "browser.error.openAddress": "Die Adresse konnte in diesem Tab nicht geöffnet werden.",
+  "browser.error.channelNoBrowserMember": "Kein Mitglied kann in diesem Kanal einen neuen Tab öffnen.",
   "browser.error.closeTab": "Der Browser-Tab konnte nicht geschlossen werden.",
   "browser.error.reloadTab": "Der Browser-Tab konnte nicht neu geladen werden.",
   "browser.error.stopLoading": "Das Laden der Seite konnte nicht gestoppt werden.",
+  "browser.error.teachStart": "Die Aufzeichnung der Aufgabe konnte nicht gestartet werden.",
+  "browser.error.teachStop": "Die Aufzeichnung der Aufgabe konnte nicht beendet werden.",
+  "browser.error.teachEmpty": "Die Aufzeichnung enthält keine Schritte.",
+  "browser.teach.intro":
+    "Zeige {name} eine Aufgabe auf dieser Seite. {name} lernt die Schritte und kann die Aufgabe wiederholen.",
+  "browser.teach.start": "Aufnahme starten",
+  "browser.teach.recording": "{name} zeichnet deine Schritte auf",
+  "browser.teach.stop": "Aufnahme stoppen und speichern",
+  "browser.teach.discard": "Aufzeichnung verwerfen",
+  "browser.teach.message":
+    "Ich habe dir im Browser eine Aufgabe gezeigt. Lerne sie aus der Aufzeichnung und speichere sie als Skill. Sage mir dann in wenigen einfachen Worten, was du gelernt hast.",
+  "browser.teach.steps":
+    "Die Aufzeichnung enthält keinen eingegebenen Text: Frage mich nach jedem Wert, den ich eingegeben habe.",
+  "browser.teach.step.page": "{number}. Öffne {page}",
+  "browser.teach.step.pageTitled": "{number}. Öffne {page} („{title}“)",
+  "browser.teach.step.click": "{number}. Klicke auf „{name}“ ({role})",
+  "browser.teach.step.clickUnnamed": "{number}. Klicke auf ein Element ({role}) auf {page}",
   "browser.error.takeControl": "Der Browser-Tab konnte nicht übernommen werden.",
   "browser.error.releaseControl": "Der Browser-Tab konnte nicht an den Agenten zurückgegeben werden.",
   "browser.error.navigateBack": "Zurücknavigieren war nicht möglich.",
@@ -148,6 +188,12 @@ export const messages = {
   "browser.signIn.stillSignedOut":
     "{server} zeigt für {site} noch eine Anmeldeseite. Schließe die Anmeldung im Fenster ab.",
   "browser.signIn.failed": "OpenBot konnte die Anmeldung nicht senden.",
+  "browser.httpSignIn.title": "Bei {site} anmelden",
+  "browser.httpSignIn.description": "Diese Website fragt nach ihrem eigenen Benutzernamen und Passwort.",
+  "browser.httpSignIn.refused": "Die Website hat diesen Benutzernamen oder dieses Passwort nicht angenommen.",
+  "browser.httpSignIn.username": "Benutzername",
+  "browser.httpSignIn.password": "Passwort",
+  "browser.httpSignIn.submit": "Anmelden",
   "browser.profiles.title": "Browser-Profile",
   "browser.profiles.subtitle":
     "Jedes Profil behält eigene Anmeldungen, Cookies und Website-Daten auf dem Computer, auf dem OpenBot läuft.",
@@ -215,4 +261,11 @@ export const messages = {
   },
   "browser.proxies.changeTitle": "Proxy von {name} ändern?",
   "browser.proxies.change": "Proxy ändern",
+  "browser.location.title": "{site} möchte deinen Standort wissen",
+  "browser.location.description": "Erlaube das nur für Websites, denen du vertraust.",
+  "browser.location.block": "Blockieren",
+  "browser.location.allow": "Erlauben",
+  "browser.location.allowAlways": "Immer erlauben",
+  "browser.location.unavailable": "Der Standort dieses Geräts ist nicht verfügbar.",
+  "browser.location.answerFailed": "Die Standortanfrage konnte nicht beantwortet werden.",
 } as const satisfies PartialTranslation<typeof source>;

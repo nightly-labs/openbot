@@ -5,7 +5,7 @@ import type {
   CustomProviderSummary,
   ProviderRuntimeSnapshot,
 } from "@openbot/contracts/ipc";
-import { skipToken, useQuery, useQueryClient } from "@tanstack/react-query";
+import { type QueryKey, skipToken, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useCallback, useMemo, useRef, useState } from "react";
 import { useQueryScope } from "@/features/auth/context/mobile-session-context";
 import { type ProviderAdmin, providerRows } from "@/features/servers/model/provider-admin";
@@ -14,12 +14,9 @@ import { queryKeys } from "@/features/workspace/model/query-keys";
 import { haptics } from "@/shared/lib/haptics";
 import { useText } from "@/shared/lib/text";
 
-/** The host sends no runtime event, so the runtimes are read again while a download runs, as on the web. */
 const RUNTIME_POLL_MS = 1000;
-/** The phone does not read the host's status events, so the status is read again while a sign-in waits. */
 const STATUS_POLL_MS = 3000;
 
-/** The Providers admin of a host, or null when this member cannot manage its providers. */
 export function useProviderAdmin(serverId: string) {
   const { canManageProviders } = useMobileWorkspace();
   const { providerAdmin } = useMobileWorkspaceActions();
@@ -28,20 +25,30 @@ export function useProviderAdmin(serverId: string) {
   return { available, admin };
 }
 
-/**
- * The providers of a host (`providers-v1`), as the Providers page and each provider page show them.
- * Both pages read the same queries, so a change on one shows on the other.
- */
+function useProviderStatusQuery(serverId: string, admin: ProviderAdmin | null, watchStatus: boolean) {
+  const queryScope = useQueryScope();
+  return useQuery({
+    queryKey: queryKeys.providerStatus(queryScope, serverId),
+    retry: false,
+    staleTime: 0,
+    refetchInterval: watchStatus ? STATUS_POLL_MS : false,
+    queryFn: admin ? () => admin.readStatus() : skipToken,
+  });
+}
+
+export function useServerProviderStatus(serverId: string) {
+  const { admin } = useProviderAdmin(serverId);
+  return useProviderStatusQuery(serverId, admin, false);
+}
+
 export function useServerProviders(serverId: string, options: { watchStatus?: boolean } = {}) {
   const { available, admin } = useProviderAdmin(serverId);
   const queryScope = useQueryScope();
   const queryClient = useQueryClient();
   const statusKey = queryKeys.providerStatus(queryScope, serverId);
   const runtimesKey = queryKeys.providerRuntimes(queryScope, serverId);
-  // The scope is a new array on each render, so the callbacks read the keys of the latest render.
   const keys = useRef({ statusKey, runtimesKey });
   keys.current = { statusKey, runtimesKey };
-  /** Shows the status that an action answered, and stops an older read from replacing it. */
   const applyStatus = useCallback(
     async (next: AgentStatus) => {
       const queryKey = keys.current.statusKey;
@@ -62,13 +69,7 @@ export function useServerProviders(serverId: string, options: { watchStatus?: bo
     () => queryClient.invalidateQueries({ queryKey: keys.current.statusKey, exact: true }),
     [queryClient],
   );
-  const status = useQuery({
-    queryKey: statusKey,
-    retry: false,
-    staleTime: 0,
-    refetchInterval: options.watchStatus ? STATUS_POLL_MS : false,
-    queryFn: admin ? () => admin.readStatus() : skipToken,
-  });
+  const status = useProviderStatusQuery(serverId, admin, options.watchStatus === true);
   const runtimes = useQuery({
     queryKey: runtimesKey,
     retry: false,
@@ -97,14 +98,10 @@ export function useServerProviders(serverId: string, options: { watchStatus?: bo
   };
 }
 
-/**
- * The custom endpoints of a host, as the Providers page and the custom provider page show them. The
- * host answers each save and removal with the whole list, and `applyList` shows it.
- */
 export function useServerCustomProviders(serverId: string, admin: ProviderAdmin | null) {
   const queryScope = useQueryScope();
   const queryClient = useQueryClient();
-  const queryKey = queryKeys.customProviders(queryScope, serverId);
+  const queryKey = queryKeys.customProviders(queryScope, serverId, Boolean(admin?.updateCustom));
   const keys = useRef(queryKey);
   keys.current = queryKey;
   const list = useQuery({
@@ -123,7 +120,6 @@ export function useServerCustomProviders(serverId: string, admin: ProviderAdmin 
   return { list, applyList };
 }
 
-/** The accounts of a host's providers, as the provider page and the account page show them. */
 export function useServerProviderAccounts(serverId: string, admin: ProviderAdmin | null) {
   const queryScope = useQueryScope();
   const accounts = admin?.accounts;
@@ -137,10 +133,6 @@ export function useServerProviderAccounts(serverId: string, admin: ProviderAdmin
   return { list, refresh };
 }
 
-/**
- * Reads the accounts of a host's providers again, for a page that changes them but does not show
- * them. An agent page reads the same accounts under its own key, so a change reads them all again.
- */
 export function useRefreshProviderAccounts(serverId: string) {
   const queryClient = useQueryClient();
   return useCallback(
@@ -152,15 +144,22 @@ export function useRefreshProviderAccounts(serverId: string) {
   );
 }
 
-/**
- * The provider that a new agent of the host starts on (`provider-default-v1`), as the Providers page
- * and each provider page show it. `choose` saves a provider; the host has no "none".
- */
 export function useHostProviderDefault(serverId: string, setting: ProviderAdmin["defaultProvider"]) {
-  const { t, errorMessage } = useText();
   const queryScope = useQueryScope();
+  const { current, saving, error, save } = useProviderSetting(queryKeys.providerDefault(queryScope, serverId), setting);
+  const choose = (provider: AgentProviderId) => {
+    if (!setting || saving || provider === current.data?.provider) return;
+    save(provider);
+  };
+  return { current, saving, error, choose };
+}
+
+export function useProviderSetting<T, V>(
+  queryKey: QueryKey,
+  setting: { read: () => Promise<T>; set: (value: V) => Promise<T> } | null,
+) {
+  const { t, errorMessage } = useText();
   const queryClient = useQueryClient();
-  const queryKey = queryKeys.providerDefault(queryScope, serverId);
   const current = useQuery({
     queryKey,
     retry: false,
@@ -169,12 +168,12 @@ export function useHostProviderDefault(serverId: string, setting: ProviderAdmin[
   });
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const choose = (provider: AgentProviderId) => {
-    if (!setting || saving || provider === current.data?.provider) return;
+  const save = (value: V) => {
+    if (!setting) return;
     setSaving(true);
     setError(null);
     setting
-      .set(provider)
+      .set(value)
       .then(async (saved) => {
         await queryClient.cancelQueries({ queryKey, exact: true });
         queryClient.setQueryData(queryKey, saved);
@@ -186,10 +185,9 @@ export function useHostProviderDefault(serverId: string, setting: ProviderAdmin[
       })
       .finally(() => setSaving(false));
   };
-  return { current, saving, error, choose };
+  return { current, saving, error, save };
 }
 
-/** The state of a provider's API key on the host, as the provider page and the key page show it. */
 export function useProviderKeyState(serverId: string, admin: ProviderAdmin | null, provider: AgentProviderId | null) {
   const queryScope = useQueryScope();
   const queryKey = queryKeys.providerKey(queryScope, serverId, provider ?? "");
@@ -202,7 +200,6 @@ export function useProviderKeyState(serverId: string, admin: ProviderAdmin | nul
   });
 }
 
-/** The custom ACP agents of a host, as the Providers page and the custom agent page show them. */
 export function useServerCustomAgents(serverId: string, admin: ProviderAdmin | null) {
   const queryScope = useQueryScope();
   const queryClient = useQueryClient();

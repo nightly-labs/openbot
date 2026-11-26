@@ -13,18 +13,23 @@ import type {
   AttachmentSummary,
   ConversationSnapshot,
   DraftAttachment,
+  ResponseStyle,
 } from "@openbot/contracts/ipc";
 import type { AppTextKey } from "@openbot/i18n";
 import { plainTaskTitle, taskApproval } from "@openbot/team-client/agent-tasks";
+import { retryOperationIds } from "@openbot/team-client/retry-operation-id";
 import type { AgentMessage, AgentProfile } from "@openbot/ui/data";
 import type { AgentTaskWait } from "@openbot/ui/features/conversation/AgentTasks";
 import type { AttachmentDownloads, AttachmentMediaSource } from "@openbot/ui/features/conversation/AttachmentCards";
 import type { ComposerPasteResult, ComposerSelection } from "@openbot/ui/features/conversation/ComposerEditor";
+import type { MediaApprovalControls } from "@openbot/ui/features/conversation/MediaApprovalCard";
 import type { SendShortcut } from "@openbot/ui/features/conversation/send-shortcut";
 import { AgentThreadView, type AgentThreadVoice } from "@openbot/ui/features/conversation/threads/AgentThreadView";
 import { TaskAnswerCard, TaskPanel } from "@openbot/ui/features/tasks/TaskPanel";
 import { TASKS_SIDE_DEFAULT, TASKS_SIDE_MIN, TasksPage, type TasksVoice } from "@openbot/ui/features/tasks/TasksPage";
 import { currentText } from "@openbot/ui/text";
+import { appendVoiceTranscript } from "@openbot/ui/voice-recording";
+import type { JSX } from "@solidjs/web";
 import {
   createEffect,
   createMemo,
@@ -39,112 +44,86 @@ import {
 import { actionToast } from "../../action-toast";
 import { useShowAgentSteps } from "../../agent-steps-preference";
 import { toAgentMessages } from "../../app-message-projection";
+import { useChatBubbleStyle } from "../../chat-bubble-style-preference";
 import { readPanelWidth, savePanelWidth } from "../../components/panel-width-storage";
 import { usePlatform } from "../../platform";
-import { appendVoiceTranscript } from "../../voice-recording";
 import { readAgentSelection, writeAgentSelection } from "../agents/agent-selection";
 import { insertAtSelection, insertPastedText, rowAttachments } from "../conversation/composer-draft";
 import { latestVisibleAgentMessageId } from "../conversation/conversation-read-state";
+import { naturalThreadRows } from "../conversation/narration-rows";
 import { importPastedFiles, type PastePreview, pastePreviewTracker } from "../conversation/stores/composer-actions";
 import { createTurnSteps } from "../conversation/turn-steps";
+import { createTurnStreamHold } from "../conversation/turn-stream-hold";
+import { useTurnTrace } from "../conversation/turn-trace";
+import { createPageHeaderFrame } from "../window/page-header-frame";
 import type { TaskEvent, TasksSource } from "./tasks-port";
 
-/** How long a start waits before it reaches the agent. Undo cancels it in this time. */
 const UNDO_MS = 6_000;
-/** The agent last chosen on this page for each server, kept apart from the chat agent. */
 const TASK_AGENT_STORAGE_KEY = "openbot:task-agent:v1";
-/** The width of the task panel beside the list, the same on every server. */
 const TASK_PANEL_WIDTH_STORAGE_KEY = "openbot:task-panel-width";
 
-/** What the voice of the composer can do on the page: read and change the draft, and start a task. */
 export interface TasksVoiceControls {
   serverId: () => string;
   draft: () => string;
   setDraft: (text: string) => void;
-  /** Starts a task with this text. False when the text has nothing to do. */
   start: (text: string) => boolean;
   showError: (message: string) => void;
   focus: () => void;
-  /** The task whose panel shows. Its message box can record too. */
   openTaskId: () => string | null;
-  /** Adds what was said to the draft of a task's message box. */
   appendTaskTranscript: (taskId: string, text: string) => void;
-  /** Sends the draft of a task's message box, when its panel still shows. */
   sendTask: (taskId: string) => Promise<void>;
 }
 
-/**
- * The files of a task message: a start or a message to a task. Only a server that takes files in a
- * side thread has them: this computer, or a host with `agent-thread-files-v1`.
- */
 export interface TaskFiles {
   accepted: () => boolean;
   import: (data: AttachmentDataInput[], serverId: string) => Promise<DraftAttachment[]>;
   discard: (id: string, serverId: string) => Promise<void>;
 }
 
-/**
- * The voice of the composer and of the open task's message box: one recording at a time. `submit` sends
- * while the composer records: the transcript starts the task.
- */
 export type TasksVoiceAdapter = TasksVoice & {
   submit: () => void;
-  /** The task of the last recording. Undefined when the Tasks composer recorded last. */
   taskId: string | undefined;
   startTask: (taskId: string) => void;
-  /** Stops the task's recording, and sends its message with the transcript. */
   sendTask: () => void;
 };
 
 interface TasksViewProps {
   serverId: string;
   hostName: string;
+  failureText?: ((error: string) => string) | undefined;
   onBack?: (() => void) | undefined;
-  agentsOpen?: boolean | undefined;
-  onToggleAgents?: (() => void) | undefined;
   source: TasksSource;
   agents: AgentProfile[];
-  /** Absent where the client cannot record. */
   voice?: ((controls: TasksVoiceControls) => TasksVoiceAdapter) | undefined;
   onOpenLink: (url: string) => void;
   onAttachmentAction: (attachment: AttachmentSummary, action: "open" | "reveal" | "download") => void;
-  /** Absent where the client cannot send files with a task message. */
   files?: TaskFiles | undefined;
-  /** Loads the images of a client that gets no `previewUrl`. */
   mediaSource?: AttachmentMediaSource | undefined;
-  /** The download state of attachments from a joined server. */
   downloads?: AttachmentDownloads | undefined;
-  /** The waiting approvals of the server's agents. */
   approvals: readonly AgentApproval[];
   onRespondApproval: (approval: AgentApproval, decision: "accept" | "decline") => Promise<boolean>;
-  /** Moves the read mark of an open task to a message. Absent where the server keeps no read marks. */
+  mediaApproval?: MediaApprovalControls | undefined;
+  approvalCard?: ((approval: AgentApproval) => JSX.Element | undefined) | undefined;
   onRead?: ((input: AgentTaskInput, messageId: string) => void) | undefined;
-  /** Whether the task's running turn waits for a question or a browser takeover, which the chat answers. */
   waitsForAnswer?: ((task: AgentTask) => boolean) | undefined;
-  /** Opens the task as a thread tab in its agent's chat, and leaves the page. */
   onOpenInChat?: ((task: AgentTask) => void) | undefined;
   sendShortcut?: SendShortcut | undefined;
+  responseStyle?: ResponseStyle | undefined;
 }
 
-/** A start that waits for its Undo time. Its task shows in the list as queued. */
 interface PendingStart {
   task: AgentTask;
   text: string;
   attachments: DraftAttachment[];
   clientMessageId: string;
-  /** The server of the start. A server change commits it after `props.serverId` names the new one. */
   serverId: string;
   timer: ReturnType<typeof setTimeout>;
 }
 
 interface TasksViewState {
-  /** The task list of each agent, by agent id. */
   snapshots: Record<string, AgentTasksSnapshot>;
-  /** The conversation of each opened task, by task id. */
   conversations: Record<string, ConversationSnapshot>;
-  /** The unsent text of each task's message box, by task id. */
   drafts: Record<string, string>;
-  /** The files of each message box that the text does not name: `START_FILES` for the start, or a task id. */
   files: Record<string, DraftAttachment[]>;
   pending: AgentTask | null;
   agentId: string;
@@ -153,25 +132,19 @@ interface TasksViewState {
   startError: string | null;
   took: { taskId: string; pending: boolean } | null;
   selectedId: string | null;
-  /** The width of the task panel that the user chose. */
   sideWidth: number;
-  /** Each increase moves the caret of a task's message box to the end, as after a dictation. By task id. */
   focusRequests: Record<string, number>;
 }
 
-/** The key of the start composer's files in `TasksViewState.files`. A task id never has this form. */
 const START_FILES = "start";
+
+const sendIds = retryOperationIds(() => crypto.randomUUID());
 
 function toastError(error: unknown, fallback: AppTextKey): void {
   const { t, errorMessage } = currentText();
   actionToast.error(errorMessage(error, t(fallback)));
 }
 
-/**
- * The tasks of all agents of a server, on desktop and on the web. The page starts a task for the
- * chosen agent a few seconds after the send, so Undo can take it back; opening it or leaving the page
- * starts it at once.
- */
 export function TasksView(props: TasksViewProps) {
   const [state, setState] = createStore<TasksViewState>({
     snapshots: {},
@@ -195,6 +168,7 @@ export function TasksView(props: TasksViewProps) {
   });
   const { appFocused, appInfo } = usePlatform();
   const showAgentSteps = useShowAgentSteps();
+  const bubbleStyle = useChatBubbleStyle();
   let pending: PendingStart | null = null;
   let generation = 0;
   const listRequests = new Map<string, number>();
@@ -208,7 +182,6 @@ export function TasksView(props: TasksViewProps) {
     for (const attachment of attachments) void props.files?.discard(attachment.id, serverId).catch(() => undefined);
   }
 
-  /** The text of a message box: `START_FILES` for the start, or a task id. */
   const textOf = (key: string) => (key === START_FILES ? state.draft : (state.drafts[key] ?? ""));
   function setText(key: string, text: string): void {
     setState((draft) => {
@@ -218,11 +191,6 @@ export function TasksView(props: TasksViewProps) {
   }
   const rowFilesOf = (key: string) => rowAttachments(textOf(key), filesOf(key));
 
-  /**
-   * Imports pasted files into a message box, and puts their references at the selection, or at the end
-   * when the text changed. The files go to the server of the paste only. `text` is the text of a long
-   * paste that `files` holds: when no file comes, that text goes at the selection instead.
-   */
   async function pasteFiles(
     key: string,
     files: ReadonlyArray<File | Promise<File>>,
@@ -252,7 +220,6 @@ export function TasksView(props: TasksViewProps) {
         discardFiles(imported, serverId);
         return;
       }
-      // Another paste can fill the box while this one imports.
       const accepted = imported.slice(0, Math.max(0, INPUT_LIMITS.attachments - filesOf(key).length));
       discardFiles(imported.slice(accepted.length), serverId);
       if (accepted.length < imported.length)
@@ -263,7 +230,6 @@ export function TasksView(props: TasksViewProps) {
       });
       const references = accepted.map((file) => serializeAttachmentReference(file.name, file.id)).join(" ");
       const result = insertAtSelection(textOf(key), references, { before, selection });
-      // A message that would be too long keeps the files in the row only.
       if (result.value.length > INPUT_LIMITS.messageText) return;
       setText(key, result.value);
       return result;
@@ -289,7 +255,6 @@ export function TasksView(props: TasksViewProps) {
     );
   }
 
-  /** Takes the files of a message box out of the page state, for a message that carries them. */
   function takeFiles(key: string): DraftAttachment[] {
     const taken = filesOf(key);
     if (taken.length)
@@ -299,7 +264,6 @@ export function TasksView(props: TasksViewProps) {
     return taken;
   }
 
-  /** Puts files back in front of a message box's row, after a start that failed or was undone. */
   function returnFiles(key: string, attachments: readonly DraftAttachment[]): void {
     if (!attachments.length) return;
     setState((draft) => {
@@ -307,7 +271,6 @@ export function TasksView(props: TasksViewProps) {
     });
   }
 
-  // The agent chosen last on this server stays the default, so the user does not choose it again on each visit.
   const savedAgentId = createMemo(() => readAgentSelection(TASK_AGENT_STORAGE_KEY)[props.serverId] ?? "");
   const isListed = (id: string) => props.agents.some((agent) => agent.id === id);
   const agentId = () =>
@@ -320,7 +283,6 @@ export function TasksView(props: TasksViewProps) {
   });
   const taskOf = (taskId: string) => tasks().find((task) => task.id === taskId);
 
-  /** Stores a task list. A task that the list no longer has loses its conversation, its draft and the panel. */
   function setSnapshot(snapshot: AgentTasksSnapshot): void {
     const kept = new Set(snapshot.tasks.map((task) => task.id));
     const gone = (state.snapshots[snapshot.agentId]?.tasks ?? []).filter((task) => !kept.has(task.id));
@@ -340,7 +302,6 @@ export function TasksView(props: TasksViewProps) {
     setSnapshot(snapshot);
   }
 
-  /** Keeps the newest conversation of a task. A delta raises the revision, so an older snapshot loses. */
   function applyConversation(taskId: string, snapshot: ConversationSnapshot): void {
     const stored = state.conversations[taskId];
     if (stored && snapshot.revision < stored.revision) return;
@@ -359,7 +320,6 @@ export function TasksView(props: TasksViewProps) {
       return;
     }
     const stored = state.conversations[event.taskId];
-    // A task that did not load its conversation reads it whole when it opens.
     if (!stored || event.revision <= stored.revision) return;
     setState((draft) => {
       const conversation = draft.conversations[event.taskId];
@@ -382,7 +342,6 @@ export function TasksView(props: TasksViewProps) {
     });
   }
 
-  /** Reads the task lists of the agents. One toast tells of a failure, not one for each agent. */
   function loadLists(agentIds: readonly string[]): void {
     const serverId = props.serverId;
     const current = generation;
@@ -416,10 +375,6 @@ export function TasksView(props: TasksViewProps) {
     );
   }
 
-  /**
-   * Adds a task that a start returned, so it shows before the list event arrives. A list read that started
-   * before the task does not have it, so its answer no longer counts.
-   */
   function rememberTask(task: AgentTask): void {
     listRequests.set(task.agentId, (listRequests.get(task.agentId) ?? 0) + 1);
     setState((draft) => {
@@ -429,10 +384,6 @@ export function TasksView(props: TasksViewProps) {
     });
   }
 
-  /**
-   * Starts the waiting task now. The page shows the real task when the host returns it; a failure
-   * puts the text back in an empty composer.
-   */
   async function commit(): Promise<AgentTask | null> {
     const start = pending;
     if (!start) return null;
@@ -480,13 +431,11 @@ export function TasksView(props: TasksViewProps) {
     }
   }
 
-  /** A start leaves the page at once: a send before it, the page closing, or a server change. */
   function commitNow(): void {
     if (pending) void commit();
   }
 
   function start(text: string): boolean {
-    // A start of images only names them, as a side thread does. A file gives its name to the title.
     if (!plainTaskTitle(expandAttachmentReferences(text)))
       text = filesOf(START_FILES)
         .map((file) => serializeAttachmentReference(file.name, file.id))
@@ -531,7 +480,6 @@ export function TasksView(props: TasksViewProps) {
     return true;
   }
 
-  /** Takes the waiting start back: its text and agent return to the composer. */
   function undo(): void {
     const start = pending;
     if (!start) return;
@@ -548,7 +496,6 @@ export function TasksView(props: TasksViewProps) {
     returnFiles(START_FILES, start.attachments);
   }
 
-  /** A waiting task opens as soon as it starts; the panel shows it as queued until then. */
   function select(taskId: string | null): void {
     setState((draft) => {
       draft.selectedId = taskId;
@@ -567,30 +514,30 @@ export function TasksView(props: TasksViewProps) {
     }
   }
 
-  /** Sends a message to a task. An archived task is restored first, as in a thread tab. */
   async function sendToTask(taskId: string, text: string): Promise<boolean> {
     const task = taskOf(taskId);
     if (!task || task.id.startsWith("pending:")) return false;
     const target = { agentId: task.agentId, taskId: task.id };
     const serverId = untrack(() => props.serverId);
     const files = untrack(() => filesOf(taskId));
+    const message = sendIds([serverId, taskId, text, files.map((file) => file.id)]);
     const sent = await runAction(async () => {
       if (taskOf(taskId)?.state === "closed") await props.source.reopen(target, serverId);
       await props.source.send(
         {
           ...target,
           text,
-          clientMessageId: crypto.randomUUID(),
+          clientMessageId: message.id,
           ...(files.length ? { attachmentDraftIds: files.map((file) => file.id) } : {}),
         },
         serverId,
       );
     }, "conversation.tasks.error.send");
+    if (!sent) message.failed();
     if (sent) {
       const sentIds = new Set(files.map((file) => file.id));
       setState((draft) => {
         delete draft.drafts[taskId];
-        // A file that came during the send stays.
         const rest = (draft.files[taskId] ?? []).filter((file) => !sentIds.has(file.id));
         if (rest.length) draft.files[taskId] = rest;
         else delete draft.files[taskId];
@@ -625,12 +572,10 @@ export function TasksView(props: TasksViewProps) {
         draft.focusRequests[taskId] = (draft.focusRequests[taskId] ?? 0) + 1;
       }),
     sendTask: async (taskId) => {
-      // The transcript was just appended; the send reads the draft, so apply that write first.
       flush();
       if (state.selectedId !== taskId) return;
       const text = textOf(taskId).trim();
       if (text || filesOf(taskId).length > 0) await sendToTask(taskId, text);
-      // The locked message box did not take the earlier focus request.
       if (state.selectedId === taskId)
         setState((draft) => {
           draft.focusRequests[taskId] = (draft.focusRequests[taskId] ?? 0) + 1;
@@ -638,7 +583,6 @@ export function TasksView(props: TasksViewProps) {
     },
   };
   const voice = untrack(() => props.voice?.(voiceControls));
-  /** The microphone of the Tasks composer. It waits while a task's message box records. */
   const composerVoice = voice && startVoice(voice);
   function startVoice(adapter: TasksVoiceAdapter): TasksVoice {
     return {
@@ -665,7 +609,6 @@ export function TasksView(props: TasksViewProps) {
       onFinish: adapter.onFinish,
     };
   }
-  /** The microphone of a task's message box, as in a side thread of the chat. */
   function taskVoice(adapter: TasksVoiceAdapter, taskId: string): AgentThreadVoice {
     const owned = () => adapter.taskId === taskId;
     return {
@@ -694,7 +637,6 @@ export function TasksView(props: TasksViewProps) {
     };
   }
 
-  // The page stays open when the user switches the server, so the tasks clear, load and listen again.
   createEffect(
     () => props.serverId,
     (serverId) => {
@@ -702,30 +644,24 @@ export function TasksView(props: TasksViewProps) {
         draft.snapshots = {};
         draft.conversations = {};
         draft.drafts = {};
-        // The old server discarded the files, so the start text no longer names them.
         for (const file of draft.files[START_FILES] ?? [])
           draft.draft = removeAttachmentReferences(draft.draft, file.id);
         draft.files = {};
         draft.pending = null;
         draft.selectedId = null;
         draft.took = null;
-        // Agent IDs can repeat on two servers, so the new server starts from its own saved agent.
         draft.agentId = "";
       });
-      // The agents of the new server load again, also an agent ID that the old server had.
       listRequests.clear();
       readRequests.clear();
       untrack(() => loadLists(props.agents.map((agent) => agent.id)));
-      // A turn can end while the host is away, so the open task reads its whole conversation again.
       const unsubscribe = props.source.onEvent(serverId, applyEvent, () => {
         loadLists(props.agents.map((agent) => agent.id));
         const task = state.selectedId ? taskOf(state.selectedId) : undefined;
         if (task && !task.id.startsWith("pending:")) readTask(task);
       });
       return () => {
-        // A waiting start goes to the server it was sent on.
         commitNow();
-        // The files of the message boxes are drafts on the old server, so they go.
         discardFiles(Object.values(untrack(() => state.files)).flat(), serverId);
         generation++;
         unsubscribe();
@@ -733,7 +669,6 @@ export function TasksView(props: TasksViewProps) {
     },
   );
 
-  // A new agent loads its list; the agents that loaded keep theirs.
   createEffect(
     () => props.agents.map((agent) => agent.id),
     (ids) => {
@@ -742,7 +677,6 @@ export function TasksView(props: TasksViewProps) {
     },
   );
 
-  // The opened task reads its whole conversation; events keep it current after that.
   createEffect(
     () => {
       const taskId = state.selectedId;
@@ -762,7 +696,6 @@ export function TasksView(props: TasksViewProps) {
     generation++;
   });
 
-  /** What a running task waits for from the person. The chat answers a question or a browser takeover. */
   function waitOf(task: AgentTask): AgentTaskWait {
     if (task.state !== "running") return undefined;
     if (taskApproval(task, props.approvals)) return "approval";
@@ -771,29 +704,35 @@ export function TasksView(props: TasksViewProps) {
 
   function panel(taskId: string) {
     const task = () => taskOf(taskId) ?? null;
-    /** The task on the host. A start that waits for its Undo time has none yet. */
     const hosted = () => {
       const current = task();
       return current && !current.id.startsWith("pending:") ? current : null;
     };
     const owner = () => agentOf(task()?.agentId ?? "");
-    /** Reconciled by id, so a stream chunk redraws only the message that changed. */
     const messages = createProjection<AgentMessage[]>(
       () => {
         const conversation = state.conversations[taskId];
-        // The chat answers a question that waits, so its message is left out, as in a thread tab.
         const shown = conversation?.messages.filter((message) => message.questionPrompt?.resolution !== null);
         return shown ? toAgentMessages(shown, task()?.agentId) : [];
       },
       [],
       { key: "id" },
     );
-    // The page gets only the latest progress line of a running turn, so its steps are the thoughts,
-    // and after the turn the tool steps of its stored trace.
+    const streamHeld = createTurnStreamHold(() => hosted()?.activeTurnId);
+    const shownMessages = createMemo(() =>
+      props.responseStyle === "natural"
+        ? naturalThreadRows(messages, (owner() ?? props.agents[0])?.provider, streamHeld)
+        : messages,
+    );
     const turnSteps = createTurnSteps({
       messages: () => messages,
       lines: () => undefined,
       activeTurnId: () => hosted()?.activeTurnId,
+    });
+    const turnTrace = useTurnTrace({
+      turnSteps,
+      agentName: () => (owner() ?? props.agents[0])?.name,
+      agents: () => props.agents,
     });
     const input = () => {
       const current = hosted();
@@ -807,7 +746,6 @@ export function TasksView(props: TasksViewProps) {
       const current = hosted();
       return current ? waitOf(current) : undefined;
     };
-    /** An archived task is restored first: the chat does not show an archived thread as a tab. */
     const openInChat = async () => {
       const current = hosted();
       if (!current) return;
@@ -820,12 +758,10 @@ export function TasksView(props: TasksViewProps) {
       props.onOpenInChat?.(current);
     };
     const chatAction = () => (props.onOpenInChat ? () => void openInChat() : undefined);
-    /** A question or a browser takeover waits: the card sends the person to the chat, which answers it. */
     const answerCard = (agentName: string) => {
       if (wait() !== "answer") return undefined;
       return <TaskAnswerCard agentName={agentName} onAnswer={chatAction()} />;
     };
-    // The person reads the open task while the window has focus, as in its thread tab.
     createEffect(
       () => ({ target: input(), messageId: appFocused() ? latestVisibleAgentMessageId(messages) : null }),
       ({ target, messageId }) => {
@@ -833,7 +769,6 @@ export function TasksView(props: TasksViewProps) {
       },
     );
     const panelVoice = voice && taskVoice(voice, taskId);
-    // The message box is new each time a task opens. A focus request from before is not for it.
     const shownAt = untrack(() => state.focusRequests[taskId] ?? 0);
     const focusRequest = () => {
       const request = state.focusRequests[taskId] ?? 0;
@@ -863,11 +798,14 @@ export function TasksView(props: TasksViewProps) {
               task={hosted()}
               limit={state.snapshots[task()?.agentId ?? ""]?.limit ?? 1}
               agent={agent()}
+              bubbleStyle={bubbleStyle()}
+              responseStyle={props.responseStyle}
               agents={props.agents}
-              messages={messages}
+              messages={shownMessages()}
               draft={state.drafts[taskId] ?? ""}
               draftAttachments={filesOf(taskId)}
               rowAttachments={rowFilesOf(taskId)}
+              failureText={props.failureText}
               pendingImages={pendingImagesOf(taskId)}
               onRemoveAttachment={filesAccepted() ? (attachment) => removeFile(taskId, attachment) : undefined}
               onPasteFiles={
@@ -892,6 +830,8 @@ export function TasksView(props: TasksViewProps) {
               mediaSource={props.mediaSource}
               downloads={props.downloads}
               approval={approval()}
+              media={props.mediaApproval}
+              approvalCard={props.approvalCard}
               onRespondApproval={async (decision) => {
                 const current = approval();
                 return current ? props.onRespondApproval(current, decision) : false;
@@ -900,6 +840,7 @@ export function TasksView(props: TasksViewProps) {
               attention={answerCard(agent().name)}
               stepsAbove={turnSteps.stepsAbove}
               factsAbove={turnSteps.factsAbove}
+              traceAbove={turnTrace}
               activeSteps={turnSteps.activeSteps()}
               stepsOpenByDefault={showAgentSteps()}
               sendShortcut={props.sendShortcut}
@@ -916,16 +857,14 @@ export function TasksView(props: TasksViewProps) {
     return current && task ? { task, pending: current.pending } : null;
   };
 
+  const headerFrame = createPageHeaderFrame();
   return (
     <TasksPage
       hostName={props.hostName}
       onBack={props.onBack}
-      agentsOpen={props.agentsOpen}
-      onToggleAgents={props.onToggleAgents}
+      frame={headerFrame()}
       agents={props.agents}
       tasks={tasks()}
-      // A list that did not load keeps its agent out, so a failed load does not show the empty page.
-      // With no agents yet, the agent list did not load.
       loaded={props.agents.length > 0 && props.agents.every((agent) => state.snapshots[agent.id] !== undefined)}
       agentId={agentId()}
       onAgentChange={(id) => {

@@ -1,20 +1,13 @@
 import type { ProviderAdminDesktopApi, ProviderRuntimeSnapshot, ProviderRuntimeStatus } from "@openbot/contracts/ipc";
 import type { ProviderRuntimeSource } from "./provider-runtime-store";
 
-/** How often a download on the host is read again while it runs. */
 const POLL_MS = 1000;
-/** The wait after a read failed, so a host that went away is not asked every second. */
 const RETRY_MS = 5000;
 
-/**
- * The managed runtimes of a joined server's host, in the shape the runtime store takes for this
- * computer's. `providers-v1` sends no progress event, so while a download runs on the host this
- * reads the status again and hands it to the store's listener. The reads stop when no download runs
- * and when the store unsubscribes.
- */
 export function remoteProviderRuntimes(admin: () => ProviderAdminDesktopApi, serverId: string): ProviderRuntimeSource {
   const listeners = new Set<(snapshot: ProviderRuntimeSnapshot) => void>();
   let timer: ReturnType<typeof setTimeout> | undefined;
+  let starting = 0;
 
   function poll(delay: number): void {
     if (timer !== undefined || listeners.size === 0) return;
@@ -25,14 +18,13 @@ export function remoteProviderRuntimes(admin: () => ProviderAdminDesktopApi, ser
         .then(
           (snapshot) => {
             for (const listener of listeners) listener(snapshot);
-            if (running(snapshot)) poll(POLL_MS);
+            if (running(snapshot) || starting > 0) poll(POLL_MS);
           },
           () => poll(RETRY_MS),
         );
     }, delay);
   }
 
-  /** Starts the reads when the answer to a call shows a download under way. */
   function observe(snapshot: ProviderRuntimeSnapshot): ProviderRuntimeSnapshot {
     if (running(snapshot)) poll(POLL_MS);
     return snapshot;
@@ -40,7 +32,16 @@ export function remoteProviderRuntimes(admin: () => ProviderAdminDesktopApi, ser
 
   return {
     getStatus: () => admin().getRuntimes(serverId).then(observe),
-    download: (provider) => admin().downloadRuntime(provider, serverId).then(observe),
+    download: (provider) => {
+      starting += 1;
+      poll(POLL_MS);
+      return admin()
+        .downloadRuntime(provider, serverId)
+        .finally(() => {
+          starting -= 1;
+        })
+        .then(observe);
+    },
     cancel: (provider) => admin().cancelRuntime(provider, serverId).then(observe),
     checkForUpdates: () => admin().checkRuntimeUpdates(serverId).then(observe),
     onEvent: (listener) => {

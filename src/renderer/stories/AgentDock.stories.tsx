@@ -1,9 +1,16 @@
-import { AVATAR_HUES } from "@openbot/contracts/ipc";
+import {
+  type AgentApproval,
+  type AgentDockPrompt,
+  type AgentDockTakeover,
+  type AgentDockUsageLimit,
+  AVATAR_HUES,
+} from "@openbot/contracts/ipc";
 import type { AvatarMood } from "@openbot/ui/bloub-avatar";
 import type { AgentMessage, AgentProfile } from "@openbot/ui/data";
 import {
   AgentDock,
   type AgentDockChannel,
+  type AgentDockChatAnswers,
   type AgentDockChatModel,
   type AgentDockSeat,
   type AgentDockSeatRef,
@@ -44,7 +51,6 @@ const support: AgentProfile = {
   avatarHue: 150,
   threadId: "support-thread",
 };
-/** More copies of the fixture agents, so the dock has more seats than the screen shows. */
 const EXTRA_AGENTS: AgentProfile[] = Array.from({ length: 10 }, (_, index) => {
   const base = [chief, research, sales][index % 3] ?? chief;
   return {
@@ -58,7 +64,6 @@ const EXTRA_AGENTS: AgentProfile[] = Array.from({ length: 10 }, (_, index) => {
 });
 const AGENTS = [chief, research, sales, design, support, ...EXTRA_AGENTS];
 
-/** Channels with their members. One has a picture instead of the member faces. */
 const CHANNELS: AgentDockChannel[] = [
   {
     id: "launch",
@@ -78,7 +83,6 @@ const CHANNELS: AgentDockChannel[] = [
   },
 ];
 
-/** The state of each agent and channel: the same states as the sidebar badges. */
 const ACTIVITY: Record<string, { mood: AvatarMood; state: SidebarAgentState | undefined }> = {
   chief: { mood: "working", state: { kind: "working" } },
   research: {
@@ -104,7 +108,6 @@ const MESSAGES: Record<string, AgentMessage[]> = {
     message("r1", "you", "Compare the three markets we spoke about."),
     message("r2", "agent", "I have the numbers for all three. Before I write the summary, I need one answer."),
   ],
-  // Long enough to scroll, so the edges of the log fade.
   sales: [
     message("s0a", "you", "Send the follow-up email to the five leads from Tuesday's demo."),
     message("s0b", "agent", "Sent to all five. I used the short version with the pricing link."),
@@ -121,7 +124,6 @@ const MESSAGES: Record<string, AgentMessage[]> = {
     message("u1", "you", "How many tickets are open?"),
     message("u2", "agent", "Four. Two of them need your decision today."),
   ],
-  // A channel names the author of each message. The reader's own messages have no sender.
   launch: [
     { ...message("l1", "you", "Is everything ready for Thursday?"), senderMember: { id: "member-ana", name: "Ana" } },
     { ...message("l2", "agent", "The plan is done. Research checks the numbers now."), senderAgentId: "chief" },
@@ -146,7 +148,6 @@ function workingFixture(): Record<string, boolean> {
   return working;
 }
 
-/** Finished work of three agents, the newest last. */
 function finishedFixture(now: number): AgentDockShelfResult[] {
   return [
     { id: "result-1", agentId: "support", kind: "message", label: "Replied to 4 tickets", at: now - 3000 },
@@ -156,20 +157,125 @@ function finishedFixture(now: number): AgentDockShelfResult[] {
   ];
 }
 
-/** The time without use before the story dock slides into the edge, as in the dock window. */
+const APPROVAL: AgentApproval = {
+  requestId: "story-approval",
+  agentId: "chief",
+  threadId: "chief-thread",
+  turnId: "chief-turn",
+  kind: "command",
+  command: "git push origin launch-plan",
+  cwd: "~/OpenBot/Chief",
+  reason: "Push the launch plan branch so Research can review it.",
+  grantRoot: null,
+  permissions: null,
+};
+
+const PROMPT: AgentDockPrompt = {
+  requestId: "story-prompt",
+  agentId: "research",
+  threadId: "research-thread",
+  turnId: "research-turn",
+  questions: [
+    {
+      id: "market",
+      header: "Market",
+      question: "Which market do you want first?",
+      isSecret: false,
+      options: [
+        { label: "Germany", description: "The biggest market, with the most competitors." },
+        { label: "Poland", description: "Smaller, and we already have two customers there." },
+        { label: "Spain", description: "The fastest growth of the three." },
+      ],
+    },
+  ],
+  attempt: 0,
+};
+
+const CRM_PAGE = { title: "Acme CRM – Sign in", origin: "https://crm.example.com" };
+
+const TAKEOVER: AgentDockTakeover = {
+  request: {
+    requestId: "story-takeover",
+    agentId: "sales",
+    threadId: "sales-thread",
+    turnId: "sales-turn",
+    tabId: "tab-crm",
+    secret: { method: "password", origin: "https://crm.example.com", digits: 6 },
+  },
+  page: CRM_PAGE,
+  agentName: "Sales",
+  vault: { server: null },
+  attempt: 0,
+};
+
+const MANUAL_TAKEOVER: AgentDockTakeover = {
+  request: {
+    requestId: "story-manual-takeover",
+    agentId: "sales",
+    threadId: "sales-thread",
+    turnId: "sales-turn",
+    tabId: "tab-crm",
+  },
+  page: CRM_PAGE,
+  agentName: "Sales",
+  vault: null,
+  attempt: 0,
+};
+
+const USAGE_LIMIT: AgentDockUsageLimit = {
+  agentId: "chief",
+  provider: "claude",
+  model: "Claude Opus 5.5",
+  agentName: null,
+  resetsAt: Date.UTC(2026, 8, 21, 9, 0) / 1_000,
+  options: [
+    {
+      key: "codex:gpt-6-luna",
+      choice: { provider: "codex", model: "gpt-6-luna" },
+      model: "GPT-6 Luna",
+      account: null,
+      state: "ready",
+    },
+    {
+      key: "claude:claude-sonnet-5",
+      choice: { provider: "claude", model: "claude-sonnet-5" },
+      model: "Claude Sonnet 5",
+      account: null,
+      state: "limit",
+    },
+  ],
+  rememberable: true,
+  attempt: 0,
+};
+
+interface StoryRequests {
+  approval?: AgentApproval;
+  prompt?: AgentDockPrompt;
+  takeover?: AgentDockTakeover;
+  usageLimit?: AgentDockUsageLimit;
+}
+
 const STORY_TUCK_DELAY_MS = 900;
 
-/**
- * The dock with fixture agents. A message that you send gets a short answer, which also shows on the
- * finished-work shelf until you open that chat. With `edgeStrip`, the dock hides when not in use and
- * leaves the edge strip, as "Show a strip at the edge" in Settings does.
- */
-function AgentDockStory(props: { seats: AgentDockSeatRef[]; results?: AgentDockShelfResult[]; edgeStrip?: boolean }) {
+function AgentDockStory(props: {
+  seats: AgentDockSeatRef[];
+  temporary?: AgentDockSeatRef[];
+  results?: AgentDockShelfResult[];
+  edgeStrip?: boolean;
+  requests?: StoryRequests;
+}) {
+  const answered: string[] = [];
   const [state, setState] = createStore({
-    seats: props.seats.map(agentDockSeatKey),
+    seats: [...props.seats, ...(props.temporary ?? [])].map(agentDockSeatKey),
+    temporary: (props.temporary ?? []).map(agentDockSeatKey),
     messages: structuredClone(MESSAGES),
     working: workingFixture(),
     results: [...(props.results ?? [])],
+    approval: props.requests?.approval ? structuredClone(props.requests.approval) : null,
+    prompt: props.requests?.prompt ? structuredClone(props.requests.prompt) : null,
+    takeover: props.requests?.takeover ? structuredClone(props.requests.takeover) : null,
+    usageLimit: props.requests?.usageLimit ? structuredClone(props.requests.usageLimit) : null,
+    answered,
   });
   const timers = new Set<number>();
   onCleanup(() => {
@@ -177,7 +283,6 @@ function AgentDockStory(props: { seats: AgentDockSeatRef[]; results?: AgentDockS
   });
   let nextId = 0;
 
-  // As in the app, the dock starts full and goes into the edge when it is not in use.
   const [tucked, setTucked] = createSignal(false);
   const use = { near: false, onDock: false, chat: false };
   let tuckTimer: number | undefined;
@@ -201,28 +306,97 @@ function AgentDockStory(props: { seats: AgentDockSeatRef[]; results?: AgentDockS
     };
   });
 
+  const asksOf = (id: string): SidebarAgentState | undefined => {
+    if (state.usageLimit?.agentId === id) return { kind: "limited", resetsAt: state.usageLimit.resetsAt };
+    if (state.takeover?.request.agentId === id) return { kind: "waiting", reason: "takeover", detail: null };
+    if (state.prompt?.agentId === id)
+      return { kind: "waiting", reason: "question", detail: state.prompt.questions[0]?.question ?? null };
+    if (state.approval?.agentId === id)
+      return { kind: "waiting", reason: "approval", detail: state.approval.command ?? null };
+    return undefined;
+  };
   const seats = (): AgentDockSeat[] =>
     state.seats.flatMap((key): AgentDockSeat[] => {
       const id = key.slice(key.indexOf(":") + 1);
-      const activity = ACTIVITY[id];
+      const activity = state.answered.includes(id) ? undefined : ACTIVITY[id];
       const working = state.working[id] ?? false;
-      const badge = working ? { kind: "working" as const } : activity?.state;
+      const asks = asksOf(id);
+      const badge: SidebarAgentState | undefined = asks ?? (working ? { kind: "working" } : activity?.state);
+      const temporary = state.temporary.includes(key);
       if (key.startsWith("channel:")) {
         const channel = CHANNELS.find((candidate) => candidate.id === id);
-        return channel ? [{ kind: "channel", channel, state: badge }] : [];
+        return channel ? [{ kind: "channel", channel, state: badge, temporary }] : [];
       }
       const agent = AGENTS.find((candidate) => candidate.id === id);
       return agent
-        ? [{ kind: "agent", agent, mood: working ? "working" : (activity?.mood ?? "idle"), state: badge }]
+        ? [
+            {
+              kind: "agent",
+              agent,
+              mood: asks ? "waiting" : working ? "working" : (activity?.mood ?? "idle"),
+              state: badge,
+              temporary,
+            },
+          ]
         : [];
     });
   const chat = (seat: AgentDockSeatRef): AgentDockChatModel => {
-    const activity = ACTIVITY[seat.id]?.state;
+    const activity = state.answered.includes(seat.id) ? undefined : ACTIVITY[seat.id]?.state;
+    const approval = state.approval?.agentId === seat.id ? state.approval : null;
+    const prompt = state.prompt?.agentId === seat.id ? state.prompt : null;
+    const takeover = state.takeover?.request.agentId === seat.id ? state.takeover : null;
+    const usageLimit = state.usageLimit?.agentId === seat.id ? state.usageLimit : null;
+    const asks = asksOf(seat.id);
     return {
       messages: state.messages[seat.id] ?? [],
-      working: state.working[seat.id] ?? false,
-      wait: activity?.kind === "waiting" ? activity.reason : null,
+      working: asks ? false : (state.working[seat.id] ?? false),
+      wait: asks?.kind === "waiting" ? asks.reason : activity?.kind === "waiting" ? activity.reason : null,
+      approval: approval ? { approval, attempt: 0 } : null,
+      prompt,
+      takeover,
+      usageLimit,
     };
+  };
+
+  const answerLater = (agentId: string, request: keyof StoryRequests, reply: string) =>
+    new Promise<true>((resolve) => {
+      const timer = window.setTimeout(() => {
+        timers.delete(timer);
+        setState((draft) => {
+          draft[request] = null;
+          draft.answered.push(agentId);
+          addMessage(draft.messages, agentId, message(`answer-${++nextId}`, "agent", reply));
+        });
+        resolve(true);
+      }, 600);
+      timers.add(timer);
+    });
+  const answers: AgentDockChatAnswers = {
+    approval: (approval, decision) =>
+      answerLater(
+        approval.agentId,
+        "approval",
+        decision === "accept" ? "Pushed. Research can review the branch now." : "OK, I did not push it.",
+      ),
+    prompt: (prompt, given) =>
+      answerLater(
+        prompt.agentId,
+        "prompt",
+        Object.keys(given).length === 0 ? "OK, I stopped the question." : "Thanks. I start with that market.",
+      ),
+    takeover: (takeover, decision) =>
+      answerLater(
+        takeover.request.agentId,
+        "takeover",
+        decision === "complete" ? "Thanks. I continue in the CRM." : "OK, I stopped the CRM step.",
+      ),
+    secret: async (takeover) => {
+      await answerLater(takeover.request.agentId, "takeover", "Signed in. I continue in the CRM.");
+    },
+    usageLimitSend: async (limit, option) => {
+      await answerLater(limit.agentId, "usageLimit", `Sent on ${option.model}.`);
+    },
+    usageLimitWait: (limit) => void answerLater(limit.agentId, "usageLimit", "OK, I send it when the limit resets."),
   };
 
   return (
@@ -234,6 +408,7 @@ function AgentDockStory(props: { seats: AgentDockSeatRef[]; results?: AgentDockS
           (channel) => !state.seats.includes(agentDockSeatKey({ kind: "channel", id: channel.id })),
         )}
         chat={chat}
+        blurRequest={0}
         results={state.results}
         tucked={tucked()}
         onOpenChange={(seat) => {
@@ -247,7 +422,11 @@ function AgentDockStory(props: { seats: AgentDockSeatRef[]; results?: AgentDockS
         }}
         onAdd={(seat) =>
           setState((draft) => {
-            draft.seats.push(agentDockSeatKey(seat));
+            const key = agentDockSeatKey(seat);
+            const firstTemporary = draft.seats.findIndex((item) => draft.temporary.includes(item));
+            draft.temporary = draft.temporary.filter((item) => item !== key);
+            draft.seats = draft.seats.filter((item) => item !== key);
+            draft.seats.splice(firstTemporary < 0 ? draft.seats.length : firstTemporary, 0, key);
           })
         }
         onRemove={(seat) =>
@@ -256,6 +435,15 @@ function AgentDockStory(props: { seats: AgentDockSeatRef[]; results?: AgentDockS
           })
         }
         onOpenSettings={() => undefined}
+        onHide={() => undefined}
+        onMove={(seat, before) =>
+          setState((draft) => {
+            const key = agentDockSeatKey(seat);
+            draft.seats.splice(draft.seats.indexOf(key), 1);
+            const index = before ? draft.seats.indexOf(agentDockSeatKey(before)) : -1;
+            draft.seats.splice(index < 0 ? draft.seats.length : index, 0, key);
+          })
+        }
         onSend={async (seat, text) => {
           const agentId = seat.id;
           const id = `story-${++nextId}`;
@@ -285,6 +473,7 @@ function AgentDockStory(props: { seats: AgentDockSeatRef[]; results?: AgentDockS
           return { messageId: id };
         }}
         onOpenInMain={() => undefined}
+        answers={answers}
         agents={AGENTS}
       />
       <Show when={props.edgeStrip}>
@@ -311,21 +500,10 @@ const meta = {
 export default meta;
 type Story = StoryObj<typeof meta>;
 
-/**
- * Five agents on the dock, each in a different state: working, waiting for an answer, unread answers,
- * a failed routine and a new answer. Click an agent to open its chat; click it again or press Escape
- * to close it. Use + to add an agent and the ⋯ menu in the chat to remove one. Ten agents and two
- * channels are not on the dock, so the + menu starts with a search field: type part of a name and
- * press Enter to add the first match. With 8 or fewer, the menu is a plain list.
- */
 export const States: Story = {
   render: () => <AgentDockStory seats={agentSeats("chief", "research", "sales", "design", "support")} />,
 };
 
-/**
- * Two channels beside the agents. A channel shows its member faces or its picture. Its chat names the
- * author of each message; the reader's own messages are on the right. Use + to add a channel.
- */
 export const Channels: Story = {
   render: () => (
     <AgentDockStory
@@ -338,11 +516,15 @@ export const Channels: Story = {
   ),
 };
 
-/**
- * Four agents finished work. The three newest show beside the dock and "+1 more" shows the oldest.
- * Each hides after 8 s; the pointer on the dock or on the shelf brings them back. Click one to open
- * its chat.
- */
+export const NewMessageSeats: Story = {
+  render: () => (
+    <AgentDockStory
+      seats={agentSeats("chief", "design")}
+      temporary={[...agentSeats("research", "sales"), { kind: "channel", id: "launch" }]}
+    />
+  ),
+};
+
 export const FinishedWork: Story = {
   render: () => (
     <AgentDockStory
@@ -352,29 +534,53 @@ export const FinishedWork: Story = {
   ),
 };
 
-/**
- * Fifteen agents: more than the dock shows. Scroll the seats; the edges fade where more agents are
- * behind them. An agent that you open at a faded edge scrolls into view.
- */
+export const Approval: Story = {
+  render: () => <AgentDockStory seats={agentSeats("chief", "research", "sales")} requests={{ approval: APPROVAL }} />,
+};
+
+export const Question: Story = {
+  render: () => <AgentDockStory seats={agentSeats("chief", "research", "sales")} requests={{ prompt: PROMPT }} />,
+};
+
+export const TakeoverSecret: Story = {
+  render: () => <AgentDockStory seats={agentSeats("chief", "research", "sales")} requests={{ takeover: TAKEOVER }} />,
+};
+
+export const TakeoverManual: Story = {
+  render: () => (
+    <AgentDockStory seats={agentSeats("chief", "research", "sales")} requests={{ takeover: MANUAL_TAKEOVER }} />
+  ),
+};
+
+export const UsageLimit: Story = {
+  render: () => (
+    <AgentDockStory seats={agentSeats("chief", "research", "sales")} requests={{ usageLimit: USAGE_LIMIT }} />
+  ),
+};
+
 export const ManyAgents: Story = {
   render: () => <AgentDockStory seats={agentSeats(...AGENTS.map((agent) => agent.id))} />,
 };
 
-/** No agent on the dock yet: only the + button. */
+export const AllOnDock: Story = {
+  render: () => (
+    <AgentDockStory
+      seats={[
+        ...agentSeats(...AGENTS.map((agent) => agent.id)),
+        ...CHANNELS.map((channel) => ({ kind: "channel" as const, id: channel.id })),
+      ]}
+    />
+  ),
+};
+
 export const Empty: Story = {
   render: () => <AgentDockStory seats={[]} />,
 };
 
-/**
- * The dock hides when not in use and leaves a thin strip at the edge. Move the pointer toward the strip:
- * it grows, and the dock comes out when the pointer is close. Research asks a question, so a wash front
- * goes up through the strip from time to time.
- */
 export const EdgeStrip: Story = {
   render: () => <AgentDockStory seats={agentSeats("chief", "research", "sales")} edgeStrip />,
 };
 
-/** The edge strip while no agent asks anything: the strip stays dark and nothing moves. */
 export const EdgeStripQuiet: Story = {
   render: () => <AgentDockStory seats={agentSeats("chief", "sales")} edgeStrip />,
 };

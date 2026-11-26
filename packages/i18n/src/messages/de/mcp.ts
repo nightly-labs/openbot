@@ -28,7 +28,10 @@ export const messages = {
   "mcp.signIn.waiting": "Warten auf den Browser…",
   "mcp.signIn.continue": "Weiter zu {name}",
   "mcp.signIn.pageDescription": "Diese Seite ist im Browser auf {host} geöffnet. Melde dich hier an.",
-  "mcp.server.loadFailed": "Die MCP-Server konnten nicht geladen werden.",
+  "mcp.signIn.copyHint": "Wenn die Seite nicht lädt, kopiere den Link und öffne ihn in einem anderen Browser.",
+  "mcp.signIn.copyLink": "Link kopieren",
+  "mcp.signIn.pasteHint":
+    "Wenn du dich auf einem anderen Gerät anmeldest, kopiere am Ende die Adresse aus dessen Browser und füge sie hier ein.",
   "mcp.test.connected": {
     one: "Verbunden · {count} Werkzeug",
     other: "Verbunden · {count} Werkzeuge",
@@ -40,6 +43,7 @@ export const messages = {
   "mcp.status.signedIn": "Angemeldet",
   "mcp.status.signingIn": "Anmeldung läuft…",
   "mcp.status.signInNeeded": "Anmeldung nötig",
+  "mcp.status.signInAppNeeded": "Anmelde-App nötig",
   "mcp.status.refused": "Abgelehnt",
   "mcp.status.checkUrl": "URL prüfen",
   "mcp.status.noAnswer": "Keine Antwort",
@@ -57,12 +61,6 @@ export const messages = {
   "mcp.panel.noAnswer": "Dieser Server hat nicht geantwortet.",
   "mcp.panel.connectTitle": "Mit einem eigenen MCP verbinden",
   "mcp.panel.editTitle": "MCP-Server bearbeiten",
-  "mcp.panel.changesNotSaved": "Änderungen nicht gespeichert",
-  "mcp.panel.title": "MCP-Server",
-  "mcp.panel.description":
-    "Model-Context-Protocol-Server geben den Agenten dieses Servers zusätzliche Werkzeuge. Claude- und Codex-Agenten erhalten nur die Server in dieser Liste. OpenCode- und Grok-Agenten können auch Server aus ihren eigenen Konfigurationsdateien starten.",
-  "mcp.panel.connectCustom": "Eigenen MCP verbinden",
-  "mcp.panel.empty": "Noch keine MCP-Server.",
   "mcp.panel.enable": "{name} aktivieren",
   "mcp.panel.detailsTitle": "Details",
   "mcp.panel.detailsDescription": "Benenne diesen Server und wähle, wie OpenBot ihn erreicht.",
@@ -104,17 +102,11 @@ export const messages = {
     "Verbindet sich einmal mit diesen Einstellungen und meldet die verfügbaren Werkzeuge. Nichts wird gespeichert oder aufbewahrt.",
   "mcp.panel.testConnection": "Verbindung testen",
   "mcp.panel.notTested": "Noch nicht getestet.",
-  "mcp.panel.removeTitle": "{name} entfernen?",
-  "mcp.panel.removeDescription":
-    "Seine Werkzeuge werden den Agenten dieses Servers nicht mehr angeboten. Die Konfiguration wird nicht aufbewahrt.",
-  "mcp.panel.removeConfirm": "MCP-Server entfernen",
-  "mcp.panel.actionsFor": "Aktionen für {name}",
-  "mcp.panel.testUnavailable": "Dieser Server kann hier nicht getestet werden.",
   "mcp.panel.signIn": "Anmelden",
   "mcp.panel.signOut": "Abmelden",
   "mcp.panel.cancelSignIn": "Anmeldung abbrechen",
+  "mcp.panel.useAddress": "Diese Adresse nutzen",
   "mcp.panel.signInTo": "Bei {name} anmelden",
-  "mcp.panel.cancelSignInTo": "Anmeldung bei {name} abbrechen",
   "mcp.panel.signInWaiting": {
     one: "Schließe die Anmeldung im Browser ab. OpenBot wartet höchstens {count} Minute.",
     other: "Schließe die Anmeldung im Browser ab. OpenBot wartet höchstens {count} Minuten.",
@@ -154,6 +146,7 @@ export const messages = {
   "mcp.signIn.relayDeviceDescription":
     "Melde dich in deinem Browser auf {page} an und schließe die Anmeldung dort ab. {host} erkennt die Anmeldung selbst.",
   "mcp.signIn.relayOpen": "Anmeldeseite öffnen",
+  "mcp.signIn.relayCopy": "Link kopieren",
   "mcp.signIn.relayPasteHint":
     "Wenn der Browser nicht zu OpenBot zurückkehrt, kopiere die angezeigte Adresse und füge sie hier ein.",
   "mcp.signIn.relayPasteRequired":

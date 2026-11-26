@@ -15,8 +15,6 @@ const logger = createOpenBotLogger("verify-windows-package");
 const FUSE_DISABLED = 48;
 const FUSE_ENABLED = 49;
 
-// Each launch step ends on a state or an event. This limit only turns a real hang into a clear failure:
-// a slow release runner can need much more time than usual to start the first instance.
 const launchStepLimitMs = 5 * 60_000;
 
 if (process.platform !== "win32") {
@@ -24,7 +22,6 @@ if (process.platform !== "win32") {
 }
 
 const requireUpdateMetadata = process.argv.includes("--require-update-metadata");
-// A tag build signs with `electron-builder.windows-signing.yml`. Local and dry-run builds stay unsigned.
 const requireSignature = process.argv.includes("--require-signature");
 const appPathArgument = process.argv.slice(2).find((argument) => !argument.startsWith("--"));
 const appPath = resolve(appPathArgument ?? "dist/win-unpacked");
@@ -36,16 +33,23 @@ const voiceRuntimeFiles = [
   "sherpa-onnx-c-api.dll",
   "onnxruntime.dll",
   "onnxruntime_providers_shared.dll",
-  // ONNX Runtime session settings that the voice hosts read.
   "no-arena.cfg",
+  "silero_vad_v5.onnx",
 ];
 const voiceHostPath = resolve(resourcesPath, "app.asar.unpacked/out/main/voice-transcription-host.js");
 const speechHostPath = resolve(resourcesPath, "app.asar.unpacked/out/main/voice-speech-host.js");
+const processLauncherHostPath = resolve(resourcesPath, "app.asar.unpacked/out/main/process-launcher-host.js");
 
 await Promise.all([
   access(executablePath),
   access(resolve(resourcesPath, "app.asar.unpacked/node_modules/effect/package.json")),
   access(resolve(resourcesPath, "app.asar.unpacked/node_modules/effect/dist/index.js")),
+  access(
+    resolve(
+      resourcesPath,
+      "app.asar.unpacked/node_modules/@indutny/simple-windows-notifications/prebuilds/win32-x64/@indutny+simple-windows-notifications.node",
+    ),
+  ),
   access(resolve(resourcesPath, "app.asar")),
   access(resolve(resourcesPath, "licenses/Electron-LICENSE")),
   access(resolve(resourcesPath, "licenses/LICENSES.chromium.html")),
@@ -60,6 +64,7 @@ await Promise.all([
   ...voiceRuntimeFiles.map((name) => access(resolve(voiceRuntimePath, name))),
   access(voiceHostPath),
   access(speechHostPath),
+  access(processLauncherHostPath),
   access(resolve(resourcesPath, "remote-desktop-runtime/licenses/Sunshine-GPL-3.0.txt")),
   access(resolve(resourcesPath, "remote-desktop-runtime/licenses/moonlight-web-stream-GPL-3.0.txt")),
   access(resolve(resourcesPath, "remote-desktop-runtime/source-manifest.json")),
@@ -82,13 +87,11 @@ await Promise.all([
   access(resolve(resourcesPath, "cua-driver/win32/x64/cua-driver.exe")),
   access(resolve(resourcesPath, "cua-driver/win32/x64/LICENSE.md")),
 ]);
-// Only this platform's driver ships, so a shared `extraResources` entry is a loud failure.
 await Promise.all(["darwin", "linux"].map((name) => assertAbsent(resolve(resourcesPath, "cua-driver", name))));
 await Promise.all(["codex", "claude", "grok"].map((name) => assertAbsent(resolve(resourcesPath, name))));
 await assertAbsent(resolve(resourcesPath, "cloudflared"));
 await assertAbsent(resolve(resourcesPath, "app.asar.unpacked/node_modules/@anthropic-ai/claude-agent-sdk-win32-x64"));
 
-// The dictation models and Supertonic are downloaded on demand.
 if (
   [
     "voice/model",
@@ -153,8 +156,6 @@ const ownExecutables = [
   ),
 ];
 if (requireSignature) {
-  // An installed signed build accepts an update only from this publisher, so every executable must
-  // carry the name that app-update.yml gives to the updater.
   const metadata = updateMetadata === null ? null : parseYaml(updateMetadata);
   const publisherNames = isDynamicRecord(metadata) ? metadata.publisherName : undefined;
   if (!Array.isArray(publisherNames) || publisherNames.length !== 1 || !isString(publisherNames[0])) {
@@ -213,8 +214,6 @@ function powerShellLiteral(value: string): string {
 
 function runWindowsPowerShell(command: string): string {
   const environment = { ...process.env };
-  // GitHub's pwsh runner exports its PowerShell 7 module path. Windows PowerShell
-  // must rebuild its own path so built-in modules such as Security can load.
   delete environment.PSModulePath;
   return execFileSync("powershell.exe", ["-NoProfile", "-NonInteractive", "-Command", command], {
     encoding: "utf8",
@@ -223,7 +222,6 @@ function runWindowsPowerShell(command: string): string {
 }
 
 function verifyAuthenticode(path: string, expectedStatus: "NotSigned" | "Valid", publisherName?: string): void {
-  // Windows PowerShell writes the console code page by default, which would garble a non-ASCII name.
   const signature = JSON.parse(
     runWindowsPowerShell(
       "[Console]::OutputEncoding = [Text.Encoding]::UTF8; " +
@@ -271,18 +269,12 @@ async function verifyLaunch(executable: string): Promise<void> {
   });
 
   try {
-    // Chromium on Windows keeps `lockfile` in userData open while main holds its single-instance lock. A
-    // second instance that starts before that does not forward to the first one: it takes the lock and stays open.
     await waitForFirstInstance(
       launchExit,
       () => pathExists(join(userDataPath, "lockfile")),
       "take its lock",
       () => stderr,
     );
-    // The lock is not enough. The second instance waits about 20 seconds for the first one to answer, and
-    // the answer needs a free main thread; with no answer, Chromium can kill the first instance. Main
-    // answers only after its start, and a launch that stops during the start must fail here. So this
-    // waits until the window has loaded and called main (`trace.ndjson`, see `rendererCalledMain`).
     await waitForFirstInstance(
       launchExit,
       () => rendererCalledMain(userDataPath),
@@ -313,12 +305,9 @@ function terminateProcessTree(pid: number | undefined): void {
   if (pid === undefined) return;
   try {
     execFileSync("taskkill.exe", ["/pid", String(pid), "/t", "/f"], { stdio: "ignore" });
-  } catch {
-    // The application can finish before taskkill reads the process tree.
-  }
+  } catch {}
 }
 
-/** Waits for a state of the first instance. It fails immediately when the first instance exits. */
 async function waitForFirstInstance(
   launchExit: Promise<never>,
   reached: () => Promise<boolean>,
@@ -352,11 +341,6 @@ async function pathExists(path: string): Promise<boolean> {
   }
 }
 
-/**
- * Whether the window of the first instance has called main. The renderer asks main for `getAppInfo` when
- * it mounts (src/renderer/src/platform.tsx), main records each trusted call in `logs/trace.ndjson`
- * (`setIpcCallObserver` in src/main/index.ts), and a main-thread timer writes the line about one second later.
- */
 async function rendererCalledMain(userDataPath: string): Promise<boolean> {
   try {
     return (await readFile(join(userDataPath, "logs", "trace.ndjson"), "utf8")).includes('"kind":"ipc"');
@@ -390,8 +374,6 @@ async function verifySecondInstanceExits(
   });
   const stop = new AbortController();
   try {
-    // The second instance exits only after the first one accepts its arguments. A busy first instance
-    // accepts them later, so this waits for the exit and not for a fixed time.
     const result = await Promise.race([
       new Promise<{ code: number | null; signal: NodeJS.Signals | null }>((resolveExit) => {
         second.once("exit", (code, signal) => resolveExit({ code, signal }));

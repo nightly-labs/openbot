@@ -11,32 +11,20 @@ import {
   SUPERTONIC_MODEL_FILES,
 } from "@openbot/contracts/speech-models";
 import { sourceText } from "@openbot/i18n/source";
+import { createOpenBotLogger } from "@openbot/logging";
 import { Effect, Exit, Fiber, Result, Schema, Scope, Stream } from "effect";
 import { causeHelpers } from "../backend/effect-boundary";
 
-/** The N-API addon of sherpa-onnx. Its libraries are in the same directory. */
-export const VOICE_RUNTIME_ADDON = "sherpa-onnx.node";
+const logger = createOpenBotLogger("voice-model-service");
 
-/**
- * ONNX Runtime session settings, as files that `scripts/prepare-voice.ts` writes to the voice
- * runtime directory. A host gives sherpa-onnx `cpu:<file>`. `scripts/voice-host-bench.ts` measures
- * each file with each model.
- */
+export const VOICE_RUNTIME_ADDON = "sherpa-onnx.node";
+export const VOICE_SPEECH_DETECTOR = "silero_vad_v5.onnx";
+
 export const VOICE_SESSION_CONFIGS = {
-  /**
-   * Without the CPU memory arena, a host gives back the memory of each decode. Prepacking stays on:
-   * without it Parakeet holds about 750 MB less, but decodes 20-60% slower, and Bark many times slower.
-   */
   "no-arena.cfg": "EnableCpuMemArena=0\n",
 } as const;
-/** A settings file, or empty for the ONNX Runtime defaults. */
 export type VoiceSessionConfig = keyof typeof VOICE_SESSION_CONFIGS | "";
 
-/**
- * Without the arena, Parakeet and Bark hold about 230 MB less at about the same speed. Whisper
- * holds about 880 MB less, but decodes 15-30% slower, so it keeps the defaults. Cohere Transcribe
- * holds about 820 MB less, but decodes about twice as slowly, so it keeps the defaults too.
- */
 export const TRANSCRIPTION_SESSION_CONFIGS: Readonly<Record<LocalVoiceModelId, VoiceSessionConfig>> = {
   "parakeet-tdt-0.6b-v3": "no-arena.cfg",
   "parakeet-unified-en-0.6b": "no-arena.cfg",
@@ -44,16 +32,10 @@ export const TRANSCRIPTION_SESSION_CONFIGS: Readonly<Record<LocalVoiceModelId, V
   "whisper-turbo": "",
   "cohere-transcribe-03-2026": "",
 };
-/** Without the CPU memory arena, Supertonic holds about 110 MB less at about the same speed. */
 export const SPEECH_SESSION_CONFIG: VoiceSessionConfig = "no-arena.cfg";
 
-/** Supertonic is not faster with more than 4 threads. */
 export const SPEECH_HOST_THREADS = 4;
 
-/**
- * Half the logical processors, from 4 to 6; half leaves out SMT siblings. On a 12-processor M4 Pro,
- * 6 threads decode Parakeet and Whisper 10-25% faster than 4, and 8 are not faster than 6.
- */
 export function transcriptionHostThreads(processors = availableParallelism()): number {
   return Math.min(6, Math.max(4, Math.floor(processors / 2)));
 }
@@ -68,13 +50,8 @@ export interface VoiceModelFile {
 const BARK_PLUS_MODEL_REVISION = "5f95a80a9da9d392a38df8e9a6609e25be643d07";
 const BARK_PLUS_MODEL_BASE_URL = `https://huggingface.co/velddev/Underdog-Bark-3.0-Plus-sherpa-onnx/resolve/${BARK_PLUS_MODEL_REVISION}`;
 
-/** The directory name of Bark 3.0 Plus in `<userData>/runtimes`. A new pin needs a new name. */
 export const BARK_PLUS_MODEL_DIRECTORY = "bark-3.0-plus-int8";
 
-/**
- * Conway Research Underdog Bark 3.0 Plus (CC-BY-4.0), a post-trained Parakeet TDT 0.6B v3. The
- * int8 ONNX export for sherpa-onnx is unofficial; it has the file names of the Parakeet export.
- */
 const BARK_PLUS_MODEL_FILES: readonly VoiceModelFile[] = [
   {
     name: "encoder.int8.onnx",
@@ -105,13 +82,8 @@ const BARK_PLUS_MODEL_FILES: readonly VoiceModelFile[] = [
 const WHISPER_TURBO_MODEL_REVISION = "2ca6ff69fc878651b770880507669577ac41c2ff";
 const WHISPER_TURBO_MODEL_BASE_URL = `https://huggingface.co/csukuangfj/sherpa-onnx-whisper-turbo/resolve/${WHISPER_TURBO_MODEL_REVISION}`;
 
-/**
- * The directory name of Whisper turbo in `<userData>/runtimes`. It is not `whisper`: startup
- * deletes that directory, which held the Whisper model of earlier versions.
- */
 export const WHISPER_TURBO_MODEL_DIRECTORY = "whisper-turbo-int8";
 
-/** OpenAI Whisper large-v3 turbo (MIT), int8 ONNX export for sherpa-onnx. */
 const WHISPER_TURBO_MODEL_FILES: readonly VoiceModelFile[] = [
   {
     name: "turbo-encoder.int8.onnx",
@@ -120,10 +92,10 @@ const WHISPER_TURBO_MODEL_FILES: readonly VoiceModelFile[] = [
     sha256: "b02dcdf54f348741e93fe732b67d933c8dcb6735655f710640143081db38878b",
   },
   {
-    name: "turbo-decoder.int8.onnx",
-    url: `${WHISPER_TURBO_MODEL_BASE_URL}/turbo-decoder.int8.onnx`,
-    bytes: 361_080_764,
-    sha256: "20accd02388482eb3a46bd615631adfdc85e1eb2c7db9ea3f02a40ffe6b81547",
+    name: "turbo-decoder.onnx",
+    url: `${WHISPER_TURBO_MODEL_BASE_URL}/turbo-decoder.onnx`,
+    bytes: 636_209_532,
+    sha256: "b24db5d90fa230c5eaa6b823d74862ced9e0d1dc3e01ec46601968e8db0e09ec",
   },
   {
     name: "turbo-tokens.txt",
@@ -136,13 +108,8 @@ const WHISPER_TURBO_MODEL_FILES: readonly VoiceModelFile[] = [
 const COHERE_TRANSCRIBE_MODEL_REVISION = "156a470cf08eefe706a0004f3c52d9ee567ca7a0";
 const COHERE_TRANSCRIBE_MODEL_BASE_URL = `https://huggingface.co/csukuangfj2/sherpa-onnx-cohere-transcribe-14-lang-int8-2026-04-01/resolve/${COHERE_TRANSCRIBE_MODEL_REVISION}`;
 
-/** The directory name of Cohere Transcribe in `<userData>/runtimes`. A new pin needs a new name. */
 export const COHERE_TRANSCRIBE_MODEL_DIRECTORY = "cohere-transcribe-14-lang-int8";
 
-/**
- * Cohere Labs Cohere Transcribe 03-2026 (Apache-2.0), int8 ONNX export for sherpa-onnx. The
- * encoder keeps its weights in `encoder.int8.onnx.data`, which must stay next to it.
- */
 const COHERE_TRANSCRIBE_MODEL_FILES: readonly VoiceModelFile[] = [
   {
     name: "encoder.int8.onnx",
@@ -170,10 +137,8 @@ const COHERE_TRANSCRIBE_MODEL_FILES: readonly VoiceModelFile[] = [
   },
 ];
 
-/** A model that OpenBot downloads: a dictation model or the speech model. */
 type DownloadedModelId = LocalVoiceModelId | LocalSpeechModelId;
 
-/** The directory name of Supertonic 3 in `<userData>/runtimes`. The phone uses the same name. */
 export {
   PARAKEET_MODEL_DIRECTORY,
   PARAKEET_MODEL_FILES,
@@ -181,7 +146,6 @@ export {
   SUPERTONIC_MODEL_DIRECTORY,
 } from "@openbot/contracts/speech-models";
 
-/** The files of each model. */
 const VOICE_MODEL_FILES: Record<DownloadedModelId, readonly VoiceModelFile[]> = {
   "parakeet-tdt-0.6b-v3": PARAKEET_MODEL_FILES,
   "parakeet-unified-en-0.6b": PARAKEET_UNIFIED_MODEL_FILES,
@@ -191,7 +155,10 @@ const VOICE_MODEL_FILES: Record<DownloadedModelId, readonly VoiceModelFile[]> = 
   "supertonic-3": SUPERTONIC_MODEL_FILES,
 };
 
-/** The status of one downloaded model. */
+const RETIRED_MODEL_FILES: Partial<Record<DownloadedModelId, readonly string[]>> = {
+  "whisper-turbo": ["turbo-decoder.int8.onnx"],
+};
+
 export type DownloadedModelStatus<Id extends DownloadedModelId> = Omit<VoiceModelStatus, "modelId"> & { modelId: Id };
 
 interface VoiceModelEvents<Id extends DownloadedModelId> {
@@ -205,7 +172,6 @@ interface VoiceModelServiceOptions<Id extends DownloadedModelId> {
   fetch?: ((input: string | URL | Request, init?: RequestInit) => Promise<Response>) | undefined;
 }
 
-/** What a verified file looked like, so a later check can skip the hash while nothing changed. */
 interface VerifiedFile {
   size: number;
   mtimeMs: number;
@@ -217,11 +183,6 @@ export class VoiceModelService<Id extends DownloadedModelId> extends EventEmitte
   readonly #files: readonly VoiceModelFile[];
   readonly #totalBytes: number;
   readonly #fetch: (input: string | URL | Request, init?: RequestInit) => Promise<Response>;
-  /**
-   * Files that passed the full SHA-256 check in this process. Transcription asks for the model about
-   * once per second while the user speaks, and hashing 670 MB each time is not acceptable. A file
-   * whose size or modification time changed is hashed again.
-   */
   readonly #verified = new Map<string, VerifiedFile>();
   #status: Omit<VoiceModelStatus, "modelId"> = { phase: "missing", progress: null, message: null };
   #preparation: Fiber.Fiber<DownloadedModelStatus<Id>, VoiceOperationError> | null = null;
@@ -229,7 +190,6 @@ export class VoiceModelService<Id extends DownloadedModelId> extends EventEmitte
   readonly #scope = Scope.makeUnsafe();
   #abortController: AbortController | null = null;
   #stopping = false;
-  /** The user stopped the download in progress, so it ends as missing rather than failed. */
   #cancelled = false;
 
   constructor(options: VoiceModelServiceOptions<Id>) {
@@ -250,15 +210,23 @@ export class VoiceModelService<Id extends DownloadedModelId> extends EventEmitte
     return yield* this.#readStatus();
   }).bind(this);
 
+  readonly removeRetiredFiles = Effect.fn("VoiceModel.removeRetiredFiles")(function* (this: VoiceModelService<Id>) {
+    const retired = (RETIRED_MODEL_FILES[this.modelId] ?? [])
+      .map((name) => join(this.#directory, name))
+      .filter((path) => existsSync(path));
+    if (retired.length === 0) return;
+    if (this.#files.some((file) => !existsSync(join(this.#directory, file.name)))) return;
+    if (!(yield* this.#isComplete())) return;
+    for (const path of retired) yield* voiceIO(() => rm(path, { force: true }));
+  }).bind(this);
+
   readonly prepare = Effect.fn("VoiceModel.prepare")(function* (this: VoiceModelService<Id>) {
-    // A download that starts while the files are deleted would write into the directory being removed.
     if (this.#removal) yield* Fiber.await(this.#removal);
     if (this.#preparation) return yield* Fiber.join(this.#preparation);
     this.#cancelled = false;
     const fiber = yield* Effect.forkIn(
       Effect.gen({ self: this }, function* () {
         if (yield* this.#isComplete()) {
-          // Each transcription prepares the model, so a ready model does not announce itself again.
           if (this.#status.phase !== "ready") this.#setStatus({ phase: "ready", progress: 100, message: null });
           return this.#copyStatus();
         }
@@ -288,12 +256,13 @@ export class VoiceModelService<Id extends DownloadedModelId> extends EventEmitte
             this.#setStatus({ phase: "ready", progress: 100, message: null });
           }).pipe(Effect.ensuring(Effect.sync(() => controller.abort()))),
         );
+        if (Result.isSuccess(downloaded)) yield* this.#removeRetiredFilesOrWarn();
         if (Result.isFailure(downloaded) && this.#cancelled) {
-          // Files that completed stay verified, so the next download starts at the first one missing.
           this.#setStatus({ phase: "missing", progress: null, message: null });
         } else if (Result.isFailure(downloaded)) {
           const cause = downloaded.failure.cause;
           const stopped = cause instanceof Error && cause.name === "AbortError";
+          if (!stopped) logger.warn(`Could not download the ${this.modelId} model.`, downloadFailureReason(cause));
           this.#setStatus({
             phase: "error",
             progress: null,
@@ -315,7 +284,6 @@ export class VoiceModelService<Id extends DownloadedModelId> extends EventEmitte
     return yield* Fiber.join(fiber);
   }).bind(this);
 
-  /** Stops the download in progress, if any, and answers the status after it ends. */
   readonly cancel = Effect.fn("VoiceModel.cancel")(function* (this: VoiceModelService<Id>) {
     const preparation = this.#preparation;
     if (!preparation) return yield* this.getStatus();
@@ -325,11 +293,6 @@ export class VoiceModelService<Id extends DownloadedModelId> extends EventEmitte
     return this.#copyStatus();
   }).bind(this);
 
-  /**
-   * Deletes the model directory, and stops the download in progress first. `endHost` ends any host
-   * that has the model loaded; a `prepare` during it waits, so no new host loads the files that go.
-   * The directory is the one main gave this service, never a renderer path.
-   */
   readonly remove = Effect.fn("VoiceModel.remove")(function* (
     this: VoiceModelService<Id>,
     endHost: Effect.Effect<void>,
@@ -341,7 +304,6 @@ export class VoiceModelService<Id extends DownloadedModelId> extends EventEmitte
         yield* endHost;
         const removed = yield* Effect.result(voiceIO(() => rm(this.#directory, { recursive: true, force: true })));
         if (Result.isFailure(removed)) {
-          // Some files can be gone. A file that is still there and unchanged needs only a `stat`.
           yield* this.#readStatus();
           return yield* new VoiceOperationError({ cause: new Error(sourceText("error.voice.removeFailed")) });
         }
@@ -367,7 +329,6 @@ export class VoiceModelService<Id extends DownloadedModelId> extends EventEmitte
     yield* Scope.close(this.#scope, Exit.void);
   }, Effect.uninterruptible).bind(this);
 
-  /** Streams one file to `<path>.part`, checks its size and hash, and only then moves it into place. */
   #download(
     file: VoiceModelFile,
     path: string,
@@ -376,9 +337,14 @@ export class VoiceModelService<Id extends DownloadedModelId> extends EventEmitte
   ): Effect.Effect<void, VoiceOperationError> {
     const partialPath = `${path}.part`;
     let committed = false;
+    let stall: StallDeadline | undefined;
     return Effect.gen({ self: this }, function* () {
       yield* voiceIO(() => rm(partialPath, { force: true }));
-      const response = yield* voiceIO(() => this.#fetch(file.url, { signal }));
+      const deadline = startStallDeadline();
+      stall = deadline;
+      const response = yield* voiceIO(() =>
+        deadline.race(this.#fetch(file.url, { signal: AbortSignal.any([signal, deadline.signal]) })),
+      );
       if (!response.ok || !response.body)
         return yield* new VoiceOperationError({ cause: new Error(`download-status-${response.status}`) });
       const body = response.body;
@@ -393,8 +359,9 @@ export class VoiceModelService<Id extends DownloadedModelId> extends EventEmitte
             (reader) =>
               Effect.gen({ self: this }, function* () {
                 while (true) {
-                  const { done, value } = yield* voiceIO(() => reader.read());
+                  const { done, value } = yield* voiceIO(() => deadline.race(reader.read()));
                   if (done) break;
+                  deadline.extend();
                   receivedBytes += value.byteLength;
                   if (receivedBytes > file.bytes)
                     return yield* new VoiceOperationError({ cause: new Error("download-too-large") });
@@ -406,6 +373,7 @@ export class VoiceModelService<Id extends DownloadedModelId> extends EventEmitte
                     );
                     writtenBytes += result.bytesWritten;
                   }
+                  deadline.extend();
                   const progress = Math.min(
                     100,
                     Math.floor(((completedBytes + receivedBytes) / this.#totalBytes) * 100),
@@ -417,7 +385,7 @@ export class VoiceModelService<Id extends DownloadedModelId> extends EventEmitte
                 }
               }),
             (reader) =>
-              voiceIO(() => reader.cancel()).pipe(
+              voiceIO(() => deadline.race(reader.cancel())).pipe(
                 Effect.catch(() => Effect.void),
                 Effect.ensuring(Effect.sync(() => reader.releaseLock())),
               ),
@@ -431,9 +399,23 @@ export class VoiceModelService<Id extends DownloadedModelId> extends EventEmitte
       const { size, mtimeMs } = yield* voiceIO(() => stat(path));
       this.#verified.set(file.name, { size, mtimeMs });
     }).pipe(
+      Effect.ensuring(Effect.sync(() => stall?.clear())),
       Effect.ensuring(
         Effect.suspend(() =>
           committed ? Effect.void : voiceIO(() => rm(partialPath, { force: true })).pipe(Effect.orDie),
+        ),
+      ),
+    );
+  }
+
+  #removeRetiredFilesOrWarn(): Effect.Effect<void> {
+    return this.removeRetiredFiles().pipe(
+      Effect.catch((error) =>
+        Effect.sync(() =>
+          logger.warn(
+            `Could not remove the old files of the ${this.modelId} model.`,
+            downloadFailureReason(error.cause),
+          ),
         ),
       ),
     );
@@ -454,7 +436,6 @@ export class VoiceModelService<Id extends DownloadedModelId> extends EventEmitte
     });
   }
 
-  /** A file verified earlier in this process needs only a `stat`; any other file is hashed. */
   #isVerified(file: VoiceModelFile): Effect.Effect<boolean, VoiceOperationError> {
     return Effect.gen({ self: this }, function* () {
       const path = join(this.#directory, file.name);
@@ -488,10 +469,57 @@ export class VoiceOperationError extends Schema.TaggedError<VoiceOperationError>
 
 const { io: voiceIO } = causeHelpers(VoiceOperationError);
 
-/**
- * Deletes the Whisper model cache that earlier versions downloaded (`<userData>/runtimes/whisper`).
- * It is a 539 MB application download, not user data, and no version reads it any more.
- */
+const DOWNLOAD_STALL_MS = 60_000;
+
+interface StallDeadline {
+  readonly signal: AbortSignal;
+  readonly extend: () => void;
+  readonly clear: () => void;
+  readonly race: <T>(work: Promise<T>) => Promise<T>;
+}
+
+function startStallDeadline(): StallDeadline {
+  const controller = new AbortController();
+  const stalled = new Error("download-stalled");
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  const extend = () => {
+    clearTimeout(timer);
+    timer = setTimeout(() => controller.abort(stalled), DOWNLOAD_STALL_MS);
+  };
+  extend();
+  return {
+    signal: controller.signal,
+    extend,
+    clear: () => clearTimeout(timer),
+    race: <T>(work: Promise<T>) =>
+      new Promise<T>((resolve, reject) => {
+        const stop = () => reject(stalled);
+        work
+          .then(resolve, (error: unknown) => reject(controller.signal.aborted ? stalled : error))
+          .finally(() => controller.signal.removeEventListener("abort", stop));
+        if (controller.signal.aborted) stop();
+        else controller.signal.addEventListener("abort", stop, { once: true });
+      }),
+  };
+}
+
+function downloadFailureReason(cause: unknown): string {
+  if (!(cause instanceof Error)) return "unknown";
+  if (/^download-[a-z0-9-]+$/.test(cause.message)) return cause.message;
+  const network = /net::ERR_[A-Z_]+/.exec(cause.message);
+  if (network) return network[0];
+  for (const error of [cause, cause.cause]) {
+    if (
+      error instanceof Error &&
+      "code" in error &&
+      typeof error.code === "string" &&
+      /^[A-Z][A-Z0-9_]+$/.test(error.code)
+    )
+      return error.code;
+  }
+  return "unknown";
+}
+
 export const removeLegacyWhisperCache = Effect.fn("VoiceModel.removeLegacyWhisperCache")(function* (directory: string) {
   yield* voiceIO(() => rm(directory, { recursive: true, force: true }));
 });

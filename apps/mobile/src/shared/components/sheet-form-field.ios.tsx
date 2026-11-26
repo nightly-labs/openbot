@@ -3,13 +3,15 @@ import { useNativeState } from "@expo/ui/swift-ui";
 import { accessibilityLabel } from "@expo/ui/swift-ui/modifiers";
 import { Typography } from "heroui-native";
 import { useThemeColor } from "heroui-native/hooks";
-import { useEffect } from "react";
+import { useEffect, useRef } from "react";
 import { View } from "react-native";
 
 import { useTextScale } from "@/features/settings/model/text-size-store";
 import type { SheetFormFieldProps } from "@/shared/components/sheet-form-field.types";
 import { APP_FONT } from "@/shared/lib/app-font";
 import { layoutDirection, textDirection } from "@/shared/lib/text-direction";
+
+const RECENT_FIELD_TEXTS = 8;
 
 export function SheetFormField({
   autoCapitalize,
@@ -36,14 +38,16 @@ export function SheetFormField({
   value,
 }: SheetFormFieldProps) {
   const [foreground, muted, border, danger] = useThemeColor(["foreground", "muted", "border", "danger"]);
-  // The SwiftUI field is not a React Native `Text`, so it takes the text size of the app here.
   const textScale = useTextScale();
   const nativeValue = useNativeState(value);
+  const fieldTexts = useRef([value]);
   useEffect(() => {
+    const [current, ...older] = fieldTexts.current;
+    if (value === current || (value !== "" && older.includes(value))) return;
+    fieldTexts.current = [value];
     nativeValue.set(value);
   }, [nativeValue, value]);
   const lines = multiline ? (tall ? 14 : 4) : 1;
-  // A tall field takes the height of its lines, so the lines fill it.
   const height = tall && multiline ? undefined : multiline ? 108 : 54;
 
   return (
@@ -76,8 +80,6 @@ export function SheetFormField({
             modifiers={[accessibilityLabel(label)]}
             multiline={multiline}
             numberOfLines={lines}
-            // SwiftUI aligns to the leading or trailing side of the layout. Text in the other
-            // direction than the layout goes to the trailing side.
             textAlign={textAlign ?? (textDirection(value, layoutDirection()) === layoutDirection() ? "left" : "right")}
             autoCapitalize={autoCapitalize}
             autoCorrect={autoCorrect}
@@ -95,7 +97,10 @@ export function SheetFormField({
             }
             textStyle={{ color: String(foreground), fontFamily: APP_FONT, fontSize: 16 * textScale }}
             value={nativeValue}
-            onChangeText={onChangeText}
+            onChangeText={(text) => {
+              fieldTexts.current = [text, ...fieldTexts.current.slice(0, RECENT_FIELD_TEXTS - 1)];
+              onChangeText(text);
+            }}
             onSubmitEditing={onSubmitEditing}
           />
         </Host>

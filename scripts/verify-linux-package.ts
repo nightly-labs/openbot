@@ -12,18 +12,14 @@ import { elfSearchPaths, ORIGIN_SEARCH_PATH } from "./elf-search-paths";
 
 const logger = createOpenBotLogger("verify-linux-package");
 
-// Each launch step ends on a state or an event. This limit only turns a real hang into a clear failure:
-// a slow release runner can need much more time than usual to start the first instance.
 const launchStepLimitMs = 5 * 60_000;
 
-/** The scripts that a server installs from a release (`RELEASE_FILES` in scripts/hosting/openbot-hosted-update). */
 const HOSTED_SCRIPTS = [
   "openbot-hosted-server",
   "openbot-hosted-env",
   "openbot-hosted-update",
   "openbot",
   "openbot-boat-pre-stop",
-  // Not installed on a server: `install-server.sh` runs it from the unpacked release.
   "openbot-server-setup",
 ];
 const HOSTED_UNITS = [
@@ -42,7 +38,6 @@ if (process.platform !== "linux") {
   throw new Error("The Linux package verifier must run on Linux.");
 }
 
-/** The verifier checks a build for the host it runs on: CI builds each architecture on its own runner. */
 const LINUX_ARCHITECTURES = {
   x64: { label: "x86-64", elfMachine: 0x3e },
   arm64: { label: "AArch64", elfMachine: 0xb7 },
@@ -58,13 +53,11 @@ const appPathArgument = process.argv.slice(2).find((argument) => !argument.start
 const appPath = resolve(
   appPathArgument ?? (architecture === "x64" ? "dist/linux-unpacked" : "dist/linux-arm64-unpacked"),
 );
-// electron-builder names the Linux binary after `name` in package.json, not `productName`.
 const executablePath = resolve(appPath, "openbot");
 const resourcesPath = resolve(appPath, "resources");
 const asarPath = resolve(resourcesPath, "app.asar");
 const voiceRuntimePath = resolve(resourcesPath, "voice/runtime");
 const voiceRuntimeLibraries = ["sherpa-onnx.node", "libsherpa-onnx-c-api.so", "libonnxruntime.so"];
-// ONNX Runtime session settings that the voice hosts read. It is text, not a library.
 const voiceSessionSettingsPath = resolve(voiceRuntimePath, "no-arena.cfg");
 const voiceHostPath = resolve(resourcesPath, "app.asar.unpacked/out/main/voice-transcription-host.js");
 const speechHostPath = resolve(resourcesPath, "app.asar.unpacked/out/main/voice-speech-host.js");
@@ -81,14 +74,17 @@ await Promise.all([
   access(resolve(resourcesPath, "licenses/onnxruntime-LICENSE")),
   ...voiceRuntimeLibraries.map((name) => access(resolve(voiceRuntimePath, name))),
   access(voiceSessionSettingsPath),
+  access(resolve(voiceRuntimePath, "silero_vad_v5.onnx")),
   access(voiceHostPath),
   access(speechHostPath),
-  // A hosted server refuses an update to a release without all of its hosting files.
-  ...["packages.txt", "openbot-hosted.apparmor", ...HOSTED_UNITS].map((file) =>
+  ...["packages.txt", "optional-packages.txt", "openbot-hosted.apparmor", ...HOSTED_UNITS].map((file) =>
     access(resolve(resourcesPath, "hosting", file)),
   ),
   ...HOSTED_SCRIPTS.map((file) => access(resolve(resourcesPath, "hosting", file), constants.X_OK)),
-  // The Computer Use driver of this architecture.
+  access(resolve(resourcesPath, "hosting/openbot-desktop"), constants.X_OK),
+  ...["openbox/openbot-rc.xml", "openbox/openbot-menu.xml", "themes/OpenBot/openbox-3/themerc", "openbot-logo.png"].map(
+    (file) => access(resolve(resourcesPath, "hosting/desktop", file)),
+  ),
   access(resolve(resourcesPath, `cua-driver/linux/${architecture}/cua-driver`)),
   access(resolve(resourcesPath, `cua-driver/linux/${architecture}/wayland-helper/winrects@cua/extension.js`)),
   access(resolve(resourcesPath, `cua-driver/linux/${architecture}/LICENSE.md`)),
@@ -99,10 +95,7 @@ await Promise.all(
   ),
 );
 
-// The voice runtime is the one this architecture loads. The Parakeet, Bark, Whisper and Supertonic
-// models are downloaded on demand.
 await Promise.all(voiceRuntimeLibraries.map((name) => assertElfMachine(resolve(voiceRuntimePath, name))));
-// `prepare-voice` removes the CI build directory and the working directory from the search paths.
 for (const name of voiceRuntimeLibraries) {
   const paths = elfSearchPaths(await readFile(resolve(voiceRuntimePath, name)));
   if (paths.some(({ value }) => value !== ORIGIN_SEARCH_PATH)) {
@@ -134,7 +127,6 @@ for (const [path, name] of [
     throw new Error(`The ${name} host must import nothing but node: builtins.`);
   }
 }
-// The remote desktop runtime is built for x64 only, and only for this platform.
 if (architecture === "x64") {
   await Promise.all(
     ["sunshine", "web-server", "streamer", "static/stream.html"].map((name) =>
@@ -153,7 +145,6 @@ if (architecture === "x64") {
   );
 }
 
-// Providers and the tunnel are downloaded on demand, exactly as on macOS and Windows.
 await Promise.all(
   ["codex", "claude", "grok", "cloudflared"].map((name) =>
     assertAbsent(resolve(resourcesPath, name), "Runtimes must not be packaged"),
@@ -168,8 +159,6 @@ const packageJson = JSON.parse(await readFile("package.json", "utf8"));
 if (!isDynamicRecord(packageJson)) throw new Error("package.json is not a JSON object.");
 if (!isString(packageJson.version)) throw new Error("package.json version is missing.");
 
-// The Linux build has no version resource to read, so the packaged manifest is the record of what
-// was built. It is the same file the running app reports through `app.getVersion()`.
 const packagedManifest = JSON.parse(await readAsarFile(asarPath, "package.json"));
 if (!isDynamicRecord(packagedManifest)) throw new Error("The packaged package.json is not a JSON object.");
 expectEqual(packagedManifest.name, "openbot", "packaged name");
@@ -251,16 +240,6 @@ async function findAppImages(): Promise<string[]> {
   return (await readdir("dist")).filter((name) => name.endsWith(".AppImage"));
 }
 
-/**
- * Reads one top-level file out of an asar archive.
- *
- * The archive opens with four little-endian 32-bit words - a constant `4`, the size of the header
- * block, the size of the JSON inside it, and the length of the JSON string itself - and then the
- * JSON file table, which gives every entry an offset into the data that follows the header block.
- * Doing this here keeps the verifier on the declared dependencies: `@electron/asar` is only a
- * transitive dependency of electron-builder, and reading four words of a stable on-disk format is a
- * smaller commitment than depending on it.
- */
 async function readAsarFile(archive: string, name: string): Promise<string> {
   const buffer = await readFile(archive);
   const headerSize = buffer.readUInt32LE(4);
@@ -277,17 +256,6 @@ async function readAsarFile(archive: string, name: string): Promise<string> {
   return buffer.toString("utf8", start, start + entry.size);
 }
 
-/**
- * Starts the packaged application once and makes sure it stays up.
- *
- * This needs a display, so in CI it runs under `xvfb-run -a`. It cannot be verified on a macOS
- * worktree at all: the verifier refuses to run there, and a headless Electron does not reach
- * `ready` in an agent shell.
- *
- * No `--no-sandbox` here or anywhere else. If the launch fails with a user-namespace error, the
- * host is missing the AppArmor profile, which is a real defect in the install instructions rather
- * than something to switch the sandbox off for.
- */
 async function verifyLaunch(executable: string): Promise<void> {
   if (!process.env.DISPLAY && !process.env.WAYLAND_DISPLAY) {
     throw new Error("The launch check needs a display. Run it under `xvfb-run -a`.");
@@ -312,18 +280,12 @@ async function verifyLaunch(executable: string): Promise<void> {
   });
 
   try {
-    // Chromium makes `SingletonLock` in userData when main takes its single-instance lock. A second
-    // instance that starts before that does not forward to the first one: it takes the lock and stays open.
     await waitForFirstInstance(
       launchExit,
       () => pathExists(join(userDataPath, "SingletonLock")),
       "take its lock",
       () => stderr,
     );
-    // The lock is not enough. The second instance waits about 20 seconds for the first one to answer, and
-    // the answer needs a free main thread; with no answer, Chromium can kill the first instance. Main
-    // answers only after its start, and a launch that stops during the start must fail here. So this
-    // waits until the window has loaded and called main (`trace.ndjson`, see `rendererCalledMain`).
     await waitForFirstInstance(
       launchExit,
       () => rendererCalledMain(userDataPath),
@@ -362,7 +324,6 @@ function launchEnvironment(userDataPath: string): NodeJS.ProcessEnv {
   };
 }
 
-/** Waits for a state of the first instance. It fails immediately when the first instance exits. */
 async function waitForFirstInstance(
   launchExit: Promise<never>,
   reached: () => Promise<boolean>,
@@ -386,7 +347,6 @@ async function waitForFirstInstance(
   }
 }
 
-// `SingletonLock` is a symbolic link to a host and process name, not to a file, so it must not be followed.
 async function pathExists(path: string): Promise<boolean> {
   try {
     await lstat(path);
@@ -397,11 +357,6 @@ async function pathExists(path: string): Promise<boolean> {
   }
 }
 
-/**
- * Whether the window of the first instance has called main. The renderer asks main for `getAppInfo` when
- * it mounts (src/renderer/src/platform.tsx), main records each trusted call in `logs/trace.ndjson`
- * (`setIpcCallObserver` in src/main/index.ts), and a main-thread timer writes the line about one second later.
- */
 async function rendererCalledMain(userDataPath: string): Promise<boolean> {
   try {
     return (await readFile(join(userDataPath, "logs", "trace.ndjson"), "utf8")).includes('"kind":"ipc"');
@@ -427,8 +382,6 @@ async function verifySecondInstanceExits(
   });
   const stop = new AbortController();
   try {
-    // The second instance exits only after the first one accepts its arguments. A busy first instance
-    // accepts them later, so this waits for the exit and not for a fixed time.
     const result = await Promise.race([
       new Promise<{ code: number | null; signal: NodeJS.Signals | null }>((resolveExit) => {
         second.once("exit", (code, signal) => resolveExit({ code, signal }));

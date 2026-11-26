@@ -9,28 +9,86 @@ export const messages = {
   "error.connector.githubClientUnknown": "GitHub ne connaît pas le Client ID de cette application GitHub.",
   "error.connector.githubUnexpected": "GitHub a envoyé une réponse inattendue : {detail}",
   "error.connector.githubUnreachable": "OpenBot ne peut pas joindre GitHub : {detail}",
+  "error.connector.githubOffline":
+    "OpenBot ne peut pas joindre GitHub. Vérifiez la connexion internet et les réglages DNS de l’ordinateur ou du serveur qui exécute OpenBot, puis réessayez.",
   "error.connector.githubExpired": "La connexion GitHub a expiré. Connectez GitHub à nouveau.",
   "error.connector.githubFileUnreadable": "Le fichier de connexion GitHub est illisible.",
   "error.connector.githubFileTooLarge": "Le fichier de connexion GitHub est trop volumineux.",
+  "error.connector.nearSignIn": "Connectez-vous à OpenBot pour utiliser le portefeuille crypto.",
+  "error.connector.nearServiceUnavailable":
+    "Le service du portefeuille crypto n’est pas disponible. Réessayez plus tard.",
+  "error.connector.nearWalletNotFound": "Ce portefeuille n’appartient pas à ce compte ou à ce serveur OpenBot.",
+  "error.connector.nearWalletLimit": "Trop de nouveaux portefeuilles aujourd’hui. Réessayez demain.",
+  "error.connector.nearProviderBusy": "NEAR Intents ne répond pas pour le moment. Réessayez dans quelques minutes.",
+  "error.connector.nearNoWallet":
+    "Aucun portefeuille crypto n’est configuré. Configurez-le dans Réglages du serveur > Vault > Crypto.",
+  "error.connector.nearWalletExists": "Un portefeuille crypto est déjà configuré.",
+  "error.connector.nearFrozen":
+    "Les paiements depuis le portefeuille crypto sont en pause. Reprenez-les dans Réglages du serveur > Vault > Crypto.",
+  "error.connector.nearAgentNotAllowed":
+    "Cet agent ne peut pas payer depuis le portefeuille crypto. Activez-le dans Réglages du serveur > Vault > Crypto.",
+  "error.connector.nearGrantExpired":
+    "OpenBot n’a pas d’autorisation de paiement pour le portefeuille crypto. Renouvelez-la dans Réglages du serveur > Vault > Crypto.",
+  "error.connector.nearUnknownAsset": "Le portefeuille crypto n’a pas d’actif {asset}.",
+  "error.connector.nearAmountInvalid": "{amount} n’est pas un montant valide de {asset}.",
+  "error.connector.nearRecipientInvalid": "{recipient} n’est ni un compte NEAR ni une adresse chain:address.",
+  "error.connector.nearRefused": "La NEAR Intents Agent API a refusé la requête : {detail}",
+  "error.connector.nearUnexpected": "La NEAR Intents Agent API a envoyé une réponse inattendue : {detail}",
+  "error.connector.nearUnreachable": "OpenBot ne peut pas joindre la NEAR Intents Agent API : {detail}",
+  "error.connector.nearFileUnreadable": "Le fichier du portefeuille crypto est illisible.",
+  "error.connector.nearFileTooLarge": "Le fichier du portefeuille crypto est trop volumineux.",
+  "error.connector.nearSigningCanceled": "La signature a été annulée.",
+  "error.connector.nearSigningExpired": "La signature n’est pas arrivée à temps. Réessayez.",
+  "error.connector.nearSigningInvalid": "La signature du navigateur n’est pas valide.",
+  "error.connector.nearSigningBusy":
+    "Une autre signature est en attente dans le navigateur. Terminez-la ou annulez-la d’abord.",
+  "error.connector.nearPolicyCooldown":
+    "Vous pourrez de nouveau modifier les règles du portefeuille à partir de {time}.",
+  "error.connector.nearPolicyPending": "La modification des règles n’a pas abouti. Réessayez dans quelques minutes.",
+  "error.connector.nearDeclined": "Le propriétaire a refusé le paiement.",
+  "error.connector.nearUncertain":
+    "OpenBot ne sait pas si le paiement a été envoyé. Ne payez pas une deuxième fois. Le propriétaire peut consulter l’historique du portefeuille.",
+  "error.connector.nearPaymentFailed": "Le paiement a échoué : {detail}",
+  "error.connector.nearPaymentUnknown": "Ce paiement n’attend plus de réponse.",
+  "error.connector.nearRuleFull": "Une règle de paiement peut avoir au plus {limit} destinataires.",
+  "error.connector.nearRulesFull": "Le portefeuille peut avoir au plus {limit} règles de paiement.",
   "error.connector.onePasswordCliMissing":
     "OpenBot ne trouve pas la CLI 1Password. Installez-la et activez son intégration dans l’application 1Password, ou utilisez un jeton de compte de service.",
   "error.connector.onePasswordCliInstallFailed":
     "OpenBot n’a pas pu installer la CLI 1Password. Vérifiez la connexion à Internet, puis réessayez.",
   "error.connector.onePasswordCliSignedOut":
     "La CLI 1Password n’est pas connectée. Activez son intégration dans l’application 1Password, puis connectez-vous à nouveau.",
+  "error.connector.onePasswordAppUnreachable":
+    "OpenBot ne parvient pas à joindre l’app 1Password. Ouvrez 1Password et déverrouillez-le. Dans Réglages > Développeur, vérifiez que « Intégrer avec 1Password CLI » est activé. Puis réessayez.",
   "error.connector.onePasswordCliFailed": "La CLI 1Password a échoué : {detail}",
+  "error.connector.onePasswordCliForbidden":
+    "Votre compte 1Password ne vous permet pas de créer le coffre partagé ni un compte de service. Demandez cette autorisation à un propriétaire ou à un administrateur du compte, ou demandez-lui un jeton de compte de service, puis cliquez sur « Utiliser un jeton ».",
   "error.connector.onePasswordUnexpected": "1Password a envoyé une réponse inattendue : {detail}",
   "error.connector.onePasswordTokenRejected": "1Password n’a pas accepté le jeton du compte de service.",
+  "error.connector.onePasswordUnreachable":
+    "OpenBot n’a pas pu se connecter à 1Password. Vérifiez la connexion à Internet, puis réessayez.",
+  "error.connector.onePasswordRateLimited":
+    "1Password a reçu trop de requêtes. Patientez quelques minutes, puis réessayez.",
   "error.connector.onePasswordNoVault":
     "Le compte de service ne peut lire aucun coffre. Donnez-lui accès à un coffre, puis réessayez.",
+  "error.connector.onePasswordReadFailed":
+    "OpenBot ne peut pas lire vos identifiants dans 1Password. Déconnectez 1Password, puis reconnectez-le.",
   "error.connector.onePasswordFileUnreadable": "Le fichier de connexion 1Password est illisible.",
   "error.connector.onePasswordFileTooLarge": "Le fichier de connexion 1Password est trop volumineux.",
   "error.connector.bitwardenFailed":
     "Impossible de lire Bitwarden. Installez la CLI bw, connectez-vous, déverrouillez-la et créez un dossier nommé « Shared with OpenBot ». Connectez-vous avec une nouvelle clé de session.",
+  "error.connector.bitwardenCliMissing":
+    "OpenBot ne trouve pas la CLI Bitwarden. Installez bw, vérifiez qu’il fonctionne dans un nouveau terminal, puis reconnectez-vous.",
+  "error.connector.bitwardenFolderMissing":
+    "Bitwarden doit avoir exactement un dossier nommé Shared with OpenBot. Créez-le ou supprimez le dossier en trop, puis reconnectez-vous.",
   "error.connector.bitwardenHostInput":
     "Saisissez une adresse de serveur HTTPS, le client_id et le client_secret de la clé d’API et le mot de passe principal.",
   "error.connector.bitwardenHostFailed":
     "Impossible d’ouvrir Bitwarden sur ce serveur. Vérifiez l’adresse du serveur, la clé d’API et le mot de passe principal, et assurez-vous qu’un dossier se nomme « Shared with OpenBot ». Puis connectez-vous à nouveau.",
+  "error.connector.bitwardenHostSignInFailed":
+    "Impossible de se connecter à Bitwarden sur ce serveur. Vérifiez l’adresse du serveur et la clé d’API, puis connectez-vous à nouveau.",
+  "error.connector.bitwardenHostUnlockFailed":
+    "Impossible de déverrouiller Bitwarden sur ce serveur. Vérifiez le mot de passe principal, puis connectez-vous à nouveau.",
   "error.connector.bitwardenCliInstallFailed":
     "Impossible d’installer la CLI Bitwarden sur ce serveur. Vérifiez sa connexion réseau, puis connectez-vous à nouveau.",
   "error.connector.bitwardenFileUnreadable": "Le fichier de connexion Bitwarden est illisible.",
@@ -42,6 +100,8 @@ export const messages = {
     "Impossible d’installer la CLI Proton Pass. Vérifiez la connexion réseau, puis connectez-vous à nouveau.",
   "error.connector.protonPassPlan":
     "Votre forfait Proton n’autorise pas la CLI Proton Pass. Changez de forfait, puis connectez-vous à nouveau.",
+  "error.connector.protonPassPlanMissing":
+    "Votre forfait Proton n’inclut pas la CLI Proton Pass. Elle nécessite un forfait Proton qui inclut Pass Plus. Changez de forfait, puis connectez-vous à nouveau.",
   "error.connector.protonPassExpired": "L’accès à Proton Pass a pris fin. Connectez-vous à nouveau.",
   "error.connector.protonPassKeyInvalid": "Saisissez une clé d’accès Proton Pass qui commence par pst_.",
   "error.connector.protonPassExtraPassword": "Le mot de passe supplémentaire est incorrect. Saisissez-le à nouveau.",

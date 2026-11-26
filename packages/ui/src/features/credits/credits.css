@@ -1,0 +1,1240 @@
+@property --credit-tier {
+  syntax: "<color>";
+  inherits: true;
+  initial-value: transparent;
+}
+
+@keyframes credit-rise {
+  from {
+    opacity: 0;
+    translate: 0 var(--openbot-space-3);
+  }
+}
+
+@keyframes credit-pop {
+  from {
+    opacity: 0;
+    scale: 0.85;
+    filter: blur(2px);
+  }
+}
+
+@keyframes credit-from-end {
+  from {
+    opacity: 0;
+    translate: var(--openbot-space-6) 0;
+  }
+}
+
+@keyframes credit-from-start {
+  from {
+    opacity: 0;
+    translate: calc(var(--openbot-space-6) * -1) 0;
+  }
+}
+
+@keyframes credit-strike {
+  from {
+    scale: 0 1;
+  }
+}
+
+@keyframes credit-redeem-spin {
+  to {
+    rotate: 1turn;
+  }
+}
+
+@keyframes credit-redeem-burst {
+  from {
+    opacity: 0;
+    scale: 0.4;
+    rotate: -30deg;
+  }
+
+  70% {
+    opacity: 1;
+    scale: 1.12;
+    rotate: 6deg;
+  }
+}
+
+@keyframes credit-shake {
+  20% {
+    translate: -6px 0;
+  }
+  40% {
+    translate: 6px 0;
+  }
+  60% {
+    translate: -4px 0;
+  }
+  80% {
+    translate: 2px 0;
+  }
+}
+
+[data-tier="basic"] {
+  --credit-tier: var(--openbot-credit-basic);
+}
+
+[data-tier="plus"] {
+  --credit-tier: var(--openbot-credit-plus);
+}
+
+[data-tier="max"] {
+  --credit-tier: var(--openbot-credit-max);
+}
+
+.credit-icon {
+  display: inline-flex;
+  flex: none;
+  width: 1em;
+  height: 1em;
+  vertical-align: -0.125em;
+}
+
+.credit-star {
+  width: 100%;
+  height: 100%;
+  fill: var(--openbot-credit-star-fill);
+}
+
+.credit-icon[data-tile] {
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--openbot-radius-logo);
+  background: var(--openbot-credit-star);
+}
+
+.credit-icon[data-tile] .credit-star {
+  width: 64%;
+  height: 64%;
+  fill: var(--openbot-credit-tile-ink);
+}
+
+.credit-amount {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3em;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.credit-page {
+  --credit-big: calc(var(--openbot-text-display) * 1.5);
+  --credit-stagger: calc(var(--openbot-duration-fast) / 3);
+  transition: --credit-tier var(--openbot-duration-overlay) var(--openbot-ease-out);
+}
+
+.credit-roll {
+  display: inline-flex;
+}
+
+.credit-page .hosted-pricing-scroll {
+  position: relative;
+  isolation: isolate;
+}
+
+.credit-page .hosted-pricing-scroll::before {
+  position: absolute;
+  z-index: -1;
+  inset: 0;
+  background: radial-gradient(
+    46% 30% at 50% 22%,
+    color-mix(in srgb, var(--credit-tier) 16%, var(--openbot-transparent)),
+    var(--openbot-transparent) 70%
+  );
+  content: "";
+  pointer-events: none;
+}
+
+.credit-page-body {
+  display: grid;
+  justify-items: center;
+  gap: var(--openbot-space-8);
+  width: min(100%, 1040px);
+  margin: 0 auto;
+  padding: var(--openbot-space-6) var(--openbot-space-8) var(--openbot-space-8);
+}
+
+.credit-target-logo {
+  flex: none;
+  width: 24px;
+  height: 24px;
+  padding: 3px;
+  border-radius: var(--openbot-radius-pill);
+}
+
+svg.credit-target-logo {
+  background: var(--openbot-bg-control);
+  color: var(--openbot-text-muted);
+}
+
+.credit-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--openbot-space-3);
+}
+
+.credit-tier-tag {
+  padding: 2px var(--openbot-space-3);
+  border: 1px solid color-mix(in srgb, var(--credit-tier) 50%, var(--openbot-transparent));
+  border-radius: var(--openbot-radius-pill);
+  background: color-mix(in srgb, var(--credit-tier) 14%, var(--openbot-transparent));
+  color: var(--credit-tier);
+  font-size: var(--openbot-text-sm);
+  font-weight: var(--openbot-weight-semibold);
+  letter-spacing: 0.08em;
+  line-height: var(--openbot-leading-md);
+  text-transform: uppercase;
+}
+
+.credit-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--openbot-space-1);
+  padding: 2px var(--openbot-space-3);
+  border: 1px solid var(--openbot-border-strong);
+  border-radius: var(--openbot-radius-pill);
+  background: var(--openbot-bg-control);
+  color: var(--openbot-text-secondary);
+  font-size: var(--openbot-text-sm);
+  font-variant-numeric: tabular-nums;
+  line-height: var(--openbot-leading-md);
+  white-space: nowrap;
+}
+
+.credit-chip-save {
+  animation: credit-pop var(--openbot-duration-overlay) var(--openbot-ease-out) backwards;
+  border-color: var(--credit-tier);
+  background: var(--credit-tier);
+  color: var(--openbot-text-on-light);
+  font-weight: var(--openbot-weight-bold);
+}
+
+.credit-facts {
+  display: grid;
+  gap: var(--openbot-space-2);
+  margin: 0;
+  padding: 0;
+  color: var(--openbot-text-muted);
+  font-size: var(--openbot-text-md);
+  line-height: var(--openbot-leading-md);
+  list-style: none;
+}
+
+.credit-facts li {
+  display: flex;
+  align-items: center;
+  gap: var(--openbot-space-2);
+}
+
+.credit-facts svg {
+  flex: none;
+  width: 16px;
+  height: 16px;
+  color: var(--credit-tier);
+}
+
+.credit-price {
+  display: flex;
+  align-items: baseline;
+  gap: var(--openbot-space-2);
+  margin: 0;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.credit-price-was {
+  animation: credit-pop var(--openbot-duration-overlay) var(--openbot-ease-out) backwards;
+  color: var(--credit-tier);
+  font-size: var(--openbot-text-2xl);
+  font-weight: var(--openbot-weight-semibold);
+  line-height: var(--openbot-leading-2xl);
+  position: relative;
+  text-decoration: none;
+}
+
+.credit-price-was::after {
+  position: absolute;
+  inset: calc(50% - 1px) -2px auto;
+  height: 2px;
+  border-radius: var(--openbot-radius-pill);
+  background: currentcolor;
+  content: "";
+  transform-origin: left center;
+  animation: credit-strike var(--openbot-duration-overlay) var(--openbot-ease-out) var(--openbot-duration-normal)
+    backwards;
+}
+
+.credit-price-now {
+  color: var(--openbot-text-primary);
+  font-size: var(--openbot-text-2xl);
+  font-weight: var(--openbot-weight-semibold);
+  line-height: var(--openbot-leading-2xl);
+}
+
+.credit-page .credit-pay {
+  min-width: 168px;
+  height: 52px;
+  font-variant-numeric: tabular-nums;
+}
+
+.credit-after {
+  display: flex;
+  align-items: center;
+  gap: var(--openbot-space-2);
+  min-width: 0;
+  margin: 0;
+  color: var(--openbot-text-muted);
+  font-size: var(--openbot-text-sm);
+  white-space: nowrap;
+}
+
+.credit-after-name {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.credit-after-numbers {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--openbot-space-1);
+  color: var(--openbot-text-primary);
+  font-variant-numeric: tabular-nums;
+}
+
+.credit-slider {
+  --credit-thumb: 28px;
+  display: flex;
+  flex-direction: column;
+  gap: var(--openbot-space-2);
+  width: 100%;
+  padding-inline: var(--openbot-space-3);
+}
+
+.credit-stops {
+  position: relative;
+  height: 30px;
+}
+
+.credit-page .credit-stop {
+  position: absolute;
+  top: 0;
+  display: grid;
+  justify-items: center;
+  gap: 2px;
+  height: auto;
+  min-height: 0;
+  padding: 2px var(--openbot-space-1);
+  color: var(--openbot-text-muted);
+  font-size: var(--openbot-text-sm);
+  font-variant-numeric: tabular-nums;
+  line-height: var(--openbot-leading-sm);
+  translate: -50% 0;
+  transform-origin: bottom center;
+  transition:
+    color var(--openbot-duration-overlay) var(--openbot-ease-out),
+    scale var(--openbot-duration-overlay) var(--openbot-ease-out);
+}
+
+.credit-page .credit-stop::after {
+  width: 1px;
+  height: 5px;
+  background: var(--openbot-border-strong);
+  content: "";
+  transition: background-color var(--openbot-duration-overlay) var(--openbot-ease-out);
+}
+
+.credit-page .credit-stop[data-passed]::after,
+.credit-page .credit-stop[data-active]::after {
+  background: var(--credit-tier);
+}
+
+.credit-page .credit-stop:hover {
+  background: var(--openbot-transparent);
+  color: var(--openbot-text-primary);
+}
+
+.credit-page .credit-stop[data-passed] {
+  color: color-mix(in srgb, var(--credit-tier) 85%, var(--openbot-text-muted));
+}
+
+.credit-page .credit-stop[data-active] {
+  color: var(--openbot-text-primary);
+  font-weight: var(--openbot-weight-semibold);
+  scale: 1.12;
+}
+
+.credit-slider-field .ui-slider-header {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+}
+
+.credit-slider-field .ui-slider-track {
+  height: 10px;
+  margin-block: calc((var(--credit-thumb) - 10px) / 2);
+  background: linear-gradient(
+    90deg,
+    color-mix(in srgb, var(--openbot-credit-basic) 18%, var(--openbot-transparent)) 0 var(--credit-plus-at),
+    color-mix(in srgb, var(--openbot-credit-plus) 18%, var(--openbot-transparent)) var(--credit-plus-at)
+      var(--credit-max-at),
+    color-mix(in srgb, var(--openbot-credit-max) 18%, var(--openbot-transparent)) var(--credit-max-at) 100%
+  );
+}
+
+.credit-slider-field .ui-slider-track::after {
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  background: linear-gradient(
+    90deg,
+    var(--openbot-credit-basic),
+    var(--openbot-credit-plus) var(--credit-max-at),
+    var(--openbot-credit-max)
+  );
+  clip-path: inset(0 calc(100% - var(--credit-pos)) 0 0 round var(--openbot-radius-pill));
+  content: "";
+  pointer-events: none;
+  transition: clip-path var(--openbot-duration-overlay) var(--openbot-ease-out);
+}
+
+.credit-slider-field .ui-slider-fill {
+  background: var(--openbot-transparent);
+}
+
+.credit-slider-field .ui-slider-thumb {
+  position: absolute;
+  z-index: 1;
+  top: calc(50% - (var(--credit-thumb) / 2));
+  width: var(--credit-thumb);
+  height: var(--credit-thumb);
+  border: 2px solid var(--credit-tier);
+  background: var(--openbot-surface-light);
+  box-shadow: none;
+  transition:
+    left var(--openbot-duration-overlay) var(--openbot-ease-out),
+    scale var(--openbot-duration-slow) var(--openbot-ease-out);
+}
+
+.credit-slider-field .ui-slider-thumb[data-dragging] {
+  scale: 1.12;
+  transition-property: scale;
+}
+
+.credit-slider-field .ui-slider-thumb:focus-visible {
+  box-shadow: var(--openbot-focus-ring);
+}
+
+.credit-slider-field .ui-slider-thumb::before,
+.credit-slider-field .ui-slider-thumb::after {
+  position: absolute;
+  top: calc(50% - 3px);
+  width: 6px;
+  height: 6px;
+  border-color: var(--openbot-text-on-light);
+  border-style: solid;
+  content: "";
+}
+
+.credit-slider-field .ui-slider-thumb::before {
+  left: 6px;
+  border-width: 0 0 1.5px 1.5px;
+  transform: rotate(45deg);
+}
+
+.credit-slider-field .ui-slider-thumb::after {
+  right: 6px;
+  border-width: 1.5px 1.5px 0 0;
+  transform: rotate(45deg);
+}
+
+.credit-packs {
+  container: credit-packs / inline-size;
+  display: grid;
+  gap: var(--openbot-space-4);
+  width: 100%;
+}
+
+.credit-split {
+  animation: credit-rise var(--openbot-duration-toast-enter) var(--openbot-ease-out) backwards;
+  transition: --credit-tier var(--openbot-duration-overlay) var(--openbot-ease-out);
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 300px;
+  width: 100%;
+  margin-block-end: var(--openbot-space-4);
+  overflow: hidden;
+  border: 1px solid color-mix(in srgb, var(--credit-tier) 30%, var(--openbot-transparent));
+  border-radius: var(--openbot-radius-card);
+  background:
+    radial-gradient(
+      70% 90% at 0% 0%,
+      color-mix(in srgb, var(--credit-tier) 12%, var(--openbot-transparent)),
+      var(--openbot-transparent) 70%
+    ),
+    color-mix(in srgb, var(--openbot-bg-canvas) 82%, var(--openbot-transparent));
+}
+
+.credit-split-main {
+  display: grid;
+  gap: var(--openbot-space-6);
+  padding: var(--openbot-space-8);
+}
+
+.credit-split-amount {
+  display: flex;
+  align-items: baseline;
+  gap: var(--openbot-space-2);
+  margin: 0 var(--openbot-space-2) 0 0;
+}
+
+.credit-split-amount .credit-icon-hero {
+  align-self: center;
+  width: calc(var(--credit-big) * 0.6);
+  height: calc(var(--credit-big) * 0.6);
+  margin-inline-end: var(--openbot-space-1);
+}
+
+.credit-split-number {
+  background: linear-gradient(180deg, var(--openbot-text-primary) 35%, var(--credit-tier));
+  background-clip: text;
+  color: var(--openbot-transparent);
+  font-size: var(--credit-big);
+  font-weight: var(--openbot-weight-semibold);
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.03em;
+  line-height: 1;
+}
+
+.credit-split-number * {
+  color: inherit;
+}
+
+.credit-split-unit {
+  color: var(--openbot-text-muted);
+  font-size: var(--openbot-text-xl);
+}
+
+.credit-split-side {
+  display: grid;
+  align-content: center;
+  justify-items: center;
+  gap: var(--openbot-space-4);
+  min-width: 0;
+  padding: var(--openbot-space-8) var(--openbot-space-6);
+  border-inline-start: 1px solid var(--openbot-border-strong);
+  background: color-mix(in srgb, var(--credit-tier) 5%, var(--openbot-transparent));
+}
+
+.credit-split-price {
+  justify-content: center;
+}
+
+.credit-split-price .credit-price-was {
+  font-size: var(--openbot-text-3xl);
+  line-height: var(--openbot-leading-3xl);
+}
+
+.credit-split-price .credit-price-now {
+  font-size: var(--openbot-text-display);
+  line-height: var(--openbot-leading-display);
+}
+
+.credit-page .credit-split-pay {
+  width: 100%;
+}
+
+.credit-pack {
+  position: relative;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: var(--openbot-space-6);
+  padding: var(--openbot-space-6) var(--openbot-space-8);
+  border: 1px solid var(--openbot-border-strong);
+  border-radius: var(--openbot-radius-card);
+  background: linear-gradient(
+    90deg,
+    color-mix(in srgb, var(--credit-tier) 7%, var(--openbot-transparent)),
+    var(--openbot-transparent) 50%
+  );
+  animation: credit-rise var(--openbot-duration-toast-enter) var(--openbot-ease-out) backwards;
+  animation-delay: calc(var(--credit-order) * var(--credit-stagger));
+  transition: border-color var(--openbot-duration-normal) var(--openbot-ease-out);
+}
+
+.credit-pack:hover {
+  border-color: color-mix(in srgb, var(--credit-tier) 45%, var(--openbot-transparent));
+}
+
+.credit-pack[data-popular] {
+  border-color: var(--credit-tier);
+  background: linear-gradient(
+    90deg,
+    color-mix(in srgb, var(--credit-tier) 16%, var(--openbot-transparent)),
+    color-mix(in srgb, var(--credit-tier) 4%, var(--openbot-transparent))
+  );
+}
+
+.credit-popular {
+  position: absolute;
+  top: 0;
+  left: var(--openbot-space-8);
+  padding: 2px var(--openbot-space-3);
+  border-radius: var(--openbot-radius-pill);
+  background: var(--credit-tier);
+  color: var(--openbot-text-on-light);
+  font-size: var(--openbot-text-sm);
+  font-weight: var(--openbot-weight-bold);
+  letter-spacing: 0.08em;
+  line-height: var(--openbot-leading-sm);
+  text-transform: uppercase;
+  transform: translateY(-50%);
+  animation: credit-pop var(--openbot-duration-overlay) var(--openbot-ease-out) backwards;
+  animation-delay: calc(var(--credit-order) * var(--credit-stagger) + var(--openbot-duration-overlay));
+}
+
+.credit-pack-main {
+  display: grid;
+  gap: var(--openbot-space-4);
+}
+
+.credit-pack-amount {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--openbot-space-2);
+  margin: 0;
+  color: var(--openbot-text-primary);
+  font-size: var(--openbot-text-xl);
+  font-weight: var(--openbot-weight-semibold);
+  font-variant-numeric: tabular-nums;
+}
+
+.credit-pack .credit-head {
+  flex-wrap: nowrap;
+}
+
+.credit-pack .credit-facts {
+  display: flex;
+  gap: var(--openbot-space-6);
+}
+
+.credit-pack .credit-facts li {
+  white-space: nowrap;
+}
+
+.credit-pack-side {
+  display: flex;
+  align-items: center;
+  gap: var(--openbot-space-6);
+}
+
+.credit-pack-price {
+  align-items: end;
+}
+
+@container credit-packs (width < 960px) {
+  .credit-pack-side {
+    flex-direction: column;
+    align-items: end;
+    gap: var(--openbot-space-2);
+  }
+}
+
+.credit-header-actions {
+  display: flex;
+  align-items: center;
+  gap: var(--openbot-space-3);
+}
+
+.credit-header-actions .credit-redeem-trigger {
+  height: 30px;
+  border-color: var(--openbot-border);
+  border-radius: var(--openbot-radius-pill);
+  padding-inline: var(--openbot-space-2) var(--openbot-space-3);
+  color: var(--openbot-text-primary);
+  font-size: var(--openbot-text-sm);
+}
+
+.credit-header-actions .hosted-currency {
+  flex: none;
+  width: auto;
+}
+
+.credit-corner {
+  display: flex;
+  align-items: center;
+  gap: var(--openbot-space-2);
+}
+
+.credit-corner-for {
+  color: var(--openbot-text-muted);
+  font-size: var(--openbot-text-sm);
+}
+
+.credit-corner-select {
+  display: inline-flex;
+  min-width: 0;
+  max-width: 320px;
+  height: 30px;
+  flex: none;
+  align-items: center;
+  gap: var(--openbot-space-2);
+  border: 0;
+  border-radius: var(--openbot-radius-pill);
+  outline: 0;
+  background: var(--openbot-bg-control);
+  box-shadow: inset 0 0 0 1px var(--openbot-border);
+  padding-inline: 3px var(--openbot-space-2);
+  color: var(--openbot-text-primary);
+  font-family: var(--openbot-font-sans);
+  cursor: pointer;
+}
+
+.credit-corner-select:hover,
+.credit-corner-select[data-expanded] {
+  background: var(--openbot-bg-control-hover);
+  box-shadow: inset 0 0 0 1px var(--openbot-border-strong);
+}
+
+.credit-corner-select:focus-visible {
+  box-shadow: inset 0 0 0 1px var(--openbot-border-focus);
+}
+
+.credit-corner-chevron {
+  width: var(--openbot-icon-sm);
+  height: var(--openbot-icon-sm);
+  flex: none;
+  color: var(--openbot-text-muted);
+}
+
+.credit-corner-value {
+  display: flex;
+  align-items: center;
+  gap: var(--openbot-space-2);
+  min-width: 0;
+}
+
+.credit-corner-name {
+  min-width: 0;
+  overflow: hidden;
+  font-size: var(--openbot-text-sm);
+  font-weight: var(--openbot-weight-medium);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.credit-corner-balance {
+  padding: 1px var(--openbot-space-2);
+  border-radius: var(--openbot-radius-pill);
+  background: var(--openbot-bg-control-active);
+  color: var(--openbot-text-secondary);
+  font-size: var(--openbot-text-sm);
+  font-weight: var(--openbot-weight-medium);
+}
+
+.credit-picker-menu.search-picker-menu.ui-action-menu {
+  width: 340px;
+  max-width: calc(100vw - var(--openbot-space-4));
+}
+
+.credit-picker-menu .search-picker-option[aria-selected="true"] {
+  box-shadow: inset 0 0 0 1px var(--openbot-border-strong);
+}
+
+.search-picker-option .credit-picker-logo {
+  width: 18px;
+  height: 18px;
+  padding: 2px;
+}
+
+.credit-picker-role {
+  flex: none;
+  margin-inline-start: auto;
+  color: var(--openbot-text-muted);
+  font-size: var(--openbot-text-sm);
+}
+
+.credit-picker-balance {
+  flex: none;
+  color: var(--openbot-text-secondary);
+  font-size: var(--openbot-text-sm);
+  font-variant-numeric: tabular-nums;
+}
+
+.credit-rail-icon .credit-icon {
+  width: 20px;
+  height: 20px;
+}
+
+.credits-section-balance {
+  color: var(--openbot-text-primary);
+  font-weight: var(--openbot-weight-semibold);
+}
+
+.credit-move-modal {
+  width: min(440px, 100%);
+}
+
+.credit-move-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--openbot-space-2);
+}
+
+.credit-move-form {
+  display: grid;
+  gap: var(--openbot-space-4);
+}
+
+.credit-move-amount {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--openbot-space-2);
+  padding-block-start: var(--openbot-space-4);
+}
+
+.credit-move-amount-icon {
+  width: 32px;
+  height: 32px;
+  flex: none;
+}
+
+.credit-move-amount .credit-move-input {
+  width: auto;
+  min-width: 1ch;
+  max-width: 100%;
+  height: auto;
+  padding: 0;
+  border: 0;
+  background: var(--openbot-transparent);
+  box-shadow: none;
+  field-sizing: content;
+  font-size: var(--openbot-text-display);
+  font-weight: var(--openbot-weight-semibold);
+  font-variant-numeric: tabular-nums;
+  text-align: center;
+  transition: color var(--openbot-duration-hover) ease;
+}
+
+.credit-move-amount[data-invalid] {
+  animation: credit-shake calc(var(--openbot-duration-normal) * 2) var(--openbot-ease-out);
+}
+
+.credit-move-amount[data-invalid] .credit-move-input {
+  color: var(--openbot-danger);
+}
+
+.credit-move-max {
+  justify-self: center;
+  color: var(--openbot-text-muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.credit-move-route {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+  align-items: center;
+  gap: var(--openbot-space-2);
+  padding-block-end: var(--openbot-space-2);
+}
+
+.credit-move-chip {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  justify-content: center;
+  gap: var(--openbot-space-2);
+  padding: var(--openbot-space-2) var(--openbot-space-3);
+  border: 1px solid var(--openbot-border-grouped);
+  border-radius: var(--openbot-radius-pill);
+  background: var(--openbot-bg-grouped);
+  color: var(--openbot-text-primary);
+  font-weight: var(--openbot-weight-medium);
+}
+
+.credit-move-chip-icon {
+  width: 20px;
+  height: 20px;
+  flex: none;
+}
+
+.credit-move-chip-logo {
+  --server-plush-logo-size: 20px;
+  flex: none;
+}
+
+.credit-move-chip-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.credit-move-swap {
+  border-radius: var(--openbot-radius-pill);
+  color: var(--openbot-text-muted);
+}
+
+.credit-move-swap svg {
+  rotate: calc(var(--credit-swap-turns, 0) * 180deg);
+  transition: rotate var(--openbot-duration-overlay) var(--openbot-ease-out);
+}
+
+.credit-move-route[data-swapped] > .credit-move-chip:first-child {
+  animation: credit-from-end var(--openbot-duration-overlay) var(--openbot-ease-out);
+}
+
+.credit-move-route[data-swapped] > .credit-move-chip:last-child {
+  animation: credit-from-start var(--openbot-duration-overlay) var(--openbot-ease-out);
+}
+
+.credit-move-submit {
+  width: 100%;
+}
+
+.hosted-upsell-modal.credit-confirm-modal {
+  --credit-stagger: calc(var(--openbot-duration-fast) / 3);
+  position: relative;
+  gap: var(--openbot-space-6);
+  padding-block-start: var(--openbot-space-8);
+}
+
+.credit-confirm-modal .hosted-upsell-modal-title {
+  font-size: var(--openbot-text-2xl);
+  line-height: var(--openbot-leading-2xl);
+}
+
+.credit-confirm-close {
+  position: absolute;
+  inset: var(--openbot-space-3) var(--openbot-space-3) auto auto;
+}
+
+.credit-confirm-hero {
+  display: grid;
+  justify-items: center;
+  gap: var(--openbot-space-3);
+  text-align: center;
+}
+
+.credit-confirm-badge {
+  display: grid;
+  place-items: center;
+  width: 56px;
+  height: 56px;
+  border: 1px solid var(--credit-tier);
+  border-radius: var(--openbot-radius-pill);
+  background: color-mix(in srgb, var(--credit-tier) 14%, transparent);
+  animation: credit-pop var(--openbot-duration-overlay) var(--openbot-ease-out) var(--openbot-duration-fast) backwards;
+}
+
+.credit-confirm-icon {
+  width: 28px;
+  height: 28px;
+}
+
+.credit-confirm-summary {
+  display: grid;
+  margin: 0;
+  border: 1px solid var(--openbot-border-grouped);
+  border-radius: var(--openbot-radius-lg);
+  background: var(--openbot-bg-grouped);
+}
+
+.credit-confirm-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--openbot-space-3);
+  min-height: 48px;
+  padding: var(--openbot-space-2) var(--openbot-space-4);
+  font-variant-numeric: tabular-nums;
+  animation: credit-rise var(--openbot-duration-overlay) var(--openbot-ease-out) backwards;
+}
+
+.credit-confirm-row:nth-child(2) {
+  animation-delay: var(--credit-stagger);
+}
+
+.credit-confirm-row:nth-child(3) {
+  animation-delay: calc(var(--credit-stagger) * 2);
+}
+
+.credit-confirm-row:nth-child(4) {
+  animation-delay: calc(var(--credit-stagger) * 3);
+}
+
+.credit-confirm-row + .credit-confirm-row {
+  border-top: 1px solid var(--openbot-border-grouped);
+}
+
+.credit-confirm-row dt {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--openbot-space-2);
+  color: var(--openbot-text-secondary);
+}
+
+.credit-confirm-row dd {
+  min-width: 0;
+  margin: 0;
+  color: var(--openbot-text-primary);
+}
+
+.credit-confirm-discount dd {
+  color: var(--credit-tier);
+  font-weight: var(--openbot-weight-medium);
+}
+
+.credit-confirm-target {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--openbot-space-2);
+}
+
+.credit-confirm-target-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.credit-confirm-total dt,
+.credit-confirm-total dd {
+  color: var(--openbot-text-primary);
+  font-size: var(--openbot-text-lg);
+  font-weight: var(--openbot-weight-semibold);
+}
+
+.credit-confirm-pay {
+  width: 100%;
+  height: 52px;
+  font-variant-numeric: tabular-nums;
+}
+
+.credits-section-icon {
+  width: 32px;
+  height: 32px;
+}
+
+.credit-activity-icon {
+  display: grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  flex: none;
+  border-radius: var(--openbot-radius-md);
+  background: var(--openbot-bg-control);
+  color: var(--openbot-text-primary);
+}
+
+.credit-activity-icon svg,
+.credit-activity-icon .maker-logo {
+  width: 16px;
+  height: 16px;
+}
+
+.credit-activity-title {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--openbot-space-2);
+  min-width: 0;
+}
+
+.credit-activity-amount {
+  font-variant-numeric: tabular-nums;
+  font-weight: 600;
+  color: var(--openbot-text-primary);
+  white-space: nowrap;
+}
+
+.credit-activity-amount[data-positive] {
+  color: var(--openbot-success-text);
+}
+
+.credit-activity-amount[data-pending] {
+  color: var(--openbot-text-dim);
+}
+
+.credit-activity-more {
+  justify-self: center;
+  margin-block-start: var(--openbot-space-2);
+}
+
+.credit-redeem-confetti .ui-confetti {
+  z-index: calc(var(--openbot-layer-dialog-host) + 1);
+}
+
+.hosted-upsell-modal.credit-redeem-modal {
+  position: relative;
+  width: min(460px, 100%);
+  gap: var(--openbot-space-4);
+  overflow: hidden;
+  background:
+    radial-gradient(120% 70% at 50% 0%, color-mix(in srgb, var(--credit-tier) 16%, transparent), transparent 70%),
+    var(--openbot-bg-sidebar);
+}
+
+.credit-redeem-anchor {
+  position: absolute;
+  top: 35%;
+  width: 1px;
+  height: 1px;
+}
+
+.credit-redeem-anchor[data-side="start"] {
+  inset-inline-start: 8%;
+}
+
+.credit-redeem-anchor[data-side="end"] {
+  inset-inline-end: 8%;
+}
+
+.credit-redeem-form,
+.credit-redeem-won {
+  display: grid;
+  justify-items: center;
+  gap: var(--openbot-space-4);
+}
+
+.credit-redeem-won {
+  gap: var(--openbot-space-3);
+  animation: credit-rise var(--openbot-duration-dialog) var(--openbot-ease-out) both;
+}
+
+.credit-redeem-won .credit-move-submit {
+  margin-top: var(--openbot-space-2);
+}
+
+.credit-redeem-field {
+  display: grid;
+  gap: var(--openbot-space-1-5);
+  width: 100%;
+}
+
+.credit-redeem-modal[data-status="error"] .credit-redeem-field {
+  animation: credit-shake 0.4s var(--openbot-ease-in-out);
+}
+
+.credit-redeem-input {
+  font-family: var(--openbot-font-mono);
+  font-size: var(--openbot-text-lg);
+  letter-spacing: 0.12em;
+  text-align: center;
+  text-transform: uppercase;
+}
+
+.credit-redeem-error {
+  margin: 0;
+  color: var(--openbot-danger);
+  font-size: var(--openbot-text-sm);
+  text-align: center;
+}
+
+.credit-redeem-star {
+  position: relative;
+  display: grid;
+  place-items: center;
+  width: 112px;
+  height: 112px;
+  justify-self: center;
+}
+
+.credit-redeem-star[data-size="md"] {
+  width: 72px;
+  height: 72px;
+}
+
+.credit-redeem-rays {
+  position: absolute;
+  inset: -40%;
+  border-radius: var(--openbot-radius-pill);
+  background:
+    radial-gradient(closest-side, color-mix(in srgb, var(--credit-tier) 55%, transparent), transparent 70%),
+    repeating-conic-gradient(
+      from 0deg,
+      color-mix(in srgb, var(--credit-tier) 28%, transparent) 0deg 8deg,
+      transparent 8deg 22deg
+    );
+  mask-image: radial-gradient(closest-side, var(--openbot-text-primary) 40%, var(--openbot-transparent) 100%);
+  animation: credit-redeem-spin 14s linear infinite;
+  pointer-events: none;
+}
+
+.credit-redeem-star[data-size="md"] .credit-redeem-rays {
+  inset: -25%;
+  opacity: 0.7;
+}
+
+.credit-redeem-star-icon.credit-icon {
+  position: relative;
+  width: 64%;
+  height: 64%;
+  background: linear-gradient(145deg, var(--openbot-credit-star), var(--credit-tier));
+  animation: credit-redeem-burst var(--openbot-duration-dialog) var(--openbot-ease-out) both;
+}
+
+.credit-redeem-amount {
+  display: flex;
+  align-items: baseline;
+  justify-content: center;
+  gap: var(--openbot-space-2);
+  margin: 0;
+  font-size: var(--openbot-text-display);
+  font-weight: var(--openbot-weight-semibold);
+}
+
+.credit-redeem-count {
+  background: linear-gradient(180deg, var(--openbot-text-primary) 35%, var(--credit-tier));
+  background-clip: text;
+  color: var(--openbot-transparent);
+  font-variant-numeric: tabular-nums;
+}
+
+.credit-redeem-count * {
+  color: inherit;
+}
+
+.credit-redeem-after {
+  justify-content: center;
+}
+
+.credit-redeem-after-logo {
+  width: 18px;
+  height: 18px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .credit-page,
+  .credit-split,
+  .credit-move-swap svg,
+  .credit-page .credit-stop,
+  .credit-page .credit-stop::after,
+  .credit-slider-field .ui-slider-thumb,
+  .credit-slider-field .ui-slider-track::after {
+    transition: none;
+  }
+
+  .credit-split,
+  .credit-pack,
+  .credit-popular,
+  .credit-chip-save,
+  .credit-price-was,
+  .credit-price-was::after,
+  .credit-move-amount[data-invalid],
+  .credit-move-route[data-swapped] > .credit-move-chip,
+  .credit-confirm-badge,
+  .credit-confirm-row,
+  .credit-redeem-won,
+  .credit-redeem-rays,
+  .credit-redeem-star-icon.credit-icon,
+  .credit-redeem-modal[data-status="error"] .credit-redeem-field {
+    animation: none;
+  }
+}

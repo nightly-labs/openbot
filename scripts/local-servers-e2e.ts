@@ -1,13 +1,3 @@
-// Creates two servers on this computer in a running dev app, and checks that each one is a separate
-// workspace in its own child process. The first server comes from the add menu, as a user creates it;
-// the second from the same IPC call. The check then switches between Local and both
-// servers with Cmd+1..9, stops one child the hard way and waits for the supervisor to start it again,
-// restarts the other one, fills this computer up to its limit and checks that one more is refused, and
-// deletes them all. A deleted server's user data and agent folder must be in
-// the Trash, not removed. Records the child process ids and their memory.
-// Needs `--allow-mutations`, because it creates and deletes servers in the dev profile.
-// Run: `bun scripts/local-servers-e2e.ts --allow-mutations`.
-// Writes .openbot-build/local-servers-e2e/report.json and screenshots.
 import assert from "node:assert/strict";
 import { execFileSync } from "node:child_process";
 import { existsSync, mkdirSync, readdirSync, writeFileSync } from "node:fs";
@@ -20,7 +10,6 @@ import type { Page } from "playwright-core";
 import { assertMutationAllowed, connectToDevApp } from "./dev-automation/cdp-client";
 import { readDevInstanceRecords } from "./dev-automation/instance-registry";
 
-// The page functions below run in the app window, where the preload bridge sets this.
 declare global {
   interface Window {
     openbot: OpenBotDesktopApi;
@@ -29,8 +18,9 @@ declare global {
 
 const OUT = resolve(import.meta.dirname, "../.openbot-build/local-servers-e2e");
 const NAMES = ["E2E studio one", "E2E studio two"] as const;
-// A child's first start opens its database and its Team API. A bound on failure only.
 const START_DEADLINE_MS = 90_000;
+const STOPPED_API_URL = "http://127.0.0.1:0";
+const SUPERVISOR_RESTARTS = 3;
 const MODIFIER = process.platform === "darwin" ? "Meta" : "Control";
 
 interface Child {
@@ -67,11 +57,6 @@ async function step<T>(name: string, run: () => Promise<T>): Promise<T> {
   }
 }
 
-/**
- * The main processes of servers on this computer, found by their `--user-data-dir` under `local-servers`.
- * The path can hold spaces ("Application Support"); the server id at its end does not. Their Chromium
- * helpers carry the same flag and a `--type=`; they are not servers.
- */
 function children(): Child[] {
   const lines = execFileSync("ps", ["-axww", "-o", "pid=,rss=,command="], { encoding: "utf8" }).split("\n");
   return lines.flatMap((line) => {
@@ -98,6 +83,18 @@ async function waitForServer(page: Page, serverId: string, state: ServerSummary[
   );
 }
 
+async function waitForLocalServer(page: Page, serverId: string, phase: "stopped" | "started"): Promise<void> {
+  const deadline = Date.now() + START_DEADLINE_MS;
+  for (;;) {
+    const server = (await servers(page)).find((item) => item.id === serverId);
+    const stopped = server?.apiUrl === STOPPED_API_URL && server.state === "offline";
+    const started = server !== undefined && server.apiUrl !== STOPPED_API_URL && server.state === "online";
+    if (phase === "stopped" ? stopped : started) return;
+    assert.ok(Date.now() < deadline, `${serverId} was not ${phase} within ${START_DEADLINE_MS} ms.`);
+    await new Promise((done) => setTimeout(done, 250));
+  }
+}
+
 async function waitForActive(page: Page, serverId: string): Promise<void> {
   await page.waitForFunction(
     async (id) => (await window.openbot.servers.list()).some((s) => s.id === id && s.active),
@@ -106,7 +103,6 @@ async function waitForActive(page: Page, serverId: string): Promise<void> {
   );
 }
 
-/** Waits until the child of a server runs with a process id other than `previous`. */
 async function waitForChild(entryId: string, previous: number | null): Promise<Child> {
   const deadline = Date.now() + START_DEADLINE_MS;
   for (;;) {
@@ -117,11 +113,6 @@ async function waitForChild(entryId: string, previous: number | null): Promise<C
   }
 }
 
-/**
- * With hosted servers, the add button opens their plans, and the item is in the "Other options" menu
- * of the plans. Without them, the add button opens a menu with the item. The rail shows only with two
- * or more servers; before that, the add item is in the server menu.
- */
 async function openCreateLocalServer(page: Page): Promise<void> {
   const item = page.getByRole("menuitem", { name: en["server.local.createTitle"], exact: true });
   const otherOptions = page.getByRole("button", { name: en["server.add.otherOptions"], exact: true });
@@ -139,10 +130,6 @@ async function openCreateLocalServer(page: Page): Promise<void> {
   await item.click();
 }
 
-/**
- * The names in the Trash, or null when macOS privacy control does not let this terminal read it. The
- * terminal then needs Full Disk Access.
- */
 function trashEntries(): string[] | null {
   try {
     return readdirSync(join(homedir(), ".Trash"));
@@ -152,7 +139,6 @@ function trashEntries(): string[] | null {
   }
 }
 
-/** The Trash holds a moved folder under its name, or its name with a number when the name is in use. */
 function inTrash(entries: readonly string[], path: string): boolean {
   const name = basename(path);
   return entries.some((entry) => entry === name || entry.startsWith(`${name} `));
@@ -250,10 +236,33 @@ try {
     assert.ok(first);
     const stopped = first.child.pid;
     process.kill(stopped, "SIGKILL");
+    await waitForLocalServer(page, first.server.id, "stopped");
     const next = await waitForChild(first.entryId, stopped);
-    await waitForServer(page, first.server.id, "online");
+    await waitForLocalServer(page, first.server.id, "started");
     first.child = next;
     return { stoppedPid: stopped, newPid: next.pid };
+  });
+
+  await step("Retry starts a server that stopped too often", async () => {
+    const [first] = created;
+    assert.ok(first);
+    const stoppedPids: number[] = [];
+    for (let stop = 2; stop <= SUPERVISOR_RESTARTS; stop += 1) {
+      stoppedPids.push(first.child.pid);
+      process.kill(first.child.pid, "SIGKILL");
+      await waitForLocalServer(page, first.server.id, "stopped");
+      first.child = await waitForChild(first.entryId, first.child.pid);
+      await waitForLocalServer(page, first.server.id, "started");
+    }
+    const last = first.child.pid;
+    stoppedPids.push(last);
+    process.kill(last, "SIGKILL");
+    await waitForLocalServer(page, first.server.id, "stopped");
+    const summary = await page.evaluate((id) => window.openbot.servers.retryConnection(id), first.server.id);
+    assert.equal(summary.state, "online", "Retry did not start the stopped server.");
+    const next = await waitForChild(first.entryId, last);
+    first.child = next;
+    return { stoppedPids, newPid: next.pid };
   });
 
   await step("Restart server starts a new child", async () => {
@@ -338,8 +347,6 @@ try {
 
   report.passed = true;
 } finally {
-  // A failed step leaves its servers, also one that it did not record yet: delete each server on this
-  // computer that was not there before, so the dev profile has only what it had before.
   const known = new Set(before.map((server) => server.id));
   const left = (await servers(page).catch(() => [])).filter((server) => server.thisComputer && !known.has(server.id));
   for (const server of left)

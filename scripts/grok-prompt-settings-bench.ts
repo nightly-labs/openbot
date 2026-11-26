@@ -1,19 +1,3 @@
-// Measures what the Grok CLI features that OpenBot agents do not use cost in each request. Runs the
-// real Grok CLI through `GrokAgentClient`, with a copy of the user's Grok login (see
-// `grok-live-harness.ts`), on Grok Build Fast, in a temporary git workspace.
-// `current` is the settings that `grok-client.ts` sends. Each other variant writes keys to the
-// temporary `config.toml`, which OpenBot respects, or sets an environment value, and runs these
-// turns, each in a new session:
-//   1. a one-word reply: the main request is the fixed prefix of every request (system prompt,
-//      tools, rules) plus a short message,
-//   2. a small task with tools, which makes several requests.
-// Each variant runs with no user setup (the default) and with a copy of the user's setup: their
-// `config.toml` and the `SKILL.md` files that Grok finds in `~/.claude`, `~/.agents` and `~/.codex`.
-// The report holds, for each turn, the kind (main, title, summary), model, tools and tokens of each
-// request. Grok names a session in the background, so a title request can fall in the next turn.
-// Costs a few dozen Grok Build Fast turns. `bun run bench:grok-prompt-settings`; `--variant=<name>`
-// runs one variant; `--setup=off|on` runs one setup; `--model=<id>` replaces Grok Build Fast.
-// Writes .openbot-build/grok-prompt-settings-bench/report.json.
 import { mkdirSync, writeFileSync } from "node:fs";
 import { mkdtemp, realpath, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
@@ -40,13 +24,10 @@ const DEVELOPER_INSTRUCTIONS = "You are Ada, a careful assistant in an end-to-en
 
 interface Variant {
   name: string;
-  /** Dotted `config.toml` keys written to the temporary Grok home. */
   config?: Record<string, TomlValue>;
-  /** Environment values added for Grok. */
   env?: Record<string, string>;
 }
 
-/** The `config.toml` keys that turn back on each feature that `grok-client.ts` turns off. */
 const OPENBOT_SETTINGS: Record<string, TomlValue> = {
   "features.feedback": true,
   "workflows.enabled": true,
@@ -54,16 +35,9 @@ const OPENBOT_SETTINGS: Record<string, TomlValue> = {
   "compat.claude.skills": true,
 };
 
-/**
- * Features that OpenBot agents keep, measured one at a time on top of `current`. On 2026-11-07, in
- * tokens of each request: X search 1,956, the video tools 1,704, subagents 783, web search and fetch
- * 617, image edit 467, ask user question 345, image generation 232. The user kept all of them.
- * `compat.codex.skills = false` saved 23 with the user's setup.
- */
 const REFERENCES: Variant[] = [
   { name: "video-gen-off", config: { "features.video_gen": false } },
   { name: "image-gen-off", config: { "features.image_gen": false } },
-  // `features.image_edit` is a requirements-only key; the environment value turns it off.
   { name: "image-edit-off", env: { GROK_IMAGE_EDIT: "0" } },
   { name: "ask-user-question-off", config: { "features.ask_user_question": false } },
   { name: "subagents-off", config: { "subagents.enabled": false } },
@@ -82,11 +56,8 @@ interface TurnReport {
   status: string | null;
   error: string | null;
   requests: GrokRequest[];
-  /** The input tokens of the first main request: the prompt that each request repeats. */
   firstRequestPrompt: number;
-  /** The input tokens of the turn's main requests. */
   mainPrompt: number;
-  /** The input tokens of all requests of the turn, title and summary requests included. */
   totalPrompt: number;
 }
 

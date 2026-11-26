@@ -1,18 +1,3 @@
-// Transcribes spoken English with the real transcription service, sherpa-onnx addon and local
-// dictation models, without the app window. Each model downloads to the directory the dev app uses,
-// with the pinned checksums. macOS `say` speaks the samples in Samantha, a voice that every Mac has;
-// the default voice can be a novelty voice that no model understands. A model that takes a fixed
-// language also gets German (Anna) and Polish (Ewa) samples with that language selected.
-//
-// The host runs in Electron as Node through `child_process.fork`, as in `voice-speech-smoke.ts`.
-// A Bun parent and an Electron child share only JSON messages, so the PCM bytes go as an array of
-// numbers, and a listener that runs before the host's listener makes them a `Uint8Array` again.
-//
-// Writes `report.json` to `.openbot-build/voice-transcription-smoke/`.
-// Run `bun run voice:prepare-runtime` first. macOS only.
-//
-//   bun scripts/voice-transcription-smoke.ts [model id...]   (default: parakeet-unified-en-0.6b)
-
 import { execFileSync, fork } from "node:child_process";
 import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
@@ -46,7 +31,6 @@ const RESOURCES_ROOT = resolve(".openbot-build/voice");
 const OUTPUT = resolve(".openbot-build/voice-transcription-smoke");
 const HOST = resolve("src/main/voice-transcription-host.ts");
 const ELECTRON = resolve("node_modules/electron/dist/Electron.app/Contents/MacOS/Electron");
-/** The same directories as the dev app in `application-services.ts`. */
 const MODEL_DIRECTORIES: Record<LocalVoiceModelId, string> = {
   "parakeet-tdt-0.6b-v3": join(RESOURCES_ROOT, "model"),
   "parakeet-unified-en-0.6b": join(RESOURCES_ROOT, PARAKEET_UNIFIED_MODEL_DIRECTORY),
@@ -54,19 +38,41 @@ const MODEL_DIRECTORIES: Record<LocalVoiceModelId, string> = {
   "whisper-turbo": join(RESOURCES_ROOT, WHISPER_TURBO_MODEL_DIRECTORY),
   "cohere-transcribe-03-2026": join(RESOURCES_ROOT, COHERE_TRANSCRIBE_MODEL_DIRECTORY),
 };
-/** Synthetic speech is clear, so a model that works gets nearly every word. */
 const MAXIMUM_WORD_ERROR_RATE = 0.15;
-/** Makes the JSON array of `pcm` a `Uint8Array` before the host checks the request. */
 const PCM_FROM_JSON = `data:text/javascript,process.prependListener("message",(m)=>{if(m&&typeof m==="object"&&Array.isArray(m.pcm))m.pcm=Uint8Array.from(m.pcm)});`;
 const FAILURES: readonly VoiceTranscriptionFailure[] = ["runtime-unavailable", "model-load-failed", "inference-failed"];
 
 const logger = createOpenBotLogger("voice-transcription-smoke");
 
-/**
- * Each sample starts with a short word: a model that loses the first word fails here. The English
- * samples use automatic, so a model with its own languages must fall back to English.
- */
-const SAMPLES: readonly { name: string; text: string; voice: string; language: VoiceLanguage }[] = [
+const BRIEFING_SENTENCES = [
+  "Please open the settings and turn on dark mode.",
+  "Read the latest reply from the team and summarize it for me.",
+  "Yes, send the report to everyone on the project.",
+  "Can you check why the build failed on the main branch this morning? I think the new test for the login page is flaky, so please run it again and tell me what you find.",
+];
+const NO_SPEECH_SECONDS = 3;
+const noise = (index: number) => (Math.sin(index * 12.9898) * 43_758.5453) % 1;
+const NO_SPEECH_SAMPLES: Readonly<Record<string, (index: number) => number>> = {
+  silence: () => 0,
+  "room noise": (index) => 0.02 * noise(index),
+  hum: (index) => 0.1 * Math.sin((2 * Math.PI * 120 * index) / 16_000) + 0.01 * noise(index),
+  "noise bursts": (index) => (Math.floor(index / 3_200) % 3 === 0 ? 0.3 : 0.005) * noise(index),
+};
+const NO_SPEECH_LANGUAGES: readonly VoiceLanguage[] = ["pt", AUTOMATIC_VOICE_LANGUAGE];
+const BRIEFING = Array.from({ length: 27 }, () => BRIEFING_SENTENCES).flat();
+const BRIEFING_MINIMUM_SECONDS = 500;
+const WAV_BYTES_PER_SECOND = 32_000;
+
+interface Sample {
+  name: string;
+  text: string;
+  spoken?: string;
+  minimumSeconds?: number;
+  voice: string;
+  language: VoiceLanguage;
+}
+
+const SAMPLES: readonly Sample[] = [
   {
     name: "settings",
     text: "Please open the settings and turn on dark mode.",
@@ -103,6 +109,14 @@ const SAMPLES: readonly { name: string; text: string; voice: string; language: V
     voice: "Ewa",
     language: "pl",
   },
+  {
+    name: "briefing",
+    text: BRIEFING.join(" "),
+    spoken: BRIEFING.join(" [[slnc 700]] "),
+    minimumSeconds: BRIEFING_MINIMUM_SECONDS,
+    voice: "Samantha",
+    language: AUTOMATIC_VOICE_LANGUAGE,
+  },
 ];
 
 function spawnHost(): VoiceTranscriptionHostProcess {
@@ -135,11 +149,11 @@ function responseFromJson(message: unknown): VoiceTranscriptionResponse {
     if (!failure) throw new Error("The host sent an unknown error.");
     return { id: message.id, error: failure };
   }
+  if ("speech" in message && typeof message.speech === "boolean") return { id: message.id, speech: message.speech };
   if (!("text" in message) || typeof message.text !== "string") throw new Error("The host sent no text.");
   return { id: message.id, text: message.text };
 }
 
-/** Speaks the text with macOS `say` and answers the canonical 44-byte WAV that dictation sends. */
 async function spokenWav(text: string, voice: string, directory: string): Promise<Uint8Array> {
   const path = join(directory, "sample.wav");
   execFileSync("say", ["-v", voice, "-o", path, "--data-format=LEI16@16000", "--channels=1", text]);
@@ -179,6 +193,14 @@ function wav(pcm: Uint8Array): Uint8Array {
   return file;
 }
 
+function noSpeechWav(sample: (index: number) => number): Uint8Array {
+  const pcm = new Uint8Array(NO_SPEECH_SECONDS * WAV_BYTES_PER_SECOND);
+  const view = new DataView(pcm.buffer);
+  for (let index = 0; index < pcm.byteLength / 2; index += 1)
+    view.setInt16(index * 2, Math.round(Math.max(-1, Math.min(1, sample(index))) * 32_767), true);
+  return wav(pcm);
+}
+
 function words(text: string): string[] {
   return text
     .toLowerCase()
@@ -187,7 +209,6 @@ function words(text: string): string[] {
     .filter(Boolean);
 }
 
-/** Word-level edit distance divided by the number of expected words. */
 function wordErrorRate(expected: string, actual: string): number {
   const reference = words(expected);
   const hypothesis = words(actual);
@@ -214,7 +235,6 @@ async function main(): Promise<void> {
     resourcesRoot: RESOURCES_ROOT,
     modelDirectories: MODEL_DIRECTORIES,
     preferences: new VoicePreferenceStore(join(temporary, "voice-preference.json")),
-    // Cloud dictation is not used: the key stores are never loaded and nothing is encrypted.
     apiKeys: {
       elevenlabs: new VoiceApiKeyStore({
         path: join(temporary, "voice-api-key.json"),
@@ -231,7 +251,6 @@ async function main(): Promise<void> {
   const results: unknown[] = [];
   let failed = false;
   try {
-    // A sample is spoken only when a requested model uses it, so an English run needs no German or Polish voice.
     const audio = new Map<string, Uint8Array>();
     for (const modelId of modelIds.filter(isLocalVoiceModelId)) {
       const supportsLanguage = VOICE_MODELS.find((model) => model.id === modelId)?.supportsLanguage === true;
@@ -241,7 +260,8 @@ async function main(): Promise<void> {
       if (status.phase !== "ready") throw new Error(`${modelId} is not ready: ${status.phase} ${status.message ?? ""}`);
       const downloadMs = Date.now() - downloadStartedAt;
       for (const sample of samples) {
-        const wavBytes = audio.get(sample.name) ?? (await spokenWav(sample.text, sample.voice, temporary));
+        const wavBytes =
+          audio.get(sample.name) ?? (await spokenWav(sample.spoken ?? sample.text, sample.voice, temporary));
         audio.set(sample.name, wavBytes);
         await Effect.runPromise(voice.setSettings({ modelId, language: sample.language }));
         const startedAt = Date.now();
@@ -249,7 +269,9 @@ async function main(): Promise<void> {
         const transcriptionMs = Date.now() - startedAt;
         const wer = wordErrorRate(sample.text, text);
         const firstWord = words(text)[0] === words(sample.text)[0];
-        const ok = wer <= MAXIMUM_WORD_ERROR_RATE && firstWord;
+        const audioSeconds = (wavBytes.byteLength - 44) / WAV_BYTES_PER_SECOND;
+        const longEnough = audioSeconds >= (sample.minimumSeconds ?? 0);
+        const ok = wer <= MAXIMUM_WORD_ERROR_RATE && firstWord && longEnough;
         failed ||= !ok;
         results.push({
           modelId,
@@ -259,11 +281,26 @@ async function main(): Promise<void> {
           text,
           wer,
           firstWord,
+          audioSeconds,
+          longEnough,
           ok,
           transcriptionMs,
           downloadMs,
         });
-        logger.info(`${modelId} ${sample.name}: "${text}" (WER ${(wer * 100).toFixed(1)} %, ${transcriptionMs} ms)`);
+        logger.info(
+          `${modelId} ${sample.name} ${audioSeconds.toFixed(1)} s: "${text}" (WER ${(wer * 100).toFixed(1)} %, ${transcriptionMs} ms)`,
+        );
+      }
+      if (!modelId.startsWith("whisper")) continue;
+      for (const language of NO_SPEECH_LANGUAGES) {
+        await Effect.runPromise(voice.setSettings({ modelId, language }));
+        for (const [name, sample] of Object.entries(NO_SPEECH_SAMPLES)) {
+          const { text } = await Effect.runPromise(voice.transcribe(noSpeechWav(sample)));
+          const ok = text === "";
+          failed ||= !ok;
+          results.push({ modelId, sample: name, language, expected: "", text, ok });
+          logger.info(`${modelId} ${name} (${language}) with no speech: "${text}"`);
+        }
       }
     }
     await writeFile(
@@ -275,7 +312,10 @@ async function main(): Promise<void> {
     await Effect.runPromise(voice.shutdown());
     await rm(temporary, { recursive: true, force: true });
   }
-  if (failed) throw new Error("A transcription missed its first word or had too many word errors.");
+  if (failed)
+    throw new Error(
+      "A transcription missed its first word, had too many word errors, had too little audio, or wrote words from a recording with no speech.",
+    );
 }
 
 await main();

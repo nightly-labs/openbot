@@ -1,10 +1,3 @@
-/**
- * Agent settings > Instructions: the text of `AGENTS.md` at the root of a local agent's workspace, or
- * of `CLAUDE.md` in an older workspace. A bar at the top names the file and its folder; under it the
- * page shows the file as formatted text. Edit puts the whole file in a field on the same page. The
- * agent reads the file in each session and can change it, so the page reads it again after each turn.
- */
-
 import { INPUT_LIMITS } from "@openbot/contracts/input-limits";
 import type { AgentInstructionsFile } from "@openbot/contracts/ipc";
 import { Button, FileText, FolderOpen, IconButton, Textarea } from "@openbot/ui";
@@ -18,30 +11,20 @@ import { MarkdownMessageText } from "./MarkdownMessageText";
 
 const LIMIT = INPUT_LIMITS.agentInstructionsFile;
 
-/** The calls of the computer that runs the agent. */
 export interface AgentInstructionsFileCalls {
   read: (agentId: string) => Promise<AgentInstructionsFile>;
-  /** `expected` is the file text that the edit started from. */
   save: (agentId: string, text: string, expected: string) => Promise<AgentInstructionsFile>;
-  /** Calls `watcher` after each save. Returns the call that stops it. */
   watch: (watcher: (agentId: string, file: AgentInstructionsFile) => void) => () => void;
 }
 
 export interface AgentInstructionsCalls extends AgentInstructionsFileCalls {
-  /** Opens a link of the formatted text. */
   openLink: (url: string) => void;
-  /**
-   * Shows the file in the file manager. Main finds the file from the agent id. Absent when the file is
-   * on another computer.
-   */
   reveal?: ((agentId: string) => Promise<void>) | undefined;
 }
 
 export function AgentInstructionsView(props: {
   agentId: string;
-  /** The workspace folder. The file is at its root. */
   folder?: string | undefined;
-  /** The agent has a turn now. When it ends, the page reads the file again. */
   working: boolean;
   calls: AgentInstructionsCalls;
   onBack: () => void;
@@ -51,7 +34,6 @@ export function AgentInstructionsView(props: {
   const [file, setFile] = createSignal<AgentInstructionsFile | null>(null);
   const [error, setError] = createSignal<string | null>(null);
   const [editing, setEditing] = createSignal(false);
-  /** The agent whose file the page shows. A late answer for the agent shown before is dropped. */
   let shown: string | undefined;
   let request = 0;
 
@@ -198,12 +180,6 @@ export function AgentInstructionsView(props: {
   );
 }
 
-/**
- * The whole file in a field, with Cancel and Save. Cmd+Enter saves; Escape cancels. A save sends the
- * text that the edit started from: when the agent changed the file since then, main refuses the
- * save, and the editor keeps the user's text and says so. A second Save then replaces the agent's
- * version.
- */
 function InstructionsEditor(props: {
   agentId: string;
   initial: string;
@@ -215,7 +191,6 @@ function InstructionsEditor(props: {
   const [text, setText] = createSignal(untrack(() => props.initial));
   const [busy, setBusy] = createSignal(false);
   const [error, setError] = createSignal<string | null>(null);
-  /** The file text that the edit started from. */
   let base = untrack(() => props.initial);
   let closed = false;
 
@@ -234,8 +209,6 @@ function InstructionsEditor(props: {
     } catch (failure) {
       if (closed) return;
       const saveError = errorMessage(failure, t("error.agent.instructionsSaveFailed"));
-      // The agent can change the file while the user edits it. The user's text stays, and the next
-      // Save replaces the agent's version.
       const current = await props.calls.read(props.agentId).then(
         (file) => file.text,
         () => null,

@@ -1,11 +1,7 @@
-// The loopback MCP address that agents reach for the http servers this machine signed in to. It
-// adds the OAuth token upstream, so a provider process holds a bearer for this address only, and
-// it renews a token that the server refuses during a session.
-
 import { createHash, createHmac, randomBytes, timingSafeEqual } from "node:crypto";
 import { once } from "node:events";
 import { createServer, type Server as HttpServer, type IncomingMessage, type ServerResponse } from "node:http";
-import { isDynamicRecord, isString } from "@openbot/contracts/runtime-values";
+import { type DynamicRecord, isDynamicRecord, isString } from "@openbot/contracts/runtime-values";
 import { sourceText } from "@openbot/i18n/source";
 import { createOpenBotLogger, registerSecretValue, toLogValue } from "@openbot/logging";
 import { Effect, Semaphore } from "effect";
@@ -14,25 +10,14 @@ import { McpOperationError, mcpCall, mcpSync } from "./mcp-effects";
 
 const logger = createOpenBotLogger("mcp-oauth-proxy");
 
-/** The same limit as the GitHub proxy. The body is kept whole, so a refused request can be sent again. */
 const MAX_BODY_BYTES = 4 * 1024 * 1024;
-/** A tool call can run long. The limit only stops a server that never answers. */
 const POST_HEADER_TIMEOUT_MS = 5 * 60_000;
-/** A GET opens a stream and a DELETE ends a session; both answer at once when the server is up. */
 const OTHER_HEADER_TIMEOUT_MS = 30_000;
 const MAX_REDIRECTS = 3;
-/** The JSON-RPC code that MCP servers use for a request they refuse without a sign-in. */
 const SIGN_IN_NEEDED_CODE = -32001;
-/** An `initialize` request is small. A larger body goes through as it is. */
 const MAX_INITIALIZE_BYTES = 64 * 1024;
-/** The longest agent name in the client title, so that a server does not cut "(OpenBot)" off. */
 const MAX_AGENT_NAME_LENGTH = 80;
 
-/**
- * The headers of the Streamable HTTP transport. Every other header of the provider stays here.
- * A server of revision 2026-07-28 refuses a request without `Mcp-Method` and, for a named call,
- * `Mcp-Name`. The proxy does not change the method or the name, so the provider's values stay true.
- */
 const FORWARDED_REQUEST_HEADERS = [
   "accept",
   "content-type",
@@ -42,11 +27,9 @@ const FORWARDED_REQUEST_HEADERS = [
   "mcp-name",
   "last-event-id",
 ];
-/** The `Mcp-Param-{Name}` headers that a tool of revision 2026-07-28 asks for in its input schema. */
 const FORWARDED_REQUEST_HEADER_PREFIX = "mcp-param-";
 const FORWARDED_RESPONSE_HEADERS = ["content-type", "cache-control", "mcp-session-id", "mcp-protocol-version"];
 
-/** The port and the secret, kept so that a session resumed after a restart reaches the same address. */
 export interface McpOAuthProxySettings {
   port: number | null;
   secret: string;
@@ -57,73 +40,44 @@ export interface McpOAuthProxySettingsStore {
   write: (settings: McpOAuthProxySettings) => Effect.Effect<void, McpOperationError>;
 }
 
-/** Where one route goes right now. */
 export interface McpOAuthProxyTarget {
-  /** The row address. Its fragment, when it has one, names the account of the sign-in. */
   url: string;
-  /** The headers the user wrote on the row. They are added here, not given to the provider. */
   headers: ReadonlyArray<{ key: string; value: string }>;
   token: string;
 }
 
 export interface McpOAuthProxyOptions {
-  /** `null` in a test: the port and the secret then change at each start. */
   settings: McpOAuthProxySettingsStore | null;
-  /**
-   * The upstream of a route, read for each request, or `null` when no enabled row has the route
-   * or this machine holds no token for it. A removed, turned-off or signed-out server is refused
-   * at once, with no list of routes to keep current.
-   */
   target: (route: string) => Effect.Effect<McpOAuthProxyTarget | null, McpOperationError>;
-  /** A new token after the server refused `rejected`, or `null`. See `McpOAuth.refreshAccessToken`. */
   refresh: (url: string, rejected: string) => Effect.Effect<string | null, McpOperationError>;
-  /** What the proxy tells a server about the client. Without it, the provider's own `clientInfo` goes through. */
+  scopeRefused: (url: string, rejected: string, scope: string | null) => Effect.Effect<void, McpOperationError>;
+  signInEnded: (url: string) => boolean;
   client?: McpOAuthProxyClient;
 }
 
-/** The client that a server sees: OpenBot, and the agent of the route when it has one. */
 interface McpOAuthProxyClient {
   version: string;
-  /** The current name of the agent whose key is `agentKey`, or `null` when no agent has it now. */
   agentName: (agentKey: string) => string | null;
 }
 
-/** The address and the bearer that one provider process is given for one route. */
 export interface McpOAuthProxyRoute {
   url: string;
   bearer: string;
 }
 
-/**
- * A loopback pass-through for the Streamable HTTP transport.
- *
- * Bytes go through unchanged, event streams included, because the provider and the server speak
- * MCP to each other. This class changes the credential, and it names OpenBot and the agent as the
- * client in the `clientInfo` of `initialize`. Each route has its own bearer, made
- * from the secret, so a bearer that one row's provider holds opens no other route. An agent route
- * adds the agent key to the path and to the bearer; the route without one stays valid for the
- * sessions that hold it.
- *
- * **Never a 401.** A provider that gets a 401 starts its own OAuth sign-in against this address,
- * which has no metadata, and reports a broken server. A sign-in that is gone gets a JSON-RPC error
- * that the agent can read instead.
- */
 export class McpOAuthProxy {
   readonly #options: McpOAuthProxyOptions;
   readonly #starting = Semaphore.makeUnsafe(1);
   #server: HttpServer | null = null;
   #port: number | null = null;
   #secret: string | null = null;
+  readonly #failedStarts = new Map<string, boolean>();
+  readonly #attempts = new Map<string, number>();
 
   constructor(options: McpOAuthProxyOptions) {
     this.#options = options;
   }
 
-  /**
-   * The address and the bearer of `route` for the agent with `agentKey` (`mcpOAuthProxyAgentKey`),
-   * after the listener is up. Every caller shares one start, so two hand-offs at once do not bind
-   * two ports.
-   */
   readonly route = Effect.fn("McpOAuthProxy.route")(function* (
     this: McpOAuthProxy,
     route: string,
@@ -133,14 +87,20 @@ export class McpOAuthProxy {
     const path = agentKey ? `${route}/${agentKey}` : route;
     const bearer = routeBearer(secret, path);
     registerSecretValue(bearer);
-    return { url: `http://127.0.0.1:${port}/mcp/${path}`, bearer };
+    let attempt = this.#attempts.get(path) ?? 0;
+    if (this.#failedStarts.delete(path)) this.#attempts.set(path, ++attempt);
+    return { url: `http://127.0.0.1:${port}/mcp/${path}${attempt > 0 ? `?attempt=${attempt}` : ""}`, bearer };
   });
 
-  /**
-   * A digest of the port and the secret, or `null` before the listener is up. The Codex tool
-   * manifest records it: a session that holds the address of another port must be replaced, because
-   * Codex keeps the configuration of a resumed session.
-   */
+  failedStart(route: string): boolean {
+    for (const [path, reported] of this.#failedStarts) if (!reported && onRoute(path, route)) return true;
+    return false;
+  }
+
+  reportedFailedStart(route: string): void {
+    for (const path of this.#failedStarts.keys()) if (onRoute(path, route)) this.#failedStarts.set(path, true);
+  }
+
   readonly identity = Effect.fn("McpOAuthProxy.identity")(function* (this: McpOAuthProxy) {
     const { port, secret } = yield* this.#start();
     return createHash("sha256").update(`${port}\u0000${secret}`).digest("hex");
@@ -151,10 +111,11 @@ export class McpOAuthProxy {
     this.#server = null;
     this.#port = null;
     this.#secret = null;
+    this.#failedStarts.clear();
+    this.#attempts.clear();
     if (!server) return;
     yield* Effect.callback<void>((resume) => {
       server.close(() => resume(Effect.void));
-      // An event stream stays open as long as the server sends nothing, so `close` alone never ends.
       server.closeAllConnections();
     });
   });
@@ -172,8 +133,6 @@ export class McpOAuthProxy {
           server.close();
           return yield* new McpOperationError({ cause: new Error("The MCP sign-in proxy has no loopback port.") });
         }
-        // Sessions resumed with the old address send the old bearers to a port that another program
-        // may hold now. A new secret makes those bearers worthless.
         const secret =
           saved && (saved.port === null || saved.port === address.port)
             ? saved.secret
@@ -222,7 +181,6 @@ export class McpOAuthProxy {
     response: ServerResponse,
   ) {
     yield* this.#answer(request, response).pipe(
-      // A provider that closed its own connection, an event stream for example, is not a failure.
       Effect.catch((error) => (response.destroyed ? Effect.void : answerFailure(response, error))),
     );
   });
@@ -234,16 +192,14 @@ export class McpOAuthProxy {
   ) {
     const port = this.#port;
     const secret = this.#secret;
-    // A page in a browser can reach a loopback port. It cannot send a matching `Host` through DNS
-    // rebinding, and it cannot know a bearer, so both are checked before anything else is read.
     if (port === null || secret === null || !allowedHost(request.headers.host, port)) return refuse(response, 403);
     const controller = new AbortController();
-    // The provider closed the connection: the upstream request and its event stream end too. This is
-    // set before the first wait, so a close during a token refresh is not missed.
     response.once("close", () => controller.abort());
-    const [, route, agentKey] = /^\/mcp\/([0-9a-f]{32})(?:\/([0-9a-f]{32}))?$/u.exec(request.url ?? "") ?? [];
-    if (!route || !authorized(request, routeBearer(secret, agentKey ? `${route}/${agentKey}` : route)))
-      return refuse(response, 403);
+    const [, route, agentKey] =
+      /^\/mcp\/([0-9a-f]{32})(?:\/([0-9a-f]{32}))?(?:\?[^#]*)?$/u.exec(request.url ?? "") ?? [];
+    if (!route) return refuse(response, 403);
+    const path = agentKey ? `${route}/${agentKey}` : route;
+    if (!authorized(request, routeBearer(secret, path))) return refuse(response, 403);
     const method = request.method ?? "";
     if (method !== "POST" && method !== "GET" && method !== "DELETE") {
       response.writeHead(405, { allow: "POST, GET, DELETE" });
@@ -252,12 +208,66 @@ export class McpOAuthProxy {
     }
     const read = method === "POST" ? yield* readBody(request) : null;
     if (read === "too-large") return refuse(response, 413);
+    const start = { answered: false };
+    const relay = this.#relay(request, response, method, read, route, agentKey ?? null, controller, start);
+    if (!read || initializeRequest(read, request) === null) return yield* relay;
+    yield* relay.pipe(
+      Effect.ensuring(
+        Effect.sync(() => {
+          if (start.answered) this.#failedStarts.delete(path);
+          else this.#failedStarts.set(path, false);
+        }),
+      ),
+    );
+  });
+
+  readonly #relay = Effect.fn("McpOAuthProxy.relay")(function* (
+    this: McpOAuthProxy,
+    request: IncomingMessage,
+    response: ServerResponse,
+    method: string,
+    read: Buffer | null,
+    route: string,
+    agentKey: string | null,
+    controller: AbortController,
+    start: { answered: boolean },
+  ): Effect.fn.Return<void, McpOperationError> {
     const target = yield* this.#options.target(route);
-    if (!target) return signInNeeded(response, method, read);
+    if (!target) return refuseRequests(response, method, read, sourceText("error.backend.mcpOAuthSignInNeeded"));
     const client = this.#options.client;
-    const body = read && client ? yield* mcpSync(() => withClientInfo(read, request, client, agentKey ?? null)) : read;
-    const upstream = yield* this.#forward(target, request, method, body, controller);
-    if (!upstream) return signInNeeded(response, method, body);
+    const body = read && client ? yield* mcpSync(() => withClientInfo(read, request, client, agentKey)) : read;
+    const { answer: upstream, token } = yield* this.#forward(target, request, method, body, controller);
+    if (upstream instanceof Response && upstream.status === 403) {
+      const scope = insufficientScopeChallenge(upstream.headers.get("www-authenticate") ?? "");
+      if (scope !== undefined) {
+        yield* discard(upstream);
+        yield* this.#options.scopeRefused(target.url, token, scope);
+        logger.warn("The MCP server asked for more access than the sign-in of this computer gives.");
+        return refuseRequests(response, method, body, sourceText("error.backend.mcpOAuthScopeNeeded"));
+      }
+    }
+    if (!(upstream instanceof Response)) {
+      const ended = this.#options.signInEnded(target.url);
+      logger.warn("The MCP server refused a request with the sign-in of this computer.", {
+        challengeError: upstream.challengeError,
+        renewed: upstream.renewed,
+        signInActive: !ended,
+      });
+      const message = ended
+        ? sourceText("error.backend.mcpOAuthSignInNeeded")
+        : upstream.renewed
+          ? sourceText("error.backend.mcpOAuthRequestRefused")
+          : sourceText("error.backend.mcpOAuthRenewalFailed");
+      return refuseRequests(response, method, body, message);
+    }
+    const refused = upstream.status === 400 && method === "POST" ? notificationMethods(body) : null;
+    if (refused) {
+      yield* discard(upstream);
+      logger.warn("The MCP server refused a notification. The sign-in proxy accepted it.", { methods: refused });
+      response.writeHead(202);
+      response.end();
+      return;
+    }
     const headers: Record<string, string> = {};
     for (const name of FORWARDED_RESPONSE_HEADERS) {
       const value = upstream.headers.get(name);
@@ -265,6 +275,7 @@ export class McpOAuthProxy {
     }
     response.writeHead(upstream.status, headers);
     response.flushHeaders();
+    start.answered = upstream.ok;
     if (!upstream.body) {
       response.end();
       return;
@@ -273,7 +284,6 @@ export class McpOAuthProxy {
     yield* mcpCall(() => pipeBody(stream, response, controller.signal));
   });
 
-  /** The upstream answer, with one renewed token after a 401. `null` when the sign-in is gone. */
   readonly #forward = Effect.fn("McpOAuthProxy.forward")(function* (
     this: McpOAuthProxy,
     target: McpOAuthProxyTarget,
@@ -281,30 +291,31 @@ export class McpOAuthProxy {
     method: string,
     body: Buffer | null,
     controller: AbortController,
-  ): Effect.fn.Return<Response | null, McpOperationError> {
+  ): Effect.fn.Return<{ answer: Response | UpstreamRefusal; token: string }, McpOperationError> {
     const first = yield* send(target, target.token, request, method, body, controller);
-    if (first.status !== 401) return first;
+    if (first.status !== 401) return { answer: first, token: target.token };
     yield* discard(first);
     const renewed = yield* this.#options.refresh(target.url, target.token);
-    if (!renewed) return null;
+    if (!renewed) return { answer: { challengeError: challengeError(first), renewed: false }, token: target.token };
     const second = yield* send(target, renewed, request, method, body, controller);
-    if (second.status !== 401) return second;
+    if (second.status !== 401) return { answer: second, token: renewed };
     yield* discard(second);
-    return null;
+    return { answer: { challengeError: challengeError(second), renewed: true }, token: renewed };
   });
 }
 
-/** The bearer of one route: a keyed digest, so no table of bearers is kept or written anywhere. */
+function onRoute(path: string, route: string): boolean {
+  return path === route || path.startsWith(`${route}/`);
+}
+
 function routeBearer(secret: string, route: string): string {
   return createHmac("sha256", secret).update(route).digest("base64url");
 }
 
-/** The route of one row. A new URL is a new route, so a session that holds the old one is refused. */
 export function mcpOAuthProxyRoute(mcpServerId: string, url: string): string {
   return createHash("sha256").update(`${mcpServerId}\u0000${url}`).digest("hex").slice(0, 32);
 }
 
-/** The path segment of one agent. Agent ids are not all hex, and the path does not show them. */
 export function mcpOAuthProxyAgentKey(agentId: string): string {
   return createHash("sha256").update(`agent\u0000${agentId}`).digest("hex").slice(0, 32);
 }
@@ -316,13 +327,7 @@ interface ClientInfo {
   websiteUrl: string;
 }
 
-/**
- * OpenBot as the MCP client. The name is fixed, so a server can know OpenBot; the title names the
- * agent, read at each `initialize`, so a rename shows in the next session.
- */
 function clientInfo(client: McpOAuthProxyClient, agentKey: string | null): ClientInfo {
-  // Control characters and line breaks would break a label that a server shows on one line, and
-  // direction marks could make it read as the name of another agent.
   const agentName = agentKey ? client.agentName(agentKey) : null;
   const name = agentName
     ? Array.from(agentName.replace(/[\p{Cc}\p{Zl}\p{Zp}\u200E\u200F\u202A-\u202E\u2066-\u2069]+/gu, " ").trim())
@@ -338,29 +343,30 @@ function clientInfo(client: McpOAuthProxyClient, agentKey: string | null): Clien
   };
 }
 
-/**
- * The body with OpenBot as the `clientInfo` when it is an `initialize` request. Any other body is
- * returned as it is. MCP does not let `initialize` be part of a batch, so a batch is not read.
- */
+function initializeRequest(body: Buffer, request: IncomingMessage): DynamicRecord | null {
+  if (
+    body.length > MAX_INITIALIZE_BYTES ||
+    !request.headers["content-type"]?.toLowerCase().includes("json") ||
+    !body.includes('"initialize"')
+  )
+    return null;
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(body.toString("utf8"));
+  } catch {
+    return null;
+  }
+  return isDynamicRecord(parsed) && parsed.method === "initialize" ? parsed : null;
+}
+
 function withClientInfo(
   body: Buffer,
   request: IncomingMessage,
   client: McpOAuthProxyClient,
   agentKey: string | null,
 ): Buffer {
-  if (
-    body.length > MAX_INITIALIZE_BYTES ||
-    !request.headers["content-type"]?.toLowerCase().includes("json") ||
-    !body.includes('"initialize"')
-  )
-    return body;
-  let parsed: unknown;
-  try {
-    parsed = JSON.parse(body.toString("utf8"));
-  } catch {
-    return body;
-  }
-  if (!isDynamicRecord(parsed) || parsed.method !== "initialize" || !isDynamicRecord(parsed.params)) return body;
+  const parsed = initializeRequest(body, request);
+  if (parsed === null || !isDynamicRecord(parsed.params)) return body;
   const params = { ...parsed.params, clientInfo: clientInfo(client, agentKey) };
   return Buffer.from(JSON.stringify({ ...parsed, params }));
 }
@@ -382,7 +388,6 @@ function refuse(response: ServerResponse, status: number): void {
   response.end(JSON.stringify({ error: status === 413 ? "request_too_large" : "forbidden" }));
 }
 
-/** The whole request body, or `"too-large"`. */
 const readBody = Effect.fn("McpOAuthProxy.readBody")(function* (request: IncomingMessage) {
   return yield* mcpCall(async () => {
     const chunks: Buffer[] = [];
@@ -400,10 +405,6 @@ const readBody = Effect.fn("McpOAuthProxy.readBody")(function* (request: Incomin
   });
 });
 
-/**
- * One request to the server, after the same-origin 307 and 308 redirects. Any other redirect is
- * refused: it would send the token to another address, or change a POST into a GET.
- */
 const send = Effect.fn("McpOAuthProxy.send")(function* (
   target: McpOAuthProxyTarget,
   token: string,
@@ -415,7 +416,6 @@ const send = Effect.fn("McpOAuthProxy.send")(function* (
   const headers = yield* mcpSync(() => upstreamHeaders(target, token, request));
   const origin = new URL(target.url).origin;
   let url = new URL(target.url);
-  // The fragment names the account on this machine. It does not go upstream.
   url.hash = "";
   for (let hop = 0; ; hop += 1) {
     const answer = yield* upstreamFetch(
@@ -442,10 +442,6 @@ function upstreamHeaders(target: McpOAuthProxyTarget, token: string, request: In
   for (const { key, value } of target.headers) {
     if (key.trim().toLowerCase() !== "authorization") headers.set(key.trim(), value);
   }
-  // A `User-Agent` that the user wrote on the row is kept. The provider's own does not go upstream.
-  // There is no `OpenBot/<version>` default: n8n answers each `User-Agent` with "bot" in it
-  // with an empty 204 (#6497). `clientInfo` names OpenBot.
-  // Node gives the request header names in lowercase.
   for (const [name, value] of Object.entries(request.headers)) {
     if (
       isString(value) &&
@@ -457,7 +453,6 @@ function upstreamHeaders(target: McpOAuthProxyTarget, token: string, request: In
   return headers;
 }
 
-/** A fetch that is abandoned when the headers take longer than `timeoutMs`. The body has no limit. */
 function upstreamFetch(
   url: URL,
   init: RequestInit,
@@ -468,24 +463,40 @@ function upstreamFetch(
     const timer = setTimeout(() => controller.abort(new Error("The MCP server did not answer in time.")), timeoutMs);
     try {
       return await fetch(url, { ...init, signal: controller.signal });
+    } catch (error) {
+      if (controller.signal.aborted || !notConnected(error)) throw error;
+      logger.info("A connection to the MCP server could not be opened. It is tried once more.", {
+        cause: toLogValue(error),
+      });
+      return await fetch(url, { ...init, signal: controller.signal });
     } finally {
       clearTimeout(timer);
     }
   });
 }
 
+function notConnected(error: unknown): boolean {
+  for (let current = error, depth = 0; current instanceof Error && depth < 4; current = current.cause, depth += 1) {
+    if (isDynamicRecord(current)) {
+      const { code, syscall } = current;
+      if (code === "UND_ERR_CONNECT_TIMEOUT" || code === "EAI_AGAIN" || syscall === "connect") return true;
+    }
+    if (current instanceof AggregateError && current.errors.length > 0 && current.errors.every(notConnected))
+      return true;
+  }
+  return false;
+}
+
 function discard(answer: Response): Effect.Effect<void> {
   return mcpCall(() => answer.body?.cancel()).pipe(Effect.catch(() => Effect.void));
 }
 
-/** Writes the upstream body as it arrives, so each event of a stream reaches the provider at once. */
 async function pipeBody(body: ReadableStream<Uint8Array>, response: ServerResponse, signal: AbortSignal) {
   const reader = body.getReader();
   try {
     while (true) {
       const { done, value } = await reader.read();
       if (done) break;
-      // `once` removes its listeners when either event comes, and rejects when the provider is gone.
       if (!response.write(value)) await once(response, "drain", { signal });
     }
     response.end();
@@ -494,19 +505,29 @@ async function pipeBody(body: ReadableStream<Uint8Array>, response: ServerRespon
   }
 }
 
-/**
- * The answer when OpenBot holds no usable sign-in for the route: a JSON-RPC error for each request
- * in the body, so the agent reads why the tool is not there and the provider does not sign in by
- * itself. A body with notifications only is accepted, as a server would.
- */
-function signInNeeded(response: ServerResponse, method: string, body: Buffer | null): void {
+interface UpstreamRefusal {
+  challengeError: string | null;
+  renewed: boolean;
+}
+
+function challengeError(answer: Response): string | null {
+  return /\berror="?([\w.-]{1,64})/u.exec(answer.headers.get("www-authenticate") ?? "")?.[1] ?? null;
+}
+
+export function insufficientScopeChallenge(challenge: string): string | null | undefined {
+  if (!/(?:^|,)\s*bearer\b/iu.test(challenge) || !/\berror\s*=\s*"?insufficient_scope\b/iu.test(challenge))
+    return undefined;
+  const scope = /(?:^|[\s,])scope\s*=\s*(?:"([^"]{0,512})"|([^\s,"]{1,512})(?=[\s,]|$))/iu.exec(challenge);
+  return (scope?.[1] ?? scope?.[2])?.trim() || null;
+}
+
+function refuseRequests(response: ServerResponse, method: string, body: Buffer | null, message: string): void {
   if (method !== "POST") {
     response.writeHead(405, { allow: "POST" });
     response.end();
     return;
   }
   const { batch, requests } = jsonRpcRequests(body);
-  const message = sourceText("error.backend.mcpOAuthSignInNeeded");
   const errors = requests.map((id) => ({ jsonrpc: "2.0", id, error: { code: SIGN_IN_NEEDED_CODE, message } }));
   if (errors.length === 0) {
     response.writeHead(202);
@@ -517,9 +538,25 @@ function signInNeeded(response: ServerResponse, method: string, body: Buffer | n
   response.end(JSON.stringify(batch ? errors : errors[0]));
 }
 
+function notificationMethods(body: Buffer | null): string[] | null {
+  let parsed: unknown = null;
+  try {
+    parsed = body && body.length > 0 ? JSON.parse(body.toString("utf8")) : null;
+  } catch {
+    return null;
+  }
+  const messages = Array.isArray(parsed) ? parsed : [parsed];
+  const methods: string[] = [];
+  for (const item of messages) {
+    if (!isDynamicRecord(item) || !isString(item.method) || "id" in item) return null;
+    if (item.method === "notifications/initialized") return null;
+    methods.push(item.method);
+  }
+  return methods.length > 0 ? methods : null;
+}
+
 type JsonRpcId = string | number | null;
 
-/** The ids of the JSON-RPC requests in a body, and whether it was a batch. Notifications have no id. */
 function jsonRpcRequests(body: Buffer | null): { batch: boolean; requests: JsonRpcId[] } {
   let parsed: unknown = null;
   try {
@@ -540,10 +577,6 @@ function jsonRpcRequests(body: Buffer | null): { batch: boolean; requests: JsonR
   };
 }
 
-/**
- * A server that cannot be reached, a refused redirect, or a stream that broke. The cause stays in
- * the log; a stream that already started is cut, so the provider sees the end of it.
- */
 function answerFailure(response: ServerResponse, error: McpOperationError): Effect.Effect<void> {
   return Effect.sync(() => {
     logger.warn("An MCP request through the sign-in proxy failed.", { cause: toLogValue(error.cause) });

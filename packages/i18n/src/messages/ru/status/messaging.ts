@@ -1,10 +1,9 @@
 import type { PartialTranslation } from "../../../message";
 import type { messages as source } from "../../en/status/messaging";
 
-// Not translated yet: the screen shows the English text.
 export const messages = {
   "status.messaging.working": "Уже работаю…",
-  "status.messaging.queued": "Ожидание: OpenBot занят другим запросом. Ответ придёт сюда.",
+  "status.messaging.queued": "Ожидание: предыдущий запрос ещё выполняется. Ответ придёт сюда.",
   "status.messaging.busy": "В очереди слишком много запросов. Повторите попытку позже.",
   "status.messaging.failed": "OpenBot не смог завершить этот запрос. Подробности — на хосте OpenBot.",
   "status.messaging.noAnswer": "OpenBot завершил работу без письменного ответа.",
@@ -13,6 +12,7 @@ export const messages = {
   "status.messaging.stopped": "Остановлено.",
   "status.messaging.stop": "Остановить",
   "status.messaging.approvalTitle": "OpenBot просит подтверждения, чтобы продолжить.",
+  "status.messaging.approvalTitleTeammate": "Агент {agent} просит подтверждения, чтобы продолжить.",
   "status.messaging.approvalCommand": "Выполнить команду",
   "status.messaging.approvalFileChange": "Изменить файлы",
   "status.messaging.approvalPermissions": "Получить дополнительные разрешения",
@@ -35,9 +35,11 @@ export const messages = {
   "status.messaging.signInReceived": "OpenBot получил установку Slack. Эту вкладку можно закрыть.",
   "status.messaging.signInUnknown": "OpenBot не начинал эту установку Slack. Начните её заново в OpenBot.",
   "status.messaging.telegramNoAgent":
-    "Пока нет агента, который мог бы здесь ответить. Добавьте Оркестратора Telegram в OpenBot.",
+    "Пока нет агента, который мог бы здесь ответить. В OpenBot откройте Маркетплейс > Приложения > Telegram и нажмите «Добавить агента».",
   "status.messaging.telegramLinked":
     "OpenBot подключён к этому чату. Упомяните {bot} или ответьте на сообщение OpenBot, чтобы обратиться к агентам.",
+  "status.messaging.telegramNotLinked":
+    "OpenBot не подключён к этому чату. Чтобы подключить его, откройте приложение OpenBot, перейдите в Каталог → Приложения → Telegram и выберите «Добавить в группу» или «Открыть личный чат».",
   "status.messaging.telegramOrchestratorName": "Оркестратор Telegram",
   "status.messaging.telegramOrchestratorTitle": "Отвечает в Telegram и обращается к команде",
   "status.messaging.whatsappNoAgent":
@@ -52,6 +54,13 @@ export const messages = {
     "👋 *OpenBot подключён*\n\nПишите сюда, чтобы обратиться к своим агентам. WhatsApp Orchestrator отвечает сам или передаёт работу нужному агенту.\n\nОтправьте *stop*, чтобы остановить запрос.",
   "status.messaging.whatsappWelcomeDedicated":
     "👋 *OpenBot подключён*\n\nЛюди, которым вы разрешите в OpenBot, теперь могут писать на этот номер. Новый человек получит код: одобрите его в OpenBot в разделе «Запросы».\n\nОтправьте *stop*, чтобы остановить запрос.",
+  "status.messaging.whatsappOtherOpenBot":
+    "К этому номеру WhatsApp привязан ещё один OpenBot, поэтому вы можете получать два ответа. Чтобы это исправить, откройте «Связанные устройства» в WhatsApp на телефоне и выйдите из OpenBot, которым вы не пользуетесь.",
+  "status.messaging.whatsappPaused":
+    "OpenBot перестал отвечать здесь на 10 минут: за короткое время пришло слишком много сообщений. Если к этому номеру привязан ещё один OpenBot, откройте «Связанные устройства» в WhatsApp на телефоне и выйдите из OpenBot, которым вы не пользуетесь.",
+  "status.messaging.whatsappNotDelivered": "WhatsApp не принял этот ответ, поэтому человек его не получил.",
+  "status.messaging.whatsappPartlyDelivered":
+    "WhatsApp принял этот ответ не полностью, поэтому человек получил только его часть.",
   "status.messaging.whatsappOrchestratorName": "Оркестратор WhatsApp",
   "status.messaging.whatsappOrchestratorTitle": "Отвечает в WhatsApp и обращается к команде",
 } as const satisfies PartialTranslation<typeof source>;

@@ -20,12 +20,17 @@ import {
 import { type DynamicRecord, isDynamicRecord, isString } from "@openbot/contracts/runtime-values";
 import { ContextResetBusyError } from "@openbot/contracts/team-protocol/context-reset-v1";
 import { sourceText } from "@openbot/i18n/source";
-import { createOpenBotLogger, registerSecretValue, toLogValue } from "@openbot/logging";
+import { createOpenBotLogger, type LogValue, registerSecretValue, toLogValue } from "@openbot/logging";
 import { RoutineInputError } from "@openbot/team-client/routine-schedule";
 import { Effect, Exit, Schema, Scope, Semaphore } from "effect";
 import { AgentSettingsRefused } from "../backend/agent/agent-settings-refused";
-import { InactiveAttentionRequest } from "../backend/agent/inactive-attention-request";
-import { type ModelRequest, requestedRuntime } from "../backend/agent/model-tools";
+import { ForbiddenAttentionAnswer, InactiveAttentionRequest } from "../backend/agent/inactive-attention-request";
+import {
+  type ModelRequest,
+  type ProviderStatusRow,
+  requestedRuntime,
+  requireRunnableChange,
+} from "../backend/agent/model-tools";
 import type { AgentLifecycleFailed, AgentService } from "../backend/agent-service";
 import { writeFileAtomically } from "../backend/atomic-json-file";
 import { AUTOMATION_HEADERS_FILE, AUTOMATION_TOKEN_FILE, AUTOMATION_URL_FILE } from "../backend/automation-command";
@@ -38,12 +43,10 @@ import { approvalDecision, promptAnswers } from "./team-api/request-helpers";
 const logger = createOpenBotLogger("automation");
 
 const HOUR_MS = 60 * 60 * 1000;
-// A payload is at most 4,000 characters; four UTF-8 bytes each plus JSON escapes stay below this.
 const BODY_LIMIT_BYTES = 32 * 1024;
 const RUN_PATH = /^\/v1\/agents\/([^/]+)\/routines\/([^/]+)\/run$/;
 const AGENT_PATH =
   /^\/v1\/agents\/([^/]+)\/(messages|pending|settings|context\/clear|deliveries\/([^/]+)|prompts\/([^/]+)\/answer|approvals\/([^/]+)\/respond)$/;
-/** A delivery in one of these states has no more work. Its turn's answer is final. */
 const ENDED_DELIVERY_STATUSES: ReadonlySet<QueueDelivery["status"]> = new Set([
   "completed",
   "failed",
@@ -51,74 +54,53 @@ const ENDED_DELIVERY_STATUSES: ReadonlySet<QueueDelivery["status"]> = new Set([
   "cancelled",
 ]);
 
-/** A start or close that failed. It is only logged; the next `sync` tries again. */
 class AutomationServerFailed extends Schema.TaggedError<AutomationServerFailed>()("AutomationServerFailed", {
   cause: Schema.Defect(),
 }) {}
 
 const { io: automationIO, rewrap: toAutomationServerFailed } = causeHelpers(AutomationServerFailed);
 
-/** The fields of an updated agent that a script reads back. */
 export type UpdatedAgent = Pick<
   AgentSummary,
   "id" | "name" | "provider" | "model" | "reasoningEffort" | "providerAccountId"
 >;
 
 export interface AutomationServerOptions {
-  /** The folder that holds the URL and token files. Only the user can read it. */
   root: string;
   listAgents: () => readonly Pick<
     AgentSummary,
-    "id" | "name" | "allowAutomation" | "hiddenAt" | "provider" | "model" | "reasoningEffort"
+    "id" | "name" | "allowAutomation" | "provider" | "model" | "reasoningEffort"
   >[];
-  /** The account defaults; an agent with no automation setting of its own follows them. */
   agentDefaults: () => AgentDefaults;
-  /** The models that the provider CLIs list now. */
   listModels: () => AgentModelOption[];
+  providerStatuses: () => readonly ProviderStatusRow[];
   listRoutines: (agentId: string) => readonly Pick<Routine, "id" | "name" | "active">[];
   runRoutine: (input: {
     agentId: string;
     routineId: string;
     payload: string;
-    /** The open wait the event continues. Absent: the run wakes every wait it matches. */
     waitId?: string;
   }) => Effect.Effect<Pick<RoutineRun, "id" | "deliveryId">, AgentLifecycleFailed>;
   now?: () => number;
   sendMessage: AgentService["sendMessage"];
   getLocalAttention: AgentService["getLocalAttention"];
   respondToLocalAttention: AgentService["respondToLocalAttention"];
-  /** A delivery by its ID, or null when it is gone. */
   delivery: (deliveryId: string) => Pick<QueueDelivery, "recipientAgentId" | "status" | "turnId" | "error"> | null;
-  /** The answer an agent gave in one turn, or null when it gave none. */
   turnAnswer: (agentId: string, turnId: string) => string | null;
-  /** The same update as the agent's settings. It refuses a provider or account change while the agent works. */
   updateAgent: (input: UpdateAgentInput) => Effect.Effect<UpdatedAgent, { readonly cause: unknown }>;
-  /** The same as **New chat** in the agent's settings. It fails with `ContextResetBusyError` while the agent works. */
   clearAgentContext: (agentId: string) => Effect.Effect<void, { readonly cause: unknown }>;
 }
 
-/**
- * The loopback API for local scripts that work with an enabled agent.
- *
- * It listens only while at least one agent allows local scripts. A caller proves that it runs as
- * this OS user by reading the token file; the token changes at each start. A request with an
- * `Origin` header or a foreign `Host` is refused before the token is read, so a web page cannot
- * reach it through DNS rebinding. It never shows or focuses a window.
- */
 export class AutomationServer {
   readonly #options: AutomationServerOptions;
   readonly #now: () => number;
-  /** The run times of each agent in the last hour. */
   readonly #runs = new Map<string, number[]>();
   #server: Server | null = null;
   #port = 0;
   #token: Buffer = Buffer.alloc(0);
-  /** One state change at a time, in the order the calls came. */
   readonly #lock = Semaphore.makeUnsafe(1);
-  /** The background syncs that `requestSync` starts; `stop` interrupts those that still wait. */
   readonly #scope = Scope.makeUnsafe();
   #stopped = false;
-  /** False until the first close, which also removes files that a crash left behind. */
   #filesClean = false;
 
   constructor(options: AutomationServerOptions) {
@@ -126,7 +108,6 @@ export class AutomationServer {
     this.#now = options.now ?? Date.now;
   }
 
-  /** Starts or stops the listener to match the agents' setting. Calls run in order. Never fails. */
   readonly sync = Effect.fn("AutomationServer.sync")(function* (this: AutomationServer) {
     yield* this.#step(
       Effect.suspend(() => {
@@ -140,9 +121,12 @@ export class AutomationServer {
     );
   }).bind(this);
 
-  /** Starts a `sync` that nobody waits for. `stop` interrupts it while it waits for its turn. */
   readonly requestSync = Effect.fn("AutomationServer.requestSync")(function* (this: AutomationServer) {
     yield* Effect.forkIn(this.sync(), this.#scope, { startImmediately: true });
+  }).bind(this);
+
+  readonly removeStaleFiles = Effect.fn("AutomationServer.removeStaleFiles")(function* (this: AutomationServer) {
+    yield* this.#step(this.#close());
   }).bind(this);
 
   readonly stop = Effect.fn("AutomationServer.stop")(function* (this: AutomationServer) {
@@ -151,14 +135,12 @@ export class AutomationServer {
     yield* this.#step(this.#close());
   }).bind(this);
 
-  /** Never fails: a failed start is logged, and the next `sync` tries again. */
   #step(step: Effect.Effect<void, AutomationServerFailed>): Effect.Effect<void> {
     return this.#lock.withPermit(
       step.pipe(
         Effect.catch((error) =>
           Effect.sync(() => logger.warn("The automation server could not change state.", error.cause)),
         ),
-        // A step that started finishes, so the files and the listener always agree.
         Effect.uninterruptible,
       ),
     );
@@ -178,16 +160,11 @@ export class AutomationServer {
     const { root } = this.#options;
     yield* Effect.gen(function* () {
       yield* automationIO(() => mkdir(root, { recursive: true, mode: 0o700 }));
-      // `mkdir` keeps the mode of a folder that already exists.
       if (process.platform !== "win32") yield* automationIO(() => chmod(root, 0o700));
-      // The token first: a script that finds the new URL also finds the token that goes with it.
       yield* writeAutomationFile(join(root, AUTOMATION_TOKEN_FILE), token);
       yield* writeAutomationFile(join(root, AUTOMATION_HEADERS_FILE), `Authorization: Bearer ${token}\n`);
       yield* writeAutomationFile(join(root, AUTOMATION_URL_FILE), `http://127.0.0.1:${port}`);
-    }).pipe(
-      // Closed, so that the next `sync` starts again instead of keeping a door nobody can find.
-      Effect.catch((error) => Effect.andThen(this.#close(), Effect.fail(error))),
-    );
+    }).pipe(Effect.catch((error) => Effect.andThen(this.#close(), Effect.fail(error))));
     logger.info(`The automation server listens on port ${this.#port}.`);
   }).bind(this);
 
@@ -248,6 +225,7 @@ export class AutomationServer {
     } catch (error) {
       if (error instanceof HttpError) return send(response, error.status, { error: error.message });
       if (error instanceof InactiveAttentionRequest) return send(response, 409, { error: error.message });
+      if (error instanceof ForbiddenAttentionAnswer) return send(response, 403, { error: error.message });
       if (error instanceof AgentSettingsRefused) return send(response, 409, { error: error.message });
       if (error instanceof ContextResetBusyError) return send(response, 409, { error: error.message });
       logger.warn("An automation request failed.", error);
@@ -284,21 +262,19 @@ export class AutomationServer {
     }
     if (request.method !== "POST") return send(response, 405, { error: "method not allowed" });
     if (route === "context/clear") {
-      // No body: the agent is the whole request, and the busy refusal comes back as 409.
       await runCauseEffect(this.#options.clearAgentContext(agentId));
       logger.info(`A local script started a new chat with agent ${agentId}.`);
       return send(response, 200, { ok: true });
     }
     const value = await readJson(request);
-    // The setting can change while the script uploads its body.
     const agent = this.#requireAgent(agentId);
     if (route === "settings") {
       const { runtime, providerAccountId } = settingsRequest(value);
-      // The same resolution as the agent's `update_profile` tool: a model names its provider, and an
-      // effort that the new model does not support is refused or replaced by the model's default.
+      const requested = requestedRuntime(agent, runtime, this.#options.listModels());
+      requireRunnableChange(agent, requested, this.#options.providerStatuses());
       const input: UpdateAgentInput = {
         agentId,
-        ...requestedRuntime(agent, runtime, this.#options.listModels()),
+        ...requested,
         ...(providerAccountId === undefined ? {} : { providerAccountId }),
       };
       const updated = await runCauseEffect(this.#options.updateAgent(input));
@@ -315,10 +291,8 @@ export class AutomationServer {
     if (route === "messages") {
       const text = requiredString(value, "text", INPUT_LIMITS.messageText);
       const clientMessageId = requiredString(value, "clientMessageId", INPUT_LIMITS.identifier);
-      this.#requireNotHidden(agentId);
       const now = this.#takeSlot(agentId);
       try {
-        // Separate script retry keys from local UI retry keys without inventing a team member.
         const receipt = await runCauseEffect(
           this.#options.sendMessage({ agentId, text, clientMessageId: `automation:${clientMessageId}` }),
         );
@@ -337,7 +311,6 @@ export class AutomationServer {
     send(response, 200, { ok: true });
   }
 
-  /** The state of one message delivery to this agent, and the turn's answer once the delivery ended. */
   #deliveryResult(agentId: string, deliveryId: string) {
     const delivery = this.#options.delivery(deliveryId);
     if (!delivery || delivery.recipientAgentId !== agentId) throw new HttpError(404, "not found");
@@ -349,15 +322,6 @@ export class AutomationServer {
       error: delivery.error,
       answer: ended && delivery.turnId ? this.#options.turnAnswer(agentId, delivery.turnId) : null,
     };
-  }
-
-  /**
-   * A hidden agent takes no new work: no message and no routine run. An answer to a prompt or an
-   * approval of a turn that already runs is still accepted.
-   */
-  #requireNotHidden(agentId: string): void {
-    if (this.#options.listAgents().some((agent) => agent.id === agentId && agent.hiddenAt !== undefined))
-      throw new HttpError(409, sourceText("error.backend.recipientHidden"));
   }
 
   #requireAgent(agentId: string, routine = false) {
@@ -383,7 +347,6 @@ export class AutomationServer {
       return send(response, 413, { error });
     }
     this.#requireAgent(agentId, true);
-    this.#requireNotHidden(agentId);
     if (!this.#options.listRoutines(agentId).some((routine) => routine.id === routineId)) {
       return send(response, 404, { error: sourceText("error.backend.routineGone") });
     }
@@ -395,7 +358,6 @@ export class AutomationServer {
       );
     } catch (error) {
       this.#releaseSlot(agentId, now);
-      // Only a known refusal goes back to the script; another error is logged and gets a 500.
       if (error instanceof RoutineInputError) return send(response, 409, { error: error.message });
       throw error;
     }
@@ -407,7 +369,6 @@ export class AutomationServer {
     const now = this.#now();
     const recent = (this.#runs.get(agentId) ?? []).filter((time) => now - time < HOUR_MS);
     this.#runs.set(agentId, recent);
-    // The account default `automationRunsPerHour`: a script that loops cannot spend the user's quota.
     const limit = this.#options.agentDefaults().automationRunsPerHour;
     if (recent.length >= limit) {
       const params = { limit };
@@ -423,19 +384,16 @@ export class AutomationServer {
   }
 
   #listAgents() {
-    return (
-      this.#options
-        .listAgents()
-        // A hidden agent takes no new work, so a script does not see it until it is restored.
-        .filter((agent) => agentAutomationAllowed(agent, this.#options.agentDefaults()) && agent.hiddenAt === undefined)
-        .map((agent) => ({
-          id: agent.id,
-          name: agent.name,
-          routines: this.#options
-            .listRoutines(agent.id)
-            .map((routine) => ({ id: routine.id, name: routine.name, active: routine.active })),
-        }))
-    );
+    return this.#options
+      .listAgents()
+      .filter((agent) => agentAutomationAllowed(agent, this.#options.agentDefaults()))
+      .map((agent) => ({
+        id: agent.id,
+        name: agent.name,
+        routines: this.#options
+          .listRoutines(agent.id)
+          .map((routine) => ({ id: routine.id, name: routine.name, active: routine.active })),
+      }));
   }
 
   #releaseSlot(agentId: string, time: number): void {
@@ -455,7 +413,6 @@ function writeAutomationFile(path: string, content: string): Effect.Effect<void,
   return writeFileAtomically(path, content).pipe(toAutomationServerFailed);
 }
 
-/** A path segment, or null when its percent encoding is not valid. */
 function decodePathPart(value: string): string | null {
   try {
     return decodeURIComponent(value);
@@ -464,15 +421,35 @@ function decodePathPart(value: string): string | null {
   }
 }
 
-/** The body as text, or null when it is larger than the limit. */
 async function readBody(request: IncomingMessage): Promise<string | null> {
   const body = await readBodyWithin(request, BODY_LIMIT_BYTES);
   return body === null ? null : body.toString("utf8");
 }
 
+const ROUTING_ID_KEYS: ReadonlySet<string> = new Set([
+  "id",
+  "agentId",
+  "recipientAgentId",
+  "threadId",
+  "turnId",
+  "requestId",
+  "messageId",
+  "deliveryId",
+  "runId",
+  "providerAccountId",
+]);
+
 function send(response: ServerResponse, status: number, body: unknown): void {
   response.writeHead(status, { "content-type": "application/json", "cache-control": "no-store" });
-  response.end(JSON.stringify(toLogValue(body)));
+  response.end(JSON.stringify(responseValue(body)));
+}
+
+function responseValue(value: unknown, key?: string): LogValue {
+  if (key !== undefined && ROUTING_ID_KEYS.has(key) && isString(value)) return value;
+  if (Array.isArray(value)) return value.map((entry) => responseValue(entry));
+  if (isDynamicRecord(value))
+    return Object.fromEntries(Object.entries(value).map(([name, entry]) => [name, responseValue(entry, name)]));
+  return toLogValue(value);
 }
 
 async function readJson(request: IncomingMessage): Promise<DynamicRecord> {
@@ -491,10 +468,6 @@ async function readJson(request: IncomingMessage): Promise<DynamicRecord> {
   return value;
 }
 
-/**
- * The model and account fields of an update. Name, permissions and Local scripts itself stay in the
- * app: a script can choose how an agent runs, not who it is or what it may do.
- */
 function settingsRequest(value: DynamicRecord): {
   runtime: ModelRequest;
   providerAccountId: UpdateAgentInput["providerAccountId"];

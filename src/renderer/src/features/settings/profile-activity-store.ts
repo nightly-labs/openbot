@@ -3,15 +3,11 @@ import type { ProfileActivityPhase } from "@openbot/ui/features/settings/Profile
 import type { ProfileActivityState } from "@openbot/ui/features/settings/SettingsProfileTab";
 import { errorReference } from "@openbot/user-errors";
 import { createEffect, createStore, untrack } from "solid-js";
+import { createBackgroundRefresh } from "../usage/background-refresh";
 import { usagePort } from "../usage/usage-port";
 
-/** The past year of this computer's host analytics, the report that the Profile tab summarizes. */
 const PROFILE_DAYS = 365;
 
-/**
- * Loads the report each time the Profile tab shows, and again after each turn while it shows. The
- * report on screen stays while a later load runs, so the tiles do not empty and fill again.
- */
 export function createProfileActivityStore(
   isActive: () => boolean,
   createShareImage: NonNullable<ProfileActivityState["onCreateShareImage"]>,
@@ -45,7 +41,6 @@ export function createProfileActivityStore(
         draft.phase = report ? "ready" : "unsupported";
       });
     } catch (error) {
-      // A failed refresh keeps the report on screen; the next turn or the next visit tries again.
       if (request !== generation || background) return;
       setState((draft) => {
         draft.phase = "error";
@@ -60,10 +55,12 @@ export function createProfileActivityStore(
       return;
     }
     void load();
+    const refresh = createBackgroundRefresh(load);
     const unsubscribe = usagePort().agent.onScopedEvent(({ serverId, event }) => {
-      if (serverId === LOCAL_SERVER_ID && event.type === "turn-completed") void load();
+      if (serverId === LOCAL_SERVER_ID && event.type === "turn-completed") refresh.request();
     });
     return () => {
+      refresh.dispose();
       unsubscribe();
     };
   });

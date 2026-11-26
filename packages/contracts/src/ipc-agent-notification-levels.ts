@@ -2,40 +2,26 @@ import { isIdentifier } from "./ipc-bounded-values";
 import { SERVER_NOTIFICATION_LEVELS, type ServerNotificationLevel } from "./ipc-team-host";
 import { isDynamicRecord } from "./runtime-values";
 
-/**
- * The notification level that the signed-in user chose for one agent. It replaces the level of the
- * server for the events of that agent, on each device of the user. The host keeps it for each
- * member, so the other members of the server keep their own choice.
- */
 export interface AgentNotificationLevelEntry {
   agentId: string;
   level: ServerNotificationLevel;
 }
 
-/** The most agents with a level of their own, as `agent-notification-levels-v1` permits. */
 export const AGENT_NOTIFICATION_LEVEL_LIMIT = 1000;
 
-/**
- * The levels that the signed-in user chose on one server, for all of their devices. An agent that is
- * not in the list uses the server level.
- */
 export interface AgentNotificationLevelsSnapshot {
-  /** The level of the whole server, or `null` when each device uses its own level. */
   server: ServerNotificationLevel | null;
   agents: AgentNotificationLevelEntry[];
 }
 
-/** The snapshot of a server without levels: each device uses its own server level. */
 export const EMPTY_AGENT_NOTIFICATION_LEVELS: AgentNotificationLevelsSnapshot = { server: null, agents: [] };
 
 export interface SetOwnServerNotificationLevelInput {
-  /** `null` gives each device its own server level again. */
   level: ServerNotificationLevel | null;
 }
 
 export interface SetAgentNotificationLevelInput {
   agentId: string;
-  /** `null` removes the level of the agent, so the server level applies again. */
   level: ServerNotificationLevel | null;
 }
 
@@ -84,7 +70,6 @@ export function parseSetOwnServerNotificationLevelInput(value: unknown): SetOwnS
   return { level: value.level };
 }
 
-/** The levels of a snapshot by agent. */
 export function agentNotificationLevelMap(
   snapshot: AgentNotificationLevelsSnapshot,
 ): ReadonlyMap<string, ServerNotificationLevel> {

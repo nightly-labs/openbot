@@ -1,9 +1,3 @@
-import { Effect } from "effect";
-import { GitHubOperationError, githubCall, toGitHubOperationError } from "./github-effects";
-// The GitHub MCP server that agents reach on this computer. It forwards to GitHub's remote MCP
-// server with the token for each call: the bot token of the repository that the call names, or
-// the user token.
-
 import { timingSafeEqual } from "node:crypto";
 import { createServer, type Server as HttpServer, type IncomingMessage, type ServerResponse } from "node:http";
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
@@ -22,47 +16,47 @@ import {
 } from "@modelcontextprotocol/sdk/types.js";
 import { isDynamicRecord, isString } from "@openbot/contracts/runtime-values";
 import { createOpenBotLogger, toLogValue } from "@openbot/logging";
+import { Effect } from "effect";
 import { runCauseEffect } from "../backend/effect-boundary";
 import { readJsonBody } from "../backend/local-mcp-bridge";
 import { cutModelText, MCP_RESULT_MORE, MCP_RESULT_TEXT_LIMIT } from "../backend/model-text-limit";
+import { GitHubOperationError, githubCall, toGitHubOperationError } from "./github-effects";
 
 const logger = createOpenBotLogger("github-mcp-proxy");
 
-/** A GitHub call rarely takes long. The limit only stops a call that GitHub never answers. */
 const UPSTREAM_TIMEOUT_MS = 5 * 60_000;
 const MAX_BODY_BYTES = 4 * 1024 * 1024;
-/** GitHub's answer when the installation does not have a permission that the call needs. */
 const MISSING_PERMISSION = "Resource not accessible by integration";
-/** For the agent, which tells the user. GitHub needs `administration: write` to create a repository. */
 const REPOSITORY_CREATION_HINT =
   'OpenBot cannot create repositories for this owner. GitHub needs the "Administration: write" permission of the ' +
   "OpenBotGit app on that account. An owner of the account installs OpenBotGit there, or approves its pending " +
   "permission request, in GitHub settings: Applications > Installed GitHub Apps (for an organization, in the " +
   "organization settings). Organization policy can also block repository creation. Tell the user this, and do " +
   "not try another credential. The user can also create the repository on github.com.";
-/** A refusal or a missing item in GitHub's text, which is also how GitHub hides a repository from the app. */
 const NOT_FOUND_OR_REFUSED = /\b40[34]\b|Not Found/u;
-/** A rate limit answer is not about access. */
 const RATE_LIMIT = /rate limit/iu;
-/** For the agent, which tells the user. The user token reaches only repositories where the app is installed. */
 const notVisibleHint = (repository: string) =>
   `OpenBot cannot see ${repository} on GitHub. It does not exist, or it is a private repository where the OpenBot ` +
   'GitHub App is not installed: GitHub then answers "Not Found", and git answers "Write access to repository not ' +
   'granted". Check the owner and the name. When they are correct, tell the user to add the repository in OpenBot: ' +
   "Marketplace > Apps > GitHub > Choose repositories.";
+const SAML_ENFORCEMENT = /SAML enforcement/iu;
+const singleSignOnHint = (owner: string) =>
+  `GitHub refused this request because the organization ${owner} uses single sign-on (SAML), and the GitHub ` +
+  "sign-in of OpenBot does not have single sign-on access to it. This happens when the user signed in to GitHub " +
+  "in OpenBot while their browser had no active single sign-on session for the organization. Repository " +
+  'permissions are not the cause, and the "grant your OAuth token" step in the GitHub message does not apply to ' +
+  "OpenBot. Do not try another credential. Tell the user to: 1. Open " +
+  `https://github.com/orgs/${encodeURIComponent(owner)}/sso in their browser and complete the single sign-on. ` +
+  '2. In OpenBot, open Marketplace > Apps > GitHub and click "Disconnect". On the GitHub page that opens, revoke ' +
+  'OpenBotGit. 3. Click "Connect GitHub" and enter the code in the same browser. Then try again.';
 
 export interface GitHubMcpProxyOptions {
-  /** GitHub's remote MCP server. */
   upstreamUrl: string;
-  /** The bearer that agents send. It stays the same across restarts, so a resumed session keeps working. */
   secret: () => string;
-  /** The user token, or null while the connection is not active. */
   userToken: () => Effect.Effect<string | null, GitHubOperationError>;
-  /** The bot token of `owner/name`, or null when the user token applies. */
   botToken: (owner: string, name: string) => string | null;
-  /** Whether the user token can read `owner/name`, or null when that is not known. */
   canRead: (owner: string, name: string, signal: AbortSignal) => Effect.Effect<boolean | null>;
-  /** GitHub refused `token` with HTTP 401. */
   refused: (token: string) => Effect.Effect<void>;
 }
 
@@ -71,14 +65,6 @@ interface Upstream {
   ready: Effect.Effect<void, GitHubOperationError>;
 }
 
-/**
- * A loopback MCP server with GitHub's tools. Each POST gets a new MCP server with no session, as in
- * `LocalMcpBridge`. Upstream, one MCP client runs for each token, because GitHub binds an MCP session
- * to the token that opened it.
- *
- * A tool call with `owner` and `repo` arguments, and a resource read of a `repo://owner/name/` URI,
- * use the bot token of that repository when there is one. Every other request uses the user token.
- */
 export class GitHubMcpProxy {
   readonly #options: GitHubMcpProxyOptions;
   readonly #upstreams = new Map<string, Upstream>();
@@ -89,15 +75,10 @@ export class GitHubMcpProxy {
     this.#options = options;
   }
 
-  /** The URL that agents are given, or null before `start`. */
   url(): string | null {
     return this.#port === null ? null : `http://127.0.0.1:${this.#port}/mcp`;
   }
 
-  /**
-   * Listens on `preferredPort` when it is free, so a resumed session finds the same URL, and on a new
-   * port when it is not. Returns the port.
-   */
   readonly start = Effect.fn("GitHubMcpProxy.start")(function* (this: GitHubMcpProxy, preferredPort: number | null) {
     if (this.#port !== null) return this.#port;
     const server = yield* this.#listen(preferredPort ?? 0).pipe(
@@ -190,7 +171,6 @@ export class GitHubMcpProxy {
       response.end(JSON.stringify({ error: "github_unreachable" }));
       return;
     }
-    // No `sessionIdGenerator`: each POST is one stateless request.
     const transport = new StreamableHTTPServerTransport({});
     yield* Effect.gen(function* () {
       yield* githubCall(() => mcp.connect(transport));
@@ -220,7 +200,6 @@ export class GitHubMcpProxy {
     );
   });
 
-  /** The MCP server for one POST, with GitHub's instructions and capabilities. */
   readonly #serverForEffect = Effect.fn("GitHubMcpProxy.serverFor")(function* (
     this: GitHubMcpProxy,
     userToken: string,
@@ -241,7 +220,10 @@ export class GitHubMcpProxy {
     );
     const forward = <T>(token: string, call: (client: Client) => Promise<T>) => runCauseEffect(this.#call(token, call));
     mcp.setRequestHandler(ListToolsRequestSchema, ({ params }, extra) =>
-      forward(userToken, (client) => client.listTools(params, requestOptions(extra.signal))),
+      forward(userToken, (client) => client.listTools(params, requestOptions(extra.signal))).then((result) => ({
+        ...result,
+        tools: result.tools.filter(isModelVisible),
+      })),
     );
     mcp.setRequestHandler(CallToolRequestSchema, ({ params }, extra) => {
       const args = params.arguments;
@@ -254,14 +236,16 @@ export class GitHubMcpProxy {
             client.callTool(params, undefined, requestOptions(extra.signal)),
           );
           if (params.name === "create_repository") addRepositoryCreationHint(result);
-          // A bot token exists only where the app is installed, so only a user token call can need the hint.
+          const singleSignOn = owner !== null && isSingleSignOnRefused(result);
+          if (singleSignOn) addHint(result, singleSignOnHint(owner));
           const unseen =
+            !singleSignOn &&
             token === userToken &&
             owner &&
             name &&
             isNotFoundOrRefused(result) &&
             (yield* this.#options.canRead(owner, name, extra.signal)) === false;
-          if (unseen) addNotVisibleHint(result, `${owner}/${name}`);
+          if (unseen) addHint(result, notVisibleHint(`${owner}/${name}`));
           boundTextContent(result);
           return result;
         }),
@@ -291,7 +275,6 @@ export class GitHubMcpProxy {
     return mcp;
   });
 
-  /** One call on the client of `token`. A session that GitHub ended opens again once. */
   readonly #call = Effect.fn("GitHubMcpProxy.call")(function* <T>(
     this: GitHubMcpProxy,
     token: string,
@@ -337,7 +320,6 @@ export class GitHubMcpProxy {
     return current.client;
   });
 
-  /** Closes `client` only while it is the client of `token`: a parallel call can have opened a new one. */
   readonly #drop = Effect.fn("GitHubMcpProxy.drop")(function* (this: GitHubMcpProxy, token: string, client: Client) {
     const upstream = this.#upstreams.get(token);
     if (upstream?.client !== client) return;
@@ -354,12 +336,16 @@ export class GitHubMcpProxy {
   }
 }
 
-/** GitHub's answer to a token that is not valid, for example after the user revoked the app on GitHub. */
+function isModelVisible(tool: Awaited<ReturnType<Client["listTools"]>>["tools"][number]): boolean {
+  const ui = tool._meta?.ui;
+  const visibility = isDynamicRecord(ui) ? ui.visibility : undefined;
+  return !Array.isArray(visibility) || visibility.includes("model");
+}
+
 function isRefused(error: unknown): boolean {
   return error instanceof StreamableHTTPError && error.code === 401;
 }
 
-/** Explains a refusal that the app's permissions cause, because GitHub's own text does not say what to do. */
 function addRepositoryCreationHint(result: Awaited<ReturnType<Client["callTool"]>>): void {
   if (result.isError !== true || !Array.isArray(result.content)) return;
   const refused = result.content.some(
@@ -368,21 +354,24 @@ function addRepositoryCreationHint(result: Awaited<ReturnType<Client["callTool"]
   if (refused) result.content.push({ type: "text", text: REPOSITORY_CREATION_HINT });
 }
 
-/** An error that can mean that GitHub hides the repository from the app, as GitHub's text says nothing more. */
+function errorTexts(result: Awaited<ReturnType<Client["callTool"]>>): string[] {
+  if (result.isError !== true || !Array.isArray(result.content)) return [];
+  return result.content.flatMap((item) => (isDynamicRecord(item) && isString(item.text) ? [item.text] : []));
+}
+
 function isNotFoundOrRefused(result: Awaited<ReturnType<Client["callTool"]>>): boolean {
-  if (result.isError !== true || !Array.isArray(result.content)) return false;
-  const texts = result.content.flatMap((item) => (isDynamicRecord(item) && isString(item.text) ? [item.text] : []));
+  const texts = errorTexts(result);
   return texts.some((text) => NOT_FOUND_OR_REFUSED.test(text)) && !texts.some((text) => RATE_LIMIT.test(text));
 }
 
-function addNotVisibleHint(result: Awaited<ReturnType<Client["callTool"]>>, repository: string): void {
-  if (Array.isArray(result.content)) result.content.push({ type: "text", text: notVisibleHint(repository) });
+function isSingleSignOnRefused(result: Awaited<ReturnType<Client["callTool"]>>): boolean {
+  return errorTexts(result).some((text) => SAML_ENFORCEMENT.test(text));
 }
 
-/**
- * Cuts each text item past the model limit: a long issue list or search result otherwise stays in the
- * agent's context for the rest of the session. The note says how to read more.
- */
+function addHint(result: Awaited<ReturnType<Client["callTool"]>>, hint: string): void {
+  if (Array.isArray(result.content)) result.content.push({ type: "text", text: hint });
+}
+
 function boundTextContent(result: Awaited<ReturnType<Client["callTool"]>>): void {
   if (!Array.isArray(result.content)) return;
   result.content = result.content.map((item) => {

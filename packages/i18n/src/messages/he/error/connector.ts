@@ -9,6 +9,8 @@ export const messages = {
   "error.connector.githubClientUnknown": "GitHub לא מכיר את ה-Client ID של ה-GitHub App הזה.",
   "error.connector.githubUnexpected": "GitHub שלח תשובה לא צפויה: {detail}",
   "error.connector.githubUnreachable": "OpenBot לא מצליח להגיע אל GitHub: {detail}",
+  "error.connector.githubOffline":
+    "OpenBot לא מצליח להגיע אל GitHub. יש לבדוק את החיבור לאינטרנט ואת הגדרות ה-DNS של המחשב או השרת שמריץ את OpenBot, ולנסות שוב.",
   "error.connector.githubExpired": "החיבור ל-GitHub פג תוקף. יש לחבר את GitHub מחדש.",
   "error.connector.githubFileUnreadable": "קובץ החיבור ל-GitHub אינו קריא.",
   "error.connector.githubFileTooLarge": "קובץ החיבור ל-GitHub גדול מדי.",
@@ -21,24 +23,74 @@ export const messages = {
   "error.connector.linkNoCard": "בחשבון Link אין כרטיס. יש להוסיף כרטיס ב-Link.",
   "error.connector.linkFileUnreadable": "קובץ החיבור ל-Link אינו קריא.",
   "error.connector.linkFileTooLarge": "קובץ החיבור ל-Link גדול מדי.",
+  "error.connector.nearSignIn": "יש להתחבר ל-OpenBot כדי להשתמש בארנק הקריפטו.",
+  "error.connector.nearServiceUnavailable": "שירות ארנק הקריפטו לא זמין. יש לנסות שוב מאוחר יותר.",
+  "error.connector.nearWalletNotFound": "הארנק הזה לא שייך לחשבון OpenBot הזה או לשרת הזה.",
+  "error.connector.nearWalletLimit": "יותר מדי ארנקים חדשים היום. יש לנסות שוב מחר.",
+  "error.connector.nearProviderBusy": "NEAR Intents לא עונה כרגע. יש לנסות שוב בעוד כמה דקות.",
+  "error.connector.nearNoWallet": "לא הוגדר ארנק קריפטו. אפשר להגדיר אותו בהגדרות השרת > כספת > קריפטו.",
+  "error.connector.nearWalletExists": "כבר הוגדר ארנק קריפטו.",
+  "error.connector.nearFrozen": "התשלומים מארנק הקריפטו מושהים. אפשר לחדש אותם בהגדרות השרת > כספת > קריפטו.",
+  "error.connector.nearAgentNotAllowed":
+    "הסוכן הזה לא יכול לשלם מארנק הקריפטו. אפשר להפעיל זאת בהגדרות השרת > כספת > קריפטו.",
+  "error.connector.nearGrantExpired":
+    "ל-OpenBot אין הרשאת תשלום עבור ארנק הקריפטו. אפשר לחדש אותה בהגדרות השרת > כספת > קריפטו.",
+  "error.connector.nearUnknownAsset": "בארנק הקריפטו אין נכס {asset}.",
+  "error.connector.nearAmountInvalid": "{amount} אינו סכום תקין של {asset}.",
+  "error.connector.nearRecipientInvalid": "{recipient} אינו חשבון NEAR ואינו chain:address.",
+  "error.connector.nearRefused": "ה-NEAR Intents Agent API דחה את הבקשה: {detail}",
+  "error.connector.nearUnexpected": "ה-NEAR Intents Agent API שלח תשובה לא צפויה: {detail}",
+  "error.connector.nearUnreachable": "OpenBot לא מצליח להגיע אל ה-NEAR Intents Agent API: {detail}",
+  "error.connector.nearFileUnreadable": "קובץ ארנק הקריפטו אינו קריא.",
+  "error.connector.nearFileTooLarge": "קובץ ארנק הקריפטו גדול מדי.",
+  "error.connector.nearSigningCanceled": "החתימה בוטלה.",
+  "error.connector.nearSigningExpired": "החתימה לא הגיעה בזמן. יש לנסות שוב.",
+  "error.connector.nearSigningInvalid": "החתימה מהדפדפן אינה תקינה.",
+  "error.connector.nearSigningBusy": "חתימה אחרת ממתינה בדפדפן. יש לסיים או לבטל אותה קודם.",
+  "error.connector.nearPolicyCooldown": "אפשר לשנות שוב את כללי הארנק ב-{time}.",
+  "error.connector.nearPolicyPending": "שינוי המדיניות לא הסתיים. יש לנסות שוב בעוד כמה דקות.",
+  "error.connector.nearDeclined": "הבעלים דחה את התשלום.",
+  "error.connector.nearUncertain":
+    "OpenBot לא יודע אם התשלום נשלח. אין לשלם שוב. הבעלים יכול לבדוק את היסטוריית הארנק.",
+  "error.connector.nearPaymentFailed": "התשלום נכשל: {detail}",
+  "error.connector.nearPaymentUnknown": "התשלום הזה כבר לא ממתין לתשובה.",
+  "error.connector.nearRuleFull": "בכלל תשלום יכולים להיות לכל היותר {limit} נמענים.",
+  "error.connector.nearRulesFull": "בארנק יכולים להיות לכל היותר {limit} כללי תשלום.",
   "error.connector.onePasswordCliMissing":
     "OpenBot לא מוצא את ה-CLI של 1Password. יש להתקין אותו ולהפעיל את האינטגרציה שלו באפליקציית 1Password, או להשתמש באסימון של חשבון שירות.",
   "error.connector.onePasswordCliInstallFailed":
     "OpenBot לא הצליח להתקין את ה-CLI של 1Password. יש לבדוק את החיבור לאינטרנט ולנסות שוב.",
   "error.connector.onePasswordCliSignedOut":
     "ה-CLI של 1Password לא מחובר. יש להפעיל את האינטגרציה שלו באפליקציית 1Password ולהתחבר שוב.",
+  "error.connector.onePasswordAppUnreachable":
+    "OpenBot לא מצליח להתחבר לאפליקציית 1Password. יש לפתוח את 1Password ולבטל את הנעילה. בהגדרות > מפתחים יש לוודא ש״Integrate with 1Password CLI״ מופעל. לאחר מכן יש לנסות שוב.",
   "error.connector.onePasswordCliFailed": "ה-CLI של 1Password נכשל: {detail}",
+  "error.connector.onePasswordCliForbidden":
+    "חשבון 1Password שלך לא מאפשר לך ליצור את הכספת המשותפת או חשבון שירות. יש לבקש את ההרשאה הזו מבעלים או ממנהל של החשבון, או לבקש מהם אסימון של חשבון שירות וללחוץ על ״שימוש באסימון״.",
   "error.connector.onePasswordUnexpected": "1Password שלח תשובה לא צפויה: {detail}",
   "error.connector.onePasswordTokenRejected": "1Password לא קיבל את האסימון של חשבון השירות.",
+  "error.connector.onePasswordUnreachable":
+    "OpenBot לא הצליח להתחבר ל-1Password. יש לבדוק את החיבור לאינטרנט ולנסות שוב.",
+  "error.connector.onePasswordRateLimited": "1Password קיבל יותר מדי בקשות. יש להמתין כמה דקות ולנסות שוב.",
   "error.connector.onePasswordNoVault": "חשבון השירות לא יכול לקרוא אף כספת. יש לתת לו גישה לכספת ולנסות שוב.",
+  "error.connector.onePasswordReadFailed":
+    "OpenBot לא יכול לקרוא את פרטי ההתחברות שלך ב-1Password. יש לנתק את 1Password ולחבר אותו שוב.",
   "error.connector.onePasswordFileUnreadable": "קובץ החיבור ל-1Password אינו קריא.",
   "error.connector.onePasswordFileTooLarge": "קובץ החיבור ל-1Password גדול מדי.",
   "error.connector.bitwardenFailed":
     "לא ניתן לקרוא את Bitwarden. יש להתקין את ה-CLI bw, להתחבר, לבטל את הנעילה וליצור תיקייה אחת בשם Shared with OpenBot. יש להתחבר עם מפתח סשן חדש.",
+  "error.connector.bitwardenCliMissing":
+    "OpenBot לא מוצא את ה-CLI של Bitwarden. התקינו את bw, ודאו שהוא פועל בטרמינל חדש ואז התחברו שוב.",
+  "error.connector.bitwardenFolderMissing":
+    "ב-Bitwarden צריכה להיות בדיוק תיקייה אחת בשם Shared with OpenBot. צרו אותה או מחקו את התיקייה העודפת, ואז התחברו שוב.",
   "error.connector.bitwardenHostInput":
     "יש להזין כתובת שרת HTTPS, את client_id ו-client_secret של מפתח ה-API ואת הסיסמה הראשית.",
   "error.connector.bitwardenHostFailed":
     "לא ניתן לפתוח את Bitwarden בשרת הזה. יש לבדוק את כתובת השרת, את מפתח ה-API ואת הסיסמה הראשית, ולוודא שתיקייה אחת נקראת Shared with OpenBot. לאחר מכן יש להתחבר שוב.",
+  "error.connector.bitwardenHostSignInFailed":
+    "לא ניתן להיכנס ל-Bitwarden בשרת הזה. יש לבדוק את כתובת השרת ואת מפתח ה-API ולהתחבר שוב.",
+  "error.connector.bitwardenHostUnlockFailed":
+    "לא ניתן לבטל את הנעילה של Bitwarden בשרת הזה. יש לבדוק את הסיסמה הראשית ולהתחבר שוב.",
   "error.connector.bitwardenCliInstallFailed":
     "לא ניתן להתקין את ה-CLI של Bitwarden בשרת הזה. יש לבדוק את חיבור הרשת שלו ולהתחבר שוב.",
   "error.connector.bitwardenFileUnreadable": "קובץ החיבור ל-Bitwarden אינו קריא.",
@@ -50,6 +102,8 @@ export const messages = {
     "לא ניתן להתקין את ה-CLI של Proton Pass. יש לבדוק את חיבור הרשת ולהתחבר שוב.",
   "error.connector.protonPassPlan":
     "התוכנית שלך ב-Proton לא כוללת את ה-CLI של Proton Pass. יש לשנות תוכנית ולהתחבר שוב.",
+  "error.connector.protonPassPlanMissing":
+    "התוכנית שלך ב-Proton לא כוללת את ה-CLI של Proton Pass. נדרשת תוכנית Proton שכוללת Pass Plus. יש לשנות תוכנית ולהתחבר שוב.",
   "error.connector.protonPassExpired": "הגישה אל Proton Pass הסתיימה. יש להתחבר שוב.",
   "error.connector.protonPassKeyInvalid": "יש להזין מפתח גישה של Proton Pass שמתחיל ב-pst_.",
   "error.connector.protonPassExtraPassword": "הסיסמה הנוספת שגויה. יש להזין אותה שוב.",

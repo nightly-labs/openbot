@@ -56,9 +56,6 @@ describe("OpenBotDatabase", () => {
     database.close();
     const legacy = new DatabaseSync(path);
     removeSchemaAfterVersion14(legacy);
-    // The squatted name is the index's, not a table's: the migration creates its tables with
-    // IF NOT EXISTS, and SQLite refuses an index whose name a table already holds however the
-    // statement is spelled. What is under test is the rollback, not which object collides.
     legacy.exec("CREATE TABLE channel_tasks_channel (conflict TEXT)");
     legacy.close();
     const failed = new OpenBotDatabase(root);
@@ -183,6 +180,15 @@ describe("OpenBotDatabase", () => {
       { version: 58 },
       { version: 59 },
       { version: 60 },
+      { version: 61 },
+      { version: 62 },
+      { version: 63 },
+      { version: 64 },
+      { version: 65 },
+      { version: 66 },
+      { version: 67 },
+      { version: 68 },
+      { version: 69 },
     ]);
     database.close();
   });
@@ -349,8 +355,6 @@ describe("OpenBotDatabase", () => {
         .get(),
     ).toEqual({ aggregate_type: "hosted-site-terminal", aggregate_id: pending.agentId });
 
-    // The real marker command appends the outcome message to the thread. A command with no event keeps
-    // no receipt.
     database.dispatch(
       pending.markerCommandId,
       [
@@ -700,15 +704,12 @@ describe("OpenBotDatabase", () => {
       const start = turn * 100;
       const turnId = `turn-${turn}`;
       messages.push(
-        // Each later question was queued while the turn before it ran.
         message(`${turnId}-question`, turn === 0 ? 0 : start - 50, { author: "user", turnId }),
         message(`${turnId}-thought`, start + 1, { turnId, itemType: "commentary" }),
         message(`${turnId}-tie`, start + 1, { turnId, itemType: "commentary" }),
-        // An ACP agent sends its answer only when the turn ends.
         message(`${turnId}-answer`, start + 90, { turnId }),
       );
     }
-    // Grok refuses a steer and answers it in the same turn, after the first answer.
     messages.push(
       message("steered-question", 2_000, { author: "user", turnId: "steered" }),
       message("steered-thought", 2_001, { turnId: "steered", itemType: "commentary" }),
@@ -718,15 +719,12 @@ describe("OpenBotDatabase", () => {
       message("steered-second-answer", 2_030, { turnId: "steered" }),
       message("marker", 2_015),
     );
-    // The shared order puts a turn's question first even when its answer has an earlier time.
     messages.push(
       message("skewed-answer", 1_500, { turnId: "skewed" }),
       message("skewed-thought", 1_501, { turnId: "skewed", itemType: "commentary" }),
       message("skewed-question", 1_502, { author: "user", turnId: "skewed" }),
     );
-    // Two messages alone at one time keep the order they were stored in.
     messages.push(message("tie-z", 1_600), message("tie-a", 1_600));
-    // A turn larger than a page, with a steer on its last page.
     messages.push(
       message("large-question", 2_999, { author: "user", turnId: "large" }),
       message("large-answer", 3_200, { turnId: "large" }),
@@ -739,7 +737,6 @@ describe("OpenBotDatabase", () => {
           : message(id, 3_000 + index, { turnId: "large", itemType: "commentary" }),
       );
     }
-    // The live runtime sorts a snapshot before it stores it.
     sortConversationMessages(messages);
     const expected = messages.map(({ id }) => id);
     database.persistConversation(
@@ -757,8 +754,6 @@ describe("OpenBotDatabase", () => {
       "conversation.acp-order",
     );
 
-    // A queued message gets its conversation time when it is steered (#1746). Live writes and
-    // event replay must both replace the original queue time before SQL pages are read.
     const steer = messages.find((item) => item.id === "steer");
     if (!steer || !agent.threadId) throw new Error("The steered message needs a thread.");
     database.persistConversationChanges({
@@ -814,19 +809,15 @@ describe("OpenBotDatabase", () => {
       });
     }
 
-    // The marker came while the steered turn ran and shows after it. Read through it, only the
-    // answer of the later turn is unread.
     expect(new ConversationReadStore(database).markReadForThread("member", agent.threadId, "marker")).toEqual({
       unreadCount: 1,
       firstUnreadMessageId: "large-answer",
       throughMessageId: "marker",
     });
-    // Read through the thought, the answer shown after it is still unread.
     expect(
       new ConversationReadStore(database).markReadForThread("skew-reader", agent.threadId, "skewed-thought"),
     ).toMatchObject({ firstUnreadMessageId: "skewed-answer" });
 
-    // An anchor late in a turn larger than a page still gets the rows after it.
     const lateAnchor = database.readConversationPage(
       agent.id,
       agent.threadId,
@@ -836,7 +827,6 @@ describe("OpenBotDatabase", () => {
     expect(lateAnchor.messages.length).toBeLessThanOrEqual(100);
     expect(lateAnchor.messages.map(({ id }) => id)).toContain("large-106");
 
-    // An anchor at the start of a turn keeps the page's room for that turn, not for earlier turns.
     const turnStart = database.readConversationPage(
       agent.id,
       agent.threadId,
@@ -847,7 +837,6 @@ describe("OpenBotDatabase", () => {
       expected.slice(expected.indexOf("large-question"), expected.indexOf("large-question") + 100),
     );
 
-    // With limit 2 the turn before the anchor already fills the page; the rest of the turn still comes.
     for (const limit of [2, 4]) {
       const around = database.readConversationPage(
         agent.id,
@@ -921,8 +910,6 @@ describe("OpenBotDatabase", () => {
       "conversation.channel-search-channel",
     );
 
-    // A result names an agent and a message, and opening one shows the normal conversation of that
-    // agent. A channel message is not there, so the search must not offer it.
     const search = database.searchConversationMessages("unique channel needle");
     expect(search.results.map((result) => result.message.id)).toEqual(["normal-hit"]);
     expect(search.total).toBe(1);
@@ -1031,7 +1018,6 @@ describe("OpenBotDatabase", () => {
     expect(older.pageInfo.hasOlder).toBe(false);
     expect(database.searchConversationMessages("Morning brief", agent.id).total).toBe(0);
     expect(database.searchConversationMessages("Launch page", agent.id).total).toBe(0);
-    // A quiet routine answer is not news, and a Team API client never gets it.
     expect(database.searchConversationMessages("Nothing to report", agent.id).total).toBe(0);
     database.close();
   });
@@ -1092,14 +1078,10 @@ describe("OpenBotDatabase", () => {
     const conversation = database.readConversation(agent.id, agent.threadId);
     expect(conversation.revision).toBe(revision);
     expect(conversation.messages.at(-1)).toMatchObject({ id: "assistant-live", text: "token ".repeat(100) });
-    // The settled history keeps the sequence it was written at, so the streamed message is the only
-    // row a flush touched. A flush that rewrote the whole thread would stamp every row with its own
-    // sequence, which is the cost this write path exists to avoid.
     const rewritten = Object.entries(messageSequences(database, agent.threadId))
       .filter(([messageId, sequence]) => settledSequences[messageId] !== sequence)
       .map(([messageId]) => messageId);
     expect(rewritten).toEqual(["assistant-live"]);
-    // One hundred flushes, one event and one receipt: each flush drops the one it supersedes.
     expect(streamedMessageEventCount(database, agent.threadId)).toBe(1);
     expect(
       database.connection
@@ -1124,8 +1106,6 @@ describe("OpenBotDatabase", () => {
 
     streamed.text = "partial answ";
     database.persistStreamingMessage({ snapshot, messageId: streamed.id, eventType: "response.delta-flushed" });
-    // `item/completed` replaces the text instead of adding to it, so a replay that summed the
-    // flushes would rebuild "partial answ" plus the whole answer.
     streamed.text = "The complete answer.";
     streamed.status = "completed";
     const revision = database.persistStreamingMessage({
@@ -1166,7 +1146,6 @@ describe("OpenBotDatabase", () => {
 
     expect(streamedMessageEventCount(database, agent.threadId)).toBe(0);
     expect(snapshotEventCount(database, agent.threadId)).toBe(1);
-    // The whole snapshot carries the streamed text, so dropping the flushes loses nothing.
     database.connection.prepare("DELETE FROM projection_thread_messages WHERE thread_id = ?").run(agent.threadId);
     expect(database.rebuildThreadProjection(agent.threadId).messages.at(-1)).toMatchObject({
       text: "An answer that streamed in.",
@@ -1175,25 +1154,40 @@ describe("OpenBotDatabase", () => {
     database.close();
   });
 
-  it("falls back to a whole snapshot when the streamed message left the thread", async () => {
+  it("keeps the stored chat and its order when a stream flush has only the loaded window", async () => {
     const database = await createDatabase();
     const agent = testAgent();
     database.replaceAgents("agents-import", [agent], "agents.imported");
     if (!agent.threadId) throw new Error("The test agent has no thread.");
     const snapshot = streamingSnapshot(agent, 2);
     database.persistConversation(snapshot, "turn.started", { turnId: "turn-1" });
-    // A thread reset between the buffer and its flush leaves the message unknown to the snapshot.
-    snapshot.messages = snapshot.messages.slice(0, 1);
+    const stored = database.readConversation(agent.id, agent.threadId);
+    const storedOrdinals = () =>
+      database.connection
+        .prepare("SELECT message_id, ordinal FROM projection_thread_messages WHERE thread_id = ? ORDER BY message_id")
+        .all(agent.threadId ?? "");
+    const ordinalsBefore = storedOrdinals();
+    const outsideWindow = stored.messages[0];
+    if (!outsideWindow) throw new Error("The stored chat has no messages.");
+    snapshot.messages = snapshot.messages.slice(-1);
 
     const revision = database.persistStreamingMessage({
       snapshot,
-      messageId: "assistant-live",
+      messageId: outsideWindow.id,
       eventType: "response.delta-flushed",
     });
+    expect(revision).toBe(stored.revision);
+    expect(database.readConversation(agent.id, agent.threadId)).toEqual(stored);
+
+    const streamed = snapshot.messages[0];
+    if (!streamed) throw new Error("The streaming message is missing.");
+    streamed.text = "An answer that streamed in.";
+    database.persistStreamingMessage({ snapshot, messageId: streamed.id, eventType: "response.delta-flushed" });
 
     const conversation = database.readConversation(agent.id, agent.threadId);
-    expect(conversation.revision).toBe(revision);
-    expect(conversation.messages.map((message) => message.id)).toEqual(["settled-0"]);
+    expect(conversation.messages.map((message) => message.id)).toEqual(stored.messages.map((message) => message.id));
+    expect(conversation.messages.at(-1)).toMatchObject({ id: streamed.id, text: "An answer that streamed in." });
+    expect(storedOrdinals()).toEqual(ordinalsBefore);
     database.close();
   });
 
@@ -1442,9 +1436,6 @@ describe("OpenBotDatabase", () => {
     reopened.close();
   }, 20_000);
 
-  // A release shipped versions 15 and 16 for usage analytics, so every database upgraded by that
-  // release stands at 16 with no channel storage. Channel storage has to arrive above it: numbered
-  // at or below 16 it would be filtered out as already applied, and the tables would never appear.
   it("adds channel projections to a database that already ran the analytics versions", async () => {
     const root = await mkdtemp(join(tmpdir(), "openbot-db-v16-"));
     roots.push(root);
@@ -1533,6 +1524,15 @@ describe("OpenBotDatabase", () => {
       { version: 58 },
       { version: 59 },
       { version: 60 },
+      { version: 61 },
+      { version: 62 },
+      { version: 63 },
+      { version: 64 },
+      { version: 65 },
+      { version: 66 },
+      { version: 67 },
+      { version: 68 },
+      { version: 69 },
     ]);
     expect(migrated.connection.prepare("PRAGMA foreign_key_check").all()).toEqual([]);
     migrated.close();
@@ -1561,7 +1561,7 @@ describe("OpenBotDatabase", () => {
     removeProviderHistorySchema(legacy);
     legacy
       .prepare(
-        "DELETE FROM schema_migrations WHERE version IN (29, 30, 31, 32, 33, 34, 35, 36, 37, 38, 39, 40, 41, 42, 43, 44, 45, 46, 47, 48, 49, 50, 51, 52, 53, 54, 55, 56, 57, 58, 59, 60)",
+        "DELETE FROM schema_migrations WHERE version IN (29, 30, 31, 32, 33, 34, 35, 36, 37, 38, 39, 40, 41, 42, 43, 44, 45, 46, 47, 48, 49, 50, 51, 52, 53, 54, 55, 56, 57, 58, 59, 60, 61, 62, 63, 64, 65, 66, 67, 68, 69)",
       )
       .run();
     if (failFirst) legacy.exec("CREATE TABLE provider_history_imports_thread (conflict TEXT)");
@@ -1640,8 +1640,6 @@ describe("OpenBotDatabase", () => {
       .run("channel-v18", "channel-v18-message", 1, JSON.stringify({ text: "Keep this channel message" }));
     database.close();
 
-    // Recreate the unshipped channel branch's version 18 profile: channel migrations are marked through
-    // 18, while its provider table still has the three-provider CHECK that migration 17 widens.
     const legacy = new DatabaseSync(database.path);
     removeProviderHistorySchema(legacy);
     legacy.exec(`
@@ -1665,7 +1663,7 @@ describe("OpenBotDatabase", () => {
       ALTER TABLE projection_provider_sessions_v18 RENAME TO projection_provider_sessions;
       CREATE INDEX provider_sessions_thread
         ON projection_provider_sessions(thread_id, provider, state);
-      DELETE FROM schema_migrations WHERE version IN (19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35, 36, 37, 38, 39, 40, 41, 42, 43, 44, 45, 46, 47, 48, 49, 50, 51, 52, 53, 54, 55, 56, 57, 58, 59, 60);
+      DELETE FROM schema_migrations WHERE version IN (19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35, 36, 37, 38, 39, 40, 41, 42, 43, 44, 45, 46, 47, 48, 49, 50, 51, 52, 53, 54, 55, 56, 57, 58, 59, 60, 61, 62, 63, 64, 65, 66, 67, 68, 69);
       PRAGMA foreign_keys = ON;
     `);
     legacy.close();
@@ -1693,7 +1691,7 @@ describe("OpenBotDatabase", () => {
         .get(),
     ).toMatchObject({ sql: expect.not.stringContaining("CHECK(provider") });
     expect(migrated.connection.prepare("SELECT MAX(version) AS version FROM schema_migrations").get()).toEqual({
-      version: 60,
+      version: 69,
     });
     migrated.close();
   });
@@ -1707,12 +1705,11 @@ describe("OpenBotDatabase", () => {
     database.replaceAgents("agents-import", [agent], "agents.imported");
     database.close();
 
-    // A version 19 database: the table migration 20 creates is not there, and neither is its row.
     const legacy = new DatabaseSync(database.path);
     removeProviderHistorySchema(legacy);
     legacy.exec(`
       DROP TABLE projection_mcp_servers;
-      DELETE FROM schema_migrations WHERE version IN (20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35, 36, 37, 38, 39, 40, 41, 42, 43, 44, 45, 46, 47, 48, 49, 50, 51, 52, 53, 54, 55, 56, 57, 58, 59, 60);
+      DELETE FROM schema_migrations WHERE version IN (20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35, 36, 37, 38, 39, 40, 41, 42, 43, 44, 45, 46, 47, 48, 49, 50, 51, 52, 53, 54, 55, 56, 57, 58, 59, 60, 61, 62, 63, 64, 65, 66, 67, 68, 69);
     `);
     legacy.close();
 
@@ -1730,14 +1727,13 @@ describe("OpenBotDatabase", () => {
       .run();
     migrated.close();
 
-    // Re-running is a no-op: the row the user already has survives a second start.
     const reopened = new OpenBotDatabase(root);
     await runCauseEffect(reopened.initialize());
     expect(reopened.connection.prepare("SELECT name FROM projection_mcp_servers").all()).toEqual([
       { name: "Filesystem" },
     ]);
     expect(reopened.connection.prepare("SELECT MAX(version) AS version FROM schema_migrations").get()).toEqual({
-      version: 60,
+      version: 69,
     });
     reopened.close();
   });
@@ -1770,19 +1766,18 @@ describe("OpenBotDatabase", () => {
       database.persistConversation(conversation, "conversation.saved");
       database.close();
 
-      // A version 24 database: neither the tables of migration 25 nor its marker.
       const legacy = new DatabaseSync(database.path);
       removeProviderHistorySchema(legacy);
       legacy.exec(`
+        DROP TABLE projection_messaging_history;
         DROP TABLE projection_messaging_pings;
         DROP TABLE projection_messaging_allowed_senders;
         DROP TABLE projection_messaging_allowed_roles;
         DROP TABLE projection_messaging_memories;
         DROP TABLE projection_messaging_threads;
         DROP TABLE projection_messaging_connections;
-        DELETE FROM schema_migrations WHERE version IN (25, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35, 36, 37, 38, 39, 40, 41, 42, 43, 44, 45, 46, 47, 48, 49, 50, 51, 52, 53, 54, 55, 56, 57, 58, 59, 60);
+        DELETE FROM schema_migrations WHERE version IN (25, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35, 36, 37, 38, 39, 40, 41, 42, 43, 44, 45, 46, 47, 48, 49, 50, 51, 52, 53, 54, 55, 56, 57, 58, 59, 60, 61, 62, 63, 64, 65, 66, 67, 68, 69);
       `);
-      // The squatted name is the index's: the tables use IF NOT EXISTS, so only the index can collide.
       if (failFirst) legacy.exec("CREATE TABLE messaging_threads_agent (conflict TEXT)");
       legacy.close();
 
@@ -1805,7 +1800,7 @@ describe("OpenBotDatabase", () => {
       expect(migrated.listAgents()).toEqual([agent]);
       expect(migrated.readConversation(agent.id, agent.threadId).messages).toEqual(conversation.messages);
       expect(connection.prepare("SELECT MAX(version) AS version FROM schema_migrations").get()).toEqual({
-        version: 60,
+        version: 69,
       });
       expect(connection.prepare("PRAGMA foreign_keys").get()).toEqual({ foreign_keys: 1 });
       expect(connection.prepare("PRAGMA foreign_key_check").all()).toEqual([]);
@@ -1831,7 +1826,6 @@ describe("OpenBotDatabase", () => {
       expect(() => link("link-2", "missing-thread")).toThrow(/FOREIGN KEY constraint failed/u);
       migrated.close();
 
-      // A second start runs nothing and keeps the row.
       const reopened = new OpenBotDatabase(root);
       await runCauseEffect(reopened.initialize());
       expect(reopened.connection.prepare("SELECT link_id FROM projection_messaging_threads").all()).toEqual([
@@ -1848,8 +1842,6 @@ describe("OpenBotDatabase", () => {
     await runCauseEffect(database.initialize());
     database.close();
 
-    // A version 20 database, written when `computer_use` was still a name a user could take. The
-    // second row holds the first name the migration reaches for, so it has to reach further.
     const legacy = new DatabaseSync(database.path);
     removeProviderHistorySchema(legacy);
     legacy.exec(`
@@ -1861,7 +1853,7 @@ describe("OpenBotDatabase", () => {
          '2026-09-14T10:00:00.000Z', '2026-09-14T10:00:00.000Z'),
         ('mcp-2', 'computer_use_saved', 'stdio', 1, 'other', '[]', '[]', '[]', '', '', '[]', 1,
          '2026-09-14T10:00:00.000Z', '2026-09-14T10:00:00.000Z');
-      DELETE FROM schema_migrations WHERE version IN (21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35, 36, 37, 38, 39, 40, 41, 42, 43, 44, 45, 46, 47, 48, 49, 50, 51, 52, 53, 54, 55, 56, 57, 58, 59, 60);
+      DELETE FROM schema_migrations WHERE version IN (21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35, 36, 37, 38, 39, 40, 41, 42, 43, 44, 45, 46, 47, 48, 49, 50, 51, 52, 53, 54, 55, 56, 57, 58, 59, 60, 61, 62, 63, 64, 65, 66, 67, 68, 69);
     `);
     legacy.close();
 
@@ -1877,7 +1869,6 @@ describe("OpenBotDatabase", () => {
     ]);
     migrated.close();
 
-    // Running again renames nothing: the name is free now, so a second start leaves the row alone.
     const reopened = new OpenBotDatabase(root);
     await runCauseEffect(reopened.initialize());
     expect(reopened.connection.prepare("SELECT name FROM projection_mcp_servers ORDER BY position").all()).toEqual([
@@ -1979,6 +1970,15 @@ describe("OpenBotDatabase", () => {
       { version: 58 },
       { version: 59 },
       { version: 60 },
+      { version: 61 },
+      { version: 62 },
+      { version: 63 },
+      { version: 64 },
+      { version: 65 },
+      { version: 66 },
+      { version: 67 },
+      { version: 68 },
+      { version: 69 },
     ]);
     migrated.close();
   });
@@ -2097,6 +2097,15 @@ describe("OpenBotDatabase", () => {
       { version: 58 },
       { version: 59 },
       { version: 60 },
+      { version: 61 },
+      { version: 62 },
+      { version: 63 },
+      { version: 64 },
+      { version: 65 },
+      { version: 66 },
+      { version: 67 },
+      { version: 68 },
+      { version: 69 },
     ]);
     retried.close();
   });
@@ -2263,10 +2272,6 @@ describe("OpenBotDatabase", () => {
         agent_id, message_id, emoji, actor_kind, actor_bot_id, updated_at, last_event_sequence
       ) VALUES ('chief', 'message-1', '\u{1F44D}', 'bot', 'helper', '2026-08-20T10:00:00.000Z', 1);
     `);
-    // This migration rebuilds the reaction table and rewrites the actor kind inside the copy, and it runs
-    // with foreign keys on so a real violation surfaces rather than hiding. The blocker is a child row
-    // pointing at the reaction under its pre-rename actor kind, so the rebuild orphans it and the
-    // migration throws after it has already written the new table.
     legacy.exec(`
       CREATE TABLE blocker (
         agent_id TEXT NOT NULL,
@@ -2332,14 +2337,11 @@ describe("OpenBotDatabase", () => {
       thread_id: `openbot-thread-${agentId}`,
       message_id: "message-1",
     });
-    // A message that quoted the old workspace path points at where that workspace lives now.
     expect(
       migrated.connection
         .prepare("SELECT json_extract(message_json, '$.text') AS text FROM projection_thread_messages")
         .get(),
     ).toEqual({ text: `Wrote ${workspace}/index.html` });
-    // `aggregate_id` carries no foreign key, so a row missed here would be silently lost history, and the
-    // marker command id is compared against a string rebuilt from the agent id, so both have to move.
     expect(
       migrated.connection
         .prepare(
@@ -2356,9 +2358,6 @@ describe("OpenBotDatabase", () => {
         markerCommandId: `hosted-site-event:${agentId}:operation-1:succeeded`,
       }),
     ]);
-    // The seed is the input to the function that draws the face, not an identifier. Rewriting it with the
-    // id gives every pre-rename agent a different face on upgrade, in the projection and in the events a
-    // replay would rebuild that projection from.
     expect(
       migrated.connection
         .prepare("SELECT json_extract(agent_json, '$.avatarSeed') AS seed FROM projection_agents")
@@ -2371,10 +2370,6 @@ describe("OpenBotDatabase", () => {
         )
         .get(),
     ).toEqual({ seed: legacyId, id: agentId });
-    // A memory is the only free text this database indexes, under `UNIQUE(agent_id, normalized_text)`. These
-    // two say the same sentence in the two spellings, so rewriting one would duplicate the other: aborting
-    // locks the user out of a migration that has no backup, and collapsing the pair discards a record with
-    // its own origin and timestamps. Both survive with the sentence as written, both still the agent's own.
     expect(
       migrated.connection.prepare("SELECT agent_id, text FROM projection_agent_memories ORDER BY text").all(),
     ).toEqual([
@@ -2382,10 +2377,6 @@ describe("OpenBotDatabase", () => {
       { agent_id: agentId, text: `remember ${legacyId} deploys` },
     ]);
     expect(migrated.connection.prepare("PRAGMA foreign_key_check").all()).toEqual([]);
-    // v13 moves the id values and leaves the key names, because rewriting a key by text substitution would
-    // also edit a message quoting it. So the released spellings arrive at the reader, and the reader has to
-    // answer with the message rather than with "Invalid conversation message." -- which is the whole page,
-    // not one message, for anyone whose agents ever wrote to each other.
     const page = migrated.readConversationPage(agentId, `openbot-thread-${agentId}`);
     expect(page.messages).toEqual([
       expect.objectContaining({
@@ -2402,8 +2393,6 @@ describe("OpenBotDatabase", () => {
     migrated.close();
   });
 
-  // Released builds stored an agent's blank `replyToMessageId` as `""`. The guard rejects an empty id,
-  // so the read failed for the whole page of the sender and of the recipient, and stalled the queue.
   it("reads a message that a released build stored with a blank reply id", async () => {
     const root = await mkdtemp(join(tmpdir(), "openbot-db-blank-reply-"));
     roots.push(root);
@@ -2456,8 +2445,6 @@ describe("OpenBotDatabase", () => {
     database.close();
   });
 
-  // Released builds stored a workflow handoff with the workflow title as `routine.name`. A title can have
-  // 160 characters and the guard accepts 80, so the read failed for the whole page and stalled the queue.
   it("reads a workflow handoff that a released build stored with a long title", async () => {
     const root = await mkdtemp(join(tmpdir(), "openbot-db-long-routine-name-"));
     roots.push(root);
@@ -2488,7 +2475,6 @@ describe("OpenBotDatabase", () => {
           itemType: "routine",
           text: "Summarize the report.",
           createdAt: "2026-11-02T12:00:00.000Z",
-          // 79 letters, then an emoji (two UTF-16 units) across the limit, then more title.
           routine: {
             routineId: "workflow-1",
             runId: "run-1",
@@ -2520,9 +2506,6 @@ describe("OpenBotDatabase", () => {
     removeSchemaAfterVersion14(legacy);
     downgradeToV11(legacy);
     seedLegacyAgent(legacy, legacyId, `/Users/dev/OpenBot/Bots/${legacyId}`);
-    // This migration rewrites every text column in the database with foreign keys switched off, which is
-    // the widest blast radius of any migration here and the one that runs on a file with no backup. The
-    // blocker makes it throw partway, once the substitution has already written rows.
     legacy.exec("CREATE TABLE blocker (value TEXT CHECK(value NOT LIKE 'agent-%'))");
     legacy.prepare("INSERT INTO blocker (value) VALUES (?)").run(legacyId);
     legacy.close();
@@ -2555,11 +2538,6 @@ describe("OpenBotDatabase", () => {
     await runCauseEffect(database.initialize());
     database.close();
 
-    // `bot-` is not proof of a generated id, and neither is a UUID after it. `bot-research` is a name a
-    // user or an imported `bots.json` chose; `bot-<uuid>` is one `getOrCreate` will accept from any caller.
-    // Either can be sitting beside the `agent-` spelling this migration would rename it to, and renaming
-    // one onto the other is a primary-key collision the substitution resolves by dropping a row -- so an
-    // agent nobody touched disappears on upgrade.
     const legacy = new DatabaseSync(database.path);
     removeSchemaAfterVersion14(legacy);
     downgradeToV11(legacy);
@@ -2567,10 +2545,6 @@ describe("OpenBotDatabase", () => {
     seedLegacyAgent(legacy, "agent-research", "/Users/dev/OpenBot/Agents/agent-research");
     seedLegacyAgent(legacy, "bot-8c41d0f2-6b5a-4e93-8d17-2a0b3c4d5e6f", "/Users/dev/OpenBot/Agents/pair-legacy");
     seedLegacyAgent(legacy, "agent-8c41d0f2-6b5a-4e93-8d17-2a0b3c4d5e6f", "/Users/dev/OpenBot/Agents/pair");
-    // And the rename travels as a text substitution, so an id that *contains* a generated one is caught by
-    // it: rewriting `bot-<uuid>` inside `bot-<uuid>-copy` renames a second agent nobody asked about, onto
-    // an id its neighbour already holds -- which the row-level conflict resolution settles by deleting one
-    // of them. Three agents in, three agents out.
     seedLegacyAgent(legacy, "bot-1f0a2b3c-4d5e-4f60-8a91-b2c3d4e5f607", "/Users/dev/OpenBot/Agents/prefix");
     seedLegacyAgent(legacy, "bot-1f0a2b3c-4d5e-4f60-8a91-b2c3d4e5f607-copy", "/Users/dev/OpenBot/Agents/copy");
     seedLegacyAgent(legacy, "agent-1f0a2b3c-4d5e-4f60-8a91-b2c3d4e5f607-copy", "/Users/dev/OpenBot/Agents/twin");
@@ -2599,7 +2573,6 @@ describe("OpenBotDatabase", () => {
     database.close();
 
     const newer = new DatabaseSync(database.path);
-    // One past the latest this application knows, whatever that is today.
     newer
       .prepare("INSERT INTO schema_migrations(version, applied_at) SELECT MAX(version) + 1, ? FROM schema_migrations")
       .run("2026-08-20T10:00:00.000Z");
@@ -2685,8 +2658,6 @@ describe("OpenBotDatabase", () => {
     const table = migrated.connection
       .prepare("SELECT sql FROM sqlite_master WHERE type = 'table' AND name = 'projection_provider_sessions'")
       .get();
-    // A pre-v8 database goes through migrations 8, 17, 22, 23, 24, 26 and 28 in one start, and 28 removes
-    // the provider CHECK that the others widen.
     expect(table).toMatchObject({ sql: expect.not.stringContaining("CHECK(provider") });
     expect(() =>
       migrated.bindProviderSession({
@@ -2729,8 +2700,6 @@ describe("OpenBotDatabase", () => {
         .listProviderSessions(threadId)
         .find((session) => session.provider === "codex")?.id;
       if (!codexSessionId) throw new Error("The codex provider session was not stored.");
-      // A turn points at the session the rebuild drops. With foreign keys on, the DROP would fire
-      // ON DELETE SET NULL and blank this column on every turn in the database.
       database.connection
         .prepare(
           `INSERT INTO projection_turns
@@ -2740,7 +2709,6 @@ describe("OpenBotDatabase", () => {
         .run(threadId, codexSessionId);
       database.close();
 
-      // A v16 database: the shipped three-provider constraint, and the migration ledger stamped one short.
       const legacy = new DatabaseSync(database.path);
       legacy.exec(`
       DELETE FROM schema_migrations WHERE version >= 17;
@@ -2810,10 +2778,7 @@ describe("OpenBotDatabase", () => {
       const table = migrated.connection
         .prepare("SELECT sql FROM sqlite_master WHERE type = 'table' AND name = 'projection_provider_sessions'")
         .get();
-      // A v16 database goes through migrations 17, 22, 23, 24, 26 and 28 in one start, and 28 removes the
-      // provider CHECK that the others widen.
       expect(table).toMatchObject({ sql: expect.not.stringContaining("CHECK(provider") });
-      // Written through SQL, not `bindProviderSession`: the table itself must accept the row.
       expect(() =>
         migrated.connection
           .prepare(
@@ -2858,7 +2823,6 @@ describe("OpenBotDatabase", () => {
         .listProviderSessions(threadId)
         .find((session) => session.provider === "opencode")?.id;
       if (!opencodeSessionId) throw new Error("The opencode provider session was not stored.");
-      // With foreign keys on, the DROP in the rebuild would set this column to NULL.
       database.connection
         .prepare(
           `INSERT INTO projection_turns
@@ -2868,7 +2832,6 @@ describe("OpenBotDatabase", () => {
         .run(threadId, opencodeSessionId);
       database.close();
 
-      // A v21 database: the four-provider constraint that migration 17 wrote, and no marker for 22.
       const legacy = new DatabaseSync(database.path);
       legacy.exec(`
       DELETE FROM schema_migrations WHERE version >= 22;
@@ -2941,7 +2904,7 @@ describe("OpenBotDatabase", () => {
       expect(migrated.connection.prepare("PRAGMA foreign_key_check").all()).toEqual([]);
       expect(migrated.connection.prepare("PRAGMA integrity_check").get()).toEqual({ integrity_check: "ok" });
       expect(migrated.connection.prepare("SELECT MAX(version) AS version FROM schema_migrations").get()).toEqual({
-        version: 60,
+        version: 69,
       });
       expect(
         migrated.connection.prepare("SELECT provider_session_id FROM projection_turns WHERE turn_id = ?").get("turn-1"),
@@ -2957,7 +2920,6 @@ describe("OpenBotDatabase", () => {
       expectUnknownProviderRejected(migrated, threadId);
       migrated.close();
 
-      // A second start runs nothing: the Antigravity session and the older sessions stay.
       const reopened = new OpenBotDatabase(root);
       await runCauseEffect(reopened.initialize());
       expect(reopened.listProviderSessions(threadId).map((session) => session.provider)).toEqual([
@@ -2971,9 +2933,6 @@ describe("OpenBotDatabase", () => {
     },
   );
 
-  // Every shipped provider-session table: the v16 baseline (three providers), v17 to v21 (the same
-  // four-provider table), and v22 (five). Migration 23 must keep every row, the turn link, the index
-  // and the UNIQUE constraint, and only then accept `acp`.
   it.each([
     { source: 16, providers: ["codex", "claude", "grok"], failFirst: false },
     { source: 21, providers: ["codex", "claude", "grok", "opencode"], failFirst: false },
@@ -3002,7 +2961,6 @@ describe("OpenBotDatabase", () => {
       }
       const linkedSessionId = database.listProviderSessions(threadId).at(-1)?.id;
       if (!linkedSessionId) throw new Error("No provider session was stored.");
-      // With foreign keys on, the DROP in the rebuild would set this column to NULL.
       database.connection
         .prepare(
           `INSERT INTO projection_turns
@@ -3082,7 +3040,7 @@ describe("OpenBotDatabase", () => {
       expect(connection.prepare("PRAGMA foreign_key_check").all()).toEqual([]);
       expect(connection.prepare("PRAGMA integrity_check").get()).toEqual({ integrity_check: "ok" });
       expect(connection.prepare("SELECT MAX(version) AS version FROM schema_migrations").get()).toEqual({
-        version: 60,
+        version: 69,
       });
       expect(
         connection.prepare("SELECT provider_session_id FROM projection_turns WHERE turn_id = ?").get("turn-1"),
@@ -3108,7 +3066,6 @@ describe("OpenBotDatabase", () => {
       expect(() => insert("session-duplicate", "acp", "goose:acp-session")).toThrow(/UNIQUE constraint failed/u);
       migrated.close();
 
-      // A second start runs nothing: the table already allows `acp`, so the rebuild is skipped.
       const reopened = new OpenBotDatabase(root);
       await runCauseEffect(reopened.initialize());
       expect(reopened.listProviderSessions(threadId).map((session) => session.provider)).toEqual([...providers, "acp"]);
@@ -3132,9 +3089,6 @@ describe("OpenBotDatabase", () => {
     );
   });
 
-  // Every shipped provider-session table: the v16 baseline (three providers), v17 to v21 (four), v22
-  // (five) and v23 (six). Migration 24 must keep every row, the turn link, the index and the UNIQUE
-  // constraint, and only then accept `cursor`.
   it.each([
     { source: 16, providers: ["codex", "claude", "grok"], failFirst: false },
     { source: 21, providers: ["codex", "claude", "grok", "opencode"], failFirst: false },
@@ -3164,7 +3118,6 @@ describe("OpenBotDatabase", () => {
       }
       const linkedSessionId = database.listProviderSessions(threadId).at(-1)?.id;
       if (!linkedSessionId) throw new Error("No provider session was stored.");
-      // With foreign keys on, the DROP in the rebuild would set this column to NULL.
       database.connection
         .prepare(
           `INSERT INTO projection_turns
@@ -3244,7 +3197,7 @@ describe("OpenBotDatabase", () => {
       expect(connection.prepare("PRAGMA foreign_key_check").all()).toEqual([]);
       expect(connection.prepare("PRAGMA integrity_check").get()).toEqual({ integrity_check: "ok" });
       expect(connection.prepare("SELECT MAX(version) AS version FROM schema_migrations").get()).toEqual({
-        version: 60,
+        version: 69,
       });
       expect(
         connection.prepare("SELECT provider_session_id FROM projection_turns WHERE turn_id = ?").get("turn-1"),
@@ -3270,7 +3223,6 @@ describe("OpenBotDatabase", () => {
       expect(() => insert("session-duplicate", "cursor", "cursor-session")).toThrow(/UNIQUE constraint failed/u);
       migrated.close();
 
-      // A second start runs nothing: the table already allows `cursor`, so the rebuild is skipped.
       const reopened = new OpenBotDatabase(root);
       await runCauseEffect(reopened.initialize());
       expect(reopened.listProviderSessions(threadId).map((session) => session.provider)).toEqual([
@@ -3297,9 +3249,6 @@ describe("OpenBotDatabase", () => {
     );
   });
 
-  // Every shipped provider-session table: the v16 baseline (three providers), v17 to v21 (four), v22
-  // (five), v23 (six) and v24 to v25 (seven). Migration 26 must keep every row, the turn link, the
-  // index and the UNIQUE constraint, and only then accept `cline`.
   it.each([
     { source: 16, providers: ["codex", "claude", "grok"], failFirst: false },
     { source: 21, providers: ["codex", "claude", "grok", "opencode"], failFirst: false },
@@ -3339,7 +3288,6 @@ describe("OpenBotDatabase", () => {
       }
       const linkedSessionId = database.listProviderSessions(threadId).at(-1)?.id;
       if (!linkedSessionId) throw new Error("No provider session was stored.");
-      // With foreign keys on, the DROP in the rebuild would set this column to NULL.
       database.connection
         .prepare(
           `INSERT INTO projection_turns
@@ -3419,7 +3367,7 @@ describe("OpenBotDatabase", () => {
       expect(connection.prepare("PRAGMA foreign_key_check").all()).toEqual([]);
       expect(connection.prepare("PRAGMA integrity_check").get()).toEqual({ integrity_check: "ok" });
       expect(connection.prepare("SELECT MAX(version) AS version FROM schema_migrations").get()).toEqual({
-        version: 60,
+        version: 69,
       });
       expect(
         connection.prepare("SELECT provider_session_id FROM projection_turns WHERE turn_id = ?").get("turn-1"),
@@ -3447,7 +3395,6 @@ describe("OpenBotDatabase", () => {
       );
       migrated.close();
 
-      // A second start runs nothing: the table already allows `cline`, so the rebuild is skipped.
       const reopened = new OpenBotDatabase(root);
       await runCauseEffect(reopened.initialize());
       expect(reopened.listProviderSessions(threadId).map((session) => session.provider)).toEqual([
@@ -3490,8 +3437,6 @@ describe("OpenBotDatabase", () => {
     );
   });
 
-  // The agent routine table is the v8 baseline's and the channel one is migration 19's, and neither
-  // changed before migration 27. So v19 is the oldest shipped database with both, and v26 the newest.
   it.each([
     { source: 19, failFirst: false },
     { source: 26, failFirst: false },
@@ -3540,7 +3485,6 @@ describe("OpenBotDatabase", () => {
       );
       database.close();
 
-      // The shipped shape: no policy column, and no marker past the source version.
       const legacy = new DatabaseSync(database.path);
       legacy.exec(`
         ALTER TABLE projection_agent_routines DROP COLUMN limit_policy;
@@ -3588,7 +3532,7 @@ describe("OpenBotDatabase", () => {
       expect(connection.prepare("PRAGMA foreign_key_check").all()).toEqual([]);
       expect(connection.prepare("PRAGMA integrity_check").get()).toEqual({ integrity_check: "ok" });
       expect(connection.prepare("SELECT MAX(version) AS version FROM schema_migrations").get()).toEqual({
-        version: 60,
+        version: 69,
       });
       const agentRoutines = new AgentRoutineStore(migrated);
       expect(agentRoutines.get(agent.id, agentRoutine.id)?.limitPolicy).toBe("wait");
@@ -3599,7 +3543,6 @@ describe("OpenBotDatabase", () => {
       );
       migrated.close();
 
-      // A second start runs nothing and keeps the policy the user chose.
       const reopened = new OpenBotDatabase(root);
       await runCauseEffect(reopened.initialize());
       expect(new AgentRoutineStore(reopened).get(agent.id, agentRoutine.id)?.limitPolicy).toBe("skip");
@@ -3623,9 +3566,6 @@ describe("OpenBotDatabase", () => {
     );
   });
 
-  // Every shipped provider-session table: the v16 baseline (three providers), v17 to v21 (four), v22
-  // (five), v23 (six), v24 to v25 (seven) and v26 to v27 (eight). Migration 28 must keep every row, the
-  // turn link, the index, the UNIQUE and the state CHECK, and remove only the provider CHECK.
   it.each([
     { source: 16, providers: ["codex", "claude", "grok"], failFirst: false },
     { source: 21, providers: ["codex", "claude", "grok", "opencode"], failFirst: false },
@@ -3669,7 +3609,6 @@ describe("OpenBotDatabase", () => {
       }
       const linkedSessionId = database.listProviderSessions(threadId).at(-1)?.id;
       if (!linkedSessionId) throw new Error("No provider session was stored.");
-      // With foreign keys on, the DROP in the rebuild would set this column to NULL.
       database.connection
         .prepare(
           `INSERT INTO projection_turns
@@ -3753,7 +3692,7 @@ describe("OpenBotDatabase", () => {
       expect(connection.prepare("PRAGMA foreign_key_check").all()).toEqual([]);
       expect(connection.prepare("PRAGMA integrity_check").get()).toEqual({ integrity_check: "ok" });
       expect(connection.prepare("SELECT MAX(version) AS version FROM schema_migrations").get()).toEqual({
-        version: 60,
+        version: 69,
       });
       expect(
         connection.prepare("SELECT provider_session_id FROM projection_turns WHERE turn_id = ?").get("turn-1"),
@@ -3783,7 +3722,6 @@ describe("OpenBotDatabase", () => {
       });
       migrated.close();
 
-      // A second start runs nothing and keeps the session bound after the migration.
       const reopened = new OpenBotDatabase(root);
       await runCauseEffect(reopened.initialize());
       expect(reopened.activeProviderSession(threadId, "cline")).toEqual(cline);
@@ -3845,7 +3783,6 @@ describe("OpenBotDatabase", () => {
       count: 0,
     });
     expect(database.pendingHostedSiteTerminalEvents()).toEqual([]);
-    // An orphan receipt makes `dispatch` replay its stale result for a command that never ran.
     expect(
       database.connection
         .prepare(
@@ -3876,10 +3813,6 @@ describe("OpenBotDatabase", () => {
     );
   });
 
-  // Migration 31 only adds the routine flow tables, which reference the agent routines and their
-  // runs. Those tables last changed in migration 27, so v27 is the newest schema that changed them,
-  // v19 the oldest that the v27 coverage above starts from, and v29 and v30 the shipped schemas of
-  // v0.32.0 and v0.33.0, which this migration meets on an upgrade.
   it.each([
     { source: 19, failFirst: false },
     { source: 27, failFirst: false },
@@ -3927,7 +3860,6 @@ describe("OpenBotDatabase", () => {
       const run = routines.createRun(routine, null, "test", now.toISOString());
       database.close();
 
-      // The shipped shape: no routine flow tables, and no marker past the source version.
       const legacy = new DatabaseSync(database.path);
       legacy.exec(`
         DROP TABLE routine_flow_steps;
@@ -3980,7 +3912,7 @@ describe("OpenBotDatabase", () => {
       expect(migrated.readConversation(agent.id, agent.threadId).messages).toEqual(conversation.messages);
       expect(routineRows(connection)).toEqual(original);
       expect(connection.prepare("SELECT MAX(version) AS version FROM schema_migrations").get()).toEqual({
-        version: 60,
+        version: 69,
       });
       expect(connection.prepare("PRAGMA foreign_keys").get()).toEqual({ foreign_keys: 1 });
       expect(connection.prepare("PRAGMA foreign_key_check").all()).toEqual([]);
@@ -4006,7 +3938,6 @@ describe("OpenBotDatabase", () => {
       expect(() => step("step-2", "missing-run")).toThrow(/FOREIGN KEY constraint failed/u);
       migrated.close();
 
-      // A second start runs nothing and keeps the rows; deleting the routine takes its flow with it.
       const reopened = new OpenBotDatabase(root);
       await runCauseEffect(reopened.initialize());
       expect(reopened.connection.prepare("SELECT link_id FROM routine_flow_links").all()).toEqual([
@@ -4023,10 +3954,8 @@ describe("OpenBotDatabase", () => {
     const database = await createDatabase();
     const { path, userDataPath } = database;
     damageProbeTable(database);
-    // A crash or a kill leaves the write-ahead log; a clean close removes it.
     await writeFile(`${path}-wal`, "");
 
-    // The failed start closes the database, which removes the log; the next start must fail again.
     for (const _start of [1, 2]) {
       await expect(runCauseEffect(new OpenBotDatabase(userDataPath).initialize())).rejects.toThrow(
         sourceText("error.backend.databaseIntegrity"),
@@ -4041,7 +3970,6 @@ describe("OpenBotDatabase", () => {
 
     const reopened = new OpenBotDatabase(userDataPath);
     await runCauseEffect(reopened.initialize());
-    // The damage is still there: the start did not run the check that finds it.
     expect(reopened.connection.prepare("PRAGMA quick_check").all()).not.toEqual([{ quick_check: "ok" }]);
     reopened.close();
   });
@@ -4050,11 +3978,10 @@ describe("OpenBotDatabase", () => {
     const database = await createDatabase();
     const userDataPath = database.userDataPath;
     database.connection.exec(
-      "DROP TABLE projection_agent_threads; DELETE FROM schema_migrations WHERE version IN (38, 39, 40, 41, 42, 43, 44, 45, 46, 47, 48, 49, 50, 51, 52, 53, 54, 55, 56, 57, 58, 59, 60)",
+      "DROP TABLE projection_agent_threads; DELETE FROM schema_migrations WHERE version IN (38, 39, 40, 41, 42, 43, 44, 45, 46, 47, 48, 49, 50, 51, 52, 53, 54, 55, 56, 57, 58, 59, 60, 61, 62, 63, 64, 65, 66, 67, 68, 69)",
     );
     damageProbeTable(database);
 
-    // The first start applies the migration; the second has none to run and must still check.
     for (const _start of [1, 2]) {
       await expect(runCauseEffect(new OpenBotDatabase(userDataPath).initialize())).rejects.toThrow(
         sourceText("error.backend.databaseIntegrity"),
@@ -4063,7 +3990,6 @@ describe("OpenBotDatabase", () => {
   });
 });
 
-/** Breaks a NOT NULL rule in a new table, as a damaged page would, and closes the database cleanly. */
 function damageProbeTable(database: OpenBotDatabase): void {
   database.connection.exec("CREATE TABLE damage_probe (value TEXT); INSERT INTO damage_probe VALUES (NULL)");
   const path = database.path;
@@ -4076,8 +4002,6 @@ function damageProbeTable(database: OpenBotDatabase): void {
   connection.close();
 }
 
-// Rebuilds the pre-v12 `projection_reactions` shape so v12, v13 and v14 run again over a fixture that
-// looks the way a shipped release left it, rather than over a database that already carries their result.
 function downgradeToV11(database: DatabaseSync): void {
   database.exec(`
     CREATE TABLE projection_reactions_v11 (
@@ -4096,16 +4020,12 @@ function downgradeToV11(database: DatabaseSync): void {
   `);
 }
 
-// One agent whose id, thread, message text and hosted-site history all still spell the id `bot-<uuid>`.
 function seedLegacyAgent(database: DatabaseSync, legacyId: string, workspacePath: string): void {
   const threadId = `openbot-thread-${legacyId}`;
   const agentJson = JSON.stringify({ id: legacyId, name: "Chief", threadId, workspacePath, avatarSeed: legacyId });
   const rosterJson = JSON.stringify({
     agents: [{ id: legacyId, name: "Chief", threadId, workspacePath, avatarSeed: legacyId }],
   });
-  // The shape a released build persisted: the exchange between two agents and the reaction one of them
-  // left spell the product agent `bot` in their keys and in the actor discriminant. v13 rewrites the id
-  // values inside them and leaves the keys, so this is what a page read meets after the upgrade.
   const messageJson = JSON.stringify({
     id: "message-1",
     author: "agent",
@@ -4140,9 +4060,6 @@ function seedLegacyAgent(database: DatabaseSync, legacyId: string, workspacePath
     createdAt: "2026-09-01T12:00:00.000Z",
   });
 
-  // Two memories of one agent that quote the id in each spelling. Rewriting the first makes it equal to the
-  // second under `UNIQUE(agent_id, normalized_text)`, which is a duplicated sentence, not a reason to lock
-  // the user out of their database.
   const memories = [`remember ${legacyId} deploys`, `remember ${legacyId.replace(/^bot-/u, "agent-")} deploys`];
 
   const insert = database.prepare(
@@ -4237,9 +4154,7 @@ function testAgent(): AgentSummary {
   };
 }
 
-/** Migration 28 removed the provider CHECK: an unknown provider must still write no event and no row. */
 function expectUnknownProviderRejected(database: OpenBotDatabase, threadId: string): void {
-  // A provider string from outside the type system, such as an old settings file.
   const provider: AgentProviderId = JSON.parse('"gemini"');
   const events = eventCount(database);
   const sessions = database.listProviderSessions(threadId);
@@ -4288,7 +4203,6 @@ function streamedMessageEventCount(database: OpenBotDatabase, threadId: string |
   return row.count;
 }
 
-/** The sequence each projected message was last written at, by message id. */
 function messageSequences(database: OpenBotDatabase, threadId: string): Record<string, number> {
   const sequences: Record<string, number> = {};
   for (const row of database.connection
@@ -4302,7 +4216,6 @@ function messageSequences(database: OpenBotDatabase, threadId: string): Record<s
   return sequences;
 }
 
-/** A settled history with one message still streaming at the end of it. */
 function streamingSnapshot(agent: AgentSummary, settled: number): ConversationSnapshot {
   const settledMessages: ConversationMessage[] = Array.from({ length: settled }, (_, index) => ({
     id: `settled-${index}`,
@@ -4356,11 +4269,7 @@ function withoutAttachments(message: ConversationMessage): ConversationMessage {
   return result;
 }
 
-// These tests construct released schemas by stripping newer additions from a fresh fixture.
 function removeSchemaAfterVersion14(db: DatabaseSync): void {
-  // Channel migrations 18 and 19 stand on the provider migration 17, so a fixture below 17 must
-  // drop all three. Every version from 15 up goes: a history that keeps a later version and drops an earlier one has a gap, which the
-  // schema check rejects before any upgrade runs.
   for (const table of ["memories", "routines", "routine_triggers", "routine_runs"])
     db.exec(`DROP TABLE projection_channel_${table}`);
   for (const table of ["assignments", "tasks", "messages", "summaries", "reads", "contexts"])
@@ -4371,7 +4280,6 @@ function removeSchemaAfterVersion14(db: DatabaseSync): void {
   db.exec("DELETE FROM schema_migrations WHERE version >= 15");
 }
 
-/** Migration 30's webhook tables, children first. */
 const WEBHOOK_TABLES_DROP_SQL = `
   DROP TABLE projection_webhook_receipts;
   DROP TABLE projection_webhook_route_revocations;
@@ -4379,7 +4287,6 @@ const WEBHOOK_TABLES_DROP_SQL = `
   DROP TABLE projection_routine_webhooks;
 `;
 
-/** Migration 29's provider history tables, children first. */
 const PROVIDER_HISTORY_TABLES_DROP_SQL = `
   DROP TABLE provider_history_staging;
   DROP TABLE provider_history_turns;

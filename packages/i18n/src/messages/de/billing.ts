@@ -30,10 +30,13 @@ export const messages = {
   "billing.status.paused": "Pausiert",
   "billing.otherServers": "Andere Server",
   "billing.action.menu": "Tarifaktionen für {server}",
-  "billing.action.change": "Tarif ändern",
+  "billing.action.addStorage": "Speicher hinzufügen",
   "billing.action.cancel": "Tarif kündigen",
   "billing.action.renew": "Tarif verlängern",
   "billing.action.updatePayment": "Zahlungsmethode aktualisieren",
+  "billing.storage.title": "Mehr Speicher für {server}",
+  "billing.storage.add": "{size} hinzufügen",
+  "billing.storage.failed": "Der Speicher konnte nicht hinzugefügt werden.",
   "billing.lifecycle.cancelRenewal": "Verlängerung kündigen",
   "billing.lifecycle.cancelTitle": "Verlängerung für {name} kündigen?",
   "billing.lifecycle.cancelDescription":
@@ -42,8 +45,6 @@ export const messages = {
     "Die automatische Verlängerung wird für diesen Server fortgesetzt. Seine Agenten, Unterhaltungen und Dateien bleiben erhalten.",
   "billing.lifecycle.dataStays": "Die Verlängerung ist aus. Deine Daten bleiben erhalten, wenn der Tarif endet.",
   "billing.lifecycle.deleteServer": "Server löschen…",
-  "billing.lifecycle.whenDelete": "Wann soll dieser Server gelöscht werden?",
-  "billing.lifecycle.atPeriodEnd": "Am Ende des Zeitraums · {date}",
   "billing.lifecycle.planEndsLabel": "Tarif endet",
   "billing.lifecycle.plansDescription":
     "Verwalte jeden Server einzeln. Beim Kündigen der Verlängerung bleiben seine Daten erhalten.",
@@ -52,15 +53,12 @@ export const messages = {
   "billing.lifecycle.renewalLabel": "Nächste Verlängerung",
   "billing.lifecycle.deletionLabel": "Löschdatum",
   "billing.lifecycle.billingLabel": "Abrechnung",
-  "billing.lifecycle.immediately": "Sofort",
   "billing.lifecycle.automatic": "Automatische Verlängerung wird fortgesetzt",
-  "billing.lifecycle.noRefund": "Keine Erstattung für ungenutzte Zeit",
   "billing.lifecycle.noRenewal": "Keine weiteren Verlängerungen",
   "billing.lifecycle.dateUtc": "{date} UTC",
   "billing.lifecycle.renews": "Die automatische Verlängerung ist an.",
   "billing.lifecycle.schedule": "Am Ende des Zeitraums löschen",
   "billing.lifecycle.keep": "Server behalten",
-  "billing.lifecycle.deleteNow": "Jetzt löschen",
   "billing.lifecycle.deletesOn": "Wird am {date} gelöscht",
   "billing.lifecycle.scheduledDescription": "Die Verlängerung ist aus. Dein Server und deine Daten werden gelöscht.",
   "billing.lifecycle.scheduleDescription":
@@ -69,12 +67,9 @@ export const messages = {
   "billing.lifecycle.keepDescription":
     "Dein Server und seine Daten bleiben erhalten. Die geplante Löschung wird gestoppt und die automatische Verlängerung fortgesetzt.",
   "billing.lifecycle.deleteTitle": "{name} löschen?",
-  "billing.lifecycle.deleteDescription":
-    "Lösche diesen Server, seine Agenten, Unterhaltungen und Dateien endgültig. Dein Abonnement endet jetzt. Das kann nicht rückgängig gemacht werden.",
   "billing.lifecycle.saving": "Wird gespeichert…",
   "billing.lifecycle.failed":
     "Die Änderung konnte nicht bestätigt werden. Aktualisiere die Abrechnung und versuche es erneut.",
-  "billing.lifecycle.deleted": "{name} wurde gelöscht. Das Abonnement ist beendet.",
   "billing.lifecycle.label": "Designvorschau · Nur simulierte Aktionen",
   "billing.lifecycle.reset": "Vorschau zurücksetzen",
   "billing.license.title": "Lizenz",
@@ -146,7 +141,6 @@ export const messages = {
   "billing.license.cancel.descriptionNow":
     "Die Lizenz endet mit dem bezahlten Zeitraum. Deine Server sind nicht betroffen.",
   "billing.license.cancel.keep": "Lizenz behalten",
-  // The order form: a hosted server and a license in one order. The pricing page and Billing show it.
   "billing.order.billing": "Abrechnungszeitraum",
   "billing.order.currency": "Währung",
   "billing.order.monthly": "Monatlich",
@@ -156,6 +150,7 @@ export const messages = {
   "billing.order.server.summary": "Wir betreiben OpenBot für dein Team.",
   "billing.order.server.none": "Kein Server",
   "billing.order.server.noneDetail": "OpenBot auf deinem eigenen Computer nutzen",
+  "billing.order.server.thisComputer": "Dein Computer",
   "billing.order.server.bestValue": "Preistipp",
   "billing.order.server.bestFor.starter": "Ideal für eine Person",
   "billing.order.server.bestFor.standard": "Ideal für ein kleines Team",
@@ -197,6 +192,7 @@ export const messages = {
   "billing.order.cta.server": "Server erstellen",
   "billing.order.cta.license": "Lizenz kaufen",
   "billing.order.cta.download": "Herunterladen",
+  "billing.order.cta.keepComputer": "Auf diesem Computer bleiben",
   "billing.license.invite.title": "Nutzer zur Lizenz hinzufügen?",
   "billing.license.invite.description": "Diese Einladung fügt deiner Lizenz 1 Nutzer hinzu: {price} mehr pro Monat.",
   "billing.license.invite.confirm": "Hinzufügen und einladen",
@@ -208,4 +204,35 @@ export const messages = {
     other:
       "Deine Lizenz hat {count} Nutzer, das Maximum. Kontaktiere uns für eine größere Lizenz. Neue Personen können deinen Servern nicht beitreten.",
   },
+  "billing.details.country": "Rechnungsland",
+  "billing.details.countryPlaceholder": "Land wählen",
+  "billing.details.vatId": "EU-USt-IdNr. (optional)",
+  "billing.details.vatIdInvalid": "Das ist keine USt-IdNr. des gewählten Landes.",
+  "billing.details.countryMissing": "Wähle dein Rechnungsland.",
+  "billing.details.saveFailed": "Rechnungsdaten konnten nicht gespeichert werden",
+  "billing.credits.explainer.title": "Was sind Credits?",
+  "billing.credits.explainer.page": "{page} von {total}",
+  "billing.credits.explainer.pages": "Seiten",
+  "billing.credits.explainer.mediaTitle": "Credits bezahlen Medien",
+  "billing.credits.explainer.mediaText":
+    "Wenn ein Agent ein Bild, ein Video oder eine Stimme erstellt, verbraucht er Credits.",
+  "billing.credits.explainer.chatTitle": "Chats bleiben kostenlos",
+  "billing.credits.explainer.chatText":
+    "Chats nutzen deinen eigenen KI-Anbieter. Gespräche mit deinen Agents kosten keine Credits.",
+  "billing.credits.explainer.chatFree": "0 Credits",
+  "billing.credits.explainer.modelsTitle": "Jedes Modell hat einen Preis",
+  "billing.credits.explainer.modelsText":
+    "Bessere Modelle kosten mehr. Ein Bild kostet {pictureMin}–{pictureMax} Credits, ein Video von {seconds} s {videoMin}–{videoMax}.",
+  "billing.credits.explainer.perPicture": "/ Bild",
+  "billing.credits.explainer.perClip": "/ {seconds}-s-Video",
+  "billing.credits.explainer.getTitle": "Credits erhalten",
+  "billing.credits.explainer.getText":
+    "Kaufe ein Paket, wenn du mehr brauchst. Größere Pakete bieten einen besseren Preis pro Credit.",
+  "billing.credits.explainer.freeEnd": "Monatliche kostenlose Credits laufen ab",
+  "billing.credits.explainer.welcome": "Neue Konten erhalten {amount} kostenlose Credits zum Testen einiger Modelle",
+  "billing.credits.welcomeIncluded": "Kostenlose Credits: {amount}",
+  "billing.credits.explainer.allPrices": "Alle {count} Modelle",
+  "billing.credits.explainer.next": "Weiter",
+  "billing.credits.explainer.gotIt": "Verstanden",
+  "billing.credits.explainer.place": "OpenBot",
 } as const satisfies PartialTranslation<typeof source>;

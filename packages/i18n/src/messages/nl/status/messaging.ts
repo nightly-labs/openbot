@@ -3,7 +3,7 @@ import type { messages as source } from "../../en/status/messaging";
 
 export const messages = {
   "status.messaging.working": "Mee bezig…",
-  "status.messaging.queued": "Even wachten: OpenBot werkt aan een ander verzoek. Het antwoord komt hier.",
+  "status.messaging.queued": "Even wachten tot een eerder verzoek klaar is. Het antwoord komt hier.",
   "status.messaging.busy": "Er wachten te veel verzoeken. Probeer het later opnieuw.",
   "status.messaging.failed": "OpenBot kon dit verzoek niet afronden. De OpenBot-host heeft de details.",
   "status.messaging.noAnswer": "OpenBot is klaar zonder geschreven antwoord.",
@@ -12,6 +12,7 @@ export const messages = {
   "status.messaging.stopped": "Gestopt.",
   "status.messaging.stop": "Stop",
   "status.messaging.approvalTitle": "OpenBot vraagt om goedkeuring om door te gaan.",
+  "status.messaging.approvalTitleTeammate": "Teamgenoot {agent} vraagt om goedkeuring om door te gaan.",
   "status.messaging.approvalCommand": "Een opdracht uitvoeren",
   "status.messaging.approvalFileChange": "Bestanden wijzigen",
   "status.messaging.approvalPermissions": "Meer machtigingen krijgen",
@@ -34,9 +35,11 @@ export const messages = {
   "status.messaging.signInReceived": "OpenBot heeft de Slack-installatie ontvangen. Je kunt dit tabblad sluiten.",
   "status.messaging.signInUnknown": "OpenBot heeft deze Slack-installatie niet gestart. Start hem opnieuw in OpenBot.",
   "status.messaging.telegramNoAgent":
-    "Er kan hier nog geen agent antwoorden. Voeg de Telegram-orchestrator toe in OpenBot.",
+    "Er kan hier nog geen agent antwoorden. Open in OpenBot Marktplaats > Apps > Telegram en klik op Agent toevoegen.",
   "status.messaging.telegramLinked":
     "OpenBot is verbonden met deze chat. Noem {bot} of reageer op een bericht van OpenBot om de agents iets te vragen.",
+  "status.messaging.telegramNotLinked":
+    "OpenBot is niet verbonden met deze chat. Open de OpenBot-app, ga naar Marktplaats → Apps → Telegram en kies 'Toevoegen aan een groep' of 'Open een directe chat' om te verbinden.",
   "status.messaging.telegramOrchestratorName": "Telegram-orchestrator",
   "status.messaging.telegramOrchestratorTitle": "Antwoordt in Telegram en vraagt het team",
   "status.messaging.whatsappNoAgent":
@@ -51,6 +54,14 @@ export const messages = {
     "👋 *OpenBot is verbonden*\n\nSchrijf hier om je agents iets te vragen. De WhatsApp Orchestrator antwoordt, of geeft het werk aan de juiste agent.\n\nStuur *stop* om een verzoek te stoppen.",
   "status.messaging.whatsappWelcomeDedicated":
     "👋 *OpenBot is verbonden*\n\nDe mensen die je in OpenBot toestaat, kunnen nu naar dit nummer schrijven. Een nieuw persoon krijgt een code: keur die goed in OpenBot onder Verzoeken.\n\nStuur *stop* om een verzoek te stoppen.",
+  "status.messaging.whatsappOtherOpenBot":
+    "Er is nog een OpenBot aan dit WhatsApp-nummer gekoppeld, dus je kunt twee antwoorden krijgen. Open om dit op te lossen Gekoppelde apparaten in WhatsApp op je telefoon en log uit bij de OpenBot die je niet gebruikt.",
+  "status.messaging.whatsappPaused":
+    "OpenBot antwoordt hier 10 minuten niet: er kwamen te veel berichten in korte tijd. Als er nog een OpenBot aan dit nummer is gekoppeld, open dan Gekoppelde apparaten in WhatsApp op je telefoon en log uit bij de OpenBot die je niet gebruikt.",
+  "status.messaging.whatsappNotDelivered":
+    "WhatsApp heeft dit antwoord niet geaccepteerd, dus de persoon heeft het niet ontvangen.",
+  "status.messaging.whatsappPartlyDelivered":
+    "WhatsApp heeft dit antwoord niet volledig geaccepteerd, dus de persoon heeft maar een deel ontvangen.",
   "status.messaging.whatsappOrchestratorName": "WhatsApp-orchestrator",
   "status.messaging.whatsappOrchestratorTitle": "Antwoordt in WhatsApp en vraagt het team",
 } as const satisfies PartialTranslation<typeof source>;

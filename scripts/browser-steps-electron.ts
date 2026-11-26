@@ -75,7 +75,6 @@ async function main(): Promise<void> {
       focusable: false,
       webPreferences: { sandbox: true, contextIsolation: true, nodeIntegration: false },
     });
-    // The site memories that the host reads, by agent and host name, for the site-memories phase.
     const siteMemoryReads: { agentId: string; hostname: string }[] = [];
     let siteMemoriesOn = false;
     browser = new BrowserHost(window, join(fixtureRoot, "downloads"), join(fixtureRoot, "tabs.json"), {
@@ -137,7 +136,6 @@ async function main(): Promise<void> {
     assert.equal(searched.outcome.status, "completed");
     assert.equal(searched.outcome.steps, 4);
     assert.equal(searched.outcome.value, "Result: openbot");
-    // Each snapshot raises the revision by one: one final capture, none per step.
     assert.equal(searched.outcome.snapshot?.revision, form.revision + 1, "Script steps took snapshots of their own.");
     recordCases("script-runs-steps-in-order", "script-takes-one-final-snapshot");
 
@@ -186,7 +184,6 @@ async function main(): Promise<void> {
     await held.contents.executeJavaScript(
       "new Promise((resolve) => { const ready = () => (window.fixtureFinish ? resolve() : requestAnimationFrame(ready)); ready(); })",
     );
-    // The take waits in the tab queue behind the running step, so it is not awaited here.
     const take = Effect.runFork(host.takeUserControl(held.tab.id, { kind: "local" }));
     await held.contents.executeJavaScript("window.fixtureFinish('done')");
     const heldOutcome = await holding;
@@ -197,8 +194,6 @@ async function main(): Promise<void> {
     host.releaseUserControl(held.tab.id);
     recordCases("script-stops-at-user-control");
 
-    // The person takes the tab during the last step: the script is done, but the final snapshot is
-    // refused. The result keeps the value, so that the agent does not run the steps again.
     await held.contents.executeJavaScript("delete window.fixtureFinish");
     const late = runScript({
       tabId: held.tab.id,
@@ -278,7 +273,6 @@ async function main(): Promise<void> {
       [1, 2, 3].flatMap((page) => [1, 2, 3].map((item) => `item-${page}-${item}`)),
     );
     assert.equal(looped.outcome.log?.length, 2);
-    // Each navigation also raises the revision: two pages, then the one final capture.
     assert.equal(looped.outcome.snapshot?.revision, list.revision + 3, "Script steps took snapshots.");
     recordCases("script-loops-across-pages", "script-returns-value", "script-keeps-log", "script-one-final-snapshot");
 
@@ -298,7 +292,6 @@ async function main(): Promise<void> {
     assert.deepEqual(isolated.outcome.value, ["undefined", "undefined", "undefined", "undefined"]);
     recordCases("script-has-no-host-access");
 
-    // A timer is a host sleep step, so it waits through a navigation as well.
     const slept = await runScript({
       tabId: list.tab.id,
       finalSnapshot: false,
@@ -331,7 +324,6 @@ async function main(): Promise<void> {
     assert.deepEqual(waited.outcome.value, [null, "yes", true], waited.outcome.error);
     recordCases("script-evaluate-undefined-is-null", "script-waits-for-page-function");
 
-    // The forms that models write from other libraries wait for the same conditions.
     const guessed = await runScript({
       tabId: list.tab.id,
       finalSnapshot: false,
@@ -370,7 +362,6 @@ async function main(): Promise<void> {
     ]);
     recordCases("script-accepts-guessed-wait-forms", "script-targets-take-nth");
 
-    // "present" after a selector waits for the element, not for the selector as page text.
     const presence = await runScript({
       tabId: list.tab.id,
       finalSnapshot: false,
@@ -384,7 +375,6 @@ async function main(): Promise<void> {
     assert.equal(presence.outcome.value, true, presence.outcome.error);
     recordCases("script-waits-for-present-selector");
 
-    // The sandbox has no page globals: the error says where they are.
     const pageGlobal = await runScript({
       tabId: list.tab.id,
       finalSnapshot: false,
@@ -401,8 +391,6 @@ async function main(): Promise<void> {
     assert.match(snakeHelper.outcome.error ?? "", /helpers use camelCase: waitFor/u);
     recordCases("script-names-the-sandbox-for-page-globals", "script-names-camel-case-helpers");
 
-    // Scripts resolve the links that they read, as in a browser, and can navigate to a URL object.
-    // location is the tab address after each step, and it is read-only.
     const resolved = await runScript({
       tabId: list.tab.id,
       finalSnapshot: false,
@@ -435,7 +423,6 @@ async function main(): Promise<void> {
     ]);
     recordCases("script-resolves-urls", "script-reads-tab-location");
 
-    // A wait needs one match: each of these targets matches several elements of the list page.
     const waitedForMany = await runScript({
       tabId: list.tab.id,
       finalSnapshot: false,
@@ -506,6 +493,7 @@ async function main(): Promise<void> {
 
     phase("page-settle");
     const pageSchema = z.object({
+      tabId: z.string(),
       url: z.string(),
       elements: z.array(z.object({ name: z.string() })),
       diagnostics: z.array(z.object({ message: z.string() })).optional(),
@@ -538,6 +526,14 @@ async function main(): Promise<void> {
     assert.equal(interstitial.page.challenge?.status, "cleared");
     measurements.interstitialNavigateMs = interstitial.ms;
     recordCases("snapshot-waits-for-interstitial");
+    const longInterstitial = await readPage("navigate", { tabId: settleTab.id, url: `${origin}/long-challenge` });
+    assert.equal(longInterstitial.page.url, `${origin}/form`, "The snapshot did not wait for a long interstitial.");
+    assert.equal(longInterstitial.page.challenge?.status, "cleared");
+    recordCases("snapshot-waits-for-long-interstitial");
+    const redirected = await readPage("open", { url: `${origin}/redirect-during-read` });
+    assert.equal(redirected.page.url, `${origin}/form`, "`open` did not read the page after the redirect.");
+    await call("close_tab", { tabId: redirected.page.tabId });
+    recordCases("open-reads-again-after-redirect");
     const captcha = await readPage("navigate", { tabId: settleTab.id, url: `${origin}/captcha` });
     assert.equal(captcha.page.challenge?.status, "needs-user");
     assert(captcha.ms < 5_000, `An interactive check waited: ${captcha.ms} ms.`);
@@ -545,7 +541,6 @@ async function main(): Promise<void> {
     assert.equal(ordinary.page.challenge, undefined, "A long page that mentions a captcha read as a check.");
     recordCases("snapshot-reports-interactive-check", "snapshot-ignores-long-page");
     const stuckCheck = await readPage("navigate", { tabId: settleTab.id, url: `${origin}/stuck-challenge` });
-    // navigate stops its wait at its own timeout; the next read waits only the rest of the 15 s.
     assert.equal(stuckCheck.page.challenge?.status, "checking", "A check with wait time left asked for a person.");
     const stuckCheckRest = await readPage("snapshot", { tabId: settleTab.id, image: "never" });
     assert.equal(stuckCheckRest.page.challenge?.status, "needs-user", "A check that stayed did not ask for a person.");
@@ -565,7 +560,6 @@ async function main(): Promise<void> {
     assert.equal(offer.page.challenge?.status, "click-once", "A checkbox check did not offer its click.");
     await call("click", { tabId: settleTab.id, target: offerSchema.parse(offer.raw).challenge.target });
     const passed = await readPage("snapshot", { tabId: settleTab.id, image: "never" });
-    // The check passed before or while the read waited.
     assert(
       passed.page.challenge === undefined || passed.page.challenge.status === "cleared",
       `The clicked checkbox did not pass the check: ${passed.page.challenge?.status}`,
@@ -610,7 +604,6 @@ async function main(): Promise<void> {
 
     phase("modal");
     const modal = await readPage("navigate", { tabId: settleTab.id, url: `${origin}/modal` });
-    // A fact for the modal-first decision, not a requirement.
     measurements.modalOutsideButtonInSnapshot = names(modal.page).includes("Outside");
     assert(names(modal.page).includes("Inside"), "The modal button is missing.");
     recordCases("snapshot-reads-modal");
@@ -676,9 +669,25 @@ async function main(): Promise<void> {
     measurements.crashedScriptMs = Date.now() - crashStarted;
     assert(measurements.crashedScriptMs < 15_000, "A crashed script waited for its deadline.");
     recordCases("crashed-script-stops");
+
+    const toolCrashStarted = Date.now();
+    const pendingEvaluate = call("evaluate", {
+      tabId: crashing.tab.id,
+      expression: "new Promise((resolve) => { window.fixtureEvaluate = resolve; })",
+      awaitPromise: true,
+    });
+    await crashing.contents.executeJavaScript(
+      "new Promise((resolve) => { const ready = () => (window.fixtureEvaluate ? resolve() : requestAnimationFrame(ready)); ready(); })",
+    );
+    crashing.contents.forcefullyCrashRenderer();
+    const crashedEvaluate = await pendingEvaluate;
+    measurements.crashedToolMs = Date.now() - toolCrashStarted;
+    assert.equal(crashedEvaluate.success, false, "A tool call on a crashed page did not fail.");
+    assert(text(crashedEvaluate).includes("The page crashed"), text(crashedEvaluate));
+    assert(measurements.crashedToolMs < 15_000, "A tool call on a crashed page waited for its deadline.");
+    recordCases("crashed-tool-call-stops");
     await close(crashing.tab.id);
 
-    // A new host with a short sweep: of the idle tabs, only the 3 most recently used stay loaded.
     phase("tab-sleep");
     await runCauseEffect(host.destroy());
     const sleepy = new BrowserHost(window, join(fixtureRoot, "downloads"), join(fixtureRoot, "sleep-tabs.json"), {
@@ -699,21 +708,29 @@ async function main(): Promise<void> {
       assert(contents, `Missing contents of sleep tab ${index}.`);
       loaded.push(contents);
     }
+    await runCauseEffect(sleepy.setVisible({ visible: true, bounds: { x: 0, y: 0, width: 800, height: 600 } }));
     const [first, second, ...newest] = loaded;
     assert(first && second, "Missing sleep tabs.");
-    // The fifth tab is the active one, so it is in use; the first of the four idle tabs is past the cap.
     await unloaded(first);
     assert(!second.isDestroyed() && newest.every((item) => !item.isDestroyed()), "A tab within the cap slept.");
     recordCases("idle-tabs-past-cap-sleep");
 
     assert(firstTabId, "Missing the first sleep tab.");
-    const woken = snapshotSchema.parse(
-      parseBrowserToolText(
-        text(await runCauseEffect(sleepy.handleDynamicTool(params("snapshot", { tabId: firstTabId, image: "never" })))),
-      ),
+    const wokenResult = await runCauseEffect(
+      sleepy.handleDynamicTool(params("snapshot", { tabId: firstTabId, image: "never" })),
     );
+    const woken = snapshotSchema.parse(parseBrowserToolText(text(wokenResult)));
     assert.equal(woken.url, `${origin}/form?tab=1`, "A slept tab did not load its page again.");
-    // The woken tab is now the most recently used one, so the second tab is past the cap.
+    const unloadNote = (result: DynamicToolResult) =>
+      result.contentItems.some((item) => item.type === "inputText" && item.text.includes("unloaded to free memory"));
+    assert(unloadNote(wokenResult), "A woken tab did not tell the agent that its page was unloaded.");
+    assert(
+      !unloadNote(
+        await runCauseEffect(sleepy.handleDynamicTool(params("snapshot", { tabId: firstTabId, image: "never" }))),
+      ),
+      "The unload note came again on the next call.",
+    );
+    recordCases("slept-tab-tells-agent-once");
     await unloaded(second);
     assert(
       newest.every((item) => !item.isDestroyed()),
@@ -754,7 +771,6 @@ async function main(): Promise<void> {
 
 function phase(name: string): void {
   currentPhase = name;
-  // Machine-readable: phase receipts contain no page data.
   process.stdout.write(`${JSON.stringify({ runId, phase: name, status: "running" })}\n`);
 }
 
@@ -778,6 +794,13 @@ const PAGES: Record<string, string> = {
   "/challenge": `<!doctype html><meta charset="utf-8"><title>Just a moment...</title>
     <div id="challenge-running">Checking your browser before accessing the site.</div>
     <script>setTimeout(() => location.replace("/form"), 3000);</script>`,
+  "/long-challenge": `<!doctype html><meta charset="utf-8"><title>Just a moment...</title>
+    <script src="/cdn-cgi/challenge-platform/h/b/orchestrate/chl_page/v1?ray=fixture"></script>
+    <p>Verifying the security of your connection.</p>
+    <div role="dialog"><p>${"This site uses cookies to improve your experience. ".repeat(200)}</p></div>
+    <script>setTimeout(() => location.replace("/form"), 3000);</script>`,
+  "/redirect-during-read": `<!doctype html><meta charset="utf-8"><title>Redirect</title><p>One moment.</p>
+    <script>setTimeout(() => location.replace("/form"), 100);</script>`,
   "/stuck-challenge": `<!doctype html><meta charset="utf-8"><title>Just a moment...</title>
     <div id="challenge-running">Checking your browser before accessing the site.</div>`,
   "/captcha": `<!doctype html><meta charset="utf-8"><title>Security check</title>
@@ -788,7 +811,6 @@ const PAGES: Record<string, string> = {
   "/stuck-checkbox-captcha": checkboxCaptchaPage(false),
   "/shadow-checkbox-captcha": checkboxCaptchaPage(true, true),
   "/self-passing-turnstile": checkboxCaptchaPage(false, false, true),
-  // A click anywhere in the widget tells the page; the fixture page decides whether the check passes.
   "/challenges.cloudflare.com/turnstile": `<!doctype html><meta charset="utf-8">
     <body style="margin:0"><label style="display:block;height:65px;padding-left:16px">
     <input type="checkbox" style="margin-top:20px">Verify you are human</label>
@@ -801,8 +823,6 @@ const PAGES: Record<string, string> = {
     <script>document.querySelector("dialog").showModal();</script>`,
 };
 
-// Turnstile puts its frame in a closed shadow root, so only CDP finds it. A widget that passes by
-// itself gets its token without a click.
 function checkboxCaptchaPage(passes: boolean, shadow = false, selfPass = false): string {
   const frame = `<iframe src="/challenges.cloudflare.com/turnstile" style="width:300px;height:65px;border:0"></iframe>`;
   return `<!doctype html><meta charset="utf-8"><title>Security check</title>

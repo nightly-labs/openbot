@@ -65,6 +65,7 @@ export const messages = {
     other: "يمكنك إضافة {count} مجلد على الأكثر",
   },
   "agentSettings.folders.browse.places": "انتقال إلى",
+  "agentSettings.folders.browse.path": "مسار المجلد",
   "agentSettings.folders.browse.home": "المجلد الرئيسي",
   "agentSettings.folders.browse.parent": "صعودًا إلى {folder}",
   "agentSettings.folders.browse.failed": "تعذّر فتح هذا المجلد.",
@@ -126,6 +127,7 @@ export const messages = {
   "agentSettings.backupModels.limited": "بلغ حد الاستخدام · تم التخطي",
   "agentSettings.backupModels.unavailable": "غير متاح الآن · تم التخطي",
   "agentSettings.backupModels.withAccount": "{model} · {account}",
+  "agentSettings.backupModels.withProvider": "{model} · {provider}",
   "agentSettings.backupModels.note":
     "عندما يوقف حدّ الاستخدام {name} بعد أن يبدأ العمل، يتابع {name} العمل نفسه على أول نموذج متاح في الترتيب. ويعود إلى {model} عند انتهاء الحد، أو بعد 10 دقائق من خطأ المزوّد.",
   "agentSettings.groups.brain": "العقل",
@@ -181,8 +183,6 @@ export const messages = {
   "agentSettings.runtime.accessLabel": "وصول الوكيل",
   "agentSettings.runtime.busyMessage": "أثناء العمل",
   "agentSettings.runtime.busyMessageLabel": "الرسائل أثناء عمل الوكيل",
-  "agentSettings.runtime.taskLimit": "السلاسل المتوازية",
-  "agentSettings.runtime.taskLimitLabel": "السلاسل التي تعمل في الوقت نفسه",
   "agentSettings.runtime.workingDirectory": "دليل العمل",
   "agentSettings.runtime.notAvailable": "غير متاح بعد",
   "agentSettings.runtime.fullAccessNote": "يعمل الوكيل بوصول كامل إلى الحاسوب من مساحة عمله والمجلد المشترك.",
@@ -200,8 +200,6 @@ export const messages = {
   "agentSettings.busyMessage.steer": "توجيه",
   "agentSettings.busyMessage.steerUnsupported":
     "لا يستطيع {provider} توجيه دور قيد التشغيل. تنتظر الرسائل المرسلة أثناء عمله في قائمة الانتظار.",
-  "agentSettings.taskLimit.default": "افتراضي ({count})",
-  "agentSettings.taskLimit.oneTurn": "يشغّل {provider} دورًا واحدًا في كل مرة. تنتظر سلاسل هذا الوكيل بعضها بعضًا.",
 
   "agentSettings.notificationLevel.title": "إشعاري",
   "agentSettings.notificationLevel.server": "افتراضي الخادم ({level})",
@@ -209,13 +207,14 @@ export const messages = {
     "هذا الاختيار لك وحدك ويُطبَّق على كل أجهزتك. عندما يكون الخادم مكتومًا أو مضبوطًا على «لا شيء»، يبقى هذا الوكيل صامتًا أيضًا.",
 
   "agentSettings.newChat.title": "دردشة جديدة",
-  "agentSettings.newChat.description": "ينسى الوكيل هذه الدردشة. ويبقى إعداده.",
+  "agentSettings.newChat.description": "يبدأ الوكيل من جديد، ويمكنه البحث في هذه الدردشة عند الحاجة. ويبقى إعداده.",
   "agentSettings.newChat.button": "بدء",
   "agentSettings.newChat.confirmTitle": "هل تريد بدء دردشة جديدة مع {name}؟",
   "agentSettings.newChat.confirmDescription":
-    "ينسى الوكيل هذه الدردشة. تبقى الرسائل ظاهرة فوق فاصل. ولا تتغير التعليمات والنموذج والأدوات والذكريات ومساحة العمل والمتصفح.",
+    "يبدأ الوكيل من جديد، ويمكنه البحث في هذه الدردشة عند الحاجة. تبقى الرسائل ظاهرة فوق فاصل. ولا تتغير التعليمات والنموذج والأدوات والذكريات ومساحة العمل والمتصفح.",
   "agentSettings.newChat.confirm": "بدء دردشة جديدة",
   "agentSettings.newChat.failed": "تعذّر بدء دردشة جديدة.",
+  "agentSettings.newChat.busy": "الوكيل يعمل الآن. لبدء دردشة جديدة، انتظر حتى ينتهي أو أوقفه.",
   "agentSettings.deleteHistory.title": "حذف السجل",
   "agentSettings.deleteHistory.description": "تُحذف رسائل هذه الدردشة وينساها الوكيل. يبقى إعداده كما هو.",
   "agentSettings.deleteHistory.button": "حذف",
@@ -224,6 +223,10 @@ export const messages = {
     "تُحذف كل رسائل هذه الدردشة وملفاتها من OpenBot وينساها الوكيل. لا يمكن التراجع عن ذلك. لا تتغير المحادثات الجانبية والتعليمات والنموذج والأدوات والذكريات ومساحة العمل والمتصفح.",
   "agentSettings.deleteHistory.confirm": "حذف السجل",
   "agentSettings.deleteHistory.failed": "تعذّر حذف السجل.",
+  "agentSettings.deleteAgent.title": "حذف الوكيل",
+  "agentSettings.deleteAgent.description":
+    "يُحذف الوكيل ومحادثته وذكرياته ومهامه الدورية ومساحة العمل الخاصة به من OpenBot.",
+  "agentSettings.deleteAgent.button": "حذف",
 
   "agentSettings.fullAccess.title": "هل تريد منح هذا الوكيل وصولًا كاملًا؟",
   "agentSettings.fullAccess.askTitle": "هل تسمح لهذا الوكيل بالعمل خارج مساحة عمله؟",
@@ -235,6 +238,8 @@ export const messages = {
   "agentSettings.fullAccess.askConfirm": "استخدام «السؤال أولًا»",
 
   "agentSettings.links.usage": "الاستخدام",
+  "agentSettings.links.apps": "التطبيقات",
+  "agentSettings.links.appsScope": "كل الوكلاء",
   "agentSettings.links.memories": "الذكريات",
   "agentSettings.links.memoriesCount": {
     zero: "لا ذكريات محفوظة",
@@ -287,6 +292,9 @@ export const messages = {
   "agentSettings.agentNewChat.description": "السماح للوكيل ببدء دردشة جديدة عندما تطول دردشته. يحفظ ملاحظات أولًا.",
   "agentSettings.quickAcknowledgement.title": "عرض الخطة قبل المهام الطويلة",
   "agentSettings.quickAcknowledgement.description": "قبل مهمة طويلة، يعرض الوكيل خطته.",
+  "agentSettings.builtinMemory.title": "ذاكرة OpenBot",
+  "agentSettings.builtinMemory.description":
+    "يحفظ الوكيل ذكرياته ويقرؤها. أوقفها لاستخدام تطبيق ذاكرة فقط، مثل Mem0. تبقى الذكريات المحفوظة.",
   "agentSettings.browserProfile.label": "ملف تعريف المتصفح",
   "agentSettings.browserProfile.shared": "مشترك",
   "agentSettings.browserProfile.agent": "هذا الوكيل فقط",
@@ -296,6 +304,8 @@ export const messages = {
   "agentSettings.browserProfile.manageDescription":
     "يحتفظ كل ملف تعريف بعمليات تسجيل الدخول وملفات تعريف الارتباط الخاصة به. يؤدي التغيير إلى إغلاق علامات التبويب المفتوحة لدى الوكيل.",
   "agentSettings.browserProfile.manage": "إدارة",
+  "agentSettings.browserProfile.movedNote":
+    "تبقى عمليات تسجيل الدخول إلى المواقع في ملف التعريف القديم. يجب أن يسجّل الوكيل الدخول إلى هذه المواقع مرة أخرى.",
   "agentSettings.runtime.workspaceEnforcedProcess":
     "تعمل عملية {provider} كاملةً في بيئة معزولة، لذا تفشل الكتابة خارجها. متاح على macOS فقط.",
 } as const satisfies PartialTranslation<typeof source>;

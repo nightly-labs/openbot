@@ -1,29 +1,4 @@
-// The shape of `servers.json` on the user's disk, and how a file written by an older build is read.
-//
-// This is persisted user state with no backup: nothing copies the file before an upgrade, and the
-// first write after a read replaces it. So a read that cannot make sense of one part must give back
-// everything else rather than nothing -- see `readStoredRemoteServers`. `src/backend/AGENTS.md` states
-// the same rule for the database; the reasoning is identical and the file is smaller.
-//
-// "Everything else" includes the part it could not read. An entry this build rejects is carried in
-// `unreadableServers` and written back into `servers` untouched, so the file keeps every entry it
-// arrived with. Dropping one would be the same data loss one step later: a server with an intact
-// token and a single field this build does not recognise -- written by a newer build, or by a hand
-// edit -- would vanish on the next write, and the build that understands it would never see it
-// again. This build refuses to *use* such an entry, and it does not get to delete it: only the user
-// removing the server, or joining one with the same id, retires a preserved entry, and
-// `RemoteServerStore` owns both of those. The one thing that displaces an entry without retiring it
-// is a readable server arriving on the same id -- see `serializeStoredRemoteServers`, which writes
-// the readable one because a file with two entries under one id is worse than either alone.
-//
-// The same applies to the selection. If the active server is a preserved entry, this build cannot
-// select it, so it runs on the local server -- but the id stays in the file, so the build that can
-// read the entry still finds the user on it.
-//
-// Versions 1 and 2 differ from 3 only in fields this reader already treats as optional, so an upgrade
-// is a re-tag. A version this build does not know is refused outright: it was written by a newer
-// OpenBot, and guessing at it would replace a file that build can still read.
-
+import { type CustomServerPlan, optionalCustomServerPayment } from "@openbot/contracts/custom-server-plans";
 import type { ServerNotificationLevel, TeamRole } from "@openbot/contracts/ipc";
 import { LOCAL_SERVER_ID, SERVER_NOTIFICATION_LEVELS } from "@openbot/contracts/ipc";
 import {
@@ -34,6 +9,10 @@ import {
   isOneOf,
   isString,
 } from "@openbot/contracts/runtime-values";
+import {
+  optionalServerAppearanceField,
+  type ServerAppearance,
+} from "@openbot/contracts/team-protocol/host-appearance-v1";
 
 export interface StoredRemoteServer {
   id: string;
@@ -45,31 +24,25 @@ export interface StoredRemoteServer {
   encryptedToken: string;
   remoteDesktopAvailable: boolean;
   logoVersion?: string | null;
+  appearance?: ServerAppearance | null;
   role: TeamRole;
   transport?: "webrtc-v2";
-  /** The active members that the host's plan allows, from the account server's host list. */
   memberLimit?: number;
-  /** A hosted server, from the account server's host list. */
+  licenseRaisesMemberLimit?: boolean;
   hosted?: boolean;
-  /** The plan storage in GB of a hosted server, from the account server's host list. */
+  restartAvailable?: boolean;
   storageGb?: number;
+  paymentRequired?: true;
+  customPlan?: CustomServerPlan;
 }
 
-// An entry this build cannot read, and where it sat in `servers`. The slot is named by the entry
-// that followed it, not by an index: a list the user removes a server from renumbers, and an index
-// taken before the removal would move the preserved entry past the servers it used to sit behind.
-// Null means it was last.
 interface PreservedRemoteServer {
   beforeId: string | null;
   entry: DynamicRecord;
 }
 
-// Per-server notification choices beyond the permanent mute, which stays in `mutedServerIds` so an
-// older build still reads it. An older build drops this key on its next write; that loses only these
-// choices, never a server.
 export interface StoredServerNotifications {
   level?: ServerNotificationLevel;
-  // Epoch milliseconds. A past value means the mute has ended.
   mutedUntil?: number;
 }
 
@@ -80,21 +53,11 @@ export interface StoredRemoteServers {
   hiddenHostIds: string[];
   mutedServerIds: string[];
   serverNotifications: Record<string, StoredServerNotifications>;
-  // The joined servers that may send browser connections through this computer (`browser-egress-v1`).
-  // An older build drops this key on its next write; that turns sharing off, never on.
   browserEgressServerIds: string[];
-  // Entries kept verbatim for whoever can read them, each with the slot it occupied. In memory only:
-  // `serializeStoredRemoteServers` puts them back in `servers`, because a key of its own would be
-  // invisible to the older build that is the whole reason for keeping them -- and puts them back
-  // where they were, because `servers` order is the sidebar order the user arranged.
   unreadableServers: PreservedRemoteServer[];
-  // The selection this build had to fall back from, for the same reason and by the same trick: it is
-  // written as `activeServerId` while `activeServerId` above -- the one the app runs on -- stays
-  // local. Null once the user picks a server themselves, which is the only thing that supersedes it.
   unreadableActiveServerId: string | null;
 }
 
-// A function, not a shared constant: the caller owns the result and writes through it.
 export function emptyStoredRemoteServers(): StoredRemoteServers {
   return {
     version: 3,
@@ -109,23 +72,17 @@ export function emptyStoredRemoteServers(): StoredRemoteServers {
   };
 }
 
-// One unreadable entry costs the user the use of that entry, not the file and not the entry. Returning
-// null here -- which this did until 2026-09 -- left the manager on its empty default, and its next
-// write replaced every server the user had joined with an empty list. Null is now reserved for a file
-// whose top level makes no sense, which `RemoteServerStore.load` turns into a refusal to touch it.
 export function readStoredRemoteServers(value: unknown): StoredRemoteServers | null {
   if (!isDynamicRecord(value) || !isString(value.activeServerId) || !Array.isArray(value.servers)) return null;
   if (value.version !== 1 && value.version !== 2 && value.version !== 3) return null;
   const servers: StoredRemoteServer[] = [];
   const unreadableServers: PreservedRemoteServer[] = [];
-  // Backwards, so each unreadable entry already knows the readable one that follows it.
   let following: string | null = null;
   for (const serverValue of [...value.servers].reverse()) {
     const server = readStoredRemoteServer(serverValue);
     if (server) {
       servers.unshift(server);
       following = server.id;
-      // A non-record entry carries no token and no identity, so there is nothing in it to preserve.
     } else if (isDynamicRecord(serverValue)) {
       unreadableServers.unshift({ beforeId: following, entry: serverValue });
     }
@@ -133,10 +90,6 @@ export function readStoredRemoteServers(value: unknown): StoredRemoteServers | n
   const hiddenHostIds = Array.isArray(value.hiddenHostIds)
     ? value.hiddenHostIds.filter((hostId): hostId is string => isString(hostId))
     : [];
-  // The active server may be one of the entries just dropped. The local server is always selectable,
-  // so it is the one fallback that cannot itself be missing. A fallback that stepped off a preserved
-  // entry is remembered rather than overwritten; one that stepped off a dangling id is not, because
-  // there is nothing left in the file for it to name.
   const selectable =
     value.activeServerId === LOCAL_SERVER_ID || servers.some((server) => server.id === value.activeServerId);
   const preservedActive = unreadableServers.some((preserved) => preserved.entry.id === value.activeServerId);
@@ -155,22 +108,6 @@ export function readStoredRemoteServers(value: unknown): StoredRemoteServers | n
   };
 }
 
-// The on-disk object. Every unreadable entry rejoins `servers`, in the slot it came from. Where a
-// readable server now holds a preserved entry's id -- which is reconciliation minting one off a
-// directory advertisement, not a user rejoining -- the *preserved* entry is the one written and the
-// synthesized one is not. Both cannot be: two entries under one id is not a file any build can act
-// on, because the build that can finally decode the preserved entry lists the server twice and its
-// `reorder` refuses an ordering whose ids are not unique.
-//
-// The preserved entry wins that choice because it is the only one of the two that cannot be rebuilt.
-// A synthesized WebRTC entry carries no token and nothing the user typed: the next host directory
-// sync makes it again, with the pinned key and fingerprint `reconcileWebRtcHosts` reads out of the
-// preserved record. Writing the synthesized entry instead would drop whatever fields this build did
-// not recognise -- the reason the entry is kept at all -- for good, at the next restart.
-//
-// The slot matters because `servers` order is the sidebar order the user dragged into place. Writing
-// the preserved entries last would let any unrelated write reshuffle a list this build cannot even
-// display, and the build that can display it would show the new order as the user's own.
 export function serializeStoredRemoteServers(state: StoredRemoteServers): {
   version: 3;
   activeServerId: string;
@@ -181,8 +118,6 @@ export function serializeStoredRemoteServers(state: StoredRemoteServers): {
   browserEgressServerIds: string[];
 } {
   const readableIds = new Set(state.servers.map((server) => server.id));
-  // A preserved entry whose id a readable server now holds is written where that server sits, so the
-  // position reconciliation gave the host is the position it keeps.
   const claims = new Map<string, PreservedRemoteServer>();
   for (const preserved of state.unreadableServers) {
     const id = idOf(preserved.entry);
@@ -191,9 +126,6 @@ export function serializeStoredRemoteServers(state: StoredRemoteServers): {
   const written = new Set<PreservedRemoteServer>(claims.values());
   const servers: (StoredRemoteServer | DynamicRecord)[] = [];
   for (const server of state.servers) {
-    // Only a readable server anchors a slot. An opaque entry cannot: this build did not read its
-    // `id`, so treating one as an anchor would let a field it rejected decide where another entry
-    // lands -- and two entries whose `id` is missing would anchor on each other and swap.
     for (const preserved of state.unreadableServers) {
       if (preserved.beforeId !== server.id || written.has(preserved)) continue;
       written.add(preserved);
@@ -202,7 +134,6 @@ export function serializeStoredRemoteServers(state: StoredRemoteServers): {
     const claim = claims.get(server.id);
     servers.push(claim ? claim.entry : server);
   }
-  // A successor that is gone leaves the entry at the end, which is the most its slot can still mean.
   for (const preserved of state.unreadableServers) {
     if (!written.has(preserved)) servers.push(preserved.entry);
   }
@@ -217,11 +148,8 @@ export function serializeStoredRemoteServers(state: StoredRemoteServers): {
   };
 }
 
-// A bad field drops only that field, and a bad entry only that entry: these are preferences, and the
-// rest of the file must still load.
 function readServerNotifications(value: unknown): Record<string, StoredServerNotifications> {
   if (!isDynamicRecord(value)) return {};
-  // `fromEntries` defines own properties, so an id such as `__proto__` cannot reach the prototype.
   return Object.fromEntries(
     Object.entries(value).flatMap(([serverId, entry]): [string, StoredServerNotifications][] => {
       if (!isDynamicRecord(entry)) return [];
@@ -270,10 +198,13 @@ function readStoredRemoteServer(value: unknown): StoredRemoteServer | null {
     ...(value.logoVersion === undefined ? {} : { logoVersion: value.logoVersion }),
     role: value.role,
     ...(value.transport === undefined ? {} : { transport: value.transport }),
-    // A bad limit drops only the limit: the next host list writes it again.
     ...(isPositiveInteger(value.memberLimit) ? { memberLimit: value.memberLimit } : {}),
+    ...(isBoolean(value.licenseRaisesMemberLimit) ? { licenseRaisesMemberLimit: value.licenseRaisesMemberLimit } : {}),
     ...(isBoolean(value.hosted) ? { hosted: value.hosted } : {}),
+    ...(isBoolean(value.restartAvailable) ? { restartAvailable: value.restartAvailable } : {}),
     ...(isPositiveInteger(value.storageGb) ? { storageGb: value.storageGb } : {}),
+    ...optionalCustomServerPayment(value),
+    ...optionalServerAppearanceField(value.appearance),
   };
 }
 
