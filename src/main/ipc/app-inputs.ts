@@ -447,6 +447,7 @@ export function parseExternalDestination(input: unknown): ExternalDestination {
     input !== "grok-bot-export" &&
     input !== "hosted-server-contact" &&
     input !== "download" &&
+    input !== "chrome-extension" &&
     input !== "mac-screen-recording"
   ) {
     throw new Error("Unknown external destination.");

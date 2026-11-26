@@ -421,6 +421,8 @@ export const messages = {
   "sitePage.landing.download.googlePlay": "Доступно в Google Play",
   "sitePage.landing.download.pages": "Системные требования и установка:",
   "sitePage.landing.download.apk": "Скачать APK",
+  "sitePage.landing.download.chromeDescription": "Интернет-магазин Chrome · Ваши агенты рядом с любой страницей",
+  "sitePage.landing.download.chromeAction": "Установить в Chrome",
   "sitePage.referral.invitedBy": "{name} приглашает вас в OpenBot",
   "sitePage.referral.invited": "У вас есть приглашение в OpenBot",
   "sitePage.referral.offer": "Скидка {percent}",

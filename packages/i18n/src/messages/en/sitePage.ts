@@ -434,6 +434,8 @@ export const messages = defineMessages("sitePage", {
   "sitePage.landing.download.googlePlay": "Get it on Google Play",
   "sitePage.landing.download.pages": "System requirements and install steps:",
   "sitePage.landing.download.apk": "Get the APK",
+  "sitePage.landing.download.chromeDescription": "Chrome Web Store · Your agents beside any page",
+  "sitePage.landing.download.chromeAction": "Add to Chrome",
   "sitePage.referral.invitedBy": "{name} invited you to OpenBot",
   "sitePage.referral.invited": "You have an invite to OpenBot",
   "sitePage.referral.offer": "{percent} off",

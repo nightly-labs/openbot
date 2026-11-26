@@ -291,6 +291,11 @@ export const messages = {
   "provider.account.pool": "تجميع الحسابات",
   "provider.account.poolDescription":
     "يستخدم الوكلاء حسابًا واحدًا حتى يقترب من حد الاستخدام، ثم الحساب الذي يُعاد تعيين حده أولًا.",
+  "provider.account.poolStrategy": "طريقة الاستخدام",
+  "provider.account.poolFillFirst": "ملء الأول أولًا",
+  "provider.account.poolSpread": "توزيع",
+  "provider.account.poolSpreadDescription":
+    "يتوزع الوكلاء على الحسابات التي بقي فيها أكبر قدر من الاستخدام. لا يغيّر الوكيل حسابه إلا عندما يكون لدى حساب آخر مساحة أكبر بكثير.",
   "provider.account.inUse": "قيد الاستخدام",
   "provider.account.notInPool": "خارج المجموعة",
   "provider.account.leaveOutOfPool": "استبعاد من المجموعة",

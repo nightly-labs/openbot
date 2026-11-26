@@ -253,6 +253,11 @@ export const messages = {
   "provider.account.pool": "Accounts bundelen",
   "provider.account.poolDescription":
     "Agents gebruiken één account tot het een gebruikslimiet nadert, en dan het account waarvan de limiet het eerst reset.",
+  "provider.account.poolStrategy": "Accounts gebruiken",
+  "provider.account.poolFillFirst": "Eerst vullen",
+  "provider.account.poolSpread": "Spreiden",
+  "provider.account.poolSpreadDescription":
+    "Agents verdelen zich over de accounts met het meeste gebruik over. Een agent wisselt alleen van account als een ander account veel meer ruimte heeft.",
   "provider.account.inUse": "In gebruik",
   "provider.account.notInPool": "Niet in pool",
   "provider.account.leaveOutOfPool": "Uit pool halen",

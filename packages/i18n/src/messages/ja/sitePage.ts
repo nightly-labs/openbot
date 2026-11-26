@@ -418,6 +418,8 @@ export const messages = {
   "sitePage.landing.download.googlePlay": "Google Play で手に入れよう",
   "sitePage.landing.download.pages": "システム要件とインストール手順:",
   "sitePage.landing.download.apk": "APK を入手",
+  "sitePage.landing.download.chromeDescription": "Chrome ウェブストア · どのページの横でもエージェントと",
+  "sitePage.landing.download.chromeAction": "Chrome に追加",
   "sitePage.referral.invitedBy": "{name} さんから OpenBot に招待されました",
   "sitePage.referral.invited": "OpenBot への招待が届いています",
   "sitePage.referral.offer": "{percent} オフ",

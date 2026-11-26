@@ -442,6 +442,11 @@ import {
   PROVIDER_ACCOUNT_MODELS_ROUTES,
 } from "@openbot/contracts/team-protocol/provider-account-models-v1";
 import {
+  decodeProviderAccountPoolStrategies,
+  PROVIDER_ACCOUNT_POOL_STRATEGY_CAPABILITY,
+  PROVIDER_ACCOUNT_POOL_STRATEGY_ROUTES,
+} from "@openbot/contracts/team-protocol/provider-account-pool-strategy-v1";
+import {
   PROVIDER_ACCOUNT_POOL_CAPABILITY,
   PROVIDER_ACCOUNT_POOL_ROUTES,
 } from "@openbot/contracts/team-protocol/provider-account-pool-v1";
@@ -3356,13 +3361,18 @@ try {
     providerAccounts: new ProviderAccountsHost({
       service: {
         getStatus: accountModelsStatus,
-        setProviderAccountPool: (provider, enabled, leftOut) =>
+        setProviderAccountPool: (provider, enabled, leftOut, strategy) =>
           Effect.sync(() => {
-            record("setProviderAccountPool", { provider, enabled, leftOut });
+            record("setProviderAccountPool", { provider, enabled, leftOut, ...(strategy ? { strategy } : {}) });
             const known = ["default", ULTRA_ACCOUNT, FREE_ACCOUNT];
             const out = leftOut.filter((id) => known.includes(id));
+            const kept = strategy ?? antigravityPool?.strategy;
             antigravityPool = enabled
-              ? { leftOut: out, inUse: known.find((id) => !out.includes(id)) ?? null }
+              ? {
+                  leftOut: out,
+                  inUse: known.find((id) => !out.includes(id)) ?? null,
+                  ...(kept && kept !== "fillFirst" ? { strategy: kept } : {}),
+                }
               : undefined;
             return accountModelsStatus();
           }),
@@ -5227,6 +5237,109 @@ try {
       "an admin turns the pool off again",
       offAgain.status === 200 && isDeepStrictEqual(cleared.body, { pools: [] }),
       [summary(offAgain), summary(cleared)],
+    );
+  }
+
+  {
+    const route = PROVIDER_ACCOUNT_POOL_STRATEGY_ROUTES;
+    const pool = PROVIDER_ACCOUNT_POOL_ROUTES;
+    const v10 = {
+      capabilities: [PROVIDER_ACCOUNT_POOL_CAPABILITY, PROVIDER_ACCOUNT_POOL_STRATEGY_CAPABILITY],
+      protocol: TEAM_PROTOCOL_V10,
+    };
+    const v9 = { capabilities: [PROVIDER_ACCOUNT_POOL_CAPABILITY], protocol: TEAM_PROTOCOL_V9 };
+    const compatibility = await call("GET", TEAM_API_ROUTES.compatibility, { protocol: TEAM_PROTOCOL_V10 });
+    const older = await call("GET", TEAM_API_ROUTES.compatibility, { protocol: TEAM_PROTOCOL_V9 });
+    check(
+      "the host advertises provider-account-pool-strategy-v1 to a protocol 10 peer only",
+      list(field(compatibility.body, "capabilities")).includes(PROVIDER_ACCOUNT_POOL_STRATEGY_CAPABILITY) &&
+        older.status === 200 &&
+        !list(field(older.body, "capabilities")).includes(PROVIDER_ACCOUNT_POOL_STRATEGY_CAPABILITY),
+      [summary(compatibility), summary(older)],
+    );
+    const unsupported = await call("POST", route.list, { token: adaToken, json: {}, ...v9 });
+    check(
+      "the strategy route without the capability gets 400 providersUnsupported",
+      errorIs(unsupported, 400, sourceText("error.team.providersUnsupported")),
+      summary(unsupported),
+    );
+    const writes = callsOf("setProviderAccountPool").length;
+    const memberRead = await call("POST", route.list, { token: bobToken, json: {}, ...v10 });
+    const memberUpdate = await call("POST", route.update, {
+      token: bobToken,
+      json: { provider: "antigravity", strategy: "spread" },
+      ...v10,
+    });
+    const offUpdate = await call("POST", route.update, {
+      token: adaToken,
+      json: { provider: "antigravity", strategy: "spread" },
+      ...v10,
+    });
+    const offList = await call("POST", route.list, { token: adaToken, json: {}, ...v10 });
+    check(
+      "a member cannot read or change the strategy, and with the pool off an admin change writes nothing",
+      errorIs(memberRead, 403, sourceText("error.team.adminRequired")) &&
+        errorIs(memberUpdate, 403, sourceText("error.team.adminRequired")) &&
+        offUpdate.status === 200 &&
+        isDeepStrictEqual(offList.body, { strategies: [] }) &&
+        callsOf("setProviderAccountPool").length === writes,
+      [summary(memberRead), summary(memberUpdate), summary(offUpdate), summary(offList)],
+    );
+    const badStrategy = await call("POST", route.update, {
+      token: adaToken,
+      json: { provider: "antigravity", strategy: "roundRobin" },
+      ...v10,
+    });
+    check(
+      "a strategy that is not one gets 400, and the host writes nothing",
+      badStrategy.status === 400 && callsOf("setProviderAccountPool").length === writes,
+      summary(badStrategy),
+    );
+    await call("POST", pool.update, {
+      token: adaToken,
+      json: { provider: "antigravity", enabled: true, leftOut: [FREE_ACCOUNT] },
+      ...v10,
+    });
+    const fillFirst = await call("POST", route.list, { token: adaToken, json: {}, ...v10 });
+    const spread = await call("POST", route.update, {
+      token: adaToken,
+      json: { provider: "antigravity", strategy: "spread" },
+      ...v10,
+    });
+    const spreadList = await call("POST", route.list, { token: adaToken, json: {}, ...v10 });
+    const v1List = await call("POST", pool.list, { token: adaToken, json: {}, ...v9 });
+    check(
+      "an admin sets Spread, the host keeps the left-out account, and the v1 pool list keeps its shape",
+      isDeepStrictEqual(fillFirst.body, { strategies: [{ provider: "antigravity", strategy: "fillFirst" }] }) &&
+        spread.status === 200 &&
+        isDeepStrictEqual(callsOf("setProviderAccountPool").at(-1), [
+          { provider: "antigravity", enabled: true, leftOut: [FREE_ACCOUNT], strategy: "spread" },
+        ]) &&
+        isDeepStrictEqual(decodeProviderAccountPoolStrategies(spreadList.body), [
+          { provider: "antigravity", strategy: "spread" },
+        ]) &&
+        isDeepStrictEqual(v1List.body, {
+          pools: [{ provider: "antigravity", leftOut: [FREE_ACCOUNT], inUse: "default" }],
+        }),
+      [summary(fillFirst), summary(spread), summary(spreadList), summary(v1List)],
+    );
+    await call("POST", pool.update, {
+      token: adaToken,
+      json: { provider: "antigravity", enabled: true, leftOut: [] },
+      ...v9,
+    });
+    const keptList = await call("POST", route.list, { token: adaToken, json: {}, ...v10 });
+    await call("POST", pool.update, {
+      token: adaToken,
+      json: { provider: "antigravity", enabled: false, leftOut: [] },
+      ...v9,
+    });
+    const clearedList = await call("POST", route.list, { token: adaToken, json: {}, ...v10 });
+    check(
+      "a v1 pool change from an older client keeps Spread, and turning the pool off drops it",
+      isDeepStrictEqual(keptList.body, { strategies: [{ provider: "antigravity", strategy: "spread" }] }) &&
+        isDeepStrictEqual(clearedList.body, { strategies: [] }),
+      [summary(keptList), summary(clearedList)],
     );
   }
 

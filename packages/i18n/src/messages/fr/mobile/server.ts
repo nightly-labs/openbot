@@ -1204,6 +1204,11 @@ export const messages = {
   "mobile.server.providers.pool": "Regrouper les comptes",
   "mobile.server.providers.poolHint":
     "Les agents utilisent un compte jusqu’à ce qu’il approche d’une limite d’usage, puis le compte dont la limite se réinitialise en premier.",
+  "mobile.server.providers.poolStrategy": "Utiliser les comptes",
+  "mobile.server.providers.poolFillFirst": "Remplir d’abord",
+  "mobile.server.providers.poolSpread": "Répartir",
+  "mobile.server.providers.poolSpreadHint":
+    "Les agents se répartissent sur les comptes qui ont le plus d’usage restant. Un agent change de compte seulement quand un autre compte a beaucoup plus de marge.",
   "mobile.server.providers.accountsPooledHint":
     "Les agents partagent ces comptes. Un nouveau compte se connecte sur sa page, sur ce téléphone.",
   "mobile.server.providers.accountsPooledOnComputer":

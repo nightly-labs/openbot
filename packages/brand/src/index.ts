@@ -1,5 +1,6 @@
 export { AppLogo, type AppLogoAnimation, type AppLogoProps, type AppLogoVariant } from "./AppLogo";
 export {
+  type BrowserLogoVariant,
   type MobilePlatformLogoVariant,
   PlatformLogo,
   type PlatformLogoProps,

@@ -419,6 +419,8 @@ export const messages = {
   "sitePage.landing.download.googlePlay": "Google Play'den alın",
   "sitePage.landing.download.pages": "Sistem gereksinimleri ve kurulum adımları:",
   "sitePage.landing.download.apk": "APK'yı indirin",
+  "sitePage.landing.download.chromeDescription": "Chrome Web Mağazası · Ajanlarınız her sayfanın yanında",
+  "sitePage.landing.download.chromeAction": "Chrome'a ekle",
   "sitePage.referral.invitedBy": "{name} sizi OpenBot'a davet etti",
   "sitePage.referral.invited": "OpenBot'a davetiniz var",
   "sitePage.referral.offer": "{percent} indirim",
