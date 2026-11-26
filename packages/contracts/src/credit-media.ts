@@ -193,7 +193,8 @@ export function creditModelCostsLive(models: readonly CreditMediaModel[]): Credi
   const listed = CREDIT_MODEL_COSTS.map((cost) => {
     const model = live.get(cost.modelId);
     const credits = model ? creditMediaShownCredits(model) : null;
-    return credits === null ? cost : { ...cost, credits };
+    if (!model || credits === null) return cost;
+    return model.variant === null ? { ...cost, credits } : { ...cost, credits, variant: model.variant };
   });
   const added = models.flatMap((model) => {
     if (known.has(model.id)) return [];

@@ -48,7 +48,15 @@ interface CreditPrices {
 
 function chargeRange(costs: readonly CreditModelCost[], kind: CreditModelCost["kind"]): ChargeRange {
   const charges = costs.filter((model) => model.kind === kind).map(creditModelCharge);
+  if (charges.length === 0) return chargeRange(CREDIT_MODEL_COSTS, kind);
   return { min: Math.min(...charges), max: Math.max(...charges) };
+}
+
+function exampleModels(costs: readonly CreditModelCost[]): CreditModelCost[] {
+  return EXAMPLE_MODEL_IDS.flatMap((id) => {
+    const model = costs.find((entry) => entry.modelId === id);
+    return model ? [model] : [];
+  });
 }
 
 function creditPrices(live: readonly CreditMediaModel[] | undefined): CreditPrices {
@@ -56,10 +64,8 @@ function creditPrices(live: readonly CreditMediaModel[] | undefined): CreditPric
   const all = models ? creditModelCostsLive(models) : CREDIT_MODEL_COSTS;
   const available = models ? new Set(models.map((model) => model.id)) : undefined;
   const ranged = available ? all.filter((model) => available.has(model.modelId)) : all;
-  const examples = EXAMPLE_MODEL_IDS.flatMap((id) => {
-    const model = ranged.find((entry) => entry.modelId === id);
-    return model ? [model] : [];
-  });
+  const liveExamples = exampleModels(ranged);
+  const examples = liveExamples.length > 0 ? liveExamples : exampleModels(CREDIT_MODEL_COSTS);
   return {
     all,
     examples,
