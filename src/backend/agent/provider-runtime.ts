@@ -2181,14 +2181,31 @@ export class ProviderRuntime implements ProviderPort {
       return "skipped-busy";
     }
     const result = yield* Effect.result(
-      this.#runProviderConnectionCommand(harness, () => this.#reprobeProvider(harness)),
+      this.#runProviderConnectionCommand(harness, () => this.#reprobeWithNewEndpoints(harness)),
     );
     if (Result.isFailure(result) && this.#hooks.isProviderBusy(harness)) {
       this.#environmentReloadPending.add(harness);
       return "skipped-busy";
     }
+    if (Result.isFailure(result)) yield* this.#wakeReleasedProvider(harness);
     return "restarted";
   }, Effect.uninterruptible).bind(this);
+
+  readonly #reprobeWithNewEndpoints = Effect.fn("ProviderRuntime.reprobeWithNewEndpoints")(function* (
+    this: ProviderRuntime,
+    provider: AgentProvider,
+  ) {
+    this.#countActivation(provider);
+    return yield* this.#reprobeProvider(provider, { releaseOldClientOnFailure: true });
+  });
+
+  readonly #wakeReleasedProvider = Effect.fn("ProviderRuntime.wakeReleasedProvider")(function* (
+    this: ProviderRuntime,
+    provider: AgentProvider,
+  ) {
+    if (this.#clients.has(provider) || !this.#released.has(provider)) return;
+    yield* this.ensureProvider(provider).pipe(Effect.ignore, Effect.forkIn(this.#scope));
+  });
 
   #waitsForEndpoint(harness: CustomProviderHarness): boolean {
     return (
@@ -2223,10 +2240,14 @@ export class ProviderRuntime implements ProviderPort {
       this.#environmentReloadWaitsSince.set(provider, waitingSince);
       return;
     }
+    const endpointHarness = isCustomProviderHarness(provider);
     const result = yield* Effect.result(
-      this.#runProviderConnectionCommand(provider, () => this.#reprobeProvider(provider)),
+      this.#runProviderConnectionCommand(provider, () =>
+        endpointHarness ? this.#reprobeWithNewEndpoints(provider) : this.#reprobeProvider(provider),
+      ),
     );
     if (Result.isFailure(result) && this.#hooks.isProviderBusy(provider)) this.#environmentReloadPending.add(provider);
+    else if (Result.isFailure(result) && endpointHarness) yield* this.#wakeReleasedProvider(provider);
   }, Effect.uninterruptible);
 
   readonly reloadCustomAgents = Effect.fn("ProviderRuntime.reloadCustomAgents")(function* (this: ProviderRuntime) {
