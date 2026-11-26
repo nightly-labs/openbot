@@ -6,7 +6,7 @@ import {
   type MarketplaceSuggestionSkillAction,
 } from "@openbot/ui/features/conversation/MarketplaceSuggestionCard";
 import { useText } from "@openbot/ui/text";
-import { createEffect, createSignal } from "solid-js";
+import { createSignal } from "solid-js";
 import { dismissMarketplaceSuggestion, marketplaceSuggestionDismissed } from "./marketplace-suggestion-dismissals";
 
 export type SkillSuggestionOutcome = "open" | "working" | "saved" | "answered";
@@ -49,22 +49,14 @@ export interface SkillSuggestionChatCardProps {
 export function SkillSuggestionChatCard(props: SkillSuggestionChatCardProps) {
   const { t } = useText();
   const [press, setPress] = createSignal<"pending" | "sent" | "saved" | null>(null);
-  const [replyStarted, setReplyStarted] = createSignal(false);
-  createEffect(
-    () => props.outcome,
-    (outcome) => {
-      if (outcome !== "answered") setReplyStarted(true);
-    },
-  );
-  const replyAnswered = () => props.outcome === "answered" && replyStarted();
   const state = () => {
     if (props.outcome === "saved" || press() === "saved") return "connected";
-    if (press() === "pending" || (press() === "sent" && !replyAnswered())) return "busy";
+    if (press() === "pending" || (press() === "sent" && props.outcome === "working")) return "busy";
     return "available";
   };
+  const handedToChat = () => press() === "sent" && state() !== "busy";
   const save = async () => {
-    if (state() !== "available") return;
-    setReplyStarted(props.outcome !== "answered");
+    if (state() !== "available" || handedToChat()) return;
     setPress("pending");
     const reply =
       props.suggestion.action === "create" ? t("chat.suggestion.saveReply") : t("chat.suggestion.updateReply");
@@ -81,7 +73,7 @@ export function SkillSuggestionChatCard(props: SkillSuggestionChatCardProps) {
   };
   const skillAction = (): MarketplaceSuggestionSkillAction =>
     props.suggestion.action === "create" ? "save" : "update";
-  const onSave = () => (props.onSave ? () => void save() : undefined);
+  const onSave = () => (handedToChat() || !props.onSave ? undefined : () => void save());
   const openSkill = () => {
     const suggestion = props.suggestion;
     const open = props.onOpenSkill;
