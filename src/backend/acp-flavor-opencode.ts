@@ -301,6 +301,7 @@ export const OPENCODE_ACP_FLAVOR: AcpFlavor = {
     return isOpenCodeServiceFailure(error) ? "list-sessions" : null;
   },
   keepModelsOnRefreshFailure: true,
+  modelNotOffered: (error) => error.code === -32602 && isRecord(error.data) && typeof error.data.modelId === "string",
   streamAnswerBeforePromptReturns: true,
   thoughtsInsideAnswer: true,
   unsentBackgroundTurns: true,
