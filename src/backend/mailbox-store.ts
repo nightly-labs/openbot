@@ -182,11 +182,20 @@ interface AwaitedThreadCandidate {
   completed: boolean;
 }
 
-interface KeptAwaitedThreadCandidates {
-  state: StoredState;
+type TaskRequestMessage = StoredMessage & { sender: { kind: "agent"; agentId: string }; senderTaskId: string };
+
+interface TaskRequestDelivery {
+  delivery: StoredDelivery;
+  message: TaskRequestMessage;
+}
+
+interface KeptTaskRequestDeliveries {
   messages: StoredMessage[];
+  messagesLength: number;
   deliveries: StoredDelivery[];
-  candidates: readonly AwaitedThreadCandidate[];
+  deliveriesLength: number;
+  requests: TaskRequestDelivery[];
+  orphans: number;
 }
 
 interface ConversationIndex {
@@ -306,7 +315,7 @@ export class MailboxStore {
   #state: StoredState = structuredClone(EMPTY_STATE);
   #taskRunsInProvider: (agentId: string, taskId: string) => boolean = () => false;
   #keptConversationIndex: ConversationIndex | undefined;
-  #keptAwaitedThreadCandidates: KeptAwaitedThreadCandidates | undefined;
+  #keptTaskRequestDeliveries: KeptTaskRequestDeliveries | undefined;
   #keptConversationStructure: ConversationStructure | undefined;
   #keptRequestHolders: KeptIndex<StoredMessage, Map<string, Set<string>>> | undefined;
   #keptAnsweredKeys: KeptIndex<StoredMessage, Set<string>> | undefined;
@@ -957,15 +966,13 @@ export class MailboxStore {
     });
   }
 
-  #awaitedThreadCandidates(): readonly AwaitedThreadCandidate[] {
-    const state = this.#state;
-    const unsaved = this.#hasUnsavedChanges();
-    const kept = this.#keptAwaitedThreadCandidates;
-    if (!unsaved && kept?.state === state && kept.messages === state.messages && kept.deliveries === state.deliveries)
-      return kept.candidates;
-    let messages: ReadonlyMap<string, StoredMessage> | undefined;
-    let answered: ReadonlySet<string> | undefined;
-    const candidates = state.deliveries.flatMap((delivery): AwaitedThreadCandidate[] => {
+  #awaitedThreadCandidates(): AwaitedThreadCandidate[] {
+    const kept = this.#taskRequestDeliveries();
+    const answered = this.#answeredKeys();
+    kept.requests = kept.requests.filter(
+      ({ delivery, message }) => !answered.has(`${message.id}:${delivery.recipientAgentId}`),
+    );
+    return kept.requests.flatMap(({ delivery, message }): AwaitedThreadCandidate[] => {
       const completed = delivery.status === "completed";
       const status = completed
         ? "running"
@@ -973,11 +980,6 @@ export class MailboxStore {
           ? delivery.status
           : null;
       if (!status) return [];
-      messages ??= this.#messagesById();
-      const message = messages.get(delivery.messageId);
-      if (!message?.senderTaskId || message.sender.kind !== "agent" || message.expectsReply === false) return [];
-      answered ??= this.#answeredKeys();
-      if (answered.has(`${message.id}:${delivery.recipientAgentId}`)) return [];
       return [
         {
           completed,
@@ -992,10 +994,32 @@ export class MailboxStore {
         },
       ];
     });
-    this.#keptAwaitedThreadCandidates = unsaved
-      ? undefined
-      : { state, messages: state.messages, deliveries: state.deliveries, candidates };
-    return candidates;
+  }
+
+  #taskRequestDeliveries(): KeptTaskRequestDeliveries {
+    const { messages, deliveries } = this.#state;
+    const kept = this.#keptTaskRequestDeliveries;
+    const extendable =
+      kept?.messages === messages &&
+      kept.deliveries === deliveries &&
+      kept.messagesLength <= messages.length &&
+      kept.deliveriesLength <= deliveries.length &&
+      (kept.orphans === 0 || kept.messagesLength === messages.length);
+    const index: KeptTaskRequestDeliveries = extendable
+      ? kept
+      : { messages, messagesLength: 0, deliveries, deliveriesLength: 0, requests: [], orphans: 0 };
+    if (index.deliveriesLength < deliveries.length) {
+      const messagesById = this.#messagesById();
+      for (const delivery of deliveries.slice(index.deliveriesLength)) {
+        const message = messagesById.get(delivery.messageId);
+        if (!message) index.orphans += 1;
+        else if (isTaskRequest(message)) index.requests.push({ delivery, message });
+      }
+    }
+    index.messagesLength = messages.length;
+    index.deliveriesLength = deliveries.length;
+    this.#keptTaskRequestDeliveries = index;
+    return index;
   }
 
   #hasUnsavedChanges(): boolean {
@@ -2919,7 +2943,6 @@ export class MailboxStore {
   restorePersistedState(): void {
     this.#state = normalizeStoredState(readStoredMailboxState(this.#database.readMailboxState()).state);
     this.#keptConversationIndex = undefined;
-    this.#keptAwaitedThreadCandidates = undefined;
     if (!this.#database.connection.isTransaction) this.#clearChanges();
   }
 
@@ -4008,7 +4031,6 @@ export class MailboxStore {
     replaceAll = false,
   ): void {
     this.#keptConversationIndex = undefined;
-    this.#keptAwaitedThreadCandidates = undefined;
     const ownsTransaction = !this.#database.connection.isTransaction;
     const idempotency = this.#idempotencyMark();
     const wrote = replaceAll
@@ -4034,7 +4056,6 @@ export class MailboxStore {
   #clearChanges(): void {
     for (const keys of Object.values(this.#changes)) keys.clear();
     this.#keptConversationIndex = undefined;
-    this.#keptAwaitedThreadCandidates = undefined;
   }
 
   #drainFileDeletionOutboxEffect = Effect.fn("MailboxStore.drainFileDeletionOutbox")(function* (this: MailboxStore) {
@@ -4372,6 +4393,10 @@ function sameIdempotencyMark(left: IdempotencyMark, right: IdempotencyMark): boo
 function sourceTurnIdOfKey(key: string): string | undefined {
   const parts = key.split(":");
   return parts.length >= 3 ? parts.at(-2) : undefined;
+}
+
+function isTaskRequest(message: StoredMessage): message is TaskRequestMessage {
+  return Boolean(message.senderTaskId) && message.sender.kind === "agent" && message.expectsReply !== false;
 }
 
 function heldTaskId(message: StoredMessage): string | undefined {
