@@ -216,7 +216,9 @@ gh run list --workflow release-extension.yml --event push --limit 5 \
 ```
 
 - `headSha` must be the commit of `v<new>` (`git rev-list -n1 v<new>`).
-- The `publish` job summary says that the version was submitted, or why it was not.
+- The run summary says that the version was submitted, or why it was not. The `package` job
+  writes the permission stop; when it stops, the `publish` job is skipped. The `publish` job writes
+  the store result and a warning when it skipped the upload.
 
 When it stopped on new permissions that the developer confirmed, or the developer wants to replace a
 version in review, run it by hand on the tag:

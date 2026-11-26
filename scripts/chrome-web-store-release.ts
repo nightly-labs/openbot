@@ -46,6 +46,8 @@ const ServiceAccountKey = Schema.Struct({
 const decodeServiceAccountKey = Schema.decodeUnknownSync(Schema.fromJsonString(ServiceAccountKey));
 
 const decodeJson = Schema.decodeUnknownSync(Schema.fromJsonString(Schema.Unknown));
+const decodeJsonOption = (text: string) =>
+  Option.getOrUndefined(Schema.decodeUnknownOption(Schema.fromJsonString(Schema.Unknown))(text));
 
 const decodeAccessToken = Schema.decodeUnknownSync(Schema.Struct({ access_token: Schema.String }));
 
@@ -98,6 +100,11 @@ interface Options {
 
 function out(text: string): void {
   process.stdout.write(`${text}\n`);
+}
+
+function warn(lines: string[]): void {
+  out(`::warning title=Chrome Web Store::${lines[0] ?? ""}`);
+  summarize(lines);
 }
 
 function summarize(lines: string[]): void {
@@ -171,12 +178,12 @@ async function checkPackage(zipPath: string): Promise<Manifest> {
   return manifest;
 }
 
-async function publicManifest(): Promise<Manifest | null> {
+async function publicManifest(): Promise<Manifest> {
   const response = await fetch(PUBLIC_PACKAGE_URL, { signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS) });
-  if (response.status === 204 || response.status === 404) return null;
   if (!response.ok) throw new Error(`The public package download failed with HTTP ${response.status}.`);
   const crx = Buffer.from(await response.arrayBuffer());
-  if (crx.length === 0) return null;
+  if (crx.length === 0)
+    throw new Error(`The public package download gave no package (HTTP ${response.status}). No permission comparison.`);
   if (crx.subarray(0, 4).toString("latin1") !== "Cr24" || crx.readUInt32LE(4) !== 3)
     throw new Error("The public package is not a CRX3 file.");
   const zipStart = 12 + crx.readUInt32LE(8);
@@ -214,10 +221,6 @@ function addedAccess(previous: Manifest, next: Manifest): string[] {
 
 async function checkAgainstPublic(manifest: Manifest, options: Options): Promise<void> {
   const published = await publicManifest();
-  if (!published) {
-    summarize([`The store has no public version of ${EXTENSION_ID}. No permission comparison.`]);
-    return;
-  }
   if (compareVersions(manifest.version, published.version) <= 0) {
     summarize([`The public version is ${published.version}. This package (${manifest.version}) is not newer.`]);
     return;
@@ -285,13 +288,12 @@ class StoreClient {
     if (contentType) headers["content-type"] = contentType;
     const response = await fetch(url, { method, headers, body, signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS) });
     const text = await response.text();
-    const parsed = decodeJson(text.length > 0 ? text : "{}");
     if (!response.ok) {
-      const error = decodeGoogleError(parsed);
+      const error = decodeGoogleError(decodeJsonOption(text));
       const detail = Option.isSome(error) ? `${error.value.error.status ?? ""} ${error.value.error.message ?? ""}` : "";
       throw new Error(`${method} ${new URL(url).pathname} failed with HTTP ${response.status}. ${detail}`.trim());
     }
-    return parsed;
+    return decodeJson(text.length > 0 ? text : "{}");
   }
 
   async status(): Promise<ItemStatus> {
@@ -360,12 +362,12 @@ async function planSubmission(client: StoreClient, version: string, options: Opt
     return "done";
   }
   if (newest && compareVersions(newest, version) > 0) {
-    summarize([`The store has version ${newest}, which is newer than ${version}. Nothing to upload.`]);
+    warn([`The store has version ${newest}, which is newer than ${version}. Nothing to upload.`]);
     return "skip";
   }
   if (submitted?.state === "PENDING_REVIEW") {
     if (!options.replacePending) {
-      summarize([
+      warn([
         `Version ${submittedVersion ?? "unknown"} is in review. Version ${version} was not uploaded.`,
         "The next release uploads after the review. To replace the version in review now, run the workflow by hand on the tag with `replace_pending`.",
       ]);
