@@ -1057,10 +1057,11 @@ interface PoolStrategyOption {
   readonly labelKey: AppTextKey;
 }
 
-const POOL_STRATEGY_OPTIONS: PoolStrategyOption[] = PROVIDER_ACCOUNT_POOL_STRATEGIES.map((id) => ({
-  id,
-  labelKey: id === "spread" ? "provider.account.poolSpread" : "provider.account.poolFillFirst",
-}));
+const POOL_STRATEGY_OPTION: Record<ProviderAccountPoolStrategy, PoolStrategyOption> = {
+  fillFirst: { id: "fillFirst", labelKey: "provider.account.poolFillFirst" },
+  spread: { id: "spread", labelKey: "provider.account.poolSpread" },
+};
+const POOL_STRATEGY_OPTIONS = PROVIDER_ACCOUNT_POOL_STRATEGIES.map((id) => POOL_STRATEGY_OPTION[id]);
 
 function PoolStrategySelect(props: {
   value: ProviderAccountPoolStrategy;
@@ -1069,14 +1070,13 @@ function PoolStrategySelect(props: {
   onChange: (strategy: ProviderAccountPoolStrategy) => void;
 }) {
   const { t } = useText();
-  const selected = () => POOL_STRATEGY_OPTIONS.find((option) => option.id === props.value) ?? POOL_STRATEGY_OPTIONS[0];
   return (
     <Select<PoolStrategyOption>
       class="provider-settings-select"
       options={POOL_STRATEGY_OPTIONS}
       optionValue="id"
       optionTextValue={(option) => t(option.labelKey)}
-      value={selected()}
+      value={POOL_STRATEGY_OPTION[props.value]}
       disabled={props.disabled}
       onChange={(option) => {
         if (option && option.id !== props.value) props.onChange(option.id);
