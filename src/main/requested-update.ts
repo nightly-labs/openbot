@@ -339,6 +339,7 @@ export class RequestedUpdate extends EventEmitter<{ preference: [UpdatePreferenc
       .pipe(
         Effect.andThen(
           Effect.suspend(() => {
+            if (this.#schedule !== schedule) return Effect.void;
             this.#log(`Restarting to install the update that ${describe(schedule)} asked for.`);
             this.#announceState("restarting");
             this.#installing = true;
