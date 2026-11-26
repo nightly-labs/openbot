@@ -1,3 +1,0 @@
-### Added
-
-- A page in the OpenBot browser can ask for your location. The agent's chat now asks you first with Block, Allow always and Allow. Allow holds while the tab stays on the same site. Allow always holds for that site in all agent tabs until OpenBot or the server restarts. On a joined server, it holds in the tabs of the same agent. Before, the browser always blocked the request. A page in a tab that you opened yourself still gets Block. On a joined server, Allow sends the location of your own device, not the location of the server. **Update the server to this version to answer location requests from a joined server.**

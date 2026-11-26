@@ -181,14 +181,12 @@ class WhatsAppAdapter implements MessagingAdapter {
   ) {
     if (!body.buttons?.length) this.#handle.chats.forgetMenu(messageId);
     const sentAt = this.#sentAt.get(messageId);
-    if (sentAt === undefined || Date.now() - sentAt > EDIT_WINDOW_MS) {
-      yield* this.post(target, body);
-      return;
-    }
+    if (sentAt === undefined || Date.now() - sentAt > EDIT_WINDOW_MS) return yield* this.post(target, body);
     yield* this.#session().send(target.platformChannelId, {
       text: this.#statusText(body),
       edit: this.#ownKey(target, messageId),
     });
+    return messageId;
   });
 
   readonly remove = Effect.fnUntraced(function* (this: WhatsAppAdapter, target: MessageTarget, messageId: string) {

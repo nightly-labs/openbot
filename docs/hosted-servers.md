@@ -2081,8 +2081,9 @@ Billing lists each paid server separately. Cancel renewal stops the next payment
 server stops when its plan ends and keeps its data. Keep server resumes renewal before
 the plan ends and removes any scheduled deletion.
 
-Delete server requires the server name. The owner can delete immediately with no refund
-for unused time, or schedule deletion for the paid-through date. The account Worker stores
+Delete server requires the server name and schedules deletion for the paid-through date.
+Billing has no option to delete a paid server immediately. The account Worker still accepts
+`timing: "now"` from released clients in the support window. The account Worker stores
 the date and subscription ID. The cron deletes on its next pass after that date only after
 Stripe confirms the subscription has ended and no newer or open plan exists. Failed
 provider deletion is retried through the existing deletion queue. Keep server and deletion

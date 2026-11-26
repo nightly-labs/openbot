@@ -30,7 +30,7 @@ const OPENCODE_RETRY_TYPES: ReadonlyMap<string, boolean> = new Map([
   ["provider.transport", true],
 ]);
 
-const TEXT_TOOL_CALL_TAG = String.raw`(?:[\w.-]+:|[|｜]DSML[|｜])?(?:function_calls?|tool_calls?|invoke)`;
+const TEXT_TOOL_CALL_TAG = String.raw`(?:[\w.-]+:|[|｜]DSML[|｜])?(?:function_calls?|tool_calls?|invoke|execute)`;
 const TEXT_TOOL_CALL_ENDING = new RegExp(
   String.raw`(?:^|\n)[ \t]*(?:<${TEXT_TOOL_CALL_TAG}\b[^>]*>[\s\S]*</${TEXT_TOOL_CALL_TAG}>|<｜tool▁calls▁begin｜>[\s\S]*<｜tool▁calls▁end｜>|\[Assistant tool call\]:[ \t]*[\w.-]+\([\s\S]*\))\s*$`,
   "u",

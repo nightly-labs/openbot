@@ -263,12 +263,18 @@ State which surfaces a change touches. Check all affected consumers and reverse 
   turns: the token budget is small.
 - For NEAR Intents wallet smoke checks, `apps/auth-api/.env.dev` holds `NEAR_INTENTS_PARTNER_KEY`
   (an `agent-api` partner key for the production Agent API, `https://api.agentsonintents.com`; the
-  demo API refuses it) and `NEAR_TEST_OWNER_PASSKEY` (the P-256 key of the test wallet's passkey
-  owner). Load them the same way as `INCEPTION_API_KEY`, and never print them.
-  `bun run smoke:near-wallet-live` drives the real wallet service against production with that owner;
-  it keeps its encrypted state in `.openbot-build/near-wallet-live/`. It is a shared test wallet:
-  each person or agent with the dev key controls its funds. Keep only a few dollars in it. The Agent
-  API has no testnet: ask before any call that moves funds.
+  demo API refuses it) and `NEAR_TEST_WALLET_OWNER_KEY` (the P-256 key of the passkey that owns the
+  test wallets). Load them the same way as `INCEPTION_API_KEY`, and never print them. The partner key
+  holds no funds; each wallet holds its own. The test funds stay in the wallet "OpenBot mainnet test
+  wallet" (`NEAR_TEST_WALLET_ACCOUNT`). Send test payments to "OpenBot mainnet test recipient"
+  (`NEAR_TEST_RECIPIENT_ACCOUNT`); move them back after the test. Both wallets have the test key as
+  owner and need its vote for each payment. It is a shared test wallet: each person or agent with the
+  dev key controls its funds. Keep only a few dollars in it.
+  `bun run smoke:near-wallet-live` drives the real wallet service against production on the test
+  wallet: it signs a grant with the owner key, changes the budget, freezes and unfreezes the wallet,
+  and keeps its encrypted state in `.openbot-build/near-wallet-live/`. It moves no funds. Wait 5
+  minutes between two runs: the Agent API refuses a second rule change sooner. The Agent API has no
+  testnet: ask before any call that moves funds.
 - For development and manual tests, the team has one test Google account. `apps/auth-api/.env.dev`
   holds `DEV_TEST_GMAIL_ADDRESS` and `DEV_TEST_GMAIL_PASSWORD`. Use it to sign in to Gmail and to
   third-party services ("Sign in with Google") for development and smoke checks, never for a

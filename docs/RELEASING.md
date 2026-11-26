@@ -684,7 +684,12 @@ stage the user waits on is bounded by a timeout and recorded in `logs/update/upd
 check, download, or restart reports an actionable error and can be retried in place.
 
 The voice runtime (the sherpa-onnx N-API addon and ONNX Runtime, from the pinned `sherpa-onnx-*`
-npm packages) is part of the macOS, Windows and Linux applications, in `voice/runtime`. Each Linux
+npm packages) is part of the macOS, Windows and Linux applications, in `voice/runtime`. The runtime
+also holds the pinned Silero VAD v5 speech detector (`silero_vad_v5.onnx`, 2.3 MB, MIT, notice in
+`NOTICE`), which `scripts/prepare-voice.ts` downloads and checks. Before a Whisper model (local or
+Groq) transcribes a recording, the transcription host runs the detector, and a recording with no
+speech gives an empty text and is not uploaded. When the file is missing, transcription works as
+before. Each Linux
 AppImage carries the runtime of its architecture. The Linux arm64 AppImage ships no remote desktop
 runtime. The NVIDIA Parakeet TDT 0.6B v3 int8 model is not part of an application or update
 artifact. OpenBot downloads its four pinned files on first voice use, checks the size and SHA-256 of
