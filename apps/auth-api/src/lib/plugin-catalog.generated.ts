@@ -1554,6 +1554,12 @@ export const PLUGIN_CATALOG_INDEX: PluginCatalogIndex = {
       featured: false,
       detailSha256: "165a596c50c0bfcdfb4e79ddbb7a85ae01ab1149e7397c2422384244927c5510",
     },
+    {
+      slug: "n1p",
+      version: "1.0.0",
+      featured: false,
+      detailSha256: "8c79c72a4d21d352971c989c5cf9cc821be7a2f0c2930895924576c0e06f3d3d",
+    },
   ],
 };
 
@@ -10798,6 +10804,41 @@ export const PLUGIN_CATALOG_DETAILS: Record<string, PluginCatalogDetail> = {
     websiteUrl: "https://www.zoominfo.com",
     privacyPolicyUrl: "https://www.zoominfo.com/legal/privacy-policy",
     termsUrl: "https://www.zoominfo.com/legal/terms-of-use",
+    skills: [],
+  },
+  n1p: {
+    slug: "n1p",
+    name: "N1P",
+    tagline: "Business brain for one-person businesses",
+    description:
+      "N1P is the operating system of a one-person business: the business brain (positioning, audience, offers, voice), sales copy and content. Agents read the brain, update one field at a time, save copy and content to the right N1P screens, and post updates the owner sees. Every change keeps the previous text and can be undone in N1P; no tool deletes anything. Each user signs in to their own N1P account through the browser.",
+    category: "productivity",
+    creatorName: "N1P",
+    iconUrl: "https://sistema.n1p.com.br/pwa-512x512.png",
+    version: "1.0.0",
+    prompts: [
+      { id: "prompt-read-brain", text: "Read my N1P brain and tell me which fields are empty or weak." },
+      { id: "prompt-positioning", text: "Rewrite my positioning statement in N1P from what my brain already says." },
+      { id: "prompt-content", text: "Write a carousel about my main offer and save it to my N1P content library." },
+    ],
+    apps: [
+      {
+        id: "app-n1p-mcp",
+        name: "N1P",
+        description:
+          "Read the N1P business brain, update one field at a time with undo, save sales copy and content, and post updates, over N1P's MCP server with browser sign-in.",
+        iconUrl: "https://sistema.n1p.com.br/pwa-512x512.png",
+        server: {
+          name: "n1p",
+          transport: "http",
+          url: "https://sistema.n1p.com.br/mcp",
+          auth: [{ id: "n1p-oauth", kind: "link", label: "Sign in" }],
+        },
+      },
+    ],
+    websiteUrl: "https://sistema.n1p.com.br",
+    privacyPolicyUrl: "https://sistema.n1p.com.br/privacy",
+    termsUrl: "https://sistema.n1p.com.br/terms",
     skills: [],
   },
 };
