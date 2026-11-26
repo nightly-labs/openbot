@@ -751,6 +751,12 @@ export const PLUGIN_CATALOG_INDEX: PluginCatalogIndex = {
       detailSha256: "e1991e6e6d8aecb4e6300b8d40ca2b781e7f79a27097f151141c49a920bc34c6",
     },
     {
+      slug: "fumadocs",
+      version: "1.0.0",
+      featured: false,
+      detailSha256: "1a1b4d4e0464c270ae803c73f855823da568c0554d09e27325db1600d8002079",
+    },
+    {
       slug: "futu",
       version: "1.0.0",
       featured: false,
@@ -6030,6 +6036,35 @@ export const PLUGIN_CATALOG_DETAILS: Record<string, PluginCatalogDetail> = {
     websiteUrl: "https://www.freee.co.jp",
     privacyPolicyUrl: "https://corp.freee.co.jp/privacy/",
     termsUrl: "https://www.freee.co.jp/terms/",
+    skills: [],
+  },
+  fumadocs: {
+    slug: "fumadocs",
+    name: "Fumadocs",
+    tagline: "Fumadocs framework documentation",
+    description:
+      "Fumadocs lets agents search and read the documentation of Fumadocs, the open-source React documentation framework, so they can set up, configure, and extend a Fumadocs site with the current API. It needs no account and no key.",
+    category: "coding",
+    creatorName: "Fuma Nama",
+    iconUrl: "https://github.com/fuma-nama.png?size=128",
+    version: "1.0.0",
+    prompts: [
+      { id: "prompt-add-to-next", text: "How do I add Fumadocs to an existing Next.js app?" },
+      { id: "prompt-search", text: "How do I set up search with Orama in Fumadocs?" },
+      { id: "prompt-openapi", text: "How do I generate API reference pages from an OpenAPI file with Fumadocs?" },
+    ],
+    apps: [
+      {
+        id: "app-fumadocs-mcp",
+        name: "Fumadocs",
+        description: "Fumadocs documentation lookup, over the Fumadocs MCP server with no sign-in.",
+        iconUrl: "https://github.com/fuma-nama.png?size=128",
+        server: { name: "fumadocs", transport: "http", url: "https://www.fumadocs.dev/api/mcp" },
+      },
+    ],
+    websiteUrl: "https://fumadocs.dev",
+    privacyPolicyUrl: null,
+    termsUrl: null,
     skills: [],
   },
   futu: {
