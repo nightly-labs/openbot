@@ -16,7 +16,9 @@ const OTHER_THREADS = 200;
 const OTHER_ACTIVITIES_PER_THREAD = 2_500;
 const UPDATE_PAIRS_BEFORE_REPLAY = 300;
 const UPDATE_PAIRS_AFTER_REPLAY = 300;
-const MAX_INDEXED_BATCH_MS = 1_000;
+const MIN_SPEEDUP_WITH_INDEX = 10;
+const COMPACTION_ACTIVITY_DELETE =
+  "DELETE FROM projection_thread_activities WHERE thread_id = ? AND last_event_sequence = ?";
 
 function message(id: string, minute: number, text: string): ConversationMessage {
   return {
@@ -45,6 +47,7 @@ interface Run {
   batches: number;
   batchMs: { p50: number; p99: number; max: number };
   totalMs: number;
+  deletePlan: string;
   messagesBefore: string;
   messagesAfter: string;
 }
@@ -56,6 +59,12 @@ function count(database: OpenBotDatabase, sql: string, ...parameters: string[]):
 function messagesHash(database: OpenBotDatabase, threadId: string): string {
   const conversation = database.rebuildThreadProjection(threadId);
   return createHash("sha256").update(JSON.stringify(conversation.messages)).digest("hex");
+}
+
+function queryPlan(database: OpenBotDatabase, sql: string): string {
+  return databaseRows(database.connection.prepare(`EXPLAIN QUERY PLAN ${sql}`).all("thread", 1))
+    .map((row) => String(row.detail))
+    .join("; ");
 }
 
 function addOtherActivities(database: OpenBotDatabase, agentId: string): void {
@@ -161,6 +170,7 @@ async function run(index: boolean): Promise<Run> {
       batches: times.length,
       batchMs: { p50: at(0.5), p99: at(0.99), max: sorted.at(-1) ?? 0 },
       totalMs,
+      deletePlan: queryPlan(database, COMPACTION_ACTIVITY_DELETE),
       messagesBefore: before.messages,
       messagesAfter: messagesHash(database, threadId),
     };
@@ -189,7 +199,8 @@ try {
     keepsTheChat: indexed.messagesAfter === indexed.messagesBefore,
     sameResultWithoutIndex:
       withoutIndex.deleted === indexed.deleted && withoutIndex.threadActivitiesAfter === indexed.threadActivitiesAfter,
-    batchesStayShort: indexed.batchMs.max < MAX_INDEXED_BATCH_MS,
+    deleteUsesTheIndex: indexed.deletePlan.includes("thread_activities_sequence"),
+    indexMakesCompactionFaster: withoutIndex.totalMs > MIN_SPEEDUP_WITH_INDEX * indexed.totalMs,
   };
   report.passed = Object.values(report.checks).every(Boolean);
 } catch (error) {
