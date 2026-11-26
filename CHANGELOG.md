@@ -157,6 +157,7 @@ All notable changes to OpenBot will be documented here. The project follows
 - After a provider such as OpenCode sends a very large tool update, the next chats and routines on that provider work again. Before, each new turn on that provider, also for other agents, failed at once with the same "Incoming ACP data exceeds the configured byte limit" error until you quit OpenBot. Tool updates up to 256 MB, such as an edit of a large file, also work again: before, updates larger than 32 MB failed. On a joined server, the server must also be on this version.
 - The Usage page no longer cuts off the labels of the totals.
 - On the Usage page, a provider with no brand color gets its own chart color. Before, all these providers were grey.
+- Bitwarden on a server now connects when you paste the web vault address from the browser, for example `https://vault.example.com/#/vault`. OpenBot removes the part after `#`. Before, it showed the error for all four fields, although they were filled. The server must also be on this version.
 
 ## [0.79.0] - 2026-11-25
 
