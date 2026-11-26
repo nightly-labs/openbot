@@ -291,6 +291,7 @@ interface AcpTurn {
   awaitingCommands: boolean;
   ownReply: "none" | "reported" | "open" | "ended";
   abandoned: boolean;
+  stallCancel: "waiting" | "answered" | null;
   reportedCost: number | null;
   unprompted: boolean;
   textMessageId: string | null;
@@ -1356,6 +1357,7 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
           turn.id !== getString(params, "expectedTurnId") ||
           turn.stopped ||
           turn.completing ||
+          turn.stallCancel !== null ||
           (!steer && (turn.unprompted || turn.waitingOnUser > 0));
         if (turnChanged()) return yield* providerFailure(new Error(sourceText("error.backend.steerTurnChanged")));
         if (!steer && !turn.answered)
@@ -2711,6 +2713,7 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
       awaitingCommands: false,
       ownReply: "none",
       abandoned: false,
+      stallCancel: null,
       reportedCost: null,
       unprompted,
       textMessageId: null,
@@ -2787,6 +2790,12 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
       while (providerResult(yield* Effect.result(this.#leaveOutFailedMcpServer(thread, turn, response, params))))
         response = providerResult(yield* send());
       if (thread.activeTurn !== turn || turn.completing) return;
+      if (
+        turn.stallCancel !== null &&
+        !turn.stopped &&
+        (response.stopReason !== "end_turn" || turn.stallCancel === "waiting")
+      )
+        return;
       const cancelledUnstarted = () =>
         response.stopReason === "cancelled" && !turn.stopped && !turn.answered && turn.failureCause === null;
       if (cancelledUnstarted()) {
@@ -2949,6 +2958,7 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
       if (turn.signInLost)
         yield* this.#endAgentProcess(sourceText("error.provider.acpSignInLost", { provider: this.#label }));
     } catch (error) {
+      if (turn.stallCancel !== null && !turn.stopped) return;
       const transport = thread.transport;
       const serverLost = !turn.stopped && !transport && this.#flavor.serverLost?.(error) === true;
       const failure = turn.stopped
@@ -3697,6 +3707,7 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
       if ((update.content.text.trim() || released.trim()) && !held) {
         turn.receivedOutput = true;
         turn.interruptedAnswer = null;
+        if (turn.stallCancel) turn.stallCancel = "answered";
       }
       if (this.#flavor.streamAnswerBeforePromptReturns && text && !held) {
         if (!turn.text || released)
@@ -3971,8 +3982,11 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
         continue;
       }
       this.emit("diagnostic", `${this.#label} sent nothing for ${silentFor} ms; ending turn ${turn.id}.`);
-      turn.failureCause = "stalled";
+      turn.stallCancel = "waiting";
       yield* providerCall(() => this.#sessionConnection(thread).cancel({ sessionId: thread.id })).pipe(Effect.ignore);
+      if (turn.task) yield* Fiber.await(turn.task).pipe(Effect.timeoutOption(Math.min(ACP_STOP_GRACE_MS, limit)));
+      if (thread.activeTurn !== turn || turn.completing || turn.stopped) return;
+      turn.failureCause = "stalled";
       yield* this.#abandonTurn(
         thread,
         turn,
