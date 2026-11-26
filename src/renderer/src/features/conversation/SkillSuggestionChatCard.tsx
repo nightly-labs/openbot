@@ -54,9 +54,8 @@ export function SkillSuggestionChatCard(props: SkillSuggestionChatCardProps) {
     if (press() === "pending" && props.outcome !== "answered") return "busy";
     return "available";
   };
-  const answeredInChat = () => props.outcome === "answered" || (props.outcome === "working" && press() !== "pending");
   const save = async () => {
-    if (press() !== null) return;
+    if (state() !== "available") return;
     setPress("pending");
     const reply =
       props.suggestion.action === "create" ? t("chat.suggestion.saveReply") : t("chat.suggestion.updateReply");
@@ -72,7 +71,7 @@ export function SkillSuggestionChatCard(props: SkillSuggestionChatCardProps) {
   };
   const skillAction = (): MarketplaceSuggestionSkillAction =>
     props.suggestion.action === "create" ? "save" : "update";
-  const onSave = () => (answeredInChat() || !props.onSave ? undefined : () => void save());
+  const onSave = () => (props.onSave ? () => void save() : undefined);
   const openSkill = () => {
     const suggestion = props.suggestion;
     const open = props.onOpenSkill;
