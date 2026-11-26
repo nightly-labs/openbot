@@ -6,7 +6,7 @@ import {
   type GlassPoint,
   type GlassShape,
   type GlassView,
-} from "./glass-lens";
+} from "./fluid-glass";
 import { fitSize, paintCentered, paintElement, paintRobot } from "./glass-scene";
 
 const AMOUNT = "$0";
