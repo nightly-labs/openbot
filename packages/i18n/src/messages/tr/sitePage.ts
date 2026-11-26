@@ -66,6 +66,7 @@ export const messages = {
   "sitePage.nearSign.action.freeze": "Ödemeleri duraklatın",
   "sitePage.nearSign.action.unfreeze": "Ödemeleri sürdürün",
   "sitePage.nearSign.action.autoPay": "Otomatik ödemeleri açın",
+  "sitePage.nearSign.action.manualPay": "Otomatik ödemeleri kapatın",
   "sitePage.nearSign.action.approvePayment": "Bir ödemeyi onaylayın",
   "sitePage.nearSign.action.checkBackup": "Geçiş anahtarı yedeğini kontrol edin",
   "sitePage.nearSign.createPasskey": "Geçiş anahtarı oluştur",

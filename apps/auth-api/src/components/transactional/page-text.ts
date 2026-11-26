@@ -122,6 +122,7 @@ export function nearSignText(t: AppTranslate) {
       freeze: t("sitePage.nearSign.action.freeze"),
       unfreeze: t("sitePage.nearSign.action.unfreeze"),
       "auto-pay": t("sitePage.nearSign.action.autoPay"),
+      "manual-pay": t("sitePage.nearSign.action.manualPay"),
       "approve-payment": t("sitePage.nearSign.action.approvePayment"),
       "check-backup": t("sitePage.nearSign.action.checkBackup"),
     } satisfies Record<NearOwnerAction, string>,

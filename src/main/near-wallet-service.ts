@@ -320,7 +320,7 @@ export class NearWalletService implements NearWallet {
         )
           return yield* nearFailure(sourceText("error.connector.nearRulesFull", { limit: NEAR_WALLET_LIMITS.rules }));
         yield* this.#activeWallet();
-        yield* this.#allowAutoPay();
+        yield* this.#setOwnerApproval(false);
         yield* this.#store.update((current) => ({
           ...current,
           rules: [...current.rules.filter((rule) => rule.domain !== input.domain), input],
@@ -331,7 +331,11 @@ export class NearWalletService implements NearWallet {
 
   readonly removeRule = Effect.fn("NearWallet.removeRule")(function* (this: NearWalletService, domain: string) {
     return yield* this.#ownerStep(
-      this.#store.update((record) => ({ ...record, rules: record.rules.filter((rule) => rule.domain !== domain) })),
+      Effect.gen({ self: this }, function* () {
+        const otherRule = (rule: NearRuleInput) => rule.domain !== domain;
+        if (!this.#store.read().rules.some(otherRule)) yield* this.#setOwnerApproval(true);
+        yield* this.#store.update((current) => ({ ...current, rules: current.rules.filter(otherRule) }));
+      }),
     );
   }).bind(this);
 
@@ -356,7 +360,7 @@ export class NearWalletService implements NearWallet {
           return yield* nearFailure(
             sourceText("error.connector.nearRuleFull", { limit: NEAR_WALLET_LIMITS.recipientsPerRule }),
           );
-        yield* this.#allowAutoPay();
+        yield* this.#setOwnerApproval(false);
         yield* this.#store.update((current) => ({
           ...current,
           rules: [
@@ -710,21 +714,25 @@ export class NearWalletService implements NearWallet {
     );
   });
 
-  readonly #allowAutoPay = Effect.fn("NearWallet.allowAutoPay")(function* (this: NearWalletService) {
-    if (!this.#store.read().wallet?.ownerApproval) return;
+  readonly #setOwnerApproval = Effect.fn("NearWallet.setOwnerApproval")(function* (
+    this: NearWalletService,
+    ownerApproval: boolean,
+  ) {
+    const wallet = this.#store.read().wallet;
+    if (!wallet || wallet.ownerApproval === ownerApproval) return;
     yield* this.#updatePolicy(
-      "auto-pay",
-      (policy) => ({ ...policy, owner_approval: false }),
-      sourceText("status.agent.nearSummaryAutoPay"),
+      ownerApproval ? "manual-pay" : "auto-pay",
+      (policy) => ({ ...policy, owner_approval: ownerApproval }),
+      sourceText(ownerApproval ? "status.agent.nearSummaryManualPay" : "status.agent.nearSummaryAutoPay"),
     );
     yield* this.#store.update((record) =>
-      record.wallet ? { ...record, wallet: { ...record.wallet, ownerApproval: false } } : record,
+      record.wallet ? { ...record, wallet: { ...record.wallet, ownerApproval } } : record,
     );
   });
 
   readonly #updatePolicy = Effect.fn("NearWallet.updatePolicy")(function* (
     this: NearWalletService,
-    action: "budget" | "auto-pay",
+    action: "budget" | "auto-pay" | "manual-pay",
     change: (policy: Policy) => Policy,
     summary: string,
   ) {

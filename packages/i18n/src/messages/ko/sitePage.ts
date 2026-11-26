@@ -65,6 +65,7 @@ export const messages = {
   "sitePage.nearSign.action.freeze": "결제 일시 중지",
   "sitePage.nearSign.action.unfreeze": "결제 재개",
   "sitePage.nearSign.action.autoPay": "자동 결제 켜기",
+  "sitePage.nearSign.action.manualPay": "자동 결제 끄기",
   "sitePage.nearSign.action.approvePayment": "결제 승인",
   "sitePage.nearSign.action.checkBackup": "패스키 백업 확인",
   "sitePage.nearSign.createPasskey": "패스키 만들기",

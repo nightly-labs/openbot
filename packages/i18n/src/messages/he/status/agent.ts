@@ -78,6 +78,7 @@ export const messages = {
   "status.agent.nearSummaryBudget": "שינוי התקציב היומי של הארנק ל-{amount} USD.",
   "status.agent.nearSummaryAutoPay":
     "מתן הרשאה ל-OpenBot לשלם בלי החתימה שלך כשכלל תשלום מאפשר זאת. תשלומים אחרים עדיין ממתינים לאישור שלך בצ'אט.",
+  "status.agent.nearSummaryManualPay": "לא נשאר כלל תשלום. OpenBot יבקש שוב את החתימה שלך לכל תשלום.",
   "status.agent.nearSummaryPayment": "אישור התשלום של {amount} ל-{recipient}.",
   "status.agent.nearSummaryFreeze": "הסוכנים לא יוכלו לשלם מהארנק הזה עד שהתשלומים יחודשו.",
   "status.agent.nearSummaryUnfreeze": "הסוכנים יכולים שוב לשלם מהארנק הזה, במסגרת הכללים שלך.",
