@@ -700,7 +700,11 @@ async function main(): Promise<void> {
         const status = wallet.status();
         details.set("failedOwnerStep", { refused: failed.error, error: status.error, rules: status.rules });
         assert.ok(failed.error ?? status.error, "a refused signature shows a sentence");
-        assert.deepEqual(status.rules, [], "the rule is removed although the signature failed");
+        assert.deepEqual(
+          status.rules.map((rule) => rule.domain),
+          [DOMAIN],
+          "the rule stays so that the owner can remove it again",
+        );
         assert.equal(policyOf(fakeAgent).owner_approval, false);
         assert.equal(wallet.store.read().wallet?.ownerApproval, false);
       } finally {

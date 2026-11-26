@@ -332,11 +332,9 @@ export class NearWalletService implements NearWallet {
   readonly removeRule = Effect.fn("NearWallet.removeRule")(function* (this: NearWalletService, domain: string) {
     return yield* this.#ownerStep(
       Effect.gen({ self: this }, function* () {
-        const record = yield* this.#store.update((current) => ({
-          ...current,
-          rules: current.rules.filter((rule) => rule.domain !== domain),
-        }));
-        if (record.rules.length === 0) yield* this.#setOwnerApproval(true);
+        const otherRule = (rule: NearRuleInput) => rule.domain !== domain;
+        if (!this.#store.read().rules.some(otherRule)) yield* this.#setOwnerApproval(true);
+        yield* this.#store.update((current) => ({ ...current, rules: current.rules.filter(otherRule) }));
       }),
     );
   }).bind(this);
