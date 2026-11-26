@@ -569,6 +569,7 @@ function customFailureCause(error: unknown): CauseCode | null {
 }
 
 const OMP_ACP_FLAVOR: AcpFlavor = {
+  reopenKeepsPrompts: true,
   sessionNotFound: ompSessionNotFound,
   emptyAnswerFailure: customEmptyAnswerFailure,
   turnFailure: customTurnFailure,
