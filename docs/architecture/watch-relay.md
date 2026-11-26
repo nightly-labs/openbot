@@ -73,7 +73,8 @@ JSON body `WatchRelayHttpRequest { v: 1, ts, sealed, proof }`, at most `WATCH_RE
   open with `hello.watchRelay: true` for 30 days after the last setup or relay request.
 - On `watch-delivery` the host:
   1. checks the ticket like a remote ticket, but with `aud: "openbot-watch"`, `hostId` of this host,
-     the current auth epoch, and an active membership;
+     the current auth epoch, and a member that is not disabled on this host (a member that the host does
+     not know yet is accepted, as for a remote session);
   2. checks the proof with `clientPublicKey` and the clock;
   3. opens `sealed` with `openWatchRequest` (nonce `hostId\njti`);
   4. refuses a request `id` that it saw in the last 10 minutes;

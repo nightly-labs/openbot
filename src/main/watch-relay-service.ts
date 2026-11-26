@@ -62,6 +62,7 @@ export class WatchRelayService {
   #loadedKey: WatchRelayKey | null = null;
   #release: (() => void) | null = null;
   #timer: ReturnType<typeof setTimeout> | null = null;
+  #heldUntil = 0;
   #disposed = false;
 
   constructor(options: WatchRelayServiceOptions) {
@@ -116,8 +117,8 @@ export class WatchRelayService {
     if (claims.hostId !== hostId) return answer(403);
     const epoch = this.#options.ingress.authEpoch();
     if (epoch === null || claims.authEpoch !== epoch) return answer(401);
-    const member = this.#options.member(claims.membershipId, claims.role);
-    if (!member || member.disabled) return answer(403);
+    const member = this.#options.member(claims.membershipId, claims.role) ?? ticketMember(claims);
+    if (member.disabled) return answer(403);
     if (!watchClockAccepts(delivery.ts, this.#now())) return answer(401);
     const proven = yield* Effect.tryPromise(async () =>
       verifyWatchProof(
@@ -205,7 +206,8 @@ export class WatchRelayService {
 
   #hold(until: number): void {
     if (this.#disposed) return;
-    const remaining = until - this.#now();
+    this.#heldUntil = Math.max(this.#heldUntil, until);
+    const remaining = this.#heldUntil - this.#now();
     if (remaining <= 0) {
       this.#clearTimer();
       this.#release?.();
@@ -217,7 +219,7 @@ export class WatchRelayService {
     this.#timer = setTimeout(
       () => {
         this.#timer = null;
-        this.#hold(this.#options.wanted.get().wantedUntil);
+        this.#hold(this.#heldUntil);
       },
       Math.min(remaining, TIMER_LIMIT_MS),
     );
@@ -228,6 +230,18 @@ export class WatchRelayService {
     if (this.#timer) clearTimeout(this.#timer);
     this.#timer = null;
   }
+}
+
+function ticketMember(claims: WatchTicketClaims): TeamMemberSummary {
+  return {
+    id: claims.membershipId,
+    username: claims.userId,
+    email: null,
+    name: null,
+    role: claims.role,
+    createdAt: new Date(claims.iat * 1000).toISOString(),
+    disabled: false,
+  };
 }
 
 function fittedReply({ result, snapshot }: WatchCommandReply): string {

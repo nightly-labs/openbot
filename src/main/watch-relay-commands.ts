@@ -228,12 +228,15 @@ export class WatchRelayCommands {
     member: WatchRelayMember,
   ) {
     const hidden = this.#api.hiddenAgentIds({ id: member.id, role: member.role });
-    const clipped = this.#api.agents
-      .getRuntimeSnapshot()
-      .latestMessages.filter(
-        (item) =>
-          !hidden.has(item.agentId) && item.text.length >= AGENT_RUNTIME_TEXT_LIMIT && !this.#fullReplies.has(item.id),
-      );
+    const runtime = this.#api.agents.getRuntimeSnapshot();
+    const streaming = new Set(runtime.activeTurns.map((turn) => turn.agentId));
+    const clipped = runtime.latestMessages.filter(
+      (item) =>
+        !hidden.has(item.agentId) &&
+        !streaming.has(item.agentId) &&
+        item.text.length >= AGENT_RUNTIME_TEXT_LIMIT &&
+        !this.#fullReplies.has(item.id),
+    );
     for (const item of clipped) {
       const page = yield* this.#api.agents
         .readConversationPageFor(item.agentId, member.id, undefined, FULL_REPLY_PAGE_LIMIT)

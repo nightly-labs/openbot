@@ -15,6 +15,7 @@ import type {
   RespondToApprovalInput,
   RespondToPromptInput,
   SendMessageInput,
+  TeamMemberSummary,
 } from "@openbot/contracts/ipc";
 import { isDynamicRecord } from "@openbot/contracts/runtime-values";
 import {
@@ -228,6 +229,16 @@ const unread = new Map<string, number>();
 const working = new Map<string, { threadId: string; turnId: string }>();
 const LONG_REPLY = Array.from({ length: 24 }, (_, index) => `Sentence ${index + 1} of a long agent reply.`).join(" ");
 const latestMessages: AgentRuntimeSnapshot["latestMessages"] = [];
+const DISABLED_MEMBER = "disabled-member";
+const disabledMember = (): TeamMemberSummary => ({
+  id: DISABLED_MEMBER,
+  username: "disabled",
+  email: null,
+  name: null,
+  role: "member",
+  createdAt: new Date(0).toISOString(),
+  disabled: true,
+});
 const sameRequest = (left: string | number, right: string | number) => String(left) === String(right);
 
 class WatchFixtureAgents extends AgentService {
@@ -472,7 +483,7 @@ try {
           authEpoch: () => EPOCH,
         },
         verifyTicket: (ticket) => centralAuth.verifyWatchTicket(ticket),
-        member: (membershipId) => team.getMember(membershipId),
+        member: (membershipId) => (membershipId === DISABLED_MEMBER ? disabledMember() : team.getMember(membershipId)),
         commands: () => commands,
       });
       server = new TeamApiServer({
@@ -760,7 +771,7 @@ try {
     return open.result;
   });
 
-  await step("The host refuses bad tickets, proofs, clocks, replays and hosts", async () => {
+  await step("The host refuses bad tickets, proofs, clocks, replays, hosts and disabled members", async () => {
     assert.ok(relay);
     const host = relay;
     const statusOf = async (built: Awaited<ReturnType<typeof delivery>>) =>
@@ -773,6 +784,9 @@ try {
       wrongHost: await statusOf(await delivery(refresh, { ticket: await ticket({ hostId: "another-host" }) })),
       oldEpoch: await statusOf(await delivery(refresh, { ticket: await ticket({ authEpoch: EPOCH - 1 }) })),
       unknownMember: await statusOf(await delivery(refresh, { ticket: await ticket({ membershipId: "nobody" }) })),
+      disabledMember: await statusOf(
+        await delivery(refresh, { ticket: await ticket({ membershipId: DISABLED_MEMBER }) }),
+      ),
       wrongNonce: await statusOf(await delivery(refresh, { sealJti: "another-ticket" })),
     };
     const replayed = await delivery(refresh, { id: `replay-${randomUUID()}` });
@@ -784,7 +798,8 @@ try {
       staleClock: 401,
       wrongHost: 403,
       oldEpoch: 401,
-      unknownMember: 403,
+      unknownMember: 200,
+      disabledMember: 403,
       wrongNonce: 400,
     });
     assert.equal(first, 200);

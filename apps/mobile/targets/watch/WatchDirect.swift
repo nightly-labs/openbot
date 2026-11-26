@@ -8,7 +8,7 @@ enum WatchDirectFailure: Error {
 }
 
 actor WatchDirect {
-  static let requestTimeout: TimeInterval = 20
+  static let requestTimeout: TimeInterval = 25
   static let relayPath = "/v1/watch/request"
   static let ticketPath = "/v2/remote/watch/ticket"
   static let ticketMargin: TimeInterval = 60

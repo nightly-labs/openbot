@@ -515,7 +515,7 @@ export class SignalIngress implements MessagingIngress {
     let webhookTicket: Effect.Effect<string | null, RemoteWorkflowError> = webhooks
       ? account.webhookRoute(hostId)
       : Effect.succeed(null);
-    if (webhooks && (slack || discord || telegram || github))
+    if (webhooks && (slack || discord || telegram || github || watchRelay))
       webhookTicket = webhookTicket.pipe(
         Effect.catch(() =>
           Effect.sync(() => {
@@ -527,7 +527,7 @@ export class SignalIngress implements MessagingIngress {
     let githubTicket: Effect.Effect<string | null, RemoteWorkflowError> = github
       ? account.githubRoute(hostId)
       : Effect.succeed(null);
-    if (github && (slack || discord || telegram || webhooks))
+    if (github && (slack || discord || telegram || webhooks || watchRelay))
       githubTicket = githubTicket.pipe(
         Effect.catch(() =>
           Effect.sync(() => {
