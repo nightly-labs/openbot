@@ -32,6 +32,7 @@ import {
   requiredNumberColumn,
   requiredStringColumn,
 } from "./database/database-rows";
+import { currentConversationMessage } from "./database/legacy-conversation-message";
 import { withTransaction } from "./database/sqlite-transaction";
 import { cachedStatement } from "./database/statement-cache";
 import type { OpenBotDatabase } from "./openbot-database";
@@ -159,6 +160,18 @@ function parsedJsonColumn<T>(value: DynamicRecord[string], parse: (decoded: unkn
   } catch {
     return fallback;
   }
+}
+
+function repairedChannelMessage(decoded: unknown): ChannelMessage | undefined {
+  if (isChannelMessage(decoded)) return decoded;
+  if (!isDynamicRecord(decoded)) return undefined;
+  const message = currentConversationMessage(decoded.message);
+  const repaired = message ? { ...decoded, message } : decoded;
+  return isChannelMessage(repaired) ? repaired : undefined;
+}
+
+function listedChannelMessage(value: DynamicRecord[string]): ChannelMessage | undefined {
+  return parsedJsonColumn(value, repairedChannelMessage, undefined);
 }
 
 function storedFolders(value: DynamicRecord[string]): readonly string[] | undefined {
@@ -340,15 +353,7 @@ export class ChannelStore {
     }
     return rows.map((row) => {
       const channel = decodeChannel(JSON.parse(requiredStringColumn(row, "channel_json")));
-      const latestJson = row.latest_json;
-      const latest =
-        typeof latestJson === "string" && latestJson.length > 0
-          ? (() => {
-              const value = JSON.parse(latestJson);
-              if (!isChannelMessage(value)) throw new Error("Invalid stored channel message.");
-              return value;
-            })()
-          : undefined;
+      const latest = listedChannelMessage(row.latest_json);
       const tasks = this.#taskCountsOf(channel.id, keepsCounts);
       return {
         ...channel,
