@@ -58,6 +58,7 @@ export const messages = {
   "agent.dock.openInMain": "فتح في النافذة الرئيسية",
   "agent.dock.openWindow": "فتح في نافذة جديدة",
   "agent.dock.openPage": "فتح {title}",
+  "agent.dock.openFile": "فتح {name}",
   "agent.dock.remove": "إزالة من الشريط",
   "agent.dock.send": "إرسال",
   "agent.dock.working": "يعمل…",
