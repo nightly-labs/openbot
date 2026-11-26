@@ -87,6 +87,8 @@ export const messages = {
     "Impossibile sbloccare Bitwarden su questo server. Controlla la password principale, poi connetti di nuovo.",
   "error.connector.bitwardenCliInstallFailed":
     "Impossibile installare la CLI di Bitwarden su questo server. Controlla la sua connessione di rete, poi connetti di nuovo.",
+  "error.connector.bitwardenCliCannotStart":
+    "La CLI di Bitwarden non si è avviata su questo server. Connetti di nuovo. Se ancora non si avvia, scegli Aiuto > Segnala un problema.",
   "error.connector.bitwardenFileUnreadable": "Il file di connessione di Bitwarden non è leggibile.",
   "error.connector.passwordManagerUnknown": "OpenBot non conosce questo gestore di password.",
   "error.connector.passwordManagerMethod": "Questo gestore di password non può connettersi in questo modo.",
