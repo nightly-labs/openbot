@@ -505,6 +505,7 @@ export function createGitHubRest(options: GitHubRestOptions): WorkflowGitHubApi 
 export interface WorkflowGitHubDirectory {
   catalog(): Effect.Effect<WorkflowGitHubCatalog, GitHubOperationError>;
   relayCatalog(): Effect.Effect<WorkflowGitHubCatalog & { relay: WorkflowGitHubRelay }, GitHubOperationError>;
+  relayStatus(): WorkflowGitHubRelay;
   options(repository: string): Effect.Effect<WorkflowGitHubRepositoryOptions, GitHubOperationError>;
 }
 
@@ -513,15 +514,19 @@ export function workflowGitHubDirectory(
   api: Pick<WorkflowGitHubApi, "options">,
   relay: (visible: readonly string[]) => WorkflowGitHubRelay,
 ): WorkflowGitHubDirectory {
-  return {
-    catalog,
-    relayCatalog: () =>
-      catalog().pipe(
-        Effect.map((found) => ({
-          ...found,
-          relay: relay(found.repositories.filter((entry) => entry.events).map((entry) => entry.fullName)),
-        })),
+  let visible: readonly string[] = [];
+  const read = () =>
+    catalog().pipe(
+      Effect.tap((found) =>
+        Effect.sync(() => {
+          visible = found.repositories.filter((entry) => entry.events).map((entry) => entry.fullName);
+        }),
       ),
+    );
+  return {
+    catalog: read,
+    relayCatalog: () => read().pipe(Effect.map((found) => ({ ...found, relay: relay(visible) }))),
+    relayStatus: () => relay(visible),
     options: (repository) =>
       api.options(repository).pipe(
         Effect.mapError(

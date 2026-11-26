@@ -645,6 +645,7 @@ async function startHost(): Promise<Host> {
       github: {
         catalog: () => Effect.succeed(GITHUB_CATALOG),
         relayCatalog: () => Effect.succeed({ ...GITHUB_CATALOG, relay: GITHUB_RELAY }),
+        relayStatus: () => GITHUB_RELAY,
         options: unused,
       },
       files: createWorkflowFileExporter({

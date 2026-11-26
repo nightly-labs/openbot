@@ -22,7 +22,7 @@ export interface GitHubRelayOptions {
   now?: () => number;
 }
 
-const ROUTE_REFRESH_MS = 5 * 60_000;
+const ROUTE_REFRESH_MS = 30 * 60_000;
 
 export class GitHubRelay {
   readonly #options: GitHubRelayOptions;
@@ -30,6 +30,7 @@ export class GitHubRelay {
   #release: (() => void) | null = null;
   #routed = new Map<string, GitHubRouteTicketRepository>();
   #refreshedAt = Number.NEGATIVE_INFINITY;
+  #refreshedFor = "";
 
   constructor(options: GitHubRelayOptions) {
     this.#options = options;
@@ -61,12 +62,18 @@ export class GitHubRelay {
   status(visible: readonly string[]): WorkflowGitHubRelay {
     const ready = this.connected();
     const routed = [...this.#routed.keys()];
-    const stale = visible.some((name) => {
-      const key = name.toLowerCase();
-      return this.#repositories.includes(key) && !this.#routed.has(key);
-    });
+    const stale = [
+      ...new Set(
+        visible
+          .map((name) => name.toLowerCase())
+          .filter((key) => this.#repositories.includes(key) && !this.#routed.has(key)),
+      ),
+    ]
+      .sort()
+      .join("\n");
     const now = (this.#options.now ?? Date.now)();
-    if (ready && stale && now - this.#refreshedAt >= ROUTE_REFRESH_MS) {
+    if (ready && stale && (stale !== this.#refreshedFor || now - this.#refreshedAt >= ROUTE_REFRESH_MS)) {
+      this.#refreshedFor = stale;
       this.#refreshedAt = now;
       this.#options.ingress().reconnect();
     }

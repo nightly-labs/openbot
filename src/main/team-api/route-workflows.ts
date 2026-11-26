@@ -468,7 +468,7 @@ export async function routeWorkflows(
       return json(200, fitted(await run(github.catalog())));
     case WORKFLOWS_GITHUB_RELAY_ROUTES.status:
       requireAdmin(member);
-      return json(200, fitted((await run(github.relayCatalog())).relay));
+      return json(200, fitted(github.relayStatus()));
     case WORKFLOWS_GITHUB_ROUTES.options: {
       requireAdmin(member);
       const input = parse(parseWorkflowGitHubRepository, body);

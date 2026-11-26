@@ -153,7 +153,9 @@ The trigger step shows the relay state (`GitHubRelay.status`): a warning while t
 is not ready for GitHub, and a warning for each watched repository that the last route ticket does not
 name. The workflow screen reads the state again every 30 seconds while a warning shows. When a watched
 repository is in the GitHub catalog with its events on but not in the route, for example after the
-user installs OpenBotGit on it, reading the state asks for a new ticket, at most once in 5 minutes.
+user installs OpenBotGit on it, reading the state asks for a new ticket: once for each new set of such
+repositories, and again after 30 minutes for the same set. The Team API relay route uses the
+repositories of the last catalog read, so it does not read GitHub again.
 
 `Workflows.receiveGitHub` records each delivery in `workflow_github_deliveries`, without the body,
 the newest 50 per trigger (`WORKFLOW_GITHUB_DELIVERY_LIMIT`). A delivery ID that is there already

@@ -340,7 +340,11 @@ export function createWorkflowsController(
         setGitHubCatalog(next);
         if (workflowGitHubRelayPending(next)) relayTimer = setTimeout(readGitHubCatalog, GITHUB_RELAY_REREAD_MS);
       },
-      () => undefined,
+      () => {
+        const shown = githubCatalog();
+        if (!disposed && request === catalogRead && shown && workflowGitHubRelayPending(shown))
+          relayTimer = setTimeout(readGitHubCatalog, GITHUB_RELAY_REREAD_MS);
+      },
     );
   };
   const refreshGitHub = () => {
