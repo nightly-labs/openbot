@@ -54,6 +54,9 @@ export const messages = {
   "error.agent.setupCleanupFailed": "Не удалось настроить агента, а неполного агента удалить не получилось.",
   "error.agent.modelUnavailable": "Выбранная модель агента недоступна.",
   "error.agent.modelProviderNotConnected": "Выбранная модель агента «{model}» недоступна: {provider} не подключён.",
+  "error.agent.modelProviderFailed": "Выбранная модель агента «{model}» недоступна. В {provider} ошибка: {detail}",
+  "error.agent.modelProviderFailedCheck":
+    "Выбранная модель агента «{model}» недоступна. Проверьте {provider} в разделе «Настройки сервера» > «Провайдеры», затем повторите попытку. Последняя ошибка: {detail}",
   "error.agent.modelProviderSignInRequired":
     "Выбранная модель агента «{model}» недоступна: нужно войти в {provider}. Войдите в {provider} и повторите попытку.",
   "error.agent.modelProviderNotInstalled": "Выбранная модель агента «{model}» недоступна: {provider} не установлен.",

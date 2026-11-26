@@ -59,6 +59,10 @@ export const messages = {
   "error.agent.modelUnavailable": "Het gekozen model van de agent is niet beschikbaar.",
   "error.agent.modelProviderNotConnected":
     "Het gekozen model “{model}” van de agent is niet beschikbaar: {provider} is niet verbonden.",
+  "error.agent.modelProviderFailed":
+    "Het gekozen model “{model}” van de agent is niet beschikbaar. {provider} heeft een fout: {detail}",
+  "error.agent.modelProviderFailedCheck":
+    "Het gekozen model “{model}” van de agent is niet beschikbaar. Controleer {provider} in Serverinstellingen > Aanbieders en probeer het daarna opnieuw. Laatste fout: {detail}",
   "error.agent.modelProviderSignInRequired":
     "Het gekozen model “{model}” van de agent is niet beschikbaar: {provider} vraagt om aanmelding. Meld je aan bij {provider} en probeer het opnieuw.",
   "error.agent.modelProviderNotInstalled":

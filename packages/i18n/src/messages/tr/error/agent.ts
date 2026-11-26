@@ -55,6 +55,10 @@ export const messages = {
   "error.agent.setupCleanupFailed": "Ajan kurulumu başarısız oldu ve tamamlanmamış ajan kaldırılamadı.",
   "error.agent.modelUnavailable": "Seçilen ajan modeli kullanılamıyor.",
   "error.agent.modelProviderNotConnected": 'Seçilen ajan modeli "{model}" kullanılamıyor: {provider} bağlı değil.',
+  "error.agent.modelProviderFailed":
+    'Seçilen ajan modeli "{model}" kullanılamıyor. {provider} bir hata verdi: {detail}',
+  "error.agent.modelProviderFailedCheck":
+    'Seçilen ajan modeli "{model}" kullanılamıyor. Sunucu ayarları > Sağlayıcılar bölümünde {provider} öğesini kontrol edin, ardından yeniden deneyin. Son hata: {detail}',
   "error.agent.modelProviderSignInRequired":
     'Seçilen ajan modeli "{model}" kullanılamıyor: {provider} oturum açmayı gerektiriyor. {provider} hesabında oturum açıp yeniden dene.',
   "error.agent.modelProviderNotInstalled": 'Seçilen ajan modeli "{model}" kullanılamıyor: {provider} yüklü değil.',

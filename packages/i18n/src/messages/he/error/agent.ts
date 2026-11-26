@@ -51,6 +51,9 @@ export const messages = {
   "error.agent.setupCleanupFailed": "הגדרת הסוכן נכשלה ולא ניתן היה להסיר את הסוכן החלקי.",
   "error.agent.modelUnavailable": "מודל הסוכן שנבחר אינו זמין.",
   "error.agent.modelProviderNotConnected": 'מודל הסוכן שנבחר "{model}" אינו זמין: {provider} אינו מחובר.',
+  "error.agent.modelProviderFailed": 'מודל הסוכן שנבחר "{model}" אינו זמין. ב-{provider} יש שגיאה: {detail}',
+  "error.agent.modelProviderFailedCheck":
+    'מודל הסוכן שנבחר "{model}" אינו זמין. בדקו את {provider} בהגדרות השרת ← ספקים, ואז נסו שוב. השגיאה האחרונה: {detail}',
   "error.agent.modelProviderSignInRequired":
     'מודל הסוכן שנבחר "{model}" אינו זמין: {provider} דורש התחברות. התחבר ל-{provider} ונסה שוב.',
   "error.agent.modelProviderNotInstalled": 'מודל הסוכן שנבחר "{model}" אינו זמין: {provider} אינו מותקן.',
