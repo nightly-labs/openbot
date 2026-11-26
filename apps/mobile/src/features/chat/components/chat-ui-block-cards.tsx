@@ -254,7 +254,7 @@ export function ConfirmBody({
   const fields = spec.fields ?? [];
   return (
     <View className="gap-2">
-      <View className="flex-row items-center gap-2">
+      <View className="flex-row items-start gap-2">
         <Typography weight="medium" className={`min-w-0 flex-1 ${spec.danger && !closed ? "text-danger-text" : ""}`}>
           {spec.title}
         </Typography>

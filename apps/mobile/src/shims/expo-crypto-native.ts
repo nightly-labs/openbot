@@ -49,8 +49,8 @@ const expoGoCrypto = {
   digestString,
   digestStringAsync: async (algorithm: string, data: string, options: { encoding: "hex" | "base64" }) =>
     digestString(algorithm, data, options),
-  digest: (algorithm: string, output: Uint8Array, data: Uint8Array): void => {
-    output.set(hashOf(algorithm)(data));
+  digest: (algorithm: string, output: Uint8Array, data: ArrayBufferView): void => {
+    output.set(hashOf(algorithm)(new Uint8Array(data.buffer, data.byteOffset, data.byteLength)));
   },
 };
 
