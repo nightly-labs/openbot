@@ -24,7 +24,7 @@ import {
   workflowTriggerFields,
   workflowTriggerRecord,
 } from "@openbot/contracts/ipc";
-import type { DynamicRecord } from "@openbot/contracts/runtime-values";
+import { type DynamicRecord, isDynamicRecord } from "@openbot/contracts/runtime-values";
 import type { ReceivedWebhookEvent } from "../routine-store";
 import type { StoredWorkflowStep } from "./workflow-run-store";
 import { workflowScheduleRecord } from "./workflow-triggers";
@@ -39,7 +39,7 @@ function givenAnswer({ node, fields, builtIn }: WorkflowAnswerSource, output: st
   const record = lastJsonObject(output);
   if (!record) return {};
   const given = node.kind === "trigger" && Object.hasOwn(record, "data") ? record.data : record;
-  return checkWorkflowAnswer(fields, given).answer;
+  return checkWorkflowAnswer(fields, given, "ignore", "given").answer;
 }
 
 function triggerAnswer(node: WorkflowNode, output: string): WorkflowAnswer {
@@ -203,11 +203,17 @@ export type ReadAnswer = { output: string } | { problems: WorkflowAnswerValuePro
 export function readAnswer(fields: readonly WorkflowAnswerField[], text: string): ReadAnswer {
   const record = lastJsonObject(text);
   if (!record) return { problems: [{ name: fields.map((field) => field.name).join(", "), problem: "json" }] };
-  return readGivenAnswer(fields, record);
+  return readGivenAnswer(fields, unwrappedAnswer(fields, record));
+}
+
+function unwrappedAnswer(fields: readonly WorkflowAnswerField[], record: DynamicRecord): DynamicRecord {
+  const wrapped = record.answer;
+  if (Object.keys(record).length !== 1 || !isDynamicRecord(wrapped)) return record;
+  return fields.some((field) => field.name === "answer") ? record : wrapped;
 }
 
 export function readGivenAnswer(fields: readonly WorkflowAnswerField[], value: unknown): ReadAnswer {
-  const { answer, problems } = checkWorkflowAnswer(fields, value, "refuse");
+  const { answer, problems } = checkWorkflowAnswer(fields, value, "refuse", "given");
   return problems.length > 0 ? { problems } : { output: JSON.stringify(answer) };
 }
 

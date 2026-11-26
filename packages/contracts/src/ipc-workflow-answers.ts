@@ -143,27 +143,32 @@ function typeHint(field: WorkflowAnswerField): string {
 
 export type WorkflowAnswerValueProblem = {
   name: string;
-  problem: "missing" | "type" | "label" | "unknown" | "json";
+  problem: "missing" | "empty" | "type" | "label" | "unknown" | "json";
 };
 
 export type WorkflowAnswerExtraKeys = "refuse" | "refuseMiscased" | "ignore";
+
+export type WorkflowAnswerEmptyList = "given" | "refuse";
 
 export function checkWorkflowAnswer(
   fields: readonly WorkflowAnswerField[],
   value: unknown,
   extraKeys: WorkflowAnswerExtraKeys = "ignore",
+  emptyList: WorkflowAnswerEmptyList = "refuse",
 ): { answer: WorkflowAnswer; problems: WorkflowAnswerValueProblem[] } {
   const record: DynamicRecord = isDynamicRecord(value) ? value : {};
   const entries: [string, WorkflowAnswerValue][] = [];
   const problems: WorkflowAnswerValueProblem[] = extraKeyProblems(fields, record, extraKeys);
   for (const field of fields) {
     const raw = Object.hasOwn(record, field.name) ? record[field.name] : undefined;
-    const checked = raw === undefined || raw === null || raw === "" ? undefined : answerValue(field, raw);
+    const absent = raw === undefined || raw === null;
+    const checked = absent || raw === "" ? undefined : answerValue(field, raw);
     if (checked !== undefined && typeof checked === "object" && "problem" in checked)
       problems.push({ name: field.name, problem: checked.problem });
-    else if (checked === undefined || isBlank(checked)) {
-      if (!field.optional) problems.push({ name: field.name, problem: "missing" });
-    } else entries.push([field.name, checked]);
+    else if (checked !== undefined && !isBlank(checked)) entries.push([field.name, checked]);
+    else if (field.optional) continue;
+    else if (emptyList === "given" && typeof checked === "object") entries.push([field.name, checked]);
+    else problems.push({ name: field.name, problem: absent ? "missing" : "empty" });
   }
   return { answer: Object.fromEntries(entries), problems };
 }
@@ -228,6 +233,8 @@ function valueProblemText({ name, problem }: WorkflowAnswerValueProblem): string
   switch (problem) {
     case "missing":
       return `${name} is missing`;
+    case "empty":
+      return `${name} is empty`;
     case "label":
       return `${name} is not one of the labels`;
     case "unknown":
