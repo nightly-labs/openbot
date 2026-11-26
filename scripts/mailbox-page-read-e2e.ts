@@ -14,6 +14,7 @@ import { RoutineScheduler } from "../src/backend/agent/routine-scheduler";
 import { AgentStore } from "../src/backend/agent-store";
 import { AgentWaitStore } from "../src/backend/agent-waits/agent-wait-store";
 import { AgentWaits } from "../src/backend/agent-waits/agent-waits";
+import { withoutQueuePositions } from "../src/backend/database/conversation-writer";
 import type { MailboxProjectionState } from "../src/backend/database/mailbox-projection";
 import { runCauseEffect } from "../src/backend/effect-boundary";
 import { MailboxStore } from "../src/backend/mailbox-store";
@@ -323,7 +324,10 @@ try {
       pagesRead += 1;
       if (
         conversationContentSignature(before) !== conversationContentSignature(synced) &&
-        isDeepStrictEqual(JSON.parse(JSON.stringify(synced.messages)), before.messages)
+        isDeepStrictEqual(
+          JSON.parse(JSON.stringify(synced.messages.map(withoutQueuePositions))),
+          before.messages.map(withoutQueuePositions),
+        )
       )
         sameContentPages += 1;
       reconcile.push(measure(() => sync.reconcilePersistedMailboxMessages(agent)));

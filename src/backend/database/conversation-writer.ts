@@ -390,7 +390,7 @@ export class ConversationWriter {
     const messages = withoutDeletedMessages(this.#core.connection, threadId, written);
     if (messages.length === 0) return [];
     const unknown = messages.filter((message) => !known.has(message.id));
-    const stored = new Map<string, ConversationMessage | null>(known);
+    const fetched = new Map<string, ConversationMessage | null>();
     if (unknown.length > 0)
       for (const row of databaseRows(
         this.#core.connection
@@ -400,12 +400,12 @@ export class ConversationWriter {
           )
           .all(threadId, ...unknown.map((message) => message.id)),
       ))
-        stored.set(
+        fetched.set(
           requiredStringColumn(row, "message_id"),
           currentConversationMessage(JSON.parse(requiredStringColumn(row, "message_json"))),
         );
     return messages.filter((message) => {
-      const existing = stored.get(message.id);
+      const existing = known.get(message.id) ?? fetched.get(message.id);
       if (!existing) return true;
       return !isDeepStrictEqual(
         JSON.parse(JSON.stringify(withoutQueuePositions(mergeLiveMessage(existing, message)))),

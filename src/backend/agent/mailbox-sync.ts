@@ -12,6 +12,7 @@ import {
 } from "@openbot/contracts/ipc";
 import { Effect, type Scope } from "effect";
 import { isMailboxMessageCopy } from "../conversation-snapshots";
+import { withoutQueuePositions } from "../database/conversation-writer";
 import type { MailboxStore } from "../mailbox-store";
 import type { OpenBotDatabase } from "../openbot-database";
 import type { ConversationRuntime } from "./conversation-runtime";
@@ -171,24 +172,8 @@ export class MailboxSync {
       persisted,
       this.#mailbox.conversationMessages(agent.id, oldest === undefined ? {} : { fromCreatedAt: oldest }),
     );
-    if (isDeepStrictEqual(JSON.parse(JSON.stringify(persisted.messages)), page.messages)) return;
-    const stored = new Map(page.messages.map((message) => [message.id, message]));
-    const changedMessages = this.#database.changedConversationMessages(agent.threadId, persisted.messages, stored);
-    const keptMessageIds = new Set(persisted.messages.map((message) => message.id));
-    const removedMessageIds = [...stored.keys()].filter((messageId) => !keptMessageIds.has(messageId));
-    if (changedMessages.length > 0 || removedMessageIds.length > 0) {
-      this.#database.persistConversationChanges({
-        agentId: agent.id,
-        threadId: agent.threadId,
-        activeTurnId: persisted.activeTurnId,
-        changedMessages,
-        removedMessageIds,
-        eventType: "conversation.mailbox-reconciled",
-        detail: {
-          messageCount: changedMessages.length,
-        },
-      });
-    }
+    if (!sameStoredContent(persisted.messages, page.messages))
+      this.#persistMailboxChanges(agent.threadId, page, persisted);
     const live = this.#conversation.snapshot(agent.id);
     if (live) {
       const liveOldest = live.messages[0]?.createdAt;
@@ -197,6 +182,25 @@ export class MailboxSync {
         this.#mailbox.conversationMessages(agent.id, liveOldest === undefined ? {} : { fromCreatedAt: liveOldest }),
       );
     }
+  }
+
+  #persistMailboxChanges(threadId: string, page: ConversationSnapshot, persisted: ConversationSnapshot): void {
+    const stored = new Map(page.messages.map((message) => [message.id, message]));
+    const changedMessages = this.#database.changedConversationMessages(threadId, persisted.messages, stored);
+    const keptMessageIds = new Set(persisted.messages.map((message) => message.id));
+    const removedMessageIds = [...stored.keys()].filter((messageId) => !keptMessageIds.has(messageId));
+    if (changedMessages.length === 0 && removedMessageIds.length === 0) return;
+    this.#database.persistConversationChanges({
+      agentId: page.agentId,
+      threadId,
+      activeTurnId: persisted.activeTurnId,
+      changedMessages,
+      removedMessageIds,
+      eventType: "conversation.mailbox-reconciled",
+      detail: {
+        messageCount: changedMessages.length,
+      },
+    });
   }
 
   queueSnapshot(agentId: string): QueueSnapshot {
@@ -261,4 +265,11 @@ export class MailboxSync {
       );
     });
   }
+}
+
+function sameStoredContent(synced: readonly ConversationMessage[], stored: readonly ConversationMessage[]): boolean {
+  return isDeepStrictEqual(
+    JSON.parse(JSON.stringify(synced.map(withoutQueuePositions))),
+    stored.map(withoutQueuePositions),
+  );
 }

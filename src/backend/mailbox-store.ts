@@ -891,16 +891,19 @@ export class MailboxStore {
         if (list) list.push(delivery);
         else open.set(agentId, [delivery]);
       }
-    const positions = new Map([...open.keys()].flatMap((agentId) => [...this.#queuedPositions(agentId)]));
-    return [...targets].map((agentId) => ({
-      agentId,
-      ...(welcomes.has(agentId) ? { welcome: true as const } : {}),
-      deliveries: (open.get(agentId) ?? [])
-        .sort(compareQueueOrder)
-        .map((delivery) =>
-          this.#publicDelivery(delivery, positions, this.#requireMessage(delivery.messageId, messages)),
-        ),
-    }));
+    return [...targets].map((agentId) => {
+      const deliveries = open.get(agentId) ?? [];
+      const positions = deliveries.length > 0 ? this.#queuedPositions(agentId) : new Map<string, number>();
+      return {
+        agentId,
+        ...(welcomes.has(agentId) ? { welcome: true as const } : {}),
+        deliveries: deliveries
+          .sort(compareQueueOrder)
+          .map((delivery) =>
+            this.#publicDelivery(delivery, positions, this.#requireMessage(delivery.messageId, messages)),
+          ),
+      };
+    });
   }
 
   queuedExecutionDeliveryIds(agentId: string): string[] {
