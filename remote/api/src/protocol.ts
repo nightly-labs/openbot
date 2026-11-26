@@ -9,6 +9,11 @@ import {
   type TelegramCallMethod,
   type TelegramCallParams,
 } from "@openbot/contracts/signal-protocol/telegram-route";
+import {
+  isWatchRelaySealed,
+  WATCH_RELAY_REPLY_SEALED_LIMIT,
+  type WatchRelayHostStatus,
+} from "@openbot/contracts/signal-protocol/watch-relay";
 import { z } from "zod";
 
 export type {
@@ -52,6 +57,7 @@ const signalMessageTypeSchema = z.enum([
   "github-delivery-result",
   "telegram-call",
   "queued-delivery-ack",
+  "watch-delivery-result",
 ]);
 
 const telegramChatIdSchema = z.int();
@@ -154,6 +160,7 @@ const signalClientMessageSchema = z.discriminatedUnion("type", [
     telegramRoute: z.string().min(1).max(16_384).optional(),
     queueKey: z.string().max(128).optional(),
     webhookFormats: z.array(z.string().min(1).max(64)).max(8).optional().catch(undefined),
+    watchRelay: z.boolean().optional(),
   }),
   z.object({
     type: z.enum(["offer", "answer"]),
@@ -220,6 +227,25 @@ const signalClientMessageSchema = z.discriminatedUnion("type", [
     version: z.literal(1),
     requestId: identifierSchema,
     status: z.union([z.literal(202), z.literal(400), z.literal(404), z.literal(503)]),
+  }),
+  z.object({
+    type: z.literal("watch-delivery-result"),
+    version: z.literal(1),
+    requestId: identifierSchema,
+    status: z.union([
+      z.literal(200),
+      z.literal(400),
+      z.literal(401),
+      z.literal(403),
+      z.literal(404),
+      z.literal(413),
+      z.literal(429),
+      z.literal(503),
+    ]) satisfies z.ZodType<WatchRelayHostStatus>,
+    sealed: z
+      .string()
+      .refine((value) => isWatchRelaySealed(value, WATCH_RELAY_REPLY_SEALED_LIMIT))
+      .optional(),
   }),
   telegramCallSchema,
 ]) satisfies z.ZodType<SignalClientMessage>;

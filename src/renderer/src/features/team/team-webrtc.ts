@@ -398,7 +398,8 @@ async function handleSignal(state: PeerState, message: SignalServerMessage): Pro
     message.type === "github-delivery" ||
     message.type === "telegram-delivery" ||
     message.type === "telegram-call-result" ||
-    message.type === "queued-delivery"
+    message.type === "queued-delivery" ||
+    message.type === "watch-delivery"
   )
     return;
   if (message.type === "host-waiting") {

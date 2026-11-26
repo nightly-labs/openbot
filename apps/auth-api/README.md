@@ -494,6 +494,15 @@ It has its own key in `LIVE_ACTIVITY_RATE_LIMITER`, and it sends nothing for a d
 has ended (`RemoteControlPlane.sessionOpen`), because the host does not learn about the end. The
 alert has "OpenBot" as its only text and `mutable-content`; the app opens the sealed bytes.
 
+`POST /v2/remote/watch/sessions` pairs an Apple Watch with the phone account session that sends it
+(`watch_sessions` in D1). The body is `{ publicKey }`, the raw P-256 key of the watch. The answer is
+`{ watchSessionId, token, expiresAt }`; D1 keeps only the hash of the token. The watch session ends
+after 30 days, or when its phone session ends. The same key again replaces the old session, and an
+account keeps at most 5. `DELETE /v2/remote/watch/sessions/:watchSessionId` revokes one.
+`POST /v2/remote/watch/ticket` takes the watch token and a signed `{ hostId, ts, proof }`, checks the
+membership on the host, and gives an ES256 ticket with `aud: "openbot-watch"` from the remote ticket
+key. `WATCH_TICKET_RATE_LIMITER` limits each watch session to 30 tickets a minute.
+
 The relay is off until `APNS_PRIVATE_KEY` (the `.p8` key text) and `APNS_KEY_ID` are set. Create
 the key in Apple Developer > Keys with the Apple Push Notifications service, then add both to the
 encrypted environment and to the `cloudflare-production` GitHub environment. `APNS_TEAM_ID` and

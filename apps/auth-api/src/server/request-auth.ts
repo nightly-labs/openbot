@@ -71,6 +71,7 @@ import {
   type TeamInviteEmailDelivery,
   type WorkerBindings,
 } from "./types";
+import { WatchSessionStoreError, WatchSessions } from "./watch-sessions";
 
 function accountAnalytics(bindings: WorkerBindings): AccountAnalytics {
   return createAccountAnalytics({
@@ -533,6 +534,23 @@ export function requestOwnerTransferEmailDelivery(): OwnerTransferEmailDelivery 
 
 export function requestRemoteControlPlane(): RemoteControlPlane {
   return new RemoteControlPlane(requireWorkerBindings(env), { schedule });
+}
+
+export function requestWatchSessions(): WatchSessions {
+  const bindings = requireWorkerBindings(env);
+  const limiter = bindings.WATCH_TICKET_RATE_LIMITER;
+  return new WatchSessions({
+    database: bindings.DB,
+    now: () => Date.now(),
+    issueTicket: (input) => Effect.suspend(() => requestRemoteControlPlane().issueWatchTicket(input)),
+    allowTicket: limiter
+      ? (watchSessionId) =>
+          Effect.tryPromise({
+            try: () => limiter.limit({ key: `watch:${watchSessionId}` }),
+            catch: () => new WatchSessionStoreError({}),
+          }).pipe(Effect.map((result) => result.success))
+      : null,
+  });
 }
 
 export function requestHostedServerService(request?: Request): HostedServerService {

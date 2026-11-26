@@ -17,13 +17,26 @@ import {
   telegramRouteChatKey,
 } from "@openbot/contracts/signal-protocol/telegram-route";
 import {
+  verifyWatchProof,
+  WATCH_RELAY_CAPABILITY,
+  WATCH_RELAY_HOST_TIMEOUT_MS,
+  WATCH_RELAY_PENDING_PER_HOST,
+  type WatchRelayHostStatus,
+  type WatchRelayHttpRequest,
+  type WatchRelayStatus,
+  type WatchTicketClaims,
+  watchClockAccepts,
+  watchProofMessage,
+  watchSealedDigest,
+} from "@openbot/contracts/signal-protocol/watch-relay";
+import {
   WEBHOOK_ROUTE_TTL_SECONDS,
   type WebhookRoute,
   type WebhookSignatureFormat,
 } from "@openbot/contracts/signal-protocol/webhook-route";
 import { sourceText } from "@openbot/i18n/source";
-import { Context, Effect, Fiber, Layer, Result, Schema } from "effect";
-import { IngressQueue, queueRouteKey, type RouteWaker } from "./ingress-queue";
+import { Context, Deferred, Effect, Fiber, Layer, Result, Schema } from "effect";
+import { IngressQueue, queueRouteKey, type RouteWake, type RouteWaker } from "./ingress-queue";
 import {
   type DecodedSignalClientMessage,
   decodeSignalClientMessage,
@@ -87,6 +100,7 @@ export interface RemoteTokenProvider {
   verifyWebhookRoute?(token: string, hostId: string): Effect.Effect<WebhookRouteTicket, RemoteTokenError>;
   validateWebhookRoute?(hostId: string, routes: WebhookRoute[]): Effect.Effect<string[], RemoteTokenError>;
   verifyGitHubRoute?(token: string, hostId: string): Effect.Effect<GitHubRoute, RemoteTokenError>;
+  verifyWatchTicket?(token: string): Effect.Effect<WatchTicketClaims, RemoteTokenError>;
   revokeHost?(hostId: string, authEpoch: number): void;
   revokeSession?(sessionId: string): void;
 }
@@ -121,6 +135,7 @@ interface AuthenticatedPeer {
   webhookRoutes: string[];
   webhookFormats: ReadonlySet<string>;
   githubRepositories: string[];
+  watchRelay: boolean;
   turnCredentials: { iceServers: IceServer[]; issuedAt: number } | null;
 }
 
@@ -172,6 +187,7 @@ export interface SignalServiceOptions {
   discord?: boolean;
   telegram?: SignalTelegram | null;
   routeWaker?: RouteWaker | null;
+  hostWaker?: HostWaker | null;
   fork?: (work: Effect.Effect<unknown>) => void;
   isEntry?: () => boolean;
 }
@@ -238,6 +254,55 @@ interface PendingDelivery {
   resolve(result: IngressDeliveryResult | null): void;
 }
 
+export type HostWaker = (hostId: string) => Effect.Effect<RouteWake | null>;
+
+export type WatchRelayErrorCode =
+  | "invalid_request"
+  | "unauthorized"
+  | "forbidden"
+  | "not_found"
+  | "too_large"
+  | "rate_limited"
+  | "host_offline"
+  | "waking"
+  | "timeout";
+
+export type WatchRelayAnswer =
+  | { status: 200; sealed: string }
+  | { status: Exclude<WatchRelayStatus, 200>; error: WatchRelayErrorCode };
+
+type WatchDeliveryResult = Extract<SignalClientMessage, { type: "watch-delivery-result" }>;
+
+type WatchDeliveryOutcome = WatchDeliveryResult | "timeout" | "closed";
+
+interface PendingWatchRequest {
+  socketId: string;
+  hostId: string;
+  timer: ReturnType<typeof setTimeout>;
+  resolve(outcome: WatchDeliveryOutcome): void;
+}
+
+const WATCH_UNAUTHORIZED: WatchRelayAnswer = { status: 401, error: "unauthorized" };
+const WATCH_RATE_LIMITED: WatchRelayAnswer = { status: 429, error: "rate_limited" };
+const WATCH_HOST_OFFLINE: WatchRelayAnswer = { status: 503, error: "host_offline" };
+const WATCH_WAKING: WatchRelayAnswer = { status: 503, error: "waking" };
+const WATCH_TIMEOUT: WatchRelayAnswer = { status: 504, error: "timeout" };
+const WATCH_HOST_ERRORS: Record<Exclude<WatchRelayHostStatus, 200>, WatchRelayErrorCode> = {
+  400: "invalid_request",
+  401: "unauthorized",
+  403: "forbidden",
+  404: "not_found",
+  413: "too_large",
+  429: "rate_limited",
+  503: "host_offline",
+};
+const WATCH_SESSION_REQUESTS_PER_MINUTE = 60;
+const WATCH_ADDRESS_REQUESTS_PER_MINUTE = 120;
+const WATCH_HOST_WAKE_CHECK_MILLISECONDS = 60_000;
+const MAXIMUM_WATCH_HOST_WAKES = 100_000;
+
+class WatchProofError extends Schema.TaggedError<WatchProofError>()("WatchProofError", {}) {}
+
 export interface IngressDeliveryLimits {
   timeoutMilliseconds: number;
   maximumPendingPerHost: number;
@@ -301,6 +366,10 @@ export class SignalService {
   readonly #discordEnabled: boolean;
   #discordMembership: DiscordMembership | null = null;
   readonly #pendingDeliveries = new Map<string, PendingDelivery>();
+  readonly #watchRelays = new Map<string, string>();
+  readonly #pendingWatchRequests = new Map<string, PendingWatchRequest>();
+  readonly #hostWaker: HostWaker | null;
+  readonly #hostWakes = new Map<string, { at: number; outcome: Deferred.Deferred<WatchRelayAnswer> }>();
   readonly #queue: IngressQueue;
   readonly #fork: (work: Effect.Effect<unknown>) => void;
   readonly #isEntry: () => boolean;
@@ -370,6 +439,7 @@ export class SignalService {
     this.#fork = options.fork ?? ((work) => void Effect.runFork(work));
     this.#isEntry = options.isEntry ?? (() => true);
     this.#queue = new IngressQueue(options.routeWaker ?? null, { fork: this.#fork });
+    this.#hostWaker = options.hostWaker ?? null;
   }
 
   get telegram(): SignalTelegram | null {
@@ -390,6 +460,7 @@ export class SignalService {
     this.#peerExpirationTimers.clear();
     this.#helloTimers.clear();
     for (const requestId of [...this.#pendingDeliveries.keys()]) this.#settleDelivery(requestId, null);
+    for (const requestId of [...this.#pendingWatchRequests.keys()]) this.#settleWatch(requestId, "closed");
     this.#queue.close();
   }
 
@@ -487,6 +558,15 @@ export class SignalService {
         this.#settleDelivery(message.requestId, message);
         return;
       }
+      if (message.type === "watch-delivery-result") {
+        const pending = this.#pendingWatchRequests.get(message.requestId);
+        if (!pending || pending.socketId !== socket.id) {
+          this.#fail(socket, "permission_denied", "The delivery does not belong to this peer.");
+          return;
+        }
+        this.#settleWatch(message.requestId, message);
+        return;
+      }
       if (message.type === "telegram-call") {
         if (peer.peer !== "ingress") {
           this.#fail(socket, "permission_denied", "Only an ingress socket can call the Bot API.");
@@ -534,6 +614,16 @@ export class SignalService {
         if (calls) yield* Fiber.interruptAll([...calls]);
         for (const [requestId, pending] of [...this.#pendingDeliveries]) {
           if (pending.socketId === socket.id) this.#settleDelivery(requestId, null);
+        }
+        for (const [requestId, pending] of [...this.#pendingWatchRequests]) {
+          if (pending.socketId === socket.id) this.#settleWatch(requestId, "closed");
+        }
+        if (this.#watchRelays.get(peer.claims.hostId) === socket.id) {
+          this.#watchRelays.delete(peer.claims.hostId);
+          for (const other of this.#peers.values()) {
+            if (other.peer === "ingress" && other.watchRelay && other.claims.hostId === peer.claims.hostId)
+              this.#watchRelays.set(peer.claims.hostId, other.socket.id);
+          }
         }
         for (const route of peer.webhookRoutes) {
           if (this.#webhookRoutes.get(route) === socket.id) this.#webhookRoutes.delete(route);
@@ -827,6 +917,121 @@ export class SignalService {
     return statuses.every((status) => status === 404) ? { status: 204 } : UNAVAILABLE;
   });
 
+  acceptWatchRequest(address: string): boolean {
+    return this.#acceptRateLimit(`watch-address:${address}`, Date.now(), WATCH_ADDRESS_REQUESTS_PER_MINUTE);
+  }
+
+  readonly relayWatch = Effect.fn("Signal.relayWatch")(function* (
+    this: SignalService,
+    ticket: string,
+    request: WatchRelayHttpRequest,
+  ): Effect.fn.Return<WatchRelayAnswer, never, SignalTokens> {
+    const tokens = yield* SignalTokens;
+    if (!tokens.verifyWatchTicket) return WATCH_UNAUTHORIZED;
+    const verified = yield* tokens.verifyWatchTicket(ticket).pipe(Effect.result);
+    if (Result.isFailure(verified)) return WATCH_UNAUTHORIZED;
+    const claims = verified.success;
+    if (!claims.signal && !this.#isEntry()) return WATCH_HOST_OFFLINE;
+    if (
+      this.#isRevoked({
+        hostId: claims.hostId,
+        sessionId: claims.watchSessionId,
+        role: claims.role,
+        authEpoch: claims.authEpoch,
+      })
+    )
+      return WATCH_UNAUTHORIZED;
+    if (!watchClockAccepts(request.ts, Date.now())) return WATCH_UNAUTHORIZED;
+    const proven = yield* Effect.tryPromise({
+      try: async () =>
+        verifyWatchProof(
+          claims.clientPublicKey,
+          watchProofMessage(claims.hostId, claims.jti, await watchSealedDigest(request.sealed), request.ts),
+          request.proof,
+        ),
+      catch: () => new WatchProofError(),
+    }).pipe(Effect.catch(() => Effect.succeed(false)));
+    if (!proven) return WATCH_UNAUTHORIZED;
+    if (!this.#acceptRateLimit(`watch-session:${claims.watchSessionId}`, Date.now(), WATCH_SESSION_REQUESTS_PER_MINUTE))
+      return WATCH_RATE_LIMITED;
+    const socketId = this.#watchRelays.get(claims.hostId);
+    const ingress = socketId ? this.#peers.get(socketId) : undefined;
+    if (!ingress) return yield* this.#wakeHost(claims.hostId);
+    let hostPending = 0;
+    for (const pending of this.#pendingWatchRequests.values()) if (pending.hostId === claims.hostId) hostPending += 1;
+    if (
+      hostPending >= WATCH_RELAY_PENDING_PER_HOST ||
+      this.#pendingWatchRequests.size >= this.#deliveryLimits.maximumPending
+    )
+      return WATCH_RATE_LIMITED;
+    const requestId = randomIdentifier();
+    const outcome = yield* Effect.callback<WatchDeliveryOutcome>((resume) => {
+      const timer = setTimeout(() => this.#settleWatch(requestId, "timeout"), WATCH_RELAY_HOST_TIMEOUT_MS);
+      timer.unref?.();
+      this.#pendingWatchRequests.set(requestId, {
+        socketId: ingress.socket.id,
+        hostId: claims.hostId,
+        timer,
+        resolve: (result) => resume(Effect.succeed(result)),
+      });
+      this.#send(ingress.socket, {
+        type: "watch-delivery",
+        version: 1,
+        requestId,
+        ticket,
+        ts: request.ts,
+        proof: request.proof,
+        sealed: request.sealed,
+      });
+    }).pipe(
+      Effect.ensuring(
+        Effect.sync(() => {
+          const pending = this.#pendingWatchRequests.get(requestId);
+          if (!pending) return;
+          clearTimeout(pending.timer);
+          this.#pendingWatchRequests.delete(requestId);
+        }),
+      ),
+    );
+    if (outcome === "timeout") return WATCH_TIMEOUT;
+    if (outcome === "closed") return WATCH_HOST_OFFLINE;
+    if (outcome.status !== 200) return { status: outcome.status, error: WATCH_HOST_ERRORS[outcome.status] };
+    return outcome.sealed ? { status: 200, sealed: outcome.sealed } : WATCH_HOST_OFFLINE;
+  });
+
+  readonly #wakeHost = Effect.fn("Signal.wakeHost")(function* (this: SignalService, hostId: string) {
+    const waker = this.#hostWaker;
+    if (!waker) return WATCH_HOST_OFFLINE;
+    const now = Date.now();
+    const known = this.#hostWakes.get(hostId);
+    if (known && now - known.at < WATCH_HOST_WAKE_CHECK_MILLISECONDS) return yield* Deferred.await(known.outcome);
+    for (const [key, entry] of this.#hostWakes) {
+      if (now - entry.at < WATCH_HOST_WAKE_CHECK_MILLISECONDS && this.#hostWakes.size < MAXIMUM_WATCH_HOST_WAKES) break;
+      this.#hostWakes.delete(key);
+    }
+    const outcome = Deferred.makeUnsafe<WatchRelayAnswer>();
+    this.#hostWakes.delete(hostId);
+    this.#hostWakes.set(hostId, { at: now, outcome });
+    this.#fork(
+      waker(hostId).pipe(
+        Effect.map((wake) =>
+          wake?.hostId === hostId && wake.state === "starting" ? WATCH_WAKING : WATCH_HOST_OFFLINE,
+        ),
+        Effect.catchCause(() => Effect.succeed(WATCH_HOST_OFFLINE)),
+        Effect.flatMap((answer) => Deferred.succeed(outcome, answer)),
+      ),
+    );
+    return yield* Deferred.await(outcome);
+  });
+
+  #settleWatch(requestId: string, outcome: WatchDeliveryOutcome): void {
+    const pending = this.#pendingWatchRequests.get(requestId);
+    if (!pending) return;
+    this.#pendingWatchRequests.delete(requestId);
+    clearTimeout(pending.timer);
+    pending.resolve(outcome);
+  }
+
   readonly #deliver = Effect.fn("Signal.deliver")(
     (
       kind: IngressDeliveryKind,
@@ -1094,6 +1299,7 @@ export class SignalService {
     const capabilities = [
       ...(this.#telegram ? [TELEGRAM_CAPABILITY] : []),
       ...(this.#queue.enabled ? [INGRESS_QUEUE_CAPABILITY] : []),
+      WATCH_RELAY_CAPABILITY,
     ];
     return capabilities.length > 0 ? { capabilities } : {};
   }
@@ -1208,10 +1414,11 @@ export class SignalService {
               !message.discordRoute &&
               !message.webhookRoute &&
               !message.telegramRoute &&
-              !message.githubRoute
+              !message.githubRoute &&
+              message.watchRelay !== true
             )
               return yield* new RemoteTokenError({
-                message: "A Slack, Discord, Telegram, webhook or GitHub route is required.",
+                message: "A Slack, Discord, Telegram, webhook or GitHub route, or the watch relay, is required.",
               });
             if (message.slackRoute) {
               if (!tokens.verifySlackRoute) return yield* new RemoteTokenError({ message: "Slack route required." });
@@ -1328,6 +1535,7 @@ export class SignalService {
           githubRepositories: githubRoute.repositories.map((repository) =>
             githubRepositoryKey(repository.installationId, repository.id),
           ),
+          watchRelay: message.peer === "ingress" && message.watchRelay === true,
           turnCredentials: null,
         };
         this.#peers.set(socket.id, peer);
@@ -1382,6 +1590,7 @@ export class SignalService {
             hosts.set(claims.hostId, socket.id);
             this.#githubRepositories.set(route, hosts);
           }
+          if (peer.watchRelay) this.#watchRelays.set(claims.hostId, socket.id);
           this.#send(socket, {
             type: "ready",
             version: 1,
@@ -1689,6 +1898,10 @@ export class SignalService {
   }
 
   #acceptRateKey(key: string, now: number, factor = 1): boolean {
+    return this.#acceptRateLimit(key, now, this.#maximumMessagesPerMinute * factor);
+  }
+
+  #acceptRateLimit(key: string, now: number, limit: number): boolean {
     this.#pruneRateWindows(now);
     const current = this.#rateWindows.get(key);
     if (!current || now - current.startedAt >= RATE_WINDOW_MILLISECONDS) {
@@ -1701,7 +1914,7 @@ export class SignalService {
       return true;
     }
     current.count += 1;
-    return current.count <= this.#maximumMessagesPerMinute * factor;
+    return current.count <= limit;
   }
 
   #pruneReplayCache(nowSeconds = Math.floor(Date.now() / 1_000)): void {

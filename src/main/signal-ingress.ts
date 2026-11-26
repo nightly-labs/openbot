@@ -1,4 +1,5 @@
 import type { MessagingPlatform } from "@openbot/contracts/ipc";
+import { isNumber } from "@openbot/contracts/runtime-values";
 import { decodeSignalServerMessage } from "@openbot/contracts/signal-protocol/decode";
 import { type DiscordApiRequest, decodeDiscordApiError } from "@openbot/contracts/signal-protocol/discord-api";
 import { DISCORD_API_PATH } from "@openbot/contracts/signal-protocol/discord-route";
@@ -21,6 +22,7 @@ import {
   type TelegramCallParams,
   type TelegramCallResult,
 } from "@openbot/contracts/signal-protocol/telegram-route";
+import type { WatchRelayHostStatus } from "@openbot/contracts/signal-protocol/watch-relay";
 import {
   STANDARD_WEBHOOKS_FORMAT,
   type WebhookSignatureFormat,
@@ -28,6 +30,7 @@ import {
 import { createOpenBotLogger, toLogValue } from "@openbot/logging";
 import { Context, Deferred, Effect, Exit, Layer, ManagedRuntime, Option, Result, Scope, Semaphore } from "effect";
 import { HttpsProxyAgent } from "https-proxy-agent";
+import { decodeJwt } from "jose";
 import WebSocket from "ws";
 import {
   DiscordApiError,
@@ -169,6 +172,25 @@ export interface GitHubIngressHandler {
   offline(from: number, to: number): Effect.Effect<void>;
 }
 
+export interface WatchIngressDelivery {
+  ticket: string;
+  ts: number;
+  proof: string;
+  sealed: string;
+}
+
+export interface WatchIngressAnswer {
+  status: WatchRelayHostStatus;
+  sealed?: string;
+}
+
+export type WatchIngressHandler = (delivery: WatchIngressDelivery) => Effect.Effect<WatchIngressAnswer>;
+
+function ticketAuthEpoch(ticket: string): number | null {
+  const epoch = Result.getOrNull(Result.try(() => decodeJwt(ticket).authEpoch));
+  return isNumber(epoch) && Number.isSafeInteger(epoch) ? epoch : null;
+}
+
 export class SignalIngress implements MessagingIngress {
   readonly #options: SignalIngressOptions;
   readonly #runtime: ManagedRuntime.ManagedRuntime<SignalIngressAccount, never>;
@@ -199,6 +221,9 @@ export class SignalIngress implements MessagingIngress {
   #githubLostAt: number | null = null;
   #telegramMissing = false;
   #telegramBackoffMs = BACKOFF_START_MS;
+  #watchHolders = 0;
+  #watchHandler: WatchIngressHandler | null = null;
+  #authEpoch: number | null = null;
   #directNext = false;
   readonly #sessionListeners = new Set<(session: DiscordSession | null) => void>();
   readonly #routeListeners = new Set<(guildIds: ReadonlySet<string>) => void>();
@@ -231,7 +256,7 @@ export class SignalIngress implements MessagingIngress {
   acquire(platform: MessagingPlatform): () => void {
     const before = this.#holders.get(platform) ?? 0;
     this.#holders.set(platform, before + 1);
-    if (this.#held() === 1 && this.#webhookHolders === 0 && this.#githubHolders === 0) this.#run(this.#open());
+    if (this.#holderTotal() === 1) this.#run(this.#open());
     else if (before === 0) this.reconnect();
     let released = false;
     return () => {
@@ -244,7 +269,7 @@ export class SignalIngress implements MessagingIngress {
 
   acquireWebhooks(): () => void {
     this.#webhookHolders += 1;
-    if (this.#held() === 0 && this.#webhookHolders === 1 && this.#githubHolders === 0) this.#run(this.#open());
+    if (this.#holderTotal() === 1) this.#run(this.#open());
     else if (this.#webhookHolders === 1) this.reconnect();
     let released = false;
     return () => {
@@ -257,7 +282,7 @@ export class SignalIngress implements MessagingIngress {
 
   acquireGitHub(): () => void {
     this.#githubHolders += 1;
-    if (this.#held() === 0 && this.#webhookHolders === 0 && this.#githubHolders === 1) this.#run(this.#open());
+    if (this.#holderTotal() === 1) this.#run(this.#open());
     else if (this.#githubHolders === 1) this.reconnect();
     let released = false;
     return () => {
@@ -269,8 +294,34 @@ export class SignalIngress implements MessagingIngress {
     };
   }
 
+  acquireWatchRelay(): () => void {
+    this.#watchHolders += 1;
+    if (this.#holderTotal() === 1) this.#run(this.#open());
+    else if (this.#watchHolders === 1) this.reconnect();
+    let released = false;
+    return () => {
+      if (released) return;
+      released = true;
+      this.#watchHolders = Math.max(0, this.#watchHolders - 1);
+      if (this.#unheld()) this.#close();
+      else if (this.#watchHolders === 0) this.reconnect();
+    };
+  }
+
+  handleWatch(handler: WatchIngressHandler | null): void {
+    this.#watchHandler = handler;
+  }
+
+  authEpoch(): number | null {
+    return this.#state === "online" ? this.#authEpoch : null;
+  }
+
   #unheld(): boolean {
-    return this.#held() === 0 && this.#webhookHolders === 0 && this.#githubHolders === 0;
+    return this.#holderTotal() === 0;
+  }
+
+  #holderTotal(): number {
+    return this.#held() + this.#webhookHolders + this.#githubHolders + this.#watchHolders;
   }
 
   #held(): number {
@@ -441,6 +492,8 @@ export class SignalIngress implements MessagingIngress {
     this.#webhookHolders = 0;
     this.#githubHandler = null;
     this.#githubHolders = 0;
+    this.#watchHandler = null;
+    this.#watchHolders = 0;
     yield* Scope.close(this.#scope, Exit.void);
     yield* this.#runtime.disposeEffect;
   }, Effect.uninterruptible);
@@ -459,10 +512,11 @@ export class SignalIngress implements MessagingIngress {
     const telegram = this.#holds("telegram");
     const webhooks = this.#webhookHolders > 0;
     const github = this.#githubHolders > 0;
+    const watchRelay = this.#watchHolders > 0;
     let webhookTicket: Effect.Effect<string | null, RemoteWorkflowError> = webhooks
       ? account.webhookRoute(hostId)
       : Effect.succeed(null);
-    if (webhooks && (slack || discord || telegram || github))
+    if (webhooks && (slack || discord || telegram || github || watchRelay))
       webhookTicket = webhookTicket.pipe(
         Effect.catch((failure) =>
           Effect.sync(() => {
@@ -477,7 +531,7 @@ export class SignalIngress implements MessagingIngress {
     let githubTicket: Effect.Effect<string | null, RemoteWorkflowError> = github
       ? account.githubRoute(hostId)
       : Effect.succeed(null);
-    if (github && (slack || discord || telegram || webhooks))
+    if (github && (slack || discord || telegram || webhooks || watchRelay))
       githubTicket = githubTicket.pipe(
         Effect.catch((failure) =>
           Effect.sync(() => {
@@ -528,6 +582,7 @@ export class SignalIngress implements MessagingIngress {
       this.#readyDeadline = null;
       if (socket === this.#socket) socket.terminate();
     }, READY_TIMEOUT_MS);
+    this.#authEpoch = ticketAuthEpoch(bootstrap.ticket);
     this.#apiUrl = discordApiUrl(bootstrap.signalUrl);
     this.#signalOrigin = signalHttpOrigin(bootstrap.signalUrl);
     let opened = false;
@@ -541,6 +596,7 @@ export class SignalIngress implements MessagingIngress {
         ...routes,
         ...(queueKey ? { queueKey: queueKey.publicKey } : {}),
         webhookFormats: [STANDARD_WEBHOOKS_FORMAT],
+        ...(watchRelay ? { watchRelay: true } : {}),
       };
       socket.send(JSON.stringify(hello));
     });
@@ -665,6 +721,22 @@ export class SignalIngress implements MessagingIngress {
         version: SIGNAL_PROTOCOL_VERSION,
         requestId: message.requestId,
         status: answer.status,
+      };
+      socket.send(JSON.stringify(result));
+      return;
+    }
+    if (message.type === "watch-delivery") {
+      const handler = this.#watchHandler;
+      const answer: WatchIngressAnswer = handler
+        ? yield* handler({ ticket: message.ticket, ts: message.ts, proof: message.proof, sealed: message.sealed })
+        : { status: 503 };
+      if (socket.readyState !== WebSocket.OPEN) return;
+      const result: SignalClientMessage = {
+        type: "watch-delivery-result",
+        version: SIGNAL_PROTOCOL_VERSION,
+        requestId: message.requestId,
+        status: answer.status,
+        ...(answer.sealed === undefined ? {} : { sealed: answer.sealed }),
       };
       socket.send(JSON.stringify(result));
       return;

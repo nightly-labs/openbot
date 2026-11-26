@@ -264,6 +264,7 @@ import { VAULT_V3_CAPABILITY } from "./vault-v3";
 import { VAULT_V4_CAPABILITY } from "./vault-v4";
 import { TEAM_VIDEO_GENERATION_CAPABILITY } from "./video-generation-v1";
 import { VOICE_TRANSCRIPTION_CAPABILITY } from "./voice-transcription-v1";
+import { WATCH_RELAY_TEAM_CAPABILITY } from "./watch-relay-v1";
 import { WEBHOOK_AGENT_SECRET_CAPABILITY } from "./webhook-agent-secret-v1";
 import { WEBHOOK_SENDER_SECRET_CAPABILITY } from "./webhook-sender-secret-v1";
 import { WEBHOOK_TESTS_CAPABILITY } from "./webhook-tests-v1";
@@ -522,6 +523,7 @@ export {
   VAULT_V2_CAPABILITY,
   VAULT_V3_CAPABILITY,
   VAULT_V4_CAPABILITY,
+  WATCH_RELAY_TEAM_CAPABILITY,
   WEBHOOK_AGENT_SECRET_CAPABILITY,
   WEBHOOK_SENDER_SECRET_CAPABILITY,
   WEBHOOK_TESTS_CAPABILITY,
@@ -884,6 +886,7 @@ const TEAM_CAPABILITY_REGISTRY = [
   [WORKFLOW_PRESENCE_CAPABILITY, V10],
   [TEAM_NEAR_PAYMENT_CAPABILITY, V10],
   [PROVIDER_ACCOUNT_POOL_STRATEGY_CAPABILITY, V10],
+  [WATCH_RELAY_TEAM_CAPABILITY, V10],
 ] as const satisfies readonly (readonly [string, TeamCapabilityPlacement])[];
 
 export const TEAM_CURRENT_CAPABILITIES = TEAM_CAPABILITY_REGISTRY.map(([capability]) => capability);
