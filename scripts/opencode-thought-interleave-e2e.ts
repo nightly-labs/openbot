@@ -74,6 +74,34 @@ try {
     ["Full answer."],
     "The retried answer replaces the partial answer.",
   );
+  const answers = async (prompt: string) => {
+    const items = await turnItems(client, thread, prompt);
+    report.turns[prompt] = items;
+    return {
+      answers: items.filter((item) => item.phase === "final_answer").map((item) => item.text),
+      thoughts: items.filter((item) => item.phase === "commentary").map((item) => item.text),
+    };
+  };
+  assert.deepEqual(
+    await answers("tagged"),
+    { answers: ["Clean answer."], thoughts: ["Plan the reply."] },
+    "A leading thinking block split across chunks moves into the thoughts.",
+  );
+  assert.deepEqual(
+    await answers("messages"),
+    { answers: ["First part.\n\nSecond part."], thoughts: ["First plan.", "Second plan."] },
+    "Each message moves its own leading thinking block.",
+  );
+  assert.deepEqual(
+    await answers("unclosed"),
+    { answers: ["<think>Never closed."], thoughts: [] },
+    "An unclosed thinking block stays in the answer.",
+  );
+  assert.deepEqual(
+    await answers("mention"),
+    { answers: ["Use the <think> tag like this. <thinker> stays."], thoughts: [] },
+    "A tag inside the answer stays in the answer.",
+  );
   report.passed = true;
 } finally {
   await stopClients(clients);

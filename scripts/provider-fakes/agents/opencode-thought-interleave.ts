@@ -33,7 +33,19 @@ serveFakeAcpAgent({
   "session/prompt": (request, peer) => {
     const { sessionId } = request.params;
     const prompt = request.params.prompt?.map((part) => part.text ?? "").join("") ?? "";
-    if (prompt.includes("harness")) {
+    const message = (messageId: string, text: string) =>
+      peer.update(sessionId, { sessionUpdate: "agent_message_chunk", messageId, content: { type: "text", text } });
+    if (prompt.includes("tagged")) {
+      for (const text of ["\n<thi", "nking>Plan the", " reply.</thin", "king>\n", "\nClean answer."])
+        message("m-tagged", text);
+    } else if (prompt.includes("messages")) {
+      for (const text of ["<think>First plan.</think>", "First part."]) message("m-first", text);
+      for (const text of ["<think>Second", " plan.</think>\n\nSecond part."]) message("m-second", text);
+    } else if (prompt.includes("unclosed")) {
+      for (const text of ["<think>Never", " closed."]) message("m-unclosed", text);
+    } else if (prompt.includes("mention")) {
+      for (const text of ["Use the <think> tag ", "like this.", " <thinker> stays."]) message("m-mention", text);
+    } else if (prompt.includes("harness")) {
       peer.say(sessionId, "Partial ans");
       peer.say(sessionId, "API Error: The stream ended. The response above may be incomplete.");
       peer.say(sessionId, "Full answer.");

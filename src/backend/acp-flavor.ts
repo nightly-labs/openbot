@@ -142,6 +142,7 @@ export interface AcpFlavor {
   interruptToolsOnStop?: true;
   streamAnswerBeforePromptReturns?: true;
   thoughtsInsideAnswer?: true;
+  leadingTaggedThoughts?: true;
   resumesAnswerAfterThought?: { report: RegExp };
   promptOpenForBackgroundTasks?: true;
   silentTurnLimitMs?: number;
