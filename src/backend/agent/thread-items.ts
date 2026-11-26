@@ -138,7 +138,7 @@ function isCodexRefusedAudio(provider: AgentProvider, message: string): boolean 
 function isRejectedOpenCodeRequest(provider: AgentProvider, message: string): boolean {
   return (
     provider === "opencode" &&
-    /\bthe request contains invalid parameters\b|\bInternal error: Invalid request parameters\b|\bUpstream request failed: \[invalid_request\] the request is invalid\b/i.test(
+    /\bthe request contains invalid parameters\b|\bInternal error: Invalid request parameters\b|\bUpstream request failed: \[invalid_request\] the request is invalid\b|\bUpstream request failed: \[invalid_request_error\] messages\.\d+\.output_config\b/i.test(
       message,
     )
   );
