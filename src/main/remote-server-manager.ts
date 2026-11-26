@@ -2253,6 +2253,7 @@ export class RemoteServerManager extends EventEmitter<RemoteServerEvents> {
       this: RemoteServerManager,
       serverId: string,
       part: { exportId: string; index: number },
+      progress?: RemoteFileProgress,
     ): Effect.fn.Return<Uint8Array, RemoteWorkflowError, RemoteRequest> {
       const server = yield* remoteDecode(() => this.#store.require(serverId));
       const url = new URL(INSTANCE_TRANSFER_CHUNKS_ROUTES.exportChunk, server.apiUrl);
@@ -2262,6 +2263,7 @@ export class RemoteServerManager extends EventEmitter<RemoteServerEvents> {
         { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(part) },
         true,
         INSTANCE_TRANSFER_PART_TIMEOUT_MS,
+        progress,
       );
       yield* this.#rejectHostError(response, url);
       return new Uint8Array(yield* remoteCall(() => response.arrayBuffer()));

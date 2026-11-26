@@ -200,10 +200,12 @@ export const downloadTransferInParts = Effect.fn("RemoteInstanceTransfer.downloa
     yield* Effect.gen(function* () {
       const whole = createHash("sha256");
       for (const [index, expected] of file.chunks.entries()) {
-        const length = Math.min(file.chunkBytes, file.size - index * file.chunkBytes);
+        const position = index * file.chunkBytes;
+        const length = Math.min(file.chunkBytes, file.size - position);
+        const partProgress = { size: length, onProgress: (received: number) => report(position + received) };
         const bytes = yield* retryPart(
           remote
-            .readInstanceTransferPart(serverId, { exportId: file.exportId, index })
+            .readInstanceTransferPart(serverId, { exportId: file.exportId, index }, partProgress)
             .pipe(
               Effect.flatMap((bytes) =>
                 bytes.length === length && sha256Hex(bytes) === expected
@@ -213,8 +215,8 @@ export const downloadTransferInParts = Effect.fn("RemoteInstanceTransfer.downloa
             ),
         );
         whole.update(bytes);
-        yield* archiveCall(() => writeFully(handle, bytes, index * file.chunkBytes));
-        report(index * file.chunkBytes + bytes.length, true);
+        yield* archiveCall(() => writeFully(handle, bytes, position));
+        report(position + bytes.length, true);
       }
       if (whole.digest("hex") !== file.sha256) return yield* invalidPart();
     }).pipe(Effect.ensuring(archiveCall(() => handle.close()).pipe(Effect.ignore)));

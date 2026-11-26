@@ -444,7 +444,7 @@ function CopyProgress(props: { progress: CopyAgentsProgress; from: string; to: s
   const showsBytes = () => moving() && props.progress.total > 0;
   const stalled = createStalled(() => props.progress);
   return (
-    <div>
+    <div class="copy-agents-progress">
       <p class="instance-transfer-upload-status" aria-live="polite">
         {t(STEP_TEXT[props.progress.step], {
           server: props.progress.step === "preparing" || props.progress.step === "downloading" ? props.from : props.to,
