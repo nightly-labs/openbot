@@ -52,6 +52,15 @@
   flex-direction: column;
   gap: var(--openbot-space-8);
 }
+.agent-usage-report {
+  display: flex;
+  flex-direction: column;
+  gap: inherit;
+  transition: opacity var(--openbot-duration-fast) var(--openbot-ease-out);
+}
+.agent-usage-report[data-stale] {
+  opacity: 0.5;
+}
 .agent-usage h3 {
   font-size: var(--openbot-text-xl);
   font-weight: 550;

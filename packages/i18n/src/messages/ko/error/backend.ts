@@ -348,6 +348,7 @@ export const messages = {
     "이 컴퓨터가 서버 연결을 차단했어요. 방화벽이나 보안 소프트웨어를 확인한 후 다시 시도해 주세요.",
   "error.backend.mcpServerIncompatible":
     "이 주소에서 응답은 있지만 Streamable HTTP 기반 MCP 서버가 아니에요. URL을 확인하고 서버를 실행하는 앱을 업데이트하세요.",
+  "error.backend.mcpServerKeyNotAccepted": "서버가 API 키를 받아들이지 않았어요. 키를 확인한 다음 다시 시도하세요.",
   "error.backend.mcpRemoteBridge":
     "{reason} 이 명령은 mcp-remote 브리지를 실행해요. 대신 Streamable HTTP를 선택하고 URL {url}을(를) 사용하면 OpenBot이 로그인해 줘요.",
   "error.backend.oauthNotHttps": "OAuth 엔드포인트 {origin}이(가) https가 아니어서 자격 증명을 보내지 않았어요.",

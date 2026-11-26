@@ -1882,7 +1882,10 @@ creates them and the Customer Portal settings.
     metadata `openbot_vat=pl_standard` (`VAT_TAX_RATE`, made by `api:stripe:bootstrap`).
   - A VAT ID of another EU country gets reverse charge (`tax_exempt=reverse`, no Tax Rate) only after
     the EU VIES REST service confirms it. An unknown ID returns 400 `vat_id_invalid`; no answer from
-    VIES returns 503 `vat_id_unverified`, and nothing changes. The optional setting
+    VIES returns 503 `vat_id_unverified`, and nothing changes. The Worker tries VIES up to 3 times in
+    20 seconds (9 seconds for each try), and checks again without `VIES_REQUESTER_VAT_ID` when VIES
+    refuses it. It stops at once when VIES blocks the VAT ID or the caller (`VAT_BLOCKED`,
+    `IP_BLOCKED`). Desktop and the web client wait 30 seconds for this `PUT`. The optional setting
     `VIES_REQUESTER_VAT_ID` (the seller's VAT ID) makes VIES return a consultation number, which the
     customer metadata `openbot_vies_request` keeps as proof.
   - A buyer outside the EU (also the UK, Norway and Switzerland) pays no VAT.
@@ -1934,8 +1937,8 @@ gives 8 Stripe prices (`LICENSE_PLANS`):
 | --- | --- | --- | --- | --- |
 | Starter | `openbot_license_starter_{month,year}` | 10 | 96 | 1 |
 | Starter bundle | `openbot_license_starter_bundle_{month,year}` | 9 | 86.40 | 1 |
-| Team | `openbot_license_{month,year}` | 25 for 2 users, + 15 for each extra user | 240, + 144 | 2–10 |
-| Team bundle | `openbot_license_bundle_{month,year}` | 22.50, + 13.50 | 216, + 129.60 | 2–10 |
+| Team | `openbot_license_{month,year}` | 25 for 2 users, + 15 for each extra user | 240, + 144 | 2–25 |
+| Team bundle | `openbot_license_bundle_{month,year}` | 22.50, + 13.50 | 216, + 129.60 | 2–25 |
 
 A year is 12 months less 20% (`LICENSE_YEAR_DISCOUNT_PERCENT`). The bundle discount
 (`LICENSE_BUNDLE_DISCOUNT_PERCENT`: 10%) comes off after it. The amounts are

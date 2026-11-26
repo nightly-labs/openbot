@@ -75,6 +75,7 @@ export const messages = {
   "status.agent.nearSummaryGrant": "允许此 OpenBot 应用在 {days} 天内按你的规则从钱包付款。",
   "status.agent.nearSummaryBudget": "将钱包的每日预算改为 {amount} USD。",
   "status.agent.nearSummaryAutoPay": "当付款规则允许时，让 OpenBot 无需你的签名即可付款。其他付款仍会在聊天中询问你。",
+  "status.agent.nearSummaryManualPay": "已没有付款规则。OpenBot 将再次为每笔付款请求你的签名。",
   "status.agent.nearSummaryPayment": "批准向 {recipient} 支付 {amount}。",
   "status.agent.nearSummaryFreeze": "在你恢复付款之前，助手无法从此钱包付款。",
   "status.agent.nearSummaryUnfreeze": "助手可以再次按你的规则从此钱包付款。",

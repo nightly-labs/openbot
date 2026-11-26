@@ -1,5 +1,42 @@
 [
   {
+    "version": "0.80.0",
+    "date": "2026-11-26",
+    "notices": [
+      "Update each joined server to this version too. It makes a server with a large chat history fast again after 0.79.0. The Apple Watch app, live workflow pointers, Spread and many fixes below work on a server only when the server has this version."
+    ],
+    "groups": [
+      {
+        "type": "added",
+        "items": [
+          "Your server answers the OpenBot Apple Watch app directly. The watch works when OpenBot on iPhone is in the background or closed. The requests and answers are end to end encrypted between the watch and the server.",
+          "See the pointer and the selected step of each other person who has the same workflow open.",
+          "Settings › Providers › Pool accounts has a new choice, Spread. It puts agents on the accounts with the most usage left, so all accounts get used. Fill first stays the default.",
+          "Each NEAR wallet payment shows a card in the chat, with its state and a link to the transaction. When you set up the wallet or change its spending, you can type your own daily limit.",
+          "MAGI-2 makes 1080p video clips with sound for OpenBot credits. An agent that names no video model now uses it."
+        ]
+      },
+      {
+        "type": "changed",
+        "items": [
+          "The Usage page shows cost and tokens as stacked bars, with one color for each provider. It keeps the last report on screen while it loads a new one.",
+          "The Buy credits page shows each credit pack as a card with its own color, its price and the price of one credit.",
+          "A Team license now has up to 25 users. Before, the maximum was 10."
+        ]
+      },
+      {
+        "type": "fixed",
+        "items": [
+          "A server with a large chat history is fast again after the upgrade to 0.79.0. Before, a cleanup of old chat events stopped the server for many seconds each minute.",
+          "Typing in the message box no longer lags while an agent writes its reply.",
+          "On Windows, Computer Use agents see the desktop again. Since 0.77.0, they got a black picture.",
+          "A long chat with many images uses much less memory.",
+          "Timed routines start again by themselves after a short database error. Before, one failed read stopped all timed routines."
+        ]
+      }
+    ]
+  },
+  {
     "version": "0.79.0",
     "date": "2026-11-25",
     "notices": [

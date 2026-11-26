@@ -1,8 +1,14 @@
-import { type MobilePlatformLogoVariant, PlatformLogo, type PlatformLogoVariant } from "@openbot/brand";
+import {
+  type BrowserLogoVariant,
+  type MobilePlatformLogoVariant,
+  PlatformLogo,
+  type PlatformLogoVariant,
+} from "@openbot/brand";
 import type { JSX } from "@solidjs/web";
 import { Link } from "@tanstack/solid-router";
 import { For, Show } from "solid-js";
 import { ANDROID_APK_AVAILABLE } from "../../lib/android-apk";
+import { CHROME_EXTENSION } from "../../lib/browser-extension";
 import { DOWNLOAD_PLATFORM_ORDER, DOWNLOAD_PLATFORMS } from "../../lib/download-platforms";
 import { EXTERNAL_LINK_REL, OPENBOT_ALTERNATE_DOWNLOAD_LINKS, OPENBOT_ANDROID_APK_LINK } from "../../lib/landing-links";
 import { MOBILE_APP_ORDER, MOBILE_APPS } from "../../lib/mobile-apps";
@@ -14,7 +20,7 @@ interface DownloadCardContentProps {
   action?: string;
   actions?: JSX.Element;
   description: string;
-  platform: PlatformLogoVariant | MobilePlatformLogoVariant;
+  platform: PlatformLogoVariant | MobilePlatformLogoVariant | BrowserLogoVariant;
   status: string;
   title: string;
 }
@@ -189,6 +195,23 @@ export function DownloadSection() {
               );
             }}
           </For>
+          <a
+            class="landing-download-card"
+            href={CHROME_EXTENSION.href}
+            target="_blank"
+            rel={EXTERNAL_LINK_REL}
+            data-download-platform={CHROME_EXTENSION.id}
+            data-state="available"
+            data-revealed={revealState()}
+          >
+            <DownloadCardContent
+              platform={CHROME_EXTENSION.id}
+              status={text().available}
+              title={CHROME_EXTENSION.label}
+              description={text().chrome.description}
+              action={text().chrome.action}
+            />
+          </a>
         </div>
 
         <p class="landing-download-pages">

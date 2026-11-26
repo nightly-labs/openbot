@@ -1067,6 +1067,11 @@ export const messages = {
   "mobile.server.providers.accountKeyAddFailed": "无法添加账号，请重试。",
   "mobile.server.providers.pool": "账号池",
   "mobile.server.providers.poolHint": "助手先用一个账号，直到接近用量限额，再换到限额最先重置的账号。",
+  "mobile.server.providers.poolStrategy": "账号用法",
+  "mobile.server.providers.poolFillFirst": "先用满",
+  "mobile.server.providers.poolSpread": "分散",
+  "mobile.server.providers.poolSpreadHint":
+    "助手分散到剩余用量最多的账号。只有当另一个账号的余量多很多时，助手才会换账号。",
   "mobile.server.providers.accountsPooledHint": "助手共用这些账号。新账号在本手机上它的页面中登录。",
   "mobile.server.providers.accountsPooledOnComputer": "助手共用这些账号。请在电脑上的 OpenBot 中添加账号。",
   "mobile.server.providers.inUse": "使用中",

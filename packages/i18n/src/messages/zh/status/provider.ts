@@ -25,4 +25,5 @@ export const messages = {
   "status.provider.claudeFastModeUnavailable": "Claude 以标准速度回答。Claude Code 无法在本轮使用快速模式。",
   "status.provider.claudeOwnApiKey":
     "Claude Code 已设置为使用 Anthropic API 密钥。Anthropic 会从该密钥的 API 额度中扣除每次请求的费用，而不是从你的 Claude 套餐中扣除。要使用你的套餐，请从 Claude Code 设置或环境变量中移除该密钥，然后重启 OpenBot。",
+  "status.provider.accountRemovesAfterTurn": "当前轮次结束后，OpenBot 会移除这个账号。之后它的助手使用其他账号。",
 } as const satisfies PartialTranslation<typeof source>;

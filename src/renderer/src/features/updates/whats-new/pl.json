@@ -1,5 +1,42 @@
 [
   {
+    "version": "0.80.0",
+    "date": "2026-11-26",
+    "notices": [
+      "Zaktualizuj także do tej wersji każdy dołączony serwer. Serwer z dużą historią czatów znów działa szybko po wersji 0.79.0. Aplikacja Apple Watch, wskaźniki przepływów pracy na żywo, opcja Rozkładaj i wiele poprawek poniżej działają na serwerze tylko wtedy, gdy serwer ma tę wersję."
+    ],
+    "groups": [
+      {
+        "type": "added",
+        "items": [
+          "Twój serwer odpowiada bezpośrednio aplikacji OpenBot Apple Watch. Zegarek działa, gdy OpenBot na iPhonie działa w tle albo jest zamknięty. Zapytania i odpowiedzi są szyfrowane od końca do końca między zegarkiem a serwerem.",
+          "Zobacz wskaźnik i wybrany krok każdej innej osoby, która ma otwarty ten sam przepływ pracy.",
+          "Ustawienia › Dostawcy › Łącz konta w pulę mają nową opcję: Rozkładaj. Przydziela agentów do kont z największą ilością pozostałego użycia, dzięki czemu wszystkie konta są wykorzystywane. Najpierw zapełniaj pozostaje domyślną opcją.",
+          "Każda płatność z portfela NEAR pokazuje w czacie kartę z jej stanem i linkiem do transakcji. Gdy konfigurujesz portfel albo zmieniasz wydatki, możesz wpisać własny dzienny limit.",
+          "MAGI-2 tworzy klipy wideo 1080p z dźwiękiem za kredyty OpenBot. Agent, który nie podaje modelu wideo, używa go teraz."
+        ]
+      },
+      {
+        "type": "changed",
+        "items": [
+          "Strona Użycie pokazuje koszt i tokeny jako słupki skumulowane, z jednym kolorem dla każdego dostawcy. Ostatni raport zostaje na ekranie, gdy ładuje się nowy.",
+          "Strona Buy credits pokazuje każdy pakiet kredytów jako kartę we własnym kolorze, z ceną i ceną jednego kredytu.",
+          "Licencja Team obejmuje teraz do 25 użytkowników. Wcześniej maksimum wynosiło 10."
+        ]
+      },
+      {
+        "type": "fixed",
+        "items": [
+          "Serwer z dużą historią czatów znów działa szybko po aktualizacji do wersji 0.79.0. Wcześniej czyszczenie starych zdarzeń czatu zatrzymywało serwer na wiele sekund co minutę.",
+          "Pisanie w polu wiadomości już nie zacina się, gdy agent pisze odpowiedź.",
+          "W Windows agenci z funkcją Sterowanie komputerem znów widzą pulpit. Od wersji 0.77.0 dostawali czarny obraz.",
+          "Długi czat z wieloma obrazami zużywa dużo mniej pamięci.",
+          "Zaplanowane rutyny uruchamiają się znów same po krótkim błędzie bazy danych. Wcześniej jeden nieudany odczyt zatrzymywał wszystkie zaplanowane rutyny."
+        ]
+      }
+    ]
+  },
+  {
     "version": "0.79.0",
     "date": "2026-11-25",
     "notices": [

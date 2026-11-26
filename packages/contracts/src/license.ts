@@ -54,7 +54,7 @@ export const ORDER_METADATA = {
 } as const;
 
 export const LICENSE_INCLUDED_USERS = 2;
-export const LICENSE_MAX_USERS = 10;
+export const LICENSE_MAX_USERS = 25;
 export const LICENSE_SITES_PER_USER = 3;
 export const LICENSE_DEVICES_PER_USER = 3;
 export const LICENSE_YEAR_DISCOUNT_PERCENT = 20;

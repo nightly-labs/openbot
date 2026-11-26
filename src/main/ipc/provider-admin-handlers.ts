@@ -56,6 +56,12 @@ import {
   PROVIDER_ACCOUNT_MODELS_ROUTES,
 } from "@openbot/contracts/team-protocol/provider-account-models-v1";
 import {
+  decodeProviderAccountPoolStrategies,
+  PROVIDER_ACCOUNT_POOL_STRATEGY_CAPABILITY,
+  PROVIDER_ACCOUNT_POOL_STRATEGY_ROUTES,
+  withProviderAccountPoolStrategies,
+} from "@openbot/contracts/team-protocol/provider-account-pool-strategy-v1";
+import {
   PROVIDER_ACCOUNT_POOL_CAPABILITY,
   PROVIDER_ACCOUNT_POOL_ROUTES,
 } from "@openbot/contracts/team-protocol/provider-account-pool-v1";
@@ -420,11 +426,26 @@ export function providerAdminIpcHandlers({
                   Effect.orElseSucceed(() => null),
                 )
             : Effect.succeed(null);
+          const strategies =
+            remoteServers.supportsCapability(serverId, PROVIDER_ACCOUNT_POOL_CAPABILITY) &&
+            remoteServers.supportsCapability(serverId, PROVIDER_ACCOUNT_POOL_STRATEGY_CAPABILITY)
+              ? remoteServers
+                  .request(serverId, PROVIDER_ACCOUNT_POOL_STRATEGY_ROUTES.list, decodeProviderAccountPoolStrategies, {
+                    method: "POST",
+                    body: {},
+                  })
+                  .pipe(Effect.orElseSucceed(() => null))
+              : Effect.succeed(null);
           return runCauseEffect(
-            Effect.all([list, models, pools, liveVoice], { concurrency: "unbounded" }).pipe(
-              Effect.map(([accounts, extra, pooled, voice]) => {
+            Effect.all([list, models, pools, liveVoice, strategies], { concurrency: "unbounded" }).pipe(
+              Effect.map(([accounts, extra, pooled, voice, strategyRows]) => {
                 const withModels = extra ? withHostProviderAccountModels(accounts, extra) : accounts;
-                const withPools = pooled ? { ...withModels, pools: pooled } : withModels;
+                const withPools = pooled
+                  ? {
+                      ...withModels,
+                      pools: strategyRows ? withProviderAccountPoolStrategies(pooled, strategyRows) : pooled,
+                    }
+                  : withModels;
                 return voice ? { ...withPools, liveVoiceAccount: voice.accountId } : withPools;
               }),
             ),
@@ -489,14 +510,28 @@ export function providerAdminIpcHandlers({
       removeAccount: accountsRequest(parseRemoveProviderAccountInput, PROVIDER_ACCOUNTS_ROUTES.remove, acceptEmpty),
       setAccountPool: scopedHandler(parseSetProviderAccountPoolInput, {
         local: () => Promise.reject(new Error(sourceText("error.team.providersUnsupported"))),
-        remote: (input, serverId) => {
+        remote: ({ strategy, ...input }, serverId) => {
           if (!remoteServers.supportsCapability(serverId, PROVIDER_ACCOUNT_POOL_CAPABILITY))
             throw new Error(sourceText("error.team.providersUnsupported"));
+          const update = remoteServers.request(serverId, PROVIDER_ACCOUNT_POOL_ROUTES.update, acceptEmpty, {
+            method: "POST",
+            body: input,
+          });
+          const withStrategy =
+            strategy &&
+            input.enabled &&
+            remoteServers.supportsCapability(serverId, PROVIDER_ACCOUNT_POOL_STRATEGY_CAPABILITY);
           return runCauseEffect(
-            remoteServers.request(serverId, PROVIDER_ACCOUNT_POOL_ROUTES.update, acceptEmpty, {
-              method: "POST",
-              body: input,
-            }),
+            withStrategy
+              ? update.pipe(
+                  Effect.andThen(
+                    remoteServers.request(serverId, PROVIDER_ACCOUNT_POOL_STRATEGY_ROUTES.update, acceptEmpty, {
+                      method: "POST",
+                      body: { provider: input.provider, strategy },
+                    }),
+                  ),
+                )
+              : update,
           );
         },
       }),

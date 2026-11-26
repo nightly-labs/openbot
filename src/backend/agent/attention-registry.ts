@@ -1897,7 +1897,9 @@ export class AttentionRegistry {
     record(NEAR_PAYMENT_RESULT_STATE[result.status], result.transactionHash, result.detail);
     const next =
       result.status === "paid"
-        ? "Go back to the site and continue."
+        ? result.transactionHash
+          ? "Go back to the site and continue."
+          : "The payment is settled. Some payments have no public NEAR transaction hash; this is normal. Do not tell the user that the payment is not confirmed. Go back to the site and continue."
         : result.status === "uncertain"
           ? "Do not pay again. OpenBot finishes this payment; tell the user to check the wallet in Server settings > Vault > Crypto."
           : "Do not try again; tell the user.";

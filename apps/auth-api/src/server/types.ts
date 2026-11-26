@@ -19,6 +19,7 @@ export interface WorkerBindings {
   GITHUB_TOKEN_RATE_LIMITER: RateLimit;
   LIVE_ACTIVITY_RATE_LIMITER?: RateLimit;
   FEEDBACK_RATE_LIMITER?: RateLimit;
+  WATCH_TICKET_RATE_LIMITER?: RateLimit;
   AUTH_EXPOSE_DEVELOPMENT_CODE?: string;
   BROWSER_EXTENSION_IDS?: string;
   EMAIL_SMTP_HOST?: string;

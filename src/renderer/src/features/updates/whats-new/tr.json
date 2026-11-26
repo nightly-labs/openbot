@@ -1,5 +1,42 @@
 [
   {
+    "version": "0.80.0",
+    "date": "2026-11-26",
+    "notices": [
+      "Katıldığınız her sunucuyu da bu sürüme güncelleyin. 0.79.0'dan sonra büyük sohbet geçmişi olan bir sunucu yeniden hızlı çalışır. Apple Watch uygulaması, canlı iş akışı işaretçileri, Dağıt ve aşağıdaki birçok düzeltme bir sunucuda yalnızca sunucu bu sürümdeyse çalışır."
+    ],
+    "groups": [
+      {
+        "type": "added",
+        "items": [
+          "Sunucunuz OpenBot Apple Watch uygulamasına doğrudan yanıt verir. OpenBot iPhone'da arka plandayken veya kapalıyken de saat çalışır. İstekler ve yanıtlar saat ile sunucu arasında uçtan uca şifrelenir.",
+          "Aynı iş akışını açan diğer her kişinin imlecini ve seçili adımını görürsünüz.",
+          "Ayarlar › Sağlayıcılar › Hesapları havuzla bölümünde yeni bir seçenek var: Dağıt. Ajanları en çok kullanım hakkı kalan hesaplara yerleştirir, böylece tüm hesaplar kullanılır. Önce doldur varsayılan olarak kalır.",
+          "Her NEAR cüzdan ödemesi sohbette durumu ve işlem bağlantısıyla bir kart gösterir. Cüzdanı kurarken veya harcamasını değiştirirken kendi günlük limitinizi yazabilirsiniz.",
+          "MAGI-2, OpenBot kredileriyle sesli 1080p video klipleri üretir. Video modeli adı verilmeyen bir ajan artık bunu kullanır."
+        ]
+      },
+      {
+        "type": "changed",
+        "items": [
+          "Kullanım sayfası maliyeti ve token sayısını sağlayıcı başına bir renkle yığılmış çubuklar olarak gösterir. Yeni bir rapor yüklenirken son raporu ekranda tutar.",
+          "Buy credits sayfası her kredi paketini kendi rengi, fiyatı ve tek kredinin fiyatıyla bir kart olarak gösterir.",
+          "Team lisansı artık en fazla 25 kullanıcı içerebilir. Önceden en fazla 10 idi."
+        ]
+      },
+      {
+        "type": "fixed",
+        "items": [
+          "0.79.0'a yükseltmeden sonra büyük sohbet geçmişi olan bir sunucu yeniden hızlı çalışır. Önceden eski sohbet olaylarının temizliği sunucuyu her dakika birkaç saniye durduruyordu.",
+          "Ajan yanıt yazarken mesaj kutusuna yazmak artık gecikmez.",
+          "Windows'ta Bilgisayar Kullanımı ajanları masaüstünü yeniden görür. 0.77.0'dan beri siyah bir görüntü alıyorlardı.",
+          "Çok sayıda resim içeren uzun bir sohbet çok daha az bellek kullanır.",
+          "Zamanlanmış rutinler, kısa bir veritabanı hatasından sonra kendiliğinden yeniden başlar. Önceden tek bir başarısız okuma tüm zamanlanmış rutinleri durduruyordu."
+        ]
+      }
+    ]
+  },
+  {
     "version": "0.79.0",
     "date": "2026-11-25",
     "notices": [

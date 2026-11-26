@@ -555,6 +555,7 @@ export interface CreditEstimateSpec {
 export const CREDIT_ESTIMATE_SPECS: Readonly<Record<string, CreditEstimateSpec>> = {
   "nano-banana-pro": { resolution: "1K", credits: 3 },
   "seedance-2.5": { resolution: "480p", credits: 13.5 },
+  "magi-2": { resolution: "1080p", credits: 11 },
 };
 
 export function creditEstimates(): CreditEstimate[] {

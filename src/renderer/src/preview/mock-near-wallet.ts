@@ -73,7 +73,16 @@ export function createMockNearWallet(): NearWalletDesktopApi {
       });
       return status.account?.ownerApproval ? sign("auto-pay", save) : set(save(status));
     },
-    removeRule: async ({ domain }) => set({ ...status, rules: status.rules.filter((rule) => rule.domain !== domain) }),
+    removeRule: async ({ domain }) => {
+      const remove = (current: NearWalletStatus): NearWalletStatus => ({
+        ...current,
+        rules: current.rules.filter((rule) => rule.domain !== domain),
+      });
+      const removesLastRule = status.rules.length === 1 && status.rules[0]?.domain === domain;
+      return removesLastRule && status.account?.ownerApproval === false
+        ? sign("manual-pay", (current) => withAccount(remove(current), { ownerApproval: true }))
+        : set(remove(status));
+    },
     allowPayment: async ({ requestId, dailyUsd }) => {
       const payment = status.payments.find((candidate) => candidate.requestId === requestId);
       if (!payment) return structuredClone(status);

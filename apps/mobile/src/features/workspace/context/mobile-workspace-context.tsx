@@ -199,6 +199,8 @@ import { ShortcutsSync } from "@/features/shortcuts/shortcuts-sync";
 import { fetch } from "@/features/support/model/logged-fetch";
 import { supportLog } from "@/features/support/model/support-log";
 import { forgetPhoneFeedback, shownPhoneFeedback } from "@/features/support/model/support-log-capture";
+import { useWatchAwake } from "@/features/watch/model/watch-awake";
+import { WatchSync } from "@/features/watch/watch-sync";
 import { OwnerTransferPrompts } from "@/features/workspace/components/owner-transfer-prompts";
 import type { RemoteTeamTransportRef } from "@/features/workspace/components/remote-team-transport";
 import {
@@ -448,6 +450,7 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
   const loadGeneration = useRef(0);
   const directoryGeneration = useRef(0);
   const foreground = useAppForeground();
+  const watchAwake = useWatchAwake();
   const [servers, setServers] = useState<MobileServer[]>([]);
   const [serverDirectoryState, setServerDirectoryState] = useState<MobileServerDirectoryState>("loading");
   const [serverDirectoryError, setServerDirectoryError] = useState<string | null>(null);
@@ -462,7 +465,7 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
     loaded: () => allSettled(serverLoads.current),
     saved: () => allSettled(cacheWrites.current),
   });
-  const live = foreground || backgroundRefreshing;
+  const live = foreground || backgroundRefreshing || watchAwake;
   const firstConnectionTimers = useRef(new Map<string, ReturnType<typeof setTimeout>>());
   const [sidebarByServer, setSidebarByServer] = useState<
     Record<string, { layout: SidebarLayoutSnapshot | null; error: string | null }>
@@ -2879,6 +2882,14 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
             active={foreground}
             onAccepted={refreshMemberships}
           />
+          <WatchSync
+            servers={orderedServers}
+            serversReady={serverDirectoryState === "ready"}
+            agents={directoryAgents}
+            preferences={visiblePreferences}
+            capabilities={serverCapabilities.current}
+            teamApi={teamApi}
+          />
           <NotificationAvatarSync
             servers={servers}
             serversReady={serverDirectoryState === "ready"}
@@ -2889,7 +2900,9 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
               key={server.id}
               hostId={server.id}
               publicKey={server.publicKey}
-              active={(foreground && (!othersHeld || server.id === activeServerId)) || backgroundRefreshing}
+              active={
+                (foreground && (!othersHeld || server.id === activeServerId)) || backgroundRefreshing || watchAwake
+              }
               background={!foreground}
               directory={directory}
               register={registerConnection}

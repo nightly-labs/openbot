@@ -85,6 +85,8 @@ export const messages = {
   "status.agent.nearSummaryBudget": "Wijzig het dagbudget van de wallet naar {amount} USD.",
   "status.agent.nearSummaryAutoPay":
     "Laat OpenBot zonder je handtekening betalen als een betaalregel dat toestaat. Voor andere betalingen krijg je nog steeds een vraag in de chat.",
+  "status.agent.nearSummaryManualPay":
+    "Er is geen betaalregel meer. OpenBot vraagt weer voor elke betaling om je handtekening.",
   "status.agent.nearSummaryPayment": "Keur de betaling van {amount} aan {recipient} goed.",
   "status.agent.nearSummaryFreeze": "Agents kunnen niet uit deze wallet betalen tot je de betalingen hervat.",
   "status.agent.nearSummaryUnfreeze": "Agents kunnen weer uit deze wallet betalen, binnen je regels.",

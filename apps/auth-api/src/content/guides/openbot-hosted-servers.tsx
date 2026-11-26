@@ -60,7 +60,7 @@ export function OpenBotHostedServers() {
       />
       <p>
         Work at a company also needs a commercial license. A Starter license for one user costs €10 a month, and a Team
-        license costs €25 a month for two users and €15 for each extra user, up to 10 users. With a hosted server, the
+        license costs €25 a month for two users and €15 for each extra user, up to 25 users. With a hosted server, the
         license costs 10% less, and you can buy both with one payment. Yearly billing also takes 20% off the license.
       </p>
 

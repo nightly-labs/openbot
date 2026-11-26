@@ -29,6 +29,7 @@ import {
   writeDevStackRecord,
 } from "./dev-automation/stack-registry";
 import { attachSlackTunnels } from "./dev-slack-tunnels";
+import { attachMobileTunnels } from "./dev-tunnels";
 import {
   developmentChildEnvironment,
   developmentSettingsForService,
@@ -203,6 +204,7 @@ const DEVELOPMENT_OPTIONS = [
   "--isolated",
   "--hosting=test",
   "--slack",
+  "--tunnel",
   "--foreground",
 ] as const;
 const TEST_ACCOUNT_API_URL = "https://openbot-auth-api-test.internal9671.workers.dev";
@@ -214,6 +216,7 @@ export interface DevelopmentInvocation {
   shared: boolean;
   hostingTest: boolean;
   slack: boolean;
+  tunnel: boolean;
   foreground: boolean;
 }
 
@@ -229,6 +232,9 @@ export function parseDevelopmentTarget(args: string[]): DevelopmentInvocation {
   if (args.includes("--shared") && args.includes("--isolated")) {
     throw new Error("Use --shared or --isolated, not both.");
   }
+  if (args.includes("--tunnel") && (args.includes("--slack") || args.includes("--hosting=test"))) {
+    throw new Error("--tunnel cannot be used with --slack or --hosting=test.");
+  }
   return {
     target,
     dryRun: args.includes("--dry-run"),
@@ -236,6 +242,7 @@ export function parseDevelopmentTarget(args: string[]): DevelopmentInvocation {
     shared: args.includes("--shared"),
     hostingTest: args.includes("--hosting=test"),
     slack: args.includes("--slack"),
+    tunnel: args.includes("--tunnel"),
     foreground: args.includes("--foreground"),
   };
 }
@@ -263,7 +270,7 @@ function prepareVoiceRuntime(): void {
 }
 
 async function main(): Promise<void> {
-  const { target, dryRun, force, shared, hostingTest, slack, foreground } = parseDevelopmentTarget(
+  const { target, dryRun, force, shared, hostingTest, slack, tunnel, foreground } = parseDevelopmentTarget(
     process.argv.slice(2),
   );
   if (!dryRun && prepareDevelopmentEnvironment() === "created") {
@@ -327,7 +334,11 @@ async function main(): Promise<void> {
     return;
   }
 
-  const closeSlackTunnels = slack ? await attachSlackTunnels(specs, projectRoot) : null;
+  const closeTunnels = slack
+    ? await attachSlackTunnels(specs, projectRoot)
+    : tunnel
+      ? await attachMobileTunnels(specs)
+      : null;
 
   try {
     const seed = developmentProfileToSeed(specs);
@@ -335,7 +346,7 @@ async function main(): Promise<void> {
 
     await runDevelopmentServices(specs, stack);
   } catch (error) {
-    closeSlackTunnels?.();
+    closeTunnels?.();
     throw error;
   }
 }

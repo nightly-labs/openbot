@@ -10,6 +10,7 @@ export interface AuthRetentionResult {
   creditCodeLimits: number;
   teamTickets: number;
   remoteSessions: number;
+  watchSessions: number;
   remoteInvites: number;
   mobileConnectLinks: number;
   serverClaims: number;
@@ -58,6 +59,11 @@ function authRetentionOperations(now: number): AuthRetentionOperation[] {
       name: "remoteSessions",
       sql: "DELETE FROM remote_sessions WHERE ended_at IS NOT NULL AND ended_at <= ?",
       cutoff: now - 10 * 60_000,
+    },
+    {
+      name: "watchSessions",
+      sql: "DELETE FROM watch_sessions WHERE expires_at <= ? OR revoked_at IS NOT NULL",
+      cutoff: now,
     },
     {
       name: "remoteInvites",
@@ -119,6 +125,7 @@ const prune = Effect.fn("AuthRetention.prune")(function* (now: number) {
     creditCodeLimits: 0,
     teamTickets: 0,
     remoteSessions: 0,
+    watchSessions: 0,
     remoteInvites: 0,
     mobileConnectLinks: 0,
     serverClaims: 0,

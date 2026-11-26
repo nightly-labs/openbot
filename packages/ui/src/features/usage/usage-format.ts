@@ -1,6 +1,7 @@
 import type { AnalyticsModel } from "@openbot/contracts/ipc";
-import { agentProviderName, analyticsTokens, isAgentProvider } from "@openbot/contracts/ipc";
+import { AGENT_PROVIDERS, agentProviderName, analyticsTokens, isAgentProvider } from "@openbot/contracts/ipc";
 import type { AppTextKey } from "@openbot/i18n";
+import type { UsageSeriesRow } from "@openbot/team-client/usage-series";
 import { currentText, type TextValue } from "../../text";
 
 type UsageText = Pick<TextValue, "t" | "format">;
@@ -47,6 +48,11 @@ export function usageCost(value: number | null, text: UsageText = currentText())
         maximumFractionDigits: value > 0 && value < 0.01 ? Math.min(12, -Math.floor(Math.log10(value)) + 1) : 2,
       });
 }
+export function usageAxisCost(value: number, text: UsageText = currentText()): string {
+  return Math.abs(value) >= 1000
+    ? text.format.currencyUsd(value, { notation: "compact", maximumFractionDigits: 1 })
+    : usageCost(value, text);
+}
 export function usageExactCost(value: number | null, text: UsageText = currentText()): string {
   return value === null
     ? text.t("usage.noCostEstimate")
@@ -71,8 +77,61 @@ const seriesColors: Readonly<Record<string, string>> = {
   claude: "var(--openbot-chart-series-claude)",
   grok: "var(--openbot-chart-series-grok)",
 };
+const extraSeriesColors = [
+  "var(--openbot-chart-series-extra-1)",
+  "var(--openbot-chart-series-extra-2)",
+  "var(--openbot-chart-series-extra-3)",
+  "var(--openbot-chart-series-extra-4)",
+] as const;
+const otherSeriesColor = "var(--openbot-chart-series-other)";
+
 export function usageSeriesColor(provider: string): string {
-  return seriesColors[provider] ?? "var(--openbot-chart-series-other)";
+  return seriesColors[provider] ?? otherSeriesColor;
+}
+function providerOrder(provider: string): number {
+  const index = AGENT_PROVIDERS.findIndex((candidate) => candidate === provider);
+  return index === -1 ? AGENT_PROVIDERS.length : index;
+}
+export function usageSeriesColors(providers: Iterable<string>): (provider: string) => string {
+  const extras = [...new Set(providers)]
+    .filter((provider) => !(provider in seriesColors))
+    .sort((a, b) => providerOrder(a) - providerOrder(b) || a.localeCompare(b));
+  const colors = new Map(extras.map((provider, index) => [provider, extraSeriesColors[index] ?? otherSeriesColor]));
+  return (provider) => seriesColors[provider] ?? colors.get(provider) ?? otherSeriesColor;
+}
+
+export type UsageBucket = "day" | "week" | "month";
+export function usageBucket(days: number): UsageBucket {
+  if (days <= 45) return "day";
+  return days <= 120 ? "week" : "month";
+}
+function bucketStart(date: string, bucket: UsageBucket): string {
+  if (bucket === "day") return date;
+  if (bucket === "month") return `${date.slice(0, 7)}-01`;
+  const day = new Date(`${date}T12:00:00Z`);
+  day.setUTCDate(day.getUTCDate() - ((day.getUTCDay() + 6) % 7));
+  return day.toISOString().slice(0, 10);
+}
+export function usageBucketRows(rows: UsageSeriesRow[], series: string[], bucket: UsageBucket): UsageSeriesRow[] {
+  if (bucket === "day") return rows;
+  const buckets = new Map<string, UsageSeriesRow>();
+  for (const row of rows) {
+    const date = bucketStart(row.date, bucket);
+    let target = buckets.get(date);
+    if (!target) {
+      target = { date };
+      for (const key of series) target[key] = null;
+      buckets.set(date, target);
+    }
+    for (const key of series) {
+      const value = row[key];
+      if (typeof value === "number") {
+        const current = target[key];
+        target[key] = (typeof current === "number" ? current : 0) + value;
+      }
+    }
+  }
+  return [...buckets.values()];
 }
 
 export { type UsageSeriesRow, usageSeries, usageTotalSeries } from "@openbot/team-client/usage-series";

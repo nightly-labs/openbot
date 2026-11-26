@@ -23,6 +23,7 @@ import type {
   VoiceLiveEvent,
   VoiceTranscriptionResult,
 } from "@openbot/contracts/ipc";
+import type { WatchRelaySetup } from "@openbot/contracts/team-protocol/watch-relay-v1";
 import type { WorkflowSpotEvent } from "@openbot/contracts/team-protocol/workflow-presence-v1";
 import type { Logger } from "@openbot/logging";
 import type { Effect } from "effect";
@@ -283,6 +284,8 @@ export type TeamApiProviderAccounts = Pick<
   | "models"
   | "pools"
   | "setPool"
+  | "poolStrategies"
+  | "setPoolStrategy"
   | "liveVoiceAccount"
   | "setLiveVoiceAccount"
   | "usage"
@@ -633,6 +636,11 @@ export type TeamApiClientBrowser = Pick<
   "setPresence" | "resolve" | "sessionEnded" | "subscribe" | "shares"
 >;
 
+export interface TeamApiWatchRelay {
+  available(): boolean;
+  setup(): Effect.Effect<WatchRelaySetup | null>;
+}
+
 export type TeamApiAgentAccess = Pick<AgentAccessStore, "copyAgent" | "get" | "levels" | "set" | "subscribe">;
 export type TeamApiServerAudit = Pick<ServerAuditStore, "read">;
 
@@ -706,6 +714,7 @@ export interface TeamApiOptions {
   onSessionRevoked?: ((sessionId: string) => Effect.Effect<void, RemoteWorkflowError>) | undefined;
   liveActivityPush?: LiveActivityPushService | undefined;
   pushNotifications?: PushNotificationService | undefined;
+  watchRelay?: TeamApiWatchRelay | undefined;
   focusUse?: boolean | undefined;
   rateLimitCapacity?: number | undefined;
   workflowSpotStaleMs?: number | undefined;
