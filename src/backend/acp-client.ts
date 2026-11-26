@@ -1357,6 +1357,7 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
           turn.id !== getString(params, "expectedTurnId") ||
           turn.stopped ||
           turn.completing ||
+          turn.stallCancel !== null ||
           (!steer && (turn.unprompted || turn.waitingOnUser > 0));
         if (turnChanged()) return yield* providerFailure(new Error(sourceText("error.backend.steerTurnChanged")));
         if (!steer && !turn.answered)
