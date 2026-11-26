@@ -16,7 +16,9 @@ import { devLatestAppVersion } from "@/shared/lib/dev-feature-overrides";
 import { currentAppVersion, useLatestAppVersion, useMobileFeaturesRefresh } from "@/shared/lib/mobile-features";
 import { isIOS } from "@/shared/lib/platform";
 
-export type AppUpdate = { kind: "ready"; id: string } | { kind: "store"; id: string; version: string };
+export type AppUpdate =
+  | { kind: "ready"; id: string; updateId: string | null }
+  | { kind: "store"; id: string; version: string };
 
 const IOS_STORE_URL = "itms-apps://apps.apple.com/app/id6807024266";
 const IOS_STORE_WEB_URL = "https://apps.apple.com/app/id6807024266";
@@ -28,6 +30,7 @@ const NOTES_TIMEOUT_MS = 10_000;
 const NOTES_STALE_MS = 10 * 60_000;
 
 const key = "openbot.mobile.appUpdate.dismissed.v1";
+const otaNotesSeenKey = "openbot.mobile.appUpdate.otaNotesSeen.v1";
 
 const UPDATE_CHECK_INTERVAL_MS = 15 * 60_000;
 let lastUpdateCheck = Date.now();
@@ -66,6 +69,21 @@ async function loadDismissedAppUpdate(): Promise<void> {
 export async function dismissAppUpdate(update: AppUpdate): Promise<void> {
   useDismissedAppUpdate.setState({ dismissed: update.id, ready: true });
   await SecureStore.setItemAsync(key, update.id);
+}
+
+const useOtaNotesSeen = create<{ seen: string | null; ready: boolean }>(() => ({ seen: null, ready: false }));
+
+async function loadOtaNotesSeen(): Promise<void> {
+  if (useOtaNotesSeen.getState().ready) return;
+  try {
+    useOtaNotesSeen.setState({ seen: await SecureStore.getItemAsync(otaNotesSeenKey) });
+  } finally {
+    useOtaNotesSeen.setState({ ready: true });
+  }
+}
+
+export async function markOtaNotesSeen(version: string): Promise<void> {
+  await SecureStore.setItemAsync(otaNotesSeenKey, version);
 }
 
 let rollbackFetched = false;
@@ -116,7 +134,11 @@ export function useAppUpdate(): AppUpdate | null {
   const current = currentAppVersion();
   const update: AppUpdate | null =
     isUpdatePending && downloadedUpdate
-      ? { kind: "ready", id: downloadedUpdateId(downloadedUpdate) }
+      ? {
+          kind: "ready",
+          id: downloadedUpdateId(downloadedUpdate),
+          updateId: downloadedUpdate.type === Updates.UpdateInfoType.NEW ? downloadedUpdate.updateId : null,
+        }
       : latest && current && isNewerMobileVersion(latest, current)
         ? { kind: "store", id: `store:${latest}`, version: latest }
         : null;
@@ -169,5 +191,41 @@ export function useAppUpdateNotes(enabled: boolean) {
     retry: false,
     staleTime: NOTES_STALE_MS,
     queryFn: ({ signal }) => fetchReleaseNotes(apiUrl ?? "", after, signal),
+  });
+}
+
+function isUpdateOf(version: string, base: string): boolean {
+  return version.startsWith(`${base}.`) && version.split(".").length === 4;
+}
+
+export function newestReleaseVersion(releases: readonly MobileReleaseNotes[]): string | null {
+  return releases.reduce<string | null>(
+    (newest, release) => (newest === null || isNewerMobileVersion(release.version, newest) ? release.version : newest),
+    null,
+  );
+}
+
+export function useOtaUpdateNotes(enabled: boolean) {
+  const { session } = useMobileSession();
+  const apiUrl = session?.apiUrl ?? null;
+  const base = currentAppVersion();
+  const seen = useOtaNotesSeen((state) => (state.ready ? state.seen : undefined));
+  useEffect(() => {
+    void loadOtaNotesSeen();
+  }, []);
+  return useQuery<MobileReleaseNotes[]>({
+    queryKey: ["ota-update-notes", apiUrl, base, seen],
+    enabled: enabled && apiUrl !== null && base !== null && seen !== undefined,
+    retry: false,
+    staleTime: NOTES_STALE_MS,
+    queryFn: async ({ signal }) => {
+      const releases = await fetchReleaseNotes(apiUrl ?? "", base, signal);
+      return releases.filter(
+        (release) =>
+          base !== null &&
+          isUpdateOf(release.version, base) &&
+          (!seen || !isUpdateOf(seen, base) || isNewerMobileVersion(release.version, seen)),
+      );
+    },
   });
 }
