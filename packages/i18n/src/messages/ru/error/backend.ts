@@ -362,6 +362,7 @@ export const messages = {
     "Этот компьютер заблокировал подключение к серверу. Проверьте брандмауэр или защитное ПО и повторите попытку.",
   "error.backend.mcpServerIncompatible":
     "По этому адресу что-то ответило, но не как сервер MCP через Streamable HTTP. Проверьте URL и обновите приложение, которое запускает сервер.",
+  "error.backend.mcpServerKeyNotAccepted": "Сервер не принял ключ API. Проверьте ключ и попробуйте ещё раз.",
   "error.backend.mcpRemoteBridge":
     "{reason} Эта команда запускает мост mcp-remote. Выберите вместо него Streamable HTTP с URL {url}, и OpenBot выполнит вход.",
   "error.backend.oauthNotHttps": "Эндпоинт OAuth {origin} не использует https, поэтому учётные данные не отправлены.",
