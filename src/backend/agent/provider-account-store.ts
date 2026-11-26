@@ -6,6 +6,8 @@ import {
   DEFAULT_PROVIDER_ACCOUNT_ID,
   MAX_PROVIDER_ACCOUNTS,
   PROVIDER_ACCOUNT_LABEL_MAX_LENGTH,
+  PROVIDER_ACCOUNT_POOL_STRATEGIES,
+  type ProviderAccountPoolStrategy,
 } from "@openbot/contracts/ipc";
 import { sourceText } from "@openbot/i18n/source";
 import { Effect, Schema, Semaphore } from "effect";
@@ -14,6 +16,11 @@ import { causeHelpers } from "../effect-boundary";
 import { isMissingFileError } from "../file-errors";
 
 type AccountProvider = Exclude<AgentProviderId, "acp">;
+
+export interface StoredProviderAccountPool {
+  leftOut: readonly string[];
+  strategy?: ProviderAccountPoolStrategy;
+}
 
 export interface StoredProviderAccount {
   id: string;
@@ -39,6 +46,7 @@ const ProviderAccountsFile = Schema.Struct({
         leftOut: Schema.Array(Schema.String.check(Schema.isPattern(POOL_ACCOUNT_ID))).check(
           Schema.isMaxLength(MAX_PROVIDER_ACCOUNTS),
         ),
+        strategy: Schema.optionalKey(Schema.Literals(PROVIDER_ACCOUNT_POOL_STRATEGIES)),
       }),
     ),
   ),
@@ -95,19 +103,26 @@ export class ProviderAccountStore {
     return this.#file.defaultLabels[provider] ?? null;
   }
 
-  pool(provider: AgentProviderId): { leftOut: readonly string[] } | null {
+  pool(provider: AgentProviderId): StoredProviderAccountPool | null {
     return this.#file.pools?.[provider] ?? null;
   }
 
   readonly setPool = Effect.fn("ProviderAccountStore.setPool")(function* (
     this: ProviderAccountStore,
     provider: AccountProvider,
-    pool: { leftOut: readonly string[] } | null,
+    pool: StoredProviderAccountPool | null,
   ) {
     return yield* this.#change((file) => {
-      const { [provider]: _previous, ...pools } = file.pools ?? {};
+      const { [provider]: previous, ...pools } = file.pools ?? {};
+      const strategy = pool?.strategy ?? previous?.strategy;
+      const next = pool
+        ? {
+            leftOut: [...new Set(pool.leftOut)],
+            ...(strategy && strategy !== "fillFirst" ? { strategy } : {}),
+          }
+        : null;
       return Effect.succeed({
-        file: { ...file, pools: pool ? { ...pools, [provider]: { leftOut: [...new Set(pool.leftOut)] } } : pools },
+        file: { ...file, pools: next ? { ...pools, [provider]: next } : pools },
         result: undefined,
       });
     });
@@ -253,7 +268,7 @@ function withoutPoolAccount(
   return Object.fromEntries(
     Object.entries(pools).map(([provider, pool]) => [
       provider,
-      { leftOut: pool.leftOut.filter((id) => id !== accountId) },
+      { ...pool, leftOut: pool.leftOut.filter((id) => id !== accountId) },
     ]),
   );
 }

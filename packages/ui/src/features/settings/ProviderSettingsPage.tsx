@@ -17,8 +17,10 @@ import {
   isProviderEnvironmentProvider,
   MAX_PROVIDER_ACCOUNTS,
   PROMPT_CACHE_TTLS,
+  PROVIDER_ACCOUNT_POOL_STRATEGIES,
   type PromptCacheTtl,
   type ProviderAccountPool,
+  type ProviderAccountPoolStrategy,
   type ProviderAccountState,
   type ProviderEnvironment,
   type ProviderEnvironmentVariableInput,
@@ -818,8 +820,11 @@ function AccountsSection(props: SectionProps) {
   const poolOffered = () => Boolean(props.accountActions?.setPool) && (planAccounts().length > 1 || Boolean(pool()));
   const poolLabelId = `provider-settings-${props.option.id}-pool-label`;
   const maxAccounts = () => props.accountActions?.maxAccounts ?? MAX_PROVIDER_ACCOUNTS;
-  const setPool = (enabled: boolean, leftOut: readonly string[]) =>
-    run(props.option.name, () => props.accountActions?.setPool?.(props.option.id, enabled, leftOut));
+  const setPool = (enabled: boolean, leftOut: readonly string[], strategy?: ProviderAccountPoolStrategy) =>
+    run(props.option.name, () => props.accountActions?.setPool?.(props.option.id, enabled, leftOut, strategy));
+  const poolStrategy = () => pool()?.strategy ?? "fillFirst";
+  const poolDescription = (): AppTextKey =>
+    poolStrategy() === "spread" ? "provider.account.poolSpreadDescription" : "provider.account.poolDescription";
   const removeDescription = (account: ProviderPickerAccount | null) => {
     if (!account) return "";
     const first = accounts()[0];
@@ -875,7 +880,7 @@ function AccountsSection(props: SectionProps) {
           <Item class="settings-modal-row">
             <ItemContent>
               <ItemTitle id={poolLabelId}>{t("provider.account.pool")}</ItemTitle>
-              <ItemDescription>{t("provider.account.poolDescription")}</ItemDescription>
+              <ItemDescription>{t(poolDescription())}</ItemDescription>
             </ItemContent>
             <ItemActions>
               <Switch
@@ -883,6 +888,21 @@ function AccountsSection(props: SectionProps) {
                 disabled={props.disabled === true}
                 aria-labelledby={poolLabelId}
                 onChange={(enabled: boolean) => setPool(enabled, pool()?.leftOut ?? [])}
+              />
+            </ItemActions>
+          </Item>
+        </Show>
+        <Show when={poolOffered() && pool() && props.accountActions?.poolStrategy}>
+          <Item class="settings-modal-row">
+            <ItemContent>
+              <ItemTitle>{t("provider.account.poolStrategy")}</ItemTitle>
+            </ItemContent>
+            <ItemActions>
+              <PoolStrategySelect
+                value={poolStrategy()}
+                disabled={props.disabled === true}
+                menuMount={props.menuMount}
+                onChange={(strategy) => setPool(true, pool()?.leftOut ?? [], strategy)}
               />
             </ItemActions>
           </Item>
@@ -1031,6 +1051,48 @@ const OTHER_VERSION_ACTION = {
   managed: "provider.settings.useInstalledVersion",
   system: "provider.settings.useDownloadedVersion",
 } as const satisfies Record<NonNullable<AgentProviderStatus["cliSource"]>, keyof AppMessages>;
+
+interface PoolStrategyOption {
+  readonly id: ProviderAccountPoolStrategy;
+  readonly labelKey: AppTextKey;
+}
+
+const POOL_STRATEGY_OPTIONS: PoolStrategyOption[] = PROVIDER_ACCOUNT_POOL_STRATEGIES.map((id) => ({
+  id,
+  labelKey: id === "spread" ? "provider.account.poolSpread" : "provider.account.poolFillFirst",
+}));
+
+function PoolStrategySelect(props: {
+  value: ProviderAccountPoolStrategy;
+  disabled: boolean;
+  menuMount: HTMLElement | undefined;
+  onChange: (strategy: ProviderAccountPoolStrategy) => void;
+}) {
+  const { t } = useText();
+  const selected = () => POOL_STRATEGY_OPTIONS.find((option) => option.id === props.value) ?? POOL_STRATEGY_OPTIONS[0];
+  return (
+    <Select<PoolStrategyOption>
+      class="provider-settings-select"
+      options={POOL_STRATEGY_OPTIONS}
+      optionValue="id"
+      optionTextValue={(option) => t(option.labelKey)}
+      value={selected()}
+      disabled={props.disabled}
+      onChange={(option) => {
+        if (option && option.id !== props.value) props.onChange(option.id);
+      }}
+      placement="bottom-end"
+      itemComponent={(itemProps) => (
+        <SelectItem item={itemProps.item}>{t(itemProps.item.rawValue.labelKey)}</SelectItem>
+      )}
+    >
+      <SelectTrigger size="sm" aria-label={t("provider.account.poolStrategy")}>
+        <SelectValue<PoolStrategyOption>>{(state) => t(state.selectedOption().labelKey)}</SelectValue>
+      </SelectTrigger>
+      <SelectContent mount={props.menuMount} />
+    </Select>
+  );
+}
 
 function AccountRow(
   props: SectionProps & {

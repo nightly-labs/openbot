@@ -1428,6 +1428,11 @@ export const messages = defineMessages("mobile.server", {
   "mobile.server.providers.pool": "Pool accounts",
   "mobile.server.providers.poolHint":
     "Agents use one account until it nears a usage limit, then the account whose limit resets first.",
+  "mobile.server.providers.poolStrategy": "Use accounts",
+  "mobile.server.providers.poolFillFirst": "Fill first",
+  "mobile.server.providers.poolSpread": "Spread",
+  "mobile.server.providers.poolSpreadHint":
+    "Agents spread over the accounts with the most usage left. An agent changes accounts only when another account has much more room.",
   "mobile.server.providers.accountsPooledHint":
     "Agents share these accounts. A new account signs in on its page on this phone.",
   "mobile.server.providers.accountsPooledOnComputer":

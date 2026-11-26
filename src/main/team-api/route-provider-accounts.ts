@@ -1,3 +1,4 @@
+import { isProviderAccountPoolStrategy } from "@openbot/contracts/ipc";
 import { isString } from "@openbot/contracts/runtime-values";
 import { CLAUDE_API_KEY_ACCOUNT_ID } from "@openbot/contracts/team-protocol/claude-api-key-v1";
 import {
@@ -17,6 +18,10 @@ import {
   PROVIDER_ACCOUNT_MODELS_CAPABILITY,
   PROVIDER_ACCOUNT_MODELS_ROUTES,
 } from "@openbot/contracts/team-protocol/provider-account-models-v1";
+import {
+  PROVIDER_ACCOUNT_POOL_STRATEGY_CAPABILITY,
+  PROVIDER_ACCOUNT_POOL_STRATEGY_ROUTES,
+} from "@openbot/contracts/team-protocol/provider-account-pool-strategy-v1";
 import {
   PROVIDER_ACCOUNT_POOL_CAPABILITY,
   PROVIDER_ACCOUNT_POOL_ROUTES,
@@ -159,6 +164,24 @@ export async function routeProviderAccountPool(
   const body = await readJson(request);
   const leftOut = Array.isArray(body.leftOut) ? body.leftOut.filter(isString) : [];
   await runCauseEffect(accounts.setPool(parseProviderId(body.provider), body.enabled === true, leftOut));
+  return json(200, {});
+}
+
+const POOL_STRATEGY_ROUTES: ReadonlySet<string> = new Set(Object.values(PROVIDER_ACCOUNT_POOL_STRATEGY_ROUTES));
+
+export async function routeProviderAccountPoolStrategy(
+  context: TeamApiRequestContext,
+  accounts: TeamApiProviderAccounts | undefined,
+): Promise<RouteOutcome> {
+  const { method, url, capabilities, member, request, json } = context;
+  if (method !== "POST" || !POOL_STRATEGY_ROUTES.has(url.pathname)) return "unmatched";
+  if (!accounts || !capabilities.has(PROVIDER_ACCOUNT_POOL_STRATEGY_CAPABILITY))
+    throw new HttpError(400, sourceText("error.team.providersUnsupported"));
+  requireAdmin(member);
+  if (url.pathname === PROVIDER_ACCOUNT_POOL_STRATEGY_ROUTES.list) return json(200, accounts.poolStrategies());
+  const body = await readJson(request);
+  if (!isProviderAccountPoolStrategy(body.strategy)) throw new HttpError(400, "strategy is invalid.");
+  await runCauseEffect(accounts.setPoolStrategy(parseProviderId(body.provider), body.strategy));
   return json(200, {});
 }
 

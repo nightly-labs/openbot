@@ -1853,6 +1853,38 @@ keep their frozen shapes.
 
 Run `bun run test:provider-many-accounts` to check the limits through the Team API and the account store.
 
+### How the account pool picks an account
+
+A provider with a pool (`pools[provider]` in `provider-accounts.json`) gives each agent turn an account
+from the pool. `ProviderAccountPool.strategy` selects how
+([`provider-account-pool.ts`](../../src/backend/agent/provider-account-pool.ts)):
+
+- **Fill first** (`fillFirst`, the default, not written to the file): `pickPoolAccount` keeps all
+  agents on the open account whose longest window resets first. The next account starts only when the
+  first one is near its limit (85% of a window of 24 hours or less, 95% of a longer window).
+- **Spread** (`spread`): `pickSpreadPoolAccount` gives each open account a share: the room left
+  (the smallest `100 - buffer - used` of its windows) divided by the agents on it, plus one. An
+  account with no usage reading gets the mean room of the read accounts, or 50 when no account has a
+  reading. A new agent goes to the account with the largest share. An agent with an account stays on
+  it until another account has a share 1.25 times larger, so agents do not move at each reading.
+
+When no account is open, both strategies use the least used account. `setPool` keeps the strategy
+when an update gives none, so a pool change from a client without the strategy keeps Spread. Turning
+the pool off deletes the entry and its strategy. An older app on the same computer ignores the
+`strategy` key and uses Fill first; its next pool write drops the key.
+
+A joined server reads and sets the strategy through the protocol 10 capability
+`provider-account-pool-strategy-v1`
+([`provider-account-pool-strategy-v1.ts`](../../packages/contracts/src/team-protocol/provider-account-pool-strategy-v1.ts)).
+The frozen `provider-account-pool-v1` rows keep their shape, and the client merges the strategy list
+into them (`withProviderAccountPoolStrategies`). An update when the pool is off does nothing. A client
+sends the strategy only after the v1 pool update, and only to a host with the capability; Settings
+hides the choice for a host without it.
+
+When an admin removes an account that a running turn uses, the account stays until the turn ends
+(`status.provider.accountRemovesAfterTurn`). Then OpenBot moves its agents to other accounts and
+removes it. A restart before the turn ends cancels the removal.
+
 ### Account code sign-in
 
 An account after the first of Codex, Grok or Claude can also sign in with a code (`accountCodeSignIn` in the

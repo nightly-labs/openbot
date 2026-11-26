@@ -254,6 +254,11 @@ export const messages = {
   "provider.account.pool": "Agrupar contas",
   "provider.account.poolDescription":
     "Os agentes usam uma conta até ela chegar perto de um limite de uso e depois a conta cujo limite reinicia primeiro.",
+  "provider.account.poolStrategy": "Usar contas",
+  "provider.account.poolFillFirst": "Encher primeiro",
+  "provider.account.poolSpread": "Distribuir",
+  "provider.account.poolSpreadDescription":
+    "Os agentes se distribuem entre as contas com mais uso restante. Um agente só troca de conta quando outra conta tem muito mais margem.",
   "provider.account.inUse": "Em uso",
   "provider.account.notInPool": "Fora do grupo",
   "provider.account.leaveOutOfPool": "Tirar do grupo",
