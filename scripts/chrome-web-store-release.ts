@@ -286,7 +286,12 @@ class StoreClient {
   async #request(method: string, url: string, body?: BodyInit, contentType?: string): Promise<unknown> {
     const headers: Record<string, string> = { authorization: `Bearer ${this.#token}` };
     if (contentType) headers["content-type"] = contentType;
-    const response = await fetch(url, { method, headers, body, signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS) });
+    const response = await fetch(url, {
+      method,
+      headers,
+      body: body ?? null,
+      signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
+    });
     const text = await response.text();
     if (!response.ok) {
       const error = decodeGoogleError(decodeJsonOption(text));
