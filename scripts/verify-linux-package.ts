@@ -18,6 +18,7 @@ const HOSTED_SCRIPTS = [
   "openbot-hosted-server",
   "openbot-hosted-env",
   "openbot-hosted-update",
+  "openbot-hosted-keyring",
   "openbot",
   "openbot-boat-pre-stop",
   "openbot-server-setup",
