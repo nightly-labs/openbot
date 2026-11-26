@@ -1024,7 +1024,11 @@ advertise the capability; open OpenBot in the host's desktop session to connect 
 A host on any platform also advertises the `antigravity-code-sign-in-v1` marker (Team API v10). It
 adds nothing to the wire: it tells a client that the released providers-v8 `codeLoginStart` route
 signs Gemini in with `agy acp --login` (`ANTIGRAVITY_CODE_SIGN_IN` in `provider-drivers.ts`) and
-answers with the `paste` shape. The CLI prints the Google link; the user opens it on any device and
+answers with the `paste` shape. The CLI prints the Google link and also runs `open` or `xdg-open` with
+it, so each start would open a Google tab on the host (#16705). The code sign-in, also of an added
+account, therefore gets `SSH_CONNECTION` (`ANTIGRAVITY_LINK_ONLY_ENV`): then 1.5.4 prints the link
+only. The ACP `authenticate` sign-in does not get it, because the CLI then refuses a browser sign-in.
+The user opens the link on any device and
 pastes the code, or the URL of the page they land on, with the released `codeLoginSubmit`. This
 works on a server with no desktop and on a Windows host. A host before this marker refuses Gemini on
 that route, so the desktop with a joined server, the web client and mobile offer the code sign-in
