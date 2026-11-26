@@ -250,13 +250,18 @@ apparmor_predates_abi_4() {
     ! apparmor_parser --skip-kernel-load --skip-cache "$1" >/dev/null 2>&1
 }
 
+install_hosted_file() {
+  local source=$1 file=$2
+  install -m 0755 "$source/$file" "$INSTALL/hosted/.$file.new"
+  mv -f "$INSTALL/hosted/.$file.new" "$INSTALL/hosted/$file"
+}
+
 install_hosting() {
   local source=$1 user file unit changed=0
   user=$(<"$INSTALL/hosted/service-user")
   [[ $user =~ ^[a-zA-Z_][a-zA-Z0-9_-]*$ ]] || fail "The service user is not valid."
   for file in "${HOSTED_FILES[@]}"; do
-    install -m 0755 "$source/$file" "$INSTALL/hosted/.$file.new"
-    mv -f "$INSTALL/hosted/.$file.new" "$INSTALL/hosted/$file"
+    install_hosted_file "$source" "$file"
   done
   if apparmor_predates_abi_4 "$source/openbot-hosted.apparmor"; then
     rm -f /etc/apparmor.d/openbot-hosted
@@ -417,8 +422,7 @@ install_missing_hosted_files() {
   local source=$1 file
   for file in "${HOSTED_FILES[@]}"; do
     if [ ! -e "$INSTALL/hosted/$file" ] && [ -f "$source/$file" ]; then
-      install -m 0755 "$source/$file" "$INSTALL/hosted/.$file.new"
-      mv -f "$INSTALL/hosted/.$file.new" "$INSTALL/hosted/$file"
+      install_hosted_file "$source" "$file"
     fi
   done
 }

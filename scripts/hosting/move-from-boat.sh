@@ -512,6 +512,8 @@ export_data() {
   systemctl stop openbot-pre-stop-restart.timer 2>/dev/null || true
   systemctl stop openbot.service
   if openbot_runs; then fail "OpenBot still runs. Nothing was archived."; fi
+  [ ! -x /opt/OpenBot/hosted/openbot-hosted-keyring ] || /opt/OpenBot/hosted/openbot-hosted-keyring start ||
+    echo "The keyring check did not complete. The archive has the keyring as it is." >&2
 
   local tree trees="" members=() commands name notes
   while read -r tree; do

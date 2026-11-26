@@ -194,6 +194,7 @@ async function runCases(): Promise<void> {
     guardLog: [],
     notes: { modes: saved.modes, items: saved.items.length },
   });
+  lastDigest = saved.digest;
 
   const unchanged = await restartAndRead();
   assert.equal(unchanged.run.opened, true, "restart: the session opens");

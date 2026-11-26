@@ -727,7 +727,7 @@ daemon). `openbot-hosted-keyring` (root) prevents this:
   passes when the password unlocks the keyring (`Locked` is false) and gnome-keyring does not make
   `login_1.keyring`. It lists the items of the `safeStorage` schema
   (`chrome_libsecret_os_crypt_password_v2`) with their `Created` and `Modified` values. It reads the
-  files as the service user, and refuses a file larger than 16 MiB. The check runs as `nobody`, not
+  files as the service user. When a file is larger than 16 MiB, the guard changes nothing. The check runs as `nobody`, not
   as the service user, so an agent cannot stop it or change its result. `dbus-daemon` needs a user
   in the password database, so a free UID does not work. During a check, other processes that run
   as `nobody` can read the copy of the files in `/run`.
@@ -743,6 +743,10 @@ daemon). `openbot-hosted-keyring` (root) prevents this:
 - When a check cannot complete (no `gnome-keyring-daemon`, a time-out), or neither the copy nor the
   current files pass, the guard changes nothing. It never stops the start of OpenBot
   (`ExecStartPre=-+`).
+- `start` waits 15 s at most for an hourly check that runs. Then it changes nothing, so the start
+  stays in the 90 s start time-out of `openbot.service`.
+- `move-from-boat.sh export` runs `start` after it stops OpenBot, so the archive has the restored
+  keyring, not a damaged one.
 
 A server gets the guard with its first update to a release that has it. The old `apply` installs the
 new units, so `openbot.service` has the new `ExecStartPre` at once. The old `HOSTED_FILES` does not
@@ -752,7 +756,11 @@ of `HOSTED_FILES`. The first copy comes from the first hourly check after the up
 Limits:
 
 - An item that is not a `safeStorage` item (for example a provider CLI sign-in) and that changed after
-  the last copy is lost when the guard restores the copy.
+  the last copy is lost when the guard restores the copy. `replaced` keeps only the files of the last
+  restore.
+- When the start check cannot complete while the keyring is damaged, OpenBot can start with a new
+  `safeStorage` key. If the owner then claims the server again, the next start restores the old key,
+  and the server must be claimed one more time. After that, the key stays.
 - The guard does not protect against a keyring that an agent makes on purpose with the same
   `safeStorage` item and a different key.
 - When you restore the data of another server on this machine, delete `/srv/openbot-keyring` first.

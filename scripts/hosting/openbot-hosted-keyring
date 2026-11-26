@@ -9,6 +9,8 @@ KEYRING=/srv/openbot-hosted/keyrings/login.keyring
 FILE_LIMIT=16777216
 CHECK_SECONDS=20
 CHECK_USER=nobody
+START_LOCK_SECONDS=15
+TOO_LARGE=3
 SAFE_STORAGE_SCHEMA=chrome_libsecret_os_crypt_password_v2
 PASS=0
 FAILED=1
@@ -59,14 +61,19 @@ read_as_user() {
   runuser -u "$user" -- test -f "$source" 2>/dev/null || return 1
   runuser -u "$user" -- head -c "$((FILE_LIMIT + 1))" -- "$source" >"$target" 2>/dev/null || return 1
   size=$(stat -c %s "$target")
-  [ "$size" -gt 0 ] && [ "$size" -le "$FILE_LIMIT" ]
+  [ "$size" -le "$FILE_LIMIT" ] || return "$TOO_LARGE"
+  [ "$size" -gt 0 ]
 }
 
 read_current() {
-  local target=$1
+  local target=$1 status=0 password_status=0 keyring_status=0
   mkdir -p "$target"
-  read_as_user "$USER_NAME" "$PASSWORD" "$target/keyring-password" || return 1
-  read_as_user "$USER_NAME" "$KEYRING" "$target/login.keyring"
+  read_as_user "$USER_NAME" "$PASSWORD" "$target/keyring-password" || password_status=$?
+  read_as_user "$USER_NAME" "$KEYRING" "$target/login.keyring" || keyring_status=$?
+  for status in "$password_status" "$keyring_status"; do
+    [ "$status" -ne "$TOO_LARGE" ] || return "$TOO_LARGE"
+  done
+  [ "$password_status" -eq 0 ] && [ "$keyring_status" -eq 0 ]
 }
 
 has_backup() {
@@ -126,7 +133,7 @@ restore_backup() {
   local current=$1 replaced file
   replaced=$(mktemp -d "$BACKUP/.replaced.XXXXXX")
   for file in keyring-password login.keyring; do
-    [ ! -f "$current/$file" ] || cp "$current/$file" "$replaced/"
+    [ ! -s "$current/$file" ] || cp "$current/$file" "$replaced/"
   done
   rm -rf "$BACKUP/replaced"
   mv -f "$replaced" "$BACKUP/replaced"
@@ -139,8 +146,13 @@ same_files() {
 }
 
 guard() {
-  local mode=$1 current=$WORK/current backup_status=0 current_status=0 complete=1
-  read_current "$current" || complete=0
+  local mode=$1 current=$WORK/current backup_status=0 current_status=0 complete=1 read_status=0
+  read_current "$current" || read_status=$?
+  if [ "$read_status" -eq "$TOO_LARGE" ]; then
+    log "A file of the OpenBot keyring is larger than $FILE_LIMIT bytes. The OpenBot keyring and its copy stay as they are."
+    return 0
+  fi
+  [ "$read_status" -eq 0 ] || complete=0
   if ! has_backup; then
     [ "$complete" -eq 1 ] || return 0
     check_keyring "$current" "$WORK/current.items" || return 0
@@ -192,7 +204,14 @@ main() {
   [ -n "$home" ] || { log "The service user has no home folder." && return 1; }
   PASSWORD=$home/.config/openbot-hosted/keyring-password
   exec 8>/run/openbot-hosted-keyring.lock
-  flock 8
+  if [ "$mode" = start ]; then
+    flock -w "$START_LOCK_SECONDS" 8 || {
+      log "Another keyring check did not stop in $START_LOCK_SECONDS seconds. The OpenBot keyring stays as it is."
+      return 0
+    }
+  else
+    flock 8
+  fi
   WORK=$(mktemp -d /run/openbot-hosted-keyring.XXXXXX)
   trap 'rm -rf "$WORK"' EXIT
   chmod 0711 "$WORK"
