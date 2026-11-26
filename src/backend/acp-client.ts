@@ -102,6 +102,7 @@ import {
   type McpServerSource,
   type McpToolRuntimeSource,
   mcpAgentParam,
+  type UsableMcpServer,
   usableMcpServers,
 } from "./mcp-provider-shapes";
 import { type RelayedMcpToolOutcome, type StdioMcpRelay, startStdioMcpRelay } from "./mcp-stdio-relay";
@@ -1939,15 +1940,18 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
             let currentModelId: string | null;
             let listsModels: boolean;
             const ownMcpServerNames = this.#ownMcpServerNames(cwd);
-            const configs = agentMcpServers(this.options.mcpServers?.(agentId) ?? [], computerUse);
-            const handoff = acpMcpServers(
-              providerResult(
-                yield* Effect.result(
-                  usableMcpServers(configs, this.options.mcpToolRuntimes?.(), this.options.mcpEndpoint, agentId).pipe(
-                    toProviderClientOperationError,
-                  ),
-                ),
+            const usable = providerResult(
+              yield* Effect.result(
+                usableMcpServers(
+                  agentMcpServers(this.options.mcpServers?.(agentId) ?? [], computerUse),
+                  this.options.mcpToolRuntimes?.(),
+                  this.options.mcpEndpoint,
+                  agentId,
+                ).pipe(toProviderClientOperationError),
               ),
+            );
+            const handoff = acpMcpServers(
+              usable,
               ownMcpServerNames,
               this.#flavor.mcpServerName,
               relaysStdio,
@@ -1961,7 +1965,7 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
               closeRelays = relayed.close;
               relayedServers = { own: ownMcpServerNames, byName: relayed.byName };
             }
-            given = this.#withMcpReconnects(given, configs, ownMcpServerNames);
+            given = this.#withMcpReconnects(given, usable, ownMcpServerNames);
             let mcpServers = [...given, ...mcp.servers];
             const enableMcpServers = this.#flavor.enableMcpServers;
             if (enableMcpServers) {
@@ -3410,14 +3414,16 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
 
   #withMcpReconnects(
     servers: readonly AcpMcpServer[],
-    configs: readonly McpServerConfig[],
+    usable: readonly UsableMcpServer[],
     own: readonly string[],
   ): AcpMcpServer[] {
     const reconnect = this.#flavor.mcpServersPerDirectory ? this.options.mcpReconnect : undefined;
     if (!reconnect) return [...servers];
-    const counts = new Map(
-      configs.map((config) => [acpMcpServerName(config, own, this.#flavor.mcpServerName), reconnect(config.id)]),
-    );
+    const counts = new Map<string, number>();
+    for (const { config, error } of usable) {
+      const name = acpMcpServerName(config, own, this.#flavor.mcpServerName);
+      if (error === undefined && !counts.has(name)) counts.set(name, reconnect(config.id));
+    }
     return servers.map((server) => {
       const count = counts.get(server.name) ?? 0;
       if (!("type" in server) || count === 0) return server;

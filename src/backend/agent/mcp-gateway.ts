@@ -257,6 +257,7 @@ export class McpGateway {
       catch: (cause) => new McpGatewayFailed({ cause }),
     });
     this.#providerFailedStarts.delete(input.mcpServerId);
+    this.#reconnects.delete(input.mcpServerId);
     const list = yield* this.changed("now", [removed?.name]);
     const removedResource = removed?.transport === "http" ? mcpOAuthAccountKey(removed.url) : null;
     if (
