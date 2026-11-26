@@ -24,7 +24,7 @@ import type { ReferralCalls } from "@openbot/ui/features/referral/referral-store
 import { currentText } from "@openbot/ui/text";
 
 const REQUEST_TIMEOUT_MS = 15_000;
-const DETAILS_TIMEOUT_MS = 30_000;
+const DETAILS_SAVE_TIMEOUT_MS = 30_000;
 
 export function createWebBillingCalls(
   accountFetch: typeof fetch,
@@ -33,7 +33,13 @@ export function createWebBillingCalls(
   const request = browserRequest(accountFetch);
 
   async function details(body?: string) {
-    const value = await request("v1/me/billing/details", parseBillingDetails, body, "PUT", DETAILS_TIMEOUT_MS);
+    const value = await request(
+      "v1/me/billing/details",
+      parseBillingDetails,
+      body,
+      "PUT",
+      body === undefined ? REQUEST_TIMEOUT_MS : DETAILS_SAVE_TIMEOUT_MS,
+    );
     if (!value) throw new Error(currentText().sourceText("error.billing.invalidResponse"));
     return value;
   }

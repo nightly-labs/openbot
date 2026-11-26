@@ -10,7 +10,15 @@ const TIMING: ViesTiming = { deadlineMs: 1_500, attemptTimeoutMs: 400, minAttemp
 const VAT_ID = "DE123456789";
 const REQUESTER = "PL1234567890";
 
-type Reply = "valid" | "invalidInput" | "requesterRefused" | "busy" | "msUnavailable" | "serverError" | "hang";
+type Reply =
+  | "valid"
+  | "invalidInput"
+  | "requesterRefused"
+  | "blocked"
+  | "busy"
+  | "msUnavailable"
+  | "serverError"
+  | "hang";
 
 interface SeenRequest {
   requester: boolean;
@@ -45,6 +53,7 @@ function answer(reply: Reply, requester: boolean, response: ServerResponse) {
   if (reply === "valid") return send(response, 200, requester ? VALID_BODY : { ...VALID_BODY, requestIdentifier: "" });
   if (reply === "invalidInput") return send(response, 200, errorBody("INVALID_INPUT"));
   if (reply === "requesterRefused") return send(response, 200, errorBody("INVALID_REQUESTER_INFO"));
+  if (reply === "blocked") return send(response, 200, errorBody("IP_BLOCKED"));
   if (reply === "busy") return send(response, 200, errorBody("MS_MAX_CONCURRENT_REQUESTS"));
   if (reply === "msUnavailable") return send(response, 200, errorBody("MS_UNAVAILABLE"));
   return send(response, 500, { message: "internal" });
@@ -116,6 +125,20 @@ try {
     [true, false],
   );
   cases.push(refused);
+
+  const refusedThenBusy = await runCase(
+    "requester refusal does not use a plain try",
+    ["requesterRefused", "busy", "busy", "valid"],
+    REQUESTER,
+  );
+  assert.equal(refusedThenBusy.outcome, "valid=true id=none");
+  assert.equal(refusedThenBusy.requests.length, 4);
+  cases.push(refusedThenBusy);
+
+  const blocked = await runCase("blocked caller stops at once", ["blocked", "valid"], null);
+  assert.equal(blocked.outcome, "ViesUnavailableError");
+  assert.equal(blocked.requests.length, 1);
+  cases.push(blocked);
 
   const invalid = await runCase("unknown VAT ID is invalid at once", ["invalidInput"], REQUESTER);
   assert.equal(invalid.outcome, "valid=false id=none");

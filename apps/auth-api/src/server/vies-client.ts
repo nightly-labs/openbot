@@ -1,4 +1,4 @@
-import { Effect, Option, Schema } from "effect";
+import { Clock, Effect, Option, Schema } from "effect";
 
 const VIES_CHECK_URL = "https://ec.europa.eu/taxation_customs/vies/rest-api/check-vat-number";
 const VIES_DEADLINE_MS = 20_000;
@@ -7,6 +7,7 @@ const VIES_MIN_ATTEMPT_MS = 2_000;
 const VIES_RETRY_DELAY_MS = 1_000;
 const VIES_MAX_ATTEMPTS = 3;
 const VIES_REQUESTER_ERRORS = new Set(["INVALID_REQUESTER_INFO", "VOW-ERR-2700"]);
+const VIES_BLOCKED_ERRORS = new Set(["VAT_BLOCKED", "IP_BLOCKED"]);
 
 export type ViesFetch = (input: string, init: RequestInit) => Promise<Response>;
 
@@ -25,7 +26,11 @@ export interface ViesTiming {
   retryDelayMs: number;
 }
 
-type ViesAttempt = { kind: "answered"; result: ViesResult } | { kind: "requesterRefused" } | { kind: "unavailable" };
+type ViesAttempt =
+  | { kind: "answered"; result: ViesResult }
+  | { kind: "requesterRefused" }
+  | { kind: "blocked" }
+  | { kind: "unavailable" };
 
 const checkSchema = Schema.Struct({
   valid: Schema.Boolean,
@@ -62,6 +67,7 @@ function readAttempt(ok: boolean, value: unknown): ViesAttempt {
   if (errors.includes("INVALID_INPUT"))
     return { kind: "answered", result: { valid: false, requestIdentifier: null, requestDate: null } };
   if (errors.some((error) => VIES_REQUESTER_ERRORS.has(error))) return { kind: "requesterRefused" };
+  if (errors.some((error) => VIES_BLOCKED_ERRORS.has(error))) return { kind: "blocked" };
   return { kind: "unavailable" };
 }
 
@@ -84,8 +90,8 @@ export class ViesClient {
       body.requesterMemberStateCode = requester.slice(0, 2);
       body.requesterNumber = requester.slice(2);
     }
-    return yield* Effect.tryPromise({
-      try: async (signal) => {
+    return yield* Effect.promise(async (signal) => {
+      try {
         const response = await this.fetcher(this.url, {
           method: "POST",
           headers: { "Content-Type": "application/json", Accept: "application/json" },
@@ -93,28 +99,34 @@ export class ViesClient {
           signal: AbortSignal.any([signal, AbortSignal.timeout(timeoutMs)]),
         });
         return readAttempt(response.ok, await response.json());
-      },
-      catch: () => new ViesUnavailableError({}),
-    }).pipe(Effect.orElseSucceed(() => VIES_UNAVAILABLE));
+      } catch {
+        return VIES_UNAVAILABLE;
+      }
+    });
   }).bind(this);
 
   readonly check = Effect.fn("ViesClient.check")(function* (
     this: ViesClient,
     vatId: string,
   ): Effect.fn.Return<ViesResult, ViesUnavailableError> {
-    const deadline = Date.now() + this.timing.deadlineMs;
+    const deadline = (yield* Clock.currentTimeMillis) + this.timing.deadlineMs;
     let requester = this.requester;
-    for (let attempts = 0; attempts < VIES_MAX_ATTEMPTS; attempts++) {
-      const remaining = deadline - Date.now();
+    let attempts = 0;
+    while (attempts < VIES_MAX_ATTEMPTS) {
+      const remaining = deadline - (yield* Clock.currentTimeMillis);
       if (remaining < this.timing.minAttemptMs) break;
       const attempt = yield* this.attempt(vatId, requester, Math.min(this.timing.attemptTimeoutMs, remaining));
       if (attempt.kind === "answered") return attempt.result;
+      if (attempt.kind === "blocked") break;
       if (attempt.kind === "requesterRefused" && requester) {
         console.error("billing: VIES refused VIES_REQUESTER_VAT_ID; checking the VAT ID without a requester");
         requester = null;
-      } else if (deadline - Date.now() > this.timing.retryDelayMs + this.timing.minAttemptMs) {
-        yield* Effect.sleep(this.timing.retryDelayMs);
+        continue;
       }
+      attempts += 1;
+      const left = deadline - (yield* Clock.currentTimeMillis);
+      if (attempts < VIES_MAX_ATTEMPTS && left > this.timing.retryDelayMs + this.timing.minAttemptMs)
+        yield* Effect.sleep(this.timing.retryDelayMs);
     }
     return yield* new ViesUnavailableError({});
   }).bind(this);
