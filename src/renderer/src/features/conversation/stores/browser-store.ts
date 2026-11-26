@@ -273,21 +273,17 @@ export function createBrowserStore(deps: BrowserStoreDeps) {
       deps.panels.setActiveRightPanel("browser");
     return completed;
   };
-  const browserTabCounts = new Map<string, number>();
-  let browserTabCountServer: string | undefined;
+  let previousBrowserTabs: { owner: string; count: number } = { owner: "", count: 0 };
   createEffect(
     () => ({
-      server: deps.props.server?.id ?? "local",
-      view: viewId() ?? "",
+      owner: `${deps.props.server?.id ?? "local"}:${deps.props.agent?.id ?? ""}`,
       count: browserTabs().length,
       enabled: deps.props.browserEnabled !== false,
     }),
-    ({ server, view, count, enabled }) => {
-      if (server !== browserTabCountServer) browserTabCounts.clear();
-      browserTabCountServer = server;
-      const previousCount = browserTabCounts.get(view) ?? 0;
-      browserTabCounts.set(view, count);
-      if (!enabled || previousCount === 0 || count > 0) return;
+    ({ owner, count, enabled }) => {
+      const previous = previousBrowserTabs;
+      previousBrowserTabs = { owner, count };
+      if (!enabled || previous.owner !== owner || previous.count === 0 || count > 0) return;
       const mode = untrack(deps.panels.activeRightPanel);
       if (untrack(() => deps.panels.paneShown("browser")) || mode === "browser-expanded" || mode === "browser-pip")
         untrack(deps.panels.closeBrowserPane);
