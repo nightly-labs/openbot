@@ -880,19 +880,18 @@ export class MailboxStore {
     const messages = this.#messagesById();
     const welcomes = new Set<string>();
     const open = new Map<string, StoredDelivery[]>();
-    for (const delivery of this.#state.deliveries) {
-      const agentId = delivery.recipientAgentId;
-      if (!targets.has(agentId)) continue;
-      if (WELCOME_PENDING_STATUSES.has(delivery.status) && messages.get(delivery.messageId)?.welcome === true)
-        welcomes.add(agentId);
-      if (executionMessageIds.has(delivery.messageId)) continue;
-      const failed = delivery.status === "failed" && delivery.turnId === failedTurns.get(agentId);
-      if (!isActiveDelivery(delivery) && !failed) continue;
-      const list = open.get(agentId);
-      if (list) list.push(delivery);
-      else open.set(agentId, [delivery]);
-    }
-    const positions = open.size > 0 ? this.#queuedPositions() : new Map<string, number>();
+    for (const agentId of targets)
+      for (const delivery of this.#deliveriesFor(agentId)) {
+        if (WELCOME_PENDING_STATUSES.has(delivery.status) && messages.get(delivery.messageId)?.welcome === true)
+          welcomes.add(agentId);
+        if (executionMessageIds.has(delivery.messageId)) continue;
+        const failed = delivery.status === "failed" && delivery.turnId === failedTurns.get(agentId);
+        if (!isActiveDelivery(delivery) && !failed) continue;
+        const list = open.get(agentId);
+        if (list) list.push(delivery);
+        else open.set(agentId, [delivery]);
+      }
+    const positions = new Map([...open.keys()].flatMap((agentId) => [...this.#queuedPositions(agentId)]));
     return [...targets].map((agentId) => ({
       agentId,
       ...(welcomes.has(agentId) ? { welcome: true as const } : {}),
@@ -906,10 +905,9 @@ export class MailboxStore {
 
   queuedExecutionDeliveryIds(agentId: string): string[] {
     const executionMessageIds = this.#executionMessageIds();
-    return this.#state.deliveries
+    return this.#deliveriesFor(agentId)
       .filter(
         (delivery) =>
-          delivery.recipientAgentId === agentId &&
           delivery.status === "queued" &&
           !waitsForPlanContinuation(delivery) &&
           executionMessageIds.has(delivery.messageId),

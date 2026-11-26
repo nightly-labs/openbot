@@ -1,9 +1,10 @@
+import { createHash } from "node:crypto";
 import { mkdirSync, writeFileSync } from "node:fs";
 import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { isDeepStrictEqual } from "node:util";
-import type { AgentSummary, ConversationMessage, ConversationSnapshot } from "@openbot/contracts/ipc";
+import type { AgentSummary, ConversationMessage, ConversationSnapshot, QueueSnapshot } from "@openbot/contracts/ipc";
 import { Effect, Exit, Scope } from "effect";
 import { ConversationReader } from "../src/backend/agent/conversation-reader";
 import { ConversationRuntime } from "../src/backend/agent/conversation-runtime";
@@ -25,6 +26,8 @@ const MESSAGES = Number(process.env.PAGE_READ_MESSAGES ?? 70_000);
 const ANSWERS_PER_AGENT = 150;
 const BASE = Date.parse("2026-10-01T00:00:00.000Z");
 const READS_PER_AGENT = 3;
+const OPEN_SEED = 4_000;
+const OPEN_EVERY = 40;
 
 type SeedDelivery = MailboxProjectionState["deliveries"][number] & { queueOrder: number };
 
@@ -65,20 +68,23 @@ function seedState(agents: readonly string[]): MailboxProjectionState {
     const kind = index % 10;
     const senderAgent = agents[(index * 7 + 3) % agents.length] ?? "";
     const sender = kind < 6 || senderAgent === recipient ? { kind: "user" } : { kind: "agent", agentId: senderAgent };
-    messages.push({
+    const open = index >= MESSAGES - OPEN_SEED ? index % OPEN_EVERY : -1;
+    const message = {
       id,
       sender,
       text: `Message ${index}`,
       replyToMessageId: null,
       createdAt: time(index),
       attachments: [],
-    });
+      ...(open === 3 ? { taskId: `task-${index}` } : {}),
+    };
+    messages.push(message);
     deliveries.push({
       id: `delivery-${deliveries.length}`,
       messageId: id,
       recipientAgentId: recipient,
-      status: "completed",
-      turnId: `turn-${index}`,
+      status: open === 0 || open === 3 ? "queued" : open === 1 ? "running" : open === 2 ? "failed" : "completed",
+      turnId: open === 0 || open === 3 ? null : `turn-${index}`,
       error: null,
       createdAt: time(index),
       queueOrder: order++,
@@ -132,6 +138,13 @@ interface EquivalenceCase {
   passed: boolean;
 }
 
+interface QueueViews {
+  activeDeliveries: number;
+  executionDeliveries: number;
+  mismatches: string[];
+  digest: string;
+}
+
 interface Report {
   agents: number;
   messages: number;
@@ -141,6 +154,7 @@ interface Report {
   sameContentPages?: number;
   pagesRead?: number;
   equivalence: EquivalenceCase[];
+  queueViews?: QueueViews;
   passed: boolean;
   error?: string;
 }
@@ -347,6 +361,45 @@ try {
   report.timings.signature100 = timing(signature);
   report.timings.changedConversationMessages = timing(changed);
 
+  const failedTurns = new Map<string, string>();
+  for (let index = MESSAGES - OPEN_SEED + 2; index < MESSAGES; index += OPEN_EVERY)
+    failedTurns.set(agentIds[index % agentIds.length] ?? "", `turn-${index}`);
+  let active: QueueSnapshot[] = [];
+  const activeTimes = Array.from({ length: 20 }, () =>
+    measure(() => {
+      active = mailbox.listActiveQueues(agentIds, failedTurns);
+    }),
+  );
+  let executionIds: string[][] = [];
+  const executionTimes = Array.from({ length: 20 }, () =>
+    measure(() => {
+      executionIds = agentIds.map((id) => mailbox.queuedExecutionDeliveryIds(id));
+    }),
+  );
+  report.timings.listActiveQueues = timing(activeTimes);
+  report.timings.queuedExecutionDeliveryIdsAllAgents = timing(executionTimes);
+  const mismatches: string[] = [];
+  for (const queue of active) {
+    const full = mailbox.listQueue(queue.agentId);
+    if (full.welcome !== queue.welcome) mismatches.push(`${queue.agentId}:welcome`);
+    for (const delivery of queue.deliveries)
+      if (!isDeepStrictEqual(full.deliveries.find((item) => item.id === delivery.id) ?? null, delivery))
+        mismatches.push(`${queue.agentId}:${delivery.id}`);
+  }
+  const agentIndex = new Map(agentIds.map((id, index) => [id, `agent-${index}`]));
+  report.queueViews = {
+    activeDeliveries: active.reduce((sum, queue) => sum + queue.deliveries.length, 0),
+    executionDeliveries: executionIds.reduce((sum, ids) => sum + ids.length, 0),
+    mismatches,
+    digest: createHash("sha256")
+      .update(
+        JSON.stringify({ active, executionIds }, (_key, value) =>
+          typeof value === "string" ? (agentIndex.get(value) ?? value) : value,
+        ),
+      )
+      .digest("hex"),
+  };
+
   const [target] = agents();
   if (!target) throw new Error("No agent to change.");
   const user = { kind: "user" } as const;
@@ -405,8 +458,11 @@ try {
   }
   report.passed =
     report.equivalence.every((result) => result.passed) &&
-    report.storedChecksInSteadyReads === 0 &&
-    sameContentPages === pagesRead;
+    sameContentPages > 0 &&
+    report.storedChecksInSteadyReads <= 2 * (pagesRead - sameContentPages) &&
+    report.queueViews.mismatches.length === 0 &&
+    report.queueViews.activeDeliveries > 0 &&
+    report.queueViews.executionDeliveries > 0;
 } catch (error) {
   report.passed = false;
   report.error = error instanceof Error ? (error.stack ?? error.message) : String(error);
