@@ -46,6 +46,7 @@ import { TEAM_PROTOCOL_V9 } from "@openbot/contracts/team-protocol/v9";
 import { TEAM_PROTOCOL_V10 } from "@openbot/contracts/team-protocol/v10";
 import {
   WORKFLOW_PRESENCE_CAPABILITY,
+  WORKFLOW_PRESENCE_LIMITS,
   WORKFLOW_SPOT_CONTROL,
   type WorkflowSpotEvent,
   type WorkflowSpotPoint,
@@ -2109,7 +2110,13 @@ try {
       sendSpot(mate, ids.open, { x: 6, y: 6 });
     }
     const mateEvents = () => ownerSeen.filter((event) => event.memberId === presence.memberId);
-    assert.equal(mateEvents().length, 1, JSON.stringify(mateEvents()));
+    const keptEvents = mateEvents();
+    const mostBroadcasts = 1 + Math.floor((SPOT_STALE_MS * 1.5) / (WORKFLOW_PRESENCE_LIMITS.keepAliveMs / 2));
+    assert.ok(keptEvents.length >= 1 && keptEvents.length <= mostBroadcasts, JSON.stringify(keptEvents));
+    assert.ok(
+      keptEvents.every((event) => spotAt(event, 6, 6)),
+      JSON.stringify(keptEvents),
+    );
     const silentFrom = Date.now();
     await nextSpot(owner, (event) => event.memberId === presence.memberId && event.spot === null);
     const removedAfterMs = Date.now() - silentFrom;
@@ -2121,7 +2128,13 @@ try {
     clearInterval(ownerAlive);
     owner.close();
     mate.close();
-    return { keptForMs: SPOT_STALE_MS * 1.5, broadcastsWhileKept: 1, removedAfterMs, returnsOnNextSend: true };
+    return {
+      keptForMs: SPOT_STALE_MS * 1.5,
+      broadcastsWhileKept: keptEvents.length,
+      mostBroadcasts,
+      removedAfterMs,
+      returnsOnNextSend: true,
+    };
   });
 
   await step("size: a workflow too large for one frame answers 413 with its own sentence", async () => {

@@ -465,13 +465,20 @@ A client sends the control only to a host with the capability: an older host clo
 unknown control, and the host closes a socket that sends it without declaring the capability (1003).
 A change of agent access or of the agent list checks each open seat again, and a change of a
 workflow checks the seats on it. A seat that cannot see the workflow now gets `spot: null` for each
-other member and leaves the relay; its next spot on the workflow is checked again.
-A client sends its spot again every 10 s (`keepAliveMs`) while the workflow is open. The relay
-does not send an unchanged spot to the others, and removes a spot that no message refreshed in 30 s
-(`staleMs`), as if the seat left. A closed tab or a lost WebRTC path can keep the event socket of a
-host session open, so the end of the socket alone does not remove a cursor. A page that unloads
-(`pagehide`) sends `workflowId: null` first, so a closed tab leaves at once; the 30 s expiry covers a
-lost path or a stopped browser.
+other member and leaves the relay. The relay then drops its spots on that workflow until the seat
+leaves the workflow or access changes again. Each seat has at most one access check in flight; a
+check that an access change made old runs again before the seat joins.
+A client sends its spot again every 10 s (`keepAliveMs`) while the workflow is open and the page is
+visible. The relay sends an unchanged spot to the others again when 5 s (`keepAliveMs / 2`) passed
+since its last send, and removes a spot that no message refreshed in 30 s (`staleMs`), as if the seat
+left. A client also removes a member whose spot did not arrive in 30 s. A closed tab or a lost WebRTC
+path can keep the event socket of a host session open, so the end of the socket alone does not remove
+a cursor. A page that unloads (`pagehide`) or becomes hidden sends `workflowId: null` first, so a
+closed tab leaves at once; the 30 s expiry covers a lost path or a stopped browser. When the host
+stops, the relay sends `spot: null` for each open spot first.
+The desktop main process merges the spots of its windows for each server: it sends only the spot of
+the window that changed its spot last. When that window leaves or closes, it sends the spot of the
+next window, or `workflowId: null` when no window has a workflow open.
 
 One registry (`packages/contracts/src/ipc-workflow-nodes.ts`) lists the fields of each node kind:
 which fields the host reads at run time, which take `{{name}}` values, the values that a field can

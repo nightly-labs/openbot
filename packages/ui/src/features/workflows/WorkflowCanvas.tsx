@@ -1409,6 +1409,14 @@ export function WorkflowCanvas(props: WorkflowCanvasProps) {
   createEffect(ownSelection, (selected) => {
     untrack(() => reportSpot(selected));
   });
+  createEffect(
+    () => `${camera.x} ${camera.y} ${camera.scale}`,
+    () => {
+      untrack(() => {
+        if (pointer) reportSpot(ownSelection());
+      });
+    },
+  );
   const placeCamera = (next: Camera) => {
     setCamera((draft) => {
       draft.x = next.x;

@@ -318,6 +318,7 @@ export class RemoteServerManager extends EventEmitter<RemoteServerEvents> {
   #duplicateIds = retryOperationIds(randomUUID);
   readonly #hostRestartAway = new Map<string, number>();
   readonly #webrtcTransport: TeamWebRtcClientTransport | null;
+  readonly #workflowSpotSends = new Map<string, WorkflowSpotControl | null>();
   readonly #getLocalHostId: () => string | null;
   #localMemberLimit: Pick<ServerSummary, "memberLimit" | "licenseRaisesMemberLimit"> = {};
   #keyChangedAt = new Map<string, number>();
@@ -1924,14 +1925,29 @@ export class RemoteServerManager extends EventEmitter<RemoteServerEvents> {
     const control: WorkflowSpotControl = { type: WORKFLOW_SPOT_CONTROL, ...input };
     if (this.#store.find(serverId)?.transport === "webrtc-v2") {
       const transport = this.#webrtcTransport;
-      if (transport)
-        yield* Effect.forkIn(
-          this.#owned(transport.setWorkflowSpot(serverId, control).pipe(Effect.catch(() => Effect.void))),
-          this.#scope,
-        );
+      if (!transport) return;
+      const sending = this.#workflowSpotSends.has(serverId);
+      this.#workflowSpotSends.set(serverId, control);
+      if (!sending) yield* Effect.forkIn(this.#owned(this.#sendWorkflowSpots(transport, serverId)), this.#scope);
       return;
     }
     this.#events.sendWorkflowSpot(serverId, control);
+  }).bind(this);
+
+  readonly #sendWorkflowSpots = Effect.fn("RemoteManager.sendWorkflowSpots")(function* (
+    this: RemoteServerManager,
+    transport: TeamWebRtcClientTransport,
+    serverId: string,
+  ) {
+    const sends = this.#workflowSpotSends;
+    const drain = Effect.gen(function* () {
+      for (let control = sends.get(serverId); control; control = sends.get(serverId)) {
+        sends.set(serverId, null);
+        yield* transport.setWorkflowSpot(serverId, control).pipe(Effect.catch(() => Effect.void));
+      }
+      sends.delete(serverId);
+    });
+    yield* drain.pipe(Effect.onInterrupt(() => Effect.sync(() => sends.delete(serverId))));
   }).bind(this);
 
   checkRemoteDesktopSetup(serverId: string) {

@@ -657,7 +657,26 @@ export function createWorkflowsController(
   };
 
   const [spots, setSpots] = createSignal<Readonly<Record<string, WorkflowSpot>>>({});
-  const openWorkflowId = () => stored()?.detail.summary.id;
+  const openWorkflowId = createMemo(() => stored()?.detail.summary.id);
+  const spotSeenAt = new Map<string, number>();
+  let spotSweep: ReturnType<typeof setInterval> | undefined;
+  const sweepSpots = () => {
+    const oldest = Date.now() - WORKFLOW_PRESENCE_LIMITS.staleMs;
+    const stale = [...spotSeenAt].filter(([, seenAt]) => seenAt < oldest).map(([memberId]) => memberId);
+    if (stale.length === 0) return;
+    for (const memberId of stale) spotSeenAt.delete(memberId);
+    setSpots((current) => Object.fromEntries(Object.entries(current).filter(([memberId]) => spotSeenAt.has(memberId))));
+    if (spotSeenAt.size === 0) stopSpotSweep();
+  };
+  const stopSpotSweep = () => {
+    if (spotSweep !== undefined) clearInterval(spotSweep);
+    spotSweep = undefined;
+  };
+  const clearSpots = () => {
+    spotSeenAt.clear();
+    stopSpotSweep();
+    setSpots({});
+  };
   let ownSpot: WorkflowSpotInput | null = null;
   let spotSentAt = 0;
   let spotTimer: ReturnType<typeof setTimeout> | undefined;
@@ -695,7 +714,7 @@ export function createWorkflowsController(
   };
   const reportSpot = (spot: WorkflowOwnSpot) => {
     const workflowId = untrack(openWorkflowId);
-    if (!workflowId || !host.presenceSupported()) return;
+    if (!workflowId || !host.presenceSupported() || !untrack(pageVisible)) return;
     queueSpot({ workflowId, at: spot.at, selected: spot.selected });
   };
   const resendSpot = () => {
@@ -706,16 +725,22 @@ export function createWorkflowsController(
   const receiveSpot = (event: WorkflowSpotEvent) => {
     if (event.workflowId !== untrack(openWorkflowId)) return;
     const spot = event.spot;
+    if (spot) {
+      spotSeenAt.set(event.memberId, Date.now());
+      spotSweep ??= setInterval(sweepSpots, WORKFLOW_PRESENCE_LIMITS.keepAliveMs);
+    } else spotSeenAt.delete(event.memberId);
     setSpots((current) => {
       const { [event.memberId]: _left, ...others } = current;
       return spot ? { ...others, [event.memberId]: spot } : others;
     });
   };
+  const [pageVisible, setPageVisible] = createSignal(document.visibilityState !== "hidden");
+  const onVisibilityChange = () => setPageVisible(document.visibilityState !== "hidden");
   createEffect(
-    () => ({ workflowId: openWorkflowId(), supported: host.presenceSupported() }),
-    ({ workflowId, supported }) => {
-      setSpots({});
-      if (!workflowId || !supported) {
+    () => (pageVisible() && host.presenceSupported() ? openWorkflowId() : undefined),
+    (workflowId) => {
+      clearSpots();
+      if (!workflowId) {
         leaveSpot();
         return;
       }
@@ -732,13 +757,16 @@ export function createWorkflowsController(
     const stopSpots = host.onSpot(receiveSpot);
     window.addEventListener("focus", onFocus);
     window.addEventListener("pagehide", leaveSpot);
+    document.addEventListener("visibilitychange", onVisibilityChange);
     return () => {
       stop();
       stopFolders();
       stopSpots();
       leaveSpot();
+      stopSpotSweep();
       window.removeEventListener("focus", onFocus);
       window.removeEventListener("pagehide", leaveSpot);
+      document.removeEventListener("visibilitychange", onVisibilityChange);
       if (refreshTimer !== undefined) clearTimeout(refreshTimer);
       flush();
       disposed = true;

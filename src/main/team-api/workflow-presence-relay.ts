@@ -21,6 +21,8 @@ interface SeatState {
   seenAt: number;
   expiry: ReturnType<typeof setTimeout> | null;
   checking: string | null;
+  checkRunning: boolean;
+  checkStale: boolean;
   denied: string | null;
   waiting: WorkflowSpot | null;
   publishedAt: number;
@@ -54,7 +56,10 @@ export class WorkflowPresenceRelay<Key> {
     const spot = { at: input.at, selected: input.selected };
     if (workflowId === state.workflowId) {
       state.seenAt = this.#now();
-      if (sameSpot(state.spot, spot)) return;
+      if (sameSpot(state.spot, spot)) {
+        if (state.seenAt - state.publishedAt >= WORKFLOW_PRESENCE_LIMITS.keepAliveMs / 2) this.#schedule(state);
+        return;
+      }
       state.spot = spot;
       state.changedAt = this.#now();
       this.#schedule(state);
@@ -69,14 +74,14 @@ export class WorkflowPresenceRelay<Key> {
     state.denied = null;
     state.waiting = spot;
     state.checking = workflowId;
-    void this.#canView(key, workflowId)
-      .catch(() => false)
-      .then((visible) => this.#admit(key, state, workflowId, visible));
+    this.#check(key, state);
   }
 
   recheck(workflowId?: string): void {
     for (const [key, state] of this.#seats) {
       if (workflowId === undefined || state.denied === workflowId) state.denied = null;
+      if (state.checking !== null && (workflowId === undefined || state.checking === workflowId))
+        state.checkStale = true;
       const open = state.workflowId;
       if (open === null || (workflowId !== undefined && open !== workflowId)) continue;
       void this.#canView(key, open)
@@ -99,6 +104,8 @@ export class WorkflowPresenceRelay<Key> {
 
   clear(): void {
     for (const state of this.#seats.values()) {
+      if (state.workflowId !== null)
+        for (const event of this.#snapshot(state, state.workflowId)) state.seat.deliver({ ...event, spot: null });
       if (state.trailing) clearTimeout(state.trailing);
       if (state.expiry) clearTimeout(state.expiry);
     }
@@ -114,6 +121,8 @@ export class WorkflowPresenceRelay<Key> {
       seenAt: 0,
       expiry: null,
       checking: null,
+      checkRunning: false,
+      checkStale: false,
       denied: null,
       waiting: null,
       publishedAt: 0,
@@ -123,8 +132,22 @@ export class WorkflowPresenceRelay<Key> {
     return state;
   }
 
-  #admit(key: Key, state: SeatState, workflowId: string, visible: boolean): void {
-    if (this.#seats.get(key) !== state || state.checking !== workflowId) return;
+  #check(key: Key, state: SeatState): void {
+    const workflowId = state.checking;
+    if (state.checkRunning || workflowId === null) return;
+    state.checkRunning = true;
+    state.checkStale = false;
+    void this.#canView(key, workflowId)
+      .catch(() => false)
+      .then((visible) => {
+        state.checkRunning = false;
+        if (this.#seats.get(key) !== state) return;
+        if (state.checkStale || state.checking !== workflowId) this.#check(key, state);
+        else this.#admit(state, workflowId, visible);
+      });
+  }
+
+  #admit(state: SeatState, workflowId: string, visible: boolean): void {
     state.checking = null;
     const spot = state.waiting;
     state.waiting = null;
