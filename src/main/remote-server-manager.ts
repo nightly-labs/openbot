@@ -2266,7 +2266,11 @@ export class RemoteServerManager extends EventEmitter<RemoteServerEvents> {
         progress,
       );
       yield* this.#rejectHostError(response, url);
-      return new Uint8Array(yield* remoteCall(() => response.arrayBuffer()));
+      return yield* remoteCall((signal) =>
+        progress && server.transport !== "webrtc-v2"
+          ? countedResponseBytes(response, progress, signal)
+          : response.arrayBuffer().then((buffer) => new Uint8Array(buffer)),
+      );
     },
     (operation) => this.#owned(operation),
   ).bind(this);

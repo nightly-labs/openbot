@@ -453,7 +453,7 @@ function CopyProgress(props: { progress: CopyAgentsProgress; from: string; to: s
       <Show when={showsBytes()}>
         <TransferUploadProgress progress={props.progress} receiving={props.progress.step === "downloading"} />
       </Show>
-      <Show when={moving() && stalled() && props.progress.sent < props.progress.total}>
+      <Show when={props.progress.step === "downloading" && stalled() && props.progress.sent < props.progress.total}>
         <p class="instance-transfer-upload-status" role="status">
           {t("settings.transfer.copy.stalled")}
         </p>

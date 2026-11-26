@@ -29,6 +29,7 @@ interface RunningCopy {
   fromId: string;
   toId: string;
   result: Promise<InstanceTransferResult>;
+  progress: CopyAgentsProgress | null;
 }
 
 const runningCopies = new Map<string, RunningCopy>();
@@ -47,7 +48,7 @@ export function createServerCopyStore(
     fromError: null,
     toError: null,
     phase: running ? "copying" : "idle",
-    progress: null,
+    progress: running?.progress ?? null,
     result: null,
     error: null,
   });
@@ -167,8 +168,17 @@ export function createServerCopyStore(
       draft.progress = null;
       draft.error = null;
     });
-    const copying = { fromId: state.fromId, toId, result: calls.copy({ fromServerId: state.fromId, agentIds }, toId) };
+    const copying: RunningCopy = {
+      fromId: state.fromId,
+      toId,
+      result: calls.copy({ fromServerId: state.fromId, agentIds }, toId),
+      progress: null,
+    };
     runningCopies.set(serverId, copying);
+    const stopKeeping = calls.onUploadProgress?.(({ serverId: target, sent, total, copyStep }) => {
+      if (copyStep && target === toId) copying.progress = { step: copyStep, sent, total };
+    });
+    if (stopKeeping) void copying.result.then(stopKeeping, stopKeeping);
     void copying.result.then(
       () => desktopAnalytics.track("server_transfer_action", { action: "copy", result: "succeeded" }),
       () =>
