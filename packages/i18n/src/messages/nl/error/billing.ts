@@ -19,6 +19,8 @@ export const messages = {
   "error.billing.licensePaymentFailed":
     "De betaling voor de toegevoegde gebruikers is mislukt. Werk de betaalmethode bij en probeer het opnieuw.",
   "error.billing.licenseUnavailable": "Licenties zijn nu niet beschikbaar.",
+  "error.billing.mediaContentRefused":
+    "De veiligheidscontrole van het model heeft de prompt of de afbeeldingen geweigerd. Die weigert vaak echte personen, bekende personages, merken, geweld en inhoud voor volwassenen. Pas ze aan en probeer het opnieuw. Er zijn geen credits gebruikt.",
   "error.billing.noLicense": "Dit account heeft geen licentie.",
   "error.billing.countryRequired":
     "Geef je factuurland op voordat je betaalt. Werk OpenBot bij om dit te doen en probeer het opnieuw.",

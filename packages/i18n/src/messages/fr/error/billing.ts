@@ -20,6 +20,8 @@ export const messages = {
   "error.billing.licensePaymentFailed":
     "Le paiement des utilisateurs ajoutés a échoué. Mettez à jour le moyen de paiement et réessayez.",
   "error.billing.licenseUnavailable": "Les licences ne sont pas disponibles pour le moment.",
+  "error.billing.mediaContentRefused":
+    "Le contrôle de sécurité du modèle a refusé le prompt ou les images. Il refuse souvent les personnes réelles, les personnages célèbres, les marques, la violence et le contenu pour adultes. Modifie-les et réessaie. Aucun crédit n'a été utilisé.",
   "error.billing.licenseOneUser":
     "Cette licence est prévue pour 1 utilisateur. Passez à Team pour ajouter des utilisateurs.",
   "error.billing.licensePlanChange":

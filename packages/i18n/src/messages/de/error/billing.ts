@@ -20,6 +20,8 @@ export const messages = {
   "error.billing.licensePaymentFailed":
     "Die Zahlung für die zusätzlichen Nutzer ist fehlgeschlagen. Aktualisieren Sie die Zahlungsmethode und versuchen Sie es erneut.",
   "error.billing.licenseUnavailable": "Lizenzen sind derzeit nicht verfügbar.",
+  "error.billing.mediaContentRefused":
+    "Die Sicherheitsprüfung des Modells hat den Prompt oder die Bilder abgelehnt. Sie lehnt oft echte Personen, bekannte Figuren, Marken, Gewalt und Inhalte für Erwachsene ab. Ändere sie und versuche es erneut. Es wurden keine Credits verbraucht.",
   "error.billing.licenseOneUser": "Diese Lizenz gilt für 1 Nutzer. Wechsle zu Team, um Nutzer hinzuzufügen.",
   "error.billing.licensePlanChange":
     "Diese Lizenz kann nicht zu diesem Tarif wechseln. Kündige sie und kaufe den neuen Tarif.",

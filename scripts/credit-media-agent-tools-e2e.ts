@@ -154,6 +154,7 @@ const gateway: CreditMediaGateway = {
           { index: 0, mimeType: video ? "video/mp4" : "image/png", width: null, height: null, durationMs: null },
         ],
         failure: null,
+        reason: null,
       };
     }),
   job: (jobId) => {
@@ -168,6 +169,7 @@ const gateway: CreditMediaGateway = {
       pollAfterSeconds: 0,
       outputs: finished ? [{ index: 0, mimeType: "video/mp4", width: null, height: null, durationMs: null }] : [],
       failure: null,
+      reason: null,
     });
   },
   output: (jobId) =>

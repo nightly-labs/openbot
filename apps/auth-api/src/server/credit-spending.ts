@@ -20,13 +20,12 @@ export type CreditWallet = { userId: string } | { serverId: string };
 type CreditHoldStatus = "held" | "charged" | "released";
 type CreditHoldFunding = "paid" | "welcome";
 export type CreditHoldOutcome = "completed" | "failed" | "canceled" | "refused" | "abandoned" | "expired";
-export type CreditJobResult =
-  | { outcome: "completed"; charged?: number }
-  | { outcome: "failed" | "canceled" | "refused" };
+export type CreditJobRelease = { outcome: "failed" | "canceled" | "refused"; reason?: string };
+export type CreditJobResult = { outcome: "completed"; charged?: number } | CreditJobRelease;
 export type CreditJobCheck =
   | { status: "running" }
   | { status: "completed"; charged?: number }
-  | { status: "failed" | "canceled" };
+  | { status: "failed" | "canceled" | "refused"; reason?: string };
 export type CreditJobChecker = (
   providerJobId: string,
   jobId: string,
@@ -57,6 +56,7 @@ export interface CreditHold {
   upstream: string | null;
   funding: CreditHoldFunding;
   viaServerId: string | null;
+  failureReason: string | null;
 }
 
 export interface CreditSubmitTarget {
@@ -96,9 +96,10 @@ interface TrackedHoldRow {
   credits_tenths: number;
   charged_tenths: number | null;
   outcome: string | null;
+  failure_reason: string | null;
 }
 
-const TRACKED_HOLD_SQL = `RETURNING server_id, model_id, credits_tenths, charged_tenths, outcome,
+const TRACKED_HOLD_SQL = `RETURNING server_id, model_id, credits_tenths, charged_tenths, outcome, failure_reason,
   COALESCE(actor_user_id, user_id, (SELECT owner_user_id FROM remote_hosts WHERE host_id = credit_holds.server_id))
     AS account_id,
   (SELECT kind FROM credit_media_models WHERE model_id = credit_holds.model_id) AS kind`;
@@ -117,6 +118,7 @@ interface HoldRow {
   upstream: string | null;
   funding: string;
   via_server_id: string | null;
+  failure_reason: string | null;
 }
 
 interface DueRow {
@@ -194,6 +196,7 @@ function toHold(row: HoldRow): CreditHold {
     upstream: row.upstream,
     funding: isOneOf(HOLD_FUNDINGS, row.funding) ? row.funding : "paid",
     viaServerId: row.via_server_id,
+    failureReason: row.failure_reason,
   };
 }
 
@@ -228,6 +231,7 @@ function settledEvent(row: TrackedHoldRow): CreditActionEvent {
     credits: row.charged_tenths === null ? held : creditsFromTenths(row.charged_tenths),
     creditsHeld: held,
     outcome: isOneOf(HOLD_OUTCOMES, row.outcome) ? row.outcome : null,
+    ...(row.charged_tenths === null && row.failure_reason !== null ? { reason: row.failure_reason } : {}),
   };
 }
 
@@ -237,7 +241,8 @@ function nextCheckAt(now: number, createdAt: number): number {
 
 function checkResult(check: CreditJobCheck): CreditJobResult | null {
   if (check.status === "running") return null;
-  if (check.status !== "completed") return { outcome: check.status };
+  if (check.status !== "completed")
+    return check.reason === undefined ? { outcome: check.status } : { outcome: check.status, reason: check.reason };
   return check.charged === undefined ? { outcome: "completed" } : { outcome: "completed", charged: check.charged };
 }
 
@@ -402,11 +407,18 @@ export class CreditSpending {
                     charged_tenths = CASE
                       WHEN ?2 = 'charged' THEN MAX(0, MIN(COALESCE(?4, credits_tenths), credits_tenths))
                     END,
-                    settled_at = ?5
+                    settled_at = ?5, failure_reason = ?6
               WHERE job_id = ?1 AND status = 'held'
              ${TRACKED_HOLD_SQL}`,
           )
-          .bind(jobId, completed ? "charged" : "released", result.outcome, charged, now),
+          .bind(
+            jobId,
+            completed ? "charged" : "released",
+            result.outcome,
+            charged,
+            now,
+            result.outcome === "completed" ? null : (result.reason ?? null),
+          ),
         this.#database
           .prepare(
             consumeGrantsSql(
@@ -441,7 +453,7 @@ export class CreditSpending {
       this.#database
         .prepare(
           `SELECT job_id, user_id, server_id, actor_user_id, model_id, credits_tenths, status, outcome, charged_tenths,
-                  provider_job_id, upstream, funding, via_server_id
+                  provider_job_id, upstream, funding, via_server_id, failure_reason
              FROM credit_holds WHERE job_id = ?`,
         )
         .bind(jobId)

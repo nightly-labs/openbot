@@ -90,6 +90,7 @@ const view = (jobId: string, job: FakeJob): CreditMediaJob => ({
       ? [{ index: 0, mimeType: "image/png", width: null, height: null, durationMs: null }]
       : [],
   failure: job.status === "failed" ? "failed" : null,
+  reason: null,
 });
 
 const gateway: CreditMediaGateway = {
