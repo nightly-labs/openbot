@@ -178,7 +178,7 @@ const gateway: CreditMediaGateway = {
 };
 
 let approvalCredits = DEFAULT_MEDIA_APPROVAL_CREDITS;
-let defaultModels: Record<CreditMediaGenerationKind, string | null> = { image: null, video: null };
+let defaultModels: Record<CreditMediaGenerationKind, readonly string[]> = { image: [], video: [] };
 let agentsAllowed = true;
 let askWhenBlocked = true;
 const mutedMembers = new Set<string>();
@@ -203,7 +203,7 @@ const tools = new CreditMediaTools({
       else mutedMembers.add(person.id);
     }),
   approvalCredits: () => approvalCredits,
-  defaultModel: (kind) => defaultModels[kind],
+  defaultModels: (kind) => defaultModels[kind],
   fitImage: (bytes) => ({
     dataUrl: `data:image/png;base64,${Buffer.from(bytes).toString("base64")}`,
     width: 1920,
@@ -685,7 +685,7 @@ async function flow() {
     otherModel.submitted?.request,
   );
 
-  defaultModels = { image: "image-edit", video: null };
+  defaultModels = { image: ["image-edit"], video: [] };
   const preferred = await call("generate_image", { prompt: "A tree" });
   const preferredList = await call("list_media_models", {});
   check(
@@ -706,7 +706,17 @@ async function flow() {
     named.result.success && named.submitted?.request.model === "image-text",
     named.submitted?.request,
   );
-  defaultModels = { image: null, video: null };
+  defaultModels = { image: ["image-missing", "image-edit"], video: [] };
+  const fallback = await call("generate_image", { prompt: "A tree" });
+  const fallbackList = await call("list_media_models", {});
+  check(
+    "when the first preferred model is not in the catalog, the next preferred model runs and the list names it",
+    fallback.result.success &&
+      fallback.submitted?.request.model === "image-edit" &&
+      fallbackList.data?.defaultModels?.image === "image-edit",
+    { request: fallback.submitted?.request, defaults: fallbackList.data?.defaultModels },
+  );
+  defaultModels = { image: [], video: [] };
   approvalCredits = DEFAULT_MEDIA_APPROVAL_CREDITS;
 
   signedIn = false;
@@ -811,7 +821,7 @@ async function stoppedCall() {
 async function freeFlow() {
   catalogModels = [...MODELS, ...FREE_MODELS];
   activeWorkflows = new CreditMediaWorkflows({ gateway, warn: () => undefined, creditsChanged: () => undefined });
-  defaultModels = { image: null, video: null };
+  defaultModels = { image: [], video: [] };
   approvalCredits = DEFAULT_MEDIA_APPROVAL_CREDITS;
   agentsAllowed = true;
   askWhenBlocked = true;
@@ -858,9 +868,9 @@ async function freeFlow() {
     { data: video.data, request: video.submitted?.request, reports: video.reports },
   );
 
-  defaultModels = { image: null, video: "video-free" };
+  defaultModels = { image: [], video: ["video-free"] };
   const lowered = await call("generate_video", { prompt: "A slow river" });
-  defaultModels = { image: null, video: null };
+  defaultModels = { image: [], video: [] };
   check(
     "a default free model above the free credits keeps the model at lower settings and the note names the settings, not the paid balance",
     lowered.result.success &&

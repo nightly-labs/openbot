@@ -2193,9 +2193,10 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
         asksMuted: (personIds) => options.creditAsks?.muted(personIds) ?? false,
         enableAgents: () => options.creditAsks?.enableAgents() ?? Effect.void,
         muteAsks: (person) => options.creditAsks?.mute(person) ?? Effect.void,
-        defaultModel: (kind) => {
+        defaultModels: (kind) => {
           const setting = options.mediaApprovalCredits?.();
-          return (kind === "image" ? setting?.imageModel : setting?.videoModel) ?? CREDIT_MEDIA_PREFERRED_MODELS[kind];
+          const chosen = kind === "image" ? setting?.imageModel : setting?.videoModel;
+          return chosen ? [chosen] : CREDIT_MEDIA_PREFERRED_MODELS[kind];
         },
         fitImage: options.fitImage ?? null,
         scope: () => this.#scope,
