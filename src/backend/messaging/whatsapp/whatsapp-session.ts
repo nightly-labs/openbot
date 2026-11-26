@@ -180,6 +180,7 @@ export class WhatsAppSession {
   #restartedOnce = false;
   #codeShown = false;
   #openedAt = 0;
+  #socketOpenedAt = 0;
   #historySent = false;
   #historySentAtOpen = false;
   #lastFrameAt = 0;
@@ -407,6 +408,7 @@ export class WhatsAppSession {
     }
     if (update.connection === "open") {
       this.#openedAt = this.#now();
+      this.#socketOpenedAt = this.#openedAt;
       this.#historySentAtOpen = this.#historySent;
       if (this.#store.linked) this.#historySent = true;
       this.#lastFrameAt = this.#openedAt;
@@ -418,7 +420,7 @@ export class WhatsAppSession {
     if (update.connection !== "close") return;
     const code = statusCode(update.lastDisconnect?.error);
     const decision = closeDecision(code, this.#pairing && !this.#store.linked, this.#restartedOnce, this.#codeShown);
-    if (this.#openedAt && this.#now() - this.#openedAt >= STABLE_MS) this.#attempt = 0;
+    if (this.#socketOpenedAt && this.#now() - this.#socketOpenedAt >= STABLE_MS) this.#attempt = 0;
     this.#dropSocket();
     const error = update.lastDisconnect?.error;
     logger.warn("A WhatsApp socket closed.", {
@@ -495,6 +497,7 @@ export class WhatsAppSession {
     if (this.#watchdog) clearInterval(this.#watchdog);
     this.#watchdog = null;
     this.#handling.clear();
+    this.#socketOpenedAt = 0;
     const socket = this.#socket;
     this.#socket = null;
     if (!socket) return;
