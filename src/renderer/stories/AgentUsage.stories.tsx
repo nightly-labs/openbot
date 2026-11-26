@@ -9,7 +9,7 @@ import { mockHostAnalytics } from "../src/preview/mock-agent-analytics";
 import { createMockOpenBot } from "./mock-openbot";
 
 function UsageStory(props: {
-  state: "ready" | "empty" | "partial" | "loading" | "error" | "unsupported" | "large" | "small" | "long";
+  state: "ready" | "empty" | "loading" | "error" | "unsupported" | "large" | "small" | "long";
   narrow?: boolean;
   agentId?: string;
   machine?: "normal" | "high";
@@ -47,8 +47,6 @@ function UsageStory(props: {
     }));
     if (props.state === "empty")
       return { ...data, totals: emptyAnalyticsTotals(), models: [], daily: [], agents: [], providerDaily: [] };
-    if (props.state === "partial")
-      return { ...data, totals: { ...data.totals, missingUsageTurns: 3, unpricedRecords: 2 } };
     return data;
   };
   onCleanup(() => {
@@ -104,7 +102,6 @@ export default meta;
 type Story = StoryObj<typeof meta>;
 export const Usage: Story = {};
 export const Empty: Story = { args: { state: "empty" } };
-export const Partial: Story = { args: { state: "partial" } };
 export const Loading: Story = { args: { state: "loading" } };
 export const ErrorState: Story = { args: { state: "error" } };
 export const Unsupported: Story = { args: { state: "unsupported" } };
