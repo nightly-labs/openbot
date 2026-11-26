@@ -91,6 +91,9 @@ message has all its keys, so the replay gives the same chat. It runs at start an
 thread runs again from its first event when the events after its `through_sequence` are at least its
 message count, and at least 1000, so the work grows with the thread. The rule uses the replay's own fold
 (`database/thread-message-fold.ts`). When you change the fold, run `bun scripts/thread-event-compaction-e2e.ts`.
+Each delete finds the activity rows of its event through the index of migration 70
+(`projection_thread_activities(thread_id, last_event_sequence)`); without it, one delete reads the
+whole table. When you change a delete of activity rows, run `bun scripts/thread-event-compaction-activities-e2e.ts`.
 
 - Do not rebuild, rewrite every row of, or `VACUUM` because of a large table unless the change needs
   it. Prefer `ADD COLUMN` with no default or a constant default, a new table, or a partial index.
