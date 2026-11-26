@@ -77,10 +77,27 @@ import type {
   ReadProviderHistory,
 } from "./provider-history";
 import { stopProcessTree } from "./windows-process-tree";
+import { TimeoutError } from "./with-timeout";
 
 const logger = createOpenBotLogger("provider-runtime");
 
 const extensionModels = new Set<string>();
+
+function piSetupRequest(
+  rpc: PiRpc,
+  provider: "pi" | KeyOnlyProviderId,
+  command: DynamicRecord,
+  timeoutMs?: number,
+): Effect.Effect<DynamicRecord, ProviderClientOperationError> {
+  return rpc.request(command, timeoutMs).pipe(
+    Effect.catch((failure) => {
+      if (!(failure.cause instanceof RequestTimeoutError)) return Effect.fail(failure);
+      logger.warn("Pi did not answer a request before the turn in time.", { provider, request: failure.cause.method });
+      const message = sourceText("error.provider.acpSettingsTimedOut", { provider: agentProviderName(provider) });
+      return Effect.fail(providerFailure(new TimeoutError(message)));
+    }),
+  );
+}
 
 function piModelSelection(provider: string, model: string) {
   if (provider !== "pi") return { provider, modelId: providerModelValue(model) };
@@ -733,16 +750,26 @@ export class PiAgentClient extends EventEmitter<ClientEvents> implements AgentCl
       const environment = { ...extension?.environment, ...keyExtension?.environment };
       yield* providerSync(() => this.#spawn(rpc, cwd, args, environment));
       if (switchesSession) {
-        const loaded = yield* rpc.request({ type: "switch_session", sessionPath: requestedId }, PI_START_TIMEOUT_MS);
+        const loaded = yield* piSetupRequest(
+          rpc,
+          this.provider,
+          { type: "switch_session", sessionPath: requestedId },
+          PI_START_TIMEOUT_MS,
+        );
         if (loaded.cancelled === true)
           return yield* providerFailure(new Error(sourceText("error.provider.piResumeCancelled")));
       }
-      const state = yield* rpc.request({ type: "get_state" }, switchesSession ? undefined : PI_START_TIMEOUT_MS);
+      const state = yield* piSetupRequest(
+        rpc,
+        this.provider,
+        { type: "get_state" },
+        switchesSession ? undefined : PI_START_TIMEOUT_MS,
+      );
       const id = getString(state, "sessionFile");
       if (!id || (resume && id !== requestedId))
         return yield* providerFailure(new Error(sourceText("error.provider.piSessionIdentity")));
       if (this.options.profileGeneration && selection && modelKey && !withExtensions) {
-        const listed = yield* rpc.request({ type: "get_available_models" });
+        const listed = yield* piSetupRequest(rpc, this.provider, { type: "get_available_models" });
         const known = getArray(listed, "models").some(
           (item) => getString(item, "provider") === selection.provider && getString(item, "id") === selection.modelId,
         );
@@ -819,14 +846,21 @@ export class PiAgentClient extends EventEmitter<ClientEvents> implements AgentCl
     if (model) {
       const selection = piModelSelection(this.provider, model);
       if (!selection) return yield* providerFailure(new Error(sourceText("error.provider.piModelInvalid")));
-      yield* thread.rpc.request({ type: "set_model", ...selection });
+      yield* piSetupRequest(thread.rpc, this.provider, { type: "set_model", ...selection });
     }
     const effort = getString(params, "effort") ?? getString(params, "reasoningEffort");
-    if (effort) yield* thread.rpc.request({ type: "set_thinking_level", level: effort === "none" ? "off" : effort });
+    if (effort)
+      yield* piSetupRequest(thread.rpc, this.provider, {
+        type: "set_thinking_level",
+        level: effort === "none" ? "off" : effort,
+      });
   });
 
-  readonly #modelReadsImages = Effect.fn("PiAgentClient.modelReadsImages")(function* (thread: PiThread) {
-    const state = yield* thread.rpc.request({ type: "get_state" });
+  readonly #modelReadsImages = Effect.fn("PiAgentClient.modelReadsImages")(function* (
+    this: PiAgentClient,
+    thread: PiThread,
+  ) {
+    const state = yield* piSetupRequest(thread.rpc, this.provider, { type: "get_state" });
     const input = getArray(getRecord(state, "model"), "input");
     return input.length === 0 || input.includes("image");
   });
