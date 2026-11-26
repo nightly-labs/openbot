@@ -344,16 +344,18 @@ const ANTIGRAVITY_SIGN_IN: AcpAuthenticateSignIn = {
   timeoutMs: CLI_LOGIN_TIMEOUT_MS,
 };
 
+const ANTIGRAVITY_LINK_ONLY_ENV = { ...ANTIGRAVITY_ENV, SSH_CONNECTION: "127.0.0.1 0 127.0.0.1 0" };
+
 const ANTIGRAVITY_CODE_SIGN_IN: ProviderSignInCommand = {
   argv: () => Effect.succeed([...antigravityArgv({ ...process.env, ...ANTIGRAVITY_ENV }), "--login"]),
-  env: () => ({ ...ANTIGRAVITY_ENV }),
+  env: () => ({ ...ANTIGRAVITY_LINK_ONLY_ENV }),
   timeoutMs: CLI_LOGIN_TIMEOUT_MS,
   pipedInput: true,
 };
 
 const ANTIGRAVITY_ACCOUNT_CODE_SIGN_IN: ProviderAccountCodeCommand = {
   argv: (env) => [...antigravityArgv(env), "--login"],
-  env: () => ({ ...ANTIGRAVITY_ENV }),
+  env: () => ({ ...ANTIGRAVITY_LINK_ONLY_ENV }),
   timeoutMs: CLI_LOGIN_TIMEOUT_MS,
   pipedInput: true,
 };
