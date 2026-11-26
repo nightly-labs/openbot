@@ -71,6 +71,10 @@ export const messages = {
   "status.agent.nearSignatureUnknown": "OpenBot이 이 서명을 기다리고 있지 않습니다. OpenBot에서 다시 시작하세요.",
   "status.agent.nearPayment":
     "{domain} 결제로 암호화폐 지갑에서 {recipient}에게 {amount} {symbol}을(를) 보냅니다: {reason}",
+  "status.agent.nearPaymentSending": "{domain}에 {amount} 결제 중: {reason}",
+  "status.agent.nearPaymentPaid": "{domain}에 {amount} 결제됨: {reason}",
+  "status.agent.nearPaymentNotPaid": "결제 안 됨: {domain}에 {amount}: {reason}",
+  "status.agent.nearPaymentUncertain": "확인 안 됨: {domain}에 {amount}: {reason}",
   "status.agent.nearSummaryCreate":
     "모든 에이전트가 하루 최대 {amount} USD까지 결제할 수 있습니다. 나중에 OpenBot에서 변경할 수 있습니다.",
   "status.agent.nearSummaryGrant": "이 OpenBot 앱이 {days}일 동안 내 규칙 범위 안에서 지갑으로 결제하도록 허용합니다.",

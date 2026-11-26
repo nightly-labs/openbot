@@ -74,6 +74,10 @@ export const messages = {
   "status.agent.nearSignatureReceived": "OpenBot hat die Signatur erhalten. Du kannst diesen Tab schließen.",
   "status.agent.nearSignatureUnknown": "OpenBot wartet nicht auf diese Signatur. Starte sie in OpenBot erneut.",
   "status.agent.nearPayment": "{amount} {symbol} aus der Krypto-Wallet an {recipient} zahlen, für {domain}: {reason}",
+  "status.agent.nearPaymentSending": "{amount} wird gezahlt für {domain}: {reason}",
+  "status.agent.nearPaymentPaid": "{amount} gezahlt für {domain}: {reason}",
+  "status.agent.nearPaymentNotPaid": "Nicht gezahlt: {amount} für {domain}: {reason}",
+  "status.agent.nearPaymentUncertain": "Nicht bestätigt: {amount} für {domain}: {reason}",
   "status.agent.nearSummaryCreate":
     "Alle Agenten können bis zu {amount} USD pro Tag zahlen. Du kannst das später in OpenBot ändern.",
   "status.agent.nearSummaryGrant":

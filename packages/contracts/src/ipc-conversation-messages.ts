@@ -12,6 +12,7 @@ import {
   isConversationSubagents,
 } from "./ipc-conversation-subagents";
 import { type ConversationTurnTrace, isConversationTurnTrace } from "./ipc-conversation-trace";
+import { type ConversationNearPayment, isConversationNearPayment } from "./ipc-near-wallet";
 import { QUEUE_DELIVERY_STATUSES, type QueueDelivery } from "./ipc-queue";
 import { isBoolean, isDynamicRecord, isNumber, isOneOf, isString } from "./runtime-values";
 import { type ConversationSkillSuggestion, isConversationSkillSuggestion } from "./skill-suggestion-events";
@@ -298,6 +299,7 @@ export interface ConversationMessage {
   instructionsChange?: AgentInstructionsChange | undefined;
   skillSuggestion?: ConversationSkillSuggestion | undefined;
   uiBlock?: ConversationUiBlock | undefined;
+  nearPayment?: ConversationNearPayment | undefined;
   trace?: ConversationTurnTrace | undefined;
 }
 
@@ -350,6 +352,7 @@ export function isConversationMessage(value: unknown): value is ConversationMess
     (value.instructionsChange === undefined || isAgentInstructionsChange(value.instructionsChange)) &&
     (value.skillSuggestion === undefined || isConversationSkillSuggestion(value.skillSuggestion)) &&
     (value.uiBlock === undefined || isConversationUiBlock(value.uiBlock)) &&
+    (value.nearPayment === undefined || isConversationNearPayment(value.nearPayment)) &&
     (value.trace === undefined || isConversationTurnTrace(value.trace))
   );
 }
