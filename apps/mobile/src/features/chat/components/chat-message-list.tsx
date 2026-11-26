@@ -1926,7 +1926,7 @@ export const ChatMessageList = memo(function ChatMessageList({
     );
     const latestStep =
       showThinking && !replying && latestThinking?.kind === "thinking" ? latestThinking.steps.at(-1) : undefined;
-    const thinkingDetail = latestStep && !latestStep.progress ? thoughtTitle(latestStep.text) || null : null;
+    const thinkingDetail = latestStep && !latestStep.progress ? thoughtTitle(latestStep.text) : null;
     const activityLabel =
       sending && !activity
         ? t("common.sending")
