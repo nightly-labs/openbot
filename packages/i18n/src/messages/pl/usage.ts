@@ -16,8 +16,7 @@ export const messages = {
     "Dzienny szacowany koszt w USD według dostawcy. Dokładne wartości pokazuje „Pokaż dane dzienne”.",
   "usage.chart.tokensDescription":
     "Dzienne tokeny bez odczytów z pamięci podręcznej według dostawcy. Dokładne wartości pokazuje „Pokaż dane dzienne”.",
-  "usage.chart.costLabel": "Dzienny szacowany koszt w USD według dostawcy",
-  "usage.chart.tokensLabel": "Dzienne tokeny bez odczytów z pamięci podręcznej według dostawcy",
+  "usage.chart.weekOf": "Tydzień od {date}",
   "usage.column.cost": "Koszt",
   "usage.column.share": "Udział",
   "usage.column.tokens": "Tokeny",
@@ -26,8 +25,6 @@ export const messages = {
   "usage.column.loads": "Wczytania",
   "usage.column.agents": "Agenci",
   "usage.empty": "Brak zarejestrowanego użycia w tym okresie.",
-  "usage.partial":
-    "Dane częściowe · tury bez zgłoszonego użycia: {turns}; rekordy bez szacunku kosztu: {unpriced}; rekordy z niepełnymi danymi o tokenach: {incomplete}.",
   "usage.summary": "Podsumowanie użycia",
   "usage.sessions": {
     one: "{sessions} sesja",
@@ -42,6 +39,10 @@ export const messages = {
   "usage.dailyTrend": "Trend dzienny",
   "usage.dailyCost": "Koszt dzienny",
   "usage.dailyTokens": "Tokeny dziennie",
+  "usage.weeklyCost": "Koszt tygodniowy",
+  "usage.weeklyTokens": "Tokeny tygodniowo",
+  "usage.monthlyCost": "Koszt miesięczny",
+  "usage.monthlyTokens": "Tokeny miesięcznie",
   "usage.viewDailyData": "Pokaż dane dzienne",
   "usage.totals.title": "Sumy",
   "usage.totals.tokens": "Tokeny bez odczytów z pamięci podręcznej",

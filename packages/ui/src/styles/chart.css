@@ -33,3 +33,6 @@
   padding-top: var(--openbot-space-2);
   color: var(--openbot-text-muted);
 }
+.ui-chart-cursor {
+  fill: var(--openbot-bg-control-hover);
+}

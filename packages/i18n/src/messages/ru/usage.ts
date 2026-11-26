@@ -16,8 +16,7 @@ export const messages = {
     "Ежедневная примерная стоимость в USD по провайдерам. Точные значения доступны по ссылке «Данные по дням».",
   "usage.chart.tokensDescription":
     "Ежедневные токены без чтения из кэша по провайдерам. Точные значения доступны по ссылке «Данные по дням».",
-  "usage.chart.costLabel": "Ежедневная примерная стоимость в USD по провайдерам",
-  "usage.chart.tokensLabel": "Ежедневные токены без чтения из кэша по провайдерам",
+  "usage.chart.weekOf": "Неделя с {date}",
   "usage.column.cost": "Стоимость",
   "usage.column.share": "Доля",
   "usage.column.tokens": "Токены",
@@ -26,8 +25,6 @@ export const messages = {
   "usage.column.loads": "Загрузки",
   "usage.column.agents": "Агенты",
   "usage.empty": "За этот период использования нет.",
-  "usage.partial":
-    "Неполные данные · у {turns} ходов нет сведений об использовании; у {unpriced} записей нет оценки стоимости; у {incomplete} записей неполные данные о токенах.",
   "usage.summary": "Сводка использования",
   "usage.sessions": {
     one: "{sessions} сессия",
@@ -42,6 +39,10 @@ export const messages = {
   "usage.dailyTrend": "Динамика по дням",
   "usage.dailyCost": "Стоимость по дням",
   "usage.dailyTokens": "Токены по дням",
+  "usage.weeklyCost": "Стоимость по неделям",
+  "usage.weeklyTokens": "Токены по неделям",
+  "usage.monthlyCost": "Стоимость по месяцам",
+  "usage.monthlyTokens": "Токены по месяцам",
   "usage.viewDailyData": "Данные по дням",
   "usage.totals.title": "Итого",
   "usage.totals.tokens": "Токены без чтения из кэша",

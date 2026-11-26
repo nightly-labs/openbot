@@ -141,6 +141,10 @@
   --openbot-chart-series-codex: #d6adf2;
   --openbot-chart-series-claude: var(--openbot-provider-claude);
   --openbot-chart-series-grok: #6bc7d9;
+  --openbot-chart-series-extra-1: #d55181;
+  --openbot-chart-series-extra-2: #199e70;
+  --openbot-chart-series-extra-3: #c98500;
+  --openbot-chart-series-extra-4: #3987e5;
   --openbot-chart-series-other: var(--openbot-text-muted);
 
   --openbot-chart-storage-workspaces: #3987e5;

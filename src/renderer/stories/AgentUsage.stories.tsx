@@ -4,6 +4,7 @@ import { onCleanup } from "solid-js";
 import { fn } from "storybook/test";
 import type { Meta, StoryObj } from "storybook-solidjs-vite";
 import { AgentUsagePanel } from "../src/features/usage/AgentUsagePanel";
+import { PlatformProvider } from "../src/platform";
 import { mockHostAnalytics } from "../src/preview/mock-agent-analytics";
 import { createMockOpenBot } from "./mock-openbot";
 
@@ -59,22 +60,24 @@ function UsageStory(props: {
     return load && <UsageMachineMeter metrics={machineMetrics(load)} onOpenStorage={fn()} />;
   };
   return (
-    <main
-      style={{
-        width: props.narrow ? "390px" : "100%",
-        height: "900px",
-        overflow: "hidden",
-        background: "var(--openbot-bg-canvas)",
-      }}
-    >
-      <AgentUsagePanel
-        hostName="Local host"
-        serverId="local"
-        agentId={props.agentId}
-        onBack={fn()}
-        machine={machine()}
-      />
-    </main>
+    <PlatformProvider>
+      <main
+        style={{
+          width: props.narrow ? "390px" : "100%",
+          height: "900px",
+          overflow: "hidden",
+          background: "var(--openbot-bg-canvas)",
+        }}
+      >
+        <AgentUsagePanel
+          hostName="Local host"
+          serverId="local"
+          agentId={props.agentId}
+          onBack={fn()}
+          machine={machine()}
+        />
+      </main>
+    </PlatformProvider>
   );
 }
 const GB = 1024 ** 3;
