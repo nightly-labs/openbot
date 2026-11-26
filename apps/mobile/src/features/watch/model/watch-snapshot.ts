@@ -96,8 +96,6 @@ export interface WatchSnapshotInput {
   hidden: (serverId: string) => readonly string[];
   pinned: (serverId: string) => readonly string[];
   layout: (serverId: string) => SidebarLayoutSnapshot | null;
-  recent: boolean;
-  unreadFirst: boolean;
   paused: boolean;
   live: LiveWorkspaceState;
   conversation: (agentId: string) => MobileConversation | undefined;
@@ -206,24 +204,29 @@ function stateOf(wait: WatchWait | null, activity: MobileAgentActivity | undefin
   return activity ? "working" : "idle";
 }
 
-function appOrder(input: WatchSnapshotInput, server: MobileServer): MobileAgent[] {
+interface PlacedAgent {
+  agent: MobileAgent;
+  folder: string | null;
+}
+
+function appOrder(input: WatchSnapshotInput, server: MobileServer): PlacedAgent[] {
   const hidden = new Set(input.hidden(server.id));
   const visible = input.agents.filter((agent) => agent.serverId === server.id && !hidden.has(agent.id));
   const byId = new Map(visible.map((agent) => [agent.id, agent]));
   const pinned = input.pinned(server.id).flatMap((id) => byId.get(id) ?? []);
   const pinnedIds = new Set(pinned.map((agent) => agent.id));
+  let folder: string | null = null;
   const rest = mobileSidebarItems(
     input.layout(server.id),
     visible.filter((agent) => !pinnedIds.has(agent.id)),
     [],
     undefined,
     input.text.t,
-    {
-      recent: input.recent,
-      unreadFirst: input.unreadFirst ? new Set(input.live.unreadAgentIds) : null,
-    },
-  ).flatMap((item) => (item.kind === "agent" ? [item.agent] : []));
-  return [...pinned, ...rest];
+  ).flatMap((item): PlacedAgent[] => {
+    if (item.kind === "section") folder = item.name;
+    return item.kind === "agent" ? [{ agent: item.agent, folder }] : [];
+  });
+  return [...pinned.map((agent) => ({ agent, folder: null })), ...rest];
 }
 
 function withinLimit(agents: readonly WatchAgent[]): WatchAgent[] {
@@ -244,7 +247,7 @@ export function buildWatchSnapshot(input: WatchSnapshotInput): WatchSnapshot {
     const approvals = live.approvalRequests[server.id] ?? [];
     const waits = live.threadWaitsByServer[server.id] ?? [];
     const activities = live.activityByServer[server.id] ?? {};
-    for (const agent of appOrder(input, server)) {
+    for (const { agent, folder } of appOrder(input, server)) {
       const conversation = input.conversation(agent.id);
       const activity = activities[agent.id];
       const wait = agentWait(agent, approvals, waits, conversation, text) ?? waitingActivity(activity);
@@ -258,6 +261,7 @@ export function buildWatchSnapshot(input: WatchSnapshotInput): WatchSnapshot {
         color: avatarHeadColor(agent.avatarSeed, agent.avatarHue, agent.avatarColor),
         ...(avatar ? { avatar } : {}),
         pinned: pinned.has(agent.id),
+        ...(folder ? { folder } : {}),
         unread: live.unreadAgentIds.includes(agent.id) ? Math.max(1, live.unreadCounts[agent.id] ?? 1) : 0,
         state,
         detail: watchText(state === "working" ? (activity?.detail ?? null) : agent.preview, 160),

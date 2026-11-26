@@ -101,6 +101,7 @@ struct WatchAgent: Codable, Hashable, Identifiable {
   var color: String
   var avatar: String?
   var pinned: Bool?
+  var folder: String?
   var unread: Int?
   var state: WatchAgentState
   var detail: String?

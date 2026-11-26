@@ -3,7 +3,7 @@ import SwiftUI
 struct AgentGroup: Identifiable {
   let id: String
   let title: String
-  let agents: [WatchAgent]
+  var agents: [WatchAgent]
 }
 
 struct AgentListView: View {
@@ -16,6 +16,14 @@ struct AgentListView: View {
       EmptyAgentsView(live: snapshot.live)
     } else {
       List {
+        if let title {
+          Text(title)
+            .font(.title3.weight(.semibold))
+            .foregroundStyle(.secondary)
+            .lineLimit(2)
+            .minimumScaleFactor(0.8)
+            .listRowBackground(Color.clear)
+        }
         if session.showsConnectionNote {
           ConnectionNote()
             .listRowBackground(Color.clear)
@@ -31,8 +39,11 @@ struct AgentListView: View {
           }
         }
       }
-      .navigationTitle(Text(verbatim: "OpenBot"))
     }
+  }
+
+  private var title: String? {
+    snapshot.servers.count == 1 ? snapshot.servers.first?.name : nil
   }
 
   private var groups: [AgentGroup] {
@@ -51,19 +62,23 @@ struct AgentListView: View {
     if !waiting.isEmpty {
       result.append(AgentGroup(id: "waiting", title: text(TextKey.needsYou), agents: waiting))
     }
-    for server in snapshot.servers {
-      let agents = rest.filter { $0.serverId == server.id }
-      if !agents.isEmpty {
-        result.append(AgentGroup(id: "server-\(server.id)", title: server.name, agents: agents))
+    let manyServers = Set(snapshot.agents.map(\.serverId)).count > 1
+    var folders: [AgentGroup] = []
+    for agent in rest {
+      let id = "folder-\(agent.serverId)-\(agent.folder ?? "")"
+      if let index = folders.firstIndex(where: { $0.id == id }) {
+        folders[index].agents.append(agent)
+      } else {
+        folders.append(AgentGroup(id: id, title: folderTitle(agent, manyServers: manyServers), agents: [agent]))
       }
     }
-    let known = Set(snapshot.servers.map(\.id))
-    let unlisted = rest.filter { !known.contains($0.serverId) }
-    if !unlisted.isEmpty {
-      result.append(AgentGroup(id: "other", title: unlisted[0].server, agents: unlisted))
-    }
-    return result
+    return result + folders
   }
+}
+
+private func folderTitle(_ agent: WatchAgent, manyServers: Bool) -> String {
+  guard let folder = agent.folder, !folder.isEmpty else { return agent.server }
+  return manyServers ? "\(agent.server) · \(folder)" : folder
 }
 
 struct AgentRow: View {

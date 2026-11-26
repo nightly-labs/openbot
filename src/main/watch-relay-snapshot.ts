@@ -9,6 +9,8 @@ import {
   type ConversationReadState,
   SIDEBAR_UNASSIGNED_SECTION_ID,
   type SidebarLayoutSnapshot,
+  sidebarFolderParents,
+  sidebarFolderPath,
 } from "@openbot/contracts/ipc";
 import {
   WATCH_AGENT_LIMIT,
@@ -250,53 +252,50 @@ function activeTurnId(agentId: string, runtime: AgentRuntimeSnapshot): string | 
   return work ? work.turnId : null;
 }
 
-function activity(agent: AgentSummary): number {
-  const time = agent.updatedAt ? Date.parse(agent.updatedAt) : Number.NaN;
-  return Number.isNaN(time) ? 0 : time;
-}
-
-function byRecent(agents: readonly AgentSummary[]): AgentSummary[] {
-  return [...agents].sort((a, b) => activity(b) - activity(a));
+interface PlacedAgent {
+  agent: AgentSummary;
+  folder: string | null;
 }
 
 function sidebarOrder(
   layout: SidebarLayoutSnapshot | null,
   agents: readonly AgentSummary[],
-  unread: ReadonlySet<string>,
-): AgentSummary[] {
+  t: WatchText["t"],
+): PlacedAgent[] {
   const positions = new Map(layout?.agentOrder.map((id, index) => [id, index]));
   const placed = layout
     ? [...agents].sort((a, b) => (positions.get(a.id) ?? positions.size) - (positions.get(b.id) ?? positions.size))
     : [...agents];
-  const chats = [
-    ...byRecent(placed.filter((agent) => unread.has(agent.id))),
-    ...byRecent(placed.filter((agent) => !unread.has(agent.id))),
-  ];
-  if (!layout) return chats;
+  if (!layout) return placed.map((agent) => ({ agent, folder: null }));
   const sections = new Set(layout.sections.map((section) => section.id));
   const groups = new Map<string, AgentSummary[]>();
-  for (const agent of chats) {
+  for (const agent of placed) {
     const assigned = layout.agentAssignments[agent.id];
     const sectionId = assigned && sections.has(assigned) ? assigned : SIDEBAR_UNASSIGNED_SECTION_ID;
     const group = groups.get(sectionId) ?? [];
     group.push(agent);
     groups.set(sectionId, group);
   }
-  return layout.order.flatMap((id) =>
-    sections.has(id) || id === SIDEBAR_UNASSIGNED_SECTION_ID ? (groups.get(id) ?? []) : [],
-  );
+  const parents = sidebarFolderParents(layout);
+  return layout.order.flatMap((id) => {
+    if (!sections.has(id) && id !== SIDEBAR_UNASSIGNED_SECTION_ID) return [];
+    const folder = sections.has(id)
+      ? sidebarFolderPath(layout, parents, id).join(" / ")
+      : t("mobile.workspace.section.agents");
+    return (groups.get(id) ?? []).map((agent) => ({ agent, folder }));
+  });
 }
 
-function appOrder(input: HostWatchSnapshotInput, unread: ReadonlySet<string>): AgentSummary[] {
+function appOrder(input: HostWatchSnapshotInput): PlacedAgent[] {
   const byId = new Map(input.agents.map((agent) => [agent.id, agent]));
   const pinned = input.pinned.flatMap((id) => byId.get(id) ?? []);
   const pinnedIds = new Set(pinned.map((agent) => agent.id));
   const rest = sidebarOrder(
     input.layout,
     input.agents.filter((agent) => !pinnedIds.has(agent.id)),
-    unread,
+    input.text.t,
   );
-  return [...pinned, ...rest];
+  return [...pinned.map((agent) => ({ agent, folder: null })), ...rest];
 }
 
 function withinLimit(agents: readonly WatchAgent[]): WatchAgent[] {
@@ -331,7 +330,7 @@ export function buildHostWatchSnapshot(input: HostWatchSnapshotInput): WatchSnap
   );
   const pinned = new Set(input.pinned);
   const listed: WatchAgent[] = [];
-  for (const agent of appOrder(input, new Set(unreadCounts.keys()))) {
+  for (const { agent, folder } of appOrder(input)) {
     const waiting = agentWait(agent, input);
     const turnId = waiting?.turnId ?? activeTurnId(agent.id, runtime);
     const state = waiting ? "waiting" : turnId ? "working" : "idle";
@@ -345,6 +344,7 @@ export function buildHostWatchSnapshot(input: HostWatchSnapshotInput): WatchSnap
       color: avatarHeadColor(agent.avatarSeed, agent.avatarHue, agent.avatarColor ?? null),
       ...(avatar ? { avatar } : {}),
       pinned: pinned.has(agent.id),
+      ...(folder ? { folder } : {}),
       unread: unreadCounts.get(agent.id) ?? 0,
       state,
       detail: watchText(state === "working" ? null : agent.preview, 160),

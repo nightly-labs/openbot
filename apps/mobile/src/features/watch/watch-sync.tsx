@@ -6,7 +6,6 @@ import * as Notifications from "expo-notifications";
 import { type ReactNode, useCallback, useEffect, useRef } from "react";
 import { useCSSVariable } from "uniwind";
 import { useMobileSession } from "@/features/auth/context/mobile-session-context";
-import { useChatOrderPreference } from "@/features/settings/model/chat-order";
 import { shareAvatarFile, shareAvatarName } from "@/features/share/model/share-extension";
 import { useWatchAwake } from "@/features/watch/model/watch-awake";
 import {
@@ -90,7 +89,6 @@ function WatchLinkSync({ servers, serversReady, agents, preferences, capabilitie
   const actions = useMobileWorkspaceActions();
   const liveState = actions.liveState;
   const sidebarByServer = useMobileWorkspaceSelector((current) => current.sidebarByServer);
-  const chatOrder = useChatOrderPreference((state) => state.order);
   const foreground = useAppForeground();
   const watchAwake = useWatchAwake();
   const paused = !foreground && !watchAwake;
@@ -103,8 +101,6 @@ function WatchLinkSync({ servers, serversReady, agents, preferences, capabilitie
         hidden: (serverId) => preferences[serverId]?.hidden ?? [],
         pinned: (serverId) => preferences[serverId]?.pinned ?? [],
         layout: (serverId) => sidebarByServer[serverId]?.layout ?? null,
-        recent: chatOrder === "recent",
-        unreadFirst: chatOrder === "unread-first" || chatOrder === "unread-group",
         paused,
         live: liveState.get(),
         conversation: (agentId) => actions.conversationStore.get(agentId),
@@ -115,7 +111,7 @@ function WatchLinkSync({ servers, serversReady, agents, preferences, capabilitie
         text,
         accent,
       }),
-    [servers, agents, preferences, sidebarByServer, chatOrder, paused, liveState, actions, text, accent, session],
+    [servers, agents, preferences, sidebarByServer, paused, liveState, actions, text, accent, session],
   );
   const buildRef = useRef(build);
   buildRef.current = build;

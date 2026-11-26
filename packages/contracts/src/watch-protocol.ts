@@ -49,6 +49,7 @@ export interface WatchAgent {
   color: string;
   avatar?: string;
   pinned: boolean;
+  folder?: string;
   unread: number;
   state: WatchAgentState;
   detail: string | null;

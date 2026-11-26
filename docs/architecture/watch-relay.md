@@ -86,6 +86,9 @@ JSON body `WatchRelayHttpRequest { v: 1, ts, sealed, proof }`, at most `WATCH_RE
 - `refresh` returns a `WatchSnapshot` for this host only, in the same shape and order rules as the
   phone builds (`apps/mobile/src/features/watch/model/watch-snapshot.ts`), localized for
   `refresh.language`. `servers` has one entry, this host, with `watchKey`.
+- Agents come in the stored sidebar order: pinned agents first, then each folder in layout order, each agent
+  with `folder` (the folder path, such as `Parent / Child`). The order does not change with unread state
+  or recent activity. The watch shows Pinned, Unread and Needs you sections, then one section per folder.
 - `avatars` returns the agent pictures that the host's snapshot names. `open` is not supported on
   the direct link (the watch uses the phone for it).
 
