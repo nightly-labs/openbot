@@ -513,6 +513,7 @@ try {
     );
     clients.push(listClient);
     listClient.on("request", (request: AppServerRequest) => {
+      if (request.method !== "item/tool/call") return;
       listClient.respond(request.id, { success: true, contentItems: [{ type: "inputText", text: "Research" }] });
     });
     listClient.on("notification", (notification: { method: string; params?: unknown }) => {

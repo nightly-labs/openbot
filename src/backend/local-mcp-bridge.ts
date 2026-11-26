@@ -353,6 +353,7 @@ export class LocalMcpBridge {
             .get(route.namespace.name)
             ?.tools.find((candidate) => candidate.name === params.name);
           if (!tool) return yield* mcpFailure(new Error(`Unknown ${route.namespace.name} tool: ${params.name}`));
+          if (token === route.tokens.at(-1)) member.calledAt = Date.now();
           const abandoned = new AbortController();
           const abandon = () => abandoned.abort();
           const stopWaiting = () => abandoned.abort(PROVIDER_STOPPED_WAITING);
@@ -395,7 +396,6 @@ export class LocalMcpBridge {
               }),
             ),
           );
-          if (token === route.tokens.at(-1)) member.calledAt = Date.now();
           const content: CallToolResult["content"] = [];
           for (const item of result.contentItems) {
             if (item.type === "inputText") {
