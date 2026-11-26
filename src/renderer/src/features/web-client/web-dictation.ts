@@ -1,6 +1,7 @@
 import {
   DEFAULT_VOICE_MODEL_ID,
   DEFAULT_VOICE_SETTINGS,
+  VOICE_AUDIO_LIMITS,
   type VoiceModelStatus,
   type VoiceServerSettings,
   type VoiceSettingsState,
@@ -36,7 +37,12 @@ export function webDictationPort(request: () => TeamApiRequest) {
     getServer: async () => HOST_DICTATES,
     prepareModel: async () => HOST_READY,
     async transcribe({ audio }: VoiceTranscriptionInput): Promise<VoiceTranscriptionResult> {
-      const upload = { name: "dictation.wav", mimeType: "audio/wav", base64: bytesToBase64(audio) };
+      const upload = {
+        name: "dictation.wav",
+        mimeType: "audio/wav",
+        base64: bytesToBase64(audio),
+        maxBytes: VOICE_AUDIO_LIMITS.maximumWavBytes,
+      };
       try {
         return await request()("POST", VOICE_TRANSCRIPTION_ROUTES.transcribe, decodeVoiceTranscription, {}, upload);
       } catch (error) {
