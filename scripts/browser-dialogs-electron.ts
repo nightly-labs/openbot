@@ -272,7 +272,10 @@ async function main(): Promise<void> {
       host.endControl(THREAD_ID, TURN_ID);
       assert.equal((await box).aborted, false, "The turn end closed Electron's box.");
       failure(await answer(tabId, opened.id, true, "turn-2"), /Only a person can answer/);
-      failure(await call("snapshot", { tabId, image: "never" }, "turn-2"), /only a person can answer it/);
+      const personRefusal = await call("snapshot", { tabId, image: "never" }, "turn-2");
+      failure(personRefusal, /only a person can answer it/);
+      assert.match(text(personRefusal), /A confirm dialog .*"Delete the test item\?"/);
+      assert(!text(personRefusal).includes(opened.id), "The agent got the id of a person's dialog.");
       recordCases("turn-end-hands-off");
       (await box).answer(0);
       await waitUntil(async () => (await title(contents)) === "confirm:true");

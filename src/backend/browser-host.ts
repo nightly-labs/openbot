@@ -4677,7 +4677,7 @@ export class BrowserHost {
         `A ${dialog.type} dialog is open in this tab: ${JSON.stringify(dialog.message)}. Answer it first with handle_dialog, dialogId ${dialog.id}.`,
       );
     throw new Error(
-      "A dialog is open in this tab, and only a person can answer it. Ask the user to answer it, then try again.",
+      `A ${dialog.type} dialog is open in this tab, and only a person can answer it: ${JSON.stringify(dialog.message)}. Ask the user to answer it, then try again.`,
     );
   }
 
