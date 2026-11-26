@@ -298,6 +298,7 @@
     "test:provider-cli-canary": "bun scripts/provider-cli-canary.ts",
     "test:provider-live": "bun scripts/provider-live-e2e.ts",
     "test:hermes-catalog-tools": "bun scripts/hermes-catalog-tools-e2e.ts",
+    "test:hermes-custom-provider-names": "bun scripts/hermes-custom-provider-names-e2e.ts",
     "test:hermes-server": "bun scripts/hermes-server-e2e.ts",
     "test:hermes-session-processes": "bun scripts/hermes-session-processes-e2e.ts",
     "test:custom-agents": "bun scripts/custom-acp-agent-e2e.ts",

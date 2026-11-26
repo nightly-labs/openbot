@@ -28,6 +28,7 @@ import {
 } from "@openbot/contracts/ipc";
 import { providerOffersModels } from "../../components/provider-model-options";
 import type { AgentProfile } from "../../data";
+import { currentText } from "../../text";
 import type { CreationPreference } from "../agents/agent-creation-model";
 
 export interface WorkflowFeatures {
@@ -136,7 +137,7 @@ export function offeredModelProviders(catalogs: WorkflowCatalogs, current?: Agen
     (provider) =>
       provider === current ||
       !isKnownAgentProvider(provider) ||
-      providerOffersModels(catalogs.status, catalogs.models, provider),
+      providerOffersModels(catalogs.status, catalogs.models, provider, currentText().t),
   );
 }
 

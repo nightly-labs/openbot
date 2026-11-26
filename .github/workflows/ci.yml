@@ -1155,6 +1155,10 @@ jobs:
         if: ${{ !cancelled() }}
         run: bun run test:grok-partial-model-list
 
+      - name: Run the Hermes custom provider names E2E test
+        if: ${{ !cancelled() }}
+        run: bun run test:hermes-custom-provider-names
+
       - name: Run the Pi steer E2E test
         if: ${{ !cancelled() }}
         run: bun run test:pi-steer
@@ -1240,6 +1244,7 @@ jobs:
             .openbot-build/custom-agent-steer-e2e/
             .openbot-build/grok-question-e2e/
             .openbot-build/grok-partial-model-list-e2e/
+            .openbot-build/hermes-custom-provider-names-e2e/
             .openbot-build/pi-steer-e2e/
             .openbot-build/pi-idle-release-e2e/
             .openbot-build/muse-instructions-once-e2e/

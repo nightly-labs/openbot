@@ -196,6 +196,7 @@ export interface ModelListResponse {
   data: Array<{
     model?: string;
     displayName?: string;
+    description?: string;
     defaultReasoningEffort?: string;
     supportedReasoningEfforts?: Array<{ reasoningEffort?: string }>;
     reasoningEffortConfigurable?: boolean;
@@ -217,6 +218,7 @@ export function decodeModelListResponse(value: unknown): ModelListResponse {
     data: data.filter(isRecord).map((item) => ({
       ...(isString(item.model) ? { model: item.model } : {}),
       ...(isString(item.displayName) ? { displayName: item.displayName } : {}),
+      ...(isString(item.description) ? { description: item.description } : {}),
       ...(isString(item.defaultReasoningEffort) ? { defaultReasoningEffort: item.defaultReasoningEffort } : {}),
       ...(isBoolean(item.hidden) ? { hidden: item.hidden } : {}),
       ...(isString(item.upgrade) ? { upgrade: item.upgrade } : {}),

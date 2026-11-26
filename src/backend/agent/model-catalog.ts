@@ -1,6 +1,7 @@
+import { INPUT_LIMITS } from "@openbot/contracts/input-limits";
 import type { AgentModelOption, ProviderModelSource } from "@openbot/contracts/ipc";
 import { isAgentModel, isReasoningEffort } from "@openbot/contracts/ipc";
-import { createOpenBotLogger, registerPublicValues } from "@openbot/logging";
+import { createOpenBotLogger, redactText, registerPublicValues } from "@openbot/logging";
 import { Effect, Result } from "effect";
 import type { AgentClient, AgentProvider } from "./../agent-client";
 import { providerCheckTimeoutMs } from "../disk-restore";
@@ -136,11 +137,21 @@ export class ModelCatalog {
       const name = modelDisplayName(
         catalog.modelName?.(server.model) || server.displayName?.trim() || fallback?.name || server.model,
       );
+      const providerLine =
+        client.provider === "hermes" && server.model.startsWith("custom:")
+          ? server.description?.split(/[\r\n]/u, 1)[0]
+          : undefined;
+      const providerDescription = providerLine?.startsWith("Provider: ")
+        ? redactText(providerLine).slice(0, INPUT_LIMITS.agentDescription)
+        : undefined;
       models.push({
         provider: client.provider,
         id: server.model,
         name,
-        description: fallback?.description ?? `${providerLabel(client.provider)} model discovered from the local CLI.`,
+        description:
+          providerDescription ??
+          fallback?.description ??
+          `${providerLabel(client.provider)} model discovered from the local CLI.`,
         defaultReasoningEffort: isReasoningEffort(server?.defaultReasoningEffort)
           ? server.defaultReasoningEffort
           : (fallback?.defaultReasoningEffort ?? "medium"),
