@@ -11,6 +11,7 @@ export const messages = {
   "status.agent.routineSkippedRunOpen": "Pulada: a última execução ainda não tinha terminado",
   "status.agent.routineSkippedUsageLimit": "Pulada: o limite de uso foi atingido",
   "status.agent.modelSwitchedForError": "Erro do provedor. O modelo mudou para {model}.",
+  "status.agent.modelSwitchedForErrorWithReason": "Erro do provedor. O modelo mudou para {model}.\n{reason}",
   "status.agent.modelSwitchedForSpentBalance":
     "{previous} ficou sem créditos. Trocado para {model}. Para usá-lo de novo, adicione créditos e depois selecione-o.",
   "status.agent.modelReturnedAfterError": "Após o erro do provedor, o modelo voltou para {model}.",

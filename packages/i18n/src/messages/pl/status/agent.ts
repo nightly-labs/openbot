@@ -11,6 +11,7 @@ export const messages = {
   "status.agent.routineSkippedRunOpen": "Pominięto: poprzednie uruchomienie jeszcze się nie zakończyło",
   "status.agent.routineSkippedUsageLimit": "Pominięto: osiągnięto limit użycia",
   "status.agent.modelSwitchedForError": "Błąd dostawcy. Przełączono na {model}.",
+  "status.agent.modelSwitchedForErrorWithReason": "Błąd dostawcy. Przełączono na {model}.\n{reason}",
   "status.agent.modelSwitchedForSpentBalance":
     "{previous} nie ma już kredytów. Przełączono na {model}. Aby znowu go używać, dodaj kredyty, a potem go wybierz.",
   "status.agent.modelReturnedAfterError": "Po błędzie dostawcy przełączono z powrotem na {model}.",

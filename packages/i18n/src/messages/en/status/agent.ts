@@ -21,6 +21,7 @@ export const messages = defineMessages("status.agent", {
   "status.agent.routineSkippedRunOpen": "Skipped: the last run had not finished",
   "status.agent.routineSkippedUsageLimit": "Skipped: usage limit reached",
   "status.agent.modelSwitchedForError": "Provider error. Switched to {model}.",
+  "status.agent.modelSwitchedForErrorWithReason": "Provider error. Switched to {model}.\n{reason}",
   "status.agent.modelSwitchedForSpentBalance":
     "{previous} has no credits left. Switched to {model}. To use it again, add credits and then select it.",
   "status.agent.modelReturnedAfterError": "Switched back to {model} after the provider error.",

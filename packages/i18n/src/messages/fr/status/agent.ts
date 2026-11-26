@@ -11,6 +11,7 @@ export const messages = {
   "status.agent.routineSkippedRunOpen": "Non exécutée : la dernière exécution n’était pas terminée",
   "status.agent.routineSkippedUsageLimit": "Non exécutée : limite d’utilisation atteinte",
   "status.agent.modelSwitchedForError": "Erreur du fournisseur. Passage à {model}.",
+  "status.agent.modelSwitchedForErrorWithReason": "Erreur du fournisseur. Passage à {model}.\n{reason}",
   "status.agent.modelSwitchedForSpentBalance":
     "{previous} n’a plus de crédits. Passage à {model}. Pour l’utiliser à nouveau, ajoutez des crédits, puis sélectionnez-le.",
   "status.agent.modelReturnedAfterError": "Retour à {model} après l’erreur du fournisseur.",

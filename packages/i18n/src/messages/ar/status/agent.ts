@@ -10,6 +10,7 @@ export const messages = {
   "status.agent.routineSkippedRunOpen": "تشغيل متخطى: لم يكن التشغيل السابق قد انتهى",
   "status.agent.routineSkippedUsageLimit": "تشغيل متخطى: تم بلوغ حد الاستخدام",
   "status.agent.modelSwitchedForError": "خطأ في المزوّد. تم التبديل إلى {model}.",
+  "status.agent.modelSwitchedForErrorWithReason": "خطأ في المزوّد. تم التبديل إلى {model}.\n{reason}",
   "status.agent.modelSwitchedForSpentBalance":
     "لم يتبق رصيد في {previous}. تم التبديل إلى {model}. لاستخدامه مرة أخرى، أضف رصيدًا ثم اختره.",
   "status.agent.modelReturnedAfterError": "تمت العودة إلى {model} بعد خطأ المزوّد.",

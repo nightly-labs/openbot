@@ -1247,7 +1247,15 @@ export class TurnLifecycle {
     const spent = failover.quiet === true && resetDelayMs === null && isBalanceDiagnostic(failover.message);
     const { causeCode, provider } = failover.context;
     const notOffered = causeCode === "model_not_found" && provider === "claude";
-    this.#usageLimits.failed(agentId, model, resetDelayMs, spent, causeCode === "authentication", notOffered);
+    this.#usageLimits.failed(
+      agentId,
+      model,
+      resetDelayMs,
+      spent,
+      causeCode === "authentication",
+      notOffered,
+      failover.message,
+    );
   }
 
   #noteEvent(params: unknown): { threadId: string | null; agentId: string | undefined } {

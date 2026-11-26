@@ -1117,6 +1117,13 @@
   overflow-wrap: anywhere;
 }
 
+.chat-action-marker-model-switch .chat-action-marker-label {
+  min-width: 0;
+  flex: 0 1 auto;
+  white-space: pre-line;
+  overflow-wrap: anywhere;
+}
+
 .chat-action-target {
   box-sizing: border-box;
   display: inline-flex;

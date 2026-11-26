@@ -10,6 +10,7 @@ export const messages = {
   "status.agent.routineSkippedRunOpen": "דולגה ריצה: הריצה הקודמת עוד לא הסתיימה",
   "status.agent.routineSkippedUsageLimit": "דולגה ריצה: הגעת למכסת השימוש",
   "status.agent.modelSwitchedForError": "שגיאת ספק. עבר אל {model}.",
+  "status.agent.modelSwitchedForErrorWithReason": "שגיאת ספק. עבר אל {model}.\n{reason}",
   "status.agent.modelSwitchedForSpentBalance":
     "ל-{previous} לא נשארו קרדיטים. עבר ל-{model}. כדי להשתמש בו שוב, הוסף קרדיטים ואז בחר בו.",
   "status.agent.modelReturnedAfterError": "חזר אל {model} אחרי שגיאת הספק.",

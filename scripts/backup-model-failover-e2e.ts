@@ -747,14 +747,24 @@ try {
   );
   failing([PRIMARY]);
 
+  let providerErrorText = "";
   await check("an agent with no backup models fails as before", async () => {
     const since = events.length;
     const outcome = await send(stayer.id, "work");
     assert.equal(outcome.status, "failed", "The turn fails.");
     assert.equal(agentOf(stayer.id).model, PRIMARY, "The agent stays on its own model.");
-    assert.ok(errorsFor(stayer.id, since).length > 0, "The error shows.");
+    const shown = errorsFor(stayer.id, since);
+    assert.ok(shown.length > 0, "The error shows.");
+    const first = shown[0];
+    providerErrorText = first?.type === "error" ? first.message.trim() : "";
+    assert.ok(providerErrorText, "The error has a text.");
     return outcome;
   });
+  const switchedForError = () =>
+    sourceText("status.agent.modelSwitchedForErrorWithReason", {
+      model: modelName(BACKUP),
+      reason: providerErrorText,
+    });
 
   await check("a provider error moves the agent to its backup model", async () => {
     const since = events.length;
@@ -773,7 +783,7 @@ try {
     assert.equal(agent.usageLimitReturn?.cause, "provider-error", "The return names the provider error.");
     assert.deepEqual(errorsFor(mover.id, since), [], "No error shows for the moved turn.");
     const notes = await markers(mover.id, MODEL_SWITCH_ITEM_TYPES["provider-error"]);
-    assert.deepEqual(notes, [sourceText("status.agent.modelSwitchedForError", { model: modelName(BACKUP) })]);
+    assert.deepEqual(notes, [switchedForError()], "The switch note gives the provider error.");
     await verifyHistoryKeepsRequests(mover.id);
     return { ran, notes };
   });
@@ -869,12 +879,7 @@ try {
       .map((message) => message.text);
     assert.deepEqual(
       shown,
-      [
-        "act-then-fail",
-        "Partial answer.",
-        sourceText("status.agent.modelSwitchedForError", { model: modelName(BACKUP) }),
-        "Done.",
-      ],
+      ["act-then-fail", "Partial answer.", switchedForError(), "Done."],
       "The chat shows the stopped text, the switch and then the backup's answer.",
     );
     failing([]);
