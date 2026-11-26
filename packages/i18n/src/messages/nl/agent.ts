@@ -63,6 +63,7 @@ export const messages = {
   "agent.dock.openInMain": "Openen in het hoofdvenster",
   "agent.dock.openWindow": "Openen in nieuw venster",
   "agent.dock.openPage": "{title} openen",
+  "agent.dock.openFile": "{name} openen",
   "agent.dock.remove": "Uit het dock verwijderen",
   "agent.dock.send": "Versturen",
   "agent.dock.working": "Bezig…",

@@ -312,7 +312,7 @@ import {
   aboveAppsWindowKind,
   ozonePlatformArguments,
   setAboveAppsXWayland,
-  usesX11Windows,
+  x11OverlaysShow,
 } from "./linux-wayland-output";
 import { localRoutineFeedDocument } from "./local-routine-calendar";
 import {
@@ -2069,7 +2069,7 @@ export async function createApplicationServices({
     await Effect.runPromise(computerUseReads.close());
   });
   const agentsShareDisplay = !hasSeparateAgentDisplay(process.platform);
-  const drawsComputerUseHighlight = agentsShareDisplay && (process.platform !== "linux" || usesX11Windows());
+  const drawsComputerUseHighlight = agentsShareDisplay && (process.platform !== "linux" || x11OverlaysShow());
   const computerUsePermissionHelp = new ComputerUsePermissionHelpWindowController({
     createWindow: () =>
       createComputerUsePermissionHelpWindow(language.translate, () => localeDirection(language.locale)),
@@ -3207,6 +3207,7 @@ export async function createApplicationServices({
     timezone: () => serverTimezone.effective(),
     settings: {
       mcpServers: () => service.listMcpServers(),
+      listedMcpServers: () => catalogPluginServers.filter((server) => server.transport === "http"),
       saveMcpServer: (config) => service.saveMcpServer({ config }),
       customProviders: () => customProviderChanges.list(),
       saveCustomProvider: (input) => customProviderChanges.save(input),
@@ -4052,7 +4053,7 @@ export async function createApplicationServices({
       write: (line) => process.stdout.write(line),
     });
   }
-  configureAttachmentProtocol({ mailbox, agents: service, remoteServers });
+  configureAttachmentProtocol({ mailbox, agents: service, remoteServers, attachmentPreviews });
   configureServerLogoProtocols({ teamStore, remoteServers });
   const browserView = new BrowserViewClient({
     servers: remoteServers,

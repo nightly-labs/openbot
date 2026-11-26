@@ -250,7 +250,7 @@ export const messages = {
   "settings.notch.xwayland.description":
     "En Wayland, OpenBot debe usar XWayland para mostrar la Dynamic Island sobre otras apps. Hasta entonces, la isla no aparece.",
   "settings.notch.xwayland.unsupported":
-    "En Wayland sin XWayland, la Dynamic Island no puede aparecer sobre otras apps.",
+    "En este escritorio Wayland, la Dynamic Island no puede aparecer sobre otras apps.",
   "settings.notch.xwayland.restart": "Reiniciar",
   "settings.notch.idle.title": "Mostrar la isla inactiva",
   "settings.notch.idle.description": "Mostrar el logotipo de OpenBot y el saludo cuando no hay un estado activo.",
@@ -281,7 +281,7 @@ export const messages = {
   "settings.agentDock.xwayland.description":
     "En Wayland, OpenBot debe usar XWayland para mostrar el dock sobre otras apps. Hasta entonces, el dock aparece en la ventana de OpenBot.",
   "settings.agentDock.xwayland.unsupported":
-    "En Wayland sin XWayland, el dock no puede aparecer sobre otras apps. Aparece en la ventana de OpenBot.",
+    "En este escritorio Wayland, el dock no puede aparecer sobre otras apps. Aparece en la ventana de OpenBot.",
   "settings.agentDock.xwayland.restart": "Reiniciar",
   "settings.agentDock.noCompositor.title": "En la ventana de OpenBot",
   "settings.agentDock.noCompositor.description":

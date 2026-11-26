@@ -374,6 +374,8 @@ export const messages = defineMessages("sitePage", {
   "sitePage.landing.pricing.yourPlans": "Uses the AI plans you already pay for",
   "sitePage.landing.pricing.download": "Download",
   "sitePage.landing.pricing.license": "License for work",
+  "sitePage.landing.pricing.eggs.smallPrint": "no small print. really.",
+  "sitePage.landing.pricing.eggs.forever": "forever",
   "sitePage.landing.teams.title": "OpenBot for Teams",
   "sitePage.landing.teams.statement": "AI coworkers for your whole company.",
   "sitePage.landing.teams.description": "We run OpenBot on managed servers and set it up around your team and tools.",

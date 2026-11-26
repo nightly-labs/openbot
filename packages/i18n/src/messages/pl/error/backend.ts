@@ -211,6 +211,7 @@ export const messages = {
   "error.backend.videoGenerationFailed": "Generowanie filmu nie powiodło się.",
   "error.backend.videoGenerationNoVideo": "Generowanie filmu nie zwróciło filmu.",
   "error.backend.videoGenerationInterrupted": "Generowanie filmu zostało przerwane.",
+  "error.backend.grokVideoNoQuota": "Twoje konto Grok nie może tworzyć filmów. Wygeneruj film za kredyty.",
   "error.backend.attachmentNotRegularFile": "Załączać można tylko zwykłe pliki: {name}",
   "error.backend.attachmentCopyFailed": "OpenBot nie mógł skopiować pliku {name}.",
   "error.backend.routineNameRequired": "Nazwa rutyny jest wymagana.",

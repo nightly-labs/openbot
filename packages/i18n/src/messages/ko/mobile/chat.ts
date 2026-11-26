@@ -132,6 +132,7 @@ export const messages = {
   "mobile.chat.question.holdHint": "버튼을 길게 눌러 확인하세요.",
   "mobile.chat.question.preview": "미리 보기",
   "mobile.chat.question.showAllPreview": "모두 보기",
+  "mobile.chat.question.copyPreviewFailed": "초안을 복사할 수 없습니다",
   "mobile.chat.question.sendChoice": "보내기",
   "mobile.chat.question.selectedCount": { other: "{count}개 선택됨" },
   "mobile.chat.question.noneSelected": "선택한 항목 없음",

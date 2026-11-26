@@ -133,6 +133,7 @@ export const messages = {
   "mobile.chat.question.holdHint": "Onaylamak için düğmeyi basılı tutun.",
   "mobile.chat.question.preview": "Önizleme",
   "mobile.chat.question.showAllPreview": "Tümünü göster",
+  "mobile.chat.question.copyPreviewFailed": "Taslak kopyalanamadı",
   "mobile.chat.question.sendChoice": "Gönder",
   "mobile.chat.question.selectedCount": { one: "{count} seçildi", other: "{count} seçildi" },
   "mobile.chat.question.noneSelected": "Hiçbir şey seçilmedi",

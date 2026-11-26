@@ -181,6 +181,7 @@ export const messages = {
   "error.backend.videoGenerationFailed": "视频生成失败。",
   "error.backend.videoGenerationNoVideo": "视频生成没有返回视频。",
   "error.backend.videoGenerationInterrupted": "视频生成已中断。",
+  "error.backend.grokVideoNoQuota": "你的 Grok 账号无法生成视频。请改用积分生成视频。",
   "error.backend.attachmentNotRegularFile": "只能附加普通文件：{name}",
   "error.backend.attachmentCopyFailed": "OpenBot 无法复制 {name}。",
   "error.backend.routineNameRequired": "需要填写自动化任务名称。",

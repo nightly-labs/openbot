@@ -132,6 +132,7 @@ export const messages = defineMessages("mobile.chat", {
   "mobile.chat.question.holdHint": "Touch and hold the button to confirm.",
   "mobile.chat.question.preview": "Preview",
   "mobile.chat.question.showAllPreview": "Show all",
+  "mobile.chat.question.copyPreviewFailed": "Could not copy the draft",
   "mobile.chat.question.sendChoice": "Send",
   "mobile.chat.question.selectedCount": { one: "{count} selected", other: "{count} selected" },
   "mobile.chat.question.noneSelected": "Nothing selected",

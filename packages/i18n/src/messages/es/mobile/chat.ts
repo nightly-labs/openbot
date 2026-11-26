@@ -134,6 +134,7 @@ export const messages = {
   "mobile.chat.question.holdHint": "Mantén pulsado el botón para confirmar.",
   "mobile.chat.question.preview": "Vista previa",
   "mobile.chat.question.showAllPreview": "Mostrar todo",
+  "mobile.chat.question.copyPreviewFailed": "No se pudo copiar el borrador",
   "mobile.chat.question.sendChoice": "Enviar",
   "mobile.chat.question.selectedCount": { one: "{count} seleccionado", other: "{count} seleccionados" },
   "mobile.chat.question.noneSelected": "Nada seleccionado",

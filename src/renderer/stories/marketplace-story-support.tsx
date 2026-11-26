@@ -1,4 +1,4 @@
-import { X_AGENT_LISTING_ID } from "@openbot/contracts/browser-extension-x";
+import { X_AGENT_LISTING_ID, X_EXTENSION_URL } from "@openbot/contracts/browser-extension-x";
 import {
   AVATAR_HUES,
   type ClientAgentSummary,
@@ -313,7 +313,7 @@ function storyXApp(agent: MarketplaceAgent | null): MarketplaceApp {
     category: "productivity",
     status: agent ? "connected" : "idle",
     agent,
-    extensionUrl: "https://chromewebstore.google.com/detail/openbot",
+    extensionUrl: X_EXTENSION_URL,
   };
 }
 

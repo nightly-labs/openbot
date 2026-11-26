@@ -939,7 +939,7 @@ export class AttentionRegistry {
                     : { status: "skipped", blockId: pending.uiBlock.blockId },
                 )
               : pending.responseKind === "dynamic-tool"
-                ? dynamicPromptResult(answers)
+                ? dynamicPromptResult(pending.questions, answers)
                 : pending.responseKind === "mcp-elicitation"
                   ? mcpElicitationResult(pending.params, answers)
                   : {

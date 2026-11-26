@@ -207,6 +207,7 @@ export const messages = {
   "mobile.chat.question.holdHint": "المس الزر مع الاستمرار للتأكيد.",
   "mobile.chat.question.preview": "معاينة",
   "mobile.chat.question.showAllPreview": "عرض الكل",
+  "mobile.chat.question.copyPreviewFailed": "تعذّر نسخ المسودة",
   "mobile.chat.question.sendChoice": "إرسال",
   "mobile.chat.question.selectedCount": {
     zero: "لم يُحدَّد شيء",

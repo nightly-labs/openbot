@@ -869,6 +869,42 @@ How the apps use it:
   confirmed state. An answer with no readable minimum removes the block.
 - An install that cannot update itself (a Linux package, Nix) shows only the download page.
 
+## Browser extension
+
+Each release tag also releases the Chrome extension. `.github/workflows/release-extension.yml` runs
+on the tag push, builds the zip from the tag, and `scripts/chrome-web-store-release.ts` uploads it to
+the Chrome Web Store and submits it with automatic publish. The store reviews the version, then
+publishes it to all users. Chrome updates each install within a few hours. The extension version is
+the release version.
+
+The workflow does not upload, and the job summary says why, when:
+
+- the package asks for a permission, a host or a match pattern that the public version does not
+  have. Chrome can disable the extension for each user until the user accepts the new warning.
+  Confirm the change, then run the workflow by hand on the tag with `publish` and
+  `allow_new_permissions`;
+- an earlier version is still in review. The next release uploads after the review. To replace the
+  version in review, run the workflow by hand on the tag with `publish` and `replace_pending`;
+- the store already has this version or a newer one, for example after a patch of an older release.
+
+It also stops on a development build, a source map, or a manifest version that is not the tag. A run
+by hand on a branch only builds and checks the zip. The `release-extension-safely` skill audits a
+range for the hazards that the script cannot see: stored state, host capability gates and account
+service routes. Use it on a pull request that changes the extension.
+
+### One-time Chrome Web Store setup
+
+1. In Google Cloud, enable the **Chrome Web Store API** in a project, create a service account with
+   no roles, and create a JSON key for it.
+2. In the Chrome Web Store Developer Dashboard of the "Nightly" publisher, add the service account
+   email in **Account**. A publisher has one service account. Copy the publisher ID from
+   **Publisher > Settings**.
+3. In `nightly-labs/openbot`, create the `chrome-web-store` environment. Limit its deployments to
+   `v*.*.*` tags. Add the secret `CHROME_WEB_STORE_SERVICE_ACCOUNT_KEY` (the JSON key) and the
+   variable `CHROME_WEB_STORE_PUBLISHER_ID`.
+4. In the dashboard, set the distribution and the rollout percentage. The API publishes with the
+   saved settings. After a change of visibility in the dashboard, publish once by hand.
+
 ## Release health after publishing
 
 Before a staged rollout goes to 100%, run the release health check. It compares how the new release

@@ -165,7 +165,7 @@ function isUnreadableAntigravityHistory(provider: AgentProvider, message: string
 function isUnsignedAntigravityThinking(provider: AgentProvider, message: string): boolean {
   return (
     provider === "antigravity" &&
-    /\bmessages\.\d+\.content\.\d+(?:\.thinking\.signature: Field required|: Invalid `signature` in `thinking` block)/u.test(
+    /\bmessages\.\d+\.content\.\d+(?:\.thinking\.signature: Field required|: Invalid `signature` in `thinking` block|: [^\n]*\bthinking\b[^\n]*\bcannot be modified\b)/u.test(
       message,
     )
   );
@@ -223,6 +223,7 @@ export function refusedSessionFailure(
   provider: AgentProvider,
   message: string,
   contextWindow: number | null = null,
+  imageLimitRepeated = false,
 ): string | null {
   if (isForeignReasoningError(message))
     return sourceText("error.provider.foreignReasoning", { provider: providerLabel(provider) });
@@ -237,7 +238,9 @@ export function refusedSessionFailure(
   if (isImageTooLargeDiagnostic(message))
     return sourceText("error.provider.imageTooLarge", { provider: providerLabel(provider) });
   if (isImageCountDiagnostic(message))
-    return sourceText("error.provider.imageCountLimit", { provider: providerLabel(provider) });
+    return imageLimitRepeated
+      ? sourceText("error.provider.imageCountLimitRepeated")
+      : sourceText("error.provider.imageCountLimit", { provider: providerLabel(provider) });
   if (isImageUnreadableDiagnostic(message) || isUnsendableOpenCodeMedia(provider, message))
     return sourceText("error.provider.imageUnreadable", { provider: providerLabel(provider) });
   if (isRequestBodyLimitDiagnostic(message))

@@ -48,6 +48,11 @@ import {
   toWireTeamProtocolV1ClientEvent,
 } from "@openbot/contracts/team-protocol/v1-adapter";
 import { TEAM_PROTOCOL_V9 } from "@openbot/contracts/team-protocol/v9";
+import {
+  WORKFLOW_SPOT_CONTROL,
+  type WorkflowSpotControl,
+  type WorkflowSpotInput,
+} from "@openbot/contracts/team-protocol/workflow-presence-v1";
 import { sourceText } from "@openbot/i18n/source";
 import { errorReference, referenceFrom } from "@openbot/user-errors/reference";
 import { Context, Deferred, Effect, Exit, Layer, ManagedRuntime, Result, Schema, Scope, Semaphore } from "effect";
@@ -587,6 +592,11 @@ export function createRemoteTeamPeer(
           lastTyping = null;
         },
       );
+    },
+    setWorkflowSpot(input: WorkflowSpotInput) {
+      const state = peer;
+      if (!state || !isPeerOnline(state)) return;
+      void runPeerEffect(sendEventControl(state, { type: WORKFLOW_SPOT_CONTROL, ...input })).catch(() => undefined);
     },
     execute: (command: RemoteTeamCommand) => runPeerEffect(executeCommand(command, actions)),
     setWaitForHost(value: boolean) {
@@ -2051,7 +2061,7 @@ export function createRemoteTeamPeer(
     }, 16);
   }
 
-  function sendEventControl(state: PeerState, control: TeamProtocolV1CurrentEventControl) {
+  function sendEventControl(state: PeerState, control: TeamProtocolV1CurrentEventControl | WorkflowSpotControl) {
     return Effect.fn("RemotePeer.sendEventControl")(function* () {
       yield* sendPayload(
         state,
@@ -2060,7 +2070,7 @@ export function createRemoteTeamPeer(
           encodeTeamProtocolV2Frame({
             version: 2,
             type: "event-control",
-            control: toWireTeamProtocolV1ClientEvent(control),
+            control: control.type === WORKFLOW_SPOT_CONTROL ? control : toWireTeamProtocolV1ClientEvent(control),
           }),
         ),
       );

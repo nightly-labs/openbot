@@ -781,8 +781,9 @@ The extension (`apps/browser-extension`) sends a post from X to the user's X age
 `marketplace/production-catalog`). On desktop and web, the user adds this agent with the X app of
 the Marketplace (`MarketplaceXAppPage` in `packages/ui/src/features/marketplace`), not from the Agents
 tab. Its setup has two steps, as a chat app has: get the extension (`X_EXTENSION_URL`), then add the
-agent through the usual Marketplace install. The X app shows only when `X_EXTENSION_URL` is set; it is
-`null` until the store page exists. It then shows on this computer, and on a joined server only for an
+agent through the usual Marketplace install. `X_EXTENSION_URL` is the Chrome Web Store page of the
+extension (ID `eggdpikcggoicfcfdpdihfkinajchpfj`, also in `BROWSER_EXTENSION_IDS` of
+`apps/auth-api/wrangler.jsonc`). The X app shows on this computer, and on a joined server only for an
 admin that can install agents (`agent-install-v1`), as Discord and the other chat apps do.
 There are three parts:
 

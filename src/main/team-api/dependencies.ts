@@ -23,6 +23,7 @@ import type {
   VoiceLiveEvent,
   VoiceTranscriptionResult,
 } from "@openbot/contracts/ipc";
+import type { WorkflowSpotEvent } from "@openbot/contracts/team-protocol/workflow-presence-v1";
 import type { Logger } from "@openbot/logging";
 import type { Effect } from "effect";
 import type { AgentService } from "../../backend/agent-service";
@@ -698,6 +699,7 @@ export interface TeamApiOptions {
   chat?: TeamChatStore | undefined;
   onDirectMessage?: ((event: DirectMessageRealtimeEvent) => void) | undefined;
   onDirectTyping?: ((event: DirectTypingRealtimeEvent) => void) | undefined;
+  onWorkflowSpot?: ((event: WorkflowSpotEvent) => void) | undefined;
   createInvite?: OmitThisParameter<HostService["createInvite"]> | undefined;
   updateMember?: OmitThisParameter<HostService["updateMember"]> | undefined;
   removeMember?: OmitThisParameter<HostService["removeMember"]> | undefined;
@@ -706,6 +708,7 @@ export interface TeamApiOptions {
   pushNotifications?: PushNotificationService | undefined;
   focusUse?: boolean | undefined;
   rateLimitCapacity?: number | undefined;
+  workflowSpotStaleMs?: number | undefined;
   now?: (() => number) | undefined;
   logger?: Logger | undefined;
 }

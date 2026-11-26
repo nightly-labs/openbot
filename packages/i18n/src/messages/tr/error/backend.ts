@@ -206,6 +206,7 @@ export const messages = {
   "error.backend.videoGenerationFailed": "Video oluşturulamadı.",
   "error.backend.videoGenerationNoVideo": "Video oluşturma bir video döndürmedi.",
   "error.backend.videoGenerationInterrupted": "Video oluşturma kesintiye uğradı.",
+  "error.backend.grokVideoNoQuota": "Grok hesabınız video oluşturamıyor. Bunun yerine videoyu kredilerle oluşturun.",
   "error.backend.attachmentNotRegularFile": "Yalnızca normal dosyalar eklenebilir: {name}",
   "error.backend.attachmentCopyFailed": "OpenBot {name} öğesini kopyalayamadı.",
   "error.backend.routineNameRequired": "Bir rutin adı gereklidir.",

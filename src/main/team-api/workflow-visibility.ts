@@ -26,7 +26,7 @@ export async function runWorkflowEffect<A>(operation: Effect.Effect<A, { readonl
   }
 }
 
-interface WorkflowViewer {
+export interface WorkflowViewer {
   admin: boolean;
   protocol: number;
   hiddenAgentIds: ReadonlySet<string>;
@@ -95,4 +95,15 @@ export async function visibleWorkflowIds(
       .filter(({ graph, needsNewerApp }) => !needsNewerApp && visibleGraph(graph, known))
       .map(({ summary }) => summary.id),
   );
+}
+
+export async function workflowVisibleTo(
+  viewer: WorkflowViewer,
+  workflows: Pick<TeamApiWorkflows, "get">,
+  agents: Pick<TeamApiAgents, "listAgents">,
+  workflowId: string,
+): Promise<boolean> {
+  const detail = await runCauseEffect(workflows.get(workflowId));
+  const known = new Set(agents.listAgents().map((agent) => agent.id));
+  return !detail.needsNewerApp && workflowGraphVisible(viewer, detail.graph, known);
 }

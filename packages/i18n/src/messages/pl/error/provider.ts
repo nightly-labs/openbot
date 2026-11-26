@@ -444,6 +444,8 @@ export const messages = {
     "Model nie przyjął obrazu z tego czatu, ponieważ obraz jest za duży. OpenBot rozpoczął nową sesję {provider} z historią czatu. Spróbuj ponownie.",
   "error.provider.imageCountLimit":
     "Model nie przyjął tego czatu, ponieważ czat zawiera za dużo obrazów. OpenBot rozpoczął nową sesję {provider} z historią czatu. Spróbuj ponownie.",
+  "error.provider.imageCountLimitRepeated":
+    "Model znowu nie przyjął tego czatu: czat zawiera za dużo obrazów. Zadanie otwiera więcej obrazów, niż ten model przyjmuje, więc nowa sesja nie pomoże. Wybierz Nowy czat i poproś agenta, aby w każdym kroku otwierał mniej obrazów, albo wybierz model, który przyjmuje więcej obrazów.",
   "error.provider.imageUnreadable":
     "Model nie mógł odczytać obrazu w tym czacie. OpenBot rozpoczął nową sesję {provider} z historią czatu. Spróbuj ponownie. Jeśli wysłano obraz, wyślij inny.",
   "error.provider.requestTooLarge":

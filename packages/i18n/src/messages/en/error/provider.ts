@@ -437,6 +437,8 @@ export const messages = defineMessages("error.provider", {
     "The model did not accept an image in this chat because the image is too large. OpenBot started a new {provider} session with the chat history. Try again.",
   "error.provider.imageCountLimit":
     "The model did not accept this chat because the chat has too many images. OpenBot started a new {provider} session with the chat history. Try again.",
+  "error.provider.imageCountLimitRepeated":
+    "The model did not accept this chat again: it has too many images. One task opens more images than this model accepts, so a new session does not help. Select New chat and ask the agent to open fewer images in each step, or select a model that accepts more images.",
   "error.provider.imageUnreadable":
     "The model could not read an image in this chat. OpenBot started a new {provider} session with the chat history. Try again. If you sent an image, send a different one.",
   "error.provider.requestTooLarge":

@@ -665,6 +665,7 @@ export function MessageBody(props: {
                 prompt={attachment().name}
                 aspectRatio="square"
                 attachment={attachment()}
+                copyUrl={props.imageCopies?.copyUrl(attachment())}
                 loading={!attachment().previewUrl}
                 onPreview={openAttachment}
                 onDownload={props.onDownload}

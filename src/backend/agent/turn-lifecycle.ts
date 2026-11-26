@@ -90,6 +90,7 @@ import {
   GEMINI_INVALID_CREDENTIALS,
   isBalanceDiagnostic,
   isCodexAccountSettingsFailure,
+  isImageCountDiagnostic,
   isPlanLimitDiagnostic,
   isUsageLimitDiagnostic,
   providerResetDelayMs,
@@ -227,6 +228,11 @@ interface HeldProviderError {
   quiet?: boolean;
   link?: string;
   movesToBackup?: true;
+}
+
+interface ImageLimitChat {
+  key: string;
+  model: string | null;
 }
 
 function accountLink(params: unknown): string | undefined {
@@ -425,6 +431,7 @@ export class TurnLifecycle {
   readonly #refusedRetries = new Set<string>();
   readonly #safetyBlockedTurns = new Set<string>();
   readonly #sessionFailures = new Map<string, number>();
+  readonly #imageLimitedChats = new Map<string, string | null>();
   readonly #noUpdateTurns = new Set<string>();
   readonly #taskStartTurns = new Set<string>();
   readonly #noUpdateSteps = new Map<string, Set<string>>();
@@ -499,6 +506,8 @@ export class TurnLifecycle {
       if (work.agentId === agentId) this.#waitingThreads.delete(threadId);
     this.#lastEventAt.delete(agentId);
     for (const key of this.#lastResults.keys()) if (key.startsWith(`${agentId}\u0000`)) this.#lastResults.delete(key);
+    for (const key of this.#imageLimitedChats.keys())
+      if (key.startsWith(`${agentId}\u0000`)) this.#imageLimitedChats.delete(key);
     for (const [childId, parent] of this.#codexChildren)
       if (parent.agentId === agentId) this.#codexChildren.delete(childId);
   }
@@ -528,6 +537,10 @@ export class TurnLifecycle {
 
   turnStartedAt(turnId: string): number | null {
     return this.#runningTurns.get(turnId)?.startedAt ?? null;
+  }
+
+  turnSession(turnId: string): string | undefined {
+    return this.#runningTurns.get(turnId)?.threadId;
   }
 
   startedTask(turnId: string): void {
@@ -601,6 +614,7 @@ export class TurnLifecycle {
     this.#refusedRetries.clear();
     this.#safetyBlockedTurns.clear();
     this.#sessionFailures.clear();
+    this.#imageLimitedChats.clear();
     this.#lastEventAt.clear();
     this.#codexChildren.clear();
     this.#codexChildTurns.clear();
@@ -2251,12 +2265,16 @@ export class TurnLifecycle {
       this.#turnRetries.delete(turnId);
       this.#capacityNotices.delete(turnId);
       this.#retryNotices.delete(turnId);
+      const imageLimitChat = this.#imageLimitChat(agentId, threadId, turnId);
+      const imageLimitRepeated =
+        imageLimitChat !== null && this.#imageLimitedChats.get(imageLimitChat.key) === imageLimitChat.model;
       const refusedFailure =
         running !== undefined && status === "failed" && reportedError !== undefined
           ? refusedSessionFailure(
               running.client.provider,
               reportedError,
               running.client.contextWindow?.(threadId) ?? null,
+              imageLimitRepeated,
             )
           : null;
       const refused = running !== undefined && refusedFailure !== null;
@@ -2327,6 +2345,7 @@ export class TurnLifecycle {
         yield* this.#retryRefusedTurn(agentId, threadId, turnId, snapshot, deliveries);
         return;
       }
+      this.#noteImageLimit(imageLimitChat, status, reportedError);
       const channelTurn = !taskTurn && this.#conversation.isExecutionThread(snapshot.threadId);
       const laneTaskId = taskTurn ? this.#taskForThread(agentId, threadId) : null;
       const compactionContinuation =
@@ -2988,6 +3007,29 @@ export class TurnLifecycle {
       if (oldest !== undefined) this.#sessionFailures.delete(oldest);
     }
     return false;
+  }
+
+  forgetImageLimit(agentId: string, threadId: string): void {
+    this.#imageLimitedChats.delete(`${agentId}\u0000${threadId}`);
+  }
+
+  #imageLimitChat(agentId: string, threadId: string, turnId: string): ImageLimitChat | null {
+    const publicThreadId = this.#conversation.publicThreadId(agentId, threadId);
+    if (this.#conversation.isExecutionThread(publicThreadId) || this.#conversation.isRoutineSession(threadId))
+      return null;
+    return { key: `${agentId}\u0000${publicThreadId}`, model: this.#hooks.turnModel(agentId, turnId) ?? null };
+  }
+
+  #noteImageLimit(chat: ImageLimitChat | null, status: string, reportedError: string | undefined): void {
+    if (chat === null) return;
+    if (status === "completed") this.#imageLimitedChats.delete(chat.key);
+    if (status !== "failed" || reportedError === undefined || !isImageCountDiagnostic(reportedError)) return;
+    this.#imageLimitedChats.delete(chat.key);
+    this.#imageLimitedChats.set(chat.key, chat.model);
+    if (this.#imageLimitedChats.size > ENDED_TURN_LIMIT) {
+      const [oldest] = this.#imageLimitedChats.keys();
+      if (oldest !== undefined) this.#imageLimitedChats.delete(oldest);
+    }
   }
 
   readonly #dropFailingSession = Effect.fn("TurnLifecycle.dropFailingSession")(function* (

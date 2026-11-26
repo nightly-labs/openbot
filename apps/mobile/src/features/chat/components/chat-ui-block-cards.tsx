@@ -1,3 +1,4 @@
+import { INPUT_LIMITS } from "@openbot/contracts/input-limits";
 import type { AgentPromptResolution, ConversationQuestionPrompt } from "@openbot/contracts/ipc";
 import {
   type ConversationUiBlock,
@@ -24,12 +25,14 @@ import Check from "lucide-react-native/icons/check";
 import X from "lucide-react-native/icons/x";
 import { type ReactNode, useEffect, useState } from "react";
 import { AccessibilityInfo, View } from "react-native";
-import { useCSSVariable } from "uniwind";
+import { useCSSVariable, useUniwind } from "uniwind";
 import { useChatCardSurface } from "@/features/chat/components/chat-bubble-fill";
 import { ChatMarkdown } from "@/features/chat/components/chat-markdown";
+import { copyToClipboard } from "@/features/chat/components/use-copy-message";
 import type { QuestionPromptController } from "@/features/chat/components/use-question-prompt";
 import { storeCodePreview } from "@/features/chat/model/code-preview-store";
 import { promptAnswerLabel } from "@/features/chat/model/question-prompt";
+import { SettingsPicker } from "@/features/settings/components/settings-controls";
 import { SheetFormField } from "@/shared/components/sheet-form-field";
 import { useSecondsUntil } from "@/shared/lib/countdown";
 import { haptics } from "@/shared/lib/haptics";
@@ -152,20 +155,44 @@ function ConfirmPreview({ markdown, title }: { markdown: string; title: string }
           />
         </View>
       </View>
-      {cutOff ? (
-        <Button
-          variant="ghost"
-          size="sm"
-          className="self-start px-0"
-          onPress={() => {
-            const previewId = storeCodePreview({ kind: "markdown", source: markdown, title });
-            router.push({ pathname: "/code-preview/[previewId]", params: { previewId } });
-          }}
-        >
-          <Button.Label>{t("mobile.chat.question.showAllPreview")}</Button.Label>
-        </Button>
-      ) : null}
+      <View className="flex-row flex-wrap items-center gap-x-4">
+        {cutOff ? (
+          <Button
+            variant="ghost"
+            size="sm"
+            className="px-0"
+            onPress={() => {
+              const previewId = storeCodePreview({ kind: "markdown", source: markdown, title });
+              router.push({ pathname: "/code-preview/[previewId]", params: { previewId } });
+            }}
+          >
+            <Button.Label>{t("mobile.chat.question.showAllPreview")}</Button.Label>
+          </Button>
+        ) : null}
+        <CopyPreviewButton markdown={markdown} />
+      </View>
     </View>
+  );
+}
+
+const COPIED_FEEDBACK_MS = 1_500;
+
+function CopyPreviewButton({ markdown }: { markdown: string }) {
+  const { t } = useText();
+  const [copiedText, setCopiedText] = useState<string | null>(null);
+  const copied = copiedText === markdown;
+  useEffect(() => {
+    if (copiedText === null) return;
+    const timer = setTimeout(() => setCopiedText(null), COPIED_FEEDBACK_MS);
+    return () => clearTimeout(timer);
+  }, [copiedText]);
+  async function copy() {
+    if (await copyToClipboard(markdown, "mobile.chat.question.copyPreviewFailed", t)) setCopiedText(markdown);
+  }
+  return (
+    <Button variant="ghost" size="sm" className="px-0" onPress={() => void copy()}>
+      <Button.Label>{t(copied ? "common.copied" : "common.copy")}</Button.Label>
+    </Button>
   );
 }
 
@@ -207,6 +234,7 @@ export function ConfirmBody({
   onSelect?: (select: string, option: string) => void;
   disabled?: boolean;
 }) {
+  const { theme } = useUniwind();
   return (
     <View className="gap-3">
       <Typography weight="medium" className={spec.danger && !closed ? "text-danger-text" : undefined}>
@@ -217,7 +245,21 @@ export function ConfirmBody({
           {spec.fields?.map((field, index) =>
             "select" in field ? (
               <FieldRow key={`select\n${field.select}`} index={index} label={field.label}>
-                {onSelect && !compact ? (
+                {onSelect && !compact && field.options.length > INPUT_LIMITS.promptOptions ? (
+                  <View className="flex-row pt-0.5">
+                    <SettingsPicker<string>
+                      value={selectValue(field)}
+                      options={field.options.map((option) => ({ value: option, label: option }))}
+                      enabled={!disabled}
+                      dark={theme === "dark"}
+                      label={field.label}
+                      onChange={(option) => {
+                        void haptics.selection();
+                        onSelect(field.select, option);
+                      }}
+                    />
+                  </View>
+                ) : onSelect && !compact ? (
                   <View className="flex-row flex-wrap gap-1.5 pt-0.5">
                     {field.options.map((option) => (
                       <Button

@@ -350,6 +350,8 @@ export const messages = {
   "sitePage.landing.pricing.yourPlans": "이미 결제 중인 AI 요금제 사용",
   "sitePage.landing.pricing.download": "다운로드",
   "sitePage.landing.pricing.license": "업무용 라이선스",
+  "sitePage.landing.pricing.eggs.smallPrint": "깨알 같은 조건은 없습니다. 정말로.",
+  "sitePage.landing.pricing.eggs.forever": "영원히",
   "sitePage.landing.teams.title": "팀을 위한 OpenBot",
   "sitePage.landing.teams.statement": "회사 전체를 위한 AI 동료.",
   "sitePage.landing.teams.description": "관리형 서버에서 OpenBot을 운영하고 팀과 도구에 맞게 설정해 드려요.",

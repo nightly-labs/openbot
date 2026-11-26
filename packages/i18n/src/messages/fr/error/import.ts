@@ -96,6 +96,8 @@ export const messages = {
   "error.import.transferAgentEnv": "{name} : saisissez de nouveau les valeurs de {names} dans les réglages.",
   "error.import.transferMcpValues":
     "{name} : le serveur MCP est ajouté désactivé. Vérifiez sa commande, saisissez de nouveau ses valeurs et son adresse complète, puis activez-le dans Marketplace, Apps.",
+  "error.import.transferMcpSignIn":
+    "{name} : l'app est ajoutée désactivée. Connectez-la de nouveau, puis activez-la dans Marketplace, Apps.",
   "error.import.transferValuesCleared":
     "{name} : les valeurs qui peuvent contenir un secret ont été retirées de ses arguments ou de son adresse. Saisissez-les de nouveau dans les réglages.",
   "error.import.transferSharedKept":

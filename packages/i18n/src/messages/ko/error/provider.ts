@@ -447,6 +447,8 @@ export const messages = {
     "이미지가 너무 커서 모델이 이 채팅의 이미지를 받지 않았습니다. OpenBot이 채팅 기록으로 새 {provider} 세션을 시작했습니다. 다시 시도하세요.",
   "error.provider.imageCountLimit":
     "이미지가 너무 많아서 모델이 이 채팅을 받지 않았습니다. OpenBot이 채팅 기록으로 새 {provider} 세션을 시작했습니다. 다시 시도하세요.",
+  "error.provider.imageCountLimitRepeated":
+    "이미지가 너무 많아서 모델이 이 채팅을 다시 받지 않았습니다. 한 작업이 이 모델이 받는 것보다 많은 이미지를 열기 때문에 새 세션으로는 해결되지 않습니다. 새 채팅을 선택하고 에이전트에게 각 단계에서 이미지를 더 적게 열라고 요청하거나, 이미지를 더 많이 받는 모델을 선택하세요.",
   "error.provider.imageUnreadable":
     "모델이 이 채팅의 이미지를 읽지 못했습니다. OpenBot이 채팅 기록으로 새 {provider} 세션을 시작했습니다. 다시 시도하세요. 이미지를 보냈다면 다른 이미지를 보내세요.",
   "error.provider.requestTooLarge":
