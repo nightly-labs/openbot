@@ -1,3 +1,4 @@
+import { createSignal, onSettled } from "solid-js";
 import { OPENBOT_LINKS } from "../../lib/landing-links";
 import { SiteLogoLink } from "../brand/SiteLogoLink";
 import { Button, ButtonLink } from "../ui/button";
@@ -38,15 +39,32 @@ export function SiteHeader(props: SiteHeaderProps) {
     </>
   );
 
+  const [stuck, setStuck] = createSignal(false);
+  const stuckAttribute = () => (stuck() ? "" : undefined);
+  let pageTop: HTMLSpanElement | undefined;
+  onSettled(() => {
+    if (!pageTop) return;
+    const observer = new IntersectionObserver(([entry]) => {
+      if (entry) setStuck(!entry.isIntersecting);
+    });
+    observer.observe(pageTop);
+    return () => {
+      observer.disconnect();
+    };
+  });
+
   return (
-    <header class="landing-header" data-enter="header" lang={chrome().lang}>
-      <SiteLogoLink />
-      <SiteNavigationMenu />
-      <div class="site-header-actions">
-        <SiteLanguageMenu />
-        {actions(props.downloadRef)}
-        <SiteMobileMenu actions={() => actions()} />
-      </div>
-    </header>
+    <>
+      <span ref={pageTop} class="site-header-page-top" aria-hidden="true" />
+      <header class="landing-header" data-enter="header" data-stuck={stuckAttribute()} lang={chrome().lang}>
+        <SiteLogoLink />
+        <SiteNavigationMenu />
+        <div class="site-header-actions">
+          <SiteLanguageMenu />
+          {actions(props.downloadRef)}
+          <SiteMobileMenu actions={() => actions()} />
+        </div>
+      </header>
+    </>
   );
 }
