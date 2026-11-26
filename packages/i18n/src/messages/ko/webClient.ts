@@ -50,6 +50,8 @@ export const messages = {
   "webClient.agent.unconfirmed": "결과를 확인하지 못했어요. 이 양식을 닫고 서버를 확인한 후 다시 시도해 주세요.",
   "webClient.error.usageOffline": "사용량을 보려면 서버에 연결해 주세요.",
   "webClient.error.desktopOnly": "이 작업은 데스크톱 앱에서 할 수 있어요.",
+  "webClient.voice.notSetUp":
+    "이 서버에는 음성 인식이 설정되어 있지 않아요. 소유자나 관리자가 서버 설정 → 에이전트 → 음성 인식에서 모델을 선택할 수 있어요.",
   "webClient.settings.preferences.title": "환경설정",
   "webClient.settings.preferences.description": "이 브라우저에서 OpenBot의 언어와 소리를 선택하세요.",
   "webClient.error.checkConversation": "다시 보내기 전에 대화를 확인해 주세요.",

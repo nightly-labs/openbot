@@ -34,6 +34,7 @@ import {
   SIDE_QUESTION_THREADS_CAPABILITY,
 } from "@openbot/contracts/team-protocol/side-question-v1";
 import { SKILL_LEARNING_ROUTES } from "@openbot/contracts/team-protocol/skill-learning-v1";
+import { VOICE_TRANSCRIPTION_CAPABILITY } from "@openbot/contracts/team-protocol/voice-transcription-v1";
 import { WEBHOOK_AGENT_SECRET_CAPABILITY } from "@openbot/contracts/team-protocol/webhook-agent-secret-v1";
 import { runTeamEffect } from "@openbot/team-client";
 import {
@@ -70,6 +71,7 @@ import {
 import { createWebAttachmentMedia } from "./web-attachment-media";
 import { createWebAttachmentFiles, openWebLink } from "./web-attachments";
 import { webBrowserProfileCalls } from "./web-browser-profiles";
+import { webDictationPort } from "./web-dictation";
 import { useWebLiveVoice, webLiveVoicePort } from "./web-live-voice";
 import { openWebMessageLink, webMessageLinks } from "./web-message-link-relay";
 import type { WebWorkspaceRuntime } from "./web-runtime";
@@ -287,6 +289,10 @@ export function createWebConversationRuntime(
   const unavailable = async (): Promise<never> => {
     throw new Error(currentText().t("webClient.error.desktopOnly"));
   };
+  const hostDictation = () =>
+    adminRequest && hasCapability?.(VOICE_TRANSCRIPTION_CAPABILITY) === true
+      ? webDictationPort(adminRequest)
+      : undefined;
   const emit = (event: AttachmentImportEvent) => {
     for (const listener of listeners) listener(event);
   };
@@ -434,13 +440,13 @@ export function createWebConversationRuntime(
       setVisible: async () => {},
     },
     voice: {
-      getSettings: unavailable,
+      getSettings: () => hostDictation()?.getSettings() ?? unavailable(),
       setSettings: unavailable,
-      getServer: async () => null,
+      getServer: async () => (await hostDictation()?.getServer()) ?? null,
       onModelStatus: () => () => {},
-      prepareModel: unavailable,
+      prepareModel: () => hostDictation()?.prepareModel() ?? unavailable(),
       downloadModel: unavailable,
-      transcribe: unavailable,
+      transcribe: (input) => hostDictation()?.transcribe(input) ?? unavailable(),
       startStream: unavailable,
       appendStream: unavailable,
       finishStream: unavailable,
@@ -448,6 +454,9 @@ export function createWebConversationRuntime(
       onStreamTranscript: () => () => {},
     },
     openUrl: openWebLink,
+    get dictation() {
+      return hostDictation() !== undefined;
+    },
     get liveVoice() {
       if (!adminRequest || !onHostEvent || hasCapability?.(LIVE_VOICE_CAPABILITY) !== true || !webLiveVoice())
         return undefined;

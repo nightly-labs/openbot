@@ -53,6 +53,8 @@ export const messages = {
     "結果が確認できません。再試行する前に、このフォームを閉じてサーバーを確認してください。",
   "webClient.error.usageOffline": "使用量を表示するには、サーバーに接続してください。",
   "webClient.error.desktopOnly": "この操作はデスクトップアプリで使えます。",
+  "webClient.voice.notSetUp":
+    "このサーバーでは音声認識が設定されていません。オーナーまたは管理者が、サーバーの設定 → エージェント → 音声認識 でモデルを選べます。",
   "webClient.settings.preferences.title": "環境設定",
   "webClient.settings.preferences.description": "このブラウザーでの OpenBot の言語とサウンドを選びます。",
   "webClient.error.checkConversation": "もう一度送信する前に会話を確認してください。",

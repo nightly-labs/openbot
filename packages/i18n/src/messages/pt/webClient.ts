@@ -52,6 +52,8 @@ export const messages = {
     "O resultado não foi confirmado. Feche este formulário e verifique o servidor antes de tentar novamente.",
   "webClient.error.usageOffline": "Conecte-se ao seu servidor para ver o uso.",
   "webClient.error.desktopOnly": "Esta ação está disponível no app para computador.",
+  "webClient.voice.notSetUp":
+    "O reconhecimento de fala não está configurado neste servidor. O proprietário ou um administrador pode escolher um modelo em Configurações do servidor → Agentes → Reconhecimento de fala.",
   "webClient.settings.preferences.title": "Preferências",
   "webClient.settings.preferences.description": "Escolha o idioma e os sons do OpenBot neste navegador.",
   "webClient.error.checkConversation": "Verifique a conversa antes de enviar novamente.",

@@ -228,7 +228,7 @@ export function ConversationComposer() {
   const waitItems = createMemo(() => openWaitItems(props.waits ?? [], props.queue));
   const waitsVisible = () => waitItems().length > 0 && Boolean(props.onCancelWait);
   const queueRows = () => (queueOpen() ? presentedQueueDeliveries() : renderedQueueDeliveries());
-  const voiceAvailable = () => !props.runtime;
+  const voiceAvailable = () => !props.runtime || props.runtime.dictation === true;
   const speaking = () => {
     const reading = speechReading();
     return reading &&

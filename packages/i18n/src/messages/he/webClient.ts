@@ -49,6 +49,8 @@ export const messages = {
   "webClient.agent.unconfirmed": "התוצאה לא אושרה. יש לסגור את הטופס ולבדוק את השרת לפני ניסיון נוסף.",
   "webClient.error.usageOffline": "יש להתחבר לשרת כדי להציג את השימוש.",
   "webClient.error.desktopOnly": "הפעולה זמינה באפליקציית שולחן העבודה.",
+  "webClient.voice.notSetUp":
+    "זיהוי דיבור לא הוגדר בשרת הזה. הבעלים או מנהל יכולים לבחור מודל בהגדרות השרת ← סוכנים ← זיהוי דיבור.",
   "webClient.settings.preferences.title": "העדפות",
   "webClient.settings.preferences.description": "אפשר לבחור את השפה והצלילים של OpenBot בדפדפן הזה.",
   "webClient.error.checkConversation": "יש לבדוק את השיחה לפני שליחה נוספת.",

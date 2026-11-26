@@ -90,6 +90,7 @@ export interface ConversationRuntime {
   openUrl: OpenBotDesktopApi["openUrl"];
   askSideQuestion?: ((input: AskSideQuestionInput) => Promise<string>) | undefined;
   sideQuestionThreads?: boolean | undefined;
+  dictation?: boolean | undefined;
   liveVoice?: CodexLivePort | undefined;
   skillCatalog?: SkillCatalogCalls | undefined;
   withdrawFeedback?: ((input: { agentId: string; messageId: string }) => Promise<WithdrawFeedbackResult>) | undefined;

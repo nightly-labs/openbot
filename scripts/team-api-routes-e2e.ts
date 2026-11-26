@@ -2644,9 +2644,11 @@ const machineAlertStore = new MachineAlertPreferenceStore(join(root, "machine-al
 const voiceTranscription: TeamApiVoiceTranscription = {
   transcribe: (audio) => {
     record("transcribe", audio.byteLength);
-    return audio.byteLength === 44
-      ? Effect.fail(new VoiceOperationError({ cause: new Error(sourceText("error.voice.host.preparing")) }))
-      : Effect.succeed({ text: `heard ${audio.byteLength - 44} bytes` });
+    if (audio.byteLength === 44)
+      return Effect.fail(new VoiceOperationError({ cause: new Error(sourceText("error.voice.host.preparing")) }));
+    if (audio.byteLength === 46)
+      return Effect.fail(new VoiceOperationError({ cause: new Error(sourceText("error.voice.host.notSetUp")) }));
+    return Effect.succeed({ text: `heard ${audio.byteLength - 44} bytes` });
   },
 };
 
@@ -16415,16 +16417,18 @@ try {
     );
     const heard = await call("POST", route, { ...options, bytes: wav(1_600) });
     const preparing = await call("POST", route, { ...options, bytes: wav(0) });
+    const notSetUp = await call("POST", route, { ...options, bytes: wav(1) });
     check(
-      "a member's recording comes back as text, and a host with no model ready answers 409 with the sentence",
+      "a member's recording comes back as text, and a host with no model ready or set up answers 409 with the sentence",
       heard.status === 200 &&
         isDeepStrictEqual(heard.body, { text: "heard 3200 bytes" }) &&
         errorIs(preparing, 409, sourceText("error.voice.host.preparing")) &&
+        errorIs(notSetUp, 409, sourceText("error.voice.host.notSetUp")) &&
         isDeepStrictEqual(
           callsOf("transcribe").map((args) => args[0]),
-          [3_244, 44],
+          [3_244, 44, 46],
         ),
-      [summary(heard), summary(preparing), callsOf("transcribe")],
+      [summary(heard), summary(preparing), summary(notSetUp), callsOf("transcribe")],
     );
   }
 

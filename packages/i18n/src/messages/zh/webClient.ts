@@ -49,6 +49,8 @@ export const messages = {
   "webClient.agent.unconfirmed": "结果未确认。请关闭该表单并检查服务器，然后重试。",
   "webClient.error.usageOffline": "请连接服务器以查看用量。",
   "webClient.error.desktopOnly": "该操作仅在桌面应用中可用。",
+  "webClient.voice.notSetUp":
+    "此服务器尚未设置语音识别。服务器所有者或管理员可以在 服务器设置 → 助手 → 语音识别 中选择模型。",
   "webClient.settings.preferences.title": "偏好设置",
   "webClient.settings.preferences.description": "选择该浏览器中 OpenBot 的语言和音效。",
   "webClient.error.checkConversation": "重新发送前请先检查对话。",

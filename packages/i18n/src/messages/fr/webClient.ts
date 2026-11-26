@@ -52,6 +52,8 @@ export const messages = {
     "Le résultat n’est pas confirmé. Fermez ce formulaire et vérifiez le serveur avant de réessayer.",
   "webClient.error.usageOffline": "Connectez-vous à votre serveur pour voir l’utilisation.",
   "webClient.error.desktopOnly": "Cette action est disponible dans l’application de bureau.",
+  "webClient.voice.notSetUp":
+    "La reconnaissance vocale n’est pas configurée sur ce serveur. Son propriétaire ou un administrateur peut choisir un modèle dans Réglages du serveur → Agents → Reconnaissance vocale.",
   "webClient.settings.preferences.title": "Préférences",
   "webClient.settings.preferences.description": "Choisissez la langue et les sons d’OpenBot dans ce navigateur.",
   "webClient.error.checkConversation": "Vérifiez la conversation avant d’envoyer à nouveau.",

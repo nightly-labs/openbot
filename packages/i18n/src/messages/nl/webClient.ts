@@ -52,6 +52,8 @@ export const messages = {
     "Het resultaat is niet bevestigd. Sluit dit formulier en controleer de server voordat je het opnieuw probeert.",
   "webClient.error.usageOffline": "Maak verbinding met je server om het gebruik te bekijken.",
   "webClient.error.desktopOnly": "Deze actie is beschikbaar in de desktop-app.",
+  "webClient.voice.notSetUp":
+    "Spraakherkenning is niet ingesteld op deze server. De eigenaar of een beheerder kan een model kiezen in Serverinstellingen → Agents → Spraakherkenning.",
   "webClient.settings.preferences.title": "Voorkeuren",
   "webClient.settings.preferences.description": "Kies de taal en geluiden van OpenBot in deze browser.",
   "webClient.error.checkConversation": "Controleer het gesprek voordat je opnieuw verstuurt.",
