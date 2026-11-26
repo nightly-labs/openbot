@@ -48,6 +48,7 @@ export function remoteServerSummaries(
         logoUrl: server.logoVersion ? remoteServerLogoUrl(server.id, server.logoVersion) : null,
         ...(server.appearance === undefined ? {} : { appearance: server.appearance }),
         role: server.role,
+        ...(server.username === undefined ? {} : { username: server.username }),
         active: activeServerId === server.id,
         ...(server.memberLimit === undefined ? {} : { memberLimit: server.memberLimit }),
         ...(server.licenseRaisesMemberLimit === undefined
