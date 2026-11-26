@@ -1,13 +1,13 @@
-import { readdirSync, readFileSync, statSync } from "node:fs";
+import { readdirSync, readFileSync } from "node:fs";
 import { relative, resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";
 import { createOpenBotLogger } from "@openbot/logging";
 
 function filesUnder(directory: string): string[] {
-  return readdirSync(directory).flatMap((entry) => {
-    if (entry === "node_modules") return [];
-    const path = resolve(directory, entry);
-    return statSync(path).isDirectory() ? filesUnder(path) : [path];
+  return readdirSync(directory, { withFileTypes: true }).flatMap((entry) => {
+    if (entry.name === "node_modules" || entry.isSymbolicLink()) return [];
+    const path = resolve(directory, entry.name);
+    return entry.isDirectory() ? filesUnder(path) : [path];
   });
 }
 
