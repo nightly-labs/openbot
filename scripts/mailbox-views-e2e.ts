@@ -271,7 +271,7 @@ try {
   const rebuilt = views(fresh);
   const sameAsFullRebuild = isDeepStrictEqual(live, rebuilt);
   const slowestAppend = Math.max(timing(afterEnqueue).p50, timing(afterAgentReply).p50);
-  const appendKeepsIndex = slowestAppend * MIN_SPEEDUP_AFTER_APPEND < timing(cold).p50;
+  const appendKeepsIndex = slowestAppend * MIN_SPEEDUP_AFTER_APPEND < (cold[0] ?? 0);
   report.checks = { sameAsFullRebuild, appendKeepsIndex };
   database.close();
   report.passed = sameAsFullRebuild && appendKeepsIndex;

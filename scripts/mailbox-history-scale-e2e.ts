@@ -3,6 +3,7 @@ import { appendFileSync, mkdirSync, writeFileSync } from "node:fs";
 import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
+import { isDeepStrictEqual } from "node:util";
 import type { MailboxProjectionState } from "../src/backend/database/mailbox-projection";
 import { runCauseEffect } from "../src/backend/effect-boundary";
 import { MailboxStore } from "../src/backend/mailbox-store";
@@ -158,7 +159,21 @@ async function timed<T>(
   return result;
 }
 
-type SizeResult = { medianMs: Record<string, number>; digest: string };
+type SizeResult = { medianMs: Record<string, number>; digest: string; sameAsNewStore: boolean };
+
+function storeReads(mailbox: MailboxStore, failedTurns: ReadonlyMap<string, string>, fromCreatedAt: string) {
+  return {
+    queues: agentIds.map((agentId) => mailbox.listQueue(agentId)),
+    queuedIds: agentIds.map((agentId) => mailbox.queuedDeliveryIds(agentId)),
+    conversations: agentIds.map((agentId) => mailbox.conversationMessages(agentId, { fromCreatedAt })),
+    activeQueues: mailbox.listActiveQueues(agentIds, failedTurns),
+    runtimeWork: mailbox.listRuntimeWork(agentIds, failedTurns),
+    unresolved: mailbox.unresolvedDeliveries(),
+    unfinishedTasks: mailbox.unfinishedTaskDeliveries(),
+    awaited: mailbox.awaitedThreadRequests(),
+    positions: [...mailbox.queuedPositions()].sort(([left], [right]) => left.localeCompare(right)),
+  };
+}
 
 async function runSize(size: number): Promise<SizeResult> {
   const root = await mkdtemp(join(tmpdir(), "openbot-history-scale-"));
@@ -216,6 +231,25 @@ async function runSize(size: number): Promise<SizeResult> {
         ),
       );
       await timed(samples, digest, "markTerminal", () => runCauseEffect(mailbox.markTerminal(deliveryId, "completed")));
+      if (cycle % 3 === 0) {
+        const retryTurnId = `turn-retry-${cycle}`;
+        await timed(samples, digest, "requeueFinished", () =>
+          runCauseEffect(mailbox.requeueRefused(deliveryId, undefined, true)),
+        );
+        await runCauseEffect(mailbox.markStarting(deliveryId));
+        await runCauseEffect(mailbox.markRunning(deliveryId, retryTurnId));
+        await timed(samples, digest, "markFailed", () =>
+          runCauseEffect(mailbox.markTerminal(deliveryId, "failed", `Failure ${cycle}`)),
+        );
+        failedTurns.set(agentId, retryTurnId);
+      } else if (cycle % 3 === 1) {
+        const cancelled = await runCauseEffect(
+          mailbox.enqueue({ sender: user, recipientAgentIds: [agentId], text: `Cancelled ${cycle}` }),
+        );
+        await timed(samples, digest, "cancel", () =>
+          runCauseEffect(mailbox.cancel(agentId, cancelled.deliveries[0]?.id ?? "")),
+        );
+      }
       await timed(samples, digest, "conversationMessagesAfterChange", () =>
         mailbox.conversationMessages(agentId, { fromCreatedAt: time(size - 500) }),
       );
@@ -227,9 +261,16 @@ async function runSize(size: number): Promise<SizeResult> {
     digest.add("finalAwaited", mailbox.awaitedThreadRequests());
     digest.add("finalRuntimeWork", mailbox.listRuntimeWork(agentIds, failedTurns));
     digest.addUnordered("persisted", database.readMailboxState());
+    const newStore = new MailboxStore(join(root, "state"), join(root, "shared"), database);
+    await runCauseEffect(newStore.initialize());
+    const fromCreatedAt = time(size - 2_000);
     return {
       medianMs: Object.fromEntries([...samples].map(([name, list]) => [name, median(list)])),
       digest: digest.value(),
+      sameAsNewStore: isDeepStrictEqual(
+        storeReads(mailbox, failedTurns, fromCreatedAt),
+        storeReads(newStore, failedTurns, fromCreatedAt),
+      ),
     };
   } finally {
     database.close();
@@ -241,12 +282,24 @@ const runs: Record<string, SizeResult> = {};
 for (const size of SIZES) runs[size] = await runSize(size);
 const results = Object.fromEntries(Object.entries(runs).map(([size, run]) => [size, run.medianMs]));
 const digests = Object.fromEntries(Object.entries(runs).map(([size, run]) => [size, run.digest]));
+const sameAsNewStore = Object.fromEntries(Object.entries(runs).map(([size, run]) => [size, run.sameAsNewStore]));
+const passed = Object.values(sameAsNewStore).every(Boolean);
 const [small, large] = SIZES;
 const growth: Record<string, number> = {};
 if (small !== undefined && large !== undefined)
   for (const [name, value] of Object.entries(results[large] ?? {}))
     growth[name] = Number((value / Math.max(results[small]?.[name] ?? 0, 0.001)).toFixed(2));
 mkdirSync(OUT, { recursive: true });
-const report = { sizes: SIZES, agents: AGENTS, cycles: CYCLES, digests, medianMs: results, growth };
+const report = {
+  sizes: SIZES,
+  agents: AGENTS,
+  cycles: CYCLES,
+  passed,
+  sameAsNewStore,
+  digests,
+  medianMs: results,
+  growth,
+};
 writeFileSync(join(OUT, "report.json"), `${JSON.stringify(report, null, 2)}\n`);
 process.stdout.write(`${JSON.stringify(report, null, 2)}\n`);
+if (!passed) process.exitCode = 1;

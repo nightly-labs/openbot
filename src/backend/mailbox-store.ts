@@ -162,6 +162,7 @@ interface ConversationStructure {
   deliveriesLength: number;
   deliveriesByMessage: Map<string, StoredDelivery[]>;
   entriesByAgent: Map<string, ConversationIndexEntry[]>;
+  entriesBuilt: boolean;
 }
 
 interface IdempotencyMark {
@@ -196,6 +197,15 @@ interface KeptTaskRequestDeliveries {
   deliveriesLength: number;
   requests: TaskRequestDelivery[];
   orphans: number;
+}
+
+interface OpenDeliveryIndex {
+  source: StoredDelivery[];
+  length: number;
+  positions: Map<StoredDelivery, number>;
+  openByAgent: Map<string, Set<StoredDelivery>>;
+  failedByTurn: Map<string, Set<StoredDelivery>>;
+  failedTurns: Map<StoredDelivery, string>;
 }
 
 interface ConversationIndex {
@@ -324,6 +334,7 @@ export class MailboxStore {
   #keptDeliveriesByRecipient: KeptIndex<StoredDelivery, Map<string, StoredDelivery[]>> | undefined;
   #keptDeliveriesById: KeptIndex<StoredDelivery, Map<string, StoredDelivery>> | undefined;
   #keptDeliveriesByMessage: KeptIndex<StoredDelivery, Map<string, StoredDelivery[]>> | undefined;
+  #keptOpenDeliveries: OpenDeliveryIndex | undefined;
   #idempotencyRevision = 0;
   #savedIdempotency: IdempotencyMark | undefined;
   #keptTurnIds: { mark: IdempotencyMark; turnIds: Map<string, string | undefined> } | undefined;
@@ -589,27 +600,15 @@ export class MailboxStore {
   }
 
   pendingMessagingReturns(linkId: string): number {
-    const messageIds = new Set(
-      this.#state.messages.filter((message) => message.messagingReturn?.linkId === linkId).map((message) => message.id),
-    );
-    return this.#state.deliveries.filter(
-      (delivery) =>
-        messageIds.has(delivery.messageId) &&
-        (delivery.status === "queued" || delivery.status === "starting" || delivery.status === "running"),
+    return this.#openDeliveries().filter(
+      (delivery) => this.#messageById(delivery.messageId)?.messagingReturn?.linkId === linkId,
     ).length;
   }
 
   unresolvedMessagingDeliveries(linkId: string): DeliveryContext[] {
-    const messageIds = new Set(
-      this.#state.messages.filter((message) => message.messaging?.linkId === linkId).map((message) => message.id),
-    );
     return this.#contexts(
-      this.#state.deliveries
-        .filter(
-          (delivery) =>
-            messageIds.has(delivery.messageId) &&
-            (delivery.status === "queued" || delivery.status === "starting" || delivery.status === "running"),
-        )
+      this.#openDeliveries()
+        .filter((delivery) => this.#messageById(delivery.messageId)?.messaging?.linkId === linkId)
         .sort(compareQueueOrder),
     );
   }
@@ -891,13 +890,13 @@ export class MailboxStore {
     const messages = this.#messagesById();
     const welcomes = new Set<string>();
     const open = new Map<string, StoredDelivery[]>();
+    const failures = this.#currentFailures(targets, failedTurns);
     for (const agentId of targets)
-      for (const delivery of this.#deliveriesFor(agentId)) {
+      for (const delivery of [...this.#openDeliveriesOf(agentId), ...failures]) {
+        if (delivery.recipientAgentId !== agentId) continue;
         if (WELCOME_PENDING_STATUSES.has(delivery.status) && messages.get(delivery.messageId)?.welcome === true)
           welcomes.add(agentId);
         if (executionMessageIds.has(delivery.messageId)) continue;
-        const failed = delivery.status === "failed" && delivery.turnId === failedTurns.get(agentId);
-        if (!isActiveDelivery(delivery) && !failed) continue;
         const list = open.get(agentId);
         if (list) list.push(delivery);
         else open.set(agentId, [delivery]);
@@ -1123,7 +1122,7 @@ export class MailboxStore {
   }
 
   #lanesWithWork(agentId: string, queuedOnly: boolean): string[] {
-    const deliveries = queuedOnly ? this.#queuedFor(agentId) : this.#deliveriesFor(agentId).filter(isActiveDelivery);
+    const deliveries = queuedOnly ? this.#queuedFor(agentId) : this.#openDeliveriesOf(agentId);
     if (deliveries.length === 0) return [];
     const messages = this.#messagesById();
     const lanes = new Set<string>();
@@ -1654,8 +1653,8 @@ export class MailboxStore {
 
   unfinishedTaskDeliveries(): Array<{ agentId: string; deliveryId: string; taskId: string; queued: boolean }> {
     const messages = this.#messagesById();
-    return this.#state.deliveries.flatMap((delivery) => {
-      const taskId = isActiveDelivery(delivery) ? this.#taskIdOf(delivery, messages) : null;
+    return this.#openDeliveries().flatMap((delivery) => {
+      const taskId = this.#taskIdOf(delivery, messages);
       return taskId
         ? [
             {
@@ -1741,20 +1740,17 @@ export class MailboxStore {
 
   listRuntimeWork(agentIds: readonly string[], failedTurns: ReadonlyMap<string, string>): AgentRuntimeWorkItem[] {
     const targetAgentIds = new Set(agentIds);
-    const candidates: { delivery: StoredDelivery; isCurrentFailure: boolean }[] = [];
-    for (const delivery of this.#state.deliveries) {
-      if (!targetAgentIds.has(delivery.recipientAgentId)) continue;
-      const isWorking = delivery.status === "starting" || delivery.status === "running";
-      const isCurrentFailure =
-        delivery.status === "failed" && delivery.turnId === failedTurns.get(delivery.recipientAgentId);
-      if (isWorking || isCurrentFailure) candidates.push({ delivery, isCurrentFailure });
-    }
+    const index = this.#openDeliveryIndex();
+    const candidates = inArrayOrder(index, [
+      ...[...targetAgentIds].flatMap((agentId) =>
+        [...(index.openByAgent.get(agentId) ?? [])].filter(
+          (delivery) => delivery.status === "starting" || delivery.status === "running",
+        ),
+      ),
+      ...this.#currentFailures(targetAgentIds, failedTurns),
+    ]).map((delivery) => ({ delivery, isCurrentFailure: delivery.status === "failed" }));
     if (candidates.length === 0) return [];
-    const candidateMessageIds = new Set(candidates.map(({ delivery }) => delivery.messageId));
-    const messages = new Map<string, StoredMessage>();
-    for (const message of this.#state.messages) {
-      if (candidateMessageIds.has(message.id)) messages.set(message.id, message);
-    }
+    const messages = this.#messagesById();
     const working: StoredDelivery[] = [];
     const failed: StoredDelivery[] = [];
     const workingAgentIds = new Set<string>();
@@ -1962,21 +1958,18 @@ export class MailboxStore {
       deliveriesLength: deliveries.length,
       deliveriesByMessage,
       entriesByAgent: new Map(),
+      entriesBuilt: false,
     };
     this.#keptConversationStructure = structure;
     return structure;
   }
 
-  #conversationEntries(structure: ConversationStructure, agentId: string): ConversationIndexEntry[] {
-    const known = structure.entriesByAgent.get(agentId);
-    if (known) return known;
-    const entries: ConversationIndexEntry[] = [];
-    for (const message of structure.messages) {
-      const entry = conversationEntry(message, agentId, structure.deliveriesByMessage);
-      if (entry) entries.push(entry);
+  #conversationEntries(structure: ConversationStructure, agentId: string): readonly ConversationIndexEntry[] {
+    if (!structure.entriesBuilt) {
+      for (const message of structure.messages) addConversationEntries(structure, message);
+      structure.entriesBuilt = true;
     }
-    structure.entriesByAgent.set(agentId, entries);
-    return entries;
+    return structure.entriesByAgent.get(agentId) ?? [];
   }
 
   reactionFor(
@@ -2181,9 +2174,63 @@ export class MailboxStore {
   }
 
   #queuedFor(agentId: string): StoredDelivery[] {
-    return this.#deliveriesFor(agentId)
+    return this.#openDeliveriesOf(agentId)
       .filter((candidate) => candidate.status === "queued")
       .sort(compareQueueOrder);
+  }
+
+  #openDeliveryIndex(): OpenDeliveryIndex {
+    const deliveries = this.#state.deliveries;
+    const kept = this.#keptOpenDeliveries;
+    const index =
+      kept?.source === deliveries && kept.length <= deliveries.length
+        ? kept
+        : {
+            source: deliveries,
+            length: 0,
+            positions: new Map(),
+            openByAgent: new Map(),
+            failedByTurn: new Map(),
+            failedTurns: new Map(),
+          };
+    for (let position = index.length; position < deliveries.length; position += 1) {
+      const delivery = deliveries[position];
+      if (!delivery) continue;
+      index.positions.set(delivery, position);
+      placeOpenDelivery(index, delivery);
+    }
+    index.length = deliveries.length;
+    for (const id of this.#changes.deliveryIds) {
+      const delivery = this.#deliveryById(id);
+      if (delivery) placeOpenDelivery(index, delivery);
+    }
+    this.#keptOpenDeliveries = index;
+    return index;
+  }
+
+  #openDeliveriesOf(agentId: string): StoredDelivery[] {
+    const index = this.#openDeliveryIndex();
+    return inArrayOrder(index, index.openByAgent.get(agentId) ?? []);
+  }
+
+  #openDeliveries(): StoredDelivery[] {
+    const index = this.#openDeliveryIndex();
+    return inArrayOrder(
+      index,
+      [...index.openByAgent.values()].flatMap((deliveries) => [...deliveries]),
+    );
+  }
+
+  #currentFailures(agentIds: ReadonlySet<string>, failedTurns: ReadonlyMap<string, string>): StoredDelivery[] {
+    const index = this.#openDeliveryIndex();
+    const failures: StoredDelivery[] = [];
+    for (const agentId of agentIds) {
+      const turnId = failedTurns.get(agentId);
+      if (turnId === undefined) continue;
+      for (const delivery of index.failedByTurn.get(turnId) ?? [])
+        if (delivery.recipientAgentId === agentId) failures.push(delivery);
+    }
+    return inArrayOrder(index, failures);
   }
 
   #deliveriesFor(agentId: string): readonly StoredDelivery[] {
@@ -2207,7 +2254,7 @@ export class MailboxStore {
   agentsWithEditHolds(): string[] {
     return [
       ...new Set(
-        this.#state.deliveries
+        this.#openDeliveries()
           .filter((delivery) => delivery.status === "queued" && this.#isHeldByEdit(delivery))
           .map((delivery) => delivery.recipientAgentId),
       ),
@@ -2278,10 +2325,7 @@ export class MailboxStore {
   }
 
   queuedDeliveryIds(agentId: string): string[] {
-    return this.#state.deliveries
-      .filter((delivery) => delivery.recipientAgentId === agentId && delivery.status === "queued")
-      .sort(compareQueueOrder)
-      .map((delivery) => delivery.id);
+    return this.#queuedFor(agentId).map((delivery) => delivery.id);
   }
 
   draftName(draftId: string): string | null {
@@ -3244,9 +3288,7 @@ export class MailboxStore {
     deliveryIds: string[],
   ): Effect.fn.Return<void, StoredStateFailure> {
     try {
-      const allQueued = this.#state.deliveries.filter(
-        (delivery) => delivery.recipientAgentId === agentId && delivery.status === "queued",
-      );
+      const allQueued = this.#openDeliveriesOf(agentId).filter((delivery) => delivery.status === "queued");
       const held = (delivery: StoredDelivery) => Boolean(delivery.editId) || waitsForPlanContinuation(delivery);
       const heldIds = new Set(allQueued.filter(held).map((delivery) => delivery.id));
       const requested = deliveryIds.filter((deliveryId) => !heldIds.has(deliveryId));
@@ -3458,9 +3500,7 @@ export class MailboxStore {
   }, Effect.uninterruptible).bind(this);
 
   hasUnfinishedDelivery(agentId: string): boolean {
-    return this.#deliveriesFor(agentId).some(
-      (delivery) => delivery.status === "queued" || delivery.status === "starting" || delivery.status === "running",
-    );
+    return this.#openDeliveriesOf(agentId).length > 0;
   }
 
   hasUnfinishedDeliveryOutsideTasks(
@@ -3470,8 +3510,7 @@ export class MailboxStore {
     includeMessaging = true,
   ): boolean {
     const messages = this.#messagesById();
-    return this.#state.deliveries.some((delivery) => {
-      if (delivery.recipientAgentId !== agentId || !isActiveDelivery(delivery)) return false;
+    return this.#openDeliveriesOf(agentId).some((delivery) => {
       if (delivery.status === "queued" && exceptQueued.includes(delivery.id)) return false;
       const lane = this.#laneOf(delivery, messages);
       return (
@@ -3483,18 +3522,18 @@ export class MailboxStore {
   }
 
   hasQueuedDelivery(agentId: string): boolean {
-    return this.#deliveriesFor(agentId).some((delivery) => delivery.status === "queued");
+    return this.#openDeliveriesOf(agentId).some((delivery) => delivery.status === "queued");
   }
 
   hasStartedDelivery(agentId: string): boolean {
-    return this.#deliveriesFor(agentId).some(
+    return this.#openDeliveriesOf(agentId).some(
       (delivery) => delivery.status === "starting" || delivery.status === "running",
     );
   }
 
   unresolvedDeliveries(): DeliveryContext[] {
     return this.#contexts(
-      this.#state.deliveries.filter((delivery) => delivery.status === "starting" || delivery.status === "running"),
+      this.#openDeliveries().filter((delivery) => delivery.status === "starting" || delivery.status === "running"),
     );
   }
 
@@ -3933,7 +3972,7 @@ export class MailboxStore {
   #queuedPositions(agentId?: string): Map<string, number> {
     const counts = new Map<string, number>();
     const positions = new Map<string, number>();
-    const queued = (agentId === undefined ? this.#state.deliveries : this.#deliveriesFor(agentId))
+    const queued = (agentId === undefined ? this.#openDeliveries() : this.#openDeliveriesOf(agentId))
       .filter((delivery) => delivery.status === "queued" && !waitsForPlanContinuation(delivery))
       .sort(compareQueueOrder);
     for (const delivery of queued) {
@@ -3946,11 +3985,10 @@ export class MailboxStore {
 
   #queuedPosition(delivery: StoredDelivery): number {
     let position = 1;
-    for (const candidate of this.#state.deliveries)
+    for (const candidate of this.#openDeliveriesOf(delivery.recipientAgentId))
       if (
         candidate.status === "queued" &&
         !waitsForPlanContinuation(candidate) &&
-        candidate.recipientAgentId === delivery.recipientAgentId &&
         compareQueueOrder(candidate, delivery) < 0
       )
         position += 1;
@@ -3961,17 +3999,15 @@ export class MailboxStore {
     const positions = this.#queuedPositions();
     return {
       messageId,
-      deliveries: this.#state.deliveries
-        .filter((delivery) => delivery.messageId === messageId)
-        .map((delivery) => {
-          const item = this.#publicDelivery(delivery, positions);
-          return {
-            id: item.id,
-            recipientAgentId: item.recipientAgentId,
-            status: item.status,
-            position: item.position,
-          };
-        }),
+      deliveries: this.#deliveriesOfMessage(messageId).map((delivery) => {
+        const item = this.#publicDelivery(delivery, positions);
+        return {
+          id: item.id,
+          recipientAgentId: item.recipientAgentId,
+          status: item.status,
+          position: item.position,
+        };
+      }),
     };
   }
 
@@ -4054,6 +4090,8 @@ export class MailboxStore {
   };
 
   #clearChanges(): void {
+    if (this.#keptOpenDeliveries?.source === this.#state.deliveries) this.#openDeliveryIndex();
+    else this.#keptOpenDeliveries = undefined;
     for (const keys of Object.values(this.#changes)) keys.clear();
     this.#keptConversationIndex = undefined;
   }
@@ -4110,6 +4148,31 @@ function extendKeptIndex<Item, Index>(
   return { source, length: source.length, index };
 }
 
+function placeOpenDelivery(index: OpenDeliveryIndex, delivery: StoredDelivery): void {
+  const agentId = delivery.recipientAgentId;
+  const open = index.openByAgent.get(agentId);
+  if (isActiveDelivery(delivery)) {
+    if (open) open.add(delivery);
+    else index.openByAgent.set(agentId, new Set([delivery]));
+  } else open?.delete(delivery);
+  const failedTurnId = delivery.status === "failed" && delivery.turnId !== null ? delivery.turnId : undefined;
+  const previousTurnId = index.failedTurns.get(delivery);
+  if (previousTurnId === failedTurnId) return;
+  if (previousTurnId !== undefined) {
+    index.failedByTurn.get(previousTurnId)?.delete(delivery);
+    index.failedTurns.delete(delivery);
+  }
+  if (failedTurnId === undefined) return;
+  index.failedTurns.set(delivery, failedTurnId);
+  const failed = index.failedByTurn.get(failedTurnId);
+  if (failed) failed.add(delivery);
+  else index.failedByTurn.set(failedTurnId, new Set([delivery]));
+}
+
+function inArrayOrder(index: OpenDeliveryIndex, deliveries: Iterable<StoredDelivery>): StoredDelivery[] {
+  return [...deliveries].sort((left, right) => (index.positions.get(left) ?? 0) - (index.positions.get(right) ?? 0));
+}
+
 function addDeliveryOfMessage(deliveriesByMessage: Map<string, StoredDelivery[]>, delivery: StoredDelivery): void {
   const items = deliveriesByMessage.get(delivery.messageId);
   if (items) items.push(delivery);
@@ -4125,14 +4188,24 @@ function appendToConversationStructure(structure: ConversationStructure): boolea
   const addedDeliveries = deliveries.slice(structure.deliveriesLength);
   if (addedDeliveries.some((delivery) => !addedMessageIds.has(delivery.messageId))) return false;
   for (const delivery of addedDeliveries) addDeliveryOfMessage(structure.deliveriesByMessage, delivery);
-  for (const [agentId, entries] of structure.entriesByAgent)
-    for (const message of addedMessages) {
-      const entry = conversationEntry(message, agentId, structure.deliveriesByMessage);
-      if (entry) entries.push(entry);
-    }
+  if (structure.entriesBuilt) for (const message of addedMessages) addConversationEntries(structure, message);
   structure.messagesLength = messages.length;
   structure.deliveriesLength = deliveries.length;
   return true;
+}
+
+function addConversationEntries(structure: ConversationStructure, message: StoredMessage): void {
+  const agentIds = new Set(
+    (structure.deliveriesByMessage.get(message.id) ?? []).map((delivery) => delivery.recipientAgentId),
+  );
+  if (message.sender.kind === "agent") agentIds.add(message.sender.agentId);
+  for (const agentId of agentIds) {
+    const entry = conversationEntry(message, agentId, structure.deliveriesByMessage);
+    if (!entry) continue;
+    const entries = structure.entriesByAgent.get(agentId);
+    if (entries) entries.push(entry);
+    else structure.entriesByAgent.set(agentId, [entry]);
+  }
 }
 
 function conversationEntry(

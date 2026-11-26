@@ -273,10 +273,10 @@ export class MailboxProjection {
     if (!marker) return null;
     const metadata = parseMailboxMetadata(requiredStringColumn(marker, "metadata_json"));
     const messages = databaseRows(
-      db.prepare("SELECT message_json FROM projection_mailbox_messages ORDER BY created_at, message_id").all(),
+      db.prepare("SELECT message_json FROM projection_mailbox_messages ORDER BY created_at, rowid").all(),
     ).map((row) => JSON.parse(requiredStringColumn(row, "message_json")));
     const deliveries = databaseRows(
-      db.prepare("SELECT delivery_json FROM projection_deliveries ORDER BY created_at, delivery_id").all(),
+      db.prepare("SELECT delivery_json FROM projection_deliveries ORDER BY created_at, rowid").all(),
     ).map((row) => JSON.parse(requiredStringColumn(row, "delivery_json")));
     const drafts = databaseRows(
       db.prepare("SELECT metadata_json FROM projection_attachments WHERE owner_kind = 'draft'").all(),
