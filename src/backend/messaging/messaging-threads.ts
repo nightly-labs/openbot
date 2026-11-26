@@ -114,7 +114,11 @@ interface MessagingPostPing {
   threadKey?: string;
 }
 
-export type MessagingStopReason = "keys" | "removed" | "moved";
+export type MessagingStopReason =
+  | { kind: "keys" }
+  | { kind: "access" }
+  | { kind: "removed" }
+  | { kind: "moved"; relinkedAs: string | null };
 
 export interface MessagingOutbound {
   keysUnreadable(connectionId: string): boolean;
@@ -247,11 +251,13 @@ export const MESSAGING_NOT_RUNNING = "This connection does not run now.";
 function stoppedConnectionText(platform: MessagingPlatform, reason: MessagingStopReason): string {
   const name = PLATFORM_NAMES[platform];
   const apps = `Marketplace > Apps > ${name}`;
-  if (reason === "keys")
-    return `This connection does not run: OpenBot cannot use its saved keys. Tell the user to connect ${name} again in ${apps}.`;
-  if (platform !== "telegram")
-    return `This connection does not run: ${name} removed OpenBot from it. Tell the user to connect it again in ${apps}.`;
-  if (reason === "moved")
+  if (reason.kind === "keys")
+    return `This connection does not run: OpenBot cannot read its saved keys. Tell the user to connect ${name} again in ${apps}.`;
+  if (reason.kind === "access")
+    return `This connection does not run: ${name} no longer accepts OpenBot here, because the app or bot was removed or its access ended. Tell the user to connect it again in ${apps}.`;
+  if (reason.kind === "moved" && reason.relinkedAs)
+    return `This Telegram group became a supergroup and got a new id, so this link does not run. The group is linked again as connection ${reason.relinkedAs}: use that connection.`;
+  if (reason.kind === "moved")
     return `This Telegram group became a supergroup and got a new id, so this link does not run. The bot is still in the group. Tell the user to link the group again in ${apps} > Link a chat.`;
   return `This Telegram chat link does not run: the bot was removed from the chat, or the group became a supergroup and got a new id. Tell the user to check that the bot is in the chat, then link the chat again in ${apps} > Link a chat.`;
 }

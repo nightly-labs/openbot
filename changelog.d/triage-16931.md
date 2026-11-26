@@ -1,8 +1,8 @@
 ### Fixed
 
 - Tell an agent why it cannot post to a Telegram, Slack, Discord or WhatsApp chat that stopped, and
-  what you must do. Before, the agent saw the chat in its list, but each post failed with "This
+  what you must do. Before, the agent saw the chat as ready, but each post failed with "This
   connection does not run now."
-- Show the correct reason for a Telegram chat that stopped after its group became a supergroup, and
-  link it again with Link a chat. Before, the app said that the bot left the chat and told you to
-  disconnect it, which deleted its saved history.
+- Say in Settings that a stopped Telegram chat lost the bot or became a supergroup, and that you link
+  it again with Link a chat. Before, it said only that the bot left, and told you to disconnect the
+  chat, which deletes its saved history.

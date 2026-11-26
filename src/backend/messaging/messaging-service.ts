@@ -1251,21 +1251,25 @@ export class MessagingService {
     migratedTo: string,
   ) {
     const values = this.#credentials.get(connectionId);
-    if (values) yield* this.#credentials.set(connectionId, { ...values, migratedTo });
+    if (values)
+      yield* this.#credentials
+        .set(connectionId, { ...values, migratedTo })
+        .pipe(Effect.catch((failure) => Effect.sync(() => this.#warn(failure.cause))));
   });
 
   #stopReason(connectionId: string): MessagingStopReason | null {
     const record = this.#threads.store.connection(connectionId);
-    if (!record?.enabled || this.#live.get(connectionId)?.identity) return null;
+    if (!record?.enabled) return null;
     const state = this.#summary(record).state;
-    if (
-      this.#credentials.status(connectionId) !== "saved" ||
-      state === "secret_storage_unavailable" ||
-      state === "invalid_token"
-    )
-      return "keys";
+    if (state === "invalid_token") return { kind: "access" };
+    if (this.#live.get(connectionId)?.identity) return null;
+    if (this.#credentials.status(connectionId) !== "saved" || state === "secret_storage_unavailable")
+      return { kind: "keys" };
     if (state !== "removed") return null;
-    return this.#credentials.get(connectionId)?.migratedTo ? "moved" : "removed";
+    const migratedTo = this.#credentials.get(connectionId)?.migratedTo;
+    if (!migratedTo) return { kind: "removed" };
+    const relinked = this.#threads.store.connectionForWorkspace("telegram", migratedTo);
+    return { kind: "moved", relinkedAs: relinked?.enabled ? relinked.connectionId : null };
   }
 
   #summary(record: MessagingConnectionRecord): MessagingConnection {
