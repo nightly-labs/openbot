@@ -672,7 +672,13 @@ const MessageRow = memo(function MessageRow({
       },
       link: (href) => {
         const target = messageLinkFileTargets(href, fileAgentId);
-        return target ? () => void openFile(target.file, target.written, attachmentOf(target.file)) : null;
+        if (!target) return null;
+        return () =>
+          void openFile(
+            target.file,
+            target.written,
+            (target.written && attachmentOf(target.written)) || attachmentOf(target.file),
+          );
       },
     };
   }, [fileBody, fileAgentId, fileAttachments, openFile]);

@@ -80,7 +80,8 @@ function workspaceLinkPath(value: string): string | null {
 
 function withoutLinkFragment(href: string): string {
   const fragment = href.indexOf("#");
-  return fragment > 0 ? href.slice(0, fragment) : href;
+  if (fragment <= 0 || /[./\\]/u.test(href.slice(fragment + 1))) return href;
+  return href.slice(0, fragment);
 }
 
 export function messageLinkFileTargets(
@@ -119,13 +120,14 @@ export function messageChipFileNames(body: string, agentId: string | undefined):
   if (!body.includes("`") && !body.includes("[") && !body.includes("<")) return names;
   const directory = messageFileDirectory(body);
   walkChatMarkdown(parseFinishedChatMarkdown(body), (token) => {
-    const file =
-      token.type === "link" && typeof token.href === "string"
-        ? (messageLinkFileTargets(token.href, agentId)?.file ?? null)
-        : token.type === "codespan" && typeof token.text === "string"
-          ? (messageFileTarget(token.text, directory, agentId)?.file ?? null)
-          : null;
-    if (file) names.add(messageTargetFileName(file));
+    const link =
+      token.type === "link" && typeof token.href === "string" ? messageLinkFileTargets(token.href, agentId) : null;
+    const files = link
+      ? [link.file, link.written]
+      : token.type === "codespan" && typeof token.text === "string"
+        ? [messageFileTarget(token.text, directory, agentId)?.file]
+        : [];
+    for (const file of files) if (file) names.add(messageTargetFileName(file));
   });
   return names;
 }
