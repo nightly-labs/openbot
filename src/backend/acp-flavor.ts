@@ -538,10 +538,28 @@ function customSessionNotFound(error: RequestError, sessionId: string): boolean 
   return geminiCliSessionNotFound(error, sessionId) ?? ompSessionNotFound(error, sessionId);
 }
 
+const SESSION_REFUSED_CODE = -32901;
+
+function sessionRefused(error: unknown, reason: "session_already_open" | "session_busy"): boolean {
+  return (
+    error instanceof RequestError &&
+    error.code === SESSION_REFUSED_CODE &&
+    isRecord(error.data) &&
+    error.data.reason === reason
+  );
+}
+
 function customSessionStillActive(error: unknown): boolean {
   return (
-    error instanceof RequestError && error.code === -32602 && /\bsession is already active\b/iu.test(errorText(error))
+    (error instanceof RequestError &&
+      error.code === -32602 &&
+      /\bsession is already active\b/iu.test(errorText(error))) ||
+    sessionRefused(error, "session_already_open")
   );
+}
+
+function customSessionBusy(error: unknown): boolean {
+  return sessionRefused(error, "session_busy");
 }
 
 function customEmptyAnswerFailure({ answered }: { answered: boolean }, label: string): string | null {
@@ -579,6 +597,7 @@ const OMP_ACP_FLAVOR: AcpFlavor = {
 const CUSTOM_ACP_FLAVOR: AcpFlavor = {
   sessionNotFound: customSessionNotFound,
   sessionStillActive: customSessionStillActive,
+  sessionBusy: customSessionBusy,
   emptyAnswerFailure: customEmptyAnswerFailure,
   turnFailure: customTurnFailure,
   failureCause: customFailureCause,
