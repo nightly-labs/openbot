@@ -64,6 +64,8 @@ export function readProcessGroupOutput(
     };
     const stop = (error: GroupReadFailure) => {
       failure ??= error;
+      child.stdout.destroy();
+      child.stderr.destroy();
       endGroup();
     };
     const timer = setTimeout(
@@ -89,7 +91,7 @@ export function readProcessGroupOutput(
     child.stderr.resume();
     child.once("exit", endGroup);
     child.once("error", (error) => {
-      forget();
+      stop(error);
       settle(error);
     });
     child.once("close", (code, signal) => {
