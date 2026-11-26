@@ -62,7 +62,14 @@ interface Spring {
 }
 
 const SHAPE_ID: Record<GlassShape, number> = { lens: 0, blob: 1, pill: 2, torus: 3, prism: 4, diamond: 5 };
-const SPIN: Record<GlassShape, number> = { lens: 0, blob: 0.35, pill: 0.7, torus: 0.8, prism: 1, diamond: 0.9 };
+const SPIN: Record<GlassShape, { yaw: number; roll: number }> = {
+  lens: { yaw: 0, roll: 0 },
+  blob: { yaw: 0, roll: 0.12 },
+  pill: { yaw: 0, roll: 0.25 },
+  torus: { yaw: 0, roll: 0 },
+  prism: { yaw: 0, roll: 0.3 },
+  diamond: { yaw: 0.27, roll: 0 },
+};
 const TILT: Record<GlassShape, number> = { lens: 0.35, blob: 0.5, pill: 0.6, torus: 0.7, prism: 0.8, diamond: 0.7 };
 const POSE: Record<GlassShape, readonly [number, number]> = {
   lens: [0, 0],
@@ -278,7 +285,7 @@ vec4 studio(vec3 d, float gain) {
   float yaw = atan(d.x, d.z);
   float key = softbox(vec2(yaw + 0.62, d.y - 0.5), vec2(0.26, 0.16), 0.05);
   float strip = softbox(vec2(yaw - 0.95, d.y - 0.05), vec2(0.06, 0.5), 0.03);
-  float level = (key * 18.0 + strip * 8.0 + smoothstep(0.0, 1.0, d.z) * 0.04) * gain;
+  float level = (key * 7.0 + strip * 3.5 + smoothstep(0.0, 1.0, d.z) * 0.04) * gain;
   float cover = clamp(level, 0.0, 1.0);
   return vec4(vec3(cover), cover);
 }
@@ -629,7 +636,7 @@ function runLens(parts: GlassLensParts, read: () => GlassLensSettings, intro: bo
   const jelly: Spring = { value: 1, speed: 0 };
   const grow: Spring = { value: intro && !reduced ? 0 : 1, speed: 0 };
   const morph: Morph = { from: first.shape, to: first.shape, t: 1, next: null, asked: first.shape };
-  const spin = { yaw: 0, pitch: 0 };
+  const spin = { yaw: 0, roll: 0 };
   let sceneKey = "";
   let sceneReady = false;
   let placed = false;
@@ -821,9 +828,9 @@ function runLens(parts: GlassLensParts, read: () => GlassLensSettings, intro: bo
   };
 
   const advanceSpin = (dt: number) => {
-    const rate = reduced ? 0 : SPIN[morph.to];
-    spin.yaw = unwind(spin.yaw, rate * 0.3, dt);
-    spin.pitch = unwind(spin.pitch, rate * 0.12, dt);
+    const rate = SPIN[morph.to];
+    spin.yaw = unwind(spin.yaw, reduced ? 0 : rate.yaw, dt);
+    spin.roll = unwind(spin.roll, reduced ? 0 : rate.roll, dt);
   };
 
   const turn = () => {
@@ -833,8 +840,8 @@ function runLens(parts: GlassLensParts, read: () => GlassLensSettings, intro: bo
     const leanY = reduced ? 0 : clamp(lens.vy * 0.00035, -0.5, 0.5);
     const pose = (index: 0 | 1) => POSE[morph.from][index] + (POSE[morph.to][index] - POSE[morph.from][index]) * mixed;
     const yaw = spin.yaw + pose(1) + leanX + tilt * Math.sin(clock * 0.7) * 0.2;
-    const pitch = spin.pitch + pose(0) + leanY + tilt * Math.cos(clock * 0.53) * 0.16;
-    const roll = tilt * Math.sin(clock * 0.31 + 1.2) * 0.12 - leanX * 0.3;
+    const pitch = pose(0) + leanY + tilt * Math.cos(clock * 0.53) * 0.16;
+    const roll = spin.roll + tilt * Math.sin(clock * 0.31 + 1.2) * 0.12 - leanX * 0.3;
     return orientation(yaw, pitch, roll);
   };
 
