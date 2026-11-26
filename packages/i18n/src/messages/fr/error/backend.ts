@@ -64,6 +64,11 @@ export const messages = {
     "OpenBot n’a pas pu charger la page dans la fenêtre de connexion. Vérifiez la connexion internet, puis rouvrez la fenêtre de connexion.",
   "error.backend.browserSignInReadFailed": "OpenBot n’a pas pu lire la connexion dans la fenêtre.",
   "error.backend.browserStopUnsupported": "Cet hôte distant ne peut pas arrêter le chargement d’une page.",
+  "error.backend.browserLocationFailed": "Impossible de définir la position pour la page.",
+  "error.backend.browserPermissionsUnsupported": "Cet hôte distant ne peut pas répondre aux demandes de position.",
+  "error.backend.browserLocationRequired": "Envoyez la position de l’appareil pour autoriser la demande.",
+  "error.backend.browserHttpSignInInactive": "Ce site ne demande plus de connexion. Rechargez la page pour réessayer.",
+  "error.backend.browserHttpSignInUnsupported": "Cet hôte distant ne peut pas recevoir une connexion à un site.",
   "error.backend.sharedDataLocalOnly": "Les données partagées sont gérées sur l’ordinateur qui exécute ces agents.",
   "error.backend.browserUrlProtocol": "Seules les URL de navigateur HTTP(S) sont autorisées.",
   "error.backend.sunshineNotReady": "Sunshine n’est pas devenu prêt.",
@@ -215,6 +220,8 @@ export const messages = {
   "error.backend.videoGenerationFailed": "La génération de la vidéo a échoué.",
   "error.backend.videoGenerationNoVideo": "La génération de la vidéo n’a renvoyé aucune vidéo.",
   "error.backend.videoGenerationInterrupted": "La génération de la vidéo a été interrompue.",
+  "error.backend.grokVideoNoQuota":
+    "Votre compte Grok ne peut pas créer de vidéos. Générez plutôt la vidéo avec des crédits.",
   "error.backend.attachmentNotRegularFile": "Seuls les fichiers ordinaires peuvent être joints : {name}",
   "error.backend.attachmentCopyFailed": "OpenBot n’a pas pu copier {name}.",
   "error.backend.routineNameRequired": "Un nom de routine est requis.",
@@ -304,6 +311,8 @@ export const messages = {
     "Le serveur de connexion n’accepte pas encore OpenBot comme application. Votre compte n’en est pas la cause. Utilisez un autre moyen de connexion, par exemple un serveur MCP local.",
   "error.backend.mcpRegistrationUnavailable":
     "Le serveur de connexion ne peut pas enregistrer OpenBot comme application. Votre compte n’en est pas la cause. Pour vous connecter, enregistrez ce serveur dans Marketplace, Apps, puis ajoutez-lui une app de connexion.",
+  "error.backend.mcpSignInAppNeeded":
+    "Le serveur de connexion ne peut pas enregistrer OpenBot comme application. Votre compte n’en est pas la cause. Pour vous connecter, ouvrez ce serveur dans Marketplace, Apps, cliquez sur Tester la connexion, puis ajoutez une app de connexion.",
   "error.backend.mcpSignInAbandonedGeneric": "La connexion a été abandonnée.",
   "error.backend.mcpSignInForgotten": "La connexion MCP a été oubliée pendant son exécution.",
   "error.backend.mcpSignInAbandoned": "La connexion MCP a été abandonnée.",
@@ -456,6 +465,10 @@ export const messages = {
     "Le proxy {name} a refusé l’identification, la page ne s’est donc pas ouverte.",
   "error.backend.browserSystemProxyFailed":
     "Le proxy des réglages de l’ordinateur qui exécute OpenBot ne répond pas ou a refusé la connexion, la page ne s’est donc pas ouverte. Vérifiez les réglages de proxy de cet ordinateur.",
+  "error.backend.browserSystemProxyOrSiteClosed":
+    "Le site ou le proxy des réglages de l’ordinateur qui exécute OpenBot a fermé la connexion sans réponse, la page ne s’est donc pas ouverte. Si aucun site ne s’ouvre, vérifiez les réglages de proxy de cet ordinateur.",
+  "error.backend.browserProfileProxyOrSiteClosed":
+    "Le site ou le proxy de ce profil de navigateur a fermé la connexion sans réponse, la page ne s’est donc pas ouverte. Si aucun site ne s’ouvre, vérifiez le proxy du profil.",
   "error.backend.browserProxyComputerUnreachable":
     "L’ordinateur de ce profil ne répond pas, la page ne s’est donc pas ouverte.",
   "error.backend.browserProxyComputerLocalAddress":

@@ -42,6 +42,7 @@ export const messages = {
   "update.idleRestart.description": "Nieuwe routineruns wachten tot de herstart.",
   "update.idleRestart.waitingFor": "Wachten op {reasons}.",
   "update.idleRestart.cancel": "Herstart annuleren",
+  "update.idleRestart.openSettings": "Update-instellingen openen",
   "update.idleRestart.restartNow": "Nu herstarten",
   "update.idleRestart.restartNowTitle": "OpenBot nu herstarten?",
   "update.idleRestart.restartNowDescription": "Beurten van agents en routineruns die niet klaar zijn, stoppen nu.",

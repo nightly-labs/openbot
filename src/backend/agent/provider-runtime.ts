@@ -160,8 +160,13 @@ const accountReadDecoder = (provider: AgentProvider) =>
   provider === "codex" ? decodeCodexAccountReadResult : decodeAccountReadResult;
 const LONG_START_TIMEOUT_MS = 180_000;
 const PROVIDER_IDLE_RELEASE_MS = 10 * 60_000;
+const CODEX_MCP_TOOL_LIST_REUSE_MS = 30 * 60_000;
 const PROVIDER_UNASSIGNED_RELEASE_MS = 60_000;
 const PROVIDER_IDLE_CHECK_MS = 60_000;
+
+function assignedProviderIdleReleaseMs(provider: AgentProvider): number {
+  return provider === "codex" ? CODEX_MCP_TOOL_LIST_REUSE_MS : PROVIDER_IDLE_RELEASE_MS;
+}
 const LAUNCH_START_CONCURRENCY = 2;
 const SIGN_IN_FILE_POLL_MS = 2_000;
 const SIGN_IN_RECHECK_DELAYS_MS: readonly number[] = [5_000, 10_000, 20_000];
@@ -776,6 +781,7 @@ export class ProviderRuntime implements ProviderPort {
         this.#bundledExecutables[cliProvider],
         preferInstalled,
         this.#installedChosen.has(cliProvider) || this.#installedFallback.has(cliProvider),
+        this.#scope,
       ).pipe(toProviderOperationFailed);
       this.#cliSources.set(provider, cli);
       if (passedOver) this.#passedOverClis.set(provider, passedOver);
@@ -849,7 +855,7 @@ export class ProviderRuntime implements ProviderPort {
         continue;
       }
       const limit = this.#hooks.isProviderAssigned(provider)
-        ? PROVIDER_IDLE_RELEASE_MS
+        ? assignedProviderIdleReleaseMs(provider)
         : PROVIDER_UNASSIGNED_RELEASE_MS;
       if (now - lastUsed < limit) continue;
       logger.info("Stopped an idle provider CLI.", { provider });
@@ -1977,8 +1983,7 @@ export class ProviderRuntime implements ProviderPort {
 
   #extraModels(provider: AgentProvider, account: ProviderAccountStatus): ProviderAccountStatus {
     if (!account.models) return account;
-    const catalogue = this.#modelCatalog.list().filter((model) => model.provider === provider);
-    const models = account.models.filter((model) => !catalogue.some((listed) => listed.id === model.id));
+    const models = account.models.filter((model) => !this.#modelCatalog.lists(provider, model.id));
     return { ...account, models };
   }
 
@@ -2340,8 +2345,18 @@ export class ProviderRuntime implements ProviderPort {
     );
     this.#countActivation(provider);
     this.#forgetUsage(provider);
-    return yield* this.#reprobeProvider(provider);
+    return yield* this.#reprobeProvider(provider, { releaseOldClientOnFailure: true });
   }, Effect.uninterruptible);
+
+  readonly #releaseClientWithOldCredential = Effect.fn("ProviderRuntime.releaseClientWithOldCredential")(function* (
+    this: ProviderRuntime,
+    provider: AgentProvider,
+  ) {
+    const client = this.#clients.get(provider);
+    if (!client || this.#hooks.isProviderBusy(provider)) return;
+    logger.info("Stopped a provider CLI that still uses the previous credential.", { provider });
+    yield* this.#releaseClient(provider, client);
+  });
 
   updateProviderCli(
     provider: AgentProvider,
@@ -3526,6 +3541,7 @@ export class ProviderRuntime implements ProviderPort {
   readonly #reprobeProvider = Effect.fn("ProviderRuntime.reprobeProvider")(function* (
     this: ProviderRuntime,
     provider: AgentProvider,
+    options: { releaseOldClientOnFailure?: boolean } = {},
   ) {
     if (this.#hooks.isProviderBusy(provider)) {
       return yield* new ProviderOperationFailed({
@@ -3570,8 +3586,19 @@ export class ProviderRuntime implements ProviderPort {
               return this.status();
             });
           }),
+          Effect.tapError(() =>
+            options.releaseOldClientOnFailure ? this.#releaseClientWithOldCredential(provider) : Effect.void,
+          ),
           Effect.tapError((failure) =>
-            Effect.sync(() => this.#setProviderConnectionFailure(provider, failure.cause, cli?.version)),
+            Effect.sync(() =>
+              this.#setProviderConnectionFailure(
+                provider,
+                failure.cause,
+                cli?.version,
+                undefined,
+                options.releaseOldClientOnFailure,
+              ),
+            ),
           ),
         ),
       () =>

@@ -62,6 +62,12 @@ export const messages = {
     "OpenBot はサインインウィンドウでページを読み込めませんでした。インターネット接続を確認してから、サインインウィンドウをもう一度開いてください。",
   "error.backend.browserSignInReadFailed": "OpenBot はウィンドウからサインインを読み取れませんでした。",
   "error.backend.browserStopUnsupported": "このリモートホストはページの読み込みを停止できません。",
+  "error.backend.browserLocationFailed": "ページの位置情報を設定できませんでした。",
+  "error.backend.browserPermissionsUnsupported": "このリモートホストは位置情報のリクエストに応答できません。",
+  "error.backend.browserLocationRequired": "リクエストを許可するには、デバイスの位置情報を送信してください。",
+  "error.backend.browserHttpSignInInactive":
+    "このサイトはもうサインインを求めていません。ページを再読み込みして、もう一度お試しください。",
+  "error.backend.browserHttpSignInUnsupported": "このリモートホストはサイトへのサインインを受け取れません。",
   "error.backend.sharedDataLocalOnly": "共有データは、これらのエージェントを実行しているコンピューターで管理されます。",
   "error.backend.browserUrlProtocol": "HTTP(S) のブラウザー URL のみ使用できます。",
   "error.backend.sunshineNotReady": "Sunshine の準備ができませんでした。",
@@ -212,6 +218,8 @@ export const messages = {
   "error.backend.videoGenerationFailed": "動画の生成に失敗しました。",
   "error.backend.videoGenerationNoVideo": "動画の生成で動画が返されませんでした。",
   "error.backend.videoGenerationInterrupted": "動画の生成が中断されました。",
+  "error.backend.grokVideoNoQuota":
+    "この Grok アカウントでは動画を作成できません。代わりにクレジットで動画を生成してください。",
   "error.backend.attachmentNotRegularFile": "添付できるのは通常のファイルだけです: {name}",
   "error.backend.attachmentCopyFailed": "OpenBot は {name} をコピーできませんでした。",
   "error.backend.routineNameRequired": "ルーティン名が必要です。",
@@ -301,6 +309,8 @@ export const messages = {
     "サインインサーバーはまだ OpenBot をアプリとして受け付けていません。原因はお使いのアカウントではありません。ローカル MCP サーバーなど、別の方法で接続してください。",
   "error.backend.mcpRegistrationUnavailable":
     "サインインサーバーは OpenBot をアプリとして登録できません。原因はお使いのアカウントではありません。接続するには、マーケットプレイス、アプリでこのサーバーを保存してから、サインインアプリを追加してください。",
+  "error.backend.mcpSignInAppNeeded":
+    "サインインサーバーは OpenBot をアプリとして登録できません。原因はお使いのアカウントではありません。接続するには、マーケットプレイス、アプリでこのサーバーを開き、接続をテストをクリックしてから、サインインアプリを追加してください。",
   "error.backend.mcpSignInAbandonedGeneric": "サインインは中止されました。",
   "error.backend.mcpSignInForgotten": "MCP のサインインは実行中に破棄されました。",
   "error.backend.mcpSignInAbandoned": "MCP のサインインは中止されました。",
@@ -449,6 +459,10 @@ export const messages = {
   "error.backend.browserProxySignInRefused": "プロキシ {name} がサインインを拒否したため、ページを開けませんでした。",
   "error.backend.browserSystemProxyFailed":
     "OpenBot を実行しているコンピューターの設定にあるプロキシが応答しないか接続を拒否したため、ページを開けませんでした。そのコンピューターのプロキシ設定を確認してください。",
+  "error.backend.browserSystemProxyOrSiteClosed":
+    "サイト、または OpenBot を実行しているコンピューターの設定にあるプロキシが応答なしで接続を閉じたため、ページを開けませんでした。どのサイトも開けない場合は、そのコンピューターのプロキシ設定を確認してください。",
+  "error.backend.browserProfileProxyOrSiteClosed":
+    "サイト、またはこのブラウザープロファイルのプロキシが応答なしで接続を閉じたため、ページを開けませんでした。どのサイトも開けない場合は、プロファイルのプロキシを確認してください。",
   "error.backend.browserProxyComputerUnreachable":
     "このプロファイルが使うコンピューターが応答しないため、ページを開けませんでした。",
   "error.backend.browserProxyComputerLocalAddress":

@@ -215,6 +215,7 @@ export const queryKeys = {
     ...logo,
   ],
   planLimits: (scope: QueryScope, serverId: string) => ["plan-limits", ...scope, serverId],
+  agentUsageLimits: (scope: QueryScope, serverId: string) => ["agent-usage-limits", ...scope, serverId],
   machineMetrics: (scope: QueryScope, serverId: string) => ["machine-metrics", ...scope, serverId],
   serverUsage: (scope: QueryScope, serverId: string, range: unknown) => ["server-usage", ...scope, serverId, range],
   profileActivity: (scope: QueryScope, serverId: string, range: unknown) => [

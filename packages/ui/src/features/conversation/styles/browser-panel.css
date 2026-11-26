@@ -166,6 +166,62 @@
   object-fit: contain;
 }
 
+.browser-live-view-dialog-scrim {
+  position: absolute;
+  display: flex;
+  justify-content: center;
+  align-items: flex-start;
+  padding: var(--openbot-space-6) var(--openbot-space-4) 0;
+  background: var(--openbot-bg-overlay);
+  inset: 0;
+}
+
+.ui-dialog-content.browser-live-view-dialog {
+  display: grid;
+  width: min(460px, 100%);
+  box-sizing: border-box;
+  gap: var(--openbot-space-3);
+  padding: var(--openbot-space-4);
+  background: var(--openbot-bg-surface-raised);
+  box-shadow:
+    0 0 0 1px var(--openbot-dialog-ring),
+    var(--openbot-shadow-raised);
+  outline: 0;
+}
+
+.browser-live-view-dialog-site {
+  display: flex;
+  align-items: center;
+  gap: var(--openbot-space-1-5);
+  margin: 0;
+  color: var(--openbot-text-secondary);
+  font-size: var(--openbot-text-sm);
+  font-weight: var(--openbot-weight-regular);
+}
+
+.browser-live-view-dialog-site > svg {
+  width: 14px;
+  height: 14px;
+  flex: none;
+}
+
+.browser-live-view-dialog-message {
+  max-height: 240px;
+  margin: 0;
+  overflow-y: auto;
+  color: var(--openbot-text-primary);
+  font-size: var(--openbot-text-md);
+  line-height: var(--openbot-leading-md);
+  overflow-wrap: anywhere;
+  white-space: pre-wrap;
+}
+
+.browser-live-view-dialog-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--openbot-space-2);
+}
+
 .browser-empty-state {
   display: grid;
   height: 100%;

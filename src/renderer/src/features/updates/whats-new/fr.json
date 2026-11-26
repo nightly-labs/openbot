@@ -1,5 +1,42 @@
 [
   {
+    "version": "0.79.0",
+    "date": "2026-11-25",
+    "notices": [
+      "Mettez aussi à jour vers cette version chaque serveur que vous avez rejoint. Les outils d’image et de vidéo payés en crédits, les demandes de localisation et plusieurs des corrections ci-dessous ne fonctionnent sur un serveur que si le serveur a cette version."
+    ],
+    "groups": [
+      {
+        "type": "added",
+        "items": [
+          "Les agents peuvent créer des images et des vidéos avec des crédits OpenBot, et retoucher vos images. La carte d’approbation affiche le modèle, le prix et le prompt. Vous pouvez choisir un autre modèle avant de l’autoriser. L’élément Credits de la barre latérale gauche affiche votre solde. Un propriétaire ou un administrateur peut activer ou désactiver « Les agents peuvent utiliser des crédits ».",
+          "Les agents peuvent payer des sites en crypto depuis un portefeuille NEAR Intents. Connectez-le dans Réglages du serveur › Vault › Crypto avec une clé d’accès, puis faites un dépôt. Chaque paiement attend votre approbation dans la discussion, sauf si vous choisissez « Toujours autoriser » pour ce site. Un budget quotidien limite ce que les agents peuvent dépenser. Le portefeuille sert uniquement sur cet ordinateur, et les paiements utilisent de vrais fonds.",
+          "Chaque compte reçoit 10 crédits gratuits de bienvenue. Vous pouvez aussi utiliser un code de crédit sur la page Credits avec Redeem code.",
+          "L’onglet de navigateur d’un agent peut demander votre localisation. Le chat vous demande d’abord, et vous choisissez Bloquer, Toujours autoriser ou Autoriser. Avant, le navigateur bloquait toujours la demande.",
+          "La barre latérale a des onglets au-dessus de la liste des discussions : Tous, Non lues et les dossiers que vous choisissez. Chaque onglet affiche ses discussions non lues."
+        ]
+      },
+      {
+        "type": "changed",
+        "items": [
+          "Une nouvelle étape de workflow démarre maintenant avec un modèle qui peut s’exécuter. Une étape de texte utilise votre modèle préféré, ou le modèle habituel d’un fournisseur connecté.",
+          "Quand vous n’avez que des crédits gratuits, la liste des modèles d’une carte d’approbation marque avec « Crédits gratuits » les modèles payés par les crédits gratuits.",
+          "Le panneau latéral peut se diviser en jusqu’à trois groupes, l’un au-dessus de l’autre. Faites glisser la ligne entre deux groupes pour changer leur hauteur."
+        ]
+      },
+      {
+        "type": "fixed",
+        "items": [
+          "L’application se fige moins, surtout sous Windows. Elle garde les résultats des vérifications lentes pendant un court moment et fait le travail lent en arrière-plan.",
+          "Quand un agent Claude termine un plan en mode plan, le chat affiche maintenant le plan avec Approuver et Stop planning. Avant, aucune approbation n’apparaissait et l’agent commençait à construire.",
+          "Un message d’un autre agent ou d’une routine n’arrête plus le travail d’un agent Claude occupé.",
+          "Une alerte d’un site web dans l’onglet de navigateur d’un agent ne couvre plus la fenêtre d’OpenBot tant que vous ne cliquez pas sur OK. L’alerte se ferme toute seule et l’agent reçoit son texte.",
+          "Sur un bureau Linux X11, la saisie dans OpenBot ne s’arrête plus après qu’un agent utilise Computer Use dans une autre app. Si la saisie s’était déjà arrêtée, déconnectez-vous puis reconnectez-vous une fois."
+        ]
+      }
+    ]
+  },
+  {
     "version": "0.78.0",
     "date": "2026-11-24",
     "notices": [

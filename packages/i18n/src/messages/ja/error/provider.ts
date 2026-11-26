@@ -368,6 +368,8 @@ export const messages = {
     "Gemini はこのチャットの保存済みの履歴を読み取れませんでした。OpenBot はチャット履歴を引き継いで新しい Gemini セッションを開始しました。メッセージをもう一度送信してください。",
   "error.provider.acpTurnStuck":
     "{provider} は前のターンを終了しなかったため、このメッセージを受け付けませんでした。OpenBot はチャット履歴を引き継いで新しい {provider} セッションを開始しました。メッセージをもう一度送信してください。",
+  "error.provider.antigravityLicenseRefused":
+    "Google によると、このアカウントにはこのモデルを使用するライセンスがありません。別のモデルを選んでから、メッセージをもう一度送信してください。\n{detail}",
   "error.provider.antigravityLocationUnsupported":
     "Google は、このエージェントを実行しているコンピューターのネットワーク上の場所からの Gemini の利用を許可していません。別のコンピューターで Gemini を使うか、このエージェントに別のプロバイダーを選んでください。\n{detail}",
   "error.provider.antigravityTurnStopped":
@@ -464,6 +466,8 @@ export const messages = {
     "画像が大きすぎるため、モデルはこのチャットの画像を受け付けませんでした。OpenBot はチャット履歴を引き継いだ新しい {provider} セッションを開始しました。もう一度お試しください。",
   "error.provider.imageCountLimit":
     "画像が多すぎるため、モデルはこのチャットを受け付けませんでした。OpenBot はチャット履歴を引き継いだ新しい {provider} セッションを開始しました。もう一度お試しください。",
+  "error.provider.imageCountLimitRepeated":
+    "画像が多すぎるため、モデルはこのチャットをまた受け付けませんでした。1 つのタスクがこのモデルの上限より多くの画像を開くため、新しいセッションでは解決しません。「新しいチャット」を選択し、各ステップで開く画像を減らすようエージェントに頼むか、より多くの画像を受け付けるモデルを選択してください。",
   "error.provider.imageUnreadable":
     "モデルはこのチャット内の画像を読み取れませんでした。OpenBot はチャット履歴を引き継いだ新しい {provider} セッションを開始しました。もう一度お試しください。画像を送った場合は、別の画像を送ってください。",
   "error.provider.requestTooLarge":
@@ -478,6 +482,8 @@ export const messages = {
     "Muse が MCP サーバーを起動できず、このセッションで MCP をブロックしました。OpenBot はチャット履歴を引き継いだ新しい Muse セッションを開始しました。もう一度お試しください。エラーが続く場合は、このエージェントの Computer Use または失敗した MCP サーバーをオフにしてください。",
   "error.provider.claudeSessionMissing":
     "Claude Code はこのチャットの保存済みセッションを見つけられませんでした。OpenBot はチャット履歴を引き継いだ新しい Claude Code セッションを開始しました。もう一度お試しください。",
+  "error.provider.opencodeSessionMissing":
+    "OpenCode はこのチャットの保存済みセッションを見つけられませんでした。OpenBot はチャット履歴を引き継いだ新しい OpenCode セッションを開始しました。もう一度お試しください。",
   "error.provider.grokSignIn": "Grok を使うには `grok login` を実行するか、XAI_API_KEY を設定してください。",
   "error.provider.acpSignInNoStart":
     "プロバイダーが起動しなかったため、ログインを開始できませんでした。もう一度お試しいただくか、OpenBot を再起動してください。",
@@ -596,7 +602,10 @@ export const messages = {
   "error.provider.piOutdated":
     "Pi {version} は古すぎます。ネイティブ RPC と MCP に対応するには、Pi 1.1.0 以降をインストールしてください。",
   "error.provider.nativeMissing": "{provider} CLI がインストールされていません。設定でダウンロードしてください。",
-  "error.provider.nativeNotStarted": "{provider} CLI を起動できませんでした。",
+  "error.provider.nativeNotStarted":
+    "OpenBot はインストール済みの {provider} を見つけましたが、起動しませんでした。{provider} を更新するか再インストールしてから、もう一度お試しください。",
+  "error.provider.nativeManagedNotStarted":
+    "このサーバーを実行するコンピューターで {provider} が起動しませんでした。そのコンピューターで OpenBot を再起動してください。それでも起動しない場合は、ヘルプ > 問題を報告 を選んでください。",
   "error.provider.nativeVersionUnreadable": "{provider} CLI のバージョンを読み取れませんでした。",
   "error.provider.piSessionBusy": "現在の Pi のターンが終わるまでお待ちください。",
   "error.provider.acpSessionBusy":

@@ -5,7 +5,9 @@ import { type AgentNotificationLevelsEvent, agentNotificationLevelsEvent } from 
 import { type AgentSessionSettingsEvent, agentSessionSettingsEvent } from "./agent-session-settings-v1";
 import { withAgentTaskEventUiBlocks } from "./agent-task-ui-blocks-v1";
 import { type AgentTasksEvent, agentTasksEvent } from "./agent-tasks-v1";
+import { type BrowserHttpSignInEvent, browserHttpSignInEvent } from "./browser-http-sign-in-v1";
 import { type BrowserPageStateEvent, browserPageStateEvent } from "./browser-page-state-v1";
+import { type BrowserPermissionsEvent, browserPermissionsEvent } from "./browser-permissions-v1";
 import { type BrowserProfilesEvent, browserProfilesEvent } from "./browser-profiles-events-v1";
 import { type BrowserUserControlEvent, browserUserControlEvent } from "./browser-user-control-v1";
 import { type ChannelEvent, channelEvent } from "./channels-v1";
@@ -28,6 +30,7 @@ import { type SkillsEvent, skillsEvent } from "./skills-events-v1";
 import { type UsageCreditsEvent, usageCreditsEvent } from "./usage-credits-v1";
 import { type VaultEvent, vaultEvent } from "./vault-v1";
 import { type WorkflowFoldersEvent, workflowFoldersEvent } from "./workflow-folders-v1";
+import { type WorkflowSpotEvent, workflowSpotEvent } from "./workflow-presence-v1";
 import { type WorkflowsEvent, workflowsEvent } from "./workflows-v1";
 
 export type OptionalTeamEvent =
@@ -38,7 +41,9 @@ export type OptionalTeamEvent =
   | AgentSessionSettingsEvent
   | ChatColorsEvent
   | ClientBrowserCommandEvent
+  | BrowserHttpSignInEvent
   | BrowserPageStateEvent
+  | BrowserPermissionsEvent
   | BrowserProfilesEvent
   | BrowserUserControlEvent
   | AgentTasksEvent
@@ -60,6 +65,7 @@ export type OptionalTeamEvent =
   | VaultEvent
   | WorkflowsEvent
   | WorkflowFoldersEvent
+  | WorkflowSpotEvent
   | CrmEvent;
 
 export interface OptionalTeamEventOptions {
@@ -75,7 +81,9 @@ export function optionalTeamEvent(value: unknown, options?: OptionalTeamEventOpt
     agentSessionSettingsEvent(value) ??
     chatColorsEvent(value) ??
     clientBrowserCommandEvent(value) ??
+    browserHttpSignInEvent(value) ??
     browserPageStateEvent(value) ??
+    browserPermissionsEvent(value) ??
     browserProfilesEvent(value) ??
     browserUserControlEvent(value) ??
     agentTasksEvent(value) ??
@@ -97,6 +105,7 @@ export function optionalTeamEvent(value: unknown, options?: OptionalTeamEventOpt
     vaultEvent(value) ??
     workflowsEvent(value) ??
     workflowFoldersEvent(value) ??
+    workflowSpotEvent(value) ??
     crmEvent(value);
   return event && options?.agentTaskUiBlocks ? withAgentTaskEventUiBlocks(event, value) : event;
 }

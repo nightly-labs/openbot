@@ -18,6 +18,7 @@ export function sidebarAgentThreads(input: SidebarAgentThreadsInput): SidebarAge
   const { tasks, tabs } = input;
   if (!tasks.available()) return undefined;
   const reading = new Set<string>();
+  const editable = tasks.editable();
   return {
     threads: (agentId) => {
       const list = tasks.snapshot(agentId)?.tasks ?? [];
@@ -40,5 +41,7 @@ export function sidebarAgentThreads(input: SidebarAgentThreadsInput): SidebarAge
     },
     onOpen: input.openThread,
     onNew: input.onNew,
+    onArchive: (agentId, threadId) => void tabs.archive(agentId, threadId),
+    onDelete: editable ? (agentId, threadId) => void tabs.remove(agentId, threadId) : undefined,
   };
 }

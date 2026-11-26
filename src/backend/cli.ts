@@ -8,7 +8,8 @@ import { olderVersion } from "@openbot/contracts/cli-version";
 import { type AgentProviderId, agentProviderName } from "@openbot/contracts/ipc";
 import { isDynamicRecord } from "@openbot/contracts/runtime-values";
 import { sourceText } from "@openbot/i18n/source";
-import { Deferred, Effect, Result } from "effect";
+import { createOpenBotLogger } from "@openbot/logging";
+import { Deferred, Effect, Fiber, Option, Result, type Scope } from "effect";
 import { providerCheckTimeoutMs } from "./disk-restore";
 import type { SignInRegion } from "./kimi-region";
 import { type ProviderClientOperationError, providerCall, providerFailure } from "./provider-client-effects";
@@ -16,6 +17,8 @@ import { type ProviderClientOperationError, providerCall, providerFailure } from
 export { compareReleases, isVersion, olderVersion } from "@openbot/contracts/cli-version";
 
 const execFileAsync = promisify(execFile);
+const logger = createOpenBotLogger("provider-runtime");
+const loggedStartFailures = new Set<string>();
 const MINIMUM_CODEX_VERSION = [0, 156, 0] as const;
 const MINIMUM_CLAUDE_VERSION = [2, 1, 232] as const;
 const MINIMUM_GROK_VERSION = [1, 0, 5] as const;
@@ -715,6 +718,7 @@ const resolveNativeCli = Effect.fn("Cli.resolveNativeCli")(function* (
   const candidates = yield* cliCandidates(provider, input.systemCandidates, input.bundledExecutable ?? null);
   let found = false;
   let outdated: CodexCliError | undefined;
+  let failedSource: "system" | "managed" | undefined;
   for (const candidate of candidates) {
     if (provider === "muse" && isWindowsLauncherScript(candidate.executable)) continue;
     if (!(yield* isExecutable(candidate.executable))) continue;
@@ -729,22 +733,38 @@ const resolveNativeCli = Effect.fn("Cli.resolveNativeCli")(function* (
       }).pipe(Effect.catchDefect((cause) => Effect.fail(providerFailure(cause)))),
     );
     if (Result.isSuccess(attempt)) return attempt.success;
-    if (attempt.failure.cause instanceof CodexCliError && attempt.failure.cause.code === "outdated")
-      outdated = attempt.failure.cause;
-    if (isCliTimeout(attempt.failure.cause)) return yield* Effect.fail(attempt.failure);
+    const cause = attempt.failure.cause;
+    if (cause instanceof CodexCliError && cause.code === "outdated") outdated = cause;
+    else if (isCliTimeout(cause)) return yield* Effect.fail(attempt.failure);
+    else {
+      failedSource ??= candidate.source;
+      const failure = startFailure(cause);
+      const logged = `${candidate.executable}\0${failure.code}\0${failure.signal ?? ""}`;
+      if (!loggedStartFailures.has(logged)) {
+        loggedStartFailures.add(logged);
+        logger.warn("Provider CLI did not start.", { provider, source: candidate.source, ...failure });
+      }
+    }
   }
   if (outdated) return yield* Effect.fail(providerFailure(outdated));
+  const key = !found
+    ? "error.provider.nativeMissing"
+    : failedSource === "managed"
+      ? "error.provider.nativeManagedNotStarted"
+      : "error.provider.nativeNotStarted";
   return yield* Effect.fail(
     providerFailure(
-      new CodexCliError(
-        sourceText(found ? "error.provider.nativeNotStarted" : "error.provider.nativeMissing", {
-          provider: agentProviderName(provider),
-        }),
-        found ? "invalid" : "missing",
-      ),
+      new CodexCliError(sourceText(key, { provider: agentProviderName(provider) }), found ? "invalid" : "missing"),
     ),
   );
 });
+
+function startFailure(cause: unknown): { code: string | number | null; signal?: string } {
+  if (cause instanceof CodexCliError) return { code: cause.code };
+  if (!isDynamicRecord(cause)) return { code: null };
+  const code = typeof cause.code === "string" || typeof cause.code === "number" ? cause.code : null;
+  return typeof cause.signal === "string" ? { code, signal: cause.signal } : { code };
+}
 
 export const resolvePiCli = (input?: { systemCandidates?: string[]; bundledExecutable?: string | null | undefined }) =>
   resolveNativeCli("pi", input);
@@ -845,14 +865,79 @@ export interface InstalledFirstChoice<Cli> {
   } | null;
 }
 
+const OPTIONAL_INSTALLED_CLI_WAIT_MS = 20_000;
+const SKIP_HUNG_INSTALLED_CLI_MS = 10 * 60_000;
+
+interface InstalledCliCheck {
+  waitedOut: boolean;
+  hungAt: number | null;
+}
+
+const installedCliChecks = new Map<string, InstalledCliCheck>();
+
+function isTimeoutFailure(failure: unknown): boolean {
+  return isDynamicRecord(failure) && isCliTimeout(failure.cause);
+}
+
+function settleInstalledCliCheck(key: string, check: InstalledCliCheck, hung: boolean): void {
+  if (installedCliChecks.get(key) !== check) return;
+  if (hung && check.waitedOut) check.hungAt = Date.now();
+  else installedCliChecks.delete(key);
+}
+
+function skipsInstalledCli(key: string): boolean {
+  const hungAt = installedCliChecks.get(key)?.hungAt ?? null;
+  return hungAt !== null && Date.now() - hungAt < SKIP_HUNG_INSTALLED_CLI_MS;
+}
+
+function optionalInstalledCli<Cli, E>(
+  installed: Effect.Effect<Cli, E>,
+  key: string,
+  backgroundScope: Scope.Closeable | undefined,
+) {
+  const withinWait = <A>(effect: Effect.Effect<A>) =>
+    effect.pipe(Effect.timeoutOption(providerCheckTimeoutMs(OPTIONAL_INSTALLED_CLI_WAIT_MS)));
+  return Effect.gen(function* () {
+    if (skipsInstalledCli(key)) return null;
+    const running = installedCliChecks.get(key);
+    if (running && running.hungAt === null) {
+      if (running.waitedOut) return null;
+      const own = yield* withinWait(Effect.result(installed));
+      return Option.isSome(own) && Result.isSuccess(own.value) ? own.value.success : null;
+    }
+    const check: InstalledCliCheck = { waitedOut: false, hungAt: null };
+    installedCliChecks.set(key, check);
+    const read = installed.pipe(
+      Effect.result,
+      Effect.tap((result) =>
+        Effect.sync(() =>
+          settleInstalledCliCheck(key, check, Result.isFailure(result) && isTimeoutFailure(result.failure)),
+        ),
+      ),
+      Effect.onInterrupt(() => Effect.sync(() => settleInstalledCliCheck(key, check, false))),
+    );
+    const fiber = yield* backgroundScope && backgroundScope.state._tag !== "Closed"
+      ? Effect.forkIn(read, backgroundScope)
+      : Effect.forkChild(read);
+    const answer = yield* withinWait(Fiber.join(fiber));
+    if (Option.isNone(answer)) {
+      check.waitedOut = true;
+      return null;
+    }
+    return Result.isSuccess(answer.value) ? answer.value.success : null;
+  });
+}
+
 export function chooseInstalledFirst<Cli extends AgentCliInfo, E>(
   resolve: (input: { bundledExecutable?: string | null }) => Effect.Effect<Cli, E>,
   bundledExecutable: string | null | undefined,
   preferInstalled: boolean,
   installedChosen = false,
+  backgroundScope?: Scope.Closeable,
 ): Effect.Effect<InstalledFirstChoice<Cli>, E> {
   const copy = resolve(bundledExecutable === undefined ? {} : { bundledExecutable });
-  const installedCli = resolve({ bundledExecutable: null }).pipe(Effect.orElseSucceed(() => null));
+  const installed = resolve({ bundledExecutable: null });
+  const installedCli = installed.pipe(Effect.orElseSucceed(() => null));
   const choose = (resolved: Cli, installed: Cli | null): InstalledFirstChoice<Cli> => {
     if (resolved.source !== "managed" || installed?.source !== "system") return { cli: resolved, passedOver: null };
     const asNew = installed.version === resolved.version || olderVersion(resolved.version, installed.version);
@@ -871,8 +956,11 @@ export function chooseInstalledFirst<Cli extends AgentCliInfo, E>(
   };
   return Effect.gen(function* () {
     if (bundledExecutable) {
-      const [resolved, installed] = yield* Effect.all([copy, installedCli], { concurrency: 2 });
-      return choose(resolved, installed);
+      const installedCheck = installedChosen
+        ? installedCli
+        : optionalInstalledCli(installed, bundledExecutable, backgroundScope);
+      const [resolved, installedFound] = yield* Effect.all([copy, installedCheck], { concurrency: 2 });
+      return choose(resolved, installedFound);
     }
     const resolved = yield* copy;
     return resolved.source === "managed" ? choose(resolved, yield* installedCli) : { cli: resolved, passedOver: null };

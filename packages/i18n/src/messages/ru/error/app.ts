@@ -11,4 +11,6 @@ export const messages = {
   "error.app.remoteIdentityUnavailable": "Идентификатор удалённого хоста недоступен.",
   "error.app.iceServersMissing": "Remote Signal ещё не передал ICE-серверы.",
   "error.app.finishLocalTest": "Завершите локальную проверку, прежде чем переключать экраны.",
+  "error.app.windowBlockedBySecuritySoftware":
+    "Вероятно, защитная программа на этом компьютере остановила окно OpenBot. Добавьте OpenBot.exe в доверенные программы в защитной программе, например в Kaspersky. Затем снова запустите OpenBot.",
 } as const satisfies PartialTranslation<typeof source>;

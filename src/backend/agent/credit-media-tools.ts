@@ -3,6 +3,7 @@ import { attachmentMimeTypeForName } from "@openbot/contracts/attachment-files";
 import {
   CREDIT_MEDIA_PROMPT_LIMIT,
   CREDIT_MEDIA_REFERENCE_LIMIT,
+  type CreditMediaBalance,
   type CreditMediaGenerationKind,
   type CreditMediaInputRole,
   type CreditMediaJobRequest,
@@ -190,7 +191,7 @@ export interface CreditMediaToolsOptions {
   askWhenBlocked: () => boolean;
   asksMuted: (personIds: readonly string[]) => boolean;
   muteAsks: (person: CreditAsksPerson | null) => Effect.Effect<void, unknown>;
-  defaultModel: (kind: CreditMediaGenerationKind) => string | null;
+  defaultModels: (kind: CreditMediaGenerationKind) => readonly string[];
   fitImage: ImageFitter | null;
   scope: () => Scope.Scope;
   report?: (report: CreditMediaReport) => void;
@@ -216,6 +217,7 @@ interface PlannedJob {
   job: Omit<CreditMediaJobRequest, "jobId">;
   inputs: Inputs;
   cost: number;
+  freeNote: string | null;
 }
 
 const failure = (message: string) => openBotToolFailure(message);
@@ -326,12 +328,14 @@ function extensionOf(mimeType: string): string {
 function chosenModel(
   ofKind: readonly CreditMediaModel[],
   requested: string | undefined,
-  defaultModel: string | null,
+  defaultModels: readonly string[],
   inputs: Inputs,
 ): CreditMediaModel | undefined {
   if (requested !== undefined) return ofKind.find((candidate) => candidate.id === requested);
-  const preferred = ofKind.find((candidate) => candidate.id === defaultModel);
-  if (preferred && takesInputs(preferred, inputs)) return preferred;
+  for (const id of defaultModels) {
+    const preferred = ofKind.find((candidate) => candidate.id === id);
+    if (preferred && takesInputs(preferred, inputs)) return preferred;
+  }
   return ofKind.find((candidate) => takesInputs(candidate, inputs));
 }
 
@@ -340,11 +344,11 @@ function plannedJob(
   kind: CreditMediaGenerationKind,
   args: JobArguments,
   inputs: Inputs,
-  defaultModel: string | null,
+  defaultModels: readonly string[],
 ): PlannedJob | string {
   const ofKind = models.filter((model) => model.kind === kind);
   if (ofKind.length === 0) return `No ${kind} model is available now. Try again later.`;
-  const model = chosenModel(ofKind, args.model, defaultModel, inputs);
+  const model = chosenModel(ofKind, args.model, defaultModels, inputs);
   if (!model)
     return args.model === undefined
       ? `No ${kind} model takes these pictures. Call ${LIST_MEDIA_MODELS_TOOL}.`
@@ -364,7 +368,81 @@ function plannedJob(
   if (requestProblem) return requestProblemText(model, requestProblem);
   const cost = creditMediaCost(model, job);
   if (cost === null) return `${model.id} has no price for this request. Choose another resolution or model.`;
-  return { model, job, inputs, cost };
+  return { model, job, inputs, cost, freeNote: null };
+}
+
+function settingChoices(model: CreditMediaModel, args: JobArguments): JobArguments[] {
+  const resolutions: (string | undefined)[] =
+    args.resolution === undefined && model.resolutions.length > 0 ? [...model.resolutions] : [args.resolution];
+  const durations: (number | undefined)[] =
+    model.kind === "video" && args.duration === undefined && model.durations.length > 0
+      ? [...model.durations]
+      : [args.duration];
+  return resolutions.flatMap((resolution) =>
+    durations.map((duration) => ({ ...args, model: model.id, resolution, duration })),
+  );
+}
+
+function freeFit(
+  models: readonly CreditMediaModel[],
+  kind: CreditMediaGenerationKind,
+  args: JobArguments,
+  inputs: Inputs,
+  credits: number,
+): PlannedJob | null {
+  const free = models.filter((model) => model.kind === kind && model.welcome === true && takesInputs(model, inputs));
+  const fits = (planned: PlannedJob | string): planned is PlannedJob =>
+    typeof planned !== "string" && planned.cost <= credits;
+  const asked = free
+    .map((model) => plannedJob(models, kind, { ...args, model: model.id }, inputs, []))
+    .filter(fits)
+    .sort((a, b) => a.cost - b.cost);
+  if (asked[0]) return asked[0];
+  const reduced = free
+    .flatMap((model) => settingChoices(model, args).map((choice) => plannedJob(models, kind, choice, inputs, [])))
+    .filter(fits)
+    .sort((a, b) => (b.job.duration ?? 0) - (a.job.duration ?? 0) || b.cost - a.cost);
+  return reduced[0] ?? null;
+}
+
+function freeOfferText(tool: string, short: PlannedJob, spendable: number, free: PlannedJob): string {
+  const settings = [
+    `model "${free.model.id}"`,
+    ...(free.job.resolution === null ? [] : [`resolution "${free.job.resolution}"`]),
+    ...(free.job.duration === null ? [] : [`duration ${free.job.duration}`]),
+  ].join(", ");
+  const balance =
+    short.model.welcome === true
+      ? `the free credits are ${spendable}, too few for these settings`
+      : `the paid balance is ${spendable}`;
+  const next =
+    free.model.id === short.model.id
+      ? `It fits at lower settings: call ${tool} again with ${settings} (${free.cost} credits).`
+      : `${listedModel(free.model).name} takes free credits: call ${tool} again with ${settings} (${free.cost} credits).`;
+  return `Nothing was spent. ${short.model.id} costs ${short.cost} credits, and ${balance}. ${next} When the user named ${short.model.id}, ask the user first; they add paid credits in Settings > Credits.`;
+}
+
+function settingsText(planned: PlannedJob): string {
+  return [
+    ...(planned.job.resolution === null ? [] : [planned.job.resolution]),
+    ...(planned.job.duration === null ? [] : [`${planned.job.duration} s`]),
+  ].join(", ");
+}
+
+function freeNoteText(asked: PlannedJob, free: PlannedJob): string {
+  const askedName = listedModel(asked.model).name;
+  const freeName = listedModel(free.model).name;
+  const settings = settingsText(free);
+  const used = settings === "" ? freeName : `${freeName} at ${settings}`;
+  if (asked.model.welcome !== true)
+    return `The paid balance was too low for ${askedName}, so OpenBot used ${used}, which takes free credits.`;
+  if (free.model.id === asked.model.id)
+    return `The free credits were too few for ${askedName} at the asked settings, so OpenBot used ${used}.`;
+  return `The free credits were too few for ${askedName}, so OpenBot used ${used}, which also takes free credits.`;
+}
+
+function freeNote(planned: PlannedJob): { note?: string } {
+  return planned.freeNote === null ? {} : { note: planned.freeNote };
 }
 
 function choiceOf(planned: PlannedJob): MediaApprovalChoice {
@@ -381,7 +459,8 @@ function approvalOffer(
   models: readonly CreditMediaModel[],
   kind: CreditMediaGenerationKind,
   planned: PlannedJob,
-  defaultModel: string | null,
+  defaultModels: readonly string[],
+  balance: CreditMediaBalance | null,
 ): MediaApprovalOffer {
   const others = models.filter(
     (model) => model.kind === kind && model.id !== planned.model.id && inputProblem(model, planned.inputs) === null,
@@ -392,9 +471,10 @@ function approvalOffer(
     prompt: planned.job.prompt,
     agentModel: planned.model.id,
     choice: choiceOf(planned),
-    defaultModel: offered.some((model) => model.id === defaultModel) ? defaultModel : null,
+    defaultModel: defaultModels.find((id) => offered.some((model) => model.id === id)) ?? null,
     canSetDefault: true,
     models: offered,
+    ...(balance ? { balance: { available: balance.available, welcome: balance.welcome ?? 0 } } : {}),
   };
 }
 
@@ -525,6 +605,12 @@ export class CreditMediaTools {
     );
   }
 
+  #defaultModelIn(models: readonly CreditMediaModel[], kind: CreditMediaGenerationKind): string | null {
+    const preferred = this.#options.defaultModels(kind);
+    const offered = preferred.find((id) => models.some((model) => model.kind === kind && model.id === id));
+    return offered ?? preferred[0] ?? null;
+  }
+
   #list = Effect.fn("CreditMediaTools.list")(function* (
     this: CreditMediaTools,
     media: CreditMediaWorkflows,
@@ -539,7 +625,7 @@ export class CreditMediaTools {
       ...(balance?.welcome ? { freeCredits: balance.welcome } : {}),
       agentsCanUseCredits: this.#options.agentsAllowed(),
       askAboveCredits: this.#options.approvalCredits(),
-      defaultModels: { image: this.#options.defaultModel("image"), video: this.#options.defaultModel("video") },
+      defaultModels: { image: this.#defaultModelIn(models, "image"), video: this.#defaultModelIn(models, "video") },
       models: models.filter((model) => kind === undefined || model.kind === kind).map(listedModel),
     });
   });
@@ -557,15 +643,22 @@ export class CreditMediaTools {
     run.facts.references = roles.length;
     run.facts.modelSource = args.model === undefined ? "default" : "agent";
     const models = yield* media.models();
-    const defaultModel = this.#options.defaultModel(kind);
-    const first = plannedJob(models, kind, args, inputs, defaultModel);
-    if (typeof first === "string") {
+    const defaultModels = this.#options.defaultModels(kind);
+    const asked = plannedJob(models, kind, args, inputs, defaultModels);
+    if (typeof asked === "string") {
       run.facts.outcome = "invalid";
       run.facts.agentModel = args.model ?? null;
-      return failure(first);
+      return failure(asked);
     }
-    run.facts.agentModel = first.model.id;
-    notePlan(run, first);
+    run.facts.agentModel = asked.model.id;
+    notePlan(run, asked);
+    const free = yield* this.#freeInstead(media, models, kind, args, asked);
+    if (free && args.model !== undefined) {
+      run.facts.outcome = "short";
+      return failure(freeOfferText(call.tool, asked, free.spendable, free.planned));
+    }
+    const first = free ? { ...free.planned, freeNote: freeNoteText(asked, free.planned) } : asked;
+    if (free) notePlan(run, first);
     const held = yield* this.#holdUntilFunded(media, call, run, first.model, first.cost);
     if (held) return failure(held);
     const read = yield* Effect.result(call.readInputs(roles.map(({ path }) => path)));
@@ -581,7 +674,8 @@ export class CreditMediaTools {
         kind === "image"
           ? sourceText("status.agent.creditImageApproval", { model: name, credits: first.cost })
           : sourceText("status.agent.creditVideoApproval", { model: name, credits: first.cost });
-      const approval = yield* call.approve(reason, approvalOffer(models, kind, first, defaultModel));
+      const balance = yield* media.balance();
+      const approval = yield* call.approve(reason, approvalOffer(models, kind, first, defaultModels, balance));
       run.facts.approval = {
         accepted: approval.accepted,
         via: approval.via,
@@ -592,7 +686,7 @@ export class CreditMediaTools {
         return failure(sourceText("error.agent.creditMediaDeclined"));
       }
       if (approval.choice) {
-        const chosen = plannedJob(models, kind, argumentsOf(args.prompt, approval.choice), inputs, defaultModel);
+        const chosen = plannedJob(models, kind, argumentsOf(args.prompt, approval.choice), inputs, defaultModels);
         if (typeof chosen === "string") {
           run.facts.outcome = "invalid";
           return failure(chosen);
@@ -692,6 +786,7 @@ export class CreditMediaTools {
       duration: planned.job.duration,
       resolution: planned.job.resolution,
       ...file,
+      ...freeNote(planned),
     });
   });
 
@@ -705,6 +800,23 @@ export class CreditMediaTools {
     const spendable = yield* spendableFor(media, model);
     if (spendable === null || cost <= spendable) return null;
     return { reason: "balance", balance: spendable } satisfies Blocked;
+  });
+
+  #freeInstead = Effect.fn("CreditMediaTools.freeInstead")(function* (
+    this: CreditMediaTools,
+    media: CreditMediaWorkflows,
+    models: readonly CreditMediaModel[],
+    kind: CreditMediaGenerationKind,
+    args: JobArguments,
+    asked: PlannedJob,
+  ) {
+    if (!this.#options.agentsAllowed()) return null;
+    const balance = yield* media.balance();
+    if (!balance?.welcome) return null;
+    const spendable = creditMediaSpendable(balance, asked.model.welcome === true);
+    if (asked.cost <= spendable) return null;
+    const planned = freeFit(models, kind, args, asked.inputs, creditMediaSpendable(balance, true));
+    return planned ? { planned, spendable } : null;
   });
 
   #holdUntilFunded = Effect.fn("CreditMediaTools.holdUntilFunded")(function* (
@@ -762,7 +874,14 @@ export class CreditMediaTools {
     size: { width: number; height: number } | null,
     file: { file?: string },
   ): DynamicToolResult {
-    const summary = { status: "shown", model: planned.model.id, credits, ...(size ?? {}), ...file };
+    const summary = {
+      status: "shown",
+      model: planned.model.id,
+      credits,
+      ...(size ?? {}),
+      ...file,
+      ...freeNote(planned),
+    };
     const fitted = this.#options.fitImage?.(bytes);
     if (!fitted || typeof fitted === "string") return openBotToolResult(summary);
     return {

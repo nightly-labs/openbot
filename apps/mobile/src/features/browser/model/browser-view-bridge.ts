@@ -32,6 +32,7 @@ export type BrowserViewBridgeOpen = {
   contextMenu: boolean;
   viewport: { width: number; height: number } | null;
   pageCopy: boolean;
+  dialog: boolean;
 };
 
 export type BrowserViewBridgeCommand =
@@ -69,6 +70,7 @@ export function createBrowserViewBridge(
       contextMenu: view?.options.contextMenu ?? false,
       viewport: view?.options.viewport ?? null,
       pageCopy: view?.options.pageCopy ?? false,
+      dialog: view?.options.dialog ?? false,
     }),
   );
 
@@ -178,6 +180,7 @@ export function createBrowserViewBridge(
           contextMenu: value.contextMenu === true,
           viewport: pageSize(value.viewport),
           pageCopy: value.pageCopy === true,
+          dialog: value.dialog === true,
         });
       else if (value.type === "close") close(viewId);
       else if (value.type === "input" && Array.isArray(value.inputs)) input(viewId, value.inputs);

@@ -38,6 +38,7 @@ export const messages = {
   "mcp.status.signedIn": "מחובר",
   "mcp.status.signingIn": "מתחבר…",
   "mcp.status.signInNeeded": "נדרשת התחברות",
+  "mcp.status.signInAppNeeded": "נדרשת אפליקציית התחברות",
   "mcp.status.refused": "נדחה",
   "mcp.status.checkUrl": "יש לבדוק את ה-URL",
   "mcp.status.noAnswer": "אין תשובה",

@@ -82,6 +82,8 @@ export const messages = {
   "prompt.mediaApproval.setDefault": "הגדרה כברירת מחדל",
   "prompt.mediaApproval.perImage": "לתמונה",
   "prompt.mediaApproval.forSeconds": "ל־{count} ש׳",
+  "prompt.mediaApproval.freeCredits": "קרדיטים חינם",
+  "prompt.mediaApproval.paidOnly": "קרדיטים בתשלום בלבד",
   "prompt.mediaApproval.defaultFailed": "לא ניתן היה לשמור את מודל ברירת המחדל. יש לנסות שוב.",
   "prompt.creditsHold.needMore": "אני צריך עוד קרדיטים",
   "prompt.creditsHold.cannotUse": "אני לא יכול להשתמש בקרדיטים",

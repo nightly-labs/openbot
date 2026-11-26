@@ -3,7 +3,7 @@ import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import type { AgentEvent, BrowserTab, ConversationSnapshot } from "@openbot/contracts/ipc";
-import { uiBlockAnswersFromResponse } from "@openbot/contracts/ui-blocks";
+import { type UiBlockSpec, uiBlockAnswersFromResponse } from "@openbot/contracts/ui-blocks";
 import { Effect } from "effect";
 import { AttentionRegistry } from "../src/backend/agent/attention-registry";
 import { vaultRequestFormSpec } from "../src/backend/agent/prompts";
@@ -410,6 +410,87 @@ try {
     } finally {
       await rm(root, { recursive: true, force: true });
     }
+  });
+
+  await step("a confirm card answers a provider deadline first, stays open, and its answer comes late", async () => {
+    const lateAnswers: string[] = [];
+    const cardRegistry = new AttentionRegistry({
+      conversation: {
+        agentForThread: (threadId) => (threadId === THREAD ? AGENT : undefined),
+        publicThreadId: (_agentId, threadId) => threadId,
+        ensureSnapshot: () => snapshot,
+        emitConversation: () => {
+          snapshot.revision += 1;
+        },
+      },
+      browser: {
+        listTabs: () => tabs,
+        toolCanUseTab: () => false,
+        beginTakeover: () => Effect.void,
+        endTakeover: () => {},
+      },
+      hostedSites: { prepareApproval: () => Effect.succeed(null), resolveApproval: () => Effect.void },
+      routines: { markNeedsAttention: () => {}, markRunningForTurn: () => {}, runsTurn: () => false },
+      emit: (event) => events.push(event),
+      emitError: () => {},
+      emitRuntimeSnapshot: () => {},
+      lateAnswerTarget: () => ({}),
+      sendLateAnswer: (_agentId, _target, text) => lateAnswers.push(text),
+    });
+    const surface = (turnId: string, spec: UiBlockSpec, deadline: boolean) => {
+      const id = nextRequest++;
+      cardRegistry.surfaceUiBlock(
+        client,
+        {
+          id,
+          method: "item/tool/call",
+          params: { threadId: THREAD, turnId, callId: `call-${id}`, namespace: "openbot", tool: "ask_ui" },
+          ...(deadline ? { detachAfterMs: DEADLINE_MS } : {}),
+        },
+        { blockId: `block-${id}`, spec },
+      );
+      return id;
+    };
+    const spec: UiBlockSpec = {
+      type: "confirm",
+      title: "Post the weekly status update?",
+      fields: [{ label: "Channel", value: "#team" }],
+      actions: [
+        { id: "post", label: "Post", style: "primary" },
+        { id: "skip", label: "Not now" },
+      ],
+    };
+    const noDeadlineId = surface("turn-card-1", spec, false);
+    const secretId = surface(
+      "turn-card-2",
+      {
+        type: "form",
+        title: "Connect the service",
+        fields: [{ id: "token", kind: "text", label: "Token", secret: true }],
+      },
+      true,
+    );
+    const id = surface("turn-card-3", spec, true);
+    const waiting = answerOf(await client.answered(id));
+    assert.equal(waiting.status, "waiting");
+    assert.equal(waiting.success, true, "the agent got a failed call");
+    assert(!client.answers.has(secretId), "a form with a secret field answered its call");
+    assert(!client.answers.has(noDeadlineId), "a card with no provider deadline answered its call");
+    const card = () => cardRegistry.runtimeAttention().pendingPrompts.find((prompt) => prompt.requestId === id);
+    assert.equal(card()?.detached, true);
+    cardRegistry.clearForTurn(THREAD, "turn-card-3", true);
+    assert(card(), "the end of the turn closed the card");
+    await runCauseEffect(
+      cardRegistry.respondToPrompt(
+        { requestId: id, answers: uiBlockAnswersFromResponse(spec, { actionId: "post" }) },
+        { sender: { id: "owner", name: "Ada" }, privileged: true },
+      ),
+    );
+    assert.equal(card(), undefined);
+    assert.deepEqual(lateAnswers, ["> Post the weekly status update?\n> \n> Channel: #team\n\nPost"]);
+    cardRegistry.clearForTurn(THREAD, "turn-card-1", true);
+    cardRegistry.clearForTurn(THREAD, "turn-card-2", true);
+    return { waiting, lateAnswer: lateAnswers[0] };
   });
 
   const releasedAnswers: string[] = [];

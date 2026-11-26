@@ -177,6 +177,7 @@ export const messages = {
   "chat.marker.settingLink": "設定を表示しました",
   "chat.settingLink.desktopOnly": "コンピューターの OpenBot アプリで開いてください。",
   "chat.settingLink.agentChatOnly": "このエージェントとのチャットで開いてください。",
+  "chat.settingLink.adminOnly": "この設定を変更できるのはサーバーの所有者または管理者だけです。",
   "chat.marker.skillSuggestion": "スキルを提案しました",
   "chat.marker.serverInstall": "サーバーをインストールするコマンドを作成しました",
   "chat.marker.skill.created": "スキルを作成しました",

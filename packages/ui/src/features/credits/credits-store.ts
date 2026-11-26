@@ -1,11 +1,12 @@
-import type {
-  CreditActivity,
-  CreditCheckoutRequest,
-  CreditRedeemRequest,
-  CreditRedeemResult,
-  CreditServerWallet,
-  CreditsState,
-  CreditTransferRequest,
+import {
+  type CreditActivity,
+  type CreditCheckoutRequest,
+  type CreditRedeemRequest,
+  type CreditRedeemResult,
+  type CreditServerWallet,
+  type CreditsState,
+  type CreditTransferRequest,
+  creditsMovable,
 } from "@openbot/contracts/credits";
 import { classifyFailure } from "@openbot/telemetry";
 import { createEffect, createSignal, createStore } from "solid-js";
@@ -50,6 +51,10 @@ export function creditsServer(credits: CreditsState | null, serverId: string | n
   return credits.servers.find((server) => server.serverId === serverId) ?? null;
 }
 
+export function movablePersonalCredits(credits: CreditsState | null | undefined): number {
+  return credits ? creditsMovable(credits) : 0;
+}
+
 export interface CreditsRailWallet {
   balance: number;
   welcome: number | null;
@@ -69,7 +74,14 @@ export function creditsRailWallet(
   const movable = wallet?.role === "owner" ? wallet : null;
   if (!wallet)
     return { balance: credits.balance, welcome: credits.welcome ?? null, serverId: null, name: null, movable };
-  return { balance: wallet.balance, welcome: null, serverId: wallet.serverId, name: wallet.name, movable };
+  const welcome = movable ? (credits.welcome ?? null) : null;
+  return {
+    balance: wallet.balance + (welcome ?? 0),
+    welcome,
+    serverId: wallet.serverId,
+    name: wallet.name,
+    movable,
+  };
 }
 
 export function createCreditsStore(

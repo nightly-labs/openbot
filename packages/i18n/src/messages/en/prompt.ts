@@ -81,6 +81,8 @@ export const messages = defineMessages("prompt", {
   "prompt.mediaApproval.setDefault": "Set as default",
   "prompt.mediaApproval.perImage": "per image",
   "prompt.mediaApproval.forSeconds": "for {count} s",
+  "prompt.mediaApproval.freeCredits": "Free credits",
+  "prompt.mediaApproval.paidOnly": "Paid credits only",
   "prompt.mediaApproval.defaultFailed": "Could not save the default model. Try again.",
   "prompt.creditsHold.needMore": "I need more credits",
   "prompt.creditsHold.cannotUse": "I can't use credits",

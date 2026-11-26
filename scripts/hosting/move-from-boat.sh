@@ -6,6 +6,7 @@ umask 077
 SERVICE_USER=user
 USER_HOME=/home/$SERVICE_USER
 KEYRING_HOME=/srv/openbot-hosted
+KEYRING_BACKUP=/srv/openbot-keyring
 MANIFEST=$KEYRING_HOME/move-manifest
 IMPORT_STATE=/var/lib/openbot-move-import
 OFFER=/etc/openbot-pool
@@ -323,7 +324,7 @@ customer_folders() {
 
 movable_folder() {
   [[ $1 =~ ^/(srv/|mnt/|media/)?[A-Za-z0-9_@+-][A-Za-z0-9._@+-]*$ ]] || return 1
-  [ "$1" != "$KEYRING_HOME" ] || return 1
+  [ "$1" != "$KEYRING_HOME" ] && [ "$1" != "$KEYRING_BACKUP" ] || return 1
   case $1 in
     /bin | /boot | /cdrom | /dev | /etc | /gnu | /home | /initrd* | /lib* | /lost+found | /media | /mnt | /nix | \
       /opt | /proc | /root | /run | /sbin | /snap | /srv | /swap* | /sys | /tmp | /usr | /var) return 1 ;;
@@ -388,7 +389,7 @@ offer() {
   is_hosted_install || fail "This machine is not prepared. Run \"$0 prepare\" first."
   openbot_is_off || fail "OpenBot is enabled or runs on this machine. It is not a prepared pool server."
   [ ! -e "$USER_HOME/.config/OpenBot" ] && [ ! -e "$USER_HOME/.config/openbot-hosted" ] &&
-    [ ! -e "$KEYRING_HOME/keyrings" ] && [ ! -e "$IMPORT_STATE" ] ||
+    [ ! -e "$KEYRING_HOME/keyrings" ] && [ ! -e "$KEYRING_BACKUP" ] && [ ! -e "$IMPORT_STATE" ] ||
     fail "This machine has the data of a server. It cannot take a new one."
   grep -q '^OPENBOT_AUTH_API_URL=https://' /opt/OpenBot/hosted/openbot.env ||
     fail "This machine names no account service."
@@ -415,8 +416,8 @@ prepare() {
   source=$(cd "$(dirname "$0")" && pwd)
   [ -f "$source/provision.sh" ] || fail "Run this file from a copy of scripts/hosting."
   [ ! -e /opt/OpenBot ] || fail "OpenBot is installed on this machine. Use a free pool server."
-  [ ! -e "$USER_HOME" ] && [ ! -e "$KEYRING_HOME" ] ||
-    fail "This machine has data in $USER_HOME or $KEYRING_HOME."
+  [ ! -e "$USER_HOME" ] && [ ! -e "$KEYRING_HOME" ] && [ ! -e "$KEYRING_BACKUP" ] ||
+    fail "This machine has data in $USER_HOME, $KEYRING_HOME or $KEYRING_BACKUP."
   ! id "$SERVICE_USER" >/dev/null 2>&1 || fail "This machine has a user $SERVICE_USER."
   stop_offer
   owner=$(getent passwd "$uid" | cut -d: -f1 || true)
@@ -447,8 +448,8 @@ upgrade() {
   [ -f "$source/provision.sh" ] || fail "Run this file from a copy of scripts/hosting."
   stop_offer
   is_hosted_install || fail "This machine is not prepared. Run \"$0 prepare\" first."
-  [ ! -e "$USER_HOME/.config/OpenBot" ] && [ ! -e "$KEYRING_HOME/keyrings" ] && [ ! -e "$IMPORT_STATE" ] ||
-    fail "This machine has the data of a server. Do not upgrade it here."
+  [ ! -e "$USER_HOME/.config/OpenBot" ] && [ ! -e "$KEYRING_HOME/keyrings" ] && [ ! -e "$KEYRING_BACKUP" ] &&
+    [ ! -e "$IMPORT_STATE" ] || fail "This machine has the data of a server. Do not upgrade it here."
   if openbot_runs; then fail "OpenBot runs. Stop it."; fi
   copy=$(mktemp -d /run/openbot-move.XXXXXX)
   # shellcheck disable=SC2064
@@ -476,6 +477,10 @@ install_packages() {
   install_packages_of "$(cat)"
 }
 
+keyring_files_present() {
+  [ -s "$USER_HOME/.config/openbot-hosted/keyring-password" ] && [ -s "$KEYRING_HOME/keyrings/login.keyring" ]
+}
+
 export_data() {
   [ "$#" -ge 1 ] || fail "usage: $0 export <archive | -> [<folder>...]"
   local archive=$1 copy=$1 version folder
@@ -494,7 +499,7 @@ export_data() {
   id "$SERVICE_USER" >/dev/null 2>&1 || fail "This machine has no user $SERVICE_USER. It is not a boat sandbox."
   is_hosted_install || fail "This machine is not a hosted server of the user $SERVICE_USER."
   [ -s "$USER_HOME/.config/OpenBot/openbot.db" ] || fail "The home of $SERVICE_USER has no OpenBot database."
-  [ -s "$USER_HOME/.config/openbot-hosted/keyring-password" ] && [ -s "$KEYRING_HOME/keyrings/login.keyring" ] ||
+  keyring_files_present || [ -s "$KEYRING_BACKUP/login.keyring" ] ||
     fail "The server keyring or its password file is missing. The server could not sign in after the move."
   local waited=0
   while [ -e /var/lib/ascii-lazy/active ] && [ ! -e /var/lib/ascii-lazy/hydration-done ]; do
@@ -511,6 +516,10 @@ export_data() {
   systemctl stop openbot-pre-stop-restart.timer 2>/dev/null || true
   systemctl stop openbot.service
   if openbot_runs; then fail "OpenBot still runs. Nothing was archived."; fi
+  [ ! -x /opt/OpenBot/hosted/openbot-hosted-keyring ] || /opt/OpenBot/hosted/openbot-hosted-keyring start ||
+    echo "The keyring check did not complete. The archive has the keyring as it is." >&2
+  keyring_files_present ||
+    fail "The server keyring or its password file is missing, and its copy did not restore it. OpenBot stays stopped. Nothing was archived."
 
   local tree trees="" members=() commands name notes
   while read -r tree; do
@@ -793,7 +802,7 @@ import_data() {
   openbot_is_off || fail "OpenBot is enabled or runs on this machine. It is not a prepared pool server."
   [ ! -e "$IMPORT_STATE" ] ||
     fail "An import did not get to its start on this machine. Run \"$0 discard $(hostname)\", then run the import again."
-  [ ! -e "$USER_HOME/.config/OpenBot" ] && [ ! -e "$KEYRING_HOME/keyrings" ] ||
+  [ ! -e "$USER_HOME/.config/OpenBot" ] && [ ! -e "$KEYRING_HOME/keyrings" ] && [ ! -e "$KEYRING_BACKUP" ] ||
     fail "This machine has the data of a server."
   shift
   for folder in "$@"; do
@@ -919,6 +928,7 @@ discard() {
     fail "The database changed after the import. Nothing was removed. To erase this server, reinstall the machine."
   fi
   find "$USER_HOME" "$KEYRING_HOME" -xdev -mindepth 1 -delete
+  rm -rf --one-file-system -- "$KEYRING_BACKUP"
   sed -n 's/^tree=//p' "$IMPORT_STATE" | while read -r tree; do
     if [ -n "$tree" ] && movable_tree "$tree"; then rm -rf --one-file-system -- "$tree"; fi
   done

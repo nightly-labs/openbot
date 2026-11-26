@@ -1015,8 +1015,10 @@ export function createBoard(options: BoardOptions) {
       ports.set(key, entry);
       const nodeElement = entry.element.closest("[data-node-id]");
       if (nodeElement) resize.observe(nodeElement);
+      resize.observe(entry.element);
       schedule();
       return () => {
+        resize.unobserve(entry.element);
         if (ports.get(key) === entry) ports.delete(key);
         if (nodeElement && ![...ports.values()].some((other) => other.node === entry.node))
           resize.unobserve(nodeElement);

@@ -177,6 +177,8 @@ const remoteTicketJwksSchema = z.object({
 
 export type RemoteConnectionBootstrap = RemoteSessionTicket;
 
+export type RelayCaller = { kind: "server"; hostId: string } | { kind: "personal" };
+
 export interface RemoteHostTicketHome {
   readonly failedSignalUrl?: string;
   readonly preferredSignalHome?: string | null;
@@ -700,6 +702,35 @@ export class CentralAuthManager extends EventEmitter<CentralAuthEvents> {
         Effect.flatMap((headers) => this.#requestEffect(path, { ...init, headers }, decoder, timeoutMs)),
       ),
     );
+  }
+
+  readonly relayFetch = Effect.fn("CentralAuth.relayFetch")(
+    function* (
+      this: CentralAuthManager,
+      caller: RelayCaller,
+      path: string,
+      init: RequestInit,
+    ): Effect.fn.Return<Response, CentralAuthOperationError, CentralAuthTransport> {
+      const headers = yield* this.#relayHeaders(caller, init.headers);
+      return yield* CentralAuthTransport.use((transport) =>
+        transport.fetch(new URL(path, this.#options.apiUrl), { ...init, headers, redirect: "error" }),
+      );
+    },
+    (operation) => this.#owned(operation),
+  ).bind(this);
+
+  #relayHeaders(caller: RelayCaller, init: HeadersInit | undefined) {
+    if (caller.kind === "server") return this.#hostHeaders(caller.hostId, init);
+    const token = this.#sessionToken;
+    if (!token)
+      return Effect.fail(
+        new CentralAuthOperationError({
+          cause: new AuthApiError(401, "unauthorized", sourceText("error.auth.signInRequired")),
+        }),
+      );
+    const headers = new Headers(init);
+    headers.set("Authorization", `Bearer ${token}`);
+    return Effect.succeed(headers);
   }
 
   readonly downloadAsHost = Effect.fn("CentralAuth.downloadAsHost")(

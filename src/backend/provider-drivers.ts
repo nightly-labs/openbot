@@ -86,25 +86,28 @@ import type { McpOAuthAuthority } from "./mcp-oauth-provider";
 import type { McpOAuthProxySettingsStore } from "./mcp-oauth-proxy";
 import type { McpDropReporter, McpEndpointSource, McpServerSource, McpToolRuntimeSource } from "./mcp-provider-shapes";
 import { MuseAgentClient } from "./muse-client";
-import { openCodeAgentDefaultsEnv } from "./opencode-agent-defaults";
+import { openCodeAgentDefaultsEnv, openCodeUserConfigHasMediaSetup } from "./opencode-agent-defaults";
 import {
   CUSTOM_ENDPOINT_SILENCE_MS,
   type CustomProviderSource,
   clearedInheritedOpenCodeKeyEnv,
   customProvidersOn,
-  OPENCODE_AGENT_CONFIG,
+  hasCustomProviderCredentials,
   OPENCODE_GO_PROVIDER,
   OPENCODE_PROFILE_CONFIG,
+  openCodeAgentConfig,
   openCodeConfigEnv,
   openCodeModelName,
   openCodeSignInMessage,
 } from "./opencode-config";
 import {
+  hasOpenCodeMediaSignIn,
   hasOpenCodeProviderKey,
   readOpenCodeGoUsage,
   readOpenCodeRefusalStatus,
   readOpenCodeStoredKey,
 } from "./opencode-usage";
+import { openCodeWindowsShellEnv } from "./opencode-windows-shell";
 import { PiAgentClient } from "./pi-client";
 import {
   antigravityStatePaths,
@@ -174,6 +177,7 @@ export interface ProviderHomeAccountSupport {
   readonly signOut?: ProviderCliCommand;
   supports?(cli: AgentCliInfo): boolean;
   readonly usageLeavesSession?: boolean;
+  readonly readOwnEmail?: () => Effect.Effect<string | null>;
 }
 
 export interface ProviderKeyAccountSupport {
@@ -342,16 +346,18 @@ const ANTIGRAVITY_SIGN_IN: AcpAuthenticateSignIn = {
   timeoutMs: CLI_LOGIN_TIMEOUT_MS,
 };
 
+const ANTIGRAVITY_LINK_ONLY_ENV = { ...ANTIGRAVITY_ENV, SSH_CONNECTION: "127.0.0.1 0 127.0.0.1 0" };
+
 const ANTIGRAVITY_CODE_SIGN_IN: ProviderSignInCommand = {
   argv: () => Effect.succeed([...antigravityArgv({ ...process.env, ...ANTIGRAVITY_ENV }), "--login"]),
-  env: () => ({ ...ANTIGRAVITY_ENV }),
+  env: () => ({ ...ANTIGRAVITY_LINK_ONLY_ENV }),
   timeoutMs: CLI_LOGIN_TIMEOUT_MS,
   pipedInput: true,
 };
 
 const ANTIGRAVITY_ACCOUNT_CODE_SIGN_IN: ProviderAccountCodeCommand = {
   argv: (env) => [...antigravityArgv(env), "--login"],
-  env: () => ({ ...ANTIGRAVITY_ENV }),
+  env: () => ({ ...ANTIGRAVITY_LINK_ONLY_ENV }),
   timeoutMs: CLI_LOGIN_TIMEOUT_MS,
   pipedInput: true,
 };
@@ -452,7 +458,10 @@ export interface ProviderClientContext {
   readonly providerStateDirectory?: string;
   readonly providerTempDirectory?: string;
   readonly availableDiskBytes?: (path: string) => number;
-  readonly agentEnvironment?: (inherited?: NodeJS.ProcessEnv) => Readonly<Record<string, string>>;
+  readonly agentEnvironment?: (
+    inherited?: NodeJS.ProcessEnv,
+    gitConfig?: AgentGitConfigForm,
+  ) => Readonly<Record<string, string>>;
   readonly serverEnvironment?: Readonly<Record<string, string>>;
   readonly accountEnvironment?: Readonly<Record<string, string>>;
   readonly customAgents?: CustomAgentSource;
@@ -465,6 +474,8 @@ export interface ProviderClientContext {
   readonly systemProxyFetch?: (url: string, init: RequestInit) => Promise<Response>;
   readonly fitImage?: ImageFitter | null;
 }
+
+export type AgentGitConfigForm = "parameters" | "count";
 
 const CODEX_ADDRESS_VARIABLE = "OPENAI_BASE_URL";
 
@@ -480,12 +491,10 @@ function codexVariableOverrides(variables: Readonly<Record<string, string>>): st
   ];
 }
 
-function withAccountEnvironment(
-  context: ProviderClientContext,
-): ((inherited?: NodeJS.ProcessEnv) => Readonly<Record<string, string>>) | undefined {
+function withAccountEnvironment(context: ProviderClientContext): ProviderClientContext["agentEnvironment"] {
   const { agentEnvironment, accountEnvironment } = context;
   if (!accountEnvironment) return agentEnvironment;
-  return (inherited) => ({ ...agentEnvironment?.(inherited), ...accountEnvironment });
+  return (inherited, gitConfig) => ({ ...agentEnvironment?.(inherited, gitConfig), ...accountEnvironment });
 }
 
 function claudeAgentEnvironment(
@@ -499,7 +508,7 @@ function claudeAgentEnvironment(
         ? { ENABLE_PROMPT_CACHING_1H: "1" }
         : {}),
       ...(compactWindow === null ? {} : { CLAUDE_CODE_AUTO_COMPACT_WINDOW: String(compactWindow) }),
-      ...environment?.(inherited),
+      ...environment?.(inherited, "count"),
       ...context.providerEnvironment?.("claude"),
     };
   };
@@ -876,17 +885,28 @@ export const BUILT_IN_PROVIDER_DRIVERS: readonly BuiltInProviderDriver[] = [
         ...(confinement ? { confine: (target) => confineSpawnTarget(target, confinement, openCodeStatePaths()) } : {}),
         extraEnv: () => {
           const agentEnvironment = context.agentEnvironment?.();
+          const keyEnv = clearedInheritedOpenCodeKeyEnv(context.apiKey("opencode"));
+          const processEnv = { ...process.env, ...agentEnvironment, ...keyEnv };
+          const mediaSignIn =
+            hasCustomProviderCredentials(openCodeEndpoints(context)()) ||
+            openCodeUserConfigHasMediaSetup(processEnv) ||
+            Effect.runSync(hasOpenCodeMediaSignIn(processEnv));
           return {
             ...agentEnvironment,
             ...opencodeEnv(cli),
+            ...openCodeWindowsShellEnv({ ...process.env, ...cliPathEnvironment(cli), ...agentEnvironment }),
             ...openCodeAgentDefaultsEnv(
               context.providerStateDirectory,
               { ...process.env, ...agentEnvironment },
               cli.version,
               confinement ? "confined" : "provider-asks",
             ),
-            ...openCodeConfigEnv(OPENCODE_AGENT_CONFIG, openCodeEndpoints(context), context.apiKey("opencode")),
-            ...clearedInheritedOpenCodeKeyEnv(context.apiKey("opencode")),
+            ...openCodeConfigEnv(
+              openCodeAgentConfig(mediaSignIn),
+              openCodeEndpoints(context),
+              context.apiKey("opencode"),
+            ),
+            ...keyEnv,
             ...(confinement ? OPENCODE_CONFINED_ENV : {}),
           };
         },
@@ -961,6 +981,7 @@ export const BUILT_IN_PROVIDER_DRIVERS: readonly BuiltInProviderDriver[] = [
       codeSignIn: { flow: "paste", command: ANTIGRAVITY_ACCOUNT_CODE_SIGN_IN },
       supports: (cli) => antigravityTakesStateFolders(cli.version),
       usageLeavesSession: true,
+      readOwnEmail: () => readAntigravityEmail(join(antigravityAppDataDir(process.env), ANTIGRAVITY_TOKEN_FILE)),
     },
     signOut: {
       argv: antigravityArgv(process.env),

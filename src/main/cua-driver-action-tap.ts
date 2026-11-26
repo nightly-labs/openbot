@@ -1,6 +1,7 @@
 import { chmod } from "node:fs/promises";
 import { connect, createServer, type Server, type Socket } from "node:net";
 import { Transform, type TransformCallback } from "node:stream";
+import { StringDecoder } from "node:string_decoder";
 import { type DynamicRecord, isDynamicRecord } from "@openbot/contracts/runtime-values";
 import { createOpenBotLogger, type Logger } from "@openbot/logging";
 import { Effect, Result } from "effect";
@@ -50,6 +51,10 @@ const DRIVER_CURSOR_TOOLS = new Set([
   "set_agent_cursor_theme",
   "get_agent_cursor_state",
 ]);
+
+const FOREGROUND_HIDDEN_TOOLS = new Set([...DRIVER_CURSOR_TOOLS, "parallel_mouse_drag"]);
+
+const FOREGROUND = "foreground";
 
 const POINTER_TOOLS = new Set(["click", "move_cursor", "scroll"]);
 
@@ -114,6 +119,40 @@ function readStep(raw: unknown): { tool: string; args: DynamicRecord } | null {
 function windowOf(args: DynamicRecord): DynamicRecord | null {
   const fields = WINDOW_KEYS.filter((key) => args[key] !== undefined && args[key] !== null);
   return fields.length > 0 ? Object.fromEntries(fields.map((key) => [key, args[key]])) : null;
+}
+
+function deliveryModeTools(tools: readonly unknown[]): Set<string> {
+  const names = new Set<string>();
+  for (const tool of tools) {
+    if (!isDynamicRecord(tool) || typeof tool.name !== "string" || !isDynamicRecord(tool.input_schema)) continue;
+    const { properties } = tool.input_schema;
+    if (isDynamicRecord(properties) && properties.delivery_mode !== undefined) names.add(tool.name);
+  }
+  return names;
+}
+
+function inForeground(line: string, tools: ReadonlySet<string>): string {
+  if (!line.includes('"call"')) return line;
+  const parsed = parseAnswerLine(line);
+  if (parsed?.method !== "call" || typeof parsed.name !== "string") return line;
+  if (!tools.has(parsed.name)) return line;
+  const args: DynamicRecord = isDynamicRecord(parsed.args) ? parsed.args : {};
+  const steps =
+    parsed.name === RUN_STEPS_TOOL && Array.isArray(args.steps)
+      ? { steps: args.steps.map((step) => (isDynamicRecord(step) ? stepInForeground(step) : step)) }
+      : {};
+  return JSON.stringify({ ...parsed, args: { ...args, ...steps, delivery_mode: FOREGROUND } });
+}
+
+function stepInForeground(step: DynamicRecord): DynamicRecord {
+  return Object.fromEntries(
+    Object.entries(step).map(([key, value]) => {
+      if (key === "delivery_mode") return [key, FOREGROUND];
+      if (isDynamicRecord(value) && value.delivery_mode !== undefined)
+        return [key, { ...value, delivery_mode: FOREGROUND }];
+      return [key, value];
+    }),
+  );
 }
 
 function readTarget(tool: string, args: DynamicRecord, at: number): ObservedAction | null {
@@ -215,6 +254,7 @@ class CallAnswerLines extends Transform {
   readonly #refused: () => void;
   readonly #now: () => number;
   readonly #compact: CompactScreenshot | null;
+  readonly #listed: (line: Buffer) => Buffer;
 
   constructor(
     answered: (tool: string, ms: number) => void,
@@ -222,6 +262,7 @@ class CallAnswerLines extends Transform {
     refused: () => void,
     now: () => number,
     compact: CompactScreenshot | null,
+    listed: (line: Buffer) => Buffer,
   ) {
     super();
     this.#answered = answered;
@@ -229,6 +270,7 @@ class CallAnswerLines extends Transform {
     this.#refused = refused;
     this.#now = now;
     this.#compact = compact;
+    this.#listed = listed;
   }
 
   expect(request: ExpectedAnswer | null): void {
@@ -287,7 +329,7 @@ class CallAnswerLines extends Transform {
     this.#held = [];
     this.#heldBytes = 0;
     if (!whole) this.push(line);
-    else if (this.#answering === "list") this.push(withoutDriverCursorTools(line));
+    else if (this.#answering === "list") this.push(this.#listed(line));
     else {
       const read = SCREENSHOT_TOOLS.has(this.#answering?.tool ?? "") ? this.#readScreenshot : undefined;
       this.push(withCopy(line, read, this.#compact));
@@ -306,13 +348,18 @@ function isAccessibilityRefusal(line: Buffer): boolean {
   return line.includes('"ok":false') || line.includes('"isError":true');
 }
 
-function withoutDriverCursorTools(line: Buffer): Buffer {
-  if (!line.includes("agent_cursor")) return line;
+function withListedTools(
+  line: Buffer,
+  hidden: ReadonlySet<string>,
+  read: ((tools: readonly unknown[]) => void) | null,
+): Buffer {
+  if (!read && !line.includes("agent_cursor")) return line;
   const parsed = parseAnswerLine(line.toString("utf8", 0, line.length - 1));
   const result = parsed?.ok === true ? parsed.result : null;
   if (!parsed || !isDynamicRecord(result) || !Array.isArray(result.tools)) return line;
+  read?.(result.tools);
   const tools = result.tools.filter(
-    (tool) => !(isDynamicRecord(tool) && typeof tool.name === "string" && DRIVER_CURSOR_TOOLS.has(tool.name)),
+    (tool) => !(isDynamicRecord(tool) && typeof tool.name === "string" && hidden.has(tool.name)),
   );
   if (tools.length === result.tools.length) return line;
   return Buffer.from(`${JSON.stringify({ ...parsed, result: { ...result, tools } })}\n`, "utf8");
@@ -352,11 +399,19 @@ export class CuaDriverActionTap {
   #onAccessibilityRefused: (() => void) | null = null;
   #onToolCall: (() => void) | null = null;
   readonly #compact: CompactScreenshot | null;
+  readonly #foregroundInput: boolean;
+  #deliveryModeTools: ReadonlySet<string> = new Set();
 
-  constructor(now: () => number = Date.now, logger: Logger = defaultLogger, compact: CompactScreenshot | null = null) {
+  constructor(
+    now: () => number = Date.now,
+    logger: Logger = defaultLogger,
+    compact: CompactScreenshot | null = null,
+    foregroundInput = false,
+  ) {
     this.#now = now;
     this.#logger = logger;
     this.#compact = compact;
+    this.#foregroundInput = foregroundInput;
   }
 
   onAccessibilityRefused(listener: () => void): void {
@@ -443,6 +498,7 @@ export class CuaDriverActionTap {
       () => this.#onAccessibilityRefused?.(),
       this.#now,
       this.#compact,
+      (line) => this.#listed(line),
     );
     const end = () => {
       for (const call of answers.takeUnanswered()) this.#logUnanswered(call.tool, this.#now() - call.at);
@@ -460,13 +516,16 @@ export class CuaDriverActionTap {
     daemon.pipe(answers).pipe(client);
     let pending = "";
     let skipping = false;
+    const decoder = new StringDecoder("utf8");
+    const foreground = this.#foregroundInput;
     client.on("data", (chunk: Buffer) => {
-      daemon.write(chunk);
-      pending += chunk.toString("utf8");
+      if (!foreground) daemon.write(chunk);
+      pending += decoder.write(chunk);
       let newline = pending.indexOf("\n");
       while (newline >= 0) {
         const line = pending.slice(0, newline);
         pending = pending.slice(newline + 1);
+        if (foreground) daemon.write(`${skipping ? line : inForeground(line, this.#deliveryModeTools)}\n`);
         if (skipping) {
           answers.expect(null);
         } else {
@@ -481,9 +540,17 @@ export class CuaDriverActionTap {
         newline = pending.indexOf("\n");
       }
       if (pending.length > MAX_REQUEST_LINE_BYTES) {
+        if (foreground) daemon.write(pending);
         pending = "";
         skipping = true;
       }
+    });
+  }
+
+  #listed(line: Buffer): Buffer {
+    if (!this.#foregroundInput) return withListedTools(line, DRIVER_CURSOR_TOOLS, null);
+    return withListedTools(line, FOREGROUND_HIDDEN_TOOLS, (tools) => {
+      this.#deliveryModeTools = deliveryModeTools(tools);
     });
   }
 

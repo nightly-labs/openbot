@@ -31,6 +31,7 @@ export const messages = {
   "error.voice.live.timedOut": "Codex 实时语音未能及时启动。请重试。",
   "error.voice.live.failed": "实时语音已停止：{reason}",
   "error.voice.live.disconnected": "实时语音已断开。",
+  "error.voice.live.connectionLost": "实时语音连接已中断。取消麦克风静音以重新开始。",
   "error.voice.live.startFailed":
     "无法启动实时语音。请在运行该智能体的电脑上更新 Codex 并使用 ChatGPT 登录，然后重试。原因：{reason}",
   "error.voice.live.hostFailed":

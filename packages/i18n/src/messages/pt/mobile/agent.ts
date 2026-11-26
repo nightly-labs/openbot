@@ -388,7 +388,7 @@ export const messages = {
     "Quando um limite de uso para {name} depois de começar a trabalhar, {name} continua o mesmo trabalho no primeiro modelo disponível da ordem. Volta para {model} quando o limite termina, ou 10 minutos após um erro do provedor.",
   "mobile.agent.busyMessage.label": "Durante o trabalho",
   "mobile.agent.busyMessage.footer":
-    "O que acontece com uma mensagem enviada enquanto o agente trabalha. Fila a guarda até o fim do turno. Orientar a entrega ao agente durante o turno.",
+    "O que acontece com uma mensagem sua ou de outro agente que chega enquanto o agente trabalha. Fila a guarda até o fim do turno. Orientar a entrega ao agente durante o turno.",
   "mobile.agent.busyMessage.queue": "Fila",
   "mobile.agent.busyMessage.steer": "Orientar",
   "mobile.agent.busyMessage.hostDefaultQueue": "Padrão do anfitrião (Fila)",

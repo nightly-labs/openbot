@@ -201,6 +201,12 @@ starts a new conversation or compacts it; only an owner or admin deletes the cha
 desktop hides that row from a member. A host without the capability does not show the rows. Protocol
 9 only.
 
+`channel-compact-availability-v1` adds `POST /v1/channels/context/compact-availability` with
+`{ channelId }`. The host answers `{ available }`: false when no member of the channel can compact on
+request, for example when all members use Claude Code or a custom ACP agent, which compact by
+themselves. The desktop, the web client and mobile then hide "Compact context" in the channel
+settings. A client of a host without the capability shows the row as before. Protocol 10 only.
+
 ### Workspace folders
 
 `workspace-directory-v1` adds `POST /v1/workspace-directory` with `{ agentId, path }`. Any member who
@@ -445,6 +451,34 @@ with the same filter as `get`. The contract header in `team-protocol/workflows-v
 Node kinds, port types, statuses, run sources, trigger types and version kinds cross as open names,
 so a newer host can add one. A client shows a workflow with a node kind or a port type that it does
 not know as read-only (`needsNewerApp`), and keeps the node when it saves.
+
+`workflow-presence-v1` (protocol 10, `team-protocol/workflow-presence-v1.ts`) shows the pointer and
+the selected node of each other person who has the same workflow open. A client sends the control
+`workflow-spot { workflowId, at, selected }` on its event socket, at most once in 50 ms, and
+`workflowId: null` when it closes the workflow. The relay (`team-api/workflow-presence-relay.ts`) keeps
+the spots in memory only, never in the database. It checks once, when a seat opens a workflow, that the
+member can see it, with the filter of `get`. It sends `workflow-spot-changed { workflowId, memberId,
+spot }` at most once in 40 ms to the seats of other members on that workflow, never to the sender's
+member. A seat that opens a workflow gets the current spots first. When a seat leaves, the others get
+the spot of another seat of the same member, or `spot: null`. The host user is the seat `local`.
+A client sends the control only to a host with the capability: an older host closes the socket on an
+unknown control, and the host closes a socket that sends it without declaring the capability (1003).
+A change of agent access or of the agent list checks each open seat again, and a change of a
+workflow checks the seats on it. A seat that cannot see the workflow now gets `spot: null` for each
+other member and leaves the relay. The relay then drops its spots on that workflow until the seat
+leaves the workflow or access changes again. Each seat has at most one access check in flight; a
+check that an access change made old runs again before the seat joins.
+A client sends its spot again every 10 s (`keepAliveMs`) while the workflow is open and the page is
+visible. The relay sends an unchanged spot to the others again when 5 s (`keepAliveMs / 2`) passed
+since its last send, and removes a spot that no message refreshed in 30 s (`staleMs`), as if the seat
+left. A client also removes a member whose spot did not arrive in 30 s. A closed tab or a lost WebRTC
+path can keep the event socket of a host session open, so the end of the socket alone does not remove
+a cursor. A page that unloads (`pagehide`) or becomes hidden sends `workflowId: null` first, so a
+closed tab leaves at once; the 30 s expiry covers a lost path or a stopped browser. When the host
+stops, the relay sends `spot: null` for each open spot first.
+The desktop main process merges the spots of its windows for each server: it sends only the spot of
+the window that changed its spot last. When that window leaves or closes, it sends the spot of the
+next window, or `workflowId: null` when no window has a workflow open.
 
 One registry (`packages/contracts/src/ipc-workflow-nodes.ts`) lists the fields of each node kind:
 which fields the host reads at run time, which take `{{name}}` values, the values that a field can
@@ -970,6 +1004,17 @@ sends `browser-page-state-changed` with the same list. A stop ends the load at o
 tab operations, and a stop of a tab that does not load changes nothing. A client shows Stop only for a
 host that reports the page state; for an older host, Back and Forward stay enabled.
 
+`browser-permissions-v1` (protocol 10) adds `POST /v1/browser/permissions` (empty body) and
+`POST /v1/browser/permissions/answer` (`{ tabId, requestId, allow, always?, location? }`, with
+`location: { latitude, longitude, accuracyMeters }`). Both answer with
+`{ requests: [{ tabId, id, origin, permission: "geolocation" }] }` for the tabs that the session can
+see, and each change sends `browser-permissions-changed` with the same list. The frozen tab projection
+does not carry the request, so the client adds it from this list. An Allow must carry the location of
+the member's device; without it the host answers 400 `browserLocationRequired`. `always: true` is
+valid only with an Allow, and keeps the Allow and the location for the origin in all tabs of the same agent (or thread) until the host restarts. A client shows the
+Allow and Block question only for a host with the capability. For an older host, the page gets Block, as
+before.
+
 `browser-sign-in-v1` adds `POST /v1/browser/sign-in` with `{ tabId, cookies }`, up to 150 cookies,
 and answers with `{ cookies }`, the count that the host set. Some sites refuse a sign-in from a
 data-center address, but accept the session that the member's own computer made. The desktop opens a
@@ -1009,6 +1054,22 @@ the cookies as `browser-sign-in` does. It writes the pairs only when the tab sho
 keeps the other pairs of that origin, and loads the tab again when it set a cookie or a pair. A
 desktop uses this route when the server advertises the capability, and `browser-sign-in` with
 cookies only for an older server. The host never sends the values back or records them.
+
+`browser-http-sign-in` (protocol 10) is for a site that asks for its sign-in in its own prompt (HTTP
+Basic or Digest), not in a page field (#8462). Before it, Electron cancelled such a prompt, and the
+tab and the takeover showed only the empty 401 page. The host records a prompt only for a page load
+over HTTPS that is not for a proxy (`#siteSignIn` in `src/backend/browser-host.ts`). Electron still
+cancels it, so the page load and the agent do not wait. The tab shows the prompt as
+`httpSignIn: { origin, refused? }`, and a snapshot gives the agent a `needs-user` challenge that tells
+it to call `request_takeover`. `POST /v1/browser/http-sign-in` (empty body) and
+`POST /v1/browser/http-sign-in/answer` (`{ tabId, username, password }` or `{ tabId, cancel: true }`)
+both answer with `{ tabs: [{ tabId, origin, refused }] }`, and each change sends
+`browser-http-sign-in-changed` with the same list, filtered like the page state. The host keeps an
+answer in memory for one try at the same origin and realm, loads the tab again, and forgets it at the
+next commit. A second prompt after that try shows `refused: true`. A navigation to another page
+closes the prompt, and a cancel keeps the page. The desktop and the web client show the sign-in in a
+popover under the address bar of the browser view and of the browser window, and mobile shows it above the live view, only
+when the host has the capability. The host never sends the answer back or records it.
 
 `browser-vault-skip-v1` (protocol 9 only) adds `vaultSkip` beside the frozen takeover projection, in
 the `browser-takeover-requested` event and in `pendingBrowserTakeovers`. The host sets it on a password

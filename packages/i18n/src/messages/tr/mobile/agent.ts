@@ -394,7 +394,7 @@ export const messages = {
     "Bir kullanım sınırı {name} işe başladıktan sonra onu durdurursa, {name} aynı işe sıradaki ilk kullanılabilir modelle devam eder. Sınır bittiğinde veya bir sağlayıcı hatasından 10 dakika sonra {model} modeline geri döner.",
   "mobile.agent.busyMessage.label": "Çalışırken",
   "mobile.agent.busyMessage.footer":
-    "Ajan çalışırken gönderdiğiniz bir mesajın ne olacağı. Kuyruk, mesajı tur bitene kadar tutar. Yönlendir, mesajı tur sırasında ajana verir.",
+    "Ajan çalışırken sizden veya başka bir ajandan gelen bir mesajın ne olacağı. Kuyruk, mesajı tur bitene kadar tutar. Yönlendir, mesajı tur sırasında ajana verir.",
   "mobile.agent.busyMessage.queue": "Kuyruk",
   "mobile.agent.busyMessage.steer": "Yönlendir",
   "mobile.agent.busyMessage.hostDefaultQueue": "Ana makine varsayılanı (Kuyruk)",

@@ -150,6 +150,7 @@ import {
   agentNewChatAllowed,
   agentTaskLimit,
   type BusyMessageMode,
+  browserHttpSignInPrompts,
   COMPUTER_USE_MCP_SERVER_NAME,
   CONTEXT_RESET_ITEM_TYPE,
   type CreditsHold,
@@ -191,12 +192,13 @@ import {
 } from "@openbot/contracts/ipc";
 import type { DynamicRecord } from "@openbot/contracts/runtime-values";
 import { AGENT_THREAD_READS_LIMIT } from "@openbot/contracts/team-protocol/agent-thread-reads-v1";
+import { browserPermissionRequests } from "@openbot/contracts/team-protocol/browser-permissions-v1";
 import { CLAUDE_API_KEY_ACCOUNT_ID } from "@openbot/contracts/team-protocol/claude-api-key-v1";
 import { ContextCompactRefusedError } from "@openbot/contracts/team-protocol/context-compact-v1";
 import { ContextResetBusyError } from "@openbot/contracts/team-protocol/context-reset-v1";
 import type { QueueEditRequest } from "@openbot/contracts/team-protocol/queue-edit-v1";
 import { sourceText } from "@openbot/i18n/source";
-import { createOpenBotLogger } from "@openbot/logging";
+import { createOpenBotLogger, redactText, toLogValue } from "@openbot/logging";
 import { workflowMediaCreditsOf, workflowMediaProvidersOf } from "@openbot/team-client/workflow-decoding";
 import { type CauseCode, classifyFailure, isCauseCode } from "@openbot/telemetry";
 import { Cause, Deferred, Effect, Exit, Fiber, Result, Schema, Scope, Semaphore } from "effect";
@@ -333,7 +335,7 @@ import {
 } from "./agent/workflow-generation-error";
 import { confinedWritesAllowed, effectiveAgentFolders } from "./agent/workspace-sandbox";
 import type { AgentApiKeys } from "./agent-api-keys";
-import type { AgentProvider } from "./agent-client";
+import { type AgentProvider, fixedContextCompaction } from "./agent-client";
 import type { AgentTables } from "./agent-data/agent-tables";
 import {
   AgentHistoryTransfer,
@@ -357,6 +359,7 @@ import type { BundledProviderExecutables } from "./cli";
 import type { ConversationMarkerExclusions } from "./conversation-read-store";
 import type { CrmHandle } from "./crm/crm";
 import type { ProviderSession } from "./database/provider-sessions";
+import { readUsageReportInWorker } from "./database/usage-report-reader";
 import { reportOriginalFailure } from "./effect-boundary";
 import type { HostMemory } from "./host-memory";
 import type { SignInRegion } from "./kimi-region";
@@ -368,6 +371,7 @@ import { McpServerStore } from "./mcp-server-store";
 import type { MessageDeleteAccess, MessageDeleteRefused } from "./message-delete";
 import type { MessagePinRefused } from "./message-pins";
 import { isAnswer, MessagingThreads, toMessagingThreadFailed } from "./messaging/messaging-threads";
+import type { NearWallet } from "./near-wallet";
 import type { CustomProviderConfig } from "./opencode-config";
 import type { PasswordVault } from "./password-vault";
 import { canConfineProcesses } from "./process-confinement";
@@ -465,6 +469,7 @@ export interface AgentServiceOptions {
   avatarDecoder?: AvatarImageDecoder | null;
   prepareMcpTest?: (config: McpServerConfig) => Effect.Effect<void, unknown>;
   mcpAgentAccess?: (mcpServerId: string, agentId: string | null) => boolean;
+  usageReportWorkerPath?: string | null;
   hiddenModels?: (provider: AgentProvider) => ReadonlySet<string> | undefined;
   marketplaceAppServer?: (appId: string) => MarketplaceAppServer | null;
   passwordManagerConnected?: (manager: PasswordManagerId) => boolean;
@@ -515,6 +520,7 @@ export interface AgentServiceOptions {
   passwordVault?: PasswordVault | null;
   vaultItems?: VaultItems | null;
   linkWallet?: LinkWallet | null;
+  nearWallet?: NearWallet | null;
   agentApiKeys?: AgentApiKeys | null;
   hostMemory?: HostMemory | null;
   hostTurnLimits?: { turnLimit(): number | "unlimited" | null; agentTaskLimit(): number };
@@ -522,6 +528,7 @@ export interface AgentServiceOptions {
   agentCursorDrawn?: boolean;
   computerUseOnWayland?: boolean;
   computerUseInputRefused?: () => boolean;
+  computerUseForegroundInput?: boolean;
   computerUseMissingPermissions?: () => readonly MacPermissionId[];
   codexIdleSessions?: { releaseAfterMs: number; idleLimit: number };
   creditMedia?: CreditMediaGateway | null;
@@ -598,6 +605,7 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
   readonly #mediaCatalog: WorkflowMediaCatalogCache;
   readonly #creditMedia: CreditMediaWorkflows | null;
   readonly #mcpAgentAccess: AgentServiceOptions["mcpAgentAccess"];
+  readonly #usageReportWorkerPath: string | null;
   readonly #hiddenModels: AgentServiceOptions["hiddenModels"];
   readonly #clearPictureBackground: AgentServiceOptions["clearPictureBackground"];
   readonly #providers: ProviderRuntime;
@@ -641,6 +649,7 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
   readonly #steersAfterTurnStart = new Map<string, { agentId: string; taskId: string | null; threadId: string }>();
 
   readonly #requestedNewChats = new Set<string>();
+  readonly #settlingStaleTaskTurns = new Set<string>();
   readonly signInWaits = new ProviderSignInWaits((agentId) => this.#store.get(agentId) !== undefined);
   #signInProviders: ReadonlySet<AgentProvider> = new Set();
   readonly #planContinuation = new PlanContinuation({ limit: 8 });
@@ -652,6 +661,7 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
   constructor(options: AgentServiceOptions) {
     super();
     this.#mcpAgentAccess = options.mcpAgentAccess;
+    this.#usageReportWorkerPath = options.usageReportWorkerPath ?? null;
     this.#hiddenModels = options.hiddenModels;
     this.#clearPictureBackground = options.clearPictureBackground;
     const {
@@ -1156,9 +1166,9 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
         ...(options.fitImage ? { fitImage: options.fitImage } : {}),
         ...(credentials.serverEnvironment
           ? {
-              agentEnvironment: (inherited) => ({
+              agentEnvironment: (inherited, gitConfig) => ({
                 ...credentials.serverEnvironment,
-                ...credentials.agentEnvironment?.(inherited),
+                ...credentials.agentEnvironment?.(inherited, gitConfig),
               }),
             }
           : {}),
@@ -1270,6 +1280,7 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
       ...(options.passwordVault === undefined ? {} : { passwordVault: options.passwordVault }),
       ...(options.vaultItems === undefined ? {} : { vaultItems: options.vaultItems }),
       linkWallet: options.linkWallet ?? null,
+      nearWallet: options.nearWallet ?? null,
       agentName: (agentId) => store.get(agentId)?.name,
       noteVaultChange: (agentId, threadId, turnId, text) => this.#tools.postVaultNote(agentId, threadId, turnId, text),
       apiKeys: options.agentApiKeys ?? null,
@@ -1312,6 +1323,8 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
     });
     let userControlTabIds = "";
     let browserPageStates = "";
+    let browserPermissions = "[]";
+    let browserHttpSignIns = "";
     this.#browser.onChanged((tabs, activeTabId) => {
       this.#attention.cancelTakeoversForMissingTabs(tabs);
       Effect.runFork(this.#browserUploads.retainTabs(tabs).pipe(Effect.forkIn(this.#scope)));
@@ -1325,6 +1338,18 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
       if (pageStateKey !== browserPageStates) {
         browserPageStates = pageStateKey;
         this.#emit({ type: "browser-page-state-changed", tabs: pageStates });
+      }
+      const permissionRequests = browserPermissionRequests(tabs);
+      const permissionKey = JSON.stringify(permissionRequests);
+      if (permissionKey !== browserPermissions) {
+        browserPermissions = permissionKey;
+        this.#emit({ type: "browser-permissions-changed", requests: permissionRequests });
+      }
+      const httpSignIns = browserHttpSignInPrompts(tabs);
+      const httpSignInKey = JSON.stringify(httpSignIns);
+      if (httpSignInKey !== browserHttpSignIns) {
+        browserHttpSignIns = httpSignInKey;
+        this.#emit({ type: "browser-http-sign-in-changed", tabs: httpSignIns });
       }
       const held = tabs.filter((tab) => tab.userControl).map((tab) => tab.id);
       if (held.join("\n") === userControlTabIds) return;
@@ -1407,12 +1432,14 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
         cards: options.vaultItems?.hasCards(agentId) ?? false,
         contacts: options.vaultItems?.hasContacts(agentId) ?? false,
         link: options.linkWallet?.connected() ?? false,
+        near: options.nearWallet?.ready() ?? false,
       }),
       serverHost: hostMemory !== null,
       ...(options.hostedStorageGb ? { hostedStorageGb: options.hostedStorageGb } : {}),
       ...(options.agentCursorDrawn ? { agentCursorDrawn: true } : {}),
       ...(options.computerUseOnWayland ? { computerUseOnWayland: true } : {}),
       ...(options.computerUseInputRefused ? { computerUseInputRefused: options.computerUseInputRefused } : {}),
+      ...(options.computerUseForegroundInput ? { computerUseForegroundInput: true } : {}),
       ...(options.responseStyle ? { responseStyle: options.responseStyle } : {}),
       memoryReview: () => this.#memoryReview.running(),
       skillRevision: () => options.skillLearning?.() === "automatic",
@@ -1739,6 +1766,10 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
       interrupt: (agentId, turnId, threadId) => this.interrupt(agentId, turnId, threadId).pipe(toMessagingThreadFailed),
       forgetThread: (threadId) => this.#forgetExecutionThread(threadId).pipe(toMessagingThreadFailed),
       ownChat: (threadId) => this.#store.ownsThread(threadId),
+      appendSystemMessage: (agentId, sideThreadId, message) =>
+        sideThreadId
+          ? this.#appendSideThreadSystemMessage(agentId, sideThreadId, message, "messaging.undelivered")
+          : this.#appendSystemMessage(agentId, message, "messaging.undelivered"),
       contextSession: (agentId, threadId) => {
         const agent = this.#store.get(agentId);
         if (!agent || !this.#reportsCompactions(agentId)) return null;
@@ -1844,8 +1875,10 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
         mayContinueOnBackup: (agentId) => this.#mayContinueStoppedWork(agentId),
         mayFailOver: (agentId) => this.#mayFailOver(agentId),
         turnEnded: (turnId) => this.#turn.hasEnded(turnId),
-        staleTurnSettlement: (agentId, threadId, turnId) =>
-          this.#turnRunsNowhere(agentId, turnId) ? this.#settleStaleOwnTurn(agentId, threadId, turnId) : null,
+        staleTurnSettlement: (agentId, threadId, turnId, channelLaneId) =>
+          this.#turnRunsNowhere(agentId, turnId, channelLaneId)
+            ? this.#settleStaleTurn(agentId, threadId, turnId, channelLaneId)
+            : null,
         orphanedDeliveryRecovery: (agentId) =>
           this.#mayRecoverOrphanedDeliveries(agentId) ? this.#recoverOrphanedDeliveries(agentId) : null,
         turnRestarting: (turnId) => this.#turn.forgetEnded(turnId),
@@ -1856,6 +1889,9 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
             logger.info(`Agent ${agentId} dropped its new chat request: a turn in its chat started first.`);
         },
         followPendingRuntime: (agentId) => this.#startPendingRuntime(agentId),
+        pendingRuntimeWaits: (agentId) =>
+          Boolean(this.#store.get(agentId)?.pendingRuntime) && this.#runtimeHandoverBusy(agentId),
+        settleStaleTaskTurns: (agentId) => this.#settleStaleTaskTurnsOnce(agentId),
         signInWait: (agentId, provider) => this.signInWaits.note(agentId, provider),
         followUsageLimit: (agentId) => {
           if (this.#startPendingRuntime(agentId)) return true;
@@ -1956,6 +1992,7 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
         tagReferences: (agentId, threadId) => this.#tagReferences(agentId, threadId),
         liveVoiceRelayed: (deliveryId) => this.#liveVoiceRelayed.get(deliveryId) ?? null,
         fromChrome: (deliveryId) => this.#fromChrome.has(deliveryId),
+        turnSession: (turnId) => this.#turn.turnSession(turnId),
       },
     });
     this.#turn = new TurnLifecycle({
@@ -2156,9 +2193,10 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
         asksMuted: (personIds) => options.creditAsks?.muted(personIds) ?? false,
         enableAgents: () => options.creditAsks?.enableAgents() ?? Effect.void,
         muteAsks: (person) => options.creditAsks?.mute(person) ?? Effect.void,
-        defaultModel: (kind) => {
+        defaultModels: (kind) => {
           const setting = options.mediaApprovalCredits?.();
-          return (kind === "image" ? setting?.imageModel : setting?.videoModel) ?? CREDIT_MEDIA_PREFERRED_MODELS[kind];
+          const chosen = kind === "image" ? setting?.imageModel : setting?.videoModel;
+          return chosen ? [chosen] : CREDIT_MEDIA_PREFERRED_MODELS[kind];
         },
         fitImage: options.fitImage ?? null,
         scope: () => this.#scope,
@@ -2278,15 +2316,29 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
     return this.#store.database.usage.read(input);
   }
 
-  getHostAnalytics(input: HostAnalyticsInput) {
-    if (
-      input.agentId &&
-      input.agentId !== WORKFLOWS_USAGE_ID &&
-      !this.listAgents().some((agent) => agent.id === input.agentId)
-    )
-      throw new Error(sourceText("error.team.agentNotFound"));
-    return this.#store.database.usage.readHost(input);
-  }
+  readonly getHostAnalytics = Effect.fn("AgentService.getHostAnalytics")(function* (
+    this: AgentService,
+    input: HostAnalyticsInput,
+  ) {
+    yield* lifecycleStep("find usage report agent", () => {
+      if (
+        input.agentId &&
+        input.agentId !== WORKFLOWS_USAGE_ID &&
+        !this.listAgents().some((agent) => agent.id === input.agentId)
+      )
+        throw new Error(sourceText("error.team.agentNotFound"));
+    });
+    const readOnMain = lifecycleStep("read usage report", () => this.#store.database.usage.readHost(input));
+    const workerPath = this.#usageReportWorkerPath;
+    if (!workerPath) return yield* readOnMain;
+    return yield* readUsageReportInWorker({ databasePath: this.#store.database.path, workerPath }, input).pipe(
+      Effect.catch((failure) =>
+        Effect.sync(() =>
+          logger.warn("The usage report worker failed. The report runs on the main thread.", toLogValue(failure.cause)),
+        ).pipe(Effect.andThen(readOnMain)),
+      ),
+    );
+  }).bind(this);
 
   getTurnUsage(agentId: string, turnId: string, since: string) {
     return this.#store.database.usage.readTurn(agentId, turnId, since);
@@ -3138,7 +3190,7 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
             failed(
               failure instanceof GenerationUsageLimitError
                 ? sourceText("error.provider.usageLimitReached")
-                : workflowGenerationError(failure.cause, provider),
+                : workflowGenerationError(failure.cause, provider, (text) => redactText(this.#mcp.redact(text))),
             ),
           ),
         );
@@ -3936,14 +3988,26 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
     }
   });
 
-  #turnRunsNowhere(agentId: string, turnId: string): boolean {
+  #settleStaleTaskTurnsOnce(agentId: string): void {
+    if (this.#settlingStaleTaskTurns.has(agentId)) return;
+    this.#settlingStaleTaskTurns.add(agentId);
+    Effect.runFork(
+      this.#settleStaleTaskTurns(agentId).pipe(
+        Effect.catch((failure) => Effect.sync(() => this.#emitError("stale_task_settlement_failed", failure, agentId))),
+        Effect.ensuring(Effect.sync(() => this.#settlingStaleTaskTurns.delete(agentId))),
+        Effect.forkIn(this.#scope, { startImmediately: true }),
+      ),
+    );
+  }
+
+  #turnRunsNowhere(agentId: string, turnId: string, channelLaneId?: string): boolean {
     return (
       !this.#stopping &&
       this.#turn.hasEnded(turnId) &&
       this.#turn.turnStartedAt(turnId) === null &&
       !this.#turn.isCompleting(turnId) &&
       this.#mailbox.findDeliveriesByTurn(agentId, turnId).length === 0 &&
-      this.#mailbox.startingDeliveriesForAgent(agentId).length === 0 &&
+      this.#mailbox.startingDeliveriesForAgent(agentId, channelLaneId).length === 0 &&
       this.#turn.workingCodexChildren(agentId, turnId).length === 0
     );
   }
@@ -3970,15 +4034,17 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
     if (!this.#boot.hasOrphanedOwnChatDelivery(agentId)) this.#drain.scheduleDrain(agentId);
   });
 
-  readonly #settleStaleOwnTurn = Effect.fn("AgentService.settleStaleOwnTurn")(function* (
+  readonly #settleStaleTurn = Effect.fn("AgentService.settleStaleTurn")(function* (
     this: AgentService,
     agentId: string,
     threadId: string,
     turnId: string,
+    channelLaneId: string | undefined,
   ) {
-    if (!this.#turnRunsNowhere(agentId, turnId)) return;
+    if (!this.#turnRunsNowhere(agentId, turnId, channelLaneId)) return;
     logger.warn("A chat turn that no provider runs held the agent's queue. It ends as interrupted.", {
       agentId,
+      threadId,
       turnId,
     });
     yield* this.#turn.settleOrphanedTurn(agentId, threadId, turnId, "interrupted");
@@ -4267,6 +4333,7 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
         agent.reasoningEffort,
       );
     }
+    if (previous?.pendingRuntime && !agent.pendingRuntime) this.#drain.scheduleDrain(agent.id);
     if (profileChanged) this.#conversation.unloadAgentThreads(agent.id);
     if (previous && workspaceAccessEnforced(previous) && !workspaceAccessEnforced(agent))
       this.#attention.answerGrantedRequests();
@@ -4872,6 +4939,7 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
       return threadId;
     });
     yield* this.#threads.endThreadContext(threadId);
+    this.#turn.forgetImageLimit(agentId, threadId);
     yield* this.#memoryReview.chatCleared(agentId);
   }, Effect.uninterruptible).bind(this);
 
@@ -5180,8 +5248,13 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
     );
   }
 
+  channelCompactAvailable(channelId: string): boolean {
+    const members = new Set(this.channels.store.get(channelId).members.map((member) => member.agentId));
+    return this.#store.list().some((agent) => members.has(agent.id) && this.#mayCompactOnRequest(agent));
+  }
+
   #mayCompactOnRequest(agent: AgentSummary): boolean {
-    const mode = this.#providers.lastCompactionMode(agent);
+    const mode = this.#providers.lastCompactionMode(agent) ?? fixedContextCompaction(agent.provider);
     return mode === undefined || compactsOnRequest(mode);
   }
 
@@ -6252,13 +6325,15 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
     this: AgentService,
     agent: AgentSummary,
   ) {
-    const signIn = () => ({ cause: new Error(sourceText("error.voice.live.signIn")) });
-    yield* this.#providers.ensureProvider("codex").pipe(Effect.mapError(signIn));
+    const codexFailure = (cause: unknown) => ({
+      cause: this.#providers.signInRequired("codex") ? new Error(sourceText("error.voice.live.signIn")) : cause,
+    });
+    yield* this.#providers.ensureProvider("codex").pipe(Effect.mapError((failure) => codexFailure(failure.cause)));
     const model = this.#sideCodexModel();
     if (!model) return yield* Effect.fail({ cause: new Error(sourceText("error.provider.noModel")) });
     const client = yield* Effect.try({
       try: () => this.#providers.createProfileClient("codex", this.#liveVoiceAccountId(agent)),
-      catch: signIn,
+      catch: codexFailure,
     });
     return { client, model: model.id, effort: model.defaultReasoningEffort };
   }).bind(this);
@@ -7136,7 +7211,7 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
       if (explain && steers) yield* this.#markSteerFallback(agent.id, deliveryId, "provider-unsupported");
       return yield* notSteered("provider-unsupported");
     }
-    if (this.#routineRunsIn(agent, task?.threadId ?? null)) {
+    if (this.#routineRunsTurn(agent, task?.threadId ?? null, steerTurnId)) {
       if (explain && steers) yield* this.#markSteerFallback(agent.id, deliveryId, "steer-failed");
       return yield* notSteered("routine-run");
     }
@@ -7517,9 +7592,12 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
     }
   });
 
-  #routineRunsIn(agent: AgentSummary, threadId: string | null): boolean {
+  #routineRunsTurn(agent: AgentSummary, threadId: string | null, turnId: string): boolean {
     const publicThreadId = threadId ?? agent.threadId;
-    return publicThreadId !== null && this.#conversation.routineSession(agent.id, publicThreadId) !== undefined;
+    if (publicThreadId === null || this.#conversation.routineSession(agent.id, publicThreadId) === undefined)
+      return false;
+    const turnSession = this.#turn.turnSession(turnId);
+    return turnSession === undefined || this.#conversation.isRoutineSession(turnSession);
   }
 
   #runningSession(agent: AgentSummary, threadId: string | null | undefined): string | undefined {

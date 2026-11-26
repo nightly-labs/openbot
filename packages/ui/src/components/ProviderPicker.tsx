@@ -532,11 +532,20 @@ export function ProviderPicker(props: ProviderPickerProps) {
                           variant="outline"
                           size="xs"
                           class="provider-picker-install"
-                          aria-label={t("provider.aria.codeFallback", { name: option().name })}
+                          aria-label={t(
+                            alternative() === "address"
+                              ? "provider.aria.addressFallback"
+                              : "provider.aria.codeFallback",
+                            { name: option().name },
+                          )}
                           disabled={props.disabled || props.refreshingProviders}
                           onClick={signInAlternative}
                         >
-                          {t("provider.action.signInWithCode")}
+                          {t(
+                            alternative() === "address"
+                              ? "provider.action.pasteAddress"
+                              : "provider.action.signInWithCode",
+                          )}
                         </Button>
                       </Show>
                       <Show when={runtimeAction()}>

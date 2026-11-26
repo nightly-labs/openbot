@@ -228,6 +228,24 @@ the last version that opened. When that version cannot open the data, or when Op
 the window offers the latest version instead. An older version would only stop again with the
 message below.
 
+## Security software stops OpenBot on Windows
+
+When security software stops the OpenBot window as it starts, OpenBot says "Security software on
+this computer probably stopped the OpenBot window." Older versions show
+`ERR_FAILED (-2) loading 'openbot-app://app/index.html'`. A new version can be blocked although an
+earlier version worked, because the security software does not know the new `OpenBot.exe` yet. The
+same can occur after an update of the security software. Your local data was not reset or
+overwritten.
+
+1. To find the OpenBot folder, right-click the OpenBot shortcut and click **Open file location**.
+2. In your security software, add `OpenBot.exe` from that folder as a trusted application. In
+   Kaspersky, open **Exclusions and actions on object detection** in the security settings, then
+   **Specify trusted applications**. Add `OpenBot.exe`, and select **Do not monitor application
+   activity** and **Do not monitor child application activity** (apply recursively).
+3. Start OpenBot again.
+
+Do not start OpenBot with `--no-sandbox`. It is not a supported workaround.
+
 ## OpenBot says a newer version saved your data
 
 An older OpenBot started after a newer one opened your data, for example from an old shortcut or a

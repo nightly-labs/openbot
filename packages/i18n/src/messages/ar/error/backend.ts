@@ -58,6 +58,11 @@ export const messages = {
     "تعذّر على OpenBot تحميل الصفحة في نافذة تسجيل الدخول. تحقّق من الاتصال بالإنترنت، ثم افتح نافذة تسجيل الدخول مرة أخرى.",
   "error.backend.browserSignInReadFailed": "تعذّر على OpenBot قراءة تسجيل الدخول من النافذة.",
   "error.backend.browserStopUnsupported": "لا يمكن لهذا المضيف البعيد إيقاف تحميل الصفحة.",
+  "error.backend.browserLocationFailed": "تعذر تعيين الموقع للصفحة.",
+  "error.backend.browserPermissionsUnsupported": "لا يمكن لهذا المضيف البعيد الرد على طلبات الموقع.",
+  "error.backend.browserLocationRequired": "أرسل موقع الجهاز للسماح بالطلب.",
+  "error.backend.browserHttpSignInInactive": "لم يعد هذا الموقع يطلب تسجيل الدخول. أعد تحميل الصفحة للمحاولة مرة أخرى.",
+  "error.backend.browserHttpSignInUnsupported": "لا يمكن لهذا المضيف البعيد استقبال تسجيل دخول إلى موقع.",
   "error.backend.sharedDataLocalOnly": "تتم إدارة البيانات المشتركة على الحاسوب الذي يشغّل هؤلاء الوكلاء.",
   "error.backend.browserUrlProtocol": "يُسمح فقط بعناوين URL من نوع HTTP(S) في المتصفح.",
   "error.backend.sunshineNotReady": "لم يصبح Sunshine جاهزًا.",
@@ -189,6 +194,8 @@ export const messages = {
   "error.backend.videoGenerationFailed": "فشل إنشاء الفيديو.",
   "error.backend.videoGenerationNoVideo": "لم يُرجع إنشاء الفيديو أي فيديو.",
   "error.backend.videoGenerationInterrupted": "تمت مقاطعة إنشاء الفيديو.",
+  "error.backend.grokVideoNoQuota":
+    "لا يمكن لحساب Grok الخاص بك إنشاء مقاطع فيديو. أنشئ الفيديو باستخدام الأرصدة بدلًا من ذلك.",
   "error.backend.attachmentNotRegularFile": "يمكن إرفاق الملفات العادية فقط: {name}",
   "error.backend.attachmentCopyFailed": "تعذّر على OpenBot نسخ {name}.",
   "error.backend.routineNameRequired": "يلزم اسم للمهمة الدورية.",
@@ -270,6 +277,8 @@ export const messages = {
     "لا يقبل خادم تسجيل الدخول OpenBot كتطبيق بعد. حسابك ليس السبب. استخدم طريقة أخرى للاتصال، مثل خادم MCP محلي.",
   "error.backend.mcpRegistrationUnavailable":
     "لا يستطيع خادم تسجيل الدخول تسجيل OpenBot كتطبيق. حسابك ليس السبب. للاتصال، احفظ هذا الخادم في المتجر، التطبيقات، ثم أضف إليه تطبيق تسجيل دخول.",
+  "error.backend.mcpSignInAppNeeded":
+    "لا يستطيع خادم تسجيل الدخول تسجيل OpenBot كتطبيق. حسابك ليس السبب. للاتصال، افتح هذا الخادم في المتجر، التطبيقات، وانقر على اختبار الاتصال، ثم أضف تطبيق تسجيل دخول.",
   "error.backend.mcpSignInAbandonedGeneric": "تم التخلي عن تسجيل الدخول.",
   "error.backend.mcpSignInForgotten": "تم نسيان تسجيل الدخول إلى MCP أثناء تشغيله.",
   "error.backend.mcpSignInAbandoned": "تم التخلي عن تسجيل الدخول إلى MCP.",
@@ -414,6 +423,10 @@ export const messages = {
   "error.backend.browserProxySignInRefused": "رفض الوكيل {name} تسجيل الدخول، لذلك لم تُفتح الصفحة.",
   "error.backend.browserSystemProxyFailed":
     "الوكيل في إعدادات الكمبيوتر الذي يشغّل OpenBot لا يستجيب أو رفض الاتصال، لذلك لم تُفتح الصفحة. تحقّق من إعدادات الوكيل في ذلك الكمبيوتر.",
+  "error.backend.browserSystemProxyOrSiteClosed":
+    "أغلق الموقع أو الوكيل في إعدادات الكمبيوتر الذي يشغّل OpenBot الاتصال دون أي رد، لذلك لم تُفتح الصفحة. إذا لم يُفتح أي موقع، فتحقّق من إعدادات الوكيل في ذلك الكمبيوتر.",
+  "error.backend.browserProfileProxyOrSiteClosed":
+    "أغلق الموقع أو وكيل ملف تعريف المتصفح هذا الاتصال دون أي رد، لذلك لم تُفتح الصفحة. إذا لم يُفتح أي موقع، فتحقّق من وكيل ملف التعريف.",
   "error.backend.browserProxyComputerUnreachable":
     "الكمبيوتر الذي يستخدمه هذا الملف الشخصي لا يستجيب، لذلك لم تُفتح الصفحة.",
   "error.backend.browserProxyComputerLocalAddress":
