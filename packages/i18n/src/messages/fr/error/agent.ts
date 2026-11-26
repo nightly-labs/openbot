@@ -20,6 +20,8 @@ export const messages = {
     "L’outil ne s’est pas exécuté. tool_call n’a trouvé aucun outil avec ce nom. Utilisez le nom qualifié exact que donne tool_search, par exemple openbot_browser.snapshot.",
   "error.agent.toolCallUnknownToolSuggest":
     "L’outil ne s’est pas exécuté. tool_call n’a trouvé aucun outil avec ce nom. Le nom qualifié est peut-être {name}. Si c’est le cas, renvoyez l’appel avec ce nom.",
+  "error.agent.toolCallNullValue":
+    "L’outil ne s’est pas exécuté. {name} attend un objet ou une liste à {paths}, mais chacun de ces éléments de liste est arrivé comme null. Renvoyez l’appel et donnez chacun de ces éléments sous forme de chaîne qui contient son JSON.",
   "error.agent.toolDescribeUnknownNames":
     "tool_describe n’a trouvé aucun outil OpenBot nommé {names}. Il décrit uniquement les outils OpenBot et du navigateur que liste openbot.tool_search, pas les outils MCP.",
   "error.agent.toolDescribeDiscoveryNames":
@@ -204,6 +206,8 @@ export const messages = {
   "error.agent.screenCaptureShared":
     "La capture d’écran ne fonctionne pas dans une conversation Slack, Discord ou Telegram, car d’autres personnes reçoivent ses fichiers.",
   "error.agent.screenCaptureDeclined": "L’utilisateur n’a pas autorisé cette capture d’écran. Rien n’a été capturé.",
+  "error.agent.creditMediaDeclined": "L’utilisateur n’a pas autorisé cette génération. Aucun crédit n’a été dépensé.",
+  "error.agent.creditMediaNotSaved": "Le fichier a été créé, mais OpenBot n’a pas pu l’enregistrer dans le chat.",
   "error.agent.mcpToolDeclined": "L’utilisateur n’a pas autorisé cet appel d’outil MCP. L’outil n’a pas été exécuté.",
   "error.agent.screenCaptureWindowMissing":
     "Cette fenêtre n’est pas ouverte. Appelez list_capture_sources pour obtenir les identifiants actuels des fenêtres.",

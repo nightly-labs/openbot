@@ -32,6 +32,7 @@ export const messages = {
   "error.voice.live.timedOut": "Codex 라이브 음성이 제시간에 시작되지 않았어요. 다시 시도하세요.",
   "error.voice.live.failed": "라이브 음성이 중지되었어요: {reason}",
   "error.voice.live.disconnected": "라이브 음성 연결이 끊어졌어요.",
+  "error.voice.live.connectionLost": "라이브 음성 연결이 끊어졌어요. 마이크 음소거를 해제하면 다시 시작해요.",
   "error.voice.live.startFailed":
     "라이브 음성을 시작하지 못했어요. 에이전트를 실행하는 컴퓨터에서 Codex를 업데이트하고 ChatGPT로 로그인한 다음 다시 시도하세요. 이유: {reason}",
   "error.voice.live.hostFailed":

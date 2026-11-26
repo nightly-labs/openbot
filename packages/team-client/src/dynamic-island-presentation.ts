@@ -330,7 +330,7 @@ function approvalTitle(approval: AgentApproval, text: DynamicIslandText) {
   return text.approvalPermissions;
 }
 
-function presentationPriority(mode: DynamicIslandPresentation["mode"]): 0 | 1 | 2 | 3 | 4 | 5 | 6 {
+export function presentationPriority(mode: DynamicIslandPresentation["mode"]): 0 | 1 | 2 | 3 | 4 | 5 | 6 {
   if (mode === "question") return 0;
   if (mode === "approval") return 1;
   if (mode === "takeover") return 2;

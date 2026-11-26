@@ -11,4 +11,6 @@ export const messages = {
   "error.app.remoteIdentityUnavailable": "원격 호스트 ID를 사용할 수 없어요.",
   "error.app.iceServersMissing": "원격 Signal이 아직 ICE 서버를 제공하지 않았어요.",
   "error.app.finishLocalTest": "디스플레이를 전환하기 전에 로컬 테스트를 끝내 주세요.",
+  "error.app.windowBlockedBySecuritySoftware":
+    "이 컴퓨터의 보안 소프트웨어가 OpenBot 창을 멈춘 것 같아요. 보안 소프트웨어(예: Kaspersky)에서 OpenBot.exe를 신뢰할 수 있는 애플리케이션으로 추가한 다음 OpenBot을 다시 시작해 주세요.",
 } as const satisfies PartialTranslation<typeof source>;

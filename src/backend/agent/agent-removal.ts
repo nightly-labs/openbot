@@ -56,6 +56,8 @@ export interface AgentRemovalOptions {
   hooks: AgentRemovalHooks;
 }
 
+const WORK_SETTLE_WAIT_MS = 30_000;
+
 export class AgentRemoval {
   readonly #deleting = new Set<string>();
   readonly #heldFolders = new Set<string>();
@@ -123,8 +125,7 @@ export class AgentRemoval {
       }),
       ({ wasPending }) =>
         Effect.gen({ self: this }, function* () {
-          yield* this.#drain.taskFor(agentId)?.pipe(Effect.ignore) ?? Effect.void;
-          yield* this.#hooks.settleModelMoves(agentId);
+          yield* this.#settleWork(agentId);
           const current = yield* removalStep(() => {
             this.#assertIdle(agentId);
             return this.#store.list().find((entry) => entry.id === agentId) ?? agent;
@@ -162,6 +163,21 @@ export class AgentRemoval {
           else this.#heldFolders.delete(agentId);
         }),
       ),
+    );
+  }
+
+  #settleWork(agentId: string): Effect.Effect<void, AgentRemovalFailed> {
+    return Effect.interruptible(
+      Effect.andThen(
+        this.#drain.taskFor(agentId)?.pipe(Effect.ignore) ?? Effect.void,
+        this.#hooks.settleModelMoves(agentId),
+      ),
+    ).pipe(
+      Effect.timeoutOrElse({
+        duration: WORK_SETTLE_WAIT_MS,
+        orElse: () =>
+          Effect.fail(new AgentRemovalFailed({ cause: new Error(sourceText("error.agent.stopBeforeDelete")) })),
+      }),
     );
   }
 

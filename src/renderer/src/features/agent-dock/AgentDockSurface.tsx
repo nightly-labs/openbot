@@ -22,6 +22,7 @@ import {
   agentDockBody,
   agentDockSeatKey,
 } from "@openbot/ui/features/agent-dock/AgentDock";
+import { DRAFT_THREAD_ID } from "@openbot/ui/features/conversation/threads/thread-types";
 import { useText } from "@openbot/ui/text";
 import { createEffect, createMemo, createSignal, onSettled, Show } from "solid-js";
 import { currentDevicePlatform } from "../../send-shortcut-preference";
@@ -113,7 +114,7 @@ export function AgentDockSurface() {
   let sentShape = "";
   let sentExtent: AgentDockExtent | null | undefined;
   let shrinkTimer: ReturnType<typeof setTimeout> | undefined;
-  let failed: { seatKey: string; text: string; clientMessageId: string } | null = null;
+  let failed: { seatKey: string; taskId: string | undefined; text: string; clientMessageId: string } | null = null;
 
   const apply = (next: AgentDockPresentation | null) => {
     received = true;
@@ -375,6 +376,13 @@ export function AgentDockSurface() {
         }),
       );
       bySeat.set(agentDockSeatKey(chat.seat), {
+        thread: chat.thread ?? null,
+        threads: chat.threads
+          ? {
+              activeId: chat.threads.activeId,
+              threads: chat.threads.threads.map((thread) => ({ ...thread, kind: "side" as const })),
+            }
+          : null,
         messages,
         working: chat.working,
         wait: chat.wait,
@@ -515,17 +523,33 @@ export function AgentDockSurface() {
             }}
             onSend={async (seat, text) => {
               const seatKey = agentDockSeatKey(seat);
+              const shown = presentation()?.chats.find((chat) => agentDockSeatKey(chat.seat) === seatKey);
+              const draft = seat.kind === "agent" && shown?.threads?.activeId === DRAFT_THREAD_ID;
+              const taskId = draft ? DRAFT_THREAD_ID : shown?.thread?.taskId;
               const clientMessageId =
-                failed && failed.seatKey === seatKey && failed.text === text
+                failed && failed.seatKey === seatKey && failed.taskId === taskId && failed.text === text
                   ? failed.clientMessageId
                   : crypto.randomUUID();
               try {
-                await perform({ type: "send", serverId: server, seat: contractSeat(seat), text, clientMessageId });
+                await perform(
+                  draft
+                    ? { type: "start-thread", serverId: server, agentId: seat.id, text, clientMessageId }
+                    : {
+                        type: "send",
+                        serverId: server,
+                        seat: contractSeat(seat),
+                        ...(taskId ? { taskId } : {}),
+                        text,
+                        clientMessageId,
+                      },
+                );
                 failed = null;
                 return { messageId: clientMessageId };
               } catch (error) {
-                failed = { seatKey, text, clientMessageId };
-                return { error: errorMessage(error, t("chat.errorStatus.send")) };
+                failed = { seatKey, taskId, text, clientMessageId };
+                return {
+                  error: errorMessage(error, t(draft ? "conversation.threads.error.start" : "chat.errorStatus.send")),
+                };
               }
             }}
             onOpenInMain={(seat) =>
@@ -537,6 +561,12 @@ export function AgentDockSurface() {
             }
             onOpenWindow={(agentId) =>
               void perform({ type: "open-window", serverId: server, agentId }).catch(() => undefined)
+            }
+            onOpenThread={(seat, threadId) =>
+              void perform({ type: "open-thread", serverId: server, agentId: seat.id, threadId }).catch(() => undefined)
+            }
+            onNewThread={(seat) =>
+              void perform({ type: "new-thread", serverId: server, agentId: seat.id }).catch(() => undefined)
             }
             answers={answersFor(server)}
             agents={agents()}

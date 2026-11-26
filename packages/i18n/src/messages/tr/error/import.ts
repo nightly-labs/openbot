@@ -88,6 +88,8 @@ export const messages = {
   "error.import.transferAgentEnv": "{name}: {names} değerlerini Ayarlar'da yeniden girin.",
   "error.import.transferMcpValues":
     "{name}: MCP sunucusu kapalı olarak eklendi. Komutunu kontrol edin, değerlerini ve tam adresini yeniden girin, ardından Pazaryeri, Uygulamalar bölümünde açın.",
+  "error.import.transferMcpSignIn":
+    "{name}: uygulama kapalı olarak eklendi. Yeniden bağlayın, ardından Pazaryeri, Uygulamalar bölümünde açın.",
   "error.import.transferValuesCleared":
     "{name}: bağımsız değişkenlerinden veya adresinden gizli bilgi içerebilecek değerler kaldırıldı. Bunları Ayarlar'da yeniden girin.",
   "error.import.transferSharedKept":

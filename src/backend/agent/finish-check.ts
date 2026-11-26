@@ -16,6 +16,8 @@ const STEP_LINES = 40;
 const STEP_CHARACTERS = 160;
 const RESULT_CHARACTERS = 240;
 const MISSING_CHARACTERS = 600;
+const EARLIER_ANSWERS = 3;
+const EARLIER_ANSWER_CHARACTERS = 2_000;
 
 export const FinishCheckResult = Schema.Struct({
   verdict: Schema.Literals(["done", "continue", "user", "blocked", "waiting"]),
@@ -34,6 +36,8 @@ export interface FinishCheckInput {
   steps: readonly FinishCheckStep[];
   plan: ConversationPlan | null;
   answer: string;
+  earlierAnswers?: readonly string[];
+  earlierGaps?: readonly string[];
   continuations: number;
   awaitsTeammate?: boolean;
 }
@@ -48,6 +52,35 @@ const oneLine = (text: string) => text.replace(/\s+/g, " ").trim();
 function resultPart(result: string): string {
   const text = oneLine(result);
   return text.startsWith("…") ? clipEnd(text, RESULT_CHARACTERS) : clip(text, RESULT_CHARACTERS);
+}
+
+function earlierTurnLines(answers: readonly string[], gaps: readonly string[]): string[] {
+  if (answers.length === 0 && gaps.length === 0) return [];
+  return [
+    "",
+    "OpenBot already continued this request automatically. The work of the earlier turns counts for the request.",
+    ...(answers.length > 0
+      ? [
+          "The agent's earlier answers to the user in this request, oldest first. The user already sees them:",
+          "<earlier-answers>",
+          ...answers
+            .slice(-EARLIER_ANSWERS)
+            .flatMap((answer, index) => [
+              `--- answer ${index + 1} ---`,
+              clip(answer.trim(), EARLIER_ANSWER_CHARACTERS),
+            ]),
+          "</earlier-answers>",
+        ]
+      : []),
+    ...(gaps.length > 0
+      ? [
+          "What the earlier checks said was not done, oldest first:",
+          "<earlier-checks>",
+          ...gaps.map((gap) => `- ${clip(oneLine(gap), MISSING_CHARACTERS)}`),
+          "</earlier-checks>",
+        ]
+      : []),
+  ];
 }
 
 function stepLine(step: FinishCheckStep): string {
@@ -65,6 +98,7 @@ export function finishCheckPrompt(input: FinishCheckInput): string {
   const tools = input.steps.filter((step) => step.kind === "tool");
   const shownTools = tools.slice(-STEP_LINES);
   const plan = input.plan?.steps.map((step) => `- [${step.status}] ${oneLine(step.text)}`) ?? [];
+  const earlier = earlierTurnLines(input.earlierAnswers ?? [], input.earlierGaps ?? []);
   return [
     `${FINISH_CHECK_MARKER}. You check whether an AI agent finished the user's request. You do not do the work, and you do not talk to the user. Answer with one JSON object only.`,
     "",
@@ -83,6 +117,7 @@ export function finishCheckPrompt(input: FinishCheckInput): string {
           "</context>",
         ]
       : []),
+    ...earlier,
     "",
     ...(tools.length === 0
       ? ["The agent used no tools in its last turn."]
@@ -118,6 +153,11 @@ export function finishCheckPrompt(input: FinishCheckInput): string {
         ]
       : []),
     'Do not ask for more than the request asked for. Do not choose "continue" for extra polish, a nice-to-have, or a risky action. When you are not sure, choose "done".',
+    ...(earlier.length > 0
+      ? [
+          "Judge the earlier answers and the last answer together. When the agent did or checked what an earlier check said, or showed that it was not needed, do not ask for it again, also not in different words.",
+        ]
+      : []),
     "",
     `JSON shape: {"verdict":"done"|"continue"|"user"|"blocked"${input.awaitsTeammate ? '|"waiting"' : ""},"missing":"for continue only: what is not done, as at most 3 short instructions to the agent"}`,
   ].join("\n");

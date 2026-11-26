@@ -17,7 +17,7 @@ import { useText } from "../../text";
 export function ChannelContextActions(props: {
   channelName: string;
   startNewConversation: () => Promise<void>;
-  compact: () => Promise<void>;
+  compact?: (() => Promise<void>) | undefined;
   deleteHistory?: (() => Promise<void>) | undefined;
 }) {
   const { t, errorMessage } = useText();
@@ -56,11 +56,11 @@ export function ChannelContextActions(props: {
     }
   }
 
-  async function compact(): Promise<void> {
+  async function compact(run: () => Promise<void>): Promise<void> {
     setCompactFailure(null);
     setCompacting(true);
     try {
-      await props.compact();
+      await run();
     } catch (error) {
       setCompactFailure({
         message: errorMessage(error, t("channel.settings.compact.failed")),
@@ -93,17 +93,27 @@ export function ChannelContextActions(props: {
             </Button>
           </ItemActions>
         </Item>
-        <Item>
-          <ItemContent>
-            <ItemTitle>{t("channel.settings.compact.title")}</ItemTitle>
-            <ItemDescription>{t("channel.settings.compact.description")}</ItemDescription>
-          </ItemContent>
-          <ItemActions>
-            <Button size="sm" variant="outline" type="button" disabled={compacting()} onClick={() => void compact()}>
-              {t("composer.context.compact")}
-            </Button>
-          </ItemActions>
-        </Item>
+        <Show when={props.compact}>
+          {(run) => (
+            <Item>
+              <ItemContent>
+                <ItemTitle>{t("channel.settings.compact.title")}</ItemTitle>
+                <ItemDescription>{t("channel.settings.compact.description")}</ItemDescription>
+              </ItemContent>
+              <ItemActions>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  type="button"
+                  disabled={compacting()}
+                  onClick={() => void compact(run())}
+                >
+                  {t("composer.context.compact")}
+                </Button>
+              </ItemActions>
+            </Item>
+          )}
+        </Show>
         <Show when={props.deleteHistory}>
           <Item>
             <ItemContent>

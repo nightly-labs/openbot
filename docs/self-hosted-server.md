@@ -297,11 +297,14 @@ already in its server list. Remove a phone from the account in the desktop app, 
 `sudo openbot uninstall` signs out, then removes the service, the units, the AppArmor profile, the
 `openbot` command and the server files in `/opt/OpenBot`. It keeps the home folder of the service user
 and the keyring in `/srv/openbot-hosted`. The keyring has the key of the encrypted data in that home
-folder, so keep or delete the two together. An install with the same `--user` uses them again. To
-delete the data too:
+folder, so keep or delete the two together. `/srv/openbot-keyring` has a copy of the keyring that only
+root can read: the server restores it when an agent damages the keyring (see
+[Keyring guard](hosted-servers.md#keyring-guard)). An install with the same `--user` uses them again.
+Before you put the data of another server on this computer, delete `/srv/openbot-keyring`. To delete
+the data too:
 
 ```sh
-sudo userdel --remove openbot && sudo rm -rf /srv/openbot-hosted
+sudo userdel --remove openbot && sudo rm -rf /srv/openbot-hosted /srv/openbot-keyring
 ```
 
 The server stays in the server list of the account, offline. Remove it there.

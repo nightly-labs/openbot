@@ -40,6 +40,7 @@ export const messages = {
   "mcp.status.signedIn": "Conectado",
   "mcp.status.signingIn": "Entrando…",
   "mcp.status.signInNeeded": "Requer login",
+  "mcp.status.signInAppNeeded": "Requer app de login",
   "mcp.status.refused": "Recusado",
   "mcp.status.checkUrl": "Verifique a URL",
   "mcp.status.noAnswer": "Sem resposta",

@@ -94,6 +94,7 @@ import {
 
 export type { AgentDockChatAnswers, AgentDockChatModel } from "./AgentDockChat";
 export type { AgentDockShelfResult } from "./AgentDockShelf";
+export type { AgentDockThreadChoices } from "./AgentDockThreadMenu";
 
 export interface AgentDockSeatRef {
   kind: "agent" | "channel";
@@ -189,6 +190,8 @@ export interface AgentDockProps {
   onSend: (seat: AgentDockSeatRef, text: string) => Promise<AgentDockSendResult>;
   onOpenInMain: (seat: AgentDockSeatRef) => void;
   onOpenWindow?: ((agentId: string) => void) | undefined;
+  onOpenThread?: ((seat: AgentDockSeatRef, id: string) => void) | undefined;
+  onNewThread?: ((seat: AgentDockSeatRef) => void) | undefined;
   agents: ComposerAgent[];
   onSelectAgent?: ((agentId: string) => void) | undefined;
   onOpenLink?: ((url: string) => void) | undefined;
@@ -303,6 +306,10 @@ export function AgentDock(props: AgentDockProps) {
     return next;
   });
   const seatFor = (id: string) => seatProps().get(id);
+  const firstTemporaryAfterSaved = createMemo(() => {
+    const index = state.seats.findIndex((id) => seatFor(id)?.temporary === true);
+    return index > 0 ? state.seats[index] : undefined;
+  });
   const seatAgent = (agentId: string) => {
     const seat = seatFor(agentDockSeatKey({ kind: "agent", id: agentId }));
     return seat?.kind === "agent" ? seat.agent : undefined;
@@ -1257,6 +1264,7 @@ export function AgentDock(props: AgentDockProps) {
                     }}
                     style={{ left: `${DOCK_PAD}px` }}
                     data-dragging={draggedSeat() === id ? "" : undefined}
+                    data-temporary-start={firstTemporaryAfterSaved() === id ? "" : undefined}
                   >
                     <Show when={seatFor(id)}>
                       {(seat) => (
@@ -1514,6 +1522,10 @@ export function AgentDock(props: AgentDockProps) {
                       else props.onOpenInMain(refOfKey(id));
                     }}
                     onOpenWindow={openWindowFor(id)}
+                    onOpenThread={
+                      props.onOpenThread ? (threadId) => props.onOpenThread?.(refOfKey(id), threadId) : undefined
+                    }
+                    onNewThread={props.onNewThread ? () => props.onNewThread?.(refOfKey(id)) : undefined}
                     voice={chatVoice(id)}
                     agents={props.agents}
                     onSelectAgent={(agentId) => {

@@ -45,6 +45,7 @@ export const messages = {
   "update.idleRestart.description": "Le nuove esecuzioni delle routine attendono il riavvio.",
   "update.idleRestart.waitingFor": "In attesa di {reasons}.",
   "update.idleRestart.cancel": "Annulla riavvio",
+  "update.idleRestart.openSettings": "Impostazioni aggiornamenti",
   "update.idleRestart.restartNow": "Riavvia ora",
   "update.idleRestart.restartNowTitle": "Riavviare OpenBot ora?",
   "update.idleRestart.restartNowDescription":

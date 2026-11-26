@@ -387,11 +387,12 @@ export const messages = {
   "mobile.agent.backupModels.remove": "{model} entfernen",
   "mobile.agent.backupModels.unavailable": "Gerade nicht verfügbar · übersprungen",
   "mobile.agent.backupModels.withAccount": "{model} · {account}",
+  "mobile.agent.backupModels.withProvider": "{model} · {provider}",
   "mobile.agent.backupModels.note":
     "Stoppt ein Nutzungslimit {name} nach Beginn der Arbeit, setzt {name} dieselbe Arbeit mit dem ersten verfügbaren Modell der Reihenfolge fort. Wenn das Limit endet oder 10 Minuten nach einem Anbieterfehler, kehrt {name} zu {model} zurück.",
   "mobile.agent.busyMessage.label": "Während der Arbeit",
   "mobile.agent.busyMessage.footer":
-    "Was mit einer Nachricht passiert, die du sendest, während der Agent arbeitet. Warteschlange behält sie, bis der Durchlauf endet. Steuern gibt sie dem Agenten während des Durchlaufs.",
+    "Was mit einer Nachricht von dir oder einem anderen Agenten passiert, die ankommt, während der Agent arbeitet. Warteschlange behält sie, bis der Durchlauf endet. Steuern gibt sie dem Agenten während des Durchlaufs.",
   "mobile.agent.busyMessage.queue": "Warteschlange",
   "mobile.agent.busyMessage.steer": "Steuern",
   "mobile.agent.busyMessage.hostDefaultQueue": "Host-Standard (Warteschlange)",
@@ -702,6 +703,7 @@ export const messages = {
   "mobile.agent.folders.includeConfirm": "Nicht ausschließen",
   "mobile.agent.folders.browseTitle": "Ordner wählen",
   "mobile.agent.folders.places": "Gehe zu",
+  "mobile.agent.folders.path": "Ordnerpfad",
   "mobile.agent.folders.home": "Benutzerordner",
   "mobile.agent.folders.parent": "Nach oben: {folder}",
   "mobile.agent.folders.browseFailed": "Dieser Ordner kann nicht geöffnet werden.",

@@ -3,7 +3,7 @@ import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { AcpAgentClient } from "../src/backend/acp-client";
-import { type AcpFlavor, customAgentFlavor, DEFAULT_ACP_FLAVOR } from "../src/backend/acp-flavor";
+import { type AcpFlavor, customAgentFlavor, DEFAULT_ACP_FLAVOR, MISTRAL_ACP_FLAVOR } from "../src/backend/acp-flavor";
 import { ANTIGRAVITY_ACP_FLAVOR } from "../src/backend/acp-flavor-antigravity";
 import { openBotTool, toolActivity, toolUsage, toThreadItem } from "../src/backend/agent/thread-items";
 import type { AgentClient } from "../src/backend/agent-client";
@@ -100,6 +100,18 @@ const KIMI_CALLS = [
   { toolCallId: "kimi-other-server", title: "mcp__github__create_issue", kind: "other", idOnlyPermission: true },
 ];
 
+const MISTRAL_BRIDGE_CALLS = [
+  { toolCallId: "vibe-browser", title: "mcp_openbot_browser.open", kind: "other", untitledPermission: true },
+  { toolCallId: "vibe-openbot", title: "mcp_openbot.send_message", kind: "other", untitledPermission: true },
+];
+
+const MISTRAL_OTHER_CALLS = [
+  { toolCallId: "vibe-longer-tool", title: "mcp_openbot_browser.open_extra", kind: "other", untitledPermission: true },
+  { toolCallId: "vibe-other-server", title: "mcp_openbot_browser_other.open", kind: "other", untitledPermission: true },
+  { toolCallId: "vibe-github", title: "mcp_github.create_issue", kind: "other", untitledPermission: true },
+  { toolCallId: "vibe-edit", title: "mcp_openbot.send_message", kind: "edit", untitledPermission: true },
+];
+
 const bridgeIds = new Set(BRIDGE_CALLS.map((call) => call.toolCallId));
 
 const DYNAMIC_TOOLS = [
@@ -136,6 +148,7 @@ interface Report {
   otherFlavor?: Run;
   otherUnconfined?: Run;
   kimi?: Run;
+  mistral?: Run;
   failure?: string;
 }
 
@@ -290,6 +303,19 @@ try {
     ],
     "A Kimi file change takes its kind and path from its tool call, and another MCP server keeps its card.",
   );
+
+  const mistral = await run("mistral", true, MISTRAL_ACP_FLAVOR, [...MISTRAL_BRIDGE_CALLS, ...MISTRAL_OTHER_CALLS]);
+  report.mistral = mistral;
+  assert.equal(mistral.status, "completed", "The confined Mistral turn completes.");
+  for (const call of MISTRAL_BRIDGE_CALLS)
+    assert.equal(
+      mistral.outcomes[call.toolCallId],
+      "allow",
+      `${call.toolCallId} runs without a card when its request has only the tool call ID.`,
+    );
+  for (const call of MISTRAL_OTHER_CALLS)
+    assert.equal(mistral.outcomes[call.toolCallId], "reject", `${call.toolCallId} keeps its card.`);
+  assert.equal(mistral.cards.length, MISTRAL_OTHER_CALLS.length, "Only the other Mistral calls show a card.");
 
   report.passed = true;
 } catch (error) {

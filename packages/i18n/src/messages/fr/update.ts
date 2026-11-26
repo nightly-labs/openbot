@@ -44,6 +44,7 @@ export const messages = {
   "update.idleRestart.description": "Les nouvelles exécutions de routines attendent le redémarrage.",
   "update.idleRestart.waitingFor": "En attente de {reasons}.",
   "update.idleRestart.cancel": "Annuler le redémarrage",
+  "update.idleRestart.openSettings": "Réglages de mise à jour",
   "update.idleRestart.restartNow": "Redémarrer maintenant",
   "update.idleRestart.restartNowTitle": "Redémarrer OpenBot maintenant ?",
   "update.idleRestart.restartNowDescription":

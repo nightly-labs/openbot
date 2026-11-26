@@ -8,9 +8,10 @@ const MODEL = PROVIDER_AUTH ? "anthropic/claude-sonnet-5" : "opencode-go/glm-5.3
 interface ProviderOptions {
   options?: { apiKey?: string; baseURL?: string };
 }
-const config: { provider?: Record<string, ProviderOptions | undefined> } = process.env.OPENCODE_CONFIG_CONTENT
-  ? JSON.parse(process.env.OPENCODE_CONFIG_CONTENT)
-  : {};
+const config: {
+  provider?: Record<string, ProviderOptions | undefined>;
+  experimental?: { image_generate?: boolean; video_generate?: boolean };
+} = process.env.OPENCODE_CONFIG_CONTENT ? JSON.parse(process.env.OPENCODE_CONFIG_CONTENT) : {};
 const configKey = config.provider?.["opencode-go"]?.options?.apiKey ?? null;
 const key = configKey ?? process.env.FAKE_AUTH_KEY ?? process.env.OPENCODE_API_KEY ?? null;
 const setup = (sessionId: string | undefined) => ({
@@ -26,6 +27,8 @@ logEntry({
   baseURL: config.provider?.["opencode-go"]?.options?.baseURL ?? null,
   zenKey: config.provider?.opencode?.options?.apiKey ?? null,
   envKey: process.env.OPENCODE_API_KEY ?? null,
+  imageTool: config.experimental?.image_generate ?? null,
+  videoTool: config.experimental?.video_generate ?? null,
 });
 
 let count = 0;

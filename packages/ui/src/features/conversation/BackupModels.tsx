@@ -116,10 +116,13 @@ export function backupModelOptions(
 
 function useOptionLabel() {
   const { t } = useText();
-  return (option: BackupModelOption) =>
-    option.account
-      ? t("agentSettings.backupModels.withAccount", { model: option.model, account: option.account })
-      : option.model;
+  return (option: BackupModelOption) => {
+    const model = t("agentSettings.backupModels.withProvider", {
+      model: option.model,
+      provider: agentProviderName(option.choice.provider),
+    });
+    return option.account ? t("agentSettings.backupModels.withAccount", { model, account: option.account }) : model;
+  };
 }
 
 function OptionLogo(props: { provider: AgentProviderId }) {
@@ -276,9 +279,7 @@ export function BackupModelsPage(props: BackupModelsPageProps) {
             value={null}
             optionValue={(option) => option.key}
             label={label}
-            optionTextValue={(option) =>
-              `${label(option)} ${agentProviderName(option.choice.provider)} ${option.choice.model}`
-            }
+            optionTextValue={(option) => `${label(option)} ${option.choice.model}`}
             itemContent={(option) => <OptionContent option={option} />}
             onChange={(option) => save({ automatic: automatic(), order: [...order(), option.choice] })}
           >

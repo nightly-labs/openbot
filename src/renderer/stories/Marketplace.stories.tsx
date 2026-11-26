@@ -88,6 +88,13 @@ export const CustomServer = at((nav) => {
   nav.go({ kind: "app", id: `custom:${STORY_MCP_SERVERS[0]?.id ?? ""}` });
 });
 
+export const CustomServerSignInApp = at(
+  (nav) => {
+    nav.go({ kind: "app", id: `custom:${STORY_MCP_SERVERS[1]?.id ?? ""}` });
+  },
+  { signInAppNeeded: true },
+);
+
 export const CustomServerAdd = at((nav) => {
   nav.go({ kind: "server", id: null });
 });

@@ -1,9 +1,30 @@
 name: Release browser extension
 
 on:
+  push:
+    tags:
+      - "v*.*.*"
   workflow_dispatch:
+    inputs:
+      publish:
+        description: Upload to the Chrome Web Store and submit for review. Run it on a release tag.
+        type: boolean
+        default: false
+      allow_new_permissions:
+        description: Publish although the package asks for a permission or a site that the public version does not have.
+        type: boolean
+        default: false
+      replace_pending:
+        description: Cancel the version that is in review and submit this one.
+        type: boolean
+        default: false
 
 permissions: {}
+
+concurrency:
+  group: release-extension
+  cancel-in-progress: false
+  queue: max
 
 jobs:
   package:
@@ -12,11 +33,25 @@ jobs:
     timeout-minutes: 15
     permissions:
       contents: read
+    outputs:
+      name: ${{ steps.package.outputs.name }}
     steps:
       - name: Check out
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
+          fetch-depth: 0
           persist-credentials: false
+
+      - name: Require release commit on main
+        if: github.ref_type == 'tag'
+        shell: bash
+        run: |
+          git fetch origin main --no-tags
+          release_commit="$(git rev-list -n 1 "$GITHUB_REF_NAME")"
+          if ! git merge-base --is-ancestor "$release_commit" origin/main; then
+            echo "Release tag $GITHUB_REF_NAME does not point to a commit on origin/main." >&2
+            exit 1
+          fi
 
       - name: Set up Bun and Node
         uses: ./.github/actions/setup-bun
@@ -34,8 +69,8 @@ jobs:
           name="openbot-extension-${version}.zip"
           (cd apps/browser-extension/dist && zip -r -X "$RUNNER_TEMP/$name" .)
           unzip -l "$RUNNER_TEMP/$name"
+          echo "name=$name" >> "$GITHUB_OUTPUT"
           echo "path=$RUNNER_TEMP/$name" >> "$GITHUB_OUTPUT"
-          echo "Upload \`$name\` (manifest version $version) in the Chrome Web Store Developer Dashboard." >> "$GITHUB_STEP_SUMMARY"
 
       - name: Upload the package
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
@@ -44,3 +79,59 @@ jobs:
           archive: false
           if-no-files-found: error
           retention-days: 30
+
+      - name: Check the package against the public version
+        shell: bash
+        env:
+          PACKAGE_PATH: ${{ steps.package.outputs.path }}
+          ALLOW_NEW_PERMISSIONS: ${{ inputs.allow_new_permissions }}
+        run: |
+          flags=()
+          if [[ "$ALLOW_NEW_PERMISSIONS" == "true" ]]; then flags+=(--allow-new-permissions); fi
+          bun scripts/chrome-web-store-release.ts check "$PACKAGE_PATH" "${flags[@]}"
+
+  publish:
+    name: Publish to the Chrome Web Store
+    needs: package
+    if: github.ref_type == 'tag' && (github.event_name == 'push' || inputs.publish)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    environment: chrome-web-store
+    permissions:
+      contents: read
+    steps:
+      - name: Check out
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Set up Bun and Node
+        uses: ./.github/actions/setup-bun
+        with:
+          install: ignore-scripts
+
+      - name: Download the package
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: ${{ needs.package.outputs.name }}
+          path: package
+          skip-decompress: true
+
+      - name: Upload and submit for review
+        shell: bash
+        env:
+          CHROME_WEB_STORE_SERVICE_ACCOUNT_KEY: ${{ secrets.CHROME_WEB_STORE_SERVICE_ACCOUNT_KEY }}
+          CHROME_WEB_STORE_PUBLISHER_ID: ${{ vars.CHROME_WEB_STORE_PUBLISHER_ID }}
+          PACKAGE_NAME: ${{ needs.package.outputs.name }}
+          ALLOW_NEW_PERMISSIONS: ${{ inputs.allow_new_permissions }}
+          REPLACE_PENDING: ${{ inputs.replace_pending }}
+        run: |
+          flags=()
+          if [[ "$ALLOW_NEW_PERMISSIONS" == "true" ]]; then flags+=(--allow-new-permissions); fi
+          if [[ "$REPLACE_PENDING" == "true" ]]; then flags+=(--replace-pending); fi
+          package_path="$(find package -type f -name "$PACKAGE_NAME" -print -quit)"
+          if [[ -z "$package_path" ]]; then
+            echo "The downloaded artifact has no $PACKAGE_NAME." >&2
+            exit 1
+          fi
+          bun scripts/chrome-web-store-release.ts publish "$package_path" "${flags[@]}"
