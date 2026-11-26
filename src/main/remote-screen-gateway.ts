@@ -40,6 +40,8 @@ import { rawDataSize, rawDataText } from "./ws-raw-data";
 
 const GRANT_TTL_MS = 60_000;
 const REMOTE_DESKTOP_MAX_SESSIONS = 4;
+const MAC_SCREEN_WAKE_TIMEOUT_MS = 2_000;
+const MAC_SCREEN_WAKE_POLL_MS = 100;
 const VIEWER_COOKIE = "openbotRemoteViewer";
 const MAX_PENDING_STREAM_FRAMES = 32;
 const MAX_PENDING_STREAM_BYTES = 1_048_576;
@@ -81,6 +83,7 @@ interface RemoteScreenGatewayOptions {
   getDisplayScreenOrigin?: ((displayId: string) => { x: number; y: number } | undefined) | undefined;
   sessionDisconnected?: (() => boolean) | undefined;
   screenLocked?: (() => boolean) | undefined;
+  wakeScreen?: (() => void) | undefined;
   getIceServers: () => Effect.Effect<RemoteDesktopIceServer[], RemoteWorkflowError>;
   createRuntime?: RemoteScreenGatewayCreateRuntime;
   audit?: (event: RemoteScreenAuditEvent) => void;
@@ -509,6 +512,20 @@ export class RemoteScreenGateway {
     (operation) => this.#provide(operation),
   ).bind(this);
 
+  readonly #macScreenStaysLocked = Effect.fn("RemoteScreenGateway.macScreenStaysLocked")(function* (
+    this: RemoteScreenGateway,
+  ) {
+    const { screenLocked, wakeScreen } = this.#options;
+    if (!screenLocked?.()) return false;
+    if (!wakeScreen) return true;
+    wakeScreen();
+    for (let waitedMs = 0; waitedMs < MAC_SCREEN_WAKE_TIMEOUT_MS; waitedMs += MAC_SCREEN_WAKE_POLL_MS) {
+      yield* Effect.sleep(MAC_SCREEN_WAKE_POLL_MS);
+      if (!screenLocked()) return false;
+    }
+    return true;
+  }).bind(this);
+
   readonly #createSession = Effect.fn("RemoteScreenGateway.createSession")(function* (
     this: RemoteScreenGateway,
     input: RemoteScreenSessionRequest,
@@ -534,7 +551,7 @@ export class RemoteScreenGateway {
         cause: new RemoteScreenError(503, "host_unavailable", sourceText("error.remote.windowsSessionDisconnected")),
       });
     }
-    if (this.#options.platform === "darwin" && this.#options.screenLocked?.()) {
+    if (this.#options.platform === "darwin" && (yield* this.#macScreenStaysLocked())) {
       return yield* new RemoteWorkflowError({
         cause: new RemoteScreenError(503, "host_unavailable", sourceText("error.remote.macScreenLocked")),
       });

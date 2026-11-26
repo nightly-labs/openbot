@@ -13,6 +13,7 @@ export const messages = {
   "status.agent.modelSwitchedForSpentBalance":
     "لم يتبق رصيد في {previous}. تم التبديل إلى {model}. لاستخدامه مرة أخرى، أضف رصيدًا ثم اختره.",
   "status.agent.modelReturnedAfterError": "تمت العودة إلى {model} بعد خطأ المزوّد.",
+  "status.agent.modelSwitchedForRemovedModel": "لم يعد {previous} متاحًا. تم التبديل إلى {model}.",
   "status.agent.marketplaceSuggested": "اقترح تطبيقًا من المتجر: {app}.",
   "status.agent.settingShown": "عرض إعدادًا: {setting}.",
   "status.agent.channelMemberAdded": "أضاف {agent} العضو {member} إلى القناة. بطلب من {person}.",
@@ -25,6 +26,12 @@ export const messages = {
   "status.agent.screenCaptureScreen": "التقاط الشاشة الرئيسية وإرسال الصورة إلى نموذج الوكيل.",
   "status.agent.screenCaptureChannel":
     "تظهر الصورة في القناة {channel}، ويمكن لكل عضو في هذا الخادم يقرأ القناة رؤيتها.",
+  "status.agent.creditImageApproval": "إنشاء صورة باستخدام {model}. يستهلك ذلك {credits} من الأرصدة.",
+  "status.agent.creditVideoApproval": "إنشاء فيديو باستخدام {model}. يستهلك ذلك {credits} من الأرصدة.",
+  "status.agent.creditMediaChannel":
+    "تظهر النتيجة في القناة {channel}، ويمكن لكل عضو في هذا الخادم يقرأ القناة رؤيتها.",
+  "status.agent.creditsHoldBalance": "يستهلك ذلك {credits} من الأرصدة، والرصيد الحالي {balance} من الأرصدة.",
+  "status.agent.creditsHoldAgentsOff": "لا يمكن للوكلاء على هذا الخادم استخدام الأرصدة.",
   "status.agent.screenCapturePermissionNext": "قد يطلب منك macOS بعد ذلك السماح لـ OpenBot بـ «تسجيل الشاشة».",
   "status.agent.screenCaptureDisplay": "التقاط الشاشة {name} وإرسال الصورة إلى نموذج الوكيل.",
   "status.agent.screenCaptureWindow": "التقاط النافذة {name} وإرسال الصورة إلى نموذج الوكيل.",
@@ -62,6 +69,19 @@ export const messages = {
   "status.agent.vaultCardFillFrames": "حقول البطاقة موجودة في إطارات من {origins}.",
   "status.agent.linkCardFill":
     "تعبئة بطاقة Link لمرة واحدة {card} في {site}. وافقت على هذا الدفع في Link لصالح {merchant}.",
+  "status.agent.nearSignatureReceived": "تلقّى OpenBot التوقيع. يمكنك إغلاق علامة التبويب هذه.",
+  "status.agent.nearSignatureUnknown": "لا ينتظر OpenBot هذا التوقيع. ابدأه من جديد في OpenBot.",
+  "status.agent.nearPayment":
+    "دفع {amount} {symbol} إلى {recipient} من محفظة العملات المشفرة، لصالح {domain}: {reason}",
+  "status.agent.nearSummaryCreate":
+    "يمكن لكل الوكلاء دفع ما يصل إلى {amount} USD يوميًا. يمكنك تغيير ذلك لاحقًا في OpenBot.",
+  "status.agent.nearSummaryGrant": "السماح لتطبيق OpenBot هذا بالدفع من المحفظة لمدة {days} يومًا، ضمن قواعدك.",
+  "status.agent.nearSummaryBudget": "تغيير الميزانية اليومية للمحفظة إلى {amount} USD.",
+  "status.agent.nearSummaryAutoPay":
+    "السماح لـ OpenBot بالدفع دون توقيعك عندما تسمح بذلك قاعدة دفع. أما الدفعات الأخرى فتظل تسألك في الدردشة.",
+  "status.agent.nearSummaryPayment": "الموافقة على دفع {amount} إلى {recipient}.",
+  "status.agent.nearSummaryFreeze": "لا يمكن للوكلاء الدفع من هذه المحفظة حتى تستأنف الدفعات.",
+  "status.agent.nearSummaryUnfreeze": "يمكن للوكلاء الدفع من هذه المحفظة مرة أخرى، ضمن قواعدك.",
   "status.agent.screenCaptureProgress": "جارٍ طلب التقاط الشاشة…",
   "status.agent.screenCaptureReviewing": "جارٍ مراجعة لقطة الشاشة…",
   "status.agent.browserOpening": "جارٍ فتح صفحة ويب…",
@@ -69,6 +89,7 @@ export const messages = {
   "status.agent.browserClicking": "جارٍ النقر على صفحة الويب…",
   "status.agent.browserTyping": "جارٍ الكتابة في صفحة الويب…",
   "status.agent.browserActing": "جارٍ استخدام صفحة الويب…",
+  "status.agent.browserPaying": "جارٍ إرسال الدفعة…",
   "status.agent.browserReviewing": "جارٍ مراجعة صفحة الويب…",
   "status.agent.memoriesSearching": "جارٍ البحث في ذكرياته…",
   "status.agent.chatsSearching": "جارٍ البحث في دردشاته السابقة…",
@@ -132,6 +153,10 @@ export const messages = {
   "status.agent.apiKeyScope.label": "الحفظ لـ",
   "status.agent.apiKeyScope.vault": "كل الوكلاء (الخزنة)",
   "status.agent.apiKeyScope.agent": "هذا الوكيل فقط",
+  "status.agent.location.field": "موقعك",
+  "status.agent.location.placeholder": "مدينة أو عنوان أو مكان",
+  "status.agent.location.submit": "مشاركة",
+  "status.agent.location.shared": "تمت مشاركة الموقع",
   "status.agent.vaultExpiryHint": "MM/YY",
   "status.agent.vaultField.website": "موقع الويب",
   "status.agent.vaultField.username": "اسم المستخدم أو البريد الإلكتروني",
@@ -153,11 +178,9 @@ export const messages = {
   "status.agent.nextStepContinues": "توقف الوكيل قبل خطوته التالية. سيتابع ({current} من {limit}).",
   "status.agent.planContinues": "في الخطة خطوات مفتوحة. سيتابع الوكيل ({current} من {limit}).",
   "status.agent.planStopped": "توقف الوكيل وفي خطته خطوات مفتوحة. أرسل رسالة للمتابعة.",
+  "status.agent.continuationLimitReached":
+    "توقف الوكيل قبل أن ينتهي الطلب. لا يمكنه المتابعة وحده مرة أخرى. أرسل رسالة للمتابعة.",
   "status.agent.compactionContinues": "توقف الاتصال أثناء ضغط الوكيل لسياقه. يتابع الوكيل.",
   "status.agent.providerExitContinues": "توقف الوكيل قبل أن يكمل إجابته. يتابع الوكيل.",
   "status.agent.branchTitle": "دردشة متفرعة",
-  "status.agent.location.field": "موقعك",
-  "status.agent.location.placeholder": "مدينة أو عنوان أو مكان",
-  "status.agent.location.submit": "مشاركة",
-  "status.agent.location.shared": "تمت مشاركة الموقع",
 } as const satisfies PartialTranslation<typeof source>;

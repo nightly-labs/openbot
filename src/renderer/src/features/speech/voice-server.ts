@@ -3,17 +3,27 @@ import { createSignal } from "solid-js";
 import { speechPort } from "./speech-port";
 
 const [server, setServer] = createSignal<VoiceServerSettings | null | undefined>(undefined);
-let following = false;
+let loaded: Promise<void> | undefined;
 
-export function voiceServer(): VoiceServerSettings | null | undefined {
-  if (!following) {
-    following = true;
+function followVoiceServer(): Promise<void> {
+  if (!loaded) {
     const voice = speechPort().voice;
     voice.onServerSettings((next) => setServer(next));
-    void voice.getServer().then(
-      (next) => setServer((current) => (current === undefined ? next : current)),
+    loaded = voice.getServer().then(
+      (next) => {
+        setServer((current) => (current === undefined ? next : current));
+      },
       () => undefined,
     );
   }
+  return loaded;
+}
+
+export function voiceServer(): VoiceServerSettings | null | undefined {
+  void followVoiceServer();
   return server();
+}
+
+export function voiceServerLoaded(): Promise<void> {
+  return followVoiceServer();
 }

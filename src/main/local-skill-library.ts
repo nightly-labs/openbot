@@ -72,7 +72,7 @@ export class LocalSkillLibrary {
     return join(this.root, id);
   }
 
-  private revision(id: string, requested?: number): Effect.Effect<number, LocalSkillFailure> {
+  revision(id: string, requested?: number): Effect.Effect<number, LocalSkillFailure> {
     return Effect.gen({ self: this }, function* (): Effect.fn.Return<number, LocalSkillFailure> {
       if (requested !== undefined && (!Number.isSafeInteger(requested) || requested < 1))
         return yield* new LocalSkillFailure({ cause: new Error("Invalid skill revision.") });

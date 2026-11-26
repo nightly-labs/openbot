@@ -78,7 +78,7 @@ function readinessInput(state: HostState): RestartReadinessInput {
   };
 }
 
-function hostedServer(state: HostState, maximumWaitMs: number | null) {
+function hostedServer(state: HostState, maximumWaitMs: number | null, spread = { ms: 0, random: Math.random }) {
   const updater = new StagedReleaseUpdater();
   const log: string[] = [];
   const announced: HostRestartState[] = [];
@@ -99,6 +99,8 @@ function hostedServer(state: HostState, maximumWaitMs: number | null) {
     announce: (restartState) => announced.push(restartState),
     pollMs: POLL_MS,
     graceMs: 0,
+    automaticSpreadMs: spread.ms,
+    random: spread.random,
     clientInUse: () => state.clientInUse,
     maximumIdleWait:
       maximumWaitMs === null
@@ -183,6 +185,22 @@ unlimitedState.browserView = false;
 await until("the install after the browser view closed", () => unlimited.updater.installs === 1);
 await Effect.runPromise(unlimited.requested.dispose());
 
+const SPREAD_MS = 4 * DEADLINE_MS;
+const spreadState: HostState = { ...unlimitedState, browserView: false, clientInUse: false };
+const spread = hostedServer(spreadState, MAXIMUM_WAIT_MS, { ms: SPREAD_MS, random: () => 0.5 });
+const control = hostedServer({ ...spreadState }, MAXIMUM_WAIT_MS);
+await until("the install of the host with no spread", () => control.updater.installs === 1);
+assert.ok(hasLine(spread.log, `into ${RELEASE} waits ${SPREAD_MS / 2000} s.`), "The spread was not logged.");
+assert.equal(spread.updater.installs, 0, "The automatic restart did not wait for its spread.");
+assert.equal(spread.readinessChecks(), 0, "The automatic restart checked readiness before its spread ended.");
+assert.deepEqual(spread.announced, [], "Members got a restart notice during the spread.");
+assert.equal(spread.updater.status.scheduledRestart, undefined, "The spread published a scheduled restart.");
+spread.requested.setRequired(true);
+await until("the required install that skips the spread", () => spread.updater.installs === 1);
+assert.deepEqual(spread.announced, ["waiting", "restarting"]);
+await Effect.runPromise(spread.requested.dispose());
+await Effect.runPromise(control.requested.dispose());
+
 const report = {
   ok: true,
   checkedAt: new Date().toISOString(),
@@ -191,6 +209,7 @@ const report = {
   hosted: { installs: hosted.updater.installs, announced: hosted.announced, log: hosted.log },
   providerOperation: { installs: provider.updater.installs, log: provider.log },
   withoutMaximum: { installs: unlimited.updater.installs, log: unlimited.log },
+  spread: { spreadMs: SPREAD_MS, installs: spread.updater.installs, log: spread.log },
 };
 writeFileSync(resolve(OUT, "report.json"), `${JSON.stringify(report, null, 2)}\n`);
 logger.info(`Passed. Report: ${resolve(OUT, "report.json")}`);

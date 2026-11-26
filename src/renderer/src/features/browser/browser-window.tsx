@@ -127,6 +127,9 @@ function BrowserWindowPage() {
       canOpenWindow={false}
       onBack={() => void browser.dockWindow()}
       onEnterPip={() => undefined}
+      onHttpSignIn={(tabId, answer) =>
+        browser.answerHttpSignIn(answer ? { tabId, ...answer } : { tabId, cancel: true })
+      }
     />
   );
 }

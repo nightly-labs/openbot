@@ -708,6 +708,76 @@ no desktop session, the server starts two Xvfb displays and Openbox on the agent
   them through the slow mount for 25 s. boat keeps changes in `/srv` (not in `/var/lib`), and `/srv`
   is on the disk before the service starts.
 
+### Keyring guard
+
+The agents run as the service user, so an agent can stop the gnome-keyring daemon, replace it, change
+the keyring password or delete `login.keyring`. Chromium keeps the `safeStorage` key in memory, so
+OpenBot works until its next start. Then it cannot decrypt the account session, and the claim is
+used: the server stays signed out (server 3c3a7741 on 2026-11-25, after its Pi agent replaced the
+daemon). `openbot-hosted-keyring` (root) prevents this:
+
+- `openbot-hosted-keyring backup` runs from `openbot-hosted-update check` (each hour, from
+  `openbot-update.timer`). It saves a copy of `keyring-password` and `login.keyring` in
+  `/srv/openbot-keyring` (root, `0700`; files `0600`). The service user cannot read or change it.
+  `/srv` is root-owned, and boat keeps it.
+- `openbot-hosted-keyring start` runs as root in `ExecStartPre` of `openbot.service`, before
+  `openbot-hosted-server`. When the files are the same as the copy, it stops there. Otherwise it
+  checks the copy and the current files.
+- A check opens the keyring in a new D-Bus session as `nobody`, with `env -i`, for 20 s at most. It
+  passes when the password unlocks the keyring (`Locked` is false) and gnome-keyring does not make
+  `login_1.keyring`. It lists the items of the `safeStorage` schema
+  (`chrome_libsecret_os_crypt_password_v2`) with their `Created` and `Modified` values. It reads the
+  files as the service user. When a file is larger than 16 MiB, the guard changes nothing. The check runs as `nobody`, not
+  as the service user, so an agent cannot stop it or change its result. `dbus-daemon` needs a user
+  in the password database, so a free UID does not work. During a check, other processes that run
+  as `nobody` can read the copy of the files in `/run`.
+- When a check cannot complete, the guard logs `The keyring check did not complete (<code>)`. The
+  code is the step that failed: `10` unlock, `11` start, `12` and `13` `Locked`, `14` search, `15` to
+  `17` item properties, `124` and `137` the 20 s time-out, `missing` a missing command or user.
+- When the current files pass, and they keep each `safeStorage` item of the copy (or the copy does
+  not pass), the guard refreshes the copy. So a new password from `openbot-hosted-server`, and items
+  that other programs add, stay.
+- When the current files do not pass, or an item of the copy is missing or changed, `start` writes
+  the copy back as the service user, and moves the replaced files to `/srv/openbot-keyring/replaced`.
+  `backup` only logs this; the next start restores it.
+- When a check cannot complete (no `gnome-keyring-daemon`, a time-out), or neither the copy nor the
+  current files pass, the guard changes nothing. It never stops the start of OpenBot
+  (`ExecStartPre=-+`).
+- `start` waits 15 s at most for an hourly check that runs. Then it changes nothing, so the start
+  stays in the 90 s start time-out of `openbot.service`.
+- `move-from-boat.sh export` runs `start` after it stops OpenBot, so the archive has the restored
+  keyring, not a damaged one. When a keyring file is missing, `export` continues only when the copy
+  exists, and it archives only when the guard restored the file.
+
+A server gets the guard with its first update to a release that has it. The old `apply` installs the
+new units, so `openbot.service` has the new `ExecStartPre` at once. The old `HOSTED_FILES` does not
+name the guard, so the new `trigger` (the `ExecStartPre` before the guard) installs each missing file
+of `HOSTED_FILES`. The first copy comes from the first hourly check after the update.
+
+Limits:
+
+- An item that is not a `safeStorage` item (for example a provider CLI sign-in) and that changed after
+  the last copy is lost when the guard restores the copy. `replaced` keeps only the files of the last
+  restore.
+- When the start check cannot complete while the keyring is damaged, OpenBot can start with a new
+  `safeStorage` key. If the owner then claims the server again, the next start restores the old key,
+  and the server must be claimed one more time. After that, the key stays.
+- The guard does not protect against a keyring that an agent makes on purpose with the same
+  `safeStorage` item and a different key.
+- When you restore the data of another server on this machine, delete `/srv/openbot-keyring` first.
+  Otherwise the guard restores the keyring of the old server. `move-from-boat.sh` refuses `offer`,
+  `prepare`, `upgrade` and `import` when the folder exists, and `discard` deletes it.
+- A Docker container (`openbot-container`) has no guard.
+
+`bun scripts/hosting/hosted-keyring-guard-e2e.ts [--release 26.04] [--keep]` tests the guard in a
+privileged Docker container with systemd, the Electron of `package.json` and a small app that keeps an
+encrypted session with `safeStorage`. It installs `openbot.service` and an old `hosted` folder without
+the guard, so `trigger` must install it. Then it damages the keyring as the service user, restarts the
+service and checks that the session opens: the incident of 2026-11-25 (with a control run without the
+guard, in which the session does not open), a changed password, a removed password, a damaged
+keyring file and a `safeStorage` item deleted over D-Bus. It also checks that an item that another
+program adds stays. It writes `.openbot-build/hosted-keyring-guard-e2e/report.json` and the journal.
+
 OpenBot redeems the claim only when `safeStorage` works. After the first redeem the claim works
 for 10 more minutes, so a server whose response was lost can redeem it again; each redeem revokes the
 session of the one before. After that, a session that is only in memory would leave the server
@@ -796,8 +866,8 @@ do not all pass the check before their processes grow. A start that fails counts
 | Level | When | What happens |
 | --- | --- | --- |
 | `ok` | Other times. After `low`, only at 256 MB above the `low` limit (10% of the total when that is less). | Turns start. |
-| `low` | Free memory is less than 512 MB or 12% of the total. Below 2.5 GB of total memory, 20% of the total replaces 512 MB, so a small server does not stay `low`. It is always at least 64 MB above the `critical` limit. | No new turn starts; the message stays queued. The agent shows one notice in each low period. The browser opens no new tab. At each sample, a Claude thread whose background tasks sent nothing for 30 minutes closes; with normal memory, background tasks keep their thread open. |
-| `critical` | Free memory is less than 256 MB or 6% of the total. | As `low`. Also, the provider threads with no turn close one time. They open again from their session at the next turn. Leftover agent processes stop (see below). |
+| `low` | Free memory is less than 512 MB or 12% of the total. Below 2.5 GB of total memory, 20% of the total replaces 512 MB, so a small server does not stay `low`. It is always at least 64 MB above the `critical` limit. | No new turn starts; the message stays queued. The agent shows one notice in each low period. The browser opens a new tab only for a chat that has no tab with a loaded page (a tab that unloaded does not count), so the first tab still opens. At each sample, a Claude thread whose background tasks sent nothing for 30 minutes closes; with normal memory, background tasks keep their thread open. |
+| `critical` | Free memory is less than 256 MB or 6% of the total. | As `low`, but the browser opens no new tab. Also, the provider threads with no turn close one time. They open again from their session at the next turn. Leftover agent processes stop (see below). |
 
 Agent processes (`AgentProcesses` in `src/main/server-memory.ts`):
 
@@ -1070,7 +1140,7 @@ The bootstrap does not restart OpenBot, and a second run gives the same state:
 | Part | Result | Files |
 | --- | --- | --- |
 | SSH | Keys only, no forwarding. The operator keys sign in as root, and as no other user. | `/etc/ssh/sshd_config.d/00-openbot-hardening.conf`, `/etc/ssh/openbot-operator-keys/root` |
-| Egress rules | The service user cannot connect to the CloudStack router (the DHCP server, which gives metadata and a reset root password to each process that asks), nor to private, link-local and multicast addresses. No user can connect to TCP port 25. | `/usr/local/sbin/openbot-egress-firewall`, `/etc/openbot/egress-router`, `openbot-egress-firewall.service`, `openbot.service.d/10-egress-firewall.conf` |
+| Egress rules | The service user cannot connect to the CloudStack router (the DHCP server, which gives metadata and a reset root password to each process that asks), nor to private, link-local and multicast addresses. It also cannot connect to the IPv6 addresses of Google services (`goog.json` without `cloud.json` from `https://www.gstatic.com/ipranges/`), so Gemini and other Google services connect over IPv4. Google can put an IPv6 range of Leaseweb in a country where Gemini refuses requests (#15812). No user can connect to TCP port 25. | `/usr/local/sbin/openbot-egress-firewall`, `/etc/openbot/egress-router`, `openbot-egress-firewall.service`, `openbot.service.d/10-egress-firewall.conf` |
 | Updates | Security updates each day. They restart neither the server nor OpenBot. Ubuntu (`needrestart`) restarts each other service that uses an updated library. | `/etc/apt/apt.conf.d/20auto-upgrades`, `52openbot-unattended`, `/etc/needrestart/conf.d/50-openbot.conf` |
 | Kernel | A new kernel gets a boot entry: the bootstrap installs `grub-pc` when the image has no `update-grub`. The boot arguments of the image stay. | `/etc/default/grub.d/50-openbot.cfg` |
 
@@ -1109,6 +1179,7 @@ Leaseweb accounts use one scheme:
 | `custom-<NN> <customer> <owner email>` | A server for one customer, not in the pool. `<NN>` is the next number after the highest on all accounts; `leaseweb-pool.ts custom` sets it. `<customer>` is one word in small letters. | `custom-01 acme jane@example.com` |
 | `openbot-signal-<home>` | A Signal machine (see `docs/remote-session-deployment.md`). | `openbot-signal-us` |
 | `pool-test-<NN>` | A test machine of the operator. | `pool-test-01` |
+| `internal-<purpose>` | A machine of the operators, not in the pool and not for tests. `internal-store-review` is the server of the app store reviewers; see `AGENTS.md`. | `internal-store-review` |
 
 `leaseweb-pool.ts traffic [--from=YYYY-MM-DD] [--to=YYYY-MM-DD]` is read only. It shows the public
 traffic in and out of each VPS on the five accounts, from the first day of this month (UTC) to today,
@@ -1254,10 +1325,11 @@ The Worker cannot connect to a machine, and it has no Leaseweb key. So the machi
 4. At the payment, the Worker reads the ready machines with the product of the plan: `VPS01` for
    Starter, `VPS02` for Standard, `VPS03` for Pro. It never uses a larger or a smaller machine. The
    currency gives the locations (`poolLocations`): a purchase in `usd` or `brl` gets a machine in
-   `WDC-02`, and one in `AMS-01` when `WDC-02` has none. A purchase in `eur` or `pln` gets only a
-   machine in `AMS-01`, so that its data stays in the EU, as on boat. A machine in each other location
-   gets no new server; `PRIVACY.md` names the locations, so change the two together. In a location,
-   the machine that was added first comes first. One `UPDATE` writes `operator_host` and the hash of a host ID
+   `WDC-02`, and one in `AMS-01` or `FRA-01` when `WDC-02` has none. A purchase in `eur` or `pln`
+   gets a machine in `AMS-01`, and one in `FRA-01` when `AMS-01` has none, so that its data stays in
+   the EU, as on boat. A machine in each other location gets no new server; `PRIVACY.md` names the
+   locations, so change the two together. The first location of the list comes first. In the other
+   locations, and in a location, the machine that was added first comes first. One `UPDATE` writes `operator_host` and the hash of a host ID
    claim, and it changes no row when another server has the machine. So two payments in the same second
    never get one machine. After three machines that another payment took, the server starts on boat.
 5. The next request of the machine gets `{"state":"assigned","serverId":…,"claim":…}`. The unit runs
@@ -1300,7 +1372,8 @@ A machine of the pool is not the boat image:
 - It has no Docker and no boat desktop. OpenBot uses its own virtual displays.
 - It shows the storage of the plan (25, 75 and 150 GB), the same numbers as the pricing page
   (`storageTierGb`).
-- The clients show no restart action, and the server does not stop when it is not in use.
+- Restart server asks the server to restart itself (`host-restart-v1`), as on a self-hosted server,
+  and the server does not stop when it is not in use.
 
 Measured on the test Worker with a real Leaseweb VPS 2 (smoke, 2026-11-13): `prepare` of a clean
 machine takes about 3 minutes. OpenBot on the machine signed in 9 seconds after the payment, and the
@@ -1342,7 +1415,7 @@ writes `observed_state`:
 | The plan ends | Sets `desired_state = 'stopped'`, `observed_error = 'plan_ended'` and `plan_ended_at`. A start request gets `402 plan_required`. | Stop `openbot.service`, then write `observed_state = 'stopped'`. Until then the server still runs. |
 | The owner renews | Sets `desired_state = 'running'` and clears the error. `plan_ended_at` stays. | Start `openbot.service`, then write `observed_state = 'running'`. |
 | 14 days after the plan ended, with no open subscription | Reads the subscription at Stripe, then deletes the server as the owner does. | As for a delete. |
-| The owner or an admin restarts the server | Refuses with `409 hosted_server_restart_unavailable`. | Restart `openbot.service` on a request to support. |
+| The owner or an admin restarts the server | Refuses with `409 hosted_server_restart_unavailable`. The clients send the restart to the server (`host-restart-v1`), so the Worker gets no request. | Restart `openbot.service` on a request to support when OpenBot does not answer. |
 | The owner deletes the server | Cancels the plan, deletes the sandbox in `retired_sandbox_id`, removes the Remote host, ends the session, and sets `observed_state = 'deleted'`. `operator_host` stays. | Reinstall the VPS, set its reference to `pool`, then set `operator_host = NULL`. |
 | boat sends an event for the old sandbox | Finds no row for it. | Nothing. |
 
@@ -1572,9 +1645,10 @@ The VPS is not the same machine as the sandbox:
   agent of the customer that used Docker does not have it after the move.
 - `provision.sh` also writes `~/.boat/pre-stop` and `~/.boatignore` on the VPS, as each update does
   on a hosted server. Nothing on the VPS reads them.
-- The clients show no restart action for a moved server: the server list of the account service has
-  `restartAvailable: false` for it. A client from before this field shows the action and gets the
-  refusal of the Worker.
+- The server list of the account service has `restartAvailable: false` for a moved server, so the
+  clients do not send its restart to the Worker. The owner or an admin restarts it through the
+  server (`host-restart-v1`) while it is online. A client from before this field sends the restart
+  to the Worker and gets its refusal.
 - Each server has the storage of its plan: 25, 75 and 150 GB for Starter, Standard and Pro
   (`BILLING_PLANS`, and `storageTierGb` with a storage tier). The account service sends the number in
   the server list, the hosting list and the billing state, so the storage meter, the storage alerts,
@@ -2077,8 +2151,9 @@ Billing lists each paid server separately. Cancel renewal stops the next payment
 server stops when its plan ends and keeps its data. Keep server resumes renewal before
 the plan ends and removes any scheduled deletion.
 
-Delete server requires the server name. The owner can delete immediately with no refund
-for unused time, or schedule deletion for the paid-through date. The account Worker stores
+Delete server requires the server name and schedules deletion for the paid-through date.
+Billing has no option to delete a paid server immediately. The account Worker still accepts
+`timing: "now"` from released clients in the support window. The account Worker stores
 the date and subscription ID. The cron deletes on its next pass after that date only after
 Stripe confirms the subscription has ended and no newer or open plan exists. Failed
 provider deletion is retried through the existing deletion queue. Keep server and deletion

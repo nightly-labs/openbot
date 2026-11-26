@@ -511,11 +511,10 @@ export class ModelVisibility {
       if (!picker) return [model];
       const used = inUse.has(modelKey(model.provider, model.id));
       if (picker.hidden.has(model.id)) return used ? [{ ...model, listing: "kept" }] : [];
-      if (picker.byDefault.has(model.id)) {
-        const released = Date.parse(picker.released.get(model.id) ?? "");
-        return now - released < NEW_MODEL_MS ? [{ ...model, listing: "new" }] : [model];
-      }
-      return used ? [model] : [{ ...model, listing: "older" }];
+      if (model.listing === "older" || !picker.byDefault.has(model.id))
+        return used ? [{ ...model, listing: undefined }] : [{ ...model, listing: "older" }];
+      const released = Date.parse(picker.released.get(model.id) ?? "");
+      return now - released < NEW_MODEL_MS ? [{ ...model, listing: "new" }] : [model];
     });
   });
 

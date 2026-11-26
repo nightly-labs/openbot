@@ -62,6 +62,7 @@ import type { FirstAgentDraft } from "@openbot/ui/features/agents/FirstAgentSetu
 import { currentText } from "@openbot/ui/text";
 import { createStore, flush } from "solid-js";
 import { createAgentSettingsApi } from "./agent-settings";
+import { track, withResult } from "./analytics";
 import { createAttachmentMedia, type HostFile } from "./attachment-media";
 
 export interface OpenChat {
@@ -125,6 +126,7 @@ const CHANNEL_READ_INTERVAL_MS = 250;
 const SHOWN_ITEM_TYPES: ReadonlySet<string | undefined> = new Set([
   undefined,
   "agentMessage",
+  "final_answer",
   "agent_attachment",
   "image_generation",
 ]);
@@ -218,11 +220,14 @@ export function createWorkspace(
 
   async function createFolder(name: string): Promise<void> {
     showLayout(
-      await request(
-        "POST",
-        has(SIDEBAR_FOLDERS_CAPABILITY) ? SIDEBAR_FOLDERS_ROUTES.actions : TEAM_API_ROUTES.sidebarLayout.actions,
-        decodeLayout,
-        { type: "create", name },
+      await withResult(
+        request(
+          "POST",
+          has(SIDEBAR_FOLDERS_CAPABILITY) ? SIDEBAR_FOLDERS_ROUTES.actions : TEAM_API_ROUTES.sidebarLayout.actions,
+          decodeLayout,
+          { type: "create", name },
+        ),
+        (result) => track("folder_action", { action: "created", result }),
       ),
     );
   }
@@ -345,8 +350,10 @@ export function createWorkspace(
         replyToMessageId: null,
         attachmentDraftIds: [],
       });
+      void track("message_send", { target: "channel", result: "succeeded" });
       await reloadChannel();
     } catch (error) {
+      void track("message_send", { target: "channel", result: "failed" });
       if (state.channel?.channelId !== channelId) return;
       setState((draft) => {
         if (!draft.channel) return;
@@ -363,12 +370,15 @@ export function createWorkspace(
 
   async function createChannel(draft: ChannelDraft): Promise<string> {
     if (!channelsApi) throw new Error(currentText().t("extension.create.failed"));
-    const channel = await channelsApi.channelCommand({
-      type: "save",
-      operationId: crypto.randomUUID(),
-      channelId: crypto.randomUUID(),
-      draft,
-    });
+    const channel = await withResult(
+      channelsApi.channelCommand({
+        type: "save",
+        operationId: crypto.randomUUID(),
+        channelId: crypto.randomUUID(),
+        draft,
+      }),
+      (result) => track("channel_action", { action: "created", result }),
+    );
     setState((next) => {
       if (!next.channels.some((entry) => entry.id === channel.id))
         next.channels.unshift({ ...channel, unreadCount: 0, activeTasks: 0, lastMessage: null });
@@ -541,6 +551,7 @@ export function createWorkspace(
     const generation = chatGeneration;
     const clientMessageId = crypto.randomUUID();
     const { agentId, taskId, draftThread } = chat;
+    const target = draftThread ? "new_thread" : taskId !== null ? "thread" : "chat";
     setState((draft) => {
       if (!draft.chat) return;
       draft.chat.sending = true;
@@ -577,8 +588,10 @@ export function createWorkspace(
         });
         if (!isQueuedMessageReceipt(receipt)) throw new Error(currentText().t("extension.chat.sendFailed"));
       }
+      void track("message_send", { target, result: "succeeded" });
       if (generation === chatGeneration) await reloadChat();
     } catch (error) {
+      void track("message_send", { target, result: "failed" });
       if (generation !== chatGeneration) return;
       setState((draft) => {
         if (!draft.chat) return;
@@ -633,8 +646,10 @@ export function createWorkspace(
       { ...profile, ...(operation ? { operationId: operation.id } : {}) },
     ).catch((error: unknown) => {
       operation?.failed();
+      void track("agent_action", { action: "create", result: "failed" });
       throw error;
     });
+    void track("agent_action", { action: "create", result: "succeeded" });
     setState((draft) => {
       if (!draft.agents.some((entry) => entry.id === agent.id)) draft.agents.push(agent);
     });
@@ -691,8 +706,10 @@ export function createWorkspace(
     try {
       await raw("POST", TEAM_API_ROUTES.respond.prompt, { requestId, answers });
     } catch {
+      void track("agent_input_action", { kind: "prompt", decision: "answered", result: "failed" });
       return false;
     }
+    void track("agent_input_action", { kind: "prompt", decision: "answered", result: "succeeded" });
     setState((draft) => {
       draft.prompts = draft.prompts.filter((prompt) => prompt.requestId !== requestId);
     });

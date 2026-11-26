@@ -15,6 +15,7 @@ import {
   decodeChannel,
   decodeChannelPage,
   decodeChannelSummaries,
+  decodeCreditsAskMuted,
   decodeSaveAgentProfileResult,
   decodeSaveSkillSuggestionResult,
   hostAnalyticsQuery,
@@ -24,10 +25,14 @@ import {
   parseAskSideQuestion,
   parseChannelCommand,
   parseChannelRead,
+  parseCreditsAskMutedInput,
   parseGenerateAgentProfile,
   parseHostAnalyticsInput,
   parseLocalBrowserSecretResponse,
+  parseReadMediaApprovalInput,
   parseResetAgentSessionSetting,
+  parseRespondToCreditsHoldInput,
+  parseRespondToMediaApprovalInput,
   parseSaveAgentProfile,
   parseSaveSkillSuggestion,
   parseSetAgentHiddenInput,
@@ -123,6 +128,11 @@ import {
   BROWSER_SECRET_VAULT_CAPABILITY,
   BROWSER_SECRET_VAULT_ROUTES,
 } from "@openbot/contracts/team-protocol/browser-secret-vault-v1";
+import {
+  CHANNEL_COMPACT_AVAILABILITY_CAPABILITY,
+  CHANNEL_COMPACT_AVAILABILITY_ROUTE,
+  decodeChannelCompactAvailability,
+} from "@openbot/contracts/team-protocol/channel-compact-availability-v1";
 import { CHANNEL_ROUTES } from "@openbot/contracts/team-protocol/channels-v1";
 import { CHAT_COLORS_CAPABILITY } from "@openbot/contracts/team-protocol/chat-colors-v1";
 import { CHAT_HISTORY_CAPABILITY, CHAT_HISTORY_ROUTES } from "@openbot/contracts/team-protocol/chat-history-v1";
@@ -145,6 +155,12 @@ import {
   FEEDBACK_WITHDRAW_CAPABILITY,
   FEEDBACK_WITHDRAW_ROUTES,
 } from "@openbot/contracts/team-protocol/feedback-withdraw-v1";
+import {
+  decodeCreditsHoldResponse,
+  decodeMediaApprovalReadResponse,
+  MEDIA_APPROVAL_CHOICE_CAPABILITY,
+  MEDIA_APPROVAL_CHOICE_ROUTES,
+} from "@openbot/contracts/team-protocol/media-approval-choice-v1";
 import { MESSAGE_DELETE_CAPABILITY, MESSAGE_DELETE_ROUTES } from "@openbot/contracts/team-protocol/message-delete-v1";
 import {
   decodeMessagePinsResponse,
@@ -201,6 +217,7 @@ import type { SidebarLayoutStore } from "../../backend/sidebar-layout-store";
 import type { NotificationChat } from "../desktop-notifications";
 import type { HostService } from "../host-service";
 import type { LibraryFoldersService } from "../library-folders-service";
+import type { CreditAsksControl } from "../media-approval-credits-preference-store";
 import { runMessageDelete } from "../message-delete-refusal";
 import { type MessageLinkRelay, openMessageLink } from "../message-link-relay";
 import { runMessagePin } from "../message-pin-refusal";
@@ -344,6 +361,7 @@ export interface AgentIpcDependencies {
   openExternal: (url: string) => Promise<void>;
   modelVisibility: Pick<ModelVisibility, "picker">;
   closeChatNotifications: (serverId: string, chat: NotificationChat) => void;
+  creditAsks: Pick<CreditAsksControl, "setMuted" | "mutedFor">;
 }
 
 export function agentIpcHandlers({
@@ -358,6 +376,7 @@ export function agentIpcHandlers({
   openExternal,
   modelVisibility,
   closeChatNotifications,
+  creditAsks,
 }: AgentIpcDependencies): Pick<IpcGroupHandlers, "agent"> {
   const remoteTaskRequest = <T>(serverId: string, path: string, decoder: ResponseDecoder<T>, body: RemoteTaskBody) => {
     if (!remoteServers.supportsCapability(serverId, AGENT_TASKS_CAPABILITY)) taskRemoteUnsupported();
@@ -450,7 +469,7 @@ export function agentIpcHandlers({
         },
       }),
       getHostAnalytics: scopedHandler(parseHostAnalyticsInput, {
-        local: (input) => service.getHostAnalytics(input),
+        local: (input) => runCauseEffect(service.getHostAnalytics(input)),
         remote: (input, serverId) =>
           remoteServers.supportsCapability(serverId, "host-analytics")
             ? runCauseEffect(
@@ -734,6 +753,18 @@ export function agentIpcHandlers({
             { channelId },
             "error.team.channelContextUnsupported",
           ),
+      }),
+      channelCompactAvailability: scopedHandler(parseChannelId, {
+        local: (channelId) => ({ available: service.channelCompactAvailable(channelId) }),
+        remote: (channelId, serverId) =>
+          remoteServers.supportsCapability(serverId, CHANNEL_COMPACT_AVAILABILITY_CAPABILITY)
+            ? runCauseEffect(
+                remoteServers.request(serverId, CHANNEL_COMPACT_AVAILABILITY_ROUTE, decodeChannelCompactAvailability, {
+                  method: "POST",
+                  body: { channelId },
+                }),
+              )
+            : { available: true },
       }),
       getSidebarLayout: scopedQueryHandler({
         local: () => sidebarLayout.getSnapshot(),
@@ -1629,6 +1660,74 @@ export function agentIpcHandlers({
             remoteServers.request(serverId, PENDING_APPROVAL_ROUTES.read, decodePendingApprovalResponse, {
               method: "POST",
               body: { ...parsed },
+            }),
+          );
+        },
+      }),
+      readMediaApproval: scopedHandler(parseReadMediaApprovalInput, {
+        local: ({ agentId, requestId }) => ({
+          media: service.pendingMediaApproval(agentId, requestId) ?? null,
+          hold: service.pendingCreditsHold(agentId, requestId, true) ?? null,
+        }),
+        remote: (parsed, serverId) => {
+          if (!remoteServers.supportsCapability(serverId, MEDIA_APPROVAL_CHOICE_CAPABILITY))
+            return { media: null, hold: null };
+          return runCauseEffect(
+            remoteServers.request(serverId, MEDIA_APPROVAL_CHOICE_ROUTES.read, decodeMediaApprovalReadResponse, {
+              method: "POST",
+              body: { ...parsed },
+            }),
+          );
+        },
+      }),
+      respondToMediaApproval: scopedHandler(parseRespondToMediaApprovalInput, {
+        local: (parsed) => runCauseEffect(service.respondToMediaApproval(parsed)),
+        remote: (parsed, serverId) => {
+          if (!remoteServers.supportsCapability(serverId, MEDIA_APPROVAL_CHOICE_CAPABILITY))
+            throw new Error(sourceText("error.team.mediaApprovalChoiceUnsupported"));
+          return runCauseEffect(
+            remoteServers.request(serverId, MEDIA_APPROVAL_CHOICE_ROUTES.respond, decodeVoid, {
+              method: "POST",
+              body: { ...parsed },
+            }),
+          );
+        },
+      }),
+      respondToCreditsHold: scopedHandler(parseRespondToCreditsHoldInput, {
+        local: (parsed) => runCauseEffect(service.respondToCreditsHold(parsed)),
+        remote: (parsed, serverId) => {
+          if (!remoteServers.supportsCapability(serverId, MEDIA_APPROVAL_CHOICE_CAPABILITY))
+            throw new Error(sourceText("error.team.mediaApprovalChoiceUnsupported"));
+          return runCauseEffect(
+            remoteServers.request(serverId, MEDIA_APPROVAL_CHOICE_ROUTES.hold, decodeCreditsHoldResponse, {
+              method: "POST",
+              body: { ...parsed },
+            }),
+          );
+        },
+      }),
+      setCreditsAskMuted: scopedHandler(parseCreditsAskMutedInput, {
+        local: ({ muted }) => runCauseEffect(creditAsks.setMuted(null, muted)),
+        remote: ({ muted }, serverId) => {
+          if (!remoteServers.supportsCapability(serverId, MEDIA_APPROVAL_CHOICE_CAPABILITY))
+            throw new Error(sourceText("error.team.mediaApprovalChoiceUnsupported"));
+          return runCauseEffect(
+            remoteServers.request(serverId, MEDIA_APPROVAL_CHOICE_ROUTES.muted, decodeVoid, {
+              method: "POST",
+              body: { muted },
+            }),
+          );
+        },
+      }),
+      readCreditsAskMuted: scopedQueryHandler({
+        local: () => ({ muted: creditAsks.mutedFor(null) }),
+        remote: (serverId) => {
+          if (!remoteServers.supportsCapability(serverId, MEDIA_APPROVAL_CHOICE_CAPABILITY))
+            throw new Error(sourceText("error.team.mediaApprovalChoiceUnsupported"));
+          return runCauseEffect(
+            remoteServers.request(serverId, MEDIA_APPROVAL_CHOICE_ROUTES.mutedRead, decodeCreditsAskMuted, {
+              method: "POST",
+              body: {},
             }),
           );
         },

@@ -11,6 +11,7 @@ import {
   Text,
   Trash2,
 } from "@openbot/ui";
+import { McpSignInLinkCopy } from "@openbot/ui/features/settings/McpSignInDialog";
 import { useText } from "@openbot/ui/text";
 import type { JSX } from "@solidjs/web";
 import { createMemo, createStore, For, onCleanup, Show, untrack } from "solid-js";
@@ -626,6 +627,17 @@ export function McpServerForm(props: McpServerFormProps) {
                     <Button type="button" size="sm" variant="outline" onClick={() => cancelSignIn(pending().url)}>
                       {t("mcp.panel.cancelSignIn")}
                     </Button>
+                  </div>
+                )}
+              </Show>
+              <Show when={signingIn() ? props.tools.signIn()?.copyLink : undefined}>
+                {(copy) => (
+                  <div class="server-mcp-sign-in-link">
+                    <McpSignInLinkCopy
+                      onCopy={copy()}
+                      onPaste={props.tools.signIn()?.pasteAddress}
+                      waitingNote={false}
+                    />
                   </div>
                 )}
               </Show>

@@ -10,7 +10,7 @@ import { sourceText } from "@openbot/i18n/source";
 import { createOpenBotLogger } from "@openbot/logging";
 import { Effect, Exit, Fiber, Schedule, type Scope, Semaphore } from "effect";
 import type { AcpConnection } from "./acp-connection";
-import { type AgentProvider, ProviderModelNotOfferedError } from "./agent-client";
+import { type AgentProvider, ProviderModelNotOfferedError, ProviderSettingsConflictError } from "./agent-client";
 import { isRecord } from "./protocol";
 import {
   type ProviderClientOperationError,
@@ -30,6 +30,10 @@ const MODEL_REASONING_CLEANUP_MS = 1_000;
 const MODEL_DISCOVERY_RETURN_MS = 250;
 
 const PROBE_START_RETRY_MS = 1_000;
+
+const CONFIG_CONFLICT_RETRIES = 2;
+
+const CONFIG_CONFLICT_RETRY_MS = 250;
 
 export interface AcpModel {
   id: string;
@@ -60,8 +64,10 @@ export interface AcpConfigurationOptions {
   processWideModel?: boolean;
   setsConfigOnlyOnChange?: boolean;
   modelSetUnsaved?: ((error: RequestError) => boolean) | undefined;
+  modelNotOffered?: ((error: RequestError) => boolean) | undefined;
   modelConfigId?: string | undefined;
   configSetUnsaved?: ((error: RequestError) => boolean) | undefined;
+  configConflict?: ((error: unknown) => boolean) | undefined;
   keepProbeSession?: () => boolean;
   probeCloseDelayMs?: number | undefined;
   effortCategories?: readonly string[] | undefined;
@@ -377,25 +383,18 @@ export class AcpConfiguration {
       const values = selectValues(option);
       const wanted = category === "thought_level" ? effortWireValue(values, value) : value;
       const listed = values.some((candidate) => candidate.value === wanted);
-      const selected = listed ? wanted : unlisted && option.id === "model" ? value : undefined;
-      if (!selected) {
-        if (
-          category === "model" &&
-          requireModel &&
-          !values.some(
-            (candidate) =>
-              value.startsWith(`${candidate.value}-`) && isReasoningEffort(value.slice(candidate.value.length + 1)),
-          )
-        ) {
-          logger.warn("An agent session does not offer the model of the turn.", {
-            provider: this.options.provider,
-            model: value,
-          });
-          const name = models.find((candidate) => candidate.id === value)?.name ?? value;
-          return yield* providerFailure(new ProviderModelNotOfferedError(this.options.label(), name));
-        }
-        continue;
-      }
+      const offered = listed ? wanted : unlisted && option.id === "model" ? value : undefined;
+      const notListed =
+        !offered &&
+        category === "model" &&
+        requireModel &&
+        !values.some(
+          (candidate) =>
+            value.startsWith(`${candidate.value}-`) && isReasoningEffort(value.slice(candidate.value.length + 1)),
+        );
+      if (notListed && !this.options.modelNotOffered) return yield* this.#modelNotOffered(value, models);
+      const selected = offered ?? (notListed ? value : undefined);
+      if (!selected) continue;
       if (
         this.options.setsConfigOnlyOnChange &&
         listed &&
@@ -435,6 +434,12 @@ export class AcpConfiguration {
           configId: option.id,
           value: selected,
         }),
+      ).pipe(
+        Effect.catch((failure) =>
+          notListed && failure.cause instanceof RequestError && this.options.modelNotOffered?.(failure.cause)
+            ? this.#modelNotOffered(value, models)
+            : Effect.fail(failure),
+        ),
       );
       const response = processWide
         ? yield* request.pipe(
@@ -464,6 +469,8 @@ export class AcpConfiguration {
           )
         : yield* this.#confirmingSet(thread, option.id, request);
       thread.configOptions = response.configOptions;
+      if (notListed && !listsValue(response.configOptions, option.id, selected))
+        return yield* this.#modelNotOffered(value, models);
       if (category === "model") thread.currentModelId = selected;
     }
   });
@@ -491,6 +498,17 @@ export class AcpConfiguration {
     thread.configOptions = response.configOptions;
     return this.sessionSettings(thread.configOptions);
   });
+
+  #modelNotOffered(model: string, models: readonly AcpModel[]): Effect.Effect<never, ProviderClientOperationError> {
+    return Effect.suspend(() => {
+      logger.warn("An agent session does not offer the model of the turn.", {
+        provider: this.options.provider,
+        model,
+      });
+      const name = models.find((candidate) => candidate.id === model)?.name ?? model;
+      return Effect.fail(providerFailure(new ProviderModelNotOfferedError(this.options.label(), name)));
+    });
+  }
 
   #setModel(thread: AcpConfigurationState, value: string): Effect.Effect<void, ProviderClientOperationError> {
     this.#processModel = null;
@@ -546,7 +564,22 @@ export class AcpConfiguration {
   }
 
   #timed<T>(method: string, request: () => Promise<T>): Effect.Effect<T, ProviderClientOperationError> {
-    return providerCall(request).pipe(
+    const conflict = this.options.configConflict;
+    const call = conflict
+      ? providerCall(request).pipe(
+          Effect.retry({
+            times: CONFIG_CONFLICT_RETRIES,
+            while: (failure) => conflict(failure.cause),
+            schedule: Schedule.spaced(CONFIG_CONFLICT_RETRY_MS),
+          }),
+          Effect.mapError((failure) =>
+            conflict(failure.cause)
+              ? providerFailure(new ProviderSettingsConflictError(this.options.label()))
+              : failure,
+          ),
+        )
+      : providerCall(request);
+    return call.pipe(
       Effect.timeoutOrElse({
         duration: this.options.requestTimeoutMs,
         orElse: () => {
@@ -815,6 +848,11 @@ function availableModels(response: SessionSetupResponse): Array<{
 
 function selectValues(option: Extract<SessionConfigOption, { type: "select" }>) {
   return option.options.flatMap((entry) => ("options" in entry ? entry.options : [entry]));
+}
+
+function listsValue(options: readonly SessionConfigOption[], configId: string, value: string): boolean {
+  const option = options.find((candidate) => candidate.id === configId);
+  return option?.type === "select" && selectValues(option).some((entry) => entry.value === value);
 }
 
 function reasoningEffortWireValues(values: string[]): Map<string, string> {

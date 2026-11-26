@@ -8,6 +8,7 @@ import {
   teamCapabilityLists,
 } from "@openbot/contracts/team-protocol/current";
 import { optionalTeamEvent, optionalTeamEventToCurrent } from "@openbot/contracts/team-protocol/optional-events";
+import { addPromptQuestionDetails } from "@openbot/contracts/team-protocol/prompt-detail-v1";
 import { teamSideRouteCodec } from "@openbot/contracts/team-protocol/side-routes";
 import { addSkillSuggestionNames } from "@openbot/contracts/team-protocol/skill-learning-v1";
 import {
@@ -29,10 +30,11 @@ import { TEAM_PROTOCOL_V9 } from "@openbot/contracts/team-protocol/v9";
 import { encodeTeamProtocolV9WebRtcHttpRequest } from "@openbot/contracts/team-protocol/v9-webrtc-adapter";
 import { TEAM_PROTOCOL_V10 } from "@openbot/contracts/team-protocol/v10";
 import { decodeTeamProtocolV10WebRtcHttpResponse } from "@openbot/contracts/team-protocol/v10-webrtc-adapter";
+import { WORKFLOW_SPOT_CONTROL, type WorkflowSpotControl } from "@openbot/contracts/team-protocol/workflow-presence-v1";
 import { sourceText } from "@openbot/i18n/source";
 import { remoteWorkspaceReadTimeout, startRemoteRequestDeadline } from "@openbot/team-client/remote-recovery";
 import { type RemoteRequestProfile, startRemoteRequest } from "@openbot/team-client/sync-profile";
-import { Context, Deferred, Effect, Fiber, Layer, Result, Schema } from "effect";
+import { Context, Deferred, Effect, Exit, Fiber, Layer, Result, Schema } from "effect";
 import type { CentralAuthOperationError } from "./central-auth-effects";
 import type { RemoteConnectionBootstrap } from "./central-auth-manager";
 import type {
@@ -62,6 +64,7 @@ const CONNECT_RETRY_LIMIT_MILLISECONDS = 30_000;
 
 const CONNECT_LIMIT_MILLISECONDS = 30_000;
 const HOST_WAIT_LIMIT_MILLISECONDS = 60_000;
+const TYPING_REFRESH_MILLISECONDS = 2_000;
 const SIGNAL_HOLD_LIMIT_MILLISECONDS = 70_000;
 
 interface TeamWebRtcClientTransportEvents {
@@ -107,6 +110,7 @@ interface TeamWebRtcClientTransportOptions {
   ) => Effect.Effect<void, CentralAuthOperationError>;
   removeMember: (hostId: string, membershipId: string) => Effect.Effect<void, CentralAuthOperationError>;
   removeOwnedHost: (hostId: string) => Effect.Effect<void, CentralAuthOperationError>;
+  setHostHidden: (hostId: string, hidden: boolean) => Effect.Effect<void, CentralAuthOperationError>;
   getPrincipalId: () => string;
   controlPlaneUrl: string;
   downloadHostLogo: (
@@ -204,6 +208,9 @@ export class TeamWebRtcClientTransport extends EventEmitter<TeamWebRtcClientTran
   >();
   readonly #lastAnswerAt = new Map<string, number>();
   readonly #lastEventSequence = new Map<string, number>();
+  readonly #eventAckTimers = new Map<string, ReturnType<typeof setTimeout>>();
+  readonly #lastTyping = new Map<string, { agentId: string | null; typing: boolean; sentAt: number }>();
+  readonly #typingInFlight = new Map<string, { agentId: string | null; typing: boolean }>();
   readonly #hostPublicKeys = new Map<string, string>();
   #hostKeySync: Deferred.Deferred<void> | null = null;
   #signalUrl: string | null = null;
@@ -346,6 +353,14 @@ export class TeamWebRtcClientTransport extends EventEmitter<TeamWebRtcClientTran
     );
   }).bind(this);
 
+  readonly setHostHidden = Effect.fn("TeamWebRtcClient.setHostHidden")(function* (
+    this: TeamWebRtcClientTransport,
+    hostId: string,
+    hidden: boolean,
+  ): Effect.fn.Return<void, RemoteWorkflowError> {
+    return yield* this.#owned(this.#options.setHostHidden(hostId, hidden).pipe(toRemoteWorkflowError));
+  }).bind(this);
+
   readonly sendDesktop = Effect.fn("TeamWebRtcClient.sendDesktop")(function* (
     this: TeamWebRtcClientTransport,
     hostId: string,
@@ -372,7 +387,26 @@ export class TeamWebRtcClientTransport extends EventEmitter<TeamWebRtcClientTran
     agentId: string | null,
     typing: boolean,
   ): Effect.fn.Return<void, RemoteWorkflowError> {
-    return yield* this.#owned(this.#sendEventControlEffect(hostId, { type: "team-typing", agentId, typing }));
+    const pending = this.#typingInFlight.get(hostId);
+    const previous = this.#lastTyping.get(hostId);
+    const duplicate = pending
+      ? pending.agentId === agentId && pending.typing === typing
+      : previous?.agentId === agentId &&
+        previous.typing === typing &&
+        (!typing || Date.now() - previous.sentAt < TYPING_REFRESH_MILLISECONDS);
+    if (duplicate) return;
+    const inFlight = { agentId, typing };
+    this.#typingInFlight.set(hostId, inFlight);
+    yield* this.#owned(this.#sendEventControlEffect(hostId, { type: "team-typing", agentId, typing })).pipe(
+      Effect.onExit((exit) =>
+        Effect.sync(() => {
+          if (this.#typingInFlight.get(hostId) !== inFlight) return;
+          this.#typingInFlight.delete(hostId);
+          if (Exit.isSuccess(exit)) this.#lastTyping.set(hostId, { agentId, typing, sentAt: Date.now() });
+          else this.#lastTyping.delete(hostId);
+        }),
+      ),
+    );
   }).bind(this);
 
   readonly setDirectTyping = Effect.fn("TeamWebRtcClient.setDirectTyping")(function* (
@@ -384,6 +418,14 @@ export class TeamWebRtcClientTransport extends EventEmitter<TeamWebRtcClientTran
     return yield* this.#owned(
       this.#sendEventControlEffect(hostId, { type: "team-direct-typing", recipientMemberId, typing }),
     );
+  }).bind(this);
+
+  readonly setWorkflowSpot = Effect.fn("TeamWebRtcClient.setWorkflowSpot")(function* (
+    this: TeamWebRtcClientTransport,
+    hostId: string,
+    control: WorkflowSpotControl,
+  ): Effect.fn.Return<void, RemoteWorkflowError> {
+    return yield* this.#owned(this.#sendEventControlEffect(hostId, control));
   }).bind(this);
 
   connect(hostId: string): Effect.Effect<void, RemoteWorkflowError> {
@@ -576,7 +618,10 @@ export class TeamWebRtcClientTransport extends EventEmitter<TeamWebRtcClientTran
                   }),
               ),
             );
-        if (this.#sendsSkillSuggestionNames(hostId)) addSkillSuggestionNames(body, envelope.body);
+        if (this.#sendsWireExtensions(hostId)) {
+          addSkillSuggestionNames(body, envelope.body);
+          addPromptQuestionDetails(body, envelope.body);
+        }
         if (method === "GET" && path === "/v1/compatibility" && status === 200) {
           const support = yield* remoteDecode(() => decodeTeamProtocolSupportExpanded(body));
           this.#hostProtocols.set(hostId, Math.min(support.protocol.maximum, LOCAL_TEAM_PROTOCOL.maximum));
@@ -1136,7 +1181,7 @@ export class TeamWebRtcClientTransport extends EventEmitter<TeamWebRtcClientTran
   readonly #sendEventControlEffect = Effect.fn("TeamWebRtcClient.sendEventControl")(function* (
     this: TeamWebRtcClientTransport,
     hostId: string,
-    control: TeamProtocolV1CurrentEventControl,
+    control: TeamProtocolV1CurrentEventControl | WorkflowSpotControl,
   ): Effect.fn.Return<void, RemoteWorkflowError, TeamClientBridge> {
     yield* this.#ensureConnected(hostId);
     yield* TeamClientBridge.use((bridge) =>
@@ -1146,7 +1191,7 @@ export class TeamWebRtcClientTransport extends EventEmitter<TeamWebRtcClientTran
         encodeTeamProtocolV2Frame({
           version: 2,
           type: "event-control",
-          control: toWireTeamProtocolV1ClientEvent(control),
+          control: control.type === WORKFLOW_SPOT_CONTROL ? control : toWireTeamProtocolV1ClientEvent(control),
         }),
       ),
     );
@@ -1251,6 +1296,11 @@ export class TeamWebRtcClientTransport extends EventEmitter<TeamWebRtcClientTran
     this.#files.setPeerAuthenticated(hostId, false);
     active.connected = false;
     this.#lastEventSequence.delete(hostId);
+    const ackTimer = this.#eventAckTimers.get(hostId);
+    if (ackTimer !== undefined) clearTimeout(ackTimer);
+    this.#eventAckTimers.delete(hostId);
+    this.#lastTyping.delete(hostId);
+    this.#typingInFlight.delete(hostId);
     for (const [requestId, pending] of this.#pending) {
       if (pending.hostId !== hostId) continue;
       clearTimeout(pending.timer);
@@ -1399,11 +1449,7 @@ export class TeamWebRtcClientTransport extends EventEmitter<TeamWebRtcClientTran
       const frame = decodeTeamProtocolV2EventFrame(data);
       if (frame.type === "event-reset") {
         this.#lastEventSequence.set(hostId, frame.nextSequence - 1);
-        this.#sendRecoverable(
-          hostId,
-          "events",
-          encodeTeamProtocolV2Frame({ version: 2, type: "event-ack", throughSequence: frame.nextSequence - 1 }),
-        );
+        this.#scheduleEventAck(hostId);
         this.#sendRecoverable(
           hostId,
           "events",
@@ -1421,11 +1467,7 @@ export class TeamWebRtcClientTransport extends EventEmitter<TeamWebRtcClientTran
       }
       const lastSequence = this.#lastEventSequence.get(hostId) ?? 0;
       if (frame.sequence <= lastSequence) {
-        this.#sendRecoverable(
-          hostId,
-          "events",
-          encodeTeamProtocolV2Frame({ version: 2, type: "event-ack", throughSequence: lastSequence }),
-        );
+        this.#scheduleEventAck(hostId);
         return;
       }
       if (frame.sequence !== lastSequence + 1) {
@@ -1441,21 +1483,38 @@ export class TeamWebRtcClientTransport extends EventEmitter<TeamWebRtcClientTran
         return;
       }
       if (decoded.status === "known") {
-        if (this.#sendsSkillSuggestionNames(hostId)) addSkillSuggestionNames(decoded.event, frame.payload);
+        if (this.#sendsWireExtensions(hostId)) {
+          addSkillSuggestionNames(decoded.event, frame.payload);
+          addPromptQuestionDetails(decoded.event, frame.payload);
+        }
         this.emit("event", hostId, decoded.event);
       }
       this.#lastEventSequence.set(hostId, frame.sequence);
-      this.#sendRecoverable(
-        hostId,
-        "events",
-        encodeTeamProtocolV2Frame({ version: 2, type: "event-ack", throughSequence: frame.sequence }),
-      );
+      this.#scheduleEventAck(hostId);
     } catch {
       this.#failProtocol(hostId, "The host returned an invalid event frame.");
     }
   }
 
-  #sendsSkillSuggestionNames(hostId: string): boolean {
+  #scheduleEventAck(hostId: string): void {
+    if (this.#eventAckTimers.has(hostId)) return;
+    const timer = setTimeout(() => {
+      this.#eventAckTimers.delete(hostId);
+      if (!this.#active.get(hostId)?.connected) return;
+      this.#sendRecoverable(
+        hostId,
+        "events",
+        encodeTeamProtocolV2Frame({
+          version: 2,
+          type: "event-ack",
+          throughSequence: this.#lastEventSequence.get(hostId) ?? 0,
+        }),
+      );
+    }, 16);
+    this.#eventAckTimers.set(hostId, timer);
+  }
+
+  #sendsWireExtensions(hostId: string): boolean {
     return (this.#hostProtocols.get(hostId) ?? 0) >= TEAM_PROTOCOL_V9;
   }
 
@@ -1477,8 +1536,11 @@ export class TeamWebRtcClientTransport extends EventEmitter<TeamWebRtcClientTran
     this.emit("path", hostId, path);
   };
   readonly #onError = (hostId: string, code: string, message: string): void => {
-    if (!this.#active.has(hostId)) return;
-    this.emit("error", hostId, code, message);
+    const active = this.#active.get(hostId);
+    if (!active) return;
+    if (code === "data_channel_error" && !active.connected && active.authentication?.started)
+      this.emit("error", hostId, "sign_in_closed", sourceText("error.remote.signInConnectionClosed"));
+    else this.emit("error", hostId, code, message);
   };
 
   #sendRecoverable(hostId: string, channel: "events", data: string): void {

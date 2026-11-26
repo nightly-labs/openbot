@@ -7,6 +7,7 @@ import {
   CHALLENGE_WAIT_MS,
   type DetectedChallenge,
   describeChallenge,
+  httpSignInChallenge,
   TURNSTILE_SELF_PASS_MS,
 } from "./browser-challenge";
 import { type BrowserOperationError, browserFailure, browserSync } from "./browser-effects";
@@ -144,7 +145,7 @@ function queueWaitError(tab: BrowserHostTab, turn: BrowserDialogOwner | undefine
   if (dialog && turn && tab.engine.dialogOwnedBy(turn))
     return `An earlier action on this tab still waits for a page ${dialog.type} dialog. Answer it first with handle_dialog, dialogId ${dialog.id}, then try again.`;
   if (dialog)
-    return "An earlier action on this tab still waits for a page dialog that only a person can answer. Ask the user to answer it, then read the tab again.";
+    return `An earlier action on this tab still waits for a page ${dialog.type} dialog that only a person can answer: ${JSON.stringify(dialog.message)}. Ask the user to answer it, then read the tab again.`;
   return "An earlier action on this tab did not finish, so this call did not run. Open the page in a new tab, or try again later.";
 }
 
@@ -278,6 +279,7 @@ export const readTabSnapshot = Effect.fn("BrowserTab.readTabSnapshot")(function*
       afterTakeover,
     );
     if (challenge) result.snapshot.challenge = challenge;
+    else if (tab.httpSignIn) result.snapshot.challenge = httpSignInChallenge();
   }
   const recalled = siteMemories && !tab.secret ? recallSiteMemories(tab, result.snapshot.url, siteMemories) : null;
   if (recalled?.memories.length) result.snapshot.siteMemories = recalled.memories;

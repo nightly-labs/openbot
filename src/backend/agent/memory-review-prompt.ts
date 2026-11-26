@@ -65,6 +65,7 @@ export interface ReviewSkill {
 export function acceptedSuggestion(
   suggestion: SkillReviewSuggestion | null | undefined,
   skills: readonly ReviewSkill[],
+  canCreate: boolean,
 ): SkillReviewSuggestion | null {
   if (!suggestion) return null;
   if (suggestion.action === "update") {
@@ -73,6 +74,7 @@ export function acceptedSuggestion(
     const name = skill?.name.trim();
     return name ? { ...suggestion, name } : null;
   }
+  if (!canCreate) return null;
   const name = suggestion.name.toLocaleLowerCase();
   return skills.some((skill) => skill.name.trim().toLocaleLowerCase() === name) ? null : suggestion;
 }
@@ -81,6 +83,7 @@ export interface SkillReviewInput {
   skills: readonly ReviewSkill[];
   earlierSuggestions: readonly string[];
   automatic: boolean;
+  canCreate: boolean;
 }
 
 export function memoryReviewPrompt(
@@ -94,7 +97,7 @@ export function memoryReviewPrompt(
   const steps = skillInput ? workSteps(messages) : [];
   return [
     "You keep the long-term memory of the agent in this profile. Read the chat below and decide which memories to add, update or forget, so that the agent knows them in later chats. You cannot use tools here.",
-    ...(skillInput ? skillRules(skillInput.automatic) : []),
+    ...(skillInput ? skillRules(skillInput.automatic, skillInput.canCreate) : []),
     skillInput ? "Then decide the memories. Memory rules:" : "Rules:",
     "- Keep only what stays true across chats: the user's preferences, stable facts about the user, their projects and their environment, and plans that the user can ask about later, such as an offer or a deadline. A fact from a task or side thread counts too. Write the date of a plan that ends.",
     "- A lasting rule that the user gives the agent (always, never) is not a memory: the agent keeps it in its Instructions.",
@@ -178,7 +181,7 @@ export function memoryReviewPrompt(
 const SKILL_LANGUAGE_RULE =
   '- First set "language" to the language of the messages that the user typed in the chat. The agent profile, the memories, the skills, the earlier skill questions, the work steps, these rules and where the user lives do not set it. Then write the name and the message in that language.';
 
-function skillRules(automatic: boolean): string[] {
+function skillRules(automatic: boolean, canCreate: boolean): string[] {
   return [
     `First decide whether ${automatic ? "to save a skill" : "to ask the user to save a skill"}. A skill is the instructions for one class of task, done the most efficient and correct way for this user: the procedure, the tools and commands that work, their order, how the user wants the result, and the pitfalls that cost time. A later chat follows it and gets the result right the first time.`,
     "Skill rules:",
@@ -186,7 +189,9 @@ function skillRules(automatic: boolean): string[] {
     "- The work steps list the agent's tool calls in these turns, with the error of each failed one. Failed steps and the step that then worked show a lesson.",
     "- A fact about the user or their environment goes to memory. How to do a class of task goes to a skill. A preference for one class of task belongs in its skill; a preference for every answer belongs in memory.",
     "- When a signal is in the chat, suggest the skill, also when it is short. Do not add a memory with the same procedure, format or rule instead: the skill holds it.",
-    '- Prefer "update" of a listed skill whose canUpdate is true and that covers the class of task, also when someone else wrote it. Use "create" only when no listed skill covers it.',
+    canCreate
+      ? '- Prefer "update" of a listed skill whose canUpdate is true and that covers the class of task, also when someone else wrote it. Use "create" only when no listed skill covers it.'
+      : '- The agent has the most skills that it can have, so it cannot get a new skill. Never use "create". Use "update" of a listed skill whose canUpdate is true and that covers the class of task, also when someone else wrote it. When no such skill covers it, answer null.',
     '- Give a new skill a class-level name of two to five words, such as "Cloudflare Worker deploys". Never a PR or issue number, an error message, a code name, a date, a library name alone, or a name that fits only today\'s task.',
     '- Do not suggest: failures that depend on the environment and the user can fix, such as a missing program, package, sign-in or setting; claims that a tool or feature does not work; errors that went away in the chat (a retry that worked is the lesson, not the error); a task done once, such as "summarize this page"; and attempts that never worked. Never present failed attempts as a method.',
     `- Do not ${automatic ? "save" : "ask"} again ${automatic ? "a lesson that an earlier skill line holds" : "about a lesson that an earlier skill question asked about"}, also with another skill name or a new example of the same lesson. ${automatic ? "Save" : "Ask"} only a different lesson. Do not suggest what a listed skill already says.`,

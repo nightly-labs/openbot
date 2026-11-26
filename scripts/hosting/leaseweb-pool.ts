@@ -219,7 +219,7 @@ echo "version=$v"
 echo "user=$(cat /opt/OpenBot/hosted/service-user 2>/dev/null || true)"
 echo "ids=$(id -u user 2>/dev/null || true):$(id -g user 2>/dev/null || true)"
 echo "enabled=$(systemctl is-enabled openbot.service 2>/dev/null || true)"
-if [ -e /home/user/.config/OpenBot ] || [ -e /home/user/.config/openbot-hosted ] || [ -e /srv/openbot-hosted/keyrings ]; then echo data=yes; else echo data=no; fi
+if [ -e /home/user/.config/OpenBot ] || [ -e /home/user/.config/openbot-hosted ] || [ -e /srv/openbot-hosted/keyrings ] || [ -e /srv/openbot-keyring ]; then echo data=yes; else echo data=no; fi
 echo "hostkey=$(cut -d' ' -f1,2 /etc/ssh/ssh_host_ed25519_key.pub)"`;
 
 const CUSTOM_STATE = `export LC_ALL=C
@@ -365,6 +365,7 @@ function movableFolder(folder: string) {
   return (
     /^\/(?:srv\/|mnt\/|media\/)?[A-Za-z0-9_@+-][A-Za-z0-9._@+-]*$/u.test(folder) &&
     folder !== "/srv/openbot-hosted" &&
+    folder !== "/srv/openbot-keyring" &&
     !/^\/(?:bin|boot|cdrom|dev|etc|gnu|home|initrd.*|lib.*|lost\+found|media|mnt|nix|opt|proc|root|run|sbin|snap|srv|swap.*|sys|tmp|usr|var)$/u.test(
       folder,
     )
@@ -1812,7 +1813,7 @@ exit "$status"`;
 
   #moveCandidates(product: string, currency: string | null) {
     const locations: [string, ...string[]] =
-      currency === "usd" || currency === "brl" ? ["WDC-02", "AMS-01"] : ["AMS-01"];
+      currency === "usd" || currency === "brl" ? ["WDC-02", "AMS-01", "FRA-01"] : ["AMS-01", "FRA-01"];
     return this.#rows(
       `SELECT p.host_id FROM operator_hosts p
        WHERE p.removed_at IS NULL AND p.product = ${literal(product, PRODUCT_PATTERN)}

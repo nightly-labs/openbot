@@ -22,6 +22,7 @@ import {
   type VoiceModelId,
   type VoiceModelStatus,
   type VoiceSettings,
+  type VoiceSettingsState,
   type VoiceStream,
   type VoiceStreamAudio,
   type VoiceStreamTranscript,
@@ -41,15 +42,18 @@ import {
   TRANSCRIPTION_SESSION_CONFIGS,
   transcriptionHostThreads,
   VOICE_RUNTIME_ADDON,
+  VOICE_SPEECH_DETECTOR,
   VoiceModelService,
   VoiceOperationError,
 } from "./voice-model-service";
 import type { VoicePreferenceStore } from "./voice-preference-store";
 import { transcribeRecording } from "./voice-server-service";
 import type {
+  VoiceSpeechCheckRequest,
   VoiceTranscriptionEngine,
   VoiceTranscriptionFailure,
   VoiceTranscriptionHostProcess,
+  VoiceTranscriptionRequest,
   VoiceTranscriptionResponse,
 } from "./voice-transcription-protocol";
 
@@ -57,6 +61,8 @@ const logger = createOpenBotLogger("voice-transcription-service");
 
 const TRANSCRIPTION_TIMEOUT_MS = 180_000;
 const TRANSCRIPTION_TIMEOUT_PER_AUDIO_SECOND_MS = 1_500;
+const SPEECH_CHECK_TIMEOUT_MS = 30_000;
+const SPEECH_CHECK_TIMEOUT_PER_AUDIO_SECOND_MS = 100;
 const GROQ_API_ADDRESS = "https://api.groq.com/openai/v1";
 const GROQ_MODELS: Record<GroqVoiceModelId, string> = {
   "groq-whisper-large-v3-turbo": "whisper-large-v3-turbo",
@@ -121,14 +127,19 @@ class HostFailure extends Error {
   }
 }
 
+type HostAnswer = Exclude<VoiceTranscriptionResponse, { error: VoiceTranscriptionFailure }>;
+
+type HostQuestion = Omit<VoiceTranscriptionRequest, "id"> | Omit<VoiceSpeechCheckRequest, "id">;
+
 interface PendingRequest {
   id: number;
-  settle: (result: Effect.Effect<string, VoiceOperationError>) => void;
+  settle: (result: Effect.Effect<HostAnswer, VoiceOperationError>) => void;
 }
 
 export class VoiceTranscriptionService extends EventEmitter<VoiceTranscriptionEvents> {
   readonly #scope = Scope.makeUnsafe();
   readonly #addonPath: string;
+  readonly #speechDetector: string;
   readonly #models: Record<LocalVoiceModelId, VoiceModelService<LocalVoiceModelId>>;
   readonly #preferences: VoicePreferenceStore;
   readonly #apiKeys: Record<DictationKeyProvider, VoiceApiKeyStore>;
@@ -147,6 +158,7 @@ export class VoiceTranscriptionService extends EventEmitter<VoiceTranscriptionEv
   constructor(options: VoiceTranscriptionServiceOptions) {
     super();
     this.#addonPath = join(options.resourcesRoot, "runtime", VOICE_RUNTIME_ADDON);
+    this.#speechDetector = join(options.resourcesRoot, "runtime", VOICE_SPEECH_DETECTOR);
     this.#spawnHost = options.spawnHost;
     this.#openStreamSocket = options.openStreamSocket;
     this.#preferences = options.preferences;
@@ -215,7 +227,7 @@ export class VoiceTranscriptionService extends EventEmitter<VoiceTranscriptionEv
     );
   }).bind(this);
 
-  getSettings(): VoiceSettings {
+  getSettings(): VoiceSettingsState {
     return this.#preferences.get();
   }
 
@@ -398,7 +410,7 @@ export class VoiceTranscriptionService extends EventEmitter<VoiceTranscriptionEv
       );
     const startedAt = Date.now();
     const audioSeconds = (Math.max(0, audio.byteLength - WAV_HEADER_BYTES) / BYTES_PER_SECOND).toFixed(1);
-    return transcribeRecording(
+    const upload = transcribeRecording(
       this.#fetch,
       { address: GROQ_API_ADDRESS, apiKey },
       GROQ_MODELS[modelId],
@@ -416,6 +428,9 @@ export class VoiceTranscriptionService extends EventEmitter<VoiceTranscriptionEv
           logger.info(`Groq transcription of ${audioSeconds}s completed in ${Date.now() - startedAt}ms.`),
         ),
       ),
+    );
+    return this.#hasSpeech(audio.slice(WAV_HEADER_BYTES)).pipe(
+      Effect.flatMap((speech) => (speech ? upload : Effect.succeed({ text: "" }))),
     );
   }
 
@@ -444,11 +459,59 @@ export class VoiceTranscriptionService extends EventEmitter<VoiceTranscriptionEv
     modelId: LocalVoiceModelId,
     language: VoiceSettings["language"],
   ): Effect.Effect<string, VoiceOperationError> {
-    return Effect.callback<string, VoiceOperationError>((resume) => {
+    return this.#ask(
+      {
+        addonPath: this.#addonPath,
+        modelDirectory: this.#models[modelId].directory,
+        engine: MODEL_ENGINES[modelId],
+        language: hostLanguage(modelId, language),
+        leadingSilenceSamples: LEADING_SILENCE_SAMPLES[modelId],
+        numThreads: HOST_THREADS,
+        sessionConfig: TRANSCRIPTION_SESSION_CONFIGS[modelId],
+        speechDetector: this.#speechDetector,
+        pcm,
+      },
+      modelId,
+      Math.max(
+        TRANSCRIPTION_TIMEOUT_MS,
+        (pcm.byteLength / BYTES_PER_SECOND) * TRANSCRIPTION_TIMEOUT_PER_AUDIO_SECOND_MS,
+      ),
+    ).pipe(
+      Effect.flatMap((answer) =>
+        "text" in answer
+          ? Effect.succeed(answer.text)
+          : Effect.fail(new VoiceOperationError({ cause: new HostFailure("inference-failed") })),
+      ),
+    );
+  }
+
+  #hasSpeech(pcm: Uint8Array): Effect.Effect<boolean> {
+    if (!existsSync(this.#addonPath) || !existsSync(this.#speechDetector)) return Effect.succeed(true);
+    return this.#ask(
+      { addonPath: this.#addonPath, speechDetector: this.#speechDetector, pcm },
+      null,
+      Math.max(SPEECH_CHECK_TIMEOUT_MS, (pcm.byteLength / BYTES_PER_SECOND) * SPEECH_CHECK_TIMEOUT_PER_AUDIO_SECOND_MS),
+    ).pipe(
+      Effect.map((answer) => !("speech" in answer) || answer.speech),
+      Effect.tapError((error) =>
+        Effect.sync(() =>
+          logger.warn("The speech check failed, so the recording is transcribed.", errorCategory(error.cause)),
+        ),
+      ),
+      Effect.orElseSucceed(() => true),
+    );
+  }
+
+  #ask(
+    question: HostQuestion,
+    modelId: LocalVoiceModelId | null,
+    timeoutMs: number,
+  ): Effect.Effect<HostAnswer, VoiceOperationError> {
+    return Effect.callback<HostAnswer, VoiceOperationError>((resume) => {
       this.#cancelIdleStop();
-      if (this.#hostModelId !== modelId) this.#stopHost();
+      if (modelId !== null && this.#hostModelId !== modelId) this.#stopHost();
       const host = this.#ensureHost();
-      this.#hostModelId = modelId;
+      if (modelId !== null) this.#hostModelId = modelId;
       const id = this.#nextRequestId++;
       let settled = false;
       this.#pending = {
@@ -458,28 +521,14 @@ export class VoiceTranscriptionService extends EventEmitter<VoiceTranscriptionEv
           resume(result);
         },
       };
-      const engine = MODEL_ENGINES[modelId];
-      host.send({
-        id,
-        addonPath: this.#addonPath,
-        modelDirectory: this.#models[modelId].directory,
-        engine,
-        language: hostLanguage(modelId, language),
-        leadingSilenceSamples: LEADING_SILENCE_SAMPLES[modelId],
-        numThreads: HOST_THREADS,
-        sessionConfig: TRANSCRIPTION_SESSION_CONFIGS[modelId],
-        pcm,
-      });
+      host.send({ ...question, id });
       return Effect.sync(() => {
         if (this.#pending?.id === id) this.#pending = null;
         if (!settled) this.#stopHost();
       });
     }).pipe(
       Effect.timeoutOrElse({
-        duration: Math.max(
-          TRANSCRIPTION_TIMEOUT_MS,
-          (pcm.byteLength / BYTES_PER_SECOND) * TRANSCRIPTION_TIMEOUT_PER_AUDIO_SECOND_MS,
-        ),
+        duration: timeoutMs,
         orElse: () =>
           Effect.fail(new VoiceOperationError({ cause: new Error(sourceText("error.voice.transcriptionTimedOut")) })),
       }),
@@ -507,7 +556,7 @@ export class VoiceTranscriptionService extends EventEmitter<VoiceTranscriptionEv
     return host;
   }
 
-  #settle(id: number, result: Effect.Effect<string, VoiceOperationError>): void {
+  #settle(id: number, result: Effect.Effect<HostAnswer, VoiceOperationError>): void {
     const pending = this.#pending;
     if (pending?.id !== id) return;
     this.#pending = null;
@@ -555,9 +604,9 @@ function cloudProvider(modelId: CloudVoiceModelId): DictationKeyProvider {
   return CLOUD_MODELS.find((model) => model.id === modelId)?.provider ?? "elevenlabs";
 }
 
-function responseResult(response: VoiceTranscriptionResponse): Effect.Effect<string, VoiceOperationError> {
-  if ("text" in response) return Effect.succeed(response.text);
-  return Effect.fail(new VoiceOperationError({ cause: new HostFailure(response.error) }));
+function responseResult(response: VoiceTranscriptionResponse): Effect.Effect<HostAnswer, VoiceOperationError> {
+  if ("error" in response) return Effect.fail(new VoiceOperationError({ cause: new HostFailure(response.error) }));
+  return Effect.succeed(response);
 }
 
 function streamError(cause: unknown): VoiceOperationError {

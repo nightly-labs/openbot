@@ -43,6 +43,7 @@ export const messages = {
   "mcp.status.signedIn": "Sesión iniciada",
   "mcp.status.signingIn": "Iniciando sesión…",
   "mcp.status.signInNeeded": "Requiere inicio de sesión",
+  "mcp.status.signInAppNeeded": "Requiere app de inicio de sesión",
   "mcp.status.refused": "Rechazado",
   "mcp.status.checkUrl": "Revisa la URL",
   "mcp.status.noAnswer": "Sin respuesta",

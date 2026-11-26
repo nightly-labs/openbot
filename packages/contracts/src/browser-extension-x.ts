@@ -2,6 +2,8 @@ import { isDynamicRecord, isString } from "./runtime-values";
 
 export const X_AGENT_LISTING_ID = "openbot-curated-agent-x-desk";
 
+export const X_EXTENSION_URL = "https://chromewebstore.google.com/detail/openbot/eggdpikcggoicfcfdpdihfkinajchpfj";
+
 export const X_PAGE_RULES_ROUTE = "/v1/browser-extension/x-rules";
 
 export const X_PAGE_PARTS = [
@@ -31,17 +33,36 @@ const SELECTOR_LENGTH = 300;
 export const X_PAGE_RULES_DEFAULT: XPageRules = {
   mention: "openbot_",
   selectors: {
-    composer: ['[data-testid="tweetTextarea_0"]', 'div[role="textbox"][contenteditable="true"]'],
-    replyButton: ['[data-testid="tweetButtonInline"]', '[data-testid="tweetButton"]'],
+    composer: [
+      '[data-testid="tweetTextarea_0"]',
+      'textarea[aria-multiline="true"]',
+      'div[role="textbox"][contenteditable="true"]',
+    ],
+    replyButton: [
+      '[data-testid="tweetButtonInline"]',
+      '[data-testid="tweetButton"]',
+      'button[data-slot="xds-button"][class~="bg-btn-primary"]:not([aria-label])',
+    ],
     dialog: ['[role="dialog"]'],
-    post: ['article[data-testid="tweet"]', "article"],
-    focalPost: ['article[data-testid="tweet"][tabindex="-1"]'],
-    postText: ['[data-testid="tweetText"]'],
-    postAuthor: ['[data-testid="User-Name"]'],
+    post: ['article[data-testid="tweet"]', "article", "form > div:has(> div > [data-post-avatar])"],
+    focalPost: ['article[data-testid="tweet"][tabindex="-1"]', '[data-navigation-stop][tabindex="-1"] > article'],
+    postText: ['[data-testid="tweetText"]', 'div[dir="auto"][lang]:not(article article *)'],
+    postAuthor: [
+      '[data-testid="User-Name"]',
+      'div:not(article article *):has(> span > a[href] > div[dir="auto"])',
+      'div:not(article article *):has(> span > div[dir="auto"])',
+    ],
     postTime: ["time[datetime]"],
-    postLink: ['a[href*="/status/"]:has(time)'],
-    article: ['[data-testid="twitterArticleRichTextView"]', '[data-testid="longformRichTextComponent"]'],
-    media: ['[data-testid="tweetPhoto"] img'],
+    postLink: [
+      'a[href*="/status/"]:has(time)',
+      'a[data-base-ui-tooltip-trigger][href*="/status/"]:not(article article *)',
+    ],
+    article: [
+      '[data-testid="twitterArticleRichTextView"]',
+      '[data-testid="longformRichTextComponent"]',
+      'div:has(> [data-article-part="title"])',
+    ],
+    media: ['[data-testid="tweetPhoto"] img', 'a[data-engagement-action="media"] img:not(article article *)'],
   },
 };
 

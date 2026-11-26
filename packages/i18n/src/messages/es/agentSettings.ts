@@ -49,6 +49,7 @@ export const messages = {
     other: "Puedes añadir {count} carpetas como máximo",
   },
   "agentSettings.folders.browse.places": "Ir a",
+  "agentSettings.folders.browse.path": "Ruta de la carpeta",
   "agentSettings.folders.browse.home": "Carpeta de inicio",
   "agentSettings.folders.browse.parent": "Subir a {folder}",
   "agentSettings.folders.browse.failed": "No se puede abrir esta carpeta.",
@@ -95,6 +96,7 @@ export const messages = {
   "agentSettings.backupModels.limited": "Límite de uso alcanzado · omitido",
   "agentSettings.backupModels.unavailable": "No disponible ahora · omitido",
   "agentSettings.backupModels.withAccount": "{model} · {account}",
+  "agentSettings.backupModels.withProvider": "{model} · {provider}",
   "agentSettings.backupModels.note":
     "Si un límite de uso detiene a {name} después de empezar a trabajar, {name} continúa el mismo trabajo con el primer modelo disponible del orden. Vuelve a {model} cuando termina el límite, o 10 minutos después de un error del proveedor.",
   "agentSettings.groups.brain": "Cerebro",
@@ -190,6 +192,10 @@ export const messages = {
     "Todos los mensajes y archivos de este chat se eliminan de OpenBot y el agente los olvida. No se puede deshacer. Los hilos secundarios, las instrucciones, el modelo, las herramientas, las memorias, el espacio de trabajo y el navegador no cambian.",
   "agentSettings.deleteHistory.confirm": "Eliminar historial",
   "agentSettings.deleteHistory.failed": "No se pudo eliminar el historial.",
+  "agentSettings.deleteAgent.title": "Eliminar agente",
+  "agentSettings.deleteAgent.description":
+    "El agente, su chat, sus recuerdos, sus rutinas y su espacio de trabajo se eliminan de OpenBot.",
+  "agentSettings.deleteAgent.button": "Eliminar",
   "agentSettings.fullAccess.title": "¿Dar acceso completo a este agente?",
   "agentSettings.fullAccess.askTitle": "¿Dejar que este agente trabaje fuera de su espacio de trabajo?",
   "agentSettings.fullAccess.description":

@@ -40,6 +40,7 @@ export const messages = {
   "browser.tab.closeUnnamed": "Fermer l’onglet du navigateur",
   "browser.newTab": "Nouvel onglet du navigateur",
   "browser.backToChat": "Retour au chat",
+  "browser.fullView.open": "Ouvrir en plein écran",
   "browser.goBack": "Revenir en arrière",
   "browser.goForward": "Avancer",
   "browser.reload": "Actualiser la page",
@@ -71,6 +72,10 @@ export const messages = {
   "browser.liveView.copyFailed": "Impossible de copier le texte. Cliquez sur la page et réessayez.",
   "browser.liveView.pageCopied":
     "La page a copié du texte. Choisissez Copier pour le mettre dans votre presse-papiers.",
+  "browser.liveView.dialog.site": "{site} indique",
+  "browser.liveView.dialog.page": "Cette page indique",
+  "browser.liveView.dialog.waiting": "La page attend votre réponse.",
+  "browser.liveView.dialog.ok": "OK",
   "browser.previews.label": "Aperçus du navigateur",
   "browser.previews.resize": "Redimensionner le panneau de droite",
   "browser.previews.empty": "Aucun onglet de navigateur",
@@ -180,6 +185,12 @@ export const messages = {
   "browser.signIn.stillSignedOut":
     "{server} affiche toujours une page de connexion de {site}. Terminez la connexion dans la fenêtre.",
   "browser.signIn.failed": "OpenBot n’a pas pu envoyer la connexion.",
+  "browser.httpSignIn.title": "Se connecter à {site}",
+  "browser.httpSignIn.description": "Ce site demande son propre nom d’utilisateur et son mot de passe.",
+  "browser.httpSignIn.refused": "Le site n’a pas accepté ce nom d’utilisateur ou ce mot de passe.",
+  "browser.httpSignIn.username": "Nom d’utilisateur",
+  "browser.httpSignIn.password": "Mot de passe",
+  "browser.httpSignIn.submit": "Se connecter",
   "browser.profiles.title": "Profils de navigateur",
   "browser.profiles.subtitle":
     "Chaque profil garde ses propres connexions, cookies et données de sites sur l’ordinateur qui exécute OpenBot.",
@@ -247,4 +258,11 @@ export const messages = {
   },
   "browser.proxies.changeTitle": "Changer le proxy de {name} ?",
   "browser.proxies.change": "Changer de proxy",
+  "browser.location.title": "{site} veut connaître votre position",
+  "browser.location.description": "Autorisez uniquement les sites de confiance.",
+  "browser.location.block": "Bloquer",
+  "browser.location.allow": "Autoriser",
+  "browser.location.allowAlways": "Toujours autoriser",
+  "browser.location.unavailable": "Impossible d’obtenir la position de cet appareil.",
+  "browser.location.answerFailed": "Impossible de répondre à la demande de position.",
 } as const satisfies PartialTranslation<typeof source>;

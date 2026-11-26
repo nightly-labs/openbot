@@ -4,9 +4,11 @@ import {
   fileQuoteId,
   fileQuoteTarget,
   limitedQuoteText,
+  serializeChatTagReference,
 } from "@openbot/contracts/chat-tag-references";
 import { isNarrationItemId } from "@openbot/contracts/conversation-narration";
 import {
+  AUTOMATIC_VOICE_LANGUAGE,
   customProviderOfModel,
   isCustomProviderHarness,
   type McpSignInRelayPage,
@@ -15,7 +17,7 @@ import {
 } from "@openbot/contracts/ipc";
 import { AGENT_FAST_MODE_CAPABILITY } from "@openbot/contracts/team-protocol/agent-fast-mode-v1";
 import { AGENT_SPEED_CAPABILITY } from "@openbot/contracts/team-protocol/agent-speed-v1";
-import { toast } from "@openbot/ui";
+import { dialogShown, toast } from "@openbot/ui";
 import type { QuestionPromptComposerAnswer } from "@openbot/ui/components/QuestionPromptBubble";
 import type { AgentMessage } from "@openbot/ui/data";
 import { awaitingReplyEnded } from "@openbot/ui/features/conversation/AwaitingReplies";
@@ -40,10 +42,11 @@ import {
 } from "solid-js";
 import { actionToast } from "../../action-toast";
 import { matchesShortcut } from "../../keyboard-shortcut-preference";
-import { holdNativeBrowserPage } from "../../native-browser-page";
+import { holdNativeBrowserPage, reserveNativeBrowserPageInset } from "../../native-browser-page";
 import { createScopeGuard } from "../../scope-lifetime";
 import { serverSupportsCapability } from "../servers/server-capabilities";
 import { codexLiveAccess } from "../speech/codex-live-access";
+import { followDictatedChannelReply } from "../speech/speech-replies";
 import { insideOverlay } from "../window/workspace-shortcuts";
 import { createAttachmentImportSounds } from "./attachment-import-sounds";
 import { createChangeMarkerActions } from "./change-marker-actions";
@@ -75,7 +78,7 @@ import { createBrowserStore } from "./stores/browser-store";
 import { createComposerActions } from "./stores/composer-actions";
 import { conversationOwnerId, createComposerStore, currentConversationTarget } from "./stores/composer-store";
 import { createMcpServersStore } from "./stores/mcp-servers-store";
-import { createMessageActions } from "./stores/message-actions";
+import { createMessageActions, draftWithPageContext, draftWithPageText } from "./stores/message-actions";
 import { createMessagePinsStore } from "./stores/message-pins-store";
 import { createPanelsStore, isSidePanelMode } from "./stores/panels-store";
 import { PENDING_SEND_ID_PREFIX, type PendingSend, pendingSendMessage } from "./stores/pending-send-store";
@@ -90,6 +93,7 @@ import { createThreadComposerActions } from "./stores/thread-composer-actions";
 import { createThreadQueue } from "./stores/thread-queue-edit";
 import { createVoiceConversation } from "./stores/voice-conversation-store";
 import { createVoiceStore } from "./stores/voice-store";
+import { claimVoiceLanguageNotice } from "./voice-language-notice";
 
 const READER_INPUT_WINDOW_MS = 250;
 
@@ -198,6 +202,8 @@ export function createConversationViewScope(props: ConversationProps) {
     setVoiceLevels,
     voiceLimitReached,
     setVoiceLimitReached,
+    voiceLanguageChoice,
+    setVoiceLanguageChoice,
     markingRead,
     setMarkingRead,
     submitting,
@@ -313,6 +319,11 @@ export function createConversationViewScope(props: ConversationProps) {
     activeRightPanel,
     settingsOpen,
     filesOpen,
+    sideSplits,
+    paneSplit,
+    paneShown,
+    removeSplitPane,
+    moveSidePanelPane,
     panelSubagentId,
     openSubagentPanel,
     panelThreadId,
@@ -336,9 +347,11 @@ export function createConversationViewScope(props: ConversationProps) {
     openBrowserWindow,
     reattachBrowserWindow,
     hideBrowserPanel,
+    openFileFromThread,
     previewAttachment,
     attachmentAction,
     attachmentDownloads,
+    imageCopies,
     openSharedFile,
     openThreadFile,
     openWorkspaceFile,
@@ -442,6 +455,7 @@ export function createConversationViewScope(props: ConversationProps) {
   const currentChatErrorRun = () => currentChatErrorEntry()?.run ?? null;
   const currentChatErrorLink = () => currentChatErrorEntry()?.link ?? null;
   const currentChatErrorDetails = () => currentChatErrorEntry()?.details ?? null;
+  const currentChatErrorNotice = () => currentChatErrorEntry()?.notice === true;
   const attachmentBusy = (target = currentTarget()) =>
     target !== undefined && importingDrafts().has(composerDraftKey(target));
   const uploadFailed = (target = currentTarget()) =>
@@ -545,10 +559,12 @@ export function createConversationViewScope(props: ConversationProps) {
     browserAddress,
     setBrowserAddress,
     setComposerError: setScopedComposerError,
+    browserWindowOpen,
     takeoverPageRequest: controller.browserTakeoverPageRequest,
     setTakeoverPageRequest: controller.setBrowserTakeoverPageRequest,
     panels: {
       activeRightPanel,
+      paneShown,
       setActiveRightPanel,
       reattachBrowserWindow,
       closeBrowserPane,
@@ -569,6 +585,8 @@ export function createConversationViewScope(props: ConversationProps) {
     openBrowserTakeoverTab,
     openWaitingAgent,
     canOpenBrowserTakeoverTab,
+    browserTabNotice,
+    noticeBrowserTabs,
     localSignIn,
     activeBrowserControl,
     actingBrowserControl,
@@ -582,6 +600,9 @@ export function createConversationViewScope(props: ConversationProps) {
     browserTabOwner,
     reloadBrowserTab,
     stopBrowserTab,
+    answerBrowserPermission,
+    permissionAnswerPending,
+    answerBrowserHttpSignIn,
     navigateBrowserTab,
     takeBrowserControl,
     releaseBrowserControl,
@@ -611,8 +632,25 @@ export function createConversationViewScope(props: ConversationProps) {
     return id !== null && sideThreadIds().includes(id) ? id : null;
   };
   function toggleSidePanel() {
-    if (sidePanelOpen()) hideBrowserPanel();
+    if (sidePanelOpen()) closeSidePanel();
     else showSidePanel();
+  }
+  function closeSidePanel() {
+    if (
+      typeof document.startViewTransition !== "function" ||
+      window.matchMedia("(prefers-reduced-motion: reduce)").matches
+    ) {
+      hideBrowserPanel();
+      return;
+    }
+    const transition = document.startViewTransition({
+      types: ["side-panel-close"],
+      update: () => {
+        hideBrowserPanel();
+        flush();
+      },
+    });
+    transition.ready.catch(() => undefined);
   }
   function showSidePanel(startsBrowser = true) {
     const { panes, selected, files, file } = sidePanel();
@@ -675,19 +713,24 @@ export function createConversationViewScope(props: ConversationProps) {
       }
     },
   );
-  const shownSubagentId = () => (activeRightPanel() === "subagent" ? panelSubagentId() : null);
+  const shownSubagentId = () => (paneShown("subagent") ? panelSubagentId() : null);
   function toggleSubagentPanel(subagentId: string) {
     if (shownSubagentId() === subagentId) closeSidePanelPane("subagent");
     else openSubagentPanel(subagentId);
   }
   function closeSidePanelPane(pane: SidePanelPane) {
     sidePanelPaneActions[pane]?.release?.();
+    if (paneSplit(pane)) {
+      removeSplitPane(pane);
+      return;
+    }
     const shown = sidePanelOpen() && sidePanel().selected === pane;
     const next = removeSidePanelPane(pane);
     if (shown) showSidePanelInPlaceOf(next);
   }
   function closeBrowserPane() {
-    showSidePanelInPlaceOf(removeSidePanelPane("browser"));
+    if (paneSplit("browser")) removeSplitPane("browser");
+    else showSidePanelInPlaceOf(removeSidePanelPane("browser"));
   }
   function showSidePanelInPlaceOf(next: SidePanelPane | null) {
     const thread = sideThreadIds()[0];
@@ -972,6 +1015,9 @@ export function createConversationViewScope(props: ConversationProps) {
       setVoiceLimitReached((current) =>
         reached ? target : current?.agentId === target.agentId && current.serverId === target.serverId ? null : current,
       ),
+    offerVoiceLanguageChoice: (target) => {
+      if (claimVoiceLanguageNotice()) setVoiceLanguageChoice(target);
+    },
     hooks: {
       saveEdit: (...args) => actions.saveQueuedMessageEdit(...args),
       submit: (...args) => actions.submitMessage(...args),
@@ -1109,6 +1155,33 @@ export function createConversationViewScope(props: ConversationProps) {
     );
   };
   const dismissVoiceLimitNotice = () => setVoiceLimitReached(null);
+  const voiceLanguageNotice = () => {
+    const offered = voiceLanguageChoice();
+    return Boolean(
+      offered && offered.agentId === conversationOwnerId(props) && offered.serverId === (props.server?.id ?? "local"),
+    );
+  };
+  const dismissVoiceLanguageNotice = () => setVoiceLanguageChoice(null);
+  const chooseOtherVoiceLanguage = async () => {
+    const target = voiceLanguageChoice();
+    setVoiceLanguageChoice(null);
+    if (!target) return;
+    const voice = conversationRuntime(props).voice;
+    const { t, errorMessage } = currentText();
+    try {
+      await voice.setSettings({ modelId: "whisper-turbo", language: AUTOMATIC_VOICE_LANGUAGE });
+    } catch (error) {
+      setConversationError(target, errorMessage(error, t("settings.voice.saveFailed")));
+      return;
+    }
+    try {
+      const status = await voice.downloadModel({ modelId: "whisper-turbo" });
+      if (status.phase === "error")
+        setConversationError(target, errorMessage(status.message, t("settings.voice.downloadFailed")));
+    } catch (error) {
+      setConversationError(target, errorMessage(error, t("settings.voice.downloadFailed")));
+    }
+  };
   createEffect(
     () => voiceLimitNotice() && !currentDraft().text.trim(),
     (emptied) => {
@@ -1358,13 +1431,19 @@ export function createConversationViewScope(props: ConversationProps) {
   };
   let conversationPanel: HTMLElement | undefined;
   const [browserSurface, setBrowserSurface] = createSignal<HTMLDivElement>();
+  const [browserPaneSurface, setBrowserPaneSurface] = createSignal<HTMLDivElement>();
+  const browserWindowShown = () => browserWindowOpen() && props.browserEnabled !== false;
+  const shownBrowserSurface = () => {
+    if (browserExpandedOpen()) return browserSurface();
+    return browserWindowShown() ? undefined : browserPaneSurface();
+  };
   const [messageLinkRelay, setMessageLinkRelay] = createSignal<{
     url: string;
     target: ConversationTarget;
     page: McpSignInRelayPage;
   } | null>(null);
   let browserResizeObserver: ResizeObserver | undefined;
-  let browserWindowResizeHandler: (() => void) | undefined;
+  let browserBoundsListeners: AbortController | undefined;
   let browserVisibilityFrame: number | undefined;
   let browserBoundsFrame: number | undefined;
   let browserVisibilityGeneration = 0;
@@ -1804,7 +1883,61 @@ export function createConversationViewScope(props: ConversationProps) {
 
   function quoteSelection(messageId: string, text: string) {
     const quoted = limitedQuoteText(text);
+    const thread = previewSideThread(messageId);
+    if (thread) {
+      const quote = serializeChatTagReference("quote", quoted, messageId);
+      addToSideDraft(thread, (draft) => `${draft}${draft && !/\s$/u.test(draft) ? " " : ""}${quote} `);
+      return;
+    }
     setQuoteRequest((current) => ({ id: (current?.id ?? 0) + 1, messageId, text: quoted }));
+  }
+
+  function quotesShownPreview(quoteId: string): boolean {
+    const target = fileQuoteTarget(quoteId);
+    return target !== null && fileQuoteId({ ...target, lines: undefined }) === previewQuoteId();
+  }
+
+  function previewSideThread(quoteId?: string): { id: string; draftKey: string } | undefined {
+    if (quoteId !== undefined && !quotesShownPreview(quoteId)) return undefined;
+    const id = filePreviewOpen() ? sidebarFilePreview()?.threadId : undefined;
+    const draftKey = id && sideThreadIds().includes(id) ? threadComposer.sideDraftKey(id) : undefined;
+    return id && draftKey ? { id, draftKey } : undefined;
+  }
+
+  function addToSideDraft(thread: { id: string; draftKey: string }, update: (draft: string) => string) {
+    threadComposer.setText(thread.draftKey, update(threadComposer.draft(thread.draftKey).text));
+    openPanelThread(thread.id);
+    flush();
+    requestDraftFocus(thread.draftKey);
+  }
+
+  function addPreviewPageText(text: string) {
+    const thread = previewSideThread();
+    if (thread) addToSideDraft(thread, (draft) => draftWithPageText(draft, text));
+    else addPageText(text);
+  }
+
+  function setPreviewPageContext(attachmentId: string, text: string) {
+    const hasAttachment = (message: { attachments?: readonly { id: string }[] | undefined }) =>
+      message.attachments?.some((file) => file.id === attachmentId) === true;
+    const thread = previewSideThread();
+    if (!thread) {
+      const message = props.messages.find(hasAttachment);
+      if (message) setPageContext(message, text);
+      return;
+    }
+    const message = props.threads?.side.thread(thread.id)?.conversation?.messages.find(hasAttachment);
+    const next = message && draftWithPageContext(threadComposer.draft(thread.draftKey).text, message.id, text);
+    if (next !== undefined) threadComposer.setText(thread.draftKey, next);
+  }
+
+  async function sendMessageSelection(messageId: string, body: string): Promise<boolean> {
+    const thread = previewSideThread(messageId);
+    const side = thread ? props.threads?.side.thread(thread.id) : undefined;
+    if (!thread || !side) return sendSelectionInstruction(messageId, body);
+    const sent = await side.onSend(body, [], null);
+    if (sent) openPanelThread(thread.id);
+    return sent;
   }
 
   const taggableBrowserTabs = createMemo(() =>
@@ -2150,7 +2283,6 @@ export function createConversationViewScope(props: ConversationProps) {
     },
   );
 
-  const browserWindowShown = () => browserWindowOpen() && props.browserEnabled !== false;
   const browserCanDetach = () =>
     !props.runtime && (props.server?.kind !== "remote" || serverSupportsCapability(props.server, "browser-view"));
   createEffect(
@@ -2173,29 +2305,35 @@ export function createConversationViewScope(props: ConversationProps) {
   );
 
   const browserPageVisible = () =>
-    browserExpandedOpen() &&
-    Boolean(browserSurface()) &&
+    Boolean(shownBrowserSurface()) &&
     !props.browserVisibilitySuspended &&
     !props.globalOverlayOpen &&
+    !dialogShown() &&
     !props.remoteDesktopVisible;
   createEffect(
-    () => props.browserEnabled !== false && browserPageVisible() && !props.runtime && props.server?.kind === "local",
+    () =>
+      props.browserEnabled !== false &&
+      browserExpandedOpen() &&
+      browserPageVisible() &&
+      !props.runtime &&
+      props.server?.kind === "local",
     (shown) => (shown ? holdNativeBrowserPage() : undefined),
   );
   createEffect(
     () => ({
       agentId: props.agent?.id,
       browserEnabled: props.browserEnabled !== false,
-      surface: browserSurface(),
+      surface: shownBrowserSurface(),
       visible: browserPageVisible(),
+      sidePanelPage: !browserExpandedOpen() && !props.runtime && props.server?.kind === "local",
     }),
-    ({ agentId, browserEnabled, visible, surface }) => {
+    ({ agentId, browserEnabled, visible, surface, sidePanelPage }) => {
       const generation = ++browserVisibilityGeneration;
       if (browserVisibilityFrame !== undefined) cancelAnimationFrame(browserVisibilityFrame);
       browserResizeObserver?.disconnect();
       browserResizeObserver = undefined;
-      if (browserWindowResizeHandler) window.removeEventListener("resize", browserWindowResizeHandler);
-      browserWindowResizeHandler = undefined;
+      browserBoundsListeners?.abort();
+      browserBoundsListeners = undefined;
       if (browserBoundsFrame !== undefined) cancelAnimationFrame(browserBoundsFrame);
       browserBoundsFrame = undefined;
       if (!browserEnabled) return;
@@ -2203,12 +2341,13 @@ export function createConversationViewScope(props: ConversationProps) {
         void conversationRuntime(props).browser.setVisible({ visible: false, target: "main" });
         return;
       }
+      const pageInset = sidePanelPage ? reserveNativeBrowserPageInset() : undefined;
       browserVisibilityFrame = requestAnimationFrame(() => {
         browserVisibilityFrame = undefined;
         if (
           generation !== browserVisibilityGeneration ||
           props.agent?.id !== agentId ||
-          !browserExpandedOpen() ||
+          shownBrowserSurface() !== surface ||
           !surface?.isConnected
         ) {
           return;
@@ -2217,12 +2356,13 @@ export function createConversationViewScope(props: ConversationProps) {
           if (
             generation !== browserVisibilityGeneration ||
             props.agent?.id !== agentId ||
-            !browserExpandedOpen() ||
+            shownBrowserSurface() !== surface ||
             !surface?.isConnected
           ) {
             return;
           }
           const bounds = surface.getBoundingClientRect();
+          pageInset?.update(Math.max(0, window.innerWidth - bounds.x));
           void conversationRuntime(props).browser.setVisible({
             visible: true,
             target: "main",
@@ -2245,9 +2385,18 @@ export function createConversationViewScope(props: ConversationProps) {
         browserResizeObserver = new ResizeObserver(scheduleBoundsSync);
         browserResizeObserver.observe(surface);
         if (conversationPanel) browserResizeObserver.observe(conversationPanel);
-        browserWindowResizeHandler = scheduleBoundsSync;
-        window.addEventListener("resize", browserWindowResizeHandler);
+        browserBoundsListeners = new AbortController();
+        const { signal } = browserBoundsListeners;
+        window.addEventListener("resize", scheduleBoundsSync, { signal });
+        conversationPanel?.addEventListener(
+          "transitionend",
+          (event) => {
+            if (event.target === event.currentTarget) scheduleBoundsSync();
+          },
+          { signal },
+        );
       });
+      return () => pageInset?.release();
     },
   );
 
@@ -2310,7 +2459,7 @@ export function createConversationViewScope(props: ConversationProps) {
     if (browserVisibilityFrame !== undefined) cancelAnimationFrame(browserVisibilityFrame);
     if (browserBoundsFrame !== undefined) cancelAnimationFrame(browserBoundsFrame);
     browserResizeObserver?.disconnect();
-    if (browserWindowResizeHandler) window.removeEventListener("resize", browserWindowResizeHandler);
+    browserBoundsListeners?.abort();
     removeBrowserPictureInPictureListener();
     removeBrowserWindowListener();
     if (props.browserEnabled !== false) {
@@ -2501,22 +2650,38 @@ export function createConversationViewScope(props: ConversationProps) {
   const setBrowserSurfaceElement = (element: HTMLDivElement | undefined) => {
     setBrowserSurface(element);
   };
+  const setBrowserPaneSurfaceElement = (element: HTMLDivElement | undefined) => {
+    setBrowserPaneSurface(element);
+  };
+  const releaseBrowserPaneSurface = (element: HTMLDivElement | undefined) => {
+    if (element && untrack(browserPaneSurface) === element) setBrowserPaneSurface(undefined);
+  };
   const setAttachmentPickerElement = (element: HTMLInputElement) => {
     attachmentPicker = element;
   };
+  if (channel)
+    createEffect(
+      () => ({ view: channel.replyView(), serverId: props.server?.id ?? "local" }),
+      ({ view, serverId }) => followDictatedChannelReply({ serverId, agentId: channel.id }, view),
+    );
   const voiceConversationAvailable = () =>
-    !channel &&
-    (!props.runtime ||
-      (props.runtime.liveVoice !== undefined && codexLiveAccess(props.agentStatus.providers) !== "signIn"));
-  const voiceConversationOpen = () => Boolean(props.agent && controller.voiceSessions.active(props.agent.id));
+    channel
+      ? !props.runtime
+      : !props.runtime ||
+        (props.runtime.liveVoice !== undefined && codexLiveAccess(props.agentStatus.providers) !== "signIn");
+  const voiceConversationOpen = () => {
+    const ownerId = conversationOwnerId(props);
+    return Boolean(ownerId && controller.voiceSessions.active(ownerId));
+  };
   function toggleVoiceConversation() {
-    const agentId = props.agent?.id;
-    if (!agentId) return;
-    if (controller.voiceSessions.active(agentId)) controller.voiceSessions.stop(agentId);
-    else if (voiceConversationAvailable()) controller.voiceSessions.start(agentId);
+    const ownerId = conversationOwnerId(props);
+    if (!ownerId) return;
+    if (controller.voiceSessions.active(ownerId)) controller.voiceSessions.stop(ownerId);
+    else if (voiceConversationAvailable()) controller.voiceSessions.start(ownerId);
   }
   function endVoiceConversation() {
-    if (props.agent) controller.voiceSessions.stop(props.agent.id);
+    const ownerId = conversationOwnerId(props);
+    if (ownerId) controller.voiceSessions.stop(ownerId);
   }
   onCleanup(() => controller.voiceSessions.end("transcribed"));
   const startVoiceConversation = (agentId: string) =>
@@ -2527,7 +2692,9 @@ export function createConversationViewScope(props: ConversationProps) {
       submit: (draft, target, submittedSnapshot, voice) =>
         actions.submitMessage(draft, target, submittedSnapshot, voice),
       serverOnline: () => props.server?.kind !== "remote" || props.server.state === "online",
-      progressUpdate: (message) => isNarrationItemId(message.id, props.agent?.provider),
+      progressUpdate: (message) => !channel && isNarrationItemId(message.id, props.agent?.provider),
+      keepsRecording: !channel,
+      inChannel: Boolean(channel),
     });
 
   return {
@@ -2562,6 +2729,8 @@ export function createConversationViewScope(props: ConversationProps) {
     conversationPanelElement,
     setAgentActivitySlotElement,
     setBrowserSurfaceElement,
+    setBrowserPaneSurfaceElement,
+    releaseBrowserPaneSurface,
     setChatSearchInputElement,
     setConversationPanelElement,
     setAttachmentPickerElement,
@@ -2582,6 +2751,8 @@ export function createConversationViewScope(props: ConversationProps) {
     openBrowserTakeoverTab,
     openWaitingAgent,
     canOpenBrowserTakeoverTab,
+    browserTabNotice,
+    noticeBrowserTabs,
     localSignIn,
     activeChatSearchIndex,
     agentActivity,
@@ -2594,6 +2765,7 @@ export function createConversationViewScope(props: ConversationProps) {
     browserTabOwner,
     attachmentAction,
     attachmentDownloads,
+    imageCopies,
     attachmentBusy,
     uploadFailed,
     currentUploads,
@@ -2629,6 +2801,7 @@ export function createConversationViewScope(props: ConversationProps) {
     currentChatErrorRun,
     currentChatErrorLink,
     currentChatErrorDetails,
+    currentChatErrorNotice,
     currentChatConversationKey,
     dismissCurrentChatErrors,
     dismissAwaitingReplies,
@@ -2661,6 +2834,10 @@ export function createConversationViewScope(props: ConversationProps) {
     scrollFades,
     filesOpen,
     activeRightPanel,
+    sideSplits,
+    paneSplit,
+    paneShown,
+    moveSidePanelPane,
     panelSubagentId,
     shownSubagentId,
     shownPanelThreadId,
@@ -2727,6 +2904,7 @@ export function createConversationViewScope(props: ConversationProps) {
     editPendingSend,
     dismissPendingSend,
     presentedQueueDeliveries,
+    openFileFromThread,
     previewAttachment,
     props,
     queuePanelVisible,
@@ -2736,6 +2914,9 @@ export function createConversationViewScope(props: ConversationProps) {
     navigateBrowserTab,
     reloadBrowserTab,
     stopBrowserTab,
+    answerBrowserPermission,
+    permissionAnswerPending,
+    answerBrowserHttpSignIn,
     removeAttachment,
     renderedAgentActivity,
     activeStepActivity,
@@ -2747,7 +2928,9 @@ export function createConversationViewScope(props: ConversationProps) {
     replyTarget,
     replyToMessage,
     addPageText,
+    addPreviewPageText,
     setPageContext,
+    setPreviewPageContext,
     skillSettingsRequest,
     openSkillSettings,
     clearSkillSettingsRequest,
@@ -2763,7 +2946,7 @@ export function createConversationViewScope(props: ConversationProps) {
     screenOpen,
     selectAndConfirmModel,
     selectAndConfirmReasoning,
-    sendSelectionInstruction,
+    sendMessageSelection,
     sendCardMessage,
     sendCardFile,
     saveSkillSuggestion,
@@ -2827,6 +3010,9 @@ export function createConversationViewScope(props: ConversationProps) {
     voiceLevels,
     voiceLimitNotice,
     dismissVoiceLimitNotice,
+    voiceLanguageNotice,
+    dismissVoiceLanguageNotice,
+    chooseOtherVoiceLanguage,
     voiceLiveText,
     voicePhase,
     voiceThreadKey,

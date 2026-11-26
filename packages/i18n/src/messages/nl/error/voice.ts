@@ -34,6 +34,10 @@ export const messages = {
   "error.voice.live.timedOut": "Codex live spraak is niet op tijd gestart. Probeer het opnieuw.",
   "error.voice.live.failed": "Live spraak is gestopt: {reason}",
   "error.voice.live.disconnected": "Live spraak is verbroken.",
+  "error.voice.live.connectionLost":
+    "Live spraak heeft de verbinding verloren. Zet de microfoon weer aan om opnieuw te starten.",
+  "error.voice.live.startFailed":
+    "Live spraak kon niet starten. Werk Codex bij en log in met ChatGPT op de computer waarop de agent draait, en probeer het dan opnieuw. Reden: {reason}",
   "error.voice.live.hostFailed":
     "Codex op de server kon live spraak niet starten. Vraag de eigenaar om Codex op die computer bij te werken en in te loggen met ChatGPT, en probeer het dan opnieuw.",
   "error.voice.live.signIn": "Meld je met je ChatGPT-account aan bij Codex om live spraak te gebruiken.",
@@ -44,4 +48,6 @@ export const messages = {
   "error.voice.live.refused":
     "OpenAI weigerde live spraak te starten. Probeer het later opnieuw, of zet live spraak uit in Instellingen om met je stem te praten.",
   "error.voice.live.off": "Codex live spraak staat uit. Zet het aan in Instellingen → Spraak.",
+  "error.voice.server.modelUnsupported":
+    "{host} kan niet transcriberen met {model}. Kies in Instellingen een ander dicteermodel voor de spraakserver.",
 } as const satisfies PartialTranslation<typeof source>;

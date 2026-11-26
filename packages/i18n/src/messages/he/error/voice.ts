@@ -31,6 +31,9 @@ export const messages = {
   "error.voice.live.timedOut": "הקול החי של Codex לא התחיל בזמן. יש לנסות שוב.",
   "error.voice.live.failed": "הקול החי נעצר: {reason}",
   "error.voice.live.disconnected": "הקול החי התנתק.",
+  "error.voice.live.connectionLost": "הקול החי איבד את החיבור. בטלו את השתקת המיקרופון כדי להפעיל אותו שוב.",
+  "error.voice.live.startFailed":
+    "לא ניתן היה להפעיל את הקול החי. עדכנו את Codex והיכנסו עם ChatGPT במחשב שמריץ את הסוכן, ואז נסו שוב. סיבה: {reason}",
   "error.voice.live.hostFailed":
     "Codex בשרת לא הצליח להפעיל את הקול החי. בקשו מהבעלים לעדכן את Codex במחשב הזה ולהיכנס עם ChatGPT, ואז נסו שוב.",
   "error.voice.live.signIn": "יש להתחבר ל-Codex עם חשבון ChatGPT כדי להשתמש בקול חי.",
@@ -45,4 +48,6 @@ export const messages = {
   "error.voice.server.invalidAnswer": "{host} לא שלח תשובה תואמת OpenAI.",
   "error.voice.server.invalidAudio": "{host} שלח אודיו ש-OpenBot לא יכול להשמיע. יש להשתמש בשרת ששולח WAV.",
   "error.voice.server.tooLarge": "התשובה מ-{host} גדולה מדי.",
+  "error.voice.server.modelUnsupported":
+    "{host} לא יכול לתמלל עם {model}. יש לבחור מודל הכתבה אחר לשרת הקול בהגדרות ← קול.",
 } as const satisfies PartialTranslation<typeof source>;

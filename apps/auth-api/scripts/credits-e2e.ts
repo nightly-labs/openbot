@@ -10,13 +10,22 @@ import {
   type CreditActivityEntry,
   creditLookupKey,
   creditStops,
+  formatCreditCode,
   parseCreditActivity,
+  parseCreditRedeemRequest,
   parseCreditTransferRequest,
 } from "@openbot/contracts/credits";
 import { Effect } from "effect";
 import { createAccountAnalytics } from "../src/server/account-analytics";
 import { BillingError, type BillingOperationError } from "../src/server/billing-errors";
 import { CREDIT_AUDIT_RETENTION_MS, CreditAudit } from "../src/server/credit-audit";
+import {
+  CREDIT_CODE_LIMIT_WINDOW_MS,
+  CREDIT_CODE_LIMITS,
+  type CreditCodeLimit,
+  creditCodeHash,
+  generateCreditCode,
+} from "../src/server/credit-codes";
 import { CreditGrants, licenseCreditSlot } from "../src/server/credit-grants";
 import type { CreditService } from "../src/server/credit-service";
 import {
@@ -25,6 +34,7 @@ import {
   CREDIT_HOLD_START_GRACE_MS,
   type CreditJobCheck,
   CreditSpending,
+  type CreditWallet,
 } from "../src/server/credit-spending";
 import { createHostedBilling } from "../src/server/hosted-billing";
 import { RemoteControlPlane } from "../src/server/remote-control-plane";
@@ -67,7 +77,9 @@ function check(name: string, passed: boolean, detail?: unknown) {
   checks.push({ name, passed, ...(detail === undefined ? {} : { detail }) });
 }
 
-function migratedDatabase(): DatabaseSync {
+type WelcomeStart = "used" | "unissued";
+
+function migratedDatabase(welcome: WelcomeStart): DatabaseSync {
   const database = new DatabaseSync(":memory:");
   database.exec("PRAGMA foreign_keys = ON");
   for (const name of readdirSync(MIGRATIONS).sort()) database.exec(readFileSync(join(MIGRATIONS, name), "utf8"));
@@ -75,6 +87,13 @@ function migratedDatabase(): DatabaseSync {
     database
       .prepare("INSERT INTO users(id, identity_key, email, created_at, updated_at) VALUES (?, ?, ?, 1, 1)")
       .run(user.id, `email:${user.email}`, user.email);
+    if (welcome === "used") {
+      database
+        .prepare(
+          "INSERT INTO credit_grants(grant_id, user_id, credits_tenths, remaining_tenths, source, scope, starts_at, expires_at, created_at) VALUES (?, ?, 100, 0, 'welcome', 'welcome', 0, ?, 0)",
+        )
+        .run(`welcome:${user.id}`, user.id, Date.UTC(9999, 11, 31));
+    }
   }
   database.exec(`
     INSERT INTO remote_hosts(host_id, owner_user_id, name, created_at, updated_at)
@@ -256,8 +275,8 @@ function addOwnedServer(database: DatabaseSync, serverId: string) {
   `);
 }
 
-async function harness() {
-  const database = migratedDatabase();
+async function harness(welcome: WelcomeStart = "used") {
+  const database = migratedDatabase(welcome);
   const stripe = fakeStripe();
   const work: Promise<void>[] = [];
   const { billing } = createHostedBilling(
@@ -1430,7 +1449,7 @@ async function freeMonthlyCredits() {
     (
       await d1
         .prepare(
-          "SELECT grant_id, user_id, server_id, credits_tenths / 10.0 AS credits, remaining_tenths / 10.0 AS remaining, starts_at, expires_at, status FROM credit_grants WHERE user_id = ?1 OR server_id = ?1 ORDER BY created_at, grant_id",
+          "SELECT grant_id, user_id, server_id, credits_tenths / 10.0 AS credits, remaining_tenths / 10.0 AS remaining, starts_at, expires_at, status FROM credit_grants WHERE (user_id = ?1 OR server_id = ?1) AND scope = 'all' ORDER BY created_at, grant_id",
         )
         .bind(user)
         .all<GrantRow>()
@@ -1611,12 +1630,473 @@ async function freeMonthlyCredits() {
   );
 }
 
+async function welcomeCredits() {
+  const { database, credits, deliver, session, state, analytics, creditEvents } = await harness("unissued");
+  const spending = new CreditSpending({ database: sqliteD1(database), now: () => Date.now(), analytics });
+  const run = <A>(effect: Effect.Effect<A, BillingError | BillingOperationError>) => Effect.runPromise(effect);
+  const hold = (jobId: string, amount: number, welcome: boolean, wallet: CreditWallet = { userId: OWNER.id }) =>
+    spending.hold({ jobId, wallet, actorUserId: OWNER.id, modelId: "image-model", credits: amount, welcome });
+  const welcomeGrant = () =>
+    database
+      .prepare(
+        "SELECT credits_tenths / 10.0 AS credits, remaining_tenths / 10.0 AS remaining, status FROM credit_grants WHERE grant_id = ?",
+      )
+      .get(`welcome:${OWNER.id}`);
+  const ledgerRows = () =>
+    database
+      .prepare("SELECT kind, amount_tenths / 10.0 AS amount FROM credit_ledger WHERE user_id = ? ORDER BY entry_id")
+      .all(OWNER.id);
+
+  const first = await state(OWNER.id);
+  const second = await state(OWNER.id);
+  const granted = eventsOf(await creditEvents(), OWNER.id, { action: "granted", wallet: "personal", credits: 10 });
+  check(
+    "a new account gets 10 free credits once, with one ledger entry and one event",
+    first.balance === 10 &&
+      first.welcome === 10 &&
+      first.expiring === undefined &&
+      second.balance === 10 &&
+      second.welcome === 10 &&
+      JSON.stringify(ledgerRows()) === JSON.stringify([{ kind: "grant", amount: 10 }]) &&
+      granted.length === 1,
+    { first, second, ledger: ledgerRows(), granted: granted.length },
+  );
+
+  const paidOnly = await failure(hold("w-paid", 2, false));
+  const move = await failure(credits.transfer(OWNER.id, { serverId: SERVER_ID, direction: "to_server", credits: 5 }));
+  const serverHold = await failure(hold("w-server", 2, true, { serverId: SERVER_ID }));
+  check(
+    "free credits cannot pay a model without free use, a move to a server, or a server generation",
+    paidOnly.code === "credits_spend_not_enough" &&
+      move.code === "credits_not_enough" &&
+      serverHold.code === "credits_spend_not_enough" &&
+      (await state(OWNER.id)).welcome === 10,
+    { paidOnly, move, serverHold },
+  );
+
+  const free = await run(hold("w-1", 4.5, true));
+  const whileHeld = await state(OWNER.id);
+  await run(spending.settle("w-1", { outcome: "completed" }));
+  const afterFree = await state(OWNER.id);
+  check(
+    "a model with free use holds and charges the free credits",
+    free.funding === "welcome" &&
+      whileHeld.balance === 5.5 &&
+      whileHeld.welcome === 5.5 &&
+      afterFree.balance === 5.5 &&
+      afterFree.welcome === 5.5 &&
+      JSON.stringify(welcomeGrant()) === JSON.stringify({ credits: 10, remaining: 5.5, status: "active" }),
+    { free, whileHeld, afterFree, grant: welcomeGrant() },
+  );
+
+  await deliver("checkout.session.completed", {
+    ...session("cs_w1", OWNER.id, 10_000, 2_000),
+    payment_status: "paid",
+    payment_intent: "pi_w1",
+  });
+  const tooBigForFree = await run(hold("w-2", 8.5, true));
+  await run(spending.settle("w-2", { outcome: "completed" }));
+  const paidHold = await run(hold("w-3", 20, false));
+  await run(spending.settle("w-3", { outcome: "completed" }));
+  const afterPaid = await state(OWNER.id);
+  check(
+    "a hold that the free credits cannot cover uses paid credits, and paid generations keep the free credits",
+    tooBigForFree.funding === "paid" &&
+      paidHold.funding === "paid" &&
+      afterPaid.balance === 2_000 - 8.5 - 20 + 5.5 &&
+      afterPaid.welcome === 5.5 &&
+      JSON.stringify(welcomeGrant()) === JSON.stringify({ credits: 10, remaining: 5.5, status: "active" }),
+    { tooBigForFree, paidHold, afterPaid, grant: welcomeGrant() },
+  );
+
+  const moved = await run(
+    credits.transfer(OWNER.id, { serverId: SERVER_ID, direction: "to_server", credits: 2_000 - 8.5 - 20 }),
+  );
+  const tooFar = await failure(credits.transfer(OWNER.id, { serverId: SERVER_ID, direction: "to_server", credits: 1 }));
+  check(
+    "a move to a server takes all paid credits but never the free credits",
+    moved.balance === 5.5 && tooFar.code === "credits_not_enough" && (await state(OWNER.id)).welcome === 5.5,
+    { moved, tooFar },
+  );
+  await run(credits.transfer(OWNER.id, { serverId: SERVER_ID, direction: "to_personal", credits: 1_000 }));
+
+  const refund = {
+    id: "re_w1",
+    object: "refund",
+    status: "succeeded",
+    payment_intent: "pi_w1",
+    amount: 10_000,
+    currency: "eur",
+  };
+  await deliver("refund.created", refund);
+  const refunded = await state(OWNER.id);
+  check(
+    "a refund takes back paid credits only and keeps the free credits",
+    refunded.balance === 5.5 && refunded.welcome === 5.5,
+    refunded,
+  );
+}
+
+async function creditCodes() {
+  const { database, stripe, credits, state, creditEvents } = await harness();
+  const now = Date.now();
+  const made: string[] = [];
+  const addresses: string[] = [];
+  const addCode = async (
+    id: string,
+    credits: number,
+    options: { max?: number; expiresAt?: number; disabled?: boolean; campaign?: string } = {},
+  ) => {
+    const code = generateCreditCode();
+    made.push(code);
+    database
+      .prepare(
+        `INSERT INTO credit_codes(code_id, code_hash, credits_tenths, max_redemptions, grant_days, expires_at, campaign, created_at, disabled_at)
+         VALUES (?, ?, ?, ?, 30, ?, ?, ?, ?)`,
+      )
+      .run(
+        id,
+        await creditCodeHash(code),
+        credits * 10,
+        options.max ?? 1,
+        options.expiresAt ?? null,
+        options.campaign ?? "",
+        now - 1,
+        options.disabled ? now - 1 : null,
+      );
+    return code;
+  };
+  const addUsers = (prefix: string, count: number) =>
+    Array.from({ length: count }, (_, index) => {
+      const id = `${prefix}-${index}`;
+      database
+        .prepare("INSERT INTO users(id, identity_key, email, created_at, updated_at) VALUES (?, ?, ?, 1, 1)")
+        .run(id, `email:${id}@example.test`, `${id}@example.test`);
+      return id;
+    });
+  const network = (last: number) => {
+    const address = `198.51.100.${last}`;
+    addresses.push(address);
+    return address;
+  };
+  const home = network(7);
+  const redeem = (userId: string, code: string, options: { serverId?: string; from?: string } = {}) =>
+    credits.redeem(
+      userId,
+      options.serverId === undefined ? { code } : { code, serverId: options.serverId },
+      options.from ?? home,
+    );
+  const nextHour = () =>
+    database.prepare("UPDATE credit_code_limits SET window_start = window_start - ?").run(CREDIT_CODE_LIMIT_WINDOW_MS);
+  const clearLimits = () => database.prepare("DELETE FROM credit_code_limits").run();
+  const limitedBy = async (limit: CreditCodeLimit) => {
+    await creditEvents();
+    return stripe.tracked.filter(
+      (event) =>
+        event.name === "credit_code_redeem" &&
+        event.properties.get("outcome") === "rate_limited" &&
+        event.properties.get("limit") === limit,
+    ).length;
+  };
+
+  const generated = Array.from({ length: 2_000 }, generateCreditCode);
+  check(
+    "generated codes have 16 characters from the 32-character alphabet and do not repeat",
+    new Set(generated).size === generated.length &&
+      generated.every((code) => /^[2-9A-HJ-NP-Z]{16}$/.test(code)) &&
+      new Set(generated.join("")).size === 32,
+  );
+
+  const single = await addCode("code-single", 500, { campaign: "launch-week" });
+  const typed = formatCreditCode(single).toLowerCase().replaceAll("-", " - ");
+  const won = await Effect.runPromise(redeem(OWNER.id, typed));
+  check(
+    "a code typed in lower case with spaces and dashes gives its credits to the personal wallet",
+    won.credits === 500 && won.state.balance === 500,
+    won,
+  );
+  const grant = database
+    .prepare(
+      "SELECT user_id, server_id, credits_tenths, source, expires_at - starts_at AS days FROM credit_grants WHERE source = 'code:code-single'",
+    )
+    .get();
+  check(
+    "the redemption is a free grant that ends after the grant days of the code",
+    grant?.user_id === OWNER.id &&
+      grant.server_id === null &&
+      grant.credits_tenths === 5_000 &&
+      grant.days === 30 * DAY_MS,
+    grant,
+  );
+  check(
+    "the same account cannot redeem a code two times",
+    (await failure(redeem(OWNER.id, single))).code === "credit_code_redeemed",
+  );
+  check(
+    "another account cannot redeem a code that has no redemptions left",
+    (await failure(redeem(MEMBER.id, single))).code === "credit_code_used",
+  );
+  const second = await addCode("code-second", 25);
+  const secondWon = await Effect.runPromise(redeem(OWNER.id, second));
+  check(
+    "one account can redeem different codes",
+    secondWon.credits === 25 && secondWon.state.balance === 525,
+    secondWon,
+  );
+
+  const shared = await addCode("code-shared", 50, { max: 2, campaign: "partners" });
+  const serverWon = await Effect.runPromise(redeem(MEMBER.id, shared, { serverId: SERVER_ID }));
+  check(
+    "a member can redeem a code for the server wallet",
+    serverWon.credits === 50 && serverWon.state.servers.find((item) => item.serverId === SERVER_ID)?.balance === 50,
+    serverWon,
+  );
+  check(
+    "an account cannot redeem a code for a server that it is not a member of",
+    (await failure(redeem(OUTSIDER.id, shared, { serverId: SERVER_ID }))).code === "credits_server_member",
+  );
+  const racers = await Promise.allSettled([
+    Effect.runPromise(redeem(OWNER.id, shared)),
+    Effect.runPromise(redeem(OUTSIDER.id, shared)),
+  ]);
+  const sharedRow = database.prepare("SELECT redemptions FROM credit_codes WHERE code_id = 'code-shared'").get();
+  check(
+    "two accounts that redeem the last use at the same time get it only one time",
+    racers.filter((item) => item.status === "fulfilled").length === 1 && sharedRow?.redemptions === 2,
+    { racers: racers.map((item) => item.status), sharedRow },
+  );
+
+  const expired = await addCode("code-expired", 10, { expiresAt: now - 1 });
+  const disabled = await addCode("code-disabled", 10, { disabled: true });
+  check(
+    "an expired code and a disabled code give nothing",
+    (await failure(redeem(MEMBER.id, expired))).code === "credit_code_expired" &&
+      (await failure(redeem(MEMBER.id, disabled))).code === "credit_code_invalid",
+  );
+  check(
+    "a code with a wrong letter is not valid",
+    (await failure(redeem(MEMBER.id, `${single.slice(0, -1)}${single.endsWith("2") ? "3" : "2"}`))).code ===
+      "credit_code_invalid",
+  );
+  check(
+    "the request parser refuses a code that is not text, a long code and a wrong server ID",
+    parseCreditRedeemRequest({ code: 1 }) === null &&
+      parseCreditRedeemRequest({ code: "A".repeat(65) }) === null &&
+      parseCreditRedeemRequest({ code: single, serverId: "" }) === null &&
+      parseCreditRedeemRequest({ code: single })?.code === single,
+  );
+
+  clearLimits();
+  const guesser = OUTSIDER.id;
+  const guesserNetwork = network(10);
+  for (let attempt = 0; attempt < CREDIT_CODE_LIMITS.account_wrong; attempt += 1) {
+    await failure(redeem(guesser, generateCreditCode(), { from: guesserNetwork }));
+  }
+  const fresh = await addCode("code-fresh", 20);
+  check(
+    `after ${CREDIT_CODE_LIMITS.account_wrong} wrong codes in one hour, a correct code also waits, from any network`,
+    (await failure(redeem(guesser, fresh, { from: guesserNetwork }))).code === "credit_code_attempts" &&
+      (await failure(redeem(guesser, fresh, { from: network(11) }))).code === "credit_code_attempts" &&
+      (await limitedBy("account_wrong")) === 2,
+  );
+  nextHour();
+  const afterWait = await Effect.runPromise(redeem(guesser, fresh, { from: guesserNetwork }));
+  check("after one hour the account can redeem again", afterWait.credits === 20, afterWait);
+
+  clearLimits();
+  const usedTries: string[] = [];
+  for (let attempt = 0; attempt <= CREDIT_CODE_LIMITS.account_wrong; attempt += 1) {
+    usedTries.push((await failure(redeem(MEMBER.id, single))).code);
+  }
+  const stillOpen = await addCode("code-still-open", 2);
+  const afterUsed = await Effect.runPromise(redeem(MEMBER.id, stillOpen));
+  check(
+    "a code that is used, expired or redeemed before is not a wrong code: the account can still redeem",
+    usedTries.every((code) => code === "credit_code_used") && afterUsed.credits === 2,
+    { usedTries, afterUsed: afterUsed.credits },
+  );
+
+  clearLimits();
+  const crowd = addUsers("crowd", CREDIT_CODE_LIMITS.network_wrong / 5);
+  const crowdNetwork = network(20);
+  for (const user of crowd) {
+    for (let attempt = 0; attempt < 5; attempt += 1) {
+      await failure(redeem(user, generateCreditCode(), { from: crowdNetwork }));
+    }
+  }
+  const neighbour = await addCode("code-neighbour", 5);
+  check(
+    `after ${CREDIT_CODE_LIMITS.network_wrong} wrong codes from one network, other accounts on that network wait`,
+    (await failure(redeem(MEMBER.id, neighbour, { from: crowdNetwork }))).code === "credit_code_attempts" &&
+      (await limitedBy("network_wrong")) === 1,
+  );
+  const elsewhere = await Effect.runPromise(redeem(MEMBER.id, neighbour, { from: network(21) }));
+  check("an account on another network is not stopped by that network", elsewhere.credits === 5, elsewhere);
+
+  clearLimits();
+  const open = await addCode("code-open", 1, { max: 1_000 });
+  const busy = OUTSIDER.id;
+  const busyNetwork = network(30);
+  for (let attempt = 0; attempt < CREDIT_CODE_LIMITS.account_tries; attempt += 1) {
+    await failure(redeem(busy, open, { serverId: SERVER_ID, from: busyNetwork }));
+  }
+  check(
+    `after ${CREDIT_CODE_LIMITS.account_tries} tries in one hour, an account waits even when no code was wrong`,
+    (await failure(redeem(busy, open, { from: network(31) }))).code === "credit_code_attempts" &&
+      (await limitedBy("account_tries")) === 1,
+  );
+  for (let attempt = 0; attempt < CREDIT_CODE_LIMITS.network_tries; attempt += 1) {
+    await failure(redeem(busy, open, { from: busyNetwork }));
+  }
+  const [busyNeighbour] = addUsers("busy-neighbour", 1);
+  const busyNeighbourWon = await Effect.runPromise(redeem(busyNeighbour ?? "", open, { from: busyNetwork }));
+  check(
+    "tries that an account limit refuses do not count against the network",
+    busyNeighbourWon.credits === 1,
+    busyNeighbourWon,
+  );
+
+  clearLimits();
+  const flood = addUsers("flood", CREDIT_CODE_LIMITS.network_tries / CREDIT_CODE_LIMITS.account_tries + 1);
+  const floodNetwork = network(40);
+  const floodLast = flood.at(-1) ?? "";
+  for (const user of flood.slice(0, -1)) {
+    for (let attempt = 0; attempt < CREDIT_CODE_LIMITS.account_tries; attempt += 1) {
+      await failure(redeem(user, open, { serverId: SERVER_ID, from: floodNetwork }));
+    }
+  }
+  check(
+    `after ${CREDIT_CODE_LIMITS.network_tries} tries from one network, a new account on it waits`,
+    (await failure(redeem(floodLast, open, { from: floodNetwork }))).code === "credit_code_attempts" &&
+      (await limitedBy("network_tries")) === 1,
+  );
+  const floodElsewhere = await Effect.runPromise(redeem(floodLast, open, { from: network(41) }));
+  check("the same account can redeem from another network", floodElsewhere.credits === 1, floodElsewhere);
+
+  clearLimits();
+  const promo = await addCode("code-promo", 3, { max: 1_000, campaign: "spring-promo" });
+  const farm = addUsers("farm", CREDIT_CODE_LIMITS.network_code + 1);
+  const farmNetwork = network(50);
+  const farmed: boolean[] = [];
+  for (const user of farm) {
+    farmed.push(
+      await Effect.runPromise(redeem(user, promo, { from: farmNetwork })).then(
+        () => true,
+        () => false,
+      ),
+    );
+  }
+  const promoRow = database.prepare("SELECT redemptions FROM credit_codes WHERE code_id = 'code-promo'").get();
+  check(
+    `one network redeems one shared code for at most ${CREDIT_CODE_LIMITS.network_code} accounts in one hour`,
+    farmed.filter(Boolean).length === CREDIT_CODE_LIMITS.network_code &&
+      promoRow?.redemptions === CREDIT_CODE_LIMITS.network_code &&
+      (await limitedBy("network_code")) === 1,
+    { promoRow },
+  );
+  const farmLast = farm.at(-1) ?? "";
+  const farmElsewhere = await Effect.runPromise(redeem(farmLast, promo, { from: network(51) }));
+  check("the stopped account can redeem the shared code from another network", farmElsewhere.credits === 3);
+
+  const activity = await Effect.runPromise(credits.activity(OWNER.id));
+  check(
+    "the activity shows the redeemed credits as free credits from the account",
+    activity.entries.some((item) => item.kind === "free" && item.credits === 500 && item.actor === "you"),
+    activity.entries.filter((item) => item.kind === "free"),
+  );
+  const ownerState = await state(OWNER.id);
+  const ownerWonRace = racers[0].status === "fulfilled";
+  check("the redeemed credits are in the balance", ownerState.balance === (ownerWonRace ? 575 : 525), {
+    ownerWonRace,
+    balance: ownerState.balance,
+  });
+
+  const limits = database.prepare("SELECT * FROM credit_code_limits").all();
+  const limitText = JSON.stringify(limits);
+  check(
+    "the limit table keeps only hashed keys: no account ID, network address or code",
+    limits.length > 0 &&
+      limits.every((row) => typeof row.key_hash === "string" && /^[0-9a-f]{64}$/.test(row.key_hash)) &&
+      [...addresses, OWNER.id, MEMBER.id, OUTSIDER.id, ...flood, ...farm].every((value) => !limitText.includes(value)),
+    limits.slice(0, 3),
+  );
+  const stored = JSON.stringify([
+    database.prepare("SELECT * FROM credit_codes").all(),
+    database.prepare("SELECT * FROM credit_code_redemptions").all(),
+    database.prepare("SELECT * FROM credit_grants").all(),
+    database.prepare("SELECT * FROM credit_ledger").all(),
+    limits,
+    auditRows(database),
+  ]);
+  const plainCodes = made.flatMap((code) => [code, formatCreditCode(code)]);
+  check(
+    "the database, the ledger and the audit keep no plain code and no network address",
+    [...plainCodes, ...addresses].every((value) => !stored.includes(value)),
+  );
+  const trail = auditRows(database);
+  check(
+    "the audit records each refused redemption with its code",
+    [
+      "credit_code_redeemed",
+      "credit_code_used",
+      "credit_code_expired",
+      "credit_code_invalid",
+      "credit_code_attempts",
+      "credits_server_member",
+    ].every((code) => audited(trail, { event: "redeem", result: "failed", code }).length > 0),
+    trail.filter((row) => row.event === "redeem"),
+  );
+  const events = await creditEvents();
+  check(
+    "analytics count each redemption with its wallet, credits, campaign and use count, and no code",
+    eventsOf(events, OWNER.id, {
+      action: "redeemed",
+      wallet: "personal",
+      credits: 500,
+      campaign: "launch-week",
+      code_uses: "single",
+    }).length === 1 &&
+      eventsOf(events, OWNER.id, { action: "redeemed", wallet: "personal", credits: 25, code_uses: "single" }).filter(
+        (event) => !event.properties.has("campaign"),
+      ).length === 1 &&
+      eventsOf(events, MEMBER.id, {
+        action: "redeemed",
+        wallet: "server",
+        credits: 50,
+        campaign: "partners",
+        code_uses: "multi",
+      }).length === 1 &&
+      keepsPrivate(events, [...plainCodes, ...addresses, SERVER_ID]),
+    readable(events.filter((event) => event.properties.get("action") === "redeemed")),
+  );
+  const tries = stripe.tracked.filter((event) => event.name === "credit_code_redeem");
+  const outcomes = new Set(tries.map((event) => event.properties.get("outcome")));
+  check(
+    "analytics send one try event for each redemption try, with its outcome and no code, address or server",
+    ["redeemed", "invalid", "disabled", "expired", "used_up", "redeemed_before", "not_member", "rate_limited"].every(
+      (outcome) => outcomes.has(outcome),
+    ) &&
+      eventsOf(tries, OUTSIDER.id, { outcome: "not_member", wallet: "server", campaign: "partners" }).length === 1 &&
+      eventsOf(tries, OWNER.id, { outcome: "redeemed_before", campaign: "launch-week", code_uses: "single" }).length ===
+        1 &&
+      tries.every(
+        (event) =>
+          (event.properties.get("outcome") === "rate_limited") === event.properties.has("limit") &&
+          (event.properties.get("outcome") === "redeemed") === event.properties.has("credits"),
+      ) &&
+      keepsPrivate(tries, [...plainCodes, ...addresses, SERVER_ID]),
+    readable(tries.slice(0, 12)),
+  );
+}
+
 let passed = false;
 try {
   await walletsAndTransfers();
   await holdsAndSpending();
   await holdLimits();
   await freeMonthlyCredits();
+  await welcomeCredits();
+  await creditCodes();
   passed = checks.every((item) => item.passed);
 } finally {
   await mkdir(OUT, { recursive: true });

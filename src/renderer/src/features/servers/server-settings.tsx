@@ -10,11 +10,13 @@ import type {
   TeamPresenceMember,
   UpdateTeamMemberInput,
 } from "@openbot/contracts/ipc";
+import { accountRestartsServer } from "@openbot/ui/features/servers/ServerActionItems";
 import { currentText } from "@openbot/ui/text";
 import { createEffect, createMemo, createSignal, flush, onCleanup } from "solid-js";
 import { desktopAnalytics } from "../../analytics";
 import { createSimpleContext } from "../../simple-context";
 import { useAuth } from "../account/account-context";
+import { FALLBACK_SERVER_NAME } from "./hosted-server-name";
 import type { ServerSettingsSection } from "./ServerSettingsModal";
 import {
   serverCanAdminister,
@@ -24,8 +26,6 @@ import {
 } from "./server-capabilities";
 import { useServers } from "./servers-context";
 import { serverAdminPort, serversPort } from "./servers-port";
-
-const FALLBACK_SERVER_NAME = "OpenBot";
 
 function generatedServerName(user: CentralAuthUser | null): string {
   const person = (user?.name?.trim() || user?.email.split("@")[0] || "").split(/\s+/u)[0] ?? "";
@@ -404,7 +404,7 @@ const ServerSettings = createSimpleContext({
       const server = restartConfirmServer();
       if (!server) throw new Error(currentText().t("server.settings.unavailable"));
       if (server.thisComputer) await serversPort().localServers.restart(server.id);
-      else if (server.hosted !== true && serverSupportsCapability(server, "host-restart-v1"))
+      else if (!accountRestartsServer(server) && serverSupportsCapability(server, "host-restart-v1"))
         await serversPort().hostAdmin.restartHost(server.id);
       else await serversPort().hostedServers.restart(server.id);
     }

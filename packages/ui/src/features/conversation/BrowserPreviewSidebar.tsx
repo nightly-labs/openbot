@@ -4,6 +4,7 @@ import { PanelResizer } from "@openbot/ui/components/PanelResizer";
 import { SETTINGS_PANEL_DEFAULT } from "@openbot/ui/components/SettingsPanel";
 import { useText } from "@openbot/ui/text";
 import { holdFlag } from "@openbot/ui/utils";
+import type { JSX } from "@solidjs/web";
 import { createEffect, createMemo, createSignal, createStore, For, onSettled, Show, untrack } from "solid-js";
 
 const BROWSER_PANEL_MIN = SETTINGS_PANEL_DEFAULT;
@@ -25,13 +26,15 @@ interface BrowserPreviewSidebarProps {
   onOpenTab: (tabId: string, trigger: HTMLButtonElement) => void;
   onCloseTab?: (tabId: string) => void;
   onNewTab?: () => void;
+  pageShown?: boolean | undefined;
+  children?: JSX.Element;
 }
 
 export default function BrowserPreviewSidebar(props: BrowserPreviewSidebarProps) {
   const { t } = useText();
   let panel!: HTMLElement;
   onSettled(() => {
-    const conversation = panel.closest(".conversation-panel");
+    const conversation = panel.closest("[data-side-split]") ? null : panel.closest(".conversation-panel");
     return conversation ? holdFlag(conversation, "browser-side-panel") : undefined;
   });
   const [panelWidth, setPanelWidth] = createSignal(props.readWidth());
@@ -78,32 +81,34 @@ export default function BrowserPreviewSidebar(props: BrowserPreviewSidebarProps)
         onReset={resetPanelWidth}
       />
 
-      <div class="browser-preview-list">
-        <For each={props.tabs} keyed={(tab) => tab.id}>
-          {(tab) => (
-            <BrowserPreviewCard
-              capturePreview={props.capturePreview}
-              tab={tab()}
-              busy={props.busyTabIds?.has(tab().id) === true}
-              contextKey={props.contextKey}
-              enabled={!props.hidden && !props.suspended}
-              onOpen={props.onOpenTab}
-              onClose={props.onCloseTab}
-            />
-          )}
-        </For>
-        <Show when={props.tabs.length === 0}>
-          <div class="browser-empty-state">
-            <Monitor aria-hidden="true" />
-            <strong>{t("browser.previews.empty")}</strong>
-            <Show when={props.onNewTab}>
-              <Button variant="secondary" size="sm" onClick={() => props.onNewTab?.()}>
-                {t("browser.previews.openPage")}
-              </Button>
-            </Show>
-          </div>
-        </Show>
-      </div>
+      <Show when={props.pageShown !== true} fallback={props.children}>
+        <div class="browser-preview-list">
+          <For each={props.tabs} keyed={(tab) => tab.id}>
+            {(tab) => (
+              <BrowserPreviewCard
+                capturePreview={props.capturePreview}
+                tab={tab()}
+                busy={props.busyTabIds?.has(tab().id) === true}
+                contextKey={props.contextKey}
+                enabled={!props.hidden && !props.suspended}
+                onOpen={props.onOpenTab}
+                onClose={props.onCloseTab}
+              />
+            )}
+          </For>
+          <Show when={props.tabs.length === 0}>
+            <div class="browser-empty-state">
+              <Monitor aria-hidden="true" />
+              <strong>{t("browser.previews.empty")}</strong>
+              <Show when={props.onNewTab}>
+                <Button variant="secondary" size="sm" onClick={() => props.onNewTab?.()}>
+                  {t("browser.previews.openPage")}
+                </Button>
+              </Show>
+            </div>
+          </Show>
+        </div>
+      </Show>
     </aside>
   );
 }

@@ -1,4 +1,5 @@
 import type { JSX } from "@solidjs/web";
+import { useText } from "../../text";
 import { cx } from "../../utils";
 import "./credits.css";
 
@@ -15,11 +16,16 @@ export function CreditIcon(props: { class?: string | undefined; tile?: boolean |
   );
 }
 
-export function CreditAmount(props: { value: string; class?: string | undefined }): JSX.Element {
+export function CreditAmount(props: { credits: number | null; class?: string | undefined }): JSX.Element {
+  const { t, format } = useText();
+  const shown = () => (props.credits === null ? "" : format.number(props.credits));
   return (
     <span class={cx("credit-amount", props.class)}>
       <CreditIcon />
-      {props.value}
+      <span aria-hidden="true">{shown()}</span>
+      <span class="sr-only">
+        {props.credits === null ? "" : t("billing.credits.amount", { count: props.credits, amount: shown() })}
+      </span>
     </span>
   );
 }

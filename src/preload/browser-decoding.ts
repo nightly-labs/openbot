@@ -8,9 +8,11 @@ import {
   type BrowserControlState,
   type BrowserDisplayState,
   type BrowserEnvironment,
+  type BrowserHttpSignIn,
   type BrowserLiveViewEvent,
   type BrowserLocalSignInEnd,
   type BrowserLocalSignInResult,
+  type BrowserPermissionRequest,
   type BrowserPictureInPictureEvent,
   type BrowserPreview,
   type BrowserTab,
@@ -35,6 +37,7 @@ import {
 import { type DynamicRecord, isBoolean, isNumber, isOneOf, isString } from "@openbot/contracts/runtime-values";
 
 const CONTROL_PHASES = ["acting", "waiting"] as const;
+const DIALOG_TYPES = ["alert", "confirm"] as const;
 const VIEWPORT_MODES = ["fill", "custom"] as const;
 const VIEWPORT_PRESETS = ["desktop", "tablet", "mobile"] as const;
 const COLOR_SCHEMES = ["light", "dark", "system"] as const;
@@ -98,6 +101,16 @@ export function decodeBrowserLiveViewEvent(value: unknown): BrowserLiveViewEvent
       return { type: "copied", tabId, text: requiredString(event, "text") };
     case "copyTooLarge":
       return { type: "copyTooLarge", tabId };
+    case "dialog": {
+      if (event.dialog === null) return { type: "dialog", tabId, dialog: null };
+      const dialog = decodeRecord(event.dialog, "browser live view dialog");
+      if (!isOneOf(DIALOG_TYPES, dialog.type)) throw new Error("Invalid browser live view dialog type.");
+      return {
+        type: "dialog",
+        tabId,
+        dialog: { id: requiredString(dialog, "id"), type: dialog.type, message: requiredString(dialog, "message") },
+      };
+    }
     default:
       throw new Error("Invalid browser live view event type.");
   }
@@ -261,9 +274,11 @@ function browserTab(tab: DynamicRecord): BrowserTab {
     diagnosticErrorCount,
     openerTabId,
     popupFailure,
+    permissionRequest,
     userControl,
     canGoBack,
     canGoForward,
+    httpSignIn,
   } = tab;
   if (recording !== undefined && !isBoolean(recording)) throw new Error("Invalid recording.");
   if (canGoBack !== undefined && !isBoolean(canGoBack)) throw new Error("Invalid canGoBack.");
@@ -284,9 +299,11 @@ function browserTab(tab: DynamicRecord): BrowserTab {
     ...(diagnosticErrorCount === undefined ? {} : { diagnosticErrorCount }),
     ...(openerTabId === undefined ? {} : { openerTabId }),
     ...(popupFailure === undefined ? {} : { popupFailure: popupFailureOf(popupFailure) }),
+    ...(permissionRequest === undefined ? {} : { permissionRequest: permissionRequestOf(permissionRequest) }),
     ...(userControl === true ? { userControl } : {}),
     ...(canGoBack === undefined ? {} : { canGoBack }),
     ...(canGoForward === undefined ? {} : { canGoForward }),
+    ...(httpSignIn === undefined ? {} : { httpSignIn: httpSignInOf(httpSignIn) }),
   };
 }
 
@@ -314,9 +331,28 @@ function browserViewport(value: unknown): BrowserViewport {
   };
 }
 
+function httpSignInOf(value: unknown): BrowserHttpSignIn {
+  const signIn = decodeRecord(value, "browser HTTP sign-in");
+  const origin = requiredString(signIn, "origin");
+  if (!URL.canParse(origin) || new URL(origin).protocol !== "https:" || new URL(origin).origin !== origin)
+    throw new Error("Invalid browser HTTP sign-in origin.");
+  if (signIn.refused !== undefined && signIn.refused !== true) throw new Error("Invalid browser HTTP sign-in.");
+  return { origin, ...(signIn.refused === true ? { refused: true } : {}) };
+}
+
 function popupFailureOf(value: unknown): { id: string; message: string } {
   const failure = decodeRecord(value, "browser popup failure");
   return { id: requiredString(failure, "id"), message: requiredString(failure, "message") };
+}
+
+function permissionRequestOf(value: unknown): BrowserPermissionRequest {
+  const request = decodeRecord(value, "browser permission request");
+  if (request.permission !== "geolocation") throw new Error("Invalid permission.");
+  return {
+    id: requiredString(request, "id"),
+    origin: requiredString(request, "origin"),
+    permission: request.permission,
+  };
 }
 
 function controlSession(session: DynamicRecord): BrowserControlSession {

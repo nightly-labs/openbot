@@ -37,6 +37,7 @@ async function main(): Promise<void> {
   await putOptionalSecret("COMPANY_SIGN_IN_SECRET");
   await putOptionalSecretSet("HOSTED_ARCHIVE_KEY_SECRET", "B2_WORKER_KEY_ID_EU", "B2_WORKER_APPLICATION_KEY_EU");
   await putOptionalSecret("SERVER_CLAIMS_ADMIN_TOKEN");
+  await putOptionalSecretSet("STORE_REVIEW_EMAIL", "STORE_REVIEW_CODE");
   if (!cloudflareEnvironment) await putOptionalSecret("HOSTED_POOL_ALERT_WEBHOOK_URL");
   await putOptionalSecretSet("SLACK_CLIENT_ID", "SLACK_CLIENT_SECRET", "SLACK_STATE_SECRET");
   await putOptionalSecretSet("SLACK_ROUTE_PRIVATE_JWK", "SLACK_ROUTE_KEY_ID");
@@ -53,8 +54,7 @@ async function main(): Promise<void> {
   }
   await putOptionalSecretSet("APNS_PRIVATE_KEY", "APNS_KEY_ID");
   await putOptionalSecret("FCM_SERVICE_ACCOUNT");
-  await putOptionalSecretSet("MEDIA_API_URL", "MEDIA_API_KEY");
-  await putOptionalSecretSet("MEDIA_API_TASKS_URL", "MEDIA_API_TASKS_KEY");
+  await putOptionalSecret("NEAR_INTENTS_PARTNER_KEY");
   await run(wranglerExecutable, ["d1", "migrations", "apply", "DB", "--remote", ...environmentArgs], {
     label: "Remote D1 migrations",
   });

@@ -5,7 +5,8 @@ import Foundation
 /// is in JavaScript (`src/features/shortcuts/shortcuts-native.ts`).
 ///
 /// The shortcuts themselves need no JavaScript: List Agents reads a file, and Send Message sends
-/// from native code. Only a button that opens the app comes here.
+/// from native code. A button that opens the app comes here, and so does a message of Send Message
+/// while the app is open: the app sends it on its own connection.
 public final class ShortcutBridge: @unchecked Sendable {
   public static let shared = ShortcutBridge()
 
@@ -23,6 +24,8 @@ public final class ShortcutBridge: @unchecked Sendable {
   private var deliver: ((_ payload: String) -> Void)?
   /// The requests that came before JavaScript listened. A button can start the app.
   private var waiting: [Request] = []
+  private var deliverSend: ((_ id: String, _ payload: String) -> Void)?
+  private var sends: [String: CheckedContinuation<String?, Never>] = [:]
 
   private init() {}
 
@@ -33,6 +36,24 @@ public final class ShortcutBridge: @unchecked Sendable {
     if deliver == nil { waiting.append(Request(payload: payload)) }
     lock.unlock()
     deliver?(payload)
+  }
+
+  public func send(_ payload: String, limit: TimeInterval) async -> String? {
+    let id = UUID().uuidString
+    return await withCheckedContinuation { continuation in
+      lock.lock()
+      guard let deliverSend else {
+        lock.unlock()
+        continuation.resume(returning: nil)
+        return
+      }
+      sends[id] = continuation
+      lock.unlock()
+      DispatchQueue.global().asyncAfter(deadline: .now() + limit) { [weak self] in
+        self?.answerSend(id, outcome: "unconfirmed")
+      }
+      deliverSend(id, payload)
+    }
   }
 
   // MARK: - The module side
@@ -47,5 +68,20 @@ public final class ShortcutBridge: @unchecked Sendable {
     for request in pending where request.date.timeIntervalSinceNow > -Self.waitLimit {
       deliver(request.payload)
     }
+  }
+
+  func listenForSends(_ deliver: ((_ id: String, _ payload: String) -> Void)?) {
+    lock.lock()
+    deliverSend = deliver
+    let ended = deliver == nil ? Array(sends.keys) : []
+    lock.unlock()
+    for id in ended { answerSend(id, outcome: "unconfirmed") }
+  }
+
+  func answerSend(_ id: String, outcome: String) {
+    lock.lock()
+    let continuation = sends.removeValue(forKey: id)
+    lock.unlock()
+    continuation?.resume(returning: outcome)
   }
 }

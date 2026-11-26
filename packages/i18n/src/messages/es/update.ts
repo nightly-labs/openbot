@@ -43,6 +43,7 @@ export const messages = {
   "update.idleRestart.description": "Las nuevas ejecuciones de rutinas esperan hasta el reinicio.",
   "update.idleRestart.waitingFor": "Esperando: {reasons}.",
   "update.idleRestart.cancel": "Cancelar reinicio",
+  "update.idleRestart.openSettings": "Ajustes de actualización",
   "update.idleRestart.restartNow": "Reiniciar ahora",
   "update.idleRestart.restartNowTitle": "¿Reiniciar OpenBot ahora?",
   "update.idleRestart.restartNowDescription":

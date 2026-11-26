@@ -611,3 +611,17 @@
   width: 220px;
   min-height: var(--openbot-control-sm);
 }
+
+.server-settings-credits-field {
+  display: flex;
+  align-items: center;
+  gap: var(--openbot-space-2);
+  color: var(--openbot-text-secondary);
+  font-size: var(--openbot-text-sm);
+}
+
+.server-settings-credits-input {
+  width: 88px;
+  text-align: end;
+  font-variant-numeric: tabular-nums;
+}

@@ -83,6 +83,7 @@ import { ProviderAccountRenameField } from "../../components/ProviderAccountList
 import type { ProviderPickerOption } from "../../components/ProviderPicker";
 import {
   accountCodeSignInOffered,
+  earlierAccountWithSameEmail,
   hasKeyAccounts,
   isApiKeyAccount,
   isProviderKeyAccount,
@@ -1048,6 +1049,12 @@ function AccountRow(
   const { t, format, sourceText } = useText();
   const [renaming, setRenaming] = createSignal(false);
   const name = () => providerAccountName(t, props.accounts, props.account.id);
+  const sameEmailNote = () => {
+    const earlier = earlierAccountWithSameEmail(props.accounts, props.account.id);
+    return earlier
+      ? t("provider.account.sameEmail", { name: providerAccountName(t, props.accounts, earlier.id) })
+      : null;
+  };
   const own = () => props.account.id === DEFAULT_PROVIDER_ACCOUNT_ID;
   const apiKey = () => isApiKeyAccount(props.account.id);
   const keyAccount = () => isProviderKeyAccount(props.option.id, props.account.id);
@@ -1065,6 +1072,7 @@ function AccountRow(
   const detail = () =>
     [
       props.account.email && props.account.email !== name() ? props.account.email : null,
+      sameEmailNote(),
       agents().length > 0 ? t("provider.account.usedBy", { agents: format.list(agents()) }) : null,
     ]
       .filter(Boolean)
@@ -1420,11 +1428,16 @@ function SignInSection(props: SectionProps & { keyShown: boolean; runtimeMissing
                 type="button"
                 variant="outline"
                 size="sm"
-                aria-label={t("provider.aria.codeFallback", { name: props.option.name })}
+                aria-label={t(
+                  row().alternative() === "address" ? "provider.aria.addressFallback" : "provider.aria.codeFallback",
+                  { name: props.option.name },
+                )}
                 disabled={props.disabled}
                 onClick={row().signInAlternative}
               >
-                {t("provider.action.signInWithCode")}
+                {t(
+                  row().alternative() === "address" ? "provider.action.pasteAddress" : "provider.action.signInWithCode",
+                )}
               </Button>
             </Show>
             <Show when={row().signingIn() && props.onCancelProviderSignIn}>

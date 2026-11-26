@@ -4,20 +4,19 @@ import { playActionSound } from "../../action-sounds";
 import { useLayout } from "../../layout";
 import { usePlatform } from "../../platform";
 import { useServerActions } from "./server-actions";
-import { useServers } from "./servers-context";
 
 export function WorkspaceServerRail() {
   const platform = usePlatform();
   const layout = useLayout();
-  const { reorderServers } = useServers();
   const {
     orderedServers,
+    reorder,
     select,
     add,
     addMenuCreateLocal,
     addMenuInstallServer,
     addCreatesServer,
-    hiddenLocal,
+    hiddenServers,
     callbacks,
   } = useServerActions();
 
@@ -54,12 +53,12 @@ export function WorkspaceServerRail() {
       <ServerRail
         servers={orderedServers()}
         onSelect={select}
-        onReorder={(serverIds) => void reorderServers(serverIds)}
+        onReorder={reorder}
         onAdd={add}
         onCreateLocal={addMenuCreateLocal()}
         onInstallServer={addMenuInstallServer()}
         addCreatesServer={addCreatesServer()}
-        hiddenLocal={hiddenLocal()}
+        hiddenServers={hiddenServers()}
         {...callbacks}
       />
     </Show>

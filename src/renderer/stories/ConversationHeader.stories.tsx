@@ -69,7 +69,6 @@ const meta = {
       onChange: fn(),
       onReasoningEffortChange: fn(),
     },
-    sidePanel: { open: false, onToggle: fn() },
   },
   parameters: { layout: "fullscreen", a11y: { test: "error" } },
 } satisfies Meta<typeof ConversationHeader>;

@@ -34,12 +34,13 @@ export interface WorkerBindings {
   EMAIL_DELIVERY_WEBHOOK_URL?: string;
   EMAIL_DELIVERY_WEBHOOK_SECRET?: string;
   SKILLS_ADMIN_TOKEN?: string;
-  MEDIA_API_URL?: string;
-  MEDIA_API_KEY?: string;
-  MEDIA_API_TASKS_URL?: string;
-  MEDIA_API_TASKS_KEY?: string;
+  MEDIA_GATEWAY?: Fetcher;
+  NEAR_INTENTS_PARTNER_KEY?: string;
+  NEAR_INTENTS_AGENT_API_URL?: string;
   SITE_OPERATIONS_ADMIN_TOKEN?: string;
   SERVER_CLAIMS_ADMIN_TOKEN?: string;
+  STORE_REVIEW_EMAIL?: string;
+  STORE_REVIEW_CODE?: string;
   SITE_REPORT_HASH_SECRET?: string;
   COMPANY_SIGN_IN_SECRET?: string;
   HOSTED_ARCHIVE_KEY_SECRET?: string;

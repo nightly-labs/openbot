@@ -30,6 +30,7 @@ import { ChatEndPullRing, useChatEndPull } from "@/features/chat/components/chat
 import { ChatGlassIconButton } from "@/features/chat/components/chat-glass-icon-button";
 import { ChatHeader } from "@/features/chat/components/chat-header";
 import { ChatMessageList } from "@/features/chat/components/chat-message-list";
+import { ChatSyncStatus } from "@/features/chat/components/chat-sync-status";
 import type { ChatThreadMenu } from "@/features/chat/components/chat-thread-menu";
 import type { ComposerContextMeter } from "@/features/chat/components/composer-context-ring";
 import { useChatAttachments } from "@/features/chat/components/use-chat-attachments";
@@ -57,7 +58,10 @@ import { speechNative } from "@/features/voice/model/speech-native";
 import { useVoiceSettings } from "@/features/voice/model/voice-settings";
 import { ConnectionStatus } from "@/features/workspace/components/connection-status";
 import { useTurnStepLinesOf } from "@/features/workspace/components/use-agent-activity";
-import { useBrowserRequests } from "@/features/workspace/components/use-live-workspace";
+import {
+  useBrowserRequests,
+  useOwnedBrowserPermissionRequests,
+} from "@/features/workspace/components/use-live-workspace";
 import type { MobileAgent } from "@/features/workspace/context/mobile-workspace-context";
 import {
   useMobileWorkspaceReader,
@@ -91,6 +95,7 @@ import { voiceAccent, voicePalette } from "../model/voice-palette";
 import { rememberImageDimensions } from "./attachment-preview";
 import {
   asksForSecret,
+  BrowserLocationCard,
   BrowserSecretComposer,
   BrowserTakeoverCard,
   QuestionSecretComposer,
@@ -302,6 +307,11 @@ export function ChatView({
     [browserRequests, target, threadId, channelThreadIds],
   );
   const browserAllowed = useBrowserFeature();
+  const chatAgentIds = useMemo(
+    () => (target.kind === "agent" ? [target.id] : target.members.map((member) => member.id)),
+    [target],
+  );
+  const locationRequests = useOwnedBrowserPermissionRequests(target.serverId, chatAgentIds);
   const channelBrowser = useMemo(() => {
     if (target.kind !== "channel") return null;
     const memberIds = target.members.map((member) => member.id);
@@ -393,7 +403,12 @@ export function ChatView({
   const sendingUpload = sendingMessage ? outboxSnapshot.uploads.get(sendingMessage.clientMessageId) : undefined;
   const sendsToQueue = Boolean(queue && (activeTurnId || queue.queued.length || queue.replies.length));
   const queueSends = useRef(new Set<string>());
-  if (sendingMessage && sendsToQueue) queueSends.current.add(sendingMessage.clientMessageId);
+  const routedSends = useRef(new Set<string>());
+  if (sendingMessage && !routedSends.current.has(sendingMessage.clientMessageId)) {
+    routedSends.current.add(sendingMessage.clientMessageId);
+    if (sendsToQueue) queueSends.current.add(sendingMessage.clientMessageId);
+  } else if (sendingMessage && !sendsToQueue) queueSends.current.delete(sendingMessage.clientMessageId);
+  const sendingToQueue = Boolean(sendingMessage && queueSends.current.has(sendingMessage.clientMessageId));
   const queueDeliveries = queue?.deliveries;
   const sentToQueue =
     outboxMessages.find(
@@ -403,7 +418,7 @@ export function ChatView({
         !queueDeliveries?.some((delivery) => delivery.id === message.messageId),
     ) ?? null;
   const queuePending = useMemo(() => {
-    if (sendsToQueue && sendingMessage)
+    if (sendingToQueue && sendingMessage)
       return {
         message: outboxRow(outbox, sendingMessage),
         progress: sendingUpload?.completed ?? 0,
@@ -411,7 +426,7 @@ export function ChatView({
         cancel: () => outbox.cancelUpload(sendingMessage.clientMessageId),
       };
     return sentToQueue ? { message: outboxRow(outbox, sentToQueue), progress: 0, total: 0, cancel: () => {} } : null;
-  }, [sentToQueue, sendsToQueue, sendingMessage, sendingUpload?.completed, outbox]);
+  }, [sentToQueue, sendingToQueue, sendingMessage, sendingUpload?.completed, outbox]);
   const queued = queue?.queued;
   const heldQueueEdit = queue?.edit?.delivery ?? null;
   const queueRows = useMemo(
@@ -488,7 +503,7 @@ export function ChatView({
   const pendingMessages = useMemo(
     () =>
       outboxMessages.flatMap((message): PendingChatMessage[] =>
-        (message.state === "sending" && sendsToQueue) ||
+        (message.state === "sending" && sendingToQueue) ||
         (message.state === "sent" && queueSends.current.has(message.clientMessageId)) ||
         (message.messageId !== null && queuedMessageIds.has(message.messageId))
           ? []
@@ -502,7 +517,7 @@ export function ChatView({
               },
             ],
       ),
-    [outboxMessages, outboxSnapshot.storing, sendsToQueue, queuedMessageIds, outbox],
+    [outboxMessages, outboxSnapshot.storing, sendingToQueue, queuedMessageIds, outbox],
   );
   const messages = useMemo(
     () =>
@@ -516,8 +531,12 @@ export function ChatView({
   useEffect(() => {
     for (const id of sendBaselines.current.keys())
       if (!outboxSnapshot.storing.has(id)) sendBaselines.current.delete(id);
-    for (const id of queueSends.current)
-      if (!outboxMessages.some((message) => message.clientMessageId === id)) queueSends.current.delete(id);
+    for (const id of routedSends.current) {
+      const message = outboxMessages.find((item) => item.clientMessageId === id);
+      if (message?.state === "sending" || message?.state === "sent") continue;
+      routedSends.current.delete(id);
+      queueSends.current.delete(id);
+    }
     const received = outboxMessages.filter((message) => message.messageId !== null);
     if (received.some((message) => message.messageId !== null && !messageAliases.has(message.messageId)))
       setMessageAliases((current) => {
@@ -1042,11 +1061,13 @@ export function ChatView({
   const outboxStatuses = useMemo(() => {
     const statuses = new Map<string, OutboxRowStatus>();
     const lastWaiting = outboxMessages.findLast((message) => message.state === "waiting");
+    const heldByFailed = outboxMessages.find((message) => message.state !== "sent")?.state === "failed";
     for (const message of outboxMessages)
       if (message.state === "waiting" || message.state === "failed")
         statuses.set(outboxRowId(message), {
           message,
           online: serverOnline,
+          heldByFailed,
           showStatus: message.state === "failed" || message === lastWaiting,
           retry: () => outbox.retry(message.clientMessageId),
           edit: () => void editOutboxMessage.current(message.clientMessageId),
@@ -1116,14 +1137,14 @@ export function ChatView({
   const dismissSelection = useCallback(() => setSelection(null), []);
   const listUpload = useMemo(
     () =>
-      sendingMessage && sendingUpload && !sendsToQueue
+      sendingMessage && sendingUpload && !sendingToQueue
         ? {
             messageId: outboxRowId(sendingMessage),
             ...sendingUpload,
             cancel: () => outbox.cancelUpload(sendingMessage.clientMessageId),
           }
         : null,
-    [sendingMessage, sendingUpload, sendsToQueue, outbox],
+    [sendingMessage, sendingUpload, sendingToQueue, outbox],
   );
 
   return (
@@ -1272,6 +1293,7 @@ export function ChatView({
                         : null
                     }
                   />
+                  <ChatSyncStatus syncing={ready && serverOnline && (server?.resuming === true || catchingUp)} />
                 </View>
                 {showBrowserRequests
                   ? chatBrowserRequests
@@ -1301,6 +1323,15 @@ export function ChatView({
                           }
                         />
                       ))
+                  : null}
+                {showBrowserRequests && browserAllowed
+                  ? locationRequests.map((request) => (
+                      <BrowserLocationCard
+                        key={`${target.serverId}:location:${request.id}`}
+                        request={request}
+                        answer={(answer) => workspace().answerBrowserPermission(target.serverId, answer)}
+                      />
+                    ))
                   : null}
                 {sendError?.agentId === target.id ? (
                   <Typography.Paragraph

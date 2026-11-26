@@ -173,6 +173,7 @@ const teamBrowser: TeamApiBrowser = {
   navigate: unused,
   reload: unused,
   stop: unused,
+  answerPermission: unused,
   takeUserControl: unused,
   startTeach: unused,
   stopTeach: () => [],
@@ -188,7 +189,9 @@ const teamBrowser: TeamApiBrowser = {
   startView: unused,
   dispatchViewInput: unused,
   copyViewSelection: unused,
+  answerViewDialog: unused,
   importSignIn: unused,
+  answerHttpSignIn: unused,
 };
 
 const root = await mkdtemp(join(tmpdir(), "openbot-agent-access-"));

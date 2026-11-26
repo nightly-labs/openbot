@@ -17,6 +17,7 @@ export interface SenderFacts {
   isGroup: boolean;
   chatJid: string;
   authorNumber: string | null;
+  contactNumber: string | null;
   isSelfChat: boolean;
   fromMe: boolean;
 }
@@ -24,7 +25,8 @@ export interface SenderFacts {
 export function senderDecision(rules: WhatsAppSenderRules, facts: SenderFacts): SenderDecision {
   if (facts.isSelfChat) return { type: "allow" };
   const allowedGroup = facts.isGroup && rules.groups.has(facts.chatJid);
-  if (facts.fromMe) return allowedGroup ? { type: "save" } : { type: "ignore" };
+  const allowedContact = !facts.isGroup && facts.contactNumber !== null && allowsContact(rules, facts.contactNumber);
+  if (facts.fromMe) return allowedGroup || allowedContact ? { type: "save" } : { type: "ignore" };
   if (facts.isGroup) {
     if (!allowedGroup) return { type: "ignore" };
     return rules.readOnly.has(facts.chatJid) ? { type: "save" } : { type: "allow" };

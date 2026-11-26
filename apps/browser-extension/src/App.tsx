@@ -8,8 +8,17 @@ import type { RemoteTeamHost } from "@openbot/team-client/remote-directory";
 import { useText } from "@openbot/ui/text";
 import { createSignal, createStore, Match, onSettled, Show, Switch } from "solid-js";
 import { AgentSettingsScreen } from "./AgentSettingsScreen";
-import { endSession, readAccount, SignInIssue, startEmailSignIn, verifyEmailCode } from "./account";
-import { BrowserAsks, BrowserSharingScreen, startSharing } from "./BrowserSharing";
+import {
+  endSession,
+  readAccount,
+  SignInIssue,
+  saveAnalyticsAnswer,
+  signInOutcome,
+  startEmailSignIn,
+  verifyEmailCode,
+} from "./account";
+import { identify, type SignInMethod, track } from "./analytics";
+import { BrowserAsks } from "./BrowserSharing";
 import { ChannelScreen } from "./ChannelScreen";
 import { ChatScreen } from "./ChatScreen";
 import { type ClientBrowserLink, createClientBrowserLink } from "./client-browser-link";
@@ -26,6 +35,7 @@ import { HomeScreen } from "./HomeScreen";
 import { createHostConnection, type HostConnection } from "./host-connection";
 import { NewAgentScreen } from "./NewAgentScreen";
 import { NewChannelScreen, NewFolderScreen } from "./NewChatItemScreens";
+import { SettingsScreen } from "./SettingsScreen";
 import { SignInScreen } from "./SignInScreen";
 import { createWorkspace, type Workspace } from "./workspace";
 import { type XTarget, xSend, xStatus } from "./x-agent";
@@ -45,12 +55,27 @@ export function App() {
   const [session, setSession] = createSignal<ExtensionSession | null>(null);
   const [login, setLogin] = createSignal<CentralAuthState>({ status: "loading" });
   let emailStart: { email: string; key: string; at: number } | null = null;
+  let openTracked = false;
+
+  function trackOpened(signedIn: boolean) {
+    if (openTracked) return;
+    openTracked = true;
+    void track("extension_opened", { signed_in: signedIn });
+  }
+
+  async function signedIn(next: ExtensionSession, method: SignInMethod) {
+    await saveSession(next);
+    setSession(next);
+    void track("account_sign_in_completed", { method, result: "succeeded" });
+    void identify(next);
+  }
 
   async function checkSession() {
     setLogin({ status: "loading" });
     const saved = await readSession();
     if (!saved) {
       setLogin({ status: "signed_out" });
+      trackOpened(false);
       return;
     }
     try {
@@ -58,11 +83,14 @@ export function App() {
       if (!user) {
         await clearSession();
         setLogin({ status: "signed_out" });
+        trackOpened(false);
         return;
       }
       const current = { token: saved.token, user };
       await saveSession(current);
       setSession(current);
+      trackOpened(true);
+      void identify(current);
     } catch {
       setLogin({
         status: "error",
@@ -105,16 +133,16 @@ export function App() {
 
   async function verify(challengeId: string, code: string, referralCode?: string) {
     try {
-      const next = await verifyEmailCode(challengeId, code, referralCode);
-      await saveSession(next);
-      setSession(next);
+      await signedIn(await verifyEmailCode(challengeId, code, referralCode), "email");
     } catch (error) {
+      void track("account_sign_in_completed", { method: "email", ...signInOutcome(error) });
       showIssue(error);
     }
   }
 
-  async function signOut() {
+  async function signOut(reason: "user" | "session_ended") {
     const current = session();
+    await track("account_sign_out", { reason });
     setSession(null);
     setLogin({ status: "signed_out" });
     await clearSession();
@@ -137,22 +165,25 @@ export function App() {
                 emailStart = null;
                 setLogin({ status: "signed_out" });
               }}
-              onSignedIn={async (next) => {
-                await saveSession(next);
-                setSession(next);
-              }}
+              onSignedIn={(next) => signedIn(next, "web")}
             />
           </div>
         }
       >
-        {(current) => <ServerView session={current} onSignOut={signOut} onSessionEnded={signOut} />}
+        {(current) => (
+          <ServerView
+            session={current}
+            onSignOut={() => void signOut("user")}
+            onSessionEnded={() => void signOut("session_ended")}
+          />
+        )}
       </Show>
     </main>
   );
 }
 
 type PushedScreen =
-  | { kind: "chat" | "channel" | "new-agent" | "new-channel" | "new-folder" | "browser-sharing" }
+  | { kind: "chat" | "channel" | "new-agent" | "new-channel" | "new-folder" | "settings" }
   | { kind: "agent-settings"; agentId: string };
 
 interface ServerState {
@@ -326,8 +357,6 @@ function ServerView(props: { session: ExtensionSession; onSignOut: () => void; o
     };
   });
 
-  const sharing = () => (presence().sharing ? { tabs: presence().tabs.length, supported: canShare() } : null);
-
   function push(kind: Exclude<PushedScreen["kind"], "agent-settings">) {
     setScreen({ kind });
     setPushed(true);
@@ -387,10 +416,9 @@ function ServerView(props: { session: ExtensionSession; onSignOut: () => void; o
                   onStartThread={startThread}
                   onSelectHost={(hostId) => void open(hostId)}
                   onSignOut={() => props.onSignOut()}
-                  sharing={sharing()}
+                  onOpenSettings={() => push("settings")}
+                  sharing={presence().sharing}
                   canShare={canShare()}
-                  onShareTabs={() => void startSharing()}
-                  onManageSharing={() => push("browser-sharing")}
                 />
               </section>
               <section class="ext-layer ext-chat-layer" inert={!pushed()}>
@@ -407,8 +435,12 @@ function ServerView(props: { session: ExtensionSession; onSignOut: () => void; o
                       <Match when={shown.kind === "new-channel"}>
                         <NewChannelScreen workspace={current()} onClose={back} onCreated={openChannel} />
                       </Match>
-                      <Match when={shown.kind === "browser-sharing"}>
-                        <BrowserSharingScreen onBack={back} />
+                      <Match when={shown.kind === "settings"}>
+                        <SettingsScreen
+                          canShare={canShare()}
+                          onBack={back}
+                          onAnalyticsChanged={(enabled) => void saveAnalyticsAnswer(props.session.token, enabled)}
+                        />
                       </Match>
                       <Match when={shown.kind === "new-folder"}>
                         <NewFolderScreen workspace={current()} onClose={back} onCreated={back} />

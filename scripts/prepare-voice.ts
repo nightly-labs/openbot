@@ -4,12 +4,22 @@ import { copyFileSync, createReadStream, existsSync, readFileSync, writeFileSync
 import { mkdir, mkdtemp, readdir, readFile, rename, rm, stat, writeFile } from "node:fs/promises";
 import { join, resolve } from "node:path";
 import { createOpenBotLogger } from "@openbot/logging";
-import { PARAKEET_MODEL_FILES, VOICE_RUNTIME_ADDON, VOICE_SESSION_CONFIGS } from "../src/main/voice-model-service";
+import {
+  PARAKEET_MODEL_FILES,
+  VOICE_RUNTIME_ADDON,
+  VOICE_SESSION_CONFIGS,
+  VOICE_SPEECH_DETECTOR,
+} from "../src/main/voice-model-service";
 import { elfSearchPaths, ORIGIN_SEARCH_PATH } from "./elf-search-paths";
 
 const logger = createOpenBotLogger("prepare-voice");
 
-const SHERPA_ONNX_VERSION = "2.0.1";
+const SHERPA_ONNX_VERSION = "2.0.3";
+const SPEECH_DETECTOR_FILE = {
+  url: `https://github.com/k2-fsa/sherpa-onnx/releases/download/asr-models/${VOICE_SPEECH_DETECTOR}`,
+  bytes: 2_313_101,
+  sha256: "6b99cbfd39246b6706f98ec13c7c50c6b299181f2474fa05cbc8046acc274396",
+};
 
 interface RuntimePackage {
   name: string;
@@ -20,27 +30,27 @@ interface RuntimePackage {
 const RUNTIME_PACKAGES: Readonly<Record<string, RuntimePackage>> = {
   "darwin-arm64": {
     name: "sherpa-onnx-darwin-arm64",
-    integrity: "sha512-agXmbbwiVPUSMViMhWhYAt59iG21ui7x6HxQFU35XzHOfQe9x6Pg9V160Pzak/66x0ePMjixsLUtMaaUrLfCwQ==",
+    integrity: "sha512-PuPsSgMvzKYYBG+/CwEZbbtl4kmztravlpN8KmsQy2jWGJ3WjEJ1NkPzUNgEbrq/9s5xnyd20FFlWJXOIcAHoA==",
     files: [VOICE_RUNTIME_ADDON, "libsherpa-onnx-c-api.dylib", "libonnxruntime.dylib"],
   },
   "darwin-x64": {
     name: "sherpa-onnx-darwin-x64",
-    integrity: "sha512-SBnHa3LDOSI/5/rpBHGxKQDFq+yIdxowYY0InLzfojTUx+yGgqu7cYBrRxjzvHOiOKi0O4rmlFVZboyhIqpDgA==",
+    integrity: "sha512-ZFSsikOf0xrnvEl8Xj5Z8IpG0hqWGFDy3HwLFagwV1apftVgh/SVXbwQ+pIf0xFRBrAr+SaR3asvoCEc6DxOSg==",
     files: [VOICE_RUNTIME_ADDON, "libsherpa-onnx-c-api.dylib", "libonnxruntime.dylib"],
   },
   "win32-x64": {
     name: "sherpa-onnx-win-x64",
-    integrity: "sha512-7vwdAw9PGEb0JLSpK7UFxAdp1vabBHK9Nhw2jFRBWSFgtslUPHIB0T6syJfRgiUGyCeNW9fJvcFAk2F2u7hBEw==",
+    integrity: "sha512-UDPUCNmuhWWC0oNMphHjgdRE0M8bVbUFXk9AyyJUuOtubmxhQBLz2sd2v6RWIAXSDh/7GwPbImLqAWI51ITTNQ==",
     files: [VOICE_RUNTIME_ADDON, "sherpa-onnx-c-api.dll", "onnxruntime.dll", "onnxruntime_providers_shared.dll"],
   },
   "linux-x64": {
     name: "sherpa-onnx-linux-x64",
-    integrity: "sha512-w5mRRrIvPvcNWac7rQ8AN/t/cwElPGoRpH+ceCRBV7XfjCIQ9Rcr3Ig/kXcJLNOxgK4bGmef+Y47lIWiesDODw==",
+    integrity: "sha512-cORrflhfgu/vD22UAfU4DvwCjKC6cSmVGM2o2fXnM6O9meN8Mpu5enqb/afIi+Nwweo9eS6YmaQcvmT+L6ia2A==",
     files: [VOICE_RUNTIME_ADDON, "libsherpa-onnx-c-api.so", "libonnxruntime.so"],
   },
   "linux-arm64": {
     name: "sherpa-onnx-linux-arm64",
-    integrity: "sha512-5CJvLjFYIg23oELCsT7l07fMLT3PdquZ3tqh7KZK3Pzi+c2YiPKRe1DDUxoNdtCaw3ZiS4aQSQPBblB9JStuDA==",
+    integrity: "sha512-F4cciAFw4rrV39CR6o1yNLG1e/Gcd4Je2wGxi4Q+jl1NJh7VSvE3n4NCz4bQzBlvZWgU8ThhV9ggD6xC5iJWFQ==",
     files: [VOICE_RUNTIME_ADDON, "libsherpa-onnx-c-api.so", "libonnxruntime.so"],
   },
 };
@@ -62,6 +72,7 @@ if (!runtimePackage) {
 requireCommand("tar", ["--version"]);
 await prepareRuntime(runtimePackage);
 await writeSessionConfigs();
+await prepareSpeechDetector();
 if (!runtimeOnly) await prepareModel();
 logger.info(`Prepared voice assets in ${buildRoot}`);
 
@@ -107,23 +118,34 @@ async function writeSessionConfigs(): Promise<void> {
   );
 }
 
+async function prepareSpeechDetector(): Promise<void> {
+  await downloadVerified(join(runtimeRoot, VOICE_SPEECH_DETECTOR), {
+    name: VOICE_SPEECH_DETECTOR,
+    ...SPEECH_DETECTOR_FILE,
+  });
+}
+
 async function prepareModel(): Promise<void> {
   await mkdir(modelRoot, { recursive: true });
   await removeOtherModels();
-  for (const file of PARAKEET_MODEL_FILES) {
-    const path = join(modelRoot, file.name);
-    if (await isExpectedFile(path, file.bytes, file.sha256)) continue;
-    logger.info(`Downloading ${file.name}…`);
-    const response = await fetch(file.url);
-    if (!response.ok) throw new Error(`Unable to download ${file.name} (${response.status}).`);
-    const partialPath = `${path}.part`;
-    await writeFile(partialPath, Buffer.from(await response.arrayBuffer()));
-    if (!(await isExpectedFile(partialPath, file.bytes, file.sha256))) {
-      await rm(partialPath, { force: true });
-      throw new Error(`The downloaded ${file.name} failed its size or SHA-256 check.`);
-    }
-    await rename(partialPath, path);
+  for (const file of PARAKEET_MODEL_FILES) await downloadVerified(join(modelRoot, file.name), file);
+}
+
+async function downloadVerified(
+  path: string,
+  file: { name: string; url: string; bytes: number; sha256: string },
+): Promise<void> {
+  if (await isExpectedFile(path, file.bytes, file.sha256)) return;
+  logger.info(`Downloading ${file.name}…`);
+  const response = await fetch(file.url);
+  if (!response.ok) throw new Error(`Unable to download ${file.name} (${response.status}).`);
+  const partialPath = `${path}.part`;
+  await writeFile(partialPath, Buffer.from(await response.arrayBuffer()));
+  if (!(await isExpectedFile(partialPath, file.bytes, file.sha256))) {
+    await rm(partialPath, { force: true });
+    throw new Error(`The downloaded ${file.name} failed its size or SHA-256 check.`);
   }
+  await rename(partialPath, path);
 }
 
 async function removeOtherModels(): Promise<void> {

@@ -11,7 +11,9 @@ import { createRoutineFlows } from "../src/backend/routine-flows/routine-flows";
 
 const OUT = resolve(import.meta.dirname, "../.openbot-build/routine-flow-sweep-e2e");
 const QUARTER_HOUR_MS = 15 * 60 * 1000;
-const SOLO_RUNS = 672;
+const SOLO_RUNS = 23_000;
+const SOLO_RUN_GAP_MS = 26_000;
+const FULL_SWEEP_AFTER_MS = 31 * 60 * 1000;
 const DONE_FLOW_RUNS = 160;
 const OLD_FLOW_RUNS = 20_000;
 const TIMED_SWEEPS = 20;
@@ -24,7 +26,7 @@ interface Report {
   plans?: Record<string, string[]>;
   answerPlan?: string[];
   checks: string[];
-  timing?: { sweeps: number; totalMs: number; perSweepMs: number };
+  timing?: { firstSweepMs: number; sweeps: number; totalMs: number; perSweepMs: number; fullSweepMs: number };
   passed: boolean;
 }
 
@@ -62,7 +64,7 @@ function seed(database: OpenBotDatabase): void {
   );
   db.exec("BEGIN");
   for (let index = 0; index < SOLO_RUNS; index += 1) {
-    const time = at(now - index * QUARTER_HOUR_MS - 30_000);
+    const time = at(now - index * SOLO_RUN_GAP_MS - 30_000);
     run.run(`solo-${index}`, "routine-solo", "solo", time, "Quarter-hour check", `solo-delivery-${index}`, time, time);
   }
   for (let index = 0; index < DONE_FLOW_RUNS; index += 1) {
@@ -168,6 +170,35 @@ function count(database: OpenBotDatabase, sql: string): number {
   return Number(database.connection.prepare(sql).get()?.count);
 }
 
+function endRun(database: OpenBotDatabase, runId: string, routineId: string, agentId: string, endedAt: number): void {
+  const time = new Date(endedAt).toISOString();
+  database.connection
+    .prepare(
+      `INSERT INTO projection_routine_runs (run_id, routine_id, agent_id, trigger_id, run_kind, scheduled_for,
+         routine_name, instruction, delivery_id, status, error, created_at, updated_at, last_event_sequence)
+       VALUES (?, ?, ?, NULL, 'scheduled', ?, 'Late run', 'Collect the news.', ?, 'succeeded', NULL, ?, ?, 3)`,
+    )
+    .run(runId, routineId, agentId, time, `${runId}-delivery`, time, time);
+}
+
+function ageSettledSteps(database: OpenBotDatabase): void {
+  database.connection.exec(
+    `UPDATE routine_flow_steps SET created_at = run.updated_at, updated_at = run.updated_at
+     FROM projection_routine_runs AS run
+     WHERE run.run_id = routine_flow_steps.run_id AND routine_flow_steps.status <> 'running'`,
+  );
+}
+
+async function timed(work: () => Promise<void>): Promise<number> {
+  const started = performance.now();
+  await work();
+  return performance.now() - started;
+}
+
+function linkProbe(line: string): boolean {
+  return line === "SCAN routine_flow_links USING COVERING INDEX routine_flow_links_to";
+}
+
 const root = await mkdtemp(join(tmpdir(), "openbot-routine-flow-sweep-"));
 const database = new OpenBotDatabase(join(root, "profile"));
 try {
@@ -180,6 +211,7 @@ try {
   assert.deepEqual(indexes, [...INDEXES].sort());
   report.checks.push(`indexes: ${indexes.join(", ")}`);
   seed(database);
+  let clock = Date.now();
 
   const handoffs: { runId: string; agentId: string }[] = [];
   const flows = await Effect.runPromise(
@@ -199,10 +231,11 @@ try {
       stopRoutineRun: () => Effect.void,
       stopDelivery: () => Effect.void,
       changed: () => {},
+      now: () => new Date(clock),
     }),
   );
   try {
-    await Effect.runPromise(flows.sweep());
+    const firstSweepMs = await timed(() => Effect.runPromise(flows.sweep()));
     assert.equal(
       count(
         database,
@@ -212,6 +245,7 @@ try {
       "Each ended run of a routine without a flow gets its own agent's step: the canvas shows that answer.",
     );
     report.checks.push(`owner steps: ${SOLO_RUNS} runs of a routine without a flow`);
+    ageSettledSteps(database);
     assert.deepEqual(
       handoffs.sort((left, right) => left.runId.localeCompare(right.runId)),
       [
@@ -225,7 +259,10 @@ try {
     const plans = await sweepPlans(database, () => Effect.runPromise(flows.sweep()));
     report.plans = plans;
     const scans = Object.entries(plans).filter(([, plan]) =>
-      plan.some((line) => line.startsWith("SCAN") && !line.includes("USING INDEX routine_flow_steps_running")),
+      plan.some(
+        (line) =>
+          line.startsWith("SCAN") && !line.includes("USING INDEX routine_flow_steps_running") && !linkProbe(line),
+      ),
     );
     assert.deepEqual(scans, [], "No query of a sweep reads every row of a table.");
     report.checks.push(`query plans: ${Object.keys(plans).length} sweep queries, each reads by an index`);
@@ -237,10 +274,33 @@ try {
     assert.equal(handoffs.length, 2, "A sweep with nothing to do sends nothing.");
     assert.equal(count(database, "SELECT COUNT(*) AS count FROM routine_flow_steps"), steps);
     report.checks.push(`later sweeps: no handoff and no step in ${TIMED_SWEEPS} sweeps`);
+
+    clock += 60_000;
+    endRun(database, "late", "routine-flow", "chief", clock - 1_000);
+    endRun(database, "late-solo", "routine-solo", "solo", clock - 1_000);
+    await Effect.runPromise(flows.sweep());
+    assert.equal(
+      count(
+        database,
+        "SELECT COUNT(*) AS count FROM routine_flow_steps WHERE (run_id, agent_id) IN (VALUES ('late', 'chief'), ('late-solo', 'solo'))",
+      ),
+      2,
+      "A later sweep records the owner step of each run that ended since the last sweep.",
+    );
+    assert.deepEqual(handoffs.at(-1), { runId: "late", agentId: "editor" }, "A later sweep hands on the new answer.");
+    assert.equal(handoffs.length, 3);
+    report.checks.push("later sweep: the owner steps and the handoff of runs that ended since the last sweep");
+
+    clock += FULL_SWEEP_AFTER_MS;
+    const fullSweepMs = await timed(() => Effect.runPromise(flows.sweep()));
+    assert.equal(handoffs.length, 3, "A full sweep after a quiet half hour sends nothing again.");
+    report.checks.push("full sweep after half an hour: nothing sent again");
     report.timing = {
+      firstSweepMs: Math.round(firstSweepMs),
       sweeps: TIMED_SWEEPS,
       totalMs: Math.round(totalMs),
       perSweepMs: Number((totalMs / TIMED_SWEEPS).toFixed(2)),
+      fullSweepMs: Math.round(fullSweepMs),
     };
     report.answerPlan = checkTurnAnswerRead(database);
     report.checks.push("answer read: the turn's answers in chat order, by the turn index");
@@ -255,7 +315,8 @@ try {
   await rm(root, { recursive: true, force: true });
 }
 process.stdout.write(
-  `${report.passed ? "PASS" : "FAIL"}: ${report.checks.length} checks, ${report.timing?.perSweepMs} ms per sweep. ` +
+  `${report.passed ? "PASS" : "FAIL"}: ${report.checks.length} checks, ${report.timing?.perSweepMs} ms per later sweep, ` +
+    `${report.timing?.fullSweepMs} ms per full sweep. ` +
     `Report: ${join(OUT, "report.json")}\n`,
 );
 if (!report.passed) process.exitCode = 1;

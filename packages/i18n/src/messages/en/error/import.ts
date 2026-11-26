@@ -99,6 +99,8 @@ export const messages = defineMessages("error.import", {
   "error.import.transferAgentEnv": "{name}: enter the values of {names} again in Settings.",
   "error.import.transferMcpValues":
     "{name}: the MCP server is added turned off. Check its command, enter its values and full address again, and turn it on in Marketplace, Apps.",
+  "error.import.transferMcpSignIn":
+    "{name}: the app is added turned off. Connect it again and turn it on in Marketplace, Apps.",
   "error.import.transferValuesCleared":
     "{name}: values that can hold a secret were removed from its arguments or address. Enter them again in Settings.",
   "error.import.transferSharedKept":

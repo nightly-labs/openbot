@@ -1,6 +1,6 @@
 import { createHash } from "node:crypto";
 import { join } from "node:path";
-import { expandAttachmentReferences } from "@openbot/contracts/attachment-references";
+import { attachmentReferenceIds, expandAttachmentReferences } from "@openbot/contracts/attachment-references";
 import { chatTagReferences, expandChatTagReferences } from "@openbot/contracts/chat-tag-references";
 import type {
   AgentSummary,
@@ -120,6 +120,7 @@ export interface DeliveryPromptSources {
   fromChrome?: boolean;
   steerFramedAsUser?: boolean;
   steersQuietTurn?: boolean;
+  followsUpOwnAnswer?: boolean;
   externalChat?: boolean;
   taskReport?: TaskReportState | null;
   taskReportWaiting?: readonly string[];
@@ -215,11 +216,15 @@ const ATTACHED_FILES_HEADER = "\n\nAttached local files:\n";
 const NO_ANSWER_FROM = "No answer comes from ";
 const USER_LANGUAGE_LINE =
   "Write each line for the user in the language of the user's chat messages, not in the language of OpenBot notes or other agents.";
+const ROUTINE_LANGUAGE_LINE =
+  "Write each line for the user, also the first one, in the language that the routine task names, else the language that your instructions name, else the language of the user's chat messages, else the language of the routine task. Do not use the language of this OpenBot note.";
 const RESULT_FORMAT =
   "Reply in three lines: Status: done | partial | blocked, Result: <concrete outcome>, Evidence: <file, test, command, or none>.";
 const NO_ANSWER_REASON = ": the request to them ended before they answered. Do not wait for them.";
 const STILL_WORKING_FROM = "No answer yet from ";
 const EXTERNAL_CHAT_ANSWER = `This turn runs in an external chat, such as WhatsApp, Slack or Telegram. OpenBot posts your written answer there, and the people in it read it. Put the result only in openbot.send_message. When only a person in that chat can give what you need, ask them for it in your written answer, in plain words. Otherwise answer only ${QUIET_ANSWER}: nothing is posted.`;
+const EXTERNAL_CHAT_RESULT =
+  "OpenBot posts your written answer in the external chat of this turn, such as WhatsApp, Slack or Telegram, and the people in it read it. Give them the result in your own voice, as your instructions say. Do not name the teammate or say that a teammate did the work, unless your instructions tell you to.";
 const STILL_WORKING_REASON = ": they still work on the request. Their answer comes in a later turn.";
 export const HANDOFF_START = "Continue this OpenBot conversation.";
 export const HANDOFF_END = "--- end previous transcript ---";
@@ -302,6 +307,7 @@ function currentTeammatePrompts(prompt: string): TeammatePrompt[] | null {
 
 function userFramedTeammateText(
   delivery: QueueDelivery,
+  answersRequest: boolean,
   senderAgentId: string,
   agentNames: ReadonlyMap<string, string>,
   displayText: string,
@@ -309,7 +315,7 @@ function userFramedTeammateText(
 ): string {
   const senderName = agentNames.get(senderAgentId) ?? senderAgentId;
   const teammate = `Your teammate ${senderName} (${senderAgentId})`;
-  if (delivery.replyToMessageId)
+  if (answersRequest)
     return [
       `${teammate} answered your message through OpenBot:`,
       displayText,
@@ -401,6 +407,7 @@ export function deliveryPromptInput(context: DeliveryContext, sources: DeliveryP
   const { delivery, managedAttachments } = context;
   const { agentNames, snapshot } = sources;
   const fromTeammate = delivery.sender.kind === "agent" && delivery.sender.agentId !== delivery.recipientAgentId;
+  const answersRequest = Boolean(delivery.replyToMessageId) && sources.followsUpOwnAnswer !== true;
   const displayText = displayMessageReferences(delivery.text, delivery.attachments, agentNames, {
     fileHeadings: true,
     tags: fromTeammate ? undefined : sources.tags,
@@ -412,10 +419,7 @@ export function deliveryPromptInput(context: DeliveryContext, sources: DeliveryP
       `The user is replying to message ${delivery.replyToMessageId}.`,
       "--- referenced message ---",
       referenced
-        ? displayMessageReferences(referenced.text, referenced.attachments ?? [], agentNames, {
-            fileHeadings: true,
-            tags: sources.tags,
-          })
+        ? referencedMessageText(referenced, agentNames, sources.tags)
         : "(The referenced message is unavailable.)",
       "--- user reply ---",
       displayText || "(The reply contains attachments only.)",
@@ -437,6 +441,18 @@ export function deliveryPromptInput(context: DeliveryContext, sources: DeliveryP
       COLLABORATOR_SEPARATOR,
       displayText,
     ].join("\n");
+  } else if (
+    delivery.sender.kind === "agent" &&
+    delivery.sender.agentId === delivery.recipientAgentId &&
+    delivery.replyToMessageId
+  ) {
+    text = [
+      "This is the result of the request that you sent to an OpenBot channel with openbot.send_to_channel. You did that channel work yourself, in the channel.",
+      "Give the result to the user naturally now. Do not do the work again here, do not send the request again, and do not answer with openbot.send_message. For a blocked or paused status, tell the user what stopped and what they can do in the channel.",
+      USER_LANGUAGE_LINE,
+      COLLABORATOR_SEPARATOR,
+      displayText,
+    ].join("\n");
   } else if (delivery.sender.kind === "agent" && delivery.sender.agentId === delivery.recipientAgentId) {
     text = [
       "This message comes from your own chat, which started this task with openbot.start_task. The task is a separate conversation beside that chat.",
@@ -447,10 +463,11 @@ export function deliveryPromptInput(context: DeliveryContext, sources: DeliveryP
   } else if (
     delivery.sender.kind === "agent" &&
     sources.steerFramedAsUser &&
-    !(delivery.replyToMessageId && sources.answeredRoutine)
+    !(answersRequest && sources.answeredRoutine)
   ) {
     text = userFramedTeammateText(
       delivery,
+      answersRequest,
       delivery.sender.agentId,
       agentNames,
       displayText,
@@ -459,12 +476,13 @@ export function deliveryPromptInput(context: DeliveryContext, sources: DeliveryP
   } else if (delivery.sender.kind === "agent") {
     const senderAgentId = delivery.sender.agentId;
     const senderName = agentNames.get(senderAgentId) ?? senderAgentId;
-    const routine = delivery.replyToMessageId ? sources.answeredRoutine : null;
-    const replyProtocol = delivery.replyToMessageId
+    const routine = answersRequest ? sources.answeredRoutine : null;
+    const externalChatResult = sources.externalChat ? EXTERNAL_CHAT_RESULT : null;
+    const replyProtocol = answersRequest
       ? [
           routine
-            ? `This replies to a message you sent in a run of your routine "${routine.routineName}". That run has ended, so its task is below. Continue that task from this result now: do its next steps, such as a request to the next teammate, before you end this turn. Then give the result to the user naturally, starting with the teammate's name.`
-            : "This replies to a message you sent. Give the result to the user naturally, starting with the teammate's name.",
+            ? `This replies to a message you sent in a run of your routine "${routine.routineName}". That run has ended, so its task is below. Continue that task from this result now: do its next steps, such as a request to the next teammate, before you end this turn. ${externalChatResult ?? "Then give the result to the user naturally, starting with the teammate's name."}`
+            : `This replies to a message you sent. ${externalChatResult ?? "Give the result to the user naturally, starting with the teammate's name."}`,
           "For partial or blocked work, you still own the request: finish the rest yourself, with a follow-up, or with a better teammate; do not repeat a failed call unchanged. Give the user the blocker and its Unblock action only when the user must act. When OpenBot has a plugin for the service and it is not in your tools, call openbot.suggest_marketplace_app and end your answer with the next field of its result.",
           `Reply to the teammate only for another requested action or new information that unblocks its work, with replyToMessageId "${delivery.messageId}", never with the same request or an acknowledgement.`,
           USER_LANGUAGE_LINE,
@@ -505,10 +523,10 @@ export function deliveryPromptInput(context: DeliveryContext, sources: DeliveryP
   const wokenWaits = sources.wokenWaits ?? [];
   if (delivery.sender.kind === "routine" && sources.continuesWait) {
     text = [
-      "An event of an existing OpenBot routine continues a wait that you opened in this thread.",
+      "An event of an existing OpenBot routine continues a wait that you opened in this chat.",
       `Routine name: ${delivery.sender.routineName}`,
       "The routine run does the routine task in its own chat. Do not do the routine task here, and do not create, update, delete, or test routines.",
-      "Continue the work of this thread with the event, then give your answer as usual.",
+      "Continue the work of this chat with the event, then give your answer as usual.",
       ROUTINE_TASK_START,
       displayText,
       ROUTINE_TASK_END,
@@ -557,6 +575,7 @@ export function deliveryPromptInput(context: DeliveryContext, sources: DeliveryP
             `A stop that the user asked for is not a failure. When the user paused this routine, or asked to stop or skip this run, and did not turn it on again, do not do the task and do not call the ${ROUTINE_REPORT_FAILURE_TOOL} tool: call the ${ROUTINE_NO_UPDATE_TOOL} tool instead of a written answer.`,
           ]),
       `When the task could not be done, call the ${ROUTINE_REPORT_FAILURE_TOOL} tool with a short reason, then give your answer as usual.`,
+      ROUTINE_LANGUAGE_LINE,
       ROUTINE_TASK_START,
       displayText,
     ].join("\n");
@@ -661,13 +680,24 @@ function taggedAgentsNote(
   ].join(" ");
 }
 
+function continuationCountLines(count: number, limit: number): string[] {
+  return [
+    `Automatic continuation ${count} of ${limit}.`,
+    ...(count >= limit
+      ? [
+          "This can be the last automatic continuation of this request. If work is still left when you end this turn, end your answer with what is done, what is left, and what the user can send to continue.",
+        ]
+      : []),
+  ];
+}
+
 export function planContinuationPrompt(steps: readonly ConversationPlanStep[], count: number, limit: number): string {
   return [
     "OpenBot note, not a message from the user. Your last turn ended while your plan still had open steps:",
     ...steps.map((step) => `- [${step.status === "inProgress" ? "in progress" : "pending"}] ${step.text}`),
     "Continue the work now, from where you stopped. Do not repeat finished work or restate the plan. Keep the plan current and mark each step done when you finish it. If a step is already done, mark it done; if it no longer applies, remove it. Do not ask whether to continue. This note does not approve a risky action. If you must wait, need the user's input or approval, or are blocked, say so in one short line and end your turn.",
     USER_LANGUAGE_LINE,
-    `Automatic continuation ${count} of ${limit}.`,
+    ...continuationCountLines(count, limit),
   ].join("\n");
 }
 
@@ -686,7 +716,7 @@ export function nextStepContinuationPrompt(count: number, limit: number): string
     "OpenBot note, not a message from the user. Your last turn ended before the next step: you named the step or asked whether to continue, but you did not do it.",
     "Do the next step now, and continue until the request is done. Do not repeat finished work or restate earlier answers. Do not ask whether to continue. This note does not approve a risky action. If the request is already done, say so in one short line and end your turn. If you must wait, need the user's input or approval, or are blocked, say so in one short line and end your turn.",
     USER_LANGUAGE_LINE,
-    `Automatic continuation ${count} of ${limit}.`,
+    ...continuationCountLines(count, limit),
   ].join("\n");
 }
 
@@ -695,9 +725,9 @@ export function finishCheckContinuationPrompt(gap: string, count: number, limit:
     "OpenBot note, not a message from the user. A check of your last turn found that the request is not finished yet:",
     gap,
     "Do this work now, and continue until the request is done. Do not repeat finished work. Do not ask whether to continue. Before you say that the request is done, check the result. This note does not approve a risky action.",
-    "The user already sees your last answer. Do not write it again, also not in different words. At the end, write only what this work found or changed. If it confirms your last answer, say so in one short line. If the check is wrong and the request is already done, say so in one short line and end your turn. If you must wait, need the user's input or approval, or are blocked, say so in one short line and end your turn.",
+    "The user already sees your last answer. Do not write it again, also not in different words. At the end, write only what this work found or changed. The user does not see this note or the check: do not mention them, and do not say that a check or a verification is right or wrong. If this work confirms your last answer, or the request is already done, tell the user in one short line that you checked again and your last answer stays correct, and end your turn. If you must wait, need the user's input or approval, or are blocked, say so in one short line and end your turn.",
     USER_LANGUAGE_LINE,
-    `Automatic continuation ${count} of ${limit}.`,
+    ...continuationCountLines(count, limit),
   ].join("\n");
 }
 
@@ -767,6 +797,25 @@ export function displayMessageReferences(
   );
 }
 
+function referencedMessageText(
+  message: ConversationMessage,
+  agentNames: ReadonlyMap<string, string>,
+  tags: TagReferenceSource | undefined,
+): string {
+  const attachments = message.attachments ?? [];
+  const inlineIds = attachmentReferenceIds(message.text);
+  return [
+    displayMessageReferences(message.text, attachments, agentNames, { fileHeadings: true, tags }),
+    ...attachments.filter(({ id }) => !inlineIds.has(id)).map(attachmentMetadataLine),
+  ]
+    .filter(Boolean)
+    .join("\n");
+}
+
+function attachmentMetadataLine(attachment: NonNullable<ConversationMessage["attachments"]>[number]): string {
+  return `[attachment: ${attachment.name}; ${attachment.mimeType}; ${attachment.size} bytes]`;
+}
+
 function homeSkillTagName(id: string, name: string): string | undefined {
   const slug = homeSkillTagSlug(id);
   return slug === null ? undefined : `${name} at ${join(homeSkillRoot(), slug, "SKILL.md")}`;
@@ -780,9 +829,7 @@ export function renderHandoffMessage(
   message: ConversationSnapshot["messages"][number],
   agentNames: ReadonlyMap<string, string>,
 ): string {
-  const attachmentMetadata = (message.attachments ?? [])
-    .map((attachment) => `[attachment: ${attachment.name}; ${attachment.mimeType}; ${attachment.size} bytes]`)
-    .join("\n");
+  const attachmentMetadata = (message.attachments ?? []).map(attachmentMetadataLine).join("\n");
   const senderName = message.senderAgentId ? agentNames.get(message.senderAgentId) : undefined;
   const sender = message.senderAgentId
     ? ` agent:${senderName ? `${senderName} (${message.senderAgentId})` : message.senderAgentId}`

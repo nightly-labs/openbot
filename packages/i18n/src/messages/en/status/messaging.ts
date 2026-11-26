@@ -55,6 +55,9 @@ export const messages = defineMessages("status.messaging", {
     "Another OpenBot is linked to this WhatsApp number, so you can get two answers. To fix this, open Linked devices in WhatsApp on your phone and log out the OpenBot that you do not use.",
   "status.messaging.whatsappPaused":
     "OpenBot stopped answering here for 10 minutes: too many messages came in a short time. If another OpenBot is linked to this number, open Linked devices in WhatsApp on your phone and log out the OpenBot that you do not use.",
+  "status.messaging.whatsappNotDelivered": "WhatsApp did not accept this answer, so the person did not get it.",
+  "status.messaging.whatsappPartlyDelivered":
+    "WhatsApp did not accept all of this answer, so the person got only a part of it.",
   "status.messaging.whatsappOrchestratorName": "WhatsApp Orchestrator",
   "status.messaging.whatsappOrchestratorTitle": "Answers in WhatsApp and asks the team",
 });

@@ -49,6 +49,8 @@ import type {
   BitwardenConnectorStatus,
   BitwardenHostConnectInput,
   BranchAgentTaskInput,
+  BrowserHttpSignInInput,
+  BrowserPermissionAnswer,
   BrowserProfileList,
   BrowserProfileSummary,
   BrowserProxyList,
@@ -87,6 +89,8 @@ import type {
   HostSignalHomeSettings,
   HostSkillLearning,
   HostTimezoneSettings,
+  HostTurnLimits,
+  HostTurnLimitsInput,
   HostUpdateSettingsChange,
   HostUpdateStatus,
   HostVoiceModel,
@@ -105,6 +109,8 @@ import type {
   McpServerConfig,
   McpSignInState,
   McpTestResult,
+  MediaApprovalCreditsSetting,
+  MediaApprovalCreditsUpdate,
   MessagingOverview,
   MessagingWorkspaceInput,
   OnePasswordConnectorStatus,
@@ -210,6 +216,7 @@ import type {
   SaveEventRoutineResult,
   WebhookSecret,
 } from "@openbot/contracts/ipc-events";
+import type { AgentUsageLimits } from "@openbot/contracts/team-protocol/agent-usage-limit-v1";
 import type { ServerAppearance } from "@openbot/contracts/team-protocol/host-appearance-v1";
 import type { LiveVoiceSessionResponse, LiveVoiceStartRequest } from "@openbot/contracts/team-protocol/live-voice-v1";
 import type { QueueEditRequest } from "@openbot/contracts/team-protocol/queue-edit-v1";
@@ -272,6 +279,7 @@ export interface MobileServer {
   role: "owner" | "admin" | "member";
   memberLimit?: number;
   hosted?: boolean;
+  hidden?: true;
   storageGb?: number;
   restartAvailable?: boolean;
   keyChangedAt?: number;
@@ -313,6 +321,8 @@ export interface MobileBrowserViewSupport {
   contextMenu: boolean;
   viewport: boolean;
   navigation: boolean;
+  permissions: boolean;
+  httpSignIn: boolean;
 }
 
 type MobileBrowserTabAction =
@@ -330,6 +340,8 @@ export interface MobileWorkspaceContextValue {
     listener: (event: BrowserViewBridgeEvent) => void,
   ) => RemoteBrowserViewSession | null;
   controlBrowserTab: (serverId: string, action: MobileBrowserTabAction) => Promise<MobileBrowserTab | null>;
+  answerBrowserPermission: (serverId: string, answer: BrowserPermissionAnswer) => Promise<void>;
+  answerBrowserHttpSignIn: (serverId: string, input: BrowserHttpSignInInput) => Promise<void>;
   respondToApproval: (serverId: string, input: RespondToApprovalInput) => Promise<void>;
   readsWholeApprovals: (serverId: string) => boolean;
   readWholeApproval: (serverId: string, approval: PendingApproval) => Promise<void>;
@@ -343,6 +355,8 @@ export interface MobileWorkspaceContextValue {
   moveSidebarChat: (serverId: string, action: Extract<SidebarLayoutAction, { type: "move-agent" }>) => Promise<void>;
   loadQueue: (agentId: string, serverId: string) => Promise<QueueSnapshot>;
   canEditQueue: (serverId: string) => boolean;
+  loadAgentUsageLimits: (serverId: string) => Promise<AgentUsageLimits>;
+  canReadAgentUsageLimits: (serverId: string) => boolean;
   canReadModelSteering: (serverId: string) => boolean;
   canRetryMessage: (serverId: string) => boolean;
   canDeleteMessages: (serverId: string) => boolean;
@@ -387,8 +401,10 @@ export interface MobileWorkspaceContextValue {
   selectServer: (serverId: string) => void;
   leaveServer: (serverId: string) => Promise<void>;
   removeServer: (serverId: string) => Promise<void>;
+  setServerHidden: (serverId: string, hidden: boolean) => Promise<void>;
   refreshServers: () => Promise<void>;
   refreshServer: (serverId: string) => Promise<void>;
+  reconnectServer: (serverId: string) => Promise<void>;
   hostedServerStarting: (serverId: string) => void;
   knownServerChecks: (serverId: string) => ServerChecks | null;
   canEditServerIdentity: (serverId: string) => boolean;
@@ -423,6 +439,9 @@ export interface MobileWorkspaceContextValue {
   canManageServerTimezone: (serverId: string) => boolean;
   loadServerTimezone: (serverId: string) => Promise<HostTimezoneSettings>;
   setServerTimezone: (timezone: string | null, serverId: string) => Promise<HostTimezoneSettings>;
+  canManageServerTurnLimits: (serverId: string) => boolean;
+  loadServerTurnLimits: (serverId: string) => Promise<HostTurnLimits>;
+  setServerTurnLimits: (input: HostTurnLimitsInput, serverId: string) => Promise<HostTurnLimits>;
   canManageServerVoiceModel: (serverId: string) => boolean;
   canManageServerSignalHome: (serverId: string) => boolean;
   servesServerSignalHome: (serverId: string) => boolean;
@@ -433,6 +452,12 @@ export interface MobileWorkspaceContextValue {
   canManageAgentMemoryLimit: (serverId: string) => boolean;
   loadAgentMemoryLimit: (serverId: string) => Promise<HostAgentMemoryLimit>;
   setAgentMemoryLimit: (limit: number, serverId: string) => Promise<HostAgentMemoryLimit>;
+  canManageMediaApprovalCredits: (serverId: string) => boolean;
+  loadMediaApprovalCredits: (serverId: string) => Promise<MediaApprovalCreditsSetting>;
+  setMediaApprovalCredits: (
+    update: MediaApprovalCreditsUpdate,
+    serverId: string,
+  ) => Promise<MediaApprovalCreditsSetting>;
   canManageMemoryReview: (serverId: string) => boolean;
   loadMemoryReview: (serverId: string) => Promise<HostMemoryReview>;
   setMemoryReview: (interval: number, serverId: string) => Promise<HostMemoryReview>;
@@ -589,6 +614,7 @@ export interface MobileWorkspaceContextValue {
   testAgentRoutine: (agentId: string, routineId: string, serverId: string) => Promise<void>;
   canManageEvents: (serverId: string) => boolean;
   canManageMissedRuns: (serverId: string) => boolean;
+  canUseOnceRoutines: (serverId: string) => boolean;
   canManageRoutineResults: (serverId: string) => boolean;
   canGiveWebhookSecretToAgent: (serverId: string) => boolean;
   loadRoutineResultOptions: (serverId: string) => Promise<RoutineResultConnectionOption[]>;
@@ -615,6 +641,7 @@ export interface MobileWorkspaceContextValue {
   ) => Promise<AgentMemorySelectionState>;
   loadAgentMemories: (agentId: string, serverId: string) => Promise<AgentMemory[]>;
   loadAgentRoutines: (agentId: string, serverId: string) => Promise<Routine[]>;
+  loadOnceAgentRoutines: (agentId: string, serverId: string) => Promise<Routine[]>;
   loadRoutineCalendar: (
     input: RoutineCalendarInput,
     serverId: string,
@@ -808,7 +835,10 @@ export interface MobileWorkspaceContextValue {
     attachmentId: string,
     largeDownload?: RemoteLargeDownload,
     progress?: RemoteDownloadWatch,
+    tapped?: boolean,
+    wanted?: () => boolean,
   ) => Promise<RemoteFileUpload>;
+  prioritizeAttachmentDownload: (serverId: string, attachmentId: string) => void;
   downloadMessageFile: (serverId: string, file: MessageFileTarget) => Promise<RemoteFileUpload>;
   discardAttachment: (agentId: string, attachmentId: string, serverId?: string) => Promise<void>;
   hidesAgentsOnServer: (serverId: string) => boolean;
@@ -833,6 +863,7 @@ interface McpSignInRelay {
 export type MobileWorkspaceCapabilityCheck =
   | "browserViewSupport"
   | "canEditQueue"
+  | "canReadAgentUsageLimits"
   | "canReadModelSteering"
   | "canRetryMessage"
   | "canDeleteMessages"
@@ -874,11 +905,13 @@ type ServerCheckKey =
   | "canCreateLocalServers"
   | "canRestartServerItself"
   | "canManageServerTimezone"
+  | "canManageServerTurnLimits"
   | "canManageServerVoiceModel"
   | "canManageServerSignalHome"
   | "servesServerSignalHome"
   | "canReadMachineMetrics"
   | "canManageAgentMemoryLimit"
+  | "canManageMediaApprovalCredits"
   | "canManageMemoryReview"
   | "canManageSkillLearning"
   | "canManageBrowsingMemory"
@@ -915,6 +948,7 @@ type ServerCheckKey =
   | "canUpdateMarketplaceAgents"
   | "canManageEvents"
   | "canManageMissedRuns"
+  | "canUseOnceRoutines"
   | "canManageRoutineResults"
   | "canGiveWebhookSecretToAgent"
   | "canManageAgentSkills"

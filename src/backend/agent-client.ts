@@ -14,6 +14,15 @@ import type { ReadProviderHistory } from "./provider-history";
 
 export type AgentProvider = AgentProviderId;
 
+export const CLAUDE_CONTEXT_COMPACTION = "native";
+export const CUSTOM_ACP_CONTEXT_COMPACTION = "unsupported";
+
+export function fixedContextCompaction(provider: AgentProvider): AgentClient["contextCompaction"] {
+  if (provider === "claude") return CLAUDE_CONTEXT_COMPACTION;
+  if (provider === "acp") return CUSTOM_ACP_CONTEXT_COMPACTION;
+  return undefined;
+}
+
 export interface DiagnosticOrigin {
   readonly duringStop: boolean;
   readonly stderr?: boolean;
@@ -40,6 +49,7 @@ export interface AgentClient {
   readonly structuredOutput?: boolean;
   readonly canReleaseProcess?: () => boolean;
   readonly runsBackgroundWork?: () => boolean;
+  runsTurn?(externalThreadId: string, turnId: string): boolean;
   readonly replaceForNextTurn?: (threadIds: readonly string[]) => Effect.Effect<boolean>;
   start(): void;
   stop(): Effect.Effect<void, ProviderClientOperationError>;
@@ -54,6 +64,7 @@ export interface AgentClient {
   relaysMcpServer?(externalThreadId: string, config: McpServerConfig): boolean;
   holdsBackgroundWork?(externalThreadId: string): Effect.Effect<boolean, ProviderClientOperationError>;
   wakesAfterBackgroundWork?(externalThreadId: string): Effect.Effect<boolean, ProviderClientOperationError>;
+  wakeAfterLostWork?(externalThreadId: string): Effect.Effect<void, ProviderClientOperationError>;
   archiveThread?(externalThreadId: string): Effect.Effect<void, ProviderClientOperationError>;
   newestTurnId?(externalThreadId: string): Effect.Effect<string | null, ProviderClientOperationError>;
   nameThread?(externalThreadId: string, name: string): Effect.Effect<void, ProviderClientOperationError>;
@@ -106,6 +117,12 @@ export class ProviderSessionBusyError extends ProviderTurnActiveError {
   constructor(providerName: string) {
     super(providerName);
     this.message = sourceText("error.provider.acpSessionBusy", { provider: providerName });
+  }
+}
+
+export class ProviderSettingsConflictError extends Error {
+  constructor(readonly providerName: string) {
+    super(sourceText("error.provider.acpSettingsConflict", { provider: providerName }));
   }
 }
 

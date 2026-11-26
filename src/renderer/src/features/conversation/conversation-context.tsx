@@ -583,18 +583,19 @@ const Conversation = createSimpleContext({
             (thinkingItemIndex >= 0 ? thinking?.items?.[thinkingItemIndex] : "") ??
             "") + event.delta;
         rawAgentMessageBodies.set(messageKey, rawBody);
+        const cleanedBody = cleanAgentMessageText(rawBody);
         rendererPerfCount("conversation.cleanTextChars", rawBody.length);
         if (existing) {
           updateStored(existing, {
             ...existing,
-            body: cleanAgentMessageText(rawBody),
+            body: cleanedBody,
             streaming: true,
           });
           return;
         }
         if (thinking && thinkingItemIndex >= 0) {
           const items = [...(thinking.items ?? [])];
-          items[thinkingItemIndex] = cleanAgentMessageText(rawBody);
+          items[thinkingItemIndex] = cleanedBody;
           updateStored(thinking, { ...thinking, items, streaming: true });
           return;
         }
@@ -602,7 +603,7 @@ const Conversation = createSimpleContext({
           id: event.messageId,
           turnId: event.turnId,
           author: "agent",
-          body: cleanAgentMessageText(rawBody),
+          body: cleanedBody,
           time: formatMessageTime(event.createdAt),
           createdAt: event.createdAt,
           streaming: true,
@@ -698,10 +699,9 @@ const Conversation = createSimpleContext({
         setPresentedPromptResolutions((current) => ({ ...current, [agentId]: undefined }));
         setSubmittedPromptRequests((current) => ({ ...current, [agentId]: undefined }));
       }
-      setActiveTurns((current) => ({
-        ...current,
-        [agentId]: activeTurnId,
-      }));
+      setActiveTurns((current) =>
+        current[agentId] === activeTurnId ? current : { ...current, [agentId]: activeTurnId },
+      );
       setTurnProgress((current) => {
         const progress = current[agentId];
         if (progress && progress.turnId !== snapshot.activeTurnId) delete current[agentId];
@@ -791,10 +791,10 @@ const Conversation = createSimpleContext({
       if (merge === "latest")
         for (const messageId of openExchangesOutside(conversations[page.agentId]?.messages ?? [], page.messages))
           refreshOpenExchange(page.agentId, messageId);
-      setActiveTurns((current) => ({
-        ...current,
-        [page.agentId]: completedTurnByAgent.get(page.agentId) === page.activeTurnId ? null : page.activeTurnId,
-      }));
+      const pageActiveTurnId = completedTurnByAgent.get(page.agentId) === page.activeTurnId ? null : page.activeTurnId;
+      setActiveTurns((current) =>
+        current[page.agentId] === pageActiveTurnId ? current : { ...current, [page.agentId]: pageActiveTurnId },
+      );
       if (page.readState && merge !== "older") {
         const trackedAutoRead = autoReadAgentMessages.get(agentConversationKey(activeServerId(), page.agentId));
         const latestIncomingMessage = latestIncomingConversationMessage(page.messages);

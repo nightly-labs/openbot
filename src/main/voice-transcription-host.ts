@@ -1,6 +1,7 @@
 import { existsSync } from "node:fs";
 import { dirname, join } from "node:path";
 import type {
+  VoiceSpeechCheckRequest,
   VoiceTranscriptionEngine,
   VoiceTranscriptionFailure,
   VoiceTranscriptionRequest,
@@ -16,9 +17,19 @@ const SPEECH_BELOW_PEAK_DB = 40;
 const SPEECH_MARGIN_SAMPLES = (450 * SAMPLE_RATE) / 1_000;
 const SPEECH_END_SILENCE_SAMPLES = SAMPLE_RATE;
 const DIGITAL_SILENCE_DB = -90;
+const WHISPER_TOKENS_PER_SECOND = "15";
 const MAXIMUM_LEADING_SILENCE_SAMPLES = SAMPLE_RATE;
 const MAXIMUM_THREADS = 64;
 const SESSION_CONFIG_PATTERN = /^(?:[a-z0-9-]+\.cfg)?$/u;
+const SPEECH_WINDOW_SAMPLES = 512;
+const SPEECH_DETECTOR_CONFIG = {
+  threshold: 0.5,
+  minSilenceDuration: 0.25,
+  minSpeechDuration: 0.1,
+  windowSize: SPEECH_WINDOW_SAMPLES,
+  maxSpeechDuration: 20,
+};
+const SPEECH_BUFFER_SECONDS = 30;
 
 interface RecognizerConfig {
   featConfig: { sampleRate: number; featureDim: number };
@@ -58,6 +69,28 @@ interface SherpaOnnxAddon {
   offlineRecognizerSetConfig(recognizer: unknown, config: RecognizerConfig): void;
 }
 
+interface SpeechDetectorAddon {
+  createVoiceActivityDetector(
+    config: {
+      sileroVad: typeof SPEECH_DETECTOR_CONFIG & { model: string };
+      sampleRate: number;
+      numThreads: number;
+      provider: string;
+      debug: number;
+    },
+    bufferSizeInSeconds: number,
+  ): unknown;
+  voiceActivityDetectorAcceptWaveform(detector: unknown, samples: Float32Array): void;
+  voiceActivityDetectorIsEmpty(detector: unknown): boolean;
+  voiceActivityDetectorFlush(detector: unknown): void;
+}
+
+interface LoadedAddon {
+  path: string;
+  recognizer: SherpaOnnxAddon;
+  speechDetector: SpeechDetectorAddon | null;
+}
+
 interface LoadedRecognizer {
   key: string;
   addon: SherpaOnnxAddon;
@@ -80,6 +113,7 @@ class HostFailure extends Error {
 
 let loading: { key: string; promise: Promise<LoadedRecognizer> } | null = null;
 let queue: Promise<void> = Promise.resolve();
+let loadedAddon: LoadedAddon | null = null;
 
 function isAddon(value: unknown): value is SherpaOnnxAddon {
   return (
@@ -102,7 +136,23 @@ function isAddon(value: unknown): value is SherpaOnnxAddon {
   );
 }
 
-function loadAddon(path: string): SherpaOnnxAddon {
+function isSpeechDetectorAddon(value: unknown): value is SpeechDetectorAddon {
+  return (
+    typeof value === "object" &&
+    value !== null &&
+    "createVoiceActivityDetector" in value &&
+    typeof value.createVoiceActivityDetector === "function" &&
+    "voiceActivityDetectorAcceptWaveform" in value &&
+    typeof value.voiceActivityDetectorAcceptWaveform === "function" &&
+    "voiceActivityDetectorIsEmpty" in value &&
+    typeof value.voiceActivityDetectorIsEmpty === "function" &&
+    "voiceActivityDetectorFlush" in value &&
+    typeof value.voiceActivityDetectorFlush === "function"
+  );
+}
+
+function loadAddon(path: string): LoadedAddon {
+  if (loadedAddon?.path === path) return loadedAddon;
   const module: { exports: unknown } = { exports: {} };
   try {
     process.dlopen(module, path);
@@ -110,7 +160,38 @@ function loadAddon(path: string): SherpaOnnxAddon {
     throw new HostFailure("runtime-unavailable");
   }
   if (!isAddon(module.exports)) throw new HostFailure("runtime-unavailable");
-  return module.exports;
+  loadedAddon = {
+    path,
+    recognizer: module.exports,
+    speechDetector: isSpeechDetectorAddon(module.exports) ? module.exports : null,
+  };
+  return loadedAddon;
+}
+
+function hasSpeech(addonPath: string, speechDetector: string, samples: Float32Array): boolean {
+  if (!speechDetector || !existsSync(speechDetector)) return true;
+  try {
+    const addon = loadAddon(addonPath).speechDetector;
+    if (!addon) return true;
+    const detector = addon.createVoiceActivityDetector(
+      {
+        sileroVad: { ...SPEECH_DETECTOR_CONFIG, model: speechDetector },
+        sampleRate: SAMPLE_RATE,
+        numThreads: 1,
+        provider: "cpu",
+        debug: 0,
+      },
+      SPEECH_BUFFER_SECONDS,
+    );
+    for (let start = 0; start < samples.length; start += SPEECH_WINDOW_SAMPLES) {
+      addon.voiceActivityDetectorAcceptWaveform(detector, samples.slice(start, start + SPEECH_WINDOW_SAMPLES));
+      if (!addon.voiceActivityDetectorIsEmpty(detector)) return true;
+    }
+    addon.voiceActivityDetectorFlush(detector);
+    return !addon.voiceActivityDetectorIsEmpty(detector);
+  } catch {
+    return true;
+  }
 }
 
 function providerFor(addonPath: string, sessionConfig: string): string {
@@ -189,7 +270,7 @@ function recognizerKey(request: VoiceTranscriptionRequest): string {
 }
 
 async function createRecognizer(request: VoiceTranscriptionRequest): Promise<LoadedRecognizer> {
-  const addon = loadAddon(request.addonPath);
+  const addon = loadAddon(request.addonPath).recognizer;
   const session = { numThreads: request.numThreads, provider: providerFor(request.addonPath, request.sessionConfig) };
   try {
     const recognizer = await addon.createOfflineRecognizerAsync(
@@ -246,10 +327,11 @@ function toSamples(pcm: Uint8Array, leadingSilence: number): Float32Array {
 }
 
 async function transcribe(request: VoiceTranscriptionRequest): Promise<string> {
+  const recording = toSamples(request.pcm, request.leadingSilenceSamples);
+  if (request.engine === "whisper" && !hasSpeech(request.addonPath, request.speechDetector, recording)) return "";
   const loaded = await recognizerFor(request);
   useLanguage(loaded, request.language);
   if (request.pcm.byteLength < 2) return "";
-  const recording = toSamples(request.pcm, request.leadingSilenceSamples);
   const speech = loaded.engine === "whisper" ? speechOnly(recording) : undefined;
   const samples = speech ?? recording;
   const parts = splitIntoParts(samples, loaded.engine === "nemo-transducer" ? TRANSDUCER_PARTS : WINDOWED_PARTS);
@@ -265,6 +347,7 @@ async function decode(
   try {
     const stream = addon.createOfflineStream(recognizer);
     if (engine === "cohere-transcribe") addon.offlineStreamSetOption(stream, "language", language || "en");
+    if (engine === "whisper") addon.offlineStreamSetOption(stream, "max_tokens_per_second", WHISPER_TOKENS_PER_SECOND);
     addon.acceptWaveformOffline(stream, { samples, sampleRate: SAMPLE_RATE });
     await addon.decodeOfflineStreamAsync(recognizer, stream);
     return resultText(JSON.parse(addon.getOfflineStreamResultAsJson(stream))).trim();
@@ -354,12 +437,7 @@ function resultText(result: unknown): string {
 
 function isRequest(value: unknown): value is VoiceTranscriptionRequest {
   return (
-    typeof value === "object" &&
-    value !== null &&
-    "id" in value &&
-    typeof value.id === "number" &&
-    "addonPath" in value &&
-    typeof value.addonPath === "string" &&
+    isSpeechCheck(value) &&
     "modelDirectory" in value &&
     typeof value.modelDirectory === "string" &&
     "engine" in value &&
@@ -378,14 +456,33 @@ function isRequest(value: unknown): value is VoiceTranscriptionRequest {
     value.numThreads <= MAXIMUM_THREADS &&
     "sessionConfig" in value &&
     typeof value.sessionConfig === "string" &&
-    SESSION_CONFIG_PATTERN.test(value.sessionConfig) &&
+    SESSION_CONFIG_PATTERN.test(value.sessionConfig)
+  );
+}
+
+function isSpeechCheck(value: unknown): value is VoiceSpeechCheckRequest {
+  return (
+    typeof value === "object" &&
+    value !== null &&
+    "id" in value &&
+    typeof value.id === "number" &&
+    "addonPath" in value &&
+    typeof value.addonPath === "string" &&
+    "speechDetector" in value &&
+    typeof value.speechDetector === "string" &&
     "pcm" in value &&
     value.pcm instanceof Uint8Array
   );
 }
 
 function accept(value: unknown, respond: (response: VoiceTranscriptionResponse) => void): void {
-  if (!isRequest(value)) return;
+  if (!isRequest(value)) {
+    if (isSpeechCheck(value) && !("engine" in value))
+      queue = queue.then(() =>
+        respond({ id: value.id, speech: hasSpeech(value.addonPath, value.speechDetector, toSamples(value.pcm, 0)) }),
+      );
+    return;
+  }
   queue = queue.then(async () => {
     try {
       respond({ id: value.id, text: await transcribe(value) });

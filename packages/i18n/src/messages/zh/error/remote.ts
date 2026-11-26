@@ -86,6 +86,8 @@ export const messages = {
   "error.remote.connectionServiceUnreachable":
     "此电脑无法连接 OpenBot 连接服务。请检查网络连接。OpenBot 会自动重新连接。",
   "error.remote.serverAnswerTimeout": "服务器未及时响应。OpenBot 会自动重新连接。",
+  "error.remote.signInConnectionClosed":
+    "登录时与服务器的连接已关闭。如果反复出现，请确认服务器和此设备的日期和时间正确。",
   "error.remote.connectionCancelled": "远程连接已取消。",
   "error.remote.hostDisconnected": "与服务器的连接已断开。请确认该操作是否已完成，然后重试。",
   "error.remote.eventGap": "主机事件序列存在断档。",

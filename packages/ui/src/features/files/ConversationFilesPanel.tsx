@@ -1,6 +1,7 @@
 import { Button, buttonVariants, ChevronDown, Folder, X } from "@openbot/ui";
 import type { AgentProfile } from "@openbot/ui/data";
 import { useText } from "@openbot/ui/text";
+import type { JSX } from "@solidjs/web";
 import { onSettled, Show } from "solid-js";
 import { createScrollFades } from "../../components/createScrollFades";
 import { AgentPicker, type AgentPickerAgent } from "../agents/AgentPicker";
@@ -23,6 +24,7 @@ export interface ConversationFilesPanelProps {
   onFileAction: (file: StoredFileRow, action: StoredFileAction) => void | Promise<void>;
   workspaceAgents?: readonly AgentPickerAgent[];
   onOpenWorkspace?: (agentId: string) => void;
+  resizer?: JSX.Element;
 }
 
 function WorkspaceFolderEntry(props: { agents: readonly AgentPickerAgent[]; onOpen: (agentId: string) => void }) {
@@ -68,10 +70,12 @@ export function ConversationFilesPanel(props: ConversationFilesPanelProps) {
   onSettled(() => fades.stop);
   return (
     <aside
+      id="conversation-files-panel"
       class="browser-panel conversation-files-panel"
       aria-label={t("files.conversation.label", { title: props.conversationTitle })}
       style={props.width ? { "--browser-panel-width": `${props.width}px` } : undefined}
     >
+      {props.resizer}
       <header class="file-preview-header conversation-files-header">
         <Folder class="file-preview-file-icon side-panel-pane-title" aria-hidden="true" />
         <h2 class="side-panel-pane-title">{t("files.conversation.title")}</h2>

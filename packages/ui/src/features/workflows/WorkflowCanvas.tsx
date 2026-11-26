@@ -59,7 +59,6 @@ import {
   toast,
   Undo2,
   Ungroup,
-  Zap,
 } from "@openbot/ui";
 import type { JSX } from "@solidjs/web";
 import {
@@ -69,8 +68,10 @@ import {
   createStore,
   createUniqueId,
   For,
+  getOwner,
   onCleanup,
   onSettled,
+  runWithOwner,
   Show,
   untrack,
 } from "solid-js";
@@ -213,10 +214,26 @@ import {
   PresenceBar,
   peersOf,
   type WorkflowBuilderSpot,
+  type WorkflowCursorRoom,
+  type WorkflowOwnSpot,
   type WorkflowPeer,
   type WorkflowPresence,
 } from "./workflow-presence";
-import { activeRun, indexRunView, isOpenRun, type WorkflowRunView } from "./workflow-run-view";
+import {
+  activeRun,
+  indexRunView,
+  isOpenRun,
+  sameNodeRunState,
+  type WorkflowNodeRunState,
+  type WorkflowRunView,
+} from "./workflow-run-view";
+import {
+  templateAvailable,
+  templateClip,
+  WORKFLOW_TEMPLATES,
+  WorkflowStart,
+  type WorkflowTemplate,
+} from "./workflow-start";
 import { type TidyUnit, tidyLayout } from "./workflow-tidy";
 import { DrawArt, ShapesArt, StickyArt } from "./workflow-tool-art";
 
@@ -233,6 +250,7 @@ export interface WorkflowCanvasProps {
   opening?: boolean | undefined;
   readOnly?: boolean | undefined;
   presence?: WorkflowPresence | undefined;
+  onSpot?: ((spot: WorkflowOwnSpot) => void) | undefined;
   build?: WorkflowBuild | undefined;
   frame?: "window" | undefined;
   server?: string | undefined;
@@ -249,7 +267,7 @@ export interface WorkflowCanvasProps {
   onRestoreVersion: (versionId: string) => void;
   onPreviewVersion?: ((versionId: string | null) => void) | undefined;
   onSelect: (workflowId: string) => void;
-  onCreate: (input: { title: string; graph?: WorkflowGraph; paused?: true }) => void;
+  onCreate: (input: { title: string; graph?: WorkflowGraph; paused?: true }) => Promise<boolean>;
   onRename: (workflowId: string, title: string) => void;
   onSetPaused?: ((workflowId: string, paused: boolean) => void) | undefined;
   onExport?: ((workflowId: string) => Promise<WorkflowFileSaveResult>) | undefined;
@@ -560,16 +578,34 @@ export function WorkflowCanvas(props: WorkflowCanvasProps) {
       for (const entry of entries) {
         if (!(entry.target instanceof HTMLElement)) continue;
         const id = entry.target.dataset.slot;
-        if (id) draft[id] = { width: entry.target.offsetWidth, height: entry.target.offsetHeight };
+        if (!id) continue;
+        const width = entry.target.offsetWidth;
+        const height = entry.target.offsetHeight;
+        const previous = draft[id];
+        if (previous?.width === width && previous.height === height) continue;
+        draft[id] = { width, height };
       }
     }),
   );
   const [camera, setCamera] = createStore({ x: 0, y: 0, scale: 1 });
 
   const running = () => openRun() !== undefined;
-  const statusOf = (id: string) => runIndex().get(id)?.status;
-  const waitingOf = (id: string) => statusOf(id) === "running" && runIndex().get(id)?.step.waiting === true;
-  const stepOf = (id: string) => runIndex().get(id)?.step.id;
+  const canvasOwner = getOwner();
+  const runStates = new Map<string, () => WorkflowNodeRunState | undefined>();
+  const runStateOf = (id: string) => {
+    let state = runStates.get(id);
+    if (!state) {
+      state = runWithOwner(canvasOwner, () => createMemo(() => runIndex().get(id), { equals: sameNodeRunState }));
+      runStates.set(id, state);
+    }
+    return state();
+  };
+  const statusOf = (id: string) => runStateOf(id)?.status;
+  const waitingOf = (id: string) => {
+    const state = runStateOf(id);
+    return state?.status === "running" && state.step.waiting === true;
+  };
+  const stepOf = (id: string) => runStateOf(id)?.step.id;
 
   let viewport: HTMLElement | undefined;
   let root: HTMLElement | undefined;
@@ -628,12 +664,12 @@ export function WorkflowCanvas(props: WorkflowCanvasProps) {
     status: statusOf,
     waiting: waitingOf,
     progress: (id) => {
-      const agentId = statusOf(id) === "running" && !waitingOf(id) ? runIndex().get(id)?.step.agentId : null;
+      const agentId = statusOf(id) === "running" && !waitingOf(id) ? runStateOf(id)?.step.agentId : null;
       return agentId ? props.agentProgress?.(agentId) : undefined;
     },
-    error: (id) => runIndex().get(id)?.error,
-    resultsOf: (id) => runIndex().get(id)?.results ?? [],
-    pendingOf: (id) => (kindOf(id) === "image" ? (runIndex().get(id)?.pending ?? []) : []),
+    error: (id) => runStateOf(id)?.error,
+    resultsOf: (id) => runStateOf(id)?.results ?? [],
+    pendingOf: (id) => (kindOf(id) === "image" ? (runStateOf(id)?.pending ?? []) : []),
     duplicate: (id) => duplicateNodes([id]),
     resetSize: (id) => resetSize(id),
     beforeChange: () => commit(),
@@ -659,7 +695,7 @@ export function WorkflowCanvas(props: WorkflowCanvasProps) {
     rotateWebhookSecret: untrack(() => props.onRotateWebhookSecret),
     runStep: (id) => runNode(id),
     stopStep: (id) => {
-      const pending = runIndex().get(id)?.pending ?? [];
+      const pending = runStateOf(id)?.pending ?? [];
       if (pending.length === 0) {
         const step = stepOf(id);
         if (step) props.onStopStep(step);
@@ -771,15 +807,20 @@ export function WorkflowCanvas(props: WorkflowCanvasProps) {
   };
   onCleanup(dropFrames);
   let stopGesture = () => {};
+  const followRename = (workflowId: string, from: string, to: string) => {
+    if (workflowId === openId() && name() === from) renameTab(workflowId, to);
+  };
   const undo = () => {
     stopGesture();
     dropFrames();
-    edits.undo();
+    const rename = edits.undo();
+    if (rename) followRename(rename.workflowId, rename.after, rename.before);
   };
   const redo = () => {
     stopGesture();
     dropFrames();
-    edits.redo();
+    const rename = edits.redo();
+    if (rename) followRename(rename.workflowId, rename.before, rename.after);
   };
 
   let liveCanvas: CanvasSnapshot | undefined;
@@ -1170,10 +1211,10 @@ export function WorkflowCanvas(props: WorkflowCanvasProps) {
     if (action.startsWith("version:")) return openVersion(action.slice("version:".length));
     if (action === "live") return closeVersion();
     if (action !== "rename") closeVersion();
-    if (action === "new") props.onCreate({ title: t("workflow.canvas.untitled") });
+    if (action === "new") void props.onCreate({ title: t("workflow.canvas.untitled") });
     else if (action === "rename") startRename();
     else if (action === "duplicate")
-      props.onCreate({
+      void props.onCreate({
         title: t("workflow.canvas.copyOf", { name: name() }),
         graph: liveCanvas ? graphFromSnapshot(liveCanvas) : graph(),
         ...(props.onSetPaused ? { paused: true } : {}),
@@ -1219,9 +1260,8 @@ export function WorkflowCanvas(props: WorkflowCanvasProps) {
       },
     );
   };
-  const finishImport = (input: { title: string; graph: WorkflowGraph }) => {
-    setImporting(undefined);
-    props.onCreate({ ...input, ...(props.onSetPaused ? { paused: true } : {}) });
+  const finishImport = async (input: { title: string; graph: WorkflowGraph }) => {
+    if (await props.onCreate({ ...input, ...(props.onSetPaused ? { paused: true } : {}) })) setImporting(undefined);
   };
   const startRename = () => {
     setFolderEdit(undefined);
@@ -1345,6 +1385,14 @@ export function WorkflowCanvas(props: WorkflowCanvasProps) {
 
   const clampScale = (scale: number) => Math.min(Math.max(scale, MIN_SCALE), MAX_SCALE);
   const view = () => ({ width: viewport?.clientWidth ?? 0, height: viewport?.clientHeight ?? 0 });
+  const [viewSize, setViewSize] = createSignal({ width: 0, height: 0 });
+  const cursorRoom = (at: WfnPoint): WorkflowCursorRoom => {
+    const size = viewSize();
+    return {
+      right: size.width - (at.x * camera.scale + camera.x),
+      bottom: size.height - (at.y * camera.scale + camera.y),
+    };
+  };
   const local = (event: { clientX: number; clientY: number }): WfnPoint => {
     const rect = viewport?.getBoundingClientRect();
     return { x: event.clientX - (rect?.left ?? 0), y: event.clientY - (rect?.top ?? 0) };
@@ -1353,6 +1401,22 @@ export function WorkflowCanvas(props: WorkflowCanvasProps) {
     x: (point.x - camera.x) / camera.scale,
     y: (point.y - camera.y) / camera.scale,
   });
+  const ownSelection = () => canvas.selection()[0] ?? null;
+  const reportSpot = (selected: string | null) => {
+    const at = pointer;
+    props.onSpot?.({ at: at ? untrack(() => toWorld(at)) : null, selected });
+  };
+  createEffect(ownSelection, (selected) => {
+    untrack(() => reportSpot(selected));
+  });
+  createEffect(
+    () => `${camera.x} ${camera.y} ${camera.scale}`,
+    () => {
+      untrack(() => {
+        if (pointer) reportSpot(ownSelection());
+      });
+    },
+  );
   const placeCamera = (next: Camera) => {
     setCamera((draft) => {
       draft.x = next.x;
@@ -1824,6 +1888,38 @@ export function WorkflowCanvas(props: WorkflowCanvasProps) {
     canvas.select(copies.map((node) => node.id));
   };
 
+  const [blankFor, setBlankFor] = createSignal<string>();
+  const starting = () =>
+    live().length === 0 && strokes().length === 0 && !frozen() && !props.opening && blankFor() !== openId();
+  const templateHost = () => ({ t, features: props.features, catalogs: props.catalogs });
+  const templates = createMemo(() => WORKFLOW_TEMPLATES.filter((choice) => templateAvailable(choice, templateHost())));
+  const startFromTemplate = (choice: WorkflowTemplate) => {
+    const template = templateClip(choice, templateHost());
+    place(
+      {
+        ...template,
+        fields: Object.fromEntries(
+          template.nodes.map((node) => {
+            const fields = template.fields[node.id] ?? {};
+            const defaults =
+              node.kind === "output" ? {} : hostDefaults(node.kind, props.catalogs, props.features, fields);
+            return [node.id, { ...defaults, ...fields }];
+          }),
+        ),
+      },
+      { x: 0, y: 0 },
+      "template",
+    );
+    canvas.select([]);
+    const before = name();
+    if (before === t("workflow.canvas.untitled")) {
+      const after = t(choice.title);
+      edits.renamedWith({ workflowId: openId(), before, after });
+      renameTab(openId(), after);
+    }
+    afterLayout(() => fitView(true));
+  };
+
   const withoutIds = (clip: Clip): Clip => {
     const kinds = new Map(clip.nodes.map((node) => [node.id, node.kind]));
     return {
@@ -2152,7 +2248,9 @@ export function WorkflowCanvas(props: WorkflowCanvasProps) {
     });
   };
 
-  const peers = createMemo(() => (props.features.presence && props.presence ? peersOf(props.presence) : []));
+  const peers = createMemo<readonly WorkflowPeer[]>((previous) =>
+    props.features.presence && props.presence ? peersOf(props.presence, previous) : [],
+  );
   const self = () =>
     props.features.presence ? props.presence?.members.find((member) => member.id === props.presence?.self) : undefined;
   const spots = () => props.presence?.spots ?? {};
@@ -2705,6 +2803,7 @@ export function WorkflowCanvas(props: WorkflowCanvasProps) {
       | undefined;
     let space = false;
     const onResize = new ResizeObserver(() => {
+      setViewSize(view());
       if (!cameraMoved) fitView(false);
     });
     const stopClick = (event: MouseEvent) => {
@@ -3160,6 +3259,7 @@ export function WorkflowCanvas(props: WorkflowCanvasProps) {
     const onHover = (event: PointerEvent) => {
       const over = event.target instanceof Element && !event.target.closest("[data-wfn-portal]");
       pointer = over ? local(event) : undefined;
+      reportSpot(untrack(ownSelection));
       if (placing()) setGhost(over ? local(event) : null);
       const show = ui.tool === "draw" && ui.draw === "eraser" && over;
       if (!show && ink.eraser === null) return;
@@ -3170,6 +3270,7 @@ export function WorkflowCanvas(props: WorkflowCanvasProps) {
     };
     const onLeave = () => {
       pointer = undefined;
+      reportSpot(untrack(ownSelection));
       setGhost(null);
       setInk((draft) => {
         draft.eraser = null;
@@ -3636,8 +3737,10 @@ export function WorkflowCanvas(props: WorkflowCanvasProps) {
                   </div>
                 )}
               </Show>
-              <PeerCursors peers={peers()} spots={spots()} />
-              <Show when={builder()}>{(spot) => <BuilderCursor spot={spot()} glide={BUILD_GLIDE} />}</Show>
+              <PeerCursors peers={peers()} spots={spots()} room={cursorRoom} />
+              <Show when={builder()}>
+                {(spot) => <BuilderCursor spot={spot()} glide={BUILD_GLIDE} room={cursorRoom} />}
+              </Show>
             </div>
             <Show when={marquee()}>
               {(box) => (
@@ -3893,17 +3996,8 @@ export function WorkflowCanvas(props: WorkflowCanvasProps) {
             <Spinner label={t("workflow.canvas.opening")} />
           </div>
         </Show>
-        <Show when={live().length === 0 && !frozen() && !props.opening && allows("trigger")}>
-          <div class="wfn-empty">
-            <span class="wfn-menu-icon wfn-empty-icon" data-kind="trigger" aria-hidden="true">
-              <Zap />
-            </span>
-            <h2 class="wfn-empty-title">{t("workflow.canvas.empty.title")}</h2>
-            <Button size="sm" onClick={() => addNode("trigger")}>
-              <Plus aria-hidden="true" />
-              {t("workflow.canvas.empty.add")}
-            </Button>
-          </div>
+        <Show when={starting()}>
+          <WorkflowStart templates={templates()} onTemplate={startFromTemplate} onBlank={() => setBlankFor(openId())} />
         </Show>
         <Show when={props.frame === "window"}>{corner()}</Show>
         <Show when={props.onExport && !props.readOnly}>
@@ -4076,7 +4170,7 @@ export function WorkflowCanvas(props: WorkflowCanvasProps) {
           class="wfn-hud wfn-hud-tools"
           role="toolbar"
           aria-label={t("workflow.canvas.tool.label")}
-          hidden={frozen()}
+          hidden={frozen() || starting()}
         >
           <HudButton
             label={t("workflow.canvas.tool.select")}
@@ -4169,30 +4263,32 @@ export function WorkflowCanvas(props: WorkflowCanvasProps) {
           onHeight={setDropHeight}
         />
 
-        <Show when={minimap()}>
+        <Show when={!starting() && minimap()}>
           {(map) => <WorkflowMinimap map={map()} selected={board.selected()} onPan={panMinimap} />}
         </Show>
 
-        <WorkflowZoomMenu
-          scale={camera.scale}
-          minScale={MIN_SCALE}
-          maxScale={MAX_SCALE}
-          minimap={ui.minimap}
-          canTidy={canTidy()}
-          onTidy={tidyUp}
-          onZoom={(action) => {
-            if (action === "in") zoomBy(ZOOM_STEP);
-            else if (action === "out") zoomBy(1 / ZOOM_STEP);
-            else if (action === "reset") zoomTo(1);
-            else fitView(true);
-          }}
-          onZoomTo={zoomTo}
-          onToggleMinimap={() =>
-            setUi((draft) => {
-              draft.minimap = !draft.minimap;
-            })
-          }
-        />
+        <Show when={!starting()}>
+          <WorkflowZoomMenu
+            scale={camera.scale}
+            minScale={MIN_SCALE}
+            maxScale={MAX_SCALE}
+            minimap={ui.minimap}
+            canTidy={canTidy()}
+            onTidy={tidyUp}
+            onZoom={(action) => {
+              if (action === "in") zoomBy(ZOOM_STEP);
+              else if (action === "out") zoomBy(1 / ZOOM_STEP);
+              else if (action === "reset") zoomTo(1);
+              else fitView(true);
+            }}
+            onZoomTo={zoomTo}
+            onToggleMinimap={() =>
+              setUi((draft) => {
+                draft.minimap = !draft.minimap;
+              })
+            }
+          />
+        </Show>
 
         <Show when={ui.hidden}>
           <Button variant="secondary" size="sm" class="wfn-hud-show" onClick={toggleHud}>

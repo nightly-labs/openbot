@@ -10,9 +10,18 @@ import {
   type WorkflowGitHubRepositoryOptions,
   type WorkflowGraph,
   type WorkflowNodeKind,
+  type WorkflowRunDetail,
+  type WorkflowRunPage,
   type WorkflowSaveResult,
+  type WorkflowStep,
   type WorkflowSummary,
 } from "@openbot/contracts/ipc";
+import {
+  WORKFLOW_PRESENCE_LIMITS,
+  type WorkflowSpot,
+  type WorkflowSpotEvent,
+  type WorkflowSpotInput,
+} from "@openbot/contracts/team-protocol/workflow-presence-v1";
 import type { AppTextKey } from "@openbot/i18n";
 import { toast } from "@openbot/ui";
 import type { WorkflowCanvasProps } from "@openbot/ui/features/workflows/WorkflowCanvas";
@@ -32,7 +41,8 @@ import type {
   WorkflowSlackWorkspace,
   WorkflowTelegramChat,
 } from "@openbot/ui/features/workflows/workflow-model";
-import { EMPTY_WORKFLOW_RUN_VIEW } from "@openbot/ui/features/workflows/workflow-run-view";
+import type { WorkflowOwnSpot } from "@openbot/ui/features/workflows/workflow-presence";
+import { EMPTY_WORKFLOW_RUN_VIEW, sameWorkflowStep } from "@openbot/ui/features/workflows/workflow-run-view";
 import { useText } from "@openbot/ui/text";
 import { createEffect, createMemo, createSignal, onSettled, untrack } from "solid-js";
 import { agentAskedHere } from "../../agent-requests";
@@ -45,6 +55,7 @@ import type { WorkflowHost } from "./workflows-port";
 const RUN_PAGE = 20;
 const CACHED_WORKFLOWS = 20;
 const SAVE_DELAY_MS = 400;
+const REFRESH_DELAY_MS = 50;
 
 const NO_OPTIONS: WorkflowGitHubRepositoryOptions = { labels: [], people: [] };
 
@@ -71,6 +82,46 @@ export interface WorkflowRequest {
 type WorkflowBase = { revision: number; graph: WorkflowGraph; readOnly?: true };
 
 type WorkflowsControllerProps = Omit<WorkflowCanvasProps, "workflow" | "features" | "frame" | "readOnly" | "catalogs">;
+
+const sameRun = (left: WorkflowRunDetail, right: WorkflowRunDetail): boolean => {
+  const one = left.run;
+  const other = right.run;
+  if (
+    one.id !== other.id ||
+    one.workflowId !== other.workflowId ||
+    one.number !== other.number ||
+    one.triggerNodeId !== other.triggerNodeId ||
+    one.source !== other.source ||
+    one.status !== other.status ||
+    one.error !== other.error ||
+    one.startedAt !== other.startedAt ||
+    one.endedAt !== other.endedAt ||
+    left.steps.length !== right.steps.length
+  )
+    return false;
+  return left.steps.every((step, index) => {
+    const otherStep = right.steps[index];
+    return otherStep !== undefined && sameWorkflowStep(step, otherStep);
+  });
+};
+
+type RunPageLike = Pick<WorkflowRunPage, "nextBefore"> & {
+  readonly runs: readonly WorkflowRunDetail[];
+  readonly soloSteps: readonly WorkflowStep[];
+};
+
+const sameRunPage = (left: RunPageLike, right: RunPageLike): boolean =>
+  left.nextBefore === right.nextBefore &&
+  left.soloSteps.length === right.soloSteps.length &&
+  left.runs.length === right.runs.length &&
+  left.runs.every((run, index) => {
+    const other = right.runs[index];
+    return other !== undefined && sameRun(run, other);
+  }) &&
+  left.soloSteps.every((step, index) => {
+    const other = right.soloSteps[index];
+    return other !== undefined && sameWorkflowStep(step, other);
+  });
 
 const lastWorkflowKey = (hostKey: string) => `openbot:last-workflow:${hostKey}`;
 function readLastWorkflow(hostKey: string): string | undefined {
@@ -180,6 +231,8 @@ export function createWorkflowsController(
   let disposed = false;
   let pending: { workflowId: string; graph: WorkflowGraph } | undefined;
   let timer: ReturnType<typeof setTimeout> | undefined;
+  let refreshTimer: ReturnType<typeof setTimeout> | undefined;
+  const refreshPending = new Map<string, { workflowId: string | null; agentId: string | undefined }>();
   let edits = 0;
   let writing = 0;
   let previewRequest = 0;
@@ -323,8 +376,8 @@ export function createWorkflowsController(
     if (workflowId !== current || !list.some((summary) => summary.id === workflowId)) return;
     const [next, page, versions, github] = await (details ?? readDetail(workflowId));
     if (disposed || workflowId !== current) return;
-    const open = stored()?.detail;
-    const shown = open?.summary.id === workflowId ? open : undefined;
+    const open = stored();
+    const shown = open?.detail.summary.id === workflowId ? open.detail : undefined;
     const known = shown && bases.get(workflowId);
     const detail = shown && known && next.revision < known.revision ? shown : next;
     const newer = known !== undefined && next.revision > known.revision;
@@ -334,7 +387,12 @@ export function createWorkflowsController(
       const entry = cache.get(hostKey);
       if (entry) entry.last = workflowId;
     }
-    const value = { detail, runs: page, versions, github };
+    const value = {
+      detail,
+      runs: open && shown ? (sameRunPage(open.runs, page) ? open.runs : page) : page,
+      versions,
+      github,
+    };
     if (newer && idle && agentId !== undefined && shown) {
       playBuild(workflowId, agentId, shown.graph);
       show(value);
@@ -556,7 +614,7 @@ export function createWorkflowsController(
     return libraryPictures();
   };
 
-  const refresh = (workflowId: string | null, agentId?: string) => {
+  const refreshNow = (workflowId: string | null, agentId?: string) => {
     if (
       workflowId !== null &&
       agentId !== undefined &&
@@ -579,14 +637,137 @@ export function createWorkflowsController(
     readFolders();
   };
 
+  const flushRefresh = () => {
+    refreshTimer = undefined;
+    if (disposed) return;
+    const requests = [...refreshPending.values()];
+    refreshPending.clear();
+    for (const request of requests) {
+      try {
+        refreshNow(request.workflowId, request.agentId);
+      } catch (error) {
+        report(error);
+      }
+    }
+  };
+
+  const refresh = (workflowId: string | null, agentId?: string) => {
+    refreshPending.set(`${workflowId ?? ""}\u0000${agentId ?? ""}`, { workflowId, agentId });
+    refreshTimer ??= setTimeout(flushRefresh, REFRESH_DELAY_MS);
+  };
+
+  const [spots, setSpots] = createSignal<Readonly<Record<string, WorkflowSpot>>>({});
+  const openWorkflowId = createMemo(() => stored()?.detail.summary.id);
+  const spotSeenAt = new Map<string, number>();
+  let spotSweep: ReturnType<typeof setInterval> | undefined;
+  const sweepSpots = () => {
+    const oldest = Date.now() - WORKFLOW_PRESENCE_LIMITS.staleMs;
+    const stale = [...spotSeenAt].filter(([, seenAt]) => seenAt < oldest).map(([memberId]) => memberId);
+    if (stale.length === 0) return;
+    for (const memberId of stale) spotSeenAt.delete(memberId);
+    setSpots((current) => Object.fromEntries(Object.entries(current).filter(([memberId]) => spotSeenAt.has(memberId))));
+    if (spotSeenAt.size === 0) stopSpotSweep();
+  };
+  const stopSpotSweep = () => {
+    if (spotSweep !== undefined) clearInterval(spotSweep);
+    spotSweep = undefined;
+  };
+  const clearSpots = () => {
+    spotSeenAt.clear();
+    stopSpotSweep();
+    setSpots({});
+  };
+  let ownSpot: WorkflowSpotInput | null = null;
+  let spotSentAt = 0;
+  let spotTimer: ReturnType<typeof setTimeout> | undefined;
+  let keepAliveTimer: ReturnType<typeof setTimeout> | undefined;
+  let spotEntered = false;
+  const sendSpot = () => {
+    spotTimer = undefined;
+    if (!ownSpot || disposed) return;
+    spotSentAt = Date.now();
+    spotEntered = true;
+    host.setSpot(ownSpot);
+    if (keepAliveTimer !== undefined) clearTimeout(keepAliveTimer);
+    keepAliveTimer = setTimeout(keepSpotAlive, WORKFLOW_PRESENCE_LIMITS.keepAliveMs);
+  };
+  const keepSpotAlive = () => {
+    keepAliveTimer = undefined;
+    if (ownSpot) queueSpot(ownSpot);
+  };
+  const queueSpot = (input: WorkflowSpotInput) => {
+    ownSpot = input;
+    if (spotTimer !== undefined) return;
+    const wait = spotSentAt + WORKFLOW_PRESENCE_LIMITS.sendIntervalMs - Date.now();
+    if (wait <= 0) sendSpot();
+    else spotTimer = setTimeout(sendSpot, wait);
+  };
+  const leaveSpot = () => {
+    if (spotTimer !== undefined) clearTimeout(spotTimer);
+    if (keepAliveTimer !== undefined) clearTimeout(keepAliveTimer);
+    spotTimer = undefined;
+    keepAliveTimer = undefined;
+    ownSpot = null;
+    if (!spotEntered) return;
+    spotEntered = false;
+    host.setSpot({ workflowId: null, at: null, selected: null });
+  };
+  const reportSpot = (spot: WorkflowOwnSpot) => {
+    const workflowId = untrack(openWorkflowId);
+    if (!workflowId || !host.presenceSupported() || !untrack(pageVisible)) return;
+    queueSpot({ workflowId, at: spot.at, selected: spot.selected });
+  };
+  const resendSpot = () => {
+    if (!ownSpot || !host.presenceSupported()) return;
+    spotSentAt = 0;
+    queueSpot(ownSpot);
+  };
+  const receiveSpot = (event: WorkflowSpotEvent) => {
+    if (event.workflowId !== untrack(openWorkflowId)) return;
+    const spot = event.spot;
+    if (spot) {
+      spotSeenAt.set(event.memberId, Date.now());
+      spotSweep ??= setInterval(sweepSpots, WORKFLOW_PRESENCE_LIMITS.keepAliveMs);
+    } else spotSeenAt.delete(event.memberId);
+    setSpots((current) => {
+      const { [event.memberId]: _left, ...others } = current;
+      return spot ? { ...others, [event.memberId]: spot } : others;
+    });
+  };
+  const [pageVisible, setPageVisible] = createSignal(document.visibilityState !== "hidden");
+  const onVisibilityChange = () => setPageVisible(document.visibilityState !== "hidden");
+  createEffect(
+    () => (pageVisible() && host.presenceSupported() ? openWorkflowId() : undefined),
+    (workflowId) => {
+      clearSpots();
+      if (!workflowId) {
+        leaveSpot();
+        return;
+      }
+      if (ownSpot?.workflowId !== workflowId) queueSpot({ workflowId, at: null, selected: null });
+    },
+  );
+
   onSettled(() => {
-    const stop = host.onChanged(refresh);
+    const stop = host.onChanged((workflowId, agentId) => {
+      refresh(workflowId, agentId);
+      if (workflowId === null) resendSpot();
+    });
     const stopFolders = host.onFoldersChanged(readFolders);
+    const stopSpots = host.onSpot(receiveSpot);
     window.addEventListener("focus", onFocus);
+    window.addEventListener("pagehide", leaveSpot);
+    document.addEventListener("visibilitychange", onVisibilityChange);
     return () => {
       stop();
       stopFolders();
+      stopSpots();
+      leaveSpot();
+      stopSpotSweep();
       window.removeEventListener("focus", onFocus);
+      window.removeEventListener("pagehide", leaveSpot);
+      document.removeEventListener("visibilitychange", onVisibilityChange);
+      if (refreshTimer !== undefined) clearTimeout(refreshTimer);
       flush();
       disposed = true;
     };
@@ -724,6 +905,7 @@ export function createWorkflowsController(
       return summaries();
     },
     tabs,
+    onSpot: reportSpot,
     get folders() {
       return folders();
     },
@@ -800,10 +982,13 @@ export function createWorkflowsController(
     },
     onCreate: (input) => {
       flush();
-      write(async () => {
+      return queued(async () => {
         const created = await tracked("create", () => host.workflows.create(input));
-        await load(created.summary.id);
-      });
+        await load(created.summary.id).catch(report);
+      }).then(
+        () => true,
+        () => false,
+      );
     },
     onRename: (workflowId, title) => {
       tracked("rename", () => host.workflows.rename({ workflowId, title })).catch(report);
@@ -864,6 +1049,7 @@ export function createWorkflowsController(
     uploadPicture,
     downloadMedia,
     readOnly: () => lock() !== undefined,
+    spots,
     github,
     props,
   };

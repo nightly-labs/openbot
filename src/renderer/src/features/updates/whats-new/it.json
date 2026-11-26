@@ -1,5 +1,75 @@
 [
   {
+    "version": "0.79.0",
+    "date": "2026-11-25",
+    "notices": [
+      "Aggiorna anche ogni server a cui ti sei unito a questa versione. Gli strumenti per immagini e video con crediti, le richieste di posizione e molte delle correzioni qui sotto funzionano su un server solo se il server ha questa versione."
+    ],
+    "groups": [
+      {
+        "type": "added",
+        "items": [
+          "Gli agenti possono creare immagini e video con i crediti di OpenBot e modificare le tue foto. La scheda di approvazione mostra il modello, il prezzo e il prompt. Puoi scegliere un altro modello prima di consentire. La voce Credits nella barra a sinistra mostra il tuo saldo. Un proprietario o un amministratore può attivare o disattivare «Gli agenti possono usare crediti».",
+          "Gli agenti possono pagare i siti in crypto da un wallet NEAR Intents. Collegalo in Impostazioni server › Vault › Crypto con una passkey, poi fai un deposito. Ogni pagamento attende la tua approvazione nella chat, a meno che tu non scelga «Consenti sempre» per quel sito. Un budget giornaliero limita quanto possono spendere gli agenti. Il wallet vale solo per questo computer e i pagamenti usano fondi reali.",
+          "Ogni account riceve 10 crediti gratuiti di benvenuto. Puoi anche riscattare un codice nella pagina Credits con Redeem code.",
+          "La scheda del browser di un agente può chiedere la tua posizione. La chat ti chiede prima, e tu scegli Blocca, Consenti sempre o Consenti. Prima il browser bloccava sempre la richiesta.",
+          "La barra laterale ha schede sopra l’elenco delle chat: Tutte, Non lette e le cartelle che scegli. Ogni scheda mostra le sue chat non lette."
+        ]
+      },
+      {
+        "type": "changed",
+        "items": [
+          "Un nuovo passaggio di un flusso di lavoro ora parte con un modello che può funzionare. Un passaggio di testo usa il tuo modello preferito, o il modello abituale di un provider collegato.",
+          "Se hai solo crediti gratuiti, l’elenco dei modelli di una scheda di approvazione contrassegna con «Crediti gratuiti» i modelli che pagano con i crediti gratuiti.",
+          "Il pannello laterale può dividersi in massimo tre gruppi, uno sopra l’altro. Trascina la linea tra due gruppi per cambiarne le altezze."
+        ]
+      },
+      {
+        "type": "fixed",
+        "items": [
+          "L’app si blocca meno spesso, soprattutto su Windows. Conserva per poco tempo i risultati dei controlli lenti e svolge il lavoro lento in background.",
+          "Quando un agente Claude finisce un piano in modalità piano, la chat ora mostra il piano con Approva e Stop planning. Prima non compariva nessuna approvazione e l’agente iniziava a costruire.",
+          "Un messaggio di un altro agente o di una routine non ferma più il lavoro di un agente Claude occupato.",
+          "Un avviso di un sito nella scheda del browser di un agente non copre più la finestra di OpenBot finché non clicchi OK. L’avviso si chiude da solo e l’agente riceve il suo testo.",
+          "Su un desktop Linux X11, digitare in OpenBot non si interrompe più dopo che un agente usa Controllo del computer in un’altra app. Se la digitazione si è già interrotta, esci e rientra una volta."
+        ]
+      }
+    ]
+  },
+  {
+    "version": "0.78.0",
+    "date": "2026-11-24",
+    "notices": [
+      "Aggiorna anche ogni server a cui ti sei unito a questa versione. Molte delle correzioni qui sotto funzionano su un server solo se il server ha questa versione."
+    ],
+    "groups": [
+      {
+        "type": "added",
+        "items": [
+          "Usa la voce nei canali. Quando detti un messaggio a un canale, l’app legge ad alta voce la risposta di un agente. Puoi anche avviare una conversazione vocale dalla casella dei messaggi del canale.",
+          "Nascondi un server dalla barra dei server. Il server è nascosto anche sugli altri tuoi computer. Selezionalo nella cartella «Server nascosti» per mostrarlo di nuovo."
+        ]
+      },
+      {
+        "type": "changed",
+        "items": [
+          "La pagina Attività ora si chiama Thread, come nell’app per il telefono e nel pannello laterale della chat.",
+          "Le risposte in streaming e i flussi di lavoro che girano nello stesso momento usano meno CPU, e il client web apre un server più in fretta."
+        ]
+      },
+      {
+        "type": "fixed",
+        "items": [
+          "Su Mac, Connetti e Aggiungi account per Claude ora aprono la pagina di accesso di Claude da OpenBot.",
+          "Quando la connessione a un server a cui ti sei unito smette di inviare dati, l’app si riconnette da sola.",
+          "I canali lunghi di un server a cui ti sei unito si aprono e si aggiornano più in fretta.",
+          "Un output «Notifica» di un flusso di lavoro o un passaggio che aspetta un’approvazione ora invia una notifica sul telefono.",
+          "Una chat con Gemini continua dopo che Google rifiuta un risultato di uno strumento. Prima, ogni messaggio successivo falliva."
+        ]
+      }
+    ]
+  },
+  {
     "version": "0.77.0",
     "date": "2026-11-23",
     "notices": [

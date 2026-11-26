@@ -36,6 +36,7 @@ export interface AcpConnectionOptions {
   env: Record<string, string>;
   extraEnv?: (() => Record<string, string>) | undefined;
   confine?: ((target: SpawnTarget) => SpawnTarget) | undefined;
+  causeLine?: ((message: string) => boolean) | undefined;
   privateTemp?: Omit<ProviderTempOptions, "provider"> | undefined;
   label(): string;
   redact(text: string): string;
@@ -139,11 +140,13 @@ export class AcpConnection {
     this.#connection = new ClientSideConnection(() => this.options.client(), stream);
     let lastDiagnostic: string | null = null;
     let crashDiagnostic: string | null = null;
+    let causeDiagnostic: string | null = null;
     const diagnostics = createDiagnosticStream({
       redact: (text) => this.options.redact(text),
       emit: (message) => {
         lastDiagnostic = message;
         if (crashDiagnostic === null && CRASH_LINE.test(message)) crashDiagnostic = message;
+        if (causeDiagnostic === null && this.options.causeLine?.(message)) causeDiagnostic = message;
         this.options.diagnostic(message, { duringStop: this.#stoppedProcesses.has(child), stderr: true });
       },
     });
@@ -157,7 +160,7 @@ export class AcpConnection {
         ended,
         Effect.succeed({
           ending: signal ? `signal ${signal}` : `exit code ${code ?? "unknown"}`,
-          detail: crashDiagnostic ?? lastDiagnostic,
+          detail: crashDiagnostic ?? causeDiagnostic ?? lastDiagnostic,
         }),
       );
     });

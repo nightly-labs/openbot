@@ -21,6 +21,7 @@ const LOAD_ERRORS = [
   ["session-not-found", true],
   ["session-not-found-other", false],
   ["internal", false],
+  ["damaged-store", true],
   ["invalid-id", CUSTOM_AGENT_ONLY],
   ["invalid-id-other", false],
   ["unknown-id", CUSTOM_AGENT_ONLY],

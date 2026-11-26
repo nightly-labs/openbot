@@ -38,7 +38,7 @@ function controlAction(task: AgentTask): ControlAction {
 const isThreadAction = (id: string): id is ThreadAction =>
   id === "stop" || id === "close" || id === "reopen" || id === "rename" || id === "delete";
 
-export function useThreadActions(serverId: string, onDeleted?: (task: AgentTask) => void) {
+export function useThreadActions(serverId: string, onDeleted?: (task: AgentTask, serverId: string) => void) {
   const { t } = useText();
   const queryScope = useQueryScope();
   const queryClient = useQueryClient();
@@ -77,7 +77,7 @@ export function useThreadActions(serverId: string, onDeleted?: (task: AgentTask)
         (stored) => (stored ? { ...stored, tasks: stored.tasks.filter((entry) => entry.id !== task.id) } : stored),
       );
       void haptics.notification("success");
-      onDeleted?.(task);
+      onDeleted?.(task, serverId);
     },
     [track, deleteAgentThread, serverId, queryClient, queryScope, onDeleted],
   );

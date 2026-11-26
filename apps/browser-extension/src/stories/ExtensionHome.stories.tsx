@@ -27,12 +27,7 @@ function host(hostId: string, name: string): RemoteTeamHost {
   };
 }
 
-function Home(props: {
-  options?: StoryServerOptions;
-  offline?: boolean;
-  setup?: (workspace: Workspace) => void;
-  sharing?: { tabs: number; supported: boolean };
-}) {
+function Home(props: { options?: StoryServerOptions; offline?: boolean; setup?: (workspace: Workspace) => void }) {
   return (
     <WithWorkspace options={props.options} setup={props.setup}>
       {(workspace) => (
@@ -48,10 +43,9 @@ function Home(props: {
           onStartThread={() => undefined}
           onSelectHost={() => undefined}
           onSignOut={() => undefined}
-          sharing={props.sharing ?? null}
+          onOpenSettings={() => undefined}
+          sharing={false}
           canShare
-          onShareTabs={() => undefined}
-          onManageSharing={() => undefined}
         />
       )}
     </WithWorkspace>

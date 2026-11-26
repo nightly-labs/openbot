@@ -43,16 +43,20 @@ import type {
 } from "@openbot/contracts/ipc";
 import {
   type AgentAccessLevel,
+  agentAccessRank,
   canAdministerServer,
   conversationMessageSender,
   DEFAULT_REMOTE_CONTROL_POLICY,
+  graphAgentIds,
   isAvatarColor,
   type ServerAuditName,
   SIGNED_OUT_CHANNEL_MEMBER_ID,
+  type WorkflowGraph,
 } from "@openbot/contracts/ipc";
 import type { LiveActivityRelayPush } from "@openbot/contracts/live-activity-relay";
 import type { ServerAppearance } from "@openbot/contracts/team-protocol/host-appearance-v1";
 import type { HostRestartState } from "@openbot/contracts/team-protocol/host-update-v1";
+import type { WorkflowSpotEvent, WorkflowSpotInput } from "@openbot/contracts/team-protocol/workflow-presence-v1";
 import { sourceText } from "@openbot/i18n/source";
 import { createOpenBotLogger, toLogValue } from "@openbot/logging";
 import {
@@ -85,6 +89,10 @@ import {
   type NotificationRelayRequest,
   PushNotificationSendFailure,
   PushNotificationService,
+  type PushNotificationViewer,
+  type WorkflowNoticeSource,
+  type WorkflowPushDetail,
+  type WorkflowPushNeed,
 } from "./push-notifications";
 import type { RemoteControlPolicyStore } from "./remote-control-policy-store";
 import type { RemoteDesktopRuntimePaths } from "./remote-desktop-runtime-artifact";
@@ -99,6 +107,7 @@ import { RemoteWorkflowError, remoteDecode } from "./remote-service-effects";
 import { memberAuditChanges, memberAuditName, type ServerAuditStore } from "./server-audit-store";
 import { OWNER_PIN_KEY, type SidebarPinStore } from "./sidebar-pin-store";
 import type { TeamApiAgentNotificationLevels, TeamApiSidebarPins } from "./team-api/dependencies";
+import { workflowGraphVisible } from "./team-api/workflow-visibility";
 import { TeamApiServer } from "./team-api-server";
 import type { RemoteDirectoryMember, TeamIdentity, TeamStore } from "./team-store";
 import type { TeamWebRtcBridge } from "./team-webrtc-bridge";
@@ -117,6 +126,7 @@ interface HostEvents {
   presence: [snapshot: TeamPresenceSnapshot];
   directMessage: [event: DirectMessageRealtimeEvent];
   directTyping: [event: DirectTypingRealtimeEvent];
+  workflowSpot: [event: WorkflowSpotEvent];
 }
 
 interface MemberAuditActor {
@@ -127,6 +137,7 @@ interface MemberAuditActor {
 type ForwardedApiOptions = ConstructorParameters<typeof TeamApiServer>[0];
 
 interface HostServiceOptions {
+  onMemberUse?: ForwardedApiOptions["onMemberUse"];
   channels?: ChannelService;
   mcpServers?: ForwardedApiOptions["mcpServers"];
   mcpServerOwners?: ForwardedApiOptions["mcpServerOwners"];
@@ -203,6 +214,7 @@ interface HostServiceOptions {
   getRemoteDesktopDisplays?: () => RemoteDesktopDisplay[];
   getRemoteDesktopDisplayScreenOrigin?: (displayId: string) => { x: number; y: number } | undefined;
   remoteDesktopScreenLocked?: () => boolean;
+  wakeRemoteDesktopScreen?: () => void;
   getRemoteDesktopIceServers?: () => Effect.Effect<RemoteDesktopIceServer[], RemoteWorkflowError>;
   writeRemoteDesktopClipboard?: (text: string) => void;
   remoteControlPolicy?: RemoteControlPolicyStore;
@@ -248,6 +260,7 @@ interface HostServiceOptions {
   pushNotificationStore?: PushNotificationStore;
   hostComputerInUse?: (event: AgentEvent | null) => boolean;
   signInWaits?: ConstructorParameters<typeof PushNotificationService>[0]["signInWaits"];
+  workflowNotices?: WorkflowNoticeSource;
   awayAfterMs?: number;
   verifyRemoteSessionTicket?: (ticket: string) => Effect.Effect<VerifiedRemoteSessionTicket, RemoteWorkflowError>;
   endRemoteSession?: (sessionId: string) => Effect.Effect<void, RemoteWorkflowError>;
@@ -346,6 +359,7 @@ export class HostService extends EventEmitter<HostEvents> {
       getDisplayScreenOrigin: options.getRemoteDesktopDisplayScreenOrigin,
       sessionDisconnected: windowsSessionDisconnected,
       screenLocked: options.remoteDesktopScreenLocked,
+      wakeScreen: options.wakeRemoteDesktopScreen,
       getIceServers:
         options.getRemoteDesktopIceServers ??
         (() => Effect.fail(new RemoteWorkflowError({ cause: new Error(sourceText("error.host.iceServersMissing")) }))),
@@ -424,6 +438,9 @@ export class HostService extends EventEmitter<HostEvents> {
         ? new PushNotificationService({
             agents: options.agents,
             ...(options.signInWaits === undefined ? {} : { signInWaits: options.signInWaits }),
+            ...(options.workflowNotices === undefined ? {} : { workflowNotices: options.workflowNotices }),
+            workflowDetail: (workflowId) => this.#workflowDetail(workflowId),
+            workflowAllows: (viewer, graph, need) => this.#workflowAllows(viewer, graph, need),
             store: pushNotificationStore,
             send: (request) => {
               const hostId = options.store.getIdentity()?.serverId;
@@ -462,6 +479,7 @@ export class HostService extends EventEmitter<HostEvents> {
           })
         : undefined;
     this.#api = new TeamApiServer({
+      ...(options.onMemberUse === undefined ? {} : { onMemberUse: options.onMemberUse }),
       appVersion: options.appVersion,
       store: options.store,
       agents: options.agents,
@@ -530,6 +548,7 @@ export class HostService extends EventEmitter<HostEvents> {
       onPresence: (snapshot) => this.emit("presence", snapshot),
       onDirectMessage: (event) => this.emit("directMessage", event),
       onDirectTyping: (event) => this.emit("directTyping", event),
+      onWorkflowSpot: (event) => this.emit("workflowSpot", event),
       createInvite: (input) => this.createInvite(input),
       updateMember: (input, actor) => this.updateMember(input, actor),
       removeMember: (memberId, actor) => this.removeMember(memberId, actor),
@@ -594,7 +613,7 @@ export class HostService extends EventEmitter<HostEvents> {
               this.#pushNotifications?.reconnected(sessionId);
             }
           },
-          unknownMemberConnected: (membershipId) => this.#dispatch(this.#learnConnectedMember(membershipId)),
+          memberConnected: (membershipId, role) => this.#dispatch(this.#learnConnectedMember(membershipId, role)),
           ...(options.peerMemberChanged ? { peerMemberChanged: options.peerMemberChanged } : {}),
           ...(options.verifyRemoteSessionTicket ? { verifyClientTicket: options.verifyRemoteSessionTicket } : {}),
           ...(options.privateNetwork ? { privateNetwork: options.privateNetwork } : {}),
@@ -1436,6 +1455,11 @@ export class HostService extends EventEmitter<HostEvents> {
     this.#api.setLocalDirectTyping(this.#currentMemberId(), input.memberId, input.typing);
   }
 
+  setWorkflowSpot(input: WorkflowSpotInput): void {
+    const memberId = this.#findCurrentMemberId();
+    if (memberId) this.#api.setLocalWorkflowSpot(memberId, input);
+  }
+
   readonly listInvites = Effect.fn("HostService.listInvites")(
     function* (this: HostService) {
       const hostId = this.#options.store.getIdentity()?.serverId;
@@ -1570,6 +1594,30 @@ export class HostService extends EventEmitter<HostEvents> {
     return this.#api.copyAgentAccess(sourceAgentId, agentId);
   }
 
+  #workflowDetail(workflowId: string): Effect.Effect<WorkflowPushDetail | null> {
+    const workflows = this.#options.workflows;
+    if (!workflows) return Effect.succeed(null);
+    return workflows.get(workflowId).pipe(
+      Effect.map((detail) => (detail.needsNewerApp ? null : { graph: detail.graph, title: detail.summary.title })),
+      Effect.catch(() => Effect.succeed(null)),
+    );
+  }
+
+  #workflowAllows(viewer: PushNotificationViewer, graph: WorkflowGraph, need: WorkflowPushNeed): boolean {
+    const member = this.#options.store.getMember(viewer.memberId);
+    if (!member || member.disabled) return false;
+    const hiddenAgentIds = this.#api.hiddenAgentIds(viewer.protocol, viewer.capabilities, viewer.memberId);
+    const known = new Set(this.#options.agents.listAgents().map((agent) => agent.id));
+    const admin = canAdministerServer(member.role);
+    if (!workflowGraphVisible({ admin, protocol: viewer.protocol, hiddenAgentIds }, graph, known)) return false;
+    return (
+      need === "view" ||
+      graphAgentIds(graph).every(
+        (agentId) => agentAccessRank(this.#api.agentLevel(viewer.memberId, agentId)) >= agentAccessRank("chat"),
+      )
+    );
+  }
+
   #notificationKey(memberId: string): string {
     return memberId === this.#options.store.getOwnerMemberId() ? OWNER_NOTIFICATION_KEY : memberId;
   }
@@ -1700,6 +1748,7 @@ export class HostService extends EventEmitter<HostEvents> {
   readonly #learnConnectedMember = Effect.fn("HostService.learnConnectedMember")(function* (
     this: HostService,
     membershipId: string,
+    role: TeamRole,
   ): Effect.fn.Return<void> {
     const hostId = this.#options.store.getIdentity()?.serverId;
     const listRemoteMembers = this.#options.listRemoteMembers;
@@ -1707,7 +1756,7 @@ export class HostService extends EventEmitter<HostEvents> {
     yield* this.#memberWrites
       .withPermit(
         Effect.gen({ self: this }, function* () {
-          if (this.#options.store.getMember(membershipId)) return;
+          if (storedMemberMatches(this.#options.store.getMember(membershipId), role)) return;
           const members = yield* listRemoteMembers(hostId);
           if (!this.#isActiveHost(hostId)) return;
           yield* this.#syncRemoteDirectory(hostId, members);
@@ -2131,6 +2180,10 @@ function serverLogoUrl(version: string): string {
 function normalizeRemoteDesktopPlatform(platform: NodeJS.Platform): "darwin" | "win32" | "linux" {
   if (platform === "darwin" || platform === "win32") return platform;
   return "linux";
+}
+
+function storedMemberMatches(member: TeamMemberSummary | null, role: TeamRole): boolean {
+  return member !== null && !member.disabled && member.role === role;
 }
 
 function memberChatColorsChanged(before: readonly TeamMemberSummary[], after: readonly TeamMemberSummary[]): boolean {

@@ -6,7 +6,19 @@ import type { BrowserProfileCalls } from "../browser-profiles-port";
 
 type BrowserTabLabel = BrowserTabProfile & { proxy?: string | undefined };
 
-export function readTabProfilesWithProxies(calls: BrowserProfileCalls): () => Promise<BrowserTabLabel[]> {
+export interface BrowserTabProfilesSource {
+  load: () => Promise<BrowserTabLabel[]>;
+  onChanged: (listener: () => void) => () => void;
+}
+
+export function browserTabProfilesSource(calls: BrowserProfileCalls, withProxies: boolean): BrowserTabProfilesSource {
+  return {
+    load: withProxies ? readTabProfilesWithProxies(calls) : calls.tabProfiles,
+    onChanged: (listener) => calls.onChanged?.(listener) ?? (() => undefined),
+  };
+}
+
+function readTabProfilesWithProxies(calls: BrowserProfileCalls): () => Promise<BrowserTabLabel[]> {
   return async () => {
     const proxies = calls.proxies;
     const [entries, profiles, list] = await Promise.all([
@@ -22,10 +34,12 @@ export function readTabProfilesWithProxies(calls: BrowserProfileCalls): () => Pr
 }
 
 export function createBrowserTabProfiles(
-  read: () => (() => Promise<BrowserTabLabel[]>) | undefined,
+  read: () => BrowserTabProfilesSource | undefined,
   tabs: () => readonly BrowserTab[],
 ) {
   const [profiles, setProfiles] = createSignal<ReadonlyMap<string, BrowserTabLabel>>(new Map());
+  const [revision, setRevision] = createSignal(0);
+  const source = createMemo(read);
   let request = 0;
 
   const tabIds = createMemo(() =>
@@ -34,8 +48,10 @@ export function createBrowserTabProfiles(
       .join("\n"),
   );
 
+  createEffect(source, (current) => current?.onChanged(() => setRevision((count) => count + 1)));
+
   createEffect(
-    () => ({ load: read(), ids: tabIds() }),
+    () => ({ load: source()?.load, ids: tabIds(), revision: revision() }),
     ({ load, ids }) => {
       const current = ++request;
       if (!load || ids === "") {

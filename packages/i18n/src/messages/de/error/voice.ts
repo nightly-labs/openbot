@@ -35,6 +35,10 @@ export const messages = {
   "error.voice.live.timedOut": "Codex-Live-Sprache ist nicht rechtzeitig gestartet. Versuche es erneut.",
   "error.voice.live.failed": "Live-Sprache wurde beendet: {reason}",
   "error.voice.live.disconnected": "Live-Sprache wurde getrennt.",
+  "error.voice.live.connectionLost":
+    "Live-Sprache hat die Verbindung verloren. Hebe die Stummschaltung des Mikrofons auf, um sie neu zu starten.",
+  "error.voice.live.startFailed":
+    "Live-Sprache konnte nicht starten. Aktualisiere Codex und melde dich auf dem Computer, auf dem der Agent läuft, mit ChatGPT an. Versuche es dann noch einmal. Grund: {reason}",
   "error.voice.live.hostFailed":
     "Codex auf dem Server konnte Live-Sprache nicht starten. Bitte den Eigentümer, Codex auf diesem Computer zu aktualisieren und sich mit ChatGPT anzumelden. Versuche es dann noch einmal.",
   "error.voice.live.signIn": "Melde dich mit deinem ChatGPT-Konto bei Codex an, um Live-Sprache zu nutzen.",
@@ -45,4 +49,6 @@ export const messages = {
   "error.voice.live.refused":
     "OpenAI hat den Start der Live-Sprache abgelehnt. Versuche es später erneut, oder schalte die Live-Sprache in den Einstellungen aus, um per Sprache zu sprechen.",
   "error.voice.live.off": "Codex-Live-Sprache ist aus. Schalte sie unter Einstellungen → Diktat ein.",
+  "error.voice.server.modelUnsupported":
+    "{host} kann mit {model} nicht transkribieren. Wähle in den Einstellungen ein anderes Diktatmodell für den Sprachserver.",
 } as const satisfies PartialTranslation<typeof source>;

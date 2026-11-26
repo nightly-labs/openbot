@@ -1,6 +1,11 @@
 import { parseBillingSessionUrl, parseBillingState } from "@openbot/contracts/billing";
 import { parseBillingDetails } from "@openbot/contracts/billing-details";
-import { parseCreditActivity, parseCreditCheckoutUrl, parseCreditsState } from "@openbot/contracts/credits";
+import {
+  parseCreditActivity,
+  parseCreditCheckoutUrl,
+  parseCreditRedeemResult,
+  parseCreditsState,
+} from "@openbot/contracts/credits";
 import {
   PRICING_ORDER_PARAMS,
   type PricingOrder,
@@ -106,6 +111,11 @@ export function createWebCreditsCalls(
       navigate(url);
     },
     transfer: (transfer) => state("v1/me/credits/transfer", JSON.stringify(transfer)),
+    async redeem(redeem) {
+      const result = await request("v1/me/credits/redeem", parseCreditRedeemResult, JSON.stringify(redeem));
+      if (!result) throw new Error(currentText().sourceText("error.billing.invalidResponse"));
+      return result;
+    },
   };
 }
 

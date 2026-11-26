@@ -1,5 +1,9 @@
 import type { MobileTextKey } from "@openbot/i18n/mobile";
-import { ROUTINE_SAVED_DRAFT_KIND_VALUES, type RoutineDraftKind } from "@openbot/team-client/routine-schedule-draft";
+import {
+  ROUTINE_DRAFT_KIND_VALUES,
+  ROUTINE_SAVED_DRAFT_KIND_VALUES,
+  type RoutineDraftKind,
+} from "@openbot/team-client/routine-schedule-draft";
 import { Typography } from "heroui-native";
 import AlarmClock from "lucide-react-native/icons/alarm-clock";
 import Check from "lucide-react-native/icons/check";
@@ -48,11 +52,13 @@ export function GroupLabel({ children }: { children: string }) {
 export function RoutineTriggerPicker({
   value,
   webhook,
+  once = false,
   disabled,
   onSelect,
 }: {
   value: RoutineTriggerChoice;
   webhook: boolean;
+  once?: boolean;
   disabled: boolean;
   onSelect: (choice: RoutineTriggerChoice) => void;
 }) {
@@ -100,7 +106,7 @@ export function RoutineTriggerPicker({
         <>
           <Divider />
           <GroupLabel>{t("mobile.agent.record.schedule")}</GroupLabel>
-          {ROUTINE_SAVED_DRAFT_KIND_VALUES.map(option)}
+          {(once ? ROUTINE_DRAFT_KIND_VALUES : ROUTINE_SAVED_DRAFT_KIND_VALUES).map(option)}
           {webhook ? (
             <>
               <Divider />
