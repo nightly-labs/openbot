@@ -113,7 +113,6 @@ export function createWebCreditsCalls(
       if (!activity) throw new Error(currentText().sourceText("error.billing.invalidResponse"));
       return activity;
     },
-    getCatalog: () => readCreditCatalog(accountFetch),
     async openCheckout(checkout) {
       const url = await request("v1/me/credits/checkout", parseCreditCheckoutUrl, JSON.stringify(checkout));
       if (!url) throw new Error(currentText().sourceText("error.billing.notStripePage"));
@@ -128,7 +127,7 @@ export function createWebCreditsCalls(
   };
 }
 
-async function readCreditCatalog(accountFetch: typeof fetch): Promise<CreditMediaCatalog> {
+export async function readCreditCatalog(accountFetch: typeof fetch): Promise<CreditMediaCatalog> {
   const response = await accountFetch("/v1/media/models", {
     credentials: "omit",
     signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),

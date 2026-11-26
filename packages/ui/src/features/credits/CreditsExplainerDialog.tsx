@@ -5,7 +5,6 @@ import {
   CREDIT_MODEL_COSTS,
   CREDIT_WELCOME,
   type CreditModelCost,
-  creditModelCharge,
   creditStopPrice,
   creditStops,
 } from "@openbot/contracts/credits";
@@ -46,8 +45,12 @@ interface CreditPrices {
   video: ChargeRange;
 }
 
+function modelCredits(model: CreditModelCost): number {
+  return model.credits;
+}
+
 function chargeRange(costs: readonly CreditModelCost[], kind: CreditModelCost["kind"]): ChargeRange {
-  const charges = costs.filter((model) => model.kind === kind).map(creditModelCharge);
+  const charges = costs.filter((model) => model.kind === kind).map(modelCredits);
   if (charges.length === 0) return chargeRange(CREDIT_MODEL_COSTS, kind);
   return { min: Math.min(...charges), max: Math.max(...charges) };
 }
@@ -69,7 +72,7 @@ function creditPrices(live: readonly CreditMediaModel[] | undefined): CreditPric
   return {
     all,
     examples,
-    topExample: Math.max(...examples.map(creditModelCharge)),
+    topExample: Math.max(...examples.map(modelCredits)),
     picture: chargeRange(ranged, "image"),
     video: chargeRange(ranged, "video"),
   };
@@ -81,7 +84,7 @@ function useCredits() {
 }
 
 function barShare(model: CreditModelCost, top: number): number {
-  return Math.sqrt(creditModelCharge(model) / top);
+  return Math.sqrt(modelCredits(model) / top);
 }
 
 const ORBIT = [
@@ -153,7 +156,7 @@ function SceneModels(props: { prices: CreditPrices }) {
             </span>
             <span class="credits-explainer-bar-cost">
               <CreditIcon />
-              {credits(creditModelCharge(model))}
+              {credits(modelCredits(model))}
               <span class="credits-explainer-bar-unit">{unit(model)}</span>
             </span>
           </li>

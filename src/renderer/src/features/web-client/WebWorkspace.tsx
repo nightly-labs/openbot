@@ -385,6 +385,7 @@ import {
   createWebCreditsCalls,
   createWebLicenseCalls,
   createWebReferralCalls,
+  readCreditCatalog,
   type WebAppStart,
 } from "./web-billing";
 import { webBitwardenConnectorPort } from "./web-bitwarden-connector";
@@ -484,7 +485,7 @@ type WebWorkspaceProps = {
 const WebAccountSettings = lazy(() => import("./WebAccountSettings"));
 
 export function WebWorkspace(props: WebWorkspaceProps) {
-  const creditModels = createCreditModels(() => createWebCreditsCalls(props.accountFetch).getCatalog());
+  const creditModels = createCreditModels(() => readCreditCatalog(props.accountFetch));
   return (
     <PlatformProvider appInfo={WEB_APP_INFO}>
       <LayoutProvider>
