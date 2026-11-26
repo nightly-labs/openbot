@@ -29,8 +29,6 @@ export const messages = {
   "error.billing.detailsInvalid": "Prüfe das Land und die USt-IdNr. Die USt-IdNr. muss zum gewählten Land gehören.",
   "error.billing.vatIdInvalid":
     "Das EU-Mehrwertsteuersystem kennt diese USt-IdNr. nicht. Prüfe die Nummer oder fahre ohne USt-IdNr. fort.",
-  "error.billing.vatIdUnverified":
-    "Das EU-Mehrwertsteuersystem kann die USt-IdNr. gerade nicht prüfen. Versuche es später erneut oder fahre ohne USt-IdNr. fort.",
   "error.billing.vatUnavailable": "Die Zahlung ist gerade nicht verfügbar. Versuche es später erneut.",
   "error.billing.invalidRequest": "Die Abrechnungsanfrage ist ungültig.",
   "error.billing.invalidResponse": "Die Abrechnungsantwort ist ungültig.",

@@ -26,8 +26,6 @@ export const messages = {
   "error.billing.detailsInvalid": "Ülkeyi ve KDV numarasını kontrol edin. KDV numarası seçilen ülkeye ait olmalıdır.",
   "error.billing.vatIdInvalid":
     "AB KDV sistemi bu KDV numarasını tanımıyor. Numarayı kontrol edin veya KDV numarası olmadan devam edin.",
-  "error.billing.vatIdUnverified":
-    "AB KDV sistemi şu anda KDV numarasını kontrol edemiyor. Daha sonra yeniden deneyin veya KDV numarası olmadan devam edin.",
   "error.billing.vatUnavailable": "Ödeme şu anda kullanılamıyor. Daha sonra yeniden deneyin.",
   "error.billing.invalidRequest": "Faturalandırma isteği geçersiz.",
   "error.billing.invalidResponse": "Faturalandırma yanıtı geçersiz.",

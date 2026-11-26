@@ -23,8 +23,6 @@ export const messages = {
   "error.billing.detailsInvalid": "تحقّق من البلد ورقم ضريبة القيمة المضافة. يجب أن يكون الرقم للبلد المختار.",
   "error.billing.vatIdInvalid":
     "لا يعرف نظام ضريبة القيمة المضافة في الاتحاد الأوروبي هذا الرقم. تحقّق من الرقم أو تابع بدون رقم ضريبي.",
-  "error.billing.vatIdUnverified":
-    "لا يستطيع نظام ضريبة القيمة المضافة في الاتحاد الأوروبي التحقق من الرقم الآن. أعد المحاولة لاحقًا أو تابع بدون رقم ضريبي.",
   "error.billing.vatUnavailable": "الدفع غير متاح الآن. أعد المحاولة لاحقًا.",
   "error.billing.invalidRequest": "طلب الفوترة غير صالح.",
   "error.billing.invalidResponse": "استجابة الفوترة غير صالحة.",

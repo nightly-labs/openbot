@@ -4088,7 +4088,14 @@ const scenarios: Record<Scenario, (account: Account) => Promise<void>> = {
     );
 
     const company = await save({ country: "IE", vatId: "IE 6388047V" });
-    if (company.status === 503 && company.code === "vat_id_unverified") {
+    if (company.status === 200 && detailsSchema.safeParse(company.body).data?.vatId === null) {
+      const unansweredPage = await page();
+      record(
+        "vat",
+        "VIES did not answer: the details save and the buyer pays Polish VAT",
+        addsPolishVat(unansweredPage) && (await taxExempt()) === "none",
+        { saved: company.body, vat: vatView(unansweredPage) },
+      );
       print("SKIP [vat] reverse charge: VIES did not answer");
     } else {
       const companyPage = await page();

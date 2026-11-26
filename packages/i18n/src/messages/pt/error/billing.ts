@@ -26,8 +26,6 @@ export const messages = {
   "error.billing.detailsInvalid": "Verifique o país e o número de IVA. O número de IVA deve ser do país escolhido.",
   "error.billing.vatIdInvalid":
     "O sistema de IVA da UE não conhece este número de IVA. Verifique o número ou continue sem número de IVA.",
-  "error.billing.vatIdUnverified":
-    "O sistema de IVA da UE não pode verificar o número de IVA agora. Tente mais tarde ou continue sem número de IVA.",
   "error.billing.vatUnavailable": "O pagamento não está disponível agora. Tente mais tarde.",
   "error.billing.invalidRequest": "A solicitação de cobrança é inválida.",
   "error.billing.invalidResponse": "A resposta de cobrança é inválida.",

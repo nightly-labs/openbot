@@ -26,8 +26,6 @@ export const messages = {
     "Controleer het land en het btw-nummer. Het btw-nummer moet bij het gekozen land horen.",
   "error.billing.vatIdInvalid":
     "Het btw-systeem van de EU kent dit btw-nummer niet. Controleer het nummer of ga verder zonder btw-nummer.",
-  "error.billing.vatIdUnverified":
-    "Het btw-systeem van de EU kan het btw-nummer nu niet controleren. Probeer het later opnieuw of ga verder zonder btw-nummer.",
   "error.billing.vatUnavailable": "Betalen is nu niet mogelijk. Probeer het later opnieuw.",
   "error.billing.invalidRequest": "Het factureringsverzoek is ongeldig.",
   "error.billing.invalidResponse": "Het factureringsantwoord is ongeldig.",

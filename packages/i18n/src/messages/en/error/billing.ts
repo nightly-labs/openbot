@@ -46,8 +46,6 @@ export const messages = defineMessages("error.billing", {
   "error.billing.detailsInvalid": "Check the country and the VAT ID. The VAT ID must be one of the selected country.",
   "error.billing.vatIdInvalid":
     "The EU VAT system does not know this VAT ID. Check the number, or continue without a VAT ID.",
-  "error.billing.vatIdUnverified":
-    "The EU VAT system cannot check the VAT ID now. Try again later, or continue without a VAT ID.",
   "error.billing.vatUnavailable": "Payment is not available now. Try again later.",
   "error.billing.invalidRequest": "The billing request is invalid.",
   "error.billing.invalidResponse": "The billing response is invalid.",

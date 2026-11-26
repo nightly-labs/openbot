@@ -24,8 +24,6 @@ export const messages = {
   "error.billing.detailsInvalid": "יש לבדוק את המדינה ואת מספר המע״מ. מספר המע״מ חייב להיות של המדינה שנבחרה.",
   "error.billing.vatIdInvalid":
     "מערכת המע״מ של האיחוד האירופי לא מכירה את מספר המע״מ הזה. יש לבדוק את המספר, או להמשיך בלי מספר מע״מ.",
-  "error.billing.vatIdUnverified":
-    "מערכת המע״מ של האיחוד האירופי לא יכולה לבדוק את מספר המע״מ כרגע. יש לנסות שוב מאוחר יותר, או להמשיך בלי מספר מע״מ.",
   "error.billing.vatUnavailable": "התשלום לא זמין כרגע. יש לנסות שוב מאוחר יותר.",
   "error.billing.invalidRequest": "בקשת החיוב אינה תקינה.",
   "error.billing.invalidResponse": "תשובת החיוב אינה תקינה.",
