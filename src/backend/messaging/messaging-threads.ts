@@ -501,16 +501,14 @@ export class MessagingThreads {
     connectionId: string,
     placeId: string,
     markdown: string,
-  ): Effect.fn.Return<{ posted: true } | { failure: MessagingPostFailure }> {
+    files: readonly MessagingAnswerFile[] = [],
+  ): Effect.fn.Return<{ posted: true; skippedFiles?: string[] } | { failure: MessagingPostFailure }> {
     if (!this.store.connection(connectionId)?.enabled) return { failure: "gone" };
     const outbound = this.#outbound;
     if (!outbound) return { failure: "not-running" };
-    const answer = yield* outbound.post(
-      connectionId,
-      { platformChannelId: placeId, replyThreadId: null },
-      markdown,
-      [],
-    );
+    const answer = yield* outbound.post(connectionId, { platformChannelId: placeId, replyThreadId: null }, markdown, [
+      ...files,
+    ]);
     return "error" in answer ? { failure: answer.failure } : answer;
   });
 
