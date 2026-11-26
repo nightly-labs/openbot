@@ -577,7 +577,7 @@ const shader = (gl: WebGL2RenderingContext, type: number, source: string) => {
   return unit;
 };
 
-const linkProgram = (gl: WebGL2RenderingContext) => {
+const startProgram = (gl: WebGL2RenderingContext) => {
   const vertex = shader(gl, gl.VERTEX_SHADER, VERTEX_SOURCE);
   const fragment = shader(gl, gl.FRAGMENT_SHADER, FRAGMENT_SOURCE);
   const program = gl.createProgram();
@@ -587,9 +587,7 @@ const linkProgram = (gl: WebGL2RenderingContext) => {
   gl.linkProgram(program);
   gl.deleteShader(vertex);
   gl.deleteShader(fragment);
-  if (gl.getProgramParameter(program, gl.LINK_STATUS)) return program;
-  gl.deleteProgram(program);
-  return null;
+  return program;
 };
 
 function runLens(parts: GlassLensParts, read: () => GlassLensSettings, intro: boolean, restart: () => void) {
@@ -603,11 +601,11 @@ function runLens(parts: GlassLensParts, read: () => GlassLensSettings, intro: bo
     powerPreference: "high-performance",
   });
   if (!gl) return null;
-  const program = linkProgram(gl);
+  const program = startProgram(gl);
   if (!program) return null;
-  const uniform = new Map<UniformName, WebGLUniformLocation | null>(
-    UNIFORMS.map((name) => [name, gl.getUniformLocation(program, name)]),
-  );
+  const parallel = gl.getExtension("KHR_parallel_shader_compile");
+  const uniform = new Map<UniformName, WebGLUniformLocation | null>();
+  let linked = false;
   const at = (name: UniformName) => uniform.get(name) ?? null;
   const vao = gl.createVertexArray();
   const texture = makeTexture(gl, gl.LINEAR_MIPMAP_LINEAR);
@@ -899,9 +897,27 @@ function runLens(parts: GlassLensParts, read: () => GlassLensSettings, intro: bo
     if (!frameId && !stopped && visible && pageVisible) frameId = requestAnimationFrame(frame);
   };
 
+  const linkReady = () => {
+    if (linked) return true;
+    if (parallel && !gl.getProgramParameter(program, parallel.COMPLETION_STATUS_KHR)) return false;
+    if (!gl.getProgramParameter(program, gl.LINK_STATUS)) {
+      stop();
+      return false;
+    }
+    linked = true;
+    for (const name of UNIFORMS) uniform.set(name, gl.getUniformLocation(program, name));
+    parts.onLive(true);
+    return true;
+  };
+
   function frame(now: number) {
     frameId = 0;
     if (stopped) return;
+    if (!linkReady()) {
+      last = now;
+      schedule();
+      return;
+    }
     if (!sized) measure();
     const s = read();
     const dt = clamp((now - last) / 1000 || 0, 0, 0.05);
@@ -1089,7 +1105,7 @@ export function createGlassLens(parts: GlassLensParts, read: () => GlassLensSett
   const restart = () => {
     lens?.dispose();
     lens = runLens(parts, read, false, restart);
-    parts.onLive(lens !== null);
+    if (!lens) parts.onLive(false);
   };
   lens = runLens(parts, read, true, restart);
   if (!lens) return null;

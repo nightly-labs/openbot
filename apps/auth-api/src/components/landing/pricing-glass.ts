@@ -283,7 +283,6 @@ export function mountPricingGlass(parts: PricingGlassParts, text: () => PricingG
   document.addEventListener("keydown", onKey);
   void document.fonts?.ready.then(relayout);
   layer.dataset.interaction = state.interaction;
-  setLive(true);
 
   return () => {
     for (const id of timers) clearTimeout(id);
