@@ -119,6 +119,7 @@ export interface AgentMcpServers {
   builtIn(): readonly McpServerConfig[];
   signIns(): McpSignInState[];
   signInFailure(config: McpServerConfig): string | null;
+  accountConfig(config: McpServerConfig): McpServerConfig;
   save(config: McpServerConfig): Effect.Effect<unknown, ToolOperationFailed>;
   setEnabled(mcpServerId: string, enabled: boolean): Effect.Effect<unknown, ToolOperationFailed>;
   remove(mcpServerId: string): Effect.Effect<unknown, ToolOperationFailed>;
@@ -201,6 +202,7 @@ export function mcpServersFromGateway(
     builtIn: () => gateway.builtIn(),
     signIns: () => gateway.signIns(),
     signInFailure: (config) => gateway.signInFailure(config.url),
+    accountConfig: (config) => gateway.accountConfig(config),
     save: (config) => gateway.save({ config }).pipe(toToolFailure),
     setEnabled: (mcpServerId, enabled) => gateway.setEnabled({ mcpServerId, enabled }).pipe(toToolFailure),
     remove: (mcpServerId) => gateway.remove({ mcpServerId }).pipe(toToolFailure),
@@ -330,7 +332,7 @@ const runMcpServerTool = Effect.fn("McpServerTools.handle")(function* (
       registerHeaderSecrets(call.arguments);
       const input = yield* toolStep(() => saveMcpServerToolSchema.parse(call.arguments));
       const existing = servers.list().find((config) => config.name === input.name);
-      const config = normalizeMcpConfig(mergeServer(existing, input));
+      const config = servers.accountConfig(normalizeMcpConfig(mergeServer(existing, input)));
       const errors = mcpConfigErrors(config);
       const invalid = errors.name ?? errors.command ?? errors.url ?? errors.headers;
       if (invalid) return openBotToolFailure(invalid);

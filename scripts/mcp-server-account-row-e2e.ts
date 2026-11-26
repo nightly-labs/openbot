@@ -102,6 +102,16 @@ try {
   assert.equal(row("tested").url, tested, "a row keeps the free account that its client tested and signed in");
   steps.push({ step: "a row keeps the account that its client signed in before the save", detail: row("tested").url });
 
+  const probed = gateway.accountConfig(draft("probed", { url: ADDRESS }));
+  await save(probed);
+  assert.equal(row("probed").url, probed.url, "a row saves the account that the agent tool probed");
+  assert.notEqual(mcpOAuthAccountKey(probed.url), mcpOAuthAccountKey(work.url), "the probe skips the first row");
+  steps.push({ step: "the agent tool probes and saves one account", detail: row("probed").url });
+
+  const workAgain = gateway.accountConfig(row("work-renamed"));
+  assert.equal(workAgain.url, ADDRESS, "a saved row keeps its own account at a reconnect");
+  steps.push({ step: "a reconnect keeps the account of the row", detail: workAgain.url });
+
   const other = row("other");
   await save({ ...other, url: ADDRESS });
   const moved = row("other");

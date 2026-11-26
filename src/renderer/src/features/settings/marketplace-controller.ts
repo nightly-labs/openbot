@@ -1366,10 +1366,6 @@ export function createMarketplaceController(
     return false;
   }
 
-  function pluginAppConfig(app: MarketplacePluginApp): McpServerConfig {
-    return heldApp(app) ?? createPluginAppConfig(app);
-  }
-
   function newAccountName(app: MarketplacePluginApp): string {
     const taken = new Set(servers().map((server) => server.name.toLocaleLowerCase()));
     let count = 2;
@@ -1418,7 +1414,7 @@ export function createMarketplaceController(
         for (const app of plugin.apps) {
           const replaced = replacing.get(app.id);
           const others = servers().filter((row) => row.id !== replaced?.id);
-          const config = mcpOwnSignIn(pluginAppConfig(app), others, crypto.randomUUID());
+          const config = heldApp(app) ?? mcpOwnSignIn(createPluginAppConfig(app), others, crypto.randomUUID());
           const invalid = Object.values(mcpConfigErrors(config))[0];
           if (invalid) throw new Error(t("marketplace.error.appInvalid", { name: app.name, reason: invalid }));
           const connected = await connectStep(app, config);

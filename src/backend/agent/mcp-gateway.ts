@@ -239,13 +239,13 @@ export class McpGateway {
   readonly save = Effect.fn("McpGateway.save")(function* (this: McpGateway, input: SaveMcpServerInput) {
     const previous = this.#servers.list().find((config) => config.id === input.config.id);
     yield* Effect.try({
-      try: () => this.#servers.save(this.#accountConfig(input.config)),
+      try: () => this.#servers.save(this.accountConfig(input.config)),
       catch: (cause) => new McpGatewayFailed({ cause }),
     });
     return yield* this.changed(previous ? "now" : "after-background-work", [input.config.name, previous?.name]);
   }, Effect.uninterruptible);
 
-  #accountConfig(config: McpServerConfig): McpServerConfig {
+  accountConfig(config: McpServerConfig): McpServerConfig {
     if (config.transport !== "http" || !config.url) return config;
     const key = mcpOAuthAccountKey(config.url);
     if (key === null) return config;
