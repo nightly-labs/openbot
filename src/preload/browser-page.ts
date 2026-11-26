@@ -1,6 +1,6 @@
 import { contextBridge } from "electron";
 
-function matchChromePageValues(): void {
+function matchChromePageValues(hostArch: string): void {
   const nativesRequest = "matchChromePageValues:natives";
   const onWindows = navigator.userAgent.includes("Windows");
   const onMac = navigator.userAgent.includes("Macintosh");
@@ -150,6 +150,11 @@ function matchChromePageValues(): void {
     [debugVendor]: "Google Inc. (Intel)",
     [debugRenderer]: "ANGLE (Intel, Mesa Intel(R) UHD Graphics 620 (KBL GT2), OpenGL 4.6)",
   };
+  const armBoardGpu = {
+    [debugVendor]: "Google Inc. (Broadcom)",
+    [debugRenderer]: "ANGLE (Broadcom, V3D 4.2, OpenGL ES 3.1)",
+  };
+  const hostGpu = hostArch === "arm64" ? armBoardGpu : laptopGpu;
   const replaceSoftwareGpuName = (target: typeof globalThis): void => {
     for (const context of [target.WebGLRenderingContext, target.WebGL2RenderingContext]) {
       const prototype = context?.prototype;
@@ -166,7 +171,7 @@ function matchChromePageValues(): void {
         const name = args[0];
         if (typeof value !== "string" || (name !== debugVendor && name !== debugRenderer)) return value;
         const renderer = name === debugRenderer ? value : method.call(self, debugRenderer);
-        return typeof renderer === "string" && /SwiftShader/i.test(renderer) ? laptopGpu[name] : value;
+        return typeof renderer === "string" && /SwiftShader/i.test(renderer) ? hostGpu[name] : value;
       });
       natives.set(getParameter, "getParameter");
       Object.defineProperty(prototype, "getParameter", { ...descriptor, value: getParameter });
@@ -310,4 +315,4 @@ function matchChromePageValues(): void {
   install(globalThis);
 }
 
-contextBridge.executeInMainWorld({ func: matchChromePageValues });
+contextBridge.executeInMainWorld({ func: matchChromePageValues, args: [process.arch] });

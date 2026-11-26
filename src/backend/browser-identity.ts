@@ -1,5 +1,8 @@
 export function sessionBrowserUserAgent(userAgent: string): string {
-  return userAgent.replace(/\s(?:Electron|OpenBot)\/[^\s]+/gu, "").replace(/(\sChrome\/\d+)\.[\d.]+/u, "$1.0.0.0");
+  return userAgent
+    .replace(/\s(?:Electron|OpenBot)\/[^\s]+/gu, "")
+    .replace(/(\sChrome\/\d+)\.[\d.]+/u, "$1.0.0.0")
+    .replace(/\(X11; Linux [^;)]+\)/u, "(X11; Linux x86_64)");
 }
 
 export function browserRequestUserAgent(url: string, userAgent: string, electronVersion: string): string {

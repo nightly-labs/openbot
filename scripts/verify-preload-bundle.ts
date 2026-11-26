@@ -142,6 +142,7 @@ function runPreload(fileName: string): PreloadRun {
     module,
     exports: module.exports,
     window,
+    process: { arch: process.arch },
     console,
     URL,
     URLSearchParams,

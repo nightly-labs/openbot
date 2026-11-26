@@ -9,7 +9,7 @@ import { withoutElectronRuntimeFlags } from "./electron-spawn-env";
 
 class FixtureProcessTimeout extends Error {}
 
-const FINGERPRINT_CASES = 20;
+const FINGERPRINT_CASES = 21;
 
 const projectRoot = dirname(dirname(fileURLToPath(import.meta.url)));
 const buildRoot = await mkdtemp(join(tmpdir(), "openbot-fingerprint-"));
@@ -27,6 +27,16 @@ try {
     "--format=cjs",
     "--external=electron",
     `--outfile=${pagePreload}`,
+  ]);
+  const armPagePreload = join(dirname(reportPath), "browserPageArm64.cjs");
+  await run(process.execPath, [
+    "build",
+    join(projectRoot, "src/preload/browser-page.ts"),
+    "--target=node",
+    "--format=cjs",
+    "--external=electron",
+    '--define=process.arch="arm64"',
+    `--outfile=${armPagePreload}`,
   ]);
   await run(process.execPath, [
     "build",
@@ -47,6 +57,7 @@ try {
       entry,
       `--fixture-root=${buildRoot}`,
       `--page-preload=${pagePreload}`,
+      `--arm-page-preload=${armPagePreload}`,
       `--report-path=${reportPath}`,
       `--source-sha=${sourceSha}`,
       `--run-id=${runId}`,

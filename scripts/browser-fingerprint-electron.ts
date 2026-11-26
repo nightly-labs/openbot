@@ -19,6 +19,8 @@ const fixtureRoot = argument("fixture-root");
 const reportPath = argument("report-path");
 const runId = argument("run-id");
 const pagePreload = argument("page-preload");
+const armPagePreload = argument("arm-page-preload");
+const ARM_SOFTWARE_GPU: [string, string] = ["Google Inc. (Broadcom)", "ANGLE (Broadcom, V3D 4.2, OpenGL ES 3.1)"];
 
 const cases: string[] = [];
 const timings: Record<string, number> = {};
@@ -54,7 +56,11 @@ const values: {
   keys?: Array<Pick<z.infer<typeof pageEventSchema>, "key" | "code" | "keyCode" | "shift">>;
   hiddenClick?: ClickValues;
   shownClick?: ClickValues;
-  webgl?: { real: Array<[string, string] | null>; tab: Array<[string, string] | null> };
+  webgl?: {
+    real: Array<[string, string] | null>;
+    tab: Array<[string, string] | null>;
+    arm64Tab?: Array<[string, string] | null>;
+  };
 } = {};
 if (process.platform === "linux") {
   app.commandLine.appendSwitch("disable-gpu-compositing");
@@ -294,6 +300,27 @@ async function main(): Promise<void> {
         }
       });
       recordCase("software-webgl-names-a-gpu");
+
+      const arm64 = new BrowserWindow({
+        show: false,
+        webPreferences: { sandbox: true, contextIsolation: true, preload: armPagePreload },
+      });
+      try {
+        await arm64.loadURL(`${origin}/plain`);
+        values.webgl.arm64Tab = await page(arm64.webContents, readGpu, gpuSchema);
+      } finally {
+        arm64.destroy();
+      }
+      const { arm64Tab } = values.webgl;
+      real.forEach((names, index) => {
+        const software = process.platform === "linux" && names !== null && /SwiftShader/i.test(names.join());
+        assert.deepEqual(
+          arm64Tab[index],
+          software ? ARM_SOFTWARE_GPU : names,
+          "An ARM64 tab does not name an ARM GPU for SwiftShader, or changed a real GPU.",
+        );
+      });
+      recordCase("arm64-software-webgl-names-an-arm-gpu");
     }
 
     {
