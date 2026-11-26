@@ -45,6 +45,19 @@ serveFakeAcpAgent({
       for (const text of ["<think>Never", " closed."]) message("m-unclosed", text);
     } else if (prompt.includes("mention")) {
       for (const text of ["Use the <think> tag ", "like this.", " <thinker> stays."]) message("m-mention", text);
+    } else if (prompt.includes("tool first")) {
+      peer.update(sessionId, {
+        sessionUpdate: "tool_call",
+        toolCallId: "t-first",
+        title: "read",
+        kind: "read",
+        status: "completed",
+      });
+      message("m-tool", "<think>The file is read.</think>Answer after the tool.");
+    } else if (prompt.includes("broken")) {
+      message("m-broken", "<think>Partial");
+      message("m-broken", "API Error: The stream ended. The response above may be incomplete.");
+      message("m-broken", "<think>Plan.</think>Full answer.");
     } else if (prompt.includes("harness")) {
       peer.say(sessionId, "Partial ans");
       peer.say(sessionId, "API Error: The stream ended. The response above may be incomplete.");

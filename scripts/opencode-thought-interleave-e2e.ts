@@ -102,6 +102,15 @@ try {
     { answers: ["Use the <think> tag like this. <thinker> stays."], thoughts: [] },
     "A tag inside the answer stays in the answer.",
   );
+  const toolFirst = await answers("tool first");
+  assert.deepEqual(toolFirst.answers, ["Answer after the tool."], "A thinking block after a tool step moves too.");
+  assert.ok(toolFirst.thoughts.includes("The file is read."), "The thinking after a tool step is a thought.");
+  const broken = await answers("broken");
+  assert.deepEqual(broken.answers, ["Full answer."], "The retried answer has no reasoning in it.");
+  assert.ok(
+    broken.thoughts.every((text) => !text?.includes("<think>")),
+    "A thinking block that a stream error cut off shows no tags.",
+  );
   report.passed = true;
 } finally {
   await stopClients(clients);

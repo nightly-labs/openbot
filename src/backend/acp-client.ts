@@ -3646,6 +3646,7 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
       if (HARNESS_ERROR_CHUNK.test(update.content.text)) {
         const error = update.content.text.trim();
         turn.receivedOutput = true;
+        turn.leadingThought = new LeadingThoughtSplitter();
         turn.interruptedAnswer = [turn.text.trim() || turn.interruptedAnswer, error].filter(Boolean).join("\n\n");
         this.#completeThought(thread, turn);
         this.#completeMessage(thread, turn, "commentary");
@@ -3870,10 +3871,8 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
   }
 
   #takeLeadingThought(thread: AcpThread, turn: AcpTurn, messageId: string | null, text: string): string {
-    if (messageId && turn.leadingThought.messageId && messageId !== turn.leadingThought.messageId) {
+    if (messageId && turn.leadingThought.messageId && messageId !== turn.leadingThought.messageId)
       this.#releaseLeadingThought(thread, turn);
-      turn.leadingThought = new LeadingThoughtSplitter();
-    }
     turn.leadingThought.messageId ??= messageId;
     const { thought, answer } = turn.leadingThought.feed(text);
     if (thought) {
@@ -3893,6 +3892,7 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
         ...(messageId ? { messageId } : {}),
         content: { type: "text", text },
       });
+    turn.leadingThought = new LeadingThoughtSplitter();
   }
 
   #dropStreamedCopy(turn: AcpTurn): void {
