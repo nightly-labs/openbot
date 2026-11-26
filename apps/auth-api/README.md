@@ -501,8 +501,7 @@ after 30 days, or when its phone session ends. The same key again replaces the o
 account keeps at most 5. `DELETE /v2/remote/watch/sessions/:watchSessionId` revokes one.
 `POST /v2/remote/watch/ticket` takes the watch token and a signed `{ hostId, ts, proof }`, checks the
 membership on the host, and gives an ES256 ticket with `aud: "openbot-watch"` from the remote ticket
-key. `WATCH_TICKET_RATE_LIMITER` limits each watch session to 30 tickets a minute. The connected
-device lists (`/v1/mobile-auth/devices?includeDesktop=true` and `/v1/me/sessions`) add `watches`.
+key. `WATCH_TICKET_RATE_LIMITER` limits each watch session to 30 tickets a minute.
 
 The relay is off until `APNS_PRIVATE_KEY` (the `.p8` key text) and `APNS_KEY_ID` are set. Create
 the key in Apple Developer > Keys with the Apple Push Notifications service, then add both to the
