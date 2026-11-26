@@ -568,6 +568,7 @@ export function createConversationViewScope(props: ConversationProps) {
       setActiveRightPanel,
       reattachBrowserWindow,
       closeBrowserPane,
+      dropBrowserPane,
     },
   });
   const {
@@ -731,6 +732,10 @@ export function createConversationViewScope(props: ConversationProps) {
   function closeBrowserPane() {
     if (paneSplit("browser")) removeSplitPane("browser");
     else showSidePanelInPlaceOf(removeSidePanelPane("browser"));
+  }
+  function dropBrowserPane() {
+    if (paneSplit("browser")) removeSplitPane("browser");
+    else if (sidePanel().panes.includes("browser")) removeSidePanelPane("browser");
   }
   function showSidePanelInPlaceOf(next: SidePanelPane | null) {
     const thread = sideThreadIds()[0];

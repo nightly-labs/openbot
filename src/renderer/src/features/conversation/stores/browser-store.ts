@@ -82,6 +82,7 @@ interface BrowserPanels {
   setActiveRightPanel: (mode: RightPanelMode, agentId?: string) => void;
   reattachBrowserWindow: () => void;
   closeBrowserPane: () => void;
+  dropBrowserPane: () => void;
 }
 
 export interface BrowserStoreDeps {
@@ -272,20 +273,25 @@ export function createBrowserStore(deps: BrowserStoreDeps) {
       deps.panels.setActiveRightPanel("browser");
     return completed;
   };
-  let previousBrowserTabs: { owner: string; count: number } = { owner: "", count: 0 };
+  const browserTabCounts = new Map<string, number>();
+  let browserTabCountServer: string | undefined;
   createEffect(
     () => ({
-      owner: `${deps.props.server?.id ?? "local"}:${deps.props.agent?.id ?? ""}`,
+      server: deps.props.server?.id ?? "local",
+      view: viewId() ?? "",
       count: browserTabs().length,
       enabled: deps.props.browserEnabled !== false,
     }),
-    ({ owner, count, enabled }) => {
-      const previous = previousBrowserTabs;
-      previousBrowserTabs = { owner, count };
-      if (!enabled || previous.owner !== owner || previous.count === 0 || count > 0) return;
+    ({ server, view, count, enabled }) => {
+      if (server !== browserTabCountServer) browserTabCounts.clear();
+      browserTabCountServer = server;
+      const previousCount = browserTabCounts.get(view) ?? 0;
+      browserTabCounts.set(view, count);
+      if (!enabled || previousCount === 0 || count > 0) return;
       const mode = untrack(deps.panels.activeRightPanel);
       if (untrack(() => deps.panels.paneShown("browser")) || mode === "browser-expanded" || mode === "browser-pip")
         untrack(deps.panels.closeBrowserPane);
+      else untrack(deps.panels.dropBrowserPane);
     },
   );
 
