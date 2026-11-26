@@ -137,6 +137,7 @@ const server = createServer((request, response) => {
       "content-disposition": 'attachment; filename="openbot-stalled.bin"',
     });
     response.write("stalled download");
+    setTimeout(() => response.destroy(), 30_000).unref();
     return;
   }
   if (url.pathname === "/settle") {
@@ -500,7 +501,7 @@ const server = createServer((request, response) => {
 });
 
 const HANG_LIMIT_MS = 10 * 60_000;
-const STALLED_DOWNLOAD_MS = 2_000;
+const STALLED_DOWNLOAD_MS = 5_000;
 
 const SCENARIOS = [
   "identity",
@@ -2001,9 +2002,11 @@ async function main(): Promise<void> {
     await expectDownloadedFile(await secondDownload, join(downloadsRoot, "openbot-smoke (2).txt"), "second");
     process.stdout.write("BrowserHost: download passed.\n");
 
-    const stalledDownloads = nextDownloadsDone(downloadContents, 4, "the stalled browser downloads");
+    const stalledDownloads = trackDownloads(downloadContents, 4, "the stalled browser downloads");
     for (let index = 0; index < 4; index += 1) downloadContents.downloadURL(`${origin}/stalled-download?n=${index}`);
-    const stalledStates = (await stalledDownloads).map((finished) => finished.state);
+    await stalledDownloads.started;
+    downloadContents.downloadURL(`${origin}/download?refused=1`);
+    const stalledStates = (await stalledDownloads.done).map((finished) => finished.state);
     if (stalledStates.some((state) => state !== "cancelled")) {
       throw new Error(`Stalled browser downloads did not stop: ${stalledStates.join(", ")}.`);
     }
@@ -2031,7 +2034,11 @@ async function main(): Promise<void> {
       }),
     );
     if (!toolResult.success) throw new Error("Dynamic browser tool failed.");
-    if (!JSON.stringify(toolResult.contentItems).includes("the site sent no data")) {
+    const downloadNotes = JSON.stringify(toolResult.contentItems);
+    if (!downloadNotes.includes("Download refused: 4 downloads are already in progress")) {
+      throw new Error("A fifth download was not refused while 4 downloads stalled.");
+    }
+    if (!downloadNotes.includes("the site sent no data")) {
       throw new Error("The agent did not get a note that the stalled downloads stopped.");
     }
     process.stdout.write("BrowserHost: stalled download release passed.\n");
@@ -4751,15 +4758,26 @@ function nextDownloadDone(contents: WebContents, step: string): Promise<Finished
   });
 }
 
-function nextDownloadsDone(contents: WebContents, count: number, step: string): Promise<FinishedDownload[]> {
+function trackDownloads(
+  contents: WebContents,
+  count: number,
+  step: string,
+): { started: Promise<void>; done: Promise<FinishedDownload[]> } {
   const { session } = contents;
-  return new Promise((resolve, reject) => {
+  let allStarted = () => {};
+  const started = new Promise<void>((resolve) => {
+    allStarted = resolve;
+  });
+  const done = new Promise<FinishedDownload[]>((resolve, reject) => {
     const finished: FinishedDownload[] = [];
-    let started = 0;
+    let startedCount = 0;
     const onStarted = (_event: ElectronEvent, item: DownloadItem, source: WebContents) => {
       if (source !== contents) return;
-      started += 1;
-      if (started === count) session.off("will-download", onStarted);
+      startedCount += 1;
+      if (startedCount === count) {
+        session.off("will-download", onStarted);
+        allStarted();
+      }
       item.once("done", (_doneEvent, state) => {
         finished.push({ state, path: item.getSavePath() });
         if (finished.length < count) return;
@@ -4773,6 +4791,7 @@ function nextDownloadsDone(contents: WebContents, count: number, step: string): 
     }, 30_000);
     session.on("will-download", onStarted);
   });
+  return { started, done };
 }
 
 async function expectDownloadedFile(download: FinishedDownload, expectedPath: string, step: string): Promise<void> {

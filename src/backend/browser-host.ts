@@ -3907,35 +3907,41 @@ export class BrowserHost {
       this.#activeDownloads += 1;
       noteDownload(`started. The file saves at ${downloadPath}. A later browser tool result says when it is complete.`);
       let stallBytes = item.getReceivedBytes();
+      let lastProgressAt = Date.now();
       let stallTimer: NodeJS.Timeout | undefined;
       const stopStallTimer = () => {
         if (!stallTimer) return;
         clearTimeout(stallTimer);
         this.#downloadStallTimers.delete(stallTimer);
+        stallTimer = undefined;
       };
-      const watchStall = () => {
-        stopStallTimer();
-        stallTimer = setTimeout(endStall, this.#downloadStallMs);
-        stallTimer.unref();
-        this.#downloadStallTimers.add(stallTimer);
-      };
-      const progressed = () => {
+      const noteProgress = () => {
         const received = item.getReceivedBytes();
-        if (received <= stallBytes) return false;
+        if (received <= stallBytes) return;
         stallBytes = received;
-        watchStall();
-        return true;
+        lastProgressAt = Date.now();
       };
-      const endStall = () => {
+      const checkStall = () => {
         stopStallTimer();
-        if (progressed()) return;
+        if (this.#destroying) return;
+        noteProgress();
+        const remainingMs = lastProgressAt + this.#downloadStallMs - Date.now();
+        if (remainingMs > 0) {
+          watchStall(remainingMs);
+          return;
+        }
         logger.warn("Browser download stopped after it received no data", { stallMs: this.#downloadStallMs });
         item.cancel();
         stopped(DOWNLOAD_STALLED);
       };
-      watchStall();
+      const watchStall = (delayMs: number) => {
+        stallTimer = setTimeout(checkStall, delayMs);
+        stallTimer.unref();
+        this.#downloadStallTimers.add(stallTimer);
+      };
+      watchStall(this.#downloadStallMs);
       item.on("updated", () => {
-        progressed();
+        noteProgress();
         if (item.getState() !== "progressing" || item.getReceivedBytes() <= MAX_DOWNLOAD_BYTES) return;
         logger.warn("Browser download stopped at the size limit", { limitBytes: MAX_DOWNLOAD_BYTES });
         item.cancel();
