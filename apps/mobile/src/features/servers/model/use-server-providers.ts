@@ -9,7 +9,10 @@ import { type QueryKey, skipToken, useQuery, useQueryClient } from "@tanstack/re
 import { useCallback, useMemo, useRef, useState } from "react";
 import { useQueryScope } from "@/features/auth/context/mobile-session-context";
 import { type ProviderAdmin, providerRows } from "@/features/servers/model/provider-admin";
-import { useMobileWorkspace, useMobileWorkspaceActions } from "@/features/workspace/context/mobile-workspace-context";
+import {
+  useMobileWorkspaceActions,
+  useMobileWorkspaceSelector,
+} from "@/features/workspace/context/mobile-workspace-context";
 import { queryKeys } from "@/features/workspace/model/query-keys";
 import { haptics } from "@/shared/lib/haptics";
 import { useText } from "@/shared/lib/text";
@@ -18,9 +21,8 @@ const RUNTIME_POLL_MS = 1000;
 const STATUS_POLL_MS = 3000;
 
 export function useProviderAdmin(serverId: string) {
-  const { canManageProviders } = useMobileWorkspace();
+  const available = useMobileWorkspaceSelector((workspace) => workspace.canManageProviders(serverId));
   const { providerAdmin } = useMobileWorkspaceActions();
-  const available = canManageProviders(serverId);
   const admin = useMemo(() => (available ? providerAdmin(serverId) : null), [available, providerAdmin, serverId]);
   return { available, admin };
 }

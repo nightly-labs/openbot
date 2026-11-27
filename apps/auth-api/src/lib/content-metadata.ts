@@ -210,7 +210,7 @@ function collectionStructuredData(collection: ContentCollection, siteUrl: string
 
 export function pluginHead(plugin: SitePlugin, siteUrl: string) {
   const url = pluginUrl(plugin.slug, siteUrl);
-  const title = `${plugin.name} MCP Plugin for AI Agents — OpenBot`;
+  const title = `${plugin.name} MCP Server and Connector for AI Agents — OpenBot`;
   const description = searchDescription(plugin.description);
   const image = pageSocialImageMeta(PLUGIN_PAGE_SOCIAL_IMAGE, siteUrl);
 

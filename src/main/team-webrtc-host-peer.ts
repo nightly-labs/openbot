@@ -8,6 +8,11 @@ import { TEAM_API_ROUTES } from "@openbot/contracts/team-api-routes";
 import { AGENT_BACKGROUND_WORK_CAPABILITY } from "@openbot/contracts/team-protocol/agent-background-work-v1";
 import { AGENT_PENDING_RUNTIME_CAPABILITY } from "@openbot/contracts/team-protocol/agent-pending-runtime-v1";
 import { AGENT_TASK_UI_BLOCKS_CAPABILITY } from "@openbot/contracts/team-protocol/agent-task-ui-blocks-v1";
+import {
+  addAttachmentDimensions,
+  TEAM_ATTACHMENT_DIMENSIONS_CAPABILITY,
+  withAttachmentDimensions,
+} from "@openbot/contracts/team-protocol/attachment-dimensions-v1";
 import { browserViewStreamSessionId } from "@openbot/contracts/team-protocol/browser-view-v1";
 import { TEAM_PROTOCOL_CAPABILITY_LIMITS } from "@openbot/contracts/team-protocol/capability-limits";
 import {
@@ -908,7 +913,12 @@ export class TeamWebRtcHostPeer {
 
   #connectLocalEvents(token: string): void {
     if (!this.#localApiPort) return;
-    this.#eventsSocket?.close();
+    if (this.#eventsReconnectTimer) clearTimeout(this.#eventsReconnectTimer);
+    this.#eventsReconnectTimer = null;
+    if (this.#eventsSocket) {
+      this.#eventsSocket.close();
+      this.#eventResetPending = true;
+    }
     const socket = new webSockets.WebSocket(`ws://127.0.0.1:${this.#localApiPort}${TEAM_API_ROUTES.events}`, [
       "openbot-team-v1",
       `openbot-token.${token}`,
@@ -979,6 +989,8 @@ export class TeamWebRtcHostPeer {
         if (this.#peerCapabilities.has(TEAM_NEAR_PAYMENT_CAPABILITY)) frame = withNearPayments(frame, event);
         if (this.#peerCapabilities.has(SKILL_LEARNING_CAPABILITY)) frame = withSkillSuggestionNames(frame, event);
         if (this.#peerCapabilities.has(TEAM_PROMPT_DETAIL_CAPABILITY)) frame = withPromptQuestionDetails(frame, event);
+        if (this.#peerCapabilities.has(TEAM_ATTACHMENT_DIMENSIONS_CAPABILITY))
+          frame = withAttachmentDimensions(frame, event);
       } catch {
         return;
       }
@@ -1384,5 +1396,6 @@ function withBlockExtensions(
   if (capabilities.has(TEAM_NEAR_PAYMENT_CAPABILITY)) addNearPayments(encoded, source);
   if (capabilities.has(SKILL_LEARNING_CAPABILITY)) addSkillSuggestionNames(encoded, source);
   if (capabilities.has(TEAM_PROMPT_DETAIL_CAPABILITY)) addPromptQuestionDetails(encoded, source);
+  if (capabilities.has(TEAM_ATTACHMENT_DIMENSIONS_CAPABILITY)) addAttachmentDimensions(encoded, source);
   return encoded;
 }

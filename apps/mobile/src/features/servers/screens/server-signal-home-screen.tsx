@@ -60,7 +60,7 @@ export function ServerSignalHomeScreen() {
         });
 
   function choose(home: string | null) {
-    if (pending !== null || home === settings?.preferred) return;
+    if (pending !== null || query.isPlaceholderData || home === settings?.preferred) return;
     void haptics.selection();
     setPending(home ?? "");
     setError(null);
@@ -82,7 +82,7 @@ export function ServerSignalHomeScreen() {
       <SettingsRow
         key={home ?? ""}
         checked={selected}
-        disabled={pending !== null}
+        disabled={pending !== null || query.isPlaceholderData}
         disclosure={false}
         trailing={selected ? <Check size={18} color={accent} strokeWidth={2} /> : null}
         onPress={() => choose(home)}

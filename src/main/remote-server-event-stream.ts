@@ -9,6 +9,7 @@ import type {
 import { decodeRecord } from "@openbot/contracts/ipc-decoding";
 import { isString } from "@openbot/contracts/runtime-values";
 import { TEAM_API_ROUTES } from "@openbot/contracts/team-api-routes";
+import { addAttachmentDimensions } from "@openbot/contracts/team-protocol/attachment-dimensions-v1";
 import {
   supportsTeamCapability,
   type TeamCurrentCapability,
@@ -598,6 +599,7 @@ export class RemoteEventStream {
             const event = decoded.event;
             if (this.#advertises(serverId, SKILL_LEARNING_CAPABILITY)) addSkillSuggestionNames(event, value);
             if (this.#advertises(serverId, TEAM_PROMPT_DETAIL_CAPABILITY)) addPromptQuestionDetails(event, value);
+            addAttachmentDimensions(event, value);
             if (event.type === "team-identity") {
               this.#onServerIdentity(serverId, { serverName: event.serverName, logoVersion: event.logoVersion });
             } else if (event.type === "team-presence") {

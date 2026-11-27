@@ -3,7 +3,6 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useQueryScope } from "@/features/auth/context/mobile-session-context";
 import { useLockedMutation } from "@/features/servers/model/use-locked-action";
 import {
-  useMobileWorkspace,
   useMobileWorkspaceActions,
   useMobileWorkspaceSelector,
 } from "@/features/workspace/context/mobile-workspace-context";
@@ -34,10 +33,9 @@ export function useMcpSignIns(serverId: string, canManage: boolean) {
 }
 
 export function useServerMcp(serverId: string) {
-  const { servers } = useMobileWorkspace();
+  const server = useMobileWorkspaceSelector((workspace) => workspace.servers.find((item) => item.id === serverId));
   const queryScope = useQueryScope();
   const queryClient = useQueryClient();
-  const server = servers.find((candidate) => candidate.id === serverId);
   const { canManage, list } = useMcpServerList(serverId);
   const listKey = queryKeys.mcpServers(queryScope, serverId);
   const signInsKey = queryKeys.mcpSignIns(queryScope, serverId);
