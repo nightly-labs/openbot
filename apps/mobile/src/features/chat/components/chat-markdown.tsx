@@ -1208,13 +1208,13 @@ export const ChatMarkdown = memo(function ChatMarkdown({
     () => (finished ? finishedReplyReveal(tokens) : createReplyReveal(tokens)),
     [tokens, finished],
   );
-  const { tokens: visibleTokens, flushed } = useReplyPlayback(reveal, playback);
+  const { tokens: visibleTokens, playing } = useReplyPlayback(reveal, playback);
   const themeForeground = useThemeColor("foreground");
   const textColor = String(useCSSVariable("--openbot-text-primary"));
   const chipBackground = tone?.chip ?? withAlpha(textColor, "14");
   const codeColor = tone?.foreground ?? themeForeground;
   const { t } = useText();
-  const animateTail = (streaming || (Boolean(playback?.enabled) && !flushed)) && animationEnabled && textReveal;
+  const animateTail = (streaming || playing) && animationEnabled && textReveal;
   const presentation = useMemo<TextPresentation>(
     () => ({
       selectable,

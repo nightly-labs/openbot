@@ -355,6 +355,7 @@ interface MessageRowShared {
   firstMessageStyle: ComponentProps<typeof Animated.View>["style"];
   animationActive: boolean;
   playbackActive: boolean;
+  playbackPaused: boolean;
   screenReaderEnabled: boolean;
   textReveal: boolean;
   replySession: { progress: Map<string, number>; revealed: Set<string> };
@@ -642,6 +643,8 @@ const MessageRow = memo(function MessageRow({
             complete,
             progress: replySession.progress,
             enabled,
+            active: shared.playbackActive,
+            paused: shared.playbackPaused,
             onWord: (word: string, index: number) => {
               markRevealed(message.id);
               replyHaptics.onWord(word, index);
@@ -653,7 +656,17 @@ const MessageRow = memo(function MessageRow({
             onComplete: replyHaptics.onComplete,
           }
         : undefined,
-    [eligible, message.id, complete, replySession.progress, enabled, markRevealed, replyHaptics],
+    [
+      eligible,
+      message.id,
+      complete,
+      replySession.progress,
+      enabled,
+      shared.playbackActive,
+      shared.playbackPaused,
+      markRevealed,
+      replyHaptics,
+    ],
   );
   const speaker = message.kind === "message" && message.speaker ? agentsById.get(message.speaker.id) : undefined;
   const fileAgentId = message.kind !== "message" ? undefined : message.speaker ? speaker?.id : shared.fileAgentId;
@@ -717,7 +730,7 @@ const MessageRow = memo(function MessageRow({
     color: textColor,
     tone,
     playback,
-    animationEnabled: shared.animationActive && arriving,
+    animationEnabled: shared.animationActive && (arriving || revealed),
     align: message.kind === "message" && message.author === "user" ? ("end" as const) : ("start" as const),
     literalWordStars: message.kind === "message" && message.author === "user",
     remoteContent: shared.remoteContent,
@@ -1764,6 +1777,7 @@ export const ChatMessageList = memo(function ChatMessageList({
       firstMessageStyle: motion.firstMessageStyle,
       animationActive,
       playbackActive: animationActive && textReveal && !screenReaderEnabled,
+      playbackPaused: !animationActive && textReveal && !screenReaderEnabled,
       screenReaderEnabled,
       textReveal,
       replySession,

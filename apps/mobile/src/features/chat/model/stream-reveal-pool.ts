@@ -4,6 +4,15 @@ interface Reveal {
 }
 
 const STREAM_WORD_INTERVAL_MS = 32;
+const CATCH_UP_SHARE = 4;
+const FADE_OVERLAP = 5;
+const MOST_ACTIVE = 24;
+const STREAM_REVEAL_WINDOW = 48;
+
+function streamRevealStep(waiting: number, limit: number) {
+  const count = Math.min(MOST_ACTIVE, Math.ceil(waiting / CATCH_UP_SHARE));
+  return { count, room: Math.min(MOST_ACTIVE, Math.max(limit, count * FADE_OVERLAP)) };
+}
 
 export function createStreamRevealPool(limit = 4) {
   const waiting = new Set<Reveal>();
@@ -13,14 +22,12 @@ export function createStreamRevealPool(limit = 4) {
     if (timer !== null || waiting.size === 0) return;
     timer = setTimeout(() => {
       timer = null;
-      if (active.size >= limit) {
-        const oldest = active.values().next().value;
-        if (oldest) {
-          active.delete(oldest);
-          oldest.skip();
-        }
+      const { count, room } = streamRevealStep(waiting.size, limit);
+      for (const oldest of Array.from(active).slice(0, Math.max(0, active.size + count - room))) {
+        active.delete(oldest);
+        oldest.skip();
       }
-      for (const item of Array.from(waiting).slice(0, 1)) {
+      for (const item of Array.from(waiting).slice(0, count)) {
         waiting.delete(item);
         active.add(item);
         item.start(() => {
@@ -34,12 +41,6 @@ export function createStreamRevealPool(limit = 4) {
   return {
     add(item: Reveal) {
       waiting.add(item);
-      if (waiting.size > 10) {
-        for (const older of Array.from(waiting).slice(0, waiting.size - 10)) {
-          waiting.delete(older);
-          older.skip();
-        }
-      }
       schedule();
       return () => {
         waiting.delete(item);
@@ -57,7 +58,7 @@ export function createStreamRevealPool(limit = 4) {
   };
 }
 
-export function streamRevealWindow(body: string, baseline: string, enabled: boolean, limit = 14) {
+export function streamRevealWindow(body: string, baseline: string, enabled: boolean, limit = STREAM_REVEAL_WINDOW) {
   if (!enabled || !body.startsWith(baseline)) return { prefix: body, words: [] };
   const words = Array.from(body.slice(baseline.length).matchAll(/\s*\S+\s*|\s+/gu), (match) => ({
     start: baseline.length + match.index,
