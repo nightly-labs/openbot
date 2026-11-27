@@ -29,11 +29,17 @@ interface CachedServer {
   capabilities: readonly string[] | null;
   drawer: DrawerSnapshot | null;
   channels: { channels: ChannelSummary[]; pages: ChannelPage[] } | null;
+  warmed?: { conversations: string[]; channels: string[] } | null;
+}
+
+interface WorkspaceCacheWarmIds {
+  conversations?: ReadonlySet<string>;
+  channels?: ReadonlySet<string>;
 }
 
 export interface WorkspaceCache {
   read(serverId: string): Promise<CachedServer | null>;
-  write(serverId: string, value: CachedServer): Promise<boolean>;
+  write(serverId: string, value: CachedServer, warmed?: WorkspaceCacheWarmIds): Promise<boolean>;
   remove(serverId: string): Promise<void>;
   retain(serverIds: readonly string[]): Promise<void>;
   readHosts(): Promise<RemoteTeamHost[] | null>;
@@ -109,6 +115,13 @@ function decodeCachedChannels(value: unknown): CachedServer["channels"] {
   }
 }
 
+function decodeCachedWarmed(value: unknown): CachedServer["warmed"] {
+  if (!isDynamicRecord(value)) return null;
+  const conversations = Array.isArray(value.conversations) ? value.conversations.filter(isString) : [];
+  const channels = Array.isArray(value.channels) ? value.channels.filter(isString) : [];
+  return { conversations, channels };
+}
+
 function decodeCachedServer(value: unknown): CachedServer {
   if (
     !isDynamicRecord(value) ||
@@ -127,6 +140,7 @@ function decodeCachedServer(value: unknown): CachedServer {
     capabilities: Array.isArray(capabilities) && capabilities.every(isString) ? capabilities : null,
     drawer: decodeDrawerSnapshot(value.drawer),
     channels: decodeCachedChannels(value.channels),
+    warmed: decodeCachedWarmed(value.warmed),
   };
 }
 
@@ -225,7 +239,7 @@ export function createWorkspaceCache(scope: string): WorkspaceCache | null {
         const key = await cacheKey();
         if (key) await seal(null, key, asciiJson({ format: FORMAT, hosts }));
       }),
-    write: (serverId, value) =>
+    write: (serverId, value, warmed) =>
       inOrder(serverId, async () => {
         const key = await cacheKey();
         if (!key) return false;
@@ -237,21 +251,42 @@ export function createWorkspaceCache(scope: string): WorkspaceCache | null {
         const conversationsMarker = `${marker}:conversations`;
         const channelPagesMarker = `${marker}:channel-pages`;
         const channels = value.channels && { channels: value.channels.channels, pages: channelPagesMarker };
-        const head = asciiJson({ format: FORMAT, ...value, agents, conversations: conversationsMarker, channels });
+        const warmedPayload = warmed
+          ? {
+              conversations: [...(warmed.conversations ?? [])],
+              channels: [...(warmed.channels ?? [])],
+            }
+          : null;
+        const head = asciiJson({
+          format: FORMAT,
+          ...value,
+          agents,
+          conversations: conversationsMarker,
+          channels,
+          ...(warmedPayload && (warmedPayload.conversations.length || warmedPayload.channels.length)
+            ? { warmed: warmedPayload }
+            : {}),
+        });
         let length = head.length - conversationsMarker.length - (channels ? channelPagesMarker.length : 0);
         const conversations: string[] = [];
         const channelPages: string[] = [];
         const pages = [
           ...value.conversations.map((page) => {
             const messages = page.messages.filter(({ itemType }) => itemType !== ROUTINE_QUIET_ANSWER_ITEM_TYPE);
-            return { page: { ...page, messages }, at: messages.at(-1)?.createdAt ?? "", kept: conversations };
+            return {
+              page: { ...page, messages },
+              at: messages.at(-1)?.createdAt ?? "",
+              warmed: warmed?.conversations?.has(page.agentId) ?? false,
+              kept: conversations,
+            };
           }),
           ...(value.channels?.pages ?? []).map((page) => ({
             page,
             at: page.messages.at(-1)?.message.createdAt ?? "",
+            warmed: warmed?.channels?.has(page.channel.id) ?? false,
             kept: channelPages,
           })),
-        ].sort((a, b) => b.at.localeCompare(a.at));
+        ].sort((a, b) => Number(a.warmed) - Number(b.warmed) || b.at.localeCompare(a.at));
         for (const { page, kept } of pages) {
           const json = asciiJson(page);
           length += json.length + 1;
