@@ -447,7 +447,11 @@ A hidden lead does not route. When the user hides an agent, `ChannelService.rele
 queued and starting assignments back to the channel. The task keeps its owner and gets a new
 revision, so the work continues after restore or after a reassign. When an agent that owns waiting
 channel work (`ownsWaitingWork`) reaches its usage limit, the agent moves to its backup model as for
-its own chat. The model-switch marker shows in the agent chat and in each affected channel.
+its own chat. The model-switch marker shows in the agent chat and in each affected channel. When no
+backup model is ready and the limit stops a task after the agent did work, the task keeps its
+assignment and its saved work (`requeueForLimit` with `continueWork`), as a stopped turn of the
+agent's own chat does. The held-queue cleanup does not give such a delivery back to the channel, and
+the same model continues the task when the limit ends.
 
 A one-time routine of a channel stays on this computer. The released Team API channel codec does
 not accept its schedule, so desktop IPC allows it only on the local host.
