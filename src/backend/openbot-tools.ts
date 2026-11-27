@@ -616,7 +616,7 @@ export const OPENBOT_TOOL_DEFINITIONS: readonly OpenBotToolDefinition[] = [
   {
     name: ROUTINE_NO_UPDATE_TOOL,
     description:
-      "Only when nothing is for the user: a scheduled, script or webhook routine run, or a teammate's update, with nothing new. Write no text before or with it; OpenBot sends no notification. A requested reminder, message or result is a report, unless the task's notification conditions say to send nothing. A manual Test run shows your answer.",
+      "Only when nothing is for the user: a scheduled, script or webhook routine run with nothing to report, or a teammate's update with nothing new. Write no text before or with it; OpenBot sends no notification. A requested reminder, message or result is a report, unless the task's notification conditions say to send nothing. A Test run shows your answer.",
     shape: {},
   },
   {
