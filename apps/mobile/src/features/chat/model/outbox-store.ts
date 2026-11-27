@@ -1,5 +1,5 @@
-import { sourceText } from "@openbot/i18n/source";
 import { MOBILE_ATTACHMENT_BYTES } from "@openbot/team-client/remote-peer";
+import { stoppedBeforeSend } from "@/features/workspace/model/connection-waits";
 import type { ChatAttachment } from "../components/use-chat-attachments";
 import {
   type DecodedOutbox,
@@ -556,10 +556,6 @@ const NOT_SENT_RETRY_LIMIT = 6;
 
 function notSentRetryDelay(attempt: number): number {
   return Math.min(NOT_SENT_RETRY_FIRST_MS * 2 ** attempt, NOT_SENT_RETRY_MAX_MS);
-}
-
-function stoppedBeforeSend(error: unknown): boolean {
-  return error instanceof Error && error.message === sourceText("error.remote.selectedServerOffline");
 }
 
 function removable(message: OutboxMessage): boolean {
