@@ -4,6 +4,7 @@ import { z } from "zod";
 import { runApiResponse } from "../../../../server/effect-runtime";
 import { readRequestBytes } from "../../../../server/json-body";
 import { REMOTE_RESUME_BATCH_LIMIT } from "../../../../server/remote-control-plane";
+import { remoteResumeClaimsSchema } from "../../../../server/remote-resume-claims";
 import {
   apiError,
   json,
@@ -12,20 +13,10 @@ import {
   verifyRemoteServiceRequest,
 } from "../../../../server/request-auth";
 
-const resumeClaimsSchema = z.object({
-  sessionId: z.string().min(1).max(256),
-  hostId: z.string().min(1).max(256),
-  userId: z.string().min(1).max(256),
-  membershipId: z.string().min(1).max(256),
-  role: z.enum(["host", "owner", "admin", "member"]),
-  authEpoch: z.number().int().nonnegative(),
-  sessionExpiresAt: z.number().int().positive(),
-});
-
 const RESUME_BATCH_BODY_LIMIT = 128 * 1024;
 
 const resumeBatchSchema = z.object({
-  claims: z.array(resumeClaimsSchema).min(1).max(REMOTE_RESUME_BATCH_LIMIT),
+  claims: z.array(remoteResumeClaimsSchema).min(1).max(REMOTE_RESUME_BATCH_LIMIT),
 });
 
 export const Route = createFileRoute("/v2/remote/resume/validate-batch")({
