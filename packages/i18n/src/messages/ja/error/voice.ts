@@ -35,7 +35,7 @@ export const messages = {
   "error.voice.live.disconnected": "ライブ音声の接続が切れました。",
   "error.voice.live.connectionLost": "ライブ音声の接続が切れました。マイクのミュートを解除すると再開します。",
   "error.voice.live.startFailed":
-    "ライブ音声を開始できませんでした。エージェントを実行しているコンピューターで Codex を更新し、ChatGPT でサインインしてから、もう一度お試しください。理由: {reason}",
+    "ライブ音声を開始できませんでした。しばらくしてからもう一度お試しいただくか、設定 でライブ音声をオフにして音声で話してください。理由: {reason}",
   "error.voice.live.hostFailed":
     "サーバーの Codex がライブ音声を開始できませんでした。オーナーに、そのコンピューターの Codex を更新して ChatGPT でサインインするよう依頼してから、もう一度お試しください。",
   "error.voice.live.signIn": "ライブ音声を使うには、ChatGPT アカウントで Codex にサインインしてください。",

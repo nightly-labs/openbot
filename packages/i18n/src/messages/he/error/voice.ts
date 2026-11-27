@@ -33,7 +33,7 @@ export const messages = {
   "error.voice.live.disconnected": "הקול החי התנתק.",
   "error.voice.live.connectionLost": "הקול החי איבד את החיבור. בטלו את השתקת המיקרופון כדי להפעיל אותו שוב.",
   "error.voice.live.startFailed":
-    "לא ניתן היה להפעיל את הקול החי. עדכנו את Codex והיכנסו עם ChatGPT במחשב שמריץ את הסוכן, ואז נסו שוב. סיבה: {reason}",
+    "לא ניתן היה להפעיל את הקול החי. יש לנסות שוב מאוחר יותר, או לכבות את הקול החי בהגדרות כדי לדבר בקול. סיבה: {reason}",
   "error.voice.live.hostFailed":
     "Codex בשרת לא הצליח להפעיל את הקול החי. בקשו מהבעלים לעדכן את Codex במחשב הזה ולהיכנס עם ChatGPT, ואז נסו שוב.",
   "error.voice.live.signIn": "יש להתחבר ל-Codex עם חשבון ChatGPT כדי להשתמש בקול חי.",

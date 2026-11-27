@@ -37,7 +37,7 @@ export const messages = {
   "error.voice.live.connectionLost":
     "Live spraak heeft de verbinding verloren. Zet de microfoon weer aan om opnieuw te starten.",
   "error.voice.live.startFailed":
-    "Live spraak kon niet starten. Werk Codex bij en log in met ChatGPT op de computer waarop de agent draait, en probeer het dan opnieuw. Reden: {reason}",
+    "Live spraak kon niet starten. Probeer het later opnieuw, of zet live spraak uit in Instellingen om met je stem te praten. Reden: {reason}",
   "error.voice.live.hostFailed":
     "Codex op de server kon live spraak niet starten. Vraag de eigenaar om Codex op die computer bij te werken en in te loggen met ChatGPT, en probeer het dan opnieuw.",
   "error.voice.live.signIn": "Meld je met je ChatGPT-account aan bij Codex om live spraak te gebruiken.",
