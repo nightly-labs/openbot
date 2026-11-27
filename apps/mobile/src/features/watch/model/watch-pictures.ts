@@ -18,7 +18,10 @@ const WATCH_FACE_MOODS = ["waiting", "working"] as const satisfies readonly (key
 const WATCH_SERVER_PICTURE_FOLDER = "watch-server-pictures";
 const WATCH_SERVER_PICTURE_PIXELS = [192, 144, 108] as const;
 const WATCH_SERVER_PICTURE_LIMIT = 40_000;
+const WATCH_SERVER_PICTURE_RETRY_MS = 5 * 60_000;
 const writingServerPictures = new Set<string>();
+const failedServerPictures = new Map<string, number>();
+let wantedServerPictures: ReadonlySet<string> = new Set();
 
 function pictureName(agent: AvatarFileAgent, mood: AvatarMood): string {
   return agentAvatarFile(agent, WATCH_PICTURE_PIXELS, mood).name;
@@ -117,20 +120,25 @@ async function writeServerPicture(
   server: WatchServerPictureSource,
   session: ServerSession,
 ): Promise<boolean> {
-  const file = new File(folder, serverPictureName(server));
+  const name = serverPictureName(server);
+  const file = new File(folder, name);
   if (file.exists || writingServerPictures.has(file.uri)) return false;
+  if (Date.now() - (failedServerPictures.get(name) ?? 0) < WATCH_SERVER_PICTURE_RETRY_MS) return false;
   writingServerPictures.add(file.uri);
   try {
     const draw = await serverPictureDrawer(server, session);
     for (const pixels of WATCH_SERVER_PICTURE_PIXELS) {
       const data = await draw(pixels);
       if (data.length > WATCH_SERVER_PICTURE_LIMIT) continue;
-      if (!folder.exists || file.exists) return false;
+      if (!folder.exists || file.exists || !wantedServerPictures.has(name)) return false;
       file.writeSync(data, { encoding: "base64" });
+      failedServerPictures.delete(name);
       return true;
     }
+    failedServerPictures.set(name, Date.now());
     return false;
   } catch (error) {
+    failedServerPictures.set(name, Date.now());
     supportLog.add("warn", "app", `Watch server picture not saved: ${supportLogValue(error)}`);
     return false;
   } finally {
@@ -144,9 +152,15 @@ export async function syncWatchServerPictures(
 ): Promise<boolean> {
   const folder = appGroupDirectory(WATCH_SERVER_PICTURE_FOLDER);
   if (!folder) return false;
-  folder.create({ intermediates: true, idempotent: true });
   const named = new Set(servers.map(serverPictureName));
-  for (const entry of folder.list()) if (!named.has(entry.name)) entry.delete();
+  wantedServerPictures = named;
+  try {
+    folder.create({ intermediates: true, idempotent: true });
+    for (const entry of folder.list()) if (!named.has(entry.name)) entry.delete();
+  } catch (error) {
+    supportLog.add("warn", "app", `Watch server pictures not synced: ${supportLogValue(error)}`);
+    return false;
+  }
   const written = await Promise.all(servers.map((server) => writeServerPicture(folder, server, session)));
   return written.some(Boolean);
 }

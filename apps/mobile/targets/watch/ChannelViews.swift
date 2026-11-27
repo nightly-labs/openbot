@@ -99,7 +99,7 @@ private enum ClusterLayout {
 
 struct ChannelRow: View {
   @Environment(\.watchText) private var text
-  @Environment(\.themed) private var themed
+  @Environment(\.serverPalette) private var palette
   let channel: WatchChannel
   var divided = false
 
@@ -115,7 +115,7 @@ struct ChannelRow: View {
             Label(text(TextKey.stateWorking), systemImage: "ellipsis")
               .font(.caption2)
               .lineLimit(1)
-              .foregroundStyle(themed ? AgentRow.workingTint : .blue)
+              .foregroundStyle(palette == nil ? .blue : AgentRow.workingTint)
           } else if let line = channel.activityLine {
             Label(line, systemImage: "number")
               .font(.caption2)

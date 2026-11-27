@@ -23,9 +23,11 @@ enum WatchMerge {
         server.id = id
         server.online = true
         if server.watchKey == nil { server.watchKey = known?.watchKey }
+        let sameLook =
+          (server.color == nil || server.color == known?.color) && (server.shape == nil || server.shape == known?.shape)
         if server.color == nil { server.color = known?.color }
         if server.shape == nil { server.shape = known?.shape }
-        if server.picture == nil { server.picture = known?.picture }
+        if server.picture == nil, sameLook { server.picture = known?.picture }
         server.hiddenAgents = known?.hiddenAgents
         server.hiddenChannels = known?.hiddenChannels
         servers.append(server)

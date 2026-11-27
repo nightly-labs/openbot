@@ -157,7 +157,7 @@ struct AgentAvatar: View {
         if stateIcon && agent.isBusy {
           let style = AgentStateStyle(agent: agent, text: text)
           let waiting = agent.wait != nil || agent.state == .waiting
-          let fill = waiting ? Color.orange : Color(hex: agent.color) ?? .blue
+          let fill = waiting ? Color.orange : Color.stateTint(hex: agent.color)
           Image(systemName: style.symbol)
             .font(.system(size: size * 0.2, weight: .bold))
             .foregroundStyle(!waiting && UIColor(fill).luminance > 0.6 ? Color.black : .white)
