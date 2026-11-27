@@ -857,15 +857,21 @@ The unit (`openbot.service`):
   | Child | Setting |
   | --- | --- |
   | `main` | `cpu.weight` 100, `io.weight` 100, `memory.low` 15% of `MemoryMax` (at least 1 GiB) |
-  | `agents` | `cpu.weight` 20, `io.weight` 20, `memory.high` `MemoryMax` minus the `memory.low` of `main` (at least half of `MemoryMax`), `memory.swap.max` half of the swap |
+  | `agents` | `cpu.weight` 20, `io.weight` 20, `memory.high` `MemoryMax` minus the `memory.low` of `main` (at least half of `MemoryMax`), `memory.max` `MemoryMax` minus 256 MiB, `memory.swap.max` the swap minus the `memory.low` of `main` (at least half of the swap) |
 
   The weights act only when the two children want more than the machine has. An idle server gives
-  a build all of the CPU. Above `memory.high`, the kernel takes memory back from the agents and
-  slows them; it does not stop them. Main, Xvfb, D-Bus, the keyring and the Electron processes
+  a build all of the CPU. Above `memory.high`, the kernel moves memory of the agents to the swap and
+  slows them; it does not stop them. When the agents reach `memory.max` and their swap is full, the
+  kernel's OOM killer stops an agent process, as the unit limit did before, but never main. The
+  `memory.low` of `main` is complete when the unit is full. When the whole machine is short of
+  memory, the kernel gives `main` at most the `MemoryLow=15%` of the unit, which is less than 1 GiB
+  on a small server. Main, Xvfb, D-Bus, the keyring and the Electron processes
   stay in `main`. So jobs of agents that fill the CPU, the disk or the swap slow down, and main
   keeps answering. Without cgroup v2, without delegation, or in a unit with another name, the
-  launcher changes nothing, and the unit works as before. When a controller is missing, the log has
-  one line. `io.weight` acts only with an I/O scheduler that supports it (BFQ or `io.cost`).
+  launcher changes nothing, and the unit works as before. The launcher sets each controller on its
+  own: when the `cpu` or the `memory` controller is missing, the log has one line, and the other
+  controllers still apply. An agent runs as the service user, so it can change these values or move
+  itself back to `main`; the split protects main from load, not from an agent that wants to escape. `io.weight` acts only with an I/O scheduler that supports it (BFQ or `io.cost`).
   `service_openbot` in the launcher compares the unit cgroup, without `/main` or `/.control`, so
   the watchdog and `--stop` find main in its child cgroup.
 - `provision.sh` adds compressed swap (zram, half of the memory) when the kernel has the module.

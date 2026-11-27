@@ -29,6 +29,7 @@ const Probe = Schema.Struct({
   childOfMarked: Schema.String,
   errors: Schema.Array(Schema.String),
   agentLimits: Schema.Record(Schema.String, Schema.NullOr(Schema.String)),
+  mainLimits: Schema.Record(Schema.String, Schema.NullOr(Schema.String)),
 });
 type Probe = typeof Probe.Type;
 const decodeProbe = Schema.decodeUnknownSync(Schema.fromJsonString(Probe));
@@ -106,13 +107,12 @@ async function probe(directory: string): Promise<Probe> {
     const childOfMarked = cgroupOf(childPid);
     const cgroupRoot = await Effect.runPromise(readCgroupRoot());
     const { sample, unit } = await Effect.runPromise(readLinuxMemory());
-    const agents = cgroupRoot === null ? null : join(cgroupRoot, "agents");
-    const agentLimits = Object.fromEntries(
-      ["cpu.weight", "memory.high", "memory.swap.max"].map((file) => [
-        file,
-        agents === null ? null : readOptional(join(agents, file)),
-      ]),
-    );
+    const limits = (child: string, files: string[]) =>
+      Object.fromEntries(
+        files.map((file) => [file, cgroupRoot === null ? null : readOptional(join(cgroupRoot, child, file))]),
+      );
+    const agentLimits = limits("agents", ["cpu.weight", "memory.high", "memory.max", "memory.swap.max"]);
+    const mainLimits = limits("main", ["cpu.weight", "memory.low"]);
     return {
       ownCgroup: cgroupOf("self"),
       cgroupRoot,
@@ -123,11 +123,37 @@ async function probe(directory: string): Promise<Probe> {
       childOfMarked,
       errors,
       agentLimits,
+      mainLimits,
     };
   } finally {
-    if (childPid !== null) process.kill(childPid, "SIGKILL");
+    if (childPid !== null) stopProcess(childPid);
     for (const child of children) child.kill("SIGKILL");
   }
+}
+
+function stopProcess(pid: number): void {
+  try {
+    process.kill(pid, "SIGKILL");
+  } catch {}
+}
+
+function swapTotalBytes(): number {
+  const kib = /^SwapTotal:\s+(\d+) kB$/mu.exec(readFileSync("/proc/meminfo", "utf8"))?.[1];
+  assert.ok(kib !== undefined, "/proc/meminfo has no SwapTotal");
+  return Number(kib) * 1024;
+}
+
+function expectedMemoryLimits(memoryMax: number, swap: number) {
+  const gib = 1024 * 1024 * 1024;
+  const reserve = Math.max(Math.floor((memoryMax * 15) / 100), gib);
+  const high = Math.max(memoryMax - reserve, Math.floor(memoryMax / 2));
+  const agentsMax = memoryMax - 256 * 1024 * 1024;
+  return {
+    low: String(reserve),
+    high: String(high),
+    max: agentsMax > high ? String(agentsMax) : "max",
+    swap: String(Math.max(swap - reserve, Math.floor(swap / 2))),
+  };
 }
 
 function launcherFunctions(): string {
@@ -213,8 +239,21 @@ async function main(): Promise<void> {
   assert.equal(serverProbe.unmarkedAfter, serverProbe.ownCgroup, "a process that is not an agent moved");
   assert.equal(serverProbe.childOfMarked, `${unitCgroup}/agents`, "a new agent child did not start in agents");
   assert.deepEqual(serverProbe.errors, []);
+  const memoryDelegated = serverProbe.agentLimits["memory.high"] !== null;
+  if (memoryDelegated) {
+    const expected = expectedMemoryLimits(UNIT_MEMORY_MAX, swapTotalBytes());
+    assert.equal(serverProbe.mainLimits["memory.low"], expected.low, "main has the wrong memory.low");
+    assert.equal(serverProbe.agentLimits["memory.high"], expected.high, "agents have the wrong memory.high");
+    assert.equal(serverProbe.agentLimits["memory.max"], expected.max, "agents have the wrong memory.max");
+    assert.equal(serverProbe.agentLimits["memory.swap.max"], expected.swap, "agents have the wrong memory.swap.max");
+  }
+  const cpuDelegated = serverProbe.agentLimits["cpu.weight"] !== null;
+  if (cpuDelegated) {
+    assert.equal(serverProbe.mainLimits["cpu.weight"], "100");
+    assert.equal(serverProbe.agentLimits["cpu.weight"], "20");
+  }
 
-  const report = { ok: true, desktop: desktopProbe, server: serverProbe };
+  const report = { ok: true, memoryDelegated, cpuDelegated, desktop: desktopProbe, server: serverProbe };
   writeFileSync(join(OUT, "report.json"), `${JSON.stringify(report, null, 2)}\n`);
   logger.info(`The server agent cgroup E2E test passed. Report: ${join(OUT, "report.json")}`);
 }
