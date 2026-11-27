@@ -1858,10 +1858,13 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
       runTeamEffect(setHostSkillLearning(hostRequest(serverId), mode).pipe(Effect.mapError((error) => error.cause))),
   };
   const remoteChatContent = createRemoteChatContent({
-    getRemoteChatContent: async (serverId) =>
-      workspace.state.capabilities.includes(REMOTE_CHAT_CONTENT_CAPABILITY)
-        ? runTeamEffect(getHostRemoteChatContent(hostRequest(serverId)).pipe(Effect.mapError((error) => error.cause)))
-        : { enabled: false },
+    getRemoteChatContent: async (serverId) => {
+      if (workspace.state.capabilities.length === 0) throw new Error("The host is not connected yet.");
+      if (!workspace.state.capabilities.includes(REMOTE_CHAT_CONTENT_CAPABILITY)) return { enabled: false };
+      return runTeamEffect(
+        getHostRemoteChatContent(hostRequest(serverId)).pipe(Effect.mapError((error) => error.cause)),
+      );
+    },
     setRemoteChatContent: async (enabled, serverId) =>
       runTeamEffect(
         setHostRemoteChatContent(hostRequest(serverId), enabled).pipe(Effect.mapError((error) => error.cause)),
@@ -3062,10 +3065,7 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
             </div>
           }
         >
-          <WindowBackdrop
-            pages="srcdoc"
-            remoteContent={servers().every((item) => remoteChatContent.enabled(item.id))}
-          />
+          <WindowBackdrop pages="srcdoc" remoteContent={remoteChatContent.enabled(server()?.id)} />
           <div
             class="app-window web-app-window"
             data-loading-waited-long={loadingCover() && loadingWaitedLong() ? "" : undefined}
