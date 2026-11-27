@@ -308,8 +308,8 @@ Cloudflare Access also protects the admin routes (`/v1/skills/admin/`, `/v1/mark
 `<team>.cloudflareaccess.com`) and `CF_ACCESS_ADMIN_AUD` (the AUD tag of the Access application) are
 set, an admin request needs a valid `Cf-Access-Jwt-Assertion` as well as the admin token. With only
 one of them set, every admin request is refused. They are not secrets: set them in `wrangler.jsonc`
-`vars` only after the Access application exists. Development keeps them empty. People sign in to
-Access with MFA. Scripts send an Access service token when `CF_ACCESS_CLIENT_ID` and
+`vars` only after the Access application exists. Development keeps them empty. The Access policy
+allows only a service token; there is no interactive sign-in. Scripts send an Access service token when `CF_ACCESS_CLIENT_ID` and
 `CF_ACCESS_CLIENT_SECRET` are in the environment (`scripts/cloudflare-access-headers.ts`).
 
 `COMPANY_SIGN_IN_SECRET` (at least 32 random bytes) turns on company sign-in (OpenID Connect and
