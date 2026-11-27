@@ -539,7 +539,11 @@ export class TurnLifecycle {
       this.#stopNotes.delete(threadId);
       return;
     }
-    if (stop !== undefined && (status !== "completed" || stop === "quiet"))
+    if (
+      stop !== undefined &&
+      (status !== "completed" || stop === "quiet") &&
+      !this.#conversation.isRoutineSession(threadId)
+    )
       this.#stopNotes.set(threadId, { agentId, text: openBotStopNote(stop) });
   }
 

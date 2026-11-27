@@ -1141,11 +1141,12 @@ export class DrainScheduler {
         if (routineThreadId || !isMissingProviderSessionError(firstStart.failure.cause, client.provider))
           return yield* firstStart.failure;
         const unavailableThreadId = threadId;
-        this.#hooks.clearStopNote(unavailableThreadId, sentStopNotes.get(unavailableThreadId));
         if (this.#conversation.loadedClientFor(unavailableThreadId) === client) {
           this.#conversation.unloadThread(unavailableThreadId);
         }
         threadId = yield* this.#threads.ensureThread(agent, client, execution?.threadId).pipe(toDeliveryStartFailed);
+        if (threadId !== unavailableThreadId)
+          this.#hooks.clearStopNote(unavailableThreadId, sentStopNotes.get(unavailableThreadId));
         response = yield* startTurn(threadId);
         if (threadId === unavailableThreadId) {
           this.#threads.logRecovery(agent.id, client.provider, "resumed");
