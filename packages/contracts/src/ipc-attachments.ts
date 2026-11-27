@@ -1,4 +1,5 @@
 import { isDocxMimeType, isXlsxMimeType, playableMediaKind } from "./attachment-files";
+import { isImageSizeValue } from "./image-size";
 import { INPUT_LIMITS } from "./input-limits";
 import { isBoundedString, isIdentifier, isNullableBoundedString } from "./ipc-bounded-values";
 import { guardedDecoder } from "./ipc-decoding";
@@ -15,6 +16,8 @@ export interface AttachmentSummary {
   mimeType: string;
   previewKind: AttachmentPreviewKind;
   previewUrl: string | null;
+  width?: number;
+  height?: number;
 }
 
 export function isAttachmentSummary(value: unknown): value is AttachmentSummary {
@@ -27,7 +30,9 @@ export function isAttachmentSummary(value: unknown): value is AttachmentSummary 
     isOneOf(["image", "file"] as const, value.kind) &&
     isBoundedString(value.mimeType, INPUT_LIMITS.mimeType) &&
     isOneOf(["image", "pdf", "text", "none"] as const, value.previewKind) &&
-    (value.previewUrl === null || isBoundedString(value.previewUrl, INPUT_LIMITS.avatarUrl))
+    (value.previewUrl === null || isBoundedString(value.previewUrl, INPUT_LIMITS.avatarUrl)) &&
+    (value.width === undefined || isImageSizeValue(value.width)) &&
+    (value.height === undefined || isImageSizeValue(value.height))
   );
 }
 

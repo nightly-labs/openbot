@@ -34,6 +34,7 @@ import {
   teamProtocolV2AuthenticationTranscript,
   teamWebRtcClientProtocol,
 } from "@openbot/contracts/team-protocol";
+import { addAttachmentDimensions } from "@openbot/contracts/team-protocol/attachment-dimensions-v1";
 import type { LiveVoiceEvent } from "@openbot/contracts/team-protocol/live-voice-v1";
 import { addNearPayments } from "@openbot/contracts/team-protocol/near-payment-v1";
 import { optionalTeamEvent, optionalTeamEventToCurrent } from "@openbot/contracts/team-protocol/optional-events";
@@ -1708,20 +1709,23 @@ export function createRemoteTeamPeer(
             status: frame.result.status,
             body: sideRoute
               ? yield* peerDecode(() =>
-                  sideRoute.response(pending.path, status, body, {
-                    historyExtent: true,
-                    channelAttention: true,
-                    agentTaskUiBlocks: true,
-                    channelIsolation: true,
-                    channelPicture: true,
-                    channelBrowser: true,
-                    channelSeenSubtasks: true,
-                    channelTaskWaits: true,
-                    mcpManyServers: true,
-                    providerManyAccounts: true,
-                    routineResultsWhatsApp: true,
-                    storageWorkflowFiles: true,
-                  }),
+                  withWireAttachmentDimensions(
+                    sideRoute.response(pending.path, status, body, {
+                      historyExtent: true,
+                      channelAttention: true,
+                      agentTaskUiBlocks: true,
+                      channelIsolation: true,
+                      channelPicture: true,
+                      channelBrowser: true,
+                      channelSeenSubtasks: true,
+                      channelTaskWaits: true,
+                      mcpManyServers: true,
+                      providerManyAccounts: true,
+                      routineResultsWhatsApp: true,
+                      storageWorkflowFiles: true,
+                    }),
+                    body,
+                  ),
                 )
               : yield* peerDecode(() =>
                   withWireBlockExtensions(
@@ -1785,6 +1789,7 @@ export function createRemoteTeamPeer(
           addSkillSuggestionNames(decoded.event, frame.payload);
           addPromptQuestionDetails(decoded.event, frame.payload);
         }
+        addAttachmentDimensions(decoded.event, frame.payload);
         yield* RemotePeerIO.use((io) => io.teamEvent(state.hostId, decoded.event));
       }
       scheduleEventAck(state);
@@ -2607,6 +2612,11 @@ function sendsBlockExtensions(state: PeerState): boolean {
   return (state.hostProtocol ?? 0) >= TEAM_PROTOCOL_V9;
 }
 
+function withWireAttachmentDimensions<T>(decoded: T, wire: unknown): T {
+  addAttachmentDimensions(decoded, wire);
+  return decoded;
+}
+
 function withWireBlockExtensions<T>(state: PeerState, decoded: T, wire: unknown): T {
   if (sendsBlockExtensions(state)) {
     addUiBlockAutoAnswers(decoded, wire);
@@ -2616,5 +2626,5 @@ function withWireBlockExtensions<T>(state: PeerState, decoded: T, wire: unknown)
     addSkillSuggestionNames(decoded, wire);
     addPromptQuestionDetails(decoded, wire);
   }
-  return decoded;
+  return withWireAttachmentDimensions(decoded, wire);
 }
