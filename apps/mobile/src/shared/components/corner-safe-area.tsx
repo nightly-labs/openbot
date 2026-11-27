@@ -1,5 +1,5 @@
 import type { ReactNode } from "react";
-import { type StyleProp, View, type ViewStyle } from "react-native";
+import { Platform, type StyleProp, View, type ViewStyle } from "react-native";
 import {
   type CornerAdaptation,
   type EdgeInsets,
@@ -7,7 +7,6 @@ import {
   useSafeAreaFrame,
   useSafeAreaInsets,
 } from "react-native-safe-area-context";
-import { isIOS } from "@/shared/lib/platform";
 
 interface CornerSafeAreaProps {
   cornerAdaptation: CornerAdaptation;
@@ -19,7 +18,7 @@ export function CornerSafeArea({ cornerAdaptation, style, children }: CornerSafe
   const columnInsets = useSafeAreaInsets();
   const frame = useSafeAreaFrame();
   const rowInsets = { top: 0, right: columnInsets.right, bottom: 0, left: columnInsets.left };
-  if (!isIOS) {
+  if (!(Platform.OS === "ios" && Platform.isPad)) {
     return (
       <View pointerEvents="box-none" style={style}>
         {children(rowInsets)}
