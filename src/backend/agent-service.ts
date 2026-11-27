@@ -2032,6 +2032,7 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
         backupReadyAt: (agentId) => this.#backupReadyAt(agentId),
         backupsAtLimit: (agentId) => this.#backupsAtLimit(agentId),
         poolHasOtherAccount: (agentId) => this.#poolHasOtherAccount(agentId),
+        poolMovesOffAccount: (agentId) => this.#poolMovesOffAccount(agentId),
         mayContinueOnBackup: (agentId) => this.#mayContinueStoppedWork(agentId),
         requeueChannelDelivery: (deliveryId, continueWork) => this.#requeueChannelDelivery(deliveryId, continueWork),
         keepChannelDelivery: (deliveryId) => this.channels.keepForRetry(deliveryId),
@@ -4582,6 +4583,11 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
     if (!this.#pooled(choice)) return false;
     const current = choice.providerAccountId ?? DEFAULT_PROVIDER_ACCOUNT_ID;
     return this.#readyPoolMembers(choice.provider, choice.model).some((member) => member.accountId !== current);
+  }
+
+  #poolMovesOffAccount(agentId: string): boolean {
+    const agent = this.#store.get(agentId);
+    return agent !== undefined && this.#movesInPool(agent) && this.#poolHasOtherAccount(agentId);
   }
 
   #refreshPoolInUse(provider: AgentProvider): void {

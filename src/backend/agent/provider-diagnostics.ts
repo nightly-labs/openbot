@@ -235,6 +235,10 @@ export function isBalanceDiagnostic(message: string): boolean {
   return /\b(?:credits?|balance|quota|billing)\b/iu.test(message);
 }
 
+export function isWorkspaceCreditsDiagnostic(message: string): boolean {
+  return /\bworkspace is out of credits\b/iu.test(message);
+}
+
 export function isSpentBalanceDiagnostic(message: string): boolean {
   return isBalanceDiagnostic(message) && !isPlanLimitDiagnostic(message);
 }
