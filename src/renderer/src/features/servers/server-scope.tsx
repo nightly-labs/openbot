@@ -329,6 +329,8 @@ const ServerScope = createSimpleContext({
         });
       };
       window.addEventListener("focus", handleWindowFocus);
+      const handleNetworkRestored = () => recovery.networkRestored();
+      window.addEventListener("online", handleNetworkRestored);
 
       void initialServersReady.then(() => {
         if (scopeIsCurrent()) setBootstrapReady(true);
@@ -339,6 +341,7 @@ const ServerScope = createSimpleContext({
         recovery.dispose();
         window.removeEventListener("keydown", handleGlobalSearchShortcut);
         window.removeEventListener("focus", handleWindowFocus);
+        window.removeEventListener("online", handleNetworkRestored);
       };
     });
 
@@ -445,6 +448,7 @@ const ServerScope = createSimpleContext({
       ({ ready }) => {
         if (!ready) loadGeneration += 1;
         recovery.setActive(ready);
+        if (ready) recovery.resetBackoff();
       },
     );
 
