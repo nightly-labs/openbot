@@ -234,6 +234,7 @@
     "test:update-host-takeover": "bun scripts/update-host-takeover-e2e.ts",
     "test:hosted-update-idle-wait": "bun scripts/hosted-update-idle-wait-e2e.ts",
     "test:hosted-watchdog": "bun scripts/hosted-watchdog-e2e.ts",
+    "test:openbot-cli-control-replies": "bun scripts/hosting/openbot-cli-control-replies-e2e.ts",
     "test:browser-steps": "bun scripts/browser-steps-e2e.ts",
     "test:browser-dialogs": "bun scripts/browser-dialogs-e2e.ts",
     "test:browser-idle-freeze": "bun scripts/browser-idle-freeze-e2e.ts",
