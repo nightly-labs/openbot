@@ -33,7 +33,7 @@ import { isConnectionDrop, useUiErrors } from "../../ui-errors";
 import { useAuth } from "../account/account-context";
 import { useAgentTasks } from "../agent-tasks/agent-tasks-context";
 import { useAgentReadTracking } from "../agents/agent-read-tracking";
-import { appendLatestRuntimeMessages, attentionKey } from "../agents/agent-runtime-snapshot";
+import { appendLatestRuntimeMessages, attentionEventKey, attentionKey } from "../agents/agent-runtime-snapshot";
 import { useAgents } from "../agents/agents-context";
 import { useChannels } from "../channels/channels-context";
 import { useServers } from "../servers/servers-context";
@@ -1217,25 +1217,43 @@ const Conversation = createSimpleContext({
     function presentPromptResolution(agentId: string, turnId: string, requestId: string | number): void {
       const requestKey = promptRequestKey(turnId, requestId);
       if (!requestKey) return;
-      const promptKey = ownChatAttentionKey(agentId);
-      const currentPrompt = pendingPrompts()[promptKey];
+      const ownChatKey = ownChatAttentionKey(agentId);
+      let currentPrompt = pendingPrompts()[ownChatKey];
       if (
         currentPrompt?.type !== "prompt" ||
         promptRequestKey(currentPrompt.turnId, currentPrompt.requestId) !== requestKey
       ) {
-        return;
+        for (const event of Object.values(pendingPrompts())) {
+          if (
+            event?.type === "prompt" &&
+            event.agentId === agentId &&
+            promptRequestKey(event.turnId, event.requestId) === requestKey
+          ) {
+            currentPrompt = event;
+            break;
+          }
+        }
+        if (
+          currentPrompt?.type !== "prompt" ||
+          promptRequestKey(currentPrompt.turnId, currentPrompt.requestId) !== requestKey
+        ) {
+          return;
+        }
       }
+      const attentionKeyForPrompt = attentionEventKey(currentPrompt);
       flushConversationDeltas();
       const persisted = (conversations[agentId]?.messages ?? []).some(
         (message) => messagePromptRequestKey(message) === requestKey && message.questionPrompt?.resolution !== null,
       );
       if (persisted) {
-        setPendingPrompts((current) => ({ ...current, [promptKey]: undefined }));
+        setPendingPrompts((current) => ({ ...current, [attentionKeyForPrompt]: undefined, [ownChatKey]: undefined }));
         setPresentedPromptResolutions((current) => ({ ...current, [agentId]: undefined }));
         setSubmittedPromptRequests((current) => ({ ...current, [agentId]: undefined }));
         return;
       }
       setPresentedPromptResolutions((current) => ({ ...current, [agentId]: requestKey }));
+      // Drop the live Vault/question card while main stores the answer; it returns in the timeline when resolved.
+      setPendingPrompts((current) => ({ ...current, [attentionKeyForPrompt]: undefined }));
     }
 
     document.addEventListener("visibilitychange", applyPendingConversations);
