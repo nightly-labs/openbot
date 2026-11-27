@@ -112,6 +112,7 @@ const agents = {
   },
   getRuntimeSnapshot: snapshot,
   listConversationReads: reads,
+  listTaskReads: () => [],
 };
 
 const liveActivity = new LiveActivityPushService({

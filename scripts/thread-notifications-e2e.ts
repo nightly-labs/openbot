@@ -186,6 +186,7 @@ const agents = {
   readConversationPageFor: () => Effect.succeed(mainPage()),
   readTask,
   getRuntimeSnapshot: snapshot,
+  listTaskReads: () => [],
   listConversationReads: () =>
     Object.fromEntries(
       state.unread > 0

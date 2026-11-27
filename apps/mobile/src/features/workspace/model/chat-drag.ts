@@ -22,7 +22,11 @@ export interface DragRect {
 
 export type ChatDropTarget =
   | { area: "pins"; beforeKey: string | null }
-  | { area: "list"; sectionId: string; beforeChatId: string | null };
+  | { area: "list"; sectionId: string; beforeChatId: string | null }
+  | { area: "folder"; sectionId: string }
+  | { area: "unpin" };
+
+export type ListDrops = "positions" | "folders" | "none";
 
 export interface DropMark {
   shape: "line" | "bar" | "zone";
@@ -46,7 +50,7 @@ export interface DropFrames {
 
 export interface DropChange {
   pins?: SidebarPin[];
-  move?: Extract<SidebarLayoutAction, { type: "move-agent" }>;
+  move?: Extract<SidebarLayoutAction, { type: "move-agent" | "assign" }>;
 }
 
 const PIN_AREA_SLOP = 12;
@@ -67,14 +71,46 @@ export function chatDropTarget(
   dragged: DraggedChat,
   x: number,
   y: number,
-  options: { canPin: boolean; sections: boolean },
+  options: { canPin: boolean; drops: ListDrops },
 ): { target: ChatDropTarget; mark: DropMark } | null {
   if (frames.pinArea && contains(frames.pinArea, x, y, PIN_AREA_SLOP)) {
     if (!dragged.pinned && !options.canPin) return null;
     return pinTarget(frames, dragged, x, y);
   }
-  if (!options.sections) return dragged.pinned ? unpinTarget(frames.list, y) : null;
-  return listTarget(frames.list, dragged, y);
+  if (dragged.pinned) {
+    if (options.drops === "none") return unpinTarget(frames.list, y);
+    if (options.drops === "folders") return folderTarget(frames.list, y) ?? unpinTarget(frames.list, y);
+    return listTarget(frames.list, dragged, y);
+  }
+  if (options.drops === "none" || inGroup(frames.list, dragged)) return null;
+  return options.drops === "folders" ? folderTarget(frames.list, y) : listTarget(frames.list, dragged, y);
+}
+
+function inGroup(list: readonly ListFrame[], dragged: DraggedChat): boolean {
+  const key = sidebarPinKey(dragged.chat);
+  return list.some((entry) => entry.kind === "chat" && entry.sectionId === null && sidebarPinKey(entry.chat) === key);
+}
+
+function frameSectionId(entry: ListFrame): string | null {
+  return entry.kind === "section" ? entry.id : entry.sectionId;
+}
+
+function folderTarget(list: readonly ListFrame[], y: number): { target: ChatDropTarget; mark: DropMark } | null {
+  const last = list.at(-1);
+  const entry =
+    list.find((candidate) => y >= candidate.rect.y && y < candidate.rect.y + candidate.rect.height) ??
+    (last && y >= last.rect.y ? last : undefined);
+  const sectionId = entry ? frameSectionId(entry) : null;
+  if (sectionId === null) return null;
+  const rects = list.filter((candidate) => frameSectionId(candidate) === sectionId).map((candidate) => candidate.rect);
+  const top = Math.min(...rects.map((rect) => rect.y));
+  const bottom = Math.max(...rects.map((rect) => rect.y + rect.height));
+  const left = Math.min(...rects.map((rect) => rect.x));
+  const right = Math.max(...rects.map((rect) => rect.x + rect.width));
+  return {
+    target: { area: "folder", sectionId },
+    mark: { shape: "zone", rect: { x: left, y: top, width: right - left, height: bottom - top } },
+  };
 }
 
 function unpinTarget(list: readonly ListFrame[], y: number): { target: ChatDropTarget; mark: DropMark } | null {
@@ -85,7 +121,7 @@ function unpinTarget(list: readonly ListFrame[], y: number): { target: ChatDropT
     : last && y >= last.rect.y
       ? line(last.rect, last.rect.y + last.rect.height)
       : null;
-  return mark ? { target: { area: "list", sectionId: SIDEBAR_UNASSIGNED_SECTION_ID, beforeChatId: null }, mark } : null;
+  return mark ? { target: { area: "unpin" }, mark } : null;
 }
 
 function pinTarget(
@@ -206,14 +242,19 @@ export function chatDropChange(
   }
   const key = sidebarPinKey(dragged.chat);
   const change: DropChange = dragged.pinned ? { pins: pins.filter((pin) => sidebarPinKey(pin) !== key) } : {};
-  if (layout) {
-    const move = {
-      type: "move-agent" as const,
-      agentId: dragged.chat.id,
-      sectionId: target.sectionId === SIDEBAR_UNASSIGNED_SECTION_ID ? null : target.sectionId,
-      beforeAgentId: target.beforeChatId,
-    };
-    if (!sameLayoutPlace(layout, moveSidebarChat(layout, move), dragged.chat.id)) change.move = move;
+  if (target.area === "unpin" || !layout) return change;
+  if (target.area === "folder") {
+    const sectionId = target.sectionId === SIDEBAR_UNASSIGNED_SECTION_ID ? null : target.sectionId;
+    if ((layout.agentAssignments[dragged.chat.id] ?? null) !== sectionId)
+      change.move = { type: "assign", agentId: dragged.chat.id, sectionId };
+    return change;
   }
+  const move = {
+    type: "move-agent" as const,
+    agentId: dragged.chat.id,
+    sectionId: target.sectionId === SIDEBAR_UNASSIGNED_SECTION_ID ? null : target.sectionId,
+    beforeAgentId: target.beforeChatId,
+  };
+  if (!sameLayoutPlace(layout, moveSidebarChat(layout, move), dragged.chat.id)) change.move = move;
   return change;
 }

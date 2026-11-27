@@ -15,6 +15,7 @@ export const messages = {
   "mobile.workspace.error.sectionsLoadFailed": "לא ניתן לטעון את התיקיות. יש לנסות שוב.",
   "mobile.workspace.error.transportNotReady": "שכבת התעבורה בנייד אינה מוכנה.",
   "mobile.workspace.error.sectionsUnsupported": "המארח הזה לא תומך בשינויי תיקיות.",
+  "mobile.workspace.error.sidebarOffline": "יש להתחבר לשרת הזה כדי לשנות את התיקיות שלו.",
   "mobile.workspace.error.leaveOwnServer": "אפשר לעזוב רק שרתים מרוחקים שהצטרפת אליהם.",
   "mobile.workspace.error.removeOwnedServerOnly": "רק הבעלים יכול להסיר את השרת הזה.",
   "mobile.workspace.error.agentNotOnHost": "הסוכן אינו נמצא במארח הזה.",

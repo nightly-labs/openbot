@@ -710,6 +710,7 @@ export function ConnectedScreen({ variant = "screen" }: { variant?: "screen" | "
   const dragScroll = useRef({ offset: 0, content: 0, viewport: 0 });
   const scrollRest = scroll.ownsInset ? 0 : -headerHeight;
   const pinCount = pinnedAgentIds.length + pinnedChannelIds.length;
+  const editableLayout = activeServerOnline ? sidebarLayout : null;
   const dragScreen = useMemo<ChatDragScreen>(
     () => ({
       items,
@@ -718,7 +719,7 @@ export function ConnectedScreen({ variant = "screen" }: { variant?: "screen" | "
         ...pinnedChannels.map((channel) => ({ kind: "channel" as const, id: channel.id })),
       ],
       collapsedSectionIds,
-      sections: sidebarLayout !== null && !mobileChatOrderSortsSections(chatOrder),
+      drops: editableLayout === null ? "none" : mobileChatOrderSortsSections(chatOrder) ? "folders" : "positions",
       canPin: canAddChatPin(pinCount),
       scrollInsets: { top: headerHeight, bottom: insets.bottom + HOME_SEARCH_HEIGHT },
       beginScroll: () => {
@@ -736,14 +737,14 @@ export function ConnectedScreen({ variant = "screen" }: { variant?: "screen" | "
       onDraggingChange: setDragging,
       onDrop: (_dragged, _target, change) => applyChatDrop(workspace(), serverId, change),
       readPins: () => workspace().readChatPins(serverId),
-      layout: () => (mobileChatOrderSortsSections(chatOrder) ? null : sidebarLayout),
+      layout: () => editableLayout,
     }),
     [
       items,
       pinnedAgents,
       pinnedChannels,
       collapsedSectionIds,
-      sidebarLayout,
+      editableLayout,
       chatOrder,
       pinCount,
       headerHeight,

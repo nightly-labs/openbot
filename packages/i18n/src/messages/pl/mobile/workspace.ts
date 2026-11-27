@@ -15,6 +15,7 @@ export const messages = {
   "mobile.workspace.error.sectionsLoadFailed": "Nie udało się wczytać folderów. Spróbuj ponownie.",
   "mobile.workspace.error.transportNotReady": "Transport mobilny nie jest gotowy.",
   "mobile.workspace.error.sectionsUnsupported": "Ten host nie obsługuje zmian folderów.",
+  "mobile.workspace.error.sidebarOffline": "Połącz się z tym serwerem, aby zmienić jego foldery.",
   "mobile.workspace.error.leaveOwnServer": "Można opuścić tylko dołączone serwery zdalne.",
   "mobile.workspace.error.removeOwnedServerOnly": "Tylko właściciel może usunąć ten serwer.",
   "mobile.workspace.error.agentNotOnHost": "Agenta nie ma na tym hoście.",
