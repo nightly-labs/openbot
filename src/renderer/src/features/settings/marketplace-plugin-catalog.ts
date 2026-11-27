@@ -5226,6 +5226,41 @@ const FREEE: MarketplacePluginDetail = {
   shareUrl: "https://openbot.run/plugins/freee",
 };
 
+const FUMADOCS: MarketplacePluginDetail = {
+  id: "plugin-fumadocs",
+  slug: "fumadocs",
+  name: "Fumadocs",
+  tagline: "Fumadocs framework documentation",
+  description:
+    "Fumadocs lets agents search and read the documentation of Fumadocs, the open-source React documentation framework, so they can set up, configure, and extend a Fumadocs site with the current API. It needs no account and no key.",
+  category: "coding",
+  creatorName: "Fuma Nama",
+  iconUrl: "https://github.com/fuma-nama.png?size=128",
+  version: "1.0.0",
+  prompts: [
+    { id: "prompt-add-to-next", text: "How do I add Fumadocs to an existing Next.js app?" },
+    { id: "prompt-search", text: "How do I set up search with Orama in Fumadocs?" },
+    { id: "prompt-openapi", text: "How do I generate API reference pages from an OpenAPI file with Fumadocs?" },
+  ],
+  apps: [
+    {
+      id: "app-fumadocs-mcp",
+      name: "Fumadocs",
+      description: "Fumadocs documentation lookup, over the Fumadocs MCP server with no sign-in.",
+      iconUrl: "https://github.com/fuma-nama.png?size=128",
+      server: { name: "fumadocs", transport: "http", url: "https://www.fumadocs.dev/api/mcp" },
+    },
+  ],
+  websiteUrl: "https://fumadocs.dev",
+  privacyPolicyUrl: null,
+  termsUrl: null,
+  skills: [],
+  installs: 0,
+  featured: false,
+  updatedAt: "2026-11-10T00:00:00.000Z",
+  shareUrl: "https://openbot.run/plugins/fumadocs",
+};
+
 const FUTU: MarketplacePluginDetail = {
   id: "plugin-futu",
   slug: "futu",
@@ -10900,6 +10935,7 @@ export const MARKETPLACE_PLUGINS: MarketplacePluginDetail[] = [
   FLOOT,
   FOLK,
   FREEE,
+  FUMADOCS,
   FUTU,
   GITBOOK,
   GODADDY,

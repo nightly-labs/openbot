@@ -741,6 +741,12 @@
       "detailSha256": "e1991e6e6d8aecb4e6300b8d40ca2b781e7f79a27097f151141c49a920bc34c6"
     },
     {
+      "slug": "fumadocs",
+      "version": "1.0.0",
+      "featured": false,
+      "detailSha256": "1a1b4d4e0464c270ae803c73f855823da568c0554d09e27325db1600d8002079"
+    },
+    {
       "slug": "futu",
       "version": "1.0.0",
       "featured": false,
