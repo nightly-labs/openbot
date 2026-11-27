@@ -1,7 +1,7 @@
 import { Effect } from "effect";
 import { createRemoteJWKSet, jwtVerify } from "jose";
 
-export const CLOUDFLARE_ACCESS_JWT_HEADER = "Cf-Access-Jwt-Assertion";
+const CLOUDFLARE_ACCESS_JWT_HEADER = "Cf-Access-Jwt-Assertion";
 const JWKS_TIMEOUT_MS = 5_000;
 
 export interface CloudflareAccessConfig {
