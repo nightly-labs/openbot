@@ -14,6 +14,7 @@ import { forgetReferralCode, readReferralCode } from "@openbot/contracts/referra
 import { isBoolean, isDynamicRecord, isString } from "@openbot/contracts/runtime-values";
 import { formatLocale, resolveLocale } from "@openbot/i18n";
 import { sourceText } from "@openbot/i18n/source";
+import { rememberAccountBookmark } from "@openbot/team-client/account-bookmark";
 import { markRemoteSync } from "@openbot/team-client/sync-profile";
 import { classifyFailure } from "@openbot/telemetry";
 import { NotificationObserver, Toaster, toast } from "@openbot/ui";
@@ -60,6 +61,10 @@ import { createWebLanguagePreference } from "./web-language-preference";
 export { loadSavedLanguage } from "./web-language-preference";
 
 let workspaceImport: Promise<typeof WebWorkspace> | null = null;
+function accountRequestUrl(input: RequestInfo | URL): URL {
+  return new URL(input instanceof Request ? input.url : input, window.location.origin);
+}
+
 function loadWorkspace(): Promise<typeof WebWorkspace> {
   if (!workspaceImport) {
     workspaceImport = import("./WebWorkspace").then((module) => module.WebWorkspace);
@@ -269,6 +274,7 @@ function WebAppContent(props: { createRuntime?: WebRuntimeFactory }) {
   const accountFetch: typeof fetch = async (input, init) => {
     const generation = sessionGeneration;
     const response = await fetch(input, init);
+    rememberAccountBookmark(accountRequestUrl(input), response);
     if (
       !disposed &&
       generation === sessionGeneration &&

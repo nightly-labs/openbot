@@ -2,6 +2,7 @@ import { mkdir, readdir, readFile, writeFile } from "node:fs/promises";
 import { join, resolve } from "node:path";
 import { DatabaseSync } from "node:sqlite";
 import { LEGACY_MEMBER_LIMITS } from "@openbot/contracts/billing";
+import { HOST_KEY_HANDOVER_LIMIT } from "@openbot/contracts/host-key-handover";
 import { DEFAULT_TEAM_MEMBER_LIMIT } from "@openbot/contracts/input-limits";
 import { Effect } from "effect";
 import { observedD1 } from "../src/server/observed-d1";
@@ -53,7 +54,7 @@ function countedD1(database: DatabaseSync, counts: CallCounts): D1Database {
   return {
     prepare: (query: string) => counted(source.prepare(query)),
     batch: (statements) => {
-      counts.calls += 1;
+      counts.calls += statements.length;
       return source.batch(statements);
     },
     exec: (query) => source.exec(query),
@@ -116,6 +117,36 @@ async function main() {
        VALUES ('handover-1', 'host-plan', ?, 'old-key', 'new-key', 'old-signature', 'new-signature', ?)`,
     )
     .run(NOW, NOW);
+  database
+    .prepare(
+      `INSERT INTO licenses(stripe_subscription_id, user_id, stripe_customer_id, users, currency, status,
+         current_period_end, cancel_at_period_end, updated_at)
+       VALUES ('sub_license_lapsed', ?, 'cus_license', 20, 'eur', 'past_due', ?, 0, ?)`,
+    )
+    .run(VIEWER, NOW - DAY_MS, NOW + 1);
+  database
+    .prepare(
+      `INSERT INTO billing_subscriptions(stripe_subscription_id, user_id, stripe_customer_id, server_id, plan, interval,
+         currency, amount, status, current_period_end, cancel_at_period_end, updated_at)
+       VALUES ('sub_plan_lapsed', 'owner-plan', 'cus_plan', 'host-plan', 'starter', 'month', 'eur', 300, 'past_due', ?, 0, ?)`,
+    )
+    .run(NOW - DAY_MS, NOW + 1);
+  const addHandover = database.prepare(
+    `INSERT INTO remote_host_key_handovers(handover_id, host_id, issued_at, previous_public_key, public_key,
+       previous_signature, signature, created_at)
+     VALUES (?, 'host-licensed', ?, ?, ?, ?, ?, ?)`,
+  );
+  for (let index = 0; index < HOST_KEY_HANDOVER_LIMIT + 2; index += 1) {
+    addHandover.run(
+      `licensed-handover-${index}`,
+      NOW - index * 1_000,
+      `key-${index + 1}`,
+      `key-${index}`,
+      `signature-${index + 1}`,
+      `signature-${index}`,
+      NOW,
+    );
+  }
 
   const ticketKeys = await crypto.subtle.generateKey({ name: "ECDSA", namedCurve: "P-256" }, true, ["sign", "verify"]);
   const publicJwk = await crypto.subtle.exportKey("jwk", ticketKeys.publicKey);
@@ -159,20 +190,29 @@ async function main() {
       byId.get("host-plan")?.keyHandovers[0]?.publicKey === "new-key" &&
       byId.get("host-default")?.keyHandovers.length === 0,
   );
-  check("four servers take two D1 calls: the list and one batch", counts.calls === 2, { calls: counts.calls });
+  const licensedHandovers = byId.get("host-licensed")?.keyHandovers ?? [];
+  check(
+    "a server gets only its newest key handovers, oldest first",
+    licensedHandovers.length === HOST_KEY_HANDOVER_LIMIT &&
+      licensedHandovers[0]?.publicKey === `key-${HOST_KEY_HANDOVER_LIMIT - 1}` &&
+      licensedHandovers.at(-1)?.publicKey === "key-0",
+    { first: licensedHandovers[0]?.publicKey, last: licensedHandovers.at(-1)?.publicKey },
+  );
+  check("four servers take one D1 statement", counts.calls === 1, { calls: counts.calls });
 
   counts.calls = 0;
   const single = await Effect.runPromise(plane.listHosts("owner-default"));
-  check("one server also takes two D1 calls", single.length === 1 && counts.calls === 2, { calls: counts.calls });
+  check("one server also takes one D1 statement", single.length === 1 && counts.calls === 1, { calls: counts.calls });
 
   counts.calls = 0;
   const none = await Effect.runPromise(plane.listHosts("user-unknown"));
-  check("an account with no servers takes one D1 call", none.length === 0 && counts.calls === 1, {
+  check("an account with no servers takes one D1 statement", none.length === 0 && counts.calls === 1, {
     calls: counts.calls,
   });
 
   const passed = checks.every((entry) => entry.passed);
   await mkdir(OUT, { recursive: true });
+  await writeFile(join(OUT, "hosts.json"), `${JSON.stringify(hosts, null, 2)}\n`);
   await writeFile(join(OUT, "report.json"), `${JSON.stringify({ passed, checks }, null, 2)}\n`);
   for (const entry of checks) console.log(`${entry.passed ? "ok" : "FAIL"} ${entry.name}`);
   if (!passed) process.exit(1);
