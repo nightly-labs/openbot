@@ -46,8 +46,8 @@ async function renderContentImage(job: ContentImageRenderJob): Promise<string> {
   else await drawGradient(context, job);
   if (job.layout === "centered") {
     // Only the marks, in the middle: the platform shows the title under the card.
-    if (job.lockup) drawLockup(context, job, job.lockup);
-    else if (job.markRow) drawMarkRow(context, job, job.markRow);
+    if (job.lockup) drawCenteredLockup(context, job, job.lockup);
+    else if (job.markRow) drawCenteredMarkRow(context, job, job.markRow);
   } else if (job.title && job.withTitle) {
     drawScrim(context, job);
     if (job.lockup) drawLockup(context, job, job.lockup);
@@ -179,9 +179,8 @@ function drawLockup(context: CanvasRenderingContext2D, job: ContentImageJob, loc
   const vsMargin = 36 * unit;
   const plateWidth = padX * 2 + column * 2 + vsMargin * 2 + vsWidth;
   const plateHeight = padY * 2 + logoSize + nameGap + nameSize * 1.2;
-  const centered = job.layout === "centered";
-  const x = centered ? (job.width - plateWidth) / 2 : Math.round(job.width * 0.06);
-  const y = centered ? (job.height - plateHeight) / 2 : 64 * unit;
+  const x = Math.round(job.width * 0.06);
+  const y = 64 * unit;
   drawPlate(context, job, x, y, plateWidth, plateHeight);
 
   const logoTop = y + padY;
@@ -218,6 +217,67 @@ function drawLockup(context: CanvasRenderingContext2D, job: ContentImageJob, loc
   context.textBaseline = "alphabetic";
 }
 
+/**
+ * The lockup of an index card, in the middle of the social card: both marks and
+ * "vs" on one wide plate, with no names, and room around each mark.
+ */
+function drawCenteredLockup(context: CanvasRenderingContext2D, job: ContentImageJob, lockup: ContentImageLockup): void {
+  const unit = job.width / 1200;
+  const plateWidth = 600 * unit;
+  const plateHeight = 216 * unit;
+  const logoSize = 96 * unit;
+  const x = (job.width - plateWidth) / 2;
+  const y = (job.height - plateHeight) / 2;
+  drawPlate(context, job, x, y, plateWidth, plateHeight);
+
+  const logoTop = y + (plateHeight - logoSize) / 2;
+  drawMark(context, lockup.left?.mark ?? "openbot", x + plateWidth * 0.25 - logoSize / 2, logoTop, logoSize);
+  drawMark(context, lockup.rivalMark, x + plateWidth * 0.75 - logoSize / 2, logoTop, logoSize);
+
+  // The hairline, broken around "vs".
+  const center = x + plateWidth / 2;
+  const middle = y + plateHeight / 2;
+  const vsSize = 20 * unit;
+  const gap = vsSize * 1.1;
+  const inset = 64 * unit;
+  context.strokeStyle = "rgba(255, 255, 255, 0.2)";
+  context.lineWidth = unit;
+  context.beginPath();
+  context.moveTo(center, y + inset);
+  context.lineTo(center, middle - gap);
+  context.moveTo(center, middle + gap);
+  context.lineTo(center, y + plateHeight - inset);
+  context.stroke();
+  context.font = `500 ${vsSize}px ${FONT_FAMILY}`;
+  context.fillStyle = "rgba(255, 255, 255, 0.62)";
+  context.textAlign = "center";
+  context.textBaseline = "middle";
+  context.fillText("vs", center, middle);
+  context.textAlign = "start";
+  context.textBaseline = "alphabetic";
+}
+
+/** The roundup's marks in the middle of the social card, smaller than the title layout's, with room around each. */
+function drawCenteredMarkRow(
+  context: CanvasRenderingContext2D,
+  job: ContentImageJob,
+  marks: readonly ContentImageMark[],
+): void {
+  const unit = job.width / 1200;
+  const size = 48 * unit;
+  const gap = 28 * unit;
+  const padX = 48 * unit;
+  const padY = 44 * unit;
+  const plateWidth = padX * 2 + size * marks.length + gap * (marks.length - 1);
+  const plateHeight = padY * 2 + size;
+  const x = (job.width - plateWidth) / 2;
+  const y = (job.height - plateHeight) / 2;
+  drawPlate(context, job, x, y, plateWidth, plateHeight);
+  marks.forEach((mark, index) => {
+    drawMark(context, mark, x + padX + index * (size + gap), y + padY, size);
+  });
+}
+
 /** The roundup's lockup: one frosted plate with the mark of every app in a row, at the same place. */
 function drawMarkRow(
   context: CanvasRenderingContext2D,
@@ -233,9 +293,8 @@ function drawMarkRow(
   const size = Math.min(128 * unit, available / marks.length);
   const plateWidth = pad * 2 + size * marks.length + gap * (marks.length - 1);
   const plateHeight = pad * 2 + size;
-  const centered = job.layout === "centered";
-  const x = centered ? (job.width - plateWidth) / 2 : margin;
-  const y = centered ? (job.height - plateHeight) / 2 : 64 * unit;
+  const x = margin;
+  const y = 64 * unit;
   drawPlate(context, job, x, y, plateWidth, plateHeight);
   marks.forEach((mark, index) => {
     drawMark(context, mark, x + pad + index * (size + gap), y + pad, size);
