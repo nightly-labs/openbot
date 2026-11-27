@@ -2,7 +2,10 @@ import type { HostSignalHomeSettings } from "@openbot/contracts/ipc";
 import type { MobileTextKey } from "@openbot/i18n/mobile";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useQueryScope } from "@/features/auth/context/mobile-session-context";
-import { useMobileWorkspace, useMobileWorkspaceActions } from "@/features/workspace/context/mobile-workspace-context";
+import {
+  useMobileWorkspaceActions,
+  useMobileWorkspaceSelector,
+} from "@/features/workspace/context/mobile-workspace-context";
 import { queryKeys } from "@/features/workspace/model/query-keys";
 
 const SIGNAL_HOME_PLACES: Readonly<Record<string, MobileTextKey>> = {
@@ -34,13 +37,12 @@ export const SIGNAL_LATENCY_TEXT_CLASS: Readonly<Record<SignalLatencyTone, strin
 };
 
 export function useServerSignalHome(serverId: string) {
-  const { canManageServerSignalHome, servesServerSignalHome } = useMobileWorkspace();
+  const available = useMobileWorkspaceSelector((workspace) => workspace.canManageServerSignalHome(serverId));
+  const served = useMobileWorkspaceSelector((workspace) => workspace.servesServerSignalHome(serverId));
   const { loadServerSignalHome, setServerSignalHome } = useMobileWorkspaceActions();
   const queryScope = useQueryScope();
   const queryClient = useQueryClient();
   const queryKey = queryKeys.serverSignalHome(queryScope, serverId);
-  const available = canManageServerSignalHome(serverId);
-  const served = servesServerSignalHome(serverId);
   const query = useQuery({
     queryKey,
     enabled: served,

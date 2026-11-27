@@ -13,7 +13,10 @@ import { useQueryScope } from "@/features/auth/context/mobile-session-context";
 import { MachineUsageSummary } from "@/features/servers/components/machine-usage-summary";
 import { PlanLimitsSummary } from "@/features/servers/components/plan-limits-summary";
 import { SettingsNote } from "@/features/settings/components/settings-content";
-import { useMobileWorkspace } from "@/features/workspace/context/mobile-workspace-context";
+import {
+  useMobileWorkspaceActions,
+  useMobileWorkspaceSelector,
+} from "@/features/workspace/context/mobile-workspace-context";
 import { queryKeys } from "@/features/workspace/model/query-keys";
 import { LargeTitleScrollView } from "@/shared/components/large-title";
 import { useText } from "@/shared/lib/text";
@@ -24,8 +27,9 @@ export function ServerUsageScreen() {
   const { t } = useText();
   const { serverId } = useLocalSearchParams<{ serverId: string }>();
   const queryScope = useQueryScope();
-  const { servers, agents, loadHostAnalytics } = useMobileWorkspace();
-  const server = servers.find((item) => item.id === serverId);
+  const server = useMobileWorkspaceSelector((workspace) => workspace.servers.find((item) => item.id === serverId));
+  const agents = useMobileWorkspaceSelector((workspace) => workspace.agents);
+  const { loadHostAnalytics } = useMobileWorkspaceActions();
   const online = server?.state === "online";
   const serverAgents = agents.filter((agent) => agent.serverId === serverId);
   const [range, setRange] = useState(() => lastUsageDays());

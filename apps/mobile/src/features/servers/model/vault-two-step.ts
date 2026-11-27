@@ -13,7 +13,10 @@ import { useIsFocused } from "expo-router/react-navigation";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { create } from "zustand";
 import { useQueryScope } from "@/features/auth/context/mobile-session-context";
-import { useMobileWorkspace, useMobileWorkspaceActions } from "@/features/workspace/context/mobile-workspace-context";
+import {
+  useMobileWorkspaceActions,
+  useMobileWorkspaceSelector,
+} from "@/features/workspace/context/mobile-workspace-context";
 import { queryKeys } from "@/features/workspace/model/query-keys";
 
 export interface LiveTwoStepCode {
@@ -51,13 +54,13 @@ export function secondsLeft(code: LiveTwoStepCode, now: number): number {
 }
 
 export function useServerVaultCodes(serverId: string, hasKeys: boolean) {
-  const { canManageVaultTwoStep } = useMobileWorkspace();
+  const canManageTwoStep = useMobileWorkspaceSelector((workspace) => workspace.canManageVaultTwoStep(serverId));
   const { loadVaultCodes } = useMobileWorkspaceActions();
   const queryScope = useQueryScope();
   const focused = useIsFocused();
   const query = useQuery({
     queryKey: queryKeys.serverVaultCodes(queryScope, serverId),
-    enabled: focused && hasKeys && canManageVaultTwoStep(serverId),
+    enabled: focused && hasKeys && canManageTwoStep,
     retry: false,
     staleTime: 0,
     gcTime: 0,

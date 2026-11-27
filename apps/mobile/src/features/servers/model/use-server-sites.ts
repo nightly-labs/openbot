@@ -1,13 +1,16 @@
 import { useQuery } from "@tanstack/react-query";
 import { useQueryScope } from "@/features/auth/context/mobile-session-context";
-import { useMobileWorkspace, useMobileWorkspaceActions } from "@/features/workspace/context/mobile-workspace-context";
+import {
+  useMobileWorkspaceActions,
+  useMobileWorkspaceSelector,
+} from "@/features/workspace/context/mobile-workspace-context";
 import { queryKeys } from "@/features/workspace/model/query-keys";
 
 export function useServerSites(serverId: string) {
-  const { canViewHostedSites, canDeleteHostedSites } = useMobileWorkspace();
+  const available = useMobileWorkspaceSelector((workspace) => workspace.canViewHostedSites(serverId));
+  const canDelete = useMobileWorkspaceSelector((workspace) => workspace.canDeleteHostedSites(serverId));
   const { loadHostedSites, deleteHostedSite } = useMobileWorkspaceActions();
   const queryScope = useQueryScope();
-  const available = canViewHostedSites(serverId);
   const query = useQuery({
     queryKey: queryKeys.serverSites(queryScope, serverId),
     enabled: available,
@@ -17,7 +20,7 @@ export function useServerSites(serverId: string) {
   });
   return {
     available,
-    canDelete: canDeleteHostedSites(serverId),
+    canDelete,
     query,
     async remove(siteId: string): Promise<void> {
       await deleteHostedSite(siteId, serverId);
