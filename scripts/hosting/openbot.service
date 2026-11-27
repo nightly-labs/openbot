@@ -19,8 +19,10 @@ RestartSec=10
 RestartPreventExitStatus=78
 TimeoutStopSec=60
 MemoryMax=90%
+MemoryLow=15%
 OOMScoreAdjust=-500
 OOMPolicy=continue
+Delegate=yes
 
 [Install]
 WantedBy=multi-user.target lightdm.service

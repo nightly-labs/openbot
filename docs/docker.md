@@ -463,7 +463,8 @@ Main has an OOM score adjustment of 0 in the container, and each process that it
 So when the container is out of memory, the kernel is more likely to stop a provider CLI, an MCP
 server or an agent tool than OpenBot. Agent processes also run at nice 10, and at the `critical` level
 main stops leftover agent processes, such as the workers of a build whose parent was stopped. See
-[agent processes](hosted-servers.md#memory).
+[agent processes](hosted-servers.md#memory). The container does not split its cgroup: agent processes
+share the CPU, disk and memory of the container with main.
 
 ## Environment
 
