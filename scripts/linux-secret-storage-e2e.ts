@@ -39,7 +39,7 @@ if (process.platform !== "linux") {
 
 interface Step {
   name: string;
-  step: "write" | "read" | "legacy-write";
+  step: "write" | "read" | "legacy-write" | "vault-seed" | "vault-save" | "vault-open";
   value?: string;
   keyring?: string;
   switches?: string[];
@@ -57,6 +57,10 @@ interface StepResult extends Step {
   error?: string;
   madeKeyFile?: boolean;
   keyFileMode?: string | null;
+  vaultStatus?: string;
+  vaultStatusAfterReset?: string;
+  vaultLogins?: number;
+  vaultFile?: string | null;
 }
 
 const hasKeyring =
@@ -110,6 +114,34 @@ try {
     assert.equal(write?.format, "obk1", "macOS, no Keychain: the key file encrypts");
     assert.equal(write?.keyFileMode, "600", "macOS, no Keychain: only the user reads the key file");
     assert.equal(read?.readValue, "secret-without-keychain", "macOS, no Keychain: the secret opens after a restart");
+  }
+
+  {
+    const steps = await runCase("macOS rules: a Keychain Vault while the Keychain does not give its key", [
+      { name: "an earlier start kept the Vault in the Keychain", step: "vault-seed", platform: "darwin" },
+      {
+        name: "a start with no Keychain key opens the Vault",
+        step: "vault-open",
+        platform: "darwin",
+        switches: ["--try-reset"],
+      },
+    ]);
+    const [seed, open] = steps;
+    assert.ok(seed?.vaultFile, "macOS: the Vault file is there");
+    assert.equal(open?.vaultStatus, "unavailable", "macOS, no Keychain key: the Vault waits for the Keychain");
+    assert.equal(open?.vaultStatusAfterReset, "unavailable", "macOS, no Keychain key: a reset is refused");
+    assert.equal(open?.vaultFile, seed?.vaultFile, "macOS, no Keychain key: the Vault file does not change");
+  }
+
+  {
+    const steps = await runCase("Linux rules: a Vault that does not open", [
+      { name: "an earlier start kept the Vault in the keyring", step: "vault-seed" },
+      { name: "a start with no keyring opens the Vault", step: "vault-open", switches: ["--try-reset"] },
+    ]);
+    const [, open] = steps;
+    assert.equal(open?.vaultStatus, "unreadable", "Linux, lost key: the Vault is unreadable");
+    assert.equal(open?.vaultStatusAfterReset, "ready", "Linux, lost key: a reset starts a new Vault");
+    assert.equal(open?.vaultFile, null, "Linux, lost key: the reset deletes the Vault file");
   }
 
   if (hasKeyring) {
@@ -167,6 +199,29 @@ try {
     assert.ok(macRead?.error, "macOS: the secret with another key does not open");
     assert.equal(macRead?.madeKeyFile, false, "macOS: a failed read makes no key file");
     assert.equal(macRead?.keyFileMode, null, "macOS: still no key file");
+
+    const macVault = await runCase("macOS rules: the Keychain gives its key again", [
+      { name: "a start with the Keychain saves a login", step: "vault-save", keyring: "mac-vault", platform: "darwin" },
+      {
+        name: "a start with no Keychain key opens the Vault",
+        step: "vault-open",
+        platform: "darwin",
+        switches: ["--try-reset"],
+      },
+      {
+        name: "a start with the Keychain opens the Vault",
+        step: "vault-open",
+        keyring: "mac-vault",
+        platform: "darwin",
+      },
+    ]);
+    const [saved, closed, reopened] = macVault;
+    assert.ok(saved?.vaultFile, "macOS: the Keychain Vault is saved");
+    assert.equal(closed?.vaultStatus, "unavailable", "macOS, no Keychain key: the Vault waits for the Keychain");
+    assert.equal(closed?.vaultStatusAfterReset, "unavailable", "macOS, no Keychain key: a reset is refused");
+    assert.equal(closed?.vaultFile, saved?.vaultFile, "macOS, no Keychain key: the Vault file does not change");
+    assert.equal(reopened?.vaultStatus, "ready", "macOS, Keychain again: the Vault opens");
+    assert.equal(reopened?.vaultLogins, 1, "macOS, Keychain again: the saved login is there");
 
     const macBack = await runCase("macOS rules: the Keychain works again", [
       { name: "a start with no Keychain writes", step: "write", value: "secret-in-file", platform: "darwin" },
@@ -270,5 +325,9 @@ async function launch(step: Step, userData: string, blob: string): Promise<StepR
     ...(typeof ready.error === "string" ? { error: ready.error } : {}),
     madeKeyFile: ready.madeKeyFile,
     keyFileMode: typeof ready.keyFileMode === "string" ? ready.keyFileMode : null,
+    ...(typeof ready.vaultStatus === "string" ? { vaultStatus: ready.vaultStatus } : {}),
+    ...(typeof ready.vaultStatusAfterReset === "string" ? { vaultStatusAfterReset: ready.vaultStatusAfterReset } : {}),
+    ...(typeof ready.vaultLogins === "number" ? { vaultLogins: ready.vaultLogins } : {}),
+    ...(typeof ready.vaultFile === "string" || ready.vaultFile === null ? { vaultFile: ready.vaultFile } : {}),
   };
 }

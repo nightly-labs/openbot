@@ -1,11 +1,12 @@
 import { readFile, rm } from "node:fs/promises";
+import type { VaultStatus } from "@openbot/contracts/ipc";
 import { sourceText } from "@openbot/i18n/source";
 import { createOpenBotLogger } from "@openbot/logging";
 import { Effect, Result, Schema, Semaphore } from "effect";
 import { writeJsonFileAtomically } from "../backend/atomic-json-file";
 import { causeHelpers } from "../backend/effect-boundary";
 import { PasswordVaultError } from "../backend/password-vault";
-import type { SecretCipher } from "./provider-credential-store";
+import { type SecretCipher, SecretStorageClosedError } from "./provider-credential-store";
 
 const { io: vaultCall, sync: vaultDecode } = causeHelpers(PasswordVaultError);
 
@@ -107,14 +108,15 @@ export class VaultStore {
     this.#cipher = cipher;
   }
 
-  load(): Effect.Effect<boolean> {
+  load(): Effect.Effect<VaultStatus> {
     return Effect.gen({ self: this }, function* () {
       this.#record = EMPTY_VAULT_RECORD;
       const result = yield* Effect.result(this.#read());
-      if (Result.isFailure(result)) return false;
+      if (Result.isFailure(result))
+        return result.failure.cause instanceof SecretStorageClosedError ? "unavailable" : "unreadable";
       this.#problem = undefined;
       this.#record = result.success ?? EMPTY_VAULT_RECORD;
-      return true;
+      return "ready";
     });
   }
 
@@ -181,7 +183,7 @@ export class VaultStore {
     );
     const text = yield* vaultDecode(() => this.#cipher.decrypt(Buffer.from(envelope.record, "base64"))).pipe(
       Effect.tapError(this.#logUnreadable("decrypt")),
-      Effect.mapError(unreadable),
+      Effect.mapError((failure) => (failure.cause instanceof SecretStorageClosedError ? failure : unreadable())),
     );
     return yield* vaultDecode(() => Schema.decodeUnknownSync(recordSchema)(JSON.parse(text))).pipe(
       Effect.tapError(this.#logUnreadable("items")),

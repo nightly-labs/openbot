@@ -33,6 +33,13 @@ export class CredentialFileTooLarge extends Error {
   }
 }
 
+export class SecretStorageClosedError extends Error {
+  constructor() {
+    super(sourceText("error.app.secretStorageUnavailable"));
+    this.name = "SecretStorageClosedError";
+  }
+}
+
 export interface SecretCipher {
   encrypt: (value: string) => Buffer;
   decrypt: (value: Buffer) => string;

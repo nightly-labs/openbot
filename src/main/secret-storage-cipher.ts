@@ -14,6 +14,7 @@ import { dirname } from "node:path";
 import { createOpenBotLogger } from "@openbot/logging";
 import { app, safeStorage } from "electron";
 import { isMissingFileError } from "../backend/file-errors";
+import { SecretStorageClosedError } from "./provider-credential-store";
 
 export const SECRET_STORAGE_KEY_FILE = "secret-storage.key";
 
@@ -42,7 +43,8 @@ function isExistingFile(error: unknown): boolean {
 export function createSecretStorage(options: { keyPath: string; platform?: NodeJS.Platform }): SecretStorage {
   const platform = options.platform ?? process.platform;
   const linux = platform === "linux";
-  const keyFileFallback = linux || platform === "darwin";
+  const macos = platform === "darwin";
+  const keyFileFallback = linux || macos;
   let madeKeyFile = false;
 
   function readKey(): Buffer | null {
@@ -146,6 +148,7 @@ export function createSecretStorage(options: { keyPath: string; platform?: NodeJ
       decipher.setAuthTag(body.subarray(IV_BYTES, IV_BYTES + TAG_BYTES));
       return Buffer.concat([decipher.update(body.subarray(IV_BYTES + TAG_BYTES)), decipher.final()]).toString("utf8");
     }
+    if (macos && !safeStorage.isEncryptionAvailable()) throw new SecretStorageClosedError();
     try {
       return safeStorage.decryptString(value);
     } catch (error) {
