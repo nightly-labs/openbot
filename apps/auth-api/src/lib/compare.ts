@@ -23,6 +23,8 @@ export const COMPARE_COLLECTION: ContentCollection<"compare"> = {
   backLabel: "All comparisons",
   moreTitle: "More comparisons",
   imageEyebrow: "OPENBOT · COMPARE",
+  imageBackgrounds: true,
+  imageLayout: "centered",
   articles: publishedFirst([
     {
       slug: "paperclip",

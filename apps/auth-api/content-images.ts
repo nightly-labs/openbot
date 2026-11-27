@@ -8,6 +8,7 @@
 // and fails when it does not match the articles.
 
 import { createHash } from "node:crypto";
+import { readFileSync } from "node:fs";
 import { readdir, readFile } from "node:fs/promises";
 import { createRequire } from "node:module";
 import path from "node:path";
@@ -25,6 +26,8 @@ const appRoot = path.dirname(fileURLToPath(import.meta.url));
 
 /** The committed images, at the same paths they have in the site. */
 export const CONTENT_ART_DIRECTORY = path.join(appRoot, "content-art");
+/** The committed backgrounds of the social cards, drawn from a design file. Not shipped. */
+export const CONTENT_BACKGROUND_DIRECTORY = path.join(appRoot, "content-backgrounds");
 /** File name to input hash, for every image in `CONTENT_ART_DIRECTORY`. Not shipped. */
 export const CONTENT_ART_MANIFEST = path.join(CONTENT_ART_DIRECTORY, "manifest.json");
 
@@ -50,6 +53,12 @@ export interface ContentImageJob {
   title: string;
   /** The kicker drawn above the title. Ignored unless `withTitle`. */
   eyebrow: string;
+  /** The "openbot." wordmark in place of the kicker. Only on the social card of a collection that asks for it. */
+  wordmark?: true | undefined;
+  /** The image under the card, in `CONTENT_BACKGROUND_DIRECTORY`, in place of the gradient. Only on the social card of a collection that asks for it. */
+  background?: string | undefined;
+  /** Only the marks, in the middle of the card, with no title. Only on the social card of a collection that asks for it. */
+  layout?: "centered" | undefined;
   width: number;
   height: number;
   /** Draw the title into the image. False for the card, which has live text over it. */
@@ -58,6 +67,11 @@ export interface ContentImageJob {
   lockup?: ContentImageLockup | undefined;
   /** The mark of each app, in one row over the title. Only on the social card of a roundup. */
   markRow?: readonly ContentImageMark[] | undefined;
+}
+
+/** A job as the page receives it: the background travels as a data URL, since the page loads no files. */
+export interface ContentImageRenderJob extends ContentImageJob {
+  backgroundUrl?: string | undefined;
 }
 
 /** A compared product's mark, or OpenBot's own logo. */
@@ -105,6 +119,9 @@ function collectionJobs(collection: ContentCollection): ContentImageJob[] {
       slug: article.slug,
       title: article.title,
       eyebrow: collection.imageEyebrow,
+      wordmark: collection.imageWordmark,
+      background: collection.imageBackgrounds && `${collection.id}/${article.slug}.jpg`,
+      layout: collection.imageLayout,
       width: OG_WIDTH,
       height: OG_HEIGHT,
       withTitle: true,
@@ -161,10 +178,18 @@ export function contentImageKey(job: ContentImageJob): string {
         shaders: shadersVersion(),
         job,
         gradient,
+        background: job.background && backgroundDigest(job.background),
       }),
     )
     .digest("hex");
   return digest.slice(0, 32);
+}
+
+/** A missing background fails here, before any drawing, with the path that is missing. */
+function backgroundDigest(background: string): string {
+  return createHash("sha256")
+    .update(readFileSync(path.join(CONTENT_BACKGROUND_DIRECTORY, background)))
+    .digest("hex");
 }
 
 // The shader version is pinned in the workspace catalog. Hash the resolved

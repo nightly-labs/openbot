@@ -51,6 +51,12 @@ export interface ContentCollection<Id extends CollectionId = CollectionId> {
   moreTitle: string;
   /** The kicker drawn into the social card. */
   imageEyebrow: string;
+  /** Draws the "openbot." wordmark of the site's social cards in place of the kicker. */
+  imageWordmark?: true;
+  /** Draws each social card over `content-backgrounds/<id>/<slug>.jpg` in place of the gradient. */
+  imageBackgrounds?: true;
+  /** Draws only the marks of the social card, in the middle, with no title. */
+  imageLayout?: "centered";
   /** Newest first. `publishedFirst` does that once, so no caller has to. */
   articles: readonly CollectionArticle[];
 }

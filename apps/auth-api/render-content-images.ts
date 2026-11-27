@@ -16,8 +16,10 @@ import { promisify } from "node:util";
 import {
   CONTENT_ART_DIRECTORY,
   CONTENT_ART_MANIFEST,
+  CONTENT_BACKGROUND_DIRECTORY,
   type ContentArtManifest,
   type ContentImageJob,
+  type ContentImageRenderJob,
   contentArtProblems,
   contentImageJobs,
   contentImageKey,
@@ -72,7 +74,7 @@ async function renderInElectron(jobs: ContentImageJob[]): Promise<void> {
 
   try {
     const control = {
-      jobs,
+      jobs: await Promise.all(jobs.map(withBackgroundUrl)),
       outputDirectory: CONTENT_ART_DIRECTORY,
       // The window only has to be large enough to hold the biggest job, because
       // an element outside the viewport never gets a rendering tick.
@@ -89,6 +91,12 @@ async function renderInElectron(jobs: ContentImageJob[]): Promise<void> {
   } finally {
     await rm(workspace, { recursive: true, force: true });
   }
+}
+
+async function withBackgroundUrl(job: ContentImageJob): Promise<ContentImageRenderJob> {
+  if (!job.background) return job;
+  const image = await readFile(path.join(CONTENT_BACKGROUND_DIRECTORY, job.background), "base64");
+  return { ...job, backgroundUrl: `data:image/jpeg;base64,${image}` };
 }
 
 function resolveElectronBinary(): string {

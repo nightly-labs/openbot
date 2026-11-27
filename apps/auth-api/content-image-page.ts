@@ -7,13 +7,13 @@
 
 import { APP_LOGO_CORNER, APP_LOGO_EYE_POINTS, APP_LOGO_SIZE } from "@openbot/brand/app-logo-shape";
 import { getShaderColorFromString, meshGradientFragmentShader, ShaderMount } from "@paper-design/shaders";
-import type { ContentImageJob, ContentImageLockup, ContentImageMark } from "./content-images";
+import type { ContentImageJob, ContentImageLockup, ContentImageMark, ContentImageRenderJob } from "./content-images";
 import { RIVAL_MARK_SHAPES, type RivalMarkName } from "./src/components/compare/rival-mark-shapes";
 import { articleGradient, articleGradientUniforms } from "./src/lib/article-gradient";
 
 declare global {
   interface Window {
-    openBotContentImage?: { render: (job: ContentImageJob) => Promise<string> };
+    openBotContentImage?: { render: (job: ContentImageRenderJob) => Promise<string> };
   }
 }
 
@@ -35,7 +35,42 @@ window.openBotContentImage = { render: renderContentImage };
  */
 const WEBP_QUALITY = 0.9;
 
-async function renderContentImage(job: ContentImageJob): Promise<string> {
+async function renderContentImage(job: ContentImageRenderJob): Promise<string> {
+  const canvas = document.createElement("canvas");
+  canvas.width = job.width;
+  canvas.height = job.height;
+  const context = canvas.getContext("2d");
+  if (!context) throw new Error("Content images: a 2D canvas context is not available.");
+
+  if (job.backgroundUrl) await drawBackgroundImage(context, job, job.backgroundUrl);
+  else await drawGradient(context, job);
+  if (job.layout === "centered") {
+    // Only the marks, in the middle: the platform shows the title under the card.
+    if (job.lockup) drawLockup(context, job, job.lockup);
+    else if (job.markRow) drawMarkRow(context, job, job.markRow);
+  } else if (job.title && job.withTitle) {
+    drawScrim(context, job);
+    if (job.lockup) drawLockup(context, job, job.lockup);
+    else if (job.markRow) drawMarkRow(context, job, job.markRow);
+    drawTitle(context, job);
+  }
+
+  return job.fileName.endsWith(".webp") ? canvas.toDataURL("image/webp", WEBP_QUALITY) : canvas.toDataURL("image/png");
+}
+
+/** A background from the design file, already cut to the size of the card. */
+async function drawBackgroundImage(
+  context: CanvasRenderingContext2D,
+  job: ContentImageJob,
+  backgroundUrl: string,
+): Promise<void> {
+  const image = new Image();
+  image.src = backgroundUrl;
+  await image.decode();
+  context.drawImage(image, 0, 0, job.width, job.height);
+}
+
+async function drawGradient(context: CanvasRenderingContext2D, job: ContentImageJob): Promise<void> {
   const host = document.createElement("div");
   host.style.cssText = `position:fixed;left:0;top:0;width:${job.width}px;height:${job.height}px;`;
   document.body.append(host);
@@ -60,26 +95,9 @@ async function renderContentImage(job: ContentImageJob): Promise<string> {
     // Draws synchronously at exactly this frame, which is what makes two runs of
     // the build produce the same bytes.
     mount.setFrame(gradient.frame);
-
-    const canvas = document.createElement("canvas");
-    canvas.width = job.width;
-    canvas.height = job.height;
-    const context = canvas.getContext("2d");
-    if (!context) throw new Error("Paper shaders: a 2D canvas context is not available.");
-
     // The shader canvas is rendered at twice the output size, so this draw is a
     // supersample rather than a stretch.
     context.drawImage(mount.canvasElement, 0, 0, job.width, job.height);
-    if (job.title && job.withTitle) {
-      drawScrim(context, job);
-      if (job.lockup) drawLockup(context, job, job.lockup);
-      else if (job.markRow) drawMarkRow(context, job, job.markRow);
-      drawTitle(context, job);
-    }
-
-    return job.fileName.endsWith(".webp")
-      ? canvas.toDataURL("image/webp", WEBP_QUALITY)
-      : canvas.toDataURL("image/png");
   } finally {
     mount.dispose();
     host.remove();
@@ -131,6 +149,13 @@ function drawTitle(context: CanvasRenderingContext2D, job: ContentImageJob): voi
     context.fillText(line, padding, firstBaseline + index * lineHeight);
   });
 
+  if (job.wordmark) {
+    // The wordmark of the site's social cards: lowercase Inter Bold in white.
+    context.font = `700 ${Math.round(width * 0.03)}px ${FONT_FAMILY}`;
+    context.fillStyle = "#ffffff";
+    context.fillText("openbot.", padding, firstBaseline - lineHeight);
+    return;
+  }
   const eyebrowSize = Math.round(width * 0.017);
   context.font = `600 ${eyebrowSize}px ${FONT_FAMILY}`;
   context.fillStyle = "rgba(255, 255, 255, 0.62)";
@@ -154,8 +179,9 @@ function drawLockup(context: CanvasRenderingContext2D, job: ContentImageJob, loc
   const vsMargin = 36 * unit;
   const plateWidth = padX * 2 + column * 2 + vsMargin * 2 + vsWidth;
   const plateHeight = padY * 2 + logoSize + nameGap + nameSize * 1.2;
-  const x = Math.round(job.width * 0.06);
-  const y = 64 * unit;
+  const centered = job.layout === "centered";
+  const x = centered ? (job.width - plateWidth) / 2 : Math.round(job.width * 0.06);
+  const y = centered ? (job.height - plateHeight) / 2 : 64 * unit;
   drawPlate(context, job, x, y, plateWidth, plateHeight);
 
   const logoTop = y + padY;
@@ -201,12 +227,16 @@ function drawMarkRow(
   const unit = job.width / 1200;
   const pad = 32 * unit;
   const gap = 20 * unit;
-  const x = Math.round(job.width * 0.06);
-  const y = 64 * unit;
+  const margin = Math.round(job.width * 0.06);
   // As large as fits in the width of the title, and no larger than the lockup's marks.
-  const available = job.width - x * 2 - pad * 2 - gap * (marks.length - 1);
+  const available = job.width - margin * 2 - pad * 2 - gap * (marks.length - 1);
   const size = Math.min(128 * unit, available / marks.length);
-  drawPlate(context, job, x, y, pad * 2 + size * marks.length + gap * (marks.length - 1), pad * 2 + size);
+  const plateWidth = pad * 2 + size * marks.length + gap * (marks.length - 1);
+  const plateHeight = pad * 2 + size;
+  const centered = job.layout === "centered";
+  const x = centered ? (job.width - plateWidth) / 2 : margin;
+  const y = centered ? (job.height - plateHeight) / 2 : 64 * unit;
+  drawPlate(context, job, x, y, plateWidth, plateHeight);
   marks.forEach((mark, index) => {
     drawMark(context, mark, x + pad + index * (size + gap), y + pad, size);
   });
