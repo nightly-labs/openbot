@@ -45,6 +45,10 @@ export function ConversationView(props: ConversationProps) {
     fastModeConfirmationOpen,
     confirmFastMode,
     cancelFastModeConfirmation,
+    unsavedKeyDialogOpen,
+    saveKeyAndSend,
+    sendWithoutKey,
+    cancelUnsavedKeySend,
     voicePhase,
     voiceLevels,
     voiceElapsedSeconds,
@@ -165,6 +169,17 @@ export function ConversationView(props: ConversationProps) {
           confirmLabel={t("composer.fastMode.confirm")}
           onConfirm={confirmFastMode}
           onCancel={cancelFastModeConfirmation}
+        />
+        <ConfirmDialog
+          open={unsavedKeyDialogOpen()}
+          tone="default"
+          title={t("composer.unsavedKey.title")}
+          description={t("composer.unsavedKey.description")}
+          confirmLabel={t("composer.unsavedKey.save")}
+          secondaryLabel={t("composer.unsavedKey.send")}
+          onSecondary={sendWithoutKey}
+          onConfirm={saveKeyAndSend}
+          onCancel={cancelUnsavedKeySend}
         />
       </main>
     </ConversationViewScopeContext>

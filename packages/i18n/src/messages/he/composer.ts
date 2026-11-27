@@ -151,6 +151,11 @@ export const messages = {
   "composer.fastMode.confirmDescription":
     "Claude עונה מהר יותר, אבל כל טוקן עולה יותר. עם מינוי Claude, המצב המהיר משתמש תמיד בקרדיטים לשימוש, גם כשנשאר שימוש בתוכנית.",
   "composer.fastMode.confirm": "הפעלה",
+  "composer.unsavedKey.title": "לשמור את המפתח קודם?",
+  "composer.unsavedKey.description":
+    "הקלדת מפתח בטופס, אבל לא שמרת אותו. אם תשלח את ההודעה עכשיו, הטופס ייסגר והמפתח יאבד.",
+  "composer.unsavedKey.save": "שמירה ושליחה",
+  "composer.unsavedKey.send": "שליחה בלי המפתח",
   "composer.context.label": "ההקשר מלא ב-{percent}",
   "composer.context.labelEstimated": "ההקשר מלא בכ-{percent}",
   "composer.context.labelCompacting": "מכווץ את ההקשר",

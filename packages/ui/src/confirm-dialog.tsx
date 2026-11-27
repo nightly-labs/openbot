@@ -21,6 +21,8 @@ export interface ConfirmDialogProps {
   icon?: JSX.Element;
   tone?: ConfirmDialogTone;
   confirmLabel: JSX.Element;
+  secondaryLabel?: JSX.Element;
+  onSecondary?: () => void;
   pendingLabel?: string;
   cancelLabel?: string;
   pending?: boolean;
@@ -142,6 +144,13 @@ export function ConfirmDialog(props: ConfirmDialogProps): JSX.Element {
                 >
                   {props.cancelLabel ?? t("common.cancel")}
                 </Button>
+              </Show>
+              <Show when={props.onSecondary}>
+                {(secondary) => (
+                  <Button variant="outline" type="button" disabled={pending()} onClick={() => secondary()()}>
+                    {props.secondaryLabel}
+                  </Button>
+                )}
               </Show>
               <Button
                 ref={(element: HTMLButtonElement) => {

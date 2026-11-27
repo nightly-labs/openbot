@@ -11,6 +11,7 @@ export function ConversationQuestionPrompt(props: {
   elementRef?: (element: HTMLElement | undefined) => void;
   onAnswer?: (answers: Record<string, string[]>, options?: PromptAnswerOptions) => Promise<boolean>;
   registerComposerAnswer?: ((answer: QuestionPromptComposerAnswer) => () => void) | undefined;
+  onUnsavedKeyChange?: ((save: (() => Promise<boolean>) | undefined) => void) | undefined;
 }) {
   const { props: view, openExternalMessageUrl, keepUnsentPromptAnswer } = useConversationViewScope();
   let cachedPrompt: { key: string; prompt: NonNullable<ConversationProps["prompt"]> } | null = null;
@@ -60,6 +61,7 @@ export function ConversationQuestionPrompt(props: {
                   onAnswer={answer}
                   canEditPreview={serverSupportsCapability(view.server, UI_BLOCK_PREVIEW_EDIT_CAPABILITY)}
                   onUnsentPreviewChange={keepUnsentPromptAnswer}
+                  onUnsavedKeyChange={props.onUnsavedKeyChange}
                   onAnswered={presentResolution}
                 />
               )}

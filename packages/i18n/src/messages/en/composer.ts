@@ -150,6 +150,11 @@ export const messages = defineMessages("composer", {
   "composer.fastMode.confirmDescription":
     "Claude answers faster, but each token costs more. With a Claude subscription, fast mode always uses usage credits, also when your plan has usage left.",
   "composer.fastMode.confirm": "Turn on",
+  "composer.unsavedKey.title": "Save the key first?",
+  "composer.unsavedKey.description":
+    "You typed a key in the form, but you did not save it. If you send your message now, the form closes and the key is lost.",
+  "composer.unsavedKey.save": "Save key and send",
+  "composer.unsavedKey.send": "Send without key",
   "composer.context.label": "Context {percent} full",
   "composer.context.labelEstimated": "Context about {percent} full",
   "composer.context.labelCompacting": "Compacting context",

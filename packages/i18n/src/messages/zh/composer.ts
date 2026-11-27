@@ -142,6 +142,10 @@ export const messages = {
   "composer.fastMode.confirmDescription":
     "Claude 回答更快，但每个令牌的费用更高。使用 Claude 订阅时，即使套餐仍有剩余用量，快速模式也始终使用用量额度。",
   "composer.fastMode.confirm": "开启",
+  "composer.unsavedKey.title": "先保存密钥吗？",
+  "composer.unsavedKey.description": "你在表单中输入了密钥，但还没有保存。如果现在发送消息，表单会关闭，密钥会丢失。",
+  "composer.unsavedKey.save": "保存并发送",
+  "composer.unsavedKey.send": "不带密钥发送",
   "composer.context.label": "上下文已用 {percent}",
   "composer.context.labelEstimated": "上下文约已用 {percent}",
   "composer.context.labelCompacting": "正在压缩上下文",

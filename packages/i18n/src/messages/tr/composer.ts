@@ -156,6 +156,11 @@ export const messages = {
   "composer.fastMode.confirmDescription":
     "Claude daha hızlı yanıt verir, ancak her token daha pahalıdır. Claude aboneliğinde hızlı mod, planınızda kullanım kalsa bile her zaman kullanım kredisi harcar.",
   "composer.fastMode.confirm": "Aç",
+  "composer.unsavedKey.title": "Önce anahtar kaydedilsin mi?",
+  "composer.unsavedKey.description":
+    "Forma bir anahtar yazdınız ama kaydetmediniz. Mesajınızı şimdi gönderirseniz form kapanır ve anahtar kaybolur.",
+  "composer.unsavedKey.save": "Kaydet ve gönder",
+  "composer.unsavedKey.send": "Anahtarsız gönder",
   "composer.context.label": "Bağlam {percent} dolu",
   "composer.context.labelEstimated": "Bağlam yaklaşık {percent} dolu",
   "composer.context.labelCompacting": "Bağlam sıkıştırılıyor",

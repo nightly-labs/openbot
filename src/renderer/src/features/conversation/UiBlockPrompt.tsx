@@ -30,6 +30,7 @@ export interface UiBlockPromptProps {
   onAnswer?: ((answers: Record<string, string[]>, options?: PromptAnswerOptions) => Promise<boolean>) | undefined;
   canEditPreview?: boolean | undefined;
   onUnsentPreviewChange?: ((text: string | undefined) => void) | undefined;
+  onUnsavedKeyChange?: ((save: (() => Promise<boolean>) | undefined) => void) | undefined;
   onAnswered?: (() => void) | undefined;
   elementRef?: ((element: HTMLElement | undefined) => void) | undefined;
 }
@@ -217,6 +218,7 @@ export function UiBlockPrompt(props: UiBlockPromptProps) {
           busy={busy()}
           onSave={props.onAnswer ? saveVaultItem : undefined}
           onSkip={props.onAnswer ? skip : undefined}
+          onUnsavedKeyChange={props.onUnsavedKeyChange}
           elementRef={(element) => props.elementRef?.(element)}
         />
       )}

@@ -152,6 +152,11 @@ export const messages = {
   "composer.fastMode.confirmDescription":
     "Claude の応答が速くなりますが、トークンあたりの料金が高くなります。Claude サブスクリプションでは、プランの使用量が残っていても、高速モードは常に使用クレジットを使います。",
   "composer.fastMode.confirm": "オンにする",
+  "composer.unsavedKey.title": "先にキーを保存しますか？",
+  "composer.unsavedKey.description":
+    "フォームにキーを入力しましたが、まだ保存していません。今メッセージを送信すると、フォームが閉じてキーは失われます。",
+  "composer.unsavedKey.save": "保存して送信",
+  "composer.unsavedKey.send": "キーなしで送信",
   "composer.context.label": "コンテキスト使用率 {percent}",
   "composer.context.labelEstimated": "コンテキスト使用率 約 {percent}",
   "composer.context.labelCompacting": "コンテキストを圧縮しています",

@@ -36,6 +36,7 @@ export interface VaultRequestCardProps {
   busy?: boolean | undefined;
   onSave?: ((input: VaultSaveInput, scope?: string) => Promise<void>) | undefined;
   onSkip?: (() => void) | undefined;
+  onUnsavedKeyChange?: ((save: (() => Promise<boolean>) | undefined) => void) | undefined;
   elementRef?: ((element: HTMLElement | undefined) => void) | undefined;
 }
 
@@ -143,22 +144,32 @@ export function VaultRequestCard(props: VaultRequestCardProps) {
   const [apiKey, setApiKey] = createSignal("");
   const [scopeChoice, setScopeChoice] = createSignal(untrack(() => props.scope?.value ?? ""));
   const [saveFailure, setSaveFailure] = createSignal<string>();
-  onCleanup(() => props.elementRef?.(undefined));
+  onCleanup(() => {
+    props.elementRef?.(undefined);
+    props.onUnsavedKeyChange?.(undefined);
+  });
   const pending = () => props.status === "pending";
   const keyForm = () => props.kind === "apiKey" && pending();
 
-  async function saveApiKey(): Promise<void> {
+  function changeApiKey(key: string): void {
+    setApiKey(key);
+    props.onUnsavedKeyChange?.(keyForm() && props.onSave && key.trim() !== "" ? saveApiKey : undefined);
+  }
+
+  async function saveApiKey(): Promise<boolean> {
     const save = props.onSave;
-    if (!save || props.busy || apiKey().trim() === "") return;
+    if (!save || props.busy || apiKey().trim() === "") return false;
     setSaveFailure(undefined);
     try {
       await save(
         { kind: "apiKey", id: null, name: props.prefill.name ?? "", notes: "", key: apiKey() },
         props.scope ? scopeChoice() : undefined,
       );
-      setApiKey("");
+      changeApiKey("");
+      return true;
     } catch (cause) {
       setSaveFailure(errorMessage(cause, t("vault.failed")));
+      return false;
     }
   }
 
@@ -251,7 +262,7 @@ export function VaultRequestCard(props: VaultRequestCardProps) {
           scope={props.scope}
           apiKey={apiKey()}
           scopeChoice={scopeChoice()}
-          onKeyChange={setApiKey}
+          onKeyChange={changeApiKey}
           onScopeChange={setScopeChoice}
           onSubmit={() => void saveApiKey()}
         />

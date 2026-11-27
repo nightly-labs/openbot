@@ -157,6 +157,11 @@ export const messages = {
   "composer.fastMode.confirmDescription":
     "Claude отвечает быстрее, но каждый токен стоит дороже. С подпиской Claude быстрый режим всегда расходует кредиты использования, даже если в тарифе ещё осталось использование.",
   "composer.fastMode.confirm": "Включить",
+  "composer.unsavedKey.title": "Сначала сохранить ключ?",
+  "composer.unsavedKey.description":
+    "Вы ввели ключ в форму, но не сохранили его. Если отправить сообщение сейчас, форма закроется, и ключ будет потерян.",
+  "composer.unsavedKey.save": "Сохранить и отправить",
+  "composer.unsavedKey.send": "Отправить без ключа",
   "composer.context.label": "Контекст заполнен на {percent}",
   "composer.context.labelEstimated": "Контекст заполнен примерно на {percent}",
   "composer.context.labelCompacting": "Сжатие контекста",
