@@ -1,4 +1,8 @@
-import type { WorkflowSummary } from "@openbot/contracts/ipc";
+import {
+  decodeHostSignalHomeSettings,
+  type HostSignalHomeSettings,
+  type WorkflowSummary,
+} from "@openbot/contracts/ipc";
 import { isDynamicRecord, isString } from "@openbot/contracts/runtime-values";
 import { decodeRemoteWorkflowSummary } from "@openbot/team-client/workflow-decoding";
 import { create } from "zustand";
@@ -9,6 +13,7 @@ export interface DrawerSnapshot {
   routineRuns?: string[];
   tasks?: { unread: number; working: number } | null;
   workflows?: { needsYou: number; running: number; pinned: WorkflowSummary[] } | null;
+  signalHome?: HostSignalHomeSettings;
 }
 
 export const DRAWER_ROUTINE_RUNS = 12;
@@ -40,6 +45,11 @@ export function decodeDrawerSnapshot(value: unknown): DrawerSnapshot | null {
         running: workflows.running,
         pinned: workflows.pinned.map(decodeRemoteWorkflowSummary),
       };
+    } catch {}
+  }
+  if (value.signalHome !== undefined) {
+    try {
+      snapshot.signalHome = decodeHostSignalHomeSettings(value.signalHome);
     } catch {}
   }
   return snapshot;
