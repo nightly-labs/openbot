@@ -887,6 +887,7 @@ export function createWorkspace(
     connection,
     receiveSync: (message: SyncServerMessage) => sync?.receive(message),
     syncedAgents: () => sync?.agents() ?? null,
+    syncAvailable: () => sync !== null,
     reloadChat,
     answerPrompt,
     threadsAvailable: () => has(AGENT_TASKS_CAPABILITY),

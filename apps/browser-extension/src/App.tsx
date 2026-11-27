@@ -314,8 +314,14 @@ function ServerView(props: { session: ExtensionSession; onSignOut: () => void; o
       const granted = await connection.connect(target);
       if (current !== attempt) return;
       reconnectTries = 0;
-      if (granted.length !== capabilities.length || granted.some((entry) => !capabilities.includes(entry)))
+      if (granted.length !== capabilities.length || granted.some((entry) => !capabilities.includes(entry))) {
         await open(hostId);
+        return;
+      }
+      const opened = workspace();
+      if (!opened || opened.syncAvailable()) return;
+      await opened.load();
+      await opened.reloadChannel();
     } catch (error) {
       if (current !== attempt) return;
       if (canRetryConnection(error)) {
