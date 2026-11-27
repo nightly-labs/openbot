@@ -19,6 +19,22 @@ export const GUIDES_COLLECTION: ContentCollection<"guides"> = {
   imageEyebrow: "OPENBOT · GUIDES",
   articles: publishedFirst([
     {
+      slug: "is-openbot-open-source",
+      title: "Is OpenBot Open Source? License, GitHub and Commercial Use",
+      description:
+        "The OpenBot source code is public on GitHub under the PolyForm Noncommercial License 1.0.0. See what you can do for free and when you need a commercial license.",
+      publishedAt: "2026-11-27",
+      author: NEWS_AUTHOR,
+    },
+    {
+      slug: "fix-agent-errors",
+      title: "OpenCode and Codex Errors: What They Mean and How to Fix Them",
+      description:
+        "Fix common coding agent errors: response still truncated, CERT_NOT_YET_VALID, paginated_threads is not supported yet and workspace routing discovery unauthorized (401).",
+      publishedAt: "2026-11-27",
+      author: NEWS_AUTHOR,
+    },
+    {
       slug: "ai-agent-productivity",
       title: "AI Agent Productivity: Why Persistence Beats a Blank Chat",
       description:
@@ -92,10 +108,11 @@ export const GUIDES_COLLECTION: ContentCollection<"guides"> = {
     },
     {
       slug: "ai-agents-vs-agentic-ai",
-      title: "AI Agents vs Agentic AI: What Is the Difference?",
+      title: "Agentic AI vs AI Agents: What Is the Difference?",
       description:
-        "AI agents vs agentic AI, explained with a simple OpenBot example. See what an agent is, what makes its work agentic, and when one agent is enough.",
+        "AI agents vs agentic AI: an AI agent is the worker, agentic AI is how it works. See the key differences in one table, with a simple OpenBot example.",
       publishedAt: "2026-10-16",
+      updatedAt: "2026-11-27",
       author: NEWS_AUTHOR,
     },
     {

@@ -387,7 +387,7 @@ export const messages = {
     "Evet, kişisel ve diğer ticari olmayan kullanımlar için. OpenBot 0 $'dır ve kilitli özellik yoktur. Yalnızca yapay zekâ sağlayıcınıza, zaten sahip olduğunuz plan veya API anahtarı üzerinden ödeme yaparsınız. Ticari kullanım için lisans gerekir.",
   "sitePage.landing.faq.source.question": "OpenBot'un kaynak kodu açık mı?",
   "sitePage.landing.faq.source.answer":
-    "Evet. Kaynak kodun tamamı GitHub'da açıktır, böylece OpenBot'un ne yaptığını kontrol edebilirsiniz. Kişisel projeler, eğitim veya araştırma gibi ticari olmayan kullanımlar için ücretsiz olarak değiştirip çalıştırabilirsiniz. Ticari kullanım için ayrı bir lisans gerekir. Lisans PolyForm Noncommercial 1.0.0'dır.",
+    "Evet. Kaynak kodun tamamı GitHub'da açıktır, böylece OpenBot'un ne yaptığını kontrol edebilirsiniz. Kişisel projeler, eğitim veya araştırma gibi ticari olmayan kullanımlar için ücretsiz olarak değiştirip çalıştırabilirsiniz. Ticari kullanım için ayrı bir lisans gerekir. Lisans PolyForm Noncommercial 1.0.0'dır. OSI onaylı bir açık kaynak lisansı değildir.",
   "sitePage.landing.faq.source.link": "Kaynak kodu GitHub'da görün",
   "sitePage.landing.faq.plans.question": "ChatGPT veya Claude planımı kullanabilir miyim?",
   "sitePage.landing.faq.plans.answer":

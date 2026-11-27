@@ -390,7 +390,7 @@ export const messages = {
     "Ja, voor persoonlijk en ander niet-commercieel gebruik. OpenBot kost $ 0, zonder vergrendelde functies. Je betaalt alleen je AI-aanbieder, via het abonnement of de API-sleutel die je al hebt. Voor commercieel gebruik heb je een licentie nodig.",
   "sitePage.landing.faq.source.question": "Is de broncode van OpenBot open?",
   "sitePage.landing.faq.source.answer":
-    "Ja. Alle broncode staat open op GitHub, dus je kunt nagaan wat OpenBot doet. Voor niet-commercieel gebruik, zoals persoonlijke projecten, studie of onderzoek, mag je hem gratis aanpassen en draaien. Voor commercieel gebruik heb je een aparte licentie nodig. De licentie is PolyForm Noncommercial 1.0.0.",
+    "Ja. Alle broncode staat open op GitHub, dus je kunt nagaan wat OpenBot doet. Voor niet-commercieel gebruik, zoals persoonlijke projecten, studie of onderzoek, mag je hem gratis aanpassen en draaien. Voor commercieel gebruik heb je een aparte licentie nodig. De licentie is PolyForm Noncommercial 1.0.0. Het is geen door de OSI goedgekeurde opensourcelicentie.",
   "sitePage.landing.faq.source.link": "Bekijk de broncode op GitHub",
   "sitePage.landing.faq.plans.question": "Kan ik mijn ChatGPT- of Claude-abonnement gebruiken?",
   "sitePage.landing.faq.plans.answer":
