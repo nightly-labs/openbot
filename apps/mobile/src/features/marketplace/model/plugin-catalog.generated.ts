@@ -3788,6 +3788,34 @@ export const MOBILE_PLUGINS: readonly MobilePlugin[] = [
     ],
   },
   {
+    slug: "entropicmem",
+    name: "EntropicMem",
+    tagline: "Local long-term memory for agents",
+    description:
+      "EntropicMem gives agents durable memory on this computer: SQLite facts with full-text search, a Markdown vault, entities and relations, a timeline, and review tools. The MCP server runs locally over stdio and makes no network calls. Install the command first: `pipx install https://github.com/Ufonik88/EntropicMem/releases/download/v3.0.3/entropicmem-3.0.3-py3-none-any.whl`, then run `pipx ensurepath` once (pipx and Python 3.10+; the server is standard-library only, so no extra is needed). On first use the server creates a new v3 store under ~/.entropicmem. An existing store is served as it is and is never migrated automatically.",
+    category: "productivity",
+    creatorName: "Ufonik88",
+    version: "3.0.3",
+    prompts: [
+      { id: "prompt-recall", text: "What do you remember about the decisions we made on this project?" },
+      { id: "prompt-save", text: "Remember that this project deploys from the release branch, never from main." },
+      { id: "prompt-timeline", text: "Show me what happened in this project over the last two weeks." },
+    ],
+    websiteUrl: "https://github.com/Ufonik88/EntropicMem",
+    privacyPolicyUrl: null,
+    termsUrl: null,
+    featured: false,
+    apps: [
+      {
+        id: "app-entropicmem-mcp",
+        name: "EntropicMem",
+        description:
+          "Local memory search, writes, corrections and history over the EntropicMem MCP stdio server. No key and no network call.",
+        server: { name: "entropicmem", transport: "stdio", command: "entropicmem-mcp", args: [] },
+      },
+    ],
+  },
+  {
     slug: "era",
     name: "Era",
     tagline: "Personal finance",

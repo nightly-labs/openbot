@@ -645,6 +645,12 @@
       "detailSha256": "f77d58b834b80eae4d1763bb34602425348d36b9cf5848ed78f9964a6182c5a8"
     },
     {
+      "slug": "entropicmem",
+      "version": "3.0.3",
+      "featured": false,
+      "detailSha256": "a919eeb07f5619655e3885bfbe7134ba0e6f1bcf56c1aa13ca8e0b09ce4df2b1"
+    },
+    {
       "slug": "era",
       "version": "1.0.0",
       "featured": false,
