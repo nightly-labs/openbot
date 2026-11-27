@@ -8,6 +8,7 @@ import {
   PLUGIN_CATALOG_PATH,
   type PluginCatalog,
   pluginsForHost,
+  withBundledPlugins,
 } from "@openbot/contracts/plugin-catalog";
 import { teamCapabilitiesForProtocol } from "@openbot/contracts/team-protocol/current";
 import { PLUGIN_CATALOG_CAPABILITY } from "@openbot/contracts/team-protocol/plugin-catalog-v1";
@@ -225,15 +226,28 @@ async function main(): Promise<void> {
       assert.equal(host.servers().length, bundledServers.length);
     });
 
-    await check("a client drops only an entry with a sign-in kind it does not know", async () => {
-      futureFormat = true;
-      const response = await fetch(`${base}${PLUGIN_CATALOG_PATH}`);
-      const raw = await response.json();
-      const catalog = decodePluginCatalog(raw);
-      futureFormat = false;
-      assert.equal(raw.plugins.length, catalog.plugins.length + 1);
-      assert.ok(!slugs(catalog).includes("e2e-future-flow"));
-    });
+    await check(
+      "a client drops only an entry that it cannot read and keeps its bundled entry for that slug",
+      async () => {
+        futureFormat = true;
+        const response = await fetch(`${base}${PLUGIN_CATALOG_PATH}`);
+        const raw = await response.json();
+        const catalog = decodePluginCatalog(raw);
+        futureFormat = false;
+        assert.equal(raw.plugins.length, catalog.plugins.length + 1);
+        assert.ok(!slugs(catalog).includes("e2e-future-flow"));
+        const changedSlug = bundledIndex.plugins[0].slug;
+        const changed = decodePluginCatalog({
+          ...raw,
+          plugins: raw.plugins.map((plugin: { slug: string }) =>
+            plugin.slug === changedSlug ? { ...plugin, category: "future-category" } : plugin,
+          ),
+        });
+        assert.ok(!slugs(changed).includes(changedSlug));
+        const kept = withBundledPlugins(changed.plugins, bundledIndex.plugins);
+        assert.ok(kept.some((plugin) => plugin.slug === changedSlug));
+      },
+    );
   } finally {
     server.stop(true);
     await rm(work, { recursive: true, force: true });

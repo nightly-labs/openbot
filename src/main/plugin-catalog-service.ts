@@ -7,7 +7,7 @@ const logger = createOpenBotLogger("plugin-catalog");
 
 const CATALOG_LIFETIME_MS = 30 * 60 * 1000;
 const CATALOG_REQUEST_TIMEOUT_MS = 10_000;
-const CATALOG_REFRESH_INTERVAL = "6 hours";
+const CATALOG_REFRESH_INTERVAL = "30 minutes";
 
 class PluginCatalogLoadFailed extends Schema.TaggedError<PluginCatalogLoadFailed>()("PluginCatalogLoadFailed", {
   cause: Schema.Defect(),

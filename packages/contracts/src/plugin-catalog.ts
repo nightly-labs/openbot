@@ -83,6 +83,11 @@ export function decodePluginCatalog(value: unknown): PluginCatalog {
   };
 }
 
+export function withBundledPlugins<T extends { slug: string }>(remote: readonly T[], bundled: readonly T[]): T[] {
+  const listed = new Set(remote.map((plugin) => plugin.slug));
+  return [...remote, ...bundled.filter((plugin) => !listed.has(plugin.slug))];
+}
+
 export function pluginsForHost<T extends { slug: string; apps: readonly { server: { transport: string } }[] }>(
   plugins: readonly T[],
   bundled: ReadonlySet<string>,

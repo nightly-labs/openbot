@@ -1,5 +1,10 @@
 import type { ServerSummary } from "@openbot/contracts/ipc";
-import { type CatalogPlugin, type PluginCatalog, pluginsForHost } from "@openbot/contracts/plugin-catalog";
+import {
+  type CatalogPlugin,
+  type PluginCatalog,
+  pluginsForHost,
+  withBundledPlugins,
+} from "@openbot/contracts/plugin-catalog";
 import { createPluginShareUrl } from "@openbot/contracts/plugin-links";
 import type { MarketplacePluginDetail } from "@openbot/ui/features/settings/marketplace-plugins";
 import { createSignal } from "solid-js";
@@ -29,7 +34,7 @@ export function loadMarketplacePlugins(read: () => Promise<PluginCatalog | null>
   pending = read()
     .then((catalog) => {
       if (!catalog || catalog.plugins.length === 0) return;
-      setLoadedPlugins(catalog.plugins.map(marketplacePluginDetail));
+      setLoadedPlugins(withBundledPlugins(catalog.plugins.map(marketplacePluginDetail), MARKETPLACE_PLUGINS));
       loadedAt = Date.now();
     })
     .catch(() => undefined)

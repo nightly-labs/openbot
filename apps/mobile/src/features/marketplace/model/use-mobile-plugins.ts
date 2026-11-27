@@ -1,4 +1,4 @@
-import { type CatalogPlugin, pluginsForHost } from "@openbot/contracts/plugin-catalog";
+import { type CatalogPlugin, pluginsForHost, withBundledPlugins } from "@openbot/contracts/plugin-catalog";
 import { useQuery } from "@tanstack/react-query";
 import { useMemo } from "react";
 import { useMobileSession } from "@/features/auth/context/mobile-session-context";
@@ -25,7 +25,11 @@ export function useMobilePlugins(serverId: string): readonly MobilePlugin[] {
   return useMemo(() => {
     const plugins = catalog.data?.plugins;
     if (!plugins?.length) return MOBILE_PLUGINS;
-    return pluginsForHost(plugins.map(mobilePlugin), BUNDLED_SLUGS, hostLoadsCatalog);
+    return pluginsForHost(
+      withBundledPlugins(plugins.map(mobilePlugin), MOBILE_PLUGINS),
+      BUNDLED_SLUGS,
+      hostLoadsCatalog,
+    );
   }, [catalog.data, hostLoadsCatalog]);
 }
 
