@@ -107,6 +107,10 @@ in a terminal, for the same reason.
 
 - `POST /v2/admin/server-claims` needs the `SERVER_CLAIMS_ADMIN_TOKEN` of the account service. It
   makes the account of the email when there is none, and answers `{"claim", "expiresAt"}`.
+- When the account service has Cloudflare Access on its admin routes, add the two lines
+  `CF-Access-Client-Id: <id>` and `CF-Access-Client-Secret: <secret>` of the Access service token to
+  `server-claims.header`. Without them the request gets 401. The
+  [account service setup](../apps/auth-api/README.md) tells how Access protects the admin routes.
 - The claim works once, for 15 minutes. The account service keeps only its hash.
 - The server sends it to `POST /v2/server-claims/redeem` and gets a session of the owner. The owner
   is then the only owner of the server. The operator does not need the owner's email or password.
