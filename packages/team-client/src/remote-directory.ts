@@ -684,7 +684,7 @@ export class RemoteTeamDirectoryClient {
             return yield* directoryError(
               response.status,
               value,
-              retryAfterSeconds(response.headers.get("Retry-After")),
+              parseRetryAfterSeconds(response.headers.get("Retry-After")),
             );
           return value;
         }),
@@ -721,8 +721,16 @@ function decodeInvitePreview(value: unknown, expectedHostId: string): RemoteInvi
   };
 }
 
-function retryAfterSeconds(value: string | null): number | undefined {
-  const seconds = value !== null && /^\d+$/u.test(value.trim()) ? Number.parseInt(value.trim(), 10) : 0;
+export function parseRetryAfterSeconds(value: string | null): number | undefined {
+  if (value === null) return undefined;
+  const trimmed = value.trim();
+  if (/^\d+$/u.test(trimmed)) {
+    const seconds = Number.parseInt(trimmed, 10);
+    return seconds > 0 ? seconds : undefined;
+  }
+  const retryAt = Date.parse(trimmed);
+  if (!Number.isFinite(retryAt)) return undefined;
+  const seconds = Math.ceil((retryAt - Date.now()) / 1_000);
   return seconds > 0 ? seconds : undefined;
 }
 

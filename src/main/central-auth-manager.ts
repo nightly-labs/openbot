@@ -61,7 +61,7 @@ import { WATCH_TICKET_AUDIENCE, type WatchTicketClaims } from "@openbot/contract
 import type { ServerAppearance } from "@openbot/contracts/team-protocol/host-appearance-v1";
 import { sourceText } from "@openbot/i18n/source";
 import { createOpenBotLogger, toLogValue } from "@openbot/logging";
-import { inviteEmailRateLimitedText } from "@openbot/team-client/remote-directory";
+import { inviteEmailRateLimitedText, parseRetryAfterSeconds } from "@openbot/team-client/remote-directory";
 import { referenceFrom, safeReference } from "@openbot/user-errors";
 import { Deferred, Duration, Effect, Exit, type Layer, Result, Schema, Semaphore } from "effect";
 import { createLocalJWKSet, type JWTPayload, jwtVerify } from "jose";
@@ -2933,19 +2933,6 @@ function inviteEmailFailure(error: CentralAuthOperationError): CentralAuthOperat
       cause.reference,
     ),
   });
-}
-
-function parseRetryAfterSeconds(value: string | null): number | undefined {
-  if (value === null) return undefined;
-  const trimmed = value.trim();
-  if (/^\d+$/u.test(trimmed)) {
-    const seconds = Number.parseInt(trimmed, 10);
-    return seconds > 0 ? seconds : undefined;
-  }
-  const retryAt = Date.parse(trimmed);
-  if (!Number.isFinite(retryAt)) return undefined;
-  const seconds = Math.ceil((retryAt - Date.now()) / 1_000);
-  return seconds > 0 ? seconds : undefined;
 }
 
 function errorMessage(error: unknown, fallback: string): string {
