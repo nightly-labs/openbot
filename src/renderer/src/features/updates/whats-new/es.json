@@ -1,5 +1,42 @@
 [
   {
+    "version": "0.81.0",
+    "date": "2026-11-27",
+    "notices": [
+      "Actualiza también a esta versión cada servidor al que te has unido. La opción de contenido remoto, los chats y canales más rápidos, los videos en el lienzo y muchas de las correcciones de abajo solo funcionan en un servidor que tenga esta versión."
+    ],
+    "groups": [
+      {
+        "type": "added",
+        "items": [
+          "Pon videos y archivos de audio en un lienzo. Suéltalos, pégalos o súbelos, como con las imágenes. Un paso de recurso reproduce el clip y puede enviarlo a un agente o a un paso de video.",
+          "Nueva opción de servidor, «Cargar contenido remoto en los chats», en Ajustes del servidor › General › Privacidad. Mientras está desactivada, que es lo predeterminado, los chats no cargan nada de otros sitios web hasta que haces clic.",
+          "Pega imágenes en el chat de la extensión de Chrome: en los chats de agentes, en los hilos y en los canales."
+        ]
+      },
+      {
+        "type": "changed",
+        "items": [
+          "En un servidor al que te has unido, la app de escritorio y el cliente web mantienen al día los agentes, canales, rutinas, flujos de trabajo y los mensajes más recientes por sí solos. El servidor envía solo lo que cambió.",
+          "En un servidor al que te has unido, las reacciones, las marcas de lectura, los interruptores de rutinas, los comandos de canal y los cambios en los mensajes en cola se muestran al instante. Los chats y los canales se abren antes.",
+          "Un servidor con muchos agentes o un historial de mensajes largo usa mucha menos CPU. Con 70.000 mensajes, enviar un mensaje y abrir una conversación son de 5 a 30 veces más rápidos.",
+          "La mayoría de los precios de créditos de OpenBot para imágenes y videos son más bajos, hasta un 80 %.",
+          "Los menús, selectores, tooltips y las tarjetas de uso y créditos ahora son de cristal esmerilado. Cuando desactivas los efectos de desenfoque, son sólidos."
+        ]
+      },
+      {
+        "type": "fixed",
+        "items": [
+          "Un servidor MCP que añades en la dirección de otro servidor MCP ahora inicia sesión en su propia cuenta. Antes, ambos servidores usaban un mismo inicio de sesión.",
+          "Cuando el responsable del canal no puede enrutar un mensaje, el canal ahora indica por qué y qué hacer a continuación.",
+          "Las imágenes de un chat en un servidor al que te has unido tienen su tamaño correcto antes de cargar, así el chat no se mueve.",
+          "En Windows, la app ya no se detiene durante unos segundos cada 5 minutos aproximadamente mientras lee el uso del plan de Claude.",
+          "Cuando la comprobación de seguridad del modelo rechaza una imagen o un video de créditos de OpenBot, el flujo de trabajo y el agente indican ahora el motivo. No se usan créditos."
+        ]
+      }
+    ]
+  },
+  {
     "version": "0.80.0",
     "date": "2026-11-26",
     "notices": [

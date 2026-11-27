@@ -1,5 +1,42 @@
 [
   {
+    "version": "0.81.0",
+    "date": "2026-11-27",
+    "notices": [
+      "Update each joined server to this version too. The remote content setting, the faster chats and channels, canvas videos and many fixes below work on a server only when the server has this version."
+    ],
+    "groups": [
+      {
+        "type": "added",
+        "items": [
+          "Put videos and audio files on a canvas. Drop, paste or upload them, as you do with pictures. An asset step plays the clip and can send it to an agent or to a video step.",
+          "A new server setting, \"Load remote content in chats\", is in Server Settings › General › Privacy. While it is off, which is the default, chats load nothing from other web sites until you click.",
+          "Paste images into the chat of the Chrome extension: in agent chats, in threads and in channels."
+        ]
+      },
+      {
+        "type": "changed",
+        "items": [
+          "On a joined server, the desktop app and the web client keep agents, channels, routines, workflows and the newest messages up to date by themselves. The server sends only what changed.",
+          "On a joined server, reactions, read marks, routine switches, channel commands and changes to queued messages show at once. Chats and channels open sooner.",
+          "A server with many agents or a long message history uses much less CPU. With 70,000 messages, sending a message and opening a conversation are 5 to 30 times faster.",
+          "Most OpenBot credit prices for pictures and videos are lower, by up to 80%.",
+          "Menus, pickers, tooltips and the usage and credits cards are now frosted glass. When you turn off blur effects, they are solid."
+        ]
+      },
+      {
+        "type": "fixed",
+        "items": [
+          "An MCP server that you add on the address of another MCP server now signs in to its own account. Before, both servers used one sign-in.",
+          "When the channel lead cannot route a message, the channel now says why and what to do next.",
+          "Pictures in a chat on a joined server have their correct size before they load, so the chat does not move.",
+          "On Windows, the app no longer stops for some seconds about every 5 minutes while it reads the Claude plan usage.",
+          "When the model's safety check refuses an OpenBot credits picture or video, the workflow and the agent now say why. No credits are used."
+        ]
+      }
+    ]
+  },
+  {
     "version": "0.80.0",
     "date": "2026-11-26",
     "notices": [

@@ -1,5 +1,42 @@
 [
   {
+    "version": "0.81.0",
+    "date": "2026-11-27",
+    "notices": [
+      "Mettez aussi à jour vers cette version chaque serveur que vous avez rejoint. Le réglage du contenu distant, les discussions et canaux plus rapides, les vidéos sur un canevas et de nombreuses corrections ci-dessous ne fonctionnent sur un serveur que si celui-ci a cette version."
+    ],
+    "groups": [
+      {
+        "type": "added",
+        "items": [
+          "Placez des vidéos et des fichiers audio sur un canevas. Déposez-les, collez-les ou importez-les, comme pour les images. Une étape de ressource lit le clip et peut l’envoyer à un agent ou à une étape vidéo.",
+          "Nouveau réglage de serveur, « Charger le contenu distant dans les discussions », dans Réglages du serveur › Général › Confidentialité. Tant qu’il est désactivé, ce qui est la valeur par défaut, les discussions ne chargent rien depuis d’autres sites web tant que vous ne cliquez pas.",
+          "Collez des images dans la discussion de l’extension Chrome : dans les discussions d’agents, dans les fils de discussion et dans les canaux."
+        ]
+      },
+      {
+        "type": "changed",
+        "items": [
+          "Sur un serveur que vous avez rejoint, l’app de bureau et le client web tiennent à jour d’eux-mêmes les agents, canaux, routines, workflows et derniers messages. Le serveur n’envoie que ce qui a changé.",
+          "Sur un serveur que vous avez rejoint, les réactions, les marques de lecture, les bascules de routines, les commandes de canal et les modifications des messages en file d’attente s’affichent aussitôt. Les discussions et les canaux s’ouvrent plus vite.",
+          "Un serveur avec beaucoup d’agents ou un long historique de messages utilise beaucoup moins de CPU. Avec 70 000 messages, l’envoi d’un message et l’ouverture d’une conversation sont 5 à 30 fois plus rapides.",
+          "La plupart des prix des crédits OpenBot pour les images et les vidéos baissent, jusqu’à 80 %.",
+          "Les menus, sélecteurs, info-bulles et les cartes d’usage et de crédits sont désormais en verre dépoli. Quand vous désactivez les effets de flou, ils deviennent opaques."
+        ]
+      },
+      {
+        "type": "fixed",
+        "items": [
+          "Un serveur MCP ajouté à l’adresse d’un autre serveur MCP se connecte maintenant à son propre compte. Avant, les deux serveurs partageaient une même connexion.",
+          "Quand le responsable du canal ne peut pas acheminer un message, le canal indique maintenant pourquoi et quoi faire ensuite.",
+          "Les images d’une discussion sur un serveur que vous avez rejoint ont leur taille correcte avant de charger, pour que la discussion ne bouge pas.",
+          "Sous Windows, l’app ne s’arrête plus pendant quelques secondes environ toutes les 5 minutes pendant qu’elle lit l’utilisation du forfait Claude.",
+          "Quand le contrôle de sécurité du modèle refuse une image ou une vidéo payée en crédits OpenBot, le workflow et l’agent indiquent maintenant pourquoi. Aucun crédit n’est utilisé."
+        ]
+      }
+    ]
+  },
+  {
     "version": "0.80.0",
     "date": "2026-11-26",
     "notices": [

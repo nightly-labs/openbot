@@ -1,5 +1,42 @@
 [
   {
+    "version": "0.81.0",
+    "date": "2026-11-27",
+    "notices": [
+      "Aggiorna anche ogni server a cui ti sei unito a questa versione. L’impostazione dei contenuti remoti, le chat e i canali più veloci, i video sulla tela e molte delle correzioni qui sotto funzionano su un server solo se il server ha questa versione."
+    ],
+    "groups": [
+      {
+        "type": "added",
+        "items": [
+          "Metti video e file audio su una tela. Trascinali, incollali o caricali, come faresti con le immagini. Un passaggio risorsa riproduce la clip e può inviarla a un agente o a un passaggio video.",
+          "Una nuova impostazione del server, «Carica contenuti remoti nelle chat», si trova in Impostazioni server › Generali › Privacy. Quando è disattivata, cioè per impostazione predefinita, le chat non caricano nulla da altri siti web finché non fai clic.",
+          "Incolla immagini nella chat dell’estensione Chrome: nelle chat degli agenti, nei thread e nei canali."
+        ]
+      },
+      {
+        "type": "changed",
+        "items": [
+          "Su un server a cui ti sei unito, l’app desktop e il client web tengono aggiornati da soli agenti, canali, routine, flussi di lavoro e i messaggi più recenti. Il server invia solo ciò che è cambiato.",
+          "Su un server a cui ti sei unito, reazioni, contrassegni di lettura, attivazioni delle routine, comandi dei canali e modifiche ai messaggi in coda compaiono subito. Chat e canali si aprono prima.",
+          "Un server con molti agenti o una lunga cronologia di messaggi usa molta meno CPU. Con 70.000 messaggi, inviare un messaggio e aprire una conversazione sono da 5 a 30 volte più veloci.",
+          "La maggior parte dei prezzi in crediti OpenBot per immagini e video è più bassa, fino all’80%.",
+          "Menu, selettori, suggerimenti e le schede di utilizzo e crediti ora hanno un effetto vetro smerigliato. Quando disattivi gli effetti di sfocatura, diventano opachi."
+        ]
+      },
+      {
+        "type": "fixed",
+        "items": [
+          "Un server MCP che aggiungi all’indirizzo di un altro server MCP ora accede con il proprio account. Prima, i due server usavano un solo accesso.",
+          "Quando il responsabile del canale non può instradare un messaggio, il canale ora dice il motivo e cosa fare dopo.",
+          "Le immagini in una chat su un server a cui ti sei unito hanno la dimensione corretta prima di caricarsi, quindi la chat non si sposta.",
+          "Su Windows, l’app non si blocca più per alcuni secondi circa ogni 5 minuti mentre legge l’utilizzo del piano Claude.",
+          "Quando il controllo di sicurezza del modello rifiuta un’immagine o un video con i crediti OpenBot, il flusso di lavoro e l’agente ora spiegano il motivo. Nessun credito viene usato."
+        ]
+      }
+    ]
+  },
+  {
     "version": "0.80.0",
     "date": "2026-11-26",
     "notices": [

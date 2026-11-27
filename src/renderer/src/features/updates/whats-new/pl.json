@@ -1,5 +1,42 @@
 [
   {
+    "version": "0.81.0",
+    "date": "2026-11-27",
+    "notices": [
+      "Zaktualizuj także do tej wersji każdy dołączony serwer. Ustawienie zdalnych treści, szybsze czaty i kanały, filmy na kanwie oraz wiele poprawek poniżej działają na serwerze tylko wtedy, gdy serwer ma tę wersję."
+    ],
+    "groups": [
+      {
+        "type": "added",
+        "items": [
+          "Umieszczaj filmy i pliki audio na kanwie. Upuszczaj je, wklejaj lub wysyłaj, tak jak obrazy. Krok zasobu odtwarza klip i może wysłać go do agenta albo do kroku wideo.",
+          "Nowe ustawienie serwera „Wczytuj treści zdalne w czatach” znajduje się w Ustawienia serwera › Ogólne › Prywatność. Gdy jest wyłączone, co jest domyślne, czaty nie wczytują nic z innych stron, dopóki nie klikniesz.",
+          "Wklejaj obrazy do czatu rozszerzenia Chrome: w czatach z agentami, w wątkach i na kanałach."
+        ]
+      },
+      {
+        "type": "changed",
+        "items": [
+          "Na dołączonym serwerze aplikacja na komputer i klient webowy same na bieżąco aktualizują agentów, kanały, rutyny, przepływy pracy i najnowsze wiadomości. Serwer wysyła tylko to, co się zmieniło.",
+          "Na dołączonym serwerze reakcje, oznaczenia przeczytania, przełączniki rutyn, polecenia kanałów i zmiany w wiadomościach w kolejce pokazują się od razu. Czaty i kanały otwierają się szybciej.",
+          "Serwer z wieloma agentami lub długą historią wiadomości zużywa znacznie mniej procesora. Przy 70 000 wiadomości wysyłanie wiadomości i otwieranie rozmowy są od 5 do 30 razy szybsze.",
+          "Ceny kredytów OpenBot za obrazy i wideo są w większości niższe, nawet o 80%.",
+          "Menu, listy wyboru, podpowiedzi oraz karty użycia i kredytów mają teraz efekt matowego szkła. Gdy wyłączysz efekty rozmycia, są jednolite."
+        ]
+      },
+      {
+        "type": "fixed",
+        "items": [
+          "Serwer MCP, który dodajesz pod adresem innego serwera MCP, teraz loguje się na własne konto. Wcześniej oba serwery używały jednego logowania.",
+          "Gdy lider kanału nie może przekierować wiadomości, kanał teraz mówi, dlaczego i co zrobić dalej.",
+          "Obrazy w czacie na dołączonym serwerze mają poprawny rozmiar, zanim się wczytają, więc czat się nie przesuwa.",
+          "W Windows aplikacja nie zatrzymuje się już na kilka sekund mniej więcej co 5 minut, gdy odczytuje zużycie planu Claude.",
+          "Gdy kontrola bezpieczeństwa modelu odrzuci obraz lub wideo za kredyty OpenBot, przepływ pracy i agent teraz mówią dlaczego. Kredyty nie są zużywane."
+        ]
+      }
+    ]
+  },
+  {
     "version": "0.80.0",
     "date": "2026-11-26",
     "notices": [

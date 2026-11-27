@@ -1,10 +1,10 @@
 {
-  "version": "0.80.0",
+  "version": "0.81.0",
   "highlights": [
-    "Update your joined servers to this version too. It makes a server with a large chat history fast again after 0.79.0, and the new features below work there only then.",
-    "Use the OpenBot Apple Watch app when OpenBot on iPhone is closed. Your server answers the watch directly, end to end encrypted.",
-    "See the pointer and the selected step of each other person who has the same workflow open.",
-    "Spread agents over all your pooled provider accounts with the new Spread choice in Settings › Providers.",
-    "Type with no lag while an agent writes its reply, and use much less memory in long chats with many images."
+    "Update your joined servers to this version too. The faster chats and channels, the remote content setting and canvas videos work there only then.",
+    "Chats and channels on a joined server stay up to date by themselves, and reactions, read marks and queue changes show at once.",
+    "Choose if chats load pictures and pages from other web sites with the new \"Load remote content in chats\" server setting.",
+    "Put videos and audio files on a workflow canvas, and send them to an agent or a video step.",
+    "Pay less for most OpenBot credit pictures and videos: the prices are lower by up to 80%."
   ]
 }

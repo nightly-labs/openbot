@@ -1,5 +1,42 @@
 [
   {
+    "version": "0.81.0",
+    "date": "2026-11-27",
+    "notices": [
+      "Update ook elke server waarbij je bent aangesloten naar deze versie. De instelling voor externe inhoud, de snellere chats en kanalen, video’s op het canvas en veel van de onderstaande oplossingen werken op een server alleen als de server deze versie heeft."
+    ],
+    "groups": [
+      {
+        "type": "added",
+        "items": [
+          "Zet video’s en audiobestanden op een canvas. Sleep ze erheen, plak ze of upload ze, zoals bij afbeeldingen. Een bestandsstap speelt de clip af en kan die naar een agent of naar een videostap sturen.",
+          "Een nieuwe serverinstelling, “Externe inhoud laden in chats”, staat onder Serverinstellingen › Algemeen › Privacy. Zolang die uit staat, wat de standaard is, laden chats niets van andere websites tot je klikt.",
+          "Plak afbeeldingen in de chat van de Chrome-extensie: in agentchats, in threads en in kanalen."
+        ]
+      },
+      {
+        "type": "changed",
+        "items": [
+          "Op een server waarbij je bent aangesloten, houden de desktopapp en de webclient agents, kanalen, routines, workflows en de nieuwste berichten uit zichzelf up-to-date. De server stuurt alleen wat is veranderd.",
+          "Op een server waarbij je bent aangesloten, verschijnen reacties, leesmarkeringen, wisselingen van routines, kanaalopdrachten en wijzigingen in berichten in de wachtrij meteen. Chats en kanalen openen sneller.",
+          "Een server met veel agents of een lange berichtgeschiedenis gebruikt veel minder CPU. Met 70.000 berichten zijn het versturen van een bericht en het openen van een gesprek 5 tot 30 keer sneller.",
+          "De meeste OpenBot-creditprijzen voor afbeeldingen en video’s zijn lager, met tot 80%.",
+          "Menu’s, keuzelijsten, tooltips en de kaarten voor gebruik en credits zijn nu matglas. Als je vervagingseffecten uitzet, zijn ze effen."
+        ]
+      },
+      {
+        "type": "fixed",
+        "items": [
+          "Een MCP-server die je toevoegt op het adres van een andere MCP-server meldt zich nu aan bij het eigen account. Eerder gebruikten beide servers één aanmelding.",
+          "Als de kanaalleider een bericht niet kan doorsturen, zegt het kanaal nu waarom en wat je daarna kunt doen.",
+          "Afbeeldingen in een chat op een server waarbij je bent aangesloten hebben hun juiste formaat voordat ze laden, dus de chat schuift niet meer.",
+          "Op Windows stopt de app niet langer enkele seconden ongeveer elke 5 minuten terwijl hij het gebruik van het Claude-abonnement leest.",
+          "Wanneer de veiligheidscontrole van het model een OpenBot-creditafbeelding of -video weigert, zeggen de workflow en de agent nu waarom. Er worden geen credits gebruikt."
+        ]
+      }
+    ]
+  },
+  {
     "version": "0.80.0",
     "date": "2026-11-26",
     "notices": [

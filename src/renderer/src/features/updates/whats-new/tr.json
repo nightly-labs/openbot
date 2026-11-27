@@ -1,5 +1,42 @@
 [
   {
+    "version": "0.81.0",
+    "date": "2026-11-27",
+    "notices": [
+      "Katıldığınız her sunucuyu da bu sürüme güncelleyin. Uzak içerik ayarı, daha hızlı sohbetler ve kanallar, tuvaldeki videolar ve aşağıdaki birçok düzeltme bir sunucuda yalnızca sunucu bu sürümdeyse çalışır."
+    ],
+    "groups": [
+      {
+        "type": "added",
+        "items": [
+          "Tuvale video ve ses dosyaları koyun. Resimlerde olduğu gibi bırakın, yapıştırın veya yükleyin. Varlık adımı klibi oynatır ve bir ajana ya da bir video adımına gönderebilir.",
+          "Yeni bir sunucu ayarı, \"Sohbetlerde uzak içeriği yükle\", Sunucu ayarları › Genel › Gizlilik bölümündedir. Varsayılan olan kapalı durumdayken sohbetler, siz tıklayana kadar başka web sitelerinden hiçbir şey yüklemez.",
+          "Chrome uzantısının sohbetine resim yapıştırın: ajan sohbetlerinde, mesaj dizilerinde ve kanallarda."
+        ]
+      },
+      {
+        "type": "changed",
+        "items": [
+          "Katıldığınız bir sunucuda masaüstü uygulaması ve web istemcisi ajanları, kanalları, rutinleri, iş akışlarını ve en yeni mesajları kendiliğinden güncel tutar. Sunucu yalnızca değişenleri gönderir.",
+          "Katıldığınız bir sunucuda tepkiler, okundu işaretleri, rutin geçişleri, kanal komutları ve sıradaki mesajlardaki değişiklikler hemen görünür. Sohbetler ve kanallar daha hızlı açılır.",
+          "Çok sayıda ajanı veya uzun bir mesaj geçmişi olan sunucu çok daha az CPU kullanır. 70.000 mesajla, mesaj göndermek ve bir konuşmayı açmak 5 ila 30 kat daha hızlıdır.",
+          "OpenBot kredilerinin resim ve video fiyatlarının çoğu daha düşük, en fazla %80 daha düşük.",
+          "Menüler, seçiciler, ipuçları ve kullanım ile Credits kartları artık buzlu cam. Bulanıklık efektlerini kapattığınızda ise düz renkli olurlar."
+        ]
+      },
+      {
+        "type": "fixed",
+        "items": [
+          "Başka bir MCP sunucusunun adresiyle eklediğiniz bir MCP sunucusu artık kendi hesabıyla oturum açar. Önceden iki sunucu tek bir oturum açma kullanıyordu.",
+          "Kanal lideri bir iletiyi yönlendiremediğinde kanal artık nedenini ve sonraki adımı söyler.",
+          "Katıldığınız bir sunucudaki sohbetteki resimler yüklenmeden önce doğru boyuta sahip olur; böylece sohbet kaymaz.",
+          "Windows'ta uygulama, Claude plan kullanımını okurken yaklaşık her 5 dakikada birkaç saniyeliğine durmaz artık.",
+          "Modelin güvenlik denetimi bir OpenBot kredili resmi veya videoyu reddettiğinde iş akışı ve ajan artık nedenini söyler. Kredi kullanılmaz."
+        ]
+      }
+    ]
+  },
+  {
     "version": "0.80.0",
     "date": "2026-11-26",
     "notices": [
