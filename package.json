@@ -481,6 +481,7 @@
     "test:sync": "bun --preload ./scripts/team-api-routes-e2e-electron.mjs scripts/sync-e2e.ts",
     "test:sync-log": "bun --preload ./scripts/team-api-routes-e2e-electron.mjs scripts/sync-log-e2e.ts",
     "test:web-sync": "bun scripts/web-sync-e2e.ts",
+    "test:extension-sync": "bun scripts/browser-extension-sync-e2e.ts",
     "test:server-mute": "bun scripts/server-mute-e2e.ts",
     "test:desktop-notifications": "bun scripts/desktop-notifications-e2e.ts",
     "test:push-notification-away": "bun scripts/push-notification-away-e2e.ts",

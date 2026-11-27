@@ -262,7 +262,10 @@ function ServerView(props: { session: ExtensionSession; onSignOut: () => void; o
         capabilities: granted,
         onPresence: setPresence,
       });
-      const next = createWorkspace(connection.request, granted, connection.download, connection.transcribe);
+      const next = createWorkspace(connection.request, granted, connection.download, connection.transcribe, {
+        role: target.role,
+        send: connection.sendSync,
+      });
       setWorkspace(() => next);
       setView((draft) => {
         draft.status = "ready";
@@ -288,8 +291,10 @@ function ServerView(props: { session: ExtensionSession; onSignOut: () => void; o
           browserLink?.handleEvent(event);
           workspace()?.handleEvent(event);
         },
+        sync: (message) => workspace()?.receiveSync(message),
         state: (update) => {
           if (update.hostId !== view.hostId) return;
+          workspace()?.connection(update);
           setView((draft) => {
             draft.offline = update.state === "offline";
           });
@@ -331,7 +336,12 @@ function ServerView(props: { session: ExtensionSession; onSignOut: () => void; o
 
   function xTarget(): XTarget | null {
     if (view.status !== "ready" || !connection || !view.hostId) return null;
-    return { hostId: view.hostId, request: connection.request, capabilities };
+    return {
+      hostId: view.hostId,
+      request: connection.request,
+      capabilities,
+      syncedAgents: () => workspace()?.syncedAgents() ?? null,
+    };
   }
 
   onSettled(() => {

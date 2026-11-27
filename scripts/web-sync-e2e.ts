@@ -39,7 +39,16 @@ const browserExecutable = argument("browser-executable");
 const agentName = argument("agent") ?? "Research";
 const channelName = argument("channel") ?? "Launch room";
 const queueAgentName = argument("queue-agent") ?? "Chief";
-const STEP_NAMES = ["channels", "agents", "pins", "workflows", "reactions", "queue", "channel-messages"] as const;
+const STEP_NAMES = [
+  "channels",
+  "agents",
+  "pins",
+  "workflows",
+  "reactions",
+  "queue",
+  "channel-messages",
+  "channel-focus",
+] as const;
 type StepName = (typeof STEP_NAMES)[number];
 const only = new Set(argument("steps")?.split(",") ?? STEP_NAMES);
 for (const name of only)
@@ -50,7 +59,7 @@ for (const name of only)
 assert.ok(hostCdp, "--host-cdp takes the remote debugging port of the dev host app.");
 assert.ok(
   process.argv.includes("--allow-mutations"),
-  "This test renames a channel, an agent and a workflow, changes a pin, adds and removes a reaction, sends one agent message and posts one channel message on the dev host. Re-run with --allow-mutations.",
+  "This test renames a channel, an agent and a workflow, changes a pin, adds and removes a reaction, sends one agent message, posts two channel messages, and adds and deletes one channel on the dev host. Re-run with --allow-mutations.",
 );
 
 interface Change {
@@ -64,7 +73,7 @@ interface Step {
   name: StepName;
   listRoutes: readonly string[];
   marks: readonly string[];
-  open(page: Page): Promise<number>;
+  open(page: Page, host: Page): Promise<number>;
   changes(host: Page): Promise<Change[]>;
 }
 
@@ -80,6 +89,7 @@ interface Report {
   createdAt: string;
   api: string;
   initialListCalls: Record<string, number>;
+  prefetchReads: number | null;
   changes: ChangeReport[];
   passed: boolean;
   failure: string | null;
@@ -121,6 +131,8 @@ async function settleNetwork(page: Page, from: number): Promise<RemoteRequestRec
 }
 
 let hostPage: Page | null = null;
+let addedChannelId: string | null = null;
+let prefetchReads: number | null = null;
 let hostBrowser: Browser | null = null;
 
 async function hostRenderer(): Promise<Page> {
@@ -261,6 +273,23 @@ function postChannelMessage(name: string, text: string): Change {
   };
 }
 
+async function addHostChannel(host: Page, name: string): Promise<string> {
+  return host.evaluate(async (name) => {
+    const channelId = crypto.randomUUID();
+    await window.openbot.agent.channelCommand({
+      type: "save",
+      operationId: crypto.randomUUID(),
+      channelId,
+      draft: { name, title: name, instructions: "", members: [], leadAgentId: null },
+    });
+    return channelId;
+  }, name);
+}
+
+async function deleteHostChannel(host: Page, channelId: string): Promise<void> {
+  await host.evaluate((channelId) => window.openbot.agent.deleteChannel(channelId), channelId);
+}
+
 async function showAgents(page: Page): Promise<void> {
   await page.keyboard.press("Escape");
   await page
@@ -325,6 +354,8 @@ function steps(): Step[] {
   const renamedAgent = `${agentName} ${stamp}`;
   const queueText = `Web sync check ${stamp}. Reply with the word ok.`;
   const channelText = `Web sync channel check ${stamp}. Reply with the word ok.`;
+  const focusText = `Web sync channel focus check ${stamp}. Reply with the word ok.`;
+  const prefetchedChannel = `Web sync prefetch ${stamp}`;
   const all: Step[] = [
     {
       name: "channels",
@@ -446,12 +477,32 @@ function steps(): Step[] {
       },
       changes: async () => [postChannelMessage(channelName, channelText)],
     },
+    {
+      name: "channel-focus",
+      listRoutes: [`POST ${routeTemplate(CHANNEL_ROUTES.read)}`],
+      marks: [`sync:${CHANNEL_MESSAGES_SYNC_LOG.name}`, `sync:${CHANNEL_PAGE_META_SYNC_COLLECTION.name}`],
+      open: async (page, host) => {
+        const from = await pageNow(page);
+        await openChannel(page, channelName);
+        await settleNetwork(page, from);
+        const added = await pageNow(page);
+        addedChannelId = await addHostChannel(host, prefetchedChannel);
+        await page.locator(rowCss(prefetchedChannel)).first().waitFor({ timeout: WAIT_MS });
+        const reads = (await settleNetwork(page, added)).filter(
+          (record) => routeKey(record) === `POST ${routeTemplate(CHANNEL_ROUTES.read)}`,
+        ).length;
+        prefetchReads = reads;
+        assert.ok(reads > 0, `The web client did not prefetch the new channel "${prefetchedChannel}".`);
+        return 0;
+      },
+      changes: async () => [postChannelMessage(channelName, focusText)],
+    },
   ];
   return all.filter((step) => only.has(step.name));
 }
 
 async function runStep(page: Page, host: Page, step: Step, report: Report): Promise<void> {
-  const openedAt = await step.open(page);
+  const openedAt = await step.open(page, host);
   for (const mark of step.marks) await waitMark(page, mark, openedAt);
   await settleNetwork(page, await pageNow(page));
   for (const change of await step.changes(host)) {
@@ -478,6 +529,7 @@ async function main(): Promise<void> {
     createdAt: new Date().toISOString(),
     api,
     initialListCalls: {},
+    prefetchReads: null,
     changes: [],
     passed: false,
     failure: null,
@@ -515,6 +567,8 @@ async function main(): Promise<void> {
     report.failure = error instanceof Error ? error.message : String(error);
     throw error;
   } finally {
+    report.prefetchReads = prefetchReads;
+    if (addedChannelId && hostPage) await deleteHostChannel(hostPage, addedChannelId).catch(() => undefined);
     writeFileSync(resolve(OUT, "report.json"), `${JSON.stringify(report, null, 2)}\n`);
     logger.info(`Report: ${resolve(OUT, "report.json")}`);
     await context.close();

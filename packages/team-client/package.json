@@ -18,6 +18,7 @@
     "./sync-profile": "./src/sync-profile.ts",
     "./sync-client": "./src/sync-client.ts",
     "./sync-pages": "./src/sync-pages.ts",
+    "./client-sync": "./src/client-sync.ts",
     "./routine-calendar": "./src/routine-calendar.ts",
     "./routine-calendar-dates": "./src/routine-calendar-dates.ts",
     "./routine-schedule": "./src/routine-schedule.ts",
