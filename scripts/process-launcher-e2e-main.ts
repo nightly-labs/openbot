@@ -1,6 +1,7 @@
 import { spawn } from "node:child_process";
 import { writeFileSync } from "node:fs";
 import { performance } from "node:perf_hooks";
+import { Effect } from "effect";
 import { app } from "electron";
 import type { LaunchedProcess, ProcessLaunchOptions } from "../src/backend/process-launch";
 import { forkProcessLauncherHost, ProcessLauncher, type ProcessLauncherHost } from "../src/main/process-launcher";
@@ -20,6 +21,12 @@ const WAIT_PROGRAM =
 const LARGE_OUTPUT_PROGRAM = `process.stdout.write(Buffer.alloc(${LARGE_OUTPUT_BYTES}, 97), () => process.exit(0));`;
 const EXIT_PROGRAM = "process.stdout.write('again'); process.exit(3);";
 const FIRST_BYTE_PROGRAM = "process.stdout.write('x'); process.exit(0);";
+const TREE_PROGRAM = `
+const grandchild = require("node:child_process").spawn(process.execPath, ["-e", "setInterval(() => {}, 1000)"], { stdio: "ignore" });
+process.stdout.write(String(grandchild.pid));
+process.stdin.resume();
+`;
+const GRANDCHILD_EXIT_DEADLINE_MS = 10_000;
 
 function nodeProgram(source: string): ProcessLaunchOptions {
   return {
@@ -62,6 +69,43 @@ function settle(child: LaunchedProcess, settleAfterErrorMs = 300): Promise<Outco
 
 function firstOutput(child: LaunchedProcess): Promise<void> {
   return new Promise((resolve) => child.stdout.once("data", () => resolve()));
+}
+
+function running(pid: number): boolean {
+  try {
+    process.kill(pid, 0);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+async function grandchildStopped(pid: number): Promise<boolean> {
+  const deadline = Date.now() + GRANDCHILD_EXIT_DEADLINE_MS;
+  while (running(pid) && Date.now() < deadline) await new Promise((resolve) => setTimeout(resolve, 100));
+  return !running(pid);
+}
+
+async function startTree(launcher: ProcessLauncher): Promise<{ child: LaunchedProcess; grandchild: number }> {
+  const child = launcher.launch(nodeProgram(TREE_PROGRAM));
+  const grandchild = await new Promise<number>((resolve) =>
+    child.stdout.once("data", (chunk: Buffer) => resolve(Number(chunk.toString()))),
+  );
+  return { child, grandchild };
+}
+
+async function measureTreeStops(hostPath: string) {
+  if (process.platform !== "win32") return null;
+  const launcher = new ProcessLauncher(() => forkProcessLauncherHost(hostPath));
+  const killed = await startTree(launcher);
+  const killedDone = settle(killed.child);
+  killed.child.kill("SIGTERM");
+  const killExit = (await killedDone).exit;
+  const killEndsGrandchild = await grandchildStopped(killed.grandchild);
+  const disposed = await startTree(launcher);
+  await Effect.runPromise(launcher.dispose());
+  const disposeEndsGrandchild = await grandchildStopped(disposed.grandchild);
+  return { killExit, killEndsGrandchild, disposeEndsGrandchild };
 }
 
 function percentile(samples: number[], q: number): number {
@@ -145,8 +189,9 @@ async function run() {
   const launcherTiming = await measureSpawns(launcher.launch);
   const directTiming = await measureSpawns(directSpawn);
 
-  launcher.dispose();
-  failingLauncher.dispose();
+  await Effect.runPromise(launcher.dispose());
+  await Effect.runPromise(failingLauncher.dispose());
+  const treeStops = await measureTreeStops(hostPath);
 
   writeFileSync(
     reportPath,
@@ -163,6 +208,7 @@ async function run() {
         hostLoss,
         afterHostLoss,
         fallback,
+        treeStops,
         timing: { launcher: launcherTiming, direct: directTiming },
       },
       null,

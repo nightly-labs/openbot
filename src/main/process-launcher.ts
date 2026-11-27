@@ -3,6 +3,7 @@ import { EventEmitter } from "node:events";
 import { join } from "node:path";
 import { PassThrough } from "node:stream";
 import { createOpenBotLogger, toLogValue } from "@openbot/logging";
+import { Effect } from "effect";
 import { utilityProcess } from "electron";
 import type { LaunchedProcess, ProcessLaunchOptions } from "../backend/process-launch";
 import {
@@ -14,6 +15,8 @@ import {
 const logger = createOpenBotLogger("process-launcher");
 
 const MAX_FAILED_HOST_STARTS = 3;
+
+const CHILD_STOP_DEADLINE_MS = 3_000;
 
 export interface ProcessLauncherHost {
   send(request: ProcessLauncherRequest): void;
@@ -139,6 +142,15 @@ function spawnDirectly(child: LauncherChild, options: ProcessLaunchOptions): voi
   });
 }
 
+function stopChildInHost(host: ProcessLauncherHost, id: number, child: LauncherChild): Effect.Effect<void> {
+  return Effect.callback<void>((resume) => {
+    const exited = () => resume(Effect.void);
+    child.once("exit", exited);
+    host.send({ kind: "kill", id, signal: "SIGKILL" });
+    return Effect.sync(() => child.off("exit", exited));
+  });
+}
+
 interface PendingLaunch {
   readonly id: number;
   readonly child: LauncherChild;
@@ -173,9 +185,21 @@ export class ProcessLauncher {
     return child;
   };
 
-  dispose(): void {
-    this.#disposed = true;
-    this.#stopHost();
+  dispose(): Effect.Effect<void> {
+    return Effect.gen({ self: this }, function* () {
+      this.#disposed = true;
+      yield* this.#stopChildren();
+      this.#stopHost();
+    });
+  }
+
+  #stopChildren(): Effect.Effect<void> {
+    const host = this.#host;
+    if (!host || !this.#ready || this.#children.size === 0) return Effect.void;
+    return Effect.all(
+      [...this.#children].map(([id, child]) => stopChildInHost(host, id, child)),
+      { concurrency: "unbounded", discard: true },
+    ).pipe(Effect.timeoutOption(CHILD_STOP_DEADLINE_MS), Effect.asVoid);
   }
 
   #availableHost(): ProcessLauncherHost | null {

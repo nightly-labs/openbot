@@ -1,5 +1,6 @@
+import { execFile } from "node:child_process";
 import { appendFile, mkdir, rename, stat } from "node:fs/promises";
-import { join } from "node:path";
+import { join, win32 } from "node:path";
 import type { Readable } from "node:stream";
 import { StringDecoder } from "node:string_decoder";
 import { redactText } from "@openbot/logging";
@@ -86,6 +87,7 @@ const writeDiagnosticEffect = Effect.fn("RemoteDesktop.writeDiagnostic")(functio
 });
 
 interface ManagedChildProcess {
+  pid?: number | undefined;
   exitCode: number | null;
   signalCode: NodeJS.Signals | null;
   killed: boolean;
@@ -118,7 +120,7 @@ export const stopRemoteProcess = Effect.fn("RemoteDesktop.stopProcess")(function
     }, graceMs);
     child.once("exit", finish);
     try {
-      child.kill("SIGTERM");
+      endProcess(child);
     } catch (cause) {
       complete = true;
       resume(Effect.fail(desktopFailure(cause)));
@@ -130,3 +132,18 @@ export const stopRemoteProcess = Effect.fn("RemoteDesktop.stopProcess")(function
     });
   });
 });
+
+function endProcess(child: ManagedChildProcess): void {
+  if (process.platform !== "win32" || child.pid === undefined) {
+    child.kill("SIGTERM");
+    return;
+  }
+  execFile(
+    win32.join(process.env.SystemRoot ?? "C:\\Windows", "System32", "taskkill.exe"),
+    ["/pid", String(child.pid), "/T", "/F"],
+    { windowsHide: true },
+    () => {
+      if (child.exitCode === null && child.signalCode === null) child.kill("SIGTERM");
+    },
+  );
+}

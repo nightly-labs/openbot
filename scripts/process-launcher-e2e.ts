@@ -56,6 +56,7 @@ interface Timing {
 
 interface Report {
   failure?: string;
+  platform: string;
   hostStarts: number;
   echo: Outcome;
   kill: Outcome & { killAccepted: boolean; killedFlag: boolean };
@@ -64,6 +65,11 @@ interface Report {
   hostLoss: Outcome;
   afterHostLoss: Outcome;
   fallback: Outcome;
+  treeStops: {
+    killExit: { code: number | null; signal: string | null } | null;
+    killEndsGrandchild: boolean;
+    disposeEndsGrandchild: boolean;
+  } | null;
   timing: { launcher: Timing; direct: Timing };
 }
 
@@ -91,6 +97,15 @@ const checks: Array<[string, boolean]> = [
   ["a lost host ends its programs", report.hostLoss.exit?.signal === "SIGKILL"],
   ["the next launch starts a new host", report.afterHostLoss.exit?.code === 3 && report.hostStarts === 2],
   ["a host that cannot start falls back to a direct start", report.fallback.stdout === "FALLBACK"],
+  [
+    "a kill on Windows ends the program tree and reports the signal",
+    report.platform !== "win32" ||
+      (report.treeStops?.killEndsGrandchild === true && report.treeStops.killExit?.signal === "SIGTERM"),
+  ],
+  [
+    "dispose on Windows ends the program trees",
+    report.platform !== "win32" || report.treeStops?.disposeEndsGrandchild === true,
+  ],
 ];
 
 for (const [name, passed] of checks) logger.info(`${passed ? "pass" : "FAIL"}  ${name}`);
