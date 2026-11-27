@@ -380,8 +380,9 @@ export function moneyInput(minor: number, currency: string): string {
 const AMOUNT_MAX = 1_000_000_000_000;
 
 export function parseMoney(text: string, currency: string): number | null {
-  const clean = text.trim().replace(/\s/gu, "").replace(",", ".");
-  if (!/^\d+(\.\d+)?$/u.test(clean)) return null;
+  const amount = text.trim();
+  if (!/^(?:\d+|\d{1,3}(?:\p{Zs}\d{3})+)(?:[.,]\d+)?$/u.test(amount)) return null;
+  const clean = amount.replace(/\p{Zs}/gu, "").replace(",", ".");
   const digits = fractionDigits(currency);
   const [whole = "0", fraction = ""] = clean.split(".");
   if (fraction.length > digits) return null;
