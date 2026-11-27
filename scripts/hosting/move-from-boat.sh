@@ -315,7 +315,7 @@ customer_folders() {
   uid=$(id -u "$SERVICE_USER")
   find / \( -path /proc -o -path /sys -o -path /dev -o -path /run -o -path /tmp -o -path /var/tmp \
     -o -path /home -o -path "$KEYRING_HOME" -o -path /opt -o -path /usr -o -path /snap -o -path /var/spool/cron \
-    -o -path /var/lib/docker -o -path /var/cache -o -path /var/crash -o -path /var/log \
+    -o -path /var/lib/docker -o -path /var/lib/containerd -o -path /var/cache -o -path /var/crash -o -path /var/log \
     -o -path '/var/lib/ascii*' -o -path /var/lib/ariana \) -prune \
     -o ! -type d -uid "$uid" -print |
     awk -F/ '{ n = $2 == "var" ? 4 : 3; if (n > NF - 1) n = NF - 1; f = ""
