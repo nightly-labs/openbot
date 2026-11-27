@@ -31,6 +31,12 @@ export const messages = {
   "composer.imageInput.label": "{model} の画像をオンにする",
   "composer.imageInput.pending": "オンにしています…",
   "composer.imageInput.action": "画像をオン",
+  "composer.imageModel.body":
+    "{model} はテキストのみを受け取るため、添付した画像は見えません。{target} は画像を読めます。",
+  "composer.imageModel.bodyNoTarget":
+    "{model} はテキストのみを受け取るため、添付した画像は見えません。画像を読めるモデルを選んでください。",
+  "composer.imageModel.pending": "切り替え中…",
+  "composer.imageModel.action": "{target} を使う",
   "composer.usageLimit.credits":
     "{provider} のプランの上限をすべて使用しました。エージェントは現在クレジットを使用しています。",
   "composer.usageLimit.creditsResets":

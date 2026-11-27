@@ -36,6 +36,12 @@ export const messages = {
   "composer.imageInput.label": "Włącz obrazy dla {model}",
   "composer.imageInput.pending": "Włączanie…",
   "composer.imageInput.action": "Włącz obrazy",
+  "composer.imageModel.body":
+    "{model} otrzymuje tylko tekst, więc nie widzi załączonych obrazów. {target} potrafi czytać obrazy.",
+  "composer.imageModel.bodyNoTarget":
+    "{model} otrzymuje tylko tekst, więc nie widzi załączonych obrazów. Wybierz model, który potrafi czytać obrazy.",
+  "composer.imageModel.pending": "Przełączanie…",
+  "composer.imageModel.action": "Użyj {target}",
   "composer.usageLimit.credits": "Wykorzystano cały limit planu {provider}. Agenci używają teraz Twoich kredytów.",
   "composer.usageLimit.creditsResets":
     "Wykorzystano cały limit planu {provider}. Agenci używają Twoich kredytów do odnowienia: {reset}.",

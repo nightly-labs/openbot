@@ -18,6 +18,7 @@ import { AGENT_INSTALL_CODECS } from "./agent-install-v1";
 import { AGENT_INSTRUCTIONS_CODECS } from "./agent-instructions-v1";
 import { AGENT_MEMORIES_CODECS } from "./agent-memories-v1";
 import { AGENT_MEMORY_LIMIT_CODECS } from "./agent-memory-limit-v1";
+import { AGENT_MODEL_INPUTS_CODECS } from "./agent-model-inputs-v1";
 import { AGENT_NEW_CHAT_CODECS } from "./agent-new-chat-v1";
 import { AGENT_NOTIFICATION_LEVELS_CODECS } from "./agent-notification-levels-v1";
 import { AGENT_PENDING_RUNTIME_CODECS } from "./agent-pending-runtime-v1";
@@ -232,6 +233,7 @@ const CODECS: ReadonlyMap<string, OptionalRouteCodec> = new Map([
   ...BROWSING_MEMORY_CODECS,
   ...PROMPT_CACHE_TTL_CODECS,
   ...MODEL_STEERING_CODECS,
+  ...AGENT_MODEL_INPUTS_CODECS,
   ...PROVIDER_MODEL_SOURCE_CODECS,
   ...MODEL_VISIBILITY_CODECS,
   ...MODEL_VISIBILITY_KEPT_CODECS,

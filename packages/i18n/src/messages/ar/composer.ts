@@ -37,6 +37,11 @@ export const messages = {
   "composer.imageInput.label": "تشغيل الصور لـ {model}",
   "composer.imageInput.pending": "جارٍ التشغيل…",
   "composer.imageInput.action": "تشغيل الصور",
+  "composer.imageModel.body": "{model} يستقبل النص فقط، لذلك لا يرى الصور التي ترفقها. يمكن لـ {target} قراءة الصور.",
+  "composer.imageModel.bodyNoTarget":
+    "{model} يستقبل النص فقط، لذلك لا يرى الصور التي ترفقها. اختر نموذجًا يمكنه قراءة الصور.",
+  "composer.imageModel.pending": "جارٍ التبديل…",
+  "composer.imageModel.action": "استخدام {target}",
   "composer.usageLimit.credits": "استخدمت كل حدّ خطتك في {provider}. يستخدم وكلاؤك رصيدك الآن.",
   "composer.usageLimit.creditsResets":
     "استخدمت كل حدّ خطتك في {provider}. يستخدم وكلاؤك رصيدك حتى إعادة تعيينه {reset}.",

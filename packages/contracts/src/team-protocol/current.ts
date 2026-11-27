@@ -24,6 +24,7 @@ import { AGENT_INSTALL_CAPABILITY } from "./agent-install-v1";
 import { AGENT_INSTRUCTIONS_CAPABILITY } from "./agent-instructions-v1";
 import { AGENT_MEMORIES_CAPABILITY } from "./agent-memories-v1";
 import { AGENT_MEMORY_LIMIT_CAPABILITY } from "./agent-memory-limit-v1";
+import { AGENT_MODEL_INPUTS_CAPABILITY } from "./agent-model-inputs-v1";
 import { AGENT_NEW_CHAT_CAPABILITY } from "./agent-new-chat-v1";
 import { AGENT_NOTIFICATION_LEVELS_CAPABILITY } from "./agent-notification-levels-v1";
 import { AGENT_PENDING_RUNTIME_CAPABILITY } from "./agent-pending-runtime-v1";
@@ -336,6 +337,7 @@ export {
   AGENT_INSTRUCTIONS_CAPABILITY,
   AGENT_MEMORIES_CAPABILITY,
   AGENT_MEMORY_LIMIT_CAPABILITY,
+  AGENT_MODEL_INPUTS_CAPABILITY,
   AGENT_NEW_CHAT_CAPABILITY,
   AGENT_NOTIFICATION_LEVELS_CAPABILITY,
   AGENT_PENDING_RUNTIME_CAPABILITY,
@@ -890,6 +892,7 @@ const TEAM_CAPABILITY_REGISTRY = [
   [PROVIDER_ACCOUNT_POOL_STRATEGY_CAPABILITY, V10],
   [WATCH_RELAY_TEAM_CAPABILITY, V10],
   [WORKFLOWS_MEDIA_CLIPS_CAPABILITY, V10],
+  [AGENT_MODEL_INPUTS_CAPABILITY, V10],
 ] as const satisfies readonly (readonly [string, TeamCapabilityPlacement])[];
 
 export const TEAM_CURRENT_CAPABILITIES = TEAM_CAPABILITY_REGISTRY.map(([capability]) => capability);

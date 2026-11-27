@@ -34,6 +34,11 @@ export const messages = {
   "composer.imageInput.label": "הפעלת תמונות עבור {model}",
   "composer.imageInput.pending": "מפעיל…",
   "composer.imageInput.action": "הפעלת תמונות",
+  "composer.imageModel.body": "{model} מקבל רק טקסט, ולכן אינו רואה את התמונות שצירפת. {target} יכול לקרוא תמונות.",
+  "composer.imageModel.bodyNoTarget":
+    "{model} מקבל רק טקסט, ולכן אינו רואה את התמונות שצירפת. בחר מודל שיכול לקרוא תמונות.",
+  "composer.imageModel.pending": "מחליף…",
+  "composer.imageModel.action": "שימוש ב-{target}",
   "composer.usageLimit.credits": "ניצלת את כל מכסת התוכנית של {provider}. הסוכנים שלך משתמשים עכשיו בקרדיטים שלך.",
   "composer.usageLimit.creditsResets":
     "ניצלת את כל מכסת התוכנית של {provider}. הסוכנים שלך משתמשים בקרדיטים שלך עד שהיא תתאפס {reset}.",

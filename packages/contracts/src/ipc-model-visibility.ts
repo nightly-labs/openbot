@@ -5,7 +5,14 @@ import {
   isKnownAgentProvider,
 } from "./agent-providers";
 import { INPUT_LIMITS } from "./input-limits";
-import { AGENT_MODEL_LISTINGS, type AgentModelId, type AgentModelListing, isAgentModel } from "./ipc-agent-identity";
+import {
+  AGENT_MODEL_INPUTS,
+  AGENT_MODEL_LISTINGS,
+  type AgentModelId,
+  type AgentModelInput,
+  type AgentModelListing,
+  isAgentModel,
+} from "./ipc-agent-identity";
 import { isBoundedString } from "./ipc-bounded-values";
 import { isBoolean, isDynamicRecord, isOneOf } from "./runtime-values";
 
@@ -140,6 +147,45 @@ export function withSteeringModels<Model extends { provider: string; id: string;
   return models.map((model) =>
     keys.has(`${model.provider}\u0000${model.id}`) ? { ...model, steersTurns: true } : model,
   );
+}
+
+export interface AgentModelInputsEntry {
+  provider: AgentProviderRef;
+  id: AgentModelId;
+  inputs: AgentModelInput[];
+}
+
+export function decodeAgentModelInputs(value: unknown): AgentModelInputsEntry[] {
+  if (
+    !isDynamicRecord(value) ||
+    !Array.isArray(value.models) ||
+    value.models.length > MODEL_VISIBILITY_LIMIT ||
+    !value.models.every(
+      (model: unknown) =>
+        isDynamicRecord(model) &&
+        isAgentProviderRef(model.provider) &&
+        isAgentModel(model.id) &&
+        Array.isArray(model.inputs) &&
+        model.inputs.every((input: unknown) => isOneOf(AGENT_MODEL_INPUTS, input)),
+    )
+  )
+    throw new Error("Invalid model list.");
+  return value.models.map((model: AgentModelInputsEntry) => ({
+    provider: model.provider,
+    id: model.id,
+    inputs: model.inputs,
+  }));
+}
+
+export function withModelInputs<Model extends { provider: string; id: string; inputs?: AgentModelInput[] }>(
+  models: readonly Model[],
+  entries: readonly AgentModelInputsEntry[],
+): Model[] {
+  const byKey = new Map(entries.map((entry) => [`${entry.provider}\u0000${entry.id}`, entry.inputs]));
+  return models.map((model) => {
+    const inputs = byKey.get(`${model.provider}\u0000${model.id}`);
+    return inputs ? { ...model, inputs } : model;
+  });
 }
 
 export function withWorkspaceOnlyLimit<

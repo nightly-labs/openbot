@@ -37,6 +37,12 @@ export const messages = {
   "composer.imageInput.label": "Включить изображения для {model}",
   "composer.imageInput.pending": "Включение…",
   "composer.imageInput.action": "Включить изображения",
+  "composer.imageModel.body":
+    "{model} получает только текст и не видит прикреплённые изображения. {target} умеет читать изображения.",
+  "composer.imageModel.bodyNoTarget":
+    "{model} получает только текст и не видит прикреплённые изображения. Выберите модель, которая умеет читать изображения.",
+  "composer.imageModel.pending": "Переключение…",
+  "composer.imageModel.action": "Взять {target}",
   "composer.usageLimit.credits": "Вы исчерпали лимит тарифа {provider}. Теперь ваши агенты используют ваши кредиты.",
   "composer.usageLimit.creditsResets":
     "Вы исчерпали лимит тарифа {provider}. Ваши агенты используют ваши кредиты до сброса {reset}.",

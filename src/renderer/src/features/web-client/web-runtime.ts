@@ -74,6 +74,7 @@ import {
   canAdministerServer,
   DEFAULT_PROVIDER_ACCOUNT_ID,
   decodeAgentFastModels,
+  decodeAgentModelInputs,
   decodeAgentModelListings,
   decodeAgentSteeringModels,
   decodeCreditsAskMuted,
@@ -94,6 +95,7 @@ import {
   isTeamPresenceSnapshot,
   withFastServiceTiers,
   withKeptModels,
+  withModelInputs,
   withModelListings,
   withModelSources,
   withSteeringModels,
@@ -115,6 +117,10 @@ import {
   AGENT_FAST_MODE_CAPABILITY,
   AGENT_FAST_MODE_ROUTES,
 } from "@openbot/contracts/team-protocol/agent-fast-mode-v1";
+import {
+  AGENT_MODEL_INPUTS_CAPABILITY,
+  AGENT_MODEL_INPUTS_ROUTES,
+} from "@openbot/contracts/team-protocol/agent-model-inputs-v1";
 import { AGENT_NOTIFICATION_LEVELS_CAPABILITY } from "@openbot/contracts/team-protocol/agent-notification-levels-v1";
 import {
   AGENT_PENDING_RUNTIME_CAPABILITY,
@@ -1757,7 +1763,7 @@ export function createWebWorkspaceRuntime(
         isClientAgentModelOption,
         "models",
       )(await request("GET", TEAM_API_ROUTES.agents.models));
-      const [fast, listings, steering, kept] = await Promise.all([
+      const [fast, listings, steering, kept, inputs] = await Promise.all([
         capabilities.includes(AGENT_SPEED_CAPABILITY)
           ? request("POST", AGENT_SPEED_ROUTES.models, {}).then(decodeAgentFastModels, () => [])
           : capabilities.includes(AGENT_FAST_MODE_CAPABILITY)
@@ -1772,11 +1778,17 @@ export function createWebWorkspaceRuntime(
         capabilities.includes(MODEL_VISIBILITY_KEPT_CAPABILITY)
           ? request("POST", MODEL_VISIBILITY_KEPT_ROUTES.list, {}).then(decodeAgentSteeringModels, () => [])
           : [],
+        capabilities.includes(AGENT_MODEL_INPUTS_CAPABILITY)
+          ? request("POST", AGENT_MODEL_INPUTS_ROUTES.list, {}).then(decodeAgentModelInputs, () => [])
+          : [],
       ]);
       return withWorkspaceOnlyLimit(
-        withSteeringModels(
-          withKeptModels(withModelListings(withFastServiceTiers(models, fast), listings), kept),
-          steering,
+        withModelInputs(
+          withSteeringModels(
+            withKeptModels(withModelListings(withFastServiceTiers(models, fast), listings), kept),
+            steering,
+          ),
+          inputs,
         ),
         capabilities.includes(WORKSPACE_ONLY_PROCESS_LIMIT_CAPABILITY),
       );

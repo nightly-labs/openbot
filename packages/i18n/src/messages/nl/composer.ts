@@ -35,6 +35,12 @@ export const messages = {
   "composer.imageInput.label": "Afbeeldingen aanzetten voor {model}",
   "composer.imageInput.pending": "Aanzetten…",
   "composer.imageInput.action": "Afbeeldingen aan",
+  "composer.imageModel.body":
+    "{model} krijgt alleen tekst en ziet de bijgevoegde afbeeldingen dus niet. {target} kan afbeeldingen lezen.",
+  "composer.imageModel.bodyNoTarget":
+    "{model} krijgt alleen tekst en ziet de bijgevoegde afbeeldingen dus niet. Kies een model dat afbeeldingen kan lezen.",
+  "composer.imageModel.pending": "Wisselen…",
+  "composer.imageModel.action": "{target} gebruiken",
   "composer.usageLimit.credits":
     "Je hebt de volledige planlimiet van {provider} gebruikt. Je agents gebruiken nu je tegoed.",
   "composer.usageLimit.creditsResets":

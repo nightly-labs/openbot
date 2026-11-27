@@ -1,8 +1,15 @@
-import { type AgentProviderId, agentSteersTurns, isKnownAgentProvider } from "@openbot/contracts/agent-providers";
+import {
+  type AgentProviderId,
+  agentSteersTurns,
+  isFreeOpencodeModel,
+  isKnownAgentProvider,
+  OPENCODE_RECOMMENDED_FREE_MODELS,
+} from "@openbot/contracts/agent-providers";
 import { supportedAttachmentExtensions } from "@openbot/contracts/attachment-files";
 import {
   type AccountUsageLimit,
   type AgentWait,
+  type ClientAgentModelOption,
   CUSTOM_PROVIDER_DEFAULT_INPUTS,
   CUSTOM_PROVIDER_INPUT_KINDS,
   type CustomProviderModel,
@@ -27,6 +34,7 @@ import {
 import { sourceText } from "@openbot/i18n/source";
 import { spentUsageWindow } from "@openbot/team-client/plan-limits";
 import { Button, CopyButton, Input, toast } from "@openbot/ui";
+import { findModelOption } from "@openbot/ui/components/provider-accounts";
 import { AwaitingReplies } from "@openbot/ui/features/conversation/AwaitingReplies";
 import { ComposerAddMenu } from "@openbot/ui/features/conversation/ComposerAddMenu";
 import { ComposerAttachmentRow } from "@openbot/ui/features/conversation/ComposerAttachmentRow";
@@ -158,6 +166,9 @@ export function ConversationComposer() {
     sideThreadOpen,
     canTeachBrowserTask,
     openBrowserTeach,
+    settingsProvider,
+    settingsModel,
+    selectAndConfirmModel,
   } = useConversationViewScope();
   const { t, format, errorMessage, sourceText: localizeSourceText } = useText();
   const voicePhase = () => (voiceThreadKey() === undefined ? sharedVoicePhase() : "idle");
@@ -369,6 +380,23 @@ export function ConversationComposer() {
       toast.error(errorMessage(error, t("customProvider.saveFailed")));
     } finally {
       setAllowingImages(false);
+    }
+  };
+  const textOnlyOpencodeModel = createMemo(() => {
+    if (channel || !props.agent || settingsProvider() !== "opencode") return undefined;
+    if (!currentDraft().attachments.some((attachment) => attachment.kind === "image")) return undefined;
+    const model = findModelOption(props.modelOptions, props.agentStatus.providers, "opencode", settingsModel());
+    if (!model?.inputs || model.inputs.includes("image")) return undefined;
+    return { model, target: freeOpencodeImageModel(props.modelOptions) };
+  });
+  const [switchingImageModel, setSwitchingImageModel] = createSignal(false);
+  const switchToImageModel = async (target: ClientAgentModelOption) => {
+    if (switchingImageModel()) return;
+    setSwitchingImageModel(true);
+    try {
+      await selectAndConfirmModel(target.id, "opencode");
+    } finally {
+      setSwitchingImageModel(false);
     }
   };
   const providerWaitNotice = createMemo(() => {
@@ -637,6 +665,34 @@ export function ConversationComposer() {
                   </Button>
                 }
               />
+            )}
+          </ComposerStackCard>
+          <ComposerStackCard when={textOnlyOpencodeModel()}>
+            {(shown) => (
+              <Show
+                when={shown().target}
+                fallback={
+                  <ComposerNotice body={t("composer.imageModel.bodyNoTarget", { model: shown().model.name })} />
+                }
+              >
+                {(target) => (
+                  <ComposerNotice
+                    body={t("composer.imageModel.body", { model: shown().model.name, target: target().name })}
+                    action={
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        type="button"
+                        loading={switchingImageModel()}
+                        loadingLabel={t("composer.imageModel.pending")}
+                        onClick={() => void switchToImageModel(target())}
+                      >
+                        {t("composer.imageModel.action", { target: target().name })}
+                      </Button>
+                    }
+                  />
+                )}
+              </Show>
             )}
           </ComposerStackCard>
           <ComposerStackCard when={editingDeliveryId()}>
@@ -970,5 +1026,23 @@ function whisperModelBytes(): number {
   return (
     VOICE_MODELS.flatMap((model) => (model.kind === "local" && model.id === "whisper-turbo" ? [model.bytes] : []))[0] ??
     0
+  );
+}
+
+function freeOpencodeImageModel(options: readonly ClientAgentModelOption[]): ClientAgentModelOption | undefined {
+  const candidates = options.filter(
+    (option) =>
+      option.provider === "opencode" &&
+      option.listing !== "kept" &&
+      option.inputs?.includes("image") &&
+      isFreeOpencodeModel(option.id, option.name),
+  );
+  const rank = (option: ClientAgentModelOption) => {
+    const place = OPENCODE_RECOMMENDED_FREE_MODELS.indexOf(option.id.toLowerCase());
+    return place === -1 ? OPENCODE_RECOMMENDED_FREE_MODELS.length : place;
+  };
+  return candidates.reduce<ClientAgentModelOption | undefined>(
+    (best, option) => (best === undefined || rank(option) < rank(best) ? option : best),
+    undefined,
   );
 }
