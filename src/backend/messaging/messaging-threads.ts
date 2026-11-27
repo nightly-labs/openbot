@@ -233,7 +233,7 @@ const HISTORY_NO_ANSWER = "The platform did not answer, or it limits reads now. 
 function historyResult(history: MessagingHistory, scope: "channel" | "conversation"): OpenBotToolResponse {
   const page = boundedHistory(history.messages);
   const older = page.olderBefore
-    ? `Older messages did not fit. To read them, call again with before "${page.olderBefore}".`
+    ? `Older messages did not fit. To read them, call again with the same arguments and before "${page.olderBefore}".`
     : null;
   return openBotToolResult({
     place: history.place,

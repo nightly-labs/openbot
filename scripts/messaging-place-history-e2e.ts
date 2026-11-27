@@ -348,7 +348,7 @@ try {
         messages.map((entry) => entry.text),
         [GROUP_TEXT(1), GROUP_TEXT(2), GROUP_TEXT(3)],
       );
-      const before = /call again with before "([^"]+)"/u.exec(String(read.result.note))?.[1];
+      const before = /call again with the same arguments and before "([^"]+)"/u.exec(String(read.result.note))?.[1];
       assert.equal(before, messages[0]?.sentAt, "The note does not name the time of the oldest message shown.");
       const older = await call(threads, "messaging_history", { connection, place: NOTES, before });
       assert.ok(older.success, JSON.stringify(older.result));

@@ -271,7 +271,8 @@ export function boundedHistory(messages: readonly ContextEntry[]): BoundedHistor
 
 function sameTimeGroups(messages: readonly ContextEntry[]): ContextEntry[][] {
   const groups: ContextEntry[][] = [];
-  for (const message of [...messages].reverse()) {
+  const newestFirst = [...messages].reverse().sort((left, right) => Date.parse(right.sentAt) - Date.parse(left.sentAt));
+  for (const message of newestFirst) {
     const group = groups.at(-1);
     if (group?.[0]?.sentAt === message.sentAt) group.unshift(message);
     else groups.push([message]);
