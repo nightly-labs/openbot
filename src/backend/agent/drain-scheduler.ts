@@ -42,6 +42,7 @@ import {
   type TagReferenceSource,
   type TaskReportState,
 } from "./delivery-content";
+import type { StopNote } from "./developer-instructions";
 import type { DuplicationGate } from "./duplication-gate";
 import { handoffHasHistory } from "./handoff-history";
 import type { LiveVoiceRelayed } from "./live-voice";
@@ -120,8 +121,8 @@ export interface DrainHooks {
   ): Effect.Effect<void> | null;
   orphanedDeliveryRecovery(agentId: string): Effect.Effect<void> | null;
   turnRestarting(turnId: string): void;
-  stopNote(threadId: string): string | undefined;
-  clearStopNote(threadId: string, sent: string | undefined): void;
+  stopNote(threadId: string): StopNote | undefined;
+  clearStopNote(threadId: string, sent: StopNote | undefined): void;
   deliveriesStarting(deliveryIds: readonly string[], start: DeliveryStart): void;
   startRequestedNewChat(agentId: string, queuedRuns?: readonly string[]): Effect.Effect<void>;
   dropRequestedNewChat(agentId: string): void;
@@ -1014,12 +1015,12 @@ export class DrainScheduler {
       const delta = shortened?.delta(delivery.id);
       const deltaInput = delta ? promptInput(delta.text) : null;
       const sentHandoffs = new Map<string, string>();
-      const sentStopNotes = new Map<string, string>();
+      const sentStopNotes = new Map<string, StopNote>();
       const withStopNote = (providerThreadId: string, input: DeliveryInputItem[]) => {
         const stopNote = this.#hooks.stopNote(providerThreadId);
         if (!stopNote) return input;
         sentStopNotes.set(providerThreadId, stopNote);
-        return [{ type: "text" as const, text: stopNote }, ...input];
+        return [{ type: "text" as const, text: stopNote.text }, ...input];
       };
       const inputForThread = (providerThreadId: string) => {
         const handoff = this.#threads.consumePendingHandoff(providerThreadId);
@@ -1140,6 +1141,7 @@ export class DrainScheduler {
         if (routineThreadId || !isMissingProviderSessionError(firstStart.failure.cause, client.provider))
           return yield* firstStart.failure;
         const unavailableThreadId = threadId;
+        this.#hooks.clearStopNote(unavailableThreadId, sentStopNotes.get(unavailableThreadId));
         if (this.#conversation.loadedClientFor(unavailableThreadId) === client) {
           this.#conversation.unloadThread(unavailableThreadId);
         }
@@ -1151,6 +1153,7 @@ export class DrainScheduler {
       }
       if (!this.#hooks.turnEnded(response.turn.id)) snapshot.activeTurnId = response.turn.id;
       confirmedTurnId = response.turn.id;
+      this.#hooks.clearStopNote(threadId, sentStopNotes.get(threadId));
       this.#busyRetries.delete(agent.id);
       this.#turnModels.set(laneKey({ agentId: agent.id, taskId: laneId }), {
         turnId: response.turn.id,
@@ -1185,7 +1188,6 @@ export class DrainScheduler {
           this.#conversation.emitConversation(snapshot);
         }
       }
-      this.#hooks.clearStopNote(threadId, sentStopNotes.get(threadId));
       yield* this.#threads.deletePendingHandoff(threadId, sentHandoffs.get(threadId)).pipe(
         Effect.catch((failure) =>
           Effect.sync(() => {

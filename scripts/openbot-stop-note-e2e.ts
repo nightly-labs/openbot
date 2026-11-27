@@ -224,7 +224,7 @@ try {
 
   const conversation = await runCauseEffect(agents.readConversation(agent.id));
   report.noteShownInChat = conversation.messages.some(
-    (message) => message.text.includes(STOP_NOTE_TAG) || message.text.includes("OpenBot stopped your last turn"),
+    (message) => message.text.includes(STOP_NOTE_TAG) || message.text.includes("OpenBot stopped a recent turn"),
   );
   assert.equal(report.noteShownInChat, false, "The chat does not show the stop note.");
   report.passed = true;

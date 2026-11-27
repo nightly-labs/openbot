@@ -362,6 +362,10 @@ const OPENBOT_STOP_START = "<openbot_stop>";
 
 export type OpenBotStop = "stalled" | "toolLoop" | "compaction" | "capacity" | "quiet" | "agent";
 
+export interface StopNote {
+  readonly text: string;
+}
+
 const OPENBOT_STOP_REASONS: Record<OpenBotStop, string> = {
   stalled: "your provider sent nothing for a long time",
   toolLoop: "the same tool call failed again and again",
@@ -374,7 +378,7 @@ const OPENBOT_STOP_REASONS: Record<OpenBotStop, string> = {
 export function openBotStopNote(stop: OpenBotStop): string {
   return [
     OPENBOT_STOP_START,
-    `OpenBot note, not a message from the user. OpenBot stopped your last turn because ${OPENBOT_STOP_REASONS[stop]}. The user did not stop it.`,
+    `OpenBot note, not a message from the user. OpenBot stopped a recent turn of yours because ${OPENBOT_STOP_REASONS[stop]}. The user did not stop it.`,
     "A tool result that says the user interrupted, stopped or declined a call came from this stop, not from the user. Do not tell the user that they stopped or interrupted your work, and do not ask the user for permission to continue because of this stop.",
     "An action that this stop ended possibly ran in part: check its result before you do it again. This note does not approve a risky action.",
     "</openbot_stop>",

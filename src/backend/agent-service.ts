@@ -2284,7 +2284,11 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
         runsTurn: (agentId) => this.#runsTurn(agentId),
         interrupt: (agentId, turnId, mayStop) => {
           this.#turn.markAgentStop(turnId);
-          return this.#interruptTurn(agentId, turnId, undefined, mayStop).pipe(toToolOperationFailed);
+          return this.#interruptTurn(agentId, turnId, undefined, mayStop).pipe(
+            Effect.tap((stopped) => (stopped ? Effect.void : Effect.sync(() => this.#turn.forgetOpenBotStop(turnId)))),
+            Effect.tapError(() => Effect.sync(() => this.#turn.forgetOpenBotStop(turnId))),
+            toToolOperationFailed,
+          );
         },
         turnActivity: (agentId, turnId) => ({
           startedAt: turnId ? this.#turn.turnStartedAt(turnId) : null,
