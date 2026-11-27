@@ -1238,11 +1238,14 @@ export function createConversationViewScope(props: ConversationProps) {
     }),
     ({ chat, key, target, threadDraftKey }) => {
       if (!target) return;
+      let returned = false;
       for (const [entry, unsent] of unsentPromptAnswers) {
         if (unsent.chat !== chat || unsent.key === key) continue;
         unsentPromptAnswers.delete(entry);
         returnUnsentPromptAnswer(target, threadDraftKey, unsent.text);
+        returned = true;
       }
+      if (returned && key) setDraftHeldPromptKey(key);
     },
   );
   let lastOpenPrompt: { chat: string; key: string | null } | undefined;
