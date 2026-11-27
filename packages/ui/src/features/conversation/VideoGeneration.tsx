@@ -1,7 +1,8 @@
 import type { AttachmentSummary, ImageGenerationAspectRatio } from "@openbot/contracts/ipc";
+import { Button } from "@openbot/ui";
 import { createEffect, createStore, Show, untrack } from "solid-js";
 import { useText } from "../../text";
-import type { AttachmentMediaSource } from "./AttachmentCards";
+import { type AttachmentMediaSource, REMOTE_PREVIEW_URL } from "./AttachmentCards";
 import {
   FAILED_MEDIA_RATIO,
   MediaGenerationCanvas,
@@ -64,6 +65,7 @@ export function VideoGeneration(props: VideoGenerationProps) {
   const unavailable = () => completed() && (player.failed || (!sourceUrl() && !canLoad()));
   const failed = () => props.status === "failed" || props.status === "interrupted" || unavailable();
   const ready = () => completed() && !unavailable();
+  const playbackFailed = () => completed() && player.failed;
 
   createEffect(
     () => sourceUrl(),
@@ -106,7 +108,7 @@ export function VideoGeneration(props: VideoGenerationProps) {
 
   const menu = (): VideoStageMenu | undefined => {
     const attachment = props.attachment;
-    if (!ready() || !attachment) return undefined;
+    if (!(ready() || playbackFailed()) || !attachment) return undefined;
     const actions = [];
     const { onOpen, onDownload } = props;
     if (onOpen)
@@ -138,6 +140,14 @@ export function VideoGeneration(props: VideoGenerationProps) {
     });
   };
 
+  const retry = () => {
+    setPlayer((state) => {
+      state.failed = false;
+      state.playOnLoad = true;
+    });
+    if (!sourceUrl()) void load();
+  };
+
   return (
     <figure
       class="media-generation"
@@ -160,6 +170,7 @@ export function VideoGeneration(props: VideoGenerationProps) {
             src={sourceUrl()}
             label={props.prompt ?? t("chat.video.generated")}
             durationSeconds={props.durationSeconds}
+            preload={REMOTE_PREVIEW_URL.test(sourceUrl() ?? "") ? "none" : "metadata"}
             autoplay={player.playOnLoad}
             loading={player.loading}
             onLoad={() => void load()}
@@ -194,6 +205,11 @@ export function VideoGeneration(props: VideoGenerationProps) {
             <span class="media-generation-error" role="alert">
               {failure()}
             </span>
+          </Show>
+          <Show when={playbackFailed()}>
+            <Button type="button" variant="ghost" size="xs" class="media-generation-retry" onClick={retry}>
+              {t("common.retry")}
+            </Button>
           </Show>
           <Show when={props.prompt}>
             <span class="media-generation-prompt">{t("chat.image.prompt", { prompt: props.prompt ?? "" })}</span>

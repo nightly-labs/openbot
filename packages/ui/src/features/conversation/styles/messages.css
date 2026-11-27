@@ -1611,6 +1611,10 @@ button.chat-action-target:active,
   color: var(--openbot-danger-text);
 }
 
+.media-generation-retry {
+  justify-self: start;
+}
+
 .image-generation-preview {
   display: block;
   border: 0;
