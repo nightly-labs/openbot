@@ -894,7 +894,6 @@ export class D1AuthRepository implements AuthRepository {
       this: D1AuthRepository,
       sessionToken: string,
       now: number,
-      reads: SessionReads = "primary",
     ): Effect.fn.Return<AuthUser | null, AuthStoreError, AuthDatabase> {
       const database = yield* AuthDatabase;
       const tokenHash = yield* sha256(sessionToken).pipe(
@@ -911,7 +910,7 @@ export class D1AuthRepository implements AuthRepository {
            AND auth_sessions.expires_at > ?`,
         tokenHash,
         now,
-        reads,
+        "primary",
       );
       if (!row) return null;
       yield* this.#updateSessionActivityEffect(tokenHash, row.last_used_at, now);

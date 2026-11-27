@@ -349,11 +349,7 @@ export interface AuthRepository {
     session: { id: string; token: string; expiresAt: number };
     device: MobileAuthDeviceIdentity;
   }): Effect.Effect<MobileAuthSessionResult | null, AuthStoreError>;
-  authenticateMobileSession(
-    sessionToken: string,
-    now: number,
-    reads?: SessionReads,
-  ): Effect.Effect<AuthUser | null, AuthStoreError>;
+  authenticateMobileSession(sessionToken: string, now: number): Effect.Effect<AuthUser | null, AuthStoreError>;
   listMobileAuthDevices(
     userId: string,
     now: number,
