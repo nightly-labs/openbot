@@ -140,7 +140,7 @@ export const messages = {
   "error.backend.channelLeadRefused":
     "O modelo do líder recusou esta solicitação. Escolha um membro ou outro modelo para o líder.",
   "error.backend.channelLeadNotPermitted":
-    "O provedor não permite o modelo do líder para esta conta. Escolha outro modelo para o líder ou escolha um membro.",
+    "O provedor do líder recusou o acesso desta conta. Verifique a conta ou escolha um membro.",
   "error.backend.channelLeadBilling":
     "A conta do líder não tem crédito, ou o plano dela não inclui este modelo. Verifique o plano ou escolha um membro.",
   "error.backend.channelLeadBlocked":

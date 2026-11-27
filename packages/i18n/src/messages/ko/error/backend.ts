@@ -130,7 +130,7 @@ export const messages = {
   "error.backend.channelLeadRefused":
     "채널 리더의 모델이 이 요청을 거부했어요. 멤버를 선택하거나 리더에게 다른 모델을 골라 주세요.",
   "error.backend.channelLeadNotPermitted":
-    "제공업체가 이 계정에서 채널 리더의 모델을 허용하지 않아요. 리더에게 다른 모델을 고르거나 멤버를 선택해 주세요.",
+    "채널 리더의 제공업체가 이 계정의 접근을 거부했어요. 계정을 확인하거나 멤버를 선택해 주세요.",
   "error.backend.channelLeadBilling":
     "채널 리더의 계정에 크레딧이 없거나 요금제에 이 모델이 포함되지 않아요. 요금제를 확인하거나 멤버를 선택해 주세요.",
   "error.backend.channelLeadBlocked":

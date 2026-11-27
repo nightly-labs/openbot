@@ -48,6 +48,12 @@ const turnStart = (message) => {
   write({ id: message.id, result: { turn: { id: turnId, status: "inProgress", items: [] } } });
   write({ method: "turn/started", params: { threadId, turn: { id: turnId } } });
   if (text.includes("ROUTE-EXIT")) return setTimeout(() => process.exit(1), 20);
+  const failedThenExited = /ROUTE-FAIL-EXIT cause:([a-z_]+)/.exec(text);
+  if (failedThenExited) {
+    const error = { message: "The upstream service refused the call." };
+    write({ method: "error", params: { threadId, turnId, willRetry: false, causeCode: failedThenExited[1], error } });
+    return setTimeout(() => process.exit(1), 20);
+  }
   const failure = /ROUTE-FAIL cause:([a-z_]+)/.exec(text);
   if (failure) {
     const error = { message: "The upstream service refused the call." };
@@ -244,7 +250,27 @@ const CASES = [
     text: "ROUTE-FAIL cause:empty_answer",
     shown: sourceText("error.backend.channelLeadNoAnswer"),
   },
+  {
+    name: "permission",
+    text: "ROUTE-FAIL cause:permission",
+    shown: sourceText("error.backend.channelLeadNotPermitted"),
+  },
+  {
+    name: "context too long",
+    text: "ROUTE-FAIL cause:context_too_long",
+    shown: sourceText("error.backend.channelRoutingTooLong"),
+  },
+  {
+    name: "provider timeout",
+    text: "ROUTE-FAIL cause:timeout",
+    shown: sourceText("error.backend.channelLeadTimedOut"),
+  },
   { name: "process exit", text: "ROUTE-EXIT", shown: sourceText("error.backend.channelLeadStopped") },
+  {
+    name: "unknown error, then process exit",
+    text: "ROUTE-FAIL-EXIT cause:unknown",
+    shown: sourceText("error.backend.channelLeadStopped"),
+  },
   { name: "unknown cause", text: "ROUTE-FAIL cause:unknown", shown: sourceText("error.backend.channelLeadFailed") },
 ] as const;
 

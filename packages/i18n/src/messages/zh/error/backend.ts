@@ -113,8 +113,7 @@ export const messages = {
   "error.backend.channelLeadSignIn": "频道主责的提供方登录已过期。请重新登录，或选择一位成员。",
   "error.backend.channelLeadModelGone": "频道主责的模型不可用。请为主责选择其他模型，或选择一位成员。",
   "error.backend.channelLeadRefused": "频道主责的模型拒绝了此请求。请选择一位成员，或为主责选择其他模型。",
-  "error.backend.channelLeadNotPermitted":
-    "提供方不允许此账户使用频道主责的模型。请为主责选择其他模型，或选择一位成员。",
+  "error.backend.channelLeadNotPermitted": "频道主责的提供方拒绝了此账户的访问。请检查账户，或选择一位成员。",
   "error.backend.channelLeadBilling": "频道主责的账户没有余额，或其套餐不包含此模型。请检查套餐，或选择一位成员。",
   "error.backend.channelLeadBlocked": "频道主责的提供方拦截了此请求。请修改请求，或选择一位成员。",
   "error.backend.channelLeadNoAnswer": "频道主责的模型没有给出回答。请重试，或选择一位成员。",

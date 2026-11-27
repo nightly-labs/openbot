@@ -133,7 +133,7 @@ export const messages = {
   "error.backend.channelLeadRefused":
     "Kanal liderinin modeli bu isteği reddetti. Bir üye veya lider için başka bir model seçin.",
   "error.backend.channelLeadNotPermitted":
-    "Sağlayıcı bu hesapta kanal liderinin modeline izin vermiyor. Lider için başka bir model seçin veya bir üye seçin.",
+    "Kanal liderinin sağlayıcısı bu hesabın erişimini reddetti. Hesabı kontrol edin veya bir üye seçin.",
   "error.backend.channelLeadBilling":
     "Kanal liderinin hesabında kredi yok ya da planı bu modeli içermiyor. Planı kontrol edin veya bir üye seçin.",
   "error.backend.channelLeadBlocked":

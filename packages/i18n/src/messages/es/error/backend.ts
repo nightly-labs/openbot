@@ -141,7 +141,7 @@ export const messages = {
   "error.backend.channelLeadRefused":
     "El modelo del coordinador rechazó esta solicitud. Elige un miembro u otro modelo para el coordinador.",
   "error.backend.channelLeadNotPermitted":
-    "El proveedor no permite el modelo del coordinador para esta cuenta. Elige otro modelo para el coordinador o elige un miembro.",
+    "El proveedor del coordinador rechazó el acceso de esta cuenta. Revisa la cuenta o elige un miembro.",
   "error.backend.channelLeadBilling":
     "La cuenta del coordinador no tiene crédito, o su plan no incluye este modelo. Revisa el plan o elige un miembro.",
   "error.backend.channelLeadBlocked":

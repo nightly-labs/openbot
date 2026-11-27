@@ -142,7 +142,7 @@ export const messages = {
   "error.backend.channelLeadRefused":
     "チャンネルリードのモデルがこのリクエストを拒否しました。メンバーを選択するか、リードに別のモデルを選んでください。",
   "error.backend.channelLeadNotPermitted":
-    "プロバイダーはこのアカウントでチャンネルリードのモデルを許可していません。リードに別のモデルを選ぶか、メンバーを選択してください。",
+    "チャンネルリードのプロバイダーがこのアカウントのアクセスを拒否しました。アカウントを確認するか、メンバーを選択してください。",
   "error.backend.channelLeadBilling":
     "チャンネルリードのアカウントにクレジットがないか、プランにこのモデルが含まれていません。プランを確認するか、メンバーを選択してください。",
   "error.backend.channelLeadBlocked":

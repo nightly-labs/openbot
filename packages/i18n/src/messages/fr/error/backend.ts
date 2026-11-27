@@ -142,7 +142,7 @@ export const messages = {
   "error.backend.channelLeadRefused":
     "Le modèle du responsable a refusé cette demande. Choisissez un membre ou un autre modèle pour le responsable.",
   "error.backend.channelLeadNotPermitted":
-    "Le fournisseur n'autorise pas le modèle du responsable pour ce compte. Choisissez un autre modèle pour le responsable ou un membre.",
+    "Le fournisseur du responsable a refusé l'accès pour ce compte. Vérifiez le compte ou choisissez un membre.",
   "error.backend.channelLeadBilling":
     "Le compte du responsable n'a plus de crédit, ou son forfait n'inclut pas ce modèle. Vérifiez le forfait ou choisissez un membre.",
   "error.backend.channelLeadBlocked":

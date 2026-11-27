@@ -137,7 +137,7 @@ export const messages = {
   "error.backend.channelLeadRefused":
     "Model lidera kanału odrzucił tę prośbę. Wybierz członka lub inny model dla lidera.",
   "error.backend.channelLeadNotPermitted":
-    "Dostawca nie zezwala na model lidera kanału dla tego konta. Wybierz inny model dla lidera lub wybierz członka.",
+    "Dostawca lidera kanału odmówił dostępu temu kontu. Sprawdź konto lub wybierz członka.",
   "error.backend.channelLeadBilling":
     "Konto lidera kanału nie ma środków albo jego plan nie obejmuje tego modelu. Sprawdź plan lub wybierz członka.",
   "error.backend.channelLeadBlocked": "Dostawca lidera kanału zablokował tę prośbę. Zmień prośbę lub wybierz członka.",

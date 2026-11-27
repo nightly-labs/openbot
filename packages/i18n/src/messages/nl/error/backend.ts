@@ -139,7 +139,7 @@ export const messages = {
   "error.backend.channelLeadRefused":
     "Het model van de kanaalleider weigerde dit verzoek. Kies een lid, of een ander model voor de leider.",
   "error.backend.channelLeadNotPermitted":
-    "De provider staat het model van de kanaalleider niet toe voor dit account. Kies een ander model voor de leider, of kies een lid.",
+    "De provider van de kanaalleider weigerde toegang voor dit account. Controleer het account, of kies een lid.",
   "error.backend.channelLeadBilling":
     "Het account van de kanaalleider heeft geen tegoed, of het abonnement bevat dit model niet. Controleer het abonnement, of kies een lid.",
   "error.backend.channelLeadBlocked":

@@ -144,7 +144,7 @@ export const messages = {
   "error.backend.channelLeadRefused":
     "Das Modell der Kanalleitung hat diese Anfrage abgelehnt. Wähle ein Mitglied oder ein anderes Modell für die Leitung.",
   "error.backend.channelLeadNotPermitted":
-    "Der Anbieter erlaubt das Modell der Kanalleitung für dieses Konto nicht. Wähle ein anderes Modell für die Leitung, oder wähle ein Mitglied.",
+    "Der Anbieter der Kanalleitung hat den Zugriff für dieses Konto verweigert. Prüfe das Konto, oder wähle ein Mitglied.",
   "error.backend.channelLeadBilling":
     "Das Konto der Kanalleitung hat kein Guthaben, oder sein Tarif enthält dieses Modell nicht. Prüfe den Tarif, oder wähle ein Mitglied.",
   "error.backend.channelLeadBlocked":

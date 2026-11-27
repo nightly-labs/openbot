@@ -123,8 +123,7 @@ export const messages = {
   "error.backend.channelLeadModelGone": "نموذج الوكيل الرئيسي غير متاح. اختر نموذجًا آخر للوكيل الرئيسي، أو اختر عضوًا.",
   "error.backend.channelLeadRefused":
     "رفض نموذج الوكيل الرئيسي هذا الطلب. اختر عضوًا، أو اختر نموذجًا آخر للوكيل الرئيسي.",
-  "error.backend.channelLeadNotPermitted":
-    "لا يسمح المزوّد بنموذج الوكيل الرئيسي لهذا الحساب. اختر نموذجًا آخر للوكيل الرئيسي، أو اختر عضوًا.",
+  "error.backend.channelLeadNotPermitted": "رفض مزوّد الوكيل الرئيسي الوصول لهذا الحساب. تحقّق من الحساب، أو اختر عضوًا.",
   "error.backend.channelLeadBilling":
     "لا يوجد رصيد في حساب الوكيل الرئيسي، أو أن خطته لا تتضمن هذا النموذج. تحقّق من الخطة، أو اختر عضوًا.",
   "error.backend.channelLeadBlocked": "حظر مزوّد الوكيل الرئيسي هذا الطلب. غيّر الطلب، أو اختر عضوًا.",
