@@ -1,5 +1,5 @@
 import { X_AGENT_LISTING_ID, type XReplyPayload } from "@openbot/contracts/browser-extension-x";
-import { isQueuedMessageReceipt } from "@openbot/contracts/ipc";
+import { type ClientAgentSummary, isQueuedMessageReceipt } from "@openbot/contracts/ipc";
 import { TEAM_API_ROUTES } from "@openbot/contracts/team-api-routes";
 import { AGENT_TASKS_CAPABILITY } from "@openbot/contracts/team-protocol/agent-tasks-v1";
 import { runTeamEffect } from "@openbot/team-client";
@@ -14,10 +14,11 @@ export interface XTarget {
   hostId: string;
   request: TeamApiRequest;
   capabilities: readonly string[];
+  syncedAgents?: () => readonly ClientAgentSummary[] | null;
 }
 
 async function xAgentId(target: XTarget): Promise<string | null> {
-  const agents = await target.request("GET", TEAM_API_ROUTES.agents.all, decodeAgents);
+  const agents = target.syncedAgents?.() ?? (await target.request("GET", TEAM_API_ROUTES.agents.all, decodeAgents));
   return agents.find((agent) => agent.marketplaceSource?.listingId === X_AGENT_LISTING_ID)?.id ?? null;
 }
 

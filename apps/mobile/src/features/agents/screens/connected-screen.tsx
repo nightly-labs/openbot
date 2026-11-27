@@ -40,6 +40,7 @@ import {
   useChatDropTarget,
 } from "@/features/agents/components/chat-drag";
 import { ChatListRail } from "@/features/agents/components/chat-list-rail";
+import { ChatRowActivationContext, createChatRowActivation } from "@/features/agents/components/chat-row-activation";
 import { EmptyAgentsScene, type WelcomeHandOff } from "@/features/agents/components/empty-agents-scene";
 import {
   HOME_CARD_RADIUS,
@@ -50,6 +51,12 @@ import {
 } from "@/features/agents/components/home-backdrop-card";
 import { PinnedAgentsGrid } from "@/features/agents/components/pinned-agents-grid";
 import { SidebarSectionHeader } from "@/features/agents/components/sidebar-section-header";
+import {
+  type ChatListRow as ChatListRowOf,
+  channelAgentLookup,
+  chatListRows,
+  chatListSectionIds,
+} from "@/features/agents/model/chat-list-rows";
 import { showFailureAlert } from "@/features/analytics/failure-reports";
 import {
   AppUpdateBlock,
@@ -279,10 +286,14 @@ function changeChatOrder(order: MobileChatOrder): void {
   void saveChatOrderPreference(order).catch(() => undefined);
 }
 
-const NO_CHAT_IDS: ReadonlySet<string> = new Set();
+type ChatListRow = ChatListRowOf<MobileSidebarItem>;
 
-function listItemKey(item: MobileSidebarItem) {
-  return `${item.kind}:${item.id}`;
+const NO_CHAT_IDS: ReadonlySet<string> = new Set();
+const NO_ROWS: readonly ChatListRow[] = [];
+const NO_SECTION_IDS: readonly string[] = [];
+
+function listRowKey(row: ChatListRow) {
+  return row.key;
 }
 
 const HEADER_RIPPLE = { borderless: true, radius: 20 } as const;
@@ -375,10 +386,11 @@ export function ConnectedScreen({ variant = "screen" }: { variant?: "screen" | "
   const servers = useMobileWorkspaceSelector((current) => current.servers);
   const collapsedSectionIds = useMobileWorkspaceSelector((current) => current.collapsedSectionIds);
   const channels = useChannels(activeServer.id);
-  const channelAgents = useMemo(
-    () => new Map(agents.filter((agent) => agent.serverId === activeServer.id).map((agent) => [agent.id, agent])),
-    [agents, activeServer.id],
-  );
+  const keptChannelAgents = useRef<ReadonlyMap<string, MobileAgent> | null>(null);
+  const channelAgents = useMemo(() => {
+    keptChannelAgents.current = channelAgentLookup(keptChannelAgents.current, agents, activeServer.id);
+    return keptChannelAgents.current;
+  }, [agents, activeServer.id]);
   const [foreground, muted] = useThemeColor(["foreground", "muted"]);
   const buttonGlass = useChromeGlass({ shadow: isIOS });
   const barBlurTarget = useRef<ViewInstance>(null);
@@ -505,10 +517,6 @@ export function ConnectedScreen({ variant = "screen" }: { variant?: "screen" | "
     dragging,
     t,
   ]);
-  const visibleSectionIds = useMemo(
-    () => items.filter((item) => item.kind === "section").map((item) => item.id),
-    [items],
-  );
   const insets = useSafeAreaInsets();
   const barTop = useBarTop();
   const focused = useIsFocused();
@@ -584,44 +592,26 @@ export function ConnectedScreen({ variant = "screen" }: { variant?: "screen" | "
     [activeServer.id, cardEdge, cardMotionOff, cardServer],
   );
   const [collapseLayout, setCollapseLayout] = useState<SidebarLayoutSnapshot | null>(null);
-  const collapsedRowIds = useMemo(() => {
-    const ids = new Set<string>();
-    let sectionCollapsed = false;
-    for (const item of items) {
-      if (item.kind === "waiting" || item.kind === "unread") sectionCollapsed = false;
-      else if (item.kind === "section") {
-        const hidden = item.ancestorIds.some((ancestorId) => collapsedSectionIds.has(ancestorId));
-        if (hidden) ids.add(item.id);
-        sectionCollapsed = hidden || collapsedSectionIds.has(item.id);
-      } else if (sectionCollapsed) ids.add(item.id);
-    }
-    return ids;
-  }, [items, collapsedSectionIds]);
   const unreadCounts = useUnreadCounts();
   const activeAgentIds = useMemo(() => activeAgents.map((agent) => agent.id), [activeAgents]);
   useHomeThreadState(activeServer.id, activeAgentIds);
-  const folderUnreadKey = useMemo(() => {
-    if (!collapsedSectionIds.size) return "[]";
-    const unread = new Set(unreadAgentIds);
-    const counts = new Map<string, number>();
-    let folderIds: readonly string[] = [];
-    for (const item of items) {
-      if (item.kind === "waiting" || item.kind === "unread") folderIds = [];
-      else if (item.kind === "section")
-        folderIds = [...item.ancestorIds, item.id].filter((id) => collapsedSectionIds.has(id));
-      else {
-        const count =
-          item.kind === "channel"
-            ? item.channel.unreadCount
-            : unread.has(item.id)
-              ? Math.max(1, unreadCounts[item.id] ?? 1)
-              : 0;
-        if (count > 0) for (const folderId of folderIds) counts.set(folderId, (counts.get(folderId) ?? 0) + count);
-      }
-    }
-    return JSON.stringify([...counts]);
+  const keptRows = useRef<readonly ChatListRow[]>(NO_ROWS);
+  const rows = useMemo(() => {
+    keptRows.current = chatListRows({ items, collapsedSectionIds, unreadAgentIds, unreadCounts }, keptRows.current);
+    return keptRows.current;
   }, [items, collapsedSectionIds, unreadAgentIds, unreadCounts]);
-  const folderUnread = useMemo(() => new Map<string, number>(JSON.parse(folderUnreadKey)), [folderUnreadKey]);
+  const [rowActivation] = useState(createChatRowActivation);
+  useEffect(() => {
+    if (listServerId) rowActivation.reset();
+  }, [rowActivation, listServerId]);
+  useEffect(() => {
+    rowActivation.setKeys(rows.map(listRowKey));
+  }, [rowActivation, rows]);
+  const keptSectionIds = useRef<readonly string[]>(NO_SECTION_IDS);
+  const visibleSectionIds = useMemo(() => {
+    keptSectionIds.current = chatListSectionIds(rows, keptSectionIds.current);
+    return keptSectionIds.current;
+  }, [rows]);
   const sidebarLayout = sidebar?.layout ?? null;
   const serverId = activeServer.id;
   const toggleSection = useCallback(
@@ -633,8 +623,9 @@ export function ConnectedScreen({ variant = "screen" }: { variant?: "screen" | "
   );
   const rowOffset = hasPins ? 1 + pinnedAgents.length + pinnedChannels.length : 0;
   const renderRow = useCallback(
-    ({ item, index }: { item: MobileSidebarItem; index: number }) =>
-      item.kind === "waiting" ? (
+    ({ item: row, index }: { item: ChatListRow; index: number }) => {
+      const { item } = row;
+      return item.kind === "waiting" ? (
         <AgentListRowReveal index={index + rowOffset} reveal={listReveal}>
           <AgentWaitingGroupHeader count={item.count} />
         </AgentListRowReveal>
@@ -643,21 +634,21 @@ export function ConnectedScreen({ variant = "screen" }: { variant?: "screen" | "
           <AgentUnreadGroupHeader count={item.count} />
         </AgentListRowReveal>
       ) : item.kind === "section" ? (
-        <CollapsingRow collapsed={collapsedRowIds.has(item.id)}>
+        <CollapsingRow collapsed={row.hidden}>
           <AgentListRowReveal index={index + rowOffset} reveal={listReveal}>
             <SectionDropTarget sectionId={item.id}>
               <SidebarSectionHeader
-                key={`${activeServer.id}:${item.id}`}
+                key={`${serverId}:${item.id}`}
                 id={item.id}
                 name={item.name}
                 title={item.title}
                 parentName={item.parentName}
                 custom={item.custom}
                 empty={item.empty}
-                unread={folderUnread.get(item.id) ?? 0}
+                unread={row.unread}
                 visibleSectionIds={visibleSectionIds}
-                collapsed={collapsedSectionIds.has(item.id)}
-                first={index === 0}
+                collapsed={row.folderCollapsed}
+                first={row.first}
                 onToggle={toggleSection}
               />
             </SectionDropTarget>
@@ -666,34 +657,20 @@ export function ConnectedScreen({ variant = "screen" }: { variant?: "screen" | "
       ) : item.kind === "channel" ? (
         <TransitioningChatRow
           channel={item.channel}
-          serverId={activeServer.id}
+          serverId={serverId}
           channelAgents={channelAgents}
           index={index + rowOffset}
           reveal={listReveal}
-          collapsed={collapsedRowIds.has(item.id)}
+          collapsed={row.hidden}
         />
       ) : (
-        <TransitioningChatRow
-          agent={item.agent}
-          index={index + rowOffset}
-          reveal={listReveal}
-          collapsed={collapsedRowIds.has(item.id)}
-        />
-      ),
-    [
-      activeServer.id,
-      channelAgents,
-      collapsedRowIds,
-      collapsedSectionIds,
-      folderUnread,
-      listReveal,
-      rowOffset,
-      toggleSection,
-      visibleSectionIds,
-    ],
+        <TransitioningChatRow agent={item.agent} index={index + rowOffset} reveal={listReveal} collapsed={row.hidden} />
+      );
+    },
+    [serverId, channelAgents, listReveal, rowOffset, toggleSection, visibleSectionIds],
   );
   const renderItem = useCallback(
-    (info: { item: MobileSidebarItem; index: number }) => (
+    (info: { item: ChatListRow; index: number }) => (
       <HomeCardRow
         card={homeCard}
         background={cardBackground}
@@ -906,153 +883,161 @@ export function ConnectedScreen({ variant = "screen" }: { variant?: "screen" | "
             />
           ) : listReady ? (
             <ChatDragProvider screen={dragScreen}>
-              <Animated.FlatList
-                key={activeServer.id}
-                ref={listRef}
-                scrollEnabled={!dragging}
-                onLayout={(event) => {
-                  dragScroll.current.viewport = event.nativeEvent.layout.height;
-                  listReveal.onLayout();
-                }}
-                onContentSizeChange={(_width, height) => {
-                  dragScroll.current.content = height;
-                }}
-                itemLayoutAnimation={
-                  listReveal.finished && sidebar?.layout !== collapseLayout ? LIST_REFLOW : undefined
-                }
-                skipEnteringExitingAnimations
-                removeClippedSubviews={false}
-                className={homeCard ? "flex-1" : "flex-1 bg-background"}
-                style={{ marginLeft: insets.left, marginRight: insets.right }}
-                alwaysBounceVertical={false}
-                contentContainerClassName={items.length > 0 ? undefined : "grow"}
-                contentContainerStyle={{
-                  paddingTop: scroll.ownsInset ? headerHeight : 0,
-                  paddingBottom: insets.bottom + HOME_SEARCH_HEIGHT + 24,
-                }}
-                scrollEventThrottle={16}
-                onScroll={scroll.onScroll}
-                contentInsetAdjustmentBehavior={scroll.ownsInset ? "never" : "always"}
-                data={items}
-                keyExtractor={listItemKey}
-                renderItem={renderItem}
-                initialNumToRender={LIST_BATCH}
-                maxToRenderPerBatch={LIST_BATCH}
-                windowSize={dragging ? LIST_DRAG_WINDOW_SIZE : LIST_WINDOW_SIZE}
-                ListHeaderComponent={
-                  <View onLayout={(event) => layoutStage(event.nativeEvent.layout.height)}>
-                    <AgentListRowReveal index={0} reveal={listReveal}>
-                      {hasSelectedServer ? <AppUpdateSpacer header={updateHeader} headerHeight={headerHeight} /> : null}
-                      {hasSelectedServer ? <OtaUpdateSpacer banner={otaBanner} /> : null}
-                      {sidebar?.error ? (
-                        <View className="gap-2 px-4">
-                          <Typography.Paragraph className="text-danger-text">
-                            {sourceText(sidebar.error)}
-                          </Typography.Paragraph>
-                          <Button
-                            variant="secondary"
-                            onPress={() =>
-                              void workspace()
-                                .refreshServer(activeServer.id)
-                                .catch(() => undefined)
-                            }
-                          >
-                            <Button.Label>{t("mobile.agent.home.retrySections")}</Button.Label>
-                          </Button>
-                        </View>
-                      ) : null}
-                    </AgentListRowReveal>
-                    <PinnedAgentsGrid
-                      agents={pinnedAgents}
-                      animateLayout={!updateHeader.moving && !otaBanner.moving}
-                      dropZone={dragging && !hasPins}
-                      reveal={listReveal}
-                      revealOffset={1}
-                    >
-                      {pinnedChannels.length > 0
-                        ? pinnedChannels.map((channel) => (
-                            <ChannelListRow
-                              key={channel.id}
-                              channel={channel}
-                              serverId={activeServer.id}
-                              agents={channelAgents}
-                              pinned
-                            />
-                          ))
-                        : null}
-                    </PinnedAgentsGrid>
-                    <HomeCardTop
-                      card={homeCard}
-                      background={cardBackground}
-                      serverId={activeServer.id}
-                      cardServer={cardServer}
-                      settled={listReveal.finished}
-                    />
-                  </View>
-                }
-                ListEmptyComponent={
-                  serverDirectoryState === "error" && servers.length === 0 ? (
-                    <View className="flex-1 items-center justify-center gap-5 px-8 py-16">
-                      <View className="size-16 items-center justify-center rounded-3xl bg-control">
-                        <WifiOff color={mutedColor} size={28} strokeWidth={1.6} />
-                      </View>
-                      <View className="items-center gap-1.5">
-                        <Typography.Heading type="h4">{t("mobile.agent.home.serversFailed")}</Typography.Heading>
-                        <Typography.Paragraph align="center" className="text-text-secondary">
-                          {serverDirectoryError
-                            ? sourceText(serverDirectoryError)
-                            : t("mobile.agent.home.serversFailedBody")}
-                        </Typography.Paragraph>
-                      </View>
-                      <Button
-                        size="md"
-                        variant="secondary"
-                        onPress={() =>
-                          void workspace()
-                            .refreshServers()
-                            .catch(() => undefined)
-                        }
+              <ChatRowActivationContext value={rowActivation}>
+                <Animated.FlatList
+                  key={activeServer.id}
+                  ref={listRef}
+                  scrollEnabled={!dragging}
+                  onLayout={(event) => {
+                    dragScroll.current.viewport = event.nativeEvent.layout.height;
+                    listReveal.onLayout();
+                  }}
+                  onContentSizeChange={(_width, height) => {
+                    dragScroll.current.content = height;
+                  }}
+                  itemLayoutAnimation={
+                    listReveal.finished && sidebar?.layout !== collapseLayout ? LIST_REFLOW : undefined
+                  }
+                  skipEnteringExitingAnimations
+                  removeClippedSubviews={false}
+                  className={homeCard ? "flex-1" : "flex-1 bg-background"}
+                  style={{ marginLeft: insets.left, marginRight: insets.right }}
+                  alwaysBounceVertical={false}
+                  contentContainerClassName={items.length > 0 ? undefined : "grow"}
+                  contentContainerStyle={{
+                    paddingTop: scroll.ownsInset ? headerHeight : 0,
+                    paddingBottom: insets.bottom + HOME_SEARCH_HEIGHT + 24,
+                  }}
+                  scrollEventThrottle={16}
+                  onScroll={scroll.onScroll}
+                  contentInsetAdjustmentBehavior={scroll.ownsInset ? "never" : "always"}
+                  data={rows}
+                  keyExtractor={listRowKey}
+                  renderItem={renderItem}
+                  onViewableItemsChanged={rowActivation.showVisible}
+                  onTouchStart={rowActivation.onTouchStart}
+                  onTouchEnd={rowActivation.onTouchEnd}
+                  onTouchCancel={rowActivation.onTouchEnd}
+                  initialNumToRender={LIST_BATCH}
+                  maxToRenderPerBatch={LIST_BATCH}
+                  windowSize={dragging ? LIST_DRAG_WINDOW_SIZE : LIST_WINDOW_SIZE}
+                  ListHeaderComponent={
+                    <View onLayout={(event) => layoutStage(event.nativeEvent.layout.height)}>
+                      <AgentListRowReveal index={0} reveal={listReveal}>
+                        {hasSelectedServer ? (
+                          <AppUpdateSpacer header={updateHeader} headerHeight={headerHeight} />
+                        ) : null}
+                        {hasSelectedServer ? <OtaUpdateSpacer banner={otaBanner} /> : null}
+                        {sidebar?.error ? (
+                          <View className="gap-2 px-4">
+                            <Typography.Paragraph className="text-danger-text">
+                              {sourceText(sidebar.error)}
+                            </Typography.Paragraph>
+                            <Button
+                              variant="secondary"
+                              onPress={() =>
+                                void workspace()
+                                  .refreshServer(activeServer.id)
+                                  .catch(() => undefined)
+                              }
+                            >
+                              <Button.Label>{t("mobile.agent.home.retrySections")}</Button.Label>
+                            </Button>
+                          </View>
+                        ) : null}
+                      </AgentListRowReveal>
+                      <PinnedAgentsGrid
+                        agents={pinnedAgents}
+                        animateLayout={!updateHeader.moving && !otaBanner.moving}
+                        dropZone={dragging && !hasPins}
+                        reveal={listReveal}
+                        revealOffset={1}
                       >
-                        <Button.Label>{t("common.tryAgain")}</Button.Label>
-                      </Button>
+                        {pinnedChannels.length > 0
+                          ? pinnedChannels.map((channel) => (
+                              <ChannelListRow
+                                key={channel.id}
+                                channel={channel}
+                                serverId={activeServer.id}
+                                agents={channelAgents}
+                                pinned
+                              />
+                            ))
+                          : null}
+                      </PinnedAgentsGrid>
+                      <HomeCardTop
+                        card={homeCard}
+                        background={cardBackground}
+                        serverId={activeServer.id}
+                        cardServer={cardServer}
+                        settled={listReveal.finished}
+                      />
                     </View>
-                  ) : servers.length === 0 ? (
-                    <View className="flex-1 items-center justify-center gap-5 px-8 py-16">
-                      <View className="size-16 items-center justify-center rounded-3xl bg-control">
-                        <Layers3 color={mutedColor} size={28} strokeWidth={1.6} />
+                  }
+                  ListEmptyComponent={
+                    serverDirectoryState === "error" && servers.length === 0 ? (
+                      <View className="flex-1 items-center justify-center gap-5 px-8 py-16">
+                        <View className="size-16 items-center justify-center rounded-3xl bg-control">
+                          <WifiOff color={mutedColor} size={28} strokeWidth={1.6} />
+                        </View>
+                        <View className="items-center gap-1.5">
+                          <Typography.Heading type="h4">{t("mobile.agent.home.serversFailed")}</Typography.Heading>
+                          <Typography.Paragraph align="center" className="text-text-secondary">
+                            {serverDirectoryError
+                              ? sourceText(serverDirectoryError)
+                              : t("mobile.agent.home.serversFailedBody")}
+                          </Typography.Paragraph>
+                        </View>
+                        <Button
+                          size="md"
+                          variant="secondary"
+                          onPress={() =>
+                            void workspace()
+                              .refreshServers()
+                              .catch(() => undefined)
+                          }
+                        >
+                          <Button.Label>{t("common.tryAgain")}</Button.Label>
+                        </Button>
                       </View>
-                      <View className="items-center gap-1.5">
-                        <Typography.Heading type="h4">{t("mobile.agent.home.noServers")}</Typography.Heading>
-                        <Typography.Paragraph align="center" className="text-text-secondary">
-                          {t("mobile.agent.home.noServersBody")}
-                        </Typography.Paragraph>
+                    ) : servers.length === 0 ? (
+                      <View className="flex-1 items-center justify-center gap-5 px-8 py-16">
+                        <View className="size-16 items-center justify-center rounded-3xl bg-control">
+                          <Layers3 color={mutedColor} size={28} strokeWidth={1.6} />
+                        </View>
+                        <View className="items-center gap-1.5">
+                          <Typography.Heading type="h4">{t("mobile.agent.home.noServers")}</Typography.Heading>
+                          <Typography.Paragraph align="center" className="text-text-secondary">
+                            {t("mobile.agent.home.noServersBody")}
+                          </Typography.Paragraph>
+                        </View>
+                        <Button size="md" variant="secondary" onPress={openDrawer}>
+                          <Button.Label>{t("mobile.agent.home.openServers")}</Button.Label>
+                        </Button>
                       </View>
-                      <Button size="md" variant="secondary" onPress={openDrawer}>
-                        <Button.Label>{t("mobile.agent.home.openServers")}</Button.Label>
-                      </Button>
-                    </View>
-                  ) : !hasSelectedServer ? (
-                    <View className="flex-1 items-center justify-center gap-5 px-8 py-16">
-                      <Typography.Heading type="h4">{t("mobile.agent.home.chooseServer")}</Typography.Heading>
-                      <Button size="md" variant="secondary" onPress={openDrawer}>
-                        <Button.Label>{t("mobile.agent.home.openServers")}</Button.Label>
-                      </Button>
-                    </View>
-                  ) : activeAgents.length === 0 && !activeServerOnline ? (
-                    <View className="flex-1 items-center justify-center gap-5 px-8 py-16">
-                      <WifiOff color={mutedColor} size={28} strokeWidth={1.6} />
-                      <View className="items-center gap-1.5">
-                        <Typography.Heading type="h4">{t("mobile.agent.home.waiting")}</Typography.Heading>
-                        <Typography.Paragraph align="center" className="text-text-secondary">
-                          {t("mobile.agent.home.waitingBody")}
-                        </Typography.Paragraph>
+                    ) : !hasSelectedServer ? (
+                      <View className="flex-1 items-center justify-center gap-5 px-8 py-16">
+                        <Typography.Heading type="h4">{t("mobile.agent.home.chooseServer")}</Typography.Heading>
+                        <Button size="md" variant="secondary" onPress={openDrawer}>
+                          <Button.Label>{t("mobile.agent.home.openServers")}</Button.Label>
+                        </Button>
                       </View>
-                    </View>
-                  ) : activeAgents.length === 0 ? (
-                    <EmptyAgentsScene onAddAgent={addAgent} />
-                  ) : undefined
-                }
-              />
+                    ) : activeAgents.length === 0 && !activeServerOnline ? (
+                      <View className="flex-1 items-center justify-center gap-5 px-8 py-16">
+                        <WifiOff color={mutedColor} size={28} strokeWidth={1.6} />
+                        <View className="items-center gap-1.5">
+                          <Typography.Heading type="h4">{t("mobile.agent.home.waiting")}</Typography.Heading>
+                          <Typography.Paragraph align="center" className="text-text-secondary">
+                            {t("mobile.agent.home.waitingBody")}
+                          </Typography.Paragraph>
+                        </View>
+                      </View>
+                    ) : activeAgents.length === 0 ? (
+                      <EmptyAgentsScene onAddAgent={addAgent} />
+                    ) : undefined
+                  }
+                />
+              </ChatRowActivationContext>
             </ChatDragProvider>
           ) : null}
         </HomeSearchList>

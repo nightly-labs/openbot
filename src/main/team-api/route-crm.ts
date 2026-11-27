@@ -37,6 +37,10 @@ async function run<A>(operation: Effect.Effect<A, CrmError>): Promise<A> {
   }
 }
 
+export function crmCustomerPage(crm: Pick<TeamApiCrm, "customers">, after: number | null): Promise<CrmCustomerPage> {
+  return run(crm.customers(after === null ? {} : { after }));
+}
+
 function bytesOf(value: unknown): number {
   return Buffer.byteLength(JSON.stringify(value));
 }

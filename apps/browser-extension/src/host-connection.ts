@@ -1,6 +1,7 @@
 import { isDynamicRecord, isString } from "@openbot/contracts/runtime-values";
 import { TEAM_API_ROUTES } from "@openbot/contracts/team-api-routes";
 import { readTeamHostCompatibility, TEAM_WEB_CLIENT_PROTOCOL } from "@openbot/contracts/team-protocol/current";
+import type { SyncClientMessage, SyncServerMessage } from "@openbot/contracts/team-protocol/sync-v1";
 import { TEAM_PROTOCOL_V2_MAX_FILE_BYTES, type TeamProtocolV2Json } from "@openbot/contracts/team-protocol/v2";
 import {
   decodeVoiceTranscription,
@@ -45,6 +46,7 @@ class HostConnectionError extends Error {
 
 export interface HostConnectionEvents {
   event: (event: RemoteTeamEvent) => void;
+  sync?: (message: SyncServerMessage) => void;
   state: (update: RemoteTeamConnectionUpdate) => void;
   sessionEnded: () => void;
 }
@@ -53,6 +55,7 @@ export interface HostConnection {
   listHosts: () => Promise<RemoteTeamHost[]>;
   connect: (host: RemoteTeamHost) => Promise<string[]>;
   request: TeamApiRequest;
+  sendSync: (message: SyncClientMessage) => Promise<void>;
   download: (attachmentId: string) => Promise<HostFile>;
   transcribe: (wav: Uint8Array) => Promise<string>;
   dispose: () => Promise<void>;
@@ -88,6 +91,9 @@ export async function createHostConnection(
         events.state(update);
       },
       onTeamEvent: async (_hostId, event) => events.event(event),
+      onSyncEvent: async (hostId, message) => {
+        if (hostId === connectedHostId) events.sync?.(message);
+      },
     },
   };
   const peer = createRemoteTeamPeer(actions, {
@@ -161,6 +167,7 @@ export async function createHostConnection(
     },
     request: async (method, path, decode, body, upload) =>
       decode(await send(method, path, body, upload ? { upload } : {})),
+    sendSync: (message) => peer.sendSync(message),
     async download(attachmentId) {
       const value = await send("GET", TEAM_API_ROUTES.attachment(attachmentId), {}, { largeDownload: FILE_DOWNLOAD });
       if (!isDynamicRecord(value) || !isString(value.name) || !isString(value.mimeType) || !isString(value.base64))
@@ -187,7 +194,11 @@ export async function createHostConnection(
   };
 }
 
-function isRefusedSession(error: unknown): boolean {
+export function canRetryConnection(error: unknown): boolean {
+  return !(error instanceof HostConnectionError) || error.problem === "unavailable";
+}
+
+export function isRefusedSession(error: unknown): boolean {
   return error instanceof RemoteDirectoryError && (error.status === 401 || error.status === 403);
 }
 

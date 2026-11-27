@@ -138,6 +138,20 @@ export const messages = {
     "Het model van de kanaalleider is niet beschikbaar. Kies een ander model voor de leider, of kies een lid.",
   "error.backend.channelLeadRefused":
     "Het model van de kanaalleider weigerde dit verzoek. Kies een lid, of een ander model voor de leider.",
+  "error.backend.channelLeadNotPermitted":
+    "De provider van de kanaalleider weigerde toegang voor dit account. Controleer het account, of kies een lid.",
+  "error.backend.channelLeadBilling":
+    "Het account van de kanaalleider heeft geen tegoed, of het abonnement bevat dit model niet. Controleer het abonnement, of kies een lid.",
+  "error.backend.channelLeadUsageLimit":
+    "Het model van de kanaalleider heeft zijn gebruikslimiet bereikt. Kies een lid, of kies een ander model voor de leider.",
+  "error.backend.channelLeadBlocked":
+    "De provider van de kanaalleider blokkeerde dit verzoek. Wijzig het verzoek, of kies een lid.",
+  "error.backend.channelLeadNoAnswer":
+    "Het model van de kanaalleider gaf geen antwoord. Probeer het opnieuw, of kies een lid.",
+  "error.backend.channelLeadProviderError":
+    "De provider van de kanaalleider had een fout. Probeer het over een paar minuten opnieuw, of kies een lid.",
+  "error.backend.channelLeadStopped":
+    "Het model van de kanaalleider stopte voordat het antwoordde. Probeer het opnieuw, of kies een lid.",
   "error.backend.channelRequestMemberRequired": "Kies een lid voor dit verzoek.",
   "error.backend.channelDeliveryNotCreated": "De bezorging in het kanaal is niet gemaakt.",
   "error.backend.channelAssignmentStopped": "Deze kanaalopdracht is gestopt of vervangen.",

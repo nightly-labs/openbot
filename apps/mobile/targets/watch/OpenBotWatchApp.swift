@@ -67,7 +67,10 @@ struct RootView: View {
     }
     .animation(.snappy, value: session.feedback)
     .task(id: scenePhase) {
-      guard scenePhase == .active else { return }
+      guard scenePhase == .active else {
+        WidgetReload.flush()
+        return
+      }
       await session.runWhileActive()
     }
     .onChange(of: session.phase) { _, phase in

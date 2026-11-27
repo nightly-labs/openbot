@@ -1,4 +1,5 @@
 import "../../global.css";
+import "@/shared/lib/native-splash";
 
 import { QueryClientProvider } from "@tanstack/react-query";
 import { usePathname, useSegments } from "expo-router";
@@ -221,34 +222,35 @@ export default function RootLayout() {
     void SystemUI.setBackgroundColorAsync(canvas).catch(() => undefined);
   }, [canvas]);
   useEffect(() => {
-    void untilForeground().then(() => {
-      void loadAppearance().catch(() => undefined);
+    void untilForeground().then(async () => {
+      const firstScreen = [
+        loadAppearance(),
+        loadTextSize(),
+        loadMessageColor(),
+        loadChatBackground(),
+        loadChatBackdrop(),
+        loadFullVisualPreference(),
+        loadRoutineCollapsePreference(),
+        loadChatDetailPreferences(),
+        loadChatOrderPreference(),
+        loadMotionPreferences(),
+      ];
+      const appLanguage = loadAppLanguage().catch(() => undefined);
+      void appLanguage.then(() => offerLayoutRestart(splashColor.current, () => undefined));
+      await Promise.allSettled([...firstScreen, appLanguage, loadOnboardingProgress()]);
       void loadHapticsPreference().catch(() => undefined);
       void loadLargeFilePreference().catch(() => undefined);
       void loadPhotoQualityPreference().catch(() => undefined);
       void loadFullScreenCameraPreference().catch(() => undefined);
-      void loadMessageColor().catch(() => undefined);
-      void loadChatBackground().catch(() => undefined);
-      void loadChatBackdrop().catch(() => undefined);
-      void loadRoutineCollapsePreference().catch(() => undefined);
-      void loadChatDetailPreferences().catch(() => undefined);
-      void loadFullVisualPreference().catch(() => undefined);
-      void loadChatOrderPreference().catch(() => undefined);
       void loadChatSwipePreference().catch(() => undefined);
       void loadChatPullPreference().catch(() => undefined);
-      void loadTextSize().catch(() => undefined);
       void loadLiveActivitiesPreference().catch(() => undefined);
       void loadPushNotificationPreference().catch(() => undefined);
-      void loadMotionPreferences().catch(() => undefined);
       void loadDictationLanguage().catch(() => undefined);
       void loadVoiceSettings().catch(() => undefined);
       void loadVoiceServer().catch(() => undefined);
       supertonicModel.check();
       checkRecognitionModels();
-      void loadAppLanguage()
-        .catch(() => undefined)
-        .then(() => offerLayoutRestart(splashColor.current, () => undefined));
-      void loadOnboardingProgress().catch(() => undefined);
     });
   }, []);
 

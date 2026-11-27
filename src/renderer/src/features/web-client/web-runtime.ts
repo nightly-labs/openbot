@@ -26,6 +26,9 @@ import type {
   BrowserTeachStopInput,
   CancelQueuedMessageInput,
   Channel,
+  ChannelPage,
+  ChannelReadInput,
+  ChannelSummary,
   ChatColors,
   ClientAgentModelOption,
   ClientAgentSummary,
@@ -35,6 +38,7 @@ import type {
   ConversationSearchPage,
   CreateAgentInput,
   CreditsHold,
+  CrmCustomer,
   DuplicateAgentResult,
   EditQueuedMessageInput,
   HiddenAgentsSnapshot,
@@ -68,6 +72,7 @@ import type {
   TeamRealtimeEvent,
   UpdateAgentInput,
   UpdateQueuedMessageInput,
+  WorkflowSummary,
   WorkspaceDirectory,
 } from "@openbot/contracts/ipc";
 import {
@@ -252,6 +257,7 @@ import { WORKSPACE_ONLY_PROCESS_LIMIT_CAPABILITY } from "@openbot/contracts/team
 import { runTeamEffect } from "@openbot/team-client";
 import { bytesToBase64 } from "@openbot/team-client/base64";
 import { createRemoteBrowserView, type RemoteBrowserView } from "@openbot/team-client/browser-view";
+import { type ClientSync, type ClientSyncOrder, createClientSync } from "@openbot/team-client/client-sync";
 import { verifyEd25519Base64Url } from "@openbot/team-client/ed25519";
 import {
   RemoteDirectoryError,
@@ -384,6 +390,8 @@ export interface WebWorkspaceRuntime {
   channels?: TeamChannelsApi & {
     setChannelImage(input: SetChannelImageInput): Promise<Channel>;
     onPictures?(listener: () => void): () => void;
+    onListChanged?(listener: () => void): () => void;
+    focusSync?(channelId: string | null): void;
   };
   currentMemberId?: () => Promise<string>;
   respondToTakeover(input: RespondToBrowserTakeoverInput): Promise<void>;
@@ -402,6 +410,10 @@ export interface WebWorkspaceRuntime {
   markRead(agentId: string, throughMessageId: string | null): Promise<ConversationReadState>;
   markUnreadFrom(agentId: string, fromMessageId: string): Promise<ConversationReadState>;
   conversationReads(): Promise<Record<string, ConversationReadState>>;
+  onConversationReadsChanged?(listener: () => void): () => void;
+  focusSync?(agentId: string | null): void;
+  syncedWorkflows?(): Promise<WorkflowSummary[] | null>;
+  syncedCrmCustomers?(): Promise<CrmCustomer[] | null>;
   deleteMessage?: (input: WebMessageDelete) => Promise<void>;
   compactContext?: (agentId: string, taskId?: string) => Promise<void>;
   deleteHistory?: (input: WebHistoryDelete) => Promise<void>;
@@ -632,11 +644,51 @@ export function createWebWorkspaceRuntime(
   };
   const downloadProgress = new Map<string, RemoteDownloadWatch["onProgress"]>();
   let waitingHostId: string | null = null;
+  let sync: { hostId: string; state: ClientSync; paused: boolean } | null = null;
+  let syncFocus: string | null = null;
+  let syncChannelFocus: string | null = null;
+  const channelListListeners = new Set<() => void>();
+  const conversationReadsListeners = new Set<() => void>();
+  function stopSync(): void {
+    sync?.state.dispose();
+    sync = null;
+  }
+  function startSync(host: RemoteTeamHost, owner: typeof peer, hostCapabilities: readonly string[]): void {
+    stopSync();
+    const hostId = host.hostId;
+    const state = createClientSync({
+      capabilities: hostCapabilities,
+      role: host.role,
+      focusedAgentId: syncFocus,
+      focusedChannelId: syncChannelFocus,
+      send: (message) => owner.sendSync(message),
+      emit: (event) => events.event(hostId, event),
+      channelsChanged: () => {
+        for (const listener of channelListListeners) listener();
+      },
+      readsChanged: () => {
+        for (const listener of conversationReadsListeners) listener();
+      },
+    });
+    sync = state ? { hostId, state, paused: false } : null;
+  }
+  function syncedRead<T>(read: (state: ClientSync) => T | null): T | null {
+    return sync && sync.hostId === lockedHostId ? read(sync.state) : null;
+  }
   const openedActions: RemoteTeamPeerActions = {
     ...sessionActions,
     onConnectionUpdate: async (update) => {
       if (update.hostOffline) waitingHostId = update.hostId;
       else if (update.state !== "connecting") waitingHostId = null;
+      if (sync?.hostId === update.hostId) {
+        if (update.state !== "online") {
+          sync.paused = true;
+          sync.state.pause();
+        } else if (sync.paused || update.resync) {
+          sync.paused = false;
+          sync.state.resubscribe();
+        }
+      }
       if (update.state !== "online") {
         browserView.disconnect(update.message ?? undefined);
         const releaseGeneration = liveViewGeneration + 1;
@@ -647,7 +699,13 @@ export function createWebWorkspaceRuntime(
       events.connection(update);
     },
     onHostStreamData: (data) => browserView.receive(data),
-    onTeamEvent: async (id, event) => events.event(id, event),
+    onTeamEvent: async (id, event) => {
+      if (sync?.hostId === id && !sync.state.hostEvent(event)) return;
+      events.event(id, event);
+    },
+    onSyncEvent: async (id, event) => {
+      if (sync?.hostId === id) sync.state.receive(event);
+    },
     onAccountProfileChanged: events.accountChanged,
     onAccountServersChanged: async () => events.serversChanged?.(),
     onDownloadProgress: async ({ commandId, received, total }) => downloadProgress.get(commandId)?.(received, total),
@@ -674,6 +732,7 @@ export function createWebWorkspaceRuntime(
       ...sessionActions,
       onConnectionUpdate: async () => undefined,
       onTeamEvent: async () => undefined,
+      onSyncEvent: async () => undefined,
     };
     const ending = previous
       .dispose()
@@ -787,6 +846,26 @@ export function createWebWorkspaceRuntime(
     }
     if (!completedDraftIdsByHost.has(hostId)) draftCleanupRetryHosts.delete(hostId);
   }
+  async function readAgents(): Promise<ClientAgentSummary[]> {
+    const agents = guardedListDecoder(isClientAgentSummary, "agents")(await request("GET", TEAM_API_ROUTES.agents.all));
+    noteSyncOrder(
+      "agents",
+      agents.map((agent) => agent.id),
+    );
+    return agents;
+  }
+  function noteSyncOrder(kind: ClientSyncOrder, ids: readonly string[]): void {
+    if (sync && sync.hostId === lockedHostId) sync.state.noteOrder(kind, ids);
+  }
+  function noteSyncWrite(method: string, path: string, hostId: string | null): void {
+    if (sync && sync.hostId === hostId) sync.state.wrote(method, path);
+  }
+  async function readNotificationLevels(): Promise<AgentNotificationLevelsSnapshot> {
+    return (
+      syncedRead((state) => state.notificationLevels()) ??
+      runTeamEffect(listAgentNotificationLevels(teamApi).pipe(Effect.mapError((error) => error.cause)))
+    );
+  }
   async function readSidebarLayout(): Promise<SidebarLayoutSnapshot> {
     const value = capabilities.includes(SIDEBAR_FOLDERS_CAPABILITY)
       ? await request("POST", SIDEBAR_FOLDERS_ROUTES.read, {})
@@ -826,7 +905,10 @@ export function createWebWorkspaceRuntime(
         ...(largeDownload === undefined ? {} : { largeDownload }),
         ...(download === undefined ? {} : { downloadSize: download.size }),
       })
-      .finally(() => downloadProgress.delete(id));
+      .finally(() => {
+        downloadProgress.delete(id);
+        noteSyncWrite(method, path, requestHostId);
+      });
     if (disposed || generation !== current) throw new Error(currentText().t("webClient.error.hostChanged"));
     const membershipRead = method === "GET" && path === TEAM_API_ROUTES.me;
     if (result.status === 403 && !membershipRead) {
@@ -855,6 +937,8 @@ export function createWebWorkspaceRuntime(
     body?: TeamProtocolV2Json,
     upload?: RemoteFileUpload,
   ): Promise<T> {
+    const routines = method === "GET" && upload === undefined ? syncedRead((state) => state.routinesFor(path)) : null;
+    if (routines) return decode(routines);
     return decode(await request(method, path, body, upload));
   }
   async function teamApiDownload<T>(
@@ -953,6 +1037,18 @@ export function createWebWorkspaceRuntime(
   };
   const routinesOnce = () => capabilities.includes(ROUTINES_ONCE_CAPABILITY);
   const channels = teamChannelsApi(teamApi, routinesOnce, true);
+  async function readChannelList(): Promise<ChannelSummary[]> {
+    const list = await channels.listChannels();
+    noteSyncOrder(
+      "channels",
+      list.map((channel) => channel.id),
+    );
+    return list;
+  }
+  async function syncedChannelPage(input: ChannelReadInput): Promise<ChannelPage | null> {
+    if (input.beforeSequence !== undefined || syncChannelFocus !== input.channelId) return null;
+    return syncedRead((state) => state.channelPage(input.channelId));
+  }
   const channelPictures = new Map<string, ChannelPicture>();
   const pictureListeners = new Set<() => void>();
   let pictureReads = 0;
@@ -1062,6 +1158,7 @@ export function createWebWorkspaceRuntime(
       releaseHostLock = null;
       lockedHostId = null;
       connectedHost = null;
+      stopSync();
     }
   }
   async function giveUpHost(hostId: string): Promise<void> {
@@ -1074,6 +1171,7 @@ export function createWebWorkspaceRuntime(
   }
   async function connectHost(host: RemoteTeamHost, { takeOver = false, early }: WebConnectOptions): Promise<string[]> {
     try {
+      stopSync();
       await peer.cancelUpload().catch(() => undefined);
       const switchingHost = lockedHostId !== host.hostId;
       const retryDraftCleanup = switchingHost && draftCleanupRetryHosts.has(host.hostId);
@@ -1141,9 +1239,11 @@ export function createWebWorkspaceRuntime(
           ),
         );
       capabilities = support.capabilities;
+      startSync(host, peer, capabilities);
       if (retryDraftCleanup) await discardCompletedDrafts(host.hostId);
       return capabilities;
     } catch (error) {
+      stopSync();
       capabilities = [];
       connectedHost = null;
       try {
@@ -1278,7 +1378,7 @@ export function createWebWorkspaceRuntime(
     async browserPreview(tabId) {
       return decodeWebBrowserPreview(await request("POST", TEAM_API_ROUTES.browser.preview, { tabId }));
     },
-    getSidebarLayout: readSidebarLayout,
+    getSidebarLayout: async () => syncedRead((state) => state.sidebarLayout()) ?? readSidebarLayout(),
     async mutateSidebarLayout(action) {
       const folders = capabilities.includes(SIDEBAR_FOLDERS_CAPABILITY);
       if (!folders && (action.type === "nest" || (action.type === "create" && action.parentId !== undefined)))
@@ -1294,7 +1394,17 @@ export function createWebWorkspaceRuntime(
     channels: {
       ...channels,
       async listChannels() {
-        return withKnownChannelPictures(await channels.listChannels());
+        return withKnownChannelPictures(syncedRead((state) => state.channels()) ?? (await readChannelList()));
+      },
+      onListChanged(listener) {
+        channelListListeners.add(listener);
+        return () => {
+          channelListListeners.delete(listener);
+        };
+      },
+      focusSync(channelId) {
+        syncChannelFocus = channelId;
+        sync?.state.focusChannel(channelId);
       },
       onPictures(listener) {
         pictureListeners.add(listener);
@@ -1303,7 +1413,7 @@ export function createWebWorkspaceRuntime(
         };
       },
       async readChannel(input) {
-        const page = await channels.readChannel(input);
+        const page = (await syncedChannelPage(input)) ?? (await channels.readChannel(input));
         return {
           ...page,
           channel: await withChannelPicture(page.channel),
@@ -1413,9 +1523,11 @@ export function createWebWorkspaceRuntime(
       }
     },
     async listAgents() {
-      return guardedListDecoder(isClientAgentSummary, "agents")(await request("GET", TEAM_API_ROUTES.agents.all));
+      return syncedRead((state) => state.agents()) ?? readAgents();
     },
     async conversation(id, before) {
+      const synced = before ? null : await syncedRead((state) => state.conversationPage(id));
+      if (synced) return synced;
       if (!capabilities.includes("conversation-pagination")) {
         return decodeWebConversationSnapshot(await request("GET", TEAM_API_ROUTES.agent.conversation(id)));
       }
@@ -1540,7 +1652,21 @@ export function createWebWorkspaceRuntime(
         throw new Error(currentText().t("error.team.agentWaitsUnsupported"));
       await request("POST", AGENT_WAITS_ROUTES.cancel, { agentId, waitId });
     },
+    onConversationReadsChanged(listener) {
+      conversationReadsListeners.add(listener);
+      return () => {
+        conversationReadsListeners.delete(listener);
+      };
+    },
+    focusSync(agentId) {
+      syncFocus = agentId;
+      sync?.state.focus(agentId);
+    },
+    syncedWorkflows: async () => (sync && sync.hostId === lockedHostId ? sync.state.workflows() : null),
+    syncedCrmCustomers: async () => (sync && sync.hostId === lockedHostId ? sync.state.crmCustomers() : null),
     async conversationReads() {
+      const synced = syncedRead((state) => state.conversationReads());
+      if (synced) return synced;
       const value = await request("GET", TEAM_API_ROUTES.agents.conversationReads);
       const reads: Record<string, ConversationReadState> = {};
       if (!isDynamicRecord(value)) return reads;
@@ -1597,7 +1723,9 @@ export function createWebWorkspaceRuntime(
     },
     stop: (id, turnId) =>
       Effect.runPromise(interruptAgentTurn(teamApi, id, turnId).pipe(Effect.mapError((error) => error.cause))),
-    queue: (id) => teamApi("GET", TEAM_API_ROUTES.agent.queue(id), (value) => queueSnapshot(id, value)),
+    queue: async (id) =>
+      syncedRead((state) => state.queue(id)) ??
+      teamApi("GET", TEAM_API_ROUTES.agent.queue(id), (value) => queueSnapshot(id, value)),
     activeQueues: (agentIds) => teamApi("POST", AGENT_ACTIVE_QUEUES_ROUTES.list, decodeAgentActiveQueues, { agentIds }),
     editQueue: ({ agentId, ...edit }) =>
       teamApi("POST", TEAM_API_ROUTES.agent.queueEdit(agentId), (value) => queueSnapshot(agentId, value), edit),
@@ -1695,7 +1823,9 @@ export function createWebWorkspaceRuntime(
         throw new Error(currentText().t("error.team.workspaceDirectoryUnsupported"));
       return decodeWorkspaceDirectory(await request("POST", WORKSPACE_DIRECTORY_ROUTES.list, { agentId, path }));
     },
-    listHiddenAgents: () => runTeamEffect(listHiddenAgents(teamApi).pipe(Effect.mapError((error) => error.cause))),
+    listHiddenAgents: async () =>
+      syncedRead((state) => state.hiddenAgents()) ??
+      runTeamEffect(listHiddenAgents(teamApi).pipe(Effect.mapError((error) => error.cause))),
     setAgentHidden: (input) =>
       runTeamEffect(setAgentHidden(teamApi, input).pipe(Effect.mapError((error) => error.cause))),
     async listAgentColors() {
@@ -1704,7 +1834,9 @@ export function createWebWorkspaceRuntime(
     },
     listChatColors,
     sidebarPins: {
-      read: () => runTeamEffect(readSidebarPins(teamApi).pipe(Effect.mapError((error) => error.cause))),
+      read: async () =>
+        syncedRead((state) => state.sidebarPins()) ??
+        runTeamEffect(readSidebarPins(teamApi).pipe(Effect.mapError((error) => error.cause))),
       set: (items) => runTeamEffect(setSidebarPins(teamApi, items).pipe(Effect.mapError((error) => error.cause))),
       seed: (items) => runTeamEffect(seedSidebarPins(teamApi, items).pipe(Effect.mapError((error) => error.cause))),
     },
@@ -1714,7 +1846,7 @@ export function createWebWorkspaceRuntime(
         return hosts.agentNotificationLevels(hostId);
       }
       if (!capabilities.includes(AGENT_NOTIFICATION_LEVELS_CAPABILITY)) return { server: null, agents: [] };
-      return runTeamEffect(listAgentNotificationLevels(teamApi).pipe(Effect.mapError((error) => error.cause)));
+      return readNotificationLevels();
     },
     async setAgentNotificationLevel(input) {
       if (!capabilities.includes(AGENT_NOTIFICATION_LEVELS_CAPABILITY))
@@ -1727,10 +1859,8 @@ export function createWebWorkspaceRuntime(
         return hosts.notificationSettings(hostId);
       }
       const [agents, levels] = await Promise.all([
-        guardedListDecoder(isClientAgentSummary, "agents")(await request("GET", TEAM_API_ROUTES.agents.all)),
-        capabilities.includes(AGENT_NOTIFICATION_LEVELS_CAPABILITY)
-          ? runTeamEffect(listAgentNotificationLevels(teamApi).pipe(Effect.mapError((error) => error.cause)))
-          : null,
+        syncedRead((state) => state.agents()) ?? readAgents(),
+        capabilities.includes(AGENT_NOTIFICATION_LEVELS_CAPABILITY) ? readNotificationLevels() : null,
       ]);
       return { agents, levels };
     },
@@ -1963,6 +2093,9 @@ export function createWebWorkspaceRuntime(
       disposed = true;
       generation += 1;
       connectedHost = null;
+      stopSync();
+      channelListListeners.clear();
+      conversationReadsListeners.clear();
       revokeLocalDraftPreviews([...localDraftPreviews.keys()]);
       try {
         await Promise.all([peer.dispose(), hosts?.dispose(), ...retiring]);

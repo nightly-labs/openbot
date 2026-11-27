@@ -438,6 +438,11 @@ export interface ScopedAgentEvent {
   bufferedLive?: boolean;
 }
 
+export interface AgentSyncChangedEvent {
+  serverId: string;
+  name: string;
+}
+
 export interface AgentIpcRequest<T = unknown> {
   serverId: string;
   payload: T;

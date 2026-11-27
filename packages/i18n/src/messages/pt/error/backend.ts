@@ -139,6 +139,20 @@ export const messages = {
     "O modelo do líder não está disponível. Escolha outro modelo para o líder ou escolha um membro.",
   "error.backend.channelLeadRefused":
     "O modelo do líder recusou esta solicitação. Escolha um membro ou outro modelo para o líder.",
+  "error.backend.channelLeadNotPermitted":
+    "O provedor do líder recusou o acesso desta conta. Verifique a conta ou escolha um membro.",
+  "error.backend.channelLeadBilling":
+    "A conta do líder não tem crédito, ou o plano dela não inclui este modelo. Verifique o plano ou escolha um membro.",
+  "error.backend.channelLeadUsageLimit":
+    "O modelo do líder atingiu o limite de uso. Escolha um membro ou outro modelo para o líder.",
+  "error.backend.channelLeadBlocked":
+    "O provedor do líder bloqueou esta solicitação. Altere a solicitação ou escolha um membro.",
+  "error.backend.channelLeadNoAnswer":
+    "O modelo do líder não deu nenhuma resposta. Tente novamente ou escolha um membro.",
+  "error.backend.channelLeadProviderError":
+    "O provedor do líder teve um erro. Tente novamente em alguns minutos ou escolha um membro.",
+  "error.backend.channelLeadStopped":
+    "O modelo do líder parou antes de responder. Tente novamente ou escolha um membro.",
   "error.backend.channelRequestMemberRequired": "Escolha um membro para esta solicitação.",
   "error.backend.channelDeliveryNotCreated": "A entrega do canal não foi criada.",
   "error.backend.channelAssignmentStopped": "Esta tarefa atribuída pelo canal foi interrompida ou substituída.",

@@ -77,7 +77,11 @@ import {
   useBrowserRequests,
   useThreadWaits,
 } from "@/features/workspace/components/use-live-workspace";
-import { useMobileWorkspace } from "@/features/workspace/context/mobile-workspace-context";
+import {
+  useMobileWorkspaceActions,
+  useMobileWorkspaceReader,
+  useMobileWorkspaceSelector,
+} from "@/features/workspace/context/mobile-workspace-context";
 import type { MobileAgentActivity } from "@/features/workspace/model/agent-activity";
 import type { PendingApproval } from "@/features/workspace/model/pending-approvals";
 import { queryKeys } from "@/features/workspace/model/query-keys";
@@ -112,8 +116,9 @@ export function AgentTaskScreen() {
     messageId?: string;
     focusAt?: string;
   }>();
-  const { agents } = useMobileWorkspace();
-  const agent = agents.find((item) => item.id === agentId && item.serverId === serverId);
+  const agent = useMobileWorkspaceSelector((workspace) =>
+    workspace.agents.find((item) => item.id === agentId && item.serverId === serverId),
+  );
   if (agent)
     return (
       <AgentTaskChat
@@ -179,12 +184,14 @@ function AgentTaskChat({
     () => new Set(pins.pins.filter((pin) => pin.taskId === taskId).map((pin) => pin.messageId)),
     [pins.pins, taskId],
   );
+  const server = useMobileWorkspaceSelector((workspace) => workspace.servers.find((item) => item.id === serverId));
+  const agents = useMobileWorkspaceSelector((workspace) => workspace.agents);
+  const tasksAllowed = useMobileWorkspaceSelector((workspace) => workspace.canUseTasks(serverId));
+  const filesAllowed = useMobileWorkspaceSelector((workspace) => workspace.canAttachThreadFiles(serverId));
+  const browserViewAvailable = useMobileWorkspaceSelector((workspace) => workspace.browserViewSupport(serverId).view);
+  const wholeApprovals = useMobileWorkspaceSelector((workspace) => workspace.readsWholeApprovals(serverId));
+  const readWorkspace = useMobileWorkspaceReader();
   const {
-    servers,
-    agents,
-    canUseTasks,
-    canAttachThreadFiles,
-    attachmentSupport,
     uploadAttachment,
     discardAttachment,
     startAgentTask,
@@ -193,15 +200,12 @@ function AgentTaskChat({
     sendAgentTaskMessage,
     respondToTaskPrompt,
     respondToApproval,
-    readsWholeApprovals,
     readWholeApproval,
     respondToBrowserTakeover,
     respondToBrowserSecret,
-    browserViewSupport,
-  } = useMobileWorkspace();
-  const server = servers.find((item) => item.id === serverId);
+  } = useMobileWorkspaceActions();
   const online = showsOnline(server);
-  const enabled = server?.state === "online" && canUseTasks(serverId);
+  const enabled = server?.state === "online" && tasksAllowed;
   const serverAgents = useMemo(() => agents.filter((item) => item.serverId === serverId), [agents, serverId]);
   const list = useQuery({
     queryKey: queryKeys.agentTasks(queryScope, serverId, agentId),
@@ -372,7 +376,6 @@ function AgentTaskChat({
   const isFocused = useIsFocused();
   const foregroundVisit = useAppForeground();
   const browserAllowed = useBrowserFeature();
-  const browserViewAvailable = browserViewSupport(serverId).view;
   const insets = useSafeAreaInsets();
   const keyboardOffset = Math.max(insets.bottom, 10) - 10;
   const reducedTransparency = useReducedTransparency();
@@ -399,8 +402,7 @@ function AgentTaskChat({
   const [draft, setDraft] = useState("");
   const [sendError, setSendError] = useState<string | null>(null);
   const [sending, setSending] = useState(false);
-  const filesAllowed = canAttachThreadFiles(serverId);
-  const attachments = useChatAttachments([], undefined, () => attachmentSupport(serverId));
+  const attachments = useChatAttachments([], undefined, () => readWorkspace().attachmentSupport(serverId));
   const menuProgress = useSharedValue(0);
   const [awaitingTurn, setAwaitingTurn] = useState(false);
   const ready = isDraft || Boolean(conversation.data);
@@ -697,7 +699,7 @@ function AgentTaskChat({
           browserRequests={taskBrowserRequests}
           serverName={server?.name ?? ""}
           onRespondApproval={respondToListApproval}
-          readsWholeApprovals={readsWholeApprovals(serverId)}
+          readsWholeApprovals={wholeApprovals}
           onLoadWholeApproval={loadWholeListApproval}
           foreground={foreground}
           messages={messages}

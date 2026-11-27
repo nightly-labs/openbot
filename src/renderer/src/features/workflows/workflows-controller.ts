@@ -3,6 +3,7 @@ import {
   applyWorkflowFolderAction,
   graphAgentIds,
   type StoredFileRow,
+  WORKFLOW_AUTO_VERSION_INTERVAL_MS,
   type WorkflowDetail,
   type WorkflowFolderAction,
   type WorkflowFoldersSnapshot,
@@ -56,6 +57,23 @@ const RUN_PAGE = 20;
 const CACHED_WORKFLOWS = 20;
 const SAVE_DELAY_MS = 400;
 const REFRESH_DELAY_MS = 50;
+const SAVE_RETRY_DELAYS_MS = [1_000, 4_000] as const;
+const VERSION_CLOCK_MARGIN_MS = 60_000;
+const NOT_STEP_KINDS: readonly WorkflowNodeKind[] = ["text", "note", "shape"];
+
+const stepCount = (graph: WorkflowGraph) => graph.nodes.filter((node) => !NOT_STEP_KINDS.includes(node.kind)).length;
+
+const triggerJson = (graph: WorkflowGraph) =>
+  stableJson(
+    graph.nodes
+      .filter((node) => node.kind === "trigger" || node.schedule !== undefined)
+      .map((node) => ({ id: node.id, kind: node.kind, fields: node.fields, schedule: node.schedule ?? null })),
+  );
+
+const autoVersionDue = (versions: readonly { at: string }[]) => {
+  const latest = Math.max(...versions.map((version) => Date.parse(version.at)).filter(Number.isFinite));
+  return !Number.isFinite(latest) || Date.now() - latest >= WORKFLOW_AUTO_VERSION_INTERVAL_MS - VERSION_CLOCK_MARGIN_MS;
+};
 
 const NO_OPTIONS: WorkflowGitHubRepositoryOptions = { labels: [], people: [] };
 
@@ -275,14 +293,16 @@ export function createWorkflowsController(
   };
   const cached = (workflowId: string) =>
     hostKey === undefined ? undefined : cache.get(hostKey)?.workflows.get(workflowId);
-  const putDetail = (workflowId: string, change: (detail: WorkflowDetail) => WorkflowDetail) => {
+  const putStored = (workflowId: string, change: (value: StoredWorkflow) => StoredWorkflow) => {
     const open = stored();
     const value = open?.detail.summary.id === workflowId ? open : cached(workflowId);
     if (!value) return;
-    const next = { ...value, detail: change(value.detail) };
+    const next = change(value);
     if (value === open) setStored(next);
     remember(next);
   };
+  const putDetail = (workflowId: string, change: (detail: WorkflowDetail) => WorkflowDetail) =>
+    putStored(workflowId, (value) => ({ ...value, detail: change(value.detail) }));
   const show = (value: StoredWorkflow) => {
     if (stored()?.detail.summary.id !== value.detail.summary.id) setBase(value.detail);
     setStored(value);
@@ -302,6 +322,15 @@ export function createWorkflowsController(
     dropPending(next.summary.id);
   };
   let saving: { workflowId: string; json: string } | undefined;
+  let failedSaves = 0;
+  const ownEvents = new Map<string, number>();
+  const heldEvents = new Map<string, number>();
+  const countOf = (counts: Map<string, number>, workflowId: string) => counts.get(workflowId) ?? 0;
+  const addCount = (counts: Map<string, number>, workflowId: string, by: number) => {
+    const next = countOf(counts, workflowId) + by;
+    if (next > 0) counts.set(workflowId, next);
+    else counts.delete(workflowId);
+  };
   const canvasShows = (workflowId: string) => !disposed && stored()?.detail.summary.id === workflowId;
 
   const reset = (next: WorkflowDetail) => {
@@ -433,6 +462,68 @@ export function createWorkflowsController(
     await readOpening(workflowId, listed);
   };
 
+  const readVersions = (workflowId: string) => {
+    host.workflows.versions(workflowId).then(
+      (versions) => {
+        if (!disposed) putStored(workflowId, (value) => ({ ...value, versions }));
+      },
+      () => undefined,
+    );
+  };
+
+  const touchLibrary = (workflowId: string, steps: number) => {
+    const updatedAt = new Date().toISOString();
+    const touch = (summary: WorkflowSummary): WorkflowSummary =>
+      summary.id === workflowId ? { ...summary, updatedAt, steps: Math.max(0, summary.steps + steps) } : summary;
+    if (!summaries().some((summary) => summary.id === workflowId)) return touch;
+    const list = summaries().map(touch);
+    library = list;
+    setSummaries(list);
+    const entry = hostKey === undefined ? undefined : cache.get(hostKey);
+    if (entry) entry.library = list;
+    return touch;
+  };
+
+  const settleOwnEvent = (workflowId: string, claim: boolean) => {
+    if (claim) {
+      if (countOf(heldEvents, workflowId) > 0) addCount(heldEvents, workflowId, -1);
+      else addCount(ownEvents, workflowId, 1);
+    }
+    if (countOf(heldEvents, workflowId) === 0) return;
+    heldEvents.delete(workflowId);
+    refresh(workflowId);
+  };
+
+  const saved = (edit: { workflowId: string; graph: WorkflowGraph }, from: WorkflowBase, revision: number) => {
+    const { workflowId } = edit;
+    const known = bases.get(workflowId) ?? from;
+    if (revision <= known.revision) {
+      settleOwnEvent(workflowId, true);
+      return;
+    }
+    bases.set(workflowId, { revision, graph: edit.graph });
+    const sameTriggers = triggerJson(from.graph) === triggerJson(edit.graph);
+    const touch = sameTriggers ? touchLibrary(workflowId, stepCount(edit.graph) - stepCount(from.graph)) : undefined;
+    putDetail(workflowId, (detail) => ({
+      ...detail,
+      revision,
+      graph: edit.graph,
+      summary: touch ? touch(detail.summary) : detail.summary,
+    }));
+    settleOwnEvent(workflowId, sameTriggers);
+    if (!sameTriggers) return;
+    const versions = (stored()?.detail.summary.id === workflowId ? stored() : cached(workflowId))?.versions;
+    if (versions && autoVersionDue(versions)) readVersions(workflowId);
+  };
+
+  const saveFailed = (edit: { workflowId: string; graph: WorkflowGraph }, error: unknown) => {
+    pending ??= edit;
+    failedSaves += 1;
+    const delay = SAVE_RETRY_DELAYS_MS[failedSaves - 1];
+    if (!disposed && delay !== undefined && timer === undefined) timer = setTimeout(flush, delay);
+    if (failedSaves === 1) throw error;
+  };
+
   const save = async (
     edit: { workflowId: string; graph: WorkflowGraph },
     queuedOn: { from: WorkflowBase | undefined; seen: number },
@@ -454,17 +545,17 @@ export function createWorkflowsController(
       result = await host.workflows.saveGraph({ workflowId, baseRevision: from.revision, graph: edit.graph });
     } catch (error) {
       saving = undefined;
-      pending ??= edit;
-      throw error;
+      settleOwnEvent(workflowId, false);
+      return saveFailed(edit, error);
     }
     saving = undefined;
-    const known = bases.get(workflowId) ?? from;
+    failedSaves = 0;
     if (result.ok) {
-      if (result.revision <= known.revision) return;
-      bases.set(workflowId, { revision: result.revision, graph: edit.graph });
-      putDetail(workflowId, (detail) => ({ ...detail, revision: result.revision, graph: edit.graph }));
+      saved(edit, from, result.revision);
       return;
     }
+    settleOwnEvent(workflowId, false);
+    const known = bases.get(workflowId) ?? from;
     const newer = result.conflict;
     if (newer.revision <= known.revision) return;
     takeForeign(newer);
@@ -652,6 +743,23 @@ export function createWorkflowsController(
   };
 
   const refresh = (workflowId: string | null, agentId?: string) => {
+    if (workflowId !== null && agentId === undefined) {
+      if (countOf(ownEvents, workflowId) > 0) {
+        addCount(ownEvents, workflowId, -1);
+        return;
+      }
+      if (saving?.workflowId === workflowId) {
+        addCount(heldEvents, workflowId, 1);
+        return;
+      }
+    }
+    if (workflowId === null) {
+      ownEvents.clear();
+      if (pending !== undefined && failedSaves > 0) {
+        failedSaves = 0;
+        flush();
+      }
+    }
     refreshPending.set(`${workflowId ?? ""}\u0000${agentId ?? ""}`, { workflowId, agentId });
     refreshTimer ??= setTimeout(flushRefresh, REFRESH_DELAY_MS);
   };
@@ -915,6 +1023,8 @@ export function createWorkflowsController(
     },
     onGraphChange: (graph) => {
       edits += 1;
+      if (pending !== undefined && pending.workflowId !== current) flush();
+      failedSaves = 0;
       pending = { workflowId: current, graph };
       clearTimeout(timer);
       timer = setTimeout(flush, SAVE_DELAY_MS);

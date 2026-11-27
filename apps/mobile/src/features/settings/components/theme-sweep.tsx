@@ -95,7 +95,7 @@ function smoothstep(from: number, to: number, value: number): number {
 
 export function ThemeSweep() {
   const image = useThemeSweep((state) => state.image);
-  const shader = sweepEffect();
+  const shader = image ? sweepEffect() : null;
   useEffect(() => {
     if (!image || shader) return;
     endThemeSweep();

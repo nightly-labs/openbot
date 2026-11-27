@@ -377,7 +377,7 @@
 }
 
 .provider-model-popover {
-  --provider-model-rail-bg: var(--openbot-bg-sheet-inset);
+  --provider-model-rail-cutout: var(--ui-popover-frost-bg);
   position: relative;
   z-index: var(--openbot-layer-dropdown);
   width: min(360px, calc(100vw - 24px));
@@ -385,7 +385,9 @@
   overflow: hidden;
   border: 0;
   border-radius: var(--ui-menu-radius);
-  background: var(--ui-menu-bg);
+  background: var(--ui-popover-frost-bg);
+  -webkit-backdrop-filter: var(--ui-popover-frost-filter);
+  backdrop-filter: var(--ui-popover-frost-filter);
   color: var(--openbot-text-primary);
   box-shadow: var(--ui-menu-panel-shadow);
   transform-origin: var(--kb-popover-content-transform-origin);
@@ -410,8 +412,8 @@
   flex-direction: column;
   align-items: center;
   gap: var(--openbot-space-1);
-  border-inline-end: 1px solid var(--openbot-border);
-  background: var(--provider-model-rail-bg);
+  border-inline-end: 1px solid var(--ui-menu-edge);
+  background: var(--ui-popover-frost-sunken);
   padding: 9px 7px;
 }
 
@@ -445,10 +447,12 @@
   max-width: min(240px, calc(100vw - 16px));
   flex-direction: column;
   gap: var(--openbot-space-0-5);
-  border: 1px solid var(--openbot-border-strong);
+  border: 0;
   border-radius: var(--openbot-radius-sm);
-  background: var(--openbot-bg-surface-raised);
-  box-shadow: var(--openbot-shadow-raised);
+  background: var(--ui-popover-frost-bg);
+  -webkit-backdrop-filter: var(--ui-popover-frost-filter);
+  backdrop-filter: var(--ui-popover-frost-filter);
+  box-shadow: var(--ui-menu-panel-shadow);
   padding: var(--openbot-space-1-5) var(--openbot-space-2);
   color: var(--openbot-text-primary);
   font-size: var(--openbot-text-md);
@@ -525,7 +529,7 @@
   height: 6px;
   border-radius: var(--openbot-radius-pill);
   background: var(--openbot-text-muted);
-  box-shadow: 0 0 0 2px var(--provider-model-rail-bg);
+  box-shadow: 0 0 0 2px var(--provider-model-rail-cutout);
   content: "";
 }
 
@@ -545,7 +549,7 @@
   place-items: center;
   border-radius: var(--openbot-radius-pill);
   background: var(--openbot-bg-control);
-  box-shadow: 0 0 0 2px var(--provider-model-rail-bg);
+  box-shadow: 0 0 0 2px var(--provider-model-rail-cutout);
   color: var(--openbot-text-primary);
   font-size: var(--openbot-text-sm);
   font-weight: var(--openbot-weight-medium);
@@ -599,7 +603,7 @@
 
 .provider-model-heading .ui-button:hover,
 .provider-model-empty .ui-button-variant-outline:hover {
-  background: color-mix(in srgb, var(--openbot-text-primary) 10%, transparent);
+  background: var(--ui-menu-item-selected);
 }
 
 .provider-model-heading .ui-button svg {
@@ -684,7 +688,7 @@
   justify-content: space-between;
   gap: var(--openbot-space-1) 12px;
   margin: var(--ui-menu-padding) calc(var(--ui-menu-padding) * -1) 0;
-  border-top: 1px solid var(--openbot-border);
+  border-top: 1px solid var(--ui-menu-edge);
   padding-block: var(--ui-menu-padding) 0;
   padding-inline: calc(var(--ui-menu-padding) + var(--ui-menu-inset)) var(--ui-menu-padding);
   color: var(--openbot-text-muted);
@@ -716,12 +720,14 @@
 }
 
 .provider-model-effort-select .ui-select-trigger:is(:hover, [data-expanded]) {
-  background: color-mix(in srgb, var(--openbot-text-primary) 10%, transparent);
+  background: var(--ui-menu-item-selected);
 }
 
 .provider-model-effort-content {
   border-radius: var(--ui-menu-radius);
-  background: var(--ui-menu-bg);
+  background: var(--ui-popover-frost-bg);
+  -webkit-backdrop-filter: var(--ui-popover-frost-filter);
+  backdrop-filter: var(--ui-popover-frost-filter);
   box-shadow: var(--ui-menu-panel-shadow);
   animation: ui-menu-in var(--ui-menu-duration) var(--ui-menu-ease) both;
 }

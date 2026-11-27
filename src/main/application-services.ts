@@ -396,6 +396,7 @@ import { EncryptedRecordStore } from "./password-managers/encrypted-record-store
 import { PasswordManagersService } from "./password-managers/password-managers-service";
 import { managedProtonPassCli } from "./password-managers/proton-pass-cli-installer";
 import { ProtonPassDriver, protonPassRecordSchema } from "./password-managers/proton-pass-driver";
+import { PluginCatalogService } from "./plugin-catalog-service";
 import { PointerForwardingGate } from "./pointer-forwarding-gate";
 import { ProcessLauncher } from "./process-launcher";
 import { PromptCacheTtlPreferenceStore } from "./prompt-cache-ttl-preference-store";
@@ -518,9 +519,10 @@ import { spawnVoiceSpeechHost } from "./voice-speech-host-process";
 import { VoiceSpeechService } from "./voice-speech-service";
 import { spawnVoiceTranscriptionHost } from "./voice-transcription-host-process";
 import { VoiceTranscriptionService } from "./voice-transcription-service";
-import { WatchRelayCommands } from "./watch-relay-commands";
+import { visibleWatchChannels, WatchRelayCommands } from "./watch-relay-commands";
 import { createWatchRelayWantedStore, loadWatchRelayKey } from "./watch-relay-key";
 import { WatchRelayService } from "./watch-relay-service";
+import { WatchWidgetPushFailure, WatchWidgetPushService } from "./watch-widget-push";
 import { WebhookRelay } from "./webhook-relay";
 import { WindowsTopmostKeeper } from "./windows-topmost-keeper";
 import { createWorkflowFileExporter, type WorkflowFileExporter } from "./workflow-file-export";
@@ -624,6 +626,7 @@ const TEARDOWN_ORDER = {
   browserView: 45,
   providerDetection: 48,
   providerRuntimes: 50,
+  pluginCatalog: 56,
   localServers: 57,
   remoteServers: 60,
   voice: 70,
@@ -632,6 +635,7 @@ const TEARDOWN_ORDER = {
   routineResults: 84,
   messaging: 85,
   hostEvents: 85.5,
+  watchWidgetPush: 85.7,
   watchRelay: 85.75,
   signalIngress: 86,
   host: 90,
@@ -787,6 +791,7 @@ export interface ApplicationServices {
   localServers: LocalServers | null;
   centralAuth: CentralAuthManager;
   skills: SkillMarketplaceService;
+  pluginCatalog: PluginCatalogService;
   hostedSites: HostedSiteDesktopService;
   billing: BillingDesktopService;
   referral: ReferralDesktopService;
@@ -2112,18 +2117,25 @@ export async function createApplicationServices({
   await Effect.runPromise(agentApiKeys.registerSaved());
   await Effect.runPromise(agentApiKeys.syncVault().pipe(Effect.ignore));
   let workflowTriggers: WorkflowTriggers | null = null;
-  const catalogPluginServers = await Effect.runPromise(
-    loadCatalogPluginServers(
-      app.isPackaged
-        ? join(process.resourcesPath, "plugin-catalog")
-        : resolve(__dirname, "../../resources/plugin-catalog"),
+  const pluginCatalog = new PluginCatalogService({
+    bundled: await Effect.runPromise(
+      loadCatalogPluginServers(
+        app.isPackaged
+          ? join(process.resourcesPath, "plugin-catalog")
+          : resolve(__dirname, "../../resources/plugin-catalog"),
+      ),
     ),
+    resolveApiUrl: (path) => centralAuth.resolveApiUrl(path),
+  });
+  const pluginCatalogRefresh = Effect.runFork(pluginCatalog.refreshLoop());
+  teardown.push(TEARDOWN_ORDER.pluginCatalog, "the plugin catalog refresh", () =>
+    Effect.runPromise(Fiber.interrupt(pluginCatalogRefresh)),
   );
   providerRuntimes.setCatalogNpxApps(
     (config) =>
       config.transport === "stdio" &&
       config.command === "npx" &&
-      catalogPluginSlug(config, catalogPluginServers, homedir()) !== null,
+      catalogPluginSlug(config, pluginCatalog.servers(), homedir()) !== null,
   );
   const workflowStore = new WorkflowStore({
     database: store.database,
@@ -2236,7 +2248,7 @@ export async function createApplicationServices({
       create: () => hostedServers.createServerClaim().pipe(toToolOperationFailed),
     },
     marketplaceAppServer: (appId) => {
-      const listed = catalogPluginServers.filter((server) => server.slug === appId);
+      const listed = pluginCatalog.servers().filter((server) => server.slug === appId);
       const [server] = listed;
       if (!server || listed.length !== 1) return null;
       const config = service.listMcpServers().find((saved) => catalogPluginSlug(saved, listed, homedir()) === appId);
@@ -3221,7 +3233,7 @@ export async function createApplicationServices({
     timezone: () => serverTimezone.effective(),
     settings: {
       mcpServers: () => service.listMcpServers(),
-      listedMcpServers: () => catalogPluginServers.filter((server) => server.transport === "http"),
+      listedMcpServers: () => pluginCatalog.servers().filter((server) => server.transport === "http"),
       saveMcpServer: (config) => service.saveMcpServer({ config }),
       customProviders: () => customProviderChanges.list(),
       saveCustomProvider: (input) => customProviderChanges.save(input),
@@ -3365,6 +3377,7 @@ export async function createApplicationServices({
   teardown.push(TEARDOWN_ORDER.watchRelay, "the Apple Watch relay", () => Effect.runPromise(watchRelay.dispose()));
   const host = new HostService({
     watchRelay,
+    pluginCatalogLoaded: () => pluginCatalog.loaded(),
     onMemberUse: (memberId) => accountActivity.memberUsed(memberId),
     appVersion: app.getVersion(),
     store: teamStore,
@@ -3719,7 +3732,28 @@ export async function createApplicationServices({
       }),
   });
   teardown.push(TEARDOWN_ORDER.host, "the local host", () => runCauseEffect(host.shutdown()));
-  watchCommands = new WatchRelayCommands(host.watchTeamApi());
+  const watchTeamApi = host.watchTeamApi();
+  const watchWidgetPush = new WatchWidgetPushService({
+    agents: service,
+    hiddenAgentIds: (member) => watchTeamApi.hiddenAgentIds(member),
+    channels: (member) => visibleWatchChannels(watchTeamApi, member),
+    member: (memberId) => teamStore.getMember(memberId),
+    send: (push) => {
+      const hostId = teamStore.getIdentity()?.serverId;
+      if (!hostId)
+        return Effect.fail(
+          new WatchWidgetPushFailure({ cause: new Error(sourceText("error.auth.hostCredentialUnavailable")) }),
+        );
+      return centralAuth
+        .sendWatchWidgetPush(hostId, push)
+        .pipe(Effect.mapError((error) => new WatchWidgetPushFailure({ cause: error })));
+    },
+    logger,
+  });
+  teardown.push(TEARDOWN_ORDER.watchWidgetPush, "the Apple Watch widget pushes", () =>
+    Effect.runPromise(watchWidgetPush.dispose()),
+  );
+  watchCommands = new WatchRelayCommands(watchTeamApi, { widgetPush: watchWidgetPush });
   signalIngress.handleWatch((delivery) => watchRelay.deliver(delivery));
   Effect.runFork(watchRelay.start());
   const signedInState = centralAuth.getState();
@@ -3794,7 +3828,7 @@ export async function createApplicationServices({
     resolveMcpServer: (name) => {
       const configs = service.listMcpServers().filter((server) => isReportedMcpServerName(server.name, name));
       if (configs.length === 0) return null;
-      const slugs = new Set(configs.map((config) => catalogPluginSlug(config, catalogPluginServers, homedir())));
+      const slugs = new Set(configs.map((config) => catalogPluginSlug(config, pluginCatalog.servers(), homedir())));
       const [slug] = slugs;
       return { slug: slugs.size === 1 && slug ? slug : null };
     },
@@ -3820,7 +3854,7 @@ export async function createApplicationServices({
         workflowCount: () => workflowStore.list().length,
         skills: (agentId) => skills.listInstalledForChatTags(agentId),
         mcpServers: () => service.listMcpServers(),
-        pluginSlug: (config) => catalogPluginSlug(config, catalogPluginServers, homedir()),
+        pluginSlug: (config) => catalogPluginSlug(config, pluginCatalog.servers(), homedir()),
         computerUseEnabled: () => cuaDriver.mcpServerForProviders() !== null,
       }),
     inventoryDay: analyticsInventoryDayStore(join(app.getPath("userData"), ANALYTICS_INVENTORY_FILE)),
@@ -4516,6 +4550,7 @@ export async function createApplicationServices({
 
   return {
     service,
+    pluginCatalog,
     workflows: workflowRuntime,
     workflowFiles,
     workflowGitHub,

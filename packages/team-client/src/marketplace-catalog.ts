@@ -13,6 +13,7 @@ import {
   type MarketplaceSkillQuery,
   marketplaceQueryParams,
 } from "@openbot/contracts/ipc";
+import { decodePluginCatalog, PLUGIN_CATALOG_PATH, type PluginCatalog } from "@openbot/contracts/plugin-catalog";
 import { sourceText } from "@openbot/i18n/source";
 import { Effect, Schema } from "effect";
 
@@ -32,6 +33,7 @@ export interface MarketplaceCatalog {
     getListing: (agentId: string) => Effect.Effect<MarketplaceAgentDetail, MarketplaceCatalogError>;
   };
   templates: { get: (templateId: string) => Effect.Effect<AgentTemplateDetail, MarketplaceCatalogError> };
+  plugins: { catalog: () => Effect.Effect<PluginCatalog, MarketplaceCatalogError> };
 }
 
 export function createMarketplaceCatalog(request: typeof fetch): MarketplaceCatalog {
@@ -67,6 +69,7 @@ export function createMarketplaceCatalog(request: typeof fetch): MarketplaceCata
       getListing: (agentId) =>
         read(`/v1/marketplace/agents/${encodeURIComponent(agentId)}/listing`, decodeMarketplaceAgentDetail),
     },
+    plugins: { catalog: () => read(PLUGIN_CATALOG_PATH, decodePluginCatalog) },
     templates: {
       get: (templateId) =>
         read(

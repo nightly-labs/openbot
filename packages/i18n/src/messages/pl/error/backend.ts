@@ -136,6 +136,18 @@ export const messages = {
     "Model lidera kanału jest niedostępny. Wybierz inny model dla lidera lub wybierz członka.",
   "error.backend.channelLeadRefused":
     "Model lidera kanału odrzucił tę prośbę. Wybierz członka lub inny model dla lidera.",
+  "error.backend.channelLeadNotPermitted":
+    "Dostawca lidera kanału odmówił dostępu temu kontu. Sprawdź konto lub wybierz członka.",
+  "error.backend.channelLeadBilling":
+    "Konto lidera kanału nie ma środków albo jego plan nie obejmuje tego modelu. Sprawdź plan lub wybierz członka.",
+  "error.backend.channelLeadUsageLimit":
+    "Model lidera kanału osiągnął limit użycia. Wybierz członka lub wybierz inny model dla lidera.",
+  "error.backend.channelLeadBlocked": "Dostawca lidera kanału zablokował tę prośbę. Zmień prośbę lub wybierz członka.",
+  "error.backend.channelLeadNoAnswer": "Model lidera kanału nie dał odpowiedzi. Spróbuj ponownie lub wybierz członka.",
+  "error.backend.channelLeadProviderError":
+    "U dostawcy lidera kanału wystąpił błąd. Spróbuj ponownie za kilka minut lub wybierz członka.",
+  "error.backend.channelLeadStopped":
+    "Model lidera kanału zatrzymał się przed odpowiedzią. Spróbuj ponownie lub wybierz członka.",
   "error.backend.channelRequestMemberRequired": "Wybierz członka do tego żądania.",
   "error.backend.channelDeliveryNotCreated": "Nie utworzono dostarczenia kanału.",
   "error.backend.channelAssignmentStopped": "Ten przydział kanału został zatrzymany lub zastąpiony.",

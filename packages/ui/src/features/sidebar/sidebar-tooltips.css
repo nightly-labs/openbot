@@ -8,9 +8,11 @@
   display: grid;
   max-width: min(260px, calc(100vw - 16px));
   gap: 2px;
-  border: 1px solid var(--openbot-border-strong);
+  border: 1px solid var(--ui-menu-edge);
   border-radius: var(--openbot-radius-sm);
-  background: var(--openbot-bg-surface-raised);
+  background: var(--ui-popover-frost-bg);
+  -webkit-backdrop-filter: var(--ui-popover-frost-filter);
+  backdrop-filter: var(--ui-popover-frost-filter);
   box-shadow: var(--openbot-shadow-raised);
   padding: var(--openbot-space-2) var(--openbot-space-3);
   color: var(--openbot-text-primary);

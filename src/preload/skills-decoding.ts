@@ -44,6 +44,7 @@ import {
   requiredNumber,
   requiredString,
 } from "@openbot/contracts/ipc-decoding";
+import { decodePluginCatalog, type PluginCatalog } from "@openbot/contracts/plugin-catalog";
 import { isBoolean, isDynamicRecord, isNumber, isOneOf, isString } from "@openbot/contracts/runtime-values";
 import { decodeAgent } from "./agent-decoding";
 
@@ -71,6 +72,10 @@ export function decodeSkillPage(value: unknown): MarketplaceSkillPage {
   const page = decodeRecord(value, "marketplace page");
   if (!Array.isArray(page.skills)) throw new Error("Invalid marketplace skills.");
   return { skills: page.skills.map(decodeSkillSummary), nextCursor: nullableString(page, "nextCursor") };
+}
+
+export function decodeNullablePluginCatalog(value: unknown): PluginCatalog | null {
+  return value === null ? null : decodePluginCatalog(value);
 }
 
 export function decodeSkillDetails(value: unknown): MarketplaceSkillDetail[] {

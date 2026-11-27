@@ -915,6 +915,7 @@
 
 .wfn-menu {
   --ui-menu-bg: var(--wfn-glass);
+  --ui-popover-frost-bg: var(--wfn-glass);
   --ui-menu-panel-shadow: 0 0 0 1px var(--wfn-ring-strong);
   --ui-menu-item-hover: var(--wfn-hover);
   --ui-menu-radius: var(--openbot-radius-lg);

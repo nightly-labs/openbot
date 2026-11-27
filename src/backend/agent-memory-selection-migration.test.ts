@@ -65,7 +65,7 @@ describe("agent memory selection migration", () => {
       const before = rows(db);
       migrateOpenBotDatabase(db);
       expect(rows(db)).toEqual(before.map((row) => ({ ...row, site: null })));
-      expect(db.prepare("SELECT MAX(version) AS version FROM schema_migrations").get()).toEqual({ version: 70 });
+      expect(db.prepare("SELECT MAX(version) AS version FROM schema_migrations").get()).toEqual({ version: 71 });
       const selected = databaseRows(
         db
           .prepare(`SELECT m.memory_id, m.text, m.origin FROM projection_agent_memories m
@@ -131,9 +131,9 @@ describe("agent memory selection migration", () => {
     const db = databaseAt(31);
     seedMemories(db);
     const before = rows(db);
-    db.exec("INSERT INTO schema_migrations VALUES(71,'now')");
+    db.exec("INSERT INTO schema_migrations VALUES(72,'now')");
     expect(() => migrateOpenBotDatabase(db)).toThrow("newer than this application supports");
-    db.exec("DELETE FROM schema_migrations WHERE version=71; DELETE FROM schema_migrations WHERE version=20");
+    db.exec("DELETE FROM schema_migrations WHERE version=72; DELETE FROM schema_migrations WHERE version=20");
     expect(() => migrateOpenBotDatabase(db)).toThrow("missing version 20");
     expect(rows(db)).toEqual(before);
   });

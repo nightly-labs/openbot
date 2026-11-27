@@ -442,6 +442,10 @@ jobs:
         if: ${{ !cancelled() }}
         run: bun run test:mcp-member-access
 
+      - name: Run the shared plugin catalog E2E test
+        if: ${{ !cancelled() }}
+        run: bun run test:plugin-catalog
+
       - name: Run the server mute and unmute E2E test
         if: ${{ !cancelled() }}
         run: bun run test:server-mute
@@ -918,6 +922,10 @@ jobs:
         if: ${{ !cancelled() }}
         run: bun run test:mobile-reconnect
 
+      - name: Run the mobile agent list E2E test
+        if: ${{ !cancelled() }}
+        run: bun run test:mobile-agent-list
+
       - name: Run the memory review E2E test
         if: ${{ !cancelled() }}
         run: bun run test:memory-review
@@ -1058,6 +1066,7 @@ jobs:
             .openbot-build/agent-api-keys-e2e/
             .openbot-build/remote-connect-analytics-e2e/
             .openbot-build/mobile-reconnect-e2e/
+            .openbot-build/mobile-agent-list-e2e/
             .openbot-build/memory-review-e2e/
             .openbot-build/skill-revision-e2e.json
           if-no-files-found: ignore
@@ -1369,6 +1378,18 @@ jobs:
         with:
           name: mobile-share-sender-e2e
           path: .openbot-build/mobile-share-sender-e2e/report.json
+          if-no-files-found: ignore
+
+      - name: Run the mobile stream reconcile E2E test
+        if: ${{ !cancelled() }}
+        run: bun run test:mobile-stream-reconcile
+
+      - name: Upload the mobile stream reconcile E2E report
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: mobile-stream-reconcile-e2e
+          path: .openbot-build/mobile-stream-reconcile-e2e/report.json
           if-no-files-found: ignore
 
   mobile-ota-e2e:

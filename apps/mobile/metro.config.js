@@ -5,6 +5,11 @@ const { withUniwindConfig } = require("uniwind/metro");
 const { createTransformCacheStore } = require("./metro-cache");
 
 const config = getDefaultConfig(__dirname);
+const expoTransformOptions = config.transformer.getTransformOptions;
+config.transformer.getTransformOptions = async (...args) => {
+  const options = await expoTransformOptions(...args);
+  return { ...options, transform: { ...options.transform, inlineRequires: true } };
+};
 config.fileMapCacheDirectory = path.join(__dirname, ".expo/metro-file-map");
 fs.mkdirSync(config.fileMapCacheDirectory, { recursive: true });
 const transformCacheStore = createTransformCacheStore(__dirname);

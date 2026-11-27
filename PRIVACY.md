@@ -255,7 +255,10 @@ Live Activity starts and ends, voice conversation and spoken turn outcomes, agen
 installs, and Marketplace installs (agent, skill or app, and the result; no listing name).
 
 The mobile Marketplace reads the public catalog and the plugin app icons from the account service,
-without account credentials. The phone sends no request to a plugin vendor until the user connects
+without account credentials. The desktop app, the web client and each OpenBot host also read the
+public plugin catalog (`/v1/plugins/catalog`) from the account service without account credentials:
+the Marketplace when it opens, and a host at start and then every 30 minutes. The request carries no
+user data. The phone sends no request to a plugin vendor until the user connects
 that vendor's app. A key the user types, or the grant of a browser sign-in, goes only to the user's
 own host over the encrypted Team channel.
 Mobile properties include app version/build, iOS or Android, result, timing, bounded connection stage,
@@ -722,7 +725,8 @@ The mobile app keeps a copy of what it shows for each server: the agent list, th
 the sections, the server's capabilities, the latest page (up to 50 messages) of each chat that it
 loaded, the channel list with the latest 50 messages of each channel that it opened, and the last
 values of the drawer (the member count, the usage cost, the next routine runs,
-the thread and workflow counts, and the name and last run of each pinned workflow), up to 4 MB for
+the thread and workflow counts, the name and last run of each pinned workflow, and the Signal
+servers of the server with their last latency and the chosen one), up to 4 MB for
 each server. It also keeps the last server list that the account service gave: for each server its
 ID, name, logo version, public key and the time of its last key change, membership ID, role, member
 limit, and hosted status. So after a start the app connects and shows them at once, while the
@@ -947,8 +951,9 @@ in its mailbox and uses your address only to answer you.
 
 Cloudflare processes account and configuration API requests. It does not carry Team API, file,
 message, command, Remote Desktop media, or Remote Desktop input traffic. It forwards sealed iPhone
-Live Activity updates and phone notifications that it cannot read; see [iPhone Live Activity](#iphone-live-activity),
-[iPhone notifications](#iphone-notifications) and [Android notifications](#android-notifications). For an
+Live Activity updates and phone notifications that it cannot read, and empty watch widget pushes; see
+[iPhone Live Activity](#iphone-live-activity), [iPhone notifications](#iphone-notifications),
+[Android notifications](#android-notifications) and [Watch widget updates](#watch-widget-updates). For an
 agent's Slack app, it exchanges the Slack sign-in and serves the install page; see
 [Slack connections](#slack-connections). It does the same for the Discord app; see
 [Discord connections](#discord-connections). For the OpenBot Telegram bot, it records which
@@ -2416,6 +2421,21 @@ An answer on the watch, such as Allow, Deny, a choice or a dictated message to a
 direct link, or through the iPhone app, which sends it over its encrypted host connection, as a tap
 in the app does. Dictation on the watch uses the dictation of watchOS. Listen reads the reply with the
 speech voices of watchOS on the watch.
+
+### Watch widget updates
+
+The watch widgets show the newest state of your agents also when the watch app is closed. For this,
+on watchOS 26 and later, the watch gives each server, over the end-to-end encrypted direct link, its
+widget push token and the APNs environment (production or development). The server keeps them in
+memory only, at most 5 tokens for each member. It forgets a token 12 hours after the watch last gave
+it, when Apple refuses the token, when the member is removed or disabled, and when the server stops.
+
+When the state that the watch shows changes, for example when an agent starts to wait for you, a
+turn starts or ends, or a reply comes, the server sends the OpenBot account service only the token
+and the environment, with its own server credential. The account service sends Apple an empty
+"content changed" push, with no agent data, and stores and logs nothing from these requests. watchOS
+then reloads the widget, and the widget gets the new state from the server over the direct link.
+Apple can keep its own delivery logs under its own policy.
 
 ## iPhone notifications
 

@@ -2,6 +2,7 @@ import {
   type AgentApproval,
   type AgentApprovalPermissions,
   type AgentEvent,
+  type AgentSyncChangedEvent,
   isAgentEvent,
   type ScopedAgentEvent,
 } from "@openbot/contracts/ipc";
@@ -18,6 +19,11 @@ export function decodeScopedAgentEvent(value: unknown): ScopedAgentEvent {
   if (bufferedLive === undefined) return { serverId, event };
   if (!isBoolean(bufferedLive)) throw new Error("Invalid agent event.");
   return { serverId, event, bufferedLive };
+}
+
+export function decodeAgentSyncChangedEvent(value: unknown): AgentSyncChangedEvent {
+  const change = decodeRecord(value, "sync change");
+  return { serverId: requiredString(change, "serverId"), name: requiredString(change, "name") };
 }
 
 function agentEvent(value: unknown): AgentEvent {

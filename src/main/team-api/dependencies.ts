@@ -545,7 +545,8 @@ interface TeamApiProviders {
   pasteSignIn: boolean;
 }
 
-export type TeamApiMailbox = Pick<MailboxStore, "resolveAttachment">;
+export type TeamApiMailbox = Pick<MailboxStore, "resolveAttachment"> &
+  Partial<Pick<MailboxStore, "attachmentPaths" | "knownAttachmentSizes">>;
 export interface TeamApiAttachmentPreviews {
   file(attachmentId: string, source: PreviewFile): Effect.Effect<PreviewFile | null>;
 }
@@ -717,6 +718,7 @@ export interface TeamApiOptions {
   liveActivityPush?: LiveActivityPushService | undefined;
   pushNotifications?: PushNotificationService | undefined;
   watchRelay?: TeamApiWatchRelay | undefined;
+  pluginCatalogLoaded?: (() => boolean) | undefined;
   focusUse?: boolean | undefined;
   rateLimitCapacity?: number | undefined;
   workflowSpotStaleMs?: number | undefined;

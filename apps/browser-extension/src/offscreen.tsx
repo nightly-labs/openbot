@@ -6,7 +6,7 @@ import { render } from "@solidjs/web";
 import { type ClientBrowserLink, createClientBrowserLink } from "./client-browser-link";
 import { BROWSER_HOLD_MESSAGE } from "./client-browser-messages";
 import { readServerId, readSession, useStorageArea } from "./extension-storage";
-import { createHostConnection, type HostConnection } from "./host-connection";
+import { createHostConnection, type HostConnection, isRefusedSession } from "./host-connection";
 import { xSend, xStatus } from "./x-agent";
 import {
   decodeXRequest,
@@ -49,7 +49,20 @@ interface Target {
   link: ClientBrowserLink;
 }
 
+interface FailedTarget {
+  token: string;
+  saved: string | null;
+  at: number;
+  delayMs: number;
+  refused: boolean;
+  error: unknown;
+}
+
+const TARGET_RETRY_MS = 30_000;
+const TARGET_RETRY_MAX_MS = 5 * 60_000;
+
 let target: Target | null = null;
+let failed: FailedTarget | null = null;
 let queue: Promise<unknown> = Promise.resolve();
 
 function drop() {
@@ -58,14 +71,30 @@ function drop() {
   target = null;
 }
 
-async function currentTarget(): Promise<Target | null> {
+function sameAttempt(attempt: FailedTarget | null, token: string, saved: string | null): attempt is FailedTarget {
+  return attempt !== null && attempt.token === token && attempt.saved === saved;
+}
+
+function failTarget(token: string, saved: string | null, error: unknown): FailedTarget {
+  const previous = sameAttempt(failed, token, saved) ? failed : null;
+  const delayMs = previous ? Math.min(previous.delayMs * 2, TARGET_RETRY_MAX_MS) : TARGET_RETRY_MS;
+  return { token, saved, at: Date.now(), delayMs, refused: isRefusedSession(error), error };
+}
+
+function stillFailing(attempt: FailedTarget, maxWaitMs: number): boolean {
+  return attempt.refused || Date.now() < attempt.at + Math.min(attempt.delayMs, maxWaitMs);
+}
+
+async function currentTarget(maxWaitMs = TARGET_RETRY_MAX_MS): Promise<Target | null> {
   const session = await readSession();
   if (!session) {
     drop();
+    failed = null;
     return null;
   }
   const saved = await readServerId();
   if (target && target.token === session.token && (!saved || saved === target.hostId)) return target;
+  if (sameAttempt(failed, session.token, saved) && stillFailing(failed, maxWaitMs)) throw failed.error;
   drop();
   let link: ClientBrowserLink | null = null;
   const connection = await createHostConnection(session, {
@@ -82,16 +111,18 @@ async function currentTarget(): Promise<Target | null> {
     const capabilities = await connection.connect(host);
     link = createClientBrowserLink({ request: connection.request, capabilities });
     target = { token: session.token, hostId: host.hostId, connection, capabilities, link };
+    failed = null;
     return target;
   } catch (error) {
     await connection.dispose();
+    failed = failTarget(session.token, saved, error);
     throw error;
   }
 }
 
 async function status(): Promise<XStatusAnswer> {
   try {
-    const current = await currentTarget();
+    const current = await currentTarget(TARGET_RETRY_MS);
     if (!current) return { ready: false, reason: "signed-out" };
     return await xStatus({
       hostId: current.hostId,
@@ -107,7 +138,7 @@ async function status(): Promise<XStatusAnswer> {
 async function send(payload: XReplyPayload, clientMessageId: string): Promise<XSendResult> {
   const { t } = currentText();
   try {
-    const current = await currentTarget();
+    const current = await currentTarget(0);
     if (!current) return { ok: false, error: t("extension.x.signedOut"), reached: false };
     return await xSend(
       { hostId: current.hostId, request: current.connection.request, capabilities: current.capabilities },

@@ -371,9 +371,9 @@
   display: flex;
   height: var(--openbot-control-md);
   align-items: center;
-  border: 1px solid var(--openbot-border-strong);
+  border: 1px solid var(--ui-menu-edge);
   border-radius: var(--openbot-radius-md);
-  background: var(--openbot-bg-control);
+  background: var(--ui-menu-item-hover);
   padding-inline-end: 3px;
   transition: border-color var(--openbot-duration-hover) ease;
 }

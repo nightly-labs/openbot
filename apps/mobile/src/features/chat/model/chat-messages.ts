@@ -185,21 +185,45 @@ export function presentChatMessages(
   const visible = baseline ? messages.filter((message) => baseline.has(message.id)) : messages;
   const received = new Map<string, PendingChatMessage["message"]>();
   for (const item of pending) if (item.serverId) received.set(item.serverId, item.message);
-  const result = visible.map((message) => {
-    const local = received.get(message.id);
-    if (local) return local;
-    const alias = aliases.get(message.id);
-    if (alias === undefined) return message;
-    let aliased = aliasedMessages.get(message);
-    if (aliased?.id !== alias) {
-      aliased = { ...message, id: alias };
-      aliasedMessages.set(message, aliased);
-    }
-    return aliased;
-  });
   const drawn = new Set(visible.map((message) => message.id));
-  for (const item of pending) if (!item.serverId || !drawn.has(item.serverId)) result.push(item.message);
+  const placed = new Map<number, ChatMessage[]>();
+  const tail: ChatMessage[] = [];
+  for (const item of pending) {
+    if (item.serverId && drawn.has(item.serverId)) continue;
+    const at = item.serverId && item.baseline ? afterBaseline(visible, item.baseline) : -1;
+    if (at < 0) tail.push(item.message);
+    else placed.set(at, [...(placed.get(at) ?? []), item.message]);
+  }
+  const result: ChatMessage[] = [];
+  for (const [index, message] of visible.entries()) {
+    const before = placed.get(index);
+    if (before) result.push(...before);
+    result.push(presentedMessage(message, received, aliases));
+  }
+  result.push(...tail);
   return result;
+}
+
+function afterBaseline(messages: readonly ChatMessage[], baseline: ReadonlySet<string>): number {
+  const last = messages.findLastIndex((message) => baseline.has(message.id));
+  return last + 1 < messages.length ? last + 1 : -1;
+}
+
+function presentedMessage(
+  message: ChatMessage,
+  received: ReadonlyMap<string, ChatMessage>,
+  aliases: ReadonlyMap<string, string>,
+): ChatMessage {
+  const local = received.get(message.id);
+  if (local) return local;
+  const alias = aliases.get(message.id);
+  if (alias === undefined) return message;
+  let aliased = aliasedMessages.get(message);
+  if (aliased?.id !== alias) {
+    aliased = { ...message, id: alias };
+    aliasedMessages.set(message, aliased);
+  }
+  return aliased;
 }
 
 const projectedBubbles = new WeakMap<

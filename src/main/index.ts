@@ -551,6 +551,7 @@ const {
   forwardRemoteDesktopSessions,
   forwardServers,
   forwardTeamPresence,
+  forwardSyncChanged,
   forwardDirectMessage,
   forwardDirectTyping,
   forwardAttachmentDownload,
@@ -789,6 +790,7 @@ function registerIpcHandlers({
   remoteServers,
   centralAuth,
   skills,
+  pluginCatalog,
   hostedSites,
   githubConnector,
   linkAccount,
@@ -917,7 +919,7 @@ function registerIpcHandlers({
       forwardLiveEvent: forwardVoiceLiveEvent,
     }),
     ...accountIpcHandlers({ centralAuth, host, refreshServers: () => remoteServers.requestDirectoryRefresh() }),
-    ...skillIpcHandlers({ skills, getMainWindow: getDialogParent, translate: language.translate }),
+    ...skillIpcHandlers({ skills, pluginCatalog, getMainWindow: getDialogParent, translate: language.translate }),
     ...agentFolderIpcHandlers({
       folders: agentFolders,
       remoteServers,
@@ -1701,6 +1703,7 @@ if (!hasSingleInstanceLock) {
       });
       remoteServers.on("receivedRuntimeSnapshot", withdrawSettledNotifications);
       remoteServers.on("presence", forwardTeamPresence);
+      remoteServers.on("syncChanged", forwardSyncChanged);
       remoteServers.on("directMessage", forwardDirectMessage);
       remoteServers.on("directTyping", forwardDirectTyping);
       remoteServers.on("remoteChatContent", forwardRemoteChatContent);

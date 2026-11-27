@@ -60,7 +60,7 @@ function crmObjects(db: DatabaseSync) {
 }
 
 function expectHealthy(db: DatabaseSync): void {
-  expect(db.prepare("SELECT MAX(version) AS version FROM schema_migrations").get()).toEqual({ version: 70 });
+  expect(db.prepare("SELECT MAX(version) AS version FROM schema_migrations").get()).toEqual({ version: 71 });
   expect(db.prepare("PRAGMA foreign_keys").get()).toEqual({ foreign_keys: 1 });
   expect(db.prepare("PRAGMA foreign_key_check").all()).toEqual([]);
   expect(db.prepare("PRAGMA integrity_check").get()).toEqual({ integrity_check: "ok" });
@@ -153,6 +153,7 @@ describe("CRM migration", () => {
         ...before,
         ...CRM_TABLES_AFTER_MIGRATION,
         ...THREAD_EVENT_COMPACTION_TABLES_AFTER_MIGRATION,
+        sync_message_changes: [],
       });
       expectHealthy(db);
     },
@@ -175,6 +176,7 @@ describe("CRM migration", () => {
       ...before,
       ...CRM_TABLES_AFTER_MIGRATION,
       ...THREAD_EVENT_COMPACTION_TABLES_AFTER_MIGRATION,
+      sync_message_changes: [],
     });
     expectHealthy(db);
   });
@@ -183,9 +185,9 @@ describe("CRM migration", () => {
     const db = databaseAt(62);
     seed(db, 62);
     const before = contents(db);
-    db.exec("INSERT INTO schema_migrations VALUES(71,'now')");
+    db.exec("INSERT INTO schema_migrations VALUES(72,'now')");
     expect(() => migrateOpenBotDatabase(db)).toThrow("newer than this application supports");
-    db.exec("DELETE FROM schema_migrations WHERE version=71; DELETE FROM schema_migrations WHERE version=20");
+    db.exec("DELETE FROM schema_migrations WHERE version=72; DELETE FROM schema_migrations WHERE version=20");
     expect(() => migrateOpenBotDatabase(db)).toThrow("missing version 20");
     expect(contents(db)).toEqual(before);
     expect(crmObjects(db)).toEqual([]);
@@ -195,7 +197,7 @@ describe("CRM migration", () => {
     const db = migrated();
     insertCustomer(db);
     const after = contents(db);
-    db.exec("INSERT INTO schema_migrations VALUES(71,'now')");
+    db.exec("INSERT INTO schema_migrations VALUES(72,'now')");
     expect(() => migrateOpenBotDatabase(db)).toThrow("newer than this application supports");
     expect(contents(db)).toEqual(after);
   });

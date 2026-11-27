@@ -129,6 +129,18 @@ export const messages = {
     "채널 리더의 모델을 사용할 수 없어요. 리더에게 다른 모델을 고르거나 멤버를 선택해 주세요.",
   "error.backend.channelLeadRefused":
     "채널 리더의 모델이 이 요청을 거부했어요. 멤버를 선택하거나 리더에게 다른 모델을 골라 주세요.",
+  "error.backend.channelLeadNotPermitted":
+    "채널 리더의 제공업체가 이 계정의 접근을 거부했어요. 계정을 확인하거나 멤버를 선택해 주세요.",
+  "error.backend.channelLeadBilling":
+    "채널 리더의 계정에 크레딧이 없거나 요금제에 이 모델이 포함되지 않아요. 요금제를 확인하거나 멤버를 선택해 주세요.",
+  "error.backend.channelLeadUsageLimit":
+    "채널 리더의 모델이 사용 한도에 도달했어요. 멤버를 선택하거나 리더에게 다른 모델을 선택해 주세요.",
+  "error.backend.channelLeadBlocked":
+    "채널 리더의 제공업체가 이 요청을 차단했어요. 요청을 바꾸거나 멤버를 선택해 주세요.",
+  "error.backend.channelLeadNoAnswer": "채널 리더의 모델이 답하지 않았어요. 다시 시도하거나 멤버를 선택해 주세요.",
+  "error.backend.channelLeadProviderError":
+    "채널 리더의 제공업체에 오류가 생겼어요. 몇 분 뒤에 다시 시도하거나 멤버를 선택해 주세요.",
+  "error.backend.channelLeadStopped": "채널 리더의 모델이 답하기 전에 멈췄어요. 다시 시도하거나 멤버를 선택해 주세요.",
   "error.backend.channelRequestMemberRequired": "이 요청을 맡을 멤버를 선택하세요.",
   "error.backend.channelDeliveryNotCreated": "채널 전달이 만들어지지 않았어요.",
   "error.backend.channelAssignmentStopped": "이 채널 배정은 중지되었거나 다른 배정으로 바뀌었어요.",

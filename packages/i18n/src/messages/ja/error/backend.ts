@@ -141,6 +141,20 @@ export const messages = {
     "チャンネルリードのモデルは利用できません。リードに別のモデルを選ぶか、メンバーを選択してください。",
   "error.backend.channelLeadRefused":
     "チャンネルリードのモデルがこのリクエストを拒否しました。メンバーを選択するか、リードに別のモデルを選んでください。",
+  "error.backend.channelLeadNotPermitted":
+    "チャンネルリードのプロバイダーがこのアカウントのアクセスを拒否しました。アカウントを確認するか、メンバーを選択してください。",
+  "error.backend.channelLeadBilling":
+    "チャンネルリードのアカウントにクレジットがないか、プランにこのモデルが含まれていません。プランを確認するか、メンバーを選択してください。",
+  "error.backend.channelLeadUsageLimit":
+    "チャンネルリードのモデルが利用上限に達しました。メンバーを選択するか、リードに別のモデルを選択してください。",
+  "error.backend.channelLeadBlocked":
+    "チャンネルリードのプロバイダーがこのリクエストをブロックしました。リクエストを変更するか、メンバーを選択してください。",
+  "error.backend.channelLeadNoAnswer":
+    "チャンネルリードのモデルから回答がありませんでした。もう一度お試しいただくか、メンバーを選択してください。",
+  "error.backend.channelLeadProviderError":
+    "チャンネルリードのプロバイダーでエラーが発生しました。数分後にもう一度お試しいただくか、メンバーを選択してください。",
+  "error.backend.channelLeadStopped":
+    "チャンネルリードのモデルが回答する前に停止しました。もう一度お試しいただくか、メンバーを選択してください。",
   "error.backend.channelRequestMemberRequired": "この依頼のメンバーを選択してください。",
   "error.backend.channelDeliveryNotCreated": "チャンネルへの配信を作成できませんでした。",
   "error.backend.channelAssignmentStopped": "このチャンネルの割り当ては停止されたか、置き換えられました。",

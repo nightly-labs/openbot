@@ -11,7 +11,7 @@ import type { MobileConnectorId } from "@/features/servers/model/connectors";
 import { mcpServerDetail } from "@/features/servers/model/mcp-server-draft";
 import type { ConnectorRow } from "@/features/servers/model/use-connector-rows";
 import { catalogImageUrl, pluginIconUrl } from "../api/marketplace-catalog";
-import { MOBILE_PLUGINS, type MobilePlugin } from "./plugin-catalog.generated";
+import type { MobilePlugin } from "./plugin-catalog.generated";
 
 export type MarketplaceKind = "agent" | "app" | "skill";
 
@@ -74,8 +74,8 @@ export function skillListing(apiUrl: string, skill: MarketplaceSkillSummary): Ma
   };
 }
 
-export function appListings(apiUrl: string): MarketplaceListing[] {
-  return MOBILE_PLUGINS.map(
+export function appListings(apiUrl: string, plugins: readonly MobilePlugin[]): MarketplaceListing[] {
+  return plugins.map(
     (plugin): MarketplaceListing => ({
       kind: "app",
       id: plugin.slug,

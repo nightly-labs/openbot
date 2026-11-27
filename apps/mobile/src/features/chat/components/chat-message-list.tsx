@@ -74,7 +74,11 @@ import { ChatTurnStepsRow } from "@/features/chat/components/chat-turn-steps-row
 import { useActivityPresence } from "@/features/chat/components/use-activity-presence";
 import { CHAT_ROW_GAP, type ChatMotion } from "@/features/chat/components/use-chat-motion";
 import { useFoldScrollAnchor } from "@/features/chat/components/use-fold-scroll-anchor";
-import { useMessageArrivals } from "@/features/chat/components/use-message-arrivals";
+import {
+  ArrivalEntrancesContext,
+  useArrivalEntrance,
+  useMessageArrivals,
+} from "@/features/chat/components/use-message-arrivals";
 import type { QuestionPromptController } from "@/features/chat/components/use-question-prompt";
 import { approvalTitle } from "@/features/chat/model/approval-text";
 import { chatListView } from "@/features/chat/model/chat-list-view";
@@ -108,7 +112,6 @@ import type { PendingApproval } from "@/features/workspace/model/pending-approva
 import { useColumnWidth } from "@/shared/components/adaptive-split";
 import { haptics } from "@/shared/lib/haptics";
 import { useMotionPreference, useReducedMotion } from "@/shared/lib/motion";
-import { isAndroid } from "@/shared/lib/platform";
 import { useText } from "@/shared/lib/text";
 import { END_X, lineDirectionStyle, MIRROR_IN_RTL } from "@/shared/lib/text-direction";
 import { type BubbleTone, bubbleTone } from "../model/bubble-tone";
@@ -186,7 +189,6 @@ const USER_MESSAGE_ENTRANCE = FadeInDown.duration(240)
 const PROGRESS_UPDATE_ENTRANCE = FadeIn.duration(220)
   .easing(Easing.bezier(0.23, 1, 0.32, 1))
   .reduceMotion(ReduceMotion.System);
-const REPLY_SIZE = { duration: 180, easing: Easing.bezier(0.23, 1, 0.32, 1), reduceMotion: ReduceMotion.System };
 const REPLY_APPEAR = { duration: 220, easing: Easing.bezier(0.23, 1, 0.32, 1), reduceMotion: ReduceMotion.Never };
 const BUBBLE_CORNER = { borderCurve: "circular", borderRadius: 22 } as const;
 
@@ -194,7 +196,6 @@ function ChatBubble({
   children,
   agent,
   collapsed = false,
-  animateSize,
   className,
   style,
   fill,
@@ -202,53 +203,21 @@ function ChatBubble({
   agent: boolean;
   fill: string | undefined;
   collapsed?: boolean;
-  animateSize: boolean;
   className: string;
   style: ComponentProps<typeof Animated.View>["style"];
 }>) {
-  const sized = agent && animateSize && !isAndroid;
-  const size = useSharedValue({ width: 0, height: 0, measured: false });
   const shown = useSharedValue(collapsed ? 0 : 1);
   useEffect(() => {
     shown.set(collapsed ? 0 : withTiming(1, REPLY_APPEAR));
   }, [collapsed, shown]);
-  const background = useAnimatedStyle(() => {
-    if (!sized) return { opacity: shown.get() };
-    const { width, height, measured } = size.get();
-    return {
-      opacity: shown.get(),
-      width: measured ? withTiming(width, REPLY_SIZE) : width,
-      height: measured ? withTiming(height, REPLY_SIZE) : height,
-    };
-  });
+  const background = useAnimatedStyle(() => ({ opacity: shown.get() }));
   return (
-    <Animated.View
-      className={className}
-      style={[style, BUBBLE_CORNER]}
-      onLayout={
-        sized
-          ? ({ nativeEvent }) => {
-              const previous = size.get();
-              size.set({
-                width: nativeEvent.layout.width,
-                height: nativeEvent.layout.height,
-                measured: previous.measured || previous.width > 0,
-              });
-            }
-          : undefined
-      }
-    >
+    <Animated.View className={className} style={[style, BUBBLE_CORNER]}>
       {agent ? (
         <Animated.View
-          key={sized ? "sized" : "filled"}
           pointerEvents="none"
-          className={fill ? "absolute left-0 top-0" : "absolute left-0 top-0 bg-control/60"}
-          style={[
-            BUBBLE_CORNER,
-            sized ? null : StyleSheet.absoluteFill,
-            fill ? { backgroundColor: fill } : null,
-            background,
-          ]}
+          className={fill ? undefined : "bg-control/60"}
+          style={[BUBBLE_CORNER, StyleSheet.absoluteFill, fill ? { backgroundColor: fill } : null, background]}
         />
       ) : null}
       {children}
@@ -352,7 +321,6 @@ interface MessageRowShared {
   solidBubbleSurface: string | undefined;
   firstMessageStyle: ComponentProps<typeof Animated.View>["style"];
   screenReaderEnabled: boolean;
-  textReveal: boolean;
   replySession: { progress: Map<string, number>; revealed: Set<string> };
   markRevealed: (id: string) => void;
   replyHaptics: ReturnType<typeof useReplyHaptics>;
@@ -548,6 +516,8 @@ const MessageRow = memo(function MessageRow({
   arriving,
   animate,
   playing,
+  playbackResumes,
+  playbackPaused,
   revealed,
   pinned,
   branchable,
@@ -559,6 +529,8 @@ const MessageRow = memo(function MessageRow({
   arriving: boolean;
   animate: boolean;
   playing: boolean;
+  playbackResumes: boolean;
+  playbackPaused: boolean;
   revealed: boolean;
   pinned: boolean;
   branchable: boolean;
@@ -573,6 +545,7 @@ const MessageRow = memo(function MessageRow({
   const { t } = useText();
   const [selectionHeight, setSelectionHeight] = useState(0);
   const waiting = awaitingFirstWord(message, playing, revealed, shared.replySession.progress);
+  const entrance = useArrivalEntrance(message.id, arriving);
   const bubble = message.kind === "message" && !outbox && !message.streaming && !waiting ? message : null;
   const selectable = Boolean(bubble?.body.trim()) && shared.canSelectText;
   const messageActions = useMessageActions(
@@ -645,6 +618,9 @@ const MessageRow = memo(function MessageRow({
             complete,
             progress: replySession.progress,
             enabled,
+            active: playbackResumes,
+            paused: playbackPaused,
+            revealed,
             onWord: (word: string, index: number) => {
               markRevealed(message.id);
               replyHaptics.onWord(word, index);
@@ -656,7 +632,18 @@ const MessageRow = memo(function MessageRow({
             onComplete: replyHaptics.onComplete,
           }
         : undefined,
-    [eligible, message.id, complete, replySession.progress, enabled, markRevealed, replyHaptics],
+    [
+      eligible,
+      message.id,
+      complete,
+      replySession.progress,
+      enabled,
+      playbackResumes,
+      playbackPaused,
+      revealed,
+      markRevealed,
+      replyHaptics,
+    ],
   );
   const speaker = message.kind === "message" && message.speaker ? agentsById.get(message.speaker.id) : undefined;
   const fileAgentId = message.kind !== "message" ? undefined : message.speaker ? speaker?.id : shared.fileAgentId;
@@ -733,7 +720,6 @@ const MessageRow = memo(function MessageRow({
           agent={message.author === "agent"}
           fill={plainBubbleFill}
           collapsed={waiting}
-          animateSize={shared.textReveal}
           className={
             message.author === "user"
               ? `max-w-full self-end px-4 py-3 ${userBubbleStyle || memberColor || plainBubbleFill ? "" : "bg-control/60"}`
@@ -758,16 +744,7 @@ const MessageRow = memo(function MessageRow({
           {children}
         </ChatBubble>
       ) : null,
-    [
-      message,
-      waiting,
-      shared.textReveal,
-      shared.listWidth,
-      userBubbleStyle,
-      memberColor,
-      plainBubbleFill,
-      solidBubbleSurface,
-    ],
+    [message, waiting, shared.listWidth, userBubbleStyle, memberColor, plainBubbleFill, solidBubbleSurface],
   );
   const sentTable = useCallback(
     (table: ReactNode, key: string) => (
@@ -822,7 +799,7 @@ const MessageRow = memo(function MessageRow({
       <Animated.View
         key={message.id}
         entering={
-          arriving && !isFirstUser
+          entrance && !isFirstUser
             ? message.author === "user"
               ? USER_MESSAGE_ENTRANCE
               : message.progress && playing
@@ -1029,6 +1006,8 @@ interface RowContextValue {
   branchPoints: ReadonlySet<string>;
   animationActive: boolean;
   playbackActive: boolean;
+  playbackResumes: boolean;
+  playbackPaused: boolean;
   arrivals: ReadonlySet<string>;
   revealedIds: ReadonlySet<string>;
   responseIds: ReadonlySet<string>;
@@ -1160,6 +1139,8 @@ interface ChatRowBodyProps {
   arriving: boolean;
   animate: boolean;
   playing: boolean;
+  playbackResumes: boolean;
+  playbackPaused: boolean;
   revealed: boolean;
   pinned: boolean;
   branchable: boolean;
@@ -1186,6 +1167,8 @@ const ChatRowBody = memo(function ChatRowBody({
   arriving,
   animate,
   playing,
+  playbackResumes,
+  playbackPaused,
   revealed,
   pinned,
   branchable,
@@ -1208,6 +1191,8 @@ const ChatRowBody = memo(function ChatRowBody({
         arriving={arriving}
         animate={animate}
         playing={playing}
+        playbackResumes={playbackResumes}
+        playbackPaused={playbackPaused}
         revealed={revealed}
         pinned={pinned}
         branchable={branchable}
@@ -1250,6 +1235,7 @@ function ChatRow({ item, index }: { item: VisibleMessage; index: number }) {
   const message = latest?.id === item.id ? latest : item;
   const response = row.responseIds.has(message.id);
   const arriving = row.arrivals.has(message.id);
+  const revealed = row.revealedIds.has(message.id);
   return (
     <ChatRowBody
       message={message}
@@ -1272,9 +1258,11 @@ function ChatRow({ item, index }: { item: VisibleMessage; index: number }) {
       outbox={row.outboxStatuses?.get(message.id)}
       selecting={message.id === row.selectingMessageId}
       arriving={arriving}
-      animate={arriving && row.animationActive}
+      animate={row.animationActive && (arriving || revealed)}
       playing={arriving && row.playbackActive}
-      revealed={row.revealedIds.has(message.id)}
+      playbackResumes={revealed && row.playbackResumes}
+      playbackPaused={revealed && row.playbackPaused}
+      revealed={revealed}
       pinned={row.pinnedIds.has(message.id)}
       branchable={row.branchPoints.has(message.id)}
       canAnswer={message.kind === "question" && row.canSend}
@@ -1580,7 +1568,7 @@ export const ChatMessageList = memo(function ChatMessageList({
     },
     [replySession],
   );
-  const arrivals = useMessageArrivals(replySession.key, messages, watchesArrivals);
+  const { arriving: arrivals, entrances } = useMessageArrivals(replySession.key, messages, watchesArrivals);
   const messageColorMode = useMessageColor((state) => state.mode);
   const customMessageColor = useMessageColor((state) => state.customColor);
   const messageColorStyle = useMessageColor((state) => state.style);
@@ -1778,6 +1766,7 @@ export const ChatMessageList = memo(function ChatMessageList({
     });
   };
   const animationActive = animateMessages && motion.responseVisible;
+  const playbackShown = isFocused && appActive && motion.responseVisible;
   const canReply = Boolean(onReply);
   const canReact = Boolean(onReact);
   const canDelete = Boolean(onDeleteMessage);
@@ -1792,6 +1781,8 @@ export const ChatMessageList = memo(function ChatMessageList({
   const messageFiles = useMessageFileOpener(target.serverId);
   const remoteContent = useRemoteChatContent(target.serverId);
   const playbackActive = animationActive && textReveal && !screenReaderEnabled;
+  const playbackResumes = playbackShown && textReveal && !screenReaderEnabled;
+  const playbackPaused = !playbackShown && textReveal && !screenReaderEnabled;
   const shared = useMemo<MessageRowShared>(
     () => ({
       agents: rowAgents,
@@ -1809,7 +1800,6 @@ export const ChatMessageList = memo(function ChatMessageList({
       bubbleTone: coloredMessages ? bubbleTone(userForeground) : undefined,
       firstMessageStyle: motion.firstMessageStyle,
       screenReaderEnabled,
-      textReveal,
       replySession,
       markRevealed,
       replyHaptics,
@@ -1846,7 +1836,6 @@ export const ChatMessageList = memo(function ChatMessageList({
       solidBubbleSurface,
       motion.firstMessageStyle,
       screenReaderEnabled,
-      textReveal,
       replySession,
       markRevealed,
       replyHaptics,
@@ -1923,6 +1912,8 @@ export const ChatMessageList = memo(function ChatMessageList({
       branchPoints: shownBranchPoints,
       animationActive,
       playbackActive,
+      playbackResumes,
+      playbackPaused,
       arrivals,
       revealedIds,
       responseIds,
@@ -1951,6 +1942,8 @@ export const ChatMessageList = memo(function ChatMessageList({
       shownBranchPoints,
       animationActive,
       playbackActive,
+      playbackResumes,
+      playbackPaused,
       arrivals,
       revealedIds,
       responseIds,
@@ -2044,6 +2037,7 @@ export const ChatMessageList = memo(function ChatMessageList({
   const openTaggedTab = useTaggedTabOpener(target.serverId);
   const activityRows = useActivityPresence(
     (activities?.length ? activities : [activity]).flatMap((entry) => activitySpec(entry) ?? []),
+    motion.sendSettling,
   );
 
   const historyVisible = motion.historyVisible;
@@ -2245,17 +2239,19 @@ export const ChatMessageList = memo(function ChatMessageList({
             <HistoryShownContext value={historyState !== "ready" || motion.historyVisible}>
               <RoutineGroupsContext value={routineGroupsState}>
                 <KeptOpenContext value={replySession.keptOpen}>
-                  <RowContext value={rowContext}>
-                    <ChatSwipeGestureContext value={swipeGesture ?? null}>
-                      <ChatTimeRevealContext value={timeReveal}>
-                        <ChatTimesMountedContext value={timesMounted}>
-                          <ListHeaderContext value={listHeader}>
-                            <ListFooterContext value={listFooter}>{list}</ListFooterContext>
-                          </ListHeaderContext>
-                        </ChatTimesMountedContext>
-                      </ChatTimeRevealContext>
-                    </ChatSwipeGestureContext>
-                  </RowContext>
+                  <ArrivalEntrancesContext value={entrances}>
+                    <RowContext value={rowContext}>
+                      <ChatSwipeGestureContext value={swipeGesture ?? null}>
+                        <ChatTimeRevealContext value={timeReveal}>
+                          <ChatTimesMountedContext value={timesMounted}>
+                            <ListHeaderContext value={listHeader}>
+                              <ListFooterContext value={listFooter}>{list}</ListFooterContext>
+                            </ListHeaderContext>
+                          </ChatTimesMountedContext>
+                        </ChatTimeRevealContext>
+                      </ChatSwipeGestureContext>
+                    </RowContext>
+                  </ArrivalEntrancesContext>
                 </KeptOpenContext>
               </RoutineGroupsContext>
             </HistoryShownContext>

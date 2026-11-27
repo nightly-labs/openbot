@@ -44,6 +44,7 @@ import {
 import type { MobilePlugin } from "../model/plugin-catalog.generated";
 import { pluginConnectMethod, pluginServerId } from "../model/plugin-connect";
 import { useMarketplaceInstalled } from "../model/use-marketplace";
+import { useMobilePlugins } from "../model/use-mobile-plugins";
 import { usePluginConnect } from "../model/use-plugin-connect";
 import { useTryInChat } from "../model/use-try-in-chat";
 
@@ -69,7 +70,8 @@ export function MarketplaceListingScreen() {
     retry: false,
     queryFn: ({ signal }) => loadMarketplaceSkill(apiUrl ?? "", id, signal),
   });
-  const app = apiUrl && kind === "app" ? appListings(apiUrl).find((item) => item.id === id) : undefined;
+  const plugins = useMobilePlugins(serverId);
+  const app = apiUrl && kind === "app" ? appListings(apiUrl, plugins).find((item) => item.id === id) : undefined;
   const [busy, setBusy] = useState(false);
   usePreventRemove(busy, () => undefined);
   const close = () => {

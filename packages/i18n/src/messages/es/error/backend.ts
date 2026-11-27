@@ -140,6 +140,20 @@ export const messages = {
     "El modelo del coordinador no está disponible. Elige otro modelo para el coordinador o elige un miembro.",
   "error.backend.channelLeadRefused":
     "El modelo del coordinador rechazó esta solicitud. Elige un miembro u otro modelo para el coordinador.",
+  "error.backend.channelLeadNotPermitted":
+    "El proveedor del coordinador rechazó el acceso de esta cuenta. Revisa la cuenta o elige un miembro.",
+  "error.backend.channelLeadBilling":
+    "La cuenta del coordinador no tiene crédito, o su plan no incluye este modelo. Revisa el plan o elige un miembro.",
+  "error.backend.channelLeadUsageLimit":
+    "El modelo del coordinador alcanzó su límite de uso. Elige un miembro o elige otro modelo para el coordinador.",
+  "error.backend.channelLeadBlocked":
+    "El proveedor del coordinador bloqueó esta solicitud. Cambia la solicitud o elige un miembro.",
+  "error.backend.channelLeadNoAnswer":
+    "El modelo del coordinador no dio ninguna respuesta. Inténtalo de nuevo o elige un miembro.",
+  "error.backend.channelLeadProviderError":
+    "El proveedor del coordinador tuvo un error. Inténtalo de nuevo en unos minutos o elige un miembro.",
+  "error.backend.channelLeadStopped":
+    "El modelo del coordinador se detuvo antes de responder. Inténtalo de nuevo o elige un miembro.",
   "error.backend.channelRequestMemberRequired": "Elige un miembro para esta solicitud.",
   "error.backend.channelDeliveryNotCreated": "No se creó la entrega del canal.",
   "error.backend.channelAssignmentStopped": "Esta asignación del canal se detuvo o se reemplazó.",

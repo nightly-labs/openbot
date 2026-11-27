@@ -207,6 +207,7 @@ export function createMockSkills(options: MockSkillsOptions, onChanged: (agentId
       if (!detail) throw new Error("Skill not found");
       return clone(detail);
     },
+    pluginCatalog: async () => null,
     listMine: async () => clone(skillSubmissions),
     choosePackage: async () => clone(STORY_SKILL_PACKAGE_PREVIEW),
     submit: async (input) => {

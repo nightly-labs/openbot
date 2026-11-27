@@ -5,10 +5,12 @@ import { haptics } from "@/shared/lib/haptics";
 
 export function ChatLinkPressable({
   chatId,
+  onOpen,
   onPress,
   ...props
 }: ComponentProps<typeof Pressable> & {
   chatId?: string;
+  onOpen?: () => void;
 }) {
   const pane = useChatListPane();
 
@@ -18,6 +20,7 @@ export function ChatLinkPressable({
       onPress={(event) => {
         if (event.defaultPrevented) return;
         void haptics.impact("soft");
+        onOpen?.();
         if (pane) openChatFromPane(pane, chatId, () => onPress?.(event));
         else onPress?.(event);
       }}
