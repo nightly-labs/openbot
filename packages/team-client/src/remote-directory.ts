@@ -28,6 +28,7 @@ import {
 import { sourceText } from "@openbot/i18n/source";
 import { referenceFrom, safeReference } from "@openbot/user-errors/reference";
 import { Deferred, Effect, Schema, Semaphore } from "effect";
+import { accountBookmarkHeaders, rememberAccountBookmark } from "./account-bookmark";
 import { runTeamEffect } from "./effect-boundary";
 import {
   followHostKeyHandovers,
@@ -623,12 +624,14 @@ export class RemoteTeamDirectoryClient {
       ({ controller }) =>
         Effect.gen({ self: this }, function* () {
           const browser = this.#authentication.kind === "browser";
+          const url = new URL(browser ? `/api/browser${path}` : path, this.#apiUrl);
           const response = yield* Effect.tryPromise({
             try: () =>
-              this.#fetch(new URL(browser ? `/api/browser${path}` : path, this.#apiUrl), {
+              this.#fetch(url, {
                 ...(browser ? { credentials: "same-origin" as const } : {}),
                 method: options.method ?? "GET",
                 headers: {
+                  ...accountBookmarkHeaders(url),
                   ...(this.#authentication.kind === "bearer" && options.authenticated !== false
                     ? { Authorization: `Bearer ${this.#authentication.token}` }
                     : {}),
@@ -648,6 +651,7 @@ export class RemoteTeamDirectoryClient {
                 ? directoryFailure(sourceText("error.remote.directoryTimeout"), "timeout/directory")
                 : directoryFailure(sourceText("error.remote.directoryUnreachable"), "network/directory"),
           });
+          rememberAccountBookmark(url, response);
           const value = yield* directoryIO(() => response.json()).pipe(Effect.catch(() => Effect.succeed(null)));
           if (!response.ok) return yield* directoryError(response.status, value);
           return value;
