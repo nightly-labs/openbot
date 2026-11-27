@@ -10,10 +10,8 @@ import {
   TriangleAlert,
   toast,
 } from "@openbot/ui";
-import { createScrollFades } from "@openbot/ui/components/createScrollFades";
-import { ScrollEdgeBlur } from "@openbot/ui/components/ScrollEdgeBlur";
 import { useText } from "@openbot/ui/text";
-import { createEffect, createMemo, createStore, onCleanup, Show } from "solid-js";
+import { createEffect, createMemo, createStore, Show } from "solid-js";
 
 export interface OwnerTransferPromptCalls {
   list(): Promise<OwnerTransfer[]>;
@@ -34,8 +32,6 @@ export function OwnerTransferPrompt(props: {
   onAccepted: (accepted: AcceptedOwnerTransfer) => void;
 }) {
   const { t, errorMessage } = useText();
-  const fades = createScrollFades();
-  onCleanup(() => fades.stop());
   const [state, setState] = createStore<OwnerTransferPromptState>({
     transfers: [],
     postponed: [],
@@ -111,15 +107,11 @@ export function OwnerTransferPrompt(props: {
           <Dialog.Portal>
             <Dialog.Overlay class="ui-confirm-dialog-overlay">
               <Dialog.Content class="ui-confirm-dialog" data-tone="default">
-                <div
-                  class={["ui-confirm-dialog-main", fades.classes()]}
-                  ref={(element) => fades.bind(element)}
-                  onScroll={fades.measure}
-                >
+                <div class="ui-confirm-dialog-main">
                   <span class="ui-confirm-dialog-icon" aria-hidden="true">
                     <Crown />
                   </span>
-                  <div class="ui-confirm-dialog-content" ref={(element) => fades.watch(element)}>
+                  <div class="ui-confirm-dialog-content">
                     <Dialog.Title as="h2" class="ui-confirm-dialog-title">
                       {t("server.ownerTransfer.incomingTitle", { server: transfer().hostName })}
                     </Dialog.Title>
@@ -151,7 +143,6 @@ export function OwnerTransferPrompt(props: {
                     </Show>
                   </div>
                 </div>
-                <ScrollEdgeBlur fades={fades} />
                 <footer class="ui-confirm-dialog-actions">
                   <Button
                     type="button"

@@ -36,7 +36,6 @@ import {
   Volume2,
   VolumeX,
 } from "@openbot/ui";
-import { ScrollEdgeBlur } from "@openbot/ui/components/ScrollEdgeBlur";
 import { CreditAmount } from "@openbot/ui/features/credits/CreditIcon";
 import { MakerLogo } from "@openbot/ui/features/credits/MakerLogo";
 import { createPickerFades } from "@openbot/ui/features/workflows/WorkflowPicker";
@@ -316,7 +315,6 @@ function ModelPicker(props: {
                 </Listbox.Item>
               )}
             />
-            <ScrollEdgeBlur fades={fades} />
           </Show>
         </Popover.Content>
       </Popover.Portal>

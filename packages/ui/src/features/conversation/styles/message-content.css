@@ -1132,9 +1132,11 @@
   box-sizing: border-box;
   width: max-content;
   max-width: min(280px, calc(100vw - 16px));
-  border: 1px solid var(--openbot-border-strong);
+  border: 1px solid var(--ui-menu-edge);
   border-radius: var(--openbot-radius-md);
-  background: var(--openbot-bg-surface-raised);
+  background: var(--ui-popover-frost-bg);
+  -webkit-backdrop-filter: var(--ui-popover-frost-filter);
+  backdrop-filter: var(--ui-popover-frost-filter);
   padding: 6px 8px;
   color: var(--openbot-text-primary);
   font-size: var(--openbot-text-sm);

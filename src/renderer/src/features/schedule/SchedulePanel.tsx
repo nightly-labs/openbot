@@ -3,8 +3,6 @@ import type {
   RoutineCalendarInput,
   RoutineCalendarRunStatus,
 } from "@openbot/contracts/ipc";
-import { createScrollFades } from "@openbot/ui/components/createScrollFades";
-import { ScrollEdgeBlur } from "@openbot/ui/components/ScrollEdgeBlur";
 import {
   RoutineCalendar,
   type RoutineCalendarAgent,
@@ -12,7 +10,7 @@ import {
   type RoutineCalendarStatus,
 } from "@openbot/ui/features/conversation/RoutineCalendar";
 import { useText } from "@openbot/ui/text";
-import { createEffect, createMemo, createSignal, createStore, onCleanup, onSettled } from "solid-js";
+import { createEffect, createMemo, createSignal, createStore, onSettled } from "solid-js";
 import { actionToast } from "../../action-toast";
 import { useNavigation } from "../../navigation";
 import { useAgents } from "../agents/agents-context";
@@ -210,37 +208,28 @@ export function ScheduleView(props: ScheduleViewProps) {
   });
 
   const headerFrame = createPageHeaderFrame();
-  const fades = createScrollFades();
-  onCleanup(() => fades.stop());
-  createEffect(
-    () => ({ routines: routines().length, runs: runs().length, phase: state.phase }),
-    () => fades.remeasure(),
-  );
   return (
-    <>
-      <div class={["schedule-pane", fades.classes()]} ref={(element) => fades.bind(element)} onScroll={fades.measure}>
-        <RoutineCalendar
-          routines={routines()}
-          runs={runs()}
-          agents={props.agents}
-          now={now()}
-          timeZone={timeZone}
-          hostName={props.hostName}
-          state={state.phase}
-          onRangeChange={(first, last) => {
-            range = rangeAround(Date.parse(first), Date.parse(last));
-            void load();
-          }}
-          onOpenRoutine={openRoutine}
-          onOpenAgent={props.onOpenAgent}
-          onRetry={() => void load()}
-          onCreateRoutine={props.onCreateRoutine}
-          create={create()}
-          onBack={props.onBack}
-          frame={headerFrame()}
-        />
-      </div>
-      <ScrollEdgeBlur fades={fades} />
-    </>
+    <div class="schedule-pane">
+      <RoutineCalendar
+        routines={routines()}
+        runs={runs()}
+        agents={props.agents}
+        now={now()}
+        timeZone={timeZone}
+        hostName={props.hostName}
+        state={state.phase}
+        onRangeChange={(first, last) => {
+          range = rangeAround(Date.parse(first), Date.parse(last));
+          void load();
+        }}
+        onOpenRoutine={openRoutine}
+        onOpenAgent={props.onOpenAgent}
+        onRetry={() => void load()}
+        onCreateRoutine={props.onCreateRoutine}
+        create={create()}
+        onBack={props.onBack}
+        frame={headerFrame()}
+      />
+    </div>
   );
 }

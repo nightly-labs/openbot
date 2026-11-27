@@ -12,9 +12,7 @@ import {
 import { Button, Checkbox, Dialog, Field, IconButton, Input, Plus, SearchSelect, X } from "@openbot/ui";
 import { useText } from "@openbot/ui/text";
 import type { JSX } from "@solidjs/web";
-import { createMemo, createSignal, createStore, createUniqueId, For, onCleanup, Show } from "solid-js";
-import { createScrollFades } from "../../components/createScrollFades";
-import { ScrollEdgeBlur } from "../../components/ScrollEdgeBlur";
+import { createMemo, createSignal, createStore, createUniqueId, For, Show } from "solid-js";
 import { ChoiceSelect, CrmPopupLayer, LabelledControl, OwnerSelect, usePopupMount } from "./CrmParts";
 import { CrmSourceDialog } from "./CrmSourceDialog";
 import { addDays, CRM_CURRENCIES, EVERY_KEY, FIELD_KEY, METHOD_KEY, moneyInput, parseMoney } from "./crm-model";
@@ -49,8 +47,6 @@ function FormDialog(props: {
   const { t } = useText();
   const [busy, setBusy] = createSignal(false);
   const [layer, setLayer] = createSignal<HTMLElement>();
-  const fades = createScrollFades();
-  onCleanup(() => fades.stop());
   const submit = async () => {
     if (!props.valid || busy()) return;
     setBusy(true);
@@ -67,18 +63,14 @@ function FormDialog(props: {
           <Dialog.Content as="section" class="ui-confirm-dialog crm-form" ref={setLayer}>
             <CrmPopupLayer value={layer}>
               <form
-                class={["crm-form-body", fades.classes()]}
-                ref={(element) => fades.bind(element)}
-                onScroll={fades.measure}
+                class="crm-form-body"
                 onSubmit={(event) => {
                   event.preventDefault();
                   void submit();
                 }}
               >
                 <Dialog.Title class="crm-form-title">{props.title}</Dialog.Title>
-                <div class="crm-form-grid" ref={(element) => fades.watch(element)}>
-                  {props.children}
-                </div>
+                <div class="crm-form-grid">{props.children}</div>
                 <div class="crm-form-actions">
                   <Button type="button" variant="ghost" onClick={() => props.crm.closeForm()}>
                     {t("common.cancel")}
@@ -88,7 +80,6 @@ function FormDialog(props: {
                   </Button>
                 </div>
               </form>
-              <ScrollEdgeBlur fades={fades} />
             </CrmPopupLayer>
           </Dialog.Content>
         </Dialog.Overlay>

@@ -63,7 +63,6 @@
     "./components/TypingDots": "./src/components/TypingDots.tsx",
     "./components/createBoundedDragPreview": "./src/components/createBoundedDragPreview.ts",
     "./components/createScrollFades": "./src/components/createScrollFades.ts",
-    "./components/ScrollEdgeBlur": "./src/components/ScrollEdgeBlur.tsx",
     "./components/ScrollEdges": "./src/components/ScrollEdges.tsx",
     "./components/createVerticalDragPreview": "./src/components/createVerticalDragPreview.ts",
     "./components/provider-model-options": "./src/components/provider-model-options.ts",

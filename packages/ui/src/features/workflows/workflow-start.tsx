@@ -1,9 +1,7 @@
 import type { RoutineSchedule, WorkflowNodeKind } from "@openbot/contracts/ipc";
 import type { AppMessages, AppTranslate } from "@openbot/i18n";
 import { Button, Plus } from "@openbot/ui";
-import { For, onCleanup } from "solid-js";
-import { createScrollFades } from "../../components/createScrollFades";
-import { ScrollEdgeBlur } from "../../components/ScrollEdgeBlur";
+import { For } from "solid-js";
 import { useText } from "../../text";
 import type { WfnFields } from "./workflow-board";
 import type { Clip } from "./workflow-clipboard";
@@ -276,29 +274,24 @@ export function WorkflowStart(props: {
   onBlank: () => void;
 }) {
   const { t } = useText();
-  const fades = createScrollFades();
-  onCleanup(() => fades.stop());
   return (
-    <>
-      <div ref={(element) => fades.bind(element)} class={["wfn-empty", fades.classes()]} onScroll={fades.measure}>
-        <h2 class="wfn-start-title">{t("workflow.canvas.start.title")}</h2>
-        <div class="wfn-start-grid" ref={(element) => fades.watch(element)}>
-          <For each={props.templates}>
-            {(template) => <TemplateCard template={template} onPick={() => props.onTemplate(template)} />}
-          </For>
-          <Button variant="ghost" class="wfn-start-card" onClick={() => props.onBlank()}>
-            <span class="wfn-start-thumb" aria-hidden="true">
-              <span class="wfn-menu-icon wfn-start-blank">
-                <Plus />
-              </span>
+    <div class="wfn-empty">
+      <h2 class="wfn-start-title">{t("workflow.canvas.start.title")}</h2>
+      <div class="wfn-start-grid">
+        <For each={props.templates}>
+          {(template) => <TemplateCard template={template} onPick={() => props.onTemplate(template)} />}
+        </For>
+        <Button variant="ghost" class="wfn-start-card" onClick={() => props.onBlank()}>
+          <span class="wfn-start-thumb" aria-hidden="true">
+            <span class="wfn-menu-icon wfn-start-blank">
+              <Plus />
             </span>
-            <span class="wfn-start-text">
-              <span class="wfn-start-name">{t("workflow.canvas.start.blank")}</span>
-            </span>
-          </Button>
-        </div>
+          </span>
+          <span class="wfn-start-text">
+            <span class="wfn-start-name">{t("workflow.canvas.start.blank")}</span>
+          </span>
+        </Button>
       </div>
-      <ScrollEdgeBlur fades={fades} />
-    </>
+    </div>
   );
 }

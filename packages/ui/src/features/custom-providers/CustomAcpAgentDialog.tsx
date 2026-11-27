@@ -24,7 +24,6 @@ import {
 } from "@openbot/ui";
 import { createEffect, createSignal, createStore, For, Match, onSettled, Show, Switch, untrack } from "solid-js";
 import { createScrollFades } from "../../components/createScrollFades";
-import { ScrollEdgeBlur } from "../../components/ScrollEdgeBlur";
 import { useText } from "../../text";
 import {
   type AcpAgentCheck,
@@ -445,7 +444,6 @@ export function CustomAcpAgentDialog(props: CustomAcpAgentDialogProps) {
                   </AlertContent>
                 </Alert>
               </div>
-              <ScrollEdgeBlur fades={fades} />
 
               <footer class="custom-provider-actions">
                 <Show when={props.submitError}>

@@ -1,6 +1,5 @@
 import { ConfirmDialog, RadioGroup, TriangleAlert } from "@openbot/ui";
 import { createScrollFades } from "@openbot/ui/components/createScrollFades";
-import { ScrollEdgeBlur } from "@openbot/ui/components/ScrollEdgeBlur";
 import { useText } from "@openbot/ui/text";
 import { createStore, For, onCleanup, Show } from "solid-js";
 
@@ -77,7 +76,6 @@ export function AgentUpdateDialog(props: AgentUpdateDialogProps) {
             )}
           </For>
         </ul>
-        <ScrollEdgeBlur fades={fades} />
       </div>
       <Show when={props.othersCount > 0}>
         <p class="marketplace-agent-update-others">

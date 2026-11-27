@@ -1,10 +1,8 @@
 import { ProviderLogo } from "@openbot/brand";
 import type { AgentProviderId } from "@openbot/contracts/ipc";
 import { Button, Dialog, IconButton, Input, SlidersHorizontal, X } from "@openbot/ui";
-import { createEffect, createSignal, For, onCleanup, Show } from "solid-js";
+import { createSignal, For, Show } from "solid-js";
 import { useText } from "../text";
-import { createScrollFades } from "./createScrollFades";
-import { ScrollEdgeBlur } from "./ScrollEdgeBlur";
 
 interface MoreProvidersEntry {
   id: AgentProviderId;
@@ -35,12 +33,6 @@ export function MoreProvidersDialog(props: MoreProvidersDialogProps) {
       `${provider.name} ${provider.description ?? ""}`.toLowerCase().includes(text),
     );
   };
-  const fades = createScrollFades();
-  onCleanup(() => fades.stop());
-  createEffect(
-    () => matches().length,
-    () => fades.remeasure(),
-  );
   const close = () => {
     props.onOpenChange(false);
     setQuery("");
@@ -82,11 +74,7 @@ export function MoreProvidersDialog(props: MoreProvidersDialogProps) {
                 onValueChange={setQuery}
               />
             </Show>
-            <div
-              class={["provider-more-list", fades.classes()]}
-              ref={(element) => fades.bind(element)}
-              onScroll={fades.measure}
-            >
+            <div class="provider-more-list">
               <For each={matches()} keyed={false}>
                 {(provider) => (
                   <Button
@@ -126,7 +114,6 @@ export function MoreProvidersDialog(props: MoreProvidersDialogProps) {
                 </Button>
               </Show>
             </div>
-            <ScrollEdgeBlur fades={fades} />
           </Dialog.Content>
         </Dialog.Overlay>
       </Dialog.Portal>

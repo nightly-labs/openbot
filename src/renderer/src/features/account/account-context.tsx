@@ -49,6 +49,7 @@ const Auth = createSimpleContext({
       refreshRevision: number;
     }>({ targetKey: null, data: null, refreshRevision: 0 });
     let accountUsageRequestGeneration = 0;
+    let accountUsageTarget: string | null = null;
     let accountUsageEventIds = new Set<string>();
     let authSuccessTimer: ReturnType<typeof setTimeout> | undefined;
     let knownMobileDevices: ReadonlySet<string> | null = null;
@@ -176,7 +177,8 @@ const Auth = createSimpleContext({
     const accountUsageTargetKey = () => accountUsageState.targetKey;
 
     function selectAccountUsageTarget(targetKey: string | null): void {
-      if (accountUsageState.targetKey === targetKey) return;
+      if (accountUsageTarget === targetKey) return;
+      accountUsageTarget = targetKey;
       accountUsageRequestGeneration += 1;
       setAccountUsageState((state) => {
         state.targetKey = targetKey;
@@ -215,7 +217,7 @@ const Auth = createSimpleContext({
       const generation = ++accountUsageRequestGeneration;
       accountUsageEventIds = new Set();
       const usage = await accountPort().agent.getUsage();
-      if (generation === accountUsageRequestGeneration && accountUsageState.targetKey === targetKey) {
+      if (generation === accountUsageRequestGeneration && accountUsageTarget === targetKey) {
         setAccountUsageState((state) => {
           const byId = new Map(usage.limits.map((limit) => [usageLimitKey(limit), limit]));
           for (const limit of state.data?.limits ?? []) {

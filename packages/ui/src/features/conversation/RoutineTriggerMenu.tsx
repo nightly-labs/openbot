@@ -1,8 +1,6 @@
 import type { AppTextKey } from "@openbot/i18n";
 import { AlarmClock, buttonVariants, Check, ChevronsUpDown, DropdownMenu } from "@openbot/ui";
-import { For, onCleanup, Show } from "solid-js";
-import { createScrollFades } from "../../components/createScrollFades";
-import { ScrollEdgeBlur } from "../../components/ScrollEdgeBlur";
+import { For, Show } from "solid-js";
 import { useText } from "../../text";
 import type { RoutineDraftKind, RoutineDraftKindOption } from "./routine-schedule-draft";
 
@@ -24,8 +22,6 @@ interface RoutineTriggerMenuProps {
 
 export function RoutineTriggerMenu(props: RoutineTriggerMenuProps) {
   const { t } = useText();
-  const fades = createScrollFades();
-  onCleanup(() => fades.stop());
   return (
     <DropdownMenu.Root placement="bottom-end" gutter={6}>
       <DropdownMenu.Trigger
@@ -37,35 +33,28 @@ export function RoutineTriggerMenu(props: RoutineTriggerMenuProps) {
       </DropdownMenu.Trigger>
       <DropdownMenu.Portal>
         <DropdownMenu.Content class="routine-trigger-menu">
-          <div
-            ref={(element) => fades.bind(element)}
-            class={["routine-trigger-menu-list", fades.classes()]}
-            onScroll={fades.measure}
+          <span class="ui-menu-label" aria-hidden="true">
+            {t("routine.trigger.groupSchedule")}
+          </span>
+          <DropdownMenu.RadioGroup
+            aria-label={t("routine.trigger.groupSchedule")}
+            value={props.value}
+            onChange={(value: string) => {
+              const kind = props.kinds.find((option) => option.value === value);
+              if (kind) props.onSelect(kind.value);
+            }}
           >
-            <span class="ui-menu-label" aria-hidden="true">
-              {t("routine.trigger.groupSchedule")}
-            </span>
-            <DropdownMenu.RadioGroup
-              aria-label={t("routine.trigger.groupSchedule")}
-              value={props.value}
-              onChange={(value: string) => {
-                const kind = props.kinds.find((option) => option.value === value);
-                if (kind) props.onSelect(kind.value);
-              }}
-            >
-              <For each={props.kinds} keyed={(kind) => kind.value}>
-                {(kind) => (
-                  <TriggerItem
-                    value={kind().value}
-                    selected={props.value === kind().value}
-                    title={t(kind().label)}
-                    description={t(KIND_DESCRIPTIONS[kind().value])}
-                  />
-                )}
-              </For>
-            </DropdownMenu.RadioGroup>
-          </div>
-          <ScrollEdgeBlur fades={fades} />
+            <For each={props.kinds} keyed={(kind) => kind.value}>
+              {(kind) => (
+                <TriggerItem
+                  value={kind().value}
+                  selected={props.value === kind().value}
+                  title={t(kind().label)}
+                  description={t(KIND_DESCRIPTIONS[kind().value])}
+                />
+              )}
+            </For>
+          </DropdownMenu.RadioGroup>
         </DropdownMenu.Content>
       </DropdownMenu.Portal>
     </DropdownMenu.Root>

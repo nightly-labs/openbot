@@ -27,7 +27,6 @@ import {
 import { createMemo, For, onCleanup, Show } from "solid-js";
 import { createScrollFades } from "../../components/createScrollFades";
 import { QuestionPromptBubble } from "../../components/QuestionPromptBubble";
-import { ScrollEdgeBlur } from "../../components/ScrollEdgeBlur";
 import { TypingDots } from "../../components/TypingDots";
 import type { AgentMessage, ComposerAgent } from "../../data";
 import { useText } from "../../text";
@@ -635,7 +634,6 @@ export function AgentDockChat(props: {
             </Show>
           </div>
         </div>
-        <ScrollEdgeBlur fades={fades} />
         <div class="agent-dock-scroll-thumb" aria-hidden="true" ref={(element) => (thumb = element)} />
       </div>
 

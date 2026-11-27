@@ -7,7 +7,6 @@ import { For, Show } from "solid-js";
 import { EXTERNAL_LINK_REL, FOOTER_COLUMNS, type FooterLink, OPENBOT_LINKS } from "../../lib/landing-links";
 import { localizedPath } from "../../lib/site-paths";
 import { createLandingReveal } from "./createLandingReveal";
-import { LandingEdgeBlur } from "./LandingEdgeBlur";
 import { LandingIcon } from "./LandingIcon";
 import { useSiteChrome, useSitePath } from "./SiteText";
 
@@ -60,83 +59,80 @@ export function LandingFooter() {
   const revealState = () => (revealed() ? "true" : "false");
 
   return (
-    <>
-      <LandingEdgeBlur footer={() => footerRef} />
-      <footer ref={footerRef} class="landing-footer" data-slot="landing-footer" lang={chrome().lang}>
-        <div class="landing-footer-inner">
-          <div class="landing-footer-grid">
-            <div class="landing-footer-brand" data-revealed={revealState()}>
-              <Link
-                class="landing-footer-lockup"
-                to={localizedPath("/", chrome().locale)}
-                aria-label={chrome().text.home}
-              >
-                <AppLogo variant="production" class="landing-footer-logo" />
-                <span>OpenBot</span>
-              </Link>
+    <footer ref={footerRef} class="landing-footer" data-slot="landing-footer" lang={chrome().lang}>
+      <div class="landing-footer-inner">
+        <div class="landing-footer-grid">
+          <div class="landing-footer-brand" data-revealed={revealState()}>
+            <Link
+              class="landing-footer-lockup"
+              to={localizedPath("/", chrome().locale)}
+              aria-label={chrome().text.home}
+            >
+              <AppLogo variant="production" class="landing-footer-logo" />
+              <span>OpenBot</span>
+            </Link>
 
-              <p class="landing-footer-description">{text().description}</p>
+            <p class="landing-footer-description">{text().description}</p>
 
-              <Link class="landing-footer-cta" to="/download">
-                <span>{text().download}</span>
-                <LandingIcon name="download" />
-              </Link>
+            <Link class="landing-footer-cta" to="/download">
+              <span>{text().download}</span>
+              <LandingIcon name="download" />
+            </Link>
 
-              <div class="landing-footer-socials">
-                <For each={SOCIALS}>
-                  {(social) => (
-                    <a
-                      class="landing-footer-social"
-                      href={social.href}
-                      target="_blank"
-                      rel={EXTERNAL_LINK_REL}
-                      aria-label={social.label}
-                    >
-                      <span class="landing-visually-hidden">{social.label}</span>
-                      <social.Mark />
-                    </a>
-                  )}
-                </For>
-              </div>
-            </div>
-
-            <nav class="landing-footer-columns" aria-label={text().navigation} data-revealed={revealState()}>
-              <For each={FOOTER_COLUMNS}>
-                {(column) => (
-                  <div class="landing-footer-column">
-                    <h2>{text().columns[column.id]}</h2>
-                    <ul>
-                      <For each={column.links}>
-                        {(link) => (
-                          <li>
-                            <FooterNavLink link={link} />
-                          </li>
-                        )}
-                      </For>
-                    </ul>
-                  </div>
+            <div class="landing-footer-socials">
+              <For each={SOCIALS}>
+                {(social) => (
+                  <a
+                    class="landing-footer-social"
+                    href={social.href}
+                    target="_blank"
+                    rel={EXTERNAL_LINK_REL}
+                    aria-label={social.label}
+                  >
+                    <span class="landing-visually-hidden">{social.label}</span>
+                    <social.Mark />
+                  </a>
                 )}
               </For>
-            </nav>
-          </div>
-
-          <div class="landing-footer-bottom" data-revealed={revealState()}>
-            <p>{text().rights}</p>
-            <div class="landing-footer-meta">
-              <Link to="/download">
-                <span class="landing-footer-availability" aria-hidden="true" />
-                {text().available}
-              </Link>
-              <p class="landing-footer-made">
-                {text().made.before}
-                <LandingIcon name="heart" label={text().love} />
-                {text().made.after}
-              </p>
             </div>
           </div>
+
+          <nav class="landing-footer-columns" aria-label={text().navigation} data-revealed={revealState()}>
+            <For each={FOOTER_COLUMNS}>
+              {(column) => (
+                <div class="landing-footer-column">
+                  <h2>{text().columns[column.id]}</h2>
+                  <ul>
+                    <For each={column.links}>
+                      {(link) => (
+                        <li>
+                          <FooterNavLink link={link} />
+                        </li>
+                      )}
+                    </For>
+                  </ul>
+                </div>
+              )}
+            </For>
+          </nav>
         </div>
-      </footer>
-    </>
+
+        <div class="landing-footer-bottom" data-revealed={revealState()}>
+          <p>{text().rights}</p>
+          <div class="landing-footer-meta">
+            <Link to="/download">
+              <span class="landing-footer-availability" aria-hidden="true" />
+              {text().available}
+            </Link>
+            <p class="landing-footer-made">
+              {text().made.before}
+              <LandingIcon name="heart" label={text().love} />
+              {text().made.after}
+            </p>
+          </div>
+        </div>
+      </div>
+    </footer>
   );
 }
 

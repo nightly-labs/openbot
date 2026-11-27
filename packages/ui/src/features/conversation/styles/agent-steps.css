@@ -255,7 +255,3 @@
 :dir(rtl) .agent-step-error-toggle[aria-expanded="true"] svg[class~="lucide-chevron-right"].agent-steps-chevron {
   rotate: -90deg;
 }
-
-.agent-steps-viewport + .scroll-edge-blur {
-  --scroll-edge-blur-size: calc(var(--openbot-space-1) * 6);
-}

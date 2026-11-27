@@ -172,10 +172,7 @@ export function createReplyJumpStore(deps: ReplyJumpStoreDeps) {
       setReturnReplyId(reply.id);
       if (!document.activeElement || document.activeElement === document.body) {
         await nextFrame();
-        deps
-          .scrollElement()
-          ?.parentElement?.querySelector<HTMLElement>(":scope > [data-reply-return] .scroll-to-latest-button")
-          ?.focus();
+        deps.scrollElement()?.querySelector<HTMLElement>("[data-reply-return] .scroll-to-latest-button")?.focus();
       }
     } finally {
       jumping = false;

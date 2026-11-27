@@ -42,14 +42,6 @@
   content-visibility: hidden;
 }
 
-.conversation-panel > .conversation-covered + .scroll-edge-blur {
-  display: none;
-}
-
-.conversation-panel > .conversation-covered + .scroll-edge-blur + .scroll-to-latest {
-  visibility: hidden;
-}
-
 .conversation-panel > .composer-wrap.conversation-covered {
   top: auto;
 }

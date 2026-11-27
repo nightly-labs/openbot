@@ -21,9 +21,7 @@ import {
   Show,
   untrack,
 } from "solid-js";
-import { createScrollFades } from "../../components/createScrollFades";
 import { normalizedSearchText, snippetAround } from "../../components/global-search-text";
-import { ScrollEdgeBlur } from "../../components/ScrollEdgeBlur";
 import type {
   ComposerAgent,
   ComposerBrowserTab,
@@ -87,7 +85,12 @@ import {
   syncSkillTokens,
   truncateComposerValue,
 } from "./composer-tokens";
-import { matchParts, trackEnteringPickerRows, trackPickerHighlight } from "./mention-picker-motion";
+import {
+  matchParts,
+  trackEnteringPickerRows,
+  trackPickerHighlight,
+  trackPickerScrollFades,
+} from "./mention-picker-motion";
 import { isSendShortcutKey, type SendShortcut } from "./send-shortcut";
 
 interface ComposerEditorProps {
@@ -409,19 +412,13 @@ export function ComposerEditor(props: ComposerEditorProps) {
     return moved;
   };
   let releasePickerList: (() => void) | undefined;
-  const pickerListFades = createScrollFades();
-  const trackPickerListFades = (list: HTMLElement) => {
-    pickerListFades.bind(list);
-    const rows = new MutationObserver(pickerListFades.remeasure);
-    rows.observe(list, { childList: true, subtree: true });
-    return () => {
-      rows.disconnect();
-      pickerListFades.stop();
-    };
-  };
   const bindPickerList = (list: HTMLElement) => {
     releasePickerList?.();
-    const stops = [trackPickerListFades(list), trackEnteringPickerRows(list), trackPickerHighlight(list, takeKeyMove)];
+    const stops = [
+      trackPickerScrollFades(list),
+      trackEnteringPickerRows(list),
+      trackPickerHighlight(list, takeKeyMove),
+    ];
     releasePickerList = () => {
       for (const stop of stops) stop();
     };
@@ -1188,8 +1185,7 @@ export function ComposerEditor(props: ComposerEditorProps) {
                 as="div"
                 id={pickerListId}
                 ref={bindPickerList}
-                class={["mention-picker-list", pickerListFades.classes()]}
-                onScroll={pickerListFades.measure}
+                class="mention-picker-list"
                 aria-label={t(
                   mention()?.trigger === "$" ? "composer.picker.skillLabel" : "composer.picker.mentionLabel",
                 )}
@@ -1300,7 +1296,6 @@ export function ComposerEditor(props: ComposerEditorProps) {
                   );
                 }}
               />
-              <ScrollEdgeBlur fades={pickerListFades} />
             </Show>
             <Show when={skillProblems().length > 0}>
               <div class="mention-picker-problems" role="status">

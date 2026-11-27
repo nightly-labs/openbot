@@ -24,7 +24,6 @@ import {
 } from "@openbot/ui";
 import { createEffect, createMemo, createSignal, For, onCleanup, Show, untrack } from "solid-js";
 import { createScrollFades } from "../../components/createScrollFades";
-import { ScrollEdgeBlur } from "../../components/ScrollEdgeBlur";
 import { ScrollEdges } from "../../components/ScrollEdges";
 import { useText } from "../../text";
 import { MediaModelPicker } from "./WorkflowMediaModelPicker";
@@ -188,7 +187,6 @@ export function WorkflowMediaComposer(props: {
         value={step.prompt()}
         onValueChange={step.setPrompt}
       />
-      <ScrollEdgeBlur fades={promptFades} />
       <div class="wfn-composer-bar">
         <ComposerModel step={step} id={props.id} />
         <SettingsChip step={step} id={props.id} />

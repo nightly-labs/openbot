@@ -1,9 +1,7 @@
 import type { AgentTemplateDetail } from "@openbot/contracts/ipc";
 import { classifyFailure } from "@openbot/telemetry";
 import { Button, Dialog, Heading, IconButton, Text, toast, X } from "@openbot/ui";
-import { createSignal, onCleanup, Show } from "solid-js";
-import { createScrollFades } from "../../components/createScrollFades";
-import { ScrollEdgeBlur } from "../../components/ScrollEdgeBlur";
+import { createSignal, Show } from "solid-js";
 import { useText } from "../../text";
 import { AgentAvatar } from "./AgentAvatar";
 import { TemplateInstructions, TemplateRoutines, TemplateSkills } from "./AgentTemplateSections";
@@ -20,8 +18,6 @@ export interface AgentTemplateInstallDialogProps {
 export function AgentTemplateInstallDialog(props: AgentTemplateInstallDialogProps) {
   const { t, errorMessage } = useText();
   const [installing, setInstalling] = createSignal(false);
-  const fades = createScrollFades();
-  onCleanup(() => fades.stop());
 
   async function install(): Promise<void> {
     setInstalling(true);
@@ -69,11 +65,7 @@ export function AgentTemplateInstallDialog(props: AgentTemplateInstallDialogProp
             >
               {(detail) => (
                 <>
-                  <div
-                    class={["agent-template-body agent-template-scroll", fades.classes()]}
-                    ref={(element) => fades.bind(element)}
-                    onScroll={fades.measure}
-                  >
+                  <div class="agent-template-body agent-template-scroll">
                     <header class="agent-template-identity">
                       <AgentAvatar
                         seed={detail().avatarSeed}
@@ -89,7 +81,7 @@ export function AgentTemplateInstallDialog(props: AgentTemplateInstallDialogProp
                         {t("agentTemplate.creator", { name: detail().creatorName })}
                       </Text>
                     </header>
-                    <div class="agent-template-detail" ref={(element) => fades.watch(element)}>
+                    <div class="agent-template-detail">
                       <TemplateInstructions
                         title={detail().title}
                         description={detail().description}
@@ -99,7 +91,6 @@ export function AgentTemplateInstallDialog(props: AgentTemplateInstallDialogProp
                       <TemplateRoutines routines={detail().routines} labelled />
                     </div>
                   </div>
-                  <ScrollEdgeBlur fades={fades} />
                   <footer class="agent-template-actions">
                     <Button type="button" variant="ghost" disabled={installing()} onClick={() => changeOpen(false)}>
                       {t("common.cancel")}

@@ -13,9 +13,7 @@ import {
   OctagonX,
   TriangleAlert,
 } from "@openbot/ui";
-import { createSignal, onCleanup, Show } from "solid-js";
-import { createScrollFades } from "../../components/createScrollFades";
-import { ScrollEdgeBlur } from "../../components/ScrollEdgeBlur";
+import { createSignal, Show } from "solid-js";
 import { useText } from "../../text";
 
 export interface CreateLocalServerDialogProps {
@@ -31,8 +29,6 @@ export function CreateLocalServerDialog(props: CreateLocalServerDialogProps) {
   const [error, setError] = createSignal<string | null>(null);
   const trimmedName = () => name().trim();
   const nameTooShort = () => trimmedName().length < INPUT_LIMITS.serverNameMin;
-  const fades = createScrollFades();
-  onCleanup(() => fades.stop());
 
   async function create(): Promise<void> {
     if (creating() || nameTooShort() || props.limitReached) return;
@@ -56,13 +52,7 @@ export function CreateLocalServerDialog(props: CreateLocalServerDialogProps) {
     >
       <Dialog.Portal>
         <Dialog.Overlay>
-          <Dialog.Content
-            class={["create-local-server-dialog", fades.classes()]}
-            as="section"
-            aria-busy={creating() ? "true" : undefined}
-            ref={(element: HTMLElement) => fades.bind(element)}
-            onScroll={fades.measure}
-          >
+          <Dialog.Content class="create-local-server-dialog" as="section" aria-busy={creating() ? "true" : undefined}>
             <header class="create-local-server-header">
               <Dialog.Title class="create-local-server-title">{t("server.local.createTitle")}</Dialog.Title>
               <Dialog.Description class="create-local-server-description">
@@ -72,7 +62,6 @@ export function CreateLocalServerDialog(props: CreateLocalServerDialogProps) {
 
             <form
               class="create-local-server-form"
-              ref={(element) => fades.watch(element)}
               onSubmit={(event) => {
                 event.preventDefault();
                 void create();
@@ -142,7 +131,6 @@ export function CreateLocalServerDialog(props: CreateLocalServerDialogProps) {
               </footer>
             </form>
           </Dialog.Content>
-          <ScrollEdgeBlur fades={fades} />
         </Dialog.Overlay>
       </Dialog.Portal>
     </Dialog.Root>

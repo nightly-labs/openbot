@@ -2,8 +2,6 @@ import { AppLogo } from "@openbot/brand";
 import { installServerCommand, type ServerClaim } from "@openbot/contracts/hosted-servers";
 import { Button, Check, CircleAlert, Copy, Dialog, Heading, IconButton, LoaderCircle, Text, X } from "@openbot/ui";
 import { createSignal, Match, onCleanup, onSettled, Show, Switch } from "solid-js";
-import { createScrollFades } from "../../components/createScrollFades";
-import { ScrollEdgeBlur } from "../../components/ScrollEdgeBlur";
 import { useText } from "../../text";
 import { CodeBlock } from "../conversation/CodeBlock";
 
@@ -28,8 +26,6 @@ const formatRemaining = (ms: number) => {
 export function InstallServerDialog(props: InstallServerDialogProps) {
   const { t, errorMessage } = useText();
   const [now, setNow] = createSignal(Date.now());
-  const fades = createScrollFades();
-  onCleanup(() => fades.stop());
   onSettled(() => {
     const tick = window.setInterval(() => setNow(Date.now()), 1000);
     return () => window.clearInterval(tick);
@@ -56,12 +52,8 @@ export function InstallServerDialog(props: InstallServerDialogProps) {
             >
               <X />
             </IconButton>
-            <div
-              class={["join-server-content", fades.classes()]}
-              ref={(element) => fades.bind(element)}
-              onScroll={fades.measure}
-            >
-              <div class="install-server-page" ref={(element) => fades.watch(element)}>
+            <div class="join-server-content">
+              <div class="install-server-page">
                 <header class="join-server-header join-server-header-entry">
                   <AppLogo variant="production" class="join-server-entry-logo" />
                   <Heading as="h2" size="lg">
@@ -153,7 +145,6 @@ export function InstallServerDialog(props: InstallServerDialogProps) {
                 </footer>
               </div>
             </div>
-            <ScrollEdgeBlur fades={fades} />
           </Dialog.Content>
         </Dialog.Overlay>
       </Dialog.Portal>

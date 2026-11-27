@@ -1,9 +1,7 @@
 import type { AppTextKey } from "@openbot/i18n";
 import { type CalendarDay, calendarDayDate, calendarMonthStart } from "@openbot/team-client/routine-calendar-dates";
 import { Button, buttonVariants, Check, DropdownMenu } from "@openbot/ui";
-import { createMemo, createSignal, For, Match, onCleanup, onSettled, Show, Switch } from "solid-js";
-import { createScrollFades } from "../../components/createScrollFades";
-import { ScrollEdgeBlur } from "../../components/ScrollEdgeBlur";
+import { createMemo, createSignal, For, Match, onSettled, Show, Switch } from "solid-js";
 import { useText } from "../../text";
 import { prefersReducedMotion } from "../../utils";
 import { AgentAvatar } from "../agents/AgentAvatar";
@@ -94,12 +92,6 @@ export function RoutineCalendarEmpty(props: RoutineCalendarEmptyProps) {
   const { t } = useText();
   const [step, setStep] = createSignal(0);
   const [still, setStill] = createSignal(false);
-  const fades = createScrollFades();
-  const menuFades = createScrollFades();
-  onCleanup(() => {
-    fades.stop();
-    menuFades.stop();
-  });
   onSettled(() => {
     if (prefersReducedMotion()) {
       setStill(true);
@@ -117,73 +109,58 @@ export function RoutineCalendarEmpty(props: RoutineCalendarEmptyProps) {
   };
 
   return (
-    <>
-      <div
-        ref={(element) => fades.bind(element)}
-        class={["routine-planner-empty", fades.classes()]}
-        data-still={still() ? "" : undefined}
-        onScroll={fades.measure}
-      >
-        <RoutineCalendarEmptyBoard days={props.days} today={props.today} agents={props.agents} step={step()} />
-        <div class="routine-planner-empty-pitch">
-          <h3 class="routine-planner-empty-title">
-            <span class="routine-planner-empty-lead">{t("routine.calendar.emptyLead")}</span>
-            <span>
-              {title().before}
-              <span class="routine-planner-hand routine-planner-empty-done">{t("routine.calendar.emptyDone")}</span>
-              {title().after}
-            </span>
-          </h3>
-          <p class="routine-planner-empty-lines">
-            <span>{t("routine.calendar.emptySchedule")}</span>
-            <span>{t("routine.calendar.emptyNote")}</span>
-          </p>
-          <Show when={props.onCreateRoutine}>
-            {(create) => (
-              <Switch>
-                <Match when={props.agents.length === 1 ? props.agents[0] : undefined}>
-                  {(agent) => (
-                    <Button class="routine-planner-empty-action" onClick={() => create()(agent().id)}>
-                      {t("routine.settings.create")}
-                    </Button>
-                  )}
-                </Match>
-                <Match when={props.agents.length > 1}>
-                  <DropdownMenu.Root placement="bottom" gutter={4}>
-                    <DropdownMenu.Trigger class={`${buttonVariants()} routine-planner-empty-action`}>
-                      {t("routine.settings.create")}
-                    </DropdownMenu.Trigger>
-                    <DropdownMenu.Portal>
-                      <DropdownMenu.Content class="routine-planner-empty-menu">
-                        <div
-                          ref={(element) => menuFades.bind(element)}
-                          class={["routine-planner-empty-menu-list", menuFades.classes()]}
-                          onScroll={menuFades.measure}
-                        >
-                          <For each={props.agents} keyed={(agent) => agent.id}>
-                            {(agent) => (
-                              <DropdownMenu.Item
-                                class="routine-planner-empty-agent"
-                                onSelectAfterClose={() => create()(agent().id)}
-                              >
-                                <AgentAvatar agent={agent()} class="routine-planner-avatar" />
-                                <span>{agent().name}</span>
-                              </DropdownMenu.Item>
-                            )}
-                          </For>
-                        </div>
-                        <ScrollEdgeBlur fades={menuFades} />
-                      </DropdownMenu.Content>
-                    </DropdownMenu.Portal>
-                  </DropdownMenu.Root>
-                </Match>
-              </Switch>
-            )}
-          </Show>
-        </div>
+    <div class="routine-planner-empty" data-still={still() ? "" : undefined}>
+      <RoutineCalendarEmptyBoard days={props.days} today={props.today} agents={props.agents} step={step()} />
+      <div class="routine-planner-empty-pitch">
+        <h3 class="routine-planner-empty-title">
+          <span class="routine-planner-empty-lead">{t("routine.calendar.emptyLead")}</span>
+          <span>
+            {title().before}
+            <span class="routine-planner-hand routine-planner-empty-done">{t("routine.calendar.emptyDone")}</span>
+            {title().after}
+          </span>
+        </h3>
+        <p class="routine-planner-empty-lines">
+          <span>{t("routine.calendar.emptySchedule")}</span>
+          <span>{t("routine.calendar.emptyNote")}</span>
+        </p>
+        <Show when={props.onCreateRoutine}>
+          {(create) => (
+            <Switch>
+              <Match when={props.agents.length === 1 ? props.agents[0] : undefined}>
+                {(agent) => (
+                  <Button class="routine-planner-empty-action" onClick={() => create()(agent().id)}>
+                    {t("routine.settings.create")}
+                  </Button>
+                )}
+              </Match>
+              <Match when={props.agents.length > 1}>
+                <DropdownMenu.Root placement="bottom" gutter={4}>
+                  <DropdownMenu.Trigger class={`${buttonVariants()} routine-planner-empty-action`}>
+                    {t("routine.settings.create")}
+                  </DropdownMenu.Trigger>
+                  <DropdownMenu.Portal>
+                    <DropdownMenu.Content class="routine-planner-empty-menu">
+                      <For each={props.agents} keyed={(agent) => agent.id}>
+                        {(agent) => (
+                          <DropdownMenu.Item
+                            class="routine-planner-empty-agent"
+                            onSelectAfterClose={() => create()(agent().id)}
+                          >
+                            <AgentAvatar agent={agent()} class="routine-planner-avatar" />
+                            <span>{agent().name}</span>
+                          </DropdownMenu.Item>
+                        )}
+                      </For>
+                    </DropdownMenu.Content>
+                  </DropdownMenu.Portal>
+                </DropdownMenu.Root>
+              </Match>
+            </Switch>
+          )}
+        </Show>
       </div>
-      <ScrollEdgeBlur fades={fades} />
-    </>
+    </div>
   );
 }
 

@@ -33,7 +33,6 @@ import {
   X,
 } from "@openbot/ui";
 import { createScrollFades } from "@openbot/ui/components/createScrollFades";
-import { ScrollEdgeBlur } from "@openbot/ui/components/ScrollEdgeBlur";
 import { AgentAvatar } from "@openbot/ui/features/agents/AgentAvatar";
 import type { JSX } from "@solidjs/web";
 import { Switch as Choose, createSignal, createStore, createUniqueId, For, Match, onCleanup, Show } from "solid-js";
@@ -417,7 +416,6 @@ export function AgentPicker(props: {
             )}
           </For>
         </div>
-        <ScrollEdgeBlur fades={fades} />
       </Show>
     </ItemGroup>
   );

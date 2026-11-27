@@ -5,19 +5,7 @@ import { SETTINGS_PANEL_DEFAULT } from "@openbot/ui/components/SettingsPanel";
 import { useText } from "@openbot/ui/text";
 import { holdFlag } from "@openbot/ui/utils";
 import type { JSX } from "@solidjs/web";
-import {
-  createEffect,
-  createMemo,
-  createSignal,
-  createStore,
-  For,
-  onCleanup,
-  onSettled,
-  Show,
-  untrack,
-} from "solid-js";
-import { createScrollFades } from "../../components/createScrollFades";
-import { ScrollEdgeBlur } from "../../components/ScrollEdgeBlur";
+import { createEffect, createMemo, createSignal, createStore, For, onSettled, Show, untrack } from "solid-js";
 
 const BROWSER_PANEL_MIN = SETTINGS_PANEL_DEFAULT;
 const BUSY_CAPTURE_INTERVAL = 3000;
@@ -70,13 +58,6 @@ export default function BrowserPreviewSidebar(props: BrowserPreviewSidebarProps)
     setPanelWidth(props.readWidth());
   };
 
-  const fades = createScrollFades();
-  onCleanup(() => fades.stop());
-  createEffect(
-    () => props.tabs.length,
-    () => fades.remeasure(),
-  );
-
   return (
     <aside
       ref={panel}
@@ -101,11 +82,7 @@ export default function BrowserPreviewSidebar(props: BrowserPreviewSidebarProps)
       />
 
       <Show when={props.pageShown !== true} fallback={props.children}>
-        <div
-          class={["browser-preview-list", fades.classes()]}
-          ref={(element) => fades.bind(element)}
-          onScroll={fades.measure}
-        >
+        <div class="browser-preview-list">
           <For each={props.tabs} keyed={(tab) => tab.id}>
             {(tab) => (
               <BrowserPreviewCard
@@ -131,7 +108,6 @@ export default function BrowserPreviewSidebar(props: BrowserPreviewSidebarProps)
             </div>
           </Show>
         </div>
-        <ScrollEdgeBlur fades={fades} />
       </Show>
     </aside>
   );

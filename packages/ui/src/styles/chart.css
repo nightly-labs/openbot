@@ -13,10 +13,12 @@
   font-size: var(--openbot-text-sm);
 }
 .ui-chart-tooltip {
-  background: var(--openbot-bg-surface);
+  background: var(--ui-popover-frost-bg);
+  -webkit-backdrop-filter: var(--ui-popover-frost-filter);
+  backdrop-filter: var(--ui-popover-frost-filter);
   color: var(--openbot-text-primary);
   padding: var(--openbot-space-3);
-  border: 1px solid var(--openbot-border-strong);
+  border: 1px solid var(--ui-menu-edge);
   border-radius: var(--openbot-radius-md);
   font-size: var(--openbot-text-sm);
   font-variant-numeric: tabular-nums;

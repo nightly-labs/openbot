@@ -5,7 +5,6 @@ import { Badge } from "../../badge";
 import { Button, IconButton } from "../../button";
 import { Dialog } from "../../complex";
 import { createScrollFades } from "../../components/createScrollFades";
-import { ScrollEdgeBlur } from "../../components/ScrollEdgeBlur";
 import { createDigitRoll } from "../../digit-roll";
 import { DigitRuns } from "../../digit-runs";
 import { Input } from "../../form";
@@ -782,7 +781,6 @@ export function TraceWaterfall(props: TraceWaterfallProps) {
           </Show>
         </div>
       </div>
-      <ScrollEdgeBlur fades={fades} />
 
       <footer class="trace-footer">
         <div class="trace-replay">

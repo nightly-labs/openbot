@@ -70,12 +70,6 @@
   list-style: none;
 }
 
-.discord-roles + .scroll-edge-blur,
-.whatsapp-groups + .scroll-edge-blur {
-  overflow: hidden;
-  border-radius: var(--openbot-radius-lg);
-}
-
 .discord-role-row {
   display: flex;
   gap: var(--openbot-space-2);

@@ -177,7 +177,6 @@
 }
 
 .ui-dialog-content.browser-live-view-dialog {
-  position: relative;
   display: grid;
   width: min(460px, 100%);
   box-sizing: border-box;
@@ -215,10 +214,6 @@
   line-height: var(--openbot-leading-md);
   overflow-wrap: anywhere;
   white-space: pre-wrap;
-}
-
-.browser-live-view-dialog-message + .scroll-edge-blur {
-  --scroll-edge-blur-size: calc(var(--openbot-space-1) * 6);
 }
 
 .browser-live-view-dialog-actions {

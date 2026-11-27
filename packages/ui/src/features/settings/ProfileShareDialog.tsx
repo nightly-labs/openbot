@@ -1,8 +1,5 @@
 import { Button, Copy, Dialog, Download, IconButton, Text, toast, X } from "@openbot/ui";
-import type { JSX } from "@solidjs/web";
 import { createSignal, onCleanup, Show, untrack } from "solid-js";
-import { createScrollFades } from "../../components/createScrollFades";
-import { ScrollEdgeBlur } from "../../components/ScrollEdgeBlur";
 import { useText } from "../../text";
 
 export function blobDataUrl(blob: Blob): Promise<string> {
@@ -14,27 +11,6 @@ export function blobDataUrl(blob: Blob): Promise<string> {
   });
 }
 
-export function ProfileDialogFrame(props: {
-  class?: string;
-  children: (watch: (element: Element) => void) => JSX.Element;
-}) {
-  const fades = createScrollFades();
-  onCleanup(() => fades.stop());
-  return (
-    <Dialog.Overlay class="ui-confirm-dialog-overlay">
-      <Dialog.Content
-        as="section"
-        class={["ui-dialog-content profile-dialog", props.class, fades.classes()]}
-        ref={(element: HTMLElement) => fades.bind(element)}
-        onScroll={fades.measure}
-      >
-        {props.children((element) => fades.watch(element))}
-      </Dialog.Content>
-      <ScrollEdgeBlur fades={fades} />
-    </Dialog.Overlay>
-  );
-}
-
 export function ProfileShareDialog(props: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -43,25 +19,17 @@ export function ProfileShareDialog(props: {
   return (
     <Dialog.Root open={props.open} onOpenChange={props.onOpenChange}>
       <Dialog.Portal>
-        <ProfileDialogFrame>
-          {(watch) => (
-            <ProfileShareContent
-              createImage={props.createImage}
-              watch={watch}
-              onClose={() => props.onOpenChange(false)}
-            />
-          )}
-        </ProfileDialogFrame>
+        <Dialog.Overlay class="ui-confirm-dialog-overlay">
+          <Dialog.Content as="section" class="ui-dialog-content profile-dialog">
+            <ProfileShareContent createImage={props.createImage} onClose={() => props.onOpenChange(false)} />
+          </Dialog.Content>
+        </Dialog.Overlay>
       </Dialog.Portal>
     </Dialog.Root>
   );
 }
 
-function ProfileShareContent(props: {
-  createImage: () => Promise<Blob>;
-  watch: (element: Element) => void;
-  onClose: () => void;
-}) {
+function ProfileShareContent(props: { createImage: () => Promise<Blob>; onClose: () => void }) {
   const { t, errorMessage } = useText();
   const [image, setImage] = createSignal<{ blob: Blob; url: string } | null>(null);
   const [error, setError] = createSignal<string | null>(null);
@@ -131,12 +99,7 @@ function ProfileShareContent(props: {
         }
       >
         {(current) => (
-          <img
-            class="profile-share-image"
-            src={current().url}
-            alt={t("settings.profile.share.imageAlt")}
-            ref={(element) => props.watch(element)}
-          />
+          <img class="profile-share-image" src={current().url} alt={t("settings.profile.share.imageAlt")} />
         )}
       </Show>
       <footer class="profile-dialog-footer">

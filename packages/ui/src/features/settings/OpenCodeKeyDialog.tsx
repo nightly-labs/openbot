@@ -18,9 +18,7 @@ import {
   Input,
   OctagonX,
 } from "@openbot/ui";
-import { createSignal, onCleanup, onSettled, Show } from "solid-js";
-import { createScrollFades } from "../../components/createScrollFades";
-import { ScrollEdgeBlur } from "../../components/ScrollEdgeBlur";
+import { createSignal, onSettled, Show } from "solid-js";
 import { useText } from "../../text";
 
 const KEY_TEXT = {
@@ -130,8 +128,6 @@ export function OpenCodeKeyDialog(props: OpenCodeKeyDialogProps) {
   onSettled(() => {
     void readState();
   });
-  const fades = createScrollFades();
-  onCleanup(() => fades.stop());
 
   async function readState(): Promise<void> {
     if (provider() === "codex") {
@@ -194,12 +190,7 @@ export function OpenCodeKeyDialog(props: OpenCodeKeyDialogProps) {
     >
       <Dialog.Portal>
         <Dialog.Overlay class="opencode-key-backdrop">
-          <Dialog.Content
-            class={["opencode-key-dialog", fades.classes()]}
-            as="section"
-            ref={(element: HTMLElement) => fades.bind(element)}
-            onScroll={fades.measure}
-          >
+          <Dialog.Content class="opencode-key-dialog" as="section">
             <header class="opencode-key-header">
               <Dialog.Title class="opencode-key-title">{t(text().title)}</Dialog.Title>
               <Dialog.Description class="opencode-key-description">
@@ -219,7 +210,6 @@ export function OpenCodeKeyDialog(props: OpenCodeKeyDialogProps) {
 
             <form
               class="opencode-key-form"
-              ref={(element) => fades.watch(element)}
               onSubmit={(event) => {
                 event.preventDefault();
                 void save();
@@ -294,7 +284,6 @@ export function OpenCodeKeyDialog(props: OpenCodeKeyDialogProps) {
               </footer>
             </form>
           </Dialog.Content>
-          <ScrollEdgeBlur fades={fades} />
         </Dialog.Overlay>
       </Dialog.Portal>
     </Dialog.Root>

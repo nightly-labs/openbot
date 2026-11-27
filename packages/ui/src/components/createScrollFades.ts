@@ -77,13 +77,5 @@ export function createScrollFades(options: { stuck?: string } = {}) {
     return fades.stuckHeight;
   }
 
-  function top(): boolean {
-    return fades.top;
-  }
-
-  function bottom(): boolean {
-    return fades.bottom;
-  }
-
-  return { adopt, bind, bottom, classes, measure, remeasure, stop, stuckHeight, top, watch };
+  return { adopt, bind, classes, measure, remeasure, stop, stuckHeight, watch };
 }

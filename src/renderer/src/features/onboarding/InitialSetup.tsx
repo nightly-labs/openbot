@@ -10,11 +10,9 @@ import {
   type JoinServerInput,
 } from "@openbot/contracts/ipc";
 import { Button, Dialog, ErrorReference, Textarea } from "@openbot/ui";
-import { createScrollFades } from "@openbot/ui/components/createScrollFades";
-import { ScrollEdgeBlur } from "@openbot/ui/components/ScrollEdgeBlur";
 import { InvitePreviewCard } from "@openbot/ui/features/servers/JoinServerDialog";
 import { useText } from "@openbot/ui/text";
-import { createEffect, createMemo, createSignal, onCleanup, onSettled, Show, untrack } from "solid-js";
+import { createEffect, createMemo, createSignal, onSettled, Show, untrack } from "solid-js";
 import { ComputerUseSetup } from "../computer-use/ComputerUseSetup";
 import {
   createSetupProviders,
@@ -63,8 +61,6 @@ export function InitialSetup(props: InitialSetupProps) {
   const setError = providers.setError;
   const error = providers.error;
   const [dialogElement, setDialogElement] = createSignal<HTMLElement | undefined>();
-  const fades = createScrollFades();
-  onCleanup(() => fades.stop());
   const [saving, setSaving] = createSignal(false);
   const [inviteUrl, setInviteUrl] = createSignal(initialInviteUrl);
   const [invitePreview, setInvitePreview] = createSignal<InvitePreview | null>(null);
@@ -172,221 +168,201 @@ export function InitialSetup(props: InitialSetupProps) {
   return (
     <Dialog.Root open onOpenChange={(open) => !open && props.onClose?.()}>
       <main class="initial-setup-screen">
-        <div
-          ref={(element) => fades.bind(element)}
-          class={["initial-setup-scroller", fades.classes()]}
-          onScroll={fades.measure}
-        >
-          <Dialog.Content
-            as="section"
-            class="initial-setup"
-            data-dialog-surface="unstyled"
-            ref={(element) => {
-              setDialogElement(element);
-              fades.watch(element);
-            }}
-          >
-            <header class="initial-setup-header">
-              <div class="initial-setup-account-row">
-                <Show when={route()}>
-                  <Button
-                    variant="ghost"
-                    type="button"
-                    class="initial-setup-back"
-                    aria-label={t("onboarding.setup.back")}
-                    onClick={() => {
-                      providers.clearErrors();
-                      setRoute(null);
-                    }}
-                  >
-                    <svg viewBox="0 0 20 20" aria-hidden="true">
-                      <path d="m12.5 4.5-5 5 5 5" />
-                    </svg>
-                  </Button>
-                </Show>
-                <span class="initial-setup-account">
-                  <i aria-hidden="true" />
-                  {props.accountEmail}
-                </span>
-                <Show when={props.onLogout}>
-                  <Button
-                    variant="ghost"
-                    type="button"
-                    class="initial-setup-signout"
-                    onClick={() => void props.onLogout?.()}
-                  >
-                    {t("onboarding.setup.signOut")}
-                  </Button>
-                </Show>
-              </div>
-              <p class="initial-setup-eyebrow">{t("onboarding.setup.eyebrow")}</p>
-              <Dialog.Title as="h1" id="initial-setup-title">
-                {title()}
-              </Dialog.Title>
-              <Dialog.Description as="p" id="initial-setup-description" class="initial-setup-intro">
-                {description()}
-              </Dialog.Description>
-            </header>
-
-            <Show when={route() === null}>
-              <ul class="setup-route-list" aria-label={t("onboarding.setup.connectionType")}>
-                <li>
-                  <Button variant="ghost" type="button" class="setup-route-button" onClick={() => chooseRoute("local")}>
-                    <span class="setup-route-icon setup-route-icon-local" aria-hidden="true">
-                      <svg viewBox="0 0 24 24">
-                        <title>{t("onboarding.setup.localIcon")}</title>
-                        <rect x="3" y="4" width="18" height="13" rx="2.5" />
-                        <path d="M8 21h8M12 17v4" />
-                      </svg>
-                      <i />
-                    </span>
-                    <span class="setup-route-copy">
-                      <strong>{t("onboarding.setup.localRoute")}</strong>
-                      <small>{t("onboarding.setup.localRouteDetail", { providers: providerSentence() })}</small>
-                    </span>
-                    <RouteArrow />
-                  </Button>
-                </li>
-                <li>
-                  <Button
-                    variant="ghost"
-                    type="button"
-                    class="setup-route-button"
-                    onClick={() => chooseRoute("remote")}
-                  >
-                    <span class="setup-route-icon" aria-hidden="true">
-                      <svg viewBox="0 0 24 24">
-                        <title>{t("onboarding.setup.remoteIcon")}</title>
-                        <rect x="3" y="3" width="18" height="7" rx="2.5" />
-                        <rect x="3" y="14" width="18" height="7" rx="2.5" />
-                        <path d="M7 6.5h.01M7 17.5h.01" />
-                      </svg>
-                      <i />
-                    </span>
-                    <span class="setup-route-copy">
-                      <strong>{t("onboarding.setup.remoteTitle")}</strong>
-                      <small>{t("onboarding.setup.remoteRouteDetail")}</small>
-                    </span>
-                    <RouteArrow />
-                  </Button>
-                </li>
-              </ul>
-            </Show>
-
-            <Show when={route() === "local"}>
-              <div class="setup-local-content">
-                <SetupProviderPicker
-                  providers={providers}
-                  ariaLabel={t("onboarding.setup.defaultProvider")}
-                  label={t("onboarding.setup.defaultProvider")}
-                  hint={t("onboarding.setup.defaultProviderHint")}
-                  disabled={saving()}
-                  menuMount={dialogElement()}
-                />
-
-                <ComputerUseSetup variant="compact" />
-              </div>
-            </Show>
-
-            <Show when={route() === "remote"}>
-              <form
-                class="setup-remote-form"
-                onSubmit={(event) => {
-                  event.preventDefault();
-                  void connectRemote();
-                }}
-              >
-                <Show
-                  when={invitePreview()}
-                  fallback={
-                    <label>
-                      <span>{t("onboarding.setup.invitation")}</span>
-                      <Textarea
-                        rows="3"
-                        maxlength={INPUT_LIMITS.inviteUrl}
-                        value={inviteUrl()}
-                        onValueChange={(value) => {
-                          setInviteUrl(value);
-                          setInvitePreview(null);
-                          setError("");
-                        }}
-                        placeholder={t("onboarding.setup.invitationPlaceholder")}
-                        spellcheck={false}
-                        autofocus
-                        required
-                      />
-                    </label>
-                  }
-                >
-                  {(preview) => (
-                    <>
-                      <InvitePreviewCard preview={preview()} accountEmail={props.accountEmail} />
-                      <Button
-                        variant="ghost"
-                        type="button"
-                        class="setup-remote-change"
-                        disabled={saving()}
-                        onClick={() => {
-                          setInvitePreview(null);
-                          setError("");
-                        }}
-                      >
-                        {t("onboarding.setup.otherInvitation")}
-                      </Button>
-                    </>
-                  )}
-                </Show>
-                <Show when={!invitePreview()}>
-                  <p class="setup-remote-note">
-                    {joinNoteParts()[0]}
-                    <strong>{props.accountEmail}</strong>
-                    {joinNoteParts()[1]}
-                  </p>
-                </Show>
-              </form>
-            </Show>
-
-            <Show when={error()}>
-              <p class="initial-setup-error" role="alert">
-                {error()}
-                <ErrorReference reference={providers.errorReference()} />
-              </p>
-            </Show>
-
-            <Show when={route() !== null}>
-              <div class="initial-setup-actions">
+        <Dialog.Content as="section" class="initial-setup" data-dialog-surface="unstyled" ref={setDialogElement}>
+          <header class="initial-setup-header">
+            <div class="initial-setup-account-row">
+              <Show when={route()}>
                 <Button
-                  variant="default"
+                  variant="ghost"
                   type="button"
-                  class="initial-setup-save"
-                  disabled={
-                    saving() ||
-                    (route() === "local" && !selectedProvider()) ||
-                    (route() === "remote" && !inviteUrl().trim())
-                  }
-                  onClick={() => (route() === "local" ? void saveLocal() : void connectRemote())}
+                  class="initial-setup-back"
+                  aria-label={t("onboarding.setup.back")}
+                  onClick={() => {
+                    providers.clearErrors();
+                    setRoute(null);
+                  }}
                 >
-                  {saving()
-                    ? route() === "remote"
-                      ? t("common.connecting")
-                      : t("common.saving")
-                    : route() === "remote"
-                      ? invitePreview()
-                        ? t("onboarding.setup.connect")
-                        : t("onboarding.setup.reviewInvitation")
-                      : selectedProvider()
-                        ? t("onboarding.setup.continueWith", {
-                            provider: providers.customSelected()
-                              ? t("provider.custom.name")
-                              : providerName(selectedProvider()),
-                          })
-                        : t("onboarding.setup.chooseProvider")}
+                  <svg viewBox="0 0 20 20" aria-hidden="true">
+                    <path d="m12.5 4.5-5 5 5 5" />
+                  </svg>
                 </Button>
-              </div>
-            </Show>
-          </Dialog.Content>
-        </div>
-        <ScrollEdgeBlur fades={fades} />
+              </Show>
+              <span class="initial-setup-account">
+                <i aria-hidden="true" />
+                {props.accountEmail}
+              </span>
+              <Show when={props.onLogout}>
+                <Button
+                  variant="ghost"
+                  type="button"
+                  class="initial-setup-signout"
+                  onClick={() => void props.onLogout?.()}
+                >
+                  {t("onboarding.setup.signOut")}
+                </Button>
+              </Show>
+            </div>
+            <p class="initial-setup-eyebrow">{t("onboarding.setup.eyebrow")}</p>
+            <Dialog.Title as="h1" id="initial-setup-title">
+              {title()}
+            </Dialog.Title>
+            <Dialog.Description as="p" id="initial-setup-description" class="initial-setup-intro">
+              {description()}
+            </Dialog.Description>
+          </header>
+
+          <Show when={route() === null}>
+            <ul class="setup-route-list" aria-label={t("onboarding.setup.connectionType")}>
+              <li>
+                <Button variant="ghost" type="button" class="setup-route-button" onClick={() => chooseRoute("local")}>
+                  <span class="setup-route-icon setup-route-icon-local" aria-hidden="true">
+                    <svg viewBox="0 0 24 24">
+                      <title>{t("onboarding.setup.localIcon")}</title>
+                      <rect x="3" y="4" width="18" height="13" rx="2.5" />
+                      <path d="M8 21h8M12 17v4" />
+                    </svg>
+                    <i />
+                  </span>
+                  <span class="setup-route-copy">
+                    <strong>{t("onboarding.setup.localRoute")}</strong>
+                    <small>{t("onboarding.setup.localRouteDetail", { providers: providerSentence() })}</small>
+                  </span>
+                  <RouteArrow />
+                </Button>
+              </li>
+              <li>
+                <Button variant="ghost" type="button" class="setup-route-button" onClick={() => chooseRoute("remote")}>
+                  <span class="setup-route-icon" aria-hidden="true">
+                    <svg viewBox="0 0 24 24">
+                      <title>{t("onboarding.setup.remoteIcon")}</title>
+                      <rect x="3" y="3" width="18" height="7" rx="2.5" />
+                      <rect x="3" y="14" width="18" height="7" rx="2.5" />
+                      <path d="M7 6.5h.01M7 17.5h.01" />
+                    </svg>
+                    <i />
+                  </span>
+                  <span class="setup-route-copy">
+                    <strong>{t("onboarding.setup.remoteTitle")}</strong>
+                    <small>{t("onboarding.setup.remoteRouteDetail")}</small>
+                  </span>
+                  <RouteArrow />
+                </Button>
+              </li>
+            </ul>
+          </Show>
+
+          <Show when={route() === "local"}>
+            <div class="setup-local-content">
+              <SetupProviderPicker
+                providers={providers}
+                ariaLabel={t("onboarding.setup.defaultProvider")}
+                label={t("onboarding.setup.defaultProvider")}
+                hint={t("onboarding.setup.defaultProviderHint")}
+                disabled={saving()}
+                menuMount={dialogElement()}
+              />
+
+              <ComputerUseSetup variant="compact" />
+            </div>
+          </Show>
+
+          <Show when={route() === "remote"}>
+            <form
+              class="setup-remote-form"
+              onSubmit={(event) => {
+                event.preventDefault();
+                void connectRemote();
+              }}
+            >
+              <Show
+                when={invitePreview()}
+                fallback={
+                  <label>
+                    <span>{t("onboarding.setup.invitation")}</span>
+                    <Textarea
+                      rows="3"
+                      maxlength={INPUT_LIMITS.inviteUrl}
+                      value={inviteUrl()}
+                      onValueChange={(value) => {
+                        setInviteUrl(value);
+                        setInvitePreview(null);
+                        setError("");
+                      }}
+                      placeholder={t("onboarding.setup.invitationPlaceholder")}
+                      spellcheck={false}
+                      autofocus
+                      required
+                    />
+                  </label>
+                }
+              >
+                {(preview) => (
+                  <>
+                    <InvitePreviewCard preview={preview()} accountEmail={props.accountEmail} />
+                    <Button
+                      variant="ghost"
+                      type="button"
+                      class="setup-remote-change"
+                      disabled={saving()}
+                      onClick={() => {
+                        setInvitePreview(null);
+                        setError("");
+                      }}
+                    >
+                      {t("onboarding.setup.otherInvitation")}
+                    </Button>
+                  </>
+                )}
+              </Show>
+              <Show when={!invitePreview()}>
+                <p class="setup-remote-note">
+                  {joinNoteParts()[0]}
+                  <strong>{props.accountEmail}</strong>
+                  {joinNoteParts()[1]}
+                </p>
+              </Show>
+            </form>
+          </Show>
+
+          <Show when={error()}>
+            <p class="initial-setup-error" role="alert">
+              {error()}
+              <ErrorReference reference={providers.errorReference()} />
+            </p>
+          </Show>
+
+          <Show when={route() !== null}>
+            <div class="initial-setup-actions">
+              <Button
+                variant="default"
+                type="button"
+                class="initial-setup-save"
+                disabled={
+                  saving() ||
+                  (route() === "local" && !selectedProvider()) ||
+                  (route() === "remote" && !inviteUrl().trim())
+                }
+                onClick={() => (route() === "local" ? void saveLocal() : void connectRemote())}
+              >
+                {saving()
+                  ? route() === "remote"
+                    ? t("common.connecting")
+                    : t("common.saving")
+                  : route() === "remote"
+                    ? invitePreview()
+                      ? t("onboarding.setup.connect")
+                      : t("onboarding.setup.reviewInvitation")
+                    : selectedProvider()
+                      ? t("onboarding.setup.continueWith", {
+                          provider: providers.customSelected()
+                            ? t("provider.custom.name")
+                            : providerName(selectedProvider()),
+                        })
+                      : t("onboarding.setup.chooseProvider")}
+              </Button>
+            </div>
+          </Show>
+        </Dialog.Content>
       </main>
     </Dialog.Root>
   );

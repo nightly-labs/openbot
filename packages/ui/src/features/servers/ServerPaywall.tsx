@@ -23,8 +23,6 @@ import {
   RefreshCw,
 } from "@openbot/ui";
 import { createEffect, createSignal, createUniqueId, For, Match, onCleanup, onSettled, Show, Switch } from "solid-js";
-import { createScrollFades } from "../../components/createScrollFades";
-import { ScrollEdgeBlur } from "../../components/ScrollEdgeBlur";
 import { useText } from "../../text";
 import { AgentAvatar } from "../agents/AgentAvatar";
 import {
@@ -428,8 +426,6 @@ function PaywallWait(props: { server: ServerSummary; titleId: string }) {
 export function ServerPaywallScreen(props: { server: ServerSummary; paywall: ServerPaywall }) {
   const titleId = createUniqueId();
   const wave = createWakeWave(CREW.length);
-  const fades = createScrollFades();
-  onCleanup(() => fades.stop());
   const plan = () => (props.paywall.canSubscribe ? (props.server.customPlan ?? null) : null);
   const paid = () => props.paywall.phase() === "paid";
   const moodOf = (member: CrewMember): AvatarMood => {
@@ -441,40 +437,32 @@ export function ServerPaywallScreen(props: { server: ServerSummary; paywall: Ser
     return member.wakeRank < wave.count() ? "waiting" : "asleep";
   };
   return (
-    <>
-      <main
-        class={["server-paywall", { "server-paywall-success": paid() }, fades.classes()]}
-        aria-labelledby={titleId}
-        ref={(element) => fades.bind(element)}
-        onScroll={fades.measure}
-      >
-        <div class="server-paywall-shell" ref={(element) => fades.watch(element)}>
-          <CrewRow moodOf={moodOf} cheer={paid()} />
-          <Switch>
-            <Match when={paid()}>
-              <PaywallPaid server={props.server} paywall={props.paywall} titleId={titleId} />
-            </Match>
-            <Match when={!plan()}>
-              <PaywallWait server={props.server} titleId={titleId} />
-            </Match>
-            <Match when={props.paywall.phase() === "checkout"}>
-              <PaywallCheckout paywall={props.paywall} titleId={titleId} />
-            </Match>
-            <Match when={plan()}>
-              {(current) => (
-                <PaywallOffer
-                  server={props.server}
-                  plan={current()}
-                  paywall={props.paywall}
-                  titleId={titleId}
-                  onWake={wave.wake}
-                />
-              )}
-            </Match>
-          </Switch>
-        </div>
-      </main>
-      <ScrollEdgeBlur fades={fades} />
-    </>
+    <main class={["server-paywall", { "server-paywall-success": paid() }]} aria-labelledby={titleId}>
+      <div class="server-paywall-shell">
+        <CrewRow moodOf={moodOf} cheer={paid()} />
+        <Switch>
+          <Match when={paid()}>
+            <PaywallPaid server={props.server} paywall={props.paywall} titleId={titleId} />
+          </Match>
+          <Match when={!plan()}>
+            <PaywallWait server={props.server} titleId={titleId} />
+          </Match>
+          <Match when={props.paywall.phase() === "checkout"}>
+            <PaywallCheckout paywall={props.paywall} titleId={titleId} />
+          </Match>
+          <Match when={plan()}>
+            {(current) => (
+              <PaywallOffer
+                server={props.server}
+                plan={current()}
+                paywall={props.paywall}
+                titleId={titleId}
+                onWake={wave.wake}
+              />
+            )}
+          </Match>
+        </Switch>
+      </div>
+    </main>
   );
 }

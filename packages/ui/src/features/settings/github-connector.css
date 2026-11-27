@@ -47,10 +47,6 @@
   list-style: none;
 }
 
-.github-connector-repository-list + .scroll-edge-blur {
-  --scroll-edge-blur-size: calc(var(--openbot-space-1) * 6);
-}
-
 .github-connector-repository {
   display: flex;
   gap: var(--openbot-space-2);

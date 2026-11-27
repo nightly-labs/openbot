@@ -16,7 +16,7 @@ import type {
 } from "@openbot/contracts/ipc";
 import type { AppTextKey, AppTranslate } from "@openbot/i18n";
 import { Button, Field, Input, Textarea } from "@openbot/ui";
-import { createSignal, For, onCleanup, onSettled, Show } from "solid-js";
+import { createSignal, For, onSettled, Show } from "solid-js";
 import {
   AVATAR_COLOR_CHOICES,
   avatarHeadColor,
@@ -24,9 +24,7 @@ import {
   isAvatarColorChoice,
   type SupportedAvatarSilhouetteId,
 } from "../../bloub-avatar";
-import { createScrollFades } from "../../components/createScrollFades";
 import { ProviderModelPicker } from "../../components/ProviderModelPicker";
-import { ScrollEdgeBlur } from "../../components/ScrollEdgeBlur";
 import { currentText, useText } from "../../text";
 import { prefersReducedMotion } from "../../utils";
 import { AgentAvatar } from "./AgentAvatar";
@@ -186,8 +184,6 @@ function matchesSuggestion(draft: FirstAgentDraft, suggestion: FirstAgentSuggest
 export function FirstAgentSetup(props: FirstAgentSetupProps) {
   const { t, sourceText } = useText();
   let suggestionList: HTMLUListElement | undefined;
-  const contentFades = createScrollFades();
-  onCleanup(() => contentFades.stop());
   let activeSuggestionPointer: number | null = null;
   let suggestionDragStartX = 0;
   let suggestionDragStartScrollLeft = 0;
@@ -405,13 +401,8 @@ export function FirstAgentSetup(props: FirstAgentSetupProps) {
         </Show>
       </header>
 
-      <div
-        ref={(element) => contentFades.bind(element)}
-        class={["first-agent-setup-content", contentFades.classes()]}
-        onScroll={contentFades.measure}
-      >
+      <div class="first-agent-setup-content">
         <form
-          ref={(element) => contentFades.watch(element)}
           class="first-agent-editor"
           onSubmit={(event) => {
             event.preventDefault();
@@ -632,7 +623,6 @@ export function FirstAgentSetup(props: FirstAgentSetupProps) {
           </div>
         </section>
       </div>
-      <ScrollEdgeBlur fades={contentFades} />
     </main>
   );
 }

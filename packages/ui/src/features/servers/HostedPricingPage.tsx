@@ -19,9 +19,7 @@ import {
   TriangleAlert,
 } from "@openbot/ui";
 import type { UserErrorDetails } from "@openbot/user-errors";
-import { type Accessor, createEffect, createSignal, createUniqueId, onCleanup, Show, untrack } from "solid-js";
-import { createScrollFades } from "../../components/createScrollFades";
-import { ScrollEdgeBlur } from "../../components/ScrollEdgeBlur";
+import { type Accessor, createEffect, createSignal, createUniqueId, Show, untrack } from "solid-js";
 import { useText } from "../../text";
 import { type BillingDetailsDraft, BillingDetailsFields, billingDetailsRequest } from "../billing/BillingDetailsFields";
 import { OrderForm, type OrderFormOrder } from "../billing/OrderForm";
@@ -92,8 +90,6 @@ export function HostedPricingPage(props: HostedPricingPageProps) {
     if (!asked) setEarlyStart(false);
   });
   const [controlsMount, setControlsMount] = createSignal<HTMLElement>();
-  const fades = createScrollFades();
-  onCleanup(() => fades.stop());
 
   const accent = () => {
     const size = props.plans.findIndex((plan) => plan.id === order().server) + 1;
@@ -164,16 +160,8 @@ export function HostedPricingPage(props: HostedPricingPageProps) {
           />
         </Show>
       </PageHeader>
-      <div
-        class={["hosted-pricing-scroll", fades.classes()]}
-        ref={(element) => fades.bind(element)}
-        onScroll={fades.measure}
-      >
-        <div
-          class="hosted-pricing-hero"
-          style={{ "--hosted-pricing-accent": accent() }}
-          ref={(element) => fades.watch(element)}
-        >
+      <div class="hosted-pricing-scroll">
+        <div class="hosted-pricing-hero" style={{ "--hosted-pricing-accent": accent() }}>
           <Show when={props.serverLimit ?? null}>
             {(limit) => (
               <Alert class="hosted-pricing-alert" tone="warning" role="alert">
@@ -244,7 +232,6 @@ export function HostedPricingPage(props: HostedPricingPageProps) {
           </Show>
         </div>
       </div>
-      <ScrollEdgeBlur fades={fades} />
     </section>
   );
 }

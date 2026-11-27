@@ -36,9 +36,7 @@ import {
   TriangleAlert,
 } from "@openbot/ui";
 import type { JSX } from "@solidjs/web";
-import { createEffect, createMemo, createSignal, For, Match, onCleanup, Show, Switch, untrack } from "solid-js";
-import { createScrollFades } from "../../components/createScrollFades";
-import { ScrollEdgeBlur } from "../../components/ScrollEdgeBlur";
+import { createEffect, createMemo, createSignal, For, Match, Show, Switch, untrack } from "solid-js";
 import { RollingPrice } from "../../rolling-price";
 import { useText } from "../../text";
 import type { BillingDetailsCalls } from "../billing/BillingDetailsFields";
@@ -412,8 +410,6 @@ export function BuyCreditsPage(props: BuyCreditsPageProps): JSX.Element {
   const { t } = useText();
   const [serverId, setServerId] = createSignal<string | null>(untrack(() => props.initialServerId ?? null));
   const [index, setIndex] = createSignal(CREDIT_POPULAR_INDEX);
-  const fades = createScrollFades();
-  onCleanup(() => fades.stop());
   const [payButton, setPayButton] = createSignal<HTMLElement | undefined>();
   const [bursts, setBursts] = createSignal<readonly number[]>([]);
   const [confirming, setConfirming] = createSignal<{ stop: CreditStop; button: HTMLElement | undefined } | null>(null);
@@ -546,12 +542,8 @@ export function BuyCreditsPage(props: BuyCreditsPageProps): JSX.Element {
           </Show>
         </div>
       </PageHeader>
-      <div
-        class={["hosted-pricing-scroll", fades.classes()]}
-        ref={(element) => fades.bind(element)}
-        onScroll={fades.measure}
-      >
-        <div class="credit-page-body" ref={(element) => fades.watch(element)}>
+      <div class="hosted-pricing-scroll">
+        <div class="credit-page-body">
           <Switch>
             <Match when={ready()}>
               {(state) => (
@@ -581,7 +573,6 @@ export function BuyCreditsPage(props: BuyCreditsPageProps): JSX.Element {
           </Switch>
         </div>
       </div>
-      <ScrollEdgeBlur fades={fades} />
       <Show when={confirming()}>
         {(chosen) => (
           <Show when={ready()}>

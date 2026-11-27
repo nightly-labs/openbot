@@ -1,9 +1,7 @@
 import type { AgentModelId, AgentProviderId } from "@openbot/contracts/ipc";
 import { Button, ErrorReference, IconButton, X } from "@openbot/ui";
-import { createScrollFades } from "@openbot/ui/components/createScrollFades";
-import { ScrollEdgeBlur } from "@openbot/ui/components/ScrollEdgeBlur";
 import { useText } from "@openbot/ui/text";
-import { createSignal, createUniqueId, onCleanup, onSettled, Show } from "solid-js";
+import { createSignal, createUniqueId, onSettled, Show } from "solid-js";
 import { listenForEscape } from "./onboarding-escape";
 import { createSetupProviders, SetupProviderPicker, type SetupProviderProps } from "./SetupProviderPicker";
 import { createSetupNext } from "./setup-next";
@@ -21,8 +19,6 @@ export function ServerOnboarding(props: ServerOnboardingProps) {
   const providers = createSetupProviders(props.setup);
   const next = createSetupNext(providers);
   const reasonId = createUniqueId();
-  const fades = createScrollFades();
-  onCleanup(() => fades.stop());
 
   onSettled(() => listenForEscape(() => props.onClose));
 
@@ -48,55 +44,48 @@ export function ServerOnboarding(props: ServerOnboardingProps) {
           </IconButton>
         )}
       </Show>
-      <div
-        ref={(element) => fades.bind(element)}
-        class={["onboarding-scroller", fades.classes()]}
-        onScroll={fades.measure}
-      >
-        <div class="onboarding-shell" ref={(element) => fades.watch(element)}>
-          <section class="onboarding-panel">
-            <h1 id="server-onboarding-title">{t("onboarding.server.title", { server: props.serverName })}</h1>
-            <p class="onboarding-description">{t("onboarding.server.description")}</p>
-            <div class="onboarding-provider">
-              <SetupProviderPicker
-                providers={providers}
-                ariaLabel={t("onboarding.server.label")}
-                label={t("onboarding.server.label")}
-                hint={t("onboarding.server.hint")}
-                disabled={false}
-                menuMount={screenElement()}
-              />
-            </div>
-          </section>
-
-          <Show when={providers.error()}>
-            <p class="onboarding-error" role="alert">
-              {providers.error()}
-              <ErrorReference reference={providers.errorReference()} />
-            </p>
-          </Show>
-
-          <div class="onboarding-actions">
-            <Button
-              type="button"
-              variant="default"
-              class="onboarding-next"
-              aria-describedby={next.blockedReason() ? reasonId : undefined}
-              onClick={continueToAgent}
-            >
-              {providers.selectedProviderConnected() ? t("onboarding.server.continue") : t("onboarding.action.connect")}
-            </Button>
-            <Show when={next.blockedReason()}>
-              {(reason) => (
-                <p class="onboarding-next-reason" id={reasonId}>
-                  {reason()}
-                </p>
-              )}
-            </Show>
+      <div class="onboarding-shell">
+        <section class="onboarding-panel">
+          <h1 id="server-onboarding-title">{t("onboarding.server.title", { server: props.serverName })}</h1>
+          <p class="onboarding-description">{t("onboarding.server.description")}</p>
+          <div class="onboarding-provider">
+            <SetupProviderPicker
+              providers={providers}
+              ariaLabel={t("onboarding.server.label")}
+              label={t("onboarding.server.label")}
+              hint={t("onboarding.server.hint")}
+              disabled={false}
+              menuMount={screenElement()}
+            />
           </div>
+        </section>
+
+        <Show when={providers.error()}>
+          <p class="onboarding-error" role="alert">
+            {providers.error()}
+            <ErrorReference reference={providers.errorReference()} />
+          </p>
+        </Show>
+
+        <div class="onboarding-actions">
+          <Button
+            type="button"
+            variant="default"
+            class="onboarding-next"
+            aria-describedby={next.blockedReason() ? reasonId : undefined}
+            onClick={continueToAgent}
+          >
+            {providers.selectedProviderConnected() ? t("onboarding.server.continue") : t("onboarding.action.connect")}
+          </Button>
+          <Show when={next.blockedReason()}>
+            {(reason) => (
+              <p class="onboarding-next-reason" id={reasonId}>
+                {reason()}
+              </p>
+            )}
+          </Show>
         </div>
       </div>
-      <ScrollEdgeBlur fades={fades} />
     </main>
   );
 }

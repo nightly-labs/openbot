@@ -13,48 +13,6 @@
   padding: 0 var(--openbot-space-6) var(--openbot-space-8);
 }
 
-@property --tasks-page-stuck-height {
-  syntax: "<length>";
-  inherits: false;
-  initial-value: 0px;
-}
-
-.tasks-page .tasks-page-scroll.scroll-fade-top {
-  -webkit-mask-image: linear-gradient(
-    to bottom,
-    var(--openbot-text-primary) var(--tasks-page-stuck-height),
-    transparent var(--tasks-page-stuck-height),
-    var(--openbot-text-primary) calc(var(--tasks-page-stuck-height) + 18px),
-    var(--openbot-text-primary) 100%
-  );
-  mask-image: linear-gradient(
-    to bottom,
-    var(--openbot-text-primary) var(--tasks-page-stuck-height),
-    transparent var(--tasks-page-stuck-height),
-    var(--openbot-text-primary) calc(var(--tasks-page-stuck-height) + 18px),
-    var(--openbot-text-primary) 100%
-  );
-}
-
-.tasks-page .tasks-page-scroll.scroll-fade-top.scroll-fade-bottom {
-  -webkit-mask-image: linear-gradient(
-    to bottom,
-    var(--openbot-text-primary) var(--tasks-page-stuck-height),
-    transparent var(--tasks-page-stuck-height),
-    var(--openbot-text-primary) calc(var(--tasks-page-stuck-height) + 18px),
-    var(--openbot-text-primary) calc(100% - 18px),
-    transparent 100%
-  );
-  mask-image: linear-gradient(
-    to bottom,
-    var(--openbot-text-primary) var(--tasks-page-stuck-height),
-    transparent var(--tasks-page-stuck-height),
-    var(--openbot-text-primary) calc(var(--tasks-page-stuck-height) + 18px),
-    var(--openbot-text-primary) calc(100% - 18px),
-    transparent 100%
-  );
-}
-
 .tasks-page-column {
   display: flex;
   max-width: 36rem;

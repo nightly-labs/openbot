@@ -61,6 +61,24 @@ export function trackEnteringPickerRows(list: HTMLElement): () => void {
   return () => observer.disconnect();
 }
 
+const EDGE = 2;
+
+export function trackPickerScrollFades(list: HTMLElement): () => void {
+  const measure = () => {
+    const remaining = list.scrollHeight - list.scrollTop - list.clientHeight;
+    list.classList.toggle("scroll-fade-top", list.scrollTop > EDGE);
+    list.classList.toggle("scroll-fade-bottom", remaining > EDGE);
+  };
+  measure();
+  const observer = new MutationObserver(measure);
+  observer.observe(list, { childList: true });
+  list.addEventListener("scroll", measure, { passive: true });
+  return () => {
+    observer.disconnect();
+    list.removeEventListener("scroll", measure);
+  };
+}
+
 export interface MatchPart {
   text: string;
   match: boolean;

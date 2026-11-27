@@ -1,9 +1,7 @@
 import { Button, FolderOpen, IconButton, Skeleton } from "@openbot/ui";
 import { SettingsPanelHeader } from "@openbot/ui/components/SettingsPanel";
 import { currentText, useText } from "@openbot/ui/text";
-import { createMemo, createUniqueId, For, onCleanup, onSettled, Show } from "solid-js";
-import { createScrollFades } from "../../components/createScrollFades";
-import { ScrollEdgeBlur } from "../../components/ScrollEdgeBlur";
+import { createMemo, createUniqueId, For, Show } from "solid-js";
 import { FileList } from "./FileList";
 import {
   type ConversationStorageRow,
@@ -55,12 +53,6 @@ export function AgentFilesView(props: AgentFilesViewProps) {
   const chats = createMemo(() =>
     [...props.conversations].sort((left, right) => right.bytes - left.bytes).slice(0, CHAT_ROWS),
   );
-  const fades = createScrollFades();
-  let body!: HTMLDivElement;
-  onSettled(() => {
-    for (const child of body.children) fades.watch(child);
-  });
-  onCleanup(() => fades.stop());
 
   return (
     <div class="agent-files-view">
@@ -71,14 +63,7 @@ export function AgentFilesView(props: AgentFilesViewProps) {
         onClose={props.onClose}
         closeLabel={t("files.agent.close")}
       />
-      <div
-        class={["agent-files-body", fades.classes()]}
-        ref={(element) => {
-          body = element;
-          fades.bind(element);
-        }}
-        onScroll={fades.measure}
-      >
+      <div class="agent-files-body">
         <section class="agent-files-summary" aria-labelledby={`${headingId}-total`}>
           <div>
             <h3 id={`${headingId}-total`} class="agent-files-total-label">
@@ -118,7 +103,7 @@ export function AgentFilesView(props: AgentFilesViewProps) {
         </section>
 
         <Show when={!props.loading && chats().length > 0}>
-          <section class="agent-files-section" aria-labelledby={`${headingId}-chats`} ref={fades.watch}>
+          <section class="agent-files-section" aria-labelledby={`${headingId}-chats`}>
             <h3 id={`${headingId}-chats`} class="storage-section-heading">
               {t("files.agent.chatsBySize")}
             </h3>
@@ -166,7 +151,6 @@ export function AgentFilesView(props: AgentFilesViewProps) {
           onAction={props.onFileAction}
         />
       </div>
-      <ScrollEdgeBlur fades={fades} />
     </div>
   );
 }

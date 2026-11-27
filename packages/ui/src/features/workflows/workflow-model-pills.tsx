@@ -21,7 +21,6 @@ import {
   Zap,
 } from "@openbot/ui";
 import { createSignal, For, Show, untrack } from "solid-js";
-import { ScrollEdgeBlur } from "../../components/ScrollEdgeBlur";
 import { useText } from "../../text";
 import {
   createPickerFades,
@@ -232,7 +231,6 @@ export function ModelPill(props: {
                         </Listbox.Item>
                       )}
                     />
-                    <ScrollEdgeBlur fades={fades} />
                   </Show>
                 </Tabs.Content>
               )}

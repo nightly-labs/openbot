@@ -2,9 +2,7 @@ import { Button, buttonVariants, Pin, PinOff, Popover } from "@openbot/ui";
 import type { AgentProfile } from "@openbot/ui/data";
 import { ReplyQuote } from "@openbot/ui/features/conversation/ReplyQuote";
 import { useText } from "@openbot/ui/text";
-import { createEffect, createSignal, createUniqueId, For, onCleanup, Show } from "solid-js";
-import { createScrollFades } from "../../components/createScrollFades";
-import { ScrollEdgeBlur } from "../../components/ScrollEdgeBlur";
+import { createSignal, createUniqueId, For, Show } from "solid-js";
 
 export interface PinnedMessageItem {
   id: string;
@@ -27,12 +25,6 @@ export function PinnedMessages(props: PinnedMessagesProps) {
   const { t } = useText();
   const [open, setOpen] = createSignal(false);
   let surface: HTMLDivElement | undefined;
-  const fades = createScrollFades();
-  onCleanup(() => fades.stop());
-  createEffect(
-    () => props.pins.length,
-    () => fades.remeasure(),
-  );
   const change = (next: boolean) => {
     setOpen(next);
     props.onOpenChange?.(next);
@@ -82,11 +74,7 @@ export function PinnedMessages(props: PinnedMessagesProps) {
               </div>
             }
           >
-            <ul
-              class={["pinned-messages-list", fades.classes()]}
-              ref={(element) => fades.bind(element)}
-              onScroll={fades.measure}
-            >
+            <ul class="pinned-messages-list">
               <For each={props.pins} keyed={(pin) => pin.id}>
                 {(pin, index) => (
                   <li class="pinned-messages-item">
@@ -129,7 +117,6 @@ export function PinnedMessages(props: PinnedMessagesProps) {
                 )}
               </For>
             </ul>
-            <ScrollEdgeBlur fades={fades} />
           </Show>
         </Popover.Content>
       </Popover.Portal>

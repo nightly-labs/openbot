@@ -21,7 +21,6 @@ import {
 } from "@openbot/ui";
 import { createScrollFades } from "@openbot/ui/components/createScrollFades";
 import { ResizableTextarea } from "@openbot/ui/components/ResizableTextarea";
-import { ScrollEdgeBlur } from "@openbot/ui/components/ScrollEdgeBlur";
 import { SettingsField, SettingsLinkGroup, SettingsLinkRow } from "@openbot/ui/components/SettingsPanel";
 import { AgentAvatar } from "@openbot/ui/features/agents/AgentAvatar";
 import { InstructionsLimit, instructionsTooLong } from "@openbot/ui/features/agents/InstructionsLimit";
@@ -566,7 +565,6 @@ export function ChannelEditor(props: ChannelEditorProps) {
                       </Listbox.Item>
                     )}
                   />
-                  <ScrollEdgeBlur fades={pickerFades} />
                 </Show>
               </Popover.Content>
             </Popover.Portal>

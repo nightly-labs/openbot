@@ -1,6 +1,5 @@
 import { ErrorReference, IconButton, X } from "@openbot/ui";
 import { createScrollFades } from "@openbot/ui/components/createScrollFades";
-import { ScrollEdgeBlur } from "@openbot/ui/components/ScrollEdgeBlur";
 import { PageHeader, type PageHeaderParent } from "@openbot/ui/features/window/PageHeader";
 import { useText } from "@openbot/ui/text";
 import { holdFlag } from "@openbot/ui/utils";
@@ -202,21 +201,20 @@ function MarketplaceWindow(props: MarketplaceProps) {
             )}
           </Show>
         </div>
+        <Show when={props.model.error()}>
+          {(message) => (
+            <div class="skills-marketplace-error">
+              <span>
+                {message()}
+                <ErrorReference reference={props.model.errorReference?.()} />
+              </span>
+              <IconButton label={t("common.close")} variant="ghost" size="icon-sm" onClick={props.model.clearError}>
+                <X />
+              </IconButton>
+            </div>
+          )}
+        </Show>
       </div>
-      <ScrollEdgeBlur fades={fades} />
-      <Show when={props.model.error()}>
-        {(message) => (
-          <div class="skills-marketplace-error">
-            <span>
-              {message()}
-              <ErrorReference reference={props.model.errorReference?.()} />
-            </span>
-            <IconButton label={t("common.close")} variant="ghost" size="icon-sm" onClick={props.model.clearError}>
-              <X />
-            </IconButton>
-          </div>
-        )}
-      </Show>
       <p class="marketplace-visually-hidden" role="status" data-live-announcer="">
         {props.model.notice()}
       </p>

@@ -1,6 +1,5 @@
 import { Archive, buttonVariants, ChevronDown, ChevronRight, DropdownMenu, MessageCirclePlus } from "@openbot/ui";
 import { createScrollFades } from "@openbot/ui/components/createScrollFades";
-import { ScrollEdgeBlur } from "@openbot/ui/components/ScrollEdgeBlur";
 import { sidebarMessageTime } from "@openbot/ui/features/sidebar/sidebar-filtering";
 import { useText } from "@openbot/ui/text";
 import { For, onSettled, Show } from "solid-js";
@@ -25,27 +24,22 @@ function ThreadMenuList(props: ThreadHeaderProps) {
   onSettled(() => fades.stop);
   const current = (id: string) => (id === props.activeId ? "true" : undefined);
   return (
-    <>
-      <div class={["agent-threads-menu-list", fades.classes()]} ref={fades.bind} onScroll={fades.measure}>
-        <For each={props.threads}>
-          {(thread) => (
-            <DropdownMenu.Item
-              class="agent-threads-menu-item"
-              aria-current={current(thread.id)}
-              onSelectAfterClose={() => props.onOpen(thread.id)}
-            >
-              <Show when={thread.stem}>{(stem) => <ThreadStemMark stem={stem()} />}</Show>
-              <ThreadTitle class="agent-threads-menu-title" title={thread.title} />
-              <ThreadStatusMark status={thread.status} unread={thread.unread} />
-              <span class="agent-threads-menu-time ui-menu-trailing">
-                {sidebarMessageTime(thread.updatedAt, format)}
-              </span>
-            </DropdownMenu.Item>
-          )}
-        </For>
-      </div>
-      <ScrollEdgeBlur fades={fades} />
-    </>
+    <div class={["agent-threads-menu-list", fades.classes()]} ref={fades.bind} onScroll={fades.measure}>
+      <For each={props.threads}>
+        {(thread) => (
+          <DropdownMenu.Item
+            class="agent-threads-menu-item"
+            aria-current={current(thread.id)}
+            onSelectAfterClose={() => props.onOpen(thread.id)}
+          >
+            <Show when={thread.stem}>{(stem) => <ThreadStemMark stem={stem()} />}</Show>
+            <ThreadTitle class="agent-threads-menu-title" title={thread.title} />
+            <ThreadStatusMark status={thread.status} unread={thread.unread} />
+            <span class="agent-threads-menu-time ui-menu-trailing">{sidebarMessageTime(thread.updatedAt, format)}</span>
+          </DropdownMenu.Item>
+        )}
+      </For>
+    </div>
   );
 }
 

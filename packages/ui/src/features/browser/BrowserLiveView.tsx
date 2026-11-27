@@ -8,8 +8,6 @@ import { AlertDialog, Button, ErrorReference, Globe2, toast } from "@openbot/ui"
 import { useText } from "@openbot/ui/text";
 import { errorReference } from "@openbot/user-errors";
 import { createEffect, createSignal, createStore, onCleanup, Show } from "solid-js";
-import { createScrollFades } from "../../components/createScrollFades";
-import { ScrollEdgeBlur } from "../../components/ScrollEdgeBlur";
 
 const ALT = 1;
 const CONTROL = 2;
@@ -108,9 +106,6 @@ export default function BrowserLiveView(props: BrowserLiveViewProps) {
     settle?.(answer);
   };
   onCleanup(() => settleCopy(null));
-
-  const messageFades = createScrollFades();
-  onCleanup(() => messageFades.stop());
 
   const stopListening = runtime.onLiveViewEvent((event) => {
     if (event.tabId !== props.tabId) return;
@@ -370,14 +365,9 @@ export default function BrowserLiveView(props: BrowserLiveViewProps) {
                     ? t("browser.liveView.dialog.site", { site: props.site })
                     : t("browser.liveView.dialog.page")}
                 </AlertDialog.Title>
-                <AlertDialog.Description
-                  ref={(element: HTMLElement) => messageFades.bind(element)}
-                  class={["browser-live-view-dialog-message", messageFades.classes()]}
-                  onScroll={messageFades.measure}
-                >
+                <AlertDialog.Description class="browser-live-view-dialog-message">
                   {open().message}
                 </AlertDialog.Description>
-                <ScrollEdgeBlur fades={messageFades} />
                 <div class="browser-live-view-dialog-actions">
                   <Show when={open().type === "confirm"}>
                     <Button variant="ghost" size="sm" onClick={() => answerDialog(false)}>

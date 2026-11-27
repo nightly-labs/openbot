@@ -22,8 +22,6 @@ import {
 import { TeamPersonAvatar, teamMemberName } from "@openbot/ui/features/team/TeamPersonAvatar";
 import { type TextValue, useText } from "@openbot/ui/text";
 import { createEffect, createMemo, createSignal, For, onCleanup, onSettled, Show } from "solid-js";
-import { createScrollFades } from "../../components/createScrollFades";
-import { ScrollEdgeBlur } from "../../components/ScrollEdgeBlur";
 import { ChatScrollRail, createChatScrollRail, type UnloadedHistory } from "./ChatScrollRail";
 import { calculateChatScrollMargin, chatHistoryBoundaryReached, createChatVirtualizer } from "./createChatVirtualizer";
 import { anchorNewMessages, type NewMessageTally, tallyNewMessages } from "./new-message-tally";
@@ -150,10 +148,7 @@ export function DirectConversation(props: DirectConversationProps) {
     },
   );
 
-  const fades = createScrollFades();
-
   onCleanup(() => {
-    fades.stop();
     if (typingIdleTimer) clearTimeout(typingIdleTimer);
     if (unreadVisibilityFrame !== undefined) cancelAnimationFrame(unreadVisibilityFrame);
     props.onTypingChange(false);
@@ -302,20 +297,25 @@ export function DirectConversation(props: DirectConversationProps) {
         ref={(element) => {
           messageList = element;
           rail.ref(element);
-          fades.bind(element);
           updateVirtualScrollMargin();
         }}
-        class={["direct-message-list", fades.classes()]}
+        class="direct-message-list"
         role="log"
         onScroll={(event) => {
           const element = event.currentTarget;
-          fades.measure();
           stickToLatest = element.scrollHeight - element.scrollTop - element.clientHeight <= 80;
           updateScrollState(element);
           updateUnreadDividerVisibility();
         }}
       >
         <ChatScrollRail {...rail.props} />
+        <Show when={showScrollToLatest()}>
+          <ScrollToLatestButton
+            onClick={jumpToLatestMessage}
+            newMessageCount={newMessageCount()}
+            onDismiss={clearNewMessages}
+          />
+        </Show>
         <Show
           when={!props.loading}
           fallback={<div class="direct-conversation-state">{t("conversation.direct.loading")}</div>}
@@ -352,7 +352,6 @@ export function DirectConversation(props: DirectConversationProps) {
               <MessageGroup
                 ref={(element) => {
                   virtualRoot = element;
-                  fades.watch(element);
                   updateVirtualScrollMargin();
                 }}
                 class={["virtual-chat-list", { "virtual-chat-list-static": !messageVirtualizer.isVirtualized() }]}
@@ -421,14 +420,6 @@ export function DirectConversation(props: DirectConversationProps) {
           </Show>
         </Show>
       </div>
-      <ScrollEdgeBlur fades={fades} />
-      <Show when={showScrollToLatest()}>
-        <ScrollToLatestButton
-          onClick={jumpToLatestMessage}
-          newMessageCount={newMessageCount()}
-          onDismiss={clearNewMessages}
-        />
-      </Show>
 
       <div class="direct-composer-wrap">
         <Show when={props.typing}>

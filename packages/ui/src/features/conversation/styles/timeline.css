@@ -7,10 +7,6 @@
   padding: 8px 12px var(--openbot-space-6);
 }
 
-.conversation-scroll + .scroll-edge-blur {
-  --scroll-edge-blur-size: calc(var(--openbot-space-1) * 12);
-}
-
 .virtual-chat-list {
   position: relative;
   width: 100%;
@@ -109,30 +105,6 @@
   top: calc(100% - 50px);
   height: 36px;
   margin-bottom: -36px;
-}
-
-.scroll-edge-blur + .scroll-to-latest {
-  position: relative;
-  top: auto;
-  left: auto;
-  flex: none;
-  margin: -58px auto 14px;
-  transform: none;
-}
-
-.scroll-edge-blur + .scroll-to-latest:is([data-new-messages], [data-reply-return]) {
-  margin-top: -50px;
-}
-
-@supports (position-anchor: --scroll-edge) and (anchor-scope: --scroll-edge) {
-  .scroll-edge-blur + .scroll-to-latest:is(*, [data-new-messages], [data-reply-return]) {
-    position: absolute;
-    position-anchor: --scroll-edge;
-    bottom: calc(anchor(bottom) + 14px);
-    left: anchor(center);
-    margin: 0;
-    transform: translateX(-50%);
-  }
 }
 
 .scroll-to-latest[data-new-messages] {

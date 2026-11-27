@@ -40,7 +40,6 @@ import {
 import { createEffect, createSignal, createStore, Match, onSettled, Show, Switch, untrack } from "solid-js";
 import { createScrollFades } from "../../components/createScrollFades";
 import { REASONING_LABEL } from "../../components/ProviderModelPicker";
-import { ScrollEdgeBlur } from "../../components/ScrollEdgeBlur";
 import { useText } from "../../text";
 import {
   blankModel,
@@ -768,7 +767,6 @@ export function CustomProviderDialog(props: CustomProviderDialogProps) {
                   }
                 />
               </div>
-              <ScrollEdgeBlur fades={fades} />
 
               <footer class="custom-provider-actions">
                 <Show when={props.submitError}>

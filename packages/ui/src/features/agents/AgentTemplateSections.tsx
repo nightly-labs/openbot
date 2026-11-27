@@ -1,9 +1,7 @@
 import type { AgentTemplateSkill, MarketplaceAgentRoutine } from "@openbot/contracts/ipc";
 import type { AppTranslate } from "@openbot/i18n";
 import { Button, ChevronDown, ChevronRight, Text } from "@openbot/ui";
-import { createSignal, For, onCleanup, Show } from "solid-js";
-import { createScrollFades } from "../../components/createScrollFades";
-import { ScrollEdgeBlur } from "../../components/ScrollEdgeBlur";
+import { createSignal, For, Show } from "solid-js";
 import { useText } from "../../text";
 import { MarkdownMessageText } from "../conversation/MarkdownMessageText";
 import { routineScheduleSummary } from "../conversation/routine-schedule-ui";
@@ -76,8 +74,6 @@ export function TemplateSkills(props: { skills: readonly AgentTemplateSkill[]; e
 function EmbeddedSkill(props: { name: string; markdown: string }) {
   const { t } = useText();
   const [open, setOpen] = createSignal(false);
-  const fades = createScrollFades();
-  onCleanup(() => fades.stop());
   return (
     <>
       <Button
@@ -98,14 +94,7 @@ function EmbeddedSkill(props: { name: string; markdown: string }) {
         {t("agentTemplate.skill.local")}
       </Text>
       <Show when={open()}>
-        <pre
-          class={["agent-template-skill-text", fades.classes()]}
-          ref={(element) => fades.bind(element)}
-          onScroll={fades.measure}
-        >
-          {props.markdown}
-        </pre>
-        <ScrollEdgeBlur fades={fades} />
+        <pre class="agent-template-skill-text">{props.markdown}</pre>
       </Show>
     </>
   );

@@ -1,8 +1,5 @@
 import { Dialog, IconButton, Text, X } from "@openbot/ui";
 import type { JSX } from "@solidjs/web";
-import { onCleanup } from "solid-js";
-import { createScrollFades } from "../../components/createScrollFades";
-import { ScrollEdgeBlur } from "../../components/ScrollEdgeBlur";
 import { useText } from "../../text";
 import type { SettingsHostedServersStore } from "../settings/stores/hosted-servers-store";
 import { BillingPanel } from "./BillingPanel";
@@ -19,8 +16,6 @@ export interface BillingDialogProps {
 
 export function BillingDialog(props: BillingDialogProps): JSX.Element {
   const { t } = useText();
-  const fades = createScrollFades();
-  onCleanup(() => fades.stop());
 
   return (
     <Dialog.Root open={props.open} onOpenChange={props.onOpenChange}>
@@ -43,22 +38,15 @@ export function BillingDialog(props: BillingDialogProps): JSX.Element {
                 <Text tone="muted">{t("billing.description")}</Text>
               </Dialog.Description>
             </header>
-            <div
-              class={["billing-dialog-body", fades.classes()]}
-              ref={(element) => fades.bind(element)}
-              onScroll={fades.measure}
-            >
-              <div ref={(element) => fades.watch(element)}>
-                <BillingPanel
-                  store={props.store}
-                  available
-                  hostedServers={props.hostedServers}
-                  license={props.license}
-                  credits={props.credits}
-                />
-              </div>
+            <div class="billing-dialog-body">
+              <BillingPanel
+                store={props.store}
+                available
+                hostedServers={props.hostedServers}
+                license={props.license}
+                credits={props.credits}
+              />
             </div>
-            <ScrollEdgeBlur fades={fades} />
           </Dialog.Content>
         </Dialog.Overlay>
       </Dialog.Portal>

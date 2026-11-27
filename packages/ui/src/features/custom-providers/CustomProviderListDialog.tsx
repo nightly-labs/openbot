@@ -18,7 +18,6 @@ import {
 } from "@openbot/ui";
 import { createSignal, For, onSettled, Show } from "solid-js";
 import { createScrollFades } from "../../components/createScrollFades";
-import { ScrollEdgeBlur } from "../../components/ScrollEdgeBlur";
 import { useText } from "../../text";
 
 interface CustomProviderListDialogProps {
@@ -115,7 +114,6 @@ export function CustomProviderListDialog(props: CustomProviderListDialogProps) {
                     </ItemGroup>
                   </Show>
                 </div>
-                <ScrollEdgeBlur fades={fades} />
 
                 <footer class="custom-provider-actions">
                   <Show when={props.note}>

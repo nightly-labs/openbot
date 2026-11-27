@@ -2,7 +2,6 @@ import type { MessagingPlatform } from "@openbot/contracts/ipc";
 import { Bot, ChevronDown, DropdownMenu, Hash, Input } from "@openbot/ui";
 import type { JSX } from "@solidjs/web";
 import { For, Show, untrack } from "solid-js";
-import { ScrollEdgeBlur } from "../../components/ScrollEdgeBlur";
 import { useText } from "../../text";
 import { DiscordMark, SlackMark, TelegramMark, WhatsAppMark } from "../settings/brand-marks";
 import { createPickerFades, type PickerGroup, PickerHeading, PickerMenu, PickerRow } from "./WorkflowPicker";
@@ -188,7 +187,6 @@ export function SettingListRow(props: {
               <p class="wfn-picker-empty">{t("common.loading")}</p>
             </Show>
           </div>
-          <ScrollEdgeBlur fades={fades} />
         </DropdownMenu.Content>
       </DropdownMenu.Portal>
     </DropdownMenu.Root>

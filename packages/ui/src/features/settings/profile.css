@@ -315,11 +315,6 @@
   color: var(--openbot-text-primary);
 }
 
-.profile-dialog + .scroll-edge-blur {
-  overflow: hidden;
-  border-radius: var(--openbot-radius-xl);
-}
-
 .profile-dialog-header,
 .profile-dialog-footer {
   display: flex;

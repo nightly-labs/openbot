@@ -2,7 +2,6 @@ import { INPUT_LIMITS } from "@openbot/contracts/input-limits";
 import { assignedSkillCount } from "@openbot/contracts/ipc";
 import { Badge, Button, Checkbox, Dialog, IconButton, Input, Plus, Search, Text, X } from "@openbot/ui";
 import { createScrollFades } from "@openbot/ui/components/createScrollFades";
-import { ScrollEdgeBlur } from "@openbot/ui/components/ScrollEdgeBlur";
 import { AgentAvatar } from "@openbot/ui/features/agents/AgentAvatar";
 import { useText } from "@openbot/ui/text";
 import type { JSX } from "@solidjs/web";
@@ -252,7 +251,6 @@ export function AgentSearchList(props: {
             )}
           </For>
         </ul>
-        <ScrollEdgeBlur fades={fades} />
       </Show>
     </div>
   );

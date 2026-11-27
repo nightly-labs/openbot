@@ -281,7 +281,3 @@
     transform: translate3d(0, 0, 0) scale(1);
   }
 }
-
-.agent-queue-panel-list + .scroll-edge-blur {
-  --scroll-edge-blur-size: calc(var(--openbot-space-1) * 6);
-}

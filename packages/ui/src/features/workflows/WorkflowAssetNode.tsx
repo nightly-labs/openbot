@@ -24,7 +24,6 @@ import {
 } from "@openbot/ui";
 import { createSignal, createStore, For, onCleanup, Show, untrack } from "solid-js";
 import { createScrollFades } from "../../components/createScrollFades";
-import { ScrollEdgeBlur } from "../../components/ScrollEdgeBlur";
 import { useText } from "../../text";
 import { ImageLightbox, type ImageLightboxOpening } from "../conversation/ImageLightbox";
 import { VideoPlayer } from "../conversation/VideoPlayer";
@@ -273,7 +272,6 @@ function LibraryGrid(props: {
           </div>
         </Show>
       </div>
-      <ScrollEdgeBlur fades={fades} />
       <Show when={thumb.size > 0}>
         <div
           class="wfn-scroll-track"

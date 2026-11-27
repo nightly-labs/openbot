@@ -2,8 +2,6 @@ import { PageHeader, type PageHeaderParent } from "@openbot/ui/features/window/P
 import { cx, prefersReducedMotion } from "@openbot/ui/utils";
 import { type JSX, Portal } from "@solidjs/web";
 import { createEffect, createSignal, createUniqueId, onCleanup, Show, untrack } from "solid-js";
-import { createScrollFades } from "../../components/createScrollFades";
-import { ScrollEdgeBlur } from "../../components/ScrollEdgeBlur";
 
 export interface SettingsPagePlacement {
   nav: HTMLElement;
@@ -111,11 +109,13 @@ export function SettingsDialogShell(props: SettingsDialogShellProps) {
     const crumb = props.crumb;
     return crumb ? [{ title: props.title, onSelect: crumb.back }] : [];
   };
-  const fades = createScrollFades();
+  const [canScrollUp, setCanScrollUp] = createSignal(false);
+  const [canScrollDown, setCanScrollDown] = createSignal(false);
   let shown = untrack(() => props.open);
   let restoreTarget: HTMLElement | null = untrack(() => props.restoreFocusTarget ?? null);
   let restoreFrame: number | undefined;
   let scrollElement: HTMLDivElement | undefined;
+  let scrollResizeObserver: ResizeObserver | undefined;
 
   function restoreFocus(): void {
     if (!restoreTarget?.isConnected) return;
@@ -129,16 +129,25 @@ export function SettingsDialogShell(props: SettingsDialogShellProps) {
     });
   }
 
+  function updateScrollFades(): void {
+    if (!scrollElement) return;
+    setCanScrollUp(scrollElement.scrollTop > 1);
+    setCanScrollDown(scrollElement.scrollTop + scrollElement.clientHeight < scrollElement.scrollHeight - 1);
+  }
+
   function registerScrollElement(element: HTMLDivElement): void {
+    scrollResizeObserver?.disconnect();
     scrollElement = element;
-    fades.bind(element);
+    scrollResizeObserver = new ResizeObserver(updateScrollFades);
+    scrollResizeObserver.observe(element);
+    queueMicrotask(updateScrollFades);
   }
 
   createEffect(
     () => props.contentKey,
     () => {
       if (scrollElement) scrollElement.scrollTop = 0;
-      fades.remeasure();
+      queueMicrotask(updateScrollFades);
     },
   );
 
@@ -171,7 +180,7 @@ export function SettingsDialogShell(props: SettingsDialogShellProps) {
   );
 
   onCleanup(() => {
-    fades.stop();
+    scrollResizeObserver?.disconnect();
     if (restoreFrame !== undefined) window.cancelAnimationFrame(restoreFrame);
   });
 
@@ -203,12 +212,12 @@ export function SettingsDialogShell(props: SettingsDialogShellProps) {
                 <p id={descriptionId} class="settings-page-description">
                   {props.description}
                 </p>
-                <div class="settings-modal-scroll-frame">
-                  <div
-                    ref={registerScrollElement}
-                    class={["settings-modal-content", fades.classes()]}
-                    onScroll={fades.measure}
-                  >
+                <div
+                  class="settings-modal-scroll-frame"
+                  data-scroll-up={canScrollUp() ? "" : undefined}
+                  data-scroll-down={canScrollDown() ? "" : undefined}
+                >
+                  <div ref={registerScrollElement} class="settings-modal-content" onScroll={updateScrollFades}>
                     <Show when={!props.crumb}>
                       <h2 id={titleId} class="settings-page-heading">
                         {props.title}
@@ -216,7 +225,6 @@ export function SettingsDialogShell(props: SettingsDialogShellProps) {
                     </Show>
                     {props.children}
                   </div>
-                  <ScrollEdgeBlur fades={fades} />
                 </div>
                 <div class="settings-modal-footer">{props.footer}</div>
                 {props.floatingContent}

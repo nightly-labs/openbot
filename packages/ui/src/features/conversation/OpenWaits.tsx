@@ -1,7 +1,5 @@
 import { buttonVariants, DropdownMenu, Ellipsis, MessageCircle, X } from "@openbot/ui";
-import { createEffect, createSignal, createUniqueId, For, onCleanup, Show, untrack } from "solid-js";
-import { createScrollFades } from "../../components/createScrollFades";
-import { ScrollEdgeBlur } from "../../components/ScrollEdgeBlur";
+import { createSignal, createUniqueId, For, Show, untrack } from "solid-js";
 import { useText } from "../../text";
 import { createTaskListPlayState, TaskListHeader, TaskMark, type TaskMarkState } from "./TaskList";
 
@@ -50,9 +48,6 @@ function OpenWaitList(props: OpenWaitsProps) {
   const [open, setOpen] = createSignal(untrack(() => props.defaultOpen ?? true));
   const now = () => props.now ?? new Date();
   const total = () => props.items.length;
-  const fades = createScrollFades();
-  onCleanup(() => fades.stop());
-  createEffect(total, () => fades.remeasure());
   const woken = () => props.items.filter((item) => item.state === "woken").length;
   const wokenCount = () => (woken() > 0 ? t("chat.waits.woken", { count: woken() }) : "");
   const lead = () => props.items.find((item) => item.state === "resuming") ?? props.items[0];
@@ -91,11 +86,7 @@ function OpenWaitList(props: OpenWaitsProps) {
         />
       </div>
       <div id={panelId} class="task-list-panel" inert={open() ? undefined : true}>
-        <ol
-          class={["task-list-items", fades.classes()]}
-          ref={(element) => fades.bind(element)}
-          onScroll={fades.measure}
-        >
+        <ol class="task-list-items">
           <For each={props.items} keyed={(item) => item.id}>
             {(item, index) => (
               <li
@@ -148,7 +139,6 @@ function OpenWaitList(props: OpenWaitsProps) {
             )}
           </For>
         </ol>
-        <ScrollEdgeBlur fades={fades} />
       </div>
     </section>
   );

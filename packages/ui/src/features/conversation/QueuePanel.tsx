@@ -6,9 +6,7 @@ import type { AppTextKey } from "@openbot/i18n";
 import { Button, ConfirmDialog, LabelTooltip, LabelTooltipTrigger, Plus } from "@openbot/ui";
 import { prefersReducedMotion } from "@openbot/ui/utils";
 import { createEffect, createMemo, createSignal, For, onCleanup, Show, untrack } from "solid-js";
-import { createScrollFades } from "../../components/createScrollFades";
 import { createVerticalDragPreview } from "../../components/createVerticalDragPreview";
-import { ScrollEdgeBlur } from "../../components/ScrollEdgeBlur";
 import type { ComposerAgent, ComposerSkill } from "../../data";
 import { useText } from "../../text";
 import { fileBadge } from "./AttachmentCards";
@@ -201,14 +199,7 @@ export function QueuePanel(props: QueuePanelProps) {
     },
   );
 
-  const fades = createScrollFades();
-  createEffect(
-    () => visibleDeliveries().length,
-    () => fades.remeasure(),
-  );
-
   onCleanup(() => {
-    fades.stop();
     stopAutoScroll();
     dragPreview.stop();
     if (editingExitTimer) clearTimeout(editingExitTimer);
@@ -426,14 +417,7 @@ export function QueuePanel(props: QueuePanelProps) {
           )}
         </Show>
         <div class="agent-queue-panel-resize" ref={(element) => (queueResizeContainer = element)}>
-          <div
-            class={["agent-queue-panel-list", fades.classes()]}
-            ref={(element) => {
-              queueList = element;
-              fades.bind(element);
-            }}
-            onScroll={fades.measure}
-          >
+          <div class="agent-queue-panel-list" ref={(element) => (queueList = element)}>
             <For each={visibleDeliveries()}>
               {(delivery) => {
                 const firstAttachment = delivery.attachments[0];
@@ -620,7 +604,6 @@ export function QueuePanel(props: QueuePanelProps) {
               }}
             </For>
           </div>
-          <ScrollEdgeBlur fades={fades} />
         </div>
         <div class="sr-only" role="status" aria-live="polite" aria-atomic="true">
           {announcement()}

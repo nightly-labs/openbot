@@ -2,9 +2,7 @@ import { Button, IconButton, MessageCirclePlus, PanelRight } from "@openbot/ui";
 import { sidebarMessageTime } from "@openbot/ui/features/sidebar/sidebar-filtering";
 import { useText } from "@openbot/ui/text";
 import type { JSX } from "@solidjs/web";
-import { For, onCleanup, Show } from "solid-js";
-import { createScrollFades } from "../../../components/createScrollFades";
-import { ScrollEdgeBlur } from "../../../components/ScrollEdgeBlur";
+import { For, Show } from "solid-js";
 import { ThreadStemMark } from "./ThreadMenu";
 import { ThreadStatusMark } from "./ThreadStatusMark";
 import { ThreadTitle } from "./ThreadTitle";
@@ -63,20 +61,14 @@ function ThreadsPaneRow(props: {
 
 export function ThreadsPane(props: ThreadsPaneProps) {
   const { t } = useText();
-  const fades = createScrollFades();
-  onCleanup(() => fades.stop());
   return (
     <aside id="threads-panel" class="browser-panel threads-pane" aria-label={t("conversation.sidePanel.pane.threads")}>
       {props.resizer}
-      <div
-        class={["threads-pane-scroll", fades.classes()]}
-        ref={(element) => fades.bind(element)}
-        onScroll={fades.measure}
-      >
+      <div class="threads-pane-scroll">
         <Show
           when={props.threads.length > 0}
           fallback={
-            <div class="threads-pane-empty" ref={fades.watch}>
+            <div class="threads-pane-empty">
               <p class="threads-pane-empty-title">{t("conversation.threads.empty")}</p>
               <Button variant="secondary" size="sm" disabled={!props.canStartNew} onClick={() => props.onNew()}>
                 <MessageCirclePlus aria-hidden="true" />
@@ -85,7 +77,7 @@ export function ThreadsPane(props: ThreadsPaneProps) {
             </div>
           }
         >
-          <ul class="threads-pane-list" aria-label={t("conversation.threads.all")} ref={fades.watch}>
+          <ul class="threads-pane-list" aria-label={t("conversation.threads.all")}>
             <For each={props.threads} keyed={(thread) => thread.id}>
               {(thread) => (
                 <ThreadsPaneRow
@@ -100,7 +92,6 @@ export function ThreadsPane(props: ThreadsPaneProps) {
           </ul>
         </Show>
       </div>
-      <ScrollEdgeBlur fades={fades} />
     </aside>
   );
 }

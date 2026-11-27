@@ -17,9 +17,7 @@ import {
   toast,
   X,
 } from "@openbot/ui";
-import { createEffect, createSignal, onCleanup, Show } from "solid-js";
-import { createScrollFades } from "../../components/createScrollFades";
-import { ScrollEdgeBlur } from "../../components/ScrollEdgeBlur";
+import { createSignal, Show } from "solid-js";
 import { useText } from "../../text";
 import { AgentAvatar } from "./AgentAvatar";
 import { TemplateInstructions, TemplateRoutines, TemplateSkills } from "./AgentTemplateSections";
@@ -249,12 +247,6 @@ function TemplateDetailView(props: {
   onOpenLink: (url: string) => void;
 }) {
   const { t, sourceText } = useText();
-  const fades = createScrollFades();
-  onCleanup(() => fades.stop());
-  createEffect(
-    () => [props.view, props.preview],
-    () => fades.remeasure(),
-  );
   return (
     <div class="agent-template-body">
       <header class="agent-template-detail-header">
@@ -265,11 +257,7 @@ function TemplateDetailView(props: {
           {props.view === "context" ? t("agentTemplate.publish.context") : t("agentTemplate.section.routines")}
         </Heading>
       </header>
-      <div
-        class={["agent-template-detail", fades.classes()]}
-        ref={(element) => fades.bind(element)}
-        onScroll={fades.measure}
-      >
+      <div class="agent-template-detail">
         <Show when={props.view === "context"} fallback={<TemplateRoutines routines={props.preview.routines} />}>
           <TemplateInstructions
             title={props.preview.title}
@@ -289,7 +277,6 @@ function TemplateDetailView(props: {
           </Text>
         </Show>
       </div>
-      <ScrollEdgeBlur fades={fades} />
     </div>
   );
 }

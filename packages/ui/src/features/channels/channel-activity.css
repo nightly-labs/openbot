@@ -48,10 +48,8 @@
 
 .channel-paused-tasks {
   position: relative;
-  display: flex;
   max-height: 35dvh;
-  flex-direction: column;
-  overflow: hidden;
+  overflow-y: auto;
   margin: calc(-1 * var(--openbot-space-6)) var(--openbot-space-3) calc(-1 * var(--openbot-radius-lg));
   border-radius: var(--openbot-radius-lg) var(--openbot-radius-lg) var(--openbot-radius-md) var(--openbot-radius-md);
   background: var(--openbot-accent-strong);
@@ -60,11 +58,6 @@
   backdrop-filter: blur(var(--openbot-space-3));
   padding-bottom: var(--openbot-radius-lg);
   color: var(--openbot-accent-text);
-}
-
-.channel-paused-tasks-list {
-  min-height: 0;
-  overflow-y: auto;
 }
 
 .awaiting-replies + .channel-paused-tasks {

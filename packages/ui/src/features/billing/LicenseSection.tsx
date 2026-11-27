@@ -59,9 +59,7 @@ import {
   Zap,
 } from "@openbot/ui";
 import type { JSX } from "@solidjs/web";
-import { createEffect, createSignal, For, Match, onCleanup, onSettled, Show, Switch, untrack } from "solid-js";
-import { createScrollFades } from "../../components/createScrollFades";
-import { ScrollEdgeBlur } from "../../components/ScrollEdgeBlur";
+import { createEffect, createSignal, For, Match, onSettled, Show, Switch, untrack } from "solid-js";
 import { useText } from "../../text";
 import { guessHostedCurrency, HOSTED_BILLING_CURRENCY, HostedBillingSwitch } from "../servers/HostedServerPricing";
 import { type BillingDetailsCalls, BillingDetailsFields, createBillingDetailsForm } from "./BillingDetailsFields";
@@ -860,8 +858,6 @@ function ChangePlanDialog(props: {
 
 function LicenseUsersDialog(props: { users: LicenseUser[]; license: License; onClose: () => void }): JSX.Element {
   const { t, format } = useText();
-  const fades = createScrollFades();
-  onCleanup(() => fades.stop());
   return (
     <ConfirmDialog
       open
@@ -877,12 +873,7 @@ function LicenseUsersDialog(props: { users: LicenseUser[]; license: License; onC
       onCancel={() => props.onClose()}
       onConfirm={() => props.onClose()}
     >
-      <ItemGroup
-        class={["billing-license-users", fades.classes()]}
-        role="list"
-        ref={(element: HTMLDivElement) => fades.bind(element)}
-        onScroll={fades.measure}
-      >
+      <ItemGroup class="billing-license-users" role="list">
         <For each={props.users}>
           {(user) => (
             <Item role="listitem" size="compact">
@@ -904,7 +895,6 @@ function LicenseUsersDialog(props: { users: LicenseUser[]; license: License; onC
           )}
         </For>
       </ItemGroup>
-      <ScrollEdgeBlur fades={fades} />
     </ConfirmDialog>
   );
 }

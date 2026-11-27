@@ -144,11 +144,8 @@ body[data-skills-marketplace] :is(.integration-dialog-backdrop, .integration-wiz
 }
 
 .skills-marketplace-error {
-  position: relative;
-  z-index: 1;
-  grid-row: 2;
-  grid-column: 2;
-  align-self: end;
+  position: sticky;
+  bottom: var(--openbot-space-4);
   display: flex;
   align-items: center;
   gap: var(--openbot-space-2);
@@ -1329,8 +1326,7 @@ html:active-view-transition-type(marketplace-group) [data-marketplace-shared] .m
     grid-auto-flow: column;
   }
 
-  .skills-marketplace-body,
-  .skills-marketplace-error {
+  .skills-marketplace-body {
     grid-row: 3;
     grid-column: 1;
   }

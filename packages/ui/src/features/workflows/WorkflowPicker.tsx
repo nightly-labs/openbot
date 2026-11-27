@@ -2,7 +2,6 @@ import { Check, DropdownMenu, Input, Search } from "@openbot/ui";
 import type { JSX } from "@solidjs/web";
 import { createMemo, createSignal, For, onCleanup, Show } from "solid-js";
 import { createScrollFades } from "../../components/createScrollFades";
-import { ScrollEdgeBlur } from "../../components/ScrollEdgeBlur";
 import { useText } from "../../text";
 
 export interface PickerChip {
@@ -89,9 +88,6 @@ export function createPickerFades() {
     },
     classes: fades.classes,
     measure: fades.measure,
-    top: fades.top,
-    bottom: fades.bottom,
-    stuckHeight: fades.stuckHeight,
   };
 }
 
@@ -182,7 +178,6 @@ function PickerShell<T extends string>(props: {
           <p class="wfn-picker-empty">{t("common.loading")}</p>
         </Show>
       </div>
-      <ScrollEdgeBlur fades={fades} />
     </DropdownMenu.Content>
   );
 }

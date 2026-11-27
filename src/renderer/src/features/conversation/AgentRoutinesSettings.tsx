@@ -41,7 +41,6 @@ import {
   Webhook,
 } from "@openbot/ui";
 import { createScrollFades } from "@openbot/ui/components/createScrollFades";
-import { ScrollEdgeBlur } from "@openbot/ui/components/ScrollEdgeBlur";
 import { SettingsBackIcon, SettingsForwardIcon } from "@openbot/ui/components/SettingsPanel";
 import {
   type RoutineResultChoice,
@@ -1196,7 +1195,6 @@ export function AgentRoutinesSettings(props: AgentRoutinesSettingsProps) {
           )}
         </Show>
       </div>
-      <ScrollEdgeBlur fades={scrollFades} />
       <Show when={!draft() && !loading()}>
         <div class="agent-routines-footer">
           <HostedUpsellRoutinesNotice count={routines().filter((routine) => routine.active).length} />

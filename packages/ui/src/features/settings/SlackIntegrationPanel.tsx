@@ -18,9 +18,7 @@ import {
   Spinner,
   Text,
 } from "@openbot/ui";
-import { createEffect, createSignal, createStore, createUniqueId, For, Match, onCleanup, Show, Switch } from "solid-js";
-import { createScrollFades } from "../../components/createScrollFades";
-import { ScrollEdgeBlur } from "../../components/ScrollEdgeBlur";
+import { createEffect, createSignal, createStore, createUniqueId, For, Match, Show, Switch } from "solid-js";
 import { useText } from "../../text";
 import { DiscordTile, SlackTile } from "./brand-marks";
 import {
@@ -575,12 +573,6 @@ function RolesDialog(props: {
       .map((role) => ({ role, deleted: true })),
   ];
   const atCap = () => view.selected.length >= MESSAGING_LIMITS.allowedRoles;
-  const fades = createScrollFades();
-  onCleanup(() => fades.stop());
-  createEffect(
-    () => options().length,
-    () => fades.remeasure(),
-  );
   const toggle = (roleId: string, checked: boolean) =>
     setView((draft) => {
       draft.selected = checked
@@ -626,38 +618,30 @@ function RolesDialog(props: {
     >
       <Switch
         fallback={
-          <>
-            <ul
-              class={["discord-roles", fades.classes()]}
-              aria-label={t("connector.discord.accessTitle")}
-              ref={(element) => fades.bind(element)}
-              onScroll={fades.measure}
-            >
-              <For each={options()}>
-                {(option) => {
-                  const checked = () => view.selected.includes(option.role.id);
-                  return (
-                    <li>
-                      <label class="discord-role-row" for={`${id}-${option.role.id}`}>
-                        <Checkbox
-                          id={`${id}-${option.role.id}`}
-                          checked={checked()}
-                          disabled={!checked() && atCap()}
-                          onChange={(event) => toggle(option.role.id, event.currentTarget.checked)}
-                        />
-                        <Text variant="body-sm" class="discord-role-name">
-                          {option.deleted
-                            ? t("connector.discord.accessRoleDeleted", { role: option.role.name })
-                            : option.role.name}
-                        </Text>
-                      </label>
-                    </li>
-                  );
-                }}
-              </For>
-            </ul>
-            <ScrollEdgeBlur fades={fades} />
-          </>
+          <ul class="discord-roles" aria-label={t("connector.discord.accessTitle")}>
+            <For each={options()}>
+              {(option) => {
+                const checked = () => view.selected.includes(option.role.id);
+                return (
+                  <li>
+                    <label class="discord-role-row" for={`${id}-${option.role.id}`}>
+                      <Checkbox
+                        id={`${id}-${option.role.id}`}
+                        checked={checked()}
+                        disabled={!checked() && atCap()}
+                        onChange={(event) => toggle(option.role.id, event.currentTarget.checked)}
+                      />
+                      <Text variant="body-sm" class="discord-role-name">
+                        {option.deleted
+                          ? t("connector.discord.accessRoleDeleted", { role: option.role.name })
+                          : option.role.name}
+                      </Text>
+                    </label>
+                  </li>
+                );
+              }}
+            </For>
+          </ul>
         }
       >
         <Match when={view.status === "loading"}>

@@ -14,7 +14,6 @@ import {
   X,
 } from "@openbot/ui";
 import { createScrollFades } from "@openbot/ui/components/createScrollFades";
-import { ScrollEdgeBlur } from "@openbot/ui/components/ScrollEdgeBlur";
 import { ChannelMemberRow } from "@openbot/ui/features/channels/ChannelMemberRow";
 import { useText } from "@openbot/ui/text";
 import { createEffect, createSignal, createStore, For, onSettled, Show, snapshot } from "solid-js";
@@ -151,7 +150,6 @@ export function ChannelCreateDialog() {
                     </Show>
                   </div>
                 </div>
-                <ScrollEdgeBlur fades={listFades} />
               </fieldset>
               <footer class="channel-editor-footer">
                 <Button type="submit" disabled={channels.state.pending || !draft.name.trim() || !draft.members.length}>

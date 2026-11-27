@@ -205,6 +205,14 @@
   background: var(--window-glass-card);
 }
 
+:root[data-openbot-window-glass] .app-window .settings-page-content .settings-modal-scroll-frame::before {
+  background: linear-gradient(to bottom, var(--window-glass-card) 28%, transparent 100%);
+}
+
+:root[data-openbot-window-glass] .app-window .settings-page-content .settings-modal-scroll-frame::after {
+  background: linear-gradient(to top, var(--window-glass-card) 28%, transparent 100%);
+}
+
 :root[data-openbot-window-glass]
   .app-window
   :is(
