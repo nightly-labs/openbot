@@ -1,13 +1,15 @@
 import { Typography } from "heroui-native";
 import { useThemeColor } from "heroui-native/hooks";
 import X from "lucide-react-native/icons/x";
-import { useEffect, useMemo } from "react";
+import { useEffect, useMemo, useRef } from "react";
 import { Pressable, View } from "react-native";
 import { MobileChatView } from "@/features/chat/components/agent-chat-view";
+import { useUnreadAgentIds } from "@/features/workspace/components/use-live-workspace";
 import { useMobileWorkspaceSelector } from "@/features/workspace/context/mobile-workspace-context";
 import { findChatAgent } from "@/features/workspace/model/directory-agents";
 import { useText } from "@/shared/lib/text";
 import { chatBubbleNative } from "../chat-bubble-native";
+import { markBubbleActivityAlive, unmarkBubbleActivityAlive } from "../model/chat-bubble-activity";
 
 export function ChatBubbleHeader({ title }: { title: string }) {
   const { t } = useText();
@@ -37,6 +39,23 @@ export function ChatBubbleScreen() {
   const activeServerId = useMobileWorkspaceSelector((current) => current.activeServer.id);
   const markAgentRead = useMobileWorkspaceSelector((current) => current.markAgentRead);
   const agent = target ? findChatAgent(agents, target.agentId, target.serverId, activeServerId) : undefined;
+  const agentId = agent?.id;
+  const agentServerId = agent?.serverId;
+  const unreadAgentIds = useUnreadAgentIds();
+  const unread = useRef(unreadAgentIds);
+
+  useEffect(() => {
+    unread.current = unreadAgentIds;
+  }, [unreadAgentIds]);
+
+  useEffect(() => {
+    if (!agentId || !agentServerId) return;
+    markBubbleActivityAlive(agentServerId, agentId);
+    return () => {
+      unmarkBubbleActivityAlive(agentServerId, agentId);
+      if (!unread.current.includes(agentId)) chatBubbleNative?.dismiss(agentServerId, agentId);
+    };
+  }, [agentId, agentServerId]);
 
   useEffect(() => {
     if (agent) markAgentRead(agent.id, undefined, agent.serverId);

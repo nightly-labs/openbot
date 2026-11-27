@@ -14,11 +14,16 @@ import { KeyboardProvider } from "react-native-keyboard-controller";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 import { useCSSVariable, useUniwind, withUniwind } from "uniwind";
 import { MobileSessionProvider, useMobileSession } from "@/features/auth/context/mobile-session-context";
+import { AudioWaveformHost } from "@/features/chat/components/audio-waveform-host";
+import { MermaidRendererHost } from "@/features/chat/components/mermaid-renderer-host";
+import { OutboxProvider } from "@/features/chat/context/outbox-context";
+import { QueuedMessagesProvider } from "@/features/chat/context/queued-messages-context";
 import { MobileWorkspaceProvider } from "@/features/workspace/context/mobile-workspace-context";
 import { navigationFonts } from "@/shared/lib/app-font";
 import { isAndroid } from "@/shared/lib/platform";
 import { queryClient } from "@/shared/lib/query-client";
 import { useText } from "@/shared/lib/text";
+import { ChatBubbleErrorBoundary } from "../components/chat-bubble-error-boundary";
 import { ChatBubbleHeader, ChatBubbleScreen } from "./chat-bubble-screen";
 
 const UniwindGestureHandlerRootView = withUniwind(GestureHandlerRootView);
@@ -56,9 +61,20 @@ function BubbleContent() {
     );
   }
   return (
-    <MobileWorkspaceProvider>
-      <ChatBubbleScreen />
-    </MobileWorkspaceProvider>
+    <ChatBubbleErrorBoundary
+      title={t("mobile.settings.chatBubble.title")}
+      message={t("mobile.settings.chatBubble.error")}
+    >
+      <MobileWorkspaceProvider>
+        <OutboxProvider>
+          <QueuedMessagesProvider>
+            <ChatBubbleScreen />
+            <MermaidRendererHost />
+            <AudioWaveformHost />
+          </QueuedMessagesProvider>
+        </OutboxProvider>
+      </MobileWorkspaceProvider>
+    </ChatBubbleErrorBoundary>
   );
 }
 

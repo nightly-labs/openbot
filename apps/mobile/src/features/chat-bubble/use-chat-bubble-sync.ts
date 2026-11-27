@@ -2,6 +2,7 @@ import { useEffect, useRef } from "react";
 import { useUnreadAgentIds } from "@/features/workspace/components/use-live-workspace";
 import { useMobileWorkspaceSelector } from "@/features/workspace/context/mobile-workspace-context";
 import { chatBubbleNative } from "./chat-bubble-native";
+import { isBubbleActivityAlive } from "./model/chat-bubble-activity";
 import { writeChatBubbleConfig } from "./model/chat-bubble-config";
 import { bubbleEnabledFor, useChatBubblePreference } from "./model/chat-bubble-preference";
 
@@ -24,6 +25,7 @@ export function useChatBubbleSync(): void {
       if (unread.has(agentId)) continue;
       const agent = agents.find((item) => item.id === agentId);
       if (!agent || !bubbleEnabledFor(preference, agent.serverId, agent.id)) continue;
+      if (isBubbleActivityAlive(agent.serverId, agent.id)) continue;
       chatBubbleNative.dismiss(agent.serverId, agent.id);
     }
   }, [unreadAgentIds, agents, preference]);
