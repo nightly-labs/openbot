@@ -419,7 +419,7 @@ export const messages = {
   "error.provider.claudeAccountNoCredit":
     "Saldo środków na koncie Claude jest za niskie. Niektóre zapytania, na przykład w trybie szybkim, korzystają ze środków na użycie, także gdy plan Claude ma jeszcze limit. Doładuj środki na użycie na koncie Claude albo wybierz inny model w menu modeli agenta.",
   "error.provider.claudeExternalApiKeyRefused":
-    "Claude Code używa klucza API Anthropic, który jest nieprawidłowy. OpenBot nie ustawił tego klucza: pochodzi on z ustawień Claude Code lub ze zmiennych środowiskowych, a Claude Code używa go zamiast Twojego planu Claude. Aby używać planu, usuń klucz z ustawień Claude Code lub ze zmiennych środowiskowych, a następnie uruchom ponownie OpenBot.",
+    "Claude Code używa nieprawidłowego klucza API Anthropic zamiast Twojego planu Claude. Usuń klucz z ustawień Claude Code lub ze zmiennych środowiskowych, a następnie uruchom ponownie OpenBot.",
   "error.provider.claudeCustomEndpointBilling":
     "Claude Code wysyła zapytania do {host}, nie do Anthropic: ten adres API ustawiają ustawienia Claude Code lub zmienne środowiskowe. {host} odrzucił zapytanie z powodu salda konta, nie z powodu planu Claude. Doładuj konto {host} albo wybierz inny model w menu modeli agenta.\n{detail}",
   "error.provider.claudeServiceBlocked":

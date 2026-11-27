@@ -418,7 +418,7 @@ export const messages = {
   "error.provider.claudeAccountNoCredit":
     "На аккаунте Claude слишком мало кредитов. Некоторые запросы, например в быстром режиме, расходуют кредиты использования, даже когда в тарифе Claude ещё есть лимит. Пополните кредиты использования в аккаунте Claude или выберите другую модель в меню моделей агента.",
   "error.provider.claudeExternalApiKeyRefused":
-    "Claude Code использует недействительный ключ API Anthropic. OpenBot не задавал этот ключ: он взят из настроек Claude Code или из переменных среды, и Claude Code использует его вместо вашего плана Claude. Чтобы использовать план, удалите ключ из настроек Claude Code или из переменных среды, затем перезапустите OpenBot.",
+    "Claude Code использует недействительный ключ API Anthropic вместо вашего плана Claude. Удалите ключ из настроек Claude Code или из переменных среды, затем перезапустите OpenBot.",
   "error.provider.claudeCustomEndpointBilling":
     "Claude Code отправляет запросы на {host}, а не в Anthropic: этот адрес API задан в настройках Claude Code или в переменных окружения. {host} отклонил запрос из-за баланса аккаунта, а не из-за тарифа Claude. Пополните баланс аккаунта {host} или выберите другую модель в меню моделей агента.\n{detail}",
   "error.provider.claudeServiceBlocked":

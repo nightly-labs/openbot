@@ -422,7 +422,7 @@ export const messages = {
   "error.provider.claudeAccountNoCredit":
     "Claude 계정의 크레딧 잔액이 너무 적어요. 빠른 모드 같은 일부 요청은 Claude 플랜에 사용량이 남아 있어도 사용 크레딧을 써요. Claude 계정에서 사용 크레딧을 추가하거나, 에이전트의 모델 메뉴에서 다른 모델을 선택하세요.",
   "error.provider.claudeExternalApiKeyRefused":
-    "Claude Code가 유효하지 않은 Anthropic API 키를 사용하고 있습니다. 이 키는 OpenBot이 설정한 것이 아니라 Claude Code 설정 또는 환경 변수에서 온 것이며, Claude Code는 Claude 플랜 대신 이 키를 사용합니다. 플랜을 사용하려면 Claude Code 설정 또는 환경 변수에서 키를 제거한 다음 OpenBot을 다시 시작하세요.",
+    "Claude Code가 Claude 플랜 대신 유효하지 않은 Anthropic API 키를 사용하고 있습니다. Claude Code 설정 또는 환경 변수에서 키를 제거한 다음 OpenBot을 다시 시작하세요.",
   "error.provider.claudeCustomEndpointBilling":
     "Claude Code가 Anthropic이 아닌 {host}(으)로 요청을 보내요. Claude Code 설정 또는 환경 변수에서 이 API 주소를 지정했어요. {host}에서 계정 잔액 때문에 요청을 거부했어요. Claude 플랜의 문제가 아니에요. {host} 계정에 잔액을 추가하거나, 에이전트의 모델 메뉴에서 다른 모델을 선택하세요.\n{detail}",
   "error.provider.claudeServiceBlocked":

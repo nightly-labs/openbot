@@ -397,7 +397,7 @@ export const messages = {
   "error.provider.claudeAccountNoCredit":
     "رصيد حسابك على Claude منخفض جدًا. بعض الطلبات، مثل الوضع السريع، تستخدم أرصدة الاستخدام حتى إذا بقي استخدام في خطة Claude. أضف أرصدة استخدام في حسابك على Claude، أو اختر نموذجًا آخر في قائمة نموذج الوكيل.",
   "error.provider.claudeExternalApiKeyRefused":
-    "يستخدم Claude Code مفتاح Anthropic API غير صالح. لم يضبط OpenBot هذا المفتاح: فهو يأتي من إعدادات Claude Code أو من متغيرات البيئة، ويستخدمه Claude Code بدلًا من خطة Claude الخاصة بك. لاستخدام خطتك، أزل المفتاح من إعدادات Claude Code أو من متغيرات البيئة، ثم أعد تشغيل OpenBot.",
+    "يستخدم Claude Code مفتاح Anthropic API غير صالح بدلًا من خطة Claude الخاصة بك. أزل المفتاح من إعدادات Claude Code أو من متغيرات البيئة، ثم أعد تشغيل OpenBot.",
   "error.provider.claudeCustomEndpointBilling":
     "يرسل Claude Code الطلبات إلى {host}، لا إلى Anthropic: إعدادات Claude Code أو متغيرات البيئة تحدد عنوان API هذا. رفض {host} الطلب بسبب رصيد الحساب، لا بسبب خطة Claude. أضف رصيدًا إلى حسابك على {host}، أو اختر نموذجًا آخر في قائمة نموذج الوكيل.\n{detail}",
   "error.provider.claudeServiceBlocked":

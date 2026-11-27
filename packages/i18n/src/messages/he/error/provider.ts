@@ -399,7 +399,7 @@ export const messages = {
   "error.provider.claudeAccountNoCredit":
     "יתרת הקרדיט בחשבון Claude שלך נמוכה מדי. חלק מהבקשות, כמו המצב המהיר, משתמשות בקרדיטים לשימוש גם כשנשאר שימוש במינוי Claude. אפשר להוסיף קרדיטים לשימוש בחשבון Claude, או לבחור מודל אחר בתפריט המודל של הסוכן.",
   "error.provider.claudeExternalApiKeyRefused":
-    "Claude Code משתמש במפתח API של Anthropic שאינו תקף. OpenBot לא הגדיר את המפתח הזה: הוא מגיע מההגדרות של Claude Code או ממשתני הסביבה, ו-Claude Code משתמש בו במקום בתוכנית Claude שלך. כדי להשתמש בתוכנית שלך, הסר את המפתח מההגדרות של Claude Code או ממשתני הסביבה, ואז הפעל מחדש את OpenBot.",
+    "Claude Code משתמש במפתח API של Anthropic שאינו תקף במקום בתוכנית Claude שלך. הסר את המפתח מההגדרות של Claude Code או ממשתני הסביבה, ואז הפעל מחדש את OpenBot.",
   "error.provider.claudeCustomEndpointBilling":
     "Claude Code שולח בקשות אל {host}, לא אל Anthropic: ההגדרות של Claude Code או משתני הסביבה קובעים את כתובת ה-API הזו. {host} דחה את הבקשה בגלל יתרת החשבון, לא בגלל מינוי Claude שלך. אפשר להוסיף כסף לחשבון {host} שלך, או לבחור מודל אחר בתפריט המודל של הסוכן.\n{detail}",
   "error.provider.claudeServiceBlocked":

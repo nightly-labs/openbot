@@ -427,7 +427,7 @@ export const messages = {
   "error.provider.claudeAccountNoCredit":
     "O saldo de créditos da sua conta do Claude está baixo demais. Algumas solicitações, como o modo rápido, usam créditos de uso mesmo quando o seu plano do Claude ainda tem uso disponível. Adicione créditos de uso na sua conta do Claude, ou selecione outro modelo no menu de modelos do agente.",
   "error.provider.claudeExternalApiKeyRefused":
-    "O Claude Code usa uma chave de API da Anthropic que não é válida. O OpenBot não definiu essa chave: ela vem das configurações do Claude Code ou das variáveis de ambiente, e o Claude Code a usa no lugar do seu plano do Claude. Para usar o seu plano, remova a chave das configurações do Claude Code ou das variáveis de ambiente e reinicie o OpenBot.",
+    "O Claude Code usa uma chave de API da Anthropic que não é válida no lugar do seu plano do Claude. Remova a chave das configurações do Claude Code ou das variáveis de ambiente e reinicie o OpenBot.",
   "error.provider.claudeCustomEndpointBilling":
     "O Claude Code envia as solicitações para {host}, não para a Anthropic: as configurações do Claude Code ou as variáveis de ambiente definem este endereço de API. {host} recusou a solicitação por causa do saldo da conta, não por causa do seu plano do Claude. Adicione saldo à sua conta do {host}, ou selecione outro modelo no menu de modelos do agente.\n{detail}",
   "error.provider.claudeServiceBlocked":

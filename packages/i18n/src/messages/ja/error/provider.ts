@@ -441,7 +441,7 @@ export const messages = {
   "error.provider.claudeAccountNoCredit":
     "Claude アカウントのクレジット残高が不足しています。高速モードなど一部のリクエストは、Claude のプランに使用量が残っていても使用クレジットを使います。Claude アカウントで使用クレジットを追加するか、エージェントのモデルメニューで別のモデルを選択してください。",
   "error.provider.claudeExternalApiKeyRefused":
-    "Claude Code が無効な Anthropic API キーを使っています。このキーは OpenBot が設定したものではなく、Claude Code の設定または環境変数から来ています。Claude Code はこのキーを Claude プランの代わりに使います。プランを使うには、Claude Code の設定または環境変数からキーを削除し、OpenBot を再起動してください。",
+    "Claude Code は Claude プランの代わりに、無効な Anthropic API キーを使っています。Claude Code の設定または環境変数からキーを削除し、OpenBot を再起動してください。",
   "error.provider.claudeCustomEndpointBilling":
     "Claude Code は Anthropic ではなく {host} にリクエストを送っています。Claude Code の設定または環境変数でこの API アドレスが指定されています。{host} はアカウント残高のためにリクエストを拒否しました。Claude のプランの問題ではありません。{host} のアカウントに残高を追加するか、エージェントのモデルメニューで別のモデルを選択してください。\n{detail}",
   "error.provider.claudeServiceBlocked":
