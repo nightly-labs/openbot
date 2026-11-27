@@ -81,6 +81,7 @@ export function createWebMarketplaceCalls(
       get: (id) => runTeamEffect(catalog.skills.get(id)),
       getBySlug: (slug) => runTeamEffect(catalog.skills.getBySlug(slug)),
     },
+    pluginCatalog: () => runTeamEffect(catalog.plugins.catalog()),
     agents: {
       list: (query) => runTeamEffect(catalog.agents.list(query)),
       get: (id) => runTeamEffect(catalog.agents.get(id)),

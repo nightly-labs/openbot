@@ -265,6 +265,7 @@ import { MODEL_VISIBILITY_KEPT_CAPABILITY } from "@openbot/contracts/team-protoc
 import { TEAM_NEAR_PAYMENT_CAPABILITY, withNearPayments } from "@openbot/contracts/team-protocol/near-payment-v1";
 import { type OptionalTeamEvent, optionalTeamEvent } from "@openbot/contracts/team-protocol/optional-events";
 import { OWNER_TRANSFER_CAPABILITY } from "@openbot/contracts/team-protocol/owner-transfer-v1";
+import { PLUGIN_CATALOG_CAPABILITY } from "@openbot/contracts/team-protocol/plugin-catalog-v1";
 import {
   TEAM_PROMPT_DETAIL_CAPABILITY,
   withPromptQuestionDetails,
@@ -3154,6 +3155,7 @@ export class TeamApiServer {
           return this.#options.agentNotificationLevels !== undefined;
         if (capability === SIDEBAR_PINS_CAPABILITY) return this.#options.sidebarPins !== undefined;
         if (capability === WATCH_RELAY_TEAM_CAPABILITY) return this.#options.watchRelay?.available() === true;
+        if (capability === PLUGIN_CATALOG_CAPABILITY) return this.#options.pluginCatalogLoaded?.() === true;
         return true;
       },
     );

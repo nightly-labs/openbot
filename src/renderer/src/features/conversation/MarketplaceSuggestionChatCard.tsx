@@ -11,7 +11,7 @@ import { isPluginAppConfig } from "@openbot/ui/features/settings/marketplace-plu
 import { useText } from "@openbot/ui/text";
 import { createMemo } from "solid-js";
 import type { ConnectorRegistry } from "../connectors/connector-registry";
-import { MARKETPLACE_PLUGINS } from "../settings/marketplace-plugin-catalog";
+import { marketplacePlugins } from "../settings/marketplace-plugin-source";
 import { localizedPlugin } from "../settings/marketplace-plugin-text";
 import { useConversationViewScope } from "./conversation-scope";
 import { dismissMarketplaceSuggestion, marketplaceSuggestionDismissed } from "./marketplace-suggestion-dismissals";
@@ -25,12 +25,12 @@ export interface MarketplaceSuggestionChatCardProps {
 }
 
 export function marketplaceSuggestionKnown(appId: string): boolean {
-  return isConnectorId(appId) || MARKETPLACE_PLUGINS.some((plugin) => plugin.slug === appId);
+  return isConnectorId(appId) || marketplacePlugins().some((plugin) => plugin.slug === appId);
 }
 
 export function MarketplaceSuggestionChatCard(props: MarketplaceSuggestionChatCardProps) {
   const { t } = useText();
-  const plugin = createMemo(() => MARKETPLACE_PLUGINS.find((candidate) => candidate.slug === props.appId));
+  const plugin = createMemo(() => marketplacePlugins().find((candidate) => candidate.slug === props.appId));
   const connector = () => {
     const id = props.appId;
     return isConnectorId(id) ? (props.connectors?.get(id) ?? { id, access: "hidden" as const }) : undefined;
