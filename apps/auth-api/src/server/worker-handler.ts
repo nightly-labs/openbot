@@ -20,7 +20,7 @@ import type { HostedServerBindings } from "./hosted-server-service";
 import { HostedSiteService } from "./hosted-site-service";
 import { enforceMarketplaceIngress, MarketplaceRateLimitError } from "./marketplace-request-policy";
 import { mediaGatewayFromBinding } from "./media-gateway";
-import { observedD1 } from "./observed-d1";
+import { d1OverloadedRecently, observedD1 } from "./observed-d1";
 import { pageMarkdownResponse } from "./page-markdown";
 import {
   deliverPendingRemoteAuthEvents,
@@ -37,6 +37,21 @@ type AuthDataPruner = typeof pruneExpiredAuthData;
 type RetentionLogger = (result: AuthRetentionResult) => void;
 type WorkerExecutionContext = Pick<ExecutionContext, "waitUntil">;
 type RemoteAuthEventDelivery = typeof deliverPendingRemoteAuthEvents;
+
+const OVERLOAD_RETRY_AFTER_MIN_SECONDS = 10;
+const OVERLOAD_RETRY_AFTER_SPREAD_SECONDS = 20;
+
+function withOverloadRetryAfter(response: Response): Response {
+  if (response.status !== 500 || response.headers.has("Retry-After") || !d1OverloadedRecently(Date.now())) {
+    return response;
+  }
+  const delayed = new Response(response.body, response);
+  delayed.headers.set(
+    "Retry-After",
+    String(OVERLOAD_RETRY_AFTER_MIN_SECONDS + Math.floor(Math.random() * (OVERLOAD_RETRY_AFTER_SPREAD_SECONDS + 1))),
+  );
+  return delayed;
+}
 
 export function createWorkerHandler(
   fetchHandler: WorkerFetch,
@@ -89,7 +104,7 @@ export function createWorkerHandler(
       const markdown = await pageMarkdownResponse(request, fetchHandler);
       if (markdown) return markdown;
       const response = Promise.resolve(fetchHandler(request)).then((result) =>
-        permanentTrailingSlashRedirect(request, result),
+        withOverloadRetryAfter(permanentTrailingSlashRedirect(request, result)),
       );
       if (context && isEmailSignInStart(request)) {
         context.waitUntil(

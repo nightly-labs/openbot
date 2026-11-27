@@ -32,6 +32,7 @@ import type {
   MobileAuthDevice,
   MobileAuthDeviceIdentity,
   MobileAuthSessionResult,
+  SessionReads,
 } from "./types";
 
 const CHALLENGE_TTL_MS = 10 * 60_000;
@@ -109,6 +110,10 @@ export function readAnalyticsAnswer(body: DynamicRecord): AnalyticsAnswer | null
 export function readChatColor(body: DynamicRecord): AvatarColor | null | undefined {
   if (body.chatColor === null) return null;
   return isAvatarColor(body.chatColor) ? body.chatColor : undefined;
+}
+
+export function sessionReadsFor(request: Request): SessionReads {
+  return request.method === "GET" || request.method === "HEAD" ? "replica" : "primary";
 }
 
 export class AuthService {
@@ -391,9 +396,10 @@ export class AuthService {
     function* (
       this: AuthService,
       sessionToken: string,
+      reads: SessionReads = "primary",
     ): Effect.fn.Return<AuthUser | null, AuthWorkflowFailure, AuthDependencies> {
       const dependencies = yield* AuthDependencies;
-      return yield* dependencies.repository.authenticate(sessionToken, dependencies.now());
+      return yield* dependencies.repository.authenticate(sessionToken, dependencies.now(), reads);
     },
     (operation) => operation.pipe(Effect.mapError(authFailure), Effect.provide(this.#layer)),
   ).bind(this);
