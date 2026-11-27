@@ -94,6 +94,8 @@ export const messages = defineMessages("error.remote", {
     "OpenBot could not start the connection to this server. If this continues, quit OpenBot and open it again.",
   "error.remote.connectionServiceUnreachable":
     "This computer cannot reach the OpenBot connection service. Check its internet connection. OpenBot connects again automatically.",
+  "error.remote.deviceConnectionServiceUnreachable":
+    "This device cannot reach the OpenBot connection service. Check its internet connection and VPN. OpenBot connects again automatically.",
   "error.remote.serverAnswerTimeout": "The server did not answer in time. OpenBot connects again automatically.",
   "error.remote.signInConnectionClosed":
     "The connection to the server closed during sign-in. If this continues, make sure that the date and time are correct on the server and on this device.",
