@@ -152,17 +152,17 @@ await context.addInitScript(() => {
     const body = text(data);
     return [...body.matchAll(/"type":"(sync-[a-z-]+)"/g)].map((match) => match[1] ?? "");
   };
+  const frameType = (data: unknown): string => `frame ${/"type":"([a-z-]+)"/.exec(text(data))?.[1] ?? "unknown"}`;
   const track = (channel: RTCDataChannel) => {
     const index = opened.push(channel) - 1;
     channel.addEventListener("message", (event) => {
       if (channel.label.endsWith("events"))
-        frames.push({ channel: index, direction: "received", type: `raw ${text(event.data).slice(0, 140)}` });
+        frames.push({ channel: index, direction: "received", type: frameType(event.data) });
       for (const type of syncTypes(event.data)) frames.push({ channel: index, direction: "received", type });
     });
     const send = channel.send.bind(channel);
     channel.send = (data: string & Blob & ArrayBuffer & ArrayBufferView<ArrayBuffer>) => {
-      if (channel.label.endsWith("events"))
-        frames.push({ channel: index, direction: "sent", type: `raw ${text(data).slice(0, 140)}` });
+      if (channel.label.endsWith("events")) frames.push({ channel: index, direction: "sent", type: frameType(data) });
       for (const type of syncTypes(data)) frames.push({ channel: index, direction: "sent", type });
       send(data);
     };

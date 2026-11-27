@@ -417,7 +417,7 @@ export function createWorkspace(
       if (!next.channels.some((entry) => entry.id === channel.id))
         next.channels.unshift({ ...channel, unreadCount: 0, activeTasks: 0, lastMessage: null });
     });
-    void readChannels().catch(() => undefined);
+    if (!sync?.channels()) void readChannels().catch(() => undefined);
     return channel.id;
   }
 
@@ -866,6 +866,7 @@ export function createWorkspace(
     agentCatalog,
     createAgent,
     createFolder,
+    request,
     settings: createAgentSettingsApi(request, capabilities),
     foldersAvailable: () => has(SIDEBAR_LAYOUT_CAPABILITY),
     channelsAvailable: () => channelsApi !== null,
