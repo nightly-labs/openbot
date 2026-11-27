@@ -31,7 +31,7 @@ export interface WidgetRelayPush {
   environment: "production" | "development";
 }
 
-export function watchWidgetPushTopic(appTopic: string): string {
+function watchWidgetPushTopic(appTopic: string): string {
   return `${appTopic}.watchkitapp.push-type.widgets`;
 }
 
