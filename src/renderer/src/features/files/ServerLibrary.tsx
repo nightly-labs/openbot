@@ -15,6 +15,7 @@ import {
   remoteAttachmentUrlWith,
 } from "../conversation/attachment-preview";
 import { type AgentLevelsSource, createAgentLevels } from "../conversation/message-delete-access";
+import { useRemoteChatContent } from "../servers/remote-chat-content";
 import { serverRoleCanAdminister, serverSupportsCapability } from "../servers/server-capabilities";
 import type { FilesPort } from "./files-port";
 import { createLibraryFolders } from "./library-folders";
@@ -58,6 +59,7 @@ export function ServerLibrary(props: ServerLibraryProps) {
   const platform = usePlatform();
   const storage = createStorageUsage(() => ({ serverId: props.serverId, input: { scope: "host" } }), props.calls);
   const agents = createServerAgents(() => props.serverId, props.calls);
+  const remoteChatContent = useRemoteChatContent();
   const [viewing, setViewing] = createSignal<Viewing | null>(null);
   const agentIds = createMemo(() => new Set((agents() ?? []).map((agent) => agent.id)));
   const fileAgents = createMemo(
@@ -174,6 +176,7 @@ export function ServerLibrary(props: ServerLibraryProps) {
             viewing={shown}
             agents={agents() ?? []}
             opensFiles={props.opensFiles !== false}
+            remoteContent={remoteChatContent.enabled(props.serverId)}
             onAction={act}
             onOpenUrl={props.onOpenUrl}
             onClose={closeViewer}
@@ -188,6 +191,7 @@ function LibraryViewer(props: {
   viewing: Viewing;
   agents: AgentProfile[];
   opensFiles: boolean;
+  remoteContent: boolean;
   onAction: (file: StoredFileRow, action: StoredFileAction) => Promise<void>;
   onOpenUrl: (url: string) => void;
   onClose: () => void;
@@ -211,6 +215,7 @@ function LibraryViewer(props: {
       <Loading>
         <FilePreviewPanel
           macWindowControls={platform.appInfo()?.platform === "darwin"}
+          remoteContent={props.remoteContent}
           preview={props.viewing.preview}
           agents={props.agents}
           sourceUrl={openedAttachmentUrl(file().previewUrl)}

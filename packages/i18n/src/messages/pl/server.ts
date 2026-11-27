@@ -838,4 +838,8 @@ export const messages = {
   "server.ownerTransfer.accepted": "Jesteś teraz właścicielem serwera {server}",
   "server.ownerTransfer.acceptFailed": "Nie udało się zaakceptować przekazania.",
   "server.ownerTransfer.declineFailed": "Nie udało się odrzucić przekazania.",
+  "server.settings.privacyTitle": "Prywatność",
+  "server.settings.remoteChatContent": "Wczytuj treści zdalne w czatach",
+  "server.settings.remoteChatContentDescription":
+    "Pokazuj w czatach obrazy, ikony witryn, diagramy i strony, które wczytują treści z innych witryn. Gdy to jest wyłączone, te treści wczytują się dopiero po kliknięciu, więc inne witryny nie wiedzą, kiedy otwiera się czat. Dotyczy to wszystkich na tym serwerze.",
 } as const satisfies PartialTranslation<typeof source>;

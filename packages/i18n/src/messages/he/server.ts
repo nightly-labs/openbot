@@ -870,4 +870,8 @@ export const messages = {
   "server.ownerTransfer.accepted": "הבעלות על {server} עברה אליך",
   "server.ownerTransfer.acceptFailed": "לא ניתן לאשר את העברת הבעלות.",
   "server.ownerTransfer.declineFailed": "לא ניתן לדחות את העברת הבעלות.",
+  "server.settings.privacyTitle": "פרטיות",
+  "server.settings.remoteChatContent": "טעינת תוכן מרוחק בצ'אטים",
+  "server.settings.remoteChatContentDescription":
+    "הצגת תמונות, סמלי אתרים, תרשימים ודפים שטוענים תוכן מאתרים אחרים בצ'אטים. כשהאפשרות כבויה, התוכן נטען רק אחרי לחיצה, כך שאתרים אחרים לא יודעים מתי צ'אט נפתח. ההגדרה חלה על כל מי שבשרת הזה.",
 } as const satisfies PartialTranslation<typeof source>;

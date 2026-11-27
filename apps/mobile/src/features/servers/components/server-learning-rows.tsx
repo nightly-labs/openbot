@@ -13,6 +13,7 @@ import Brain from "lucide-react-native/icons/brain";
 import BrainCog from "lucide-react-native/icons/brain-cog";
 import Coins from "lucide-react-native/icons/coins";
 import Smile from "lucide-react-native/icons/face-slightly-smiling";
+import Globe from "lucide-react-native/icons/globe";
 import MousePointerClick from "lucide-react-native/icons/mouse-pointer-click";
 import { useState } from "react";
 import { View } from "react-native";
@@ -260,6 +261,34 @@ export function ServerBrowsingMemoryRow({ serverId }: { serverId: string }) {
           dark={theme === "dark"}
           onValueChange={(enabled) => {
             if (current && enabled !== current.enabled) setting.save(() => setBrowsingMemory(enabled, serverId));
+          }}
+        />
+      </SettingsRow>
+    </SettingsSection>
+  );
+}
+
+export function ServerRemoteChatContentRow({ serverId }: { serverId: string }) {
+  const { t } = useText();
+  const { theme } = useUniwind();
+  const { loadRemoteChatContent, setRemoteChatContent } = useMobileWorkspaceActions();
+  const setting = useHostSetting(
+    queryKeys.remoteChatContent(useQueryScope(), serverId),
+    () => loadRemoteChatContent(serverId),
+    t("mobile.server.settings.remoteChatContentLoadFailed"),
+    t("mobile.server.settings.learningSaveFailed"),
+  );
+  const current = setting.value;
+  return (
+    <SettingsSection footer={setting.error ?? t("mobile.server.settings.remoteChatContentDescription")}>
+      <SettingsRow leading={<RowIcon icon={Globe} />}>
+        <SettingsSwitch
+          value={current?.enabled ?? false}
+          disabled={!current || setting.saving}
+          label={t("mobile.server.settings.remoteChatContent")}
+          dark={theme === "dark"}
+          onValueChange={(enabled) => {
+            if (current && enabled !== current.enabled) setting.save(() => setRemoteChatContent(enabled, serverId));
           }}
         />
       </SettingsRow>

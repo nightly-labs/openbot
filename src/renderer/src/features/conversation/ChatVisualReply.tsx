@@ -1,10 +1,11 @@
 import { fileQuoteId } from "@openbot/contracts/chat-tag-references";
 import { chatVisualReply } from "@openbot/contracts/chat-visual";
-import type { AttachmentSummary } from "@openbot/contracts/ipc";
+import { type AttachmentSummary, LOCAL_SERVER_ID } from "@openbot/contracts/ipc";
 import type { AgentMessage } from "@openbot/ui/data";
 import { ChatVisual } from "@openbot/ui/features/conversation/ChatVisual";
 import { createSignal, onCleanup, untrack } from "solid-js";
 import { deviceQuoteShortcut } from "../../send-shortcut-preference";
+import { useRemoteChatContent } from "../servers/remote-chat-content";
 import { isChatVisualAppShortcut } from "./chat-visual-shortcuts";
 import { chatVisualPageUrl } from "./chat-visual-url";
 import { conversationRuntime } from "./conversation-runtime";
@@ -35,6 +36,7 @@ export function ChatVisualReply(props: {
   threadId?: string | undefined;
 }) {
   const { props: view, openExternalMessageUrl, previewAttachment, openFileFromThread } = useConversationViewScope();
+  const remoteChatContent = useRemoteChatContent();
   const visual = () => chatVisualReply(props.message) ?? props.initial;
   const pageUrl = () => chatVisualPageUrl(visual().attachment.previewUrl);
   const pageQuoteId = () =>
@@ -73,6 +75,7 @@ export function ChatVisualReply(props: {
       onUseAsBackdrop={backdropAction(props.message)}
       isAppShortcut={isChatVisualAppShortcut}
       macWindowControls={view.platform === "darwin"}
+      remoteContent={remoteChatContent.enabled(view.server?.id ?? LOCAL_SERVER_ID)}
     />
   );
 }

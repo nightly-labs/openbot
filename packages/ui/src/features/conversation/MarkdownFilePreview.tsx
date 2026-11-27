@@ -18,6 +18,7 @@ export interface MarkdownFilePreviewProps {
   onOpenLink: (url: string) => void;
   onOpenSharedFile: (path: string) => void;
   onOpenWorkspaceFile?: ((path: string) => void) | undefined;
+  remoteContent?: boolean | undefined;
 }
 
 const TRUNCATED_AFTER = 1_000_000;
@@ -48,6 +49,7 @@ export function MarkdownFilePreview(props: MarkdownFilePreviewProps) {
             onOpenLink={props.onOpenLink}
             onOpenSharedFile={props.onOpenSharedFile}
             onOpenWorkspaceFile={props.onOpenWorkspaceFile}
+            remoteContent={props.remoteContent}
           />
         </article>
         <Show when={props.truncated}>

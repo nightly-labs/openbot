@@ -34,6 +34,7 @@ import {
   ServerMemoryLimitRow,
   ServerMemoryReviewRow,
   ServerPersonalityRow,
+  ServerRemoteChatContentRow,
   ServerSkillLearningRow,
 } from "@/features/servers/components/server-learning-rows";
 import { ServerTurnLimitsRows } from "@/features/servers/components/server-turn-limits-rows";
@@ -326,6 +327,7 @@ function permitsAgentSettings(checks: ServerChecks, serverId: string): boolean {
     checks.canManageMemoryReview(serverId) ||
     checks.canManageSkillLearning(serverId) ||
     checks.canManageBrowsingMemory(serverId) ||
+    checks.canManageRemoteChatContent(serverId) ||
     checks.canManageMediaApprovalCredits(serverId) ||
     checks.canManageServerVoiceModel(serverId)
   );
@@ -423,6 +425,7 @@ export function ServerAgentsSection({ serverId }: { serverId: string }) {
     canManageMemoryReview,
     canManageSkillLearning,
     canManageBrowsingMemory,
+    canManageRemoteChatContent,
     canManageMediaApprovalCredits,
     canManageServerVoiceModel,
   } = useMobileWorkspace();
@@ -434,6 +437,7 @@ export function ServerAgentsSection({ serverId }: { serverId: string }) {
       {canManageMemoryReview(serverId) ? <ServerMemoryReviewRow serverId={serverId} /> : null}
       {canManageSkillLearning(serverId) ? <ServerSkillLearningRow serverId={serverId} /> : null}
       {canManageBrowsingMemory(serverId) ? <ServerBrowsingMemoryRow serverId={serverId} /> : null}
+      {canManageRemoteChatContent(serverId) ? <ServerRemoteChatContentRow serverId={serverId} /> : null}
       {canManageMediaApprovalCredits(serverId) ? <ServerMediaApprovalCreditsRow serverId={serverId} /> : null}
       {canManageServerVoiceModel(serverId) ? <ServerVoiceModelRow serverId={serverId} /> : null}
     </>

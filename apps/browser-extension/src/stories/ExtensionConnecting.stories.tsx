@@ -2,6 +2,7 @@ import type { CentralAuthUser } from "@openbot/contracts/ipc";
 import type { RemoteTeamHost } from "@openbot/team-client/remote-directory";
 import type { Meta, StoryObj } from "storybook-solidjs-vite";
 import { ConnectingScreen } from "../ConnectingScreen";
+import { NoServersScreen } from "../NoServersScreen";
 import { PanelFrame } from "./story-frame";
 
 const meta = {
@@ -53,4 +54,16 @@ export const ServerOffline: Story = { render: () => <Connecting hosts={HOSTS} fa
 
 export const UpdateRequired: Story = {
   render: () => <Connecting hosts={HOSTS} failure="OpenBot needs an update to work with this extension." />,
+};
+
+export const NoServers: Story = {
+  render: () => (
+    <PanelFrame>
+      <NoServersScreen
+        user={USER}
+        onRetry={() => new Promise((done) => setTimeout(done, 800))}
+        onSignOut={() => undefined}
+      />
+    </PanelFrame>
+  ),
 };

@@ -144,6 +144,7 @@ export const queryKeys = {
   memoryReview: (scope: QueryScope, serverId: string) => ["memory-review", ...scope, serverId],
   skillLearning: (scope: QueryScope, serverId: string) => ["skill-learning", ...scope, serverId],
   browsingMemory: (scope: QueryScope, serverId: string) => ["browsing-memory", ...scope, serverId],
+  remoteChatContent: (scope: QueryScope, serverId: string) => ["remote-chat-content", ...scope, serverId],
   serverPersonality: (scope: QueryScope, serverId: string) => ["server-personality", ...scope, serverId],
   serverRoles: (scope: QueryScope, serverId: string) => ["server-roles", ...scope, serverId],
   serverAudit: (scope: QueryScope, serverId: string) => ["server-audit", ...scope, serverId],

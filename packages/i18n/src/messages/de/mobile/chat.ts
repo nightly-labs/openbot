@@ -87,6 +87,9 @@ export const messages = {
   "mobile.chat.preview.openHint": "Öffnet die Vorschau",
   "mobile.chat.preview.drawing": "Diagramm wird gezeichnet…",
   "mobile.chat.preview.failed": "Dieses Diagramm konnte nicht gezeichnet werden.",
+  "mobile.chat.preview.diagramRemoteContent": "Dieses Diagramm lädt ein Bild von einer anderen Website.",
+  "mobile.chat.preview.loadDiagram": "Diagramm laden",
+  "mobile.chat.preview.runPage": "Seite ausführen",
   "mobile.chat.preview.options": "Vorschauoptionen",
   "mobile.chat.preview.preview": "Vorschau",
   "mobile.chat.preview.code": "Code",
@@ -668,6 +671,22 @@ export const messages = {
   "mobile.chat.channelWork.waiting": "Wartet in {channel} auf dich",
   "mobile.chat.channelWork.open": "{label}. Öffnet den Kanal.",
   "mobile.chat.viewOnly": "Du kannst diesen Agenten nur ansehen.",
+  "mobile.chat.locationRequest.share": "Einmal teilen",
+  "mobile.chat.locationRequest.decline": "Nicht teilen",
+  "mobile.chat.locationRequest.alwaysAllow": "Immer erlauben",
+  "mobile.chat.locationRequest.alwaysAllowed":
+    "Dieser Agent bekommt deinen Standort ohne Nachfrage, während du die App nutzt.",
+  "mobile.chat.locationRequest.askEveryTime": "Jedes Mal fragen",
+  "mobile.chat.locationRequest.locating": "Standort wird ermittelt …",
+  "mobile.chat.locationRequest.private": "Der aktuelle Standort deines Telefons geht einmal an diesen Agenten.",
+  "mobile.chat.locationRequest.shared": "Standort geteilt",
+  "mobile.chat.locationRequest.declined": "Nicht geteilt",
+  "mobile.chat.locationRequest.unavailable":
+    "Dein Telefon konnte deinen Standort nicht finden. Versuche es noch einmal.",
+  "mobile.chat.locationRequest.deniedTitle": "Standortzugriff ist aus",
+  "mobile.chat.locationRequest.denied":
+    "Erlaube OpenBot in den Einstellungen den Standortzugriff, um deinen Standort zu teilen.",
+  "mobile.chat.locationRequest.openSettings": "Einstellungen öffnen",
   "mobile.chat.appSuggestion.skip": "Überspringen",
   "mobile.chat.appSuggestion.skipNamed": "{name} überspringen",
   "mobile.chat.appSuggestion.connectNamed": "{name} verbinden",
@@ -698,20 +717,4 @@ export const messages = {
   "mobile.chat.context.noAuto": "Dieser Agent komprimiert seinen Kontext nicht.",
   "mobile.chat.context.lastCompaction": "Letzte Komprimierung: {before} → {after} Tokens",
   "mobile.chat.context.unavailable": "Dieser Chat meldet seinen Kontext gerade nicht.",
-  "mobile.chat.locationRequest.share": "Einmal teilen",
-  "mobile.chat.locationRequest.decline": "Nicht teilen",
-  "mobile.chat.locationRequest.alwaysAllow": "Immer erlauben",
-  "mobile.chat.locationRequest.alwaysAllowed":
-    "Dieser Agent bekommt deinen Standort ohne Nachfrage, während du die App nutzt.",
-  "mobile.chat.locationRequest.askEveryTime": "Jedes Mal fragen",
-  "mobile.chat.locationRequest.locating": "Standort wird ermittelt …",
-  "mobile.chat.locationRequest.private": "Der aktuelle Standort deines Telefons geht einmal an diesen Agenten.",
-  "mobile.chat.locationRequest.shared": "Standort geteilt",
-  "mobile.chat.locationRequest.declined": "Nicht geteilt",
-  "mobile.chat.locationRequest.unavailable":
-    "Dein Telefon konnte deinen Standort nicht finden. Versuche es noch einmal.",
-  "mobile.chat.locationRequest.deniedTitle": "Standortzugriff ist aus",
-  "mobile.chat.locationRequest.denied":
-    "Erlaube OpenBot in den Einstellungen den Standortzugriff, um deinen Standort zu teilen.",
-  "mobile.chat.locationRequest.openSettings": "Einstellungen öffnen",
 } as const satisfies PartialTranslation<typeof source>;

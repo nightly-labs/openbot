@@ -2,6 +2,7 @@ import type { AttachmentSummary } from "@openbot/contracts/ipc";
 import { File } from "expo-file-system";
 import { router } from "expo-router";
 import { useState } from "react";
+import { useRemoteChatContent } from "@/features/servers/model/use-remote-chat-content";
 import { queryKeys } from "@/features/workspace/model/query-keys";
 import { useText } from "@/shared/lib/text";
 import {
@@ -17,8 +18,9 @@ import { requestFile, useMediaFile } from "./use-media-file";
 export async function openFilePreview(
   kind: AttachmentPreviewKind,
   file: { uri: string; name: string; mimeType: string },
+  remoteContent = false,
 ) {
-  const entry: CodePreviewEntry = { kind, source: "", file };
+  const entry: CodePreviewEntry = { kind, source: "", file, remoteContent };
   if (kind === "html") {
     entry.source = await new File(file.uri).text();
     entry.language = "html";
@@ -36,6 +38,7 @@ export function useAttachmentPreview(serverId: string, attachment: AttachmentSum
   const kind =
     useAttachmentDownload(serverId, attachment).download === "desktop" ? null : attachmentPreviewKind(attachment);
   const file = useMediaFile(serverId, attachment, false);
+  const remoteContent = useRemoteChatContent(serverId);
   const [opening, setOpening] = useState(false);
 
   async function open() {
@@ -47,7 +50,11 @@ export function useAttachmentPreview(serverId: string, attachment: AttachmentSum
         : await requestFile(queryKeys.chatMediaFile(serverId, attachment.id), () => file.refetch());
       if (result.error) throw result.error;
       if (!result.data) throw new Error(t("mobile.chat.attachment.unavailable"));
-      await openFilePreview(kind, { uri: result.data, name: attachment.name, mimeType: attachment.mimeType });
+      await openFilePreview(
+        kind,
+        { uri: result.data, name: attachment.name, mimeType: attachment.mimeType },
+        remoteContent,
+      );
     } catch (error) {
       showFileFailure(error, t("mobile.chat.attachment.openFailed"), text);
     } finally {

@@ -85,6 +85,7 @@ import type {
   HostPersonality,
   HostProviderAccounts,
   HostReleaseStatus,
+  HostRemoteChatContent,
   HostSetMessagingEnabledInput,
   HostSignalHomeSettings,
   HostSkillLearning,
@@ -470,6 +471,10 @@ export interface MobileWorkspaceContextValue {
   canManageBrowsingMemory: (serverId: string) => boolean;
   loadBrowsingMemory: (serverId: string) => Promise<HostBrowsingMemory>;
   setBrowsingMemory: (enabled: boolean, serverId: string) => Promise<HostBrowsingMemory>;
+  canManageRemoteChatContent: (serverId: string) => boolean;
+  servesRemoteChatContent: (serverId: string) => boolean;
+  loadRemoteChatContent: (serverId: string) => Promise<HostRemoteChatContent>;
+  setRemoteChatContent: (enabled: boolean, serverId: string) => Promise<HostRemoteChatContent>;
   canManageServerPersonality: (serverId: string) => boolean;
   servesServerPersonality: (serverId: string) => boolean;
   loadServerPersonality: (serverId: string) => Promise<HostPersonality>;
@@ -918,6 +923,8 @@ type ServerCheckKey =
   | "canManageMemoryReview"
   | "canManageSkillLearning"
   | "canManageBrowsingMemory"
+  | "canManageRemoteChatContent"
+  | "servesRemoteChatContent"
   | "canManageServerPersonality"
   | "servesServerPersonality"
   | "canManageServerRoles"

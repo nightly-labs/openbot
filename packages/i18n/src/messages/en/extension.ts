@@ -19,6 +19,8 @@ export const messages = defineMessages("extension", {
   "extension.connection.updateExtension": "Update the OpenBot extension to use {server}.",
   "extension.connection.updateServer": "{server} needs an update to work with this extension.",
   "extension.connection.noServers": "Your account has no servers yet. Set one up in the OpenBot app.",
+  "extension.connection.noServersTitle": "No servers available",
+  "extension.connection.servers": "Servers",
   "extension.connection.remote": "Remote",
   "extension.connection.remoteStatus": "Remote · {status}",
   "extension.connection.notConnected": "Not connected",

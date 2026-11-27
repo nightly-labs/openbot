@@ -883,4 +883,8 @@ export const messages = defineMessages("server", {
   "server.ownerTransfer.accepted": "You are now the owner of {server}",
   "server.ownerTransfer.acceptFailed": "Could not accept the ownership transfer.",
   "server.ownerTransfer.declineFailed": "Could not decline the ownership transfer.",
+  "server.settings.privacyTitle": "Privacy",
+  "server.settings.remoteChatContent": "Load remote content in chats",
+  "server.settings.remoteChatContentDescription":
+    "Show pictures, site icons, diagrams and pages that load content from other web sites in chats. When this is off, this content loads only after a click, so other web sites do not learn when a chat opens. This applies to everyone on this server.",
 });

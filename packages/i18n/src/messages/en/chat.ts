@@ -531,4 +531,13 @@ export const messages = defineMessages("chat", {
   "chat.feedbackWithdrawn.title": "Report removed",
   "chat.feedbackWithdrawn.badge": "Removed",
   "chat.feedbackWithdrawn.body": "Your report is not on GitHub anymore. To send a corrected report, ask the agent.",
+  "chat.remoteContent.pictureNotLoaded":
+    "Picture from {host}. It was not loaded, because remote content is off on this server.",
+  "chat.remoteContent.loadPicture": "Load picture",
+  "chat.remoteContent.diagramNotDrawn":
+    "This diagram can load a picture from another web site. It was not drawn, because remote content is off on this server.",
+  "chat.remoteContent.loadDiagram": "Load diagram",
+  "chat.remoteContent.pageStatic":
+    "Shown without scripts and remote content, because remote content is off on this server.",
+  "chat.remoteContent.runPage": "Run page",
 });

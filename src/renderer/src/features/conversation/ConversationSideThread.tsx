@@ -1,4 +1,4 @@
-import { canPreviewAttachment } from "@openbot/contracts/ipc";
+import { canPreviewAttachment, LOCAL_SERVER_ID } from "@openbot/contracts/ipc";
 import type { AppTextKey } from "@openbot/i18n";
 import { classifyFailure } from "@openbot/telemetry";
 import { Input } from "@openbot/ui";
@@ -19,6 +19,7 @@ import { useCompactMessageActions } from "../../compact-message-actions-preferen
 import { usePlatform } from "../../platform";
 import { deviceQuoteShortcut } from "../../send-shortcut-preference";
 import { remoteAgentError } from "../agents/agent-error-text";
+import { useRemoteChatContent } from "../servers/remote-chat-content";
 import { useThreadVisualReplyCard } from "./ChatVisualReply";
 import { latestVisibleAgentMessageId } from "./conversation-read-state";
 import { conversationRuntime } from "./conversation-runtime";
@@ -65,6 +66,7 @@ export function ConversationSideThread(props: { threadId: string; resizer: JSX.E
     shownSubagentId,
     toggleSubagentPanel,
   } = useConversationViewScope();
+  const remoteChatContent = useRemoteChatContent();
   const backdropAction = useMessageBackdropAction(conversationRuntime(view));
   const threadBackgroundWorkSince = (taskId: string | undefined) =>
     taskId === undefined ? undefined : view.backgroundWorkSince?.(taskId);
@@ -287,6 +289,7 @@ export function ConversationSideThread(props: { threadId: string; resizer: JSX.E
             changeMarkerActions={changeMarkerActions}
             onPreview={(attachment) => fromThread(() => void previewAttachment(attachment))}
             onAttachmentAction={(attachment, action) => fromThread(() => attachmentAction(attachment, action))}
+            remoteContent={remoteChatContent.enabled(view.server?.id ?? LOCAL_SERVER_ID)}
             backdropAction={backdropAction}
             approval={current().thread.approval}
             media={view.mediaApproval}
