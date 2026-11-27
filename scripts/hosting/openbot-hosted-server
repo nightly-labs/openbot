@@ -28,7 +28,7 @@ meminfo_bytes() {
 }
 
 split_service_cgroup() {
-  local unit root pid pids memory_max total swap reserve high agents_max agents_swap gib=$((1024 * 1024 * 1024))
+  local unit root pid pids memory_max total swap reserve high agents_swap gib=$((1024 * 1024 * 1024))
   unit=$(sed -n 's/^0:://p' /proc/self/cgroup 2>/dev/null) || return 0
   case $unit in */openbot.service) ;; *) return 0 ;; esac
   root=/sys/fs/cgroup$unit
@@ -65,10 +65,8 @@ split_service_cgroup() {
   [ "$reserve" -ge "$gib" ] || reserve=$gib
   high=$((memory_max - reserve))
   [ "$high" -ge $((memory_max / 2)) ] || high=$((memory_max / 2))
-  agents_max=$((memory_max - 256 * 1024 * 1024))
   echo "$reserve" >"$root/main/memory.low" 2>/dev/null || true
   echo "$high" >"$root/agents/memory.high" 2>/dev/null || true
-  if [ "$agents_max" -gt "$high" ]; then echo "$agents_max" >"$root/agents/memory.max" 2>/dev/null || true; fi
   if [[ $swap =~ ^[0-9]+$ ]] && [ -e "$root/agents/memory.swap.max" ]; then
     agents_swap=$((swap - reserve))
     [ "$agents_swap" -ge $((swap / 2)) ] || agents_swap=$((swap / 2))

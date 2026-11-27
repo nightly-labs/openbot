@@ -857,12 +857,12 @@ The unit (`openbot.service`):
   | Child | Setting |
   | --- | --- |
   | `main` | `cpu.weight` 100, `io.weight` 100, `memory.low` 15% of `MemoryMax` (at least 1 GiB) |
-  | `agents` | `cpu.weight` 20, `io.weight` 20, `memory.high` `MemoryMax` minus the `memory.low` of `main` (at least half of `MemoryMax`), `memory.max` `MemoryMax` minus 256 MiB, `memory.swap.max` the swap minus the `memory.low` of `main` (at least half of the swap) |
+  | `agents` | `cpu.weight` 20, `io.weight` 20, `memory.high` `MemoryMax` minus the `memory.low` of `main` (at least half of `MemoryMax`), `memory.swap.max` the swap minus the `memory.low` of `main` (at least half of the swap) |
 
   The weights act only when the two children want more than the machine has. An idle server gives
   a build all of the CPU. Above `memory.high`, the kernel moves memory of the agents to the swap and
-  slows them; it does not stop them. When the agents reach `memory.max` and their swap is full, the
-  kernel's OOM killer stops an agent process, as the unit limit did before, but never main. The
+  slows them; it does not stop them. When the unit reaches `MemoryMax`, its OOM killer acts as
+  before and picks an agent process first (OOM value 500). The
   `memory.low` of `main` is complete when the unit is full. When the whole machine is short of
   memory, the kernel gives `main` at most the `MemoryLow=15%` of the unit, which is less than 1 GiB
   on a small server. Main, Xvfb, D-Bus, the keyring and the Electron processes

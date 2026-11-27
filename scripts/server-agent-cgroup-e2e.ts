@@ -111,7 +111,7 @@ async function probe(directory: string): Promise<Probe> {
       Object.fromEntries(
         files.map((file) => [file, cgroupRoot === null ? null : readOptional(join(cgroupRoot, child, file))]),
       );
-    const agentLimits = limits("agents", ["cpu.weight", "memory.high", "memory.max", "memory.swap.max"]);
+    const agentLimits = limits("agents", ["cpu.weight", "memory.high", "memory.swap.max"]);
     const mainLimits = limits("main", ["cpu.weight", "memory.low"]);
     return {
       ownCgroup: cgroupOf("self"),
@@ -147,11 +147,9 @@ function expectedMemoryLimits(memoryMax: number, swap: number) {
   const gib = 1024 * 1024 * 1024;
   const reserve = Math.max(Math.floor((memoryMax * 15) / 100), gib);
   const high = Math.max(memoryMax - reserve, Math.floor(memoryMax / 2));
-  const agentsMax = memoryMax - 256 * 1024 * 1024;
   return {
     low: String(reserve),
     high: String(high),
-    max: agentsMax > high ? String(agentsMax) : "max",
     swap: String(Math.max(swap - reserve, Math.floor(swap / 2))),
   };
 }
@@ -244,7 +242,6 @@ async function main(): Promise<void> {
     const expected = expectedMemoryLimits(UNIT_MEMORY_MAX, swapTotalBytes());
     assert.equal(serverProbe.mainLimits["memory.low"], expected.low, "main has the wrong memory.low");
     assert.equal(serverProbe.agentLimits["memory.high"], expected.high, "agents have the wrong memory.high");
-    assert.equal(serverProbe.agentLimits["memory.max"], expected.max, "agents have the wrong memory.max");
     assert.equal(serverProbe.agentLimits["memory.swap.max"], expected.swap, "agents have the wrong memory.swap.max");
   }
   const cpuDelegated = serverProbe.agentLimits["cpu.weight"] !== null;
