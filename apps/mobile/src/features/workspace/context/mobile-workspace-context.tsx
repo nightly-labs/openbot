@@ -274,6 +274,7 @@ import { createDownloadQueue } from "@/features/workspace/model/request-lanes";
 import {
   hasCapability,
   requireCapability,
+  requireSidebarLayout,
   type ServerCapabilities,
   SIDEBAR_LAYOUT_CAPABILITY,
   supportsBrowserView,
@@ -1979,11 +1980,10 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
       answerBrowserPermission: browser.answerBrowserPermission,
       answerBrowserHttpSignIn: browser.answerBrowserHttpSignIn,
       mutateSidebarLayout: async (serverId, action) => {
-        requireCapability(
+        requireSidebarLayout(
           serverCapabilities.current,
           serverId,
-          SIDEBAR_LAYOUT_CAPABILITY,
-          "mobile.workspace.error.sectionsUnsupported",
+          serversRef.current.find((server) => server.id === serverId),
         );
         const layout = await request(
           "POST",
@@ -1997,11 +1997,10 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
         applySidebarLayout(serverId, layout);
       },
       moveSidebarChat: async (serverId, action) => {
-        requireCapability(
+        requireSidebarLayout(
           serverCapabilities.current,
           serverId,
-          SIDEBAR_LAYOUT_CAPABILITY,
-          "mobile.workspace.error.sectionsUnsupported",
+          serversRef.current.find((server) => server.id === serverId),
         );
         const previous = sidebarByServerRef.current[serverId]?.layout;
         const moved = previous ? moveSidebarChat(previous, action) : null;
@@ -2009,7 +2008,9 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
         try {
           const layout = await request(
             "POST",
-            TEAM_API_ROUTES.sidebarLayout.actions,
+            action.type === "assign" && hasCapability(serverCapabilities.current, serverId, SIDEBAR_FOLDERS_CAPABILITY)
+              ? SIDEBAR_FOLDERS_ROUTES.actions
+              : TEAM_API_ROUTES.sidebarLayout.actions,
             decodeSidebarLayout,
             action,
             serverId,

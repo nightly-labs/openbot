@@ -15,6 +15,7 @@ export const messages = {
   "mobile.workspace.error.sectionsLoadFailed": "Não foi possível carregar as pastas. Tente novamente.",
   "mobile.workspace.error.transportNotReady": "O transporte de dados do aplicativo para celular não está pronto.",
   "mobile.workspace.error.sectionsUnsupported": "Este computador anfitrião não permite alterar pastas.",
+  "mobile.workspace.error.sidebarOffline": "Conecte-se a este servidor para alterar as pastas.",
   "mobile.workspace.error.leaveOwnServer": "Só é possível sair de servidores remotos dos quais você participa.",
   "mobile.workspace.error.removeOwnedServerOnly": "Somente o proprietário pode remover este servidor.",
   "mobile.workspace.error.agentNotOnHost": "O agente não está neste computador anfitrião.",
