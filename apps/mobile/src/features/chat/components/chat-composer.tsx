@@ -316,7 +316,8 @@ export const ChatComposer = memo(function ChatComposer({
       stopListening();
     };
   }, [navigation]);
-  const pasteFiles = (pasted: PastedFiles) => addPastedFiles(attachments, pasted);
+  const pasteFiles = (pasted: PastedFiles) =>
+    addPastedFiles(sendingDictationRef.current ? undefined : attachments, pasted);
   const pendingCursor = useRef<number | null>(null);
   useLayoutEffect(() => {
     if (pendingCursor.current === null) return;
