@@ -3326,6 +3326,7 @@ export function WorkflowCanvas(props: WorkflowCanvasProps) {
       if (!inCanvas(root, active) && (!pointer || isEditable(active))) return;
       if (isEditable(active) && data?.types.includes("text/plain")) return;
       event.preventDefault();
+      event.stopPropagation();
       const start = pointer ? toWorld(pointer) : undefined;
       void uploadAll(pictures).then((files) => addFiles(files, start));
     };
