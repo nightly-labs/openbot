@@ -1628,6 +1628,7 @@ jobs:
           EMAIL_SMTP_PASSWORD: ${{ secrets.EMAIL_SMTP_PASSWORD }}
           EMAIL_SMTP_OVERFLOW_PASSWORD: ${{ secrets.EMAIL_SMTP_OVERFLOW_PASSWORD }}
           EMAIL_SMTP_OVERFLOW_2_PASSWORD: ${{ secrets.EMAIL_SMTP_OVERFLOW_2_PASSWORD }}
+          EMAIL_SMTP_OVERFLOW_3_PASSWORD: ${{ secrets.EMAIL_SMTP_OVERFLOW_3_PASSWORD }}
           SKILLS_ADMIN_TOKEN: ${{ secrets.SKILLS_ADMIN_TOKEN }}
           SITE_OPERATIONS_ADMIN_TOKEN: ${{ secrets.SITE_OPERATIONS_ADMIN_TOKEN }}
           SERVER_CLAIMS_ADMIN_TOKEN: ${{ secrets.SERVER_CLAIMS_ADMIN_TOKEN }}
@@ -1695,7 +1696,7 @@ jobs:
               if (present.length !== names.length) throw new Error(`Set ${names.join(" and ")} together.`);
               for (const name of names) optional[name] = process.env[name].trim();
             }
-            for (const name of ["EMAIL_SMTP_OVERFLOW_PASSWORD", "EMAIL_SMTP_OVERFLOW_2_PASSWORD"]) {
+            for (const name of ["EMAIL_SMTP_OVERFLOW_PASSWORD", "EMAIL_SMTP_OVERFLOW_2_PASSWORD", "EMAIL_SMTP_OVERFLOW_3_PASSWORD"]) {
               if (process.env[name]) optional[name] = process.env[name];
             }
             const githubAppKey = process.env.OPENBOT_GITHUB_APP_PRIVATE_KEY?.trim();
