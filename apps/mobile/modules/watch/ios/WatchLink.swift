@@ -135,8 +135,8 @@ public final class WatchLink: NSObject, WCSessionDelegate, @unchecked Sendable {
     let previous = complicationState
     complicationState = next
     lock.unlock()
-    guard next.needsPush(after: previous), session.isComplicationEnabled,
-      session.remainingComplicationUserInfoTransfers > 0
+    guard session.isComplicationEnabled,
+      next.needsPush(after: previous, remaining: session.remainingComplicationUserInfoTransfers)
     else { return }
     session.transferCurrentComplicationUserInfo(["openbot": 1, "payload": payload])
   }
@@ -216,8 +216,11 @@ public final class WatchLink: NSObject, WCSessionDelegate, @unchecked Sendable {
 }
 
 struct ComplicationState: Equatable {
+  static let reservedTransfers = 10
+
   let state: String
   let waiting: Int
+  let unread: Int
 
   init?(payload: String) {
     guard let data = payload.data(using: .utf8),
@@ -227,10 +230,12 @@ struct ComplicationState: Equatable {
     let agents = object["agents"] as? [[String: Any]] ?? []
     self.state = state
     self.waiting = agents.filter { $0["state"] as? String == "waiting" }.count
+    self.unread = agents.reduce(0) { $0 + (($1["unread"] as? Int) ?? 0) }
   }
 
-  func needsPush(after previous: ComplicationState?) -> Bool {
+  func needsPush(after previous: ComplicationState?, remaining: Int) -> Bool {
     guard let previous else { return false }
-    return state != previous.state || waiting > previous.waiting
+    if state != previous.state || waiting > previous.waiting { return remaining > 0 }
+    return unread > previous.unread && remaining > Self.reservedTransfers
   }
 }

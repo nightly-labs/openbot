@@ -34,7 +34,7 @@ final class WatchSession: NSObject, ObservableObject {
   static let pairRetry: TimeInterval = 60 * 60
   static let pairFailureRetry: TimeInterval = 30
   static let urlScheme = "openbot-watch"
-  static let serverKey = "openbot.watch.server"
+  nonisolated static let serverKey = "openbot.watch.server"
   static let themeKey = "openbot.watch.theme"
   static let shared = WatchSession()
 
@@ -607,7 +607,7 @@ final class WatchSession: NSObject, ObservableObject {
       Self.removeAvatars(keeping: kept)
       pictures = pictures.filter { name, _ in kept.contains(name) }
       pictureTints = pictureTints.filter { name, _ in kept.contains(name) }
-      ComplicationData.write(.ready(ready))
+      ComplicationData.write(.ready(ready, previous: readySnapshot))
     }
     defaults.set(json, forKey: Self.snapshotKey)
     snapshot = next
@@ -651,6 +651,11 @@ final class WatchSession: NSObject, ObservableObject {
     pictures = [:]
     pictureTints = [:]
     avatarRevision += 1
+    refreshComplication()
+  }
+
+  func refreshComplication() {
+    if let readySnapshot { ComplicationData.write(.ready(readySnapshot)) }
   }
 
   nonisolated static var avatarFolder: URL? {

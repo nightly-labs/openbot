@@ -80,6 +80,12 @@ struct AgentCounts {
     working = agents.filter { $0.state == .working }.count + channels.filter(\.isWorking).count
   }
 
+  init(waiting: Int, unread: Int, working: Int = 0) {
+    self.waiting = waiting
+    self.unread = unread
+    self.working = working
+  }
+
   func line(_ text: WatchText) -> String? {
     let parts = [
       waiting > 0 ? "\(waiting) \(text(TextKey.needsYou))" : nil,
@@ -225,6 +231,7 @@ struct ServerPickerView: View {
       let tint = session.tint(server, accent: snapshot.accent)
       Button {
         chosenServerId = server.id
+        session.refreshComplication()
         if !path.isEmpty { path.removeLast() }
       } label: {
         HStack(spacing: 8) {
