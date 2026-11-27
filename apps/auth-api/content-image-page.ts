@@ -292,44 +292,28 @@ function drawCenteredLockup(context: CanvasRenderingContext2D, job: ContentImage
   const logoSize = 96 * unit;
   const x = (job.width - plateWidth) / 2;
   const y = (job.height - plateHeight) / 2;
+  const felt = copyCanvas(context);
   drawFeltPatch(context, job, x, y, plateWidth, plateHeight);
 
   const logoTop = y + (plateHeight - logoSize) / 2;
-  context.save();
-  setMarkShadow(context, unit);
-  drawMark(context, lockup.left?.mark ?? "openbot", x + plateWidth * 0.25 - logoSize / 2, logoTop, logoSize);
+  drawFeltOpenBotMark(context, job, felt, x + plateWidth * 0.25 - logoSize / 2, logoTop, logoSize);
   drawMark(context, lockup.rivalMark, x + plateWidth * 0.75 - logoSize / 2, logoTop, logoSize);
-  context.restore();
 
-  // The hairline, broken around "vs".
+  // The seam between the two sides, broken around "vs".
   const center = x + plateWidth / 2;
   const middle = y + plateHeight / 2;
   const vsSize = 20 * unit;
-  const gap = vsSize * 1.1;
-  const inset = 64 * unit;
+  const gap = vsSize * 1.3;
+  const inset = 56 * unit;
+  drawStitchColumn(context, center, y + inset, middle - gap, unit);
+  drawStitchColumn(context, center, middle + gap, y + plateHeight - inset, unit);
   context.save();
-  setMarkShadow(context, unit);
-  context.strokeStyle = "rgba(255, 255, 255, 0.5)";
-  context.lineWidth = unit;
-  context.beginPath();
-  context.moveTo(center, y + inset);
-  context.lineTo(center, middle - gap);
-  context.moveTo(center, middle + gap);
-  context.lineTo(center, y + plateHeight - inset);
-  context.stroke();
   context.font = `500 ${vsSize}px ${FONT_FAMILY}`;
   context.fillStyle = "rgba(255, 255, 255, 0.9)";
   context.textAlign = "center";
   context.textBaseline = "middle";
   context.fillText("vs", center, middle);
   context.restore();
-}
-
-/** A soft shadow under the white marks, so they stand off the felt. */
-function setMarkShadow(context: CanvasRenderingContext2D, unit: number): void {
-  context.shadowColor = "rgba(12, 10, 24, 0.28)";
-  context.shadowBlur = 14 * unit;
-  context.shadowOffsetY = 2 * unit;
 }
 
 /** The roundup's marks in the middle of the social card, smaller than the title layout's, with room around each. */
@@ -347,13 +331,13 @@ function drawCenteredMarkRow(
   const plateHeight = padY * 2 + size;
   const x = (job.width - plateWidth) / 2;
   const y = (job.height - plateHeight) / 2;
+  const felt = copyCanvas(context);
   drawFeltPatch(context, job, x, y, plateWidth, plateHeight);
-  context.save();
-  setMarkShadow(context, unit);
   marks.forEach((mark, index) => {
-    drawMark(context, mark, x + padX + index * (size + gap), y + padY, size);
+    const left = x + padX + index * (size + gap);
+    if (mark === "openbot") drawFeltOpenBotMark(context, job, felt, left, y + padY, size);
+    else drawMark(context, mark, left, y + padY, size);
   });
-  context.restore();
 }
 
 /** The roundup's lockup: one frosted plate with the mark of every app in a row, at the same place. */
@@ -486,28 +470,57 @@ function drawFeltPatch(
       stitchRadius,
       from + stitchLength + (random() - 0.5) * unit,
     );
-    // The holes the needle left, pressed into the felt.
-    context.fillStyle = "rgba(0, 0, 0, 0.85)";
-    for (const hole of [start, end]) {
-      context.beginPath();
-      context.arc(hole.x, hole.y + 0.4 * unit, 1.6 * unit, 0, Math.PI * 2);
-      context.fill();
-    }
-    // The thread, then the light on its top.
-    context.strokeStyle = "#2c2b30";
-    context.lineWidth = 2.6 * unit;
-    context.beginPath();
-    context.moveTo(start.x, start.y);
-    context.lineTo(end.x, end.y);
-    context.stroke();
-    context.strokeStyle = "rgba(255, 255, 255, 0.16)";
-    context.lineWidth = 0.9 * unit;
-    context.beginPath();
-    context.moveTo(start.x, start.y - 0.6 * unit);
-    context.lineTo(end.x, end.y - 0.6 * unit);
-    context.stroke();
+    drawStitch(context, start, end, unit);
   }
   context.restore();
+}
+
+/** One stitch of dark thread: the needle holes pressed into the felt, the thread, and the light on its top. */
+function drawStitch(
+  context: CanvasRenderingContext2D,
+  start: { x: number; y: number },
+  end: { x: number; y: number },
+  unit: number,
+): void {
+  context.save();
+  context.lineCap = "round";
+  context.fillStyle = "rgba(0, 0, 0, 0.85)";
+  for (const hole of [start, end]) {
+    context.beginPath();
+    context.arc(hole.x, hole.y + 0.4 * unit, 1.6 * unit, 0, Math.PI * 2);
+    context.fill();
+  }
+  context.strokeStyle = "#2c2b30";
+  context.lineWidth = 2.6 * unit;
+  context.beginPath();
+  context.moveTo(start.x, start.y);
+  context.lineTo(end.x, end.y);
+  context.stroke();
+  context.strokeStyle = "rgba(255, 255, 255, 0.16)";
+  context.lineWidth = 0.9 * unit;
+  context.beginPath();
+  context.moveTo(start.x, start.y - 0.6 * unit);
+  context.lineTo(end.x, end.y - 0.6 * unit);
+  context.stroke();
+  context.restore();
+}
+
+/** A straight run of stitches from `top` to `bottom`, as the seam that splits the patch. */
+function drawStitchColumn(
+  context: CanvasRenderingContext2D,
+  x: number,
+  top: number,
+  bottom: number,
+  unit: number,
+): void {
+  const pitch = 15 * unit;
+  const length = 9 * unit;
+  const count = Math.max(1, Math.floor((bottom - top + pitch - length) / pitch));
+  const start = top + (bottom - top - (count - 1) * pitch - length) / 2;
+  for (let index = 0; index < count; index += 1) {
+    const from = start + index * pitch;
+    drawStitch(context, { x, y: from }, { x, y: from + length }, unit);
+  }
 }
 
 function roundedRectPerimeter(width: number, height: number, radius: number): number {
@@ -573,6 +586,180 @@ function seededRandom(text: string): () => number {
     value = (value + Math.imul(value ^ (value >>> 7), 61 | value)) ^ value;
     return ((value ^ (value >>> 14)) >>> 0) / 4294967296;
   };
+}
+
+function copyCanvas(context: CanvasRenderingContext2D): HTMLCanvasElement {
+  const copy = document.createElement("canvas");
+  copy.width = context.canvas.width;
+  copy.height = context.canvas.height;
+  copy.getContext("2d")?.drawImage(context.canvas, 0, 0);
+  return copy;
+}
+
+/** The lilac of the logo, as the felt of the felt logo. */
+const LOGO_FELT = "#d6adf2";
+/** The thread of the embroidered eyes, and its lighter core. */
+const EYE_THREAD = "#1d1321";
+const EYE_THREAD_CORE = "#4b3b52";
+
+/**
+ * The OpenBot logo as a piece of lilac felt sewn onto the patch, with its eyes
+ * embroidered in dark thread. Each eye is the scribble of `AppLogo`: every
+ * other segment of it is a strand on top of the felt, and the segments between
+ * run behind it, as a satin stitch does.
+ */
+function drawFeltOpenBotMark(
+  context: CanvasRenderingContext2D,
+  job: ContentImageJob,
+  felt: HTMLCanvasElement,
+  x: number,
+  y: number,
+  size: number,
+): void {
+  const unit = job.width / 1200;
+  const scale = size / APP_LOGO_SIZE;
+  const corner = APP_LOGO_CORNER * scale;
+  const random = seededRandom(`${job.slug}:logo:${Math.round(x)}`);
+
+  // Sewn on: a tight shadow under the felt.
+  context.save();
+  context.shadowColor = "rgba(0, 0, 0, 0.6)";
+  context.shadowBlur = 4 * unit;
+  context.shadowOffsetY = 2 * unit;
+  roundedRect(context, x, y, size, size, corner);
+  context.fillStyle = LOGO_FELT;
+  context.fill();
+  context.restore();
+
+  context.save();
+  roundedRect(context, x, y, size, size, corner);
+  context.clip();
+  context.fillStyle = LOGO_FELT;
+  context.fillRect(x, y, size, size);
+  // The fibres: the card's felt, without its colour, laid over the lilac.
+  context.globalCompositeOperation = "overlay";
+  context.globalAlpha = 0.55;
+  context.filter = "grayscale(1) contrast(1.7)";
+  context.drawImage(felt, x - size * 1.3, y - size * 0.4, size * 2.6, size * 1.4, x, y, size * 2.6, size * 1.4);
+  context.filter = "none";
+  context.globalAlpha = 1;
+  context.globalCompositeOperation = "source-over";
+  // Edges that curve away.
+  context.beginPath();
+  context.rect(x - size, y - size, size * 3, size * 3);
+  context.roundRect(x, y, size, size, corner);
+  context.shadowColor = "rgba(40, 10, 60, 0.45)";
+  context.shadowBlur = 8 * scale * 2.4;
+  context.fillStyle = "#000000";
+  context.fill("evenodd");
+  context.restore();
+
+  // A soft cut edge of lilac fibres.
+  const perimeter = roundedRectPerimeter(size, size, corner);
+  const fibres = Math.round(perimeter / (1.8 * unit));
+  context.save();
+  context.lineCap = "round";
+  for (let index = 0; index < fibres; index += 1) {
+    const point = roundedRectPoint(x, y, size, size, corner, random() * perimeter);
+    const along = (random() - 0.6) * 2.5 * unit;
+    const angle = Math.atan2(point.ny, point.nx) + (random() - 0.5) * 2.4;
+    const length = (0.8 + random() * 1.8) * unit;
+    const startX = point.x + point.nx * along;
+    const startY = point.y + point.ny * along;
+    context.strokeStyle = random() < 0.6 ? "rgba(214, 173, 242, 0.6)" : "rgba(150, 105, 182, 0.55)";
+    context.lineWidth = (0.4 + random() * 0.6) * unit;
+    context.beginPath();
+    context.moveTo(startX, startY);
+    context.lineTo(startX + Math.cos(angle) * length, startY + Math.sin(angle) * length);
+    context.stroke();
+  }
+  context.restore();
+
+  context.save();
+  context.translate(x, y);
+  context.scale(scale, scale);
+  for (const points of [APP_LOGO_EYE_POINTS.left, APP_LOGO_EYE_POINTS.right]) {
+    const values = points.split(/\s+/u).map(Number);
+    for (let index = 0; index + 3 < values.length; index += 4) {
+      drawEyeStrand(
+        context,
+        { x: values[index] ?? 0, y: values[index + 1] ?? 0 },
+        { x: values[index + 2] ?? 0, y: values[index + 3] ?? 0 },
+      );
+    }
+  }
+  context.restore();
+}
+
+/**
+ * One strand of the embroidered eye, in the logo's own units: a shadow on the
+ * felt, the thread, a lighter core where it is round, and the plies of the
+ * twist as fine diagonal lines across it.
+ */
+function drawEyeStrand(
+  context: CanvasRenderingContext2D,
+  start: { x: number; y: number },
+  end: { x: number; y: number },
+): void {
+  const width = 8.5;
+  const dx = end.x - start.x;
+  const dy = end.y - start.y;
+  const length = Math.hypot(dx, dy);
+  if (length === 0) return;
+  const ux = dx / length;
+  const uy = dy / length;
+  // The strand runs a little past each needle hole, as thread does.
+  const from = { x: start.x - ux * 2, y: start.y - uy * 2 };
+  const to = { x: end.x + ux * 2, y: end.y + uy * 2 };
+
+  context.save();
+  context.lineCap = "round";
+  context.shadowColor = "rgba(0, 0, 0, 0.8)";
+  context.shadowBlur = 4;
+  context.shadowOffsetY = 3;
+  context.strokeStyle = EYE_THREAD;
+  context.lineWidth = width;
+  context.beginPath();
+  context.moveTo(from.x, from.y);
+  context.lineTo(to.x, to.y);
+  context.stroke();
+  context.restore();
+
+  context.save();
+  context.lineCap = "round";
+  context.strokeStyle = EYE_THREAD_CORE;
+  context.lineWidth = width * 0.38;
+  context.beginPath();
+  context.moveTo(from.x - uy * 1.2, from.y + ux * 1.2);
+  context.lineTo(to.x - uy * 1.2, to.y + ux * 1.2);
+  context.stroke();
+
+  // The twist: plies at an angle to the strand, light on top and dark between.
+  const nx = -uy;
+  const ny = ux;
+  const ply = 4.2;
+  const slant = 0.7;
+  for (let along = 3; along < length + 1; along += ply) {
+    const cx = from.x + ux * along;
+    const cy = from.y + uy * along;
+    const ax = cx + (nx - ux * slant) * width * 0.42;
+    const ay = cy + (ny - uy * slant) * width * 0.42;
+    const bx = cx - (nx - ux * slant) * width * 0.42;
+    const by = cy - (ny - uy * slant) * width * 0.42;
+    context.strokeStyle = "rgba(255, 235, 255, 0.22)";
+    context.lineWidth = 1.4;
+    context.beginPath();
+    context.moveTo(ax, ay);
+    context.lineTo(bx, by);
+    context.stroke();
+    context.strokeStyle = "rgba(0, 0, 0, 0.55)";
+    context.lineWidth = 0.9;
+    context.beginPath();
+    context.moveTo(ax + ux * 1.6, ay + uy * 1.6);
+    context.lineTo(bx + ux * 1.6, by + uy * 1.6);
+    context.stroke();
+  }
+  context.restore();
 }
 
 /** The average luma of an area, from a sparse sample of its pixels. */
