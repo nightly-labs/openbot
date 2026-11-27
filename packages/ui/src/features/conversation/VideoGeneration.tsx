@@ -187,6 +187,7 @@ export function VideoGeneration(props: VideoGenerationProps) {
             onError={() =>
               setPlayer((state) => {
                 state.failed = true;
+                state.playOnLoad = false;
               })
             }
             ref={(element) => {
