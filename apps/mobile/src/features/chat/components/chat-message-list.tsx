@@ -324,6 +324,7 @@ interface MessageRowShared {
   firstMessageStyle: ComponentProps<typeof Animated.View>["style"];
   animationActive: boolean;
   playbackActive: boolean;
+  playbackResumes: boolean;
   playbackPaused: boolean;
   screenReaderEnabled: boolean;
   replySession: { progress: Map<string, number>; revealed: Set<string> };
@@ -612,7 +613,7 @@ const MessageRow = memo(function MessageRow({
             complete,
             progress: replySession.progress,
             enabled,
-            active: shared.playbackActive,
+            active: shared.playbackResumes,
             paused: shared.playbackPaused,
             revealed,
             onWord: (word: string, index: number) => {
@@ -632,7 +633,7 @@ const MessageRow = memo(function MessageRow({
       complete,
       replySession.progress,
       enabled,
-      shared.playbackActive,
+      shared.playbackResumes,
       shared.playbackPaused,
       revealed,
       markRevealed,
@@ -1706,6 +1707,7 @@ export const ChatMessageList = memo(function ChatMessageList({
     });
   };
   const animationActive = animateMessages && motion.responseVisible;
+  const playbackShown = isFocused && appActive && motion.responseVisible;
   const canReply = Boolean(onReply);
   const canReact = Boolean(onReact);
   const canDelete = Boolean(onDeleteMessage);
@@ -1738,7 +1740,8 @@ export const ChatMessageList = memo(function ChatMessageList({
       firstMessageStyle: motion.firstMessageStyle,
       animationActive,
       playbackActive: animationActive && textReveal && !screenReaderEnabled,
-      playbackPaused: !animationActive && textReveal && !screenReaderEnabled,
+      playbackResumes: playbackShown && textReveal && !screenReaderEnabled,
+      playbackPaused: !playbackShown && textReveal && !screenReaderEnabled,
       screenReaderEnabled,
       replySession,
       markRevealed,
@@ -1780,6 +1783,7 @@ export const ChatMessageList = memo(function ChatMessageList({
       motion.firstMessageStyle,
       screenReaderEnabled,
       animationActive,
+      playbackShown,
       textReveal,
       replySession,
       markRevealed,
