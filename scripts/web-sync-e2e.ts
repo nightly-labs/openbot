@@ -164,7 +164,16 @@ function renameChannel(from: string, to: string): Change {
             operationId: crypto.randomUUID(),
             channelId: channel.id,
             update: true,
-            draft: { name: to, title, instructions, members, leadAgentId, isolated, browser, icon },
+            draft: {
+              name: to,
+              title,
+              instructions,
+              members,
+              leadAgentId,
+              ...(isolated === undefined ? {} : { isolated }),
+              ...(browser === undefined ? {} : { browser }),
+              ...(icon === undefined ? {} : { icon }),
+            },
           });
         },
         { from, to },
