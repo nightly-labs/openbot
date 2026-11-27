@@ -688,7 +688,6 @@ export function createChannelsController(env: ChannelsEnvironment) {
       channelPrefetchEpochs.clear();
       prefetching.clear();
       keptPages.clear();
-      replaceLoadedPage = false;
       setPrefetchRound((round) => round + 1);
       announce(null);
       return refresh();
