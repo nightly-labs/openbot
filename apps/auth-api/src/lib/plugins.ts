@@ -106,6 +106,41 @@ function readConnectStep(app: string, entry: unknown): SitePluginConnectStep[] {
   return [];
 }
 
+export interface SitePluginMcpServer {
+  app: string;
+  where: string;
+  address: string;
+}
+
+const LOOPBACK_HOSTS = ["127.0.0.1", "localhost", "[::1]"];
+
+function isLoopbackUrl(address: string): boolean {
+  return URL.canParse(address) && LOOPBACK_HOSTS.includes(new URL(address).hostname);
+}
+
+export function pluginMcpServers(plugin: SitePlugin): SitePluginMcpServer[] {
+  return plugin.apps.map((app) =>
+    app.server.transport === "http"
+      ? {
+          app: app.name,
+          where: isLoopbackUrl(app.server.url)
+            ? "local MCP server on the computer that runs OpenBot, at"
+            : "remote MCP server at",
+          address: app.server.url,
+        }
+      : {
+          app: app.name,
+          where: "local MCP server that starts on the computer that runs OpenBot with",
+          address: [app.server.command, ...app.server.args].join(" "),
+        },
+  );
+}
+
+export function pluginMcpIntro(plugin: SitePlugin): string {
+  const servers = plugin.apps.length === 1 ? "this MCP server" : `these ${plugin.apps.length} MCP servers`;
+  return `The ${plugin.name} plugin is the OpenBot connector for ${plugin.name}. It gives your agents the tools of ${servers}:`;
+}
+
 export function pluginConnectSteps(plugin: SitePlugin): SitePluginConnectStep[] {
   return plugin.apps.flatMap((app) => {
     const auth = app.server.auth;
