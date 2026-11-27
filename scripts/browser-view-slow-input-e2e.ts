@@ -9,6 +9,8 @@ import { BrowserViewGateway } from "../src/main/browser-view-gateway";
 const OUT = resolve(import.meta.dirname, "../.openbot-build/browser-view-slow-input-e2e");
 const FRAME_SPACING_MS = 2;
 const FRAMES_WHILE_INPUT_WAITS = 300;
+const FRAMES_WHILE_INPUT_HANGS = 5_000;
+const REMEMBERED_FRAME_LIMIT = 4096;
 const LAG_REASON = "The live view fell too far behind.";
 
 interface ViewRun {
@@ -22,12 +24,13 @@ interface Report {
   passed: boolean;
   slowInputWithAcks?: ViewRun;
   noAcks?: ViewRun;
+  hungInputWithAcks?: ViewRun;
   queuedClickX?: number;
 }
 
 const pause = (ms: number) => new Promise((done) => setTimeout(done, ms));
 
-async function runView(options: { ack: boolean; holdFirstInput: boolean }): Promise<ViewRun> {
+async function runView(options: { ack: boolean; holdFirstInput: boolean; frames?: number }): Promise<ViewRun> {
   const release = Deferred.makeUnsafe<void>();
   const dispatched: BrowserViewportInput[] = [];
   let emit: ((frame: BrowserScreencastFrame) => void) | null = null;
@@ -99,7 +102,7 @@ async function runView(options: { ack: boolean; holdFirstInput: boolean }): Prom
       modifiers: 0,
     }),
   );
-  for (let index = 0; index < FRAMES_WHILE_INPUT_WAITS && !run.closed; index += 1) {
+  for (let index = 0; index < (options.frames ?? FRAMES_WHILE_INPUT_WAITS) && !run.closed; index += 1) {
     sendFrame(200);
     await pause(FRAME_SPACING_MS);
   }
@@ -134,6 +137,18 @@ try {
 
   report.noAcks = await runView({ ack: false, holdFirstInput: false });
   assert.equal(report.noAcks.closed?.reason, LAG_REASON, "A viewer that stops acknowledging frames is closed.");
+
+  report.hungInputWithAcks = await runView({ ack: true, holdFirstInput: true, frames: FRAMES_WHILE_INPUT_HANGS });
+  assert.equal(
+    report.hungInputWithAcks.closed?.reason,
+    LAG_REASON,
+    "A view whose input never reaches the page closes when its frame list is full.",
+  );
+  assert.equal(
+    report.hungInputWithAcks.framesSent,
+    REMEMBERED_FRAME_LIMIT + 1,
+    "The frame list stops at its limit while an input waits for the page.",
+  );
 
   report.passed = true;
 } finally {
