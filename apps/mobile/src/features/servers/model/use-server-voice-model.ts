@@ -6,7 +6,10 @@ import {
 } from "@openbot/contracts/ipc";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useQueryScope } from "@/features/auth/context/mobile-session-context";
-import { useMobileWorkspace, useMobileWorkspaceActions } from "@/features/workspace/context/mobile-workspace-context";
+import {
+  useMobileWorkspaceActions,
+  useMobileWorkspaceSelector,
+} from "@/features/workspace/context/mobile-workspace-context";
 import { queryKeys } from "@/features/workspace/model/query-keys";
 
 const DOWNLOAD_POLL_MS = 1_000;
@@ -23,12 +26,11 @@ export function serverVoiceModels(snapshot: HostVoiceModel): LocalVoiceModelInfo
 }
 
 export function useServerVoiceModel(serverId: string) {
-  const { canManageServerVoiceModel } = useMobileWorkspace();
+  const available = useMobileWorkspaceSelector((workspace) => workspace.canManageServerVoiceModel(serverId));
   const { loadServerVoiceModel, changeServerVoiceModel } = useMobileWorkspaceActions();
   const queryScope = useQueryScope();
   const queryClient = useQueryClient();
   const queryKey = queryKeys.serverVoiceModel(queryScope, serverId);
-  const available = canManageServerVoiceModel(serverId);
   const query = useQuery({
     queryKey,
     enabled: available,

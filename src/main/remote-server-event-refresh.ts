@@ -46,6 +46,8 @@ export interface RemoteEventRefreshOptions {
   hasUsageLimits?: (serverId: string) => boolean;
   hasModelSources?: (serverId: string) => boolean;
   hasAgentWaits?: (serverId: string) => boolean;
+  hasSyncedQueue?: (serverId: string, agentId: string) => boolean;
+  hasSyncedConversation?: (serverId: string, agentId: string) => boolean;
 }
 
 export class RemoteEventRefresh {
@@ -57,6 +59,8 @@ export class RemoteEventRefresh {
   readonly #hasUsageLimits: (serverId: string) => boolean;
   readonly #hasModelSources: (serverId: string) => boolean;
   readonly #hasAgentWaits: (serverId: string) => boolean;
+  readonly #hasSyncedQueue: (serverId: string, agentId: string) => boolean;
+  readonly #hasSyncedConversation: (serverId: string, agentId: string) => boolean;
   readonly #conversations = new Map<string, ConversationRefresh>();
   readonly #queues = new Map<string, QueueRefresh>();
   readonly #waitReads = new Map<string, QueueRefresh>();
@@ -87,6 +91,8 @@ export class RemoteEventRefresh {
     this.#hasUsageLimits = options.hasUsageLimits ?? (() => false);
     this.#hasModelSources = options.hasModelSources ?? (() => false);
     this.#hasAgentWaits = options.hasAgentWaits ?? (() => false);
+    this.#hasSyncedQueue = options.hasSyncedQueue ?? (() => false);
+    this.#hasSyncedConversation = options.hasSyncedConversation ?? (() => false);
   }
 
   readonly forward = Effect.fn("RemoteEvents.forward")(function* (
@@ -99,7 +105,8 @@ export class RemoteEventRefresh {
     if (event.type === "runtime-snapshot") this.#onReceivedRuntimeSnapshot(serverId, event.snapshot);
     if (event.type === "agents-changed") this.#rosterLoads.delete(serverId);
     if (event.type === "conversation-invalidated") {
-      yield* this.#refreshConversationPage(serverId, event.agentId, event.revision);
+      if (!this.#hasSyncedConversation(serverId, event.agentId))
+        yield* this.#refreshConversationPage(serverId, event.agentId, event.revision);
     } else if (event.type === "queue-invalidated") {
       yield* this.#refreshQueue(serverId, event.agentId);
     } else if (event.type === "agent-colors-changed") {
@@ -503,6 +510,7 @@ export class RemoteEventRefresh {
   });
 
   #refreshQueue(serverId: string, agentId: string) {
+    if (this.#hasSyncedQueue(serverId, agentId)) return Effect.void;
     return this.#refreshAgentRead(
       this.#queues,
       serverId,

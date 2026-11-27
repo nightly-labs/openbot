@@ -782,4 +782,8 @@ export const messages = {
   "server.ownerTransfer.accepted": "Vous êtes maintenant propriétaire de {server}",
   "server.ownerTransfer.acceptFailed": "Impossible d’accepter le transfert.",
   "server.ownerTransfer.declineFailed": "Impossible de refuser le transfert.",
+  "server.settings.privacyTitle": "Confidentialité",
+  "server.settings.remoteChatContent": "Charger le contenu distant dans les discussions",
+  "server.settings.remoteChatContentDescription":
+    "Afficher dans les discussions les images, icônes de sites, diagrammes et pages qui chargent du contenu d'autres sites. Si cette option est désactivée, ce contenu ne se charge qu'après un clic, et les autres sites ne savent donc pas quand une discussion s'ouvre. Cela s'applique à tous sur ce serveur.",
 } as const satisfies PartialTranslation<typeof source>;

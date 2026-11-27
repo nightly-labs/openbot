@@ -85,6 +85,7 @@ import type {
   HostPersonality,
   HostProviderAccounts,
   HostReleaseStatus,
+  HostRemoteChatContent,
   HostSetMessagingEnabledInput,
   HostSignalHomeSettings,
   HostSkillLearning,
@@ -236,6 +237,7 @@ import type { MobileChannelStore } from "@/features/channels/model/channel-store
 import type { MessageFileTarget } from "@/features/chat/model/message-file-target";
 import type { ProviderAdmin } from "@/features/servers/model/provider-admin";
 import type { RemoteDesktopConnection } from "@/features/workspace/components/remote-team-transport";
+import type { WorkspaceSyncCollections } from "@/features/workspace/sync/workspace-sync";
 import type { MobileConversationStore } from "./conversation-store";
 import type { LiveWorkspaceStore } from "./live-workspace-store";
 import type { PendingApproval } from "./pending-approvals";
@@ -376,6 +378,7 @@ export interface MobileWorkspaceContextValue {
   deleteMessage: (serverId: string, target: MessageDeleteTarget) => Promise<void>;
   interruptTurn: (agentId: string, turnId: string, serverId?: string) => Promise<void>;
   channelStore: MobileChannelStore;
+  syncCollections: WorkspaceSyncCollections;
   servers: MobileServer[];
   reorderServers: (serverIds: string[]) => boolean;
   memberCountByServer: Readonly<Record<string, number>>;
@@ -470,6 +473,10 @@ export interface MobileWorkspaceContextValue {
   canManageBrowsingMemory: (serverId: string) => boolean;
   loadBrowsingMemory: (serverId: string) => Promise<HostBrowsingMemory>;
   setBrowsingMemory: (enabled: boolean, serverId: string) => Promise<HostBrowsingMemory>;
+  canManageRemoteChatContent: (serverId: string) => boolean;
+  servesRemoteChatContent: (serverId: string) => boolean;
+  loadRemoteChatContent: (serverId: string) => Promise<HostRemoteChatContent>;
+  setRemoteChatContent: (enabled: boolean, serverId: string) => Promise<HostRemoteChatContent>;
   canManageServerPersonality: (serverId: string) => boolean;
   servesServerPersonality: (serverId: string) => boolean;
   loadServerPersonality: (serverId: string) => Promise<HostPersonality>;
@@ -595,6 +602,7 @@ export interface MobileWorkspaceContextValue {
   testMcpServer: (config: McpServerConfig, serverId: string) => Promise<McpTestResult>;
   canRelayMcpSignIn: (serverId: string) => boolean;
   macAppsUnavailable: (serverId: string) => boolean;
+  hostLoadsPluginCatalog: (serverId: string) => boolean;
   canEditUiBlockPreview: (serverId: string) => boolean;
   mcpSignInRelay: (serverId: string) => McpSignInRelay;
   listMcpSignIns: (serverId: string) => Promise<McpSignInState[]>;
@@ -918,6 +926,8 @@ type ServerCheckKey =
   | "canManageMemoryReview"
   | "canManageSkillLearning"
   | "canManageBrowsingMemory"
+  | "canManageRemoteChatContent"
+  | "servesRemoteChatContent"
   | "canManageServerPersonality"
   | "servesServerPersonality"
   | "canManageServerRoles"
@@ -945,6 +955,7 @@ type ServerCheckKey =
   | "canManageMcpServers"
   | "canRelayMcpSignIn"
   | "macAppsUnavailable"
+  | "hostLoadsPluginCatalog"
   | "canEditUiBlockPreview"
   | "canManageMcpAccess"
   | "canAddMarketplaceAgents"

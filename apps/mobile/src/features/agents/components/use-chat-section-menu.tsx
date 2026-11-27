@@ -1,4 +1,9 @@
-import { SIDEBAR_UNASSIGNED_SECTION_ID, sidebarFolderParents, sidebarFolderPath } from "@openbot/contracts/ipc";
+import {
+  SIDEBAR_UNASSIGNED_SECTION_ID,
+  type SidebarLayoutSnapshot,
+  sidebarFolderParents,
+  sidebarFolderPath,
+} from "@openbot/contracts/ipc";
 import { Link, router } from "expo-router";
 import { useRef, useState } from "react";
 import { showFailureAlert } from "@/features/analytics/failure-reports";
@@ -11,7 +16,24 @@ import type { MenuAction } from "@/shared/components/menu-view";
 import { haptics } from "@/shared/lib/haptics";
 import { currentText, useText } from "@/shared/lib/text";
 
-export function useChatSectionMenu(serverId: string, chatId: string) {
+const sectionPaths = new WeakMap<SidebarLayoutSnapshot, readonly { id: string; path: string | null }[]>();
+
+function layoutSectionPaths(layout: SidebarLayoutSnapshot) {
+  const cached = sectionPaths.get(layout);
+  if (cached) return cached;
+  const parents = sidebarFolderParents(layout);
+  const names = new Map(
+    layout.sections.map((section) => [section.id, sidebarFolderPath(layout, parents, section.id).join(" / ")]),
+  );
+  const paths = layout.order.map((id) => ({
+    id,
+    path: id === SIDEBAR_UNASSIGNED_SECTION_ID ? null : (names.get(id) ?? ""),
+  }));
+  sectionPaths.set(layout, paths);
+  return paths;
+}
+
+export function useChatSectionMenu(serverId: string, chatId: string, menuMounted = true) {
   const { t } = useText();
   const workspace = useMobileWorkspaceReader();
   const layout = useMobileWorkspaceSelector(({ sidebarByServer }) => sidebarByServer[serverId]?.layout);
@@ -21,14 +43,8 @@ export function useChatSectionMenu(serverId: string, chatId: string) {
   const pending = useRef(false);
   const [saving, setSaving] = useState(false);
   const disabled = saving || !online;
-  const names = new Map<string, string>();
-  if (layout) {
-    const parents = sidebarFolderParents(layout);
-    for (const section of layout.sections)
-      names.set(section.id, sidebarFolderPath(layout, parents, section.id).join(" / "));
-  }
-  const sections = (layout?.order ?? []).flatMap((id) => {
-    const name = id === SIDEBAR_UNASSIGNED_SECTION_ID ? t("mobile.agent.section.unassigned") : names.get(id);
+  const sections = (layout ? layoutSectionPaths(layout) : []).flatMap(({ id, path }) => {
+    const name = path === null ? t("mobile.agent.section.unassigned") : path;
     return name ? [{ id, name }] : [];
   });
   const assigned = layout?.agentAssignments[chatId] ?? SIDEBAR_UNASSIGNED_SECTION_ID;
@@ -85,22 +101,23 @@ export function useChatSectionMenu(serverId: string, chatId: string) {
       if (id.startsWith("section:")) void assign(id.slice("section:".length));
       if (id === "section-new") createFolder();
     },
-    menu: layout ? (
-      <Link.Menu icon="folder" title={t("mobile.agent.section.moveTo")}>
-        {sections.map((section) => (
-          <Link.MenuAction
-            key={section.id}
-            isOn={assigned === section.id}
-            disabled={disabled || assigned === section.id}
-            onPress={() => void assign(section.id)}
-          >
-            {section.name}
+    menu:
+      layout && menuMounted ? (
+        <Link.Menu icon="folder" title={t("mobile.agent.section.moveTo")}>
+          {sections.map((section) => (
+            <Link.MenuAction
+              key={section.id}
+              isOn={assigned === section.id}
+              disabled={disabled || assigned === section.id}
+              onPress={() => void assign(section.id)}
+            >
+              {section.name}
+            </Link.MenuAction>
+          ))}
+          <Link.MenuAction icon="folder.badge.plus" disabled={disabled} onPress={createFolder}>
+            {t("mobile.agent.section.newFolder")}
           </Link.MenuAction>
-        ))}
-        <Link.MenuAction icon="folder.badge.plus" disabled={disabled} onPress={createFolder}>
-          {t("mobile.agent.section.newFolder")}
-        </Link.MenuAction>
-      </Link.Menu>
-    ) : null,
+        </Link.Menu>
+      ) : null,
   };
 }

@@ -35,7 +35,10 @@ import {
   useBrowserRequests,
   useBrowserTabsLoaded,
 } from "@/features/workspace/components/use-live-workspace";
-import { useMobileWorkspace } from "@/features/workspace/context/mobile-workspace-context";
+import {
+  useMobileWorkspaceActions,
+  useMobileWorkspaceSelector,
+} from "@/features/workspace/context/mobile-workspace-context";
 import type { MobileAgent, MobileBrowserViewSupport } from "@/features/workspace/model/workspace-types";
 import { type MenuAction, type MenuComponentRef, MenuView } from "@/shared/components/menu-view";
 import { toolbarMenuItems } from "@/shared/components/toolbar-menu-items";
@@ -72,6 +75,21 @@ const FADE: CSSTransitionProperties = {
   transitionDuration: 200,
   transitionTimingFunction: cubicBezier(0.23, 1, 0.32, 1),
 };
+
+const BROWSER_SUPPORT_FIELDS: { [Field in keyof MobileBrowserViewSupport]: Field } = {
+  view: "view",
+  clipboard: "clipboard",
+  contextMenu: "contextMenu",
+  viewport: "viewport",
+  navigation: "navigation",
+  permissions: "permissions",
+  httpSignIn: "httpSignIn",
+};
+
+function sameBrowserSupport(previous: MobileBrowserViewSupport, next: MobileBrowserViewSupport): boolean {
+  return Object.values(BROWSER_SUPPORT_FIELDS).every((field) => previous[field] === next[field]);
+}
+
 const NO_SUPPORT: MobileBrowserViewSupport = {
   view: false,
   clipboard: false,
@@ -91,7 +109,7 @@ export function BrowserScreen() {
     tabId?: string;
     agentIds?: string;
   }>();
-  const { agents } = useMobileWorkspace();
+  const agents = useMobileWorkspaceSelector((workspace) => workspace.agents);
   const [selectedId, setSelectedId] = useState(agentId);
   const onServer = (id: string) =>
     agents.find((candidate) => candidate.id === id && (!serverId || candidate.serverId === serverId));
@@ -145,19 +163,18 @@ function BrowserView({
   const { theme } = useUniwind();
   const appearance = theme === "dark" ? "dark" : "light";
   const iconColor = String(foreground);
-  const {
-    servers,
-    browserViewSupport,
-    respondToBrowserTakeover,
-    controlBrowserTab,
-    answerBrowserHttpSignIn,
-    conversationStore,
-  } = useMobileWorkspace();
-  const server = servers.find((candidate) => candidate.id === agent.serverId);
-  const online = server?.state === "online";
-  const support = online ? browserViewSupport(agent.serverId) : NO_SUPPORT;
+  const { respondToBrowserTakeover, controlBrowserTab, answerBrowserHttpSignIn } = useMobileWorkspaceActions();
+  const online = useMobileWorkspaceSelector(
+    (workspace) => workspace.servers.find((candidate) => candidate.id === agent.serverId)?.state === "online",
+  );
+  const support = useMobileWorkspaceSelector(
+    (workspace) => (online ? workspace.browserViewSupport(agent.serverId) : NO_SUPPORT),
+    sameBrowserSupport,
+  );
   const allowed = useBrowserFeature();
-  const threadId = conversationStore.get(agent.id)?.threadId ?? null;
+  const threadId = useMobileWorkspaceSelector(
+    (workspace) => workspace.conversationStore.get(agent.id)?.threadId ?? null,
+  );
   const tabs = useAgentBrowserTabs(agent.serverId, agent.id, threadId);
   const tab = useAgentBrowserTab(agent.serverId, agent.id, preferredTabId, threadId);
   const livePrompt = useBrowserHttpSignIn(agent.serverId, tab?.id ?? null);

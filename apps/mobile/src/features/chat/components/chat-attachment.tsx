@@ -19,6 +19,7 @@ import ImageOff from "lucide-react-native/icons/image-off";
 import { useEffect, useState } from "react";
 import { Pressable, useWindowDimensions, View } from "react-native";
 import Animated from "react-native-reanimated";
+import { useRemoteChatContent } from "@/features/servers/model/use-remote-chat-content";
 import { useFullVisualPreference } from "@/features/settings/model/visual-preview";
 import { haptics } from "@/shared/lib/haptics";
 import { useText } from "@/shared/lib/text";
@@ -93,6 +94,9 @@ function ChatVisualAttachment(props: ChatAttachmentProps) {
   const settled = useListSettled();
   const historyShown = useHistoryShown();
   const full = useFullVisualPreference((state) => state.enabled);
+  const remoteContent = useRemoteChatContent(serverId);
+  const [pageRun, setPageRun] = useState(false);
+  const scripts = remoteContent || pageRun;
   const [reported, setReported] = useState(() => reportedVisualHeights.get(attachment.id));
   const report = (height: number) => {
     reportedVisualHeights.set(attachment.id, height);
@@ -148,15 +152,35 @@ function ChatVisualAttachment(props: ChatAttachmentProps) {
         onPress={() => {
           void haptics.impact("soft");
           const local = { uri: page.uri, name: attachment.name, mimeType: attachment.mimeType };
-          const previewId = storeCodePreview({ kind: "html", source: page.source, language: "html", file: local });
+          const previewId = storeCodePreview({
+            kind: "html",
+            source: page.source,
+            language: "html",
+            file: local,
+            remoteContent: scripts,
+          });
           router.push({ pathname: "/code-preview/[previewId]", params: { previewId } });
         }}
       >
         <View pointerEvents="none" style={FILL}>
           {settled && historyShown ? (
-            <HtmlPage source={page.source} title={attachment.name} mode="chat" onHeight={report} />
+            <HtmlPage source={page.source} title={attachment.name} mode="chat" scripts={scripts} onHeight={report} />
           ) : null}
         </View>
+        {scripts ? null : (
+          <View pointerEvents="box-none" className="absolute inset-x-0 top-2.5 items-center">
+            <Button
+              variant="secondary"
+              size="sm"
+              onPress={() => {
+                void haptics.selection();
+                setPageRun(true);
+              }}
+            >
+              <Button.Label>{t("mobile.chat.preview.runPage")}</Button.Label>
+            </Button>
+          </View>
+        )}
         {cut ? (
           <View pointerEvents="none" className="absolute inset-x-0 bottom-2.5 items-center">
             <View className="rounded-full bg-background/70 px-2.5 py-1">

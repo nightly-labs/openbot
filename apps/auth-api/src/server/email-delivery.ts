@@ -40,6 +40,8 @@ export type EmailDeliveryBindings = Pick<
   | "EMAIL_SMTP_OVERFLOW_PASSWORD"
   | "EMAIL_SMTP_OVERFLOW_2_USERNAME"
   | "EMAIL_SMTP_OVERFLOW_2_PASSWORD"
+  | "EMAIL_SMTP_OVERFLOW_3_USERNAME"
+  | "EMAIL_SMTP_OVERFLOW_3_PASSWORD"
   | "EMAIL_FROM"
   | "EMAIL_REPLY_TO"
   | "EMAIL_LICENSE_FROM"
@@ -309,6 +311,12 @@ function readOverflowMailboxes(bindings: EmailDeliveryBindings, primary: SmtpEma
       "overflow_2",
       bindings.EMAIL_SMTP_OVERFLOW_2_USERNAME,
       bindings.EMAIL_SMTP_OVERFLOW_2_PASSWORD,
+      primary,
+    ),
+    readOverflowMailbox(
+      "overflow_3",
+      bindings.EMAIL_SMTP_OVERFLOW_3_USERNAME,
+      bindings.EMAIL_SMTP_OVERFLOW_3_PASSWORD,
       primary,
     ),
     readOverflowMailbox(

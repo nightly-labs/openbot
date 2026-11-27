@@ -1,5 +1,6 @@
 import {
   type AvatarImageInput,
+  type Channel,
   type ChannelCommand,
   type ChannelPage,
   type ChannelSummary,
@@ -45,6 +46,7 @@ export interface ChannelsEnvironment {
   scopeKey: () => string;
   readSelection: (scope: string) => string | null;
   writeSelection: (channelId: string | null) => void;
+  remote: () => boolean;
   supported: () => boolean;
   deletionSupported: () => boolean;
   messageDeletionSupported: () => boolean;
@@ -78,6 +80,27 @@ function channelAction(input: ChannelCommand, creating: boolean, page: ChannelPa
   return input.draft.members.some((member) => !members.has(member.agentId)) ? "member_added" : null;
 }
 
+function summaryWith(summary: ChannelSummary, channel: Channel): ChannelSummary {
+  const { unreadCount, activeTasks, openTasks, lastMessage, threads } = summary;
+  return {
+    ...channel,
+    unreadCount,
+    activeTasks,
+    lastMessage,
+    ...(openTasks === undefined ? {} : { openTasks }),
+    ...(threads === undefined ? {} : { threads }),
+  };
+}
+
+type CommandRead = "none" | "page" | "all";
+
+function commandRead(input: ChannelCommand, creating: boolean, listed: boolean, selected: boolean): CommandRead {
+  if (creating || !listed) return "all";
+  if (input.type === "save" || input.type === "archive" || input.type === "restore" || input.type === "read")
+    return "none";
+  return selected ? "page" : "none";
+}
+
 const KEPT_PAGES = 6;
 const CHANGE_READ_GAP_MS = 250;
 
@@ -102,6 +125,9 @@ export function createChannelsController(env: ChannelsEnvironment) {
   const readThrough = new Map<string, number>();
   let visitRead: string | null = null;
   const keptPages = new Map<string, ChannelPage>();
+  let replaceLoadedPage = false;
+  let prefetchEpoch = 0;
+  const prefetching = new Map<string, number>();
   const changeListeners = new Set<(channelId: string | null) => void>();
   function announce(channelId: string | null): void {
     for (const listener of changeListeners) listener(channelId);
@@ -120,20 +146,22 @@ export function createChannelsController(env: ChannelsEnvironment) {
   let reading: Promise<void> | null = null;
   let readAgain = false;
   let readAgainPage = false;
+  let readAgainList = false;
   let readToken = 0;
   let laterRead: Promise<void> | null = null;
   let settleLaterRead: (() => void) | null = null;
   let readStartedAt = 0;
   let endWaitingGap: (() => void) | null = null;
-  function refresh(selectedOverride?: string | null, withPage = true): Promise<void> {
+  function refresh(selectedOverride?: string | null, withPage = true, withList = true): Promise<void> {
     if (reading && selectedOverride === undefined) {
       readAgain = true;
       readAgainPage ||= withPage;
+      readAgainList ||= withList;
       return reading;
     }
     const token = ++readToken;
     readStartedAt = Date.now();
-    const run = read(selectedOverride, withPage).finally(() => {
+    const run = read(selectedOverride, withPage, withList).finally(() => {
       if (token !== readToken) return;
       reading = null;
       const settle = settleLaterRead;
@@ -141,17 +169,19 @@ export function createChannelsController(env: ChannelsEnvironment) {
       settleLaterRead = null;
       if (readAgain && !disposed) {
         const page = readAgainPage;
+        const list = readAgainList;
         readAgain = false;
         readAgainPage = false;
+        readAgainList = false;
         const gap = settle ? 0 : CHANGE_READ_GAP_MS - (Date.now() - readStartedAt);
-        if (gap <= 0) void refresh(undefined, page).finally(() => settle?.());
-        else readAfterGap(gap, page);
+        if (gap <= 0) void refresh(undefined, page, list).finally(() => settle?.());
+        else readAfterGap(gap, page, list);
       } else settle?.();
     });
     reading = run;
     return run;
   }
-  function readAfterGap(gap: number, page: boolean): void {
+  function readAfterGap(gap: number, page: boolean, list: boolean): void {
     const held = new Promise<void>((resolve) => {
       const timer = setTimeout(resolve, gap);
       endWaitingGap = () => {
@@ -164,43 +194,103 @@ export function createChannelsController(env: ChannelsEnvironment) {
       reading = null;
       if (disposed) return;
       const withPage = page || readAgainPage;
+      const withList = list || readAgainList;
       readAgain = false;
       readAgainPage = false;
-      return refresh(undefined, withPage);
+      readAgainList = false;
+      return refresh(undefined, withPage, withList);
     });
     reading = held;
   }
-  function refreshAfter(): Promise<void> {
-    if (!reading) return refresh();
+  function refreshAfter(withList = true): Promise<void> {
+    if (!reading) return refresh(undefined, true, withList);
     readAgain = true;
     readAgainPage = true;
+    readAgainList ||= withList;
     laterRead ??= new Promise<void>((resolve) => {
       settleLaterRead = resolve;
     });
     endWaitingGap?.();
     return laterRead;
   }
-  async function read(selectedOverride?: string | null, withPage = true) {
+  function clearUnread(channelId: string): void {
+    setState((state) => {
+      const listed = state.channels.find((channel) => channel.id === channelId);
+      if (listed && listed.unreadCount > 0) listed.unreadCount = 0;
+    });
+  }
+  function applyChannel(channel: Channel): boolean {
+    let listed = false;
+    setState((state) => {
+      const current = state.channels.find((item) => item.id === channel.id);
+      listed = current !== undefined;
+      if (current && channel.revision >= current.revision)
+        reconcile(
+          snapshot(state.channels).map((item) => (item.id === channel.id ? summaryWith(item, channel) : item)),
+          "id",
+        )(state.channels);
+      const page = state.page;
+      if (page?.channel.id === channel.id && channel.revision >= page.channel.revision) page.channel = channel;
+    });
+    return listed;
+  }
+  async function markRead(channelId: string, throughSequence: number, id: number, account: string): Promise<void> {
+    try {
+      await env.port().agent.channelCommand({
+        type: "read",
+        channelId,
+        throughSequence,
+        operationId: crypto.randomUUID(),
+      });
+      if (!disposed && account === env.scopeKey()) clearUnread(channelId);
+    } catch (error) {
+      if (readThrough.get(channelId) === throughSequence) readThrough.delete(channelId);
+      if (!disposed && account === env.scopeKey() && id === refreshId)
+        setState((state) => {
+          Object.assign(state, {
+            ...failure(error, "channel.error.load"),
+            loading: false,
+          });
+        });
+    }
+  }
+  async function read(selectedOverride?: string | null, withPage = true, withList = true) {
     if (!supported()) return;
     const id = ++refreshId;
     const account = env.scopeKey();
     const selected = selectedOverride === undefined ? state.selectedId : selectedOverride;
+    if (selected && withPage && state.page?.channel.id !== selected)
+      setState((state) => {
+        state.loading = true;
+        if (!failedCommand) Object.assign(state, { error: null, errorReference: null });
+      });
     try {
-      const channels = await env.port().agent.listChannels();
-      const selectedExists = selected !== null && channels.some((channel) => channel.id === selected);
-      const page = selectedExists && withPage ? await env.port().agent.readChannel({ channelId: selected }) : null;
+      const known = selected !== null && state.listed && state.channels.some((channel) => channel.id === selected);
+      const listing = withList || !known ? env.port().agent.listChannels() : null;
+      const pageRead = selected !== null && withPage ? env.port().agent.readChannel({ channelId: selected }) : null;
+      if (listing) void pageRead?.catch(() => undefined);
+      const channels = listing ? await listing : null;
+      const selectedExists =
+        selected !== null && (channels ?? state.channels).some((channel) => channel.id === selected);
+      const page = selectedExists && pageRead ? await pageRead : null;
       if (disposed || account !== env.scopeKey() || id !== refreshId || selected !== state.selectedId) return;
-      env.onList?.(channels, account);
+      if (channels) env.onList?.(channels, account);
       let closed: number[] = [];
       const readNow = selected !== null && selected === visitRead && env.canMarkRead();
-      const listed = readNow
-        ? channels.map((channel) =>
-            channel.id === selected && channel.unreadCount > 0 ? { ...channel, unreadCount: 0 } : channel,
-          )
-        : channels;
+      const listed =
+        channels && readNow
+          ? channels.map((channel) =>
+              channel.id === selected && channel.unreadCount > 0 ? { ...channel, unreadCount: 0 } : channel,
+            )
+          : channels;
       setState((state) => {
-        reconcile(listed, "id")(state.channels);
-        state.listed = true;
+        if (listed) {
+          reconcile(listed, "id")(state.channels);
+          state.listed = true;
+        } else if (readNow) {
+          const current = state.channels.find((channel) => channel.id === selected);
+          if (current && current.unreadCount > 0) current.unreadCount = 0;
+        }
         if (selected && !selectedExists) {
           state.selectedId = null;
           state.editing = null;
@@ -209,7 +299,10 @@ export function createChannelsController(env: ChannelsEnvironment) {
           if (failedCommand?.channelId === selected) failedCommand = null;
         }
         if (page && state.page?.channel.id === page.channel.id) {
-          const merged = mergeChannelPage(state.page.messages, page.messages);
+          const merged =
+            (replaceLoadedPage && state.page.channel.revision !== page.channel.revision) || page.olderCursor === null
+              ? { messages: page.messages, takeFetchedCursor: true }
+              : mergeChannelPage(state.page.messages, page.messages);
           const kept = merged.messages.slice(0, merged.messages.length - page.messages.length);
           const held = snapshot(state.page.tasks);
           const tasks = mergeChannelTasks(page.tasks, held, kept);
@@ -224,22 +317,13 @@ export function createChannelsController(env: ChannelsEnvironment) {
         if (withPage || !selectedExists) state.loading = false;
         if (!failedCommand && withPage) state.error = null;
       });
+      if (page) replaceLoadedPage = false;
       if (selected && closed.length) void loadClosedTasks(selected, closed, account);
       if (selected && !selectedExists) env.writeSelection(null);
       if (selected && page && env.canMarkRead()) visitRead = selected;
       if (selected && page && env.canMarkRead() && page.throughSequence > (readThrough.get(selected) ?? 0)) {
         readThrough.set(selected, page.throughSequence);
-        try {
-          await env.port().agent.channelCommand({
-            type: "read",
-            channelId: selected,
-            throughSequence: page.throughSequence,
-            operationId: crypto.randomUUID(),
-          });
-        } catch (error) {
-          readThrough.delete(selected);
-          throw error;
-        }
+        void markRead(selected, page.throughSequence, id, account);
       }
     } catch (error) {
       if (!disposed && account === env.scopeKey() && id === refreshId)
@@ -259,9 +343,11 @@ export function createChannelsController(env: ChannelsEnvironment) {
     visitRead = null;
     const kept = keptPages.get(channelId) ?? null;
     keptPages.delete(channelId);
+    replaceLoadedPage = kept !== null;
     flush(() =>
       setState((state) => {
         Object.assign(state, { selectedId: channelId, page: kept, editing: null, loading: kept === null });
+        if (!failedCommand) Object.assign(state, { error: null, errorReference: null });
       }),
     );
     await refresh(channelId);
@@ -306,7 +392,7 @@ export function createChannelsController(env: ChannelsEnvironment) {
       }),
     );
     try {
-      await env.port().agent.channelCommand(attempt);
+      const channel = await env.port().agent.channelCommand(attempt);
       accepted = true;
       if (action) desktopAnalytics.track("channel_action", { action, result: "succeeded" });
       if (disposed || account !== env.scopeKey()) {
@@ -324,7 +410,10 @@ export function createChannelsController(env: ChannelsEnvironment) {
           }),
         );
       }
-      await refreshAfter();
+      const listed = applyChannel(channel);
+      if (attempt.type === "read") clearUnread(attempt.channelId);
+      const after = commandRead(attempt, creating, listed, attempt.channelId === state.selectedId);
+      if (after !== "none") await refreshAfter(after === "all");
       onAccepted?.(attempt);
       return true;
     } catch (error) {
@@ -348,9 +437,11 @@ export function createChannelsController(env: ChannelsEnvironment) {
     const account = env.scopeKey();
     const port = env.port();
     const before = state.page?.channel.id === input.channelId ? state.page.throughSequence : null;
-    await port.agent.channelCommand(input);
+    const channel = await port.agent.channelCommand(input);
     if (disposed || account !== env.scopeKey()) return port.agent.readChannel({ channelId: input.channelId });
-    await refreshAfter();
+    const listed = applyChannel(channel);
+    if (!listed) await refreshAfter();
+    else if (state.selectedId === input.channelId) await refreshAfter(false);
     const page = state.page;
     return page?.channel.id === input.channelId && (before === null || page.throughSequence > before)
       ? page
@@ -406,6 +497,9 @@ export function createChannelsController(env: ChannelsEnvironment) {
         refreshId += 1;
         readThrough.clear();
         keptPages.clear();
+        replaceLoadedPage = false;
+        prefetchEpoch += 1;
+        prefetching.clear();
         visitRead = null;
         failedCommand = null;
         pendingCommands = 0;
@@ -416,8 +510,10 @@ export function createChannelsController(env: ChannelsEnvironment) {
               listed: false,
               selectedId: selected,
               page: null,
+              loading: selected !== null,
               pending: false,
               error: null,
+              errorReference: null,
               editing: null,
             });
           }),
@@ -438,6 +534,70 @@ export function createChannelsController(env: ChannelsEnvironment) {
         }),
       );
       void refresh(saved);
+    },
+  );
+  createEffect(
+    () => ({
+      scope: env.scopeKey(),
+      remote: env.remote(),
+      supported: supported(),
+      listed: state.listed,
+      channelIds: state.channels
+        .filter((channel) => !channel.archived)
+        .map((channel) => channel.id)
+        .join("\0"),
+    }),
+    ({ scope, remote, supported, listed, channelIds }) => {
+      if (!remote || !supported || !listed || !channelIds || typeof window.requestIdleCallback !== "function") return;
+      const selected = untrack(() => state.selectedId);
+      const remaining = Math.max(0, KEPT_PAGES - keptPages.size - prefetching.size);
+      if (remaining === 0) return;
+      const candidates = channelIds
+        .split("\0")
+        .filter((id) => id !== selected && !keptPages.has(id) && !prefetching.has(id))
+        .slice(0, remaining);
+      if (candidates.length === 0) return;
+      let stopped = false;
+      let idle: number | undefined;
+      function next(): void {
+        const channelId = candidates.shift();
+        if (stopped || disposed || !channelId) return;
+        idle = window.requestIdleCallback(() => {
+          if (stopped || disposed || scope !== env.scopeKey()) return;
+          if (keptPages.size + prefetching.size >= KEPT_PAGES) return;
+          if (keptPages.has(channelId) || prefetching.has(channelId) || untrack(() => state.selectedId) === channelId) {
+            next();
+            return;
+          }
+          const epoch = prefetchEpoch;
+          prefetching.set(channelId, epoch);
+          void env
+            .port()
+            .agent.readChannel({ channelId })
+            .then((page) => {
+              if (
+                !disposed &&
+                epoch === prefetchEpoch &&
+                scope === env.scopeKey() &&
+                untrack(() => state.selectedId) !== channelId &&
+                !keptPages.has(channelId) &&
+                keptPages.size < KEPT_PAGES
+              ) {
+                keepPage(page);
+              }
+            })
+            .catch(() => undefined)
+            .finally(() => {
+              if (prefetching.get(channelId) === epoch) prefetching.delete(channelId);
+              next();
+            });
+        });
+      }
+      next();
+      return () => {
+        stopped = true;
+        if (idle !== undefined) window.cancelIdleCallback(idle);
+      };
     },
   );
   onSettled(() => {
@@ -528,6 +688,7 @@ export function createChannelsController(env: ChannelsEnvironment) {
       const deleteChannelHistory = env.port().agent.deleteChannelHistory;
       if (!deleteChannelHistory) throw new Error(currentText().t("channel.error.action"));
       await deleteChannelHistory(channelId);
+      keptPages.delete(channelId);
       await refreshAfter();
     },
     compactContext: async (channelId: string) => {
@@ -577,12 +738,10 @@ export function createChannelsController(env: ChannelsEnvironment) {
       actionToast.error(message, { report: { operation: "other", source: "action", cause_code: "unknown" } });
     },
     changed: (channelId: string) => {
-      if (channelId !== state.selectedId) keptPages.delete(channelId);
       announce(channelId);
       return refresh(undefined, channelId === state.selectedId);
     },
     resync: () => {
-      keptPages.clear();
       announce(null);
       return refresh();
     },
@@ -598,8 +757,9 @@ export function createChannelsController(env: ChannelsEnvironment) {
     loadOlder,
     close: () => {
       env.writeSelection(null);
+      if (state.page?.channel.id === state.selectedId) keepPage(state.page);
       setState((state) => {
-        Object.assign(state, { selectedId: null, page: null, editing: null });
+        Object.assign(state, { selectedId: null, page: null, editing: null, loading: false });
       });
     },
     edit: () =>

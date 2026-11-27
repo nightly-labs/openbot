@@ -86,6 +86,10 @@ export function MobileChatView({
     (agentId: string, input: RespondToPromptInput) => workspace().respondToPrompt(agentId, input),
     [workspace],
   );
+  useEffect(
+    () => workspace().syncCollections.conversationLogs.retain(agent.serverId, agent.id),
+    [workspace, agent.serverId, agent.id],
+  );
   const covered = useCoveredByScreen();
   const shownConversation = useRef<ReturnType<typeof conversationStore.get>>(undefined);
   const subscribe = useCallback(

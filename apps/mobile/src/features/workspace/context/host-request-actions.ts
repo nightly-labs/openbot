@@ -189,6 +189,7 @@ import { PROVIDER_ACCOUNT_POOL_CAPABILITY } from "@openbot/contracts/team-protoc
 import { PROVIDER_ACCOUNTS_CAPABILITY } from "@openbot/contracts/team-protocol/provider-accounts-v1";
 import { PROVIDERS_ADMIN_CAPABILITY } from "@openbot/contracts/team-protocol/providers-v1";
 import { TEAM_QUEUE_EDIT_CAPABILITY } from "@openbot/contracts/team-protocol/queue-edit-v1";
+import { REMOTE_CHAT_CONTENT_CAPABILITY } from "@openbot/contracts/team-protocol/remote-chat-content-v1";
 import { ROUTINE_RECOVERY_CAPABILITY } from "@openbot/contracts/team-protocol/routine-recovery-v1";
 import { ROUTINE_RESULTS_CAPABILITY } from "@openbot/contracts/team-protocol/routine-results-v1";
 import { ROUTINES_ONCE_CAPABILITY } from "@openbot/contracts/team-protocol/routines-once-v1";
@@ -275,6 +276,7 @@ import {
   getHostMemoryReview,
   getHostPersonality,
   getHostReleaseStatus,
+  getHostRemoteChatContent,
   getHostSignalHome,
   getHostSkillLearning,
   getHostTimezone,
@@ -343,6 +345,7 @@ import {
   setHostMediaApprovalCredits,
   setHostMemoryReview,
   setHostPersonality,
+  setHostRemoteChatContent,
   setHostSignalHome,
   setHostSkillLearning,
   setHostTimezone,
@@ -437,6 +440,12 @@ import type {
   MobileWorkspaceState,
   ServerUpdateAccess,
 } from "@/features/workspace/model/workspace-types";
+import {
+  queueOf,
+  routinesOf,
+  syncedSnapshot,
+  type WorkspaceSyncCollections,
+} from "@/features/workspace/sync/workspace-sync";
 
 export type WorkspaceRequest = <T>(
   method: string,
@@ -572,6 +581,8 @@ type HostRequestActions = Pick<
   | "setSkillLearning"
   | "loadBrowsingMemory"
   | "setBrowsingMemory"
+  | "loadRemoteChatContent"
+  | "setRemoteChatContent"
   | "loadServerPersonality"
   | "setServerPersonality"
   | "loadServerRoles"
@@ -805,6 +816,7 @@ export function createHostRequestActions({
   capabilities,
   attachmentDownloads,
   largeAttachmentDownloads,
+  synced,
 }: {
   request: WorkspaceRequest;
   teamApi: (serverId: string, onUploadProgress?: (fraction: number) => void) => TeamApiRequest;
@@ -813,6 +825,7 @@ export function createHostRequestActions({
   capabilities: ServerCapabilities;
   attachmentDownloads: DownloadQueue;
   largeAttachmentDownloads: DownloadQueue;
+  synced: WorkspaceSyncCollections;
 }): { checks: HostRequestChecks; actions: HostRequestActions } {
   const has = (serverId: string, capability: string) => hasCapability(capabilities, serverId, capability);
   function capabilityApi(
@@ -886,6 +899,8 @@ export function createHostRequestActions({
     capabilityApi(serverId, SKILL_LEARNING_CAPABILITY, "mobile.server.settings.learningUnsupported");
   const browsingMemoryAdmin = (serverId: string) =>
     capabilityApi(serverId, BROWSING_MEMORY_CAPABILITY, "mobile.server.settings.learningUnsupported");
+  const remoteChatContentApi = (serverId: string) =>
+    capabilityApi(serverId, REMOTE_CHAT_CONTENT_CAPABILITY, "mobile.server.settings.learningUnsupported");
   const personalityApi = (serverId: string) =>
     capabilityApi(serverId, HOST_PERSONALITY_CAPABILITY, "mobile.server.settings.personalityUnsupported");
   const rolesAdmin = (serverId: string) =>
@@ -974,6 +989,9 @@ export function createHostRequestActions({
     loadBrowsingMemory: async (serverId) => runTeamRequest(getHostBrowsingMemory(browsingMemoryAdmin(serverId))),
     setBrowsingMemory: async (enabled, serverId) =>
       runTeamRequest(setHostBrowsingMemory(browsingMemoryAdmin(serverId), enabled)),
+    loadRemoteChatContent: async (serverId) => runTeamRequest(getHostRemoteChatContent(remoteChatContentApi(serverId))),
+    setRemoteChatContent: async (enabled, serverId) =>
+      runTeamRequest(setHostRemoteChatContent(remoteChatContentApi(serverId), enabled)),
     loadServerPersonality: async (serverId) =>
       has(serverId, HOST_PERSONALITY_CAPABILITY)
         ? runTeamRequest(getHostPersonality(personalityApi(serverId)))
@@ -984,7 +1002,9 @@ export function createHostRequestActions({
     setServerRoles: async (change, serverId) => runTeamRequest(setHostAgentAccess(rolesAdmin(serverId), change)),
     loadServerAuditLog: async (serverId) => runTeamRequest(getHostAuditLog(auditAdmin(serverId))),
     loadAgentNotificationLevels: async (serverId) =>
-      runTeamRequest(listAgentNotificationLevels(notificationLevelsApi(serverId))),
+      synced.notificationLevels.read(serverId, null, syncedSnapshot, () =>
+        runTeamRequest(listAgentNotificationLevels(notificationLevelsApi(serverId))),
+      ),
     setAgentNotificationLevel: async (input, serverId) =>
       runTeamRequest(setAgentNotificationLevel(notificationLevelsApi(serverId), input)),
     setOwnServerNotificationLevel: async (level, serverId) =>
@@ -1374,16 +1394,26 @@ export function createHostRequestActions({
     loadAgentMemories: (agentId, serverId) =>
       runTeamRequest(readAgentMemories(memoryRequest(serverId), agentId, has(serverId, AGENT_MEMORIES_CAPABILITY))),
     loadAgentRoutines: (agentId, serverId) =>
-      request(
-        "GET",
-        TEAM_API_ROUTES.agent.routines(agentId),
-        (value) => {
-          if (!Array.isArray(value) || !value.every(isRoutine) || value.some((routine) => routine.agentId !== agentId))
-            throw new Error("The host returned invalid routines.");
-          return value;
-        },
-        undefined,
+      synced.routines.read(
         serverId,
+        agentId,
+        (handle) => routinesOf(handle, agentId),
+        () =>
+          request(
+            "GET",
+            TEAM_API_ROUTES.agent.routines(agentId),
+            (value) => {
+              if (
+                !Array.isArray(value) ||
+                !value.every(isRoutine) ||
+                value.some((routine) => routine.agentId !== agentId)
+              )
+                throw new Error("The host returned invalid routines.");
+              return value;
+            },
+            undefined,
+            serverId,
+          ),
       ),
     loadRoutineCalendar: (input, serverId, owners) =>
       runTeamRequest(
@@ -1781,16 +1811,22 @@ export function createHostRequestActions({
       });
     },
     loadQueue: (agentId, serverId) =>
-      request(
-        "GET",
-        TEAM_API_ROUTES.agent.queue(agentId),
-        (value) => {
-          if (!isQueueSnapshot(value) || value.agentId !== agentId)
-            throw new Error("The host returned an invalid queue.");
-          return value;
-        },
-        undefined,
+      synced.queue.read(
         serverId,
+        agentId,
+        (handle) => queueOf(handle, agentId),
+        () =>
+          request(
+            "GET",
+            TEAM_API_ROUTES.agent.queue(agentId),
+            (value) => {
+              if (!isQueueSnapshot(value) || value.agentId !== agentId)
+                throw new Error("The host returned an invalid queue.");
+              return value;
+            },
+            undefined,
+            serverId,
+          ),
       ),
     loadAgentUsageLimits: (serverId) =>
       request(

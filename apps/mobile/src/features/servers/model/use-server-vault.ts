@@ -2,17 +2,21 @@ import type { VaultState } from "@openbot/contracts/ipc";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useQueryScope } from "@/features/auth/context/mobile-session-context";
 import { useLockedMutation } from "@/features/servers/model/use-locked-action";
-import { useMobileWorkspace, useMobileWorkspaceActions } from "@/features/workspace/context/mobile-workspace-context";
+import {
+  useMobileWorkspaceActions,
+  useMobileWorkspaceSelector,
+} from "@/features/workspace/context/mobile-workspace-context";
 import { queryKeys } from "@/features/workspace/model/query-keys";
 
 export function useServerVault(serverId: string) {
-  const { servers, canManageVault, canImportVault, canManageVaultApiKeys, canManageVaultTwoStep } =
-    useMobileWorkspace();
+  const server = useMobileWorkspaceSelector((workspace) => workspace.servers.find((item) => item.id === serverId));
+  const canManage = useMobileWorkspaceSelector((workspace) => workspace.canManageVault(serverId));
+  const canImport = useMobileWorkspaceSelector((workspace) => workspace.canImportVault(serverId));
+  const canManageApiKeys = useMobileWorkspaceSelector((workspace) => workspace.canManageVaultApiKeys(serverId));
+  const canManageTwoStep = useMobileWorkspaceSelector((workspace) => workspace.canManageVaultTwoStep(serverId));
   const { loadVault } = useMobileWorkspaceActions();
   const queryScope = useQueryScope();
   const queryClient = useQueryClient();
-  const server = servers.find((candidate) => candidate.id === serverId);
-  const canManage = canManageVault(serverId);
   const key = queryKeys.serverVault(queryScope, serverId);
   const query = useQuery({
     queryKey: key,
@@ -25,9 +29,9 @@ export function useServerVault(serverId: string) {
   return {
     server,
     canManage,
-    canImport: canImportVault(serverId),
-    canManageApiKeys: canManageVaultApiKeys(serverId),
-    canManageTwoStep: canManageVaultTwoStep(serverId),
+    canImport,
+    canManageApiKeys,
+    canManageTwoStep,
     query,
     action,
     async setState(state: VaultState): Promise<void> {

@@ -4,6 +4,7 @@ import {
   type ConversationMessage,
   isQueuedAgentReply,
   type QueueDelivery,
+  type QueueSnapshot,
   routineRunsTurn,
 } from "@openbot/contracts/ipc";
 import { isQueueEditRejected } from "@openbot/contracts/team-protocol/queue-edit-v1";
@@ -53,6 +54,48 @@ function firstIds(waiting: readonly QueueDelivery[], delivery: QueueDelivery): s
   return [delivery.id, ...waiting.filter((item) => item.id !== delivery.id).map((item) => item.id)];
 }
 
+type QueueChange = (snapshot: QueueSnapshot) => QueueSnapshot;
+
+function withoutDelivery(deliveryId: string): QueueChange {
+  return (snapshot) => {
+    const removed = snapshot.deliveries.find((item) => item.id === deliveryId)?.position ?? null;
+    return {
+      ...snapshot,
+      deliveries: snapshot.deliveries
+        .filter((item) => item.id !== deliveryId)
+        .map((item) =>
+          removed !== null && item.position !== null && item.position > removed
+            ? { ...item, position: item.position - 1 }
+            : item,
+        ),
+    };
+  };
+}
+
+function inOrder(deliveryIds: readonly string[]): QueueChange {
+  return (snapshot) => ({
+    ...snapshot,
+    deliveries: snapshot.deliveries.map((item) => {
+      const index = deliveryIds.indexOf(item.id);
+      return index < 0 ? item : { ...item, position: index + 1 };
+    }),
+  });
+}
+
+function steered(deliveryId: string, turnId: string): QueueChange {
+  return (snapshot) => ({
+    ...snapshot,
+    deliveries: snapshot.deliveries.map(
+      (item): QueueDelivery =>
+        item.id === deliveryId ? { ...item, status: "starting", position: null, turnId } : item,
+    ),
+  });
+}
+
+interface QueueReply {
+  snapshot: QueueSnapshot | null;
+}
+
 export function useChatQueue(
   agentId: string,
   serverId: string,
@@ -70,6 +113,7 @@ export function useChatQueue(
   const queryClient = useQueryClient();
   const queryScope = useQueryScope();
   const queryKey = useMemo(() => queryKeys.chatQueue(serverId, agentId), [serverId, agentId]);
+  useEffect(() => workspace().syncCollections.queue.retain(serverId, agentId), [workspace, serverId, agentId]);
   const query = useQuery({
     queryKey,
     queryFn: () => workspace().loadQueue(agentId, serverId),
@@ -165,8 +209,26 @@ export function useChatQueue(
     wasOnline.current = online;
   }, [online, queryClient, queryKey]);
 
+  const putQueue = useCallback(
+    async (snapshot: QueueSnapshot) => {
+      await queryClient.cancelQueries({ queryKey });
+      queryClient.setQueryData(queryKey, snapshot);
+    },
+    [queryClient, queryKey],
+  );
+  const showChange = useCallback(
+    async (change: QueueChange) => {
+      await queryClient.cancelQueries({ queryKey });
+      const previous = queryClient.getQueryData<QueueSnapshot>(queryKey);
+      if (!previous) return null;
+      const shown = change(previous);
+      queryClient.setQueryData(queryKey, shown);
+      return { previous, shown };
+    },
+    [queryClient, queryKey],
+  );
   const run = useCallback(
-    async (action: () => Promise<void>) => {
+    async (action: (reply: QueueReply) => Promise<void>, change?: QueueChange) => {
       if (busyRef.current) return false;
       if (!online) {
         setError(currentText().t("mobile.chat.queue.reconnect"));
@@ -175,10 +237,14 @@ export function useChatQueue(
       busyRef.current = true;
       setBusy(true);
       setError(null);
+      const reply: QueueReply = { snapshot: null };
+      const shown = change ? await showChange(change) : null;
       try {
-        await action();
+        await action(reply);
         return true;
       } catch (cause) {
+        if (shown && queryClient.getQueryData(queryKey) === shown.shown)
+          queryClient.setQueryData(queryKey, shown.previous);
         const { t, errorMessage } = currentText();
         setError(
           cause instanceof ChatUploadCancelledError
@@ -189,10 +255,11 @@ export function useChatQueue(
       } finally {
         busyRef.current = false;
         setBusy(false);
-        refresh();
+        if (reply.snapshot) void putQueue(reply.snapshot);
+        else refresh();
       }
     },
-    [online, refresh],
+    [online, refresh, showChange, putQueue, queryClient, queryKey],
   );
   const clearEdit = useCallback(async () => {
     await SecureStore.deleteItemAsync(storageKey);
@@ -223,7 +290,7 @@ export function useChatQueue(
         keepAttachmentIds: delivery.attachments.map((item) => item.id),
         addedAttachments: [],
       };
-      await run(async () => {
+      await run(async (reply) => {
         SecureStore.setItem(storageKey, JSON.stringify(next));
         editRef.current = next;
         setEdit(next);
@@ -237,6 +304,7 @@ export function useChatQueue(
             if (isQueueEditRejected(cause)) await clearEdit();
             throw cause;
           });
+        reply.snapshot = currentQueue;
         if (!next.initialized) {
           const currentDelivery = currentQueue.deliveries.find(
             (item) => item.id === delivery.id && item.status === "queued",
@@ -303,9 +371,9 @@ export function useChatQueue(
       if (!edit || !confirmed) return false;
       if (!edit.pendingSave && !text.trim() && !edit.keepAttachmentIds.length && !files.length) return false;
       cancelled.current = false;
-      const saved = await run(async () => {
+      const saved = await run(async (reply) => {
         if (edit.pendingSave) {
-          await workspace().editQueue(agentId, serverId, edit.pendingSave);
+          reply.snapshot = await workspace().editQueue(agentId, serverId, edit.pendingSave);
           await clearEdit();
           return;
         }
@@ -346,7 +414,7 @@ export function useChatQueue(
             SecureStore.setItem(storageKey, JSON.stringify(next));
             editRef.current = next;
             setEdit(next);
-            await workspace().editQueue(agentId, serverId, pendingSave);
+            reply.snapshot = await workspace().editQueue(agentId, serverId, pendingSave);
             return edit.delivery.id;
           },
         });
@@ -410,9 +478,9 @@ export function useChatQueue(
       cancelEdit: async () => {
         if (!edit) return true;
         let rejected = false;
-        const released = await run(async () => {
+        const released = await run(async (reply) => {
           try {
-            await workspace().editQueue(agentId, serverId, {
+            reply.snapshot = await workspace().editQueue(agentId, serverId, {
               action: "cancel",
               deliveryId: edit.delivery.id,
               editId: edit.editId,
@@ -430,26 +498,30 @@ export function useChatQueue(
         run(async () => {
           await workspace().changeQueue(agentId, serverId, "cancel", { deliveryId: delivery.id });
           if (edit?.delivery.id === delivery.id) await clearEdit();
-        }),
-      steer: (delivery: QueueDelivery) =>
-        run(async () => {
-          if (!activeTurnId || routineRunsTurn(query.data?.deliveries, activeTurnId)) return;
-          await workspace().changeQueue(agentId, serverId, "steer", {
-            deliveryId: delivery.id,
-            expectedTurnId: activeTurnId,
-          });
-        }),
-      sendNow: (delivery: QueueDelivery) =>
-        run(async () => {
-          const turnId = activeTurnId;
-          if (!turnId) return;
-          const waiting = orderedQueue(query.data?.deliveries ?? []);
-          if (waiting[0]?.editing && waiting[0].id !== delivery.id) return;
-          if (waiting[0]?.id !== delivery.id)
-            await workspace().changeQueue(agentId, serverId, "reorder", { deliveryIds: firstIds(waiting, delivery) });
-          if (activeTurnRef.current !== turnId) return;
-          await workspace().interruptTurn(agentId, turnId, serverId);
-        }),
+        }, withoutDelivery(delivery.id)),
+      steer: (delivery: QueueDelivery) => {
+        const turnId = activeTurnId;
+        if (!turnId || routineRunsTurn(query.data?.deliveries, turnId)) return run(() => Promise.resolve());
+        return run(
+          () =>
+            workspace().changeQueue(agentId, serverId, "steer", { deliveryId: delivery.id, expectedTurnId: turnId }),
+          steered(delivery.id, turnId),
+        );
+      },
+      sendNow: (delivery: QueueDelivery) => {
+        const turnId = activeTurnId;
+        const waiting = orderedQueue(query.data?.deliveries ?? []);
+        if (!turnId || (waiting[0]?.editing && waiting[0].id !== delivery.id)) return run(() => Promise.resolve());
+        const order = waiting[0]?.id === delivery.id ? null : firstIds(waiting, delivery);
+        return run(
+          async () => {
+            if (order) await workspace().changeQueue(agentId, serverId, "reorder", { deliveryIds: order });
+            if (activeTurnRef.current !== turnId) return;
+            await workspace().interruptTurn(agentId, turnId, serverId);
+          },
+          order ? inOrder(order) : undefined,
+        );
+      },
       runAsThread: async (delivery: QueueDelivery): Promise<AgentTask | null> => {
         const started: { task: AgentTask | null } = { task: null };
         const done = await run(async () => {
@@ -459,12 +531,10 @@ export function useChatQueue(
         if (task) addStartedTask(queryClient, queryScope, serverId, task);
         return task;
       },
-      moveFirst: (delivery: QueueDelivery) =>
-        run(async () => {
-          await workspace().changeQueue(agentId, serverId, "reorder", {
-            deliveryIds: firstIds(orderedQueue(query.data?.deliveries ?? []), delivery),
-          });
-        }),
+      moveFirst: (delivery: QueueDelivery) => {
+        const order = firstIds(orderedQueue(query.data?.deliveries ?? []), delivery);
+        return run(() => workspace().changeQueue(agentId, serverId, "reorder", { deliveryIds: order }), inOrder(order));
+      },
     }),
     [
       attachments,

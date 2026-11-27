@@ -4,7 +4,7 @@ import { MAC_APPS_LIMIT_CAPABILITY } from "@openbot/contracts/team-protocol/mac-
 import type { BrowserViewRuntime } from "@openbot/ui/features/browser/BrowserLiveView";
 import type { MarketplaceAppsBlock } from "@openbot/ui/features/marketplace/marketplace-model";
 import type { ComponentProps } from "@solidjs/web";
-import { createMemo, Loading, omit, Show } from "solid-js";
+import { createEffect, createMemo, createSignal, Loading, omit, Show } from "solid-js";
 import type { AgentTemplateInstallCalls } from "./features/agent-templates/agent-templates-port";
 import { ChannelCreateDialog } from "./features/channels/ChannelCreateDialog";
 import { useChannels } from "./features/channels/channels-context";
@@ -24,8 +24,13 @@ import {
   serverSupportsCapability,
 } from "./features/servers/server-capabilities";
 import type { MarketplaceCalls } from "./features/settings/marketplace-calls";
+import { desktopMarketplaceCalls } from "./features/settings/marketplace-calls";
 import type { MarketplaceAgentRow } from "./features/settings/marketplace-controller";
-import { MARKETPLACE_PLUGINS } from "./features/settings/marketplace-plugin-catalog";
+import {
+  loadMarketplacePlugins,
+  marketplacePlugins,
+  marketplacePluginsForServer,
+} from "./features/settings/marketplace-plugin-source";
 import {
   AgentTemplateInstall,
   GlobalSearch,
@@ -103,6 +108,23 @@ export function MarketplaceOverlay(props: {
       controller.voicePhase() === "idle" &&
       !controller.editingDeliveryId(),
   );
+  const [pluginCatalogSettled, setPluginCatalogSettled] = createSignal(false);
+  createEffect(
+    () => props.open,
+    (open) => {
+      if (!open) return;
+      setPluginCatalogSettled(false);
+      void loadMarketplacePlugins((props.calls ?? desktopMarketplaceCalls()).pluginCatalog).then(() =>
+        setPluginCatalogSettled(true),
+      );
+    },
+  );
+  const plugins = createMemo(() => marketplacePluginsForServer(props.server));
+  const initialPluginSlug = createMemo(() => {
+    const slug = props.pluginSlug ?? undefined;
+    if (!slug || pluginCatalogSettled()) return slug;
+    return marketplacePlugins().some((plugin) => plugin.slug === slug) ? slug : undefined;
+  });
   const appendExample = (agentId: string, append: (target: { serverId: string; agentId: string }) => void) => {
     const server = props.server;
     if (!serverCanAdminister(server, "skills-admin-v1") || !props.agents.some((agent) => agent.id === agentId)) return;
@@ -149,8 +171,8 @@ export function MarketplaceOverlay(props: {
               : undefined
           }
           onAgentInstalled={props.onAgentInstalled}
-          plugins={MARKETPLACE_PLUGINS}
-          initialPluginSlug={props.pluginSlug ?? undefined}
+          plugins={plugins()}
+          initialPluginSlug={initialPluginSlug()}
           initialPluginConnect={props.pluginConnect}
           onInitialPluginSlugConsumed={props.onPluginSlugConsumed}
           initialListing={props.marketplaceListing ?? undefined}

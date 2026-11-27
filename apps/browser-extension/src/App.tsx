@@ -36,6 +36,7 @@ import { HomeScreen } from "./HomeScreen";
 import { createHostConnection, type HostConnection } from "./host-connection";
 import { NewAgentScreen } from "./NewAgentScreen";
 import { NewChannelScreen, NewFolderScreen } from "./NewChatItemScreens";
+import { NoServersScreen } from "./NoServersScreen";
 import { SettingsScreen } from "./SettingsScreen";
 import { SignInScreen } from "./SignInScreen";
 import { createWorkspace, type Workspace } from "./workspace";
@@ -298,20 +299,28 @@ function ServerView(props: { session: ExtensionSession; onSignOut: () => void; o
         },
         sessionEnded: props.onSessionEnded,
       });
-      const hosts = await connection.listHosts();
-      setView((draft) => {
-        draft.hosts = hosts;
-        draft.status = hosts.length ? "connecting" : "empty";
-      });
-      if (!hosts.length) return;
-      const saved = await readServerId();
-      await open(hosts.some((entry) => entry.hostId === saved) && saved ? saved : (hosts[0]?.hostId ?? ""));
+      await listServers(connection);
     } catch (error) {
       setView((draft) => {
         draft.status = "failed";
         draft.message = error instanceof Error ? error.message : t("extension.connection.requestFailed");
       });
     }
+  }
+
+  async function listServers(current: HostConnection) {
+    const hosts = await current.listHosts();
+    setView((draft) => {
+      draft.hosts = hosts;
+      draft.status = hosts.length ? "connecting" : "empty";
+    });
+    if (!hosts.length) return;
+    const saved = await readServerId();
+    await open(hosts.some((entry) => entry.hostId === saved) && saved ? saved : (hosts[0]?.hostId ?? ""));
+  }
+
+  function listServersAgain() {
+    return connection ? listServers(connection) : start();
   }
 
   async function openChatFromX() {
@@ -405,7 +414,7 @@ function ServerView(props: { session: ExtensionSession; onSignOut: () => void; o
     <>
       <Switch>
         <Match when={view.status === "empty"}>
-          <p class="ext-state">{t("extension.connection.noServers")}</p>
+          <NoServersScreen user={props.session.user} onRetry={listServersAgain} onSignOut={() => props.onSignOut()} />
         </Match>
         <Match when={(view.status === "failed" || (view.status !== "ready" && connectStep.slow())) && host()}>
           {(target) => (

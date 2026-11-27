@@ -14,6 +14,7 @@ import { forgetReferralCode, readReferralCode } from "@openbot/contracts/referra
 import { isBoolean, isDynamicRecord, isString } from "@openbot/contracts/runtime-values";
 import { formatLocale, resolveLocale } from "@openbot/i18n";
 import { sourceText } from "@openbot/i18n/source";
+import { rememberAccountBookmark } from "@openbot/team-client/account-bookmark";
 import { markRemoteSync } from "@openbot/team-client/sync-profile";
 import { classifyFailure } from "@openbot/telemetry";
 import { NotificationObserver, Toaster, toast } from "@openbot/ui";
@@ -21,7 +22,7 @@ import { AccountLogin } from "@openbot/ui/features/account/AccountLogin";
 import { AppLoadingScreen } from "@openbot/ui/features/account/AppLoadingScreen";
 import { currentText } from "@openbot/ui/text";
 import { Dynamic } from "@solidjs/web";
-import { createEffect, createSignal, createStore, onSettled, Show } from "solid-js";
+import { createEffect, createSignal, createStore, flush, onSettled, Show } from "solid-js";
 import type { DesktopAnalyticsProperties } from "../../analytics";
 import {
   configureWebReports,
@@ -35,6 +36,8 @@ import {
 } from "../../error-reports";
 import { StaticI18nProvider } from "../../i18n-context";
 import { startupLoadingScene } from "../../startup-animation-preference";
+import { clearStoredQueueEdit, clearStoredThreadQueueEdit } from "../conversation/composer-draft";
+import { clearStoredComposerDrafts } from "../conversation/composer-draft-storage";
 import { clearStorageUsageCache } from "../files/storage-usage";
 import { AnalyticsConsentRow, ConsentNotice } from "../onboarding/AnalyticsConsent";
 import { createOnboardingTeam, onboardingSessionSeed } from "../onboarding/onboarding-avatars";
@@ -60,6 +63,10 @@ import { createWebLanguagePreference } from "./web-language-preference";
 export { loadSavedLanguage } from "./web-language-preference";
 
 let workspaceImport: Promise<typeof WebWorkspace> | null = null;
+function accountRequestUrl(input: RequestInfo | URL): URL {
+  return new URL(input instanceof Request ? input.url : input, window.location.origin);
+}
+
 function loadWorkspace(): Promise<typeof WebWorkspace> {
   if (!workspaceImport) {
     workspaceImport = import("./WebWorkspace").then((module) => module.WebWorkspace);
@@ -260,15 +267,23 @@ function WebAppContent(props: { createRuntime?: WebRuntimeFactory }) {
       clearStorageUsageCache();
     }
     sessionGeneration += 1;
-    setState((draft) => {
-      draft.account = null;
-      draft.login = { status: "signed_out" };
-    });
+    flush(() =>
+      setState((draft) => {
+        draft.account = null;
+        draft.login = { status: "signed_out" };
+      }),
+    );
+    if (ended) {
+      clearStoredComposerDrafts();
+      clearStoredQueueEdit();
+      clearStoredThreadQueueEdit();
+    }
     resetAnalyticsBox();
   }
   const accountFetch: typeof fetch = async (input, init) => {
     const generation = sessionGeneration;
     const response = await fetch(input, init);
+    rememberAccountBookmark(accountRequestUrl(input), response);
     if (
       !disposed &&
       generation === sessionGeneration &&

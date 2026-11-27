@@ -5,7 +5,10 @@ import { runTeamEffect } from "@openbot/team-client";
 import { useQuery } from "@tanstack/react-query";
 import { useQueryScope } from "@/features/auth/context/mobile-session-context";
 import { useLockedMutation } from "@/features/servers/model/use-locked-action";
-import { useMobileWorkspace } from "@/features/workspace/context/mobile-workspace-context";
+import {
+  useMobileWorkspaceActions,
+  useMobileWorkspaceSelector,
+} from "@/features/workspace/context/mobile-workspace-context";
 import { queryKeys } from "@/features/workspace/model/query-keys";
 
 function isPendingInvite(invite: RemoteTeamInvite, now: number): boolean {
@@ -13,9 +16,9 @@ function isPendingInvite(invite: RemoteTeamInvite, now: number): boolean {
 }
 
 export function useServerMembers(serverId: string) {
-  const { servers, teamDirectory } = useMobileWorkspace();
+  const server = useMobileWorkspaceSelector((workspace) => workspace.servers.find((item) => item.id === serverId));
+  const { teamDirectory } = useMobileWorkspaceActions();
   const queryScope = useQueryScope();
-  const server = servers.find((candidate) => candidate.id === serverId);
   const canManage = canAdministerServer(server?.role);
   const members = useQuery({
     queryKey: queryKeys.serverMembers(queryScope, serverId),

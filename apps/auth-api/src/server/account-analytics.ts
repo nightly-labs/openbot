@@ -38,7 +38,7 @@ import {
 import type { HostedPoolGroup } from "./hosted-pool-snapshot";
 
 const OPENPANEL_API_URL = "https://analytics.openbot.run/api";
-export const ACCOUNT_ANALYTICS_SCHEMA_VERSION = 23;
+export const ACCOUNT_ANALYTICS_SCHEMA_VERSION = 24;
 const SEND_TIMEOUT_MS = 5_000;
 const ACCOUNT_ID_PATTERN = /^[A-Za-z0-9_-]{1,128}$/u;
 const ACTIVITY_DAY_PATTERN = /^\d{4}-\d{2}-\d{2}$/u;
@@ -101,7 +101,7 @@ const EMAIL_KINDS = ["sign_in_code", "team_invite", "contact", "welcome", "licen
 export type EmailKind = (typeof EMAIL_KINDS)[number];
 const EMAIL_RESULTS = ["accepted", "rate_limited", "unknown", "failed"] as const;
 export type EmailResult = (typeof EMAIL_RESULTS)[number];
-const EMAIL_MAILBOXES = ["primary", "overflow", "overflow_2"] as const;
+const EMAIL_MAILBOXES = ["primary", "overflow", "overflow_2", "overflow_3"] as const;
 export type EmailMailbox = (typeof EMAIL_MAILBOXES)[number];
 
 const CREDIT_ACTIONS = [

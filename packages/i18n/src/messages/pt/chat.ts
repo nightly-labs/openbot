@@ -531,4 +531,13 @@ export const messages = {
   "chat.feedbackWithdrawn.title": "Relato removido",
   "chat.feedbackWithdrawn.badge": "Removido",
   "chat.feedbackWithdrawn.body": "Seu relato não está mais no GitHub. Para enviar um relato corrigido, peça ao agente.",
+  "chat.remoteContent.pictureNotLoaded":
+    "Imagem de {host}. Não foi carregada porque o conteúdo remoto está desativado neste servidor.",
+  "chat.remoteContent.loadPicture": "Carregar imagem",
+  "chat.remoteContent.diagramNotDrawn":
+    "Este diagrama pode carregar uma imagem de outro site. Ele não foi desenhado porque o conteúdo remoto está desativado neste servidor.",
+  "chat.remoteContent.loadDiagram": "Carregar diagrama",
+  "chat.remoteContent.pageStatic":
+    "Exibida sem scripts e conteúdo remoto porque o conteúdo remoto está desativado neste servidor.",
+  "chat.remoteContent.runPage": "Executar página",
 } as const satisfies PartialTranslation<typeof source>;

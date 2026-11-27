@@ -11,6 +11,7 @@ import { dismissAppSuggestion, useAppSuggestionDismissals } from "@/features/cha
 import { ListingIcon } from "@/features/marketplace/components/marketplace-parts";
 import { appListings, CONNECTOR_TAGLINES, customListing } from "@/features/marketplace/model/marketplace-listings";
 import { pluginConnectMethod, pluginInstalled } from "@/features/marketplace/model/plugin-connect";
+import { useMobilePlugins } from "@/features/marketplace/model/use-mobile-plugins";
 import { ConnectorLogo } from "@/features/servers/components/connector-logo";
 import { CONNECTOR_TITLE_KEYS, isMobileConnectorId, type MobileConnectorId } from "@/features/servers/model/connectors";
 import { useConnectorRowState } from "@/features/servers/model/use-connector-rows";
@@ -61,9 +62,10 @@ function PluginSuggestion({ serverId, messageId, slug }: { serverId: string; mes
   const { canManage, list: mcpServers } = useMcpServerList(serverId);
   const access = useServerAccess(serverId);
   const apiUrl = session?.apiUrl;
+  const plugins = useMobilePlugins(serverId);
   const listing = useMemo(
-    () => (apiUrl ? appListings(apiUrl).find((item) => item.id === slug) : undefined),
-    [apiUrl, slug],
+    () => (apiUrl ? appListings(apiUrl, plugins).find((item) => item.id === slug) : undefined),
+    [apiUrl, plugins, slug],
   );
   if (listing?.kind !== "app" || listing.source !== "plugin") return null;
   const { plugin } = listing;

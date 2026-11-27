@@ -55,6 +55,7 @@ import { importPastedFiles, type PastePreview, pastePreviewTracker } from "../co
 import { createTurnSteps } from "../conversation/turn-steps";
 import { createTurnStreamHold } from "../conversation/turn-stream-hold";
 import { useTurnTrace } from "../conversation/turn-trace";
+import { useRemoteChatContent } from "../servers/remote-chat-content";
 import { createPageHeaderFrame } from "../window/page-header-frame";
 import type { TaskEvent, TasksSource } from "./tasks-port";
 
@@ -146,6 +147,7 @@ function toastError(error: unknown, fallback: AppTextKey): void {
 }
 
 export function TasksView(props: TasksViewProps) {
+  const remoteChatContent = useRemoteChatContent();
   const [state, setState] = createStore<TasksViewState>({
     snapshots: {},
     conversations: {},
@@ -827,6 +829,7 @@ export function TasksView(props: TasksViewProps) {
               onOpenLink={props.onOpenLink}
               onPreview={(attachment) => props.onAttachmentAction(attachment, "open")}
               onAttachmentAction={props.onAttachmentAction}
+              remoteContent={remoteChatContent.enabled(props.serverId)}
               mediaSource={props.mediaSource}
               downloads={props.downloads}
               approval={approval()}
