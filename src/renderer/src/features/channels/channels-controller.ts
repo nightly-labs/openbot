@@ -9,7 +9,7 @@ import {
 import type { AppTextKey } from "@openbot/i18n";
 import type { AgentProfile } from "@openbot/ui/data";
 import { currentText } from "@openbot/ui/text";
-import { createEffect, createStore, flush, onSettled, reconcile, snapshot, untrack } from "solid-js";
+import { createEffect, createSignal, createStore, flush, onSettled, reconcile, snapshot, untrack } from "solid-js";
 import { actionToast } from "../../action-toast";
 import { type DesktopAnalyticsProperties, desktopAnalytics } from "../../analytics";
 import { mergeChannelPage } from "./channel-page-merge";
@@ -105,8 +105,9 @@ export function createChannelsController(env: ChannelsEnvironment) {
   const keptPages = new Map<string, ChannelPage>();
   let replaceLoadedPage = false;
   let prefetchEpoch = 0;
+  const [prefetchRound, setPrefetchRound] = createSignal(0);
   const channelPrefetchEpochs = new Map<string, number>();
-  const prefetching = new Set<string>();
+  const prefetching = new Map<string, number>();
   function invalidatePrefetch(channelId: string): void {
     channelPrefetchEpochs.set(channelId, (channelPrefetchEpochs.get(channelId) ?? 0) + 1);
   }
@@ -438,6 +439,7 @@ export function createChannelsController(env: ChannelsEnvironment) {
         replaceLoadedPage = false;
         prefetchEpoch += 1;
         channelPrefetchEpochs.clear();
+        prefetching.clear();
         visitRead = null;
         failedCommand = null;
         pendingCommands = 0;
@@ -475,6 +477,7 @@ export function createChannelsController(env: ChannelsEnvironment) {
   createEffect(
     () => ({
       scope: env.scopeKey(),
+      round: prefetchRound(),
       remote: env.remote(),
       supported: supported(),
       listed: state.listed,
@@ -506,7 +509,7 @@ export function createChannelsController(env: ChannelsEnvironment) {
           }
           const epoch = prefetchEpoch;
           const channelEpoch = channelPrefetchEpochs.get(channelId) ?? 0;
-          prefetching.add(channelId);
+          prefetching.set(channelId, epoch);
           void env
             .port()
             .agent.readChannel({ channelId })
@@ -525,7 +528,7 @@ export function createChannelsController(env: ChannelsEnvironment) {
             })
             .catch(() => undefined)
             .finally(() => {
-              prefetching.delete(channelId);
+              if (prefetching.get(channelId) === epoch) prefetching.delete(channelId);
               next();
             });
         });
@@ -683,8 +686,10 @@ export function createChannelsController(env: ChannelsEnvironment) {
     resync: () => {
       prefetchEpoch += 1;
       channelPrefetchEpochs.clear();
+      prefetching.clear();
       keptPages.clear();
       replaceLoadedPage = false;
+      setPrefetchRound((round) => round + 1);
       announce(null);
       return refresh();
     },
