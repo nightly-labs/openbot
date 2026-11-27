@@ -259,7 +259,7 @@ const e2e = {
       `host event ${match.type}`,
     );
   },
-  hostEvents(from: number): Array<{ type: string; peerId?: string; code?: string }> {
+  hostEvents(from: number): Array<{ type: string; peerId: string | undefined; code: string | undefined }> {
     return events
       .slice(from)
       .filter((event) => event.type !== "data" && event.type !== "command-complete")
