@@ -411,7 +411,7 @@ await check("the first new write replaces the released file with the split files
   return { files, sealedBytes: splitBytes };
 });
 
-await check("the saved Signal server settings read back before the host answers", async () => {
+await check("the drawer snapshot keeps the Signal server settings and drops a damaged copy", async () => {
   const read = await currentCache.read(SERVER_ID);
   assert.ok(read, "The workspace part was not read.");
   assert.deepEqual(read.drawer, { memberCount: 3, signalHome: SIGNAL_HOME });
