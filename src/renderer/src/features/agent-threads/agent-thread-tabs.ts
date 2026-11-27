@@ -254,7 +254,10 @@ export function createAgentThreadTabs(options: AgentThreadTabsOptions) {
       if (index < 0) return;
       const open = openIds(agentId).filter((other) => other !== id);
       open.splice(Math.max(0, index - 1), 0, id);
-      writeTabs(agentId, { open, active: wasActive ? id : (before.active ?? null) });
+      writeTabs(agentId, {
+        open: withRestingTabs(agentId, open, []),
+        active: wasActive ? id : (before.active ?? null),
+      });
     }
 
     if (restore && !(await tasks.closeTask(agentId, id, server))) {
