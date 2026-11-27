@@ -1,6 +1,5 @@
 import type { AgentExchangeSummary } from "@openbot/contracts/ipc";
 import type { MobileTranslate } from "@openbot/i18n/mobile";
-import { Link } from "expo-router";
 import type { LucideIcon } from "lucide-react-native";
 import ChevronRight from "lucide-react-native/icons/chevron-right";
 import Forward from "lucide-react-native/icons/forward";
@@ -13,6 +12,7 @@ import type { ReactNode } from "react";
 import { View } from "react-native";
 import { BloubAvatarThumbnail } from "@/features/agents/components/bloub-avatar";
 import { ChatLinkPressable } from "@/features/agents/components/chat-link-pressable";
+import { useChatNavigation } from "@/features/chat/context/chat-navigation-context";
 import type { ChatMessage, ExchangeGroup, ExchangeMarker } from "@/features/chat/model/chat-messages";
 import type { MobileAgent } from "@/features/workspace/context/mobile-workspace-context";
 import { useText } from "@/shared/lib/text";
@@ -176,6 +176,7 @@ function AgentLine({
 }) {
   const { t } = useText();
   const colors = useActivityColors();
+  const navigation = useChatNavigation();
   const accessibilityLabel = [label, name].filter(Boolean).join(", ");
   if (!linked || !agent)
     return (
@@ -188,25 +189,26 @@ function AgentLine({
       />
     );
   return (
-    <Link href={{ pathname: "/chat/[agentId]", params: { agentId: agent.id, serverId: agent.serverId } }} asChild>
-      <ChatLinkPressable
-        accessibilityRole="link"
+    <ChatLinkPressable
+      accessibilityRole="link"
+      accessibilityLabel={accessibilityLabel}
+      accessibilityHint={t("mobile.chat.exchange.openChat", { name: agent.name })}
+      hitSlop={8}
+      className="max-w-full self-start"
+      style={({ pressed }) => ({ opacity: pressed ? 0.6 : 1 })}
+      onPress={() =>
+        navigation.navigate({ pathname: "/chat/[agentId]", params: { agentId: agent.id, serverId: agent.serverId } })
+      }
+    >
+      <ChatActivityLine
+        icon={icon}
+        label={label}
+        name={name}
+        nameIcon={nameIcon}
         accessibilityLabel={accessibilityLabel}
-        accessibilityHint={t("mobile.chat.exchange.openChat", { name: agent.name })}
-        hitSlop={8}
-        className="max-w-full self-start"
-        style={({ pressed }) => ({ opacity: pressed ? 0.6 : 1 })}
-      >
-        <ChatActivityLine
-          icon={icon}
-          label={label}
-          name={name}
-          nameIcon={nameIcon}
-          accessibilityLabel={accessibilityLabel}
-          trailing={<ChevronRight size={CHEVRON_SIZE} color={colors.dim} style={MIRROR_IN_RTL} />}
-        />
-      </ChatLinkPressable>
-    </Link>
+        trailing={<ChevronRight size={CHEVRON_SIZE} color={colors.dim} style={MIRROR_IN_RTL} />}
+      />
+    </ChatLinkPressable>
   );
 }
 
