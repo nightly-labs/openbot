@@ -267,7 +267,7 @@ export function HomeScreen(props: HomeScreenProps) {
                           <button type="button" class="ph-pin" onClick={() => props.onOpenAgent(agent().id)}>
                             <span class="ph-avatar">
                               <AgentAvatar
-                                agent={avatarAgent(agent(), state().colors[agent().id])}
+                                agent={avatarAgent(agent(), state())}
                                 motion="idle"
                                 transition="cut"
                                 style={{ width: "58px", height: "58px" }}
@@ -285,7 +285,7 @@ export function HomeScreen(props: HomeScreenProps) {
                         <span class="ph-avatar ph-pin-channel">
                           <ChannelAvatar
                             members={channel().members}
-                            agents={composerAgents(state().agents, state().colors)}
+                            agents={composerAgents(state().agents, state())}
                             icon={channel().icon ?? null}
                             layout="cluster"
                           />
@@ -376,7 +376,7 @@ function ChannelRow(props: { channel: ChannelSummary; workspace: Workspace; onOp
       <span class="ph-avatar">
         <ChannelAvatar
           members={props.channel.members}
-          agents={composerAgents(state().agents, state().colors)}
+          agents={composerAgents(state().agents, state())}
           icon={props.channel.icon ?? null}
           layout="cluster"
         />
@@ -399,7 +399,7 @@ function AgentRow(props: { agent: ClientAgentSummary; workspace: Workspace; onOp
   return (
     <button type="button" class="ph-row" onClick={() => props.onOpen(props.agent.id)}>
       <span class="ph-avatar">
-        <AgentAvatar agent={avatarAgent(props.agent, state().colors[props.agent.id])} motion="idle" transition="cut" />
+        <AgentAvatar agent={avatarAgent(props.agent, state())} motion="idle" transition="cut" />
         <UnreadBadge count={state().unread[props.agent.id] ?? 0} />
       </span>
       <span class="ph-row-text">

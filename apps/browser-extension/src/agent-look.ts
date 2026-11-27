@@ -1,9 +1,30 @@
 import { avatarHeadColor } from "@openbot/brand/bloub-avatar";
 import type { AvatarColor, ClientAgentSummary } from "@openbot/contracts/ipc";
 import type { AppFormat } from "@openbot/i18n";
+import { toAgentProfile } from "@openbot/ui/features/agents/agent-profile";
+import type { AgentPicture } from "./agent-pictures";
 
-export function avatarAgent(agent: ClientAgentSummary, color: AvatarColor | undefined) {
-  return { avatarSeed: agent.avatarSeed, avatarHue: agent.avatarHue, avatarColor: color ?? null, avatarUrl: null };
+export interface AgentLook {
+  colors: Record<string, AvatarColor>;
+  pictures: Record<string, AgentPicture>;
+}
+
+function shownPicture(agent: ClientAgentSummary, look: AgentLook): string | null {
+  const picture = look.pictures[agent.id];
+  return picture && picture.source === agent.avatarUrl ? picture.url : null;
+}
+
+export function avatarAgent(agent: ClientAgentSummary, look: AgentLook) {
+  return {
+    avatarSeed: agent.avatarSeed,
+    avatarHue: agent.avatarHue,
+    avatarColor: look.colors[agent.id] ?? null,
+    avatarUrl: shownPicture(agent, look),
+  };
+}
+
+export function lookProfile(agent: ClientAgentSummary, look: AgentLook) {
+  return toAgentProfile({ ...agent, avatarColor: look.colors[agent.id] ?? null, avatarUrl: shownPicture(agent, look) });
 }
 
 export function bubbleColors(agent: ClientAgentSummary, color: AvatarColor | undefined) {
@@ -36,12 +57,12 @@ export function byRecent(left: ClientAgentSummary, right: ClientAgentSummary): n
   return (right.updatedAt ?? "").localeCompare(left.updatedAt ?? "");
 }
 
-export function composerAgents(agents: readonly ClientAgentSummary[], colors: Record<string, AvatarColor>) {
+export function composerAgents(agents: readonly ClientAgentSummary[], look: AgentLook) {
   return agents.map((entry) => ({
     id: entry.id,
     name: entry.name,
     title: entry.title,
     description: entry.description,
-    ...avatarAgent(entry, colors[entry.id]),
+    ...avatarAgent(entry, look),
   }));
 }

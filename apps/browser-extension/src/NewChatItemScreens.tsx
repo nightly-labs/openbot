@@ -156,11 +156,7 @@ export function NewChannelScreen(props: {
                 checked={form.draft.members.some((member) => member.agentId === agent.id)}
                 onChange={(event) => toggle(agent.id, event.currentTarget.checked)}
               />
-              <AgentAvatar
-                agent={avatarAgent(agent, props.workspace.state.colors[agent.id])}
-                motion="idle"
-                class="ext-form-face"
-              />
+              <AgentAvatar agent={avatarAgent(agent, props.workspace.state)} motion="idle" class="ext-form-face" />
               <span class="ph-row-text">
                 <span class="ph-row-name">{agent.name}</span>
                 <span class="ph-row-preview">{agent.description}</span>
