@@ -43,7 +43,7 @@ const REFOLD_MIN_NEW_EVENTS = 1000;
 const BATCH_BYTES = 4 * 1024 * 1024;
 const BATCH_MILLISECONDS = 25;
 const MAX_RESTARTS = 3;
-export const RECOMPACTION_INTERVAL_MILLISECONDS = 6 * 60 * 60 * 1000;
+const RECENTLY_COMPACTED_MILLISECONDS = 5 * 60 * 60 * 1000;
 
 interface ThreadProgress {
   threadId: string;
@@ -117,7 +117,7 @@ export class ThreadEventCompaction {
         )
         .get(
           this.#afterThreadId,
-          new Date(now - RECOMPACTION_INTERVAL_MILLISECONDS).toISOString(),
+          new Date(now - RECENTLY_COMPACTED_MILLISECONDS).toISOString(),
           new Date(now).toISOString(),
           REFOLD_MIN_NEW_EVENTS,
         ),
@@ -141,6 +141,7 @@ export class ThreadEventCompaction {
   }
 
   #compactBatch(db: DatabaseSync, progress: ThreadProgress): ThreadEventCompactionBatch {
+    const started = performance.now();
     const batch: ThreadEventCompactionBatch = {
       done: false,
       events: 0,
@@ -187,7 +188,6 @@ export class ThreadEventCompaction {
     const superseded: number[] = [];
     let bytes = 0;
     let reachedEnd = true;
-    const started = performance.now();
     for (const value of select.iterate(progress.threadId, progress.through, progress.cutoff)) {
       if (
         batch.events >= BATCH_EVENTS ||

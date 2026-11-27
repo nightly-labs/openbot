@@ -36,7 +36,7 @@ export function compactThreadEvents(
       failedThreads: {},
     };
     for (;;) {
-      const started = yield* Clock.currentTimeMillis;
+      const started = yield* Clock.monotonicTimeNanos;
       const batch = yield* Effect.try({
         try: () => database.compactThreadEvents(),
         catch: (cause) => new ThreadEventCompactionFailed({ cause }),
@@ -51,8 +51,8 @@ export function compactThreadEvents(
       if (batch.completedThread) result.threads += 1;
       if (batch.failedThread)
         result.failedThreads[batch.failedThread] = (result.failedThreads[batch.failedThread] ?? 0) + 1;
-      const worked = (yield* Clock.currentTimeMillis) - started;
-      yield* Effect.sleep(Duration.max(pause, Duration.millis(worked * REST_PER_WORK)));
+      const worked = Duration.nanos((yield* Clock.monotonicTimeNanos) - started);
+      yield* Effect.sleep(Duration.max(pause, Duration.times(worked, REST_PER_WORK)));
     }
   });
 }

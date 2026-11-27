@@ -90,7 +90,7 @@ generated `conversation.snapshot-updated` row when, for each message of the row,
 message has all its keys, so the replay gives the same chat. It runs 1 minute after start and every
 6 hours, on the main process, so a batch stops after 25 ms and the run then rests 9 times as long as
 it worked. A done thread runs again from its first event when the events after its `through_sequence`
-are at least its message count, and at least 1000, and its `compacted_at` is at least 6 hours old, so
+are at least its message count, and at least 1000, and its `compacted_at` is at least 5 hours old, so
 the work grows with the thread. The rule uses the replay's own fold
 (`database/thread-message-fold.ts`). When you change the fold, run `bun scripts/thread-event-compaction-e2e.ts`.
 Each delete finds the activity rows of its event through the index of migration 70
