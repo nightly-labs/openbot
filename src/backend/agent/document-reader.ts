@@ -12,7 +12,7 @@ export const readDocumentToolShape = {
 
 export const readDocumentToolSchema = z.strictObject(readDocumentToolShape);
 
-export class DocumentReadFailed extends Schema.TaggedError<DocumentReadFailed>()("DocumentReadFailed", {
+class DocumentReadFailed extends Schema.TaggedError<DocumentReadFailed>()("DocumentReadFailed", {
   reason: Schema.String,
 }) {}
 
