@@ -38,7 +38,7 @@ final class WatchSession: NSObject, ObservableObject {
   static let themeKey = "openbot.watch.theme"
   static let shared = WatchSession()
 
-  private static let snapshotKey = "openbot.watch.snapshot"
+  private static let snapshotKey = WidgetSource.snapshotKey
 
   @Published private(set) var snapshot: WatchSnapshot?
   @Published private(set) var activated = false

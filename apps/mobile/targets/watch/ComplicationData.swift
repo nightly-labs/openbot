@@ -238,22 +238,28 @@ struct ComplicationChange {
 }
 
 enum WidgetSource {
-  private static let snapshotKey = "openbot.watch.widget.snapshot"
+  static let snapshotKey = "openbot.watch.snapshot"
   private static let chosenKey = "openbot.watch.widget.server"
   private static let freshKey = "openbot.watch.widget.fresh"
 
   static func save(_ snapshot: WatchReadySnapshot, chosen: String) {
-    guard let defaults = UserDefaults(suiteName: watchAppGroup),
-      let encoded = try? JSONEncoder().encode(snapshot)
-    else { return }
-    if defaults.data(forKey: snapshotKey) != encoded { defaults.set(encoded, forKey: snapshotKey) }
+    guard let defaults = UserDefaults(suiteName: watchAppGroup) else { return }
     if defaults.string(forKey: chosenKey) != chosen { defaults.set(chosen, forKey: chosenKey) }
     defaults.set(Date().timeIntervalSince1970, forKey: freshKey)
   }
 
+  static func store(_ snapshot: WatchReadySnapshot) {
+    guard let data = try? JSONEncoder().encode(WatchSnapshot.ready(snapshot)),
+      let json = String(data: data, encoding: .utf8)
+    else { return }
+    UserDefaults(suiteName: watchAppGroup)?.set(json, forKey: snapshotKey)
+  }
+
   static func snapshot() -> WatchReadySnapshot? {
-    guard let data = UserDefaults(suiteName: watchAppGroup)?.data(forKey: snapshotKey) else { return nil }
-    return try? JSONDecoder().decode(WatchReadySnapshot.self, from: data)
+    guard let json = UserDefaults(suiteName: watchAppGroup)?.string(forKey: snapshotKey),
+      case .ready(let ready)? = WatchSnapshot.decode(json: json)
+    else { return nil }
+    return ready
   }
 
   static var chosen: String {
@@ -269,7 +275,6 @@ enum WidgetSource {
 
   static func remove() {
     let defaults = UserDefaults(suiteName: watchAppGroup)
-    defaults?.removeObject(forKey: snapshotKey)
     defaults?.removeObject(forKey: chosenKey)
     defaults?.removeObject(forKey: freshKey)
   }

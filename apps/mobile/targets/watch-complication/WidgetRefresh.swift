@@ -55,6 +55,7 @@ actor WidgetRefresh {
       let merged = WatchMerge.merge(parts: parts, phone: nil, previous: previous, hasPicture: WatchAvatarFiles.has)
     {
       _ = ComplicationData.save(merged, previous: previous, chosen: WidgetSource.chosen)
+      WidgetSource.store(merged)
     }
   }
 
