@@ -227,7 +227,7 @@ export function createChannelsController(env: ChannelsEnvironment) {
         }
         if (page && state.page?.channel.id === page.channel.id) {
           const merged =
-            replaceLoadedPage || page.olderCursor === null
+            (replaceLoadedPage && state.page.channel.revision !== page.channel.revision) || page.olderCursor === null
               ? { messages: page.messages, takeFetchedCursor: true }
               : mergeChannelPage(state.page.messages, page.messages);
           const kept = merged.messages.slice(0, merged.messages.length - page.messages.length);
