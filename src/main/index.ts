@@ -787,6 +787,7 @@ function registerIpcHandlers({
   remoteServers,
   centralAuth,
   skills,
+  pluginCatalog,
   hostedSites,
   githubConnector,
   linkAccount,
@@ -915,7 +916,7 @@ function registerIpcHandlers({
       forwardLiveEvent: forwardVoiceLiveEvent,
     }),
     ...accountIpcHandlers({ centralAuth, host, refreshServers: () => remoteServers.requestDirectoryRefresh() }),
-    ...skillIpcHandlers({ skills, getMainWindow: getDialogParent, translate: language.translate }),
+    ...skillIpcHandlers({ skills, pluginCatalog, getMainWindow: getDialogParent, translate: language.translate }),
     ...agentFolderIpcHandlers({
       folders: agentFolders,
       remoteServers,

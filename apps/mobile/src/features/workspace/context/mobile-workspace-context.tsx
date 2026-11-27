@@ -86,6 +86,7 @@ import { OWNER_TRANSFER_CAPABILITY } from "@openbot/contracts/team-protocol/owne
 import { PASSWORD_MANAGERS_CAPABILITY } from "@openbot/contracts/team-protocol/password-managers-v1";
 import { PENDING_APPROVAL_CAPABILITY } from "@openbot/contracts/team-protocol/pending-approval-v1";
 import { PHONE_FEEDBACK_CAPABILITY } from "@openbot/contracts/team-protocol/phone-feedback-v1";
+import { PLUGIN_CATALOG_CAPABILITY } from "@openbot/contracts/team-protocol/plugin-catalog-v1";
 import { PROVIDER_ACCOUNTS_CAPABILITY } from "@openbot/contracts/team-protocol/provider-accounts-v1";
 import { PROVIDERS_ADMIN_CAPABILITY } from "@openbot/contracts/team-protocol/providers-v1";
 import { PUSH_NOTIFICATION_THREADS_CAPABILITY } from "@openbot/contracts/team-protocol/push-notification-threads-v1";
@@ -2758,6 +2759,7 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
         canRelayMcpSignIn: (serverId) =>
           managesMcp(serverId) && hasCapability(capabilities, serverId, SIGN_IN_RELAY_CAPABILITY),
         macAppsUnavailable: (serverId) => hasCapability(capabilities, serverId, MAC_APPS_LIMIT_CAPABILITY),
+        hostLoadsPluginCatalog: (serverId) => hasCapability(capabilities, serverId, PLUGIN_CATALOG_CAPABILITY),
         canEditUiBlockPreview: (serverId) => hasCapability(capabilities, serverId, UI_BLOCK_PREVIEW_EDIT_CAPABILITY),
         canManageMcpAccess: (serverId) => administers(serverId, MCP_ACCESS_CAPABILITY),
         canAddMarketplaceAgents: (serverId) => administers(serverId, AGENT_INSTALL_CAPABILITY),

@@ -767,16 +767,18 @@ function renderWorkerModule(spec: PluginCatalogSpec, plugins: PluginDetail[]): s
     const { featured: _featured, updatedAt: _updatedAt, ...detail } = plugin;
     details[plugin.slug] = { ...detail, skills: [] };
   }
+  const entries = plugins.map((plugin) => ({
+    slug: plugin.slug,
+    version: plugin.version,
+    featured: spec.featured.includes(plugin.slug),
+    detailSha256: sha256(jsonLiteral(details[plugin.slug])),
+  }));
   const index = {
     schemaVersion: spec.schemaVersion,
     catalogVersion: spec.catalogVersion,
+    catalogSha256: sha256(jsonLiteral({ updatedAt: spec.updatedAt, plugins: entries })),
     updatedAt: spec.updatedAt,
-    plugins: plugins.map((plugin) => ({
-      slug: plugin.slug,
-      version: plugin.version,
-      featured: spec.featured.includes(plugin.slug),
-      detailSha256: sha256(jsonLiteral(details[plugin.slug])),
-    })),
+    plugins: entries,
   };
   return `/**
  * Plugin catalog served by the Account Worker.
@@ -788,6 +790,7 @@ function renderWorkerModule(spec: PluginCatalogSpec, plugins: PluginDetail[]): s
 export interface PluginCatalogIndex {
   schemaVersion: number;
   catalogVersion: string;
+  catalogSha256: string;
   /** When the catalog last changed. The public site dates its listing pages by it. */
   updatedAt: string;
   plugins: Array<{ slug: string; version: string; featured: boolean; detailSha256: string }>;

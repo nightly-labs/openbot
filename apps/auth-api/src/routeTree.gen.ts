@@ -160,6 +160,7 @@ import { Route as V1MobileAuthTicketRouteImport } from './routes/v1/mobile-auth/
 import { Route as V1MobileChangelogRouteImport } from './routes/v1/mobile/changelog'
 import { Route as V1MobileFeaturesRouteImport } from './routes/v1/mobile/features'
 import { Route as V1NearSplatRouteImport } from './routes/v1/near/$'
+import { Route as V1PluginsCatalogRouteImport } from './routes/v1/plugins/catalog'
 import { Route as V1SitesIndexRouteImport } from './routes/v1/sites/index'
 import { Route as V1SitesSiteIdRouteImport } from './routes/v1/sites/$siteId'
 import { Route as V1SitesReportsRouteImport } from './routes/v1/sites/reports'
@@ -1057,6 +1058,11 @@ const V1MobileFeaturesRoute = V1MobileFeaturesRouteImport.update({
 const V1NearSplatRoute = V1NearSplatRouteImport.update({
   id: '/v1/near/$',
   path: '/v1/near/$',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const V1PluginsCatalogRoute = V1PluginsCatalogRouteImport.update({
+  id: '/v1/plugins/catalog',
+  path: '/v1/plugins/catalog',
   getParentRoute: () => rootRouteImport,
 } as any)
 const V1SitesIndexRoute = V1SitesIndexRouteImport.update({
@@ -1980,6 +1986,7 @@ export interface FileRoutesByFullPath {
   '/v1/mobile/changelog': typeof V1MobileChangelogRoute
   '/v1/mobile/features': typeof V1MobileFeaturesRoute
   '/v1/near/$': typeof V1NearSplatRoute
+  '/v1/plugins/catalog': typeof V1PluginsCatalogRoute
   '/v1/sites/$siteId': typeof V1SitesSiteIdRoute
   '/v1/sites/reports': typeof V1SitesReportsRoute
   '/v1/skills/$skillId': typeof V1SkillsSkillIdRouteWithChildren
@@ -2269,6 +2276,7 @@ export interface FileRoutesByTo {
   '/v1/mobile/changelog': typeof V1MobileChangelogRoute
   '/v1/mobile/features': typeof V1MobileFeaturesRoute
   '/v1/near/$': typeof V1NearSplatRoute
+  '/v1/plugins/catalog': typeof V1PluginsCatalogRoute
   '/v1/sites/$siteId': typeof V1SitesSiteIdRoute
   '/v1/sites/reports': typeof V1SitesReportsRoute
   '/v1/skills/$skillId': typeof V1SkillsSkillIdRouteWithChildren
@@ -2563,6 +2571,7 @@ export interface FileRoutesById {
   '/v1/mobile/changelog': typeof V1MobileChangelogRoute
   '/v1/mobile/features': typeof V1MobileFeaturesRoute
   '/v1/near/$': typeof V1NearSplatRoute
+  '/v1/plugins/catalog': typeof V1PluginsCatalogRoute
   '/v1/sites/$siteId': typeof V1SitesSiteIdRoute
   '/v1/sites/reports': typeof V1SitesReportsRoute
   '/v1/skills/$skillId': typeof V1SkillsSkillIdRouteWithChildren
@@ -2854,6 +2863,7 @@ export interface FileRouteTypes {
     | '/v1/mobile/changelog'
     | '/v1/mobile/features'
     | '/v1/near/$'
+    | '/v1/plugins/catalog'
     | '/v1/sites/$siteId'
     | '/v1/sites/reports'
     | '/v1/skills/$skillId'
@@ -3143,6 +3153,7 @@ export interface FileRouteTypes {
     | '/v1/mobile/changelog'
     | '/v1/mobile/features'
     | '/v1/near/$'
+    | '/v1/plugins/catalog'
     | '/v1/sites/$siteId'
     | '/v1/sites/reports'
     | '/v1/skills/$skillId'
@@ -3436,6 +3447,7 @@ export interface FileRouteTypes {
     | '/v1/mobile/changelog'
     | '/v1/mobile/features'
     | '/v1/near/$'
+    | '/v1/plugins/catalog'
     | '/v1/sites/$siteId'
     | '/v1/sites/reports'
     | '/v1/skills/$skillId'
@@ -3662,6 +3674,7 @@ export interface RootRouteChildren {
   V1MobileChangelogRoute: typeof V1MobileChangelogRoute
   V1MobileFeaturesRoute: typeof V1MobileFeaturesRoute
   V1NearSplatRoute: typeof V1NearSplatRoute
+  V1PluginsCatalogRoute: typeof V1PluginsCatalogRoute
   V1SitesSiteIdRoute: typeof V1SitesSiteIdRoute
   V1SitesReportsRoute: typeof V1SitesReportsRoute
   V1SkillsSkillIdRoute: typeof V1SkillsSkillIdRouteWithChildren
@@ -4834,6 +4847,13 @@ declare module '@tanstack/solid-router' {
       path: '/v1/near/$'
       fullPath: '/v1/near/$'
       preLoaderRoute: typeof V1NearSplatRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/v1/plugins/catalog': {
+      id: '/v1/plugins/catalog'
+      path: '/v1/plugins/catalog'
+      fullPath: '/v1/plugins/catalog'
+      preLoaderRoute: typeof V1PluginsCatalogRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/v1/sites/': {
@@ -6235,6 +6255,7 @@ const rootRouteChildren: RootRouteChildren = {
   V1MobileChangelogRoute: V1MobileChangelogRoute,
   V1MobileFeaturesRoute: V1MobileFeaturesRoute,
   V1NearSplatRoute: V1NearSplatRoute,
+  V1PluginsCatalogRoute: V1PluginsCatalogRoute,
   V1SitesSiteIdRoute: V1SitesSiteIdRoute,
   V1SitesReportsRoute: V1SitesReportsRoute,
   V1SkillsSkillIdRoute: V1SkillsSkillIdRouteWithChildren,

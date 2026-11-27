@@ -255,7 +255,10 @@ Live Activity starts and ends, voice conversation and spoken turn outcomes, agen
 installs, and Marketplace installs (agent, skill or app, and the result; no listing name).
 
 The mobile Marketplace reads the public catalog and the plugin app icons from the account service,
-without account credentials. The phone sends no request to a plugin vendor until the user connects
+without account credentials. The desktop app, the web client and each OpenBot host also read the
+public plugin catalog (`/v1/plugins/catalog`) from the account service without account credentials:
+the Marketplace when it opens, and a host at start and then every 6 hours. The request carries no
+user data. The phone sends no request to a plugin vendor until the user connects
 that vendor's app. A key the user types, or the grant of a browser sign-in, goes only to the user's
 own host over the encrypted Team channel.
 Mobile properties include app version/build, iOS or Android, result, timing, bounded connection stage,

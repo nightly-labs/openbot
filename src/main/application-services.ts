@@ -396,6 +396,7 @@ import { EncryptedRecordStore } from "./password-managers/encrypted-record-store
 import { PasswordManagersService } from "./password-managers/password-managers-service";
 import { managedProtonPassCli } from "./password-managers/proton-pass-cli-installer";
 import { ProtonPassDriver, protonPassRecordSchema } from "./password-managers/proton-pass-driver";
+import { PluginCatalogService } from "./plugin-catalog-service";
 import { PointerForwardingGate } from "./pointer-forwarding-gate";
 import { ProcessLauncher } from "./process-launcher";
 import { PromptCacheTtlPreferenceStore } from "./prompt-cache-ttl-preference-store";
@@ -622,6 +623,7 @@ const TEARDOWN_ORDER = {
   browserView: 45,
   providerDetection: 48,
   providerRuntimes: 50,
+  pluginCatalog: 56,
   localServers: 57,
   remoteServers: 60,
   voice: 70,
@@ -784,6 +786,7 @@ export interface ApplicationServices {
   localServers: LocalServers | null;
   centralAuth: CentralAuthManager;
   skills: SkillMarketplaceService;
+  pluginCatalog: PluginCatalogService;
   hostedSites: HostedSiteDesktopService;
   billing: BillingDesktopService;
   referral: ReferralDesktopService;
@@ -2105,18 +2108,25 @@ export async function createApplicationServices({
   await Effect.runPromise(agentApiKeys.registerSaved());
   await Effect.runPromise(agentApiKeys.syncVault().pipe(Effect.ignore));
   let workflowTriggers: WorkflowTriggers | null = null;
-  const catalogPluginServers = await Effect.runPromise(
-    loadCatalogPluginServers(
-      app.isPackaged
-        ? join(process.resourcesPath, "plugin-catalog")
-        : resolve(__dirname, "../../resources/plugin-catalog"),
+  const pluginCatalog = new PluginCatalogService({
+    bundled: await Effect.runPromise(
+      loadCatalogPluginServers(
+        app.isPackaged
+          ? join(process.resourcesPath, "plugin-catalog")
+          : resolve(__dirname, "../../resources/plugin-catalog"),
+      ),
     ),
+    resolveApiUrl: (path) => centralAuth.resolveApiUrl(path),
+  });
+  const pluginCatalogRefresh = Effect.runFork(pluginCatalog.refreshLoop());
+  teardown.push(TEARDOWN_ORDER.pluginCatalog, "the plugin catalog refresh", () =>
+    Effect.runPromise(Fiber.interrupt(pluginCatalogRefresh)),
   );
   providerRuntimes.setCatalogNpxApps(
     (config) =>
       config.transport === "stdio" &&
       config.command === "npx" &&
-      catalogPluginSlug(config, catalogPluginServers, homedir()) !== null,
+      catalogPluginSlug(config, pluginCatalog.servers(), homedir()) !== null,
   );
   const workflowStore = new WorkflowStore({
     database: store.database,
@@ -2229,7 +2239,7 @@ export async function createApplicationServices({
       create: () => hostedServers.createServerClaim().pipe(toToolOperationFailed),
     },
     marketplaceAppServer: (appId) => {
-      const listed = catalogPluginServers.filter((server) => server.slug === appId);
+      const listed = pluginCatalog.servers().filter((server) => server.slug === appId);
       const [server] = listed;
       if (!server || listed.length !== 1) return null;
       const config = service.listMcpServers().find((saved) => catalogPluginSlug(saved, listed, homedir()) === appId);
@@ -3214,7 +3224,7 @@ export async function createApplicationServices({
     timezone: () => serverTimezone.effective(),
     settings: {
       mcpServers: () => service.listMcpServers(),
-      listedMcpServers: () => catalogPluginServers.filter((server) => server.transport === "http"),
+      listedMcpServers: () => pluginCatalog.servers().filter((server) => server.transport === "http"),
       saveMcpServer: (config) => service.saveMcpServer({ config }),
       customProviders: () => customProviderChanges.list(),
       saveCustomProvider: (input) => customProviderChanges.save(input),
@@ -3786,7 +3796,7 @@ export async function createApplicationServices({
     resolveMcpServer: (name) => {
       const configs = service.listMcpServers().filter((server) => isReportedMcpServerName(server.name, name));
       if (configs.length === 0) return null;
-      const slugs = new Set(configs.map((config) => catalogPluginSlug(config, catalogPluginServers, homedir())));
+      const slugs = new Set(configs.map((config) => catalogPluginSlug(config, pluginCatalog.servers(), homedir())));
       const [slug] = slugs;
       return { slug: slugs.size === 1 && slug ? slug : null };
     },
@@ -3812,7 +3822,7 @@ export async function createApplicationServices({
         workflowCount: () => workflowStore.list().length,
         skills: (agentId) => skills.listInstalledForChatTags(agentId),
         mcpServers: () => service.listMcpServers(),
-        pluginSlug: (config) => catalogPluginSlug(config, catalogPluginServers, homedir()),
+        pluginSlug: (config) => catalogPluginSlug(config, pluginCatalog.servers(), homedir()),
         computerUseEnabled: () => cuaDriver.mcpServerForProviders() !== null,
       }),
     inventoryDay: analyticsInventoryDayStore(join(app.getPath("userData"), ANALYTICS_INVENTORY_FILE)),
@@ -4508,6 +4518,7 @@ export async function createApplicationServices({
 
   return {
     service,
+    pluginCatalog,
     workflows: workflowRuntime,
     workflowFiles,
     workflowGitHub,
