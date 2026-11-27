@@ -5,6 +5,7 @@ import { getArray, getRecord, getString, isRecord } from "../protocol";
 export const CODEX_UNFIT_SKILLS = [
   "openai-docs",
   "plugin-management:plugin-management",
+  "visualize:visualize",
   "work-pets:create-pet",
   "work-pets:pets",
   "work-pets:update-pet",
