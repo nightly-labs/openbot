@@ -1875,6 +1875,12 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
       }),
   });
   onCleanup(remoteChatContent.dispose);
+  createEffect(
+    () => (workspace.state.capabilities.length > 0 ? server()?.id : undefined),
+    (serverId) => {
+      if (serverId) void remoteChatContent.load(serverId);
+    },
+  );
   const hostBrowsingMemoryCalls: HostBrowsingMemoryCalls = {
     getBrowsingMemory: async (serverId) =>
       runTeamEffect(getHostBrowsingMemory(hostRequest(serverId)).pipe(Effect.mapError((error) => error.cause))),
