@@ -306,15 +306,15 @@ function readEmailSenders(bindings: EmailDeliveryBindings): EmailSenders | null 
 function readOverflowMailboxes(bindings: EmailDeliveryBindings, primary: SmtpEmailConfig): OverflowMailbox[] {
   return [
     readOverflowMailbox(
-      "overflow",
-      bindings.EMAIL_SMTP_OVERFLOW_USERNAME,
-      bindings.EMAIL_SMTP_OVERFLOW_PASSWORD,
-      primary,
-    ),
-    readOverflowMailbox(
       "overflow_2",
       bindings.EMAIL_SMTP_OVERFLOW_2_USERNAME,
       bindings.EMAIL_SMTP_OVERFLOW_2_PASSWORD,
+      primary,
+    ),
+    readOverflowMailbox(
+      "overflow",
+      bindings.EMAIL_SMTP_OVERFLOW_USERNAME,
+      bindings.EMAIL_SMTP_OVERFLOW_PASSWORD,
       primary,
     ),
   ].flat();

@@ -562,7 +562,7 @@ export const messages = {
   "mobile.chat.outbox.failedHold": "لم يُرسل. المس الرسالة مع الاستمرار لإعادة المحاولة.",
   "mobile.chat.outbox.cancelSend": "عدم الإرسال",
   "mobile.chat.outbox.menuHint": "يعرض خيارات هذه الرسالة.",
-  "mobile.chat.outbox.unconfirmed": "غير مؤكد. تحقق من الدردشة قبل إرسالها مرة أخرى.",
+  "mobile.chat.outbox.unconfirmed": "غير مؤكد. تحقق من الدردشة، ثم المس الرسالة مع الاستمرار لتعديلها أو إلغائها.",
   "mobile.chat.outbox.editFailed": "تعذّر فتح الرسالة لتعديلها.",
   "mobile.chat.outbox.saveFailed": "تعذّر حفظ الرسائل المنتظرة على هذا الهاتف. أبقِ التطبيق مفتوحًا حتى يتم إرسالها.",
   "mobile.chat.failure.title": "لم تتم الإجابة",

@@ -292,7 +292,7 @@ async function runWorkspaceOnlySmoke(provider: AgentProvider): Promise<void> {
   try {
     await initialize(client);
     const model = created.model ?? (await defaultModel(client));
-    const codexConfig = provider === "codex" ? codexSandboxConfig(agent, sharedRoot) : {};
+    const codexConfig = provider === "codex" ? await runCauseEffect(codexSandboxConfig(agent, sharedRoot, [])) : {};
     const started = await runCauseEffect(
       client.request(
         "thread/start",
@@ -328,7 +328,7 @@ async function runWorkspaceOnlySmoke(provider: AgentProvider): Promise<void> {
           cwd: workspaceRoot,
           runtimeWorkspaceRoots: [workspaceRoot, sharedRoot],
           approvalPolicy: "on-request",
-          sandboxPolicy: codexSandboxPolicy(agent, sharedRoot),
+          sandboxPolicy: await runCauseEffect(codexSandboxPolicy(agent, sharedRoot, [])),
           input: [
             {
               type: "text",

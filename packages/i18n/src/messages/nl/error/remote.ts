@@ -100,6 +100,8 @@ export const messages = {
     "OpenBot kon de verbinding met deze server niet starten. Als dit blijft gebeuren, sluit OpenBot af en open het opnieuw.",
   "error.remote.connectionServiceUnreachable":
     "Deze computer kan de verbindingsdienst van OpenBot niet bereiken. Controleer de internetverbinding. OpenBot verbindt automatisch opnieuw.",
+  "error.remote.deviceConnectionServiceUnreachable":
+    "Dit apparaat kan de verbindingsdienst van OpenBot niet bereiken. Controleer de internetverbinding en de vpn. OpenBot verbindt automatisch opnieuw.",
   "error.remote.serverAnswerTimeout": "De server heeft niet op tijd geantwoord. OpenBot verbindt automatisch opnieuw.",
   "error.remote.signInConnectionClosed":
     "De verbinding met de server is tijdens het inloggen verbroken. Gebeurt dit vaker, controleer dan de datum en tijd op de server en op dit apparaat.",

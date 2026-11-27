@@ -1219,6 +1219,13 @@ export function createWebWorkspace(
   function retryHosts(): Promise<void> {
     return refreshHosts().catch(() => undefined);
   }
+  let focusAccountCheckedAt = Number.NEGATIVE_INFINITY;
+  function focusAccountCheck(): Promise<void> {
+    const now = Date.now();
+    if (now - focusAccountCheckedAt < FOCUS_ACCOUNT_CHECK_MS) return Promise.resolve();
+    focusAccountCheckedAt = now;
+    return props.onSessionCheck().then(retryHosts);
+  }
   function setHostedSleep(hostedSleep: HostedServerSleep | null): void {
     if (state.hostedSleep !== hostedSleep)
       setState((draft) => {
@@ -2122,14 +2129,13 @@ export function createWebWorkspace(
       : [];
   createHostRestartToasts(() => hostViews().filter((host) => !followsServerUpdate(host.id)));
   onSettled(() => {
+    focusAccountCheckedAt = Date.now();
     void refreshHosts().catch(report);
     const pageFocus = () => setPageFocused(!document.hidden && document.hasFocus());
     const focus = () => {
       pageFocus();
       runtime.hosts?.refresh();
-      void props
-        .onSessionCheck()
-        .then(retryHosts)
+      void focusAccountCheck()
         .then(() => {
           if (state.status === "online") return Date.now() - syncedAt < FOCUS_RESYNC_MS ? undefined : resync();
           if (state.recovery?.phase !== "suspended") recoverNow();
@@ -2654,6 +2660,7 @@ export function createWebWorkspace(
 }
 
 const FOCUS_RESYNC_MS = 30_000;
+const FOCUS_ACCOUNT_CHECK_MS = 60_000;
 
 function changedConversation(event: AgentEvent | TeamRealtimeEvent): string | undefined {
   switch (event.type) {

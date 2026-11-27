@@ -13,6 +13,7 @@ import {
   writeFileSync,
 } from "node:fs";
 import { request as httpRequest } from "node:http";
+import { connect } from "node:net";
 import { homedir, tmpdir } from "node:os";
 import { join, parse, resolve } from "node:path";
 import { isDeepStrictEqual } from "node:util";
@@ -3576,6 +3577,89 @@ try {
 
   function summary(reply: Reply): ReplySummary {
     return { status: reply.status, body: reply.body ?? reply.text.slice(0, 200) };
+  }
+
+  function rawUpgradeStatusLine(target: string): Promise<string> {
+    return new Promise((resolveLine, rejectLine) => {
+      const socket = connect(port, "127.0.0.1", () => {
+        socket.write(
+          [
+            `GET ${target} HTTP/1.1`,
+            `Host: 127.0.0.1:${port}`,
+            "Connection: Upgrade",
+            "Upgrade: websocket",
+            "Sec-WebSocket-Version: 13",
+            `Sec-WebSocket-Key: ${randomBytes(16).toString("base64")}`,
+            `Sec-WebSocket-Protocol: ${TEAM_PROTOCOL_V1_WEBSOCKET}`,
+            "",
+            "",
+          ].join("\r\n"),
+        );
+      });
+      const deadline = setTimeout(() => {
+        socket.destroy();
+        resolveLine("no answer");
+      }, 5_000);
+      let received = "";
+      socket.on("data", (chunk: Buffer) => {
+        received += chunk.toString("utf8");
+      });
+      socket.on("close", () => {
+        clearTimeout(deadline);
+        resolveLine(received.split("\r\n")[0] ?? "");
+      });
+      socket.on("error", (error) => {
+        clearTimeout(deadline);
+        rejectLine(error);
+      });
+    });
+  }
+
+  function rawPathGet(path: string): Promise<ReplySummary> {
+    return new Promise((resolveCall, rejectCall) => {
+      const request = httpRequest({ host: "127.0.0.1", port, method: "GET", path }, (response) => {
+        const chunks: Buffer[] = [];
+        response.on("data", (chunk: Buffer) => chunks.push(chunk));
+        response.on("end", () => {
+          const text = Buffer.concat(chunks).toString("utf8");
+          resolveCall({ status: response.statusCode ?? 0, body: text ? parseJson(text) : null });
+        });
+      });
+      request.setTimeout(5_000, () => request.destroy(new Error("The host did not answer.")));
+      request.on("error", rejectCall);
+      request.end();
+    });
+  }
+
+  {
+    const uncaught: string[] = [];
+    const recordUncaught = (error: Error) => uncaught.push(error.message);
+    process.on("uncaughtException", recordUncaught);
+    try {
+      const unparsable = await rawUpgradeStatusLine("//[");
+      const afterwards = await rawUpgradeStatusLine(TEAM_API_ROUTES.events);
+      check(
+        "an upgrade with a target that is not a URL gets 400 before the token check, and the next upgrade gets 401",
+        unparsable === "HTTP/1.1 400 Bad Request" &&
+          afterwards === "HTTP/1.1 401 Unauthorized" &&
+          uncaught.length === 0,
+        { unparsable, afterwards, uncaught },
+      );
+      const loggedBefore = logged.length;
+      const plain = await rawPathGet("//[");
+      const compatibility = await call("GET", TEAM_API_ROUTES.compatibility, { protocol: null });
+      check(
+        "a request with a target that is not a URL gets 400 with the request error, writes no error log line, and the host keeps answering",
+        plain.status === 400 &&
+          field(plain.body, "error") === sourceText("error.team.requestFailed") &&
+          logged.slice(loggedBefore).every((line) => !line.includes("Team API request failed")) &&
+          compatibility.status === 200 &&
+          uncaught.length === 0,
+        { plain, compatibility: compatibility.status, uncaught },
+      );
+    } finally {
+      process.off("uncaughtException", recordUncaught);
+    }
   }
 
   {

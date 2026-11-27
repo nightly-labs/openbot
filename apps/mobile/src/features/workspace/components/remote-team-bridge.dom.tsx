@@ -188,7 +188,9 @@ export default function RemoteTeamBridge({
       peer.setActive(value);
     };
   const setActive = applyActive.current;
-  const networkChanged = useRef(() => peer.networkMoved()).current;
+  const networkChanged = useRef((change: BridgeJson) =>
+    change === "changed" ? peer.networkChanged() : peer.networkMoved(),
+  ).current;
   const cancelUpload = useRef(() => {
     void peer.cancelUpload().catch(() => undefined);
   }).current;

@@ -14,6 +14,7 @@ import { isDynamicRecord, isNumber, isString } from "@openbot/contracts/runtime-
 import { TEAM_API_ROUTES } from "@openbot/contracts/team-api-routes";
 import { CHANNEL_ROUTES } from "@openbot/contracts/team-protocol/channels-v1";
 import { encodeTeamCapabilitiesV10, TEAM_CURRENT_CAPABILITIES } from "@openbot/contracts/team-protocol/current";
+import type { ServerAppearance } from "@openbot/contracts/team-protocol/host-appearance-v1";
 import {
   TEAM_APP_VERSION_HEADER,
   TEAM_CAPABILITIES_HEADER,
@@ -46,6 +47,7 @@ export interface WatchRelayTeamApi {
   port(): number | null;
   appVersion(): string;
   serverName(): string | null;
+  serverAppearance(): ServerAppearance | null;
   agents: Pick<
     TeamApiAgents,
     | "listAgents"
@@ -131,6 +133,7 @@ export class WatchRelayCommands {
     return buildHostWatchSnapshot({
       hostId: context.hostId,
       serverName: this.#api.serverName() ?? context.hostId,
+      appearance: this.#api.serverAppearance(),
       watchKey: context.watchKey,
       agents: agents.listAgents().filter((agent) => visible(agent.id)),
       runtime: {

@@ -687,6 +687,7 @@ export class TeamApiServer {
       port: () => this.#port,
       appVersion: () => this.#options.appVersion ?? "0.0.0",
       serverName: () => store.getIdentity()?.serverName ?? null,
+      serverAppearance: () => store.getIdentity()?.appearance ?? null,
       agents,
       layout: () => this.#options.sidebarLayout.getSnapshot(),
       listChannels: (memberId) => this.#options.channels?.store.list(memberId) ?? [],
@@ -719,7 +720,12 @@ export class TeamApiServer {
     const server = createServer((request, response) => void this.#handle(request, response));
     this.#server = server;
     server.on("upgrade", (request, socket, head) => {
-      const url = new URL(request.url ?? "/", "http://127.0.0.1");
+      const url = URL.parse(request.url ?? "/", "http://127.0.0.1");
+      if (!url) {
+        socket.write("HTTP/1.1 400 Bad Request\r\nConnection: close\r\n\r\n");
+        socket.destroy();
+        return;
+      }
       if (this.#options.remoteScreen?.handlesUpgrade(url)) {
         this.#options.remoteScreen.handleUpgrade(request, socket, head, url);
         return;
@@ -1142,7 +1148,8 @@ export class TeamApiServer {
     try {
       response.setHeader("Cache-Control", "no-store");
       response.setHeader("X-Content-Type-Options", "nosniff");
-      const url = new URL(request.url ?? "/", "http://127.0.0.1");
+      const url = URL.parse(request.url ?? "/", "http://127.0.0.1");
+      if (!url) return this.#json(response, 400, { error: sourceText("error.team.requestFailed") });
       this.#responseRoutes.set(response, {
         method,
         path: url.pathname,
