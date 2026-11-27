@@ -45,6 +45,7 @@ export interface ChannelsEnvironment {
   scopeKey: () => string;
   readSelection: (scope: string) => string | null;
   writeSelection: (channelId: string | null) => void;
+  remote: () => boolean;
   supported: () => boolean;
   deletionSupported: () => boolean;
   messageDeletionSupported: () => boolean;
@@ -102,6 +103,7 @@ export function createChannelsController(env: ChannelsEnvironment) {
   const readThrough = new Map<string, number>();
   let visitRead: string | null = null;
   const keptPages = new Map<string, ChannelPage>();
+  let prefetchEpoch = 0;
   const changeListeners = new Set<(channelId: string | null) => void>();
   function announce(channelId: string | null): void {
     for (const listener of changeListeners) listener(channelId);
@@ -406,6 +408,7 @@ export function createChannelsController(env: ChannelsEnvironment) {
         refreshId += 1;
         readThrough.clear();
         keptPages.clear();
+        prefetchEpoch += 1;
         visitRead = null;
         failedCommand = null;
         pendingCommands = 0;
@@ -438,6 +441,65 @@ export function createChannelsController(env: ChannelsEnvironment) {
         }),
       );
       void refresh(saved);
+    },
+  );
+  createEffect(
+    () => ({
+      scope: env.scopeKey(),
+      remote: env.remote(),
+      supported: supported(),
+      listed: state.listed,
+      channelIds: state.channels
+        .filter((channel) => !channel.archived)
+        .map((channel) => channel.id)
+        .join("\0"),
+    }),
+    ({ scope, remote, supported, listed, channelIds }) => {
+      if (!remote || !supported || !listed || !channelIds || typeof window.requestIdleCallback !== "function") return;
+      const selected = untrack(() => state.selectedId);
+      const remaining = Math.max(0, KEPT_PAGES - keptPages.size);
+      if (remaining === 0) return;
+      const candidates = channelIds
+        .split("\0")
+        .filter((id) => id !== selected && !keptPages.has(id))
+        .slice(0, remaining);
+      if (candidates.length === 0) return;
+      let stopped = false;
+      let idle: number | undefined;
+      function next(): void {
+        const channelId = candidates.shift();
+        if (stopped || disposed || !channelId) return;
+        idle = window.requestIdleCallback(() => {
+          if (stopped || disposed || scope !== env.scopeKey()) return;
+          if (keptPages.has(channelId) || untrack(() => state.selectedId) === channelId) {
+            next();
+            return;
+          }
+          const epoch = prefetchEpoch;
+          void env
+            .port()
+            .agent.readChannel({ channelId })
+            .then((page) => {
+              if (
+                !stopped &&
+                !disposed &&
+                epoch === prefetchEpoch &&
+                scope === env.scopeKey() &&
+                untrack(() => state.selectedId) !== channelId &&
+                !keptPages.has(channelId)
+              ) {
+                keepPage(page);
+              }
+            })
+            .catch(() => undefined)
+            .finally(next);
+        });
+      }
+      next();
+      return () => {
+        stopped = true;
+        if (idle !== undefined) window.cancelIdleCallback(idle);
+      };
     },
   );
   onSettled(() => {
@@ -528,6 +590,7 @@ export function createChannelsController(env: ChannelsEnvironment) {
       const deleteChannelHistory = env.port().agent.deleteChannelHistory;
       if (!deleteChannelHistory) throw new Error(currentText().t("channel.error.action"));
       await deleteChannelHistory(channelId);
+      prefetchEpoch += 1;
       await refreshAfter();
     },
     compactContext: async (channelId: string) => {
@@ -577,11 +640,13 @@ export function createChannelsController(env: ChannelsEnvironment) {
       actionToast.error(message, { report: { operation: "other", source: "action", cause_code: "unknown" } });
     },
     changed: (channelId: string) => {
+      prefetchEpoch += 1;
       if (channelId !== state.selectedId) keptPages.delete(channelId);
       announce(channelId);
       return refresh(undefined, channelId === state.selectedId);
     },
     resync: () => {
+      prefetchEpoch += 1;
       keptPages.clear();
       announce(null);
       return refresh();

@@ -2102,6 +2102,7 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
       const hostId = workspace.state.host?.hostId;
       if (hostId) writeChannelSelection(props.accountId, hostId, channelId);
     },
+    remote: () => true,
     supported: channelsSupported,
     deletionSupported: () => canAdministerServer(workspace.state.host?.role),
     taskCancelSupported: () => workspace.state.capabilities.includes(CHANNEL_TASK_CANCEL_CAPABILITY),
