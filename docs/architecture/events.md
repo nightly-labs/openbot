@@ -73,8 +73,8 @@ receipts. A change to `schedule` keeps them.
 The ingress socket presents a signed route ticket with the current routes, signed with the remote
 ticket key and the webhook route audience
 (`WEBHOOK_ROUTE_TTL_SECONDS`, 5 minutes). After a route change, the host opens a new socket to get a
-new ticket. Signal keeps revocations in memory. For 5 minutes after Signal starts, it confirms each
-ticket route with the account service. The host keeps the webhook ingress open while it has at least
+new ticket. Signal keeps revocations in memory. For a ticket issued before Signal started (its `iat`, with
+60 s for clock skew), it confirms each ticket route with the account service. The host keeps the webhook ingress open while it has at least
 one route. When Slack or Discord share the socket, a failed webhook ticket does not stop them: the
 socket connects without webhook routes. After it is online, the host opens it again with a backoff
 of 2 seconds that doubles up to 5 minutes, until Signal confirms the webhook route.

@@ -110,6 +110,24 @@ changes that are live now.
 
 ## 4. Deploy
 
+Deploy one home at a time. Never restart two homes in the same minute. Each restart closes the
+signalling sockets of that home, and each host that reconnects can need a check in D1. Five homes
+together sent every host to D1 at the same time on 2026-11-27 (v0.81.0): D1 answered 7429 and
+Signal closed hosts with 1013 for about 5 minutes.
+
+- When the tag adds a Signal call to the account service, deploy the Worker first and check the
+  route (step 2, "Account service"). Signal from before the Worker route uses the old single route.
+- Restart the entry home last: the home whose `/metrics` shows `openbot_remote_signal_entry` with
+  the value 1. The entry can move between homes. Restart the other homes in this order: `signal-sg`, `signal-au`,
+  `signal-us`, `signal2`, `signal1`.
+- Before each restart, read `openbot_remote_peer_connections` from the local `/metrics` route of
+  that home (health port, `Authorization: Bearer $REMOTE_METRICS_TOKEN` read on the host). Print
+  only the metric lines, never the token.
+- After each restart, go to the next home only when `/health/ready` succeeds, the gauge is again at
+  90% or more of the value before (or 5 minutes went by), and `openbot_remote_auth_unavailable_total`
+  stays 0. That counter grows when Signal closes a host with 1013 because the account service did
+  not answer. If it grows, stop and report.
+
 Report the results of steps 1 to 3 and get approval. Then follow "Deployment procedure" in
 [docs/remote-session-deployment.md](../../../docs/remote-session-deployment.md) with these changes:
 
@@ -133,7 +151,7 @@ Report the results of steps 1 to 3 and get approval. Then follow "Deployment pro
 - Unauthenticated probes of each public route that the diff adds give 401 or 403, not 404 or 502.
   For example, `POST /v1/webhooks/x` with `content-type: application/json` gives 401.
 
-Then deploy the same tag to the second machine `signal2.openbot.run` (see "Second Signal machine" in the
+Then, one home at a time as step 4 says, deploy the same tag to the second machine `signal2.openbot.run` (see "Second Signal machine" in the
 deployment document) with the same steps, `before-<tag>` image and rollback. Do the step 3 key
 comparison against `signal2` too, and copy each added encrypted line into its host file. Make the
 same Nginx change there. `https://signal2.openbot.run/health/ready` must succeed, and `/health/live` must show

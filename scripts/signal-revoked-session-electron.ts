@@ -31,7 +31,7 @@ const TURN_SECRET = randomBytes(32).toString("base64url");
 const HOST_RECONNECT_MS = 120_000;
 const TEARDOWN_AFTER_REVOKE_MS = 20_000;
 const OPEN_CHANNEL_CHECK_MS = 2_000;
-const SIGNAL_INITIAL_CHECK_MS = 3 * 60_000;
+const SIGNAL_START_CLOCK_SKEW_MS = 60_000;
 const TICKET_LIFETIME_SECONDS = 300;
 
 interface Check {
@@ -414,11 +414,11 @@ async function revokeThenSignalRestart(): Promise<void> {
 async function unusedTicketAfterRestart(): Promise<void> {
   if (!staleTicket) throw new Error("No ticket from before the Signal restart.");
   await new Promise((wake) =>
-    setTimeout(wake, Math.max(0, signalStartedAt + SIGNAL_INITIAL_CHECK_MS + 2_000 - Date.now())),
+    setTimeout(wake, Math.max(0, signalStartedAt + SIGNAL_START_CLOCK_SKEW_MS + 10_000 - Date.now())),
   );
   const stale = await page(helloSchema, "hello", memberCUrl, staleTicket.token, 10_000);
   record(
-    "After a Signal restart, an unused ticket of an ended session is refused also after the first 3 minutes",
+    "After a Signal restart, an unused ticket of an ended session is refused also after the clock skew margin",
     staleTicket.revokeStatus === 204 && stale.type !== "ready",
     `${Math.round((Date.now() - signalStartedAt) / 1_000)} s after the Signal start: ${JSON.stringify(stale)}; account service checks: ${sessionChecks.get(staleTicket.sessionId) ?? 0}`,
   );

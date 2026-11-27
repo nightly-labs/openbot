@@ -295,11 +295,16 @@ never tokens or token hashes, and all operations are scoped to the authenticated
 Cloudflare issues short ES256 connection tickets and stores the logical session. Signal issues a
 10-minute resume token, so a short Signal update does not end an active WebRTC connection. Signal
 validates a trusted, non-expired resume token locally. After a Signal restart, the first use of a token
-checks the durable control plane once. A connection ticket is checked the same way during the first
-3 minutes after a Signal start, and also later when it was issued before that start (with 60 s for
-clock skew), because Signal forgot the revocations from before its restart. Tickets issued after the
-start get no extra check. An expired token also needs one durable check before Signal issues
-a replacement. Later reconnects use the in-memory trust cache. This is not a heartbeat.
+checks the durable control plane once. A connection ticket is checked the same way when it was issued
+before the Signal start (with 60 s for clock skew), because Signal forgot the revocations from before
+its restart. Tickets issued after the start get no extra check. An expired token also needs one
+durable check before Signal issues a replacement. Later reconnects use the in-memory trust cache.
+This is not a heartbeat. Signal collects these checks for 25 ms and sends up to 100 of them in one
+signed `/v2/remote/resume/validate-batch` request, which reads D1 with one host query and one
+session query, so a restart that reconnects every host costs about one request per 100 hosts, not
+one per host. An account service without the batch route answers 404; Signal then uses the single
+`/v2/remote/resume/validate` route, at most 64 at a time, and tries the batch route again after
+10 minutes.
 Session endings and access changes use a durable D1 outbox. Cloudflare sends each revocation to Signal
 immediately and retries failed deliveries from a scheduled task. This keeps reconnect validation local
 without losing revocations when Signal is temporarily unavailable.

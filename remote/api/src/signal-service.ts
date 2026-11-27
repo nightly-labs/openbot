@@ -1,6 +1,6 @@
 import { createHash, randomBytes } from "node:crypto";
 import type { DiscordDelivery } from "@openbot/contracts/signal-protocol/discord-api";
-import { DISCORD_ROUTE_TTL_SECONDS, type DiscordRouteGuild } from "@openbot/contracts/signal-protocol/discord-route";
+import type { DiscordRouteGuild } from "@openbot/contracts/signal-protocol/discord-route";
 import type { GitHubRouteRepository } from "@openbot/contracts/signal-protocol/github-route";
 import {
   INGRESS_QUEUE_CAPABILITY,
@@ -8,7 +8,7 @@ import {
   isIngressQueueKey,
   type QueuedSignalMessage,
 } from "@openbot/contracts/signal-protocol/ingress-queue";
-import { SLACK_ROUTE_TTL_SECONDS, type SlackRouteTeam } from "@openbot/contracts/signal-protocol/slack-route";
+import type { SlackRouteTeam } from "@openbot/contracts/signal-protocol/slack-route";
 import {
   TELEGRAM_CAPABILITY,
   TELEGRAM_ROUTE_TTL_SECONDS,
@@ -29,11 +29,7 @@ import {
   watchProofMessage,
   watchSealedDigest,
 } from "@openbot/contracts/signal-protocol/watch-relay";
-import {
-  WEBHOOK_ROUTE_TTL_SECONDS,
-  type WebhookRoute,
-  type WebhookSignatureFormat,
-} from "@openbot/contracts/signal-protocol/webhook-route";
+import type { WebhookRoute, WebhookSignatureFormat } from "@openbot/contracts/signal-protocol/webhook-route";
 import { sourceText } from "@openbot/i18n/source";
 import { Context, Deferred, Effect, Fiber, Layer, Result, Schema } from "effect";
 import { IngressQueue, queueRouteKey, type RouteWake, type RouteWaker } from "./ingress-queue";
@@ -60,14 +56,17 @@ import { RemoteTokenError, type RemoteTokenUnavailableError, type TelegramChatLi
 
 interface SlackRoute {
   teams: SlackRouteTeam[];
+  issuedAt?: number | undefined;
 }
 
 interface DiscordRoute {
   guilds: DiscordRouteGuild[];
+  issuedAt?: number | undefined;
 }
 
 interface WebhookRouteTicket {
   routes: WebhookRoute[];
+  issuedAt?: number | undefined;
 }
 
 interface GitHubRoute {
@@ -76,6 +75,7 @@ interface GitHubRoute {
 
 interface TelegramRoute {
   chats: TelegramRouteChat[];
+  issuedAt?: number | undefined;
 }
 
 export interface RemoteTokenProvider {
@@ -326,7 +326,6 @@ const RATE_WINDOW_MILLISECONDS = 60_000;
 const SIGNAL_HELLO_DEADLINE_MILLISECONDS = 30_000;
 const TURN_CREDENTIAL_REUSE_MILLISECONDS = 5 * 60_000;
 const MAXIMUM_SOCKETS_PER_HOST = 4;
-const INITIAL_TICKET_TTL_MILLISECONDS = 3 * 60_000;
 const TICKET_CLOCK_SKEW_SECONDS = 60;
 const MAXIMUM_EXPIRATION_TIMER_MILLISECONDS = 24 * 60 * 60_000;
 const INGRESS_RATE_FACTOR = 10;
@@ -387,12 +386,7 @@ export class SignalService {
   readonly #revokedSessions = new Map<string, number>();
   readonly #endedHostSessions = new Map<string, Map<string, number>>();
   readonly #rateWindows = new Map<string, { startedAt: number; count: number }>();
-  readonly #validateInitialTicketsUntil = Date.now() + INITIAL_TICKET_TTL_MILLISECONDS;
   readonly #ticketsIssuedBeforeStartUntil = Math.floor(Date.now() / 1_000) + TICKET_CLOCK_SKEW_SECONDS;
-  readonly #validateSlackRoutesUntil = Date.now() + SLACK_ROUTE_TTL_SECONDS * 1_000;
-  readonly #validateTelegramRoutesUntil = Date.now() + TELEGRAM_ROUTE_TTL_SECONDS * 1_000;
-  readonly #validateDiscordRoutesUntil = Date.now() + DISCORD_ROUTE_TTL_SECONDS * 1_000;
-  readonly #validateWebhookRoutesUntil = Date.now() + WEBHOOK_ROUTE_TTL_SECONDS * 1_000;
   #lastRatePruneAt = 0;
   readonly #metrics: SignalMetrics = {
     acceptedConnections: 0,
@@ -1417,7 +1411,7 @@ export class SignalService {
         const authentication = yield* Effect.gen({ self: this }, function* () {
           const initial = yield* Effect.gen({ self: this }, function* () {
             const claims = yield* tokens.verifyTicket(message.token);
-            if (this.#mustValidateTicket(claims) && !(yield* tokens.validateClaims(claims))) {
+            if (this.#issuedBeforeStart(claims.iat) && !(yield* tokens.validateClaims(claims))) {
               return yield* new RemoteTokenError({ message: "The remote session is not active." });
             }
             return claims;
@@ -1453,7 +1447,7 @@ export class SignalService {
             if (message.slackRoute) {
               if (!tokens.verifySlackRoute) return yield* new RemoteTokenError({ message: "Slack route required." });
               slackRoute = yield* tokens.verifySlackRoute(message.slackRoute, claims.hostId);
-              if (Date.now() < this.#validateSlackRoutesUntil) {
+              if (this.#issuedBeforeStart(slackRoute.issuedAt)) {
                 if (!tokens.validateSlackRoute)
                   return yield* new RemoteTokenError({ message: "Slack route validation required." });
                 const linked = new Set(yield* tokens.validateSlackRoute(claims.hostId, slackRoute.teams));
@@ -1464,7 +1458,7 @@ export class SignalService {
               if (!tokens.verifyDiscordRoute)
                 return yield* new RemoteTokenError({ message: "Discord route verification required." });
               discordRoute = yield* tokens.verifyDiscordRoute(message.discordRoute, claims.hostId);
-              if (Date.now() < this.#validateDiscordRoutesUntil) {
+              if (this.#issuedBeforeStart(discordRoute.issuedAt)) {
                 if (!tokens.validateDiscordRoute)
                   return yield* new RemoteTokenError({ message: "Discord route validation required." });
                 const linked = new Set(yield* tokens.validateDiscordRoute(claims.hostId, discordRoute.guilds));
@@ -1475,7 +1469,7 @@ export class SignalService {
               if (!tokens.verifyWebhookRoute)
                 return yield* new RemoteTokenError({ message: "Webhook route verification required." });
               webhookRoute = yield* tokens.verifyWebhookRoute(message.webhookRoute, claims.hostId);
-              if (Date.now() < this.#validateWebhookRoutesUntil) {
+              if (this.#issuedBeforeStart(webhookRoute.issuedAt)) {
                 if (!tokens.validateWebhookRoute)
                   return yield* new RemoteTokenError({ message: "Webhook route validation required." });
                 const linked = new Set(yield* tokens.validateWebhookRoute(claims.hostId, webhookRoute.routes));
@@ -1493,7 +1487,7 @@ export class SignalService {
                 return yield* new RemoteTokenError({ message: "Telegram route verification required." });
               const verified = yield* tokens.verifyTelegramRoute(message.telegramRoute, claims.hostId);
               telegramRoute = { chats: verified.chats.filter((chat) => telegram.bot.hasBot(chat.botId)) };
-              if (Date.now() < this.#validateTelegramRoutesUntil && telegramRoute.chats.length > 0) {
+              if (this.#issuedBeforeStart(verified.issuedAt) && telegramRoute.chats.length > 0) {
                 if (!tokens.validateTelegramRoute)
                   return yield* new RemoteTokenError({ message: "Telegram route validation required." });
                 const linked = new Set(
@@ -1728,8 +1722,8 @@ export class SignalService {
       }),
   );
 
-  #mustValidateTicket(claims: RemoteTicketClaims): boolean {
-    return Date.now() < this.#validateInitialTicketsUntil || claims.iat <= this.#ticketsIssuedBeforeStartUntil;
+  #issuedBeforeStart(issuedAt: number | undefined): boolean {
+    return issuedAt === undefined || issuedAt <= this.#ticketsIssuedBeforeStartUntil;
   }
 
   #currentHost(hostId: string): AuthenticatedPeer | null {

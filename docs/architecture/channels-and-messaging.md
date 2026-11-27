@@ -696,8 +696,10 @@ the answer. Every answer comes from OpenBot.
   or moved, the Worker sends Signal `slack-route-revoked` through the signed auth-event outbox:
   Signal drops the route and refuses tickets with that link or an older one, so a host that lost the
   workspace cannot keep it with the ticket it holds. Signal keeps these revocations in memory, so for
-  one ticket lifetime after it starts it asks the Worker (`/v2/remote/slack-route/validate`, signed
-  like `/v2/remote/resume/validate`) which links of each ticket D1 still has. The host trusts a delivery because Signal checked the signature; no host has the
+  a route ticket issued before it started (its `iat`, with 60 s for clock skew, or a ticket with no
+  `iat`) it asks the Worker (`/v2/remote/slack-route/validate`, signed like
+  `/v2/remote/resume/validate`) which links of the ticket D1 still has. A route ticket issued after
+  the start gets no extra check. Discord, Telegram and webhook route tickets use the same rule. The host trusts a delivery because Signal checked the signature; no host has the
   signing secret.
 - **Not linked.** The account service names the workspace IDs beside the ticket, and the host keeps
   them for the open socket (`SignalIngress.onLinkedRoutes`). A workspace connection that is not in them
