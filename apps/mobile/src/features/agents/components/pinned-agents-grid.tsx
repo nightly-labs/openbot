@@ -149,10 +149,8 @@ const PinnedAgentItem = memo(function PinnedAgentItem({ agent }: { agent: Mobile
       accessibilityLabel={agentListStateLabel(t, openLabel, waitReason, unreadCount, unreadThreads)}
       accessibilityRole="button"
       className="w-full items-center gap-2 px-1"
-      onPressIn={() => {
-        agentChatPreview.onPressIn?.();
-        prefetchChat();
-      }}
+      onPressIn={agentChatPreview.onPressIn}
+      onOpen={prefetchChat}
       delayLongPress={longPressDelay}
       onLongPress={holdMenu.onLongPress}
       onPressOut={holdMenu.onPressOut}

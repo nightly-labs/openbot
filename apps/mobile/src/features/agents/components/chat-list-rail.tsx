@@ -90,7 +90,7 @@ const RailAgent = memo(function RailAgent({ agent }: { agent: MobileAgent }) {
     <Link href={{ pathname: "/chat/[agentId]", params: { agentId: agent.id, serverId: agent.serverId } }} asChild>
       <ChatLinkPressable
         chatId={agent.id}
-        onPressIn={prefetchChat}
+        onOpen={prefetchChat}
         accessibilityRole="button"
         accessibilityLabel={agentListStateLabel(t, openLabel, undefined, unreadCount, unreadThreads)}
         className="size-14 items-center justify-center rounded-2xl"

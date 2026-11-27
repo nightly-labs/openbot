@@ -113,10 +113,8 @@ export const AgentListRow = memo(function AgentListRow({ agent, leftInset = 20, 
         if (event.nativeEvent.actionName === "pin") toggleAgentPin(agent.id);
       }}
       className="w-full"
-      onPressIn={() => {
-        agentChatPreview.onPressIn?.();
-        prefetchChat();
-      }}
+      onPressIn={agentChatPreview.onPressIn}
+      onOpen={prefetchChat}
       delayLongPress={longPressDelay}
       onLongPress={holdMenu.onLongPress}
       onPressOut={holdMenu.onPressOut}
