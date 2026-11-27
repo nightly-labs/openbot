@@ -22,7 +22,7 @@ export const Route = createFileRoute("/v2/remote/hosts/$hostId/live-activity")({
               return apiError(400, "invalid_remote_request", "The host credential is invalid.");
             const push = readLiveActivityRelayPush(body);
             if (!push) return apiError(400, "invalid_live_activity", "The Live Activity update is invalid.");
-            yield* requestRemoteControlPlane().authenticateHost(params.hostId, body.machineToken);
+            yield* requestRemoteControlPlane().assertHostCredential(params.hostId, body.machineToken);
             const relay = requestApnsRelay();
             if (!relay) return apiError(503, "live_activity_unavailable", "Live Activity updates are not available.");
             if (!(yield* relay.allow(params.hostId))) {

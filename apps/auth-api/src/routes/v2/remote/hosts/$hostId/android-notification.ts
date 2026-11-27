@@ -23,7 +23,7 @@ export const Route = createFileRoute("/v2/remote/hosts/$hostId/android-notificat
             const push = readAndroidNotificationRelayPush(body);
             if (!push) return apiError(400, "invalid_notification", "The notification is invalid.");
             const controlPlane = requestRemoteControlPlane();
-            yield* controlPlane.authenticateHost(params.hostId, body.machineToken);
+            yield* controlPlane.assertHostCredential(params.hostId, body.machineToken);
             const relay = requestFcmRelay();
             if (!relay) return apiError(503, "notification_unavailable", "Notifications are not available.");
             if (!(yield* relay.allowNotification(params.hostId))) {

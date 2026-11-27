@@ -22,7 +22,7 @@ export const Route = createFileRoute("/v2/remote/hosts/$hostId/widget-push")({
               return apiError(400, "invalid_remote_request", "The host credential is invalid.");
             const push = readWidgetRelayPush(body);
             if (!push) return apiError(400, "invalid_widget_push", "The widget push is invalid.");
-            yield* requestRemoteControlPlane().authenticateHost(params.hostId, body.machineToken);
+            yield* requestRemoteControlPlane().assertHostCredential(params.hostId, body.machineToken);
             const relay = requestApnsRelay();
             if (!relay) return apiError(503, "widget_push_unavailable", "Widget pushes are not available.");
             if (!(yield* relay.allowWidgetPush(params.hostId))) {
