@@ -328,7 +328,7 @@ function decodeBaseline(text: string) {
   return { label: isString(value.label) ? value.label : "baseline", warm };
 }
 
-function compare(report: Report, file: string): Report["baseline"] {
+function compare(report: Report, file: string): NonNullable<Report["baseline"]> {
   const baseline = decodeBaseline(readFileSync(resolve(file), "utf8"));
   return {
     file,
