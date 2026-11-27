@@ -282,7 +282,8 @@ function AgentForm({
     const chosenAccount = account ?? savedAccount;
     const accountId = chosenAccount === DEFAULT_PROVIDER_ACCOUNT_ID ? null : chosenAccount;
     const model = edits.model ?? savedModel;
-    const keepQueued = queued !== undefined && (accountChanged || edits.model !== undefined);
+    const keepQueued =
+      queued !== undefined && (accountChanged || (edits.model !== undefined && queued.provider !== agent.provider));
     try {
       if (Object.keys(edits).length > 0 || accountChanged)
         await updateAgent(
@@ -297,7 +298,7 @@ function AgentForm({
             ...(provider !== undefined && (edits.provider !== undefined || keepQueued) ? { provider } : {}),
             ...(model !== undefined && (edits.model !== undefined || keepQueued) ? { model } : {}),
             ...(edits.reasoningEffort === undefined ? {} : { reasoningEffort: edits.reasoningEffort }),
-            ...(accountChanged || keepQueued ? { providerAccountId: accountId } : {}),
+            ...(accountChanged || (keepQueued && accountId !== null) ? { providerAccountId: accountId } : {}),
           },
           agent.serverId,
         );
