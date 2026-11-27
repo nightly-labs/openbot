@@ -30,7 +30,7 @@ export const GUIDES_COLLECTION: ContentCollection<"guides"> = {
       slug: "fix-agent-errors",
       title: "OpenCode and Codex Errors: What They Mean and How to Fix Them",
       description:
-        "Fix common coding agent errors: response still truncated, CERT_NOT_YET_VALID, paginated_threads is not supported yet and workspace routing discovery unauthorized (401).",
+        "Fix common coding agent errors: response still truncated, CERT_NOT_YET_VALID, paginated_threads is not supported yet, and workspace routing discovery unauthorized (401) or failed.",
       publishedAt: "2026-11-27",
       author: NEWS_AUTHOR,
     },

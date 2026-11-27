@@ -197,19 +197,21 @@ export function PluginPage(props: PluginPageProps) {
           <div class="plugin-body" data-enter="post-prose">
             <p class="plugin-description">{props.plugin.description}</p>
 
-            <PluginTextSection id="plugin-mcp-title" title={`${props.plugin.name} MCP server`}>
-              <p class="plugin-description">{pluginMcpIntro(props.plugin)}</p>
-              <ul class="plugin-connect-fields">
-                <For each={pluginMcpServers(props.plugin)}>
-                  {(server) => (
-                    <li>
-                      <strong class="plugin-connect-field-label">{server.app}</strong>: {server.where}{" "}
-                      <code class="plugin-mcp-address">{server.address}</code>
-                    </li>
-                  )}
-                </For>
-              </ul>
-            </PluginTextSection>
+            <Show when={props.plugin.apps.length > 0}>
+              <PluginTextSection id="plugin-mcp-title" title={`${props.plugin.name} MCP server`}>
+                <p class="plugin-description">{pluginMcpIntro(props.plugin)}</p>
+                <ul class="plugin-connect-fields">
+                  <For each={pluginMcpServers(props.plugin)}>
+                    {(server) => (
+                      <li>
+                        <strong class="plugin-connect-field-label">{server.app}</strong>: {server.where}{" "}
+                        <code class="plugin-mcp-address">{server.address}</code>
+                      </li>
+                    )}
+                  </For>
+                </ul>
+              </PluginTextSection>
+            </Show>
 
             <Show when={guide()}>
               {(written) => (

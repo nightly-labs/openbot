@@ -34,7 +34,7 @@ export function IsOpenBotOpenSource() {
         <tbody>
           <tr>
             <td>Is the source code public?</td>
-            <td>Yes, all of it, on GitHub.</td>
+            <td>Yes. The code of the apps and the server is on GitHub.</td>
           </tr>
           <tr>
             <td>Which license?</td>

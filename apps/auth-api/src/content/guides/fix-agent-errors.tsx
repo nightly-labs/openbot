@@ -10,7 +10,7 @@ export function FixAgentErrors() {
       </p>
 
       <p>
-        Newer OpenBot versions show a clear message for each of these errors. If you still see the raw text, update
+        Newer OpenBot versions show a clear message for most of these errors. If you still see the raw text, update
         OpenBot first. On a joined server, the server must also be on the new version.
       </p>
 

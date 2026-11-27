@@ -3,20 +3,10 @@ import { OPENBOT_SITE_URL } from "../lib/site-metadata";
 const SITE_ORIGIN = new URL(OPENBOT_SITE_URL).origin;
 const SITE_HOST = new URL(OPENBOT_SITE_URL).hostname;
 
-const API_HOST_CONTENT_SECTIONS = ["guides", "news", "compare", "providers", "plugins", "marketplace"];
-
-function isApiHostContentPage(request: Request, url: URL): boolean {
-  if (url.hostname !== `api.${SITE_HOST}`) return false;
-  if (request.method !== "GET" && request.method !== "HEAD") return false;
-  const section = url.pathname.split("/")[1] ?? "";
-  return API_HOST_CONTENT_SECTIONS.includes(section) && !url.pathname.startsWith("/plugins/icon/");
-}
-
 export function canonicalHostRedirect(request: Request): Response | null {
   const url = new URL(request.url);
   const isWww = url.hostname === `www.${SITE_HOST}`;
-  const isPlainHttp = url.hostname === SITE_HOST && url.protocol === "http:";
-  if (!isWww && !isPlainHttp && !isApiHostContentPage(request, url)) return null;
+  if (!isWww && !(url.hostname === SITE_HOST && url.protocol === "http:")) return null;
   return Response.redirect(`${SITE_ORIGIN}${url.pathname}${url.search}`, 308);
 }
 

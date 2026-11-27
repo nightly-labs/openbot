@@ -112,10 +112,22 @@ export interface SitePluginMcpServer {
   address: string;
 }
 
+const LOOPBACK_HOSTS = ["127.0.0.1", "localhost", "[::1]"];
+
+function isLoopbackUrl(address: string): boolean {
+  return URL.canParse(address) && LOOPBACK_HOSTS.includes(new URL(address).hostname);
+}
+
 export function pluginMcpServers(plugin: SitePlugin): SitePluginMcpServer[] {
   return plugin.apps.map((app) =>
     app.server.transport === "http"
-      ? { app: app.name, where: "remote MCP server at", address: app.server.url }
+      ? {
+          app: app.name,
+          where: isLoopbackUrl(app.server.url)
+            ? "local MCP server on the computer that runs OpenBot, at"
+            : "remote MCP server at",
+          address: app.server.url,
+        }
       : {
           app: app.name,
           where: "local MCP server that starts on the computer that runs OpenBot with",
