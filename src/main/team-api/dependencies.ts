@@ -545,7 +545,7 @@ interface TeamApiProviders {
   pasteSignIn: boolean;
 }
 
-export type TeamApiMailbox = Pick<MailboxStore, "resolveAttachment"> & Partial<Pick<MailboxStore, "attachmentPath">>;
+export type TeamApiMailbox = Pick<MailboxStore, "resolveAttachment"> & Partial<Pick<MailboxStore, "attachmentPaths">>;
 export interface TeamApiAttachmentPreviews {
   file(attachmentId: string, source: PreviewFile): Effect.Effect<PreviewFile | null>;
 }

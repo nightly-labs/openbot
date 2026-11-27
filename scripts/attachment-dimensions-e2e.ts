@@ -59,6 +59,7 @@ plugin({
 
 const { TeamApiServer } = await import("../src/main/team-api-server");
 const { TeamStore } = await import("../src/main/team-store");
+const { requestJson } = await import("../src/main/remote-server-http");
 
 interface Step {
   name: string;
@@ -70,7 +71,8 @@ interface Step {
 const report: { passed: boolean; unverified: string[]; steps: Step[] } = {
   passed: false,
   unverified: [
-    "The WebRTC transport. Its host peer copies the fields from the HTTP answer that this check reads.",
+    "The WebRTC transports. Their host peer copies the fields from the HTTP answer that this check reads.",
+    "The event streams of the phone, the web client and the desktop. They copy the fields with the same helper.",
     "The phone and browser screens. This check reads the wire data that they get.",
   ],
   steps: [],
@@ -397,13 +399,46 @@ try {
     return response;
   }
 
+  const SIZE_READ_ATTEMPTS = 100;
+  const imageNames = new Set<string>(FILES.flatMap((file) => (file.expected ? [file.name] : [])));
+
+  async function readUntilSized(route: Route, token: string) {
+    for (let attempt = 1; attempt <= SIZE_READ_ATTEMPTS; attempt += 1) {
+      const response = await read(route, { token });
+      const sized = routeAttachments(route, response.body).every(
+        (attachment) => !imageNames.has(attachment.name) || attachment.width !== undefined,
+      );
+      if (sized) return { response, attempts: attempt };
+    }
+    throw new Error(`${route.label} did not get the sizes after ${SIZE_READ_ATTEMPTS} reads.`);
+  }
+
   await step("a current client gets the pixel size of each image and none for the text file", async () => {
-    const seen: Array<{ route: string; sizes: SeenSize[] }> = [];
-    for (const route of routes)
+    const seen: Array<{ route: string; reads: number; sizes: SeenSize[] }> = [];
+    for (const route of routes) {
+      const { response, attempts } = await readUntilSized(route, token);
       seen.push({
         route: route.label,
-        sizes: checkSizes(routeAttachments(route, (await read(route, { token })).body), true),
+        reads: attempts,
+        sizes: checkSizes(routeAttachments(route, response.body), true),
       });
+    }
+    return seen;
+  });
+
+  await step("the desktop decoder for a joined server over HTTPS keeps the sizes", async () => {
+    const seen: Array<{ route: string; sizes: SeenSize[] }> = [];
+    for (const route of routes) {
+      const decoded = await Effect.runPromise(
+        requestJson(`http://127.0.0.1:${current().port}`, route.path, (value) => value, {
+          token,
+          protocol: TEAM_PROTOCOL_V10,
+          appVersion: HOST_VERSION,
+          capabilities: CURRENT,
+        }),
+      );
+      seen.push({ route: route.label, sizes: checkSizes(routeAttachments(route, decoded), true) });
+    }
     return seen;
   });
 
@@ -443,12 +478,15 @@ try {
     await stopHost();
     host = await startHost();
     const again = await login();
-    const seen: Array<{ route: string; sizes: SeenSize[] }> = [];
-    for (const route of routes)
+    const seen: Array<{ route: string; reads: number; sizes: SeenSize[] }> = [];
+    for (const route of routes) {
+      const { response, attempts } = await readUntilSized(route, again);
       seen.push({
         route: route.label,
-        sizes: checkSizes(routeAttachments(route, (await read(route, { token: again })).body), true),
+        reads: attempts,
+        sizes: checkSizes(routeAttachments(route, response.body), true),
       });
+    }
     return seen;
   });
 

@@ -1,4 +1,5 @@
 import { isDynamicRecord, isString } from "@openbot/contracts/runtime-values";
+import { addAttachmentDimensions } from "@openbot/contracts/team-protocol/attachment-dimensions-v1";
 import { type TeamCurrentCapability, teamCapabilityHeaders } from "@openbot/contracts/team-protocol/current";
 import { teamHttpCodec } from "@openbot/contracts/team-protocol/http-codecs";
 import {
@@ -156,6 +157,7 @@ export function decodeRemoteBody<T>(
     : teamHttpCodec(protocol).decodeResponse(method, path, status, input);
   if (capabilities?.includes(SKILL_LEARNING_CAPABILITY)) addSkillSuggestionNames(decoded, input);
   if (capabilities?.includes(TEAM_PROMPT_DETAIL_CAPABILITY)) addPromptQuestionDetails(decoded, input);
+  addAttachmentDimensions(decoded, input);
   return decoder(decoded);
 }
 

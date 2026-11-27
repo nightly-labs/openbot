@@ -744,7 +744,7 @@ export class TeamApiServer {
   constructor(options: TeamApiOptions) {
     this.#options = { ...options, sidebarLayout: options.sidebarLayout ?? unavailableSidebarLayout() };
     this.#attachmentSizes = createAttachmentSizeCache(
-      (attachmentId) => options.mailbox.attachmentPath?.(attachmentId) ?? null,
+      (attachmentIds) => options.mailbox.attachmentPaths?.(attachmentIds) ?? new Map(),
     );
     this.#rateLimitCapacity = options.rateLimitCapacity ?? RATE_LIMIT_CAPACITY;
     this.#now = options.now ?? Date.now;

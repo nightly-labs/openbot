@@ -3798,6 +3798,25 @@ export class MailboxStore {
     return this.#fileRecords().find((record) => record.id === attachmentId && !record.deletedAt)?.path ?? null;
   }
 
+  attachmentPaths(attachmentIds: ReadonlySet<string>): Map<string, string> {
+    const paths = new Map<string, string>();
+    for (const id of attachmentIds) {
+      const staged = this.#stagedGeneratedAttachments.get(id);
+      if (staged) paths.set(id, staged.path);
+    }
+    const take = (record: StoredAttachment) => {
+      if (!record.deletedAt && attachmentIds.has(record.id) && !paths.has(record.id)) paths.set(record.id, record.path);
+    };
+    for (const draft of this.#state.drafts) take(draft);
+    for (const message of this.#state.messages) {
+      if (paths.size === attachmentIds.size) return paths;
+      for (const record of message.attachments) take(record);
+      if (message.voiceRecording) take(message.voiceRecording);
+    }
+    for (const record of this.#state.generatedAttachments) take(record);
+    return paths;
+  }
+
   storeGeneratedAttachment = Effect.fn("MailboxStore.storeGeneratedAttachment")(function* (
     this: MailboxStore,
     input: {
