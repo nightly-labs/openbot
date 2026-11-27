@@ -1,5 +1,5 @@
 import { attachmentMimeTypeForName } from "@openbot/contracts/attachment-files";
-import { chatVisualReply } from "@openbot/contracts/chat-visual";
+import { CHAT_BACKDROP_CLEAR_ITEM_TYPE, chatVisualReply } from "@openbot/contracts/chat-visual";
 import type { AttachmentSummary } from "@openbot/contracts/ipc";
 import type { AgentMessage } from "@openbot/ui/data";
 import { customBackdropChoice, messageHtmlBackdropPage } from "@openbot/ui/features/conversation/chat-backdrop";
@@ -58,6 +58,7 @@ export function useMessageBackdropAction(runtime: ConversationRuntime) {
 
   const backdropSource = (message: AgentMessage): BackdropSource | undefined => {
     if (message.streaming || message.id.startsWith(PENDING_SEND_ID_PREFIX)) return;
+    if (message.itemType === CHAT_BACKDROP_CLEAR_ITEM_TYPE) return;
     const visual = chatVisualReply(message)?.attachment;
     const candidates = visual ? [visual, ...(message.attachments ?? [])] : (message.attachments ?? []);
     const attachment = candidates.find(
