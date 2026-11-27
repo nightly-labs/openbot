@@ -232,14 +232,20 @@ function UsageRings(props: {
                 />
               </Show>
               <Show when={usagePaceRemainingPercent(window().durationMins, window().resetsAt, now())}>
-                {(pace) => (
-                  <line
-                    class="window-rail-usage-pace"
-                    {...paceTick(outerRadius - index * RING.spacing, pace())}
-                    stroke-width={1.5}
-                    stroke-linecap="round"
-                  />
-                )}
+                {(pace) => {
+                  const tick = () => paceTick(outerRadius - index * RING.spacing, pace());
+                  return (
+                    <line
+                      class="window-rail-usage-pace"
+                      x1={tick().x1}
+                      y1={tick().y1}
+                      x2={tick().x2}
+                      y2={tick().y2}
+                      stroke-width={1.5}
+                      stroke-linecap="round"
+                    />
+                  );
+                }}
               </Show>
             </g>
           )}
