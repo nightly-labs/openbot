@@ -273,7 +273,7 @@ function ChatView(props: ChatScreenProps & { chat: OpenChat; agent: ClientAgentS
       <ChatComposer
         placeholder={t("extension.chat.ask", { name: props.agent.name })}
         error={props.chat.error}
-        conversationKey={`${props.chat.agentId}:${props.chat.taskId ?? ""}`}
+        conversationKey={`${props.chat.agentId}:${props.chat.taskId ?? (props.chat.draftThread ? "new-thread" : "")}`}
         onDismissError={() => props.workspace.clearChatError()}
         sending={props.chat.sending}
         transcribe={props.workspace.transcribe}
