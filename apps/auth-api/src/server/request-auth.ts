@@ -12,6 +12,7 @@ import { AgentTemplates } from "./agent-templates";
 import { type FcmRelaySender, sharedFcmSender } from "./android-notification-relay";
 import { AuthOperationError, AuthService, AuthServiceError, readStoreReviewSignIn } from "./auth-service";
 import { BillingError, type BillingService } from "./billing-service";
+import { cloudflareAccessAllows } from "./cloudflare-access";
 import { CompanySignInError, CompanySignInService } from "./company-sign-in";
 import type { ContactMessageServices } from "./contact-message";
 import { type CreditMediaPayer, CreditMediaService } from "./credit-media-service";
@@ -501,16 +502,25 @@ export function skillErrorResponse(error: unknown): Response {
   return authErrorResponse(error);
 }
 
+const adminRequestAllowed = Effect.fn("Auth.adminRequestAllowed")(function* (
+  request: Request,
+  token: (bindings: WorkerBindings) => string | undefined,
+) {
+  const bindings = requireWorkerBindings(env);
+  if (!(yield* adminTokenMatches(token(bindings), bearerToken(request)))) return false;
+  return yield* cloudflareAccessAllows(bindings, request);
+});
+
 export const requireSkillsAdmin = Effect.fn("Auth.requireSkillsAdmin")(function* (request: Request) {
-  return yield* adminTokenMatches(requireWorkerBindings(env).SKILLS_ADMIN_TOKEN, bearerToken(request));
+  return yield* adminRequestAllowed(request, (bindings) => bindings.SKILLS_ADMIN_TOKEN);
 });
 
 export const requireOperationsAdmin = Effect.fn("Auth.requireOperationsAdmin")(function* (request: Request) {
-  return yield* adminTokenMatches(requireWorkerBindings(env).SITE_OPERATIONS_ADMIN_TOKEN, bearerToken(request));
+  return yield* adminRequestAllowed(request, (bindings) => bindings.SITE_OPERATIONS_ADMIN_TOKEN);
 });
 
 export const requireServerClaimsAdmin = Effect.fn("Auth.requireServerClaimsAdmin")(function* (request: Request) {
-  return yield* adminTokenMatches(requireWorkerBindings(env).SERVER_CLAIMS_ADMIN_TOKEN, bearerToken(request));
+  return yield* adminRequestAllowed(request, (bindings) => bindings.SERVER_CLAIMS_ADMIN_TOKEN);
 });
 
 export function requestContactMessageServices(): ContactMessageServices {

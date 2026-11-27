@@ -1,7 +1,7 @@
 import { Effect, Result } from "effect";
 import { routeRequest as routeHostedSiteRequest } from "../../../site-router/src/index";
 import { passkeyWalletHostResponse } from "../lib/near-sign-csp";
-import { OPENBOT_SITE_URL } from "../lib/site-metadata";
+import { OPENBOT_SECURITY_HEADERS, OPENBOT_SITE_URL } from "../lib/site-metadata";
 import { sendAccountActivitySnapshots } from "./account-activity";
 import { createAccountAnalytics, createAccountEventDelivery } from "./account-analytics";
 import { type AuthRetentionResult, pruneExpiredAuthData } from "./auth-data-retention";
@@ -44,7 +44,7 @@ export function createWorkerHandler(
   log: RetentionLogger = logRetentionResult,
   deliverRemoteAuthEvents: RemoteAuthEventDelivery = deliverPendingRemoteAuthEvents,
 ) {
-  return {
+  const handler = {
     async fetch(
       request: Request,
       workerBindings: Pick<WorkerBindings, "MARKETPLACE_INGRESS_RATE_LIMITER"> &
@@ -165,7 +165,22 @@ export function createWorkerHandler(
       if (retention) log(retention);
       if (sites) console.info("Hosted site cleanup completed.", sites);
     },
+  };
+  return {
+    ...handler,
+    async fetch(...args: Parameters<typeof handler.fetch>) {
+      return withStrictTransportSecurity(await handler.fetch(...args));
+    },
   } satisfies ExportedHandler<WorkerBindings>;
+}
+
+const STRICT_TRANSPORT_SECURITY = "Strict-Transport-Security";
+
+function withStrictTransportSecurity(response: Response): Response {
+  if (response.status === 101 || response.headers.has(STRICT_TRANSPORT_SECURITY)) return response;
+  const copy = new Response(response.body, response);
+  copy.headers.set(STRICT_TRANSPORT_SECURITY, OPENBOT_SECURITY_HEADERS[STRICT_TRANSPORT_SECURITY]);
+  return copy;
 }
 
 async function runSignalEntryCheck(bindings: Partial<SignalEntryBindings>): Promise<void> {

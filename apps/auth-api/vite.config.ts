@@ -13,7 +13,10 @@ import { readLocalRuntimeVars } from "./src/server/runtime-env";
 
 export default defineConfig(({ command }) => {
   const port = readApiPort(process.env.OPENBOT_API_PORT);
-  const localRuntimeVars = command === "serve" ? readLocalRuntimeVars(process.env) : {};
+  const localRuntimeVars: Record<string, string> =
+    command === "serve"
+      ? { CF_ACCESS_TEAM_DOMAIN: "", CF_ACCESS_ADMIN_AUD: "", ...readLocalRuntimeVars(process.env) }
+      : {};
   if (localRuntimeVars.APNS_PRIVATE_KEY) {
     localRuntimeVars.APNS_ORIGIN = `http://127.0.0.1:${port}${DEVELOPMENT_APNS_PATH}`;
   }

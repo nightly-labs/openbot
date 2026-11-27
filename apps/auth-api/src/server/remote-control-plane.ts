@@ -816,6 +816,27 @@ export class RemoteControlPlane {
     (operation) => operation.pipe(Effect.provide(this.#layer)),
   ).bind(this);
 
+  readonly revokeHostCredential = Effect.fn("RemoteControlPlane.revokeHostCredential")(
+    function* (this: RemoteControlPlane, user: AuthUser, input: { hostId: string; machineToken: string }) {
+      const dependencies = yield* RemoteDependencies;
+      const hostId = yield* remoteValidate(() => requiredIdentifier(input.hostId, "host ID"));
+      const host = yield* this.authenticateHost(hostId, input.machineToken);
+      if (host.owner_user_id !== user.id) {
+        return yield* new RemoteControlPlaneError(403, "host_owner_mismatch", "This host belongs to another account.");
+      }
+      yield* remoteCall(() =>
+        dependencies.database
+          .prepare(
+            `UPDATE remote_hosts SET machine_token_hash = NULL, updated_at = ?
+             WHERE host_id = ? AND owner_user_id = ? AND machine_token_hash = ?`,
+          )
+          .bind(dependencies.now(), hostId, user.id, host.machine_token_hash)
+          .run(),
+      );
+    },
+    (operation) => operation.pipe(Effect.provide(this.#layer)),
+  ).bind(this);
+
   readonly handOverHostKey = Effect.fn("RemoteControlPlane.handOverHostKey")(
     function* (
       this: RemoteControlPlane,

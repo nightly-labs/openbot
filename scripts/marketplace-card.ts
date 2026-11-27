@@ -15,6 +15,7 @@ import {
   type MarketplaceAgentDetail,
   type MarketplaceSkillDetail,
 } from "@openbot/contracts/ipc";
+import { cloudflareAccessHeaders } from "./cloudflare-access-headers";
 import type { MarketplaceCardJob } from "./marketplace-card-page";
 
 const execFileAsync = promisify(execFile);
@@ -84,7 +85,7 @@ export async function uploadMarketplaceCard(api: MarketplaceAdminApi, card: Draw
   for (let attempt = 1; ; attempt += 1) {
     const response = await fetch(new URL(`${route}${encodeURIComponent(card.versionId)}`, api.apiUrl), {
       method: "PUT",
-      headers: { Authorization: `Bearer ${api.token}`, "Content-Type": "image/png" },
+      headers: { ...cloudflareAccessHeaders(), Authorization: `Bearer ${api.token}`, "Content-Type": "image/png" },
       body: new Blob([new Uint8Array(card.png)], { type: "image/png" }),
     });
     if (response.ok) return;

@@ -42,6 +42,8 @@ export interface WorkerBindings {
   NEAR_INTENTS_AGENT_API_URL?: string;
   SITE_OPERATIONS_ADMIN_TOKEN?: string;
   SERVER_CLAIMS_ADMIN_TOKEN?: string;
+  CF_ACCESS_TEAM_DOMAIN?: string;
+  CF_ACCESS_ADMIN_AUD?: string;
   STORE_REVIEW_EMAIL?: string;
   STORE_REVIEW_CODE?: string;
   SITE_REPORT_HASH_SECRET?: string;
