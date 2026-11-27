@@ -12,6 +12,7 @@ import { canonicalHostRedirect, permanentTrailingSlashRedirect } from "./canonic
 import { CreditAudit } from "./credit-audit";
 import { CreditGrants } from "./credit-grants";
 import { CreditMediaService } from "./credit-media-service";
+import { withD1RequestSession } from "./d1-request-session";
 import { runApiEffect } from "./effect-runtime";
 import { createHostedBilling } from "./hosted-billing";
 import { createHostedPoolAlert } from "./hosted-pool-alert";
@@ -37,6 +38,10 @@ type AuthDataPruner = typeof pruneExpiredAuthData;
 type RetentionLogger = (result: AuthRetentionResult) => void;
 type WorkerExecutionContext = Pick<ExecutionContext, "waitUntil">;
 type RemoteAuthEventDelivery = typeof deliverPendingRemoteAuthEvents;
+type WorkerFetchBindings = Pick<WorkerBindings, "MARKETPLACE_INGRESS_RATE_LIMITER"> &
+  Partial<
+    Pick<WorkerBindings, "SITES" | "SITE_LOCAL_ORIGIN" | "DB" | "OPENPANEL_CLIENT_ID" | "OPENPANEL_CLIENT_SECRET">
+  >;
 
 const OVERLOAD_RETRY_AFTER_MIN_SECONDS = 10;
 const OVERLOAD_RETRY_AFTER_SPREAD_SECONDS = 20;
@@ -59,62 +64,65 @@ export function createWorkerHandler(
   log: RetentionLogger = logRetentionResult,
   deliverRemoteAuthEvents: RemoteAuthEventDelivery = deliverPendingRemoteAuthEvents,
 ) {
-  const handler = {
-    async fetch(
-      request: Request,
-      workerBindings: Pick<WorkerBindings, "MARKETPLACE_INGRESS_RATE_LIMITER"> &
-        Partial<
-          Pick<WorkerBindings, "SITES" | "SITE_LOCAL_ORIGIN" | "DB" | "OPENPANEL_CLIENT_ID" | "OPENPANEL_CLIENT_SECRET">
-        >,
-      context?: WorkerExecutionContext,
-    ) {
-      const bindings = workerBindings.DB ? { ...workerBindings, DB: observedD1(workerBindings.DB) } : workerBindings;
-      const hostRedirect = canonicalHostRedirect(request) ?? passkeyWalletHostResponse(request, OPENBOT_SITE_URL);
-      if (hostRedirect) return hostRedirect;
-      if (request.method === "GET" && new URL(request.url).pathname === "/billing/checkout-return") {
-        return runApiEffect(checkoutReturnResponse(request, bindings));
-      }
-      const earlyResponse = await runApiEffect(
-        Effect.gen(function* () {
-          const localSiteResponse = yield* serveLocalHostedSite(request, bindings);
-          if (localSiteResponse) return localSiteResponse;
-          yield* enforceMarketplaceIngress(request, bindings);
-          return null;
-        }).pipe(
-          Effect.catchIf(
-            (error) => error instanceof MarketplaceRateLimitError,
-            (error) =>
-              Effect.succeed(
-                Response.json(
-                  { error: { code: error.code, message: error.message } },
-                  {
-                    status: error.status,
-                    headers: {
-                      "Cache-Control": "no-store",
-                      "Retry-After": String(error.retryAfterSeconds),
-                      "X-Content-Type-Options": "nosniff",
-                    },
+  async function handleFetch(
+    request: Request,
+    workerBindings: WorkerFetchBindings,
+    context: WorkerExecutionContext | undefined,
+  ): Promise<Response> {
+    const bindings = workerBindings.DB ? { ...workerBindings, DB: observedD1(workerBindings.DB) } : workerBindings;
+    const hostRedirect = canonicalHostRedirect(request) ?? passkeyWalletHostResponse(request, OPENBOT_SITE_URL);
+    if (hostRedirect) return hostRedirect;
+    if (request.method === "GET" && new URL(request.url).pathname === "/billing/checkout-return") {
+      return runApiEffect(checkoutReturnResponse(request, bindings));
+    }
+    const earlyResponse = await runApiEffect(
+      Effect.gen(function* () {
+        const localSiteResponse = yield* serveLocalHostedSite(request, bindings);
+        if (localSiteResponse) return localSiteResponse;
+        yield* enforceMarketplaceIngress(request, bindings);
+        return null;
+      }).pipe(
+        Effect.catchIf(
+          (error) => error instanceof MarketplaceRateLimitError,
+          (error) =>
+            Effect.succeed(
+              Response.json(
+                { error: { code: error.code, message: error.message } },
+                {
+                  status: error.status,
+                  headers: {
+                    "Cache-Control": "no-store",
+                    "Retry-After": String(error.retryAfterSeconds),
+                    "X-Content-Type-Options": "nosniff",
                   },
-                ),
+                },
               ),
-          ),
+            ),
+        ),
+      ),
+    );
+    if (earlyResponse) return earlyResponse;
+    const markdown = await pageMarkdownResponse(request, fetchHandler);
+    if (markdown) return markdown;
+    const response = Promise.resolve(fetchHandler(request)).then((result) =>
+      withOverloadRetryAfter(permanentTrailingSlashRedirect(request, result)),
+    );
+    if (context && isEmailSignInStart(request)) {
+      context.waitUntil(
+        response.then(
+          () => undefined,
+          () => undefined,
         ),
       );
-      if (earlyResponse) return earlyResponse;
-      const markdown = await pageMarkdownResponse(request, fetchHandler);
-      if (markdown) return markdown;
-      const response = Promise.resolve(fetchHandler(request)).then((result) =>
-        withOverloadRetryAfter(permanentTrailingSlashRedirect(request, result)),
+    }
+    return response;
+  }
+
+  return {
+    async fetch(request: Request, workerBindings: WorkerFetchBindings, context?: WorkerExecutionContext) {
+      return withStrictTransportSecurity(
+        await withD1RequestSession(request, workerBindings.DB, () => handleFetch(request, workerBindings, context)),
       );
-      if (context && isEmailSignInStart(request)) {
-        context.waitUntil(
-          response.then(
-            () => undefined,
-            () => undefined,
-          ),
-        );
-      }
-      return response;
     },
     async scheduled(
       controller: Pick<ScheduledController, "scheduledTime"> & Partial<Pick<ScheduledController, "cron">>,
@@ -179,12 +187,6 @@ export function createWorkerHandler(
       );
       if (retention) log(retention);
       if (sites) console.info("Hosted site cleanup completed.", sites);
-    },
-  };
-  return {
-    ...handler,
-    async fetch(...args: Parameters<typeof handler.fetch>) {
-      return withStrictTransportSecurity(await handler.fetch(...args));
     },
   } satisfies ExportedHandler<WorkerBindings>;
 }

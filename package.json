@@ -533,6 +533,7 @@
     "test:paid-account-identity": "bun apps/auth-api/scripts/paid-account-identity-e2e.ts",
     "test:account-activity": "bun apps/auth-api/scripts/account-activity-e2e.ts",
     "test:d1-replica-reads": "bun apps/auth-api/scripts/d1-replica-reads-e2e.ts",
+    "test:d1-request-session": "bun apps/auth-api/scripts/d1-request-session-e2e.ts",
     "test:host-list-batch": "bun apps/auth-api/scripts/host-list-batch-e2e.ts",
     "test:account-activity-reporter": "bun scripts/account-activity-reporter-e2e.ts",
     "test:smtp-stall": "bun apps/auth-api/scripts/smtp-stall-e2e.ts",

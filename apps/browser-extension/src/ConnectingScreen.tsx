@@ -21,6 +21,27 @@ function accountName(user: CentralAuthUser): string {
   return separator > 0 ? user.email.slice(0, separator) : user.email;
 }
 
+export function AccountRow(props: { user: CentralAuthUser; onSignOut: () => void }) {
+  const { t } = useText();
+  return (
+    <footer class="ext-connect-account">
+      <UserAvatar user={props.user} decorative class="ext-connect-avatar" />
+      <span class="ext-connect-text">
+        <span class="ext-connect-account-name" dir="auto">
+          {accountName(props.user)}
+        </span>
+        <span class="ext-connect-account-email" dir="auto">
+          {props.user.email}
+        </span>
+      </span>
+      <button type="button" class="ext-connect-pill" onClick={() => props.onSignOut()}>
+        <LogOut size={16} aria-hidden="true" />
+        {t("extension.home.signOut")}
+      </button>
+    </footer>
+  );
+}
+
 export function ConnectingScreen(props: ConnectingScreenProps) {
   const { t } = useText();
   const status = () =>
@@ -86,21 +107,7 @@ export function ConnectingScreen(props: ConnectingScreenProps) {
           }}
         </For>
       </ul>
-      <footer class="ext-connect-account">
-        <UserAvatar user={props.user} decorative class="ext-connect-avatar" />
-        <span class="ext-connect-text">
-          <span class="ext-connect-account-name" dir="auto">
-            {accountName(props.user)}
-          </span>
-          <span class="ext-connect-account-email" dir="auto">
-            {props.user.email}
-          </span>
-        </span>
-        <button type="button" class="ext-connect-sign-out" onClick={() => props.onSignOut()}>
-          <LogOut size={16} aria-hidden="true" />
-          {t("extension.home.signOut")}
-        </button>
-      </footer>
+      <AccountRow user={props.user} onSignOut={props.onSignOut} />
     </div>
   );
 }
