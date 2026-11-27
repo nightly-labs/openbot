@@ -522,7 +522,7 @@ whole text. The desktop and the web client keep the whole text of a shown questi
 comes (`keepWholePrompts` and `withWholePromptText` in `packages/team-client/src/runtime-attention.ts`),
 and the card takes its text from the saved chat message of the same turn and request. A text replaces
 the cut one only when it starts with it. Before, a long question card stopped in the middle of a word
-(#17555). `scripts/question-card-full-text-e2e.ts` checks it with a stand-in Claude CLI.
+(#17555). `scripts/question-steer-order-e2e.ts` checks it with a stand-in Claude CLI in CI.
 
 The optional `phone-feedback-v1` capability (protocol 9 only) adds
 `POST /v1/agent-approvals/send-phone-feedback` (`requestId`, `phone`). `phone` is what only the phone

@@ -4,7 +4,13 @@ import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
-import { AGENT_PROVIDERS, defaultProviderModel } from "@openbot/contracts/ipc";
+import {
+  AGENT_PROVIDERS,
+  type AgentEvent,
+  type AgentPromptQuestion,
+  defaultProviderModel,
+} from "@openbot/contracts/ipc";
+import { keepWholePrompts, withWholePromptText } from "@openbot/team-client/runtime-attention";
 import { Effect } from "effect";
 import type { AgentBrowserHost } from "../src/backend/agent/turn-lifecycle";
 import type { AgentClient, DiagnosticOrigin } from "../src/backend/agent-client";
@@ -12,6 +18,12 @@ import type { ClaudeCliInfo } from "../src/backend/cli";
 import type { AppServerNotification, AppServerRequest, RequestId, ResponseDecoder } from "../src/backend/protocol";
 import { providerSync } from "../src/backend/provider-client-effects";
 import type { ReadProviderHistory } from "../src/backend/provider-history";
+import {
+  attentionKey,
+  reconcileAttentionPrompts,
+  withListedPrompts,
+} from "../src/renderer/src/features/agents/agent-runtime-snapshot";
+import { messagePromptRequestKey, promptRequestKey } from "../src/renderer/src/features/conversation/conversation-keys";
 
 const OUT = resolve(import.meta.dirname, "../.openbot-build/question-steer-order-e2e");
 const root = await mkdtemp(join(tmpdir(), "openbot-question-steer-order-"));
@@ -23,7 +35,15 @@ const asking = join(root, "asking");
 const standInLog = join(root, "stand-in.jsonl");
 const claudeExecutable = join(root, "claude");
 const CLAUDE_MODEL = defaultProviderModel("claude");
-const QUESTION = "Which pet do you like?";
+const QUESTION = [
+  "I found three pets that fit the flat, and I can bring home only one of them this week.",
+  '1. "Cat" sleeps most of the day and needs a small box near the window.',
+  '2. "Dog" needs a walk two times each day, a big bed and some toys to play with in the garden.',
+  '3. "Fish" needs a clean tank and food one time each day. Which pet do you like?',
+].join(" ");
+const THIRD_ITEM = '3. "Fish" needs a clean tank';
+const DOG_DESCRIPTION =
+  `Choose Dog, ${"and plan a long walk in the morning and a short walk in the evening ".repeat(3)}`.trim();
 const MESSAGE = "Please list three launch risks.";
 const ANSWER = "Here are three launch risks.";
 const NO_MESSAGE_ANSWER = "You did not pick a pet. I wait for your new message.";
@@ -80,7 +100,7 @@ setInterval(() => {
   asked = true;
   const toolUseId = "toolu_" + randomUUID().replaceAll("-", "");
   const input = { questions: [{ question: ${JSON.stringify(QUESTION)}, header: "Pet", multiSelect: false,
-    options: [{ label: "Cat", description: "Choose Cat" }, { label: "Dog", description: "Choose Dog" }] }] };
+    options: [{ label: "Cat", description: "Choose Cat" }, { label: "Dog", description: ${JSON.stringify(DOG_DESCRIPTION)} }] }] };
   assistant([{ type: "tool_use", id: toolUseId, name: "AskUserQuestion", input }]);
   question = "req_" + randomUUID();
   write({ type: "control_request", request_id: question,
@@ -193,7 +213,16 @@ class ClaudeStandIn extends EventEmitter<ClientEvents> implements AgentClient {
   }
 }
 
+type PromptEvent = Extract<AgentEvent, { type: "prompt" }>;
+
+interface ShownText {
+  question: number;
+  description: number;
+  hasThirdItem: boolean;
+}
+
 const report: {
+  fullText?: Record<string, ShownText>;
   standInEvents?: string[];
   questionTurnId?: string;
   messageTurnId?: string | null;
@@ -260,6 +289,20 @@ const agents = new AgentService({
   busyMessageMode: () => "steer",
   clientFactory: (_provider, cli) => new ClaudeStandIn(cli),
 });
+const shownText = (questions: readonly AgentPromptQuestion[]): ShownText => {
+  const question = questions[0];
+  assert.ok(question, "The prompt has a question.");
+  return {
+    question: question.question.length,
+    description: question.options?.find((option) => option.label === "Dog")?.description.length ?? 0,
+    hasThirdItem: question.question.includes(THIRD_ITEM),
+  };
+};
+const whole: ShownText = { question: QUESTION.length, description: DOG_DESCRIPTION.length, hasThirdItem: true };
+let liveEvent: PromptEvent | undefined;
+agents.on("event", (event) => {
+  if (event.type === "prompt") liveEvent = event;
+});
 const checked = (text: string) => SHOWN_ORDER.find((shown) => text.startsWith(shown));
 try {
   await runCauseEffect(agents.initialize());
@@ -291,6 +334,38 @@ try {
     async () => (await live()).messages.find((message) => message.questionPrompt)?.turnId,
   );
   report.questionTurnId = questionTurnId;
+
+  const event = await waitFor("the live question", () => liveEvent);
+  const snapshot = agents.getRuntimeSnapshot();
+  const listed = agents.pendingPrompts();
+  const saved = (await live()).messages.find(
+    (item) => messagePromptRequestKey(item) === promptRequestKey(event.turnId, event.requestId),
+  )?.questionPrompt?.questions;
+  const key = attentionKey(event.agentId, event.threadId);
+  const desktopShown = reconcileAttentionPrompts({ [key]: event }, snapshot, {})[key];
+  const desktopListed = withListedPrompts({}, listed, {}, new Set())[key];
+  const webShown = keepWholePrompts(
+    [event],
+    snapshot.pendingPrompts.map((prompt) => ({ ...prompt, type: "prompt" as const })),
+  )[0];
+  const webListed = listed.map((prompt) => ({ ...prompt, type: "prompt" as const }))[0];
+  assert.ok(desktopShown?.type === "prompt" && desktopListed?.type === "prompt", "The desktop shows the question.");
+  assert.ok(webShown && webListed, "The web client shows the question.");
+  const hostSummary = shownText(listed[0]?.questions ?? []);
+  report.fullText = {
+    sent: shownText(event.questions),
+    hostSummary,
+    desktopAfterSnapshot: shownText(desktopShown.questions),
+    desktopAfterReload: shownText(withWholePromptText(desktopListed, saved).questions),
+    webAfterSnapshot: shownText(webShown.questions),
+    webAfterReload: shownText(withWholePromptText(webListed, saved).questions),
+  };
+  assert.ok(
+    hostSummary.question < whole.question && !hostSummary.hasThirdItem,
+    "The host summary cuts the question before its third item.",
+  );
+  for (const [view, shown] of Object.entries(report.fullText).filter(([view]) => view !== "hostSummary"))
+    assert.deepEqual(shown, whole, `The question card keeps the full text: ${view}.`);
 
   const receipt = await runCauseEffect(agents.sendMessage({ agentId: agent.id, text: MESSAGE }));
   const deliveryId = receipt.deliveries[0]?.id;
