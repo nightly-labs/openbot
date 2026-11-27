@@ -24,10 +24,15 @@ const recoveryCall = <A>(operation: () => Promise<A>) =>
 export const REMOTE_RETRY_DELAYS_MS = [500, 1_200, 2_700, 4_800] as const;
 export const REMOTE_RETRY_LIMIT = REMOTE_RETRY_DELAYS_MS.length + 1;
 export const REMOTE_RETRY_COOLDOWN_MS = 15_000;
+export const REMOTE_RETRY_COOLDOWN_MAX_MS = 5 * 60_000;
 const REMOTE_RETRY_JITTER = 0.2;
 
-function remoteRetryDelay(attempt: number): number {
-  const delay = REMOTE_RETRY_DELAYS_MS[Math.max(0, attempt - 1)] ?? REMOTE_RETRY_COOLDOWN_MS;
+function remoteCooldown(cooldowns: number): number {
+  return Math.min(REMOTE_RETRY_COOLDOWN_MS * 2 ** cooldowns, REMOTE_RETRY_COOLDOWN_MAX_MS);
+}
+
+function remoteRetryDelay(attempt: number, cooldowns = 0): number {
+  const delay = REMOTE_RETRY_DELAYS_MS[Math.max(0, attempt - 1)] ?? remoteCooldown(cooldowns);
   return Math.round(delay * (1 + REMOTE_RETRY_JITTER * Math.random()));
 }
 
@@ -187,6 +192,7 @@ export function createRemoteConnectionRecovery(
   let checking = false;
   let checkOnReturn = false;
   let attempt = 0;
+  let cooldowns = 0;
   let retryAt: number | null = null;
   let retryDelay: number | null = null;
   let timer: ReturnType<typeof setTimeout> | null = null;
@@ -203,14 +209,17 @@ export function createRemoteConnectionRecovery(
   function scheduleRetry(start: () => void = startRun) {
     if (disposed || suspended) return;
     const startingDelay = startingRetryDelay();
-    retryAt ??= Date.now() + (startingDelay ?? retryDelay ?? remoteRetryDelay(attempt));
+    retryAt ??= Date.now() + (startingDelay ?? retryDelay ?? remoteRetryDelay(attempt, cooldowns));
     if (startingDelay !== null) retryAt = Math.min(retryAt, Date.now() + startingDelay);
     retryDelay = null;
     if (!active) return;
     const remaining = Math.max(0, retryAt - Date.now());
     if (remaining === 0 && !running) {
       retryAt = null;
-      if (attempt >= REMOTE_RETRY_LIMIT) attempt = 0;
+      if (attempt >= REMOTE_RETRY_LIMIT) {
+        attempt = 0;
+        cooldowns += 1;
+      }
       start();
       return;
     }
@@ -246,7 +255,7 @@ export function createRemoteConnectionRecovery(
     refreshRequested = false;
     interrupted = false;
     attempt += 1;
-    retryDelay = remoteRetryDelay(attempt);
+    retryDelay = remoteRetryDelay(attempt, cooldowns);
     if (!online) onStatus({ phase: "connecting", attempt, remainingSeconds: Math.ceil(retryDelay / 1000) });
     yield* Effect.gen(function* () {
       const result = yield* recoveryCall(() => connect(check)).pipe(Effect.result);
@@ -265,6 +274,7 @@ export function createRemoteConnectionRecovery(
         retryRequested = true;
         if (checkingConnection) {
           attempt = 0;
+          cooldowns = 0;
           retryAt = Date.now();
         }
         scheduleRetry();
@@ -285,6 +295,7 @@ export function createRemoteConnectionRecovery(
             else {
               online = true;
               attempt = 0;
+              cooldowns = 0;
               retryAt = null;
               onStatus({ phase: "online", attempt: 0, remainingSeconds: 0 });
             }
@@ -329,6 +340,7 @@ export function createRemoteConnectionRecovery(
       if (disposed || suspended || online || running || retryAt === null) return;
       retryAt = null;
       attempt = 0;
+      cooldowns = 0;
       cancelTimer();
       if (active) startRun();
     },
@@ -348,6 +360,7 @@ export function createRemoteConnectionRecovery(
       suspended = false;
       retryAt = null;
       attempt = 0;
+      cooldowns = 0;
       cancelTimer();
       if (running || !active) refreshRequested = true;
       else startRun();
@@ -355,6 +368,7 @@ export function createRemoteConnectionRecovery(
     resetBackoff() {
       if (disposed || suspended) return;
       attempt = 0;
+      cooldowns = 0;
       retryDelay = null;
       if (retryAt === null) return;
       if (running) {

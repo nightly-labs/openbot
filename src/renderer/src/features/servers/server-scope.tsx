@@ -329,6 +329,8 @@ const ServerScope = createSimpleContext({
         });
       };
       window.addEventListener("focus", handleWindowFocus);
+      const handleNetworkRestored = () => recovery.networkRestored();
+      window.addEventListener("online", handleNetworkRestored);
 
       void initialServersReady.then(() => {
         if (scopeIsCurrent()) setBootstrapReady(true);
@@ -339,6 +341,7 @@ const ServerScope = createSimpleContext({
         recovery.dispose();
         window.removeEventListener("keydown", handleGlobalSearchShortcut);
         window.removeEventListener("focus", handleWindowFocus);
+        window.removeEventListener("online", handleNetworkRestored);
       };
     });
 
@@ -440,11 +443,16 @@ const ServerScope = createSimpleContext({
       }),
     );
 
+    let wasReady = false;
+    let readyServerId: ReturnType<typeof activeServerId> | undefined;
     createEffect(
       () => ({ ready: bootstrapReady() && serversLoaded() && transportReady(), id: activeServerId() }),
-      ({ ready }) => {
+      ({ ready, id }) => {
         if (!ready) loadGeneration += 1;
         recovery.setActive(ready);
+        if (ready && (!wasReady || id !== readyServerId)) recovery.resetBackoff();
+        wasReady = ready;
+        readyServerId = id;
       },
     );
 
