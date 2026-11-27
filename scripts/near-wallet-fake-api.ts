@@ -358,6 +358,12 @@ export class FakeAgentApi {
           400,
           errorDocument("validation_failed", "request", "A new policy must set confidential to true.", false),
         );
+      const toggled = facts.data.agent_id ? this.agents.get(facts.data.agent_id) : undefined;
+      const wantFrozen = facts.data.type === "agent_freeze";
+      if (toggled && (wantFrozen || facts.data.type === "agent_unfreeze") && toggled.policy.frozen === wantFrozen) {
+        const code = wantFrozen ? "wallet_already_frozen" : "wallet_already_unfrozen";
+        return answer(409, errorDocument(code, "policy", "The agent is already in this state.", false));
+      }
       const generated = this.#generate(raw.data, facts.data);
       return generated ? answer(200, generated) : bad("generate-intent agent");
     }

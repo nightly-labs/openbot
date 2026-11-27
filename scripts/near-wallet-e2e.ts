@@ -614,6 +614,39 @@ async function main(): Promise<void> {
       );
     });
 
+    await scenario("a pause that NEAR Intents never applied can be turned off again", async (details) => {
+      const agentId = wallet.store.read().wallet?.agentId ?? "";
+      const fakeAgent = api.agents.get(agentId);
+      assert.ok(fakeAgent);
+      page.mode = { kind: "other-key" };
+      try {
+        const failed = await Effect.runPromise(wallet.service.freeze());
+        details.set("failedFreeze", { state: failed.state, error: failed.error });
+        assert.equal(failed.state, "frozen");
+        assert.equal(policyOf(fakeAgent).frozen, false);
+      } finally {
+        page.mode = { kind: "honest" };
+      }
+      const visits = page.visits.length;
+      const unfrozen = await Effect.runPromise(wallet.service.unfreeze());
+      details.set("unfrozen", { state: unfrozen.state, error: unfrozen.error });
+      assert.equal(unfrozen.error, null);
+      assert.equal(unfrozen.state, "ready");
+      assert.equal(wallet.service.ready(), true);
+      assert.equal(page.visits.length, visits, "no signature for a wallet that is not paused");
+
+      fakeAgent.policy = { ...fakeAgent.policy, frozen: true };
+      const frozen = await Effect.runPromise(wallet.service.freeze());
+      details.set("alreadyFrozen", { state: frozen.state, error: frozen.error });
+      assert.equal(frozen.error, null);
+      assert.equal(frozen.state, "frozen");
+      assert.equal(page.visits.length, visits, "no signature for a wallet that is already paused");
+      const resumed = await Effect.runPromise(wallet.service.unfreeze());
+      assert.equal(resumed.error, null);
+      assert.equal(resumed.state, "ready");
+      assert.equal(policyOf(fakeAgent).frozen, false);
+    });
+
     await scenario("forged signature returns are refused", async (details) => {
       const wrongNoncePage = new SigningPage();
       wrongNoncePage.mode = { kind: "wrong-nonce" };

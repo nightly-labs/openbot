@@ -268,12 +268,7 @@ export class NearWalletService implements NearWallet {
       return this.status();
     }
     this.#emitStatus();
-    return yield* this.#ownerStep(
-      Effect.gen({ self: this }, function* () {
-        const intent = yield* this.#generate({ type: "agent_freeze", agent_id: wallet.agentId });
-        yield* this.#signAndSubmit("freeze", intent, sourceText("status.agent.nearSummaryFreeze"), null);
-      }),
-    );
+    return yield* this.#ownerStep(this.#sendFrozen(wallet.agentId, true));
   }).bind(this);
 
   readonly unfreeze = Effect.fn("NearWallet.unfreeze")(function* (this: NearWalletService) {
@@ -281,8 +276,7 @@ export class NearWalletService implements NearWallet {
       Effect.gen({ self: this }, function* () {
         const wallet = this.#store.read().wallet;
         if (!wallet) return yield* nearFailure(sourceText("error.connector.nearNoWallet"));
-        const intent = yield* this.#generate({ type: "agent_unfreeze", agent_id: wallet.agentId });
-        yield* this.#signAndSubmit("unfreeze", intent, sourceText("status.agent.nearSummaryUnfreeze"), null);
+        yield* this.#sendFrozen(wallet.agentId, false);
         yield* this.#store.update((record) =>
           record.wallet ? { ...record, wallet: { ...record.wallet, frozen: false } } : record,
         );
@@ -771,6 +765,20 @@ export class NearWalletService implements NearWallet {
       const api = yield* this.#partnerClient();
       return yield* nearCall((signal) => api.generateIntent<Type>(request, { idempotencyKey: newKey(), signal }));
     });
+  }
+
+  #sendFrozen(agentId: string, frozen: boolean): Effect.Effect<void, NearOperationError> {
+    const alreadyCode = frozen ? "wallet_already_frozen" : "wallet_already_unfrozen";
+    return Effect.gen({ self: this }, function* () {
+      const intent = yield* this.#generate({ type: frozen ? "agent_freeze" : "agent_unfreeze", agent_id: agentId });
+      const summary = sourceText(frozen ? "status.agent.nearSummaryFreeze" : "status.agent.nearSummaryUnfreeze");
+      yield* this.#signAndSubmit(frozen ? "freeze" : "unfreeze", intent, summary, null);
+    }).pipe(
+      Effect.catchIf(
+        (failure) => failure.cause instanceof AgentApiError && failure.cause.code === alreadyCode,
+        () => Effect.void,
+      ),
+    );
   }
 
   readonly #signAndSubmit = Effect.fn("NearWallet.signAndSubmit")(function* (
