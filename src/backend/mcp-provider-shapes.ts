@@ -51,6 +51,10 @@ export type McpEndpointSource = (
   agentId: string | null,
 ) => Effect.Effect<McpEndpoint | McpEndpointRefusal, McpOperationError>;
 
+export type McpReconnectSource = (mcpServerId: string) => number;
+
+export const MCP_RECONNECT_HEADER = "X-OpenBot-Reconnect";
+
 type McpDropReason =
   | "command_not_found"
   | "working_directory_unsupported"

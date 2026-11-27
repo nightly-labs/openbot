@@ -83,7 +83,13 @@ import { kimiSavedSignInCheck, kimiSavedSignInVersion } from "./kimi-sign-in-che
 import { readKimiUsage } from "./kimi-usage";
 import type { McpOAuthAuthority } from "./mcp-oauth-provider";
 import type { McpOAuthProxySettingsStore } from "./mcp-oauth-proxy";
-import type { McpDropReporter, McpEndpointSource, McpServerSource, McpToolRuntimeSource } from "./mcp-provider-shapes";
+import type {
+  McpDropReporter,
+  McpEndpointSource,
+  McpReconnectSource,
+  McpServerSource,
+  McpToolRuntimeSource,
+} from "./mcp-provider-shapes";
 import { MuseAgentClient } from "./muse-client";
 import { openCodeAgentDefaultsEnv, openCodeUserConfigHasMediaSetup } from "./opencode-agent-defaults";
 import {
@@ -449,6 +455,7 @@ export interface ProviderClientContext {
   readonly reportMcpDrops?: McpDropReporter;
   readonly mcpToolRuntimes?: McpToolRuntimeSource;
   readonly mcpEndpoint?: McpEndpointSource;
+  readonly mcpReconnect?: McpReconnectSource;
   readonly mcpOAuth?: McpOAuthAuthority;
   readonly mcpOAuthProxySettings?: McpOAuthProxySettingsStore;
   readonly appVersion?: string;
@@ -941,6 +948,7 @@ export const BUILT_IN_PROVIDER_DRIVERS: readonly BuiltInProviderDriver[] = [
         reportMcpDrops: context.reportMcpDrops,
         mcpToolRuntimes: context.mcpToolRuntimes,
         mcpEndpoint: context.mcpEndpoint,
+        mcpReconnect: context.mcpReconnect,
         readRateLimits: () =>
           readOpenCodeGoUsage(context.apiKey("opencode")).pipe(
             Effect.mapError((failure) => providerFailure(failure.cause)),

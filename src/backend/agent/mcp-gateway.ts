@@ -100,6 +100,7 @@ export class McpGateway {
   readonly #reportedMissingCommands = new Map<string, string>();
   readonly #testedTools = new Map<string, string>();
   readonly #providerFailedStarts = new Set<string>();
+  readonly #reconnects = new Map<string, number>();
   readonly #signInFailures = new Map<string, string>();
   readonly #proxy: McpOAuthProxy;
   readonly #logger: Logger;
@@ -227,16 +228,25 @@ export class McpGateway {
     return this.#handoff.record(configs);
   }
 
+  reconnects(mcpServerId: string): number {
+    return this.#reconnects.get(mcpServerId) ?? 0;
+  }
+
+  #reconnect(mcpServerId: string): void {
+    this.#reconnects.set(mcpServerId, this.reconnects(mcpServerId) + 1);
+  }
+
   list(): McpServerConfig[] {
     return this.#servers.list();
   }
 
   readonly save = Effect.fn("McpGateway.save")(function* (this: McpGateway, input: SaveMcpServerInput) {
     const previous = this.#servers.list().find((config) => config.id === input.config.id);
-    yield* Effect.try({
+    const saved = yield* Effect.try({
       try: () => this.#servers.save(input.config),
       catch: (cause) => new McpGatewayFailed({ cause }),
     });
+    this.#reconnect(saved.id);
     return yield* this.changed(previous ? "now" : "after-background-work", [input.config.name, previous?.name]);
   }, Effect.uninterruptible);
 
@@ -247,6 +257,7 @@ export class McpGateway {
       catch: (cause) => new McpGatewayFailed({ cause }),
     });
     this.#providerFailedStarts.delete(input.mcpServerId);
+    this.#reconnects.delete(input.mcpServerId);
     const list = yield* this.changed("now", [removed?.name]);
     const removedResource = removed?.transport === "http" ? mcpOAuthAccountKey(removed.url) : null;
     if (
@@ -269,6 +280,7 @@ export class McpGateway {
       try: () => this.#servers.setEnabled(input.mcpServerId, input.enabled),
       catch: (cause) => new McpGatewayFailed({ cause }),
     });
+    if (input.enabled) this.#reconnect(input.mcpServerId);
     return yield* this.changed(input.enabled ? "after-background-work" : "now", [changed?.name]);
   }, Effect.uninterruptible);
 
@@ -368,6 +380,7 @@ export class McpGateway {
     const route = saved !== undefined && this.#proxied(saved) ? mcpOAuthProxyRoute(saved.id, saved.url) : null;
     const failedStart = (route !== null && this.#proxy.failedStart(route)) || this.#providerFailedStarts.has(config.id);
     if (this.#testedTools.get(key) === tools && !failedStart) return;
+    this.#reconnect(config.id);
     yield* this.#hooks.refreshAllAgentRuntimes("after-background-work");
     if (failedStart) {
       if (route !== null) this.#proxy.reportedFailedStart(route);
@@ -438,12 +451,16 @@ export class McpGateway {
       ...(open && deepLinkRedirectUrl !== undefined ? { deepLinkRedirectUrl } : {}),
     });
     const resource = mcpOAuthAccountKey(input.config.url);
-    const inUse =
-      resource !== null &&
-      this.#servers
-        .listEnabled()
-        .some((config) => config.transport === "http" && mcpOAuthAccountKey(config.url) === resource);
-    if (result.error === null && inUse) yield* this.#hooks.refreshAllAgentRuntimes("after-background-work");
+    const signedIn =
+      resource === null
+        ? []
+        : this.#servers
+            .listEnabled()
+            .filter((config) => config.transport === "http" && mcpOAuthAccountKey(config.url) === resource);
+    if (result.error === null && signedIn.length > 0) {
+      for (const config of signedIn) this.#reconnect(config.id);
+      yield* this.#hooks.refreshAllAgentRuntimes("after-background-work");
+    }
     if (resource !== null) {
       if (result.error === null) this.#signInFailures.delete(resource);
       else if (matchingSourceKeys(result.error)[0] !== "error.backend.mcpSignInCancelled")

@@ -1191,6 +1191,7 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
         mcpServers: (agentId) => this.#mcp.record(this.#mcpServersFor(credentials.mcpServers(), agentId)),
         reportMcpDrops: (provider, drops) => this.#mcp.reportDrops(provider, drops),
         mcpEndpoint: (config, agentId) => this.#mcp.endpoint(config, agentId).pipe(toMcpOperationError),
+        mcpReconnect: (mcpServerId) => this.#mcp.reconnects(mcpServerId),
       },
       mcpHandoff: this.#mcp.handoffLog(),
       redactMcp: (text) => this.#mcp.redact(text),

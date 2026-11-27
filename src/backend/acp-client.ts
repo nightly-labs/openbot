@@ -95,11 +95,14 @@ import {
   acpMcpServers,
   agentMcpServers,
   computerUseParam,
+  MCP_RECONNECT_HEADER,
   type McpDropReporter,
   type McpEndpointSource,
+  type McpReconnectSource,
   type McpServerSource,
   type McpToolRuntimeSource,
   mcpAgentParam,
+  type UsableMcpServer,
   usableMcpServers,
 } from "./mcp-provider-shapes";
 import { type RelayedMcpToolOutcome, type StdioMcpRelay, startStdioMcpRelay } from "./mcp-stdio-relay";
@@ -499,6 +502,7 @@ export interface AcpProviderOptions {
   reportMcpDrops?: McpDropReporter | undefined;
   mcpToolRuntimes?: McpToolRuntimeSource | undefined;
   mcpEndpoint?: McpEndpointSource | undefined;
+  mcpReconnect?: McpReconnectSource | undefined;
   authenticate?(
     connection: ClientSideConnection,
     initialization: InitializeResponse,
@@ -1936,17 +1940,18 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
             let currentModelId: string | null;
             let listsModels: boolean;
             const ownMcpServerNames = this.#ownMcpServerNames(cwd);
-            const handoff = acpMcpServers(
-              providerResult(
-                yield* Effect.result(
-                  usableMcpServers(
-                    agentMcpServers(this.options.mcpServers?.(agentId) ?? [], computerUse),
-                    this.options.mcpToolRuntimes?.(),
-                    this.options.mcpEndpoint,
-                    agentId,
-                  ).pipe(toProviderClientOperationError),
-                ),
+            const usable = providerResult(
+              yield* Effect.result(
+                usableMcpServers(
+                  agentMcpServers(this.options.mcpServers?.(agentId) ?? [], computerUse),
+                  this.options.mcpToolRuntimes?.(),
+                  this.options.mcpEndpoint,
+                  agentId,
+                ).pipe(toProviderClientOperationError),
               ),
+            );
+            const handoff = acpMcpServers(
+              usable,
               ownMcpServerNames,
               this.#flavor.mcpServerName,
               relaysStdio,
@@ -1960,6 +1965,7 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
               closeRelays = relayed.close;
               relayedServers = { own: ownMcpServerNames, byName: relayed.byName };
             }
+            given = this.#withMcpReconnects(given, usable, ownMcpServerNames);
             let mcpServers = [...given, ...mcp.servers];
             const enableMcpServers = this.#flavor.enableMcpServers;
             if (enableMcpServers) {
@@ -3404,6 +3410,25 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
 
   #ownMcpServerNames(cwd: string): readonly string[] {
     return this.#flavor.ownMcpServerNames?.(cwd, this.options.argv) ?? [];
+  }
+
+  #withMcpReconnects(
+    servers: readonly AcpMcpServer[],
+    usable: readonly UsableMcpServer[],
+    own: readonly string[],
+  ): AcpMcpServer[] {
+    const reconnect = this.#flavor.mcpServersPerDirectory ? this.options.mcpReconnect : undefined;
+    if (!reconnect) return [...servers];
+    const counts = new Map<string, number>();
+    for (const { config, error } of usable) {
+      const name = acpMcpServerName(config, own, this.#flavor.mcpServerName);
+      if (error === undefined && !counts.has(name)) counts.set(name, reconnect(config.id));
+    }
+    return servers.map((server) => {
+      const count = counts.get(server.name) ?? 0;
+      if (!("type" in server) || count === 0) return server;
+      return { ...server, headers: [...server.headers, { name: MCP_RECONNECT_HEADER, value: String(count) }] };
+    });
   }
 
   #mcpLoadFailureMessage(thread: AcpThread, detail: string): string | null {
