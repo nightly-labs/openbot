@@ -102,6 +102,8 @@ export function createChannelsController(env: ChannelsEnvironment) {
   const readThrough = new Map<string, number>();
   let visitRead: string | null = null;
   const keptPages = new Map<string, ChannelPage>();
+  const dirtyKeptPages = new Set<string>();
+  let replaceLoadedPage = false;
   const changeListeners = new Set<(channelId: string | null) => void>();
   function announce(channelId: string | null): void {
     for (const listener of changeListeners) listener(channelId);
@@ -109,10 +111,12 @@ export function createChannelsController(env: ChannelsEnvironment) {
   function keepPage(page: ChannelPage | null): void {
     if (!page) return;
     keptPages.delete(page.channel.id);
+    dirtyKeptPages.delete(page.channel.id);
     keptPages.set(page.channel.id, snapshot(page));
     for (const id of keptPages.keys()) {
       if (keptPages.size <= KEPT_PAGES) break;
       keptPages.delete(id);
+      dirtyKeptPages.delete(id);
     }
   }
 
@@ -186,9 +190,25 @@ export function createChannelsController(env: ChannelsEnvironment) {
     const account = env.scopeKey();
     const selected = selectedOverride === undefined ? state.selectedId : selectedOverride;
     try {
-      const channels = await env.port().agent.listChannels();
+      const listPromise = env.port().agent.listChannels();
+      const pagePromise =
+        selected !== null && withPage
+          ? env
+              .port()
+              .agent.readChannel({ channelId: selected })
+              .then(
+                (value) => ({ ok: true as const, value }),
+                (error: unknown) => ({ ok: false as const, error }),
+              )
+          : null;
+      const channels = await listPromise;
       const selectedExists = selected !== null && channels.some((channel) => channel.id === selected);
-      const page = selectedExists && withPage ? await env.port().agent.readChannel({ channelId: selected }) : null;
+      let page: ChannelPage | null = null;
+      if (selectedExists && pagePromise) {
+        const result = await pagePromise;
+        if (!result.ok) throw result.error;
+        page = result.value;
+      }
       if (disposed || account !== env.scopeKey() || id !== refreshId || selected !== state.selectedId) return;
       env.onList?.(channels, account);
       let closed: number[] = [];
@@ -206,9 +226,15 @@ export function createChannelsController(env: ChannelsEnvironment) {
           state.editing = null;
           readThrough.delete(selected);
           keptPages.delete(selected);
+          dirtyKeptPages.delete(selected);
           if (failedCommand?.channelId === selected) failedCommand = null;
         }
-        if (page && state.page?.channel.id === page.channel.id) {
+        if (
+          page &&
+          state.page?.channel.id === page.channel.id &&
+          !replaceLoadedPage &&
+          page.channel.revision === state.page.channel.revision
+        ) {
           const merged = mergeChannelPage(state.page.messages, page.messages);
           const kept = merged.messages.slice(0, merged.messages.length - page.messages.length);
           const held = snapshot(state.page.tasks);
@@ -220,7 +246,10 @@ export function createChannelsController(env: ChannelsEnvironment) {
           if (page.waits === undefined) delete state.page.waits;
           else state.page.waits = page.waits;
           if (merged.takeFetchedCursor) takeOlderWindow(state.page, page);
-        } else if (withPage || !selectedExists) state.page = page;
+        } else if (withPage || !selectedExists) {
+          state.page = page;
+          replaceLoadedPage = false;
+        }
         if (withPage || !selectedExists) state.loading = false;
         if (!failedCommand && withPage) state.error = null;
       });
@@ -259,6 +288,7 @@ export function createChannelsController(env: ChannelsEnvironment) {
     visitRead = null;
     const kept = keptPages.get(channelId) ?? null;
     keptPages.delete(channelId);
+    replaceLoadedPage = dirtyKeptPages.delete(channelId);
     flush(() =>
       setState((state) => {
         Object.assign(state, { selectedId: channelId, page: kept, editing: null, loading: kept === null });
@@ -406,6 +436,8 @@ export function createChannelsController(env: ChannelsEnvironment) {
         refreshId += 1;
         readThrough.clear();
         keptPages.clear();
+        dirtyKeptPages.clear();
+        replaceLoadedPage = false;
         visitRead = null;
         failedCommand = null;
         pendingCommands = 0;
@@ -528,6 +560,8 @@ export function createChannelsController(env: ChannelsEnvironment) {
       const deleteChannelHistory = env.port().agent.deleteChannelHistory;
       if (!deleteChannelHistory) throw new Error(currentText().t("channel.error.action"));
       await deleteChannelHistory(channelId);
+      keptPages.delete(channelId);
+      dirtyKeptPages.delete(channelId);
       await refreshAfter();
     },
     compactContext: async (channelId: string) => {
@@ -577,12 +611,14 @@ export function createChannelsController(env: ChannelsEnvironment) {
       actionToast.error(message, { report: { operation: "other", source: "action", cause_code: "unknown" } });
     },
     changed: (channelId: string) => {
-      if (channelId !== state.selectedId) keptPages.delete(channelId);
+      if (channelId !== state.selectedId && keptPages.has(channelId)) dirtyKeptPages.add(channelId);
       announce(channelId);
       return refresh(undefined, channelId === state.selectedId);
     },
     resync: () => {
       keptPages.clear();
+      dirtyKeptPages.clear();
+      replaceLoadedPage = false;
       announce(null);
       return refresh();
     },
