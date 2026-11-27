@@ -190,18 +190,22 @@ const UserMediaSetup = Schema.Struct({
 
 const decodeUserMediaSetup = Schema.decodeUnknownOption(Schema.fromJsonString(UserMediaSetup));
 
-function configHasMediaSetup(text: string): boolean {
+function configHasMediaSetup(text: string, paysForMedia: (provider: string) => boolean): boolean {
   const config = decodeUserMediaSetup(stripJsonc(text));
   if (Option.isNone(config)) return true;
   const { provider, experimental } = config.value;
   return (
     experimental?.image_generate !== undefined ||
     experimental?.video_generate !== undefined ||
-    Object.values(provider ?? {}).some((entry) => Boolean(entry.options?.apiKey?.trim()))
+    Object.entries(provider ?? {}).some(([id, entry]) => paysForMedia(id) && Boolean(entry.options?.apiKey?.trim()))
   );
 }
 
-export function openCodeUserConfigHasMediaSetup(env: NodeJS.ProcessEnv, home = homedir()): boolean {
+export function openCodeUserConfigHasMediaSetup(
+  env: NodeJS.ProcessEnv,
+  paysForMedia: (provider: string) => boolean,
+  home = homedir(),
+): boolean {
   const userFile = env.OPENCODE_CONFIG?.trim();
   const files = [
     ...globalConfigFolders(env, home).flatMap((folder) => GLOBAL_CONFIG_FILES.map((name) => join(folder, name))),
@@ -209,7 +213,7 @@ export function openCodeUserConfigHasMediaSetup(env: NodeJS.ProcessEnv, home = h
   ];
   return files.some((file) => {
     const text = readTextOrNull(file);
-    return text !== null && configHasMediaSetup(text);
+    return text !== null && configHasMediaSetup(text, paysForMedia);
   });
 }
 

@@ -91,7 +91,7 @@ import {
   type CustomProviderSource,
   clearedInheritedOpenCodeKeyEnv,
   customProvidersOn,
-  hasCustomProviderCredentials,
+  hasCustomProviderMediaKey,
   OPENCODE_GO_PROVIDER,
   OPENCODE_PROFILE_CONFIG,
   openCodeAgentConfig,
@@ -103,6 +103,7 @@ import {
   hasOpenCodeMediaSignIn,
   hasOpenCodeProviderKey,
   readOpenCodeGoUsage,
+  readOpenCodeMediaProviders,
   readOpenCodeRefusalStatus,
   readOpenCodeStoredKey,
 } from "./opencode-usage";
@@ -884,10 +885,12 @@ export const BUILT_IN_PROVIDER_DRIVERS: readonly BuiltInProviderDriver[] = [
           const agentEnvironment = context.agentEnvironment?.();
           const keyEnv = clearedInheritedOpenCodeKeyEnv(context.apiKey("opencode"));
           const processEnv = { ...process.env, ...agentEnvironment, ...keyEnv };
+          const media = Effect.runSync(readOpenCodeMediaProviders(processEnv));
+          const paysForMedia = (provider: string) => media.providers.has(provider);
           const mediaSignIn =
-            hasCustomProviderCredentials(openCodeEndpoints(context)()) ||
-            openCodeUserConfigHasMediaSetup(processEnv) ||
-            Effect.runSync(hasOpenCodeMediaSignIn(processEnv));
+            hasCustomProviderMediaKey(openCodeEndpoints(context)(), paysForMedia) ||
+            openCodeUserConfigHasMediaSetup(processEnv, paysForMedia) ||
+            Effect.runSync(hasOpenCodeMediaSignIn(processEnv, media));
           return {
             ...agentEnvironment,
             ...opencodeEnv(cli),

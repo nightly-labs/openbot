@@ -177,9 +177,15 @@ function modelEntry(model: CustomProviderModel, withoutReasoning: boolean): Open
   };
 }
 
-export function hasCustomProviderCredentials(providers: readonly CustomProviderConfig[]): boolean {
+export function hasCustomProviderMediaKey(
+  providers: readonly CustomProviderConfig[],
+  paysForMedia: (provider: string) => boolean,
+): boolean {
   return providers.some(
-    (provider) => provider.models.length > 0 && (Boolean(provider.apiKey) || provider.headers.length > 0),
+    (provider) =>
+      paysForMedia(provider.id) &&
+      provider.models.length > 0 &&
+      (Boolean(provider.apiKey) || provider.headers.length > 0),
   );
 }
 
