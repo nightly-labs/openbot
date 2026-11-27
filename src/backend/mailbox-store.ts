@@ -2670,7 +2670,7 @@ export class MailboxStore {
       const answer = messages.get(earlier.messageId);
       return (
         answer !== undefined &&
-        isTeammateReply(answer) &&
+        isAnswer(answer) &&
         !failedRequestNotes.has(answer.id) &&
         answersSameRequest(answer, reply)
       );
