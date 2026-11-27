@@ -301,7 +301,10 @@ function ServerView(props: { session: ExtensionSession; onSignOut: () => void; o
       });
       await listServers(connection);
     } catch (error) {
-      showRequestFailure(error);
+      setView((draft) => {
+        draft.status = "failed";
+        draft.message = error instanceof Error ? error.message : t("extension.connection.requestFailed");
+      });
     }
   }
 
@@ -316,20 +319,8 @@ function ServerView(props: { session: ExtensionSession; onSignOut: () => void; o
     await open(hosts.some((entry) => entry.hostId === saved) && saved ? saved : (hosts[0]?.hostId ?? ""));
   }
 
-  async function listServersAgain() {
-    if (!connection) return;
-    try {
-      await listServers(connection);
-    } catch (error) {
-      showRequestFailure(error);
-    }
-  }
-
-  function showRequestFailure(error: unknown) {
-    setView((draft) => {
-      draft.status = "failed";
-      draft.message = error instanceof Error ? error.message : t("extension.connection.requestFailed");
-    });
+  function listServersAgain() {
+    return connection ? listServers(connection) : start();
   }
 
   async function openChatFromX() {

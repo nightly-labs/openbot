@@ -307,7 +307,7 @@ textarea:focus-visible {
   transition: background-color 150ms ease-out;
 }
 
-.ext-connect-pill:hover {
+.ext-connect-pill:hover:not(:disabled) {
   background: var(--ext-control-active);
 }
 
