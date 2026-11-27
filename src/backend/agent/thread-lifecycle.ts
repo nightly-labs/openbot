@@ -1,4 +1,5 @@
 import { createHash } from "node:crypto";
+import { existsSync } from "node:fs";
 import { mkdir, readdir, readFile, rm, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import {
@@ -228,6 +229,7 @@ export class ThreadLifecycle {
   readonly #routineThread: (threadId: string) => boolean;
   readonly #asksFirst: (agentId: string) => boolean;
   readonly #pendingHandoffs = new Map<string, string>();
+  readonly #failedTurnImages = new Map<string, readonly string[]>();
   readonly #givenTurnContext = new Map<string, string>();
   readonly #handoffWrites = Semaphore.makeUnsafe(1);
   readonly #archiveRetries: CodexArchiveRetries;
@@ -308,6 +310,15 @@ export class ThreadLifecycle {
 
   consumePendingHandoff(threadId: string): string | undefined {
     return this.#pendingHandoffs.get(threadId);
+  }
+
+  failedTurnImages(agentId: string, providerThreadId: string): string[] {
+    const images = this.#failedTurnImages.get(this.#conversation.publicThreadId(agentId, providerThreadId)) ?? [];
+    return images.filter((path) => existsSync(path));
+  }
+
+  forgetFailedTurnImages(agentId: string, providerThreadId: string): void {
+    this.#failedTurnImages.delete(this.#conversation.publicThreadId(agentId, providerThreadId));
   }
 
   readonly deletePendingHandoff = Effect.fn("ThreadLifecycle.deletePendingHandoff")(function* (
@@ -413,6 +424,7 @@ export class ThreadLifecycle {
 
   dispose(): void {
     this.#pendingHandoffs.clear();
+    this.#failedTurnImages.clear();
     this.#pendingRuntimeRefreshes.clear();
     this.#mcpRuntimeRefreshes.clear();
     this.#pendingStarts.clear();
@@ -1380,11 +1392,15 @@ export class ThreadLifecycle {
     this: ThreadLifecycle,
     agentId: string,
     externalThreadId: string,
+    failedTurnImages: readonly string[] = [],
   ) {
     const agent = this.#store.list().find((candidate) => candidate.id === agentId);
     if (!agent) return;
+    const publicThreadId = this.#conversation.publicThreadId(agentId, externalThreadId);
     yield* this.#releaseProviderSession(externalThreadId);
     this.retireProviderSession(agent, externalThreadId);
+    if (failedTurnImages.length > 0) this.#failedTurnImages.set(publicThreadId, failedTurnImages);
+    else this.#failedTurnImages.delete(publicThreadId);
     this.#hooks.logRecovery(agentId, agent.provider, "replaced");
   }, Effect.uninterruptible).bind(this);
 
@@ -1571,6 +1587,7 @@ export class ThreadLifecycle {
       return;
     }
     this.#store.database.deactivateProviderSessions(threadId);
+    this.#failedTurnImages.delete(threadId);
     for (const session of sessions) {
       yield* this.#releaseProviderSession(session.externalSessionId);
       this.#conversation.unbindThread(session.externalSessionId);

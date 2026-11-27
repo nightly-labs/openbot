@@ -14,7 +14,7 @@ import { ANTIGRAVITY_ACP_FLAVOR } from "../src/backend/acp-flavor-antigravity";
 import { OPENCODE_ACP_FLAVOR } from "../src/backend/acp-flavor-opencode";
 import { type AgentClient, ProviderSessionBusyError } from "../src/backend/agent-client";
 import { runCauseEffect } from "../src/backend/effect-boundary";
-import type { AppServerNotification } from "../src/backend/protocol";
+import { type AppServerNotification, getString, isRecord } from "../src/backend/protocol";
 import { installFakeAgent, readJsonl, runTurn, startThread, stopClients, type TurnResult } from "./provider-fakes/host";
 
 const OUT = resolve(import.meta.dirname, "../.openbot-build/acp-turn-stall-e2e");
@@ -59,7 +59,13 @@ interface Report {
   };
   antigravityLogged?: { status: string | null; error: string | null; elapsedMs: number };
   lostPrompt?: { status: string | null; reply: string; prompts: number; cancels: number; resumes: number };
-  lostTwice?: { status: string | null; error: string | null; elapsedMs: number; next: string | null };
+  lostTwice?: {
+    status: string | null;
+    error: string | null;
+    elapsedMs: number;
+    next: string | null;
+    freshSession: unknown[];
+  };
   quiet?: { status: string | null; reply: string; prompts: number };
   noLoad?: { stopStatus: string | null; next: string | null; sessionsOpened: number; loads: number };
   silentNew?: { error: string; elapsedMs: number };
@@ -506,14 +512,23 @@ try {
   assert.equal(report.lostPrompt.resumes, 1, "The session is resumed before the prompt is sent again.");
 
   const twiceThread = await startThread(first, { cwd: workspace });
+  const freshSessionErrors: unknown[] = [];
+  const noteFreshSession = (notification: AppServerNotification) => {
+    if (notification.method === "error" && getString(notification.params, "threadId") === twiceThread)
+      freshSessionErrors.push(isRecord(notification.params) ? notification.params.freshSession : undefined);
+  };
+  first.on("notification", noteFreshSession);
   const twice = await timed(() => runTurn(first, twiceThread, { text: "hang", timeoutMs: FIRST_UPDATE_MS * 20 }));
+  first.off("notification", noteFreshSession);
   const afterTwice = await runTurn(first, twiceThread);
   report.lostTwice = {
     status: twice.value.status,
     error: twice.value.error,
     elapsedMs: twice.elapsedMs,
     next: afterTwice.status,
+    freshSession: freshSessionErrors,
   };
+  assert.deepEqual(freshSessionErrors, [true], "The failure asks for a fresh session.");
   assert.equal(twice.value.status, "failed", "A prompt that is silent twice fails the turn.");
   assert.equal(
     twice.value.error,

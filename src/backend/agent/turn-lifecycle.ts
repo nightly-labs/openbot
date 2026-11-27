@@ -180,6 +180,14 @@ export const FAILOVER_CAUSES: ReadonlySet<CauseCode> = new Set([
 const CODEX_SAFETY_BLOCKS: ReadonlySet<string> = new Set(["cyberPolicy", "misalignmentPolicyViolation"]);
 const SAFETY_BLOCK_REVERT_TIMEOUT_MS = 10_000;
 
+function failedTurnImages(deliveries: readonly DeliveryContext[]): string[] {
+  return deliveries.flatMap(({ delivery, managedAttachments }) =>
+    delivery.sender.kind === "user"
+      ? managedAttachments.filter((attachment) => attachment.kind === "image").map((attachment) => attachment.path)
+      : [],
+  );
+}
+
 function carriesHandoff(item: DynamicRecord): boolean {
   return getArray(item, "content").some(
     (part) => isRecord(part) && isString(part.text) && part.text.startsWith(HANDOFF_START),
@@ -269,7 +277,11 @@ export interface TurnHooks {
   emitRuntimeSnapshot(): void;
   scheduleDrain(agentId: string): void;
   steerAgentMessage(recipientAgentId: string, deliveryId: string): Effect.Effect<void>;
-  dropRefusedSession(agentId: string, externalThreadId: string): Effect.Effect<void, TurnOperationFailed>;
+  dropRefusedSession(
+    agentId: string,
+    externalThreadId: string,
+    failedTurnImages?: readonly string[],
+  ): Effect.Effect<void, TurnOperationFailed>;
   listAgents(): AgentSummary[];
   redactMcp(text: string): string;
   checkFinish?(agentId: string, input: FinishCheckInput): Effect.Effect<FinishCheckResult | null>;
@@ -385,6 +397,7 @@ export class TurnLifecycle {
   readonly #turnAssociations = new Map<string, Deferred.Deferred<void, TurnOperationFailed>>();
   readonly #turnErrors = new Map<string, string>();
   readonly #turnCauses = new Map<string, CauseCode>();
+  readonly #freshSessionTurns = new Set<string>();
   readonly #turnRetries = new Map<string, number>();
   readonly #capacityNotices = new Set<string>();
   readonly #retryNotices = new Set<string>();
@@ -588,6 +601,7 @@ export class TurnLifecycle {
     this.#turnAssociations.clear();
     this.#turnErrors.clear();
     this.#turnCauses.clear();
+    this.#freshSessionTurns.clear();
     this.#turnRetries.clear();
     this.#capacityNotices.clear();
     this.#retryNotices.clear();
@@ -1753,6 +1767,7 @@ export class TurnLifecycle {
         if (notification.method === "error" && errorTurnId && this.#runningTurns.has(errorTurnId)) {
           this.#turnErrors.set(errorTurnId, shownMessage);
           this.#turnCauses.set(errorTurnId, causeCode);
+          if (isRecord(params) && params.freshSession === true) this.#freshSessionTurns.add(errorTurnId);
           if (refusedSessionFailure(source.provider, message) !== null) return;
           const errorInfo = error?.codexErrorInfo;
           if (source.provider === "codex" && typeof errorInfo === "string" && CODEX_SAFETY_BLOCKS.has(errorInfo)) {
@@ -2262,6 +2277,7 @@ export class TurnLifecycle {
       this.#turnErrors.delete(turnId);
       const failureCause = this.#turnCauses.get(turnId);
       this.#turnCauses.delete(turnId);
+      const needsFreshSession = this.#freshSessionTurns.delete(turnId);
       this.#turnRetries.delete(turnId);
       this.#capacityNotices.delete(turnId);
       this.#retryNotices.delete(turnId);
@@ -2319,6 +2335,7 @@ export class TurnLifecycle {
             failover?.context.causeCode !== "usage_limit" &&
             compactionFailure === undefined &&
             !routineSession,
+          needsFreshSession,
         );
       const shouldCompact =
         !refused &&
@@ -2561,7 +2578,8 @@ export class TurnLifecycle {
           this.#hooks.taskFailed(laneTaskId, failure);
         } else this.#hooks.emitError("agent_error", failure, agentId, context);
       }
-      if (failingSession) yield* this.#dropFailingSession(agentId, threadId, running.client.provider);
+      if (failingSession)
+        yield* this.#dropFailingSession(agentId, threadId, running.client.provider, failedTurnImages(deliveries));
       if (deliveries.some((delivery) => delivery.delivery.sender.kind === "agent")) {
         dropPlaceholderAnswers(snapshot, turnId);
       }
@@ -2992,12 +3010,18 @@ export class TurnLifecycle {
     }).pipe(Effect.catchCause(report));
   }, Effect.uninterruptible);
 
-  #countSessionFailure(running: { client: AgentClient }, threadId: string, status: string, count: boolean): boolean {
+  #countSessionFailure(
+    running: { client: AgentClient },
+    threadId: string,
+    status: string,
+    count: boolean,
+    needsFreshSession: boolean,
+  ): boolean {
     if (running.client.provider !== "antigravity") return false;
     if (status === "completed") this.#sessionFailures.delete(threadId);
     if (status !== "failed" || !count) return false;
     const failures = (this.#sessionFailures.get(threadId) ?? 0) + 1;
-    if (failures >= SESSION_FAILURE_LIMIT) {
+    if (needsFreshSession || failures >= SESSION_FAILURE_LIMIT) {
       this.#sessionFailures.delete(threadId);
       return true;
     }
@@ -3037,12 +3061,13 @@ export class TurnLifecycle {
     agentId: string,
     threadId: string,
     provider: AgentClient["provider"],
+    images: readonly string[] = [],
   ) {
-    logger.warn("A provider session failed turns in a row; OpenBot opens a new one.", {
+    logger.warn("A provider session cannot answer; OpenBot opens a new one.", {
       provider,
-      failures: SESSION_FAILURE_LIMIT,
+      images: images.length,
     });
-    yield* this.#hooks.dropRefusedSession(agentId, threadId);
+    yield* this.#hooks.dropRefusedSession(agentId, threadId, images);
   });
 
   #markEnded(turnId: string): void {

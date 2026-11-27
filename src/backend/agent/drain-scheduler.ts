@@ -1021,11 +1021,14 @@ export class DrainScheduler {
               : completeInput;
         if (!handoff) return input;
         sentHandoffs.set(providerThreadId, handoff);
-        return input.map((item, index) =>
+        const withHandoff = input.map((item, index) =>
           index === 0 && item.type === "text"
             ? { ...item, text: `${handoff}${CURRENT_MESSAGE_SEPARATOR}${item.text}` }
             : item,
         );
+        if (input.some((item) => item.type === "localImage")) return withHandoff;
+        const failedTurnImages = this.#threads.failedTurnImages(agent.id, providerThreadId);
+        return [...withHandoff, ...failedTurnImages.map((path) => ({ type: "localImage" as const, path }))];
       };
 
       for (const { delivery: item, senderTaskId } of batch) {
@@ -1172,6 +1175,7 @@ export class DrainScheduler {
           this.#conversation.emitConversation(snapshot);
         }
       }
+      this.#threads.forgetFailedTurnImages(agent.id, threadId);
       yield* this.#threads.deletePendingHandoff(threadId, sentHandoffs.get(threadId)).pipe(
         Effect.catch((failure) =>
           Effect.sync(() => {

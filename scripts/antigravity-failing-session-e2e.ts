@@ -27,6 +27,8 @@ const { runCauseEffect } = await import("../src/backend/effect-boundary");
 const { MailboxStore } = await import("../src/backend/mailbox-store");
 const { OpenBotDatabase } = await import("../src/backend/openbot-database");
 
+const PNG_PIXEL = "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==";
+
 const FAKE_AGY = `#!/usr/bin/env node
 const fs = require("node:fs");
 const NL = String.fromCharCode(10);
@@ -49,7 +51,8 @@ function handle(message) {
   if (message.method === "session/prompt") {
     const text = params.prompt.map((block) => block.text ?? "").join("");
     const fail = text.includes("FAIL") && !text.includes("PELICAN");
-    log({ sessionId: params.sessionId, fail, text });
+    const images = params.prompt.filter((block) => block.type === "image").length;
+    log({ sessionId: params.sessionId, fail, text, images });
     if (fail) return write({ id: message.id, error: { code: -32603, message: "stream idle timeout (5m0s): context deadline exceeded" } });
     update(params.sessionId, { sessionUpdate: "agent_message_chunk", content: { type: "text", text: "Done." } });
     return write({ id: message.id, result: { stopReason: "end_turn" } });
@@ -74,6 +77,7 @@ interface Prompt {
   sessionId: string;
   fail: boolean;
   text: string;
+  images: number;
 }
 
 interface Step {
@@ -81,6 +85,7 @@ interface Step {
   status: string;
   error: string | null;
   sessions: string[];
+  images: number[];
 }
 
 const report: { steps: Step[]; passed: boolean; error?: string } = { steps: [], passed: false };
@@ -148,9 +153,12 @@ const idle = (agentId: string) =>
     .listQueue(agentId)
     .deliveries.every((delivery) => !["queued", "starting", "running"].includes(delivery.status));
 
-async function send(agentId: string, text: string): Promise<Step> {
+async function send(agentId: string, text: string, sourcePaths: string[] = []): Promise<Step> {
   const before = prompts().length;
-  const receipt = await runCauseEffect(agents.sendMessage({ agentId, text }));
+  const attachments = await runCauseEffect(mailbox.prepareAttachments(sourcePaths));
+  const receipt = await runCauseEffect(
+    agents.sendMessage({ agentId, text, attachmentDraftIds: attachments.map((attachment) => attachment.id) }),
+  );
   const deliveryId = receipt.deliveries[0]?.id;
   assert.ok(deliveryId, `${text}: the message has a delivery`);
   const status = await waitFor(`${text}: the message to end`, () => {
@@ -165,6 +173,9 @@ async function send(agentId: string, text: string): Promise<Step> {
     sessions: prompts()
       .slice(before)
       .map((prompt) => prompt.sessionId),
+    images: prompts()
+      .slice(before)
+      .map((prompt) => prompt.images),
   };
   report.steps.push(step);
   return step;
@@ -193,8 +204,11 @@ try {
   assert.equal(answered.status, "completed", "The next prompt answers.");
   assert.deepEqual([...once.sessions, ...answered.sessions], [first, first], "One failed turn keeps the session.");
 
+  const picture = join(root, "picture.png");
+  await writeFile(picture, Buffer.from(PNG_PIXEL, "base64"));
   const failedA = await send(agent.id, "FAIL two");
-  const failedB = await send(agent.id, "FAIL three");
+  const failedB = await send(agent.id, "FAIL three", [picture]);
+  assert.deepEqual(failedB.images, [1], "The failed message sends its picture.");
   assert.deepEqual([failedA.status, failedB.status], ["failed", "failed"], "Both turns fail.");
   assert.deepEqual(
     [...failedA.sessions, ...failedB.sessions],
@@ -208,6 +222,9 @@ try {
   assert.ok(next && next !== first, "The next message runs on a new session.");
   const handoff = prompts().find((prompt) => prompt.sessionId === next)?.text ?? "";
   assert.ok(handoff.includes("PELICAN"), "The new session gets the conversation so far.");
+  assert.deepEqual(recovered.images, [1], "The new session gets the picture of the failed message.");
+  const later = await send(agent.id, "And now?");
+  assert.deepEqual(later.images, [0], "The picture is sent to the new session only once.");
   report.passed = true;
 } catch (error) {
   report.error = error instanceof Error ? (error.stack ?? error.message) : String(error);
