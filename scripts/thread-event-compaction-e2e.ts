@@ -68,6 +68,7 @@ interface Context {
   remove(messageIds: string[], activeTurnId?: string | null): void;
   compactBatch(): void;
   compactAll(): void;
+  ageCompaction(): void;
 }
 
 interface Case {
@@ -269,9 +270,10 @@ const cases: Case[] = [
     name: "a compacted thread with many new events is taken again",
     minimumRewritten: 0,
     minimumDeleted: 1000,
-    run: ({ write, compactAll }) => {
+    run: ({ write, compactAll, ageCompaction }) => {
       write([message("a", 1, { text: "a0" }), message("b", 2, { text: "b0" })]);
       compactAll();
+      ageCompaction();
       for (let step = 1; step <= 520; step++) {
         write([message("a", 1, { text: `a${step}` })]);
         write([message("b", 2, { text: `b${step}` })]);
@@ -372,6 +374,11 @@ function context(side: Side, compacts: boolean): Context {
     },
     compactAll: () => {
       if (compacts) while (compactBatch(side)) {}
+    },
+    ageCompaction: () => {
+      db.prepare("UPDATE thread_event_compaction SET compacted_at = ?").run(
+        new Date(Date.now() - 7 * 60 * 60 * 1000).toISOString(),
+      );
     },
   };
 }
