@@ -53,7 +53,11 @@ function BackdropVideo(props: { url: string }) {
   );
 }
 
-export function CustomBackdrop(props: { source: CustomBackdropSource; title: string; remoteContent?: boolean }) {
+export function CustomBackdrop(props: {
+  source: CustomBackdropSource;
+  title: string;
+  remoteContent?: boolean | undefined;
+}) {
   const theme = () => chatVisualAppTheme(documentColorScheme());
   const staticPage = () => props.remoteContent !== true;
   return (

@@ -19,7 +19,7 @@ function dataUrl(backdrop: SavedBackdrop): Promise<string> {
   });
 }
 
-export function WindowBackdrop(props: { pages?: "desktop" | "srcdoc"; remoteContent?: boolean }) {
+export function WindowBackdrop(props: { pages?: "desktop" | "srcdoc"; remoteContent?: boolean | undefined }) {
   const choice = useChatBackdrop();
   const scene = () => {
     const current = choice();
