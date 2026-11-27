@@ -18,7 +18,7 @@ import type { SyncCollection, SyncLog } from "@openbot/team-client/sync-client";
 import { channelPageFromSync, conversationPageFromSync } from "@openbot/team-client/sync-pages";
 import type { MobileServerSync, SyncBinding } from "./server-sync";
 
-export const CONVERSATION_SYNC_LOG_LIMIT = 50;
+const CONVERSATION_SYNC_LOG_LIMIT = 50;
 const CHANNEL_SYNC_LOG_LIMIT = 100;
 
 interface LogBindings<Entity, Meta> {
@@ -31,7 +31,7 @@ interface RetainedLog<Entity, Meta> extends LogBindings<Entity, Meta> {
   unsubscribe(): void;
 }
 
-export interface MessageLogOptions<Entity, Meta, Page> {
+interface MessageLogOptions<Entity, Meta, Page> {
   open(sync: MobileServerSync, serverId: string, id: string): LogBindings<Entity, Meta>;
   build(log: SyncLog<Entity>, meta: Meta): Page | null;
   changed(serverId: string, id: string, page: Page): void;
@@ -41,7 +41,7 @@ function retainedId(serverId: string, id: string): string {
   return JSON.stringify([serverId, id]);
 }
 
-export class SyncedMessageLogs<Entity, Meta, Page> {
+class SyncedMessageLogs<Entity, Meta, Page> {
   readonly #sync: MobileServerSync;
   readonly #options: MessageLogOptions<Entity, Meta, Page>;
   readonly #retained = new Map<string, RetainedLog<Entity, Meta>>();

@@ -90,7 +90,7 @@ import { decodeRemoteBody } from "./remote-server-http";
 
 const logger = createOpenBotLogger("remote-sync");
 
-export const REMOTE_SYNC_SCOPES_PER_SERVER = 8;
+const REMOTE_SYNC_SCOPES_PER_SERVER = 8;
 export const REMOTE_SYNC_CONVERSATION_ROWS = 50;
 const REMOTE_SYNC_CHANNEL_ROWS = 100;
 
@@ -191,7 +191,7 @@ class PrependedOrder {
   }
 }
 
-export class RemoteSyncedList<Entity> implements RemoteSyncRegistration {
+class RemoteSyncedList<Entity> implements RemoteSyncRegistration {
   readonly name: string;
   readonly capability: TeamCurrentCapability;
   readonly #spec: DesktopSpec<Entity>;
@@ -255,7 +255,7 @@ interface ScopedServer<Entity> {
   readonly handles: Map<string, SyncCollection<Entity>>;
 }
 
-export class RemoteSyncedScopes<Entity> implements RemoteSyncRegistration {
+class RemoteSyncedScopes<Entity> implements RemoteSyncRegistration {
   readonly name: string;
   readonly capability: TeamCurrentCapability;
   readonly #spec: (serverId: string, param: string) => SyncCollectionSpec<Entity>;
@@ -349,7 +349,7 @@ function logEntities<Row>(log: SyncLog<Row>): Row[] {
   return log.rows().map((row) => row.entity);
 }
 
-export class RemoteSyncedPages<Row, Meta, Page> implements RemoteSyncRegistration {
+class RemoteSyncedPages<Row, Meta, Page> implements RemoteSyncRegistration {
   readonly name: string;
   readonly capability: TeamCurrentCapability;
   readonly #options: RemoteSyncedPagesOptions<Row, Meta, Page>;

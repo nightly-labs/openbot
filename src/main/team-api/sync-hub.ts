@@ -97,7 +97,7 @@ function readCache(): ReadCache {
   return { views: new Map(), diffs: new Map() };
 }
 
-export function syncVersion(json: string): string {
+function syncVersion(json: string): string {
   return createHash("sha256").update(json).digest("base64url").slice(0, 16);
 }
 
