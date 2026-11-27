@@ -87,6 +87,32 @@ describe("redactMcpRecord", () => {
     });
   });
 
+  it("keeps the values of public custom provider headers and masks the others", () => {
+    const values = piCustomEndpointSecrets([
+      {
+        id: "studio",
+        name: "Studio",
+        baseUrl: "http://127.0.0.1:8080/v1",
+        apiKey: "studio-key-5e6f7a8b9c",
+        headers: [
+          { name: "Content-Type", value: "application/json" },
+          { name: "X-Title", value: "OpenBotStudio" },
+          { name: "HTTP-Referer", value: "https://studio.example.test/app" },
+          { name: "X-Tenant-Token", value: "tenant-c93e18f2a7" },
+        ],
+        models: [{ id: "auto", name: "auto" }],
+      },
+    ]);
+    const text =
+      "App OpenBotStudio from https://studio.example.test/app sends application/json. Tenant tenant-c93e18f2a7";
+    expect(redactMcpRecord({ item: { type: "agentMessage", text } }, values)).toEqual({
+      item: {
+        type: "agentMessage",
+        text: "App OpenBotStudio from https://studio.example.test/app sends application/json. Tenant •••",
+      },
+    });
+  });
+
   it("keeps a long html answer with many CSS rules whole (#9778)", () => {
     const rules = Array.from({ length: 40 }, (_, index) => `.card-${index}{display:flex;color:#fff}`);
     const jsx = "{items.map((item) => <li key={item.id}>{item.name}</li>)}";

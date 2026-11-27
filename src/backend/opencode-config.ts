@@ -22,6 +22,34 @@ export function customProvidersOn(source: CustomProviderSource, harness: CustomP
   return () => source().filter((provider) => (provider.harness ?? "opencode") === harness);
 }
 
+const PUBLIC_HEADER_NAMES = new Set([
+  "accept",
+  "accept-encoding",
+  "accept-language",
+  "anthropic-beta",
+  "anthropic-version",
+  "api-version",
+  "content-type",
+  "http-referer",
+  "openai-organization",
+  "openai-project",
+  "origin",
+  "referer",
+  "user-agent",
+  "x-title",
+]);
+
+export function customProviderSecretValues(
+  providers: readonly Pick<CustomProviderConfig, "apiKey" | "headers">[],
+): string[] {
+  return providers.flatMap((provider) => [
+    ...(provider.apiKey ? [provider.apiKey] : []),
+    ...provider.headers
+      .filter((header) => !PUBLIC_HEADER_NAMES.has(header.name.trim().toLowerCase()))
+      .map((header) => header.value),
+  ]);
+}
+
 export const CUSTOM_ENDPOINT_SILENCE_MS = 30 * 60_000;
 
 interface OpenCodeProviderOptions {
