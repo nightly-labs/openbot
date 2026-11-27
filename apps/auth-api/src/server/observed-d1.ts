@@ -123,8 +123,11 @@ class ObservedDatabase implements D1Database {
     const sources = statements.map((statement) =>
       statement instanceof ObservedStatement ? statement.source : statement,
     );
+    const readOnly = statements.every(
+      (statement) => statement instanceof ObservedStatement && isReadOnly(statement.sql),
+    );
     const target = this.#target();
-    return observedCall("batch", false, () => target.batch<T>(sources));
+    return observedCall("batch", readOnly, () => target.batch<T>(sources));
   }
 
   exec(query: string): Promise<D1ExecResult> {
