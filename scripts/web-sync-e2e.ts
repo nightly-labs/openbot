@@ -23,13 +23,19 @@ import { createOpenBotLogger } from "@openbot/logging";
 import { type RemoteRequestRecord, routeTemplate } from "@openbot/team-client/sync-profile";
 import { type Browser, chromium, type Locator, type Page } from "playwright-core";
 import { argument, WAIT_MS } from "./channel-e2e-support";
-import { delay, instrumentRemotePeer, literal, readSyncSink, signInDevHost } from "./remote-perf-support";
+import {
+  instrumentRemotePeer,
+  literal,
+  MARK_PREFIX,
+  pageNow,
+  settleNetwork,
+  signInDevHost,
+  waitMark,
+} from "./remote-perf-support";
 
 const NAME = "web-sync";
 const ROOT = resolve(import.meta.dirname, "..");
 const OUT = resolve(ROOT, ".openbot-build", `${NAME}-e2e`);
-const MARK_PREFIX = "openbot:remote-";
-const QUIET_MS = 1_500;
 const english = translateFor("en");
 const logger = createOpenBotLogger(NAME);
 
@@ -104,31 +110,6 @@ const rowCss = (label: string) => `[aria-label^=${JSON.stringify(`${label},`)}]`
 const pinnedCss = (name: string) => `[aria-label^=${JSON.stringify(english("sidebar.pinned.agent", { name }))}]`;
 const stamp = Date.now().toString(36);
 const SAMPLE_ID = "00000000-0000-4000-8000-000000000000";
-
-function pageNow(page: Page): Promise<number> {
-  return page.evaluate(() => performance.timeOrigin + performance.now());
-}
-
-async function waitMark(page: Page, name: string, after: number): Promise<void> {
-  await page.waitForFunction(
-    ({ mark, after }) =>
-      performance.getEntriesByName(mark).some((entry) => performance.timeOrigin + entry.startTime >= after),
-    { mark: `${MARK_PREFIX}${name}`, after },
-    { timeout: WAIT_MS, polling: 100 },
-  );
-}
-
-async function settleNetwork(page: Page, from: number): Promise<RemoteRequestRecord[]> {
-  const deadline = Date.now() + WAIT_MS;
-  for (;;) {
-    const sink = await readSyncSink(page);
-    const mine = sink.records.filter((record) => record.startedAt >= from);
-    const lastEnd = Math.max(from, ...mine.map((record) => record.endedAt));
-    if (sink.open === 0 && (await pageNow(page)) - lastEnd >= QUIET_MS) return mine;
-    if (Date.now() > deadline) throw new Error("The network of the web client did not become quiet.");
-    await delay(100);
-  }
-}
 
 let hostPage: Page | null = null;
 let addedChannelId: string | null = null;
