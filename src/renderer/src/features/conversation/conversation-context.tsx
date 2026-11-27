@@ -312,17 +312,18 @@ const Conversation = createSimpleContext({
     const prefetchKey = createMemo(() => {
       const server = activeServer();
       const agentId = activeAgentId();
-      if (!signedInAccount() || server?.kind !== "remote" || server.state !== "online" || !agentId) return "";
+      const account = signedInAccount();
+      if (!account || server?.kind !== "remote" || server.state !== "online" || !agentId) return "";
       if (conversations[agentId]?.loaded !== true) return "";
       const ids = agentList()
         .map((agent) => agent.id)
         .join("\0");
-      return `${server.id}\n${agentId}\n${ids}`;
+      return `${account}\n${server.id}\n${agentId}\n${ids}`;
     });
 
     createEffect(prefetchKey, (key) => {
       if (!key || typeof window.requestIdleCallback !== "function") return;
-      const [serverId, agentId, ids = ""] = key.split("\n");
+      const [, serverId, agentId, ids = ""] = key.split("\n");
       if (!serverId || !agentId || !ids) return;
 
       for (const cachedId of prefetchedConversationPages.keys()) {
