@@ -1,8 +1,10 @@
 import type { HostSignalHomeSettings } from "@openbot/contracts/ipc";
 import type { MobileTextKey } from "@openbot/i18n/mobile";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useEffect } from "react";
 import { useQueryScope } from "@/features/auth/context/mobile-session-context";
 import { useMobileWorkspace, useMobileWorkspaceActions } from "@/features/workspace/context/mobile-workspace-context";
+import { rememberDrawerValues, useDrawerSnapshot } from "@/features/workspace/model/drawer-snapshot";
 import { queryKeys } from "@/features/workspace/model/query-keys";
 
 const SIGNAL_HOME_PLACES: Readonly<Record<string, MobileTextKey>> = {
@@ -41,13 +43,19 @@ export function useServerSignalHome(serverId: string) {
   const queryKey = queryKeys.serverSignalHome(queryScope, serverId);
   const available = canManageServerSignalHome(serverId);
   const served = servesServerSignalHome(serverId);
+  const cached = useDrawerSnapshot(serverId).signalHome;
   const query = useQuery({
     queryKey,
     enabled: served,
     retry: false,
     staleTime: 0,
+    placeholderData: cached,
     queryFn: () => loadServerSignalHome(serverId),
   });
+  const loaded = query.isPlaceholderData ? undefined : query.data;
+  useEffect(() => {
+    if (loaded) rememberDrawerValues(serverId, { signalHome: loaded });
+  }, [serverId, loaded]);
   return {
     available,
     served,
