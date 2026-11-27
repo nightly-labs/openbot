@@ -1383,6 +1383,12 @@
       "detailSha256": "0263a73df8eb522f3f3071dcdc72152063611d461d20ce6e95eb6e91e9f80158"
     },
     {
+      "slug": "termsquad",
+      "version": "1.0.0",
+      "featured": false,
+      "detailSha256": "a0b63b07fa1310c2520e4e8f291a44f1de5143b267501bc6c5a7d603aa38d88d"
+    },
+    {
       "slug": "tessie",
       "version": "1.1.0",
       "featured": false,

@@ -9,6 +9,18 @@
 import type { McpServerConfig } from "@openbot/contracts/ipc";
 import type { MarketplacePluginApp, MarketplacePluginDetail } from "@openbot/ui/features/settings/marketplace-plugins";
 
+/**
+ * The configuration an app installs as. The catalog states the name and how the server is reached -
+ * an address, or a command, its words and its fixed settings; the rest of the record and `enabled`
+ * are made here rather than stored as catalog data that could disagree with `normalizeMcpConfig`.
+ *
+ * A credential is never among them. What a server asks for is declared in `server.auth`, and the
+ * value is typed by the user in the connect dialog, which hands back the configuration that
+ * connected.
+ *
+ * The id is empty, which is what the store reads as "new". An id it does not hold is an edit of a
+ * row that is gone, and the save is refused.
+ */
 export function createPluginAppConfig(app: MarketplacePluginApp): McpServerConfig {
   return {
     id: "",
@@ -9659,6 +9671,47 @@ const TAVILY: MarketplacePluginDetail = {
   shareUrl: "https://openbot.run/plugins/tavily",
 };
 
+const TERMSQUAD: MarketplacePluginDetail = {
+  id: "plugin-termsquad",
+  slug: "termsquad",
+  name: "TermSquad",
+  tagline: "Always-on computers for AI agents",
+  description:
+    "TermSquad lets agents start and prompt remote coding agents, read their output, run squads, and manage scheduled tasks on always-on computers. Each user signs in through the browser and chooses which computers, workspaces, and permissions to grant.",
+  category: "coding",
+  creatorName: "TermSquad",
+  iconUrl: "https://termsquad.com/brand/termsquad-icon.png",
+  version: "1.0.0",
+  prompts: [
+    { id: "prompt-computers", text: "List my TermSquad computers and their workspaces." },
+    { id: "prompt-agent-status", text: "Check the status of my coding agents and summarize their latest output." },
+    { id: "prompt-code-review", text: "Start a coding agent to review the latest changes in my selected workspace." },
+  ],
+  apps: [
+    {
+      id: "app-termsquad-mcp",
+      name: "TermSquad",
+      description:
+        "Remote agent sessions, squads, scheduled tasks, and workspace access, over TermSquad's MCP server with browser sign-in.",
+      iconUrl: "https://termsquad.com/brand/termsquad-icon.png",
+      server: {
+        name: "termsquad",
+        transport: "http",
+        url: "https://mcp.termsquad.com/mcp",
+        auth: [{ id: "termsquad-oauth", kind: "link", label: "Sign in" }],
+      },
+    },
+  ],
+  websiteUrl: "https://termsquad.com",
+  privacyPolicyUrl: "https://termsquad.com/privacy",
+  termsUrl: "https://termsquad.com/terms",
+  skills: [],
+  installs: 0,
+  featured: false,
+  updatedAt: "2026-11-10T00:00:00.000Z",
+  shareUrl: "https://openbot.run/plugins/termsquad",
+};
+
 const TESSIE: MarketplacePluginDetail = {
   id: "plugin-tessie",
   slug: "tessie",
@@ -11007,6 +11060,7 @@ export const MARKETPLACE_PLUGINS: MarketplacePluginDetail[] = [
   SYNCRO,
   TABLEAU,
   TAVILY,
+  TERMSQUAD,
   TESSIE,
   TINYFISH,
   TRADINGVIEW,

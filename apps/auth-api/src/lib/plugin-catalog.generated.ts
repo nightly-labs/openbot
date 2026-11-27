@@ -1399,6 +1399,12 @@ export const PLUGIN_CATALOG_INDEX: PluginCatalogIndex = {
       detailSha256: "0263a73df8eb522f3f3071dcdc72152063611d461d20ce6e95eb6e91e9f80158",
     },
     {
+      slug: "termsquad",
+      version: "1.0.0",
+      featured: false,
+      detailSha256: "a0b63b07fa1310c2520e4e8f291a44f1de5143b267501bc6c5a7d603aa38d88d",
+    },
+    {
       slug: "tessie",
       version: "1.1.0",
       featured: false,
@@ -9900,6 +9906,41 @@ export const PLUGIN_CATALOG_DETAILS: Record<string, PluginCatalogDetail> = {
     websiteUrl: "https://www.tavily.com",
     privacyPolicyUrl: "https://www.tavily.com/privacy",
     termsUrl: "https://www.tavily.com/terms",
+    skills: [],
+  },
+  termsquad: {
+    slug: "termsquad",
+    name: "TermSquad",
+    tagline: "Always-on computers for AI agents",
+    description:
+      "TermSquad lets agents start and prompt remote coding agents, read their output, run squads, and manage scheduled tasks on always-on computers. Each user signs in through the browser and chooses which computers, workspaces, and permissions to grant.",
+    category: "coding",
+    creatorName: "TermSquad",
+    iconUrl: "https://termsquad.com/brand/termsquad-icon.png",
+    version: "1.0.0",
+    prompts: [
+      { id: "prompt-computers", text: "List my TermSquad computers and their workspaces." },
+      { id: "prompt-agent-status", text: "Check the status of my coding agents and summarize their latest output." },
+      { id: "prompt-code-review", text: "Start a coding agent to review the latest changes in my selected workspace." },
+    ],
+    apps: [
+      {
+        id: "app-termsquad-mcp",
+        name: "TermSquad",
+        description:
+          "Remote agent sessions, squads, scheduled tasks, and workspace access, over TermSquad's MCP server with browser sign-in.",
+        iconUrl: "https://termsquad.com/brand/termsquad-icon.png",
+        server: {
+          name: "termsquad",
+          transport: "http",
+          url: "https://mcp.termsquad.com/mcp",
+          auth: [{ id: "termsquad-oauth", kind: "link", label: "Sign in" }],
+        },
+      },
+    ],
+    websiteUrl: "https://termsquad.com",
+    privacyPolicyUrl: "https://termsquad.com/privacy",
+    termsUrl: "https://termsquad.com/terms",
     skills: [],
   },
   tessie: {
