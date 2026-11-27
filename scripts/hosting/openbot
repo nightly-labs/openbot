@@ -100,6 +100,10 @@ parent_pid() {
   done 2>/dev/null <"/proc/$1/status" || return 1
 }
 
+still_holds() {
+  [ -n "$(find "/proc/$1/fd" -lname "socket:\[$2\]" 2>/dev/null)" ]
+}
+
 in_service_group() {
   [ -n "$2" ] && awk -F: -v group="$2" '
     ($1 == "0" && $2 == "" && $3 == group) || ($2 == "name=systemd" && $3 == group) { found = 1 }
@@ -115,13 +119,17 @@ check_listener() {
   pids=$(find /proc/[0-9]*/fd -lname "socket:\[$sock\]" 2>/dev/null | cut -d/ -f3 | sort -u)
   [ -n "$pids" ] || return 1
   for holder in $pids; do
-    start_time "$holder" || return 1
+    if ! start_time "$holder"; then
+      ! still_holds "$holder" "$sock" || return 1
+      continue
+    fi
     if [ -z "$own" ] || [ "$started" -lt "$own" ]; then pid=$holder own=$started; fi
   done
+  [ -n "$pid" ] || return 1
   for holder in $pids; do
     [ "$holder" != "$pid" ] || continue
-    parent_pid "$holder" || return 1
-    [ "$parent" = "$pid" ] && [ "/proc/$holder/exe" -ef "$app" ] || return 2
+    if parent_pid "$holder" && [ "$parent" = "$pid" ] && [ "/proc/$holder/exe" -ef "$app" ]; then continue; fi
+    ! still_holds "$holder" "$sock" || return 2
   done
   group=$(systemctl show --property=ControlGroup --value "$UNIT" 2>/dev/null) || true
   [ "/proc/$pid/exe" -ef "$app" ] && in_service_group "$pid" "$group" || return 2

@@ -137,7 +137,7 @@ async function runRootCasesInNamespace(): Promise<RootResult[]> {
       stdin: "ignore",
       stdout: "pipe",
       stderr: "pipe",
-      env: { PATH: path, HOME: base },
+      env: { PATH: path, HOME: base, LANG: "en_US.UTF-8", LC_ALL: "en_US.UTF-8" },
     });
     const timer = setTimeout(() => child.kill("SIGKILL"), DEADLINE_MS);
     const [stdout, stderr, exitCode] = await Promise.all([
@@ -560,7 +560,7 @@ async function run(args: string[], stdin?: string) {
     stdin: stdin === undefined ? "ignore" : new Blob([stdin]),
     stdout: "pipe",
     stderr: "pipe",
-    env: { PATH: process.env.PATH ?? "/usr/bin:/bin", HOME: work },
+    env: { PATH: process.env.PATH ?? "/usr/bin:/bin", HOME: work, LANG: "en_US.UTF-8", LC_ALL: "en_US.UTF-8" },
   });
   const timer = setTimeout(() => child.kill("SIGKILL"), DEADLINE_MS);
   const [stdout, stderr, exitCode] = await Promise.all([
