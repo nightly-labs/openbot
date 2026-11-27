@@ -1,6 +1,6 @@
 import type { ChannelSummary } from "@openbot/contracts/ipc";
 import { Link } from "expo-router";
-import { memo, type ReactNode, useMemo } from "react";
+import { memo, type ReactNode, useCallback, useMemo, useRef } from "react";
 import { FlatList, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { AgentUnreadBadge } from "@/features/agents/components/agent-unread-badge";
@@ -8,6 +8,7 @@ import { AgentWaitBadge, agentListStateLabel } from "@/features/agents/component
 import { BloubAvatar } from "@/features/agents/components/bloub-avatar";
 import { ChatLinkPressable } from "@/features/agents/components/chat-link-pressable";
 import { useChatRowBackground } from "@/features/agents/components/chat-list-pane-context";
+import { useAgentChatPrefetch } from "@/features/agents/components/use-agent-chat-prefetch";
 import { ChannelAvatar } from "@/features/channels/components/channel-avatar";
 import {
   agentListWaitReason,
@@ -29,6 +30,30 @@ type RailEntry =
   | { kind: "agent"; key: string; agent: MobileAgent }
   | { kind: "channel"; key: string; channel: ChannelSummary }
   | { kind: "divider"; key: string };
+
+function sameEntry(previous: RailEntry | undefined, next: RailEntry): previous is RailEntry {
+  if (!previous || previous.key !== next.key) return false;
+  if (next.kind === "agent") return previous.kind === "agent" && previous.agent === next.agent;
+  if (next.kind === "channel") return previous.kind === "channel" && previous.channel === next.channel;
+  return previous.kind === "divider";
+}
+
+function keptRailEntries(previous: readonly RailEntry[], next: readonly RailEntry[]): readonly RailEntry[] {
+  const kept = new Map(previous.map((entry) => [entry.key, entry]));
+  let changed = previous.length !== next.length;
+  const entries = next.map((entry, index) => {
+    const old = kept.get(entry.key);
+    if (!sameEntry(old, entry)) {
+      changed = true;
+      return entry;
+    }
+    if (previous[index] !== old) changed = true;
+    return old;
+  });
+  return changed ? entries : previous;
+}
+
+const NO_ENTRIES: readonly RailEntry[] = [];
 
 function railEntries(
   pinnedAgents: readonly MobileAgent[],
@@ -60,10 +85,12 @@ const RailAgent = memo(function RailAgent({ agent }: { agent: MobileAgent }) {
   const openLabel = t("mobile.agent.list.open", { name: agent.name });
   const activity = useAgentListActivity(agent.id);
   const waitReason = agentListWaitReason(activity);
+  const prefetchChat = useAgentChatPrefetch(agent.id, agent.serverId);
   return (
     <Link href={{ pathname: "/chat/[agentId]", params: { agentId: agent.id, serverId: agent.serverId } }} asChild>
       <ChatLinkPressable
         chatId={agent.id}
+        onOpen={prefetchChat}
         accessibilityRole="button"
         accessibilityLabel={agentListStateLabel(t, openLabel, undefined, unreadCount, unreadThreads)}
         className="size-14 items-center justify-center rounded-2xl"
@@ -151,9 +178,21 @@ export function ChatListRail({
 }) {
   const insets = useSafeAreaInsets();
   const barTop = useBarTop();
-  const entries = useMemo(
-    () => railEntries(pinnedAgents, pinnedChannels, items),
-    [pinnedAgents, pinnedChannels, items],
+  const keptEntries = useRef<readonly RailEntry[]>(NO_ENTRIES);
+  const entries = useMemo(() => {
+    keptEntries.current = keptRailEntries(keptEntries.current, railEntries(pinnedAgents, pinnedChannels, items));
+    return keptEntries.current;
+  }, [pinnedAgents, pinnedChannels, items]);
+  const renderItem = useCallback(
+    ({ item }: { item: RailEntry }) =>
+      item.kind === "agent" ? (
+        <RailAgent agent={item.agent} />
+      ) : item.kind === "channel" ? (
+        <RailChannel channel={item.channel} serverId={serverId} agents={channelAgents} />
+      ) : (
+        <RailDivider />
+      ),
+    [serverId, channelAgents],
   );
   return (
     <View className="flex-1 bg-background" style={{ paddingLeft: insets.left }}>
@@ -164,15 +203,7 @@ export function ChatListRail({
         className="flex-1"
         data={entries}
         keyExtractor={railEntryKey}
-        renderItem={({ item }) =>
-          item.kind === "agent" ? (
-            <RailAgent agent={item.agent} />
-          ) : item.kind === "channel" ? (
-            <RailChannel channel={item.channel} serverId={serverId} agents={channelAgents} />
-          ) : (
-            <RailDivider />
-          )
-        }
+        renderItem={renderItem}
         initialNumToRender={RAIL_BATCH}
         maxToRenderPerBatch={RAIL_BATCH}
         windowSize={RAIL_WINDOW_SIZE}
