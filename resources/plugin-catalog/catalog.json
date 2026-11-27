@@ -417,6 +417,12 @@
       "detailSha256": "9422e58247f644abf234503f9c4a3b340dc040d6900b44fbabeb788309d33b33"
     },
     {
+      "slug": "agents2me",
+      "version": "1.0.0",
+      "featured": false,
+      "detailSha256": "33d3ed690af0f791f047a15e48320ddc462a88a0374942630388421ba2f791d2"
+    },
+    {
       "slug": "aws-knowledge",
       "version": "1.0.0",
       "featured": false,
