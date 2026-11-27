@@ -103,6 +103,7 @@ import {
   type ProbeSample,
   unmeasuredProbeMs,
 } from "./remote-path-check";
+import { createPathWatch, PATH_WATCH_INTERVAL_MS, type PathReading, type PathWatch } from "./remote-path-watch";
 import { startRemoteRequestDeadline } from "./remote-recovery";
 import { createTeamRequestId } from "./request-id";
 import { encodeTeamWebRtcPayload, TeamWebRtcPayloadDecoder } from "./webrtc-framing";
@@ -394,6 +395,8 @@ interface PeerState {
   signalReady: boolean;
   answeredRequest: boolean;
   probingPath: boolean;
+  pathWatch: PathWatch;
+  pathWatchTimer: ReturnType<typeof setTimeout> | null;
   fullSnapshotRequested: boolean;
   lastAnswerAt: number;
   lastSignalClose: number | null;
@@ -439,6 +442,7 @@ function peerLostAfterMs(state: PeerState): number {
   return SIGNAL_IDLE_CLOSE_MS + state.reconnectGraceMs + SUSPEND_MARGIN_MS;
 }
 const HOST_ICE_RESTART_LIMIT = 10;
+const RESTARTS_KEPT_FOR_RECOVERY = 3;
 const ICE_SERVERS_REUSE_MS = (SIGNAL_TURN_CREDENTIAL_TTL_SECONDS * 1_000) / 2;
 const PREPARED_CONNECTION_LIFETIME_MS = 5 * 60_000;
 
@@ -625,6 +629,7 @@ export function createRemoteTeamPeer(
         if (state.iceRecoveryTimer !== null) clearTimeout(state.iceRecoveryTimer);
         if (state.hostWaitTimer !== null) clearTimeout(state.hostWaitTimer);
         if (state.hostWaitTicketTimer !== null) clearTimeout(state.hostWaitTicketTimer);
+        stopPathWatch(state);
         state.hostWaitTimer = null;
         state.hostWaitTicketTimer = null;
         state.disconnectedTimer = null;
@@ -659,6 +664,7 @@ export function createRemoteTeamPeer(
           );
           if (away >= ICE_CONSENT_TIMEOUT_MS) renewSignal(state, actions);
           else if (!state.socket) openSignal(state, actions);
+          watchPath(state);
         }
       }
     },
@@ -677,6 +683,16 @@ export function createRemoteTeamPeer(
       const state = peer;
       if (active && state && !state.closed)
         failPeer(state, referenced(sourceText("error.remote.connectionDropped"), "network/moved"), actions);
+      void runPeerEffect(peerCall(() => actions.current.onNetworkRestored?.())).catch(() => undefined);
+    },
+    networkChanged() {
+      const state = peer;
+      if (active && state && !state.closed) {
+        if (state.authenticated) {
+          renewSignal(state, actions);
+          probePath(state, "network changed");
+        } else failPeer(state, referenced(sourceText("error.remote.connectionDropped"), "network/changed"), actions);
+      }
       void runPeerEffect(peerCall(() => actions.current.onNetworkRestored?.())).catch(() => undefined);
     },
   };
@@ -1052,6 +1068,8 @@ export function createRemoteTeamPeer(
         signalReady: false,
         answeredRequest: false,
         probingPath: false,
+        pathWatch: createPathWatch(),
+        pathWatchTimer: null,
         fullSnapshotRequested: false,
         lastAnswerAt: 0,
         lastSignalClose: null,
@@ -1911,7 +1929,7 @@ export function createRemoteTeamPeer(
               const error = new Error(sourceText("error.remote.desktopRequestTimeout"));
               reject(error);
               if (checksConnection) failPeer(state, error, actions);
-              else probePathAfterTimeout(state);
+              else probePath(state, "request timeout");
             };
             const samples: ProbeSample[] = [];
             const checkPath = () => {
@@ -2001,15 +2019,77 @@ export function createRemoteTeamPeer(
     })();
   }
 
-  function probePathAfterTimeout(state: PeerState): void {
+  function probePath(state: PeerState, reason: string): void {
     if (state.probingPath || state.closed || peer !== state || !isPeerOnline(state)) return;
     state.probingPath = true;
-    diagnose(state, "path-check", "request timeout");
+    diagnose(state, "path-check", reason);
     void runPeerEffect(requestEffect("GET", TEAM_API_ROUTES.compatibility, null))
       .catch(() => undefined)
       .finally(() => {
         state.probingPath = false;
       });
+  }
+
+  function pathReading(connection: RTCPeerConnection) {
+    return peerCall(() => connection.getStats()).pipe(
+      Effect.map((stats): PathReading | null => {
+        const pair = selectedPair(stats);
+        if (!pair) return null;
+        const local = stats.get(pair.localCandidateId);
+        const remote = stats.get(pair.remoteCandidateId);
+        return {
+          pairId: String(pair.id),
+          received: (Number(pair.bytesReceived) || 0) + (Number(pair.responsesReceived) || 0),
+          relayed: local?.candidateType === "relay" || remote?.candidateType === "relay",
+        };
+      }),
+      Effect.catch(() => Effect.succeed(null)),
+    );
+  }
+
+  function canUpgradeRelay(state: PeerState): boolean {
+    return (
+      canSignal(state) &&
+      !state.probingPath &&
+      (state.iceRestartSentAt === null || Date.now() - state.iceRestartSentAt >= SIGNAL_RENEW_DELAY_MS) &&
+      state.iceRestarts < HOST_ICE_RESTART_LIMIT - RESTARTS_KEPT_FOR_RECOVERY
+    );
+  }
+
+  function watchPath(state: PeerState): void {
+    if (!active || state.closed || peer !== state || state.pathWatchTimer !== null || !isPeerOnline(state)) return;
+    state.pathWatchTimer = setTimeout(() => {
+      state.pathWatchTimer = null;
+      const connection = state.connection;
+      if (!active || state.closed || peer !== state || !connection || !isPeerOnline(state)) {
+        state.pathWatch.reset();
+        return;
+      }
+      void runPeerEffect(pathReading(connection))
+        .then(
+          (reading) => {
+            if (!active || state.closed || peer !== state || state.connection !== connection) return;
+            const now = Date.now();
+            const step = state.pathWatch.observe(reading, now);
+            if (step.routeChanged) void runPeerEffect(reportRoute(state, connection)).catch(() => undefined);
+            if (step.silent) probePath(state, "silent path");
+            else if (step.upgradeDue && canUpgradeRelay(state)) {
+              state.pathWatch.upgradeStarted(now);
+              diagnose(state, "ice-recovery", "upgrade from relay");
+              void runPeerEffect(restartIce(state)).catch(() => undefined);
+            }
+            watchPath(state);
+          },
+          () => watchPath(state),
+        )
+        .catch(() => watchPath(state));
+    }, PATH_WATCH_INTERVAL_MS);
+  }
+
+  function stopPathWatch(state: PeerState): void {
+    if (state.pathWatchTimer !== null) clearTimeout(state.pathWatchTimer);
+    state.pathWatchTimer = null;
+    state.pathWatch.reset();
   }
 
   function trackUploadDelivery(state: PeerState, onProgress: (sent: number, total: number) => void) {
@@ -2349,6 +2429,7 @@ export function createRemoteTeamPeer(
       if (state.hostWaitTimer !== null) clearTimeout(state.hostWaitTimer);
       if (state.hostWaitTicketTimer !== null) clearTimeout(state.hostWaitTicketTimer);
       if (state.eventAckTimer !== null) clearTimeout(state.eventAckTimer);
+      stopPathWatch(state);
       state.socket?.close();
       state.preparedSocket?.close();
       state.preparedSocket = null;
@@ -2422,6 +2503,7 @@ export function createRemoteTeamPeer(
     state.connectedTimer = null;
     if (state.connected) Deferred.doneUnsafe(state.connected, Effect.void);
     state.connected = null;
+    watchPath(state);
   }
 
   function rejectConnection(state: PeerState, error: Error): void {
