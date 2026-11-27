@@ -1543,6 +1543,12 @@
       "version": "1.0.0",
       "featured": false,
       "detailSha256": "165a596c50c0bfcdfb4e79ddbb7a85ae01ab1149e7397c2422384244927c5510"
+    },
+    {
+      "slug": "n1p",
+      "version": "1.0.0",
+      "featured": false,
+      "detailSha256": "8c79c72a4d21d352971c989c5cf9cc821be7a2f0c2930895924576c0e06f3d3d"
     }
   ]
 }

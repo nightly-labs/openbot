@@ -8747,4 +8747,37 @@ export const MOBILE_PLUGINS: readonly MobilePlugin[] = [
       },
     ],
   },
+  {
+    slug: "n1p",
+    name: "N1P",
+    tagline: "Business brain for one-person businesses",
+    description:
+      "N1P is the operating system of a one-person business: the business brain (positioning, audience, offers, voice), sales copy and content. Agents read the brain, update one field at a time, save copy and content to the right N1P screens, and post updates the owner sees. Every change keeps the previous text and can be undone in N1P; no tool deletes anything. Each user signs in to their own N1P account through the browser.",
+    category: "productivity",
+    creatorName: "N1P",
+    version: "1.0.0",
+    prompts: [
+      { id: "prompt-read-brain", text: "Read my N1P brain and tell me which fields are empty or weak." },
+      { id: "prompt-positioning", text: "Rewrite my positioning statement in N1P from what my brain already says." },
+      { id: "prompt-content", text: "Write a carousel about my main offer and save it to my N1P content library." },
+    ],
+    websiteUrl: "https://sistema.n1p.com.br",
+    privacyPolicyUrl: "https://sistema.n1p.com.br/privacy",
+    termsUrl: "https://sistema.n1p.com.br/terms",
+    featured: false,
+    apps: [
+      {
+        id: "app-n1p-mcp",
+        name: "N1P",
+        description:
+          "Read the N1P business brain, update one field at a time with undo, save sales copy and content, and post updates, over N1P's MCP server with browser sign-in.",
+        server: {
+          name: "n1p",
+          transport: "http",
+          url: "https://sistema.n1p.com.br/mcp",
+          auth: [{ id: "n1p-oauth", kind: "link", label: "Sign in" }],
+        },
+      },
+    ],
+  },
 ];
