@@ -162,6 +162,11 @@ export function decodeInstalledSkill(value: unknown): InstalledSkill {
   };
 }
 
+export function decodeLocalSetGlobalResult(value: unknown): { installed: number; failed: number } {
+  const item = decodeRecord(value, "local skill global result");
+  return { installed: requiredNumber(item, "installed"), failed: requiredNumber(item, "failed") };
+}
+
 function optionalSkillDescription(value: unknown): string | undefined {
   if (!isString(value)) return undefined;
   const description = value.trim();

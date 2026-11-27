@@ -49,6 +49,7 @@ export interface MarketplaceSkillDetail extends MarketplaceSkillSummary {
   instructions: string;
   examplePrompt?: string;
   cardUrl?: string | null;
+  global?: boolean;
 }
 
 export interface MarketplaceSkillPage {
@@ -238,8 +239,12 @@ export function decodeMarketplaceSkillPage(value: unknown): MarketplaceSkillPage
 
 export function decodeMarketplaceSkillDetail(value: unknown): MarketplaceSkillDetail {
   if (!isMarketplaceSkillDetail(value)) throw new Error("Invalid skill detail response.");
-  const { verified, ...skill } = value;
-  return isBoolean(verified) ? { ...skill, verified } : skill;
+  const { verified, global, ...skill } = value;
+  return {
+    ...skill,
+    ...(isBoolean(verified) ? { verified } : {}),
+    ...(isBoolean(global) ? { global } : {}),
+  };
 }
 
 function isMarketplaceSkillSummary(value: unknown): value is MarketplaceSkillSummary {
@@ -269,6 +274,7 @@ function isMarketplaceSkillDetail(value: unknown): value is MarketplaceSkillDeta
     isString(value.instructions) &&
     (value.examplePrompt === undefined || (isString(value.examplePrompt) && value.examplePrompt.length <= 1_000)) &&
     (value.cardUrl === undefined || value.cardUrl === null || isString(value.cardUrl)) &&
+    (value.global === undefined || isBoolean(value.global)) &&
     Array.isArray(value.files) &&
     value.files.every(isString)
   );
@@ -291,6 +297,10 @@ export interface LocalSkillRevisionInput {
   revision?: number | undefined;
 }
 export type InstallLocalSkillInput = LocalSkillRevisionInput & { agentId: string; revision: number };
+export interface SetLocalSkillGlobalInput {
+  skillId: string;
+  global: boolean;
+}
 
 export const SKILL_LEARNING_MODES = ["automatic", "ask", "off"] as const;
 export type SkillLearningMode = (typeof SKILL_LEARNING_MODES)[number];

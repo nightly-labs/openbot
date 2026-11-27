@@ -19,6 +19,7 @@ import {
   parseInstallLocalSkill,
   parseReadLocalSkill,
   parseReviseLocalSkill,
+  parseSetLocalSkillGlobal,
 } from "./local-skill-inputs";
 import { nullishPayload, stringPayload } from "./validation";
 
@@ -47,6 +48,9 @@ export function skillIpcHandlers({
       ),
       localInstall: payloadHandler(parseInstallLocalSkill, (input) =>
         runCauseEffect(localSkillTools(skills).install(input)),
+      ),
+      localSetGlobal: payloadHandler(parseSetLocalSkillGlobal, (input) =>
+        runCauseEffect(skills.setLocalGlobal(input.skillId, input.global)),
       ),
       list: payloadHandler(nullishPayload(parseMarketplaceSkillQuery), (query) => runCauseEffect(skills.list(query))),
       get: payloadHandler(requireSkillId, (skillId) => runCauseEffect(skills.get(skillId))),

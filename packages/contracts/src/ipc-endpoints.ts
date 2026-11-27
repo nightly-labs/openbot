@@ -587,6 +587,7 @@ import type {
   SaveSkillSuggestionInput,
   SaveSkillSuggestionResult,
   SetEnabledSkillInput,
+  SetLocalSkillGlobalInput,
   SkillPackagePreview,
   SkillSubmission,
   SubmitSkillInput,
@@ -1003,6 +1004,9 @@ export const IPC_ENDPOINTS = {
     localCreate: request<CreateLocalSkillInput, MarketplaceSkillDetail>()("skills:local-create"),
     localRevise: request<ReviseLocalSkillInput, MarketplaceSkillDetail>()("skills:local-revise"),
     localInstall: request<InstallLocalSkillInput, InstalledSkill>()("skills:local-install"),
+    localSetGlobal: request<SetLocalSkillGlobalInput, { installed: number; failed: number }>()(
+      "skills:local-set-global",
+    ),
 
     list: request<MarketplaceSkillQuery | undefined, MarketplaceSkillPage>()("skills:list"),
     get: request<string, MarketplaceSkillDetail>()("skills:get"),

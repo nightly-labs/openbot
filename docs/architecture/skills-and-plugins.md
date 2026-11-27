@@ -252,6 +252,8 @@ A pack is one bundle that holds skills of its own in `skills/<slug>-<name>/SKILL
 
 The backend local skill tools derive the agent from the calling provider session. Main-process IPC validates local library inputs independently of sender validation. The renderer reads local previews through that bridge. The released Team API adapters are unchanged; local creation and revision are not exposed as remote operations.
 
+Global skill ids live in `local-skills/global.json`. Marking a skill global installs its latest revision on each agent that lacks it; unmarking keeps those installs. `prepareAgentWorkspace` installs global skills on each new agent too. A disabled or modified copy on an agent is left alone, and an install that hits the per-agent skill limit (32) fails only that one agent.
+
 ## Plugin distribution
 
 A plugin is one developer's bundle: an MCP server, shown as an app, the skills that drive it, and the listing text. The catalog of available plugins is a static file set that the Account Worker serves from `openbot.run` without an account, and the main process keeps a copy in the user-data directory rather than in SQLite, because a remote catalog is a cache and not the source of truth. An install saves the app as a host-global MCP server and installs the pinned skills into the chosen agent. A share link at `openbot.run/plugins/<slug>` opens a public page, and `openbot://plugins/<slug>` opens the listing in the app; neither one installs anything.

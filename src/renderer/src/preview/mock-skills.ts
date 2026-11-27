@@ -111,7 +111,11 @@ function mockGithubDetail(skillId: string): MarketplaceSkillDetail | undefined {
   return skill && githubSkillDetail(source, skill);
 }
 
-export function createMockSkills(options: MockSkillsOptions, onChanged: (agentId: string) => void = () => {}) {
+export function createMockSkills(
+  options: MockSkillsOptions,
+  onChanged: (agentId: string) => void,
+  listAgentIds: () => string[],
+) {
   const marketplaceSkills = clone(STORY_MARKETPLACE_SKILLS);
   const localSkills = clone(
     options.localSkills ?? [
@@ -194,6 +198,25 @@ export function createMockSkills(options: MockSkillsOptions, onChanged: (agentId
       };
       writeInstalled(agentId, [...readInstalledSkills(agentId).filter((item) => item.skillId !== skillId), installed]);
       return clone(installed);
+    },
+    localSetGlobal: async ({ skillId, global }) => {
+      const skill = localSkills.find((item) => item.id === skillId);
+      if (!skill) throw new Error("Local skill not found.");
+      skill.global = global;
+      let installed = 0;
+      let failed = 0;
+      if (global) {
+        for (const agentId of listAgentIds()) {
+          if (readInstalledSkills(agentId).some((item) => item.skillId === skillId)) continue;
+          try {
+            await skills.localInstall({ agentId, skillId, revision: skill.version });
+            installed += 1;
+          } catch {
+            failed += 1;
+          }
+        }
+      }
+      return { installed, failed };
     },
     list: async (query) => mockSkillPage(marketplaceSkills, query),
     get: async (skillId) => {
@@ -291,10 +314,22 @@ export function createMockSkills(options: MockSkillsOptions, onChanged: (agentId
     },
   };
 
+  async function installGlobalSkills(agentId: string): Promise<void> {
+    for (const skill of localSkills) {
+      if (!skill.global || readInstalledSkills(agentId).some((item) => item.skillId === skill.id)) continue;
+      try {
+        await skills.localInstall({ agentId, skillId: skill.id, revision: skill.version });
+      } catch {
+        continue;
+      }
+    }
+  }
+
   return {
     skills,
     installedSkills,
     readInstalledSkills,
+    installGlobalSkills,
     readGithub: async (link: string) => clone(readMockGithub(link)),
   };
 }

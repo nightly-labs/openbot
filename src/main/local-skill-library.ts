@@ -58,12 +58,70 @@ export class LocalSkillLibrary {
         const cause = result.failure.cause;
         unreadable.push({ skillId, error: cause instanceof Error ? cause.message : String(cause) });
       }
+      const globalIds = new Set(yield* this.globalIds());
       return {
         skills: skills
           .filter((skill) => !MANAGED_SKILL_SLUGS.has(skill.slug))
+          .map((skill) => (globalIds.has(skill.id) ? { ...skill, global: true } : skill))
           .sort((a, b) => a.name.localeCompare(b.name)),
         unreadable,
       };
+    });
+  }
+
+  globalIds(): Effect.Effect<string[], LocalSkillFailure> {
+    return Effect.gen({ self: this }, function* (): Effect.fn.Return<string[], LocalSkillFailure> {
+      const content = yield* Effect.result(localIO(() => readFile(this.globalPath(), "utf8")));
+      if (Result.isFailure(content)) {
+        const error = content.failure.cause;
+        if (isDynamicRecord(error) && error.code === "ENOENT") return [];
+        return yield* content.failure;
+      }
+      const ids = yield* localSync(() => decodeGlobalSkillIds(content.success));
+      const kept: string[] = [];
+      for (const id of ids) {
+        const revisions = yield* Effect.result(this.revisions(id));
+        if (Result.isSuccess(revisions) && revisions.success.length > 0) kept.push(id);
+      }
+      return kept;
+    });
+  }
+
+  setGlobal(id: string, global: boolean): Effect.Effect<void, LocalSkillFailure> {
+    return this.serialize(
+      Effect.gen({ self: this }, function* (): Effect.fn.Return<void, LocalSkillFailure> {
+        const directory = yield* localSync(() => this.directory(id));
+        if (!(yield* this.revisions(id).pipe(Effect.map((revisions) => revisions.length > 0))))
+          return yield* new LocalSkillFailure({ cause: new Error(sourceText("error.skill.localNotFound")) });
+        yield* rejectLinks(this.root, directory);
+        const ids = new Set(yield* this.globalIds());
+        if (global) ids.add(id);
+        else ids.delete(id);
+        yield* this.writeGlobalIds([...ids]);
+      }),
+    );
+  }
+
+  private globalPath(): string {
+    return join(this.root, "global.json");
+  }
+
+  private writeGlobalIds(ids: string[]): Effect.Effect<void, LocalSkillFailure> {
+    return Effect.gen({ self: this }, function* (): Effect.fn.Return<void, LocalSkillFailure> {
+      yield* localIO(() => mkdir(this.root, { recursive: true, mode: 0o700 }));
+      const stage = join(this.root, `.global-stage-${randomUUID()}`);
+      yield* Effect.gen({ self: this }, function* () {
+        yield* localIO(() =>
+          writeFile(stage, JSON.stringify({ version: 1, skillIds: ids }), { mode: 0o600, flag: "wx" }),
+        );
+        yield* localIO(() => rename(stage, this.globalPath()));
+      }).pipe(
+        Effect.ensuring(
+          Effect.gen({ self: this }, function* () {
+            yield* localIO(() => rm(stage, { force: true }));
+          }).pipe(Effect.orDie),
+        ),
+      );
     });
   }
 
@@ -239,8 +297,11 @@ export class LocalSkillLibrary {
         const path = join(directory, String(yield* this.revision(id, revision)));
         yield* rejectLinks(this.root, path);
         yield* localIO(() => rm(path, { recursive: true, force: true }));
-        if (!(yield* localIO(() => readdir(directory))).some((name) => /^[1-9]\d*$/u.test(name)))
+        if (!(yield* localIO(() => readdir(directory))).some((name) => /^[1-9]\d*$/u.test(name))) {
           yield* localIO(() => rm(directory, { recursive: true, force: true }));
+          const ids = new Set(yield* this.globalIds());
+          if (ids.delete(id)) yield* this.writeGlobalIds([...ids]);
+        }
       }),
     );
   }
@@ -348,6 +409,18 @@ const rejectLinks = Effect.fn("LocalSkill.rejectLinks")(function* (root: string,
       return yield* new LocalSkillFailure({ cause: new Error(sourceText("error.skill.pathSymlink")) });
   }
 });
+
+function decodeGlobalSkillIds(text: string): string[] {
+  const value = JSON.parse(text);
+  if (
+    !isDynamicRecord(value) ||
+    value.version !== 1 ||
+    !Array.isArray(value.skillIds) ||
+    !value.skillIds.every(isString)
+  )
+    throw new Error("Invalid global skill list.");
+  return value.skillIds;
+}
 
 export class LocalSkillFailure extends Schema.TaggedError<LocalSkillFailure>()("LocalSkillFailure", {
   cause: Schema.Defect(),

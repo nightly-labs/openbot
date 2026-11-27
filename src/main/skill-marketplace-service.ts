@@ -32,6 +32,7 @@ import {
 } from "@openbot/contracts/ipc";
 import { isBoolean, isDynamicRecord, isNumber, isOneOf, isString } from "@openbot/contracts/runtime-values";
 import { sourceText } from "@openbot/i18n/source";
+import { createOpenBotLogger } from "@openbot/logging";
 import { Cache, Effect, Exit, Result, Schema, Semaphore } from "effect";
 import { parse as parseYaml } from "yaml";
 import type { AgentLifecycleFailed } from "../backend/agent-service";
@@ -53,6 +54,8 @@ import {
   normalizedFiles,
   readSkillArchive,
 } from "./skill-package";
+
+const logger = createOpenBotLogger("skill-marketplace-service");
 
 const DRAFT_LIFETIME_MS = 30 * 60 * 1000;
 const CATALOG_VERSION_LIFETIME = "60 seconds";
@@ -727,6 +730,71 @@ export class SkillMarketplaceService {
         .bundle(input.skillId, input.revision)
         .pipe(toSkillMarketplaceFailure);
       return yield* this.installResolved(yield* skillSync(() => this.requireAgent(input.agentId)), detail, bundle);
+    });
+  }
+
+  private latestRevision(skillId: string): Effect.Effect<number, SkillMarketplaceFailure> {
+    return this.requireLocalLibrary()
+      .revisions(skillId)
+      .pipe(
+        toSkillMarketplaceFailure,
+        Effect.flatMap((revisions) =>
+          revisions.length > 0
+            ? Effect.succeed(Math.max(...revisions))
+            : new SkillMarketplaceFailure({ cause: new Error(sourceText("error.skill.localNoRevisions")) }),
+        ),
+      );
+  }
+
+  installGlobalSkills(agentId: string): Effect.Effect<void> {
+    return Effect.gen({ self: this }, function* (): Effect.fn.Return<void, never> {
+      const globalIds = yield* Effect.result(this.requireLocalLibrary().globalIds());
+      if (Result.isFailure(globalIds)) return;
+      for (const skillId of globalIds.success) {
+        const installed = yield* Effect.result(this.installedRevision(agentId, skillId));
+        if (Result.isSuccess(installed) && installed.success !== null) continue;
+        const revision = yield* Effect.result(this.latestRevision(skillId));
+        if (Result.isFailure(revision)) continue;
+        const outcome = yield* Effect.result(this.installLocal({ agentId, skillId, revision: revision.success }));
+        if (Result.isFailure(outcome))
+          logger.warn(
+            `OpenBot could not install global skill ${skillId} on agent ${agentId}: ${outcome.failure.cause instanceof Error ? outcome.failure.cause.message : String(outcome.failure.cause)}`,
+          );
+      }
+    });
+  }
+
+  setLocalGlobal(
+    skillId: string,
+    global: boolean,
+  ): Effect.Effect<{ installed: number; failed: number }, SkillMarketplaceFailure> {
+    return Effect.gen({ self: this }, function* (): Effect.fn.Return<
+      { installed: number; failed: number },
+      SkillMarketplaceFailure
+    > {
+      yield* this.requireLocalLibrary().setGlobal(skillId, global).pipe(toSkillMarketplaceFailure);
+      let installed = 0;
+      let failed = 0;
+      if (global) {
+        const revision = yield* this.latestRevision(skillId);
+        for (const agent of this.listAgents()) {
+          const outcome = yield* Effect.result(
+            this.installedRevision(agent.id, skillId).pipe(
+              Effect.flatMap((existing) =>
+                existing !== null
+                  ? Effect.succeed("skip" as const)
+                  : this.installLocal({ agentId: agent.id, skillId, revision }).pipe(Effect.as("installed" as const)),
+              ),
+            ),
+          );
+          if (Result.isSuccess(outcome)) {
+            if (outcome.success === "installed") installed += 1;
+          } else {
+            failed += 1;
+          }
+        }
+      }
+      return { installed, failed };
     });
   }
 

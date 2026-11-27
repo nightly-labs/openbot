@@ -1294,7 +1294,11 @@ export function createMockOpenBot(options: MockOpenBotOptions = {}): MockOpenBot
   const mockProviderRuntimes = createMockProviderRuntimes(options, runtime);
   const mockVoice = createMockVoice(options, runtime);
   const mockAuth = createMockAuth(options, runtime);
-  const mockSkills = createMockSkills(options, (agentId) => emitAgentEvent({ type: "skills-changed", agentId }));
+  const mockSkills = createMockSkills(
+    options,
+    (agentId) => emitAgentEvent({ type: "skills-changed", agentId }),
+    () => agents.map((agent) => agent.id),
+  );
   const { installedSkills, readInstalledSkills } = mockSkills;
   const mockBrowser = createMockBrowser(options, runtime, emitAgentEvent);
   const mockTeam = createMockTeam(options, runtime, emitAgentEvent, () => agents);
@@ -1321,6 +1325,7 @@ export function createMockOpenBot(options: MockOpenBotOptions = {}): MockOpenBot
     queues.set(agent.id, emptyQueue(agent.id));
     emitAgentEvent({ type: "agents-changed", agents });
     try {
+      await mockSkills.installGlobalSkills(agent.id);
       await api.agent.sendMessage({ agentId: agent.id, text: input.initialMessage, attachmentDraftIds: [] });
       if (welcome)
         updateSnapshot(agent.id, (snapshot) => {
@@ -1332,6 +1337,7 @@ export function createMockOpenBot(options: MockOpenBotOptions = {}): MockOpenBot
     } catch (error) {
       agents = agents.filter((candidate) => candidate.id !== agent.id);
       queues.delete(agent.id);
+      installedSkills.delete(agent.id);
       delete snapshots[agent.id];
       emitAgentEvent({ type: "agents-changed", agents });
       throw error;

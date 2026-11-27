@@ -109,6 +109,30 @@ export function LocalSkillsLibrary(props: {
       setState((current) => ({ ...current, busy: false }));
     }
   }
+  async function toggleGlobal(skill: MarketplaceSkillDetail, global: boolean) {
+    if (state.busy || props.disabled) return;
+    const agentId = props.agentId;
+    setState((current) => ({ ...current, busy: true, error: "", reference: null }));
+    try {
+      await skillsPort().skills.localSetGlobal({ skillId: skill.id, global });
+      if (!active || props.agentId !== agentId) return;
+      setState((current) => ({
+        ...current,
+        skills: current.skills.map((item) => (item.id === skill.id ? { ...item, global } : item)),
+        selected: current.selected?.id === skill.id ? { ...current.selected, global } : current.selected,
+      }));
+      await props.onInstalled();
+    } catch (error) {
+      if (active && props.agentId === agentId)
+        setState((current) => ({
+          ...current,
+          error: errorMessage(error, t("skill.local.toggleFailed")),
+          reference: errorReference(error),
+        }));
+    } finally {
+      if (active && props.agentId === agentId) setState((current) => ({ ...current, busy: false }));
+    }
+  }
   async function trySkill(skill: MarketplaceSkillDetail) {
     const agentId = props.agentId;
     setState((current) => ({ ...current, busy: true, error: "", reference: null }));
@@ -138,21 +162,32 @@ export function LocalSkillsLibrary(props: {
           </Show>
           <Show when={state.selected}>
             {(skill) => (
-              <Button
-                disabled={
-                  state.busy ||
-                  (installed()?.installedVersion === skill().version && installed()?.state !== "needs-repair")
-                }
-                onClick={() => void install(skill())}
-              >
-                {installed()?.state === "needs-repair"
-                  ? t("skill.repair")
-                  : installed()?.installedVersion === skill().version
-                    ? t("skill.local.added")
-                    : installed()
-                      ? t("skill.update")
-                      : t("skill.local.add")}
-              </Button>
+              <>
+                <span class="agent-skill-copy">
+                  <Switch
+                    aria-label={t("skill.local.global")}
+                    checked={skill().global === true}
+                    disabled={state.busy || props.disabled === true}
+                    onChange={(global) => void toggleGlobal(skill(), global)}
+                  />
+                  <small>{t("skill.local.globalHint")}</small>
+                </span>
+                <Button
+                  disabled={
+                    state.busy ||
+                    (installed()?.installedVersion === skill().version && installed()?.state !== "needs-repair")
+                  }
+                  onClick={() => void install(skill())}
+                >
+                  {installed()?.state === "needs-repair"
+                    ? t("skill.repair")
+                    : installed()?.installedVersion === skill().version
+                      ? t("skill.local.added")
+                      : installed()
+                        ? t("skill.update")
+                        : t("skill.local.add")}
+                </Button>
+              </>
             )}
           </Show>
         </div>
