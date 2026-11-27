@@ -1193,6 +1193,11 @@ export const messages = {
   "mobile.server.providers.pool": "Hesapları havuzla",
   "mobile.server.providers.poolHint":
     "Ajanlar bir hesabı kullanım sınırına yaklaşana kadar kullanır, sonra sınırı ilk sıfırlanan hesaba geçer.",
+  "mobile.server.providers.poolStrategy": "Hesap kullanımı",
+  "mobile.server.providers.poolFillFirst": "Önce doldur",
+  "mobile.server.providers.poolSpread": "Dağıt",
+  "mobile.server.providers.poolSpreadHint":
+    "Ajanlar en çok kullanım hakkı kalan hesaplara dağılır. Bir ajan yalnızca başka bir hesapta çok daha fazla yer olduğunda hesap değiştirir.",
   "mobile.server.providers.accountsPooledHint":
     "Ajanlar bu hesapları paylaşır. Yeni bir hesap bu telefonda kendi sayfasından oturum açar.",
   "mobile.server.providers.accountsPooledOnComputer":

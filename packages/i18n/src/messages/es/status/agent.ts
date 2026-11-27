@@ -83,6 +83,8 @@ export const messages = {
   "status.agent.nearSummaryBudget": "Cambiar el presupuesto diario de la cartera a {amount} USD.",
   "status.agent.nearSummaryAutoPay":
     "Permitir que OpenBot pague sin tu firma cuando una regla de pago lo permita. Para los demás pagos, te seguirán preguntando en el chat.",
+  "status.agent.nearSummaryManualPay":
+    "Ya no queda ninguna regla de pago. OpenBot volverá a pedir tu firma para cada pago.",
   "status.agent.nearSummaryPayment": "Aprobar el pago de {amount} a {recipient}.",
   "status.agent.nearSummaryFreeze": "Los agentes no podrán pagar desde esta cartera hasta que reanudes los pagos.",
   "status.agent.nearSummaryUnfreeze": "Los agentes pueden volver a pagar desde esta cartera, dentro de tus reglas.",

@@ -34,6 +34,8 @@ export const messages = defineMessages("error.billing", {
   "error.billing.mediaModelUnavailable": "This model is not available for generation with credits.",
   "error.billing.mediaRequestInvalid": "The generation settings do not match this model.",
   "error.billing.mediaRequestRefused": "The model refused this generation. No credits were used.",
+  "error.billing.mediaContentRefused":
+    "The model's safety check refused the prompt or the pictures. It often refuses real people, famous characters, brands, violence and adult content. Change them and try again. No credits were used.",
   "error.billing.mediaBusy": "Generation is busy now. Try again in a moment.",
   "error.billing.mediaJobNotFound": "This generation was not found.",
   "error.billing.mediaResultUnavailable": "The result of this generation is not available now. Try again later.",
@@ -46,8 +48,6 @@ export const messages = defineMessages("error.billing", {
   "error.billing.detailsInvalid": "Check the country and the VAT ID. The VAT ID must be one of the selected country.",
   "error.billing.vatIdInvalid":
     "The EU VAT system does not know this VAT ID. Check the number, or continue without a VAT ID.",
-  "error.billing.vatIdUnverified":
-    "The EU VAT system cannot check the VAT ID now. Try again later, or continue without a VAT ID.",
   "error.billing.vatUnavailable": "Payment is not available now. Try again later.",
   "error.billing.invalidRequest": "The billing request is invalid.",
   "error.billing.invalidResponse": "The billing response is invalid.",

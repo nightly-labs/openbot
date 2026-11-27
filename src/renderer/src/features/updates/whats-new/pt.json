@@ -1,5 +1,42 @@
 [
   {
+    "version": "0.80.0",
+    "date": "2026-11-26",
+    "notices": [
+      "Atualize também para esta versão cada servidor em que você entrou. Ele deixa um servidor com um histórico de chat grande rápido de novo após a 0.79.0. O app Apple Watch, os ponteiros de fluxos de trabalho ao vivo, a opção Distribuir e muitas das correções abaixo funcionam em um servidor só quando o servidor tem esta versão."
+    ],
+    "groups": [
+      {
+        "type": "added",
+        "items": [
+          "Seu servidor responde diretamente ao app OpenBot Apple Watch. O relógio funciona quando o OpenBot no iPhone está em segundo plano ou fechado. As solicitações e as respostas são criptografadas de ponta a ponta entre o relógio e o servidor.",
+          "Veja o ponteiro e a etapa selecionada de cada outra pessoa que tem o mesmo fluxo de trabalho aberto.",
+          "Configurações › Provedores › Agrupar contas tem uma nova opção: Distribuir. Ela coloca agentes nas contas com mais uso restante, para que todas as contas sejam usadas. Encher primeiro continua sendo o padrão.",
+          "Cada pagamento da carteira NEAR mostra um cartão no chat, com o estado dele e um link para a transação. Ao configurar a carteira ou mudar os gastos, você pode digitar seu próprio limite diário.",
+          "O MAGI-2 cria clipes de vídeo de 1080p com som, usando créditos do OpenBot. Um agente que não indica um modelo de vídeo agora usa esse modelo."
+        ]
+      },
+      {
+        "type": "changed",
+        "items": [
+          "A página Uso mostra custo e tokens em barras empilhadas, com uma cor para cada provedor. Ela mantém o último relatório na tela enquanto carrega um novo.",
+          "A página Buy credits mostra cada pacote de créditos como um cartão com cor própria, o preço e o preço de um crédito.",
+          "Uma licença Team agora tem até 25 usuários. Antes, o máximo era 10."
+        ]
+      },
+      {
+        "type": "fixed",
+        "items": [
+          "Um servidor com um histórico de chat grande fica rápido de novo após a atualização para a 0.79.0. Antes, uma limpeza de eventos antigos do chat parava o servidor por muitos segundos a cada minuto.",
+          "Digitar na caixa de mensagem não trava mais enquanto um agente escreve a resposta.",
+          "No Windows, os agentes com Uso do computador voltam a ver a área de trabalho. Desde a 0.77.0, eles recebiam uma imagem preta.",
+          "Um chat longo com muitas imagens usa bem menos memória.",
+          "Rotinas agendadas voltam a iniciar sozinhas após um erro curto no banco de dados. Antes, uma leitura com falha parava todas as rotinas agendadas."
+        ]
+      }
+    ]
+  },
+  {
     "version": "0.79.0",
     "date": "2026-11-25",
     "notices": [

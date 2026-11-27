@@ -15,6 +15,7 @@ export const messages = {
   "mobile.workspace.error.sectionsLoadFailed": "No se pudieron cargar las carpetas. Inténtalo de nuevo.",
   "mobile.workspace.error.transportNotReady": "El transporte móvil no está listo.",
   "mobile.workspace.error.sectionsUnsupported": "Este host no admite cambios en las carpetas.",
+  "mobile.workspace.error.sidebarOffline": "Conéctate a este servidor para cambiar sus carpetas.",
   "mobile.workspace.error.leaveOwnServer": "Solo puedes salir de servidores remotos a los que te hayas unido.",
   "mobile.workspace.error.removeOwnedServerOnly": "Solo el propietario puede eliminar este servidor.",
   "mobile.workspace.error.agentNotOnHost": "El agente no está en este host.",

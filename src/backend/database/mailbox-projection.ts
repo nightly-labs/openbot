@@ -73,6 +73,12 @@ export interface MailboxProjectionChanges {
   draftIds: ReadonlySet<string>;
   generatedAttachmentIds: ReadonlySet<string>;
   reactionKeys: ReadonlySet<string>;
+  rowLookup?: MailboxRowLookup;
+}
+
+export interface MailboxRowLookup {
+  message: (id: string) => MailboxProjectionState["messages"][number] | undefined;
+  delivery: (id: string) => MailboxProjectionState["deliveries"][number] | undefined;
 }
 
 const MAILBOX_METADATA_ROW = "__mailbox__";
@@ -139,8 +145,18 @@ export class MailboxProjection {
     writeIdempotency = true,
   ): boolean {
     return this.#write(commandId, state, eventType, fileDeletions, writeIdempotency, (_db, statements, sequence) => {
-      const messages = changedRows(state.messages, changes.messageIds, (message) => String(message.id));
-      const deliveries = changedRows(state.deliveries, changes.deliveryIds, (delivery) => String(delivery.id));
+      const messages = changedRows(
+        state.messages,
+        changes.messageIds,
+        (message) => String(message.id),
+        changes.rowLookup?.message,
+      );
+      const deliveries = changedRows(
+        state.deliveries,
+        changes.deliveryIds,
+        (delivery) => String(delivery.id),
+        changes.rowLookup?.delivery,
+      );
       const reactions = changedRows(state.reactions, changes.reactionKeys, (reaction) => rowKey(reactionKey(reaction)));
       const drafts = changedRows(state.drafts, changes.draftIds, (draft) => String(draft.id));
       const generated = changedRows(state.generatedAttachments, changes.generatedAttachmentIds, (attachment) =>
@@ -257,10 +273,10 @@ export class MailboxProjection {
     if (!marker) return null;
     const metadata = parseMailboxMetadata(requiredStringColumn(marker, "metadata_json"));
     const messages = databaseRows(
-      db.prepare("SELECT message_json FROM projection_mailbox_messages ORDER BY created_at, message_id").all(),
+      db.prepare("SELECT message_json FROM projection_mailbox_messages ORDER BY created_at, rowid").all(),
     ).map((row) => JSON.parse(requiredStringColumn(row, "message_json")));
     const deliveries = databaseRows(
-      db.prepare("SELECT delivery_json FROM projection_deliveries ORDER BY created_at, delivery_id").all(),
+      db.prepare("SELECT delivery_json FROM projection_deliveries ORDER BY created_at, rowid").all(),
     ).map((row) => JSON.parse(requiredStringColumn(row, "delivery_json")));
     const drafts = databaseRows(
       db.prepare("SELECT metadata_json FROM projection_attachments WHERE owner_kind = 'draft'").all(),
@@ -509,9 +525,21 @@ function storedAttachmentIds(statements: MailboxStatements, messageId: string): 
   );
 }
 
-function changedRows<T>(rows: readonly T[], keys: ReadonlySet<string>, keyOf: (row: T) => string): Map<string, T> {
+function changedRows<T>(
+  rows: readonly T[],
+  keys: ReadonlySet<string>,
+  keyOf: (row: T) => string,
+  lookup?: (key: string) => T | undefined,
+): Map<string, T> {
   const changed = new Map<string, T>();
   if (keys.size === 0) return changed;
+  if (lookup) {
+    for (const key of keys) {
+      const row = lookup(key);
+      if (row !== undefined) changed.set(key, row);
+    }
+    return changed;
+  }
   for (const row of rows) {
     const key = keyOf(row);
     if (keys.has(key)) changed.set(key, row);

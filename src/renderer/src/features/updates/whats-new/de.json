@@ -1,5 +1,42 @@
 [
   {
+    "version": "0.80.0",
+    "date": "2026-11-26",
+    "notices": [
+      "Aktualisiere auch jeden verbundenen Server auf diese Version. Ein Server mit einem großen Chatverlauf wird nach 0.79.0 wieder schnell. Die Apple-Watch-App, die Live-Zeiger in Workflows, „Verteilen“ und viele der Korrekturen unten funktionieren auf einem Server nur, wenn der Server diese Version hat."
+    ],
+    "groups": [
+      {
+        "type": "added",
+        "items": [
+          "Dein Server antwortet der OpenBot-Apple-Watch-App direkt. Die Uhr funktioniert, wenn OpenBot auf dem iPhone im Hintergrund läuft oder geschlossen ist. Die Anfragen und Antworten sind zwischen Uhr und Server Ende-zu-Ende-verschlüsselt.",
+          "Du siehst den Zeiger und den gewählten Schritt jeder anderen Person, die denselben Workflow geöffnet hat.",
+          "Einstellungen › Anbieter › Konten bündeln hat eine neue Option, Verteilen. Sie verteilt Agenten auf die Konten mit der meisten verbleibenden Nutzung, sodass alle Konten genutzt werden. Erst auffüllen bleibt der Standard.",
+          "Jede Zahlung mit der NEAR-Wallet zeigt im Chat eine Karte mit ihrem Status und einem Link zur Transaktion. Wenn du die Wallet einrichtest oder ihre Ausgaben änderst, kannst du dein eigenes Tageslimit eingeben.",
+          "MAGI-2 erstellt 1080p-Videoclips mit Ton für OpenBot-Credits. Ein Agent, der kein Videomodell nennt, nutzt es jetzt."
+        ]
+      },
+      {
+        "type": "changed",
+        "items": [
+          "Die Seite Nutzung zeigt Kosten und Tokens als gestapelte Balken, mit einer Farbe für jeden Anbieter. Sie behält den letzten Bericht auf dem Bildschirm, während ein neuer geladen wird.",
+          "Die Seite Buy credits zeigt jedes Credit-Paket als Karte mit eigener Farbe, seinem Preis und dem Preis eines Credits.",
+          "Eine Team-Lizenz hat jetzt bis zu 25 Nutzer. Vorher lag das Maximum bei 10."
+        ]
+      },
+      {
+        "type": "fixed",
+        "items": [
+          "Ein Server mit großem Chatverlauf ist nach dem Upgrade auf 0.79.0 wieder schnell. Vorher hielt eine Bereinigung alter Chat-Ereignisse den Server jede Minute für viele Sekunden an.",
+          "Tippen in das Nachrichtenfeld ruckelt nicht mehr, während ein Agent seine Antwort schreibt.",
+          "Unter Windows sehen Agenten mit Computersteuerung den Desktop wieder. Seit 0.77.0 bekamen sie ein schwarzes Bild.",
+          "Ein langer Chat mit vielen Bildern braucht deutlich weniger Speicher.",
+          "Zeitgesteuerte Routinen starten nach einem kurzen Datenbankfehler wieder von selbst. Vorher stoppte ein einziger fehlgeschlagener Lesezugriff alle zeitgesteuerten Routinen."
+        ]
+      }
+    ]
+  },
+  {
     "version": "0.79.0",
     "date": "2026-11-25",
     "notices": [

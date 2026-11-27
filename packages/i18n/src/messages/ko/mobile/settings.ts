@@ -83,7 +83,7 @@ export const messages = {
     "이 계정의 활성 원격 연결도 함께 종료돼요. 이 기기는 다시 로그인할 수 있어요.",
   "mobile.settings.sessions.disconnect": "연결 해제",
   "mobile.settings.dictation.footer":
-    "음성 대화와 받아쓰기에서 휴대폰 음성 인식에 말하는 언어예요. 자동은 휴대전화 설정에서 지원되는 첫 번째 언어를 사용해요.",
+    "음성 대화와 받아쓰기에서 휴대폰 음성 인식에 말하는 언어예요. 자동은 입력할 때 쓰는 키보드의 언어를 사용하고, 없으면 휴대전화 설정에서 지원되는 첫 번째 언어를 사용해요.",
   "mobile.settings.dictation.automatic": "자동",
   "mobile.settings.appearance.title": "화면 모드",
   "mobile.settings.appearance.footer": "시스템은 기기의 화면 모드를 따라요.",

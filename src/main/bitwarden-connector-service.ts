@@ -98,7 +98,7 @@ export class BitwardenKeyIdBackfillError extends Error {}
 
 const CLI_TIMEOUT_MS = 30_000;
 
-const runBitwardenCli: BitwardenCliRunner = (executable, args, extra, signal) => {
+export const runBitwardenCli: BitwardenCliRunner = (executable, args, extra, signal) => {
   const env: NodeJS.ProcessEnv = { BITWARDENCLI_INTERACTIVE: "false" };
   for (const name of [
     "HOME",
@@ -192,7 +192,7 @@ const findCli: BitwardenCliFinder = Effect.fn("BitwardenConnector.findCli")(func
 function serverAddress(value: string): string | null {
   try {
     const url = new URL(value.trim());
-    if (url.protocol !== "https:" || url.username || url.password || url.search || url.hash) return null;
+    if (url.protocol !== "https:" || url.username || url.password || url.search) return null;
     return `${url.origin}${url.pathname.replace(/\/+$/u, "")}`;
   } catch {
     return null;
@@ -610,6 +610,7 @@ function registerRecord(record: BitwardenConnectorRecord): void {
 function hostError(cause: unknown): string {
   const named = [
     sourceText("error.connector.bitwardenCliInstallFailed"),
+    sourceText("error.connector.bitwardenCliCannotStart"),
     sourceText("error.connector.bitwardenHostSignInFailed"),
     sourceText("error.connector.bitwardenHostUnlockFailed"),
     sourceText("error.connector.bitwardenFolderMissing"),

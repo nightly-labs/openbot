@@ -34,6 +34,7 @@
     "node": ">=24.0.0"
   },
   "dependencies": {
+    "@bacons/apple-targets": "5.0.0",
     "@config-plugins/react-native-webrtc": "15.0.2",
     "@expo/metro-runtime": "~58.0.17",
     "@expo/ui": "~58.0.28",

@@ -642,19 +642,24 @@ export class MobileChannelStore {
     const unread = entry.state.channels.filter((channel) => channel.unreadCount > 0).map((channel) => channel.id);
     if (unread.length === 0) return;
     const results = await Promise.allSettled(
-      unread.map(async (channelId) => {
-        const page = await this.request("POST", CHANNEL_ROUTES.read, decodeChannelPage, { channelId }, serverId);
-        await this.command(serverId, {
-          type: "read",
-          operationId: operationId(),
-          channelId,
-          throughSequence: page.throughSequence,
-        });
-      }),
+      unread.map((channelId) => this.#readThrough(serverId, channelId, operationId)),
     );
     await this.refresh(serverId);
     const failure = results.find((result) => result.status === "rejected");
     if (failure) throw failure.reason;
+  }
+  async markRead(serverId: string, channelId: string, operationId: () => string) {
+    await this.#readThrough(serverId, channelId, operationId);
+    await this.refresh(serverId);
+  }
+  async #readThrough(serverId: string, channelId: string, operationId: () => string) {
+    const page = await this.request("POST", CHANNEL_ROUTES.read, decodeChannelPage, { channelId }, serverId);
+    await this.command(serverId, {
+      type: "read",
+      operationId: operationId(),
+      channelId,
+      throughSequence: page.throughSequence,
+    });
   }
   memories(serverId: string, channelId: string) {
     return this.request("POST", CHANNEL_ROUTES.memories, decodeChannelMemories, { channelId }, serverId);

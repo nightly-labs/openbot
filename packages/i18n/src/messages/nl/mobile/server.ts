@@ -1168,6 +1168,11 @@ export const messages = {
   "mobile.server.providers.pool": "Accounts bundelen",
   "mobile.server.providers.poolHint":
     "Agents gebruiken één account tot het een gebruikslimiet nadert, en dan het account waarvan de limiet het eerst reset.",
+  "mobile.server.providers.poolStrategy": "Accounts gebruiken",
+  "mobile.server.providers.poolFillFirst": "Eerst vullen",
+  "mobile.server.providers.poolSpread": "Spreiden",
+  "mobile.server.providers.poolSpreadHint":
+    "Agents verdelen zich over de accounts met het meeste gebruik over. Een agent wisselt alleen van account als een ander account veel meer ruimte heeft.",
   "mobile.server.providers.accountsPooledHint":
     "Agents delen deze accounts. Een nieuw account meldt zich aan op zijn pagina op deze telefoon.",
   "mobile.server.providers.accountsPooledOnComputer":

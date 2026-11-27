@@ -1454,6 +1454,11 @@ export const messages = {
   "mobile.server.providers.pool": "איגום חשבונות",
   "mobile.server.providers.poolHint":
     "הסוכנים משתמשים בחשבון אחד עד שהוא מתקרב למגבלת שימוש, ואז בחשבון שהמגבלה שלו מתאפסת ראשונה.",
+  "mobile.server.providers.poolStrategy": "שימוש בחשבונות",
+  "mobile.server.providers.poolFillFirst": "מילוי ראשון",
+  "mobile.server.providers.poolSpread": "פיזור",
+  "mobile.server.providers.poolSpreadHint":
+    "הסוכנים מתפזרים בין החשבונות שנשאר בהם הכי הרבה שימוש. סוכן מחליף חשבון רק כשלחשבון אחר יש הרבה יותר מקום.",
   "mobile.server.providers.accountsPooledHint": "הסוכנים חולקים את החשבונות האלה. חשבון חדש מתחבר בדף שלו בטלפון הזה.",
   "mobile.server.providers.accountsPooledOnComputer": "הסוכנים חולקים את החשבונות האלה. חשבון מוסיפים ב-OpenBot במחשב.",
   "mobile.server.providers.inUse": "בשימוש",

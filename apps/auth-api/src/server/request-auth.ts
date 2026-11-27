@@ -10,7 +10,13 @@ import { adminTokenMatches } from "./admin-token";
 import { AgentMarketplace, AgentMarketplaceError } from "./agent-marketplace";
 import { AgentTemplates } from "./agent-templates";
 import { type FcmRelaySender, sharedFcmSender } from "./android-notification-relay";
-import { AuthOperationError, AuthService, AuthServiceError, readStoreReviewSignIn } from "./auth-service";
+import {
+  AuthOperationError,
+  AuthService,
+  AuthServiceError,
+  readStoreReviewSignIn,
+  sessionReadsFor,
+} from "./auth-service";
 import { BillingError, type BillingService } from "./billing-service";
 import { CompanySignInError, CompanySignInService } from "./company-sign-in";
 import type { ContactMessageServices } from "./contact-message";
@@ -68,9 +74,11 @@ import { SlackAppError, SlackAppService } from "./slack-app";
 import {
   type OwnerTransferEmailDelivery,
   requireWorkerBindings,
+  type SessionReads,
   type TeamInviteEmailDelivery,
   type WorkerBindings,
 } from "./types";
+import { WatchSessionStoreError, WatchSessions } from "./watch-sessions";
 
 function accountAnalytics(bindings: WorkerBindings): AccountAnalytics {
   return createAccountAnalytics({
@@ -483,10 +491,10 @@ export function marketplaceErrorResponse(error: unknown): Response {
   return skillErrorResponse(error);
 }
 
-export function requestUser(request: Request) {
+export function requestUser(request: Request, reads: SessionReads = sessionReadsFor(request)) {
   const token = bearerToken(request);
   if (!token) return Effect.succeed(null);
-  return requestAuthService().authenticate(token);
+  return requestAuthService().authenticate(token, reads);
 }
 
 export function skillErrorResponse(error: unknown): Response {
@@ -533,6 +541,23 @@ export function requestOwnerTransferEmailDelivery(): OwnerTransferEmailDelivery 
 
 export function requestRemoteControlPlane(): RemoteControlPlane {
   return new RemoteControlPlane(requireWorkerBindings(env), { schedule });
+}
+
+export function requestWatchSessions(): WatchSessions {
+  const bindings = requireWorkerBindings(env);
+  const limiter = bindings.WATCH_TICKET_RATE_LIMITER;
+  return new WatchSessions({
+    database: bindings.DB,
+    now: () => Date.now(),
+    issueTicket: (input) => Effect.suspend(() => requestRemoteControlPlane().issueWatchTicket(input)),
+    allowTicket: limiter
+      ? (watchSessionId) =>
+          Effect.tryPromise({
+            try: () => limiter.limit({ key: `watch:${watchSessionId}` }),
+            catch: () => new WatchSessionStoreError({}),
+          }).pipe(Effect.map((result) => result.success))
+      : null,
+  });
 }
 
 export function requestHostedServerService(request?: Request): HostedServerService {

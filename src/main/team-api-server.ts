@@ -272,6 +272,7 @@ import {
 import { PROVIDER_ACCOUNT_CODE_CAPABILITY } from "@openbot/contracts/team-protocol/provider-account-code-v1";
 import { PROVIDER_ACCOUNT_KEYS_CAPABILITY } from "@openbot/contracts/team-protocol/provider-account-keys-v1";
 import { PROVIDER_ACCOUNT_MODELS_CAPABILITY } from "@openbot/contracts/team-protocol/provider-account-models-v1";
+import { PROVIDER_ACCOUNT_POOL_STRATEGY_CAPABILITY } from "@openbot/contracts/team-protocol/provider-account-pool-strategy-v1";
 import { PROVIDER_ACCOUNT_POOL_CAPABILITY } from "@openbot/contracts/team-protocol/provider-account-pool-v1";
 import { PROVIDER_DETECTION_CAPABILITY } from "@openbot/contracts/team-protocol/provider-detection-v1";
 import { PROVIDER_ENVIRONMENT_CAPABILITY } from "@openbot/contracts/team-protocol/provider-environment-v1";
@@ -341,6 +342,7 @@ import { TEAM_OPEN_PROVIDERS_CAPABILITY } from "@openbot/contracts/team-protocol
 import { encodeTeamProtocolV8BaseCurrentEvent } from "@openbot/contracts/team-protocol/v8-base-adapter";
 import { TEAM_PROTOCOL_V10, type TeamProtocolSupportV10 } from "@openbot/contracts/team-protocol/v10";
 import { VOICE_TRANSCRIPTION_CAPABILITY } from "@openbot/contracts/team-protocol/voice-transcription-v1";
+import { WATCH_RELAY_TEAM_CAPABILITY } from "@openbot/contracts/team-protocol/watch-relay-v1";
 import { WHATSAPP_READ_ONLY_CAPABILITY } from "@openbot/contracts/team-protocol/whatsapp-read-only-v1";
 import {
   WORKFLOW_PRESENCE_CAPABILITY,
@@ -507,6 +509,7 @@ import {
   routeProviderAccountKeys,
   routeProviderAccountModels,
   routeProviderAccountPool,
+  routeProviderAccountPoolStrategy,
   routeProviderAccounts,
 } from "./team-api/route-provider-accounts";
 import { routeProviderDefault } from "./team-api/route-provider-default";
@@ -542,6 +545,7 @@ import { routeUsageCredits } from "./team-api/route-usage-credits";
 import { routeVault } from "./team-api/route-vault";
 import { routeVaultImport } from "./team-api/route-vault-import";
 import { routeVoiceTranscription } from "./team-api/route-voice-transcription";
+import { routeWatchRelay } from "./team-api/route-watch-relay";
 import { routeWhatsAppConnector } from "./team-api/route-whatsapp-connector";
 import { routeWhatsAppReadOnly } from "./team-api/route-whatsapp-read-only";
 import { routeWhatsAppStatusReactions } from "./team-api/route-whatsapp-status-reactions";
@@ -552,6 +556,7 @@ import { routeWorkspaceDirectory } from "./team-api/route-workspace-directory";
 import { WorkflowPresenceRelay, type WorkflowPresenceSeat } from "./team-api/workflow-presence-relay";
 import { visibleWorkflowIds, workflowVisibleTo } from "./team-api/workflow-visibility";
 import { TeamStoreError } from "./team-store";
+import type { WatchRelayTeamApi } from "./watch-relay-commands";
 
 const EVENT_PAYLOAD_LIMIT = 256 * 1_024;
 const TYPING_TIMEOUT_MS = 5_000;
@@ -682,6 +687,30 @@ export class TeamApiServer {
     return this.#port;
   }
 
+  watchTeamApi(): WatchRelayTeamApi {
+    const { agents, store } = this.#options;
+    const hostHidden = () => this.#options.hiddenAgents?.listHiddenAgents().agents.map((agent) => agent.agentId) ?? [];
+    return {
+      port: () => this.#port,
+      appVersion: () => this.#options.appVersion ?? "0.0.0",
+      serverName: () => store.getIdentity()?.serverName ?? null,
+      serverAppearance: () => store.getIdentity()?.appearance ?? null,
+      agents,
+      layout: () => this.#options.sidebarLayout.getSnapshot(),
+      listChannels: (memberId) => this.#options.channels?.store.list(memberId) ?? [],
+      pins: (memberId, hidden) => this.#options.sidebarPins?.snapshot(memberId, hidden).items ?? [],
+      hiddenAgentIds: (member) =>
+        new Set([
+          ...this.hiddenAgentIds(TEAM_PROTOCOL_V10, new Set(TEAM_CURRENT_CAPABILITIES), member),
+          ...hostHidden(),
+        ]),
+      channelHiddenAgentIds: (member) =>
+        this.hiddenAgentIds(TEAM_PROTOCOL_V10, new Set(TEAM_CURRENT_CAPABILITIES), member),
+      openSession: (input) => store.openRemoteSession(input),
+      closeSession: (sessionId) => store.closeRemoteSession(sessionId),
+    };
+  }
+
   start(): Effect.Effect<number, RemoteWorkflowError> {
     return this.#lifecycle.start(() =>
       this.#start().pipe(Effect.catchDefect((cause) => Effect.fail(new RemoteWorkflowError({ cause })))),
@@ -698,7 +727,12 @@ export class TeamApiServer {
     const server = createServer((request, response) => void this.#handle(request, response));
     this.#server = server;
     server.on("upgrade", (request, socket, head) => {
-      const url = new URL(request.url ?? "/", "http://127.0.0.1");
+      const url = URL.parse(request.url ?? "/", "http://127.0.0.1");
+      if (!url) {
+        socket.write("HTTP/1.1 400 Bad Request\r\nConnection: close\r\n\r\n");
+        socket.destroy();
+        return;
+      }
       if (this.#options.remoteScreen?.handlesUpgrade(url)) {
         this.#options.remoteScreen.handleUpgrade(request, socket, head, url);
         return;
@@ -1138,7 +1172,8 @@ export class TeamApiServer {
     try {
       response.setHeader("Cache-Control", "no-store");
       response.setHeader("X-Content-Type-Options", "nosniff");
-      const url = new URL(request.url ?? "/", "http://127.0.0.1");
+      const url = URL.parse(request.url ?? "/", "http://127.0.0.1");
+      if (!url) return this.#json(response, 400, { error: sourceText("error.team.requestFailed") });
       this.#responseRoutes.set(response, {
         method,
         path: url.pathname,
@@ -1316,6 +1351,7 @@ export class TeamApiServer {
       if ((await routeProviderAccounts(context, this.#options.providerAccounts)) === "handled") return;
       if ((await routeProviderAccountModels(context, this.#options.providerAccounts)) === "handled") return;
       if ((await routeProviderAccountPool(context, this.#options.providerAccounts)) === "handled") return;
+      if ((await routeProviderAccountPoolStrategy(context, this.#options.providerAccounts)) === "handled") return;
       if ((await routeLiveVoiceAccount(context, this.#options.providerAccounts)) === "handled") return;
       if ((await routeProviderAccountKeys(context, this.#options.providerAccounts)) === "handled") return;
       if ((await routeProviderAccountCode(context, this.#options.providerAccounts)) === "handled") return;
@@ -1540,6 +1576,7 @@ export class TeamApiServer {
       )
         return;
       if ((await routePushNotifications(context, this.#options.pushNotifications)) === "handled") return;
+      if ((await routeWatchRelay(context, this.#options.watchRelay)) === "handled") return;
       if ((await routeComputerActivity(context, this.#options.pushNotifications)) === "handled") return;
       if (
         (await routeFocusUse(context, this.#options.focusUse ? (id) => this.#recordFocusUse(id) : undefined)) ===
@@ -2929,6 +2966,8 @@ export class TeamApiServer {
         if (capability === PROVIDER_ACCOUNTS_CAPABILITY) return this.#options.providerAccounts !== undefined;
         if (capability === PROVIDER_ACCOUNT_MODELS_CAPABILITY) return this.#options.providerAccounts !== undefined;
         if (capability === PROVIDER_ACCOUNT_POOL_CAPABILITY) return this.#options.providerAccounts !== undefined;
+        if (capability === PROVIDER_ACCOUNT_POOL_STRATEGY_CAPABILITY)
+          return this.#options.providerAccounts !== undefined;
         if (capability === LIVE_VOICE_ACCOUNT_CAPABILITY)
           return this.#options.providerAccounts !== undefined && this.#options.liveVoice !== undefined;
         if (capability === PROVIDER_ACCOUNT_KEYS_CAPABILITY) return this.#options.providerAccounts !== undefined;
@@ -3114,6 +3153,7 @@ export class TeamApiServer {
         if (capability === AGENT_NOTIFICATION_LEVELS_CAPABILITY)
           return this.#options.agentNotificationLevels !== undefined;
         if (capability === SIDEBAR_PINS_CAPABILITY) return this.#options.sidebarPins !== undefined;
+        if (capability === WATCH_RELAY_TEAM_CAPABILITY) return this.#options.watchRelay?.available() === true;
         return true;
       },
     );

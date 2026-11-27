@@ -9,6 +9,7 @@ import {
   MAX_PROVIDER_ACCOUNTS,
   type ProviderAccountCodeLoginStart,
   type ProviderAccountCodeLoginStatus,
+  type ProviderAccountPoolStrategy,
   type ProviderAccountState,
   type ProviderAccountStatus,
   type ProviderUsageResetOutcome,
@@ -36,7 +37,7 @@ import { stopProcessTree } from "../windows-process-tree";
 import { usageWindowResetSince } from "./account-usage";
 import { captureBrowser, signInPageByOpenBot } from "./browser-capture";
 import { type CliCodeLogin, type CliCodePrompt, pasteCodeLoginSupported, startCliCodeLogin } from "./cli-code-login";
-import type { ProviderAccountStore, StoredProviderAccount } from "./provider-account-store";
+import type { ProviderAccountStore, StoredProviderAccount, StoredProviderAccountPool } from "./provider-account-store";
 import { ProviderProcessFailed, waitForSignInProcess, waitForSuccessfulProcess } from "./provider-status";
 import { providerLabel } from "./thread-items";
 import { UsageReadGate } from "./usage-read-gate";
@@ -108,6 +109,7 @@ export class ProviderAccounts {
   readonly #store: ProviderAccountStore;
   readonly #host: ProviderAccountsHost;
   readonly #states = new Map<string, AccountState>();
+  readonly #removing = new Set<string>();
   readonly #signIns = new Map<string, Fiber.Fiber<string | null>>();
   readonly #added = new Set<string>();
   readonly #codeResults = new Map<string, { error: string | null }>();
@@ -181,7 +183,9 @@ export class ProviderAccounts {
             label: account.label,
             email: state?.email ?? null,
             state: state?.state ?? "checking",
-            message: state?.message ?? null,
+            message: this.#removing.has(removalKey(provider, account.id))
+              ? sourceText("status.provider.accountRemovesAfterTurn")
+              : (state?.message ?? null),
             ...(models ? { models: structuredClone(models) } : {}),
           };
         }),
@@ -513,7 +517,19 @@ export class ProviderAccounts {
     this.#host.changed();
   }).bind(this);
 
-  pool(provider: AgentProviderId): { leftOut: readonly string[] } | null {
+  removing(provider: AgentProviderId, accountId: string): boolean {
+    return this.#removing.has(removalKey(provider, accountId));
+  }
+
+  setRemoving(provider: AgentProviderId, accountId: string, removing: boolean): void {
+    const key = removalKey(provider, accountId);
+    if (this.#removing.has(key) === removing) return;
+    if (removing) this.#removing.add(key);
+    else this.#removing.delete(key);
+    this.#host.changed();
+  }
+
+  pool(provider: AgentProviderId): StoredProviderAccountPool | null {
     return this.#support(provider) ? this.#store.pool(provider) : null;
   }
 
@@ -522,13 +538,19 @@ export class ProviderAccounts {
     provider: AgentProviderId,
     enabled: boolean,
     leftOut: readonly string[],
+    strategy?: ProviderAccountPoolStrategy,
   ) {
     const name = providerLabel(provider);
     if (provider === "acp" || !this.#support(provider))
       return yield* accountFailure(sourceText("error.provider.accountsUnsupported", { provider: name }));
     const known = new Set([DEFAULT_PROVIDER_ACCOUNT_ID, ...this.#store.list(provider).map((account) => account.id)]);
     yield* this.#store
-      .setPool(provider, enabled ? { leftOut: leftOut.filter((accountId) => known.has(accountId)) } : null)
+      .setPool(
+        provider,
+        enabled
+          ? { leftOut: leftOut.filter((accountId) => known.has(accountId)), ...(strategy ? { strategy } : {}) }
+          : null,
+      )
       .pipe(Effect.mapError((error) => new ProviderAccountFailed({ cause: error.cause })));
     this.#host.changed();
   }).bind(this);
@@ -1068,4 +1090,8 @@ function signInCause(error: unknown): ProviderSignInError | null {
 
 export function defaultUsageModel(provider: AgentProviderId): string | undefined {
   return provider === "codex" ? undefined : agentProviderDescriptor(provider).defaultModel || undefined;
+}
+
+function removalKey(provider: AgentProviderId, accountId: string): string {
+  return `${provider}\n${accountId}`;
 }

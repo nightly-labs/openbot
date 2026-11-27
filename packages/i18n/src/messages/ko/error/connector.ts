@@ -85,6 +85,8 @@ export const messages = {
     "이 서버에서 Bitwarden 잠금을 해제할 수 없어요. 마스터 비밀번호를 확인한 후 다시 연결해 주세요.",
   "error.connector.bitwardenCliInstallFailed":
     "이 서버에 Bitwarden CLI를 설치하지 못했어요. 서버의 네트워크 연결을 확인한 후 다시 연결해 주세요.",
+  "error.connector.bitwardenCliCannotStart":
+    "이 서버에서 Bitwarden CLI가 시작되지 않았어요. 다시 연결해 주세요. 그래도 시작되지 않으면 도움말 > 문제 신고를 선택하세요.",
   "error.connector.bitwardenFileUnreadable": "Bitwarden 연결 파일을 읽을 수 없어요.",
   "error.connector.passwordManagerUnknown": "OpenBot에서 이 비밀번호 관리자를 지원하지 않습니다.",
   "error.connector.passwordManagerMethod": "이 비밀번호 관리자는 이 방법으로 연결할 수 없습니다.",

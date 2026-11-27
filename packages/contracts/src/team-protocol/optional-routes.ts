@@ -119,6 +119,7 @@ import { PROMPT_CACHE_TTL_CODECS } from "./prompt-cache-ttl-v1";
 import { PROVIDER_ACCOUNT_CODE_CODECS } from "./provider-account-code-v1";
 import { PROVIDER_ACCOUNT_KEYS_CODECS } from "./provider-account-keys-v1";
 import { PROVIDER_ACCOUNT_MODELS_CODECS } from "./provider-account-models-v1";
+import { PROVIDER_ACCOUNT_POOL_STRATEGY_CODECS } from "./provider-account-pool-strategy-v1";
 import { PROVIDER_ACCOUNT_POOL_CODECS } from "./provider-account-pool-v1";
 import { PROVIDER_ACCOUNT_RELAY_CODECS } from "./provider-account-relay-v1";
 import { PROVIDER_ACCOUNT_RELAY_V2_CODECS } from "./provider-account-relay-v2";
@@ -171,6 +172,7 @@ import { VAULT_V2_CODECS } from "./vault-v2";
 import { VAULT_V3_CODECS } from "./vault-v3";
 import { VAULT_V4_CODECS } from "./vault-v4";
 import { VOICE_TRANSCRIPTION_CODECS } from "./voice-transcription-v1";
+import { WATCH_RELAY_CODECS } from "./watch-relay-v1";
 import { WEBHOOK_AGENT_SECRET_CODECS } from "./webhook-agent-secret-v1";
 import { WEBHOOK_SENDER_SECRET_CODECS } from "./webhook-sender-secret-v1";
 import { WEBHOOK_TESTS_CODECS } from "./webhook-tests-v1";
@@ -263,6 +265,7 @@ const CODECS: ReadonlyMap<string, OptionalRouteCodec> = new Map([
   ...CHANNEL_FOLDERS_CODECS,
   ...AGENT_FAST_MODE_CODECS,
   ...AGENT_SPEED_CODECS,
+  ...WATCH_RELAY_CODECS,
   ...CONTEXT_COMPACT_CODECS,
   ...AGENT_INSTRUCTIONS_CODECS,
   ...MCP_SIGN_IN_CODECS,
@@ -287,6 +290,7 @@ const CODECS: ReadonlyMap<string, OptionalRouteCodec> = new Map([
   ...PROVIDER_ENVIRONMENT_CODECS,
   ...PROVIDER_ACCOUNT_MODELS_CODECS,
   ...PROVIDER_ACCOUNT_POOL_CODECS,
+  ...PROVIDER_ACCOUNT_POOL_STRATEGY_CODECS,
   ...PROVIDER_ACCOUNT_KEYS_CODECS,
   ...PROVIDER_ACCOUNT_CODE_CODECS,
   ...GITHUB_SKILLS_CODECS,

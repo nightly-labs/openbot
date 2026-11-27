@@ -33,6 +33,7 @@ import {
   type DragRect,
   type DropChange,
   type DropMark,
+  type ListDrops,
   type ListFrame,
   type PinnedTileFrame,
 } from "@/features/workspace/model/chat-drag";
@@ -62,7 +63,7 @@ export interface ChatDragScreen {
   items: readonly MobileSidebarItem[];
   pins: readonly SidebarPin[];
   collapsedSectionIds: ReadonlySet<string> | undefined;
-  sections: boolean;
+  drops: ListDrops;
   canPin: boolean;
   scrollInsets: { top: number; bottom: number };
   beginScroll: () => void;
@@ -117,7 +118,8 @@ function sameTarget(left: ChatDropTarget | null, right: ChatDropTarget | null): 
   if (left.area === "pins" && right.area === "pins") return left.beforeKey === right.beforeKey;
   if (left.area === "list" && right.area === "list")
     return left.sectionId === right.sectionId && left.beforeChatId === right.beforeChatId;
-  return false;
+  if (left.area === "folder" && right.area === "folder") return left.sectionId === right.sectionId;
+  return left.area === "unpin" && right.area === "unpin";
 }
 
 interface DragSession {
@@ -147,7 +149,7 @@ export function ChatDragProvider({ screen, children }: PropsWithChildren<{ scree
   const update = useCallback(() => {
     const current = session.current;
     if (!current) return;
-    const { items, pins, collapsedSectionIds, sections, canPin } = screenRef.current;
+    const { items, pins, collapsedSectionIds, drops, canPin } = screenRef.current;
     const list: ListFrame[] = [];
     let sectionId: string | null = null;
     for (const item of items) {
@@ -174,7 +176,7 @@ export function ChatDragProvider({ screen, children }: PropsWithChildren<{ scree
       current.source,
       current.x,
       current.y,
-      { canPin, sections },
+      { canPin, drops },
     );
     const change = found
       ? chatDropChange(current.source, found.target, screenRef.current.readPins(), screenRef.current.layout())

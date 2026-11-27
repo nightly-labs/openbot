@@ -55,14 +55,14 @@ import {
 } from "@/features/workspace/model/request-lanes";
 import { uploadCancelled } from "@/features/workspace/model/upload-cancels";
 import { expoGoDomOptions } from "@/shared/lib/expo-go-dom";
+import type { NetworkChange } from "@/shared/lib/network-change";
 import { currentText } from "@/shared/lib/text";
-
 import RemoteTeamBridge, { type RemoteTeamBridgeHandle } from "./remote-team-bridge.dom";
 
 export interface RemoteTeamTransportRef {
   connect(hostId: string, hostPublicKey: string): Promise<{ kept: boolean }>;
   disconnect(): Promise<void>;
-  networkChanged(): void;
+  networkChanged(change: NetworkChange): void;
   newPage(): void;
   request<T>(
     method: string,
@@ -306,9 +306,9 @@ export const RemoteTeamTransport = memo(
             );
           return { kept: result.kept === true };
         },
-        networkChanged: () => {
+        networkChanged: (change) => {
           const networkChanged = bridge.current?.networkChanged;
-          if (typeof networkChanged === "function") networkChanged(null);
+          if (typeof networkChanged === "function") networkChanged(change);
         },
         newPage: () => newPage("on refresh"),
         disconnect: async () => {

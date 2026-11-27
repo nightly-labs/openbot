@@ -339,6 +339,7 @@ export const messages = {
     "حظر هذا الحاسوب الاتصال بالخادم. تحقق من جدار الحماية أو برنامج الأمان، ثم حاول مرة أخرى.",
   "error.backend.mcpServerIncompatible":
     "أجاب شيء ما على هذا العنوان، لكن ليس كخادم MCP عبر Streamable HTTP. تحقق من URL، وحدّث التطبيق الذي يشغّل الخادم.",
+  "error.backend.mcpServerKeyNotAccepted": "لم يقبل الخادم مفتاح API. تحقق من المفتاح، ثم حاول مرة أخرى.",
   "error.backend.mcpRemoteBridge":
     "{reason} يشغّل هذا الأمر جسر mcp-remote. اختر Streamable HTTP مع URL {url} بدلًا من ذلك، وسيسجّل OpenBot دخولك.",
   "error.backend.oauthNotHttps": "نقطة نهاية OAuth {origin} ليست https، لذا لم يتم إرسال بيانات الاعتماد.",

@@ -88,6 +88,8 @@ export const messages = {
     "Nie udało się odblokować Bitwarden na tym serwerze. Sprawdź hasło główne, a następnie połącz ponownie.",
   "error.connector.bitwardenCliInstallFailed":
     "Nie udało się zainstalować Bitwarden CLI na tym serwerze. Sprawdź jego połączenie sieciowe, a następnie połącz ponownie.",
+  "error.connector.bitwardenCliCannotStart":
+    "Bitwarden CLI nie uruchomił się na tym serwerze. Połącz ponownie. Jeśli nadal się nie uruchamia, wybierz Pomoc > Zgłoś problem.",
   "error.connector.bitwardenFileUnreadable": "Nie można odczytać pliku połączenia Bitwarden.",
   "error.connector.passwordManagerUnknown": "OpenBot nie zna tego menedżera haseł.",
   "error.connector.passwordManagerMethod": "Tego menedżera haseł nie można połączyć w ten sposób.",

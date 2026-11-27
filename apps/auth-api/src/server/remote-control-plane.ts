@@ -48,6 +48,11 @@ import {
   type RemoteTicketClaims,
 } from "@openbot/contracts/signal-protocol/ticket";
 import {
+  WATCH_TICKET_AUDIENCE,
+  WATCH_TICKET_TTL_SECONDS,
+  type WatchTicketClaims,
+} from "@openbot/contracts/signal-protocol/watch-relay";
+import {
   WEBHOOK_ROUTE_AUDIENCE,
   WEBHOOK_ROUTE_ID_PATTERN,
   WEBHOOK_ROUTE_TTL_SECONDS,
@@ -64,10 +69,17 @@ import { sourceText } from "@openbot/i18n/source";
 import { Context, Effect, Layer, Option, Result, Schema } from "effect";
 import { importJWK, type JWK, type JWTPayload, SignJWT } from "jose";
 import {
+  type BillingEntitlement,
   getServerEntitlement,
   type OwnerLicense,
+  type OwnerLicenseRow,
   ownerLicenseForHost,
+  ownerLicenseFromRows,
+  ownerLicenseStatement,
   SERVER_MEMBER_LIMIT_SQL,
+  type ServerEntitlementRow,
+  serverEntitlementFromRows,
+  serverEntitlementStatement,
 } from "./billing-entitlement";
 import { decodeBase64Url, hmacSha256, importHmacSha256Key, randomToken, sha256 } from "./crypto";
 import { CUSTOM_SERVER_OFFER_COLUMNS, type CustomServerOfferRow, customServerPayment } from "./custom-server-offers";
@@ -161,6 +173,12 @@ interface MemberSeat {
   readonly licenseBinds: readonly (string | number)[] | null;
 }
 
+type HostListBatchRow = RemoteHostKeyHandoverRow | OwnerLicenseRow | ServerMemberLimitRow | ServerEntitlementRow;
+
+interface ServerMemberLimitRow {
+  member_limit: number;
+}
+
 interface MemberLimit {
   readonly limit: number;
   readonly fromLicense: boolean;
@@ -224,6 +242,56 @@ function remoteCall<A>(operation: () => Promise<A>): Effect.Effect<A, RemoteFail
 export interface SqlCondition {
   sql: string;
   binds: unknown[];
+}
+
+function memberLimitFrom(
+  custom: ServerMemberLimitRow | null,
+  plan: BillingEntitlement | null,
+  license: OwnerLicense | null,
+): MemberLimit {
+  const below = (limit: number) => license !== null && license.users < limit;
+  if (custom) return { limit: custom.member_limit, fromLicense: false, licenseRaises: below(custom.member_limit) };
+  if (plan?.hosted) return { limit: plan.memberLimit, fromLicense: false, licenseRaises: below(plan.memberLimit) };
+  if (license?.entitled && license.users > (plan?.memberLimit ?? 0))
+    return { limit: license.users, fromLicense: true, licenseRaises: true };
+  const limit = plan?.memberLimit ?? DEFAULT_TEAM_MEMBER_LIMIT;
+  return {
+    limit,
+    fromLicense: false,
+    licenseRaises: below(limit) || (license?.entitled === true && plan !== null && license.users === limit),
+  };
+}
+
+function keyHandoversStatement(database: D1Database, condition: SqlCondition): D1PreparedStatement {
+  return database
+    .prepare(
+      `SELECT host_id, issued_at, previous_public_key, public_key, previous_signature, signature
+         FROM (
+           SELECT host_id, issued_at, previous_public_key, public_key, previous_signature, signature,
+                  ROW_NUMBER() OVER (PARTITION BY host_id ORDER BY issued_at DESC) AS position
+           FROM remote_host_key_handovers WHERE ${condition.sql}
+         )
+         WHERE position <= ?
+         ORDER BY host_id, issued_at`,
+    )
+    .bind(...condition.binds, HOST_KEY_HANDOVER_LIMIT);
+}
+
+function keyHandoversFromRows(rows: readonly RemoteHostKeyHandoverRow[]): Map<string, HostKeyHandover[]> {
+  const handovers = new Map<string, HostKeyHandover[]>();
+  for (const row of rows) {
+    const list = handovers.get(row.host_id) ?? [];
+    list.push({
+      hostId: row.host_id,
+      issuedAt: row.issued_at,
+      previousPublicKey: row.previous_public_key,
+      publicKey: row.public_key,
+      previousSignature: row.previous_signature,
+      signature: row.signature,
+    });
+    handovers.set(row.host_id, list);
+  }
+  return handovers;
 }
 
 interface RemoteHostRow {
@@ -412,6 +480,29 @@ export class RemoteTicketSigner {
         .setIssuedAt(issuedAt)
         .setExpirationTime(expiresAt)
         .setAudience(REMOTE_TICKET_AUDIENCE)
+        .sign(signingKey),
+    );
+    return { ticket, expiresAt: expiresAt * 1_000 };
+  }).bind(this);
+
+  readonly issueWatch = Effect.fn("RemoteTicketSigner.issueWatch")(function* (
+    this: RemoteTicketSigner,
+    input: {
+      claims: Omit<WatchTicketClaims, "aud" | "jti" | "iat" | "exp">;
+      sessionExpiresAt: number;
+      now: number;
+    },
+  ) {
+    const issuedAt = Math.floor(input.now / 1_000);
+    const expiresAt = Math.min(issuedAt + WATCH_TICKET_TTL_SECONDS, Math.floor(input.sessionExpiresAt / 1_000));
+    const signingKey = yield* this.#signingKey();
+    const ticket = yield* remoteCall(() =>
+      new SignJWT({ ...input.claims })
+        .setProtectedHeader({ alg: "ES256", typ: "JWT", kid: this.#keyId })
+        .setJti(crypto.randomUUID())
+        .setIssuedAt(issuedAt)
+        .setExpirationTime(expiresAt)
+        .setAudience(WATCH_TICKET_AUDIENCE)
         .sign(signingKey),
     );
     return { ticket, expiresAt: expiresAt * 1_000 };
@@ -923,37 +1014,57 @@ export class RemoteControlPlane {
             } & CustomServerOfferRow
           >(),
       );
-      const keyHandovers = yield* this.#keyHandoversByHost({
-        sql: "host_id IN (SELECT host_id FROM remote_memberships WHERE user_id = ? AND status = 'active')",
-        binds: [userId],
-      });
-      return yield* Effect.forEach(
-        result.results ?? [],
-        (row) =>
-          Effect.gen({ self: this }, function* () {
-            const license = yield* this.#ownerLicense(row.host_id);
-            const { limit, licenseRaises } = yield* this.#memberLimit(row.host_id, license);
-            return {
-              hostId: row.host_id,
-              name: row.name,
-              logoKey: row.logo_key,
-              appearance: storedAppearance(row.appearance_shape, row.appearance_color),
-              devicePublicKey: row.device_public_key,
-              keyHandovers: keyHandovers.get(row.host_id) ?? [],
-              authEpoch: row.auth_epoch,
-              membershipId: row.membership_id,
-              role: row.role,
-              memberLimit: license ? Math.min(limit, license.users) : limit,
-              licenseRaisesMemberLimit: row.role === "owner" && licenseRaises,
-              hosted: row.hosted_plan !== null,
-              ...(row.hidden_at === null ? {} : { hidden: true as const }),
-              ...(row.operator_host === null ? {} : { restartAvailable: false }),
-              ...hostedStorage(row.hosted_plan, row.hosted_storage_tier),
-              ...customServerPayment(row, row.role),
-            };
+      const rows = result.results ?? [];
+      if (rows.length === 0) return [];
+      const database = dependencies.database;
+      const now = dependencies.now();
+      const [handoverResult, ...hostResults] = yield* remoteCall(() =>
+        database.batch<HostListBatchRow>([
+          keyHandoversStatement(database, {
+            sql: "host_id IN (SELECT host_id FROM remote_memberships WHERE user_id = ? AND status = 'active')",
+            binds: [userId],
           }),
-        { concurrency: "unbounded" },
+          ...rows.flatMap((row) => [
+            ownerLicenseStatement(database, row.host_id),
+            database.prepare(SERVER_MEMBER_LIMIT_SQL).bind(row.host_id),
+            serverEntitlementStatement(database, row.host_id),
+          ]),
+        ]),
       );
+      const keyHandovers = keyHandoversFromRows(
+        (handoverResult?.results ?? []).filter((entry) => "issued_at" in entry),
+      );
+      return rows.map((row, index) => {
+        const hostRows = (offset: number) => hostResults[index * 3 + offset]?.results ?? [];
+        const license = ownerLicenseFromRows(
+          hostRows(0).filter((entry) => "owner_id" in entry),
+          now,
+        );
+        const custom = hostRows(1).find((entry) => "member_limit" in entry) ?? null;
+        const plan = serverEntitlementFromRows(
+          hostRows(2).filter((entry) => "plan" in entry),
+          now,
+        );
+        const { limit, licenseRaises } = memberLimitFrom(custom, plan, license);
+        return {
+          hostId: row.host_id,
+          name: row.name,
+          logoKey: row.logo_key,
+          appearance: storedAppearance(row.appearance_shape, row.appearance_color),
+          devicePublicKey: row.device_public_key,
+          keyHandovers: keyHandovers.get(row.host_id) ?? [],
+          authEpoch: row.auth_epoch,
+          membershipId: row.membership_id,
+          role: row.role,
+          memberLimit: license ? Math.min(limit, license.users) : limit,
+          licenseRaisesMemberLimit: row.role === "owner" && licenseRaises,
+          hosted: row.hosted_plan !== null,
+          ...(row.hidden_at === null ? {} : { hidden: true as const }),
+          ...(row.operator_host === null ? {} : { restartAvailable: false }),
+          ...hostedStorage(row.hosted_plan, row.hosted_storage_tier),
+          ...customServerPayment(row, row.role),
+        };
+      });
     },
     (operation) => operation.pipe(Effect.provide(this.#layer)),
   ).bind(this);
@@ -2384,6 +2495,52 @@ export class RemoteControlPlane {
     (operation) => operation.pipe(Effect.provide(this.#layer)),
   ).bind(this);
 
+  readonly issueWatchTicket = Effect.fn("RemoteControlPlane.issueWatchTicket")(
+    function* (
+      this: RemoteControlPlane,
+      input: {
+        watchSessionId: string;
+        userId: string;
+        hostId: string;
+        clientPublicKey: string;
+        sessionExpiresAt: number;
+      },
+    ) {
+      const dependencies = yield* RemoteDependencies;
+      const membership = yield* remoteCall(() =>
+        dependencies.database
+          .prepare(
+            `SELECT m.membership_id, m.host_id, m.user_id, m.role, m.status, h.auth_epoch, h.signal_home
+         FROM remote_memberships m
+         JOIN remote_hosts h ON h.host_id = m.host_id
+         WHERE m.host_id = ? AND m.user_id = ? AND m.status = 'active' LIMIT 1`,
+          )
+          .bind(input.hostId, input.userId)
+          .first<RemoteMembershipRow & { auth_epoch: number; signal_home: string | null }>(),
+      );
+      const member = yield* remoteValidate(() => this.#assertRole(membership, ["owner", "admin", "member"]));
+      const signal = dependencies.signal;
+      if (!signal) return yield* remoteSignalNotConfigured();
+      const home = configuredSignalHome(signal, member.signal_home);
+      const issued = yield* dependencies.signer.issueWatch({
+        claims: {
+          watchSessionId: input.watchSessionId,
+          hostId: member.host_id,
+          userId: input.userId,
+          membershipId: member.membership_id,
+          role: member.role,
+          authEpoch: member.auth_epoch,
+          clientPublicKey: input.clientPublicKey,
+          ...(home ? { signal: home.id } : {}),
+        },
+        sessionExpiresAt: input.sessionExpiresAt,
+        now: dependencies.now(),
+      });
+      return { ...issued, signalUrl: home?.url ?? signal.entryUrl };
+    },
+    (operation) => operation.pipe(Effect.provide(this.#layer)),
+  ).bind(this);
+
   readonly planChanged = Effect.fn("RemoteControlPlane.planChanged")(
     function* (this: RemoteControlPlane, hostId: string): Effect.fn.Return<void, RemoteFailure, RemoteDependencies> {
       yield* this.#serversChanged(
@@ -3456,20 +3613,11 @@ export class RemoteControlPlane {
     const custom = yield* remoteCall(() =>
       dependencies.database.prepare(SERVER_MEMBER_LIMIT_SQL).bind(hostId).first<{ member_limit: number }>(),
     );
-    const below = (limit: number) => license !== null && license.users < limit;
-    if (custom) return { limit: custom.member_limit, fromLicense: false, licenseRaises: below(custom.member_limit) };
+    if (custom) return memberLimitFrom(custom, null, license);
     const plan = yield* getServerEntitlement(dependencies.database, hostId, dependencies.now()).pipe(
       Effect.mapError((error) => (error instanceof RemoteControlPlaneError ? error : new RemoteOperationError({}))),
     );
-    if (plan?.hosted) return { limit: plan.memberLimit, fromLicense: false, licenseRaises: below(plan.memberLimit) };
-    if (license?.entitled && license.users > (plan?.memberLimit ?? 0))
-      return { limit: license.users, fromLicense: true, licenseRaises: true };
-    const limit = plan?.memberLimit ?? DEFAULT_TEAM_MEMBER_LIMIT;
-    return {
-      limit,
-      fromLicense: false,
-      licenseRaises: below(limit) || (license?.entitled === true && plan !== null && license.users === limit),
-    };
+    return memberLimitFrom(null, plan, license);
   });
 
   #assertRole<Row extends RemoteMembershipRow>(membership: Row | null, roles: RemoteMemberRole[]): Row {
@@ -3573,34 +3721,9 @@ export class RemoteControlPlane {
   ): Effect.fn.Return<Map<string, HostKeyHandover[]>, RemoteFailure, RemoteDependencies> {
     const dependencies = yield* RemoteDependencies;
     const result = yield* remoteCall(() =>
-      dependencies.database
-        .prepare(
-          `SELECT host_id, issued_at, previous_public_key, public_key, previous_signature, signature
-         FROM (
-           SELECT host_id, issued_at, previous_public_key, public_key, previous_signature, signature,
-                  ROW_NUMBER() OVER (PARTITION BY host_id ORDER BY issued_at DESC) AS position
-           FROM remote_host_key_handovers WHERE ${condition.sql}
-         )
-         WHERE position <= ?
-         ORDER BY host_id, issued_at`,
-        )
-        .bind(...condition.binds, HOST_KEY_HANDOVER_LIMIT)
-        .all<RemoteHostKeyHandoverRow>(),
+      keyHandoversStatement(dependencies.database, condition).all<RemoteHostKeyHandoverRow>(),
     );
-    const handovers = new Map<string, HostKeyHandover[]>();
-    for (const row of result.results ?? []) {
-      const list = handovers.get(row.host_id) ?? [];
-      list.push({
-        hostId: row.host_id,
-        issuedAt: row.issued_at,
-        previousPublicKey: row.previous_public_key,
-        publicKey: row.public_key,
-        previousSignature: row.previous_signature,
-        signature: row.signature,
-      });
-      handovers.set(row.host_id, list);
-    }
-    return handovers;
+    return keyHandoversFromRows(result.results ?? []);
   });
 
   readonly #keyHandovers = Effect.fn("RemoteControlPlane.keyHandovers")(function* (

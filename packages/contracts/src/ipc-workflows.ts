@@ -1,3 +1,4 @@
+import { attachmentMimeTypeForName } from "./attachment-files";
 import { isCreditAmount } from "./credits";
 import { INPUT_LIMITS } from "./input-limits";
 import { integerInRange, isBoundedString, isFiniteNumber, isIdentifier } from "./ipc-bounded-values";
@@ -261,6 +262,37 @@ export const WORKFLOW_MEDIA_MODELS: readonly WorkflowMediaModel[] = [
 ];
 
 export const WORKFLOW_PICTURE_TYPES: ReadonlySet<string> = new Set(["image/png", "image/jpeg", "image/webp"]);
+
+export const WORKFLOW_CLIP_TYPES: ReadonlySet<string> = new Set([
+  "video/mp4",
+  "video/quicktime",
+  "audio/mpeg",
+  "audio/mp4",
+  "audio/wav",
+  "audio/aac",
+  "audio/ogg",
+  "audio/flac",
+]);
+
+export const WORKFLOW_ASSET_TYPES: ReadonlySet<string> = new Set([...WORKFLOW_PICTURE_TYPES, ...WORKFLOW_CLIP_TYPES]);
+
+export const WORKFLOW_ASSET_CLIP_MEDIA = ["video", "audio"] as const;
+export type WorkflowAssetClipMedia = (typeof WORKFLOW_ASSET_CLIP_MEDIA)[number];
+export type WorkflowFileMediaKind = WorkflowMediaKind | WorkflowAssetClipMedia;
+
+export const WORKFLOW_ASSET_CLIPS_FORMAT = 4;
+
+export function workflowAssetClipMedia(mimeType: string): WorkflowAssetClipMedia | null {
+  if (!WORKFLOW_CLIP_TYPES.has(mimeType)) return null;
+  return mimeType.startsWith("audio/") ? "audio" : "video";
+}
+
+export function workflowAssetType(file: { name: string; type: string }, clips: boolean): string | null {
+  if (WORKFLOW_PICTURE_TYPES.has(file.type)) return file.type;
+  if (!clips) return null;
+  const named = attachmentMimeTypeForName(file.name);
+  return WORKFLOW_CLIP_TYPES.has(named) ? named : null;
+}
 
 export const WORKFLOW_VIDEO_DURATIONS = [6, 10] as const;
 export const WORKFLOW_VIDEO_RESOLUTIONS = ["480p", "720p"] as const;

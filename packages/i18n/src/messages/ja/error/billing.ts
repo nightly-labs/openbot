@@ -19,6 +19,8 @@ export const messages = {
   "error.billing.licensePaymentFailed":
     "追加ユーザーの支払いに失敗しました。支払い方法を更新して、もう一度お試しください。",
   "error.billing.licenseUnavailable": "現在ライセンスは利用できません。",
+  "error.billing.mediaContentRefused":
+    "モデルの安全チェックがプロンプトまたは画像を拒否しました。実在の人物、有名なキャラクター、ブランド、暴力、成人向けの内容はよく拒否されます。内容を変更して、もう一度お試しください。クレジットは使用されていません。",
   "error.billing.licenseOneUser": "このライセンスは 1 ユーザー分です。ユーザーを追加するには Team に変更してください。",
   "error.billing.licensePlanChange":
     "このライセンスはそのプランに変更できません。解約してから新しいプランを購入してください。",
@@ -28,8 +30,6 @@ export const messages = {
   "error.billing.detailsInvalid": "国と VAT ID を確認してください。VAT ID は選択した国のものである必要があります。",
   "error.billing.vatIdInvalid":
     "EU の VAT システムにこの VAT ID がありません。番号を確認するか、VAT ID なしで続行してください。",
-  "error.billing.vatIdUnverified":
-    "EU の VAT システムで現在 VAT ID を確認できません。後でもう一度お試しいただくか、VAT ID なしで続行してください。",
   "error.billing.vatUnavailable": "現在お支払いはご利用いただけません。後でもう一度お試しください。",
   "error.billing.invalidRequest": "お支払いのリクエストが無効です。",
   "error.billing.invalidResponse": "お支払いの応答が無効です。",

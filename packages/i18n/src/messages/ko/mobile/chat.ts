@@ -452,7 +452,7 @@ export const messages = {
   "mobile.chat.outbox.failedHold": "보내지 못했어요. 메시지를 길게 눌러 다시 시도하세요.",
   "mobile.chat.outbox.cancelSend": "보내지 않기",
   "mobile.chat.outbox.menuHint": "이 메시지의 옵션을 보여 줘요.",
-  "mobile.chat.outbox.unconfirmed": "확인되지 않았어요. 다시 보내기 전에 채팅을 확인해 주세요.",
+  "mobile.chat.outbox.unconfirmed": "확인되지 않았어요. 채팅을 확인한 다음 메시지를 길게 눌러 수정하거나 취소하세요.",
   "mobile.chat.outbox.editFailed": "편집할 메시지를 열 수 없어요.",
   "mobile.chat.outbox.saveFailed":
     "대기 중인 메시지를 이 휴대폰에 저장할 수 없어요. 메시지가 전송될 때까지 앱을 열어 두세요.",

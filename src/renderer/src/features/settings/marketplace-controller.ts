@@ -32,7 +32,12 @@ import {
   mcpConfigErrors,
 } from "@openbot/contracts/ipc";
 import { createMarketplaceShareUrl, type MarketplaceListingLink } from "@openbot/contracts/marketplace-links";
-import { mcpAccountFragment, mcpAccountUrl } from "@openbot/contracts/mcp-accounts";
+import {
+  mcpAccountFragment,
+  mcpAccountUrl,
+  sameSignInAddress,
+  withOwnMcpAccount,
+} from "@openbot/contracts/mcp-accounts";
 import { type McpConnectFlow, mcpFlowFields, savedKeyFlow } from "@openbot/contracts/mcp-connect-flows";
 import { createPluginShareUrl } from "@openbot/contracts/plugin-links";
 import { TOAST_DURATION, toast } from "@openbot/ui";
@@ -147,15 +152,6 @@ export interface PendingSkillConfirm {
   kind: "replace" | "remove";
   agents: string;
   settle: (confirmed: boolean) => void;
-}
-
-function sameSignInAddress(a: string, b: string): boolean {
-  if (!URL.canParse(a.trim()) || !URL.canParse(b.trim())) return false;
-  if (mcpAccountFragment(a) !== mcpAccountFragment(b)) return false;
-  const [first, second] = [new URL(a.trim()), new URL(b.trim())];
-  first.hash = "";
-  second.hash = "";
-  return first.href === second.href;
 }
 
 export interface PendingServerReplace {
@@ -837,12 +833,13 @@ export function createMarketplaceController(
       accounts,
       multipleAccounts: accounts.length > 0 && accountsOffered(app),
       keySaved: rows[0] !== undefined && savedKeyFlow(app.server.auth, rows[0]) !== null,
+      paused: rows.length > 0 && rows.every((row) => !row.enabled),
     };
   }
   const pluginAgentId = () => activeAgentId() || agents()[0]?.id || "";
   const pluginSkillHeld = (skillId: string) => Boolean(installedSkill(pluginAgentId(), skillId));
   function pluginStatus(plugin: MarketplacePluginDetail): MarketplaceAppStatus {
-    if (plugin.apps.some((app) => appConnection(app).signInNeeded)) return "attention";
+    if (plugin.apps.some((app) => appConnection(app).signInNeeded || appConnection(app).paused)) return "attention";
     const parts = [
       ...plugin.apps.map((app) => Boolean(heldApp(app))),
       ...plugin.skills.map((skill) => pluginSkillHeld(skill.id)),
@@ -1375,10 +1372,6 @@ export function createMarketplaceController(
     return false;
   }
 
-  function pluginAppConfig(app: MarketplacePluginApp): McpServerConfig {
-    return heldApp(app) ?? createPluginAppConfig(app);
-  }
-
   function newAccountName(app: MarketplacePluginApp): string {
     const taken = new Set(servers().map((server) => server.name.toLocaleLowerCase()));
     let count = 2;
@@ -1425,7 +1418,15 @@ export function createMarketplaceController(
           if (!held) addedSkills.push(skill.id);
         }
         for (const app of plugin.apps) {
-          const config = pluginAppConfig(app);
+          const connection = appConnection(app);
+          if (connection.paused && !connection.signInNeeded) {
+            for (const row of heldApps(app))
+              setServers(await calls().mcp.setMcpServerEnabled({ mcpServerId: row.id, enabled: true }, serverId));
+            continue;
+          }
+          const replaced = replacing.get(app.id);
+          const others = servers().filter((row) => row.id !== replaced?.id);
+          const config = heldApp(app) ?? withOwnMcpAccount(createPluginAppConfig(app), others, crypto.randomUUID());
           const invalid = Object.values(mcpConfigErrors(config))[0];
           if (invalid) throw new Error(t("marketplace.error.appInvalid", { name: app.name, reason: invalid }));
           const connected = await connectStep(app, config);
@@ -1433,11 +1434,10 @@ export function createMarketplaceController(
             await undoSkills(agentId, addedSkills);
             return false;
           }
-          const replaced = replacing.get(app.id);
           const sharesSignIn = replaced !== undefined && sameSignInAddress(replaced.url, connected.url);
           if (replaced && !sharesSignIn)
             setServers(await calls().mcp.removeMcpServer({ mcpServerId: replaced.id }, serverId));
-          const saved = replaced && sharesSignIn ? { ...connected, id: replaced.id } : connected;
+          const saved = { ...connected, enabled: true, ...(replaced && sharesSignIn ? { id: replaced.id } : {}) };
           setServers(await calls().mcp.saveMcpServer({ config: saved }, serverId));
         }
       } catch (cause) {
@@ -1522,7 +1522,7 @@ export function createMarketplaceController(
     const saved = await run(async () => {
       const connected = await connectStep(app, currentPluginAppConfig(row, app), row);
       if (!connected) return false;
-      setServers(await calls().mcp.saveMcpServer({ config: connected }, serverId));
+      setServers(await calls().mcp.saveMcpServer({ config: { ...connected, enabled: true } }, serverId));
       return true;
     });
     if (saved !== false) {

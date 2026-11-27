@@ -15,6 +15,7 @@ export const messages = {
   "mobile.workspace.error.sectionsLoadFailed": "Klasörler yüklenemedi. Tekrar deneyin.",
   "mobile.workspace.error.transportNotReady": "Mobil aktarım hazır değil.",
   "mobile.workspace.error.sectionsUnsupported": "Bu ana makine klasör değişikliklerini desteklemiyor.",
+  "mobile.workspace.error.sidebarOffline": "Klasörlerini değiştirmek için bu sunucuya bağlanın.",
   "mobile.workspace.error.leaveOwnServer": "Yalnızca katılınan uzak sunuculardan ayrılınabilir.",
   "mobile.workspace.error.removeOwnedServerOnly": "Bu sunucuyu yalnızca sahibi kaldırabilir.",
   "mobile.workspace.error.agentNotOnHost": "Ajan bu ana makinede değil.",

@@ -55,7 +55,7 @@ import { useCSSVariable, useUniwind } from "uniwind";
 import { BloubAvatarThumbnail } from "@/features/agents/components/bloub-avatar";
 import { ChatActivityRow, type ChatActivitySpec } from "@/features/chat/components/chat-activity-row";
 import { ChatAppSuggestion, ChatMcpSignIn } from "@/features/chat/components/chat-app-suggestion";
-import { type ApprovalDecision, approvalTitle, ChatApprovalCard } from "@/features/chat/components/chat-approval-card";
+import { type ApprovalDecision, ChatApprovalCard } from "@/features/chat/components/chat-approval-card";
 import { ChatExchangeGroup, ChatExchangeMarker } from "@/features/chat/components/chat-exchange-marker";
 import { ChatMarkdown, chatMarkdownHasTable } from "@/features/chat/components/chat-markdown";
 import { ChatMemoryChanges } from "@/features/chat/components/chat-memory-changes";
@@ -75,6 +75,7 @@ import { CHAT_ROW_GAP, type ChatMotion } from "@/features/chat/components/use-ch
 import { useFoldScrollAnchor } from "@/features/chat/components/use-fold-scroll-anchor";
 import { useMessageArrivals } from "@/features/chat/components/use-message-arrivals";
 import type { QuestionPromptController } from "@/features/chat/components/use-question-prompt";
+import { approvalTitle } from "@/features/chat/model/approval-text";
 import {
   type ChatBubbleMessage,
   type ChatMarkerGroup,
@@ -119,7 +120,7 @@ import {
   messageChipFileNames,
   messageFileDirectory,
   messageFileTarget,
-  messageLinkFileTarget,
+  messageLinkFileTargets,
   messageTargetFileName,
 } from "../model/message-file-target";
 import { messageTime } from "../model/message-time";
@@ -673,8 +674,14 @@ const MessageRow = memo(function MessageRow({
         return target ? () => void openFile(target.file, target.written, attachmentOf(target.file)) : null;
       },
       link: (href) => {
-        const target = messageLinkFileTarget(href, fileAgentId);
-        return target ? () => void openFile(target, null, attachmentOf(target)) : null;
+        const target = messageLinkFileTargets(href, fileAgentId);
+        if (!target) return null;
+        return () =>
+          void openFile(
+            target.file,
+            target.written,
+            (target.written && attachmentOf(target.written)) || attachmentOf(target.file),
+          );
       },
     };
   }, [fileBody, fileAgentId, fileAttachments, openFile]);

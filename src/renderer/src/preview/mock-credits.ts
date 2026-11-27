@@ -93,6 +93,7 @@ export function createMockCredits(initial: Partial<CreditsState> = {}): CreditsD
   return {
     getState: async () => structuredClone(state),
     getActivity: async () => ({ entries: structuredClone(activity) }),
+    getCatalog: async () => ({ models: [] }),
     openCheckout: async (request) => {
       if (request.serverId === undefined) {
         state.balance += request.credits;

@@ -1,6 +1,6 @@
 import { execFile } from "node:child_process";
 import { createReadStream, createWriteStream } from "node:fs";
-import { type FileHandle, mkdir, open, readdir, readlink, writeFile } from "node:fs/promises";
+import { chmod, type FileHandle, mkdir, open, readdir, readlink, writeFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
 import { Transform } from "node:stream";
 import { pipeline } from "node:stream/promises";
@@ -104,12 +104,16 @@ interface ZipEntry {
   compressedBytes: number;
   bytes: number;
   localHeaderOffset: number;
+  unixPermissions: number;
 }
 
 const ZIP_END_MAX_BYTES = 22 + 0xffff;
 const ZIP_UNIX_TYPE_MASK = 0o170000;
 const ZIP_UNIX_REGULAR_FILE = 0o100000;
 const ZIP_UNIX_DIRECTORY = 0o040000;
+const ZIP_UNIX_PERMISSIONS_MASK = 0o777;
+const EXTRACTED_FILE_MAX_MODE = 0o755;
+const EXTRACTED_FILE_OWNER_MODE = 0o600;
 export const extractZipFiles = Effect.fn("ProviderArchive.extractZipFiles")(function* (
   archive: string,
   destination: string,
@@ -209,6 +213,7 @@ const readZipDirectoryEffect = Effect.fn("ProviderArchive.readZipDirectory")(fun
       compressedBytes: directory.readUInt32LE(offset + 20),
       bytes: directory.readUInt32LE(offset + 24),
       localHeaderOffset: directory.readUInt32LE(offset + 42),
+      unixPermissions: madeBy === 3 ? unixMode & ZIP_UNIX_PERMISSIONS_MASK : 0,
     };
     offset += 46 + nameBytes + extraBytes + commentBytes;
     const folder = entry.name.endsWith("/");
@@ -265,6 +270,8 @@ const extractZipEntryEffect = Effect.fn("ProviderArchive.extractZipEntry")(funct
   }
   if (bytes !== entry.bytes || crc >>> 0 !== entry.crc)
     return yield* new ProviderRuntimeFailure({ cause: new Error(sourceText("error.provider.archiveUnreadable")) });
+  if (entry.unixPermissions !== 0 && process.platform !== "win32")
+    yield* runtimeIO(() => chmod(path, (entry.unixPermissions & EXTRACTED_FILE_MAX_MODE) | EXTRACTED_FILE_OWNER_MODE));
 });
 
 const readAtEffect = Effect.fn("ProviderArchive.readAt")(function* (

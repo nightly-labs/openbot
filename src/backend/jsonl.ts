@@ -7,7 +7,7 @@ import { isRpcMessage, type RpcMessage } from "./protocol";
 const MIB = 1024 * 1024;
 const NEWLINE = 0x0a;
 
-const PROVIDER_LINE_LIMIT_BYTES = 256 * MIB;
+export const PROVIDER_LINE_LIMIT_BYTES = 256 * MIB;
 
 export class LineTooLongError extends Error {
   constructor(provider: string) {

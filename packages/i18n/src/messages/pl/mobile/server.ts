@@ -1304,6 +1304,11 @@ export const messages = {
   "mobile.server.providers.pool": "Łącz konta w pulę",
   "mobile.server.providers.poolHint":
     "Agenci używają jednego konta, aż zbliży się do limitu użycia, a potem konta, którego limit odnowi się najwcześniej.",
+  "mobile.server.providers.poolStrategy": "Używanie kont",
+  "mobile.server.providers.poolFillFirst": "Najpierw zapełniaj",
+  "mobile.server.providers.poolSpread": "Rozkładaj",
+  "mobile.server.providers.poolSpreadHint":
+    "Agenci rozkładają się na konta z największym pozostałym użyciem. Agent zmienia konto tylko wtedy, gdy inne konto ma dużo więcej zapasu.",
   "mobile.server.providers.accountsPooledHint":
     "Agenci współdzielą te konta. Nowe konto loguje się na swojej stronie na tym telefonie.",
   "mobile.server.providers.accountsPooledOnComputer":

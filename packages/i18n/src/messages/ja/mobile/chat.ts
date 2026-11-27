@@ -458,7 +458,8 @@ export const messages = {
   "mobile.chat.outbox.failedHold": "未送信です。メッセージを長押しして再試行してください。",
   "mobile.chat.outbox.cancelSend": "送信しない",
   "mobile.chat.outbox.menuHint": "このメッセージのオプションを表示します。",
-  "mobile.chat.outbox.unconfirmed": "未確認です。もう一度送信する前にチャットを確認してください。",
+  "mobile.chat.outbox.unconfirmed":
+    "未確認です。チャットを確認してから、メッセージを長押しして編集またはキャンセルしてください。",
   "mobile.chat.outbox.editFailed": "編集するメッセージを開けませんでした。",
   "mobile.chat.outbox.saveFailed":
     "待機中のメッセージをこのスマートフォンに保存できませんでした。送信されるまでアプリを開いたままにしてください。",

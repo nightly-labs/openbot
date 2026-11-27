@@ -56,6 +56,11 @@ import {
   AppUpdateSpacer,
   useAppUpdateHeader,
 } from "@/features/app-update/components/app-update-header";
+import {
+  OtaUpdateBlock,
+  OtaUpdateSpacer,
+  useOtaUpdateBanner,
+} from "@/features/app-update/components/ota-update-banner";
 import { useAppUpdate } from "@/features/app-update/model/app-update";
 import { ChannelListRow } from "@/features/channels/components/channel-list";
 import { useChannels } from "@/features/channels/components/use-channels";
@@ -534,8 +539,9 @@ export function ConnectedScreen({ variant = "screen" }: { variant?: "screen" | "
   const sceneShows = listReady && showAgentsScene;
   const searchShows = listReady && hasSelectedServer && !onboarding.active && !sceneShows;
   const appUpdate = useAppUpdate();
-  const updateHeader = useAppUpdateHeader(searchShows ? appUpdate : null);
-  useRatingAskGate(!pane && searchShows && !search.open && !updateHeader.shown);
+  const updateHeader = useAppUpdateHeader(searchShows && appUpdate?.kind === "store" ? appUpdate : null);
+  const otaBanner = useOtaUpdateBanner(searchShows && appUpdate?.kind === "ready" ? appUpdate : null);
+  useRatingAskGate(!pane && searchShows && !search.open && !updateHeader.shown && !otaBanner.update);
   const { open: searchOpen, closeSearch } = search;
   useEffect(() => {
     if (!searchShows && searchOpen) closeSearch();
@@ -704,6 +710,7 @@ export function ConnectedScreen({ variant = "screen" }: { variant?: "screen" | "
   const dragScroll = useRef({ offset: 0, content: 0, viewport: 0 });
   const scrollRest = scroll.ownsInset ? 0 : -headerHeight;
   const pinCount = pinnedAgentIds.length + pinnedChannelIds.length;
+  const editableLayout = activeServerOnline ? sidebarLayout : null;
   const dragScreen = useMemo<ChatDragScreen>(
     () => ({
       items,
@@ -712,7 +719,7 @@ export function ConnectedScreen({ variant = "screen" }: { variant?: "screen" | "
         ...pinnedChannels.map((channel) => ({ kind: "channel" as const, id: channel.id })),
       ],
       collapsedSectionIds,
-      sections: sidebarLayout !== null && !mobileChatOrderSortsSections(chatOrder),
+      drops: editableLayout === null ? "none" : mobileChatOrderSortsSections(chatOrder) ? "folders" : "positions",
       canPin: canAddChatPin(pinCount),
       scrollInsets: { top: headerHeight, bottom: insets.bottom + HOME_SEARCH_HEIGHT },
       beginScroll: () => {
@@ -730,14 +737,14 @@ export function ConnectedScreen({ variant = "screen" }: { variant?: "screen" | "
       onDraggingChange: setDragging,
       onDrop: (_dragged, _target, change) => applyChatDrop(workspace(), serverId, change),
       readPins: () => workspace().readChatPins(serverId),
-      layout: () => (mobileChatOrderSortsSections(chatOrder) ? null : sidebarLayout),
+      layout: () => editableLayout,
     }),
     [
       items,
       pinnedAgents,
       pinnedChannels,
       collapsedSectionIds,
-      sidebarLayout,
+      editableLayout,
       chatOrder,
       pinCount,
       headerHeight,
@@ -936,6 +943,7 @@ export function ConnectedScreen({ variant = "screen" }: { variant?: "screen" | "
                   <View onLayout={(event) => layoutStage(event.nativeEvent.layout.height)}>
                     <AgentListRowReveal index={0} reveal={listReveal}>
                       {hasSelectedServer ? <AppUpdateSpacer header={updateHeader} headerHeight={headerHeight} /> : null}
+                      {hasSelectedServer ? <OtaUpdateSpacer banner={otaBanner} /> : null}
                       {sidebar?.error ? (
                         <View className="gap-2 px-4">
                           <Typography.Paragraph className="text-danger-text">
@@ -956,7 +964,7 @@ export function ConnectedScreen({ variant = "screen" }: { variant?: "screen" | "
                     </AgentListRowReveal>
                     <PinnedAgentsGrid
                       agents={pinnedAgents}
-                      animateLayout={!updateHeader.moving}
+                      animateLayout={!updateHeader.moving && !otaBanner.moving}
                       dropZone={dragging && !hasPins}
                       reveal={listReveal}
                       revealOffset={1}
@@ -1053,6 +1061,7 @@ export function ConnectedScreen({ variant = "screen" }: { variant?: "screen" | "
       {onboarding.active ? null : (
         <LargeTitleBar scroll={scroll} blurTarget={barBlurTarget} androidSurfaceOnScroll={homeCard}>
           <AppUpdateBlock header={updateHeader} scroll={scroll} hidden={search.open} />
+          <OtaUpdateBlock banner={otaBanner} scroll={scroll} hidden={search.open} />
         </LargeTitleBar>
       )}
 

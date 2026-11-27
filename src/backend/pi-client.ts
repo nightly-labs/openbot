@@ -1114,11 +1114,13 @@ export class PiAgentClient extends EventEmitter<ClientEvents> implements AgentCl
       this.#observeCacheWrite(thread.id, getRecord(message, "usage"));
       const id = `${turn.id}:message:${turn.messageIndex++}`;
       for (const key of turn.items.keys()) if (key.startsWith(`${id}:`)) turn.items.delete(key);
+      const stop = getString(message, "stopReason");
+      const toolsWillRun = stop !== "error" && stop !== "aborted";
       for (const item of piMessageItems(message, id)) {
         if (item.id) turn.items.set(item.id, item);
+        if (toolsWillRun && item.type === "dynamicToolCall") continue;
         this.#notify("item/completed", thread, { item });
       }
-      const stop = getString(message, "stopReason");
       turn.failure = stop === "error" ? this.#failureText(getString(message, "errorMessage")) : null;
       turn.failureCause = stop === "error" ? piFailureCause(getString(message, "errorMessage")) : null;
       if (stop === "aborted") turn.stopped = true;

@@ -18,6 +18,8 @@ export const messages = {
   "error.billing.licensePaymentFailed":
     "Eklenen kullanıcıların ödemesi başarısız oldu. Ödeme yöntemini güncelleyip tekrar deneyin.",
   "error.billing.licenseUnavailable": "Lisanslar şu anda kullanılamıyor.",
+  "error.billing.mediaContentRefused":
+    "Modelin güvenlik denetimi istemi veya görselleri reddetti. Gerçek kişileri, ünlü karakterleri, markaları, şiddeti ve yetişkin içeriğini sık sık reddeder. Bunları değiştirip yeniden deneyin. Hiç kredi kullanılmadı.",
   "error.billing.licenseOneUser": "Bu lisans 1 kullanıcı içindir. Kullanıcı eklemek için Team'e geçin.",
   "error.billing.licensePlanChange": "Bu lisans o plana geçemez. Lisansı iptal edip yeni planı satın alın.",
   "error.billing.noLicense": "Bu hesabın lisansı yok.",
@@ -26,8 +28,6 @@ export const messages = {
   "error.billing.detailsInvalid": "Ülkeyi ve KDV numarasını kontrol edin. KDV numarası seçilen ülkeye ait olmalıdır.",
   "error.billing.vatIdInvalid":
     "AB KDV sistemi bu KDV numarasını tanımıyor. Numarayı kontrol edin veya KDV numarası olmadan devam edin.",
-  "error.billing.vatIdUnverified":
-    "AB KDV sistemi şu anda KDV numarasını kontrol edemiyor. Daha sonra yeniden deneyin veya KDV numarası olmadan devam edin.",
   "error.billing.vatUnavailable": "Ödeme şu anda kullanılamıyor. Daha sonra yeniden deneyin.",
   "error.billing.invalidRequest": "Faturalandırma isteği geçersiz.",
   "error.billing.invalidResponse": "Faturalandırma yanıtı geçersiz.",

@@ -353,7 +353,10 @@ export interface MobileWorkspaceContextValue {
   respondToBrowserSecret: (serverId: string, input: RespondToBrowserSecretInput) => Promise<void>;
   sidebarByServer: Record<string, { layout: SidebarLayoutSnapshot | null; error: string | null }>;
   mutateSidebarLayout: (serverId: string, action: SidebarLayoutAction) => Promise<void>;
-  moveSidebarChat: (serverId: string, action: Extract<SidebarLayoutAction, { type: "move-agent" }>) => Promise<void>;
+  moveSidebarChat: (
+    serverId: string,
+    action: Extract<SidebarLayoutAction, { type: "move-agent" | "assign" }>,
+  ) => Promise<void>;
   loadQueue: (agentId: string, serverId: string) => Promise<QueueSnapshot>;
   canEditQueue: (serverId: string) => boolean;
   loadAgentUsageLimits: (serverId: string) => Promise<AgentUsageLimits>;

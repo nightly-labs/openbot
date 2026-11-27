@@ -2,7 +2,11 @@ import { randomUUID } from "node:crypto";
 import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
-import type { CreditMediaJobRequest, CreditMediaModel } from "@openbot/contracts/credit-media";
+import type {
+  CreditMediaFailureReason,
+  CreditMediaJobRequest,
+  CreditMediaModel,
+} from "@openbot/contracts/credit-media";
 import {
   isWorkflowMediaCatalogModel,
   type WorkflowMediaKind,
@@ -95,6 +99,7 @@ const MODELS: CreditMediaModel[] = [
 const submits: { request: CreditMediaJobRequest; inputs: readonly CreditMediaUpload[] }[] = [];
 const stored: { name: string; mimeType: string; bytes: number }[] = [];
 let submitFailure: CreditMediaGatewayFailed | null = null;
+let refusal: { reason: CreditMediaFailureReason | null } | null = null;
 let jobLookups = 0;
 
 const gateway: CreditMediaGateway = {
@@ -110,6 +115,17 @@ const gateway: CreditMediaGateway = {
       Effect.map(() => {
         submits.push({ request, inputs });
         const kind = MODELS.find((entry) => entry.id === request.model)?.kind;
+        if (refusal)
+          return {
+            jobId: request.jobId,
+            model: request.model,
+            status: "failed" as const,
+            credits: 0,
+            pollAfterSeconds: 0,
+            outputs: [],
+            failure: "refused" as const,
+            reason: refusal.reason,
+          };
         return {
           jobId: request.jobId,
           model: request.model,
@@ -126,6 +142,7 @@ const gateway: CreditMediaGateway = {
             },
           ],
           failure: null,
+          reason: null,
         };
       }),
     ),
@@ -451,6 +468,23 @@ async function flow() {
       stored.some((file) => file.name === "openbot-video.mp4" && file.mimeType === "video/mp4") &&
       stored.some((file) => file.name === "openbot-image.png" && file.mimeType === "image/png"),
     stored,
+  );
+  const refusedFor = async (reason: CreditMediaFailureReason | null) => {
+    refusal = { reason };
+    try {
+      return (await generate({ kind: "image", model: "image-text", prompt: "A boat", specs: specs(), images: [] }))
+        .failure;
+    } finally {
+      refusal = null;
+    }
+  };
+  const contentRefused = await refusedFor("content_policy");
+  const otherRefused = await refusedFor(null);
+  check(
+    "a job that the model refused for content safety says why; another refused job keeps the general text",
+    contentRefused === sourceText("error.billing.mediaContentRefused") &&
+      otherRefused === sourceText("error.billing.mediaRequestRefused"),
+    { contentRefused, otherRefused },
   );
 }
 

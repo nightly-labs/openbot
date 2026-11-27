@@ -18,6 +18,8 @@ export const messages = {
   "error.billing.licensePaymentFailed":
     "O pagamento dos usuários adicionados falhou. Atualize a forma de pagamento e tente novamente.",
   "error.billing.licenseUnavailable": "As licenças não estão disponíveis agora.",
+  "error.billing.mediaContentRefused":
+    "A verificação de segurança do modelo recusou o prompt ou as imagens. Ela costuma recusar pessoas reais, personagens famosos, marcas, violência e conteúdo adulto. Altere-os e tente de novo. Nenhum crédito foi usado.",
   "error.billing.licenseOneUser": "Esta licença é para 1 usuário. Mude para Team para adicionar usuários.",
   "error.billing.licensePlanChange": "Esta licença não pode mudar para esse plano. Cancele-a e compre o novo plano.",
   "error.billing.noLicense": "Esta conta não tem licença.",
@@ -26,8 +28,6 @@ export const messages = {
   "error.billing.detailsInvalid": "Verifique o país e o número de IVA. O número de IVA deve ser do país escolhido.",
   "error.billing.vatIdInvalid":
     "O sistema de IVA da UE não conhece este número de IVA. Verifique o número ou continue sem número de IVA.",
-  "error.billing.vatIdUnverified":
-    "O sistema de IVA da UE não pode verificar o número de IVA agora. Tente mais tarde ou continue sem número de IVA.",
   "error.billing.vatUnavailable": "O pagamento não está disponível agora. Tente mais tarde.",
   "error.billing.invalidRequest": "A solicitação de cobrança é inválida.",
   "error.billing.invalidResponse": "A resposta de cobrança é inválida.",

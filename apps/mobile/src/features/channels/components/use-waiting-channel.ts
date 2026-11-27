@@ -1,3 +1,4 @@
+import type { Href } from "expo-router";
 import { useCallback, useMemo, useSyncExternalStore } from "react";
 import type { MobileAgentActivity } from "@/features/workspace/model/agent-activity";
 import { useChannelSubscription } from "./use-channels";
@@ -21,4 +22,19 @@ export function useWaitingChannel(
     const [id = "", ...name] = key.split("\n");
     return { id, name: name.join("\n") };
   }, [key]);
+}
+
+export function waitingChannelHref(
+  channelId: string,
+  serverId: string,
+  agentId: string,
+  activity: MobileAgentActivity,
+): Href {
+  return {
+    pathname: "/channel/[channelId]",
+    params:
+      activity.phase === "waiting" && activity.reason === "question"
+        ? { channelId, serverId, questionAgentId: agentId }
+        : { channelId, serverId },
+  };
 }

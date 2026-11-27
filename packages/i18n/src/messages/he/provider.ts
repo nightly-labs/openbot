@@ -263,6 +263,11 @@ export const messages = {
   "provider.account.pool": "איגום חשבונות",
   "provider.account.poolDescription":
     "הסוכנים משתמשים בחשבון אחד עד שהוא מתקרב למגבלת שימוש, ואז בחשבון שהמגבלה שלו מתאפסת ראשונה.",
+  "provider.account.poolStrategy": "שימוש בחשבונות",
+  "provider.account.poolFillFirst": "מילוי ראשון",
+  "provider.account.poolSpread": "פיזור",
+  "provider.account.poolSpreadDescription":
+    "הסוכנים מתפזרים בין החשבונות שנשאר בהם הכי הרבה שימוש. סוכן מחליף חשבון רק כשלחשבון אחר יש הרבה יותר מקום.",
   "provider.account.inUse": "בשימוש",
   "provider.account.notInPool": "מחוץ למאגר",
   "provider.account.leaveOutOfPool": "הוצאה מהמאגר",

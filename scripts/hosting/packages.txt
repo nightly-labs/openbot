@@ -7,6 +7,7 @@ curl
 dbus
 dbus-x11
 gnome-keyring
+iproute2
 libsecret-1-0
 openssl
 x11-utils

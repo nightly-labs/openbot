@@ -459,7 +459,8 @@ export const messages = {
   "mobile.chat.outbox.failedHold": "לא נשלח. יש ללחוץ לחיצה ארוכה על ההודעה כדי לנסות שוב.",
   "mobile.chat.outbox.cancelSend": "לא לשלוח",
   "mobile.chat.outbox.menuHint": "מציג את האפשרויות להודעה הזו.",
-  "mobile.chat.outbox.unconfirmed": "לא אושר. יש לבדוק את הצ'אט לפני שליחה חוזרת.",
+  "mobile.chat.outbox.unconfirmed":
+    "לא אושר. יש לבדוק את הצ'אט, ואז ללחוץ לחיצה ארוכה על ההודעה כדי לערוך או לבטל אותה.",
   "mobile.chat.outbox.editFailed": "לא ניתן לפתוח את ההודעה לעריכה.",
   "mobile.chat.outbox.saveFailed":
     "לא ניתן לשמור הודעות ממתינות בטלפון הזה. יש להשאיר את האפליקציה פתוחה עד שהן יישלחו.",

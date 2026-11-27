@@ -12,7 +12,9 @@ import {
   type MessagingPlatform,
   type ProviderAccountStatus,
   type StoredFileRow,
+  WORKFLOW_ASSET_CLIPS_FORMAT,
   WORKFLOW_NODE_KINDS,
+  type WorkflowFileMediaKind,
   type WorkflowMediaAspect,
   type WorkflowMediaInput,
   type WorkflowMediaKind,
@@ -35,8 +37,13 @@ export interface WorkflowFeatures {
   triggers: readonly WorkflowTriggerType[];
   outputs: readonly WorkflowOutputTarget[];
   uploads: boolean;
+  clips?: boolean | undefined;
   presence: boolean;
   format: number;
+}
+
+export function workflowClipsAllowed(features: WorkflowFeatures | undefined): boolean {
+  return features?.clips === true && features.format >= WORKFLOW_ASSET_CLIPS_FORMAT;
 }
 
 export const WORKFLOW_FEATURES_V1: WorkflowFeatures = {
@@ -122,9 +129,10 @@ export interface WorkflowCatalogs {
   preference?: CreationPreference | null | undefined;
   stepSettings?: ((stepId: string) => Promise<WorkflowStepSettings>) | undefined;
   files: readonly StoredFileRow[];
-  media?: ((attachmentId: string, kind: WorkflowMediaKind) => string | null | undefined) | undefined;
+  media?: ((attachmentId: string, kind: WorkflowFileMediaKind) => string | null | undefined) | undefined;
   mediaPreview?: ((attachmentId: string) => string | null | undefined) | undefined;
   upload?: ((file: File) => Promise<StoredFileRow>) | undefined;
+  previewWhileUploading?: boolean | undefined;
   download?: ((attachmentId: string) => Promise<void>) | undefined;
   self?: string | undefined;
 }

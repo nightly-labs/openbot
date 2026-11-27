@@ -13,6 +13,7 @@ import {
   writeFileSync,
 } from "node:fs";
 import { request as httpRequest } from "node:http";
+import { connect } from "node:net";
 import { homedir, tmpdir } from "node:os";
 import { join, parse, resolve } from "node:path";
 import { isDeepStrictEqual } from "node:util";
@@ -441,6 +442,11 @@ import {
   PROVIDER_ACCOUNT_MODELS_CAPABILITY,
   PROVIDER_ACCOUNT_MODELS_ROUTES,
 } from "@openbot/contracts/team-protocol/provider-account-models-v1";
+import {
+  decodeProviderAccountPoolStrategies,
+  PROVIDER_ACCOUNT_POOL_STRATEGY_CAPABILITY,
+  PROVIDER_ACCOUNT_POOL_STRATEGY_ROUTES,
+} from "@openbot/contracts/team-protocol/provider-account-pool-strategy-v1";
 import {
   PROVIDER_ACCOUNT_POOL_CAPABILITY,
   PROVIDER_ACCOUNT_POOL_ROUTES,
@@ -3365,13 +3371,18 @@ try {
     providerAccounts: new ProviderAccountsHost({
       service: {
         getStatus: accountModelsStatus,
-        setProviderAccountPool: (provider, enabled, leftOut) =>
+        setProviderAccountPool: (provider, enabled, leftOut, strategy) =>
           Effect.sync(() => {
-            record("setProviderAccountPool", { provider, enabled, leftOut });
+            record("setProviderAccountPool", { provider, enabled, leftOut, ...(strategy ? { strategy } : {}) });
             const known = ["default", ULTRA_ACCOUNT, FREE_ACCOUNT];
             const out = leftOut.filter((id) => known.includes(id));
+            const kept = strategy ?? antigravityPool?.strategy;
             antigravityPool = enabled
-              ? { leftOut: out, inUse: known.find((id) => !out.includes(id)) ?? null }
+              ? {
+                  leftOut: out,
+                  inUse: known.find((id) => !out.includes(id)) ?? null,
+                  ...(kept && kept !== "fillFirst" ? { strategy: kept } : {}),
+                }
               : undefined;
             return accountModelsStatus();
           }),
@@ -3575,6 +3586,89 @@ try {
 
   function summary(reply: Reply): ReplySummary {
     return { status: reply.status, body: reply.body ?? reply.text.slice(0, 200) };
+  }
+
+  function rawUpgradeStatusLine(target: string): Promise<string> {
+    return new Promise((resolveLine, rejectLine) => {
+      const socket = connect(port, "127.0.0.1", () => {
+        socket.write(
+          [
+            `GET ${target} HTTP/1.1`,
+            `Host: 127.0.0.1:${port}`,
+            "Connection: Upgrade",
+            "Upgrade: websocket",
+            "Sec-WebSocket-Version: 13",
+            `Sec-WebSocket-Key: ${randomBytes(16).toString("base64")}`,
+            `Sec-WebSocket-Protocol: ${TEAM_PROTOCOL_V1_WEBSOCKET}`,
+            "",
+            "",
+          ].join("\r\n"),
+        );
+      });
+      const deadline = setTimeout(() => {
+        socket.destroy();
+        resolveLine("no answer");
+      }, 5_000);
+      let received = "";
+      socket.on("data", (chunk: Buffer) => {
+        received += chunk.toString("utf8");
+      });
+      socket.on("close", () => {
+        clearTimeout(deadline);
+        resolveLine(received.split("\r\n")[0] ?? "");
+      });
+      socket.on("error", (error) => {
+        clearTimeout(deadline);
+        rejectLine(error);
+      });
+    });
+  }
+
+  function rawPathGet(path: string): Promise<ReplySummary> {
+    return new Promise((resolveCall, rejectCall) => {
+      const request = httpRequest({ host: "127.0.0.1", port, method: "GET", path }, (response) => {
+        const chunks: Buffer[] = [];
+        response.on("data", (chunk: Buffer) => chunks.push(chunk));
+        response.on("end", () => {
+          const text = Buffer.concat(chunks).toString("utf8");
+          resolveCall({ status: response.statusCode ?? 0, body: text ? parseJson(text) : null });
+        });
+      });
+      request.setTimeout(5_000, () => request.destroy(new Error("The host did not answer.")));
+      request.on("error", rejectCall);
+      request.end();
+    });
+  }
+
+  {
+    const uncaught: string[] = [];
+    const recordUncaught = (error: Error) => uncaught.push(error.message);
+    process.on("uncaughtException", recordUncaught);
+    try {
+      const unparsable = await rawUpgradeStatusLine("//[");
+      const afterwards = await rawUpgradeStatusLine(TEAM_API_ROUTES.events);
+      check(
+        "an upgrade with a target that is not a URL gets 400 before the token check, and the next upgrade gets 401",
+        unparsable === "HTTP/1.1 400 Bad Request" &&
+          afterwards === "HTTP/1.1 401 Unauthorized" &&
+          uncaught.length === 0,
+        { unparsable, afterwards, uncaught },
+      );
+      const loggedBefore = logged.length;
+      const plain = await rawPathGet("//[");
+      const compatibility = await call("GET", TEAM_API_ROUTES.compatibility, { protocol: null });
+      check(
+        "a request with a target that is not a URL gets 400 with the request error, writes no error log line, and the host keeps answering",
+        plain.status === 400 &&
+          field(plain.body, "error") === sourceText("error.team.requestFailed") &&
+          logged.slice(loggedBefore).every((line) => !line.includes("Team API request failed")) &&
+          compatibility.status === 200 &&
+          uncaught.length === 0,
+        { plain, compatibility: compatibility.status, uncaught },
+      );
+    } finally {
+      process.off("uncaughtException", recordUncaught);
+    }
   }
 
   {
@@ -5236,6 +5330,109 @@ try {
       "an admin turns the pool off again",
       offAgain.status === 200 && isDeepStrictEqual(cleared.body, { pools: [] }),
       [summary(offAgain), summary(cleared)],
+    );
+  }
+
+  {
+    const route = PROVIDER_ACCOUNT_POOL_STRATEGY_ROUTES;
+    const pool = PROVIDER_ACCOUNT_POOL_ROUTES;
+    const v10 = {
+      capabilities: [PROVIDER_ACCOUNT_POOL_CAPABILITY, PROVIDER_ACCOUNT_POOL_STRATEGY_CAPABILITY],
+      protocol: TEAM_PROTOCOL_V10,
+    };
+    const v9 = { capabilities: [PROVIDER_ACCOUNT_POOL_CAPABILITY], protocol: TEAM_PROTOCOL_V9 };
+    const compatibility = await call("GET", TEAM_API_ROUTES.compatibility, { protocol: TEAM_PROTOCOL_V10 });
+    const older = await call("GET", TEAM_API_ROUTES.compatibility, { protocol: TEAM_PROTOCOL_V9 });
+    check(
+      "the host advertises provider-account-pool-strategy-v1 to a protocol 10 peer only",
+      list(field(compatibility.body, "capabilities")).includes(PROVIDER_ACCOUNT_POOL_STRATEGY_CAPABILITY) &&
+        older.status === 200 &&
+        !list(field(older.body, "capabilities")).includes(PROVIDER_ACCOUNT_POOL_STRATEGY_CAPABILITY),
+      [summary(compatibility), summary(older)],
+    );
+    const unsupported = await call("POST", route.list, { token: adaToken, json: {}, ...v9 });
+    check(
+      "the strategy route without the capability gets 400 providersUnsupported",
+      errorIs(unsupported, 400, sourceText("error.team.providersUnsupported")),
+      summary(unsupported),
+    );
+    const writes = callsOf("setProviderAccountPool").length;
+    const memberRead = await call("POST", route.list, { token: bobToken, json: {}, ...v10 });
+    const memberUpdate = await call("POST", route.update, {
+      token: bobToken,
+      json: { provider: "antigravity", strategy: "spread" },
+      ...v10,
+    });
+    const offUpdate = await call("POST", route.update, {
+      token: adaToken,
+      json: { provider: "antigravity", strategy: "spread" },
+      ...v10,
+    });
+    const offList = await call("POST", route.list, { token: adaToken, json: {}, ...v10 });
+    check(
+      "a member cannot read or change the strategy, and with the pool off an admin change writes nothing",
+      errorIs(memberRead, 403, sourceText("error.team.adminRequired")) &&
+        errorIs(memberUpdate, 403, sourceText("error.team.adminRequired")) &&
+        offUpdate.status === 200 &&
+        isDeepStrictEqual(offList.body, { strategies: [] }) &&
+        callsOf("setProviderAccountPool").length === writes,
+      [summary(memberRead), summary(memberUpdate), summary(offUpdate), summary(offList)],
+    );
+    const badStrategy = await call("POST", route.update, {
+      token: adaToken,
+      json: { provider: "antigravity", strategy: "roundRobin" },
+      ...v10,
+    });
+    check(
+      "a strategy that is not one gets 400, and the host writes nothing",
+      badStrategy.status === 400 && callsOf("setProviderAccountPool").length === writes,
+      summary(badStrategy),
+    );
+    await call("POST", pool.update, {
+      token: adaToken,
+      json: { provider: "antigravity", enabled: true, leftOut: [FREE_ACCOUNT] },
+      ...v10,
+    });
+    const fillFirst = await call("POST", route.list, { token: adaToken, json: {}, ...v10 });
+    const spread = await call("POST", route.update, {
+      token: adaToken,
+      json: { provider: "antigravity", strategy: "spread" },
+      ...v10,
+    });
+    const spreadList = await call("POST", route.list, { token: adaToken, json: {}, ...v10 });
+    const v1List = await call("POST", pool.list, { token: adaToken, json: {}, ...v9 });
+    check(
+      "an admin sets Spread, the host keeps the left-out account, and the v1 pool list keeps its shape",
+      isDeepStrictEqual(fillFirst.body, { strategies: [{ provider: "antigravity", strategy: "fillFirst" }] }) &&
+        spread.status === 200 &&
+        isDeepStrictEqual(callsOf("setProviderAccountPool").at(-1), [
+          { provider: "antigravity", enabled: true, leftOut: [FREE_ACCOUNT], strategy: "spread" },
+        ]) &&
+        isDeepStrictEqual(decodeProviderAccountPoolStrategies(spreadList.body), [
+          { provider: "antigravity", strategy: "spread" },
+        ]) &&
+        isDeepStrictEqual(v1List.body, {
+          pools: [{ provider: "antigravity", leftOut: [FREE_ACCOUNT], inUse: "default" }],
+        }),
+      [summary(fillFirst), summary(spread), summary(spreadList), summary(v1List)],
+    );
+    await call("POST", pool.update, {
+      token: adaToken,
+      json: { provider: "antigravity", enabled: true, leftOut: [] },
+      ...v9,
+    });
+    const keptList = await call("POST", route.list, { token: adaToken, json: {}, ...v10 });
+    await call("POST", pool.update, {
+      token: adaToken,
+      json: { provider: "antigravity", enabled: false, leftOut: [] },
+      ...v9,
+    });
+    const clearedList = await call("POST", route.list, { token: adaToken, json: {}, ...v10 });
+    check(
+      "a v1 pool change from an older client keeps Spread, and turning the pool off drops it",
+      isDeepStrictEqual(keptList.body, { strategies: [{ provider: "antigravity", strategy: "spread" }] }) &&
+        isDeepStrictEqual(clearedList.body, { strategies: [] }),
+      [summary(keptList), summary(clearedList)],
     );
   }
 

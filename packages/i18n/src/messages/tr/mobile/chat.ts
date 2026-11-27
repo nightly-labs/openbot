@@ -460,7 +460,8 @@ export const messages = {
   "mobile.chat.outbox.failedHold": "Gönderilmedi. Tekrar denemek için mesaja basılı tutun.",
   "mobile.chat.outbox.cancelSend": "Gönderme",
   "mobile.chat.outbox.menuHint": "Bu mesajın seçeneklerini gösterir.",
-  "mobile.chat.outbox.unconfirmed": "Onaylanmadı. Tekrar göndermeden önce sohbeti kontrol edin.",
+  "mobile.chat.outbox.unconfirmed":
+    "Onaylanmadı. Sohbeti kontrol edin, ardından düzenlemek veya iptal etmek için mesaja basılı tutun.",
   "mobile.chat.outbox.editFailed": "Mesaj düzenlemek için açılamadı.",
   "mobile.chat.outbox.saveFailed":
     "Bekleyen mesajlar bu telefona kaydedilemedi. Gönderilene kadar uygulamayı açık tutun.",

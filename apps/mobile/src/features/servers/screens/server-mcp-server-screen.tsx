@@ -145,6 +145,14 @@ function McpServerForm({
     !signedIn &&
     (signInsKnown || signInRequested || testAsksSignIn || signingIn);
   const busy = action.isPending || test?.status === "testing" || signingIn;
+  const requestedSignInStarted = useRef(false);
+
+  useEffect(() => {
+    if (requestedSignInStarted.current || !signInRequested || !showSignIn || busy) return;
+    if (!signInsKnown || mcp.signIns.isFetching) return;
+    requestedSignInStarted.current = true;
+    startSignIn();
+  });
 
   useDiscardGuard((dirty || action.isPending) && !leaving, { busy: () => action.isPending, warn: true });
 
@@ -219,6 +227,64 @@ function McpServerForm({
 
   const relayPage = relay.state.phase === "signIn" ? relay.state : null;
 
+  const signInSection = showSignIn ? (
+    <View className="gap-3">
+      {relayPage?.paste && saved ? (
+        <SettingsSection>
+          <SignInSteps
+            steps={[
+              t("mobile.marketplace.app.stepOpen", { name: saved.name }),
+              t("mobile.marketplace.app.stepAllow"),
+              t("mobile.marketplace.app.stepBlank"),
+              t("mobile.marketplace.app.stepCopy"),
+              t("mobile.marketplace.app.stepPaste"),
+            ]}
+          />
+        </SettingsSection>
+      ) : null}
+      <SettingsSection footer={relay.error ?? t("mobile.marketplace.app.signInIntro")}>
+        <SettingsRow
+          disclosure={false}
+          disabled={relayPage ? false : busy}
+          leading={<RowIcon icon={LogIn} tone="accent" />}
+          onPress={relayPage ? relay.reopen : startSignIn}
+        >
+          <Typography.Paragraph className="text-accent">
+            {relayPage
+              ? t("mobile.marketplace.app.openAgain")
+              : signingIn
+                ? t("mobile.marketplace.app.waiting")
+                : t("mobile.server.mcp.signIn")}
+          </Typography.Paragraph>
+        </SettingsRow>
+      </SettingsSection>
+      {relayPage?.paste ? (
+        <View className="gap-3">
+          <SheetFormField
+            label={t("mobile.marketplace.app.pasteLabel")}
+            placeholder={RELAY_PASTE_PLACEHOLDER}
+            value={address}
+            autoCapitalize="none"
+            autoCorrect={false}
+            inputMode="url"
+            onChangeText={setAddress}
+          />
+          <SettingsSection>
+            <SettingsRow
+              disclosure={false}
+              disabled={!address.trim() || relay.pasting}
+              onPress={() => void relay.paste(address)}
+            >
+              <Typography.Paragraph className="text-accent">
+                {t("mobile.marketplace.app.finishSignIn")}
+              </Typography.Paragraph>
+            </SettingsRow>
+          </SettingsSection>
+        </View>
+      ) : null}
+    </View>
+  ) : null;
+
   const locked = action.isPending || signingIn;
   return (
     <SettingsContent>
@@ -230,6 +296,7 @@ function McpServerForm({
         label={saved ? undefined : t("mobile.server.mcp.addConfirm")}
         onSave={save}
       />
+      {signInRequested ? signInSection : null}
       <View className="gap-5">
         <SheetFormField
           label={t("mobile.server.mcp.name")}
@@ -412,63 +479,7 @@ function McpServerForm({
           </Typography.Paragraph>
         </SettingsRow>
       </SettingsSection>
-      {showSignIn ? (
-        <View className="gap-3">
-          {relayPage?.paste && saved ? (
-            <SettingsSection>
-              <SignInSteps
-                steps={[
-                  t("mobile.marketplace.app.stepOpen", { name: saved.name }),
-                  t("mobile.marketplace.app.stepAllow"),
-                  t("mobile.marketplace.app.stepBlank"),
-                  t("mobile.marketplace.app.stepCopy"),
-                  t("mobile.marketplace.app.stepPaste"),
-                ]}
-              />
-            </SettingsSection>
-          ) : null}
-          <SettingsSection footer={relay.error ?? t("mobile.marketplace.app.signInIntro")}>
-            <SettingsRow
-              disclosure={false}
-              disabled={relayPage ? false : busy}
-              leading={<RowIcon icon={LogIn} tone="accent" />}
-              onPress={relayPage ? relay.reopen : startSignIn}
-            >
-              <Typography.Paragraph className="text-accent">
-                {relayPage
-                  ? t("mobile.marketplace.app.openAgain")
-                  : signingIn
-                    ? t("mobile.marketplace.app.waiting")
-                    : t("mobile.server.mcp.signIn")}
-              </Typography.Paragraph>
-            </SettingsRow>
-          </SettingsSection>
-          {relayPage?.paste ? (
-            <View className="gap-3">
-              <SheetFormField
-                label={t("mobile.marketplace.app.pasteLabel")}
-                placeholder={RELAY_PASTE_PLACEHOLDER}
-                value={address}
-                autoCapitalize="none"
-                autoCorrect={false}
-                inputMode="url"
-                onChangeText={setAddress}
-              />
-              <SettingsSection>
-                <SettingsRow
-                  disclosure={false}
-                  disabled={!address.trim() || relay.pasting}
-                  onPress={() => void relay.paste(address)}
-                >
-                  <Typography.Paragraph className="text-accent">
-                    {t("mobile.marketplace.app.finishSignIn")}
-                  </Typography.Paragraph>
-                </SettingsRow>
-              </SettingsSection>
-            </View>
-          ) : null}
-        </View>
-      ) : null}
+      {signInRequested ? null : signInSection}
       {signedIn && saved ? (
         <SettingsSection footer={t("mobile.server.mcp.signedInDescription", { server: mcp.server?.name ?? "" })}>
           <SettingsRow

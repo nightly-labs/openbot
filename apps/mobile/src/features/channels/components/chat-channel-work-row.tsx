@@ -6,6 +6,7 @@ import { useCSSVariable } from "uniwind";
 import type { MobileAgentActivity } from "@/features/workspace/model/agent-activity";
 import { haptics } from "@/shared/lib/haptics";
 import { useText } from "@/shared/lib/text";
+import { waitingChannelHref } from "./use-waiting-channel";
 
 export function ChatChannelWorkRow({
   channel,
@@ -35,13 +36,7 @@ export function ChatChannelWorkRow({
         style={({ pressed }) => ({ borderCurve: "continuous", opacity: pressed ? 0.6 : 1 })}
         onPress={() => {
           void haptics.selection();
-          router.push({
-            pathname: "/channel/[channelId]",
-            params:
-              activity.phase === "waiting" && activity.reason === "question"
-                ? { channelId: channel.id, serverId, questionAgentId: agentId }
-                : { channelId: channel.id, serverId },
-          });
+          router.push(waitingChannelHref(channel.id, serverId, agentId, activity));
         }}
       >
         {activity.phase === "waiting" ? null : <Spinner size="sm" color={String(accent)} />}

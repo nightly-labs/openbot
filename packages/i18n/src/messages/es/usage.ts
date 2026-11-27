@@ -13,11 +13,10 @@ export const messages = {
   "usage.exactCost": "{amount} USD",
   "usage.tokensAmount": "{tokens} tokens",
   "usage.chart.costDescription":
-    "Coste diario estimado en USD por proveedor. Los valores exactos están disponibles en Ver datos diarios.",
+    "Coste estimado en USD por proveedor. Los valores exactos están disponibles en Ver datos diarios.",
   "usage.chart.tokensDescription":
-    "Tokens sin lecturas de caché al día por proveedor. Los valores exactos están disponibles en Ver datos diarios.",
-  "usage.chart.costLabel": "Coste diario estimado en USD por proveedor",
-  "usage.chart.tokensLabel": "Tokens sin lecturas de caché al día por proveedor",
+    "Tokens sin lecturas de caché por proveedor. Los valores exactos están disponibles en Ver datos diarios.",
+  "usage.chart.weekOf": "Semana del {date}",
   "usage.column.cost": "Coste",
   "usage.column.share": "Proporción",
   "usage.column.tokens": "Tokens",
@@ -26,8 +25,6 @@ export const messages = {
   "usage.column.loads": "Cargas",
   "usage.column.agents": "Agentes",
   "usage.empty": "No se registró uso en este período.",
-  "usage.partial":
-    "Datos parciales · {turns} turnos sin datos de uso; {unpriced} registros sin estimación de coste; {incomplete} registros con datos de tokens incompletos.",
   "usage.summary": "Resumen de uso",
   "usage.sessions": {
     one: "{sessions} sesión",
@@ -37,9 +34,12 @@ export const messages = {
   "usage.knownTokens": "Tokens conocidos sin lecturas de caché",
   "usage.provider.shareOfCost": "{share} del coste conocido",
   "usage.provider.shareOfTokens": "{share} de los tokens conocidos",
-  "usage.dailyTrend": "Tendencia diaria",
   "usage.dailyCost": "Coste diario",
   "usage.dailyTokens": "Tokens diarios",
+  "usage.weeklyCost": "Coste semanal",
+  "usage.weeklyTokens": "Tokens semanales",
+  "usage.monthlyCost": "Coste mensual",
+  "usage.monthlyTokens": "Tokens mensuales",
   "usage.viewDailyData": "Ver datos diarios",
   "usage.totals.title": "Totales",
   "usage.totals.tokens": "Tokens sin lecturas de caché",

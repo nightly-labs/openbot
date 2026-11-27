@@ -162,7 +162,7 @@ export type McpSignInOffer = "none" | "offered" | "refused";
 
 export interface McpSignIn {
   readonly provider: OAuthClientProvider;
-  begin: () => Effect.Effect<boolean, McpOperationError>;
+  begin: (lookup?: AuthorizationServerLookup) => Effect.Effect<boolean, McpOperationError>;
   complete: () => Effect.Effect<void, McpOperationError>;
   abandon: () => void;
   secrets: () => string[];
@@ -404,15 +404,16 @@ export class McpOAuth implements McpOAuthAuthority {
     attempts.add(attempt);
     return {
       provider,
-      begin: () =>
+      begin: (lookup) =>
         Effect.gen({ self: this }, function* () {
           const stored = this.#options.storage.read(key);
           if (cancelled || abandoned || (stored?.tokens && stored.neededScope === undefined)) return false;
           const controller = new AbortController();
           const fetchFn = provider.watchRegistration(this.#fetch(key, controller.signal));
+          const serverLookup = stored?.neededScope === undefined ? lookup : "this-server-or-origin";
           return yield* withTimeout(
             Effect.gen(function* () {
-              if (!(yield* namesAuthorizationServer(resource, fetchFn))) return false;
+              if (!(yield* namesAuthorizationServer(resource, fetchFn, serverLookup))) return false;
               return (yield* mcpCall(() => auth(provider, { serverUrl: resource, fetchFn }))) === "REDIRECT";
             }),
             this.#options.refreshTimeoutMs ?? MCP_TOKEN_TIMEOUT_MS,
@@ -1016,7 +1017,7 @@ class McpOAuthClientProvider implements OAuthClientProvider {
       this.#registrationStatus = response.status;
       const redirectRefused = (await registrationErrorCode(response)) === "invalid_redirect_uri";
       this.#redirectRefused = redirectRefused;
-      if (!this.#documentReplacesRefusal(response.status)) return response;
+      if (!this.#documentReplacesRefusal(response.status)) return withoutNullFields(response);
       this.#redirectRefused = false;
       await response.body?.cancel();
       return Response.json(
@@ -1385,7 +1386,23 @@ function mcpOAuthServerUrl(key: string): string {
   return normalizeResource(key) ?? key;
 }
 
-export const namesAuthorizationServer = Effect.fnUntraced(function* (resource: string, fetchFn: FetchLike) {
+export type AuthorizationServerLookup = "this-server" | "this-server-or-origin";
+
+function namesThisServer(metadataResource: string, resource: string): boolean {
+  return (
+    URL.canParse(metadataResource) &&
+    checkResourceAllowed({
+      requestedResource: resourceUrlFromServerUrl(resource),
+      configuredResource: metadataResource,
+    })
+  );
+}
+
+export const namesAuthorizationServer = Effect.fnUntraced(function* (
+  resource: string,
+  fetchFn: FetchLike,
+  lookup: AuthorizationServerLookup = "this-server-or-origin",
+) {
   let metadataStatus: number | null = null;
   const metadataFetch: FetchLike = async (input, init) => {
     metadataStatus = null;
@@ -1402,6 +1419,10 @@ export const namesAuthorizationServer = Effect.fnUntraced(function* (resource: s
       return Effect.fail(new Error(sourceText("error.backend.mcpSignInMetadataUnreadable")));
     }),
   );
+  if (lookup === "this-server")
+    return metadata && namesThisServer(metadata.resource, resource)
+      ? (metadata.authorization_servers?.[0] ?? null)
+      : null;
   if (metadata) return metadata.authorization_servers?.[0] ?? null;
   const origin = String(new URL("/", resource));
   return yield* mcpCall(() => discoverAuthorizationServerMetadata(origin, { fetchFn })).pipe(
@@ -1546,6 +1567,24 @@ async function replacesRedirectAddress(response: Response, sent: RequestInit): P
 async function refusesRedirectAddress(response: Response): Promise<boolean> {
   const error = await registrationErrorCode(response);
   return error === "invalid_redirect_uri" || error === "invalid_client_metadata";
+}
+
+const registrationReplySchema = z.record(z.string(), z.unknown());
+
+async function withoutNullFields(response: Response): Promise<Response> {
+  if (!response.ok) return response;
+  const reply = registrationReplySchema.safeParse(
+    await response
+      .clone()
+      .json()
+      .catch(() => null),
+  );
+  if (!reply.success) return response;
+  const fields = Object.entries(reply.data);
+  const kept = fields.filter(([, value]) => value !== null);
+  if (kept.length === fields.length) return response;
+  await response.body?.cancel();
+  return Response.json(Object.fromEntries(kept), { status: response.status });
 }
 
 async function registrationErrorCode(response: Response): Promise<string | null> {

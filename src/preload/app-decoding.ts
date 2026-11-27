@@ -1,6 +1,7 @@
 import { isAgentTemplateId } from "@openbot/contracts/agent-template-links";
 import { type BillingState, parseBillingState } from "@openbot/contracts/billing";
 import { type BillingDetails, parseBillingDetails } from "@openbot/contracts/billing-details";
+import { type CreditMediaCatalog, parseCreditMediaCatalog } from "@openbot/contracts/credit-media";
 import {
   type CreditActivity,
   type CreditRedeemResult,
@@ -817,6 +818,12 @@ export function decodeCreditActivity(value: unknown): CreditActivity {
   const activity = parseCreditActivity(value);
   if (!activity) throw new Error("Invalid credit activity response.");
   return activity;
+}
+
+export function decodeCreditMediaCatalog(value: unknown): CreditMediaCatalog {
+  const catalog = parseCreditMediaCatalog(value);
+  if (!catalog) throw new Error("Invalid credit media catalog response.");
+  return catalog;
 }
 
 export function decodeLicenseState(value: unknown): LicenseState {

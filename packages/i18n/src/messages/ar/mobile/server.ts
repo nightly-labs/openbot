@@ -1500,6 +1500,11 @@ export const messages = {
   "mobile.server.providers.pool": "تجميع الحسابات",
   "mobile.server.providers.poolHint":
     "يستخدم الوكلاء حسابًا واحدًا حتى يقترب من حد الاستخدام، ثم الحساب الذي يُعاد تعيين حده أولًا.",
+  "mobile.server.providers.poolStrategy": "طريقة الاستخدام",
+  "mobile.server.providers.poolFillFirst": "ملء الأول أولًا",
+  "mobile.server.providers.poolSpread": "توزيع",
+  "mobile.server.providers.poolSpreadHint":
+    "يتوزع الوكلاء على الحسابات التي بقي فيها أكبر قدر من الاستخدام. لا يغيّر الوكيل حسابه إلا عندما يكون لدى حساب آخر مساحة أكبر بكثير.",
   "mobile.server.providers.accountsPooledHint":
     "يتشارك الوكلاء هذه الحسابات. يسجّل الحساب الجديد الدخول في صفحته على هذا الهاتف.",
   "mobile.server.providers.accountsPooledOnComputer": "يتشارك الوكلاء هذه الحسابات. أضف حسابًا في OpenBot على حاسوب.",

@@ -13,6 +13,7 @@ import { CreditsExplainerDialog } from "@openbot/ui/features/credits/CreditsExpl
 import { useText } from "@openbot/ui/text";
 import { createSignal, Show } from "solid-js";
 import { usePlatform } from "../../platform";
+import { useCreditModels } from "../credits/credits-context";
 import { openCreditPrices } from "../servers/credit-prices";
 import { serverRoleCanAdminister } from "../servers/server-capabilities";
 import { appSettingLinkTarget } from "../settings/setting-link-targets";
@@ -45,6 +46,7 @@ function CreditsExplainerChatCard() {
   const { t } = useText();
   const { props } = useConversationViewScope();
   const [open, setOpen] = createSignal(false);
+  const creditModels = useCreditModels();
   return (
     <>
       <SettingLinkCard
@@ -56,6 +58,7 @@ function CreditsExplainerChatCard() {
       <CreditsExplainerDialog
         open={open()}
         onOpenChange={setOpen}
+        models={creditModels()}
         onOpenPrices={() => openCreditPrices(conversationRuntime(props).openUrl)}
       />
     </>

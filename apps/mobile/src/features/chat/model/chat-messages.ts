@@ -50,6 +50,11 @@ export type RoutineMarkerEvent = RoutineConversationEventAction | RoutineRunStat
 
 export type ChatPlanStepState = "pending" | "active" | "done";
 
+interface RoutineQuietAnswer {
+  id: string;
+  body: string;
+}
+
 export type ChatMessage =
   | {
       id: string;
@@ -79,6 +84,7 @@ export type ChatMessage =
       label: MobileTextKey;
       routineId: string;
       routineName: string;
+      quietAnswers?: readonly RoutineQuietAnswer[];
     }
   | {
       id: string;
@@ -204,6 +210,7 @@ const projectedExchanges = new WeakMap<ConversationMessage, ChatMessage>();
 const projectedQuestions = new WeakMap<ConversationMessage, ChatMessage>();
 const projectedMemoryChanges = new WeakMap<ConversationMessage, ChatMessage>();
 const projectedRoutines = new WeakMap<ConversationMessage, ChatMessage>();
+const projectedQuietRoutines = new WeakMap<ConversationMessage, { key: string; item: ChatMessage }>();
 const projectedResets = new WeakMap<ConversationMessage, ChatMessage>();
 const projectedNoAnswers = new WeakMap<ConversationMessage, ChatMessage>();
 const projectedUpdates = new WeakMap<ConversationMessage, ChatMessage>();
@@ -329,17 +336,63 @@ function latestRoutineRunMessages(messages: readonly ConversationMessage[]) {
   return new Set(latest.values());
 }
 
-function projectRoutineMarker(message: ConversationMessage, latestRuns: ReadonlySet<string>): ChatMessage | null {
+function quietAnswersByRun(messages: readonly ConversationMessage[]): ReadonlyMap<string, RoutineQuietAnswer[]> {
+  const runByTurn = new Map<string, string>();
+  const sharedTurns = new Set<string>();
+  for (const message of messages) {
+    if (!message.turnId) continue;
+    const runId = message.routine?.runId;
+    if (runId) {
+      const known = runByTurn.get(message.turnId);
+      if (known !== undefined && known !== runId) sharedTurns.add(message.turnId);
+      runByTurn.set(message.turnId, runId);
+    } else if (
+      message.author === "user" ||
+      (message.senderAgentId !== undefined && message.exchange?.direction !== "outgoing")
+    )
+      sharedTurns.add(message.turnId);
+  }
+  const answers = new Map<string, RoutineQuietAnswer[]>();
+  for (const message of messages) {
+    if (message.itemType !== ROUTINE_QUIET_ANSWER_ITEM_TYPE || !message.turnId || sharedTurns.has(message.turnId))
+      continue;
+    const runId = runByTurn.get(message.turnId);
+    if (!runId || !message.text.trim()) continue;
+    const run = answers.get(runId) ?? [];
+    run.push({ id: message.id, body: message.text });
+    answers.set(runId, run);
+  }
+  return answers;
+}
+
+function quietAnswersKey(answers: readonly RoutineQuietAnswer[]): string {
+  return answers.map(({ id, body }) => `${id}\n${body}`).join("\u0000");
+}
+
+function projectRoutineMarker(
+  message: ConversationMessage,
+  latestRuns: ReadonlySet<string>,
+  quietAnswers: ReadonlyMap<string, RoutineQuietAnswer[]>,
+): ChatMessage | null {
   const marker = routineMarker(message);
   if (!marker || (marker.runId && !latestRuns.has(message.id))) return null;
-  return projectedMarker(projectedRoutines, message, () => ({
+  const answers = marker.runId ? quietAnswers.get(marker.runId) : undefined;
+  const project = (): ChatMessage => ({
     id: `routine:${message.id}`,
     kind: "routine",
     event: marker.event,
     label: marker.label,
     routineId: marker.routineId,
     routineName: marker.routineName,
-  }));
+    ...(answers ? { quietAnswers: answers } : {}),
+  });
+  if (!answers) return projectedMarker(projectedRoutines, message, project);
+  const key = quietAnswersKey(answers);
+  const cached = projectedQuietRoutines.get(message);
+  if (cached?.key === key) return cached.item;
+  const item = project();
+  projectedQuietRoutines.set(message, { key, item });
+  return item;
 }
 const aliasedMessages = new WeakMap<ChatMessage, ChatMessage>();
 
@@ -436,6 +489,7 @@ export function projectChatMessages(
   const thinkingByTurn = new Map<string, Extract<ChatMessage, { kind: "thinking" }>>();
   const sorted = sortedConversationMessages(messages);
   const latestRuns = latestRoutineRunMessages(sorted);
+  const quietAnswers = quietAnswersByRun(sorted);
   const answered = progressUpdates ? answerTimes(sorted) : undefined;
   const shownNotes = turnShownNotes();
   const replacedIds = replacedConversationPlans(
@@ -448,7 +502,7 @@ export function projectChatMessages(
     })),
   );
   for (const message of sorted) {
-    const routine = projectRoutineMarker(message, latestRuns);
+    const routine = projectRoutineMarker(message, latestRuns, quietAnswers);
     if (routine) result.push(routine);
     if (message.routine) continue;
     if (isContextResetMarker(message)) {

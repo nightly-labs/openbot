@@ -142,13 +142,14 @@ export function mobileUnreadItems(
 
 export function moveSidebarChat(
   layout: SidebarLayoutSnapshot,
-  action: Extract<SidebarLayoutAction, { type: "move-agent" }>,
+  action: Extract<SidebarLayoutAction, { type: "move-agent" | "assign" }>,
 ): SidebarLayoutSnapshot {
-  const agentOrder = layout.agentOrder.filter((id) => id !== action.agentId);
-  const index = action.beforeAgentId === null ? -1 : agentOrder.indexOf(action.beforeAgentId);
-  agentOrder.splice(index < 0 ? agentOrder.length : index, 0, action.agentId);
   const agentAssignments = { ...layout.agentAssignments };
   if (action.sectionId === null) delete agentAssignments[action.agentId];
   else agentAssignments[action.agentId] = action.sectionId;
+  if (action.type === "assign") return { ...layout, agentAssignments };
+  const agentOrder = layout.agentOrder.filter((id) => id !== action.agentId);
+  const index = action.beforeAgentId === null ? -1 : agentOrder.indexOf(action.beforeAgentId);
+  agentOrder.splice(index < 0 ? agentOrder.length : index, 0, action.agentId);
   return { ...layout, agentAssignments, agentOrder };
 }

@@ -57,6 +57,8 @@
   --openbot-credit-star: #d0afed;
   --openbot-credit-star-fill: #d0afed;
   --openbot-credit-tile-ink: #1c1524;
+  --openbot-credit-card-light: #ffffff;
+  --openbot-credit-card-ink: #0a0a0a;
   --openbot-price-glow: rgba(180, 200, 255, 0.22);
   --openbot-bg-host-inset: #101216;
   --openbot-bg-notch: #000000;
@@ -141,6 +143,10 @@
   --openbot-chart-series-codex: #d6adf2;
   --openbot-chart-series-claude: var(--openbot-provider-claude);
   --openbot-chart-series-grok: #6bc7d9;
+  --openbot-chart-series-extra-1: #d55181;
+  --openbot-chart-series-extra-2: #199e70;
+  --openbot-chart-series-extra-3: #c98500;
+  --openbot-chart-series-extra-4: #3987e5;
   --openbot-chart-series-other: var(--openbot-text-muted);
 
   --openbot-chart-storage-workspaces: #3987e5;

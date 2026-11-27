@@ -83,6 +83,7 @@ export const messages = {
   "status.agent.nearSummaryBudget": "تغيير الميزانية اليومية للمحفظة إلى {amount} USD.",
   "status.agent.nearSummaryAutoPay":
     "السماح لـ OpenBot بالدفع دون توقيعك عندما تسمح بذلك قاعدة دفع. أما الدفعات الأخرى فتظل تسألك في الدردشة.",
+  "status.agent.nearSummaryManualPay": "لم تعد هناك قواعد دفع. سيطلب OpenBot توقيعك لكل دفعة مرة أخرى.",
   "status.agent.nearSummaryPayment": "الموافقة على دفع {amount} إلى {recipient}.",
   "status.agent.nearSummaryFreeze": "لا يمكن للوكلاء الدفع من هذه المحفظة حتى تستأنف الدفعات.",
   "status.agent.nearSummaryUnfreeze": "يمكن للوكلاء الدفع من هذه المحفظة مرة أخرى، ضمن قواعدك.",

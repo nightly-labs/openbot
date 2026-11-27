@@ -1645,15 +1645,16 @@ export function createMockOpenBot(options: MockOpenBotOptions = {}): MockOpenBot
         changeProviderAccounts(provider, (accounts) => accounts.filter((account) => account.id !== accountId)),
       );
     },
-    setProviderAccountPool: async ({ provider, enabled, leftOut }) => {
+    setProviderAccountPool: async ({ provider, enabled, leftOut, strategy }) => {
       agentStatus = {
         ...agentStatus,
         providers: agentStatus.providers?.map((row) => {
           if (row.id !== provider) return row;
-          const { accountPool: _old, ...rest } = row;
+          const { accountPool: old, ...rest } = row;
           if (!enabled) return rest;
           const inUse = row.accounts?.find((account) => !leftOut.includes(account.id))?.id ?? null;
-          return { ...rest, accountPool: { leftOut: [...leftOut], inUse } };
+          const kept = strategy ?? old?.strategy;
+          return { ...rest, accountPool: { leftOut: [...leftOut], inUse, ...(kept ? { strategy: kept } : {}) } };
         }),
       };
       return clone(agentStatus);
