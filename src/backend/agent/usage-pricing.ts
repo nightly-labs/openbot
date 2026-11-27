@@ -121,6 +121,12 @@ const PRICES: Readonly<Record<string, Price>> = {
     short: { input: 2, cached: 0.1, output: 10 },
     change: { on: "2026-12-01", short: { input: 4, cached: 0.2, output: 20 } },
   },
+  "antigravity:gemini-4-carbon": {
+    source: GEMINI,
+    verified: "2026-11-27",
+    short: { input: 2, cached: 0.1, output: 10 },
+    change: { on: "2026-12-01", short: { input: 4, cached: 0.2, output: 20 } },
+  },
   "antigravity:gemini-4-hydrogen": {
     source: GEMINI,
     verified: "2026-11-18",
