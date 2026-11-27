@@ -46,7 +46,7 @@ function serverEntitlementSourceSql(server: string): string {
          AND (sh.host_id IS NOT NULL OR hs.server_id IS NOT NULL)`;
 }
 
-export function serverEntitlementStatement(database: D1Database, serverId: string): D1PreparedStatement {
+function serverEntitlementStatement(database: D1Database, serverId: string): D1PreparedStatement {
   return database
     .prepare(
       `SELECT s.plan, s.status, s.current_period_end, hs.legacy_member_limits, hs.server_id IS NOT NULL AS hosted
@@ -132,7 +132,7 @@ export interface OwnerLicenseRow {
   current_period_end: number | null;
 }
 
-export function ownerLicenseStatement(database: D1Database, hostId: string): D1PreparedStatement {
+function ownerLicenseStatement(database: D1Database, hostId: string): D1PreparedStatement {
   return database
     .prepare(
       `SELECT l.user_id AS owner_id, l.users, l.status, l.current_period_end FROM remote_hosts h
