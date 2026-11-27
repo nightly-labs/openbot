@@ -36,7 +36,7 @@ import { TELEGRAM_ORCHESTRATOR_AVATAR } from "@openbot/contracts/telegram-app";
 import { WHATSAPP_ORCHESTRATOR_AVATAR } from "@openbot/contracts/whatsapp-app";
 import { sourceText } from "@openbot/i18n/source";
 import { createOpenBotLogger, redactPostText, redactText } from "@openbot/logging";
-import { Deferred, Effect, Exit, Result, Schedule, Schema, Scope } from "effect";
+import { Deferred, Effect, Exit, Result, Schedule, Schema, Scope, Semaphore } from "effect";
 import type { AgentLifecycleFailed } from "../agent-service";
 import { causeHelpers } from "../effect-boundary";
 import type { MessagingOrigin } from "../mailbox-store";
@@ -202,6 +202,7 @@ export class MessagingService {
   readonly #finalFailures = new Map<string, number>();
   readonly #chains = new Map<string, Deferred.Deferred<void>>();
   readonly #recent = new Set<string>();
+  readonly #orchestratorLock = Semaphore.makeUnsafe(1);
   readonly #unsubscribe: Array<() => void> = [];
   readonly #ingress: MessagingIngress | null;
   readonly #connect: SlackConnect | null;
@@ -574,7 +575,18 @@ export class MessagingService {
     platform: MessagingPlatform,
     input: AddMessagingOrchestratorInput,
   ) {
-    if (platform === "whatsapp") return yield* this.#addSharedOrchestrator(platform, input);
+    return yield* this.#orchestratorLock.withPermit(
+      platform === "whatsapp"
+        ? this.#addSharedOrchestrator(platform, input)
+        : this.#addOwnOrchestrator(platform, input),
+    );
+  }, Effect.uninterruptible).bind(this);
+
+  readonly #addOwnOrchestrator = Effect.fn("MessagingService.addOwnOrchestrator")(function* (
+    this: MessagingService,
+    platform: MessagingPlatform,
+    input: AddMessagingOrchestratorInput,
+  ) {
     const record = yield* messagingStep(() => this.#requireConnection(platform, input.workspaceId));
     const current = this.#orchestrator(record) ?? this.#platformOrchestrator(platform);
     if (current) {
@@ -602,7 +614,7 @@ export class MessagingService {
       }),
     );
     return { agentId: agent.id, sectionId };
-  }, Effect.uninterruptible).bind(this);
+  });
 
   readonly #placeInIntegrations = Effect.fn("MessagingService.placeInIntegrations")(function* (
     this: MessagingService,
@@ -843,14 +855,14 @@ export class MessagingService {
     this: MessagingService,
     input: AddTelegramOrchestratorInput,
   ) {
-    return yield* this.#addSharedOrchestrator("telegram", input);
+    return yield* this.#orchestratorLock.withPermit(this.#addSharedOrchestrator("telegram", input));
   }, Effect.uninterruptible).bind(this);
 
   readonly addWhatsAppOrchestrator = Effect.fn("MessagingService.addWhatsAppOrchestrator")(function* (
     this: MessagingService,
     input: AddTelegramOrchestratorInput,
   ) {
-    return yield* this.#addSharedOrchestrator("whatsapp", input);
+    return yield* this.#orchestratorLock.withPermit(this.#addSharedOrchestrator("whatsapp", input));
   }, Effect.uninterruptible).bind(this);
 
   readonly #addSharedOrchestrator = Effect.fn("MessagingService.addSharedOrchestrator")(function* (
