@@ -160,6 +160,8 @@ export const messages = {
   "composer.context.label": "Contexto: {percent} usado",
   "composer.context.labelEstimated": "Contexto: cerca de {percent} usado",
   "composer.context.labelCompacting": "Compactando o contexto",
+  "composer.context.labelUnknown": "Tamanho do contexto ainda desconhecido",
+  "composer.context.unknown": "O tamanho do contexto aparece após a próxima resposta.",
   "composer.context.title": "Contexto",
   "composer.context.percent": "{percent} usado",
   "composer.context.tokens": "{used} de {total} tokens",

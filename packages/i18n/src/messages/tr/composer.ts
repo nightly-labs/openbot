@@ -159,6 +159,8 @@ export const messages = {
   "composer.context.label": "Bağlam {percent} dolu",
   "composer.context.labelEstimated": "Bağlam yaklaşık {percent} dolu",
   "composer.context.labelCompacting": "Bağlam sıkıştırılıyor",
+  "composer.context.labelUnknown": "Bağlam boyutu henüz bilinmiyor",
+  "composer.context.unknown": "Bağlam boyutu bir sonraki yanıttan sonra görünür.",
   "composer.context.title": "Bağlam",
   "composer.context.percent": "{percent} dolu",
   "composer.context.tokens": "{used} / {total} token",

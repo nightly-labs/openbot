@@ -154,6 +154,8 @@ export const messages = {
   "composer.context.label": "ההקשר מלא ב-{percent}",
   "composer.context.labelEstimated": "ההקשר מלא בכ-{percent}",
   "composer.context.labelCompacting": "מכווץ את ההקשר",
+  "composer.context.labelUnknown": "גודל ההקשר עדיין לא ידוע",
+  "composer.context.unknown": "גודל ההקשר יוצג אחרי התשובה הבאה.",
   "composer.context.title": "הקשר",
   "composer.context.percent": "מלא ב-{percent}",
   "composer.context.tokens": "{used} מתוך {total} טוקנים",

@@ -647,6 +647,8 @@ export const messages = {
   "mobile.chat.context.label": "컨텍스트 {percent} 사용",
   "mobile.chat.context.labelEstimated": "컨텍스트 약 {percent} 사용",
   "mobile.chat.context.labelCompacting": "컨텍스트 압축 중",
+  "mobile.chat.context.labelUnknown": "컨텍스트 크기를 아직 알 수 없음",
+  "mobile.chat.context.unknown": "컨텍스트 크기는 다음 답장 후에 표시됩니다.",
   "mobile.chat.context.title": "컨텍스트",
   "mobile.chat.context.percent": "{percent} 사용",
   "mobile.chat.context.tokens": "토큰 {used} / {total}",

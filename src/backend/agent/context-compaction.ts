@@ -4,6 +4,7 @@ import type {
   AgentContextCategoryUsage,
   AgentContextCompactionReason,
   AgentContextState,
+  AgentSummary,
 } from "@openbot/contracts/ipc";
 import { sourceText } from "@openbot/i18n/source";
 import { createOpenBotLogger } from "@openbot/logging";
@@ -87,6 +88,7 @@ export interface ContextCompactionOptions {
   ): Effect.Effect<string | null, ThreadOperationFailed>;
   loadSession(agentId: string, client: AgentClient, threadId: string): Effect.Effect<boolean, ThreadOperationFailed>;
   rotatesSession(agentId: string, threadId: string): boolean;
+  compactionMode?(agent: AgentSummary): AgentClient["contextCompaction"];
   isStopping(): boolean;
   changed?(): void;
   compacted?(threadId: string): void;
@@ -109,6 +111,8 @@ function compactsWhenAsked(client: AgentClient, reason: AgentContextCompactionRe
   return compactsOnRequest(client.contextCompaction) || (reason !== undefined && client.compactsOnDemand === true);
 }
 
+const UNKNOWN_CONTEXT = { usage: null, compaction: null } as const;
+
 interface CompactionHold {
   agentId: string;
   client: AgentClient | null;
@@ -129,6 +133,7 @@ export class ContextCompaction {
   readonly #rotateSession: ContextCompactionOptions["rotateSession"];
   readonly #loadSession: ContextCompactionOptions["loadSession"];
   readonly #rotatesSession: ContextCompactionOptions["rotatesSession"];
+  readonly #compactionMode: (agent: AgentSummary) => AgentClient["contextCompaction"];
   readonly #isStopping: () => boolean;
   readonly #budgets = new Map<string, ThreadContextBudget>();
   readonly #compacting = new Map<string, CompactionHold>();
@@ -165,6 +170,7 @@ export class ContextCompaction {
     this.#rotateSession = options.rotateSession;
     this.#loadSession = options.loadSession;
     this.#rotatesSession = options.rotatesSession;
+    this.#compactionMode = options.compactionMode ?? (() => undefined);
     this.#isStopping = options.isStopping;
     this.#cacheExpiry = new CacheExpiryCompaction({
       usedTokens: (threadId) => this.#display.get(threadId)?.usage?.usedTokens ?? null,
@@ -183,25 +189,43 @@ export class ContextCompaction {
       const session = agent.threadId
         ? this.#store.database.activeProviderSession(agent.threadId, agent.provider)
         : null;
-      const display = session ? this.#display.get(session.externalSessionId) : null;
-      return display && agent.threadId ? [{ agentId: agent.id, threadId: agent.threadId, ...display }] : [];
+      if (!session || !agent.threadId) return [];
+      const display =
+        this.#display.get(session.externalSessionId) ??
+        (this.#compactsMainChatOnRequest(agent, session.externalSessionId) ? UNKNOWN_CONTEXT : null);
+      return display ? [{ agentId: agent.id, threadId: agent.threadId, ...display }] : [];
     });
   }
 
   threadSnapshot(threads: Array<{ id: string; threadId: string }>): AgentContextState[] {
-    if (this.#display.size === 0) return [];
     const agents = new Map(this.#store.list().map((agent) => [agent.id, agent]));
     return threads
       .flatMap(({ id: agentId, threadId }) => {
         const agent = agents.get(agentId);
-        const session = agent ? this.#store.database.activeProviderSession(threadId, agent.provider) : null;
-        const display = session ? this.#display.get(session.externalSessionId) : null;
-        if (!agent || !display) return [];
-        const handoff = this.#providers.clientForAgent(agent)?.contextCompaction === "handoff";
-        const usage = display.usage && handoff ? { ...display.usage, autoCompactAt: null } : display.usage;
+        const offersCompaction = agent !== undefined && this.#compactsTaskOnRequest(agent);
+        if (!agent || (this.#display.size === 0 && !offersCompaction)) return [];
+        const session = this.#store.database.activeProviderSession(threadId, agent.provider);
+        const display = session
+          ? (this.#display.get(session.externalSessionId) ?? (offersCompaction ? UNKNOWN_CONTEXT : null))
+          : null;
+        if (!display) return [];
+        const usage =
+          display.usage && this.#providers.clientForAgent(agent)?.contextCompaction === "handoff"
+            ? { ...display.usage, autoCompactAt: null }
+            : display.usage;
         return [{ agentId, threadId, usage, compaction: display.compaction }];
       })
       .slice(0, INPUT_LIMITS.agents * INPUT_LIMITS.agentTasks);
+  }
+
+  #compactsMainChatOnRequest(agent: AgentSummary, externalThreadId: string): boolean {
+    const mode = this.#compactionMode(agent);
+    return compactsOnRequest(mode) && (mode !== "handoff" || this.#rotatesSession(agent.id, externalThreadId));
+  }
+
+  #compactsTaskOnRequest(agent: AgentSummary): boolean {
+    const mode = this.#compactionMode(agent);
+    return compactsOnRequest(mode) && mode !== "handoff";
   }
 
   observeUsage(

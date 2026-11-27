@@ -32,15 +32,19 @@ export interface ContextUsageView {
   autoCompactAt: number | null;
   nativeManaged?: boolean;
   estimated?: boolean;
+  sizeUnknown?: boolean;
   compacting: boolean;
   lastCompaction?: { beforeTokens: number; afterTokens: number } | undefined;
   categories?: readonly { category: AgentContextCategory; tokens: number }[] | undefined;
 }
 
 export function contextUsageView(state: AgentContextState | undefined): ContextUsageView | undefined {
-  const usage = state?.usage;
-  if (!usage) return undefined;
-  const compaction = state.compaction;
+  if (!state) return undefined;
+  const { usage, compaction } = state;
+  if (!usage)
+    return compaction === null || compaction.status === "running"
+      ? { usedTokens: 0, windowTokens: 0, autoCompactAt: null, sizeUnknown: true, compacting: compaction !== null }
+      : undefined;
   return {
     ...usage,
     compacting: compaction?.status === "running",
@@ -96,7 +100,7 @@ export function ContextUsageMeter(props: {
   const [compaction, setCompaction] = createSignal<
     { phase: "idle" } | { phase: "requesting" } | { phase: "refused"; message: string }
   >({ phase: "idle" });
-  const compact = () => (props.usage.autoCompactAt === null ? undefined : props.compact);
+  const compact = () => (props.usage.sizeUnknown || props.usage.autoCompactAt !== null ? props.compact : undefined);
   const compactError = () => {
     const current = compaction();
     return current.phase === "refused" ? current.message : null;
@@ -137,9 +141,11 @@ export function ContextUsageMeter(props: {
           aria-label={
             props.usage.compacting
               ? t("composer.context.labelCompacting")
-              : t(props.usage.estimated ? "composer.context.labelEstimated" : "composer.context.label", {
-                  percent: percent(),
-                })
+              : props.usage.sizeUnknown
+                ? t("composer.context.labelUnknown")
+                : t(props.usage.estimated ? "composer.context.labelEstimated" : "composer.context.label", {
+                    percent: percent(),
+                  })
           }
         >
           <RadialProgress
@@ -156,58 +162,67 @@ export function ContextUsageMeter(props: {
             <ContentExitMotion panel={() => popover} />
             <header class="context-meter-header">
               <Popover.Title class="context-meter-title">{t("composer.context.title")}</Popover.Title>
-              <span class="context-meter-percent" data-level={level()}>
-                {t("composer.context.percent", { percent: percent() })}
-              </span>
+              <Show when={!props.usage.sizeUnknown}>
+                <span class="context-meter-percent" data-level={level()}>
+                  {t("composer.context.percent", { percent: percent() })}
+                </span>
+              </Show>
             </header>
-            <ContextUsageBar usage={props.usage} />
-            <p class="context-meter-tokens">
-              {t(props.usage.estimated ? "composer.context.tokensEstimated" : "composer.context.tokens", {
-                used: format.compact(props.usage.usedTokens),
-                total: format.compact(props.usage.windowTokens),
-              })}
-            </p>
-            <Show when={categoryRows(props.usage).length > 0}>
-              <ul class="context-meter-categories" aria-label={t("composer.context.breakdown")}>
-                <For each={categoryRows(props.usage)}>
-                  {(row) => (
-                    <li class="context-meter-category" data-category={row.category}>
-                      <span class="context-meter-swatch" aria-hidden="true" />
-                      <span class="context-meter-category-label">{t(CATEGORY_LABEL[row.category])}</span>
-                      <span class="context-meter-category-tokens">{format.compact(row.tokens)}</span>
-                    </li>
+            <Show
+              when={!props.usage.sizeUnknown}
+              fallback={
+                <Popover.Description class="context-meter-note">{t("composer.context.unknown")}</Popover.Description>
+              }
+            >
+              <ContextUsageBar usage={props.usage} />
+              <p class="context-meter-tokens">
+                {t(props.usage.estimated ? "composer.context.tokensEstimated" : "composer.context.tokens", {
+                  used: format.compact(props.usage.usedTokens),
+                  total: format.compact(props.usage.windowTokens),
+                })}
+              </p>
+              <Show when={categoryRows(props.usage).length > 0}>
+                <ul class="context-meter-categories" aria-label={t("composer.context.breakdown")}>
+                  <For each={categoryRows(props.usage)}>
+                    {(row) => (
+                      <li class="context-meter-category" data-category={row.category}>
+                        <span class="context-meter-swatch" aria-hidden="true" />
+                        <span class="context-meter-category-label">{t(CATEGORY_LABEL[row.category])}</span>
+                        <span class="context-meter-category-tokens">{format.compact(row.tokens)}</span>
+                      </li>
+                    )}
+                  </For>
+                  <li class="context-meter-category" data-category="free">
+                    <span class="context-meter-swatch" aria-hidden="true" />
+                    <span class="context-meter-category-label">{t("composer.context.category.free")}</span>
+                    <span class="context-meter-category-tokens">
+                      {format.compact(Math.max(0, props.usage.windowTokens - props.usage.usedTokens))}
+                    </span>
+                  </li>
+                </ul>
+              </Show>
+              <Popover.Description class="context-meter-note">
+                <Show
+                  when={props.usage.autoCompactAt}
+                  fallback={t(props.usage.nativeManaged ? "composer.context.nativeAuto" : "composer.context.noAuto")}
+                >
+                  {(at) => (
+                    <>{t("composer.context.autoAt", { percent: format.percent(at(), { maximumFractionDigits: 0 }) })}</>
                   )}
-                </For>
-                <li class="context-meter-category" data-category="free">
-                  <span class="context-meter-swatch" aria-hidden="true" />
-                  <span class="context-meter-category-label">{t("composer.context.category.free")}</span>
-                  <span class="context-meter-category-tokens">
-                    {format.compact(Math.max(0, props.usage.windowTokens - props.usage.usedTokens))}
-                  </span>
-                </li>
-              </ul>
+                </Show>
+                <Show when={props.usage.lastCompaction}>
+                  {(last) => (
+                    <>
+                      {" "}
+                      {t("composer.context.lastCompaction", {
+                        before: format.compact(last().beforeTokens),
+                        after: format.compact(last().afterTokens),
+                      })}
+                    </>
+                  )}
+                </Show>
+              </Popover.Description>
             </Show>
-            <Popover.Description class="context-meter-note">
-              <Show
-                when={props.usage.autoCompactAt}
-                fallback={t(props.usage.nativeManaged ? "composer.context.nativeAuto" : "composer.context.noAuto")}
-              >
-                {(at) => (
-                  <>{t("composer.context.autoAt", { percent: format.percent(at(), { maximumFractionDigits: 0 }) })}</>
-                )}
-              </Show>
-              <Show when={props.usage.lastCompaction}>
-                {(last) => (
-                  <>
-                    {" "}
-                    {t("composer.context.lastCompaction", {
-                      before: format.compact(last().beforeTokens),
-                      after: format.compact(last().afterTokens),
-                    })}
-                  </>
-                )}
-              </Show>
-            </Popover.Description>
             <Show when={compactError()}>
               {(message) => (
                 <p class="context-meter-note" role="alert">

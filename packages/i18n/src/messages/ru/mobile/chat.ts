@@ -757,6 +757,8 @@ export const messages = {
   "mobile.chat.context.label": "Контекст заполнен на {percent}",
   "mobile.chat.context.labelEstimated": "Контекст заполнен примерно на {percent}",
   "mobile.chat.context.labelCompacting": "Сжатие контекста",
+  "mobile.chat.context.labelUnknown": "Размер контекста пока неизвестен",
+  "mobile.chat.context.unknown": "Размер контекста появится после следующего ответа.",
   "mobile.chat.context.title": "Контекст",
   "mobile.chat.context.percent": "Заполнено на {percent}",
   "mobile.chat.context.tokens": "{used} из {total} токенов",

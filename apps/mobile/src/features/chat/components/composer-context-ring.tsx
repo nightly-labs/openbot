@@ -29,6 +29,7 @@ export interface ComposerContextMeter {
   share: number;
   level: ContextMeterLevel;
   compacting: boolean;
+  sizeUnknown: boolean;
   label: string;
   onPress: () => void;
 }

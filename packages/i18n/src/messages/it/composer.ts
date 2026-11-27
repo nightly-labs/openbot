@@ -160,6 +160,8 @@ export const messages = {
   "composer.context.label": "Contesto pieno al {percent}",
   "composer.context.labelEstimated": "Contesto pieno al {percent} circa",
   "composer.context.labelCompacting": "Compattazione del contesto",
+  "composer.context.labelUnknown": "Dimensione del contesto non ancora nota",
+  "composer.context.unknown": "La dimensione del contesto appare dopo la prossima risposta.",
   "composer.context.title": "Contesto",
   "composer.context.percent": "Pieno al {percent}",
   "composer.context.tokens": "{used} di {total} token",

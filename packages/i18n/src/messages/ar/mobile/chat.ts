@@ -804,6 +804,8 @@ export const messages = {
   "mobile.chat.context.label": "السياق ممتلئ بنسبة {percent}",
   "mobile.chat.context.labelEstimated": "السياق ممتلئ بنسبة {percent} تقريبًا",
   "mobile.chat.context.labelCompacting": "جارٍ ضغط السياق",
+  "mobile.chat.context.labelUnknown": "حجم السياق غير معروف بعد",
+  "mobile.chat.context.unknown": "يظهر حجم السياق بعد الرد التالي.",
   "mobile.chat.context.title": "السياق",
   "mobile.chat.context.percent": "ممتلئ بنسبة {percent}",
   "mobile.chat.context.tokens": "{used} من {total} رمز",

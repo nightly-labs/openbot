@@ -640,6 +640,8 @@ export const messages = {
   "mobile.chat.context.label": "Context {percent} vol",
   "mobile.chat.context.labelEstimated": "Context ongeveer {percent} vol",
   "mobile.chat.context.labelCompacting": "Context comprimeren",
+  "mobile.chat.context.labelUnknown": "Contextgrootte nog onbekend",
+  "mobile.chat.context.unknown": "De contextgrootte verschijnt na het volgende antwoord.",
   "mobile.chat.context.title": "Context",
   "mobile.chat.context.percent": "{percent} vol",
   "mobile.chat.context.tokens": "{used} van {total} tokens",

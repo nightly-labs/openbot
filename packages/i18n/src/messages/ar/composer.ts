@@ -157,6 +157,8 @@ export const messages = {
   "composer.context.label": "السياق ممتلئ بنسبة {percent}",
   "composer.context.labelEstimated": "السياق ممتلئ بنسبة {percent} تقريبًا",
   "composer.context.labelCompacting": "جارٍ ضغط السياق",
+  "composer.context.labelUnknown": "حجم السياق غير معروف بعد",
+  "composer.context.unknown": "يظهر حجم السياق بعد الرد التالي.",
   "composer.context.title": "السياق",
   "composer.context.percent": "ممتلئ بنسبة {percent}",
   "composer.context.tokens": "{used} من {total} رمز",

@@ -666,6 +666,8 @@ export const messages = {
   "mobile.chat.context.label": "Contexto lleno al {percent}",
   "mobile.chat.context.labelEstimated": "Contexto lleno aproximadamente al {percent}",
   "mobile.chat.context.labelCompacting": "Compactando el contexto",
+  "mobile.chat.context.labelUnknown": "Tamaño del contexto aún desconocido",
+  "mobile.chat.context.unknown": "El tamaño del contexto aparece después de la próxima respuesta.",
   "mobile.chat.context.title": "Contexto",
   "mobile.chat.context.percent": "Lleno al {percent}",
   "mobile.chat.context.tokens": "{used} de {total} tokens",

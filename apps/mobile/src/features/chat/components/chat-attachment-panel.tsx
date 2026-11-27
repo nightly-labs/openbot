@@ -193,7 +193,9 @@ export function ChatAttachmentPanel({
     Math.min(cameraWidth, startInset + safeWidth - anchor.barStart - OPTIONS_EDGE_GAP),
   );
   const contextValue =
-    context && !context.compacting ? format.percent(context.share, { maximumFractionDigits: 0 }) : undefined;
+    context && !context.compacting && !context.sizeUnknown
+      ? format.percent(context.share, { maximumFractionDigits: 0 })
+      : undefined;
   const labels = {
     useSkill: t("mobile.chat.attachment.useSkill"),
     files: t("mobile.chat.attachment.files"),

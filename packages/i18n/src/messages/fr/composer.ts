@@ -164,6 +164,8 @@ export const messages = {
   "composer.context.label": "Contexte rempli à {percent}",
   "composer.context.labelEstimated": "Contexte rempli à environ {percent}",
   "composer.context.labelCompacting": "Compactage du contexte",
+  "composer.context.labelUnknown": "Taille du contexte encore inconnue",
+  "composer.context.unknown": "La taille du contexte s'affiche après la prochaine réponse.",
   "composer.context.title": "Contexte",
   "composer.context.percent": "Rempli à {percent}",
   "composer.context.tokens": "{used} jetons sur {total}",
