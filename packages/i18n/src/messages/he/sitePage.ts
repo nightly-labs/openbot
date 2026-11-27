@@ -375,7 +375,7 @@ export const messages = {
     "כן, לשימוש אישי ולשימוש לא מסחרי אחר. OpenBot עולה $0, בלי תכונות נעולות. משלמים רק לספק ה-AI, דרך התוכנית או מפתח ה-API שכבר יש לכם. שימוש מסחרי דורש רישיון.",
   "sitePage.landing.faq.source.question": "האם קוד המקור של OpenBot פתוח?",
   "sitePage.landing.faq.source.answer":
-    "כן. כל קוד המקור פתוח ב-GitHub, כך שאפשר לבדוק מה OpenBot עושה. אפשר לשנות ולהריץ אותו בחינם לשימוש לא מסחרי, כמו פרויקטים אישיים, לימודים או מחקר. שימוש מסחרי דורש רישיון נפרד. הרישיון הוא PolyForm Noncommercial 1.0.0. זה אינו רישיון קוד פתוח שאושר על ידי OSI.",
+    "כן. כל קוד המקור פתוח ב-GitHub, כך שאפשר לבדוק מה OpenBot עושה. אפשר לשנות ולהריץ אותו בחינם לשימוש לא מסחרי, כמו פרויקטים אישיים, לימודים או מחקר. שימוש מסחרי דורש רישיון נפרד. הרישיון הוא PolyForm Noncommercial 1.0.0.",
   "sitePage.landing.faq.source.link": "קוד המקור ב-GitHub",
   "sitePage.landing.faq.plans.question": "אפשר להשתמש בתוכנית ChatGPT או Claude שלי?",
   "sitePage.landing.faq.plans.answer":

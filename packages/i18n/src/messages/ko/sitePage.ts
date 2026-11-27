@@ -378,7 +378,7 @@ export const messages = {
     "네, 개인 사용과 그 밖의 비상업적 사용은 무료예요. OpenBot은 $0이고 잠긴 기능도 없어요. 이미 가진 요금제나 API 키를 통해 AI 제공자에게만 비용을 내면 돼요. 상업적으로 사용하려면 라이선스가 필요해요.",
   "sitePage.landing.faq.source.question": "OpenBot의 소스 코드는 공개되어 있나요?",
   "sitePage.landing.faq.source.answer":
-    "네. 모든 소스 코드가 GitHub에 공개되어 있어서 OpenBot이 무엇을 하는지 직접 확인할 수 있어요. 개인 프로젝트, 학습, 연구 같은 비상업적 용도라면 무료로 수정하고 실행할 수 있어요. 상업적으로 사용하려면 별도 라이선스가 필요해요. 라이선스는 PolyForm Noncommercial 1.0.0이에요. OSI가 승인한 오픈 소스 라이선스는 아니에요.",
+    "네. 모든 소스 코드가 GitHub에 공개되어 있어서 OpenBot이 무엇을 하는지 직접 확인할 수 있어요. 개인 프로젝트, 학습, 연구 같은 비상업적 용도라면 무료로 수정하고 실행할 수 있어요. 상업적으로 사용하려면 별도 라이선스가 필요해요. 라이선스는 PolyForm Noncommercial 1.0.0이에요.",
   "sitePage.landing.faq.source.link": "GitHub에서 소스 코드 보기",
   "sitePage.landing.faq.plans.question": "ChatGPT나 Claude 요금제를 쓸 수 있나요?",
   "sitePage.landing.faq.plans.answer":

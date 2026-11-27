@@ -8,4 +8,3 @@
 - Plugin page titles now say "MCP Server and Connector", so search results match what people look for.
 - Content pages on api.openbot.run (guides, news, compare, providers, plugins and marketplace) now redirect to the same page on openbot.run. The API on api.openbot.run does not change.
 - The pages "Best AI Agent Apps" and "Codex vs Claude Code" have the new Artificial Analysis Coding Agent Index 2.1 scores and the current plans and prices of Claude, ChatGPT, Cursor and Grok Bot. The Devin pages now say that a personal ChatGPT plan can pay for Devin's GPT models on Pro, Max and Teams.
-- The home page answer to "Is OpenBot's source code open?" now also says that PolyForm Noncommercial is not an OSI-approved open source license, as the new guide says.

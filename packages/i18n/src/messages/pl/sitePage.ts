@@ -384,7 +384,7 @@ export const messages = {
     "Tak, do użytku osobistego i innego niekomercyjnego. OpenBot kosztuje 0 USD, bez zablokowanych funkcji. Płacisz tylko dostawcy AI, przez plan lub klucz API, który już masz. Użycie komercyjne wymaga licencji.",
   "sitePage.landing.faq.source.question": "Czy kod źródłowy OpenBot jest otwarty?",
   "sitePage.landing.faq.source.answer":
-    "Tak. Cały kod źródłowy jest otwarty na GitHubie, więc możesz sprawdzić, co robi OpenBot. Możesz go zmieniać i uruchamiać za darmo do użytku niekomercyjnego, na przykład w projektach osobistych, nauce lub badaniach. Użycie komercyjne wymaga osobnej licencji. Licencja to PolyForm Noncommercial 1.0.0. Nie jest to licencja open source zatwierdzona przez OSI.",
+    "Tak. Cały kod źródłowy jest otwarty na GitHubie, więc możesz sprawdzić, co robi OpenBot. Możesz go zmieniać i uruchamiać za darmo do użytku niekomercyjnego, na przykład w projektach osobistych, nauce lub badaniach. Użycie komercyjne wymaga osobnej licencji. Licencja to PolyForm Noncommercial 1.0.0.",
   "sitePage.landing.faq.source.link": "Zobacz kod źródłowy na GitHubie",
   "sitePage.landing.faq.plans.question": "Czy mogę użyć planu ChatGPT lub Claude?",
   "sitePage.landing.faq.plans.answer":

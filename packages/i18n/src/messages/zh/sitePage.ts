@@ -365,7 +365,7 @@ export const messages = {
     "是的，个人使用及其他非商业用途免费。OpenBot 售价 $0，没有任何锁定功能。你只需通过已有的套餐或 API 密钥向 AI 服务商付费。商业用途需要许可证。",
   "sitePage.landing.faq.source.question": "OpenBot 的源代码开放吗？",
   "sitePage.landing.faq.source.answer":
-    "是的。全部源代码都在 GitHub 上公开，你可以查看 OpenBot 究竟做了什么。在非商业用途下，例如个人项目、学习或研究，你可以免费修改和运行它。商业用途需要单独的许可证。许可证为 PolyForm Noncommercial 1.0.0。它不是 OSI 认可的开源许可证。",
+    "是的。全部源代码都在 GitHub 上公开，你可以查看 OpenBot 究竟做了什么。在非商业用途下，例如个人项目、学习或研究，你可以免费修改和运行它。商业用途需要单独的许可证。许可证为 PolyForm Noncommercial 1.0.0。",
   "sitePage.landing.faq.source.link": "在 GitHub 上查看源代码",
   "sitePage.landing.faq.plans.question": "我可以使用自己的 ChatGPT 或 Claude 套餐吗？",
   "sitePage.landing.faq.plans.answer":

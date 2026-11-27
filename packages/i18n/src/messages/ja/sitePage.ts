@@ -386,7 +386,7 @@ export const messages = {
     "はい。個人利用やその他の非商用利用なら無料です。OpenBot は $0 で、機能の制限もありません。支払うのは、すでにお持ちのプランまたは API キーを通じた AI プロバイダーへの料金だけです。商用利用にはライセンスが必要です。",
   "sitePage.landing.faq.source.question": "OpenBot のソースコードは公開されていますか?",
   "sitePage.landing.faq.source.answer":
-    "はい。ソースコードはすべて GitHub で公開されているので、OpenBot が何をしているか確認できます。個人のプロジェクト、学習、研究などの非商用利用なら、無料で変更して実行できます。商用利用には別途ライセンスが必要です。ライセンスは PolyForm Noncommercial 1.0.0 です。これは OSI 承認のオープンソースライセンスではありません。",
+    "はい。ソースコードはすべて GitHub で公開されているので、OpenBot が何をしているか確認できます。個人のプロジェクト、学習、研究などの非商用利用なら、無料で変更して実行できます。商用利用には別途ライセンスが必要です。ライセンスは PolyForm Noncommercial 1.0.0 です。",
   "sitePage.landing.faq.source.link": "GitHub でソースコードを見る",
   "sitePage.landing.faq.plans.question": "ChatGPT や Claude のプランを使えますか?",
   "sitePage.landing.faq.plans.answer":

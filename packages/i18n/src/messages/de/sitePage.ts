@@ -393,7 +393,7 @@ export const messages = {
     "Ja, für die private und andere nichtkommerzielle Nutzung. OpenBot kostet 0 $, ohne gesperrte Funktionen. Du bezahlst nur deinen KI-Anbieter, über das Abo oder den API-Schlüssel, den du schon hast. Für die kommerzielle Nutzung brauchst du eine Lizenz.",
   "sitePage.landing.faq.source.question": "Ist der Quellcode von OpenBot offen?",
   "sitePage.landing.faq.source.answer":
-    "Ja. Der gesamte Quellcode ist auf GitHub offen, du kannst also prüfen, was OpenBot tut. Für nichtkommerzielle Zwecke wie private Projekte, Studium oder Forschung kannst du ihn kostenlos ändern und ausführen. Für die kommerzielle Nutzung brauchst du eine eigene Lizenz. Die Lizenz ist PolyForm Noncommercial 1.0.0. Sie ist keine von der OSI anerkannte Open-Source-Lizenz.",
+    "Ja. Der gesamte Quellcode ist auf GitHub offen, du kannst also prüfen, was OpenBot tut. Für nichtkommerzielle Zwecke wie private Projekte, Studium oder Forschung kannst du ihn kostenlos ändern und ausführen. Für die kommerzielle Nutzung brauchst du eine eigene Lizenz. Die Lizenz ist PolyForm Noncommercial 1.0.0.",
   "sitePage.landing.faq.source.link": "Quellcode auf GitHub ansehen",
   "sitePage.landing.faq.plans.question": "Kann ich mein ChatGPT- oder Claude-Abo nutzen?",
   "sitePage.landing.faq.plans.answer":

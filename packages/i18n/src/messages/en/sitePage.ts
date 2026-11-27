@@ -402,7 +402,7 @@ export const messages = defineMessages("sitePage", {
     "Yes, for personal and other noncommercial use. OpenBot costs $0, with no locked features. You pay only your AI provider, through the plan or API key you already have. Commercial use needs a license.",
   "sitePage.landing.faq.source.question": "Is OpenBot's source code open?",
   "sitePage.landing.faq.source.answer":
-    "Yes. All of the source code is open on GitHub, so you can check what OpenBot does. You can change and run it for free for noncommercial use, such as personal projects, study or research. Commercial use needs a separate license. The license is PolyForm Noncommercial 1.0.0. It is not an OSI-approved open source license.",
+    "Yes. All of the source code is open on GitHub, so you can check what OpenBot does. You can change and run it for free for noncommercial use, such as personal projects, study or research. Commercial use needs a separate license. The license is PolyForm Noncommercial 1.0.0.",
   "sitePage.landing.faq.source.link": "See the source code on GitHub",
   "sitePage.landing.faq.plans.question": "Can I use my ChatGPT or Claude plan?",
   "sitePage.landing.faq.plans.answer":
