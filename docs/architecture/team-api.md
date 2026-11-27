@@ -516,6 +516,14 @@ reload or a reconnect, and the agent waited (#13486). `src/main/team-api/route-p
 leaves out the questions of a hidden or missing agent and of an agent that the member cannot see.
 The phone draws a question card from the chat messages, so it does not read this list.
 
+A runtime snapshot and this list cut the text of each question to 240 characters and each option
+description to 120 (`compactRuntimeQuestion`). The `prompt` event and the saved chat message keep the
+whole text. The desktop and the web client keep the whole text of a shown question when a snapshot
+comes (`keepWholePrompts` and `withWholePromptText` in `packages/team-client/src/runtime-attention.ts`),
+and the card takes its text from the saved chat message of the same turn and request. A text replaces
+the cut one only when it starts with it. Before, a long question card stopped in the middle of a word
+(#17555). `scripts/question-card-full-text-e2e.ts` checks it with a stand-in Claude CLI.
+
 The optional `phone-feedback-v1` capability (protocol 9 only) adds
 `POST /v1/agent-approvals/send-phone-feedback` (`requestId`, `phone`). `phone` is what only the phone
 has: `platform` (`iOS` or `Android`), `appVersion`, `system`, `network` (the kind of connection and

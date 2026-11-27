@@ -14,13 +14,15 @@ export function ConversationQuestionPrompt(props: {
 }) {
   const { props: view, openExternalMessageUrl, keepUnsentPromptAnswer } = useConversationViewScope();
   let cachedPrompt: { key: string; prompt: NonNullable<ConversationProps["prompt"]> } | null = null;
+  const promptKey = (prompt: NonNullable<ConversationProps["prompt"]>) =>
+    JSON.stringify([prompt.turnId, String(prompt.requestId)]);
   const keyedPrompt = createMemo(() => {
     const prompt = view.prompt;
     if (!prompt) {
       cachedPrompt = null;
       return null;
     }
-    const key = JSON.stringify([prompt.turnId, String(prompt.requestId)]);
+    const key = promptKey(prompt);
     if (cachedPrompt?.key === key) return cachedPrompt;
     cachedPrompt = { key, prompt };
     return cachedPrompt;
@@ -31,6 +33,10 @@ export function ConversationQuestionPrompt(props: {
   return (
     <Show when={keyedPrompt()} keyed>
       {(entry) => {
+        const shownQuestions = () => {
+          const latest = view.prompt;
+          return latest && promptKey(latest) === entry.key ? latest.questions : entry.prompt.questions;
+        };
         const presentResolution = () =>
           view.onPromptResolutionPresented?.(entry.prompt.agentId, entry.prompt.turnId, entry.prompt.requestId);
         return (
@@ -39,7 +45,7 @@ export function ConversationQuestionPrompt(props: {
               when={pendingPromptBlock()}
               fallback={
                 <QuestionPromptBubble
-                  questions={entry.prompt.questions}
+                  questions={shownQuestions()}
                   elementRef={(element) => props.elementRef?.(element)}
                   registerComposerAnswer={props.registerComposerAnswer}
                   sendShortcut={deviceSendShortcut(view.platform)}
