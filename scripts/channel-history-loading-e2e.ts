@@ -53,7 +53,8 @@ try {
   await page.evaluate(() => localStorage.removeItem("openbot:selected-channel:v1"));
   await page.reload();
   await agent.click({ timeout: TIMEOUT_MS });
-  await page.getByRole("main").getByRole("status").first().waitFor({ state: "hidden", timeout: TIMEOUT_MS });
+  await conversation.getByRole("heading", { level: 1, name: /^Research / }).waitFor({ timeout: TIMEOUT_MS });
+  await conversation.getByRole("article").first().waitFor({ timeout: TIMEOUT_MS });
   await channel.click({ timeout: TIMEOUT_MS });
   report.firstOpenShowsLoading = await loading.isVisible();
   mkdirSync(OUT, { recursive: true });
