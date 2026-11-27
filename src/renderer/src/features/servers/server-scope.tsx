@@ -443,12 +443,16 @@ const ServerScope = createSimpleContext({
       }),
     );
 
+    let wasReady = false;
+    let readyServerId: ReturnType<typeof activeServerId> | undefined;
     createEffect(
       () => ({ ready: bootstrapReady() && serversLoaded() && transportReady(), id: activeServerId() }),
-      ({ ready }) => {
+      ({ ready, id }) => {
         if (!ready) loadGeneration += 1;
         recovery.setActive(ready);
-        if (ready) recovery.resetBackoff();
+        if (ready && (!wasReady || id !== readyServerId)) recovery.resetBackoff();
+        wasReady = ready;
+        readyServerId = id;
       },
     );
 
