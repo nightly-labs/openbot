@@ -1,0 +1,6 @@
+{
+  "platforms": ["android"],
+  "android": {
+    "modules": ["run.openbot.mobile.chatbubble.ChatBubbleModule"]
+  }
+}

@@ -50,6 +50,7 @@
       "./plugins/with-android-main-handler-first",
       "./plugins/with-android-view-preallocation-off",
       "./plugins/with-android-optional-features",
+      "./plugins/with-chat-bubble",
       "expo-router",
       "expo-video",
       [

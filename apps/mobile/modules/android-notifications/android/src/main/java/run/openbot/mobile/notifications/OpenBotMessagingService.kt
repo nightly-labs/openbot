@@ -9,6 +9,7 @@ import expo.modules.notifications.notifications.model.NotificationRequest
 import expo.modules.notifications.notifications.triggers.ChannelAwareTrigger
 import expo.modules.notifications.service.ExpoFirebaseMessagingService
 import expo.modules.notifications.service.NotificationsService
+import run.openbot.mobile.chatbubble.ChatBubbleNotification
 import java.util.Date
 import java.util.UUID
 
@@ -38,6 +39,21 @@ class OpenBotMessagingService : ExpoFirebaseMessagingService() {
     // The agent picture is the large icon. Without one, the notification shows as before.
     val avatar = opened?.let { NotificationAvatars.file(this, it.serverId, it.agentId) }
     val shown = if (avatar == null) base else AgentNotificationContent(base, avatar.path)
+    // A bubble replaces the notification of an agent that the user gave a bubble.
+    if (
+      opened != null &&
+      ChatBubbleNotification.post(
+        this,
+        opened.serverId,
+        opened.agentId,
+        opened.title,
+        opened.body,
+        opened.serverName,
+        avatar?.let { NotificationAvatars.decode(it.path) },
+      )
+    ) {
+      return
+    }
     val request = NotificationRequest(identifier, shown, ChannelAwareTrigger(channelId(sound)))
     val sent = remoteMessage.sentTime
     NotificationsService.receive(this, Notification(request, if (sent > 0) Date(sent) else Date()))
