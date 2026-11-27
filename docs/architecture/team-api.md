@@ -65,7 +65,9 @@ read, which replaces a dead connection. A connection on a TURN relay restarts IC
 and 9 minutes after it found the relay, to find a direct path; these restarts stop while 3 or fewer
 of the 10 restarts are left. A failed attempt is retried after 0.5, 1.2, 2.7 and 4.8 s, each with
 up to 20 % more, then the recovery waits 15 s before the next 5 attempts (`REMOTE_RETRY_DELAYS_MS`,
-`REMOTE_RETRY_COOLDOWN_MS`). A new connection to a known host opens its Signal socket while the ticket request runs,
+`REMOTE_RETRY_COOLDOWN_MS`). Each next wait is two times longer, up to 5 minutes
+(`REMOTE_RETRY_COOLDOWN_MAX_MS`). A connection, a refresh, a return to the app and a network change
+start the waits again at 15 s. A new connection to a known host opens its Signal socket while the ticket request runs,
 and, with ICE servers less than 30 minutes old, gathers candidates before `ready`; its first offer
 holds the candidates gathered so far. A server that was
 Online when the app left keeps its Online look during the first attempt after the return, for up to

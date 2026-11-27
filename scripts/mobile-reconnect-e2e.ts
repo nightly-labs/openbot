@@ -5,6 +5,7 @@ import { createOpenBotLogger } from "@openbot/logging";
 import type { NetworkChange } from "../apps/mobile/src/shared/lib/network-change";
 import {
   createRemoteConnectionRecovery,
+  REMOTE_RETRY_COOLDOWN_MAX_MS,
   REMOTE_RETRY_COOLDOWN_MS,
   REMOTE_RETRY_DELAYS_MS,
   REMOTE_RETRY_LIMIT,
@@ -75,6 +76,38 @@ async function cooldownAfterLimit() {
   const reachedAfterMs = performance.now() - startedAt;
   recovery.dispose();
   return { status, attempts, reachedAfterMs };
+}
+
+async function growingCooldown() {
+  const firstOfCycle = new Map<number, ReturnType<typeof settled<RemoteRecoveryStatus>>>();
+  const cycle = (attempts: number) => {
+    const waiter = firstOfCycle.get(attempts) ?? settled<RemoteRecoveryStatus>();
+    firstOfCycle.set(attempts, waiter);
+    return waiter;
+  };
+  let attempts = 0;
+  const recovery = createRemoteConnectionRecovery(
+    async () => {
+      attempts += 1;
+      throw new Error("The host did not answer.");
+    },
+    () => {},
+    (status) => {
+      if (status.phase === "cooldown") cycle(attempts).resolve(status);
+    },
+  );
+  recovery.setActive(true);
+  const first = await cycle(REMOTE_RETRY_LIMIT).promise;
+  const second = await cycle(REMOTE_RETRY_LIMIT * 2).promise;
+  recovery.refresh();
+  const afterRefresh = await cycle(REMOTE_RETRY_LIMIT * 3).promise;
+  recovery.dispose();
+  return {
+    attempts,
+    firstSeconds: first.remainingSeconds,
+    secondSeconds: second.remainingSeconds,
+    afterRefreshSeconds: afterRefresh.remainingSeconds,
+  };
 }
 
 interface NativeNetworkState {
@@ -265,6 +298,20 @@ async function run() {
     { remainingSeconds: cooldown.status.remainingSeconds, reachedAfterMs: Math.round(cooldown.reachedAfterMs) },
   );
 
+  const growing = await growingCooldown();
+  const doubled = (REMOTE_RETRY_COOLDOWN_MS * 2) / 1000;
+  check(
+    `the second cooldown is about ${doubled} s`,
+    growing.secondSeconds >= doubled && growing.secondSeconds <= Math.ceil(doubled * (1 + JITTER)),
+    growing,
+  );
+  check(
+    `a refresh starts the cooldown again at ${REMOTE_RETRY_COOLDOWN_MS / 1000} s`,
+    growing.afterRefreshSeconds >= REMOTE_RETRY_COOLDOWN_MS / 1000 &&
+      growing.afterRefreshSeconds <= Math.ceil((REMOTE_RETRY_COOLDOWN_MS * (1 + JITTER)) / 1000),
+    growing,
+  );
+
   const network = await networkScenarios();
   for (const scenario of network) {
     const changes = scenario.events.map((event) => event.change);
@@ -290,6 +337,8 @@ async function run() {
     status: passed ? "passed" : "failed",
     retryDelaysMs: REMOTE_RETRY_DELAYS_MS,
     cooldownMs: REMOTE_RETRY_COOLDOWN_MS,
+    cooldownMaxMs: REMOTE_RETRY_COOLDOWN_MAX_MS,
+    growing,
     recovery: {
       attemptsAtMs: recovery.attempts.map(Math.round),
       gapsMs: gaps.map(Math.round),

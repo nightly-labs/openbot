@@ -198,7 +198,7 @@ export function canRetryConnection(error: unknown): boolean {
   return !(error instanceof HostConnectionError) || error.problem === "unavailable";
 }
 
-function isRefusedSession(error: unknown): boolean {
+export function isRefusedSession(error: unknown): boolean {
   return error instanceof RemoteDirectoryError && (error.status === 401 || error.status === 403);
 }
 
