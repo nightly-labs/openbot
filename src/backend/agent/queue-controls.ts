@@ -343,6 +343,7 @@ export class QueueControls {
               liveVoice: this.#hooks.liveVoiceRelayed(input.deliveryId),
               fromChrome: this.#hooks.fromChrome(input.deliveryId),
               steerFramedAsUser: providerForAgent(agent) === "claude",
+              steered: true,
               steersQuietTurn,
             }),
           ],
