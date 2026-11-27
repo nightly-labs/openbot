@@ -2657,6 +2657,15 @@ export class ChannelService {
       return taskReads.get(id) ?? undefined;
     };
     const history = new Map<string, ChannelMessage | null>();
+    if (turnId === undefined) {
+      const ids = snapshot.messages
+        .filter(channelCandidate)
+        .flatMap((message) =>
+          message.itemType === "commentary" ? [message.id, `${message.id}${CHANNEL_RESULT_NOTE_SUFFIX}`] : [message.id],
+        );
+      for (const id of ids) history.set(id, null);
+      for (const message of this.store.messagesById(channelId, ids)) history.set(message.id, message);
+    }
     const existing = (id: string): ChannelMessage | undefined => {
       if (!history.has(id)) history.set(id, this.store.message(channelId, id));
       return history.get(id) ?? undefined;
@@ -2671,14 +2680,7 @@ export class ChannelService {
     for (let message of turnId === undefined
       ? snapshot.messages
       : snapshot.messages.filter((item) => item.turnId === turnId)) {
-      if (
-        message.author !== "assistant" &&
-        !message.questionPrompt &&
-        !(message.attachments?.length && message.author !== "user") &&
-        !mcpSignInEvent(message) &&
-        !settingLinkEvent(message)
-      )
-        continue;
+      if (!channelCandidate(message)) continue;
       const lateId = message.turnId === undefined ? undefined : this.#lateTurns.get(message.turnId);
       const late =
         lateId === undefined
@@ -4045,6 +4047,16 @@ function terminal(task: ChannelTask): boolean {
   return task.state === "completed" || task.state === "cancelled";
 }
 const ACTIVE_ASSIGNMENT_STATES: readonly ChannelAssignment["state"][] = ["starting", "running", "queued"];
+function channelCandidate(message: ConversationMessage): boolean {
+  return (
+    message.author === "assistant" ||
+    Boolean(message.questionPrompt) ||
+    Boolean(message.attachments?.length && message.author !== "user") ||
+    mcpSignInEvent(message) !== null ||
+    settingLinkEvent(message) !== null
+  );
+}
+
 function activeAssignment(assignment: ChannelAssignment): boolean {
   return ACTIVE_ASSIGNMENT_STATES.includes(assignment.state);
 }
