@@ -453,3 +453,32 @@ Troubleshooting:
 
 - Connect shows "The server answered 401": the token is wrong or was deleted. Create a
   new token and connect again.
+
+## Faste
+
+The listing connects to Faste's remote MCP server at `https://api.faste.dev/mcp`
+(<https://faste.dev/docs>). It answers 401 with a `Bearer` challenge and publishes
+protected-resource metadata that names `https://api.faste.dev`. That authorization server
+has dynamic client registration (`POST /oauth/register`) with PKCE (`S256`) and the `code`
+response type, and accepts loopback redirects including `http://127.0.0.1:28417/mcp-auth`
+(checked 2026-11-26).
+
+During browser sign-in, the user authorizes a Faste API key (`sk_live_*`). Every issued OAuth
+access token and rotating refresh token inherits that key's scopes (such as omitting
+`billing:write`), model allowlist, per-job credit cap, daily spend cap, and expiration.
+Revoking the source API key immediately invalidates all derived OAuth sessions.
+
+Generations spend prepaid integer credits (`1 Credit = Rp 100`). Credits are reserved
+atomically when `generate_media` accepts a job and refunded automatically if generation fails.
+Uploaded inputs on `obj.faste.dev` expire after 24 hours and generated outputs expire after
+30 days.
+
+Troubleshooting:
+
+- `insufficient_credits`: top up prepaid credits (or ask the account owner to top up if the
+  authorized key omits the `billing:write` scope).
+- `key_policy_violation`: the requested model or estimated cost exceeds the authorized key's
+  allowlist, per-job cap, or daily spend cap.
+- `invalid_parameters`: call `get_model_schema` first; model inputs use strict JSON Schema
+  validation.
+

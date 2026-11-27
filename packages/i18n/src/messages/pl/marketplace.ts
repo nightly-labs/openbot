@@ -323,6 +323,17 @@ export const messages = {
   "marketplace.plugin.sunra.prompt.poster": "Zrób w Sunra plakat nocnego targu w deszczu, w formacie pionowym.",
   "marketplace.plugin.sunra.prompt.clip":
     "Zrób w Sunra 5-sekundowe wideo papierowej łódki na rzece. Najpierw podaj mi koszt.",
+  "marketplace.plugin.faste.tagline": "Generowanie obrazów i wideo AI",
+  "marketplace.plugin.faste.description":
+    "Faste pozwala agentom generować, edytować i skalować obrazy oraz wideo AI przy użyciu wyselekcjonowanych modeli, szacować koszt kredytów z wyprzedzeniem, sprawdzać saldo i limity klucza oraz śledzić asynchroniczne zadania renderowania z linkami CDN. Każdy użytkownik autoryzuje własne konto Faste w przeglądarce. Kredyty są rezerwowane atomowo dla każdego zadania i automatycznie zwracane w razie niepowodzenia.",
+  "marketplace.plugin.faste.app":
+    "Generowanie obrazów i wideo AI, szacowanie kosztu kredytów, sprawdzanie salda i śledzenie zadań przez serwer MCP Faste z logowaniem w przeglądarce.",
+  "marketplace.plugin.faste.prompt.balance":
+    "Sprawdź moje saldo kredytów Faste i wypisz modele obrazów oraz wideo dostępne dla mojego klucza.",
+  "marketplace.plugin.faste.prompt.estimate":
+    "Oszacuj koszt kredytów w Faste dla wygenerowania 5-sekundowego wideo produktowego przed jego uruchomieniem.",
+  "marketplace.plugin.faste.prompt.generate":
+    "Wygeneruj w Faste minimalistyczne studyjne zdjęcie produktowe ekspresu do kawy i udostępnij link do wyniku.",
   "marketplace.plugin.elevenlabs.tagline": "Mowa, głosy i agenci głosowi",
   "marketplace.plugin.elevenlabs.description":
     "ElevenLabs pozwala agentom zamieniać tekst na mowę, pracować z głosami oraz tworzyć, testować i przeglądać agentów głosowych ElevenLabs i ich rozmowy. Wygenerowane audio wraca jako krótko ważny link do pobrania. Każdy użytkownik loguje się do własnego konta ElevenLabs w przeglądarce, a każde generowanie zużywa kredyty tego konta.",

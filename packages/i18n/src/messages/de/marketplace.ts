@@ -322,6 +322,17 @@ export const messages = {
     "Erstelle mit Sunra ein Poster von einem Nachtmarkt im Regen, im Hochformat.",
   "marketplace.plugin.sunra.prompt.clip":
     "Erstelle mit Sunra ein 5-Sekunden-Video von einem Papierboot auf einem Fluss. Nenne mir zuerst die Kosten.",
+  "marketplace.plugin.faste.tagline": "KI-Bild- und Videogenerierung",
+  "marketplace.plugin.faste.description":
+    "Faste lässt Agenten KI-Bilder und -Videos über kuratierte Modelle erzeugen, bearbeiten und hochskalieren, Credit-Kosten vorab schätzen, Guthaben und Schlüssel-Limits prüfen sowie asynchrone Render-Jobs mit CDN-Links verfolgen. Jeder Nutzer autorisiert sein eigenes Faste-Konto im Browser. Credits werden pro Job atomar reserviert und bei einem Fehler automatisch erstattet.",
+  "marketplace.plugin.faste.app":
+    "KI-Bild- und Videogenerierung, Kostenschätzung, Guthabenprüfung und Job-Tracking über den MCP-Server von Faste mit Anmeldung im Browser.",
+  "marketplace.plugin.faste.prompt.balance":
+    "Prüfe mein Faste-Credit-Guthaben und liste die Bild- und Videomodelle auf, die für meinen Schlüssel verfügbar sind.",
+  "marketplace.plugin.faste.prompt.estimate":
+    "Schätze die Faste-Credit-Kosten für ein 5-Sekunden-Produktvideo, bevor du es startest.",
+  "marketplace.plugin.faste.prompt.generate":
+    "Erstelle mit Faste ein minimalistisches Studio-Produktfoto einer Espressomaschine und teile den Ausgabelink.",
   "marketplace.plugin.elevenlabs.tagline": "Sprache, Stimmen und Sprachagenten",
   "marketplace.plugin.elevenlabs.description":
     "Mit ElevenLabs wandeln Agenten Text in Sprache um, arbeiten mit Stimmen und erstellen, testen und prüfen ElevenLabs-Sprachagenten und ihre Gespräche. Erzeugtes Audio kommt als kurzlebiger Download-Link zurück. Jeder Benutzer meldet sich im Browser bei seinem eigenen ElevenLabs-Konto an, und jede Erzeugung verbraucht Credits dieses Kontos.",

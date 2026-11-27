@@ -273,6 +273,15 @@ export const messages = {
   "marketplace.plugin.sunra.prompt.balance": "我还有多少 Sunra 积分？",
   "marketplace.plugin.sunra.prompt.poster": "用 Sunra 生成一张雨中夜市的竖版海报。",
   "marketplace.plugin.sunra.prompt.clip": "用 Sunra 生成一段 5 秒的纸船在河上漂流的视频。先告诉我费用。",
+  "marketplace.plugin.faste.tagline": "AI 图像与视频生成",
+  "marketplace.plugin.faste.description":
+    "Faste 可让代理通过精选模型生成、编辑和超分 AI 图像与视频，提前估算积分费用，检查余额与密钥限额，并跟踪带 CDN 链接的异步渲染任务。每位用户通过浏览器授权自己的 Faste 账户。积分按任务原子预留，生成失败时自动退还。",
+  "marketplace.plugin.faste.app":
+    "通过支持浏览器登录的 Faste MCP 服务器进行 AI 图像与视频生成、积分费用估算、余额查询与任务跟踪。",
+  "marketplace.plugin.faste.prompt.balance": "检查我的 Faste 积分余额，并列出我的密钥可用的图像和视频模型。",
+  "marketplace.plugin.faste.prompt.estimate": "在运行前估算使用 Faste 生成一段 5 秒产品视频所需的积分费用。",
+  "marketplace.plugin.faste.prompt.generate":
+    "使用 Faste 生成一张极简摄影棚风格的意式浓缩咖啡机产品照，并分享输出链接。",
   "marketplace.plugin.elevenlabs.tagline": "语音、声音和语音智能体",
   "marketplace.plugin.elevenlabs.description":
     "ElevenLabs 让智能体把文本转成语音、使用各种声音，并创建、测试和查看 ElevenLabs 语音智能体及其对话。生成的音频以短时有效的下载链接返回。每位用户在浏览器中登录自己的 ElevenLabs 账号，每次生成都会使用该账号的额度。",

@@ -289,6 +289,17 @@ export const messages = {
   "marketplace.plugin.sunra.prompt.balance": "Sunra 크레딧이 얼마나 남았어?",
   "marketplace.plugin.sunra.prompt.poster": "Sunra로 비 오는 야시장 포스터를 세로 형식으로 만들어 줘.",
   "marketplace.plugin.sunra.prompt.clip": "Sunra로 강 위에 떠 있는 종이배의 5초 동영상을 만들어 줘. 비용부터 알려 줘.",
+  "marketplace.plugin.faste.tagline": "AI 이미지 및 동영상 생성",
+  "marketplace.plugin.faste.description":
+    "Faste를 사용하면 에이전트가 엄선된 모델로 AI 이미지와 동영상을 생성·편집·업스케일하고, 크레딧 비용을 사전에 추정하며, 잔액과 키 제한을 확인하고, CDN 링크와 함께 비동기 렌더링 작업을 추적할 수 있습니다. 각 사용자는 브라우저에서 자신의 Faste 계정을 승인합니다. 크레딧은 작업마다 원자적으로 예약되며 생성이 실패하면 자동으로 환불됩니다.",
+  "marketplace.plugin.faste.app":
+    "브라우저 로그인을 사용하는 Faste MCP 서버를 통해 AI 이미지·동영상 생성, 크레딧 비용 추정, 잔액 확인 및 작업 추적을 제공합니다.",
+  "marketplace.plugin.faste.prompt.balance":
+    "내 Faste 크레딧 잔액을 확인하고 내 키에서 사용할 수 있는 이미지 및 동영상 모델 목록을 보여줘.",
+  "marketplace.plugin.faste.prompt.estimate":
+    "실행하기 전에 Faste로 5초짜리 제품 동영상을 생성하는 크레딧 비용을 추정해줘.",
+  "marketplace.plugin.faste.prompt.generate":
+    "Faste로 미니멀한 스튜디오 스타일의 에스프레소 머신 제품 사진을 생성하고 결과 링크를 공유해줘.",
   "marketplace.plugin.elevenlabs.tagline": "음성, 보이스, 음성 에이전트",
   "marketplace.plugin.elevenlabs.description":
     "ElevenLabs로 에이전트가 텍스트를 음성으로 바꾸고, 보이스를 다루고, ElevenLabs 음성 에이전트와 그 대화를 만들고 테스트하고 검토할 수 있습니다. 생성된 오디오는 잠시만 유효한 다운로드 링크로 돌아옵니다. 각 사용자는 브라우저에서 자신의 ElevenLabs 계정에 로그인하며, 생성할 때마다 그 계정의 크레딧을 사용합니다.",

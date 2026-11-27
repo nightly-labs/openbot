@@ -319,6 +319,17 @@ export const messages = {
   "marketplace.plugin.sunra.prompt.poster": "Sunra ile yağmurda bir gece pazarının dikey formatta posterini yap.",
   "marketplace.plugin.sunra.prompt.clip":
     "Sunra ile nehirdeki kâğıt bir teknenin 5 saniyelik videosunu yap. Önce maliyetini söyle.",
+  "marketplace.plugin.faste.tagline": "Yapay zekâ görsel ve video üretimi",
+  "marketplace.plugin.faste.description":
+    "Faste, ajanların seçkin modellerle yapay zekâ görsel ve videoları üretmesine, düzenlemesine ve ölçeklemesine, kredi maliyetlerini önceden tahmin etmesine, bakiye ve anahtar sınırlarını kontrol etmesine ve CDN bağlantılarıyla eşzamansız işleme görevlerini takip etmesine olanak tanır. Her kullanıcı tarayıcı üzerinden kendi Faste hesabını yetkilendirir. Krediler iş başına atomik olarak ayrılır ve üretim başarısız olursa otomatik olarak iade edilir.",
+  "marketplace.plugin.faste.app":
+    "Tarayıcı oturumu ile Faste MCP sunucusu üzerinden yapay zekâ görsel ve video üretimi, kredi maliyet tahmini, bakiye kontrolü ve görev takibi.",
+  "marketplace.plugin.faste.prompt.balance":
+    "Faste kredi bakiyemi kontrol et ve anahtarımda kullanılabilir görsel ile video modellerini listele.",
+  "marketplace.plugin.faste.prompt.estimate":
+    "Çalıştırmadan önce Faste ile 5 saniyelik bir ürün videosu üretmenin kredi maliyetini tahmin et.",
+  "marketplace.plugin.faste.prompt.generate":
+    "Faste ile minimalist stüdyo tarzında bir espresso makinesi ürün fotoğrafı üret ve çıktı bağlantısını paylaş.",
   "marketplace.plugin.elevenlabs.tagline": "Konuşma, sesler ve sesli ajanlar",
   "marketplace.plugin.elevenlabs.description":
     "ElevenLabs, ajanların metni konuşmaya çevirmesini, seslerle çalışmasını ve ElevenLabs sesli ajanlarını ve konuşmalarını oluşturmasını, test etmesini ve incelemesini sağlar. Üretilen ses kısa ömürlü bir indirme bağlantısı olarak gelir. Her kullanıcı tarayıcıda kendi ElevenLabs hesabına giriş yapar ve her üretim o hesabın kredilerini kullanır.",

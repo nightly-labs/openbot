@@ -310,6 +310,16 @@ export const messages = {
   "marketplace.plugin.sunra.prompt.balance": "כמה קרדיטים של Sunra יש לי?",
   "marketplace.plugin.sunra.prompt.poster": "צור ב-Sunra פוסטר של שוק לילה בגשם, בפורמט לאורך.",
   "marketplace.plugin.sunra.prompt.clip": "צור ב-Sunra סרטון של 5 שניות של סירת נייר על נהר. תגיד לי קודם כמה זה עולה.",
+  "marketplace.plugin.faste.tagline": "יצירת תמונות וסרטונים בבינה מלאכותית",
+  "marketplace.plugin.faste.description":
+    "Faste מאפשר לסוכנים ליצור, לערוך ולשדרג רזולוציה של תמונות וסרטוני בינה מלאכותית באמצעות מודלים נבחרים, להעריך עלות קרדיטים מראש, לבדוק יתרה ומגבלות מפתח ולעקוב אחר עבודות רינדור אסינכרוניות עם קישורי CDN. כל משתמש מאשר את חשבון ה-Faste שלו בדפדפן. הקרדיטים נשמרים אטומית לכל עבודה ומוחזרים אוטומטית אם היצירה נכשלת.",
+  "marketplace.plugin.faste.app":
+    "יצירת תמונות וסרטונים בבינה מלאכותית, הערכת עלות קרדיטים, בדיקת יתרה ומעקב עבודות דרך שרת ה-MCP של Faste עם התחברות בדפדפן.",
+  "marketplace.plugin.faste.prompt.balance":
+    "בדוק את יתרת הקרדיטים שלי ב-Faste והצג את מודלי התמונות והווידאו הזמינים למפתח שלי.",
+  "marketplace.plugin.faste.prompt.estimate": "הערך את עלות הקרדיטים ב-Faste ליצירת סרטון מוצר בן 5 שניות לפני ההרצה.",
+  "marketplace.plugin.faste.prompt.generate":
+    "צור עם Faste תמונת סטודיו מינימליסטית של מכונת אספרסו ושתף את קישור הפלט.",
   "marketplace.plugin.elevenlabs.tagline": "דיבור, קולות וסוכני קול",
   "marketplace.plugin.elevenlabs.description":
     "ElevenLabs מאפשר לסוכנים להפוך טקסט לדיבור, לעבוד עם קולות וליצור, לבדוק ולסקור סוכני קול של ElevenLabs ואת השיחות שלהם. האודיו שנוצר חוזר כקישור הורדה לזמן קצר. כל משתמש מתחבר לחשבון ElevenLabs שלו דרך הדפדפן, וכל יצירה משתמשת בקרדיטים של החשבון הזה.",
