@@ -1486,10 +1486,16 @@ export class ClaudeAgentClient extends EventEmitter<ClientEvents> {
     for (;;) {
       yield* this.#threads.opened(threadId);
       const current = this.#threads.get(threadId);
-      if (current && threadConfigKey(current.config, true) === threadConfigKey(config, true)) return;
+      if (current && threadConfigKey(current.config, true) === threadConfigKey(config, true)) {
+        current.config.writeAreas = config.writeAreas;
+        return;
+      }
       if (current) {
         if (current.activeTurn) return yield* providerFailure(new Error(sourceText("error.provider.claudeTurnActive")));
-        if (threadConfigKey(current.config, false) === threadConfigKey(config, false)) return;
+        if (threadConfigKey(current.config, false) === threadConfigKey(config, false)) {
+          current.config.writeAreas = config.writeAreas;
+          return;
+        }
         queryLogger.info("Restarting a Claude query.", {
           reason: "configuration-change",
           count: ++this.#queryRestarts,
@@ -1722,7 +1728,7 @@ export class ClaudeAgentClient extends EventEmitter<ClientEvents> {
                   config.cwd,
                   config.additionalDirectories,
                   config.excludedFolders,
-                  config.writeAreas,
+                  () => config.writeAreas,
                 ),
                 managedSettings: CLAUDE_WORKSPACE_MANAGED_SETTINGS,
               }
@@ -1824,6 +1830,8 @@ export class ClaudeAgentClient extends EventEmitter<ClientEvents> {
     const runtime = yield* providerSync(() => this.#requireThread(threadId));
     if (runtime.activeTurn) return yield* providerFailure(this.#turnActiveError(runtime.activeTurn));
     runtime.contextRequest += 1;
+    const writeAreas = readWriteAreas(params);
+    if (writeAreas) runtime.config.writeAreas = writeAreas;
 
     const requestedModel = getString(params, "model");
     const modelChanged = Boolean(requestedModel && requestedModel !== runtime.config.model);
@@ -3633,10 +3641,7 @@ function readThreadConfig(params: unknown): ThreadConfig {
       isRecord(params) && Array.isArray(params.excludedFolders)
         ? params.excludedFolders.filter((value): value is string => isString(value))
         : [],
-    writeAreas:
-      isRecord(params) && Array.isArray(params.writeAreas)
-        ? params.writeAreas.filter((value): value is string => isString(value))
-        : [],
+    writeAreas: readWriteAreas(params) ?? [],
     excludedInstructionFiles:
       isRecord(params) && Array.isArray(params.excludedInstructionFiles)
         ? params.excludedInstructionFiles.filter((value): value is string => isString(value))
@@ -3645,7 +3650,13 @@ function readThreadConfig(params: unknown): ThreadConfig {
   };
 }
 
-function threadConfigKey(config: ThreadConfig, withModel: boolean): string {
+function readWriteAreas(params: unknown): string[] | null {
+  return isRecord(params) && Array.isArray(params.writeAreas)
+    ? params.writeAreas.filter((value): value is string => isString(value))
+    : null;
+}
+
+function threadConfigKey({ writeAreas: _, ...config }: ThreadConfig, withModel: boolean): string {
   const fields = {
     ...config,
     model: withModel ? (config.model ?? null) : null,

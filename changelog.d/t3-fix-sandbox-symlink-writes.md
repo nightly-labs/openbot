@@ -4,4 +4,4 @@
 
 ### Security
 
-- A Workspace only Claude agent no longer writes through a symbolic link that an agent can change. When a folder that you gave to the agent becomes a link inside a folder where agents can write, the file edit tool now asks for your approval, and shell commands cannot write there. Before, the file edit tool wrote to the target of the link without a question.
+- A Workspace only Claude agent no longer writes through a symbolic link that another Workspace only agent can change. When a folder that you gave to the agent becomes a link inside a folder where such an agent can write, the file edit tool now asks for your approval, also in a chat that started before. Shell commands in a new chat cannot write through the link. Before, the file edit tool wrote to the target of the link without a question.

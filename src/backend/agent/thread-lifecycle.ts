@@ -886,7 +886,7 @@ export class ThreadLifecycle {
           ...CODEX_DIRECT_ONLY_NAMESPACES,
           ...codexDirectMcpNamespaces(servers),
         ],
-        ...(yield* codexSandboxConfig(agent, this.#store.sharedRoot, this.#writeAreas())),
+        ...(yield* codexSandboxConfig(agent, this.#store.sharedRoot, this.writeAreas())),
         ...Object.fromEntries(
           Object.entries(environment).map(([name, value]) => [`shell_environment_policy.set.${name}`, value]),
         ),
@@ -1070,11 +1070,16 @@ export class ThreadLifecycle {
     return {
       workspaceOnly: true,
       ...(excluded.length ? { excludedFolders: excluded } : {}),
-      writeAreas: this.#writeAreas(),
+      writeAreas: this.writeAreas(),
     };
   }
 
-  #writeAreas(): string[] {
+  writeAreasParam(agent: AgentSummary, client: AgentClient): { writeAreas?: string[] } {
+    const { writeAreas } = this.#workspaceOnlyParam(agent, client);
+    return writeAreas ? { writeAreas } : {};
+  }
+
+  writeAreas(): string[] {
     return agentWriteAreas(this.#store.list(), this.#store.sharedRoot);
   }
 

@@ -101,7 +101,7 @@ export function claudeWorkspaceHooks(
   cwd: string,
   roots: readonly string[],
   excluded: readonly string[] = [],
-  writeAreas: readonly string[] = [],
+  writeAreas: () => readonly string[] = () => [],
 ): NonNullable<Options["hooks"]> {
   const matcher: HookCallbackMatcher = {
     matcher: WRITE_TOOLS.join("|"),
@@ -118,7 +118,7 @@ export function claudeWorkspaceHooks(
             },
           };
         const target = await runCauseEffect(
-          claudeWriteOutsideRoots(input.tool_name, input.tool_input, cwd, roots, writeAreas),
+          claudeWriteOutsideRoots(input.tool_name, input.tool_input, cwd, roots, writeAreas()),
         );
         if (!target) return {};
         return {

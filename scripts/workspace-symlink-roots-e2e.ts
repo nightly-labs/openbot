@@ -18,7 +18,7 @@ import { decodeRecordResponse, decodeThreadResponse, decodeTurnResponse, isRecor
 
 type WriteResult = { tool: string; target: Target; path: string; written: boolean; output: string };
 type Expectation = { name: string; expected: boolean; actual: boolean };
-type Target = "workspace" | "shared" | "outside" | "own link" | "planted link";
+type Target = "workspace" | "shared" | "outside" | "own link" | "planted link" | "excluded" | "late link";
 type ToolInput = { command: string; description: string } | { file_path: string; content: string };
 type ToolStep = { path: string; name: string; input: (path: string) => ToolInput };
 type ReplyBlock = { type: "tool_use"; id: string; name: string; input: ToolInput } | { type: "text"; text: string };
@@ -40,31 +40,44 @@ const shared = join(linkRoot, "Shared");
 const outside = join(realRoot, "outside");
 const ownLink = join(realRoot, "project-link");
 const plantedLink = join(shared, "planted");
-for (const folder of ["workspace", "Shared", "outside", "project", "secret"]) {
+const excludedFolder = join(shared, "private");
+const lateArea = join(linkRoot, "late");
+const lateLink = join(lateArea, "app");
+for (const folder of ["workspace", "Shared/private", "outside", "project", "secret", "late-secret", "late"]) {
   await mkdir(join(realRoot, folder), { recursive: true });
 }
 if (viaLink) await symlink("real", linkRoot);
 await symlink("project", ownLink);
 await symlink("../secret", join(realRoot, "Shared", "planted"));
+await symlink("../late-secret", join(realRoot, "late", "app"));
 
 const agent: Pick<AgentSummary, "id" | "access" | "provider" | "workspacePath" | "additionalFolders"> = {
   id: "workspace-symlink-roots-e2e",
   access: "workspace",
   provider: "claude",
   workspacePath: workspace,
-  additionalFolders: [ownLink, plantedLink],
+  additionalFolders: [ownLink, plantedLink, lateLink],
+};
+const fullAccessAgent: Pick<AgentSummary, "id" | "access" | "workspacePath" | "additionalFolders"> = {
+  id: "workspace-symlink-roots-e2e-full-access",
+  access: "full",
+  workspacePath: join(runRoot, "full-access-workspace"),
+  additionalFolders: [runRoot],
 };
 await runCauseEffect(checkAgentFolders(agent));
 const roots = workspaceWritableRoots(agent, shared);
-const writeAreas = agentWriteAreas([agent], shared);
+const writeAreas = agentWriteAreas([agent, fullAccessAgent], shared);
+const lateWriteAreas = [...writeAreas, lateArea];
 const targets: Record<Target, string> = {
   workspace,
   shared,
   outside,
   "own link": ownLink,
   "planted link": plantedLink,
+  excluded: excludedFolder,
+  "late link": lateLink,
 };
-const blocked: readonly Target[] = ["outside", "planted link"];
+const blocked: readonly Target[] = ["outside", "planted link", "excluded", "late link"];
 const expectations: Expectation[] = [];
 const observations: WriteResult[] = [];
 
@@ -92,10 +105,14 @@ async function writeReport(result: RunResult): Promise<void> {
   const report = {
     ...result,
     platform: process.platform,
-    homeIsSymlink: (await lstat("/home")).isSymbolicLink(),
+    homeIsSymlink: await lstat("/home").then(
+      (info) => info.isSymbolicLink(),
+      () => null,
+    ),
     viaLink,
     givenRoots: roots,
     writeAreas,
+    lateWriteAreas,
     expectations,
     observations,
   };
@@ -133,7 +150,9 @@ async function runCodex() {
   const config = await runCauseEffect(codexSandboxConfig(ownFolderAgent, shared, writeAreas));
   const writableRoots = config.sandbox_workspace_write?.writable_roots ?? [];
   const results: WriteResult[] = [];
-  for (const [target] of targetEntries().filter(([target]) => target !== "planted link")) {
+  for (const [target] of targetEntries().filter(([target]) =>
+    ["workspace", "shared", "outside", "own link"].includes(target),
+  )) {
     results.push(await write("codex shell", writableRoots, target));
   }
   const planted = await runCauseEffect(codexSandboxConfig(agent, shared, writeAreas));
@@ -146,15 +165,17 @@ async function runCodex() {
 
 async function runClaude() {
   const cli = await runCauseEffect(resolveClaudeCli());
-  const sandbox = await runCauseEffect(claudeWorkspaceSandbox(roots, [], writeAreas));
+  const sandbox = await runCauseEffect(claudeWorkspaceSandbox(roots, [excludedFolder], writeAreas));
   const steps = [
-    ...targetEntries().map(([target, folder]) => ({
-      tool: "claude shell",
-      target,
-      path: join(folder, "claude-shell.txt"),
-      name: "Bash",
-      input: (path: string) => ({ command: `printf ok > '${path}'`, description: "Write a test file" }),
-    })),
+    ...targetEntries()
+      .filter(([target]) => target !== "late link")
+      .map(([target, folder]) => ({
+        tool: "claude shell",
+        target,
+        path: join(folder, "claude-shell.txt"),
+        name: "Bash",
+        input: (path: string) => ({ command: `printf ok > '${path}'`, description: "Write a test file" }),
+      })),
     ...targetEntries()
       .filter(([target]) => target !== "outside")
       .map(([target]) => ({
@@ -165,6 +186,14 @@ async function runClaude() {
         input: (path: string) => ({ file_path: path, content: "ok" }),
       })),
   ];
+  const lateShell = {
+    tool: "claude shell, link changed after start",
+    target: "late link" as const,
+    path: join(lateLink, "claude-shell.txt"),
+    name: "Bash",
+    input: (path: string) => ({ command: `printf ok > '${path}'`, description: "Write a test file" }),
+  };
+  steps.push(lateShell);
   const outputs = new Map<string, string>();
   const server = Bun.serve({
     hostname: "127.0.0.1",
@@ -211,6 +240,7 @@ async function runClaude() {
       approvalPolicy: "on-request",
       sandbox: "workspace-write",
       workspaceOnly: true,
+      excludedFolders: [excludedFolder],
       writeAreas,
       persistSession: false,
     };
@@ -221,6 +251,7 @@ async function runClaude() {
         "turn/start",
         {
           ...threadParams,
+          writeAreas: lateWriteAreas,
           threadId: started.thread.id,
           input: [{ type: "text", text: "Write the test files." }],
         },
@@ -234,15 +265,23 @@ async function runClaude() {
   }
   const results: WriteResult[] = [];
   for (const step of steps) {
-    results.push({
+    const result = {
       tool: step.tool,
       target: step.target,
       path: step.path,
       written: await holdsOk(step.path),
       output: outputs.get(step.path) ?? "",
-    });
+    };
+    if (step === lateShell) observations.push(result);
+    else results.push(result);
   }
-  return { cliVersion: cli.version, allowWrite: sandbox.filesystem?.allowWrite ?? [], approvals, results };
+  return {
+    cliVersion: cli.version,
+    allowWrite: sandbox.filesystem?.allowWrite ?? [],
+    denyWrite: sandbox.filesystem?.denyWrite ?? [],
+    approvals,
+    results,
+  };
 }
 
 async function fakeAnthropic(
@@ -328,6 +367,8 @@ function targetEntries(): [Target, string][] {
     ["outside", targets.outside],
     ["own link", targets["own link"]],
     ["planted link", targets["planted link"]],
+    ["excluded", targets.excluded],
+    ["late link", targets["late link"]],
   ];
 }
 

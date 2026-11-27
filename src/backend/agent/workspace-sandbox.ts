@@ -94,14 +94,16 @@ export function workspaceTemporaryPaths(platform: NodeJS.Platform = process.plat
 }
 
 export function agentWriteAreas(
-  agents: readonly Pick<AgentSummary, "id" | "additionalFolders" | "workspacePath">[],
+  agents: readonly Pick<AgentSummary, "id" | "access" | "additionalFolders" | "workspacePath">[],
   sharedRoot: string,
 ): string[] {
   return [
     ...new Set([
       sharedRoot,
       ...workspaceTemporaryPaths(),
-      ...agents.flatMap((agent) => [agent.workspacePath, ...effectiveAgentFolders(agent)]),
+      ...agents
+        .filter(workspaceAccessEnforced)
+        .flatMap((agent) => [agent.workspacePath, ...effectiveAgentFolders(agent)]),
     ]),
   ];
 }

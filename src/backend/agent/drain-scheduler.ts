@@ -65,7 +65,7 @@ import type { ThreadLifecycle } from "./thread-lifecycle";
 import type { DeliveryStart } from "./turn-lifecycle";
 import { TurnSlots } from "./turn-slots";
 import type { UsageLimitGate } from "./usage-limit-gate";
-import { agentWriteAreas, checkAgentFolders, codexSandboxPolicy, workspaceWritableRoots } from "./workspace-sandbox";
+import { checkAgentFolders, codexSandboxPolicy, workspaceWritableRoots } from "./workspace-sandbox";
 
 export const REMOVED_ENDPOINT_MESSAGE = sourceText("error.agent.endpointRemoved");
 
@@ -1078,11 +1078,7 @@ export class DrainScheduler {
       const startTurn = (providerThreadId: string) =>
         Effect.gen({ self: this }, function* () {
           yield* drainStep(requireServedModel(this.#providers.configRevision(client)));
-          const sandboxPolicy = yield* codexSandboxPolicy(
-            agent,
-            this.#store.sharedRoot,
-            agentWriteAreas(this.#store.list(), this.#store.sharedRoot),
-          );
+          const sandboxPolicy = yield* codexSandboxPolicy(agent, this.#store.sharedRoot, this.#threads.writeAreas());
           return yield* this.#threads
             .requestWithArchivedThreadRecovery(
               agent,
@@ -1104,6 +1100,7 @@ export class DrainScheduler {
                   delivery.expectsReply === false &&
                   (!delivery.replyToMessageId || this.#mailbox.followsUpOwnAnswer(delivery)),
                 wakeAfterCommands: inOwnChat(providerThreadId),
+                ...this.#threads.writeAreasParam(agent, client),
                 input: inputForThread(providerThreadId),
                 cwd: agent.workspacePath,
                 runtimeWorkspaceRoots: workspaceWritableRoots(agent, this.#store.sharedRoot),
