@@ -61,6 +61,8 @@ interface ServerOutput {
   pending: Set<RequestId>;
   own: Map<RequestId, OwnAnswer>;
   handshake: Handshake | null;
+  kept: boolean;
+  startSettled: boolean;
 }
 
 interface RunningServer {
@@ -91,16 +93,21 @@ export const startStdioMcpRelay = Effect.fn("StdioMcpRelay.start")(function* (la
   };
 
   const launchServer = (transport: StreamableHTTPServerTransport) => {
-    const output: ServerOutput = { transport, pending: new Set(), own: new Map(), handshake: null };
+    const output: ServerOutput = {
+      transport,
+      pending: new Set(),
+      own: new Map(),
+      handshake: null,
+      kept: false,
+      startSettled: false,
+    };
     const child = startServer(launch, output);
     const entry: RunningServer = { child, initialized: false, output, keptUntil: null };
     const forget = () => {
       children.delete(child);
       if (entry.keptUntil) clearTimeout(entry.keptUntil);
-      if (starting === entry) {
-        starting = null;
-        if (!closing) launch.onStartAbandoned?.();
-      }
+      if (starting === entry) starting = null;
+      if (!closing) reportFailedStart(launch, output);
       const index = running.indexOf(entry);
       if (index >= 0) running.splice(index, 1);
     };
@@ -116,7 +123,6 @@ export const startStdioMcpRelay = Effect.fn("StdioMcpRelay.start")(function* (la
     const handshake = entry?.output.handshake;
     if (!entry || !handshake || handshake.client !== handshakeClient(request)) return null;
     starting = null;
-    if (entry.keptUntil) clearTimeout(entry.keptUntil);
     if (handshake.answer && isJSONRPCErrorResponse(handshake.answer)) {
       void stopServer(entry.child);
       return null;
@@ -132,15 +138,16 @@ export const startStdioMcpRelay = Effect.fn("StdioMcpRelay.start")(function* (la
     if (starting || !entry.output.handshake || !running.includes(entry)) return false;
     entry.output.transport = null;
     entry.output.pending.clear();
+    entry.output.kept = true;
     starting = entry;
-    entry.keptUntil = setTimeout(() => giveUpUnansweredStart(entry), MCP_STDIO_PROBE_TIMEOUT_MS);
+    entry.keptUntil ??= setTimeout(() => giveUpUnansweredStart(entry), MCP_STDIO_PROBE_TIMEOUT_MS);
     return true;
   };
 
   const giveUpUnansweredStart = (entry: RunningServer) => {
-    if (closing || starting !== entry || entry.output.handshake?.answer) return;
-    starting = null;
-    launch.onStartAbandoned?.();
+    if (closing || entry.output.handshake?.answer) return;
+    if (starting === entry) starting = null;
+    reportFailedStart(launch, entry.output);
     void stopServer(entry.child);
   };
 
@@ -178,8 +185,10 @@ export const startStdioMcpRelay = Effect.fn("StdioMcpRelay.start")(function* (la
       if (!live || live.output.transport !== transport) return;
       if (abandoned.has(transport)) {
         if (keepStarting(live)) return;
-        launch.onStartAbandoned?.();
+        live.output.kept = true;
+        reportFailedStart(launch, live.output);
       }
+      live.output.startSettled = true;
       void stopServer(live.child);
     };
     return transport;
@@ -281,6 +290,13 @@ function relayedOutcome(answer: JSONRPCResultResponse | JSONRPCErrorResponse | n
   return decoded.success ? { result: decoded.data } : { error: boundedError(decoded.error.message) };
 }
 
+function reportFailedStart(launch: StdioMcpLaunch, output: ServerOutput): void {
+  const answer = output.handshake?.answer;
+  if (!output.kept || output.startSettled || (answer && isJSONRPCResultResponse(answer))) return;
+  output.startSettled = true;
+  launch.onStartAbandoned?.();
+}
+
 function handshakeClient(request: JSONRPCRequest): string {
   return JSON.stringify([request.params?.protocolVersion, request.params?.capabilities]);
 }
@@ -336,7 +352,7 @@ function startServer(launch: StdioMcpLaunch, output: ServerOutput): ChildProcess
         const handshake = output.handshake;
         if (handshake && !handshake.answer && message.id === handshake.request) {
           handshake.answer = message;
-          if (!output.transport && isJSONRPCErrorResponse(message)) launch.onStartAbandoned?.();
+          if (isJSONRPCErrorResponse(message)) reportFailedStart(launch, output);
           output.pending.delete(handshake.reply);
           void output.transport?.send({ ...message, id: handshake.reply }).catch(() => undefined);
           continue;

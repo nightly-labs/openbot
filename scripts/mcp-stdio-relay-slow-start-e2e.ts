@@ -24,6 +24,7 @@ process.stdin.on("data", (chunk) => {
   for (let end = buffer.indexOf("\\n"); end >= 0; end = buffer.indexOf("\\n")) {
     const message = JSON.parse(buffer.slice(0, end));
     buffer = buffer.slice(end + 1);
+    if (mode === "crash" && message.method === "notifications/initialized") process.exit(1);
     if (message.id === undefined) continue;
     if (message.method === "initialize") {
       writeFileSync(join(dir, "launch-" + process.pid), "");
@@ -41,7 +42,7 @@ process.stdin.on("data", (chunk) => {
 });
 `;
 
-type Mode = "slow" | "exit" | "error" | "hang";
+type Mode = "slow" | "exit" | "error" | "hang" | "crash";
 
 interface ScenarioResult {
   reports: number;
@@ -143,6 +144,32 @@ try {
     await runCauseEffect(run.relay.close());
     assert.equal(run.reports(), 1, "a kept server that refuses initialize gives one card");
     report.scenarios.error = { reports: run.reports() };
+  }
+  for (const mode of ["exit", "error"] as const) {
+    const run = await scenario(mode, `taken-${mode}`);
+    const retry = await run.post(initialize(2));
+    await writeFile(join(run.dir, "release"), "");
+    assert.match(await retry.text(), /"error"/, "the retry gets the failure of the kept server");
+    await waitFor(() => run.reports() > 0, `a card for the taken server (${mode})`);
+    assert.equal(await launches(run.dir), 1, "the retry took the kept server");
+    await runCauseEffect(run.relay.close());
+    assert.equal(run.reports(), 1, `a kept server that a retry took and that then fails (${mode}) gives one card`);
+    report.scenarios[`taken-${mode}`] = { launches: 1, reports: run.reports() };
+  }
+  {
+    const run = await scenario("crash", "crash-after-start");
+    await writeFile(join(run.dir, "release"), "");
+    const retry = await run.post(initialize(2));
+    const sessionId = retry.headers.get("mcp-session-id") ?? "";
+    assert.match(await retry.text(), /"serverInfo"/, "the kept server starts");
+    await run.post({ jsonrpc: "2.0", method: "notifications/initialized" }, { "mcp-session-id": sessionId });
+    await waitFor(
+      async () => (await runCauseEffect(run.relay.callTool("ping", {}))) === null,
+      "the relay to see that the started server stopped",
+    );
+    await runCauseEffect(run.relay.close());
+    assert.equal(run.reports(), 0, "a server that stops after a good start gives no start card");
+    report.scenarios["crash-after-start"] = { launches: 1, reports: run.reports() };
   }
   {
     const run = await scenario("hang", "close");
