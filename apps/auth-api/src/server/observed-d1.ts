@@ -1,3 +1,5 @@
+import { AsyncLocalStorage } from "node:async_hooks";
+
 type D1FailureClass = "overloaded" | "constraint" | "network" | "other";
 
 type D1RetryOutcome = "none" | "succeeded" | "failed";
@@ -11,6 +13,31 @@ const READ_ONLY_SQL = /^\s*(SELECT|WITH)\b/i;
 const WRITE_KEYWORD = /\b(INSERT|UPDATE|DELETE|REPLACE|UPSERT)\b/i;
 
 const observedDatabases = new WeakMap<D1Database, D1Database>();
+const primaryDatabases = new WeakMap<D1Database, D1Database>();
+
+interface D1ReplicaReadScope {
+  sessions: Map<D1Database, D1DatabaseSession>;
+}
+
+const replicaReadScopes = new AsyncLocalStorage<D1ReplicaReadScope>();
+
+export function withD1ReplicaReads<T>(run: () => T): T {
+  return replicaReadScopes.run({ sessions: new Map() }, run);
+}
+
+export function d1ReplicaReadsActive(): boolean {
+  return replicaReadScopes.getStore() !== undefined;
+}
+
+function replicaReadSource(source: D1Database): D1Database | D1DatabaseSession {
+  const scope = replicaReadScopes.getStore();
+  if (!scope) return source;
+  const known = scope.sessions.get(source);
+  if (known) return known;
+  const session = source.withSession("first-unconstrained");
+  scope.sessions.set(source, session);
+  return session;
+}
 
 let unrecoveredOverloadAt = Number.NEGATIVE_INFINITY;
 
@@ -105,17 +132,25 @@ class ObservedStatement implements D1PreparedStatement {
 }
 
 class ObservedDatabase implements D1Database {
-  constructor(readonly source: D1Database) {}
+  constructor(
+    readonly source: D1Database,
+    readonly primaryOnly: boolean,
+  ) {}
+
+  #target(): D1Database | D1DatabaseSession {
+    return this.primaryOnly ? this.source : replicaReadSource(this.source);
+  }
 
   prepare(query: string): D1PreparedStatement {
-    return new ObservedStatement(this.source.prepare(query), query);
+    return new ObservedStatement(this.#target().prepare(query), query);
   }
 
   batch<T = unknown>(statements: D1PreparedStatement[]): Promise<D1Result<T>[]> {
     const sources = statements.map((statement) =>
       statement instanceof ObservedStatement ? statement.source : statement,
     );
-    return observedCall("batch", false, () => this.source.batch<T>(sources));
+    const target = this.#target();
+    return observedCall("batch", false, () => target.batch<T>(sources));
   }
 
   exec(query: string): Promise<D1ExecResult> {
@@ -135,7 +170,16 @@ export function observedD1(database: D1Database): D1Database {
   if (database instanceof ObservedDatabase) return database;
   const known = observedDatabases.get(database);
   if (known) return known;
-  const observed = new ObservedDatabase(database);
+  const observed = new ObservedDatabase(database, false);
   observedDatabases.set(database, observed);
   return observed;
+}
+
+export function primaryD1(database: D1Database): D1Database {
+  const source = database instanceof ObservedDatabase ? database.source : database;
+  const known = primaryDatabases.get(source);
+  if (known) return known;
+  const primary = new ObservedDatabase(source, true);
+  primaryDatabases.set(source, primary);
+  return primary;
 }

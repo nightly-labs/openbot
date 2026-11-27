@@ -2,6 +2,7 @@ import { type AvatarColor, isAvatarColor } from "@openbot/contracts/ipc";
 import type { AccountSession, MobileConnectHostBinding } from "@openbot/contracts/mobile-connect";
 import { Context, Effect, Layer, Schema } from "effect";
 import { sha256 } from "./crypto";
+import { d1ReplicaReadsActive, primaryD1 } from "./observed-d1";
 import type {
   AuthRepository,
   AuthUser,
@@ -60,6 +61,17 @@ function storeCall<A>(operation: () => Promise<A>): Effect.Effect<A, AuthStoreEr
     catch: () => new AuthStoreError({ message: "Account store operation failed." }),
   });
 }
+
+const selectSessionRow = Effect.fn("D1AuthRepository.selectSessionRow")(function* <T>(
+  database: D1Database,
+  sql: string,
+  tokenHash: string,
+  now: number,
+): Effect.fn.Return<T | null, AuthStoreError> {
+  const row = yield* storeCall(() => database.prepare(sql).bind(tokenHash, now).first<T>());
+  if (row || !d1ReplicaReadsActive()) return row;
+  return yield* storeCall(() => primaryD1(database).prepare(sql).bind(tokenHash, now).first<T>());
+});
 export class D1AuthRepository implements AuthRepository {
   readonly #layer: Layer.Layer<AuthDatabase>;
   constructor(database: D1Database) {
@@ -312,18 +324,16 @@ export class D1AuthRepository implements AuthRepository {
       const tokenHash = yield* sha256(sessionToken).pipe(
         Effect.mapError(() => new AuthStoreError({ message: "Account store operation failed." })),
       );
-      const row = yield* storeCall(() =>
-        database
-          .prepare(
-            `SELECT users.id, users.email, users.name, users.avatar_url, users.analytics_enabled, users.chat_color, auth_sessions.last_used_at
+      const row = yield* selectSessionRow<AuthenticatedUserRow>(
+        database,
+        `SELECT users.id, users.email, users.name, users.avatar_url, users.analytics_enabled, users.chat_color, auth_sessions.last_used_at
          FROM auth_sessions
          JOIN users ON users.id = auth_sessions.user_id
          WHERE auth_sessions.token_hash = ?
            AND auth_sessions.revoked_at IS NULL
            AND auth_sessions.expires_at > ?`,
-          )
-          .bind(tokenHash, now)
-          .first<AuthenticatedUserRow>(),
+        tokenHash,
+        now,
       );
       if (!row) return null;
       yield* this.#updateSessionActivityEffect(tokenHash, row.last_used_at, now);
@@ -342,10 +352,9 @@ export class D1AuthRepository implements AuthRepository {
       const tokenHash = yield* sha256(sessionToken).pipe(
         Effect.mapError(() => new AuthStoreError({ message: "Account store operation failed." })),
       );
-      const row = yield* storeCall(() =>
-        database
-          .prepare(
-            `SELECT users.id, users.email, users.name, users.avatar_url, users.analytics_enabled, users.chat_color, auth_sessions.last_used_at
+      const row = yield* selectSessionRow<AuthenticatedUserRow>(
+        database,
+        `SELECT users.id, users.email, users.name, users.avatar_url, users.analytics_enabled, users.chat_color, auth_sessions.last_used_at
          FROM auth_sessions
          JOIN users ON users.id = auth_sessions.user_id
          WHERE auth_sessions.token_hash = ?
@@ -355,9 +364,8 @@ export class D1AuthRepository implements AuthRepository {
              SELECT 1 FROM mobile_auth_sessions
              WHERE mobile_auth_sessions.session_id = auth_sessions.id
            )`,
-          )
-          .bind(tokenHash, now)
-          .first<AuthenticatedUserRow>(),
+        tokenHash,
+        now,
       );
       if (!row) return null;
       yield* this.#updateSessionActivityEffect(tokenHash, row.last_used_at, now);
@@ -884,19 +892,17 @@ export class D1AuthRepository implements AuthRepository {
       const tokenHash = yield* sha256(sessionToken).pipe(
         Effect.mapError(() => new AuthStoreError({ message: "Account store operation failed." })),
       );
-      const row = yield* storeCall(() =>
-        database
-          .prepare(
-            `SELECT users.id, users.email, users.name, users.avatar_url, users.analytics_enabled, users.chat_color, auth_sessions.last_used_at
+      const row = yield* selectSessionRow<MobileSessionUserRow>(
+        database,
+        `SELECT users.id, users.email, users.name, users.avatar_url, users.analytics_enabled, users.chat_color, auth_sessions.last_used_at
          FROM auth_sessions
          JOIN mobile_auth_sessions ON mobile_auth_sessions.session_id = auth_sessions.id
          JOIN users ON users.id = auth_sessions.user_id
          WHERE auth_sessions.token_hash = ?
            AND auth_sessions.revoked_at IS NULL
            AND auth_sessions.expires_at > ?`,
-          )
-          .bind(tokenHash, now)
-          .first<MobileSessionUserRow>(),
+        tokenHash,
+        now,
       );
       if (!row) return null;
       yield* this.#updateSessionActivityEffect(tokenHash, row.last_used_at, now);
