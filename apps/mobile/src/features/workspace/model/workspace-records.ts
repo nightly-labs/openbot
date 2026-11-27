@@ -6,6 +6,7 @@ import {
   foreignProvider,
   isAgentMarketplaceSource,
   isAgentModel,
+  isAgentPendingRuntime,
   isAgentProvider,
   isAgentProviderRef,
   isAvatarHue,
@@ -58,7 +59,15 @@ export function projectAgent(serverId: string, agent: RemoteAgent, avatarColor: 
 }
 
 export function remoteAgentOf(agent: ClientAgentSummary): RemoteAgent {
-  const { provider, ...rest } = agent;
+  const { pendingRuntime, ...current } = agent;
+  const { provider, ...rest } = pendingRuntime
+    ? {
+        ...current,
+        provider: pendingRuntime.provider,
+        model: pendingRuntime.model,
+        reasoningEffort: pendingRuntime.reasoningEffort,
+      }
+    : current;
   return isKnownAgentProvider(provider)
     ? { ...rest, provider }
     : { ...rest, provider: undefined, foreignProvider: foreignProvider(provider) };
@@ -78,6 +87,7 @@ export function decodeAgent(value: unknown): RemoteAgent {
   ) {
     throw new Error("The server returned an invalid agent.");
   }
+  const runtime = isAgentPendingRuntime(value.pendingRuntime) ? value.pendingRuntime : value;
   return {
     id: value.id,
     name: value.name,
@@ -85,10 +95,10 @@ export function decodeAgent(value: unknown): RemoteAgent {
     description: value.description,
     preview: value.preview,
     updatedAt: value.updatedAt,
-    provider: isAgentProvider(value.provider) ? value.provider : undefined,
-    foreignProvider: isAgentProviderRef(value.provider) ? foreignProvider(value.provider) : undefined,
-    model: isAgentModel(value.model) ? value.model : undefined,
-    reasoningEffort: isReasoningEffort(value.reasoningEffort) ? value.reasoningEffort : undefined,
+    provider: isAgentProvider(runtime.provider) ? runtime.provider : undefined,
+    foreignProvider: isAgentProviderRef(runtime.provider) ? foreignProvider(runtime.provider) : undefined,
+    model: isAgentModel(runtime.model) ? runtime.model : undefined,
+    reasoningEffort: isReasoningEffort(runtime.reasoningEffort) ? runtime.reasoningEffort : undefined,
     notifications: isBoolean(value.notifications) ? value.notifications : undefined,
     workspacePath: isString(value.workspacePath) && value.workspacePath ? value.workspacePath : undefined,
     avatarUrl: isString(value.avatarUrl) ? value.avatarUrl : null,

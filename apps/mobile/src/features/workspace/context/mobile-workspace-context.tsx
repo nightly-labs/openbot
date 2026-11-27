@@ -2601,9 +2601,10 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
         if (!serverId || !agentsRef.current.some((agent) => agent.id === input.agentId && agent.serverId === serverId))
           throw new Error(currentText().t("mobile.workspace.error.agentUnavailableOnHost"));
         const { avatarColor, avatarHue, providerAccountId, ...other } = input;
+        const runtimeFieldChanged =
+          other.provider !== undefined || other.model !== undefined || other.reasoningEffort !== undefined;
         const runtimeChange =
-          providerAccountId !== undefined &&
-          hasCapability(serverCapabilities.current, serverId, AGENT_PENDING_RUNTIME_CAPABILITY)
+          runtimeFieldChanged && hasCapability(serverCapabilities.current, serverId, AGENT_PENDING_RUNTIME_CAPABILITY)
             ? pendingRuntimeUpdateBody({
                 agentId: input.agentId,
                 provider: input.provider,
