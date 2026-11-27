@@ -25,6 +25,14 @@ const TITLE_MAX_LINES_WITH_LOCKUP = 2;
 /** `--openbot-logo-production` and `--openbot-logo-eye`. */
 const LOGO_BACKGROUND = "#d6adf2";
 const LOGO_EYE = "#040007";
+/** The black logo with light eyes from the brand rules, for the felt patch. */
+const DARK_LOGO = { background: "#040007", eye: "#fefdff" } as const;
+const LIGHT_LOGO = { background: LOGO_BACKGROUND, eye: LOGO_EYE } as const;
+
+/** The felt under a centred card is darkened to this average luma, so white marks on the patch stay readable. */
+const FELT_MAX_LUMA = 0.5;
+/** How strongly the fibres of the felt are drawn again over it. */
+const FELT_DETAIL_STRENGTH = 0.8;
 const FONT_FAMILY = '"Inter Variable", Inter, system-ui, sans-serif';
 
 window.openBotContentImage = { render: renderContentImage };
@@ -68,6 +76,64 @@ async function drawBackgroundImage(
   image.src = backgroundUrl;
   await image.decode();
   context.drawImage(image, 0, 0, job.width, job.height);
+  if (job.layout !== "centered") return;
+
+  // On a pale felt, white marks disappear. Measured
+  // where the plate goes, the middle of the card.
+  const luma = averageLuma(context, job.width * 0.25, job.height * 0.3, job.width * 0.5, job.height * 0.4);
+  if (luma > FELT_MAX_LUMA) {
+    context.filter = `brightness(${(FELT_MAX_LUMA / luma).toFixed(3)}) saturate(1.3)`;
+    context.drawImage(image, 0, 0, job.width, job.height);
+    context.filter = "none";
+  }
+  drawFeltDetail(context, job, image);
+}
+
+/**
+ * The image with its edge pixels stretched outwards by `pad`, so a blur near the
+ * edge does not take in the empty pixels outside the card.
+ */
+function edgePadded(image: HTMLImageElement, job: ContentImageJob, pad: number): HTMLCanvasElement {
+  const { width, height } = job;
+  const canvas = document.createElement("canvas");
+  canvas.width = width + pad * 2;
+  canvas.height = height + pad * 2;
+  const context = canvas.getContext("2d");
+  if (!context) throw new Error("Content images: a 2D canvas context is not available.");
+  const sx = image.naturalWidth / width;
+  const sy = image.naturalHeight / height;
+  context.drawImage(image, 0, 0, image.naturalWidth, sy, pad, 0, width, pad);
+  context.drawImage(image, 0, image.naturalHeight - sy, image.naturalWidth, sy, pad, height + pad, width, pad);
+  context.drawImage(image, 0, 0, sx, image.naturalHeight, 0, pad, pad, height);
+  context.drawImage(image, image.naturalWidth - sx, 0, sx, image.naturalHeight, width + pad, pad, pad, height);
+  context.drawImage(image, pad, pad, width, height);
+  return canvas;
+}
+
+/**
+ * Makes the felt read as felt at the size of a link preview: the fine detail of
+ * the image (the image less a blur of itself, as a grey around the middle) is
+ * laid back over it, stronger, with an overlay blend that keeps the colour.
+ */
+function drawFeltDetail(context: CanvasRenderingContext2D, job: ContentImageJob, image: HTMLImageElement): void {
+  const unit = job.width / 1200;
+  const detail = document.createElement("canvas");
+  detail.width = job.width;
+  detail.height = job.height;
+  const detailContext = detail.getContext("2d");
+  if (!detailContext) throw new Error("Content images: a 2D canvas context is not available.");
+  detailContext.filter = "grayscale(1)";
+  detailContext.drawImage(image, 0, 0, job.width, job.height);
+  detailContext.globalAlpha = 0.5;
+  detailContext.filter = `grayscale(1) invert(1) blur(${6 * unit}px)`;
+  detailContext.drawImage(edgePadded(image, job, 24 * unit), -24 * unit, -24 * unit);
+
+  context.save();
+  context.globalCompositeOperation = "overlay";
+  context.globalAlpha = FELT_DETAIL_STRENGTH;
+  context.filter = "contrast(3)";
+  context.drawImage(detail, 0, 0);
+  context.restore();
 }
 
 async function drawGradient(context: CanvasRenderingContext2D, job: ContentImageJob): Promise<void> {
@@ -228,11 +294,14 @@ function drawCenteredLockup(context: CanvasRenderingContext2D, job: ContentImage
   const logoSize = 96 * unit;
   const x = (job.width - plateWidth) / 2;
   const y = (job.height - plateHeight) / 2;
-  drawGlassPlate(context, job, x, y, plateWidth, plateHeight);
+  drawFeltPatch(context, job, x, y, plateWidth, plateHeight);
 
   const logoTop = y + (plateHeight - logoSize) / 2;
-  drawMark(context, lockup.left?.mark ?? "openbot", x + plateWidth * 0.25 - logoSize / 2, logoTop, logoSize);
-  drawMark(context, lockup.rivalMark, x + plateWidth * 0.75 - logoSize / 2, logoTop, logoSize);
+  context.save();
+  setMarkShadow(context, unit);
+  drawMark(context, lockup.left?.mark ?? "openbot", x + plateWidth * 0.25 - logoSize / 2, logoTop, logoSize, DARK_LOGO);
+  drawMark(context, lockup.rivalMark, x + plateWidth * 0.75 - logoSize / 2, logoTop, logoSize, DARK_LOGO);
+  context.restore();
 
   // The hairline, broken around "vs".
   const center = x + plateWidth / 2;
@@ -240,7 +309,9 @@ function drawCenteredLockup(context: CanvasRenderingContext2D, job: ContentImage
   const vsSize = 20 * unit;
   const gap = vsSize * 1.1;
   const inset = 64 * unit;
-  context.strokeStyle = "rgba(255, 255, 255, 0.2)";
+  context.save();
+  setMarkShadow(context, unit);
+  context.strokeStyle = "rgba(255, 255, 255, 0.5)";
   context.lineWidth = unit;
   context.beginPath();
   context.moveTo(center, y + inset);
@@ -249,12 +320,18 @@ function drawCenteredLockup(context: CanvasRenderingContext2D, job: ContentImage
   context.lineTo(center, y + plateHeight - inset);
   context.stroke();
   context.font = `500 ${vsSize}px ${FONT_FAMILY}`;
-  context.fillStyle = "rgba(255, 255, 255, 0.62)";
+  context.fillStyle = "rgba(255, 255, 255, 0.9)";
   context.textAlign = "center";
   context.textBaseline = "middle";
   context.fillText("vs", center, middle);
-  context.textAlign = "start";
-  context.textBaseline = "alphabetic";
+  context.restore();
+}
+
+/** A soft shadow under the white marks, so they stand off the felt. */
+function setMarkShadow(context: CanvasRenderingContext2D, unit: number): void {
+  context.shadowColor = "rgba(12, 10, 24, 0.28)";
+  context.shadowBlur = 14 * unit;
+  context.shadowOffsetY = 2 * unit;
 }
 
 /** The roundup's marks in the middle of the social card, smaller than the title layout's, with room around each. */
@@ -272,10 +349,13 @@ function drawCenteredMarkRow(
   const plateHeight = padY * 2 + size;
   const x = (job.width - plateWidth) / 2;
   const y = (job.height - plateHeight) / 2;
-  drawGlassPlate(context, job, x, y, plateWidth, plateHeight);
+  drawFeltPatch(context, job, x, y, plateWidth, plateHeight);
+  context.save();
+  setMarkShadow(context, unit);
   marks.forEach((mark, index) => {
-    drawMark(context, mark, x + padX + index * (size + gap), y + padY, size);
+    drawMark(context, mark, x + padX + index * (size + gap), y + padY, size, DARK_LOGO);
   });
+  context.restore();
 }
 
 /** The roundup's lockup: one frosted plate with the mark of every app in a row, at the same place. */
@@ -302,11 +382,10 @@ function drawMarkRow(
 }
 
 /**
- * The glass plate of a centred card: a soft shadow under it, the background
- * blurred through it, a light sheen at the top and an edge that is brighter at
- * the top than at the bottom, as if lit from above.
+ * A patch of the same felt sewn onto the card: a lighter piece cut from another
+ * part of the background, a stitch just inside its edge and a short shadow.
  */
-function drawGlassPlate(
+function drawFeltPatch(
   context: CanvasRenderingContext2D,
   job: ContentImageJob,
   x: number,
@@ -315,49 +394,65 @@ function drawGlassPlate(
   height: number,
 ): void {
   const unit = job.width / 1200;
-  const radius = 32 * unit;
+  const radius = 36 * unit;
   const under = document.createElement("canvas");
   under.width = job.width;
   under.height = job.height;
   under.getContext("2d")?.drawImage(context.canvas, 0, 0);
 
-  // The shadow, from a shape that the glass then covers.
   context.save();
-  context.shadowColor = "rgba(10, 8, 20, 0.28)";
-  context.shadowBlur = 48 * unit;
-  context.shadowOffsetY = 16 * unit;
+  context.shadowColor = "rgba(12, 10, 24, 0.32)";
+  context.shadowBlur = 14 * unit;
+  context.shadowOffsetY = 5 * unit;
   roundedRect(context, x, y, width, height, radius);
-  context.fillStyle = "rgba(0, 0, 0, 1)";
+  context.fillStyle = "#000000";
   context.fill();
   context.restore();
 
   context.save();
   roundedRect(context, x, y, width, height, radius);
   context.clip();
-  context.filter = `blur(${32 * unit}px) saturate(1.15)`;
-  context.drawImage(under, 0, 0);
-  context.filter = "none";
-  // A light tint keeps white marks readable on a pale background.
-  context.fillStyle = "rgba(16, 14, 28, 0.22)";
-  context.fillRect(x, y, width, height);
-  const sheen = context.createLinearGradient(0, y, 0, y + height);
-  sheen.addColorStop(0, "rgba(255, 255, 255, 0.2)");
-  sheen.addColorStop(0.45, "rgba(255, 255, 255, 0.05)");
-  sheen.addColorStop(1, "rgba(255, 255, 255, 0)");
-  context.fillStyle = sheen;
-  context.fillRect(x, y, width, height);
+  // Another part of the felt, turned half a turn, so its fibres do not line up.
+  context.translate(x + width / 2, y + height / 2);
+  context.rotate(Math.PI);
+  context.filter = "brightness(1.14) saturate(1.05)";
+  context.drawImage(under, -job.width / 2 + 90 * unit, -job.height / 2 + 40 * unit);
   context.restore();
 
+  // The cut edge: lit at the top, in shade at the bottom.
   const edge = context.createLinearGradient(0, y, 0, y + height);
-  edge.addColorStop(0, "rgba(255, 255, 255, 0.45)");
-  edge.addColorStop(0.5, "rgba(255, 255, 255, 0.14)");
-  edge.addColorStop(1, "rgba(255, 255, 255, 0.08)");
+  edge.addColorStop(0, "rgba(255, 255, 255, 0.3)");
+  edge.addColorStop(1, "rgba(0, 0, 0, 0.18)");
   context.save();
-  roundedRect(context, x + 0.75 * unit, y + 0.75 * unit, width - 1.5 * unit, height - 1.5 * unit, radius);
+  roundedRect(context, x + unit, y + unit, width - 2 * unit, height - 2 * unit, radius);
   context.strokeStyle = edge;
-  context.lineWidth = 1.5 * unit;
+  context.lineWidth = 2 * unit;
+  context.stroke();
+
+  // The stitch.
+  const inset = 12 * unit;
+  roundedRect(context, x + inset, y + inset, width - inset * 2, height - inset * 2, radius - inset);
+  context.setLineDash([9 * unit, 7 * unit]);
+  context.lineCap = "round";
+  context.strokeStyle = "rgba(255, 255, 255, 0.6)";
+  context.lineWidth = 2 * unit;
+  context.shadowColor = "rgba(0, 0, 0, 0.3)";
+  context.shadowBlur = 2 * unit;
+  context.shadowOffsetY = unit;
   context.stroke();
   context.restore();
+}
+
+/** The average luma of an area, from a sparse sample of its pixels. */
+function averageLuma(context: CanvasRenderingContext2D, x: number, y: number, width: number, height: number): number {
+  const pixels = context.getImageData(Math.round(x), Math.round(y), Math.round(width), Math.round(height)).data;
+  let total = 0;
+  let count = 0;
+  for (let offset = 0; offset < pixels.length; offset += 4 * 37) {
+    total += 0.2126 * (pixels[offset] ?? 0) + 0.7152 * (pixels[offset + 1] ?? 0) + 0.0722 * (pixels[offset + 2] ?? 0);
+    count += 1;
+  }
+  return total / count / 255;
 }
 
 /** The frosted plate under the marks, with a hairline edge. */
@@ -396,21 +491,34 @@ function drawPlate(
   context.restore();
 }
 
-function drawMark(context: CanvasRenderingContext2D, mark: ContentImageMark, x: number, y: number, size: number): void {
-  if (mark === "openbot") drawOpenBotMark(context, x, y, size);
+function drawMark(
+  context: CanvasRenderingContext2D,
+  mark: ContentImageMark,
+  x: number,
+  y: number,
+  size: number,
+  logo: { background: string; eye: string } = LIGHT_LOGO,
+): void {
+  if (mark === "openbot") drawOpenBotMark(context, x, y, size, logo);
   else drawRivalMark(context, mark, x, y, size);
 }
 
 /** `AppLogo`: the rounded square and the two scribbled eyes. */
-function drawOpenBotMark(context: CanvasRenderingContext2D, x: number, y: number, size: number): void {
+function drawOpenBotMark(
+  context: CanvasRenderingContext2D,
+  x: number,
+  y: number,
+  size: number,
+  logo: { background: string; eye: string },
+): void {
   context.save();
   context.translate(x, y);
   context.scale(size / APP_LOGO_SIZE, size / APP_LOGO_SIZE);
   roundedRect(context, 0, 0, APP_LOGO_SIZE, APP_LOGO_SIZE, APP_LOGO_CORNER);
-  context.fillStyle = LOGO_BACKGROUND;
+  context.fillStyle = logo.background;
   context.fill();
   context.clip();
-  context.strokeStyle = LOGO_EYE;
+  context.strokeStyle = logo.eye;
   context.lineWidth = 9.5;
   context.lineCap = "round";
   context.lineJoin = "round";
