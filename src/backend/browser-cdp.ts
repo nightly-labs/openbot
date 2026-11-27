@@ -1567,7 +1567,9 @@ export class BrowserCdpEngine {
     deadline?: number,
     onDispatch?: ActionDispatch,
   ): Effect.fn.Return<void, BrowserOperationError> {
-    let reload: { started: () => boolean; follow: () => Effect.Effect<void, BrowserOperationError> } | undefined;
+    let reload:
+      | { started: Effect.Effect<boolean>; follow: () => Effect.Effect<void, BrowserOperationError> }
+      | undefined;
     yield* this.#leaseEffect((send) =>
       Effect.gen({ self: this }, function* () {
         const resolved = yield* this.#resolveElementEffect(send, target, deadline);
@@ -1640,10 +1642,20 @@ export class BrowserCdpEngine {
         const frameDocumentGeneration = this.#frameDocumentGeneration;
         const optionValues = Array.isArray(plan.values) ? plan.values.filter(isString) : [];
         const inTopFrame = plan.topFrame === true && resolved.sessionId === undefined;
-        const documentChanged = () =>
+        let selectNodeId = resolved.backendNodeId;
+        const selectGone = Effect.suspend(() =>
+          this.#callOnNode(send, selectNodeId, "function() { return this.isConnected; }", [], resolved.sessionId),
+        ).pipe(
+          Effect.map((connected) => connected !== true),
+          Effect.catch(() => Effect.succeed(true)),
+        );
+        const documentChanged = Effect.suspend(() =>
           inTopFrame
-            ? this.#documentGeneration !== documentGeneration
-            : this.#frameDocumentGeneration !== frameDocumentGeneration;
+            ? Effect.succeed(this.#documentGeneration !== documentGeneration)
+            : this.#frameDocumentGeneration !== frameDocumentGeneration
+              ? selectGone
+              : Effect.succeed(false),
+        );
         const reloadedSelect = {
           id: isString(plan.id) ? plan.id : "",
           name: isString(plan.name) ? plan.name : "",
@@ -1659,7 +1671,6 @@ export class BrowserCdpEngine {
           follow: () => this.#confirmReloadedSelectEffect(send, reloadedSelect, desiredValues, passedValues, deadline),
         };
         yield* send("DOM.focus", { backendNodeId: resolved.backendNodeId }, resolved.sessionId);
-        let selectNodeId = resolved.backendNodeId;
         if (!plan.multiple) {
           const cycleIndices = Array.isArray(plan.typeaheadCycleIndices)
             ? plan.typeaheadCycleIndices.filter(isNumber)
@@ -1711,7 +1722,7 @@ export class BrowserCdpEngine {
               if (
                 recordValue(state)?.selectedIndex === firstDesiredIndex ||
                 presses === cycleIndices.length ||
-                documentChanged()
+                (yield* documentChanged)
               )
                 break;
               yield* browserSync(() => assertBeforeDeadline(deadline));
@@ -1720,14 +1731,15 @@ export class BrowserCdpEngine {
             }
           } else if (firstDesiredIndex !== selectedIndex) {
             yield* dispatchShortcut(send, "Home", resolved.sessionId);
-            for (let index = 0; index < targetRank && !documentChanged(); index++) {
+            for (let index = 0; index < targetRank; index++) {
+              if (yield* documentChanged) break;
               yield* dispatchShortcut(send, "ArrowDown", resolved.sessionId);
             }
           }
         } else {
           const additiveModifiers = process.platform === "darwin" ? ["Meta"] : ["Control"];
           for (const [index, desiredIndex] of desiredIndices.entries()) {
-            if (documentChanged()) break;
+            if (yield* documentChanged) break;
             const optionNodeId = yield* this.#optionBackendNodeIdEffect(
               send,
               resolved.backendNodeId,
@@ -1761,7 +1773,7 @@ export class BrowserCdpEngine {
           selectedIndices.length !== desiredIndices.length ||
           selectedIndices.some((index, position) => index !== desiredIndices[position])
         ) {
-          if (reload?.started()) return "reloaded" as const;
+          if (yield* documentChanged) return "reloaded" as const;
           const unreachable =
             !plan.multiple && plan.desiredLabel === ""
               ? " An option with no label can only be reached by keyboard where a closed select honours arrow keys, which macOS does not."
@@ -1773,7 +1785,11 @@ export class BrowserCdpEngine {
           );
         }
       }).pipe(
-        Effect.catch((failure) => (reload?.started() ? Effect.succeed("reloaded" as const) : Effect.fail(failure))),
+        Effect.catch((failure) =>
+          (reload?.started ?? Effect.succeed(false)).pipe(
+            Effect.flatMap((started) => (started ? Effect.succeed("reloaded" as const) : Effect.fail(failure))),
+          ),
+        ),
         Effect.flatMap((outcome) => (outcome === "reloaded" && reload ? reload.follow() : Effect.void)),
       ),
     );
