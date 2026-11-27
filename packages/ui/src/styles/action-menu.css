@@ -4,10 +4,15 @@
   --ui-menu-item-radius: calc(var(--ui-menu-radius) - var(--ui-menu-padding) + var(--openbot-space-0-5));
   --ui-menu-inset: calc(var(--openbot-space-2) + var(--openbot-space-0-5));
   --ui-menu-bg: var(--openbot-bg-sheet);
+  --ui-popover-frost: 65%;
+  --ui-popover-frost-filter: blur(calc(var(--openbot-space-1) * 8));
+  --ui-popover-frost-bg: color-mix(in srgb, var(--ui-menu-bg) var(--ui-popover-frost), transparent);
+  --ui-popover-frost-sunken: color-mix(in srgb, var(--openbot-bg-sheet-inset) 25%, transparent);
   --ui-menu-edge: color-mix(in srgb, var(--openbot-text-primary) 11%, transparent);
   --ui-menu-highlight: color-mix(in srgb, var(--openbot-text-primary) 5%, transparent);
   --ui-menu-shadow: var(--openbot-shadow-menu);
   --ui-menu-item-hover: color-mix(in srgb, var(--openbot-text-primary) 6%, transparent);
+  --ui-menu-item-selected: color-mix(in srgb, var(--openbot-text-primary) 10%, transparent);
   --ui-menu-panel-shadow:
     inset 0 1px 0 var(--ui-menu-highlight), 0 0 0 1px var(--ui-menu-edge), 0 4px 6px -1px var(--ui-menu-shadow),
     0 2px 4px -2px var(--ui-menu-shadow);
@@ -21,9 +26,11 @@
   border: 0;
   border-radius: var(--openbot-radius-md);
   outline: 0;
-  background: var(--openbot-bg-control);
+  background: var(--ui-popover-frost-bg);
+  -webkit-backdrop-filter: var(--ui-popover-frost-filter);
+  backdrop-filter: var(--ui-popover-frost-filter);
   box-shadow:
-    0 0 0 1px var(--openbot-border),
+    0 0 0 1px var(--ui-menu-edge),
     0 4px 6px -1px var(--openbot-shadow-popover-ambient),
     0 2px 4px -2px var(--openbot-shadow-popover-ambient);
   color: var(--openbot-text-primary);
@@ -39,12 +46,18 @@
   border: 0;
   border-radius: var(--ui-menu-radius);
   outline: 0;
-  background: var(--ui-menu-bg);
+  background: var(--ui-popover-frost-bg);
+  -webkit-backdrop-filter: var(--ui-popover-frost-filter);
+  backdrop-filter: var(--ui-popover-frost-filter);
   box-shadow: var(--ui-menu-panel-shadow);
   padding: var(--ui-menu-padding);
   color: var(--openbot-text-primary);
   transform-origin: var(--kb-menu-content-transform-origin, var(--kb-popover-content-transform-origin));
   animation: ui-menu-in var(--ui-menu-duration) var(--ui-menu-ease) both;
+}
+
+:root[data-openbot-no-blur] {
+  --ui-popover-frost: 100%;
 }
 
 .ui-action-menu:not([data-expanded]) {
@@ -239,7 +252,9 @@
   overflow: hidden;
   max-width: min(240px, calc(100vw - var(--openbot-space-4)));
   border-radius: var(--openbot-radius-md);
-  background: var(--ui-menu-bg);
+  background: var(--ui-popover-frost-bg);
+  -webkit-backdrop-filter: var(--ui-popover-frost-filter);
+  backdrop-filter: var(--ui-popover-frost-filter);
   box-shadow: var(--ui-menu-panel-shadow);
   padding: var(--openbot-space-1-5) var(--openbot-space-2);
   color: var(--openbot-text-primary);
@@ -266,9 +281,12 @@
 }
 
 .ui-action-menu[data-menu-swap-out],
-.ui-motion-tooltip[data-menu-swap-out] {
+.ui-motion-tooltip[data-menu-swap-out],
+.ui-motion-tooltip[data-menu-swap-out] .ui-motion-tooltip-label {
   background: transparent;
   box-shadow: none;
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
 }
 
 @keyframes ui-menu-in {

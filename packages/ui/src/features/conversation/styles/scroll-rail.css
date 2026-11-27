@@ -124,10 +124,11 @@
   flex-direction: column;
   gap: var(--openbot-space-1);
   padding: var(--openbot-space-3);
-  border: 1px solid color-mix(in srgb, var(--openbot-text-primary) 8%, transparent);
+  border: 1px solid var(--ui-menu-edge);
   border-radius: var(--openbot-radius-lg);
-  background: var(--openbot-bg-glass);
-  backdrop-filter: blur(var(--openbot-space-4));
+  background: var(--ui-popover-frost-bg);
+  -webkit-backdrop-filter: var(--ui-popover-frost-filter);
+  backdrop-filter: var(--ui-popover-frost-filter);
   font-size: var(--openbot-text-md);
   line-height: 18px;
   pointer-events: none;

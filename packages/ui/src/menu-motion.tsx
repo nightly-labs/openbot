@@ -12,6 +12,7 @@ const HANDOFF_WAIT_MS = 180;
 const LATE_HANDOFF_MS = 50;
 const EXIT_FALLBACK_MS = 400;
 const PLACEMENT_FRAMES = 6;
+const NEAR_GROUP_PX = 24;
 
 interface HeldSubmenu {
   copy: HTMLElement;
@@ -31,9 +32,37 @@ export interface MotionPlace {
 
 let held: HeldSubmenu | undefined;
 
-let unmatched: { panel: HTMLElement; group: Element; since: number } | undefined;
+let unmatched: { panel: HTMLElement; group: Element; until: number } | undefined;
 
 const openInGroup = new Map<HTMLElement, Element>();
+
+let pointer: { x: number; y: number } | undefined;
+
+let pointerTracked = false;
+
+function trackPointer(): void {
+  if (pointerTracked) return;
+  pointerTracked = true;
+  document.addEventListener(
+    "pointermove",
+    (event) => {
+      pointer = { x: event.clientX, y: event.clientY };
+    },
+    { capture: true, passive: true },
+  );
+}
+
+function pointerNear(element: Element): boolean {
+  if (element.matches(":hover")) return true;
+  if (!pointer) return false;
+  const rect = element.getBoundingClientRect();
+  return (
+    pointer.x >= rect.left - NEAR_GROUP_PX &&
+    pointer.x <= rect.right + NEAR_GROUP_PX &&
+    pointer.y >= rect.top - NEAR_GROUP_PX &&
+    pointer.y <= rect.bottom + NEAR_GROUP_PX
+  );
+}
 
 interface MovingState {
   rect: DOMRect;
@@ -121,7 +150,7 @@ function releaseHeld(): void {
 
 function nextPanelExpected(panel: HTMLElement, own: MotionPlace | undefined): Element | null {
   if (own) {
-    const waits = own.group.isConnected && own.group.matches(":hover") && !own.trigger.matches(":hover");
+    const waits = own.group.isConnected && pointerNear(own.group) && !own.trigger.matches(":hover");
     return waits ? own.group : null;
   }
   const trigger = triggerOf(panel);
@@ -179,7 +208,7 @@ function leave(panel: HTMLElement, place: Node | null, own: MotionPlace | undefi
       insertCopy(copy, document.body);
       holdInPlace(held);
       const next = unmatched;
-      if (next?.group === held.group && next.panel.isConnected && performance.now() - next.since < LATE_HANDOFF_MS) {
+      if (next?.group === held.group && next.panel.isConnected && performance.now() < next.until) {
         unmatched = undefined;
         handOff(held, next.panel);
       }
@@ -319,6 +348,7 @@ export function useMenuMotion(own?: () => MotionPlace | undefined): (element: HT
     if (!motionAllowed(element)) return;
     const ownGroup = own?.()?.group;
     if (ownGroup) {
+      trackPointer();
       if (Array.from(openInGroup.values()).includes(ownGroup)) element.dataset.menuHandoff = "";
       openInGroup.set(element, ownGroup);
     }
@@ -332,12 +362,13 @@ export function useMenuMotion(own?: () => MotionPlace | undefined): (element: HT
         return;
       }
       if (!group) return;
-      unmatched = { panel: element, group, since: performance.now() };
+      const wait = "menuHandoff" in element.dataset ? HANDOFF_WAIT_MS : LATE_HANDOFF_MS;
+      unmatched = { panel: element, group, until: performance.now() + wait };
       setTimeout(() => {
         if (unmatched?.panel !== element) return;
         unmatched = undefined;
         delete element.dataset.menuHandoff;
-      }, LATE_HANDOFF_MS);
+      }, wait);
     });
   };
 }

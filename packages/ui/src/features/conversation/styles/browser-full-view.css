@@ -342,9 +342,11 @@ body[data-browser-full-view] .app-frame {
   flex-direction: column;
   gap: var(--openbot-space-2);
   padding: var(--openbot-space-3);
-  border: 1px solid var(--openbot-border);
+  border: 1px solid var(--ui-menu-edge);
   border-radius: var(--openbot-radius-lg);
-  background: var(--openbot-bg-surface-raised);
+  background: var(--ui-popover-frost-bg);
+  -webkit-backdrop-filter: var(--ui-popover-frost-filter);
+  backdrop-filter: var(--ui-popover-frost-filter);
   box-shadow: var(--openbot-shadow-menu);
   color: var(--openbot-text-primary);
   font-size: var(--openbot-text-sm);
@@ -357,10 +359,13 @@ body[data-browser-full-view] .app-frame {
   left: var(--openbot-space-4);
   width: 10px;
   height: 10px;
-  border-top: 1px solid var(--openbot-border);
-  border-left: 1px solid var(--openbot-border);
-  background: var(--openbot-bg-surface-raised);
+  border-top: 1px solid var(--ui-menu-edge);
+  border-left: 1px solid var(--ui-menu-edge);
+  background: var(--ui-popover-frost-bg);
+  -webkit-backdrop-filter: var(--ui-popover-frost-filter);
+  backdrop-filter: var(--ui-popover-frost-filter);
   content: "";
+  clip-path: polygon(-20% 120%, -20% -20%, 120% -20%);
   transform: rotate(45deg);
 }
 
@@ -516,11 +521,11 @@ body[data-browser-full-view] .app-frame {
 }
 
 .browser-full-suggest-row:hover {
-  background: var(--openbot-bg-control-hover);
+  background: var(--ui-menu-item-hover);
 }
 
 .browser-full-suggest-row[aria-selected="true"] {
-  background: var(--openbot-bg-control-active);
+  background: var(--ui-menu-item-selected);
 }
 
 .browser-full-suggest-icon {
@@ -615,7 +620,7 @@ body[data-browser-full-view] .app-frame {
 }
 
 .browser-full-switch-select[aria-current="true"] {
-  background: var(--openbot-bg-control-active);
+  background: var(--ui-menu-item-selected);
 }
 
 .browser-full-switch-close svg,

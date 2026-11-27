@@ -29,7 +29,9 @@
   z-index: var(--openbot-layer-popover);
   padding: var(--openbot-space-3);
   border-radius: var(--ui-menu-radius);
-  background: var(--ui-menu-bg);
+  background: var(--ui-popover-frost-bg);
+  -webkit-backdrop-filter: var(--ui-popover-frost-filter);
+  backdrop-filter: var(--ui-popover-frost-filter);
   box-shadow: 0 0 0 1px var(--ui-menu-edge);
   color: var(--openbot-text-primary);
   animation: chat-color-popover-in var(--openbot-duration-normal) var(--openbot-ease-out) both;

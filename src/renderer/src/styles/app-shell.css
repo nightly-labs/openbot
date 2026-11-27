@@ -765,9 +765,11 @@
 .server-rail-tooltip {
   z-index: var(--openbot-layer-tooltip);
   max-width: min(240px, calc(100vw - 16px));
-  border: 1px solid var(--openbot-border-strong);
+  border: 1px solid var(--ui-menu-edge);
   border-radius: var(--openbot-radius-sm);
-  background: var(--openbot-bg-surface-raised);
+  background: var(--ui-popover-frost-bg);
+  -webkit-backdrop-filter: var(--ui-popover-frost-filter);
+  backdrop-filter: var(--ui-popover-frost-filter);
   box-shadow: var(--openbot-shadow-raised);
   padding: var(--openbot-space-2) var(--openbot-space-3);
   color: var(--openbot-text-primary);
@@ -784,7 +786,9 @@
   left: -6px;
   width: 6px;
   height: 12px;
-  background: var(--openbot-bg-surface-raised);
+  background: var(--ui-popover-frost-bg);
+  -webkit-backdrop-filter: var(--ui-popover-frost-filter);
+  backdrop-filter: var(--ui-popover-frost-filter);
   clip-path: polygon(100% 0, 100% 100%, 0 50%);
   content: "";
   transform: translateY(-50%);
@@ -3385,10 +3389,14 @@ textarea {
 .reaction-picker-row button[aria-checked="true"],
 .composer-button:hover,
 .composer-button[aria-expanded="true"],
-.composer-attachment > button:hover,
+.composer-attachment > button:hover {
+  background: var(--openbot-bg-control-hover);
+  color: var(--openbot-text-primary);
+}
+
 .agent-context-menu button:hover,
 .agent-context-menu button:focus-visible {
-  background: var(--openbot-bg-control-hover);
+  background: var(--ui-menu-item-hover);
   color: var(--openbot-text-primary);
 }
 
@@ -3430,10 +3438,7 @@ textarea {
   color: var(--openbot-text-primary);
 }
 
-.agent-settings-notifications,
-.provider-model-panel,
-.provider-model-rail,
-.avatar-editor {
+.agent-settings-notifications {
   border-color: var(--openbot-border);
   background: var(--openbot-bg-surface);
   color: var(--openbot-text-primary);

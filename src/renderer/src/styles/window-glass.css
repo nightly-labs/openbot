@@ -29,6 +29,7 @@
   --window-solid-control-active: var(--openbot-bg-control-active);
   --window-solid-tabs-bar: var(--openbot-tabs-bar-bg);
   --window-solid-tabs-pill: var(--openbot-tabs-pill-bg);
+  --ui-popover-frost: 100%;
 }
 
 :root[data-openbot-window-glass] .app-window {

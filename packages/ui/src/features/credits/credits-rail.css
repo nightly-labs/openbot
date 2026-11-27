@@ -20,7 +20,7 @@
   z-index: var(--openbot-layer-popover);
   display: grid;
   width: max-content;
-  min-width: 264px;
+  min-width: min(340px, calc(100vw - var(--openbot-space-4)));
   padding: var(--openbot-space-1);
   gap: var(--openbot-space-1);
   transform-origin: var(--kb-popover-content-transform-origin);
@@ -47,6 +47,8 @@
 .credits-rail-card[data-menu-swap-out] {
   background: transparent;
   box-shadow: none;
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
 }
 
 .window-rail-button.credits-rail-chip {
@@ -130,7 +132,7 @@
 
 @media (hover: hover) and (pointer: fine) {
   .credits-rail-row:hover {
-    background: var(--openbot-bg-control);
+    background: var(--ui-menu-item-hover);
   }
 }
 
