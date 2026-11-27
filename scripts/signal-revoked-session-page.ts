@@ -2,8 +2,8 @@ import { decodeSignalServerMessage } from "@openbot/contracts/signal-protocol/de
 import type { SignalClientMessage, SignalServerMessage } from "@openbot/contracts/signal-protocol/messages";
 import { TEAM_PROTOCOL_V2_CHANNELS } from "@openbot/contracts/team-protocol/webrtc-framing";
 import { encodeTeamWebRtcPayload, TeamWebRtcPayloadDecoder } from "@openbot/team-client";
-import type { BridgeCommand } from "../src/renderer/src/features/team/team-webrtc";
-import "../src/renderer/src/features/team/team-webrtc";
+import { type BridgeCommand, CLIENT_RECONFIRM_MS } from "../src/renderer/src/features/team/team-webrtc";
+import { advanceClock, realClearTimeout, realSetTimeout } from "./signal-revoked-session-clock";
 
 interface BridgeEvent {
   type: string;
@@ -71,13 +71,13 @@ function until<T>(read: () => T | undefined, milliseconds: number, label: string
       resolve(value);
       return true;
     };
-    const timer = window.setTimeout(() => {
+    const timer = realSetTimeout(() => {
       cleanup();
       reject(new Error(`Timed out: ${label}.`));
     }, milliseconds);
     const poll = window.setInterval(check, 100);
     const cleanup = () => {
-      clearTimeout(timer);
+      realClearTimeout(timer);
       clearInterval(poll);
       eventWaiters.delete(wake);
     };
@@ -233,12 +233,15 @@ const e2e = {
       "host signal ready",
     );
   },
+  advancePastReconfirm(): number {
+    return advanceClock(CLIENT_RECONFIRM_MS + 1_000);
+  },
   mark(): number {
     return events.length;
   },
   async waitHostEvent(
     from: number,
-    match: { type: string; peerId?: string; code?: string },
+    match: { type: string; peerId?: string; code?: string; sessionId?: string },
     milliseconds: number,
   ): Promise<BridgeEvent> {
     return until(
@@ -249,7 +252,8 @@ const e2e = {
             (event) =>
               event.type === match.type &&
               (match.peerId === undefined || event.peerId === match.peerId) &&
-              (match.code === undefined || event.code === match.code),
+              (match.code === undefined || event.code === match.code) &&
+              (match.sessionId === undefined || event.sessionId === match.sessionId),
           ),
       milliseconds,
       `host event ${match.type}`,
@@ -352,12 +356,12 @@ const e2e = {
     return new Promise((resolve) => {
       const socket = new WebSocket(signalUrl);
       const finish = (result: { type: string; code?: string; closeCode?: number }) => {
-        clearTimeout(timer);
+        realClearTimeout(timer);
         socket.onclose = null;
         socket.close();
         resolve(result);
       };
-      const timer = window.setTimeout(() => finish({ type: "timeout" }), milliseconds);
+      const timer = realSetTimeout(() => finish({ type: "timeout" }), milliseconds);
       socket.onopen = () => {
         const hello: SignalClientMessage = { type: "hello", version: 1, peer: "client", token };
         socket.send(JSON.stringify(hello));

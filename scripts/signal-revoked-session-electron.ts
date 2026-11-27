@@ -30,7 +30,7 @@ const SESSION_SECRET = randomBytes(32).toString("base64url");
 const TURN_SECRET = randomBytes(32).toString("base64url");
 const HOST_RECONNECT_MS = 120_000;
 const TEARDOWN_AFTER_REVOKE_MS = 20_000;
-const RECONFIRM_LIMIT_MS = 150_000;
+const OPEN_CHANNEL_CHECK_MS = 2_000;
 const SIGNAL_INITIAL_CHECK_MS = 3 * 60_000;
 const TICKET_LIFETIME_SECONDS = 300;
 
@@ -278,15 +278,23 @@ async function hostSignalUp(): Promise<number> {
   return Date.now();
 }
 
-async function staleChannelEvidence(name: string, closedWithin: number): Promise<{ closed: boolean; text: string }> {
+async function staleChannelEvidence(
+  name: string,
+  closedWithin: number,
+): Promise<{ closed: boolean; answered: boolean; text: string }> {
   const startedAt = Date.now();
   const closed = await page(z.boolean(), "waitRpcClosed", name, closedWithin);
-  if (closed) return { closed, text: `the data channel closed after ${Date.now() - startedAt} ms` };
+  if (closed) return { closed, answered: false, text: `the data channel closed after ${Date.now() - startedAt} ms` };
   const answered = await page(z.boolean(), "rpc", name, `after-revoke-${randomUUID()}`, 5_000);
   return {
     closed,
+    answered,
     text: `the data channel stayed ${JSON.stringify(await page(z.unknown(), "clientState", name))} for ${closedWithin} ms; host RPC answer: ${answered}`,
   };
+}
+
+async function waitLiveConfirmed(from: number, sessionId: string): Promise<void> {
+  await page(z.unknown(), "waitHostEvent", from, { type: "incoming-peer", sessionId }, 10_000);
 }
 
 async function proofOfConcept(): Promise<void> {
@@ -364,7 +372,7 @@ async function revokeWhileHostOffline(): Promise<void> {
 
 async function revokeThenSignalRestart(): Promise<void> {
   const stale = await clientSession("stale-c", MEMBER_C, memberCUrl);
-  await clientSession("live-c", MEMBER_C, memberCUrl);
+  const liveSession = await clientSession("live-c", MEMBER_C, memberCUrl);
   await hostSignalDown();
   const status = await revoke(stale.sessionId);
   await page(z.unknown(), "waitSignalClosed", "stale-c", 10_000);
@@ -373,13 +381,27 @@ async function revokeThenSignalRestart(): Promise<void> {
   staleTicket = { sessionId: staleTicketSession, token: staleToken, revokeStatus: await revoke(staleTicketSession) };
   await stopSignal();
   await startSignal();
-  const readyAt = await hostSignalUp();
+  await hostSignalUp();
+  const reconnectFrom = await page(z.number(), "mark");
   await page(z.unknown(), "reconnectClientSignal", "live-c", memberCUrl);
-  const evidence = await staleChannelEvidence("stale-c", RECONFIRM_LIMIT_MS);
+  await waitLiveConfirmed(reconnectFrom, liveSession.sessionId);
+  await hostSignalDown();
+  const firedOffline = await page(z.number(), "advancePastReconfirm");
+  const offline = await staleChannelEvidence("stale-c", OPEN_CHANNEL_CHECK_MS);
+  record(
+    "Signal outage: time while the host is off Signal does not count toward the re-confirmation limit",
+    !offline.closed && offline.answered,
+    `clock advanced past the limit while the host was off Signal (${firedOffline} timers fired); ${offline.text}`,
+  );
+  const upFrom = await page(z.number(), "mark");
+  await hostSignalUp();
+  await waitLiveConfirmed(upFrom, liveSession.sessionId);
+  const firedOnline = await page(z.number(), "advancePastReconfirm");
+  const evidence = await staleChannelEvidence("stale-c", TEARDOWN_AFTER_REVOKE_MS);
   record(
     "Signal lost its memory: the host closes a data channel that Signal does not map again",
     status === 204 && evidence.closed,
-    `auth event ${status}; ${evidence.text}; ${Date.now() - readyAt} ms after the host Signal was ready`,
+    `auth event ${status}; clock advanced past the limit while the host was on Signal (${firedOnline} timers fired); ${evidence.text}`,
   );
   const live = await page(z.boolean(), "rpc", "live-c", "live-after-restart", 5_000);
   record(

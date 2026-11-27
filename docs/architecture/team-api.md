@@ -291,9 +291,12 @@ session that ended while the host socket was away. Signal keeps the ended sessio
 24 hours and sends them in a `sessions-ended` frame each time a host socket authenticates, and at once
 to a host socket that is connected. The host closes the child peer of each listed session. Signal
 forgets these IDs when it restarts, so the host also fails closed: after each new host Signal socket,
-every child peer must be confirmed again by a `peer-ready` for its session within 2 minutes
-(`CLIENT_RECONFIRM_MS` in `team-webrtc.ts`), or the host closes it. A connected client is confirmed at
-once, because Signal maps it to the new host socket. Host frames use their own Signal rate key
+every child peer must be confirmed again by a `peer-ready` for its session, or the host closes it.
+Each child peer has 11 minutes for this (`CLIENT_RECONFIRM_MS` in `team-webrtc.ts`): the 10-minute
+client reconnect grace of Signal and 1 minute more. The time counts only while the host has a ready
+Signal socket, so a Signal outage does not close healthy peers. Signal confirms a client at once when
+the client socket is connected and Signal maps it to the resumed host socket. A client that is away
+from Signal is confirmed when it comes back. Host frames use their own Signal rate key
 (`host:<hostId>`, 10 times the per-user limit), so the traffic of an owner's client cannot close the
 host socket. Older hosts ignore `sessions-ended`.
 

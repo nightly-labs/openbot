@@ -1,6 +1,7 @@
 import { isString } from "@openbot/contracts/runtime-values";
 import { decodeSignalServerMessage } from "@openbot/contracts/signal-protocol/decode";
 import {
+  SIGNAL_CLIENT_RECONNECT_GRACE_MS,
   SIGNAL_NO_READY_CLOSE_CODE,
   SIGNAL_PROTOCOL_VERSION,
   SIGNAL_TURN_REFRESH_INTERVAL_MS,
@@ -102,7 +103,8 @@ interface PeerState {
   restartIceOnReady: boolean;
   pathLost: boolean;
   signalChain: Promise<void>;
-  unconfirmedSessions: Map<string, number | null>;
+  unconfirmedSessions: Map<string, number>;
+  reconfirmClockStartedAt: number | null;
   reconfirmTimer: number | null;
   closed: boolean;
 }
@@ -113,7 +115,7 @@ const SIGNAL_READY_DEADLINE_MS = 30_000;
 const SIGNAL_PROBE_INTERVAL_MS = 4 * 60_000;
 const RELAYED_FRAME_DEADLINE_MS = 30_000;
 const SIGNAL_HOLD_SPREAD_MS = 5_000;
-const CLIENT_RECONFIRM_MS = 120_000;
+export const CLIENT_RECONFIRM_MS = SIGNAL_CLIENT_RECONNECT_GRACE_MS + 60_000;
 
 const peers = new Map<string, PeerState>();
 let signalRetryAt = 0;
@@ -196,6 +198,7 @@ async function handleCommand(command: BridgeCommand): Promise<void> {
         pathLost: false,
         signalChain: Promise.resolve(),
         unconfirmedSessions: new Map(),
+        reconfirmClockStartedAt: null,
         reconfirmTimer: null,
         closed: false,
       };
@@ -379,6 +382,7 @@ function connectSignal(state: PeerState, prepared: WebSocket | null = null): voi
     if (state.socket !== socket) return;
     state.socket = null;
     clearSignalLiveness(state);
+    if (state.role === "host") pauseClientReconfirm(state);
     if (state.role === "host" && !state.closed)
       post({ type: "signal-closed", peerId: state.id, code: String(event.code), terminal: event.code === 4000 });
     if (event.code === 4000) {
@@ -537,6 +541,7 @@ async function handleSignal(state: PeerState, message: SignalServerMessage): Pro
         pathLost: false,
         signalChain: Promise.resolve(),
         unconfirmedSessions: new Map(),
+        reconfirmClockStartedAt: null,
         reconfirmTimer: null,
       };
       state.clients.set(message.sessionId, client);
@@ -984,38 +989,48 @@ function replaceSignal(state: PeerState): void {
 }
 
 function markClientsUnconfirmed(host: PeerState): void {
+  pauseClientReconfirm(host);
   for (const sessionId of host.clients.keys()) {
-    if (!host.unconfirmedSessions.has(sessionId)) host.unconfirmedSessions.set(sessionId, null);
+    if (!host.unconfirmedSessions.has(sessionId)) host.unconfirmedSessions.set(sessionId, CLIENT_RECONFIRM_MS);
   }
 }
 
 function armClientReconfirm(host: PeerState): void {
-  const now = Date.now();
-  for (const [sessionId, deadline] of host.unconfirmedSessions) {
-    if (deadline === null) host.unconfirmedSessions.set(sessionId, now + CLIENT_RECONFIRM_MS);
-  }
+  host.reconfirmClockStartedAt ??= Date.now();
+  scheduleClientReconfirm(host);
+}
+
+function pauseClientReconfirm(host: PeerState): void {
+  const startedAt = host.reconfirmClockStartedAt;
+  if (startedAt === null) return;
+  host.reconfirmClockStartedAt = null;
+  const onlineMs = Date.now() - startedAt;
+  for (const [sessionId, remainingMs] of host.unconfirmedSessions)
+    host.unconfirmedSessions.set(sessionId, Math.max(0, remainingMs - onlineMs));
   scheduleClientReconfirm(host);
 }
 
 function scheduleClientReconfirm(host: PeerState): void {
   if (host.reconfirmTimer !== null) clearTimeout(host.reconfirmTimer);
   host.reconfirmTimer = null;
-  const deadlines = [...host.unconfirmedSessions.values()].filter((deadline) => deadline !== null);
-  if (deadlines.length === 0) return;
+  const startedAt = host.reconfirmClockStartedAt;
+  if (startedAt === null || host.unconfirmedSessions.size === 0) return;
+  const dueAt = startedAt + Math.min(...host.unconfirmedSessions.values());
   host.reconfirmTimer = window.setTimeout(
     () => {
       host.reconfirmTimer = null;
       endUnconfirmedSessions(host);
     },
-    Math.max(0, Math.min(...deadlines) - Date.now()),
+    Math.max(0, dueAt - Date.now()),
   );
 }
 
 function endUnconfirmedSessions(host: PeerState): void {
-  if (host.closed) return;
-  const now = Date.now();
+  const startedAt = host.reconfirmClockStartedAt;
+  if (host.closed || startedAt === null) return;
+  const onlineMs = Date.now() - startedAt;
   const expired = [...host.unconfirmedSessions]
-    .filter(([, deadline]) => deadline !== null && deadline <= now)
+    .filter(([, remainingMs]) => remainingMs <= onlineMs)
     .map(([sessionId]) => sessionId);
   endSessions(host, expired);
   scheduleClientReconfirm(host);
@@ -1051,6 +1066,7 @@ function awaitSignalReady(state: PeerState, socket: WebSocket): void {
     state.signalReadyTimer = null;
     if (state.closed || state.socket !== socket) return;
     state.socket = null;
+    pauseClientReconfirm(state);
     socket.close(1000, "No ready");
     post({ type: "signal-closed", peerId: state.id, code: SIGNAL_NO_READY_CLOSE_CODE, terminal: false });
     scheduleSignalReconnect(state);
