@@ -2954,7 +2954,7 @@ export class OpenBotToolRouter {
           success: true,
           contentItems: [
             { type: "inputText", text: JSON.stringify({ ...pages, note }) },
-            { type: "inputText", text: this.#hooks.redactMcp(text) },
+            { type: "inputText", text: this.#hooks.redactMcpForAgent(text) },
           ],
         }),
       ),

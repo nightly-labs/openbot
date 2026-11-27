@@ -28,7 +28,7 @@ function readFailure(cause: unknown): DocumentReadFailed {
 
 export const readPdfText = Effect.fn("DocumentReader.readPdfText")(function* (bytes: Uint8Array, firstPage: number) {
   return yield* Effect.tryPromise({
-    try: async () => (await import("./pdf-text")).extractPdfText(bytes, firstPage),
+    try: async (signal) => (await import("./pdf-text")).extractPdfText(bytes, firstPage, signal),
     catch: readFailure,
   }).pipe(
     Effect.timeoutOrElse({

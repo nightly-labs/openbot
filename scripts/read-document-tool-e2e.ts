@@ -134,7 +134,11 @@ function pdfFile(pages: string[]): Buffer {
   objects.push(`<< /Type /Pages /Kids [${kids}] /Count ${pages.length} >>`);
   objects.push("<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>");
   for (const [index, text] of pages.entries()) {
-    const stream = text ? `BT /F1 18 Tf 72 720 Td (${text}) Tj ET` : "";
+    const stream = text
+      .split("\n")
+      .filter(Boolean)
+      .map((line, row) => `BT /F1 10 Tf 20 ${770 - row * 14} Td (${line}) Tj ET`)
+      .join("\n");
     objects.push(
       `<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Resources << /Font << /F1 3 0 R >> >> /Contents ${5 + index * 2} 0 R >>`,
     );
@@ -337,6 +341,22 @@ try {
     "A page after the end fails with the page count",
     !past.success && past.output.includes("only 35 pages"),
     past.output,
+  );
+
+  const dense = join(files, "dense.pdf");
+  const denseLines = (page: number) => [...Array.from({ length: 49 }, () => "x".repeat(60)), `End of page ${page} `];
+  await writeFile(dense, pdfFile(Array.from({ length: 25 }, (_, index) => denseLines(index + 1).join("\n"))));
+  const full = await readFromChat("read dense pages", reader.id, dense, { path: "ATTACHED" });
+  const pageField = (name: string) => Number(full.output.match(new RegExp(`"${name}":(\\d+)`))?.[1]);
+  const fullPages = { lastPage: pageField("lastPage"), nextPage: pageField("nextPage") };
+  pass(
+    "Dense pages stop at a whole page, and the next page is the first page not returned",
+    full.success &&
+      fullPages.lastPage < 25 &&
+      fullPages.nextPage === fullPages.lastPage + 1 &&
+      full.output.includes(`End of page ${fullPages.lastPage}`) &&
+      !full.output.includes(`End of page ${fullPages.nextPage} `),
+    full.output.slice(0, 200),
   );
 
   const scanned = join(files, "scanned.pdf");
