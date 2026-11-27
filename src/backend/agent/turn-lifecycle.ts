@@ -177,7 +177,7 @@ export const FAILOVER_CAUSES: ReadonlySet<CauseCode> = new Set([
   "provider_internal_error",
 ]);
 
-const CODEX_SAFETY_BLOCKS: ReadonlySet<string> = new Set(["cyberPolicy", "misalignmentPolicyViolation"]);
+const CODEX_SAFETY_BLOCKS: ReadonlySet<string> = new Set(["cyberPolicy", "bioPolicy", "misalignmentPolicyViolation"]);
 const SAFETY_BLOCK_REVERT_TIMEOUT_MS = 10_000;
 
 function carriesHandoff(item: DynamicRecord): boolean {
