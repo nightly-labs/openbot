@@ -26,6 +26,7 @@ import { CREDIT_MEDIA_TOOL_DEFINITIONS } from "./agent/credit-media-tools";
 import { CRM_TOOL_DEFINITIONS } from "./agent/crm-tool";
 import { DATA_TOOL_DEFINITIONS } from "./agent/data-tools";
 import { deleteAgentToolSchema } from "./agent/delete-agent-tool";
+import { readDocumentToolShape } from "./agent/document-reader";
 import { HISTORY_TOOL_DEFINITIONS } from "./agent/history-tools";
 import { readImageToolShape } from "./agent/image-reader";
 import {
@@ -398,6 +399,12 @@ export const OPENBOT_TOOL_DEFINITIONS: readonly OpenBotToolDefinition[] = [
     description:
       "Look at a local PNG or JPEG image, such as a photo. Returns it upright, made smaller when large, with its size.",
     shape: readImageToolShape,
+  },
+  {
+    name: "read_document",
+    description:
+      "Read the text of a local PDF file, such as a PDF that the user attached. Returns the text of up to 30 pages for each call, with page numbers.",
+    shape: readDocumentToolShape,
   },
   {
     name: "list_sections",

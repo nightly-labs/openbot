@@ -83,6 +83,7 @@
         "katex": "catalog:",
         "knip": "6.42.1",
         "lucide-solid": "catalog:",
+        "pdfjs-dist": "catalog:",
         "playwright-core": "1.64.1",
         "solid-recharts": "catalog:",
         "solid-sonner": "catalog:",

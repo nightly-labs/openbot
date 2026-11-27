@@ -213,6 +213,7 @@ const COLLABORATOR_SEPARATOR = "--- collaborator message ---";
 const ROUTINE_TASK_START = "--- routine task ---";
 const ROUTINE_TASK_END = "--- end of routine task ---";
 const ATTACHED_FILES_HEADER = "\n\nAttached local files:\n";
+const READ_PDF_NOTE = "Read the text of an attached PDF with openbot.read_document.";
 const NO_ANSWER_FROM = "No answer comes from ";
 const USER_LANGUAGE_LINE =
   "Write each line for the user in the language of the user's chat messages, not in the language of OpenBot notes or other agents.";
@@ -594,6 +595,7 @@ export function deliveryPromptInput(context: DeliveryContext, sources: DeliveryP
   if (skillSuggestion) text = `${skillSuggestion}${CURRENT_MESSAGE_SEPARATOR}${text}`;
   if (managedAttachments.length) {
     text += `${ATTACHED_FILES_HEADER}${managedAttachments.map((item) => `- ${item.name}: ${item.path}`).join("\n")}`;
+    if (managedAttachments.some((item) => item.previewKind === "pdf")) text += `\n${READ_PDF_NOTE}`;
   }
   if (context.resumeAfterUsageLimit) {
     const continuationState = context.resumeAfterUsageLimit;
