@@ -15,6 +15,8 @@ import {
   type TestRoutineInput,
 } from "@openbot/contracts/ipc";
 import type { EventRoutine, EventRoutineOwner, EventRoutineTriggerInput } from "@openbot/contracts/ipc-events";
+import { ROUTINES_SYNC_COLLECTION } from "@openbot/contracts/team-protocol/sync-collections";
+import { parseSyncName } from "@openbot/contracts/team-protocol/sync-v1";
 import type { EventRoutinesApi, RoutineWebhooksApi } from "./routine-webhooks-api";
 
 interface RoutineSaveInput {
@@ -97,7 +99,8 @@ function agentRoutineResults(agentId: string, serverId?: string | RoutineResults
 export type AgentRoutinesApi = Pick<
   OpenBotDesktopApi["agent"],
   "listRoutines" | "listRoutineRuns" | "createRoutine" | "updateRoutine" | "deleteRoutine" | "testRoutine" | "onEvent"
->;
+> &
+  Partial<Pick<OpenBotDesktopApi["agent"], "onSyncChanged">>;
 
 export function agentRoutinesPort(
   agentId: string,
@@ -136,10 +139,19 @@ export function agentRoutinesPort(
     },
     ...(runCommand ? { runCommand: (routineId: string) => runCommand({ agentId, routineId }) } : {}),
     ...(results ? { results } : {}),
-    subscribe: (reload) =>
-      api.onEvent((event) => {
+    subscribe: (reload) => {
+      const stopEvents = api.onEvent((event) => {
         if (event.type === "routines-changed" && event.agentId === agentId) reload();
-      }),
+      });
+      const stopSync = api.onSyncChanged?.((change) => {
+        const synced = parseSyncName(change.name);
+        if (synced?.base === ROUTINES_SYNC_COLLECTION.name && synced.param === agentId) reload();
+      });
+      return () => {
+        stopEvents();
+        stopSync?.();
+      };
+    },
   };
 }
 

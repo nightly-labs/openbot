@@ -62,6 +62,6 @@ export async function routeAgentRoutines(
   return "unmatched";
 }
 
-function isReleasedRoutine(routine: { trigger: { schedule: unknown } }): boolean {
+export function isReleasedRoutine(routine: { trigger: { schedule: unknown } }): boolean {
   return isReleasedRoutineSchedule(routine.trigger.schedule);
 }

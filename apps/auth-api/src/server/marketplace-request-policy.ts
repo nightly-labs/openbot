@@ -1,3 +1,4 @@
+import { PLUGIN_CATALOG_PATH } from "@openbot/contracts/plugin-catalog";
 import { Effect, Schema } from "effect";
 import { requestSourceIp } from "./source-ip";
 import type { WorkerBindings } from "./types";
@@ -52,6 +53,7 @@ function isMarketplacePath(pathname: string): boolean {
     pathname === "/v1/skills" ||
     pathname.startsWith("/v1/skills/") ||
     pathname.startsWith("/v1/marketplace/agents") ||
-    pathname.startsWith("/v1/agent-templates")
+    pathname.startsWith("/v1/agent-templates") ||
+    pathname === PLUGIN_CATALOG_PATH
   );
 }

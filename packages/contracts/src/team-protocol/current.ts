@@ -161,6 +161,7 @@ import { PASSWORD_MANAGERS_CAPABILITY } from "./password-managers-v1";
 import { PENDING_APPROVAL_CAPABILITY } from "./pending-approval-v1";
 import { PENDING_PROMPTS_CAPABILITY } from "./pending-prompts-v1";
 import { PHONE_FEEDBACK_CAPABILITY } from "./phone-feedback-v1";
+import { PLUGIN_CATALOG_CAPABILITY } from "./plugin-catalog-v1";
 import { PROMPT_CACHE_TTL_CAPABILITY, PROMPT_CACHE_TTL_PI_CAPABILITY } from "./prompt-cache-ttl-v1";
 import { TEAM_PROMPT_DETAIL_CAPABILITY } from "./prompt-detail-v1";
 import { TEAM_PROMPT_MULTI_SELECT_CAPABILITY } from "./prompt-multi-select-v1";
@@ -196,6 +197,7 @@ import { TEAM_QUEUE_EDIT_CAPABILITY } from "./queue-edit-v1";
 import { QUEUE_HOLD_CAPABILITY, QUEUE_HOLD_SIGN_IN_CAPABILITY } from "./queue-hold-v1";
 import { QUIET_TURN_CAPABILITY } from "./quiet-turn-v1";
 import { TEAM_REASONING_EFFORTS_CAPABILITY } from "./reasoning-efforts-v1";
+import { REMOTE_CHAT_CONTENT_CAPABILITY } from "./remote-chat-content-v1";
 import { ROUTINE_FLOW_STOP_CAPABILITY } from "./routine-flow-stop-v1";
 import { ROUTINE_FLOWS_CAPABILITY } from "./routine-flows-v1";
 import { ROUTINE_PAUSE_REASONS_CAPABILITY } from "./routine-pause-reasons-v1";
@@ -224,6 +226,7 @@ import { STORAGE_DISK_CAPABILITY } from "./storage-disk-v1";
 import { STORAGE_USER_FILES_CAPABILITY } from "./storage-user-files-v1";
 import { STORAGE_WORKFLOW_FILES_CAPABILITY } from "./storage-workflow-files-v1";
 import { TEAM_SUBAGENTS_CAPABILITY } from "./subagents-v1";
+import { SYNC_CAPABILITY } from "./sync-v1";
 import { THREAD_MESSAGE_SEARCH_CAPABILITY } from "./thread-message-search-v1";
 import { TEAM_UI_BLOCK_AUTO_ANSWER_CAPABILITY } from "./ui-block-auto-answer-v1";
 import { TEAM_UI_BLOCK_LOCATION_CAPABILITY } from "./ui-block-location-v1";
@@ -440,6 +443,7 @@ export {
   PASSWORD_MANAGERS_CAPABILITY,
   PENDING_APPROVAL_CAPABILITY,
   PHONE_FEEDBACK_CAPABILITY,
+  PLUGIN_CATALOG_CAPABILITY,
   PROMPT_CACHE_TTL_CAPABILITY,
   PROMPT_CACHE_TTL_PI_CAPABILITY,
   PROVIDER_ACCOUNT_RELAY_CAPABILITY,
@@ -487,6 +491,7 @@ export {
   STORAGE_CHANNEL_CAPABILITY,
   STORAGE_DISK_CAPABILITY,
   STORAGE_USER_FILES_CAPABILITY,
+  SYNC_CAPABILITY,
   TEAM_BROWSER_NAVIGATION_CAPABILITY,
   TEAM_BROWSER_VIEW_CAPABILITY,
   TEAM_BROWSER_VIEW_CLIPBOARD_CAPABILITY,
@@ -890,6 +895,9 @@ const TEAM_CAPABILITY_REGISTRY = [
   [PROVIDER_ACCOUNT_POOL_STRATEGY_CAPABILITY, V10],
   [WATCH_RELAY_TEAM_CAPABILITY, V10],
   [WORKFLOWS_MEDIA_CLIPS_CAPABILITY, V10],
+  [SYNC_CAPABILITY, V10],
+  [REMOTE_CHAT_CONTENT_CAPABILITY, V10],
+  [PLUGIN_CATALOG_CAPABILITY, V10],
 ] as const satisfies readonly (readonly [string, TeamCapabilityPlacement])[];
 
 export const TEAM_CURRENT_CAPABILITIES = TEAM_CAPABILITY_REGISTRY.map(([capability]) => capability);

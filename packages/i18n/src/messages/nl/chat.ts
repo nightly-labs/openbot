@@ -543,4 +543,13 @@ export const messages = {
   "chat.feedbackWithdrawn.badge": "Verwijderd",
   "chat.feedbackWithdrawn.body":
     "Je melding staat niet meer op GitHub. Vraag de agent om een verbeterde melding te sturen.",
+  "chat.remoteContent.pictureNotLoaded":
+    "Afbeelding van {host}. Niet geladen, omdat externe inhoud uit staat op deze server.",
+  "chat.remoteContent.loadPicture": "Afbeelding laden",
+  "chat.remoteContent.diagramNotDrawn":
+    "Dit diagram kan een afbeelding van een andere website laden. Het is niet getekend, omdat externe inhoud uit staat op deze server.",
+  "chat.remoteContent.loadDiagram": "Diagram laden",
+  "chat.remoteContent.pageStatic":
+    "Getoond zonder scripts en externe inhoud, omdat externe inhoud uit staat op deze server.",
+  "chat.remoteContent.runPage": "Pagina starten",
 } as const satisfies PartialTranslation<typeof source>;

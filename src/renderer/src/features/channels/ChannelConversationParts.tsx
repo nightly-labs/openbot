@@ -155,6 +155,9 @@ export function ChannelAboveComposer(props: { channelId: string }) {
     <Show when={page()}>
       {(current) => (
         <>
+          <Show when={!current().channel.archived && !current().channel.members.length}>
+            <p class="channel-wait-note">{t("channel.conversation.noMembers")}</p>
+          </Show>
           <For each={waitNotes(current())}>
             {(text) => (
               <p class="channel-wait-note" role="status">
@@ -169,9 +172,6 @@ export function ChannelAboveComposer(props: { channelId: string }) {
             onResume={resumeTask}
             onCancel={onCancel()}
           />
-          <Show when={!current().channel.archived && !current().channel.members.length}>
-            <p>{t("channel.conversation.noMembers")}</p>
-          </Show>
         </>
       )}
     </Show>

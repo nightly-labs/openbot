@@ -218,3 +218,16 @@
 .message-preview-dialog-body .message-preview-frame {
   height: 100%;
 }
+
+.message-preview-remote {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--openbot-space-2);
+  padding-bottom: var(--openbot-space-4);
+  text-align: center;
+}
+
+.message-preview-remote .message-preview-status {
+  padding-bottom: 0;
+}

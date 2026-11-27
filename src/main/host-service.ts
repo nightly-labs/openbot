@@ -182,6 +182,7 @@ interface HostServiceOptions {
   admin?: ForwardedApiOptions["admin"];
   focusUse?: ForwardedApiOptions["focusUse"];
   watchRelay?: ForwardedApiOptions["watchRelay"];
+  pluginCatalogLoaded?: ForwardedApiOptions["pluginCatalogLoaded"];
   appVersion: string;
   store: TeamStore;
   agents: ForwardedApiOptions["agents"] &
@@ -559,6 +560,7 @@ export class HostService extends EventEmitter<HostEvents> {
       ...(this.#pushNotifications === undefined ? {} : { pushNotifications: this.#pushNotifications }),
       ...(options.focusUse === undefined ? {} : { focusUse: options.focusUse }),
       ...(options.watchRelay === undefined ? {} : { watchRelay: options.watchRelay }),
+      ...(options.pluginCatalogLoaded === undefined ? {} : { pluginCatalogLoaded: options.pluginCatalogLoaded }),
     });
     this.#runtime = ManagedRuntime.make(
       Layer.succeed(

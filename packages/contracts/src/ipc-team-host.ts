@@ -7,6 +7,7 @@ import type { HostAppearanceEvent, ServerAppearance } from "./team-protocol/host
 import type { HostRestartEvent, HostRestartState } from "./team-protocol/host-update-v1";
 import type { LiveVoiceEvent } from "./team-protocol/live-voice-v1";
 import type { MachineAlertEvent } from "./team-protocol/machine-resources-v1";
+import type { RemoteChatContentEvent } from "./team-protocol/remote-chat-content-v1";
 
 export type { HostAppearanceEvent, ServerAppearance, ServerAppearanceShape } from "./team-protocol/host-appearance-v1";
 
@@ -302,6 +303,7 @@ export type TeamRealtimeEvent =
     }
   | HostRestartEvent
   | HostAppearanceEvent
+  | RemoteChatContentEvent
   | LiveVoiceEvent
   | MachineAlertEvent
   | ClientBrowserCommandEvent;

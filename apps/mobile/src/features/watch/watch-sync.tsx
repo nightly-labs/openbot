@@ -246,6 +246,7 @@ function WatchLinkSync({ servers, serversReady, agents, preferences, capabilitie
         await connected(() => readWorkspace().servers.some(showsOnline));
         return done();
       }
+      if (command.type === "widgetPush") return failure("failed", t("mobile.watch.error.failed"));
       if (command.type === "sendChannel" || command.type === "readChannel") {
         const { serverId, channelId } = command;
         const channel = actions.channelStore.get(serverId).channels.find((item) => item.id === channelId);

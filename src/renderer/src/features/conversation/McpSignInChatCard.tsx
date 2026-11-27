@@ -4,7 +4,7 @@ import { McpSignInCard, type McpSignInCardState } from "@openbot/ui/features/con
 import { isPluginAppConfig } from "@openbot/ui/features/settings/marketplace-plugins";
 import { useText } from "@openbot/ui/text";
 import { createMemo, createSignal, Show } from "solid-js";
-import { MARKETPLACE_PLUGINS } from "../settings/marketplace-plugin-catalog";
+import { marketplacePlugins } from "../settings/marketplace-plugin-source";
 import { conversationRuntime } from "./conversation-runtime";
 import { useConversationViewScope } from "./conversation-scope";
 
@@ -18,7 +18,7 @@ export interface McpSignInChatCardProps {
 const SIGN_IN_CHECK_DEADLINE_MS = 8_000;
 
 function heldByAppWithoutSignIn(config: McpServerConfig): boolean {
-  return MARKETPLACE_PLUGINS.some((plugin) =>
+  return marketplacePlugins().some((plugin) =>
     plugin.apps.some((app) => !app.server.auth?.length && isPluginAppConfig(config, app)),
   );
 }

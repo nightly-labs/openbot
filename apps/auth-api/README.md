@@ -303,6 +303,15 @@ GitHub Actions reads the remote-control secrets, `SKILLS_ADMIN_TOKEN`, `SITE_REP
 `SITE_OPERATIONS_ADMIN_TOKEN` and `SERVER_CLAIMS_ADMIN_TOKEN` from the `cloudflare-production` Environment. It includes
 them in Wrangler's temporary runtime secrets file.
 
+Cloudflare Access also protects the admin routes (`/v1/skills/admin/`, `/v1/marketplace/agents/admin/`,
+`/v1/sites/admin/` and `/v2/admin/`). When the Worker variables `CF_ACCESS_TEAM_DOMAIN` (for example
+`<team>.cloudflareaccess.com`) and `CF_ACCESS_ADMIN_AUD` (the AUD tag of the Access application) are
+set, an admin request needs a valid `Cf-Access-Jwt-Assertion` as well as the admin token. With only
+one of them set, every admin request is refused. They are not secrets: set them in `wrangler.jsonc`
+`vars` only after the Access application exists. Development keeps them empty. People sign in to
+Access with MFA. Scripts send an Access service token when `CF_ACCESS_CLIENT_ID` and
+`CF_ACCESS_CLIENT_SECRET` are in the environment (`scripts/cloudflare-access-headers.ts`).
+
 `COMPANY_SIGN_IN_SECRET` (at least 32 random bytes) turns on company sign-in (OpenID Connect and
 SCIM). It encrypts each company's client secret in D1, so never change or lose it: with another
 value, each company must enter its client secret again. Without it, company sign-in answers 503 and
@@ -505,6 +514,13 @@ on Apple Watch only); a host cannot give the text.
 It has its own key in `LIVE_ACTIVITY_RATE_LIMITER`, and it sends nothing for a device session that
 has ended (`RemoteControlPlane.sessionOpen`), because the host does not learn about the end. The
 alert has "OpenBot" as its only text and `mutable-content`; the app opens the sealed bytes.
+
+`POST /v2/remote/hosts/:hostId/widget-push` takes `{ machineToken, token, environment }` and sends an
+empty Apple Watch widget push: `{"aps":{"content-changed":true}}`, with `apns-push-type: widgets` and
+the topic of `watchWidgetPushTopic` (`<APNS_TOPIC>.watchkitapp.push-type.widgets`). watchOS then reloads
+the widget, and the widget gets its data from the host over the watch direct link. It has its own key
+in `LIVE_ACTIVITY_RATE_LIMITER` and stores and logs nothing. See
+[Widget push](../../docs/architecture/watch-relay.md#widget-push).
 
 `POST /v2/remote/watch/sessions` pairs an Apple Watch with the phone account session that sends it
 (`watch_sessions` in D1). The body is `{ publicKey }`, the raw P-256 key of the watch. The answer is

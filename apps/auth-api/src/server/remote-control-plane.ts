@@ -85,6 +85,7 @@ import {
 import { decodeBase64Url, hmacSha256, importHmacSha256Key, randomToken, sha256 } from "./crypto";
 import { CUSTOM_SERVER_OFFER_COLUMNS, type CustomServerOfferRow, customServerPayment } from "./custom-server-offers";
 import type { GitHubInstallationTokensError, GitHubRepositoryRoute } from "./github-installation-tokens";
+import { replicaD1 } from "./observed-d1";
 import { PERSISTENT_SESSION_EXPIRES_AT } from "./session-policy";
 import { CHECKOUT_LIFETIME_SECONDS } from "./stripe-client";
 import type { AuthUser, WorkerBindings } from "./types";
@@ -891,6 +892,31 @@ export class RemoteControlPlane {
         authEpoch: registered.auth_epoch,
         machineToken,
       };
+    },
+    (operation) => operation.pipe(Effect.provide(this.#layer)),
+  ).bind(this);
+
+  readonly revokeHostCredential = Effect.fn("RemoteControlPlane.revokeHostCredential")(
+    function* (this: RemoteControlPlane, user: AuthUser, input: { hostId: string; machineToken: string }) {
+      const dependencies = yield* RemoteDependencies;
+      const hostId = yield* remoteValidate(() => requiredIdentifier(input.hostId, "host ID"));
+      const host = yield* this.authenticateHost(hostId, input.machineToken);
+      if (host.owner_user_id !== user.id) {
+        return yield* new RemoteControlPlaneError(403, "host_owner_mismatch", "This host belongs to another account.");
+      }
+      const now = dependencies.now();
+      yield* remoteCall(() =>
+        dependencies.database.batch([
+          dependencies.database
+            .prepare(
+              `UPDATE remote_hosts SET machine_token_hash = NULL, auth_epoch = auth_epoch + 1, updated_at = ?
+               WHERE host_id = ? AND owner_user_id = ? AND machine_token_hash = ?`,
+            )
+            .bind(now, hostId, user.id, host.machine_token_hash),
+          this.#authEpochEventStatement(hostId, now, user.id, { sql: "machine_token_hash IS NULL", binds: [] }),
+        ]),
+      );
+      yield* this.#flushAuthEvents();
     },
     (operation) => operation.pipe(Effect.provide(this.#layer)),
   ).bind(this);
@@ -1909,7 +1935,7 @@ export class RemoteControlPlane {
     function* (this: RemoteControlPlane, user: AuthUser) {
       const dependencies = yield* RemoteDependencies;
       const rows = yield* remoteCall(() =>
-        dependencies.database
+        replicaD1(dependencies.database)
           .prepare(
             `SELECT ${OWNER_TRANSFER_COLUMNS} ${OWNER_TRANSFER_FROM}
            WHERE t.to_email = ? AND t.status = 'pending' AND t.expires_at > ? AND h.owner_user_id = t.from_user_id

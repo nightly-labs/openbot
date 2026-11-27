@@ -86,7 +86,12 @@ import { HttpError } from "./http-error";
 import type { RouteOutcome, TeamApiRequestContext } from "./request-context";
 import { readJson, requireAdmin, requireAgentLevel, stringField, WEBRTC_FRAME_BODY_BUDGET } from "./request-helpers";
 import { runEventsEffect } from "./route-events";
-import { runWorkflowEffect as run, workflowMissing, workflowVisibility } from "./workflow-visibility";
+import {
+  runWorkflowEffect as run,
+  visibleWorkflowSummaries,
+  workflowMissing,
+  workflowVisibility,
+} from "./workflow-visibility";
 
 const WORKFLOW_PATHS = new Set<string>(Object.values(WORKFLOWS_ROUTES));
 const WORKFLOW_GITHUB_PATHS = new Set<string>(Object.values(WORKFLOWS_GITHUB_ROUTES));
@@ -305,15 +310,14 @@ export async function routeWorkflows(
   };
 
   switch (path) {
-    case WORKFLOWS_ROUTES.list: {
-      const known = listed();
-      const all = await run(workflows.listWithGraphs());
+    case WORKFLOWS_ROUTES.list:
       return json(200, {
-        workflows: all
-          .filter(({ graph, needsNewerApp }) => !needsNewerApp && visibleGraph(graph, known))
-          .map(({ summary }) => summary),
+        workflows: await visibleWorkflowSummaries(
+          { admin, protocol: context.protocol, hiddenAgentIds },
+          workflows,
+          agents,
+        ),
       });
-    }
     case WORKFLOWS_ROUTES.get:
       return json(200, memberDetail(await visibleDetail(stringField(body, "workflowId"))));
     case WORKFLOWS_ROUTES.create: {

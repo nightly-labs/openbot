@@ -16,6 +16,7 @@ import {
   workflowAssetType,
 } from "@openbot/contracts/ipc";
 import { ATTACHMENT_PREVIEW_CAPABILITY } from "@openbot/contracts/team-protocol/attachment-preview-v1";
+import { WORKFLOWS_SYNC_COLLECTION } from "@openbot/contracts/team-protocol/sync-collections";
 import { WORKFLOW_FOLDERS_CAPABILITY } from "@openbot/contracts/team-protocol/workflow-folders-v1";
 import {
   WORKFLOW_PRESENCE_CAPABILITY,
@@ -222,11 +223,18 @@ export function desktopWorkflowHost(serverId: string, server: () => ServerSummar
         if (scoped.event.type === "workflows-changed") changed(scoped.event.workflowId, scoped.event.agentId);
         else if (scoped.event.type === "agent-access-changed") changed(null);
       });
+      const synced = window.openbot.agent.onSyncChanged((change) => {
+        if (change.serverId === serverId && change.name === WORKFLOWS_SYNC_COLLECTION.name) changed(null);
+      });
+      let online = true;
       const reconnect = window.openbot.servers.onEvent((servers) => {
-        if (servers.some((server) => server.id === serverId && server.state === "online")) changed(null);
+        const now = servers.some((server) => server.id === serverId && server.state === "online");
+        if (now && !online) changed(null);
+        online = now;
       });
       return () => {
         unsubscribe();
+        synced();
         reconnect();
       };
     },

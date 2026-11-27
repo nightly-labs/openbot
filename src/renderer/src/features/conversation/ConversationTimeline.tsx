@@ -1,6 +1,11 @@
 import type { AgentProviderId } from "@openbot/contracts/agent-providers";
 import { chatVisualReply } from "@openbot/contracts/chat-visual";
-import type { AgentApproval, ConversationMessageSender, MessageReaction } from "@openbot/contracts/ipc";
+import {
+  type AgentApproval,
+  type ConversationMessageSender,
+  LOCAL_SERVER_ID,
+  type MessageReaction,
+} from "@openbot/contracts/ipc";
 import { speechTextFromMarkdown } from "@openbot/contracts/speech-text";
 import { FEEDBACK_WITHDRAW_CAPABILITY } from "@openbot/contracts/team-protocol/feedback-withdraw-v1";
 import type { ConversationUiBlock } from "@openbot/contracts/ui-blocks";
@@ -52,6 +57,7 @@ import { useShowAgentSteps } from "../../agent-steps-preference";
 import { planItems, planTitle, replacedPlanIds } from "../../app-message-projection";
 import { useChatBubbleStyle } from "../../chat-bubble-style-preference";
 import { useCompactMessageActions } from "../../compact-message-actions-preference";
+import { useRemoteChatContent } from "../servers/remote-chat-content";
 import {
   remoteRoutineRecovery,
   serverRoleCanAdminister,
@@ -201,6 +207,7 @@ export function ConversationTimeline() {
     sendCardMessage,
     saveSkillSuggestion,
     reactToMessage,
+    withPendingReaction,
     renderedAgentActivity,
     activeStepActivity,
     activeTurnOutputShown,
@@ -238,6 +245,8 @@ export function ConversationTimeline() {
   } = useConversationViewScope();
   const { t, format } = useText();
   const controller = useConversationController();
+  const remoteChatContent = useRemoteChatContent();
+  const remoteContentShown = () => remoteChatContent.enabled(props.server?.id ?? LOCAL_SERVER_ID);
   const waitingProviderName = () => {
     const waiting = providerSilentMinutes() !== null || providerOffline();
     return waiting ? agentProviderName() : undefined;
@@ -508,6 +517,7 @@ export function ConversationTimeline() {
               onOpenQuote={openQuote}
               onOpenTag={openTaggedReference}
               macWindowControls={props.platform === "darwin"}
+              remoteContent={remoteContentShown()}
             />
           )}
         </Show>
@@ -527,6 +537,7 @@ export function ConversationTimeline() {
               onOpenQuote={openQuote}
               onOpenTag={openTaggedReference}
               macWindowControls={props.platform === "darwin"}
+              remoteContent={remoteContentShown()}
             />
           )}
         </For>
@@ -897,7 +908,8 @@ export function ConversationTimeline() {
                 const index = createMemo(() => timelineIndexById().get(virtualRow.key));
                 const message = createMemo(() => {
                   const current = index();
-                  return current === undefined ? undefined : timelineMessages()[current];
+                  const row = current === undefined ? undefined : timelineMessages()[current];
+                  return row ? withPendingReaction(row) : undefined;
                 });
                 const previousMessage = () => {
                   const current = index();
@@ -1631,6 +1643,7 @@ export function ConversationTimeline() {
                             imageCopies={imageCopies()}
                             downloads={attachmentDownloads}
                             macWindowControls={props.platform === "darwin"}
+                            remoteContent={remoteContentShown()}
                             loadImageFile={messageImageFiles && loadImageFile}
                             onDownloadImageFile={
                               messageImageFiles &&

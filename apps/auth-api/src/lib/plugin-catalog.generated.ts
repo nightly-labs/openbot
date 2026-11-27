@@ -8,6 +8,7 @@
 export interface PluginCatalogIndex {
   schemaVersion: number;
   catalogVersion: string;
+  catalogSha256: string;
   /** When the catalog last changed. The public site dates its listing pages by it. */
   updatedAt: string;
   plugins: Array<{ slug: string; version: string; featured: boolean; detailSha256: string }>;
@@ -16,6 +17,7 @@ export interface PluginCatalogIndex {
 export const PLUGIN_CATALOG_INDEX: PluginCatalogIndex = {
   schemaVersion: 1,
   catalogVersion: "v1",
+  catalogSha256: "08afd754a53fa7c0d44f155b4b7ddb8e6d9677c80d44ce07664e3eabeddd51f4",
   updatedAt: "2026-11-10T00:00:00.000Z",
   plugins: [
     {

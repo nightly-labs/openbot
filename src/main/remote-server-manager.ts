@@ -104,6 +104,7 @@ import type { LiveVoiceEvent } from "@openbot/contracts/team-protocol/live-voice
 import type { MachineAlertEvent } from "@openbot/contracts/team-protocol/machine-resources-v1";
 import { PROVIDER_MODEL_SOURCE_CAPABILITY } from "@openbot/contracts/team-protocol/provider-model-source-v1";
 import { teamSideRouteCodec } from "@openbot/contracts/team-protocol/side-routes";
+import type { SyncClientMessage } from "@openbot/contracts/team-protocol/sync-v1";
 import {
   decodeThreadMessageSearchResponse,
   THREAD_MESSAGE_SEARCH_CAPABILITY,
@@ -182,6 +183,7 @@ import { RemotePresenceCache } from "./remote-server-presence";
 import { RemoteServerStore, type StoredRemoteServerView, type TokenCipher } from "./remote-server-store";
 import type { StoredRemoteServer } from "./remote-server-stored-shape";
 import { remoteServerSummaries } from "./remote-server-summaries";
+import { RemoteServerSync } from "./remote-server-sync";
 import { addRemotePreviewUrls, isLocalDevelopmentApi, pageQuery } from "./remote-server-urls";
 import {
   type RemoteFileProgress,
@@ -221,6 +223,8 @@ interface RemoteServerEvents {
   directTyping: [serverId: string, event: DirectTypingRealtimeEvent];
   machineAlert: [serverId: string, event: MachineAlertEvent];
   liveVoice: [serverId: string, event: LiveVoiceEvent];
+  syncChanged: [serverId: string, name: string];
+  remoteChatContent: [serverId: string, enabled: boolean];
   attachmentDownload: [progress: AttachmentDownloadProgress];
   attachmentImportProgress: [progress: AttachmentImportProgress];
 }
@@ -305,6 +309,7 @@ export class RemoteServerManager extends EventEmitter<RemoteServerEvents> {
   readonly #refresh: RemoteEventRefresh;
   readonly #events: RemoteEventStream;
   readonly #presence: RemotePresenceCache;
+  readonly sync: RemoteServerSync;
   readonly #attachments = new RemoteAttachmentCache();
   readonly #attachmentPreviews = new RemoteAttachmentCache(Date.now, REMOTE_ATTACHMENT_PREVIEW_LIMITS);
   readonly #pictures: RemotePictureCache;
@@ -428,6 +433,8 @@ export class RemoteServerManager extends EventEmitter<RemoteServerEvents> {
       hasUsageLimits: (serverId) => this.supportsCapability(serverId, AGENT_USAGE_LIMIT_CAPABILITY),
       hasModelSources: (serverId) => this.supportsCapability(serverId, PROVIDER_MODEL_SOURCE_CAPABILITY),
       hasAgentWaits: (serverId) => this.supportsCapability(serverId, AGENT_WAITS_CAPABILITY),
+      hasSyncedQueue: (serverId, agentId) => this.sync.queues.isSynced(serverId, agentId),
+      hasSyncedConversation: (serverId, agentId) => this.sync.agentPages.isSynced(serverId, agentId),
       emit: (serverId, event, bufferedLive) => {
         if (event.type === "agent-notification-levels-changed")
           this.#rememberLevels(serverId, { server: event.server, agents: event.agents });
@@ -452,6 +459,17 @@ export class RemoteServerManager extends EventEmitter<RemoteServerEvents> {
         return this.#centralAccount.sendTeamInviteEmail(input);
       },
     });
+    this.sync = new RemoteServerSync({
+      supports: (serverId, capability) => this.supportsCapability(serverId, capability),
+      send: (serverId, message) => this.#sendSync(serverId, message),
+      onChanged: (serverId, name) => this.emit("syncChanged", serverId, name),
+    });
+    this.sync.queues.onSynced((serverId, _agentId, [snapshot]) => {
+      if (snapshot) this.emit("agent", serverId, { type: "queue-changed", snapshot });
+    });
+    this.sync.agentPages.onPage((serverId, _agentId, page) => {
+      this.emit("agent", serverId, { type: "conversation-page", page });
+    });
     this.#events = new RemoteEventStream({
       appVersion: this.#appVersion,
       servers: this.#store,
@@ -465,10 +483,14 @@ export class RemoteServerManager extends EventEmitter<RemoteServerEvents> {
       onDirectTyping: (serverId, event) => this.emit("directTyping", serverId, event),
       onHostRestart: (serverId, event) => this.#applyHostRestart(serverId, event),
       onHostAppearance: (serverId, event) => this.#applyHostAppearance(serverId, event),
+      onRemoteChatContent: (serverId, enabled) => this.emit("remoteChatContent", serverId, enabled),
       onMachineAlert: (serverId, event) => this.emit("machineAlert", serverId, event),
       onLiveVoice: (serverId, event) => this.emit("liveVoice", serverId, event),
       onOffline: (serverId) => this.#presence.markOffline(serverId),
       onChanged: () => this.#emitChanged(),
+      onEventsOpen: (serverId) => this.#syncOnline(serverId),
+      onEventsClosed: (serverId) => this.sync.offline(serverId),
+      onSync: (serverId, message) => this.sync.receive(serverId, message),
     });
     this.#remoteViewerProxy = this.#webrtcTransport
       ? new RemoteViewerProxy({
@@ -494,6 +516,7 @@ export class RemoteServerManager extends EventEmitter<RemoteServerEvents> {
           Effect.gen({ self: this }, function* () {
             if (server && capabilityRead !== null) yield* this.#readCapabilities(server, capabilityRead);
             this.#connectTrace?.mark(serverId, "compatibility");
+            if (this.#webrtcTransport?.isConnected(serverId)) this.#syncOnline(serverId);
             if (capabilityRead === null) this.#emitChanged();
             yield* Effect.all(
               [
@@ -521,6 +544,7 @@ export class RemoteServerManager extends EventEmitter<RemoteServerEvents> {
       );
     });
     this.#webrtcTransport?.on("disconnected", (serverId) => {
+      this.sync.offline(serverId);
       const wasOnline = this.#connections.statusFor(serverId).state === "online";
       if (wasOnline) this.#events.markSeenOnline(serverId);
       if (!this.#events.isReconnectSuspended(serverId)) this.#connections.setState(serverId, "offline");
@@ -536,6 +560,8 @@ export class RemoteServerManager extends EventEmitter<RemoteServerEvents> {
       this.#emitChanged();
     });
     this.#webrtcTransport?.on("event", (serverId, event) => this.#handleWebRtcEvent(serverId, event));
+    this.#webrtcTransport?.on("sync", (serverId, message) => this.sync.receive(serverId, message));
+    this.#webrtcTransport?.on("eventReset", (serverId) => this.sync.reset(serverId));
     this.#webrtcTransport?.on("error", (serverId, code, message) => {
       const hostedStarting = this.#awaitsHostedStart(serverId);
       const hostRestarting =
@@ -564,7 +590,22 @@ export class RemoteServerManager extends EventEmitter<RemoteServerEvents> {
     return invite;
   }
 
+  #syncOnline(serverId: string): void {
+    if (this.#store.find(serverId)?.transport === "webrtc-v2" || this.#events.declaresSync(serverId))
+      this.sync.online(serverId);
+    else this.sync.forget(serverId);
+  }
+
+  #sendSync(serverId: string, message: SyncClientMessage): Promise<void> {
+    const offline = () => Promise.reject(new Error(sourceText("error.remote.hostConnectionOffline")));
+    if (this.#store.find(serverId)?.transport !== "webrtc-v2")
+      return this.#events.sendSync(serverId, message) ? Promise.resolve() : offline();
+    const transport = this.#webrtcTransport;
+    return transport ? Effect.runPromise(transport.sendSync(serverId, message)) : offline();
+  }
+
   #suspendServer(serverId: string): void {
+    this.sync.offline(serverId);
     this.#events.suspendReconnect(serverId);
     if (this.#connections.statusFor(serverId).issue?.code === "authentication_required")
       this.#background(this.#owned(this.#pictures.forget(serverId)));
@@ -690,12 +731,12 @@ export class RemoteServerManager extends EventEmitter<RemoteServerEvents> {
   ) {
     if (serverId === LOCAL_SERVER_ID || !this.supportsCapability(serverId, AGENT_NOTIFICATION_LEVELS_CAPABILITY))
       return this.cachedNotificationLevels(serverId);
-    const snapshot = yield* this.request(
-      serverId,
-      AGENT_NOTIFICATION_LEVELS_ROUTES.read,
-      decodeAgentNotificationLevelsFromHost,
-      { method: "POST", body: {} },
-    );
+    const snapshot =
+      this.sync.notificationLevels.value(serverId) ??
+      (yield* this.request(serverId, AGENT_NOTIFICATION_LEVELS_ROUTES.read, decodeAgentNotificationLevelsFromHost, {
+        method: "POST",
+        body: {},
+      }));
     this.#rememberLevels(serverId, snapshot);
     return snapshot;
   }).bind(this);
@@ -1641,6 +1682,7 @@ export class RemoteServerManager extends EventEmitter<RemoteServerEvents> {
     this.#clearHostedStart(serverId);
     this.#hostedStartExpired.delete(serverId);
     this.#events.forget(serverId);
+    this.sync.forget(serverId);
     this.#refresh.forget(serverId);
     this.#connections.forget(serverId);
     this.#client.forget(serverId);
@@ -1691,6 +1733,8 @@ export class RemoteServerManager extends EventEmitter<RemoteServerEvents> {
   listAgentConversationReads(
     serverId = this.#store.activeServerId,
   ): Effect.Effect<Record<string, ConversationReadState>, RemoteWorkflowError> {
+    const synced = this.sync.conversationReadRecord(serverId);
+    if (synced) return Effect.succeed(synced);
     return this.request(serverId, TEAM_API_ROUTES.agents.conversationReads, decodeConversationReadStates);
   }
 
@@ -2658,6 +2702,7 @@ export class RemoteServerManager extends EventEmitter<RemoteServerEvents> {
       this.#focusUse.dispose();
       this.#computerActivity?.dispose();
       yield* this.#events.stop();
+      this.sync.stop();
       this.#refresh.clear();
       this.#client.clear();
       this.#attachments.clear();
@@ -2770,6 +2815,7 @@ export class RemoteServerManager extends EventEmitter<RemoteServerEvents> {
     else if (event.type === "team-direct-typing") this.emit("directTyping", serverId, event);
     else if (event.type === "host-restart") this.#applyHostRestart(serverId, event);
     else if (event.type === "host-appearance") this.#applyHostAppearance(serverId, event);
+    else if (event.type === "remote-chat-content") this.emit("remoteChatContent", serverId, event.enabled);
     else if (event.type === "machine-alert") this.emit("machineAlert", serverId, event);
     else if (event.type === "live-voice") this.emit("liveVoice", serverId, event);
     else if (event.type === "client-browser-command") return;

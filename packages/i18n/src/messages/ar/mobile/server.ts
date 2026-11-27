@@ -655,6 +655,10 @@ export const messages = {
   "mobile.server.settings.browsingMemoryDescription":
     "عندما تتحكم في متصفح الوكيل، يتعلّم الوكيل كيف تعمل المواقع من الصفحات والأزرار التي تستخدمها. لا يُحفظ النص الذي تكتبه.",
   "mobile.server.settings.browsingMemoryLoadFailed": "تعذّر تحميل إعداد التصفّح.",
+  "mobile.server.settings.remoteChatContent": "تحميل المحتوى الخارجي في الدردشات",
+  "mobile.server.settings.remoteChatContentDescription":
+    "عرض الصور وأيقونات المواقع من مواقع ويب أخرى في الدردشات. عند إيقاف هذا الخيار، تظهر كروابط، ولا يتم تحميل المخططات والصفحات إلا عند النقر. ينطبق هذا على الجميع في هذا الخادم.",
+  "mobile.server.settings.remoteChatContentLoadFailed": "تعذّر تحميل إعداد المحتوى الخارجي.",
   "mobile.server.settings.learningSaveFailed": "تعذّر حفظ هذا الإعداد. أعد المحاولة.",
   "mobile.server.settings.learningUnsupported": "حدّث OpenBot على هذا الخادم لتغيير هذا الإعداد من هنا.",
   "mobile.server.settings.responseStyleDescription":

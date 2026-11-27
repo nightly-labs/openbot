@@ -765,4 +765,8 @@ export const messages = {
   "server.ownerTransfer.accepted": "{server} の所有者になりました",
   "server.ownerTransfer.acceptFailed": "所有権の移転を承認できませんでした。",
   "server.ownerTransfer.declineFailed": "所有権の移転を拒否できませんでした。",
+  "server.settings.privacyTitle": "プライバシー",
+  "server.settings.remoteChatContent": "チャットでリモートコンテンツを読み込む",
+  "server.settings.remoteChatContentDescription":
+    "チャットで、別のサイトからコンテンツを読み込む画像、サイトアイコン、図、ページを表示します。オフのときは、クリックした後にだけ読み込むため、ほかのサイトはチャットが開かれたことを知りません。このサーバーの全員に適用されます。",
 } as const satisfies PartialTranslation<typeof source>;

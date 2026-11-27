@@ -17,6 +17,7 @@ import {
   type WatchWait,
   watchChannelsWithinLimit,
   watchText,
+  watchTimestamp,
 } from "@openbot/contracts/watch-protocol";
 import { feedbackApproval } from "@openbot/team-client/feedback-approval";
 import { approvalCommandText, approvalTitle, shortPath } from "@/features/chat/model/approval-text";
@@ -340,6 +341,7 @@ export function buildWatchSnapshot(input: WatchSnapshotInput): WatchSnapshot {
         state,
         detail: watchText(state === "working" ? (activity?.detail ?? null) : agent.preview, 160),
         updated: agent.updatedLabel || null,
+        ...watchTimestamp(agent.updatedAt),
         turnId: activity?.turnId ?? null,
         reply: lastReply(conversation?.messages) ?? watchText(agent.preview, WATCH_REPLY_LIMIT),
         wait,

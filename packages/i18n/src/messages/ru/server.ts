@@ -804,4 +804,8 @@ export const messages = {
   "server.ownerTransfer.accepted": "Теперь вы владелец сервера {server}",
   "server.ownerTransfer.acceptFailed": "Не удалось принять передачу.",
   "server.ownerTransfer.declineFailed": "Не удалось отклонить передачу.",
+  "server.settings.privacyTitle": "Конфиденциальность",
+  "server.settings.remoteChatContent": "Загружать внешний контент в чатах",
+  "server.settings.remoteChatContentDescription":
+    "Показывать в чатах изображения, значки сайтов, диаграммы и страницы, которые загружают контент с других сайтов. Когда это выключено, такой контент загружается только после нажатия, поэтому другие сайты не узнают, когда открывается чат. Это действует для всех на этом сервере.",
 } as const satisfies PartialTranslation<typeof source>;

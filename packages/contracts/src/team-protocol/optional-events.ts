@@ -23,6 +23,7 @@ import { type MachineAlertEvent, machineAlertEvent } from "./machine-resources-v
 import { type MessagePinsEvent, messagePinsEvent } from "./message-pins-v1";
 import { type OpenBotCreditsEvent, openBotCreditsEvent } from "./openbot-credits-events-v1";
 import { type QuietTurnCompletedEvent, quietTurnEvent } from "./quiet-turn-v1";
+import { type RemoteChatContentEvent, remoteChatContentEvent } from "./remote-chat-content-v1";
 import { type RoutineFlowsEvent, routineFlowsEvent } from "./routine-flows-v1";
 import { type SidebarFoldersEvent, sidebarFoldersEvent } from "./sidebar-folders-v1";
 import { type SidebarPinsEvent, sidebarPinsEvent } from "./sidebar-pins-v1";
@@ -49,6 +50,7 @@ export type OptionalTeamEvent =
   | AgentTasksEvent
   | ChannelEvent
   | HostAppearanceEvent
+  | RemoteChatContentEvent
   | HostRestartEvent
   | HostTurnLimitsEvent
   | LibraryFoldersEvent
@@ -89,6 +91,7 @@ export function optionalTeamEvent(value: unknown, options?: OptionalTeamEventOpt
     agentTasksEvent(value) ??
     channelEvent(value) ??
     hostAppearanceEvent(value) ??
+    remoteChatContentEvent(value) ??
     hostRestartEvent(value) ??
     hostTurnLimitsEvent(value) ??
     libraryFoldersEvent(value) ??

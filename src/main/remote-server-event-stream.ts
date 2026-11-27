@@ -24,6 +24,12 @@ import {
   TEAM_PROMPT_DETAIL_CAPABILITY,
 } from "@openbot/contracts/team-protocol/prompt-detail-v1";
 import { addSkillSuggestionNames, SKILL_LEARNING_CAPABILITY } from "@openbot/contracts/team-protocol/skill-learning-v1";
+import {
+  decodeSyncServerMessage,
+  SYNC_CAPABILITY,
+  type SyncClientMessage,
+  type SyncServerMessage,
+} from "@openbot/contracts/team-protocol/sync-v1";
 import { TEAM_PROTOCOL_V1_WEBSOCKET } from "@openbot/contracts/team-protocol/v1";
 import {
   encodeTeamProtocolV1CurrentClientEvent,
@@ -98,10 +104,14 @@ export interface RemoteEventStreamOptions {
   onDirectTyping: (serverId: string, event: DirectTypingRealtimeEvent) => void;
   onHostRestart: (serverId: string, event: HostRestartEvent) => void;
   onHostAppearance: (serverId: string, event: HostAppearanceEvent) => void;
+  onRemoteChatContent: (serverId: string, enabled: boolean) => void;
   onMachineAlert: (serverId: string, event: MachineAlertEvent) => void;
   onLiveVoice: (serverId: string, event: LiveVoiceEvent) => void;
   onOffline: (serverId: string) => void;
   onChanged: () => void;
+  onEventsOpen: (serverId: string) => void;
+  onEventsClosed: (serverId: string) => void;
+  onSync: (serverId: string, message: SyncServerMessage) => void;
 }
 
 export class RemoteEventStream {
@@ -119,10 +129,14 @@ export class RemoteEventStream {
   readonly #onDirectTyping: RemoteEventStreamOptions["onDirectTyping"];
   readonly #onHostRestart: RemoteEventStreamOptions["onHostRestart"];
   readonly #onHostAppearance: RemoteEventStreamOptions["onHostAppearance"];
+  readonly #onRemoteChatContent: RemoteEventStreamOptions["onRemoteChatContent"];
   readonly #onMachineAlert: RemoteEventStreamOptions["onMachineAlert"];
   readonly #onLiveVoice: RemoteEventStreamOptions["onLiveVoice"];
   readonly #onOffline: RemoteEventStreamOptions["onOffline"];
   readonly #onChanged: RemoteEventStreamOptions["onChanged"];
+  readonly #onEventsOpen: RemoteEventStreamOptions["onEventsOpen"];
+  readonly #onEventsClosed: RemoteEventStreamOptions["onEventsClosed"];
+  readonly #onSync: RemoteEventStreamOptions["onSync"];
   readonly #controllers = new Map<string, AbortController>();
   readonly #sockets = new Map<string, WebSocket>();
   readonly #reconnectTimers = new Map<string, ReturnType<typeof setTimeout>>();
@@ -150,10 +164,14 @@ export class RemoteEventStream {
     this.#onDirectTyping = options.onDirectTyping;
     this.#onHostRestart = options.onHostRestart;
     this.#onHostAppearance = options.onHostAppearance;
+    this.#onRemoteChatContent = options.onRemoteChatContent;
     this.#onMachineAlert = options.onMachineAlert;
     this.#onLiveVoice = options.onLiveVoice;
     this.#onOffline = options.onOffline;
     this.#onChanged = options.onChanged;
+    this.#onEventsOpen = options.onEventsOpen;
+    this.#onEventsClosed = options.onEventsClosed;
+    this.#onSync = options.onSync;
   }
 
   get enabled(): boolean {
@@ -222,6 +240,22 @@ export class RemoteEventStream {
     const socket = this.#sockets.get(serverId);
     if (!socket || socket.readyState !== WebSocket.OPEN) return;
     socket.send(JSON.stringify(control));
+  }
+
+  sendSync(serverId: string, message: SyncClientMessage): boolean {
+    const socket = this.#sockets.get(serverId);
+    if (!socket || socket.readyState !== WebSocket.OPEN) return false;
+    socket.send(JSON.stringify(message));
+    return true;
+  }
+
+  declaresSync(serverId: string): boolean {
+    const socket = this.#sockets.get(serverId);
+    return (
+      socket?.readyState === WebSocket.OPEN &&
+      socket.protocol === TEAM_PROTOCOL_V1_WEBSOCKET &&
+      this.#advertises(serverId, SYNC_CAPABILITY)
+    );
   }
 
   syncScopes(): void {
@@ -499,6 +533,7 @@ export class RemoteEventStream {
             this.#connections.setCompatibility(serverId, compatibility);
             this.#authenticationPaused.delete(serverId);
             this.#onChanged();
+            this.#onEventsOpen(serverId);
             if (this.#supportsRuntimeSnapshots(serverId, socket)) {
               agentEventsReady = true;
             } else {
@@ -541,6 +576,11 @@ export class RemoteEventStream {
           }
           try {
             const value = JSON.parse(message.data);
+            const sync = decodeSyncServerMessage(value);
+            if (sync) {
+              this.#onSync(serverId, sync);
+              return;
+            }
             const optional = optionalTeamEvent(value, { agentTaskUiBlocks: true });
             const decoded = optional
               ? { kind: "known" as const, event: optionalTeamEventToCurrent(optional) }
@@ -570,6 +610,8 @@ export class RemoteEventStream {
               this.#onHostRestart(serverId, event);
             } else if (event.type === "host-appearance") {
               this.#onHostAppearance(serverId, event);
+            } else if (event.type === "remote-chat-content") {
+              this.#onRemoteChatContent(serverId, event.enabled);
             } else if (event.type === "machine-alert") {
               this.#onMachineAlert(serverId, event);
             } else if (event.type === "live-voice") {
@@ -612,6 +654,7 @@ export class RemoteEventStream {
             if (this.#sockets.get(serverId) === socket) {
               this.#sockets.delete(serverId);
             }
+            if (opened && !this.#sockets.has(serverId)) this.#onEventsClosed(serverId);
             resolve();
           },
           { once: true },

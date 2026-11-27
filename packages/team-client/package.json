@@ -16,6 +16,8 @@
     "./request-id": "./src/request-id.ts",
     "./retry-operation-id": "./src/retry-operation-id.ts",
     "./sync-profile": "./src/sync-profile.ts",
+    "./sync-client": "./src/sync-client.ts",
+    "./sync-pages": "./src/sync-pages.ts",
     "./routine-calendar": "./src/routine-calendar.ts",
     "./routine-calendar-dates": "./src/routine-calendar-dates.ts",
     "./routine-schedule": "./src/routine-schedule.ts",

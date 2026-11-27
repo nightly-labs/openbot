@@ -32,13 +32,12 @@ import {
   configureErrorReports,
   webAnalyticsInstallId,
 } from "./error-reports";
-import { MARKETPLACE_PLUGINS } from "./features/settings/marketplace-plugin-catalog";
+import { marketplacePlugins } from "./features/settings/marketplace-plugin-source";
 
 const OPENPANEL_API_URL = "https://analytics.openbot.run/api";
 const OPENPANEL_CLIENT_ID = "6c989975-87ef-4f0c-857e-ab449a65b5c2";
 const MAX_PENDING_EVENTS = 100;
 const CURATED_LISTING_PATTERN = /^openbot-curated-(?:skill|agent)-([a-z0-9][a-z0-9-]{0,63})$/u;
-const PLUGIN_SLUGS = new Set(MARKETPLACE_PLUGINS.map((plugin) => plugin.slug));
 
 type ServerKind = "local" | "remote" | "unknown";
 type AnalyticsResult = "succeeded" | "failed";
@@ -829,7 +828,7 @@ function sanitizeDesktopProperty(
 }
 
 function listingSlug(value: string): string | undefined {
-  if (PLUGIN_SLUGS.has(value)) return value;
+  if (marketplacePlugins().some((plugin) => plugin.slug === value)) return value;
   return CURATED_LISTING_PATTERN.exec(value)?.[1];
 }
 

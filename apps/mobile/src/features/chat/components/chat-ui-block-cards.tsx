@@ -77,7 +77,15 @@ export function choiceBlockOf(prompt: ConversationQuestionPrompt, uiBlock: Conve
   return spec.multiple || !question.options?.length ? spec : null;
 }
 
-export function QuestionText({ question, variant }: { question: string; variant: "title" | "body" | "secondary" }) {
+export function QuestionText({
+  question,
+  variant,
+  remoteContent = false,
+}: {
+  question: string;
+  variant: "title" | "body" | "secondary";
+  remoteContent?: boolean;
+}) {
   const secondaryColor = useCSSVariable("--openbot-text-secondary");
   return (
     <ChatMarkdown
@@ -88,13 +96,14 @@ export function QuestionText({ question, variant }: { question: string; variant:
       inline
       finished
       selectable={false}
+      remoteContent={remoteContent}
     />
   );
 }
 
-export function QuestionDetail({ detail }: { detail: string }) {
+export function QuestionDetail({ detail, remoteContent = false }: { detail: string; remoteContent?: boolean }) {
   const secondaryColor = useCSSVariable("--openbot-text-secondary");
-  return <ChatMarkdown body={detail} color={String(secondaryColor)} compact finished />;
+  return <ChatMarkdown body={detail} color={String(secondaryColor)} compact finished remoteContent={remoteContent} />;
 }
 
 export function PromptStatus({ controller, canSend }: { controller: QuestionPromptController; canSend: boolean }) {
@@ -506,10 +515,12 @@ export function ChatChoicePrompt({
   spec,
   controller,
   canSend,
+  remoteContent = false,
 }: {
   spec: UiChoiceBlock;
   controller: QuestionPromptController;
   canSend: boolean;
+  remoteContent?: boolean;
 }) {
   const { t } = useText();
   const card = useChatCardSurface();
@@ -534,7 +545,7 @@ export function ChatChoicePrompt({
     >
       <View className="flex-row items-center gap-2">
         <View className="min-w-0 flex-1">
-          <QuestionText question={spec.title} variant="title" />
+          <QuestionText question={spec.title} variant="title" remoteContent={remoteContent} />
         </View>
         <Button
           variant="ghost"

@@ -70,6 +70,7 @@ interface FilePreviewPanelProps {
   isPageAppShortcut?: ((key: ChatVisualKey) => boolean) | undefined;
   quoteShortcut?: QuoteShortcutModifier | undefined;
   macWindowControls?: boolean | undefined;
+  remoteContent?: boolean | undefined;
   onOpenExternally: () => void;
   allowExternalOpen?: boolean;
   onDownload?: () => void;
@@ -346,6 +347,7 @@ export default function FilePreviewPanel(props: FilePreviewPanelProps) {
             onOpenLink={props.onOpenLink}
             onOpenSharedFile={props.onOpenSharedFile}
             onOpenWorkspaceFile={props.onOpenWorkspaceFile}
+            remoteContent={props.remoteContent}
           />
         </Show>
         <Show when={!rawSource() && hasPage()}>
@@ -361,6 +363,7 @@ export default function FilePreviewPanel(props: FilePreviewPanelProps) {
             isAppShortcut={props.isPageAppShortcut}
             quoteShortcut={props.quoteShortcut}
             macWindowControls={props.macWindowControls}
+            remoteContent={props.remoteContent}
           />
         </Show>
         <Show when={showsSourceText()}>

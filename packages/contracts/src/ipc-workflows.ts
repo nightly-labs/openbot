@@ -3,7 +3,7 @@ import { isCreditAmount } from "./credits";
 import { INPUT_LIMITS } from "./input-limits";
 import { integerInRange, isBoundedString, isFiniteNumber, isIdentifier } from "./ipc-bounded-values";
 import { isRoutineSchedule, type RoutineSchedule } from "./ipc-routines";
-import { isBoolean, isDynamicRecord, isNumber, isOneOf, isString } from "./runtime-values";
+import { type DynamicRecord, isBoolean, isDynamicRecord, isNumber, isOneOf, isString } from "./runtime-values";
 
 export function isWorkflowFormat(value: unknown): value is number {
   return typeof value === "number" && Number.isSafeInteger(value) && value >= 1;
@@ -960,6 +960,21 @@ export function isWorkflowSummary(value: unknown): value is WorkflowSummary {
         isString(value.lastRun.at))) &&
     (value.paused === undefined || value.paused === true)
   );
+}
+
+function withKnownRunStatus(record: DynamicRecord): DynamicRecord {
+  const lastRun = record.lastRun;
+  if (!isDynamicRecord(lastRun)) return record;
+  const status = lastRun.status;
+  return isString(status) && !isOneOf(WORKFLOW_RUN_STATUSES, status)
+    ? { ...record, lastRun: { ...lastRun, status: "stopped" } }
+    : record;
+}
+
+export function decodeWorkflowSummary(value: unknown): WorkflowSummary {
+  const summary = isDynamicRecord(value) ? withKnownRunStatus(value) : value;
+  if (!isWorkflowSummary(summary)) throw new Error("Invalid remote workflow.");
+  return summary;
 }
 
 function isTriggerState(value: unknown): value is WorkflowTriggerState {
