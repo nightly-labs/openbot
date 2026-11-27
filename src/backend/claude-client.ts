@@ -362,6 +362,7 @@ interface ThreadConfig {
   channelTools: boolean;
   workspaceOnly: boolean;
   excludedFolders: string[];
+  writeAreas: string[];
   excludedInstructionFiles: string[];
   agentId: string | null;
 }
@@ -1526,6 +1527,7 @@ export class ClaudeAgentClient extends EventEmitter<ClientEvents> {
               toolInput,
               config.cwd,
               config.additionalDirectories,
+              config.writeAreas,
             );
             if (outside)
               return yield* this.#requestWriteApprovalEffect(
@@ -1648,7 +1650,7 @@ export class ClaudeAgentClient extends EventEmitter<ClientEvents> {
         : {}),
     };
     const sandbox = config.workspaceOnly
-      ? claudeWorkspaceSandbox(config.additionalDirectories, config.excludedFolders)
+      ? yield* claudeWorkspaceSandbox(config.additionalDirectories, config.excludedFolders, config.writeAreas)
       : null;
     const settingsFile =
       Object.keys(signInSettings).length > 0
@@ -1716,7 +1718,12 @@ export class ClaudeAgentClient extends EventEmitter<ClientEvents> {
           ...(sandbox && !settingsFile ? { sandbox } : {}),
           ...(config.workspaceOnly
             ? {
-                hooks: claudeWorkspaceHooks(config.cwd, config.additionalDirectories, config.excludedFolders),
+                hooks: claudeWorkspaceHooks(
+                  config.cwd,
+                  config.additionalDirectories,
+                  config.excludedFolders,
+                  config.writeAreas,
+                ),
                 managedSettings: CLAUDE_WORKSPACE_MANAGED_SETTINGS,
               }
             : {}),
@@ -3625,6 +3632,10 @@ function readThreadConfig(params: unknown): ThreadConfig {
     excludedFolders:
       isRecord(params) && Array.isArray(params.excludedFolders)
         ? params.excludedFolders.filter((value): value is string => isString(value))
+        : [],
+    writeAreas:
+      isRecord(params) && Array.isArray(params.writeAreas)
+        ? params.writeAreas.filter((value): value is string => isString(value))
         : [],
     excludedInstructionFiles:
       isRecord(params) && Array.isArray(params.excludedInstructionFiles)

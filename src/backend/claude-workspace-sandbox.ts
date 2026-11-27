@@ -4,25 +4,27 @@ import { basename, dirname, join, resolve } from "node:path";
 import type { HookCallbackMatcher, Options, SdkPluginConfig, Settings } from "@anthropic-ai/claude-agent-sdk";
 import { isDynamicRecord, isString } from "@openbot/contracts/runtime-values";
 import { Effect, Result } from "effect";
-import { workspaceTemporaryPaths } from "./agent/workspace-sandbox";
+import { sandboxWritePaths, workspaceTemporaryPaths } from "./agent/workspace-sandbox";
 import { runCauseEffect } from "./effect-boundary";
 import { isMissingFileError } from "./file-errors";
 import { listHomeSkills, skillFolderNames } from "./home-skills";
 import { isPathInside } from "./path-containment";
 import { type ProviderClientOperationError, providerCall, providerFailure } from "./provider-client-effects";
 
-export function claudeWorkspaceSandbox(
+export const claudeWorkspaceSandbox = Effect.fn("ClaudeWorkspace.sandbox")(function* (
   roots: readonly string[],
   excluded: readonly string[] = [],
-): NonNullable<Settings["sandbox"]> {
+  writeAreas: readonly string[] = [],
+): Effect.fn.Return<NonNullable<Settings["sandbox"]>> {
+  const allowWrite = yield* sandboxWritePaths(writableRoots(roots), writeAreas);
   return {
     enabled: true,
     failIfUnavailable: true,
     autoAllowBashIfSandboxed: true,
     allowUnsandboxedCommands: false,
-    filesystem: { allowWrite: writableRoots(roots), ...(excluded.length ? { denyWrite: [...excluded] } : {}) },
+    filesystem: { allowWrite, ...(excluded.length ? { denyWrite: [...excluded] } : {}) },
   };
-}
+});
 
 export const CLAUDE_WORKSPACE_MANAGED_SETTINGS: NonNullable<Options["managedSettings"]> = {
   allowManagedHooksOnly: true,
@@ -99,6 +101,7 @@ export function claudeWorkspaceHooks(
   cwd: string,
   roots: readonly string[],
   excluded: readonly string[] = [],
+  writeAreas: readonly string[] = [],
 ): NonNullable<Options["hooks"]> {
   const matcher: HookCallbackMatcher = {
     matcher: WRITE_TOOLS.join("|"),
@@ -114,7 +117,9 @@ export function claudeWorkspaceHooks(
               permissionDecisionReason: claudeExcludedWriteMessage(denied),
             },
           };
-        const target = await runCauseEffect(claudeWriteOutsideRoots(input.tool_name, input.tool_input, cwd, roots));
+        const target = await runCauseEffect(
+          claudeWriteOutsideRoots(input.tool_name, input.tool_input, cwd, roots, writeAreas),
+        );
         if (!target) return {};
         return {
           hookSpecificOutput: {
@@ -134,6 +139,7 @@ export const claudeWriteOutsideRoots = Effect.fn("ClaudeWorkspace.writeOutsideRo
   toolInput: unknown,
   cwd: string,
   roots: readonly string[],
+  writeAreas: readonly string[] = [],
 ) {
   if (!WRITE_TOOLS.includes(toolName)) return null;
   const path = isDynamicRecord(toolInput) ? writePath(toolInput.file_path ?? toolInput.notebook_path) : null;
@@ -141,10 +147,8 @@ export const claudeWriteOutsideRoots = Effect.fn("ClaudeWorkspace.writeOutsideRo
   return yield* Effect.gen(function* () {
     const target = yield* resolveExisting(resolve(cwd, path));
     if (isClaudeSettingsFile(target)) return path;
-    const realRoots = yield* Effect.forEach(writableRoots(roots), (root) => resolveExisting(resolve(root)), {
-      concurrency: "unbounded",
-    });
-    return realRoots.some((root) => isPathInside(root, target)) ? null : path;
+    const allowed = yield* sandboxWritePaths(writableRoots(roots), writeAreas);
+    return allowed.some((root) => isPathInside(root, target)) ? null : path;
   }).pipe(Effect.catch(() => Effect.succeed(path)));
 });
 
