@@ -11,6 +11,7 @@ import {
   type UpdateAgentInput,
 } from "@openbot/contracts/ipc";
 import { AGENT_HIDDEN_WORK_CAPABILITY } from "@openbot/contracts/team-protocol/current";
+import { PROVIDER_ACCOUNT_POOL_MODELS_CAPABILITY } from "@openbot/contracts/team-protocol/provider-account-pool-models-v1";
 import { PROVIDER_ACCOUNTS_CAPABILITY } from "@openbot/contracts/team-protocol/provider-accounts-v1";
 import type { AgentProfile } from "@openbot/ui/data";
 import type { CreationPreference, DevelopmentCreation } from "@openbot/ui/features/agents/agent-creation-model";
@@ -93,7 +94,13 @@ const Agents = createSimpleContext({
         }
       },
     });
-    const agentStatus = createMemo(() => withHostAccounts(providerStatus(), hostAccounts.host()));
+    const agentStatus = createMemo(() =>
+      withHostAccounts(
+        providerStatus(),
+        hostAccounts.host(),
+        activeServerSupportsCapability(PROVIDER_ACCOUNT_POOL_MODELS_CAPABILITY),
+      ),
+    );
     const platform = usePlatform();
     const developmentCreation = createMemo((): DevelopmentCreation | null => {
       if (activeServer()?.kind !== "local" || platform.appInfo()?.variant !== "dev") return null;

@@ -109,6 +109,7 @@ export interface ProviderAccountPool {
   leftOut: string[];
   inUse: string | null;
   strategy?: ProviderAccountPoolStrategy;
+  accountModels?: true;
 }
 
 export const DEFAULT_PROVIDER_ACCOUNT_ID = "default";
@@ -185,7 +186,8 @@ export function isProviderAccountPool(value: unknown): value is ProviderAccountP
     value.leftOut.length <= MAX_PROVIDER_ACCOUNTS &&
     value.leftOut.every(isProviderAccountId) &&
     (value.inUse === null || isProviderAccountId(value.inUse)) &&
-    (value.strategy === undefined || isProviderAccountPoolStrategy(value.strategy))
+    (value.strategy === undefined || isProviderAccountPoolStrategy(value.strategy)) &&
+    (value.accountModels === undefined || value.accountModels === true)
   );
 }
 

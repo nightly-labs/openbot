@@ -2239,6 +2239,12 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
         listModels: () => this.listModels(),
         hiddenModels: (provider) => this.#hiddenModels?.(provider),
         agentModels: (choice) => this.#agentModels(choice),
+        poolModel: (provider, model) => {
+          const accountId = this.#poolAccountForModel(provider, model, undefined);
+          return accountId === undefined
+            ? undefined
+            : this.#providers.accountModels(provider, accountId).find((option) => option.id === model);
+        },
         providerAccounts: (provider) => this.getStatus().providers?.find((row) => row.id === provider)?.accounts,
         providerStatuses: () => this.getStatus().providers ?? [],
         customEndpoints: () =>
@@ -4090,21 +4096,29 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
         this.#conversation.requireKnownAgent(input.agentId);
         const previous = this.#store.get(input.agentId);
         const modelProvider = input.provider ?? (previous ? providerForAgent(previous) : undefined);
-        const requestedModel = input.model
+        const accountModel = (accountId: string | undefined) =>
+          modelProvider
+            ? this.#providers.accountModels(modelProvider, accountId).find((model) => model.id === input.model)
+            : undefined;
+        const listedModel = input.model
           ? (this.#endpoints
               .available()
               .find((model) => model.id === input.model && (!modelProvider || model.provider === modelProvider)) ??
-            (modelProvider
-              ? this.#providers
-                  .accountModels(
-                    modelProvider,
-                    input.providerAccountId !== undefined
-                      ? (input.providerAccountId ?? undefined)
-                      : previous?.providerAccountId,
-                  )
-                  .find((model) => model.id === input.model)
-              : undefined))
+            accountModel(
+              input.providerAccountId !== undefined
+                ? (input.providerAccountId ?? undefined)
+                : previous?.providerAccountId,
+            ))
           : undefined;
+        const poolAccount =
+          input.model && !listedModel && input.providerAccountId === undefined && modelProvider
+            ? this.#poolAccountForModel(
+                modelProvider,
+                input.model,
+                previous && providerForAgent(previous) === modelProvider ? previous.providerAccountId : undefined,
+              )
+            : undefined;
+        const requestedModel = listedModel ?? (poolAccount === undefined ? undefined : accountModel(poolAccount));
         if (input.model && !requestedModel) {
           throw modelUnavailableError(
             input.model,
@@ -4137,8 +4151,8 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
         }
         const previousAccount = previous ? agentProviderAccount(previous) : null;
         const requestedAccount =
-          input.providerAccountId !== undefined
-            ? agentProviderAccount({ providerAccountId: input.providerAccountId ?? undefined })
+          input.providerAccountId !== undefined || poolAccount !== undefined
+            ? agentProviderAccount({ providerAccountId: input.providerAccountId ?? poolAccount })
             : previous && requestedProvider !== providerForAgent(previous)
               ? null
               : previousAccount;
@@ -4561,6 +4575,17 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
       agentsOn.set(accountId, (agentsOn.get(accountId) ?? 0) + 1);
     }
     return pickSpreadPoolAccount(members, current, nowSeconds, (accountId) => agentsOn.get(accountId) ?? 0, openOnly);
+  }
+
+  #poolAccountForModel(provider: AgentProvider, model: string, current: string | undefined): string | undefined {
+    const choice = { provider, model, ...(current ? { providerAccountId: current } : {}) };
+    if (!this.#pooled(choice)) return undefined;
+    const ready = this.#poolPick(provider, model, current ?? DEFAULT_PROVIDER_ACCOUNT_ID);
+    if (ready !== null) return ready;
+    return this.#providers
+      .poolMembers(provider, model)
+      .find((member) => this.#providers.accountModels(provider, member.accountId).some((option) => option.id === model))
+      ?.accountId;
   }
 
   #readyPoolMembers(provider: AgentProvider, model: string | null) {

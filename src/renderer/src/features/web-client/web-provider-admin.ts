@@ -32,6 +32,7 @@ import { LIVE_VOICE_ACCOUNT_CAPABILITY } from "@openbot/contracts/team-protocol/
 import { PROVIDER_ACCOUNT_CODE_CAPABILITY } from "@openbot/contracts/team-protocol/provider-account-code-v1";
 import { PROVIDER_ACCOUNT_KEYS_CAPABILITY } from "@openbot/contracts/team-protocol/provider-account-keys-v1";
 import { PROVIDER_ACCOUNT_MODELS_CAPABILITY } from "@openbot/contracts/team-protocol/provider-account-models-v1";
+import { PROVIDER_ACCOUNT_POOL_MODELS_CAPABILITY } from "@openbot/contracts/team-protocol/provider-account-pool-models-v1";
 import { PROVIDER_ACCOUNT_POOL_STRATEGY_CAPABILITY } from "@openbot/contracts/team-protocol/provider-account-pool-strategy-v1";
 import { PROVIDER_ACCOUNT_POOL_CAPABILITY } from "@openbot/contracts/team-protocol/provider-account-pool-v1";
 import {
@@ -481,7 +482,13 @@ export function createWebProviderSettings(options: WebProviderSettingsOptions) {
     accounts: (id) => admin.accounts(id),
     usage: (id) => admin.accountUsage(id),
   });
-  const status = createMemo(() => withHostAccounts(options.status(), hostAccounts.host()));
+  const status = createMemo(() =>
+    withHostAccounts(
+      options.status(),
+      hostAccounts.host(),
+      serverSupportsCapability(options.server(), PROVIDER_ACCOUNT_POOL_MODELS_CAPABILITY),
+    ),
+  );
   const providerUseServerId = createMemo(() => remoteAdminServer(options.server(), PROVIDER_USE_CAPABILITY)?.id);
   const [providerUse, setProviderUse] = createSignal<{ serverId: string; off: AgentProviderId[] }>();
   let providerUseVersion = 0;

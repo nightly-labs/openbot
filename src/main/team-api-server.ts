@@ -272,6 +272,7 @@ import {
 import { PROVIDER_ACCOUNT_CODE_CAPABILITY } from "@openbot/contracts/team-protocol/provider-account-code-v1";
 import { PROVIDER_ACCOUNT_KEYS_CAPABILITY } from "@openbot/contracts/team-protocol/provider-account-keys-v1";
 import { PROVIDER_ACCOUNT_MODELS_CAPABILITY } from "@openbot/contracts/team-protocol/provider-account-models-v1";
+import { PROVIDER_ACCOUNT_POOL_MODELS_CAPABILITY } from "@openbot/contracts/team-protocol/provider-account-pool-models-v1";
 import { PROVIDER_ACCOUNT_POOL_STRATEGY_CAPABILITY } from "@openbot/contracts/team-protocol/provider-account-pool-strategy-v1";
 import { PROVIDER_ACCOUNT_POOL_CAPABILITY } from "@openbot/contracts/team-protocol/provider-account-pool-v1";
 import { PROVIDER_DETECTION_CAPABILITY } from "@openbot/contracts/team-protocol/provider-detection-v1";
@@ -2934,6 +2935,7 @@ export class TeamApiServer {
         if (capability === PROVIDER_ACCOUNT_POOL_CAPABILITY) return this.#options.providerAccounts !== undefined;
         if (capability === PROVIDER_ACCOUNT_POOL_STRATEGY_CAPABILITY)
           return this.#options.providerAccounts !== undefined;
+        if (capability === PROVIDER_ACCOUNT_POOL_MODELS_CAPABILITY) return this.#options.providerAccounts !== undefined;
         if (capability === LIVE_VOICE_ACCOUNT_CAPABILITY)
           return this.#options.providerAccounts !== undefined && this.#options.liveVoice !== undefined;
         if (capability === PROVIDER_ACCOUNT_KEYS_CAPABILITY) return this.#options.providerAccounts !== undefined;

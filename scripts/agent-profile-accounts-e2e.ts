@@ -191,6 +191,11 @@ const report: {
   stored?: Pick<AgentSummary, "providerAccountId" | "backupModels">;
   deletedAgent?: { ownProcessStopped: boolean; workspaceRemoved: boolean };
   pool?: { second: string | null; default: string | null; null: string | null };
+  poolModels?: {
+    statusMarked: boolean;
+    agentChoice: { model: string; account: string | null; pin: string | null };
+    personChoice: { model: string; account: string | null; pin: string | null };
+  };
   liveVoice?: { saved: string | null; afterRemove: string | null; automatic: string | null };
   checks: { name: string; passed: boolean }[];
   passed: boolean;
@@ -654,6 +659,35 @@ try {
     "With Pool accounts on, a null account gives the agent to the pool",
     pooledAgain.success && afterNull.providerAccountId === undefined && afterNull.pinnedAccountId === undefined,
     pooledAgain.text,
+  );
+  const choiceOf = (agentId: string) => {
+    const agent = storedAgent(agentId);
+    return { model: agent.model, account: agent.providerAccountId ?? null, pin: agent.pinnedAccountId ?? null };
+  };
+  const statusMarked =
+    agents.getStatus().providers?.find((row) => row.id === "codex")?.accountPool?.accountModels === true;
+  const agentChose = await callTool("choose a model of one pool account", coordinator.id, "update_profile", {
+    agentId: pooled.id,
+    model: ACCOUNT_MODEL,
+  });
+  const agentChoice = choiceOf(pooled.id);
+  await runCauseEffect(agents.updateAgent({ agentId: pooled.id, model: MODEL, providerAccountId: null }));
+  await runCauseEffect(agents.updateAgent({ agentId: pooled.id, model: ACCOUNT_MODEL }));
+  const personChoice = choiceOf(pooled.id);
+  report.poolModels = { statusMarked, agentChoice, personChoice };
+  pass("The local status marks the pool as one that lists the models of each account", statusMarked);
+  pass(
+    "With Pool accounts on, an agent that selects a model of one account moves to that account and stays in the pool",
+    agentChose.success &&
+      agentChoice.model === ACCOUNT_MODEL &&
+      agentChoice.account === second.id &&
+      agentChoice.pin === null,
+    agentChose.text,
+  );
+  pass(
+    "With Pool accounts on, a person who selects a model of one account moves the agent to that account in the pool",
+    personChoice.model === ACCOUNT_MODEL && personChoice.account === second.id && personChoice.pin === null,
+    JSON.stringify(personChoice),
   );
   await runCauseEffect(accounts.setPool("codex", null));
 
