@@ -252,8 +252,8 @@ export class CustomProviderStore {
           return build();
         });
         if (entries) {
-          registerProviderSecrets(entries);
           yield* this.#persist(entries);
+          registerProviderSecrets(entries);
           this.#entries = entries;
         }
         return this.list();
