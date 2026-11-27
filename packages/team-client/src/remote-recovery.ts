@@ -21,15 +21,14 @@ const recoveryCall = <A>(operation: () => Promise<A>) =>
       }),
   });
 
-export const REMOTE_RETRY_INTERVAL_MS = 2_000;
-export const REMOTE_RETRY_LIMIT = 5;
-export const REMOTE_RETRY_COOLDOWN_MS = 30_000;
+export const REMOTE_RETRY_DELAYS_MS = [500, 1_200, 2_700, 4_800] as const;
+export const REMOTE_RETRY_LIMIT = REMOTE_RETRY_DELAYS_MS.length + 1;
+export const REMOTE_RETRY_COOLDOWN_MS = 15_000;
 const REMOTE_RETRY_JITTER = 0.2;
 
-function remoteRetryDelay(attempt: number): number {
-  const delay =
-    attempt >= REMOTE_RETRY_LIMIT ? REMOTE_RETRY_COOLDOWN_MS : REMOTE_RETRY_INTERVAL_MS * 2 ** Math.max(0, attempt - 1);
-  return Math.round(delay * (1 + REMOTE_RETRY_JITTER * Math.random()));
+export function remoteRetryDelay(attempt: number, random: () => number = Math.random): number {
+  const delay = REMOTE_RETRY_DELAYS_MS[Math.max(0, attempt - 1)] ?? REMOTE_RETRY_COOLDOWN_MS;
+  return Math.round(delay * (1 + REMOTE_RETRY_JITTER * random()));
 }
 
 export interface RemoteRecoveryStatus {
