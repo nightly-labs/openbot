@@ -11277,7 +11277,7 @@ try {
     for (let index = 31; index <= 120; index += 1) postAlert(`page-unread-${index}`, alertMember);
     const cappedChannelPage = await call("POST", CHANNEL_ROUTES.read, { ...extentUse, json: { channelId } });
     check(
-      "a channel with unread messages opens from the first unread message and one read message, up to 100 messages",
+      "a channel with unread messages opens on the messages after the last read one and one read message, up to 100 messages",
       unreadChannelPage.status === 200 &&
         pageMessageIds(unreadChannelPage).length === 31 &&
         pageMessageIds(unreadChannelPage)[0] === "page-cap-60" &&

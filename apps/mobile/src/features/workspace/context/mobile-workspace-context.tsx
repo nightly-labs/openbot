@@ -1149,7 +1149,11 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
     [request, conversationStore],
   );
   const latestPageSize = useCallback(
-    (agentId: string) => ((liveState.get().unreadCounts[agentId] ?? 0) > 0 ? LATEST_PAGE_SIZE : READ_LATEST_PAGE_SIZE),
+    (agentId: string) => {
+      const live = liveState.get();
+      const unread = live.unreadAgentIds.includes(agentId) || (live.unreadCounts[agentId] ?? 0) > 0;
+      return unread ? LATEST_PAGE_SIZE : READ_LATEST_PAGE_SIZE;
+    },
     [liveState],
   );
   const loadConversation = useCallback(

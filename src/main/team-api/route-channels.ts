@@ -72,8 +72,8 @@ export type ChannelSettingsAgents = Pick<
 const DEFAULT_CHANNEL_PAGE_LIMIT = 100;
 const REMOTE_INITIAL_CHANNEL_PAGE_LIMIT = 24;
 
-function firstChannelPageLimit(messagesFromFirstUnread: number): number {
-  return Math.min(DEFAULT_CHANNEL_PAGE_LIMIT, Math.max(REMOTE_INITIAL_CHANNEL_PAGE_LIMIT, messagesFromFirstUnread + 1));
+function firstChannelPageLimit(messagesAfterRead: number): number {
+  return Math.min(DEFAULT_CHANNEL_PAGE_LIMIT, Math.max(REMOTE_INITIAL_CHANNEL_PAGE_LIMIT, messagesAfterRead + 1));
 }
 
 export async function routeChannels(
@@ -114,7 +114,9 @@ export async function routeChannels(
     const pageTasksOnly = capabilities.has(CHANNEL_PAGE_TASKS_CAPABILITY);
     const initialLimit =
       input.beforeSequence === undefined
-        ? firstChannelPageLimit(channels.store.messagesFromFirstUnread(input.channelId, member.id))
+        ? firstChannelPageLimit(
+            channels.store.messagesAfterRead(input.channelId, member.id, DEFAULT_CHANNEL_PAGE_LIMIT),
+          )
         : DEFAULT_CHANNEL_PAGE_LIMIT;
     const newest = channels.store.pageWithoutExtent(input.channelId, input.beforeSequence, initialLimit);
     const tasks =
