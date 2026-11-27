@@ -17,6 +17,13 @@ import { chromium, type Locator, type Page } from "playwright-core";
 import { argument, connectChannelE2e, WAIT_MS, writeReport } from "./channel-e2e-support";
 import { delay, instrumentRemotePeer, literal, readSyncSink, signInDevHost } from "./remote-perf-support";
 
+declare global {
+  interface Window {
+    __extensionSyncChannels?: RTCDataChannel[];
+    __extensionSyncFrames?: { channel: number; direction: "sent" | "received"; type: string }[];
+  }
+}
+
 const NAME = "browser-extension-sync-e2e";
 const OUT = resolve(import.meta.dirname, `../.openbot-build/${NAME}`);
 const EXTENSION = resolve(import.meta.dirname, "../apps/browser-extension");
@@ -30,6 +37,8 @@ const browserExecutable = argument("browser-executable");
 const run = crypto.randomUUID().slice(0, 6);
 const channelName = `Extension sync ${run}`;
 const channelText = `Extension sync message ${run}.`;
+const offlineText = `Extension sync message while offline ${run}.`;
+const onlineText = `Extension sync message after reconnect ${run}.`;
 
 interface ChangeReport {
   change: string;
@@ -42,16 +51,19 @@ interface Report {
   createdAt: string;
   authApi: string;
   initialRoutes: string[];
+  reconnect: { visibleMs: number; routes: string[] } | null;
   changes: ChangeReport[];
   pageErrors: string[];
   passed: boolean;
   failure: string | null;
+  diagnostics?: { peers: string[]; channels: string[]; frames: string[] } | null;
 }
 
 const report: Report = {
   createdAt: new Date().toISOString(),
   authApi,
   initialRoutes: [],
+  reconnect: null,
   changes: [],
   pageErrors: [],
   passed: false,
@@ -122,6 +134,52 @@ const context = await chromium.launchPersistentContext(profile, {
   args: [`--disable-extensions-except=${dist}`, `--load-extension=${dist}`],
 });
 await instrumentRemotePeer(context, 0);
+await context.addInitScript(() => {
+  const opened: RTCDataChannel[] = [];
+  window.__extensionSyncChannels = opened;
+  const frames: { channel: number; direction: "sent" | "received"; type: string }[] = [];
+  window.__extensionSyncFrames = frames;
+  const decoder = new TextDecoder();
+  const text = (data: unknown): string =>
+    typeof data === "string"
+      ? data
+      : data instanceof ArrayBuffer
+        ? decoder.decode(data)
+        : ArrayBuffer.isView(data)
+          ? decoder.decode(data)
+          : "";
+  const syncTypes = (data: unknown): string[] => {
+    const body = text(data);
+    return [...body.matchAll(/"type":"(sync-[a-z-]+)"/g)].map((match) => match[1] ?? "");
+  };
+  const track = (channel: RTCDataChannel) => {
+    const index = opened.push(channel) - 1;
+    channel.addEventListener("message", (event) => {
+      if (channel.label.endsWith("events"))
+        frames.push({ channel: index, direction: "received", type: `raw ${text(event.data).slice(0, 140)}` });
+      for (const type of syncTypes(event.data)) frames.push({ channel: index, direction: "received", type });
+    });
+    const send = channel.send.bind(channel);
+    channel.send = (data: string & Blob & ArrayBuffer & ArrayBufferView<ArrayBuffer>) => {
+      if (channel.label.endsWith("events"))
+        frames.push({ channel: index, direction: "sent", type: `raw ${text(data).slice(0, 140)}` });
+      for (const type of syncTypes(data)) frames.push({ channel: index, direction: "sent", type });
+      send(data);
+    };
+  };
+  const Counted = window.RTCPeerConnection;
+  window.RTCPeerConnection = class extends Counted {
+    constructor(configuration?: RTCConfiguration) {
+      super(configuration);
+      this.addEventListener("datachannel", (event) => track(event.channel));
+    }
+    override createDataChannel(...input: Parameters<RTCPeerConnection["createDataChannel"]>): RTCDataChannel {
+      const channel = super.createDataChannel(...input);
+      track(channel);
+      return channel;
+    }
+  };
+});
 
 const target = await host.page.evaluate(async () => {
   const agent = (await window.openbot.agent.listAgents())[0];
@@ -131,6 +189,51 @@ const target = await host.page.evaluate(async () => {
 const renamedAgent = `${target.name} ${run}`;
 let renamed = false;
 let channelId: string | null = null;
+
+function postHostChannelMessage(text: string): Promise<void> {
+  return host.page.evaluate(
+    async ({ channelId, text }) => {
+      await window.openbot.agent.channelCommand({
+        type: "send",
+        operationId: crypto.randomUUID(),
+        channelId,
+        text,
+        recipientAgentId: null,
+        replyToMessageId: null,
+        attachmentDraftIds: [],
+      });
+    },
+    { channelId: channelId ?? "", text },
+  );
+}
+
+function connectedPeers(page: Page): Promise<number> {
+  return page.evaluate(
+    () => (window.__syncPerfPeers ?? []).filter((peer) => peer.connectionState === "connected").length,
+  );
+}
+
+async function dropConnection(page: Page): Promise<number> {
+  const before = await page.evaluate(() => (window.__syncPerfPeers ?? []).length);
+  const closed = await page.evaluate(() => {
+    const open = (window.__extensionSyncChannels ?? []).filter((channel) => channel.readyState === "open");
+    for (const channel of open) channel.close();
+    return open.length;
+  });
+  assert.ok(closed > 0, "The extension has no open data channel to close.");
+  return before;
+}
+
+async function waitReconnected(page: Page, peersBefore: number): Promise<void> {
+  await page.waitForFunction(
+    (before) => {
+      const peers = window.__syncPerfPeers ?? [];
+      return peers.length > before && peers.at(-1)?.connectionState === "connected";
+    },
+    peersBefore,
+    { timeout: WAIT_MS, polling: 100 },
+  );
+}
 
 async function renameHostAgent(name: string): Promise<void> {
   await host.page.evaluate(({ agentId, name }) => window.openbot.agent.updateAgent({ agentId, name }), {
@@ -224,27 +327,38 @@ try {
     page,
     "post one channel message from the host",
     [`POST ${routeTemplate(CHANNEL_ROUTES.read)}`],
-    async () => {
-      await host.page.evaluate(
-        ({ channelId, text }) =>
-          window.openbot.agent.channelCommand({
-            type: "send",
-            operationId: crypto.randomUUID(),
-            channelId,
-            text,
-            recipientAgentId: null,
-            replyToMessageId: null,
-            attachmentDraftIds: [],
-          }),
-        { channelId: channelId ?? "", text: channelText },
-      );
-    },
+    () => postHostChannelMessage(channelText),
     () => page.getByText(channelText, { exact: true }).first(),
+  );
+
+  const droppedAt = await pageNow(page);
+  const peersBefore = await dropConnection(page);
+  await postHostChannelMessage(offlineText);
+  await waitReconnected(page, peersBefore);
+  await page.getByText(offlineText, { exact: true }).first().waitFor({ timeout: WAIT_MS });
+  const visibleMs = Math.round((await pageNow(page)) - droppedAt);
+  const reconnectRoutes = (await settleNetwork(page, droppedAt)).map(routeKey);
+  report.reconnect = { visibleMs, routes: reconnectRoutes };
+  logger.info(`reconnect: the offline message is visible after ${visibleMs} ms, ${reconnectRoutes.length} requests.`);
+  assert.ok((await connectedPeers(page)) > 0, "The extension did not connect again.");
+  await expectNoListCalls(
+    page,
+    "post one channel message from the host after the reconnect",
+    [`POST ${routeTemplate(CHANNEL_ROUTES.read)}`],
+    () => postHostChannelMessage(onlineText),
+    () => page.getByText(onlineText, { exact: true }).first(),
   );
   await page.screenshot({ path: resolve(OUT, "extension-sync.png") });
   report.passed = true;
 } catch (error) {
   report.failure = error instanceof Error ? error.message : String(error);
+  report.diagnostics = await panel
+    ?.evaluate(() => ({
+      peers: (window.__syncPerfPeers ?? []).map((peer) => peer.connectionState),
+      channels: (window.__extensionSyncChannels ?? []).map((channel) => `${channel.label}:${channel.readyState}`),
+      frames: (window.__extensionSyncFrames ?? []).map((frame) => `${frame.channel} ${frame.direction} ${frame.type}`),
+    }))
+    .catch(() => null);
   await panel?.screenshot({ path: resolve(OUT, "failure.png") }).catch(() => undefined);
   throw error;
 } finally {

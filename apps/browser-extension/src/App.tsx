@@ -228,6 +228,7 @@ function ServerView(props: { session: ExtensionSession; onSignOut: () => void; o
   let connection: HostConnection | null = null;
   let capabilities: readonly string[] = [];
   let attempt = 0;
+  let reconnecting = false;
   let browserLink: ClientBrowserLink | null = null;
   const [presence, setPresence] = createSignal<ClientBrowserPresence>({ sharing: false, tabs: [] });
   const [canShare, setCanShare] = createSignal(false);
@@ -284,6 +285,28 @@ function ServerView(props: { session: ExtensionSession; onSignOut: () => void; o
     }
   }
 
+  async function reconnect(hostId: string) {
+    const target = view.hosts.find((entry) => entry.hostId === hostId);
+    if (!target || !connection || reconnecting) return;
+    reconnecting = true;
+    const current = attempt;
+    try {
+      const granted = await connection.connect(target);
+      if (current !== attempt) return;
+      if (granted.length !== capabilities.length || granted.some((entry) => !capabilities.includes(entry)))
+        await open(hostId);
+    } catch (error) {
+      if (current !== attempt) return;
+      setView((draft) => {
+        draft.status = "failed";
+        draft.message =
+          error instanceof Error ? error.message : t("extension.connection.offline", { server: target.name });
+      });
+    } finally {
+      reconnecting = false;
+    }
+  }
+
   async function start() {
     try {
       connection = await createHostConnection(props.session, {
@@ -298,6 +321,7 @@ function ServerView(props: { session: ExtensionSession; onSignOut: () => void; o
           setView((draft) => {
             draft.offline = update.state === "offline";
           });
+          if (update.state === "offline" && !update.code && view.status === "ready") void reconnect(update.hostId);
           if (update.state !== "online") return;
           void workspace()?.reloadChat();
           browserLink?.refresh();
