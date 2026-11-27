@@ -11,10 +11,15 @@ import { OPENBOT_DYNAMIC_TOOLS } from "./openbot-tools";
 import { COMPUTER_USE_GUIDE_URI, piMcpServerName } from "./pi-mcp-names";
 import { providerCall } from "./provider-client-effects";
 
+const PI_EMPTY_TOOL_SEARCH_NOTE =
+  "This search does not show tools that an earlier search loaded. Those tools stay loaded: call them by their names. When no search loaded the tool that you need, search again with other words.";
+
 const EXTENSION = String.raw`export default function (pi) {
   pi.on("tool_result", (event) => {
     if (event.toolName !== "tool_search" || event.isError) return undefined;
-    return { content: [...event.content, { type: "text", text: ${JSON.stringify(piToolSearchNote())} }] };
+    const empty = event.content.some((part) => part.type === "text" && part.text?.includes("No matching tools found"));
+    const note = empty ? ${JSON.stringify(`${PI_EMPTY_TOOL_SEARCH_NOTE} ${piToolSearchNote()}`)} : ${JSON.stringify(piToolSearchNote())};
+    return { content: [...event.content, { type: "text", text: note }] };
   });
   pi.on("tool_call", (event) => {
     const path = event.toolName === "read" && typeof event.input?.path === "string" ? event.input.path : "";
