@@ -570,7 +570,7 @@ try {
         mutedUntil: null,
         preview: true,
         sound: "openbot",
-        liveActivityStartedAt: null,
+        liveActivityStartedAt: Math.floor(Date.now() / 1000),
       },
     },
   );

@@ -213,7 +213,10 @@ async function runCase(fixture: (typeof CASES)[number]): Promise<CaseResult> {
     assert.equal(result.relayPushes, 0);
     assert.equal(events.listenerCount("event"), 1);
     service.disconnected("fixture-session");
-    assert.equal(service.showsEvent("fixture-session", { agentId: "fixture-agent", kind: "reply" }, null, null), true);
+    assert.equal(
+      service.showsEvent("fixture-session", { agentId: "fixture-agent", kind: "reply" }, null, Date.now()),
+      true,
+    );
     result.stage = "relay";
     const push = await received;
     result.relay = { event: push.event, sealedLength: push.sealed?.length ?? 0, priority: push.priority };
@@ -253,7 +256,7 @@ async function runCase(fixture: (typeof CASES)[number]): Promise<CaseResult> {
           "fixture-session",
           { agentId: "fixture-agent", kind: "reply" },
           null,
-          null,
+          Date.now(),
         );
       }
     } catch {
