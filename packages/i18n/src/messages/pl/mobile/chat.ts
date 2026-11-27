@@ -540,7 +540,8 @@ export const messages = {
   "mobile.chat.outbox.failedHold": "Nie wysłano. Przytrzymaj wiadomość, aby spróbować ponownie.",
   "mobile.chat.outbox.cancelSend": "Nie wysyłaj",
   "mobile.chat.outbox.menuHint": "Pokazuje opcje tej wiadomości.",
-  "mobile.chat.outbox.unconfirmed": "Niepotwierdzona. Sprawdź czat, zanim wyślesz ją ponownie.",
+  "mobile.chat.outbox.unconfirmed":
+    "Niepotwierdzona. Sprawdź czat, a potem przytrzymaj wiadomość, aby ją edytować lub anulować.",
   "mobile.chat.outbox.editFailed": "Nie udało się otworzyć wiadomości do edycji.",
   "mobile.chat.outbox.saveFailed":
     "Nie udało się zapisać oczekujących wiadomości na tym telefonie. Nie zamykaj aplikacji, dopóki nie zostaną wysłane.",

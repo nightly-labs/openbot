@@ -449,7 +449,8 @@ export const messages = defineMessages("mobile.chat", {
   "mobile.chat.outbox.failedHold": "Not sent. Touch and hold the message to try again.",
   "mobile.chat.outbox.cancelSend": "Don't send",
   "mobile.chat.outbox.menuHint": "Shows the options for this message.",
-  "mobile.chat.outbox.unconfirmed": "Not confirmed. Check the chat before you send it again.",
+  "mobile.chat.outbox.unconfirmed":
+    "Not confirmed. Check the chat, then touch and hold the message to edit or cancel it.",
   "mobile.chat.outbox.editFailed": "Could not open the message to edit it.",
   "mobile.chat.outbox.saveFailed":
     "Could not save waiting messages on this phone. Keep the app open until they are sent.",

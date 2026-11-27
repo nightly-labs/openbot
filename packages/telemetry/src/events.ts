@@ -238,7 +238,7 @@ export function classifyFailure(error: unknown): CauseCode {
   )
     return "billing";
   if (
-    /\b(?:usage limit|hit your (?:weekly |session |\d+-hour )?limit|(?:hit|reached) your (?:weekly|session|\d+-hour) (?!(?:spend|rate|context|tokens?|requests?)\b)[\w-]+ limit|hit your (?:[\w']+ ){0,2}spend limit|quota (?:exceeded|reached|exhausted)|free[ _-]usage[ _-]exhausted|key limit exceeded|credits? balance (?:is )?too low)\b/iu.test(
+    /\b(?:usage limit|hit your (?:weekly |session |\d+-hour )?limit|(?:hit|reached) your (?:weekly|session|\d+-hour) (?!(?:spend|rate|context|tokens?|requests?)\b)[\w-]+ limit|hit your (?:[\w']+ ){0,2}spend limit|quota (?:exceeded|reached|exhausted)|(?:daily|weekly|monthly) usage quota has been exhausted|free[ _-]usage[ _-]exhausted|key limit exceeded|credits? balance (?:is )?too low)\b/iu.test(
       message,
     )
   )
