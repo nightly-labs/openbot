@@ -36,7 +36,7 @@ export interface CachedPages {
   channelPages: ChannelPage[];
 }
 
-export interface CachedWorkspace {
+interface CachedWorkspace {
   agents: RemoteAgent[];
   hidden: string[] | null;
   colors: { agentId: string; color: AvatarColor }[] | null;
