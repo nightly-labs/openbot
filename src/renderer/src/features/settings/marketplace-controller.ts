@@ -833,7 +833,7 @@ export function createMarketplaceController(
       accounts,
       multipleAccounts: accounts.length > 0 && accountsOffered(app),
       keySaved: rows[0] !== undefined && savedKeyFlow(app.server.auth, rows[0]) !== null,
-      paused: rows.some((row) => !row.enabled),
+      paused: rows.length > 0 && rows.every((row) => !row.enabled),
     };
   }
   const pluginAgentId = () => activeAgentId() || agents()[0]?.id || "";
@@ -1418,9 +1418,9 @@ export function createMarketplaceController(
           if (!held) addedSkills.push(skill.id);
         }
         for (const app of plugin.apps) {
-          const paused = appConnection(app).signInNeeded ? [] : heldApps(app).filter((row) => !row.enabled);
-          if (paused.length > 0) {
-            for (const row of paused)
+          const connection = appConnection(app);
+          if (connection.paused && !connection.signInNeeded) {
+            for (const row of heldApps(app))
               setServers(await calls().mcp.setMcpServerEnabled({ mcpServerId: row.id, enabled: true }, serverId));
             continue;
           }
