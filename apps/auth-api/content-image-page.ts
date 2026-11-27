@@ -228,7 +228,7 @@ function drawCenteredLockup(context: CanvasRenderingContext2D, job: ContentImage
   const logoSize = 96 * unit;
   const x = (job.width - plateWidth) / 2;
   const y = (job.height - plateHeight) / 2;
-  drawPlate(context, job, x, y, plateWidth, plateHeight);
+  drawGlassPlate(context, job, x, y, plateWidth, plateHeight);
 
   const logoTop = y + (plateHeight - logoSize) / 2;
   drawMark(context, lockup.left?.mark ?? "openbot", x + plateWidth * 0.25 - logoSize / 2, logoTop, logoSize);
@@ -272,7 +272,7 @@ function drawCenteredMarkRow(
   const plateHeight = padY * 2 + size;
   const x = (job.width - plateWidth) / 2;
   const y = (job.height - plateHeight) / 2;
-  drawPlate(context, job, x, y, plateWidth, plateHeight);
+  drawGlassPlate(context, job, x, y, plateWidth, plateHeight);
   marks.forEach((mark, index) => {
     drawMark(context, mark, x + padX + index * (size + gap), y + padY, size);
   });
@@ -299,6 +299,65 @@ function drawMarkRow(
   marks.forEach((mark, index) => {
     drawMark(context, mark, x + pad + index * (size + gap), y + pad, size);
   });
+}
+
+/**
+ * The glass plate of a centred card: a soft shadow under it, the background
+ * blurred through it, a light sheen at the top and an edge that is brighter at
+ * the top than at the bottom, as if lit from above.
+ */
+function drawGlassPlate(
+  context: CanvasRenderingContext2D,
+  job: ContentImageJob,
+  x: number,
+  y: number,
+  width: number,
+  height: number,
+): void {
+  const unit = job.width / 1200;
+  const radius = 32 * unit;
+  const under = document.createElement("canvas");
+  under.width = job.width;
+  under.height = job.height;
+  under.getContext("2d")?.drawImage(context.canvas, 0, 0);
+
+  // The shadow, from a shape that the glass then covers.
+  context.save();
+  context.shadowColor = "rgba(10, 8, 20, 0.28)";
+  context.shadowBlur = 48 * unit;
+  context.shadowOffsetY = 16 * unit;
+  roundedRect(context, x, y, width, height, radius);
+  context.fillStyle = "rgba(0, 0, 0, 1)";
+  context.fill();
+  context.restore();
+
+  context.save();
+  roundedRect(context, x, y, width, height, radius);
+  context.clip();
+  context.filter = `blur(${32 * unit}px) saturate(1.15)`;
+  context.drawImage(under, 0, 0);
+  context.filter = "none";
+  // A light tint keeps white marks readable on a pale background.
+  context.fillStyle = "rgba(16, 14, 28, 0.22)";
+  context.fillRect(x, y, width, height);
+  const sheen = context.createLinearGradient(0, y, 0, y + height);
+  sheen.addColorStop(0, "rgba(255, 255, 255, 0.2)");
+  sheen.addColorStop(0.45, "rgba(255, 255, 255, 0.05)");
+  sheen.addColorStop(1, "rgba(255, 255, 255, 0)");
+  context.fillStyle = sheen;
+  context.fillRect(x, y, width, height);
+  context.restore();
+
+  const edge = context.createLinearGradient(0, y, 0, y + height);
+  edge.addColorStop(0, "rgba(255, 255, 255, 0.45)");
+  edge.addColorStop(0.5, "rgba(255, 255, 255, 0.14)");
+  edge.addColorStop(1, "rgba(255, 255, 255, 0.08)");
+  context.save();
+  roundedRect(context, x + 0.75 * unit, y + 0.75 * unit, width - 1.5 * unit, height - 1.5 * unit, radius);
+  context.strokeStyle = edge;
+  context.lineWidth = 1.5 * unit;
+  context.stroke();
+  context.restore();
 }
 
 /** The frosted plate under the marks, with a hairline edge. */
