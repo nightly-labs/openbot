@@ -815,4 +815,8 @@ export const messages = {
   "server.ownerTransfer.accepted": "이제 {server}의 소유자예요",
   "server.ownerTransfer.acceptFailed": "소유권 이전을 수락하지 못했어요.",
   "server.ownerTransfer.declineFailed": "소유권 이전을 거절하지 못했어요.",
+  "server.settings.privacyTitle": "개인정보",
+  "server.settings.remoteChatContent": "채팅에서 원격 콘텐츠 불러오기",
+  "server.settings.remoteChatContentDescription":
+    "채팅에서 다른 웹사이트의 콘텐츠를 불러오는 그림, 사이트 아이콘, 다이어그램, 페이지를 표시합니다. 끄면 이 콘텐츠는 클릭한 후에만 불러오므로 다른 웹사이트는 채팅이 열린 것을 알 수 없습니다. 이 서버의 모든 사람에게 적용됩니다.",
 } as const satisfies PartialTranslation<typeof source>;

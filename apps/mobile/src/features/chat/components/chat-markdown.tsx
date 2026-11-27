@@ -122,6 +122,7 @@ interface TextPresentation {
   fontScale: number;
   t: MobileTranslate;
   linkFavicons: boolean;
+  remoteContent: boolean;
   direction: TextDirection;
   tone: BubbleTone | undefined;
   chipBackground: string;
@@ -1064,6 +1065,7 @@ const MarkdownBlock = memo(function MarkdownBlock({
             language={token.lang}
             streaming={presentation.streaming}
             tone={presentation.tone}
+            remoteContent={presentation.remoteContent}
           />
         ) : (
           <ChatCodeBlock
@@ -1161,6 +1163,7 @@ export const ChatMarkdown = memo(function ChatMarkdown({
   agents = NO_AGENTS,
   finished = false,
   linkFavicons = true,
+  remoteContent = false,
   fontWeight,
   inline: inlineOnly = false,
   tone,
@@ -1188,6 +1191,7 @@ export const ChatMarkdown = memo(function ChatMarkdown({
   selectable?: boolean;
   agents?: readonly MobileAgent[];
   linkFavicons?: boolean;
+  remoteContent?: boolean;
 }) {
   const textReveal = useMotionPreference("textReveal");
   const fontScale = useFontScale();
@@ -1224,7 +1228,8 @@ export const ChatMarkdown = memo(function ChatMarkdown({
       streaming,
       finished,
       animateTail,
-      linkFavicons,
+      linkFavicons: linkFavicons && remoteContent,
+      remoteContent,
       direction: layoutDirection(),
       tone,
       chipBackground,
@@ -1235,6 +1240,7 @@ export const ChatMarkdown = memo(function ChatMarkdown({
     }),
     [
       linkFavicons,
+      remoteContent,
       selectable,
       compact,
       color,

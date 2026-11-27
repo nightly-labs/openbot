@@ -37,6 +37,12 @@ export function chatHtmlPreviewDocument(html: string): string {
   ].join("");
 }
 
+const MERMAID_REMOTE_CONTENT_HINT = /img|image|icon|sprite|href|src|url|import|http|\/\/|\\|&#/iu;
+
+export function mermaidMayLoadRemoteContent(source: string): boolean {
+  return MERMAID_REMOTE_CONTENT_HINT.test(source);
+}
+
 export const CHAT_MERMAID_FONT_FAMILY =
   '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif';
 

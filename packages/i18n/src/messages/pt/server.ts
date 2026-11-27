@@ -776,4 +776,8 @@ export const messages = {
   "server.ownerTransfer.accepted": "Agora você é o proprietário de {server}",
   "server.ownerTransfer.acceptFailed": "Não foi possível aceitar a transferência.",
   "server.ownerTransfer.declineFailed": "Não foi possível recusar a transferência.",
+  "server.settings.privacyTitle": "Privacidade",
+  "server.settings.remoteChatContent": "Carregar conteúdo remoto nos chats",
+  "server.settings.remoteChatContentDescription":
+    "Mostra nos chats imagens, ícones de sites, diagramas e páginas que carregam conteúdo de outros sites. Quando desativado, esse conteúdo só carrega após um clique, então outros sites não sabem quando um chat é aberto. Vale para todos neste servidor.",
 } as const satisfies PartialTranslation<typeof source>;

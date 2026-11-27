@@ -221,6 +221,7 @@ interface RemoteServerEvents {
   directTyping: [serverId: string, event: DirectTypingRealtimeEvent];
   machineAlert: [serverId: string, event: MachineAlertEvent];
   liveVoice: [serverId: string, event: LiveVoiceEvent];
+  remoteChatContent: [serverId: string, enabled: boolean];
   attachmentDownload: [progress: AttachmentDownloadProgress];
   attachmentImportProgress: [progress: AttachmentImportProgress];
 }
@@ -465,6 +466,7 @@ export class RemoteServerManager extends EventEmitter<RemoteServerEvents> {
       onDirectTyping: (serverId, event) => this.emit("directTyping", serverId, event),
       onHostRestart: (serverId, event) => this.#applyHostRestart(serverId, event),
       onHostAppearance: (serverId, event) => this.#applyHostAppearance(serverId, event),
+      onRemoteChatContent: (serverId, enabled) => this.emit("remoteChatContent", serverId, enabled),
       onMachineAlert: (serverId, event) => this.emit("machineAlert", serverId, event),
       onLiveVoice: (serverId, event) => this.emit("liveVoice", serverId, event),
       onOffline: (serverId) => this.#presence.markOffline(serverId),
@@ -2770,6 +2772,7 @@ export class RemoteServerManager extends EventEmitter<RemoteServerEvents> {
     else if (event.type === "team-direct-typing") this.emit("directTyping", serverId, event);
     else if (event.type === "host-restart") this.#applyHostRestart(serverId, event);
     else if (event.type === "host-appearance") this.#applyHostAppearance(serverId, event);
+    else if (event.type === "remote-chat-content") this.emit("remoteChatContent", serverId, event.enabled);
     else if (event.type === "machine-alert") this.emit("machineAlert", serverId, event);
     else if (event.type === "live-voice") this.emit("liveVoice", serverId, event);
     else if (event.type === "client-browser-command") return;

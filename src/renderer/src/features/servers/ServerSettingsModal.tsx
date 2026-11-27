@@ -233,6 +233,7 @@ const SECTION_ROWS: Partial<Record<Section, readonly AppTextKey[]>> = {
   general: [
     "server.settings.name",
     "server.settings.logo",
+    "server.settings.remoteChatContent",
     "server.settings.hostKeyTitle",
     "server.settings.leaveTitle",
     "server.settings.removeTitle",

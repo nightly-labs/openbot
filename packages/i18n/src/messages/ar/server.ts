@@ -936,4 +936,8 @@ export const messages = {
   "server.ownerTransfer.accepted": "أصبحت الآن مالك {server}",
   "server.ownerTransfer.acceptFailed": "تعذّر قبول نقل الملكية.",
   "server.ownerTransfer.declineFailed": "تعذّر رفض نقل الملكية.",
+  "server.settings.privacyTitle": "الخصوصية",
+  "server.settings.remoteChatContent": "تحميل المحتوى البعيد في الدردشات",
+  "server.settings.remoteChatContentDescription":
+    "اعرض في الدردشات الصور وأيقونات المواقع والمخططات والصفحات التي تحمّل محتوى من مواقع أخرى. عند إيقاف هذا الخيار، لا يُحمَّل هذا المحتوى إلا بعد نقرة، فلا تعرف المواقع الأخرى متى تُفتح دردشة. ينطبق هذا على كل من في هذا الخادم.",
 } as const satisfies PartialTranslation<typeof source>;

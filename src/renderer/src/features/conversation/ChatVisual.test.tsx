@@ -1,6 +1,7 @@
 import {
   CHAT_VISUAL_CONTEXT_LIMIT,
   CHAT_VISUAL_FRAME_SANDBOX,
+  CHAT_VISUAL_STATIC_SANDBOX,
   type ChatVisualKey,
   parseChatVisualMessage,
 } from "@openbot/contracts/chat-visual";
@@ -11,13 +12,34 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 
 describe("ChatVisual from HTML", () => {
   it("shows the page as srcdoc in the sandbox, never from a URL", async () => {
-    render(() => <ChatVisual html="<p>Chart</p>" title="Launch chart" onOpenLink={vi.fn()} />);
+    render(() => <ChatVisual html="<p>Chart</p>" title="Launch chart" onOpenLink={vi.fn()} remoteContent />);
 
     const frame = screen.getByTitle("Launch chart");
     await waitFor(() => expect(frame.getAttribute("srcdoc")).toContain("<p>Chart</p>"));
     expect(frame).not.toHaveAttribute("src");
     expect(frame.getAttribute("sandbox")).toBe(CHAT_VISUAL_FRAME_SANDBOX);
     expect(frame).toHaveAttribute("referrerpolicy", "no-referrer");
+  });
+
+  it("shows the page with no scripts and no remote loads until the user runs it", async () => {
+    render(() => (
+      <ChatVisual html={'<img src="https://example.com/a.png">'} title="Launch chart" onOpenLink={vi.fn()} />
+    ));
+
+    const frame = screen.getByTitle("Launch chart");
+    await waitFor(() => expect(frame.getAttribute("srcdoc")).toContain("example.com/a.png"));
+    expect(frame.getAttribute("sandbox")).toBe(CHAT_VISUAL_STATIC_SANDBOX);
+    const page = frame.getAttribute("srcdoc") ?? "";
+    expect(page.indexOf('http-equiv="Content-Security-Policy"')).toBeLessThan(page.indexOf("example.com/a.png"));
+    expect(page).toContain("img-src data:");
+    expect(page).not.toContain("openbot-visual-bootstrap");
+
+    screen.getByText("Run page").click();
+
+    await waitFor(() =>
+      expect(screen.getByTitle("Launch chart").getAttribute("sandbox")).toBe(CHAT_VISUAL_FRAME_SANDBOX),
+    );
+    expect(screen.getByTitle("Launch chart").getAttribute("srcdoc")).not.toContain("Content-Security-Policy");
   });
 
   it("gives the page no same-origin access, popups, downloads or top navigation", () => {
@@ -27,7 +49,7 @@ describe("ChatVisual from HTML", () => {
 
   it("opens no link that a window other than the frame asks for", async () => {
     const onOpenLink = vi.fn();
-    render(() => <ChatVisual html="<p>Chart</p>" title="Launch chart" onOpenLink={onOpenLink} />);
+    render(() => <ChatVisual html="<p>Chart</p>" title="Launch chart" onOpenLink={onOpenLink} remoteContent />);
     const frame = screen.getByTitle("Launch chart");
     await waitFor(() => expect(frame).toHaveAttribute("srcdoc"));
 
@@ -68,6 +90,7 @@ describe("ChatVisual page requests", () => {
       <ChatVisual
         html="<p>Choice</p>"
         title="Pick a plan"
+        remoteContent
         onOpenLink={vi.fn()}
         onMessage={onMessage}
         onContext={onContext}

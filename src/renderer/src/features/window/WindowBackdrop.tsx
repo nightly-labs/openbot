@@ -19,7 +19,7 @@ function dataUrl(backdrop: SavedBackdrop): Promise<string> {
   });
 }
 
-export function WindowBackdrop(props: { pages?: "desktop" | "srcdoc" }) {
+export function WindowBackdrop(props: { pages?: "desktop" | "srcdoc"; remoteContent?: boolean | undefined }) {
   const choice = useChatBackdrop();
   const scene = () => {
     const current = choice();
@@ -139,7 +139,11 @@ export function WindowBackdrop(props: { pages?: "desktop" | "srcdoc" }) {
     <Show
       when={scene()}
       fallback={
-        <Show when={custom()}>{(current) => <CustomBackdrop source={current().source} title={current().name} />}</Show>
+        <Show when={custom()}>
+          {(current) => (
+            <CustomBackdrop source={current().source} title={current().name} remoteContent={props.remoteContent} />
+          )}
+        </Show>
       }
     >
       {(current) => <ChatBackdrop scene={current()} />}
