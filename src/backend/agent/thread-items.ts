@@ -615,8 +615,7 @@ export function toolProgressText(item: ThreadItem, completed: boolean): string |
   if (openBot === "remember" || openBot === "forget_memory" || openBot === "set_memory_inclusion") {
     return completed ? TOOL_RESULT_PROGRESS : sourceText("status.agent.memoriesUpdating");
   }
-  if (openBot === "set_backdrop" || openBot === "clear_backdrop")
-    return completed ? TOOL_RESULT_PROGRESS : sourceText("status.agent.backdropSetting");
+  if (openBot === "set_backdrop") return completed ? TOOL_RESULT_PROGRESS : sourceText("status.agent.backdropSetting");
   if (openBot === "read_local_skill") return completed ? TOOL_RESULT_PROGRESS : sourceText("status.agent.skillReading");
   if (openBot === "send_feedback") return completed ? TOOL_RESULT_PROGRESS : sourceText("status.agent.feedbackSending");
   if (openBot === "withdraw_feedback")

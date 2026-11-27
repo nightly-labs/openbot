@@ -1093,12 +1093,7 @@ export class OpenBotToolRouter {
                 }),
               ),
             );
-            if (
-              tool === "attach_files_to_response" ||
-              tool === "html_render" ||
-              tool === "set_backdrop" ||
-              tool === "clear_backdrop"
-            )
+            if (tool === "attach_files_to_response" || tool === "html_render" || tool === "set_backdrop")
               yield* Effect.uninterruptible(response);
             else if (tool === "web_search" || tool === "read_video") {
               if (toolRequest.signal?.aborted) return;
@@ -2111,10 +2106,6 @@ export class OpenBotToolRouter {
       return yield* this.#setBackdrop(params, senderAgentId, executionThreadId);
     }
 
-    if (params.tool === "clear_backdrop") {
-      return yield* this.#clearBackdrop(params, senderAgentId, executionThreadId);
-    }
-
     if (params.tool === "web_search") {
       const args = webSearchToolSchema.parse(params.arguments ?? {}, { reportInput: true });
       const answer = yield* this.#hooks.searchWeb(senderAgentId, args.query);
@@ -2766,17 +2757,27 @@ export class OpenBotToolRouter {
     senderAgentId: string,
     executionThreadId: string,
   ) {
-    const refused = this.#backdropRefusal(executionThreadId);
-    if (refused) return refused;
+    if (
+      this.#channels.store.channelForThread(executionThreadId) ||
+      this.#messaging.store.linkForThread(executionThreadId)
+    ) {
+      return openBotToolFailure("Only a turn in your own OpenBot chat can set the backdrop.");
+    }
+    if (this.#conversation.isTaskThread(executionThreadId)) {
+      return openBotToolFailure("Set the backdrop from your own chat, not from a task thread.");
+    }
     const parsed = setBackdropToolSchema.safeParse(params.arguments, { reportInput: true });
     if (!parsed.success) return openBotToolFailure(profileToolErrorMessage(parsed.error));
     const args = parsed.data;
+    const remove = args.html.trim().toLowerCase() === "none";
+    const status = remove ? "removed" : "set";
     const messageId = backdropMessageId(params.threadId, params.turnId, params.callId);
     if (
       this.#conversation.ensureSnapshot(senderAgentId, executionThreadId).messages.some(({ id }) => id === messageId)
     ) {
-      return openBotToolResult({ status: "set", messageId });
+      return openBotToolResult({ status, messageId });
     }
+    const requesters = this.#turnRequesters(senderAgentId, params.turnId);
     yield* this.#addGeneratedMessage({
       agentId: senderAgentId,
       threadId: executionThreadId,
@@ -2785,69 +2786,24 @@ export class OpenBotToolRouter {
       file: {
         bytes: new TextEncoder().encode(
           withChatBackdropRequesters(
-            withChatBackdropBubbles(args.html, {
-              ...(args.bubbles?.yours === undefined ? {} : { yours: lowerCaseColor(args.bubbles.yours) }),
-              ...(args.bubbles?.agents === undefined ? {} : { agents: lowerCaseColor(args.bubbles.agents) }),
-            }),
-            this.#turnRequesters(senderAgentId, params.turnId),
+            remove
+              ? "<!doctype html>"
+              : withChatBackdropBubbles(args.html, {
+                  ...(args.bubbles?.yours === undefined ? {} : { yours: lowerCaseColor(args.bubbles.yours) }),
+                  ...(args.bubbles?.agents === undefined ? {} : { agents: lowerCaseColor(args.bubbles.agents) }),
+                }),
+            requesters,
           ),
         ),
-        name: `${visualReplyFileName(args.title)}.html`,
+        name: remove ? "backdrop-removed.html" : `${visualReplyFileName(args.title)}.html`,
         mimeType: "text/html",
       },
-      text: args.title,
-      itemType: CHAT_BACKDROP_ITEM_TYPE,
-      eventType: "response.backdrop-set",
+      text: remove ? sourceText("status.agent.backdropRemoved") : args.title,
+      itemType: remove ? CHAT_BACKDROP_CLEAR_ITEM_TYPE : CHAT_BACKDROP_ITEM_TYPE,
+      eventType: remove ? "response.backdrop-cleared" : "response.backdrop-set",
       detail: (attachmentId) => ({ turnId: params.turnId, messageId, attachmentId }),
     });
-    return openBotToolResult({ status: "set", messageId });
-  });
-
-  #backdropRefusal(executionThreadId: string) {
-    if (
-      this.#channels.store.channelForThread(executionThreadId) ||
-      this.#messaging.store.linkForThread(executionThreadId)
-    ) {
-      return openBotToolFailure("Only a turn in your own OpenBot chat can change the backdrop.");
-    }
-    if (this.#conversation.isTaskThread(executionThreadId)) {
-      return openBotToolFailure("Change the backdrop from your own chat, not from a task thread.");
-    }
-    return null;
-  }
-
-  readonly #clearBackdrop = Effect.fn("OpenBotToolRouter.clearBackdrop")(function* (
-    this: OpenBotToolRouter,
-    params: DynamicToolCallParams,
-    senderAgentId: string,
-    executionThreadId: string,
-  ) {
-    const refused = this.#backdropRefusal(executionThreadId);
-    if (refused) return refused;
-    const messageId = backdropMessageId(params.threadId, params.turnId, params.callId);
-    if (
-      this.#conversation.ensureSnapshot(senderAgentId, executionThreadId).messages.some(({ id }) => id === messageId)
-    ) {
-      return openBotToolResult({ status: "removed", messageId });
-    }
-    yield* this.#addGeneratedMessage({
-      agentId: senderAgentId,
-      threadId: executionThreadId,
-      turnId: params.turnId,
-      messageId,
-      file: {
-        bytes: new TextEncoder().encode(
-          withChatBackdropRequesters("<!doctype html>", this.#turnRequesters(senderAgentId, params.turnId)),
-        ),
-        name: "backdrop-removed.html",
-        mimeType: "text/html",
-      },
-      text: sourceText("status.agent.backdropRemoved"),
-      itemType: CHAT_BACKDROP_CLEAR_ITEM_TYPE,
-      eventType: "response.backdrop-cleared",
-      detail: (attachmentId) => ({ turnId: params.turnId, messageId, attachmentId }),
-    });
-    return openBotToolResult({ status: "removed", messageId });
+    return openBotToolResult({ status, messageId });
   });
 
   readonly #addGeneratedMessage = Effect.fn("OpenBotToolRouter.addGeneratedMessage")(function* (
