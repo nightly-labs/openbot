@@ -26,6 +26,8 @@ final class WatchSession: NSObject, ObservableObject {
   static let answerTimeout: TimeInterval = 25
   static let offlineGrace: TimeInterval = 4
   static let backgroundLimit: TimeInterval = 10
+  static let avatarBatch = WatchMerge.agentLimit
+  static let avatarLoadLimit: TimeInterval = 10
   static let backgroundRefreshInterval: TimeInterval = 15 * 60
   static let backgroundRefreshIdentifier = "run.openbot.mobile.watch.refresh"
   static let pairMargin: TimeInterval = 7 * 24 * 60 * 60
@@ -160,8 +162,11 @@ final class WatchSession: NSObject, ObservableObject {
 
   private var missingAvatars: [String] {
     guard case .ready(let ready) = snapshot else { return [] }
-    let names = Set(ready.agents.flatMap(\.pictureNames))
-    return names.filter { Self.avatarURL($0) != nil && !Self.hasPicture($0) }.sorted()
+    let ordered =
+      ready.agents.compactMap(\.avatar)
+      + ready.agents.flatMap { [$0.faces?.waiting, $0.faces?.working].compactMap { $0 } }
+    var seen = Set<String>()
+    return ordered.filter { Self.avatarURL($0) != nil && !Self.hasPicture($0) && seen.insert($0).inserted }
   }
 
   var language: String {
@@ -421,38 +426,56 @@ final class WatchSession: NSObject, ObservableObject {
   private func loadMissingAvatars(phoneAllowed: Bool) async {
     let names = missingAvatars
     guard !names.isEmpty, let ready = readySnapshot else { return }
+    let deadline = Date().addingTimeInterval(Self.avatarLoadLimit)
     var byServer: [String: [String]] = [:]
-    for agent in ready.agents {
-      for name in agent.pictureNames where names.contains(name) && !(byServer[agent.serverId]?.contains(name) ?? false) {
-        byServer[agent.serverId, default: []].append(name)
+    for name in names {
+      for serverId in Set(ready.agents.filter { $0.pictureNames.contains(name) }.map(\.serverId)) {
+        byServer[serverId, default: []].append(name)
       }
     }
-    var received: [String: String] = [:]
     var remaining = Set(names)
     for (serverId, serverNames) in byServer {
-      guard let server = directServer(serverId),
-        let result = await runDirect(.avatars(names: serverNames), on: server), result.ok,
-        let avatars = result.avatars
-      else { continue }
-      for (name, data) in avatars where serverNames.contains(name) {
-        received[name] = data
-        remaining.remove(name)
+      guard let server = directServer(serverId) else { continue }
+      let saved = await loadAvatars(serverNames.filter(remaining.contains), until: deadline) { batch in
+        guard let result = await self.runDirect(.avatars(names: batch), on: server), result.ok else { return nil }
+        return result.avatars
       }
+      remaining.subtract(saved)
     }
-    if !remaining.isEmpty, phoneAllowed {
-      let result = await exchange(.avatars(names: remaining.sorted()))
-      if result.ok, let avatars = result.avatars {
-        for (name, data) in avatars where remaining.contains(name) { received[name] = data }
-      }
+    guard phoneAllowed else { return }
+    _ = await loadAvatars(names.filter(remaining.contains), until: deadline) { batch in
+      let result = await self.exchange(.avatars(names: batch))
+      return result.ok ? result.avatars : nil
     }
-    guard !received.isEmpty, let folder = Self.avatarFolder else { return }
-    guard case .ready = snapshot else { return }
+  }
+
+  private func loadAvatars(
+    _ names: [String], until deadline: Date, request: ([String]) async -> [String: String]?
+  ) async -> Set<String> {
+    var pending = names
+    var saved = Set<String>()
+    while !pending.isEmpty, Date() < deadline {
+      let batch = Array(pending.prefix(Self.avatarBatch))
+      guard let avatars = await request(batch), let arrived = saveAvatars(avatars, wanted: Set(batch)) else { break }
+      saved.formUnion(arrived)
+      let done = arrived.isEmpty ? Set(batch) : arrived
+      pending.removeAll { done.contains($0) }
+    }
+    return saved
+  }
+
+  private func saveAvatars(_ avatars: [String: String], wanted: Set<String>) -> Set<String>? {
+    guard case .ready = snapshot, let folder = Self.avatarFolder else { return nil }
     try? FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
-    for (name, base64) in received where names.contains(name) {
-      guard let url = Self.avatarURL(name), let data = Data(base64Encoded: base64) else { continue }
-      try? data.write(to: url, options: .atomic)
+    var saved = Set<String>()
+    for (name, base64) in avatars where wanted.contains(name) {
+      guard let url = Self.avatarURL(name), let data = Data(base64Encoded: base64),
+        (try? data.write(to: url, options: .atomic)) != nil
+      else { continue }
+      saved.insert(name)
     }
-    pictureArrived()
+    if !saved.isEmpty { pictureArrived() }
+    return saved
   }
 
   @discardableResult
