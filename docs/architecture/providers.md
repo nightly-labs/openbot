@@ -1858,6 +1858,16 @@ into them (`withProviderAccountPoolStrategies`). An update when the pool is off 
 sends the strategy only after the v1 pool update, and only to a host with the capability; Settings
 hides the choice for a host without it.
 
+The pool entry of the model picker lists the shared models and the own models of each connected
+member (`ProviderAccountStatus.models`), for example the Claude models of an Antigravity account. A
+pooled turn goes only to a member that lists its model: `#readyPoolMembers` keeps a member only when
+`#modelChoiceReady` finds the model in that account's list. When a person or an agent selects a model
+that the current account does not list and gives no account, the update check
+(`AgentService.#poolAccountForModel`) puts the agent on a ready member that lists it, or, when none is
+ready, on a member that lists it, where the agent waits at that limit. The local status marks the pool
+with `accountModels`. A joined client sets it only for a host with the protocol 10 capability
+`provider-account-pool-models-v1`, because an older host refuses these models for a pooled agent.
+
 When an admin removes an account that a running turn uses, the account stays until the turn ends
 (`status.provider.accountRemovesAfterTurn`). Then OpenBot moves its agents to other accounts and
 removes it. A restart before the turn ends cancels the removal.

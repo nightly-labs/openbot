@@ -167,6 +167,7 @@ import { TEAM_PROMPT_MULTI_SELECT_CAPABILITY } from "./prompt-multi-select-v1";
 import { PROVIDER_ACCOUNT_CODE_CAPABILITY } from "./provider-account-code-v1";
 import { PROVIDER_ACCOUNT_KEYS_CAPABILITY } from "./provider-account-keys-v1";
 import { PROVIDER_ACCOUNT_MODELS_CAPABILITY } from "./provider-account-models-v1";
+import { PROVIDER_ACCOUNT_POOL_MODELS_CAPABILITY } from "./provider-account-pool-models-v1";
 import { PROVIDER_ACCOUNT_POOL_STRATEGY_CAPABILITY } from "./provider-account-pool-strategy-v1";
 import { PROVIDER_ACCOUNT_POOL_CAPABILITY } from "./provider-account-pool-v1";
 import { PROVIDER_ACCOUNT_RELAY_CAPABILITY } from "./provider-account-relay-v1";
@@ -887,6 +888,7 @@ const TEAM_CAPABILITY_REGISTRY = [
   [TEAM_NEAR_PAYMENT_CAPABILITY, V10],
   [PROVIDER_ACCOUNT_POOL_STRATEGY_CAPABILITY, V10],
   [WATCH_RELAY_TEAM_CAPABILITY, V10],
+  [PROVIDER_ACCOUNT_POOL_MODELS_CAPABILITY, V10],
 ] as const satisfies readonly (readonly [string, TeamCapabilityPlacement])[];
 
 export const TEAM_CURRENT_CAPABILITIES = TEAM_CAPABILITY_REGISTRY.map(([capability]) => capability);

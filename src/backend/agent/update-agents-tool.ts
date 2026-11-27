@@ -49,6 +49,7 @@ export const handleUpdateAgentsTool = Effect.fn("UpdateAgentsTool.handle")(
       | "listAgents"
       | "listModels"
       | "agentModels"
+      | "poolModel"
       | "providerAccounts"
       | "providerStatuses"
       | "updateAgent"
@@ -91,7 +92,10 @@ export const handleUpdateAgentsTool = Effect.fn("UpdateAgentsTool.handle")(
           provider: ownProvider,
           providerAccountId: ownProvider === target.provider ? target.providerAccountId : undefined,
         });
-        const runtime = yield* toolStep(() => requestedRuntime(target, runtimeRequest, models));
+        const poolModel = model === undefined ? undefined : hooks.poolModel?.(ownProvider, model);
+        const runtime = yield* toolStep(() =>
+          requestedRuntime(target, runtimeRequest, poolModel ? [...models, poolModel] : models),
+        );
         yield* toolStep(() => requireRunnableChange(target, runtime, hooks.providerStatuses()));
         const updated = yield* hooks.updateAgent(
           {

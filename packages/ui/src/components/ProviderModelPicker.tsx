@@ -187,6 +187,9 @@ export function ProviderModelPicker(props: ProviderModelPickerProps) {
     const summary = t("provider.account.poolCount", { accounts: accountsText });
     return {
       inUse: pool.inUse,
+      models: pool.accountModels
+        ? members.flatMap((account) => (account.state === "connected" ? (account.models ?? []) : []))
+        : [],
       summary:
         pool.inUse && accounts.some((account) => account.id === pool.inUse)
           ? t("provider.account.poolInUse", { pool: summary, name: providerAccountName(t, accounts, pool.inUse) })
@@ -297,9 +300,16 @@ export function ProviderModelPicker(props: ProviderModelPickerProps) {
     return account ? { account, number: index + 1, name: providerAccountName(t, accounts, id) } : null;
   };
   const entryModelOptions = (key: RailKey): ClientAgentModelOption[] => {
-    const shared = railModelOptions(railOf(key));
-    const own = entryAccount(key)?.account.models ?? [];
-    return own.length ? [...shared, ...own] : shared;
+    const rail = railOf(key);
+    const shared = railModelOptions(rail);
+    const own = entryAccount(key)?.account.models ?? (key === rail ? (railPool(rail)?.models ?? []) : []);
+    const listed = new Set(shared.map((option) => option.id));
+    const added = own.filter((option) => {
+      if (listed.has(option.id)) return false;
+      listed.add(option.id);
+      return true;
+    });
+    return added.length ? [...shared, ...added] : shared;
   };
   const entryStatus = (key: RailKey): AgentProviderStatus => {
     const status = railStatus(railOf(key));

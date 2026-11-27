@@ -2239,6 +2239,12 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
         listModels: () => this.listModels(),
         hiddenModels: (provider) => this.#hiddenModels?.(provider),
         agentModels: (choice) => this.#agentModels(choice),
+        poolModel: (provider, model) => {
+          const accountId = this.#poolAccountForModel(provider, model, undefined);
+          return accountId === undefined
+            ? undefined
+            : this.#providers.accountModels(provider, accountId).find((option) => option.id === model);
+        },
         providerAccounts: (provider) => this.getStatus().providers?.find((row) => row.id === provider)?.accounts,
         providerStatuses: () => this.getStatus().providers ?? [],
         customEndpoints: () =>
@@ -3663,12 +3669,25 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
     return this.#endpoints
       .runExclusive(() =>
         Effect.gen({ self: this }, function* () {
+          const available = this.#endpoints.available();
+          const poolAccount =
+            input.provider && input.model && !input.providerAccountId
+              ? available.some((model) => model.provider === input.provider && model.id === input.model)
+                ? undefined
+                : this.#poolAccountForModel(input.provider, input.model, undefined, agent.id)
+              : undefined;
           const requested = yield* lifecycleStep("select requested model", () =>
-            creationModel(input, this.#endpoints.available(), this.#providers.status().providers),
+            creationModel(
+              input,
+              input.provider && poolAccount !== undefined
+                ? [...available, ...this.#providers.accountModels(input.provider, poolAccount)]
+                : available,
+              this.#providers.status().providers,
+            ),
           );
           if (requested) {
             yield* lifecycleStep("check provider switch", () => this.#providers.requireProviderOn(requested.provider));
-            const account = agentProviderAccount(input);
+            const account = agentProviderAccount({ providerAccountId: input.providerAccountId ?? poolAccount });
             if (account)
               yield* lifecycleStep("check provider account", () => {
                 if (!this.#providers.hasProviderAccount(requested.provider, account))
@@ -4084,27 +4103,37 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
     };
     if (input.provider !== undefined || input.model !== undefined || input.providerAccountId !== undefined)
       yield* this.#settleStaleTaskTurns(input.agentId);
-    const { previous, requestedModel, requestedProvider, previousAccount, requestedAccount } = yield* lifecycleStep(
-      "validate agent update",
-      () => {
+    const { previous, requestedModel, requestedProvider, previousAccount, requestedAccount, poolAccount } =
+      yield* lifecycleStep("validate agent update", () => {
         this.#conversation.requireKnownAgent(input.agentId);
         const previous = this.#store.get(input.agentId);
         const modelProvider = input.provider ?? (previous ? providerForAgent(previous) : undefined);
-        const requestedModel = input.model
+        const accountModel = (accountId: string | undefined) =>
+          modelProvider
+            ? this.#providers.accountModels(modelProvider, accountId).find((model) => model.id === input.model)
+            : undefined;
+        const listedModel = input.model
           ? (this.#endpoints
               .available()
               .find((model) => model.id === input.model && (!modelProvider || model.provider === modelProvider)) ??
-            (modelProvider
-              ? this.#providers
-                  .accountModels(
-                    modelProvider,
-                    input.providerAccountId !== undefined
-                      ? (input.providerAccountId ?? undefined)
-                      : previous?.providerAccountId,
-                  )
-                  .find((model) => model.id === input.model)
-              : undefined))
+            accountModel(
+              input.providerAccountId !== undefined
+                ? (input.providerAccountId ?? undefined)
+                : previous?.providerAccountId,
+            ))
           : undefined;
+        const poolAccount =
+          input.model && !listedModel && !input.providerAccountId && modelProvider
+            ? this.#poolAccountForModel(
+                modelProvider,
+                input.model,
+                input.providerAccountId === undefined && previous && providerForAgent(previous) === modelProvider
+                  ? previous.providerAccountId
+                  : undefined,
+                input.agentId,
+              )
+            : undefined;
+        const requestedModel = listedModel ?? (poolAccount === undefined ? undefined : accountModel(poolAccount));
         if (input.model && !requestedModel) {
           throw modelUnavailableError(
             input.model,
@@ -4137,8 +4166,8 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
         }
         const previousAccount = previous ? agentProviderAccount(previous) : null;
         const requestedAccount =
-          input.providerAccountId !== undefined
-            ? agentProviderAccount({ providerAccountId: input.providerAccountId ?? undefined })
+          input.providerAccountId !== undefined || poolAccount !== undefined
+            ? agentProviderAccount({ providerAccountId: input.providerAccountId ?? poolAccount })
             : previous && requestedProvider !== providerForAgent(previous)
               ? null
               : previousAccount;
@@ -4153,9 +4182,8 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
             }),
           );
         if (previous && requestedAccount !== previousAccount && !queueWhileBusy) requireIdle(previous);
-        return { previous, requestedModel, requestedProvider, previousAccount, requestedAccount };
-      },
-    );
+        return { previous, requestedModel, requestedProvider, previousAccount, requestedAccount, poolAccount };
+      });
     const accountChanged = previous !== undefined && requestedAccount !== previousAccount;
     const nextModelId = requestedModel?.id ?? previous?.model;
     const customAgentChanged = Boolean(
@@ -4178,18 +4206,21 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
     const queueable = queueWhileBusy && previous !== undefined && !input.leaveUsageLimit;
     const runtimeOnly = Object.keys(input).every((key) => RUNTIME_UPDATE_KEYS.has(key));
     const providerBound = Object.keys(input).some((key) => PROVIDER_BOUND_UPDATE_KEYS.has(key));
-    const pinnedAccountId = this.#accountPin(
-      input,
-      move,
-      initiatingAgentId,
-      previous && requestedProvider
-        ? {
-            provider: requestedProvider,
-            model: requestedModel?.id ?? previous.model,
-            ...(requestedAccount ? { providerAccountId: requestedAccount } : {}),
-          }
-        : undefined,
-    );
+    const pinnedAccountId =
+      poolAccount !== undefined && move === null
+        ? null
+        : this.#accountPin(
+            input,
+            move,
+            initiatingAgentId,
+            previous && requestedProvider
+              ? {
+                  provider: requestedProvider,
+                  model: requestedModel?.id ?? previous.model,
+                  ...(requestedAccount ? { providerAccountId: requestedAccount } : {}),
+                }
+              : undefined,
+          );
     const pin = pinnedAccountId === undefined ? {} : { pinnedAccountId };
     const queue = (pendingRuntime: AgentPendingRuntime) =>
       this.#store.updateAgent({ agentId: input.agentId, pendingRuntime, ...pin }, initiatingAgentId).pipe(
@@ -4561,6 +4592,22 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
       agentsOn.set(accountId, (agentsOn.get(accountId) ?? 0) + 1);
     }
     return pickSpreadPoolAccount(members, current, nowSeconds, (accountId) => agentsOn.get(accountId) ?? 0, openOnly);
+  }
+
+  #poolAccountForModel(
+    provider: AgentProvider,
+    model: string,
+    current: string | undefined,
+    movingAgentId: string | null = null,
+  ): string | undefined {
+    const choice = { provider, model, ...(current ? { providerAccountId: current } : {}) };
+    if (!this.#pooled(choice)) return undefined;
+    const ready = this.#poolPick(provider, model, current ?? DEFAULT_PROVIDER_ACCOUNT_ID, false, movingAgentId);
+    if (ready !== null) return ready;
+    return this.#providers
+      .poolMembers(provider, model)
+      .find((member) => this.#providers.accountModels(provider, member.accountId).some((option) => option.id === model))
+      ?.accountId;
   }
 
   #readyPoolMembers(provider: AgentProvider, model: string | null) {

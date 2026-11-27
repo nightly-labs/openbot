@@ -1886,6 +1886,7 @@ export class ProviderRuntime implements ProviderPort {
       leftOut: [...pool.leftOut],
       inUse: this.#poolInUse.get(provider) ?? null,
       ...(pool.strategy ? { strategy: pool.strategy } : {}),
+      accountModels: true,
     };
   }
 

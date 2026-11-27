@@ -1648,7 +1648,10 @@ export function createMockOpenBot(options: MockOpenBotOptions = {}): MockOpenBot
           if (!enabled) return rest;
           const inUse = row.accounts?.find((account) => !leftOut.includes(account.id))?.id ?? null;
           const kept = strategy ?? old?.strategy;
-          return { ...rest, accountPool: { leftOut: [...leftOut], inUse, ...(kept ? { strategy: kept } : {}) } };
+          return {
+            ...rest,
+            accountPool: { leftOut: [...leftOut], inUse, ...(kept ? { strategy: kept } : {}), accountModels: true },
+          };
         }),
       };
       return clone(agentStatus);

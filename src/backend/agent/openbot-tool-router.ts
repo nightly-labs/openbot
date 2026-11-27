@@ -451,6 +451,7 @@ export interface OpenBotToolRouterHooks {
   listModels(): AgentModelOption[];
   hiddenModels?(provider: AgentProvider): ReadonlySet<string> | undefined;
   agentModels(choice: Pick<AgentModelChoice, "provider" | "providerAccountId">): AgentModelOption[];
+  poolModel?(provider: AgentProvider, model: string): AgentModelOption | undefined;
   providerAccounts: ProviderAccountRows;
   providerStatuses(): readonly ProviderStatusRow[];
   customEndpoints(): readonly ListedCustomEndpoint[];
@@ -3633,10 +3634,16 @@ export class OpenBotToolRouter {
             ? target.providerAccountId
             : undefined;
       const requestedProvider = provider ?? target.provider;
+      const accountModels = this.#hooks.agentModels({
+        provider: requestedProvider,
+        providerAccountId: accountFor(requestedProvider),
+      });
+      const poolModel =
+        !providerAccountId && model !== undefined ? this.#hooks.poolModel?.(requestedProvider, model) : undefined;
       const runtime = requestedRuntime(
         target,
         runtimeRequest,
-        this.#hooks.agentModels({ provider: requestedProvider, providerAccountId: accountFor(requestedProvider) }),
+        poolModel ? [...accountModels, poolModel] : accountModels,
       );
       requireRunnableChange(target, runtime, this.#hooks.providerStatuses());
       const ownProvider = runtime.provider ?? target.provider;

@@ -62,6 +62,7 @@ import { AgentSharedTables } from "@/features/agents/components/agent-shared-tab
 import { AgentTasksRow } from "@/features/agents/components/agent-tasks-row";
 import { BloubAvatarPreview } from "@/features/agents/components/bloub-avatar";
 import { InstructionsLimit, instructionsTooLong } from "@/features/agents/components/instructions-limit";
+import { poolAccountModels } from "@/features/agents/model/agent-model-picker";
 import { useAgentAccessLevel } from "@/features/servers/model/use-server-roles";
 import { SettingsGroupRow, SettingsRow, SettingsSection } from "@/features/settings/components/settings-content";
 import { RowIcon } from "@/features/settings/components/settings-row-icon";
@@ -313,6 +314,7 @@ function AgentForm({
             : current,
         );
       }
+      if (!accountChanged && edits.model !== undefined) void queryClient.invalidateQueries({ queryKey: accountsKey });
       if (photoChanged) {
         await setAgentAvatar(agent.id, photo ?? null, agent.serverId);
         setPhoto(undefined);
@@ -430,6 +432,7 @@ function AgentForm({
           reasoningEffort={edits.reasoningEffort ?? agent.reasoningEffort}
           accounts={providerAccounts}
           accountId={account ?? savedAccount}
+          poolModels={accountChanged || !provider ? [] : poolAccountModels(hostAccounts, provider, savedAccount)}
           workspaceOnly={adminSettings ? workspaceAccessEnforced(adminSettings) : false}
           onChange={(value) => {
             change(value);

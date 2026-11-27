@@ -9,7 +9,11 @@ import type { AgentProfile } from "@openbot/ui/data";
 import { type Accessor, createEffect, createSignal, onCleanup, untrack } from "solid-js";
 import { createScopeGuard } from "../../scope-lifetime";
 
-export function withHostAccounts(status: AgentStatus, host: HostProviderAccounts | null): AgentStatus {
+export function withHostAccounts(
+  status: AgentStatus,
+  host: HostProviderAccounts | null,
+  poolAccountModels: boolean,
+): AgentStatus {
   if (!host || !status.providers) return status;
   const accounts = new Map(host.providers.map((row) => [row.provider, row.accounts]));
   const pools = new Map(host.pools?.map((row) => [row.provider, row.pool]));
@@ -24,7 +28,7 @@ export function withHostAccounts(status: AgentStatus, host: HostProviderAccounts
       return {
         ...rest,
         accounts: rows,
-        ...(pool ? { accountPool: pool } : {}),
+        ...(pool ? { accountPool: poolAccountModels ? { ...pool, accountModels: true } : pool } : {}),
         ...(liveVoiceAccount ? { liveVoiceAccount } : {}),
       };
     }),

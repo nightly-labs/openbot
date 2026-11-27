@@ -99,6 +99,7 @@ export function AgentRuntimeFields({
   title,
   accounts = [],
   accountId = "",
+  poolModels = [],
   onChange,
   onAccountChange,
   fastMode,
@@ -117,6 +118,7 @@ export function AgentRuntimeFields({
   title?: string;
   accounts?: readonly ProviderAccountStatus[];
   accountId?: string;
+  poolModels?: readonly AgentModelOption[];
   onChange: (value: Pick<UpdateAgentInput, "provider" | "model" | "reasoningEffort">) => void;
   onAccountChange?: (accountId: string) => void;
   fastMode?: AgentHostFieldsProps;
@@ -133,7 +135,8 @@ export function AgentRuntimeFields({
     enabled: available,
     retry: false,
   });
-  const accountModels = accounts.find((account) => account.id === accountId)?.models ?? [];
+  const ownModels = accounts.find((account) => account.id === accountId)?.models ?? [];
+  const accountModels = poolModels.length ? [...ownModels, ...poolModels] : ownModels;
   const options = withAccountModels(models.data?.filter((option) => option.provider === provider) ?? [], accountModels);
   const selected = options.find((option) => option.id === model);
   const enabled = available && !saving && options.length > 0;

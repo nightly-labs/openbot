@@ -185,6 +185,7 @@ import {
 import { ONEPASSWORD_CONNECTOR_CAPABILITY } from "@openbot/contracts/team-protocol/onepassword-connector-v1";
 import { PASSWORD_MANAGERS_CAPABILITY } from "@openbot/contracts/team-protocol/password-managers-v1";
 import { PROVIDER_ACCOUNT_MODELS_CAPABILITY } from "@openbot/contracts/team-protocol/provider-account-models-v1";
+import { PROVIDER_ACCOUNT_POOL_MODELS_CAPABILITY } from "@openbot/contracts/team-protocol/provider-account-pool-models-v1";
 import { PROVIDER_ACCOUNT_POOL_CAPABILITY } from "@openbot/contracts/team-protocol/provider-account-pool-v1";
 import { PROVIDER_ACCOUNTS_CAPABILITY } from "@openbot/contracts/team-protocol/provider-accounts-v1";
 import { PROVIDERS_ADMIN_CAPABILITY } from "@openbot/contracts/team-protocol/providers-v1";
@@ -1686,16 +1687,21 @@ export function createHostRequestActions({
         serverId,
       );
     },
-    loadProviderAccounts: async (serverId) =>
-      has(serverId, PROVIDER_ACCOUNTS_CAPABILITY)
-        ? runTeamRequest(
-            listProviderAccountsWithModels(
-              teamApi(serverId),
-              has(serverId, PROVIDER_ACCOUNT_MODELS_CAPABILITY),
-              has(serverId, PROVIDER_ACCOUNT_POOL_CAPABILITY),
-            ),
-          )
-        : null,
+    loadProviderAccounts: async (serverId) => {
+      if (!has(serverId, PROVIDER_ACCOUNTS_CAPABILITY)) return null;
+      const accounts = await runTeamRequest(
+        listProviderAccountsWithModels(
+          teamApi(serverId),
+          has(serverId, PROVIDER_ACCOUNT_MODELS_CAPABILITY),
+          has(serverId, PROVIDER_ACCOUNT_POOL_CAPABILITY),
+        ),
+      );
+      if (!accounts.pools || !has(serverId, PROVIDER_ACCOUNT_POOL_MODELS_CAPABILITY)) return accounts;
+      return {
+        ...accounts,
+        pools: accounts.pools.map((row) => ({ ...row, pool: { ...row.pool, accountModels: true as const } })),
+      };
+    },
     loadPlanLimits: (serverId, accounts) =>
       runTeamRequest(readPlanLimits(teamApi(serverId), accounts, has(serverId, USAGE_CREDITS_CAPABILITY))),
     setAgentProviderAccount: async (input, serverId) => {
