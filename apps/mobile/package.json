@@ -1,6 +1,6 @@
 {
   "name": "@openbot/mobile",
-  "main": "expo-router/entry",
+  "main": "./bubble-entry.js",
   "version": "1.4.14",
   "expo": {
     "install": {
