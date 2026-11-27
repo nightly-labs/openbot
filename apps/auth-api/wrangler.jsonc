@@ -72,8 +72,8 @@
     "BILLING_COUNTRY_REQUIRED": "true",
     "GITHUB_APP_CLIENT_ID": "Iv23lik5pzHz70cb0RUL",
     "FEEDBACK_WITHDRAWN_REPOSITORY": "",
-    "CF_ACCESS_TEAM_DOMAIN": "",
-    "CF_ACCESS_ADMIN_AUD": "",
+    "CF_ACCESS_TEAM_DOMAIN": "openbot-run.cloudflareaccess.com",
+    "CF_ACCESS_ADMIN_AUD": "087700ccf63ad1cec5cdf08e7036f8be2c246d0a76ea48046392a40a5671d18a",
     "APNS_TEAM_ID": "8A47NKRZSJ",
     "APNS_TOPIC": "run.openbot.mobile"
   },
