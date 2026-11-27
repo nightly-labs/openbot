@@ -245,7 +245,6 @@ function ServerView(props: { session: ExtensionSession; onSignOut: () => void; o
       setWorkspace(() => next);
       setView((draft) => {
         draft.status = "ready";
-        draft.offline = false;
       });
       await next.load();
       if (current !== attempt) return;
@@ -271,7 +270,8 @@ function ServerView(props: { session: ExtensionSession; onSignOut: () => void; o
         state: (update) => {
           if (update.hostId !== view.hostId) return;
           setView((draft) => {
-            draft.offline = update.state === "offline" || update.hostOffline === true;
+            if (update.state === "offline" || update.hostOffline) draft.offline = true;
+            else if (update.state === "online") draft.offline = false;
           });
           if (update.state !== "online") return;
           void workspace()?.reloadChat();
