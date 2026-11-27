@@ -122,6 +122,8 @@ interface GlobalSearchProps {
 
 const ALL_SECTION_LIMIT = 5;
 const SEARCH_DEBOUNCE_MS = 150;
+// A tab switch keeps the query, so an answer this new is reused instead of a second database scan.
+const RECENT_SEARCH_REUSE_MS = 30_000;
 const RESULT_HEIGHT = 36;
 const SECTION_HEIGHT = 28;
 const SPACED_SECTION_HEIGHT = 34;
@@ -290,6 +292,11 @@ function createRemoteSearch<T>(
   let cursor: string | null = null;
   let failedCursor: string | null = null;
   let loading = false;
+  // The last answer, so that a tab switch back to the same query does not search again.
+  let recent: { search: PagedSearch<T>; query: string; loaded: Loaded; at: number } | null = null;
+  const remember = (from: { search: PagedSearch<T>; query: string }, value: Loaded) => {
+    recent = { search: from.search, query: from.query, loaded: value, at: Date.now() };
+  };
   const show = (next: Loaded) => {
     cursor = next.cursor;
     loading = false;
@@ -301,7 +308,9 @@ function createRemoteSearch<T>(
     next.search(next.query).then(
       (page) => {
         if (current !== latest) return;
-        show({ items: page.results, total: page.total, cursor: page.nextCursor });
+        const value = { items: page.results, total: page.total, cursor: page.nextCursor };
+        remember(next, value);
+        show(value);
         setAnswered(next);
       },
       () => {
@@ -323,6 +332,16 @@ function createRemoteSearch<T>(
       show(empty);
       return;
     }
+    if (
+      recent &&
+      recent.search === next.search &&
+      recent.query === next.query &&
+      Date.now() - recent.at < RECENT_SEARCH_REUSE_MS
+    ) {
+      show(recent.loaded);
+      setAnswered(next);
+      return;
+    }
     loading = true;
     timer = setTimeout(() => loadFirst(next), SEARCH_DEBOUNCE_MS);
   });
@@ -340,13 +359,16 @@ function createRemoteSearch<T>(
         if (current !== latest) return;
         cursor = page.nextCursor;
         loading = false;
+        const source = active;
         setLoaded((previous) => {
           const seen = new Set(previous.items.map(key));
-          return {
+          const value = {
             items: [...previous.items, ...page.results.filter((item) => !seen.has(key(item)))],
             total: page.total ?? previous.total,
             cursor: page.nextCursor,
           };
+          if (source) remember(source, value);
+          return value;
         });
       },
       () => {
