@@ -72,7 +72,7 @@ function handle(message) {
     const [input, cached, output, thought] = match.slice(1).map(Number);
     return write({ id: message.id, result: { stopReason: "end_turn", usage: {
       inputTokens: input, outputTokens: output, cachedReadTokens: cached, cachedWriteTokens: 0,
-      thoughtTokens: thought, totalTokens: input + output + thought,
+      thoughtTokens: thought, totalTokens: input + cached + output,
     } } });
   }
   write({ id: message.id, result: {} });
@@ -236,9 +236,9 @@ async function check(name: string, threadId: string, index: number, sent: Turn):
       uncachedInput: sent.input,
       cachedInput: sent.cached,
       cacheCreation: 0,
-      output: sent.output + sent.thought,
+      output: sent.output,
     },
-    `${name}: the turn's own tokens, with thinking as output`,
+    `${name}: the turn's own tokens, with thinking only inside the output`,
   );
   result.passed = true;
 }
@@ -279,8 +279,8 @@ try {
   await send(agent.id, { input: 6_000, cached: 5_000, output: 200, thought: 0 }, "smaller second turn");
   await check("smaller second turn", threadId, 1, { input: 6_000, cached: 5_000, output: 200, thought: 0 });
 
-  await send(agent.id, { input: 15_000, cached: 6_000, output: 900, thought: 400 }, "larger third turn");
-  await check("larger third turn", threadId, 2, { input: 15_000, cached: 6_000, output: 900, thought: 400 });
+  await send(agent.id, { input: 15_000, cached: 6_000, output: 29_306, thought: 12_172 }, "larger third turn");
+  await check("larger third turn", threadId, 2, { input: 15_000, cached: 6_000, output: 29_306, thought: 12_172 });
 
   const cacheRead: Turn = { input: 3_165, cached: 100_717, output: 700, thought: 120 };
   await send(agent.id, cacheRead, "turn with more cache reads than input");
@@ -325,10 +325,7 @@ try {
     turns: analytics.totals.turns,
     missingUsageTurns: analytics.totals.missingUsageTurns,
   };
-  const sent = report.cases.reduce(
-    (sum, entry) => sum + entry.sent.input + entry.sent.cached + entry.sent.output + entry.sent.thought,
-    0,
-  );
+  const sent = report.cases.reduce((sum, entry) => sum + entry.sent.input + entry.sent.cached + entry.sent.output, 0);
   assert.equal(analytics.totals.turns, 5, "Analytics count every turn.");
   assert.equal(analytics.totals.missingUsageTurns, 0, "Every turn has usage.");
   assert.equal(analytics.totals.processedTokens, sent, "Analytics count every turn's tokens once.");
