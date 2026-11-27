@@ -28,6 +28,12 @@ import { profileToolErrorMessage } from "./profile-tools";
 import { type OpenBotToolResponse, openBotToolFailure, openBotToolResult } from "./routine-tools";
 import { ToolOperationFailed, toolStep } from "./tool-operation";
 
+const APP_READY_NEXT =
+  "The app answers. Use these tools when your tool search finds them. Otherwise they reach you from your next turn: ask the user to send the request again.";
+
+const SIGNED_IN_APP_ACCOUNT_NEXT =
+  "When the app answers for the wrong account, or data that the user expects is missing, tell the user that they can change the account in OpenBot: in Marketplace, Apps, open this app. With one account, the user clicks Sign in again and signs in with the correct account. With more accounts, the user clicks Add account, and can remove the wrong account. Disconnect, on the same page, removes the app. In the phone app, the user opens this app in Marketplace and uses Sign out, then signs in again. When the user does not see these controls on a joined server, a server owner or admin must do it. Do not say that a new sign-in selects a different workspace: the app's own sign-in page decides that.";
+
 const serverName = z
   .string()
   .trim()
@@ -261,7 +267,8 @@ const runMarketplaceAppStatus = Effect.fn("McpServerTools.marketplaceAppStatus")
       server,
       toolCount: outcome.toolCount,
       tools: outcome.tools,
-      next: "The app answers. Use these tools when your tool search finds them. Otherwise they reach you from your next turn: ask the user to send the request again.",
+      next:
+        "signedIn" in server && server.signedIn ? `${APP_READY_NEXT} ${SIGNED_IN_APP_ACCOUNT_NEXT}` : APP_READY_NEXT,
     });
   if (outcome.error !== null && outcome.needs === null && setupSteps.length > 0)
     return openBotToolResult({
