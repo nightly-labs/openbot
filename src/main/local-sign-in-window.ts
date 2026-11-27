@@ -193,6 +193,9 @@ export class LocalSignInWindows {
       storageReads: 0,
       storageRead: 0,
     };
+    session.cookies.on("changed", (_event, cookie, _cause, removed) => {
+      if (!removed && browserSignInCookieFitsHost(cookie.domain ?? "", host)) this.#scheduleStorageRead(pending);
+    });
     this.#pending = pending;
     return pending;
   }

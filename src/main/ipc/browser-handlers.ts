@@ -48,6 +48,7 @@ import {
 } from "@openbot/contracts/team-protocol/browser-view-v1";
 import { TEAM_BROWSER_NAVIGATION_CAPABILITY } from "@openbot/contracts/team-protocol/current";
 import { sourceText } from "@openbot/i18n/source";
+import { createOpenBotLogger, toLogValue } from "@openbot/logging";
 import type { IpcMainInvokeEvent, WebContents } from "electron";
 import type { BrowserHost } from "../../backend/browser-host";
 import { runCauseEffect } from "../../backend/effect-boundary";
@@ -87,6 +88,8 @@ import {
 } from "./define-ipc-group";
 import { routeToServer } from "./route-to-server";
 import { optionalPayload, stringPayload } from "./validation";
+
+const logger = createOpenBotLogger("browser-sign-in");
 
 export interface BrowserIpcDependencies {
   browserPictureInPicture: Pick<BrowserPictureInPicture, "open" | "close" | "dock" | "hide">;
@@ -408,7 +411,9 @@ export function browserIpcHandlers({
               }),
             ).then((result) => result.cookies);
         if (set === 0) return { cookies: 0, signedIn: false };
-        await openSignedInPageOnServer(target);
+        await openSignedInPageOnServer(target).catch((error: unknown) =>
+          logger.warn("Unable to open the signed-in page in the server tab", toLogValue(error)),
+        );
         await runCauseEffect(localSignIn.discard());
         return { cookies: set, signedIn: true };
       }),
