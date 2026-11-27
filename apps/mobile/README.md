@@ -219,7 +219,13 @@ already loaded remain visible during reconnection.
 
 The phone keeps an encrypted copy of the agents, hidden agents, sections, latest chat pages,
 channels with the latest 50 messages of each opened channel, capabilities and last drawer values (`drawer-snapshot.ts`) of each server (`workspace-cache.ts`),
-and writes it when a server load ends and when the app goes to the background. It also keeps the
+and writes it when a server load ends and when the app goes to the background. Each server has two
+files: a small one with the agents, sections, channel list, capabilities and drawer values, and one
+with the chat and channel pages. Both files of one write have the same ID. At start the app reads
+the small file of each server first and shows the agent list, then reads the page files. It does not
+write a server while its page file is still being read. A copy in the older one-file format (from a
+previous app version) is read once and replaced at the next write; an older app bundle then finds no
+copy and loads from the host. It also keeps the
 last server list of the account service. After a start, the servers of that list connect at once,
 before the account service answers; a server whose key is not the key that the phone trusts waits
 for the account service. Its list then replaces the copy: it removes a server that the account

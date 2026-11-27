@@ -244,6 +244,15 @@ export class MobileChannelStore {
       pages: new Map(pages.filter((page) => ids.has(page.channel.id)).map((page) => [page.channel.id, page])),
     });
   }
+  restorePages(serverId: string, pages: ChannelPage[]) {
+    const entry = this.entries.get(serverId);
+    if (!entry || entry.state.listed || !entry.state.channels.length || !pages.length) return;
+    const ids = new Set(entry.state.channels.map((channel) => channel.id));
+    const next = new Map(entry.state.pages);
+    for (const page of pages)
+      if (ids.has(page.channel.id) && !next.has(page.channel.id)) next.set(page.channel.id, page);
+    if (next.size !== entry.state.pages.size) this.publish(entry, { pages: next });
+  }
   cachedChannels(serverId: string): { channels: ChannelSummary[]; pages: ChannelPage[] } | null {
     const state = this.entries.get(serverId)?.state;
     if (!state?.supported || (!state.listed && !state.channels.length)) return null;
