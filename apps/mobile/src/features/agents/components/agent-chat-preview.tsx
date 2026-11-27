@@ -5,6 +5,7 @@ import { useState } from "react";
 import { View } from "react-native";
 import { BloubAvatar } from "@/features/agents/components/bloub-avatar";
 import { ChatMarkdown } from "@/features/chat/components/chat-markdown";
+import { useRemoteChatContent } from "@/features/servers/model/use-remote-chat-content";
 import { type MobileAgent, useMobileWorkspaceSelector } from "@/features/workspace/context/mobile-workspace-context";
 import { useColumnWidth } from "@/shared/components/adaptive-split";
 import { useFontScale } from "@/shared/lib/font-scale";
@@ -24,16 +25,32 @@ function previewText(preview: string): string {
   return `${(lastSpace > 0 ? text.slice(0, lastSpace) : text).replace(/[\s.,;:!?—–-]+$/, "")}…`;
 }
 
-function PreviewBubble({ text, onHeight }: { text: string; onHeight?: (height: number) => void }) {
+function PreviewBubble({
+  text,
+  serverId,
+  onHeight,
+}: {
+  text: string;
+  serverId: string;
+  onHeight?: (height: number) => void;
+}) {
   const agents = useMobileWorkspaceSelector((workspace) => workspace.agents);
   const foreground = useThemeColor("foreground");
+  const remoteContent = useRemoteChatContent(serverId);
   return (
     <View
       className="max-w-full self-start rounded-[30px] bg-control/60 px-4 py-3"
       style={{ borderCurve: "circular" }}
       onLayout={onHeight ? (event) => onHeight(event.nativeEvent.layout.height) : undefined}
     >
-      <ChatMarkdown agents={agents} body={text} color={foreground} selectable={false} animationEnabled={false} />
+      <ChatMarkdown
+        agents={agents}
+        body={text}
+        color={foreground}
+        selectable={false}
+        animationEnabled={false}
+        remoteContent={remoteContent}
+      />
     </View>
   );
 }
@@ -74,7 +91,7 @@ export function useAgentChatPreview(agent: MobileAgent) {
             className="min-h-0 flex-1 overflow-hidden"
             style={{ padding: BUBBLE_MARGIN, paddingHorizontal: SIDE_INSET }}
           >
-            <PreviewBubble text={text} />
+            <PreviewBubble text={text} serverId={agent.serverId} />
           </View>
         ) : null}
       </View>
@@ -89,7 +106,7 @@ export function useAgentChatPreview(agent: MobileAgent) {
         importantForAccessibility="no-hide-descendants"
         style={{ position: "absolute", left: 0, top: 0, width: bubbleWidth, opacity: 0 }}
       >
-        <PreviewBubble text={text} onHeight={setBubbleHeight} />
+        <PreviewBubble text={text} serverId={agent.serverId} onHeight={setBubbleHeight} />
       </View>
     ) : null;
 

@@ -3,7 +3,6 @@ import { execFileSync } from "node:child_process";
 import { existsSync, mkdirSync, readFileSync, statSync, writeFileSync } from "node:fs";
 import { join, resolve } from "node:path";
 import { isDynamicRecord, isNumber, isString } from "@openbot/contracts/runtime-values";
-import { translateFor } from "@openbot/i18n";
 import { createOpenBotLogger } from "@openbot/logging";
 import type { RemoteRequestRecord } from "@openbot/team-client/sync-profile";
 import { type Browser, type BrowserContext, chromium, type Page } from "playwright-core";
@@ -12,16 +11,15 @@ import { type Spread, spread } from "./dev-automation/bench-stats";
 import { assertMutationAllowed, connectToDevApp } from "./dev-automation/cdp-client";
 import { type DevInstanceRecord, readDevInstanceRecords } from "./dev-automation/instance-registry";
 import { resolveDevelopmentAppDataRoot } from "./development-state-paths";
+import { addNetworkLatency, delay, instrumentRemotePeer, readSyncSink, signInDevHost } from "./remote-perf-support";
 
 const NAME = "remote-sync-perf";
 const ROOT = resolve(import.meta.dirname, "..");
-const DEV_HOST_EMAIL = "openbot-dev-host@example.com";
 const MARK_PREFIX = "openbot:remote-";
 const SYNC_FILE = "dev-sync-profile.ndjson";
 const SETTLE_GAP_MS = 500;
 const POLL_MS = 250;
 const UUID = /[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/i;
-const english = translateFor("en");
 const logger = createOpenBotLogger(NAME);
 
 const runs = Number(argument("runs") ?? "5");
@@ -99,14 +97,6 @@ interface RouteRow {
   responseBytes: number;
 }
 
-declare global {
-  interface Window {
-    __syncPerfPeers?: RTCPeerConnection[];
-    __syncPerfSink?: { records: RemoteRequestRecord[]; open: number };
-  }
-}
-
-const literal = (text: string) => text.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 const bytes = (record: RemoteRequestRecord) => record.requestBytes + record.responseBytes;
 const routeKey = (record: RemoteRequestRecord) => `${record.method} ${record.route}`;
 
@@ -256,29 +246,6 @@ function isRequestRecord(value: unknown): value is RemoteRequestRecord {
   );
 }
 
-async function signIn(page: Page): Promise<void> {
-  await page.goto(`${api}/app`);
-  await page.getByRole("textbox", { name: english("account.login.email"), exact: true }).fill(DEV_HOST_EMAIL);
-  const send = page.getByRole("button", { name: english("account.login.sendCode"), exact: true });
-  const prefix = english("account.login.developmentCode", { code: "" });
-  const notice = page.getByText(new RegExp(`^${literal(prefix)}`));
-  const deadline = Date.now() + WAIT_MS;
-  await send.click();
-  while (!(await notice.isVisible()) && Date.now() < deadline) {
-    await notice.waitFor({ timeout: 5_000 }).catch(() => undefined);
-    const canRetry = (await send.isVisible().catch(() => false)) && (await send.isEnabled().catch(() => false));
-    if (!(await notice.isVisible()) && canRetry) await send.click();
-  }
-  await notice.waitFor({ timeout: 1_000 }).catch(async (error: unknown) => {
-    mkdirSync(OUT, { recursive: true });
-    await page.screenshot({ path: resolve(OUT, "web-failure.png") }).catch(() => undefined);
-    throw new Error("The account service showed no development code.", { cause: error });
-  });
-  const code = (await notice.innerText()).slice(prefix.length).replaceAll("-", "").trim();
-  assert.ok(code.length > 0, "The account service showed no development code.");
-  await page.keyboard.type(code);
-}
-
 const SELECTED_SERVER_PREFIX = "openbot.web.selected-server:";
 
 async function selectHost(page: Page, id: string): Promise<void> {
@@ -294,98 +261,6 @@ async function selectHost(page: Page, id: string): Promise<void> {
     { prefix: SELECTED_SERVER_PREFIX, id },
   );
   await page.reload();
-}
-
-async function instrument(context: BrowserContext): Promise<void> {
-  await context.addInitScript((halfTrip: number) => {
-    const collected: NonNullable<Window["__syncPerfSink"]> = { records: [], open: 0 };
-    window.__syncPerfSink = collected;
-    globalThis.__openbotSyncProfile = {
-      started() {
-        collected.open += 1;
-      },
-      push(record) {
-        collected.open -= 1;
-        collected.records.push(record);
-      },
-    };
-    const Native = window.RTCPeerConnection;
-    const peers: RTCPeerConnection[] = [];
-    window.__syncPerfPeers = peers;
-    window.RTCPeerConnection = class extends Native {
-      constructor(configuration?: RTCConfiguration) {
-        super(configuration);
-        peers.push(this);
-      }
-    };
-    if (halfTrip <= 0) return;
-    const channel = RTCDataChannel.prototype;
-    const sendText: (this: RTCDataChannel, data: string) => void = channel.send;
-    const sendBlob: (this: RTCDataChannel, data: Blob) => void = channel.send;
-    const sendBuffer: (this: RTCDataChannel, data: ArrayBuffer) => void = channel.send;
-    const sendView: (this: RTCDataChannel, data: ArrayBufferView<ArrayBuffer>) => void = channel.send;
-    type Payload = string | Blob | ArrayBuffer | ArrayBufferView<ArrayBuffer>;
-    const deliver = (target: RTCDataChannel, data: Payload) => {
-      if (typeof data === "string") sendText.call(target, data);
-      else if (data instanceof Blob) sendBlob.call(target, data);
-      else if (data instanceof ArrayBuffer) sendBuffer.call(target, data);
-      else sendView.call(target, data);
-    };
-    channel.send = function (this: RTCDataChannel, data: Payload) {
-      if (this.readyState !== "open") return deliver(this, data);
-      setTimeout(() => {
-        if (this.readyState === "open") deliver(this, data);
-      }, halfTrip);
-    };
-    const later =
-      <E extends Event>(listener: (event: E) => void) =>
-      (event: E) =>
-        void setTimeout(() => listener(event), halfTrip);
-    const wrapped = new WeakMap<object, (event: Event) => void>();
-    const add = channel.addEventListener;
-    const remove = channel.removeEventListener;
-    channel.addEventListener = function (
-      this: RTCDataChannel,
-      type: string,
-      listener: EventListenerOrEventListenerObject,
-      options?: boolean | AddEventListenerOptions,
-    ) {
-      if (type !== "message") return add.call(this, type, listener, options);
-      const delayed =
-        wrapped.get(listener) ??
-        later((event) => (typeof listener === "function" ? listener.call(this, event) : listener.handleEvent(event)));
-      wrapped.set(listener, delayed);
-      add.call(this, type, delayed, options);
-    };
-    channel.removeEventListener = function (
-      this: RTCDataChannel,
-      type: string,
-      listener: EventListenerOrEventListenerObject,
-      options?: boolean | EventListenerOptions,
-    ) {
-      remove.call(this, type, wrapped.get(listener) ?? listener, options);
-    };
-    const onmessage = Object.getOwnPropertyDescriptor(channel, "onmessage");
-    if (onmessage?.set && onmessage.get) {
-      const { get, set } = onmessage;
-      Object.defineProperty(channel, "onmessage", {
-        configurable: true,
-        enumerable: onmessage.enumerable ?? true,
-        get() {
-          return get.call(this);
-        },
-        set(this: RTCDataChannel, handler: ((event: MessageEvent) => void) | null) {
-          set.call(this, handler ? later<MessageEvent>((event) => handler.call(this, event)) : null);
-        },
-      });
-    }
-  }, latencyMs / 2);
-}
-
-async function readSink(page: Page): Promise<{ records: RemoteRequestRecord[]; open: number }> {
-  const sink = await page.evaluate(() => window.__syncPerfSink ?? null);
-  assert.ok(sink, "The page has no sync profile sink.");
-  return sink;
 }
 
 function readMarks(page: Page): Promise<Mark[]> {
@@ -453,21 +328,6 @@ async function captureFrame(page: Page, name: string): Promise<void> {
   );
 }
 
-const delay = (ms: number) => new Promise<void>((done) => setTimeout(done, ms));
-
-async function addLatency(context: BrowserContext): Promise<void> {
-  const delayed = new Set(["document", "fetch", "xhr"]);
-  await context.route("**/*", async (route) => {
-    if (delayed.has(route.request().resourceType())) await delay(latencyMs);
-    await route.fallback();
-  });
-  await context.routeWebSocket(/.*/, (socket) => {
-    const server = socket.connectToServer();
-    socket.onMessage((message) => void delay(latencyMs / 2).then(() => server.send(message)));
-    server.onMessage((message) => void delay(latencyMs / 2).then(() => socket.send(message)));
-  });
-}
-
 function withoutFrames(state: StorageState): StorageState {
   return {
     ...state,
@@ -485,15 +345,15 @@ function hasFrame(state: StorageState): boolean {
 async function webRun(browser: Browser, client: "web" | "web-warm", storageState: StorageState, capture = false) {
   const context = await browser.newContext({ storageState, viewport: { width: 1280, height: 900 } });
   try {
-    await instrument(context);
+    await instrumentRemotePeer(context, latencyMs);
     const page = await context.newPage();
-    if (latencyMs > 0) await addLatency(context);
+    if (latencyMs > 0) await addNetworkLatency(context, latencyMs);
     await page.goto(`${api}/app`);
     if (capture) await captureFrame(page, "web-warm-frame");
     const state = await settle(
       page,
       "the web client settles",
-      async () => ({ marks: await readMarks(page), sink: await readSink(page) }),
+      async () => ({ marks: await readMarks(page), sink: await readSyncSink(page) }),
       ({ marks, sink }) =>
         sink.open === 0 &&
         ["workspace-ready", "panels-ready"].every((name) => marks.some((mark) => mark.name === name)),
@@ -520,7 +380,7 @@ async function webRuns(): Promise<Run[]> {
   try {
     const first = await browser.newContext({ viewport: { width: 1280, height: 900 } });
     const page = await first.newPage();
-    await signIn(page);
+    await signInDevHost(page, api, OUT);
     if (hostId) await selectHost(page, hostId);
     await page
       .waitForFunction(

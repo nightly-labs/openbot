@@ -39,6 +39,7 @@ import {
 import { requireCapability, type ServerCapabilities } from "@/features/workspace/model/server-capabilities";
 import { ignoreResponse } from "@/features/workspace/model/workspace-records";
 import type { MobileWorkspaceContextValue } from "@/features/workspace/model/workspace-types";
+import type { WorkspaceSyncCollections } from "@/features/workspace/sync/workspace-sync";
 
 const RUN_PAGE_SIZE = 20;
 
@@ -77,10 +78,12 @@ export function createWorkflowActions({
   request,
   capabilities,
   loadAgentModels,
+  synced,
 }: {
   request: WorkspaceRequest;
   capabilities: ServerCapabilities;
   loadAgentModels: MobileWorkspaceContextValue["loadAgentModels"];
+  synced: WorkspaceSyncCollections;
 }): WorkflowActions {
   const send = <T>(serverId: string, path: string, decode: (value: unknown) => T, body: TeamProtocolV2Json) => {
     requireCapability(capabilities, serverId, WORKFLOWS_CAPABILITY, "mobile.workflow.unsupported");
@@ -91,7 +94,15 @@ export function createWorkflowActions({
     return send(serverId, path, decode, body);
   };
   return {
-    listWorkflows: (serverId) => send(serverId, WORKFLOWS_ROUTES.list, decodeRemoteWorkflowList, {}),
+    listWorkflows: (serverId) => {
+      requireCapability(capabilities, serverId, WORKFLOWS_CAPABILITY, "mobile.workflow.unsupported");
+      return synced.workflows.read(
+        serverId,
+        null,
+        (handle) => [...handle.values()],
+        () => send(serverId, WORKFLOWS_ROUTES.list, decodeRemoteWorkflowList, {}),
+      );
+    },
     loadWorkflow: (workflowId, serverId) =>
       send(serverId, WORKFLOWS_ROUTES.get, decodeRemoteWorkflowDetail, { workflowId }),
     createWorkflow: (input, serverId) =>

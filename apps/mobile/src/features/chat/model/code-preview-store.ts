@@ -6,6 +6,7 @@ export interface CodePreviewEntry {
   language?: string;
   title?: string;
   file?: { uri: string; name: string; mimeType: string };
+  remoteContent?: boolean;
 }
 
 const ENTRY_LIMIT = 20;

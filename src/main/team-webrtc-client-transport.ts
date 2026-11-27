@@ -2,6 +2,7 @@ import { generateKeyPairSync, randomBytes, sign, verify } from "node:crypto";
 import { EventEmitter } from "node:events";
 import type { AgentEvent, TeamRealtimeEvent } from "@openbot/contracts/ipc";
 import { isDynamicRecord, isNumber, isString } from "@openbot/contracts/runtime-values";
+import { addAttachmentDimensions } from "@openbot/contracts/team-protocol/attachment-dimensions-v1";
 import {
   decodeTeamProtocolSupportExpanded,
   teamCapabilitiesForProtocol,
@@ -11,6 +12,11 @@ import { optionalTeamEvent, optionalTeamEventToCurrent } from "@openbot/contract
 import { addPromptQuestionDetails } from "@openbot/contracts/team-protocol/prompt-detail-v1";
 import { teamSideRouteCodec } from "@openbot/contracts/team-protocol/side-routes";
 import { addSkillSuggestionNames } from "@openbot/contracts/team-protocol/skill-learning-v1";
+import {
+  decodeSyncServerMessage,
+  type SyncClientMessage,
+  type SyncServerMessage,
+} from "@openbot/contracts/team-protocol/sync-v1";
 import {
   type TeamProtocolV1CurrentEventControl,
   toWireTeamProtocolV1ClientEvent,
@@ -71,6 +77,8 @@ interface TeamWebRtcClientTransportEvents {
   connected: [hostId: string];
   disconnected: [hostId: string];
   event: [hostId: string, event: AgentEvent | TeamRealtimeEvent];
+  sync: [hostId: string, message: SyncServerMessage];
+  eventReset: [hostId: string];
   path: [hostId: string, path: "p2p" | "relay"];
   error: [hostId: string, code: string, message: string];
   connectFailed: [hostId: string, failure: unknown];
@@ -393,6 +401,19 @@ export class TeamWebRtcClientTransport extends EventEmitter<TeamWebRtcClientTran
     return yield* this.#owned(this.#sendEventControlEffect(hostId, { type: "runtime-snapshot-request" }));
   }).bind(this);
 
+  readonly sendSync = Effect.fn("TeamWebRtcClient.sendSync")(function* (
+    this: TeamWebRtcClientTransport,
+    hostId: string,
+    message: SyncClientMessage,
+  ): Effect.fn.Return<void, RemoteWorkflowError> {
+    if (!this.isConnected(hostId))
+      return yield* new RemoteWorkflowError({ cause: new Error(sourceText("error.remote.hostConnectionOffline")) });
+    const frame = yield* remoteDecode(() =>
+      encodeTeamProtocolV2Frame({ version: 2, type: "event-control", control: message }),
+    );
+    return yield* this.#owned(TeamClientBridge.use((bridge) => bridge.send(hostId, "events", frame)));
+  }).bind(this);
+
   readonly setTyping = Effect.fn("TeamWebRtcClient.setTyping")(function* (
     this: TeamWebRtcClientTransport,
     hostId: string,
@@ -634,6 +655,7 @@ export class TeamWebRtcClientTransport extends EventEmitter<TeamWebRtcClientTran
           addSkillSuggestionNames(body, envelope.body);
           addPromptQuestionDetails(body, envelope.body);
         }
+        addAttachmentDimensions(body, envelope.body);
         if (method === "GET" && path === "/v1/compatibility" && status === 200) {
           const support = yield* remoteDecode(() => decodeTeamProtocolSupportExpanded(body));
           this.#hostProtocols.set(hostId, Math.min(support.protocol.maximum, LOCAL_TEAM_PROTOCOL.maximum));
@@ -1471,6 +1493,7 @@ export class TeamWebRtcClientTransport extends EventEmitter<TeamWebRtcClientTran
             control: { type: "runtime-snapshot-request" },
           }),
         );
+        this.emit("eventReset", hostId);
         return;
       }
       if (frame.type !== "event") {
@@ -1486,6 +1509,13 @@ export class TeamWebRtcClientTransport extends EventEmitter<TeamWebRtcClientTran
         this.#failProtocol(hostId, sourceText("error.remote.eventGap"));
         return;
       }
+      const sync = decodeSyncServerMessage(frame.payload);
+      if (sync) {
+        this.#lastEventSequence.set(hostId, frame.sequence);
+        this.#scheduleEventAck(hostId);
+        this.emit("sync", hostId, sync);
+        return;
+      }
       const optional = frame.type === "event" ? optionalTeamEvent(frame.payload, { agentTaskUiBlocks: true }) : null;
       const decoded = optional
         ? { status: "known" as const, event: optionalTeamEventToCurrent(optional) }
@@ -1499,6 +1529,7 @@ export class TeamWebRtcClientTransport extends EventEmitter<TeamWebRtcClientTran
           addSkillSuggestionNames(decoded.event, frame.payload);
           addPromptQuestionDetails(decoded.event, frame.payload);
         }
+        addAttachmentDimensions(decoded.event, frame.payload);
         this.emit("event", hostId, decoded.event);
       }
       this.#lastEventSequence.set(hostId, frame.sequence);

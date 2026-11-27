@@ -5,21 +5,26 @@ import { useQueryScope } from "@/features/auth/context/mobile-session-context";
 import type { MobileConnectorId } from "@/features/servers/model/connectors";
 import { isMobilePasswordManagerId } from "@/features/servers/model/password-managers";
 import { useLockedMutation } from "@/features/servers/model/use-locked-action";
-import { useMobileWorkspace, useMobileWorkspaceActions } from "@/features/workspace/context/mobile-workspace-context";
+import {
+  useMobileWorkspaceActions,
+  useMobileWorkspaceSelector,
+} from "@/features/workspace/context/mobile-workspace-context";
 import { queryKeys } from "@/features/workspace/model/query-keys";
 
 const POLL_MS = 3_000;
 
 export function useServerConnectors(serverId: string, poll: MobileConnectorId | "all" | null) {
-  const {
-    servers,
-    agents,
-    canManageConnectors,
-    canManageOnePasswordConnector,
-    canManageBitwardenConnector,
-    canManageWhatsAppConnector,
-    canManagePasswordManagers,
-  } = useMobileWorkspace();
+  const server = useMobileWorkspaceSelector((workspace) => workspace.servers.find((item) => item.id === serverId));
+  const agents = useMobileWorkspaceSelector((workspace) => workspace.agents);
+  const connectors = useMobileWorkspaceSelector((workspace) => workspace.canManageConnectors(serverId));
+  const onePasswordAvailable = useMobileWorkspaceSelector((workspace) =>
+    workspace.canManageOnePasswordConnector(serverId),
+  );
+  const bitwardenAvailable = useMobileWorkspaceSelector((workspace) => workspace.canManageBitwardenConnector(serverId));
+  const whatsappAvailable = useMobileWorkspaceSelector((workspace) => workspace.canManageWhatsAppConnector(serverId));
+  const passwordManagersAvailable = useMobileWorkspaceSelector((workspace) =>
+    workspace.canManagePasswordManagers(serverId),
+  );
   const {
     githubConnector,
     loadOnePasswordConnector,
@@ -30,12 +35,6 @@ export function useServerConnectors(serverId: string, poll: MobileConnectorId | 
   } = useMobileWorkspaceActions();
   const queryScope = useQueryScope();
   const focused = useIsFocused();
-  const server = servers.find((candidate) => candidate.id === serverId);
-  const connectors = canManageConnectors(serverId);
-  const onePasswordAvailable = canManageOnePasswordConnector(serverId);
-  const bitwardenAvailable = canManageBitwardenConnector(serverId);
-  const whatsappAvailable = canManageWhatsAppConnector(serverId);
-  const passwordManagersAvailable = canManagePasswordManagers(serverId);
   const refetchInterval = (id: MobileConnectorId): number | false =>
     focused && (poll === "all" || poll === id) ? POLL_MS : false;
   const messaging = (platform: ConnectorMessagingPlatform) => ({

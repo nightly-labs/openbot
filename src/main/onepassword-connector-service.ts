@@ -482,7 +482,7 @@ export class OnePasswordConnectorService implements PasswordVault {
           ? item.fields.find((field) => field.id === "password")?.value
           : otpCode(item.fields.find((field) => field.fieldType === "Totp")?.details);
       if (!value) return null;
-      registerSecretValue(value);
+      registerSecretValue(value, { allowShort: true });
       return value;
     },
     (operation) => this.#reported(operation).pipe(Effect.mapError(({ cause }) => new PasswordVaultError({ cause }))),

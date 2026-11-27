@@ -20,6 +20,8 @@ import { mobileAnalytics } from "@/features/analytics/mobile-analytics";
 import { phoneVpn } from "@/features/support/model/phone-network-capture";
 import { supportLog, supportLogValue } from "@/features/support/model/support-log";
 import { referencedError } from "@/features/workspace/model/referenced-error";
+import type { MobileServerSync } from "@/features/workspace/sync/server-sync";
+import { type NetworkChange, strongerChange } from "@/shared/lib/network-change";
 import { subscribeNetworkMoves } from "@/shared/lib/network-path";
 import { RemoteTeamTransport, type RemoteTeamTransportRef } from "./remote-team-transport";
 
@@ -53,6 +55,7 @@ interface Props {
   active: boolean;
   background: boolean;
   directory: RemoteTeamDirectoryClient;
+  sync: MobileServerSync;
   register(hostId: string, handle: ServerConnectionHandle | null): void;
   load(hostId: string, publicKey: string, client: RemoteTeamTransportRef, context: ServerLoadContext): Promise<void>;
   onStatus(
@@ -72,6 +75,7 @@ export const ServerConnection = memo(function ServerConnection({
   active,
   background,
   directory,
+  sync,
   register,
   load,
   onStatus,
@@ -123,15 +127,15 @@ export const ServerConnection = memo(function ServerConnection({
     supportLog.add("info", "connection", `${hostId} network restored`);
     controller.current?.networkRestored();
   }, [hostId]);
-  const networkMoved = useRef(false);
+  const networkMoved = useRef<NetworkChange | null>(null);
   const clientRef = useRef(client);
   clientRef.current = client;
   useEffect(() => {
     if (!client) return;
-    return subscribeNetworkMoves(() => {
-      supportLog.add("info", "connection", `${hostId} network changed${activeRef.current ? "" : " while inactive"}`);
-      if (activeRef.current) client.networkChanged();
-      else networkMoved.current = true;
+    return subscribeNetworkMoves((change) => {
+      supportLog.add("info", "connection", `${hostId} network ${change}${activeRef.current ? "" : " while inactive"}`);
+      if (activeRef.current) client.networkChanged(change);
+      else networkMoved.current = strongerChange(networkMoved.current, change);
     });
   }, [client, hostId]);
   const handleDiagnostic = useCallback(
@@ -142,6 +146,7 @@ export const ServerConnection = memo(function ServerConnection({
   const handleConnectionUpdate = useCallback(
     (update: RemoteTeamConnectionUpdate) => {
       if (update.hostId !== hostId) return;
+      sync.connection(hostId, update);
       supportLog.add(
         update.state === "offline" ? "warn" : "info",
         "connection",
@@ -161,8 +166,16 @@ export const ServerConnection = memo(function ServerConnection({
       }
       if (update.resync) controller.current?.refresh();
     },
-    [hostId, analytics],
+    [hostId, analytics, sync],
   );
+  const handleSyncEvent = useCallback(
+    (id: string, value: unknown) => {
+      if (id === hostId) sync.receive(hostId, value);
+    },
+    [sync, hostId],
+  );
+  const handleNewPage = useCallback(() => sync.transportReset(hostId), [sync, hostId]);
+  useEffect(() => sync.setActive(hostId, active), [sync, hostId, active]);
 
   useEffect(() => {
     if (!client) return;
@@ -268,9 +281,10 @@ export const ServerConnection = memo(function ServerConnection({
       inactiveSince.current = null;
     }
     controller.current?.setActive(active);
-    if (active && networkMoved.current) {
-      networkMoved.current = false;
-      clientRef.current?.networkChanged();
+    const moved = networkMoved.current;
+    if (active && moved) {
+      networkMoved.current = null;
+      clientRef.current?.networkChanged(moved);
     }
     const phase = lastStatus.current?.status.phase;
     if (returned && (phase === "waiting" || phase === "cooldown")) controller.current?.refresh();
@@ -298,6 +312,8 @@ export const ServerConnection = memo(function ServerConnection({
       onTeamEvent={onTeamEvent}
       onConnectionUpdate={handleConnectionUpdate}
       onDiagnostic={handleDiagnostic}
+      onSyncEvent={handleSyncEvent}
+      onNewPage={handleNewPage}
     />
   );
 });

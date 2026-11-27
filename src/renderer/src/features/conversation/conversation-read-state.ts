@@ -38,7 +38,7 @@ function isIncoming(message: { itemType?: string | undefined }, fromUser: boolea
   return !fromUser && itemTypeCountsAsUnread(message.itemType);
 }
 
-function isIncomingConversationMessage(message: {
+export function isIncomingConversationMessage(message: {
   author: ConversationMessageAuthor;
   itemType?: string | undefined;
 }): boolean {
@@ -119,6 +119,43 @@ export function preserveKnownDirectUnread(
     ...state,
     unreadCount: unread.length,
     firstUnreadMessageId: unread[0]?.id ?? null,
+  };
+}
+
+export function sameReadState(left: ConversationReadState | undefined, right: ConversationReadState): boolean {
+  return (
+    left !== undefined &&
+    left.unreadCount === right.unreadCount &&
+    left.firstUnreadMessageId === right.firstUnreadMessageId &&
+    left.throughMessageId === right.throughMessageId
+  );
+}
+
+export function markedReadState(throughMessageId: string | null): ConversationReadState {
+  return { unreadCount: 0, firstUnreadMessageId: null, throughMessageId };
+}
+
+export function heldUnreadState(previous: ConversationReadState | undefined): ConversationReadState {
+  return {
+    unreadCount: Math.max(previous?.unreadCount ?? 0, 1),
+    firstUnreadMessageId: previous?.firstUnreadMessageId ?? null,
+    throughMessageId: previous?.throughMessageId ?? null,
+  };
+}
+
+export function markedUnreadState<Message extends { id: string }>(
+  messages: readonly Message[],
+  fromMessageId: string,
+  incoming: (message: Message) => boolean,
+  previous: ConversationReadState | undefined,
+): ConversationReadState {
+  const index = messages.findIndex((message) => message.id === fromMessageId);
+  if (index < 0) return { ...heldUnreadState(previous), firstUnreadMessageId: fromMessageId };
+  const unread = messages.slice(index).filter(incoming);
+  return {
+    unreadCount: Math.max(unread.length, 1),
+    firstUnreadMessageId: unread[0]?.id ?? fromMessageId,
+    throughMessageId: messages[index - 1]?.id ?? null,
   };
 }
 

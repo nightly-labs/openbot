@@ -28,6 +28,7 @@ import { Effect, Result } from "effect";
 import { isHeldTargetError } from "./atomic-json-file";
 import { type AttachmentOperationError, attachmentCall, attachmentFailure, attachmentSync } from "./attachment-effects";
 import { sha256File } from "./file-hash";
+import { ImageSizeMemory } from "./image-header-size";
 import { isWithin } from "./workspace-paths";
 
 const MAX_ATTACHMENTS = INPUT_LIMITS.attachments;
@@ -94,6 +95,7 @@ export interface AttachmentFilesOptions {
 export class AttachmentFiles {
   readonly #draftsRoot: string;
   readonly #transfersRoot: string;
+  readonly imageSizes = new ImageSizeMemory();
 
   constructor(options: AttachmentFilesOptions) {
     this.#draftsRoot = join(options.userDataPath, "attachment-drafts");
@@ -372,6 +374,7 @@ export class AttachmentFiles {
           if (wait === undefined || !isHeldTargetError(renamed.failure.cause)) return yield* renamed.failure;
           yield* Effect.sleep(wait);
         }
+        yield* this.imageSizes.measure(attachments);
         completed = true;
         return attachments;
       } catch (error) {
@@ -453,6 +456,7 @@ export class AttachmentFiles {
           yield* writeGeneratedManifestEffect(attachment);
           attachments.push(attachment);
         }
+        yield* this.imageSizes.measure(attachments);
         completed = true;
         return attachments;
       } catch (error) {
@@ -525,6 +529,7 @@ export class AttachmentFiles {
           ...(input.ownerThreadId !== undefined ? { ownerThreadId: input.ownerThreadId } : {}),
         };
         yield* writeGeneratedManifestEffect(generatedAttachment);
+        yield* this.imageSizes.measure([generatedAttachment]);
         completed = true;
         return generatedAttachment;
       } catch (error) {

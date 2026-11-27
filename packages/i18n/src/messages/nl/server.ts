@@ -844,4 +844,8 @@ export const messages = {
   "server.ownerTransfer.accepted": "Je bent nu eigenaar van {server}",
   "server.ownerTransfer.acceptFailed": "Kan de overdracht niet accepteren.",
   "server.ownerTransfer.declineFailed": "Kan de overdracht niet weigeren.",
+  "server.settings.privacyTitle": "Privacy",
+  "server.settings.remoteChatContent": "Externe inhoud laden in chats",
+  "server.settings.remoteChatContentDescription":
+    "Toon in chats afbeeldingen, websitepictogrammen, diagrammen en pagina's die inhoud van andere websites laden. Als dit uit staat, laadt deze inhoud pas na een klik, zodat andere websites niet weten wanneer een chat opent. Dit geldt voor iedereen op deze server.",
 } as const satisfies PartialTranslation<typeof source>;

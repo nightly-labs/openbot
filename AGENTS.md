@@ -63,6 +63,9 @@ adding a module or moving ownership between workspaces.
   directly from the host through Signal, end to end encrypted (`docs/architecture/watch-relay.md`).
   It keeps a watch session token and the hosts' public watch keys in its Keychain. Sign-out deletes
   all of it. Decided by the developer on 2026-11-25.
+  The watch also keeps the logo picture of each server (the plush or the uploaded logo, which the iPhone
+  draws into `watch-server-pictures` in the App Group), its color and its shape. Sign-out deletes them
+  with the other watch pictures. Decided by the developer on 2026-11-27.
   A desktop or browser client also keeps a copy of the agent and channel pictures that it loaded from a
   joined server (`src/main/remote-picture-cache.ts`,
   `src/renderer/src/features/web-client/web-agent-pictures.ts`), so the saved workspace shows the agent

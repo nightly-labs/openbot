@@ -1,4 +1,4 @@
-import { canPreviewAttachment } from "@openbot/contracts/ipc";
+import { canPreviewAttachment, LOCAL_SERVER_ID } from "@openbot/contracts/ipc";
 import type { AppTextKey } from "@openbot/i18n";
 import { classifyFailure } from "@openbot/telemetry";
 import { Input } from "@openbot/ui";
@@ -18,6 +18,7 @@ import { useCompactMessageActions } from "../../compact-message-actions-preferen
 import { usePlatform } from "../../platform";
 import { deviceQuoteShortcut, deviceSendShortcut } from "../../send-shortcut-preference";
 import { remoteAgentError } from "../agents/agent-error-text";
+import { useRemoteChatContent } from "../servers/remote-chat-content";
 import { useThreadVisualReplyCard } from "./ChatVisualReply";
 import { ConversationBrowserLocation } from "./ConversationBrowserLocation";
 import { ConversationBrowserTakeover } from "./ConversationBrowserTakeover";
@@ -78,6 +79,7 @@ export function ConversationThread() {
     toggleSubagentPanel,
     browserTabs,
   } = useConversationViewScope();
+  const remoteChatContent = useRemoteChatContent();
   const backdropAction = useMessageBackdropAction(conversationRuntime(props));
   const threadBackgroundWorkSince = (taskId: string | undefined) =>
     taskId === undefined ? undefined : props.backgroundWorkSince?.(taskId);
@@ -305,6 +307,7 @@ export function ConversationThread() {
             imageCopies={imageCopies()}
             downloads={attachmentDownloads}
             macWindowControls={props.platform === "darwin"}
+            remoteContent={remoteChatContent.enabled(props.server?.id ?? LOCAL_SERVER_ID)}
             approval={current().threads.approval}
             media={props.mediaApproval}
             onRespondApproval={(decision) =>

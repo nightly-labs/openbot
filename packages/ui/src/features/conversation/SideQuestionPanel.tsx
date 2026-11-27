@@ -39,6 +39,7 @@ export interface SideQuestionPanelProps {
   onOpenLink: (url: string) => void;
   resizer?: JSX.Element;
   macWindowControls?: boolean | undefined;
+  remoteContent?: boolean | undefined;
 }
 
 function exchangeMessages(exchange: SideQuestionExchange): AgentMessage[] {
@@ -135,6 +136,7 @@ export function SideQuestionPanel(props: SideQuestionPanelProps) {
                     onPreview={() => undefined}
                     onAttachmentAction={() => undefined}
                     macWindowControls={props.macWindowControls}
+                    remoteContent={props.remoteContent}
                   />
                 </div>
               )}

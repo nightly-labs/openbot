@@ -49,45 +49,6 @@ struct AgentPage: View {
   }
 }
 
-struct AgentStateStyle {
-  let title: String
-  let symbol: String
-  let tint: Color
-
-  init(agent: WatchAgent, text: WatchText) {
-    switch agent.wait {
-    case .approval, .phone(.approval, _), .unknown:
-      title = text(TextKey.stateApproval)
-      symbol = "checkmark.shield"
-    case .question, .phone(.question, _):
-      title = text(TextKey.stateQuestion)
-      symbol = "questionmark.bubble"
-    case .phone(.takeover, _):
-      title = text(TextKey.stateTakeover)
-      symbol = "safari"
-    case .none:
-      switch agent.state {
-      case .working, .waiting:
-        title = text(TextKey.stateWorking)
-        symbol = "ellipsis"
-      case .idle:
-        let idle = text(TextKey.stateIdle)
-        if let updated = agent.updated, !updated.isEmpty {
-          title = "\(idle) · \(updated)"
-        } else {
-          title = idle
-        }
-        symbol = "moon.zzz"
-      }
-    }
-    if agent.wait != nil {
-      tint = .orange
-    } else {
-      tint = agent.state == .idle ? .secondary : .blue
-    }
-  }
-}
-
 struct StateCapsule: View {
   @Environment(\.watchText) private var text
   let agent: WatchAgent

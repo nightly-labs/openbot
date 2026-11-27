@@ -17,6 +17,14 @@ bun run marketplace:build:plugins
 bun run marketplace:build:plugins -- --check
 ```
 
+The Worker also serves the catalog at `/v1/plugins/catalog`. A merge to `main` deploys
+the Worker, and the desktop app, the web client, the phone and the hosts read the new
+list within 30 minutes, with no app release. Keep a new entry inside the format that
+released clients read: a new sign-in kind or a new field needs a release, and older
+clients do not show that entry. A new `stdio` app shows only on hosts that announce
+`plugin-catalog-v1`. Details are in
+[Skills and plugins](../../docs/architecture/skills-and-plugins.md).
+
 Rules for a new entry:
 
 - One app per plugin. Skills stay `[]` until pinned skill versions exist.

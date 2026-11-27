@@ -10,6 +10,7 @@ import { LIVE_VOICE_ROUTES } from "@openbot/contracts/team-protocol/live-voice-v
 import { PENDING_APPROVAL_ROUTES } from "@openbot/contracts/team-protocol/pending-approval-v1";
 import { PHONE_FEEDBACK_ROUTES } from "@openbot/contracts/team-protocol/phone-feedback-v1";
 import { isQueueEditRoute, QueueEditRejectedError } from "@openbot/contracts/team-protocol/queue-edit-v1";
+import type { SyncClientMessage } from "@openbot/contracts/team-protocol/sync-v1";
 import type { TeamProtocolV2Json } from "@openbot/contracts/team-protocol/v2";
 import { sourceText } from "@openbot/i18n/source";
 import type { RemoteTeamDirectoryClient } from "@openbot/team-client";
@@ -55,14 +56,14 @@ import {
 } from "@/features/workspace/model/request-lanes";
 import { uploadCancelled } from "@/features/workspace/model/upload-cancels";
 import { expoGoDomOptions } from "@/shared/lib/expo-go-dom";
+import type { NetworkChange } from "@/shared/lib/network-change";
 import { currentText } from "@/shared/lib/text";
-
 import RemoteTeamBridge, { type RemoteTeamBridgeHandle } from "./remote-team-bridge.dom";
 
 export interface RemoteTeamTransportRef {
   connect(hostId: string, hostPublicKey: string): Promise<{ kept: boolean }>;
   disconnect(): Promise<void>;
-  networkChanged(): void;
+  networkChanged(change: NetworkChange): void;
   newPage(): void;
   request<T>(
     method: string,
@@ -85,6 +86,7 @@ export interface RemoteTeamTransportRef {
     upload?: RemoteFileUpload,
   ): Promise<{ status: number; body: unknown }>;
   openRemoteDesktopStream(path: string, listener: (event: RemoteDesktopRelayEvent) => void): RemoteDesktopStream | null;
+  sendSync(message: SyncClientMessage): void;
 }
 
 export type RemoteDesktopConnection = Pick<RemoteTeamTransportRef, "fetchRaw" | "openRemoteDesktopStream">;
@@ -104,6 +106,8 @@ interface RemoteTeamTransportProps {
   onMembershipChanged?: () => Promise<void>;
   onNetworkRestored?: () => void;
   onTeamEvent: (hostId: string, event: RemoteTeamEvent) => void;
+  onSyncEvent?: (hostId: string, value: unknown) => void;
+  onNewPage?: () => void;
 }
 
 type RemoteTeamCommandInput =
@@ -222,6 +226,7 @@ export const RemoteTeamTransport = memo(
     const newPage = useCallback((reason: string) => {
       gatheringStalls.current = 0;
       supportLog.add("warn", "connection", `${latest.current.props.hostId} new page ${reason}`);
+      bridge.current = null;
       setBridgeKey((key) => key + 1);
     }, []);
 
@@ -306,9 +311,9 @@ export const RemoteTeamTransport = memo(
             );
           return { kept: result.kept === true };
         },
-        networkChanged: () => {
+        networkChanged: (change) => {
           const networkChanged = bridge.current?.networkChanged;
-          if (typeof networkChanged === "function") networkChanged(null);
+          if (typeof networkChanged === "function") networkChanged(change);
         },
         newPage: () => newPage("on refresh"),
         disconnect: async () => {
@@ -427,6 +432,15 @@ export const RemoteTeamTransport = memo(
             },
           };
         },
+        sendSync: (message) => {
+          const sendSync = bridge.current?.sendSync;
+          if (typeof sendSync !== "function") throw new Error(sourceText("error.remote.hostConnectionOffline"));
+          sendSync(
+            message.type === "sync-subscribe"
+              ? { ...message, have: message.have.map(([key, version]) => [key, version]) }
+              : message,
+          );
+        },
       }),
       [enqueue, sendViewCommand, sendDesktopCommand, backgroundLane, newPage],
     );
@@ -441,6 +455,7 @@ export const RemoteTeamTransport = memo(
         `${latest.current.props.hostId} page ready, load ${pageLoads.current}, ${outstanding.length} commands waiting`,
       );
       sendActive(latest.current.props.active);
+      if (pageLoads.current > 1) latest.current.props.onNewPage?.();
       deliverCommands(outstanding);
     }, [sendActive, deliverCommands, mailbox]);
     const handleCommandResult = useCallback(
@@ -543,6 +558,7 @@ export const RemoteTeamTransport = memo(
         latest.current.props.onDiagnostic?.(step, detail);
       },
       onNetworkRestored: async () => latest.current.props.onNetworkRestored?.(),
+      onSyncEvent: async (hostId: string, value: unknown) => latest.current.props.onSyncEvent?.(hostId, value),
       onTeamEvents: async (hostId: string, events: RemoteTeamEvent[]) => {
         const { onTeamEvent } = latest.current.props;
         let failure: { error: unknown } | null = null;

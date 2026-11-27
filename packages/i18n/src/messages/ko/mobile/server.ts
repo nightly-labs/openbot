@@ -555,6 +555,10 @@ export const messages = {
   "mobile.server.settings.browsingMemoryDescription":
     "에이전트의 브라우저를 조작하면 에이전트가 사용한 페이지와 버튼에서 사이트 사용법을 학습합니다. 입력한 텍스트는 저장되지 않습니다.",
   "mobile.server.settings.browsingMemoryLoadFailed": "브라우징 설정을 불러올 수 없습니다.",
+  "mobile.server.settings.remoteChatContent": "채팅에서 외부 콘텐츠 불러오기",
+  "mobile.server.settings.remoteChatContentDescription":
+    "채팅에서 다른 웹사이트의 사진과 사이트 아이콘을 표시합니다. 끄면 링크로 표시되며, 다이어그램과 페이지는 탭할 때만 불러옵니다. 이 서버의 모든 사람에게 적용됩니다.",
+  "mobile.server.settings.remoteChatContentLoadFailed": "외부 콘텐츠 설정을 불러올 수 없습니다.",
   "mobile.server.settings.learningSaveFailed": "이 설정을 저장하지 못했어요. 다시 시도해 주세요.",
   "mobile.server.settings.learningUnsupported": "여기에서 이 설정을 변경하려면 이 서버의 OpenBot을 업데이트해 주세요.",
   "mobile.server.settings.responseStyleDescription":

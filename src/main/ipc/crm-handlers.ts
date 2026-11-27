@@ -14,6 +14,7 @@ import type { CrmPeopleOperations } from "../../backend/crm/crm-handle";
 import { runCauseEffect } from "../../backend/effect-boundary";
 import type { ResponseDecoder } from "../remote-host-decoding";
 import type { RemoteRequestInit } from "../remote-server-client";
+import type { RemoteServerSync } from "../remote-server-sync";
 import type { RemoteWorkflowError } from "../remote-service-effects";
 import {
   parseCrmActivityPage,
@@ -35,6 +36,7 @@ interface CrmRemoteServers {
     decoder: ResponseDecoder<T>,
     init?: RemoteRequestInit,
   ): Effect.Effect<T, RemoteWorkflowError>;
+  readonly sync: Pick<RemoteServerSync, "crmCustomerPage">;
 }
 
 interface CrmIpcDependencies {
@@ -58,7 +60,14 @@ export function crmIpcHandlers({ crm, remoteServers }: CrmIpcDependencies): Pick
       }),
       customers: scopedHandler(parseCrmCustomerPage, {
         local: (input) => Effect.runPromise(crm.customers(input)),
-        remote: (input, serverId) => remote(serverId, CRM_ROUTES.customers, decodeRemoteCrmCustomerPage, input),
+        remote: (input, serverId) => {
+          if (!remoteServers.supportsCapability(serverId, CRM_CAPABILITY))
+            throw new Error(sourceText("error.crm.serverTooOld"));
+          return (
+            remoteServers.sync.crmCustomerPage(serverId, input) ??
+            remote(serverId, CRM_ROUTES.customers, decodeRemoteCrmCustomerPage, input)
+          );
+        },
       }),
       payments: scopedHandler(parseCrmPaymentPage, {
         local: (input) => Effect.runPromise(crm.payments(input)),

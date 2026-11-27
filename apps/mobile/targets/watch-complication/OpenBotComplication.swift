@@ -1,23 +1,45 @@
+import ImageIO
 import SwiftUI
+import UIKit
 import WidgetKit
 
-private let appGroup = "group.run.openbot.mobile"
+extension ComplicationAgent {
+  var isWaiting: Bool { kind == WatchAgentState.waiting.rawValue }
+  var isWorking: Bool { kind == WatchAgentState.working.rawValue }
 
-struct ComplicationData: Codable, Equatable {
-  var state: String
-  var count: Int
-  var text: String
-  var name: String?
-  var color: String?
-  var serverId: String?
-  var agentId: String?
+  var url: URL? { ComplicationData.agentURL(serverId: serverId, agentId: id) }
 
-  static let storageKey = "openbot.watch.complication"
-  static let none = ComplicationData(
-    state: "none", count: 0, text: "", name: nil, color: nil, serverId: nil, agentId: nil)
+  func image(side: CGFloat) -> UIImage? {
+    guard let picture, let url = WatchAvatarFiles.url(picture),
+      let source = CGImageSourceCreateWithURL(url as CFURL, nil)
+    else { return nil }
+    let options: [CFString: Any] = [
+      kCGImageSourceCreateThumbnailFromImageAlways: true,
+      kCGImageSourceCreateThumbnailWithTransform: true,
+      kCGImageSourceThumbnailMaxPixelSize: side,
+    ]
+    guard let image = CGImageSourceCreateThumbnailAtIndex(source, 0, options as CFDictionary) else { return nil }
+    return UIImage(cgImage: image)
+  }
+}
+
+extension ComplicationData {
+  var isReady: Bool { state == "ready" }
+  var isLocked: Bool { state == "locked" }
+  var workingCount: Int { working ?? 0 }
+  var unreadCount: Int { unread ?? 0 }
+
+  var waitingURL: URL? {
+    guard isReady, count > 0, let serverId, let agentId else { return nil }
+    return Self.agentURL(serverId: serverId, agentId: agentId)
+  }
 
   var agentURL: URL? {
-    guard state == "ready", count > 0, let serverId, let agentId else { return nil }
+    guard isReady else { return nil }
+    return agent?.url ?? waitingURL
+  }
+
+  static func agentURL(serverId: String, agentId: String) -> URL? {
     var components = URLComponents()
     components.scheme = "openbot-watch"
     components.host = "agent"
@@ -26,10 +48,7 @@ struct ComplicationData: Codable, Equatable {
   }
 
   static func load() -> ComplicationData {
-    guard let stored = UserDefaults(suiteName: appGroup)?.data(forKey: storageKey),
-      let data = try? JSONDecoder().decode(ComplicationData.self, from: stored)
-    else { return .none }
-    return data
+    stored() ?? .none
   }
 }
 
@@ -44,21 +63,6 @@ struct ComplicationEntry: TimelineEntry {
   }
 }
 
-struct ComplicationProvider: TimelineProvider {
-  func placeholder(in context: Context) -> ComplicationEntry {
-    ComplicationEntry(date: Date(), data: .none)
-  }
-
-  func getSnapshot(in context: Context, completion: @escaping (ComplicationEntry) -> Void) {
-    completion(ComplicationEntry(date: Date(), data: context.isPreview ? .none : ComplicationData.load()))
-  }
-
-  func getTimeline(in context: Context, completion: @escaping (Timeline<ComplicationEntry>) -> Void) {
-    let entry = ComplicationEntry(date: Date(), data: ComplicationData.load())
-    completion(Timeline(entries: [entry], policy: .never))
-  }
-}
-
 @main
 struct OpenBotComplicationBundle: WidgetBundle {
   var body: some Widget {
@@ -68,12 +72,26 @@ struct OpenBotComplicationBundle: WidgetBundle {
 
 struct OpenBotComplication: Widget {
   var body: some WidgetConfiguration {
-    StaticConfiguration(kind: "OpenBotComplication", provider: ComplicationProvider()) { entry in
+    if #available(watchOS 26.0, *) {
+      return configuration.pushHandler(OpenBotWidgetPushHandler.self)
+    }
+    return configuration
+  }
+
+  private var configuration: some WidgetConfiguration {
+    AppIntentConfiguration(
+      kind: "OpenBotComplication", intent: ServerIntent.self, provider: ComplicationProvider()
+    ) { entry in
       ComplicationView(data: entry.data)
-        .containerBackground(for: .widget) { Color.clear }
-        .widgetURL(entry.data.agentURL)
     }
     .configurationDisplayName(Text(verbatim: "OpenBot"))
-    .supportedFamilies([.accessoryCircular, .accessoryCorner, .accessoryRectangular, .accessoryInline])
+    .supportedFamilies([.accessoryCircular, .accessoryCorner, .accessoryRectangular])
+  }
+}
+
+@available(watchOS 26.0, *)
+struct OpenBotWidgetPushHandler: WidgetPushHandler {
+  func pushTokenDidChange(_ pushInfo: WidgetPushInfo, widgets: [WidgetInfo]) {
+    WidgetPushRegistry.save(token: pushInfo.token)
   }
 }

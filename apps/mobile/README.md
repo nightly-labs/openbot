@@ -219,7 +219,13 @@ already loaded remain visible during reconnection.
 
 The phone keeps an encrypted copy of the agents, hidden agents, sections, latest chat pages,
 channels with the latest 50 messages of each opened channel, capabilities and last drawer values (`drawer-snapshot.ts`) of each server (`workspace-cache.ts`),
-and writes it when a server load ends and when the app goes to the background. It also keeps the
+and writes it when a server load ends and when the app goes to the background. Each server has two
+files: a small one with the agents, sections, channel list, capabilities and drawer values, and one
+with the chat and channel pages. Both files of one write have the same ID. At start the app reads
+the small file of each server first and shows the agent list, then reads the page files. It does not
+write a server while its page file is still being read. A copy in the older one-file format (from a
+previous app version) is read once and replaced at the next write; an older app bundle then finds no
+copy and loads from the host. It also keeps the
 last server list of the account service. After a start, the servers of that list connect at once,
 before the account service answers; a server whose key is not the key that the phone trusts waits
 for the account service. Its list then replaces the copy: it removes a server that the account
@@ -248,7 +254,8 @@ and a channel message uses the same id as its `operationId`, so a repeat after a
 the message once. A message that the host refused shows `Not sent`, and its menu adds Retry; it holds
 the later messages of its chat, which show `Waits for the message that was not sent`. A refused message writes its failure kind,
 its file count and its size to the support log, without the error text, which can name a file. A message that the host may have stored is not repeated when
-the host cannot drop a repeat, or 12 hours after its first attempt; it shows `Not confirmed`. This
+the host cannot drop a repeat, or 12 hours after its first attempt; it shows `Not confirmed` and tells
+the user to touch and hold it, where its menu has Edit and Don't send. This
 visual state is derived only in the mobile UI: it never changes the agent's synced avatar profile or
 sends appearance updates over RTC.
 
@@ -424,6 +431,31 @@ bun run mobile:lint
 bun run mobile:typecheck
 bun run mobile:doctor
 ```
+
+### Screen open times
+
+`scripts/mobile-screen-open-e2e.ts` measures how fast screens open. It opens chat, agent info,
+Settings, Server Settings and the Hidden chats sheet N times from the agent list, and writes the
+p50 and p90 times to `.openbot-build/mobile-screen-open/<label>.json`. It drives the app through the
+Metro inspector, so it needs no taps and no deep link prompts.
+
+The app records the times with the Expo Router performance marks
+(`unstable_enablePerformanceIntegration`), in `src/features/screen-metrics/screen-open-probe.ts`.
+The probe runs only in a development bundle, or in a bundle that Metro builds with
+`EXPO_PUBLIC_OPENBOT_SCREEN_METRICS=1`. It sends no data: the script reads the times over the
+inspector. `focusMs` is the time from the push to the `expo-router:page-focused` mark, after the
+screen content commits. `paintMs` adds two animation frames.
+
+1. Start Metro and open a development build on a simulator. For times near a release build, start
+   Metro with `EXPO_PUBLIC_OPENBOT_SCREEN_METRICS=1` and `--no-dev --minify`.
+2. Sign in and open the agent list.
+3. Run `bun scripts/mobile-screen-open-e2e.ts --runs=20 --label=before`. Options: `--metro-port`,
+   `--screens=chat,settings`, `--device`, `--agent-id`, `--agent-server-id` and `--server-id`.
+4. After a change, run it again with `--label=after --baseline=.openbot-build/mobile-screen-open/before.json`.
+   The report then has the p50 and p90 differences.
+
+The first run of each screen is in `cold`. `warm` has the other runs. Compare runs on the same
+simulator, with the same data and the same bundle mode.
 
 ## EAS
 

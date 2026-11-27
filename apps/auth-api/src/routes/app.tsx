@@ -11,7 +11,7 @@ export const Route = createFileRoute("/app")({
     "X-Robots-Tag": "noindex, nofollow",
     "Referrer-Policy": "no-referrer",
     "Permissions-Policy": "camera=(), geolocation=(), microphone=(self), payment=(), usb=()",
-    "Content-Security-Policy": "frame-ancestors 'none'",
+    "Content-Security-Policy": "frame-ancestors 'none'; img-src 'self' data: blob: https:",
     "X-Frame-Options": "DENY",
   }),
 });

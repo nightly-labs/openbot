@@ -13,6 +13,7 @@ import { VAULT_IMPORT_CAPABILITY } from "@openbot/contracts/team-protocol/vault-
 import { VAULT_CAPABILITY } from "@openbot/contracts/team-protocol/vault-v1";
 import { VAULT_V2_CAPABILITY } from "@openbot/contracts/team-protocol/vault-v2";
 import { VAULT_V3_CAPABILITY } from "@openbot/contracts/team-protocol/vault-v3";
+import { REMOTE_ACCOUNT_CHECK_INTERVAL_MS } from "@openbot/team-client/remote-directory";
 import { classifyFailure } from "@openbot/telemetry";
 import { isAgentAccount } from "@openbot/ui/components/provider-accounts";
 import type { AcpRegistrySettingsApi } from "@openbot/ui/features/custom-providers/AcpRegistrySettings";
@@ -127,8 +128,6 @@ export function WorkspaceOverlays(props: AccountProps) {
   );
 }
 
-const OWNER_TRANSFER_FOCUS_RELOAD_MS = 60_000;
-
 function OwnerTransfers() {
   const platform = usePlatform();
   const { refreshServers } = useServers();
@@ -140,7 +139,7 @@ function OwnerTransfers() {
   };
   const unsubscribe = appPort().auth.onOwnerTransfersChanged(reload);
   const focus = () => {
-    if (Date.now() - reloadedAt >= OWNER_TRANSFER_FOCUS_RELOAD_MS) reload();
+    if (Date.now() - reloadedAt >= REMOTE_ACCOUNT_CHECK_INTERVAL_MS) reload();
   };
   window.addEventListener("focus", focus);
   onCleanup(() => {

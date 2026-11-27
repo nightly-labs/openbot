@@ -4,7 +4,8 @@ import { type CrmLayout, defaultCrmLayout, readCrmLayout, SOURCE_KEY_PAGE } from
 import type { CrmData, CrmDrawerData, CrmViewProps } from "@openbot/ui/features/crm/crm-state";
 import { useText } from "@openbot/ui/text";
 import { createSignal, createStore, onCleanup, reconcile } from "solid-js";
-import type { CrmHost } from "./crm-port";
+import { applyCustomerEdit, type CrmCustomerEdit, customerEdit, rollBackCustomerEdit } from "./crm-optimistic";
+import type { CrmChangeCause, CrmHost } from "./crm-port";
 
 const LAYOUT_KEY = "openbot:crm-layout:";
 const CHANGE_DELAY_MS = 200;
@@ -47,6 +48,10 @@ export function createCrmController(host: CrmHost, serverId: string): Omit<CrmVi
   const [data, setData] = createStore<{ value: CrmData }>({ value: EMPTY });
   const [drawer, setDrawer] = createStore<{ value: CrmDrawerData | null }>({ value: null });
   const [selected, setSelected] = createSignal<string | null>(null);
+  const pendingEdits = new Map<CrmCustomerEdit, number | null>();
+  let applying = 0;
+  let ownChanges = 0;
+  let heldChanges = 0;
   let paidWanted = false;
   let loadRun = 0;
   let drawerRun = 0;
@@ -75,6 +80,10 @@ export function createCrmController(host: CrmHost, serverId: string): Omit<CrmVi
         wantPaid ? payments({ state: "paid" }) : Promise.resolve(null),
       ]);
       if (disposed || run !== loadRun) return;
+      for (const [edit, settledRun] of pendingEdits) {
+        if (settledRun !== null && run > settledRun) pendingEdits.delete(edit);
+        else for (const customer of customers) applyCustomerEdit(customer, edit);
+      }
       setData(reconcile({ value: { overview, customers, open, paid: paid ?? [], paidLoaded: paid !== null } }, "id"));
     } catch (error) {
       if (!disposed && run === loadRun) toast.error(errorMessage(error, t("crm.page.loadFailed")));
@@ -105,10 +114,37 @@ export function createCrmController(host: CrmHost, serverId: string): Omit<CrmVi
     if (customerId !== null) void loadDrawer(customerId);
   }
 
-  const stop = host.onChanged(() => {
+  function scheduleReload(): void {
     clearTimeout(timer);
     timer = setTimeout(reload, CHANGE_DELAY_MS);
-  });
+  }
+
+  function changed(cause: CrmChangeCause): void {
+    if (cause === "resync") {
+      ownChanges = 0;
+      scheduleReload();
+    } else if (ownChanges > 0) {
+      ownChanges -= 1;
+    } else if (applying > 0) {
+      heldChanges += 1;
+    } else {
+      scheduleReload();
+    }
+  }
+
+  function ownChangeDone(): void {
+    if (heldChanges > 0) heldChanges -= 1;
+    else ownChanges += 1;
+  }
+
+  function applyFinished(): void {
+    applying -= 1;
+    if (applying > 0 || heldChanges === 0) return;
+    heldChanges = 0;
+    scheduleReload();
+  }
+
+  const stop = host.onChanged(changed);
   onCleanup(() => {
     disposed = true;
     clearTimeout(timer);
@@ -127,16 +163,63 @@ export function createCrmController(host: CrmHost, serverId: string): Omit<CrmVi
     }
   }
 
-  async function apply(change: CrmChange): Promise<CrmApplyResult | null> {
+  function showEdit(edit: CrmCustomerEdit): void {
+    pendingEdits.set(edit, null);
+    setData((draft) => {
+      const customer = draft.value.customers.find((item) => item.id === edit.customerId);
+      if (customer !== undefined) applyCustomerEdit(customer, edit);
+    });
+  }
+
+  function confirmEdit(edit: CrmCustomerEdit): void {
+    pendingEdits.set(edit, loadRun);
+    if (selected() === edit.customerId) void loadDrawer(edit.customerId);
+  }
+
+  function rollBackEdit(edit: CrmCustomerEdit): void {
+    pendingEdits.delete(edit);
+    setData((draft) => {
+      const customer = draft.value.customers.find((item) => item.id === edit.customerId);
+      if (customer !== undefined) rollBackCustomerEdit(customer, edit);
+    });
+  }
+
+  function reloadNow(): void {
+    clearTimeout(timer);
+    reload();
+  }
+
+  async function sendChange(change: CrmChange, edit: CrmCustomerEdit | null): Promise<CrmApplyResult | null> {
     try {
       const result = await host.apply(change);
-      if (!result.ok) toast.info(t("crm.page.conflict"));
+      if (disposed) return result;
+      if (!result.ok) {
+        if (edit !== null) rollBackEdit(edit);
+        toast.info(t("crm.page.conflict"));
+        reloadNow();
+        return result;
+      }
+      ownChangeDone();
+      if (edit === null) reloadNow();
+      else confirmEdit(edit);
       return result;
     } catch (error) {
+      if (disposed) return null;
+      if (edit !== null) rollBackEdit(edit);
       toast.error(errorMessage(error, t("crm.page.failed")));
+      reloadNow();
       return null;
+    }
+  }
+
+  async function apply(change: CrmChange): Promise<CrmApplyResult | null> {
+    const edit = customerEdit(change, data.value.customers);
+    if (edit !== null) showEdit(edit);
+    applying += 1;
+    try {
+      return await sendChange(change, edit);
     } finally {
-      if (!disposed) reload();
+      applyFinished();
     }
   }
 

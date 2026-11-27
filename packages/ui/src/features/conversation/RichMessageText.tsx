@@ -37,6 +37,7 @@ export interface RichMessageTextProps {
   showCitationFooter?: boolean;
   streamingTailAfter?: number | undefined;
   linkFavicons?: boolean | undefined;
+  remoteContent?: boolean | undefined;
 }
 
 const UNAVAILABLE_TAG_LABELS = {
@@ -146,7 +147,7 @@ export function RichMessageText(props: RichMessageTextProps) {
                 url={part.url}
                 title={linkTitle(part.text, part.url)}
                 isolate={linkTitle(part.text, part.url) === undefined}
-                favicon={props.linkFavicons !== false}
+                favicon={props.linkFavicons !== false && props.remoteContent === true}
                 onOpenLink={props.onOpenLink}
               >
                 {part.text}

@@ -109,6 +109,7 @@ describe("development Auth API LAN access", () => {
       "/v1/marketplace/agents/listing-1",
       "/v1/marketplace/agents/listing-1/avatar",
       "/plugins/icon/linear?app=linear",
+      "/v1/plugins/catalog",
     ]) {
       expect(developmentNetworkRequestAllowed("192.168.1.20", path)).toBe(true);
     }
@@ -124,6 +125,8 @@ describe("development Auth API LAN access", () => {
       "/v1/marketplace",
       "/plugins/linear",
       "/plugins/icon/linear/other",
+      "/v1/plugins/catalog/extra",
+      "/v1/plugins",
     ]) {
       expect(developmentNetworkRequestAllowed("192.168.1.20", path)).toBe(false);
     }

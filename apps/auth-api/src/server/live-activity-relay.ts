@@ -12,6 +12,7 @@ import {
   type NotificationSound,
 } from "@openbot/contracts/notification-relay";
 import { type DynamicRecord, isDynamicRecord, isString } from "@openbot/contracts/runtime-values";
+import { WATCH_WIDGET_PUSH_TOKEN_PATTERN } from "@openbot/contracts/watch-protocol";
 import { Effect, Schema } from "effect";
 import { importPKCS8, SignJWT } from "jose";
 
@@ -25,6 +26,15 @@ export interface ApnsConfig {
 
 export type ApnsRelayResult = "sent" | "gone" | "rejected" | "unavailable";
 
+export interface WidgetRelayPush {
+  token: string;
+  environment: "production" | "development";
+}
+
+function watchWidgetPushTopic(appTopic: string): string {
+  return `${appTopic}.watchkitapp.push-type.widgets`;
+}
+
 const ACTIVITY_NAME = "AgentActivity";
 const NOTIFICATION_TITLE = "OpenBot";
 const ACTIVITY_ALERT = { title: NOTIFICATION_TITLE, body: NOTIFICATION_TITLE };
@@ -32,6 +42,8 @@ const NOTIFICATION_LIFETIME_SECONDS = 24 * 60 * 60;
 const LIVE_ACTIVITY_END_LIFETIME_SECONDS = 60 * 60;
 const TOKEN_REUSE_SECONDS = 50 * 60;
 const REQUEST_TIMEOUT_MS = 5_000;
+const WIDGET_PUSH_LIFETIME_SECONDS = 60 * 60;
+const WIDGET_PUSH_PAYLOAD = { aps: { "content-changed": true } };
 const GONE_REASONS = new Set(["BadDeviceToken", "DeviceTokenNotForTopic", "ExpiredToken", "Unregistered"]);
 
 type Fetch = (input: string, init: RequestInit) => Promise<Response>;
@@ -80,6 +92,22 @@ export class ApnsRelaySender {
         "apns-expiration": String(push.timestamp + NOTIFICATION_LIFETIME_SECONDS),
       },
       notificationPayload(push),
+    );
+  }).bind(this);
+
+  readonly sendWidgetPush = Effect.fn("ApnsRelaySender.sendWidgetPush")(function* (
+    this: ApnsRelaySender,
+    push: WidgetRelayPush,
+  ): Effect.fn.Return<ApnsRelayResult, ApnsProviderError> {
+    return yield* this.#deliver(
+      push,
+      {
+        "apns-push-type": "widgets",
+        "apns-topic": watchWidgetPushTopic(this.#config.topic),
+        "apns-priority": "5",
+        "apns-expiration": String(Math.floor(this.#now() / 1000) + WIDGET_PUSH_LIFETIME_SECONDS),
+      },
+      WIDGET_PUSH_PAYLOAD,
     );
   }).bind(this);
 
@@ -196,6 +224,13 @@ export function readLiveActivityRelayPush(body: DynamicRecord): LiveActivityRela
     priority,
     alert: activityAlert,
   };
+}
+
+export function readWidgetRelayPush(body: DynamicRecord): WidgetRelayPush | null {
+  const { token, environment } = body;
+  if (!isString(token) || !WATCH_WIDGET_PUSH_TOKEN_PATTERN.test(token)) return null;
+  if (environment !== "production" && environment !== "development") return null;
+  return { token, environment };
 }
 
 export function readNotificationRelayPush(body: DynamicRecord): NotificationRelayPush | null {

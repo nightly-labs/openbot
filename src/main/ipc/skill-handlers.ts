@@ -1,7 +1,9 @@
 import type { AppTranslate } from "@openbot/i18n";
+import { Effect } from "effect";
 import { type BrowserWindow, dialog, type OpenDialogOptions } from "electron";
 import { runCauseEffect } from "../../backend/effect-boundary";
 import { localSkillTools } from "../local-skill-tools";
+import type { PluginCatalogService } from "../plugin-catalog-service";
 import type { SkillMarketplaceService } from "../skill-marketplace-service";
 import {
   parseInstallSkill,
@@ -22,12 +24,14 @@ import { nullishPayload, stringPayload } from "./validation";
 
 export interface SkillIpcDependencies {
   skills: SkillMarketplaceService;
+  pluginCatalog: Pick<PluginCatalogService, "load">;
   getMainWindow: () => BrowserWindow | null;
   translate: AppTranslate;
 }
 
 export function skillIpcHandlers({
   skills,
+  pluginCatalog,
   getMainWindow,
   translate,
 }: SkillIpcDependencies): Pick<IpcGroupHandlers, "skills"> {
@@ -47,6 +51,7 @@ export function skillIpcHandlers({
       list: payloadHandler(nullishPayload(parseMarketplaceSkillQuery), (query) => runCauseEffect(skills.list(query))),
       get: payloadHandler(requireSkillId, (skillId) => runCauseEffect(skills.get(skillId))),
       getBySlug: payloadHandler(stringPayload("slug"), (slug) => runCauseEffect(skills.getBySlug(slug))),
+      pluginCatalog: handler(() => Effect.runPromise(pluginCatalog.load())),
       listMine: handler(() => runCauseEffect(skills.listMine())),
       choosePackage: handler(async () => {
         const mainWindow = getMainWindow();

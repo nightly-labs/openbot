@@ -171,7 +171,6 @@ export function AgentRoutinesSettings(props: AgentRoutinesSettingsProps) {
   const [showErrors, setShowErrors] = createSignal(false);
   const [confirmDelete, setConfirmDelete] = createSignal(false);
   const [deleting, setDeleting] = createSignal(false);
-  const [togglingIds, setTogglingIds] = createSignal<ReadonlySet<string>>(new Set());
   const [pendingExit, setPendingExit] = createSignal<PendingRoutineExit | null>(null);
   const scrollFades = createScrollFades();
   let draftRevision = 0;
@@ -180,12 +179,31 @@ export function AgentRoutinesSettings(props: AgentRoutinesSettingsProps) {
   onCleanup(scrollFades.stop);
 
   let listRequest = 0;
+  const wantedActive = new Map<string, boolean>();
+  const savingActive = new Set<string>();
+  const savedDuringList = new Map<string, number>();
+  let togglesRunning = 0;
+  let togglesSaved = 0;
+  let heldReloads = 0;
+
+  function withLocalToggles(listed: RoutineEditorRecord[], request: number): RoutineEditorRecord[] {
+    if (wantedActive.size === 0 && savedDuringList.size === 0) return listed;
+    const shown = new Map(routines().map((routine) => [routine.id, routine]));
+    const next = listed.map((routine) => {
+      const kept = (savedDuringList.get(routine.id) ?? 0) >= request ? (shown.get(routine.id) ?? routine) : routine;
+      const wanted = wantedActive.get(routine.id);
+      return wanted === undefined || wanted === kept.active ? kept : { ...kept, active: wanted };
+    });
+    for (const [id, savedAt] of savedDuringList) if (savedAt < request) savedDuringList.delete(id);
+    return next;
+  }
 
   async function loadRoutines(): Promise<void> {
     const request = ++listRequest;
     try {
-      const next = await props.port.list();
+      const listed = await props.port.list();
       if (request !== listRequest) return;
+      const next = withLocalToggles(listed, request);
       setRoutines(next);
       setRoutinesLoaded(true);
       props.onCountChange(next.length);
@@ -241,17 +259,30 @@ export function AgentRoutinesSettings(props: AgentRoutinesSettingsProps) {
     setDeliveries([]);
   }
 
+  function reloadRoutines(): void {
+    void loadRoutines();
+    const routineId = draft()?.id;
+    if (routineId) {
+      void loadRuns(routineId);
+      void loadResults(routineId);
+    }
+  }
+
+  function routinesChanged(): void {
+    if (togglesRunning > 0) heldReloads += 1;
+    else reloadRoutines();
+  }
+
+  function togglesSettled(): void {
+    const reload = heldReloads > togglesSaved;
+    heldReloads = 0;
+    togglesSaved = 0;
+    if (reload) reloadRoutines();
+  }
+
   createEffect(
     () => props.port,
-    (port) =>
-      port.subscribe(() => {
-        void loadRoutines();
-        const routineId = draft()?.id;
-        if (routineId) {
-          void loadRuns(routineId);
-          void loadResults(routineId);
-        }
-      }),
+    (port) => port.subscribe(routinesChanged),
   );
 
   const ownerId = createMemo(() => props.port.ownerId);
@@ -643,9 +674,16 @@ export function AgentRoutinesSettings(props: AgentRoutinesSettingsProps) {
     }
   }
 
-  async function setRoutineActive(routine: RoutineEditorRecord, active: boolean): Promise<void> {
-    if (togglingIds().has(routine.id)) return;
-    setTogglingIds((current) => new Set(current).add(routine.id));
+  function showRoutine(routine: RoutineEditorRecord, active: boolean): void {
+    setRoutines((items) =>
+      items.map((item) =>
+        item.id === routine.id ? (routine.active === active ? routine : { ...routine, active }) : item,
+      ),
+    );
+    if (draft()?.id === routine.id) refreshDraft(routine);
+  }
+
+  async function saveRoutineActive(routine: RoutineEditorRecord, active: boolean): Promise<RoutineEditorRecord> {
     const schedule = routineScheduleOf(routine);
     const tracked = { triggerKind: routineTriggerKind(routine), schedule };
     const startedAt = performance.now();
@@ -662,18 +700,42 @@ export function AgentRoutinesSettings(props: AgentRoutinesSettingsProps) {
         ...(routine.limitPolicy ? { limitPolicy: routine.limitPolicy } : {}),
         ...(routine.missedPolicy ? { missedPolicy: routine.missedPolicy } : {}),
       });
-      setRoutines((items) => items.map((item) => (item.id === saved.id ? saved : item)));
       trackRoutineAction(analytics, "update", tracked, startedAt, "succeeded");
+      return saved.runIn === undefined && routine.runIn !== undefined ? { ...saved, runIn: routine.runIn } : saved;
     } catch (caught) {
       trackRoutineAction(analytics, "update", tracked, startedAt, "failed", caught);
-      const fallback = active ? t("routine.settings.resumeFailed") : t("routine.settings.pauseFailed");
+      throw caught;
+    }
+  }
+
+  async function setRoutineActive(routine: RoutineEditorRecord, active: boolean): Promise<void> {
+    const id = routine.id;
+    showRoutine(routine, active);
+    wantedActive.set(id, active);
+    if (savingActive.has(id)) return;
+    savingActive.add(id);
+    togglesRunning += 1;
+    let confirmed = routine;
+    let wanted = active;
+    try {
+      while (wanted !== confirmed.active) {
+        const saved = await saveRoutineActive(confirmed, wanted);
+        confirmed = saved;
+        savedDuringList.set(id, listRequest);
+        togglesSaved += 1;
+        if (saved.active !== wanted) wantedActive.delete(id);
+        wanted = wantedActive.get(id) ?? saved.active;
+        showRoutine(saved, wanted);
+      }
+    } catch (caught) {
+      showRoutine(confirmed, confirmed.active);
+      const fallback = wanted ? t("routine.settings.resumeFailed") : t("routine.settings.pauseFailed");
       actionToast.error(errorMessage(caught, fallback));
     } finally {
-      setTogglingIds((current) => {
-        const next = new Set(current);
-        next.delete(routine.id);
-        return next;
-      });
+      wantedActive.delete(id);
+      savingActive.delete(id);
+      togglesRunning -= 1;
+      if (togglesRunning === 0) togglesSettled();
     }
   }
 
@@ -896,7 +958,7 @@ export function AgentRoutinesSettings(props: AgentRoutinesSettingsProps) {
                             <Switch
                               aria-label={routine().name}
                               checked={routine().active}
-                              disabled={routineCompleted(routine()) || togglingIds().has(routine().id)}
+                              disabled={routineCompleted(routine())}
                               onChange={(active) => void setRoutineActive(routine(), active)}
                             />
                           </div>

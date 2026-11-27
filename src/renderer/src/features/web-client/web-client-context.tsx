@@ -71,6 +71,13 @@ import { currentText } from "@openbot/ui/text";
 import { errorReference, type UserErrorDetails } from "@openbot/user-errors";
 import { createEffect, createMemo, createSignal, createStore, onSettled } from "solid-js";
 import { toAgentProfile } from "../../app-message-projection";
+import {
+  cancelQueueEdit,
+  patchQueueDeliveries,
+  type QueueEdit,
+  reorderQueueEdit,
+  steerQueueEdit,
+} from "../../queue-optimistic";
 import { backgroundWorkKey } from "../conversation/background-work-key";
 import { messagePromptRequestKey, promptRequestKey } from "../conversation/conversation-keys";
 import {
@@ -78,7 +85,14 @@ import {
   missingReplyOriginals,
   windowedSnapshotMessages,
 } from "../conversation/conversation-merge";
-import { latestIncomingConversationMessage } from "../conversation/conversation-read-state";
+import {
+  heldUnreadState,
+  isIncomingConversationMessage,
+  latestIncomingConversationMessage,
+  markedReadState,
+  markedUnreadState,
+  sameReadState,
+} from "../conversation/conversation-read-state";
 import type { PromptAnswerOptions } from "../conversation/conversation-types";
 import { appendTurnStepLine, type TurnStepLines } from "../conversation/turn-step-lines";
 import {
@@ -833,6 +847,15 @@ export function createWebWorkspace(
         : null,
     (id) => focusUse.setTarget(id),
   );
+  createEffect(
+    () => state.selectedId ?? null,
+    (agentId) => {
+      runtime.focusSync?.(agentId);
+    },
+  );
+  runtime.onConversationReadsChanged?.(() => {
+    if (!disposed) loadReads();
+  });
   const [serverOrder, setServerOrder] = createSignal(readWebServerOrder(props.accountId));
   const orderedHosts = createMemo(() => orderWebHosts(state.hosts, serverOrder()));
   const [avatars, setAvatars] = createSignal<ReadonlyMap<string, { source: string; url: string }>>(new Map());
@@ -1218,6 +1241,13 @@ export function createWebWorkspace(
   }
   function retryHosts(): Promise<void> {
     return refreshHosts().catch(() => undefined);
+  }
+  let focusAccountCheckedAt = Number.NEGATIVE_INFINITY;
+  function focusAccountCheck(): Promise<void> {
+    const now = Date.now();
+    if (now - focusAccountCheckedAt < FOCUS_ACCOUNT_CHECK_MS) return Promise.resolve();
+    focusAccountCheckedAt = now;
+    return props.onSessionCheck().then(retryHosts);
   }
   function setHostedSleep(hostedSleep: HostedServerSleep | null): void {
     if (state.hostedSleep !== hostedSleep)
@@ -1831,12 +1861,52 @@ export function createWebWorkspace(
       }
     })();
   }
-  function changeQueue(change: (agentId: string) => Promise<void>) {
+  interface ShownQueueEdit {
+    agentId: string;
+    edit: QueueEdit;
+    revision: number;
+    generation: number;
+  }
+  function showQueueEdit(agentId: string, edit: QueueEdit | null): ShownQueueEdit | null {
+    if (edit === null) return null;
+    const revision = (queueRevisions.get(agentId) ?? 0) + 1;
+    queueRevisions.set(agentId, revision);
+    setState((draft) => {
+      const queue = draft.queues[agentId];
+      if (queue) patchQueueDeliveries(queue.deliveries, edit, "apply");
+    });
+    return { agentId, edit, revision, generation };
+  }
+  function rollBackQueueEdit(shown: ShownQueueEdit | null): void {
+    if (shown === null || disposed || shown.generation !== generation) return;
+    if ((queueRevisions.get(shown.agentId) ?? 0) !== shown.revision) {
+      loadQueue(shown.agentId);
+      return;
+    }
+    setState((draft) => {
+      const queue = draft.queues[shown.agentId];
+      if (queue) patchQueueDeliveries(queue.deliveries, shown.edit, "roll-back");
+    });
+  }
+  function showCancelEdit(agentIds: readonly string[], deliveryId: string): ShownQueueEdit | null {
+    for (const agentId of agentIds) {
+      const shown = showQueueEdit(agentId, cancelQueueEdit(state.queues[agentId], deliveryId));
+      if (shown !== null) return shown;
+    }
+    return null;
+  }
+  function changeQueue(
+    change: (agentId: string) => Promise<void>,
+    show: (agentId: string) => ShownQueueEdit | null = () => null,
+    quietFailure: (agentId: string) => boolean = () => false,
+  ) {
     const id = selectedId;
     const current = generation;
     if (!id || state.status !== "online") return;
+    const shown = show(id);
     void change(id).catch((error) => {
-      if (current === generation) report(error);
+      rollBackQueueEdit(shown);
+      if (current === generation && !quietFailure(id)) report(error);
     });
   }
   async function select(id: string) {
@@ -2056,22 +2126,56 @@ export function createWebWorkspace(
     readWrites.set(id, write);
     return write;
   }
+  function holdRead(agentId: string, optimistic: ConversationReadState): () => void {
+    const current = generation;
+    let restore: ConversationReadState | undefined;
+    setState((draft) => {
+      const read = draft.reads[agentId];
+      restore = read ? { ...read } : undefined;
+      draft.reads[agentId] = optimistic;
+    });
+    return () => {
+      if (disposed || current !== generation) return;
+      setState((draft) => {
+        if (!sameReadState(draft.reads[agentId], optimistic)) return;
+        if (restore) draft.reads[agentId] = restore;
+        else delete draft.reads[agentId];
+      });
+    };
+  }
+  function selectedLatestPage(agentId: string): ConversationPage | undefined {
+    const conversation = state.conversations[agentId];
+    const page = conversation?.page;
+    if (selectedId !== agentId || !page || conversation.loading || conversation.around) return undefined;
+    return page.messages.length > 0 ? page : undefined;
+  }
   function markAgentRead(id: string) {
     const current = generation;
+    const loaded = selectedLatestPage(id);
+    const loadedLatest = loaded ? { threadId: loaded.threadId, messageId: loaded.messages.at(-1)?.id } : undefined;
+    const rollback = holdRead(
+      id,
+      markedReadState(loadedLatest?.messageId ?? state.reads[id]?.throughMessageId ?? null),
+    );
     const write = (readWrites.get(id) ?? Promise.resolve())
       .catch(() => undefined)
       .then(async () => {
         if (disposed || current !== generation) return;
-        const page = await runtime.conversation(id);
-        const latestMessageId = page.messages.at(-1)?.id;
+        const fetched = loadedLatest ? undefined : await runtime.conversation(id);
+        const threadId = loadedLatest ? loadedLatest.threadId : fetched?.threadId;
+        const latestMessageId = loadedLatest ? loadedLatest.messageId : fetched?.messages.at(-1)?.id;
         if (!latestMessageId || disposed || current !== generation) return;
         const readState = await runtime.markRead(id, latestMessageId);
         if (disposed || current !== generation) return;
         setState((draft) => {
           const value = draft.conversations[id]?.page;
-          if (value?.threadId === page.threadId) value.readState = readState;
+          if (value && value.threadId === threadId) value.readState = readState;
           draft.reads[id] = readState;
         });
+      })
+      .catch((error: unknown) => {
+        rollback();
+        throw error;
       });
     readWrites.set(id, write);
     return write;
@@ -2089,6 +2193,15 @@ export function createWebWorkspace(
   }
   async function markUnreadFrom(agentId: string, messageId: string): Promise<void> {
     const current = generation;
+    const rollback = holdRead(
+      agentId,
+      markedUnreadState(
+        state.conversations[agentId]?.page?.messages ?? [],
+        messageId,
+        isIncomingConversationMessage,
+        state.reads[agentId],
+      ),
+    );
     const write = (readWrites.get(agentId) ?? Promise.resolve())
       .catch(() => undefined)
       .then(async () => {
@@ -2099,13 +2212,27 @@ export function createWebWorkspace(
           if (value) value.readState = readState;
           draft.reads[agentId] = readState;
         });
+      })
+      .catch((error: unknown) => {
+        rollback();
+        throw error;
       });
     readWrites.set(agentId, write);
     await write;
   }
   async function markLatestReplyUnread(agentId: string): Promise<void> {
-    const reply = latestIncomingConversationMessage((await runtime.conversation(agentId)).messages);
-    if (reply) await markUnreadFrom(agentId, reply.id);
+    const loaded = selectedLatestPage(agentId);
+    const loadedReply = loaded ? latestIncomingConversationMessage(loaded.messages) : undefined;
+    if (loadedReply) return markUnreadFrom(agentId, loadedReply.id);
+    const rollback = holdRead(agentId, heldUnreadState(state.reads[agentId]));
+    try {
+      const reply = latestIncomingConversationMessage((await runtime.conversation(agentId)).messages);
+      if (reply) await markUnreadFrom(agentId, reply.id);
+      else rollback();
+    } catch (error) {
+      rollback();
+      throw error;
+    }
   }
   const hostViews = (): HostRestartView[] =>
     state.host
@@ -2122,14 +2249,13 @@ export function createWebWorkspace(
       : [];
   createHostRestartToasts(() => hostViews().filter((host) => !followsServerUpdate(host.id)));
   onSettled(() => {
+    focusAccountCheckedAt = Date.now();
     void refreshHosts().catch(report);
     const pageFocus = () => setPageFocused(!document.hidden && document.hasFocus());
     const focus = () => {
       pageFocus();
       runtime.hosts?.refresh();
-      void props
-        .onSessionCheck()
-        .then(retryHosts)
+      void focusAccountCheck()
         .then(() => {
           if (state.status === "online") return Date.now() - syncedAt < FOCUS_RESYNC_MS ? undefined : resync();
           if (state.recovery?.phase !== "suspended") recoverNow();
@@ -2216,19 +2342,27 @@ export function createWebWorkspace(
     refresh,
     send,
     cancelQueued: (deliveryId: string, recipientAgentId?: string) =>
-      changeQueue((agentId) => runtime.cancelQueued({ agentId: recipientAgentId ?? agentId, deliveryId })),
+      changeQueue(
+        (agentId) => runtime.cancelQueued({ agentId: recipientAgentId ?? agentId, deliveryId }),
+        (agentId) => showCancelEdit([recipientAgentId ?? agentId, agentId], deliveryId),
+      ),
     steerQueued(deliveryId: string) {
       const expectedTurnId = conversation()?.page?.activeTurnId;
       if (!expectedTurnId) return;
-      changeQueue((agentId) =>
-        runtime.steerQueued({ agentId, deliveryId, expectedTurnId }).catch((error: unknown) => {
+      changeQueue(
+        (agentId) => runtime.steerQueued({ agentId, deliveryId, expectedTurnId }),
+        (agentId) => showQueueEdit(agentId, steerQueueEdit(state.queues[agentId], deliveryId, expectedTurnId)),
+        (agentId) => {
           const delivery = state.queues[agentId]?.deliveries.find((item) => item.id === deliveryId);
-          if (delivery && delivery.status !== "queued") return;
-          throw error;
-        }),
+          return delivery !== undefined && delivery.status !== "queued";
+        },
       );
     },
-    reorderQueue: (deliveryIds: string[]) => changeQueue((agentId) => runtime.reorderQueue({ agentId, deliveryIds })),
+    reorderQueue: (deliveryIds: string[]) =>
+      changeQueue(
+        (agentId) => runtime.reorderQueue({ agentId, deliveryIds }),
+        (agentId) => showQueueEdit(agentId, reorderQueueEdit(state.queues[agentId], deliveryIds)),
+      ),
     async updateQueued(
       deliveryId: string,
       text: string,
@@ -2654,6 +2788,7 @@ export function createWebWorkspace(
 }
 
 const FOCUS_RESYNC_MS = 30_000;
+const FOCUS_ACCOUNT_CHECK_MS = 60_000;
 
 function changedConversation(event: AgentEvent | TeamRealtimeEvent): string | undefined {
   switch (event.type) {

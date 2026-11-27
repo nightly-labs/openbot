@@ -69,14 +69,23 @@ import { sourceText } from "@openbot/i18n/source";
 import { Context, Effect, Layer, Option, Result, Schema } from "effect";
 import { importJWK, type JWK, type JWTPayload, SignJWT } from "jose";
 import {
+  type BillingEntitlement,
   getServerEntitlement,
   type OwnerLicense,
+  type OwnerLicenseJsonRow,
   ownerLicenseForHost,
+  ownerLicenseFromRows,
+  ownerLicensesJsonSql,
   SERVER_MEMBER_LIMIT_SQL,
+  type ServerEntitlementJsonRow,
+  serverEntitlementFromRows,
+  serverEntitlementsJsonSql,
+  serverMemberLimitValueSql,
 } from "./billing-entitlement";
 import { decodeBase64Url, hmacSha256, importHmacSha256Key, randomToken, sha256 } from "./crypto";
 import { CUSTOM_SERVER_OFFER_COLUMNS, type CustomServerOfferRow, customServerPayment } from "./custom-server-offers";
 import type { GitHubInstallationTokensError, GitHubRepositoryRoute } from "./github-installation-tokens";
+import { replicaD1 } from "./observed-d1";
 import { PERSISTENT_SESSION_EXPIRES_AT } from "./session-policy";
 import { CHECKOUT_LIFETIME_SECONDS } from "./stripe-client";
 import type { AuthUser, WorkerBindings } from "./types";
@@ -166,6 +175,10 @@ interface MemberSeat {
   readonly licenseBinds: readonly (string | number)[] | null;
 }
 
+interface ServerMemberLimitRow {
+  member_limit: number;
+}
+
 interface MemberLimit {
   readonly limit: number;
   readonly fromLicense: boolean;
@@ -229,6 +242,73 @@ function remoteCall<A>(operation: () => Promise<A>): Effect.Effect<A, RemoteFail
 export interface SqlCondition {
   sql: string;
   binds: unknown[];
+}
+
+function memberLimitFrom(
+  custom: ServerMemberLimitRow | null,
+  plan: BillingEntitlement | null,
+  license: OwnerLicense | null,
+): MemberLimit {
+  const below = (limit: number) => license !== null && license.users < limit;
+  if (custom) return { limit: custom.member_limit, fromLicense: false, licenseRaises: below(custom.member_limit) };
+  if (plan?.hosted) return { limit: plan.memberLimit, fromLicense: false, licenseRaises: below(plan.memberLimit) };
+  if (license?.entitled && license.users > (plan?.memberLimit ?? 0))
+    return { limit: license.users, fromLicense: true, licenseRaises: true };
+  const limit = plan?.memberLimit ?? DEFAULT_TEAM_MEMBER_LIMIT;
+  return {
+    limit,
+    fromLicense: false,
+    licenseRaises: below(limit) || (license?.entitled === true && plan !== null && license.users === limit),
+  };
+}
+
+function keyHandoversStatement(database: D1Database, condition: SqlCondition): D1PreparedStatement {
+  return database
+    .prepare(
+      `SELECT host_id, issued_at, previous_public_key, public_key, previous_signature, signature
+         FROM (
+           SELECT host_id, issued_at, previous_public_key, public_key, previous_signature, signature,
+                  ROW_NUMBER() OVER (PARTITION BY host_id ORDER BY issued_at DESC) AS position
+           FROM remote_host_key_handovers WHERE ${condition.sql}
+         )
+         WHERE position <= ?
+         ORDER BY host_id, issued_at`,
+    )
+    .bind(...condition.binds, HOST_KEY_HANDOVER_LIMIT);
+}
+
+function keyHandoversJsonSql(host: string): string {
+  return `(SELECT json_group_array(json_object('host_id', k.host_id, 'issued_at', k.issued_at,
+      'previous_public_key', k.previous_public_key, 'public_key', k.public_key,
+      'previous_signature', k.previous_signature, 'signature', k.signature))
+    FROM (SELECT host_id, issued_at, previous_public_key, public_key, previous_signature, signature
+            FROM remote_host_key_handovers WHERE host_id = ${host}
+           ORDER BY issued_at DESC LIMIT ${HOST_KEY_HANDOVER_LIMIT}) k)`;
+}
+
+function jsonRows<T>(value: string): T[] {
+  return JSON.parse(value);
+}
+
+function newestFirst<T extends { updated_at: number }>(rows: T[]): T[] {
+  return rows.sort((left, right) => right.updated_at - left.updated_at);
+}
+
+function keyHandoversFromRows(rows: readonly RemoteHostKeyHandoverRow[]): Map<string, HostKeyHandover[]> {
+  const handovers = new Map<string, HostKeyHandover[]>();
+  for (const row of rows) {
+    const list = handovers.get(row.host_id) ?? [];
+    list.push({
+      hostId: row.host_id,
+      issuedAt: row.issued_at,
+      previousPublicKey: row.previous_public_key,
+      publicKey: row.public_key,
+      previousSignature: row.previous_signature,
+      signature: row.signature,
+    });
+    handovers.set(row.host_id, list);
+  }
+  return handovers;
 }
 
 interface RemoteHostRow {
@@ -816,6 +896,31 @@ export class RemoteControlPlane {
     (operation) => operation.pipe(Effect.provide(this.#layer)),
   ).bind(this);
 
+  readonly revokeHostCredential = Effect.fn("RemoteControlPlane.revokeHostCredential")(
+    function* (this: RemoteControlPlane, user: AuthUser, input: { hostId: string; machineToken: string }) {
+      const dependencies = yield* RemoteDependencies;
+      const hostId = yield* remoteValidate(() => requiredIdentifier(input.hostId, "host ID"));
+      const host = yield* this.authenticateHost(hostId, input.machineToken);
+      if (host.owner_user_id !== user.id) {
+        return yield* new RemoteControlPlaneError(403, "host_owner_mismatch", "This host belongs to another account.");
+      }
+      const now = dependencies.now();
+      yield* remoteCall(() =>
+        dependencies.database.batch([
+          dependencies.database
+            .prepare(
+              `UPDATE remote_hosts SET machine_token_hash = NULL, auth_epoch = auth_epoch + 1, updated_at = ?
+               WHERE host_id = ? AND owner_user_id = ? AND machine_token_hash = ?`,
+            )
+            .bind(now, hostId, user.id, host.machine_token_hash),
+          this.#authEpochEventStatement(hostId, now, user.id, { sql: "machine_token_hash IS NULL", binds: [] }),
+        ]),
+      );
+      yield* this.#flushAuthEvents();
+    },
+    (operation) => operation.pipe(Effect.provide(this.#layer)),
+  ).bind(this);
+
   readonly handOverHostKey = Effect.fn("RemoteControlPlane.handOverHostKey")(
     function* (
       this: RemoteControlPlane,
@@ -925,6 +1030,10 @@ export class RemoteControlPlane {
              AND s.desired_state NOT IN ('deleted', 'stopped')) AS operator_host,
            (SELECT s.storage_tier FROM hosted_servers s WHERE s.server_id = h.host_id
              AND s.desired_state NOT IN ('deleted', 'stopped')) AS hosted_storage_tier,
+           ${keyHandoversJsonSql("h.host_id")} AS key_handovers,
+           ${ownerLicensesJsonSql("h.owner_user_id")} AS owner_licenses,
+           ${serverMemberLimitValueSql("h.host_id")} AS custom_member_limit,
+           ${serverEntitlementsJsonSql("h.host_id")} AS server_entitlements,
            ${CUSTOM_SERVER_OFFER_COLUMNS}
          FROM remote_memberships m
          JOIN remote_hosts h ON h.host_id = m.host_id
@@ -948,40 +1057,46 @@ export class RemoteControlPlane {
               hosted_plan: string | null;
               operator_host: string | null;
               hosted_storage_tier: number | null;
+              key_handovers: string;
+              owner_licenses: string;
+              custom_member_limit: number | null;
+              server_entitlements: string;
             } & CustomServerOfferRow
           >(),
       );
-      const keyHandovers = yield* this.#keyHandoversByHost({
-        sql: "host_id IN (SELECT host_id FROM remote_memberships WHERE user_id = ? AND status = 'active')",
-        binds: [userId],
+      const now = dependencies.now();
+      return (result.results ?? []).map((row) => {
+        const license = ownerLicenseFromRows(newestFirst(jsonRows<OwnerLicenseJsonRow>(row.owner_licenses)), now);
+        const plan = serverEntitlementFromRows(
+          newestFirst(jsonRows<ServerEntitlementJsonRow>(row.server_entitlements)),
+          now,
+        );
+        const custom = row.custom_member_limit === null ? null : { member_limit: row.custom_member_limit };
+        const { limit, licenseRaises } = memberLimitFrom(custom, plan, license);
+        return {
+          hostId: row.host_id,
+          name: row.name,
+          logoKey: row.logo_key,
+          appearance: storedAppearance(row.appearance_shape, row.appearance_color),
+          devicePublicKey: row.device_public_key,
+          keyHandovers:
+            keyHandoversFromRows(
+              jsonRows<RemoteHostKeyHandoverRow>(row.key_handovers).sort(
+                (left, right) => left.issued_at - right.issued_at,
+              ),
+            ).get(row.host_id) ?? [],
+          authEpoch: row.auth_epoch,
+          membershipId: row.membership_id,
+          role: row.role,
+          memberLimit: license ? Math.min(limit, license.users) : limit,
+          licenseRaisesMemberLimit: row.role === "owner" && licenseRaises,
+          hosted: row.hosted_plan !== null,
+          ...(row.hidden_at === null ? {} : { hidden: true as const }),
+          ...(row.operator_host === null ? {} : { restartAvailable: false }),
+          ...hostedStorage(row.hosted_plan, row.hosted_storage_tier),
+          ...customServerPayment(row, row.role),
+        };
       });
-      return yield* Effect.forEach(
-        result.results ?? [],
-        (row) =>
-          Effect.gen({ self: this }, function* () {
-            const license = yield* this.#ownerLicense(row.host_id);
-            const { limit, licenseRaises } = yield* this.#memberLimit(row.host_id, license);
-            return {
-              hostId: row.host_id,
-              name: row.name,
-              logoKey: row.logo_key,
-              appearance: storedAppearance(row.appearance_shape, row.appearance_color),
-              devicePublicKey: row.device_public_key,
-              keyHandovers: keyHandovers.get(row.host_id) ?? [],
-              authEpoch: row.auth_epoch,
-              membershipId: row.membership_id,
-              role: row.role,
-              memberLimit: license ? Math.min(limit, license.users) : limit,
-              licenseRaisesMemberLimit: row.role === "owner" && licenseRaises,
-              hosted: row.hosted_plan !== null,
-              ...(row.hidden_at === null ? {} : { hidden: true as const }),
-              ...(row.operator_host === null ? {} : { restartAvailable: false }),
-              ...hostedStorage(row.hosted_plan, row.hosted_storage_tier),
-              ...customServerPayment(row, row.role),
-            };
-          }),
-        { concurrency: "unbounded" },
-      );
     },
     (operation) => operation.pipe(Effect.provide(this.#layer)),
   ).bind(this);
@@ -1820,7 +1935,7 @@ export class RemoteControlPlane {
     function* (this: RemoteControlPlane, user: AuthUser) {
       const dependencies = yield* RemoteDependencies;
       const rows = yield* remoteCall(() =>
-        dependencies.database
+        replicaD1(dependencies.database)
           .prepare(
             `SELECT ${OWNER_TRANSFER_COLUMNS} ${OWNER_TRANSFER_FROM}
            WHERE t.to_email = ? AND t.status = 'pending' AND t.expires_at > ? AND h.owner_user_id = t.from_user_id
@@ -3530,20 +3645,11 @@ export class RemoteControlPlane {
     const custom = yield* remoteCall(() =>
       dependencies.database.prepare(SERVER_MEMBER_LIMIT_SQL).bind(hostId).first<{ member_limit: number }>(),
     );
-    const below = (limit: number) => license !== null && license.users < limit;
-    if (custom) return { limit: custom.member_limit, fromLicense: false, licenseRaises: below(custom.member_limit) };
+    if (custom) return memberLimitFrom(custom, null, license);
     const plan = yield* getServerEntitlement(dependencies.database, hostId, dependencies.now()).pipe(
       Effect.mapError((error) => (error instanceof RemoteControlPlaneError ? error : new RemoteOperationError({}))),
     );
-    if (plan?.hosted) return { limit: plan.memberLimit, fromLicense: false, licenseRaises: below(plan.memberLimit) };
-    if (license?.entitled && license.users > (plan?.memberLimit ?? 0))
-      return { limit: license.users, fromLicense: true, licenseRaises: true };
-    const limit = plan?.memberLimit ?? DEFAULT_TEAM_MEMBER_LIMIT;
-    return {
-      limit,
-      fromLicense: false,
-      licenseRaises: below(limit) || (license?.entitled === true && plan !== null && license.users === limit),
-    };
+    return memberLimitFrom(null, plan, license);
   });
 
   #assertRole<Row extends RemoteMembershipRow>(membership: Row | null, roles: RemoteMemberRole[]): Row {
@@ -3647,34 +3753,9 @@ export class RemoteControlPlane {
   ): Effect.fn.Return<Map<string, HostKeyHandover[]>, RemoteFailure, RemoteDependencies> {
     const dependencies = yield* RemoteDependencies;
     const result = yield* remoteCall(() =>
-      dependencies.database
-        .prepare(
-          `SELECT host_id, issued_at, previous_public_key, public_key, previous_signature, signature
-         FROM (
-           SELECT host_id, issued_at, previous_public_key, public_key, previous_signature, signature,
-                  ROW_NUMBER() OVER (PARTITION BY host_id ORDER BY issued_at DESC) AS position
-           FROM remote_host_key_handovers WHERE ${condition.sql}
-         )
-         WHERE position <= ?
-         ORDER BY host_id, issued_at`,
-        )
-        .bind(...condition.binds, HOST_KEY_HANDOVER_LIMIT)
-        .all<RemoteHostKeyHandoverRow>(),
+      keyHandoversStatement(dependencies.database, condition).all<RemoteHostKeyHandoverRow>(),
     );
-    const handovers = new Map<string, HostKeyHandover[]>();
-    for (const row of result.results ?? []) {
-      const list = handovers.get(row.host_id) ?? [];
-      list.push({
-        hostId: row.host_id,
-        issuedAt: row.issued_at,
-        previousPublicKey: row.previous_public_key,
-        publicKey: row.public_key,
-        previousSignature: row.previous_signature,
-        signature: row.signature,
-      });
-      handovers.set(row.host_id, list);
-    }
-    return handovers;
+    return keyHandoversFromRows(result.results ?? []);
   });
 
   readonly #keyHandovers = Effect.fn("RemoteControlPlane.keyHandovers")(function* (

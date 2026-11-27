@@ -19,6 +19,8 @@ export const SIGNAL_CLIENT_RECONNECT_GRACE_MS = 10 * 60_000;
 
 export const SIGNAL_NO_READY_CLOSE_CODE = "no-ready";
 
+export const SIGNAL_SESSIONS_ENDED_LIMIT = 256;
+
 export type SignalPeer = "host" | "client" | "ingress";
 
 export const SLACK_DELIVERY_BODY_BYTES_LIMIT = 64 * 1024;
@@ -145,6 +147,7 @@ export type SignalServerMessage =
       reconnectGraceMs?: number;
     }
   | { type: "host-waiting"; version: SignalProtocolVersion; resumeToken: string }
+  | { type: "sessions-ended"; version: SignalProtocolVersion; sessionIds: string[] }
   | {
       type: "peer-ready";
       version: SignalProtocolVersion;

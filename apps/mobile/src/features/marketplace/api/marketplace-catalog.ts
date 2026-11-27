@@ -6,6 +6,7 @@ import type {
   MarketplaceSkillPage,
   MarketplaceSkillQuery,
 } from "@openbot/contracts/ipc";
+import type { PluginCatalog } from "@openbot/contracts/plugin-catalog";
 import { runTeamEffect } from "@openbot/team-client";
 import { createMarketplaceCatalog, type MarketplaceCatalog } from "@openbot/team-client/marketplace-catalog";
 import { fetch } from "@/features/support/model/logged-fetch";
@@ -79,4 +80,8 @@ export function loadMarketplaceSkill(
   signal?: AbortSignal,
 ): Promise<MarketplaceSkillDetail> {
   return runTeamEffect(catalogFor(apiUrl).skills.get(skillId), signal);
+}
+
+export function loadPluginCatalog(apiUrl: string, signal?: AbortSignal): Promise<PluginCatalog> {
+  return runTeamEffect(catalogFor(apiUrl).plugins.catalog(), signal);
 }

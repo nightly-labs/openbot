@@ -1078,6 +1078,7 @@ export class DrainScheduler {
       const startTurn = (providerThreadId: string) =>
         Effect.gen({ self: this }, function* () {
           yield* drainStep(requireServedModel(this.#providers.configRevision(client)));
+          const sandboxPolicy = yield* codexSandboxPolicy(agent, this.#store.sharedRoot, this.#threads.writeAreas());
           return yield* this.#threads
             .requestWithArchivedThreadRecovery(
               agent,
@@ -1099,12 +1100,13 @@ export class DrainScheduler {
                   delivery.expectsReply === false &&
                   (!delivery.replyToMessageId || this.#mailbox.followsUpOwnAnswer(delivery)),
                 wakeAfterCommands: inOwnChat(providerThreadId),
+                ...this.#threads.writeAreasParam(agent, client),
                 input: inputForThread(providerThreadId),
                 cwd: agent.workspacePath,
                 runtimeWorkspaceRoots: workspaceWritableRoots(agent, this.#store.sharedRoot),
                 approvalPolicy: this.#threads.approvalPolicy(agent),
                 approvalsReviewer: "user",
-                sandboxPolicy: codexSandboxPolicy(agent, this.#store.sharedRoot),
+                sandboxPolicy,
                 ...(client.provider === "codex" || client.provider === "claude"
                   ? this.#serviceTier(agent, client.provider)
                   : {}),

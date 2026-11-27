@@ -3,7 +3,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import { router, useGlobalSearchParams, useSegments } from "expo-router";
 import { Stack } from "expo-router/stack";
 import { useThemeColor } from "heroui-native/hooks";
-import { type PropsWithChildren, useCallback, useEffect, useMemo, useRef } from "react";
+import { type PropsWithChildren, useCallback, useEffect, useLayoutEffect, useMemo, useRef } from "react";
 import { TextInput } from "react-native";
 import { useCSSVariable } from "uniwind";
 import { ChatListPaneProvider } from "@/features/agents/components/chat-list-pane-context";
@@ -22,6 +22,7 @@ import { useNotificationTaps } from "@/features/push-notifications/use-notificat
 import type { QuickActionTarget } from "@/features/quick-actions/model/quick-action-items";
 import { shareOpenBot } from "@/features/quick-actions/model/share-app";
 import { setQuickActionNavigator } from "@/features/quick-actions/quick-actions-native";
+import { screenOpenProbe } from "@/features/screen-metrics/screen-open-probe";
 import { requestHomeSearch } from "@/features/search/model/home-search-request";
 import { AppDrawerShell, useAppDrawer } from "@/features/servers/components/app-drawer-shell";
 import { watchAndroidShares } from "@/features/share/model/android-share-watch";
@@ -68,8 +69,31 @@ export const unstable_settings = {
   anchor: "connected",
 };
 
+type ShownScreen = { agentId: string; serverId: string | null; taskId: string | null } | null;
+
+function shownScreen(screen: string | undefined, agentId: unknown, serverId: unknown, taskId: unknown): ShownScreen {
+  if (typeof agentId !== "string") return null;
+  const shownServerId = typeof serverId === "string" && serverId ? serverId : null;
+  if (screen === "chat") return { agentId, serverId: shownServerId, taskId: null };
+  if (screen === "task" && typeof taskId === "string") return { agentId, serverId: shownServerId, taskId };
+  return null;
+}
+
+function ShownScreenTracker({ onChange }: { onChange: (shown: ShownScreen) => void }) {
+  const screen = useSegments().at(-2);
+  const { agentId, serverId, taskId } = useGlobalSearchParams<{
+    agentId?: string;
+    serverId?: string;
+    taskId?: string;
+  }>();
+  useLayoutEffect(
+    () => onChange(shownScreen(screen, agentId, serverId, taskId)),
+    [onChange, screen, agentId, serverId, taskId],
+  );
+  return null;
+}
+
 function AuthenticatedStack() {
-  const segments = useSegments();
   const pushAnimation = useReducedMotion() ? "fade" : "slide_from_right";
   const chatAnimation = useSplitLayout() ? "fade" : pushAnimation;
   const { t } = useText();
@@ -113,23 +137,12 @@ function AuthenticatedStack() {
       sheetGrabberVisible: true,
     }) as const;
   const { closeDrawer } = useAppDrawer();
-  const {
-    agentId: openAgentId,
-    serverId: openServerId,
-    taskId: openTaskId,
-  } = useGlobalSearchParams<{ agentId?: string; serverId?: string; taskId?: string }>();
-  const shown = useRef<{ agentId: string; serverId: string | null; taskId: string | null } | null>(null);
-  const screen = segments.at(-2);
-  const shownServerId = typeof openServerId === "string" && openServerId ? openServerId : null;
-  shown.current =
-    typeof openAgentId !== "string"
-      ? null
-      : screen === "chat"
-        ? { agentId: openAgentId, serverId: shownServerId, taskId: null }
-        : screen === "task" && typeof openTaskId === "string"
-          ? { agentId: openAgentId, serverId: shownServerId, taskId: openTaskId }
-          : null;
+  const shown = useRef<ShownScreen>(null);
+  const setShown = useCallback((next: ShownScreen) => {
+    shown.current = next;
+  }, []);
   const workspace = useMobileWorkspaceReader();
+  useEffect(() => screenOpenProbe?.readWorkspace(workspace), [workspace]);
   const showsAgent = useCallback(
     (agentId: string, serverId: string | null) => {
       const current = shown.current;
@@ -220,7 +233,9 @@ function AuthenticatedStack() {
   const queryClient = useQueryClient();
   const scope = useQueryScope();
   const queryScope = useRef(scope);
-  queryScope.current = scope;
+  useLayoutEffect(() => {
+    queryScope.current = scope;
+  }, [scope]);
   const targetSources = useMemo(
     (): OutsideTargetSources => ({
       channels: (serverId) =>
@@ -308,139 +323,142 @@ function AuthenticatedStack() {
   useNotificationTaps(openTarget, onScreen, openWorkflow);
 
   return (
-    <Stack
-      screenOptions={(props) => ({
-        ...androidBackOptions(props, { glass: true }),
-        headerBackButtonDisplayMode: "minimal",
-        ...headerFontOptions,
-        headerShadowVisible: false,
-        headerTransparent: isIOS,
-        sheetExpandsWhenScrolledToEdge: false,
-        ...(isAndroid && { sheetCornerRadius: 28 }),
-      })}
-    >
-      <Stack.Screen name="connected" options={{ animation: "fade", gestureEnabled: false, title: "" }} />
-      <Stack.Screen
-        name="rate-app"
-        options={{
-          presentation: "containedTransparentModal",
-          animation: "none",
-          gestureEnabled: false,
-          headerShown: false,
-          contentStyle: { backgroundColor: "transparent" },
-        }}
-      />
-      <Stack.Screen name="chat/[agentId]" options={chatPage} />
-      <Stack.Screen name="side-question/[agentId]" options={chatPage} />
-      <Stack.Screen name="task/[taskId]" options={chatPage} />
-      <Stack.Screen
-        name="code-preview/[previewId]"
-        options={{
-          animation: pushAnimation,
-          contentStyle: { backgroundColor: background },
-          fullScreenGestureEnabled: false,
-          gestureEnabled: true,
-          headerShown: false,
-        }}
-      />
-      <Stack.Screen
-        name="image-gallery/[galleryId]"
-        options={{
-          animation: pushAnimation,
-          contentStyle: { backgroundColor: background },
-          fullScreenGestureEnabled: true,
-          gestureEnabled: true,
-          headerShown: false,
-        }}
-      />
-      <Stack.Screen
-        name="browser/[agentId]"
-        options={{
-          animation: pushAnimation,
-          contentStyle: { backgroundColor: background },
-          fullScreenGestureEnabled: false,
-          gestureEnabled: true,
-          ...nativeBarOptions,
-        }}
-      />
-      <Stack.Screen name="browser-tabs/[agentId]" options={formSheet([0.6])} />
-      <Stack.Screen
-        name="remote-desktop/[serverId]"
-        options={{
-          animation: pushAnimation,
-          contentStyle: { backgroundColor: background },
-          fullScreenGestureEnabled: false,
-          gestureEnabled: true,
-          ...nativeBarOptions,
-        }}
-      />
-      <Stack.Screen name="remote-desktop-stats" options={formSheet([0.6])} />
-      <Stack.Screen name="remote-desktop-help" options={formSheet([0.85])} />
-      <Stack.Screen name="browser-help" options={formSheet([0.85])} />
-      <Stack.Screen name="channel/[channelId]" options={chatPage} />
-      <Stack.Screen name="channel-info/[channelId]" options={formSheet([0.85])} />
-      <Stack.Screen name="context-usage/[agentId]" options={formSheet([0.6, 0.85])} />
-      <Stack.Screen name="channel-actions/[channelId]" options={formSheet([0.6])} />
-      <Stack.Screen name="add-channel" options={formSheet([0.85])} />
-      <Stack.Screen name="add-agent" options={formSheet([0.85])} />
-      <Stack.Screen name="agent-info/[agentId]" options={formSheet([0.85])} />
-      <Stack.Screen
-        name="install-agent"
-        options={{
-          ...formSheet(isAndroid ? [0.85] : [1]),
-          sheetInitialDetentIndex: "last",
-        }}
-      />
-      <Stack.Screen
-        name="marketplace-listing"
-        options={{
-          ...formSheet(isAndroid ? [0.85] : [1]),
-          sheetInitialDetentIndex: "last",
-        }}
-      />
-      <Stack.Screen name="section-form" listeners={refocusNameField} options={formSheet([0.85])} />
-      <Stack.Screen name="library-folders" listeners={refocusNameField} options={formSheet([0.85])} />
-      <Stack.Screen name="thread-rename" listeners={refocusNameField} options={formSheet([0.85])} />
-      <Stack.Screen name="new-task" options={formSheet([0.85])} />
-      <Stack.Screen name="add-server" options={formSheet([0.85])} />
-      <Stack.Screen name="hosted-server" options={formSheet([0.85])} />
-      <Stack.Screen name="hidden-chats" options={formSheet([0.85])} />
-      <Stack.Screen name="deleted-chats" options={formSheet([0.85])} />
-      <Stack.Screen name="server-settings" options={formSheet([0.85])} />
-      <Stack.Screen name="server-routines/index" options={largeTitlePage} />
-      <Stack.Screen name="server-routines/agent-routine" options={routinePage} />
-      <Stack.Screen name="server-routines/channel-routine" options={routinePage} />
-      <Stack.Screen name="server-tasks" options={largeTitlePage} />
-      <Stack.Screen name="server-workflows/index" options={largeTitlePage} />
-      <Stack.Screen name="server-workflows/workflow" options={largeTitlePage} />
-      <Stack.Screen name="server-workflows/runs" options={largeTitlePage} />
-      <Stack.Screen name="server-workflows/run" options={largeTitlePage} />
-      <Stack.Screen name="server-workflows/versions" options={largeTitlePage} />
-      <Stack.Screen name="server-workflows/version" options={largeTitlePage} />
-      <Stack.Screen name="server-workflows/github-events" options={largeTitlePage} />
-      <Stack.Screen
-        name="workflow-editor"
-        options={{
-          contentStyle: { backgroundColor: sheetBackground },
-          headerShown: false,
-          scrollEdgeEffects: { top: "hidden", bottom: "soft" },
-          presentation: "card",
-        }}
-      />
-      <Stack.Screen name="server-usage/index" options={largeTitlePage} />
-      <Stack.Screen name="server-library" options={largeTitlePage} />
-      <Stack.Screen name="server-marketplace/index" options={largeTitlePage} />
-      <Stack.Screen name="share" options={formSheet([0.85])} />
-      <Stack.Screen name="plan-limits" options={formSheet([0.85])} />
-      <Stack.Screen name="message-actions" options={formSheet([0.6])} />
-      <Stack.Screen name="pinned-messages" options={formSheet([0.6, 0.85])} />
-      <Stack.Screen name="queued-messages" options={formSheet([0.85])} />
-      <Stack.Screen name="vault-request" options={formSheet([0.85])} />
-      <Stack.Screen name="turn-thinking" options={formSheet([0.85])} />
-      <Stack.Screen name="subagent" options={formSheet([0.85])} />
-      <Stack.Screen name="memory-changes" options={formSheet([0.85])} />
-      <Stack.Screen name="settings" options={formSheet([0.85])} />
-    </Stack>
+    <>
+      <ShownScreenTracker onChange={setShown} />
+      <Stack
+        screenOptions={(props) => ({
+          ...androidBackOptions(props, { glass: true }),
+          headerBackButtonDisplayMode: "minimal",
+          ...headerFontOptions,
+          headerShadowVisible: false,
+          headerTransparent: isIOS,
+          sheetExpandsWhenScrolledToEdge: false,
+          ...(isAndroid && { sheetCornerRadius: 28 }),
+        })}
+      >
+        <Stack.Screen name="connected" options={{ animation: "fade", gestureEnabled: false, title: "" }} />
+        <Stack.Screen
+          name="rate-app"
+          options={{
+            presentation: "containedTransparentModal",
+            animation: "none",
+            gestureEnabled: false,
+            headerShown: false,
+            contentStyle: { backgroundColor: "transparent" },
+          }}
+        />
+        <Stack.Screen name="chat/[agentId]" options={chatPage} />
+        <Stack.Screen name="side-question/[agentId]" options={chatPage} />
+        <Stack.Screen name="task/[taskId]" options={chatPage} />
+        <Stack.Screen
+          name="code-preview/[previewId]"
+          options={{
+            animation: pushAnimation,
+            contentStyle: { backgroundColor: background },
+            fullScreenGestureEnabled: false,
+            gestureEnabled: true,
+            headerShown: false,
+          }}
+        />
+        <Stack.Screen
+          name="image-gallery/[galleryId]"
+          options={{
+            animation: pushAnimation,
+            contentStyle: { backgroundColor: background },
+            fullScreenGestureEnabled: true,
+            gestureEnabled: true,
+            headerShown: false,
+          }}
+        />
+        <Stack.Screen
+          name="browser/[agentId]"
+          options={{
+            animation: pushAnimation,
+            contentStyle: { backgroundColor: background },
+            fullScreenGestureEnabled: false,
+            gestureEnabled: true,
+            ...nativeBarOptions,
+          }}
+        />
+        <Stack.Screen name="browser-tabs/[agentId]" options={formSheet([0.6])} />
+        <Stack.Screen
+          name="remote-desktop/[serverId]"
+          options={{
+            animation: pushAnimation,
+            contentStyle: { backgroundColor: background },
+            fullScreenGestureEnabled: false,
+            gestureEnabled: true,
+            ...nativeBarOptions,
+          }}
+        />
+        <Stack.Screen name="remote-desktop-stats" options={formSheet([0.6])} />
+        <Stack.Screen name="remote-desktop-help" options={formSheet([0.85])} />
+        <Stack.Screen name="browser-help" options={formSheet([0.85])} />
+        <Stack.Screen name="channel/[channelId]" options={chatPage} />
+        <Stack.Screen name="channel-info/[channelId]" options={formSheet([0.85])} />
+        <Stack.Screen name="context-usage/[agentId]" options={formSheet([0.6, 0.85])} />
+        <Stack.Screen name="channel-actions/[channelId]" options={formSheet([0.6])} />
+        <Stack.Screen name="add-channel" options={formSheet([0.85])} />
+        <Stack.Screen name="add-agent" options={formSheet([0.85])} />
+        <Stack.Screen name="agent-info/[agentId]" options={formSheet([0.85])} />
+        <Stack.Screen
+          name="install-agent"
+          options={{
+            ...formSheet(isAndroid ? [0.85] : [1]),
+            sheetInitialDetentIndex: "last",
+          }}
+        />
+        <Stack.Screen
+          name="marketplace-listing"
+          options={{
+            ...formSheet(isAndroid ? [0.85] : [1]),
+            sheetInitialDetentIndex: "last",
+          }}
+        />
+        <Stack.Screen name="section-form" listeners={refocusNameField} options={formSheet([0.85])} />
+        <Stack.Screen name="library-folders" listeners={refocusNameField} options={formSheet([0.85])} />
+        <Stack.Screen name="thread-rename" listeners={refocusNameField} options={formSheet([0.85])} />
+        <Stack.Screen name="new-task" options={formSheet([0.85])} />
+        <Stack.Screen name="add-server" options={formSheet([0.85])} />
+        <Stack.Screen name="hosted-server" options={formSheet([0.85])} />
+        <Stack.Screen name="hidden-chats" options={formSheet([0.85])} />
+        <Stack.Screen name="deleted-chats" options={formSheet([0.85])} />
+        <Stack.Screen name="server-settings" options={formSheet([0.85])} />
+        <Stack.Screen name="server-routines/index" options={largeTitlePage} />
+        <Stack.Screen name="server-routines/agent-routine" options={routinePage} />
+        <Stack.Screen name="server-routines/channel-routine" options={routinePage} />
+        <Stack.Screen name="server-tasks" options={largeTitlePage} />
+        <Stack.Screen name="server-workflows/index" options={largeTitlePage} />
+        <Stack.Screen name="server-workflows/workflow" options={largeTitlePage} />
+        <Stack.Screen name="server-workflows/runs" options={largeTitlePage} />
+        <Stack.Screen name="server-workflows/run" options={largeTitlePage} />
+        <Stack.Screen name="server-workflows/versions" options={largeTitlePage} />
+        <Stack.Screen name="server-workflows/version" options={largeTitlePage} />
+        <Stack.Screen name="server-workflows/github-events" options={largeTitlePage} />
+        <Stack.Screen
+          name="workflow-editor"
+          options={{
+            contentStyle: { backgroundColor: sheetBackground },
+            headerShown: false,
+            scrollEdgeEffects: { top: "hidden", bottom: "soft" },
+            presentation: "card",
+          }}
+        />
+        <Stack.Screen name="server-usage/index" options={largeTitlePage} />
+        <Stack.Screen name="server-library" options={largeTitlePage} />
+        <Stack.Screen name="server-marketplace/index" options={largeTitlePage} />
+        <Stack.Screen name="share" options={formSheet([0.85])} />
+        <Stack.Screen name="plan-limits" options={formSheet([0.85])} />
+        <Stack.Screen name="message-actions" options={formSheet([0.6])} />
+        <Stack.Screen name="pinned-messages" options={formSheet([0.6, 0.85])} />
+        <Stack.Screen name="queued-messages" options={formSheet([0.85])} />
+        <Stack.Screen name="vault-request" options={formSheet([0.85])} />
+        <Stack.Screen name="turn-thinking" options={formSheet([0.85])} />
+        <Stack.Screen name="subagent" options={formSheet([0.85])} />
+        <Stack.Screen name="memory-changes" options={formSheet([0.85])} />
+        <Stack.Screen name="settings" options={formSheet([0.85])} />
+      </Stack>
+    </>
   );
 }
 

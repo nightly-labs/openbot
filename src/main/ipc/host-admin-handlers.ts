@@ -7,6 +7,7 @@ import {
   decodeHostBrowsingMemory,
   decodeHostMemoryReview,
   decodeHostPersonality,
+  decodeHostRemoteChatContent,
   decodeHostSignalHomeSettings,
   decodeHostSkillLearning,
   decodeHostTimezoneSettings,
@@ -25,6 +26,7 @@ import {
   hostAgentMemoryLimit,
   hostBrowsingMemory,
   hostMemoryReview,
+  hostRemoteChatContent,
   hostSkillLearning,
   isClaudeCompactWindowTokens,
   isPromptCacheTtl,
@@ -137,6 +139,10 @@ import {
   PROVIDER_ENVIRONMENT_CAPABILITY,
   PROVIDER_ENVIRONMENT_ROUTES,
 } from "@openbot/contracts/team-protocol/provider-environment-v1";
+import {
+  REMOTE_CHAT_CONTENT_CAPABILITY,
+  REMOTE_CHAT_CONTENT_ROUTES,
+} from "@openbot/contracts/team-protocol/remote-chat-content-v1";
 import { SERVER_AUDIT_CAPABILITY, SERVER_AUDIT_ROUTES } from "@openbot/contracts/team-protocol/server-audit-v1";
 import { SKILL_LEARNING_CAPABILITY, SKILL_LEARNING_ROUTES } from "@openbot/contracts/team-protocol/skill-learning-v1";
 import { sourceText } from "@openbot/i18n/source";
@@ -158,6 +164,7 @@ import type { MemoryReviewPreferenceStore } from "../memory-review-preference-st
 import type { ModelVisibility } from "../model-visibility";
 import type { PromptCacheTtlPreferenceStore } from "../prompt-cache-ttl-preference-store";
 import type { ProviderEnvironmentControl } from "../provider-environment-store";
+import type { RemoteChatContentPreferenceStore } from "../remote-chat-content-preference-store";
 import { acceptEmpty, decodeHostReleaseStatusFromHost, type ResponseDecoder } from "../remote-host-decoding";
 import type { RemoteRequestInit } from "../remote-server-client";
 import type { RemoteWorkflowError } from "../remote-service-effects";
@@ -200,6 +207,7 @@ interface HostAdminIpcDependencies {
   memoryReview: MemoryReviewPreferenceStore;
   skillLearning: SkillLearningPreferenceStore;
   browsingMemory: BrowsingMemoryPreferenceStore;
+  remoteChatContent: RemoteChatContentPreferenceStore;
   machineAlerts: Pick<MachineAlertMonitor, "alerts" | "setAlerts" | "canBeResponsible">;
   promptCacheTtl: Pick<PromptCacheTtlPreferenceStore, "get" | "set">;
   claudeUserSetup: ClaudeUserSetupControl;
@@ -231,6 +239,7 @@ export function hostAdminIpcHandlers({
   memoryReview,
   skillLearning,
   browsingMemory,
+  remoteChatContent,
   machineAlerts,
   promptCacheTtl,
   claudeUserSetup,
@@ -297,6 +306,14 @@ export function hostAdminIpcHandlers({
       throw new Error(sourceText("error.team.skillLearningUnsupported"));
     return runCauseEffect(remoteServers.request(serverId, route, decodeHostSkillLearning, { method: "POST", body }));
   }
+  function remoteChatContentRequest(serverId: string, route: string, body: { enabled?: boolean }) {
+    if (!remoteServers.supportsCapability(serverId, REMOTE_CHAT_CONTENT_CAPABILITY))
+      return Promise.resolve(hostRemoteChatContent({ enabled: false }));
+    return runCauseEffect(
+      remoteServers.request(serverId, route, decodeHostRemoteChatContent, { method: "POST", body }),
+    );
+  }
+
   function remoteBrowsingMemory(serverId: string, route: string, body: { enabled?: boolean }) {
     if (!remoteServers.supportsCapability(serverId, BROWSING_MEMORY_CAPABILITY))
       throw new Error(sourceText("error.team.browsingMemoryUnsupported"));
@@ -576,6 +593,18 @@ export function hostAdminIpcHandlers({
         local: async (enabled) => hostBrowsingMemory(await runCauseEffect(browsingMemory.set({ enabled }))),
         remote: (enabled, serverId) => remoteBrowsingMemory(serverId, BROWSING_MEMORY_ROUTES.update, { enabled }),
       }),
+      getRemoteChatContent: scopedQueryHandler({
+        local: () => hostRemoteChatContent(remoteChatContent.get()),
+        remote: (serverId) => remoteChatContentRequest(serverId, REMOTE_CHAT_CONTENT_ROUTES.settings, {}),
+      }),
+      setRemoteChatContent: scopedHandler(parseRemoteChatContentEnabled, {
+        local: async (enabled) => hostRemoteChatContent(await runCauseEffect(remoteChatContent.set({ enabled }))),
+        remote: (enabled, serverId) => {
+          if (!remoteServers.supportsCapability(serverId, REMOTE_CHAT_CONTENT_CAPABILITY))
+            throw new Error(sourceText("error.team.remoteChatContentUnsupported"));
+          return remoteChatContentRequest(serverId, REMOTE_CHAT_CONTENT_ROUTES.update, { enabled });
+        },
+      }),
       getMachineAlerts: scopedQueryHandler({
         local: () => machineAlerts.alerts(),
         remote: (serverId) => remoteMachineAlerts(serverId, MACHINE_RESOURCES_ROUTES.alerts, {}),
@@ -764,6 +793,11 @@ function parseMemoryReviewCount(value: unknown): number {
 
 function parseSkillLearningText(value: unknown): string {
   if (typeof value !== "string" || !value || value.length > 32) throw new Error("Skill learning mode is required.");
+  return value;
+}
+
+function parseRemoteChatContentEnabled(value: unknown): boolean {
+  if (typeof value !== "boolean") throw new Error(sourceText("error.team.remoteChatContentRequired"));
   return value;
 }
 

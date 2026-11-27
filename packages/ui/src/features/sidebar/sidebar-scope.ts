@@ -163,7 +163,7 @@ export function createSidebarScope(props: SidebarProps) {
 
   const trackListPointer = (event: PointerEvent) => {
     const target = event.target instanceof Element ? event.target : null;
-    if (event.pointerType === "touch" || target === null) {
+    if (target === null) {
       setPointerInList(false);
       return;
     }
@@ -171,7 +171,7 @@ export function createSidebarScope(props: SidebarProps) {
     else if (target.closest("[data-popper-positioner], .agent-context-menu") === null) setPointerInList(false);
   };
   const releaseListPointer = (event: PointerEvent) => {
-    if (event.relatedTarget === null) setPointerInList(false);
+    if (event.pointerType !== "touch" && event.relatedTarget === null) setPointerInList(false);
   };
   const releaseOnBlur = () => setPointerInList(false);
   document.addEventListener("pointerover", trackListPointer);

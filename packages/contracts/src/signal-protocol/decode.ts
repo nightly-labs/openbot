@@ -6,6 +6,7 @@ import {
   type IceServer,
   QUEUED_DELIVERY_SEALED_LIMIT,
   SIGNAL_PROTOCOL_VERSION,
+  SIGNAL_SESSIONS_ENDED_LIMIT,
   type SignalChannel,
   type SignalServerMessage,
   SLACK_DELIVERY_BODY_BYTES_LIMIT,
@@ -48,6 +49,8 @@ export function decodeSignalServerMessage(value: unknown): SignalServerMessage |
       };
     case "host-waiting":
       return { type: kind, version, resumeToken: identifier(value.resumeToken) };
+    case "sessions-ended":
+      return { type: kind, version, sessionIds: sessionIdList(value.sessionIds) };
     case "peer-ready":
       return {
         type: kind,
@@ -266,6 +269,11 @@ function matching(value: unknown, pattern: RegExp): string {
 
 function guildList(value: unknown): string[] {
   if (!Array.isArray(value) || value.length > DISCORD_ROUTE_GUILDS_LIMIT) invalid();
+  return value.map(identifier);
+}
+
+function sessionIdList(value: unknown): string[] {
+  if (!Array.isArray(value) || value.length > SIGNAL_SESSIONS_ENDED_LIMIT) invalid();
   return value.map(identifier);
 }
 

@@ -30,7 +30,11 @@ import { WebView } from "react-native-webview";
 import { useUniwind } from "uniwind";
 import { checkDeviceUnlock } from "@/features/app-lock/model/app-lock";
 import { ChatGlassButton, ChatGlassIconButton } from "@/features/chat/components/chat-glass-icon-button";
-import { useMobileWorkspace } from "@/features/workspace/context/mobile-workspace-context";
+import {
+  useMobileWorkspaceActions,
+  useMobileWorkspaceReader,
+  useMobileWorkspaceSelector,
+} from "@/features/workspace/context/mobile-workspace-context";
 import { type MenuAction, MenuView } from "@/shared/components/menu-view";
 import { toolbarMenuItems } from "@/shared/components/toolbar-menu-items";
 import { failureText } from "@/shared/lib/failure-text";
@@ -121,8 +125,9 @@ export function RemoteDesktopScreen() {
   const { theme } = useUniwind();
   const appearance = theme === "dark" ? "dark" : "light";
   const { serverId } = useLocalSearchParams<{ serverId: string }>();
-  const { servers, canControlComputer, remoteDesktopConnection } = useMobileWorkspace();
-  const server = servers.find((item) => item.id === serverId);
+  const server = useMobileWorkspaceSelector((workspace) => workspace.servers.find((item) => item.id === serverId));
+  const { remoteDesktopConnection } = useMobileWorkspaceActions();
+  const readWorkspace = useMobileWorkspaceReader();
   const appForeground = useAppForeground();
   const [phase, setPhase] = useState<Phase>({ type: "starting" });
   const [viewer, setViewer] = useState<ViewerStatus>({ kind: "connecting" });
@@ -173,7 +178,7 @@ export function RemoteDesktopScreen() {
       keyboardField.current?.blur();
       if (!remoteViewerProxyNative)
         return setPhase({ type: "failed", message: t("mobile.server.remoteDesktop.appUpdate") });
-      if (!canControlComputer(serverId))
+      if (!readWorkspace().canControlComputer(serverId))
         return setPhase({ type: "failed", message: t("mobile.server.remoteDesktop.unsupported") });
       if (unlock) {
         unlocking.current = true;
@@ -236,7 +241,7 @@ export function RemoteDesktopScreen() {
           setPhase({ type: "failed", message: failureText(error) ?? t("mobile.server.remoteDesktop.failed") });
       }
     },
-    [stop, canControlComputer, remoteDesktopConnection, serverId, t, scriptFor],
+    [stop, readWorkspace, remoteDesktopConnection, serverId, t, scriptFor],
   );
 
   const lifecycle = useRef({ start, stop });

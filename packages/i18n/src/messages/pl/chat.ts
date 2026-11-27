@@ -632,4 +632,13 @@ export const messages = {
   "chat.feedbackWithdrawn.badge": "Usunięte",
   "chat.feedbackWithdrawn.body":
     "Twojego zgłoszenia nie ma już na GitHubie. Aby wysłać poprawione zgłoszenie, poproś o to agenta.",
+  "chat.remoteContent.pictureNotLoaded":
+    "Obraz z {host}. Nie został wczytany, bo treści zdalne są wyłączone na tym serwerze.",
+  "chat.remoteContent.loadPicture": "Wczytaj obraz",
+  "chat.remoteContent.diagramNotDrawn":
+    "Ten diagram może wczytać obraz z innej witryny. Nie został narysowany, bo treści zdalne są wyłączone na tym serwerze.",
+  "chat.remoteContent.loadDiagram": "Wczytaj diagram",
+  "chat.remoteContent.pageStatic":
+    "Pokazano bez skryptów i treści zdalnych, bo treści zdalne są wyłączone na tym serwerze.",
+  "chat.remoteContent.runPage": "Uruchom stronę",
 } as const satisfies PartialTranslation<typeof source>;
