@@ -87,17 +87,34 @@ describe("CustomProviderStore redaction", () => {
           { name: "Content-Type", value: "application/json" },
           { name: "HTTP-Referer", value: "https://studio.example.test/app" },
           { name: "X-Title", value: "OpenBotStudio" },
+          { name: "X-Portkey-Provider", value: "anthropic" },
+          { name: "X-Gateway-Key", value: "letmeinplease" },
           { name: "X-Tenant", value: secret },
         ],
       }),
     );
 
-    const text = `Send application/json from https://studio.example.test/app as OpenBotStudio for ${secret}`;
-    const expected = "Send application/json from https://studio.example.test/app as OpenBotStudio for [redacted]";
+    const text = `Send application/json from https://studio.example.test/app as OpenBotStudio to anthropic for ${secret}`;
+    const expected =
+      "Send application/json from https://studio.example.test/app as OpenBotStudio to anthropic for [redacted]";
     expect(redactPostText(text)).toBe(expected);
     expect(redactText(text)).toContain("application/json");
     expect(redactText(text)).toContain("OpenBotStudio");
     expect(redactText(text)).not.toContain(secret);
+    expect(redactText("gateway letmeinplease")).toBe("gateway [redacted]");
+  });
+
+  it("stops masking the values of an endpoint that is removed", async () => {
+    const apiKey = unprefixed("removed");
+    const header = unprefixed("removed");
+    const removing = store();
+    await runCauseEffect(removing.load());
+    await runCauseEffect(removing.save(input(apiKey, header)));
+    expect(redactText(`${apiKey} ${header}`)).toBe("[redacted] [redacted]");
+
+    await runCauseEffect(removing.remove("studio"));
+
+    expect(redactText(`${apiKey} ${header}`)).toBe(`${apiKey} ${header}`);
   });
 
   it("masks the values of a file that a load opens", async () => {

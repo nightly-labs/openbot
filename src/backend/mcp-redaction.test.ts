@@ -98,17 +98,18 @@ describe("redactMcpRecord", () => {
           { name: "Content-Type", value: "application/json" },
           { name: "X-Title", value: "OpenBotStudio" },
           { name: "HTTP-Referer", value: "https://studio.example.test/app" },
+          { name: "X-Portkey-Provider", value: "anthropic" },
           { name: "X-Tenant-Token", value: "tenant-c93e18f2a7" },
         ],
         models: [{ id: "auto", name: "auto" }],
       },
     ]);
     const text =
-      "App OpenBotStudio from https://studio.example.test/app sends application/json. Tenant tenant-c93e18f2a7";
+      "App OpenBotStudio from https://studio.example.test/app sends application/json to anthropic. Tenant tenant-c93e18f2a7";
     expect(redactMcpRecord({ item: { type: "agentMessage", text } }, values)).toEqual({
       item: {
         type: "agentMessage",
-        text: "App OpenBotStudio from https://studio.example.test/app sends application/json. Tenant •••",
+        text: "App OpenBotStudio from https://studio.example.test/app sends application/json to anthropic. Tenant •••",
       },
     });
   });

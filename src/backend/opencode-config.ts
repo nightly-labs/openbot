@@ -31,23 +31,44 @@ const PUBLIC_HEADER_NAMES = new Set([
   "api-version",
   "content-type",
   "http-referer",
-  "openai-organization",
-  "openai-project",
   "origin",
   "referer",
   "user-agent",
   "x-title",
 ]);
 
+const SECRET_HEADER_NAME_PARTS = new Set([
+  "apikey",
+  "auth",
+  "authorization",
+  "cookie",
+  "credential",
+  "credentials",
+  "key",
+  "password",
+  "secret",
+  "session",
+  "signature",
+  "token",
+]);
+const PLAIN_WORD = /^[a-z]+(?:[-_.][a-z]+)*$/u;
+
+function isSecretHeader(header: { readonly name: string; readonly value: string }): boolean {
+  const name = header.name.trim().toLowerCase();
+  if (PUBLIC_HEADER_NAMES.has(name)) return false;
+  const secretName = name.split(/[-_]/u).some((part) => SECRET_HEADER_NAME_PARTS.has(part));
+  return secretName || !PLAIN_WORD.test(header.value);
+}
+
 export function customProviderSecretValues(
-  providers: readonly Pick<CustomProviderConfig, "apiKey" | "headers">[],
+  providers: readonly Pick<CustomProviderConfig, "id" | "name" | "apiKey" | "headers">[],
 ): string[] {
-  return providers.flatMap((provider) => [
-    ...(provider.apiKey ? [provider.apiKey] : []),
-    ...provider.headers
-      .filter((header) => !PUBLIC_HEADER_NAMES.has(header.name.trim().toLowerCase()))
-      .map((header) => header.value),
-  ]);
+  return providers.flatMap((provider) => {
+    const names = new Set([provider.id.toLowerCase(), provider.name.toLowerCase()]);
+    return [provider.apiKey ?? "", ...provider.headers.filter(isSecretHeader).map((header) => header.value)].filter(
+      (value) => value.length > 0 && !names.has(value.toLowerCase()),
+    );
+  });
 }
 
 export const CUSTOM_ENDPOINT_SILENCE_MS = 30 * 60_000;

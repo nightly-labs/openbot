@@ -20,7 +20,7 @@ import {
   sameCustomProviderOrigin,
 } from "@openbot/contracts/ipc";
 import { sourceText } from "@openbot/i18n/source";
-import { registerSecretValues } from "@openbot/logging";
+import { replaceSecretValueGroup } from "@openbot/logging";
 import { Effect, Schema, Semaphore } from "effect";
 import { z } from "zod";
 import { writeFileAtomically } from "../backend/atomic-json-file";
@@ -75,7 +75,10 @@ interface Entry {
 }
 
 function registerProviderSecrets(entries: readonly Entry[]): void {
-  registerSecretValues(customProviderSecretValues(entries.flatMap(({ secret }) => (secret ? [secret] : []))));
+  const providers = entries.flatMap(({ stored, secret }) =>
+    secret ? [{ id: stored.id, name: stored.name, ...secret }] : [],
+  );
+  replaceSecretValueGroup("custom-providers", [{ values: customProviderSecretValues(providers) }]);
 }
 
 const READ_ONLY_MESSAGE = sourceText("error.provider.endpointsReadOnly");

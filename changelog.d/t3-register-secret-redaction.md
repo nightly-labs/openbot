@@ -6,4 +6,4 @@
 
 ### Fixed
 
-- A Pi agent reply no longer shows "•••" in place of the value of a public header of a custom endpoint, such as `Content-Type`, `HTTP-Referer` or `X-Title`. The values of all other headers stay hidden.
+- A Pi agent reply no longer shows "•••" in place of the value of a public header of a custom endpoint, such as `Content-Type`, `HTTP-Referer` or `X-Title`, or in place of a plain word such as `anthropic` in a header like `X-Portkey-Provider`. Other header values, and all values of headers with a name such as `Key`, `Token` or `Authorization`, stay hidden.
