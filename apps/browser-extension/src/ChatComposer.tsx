@@ -173,7 +173,7 @@ export function ChatComposer(props: {
               resize();
             }}
             onPaste={(event) => {
-              if (!props.images.accepts || dictation?.phase() === "transcribing") return;
+              if (!props.images.accepts || props.sending || dictation?.phase() === "transcribing") return;
               const files = clipboardImages(event.clipboardData);
               if (files.length === 0) return;
               event.preventDefault();
