@@ -1728,6 +1728,9 @@ export class MessagingService {
         return {
           error: refusal(captioned.failure),
           failure: "unknown" as const,
+          ...(captioned.failure.cause instanceof WhatsAppPostUnconfirmed
+            ? directPing(`${text}\nFiles: ${single.name}`)
+            : {}),
         };
       if (captioned.success) {
         live.adapter.rememberPost?.(target, captioned.success, `${text}\nFiles: ${single.name}`);
