@@ -105,11 +105,7 @@ export function createChannelsController(env: ChannelsEnvironment) {
   const keptPages = new Map<string, ChannelPage>();
   let replaceLoadedPage = false;
   let prefetchEpoch = 0;
-  const channelPrefetchEpochs = new Map<string, number>();
   const prefetching = new Map<string, number>();
-  function invalidatePrefetch(channelId: string): void {
-    channelPrefetchEpochs.set(channelId, (channelPrefetchEpochs.get(channelId) ?? 0) + 1);
-  }
   const changeListeners = new Set<(channelId: string | null) => void>();
   function announce(channelId: string | null): void {
     for (const listener of changeListeners) listener(channelId);
@@ -437,7 +433,6 @@ export function createChannelsController(env: ChannelsEnvironment) {
         keptPages.clear();
         replaceLoadedPage = false;
         prefetchEpoch += 1;
-        channelPrefetchEpochs.clear();
         prefetching.clear();
         visitRead = null;
         failedCommand = null;
@@ -506,7 +501,6 @@ export function createChannelsController(env: ChannelsEnvironment) {
             return;
           }
           const epoch = prefetchEpoch;
-          const channelEpoch = channelPrefetchEpochs.get(channelId) ?? 0;
           prefetching.set(channelId, epoch);
           void env
             .port()
@@ -515,7 +509,6 @@ export function createChannelsController(env: ChannelsEnvironment) {
               if (
                 !disposed &&
                 epoch === prefetchEpoch &&
-                channelEpoch === (channelPrefetchEpochs.get(channelId) ?? 0) &&
                 scope === env.scopeKey() &&
                 untrack(() => state.selectedId) !== channelId &&
                 !keptPages.has(channelId) &&
@@ -627,7 +620,6 @@ export function createChannelsController(env: ChannelsEnvironment) {
       if (!deleteChannelHistory) throw new Error(currentText().t("channel.error.action"));
       await deleteChannelHistory(channelId);
       keptPages.delete(channelId);
-      invalidatePrefetch(channelId);
       await refreshAfter();
     },
     compactContext: async (channelId: string) => {
@@ -677,7 +669,6 @@ export function createChannelsController(env: ChannelsEnvironment) {
       actionToast.error(message, { report: { operation: "other", source: "action", cause_code: "unknown" } });
     },
     changed: (channelId: string) => {
-      invalidatePrefetch(channelId);
       announce(channelId);
       return refresh(undefined, channelId === state.selectedId);
     },
