@@ -452,7 +452,7 @@ export class BrowserViewGateway {
     session.frameHeight = frame.height;
     if (session.rememberFrames) {
       session.frameSizes.set(frame.sequence, { width: frame.width, height: frame.height });
-      if (session.frameSizes.size > MAX_UNACKNOWLEDGED_FRAMES) {
+      if (framesInFlight(session) > MAX_UNACKNOWLEDGED_FRAMES) {
         this.#dispatch(this.#closeSession(session, "The live view fell too far behind."));
       }
     }
