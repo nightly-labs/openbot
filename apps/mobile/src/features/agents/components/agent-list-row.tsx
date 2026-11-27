@@ -13,6 +13,8 @@ import { AgentDragPreview, useChatDrag, useHoldMenu } from "@/features/agents/co
 import { ChatLinkPressable } from "@/features/agents/components/chat-link-pressable";
 import { useChatRowBackground } from "@/features/agents/components/chat-list-pane-context";
 import { CHAT_ROW_AVATAR_SIZE, ChatRowHeading, ChatRowTime } from "@/features/agents/components/chat-row";
+import { useChatRowDormant } from "@/features/agents/components/chat-row-activation";
+import { useAgentChatPrefetch } from "@/features/agents/components/use-agent-chat-prefetch";
 import { useChatPinToggle } from "@/features/agents/components/use-chat-pin-toggle";
 import { useWaitingChannel, waitingChannelHref } from "@/features/channels/components/use-waiting-channel";
 import {
@@ -51,6 +53,7 @@ export const AgentListRow = memo(function AgentListRow({ agent, leftInset = 20, 
     ({ pinnedAgentIds, pinnedChannelIds }) => !canToggleChatPin(pinnedAgentIds, pinnedChannelIds, agent.id),
   );
   const { toggleAgentPin } = useChatPinToggle();
+  const dormant = useChatRowDormant(`agent:${agent.id}`);
   const [menuKey, setMenuKey] = useState(0);
   const drag = useChatDrag("row", () => ({
     chat: { kind: "agent", id: agent.id },
@@ -70,6 +73,7 @@ export const AgentListRow = memo(function AgentListRow({ agent, leftInset = 20, 
   const unreadThreads = useAgentListUnreadThreads(agent.id);
   const waitReason = agentListWaitReason(activity);
   const openHref = agentRowHref(agent, waitingChannel?.id, activity);
+  const prefetchChat = useAgentChatPrefetch(agent.id, agent.serverId, !waitingChannel);
   const bloub = (
     <BloubAvatar
       agentId={agent.id}
@@ -110,6 +114,7 @@ export const AgentListRow = memo(function AgentListRow({ agent, leftInset = 20, 
       }}
       className="w-full"
       onPressIn={agentChatPreview.onPressIn}
+      onOpen={prefetchChat}
       delayLongPress={longPressDelay}
       onLongPress={holdMenu.onLongPress}
       onPressOut={holdMenu.onPressOut}
@@ -150,6 +155,7 @@ export const AgentListRow = memo(function AgentListRow({ agent, leftInset = 20, 
       pinBlocked={pinBlocked}
       onPin={(withHaptic) => toggleAgentPin(agent.id, { haptic: withHaptic })}
       drag={drag}
+      dormant={dormant}
     >
       {isAndroid ? (
         <View>
@@ -159,7 +165,12 @@ export const AgentListRow = memo(function AgentListRow({ agent, leftInset = 20, 
           {menuKey > 0 ? <AgentAndroidMenu key={menuKey} agent={agent} onClose={() => setMenuKey(0)} /> : null}
         </View>
       ) : (
-        <AgentContextMenuLink agent={agent} href={openHref} preview={waitingChannel ? null : agentChatPreview.preview}>
+        <AgentContextMenuLink
+          agent={agent}
+          href={openHref}
+          preview={waitingChannel ? null : agentChatPreview.preview}
+          dormant={dormant}
+        >
           {row}
         </AgentContextMenuLink>
       )}

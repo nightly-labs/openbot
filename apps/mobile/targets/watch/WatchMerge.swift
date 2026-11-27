@@ -38,6 +38,7 @@ enum WatchMerge {
           copy.serverId = id
           copy.avatar = picture(for: copy, known: [phone, previous], hasPicture: hasPicture)
           if copy.faces == nil { copy.faces = faces(for: copy, known: [phone, previous]) }
+          if copy.updatedAt == nil { copy.updatedAt = updatedAt(for: copy, known: [phone, previous]) }
           return copy
         }
         let partChannels = part.channels?.filter { !hiddenChannels.contains($0.id) }.map { channel in
@@ -89,6 +90,12 @@ enum WatchMerge {
   static func faces(for agent: WatchAgent, known snapshots: [WatchReadySnapshot?]) -> WatchFaces? {
     snapshots.lazy.compactMap { snapshot in
       snapshot?.agents.first { $0.serverId == agent.serverId && $0.id == agent.id }?.faces
+    }.first
+  }
+
+  static func updatedAt(for agent: WatchAgent, known snapshots: [WatchReadySnapshot?]) -> Double? {
+    snapshots.lazy.compactMap { snapshot in
+      snapshot?.agents.first { $0.serverId == agent.serverId && $0.id == agent.id }?.updatedAt
     }.first
   }
 

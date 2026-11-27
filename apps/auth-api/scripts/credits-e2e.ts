@@ -26,7 +26,7 @@ import {
   creditCodeHash,
   generateCreditCode,
 } from "../src/server/credit-codes";
-import { CreditGrants, licenseCreditSlot } from "../src/server/credit-grants";
+import { CreditGrants, consumeGrantsSql, licenseCreditSlot } from "../src/server/credit-grants";
 import type { CreditService } from "../src/server/credit-service";
 import {
   CREDIT_HOLD_FIRST_CHECK_MS,
@@ -78,6 +78,16 @@ function check(name: string, passed: boolean, detail?: unknown) {
 }
 
 type WelcomeStart = "used" | "unissued";
+
+function settledGrantSearches(database: DatabaseSync): string {
+  const charged = `SELECT user_id, server_id, funding, charged_tenths AS tenths, created_at FROM credit_holds
+    WHERE job_id = ?1 AND status = 'charged'`;
+  return database
+    .prepare(`EXPLAIN QUERY PLAN ${consumeGrantsSql(charged)}`)
+    .all("job-1")
+    .map((row) => String(row.detail))
+    .join("; ");
+}
 
 function migratedDatabase(welcome: WelcomeStart): DatabaseSync {
   const database = new DatabaseSync(":memory:");
@@ -984,6 +994,14 @@ async function holdsAndSpending() {
 
   const started = await run(spending.start("job-1", "p-1"));
   const charged = await run(spending.settle("job-1", { outcome: "completed" }));
+  const grantSearches = settledGrantSearches(database);
+  check(
+    "a settled generation reads only the grants of its own account and server",
+    grantSearches.includes("credit_grants_user") &&
+      grantSearches.includes("credit_grants_server") &&
+      !grantSearches.includes("credit_grants_due"),
+    grantSearches,
+  );
   const chargedAgain = await run(spending.settle("job-1", { outcome: "failed" }));
   const spendRows = () =>
     database

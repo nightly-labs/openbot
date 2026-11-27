@@ -3,6 +3,7 @@ import { isAvatarMimeType } from "@openbot/contracts/avatar-images";
 import { AVATAR_IMAGE_LIMITS, INPUT_LIMITS } from "@openbot/contracts/input-limits";
 import {
   BROWSER_SECRET_RESPONSE_PATH,
+  type ConversationReadState,
   type CreateAgentInput,
   canAdministerServer,
   type DuplicateAgentResult,
@@ -71,11 +72,30 @@ export interface AgentRouteDependencies {
   libraryFolders?: Pick<TeamApiLibraryFolders, "removeAgent"> | undefined;
   duplicateAgent: (agentId: string, operationId: string) => Effect.Effect<DuplicateAgentResult, AgentDuplicationFailed>;
   visibleModels?: Pick<ModelVisibility, "picker">;
+  hiddenAgentIds: ReadonlySet<string>;
+}
+
+export function visibleConversationReads(
+  agents: Pick<TeamApiAgents, "listConversationReads">,
+  memberId: string,
+  capabilities: ReadonlySet<string>,
+  hiddenAgentIds: ReadonlySet<string>,
+): Record<string, ConversationReadState> {
+  const reads = agents.listConversationReads(memberId, markerExclusionsForCapabilities(capabilities));
+  return Object.fromEntries(Object.entries(reads).filter(([agentId]) => !hiddenAgentIds.has(agentId)));
 }
 
 export async function routeAgents(
   context: TeamApiRequestContext,
-  { agents, skills, sidebarLayout, libraryFolders, duplicateAgent, visibleModels }: AgentRouteDependencies,
+  {
+    agents,
+    skills,
+    sidebarLayout,
+    libraryFolders,
+    duplicateAgent,
+    visibleModels,
+    hiddenAgentIds,
+  }: AgentRouteDependencies,
 ): Promise<RouteOutcome> {
   const { method, url, request, response, member, capabilities, json, empty } = context;
   const hidden = hiddenProviderAgentIds(agents.listAgents(), context.protocol);
@@ -212,7 +232,7 @@ export async function routeAgents(
     return json(200, agents.listAgents());
   }
   if (method === "GET" && url.pathname === TEAM_API_ROUTES.agents.conversationReads) {
-    return json(200, agents.listConversationReads(member.id, markerExclusionsForCapabilities(capabilities)));
+    return json(200, visibleConversationReads(agents, member.id, capabilities, hiddenAgentIds));
   }
   if (method === "POST" && url.pathname === TEAM_API_ROUTES.agents.all) {
     requireCompatibleDefault();

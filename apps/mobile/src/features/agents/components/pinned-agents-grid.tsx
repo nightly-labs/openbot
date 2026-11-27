@@ -22,6 +22,7 @@ import {
 } from "@/features/agents/components/chat-drag";
 import { ChatLinkPressable } from "@/features/agents/components/chat-link-pressable";
 import { PINNED_AVATAR_SIZE } from "@/features/agents/components/chat-row";
+import { useAgentChatPrefetch } from "@/features/agents/components/use-agent-chat-prefetch";
 import {
   agentListWaitReason,
   useAgentListActivity,
@@ -125,6 +126,7 @@ function PinDropZone({ dropTarget }: { dropTarget: ReturnType<typeof useChatDrop
 const PinnedAgentItem = memo(function PinnedAgentItem({ agent }: { agent: MobileAgent }) {
   const { t } = useText();
   const agentChatPreview = useAgentChatPreview(agent);
+  const prefetchChat = useAgentChatPrefetch(agent.id, agent.serverId);
   const [menuKey, setMenuKey] = useState(0);
   const drag = useChatDrag("pin", () => ({
     chat: { kind: "agent", id: agent.id },
@@ -148,6 +150,7 @@ const PinnedAgentItem = memo(function PinnedAgentItem({ agent }: { agent: Mobile
       accessibilityRole="button"
       className="w-full items-center gap-2 px-1"
       onPressIn={agentChatPreview.onPressIn}
+      onOpen={prefetchChat}
       delayLongPress={longPressDelay}
       onLongPress={holdMenu.onLongPress}
       onPressOut={holdMenu.onPressOut}

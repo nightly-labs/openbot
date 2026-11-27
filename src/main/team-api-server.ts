@@ -64,6 +64,11 @@ import { AGENT_THREAD_REPLIES_CAPABILITY } from "@openbot/contracts/team-protoco
 import { AGENT_THREAD_REQUESTS_CAPABILITY } from "@openbot/contracts/team-protocol/agent-thread-requests-v1";
 import { AGENT_THREADS_CAPABILITY } from "@openbot/contracts/team-protocol/agent-threads-v1";
 import { ANTIGRAVITY_CODE_SIGN_IN_CAPABILITY } from "@openbot/contracts/team-protocol/antigravity-code-sign-in-v1";
+import {
+  type AttachmentSizeLookup,
+  TEAM_ATTACHMENT_DIMENSIONS_CAPABILITY,
+  withAttachmentDimensions,
+} from "@openbot/contracts/team-protocol/attachment-dimensions-v1";
 import { BACKGROUND_PROCESSES_CAPABILITY } from "@openbot/contracts/team-protocol/background-processes-v1";
 import { BROWSER_EGRESS_CAPABILITY } from "@openbot/contracts/team-protocol/browser-egress-v1";
 import { BROWSER_HTTP_SIGN_IN_CAPABILITY } from "@openbot/contracts/team-protocol/browser-http-sign-in-v1";
@@ -265,6 +270,7 @@ import { MODEL_VISIBILITY_KEPT_CAPABILITY } from "@openbot/contracts/team-protoc
 import { TEAM_NEAR_PAYMENT_CAPABILITY, withNearPayments } from "@openbot/contracts/team-protocol/near-payment-v1";
 import { type OptionalTeamEvent, optionalTeamEvent } from "@openbot/contracts/team-protocol/optional-events";
 import { OWNER_TRANSFER_CAPABILITY } from "@openbot/contracts/team-protocol/owner-transfer-v1";
+import { PLUGIN_CATALOG_CAPABILITY } from "@openbot/contracts/team-protocol/plugin-catalog-v1";
 import {
   TEAM_PROMPT_DETAIL_CAPABILITY,
   withPromptQuestionDetails,
@@ -305,6 +311,25 @@ import { STORAGE_CHANNEL_CAPABILITY } from "@openbot/contracts/team-protocol/sto
 import { STORAGE_DISK_CAPABILITY } from "@openbot/contracts/team-protocol/storage-disk-v1";
 import { STORAGE_USER_FILES_CAPABILITY } from "@openbot/contracts/team-protocol/storage-user-files-v1";
 import { STORAGE_WORKFLOW_FILES_CAPABILITY } from "@openbot/contracts/team-protocol/storage-workflow-files-v1";
+import {
+  AGENTS_SYNC_COLLECTION,
+  CHANNELS_SYNC_COLLECTION,
+  CONVERSATION_READS_SYNC_COLLECTION,
+  CRM_CUSTOMERS_SYNC_COLLECTION,
+  NOTIFICATION_LEVELS_SYNC_COLLECTION,
+  QUEUE_SYNC_COLLECTION,
+  ROUTINES_SYNC_COLLECTION,
+  SIDEBAR_LAYOUT_SYNC_COLLECTION,
+  SIDEBAR_PINS_SYNC_COLLECTION,
+  WORKFLOWS_SYNC_COLLECTION,
+} from "@openbot/contracts/team-protocol/sync-collections";
+import {
+  AGENT_MESSAGES_SYNC_LOG,
+  CHANNEL_MESSAGES_SYNC_LOG,
+  CHANNEL_PAGE_META_SYNC_COLLECTION,
+  CONVERSATION_PAGE_META_SYNC_COLLECTION,
+} from "@openbot/contracts/team-protocol/sync-logs";
+import { decodeSyncClientMessage, SYNC_CAPABILITY, syncName } from "@openbot/contracts/team-protocol/sync-v1";
 import {
   TEAM_UI_BLOCK_AUTO_ANSWER_CAPABILITY,
   withUiBlockAutoAnswers,
@@ -372,6 +397,7 @@ import { listenLoopback } from "./listen-loopback";
 import { mcpAccessLevel } from "./mcp-access-store";
 import { RemoteScreenError } from "./remote-screen-gateway";
 import { RemoteWorkflowError, remoteCall, toRemoteWorkflowError } from "./remote-service-effects";
+import { createAttachmentSizeCache } from "./team-api/attachment-sizes";
 import { isClientUse } from "./team-api/client-use";
 import type { TeamApiMcpServerOwners, TeamApiOptions, TeamApiSidebarLayout } from "./team-api/dependencies";
 import { HttpError } from "./team-api/http-error";
@@ -553,6 +579,9 @@ import { routeWhatsAppWorkingMessage } from "./team-api/route-whatsapp-working-m
 import { routeWorkflowFolders } from "./team-api/route-workflow-folders";
 import { routeWorkflows } from "./team-api/route-workflows";
 import { routeWorkspaceDirectory } from "./team-api/route-workspace-directory";
+import { type TeamSyncViewer, teamSyncCollections, teamSyncViewerKey } from "./team-api/sync-collections";
+import { SyncHub } from "./team-api/sync-hub";
+import { type TeamSyncLogBody, type TeamSyncLogSources, teamSyncLogs, teamSyncPageMetas } from "./team-api/sync-logs";
 import { WorkflowPresenceRelay, type WorkflowPresenceSeat } from "./team-api/workflow-presence-relay";
 import { visibleWorkflowIds, workflowVisibleTo } from "./team-api/workflow-visibility";
 import { TeamStoreError } from "./team-store";
@@ -625,6 +654,45 @@ export class TeamApiServer {
   readonly #options: Omit<TeamApiOptions, "sidebarLayout"> & { sidebarLayout: TeamApiSidebarLayout };
   readonly #rateLimits = new Map<string, RateEntry>();
   readonly #eventClients = new Map<Ws.WebSocket, EventClientState>();
+  readonly #syncLogSources: TeamSyncLogSources = {
+    agents: () => this.#options.agents,
+    channels: () => this.#options.channels,
+    database: () => this.#options.channels?.store.database,
+    response: (viewer, method, path, value) => this.#syncLogResponse(viewer, method, path, value),
+  };
+  readonly #sync = new SyncHub<TeamSyncViewer, Ws.WebSocket>(
+    {
+      collections: teamSyncCollections({
+        agents: () => this.#options.agents,
+        agentsReady: () => this.#syncAgentsReady(),
+        channels: () => this.#options.channels,
+        hiddenAgents: () => this.#options.hiddenAgents,
+        sidebarPins: () => this.#options.sidebarPins,
+        notificationLevels: () => this.#options.agentNotificationLevels,
+        sidebarLayout: () => this.#options.sidebarLayout,
+        workflows: () => this.#options.workflows,
+        crm: () => this.#options.crm,
+        response: (viewer, method, path, value) =>
+          JSON.parse(
+            this.#encodeBody(
+              {
+                method,
+                path,
+                protocol: viewer.protocol,
+                capabilities: viewer.capabilities,
+                hiddenAgentIds: viewer.hiddenAgentIds,
+              },
+              200,
+              value,
+            ),
+          ),
+      }).concat(teamSyncPageMetas(this.#syncLogSources)),
+      logs: teamSyncLogs(this.#syncLogSources),
+    },
+    (error) => (this.#options.logger ?? logger).warn("Team sync could not read a collection:", toLogValue(error)),
+  );
+  #syncAgentsLoaded = false;
+  #syncAgentShape: string | null = null;
   readonly #pendingLegacyConversationReads = new Map<string, PendingLegacyConversationRead>();
   #legacyConversationScope = Scope.makeUnsafe();
   #hostRestart: HostRestartEvent = { type: HOST_RESTART_EVENT, state: "none", version: null };
@@ -671,9 +739,14 @@ export class TeamApiServer {
   readonly #reportedUnrepresentableAgents = new Set<string>();
   readonly #representableAgents = new Map<string, Map<string, { json: string; representable: boolean }>>();
   #nextRateLimitSweepAt = 0;
+  readonly #attachmentSizes: AttachmentSizeLookup;
 
   constructor(options: TeamApiOptions) {
     this.#options = { ...options, sidebarLayout: options.sidebarLayout ?? unavailableSidebarLayout() };
+    this.#attachmentSizes = createAttachmentSizeCache({
+      known: (attachmentIds) => options.mailbox.knownAttachmentSizes?.(attachmentIds) ?? new Map(),
+      paths: (attachmentIds) => options.mailbox.attachmentPaths?.(attachmentIds) ?? new Map(),
+    });
     this.#rateLimitCapacity = options.rateLimitCapacity ?? RATE_LIMIT_CAPACITY;
     this.#now = options.now ?? Date.now;
     options.admin?.remoteChatContent?.onChange(() => this.refreshRemoteChatContent());
@@ -944,6 +1017,7 @@ export class TeamApiServer {
         client.close(1008, "Team access was revoked");
       }
     }
+    this.#sync.changedAll();
     this.#publishPresence();
   }
 
@@ -1052,6 +1126,8 @@ export class TeamApiServer {
   #sendNotificationLevels(memberId: string): void {
     const levels = this.#options.agentNotificationLevels;
     if (!levels) return;
+    this.#sync.changed(NOTIFICATION_LEVELS_SYNC_COLLECTION.name);
+    this.#sync.flush();
     for (const [client, connection] of this.#eventClients) {
       if (
         connection.memberId !== memberId ||
@@ -1068,6 +1144,8 @@ export class TeamApiServer {
   #sendSidebarPins(memberId: string): void {
     const pins = this.#options.sidebarPins;
     if (!pins) return;
+    this.#sync.changed(SIDEBAR_PINS_SYNC_COLLECTION.name);
+    this.#sync.flush();
     for (const [client, connection] of this.#eventClients) {
       if (
         connection.memberId !== memberId ||
@@ -1583,7 +1661,7 @@ export class TeamApiServer {
         "handled"
       )
         return;
-      if ((await this.#routeAgents(context)) === "handled") return;
+      if ((await this.#routeAgents(context, hidden)) === "handled") return;
 
       return this.#json(response, 404, { error: sourceText("error.team.routeNotFound") });
     } catch (error) {
@@ -1672,8 +1750,9 @@ export class TeamApiServer {
     });
   }
 
-  #routeAgents(context: TeamApiRequestContext): Promise<RouteOutcome> {
+  #routeAgents(context: TeamApiRequestContext, hiddenAgentIds: ReadonlySet<string>): Promise<RouteOutcome> {
     return routeAgents(context, {
+      hiddenAgentIds,
       agents: this.#options.agents,
       skills: this.#options.skills,
       sidebarLayout: this.#options.sidebarLayout,
@@ -1794,9 +1873,12 @@ export class TeamApiServer {
       const withSkills = capabilities.has(SKILL_LEARNING_CAPABILITY)
         ? withSkillSuggestionNames(withPayments, visible)
         : withPayments;
-      return capabilities.has(TEAM_PROMPT_DETAIL_CAPABILITY)
+      const withDetails = capabilities.has(TEAM_PROMPT_DETAIL_CAPABILITY)
         ? withPromptQuestionDetails(withSkills, visible)
         : withSkills;
+      return capabilities.has(TEAM_ATTACHMENT_DIMENSIONS_CAPABILITY)
+        ? withAttachmentDimensions(withDetails, visible, this.#attachmentSizes)
+        : withDetails;
     }
     return encodeTeamProtocolV1CurrentEvent(visible, options);
   }
@@ -1894,6 +1976,8 @@ export class TeamApiServer {
     memberId?: string,
     agentList?: readonly AgentSummary[],
   ): void {
+    this.#signalSync(broadcast);
+    this.#signalSyncLog(broadcast);
     type EncodedPayload = { value: string | null; bytes: number };
     const filteredConversationPayloads = new Map<string, EncodedPayload>();
     let agents = () => {
@@ -2064,6 +2148,8 @@ export class TeamApiServer {
                   }
                 : optional,
         );
+        if (connection.capabilities.has(TEAM_ATTACHMENT_DIMENSIONS_CAPABILITY))
+          outgoing = withAttachmentDimensions(outgoing, optional, this.#attachmentSizes);
         outgoingBytes = Buffer.byteLength(outgoing);
       } else if (event.type === "conversation" && supportsRuntimeSnapshots) {
         const conversationInvalidation = encodeEvent(
@@ -2094,7 +2180,7 @@ export class TeamApiServer {
           !connection.capabilities.has("hosted-site-event-markers") ||
           event.snapshot.messages.some((message) => !markerSupported(message.itemType, connection.capabilities)))
       ) {
-        const key = `${blockedKey}:${protocol}:${connection.capabilities.has("opencode")}:${connection.capabilities.has("routine-event-markers")}:${connection.capabilities.has("routine-run-event-markers")}:${connection.capabilities.has("hosted-site-event-markers")}:${connection.capabilities.has(SETTING_LINK_MARKERS_CAPABILITY)}:${connection.capabilities.has(ROUTINE_QUIET_ANSWERS_CAPABILITY)}:${connection.capabilities.has(TEAM_PROMPT_MULTI_SELECT_CAPABILITY)}:${connection.capabilities.has(TEAM_UI_BLOCK_AUTO_ANSWER_CAPABILITY)}:${connection.capabilities.has(TEAM_UI_BLOCK_VAULT_CAPABILITY)}:${connection.capabilities.has(TEAM_UI_BLOCK_LOCATION_CAPABILITY)}:${connection.capabilities.has(TEAM_NEAR_PAYMENT_CAPABILITY)}:${connection.capabilities.has(SKILL_LEARNING_CAPABILITY)}:${connection.capabilities.has(TEAM_PROMPT_DETAIL_CAPABILITY)}:${encodingOptions.preserveSemanticTags}`;
+        const key = `${blockedKey}:${protocol}:${connection.capabilities.has("opencode")}:${connection.capabilities.has("routine-event-markers")}:${connection.capabilities.has("routine-run-event-markers")}:${connection.capabilities.has("hosted-site-event-markers")}:${connection.capabilities.has(SETTING_LINK_MARKERS_CAPABILITY)}:${connection.capabilities.has(ROUTINE_QUIET_ANSWERS_CAPABILITY)}:${connection.capabilities.has(TEAM_PROMPT_MULTI_SELECT_CAPABILITY)}:${connection.capabilities.has(TEAM_UI_BLOCK_AUTO_ANSWER_CAPABILITY)}:${connection.capabilities.has(TEAM_UI_BLOCK_VAULT_CAPABILITY)}:${connection.capabilities.has(TEAM_UI_BLOCK_LOCATION_CAPABILITY)}:${connection.capabilities.has(TEAM_NEAR_PAYMENT_CAPABILITY)}:${connection.capabilities.has(SKILL_LEARNING_CAPABILITY)}:${connection.capabilities.has(TEAM_PROMPT_DETAIL_CAPABILITY)}:${connection.capabilities.has(TEAM_ATTACHMENT_DIMENSIONS_CAPABILITY)}:${encodingOptions.preserveSemanticTags}`;
         let filtered = filteredConversationPayloads.get(key);
         if (!filtered) {
           filtered = encodeEvent(
@@ -2310,6 +2396,12 @@ export class TeamApiServer {
         if (client.readyState === webSockets.WebSocket.OPEN) client.send(JSON.stringify(event));
       },
     };
+    this.#sync.open(client, {
+      send: (message) => {
+        if (client.readyState === webSockets.WebSocket.OPEN) client.send(JSON.stringify(message));
+      },
+      viewer: () => this.#syncViewer(connection),
+    });
     client.on("error", () => {});
     if (connection.capabilities.has("agent-runtime-snapshots")) {
       this.#sendRuntimeSnapshot(client, connection, false);
@@ -2332,6 +2424,12 @@ export class TeamApiServer {
           if (!connection.capabilities.has(WORKFLOW_PRESENCE_CAPABILITY) || !this.#options.workflows)
             throw new Error("Workflow presence is not enabled for this client.");
           this.#workflowPresence.update(connection, presenceSeat, spot);
+          return;
+        }
+        const sync = decodeSyncClientMessage(parsed);
+        if (sync) {
+          if (!connection.capabilities.has(SYNC_CAPABILITY)) throw new Error("Sync is not enabled for this client.");
+          this.#sync.receive(client, sync);
           return;
         }
         const event = decodeTeamProtocolV1CurrentClientEvent(parsed);
@@ -2405,6 +2503,7 @@ export class TeamApiServer {
       }
     });
     client.once("close", () => {
+      this.#sync.close(client);
       if (connection.typingTimer) clearTimeout(connection.typingTimer);
       if (connection.directTypingTimer) clearTimeout(connection.directTypingTimer);
       const directTypingRecipientId = connection.directTypingRecipientId;
@@ -2645,6 +2744,23 @@ export class TeamApiServer {
   #json(response: ServerResponse, status: number, value: object | null): RouteOutcome {
     const route = this.#responseRoutes.get(response);
     if (!route) throw new Error("Team API response route is unavailable.");
+    const body = this.#encodeBody(route, status, value);
+    response.writeHead(status, { "Content-Type": "application/json; charset=utf-8" });
+    response.end(`${body}\n`);
+    return "handled";
+  }
+
+  #encodeBody(
+    route: {
+      method: string;
+      path: string;
+      protocol: number;
+      capabilities: ReadonlySet<string>;
+      hiddenAgentIds?: ReadonlySet<string>;
+    },
+    status: number,
+    value: object | null,
+  ): string {
     const options = {
       preserveSemanticTags: supportsTeamSemanticTags(route.capabilities),
       historyExtent: route.capabilities.has(TEAM_HISTORY_EXTENT_CAPABILITY),
@@ -2704,12 +2820,12 @@ export class TeamApiServer {
     const withSkills = route.capabilities.has(SKILL_LEARNING_CAPABILITY)
       ? withSkillSuggestionNames(withPayments, effortValue)
       : withPayments;
-    const body = route.capabilities.has(TEAM_PROMPT_DETAIL_CAPABILITY)
+    const withDetails = route.capabilities.has(TEAM_PROMPT_DETAIL_CAPABILITY)
       ? withPromptQuestionDetails(withSkills, effortValue)
       : withSkills;
-    response.writeHead(status, { "Content-Type": "application/json; charset=utf-8" });
-    response.end(`${body}\n`);
-    return "handled";
+    return route.capabilities.has(TEAM_ATTACHMENT_DIMENSIONS_CAPABILITY)
+      ? withAttachmentDimensions(withDetails, effortValue, this.#attachmentSizes)
+      : withDetails;
   }
 
   #unrepresentableAgentIds(
@@ -2835,6 +2951,66 @@ export class TeamApiServer {
     const { store } = this.#options;
     const known = store.getMember(member) ?? store.listMembers().find((candidate) => candidate.id === member);
     return known ?? { id: member, role: "member" };
+  }
+
+  #syncAgentsReady(): Promise<void> | null {
+    const ready = this.#options.agentsReady;
+    if (!ready || this.#syncAgentsLoaded) return null;
+    return runCauseEffect(ready()).then(() => {
+      this.#syncAgentsLoaded = true;
+    });
+  }
+
+  #signalSync(event: AgentEvent): void {
+    const changes = event.type === "agents-changed" ? this.#agentsSyncChanges(event.agents) : syncChanges(event);
+    if (!changes.length) return;
+    for (const change of changes) {
+      if (change === "all") this.#sync.changedAll();
+      else this.#sync.changed(change.name, change.keys);
+    }
+    this.#sync.flush();
+  }
+
+  #syncLogResponse(viewer: TeamSyncViewer, method: string, path: string, value: TeamSyncLogBody): unknown {
+    return JSON.parse(
+      this.#encodeBody(
+        {
+          method,
+          path,
+          protocol: viewer.protocol,
+          capabilities: viewer.capabilities,
+          hiddenAgentIds: viewer.hiddenAgentIds,
+        },
+        200,
+        value,
+      ),
+    );
+  }
+
+  #agentsSyncChanges(agents: readonly Pick<AgentSummary, "id" | "threadId" | "hiddenAt">[]): readonly SyncChange[] {
+    const shape = agentSyncShape(agents);
+    const unchanged = shape === this.#syncAgentShape;
+    this.#syncAgentShape = shape;
+    return unchanged ? [{ name: AGENTS_SYNC_COLLECTION.name }] : ["all"];
+  }
+
+  #signalSyncLog(event: AgentEvent): void {
+    const change = syncLogChange(event);
+    if (!change) return;
+    if (change.log) this.#sync.changedLog(change.log);
+    this.#sync.changed(change.meta);
+    this.#sync.flush();
+  }
+
+  #syncViewer(connection: EventClientState): { key: string; value: TeamSyncViewer } {
+    const member = this.#connectionMember(connection);
+    const viewer: TeamSyncViewer = {
+      member,
+      protocol: eventProtocol(connection.capabilities),
+      hiddenAgentIds: this.hiddenAgentIds(eventProtocol(connection.capabilities), connection.capabilities, member),
+      capabilities: connection.capabilities,
+    };
+    return { key: teamSyncViewerKey(viewer), value: viewer };
   }
 
   #connectionMember(connection: EventClientState): AccessMember {
@@ -3154,6 +3330,7 @@ export class TeamApiServer {
           return this.#options.agentNotificationLevels !== undefined;
         if (capability === SIDEBAR_PINS_CAPABILITY) return this.#options.sidebarPins !== undefined;
         if (capability === WATCH_RELAY_TEAM_CAPABILITY) return this.#options.watchRelay?.available() === true;
+        if (capability === PLUGIN_CATALOG_CAPABILITY) return this.#options.pluginCatalogLoaded?.() === true;
         return true;
       },
     );
@@ -3236,6 +3413,10 @@ export class TeamApiServer {
       agentLevel: (agentId) => this.agentLevel(authenticated.member, agentId),
       json: (status, value) => this.#json(response, status, value),
       empty: (status) => this.#empty(response, status),
+      syncChanged: (name, keys) => {
+        this.#sync.changed(name, keys);
+        this.#sync.flush();
+      },
     };
   }
 }
@@ -3286,6 +3467,97 @@ function usageEventForPeer(
   return usage === event.usage ? event : usage && { ...event, usage };
 }
 
+function agentSyncLogChange(agentId: string, log = true): { log: string | null; meta: string } {
+  return {
+    log: log ? syncName(AGENT_MESSAGES_SYNC_LOG.name, agentId) : null,
+    meta: syncName(CONVERSATION_PAGE_META_SYNC_COLLECTION.name, agentId),
+  };
+}
+
+function syncLogChange(event: AgentEvent): { log: string | null; meta: string } | null {
+  switch (event.type) {
+    case "conversation":
+      return agentSyncLogChange(event.snapshot.agentId);
+    case "conversation-page":
+      return agentSyncLogChange(event.page.agentId);
+    case "queue-changed":
+      return agentSyncLogChange(event.snapshot.agentId);
+    case "conversation-invalidated":
+    case "queue-invalidated":
+    case "turn-completed":
+      return agentSyncLogChange(event.agentId);
+    case "turn-started":
+      return agentSyncLogChange(event.agentId, false);
+    case "channels-changed":
+      return {
+        log: syncName(CHANNEL_MESSAGES_SYNC_LOG.name, event.channelId),
+        meta: CHANNEL_PAGE_META_SYNC_COLLECTION.name,
+      };
+    default:
+      return null;
+  }
+}
+
+type SyncChange = "all" | { name: string; keys?: readonly string[] };
+
+const CHANNEL_WAITS_SYNC_CHANGE: SyncChange = { name: CHANNEL_PAGE_META_SYNC_COLLECTION.name };
+
+function agentRowSyncChange(agentId: string): SyncChange {
+  return { name: AGENTS_SYNC_COLLECTION.name, keys: [agentId] };
+}
+
+function agentSyncShape(agents: readonly Pick<AgentSummary, "id" | "threadId" | "hiddenAt">[]): string {
+  const rows = agents.map((agent) => JSON.stringify([agent.id, agent.threadId, agent.hiddenAt ?? null]));
+  return JSON.stringify(rows.sort());
+}
+
+function syncChanges(event: AgentEvent): readonly SyncChange[] {
+  switch (event.type) {
+    case "agent-access-changed":
+    case "hidden-agents-changed":
+      return ["all"];
+    case "channels-changed":
+      return [{ name: CHANNELS_SYNC_COLLECTION.name }];
+    case "sidebar-layout-changed":
+      return [{ name: SIDEBAR_LAYOUT_SYNC_COLLECTION.name }];
+    case "workflows-changed":
+      return [{ name: WORKFLOWS_SYNC_COLLECTION.name }];
+    case "crm-changed":
+      return [{ name: CRM_CUSTOMERS_SYNC_COLLECTION.name }];
+    case "routines-changed":
+      return [{ name: `${ROUTINES_SYNC_COLLECTION.name}:${event.agentId}` }];
+    case "queue-changed":
+      return [
+        { name: `${QUEUE_SYNC_COLLECTION.name}:${event.snapshot.agentId}` },
+        agentRowSyncChange(event.snapshot.agentId),
+      ];
+    case "conversation":
+      return [
+        { name: CONVERSATION_READS_SYNC_COLLECTION.name, keys: [event.snapshot.agentId] },
+        agentRowSyncChange(event.snapshot.agentId),
+      ];
+    case "conversation-invalidated":
+      return [
+        { name: CONVERSATION_READS_SYNC_COLLECTION.name, keys: [event.agentId] },
+        agentRowSyncChange(event.agentId),
+      ];
+    case "queue-invalidated":
+    case "turn-started":
+    case "turn-completed":
+    case "agent-session-settings-changed":
+      return [agentRowSyncChange(event.agentId)];
+    case "thread-turn-completed":
+      return [agentRowSyncChange(event.turn.agentId)];
+    case "usage-limit-reached":
+      return [agentRowSyncChange(event.agentId), CHANNEL_WAITS_SYNC_CHANGE];
+    case "runtime-snapshot":
+    case "host-turn-limits-changed":
+      return [CHANNEL_WAITS_SYNC_CHANGE];
+    default:
+      return [];
+  }
+}
+
 function eventProtocol(capabilities: ReadonlySet<string>): 1 | 4 | 5 | 6 | 7 | 8 {
   if (capabilities.has(TEAM_OPEN_PROVIDERS_CAPABILITY)) return 8;
   if (capabilities.has(TEAM_PI_MUSE_CAPABILITY)) return 7;
@@ -3318,6 +3590,7 @@ const EVENT_ENCODING_CAPABILITIES = [
   QUEUE_HOLD_CAPABILITY,
   QUEUE_HOLD_SIGN_IN_CAPABILITY,
   AGENT_ERROR_LINK_CAPABILITY,
+  TEAM_ATTACHMENT_DIMENSIONS_CAPABILITY,
 ];
 
 function eventEncodingKey(capabilities: ReadonlySet<string>, options: { preserveSemanticTags?: boolean }): string {

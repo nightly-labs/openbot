@@ -30,6 +30,7 @@ import {
   type WatchWait,
   watchChannelsWithinLimit,
   watchText,
+  watchTimestamp,
 } from "@openbot/contracts/watch-protocol";
 import { type AppFormat, createFormat } from "@openbot/i18n/format";
 import {
@@ -427,6 +428,7 @@ export function buildHostWatchSnapshot(input: HostWatchSnapshotInput): WatchSnap
       state,
       detail: watchText(state === "working" ? null : agent.preview, 160),
       updated: updatedLabel(agent.updatedAt, text.format, input.now),
+      ...watchTimestamp(agent.updatedAt),
       turnId,
       reply: watchText(latest, WATCH_REPLY_LIMIT) ?? watchText(agent.preview, WATCH_REPLY_LIMIT),
       wait: waiting?.wait ?? null,

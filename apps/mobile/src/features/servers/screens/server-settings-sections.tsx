@@ -52,15 +52,25 @@ import { useServerTimezone } from "@/features/servers/model/use-server-timezone"
 import { updateAvailable, useServerUpdate } from "@/features/servers/model/use-server-update";
 import { SettingsRow, SettingsSection } from "@/features/settings/components/settings-content";
 import { RowIcon } from "@/features/settings/components/settings-row-icon";
-import { useMobileWorkspace, useMobileWorkspaceActions } from "@/features/workspace/context/mobile-workspace-context";
+import {
+  useMobileWorkspaceActions,
+  useMobileWorkspaceSelector,
+} from "@/features/workspace/context/mobile-workspace-context";
 import { type ServerRowState, serverRowState } from "@/features/workspace/model/server-row-state";
 import type { MobileServer, ServerChecks } from "@/features/workspace/model/workspace-types";
 import { haptics } from "@/shared/lib/haptics";
 import { currentText, useText } from "@/shared/lib/text";
 
-function useServerRows(serverId: string) {
-  const workspace = useMobileWorkspace();
-  return (permits: (checks: ServerChecks) => unknown) => serverRowState(workspace, serverId, permits);
+function useServerRow(serverId: string, permits: (checks: ServerChecks) => unknown): ServerRowState {
+  return useMobileWorkspaceSelector((workspace) => serverRowState(workspace, serverId, permits));
+}
+
+type ServerFlag = {
+  [Key in keyof ServerChecks]: ServerChecks[Key] extends (serverId: string) => boolean ? Key : never;
+}[keyof ServerChecks];
+
+function useServerFlag(serverId: string, flag: ServerFlag): boolean {
+  return useMobileWorkspaceSelector((workspace) => workspace[flag](serverId));
 }
 
 function LinkRow({ label, icon, pathname, serverId, trailing, disabled }: LinkRowProps) {
@@ -95,13 +105,11 @@ interface LinkRowProps {
 
 export function ServerPeopleSection({ server }: { server: MobileServer }) {
   const { t } = useText();
-  const { memberCountByServer } = useMobileWorkspace();
-  const row = useServerRows(server.id);
-  const roles = row((checks) => checks.canManageServerRoles(server.id));
-  const audit = row((checks) => checks.canReadServerAudit(server.id));
-  const ownerTransfer = row((checks) => checks.canTransferOwnership(server.id));
+  const memberCount = useMobileWorkspaceSelector((workspace) => workspace.memberCountByServer[server.id]);
+  const roles = useServerRow(server.id, (checks) => checks.canManageServerRoles(server.id));
+  const audit = useServerRow(server.id, (checks) => checks.canReadServerAudit(server.id));
+  const ownerTransfer = useServerRow(server.id, (checks) => checks.canTransferOwnership(server.id));
   const hostedServerIds = useOwnerHostedServerIds(server);
-  const memberCount = memberCountByServer[server.id];
   return (
     <SettingsSection title={t("mobile.server.settings.peopleSection")}>
       <SettingsRow
@@ -164,8 +172,7 @@ export function ServerPeopleSection({ server }: { server: MobileServer }) {
 
 export function ServerAiSection({ serverId }: { serverId: string }) {
   const { t } = useText();
-  const row = useServerRows(serverId);
-  const providers = row((checks) => checks.canManageProviders(serverId));
+  const providers = useServerRow(serverId, (checks) => checks.canManageProviders(serverId));
   if (providers === "hidden") return null;
   return (
     <SettingsSection title={t("mobile.server.settings.aiSection")}>
@@ -176,13 +183,12 @@ export function ServerAiSection({ serverId }: { serverId: string }) {
 
 export function ServerDataSections({ serverId }: { serverId: string }) {
   const { t } = useText();
-  const row = useServerRows(serverId);
-  const vault = row((checks) => checks.canManageVault(serverId));
-  const browserProfiles = row((checks) => checks.canManageBrowserProfiles(serverId));
-  const sites = row((checks) => checks.canViewHostedSites(serverId));
-  const storage = row((checks) => checks.canReadServerStorage(serverId));
-  const importAgents = row((checks) => checks.canImportAgents(serverId));
-  const transfer = row((checks) => checks.canTransferServer(serverId));
+  const vault = useServerRow(serverId, (checks) => checks.canManageVault(serverId));
+  const browserProfiles = useServerRow(serverId, (checks) => checks.canManageBrowserProfiles(serverId));
+  const sites = useServerRow(serverId, (checks) => checks.canViewHostedSites(serverId));
+  const storage = useServerRow(serverId, (checks) => checks.canReadServerStorage(serverId));
+  const importAgents = useServerRow(serverId, (checks) => checks.canImportAgents(serverId));
+  const transfer = useServerRow(serverId, (checks) => checks.canTransferServer(serverId));
   const shown = (state: ServerRowState) => state !== "hidden";
   return (
     <>
@@ -247,14 +253,15 @@ export function ServerConnectionSection({
 }) {
   const { t } = useText();
   const serverId = server.id;
-  const { reconnectServer, hostedServerStarting, canRestartServerItself, restartServerItself } = useMobileWorkspace();
+  const { reconnectServer, hostedServerStarting, restartServerItself } = useMobileWorkspaceActions();
+  const restartsItself = useMobileWorkspaceSelector((workspace) => workspace.canRestartServerItself(serverId));
   const { session } = useMobileSession();
   const action = useLockedAction();
   const { busy, error } = action;
   const [restarting, setRestarting] = useState(false);
   const [restarted, setRestarted] = useState<string | null>(null);
   const hosted = canRestartServer(server, hostedServerIds);
-  const selfHosted = !hosted && canRestartServerItself(serverId);
+  const selfHosted = !hosted && restartsItself;
   function perform(operation: () => Promise<void>, failure?: (error: unknown) => string) {
     setRestarted(null);
     return action.perform(operation, failure);
@@ -334,7 +341,7 @@ function permitsAgentSettings(checks: ServerChecks, serverId: string): boolean {
 }
 
 export function useAgentSettingsAvailable(serverId: string): boolean {
-  return permitsAgentSettings(useMobileWorkspace(), serverId);
+  return useMobileWorkspaceSelector((workspace) => permitsAgentSettings(workspace, serverId));
 }
 
 export function ServerGeneralSection({ serverId }: { serverId: string }) {
@@ -342,11 +349,10 @@ export function ServerGeneralSection({ serverId }: { serverId: string }) {
   const timezone = useServerTimezone(serverId);
   const signalHome = useServerSignalHome(serverId);
   const update = useServerUpdate(serverId, { poll: false });
-  const row = useServerRows(serverId);
-  const updateRow = row((checks) => checks.serverUpdateAccess(serverId));
-  const timezoneRow = row((checks) => checks.canManageServerTimezone(serverId));
-  const agentsRow = row((checks) => permitsAgentSettings(checks, serverId));
-  const signalHomeAccess = row((checks) => checks.servesServerSignalHome(serverId));
+  const updateRow = useServerRow(serverId, (checks) => checks.serverUpdateAccess(serverId));
+  const timezoneRow = useServerRow(serverId, (checks) => checks.canManageServerTimezone(serverId));
+  const agentsRow = useServerRow(serverId, (checks) => permitsAgentSettings(checks, serverId));
+  const signalHomeAccess = useServerRow(serverId, (checks) => checks.servesServerSignalHome(serverId));
   const signalHomes = signalHome.query.data;
   const signalHomeRow = signalHome.query.isError || (signalHomes?.homes.length ?? 0) > 1 ? signalHomeAccess : "hidden";
   const signalHomeInUse = signalHomes?.homes.find((home) => home.id === signalHomes.current);
@@ -418,35 +424,33 @@ export function ServerGeneralSection({ serverId }: { serverId: string }) {
 }
 
 export function ServerAgentsSection({ serverId }: { serverId: string }) {
-  const {
-    canManageServerTurnLimits,
-    canManageServerPersonality,
-    canManageAgentMemoryLimit,
-    canManageMemoryReview,
-    canManageSkillLearning,
-    canManageBrowsingMemory,
-    canManageRemoteChatContent,
-    canManageMediaApprovalCredits,
-    canManageServerVoiceModel,
-  } = useMobileWorkspace();
+  const turnLimits = useServerFlag(serverId, "canManageServerTurnLimits");
+  const personality = useServerFlag(serverId, "canManageServerPersonality");
+  const memoryLimit = useServerFlag(serverId, "canManageAgentMemoryLimit");
+  const memoryReview = useServerFlag(serverId, "canManageMemoryReview");
+  const skillLearning = useServerFlag(serverId, "canManageSkillLearning");
+  const browsingMemory = useServerFlag(serverId, "canManageBrowsingMemory");
+  const remoteChatContent = useServerFlag(serverId, "canManageRemoteChatContent");
+  const mediaApprovalCredits = useServerFlag(serverId, "canManageMediaApprovalCredits");
+  const voiceModel = useServerFlag(serverId, "canManageServerVoiceModel");
   return (
     <>
-      {canManageServerTurnLimits(serverId) ? <ServerTurnLimitsRows serverId={serverId} /> : null}
-      {canManageServerPersonality(serverId) ? <ServerPersonalityRow serverId={serverId} /> : null}
-      {canManageAgentMemoryLimit(serverId) ? <ServerMemoryLimitRow serverId={serverId} /> : null}
-      {canManageMemoryReview(serverId) ? <ServerMemoryReviewRow serverId={serverId} /> : null}
-      {canManageSkillLearning(serverId) ? <ServerSkillLearningRow serverId={serverId} /> : null}
-      {canManageBrowsingMemory(serverId) ? <ServerBrowsingMemoryRow serverId={serverId} /> : null}
-      {canManageRemoteChatContent(serverId) ? <ServerRemoteChatContentRow serverId={serverId} /> : null}
-      {canManageMediaApprovalCredits(serverId) ? <ServerMediaApprovalCreditsRow serverId={serverId} /> : null}
-      {canManageServerVoiceModel(serverId) ? <ServerVoiceModelRow serverId={serverId} /> : null}
+      {turnLimits ? <ServerTurnLimitsRows serverId={serverId} /> : null}
+      {personality ? <ServerPersonalityRow serverId={serverId} /> : null}
+      {memoryLimit ? <ServerMemoryLimitRow serverId={serverId} /> : null}
+      {memoryReview ? <ServerMemoryReviewRow serverId={serverId} /> : null}
+      {skillLearning ? <ServerSkillLearningRow serverId={serverId} /> : null}
+      {browsingMemory ? <ServerBrowsingMemoryRow serverId={serverId} /> : null}
+      {remoteChatContent ? <ServerRemoteChatContentRow serverId={serverId} /> : null}
+      {mediaApprovalCredits ? <ServerMediaApprovalCreditsRow serverId={serverId} /> : null}
+      {voiceModel ? <ServerVoiceModelRow serverId={serverId} /> : null}
     </>
   );
 }
 
 export function ServerKeySettings({ server }: { server: MobileServer }) {
   const { t, format } = useText();
-  const keyRow = useServerRows(server.id)((checks) => checks.canRotateServerKey(server.id));
+  const keyRow = useServerRow(server.id, (checks) => checks.canRotateServerKey(server.id));
   const { rotateServerKey, reloadServerList } = useMobileWorkspaceActions();
   const locked = useRef(false);
   const [changing, setChanging] = useState(false);

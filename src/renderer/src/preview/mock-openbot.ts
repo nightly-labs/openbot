@@ -3599,6 +3599,7 @@ export function createMockOpenBot(options: MockOpenBotOptions = {}): MockOpenBot
         agentListeners.add(scopedListener);
         return () => agentListeners.delete(scopedListener);
       },
+      onSyncChanged: () => () => undefined,
     },
     browser: mockBrowser.browser,
     update: {

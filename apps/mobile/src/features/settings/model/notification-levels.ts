@@ -24,6 +24,25 @@ export function setSyncedNotificationLevels(serverId: string, snapshot: AgentNot
   put(serverId, snapshot);
 }
 
+export function showAgentNotificationLevel(
+  serverId: string,
+  agentId: string,
+  level: ServerNotificationLevel | null,
+): () => void {
+  const previous = useSyncedNotificationLevels.getState().servers[serverId];
+  if (!previous) return () => undefined;
+  const others = previous.agents.filter((entry) => entry.agentId !== agentId);
+  const shown: AgentNotificationLevelsSnapshot = {
+    ...previous,
+    agents: level === null ? others : [...others, { agentId, level }],
+  };
+  setSyncedNotificationLevels(serverId, shown);
+  return () => {
+    if (useSyncedNotificationLevels.getState().servers[serverId] === shown)
+      setSyncedNotificationLevels(serverId, previous);
+  };
+}
+
 export function clearSyncedNotificationLevels(): void {
   epoch += 1;
   saves.clear();

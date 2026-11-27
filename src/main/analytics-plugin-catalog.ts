@@ -1,6 +1,7 @@
 import { readFile } from "node:fs/promises";
 import { join } from "node:path";
 import { isReservedMcpServerName, type McpServerConfig } from "@openbot/contracts/ipc";
+import type { CatalogPlugin } from "@openbot/contracts/plugin-catalog";
 import { isDynamicRecord, isString } from "@openbot/contracts/runtime-values";
 import { Effect } from "effect";
 import { analyticsIO, analyticsSync } from "./analytics-effects";
@@ -40,6 +41,10 @@ export const loadCatalogPluginServers = Effect.fn("Analytics.loadPluginCatalog")
   },
   Effect.catch(() => Effect.succeed([])),
 );
+
+export function catalogPluginServersOf(plugins: readonly CatalogPlugin[]): CatalogPluginServer[] {
+  return plugins.flatMap((plugin) => plugin.apps.flatMap((app) => catalogServer(plugin.slug, app)));
+}
 
 function catalogServer(slug: string, app: unknown): CatalogPluginServer[] {
   if (!isDynamicRecord(app) || !isDynamicRecord(app.server)) return [];

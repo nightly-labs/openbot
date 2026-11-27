@@ -160,6 +160,7 @@ import { Route as V1MobileAuthTicketRouteImport } from './routes/v1/mobile-auth/
 import { Route as V1MobileChangelogRouteImport } from './routes/v1/mobile/changelog'
 import { Route as V1MobileFeaturesRouteImport } from './routes/v1/mobile/features'
 import { Route as V1NearSplatRouteImport } from './routes/v1/near/$'
+import { Route as V1PluginsCatalogRouteImport } from './routes/v1/plugins/catalog'
 import { Route as V1SitesIndexRouteImport } from './routes/v1/sites/index'
 import { Route as V1SitesSiteIdRouteImport } from './routes/v1/sites/$siteId'
 import { Route as V1SitesReportsRouteImport } from './routes/v1/sites/reports'
@@ -284,6 +285,7 @@ import { Route as V2RemoteHostsHostIdTelegramRouteRouteImport } from './routes/v
 import { Route as V2RemoteHostsHostIdTicketRouteImport } from './routes/v2/remote/hosts/$hostId/ticket'
 import { Route as V2RemoteHostsHostIdWebhookRouteRouteImport } from './routes/v2/remote/hosts/$hostId/webhook-route'
 import { Route as V2RemoteHostsHostIdWebhookRoutesRouteImport } from './routes/v2/remote/hosts/$hostId/webhook-routes'
+import { Route as V2RemoteHostsHostIdWidgetPushRouteImport } from './routes/v2/remote/hosts/$hostId/widget-push'
 import { Route as V2RemoteOwnerTransfersTransferIdAcceptRouteImport } from './routes/v2/remote/owner-transfers/$transferId/accept'
 import { Route as V2RemoteOwnerTransfersTransferIdDeclineRouteImport } from './routes/v2/remote/owner-transfers/$transferId/decline'
 import { Route as V2RemoteSessionsSessionIdEndRouteImport } from './routes/v2/remote/sessions/$sessionId/end'
@@ -1060,6 +1062,11 @@ const V1NearSplatRoute = V1NearSplatRouteImport.update({
   path: '/v1/near/$',
   getParentRoute: () => rootRouteImport,
 } as any)
+const V1PluginsCatalogRoute = V1PluginsCatalogRouteImport.update({
+  id: '/v1/plugins/catalog',
+  path: '/v1/plugins/catalog',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const V1SitesIndexRoute = V1SitesIndexRouteImport.update({
   id: '/v1/sites/',
   path: '/v1/sites/',
@@ -1738,6 +1745,12 @@ const V2RemoteHostsHostIdWebhookRoutesRoute =
     path: '/v2/remote/hosts/$hostId/webhook-routes',
     getParentRoute: () => rootRouteImport,
   } as any)
+const V2RemoteHostsHostIdWidgetPushRoute =
+  V2RemoteHostsHostIdWidgetPushRouteImport.update({
+    id: '/v2/remote/hosts/$hostId/widget-push',
+    path: '/v2/remote/hosts/$hostId/widget-push',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 const V2RemoteOwnerTransfersTransferIdAcceptRoute =
   V2RemoteOwnerTransfersTransferIdAcceptRouteImport.update({
     id: '/v2/remote/owner-transfers/$transferId/accept',
@@ -1987,6 +2000,7 @@ export interface FileRoutesByFullPath {
   '/v1/mobile/changelog': typeof V1MobileChangelogRoute
   '/v1/mobile/features': typeof V1MobileFeaturesRoute
   '/v1/near/$': typeof V1NearSplatRoute
+  '/v1/plugins/catalog': typeof V1PluginsCatalogRoute
   '/v1/sites/$siteId': typeof V1SitesSiteIdRoute
   '/v1/sites/reports': typeof V1SitesReportsRoute
   '/v1/skills/$skillId': typeof V1SkillsSkillIdRouteWithChildren
@@ -2110,6 +2124,7 @@ export interface FileRoutesByFullPath {
   '/v2/remote/hosts/$hostId/ticket': typeof V2RemoteHostsHostIdTicketRoute
   '/v2/remote/hosts/$hostId/webhook-route': typeof V2RemoteHostsHostIdWebhookRouteRoute
   '/v2/remote/hosts/$hostId/webhook-routes': typeof V2RemoteHostsHostIdWebhookRoutesRoute
+  '/v2/remote/hosts/$hostId/widget-push': typeof V2RemoteHostsHostIdWidgetPushRoute
   '/v2/remote/owner-transfers/$transferId/accept': typeof V2RemoteOwnerTransfersTransferIdAcceptRoute
   '/v2/remote/owner-transfers/$transferId/decline': typeof V2RemoteOwnerTransfersTransferIdDeclineRoute
   '/v2/remote/sessions/$sessionId/end': typeof V2RemoteSessionsSessionIdEndRoute
@@ -2277,6 +2292,7 @@ export interface FileRoutesByTo {
   '/v1/mobile/changelog': typeof V1MobileChangelogRoute
   '/v1/mobile/features': typeof V1MobileFeaturesRoute
   '/v1/near/$': typeof V1NearSplatRoute
+  '/v1/plugins/catalog': typeof V1PluginsCatalogRoute
   '/v1/sites/$siteId': typeof V1SitesSiteIdRoute
   '/v1/sites/reports': typeof V1SitesReportsRoute
   '/v1/skills/$skillId': typeof V1SkillsSkillIdRouteWithChildren
@@ -2400,6 +2416,7 @@ export interface FileRoutesByTo {
   '/v2/remote/hosts/$hostId/ticket': typeof V2RemoteHostsHostIdTicketRoute
   '/v2/remote/hosts/$hostId/webhook-route': typeof V2RemoteHostsHostIdWebhookRouteRoute
   '/v2/remote/hosts/$hostId/webhook-routes': typeof V2RemoteHostsHostIdWebhookRoutesRoute
+  '/v2/remote/hosts/$hostId/widget-push': typeof V2RemoteHostsHostIdWidgetPushRoute
   '/v2/remote/owner-transfers/$transferId/accept': typeof V2RemoteOwnerTransfersTransferIdAcceptRoute
   '/v2/remote/owner-transfers/$transferId/decline': typeof V2RemoteOwnerTransfersTransferIdDeclineRoute
   '/v2/remote/sessions/$sessionId/end': typeof V2RemoteSessionsSessionIdEndRoute
@@ -2572,6 +2589,7 @@ export interface FileRoutesById {
   '/v1/mobile/changelog': typeof V1MobileChangelogRoute
   '/v1/mobile/features': typeof V1MobileFeaturesRoute
   '/v1/near/$': typeof V1NearSplatRoute
+  '/v1/plugins/catalog': typeof V1PluginsCatalogRoute
   '/v1/sites/$siteId': typeof V1SitesSiteIdRoute
   '/v1/sites/reports': typeof V1SitesReportsRoute
   '/v1/skills/$skillId': typeof V1SkillsSkillIdRouteWithChildren
@@ -2695,6 +2713,7 @@ export interface FileRoutesById {
   '/v2/remote/hosts/$hostId/ticket': typeof V2RemoteHostsHostIdTicketRoute
   '/v2/remote/hosts/$hostId/webhook-route': typeof V2RemoteHostsHostIdWebhookRouteRoute
   '/v2/remote/hosts/$hostId/webhook-routes': typeof V2RemoteHostsHostIdWebhookRoutesRoute
+  '/v2/remote/hosts/$hostId/widget-push': typeof V2RemoteHostsHostIdWidgetPushRoute
   '/v2/remote/owner-transfers/$transferId/accept': typeof V2RemoteOwnerTransfersTransferIdAcceptRoute
   '/v2/remote/owner-transfers/$transferId/decline': typeof V2RemoteOwnerTransfersTransferIdDeclineRoute
   '/v2/remote/sessions/$sessionId/end': typeof V2RemoteSessionsSessionIdEndRoute
@@ -2864,6 +2883,7 @@ export interface FileRouteTypes {
     | '/v1/mobile/changelog'
     | '/v1/mobile/features'
     | '/v1/near/$'
+    | '/v1/plugins/catalog'
     | '/v1/sites/$siteId'
     | '/v1/sites/reports'
     | '/v1/skills/$skillId'
@@ -2987,6 +3007,7 @@ export interface FileRouteTypes {
     | '/v2/remote/hosts/$hostId/ticket'
     | '/v2/remote/hosts/$hostId/webhook-route'
     | '/v2/remote/hosts/$hostId/webhook-routes'
+    | '/v2/remote/hosts/$hostId/widget-push'
     | '/v2/remote/owner-transfers/$transferId/accept'
     | '/v2/remote/owner-transfers/$transferId/decline'
     | '/v2/remote/sessions/$sessionId/end'
@@ -3154,6 +3175,7 @@ export interface FileRouteTypes {
     | '/v1/mobile/changelog'
     | '/v1/mobile/features'
     | '/v1/near/$'
+    | '/v1/plugins/catalog'
     | '/v1/sites/$siteId'
     | '/v1/sites/reports'
     | '/v1/skills/$skillId'
@@ -3277,6 +3299,7 @@ export interface FileRouteTypes {
     | '/v2/remote/hosts/$hostId/ticket'
     | '/v2/remote/hosts/$hostId/webhook-route'
     | '/v2/remote/hosts/$hostId/webhook-routes'
+    | '/v2/remote/hosts/$hostId/widget-push'
     | '/v2/remote/owner-transfers/$transferId/accept'
     | '/v2/remote/owner-transfers/$transferId/decline'
     | '/v2/remote/sessions/$sessionId/end'
@@ -3448,6 +3471,7 @@ export interface FileRouteTypes {
     | '/v1/mobile/changelog'
     | '/v1/mobile/features'
     | '/v1/near/$'
+    | '/v1/plugins/catalog'
     | '/v1/sites/$siteId'
     | '/v1/sites/reports'
     | '/v1/skills/$skillId'
@@ -3571,6 +3595,7 @@ export interface FileRouteTypes {
     | '/v2/remote/hosts/$hostId/ticket'
     | '/v2/remote/hosts/$hostId/webhook-route'
     | '/v2/remote/hosts/$hostId/webhook-routes'
+    | '/v2/remote/hosts/$hostId/widget-push'
     | '/v2/remote/owner-transfers/$transferId/accept'
     | '/v2/remote/owner-transfers/$transferId/decline'
     | '/v2/remote/sessions/$sessionId/end'
@@ -3675,6 +3700,7 @@ export interface RootRouteChildren {
   V1MobileChangelogRoute: typeof V1MobileChangelogRoute
   V1MobileFeaturesRoute: typeof V1MobileFeaturesRoute
   V1NearSplatRoute: typeof V1NearSplatRoute
+  V1PluginsCatalogRoute: typeof V1PluginsCatalogRoute
   V1SitesSiteIdRoute: typeof V1SitesSiteIdRoute
   V1SitesReportsRoute: typeof V1SitesReportsRoute
   V1SkillsSkillIdRoute: typeof V1SkillsSkillIdRouteWithChildren
@@ -3771,6 +3797,7 @@ export interface RootRouteChildren {
   V2RemoteHostsHostIdTicketRoute: typeof V2RemoteHostsHostIdTicketRoute
   V2RemoteHostsHostIdWebhookRouteRoute: typeof V2RemoteHostsHostIdWebhookRouteRoute
   V2RemoteHostsHostIdWebhookRoutesRoute: typeof V2RemoteHostsHostIdWebhookRoutesRoute
+  V2RemoteHostsHostIdWidgetPushRoute: typeof V2RemoteHostsHostIdWidgetPushRoute
   V2RemoteOwnerTransfersTransferIdAcceptRoute: typeof V2RemoteOwnerTransfersTransferIdAcceptRoute
   V2RemoteOwnerTransfersTransferIdDeclineRoute: typeof V2RemoteOwnerTransfersTransferIdDeclineRoute
   V2RemoteSessionsSessionIdEndRoute: typeof V2RemoteSessionsSessionIdEndRoute
@@ -4850,6 +4877,13 @@ declare module '@tanstack/solid-router' {
       preLoaderRoute: typeof V1NearSplatRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/v1/plugins/catalog': {
+      id: '/v1/plugins/catalog'
+      path: '/v1/plugins/catalog'
+      fullPath: '/v1/plugins/catalog'
+      preLoaderRoute: typeof V1PluginsCatalogRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/v1/sites/': {
       id: '/v1/sites/'
       path: '/v1/sites'
@@ -5718,6 +5752,13 @@ declare module '@tanstack/solid-router' {
       preLoaderRoute: typeof V2RemoteHostsHostIdWebhookRoutesRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/v2/remote/hosts/$hostId/widget-push': {
+      id: '/v2/remote/hosts/$hostId/widget-push'
+      path: '/v2/remote/hosts/$hostId/widget-push'
+      fullPath: '/v2/remote/hosts/$hostId/widget-push'
+      preLoaderRoute: typeof V2RemoteHostsHostIdWidgetPushRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/v2/remote/owner-transfers/$transferId/accept': {
       id: '/v2/remote/owner-transfers/$transferId/accept'
       path: '/v2/remote/owner-transfers/$transferId/accept'
@@ -6256,6 +6297,7 @@ const rootRouteChildren: RootRouteChildren = {
   V1MobileChangelogRoute: V1MobileChangelogRoute,
   V1MobileFeaturesRoute: V1MobileFeaturesRoute,
   V1NearSplatRoute: V1NearSplatRoute,
+  V1PluginsCatalogRoute: V1PluginsCatalogRoute,
   V1SitesSiteIdRoute: V1SitesSiteIdRoute,
   V1SitesReportsRoute: V1SitesReportsRoute,
   V1SkillsSkillIdRoute: V1SkillsSkillIdRouteWithChildren,
@@ -6359,6 +6401,7 @@ const rootRouteChildren: RootRouteChildren = {
   V2RemoteHostsHostIdTicketRoute: V2RemoteHostsHostIdTicketRoute,
   V2RemoteHostsHostIdWebhookRouteRoute: V2RemoteHostsHostIdWebhookRouteRoute,
   V2RemoteHostsHostIdWebhookRoutesRoute: V2RemoteHostsHostIdWebhookRoutesRoute,
+  V2RemoteHostsHostIdWidgetPushRoute: V2RemoteHostsHostIdWidgetPushRoute,
   V2RemoteOwnerTransfersTransferIdAcceptRoute:
     V2RemoteOwnerTransfersTransferIdAcceptRoute,
   V2RemoteOwnerTransfersTransferIdDeclineRoute:

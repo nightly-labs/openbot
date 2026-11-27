@@ -63,7 +63,7 @@ import type {
   SetAgentDockInteractiveInput,
   SetAgentDockXWaylandInput,
 } from "./ipc-agent-dock";
-import type { AgentIpcRequest, ScopedAgentEvent } from "./ipc-agent-events";
+import type { AgentIpcRequest, AgentSyncChangedEvent, ScopedAgentEvent } from "./ipc-agent-events";
 import type {
   AddAgentFolderInput,
   AgentExclusionChange,
@@ -716,6 +716,7 @@ import type {
 import type { MarketplaceListingLink } from "./marketplace-links";
 import type { AccountSession, MobileConnectedDevice, MobileConnectLink, MobileConnectTicket } from "./mobile-connect";
 import type { AcceptedOwnerTransfer, OwnerTransfer } from "./owner-transfer";
+import type { PluginCatalog } from "./plugin-catalog";
 import type { ReferralPageRequest, ReferralState } from "./referral";
 import type { AgentActiveQueues } from "./team-protocol/agent-active-queues-v1";
 import type { ChannelCompactAvailability } from "./team-protocol/channel-compact-availability-v1";
@@ -1006,6 +1007,7 @@ export const IPC_ENDPOINTS = {
     list: request<MarketplaceSkillQuery | undefined, MarketplaceSkillPage>()("skills:list"),
     get: request<string, MarketplaceSkillDetail>()("skills:get"),
     getBySlug: request<string, MarketplaceSkillDetail>()("skills:get-by-slug"),
+    pluginCatalog: request<undefined, PluginCatalog | null>()("skills:plugin-catalog"),
     listMine: request<undefined, SkillSubmission[]>()("skills:list-mine"),
     choosePackage: request<undefined, SkillPackagePreview | null>()("skills:choose-package"),
     submit: request<SubmitSkillInput, SkillSubmission>()("skills:submit"),
@@ -1689,6 +1691,7 @@ export const IPC_ENDPOINTS = {
     respondToBrowserSecret: scopedRequest<LocalBrowserSecretResponse, void>()("agent:respond-to-browser-secret"),
     respondToBrowserTakeover: scopedRequest<RespondToBrowserTakeoverInput, void>()("agent:respond-to-browser-takeover"),
     scopedEvent: event<ScopedAgentEvent>()("agent:event"),
+    syncChanged: event<AgentSyncChangedEvent>()("agent:sync-changed"),
   },
   agentMemories: {
     getMemorySelection: scopedRequest<string, AgentMemorySelectionState | null>()("agent:get-memory-selection"),

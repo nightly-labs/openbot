@@ -102,7 +102,11 @@ function orderedGrantsSql(spent: string): string {
      WHERE g.status = 'active' AND g.remaining_tenths > 0 AND spent.tenths > 0
        AND g.expires_at > spent.created_at
        AND g.scope = CASE WHEN spent.funding = 'welcome' THEN 'welcome' ELSE 'all' END
-       AND (g.user_id = spent.user_id OR g.server_id = spent.server_id)
+       AND g.grant_id IN (
+         SELECT grant_id FROM credit_grants WHERE status = 'active' AND user_id = spent.user_id
+         UNION ALL
+         SELECT grant_id FROM credit_grants WHERE status = 'active' AND server_id = spent.server_id
+       )
   )`;
 }
 
