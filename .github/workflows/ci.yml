@@ -1622,6 +1622,7 @@ jobs:
         env:
           EMAIL_SMTP_PASSWORD: ${{ secrets.EMAIL_SMTP_PASSWORD }}
           EMAIL_SMTP_OVERFLOW_PASSWORD: ${{ secrets.EMAIL_SMTP_OVERFLOW_PASSWORD }}
+          EMAIL_SMTP_OVERFLOW_2_PASSWORD: ${{ secrets.EMAIL_SMTP_OVERFLOW_2_PASSWORD }}
           SKILLS_ADMIN_TOKEN: ${{ secrets.SKILLS_ADMIN_TOKEN }}
           SITE_OPERATIONS_ADMIN_TOKEN: ${{ secrets.SITE_OPERATIONS_ADMIN_TOKEN }}
           SERVER_CLAIMS_ADMIN_TOKEN: ${{ secrets.SERVER_CLAIMS_ADMIN_TOKEN }}
@@ -1689,8 +1690,9 @@ jobs:
               if (present.length !== names.length) throw new Error(`Set ${names.join(" and ")} together.`);
               for (const name of names) optional[name] = process.env[name].trim();
             }
-            const smtpOverflow = process.env.EMAIL_SMTP_OVERFLOW_PASSWORD;
-            if (smtpOverflow) optional.EMAIL_SMTP_OVERFLOW_PASSWORD = smtpOverflow;
+            for (const name of ["EMAIL_SMTP_OVERFLOW_PASSWORD", "EMAIL_SMTP_OVERFLOW_2_PASSWORD"]) {
+              if (process.env[name]) optional[name] = process.env[name];
+            }
             const githubAppKey = process.env.OPENBOT_GITHUB_APP_PRIVATE_KEY?.trim();
             if (githubAppKey) optional.GITHUB_APP_PRIVATE_KEY = githubAppKey;
             // Company sign-in stays off until it is set. It encrypts the stored client secrets, so it never changes.

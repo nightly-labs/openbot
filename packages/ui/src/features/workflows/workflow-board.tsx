@@ -9,8 +9,11 @@ import {
   type WorkflowGraph,
   workflowAnswerProblems,
   workflowAnswerSources,
+  workflowAssetClipMedia,
+  workflowAssetType,
   workflowInputAnswerFields,
 } from "@openbot/contracts/ipc";
+import { ATTACHMENT_PREVIEW_EDGE } from "@openbot/contracts/team-protocol/attachment-preview-v1";
 import type { AppTextKey, AppTranslate } from "@openbot/i18n";
 import { Button, Kbd, LabelTooltip, Repeat, X } from "@openbot/ui";
 import type { JSX } from "@solidjs/web";
@@ -56,6 +59,37 @@ export type WfnFields = Record<string, WfnFieldValue>;
 export interface WfnPoint {
   x: number;
   y: number;
+}
+
+const STILL_PICTURE = /^image\/(?:png|jpeg|webp|avif|bmp)$/;
+
+function readAsDataUrl(blob: Blob): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(String(reader.result));
+    reader.onerror = () => reject(reader.error);
+    reader.readAsDataURL(blob);
+  });
+}
+
+async function pictureCopy(file: File): Promise<string | undefined> {
+  if (!STILL_PICTURE.test(file.type)) return undefined;
+  const bitmap = await createImageBitmap(file).catch(() => undefined);
+  if (!bitmap) return undefined;
+  try {
+    const scale = Math.min(1, ATTACHMENT_PREVIEW_EDGE / Math.max(bitmap.width, bitmap.height));
+    const canvas = new OffscreenCanvas(
+      Math.max(1, Math.round(bitmap.width * scale)),
+      Math.max(1, Math.round(bitmap.height * scale)),
+    );
+    canvas.getContext("2d")?.drawImage(bitmap, 0, 0, canvas.width, canvas.height);
+    const small = await canvas.convertToBlob({ type: "image/webp", quality: 0.85 });
+    return await readAsDataUrl(small);
+  } catch {
+    return undefined;
+  } finally {
+    bitmap.close();
+  }
 }
 
 function edgePath(from: WfnPoint, to: WfnPoint): string {
@@ -230,6 +264,8 @@ export interface WfnBoard {
   step: (id: string) => string | undefined;
   uploads: () => readonly StoredFileRow[];
   upload: (file: File) => Promise<StoredFileRow>;
+  localCopy: (file: File) => Promise<string | undefined>;
+  localCopyOf: (fileId: string) => string | undefined;
   dropFiles?: ((id: string, files: readonly File[]) => void) | undefined;
   resizable: boolean;
   size: (id: string) => WfnSize | undefined;
@@ -823,9 +859,62 @@ export function createBoard(options: BoardOptions) {
   };
 
   const [uploads, setUploads] = createSignal<readonly StoredFileRow[]>([]);
+  const copies = new Map<File, Promise<string | undefined>>();
+  const clipCopies = new Set<string>();
+  const readyCopies = new Map<File, string>();
+  const [keptCopies, setKeptCopies] = createSignal<ReadonlyMap<string, string>>(new Map());
+  const localCopy = (file: File) => {
+    const known = copies.get(file);
+    if (known) return known;
+    if (isVideo(file)) {
+      const url = clipCopy(file);
+      const ready = Promise.resolve(url);
+      copies.set(file, ready);
+      readyCopies.set(file, url);
+      return ready;
+    }
+    const made = options.catalogs().previewWhileUploading ? pictureCopy(file) : Promise.resolve(undefined);
+    copies.set(file, made);
+    void made.then((url) => {
+      if (url && copies.get(file) === made) readyCopies.set(file, url);
+    });
+    return made;
+  };
+  const isVideo = (file: File) => workflowAssetClipMedia(workflowAssetType(file, true) ?? "") === "video";
+  const clipCopy = (file: File) => {
+    const url = URL.createObjectURL(file);
+    clipCopies.add(url);
+    return url;
+  };
+  const dropCopy = (file: File) => {
+    const made = copies.get(file);
+    if (!made) return;
+    copies.delete(file);
+    readyCopies.delete(file);
+    void made.then((url) => {
+      if (!url || !clipCopies.delete(url)) return;
+      URL.revokeObjectURL(url);
+    });
+  };
+  const keepCopy = (file: File, id: string, fallback: string | undefined) => {
+    const url = readyCopies.get(file) ?? fallback;
+    copies.delete(file);
+    readyCopies.delete(file);
+    if (url) setKeptCopies((kept) => new Map(kept).set(id, url));
+  };
   const upload = async (file: File): Promise<StoredFileRow> => {
     const host = options.catalogs().upload;
-    if (host) return host(file);
+    if (host) {
+      void localCopy(file);
+      const row = await host(file).catch((error: unknown) => {
+        dropCopy(file);
+        throw error;
+      });
+      const original =
+        options.catalogs().previewWhileUploading || row.previewKind !== "image" ? undefined : row.previewUrl;
+      keepCopy(file, row.id, original ?? undefined);
+      return row;
+    }
     const image = file.type.startsWith("image/");
     const row: StoredFileRow = {
       id: crypto.randomUUID(),
@@ -843,6 +932,7 @@ export function createBoard(options: BoardOptions) {
       status: "available",
       deletable: false,
     };
+    keepCopy(file, row.id, undefined);
     setUploads((list) => [row, ...list]);
     return row;
   };
@@ -944,6 +1034,8 @@ export function createBoard(options: BoardOptions) {
     step: (id) => options.step?.(id),
     uploads,
     upload,
+    localCopy,
+    localCopyOf: (fileId) => keptCopies().get(fileId),
     dropFiles: options.dropFiles,
     resizable: options.size !== undefined,
     size: (id) => options.size?.(id),
@@ -1239,6 +1331,10 @@ export function createBoard(options: BoardOptions) {
       resize.disconnect();
       cancelAnimationFrame(frame);
       for (const row of untrack(uploads)) if (row.previewUrl) URL.revokeObjectURL(row.previewUrl);
+      for (const url of clipCopies) URL.revokeObjectURL(url);
+      clipCopies.clear();
+      readyCopies.clear();
+      copies.clear();
     };
   });
 

@@ -78,7 +78,23 @@ function workspaceLinkPath(value: string): string | null {
   return path;
 }
 
-export function messageLinkFileTarget(href: string, agentId: string | undefined): MessageFileTarget | null {
+function withoutLinkFragment(href: string): string {
+  const fragment = href.indexOf("#");
+  if (fragment <= 0 || /[./\\]/u.test(href.slice(fragment + 1))) return href;
+  return href.slice(0, fragment);
+}
+
+export function messageLinkFileTargets(
+  href: string,
+  agentId: string | undefined,
+): { file: MessageFileTarget; written: MessageFileTarget | null } | null {
+  const linked = withoutLinkFragment(href);
+  const file = messageLinkFileTarget(linked, agentId);
+  if (!file) return null;
+  return { file, written: linked === href ? null : messageLinkFileTarget(href, agentId) };
+}
+
+function messageLinkFileTarget(href: string, agentId: string | undefined): MessageFileTarget | null {
   if (webLink(href)) return null;
   const fileUrl = fileUrlPath(href);
   const shared = decodedFileUrlPath(fileUrl ?? href).trim();
@@ -104,13 +120,14 @@ export function messageChipFileNames(body: string, agentId: string | undefined):
   if (!body.includes("`") && !body.includes("[") && !body.includes("<")) return names;
   const directory = messageFileDirectory(body);
   walkChatMarkdown(parseFinishedChatMarkdown(body), (token) => {
-    const file =
-      token.type === "link" && typeof token.href === "string"
-        ? messageLinkFileTarget(token.href, agentId)
-        : token.type === "codespan" && typeof token.text === "string"
-          ? (messageFileTarget(token.text, directory, agentId)?.file ?? null)
-          : null;
-    if (file) names.add(messageTargetFileName(file));
+    const link =
+      token.type === "link" && typeof token.href === "string" ? messageLinkFileTargets(token.href, agentId) : null;
+    const files = link
+      ? [link.file, link.written]
+      : token.type === "codespan" && typeof token.text === "string"
+        ? [messageFileTarget(token.text, directory, agentId)?.file]
+        : [];
+    for (const file of files) if (file) names.add(messageTargetFileName(file));
   });
   return names;
 }

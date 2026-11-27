@@ -54,6 +54,8 @@ export const messages = {
   "error.workflow.mediaNotMade": "لم يُنشئ النموذج الصورة أو الفيديو. قال: {answer}",
   "error.workflow.pictureMissing": "الصورة لم تعد على الخادم. أرسلها مرة أخرى.",
   "error.workflow.pictureType": "استخدم صورة بتنسيق PNG أو JPEG أو WebP.",
+  "error.workflow.assetType":
+    "استخدم صورة PNG أو JPEG أو WebP، أو فيديو MP4 أو MOV، أو ملف صوت MP3 أو M4A أو WAV أو AAC أو OGG أو FLAC.",
   "error.workflow.mediaInputMissing": "صورة من خطوة سابقة غير متاحة. شغّل تلك الخطوة مرة أخرى.",
   "error.workflow.mediaEmptyRequest": "اكتب وصفًا، أو شغّل الخطوات التي قبل هذه الخطوة حتى يصل نص أو صورة.",
   "error.workflow.mediaInputNotImage": "تقبل هذه الخطوة الصور فقط، لا مقاطع الفيديو. أزل الاتصال من الفيديو.",

@@ -15,6 +15,8 @@ export const messages = {
   "error.messaging.telegramRelayUnavailable": "OpenBot 无法在这台电脑上连接 Telegram。请登录，为这台电脑命名后重试。",
   "error.messaging.telegramRelayUnreachable":
     "OpenBot 无法从这台电脑连接到它的服务。请检查网络连接、VPN、代理或防火墙，然后重试。",
+  "error.messaging.telegramRelayCertificate":
+    "OpenBot 无法从这台电脑与其服务建立安全连接。扫描 HTTPS 流量的安全软件，或这台电脑上错误的日期和时间，可能导致此问题。请检查后重试。",
   "error.messaging.telegramServiceUnavailable": "OpenBot 当前无法连接 Telegram，请稍后重试。",
   "error.messaging.whatsappNotConnected": "该 WhatsApp 号码未连接。",
   "error.messaging.whatsappUnsupported": "这台电脑无法连接 WhatsApp。",

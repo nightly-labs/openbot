@@ -156,7 +156,7 @@ export const messages = defineMessages("mobile.settings", {
     "This also ends the account’s active remote connections. The device can sign in again.",
   "mobile.settings.sessions.disconnect": "Disconnect",
   "mobile.settings.dictation.footer":
-    "The language you speak to the phone recognizer, in a voice conversation and when you dictate. Automatic uses the first language in your phone settings that it supports.",
+    "The language you speak to the phone recognizer, in a voice conversation and when you dictate. Automatic uses the language of the keyboard you type with, then the first language in your phone settings that it supports.",
   "mobile.settings.dictation.automatic": "Automatic",
   "mobile.settings.appearance.title": "Appearance",
   "mobile.settings.appearance.footer": "System follows your device’s appearance.",

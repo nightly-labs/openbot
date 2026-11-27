@@ -15,6 +15,7 @@ export const messages = {
   "mobile.workspace.error.sectionsLoadFailed": "无法加载文件夹，请重试。",
   "mobile.workspace.error.transportNotReady": "手机端传输尚未就绪。",
   "mobile.workspace.error.sectionsUnsupported": "这台主机不支持更改文件夹。",
+  "mobile.workspace.error.sidebarOffline": "请连接该服务器以更改其文件夹。",
   "mobile.workspace.error.leaveOwnServer": "只能退出已加入的远程服务器。",
   "mobile.workspace.error.removeOwnedServerOnly": "只有所有者可以移除该服务器。",
   "mobile.workspace.error.agentNotOnHost": "该助手不在这台主机上。",

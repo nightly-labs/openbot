@@ -63,6 +63,8 @@ export const messages = {
   "error.workflow.mediaNotMade": "O modelo não criou a imagem ou o vídeo. Ele respondeu: {answer}",
   "error.workflow.pictureMissing": "A imagem não está mais no servidor. Envie-a novamente.",
   "error.workflow.pictureType": "Use uma imagem PNG, JPEG ou WebP.",
+  "error.workflow.assetType":
+    "Use uma imagem PNG, JPEG ou WebP, um vídeo MP4 ou MOV, ou um arquivo de áudio MP3, M4A, WAV, AAC, OGG ou FLAC.",
   "error.workflow.mediaInputMissing":
     "Uma imagem de uma etapa anterior não está disponível. Execute essa etapa novamente.",
   "error.workflow.mediaEmptyRequest":

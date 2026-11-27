@@ -59,6 +59,8 @@ export const messages = {
   "error.workflow.mediaNotMade": "모델이 이미지나 동영상을 만들지 않았어요. 모델의 답변: {answer}",
   "error.workflow.pictureMissing": "이미지가 서버에 더 이상 없어요. 다시 보내 주세요.",
   "error.workflow.pictureType": "PNG, JPEG 또는 WebP 이미지를 사용해 주세요.",
+  "error.workflow.assetType":
+    "PNG, JPEG 또는 WebP 이미지, MP4 또는 MOV 동영상, 또는 MP3, M4A, WAV, AAC, OGG, FLAC 오디오 파일을 사용해 주세요.",
   "error.workflow.mediaInputMissing": "이전 단계의 이미지를 사용할 수 없어요. 그 단계를 다시 실행해 주세요.",
   "error.workflow.mediaEmptyRequest": "설명을 작성하거나 앞 단계를 실행해 텍스트나 이미지가 들어오게 해 주세요.",
   "error.workflow.mediaInputNotImage": "이 단계는 동영상이 아닌 이미지만 받아요. 동영상에서 오는 연결을 지워 주세요.",

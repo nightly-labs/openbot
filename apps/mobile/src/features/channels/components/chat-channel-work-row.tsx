@@ -6,6 +6,7 @@ import { useChatNavigation } from "@/features/chat/context/chat-navigation-conte
 import type { MobileAgentActivity } from "@/features/workspace/model/agent-activity";
 import { haptics } from "@/shared/lib/haptics";
 import { useText } from "@/shared/lib/text";
+import { waitingChannelHref } from "./use-waiting-channel";
 
 export function ChatChannelWorkRow({
   channel,
@@ -36,13 +37,7 @@ export function ChatChannelWorkRow({
         style={({ pressed }) => ({ borderCurve: "continuous", opacity: pressed ? 0.6 : 1 })}
         onPress={() => {
           void haptics.selection();
-          navigation.push({
-            pathname: "/channel/[channelId]",
-            params:
-              activity.phase === "waiting" && activity.reason === "question"
-                ? { channelId: channel.id, serverId, questionAgentId: agentId }
-                : { channelId: channel.id, serverId },
-          });
+          navigation.push(waitingChannelHref(channel.id, serverId, agentId, activity));
         }}
       >
         {activity.phase === "waiting" ? null : <Spinner size="sm" color={String(accent)} />}
