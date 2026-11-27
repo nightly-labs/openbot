@@ -42,6 +42,9 @@ object ChatBubbleNotification {
       return false
     }
     if (json.optInt("version") != 1 || !json.optBoolean("enabled")) return false
+    // A file without the lock flag comes from a bundle that does not know the app lock, so the
+    // bubble stays off and the caller posts the normal notification.
+    if (json.optBoolean("locked", true)) return false
     // A file without the list allows every agent. An empty list allows none, because the app
     // writes the agents that have a bubble and it has none before the agents load.
     val agents = json.optJSONArray("agents") ?: return true

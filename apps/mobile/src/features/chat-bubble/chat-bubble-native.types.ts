@@ -10,4 +10,5 @@ export interface ChatBubbleNative {
   currentTarget(): ChatBubbleTarget | null;
   dismiss(serverId: string, agentId: string): void;
   close(): void;
+  openApp(): void;
 }

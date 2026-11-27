@@ -9,6 +9,7 @@ declare class ChatBubbleModule extends NativeModule {
   currentTarget(): ChatBubbleTarget | null;
   dismiss(serverId: string, agentId: string): void;
   close(): void;
+  openApp(): void;
 }
 
 function load(): ChatBubbleNative | null {
@@ -22,6 +23,7 @@ function load(): ChatBubbleNative | null {
     currentTarget: () => native.currentTarget() ?? null,
     dismiss: (serverId, agentId) => native.dismiss(serverId, agentId),
     close: () => native.close(),
+    openApp: () => native.openApp(),
   };
 }
 

@@ -48,7 +48,7 @@ let heldNavigation: (() => void) | null = null;
 let deviceAuthentications = 0;
 let awayDuringAuthentication: AwayState | null = null;
 
-function appLockBlocks(state: AppLockState = useAppLock.getState()): boolean {
+export function appLockBlocks(state: AppLockState = useAppLock.getState()): boolean {
   return state.status !== "ready" || (appLockEnabled(state.config) && state.locked && !state.confirming);
 }
 

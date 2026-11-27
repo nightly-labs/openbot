@@ -5,7 +5,7 @@ import { DarkTheme, DefaultTheme, ThemeProvider } from "expo-router";
 import { RoutingQueueProvider } from "expo-router/build/global-state/routingQueueContext";
 import { NavigationStateContext } from "expo-router/build/react-navigation/core/NavigationStateContext";
 import { createNativeStackNavigator } from "expo-router/native-stack";
-import { Typography } from "heroui-native";
+import { Button, Typography } from "heroui-native";
 import { HeroUINativeProvider } from "heroui-native/provider";
 import { useMemo } from "react";
 import { View } from "react-native";
@@ -13,6 +13,7 @@ import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { KeyboardProvider } from "react-native-keyboard-controller";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 import { useCSSVariable, useUniwind, withUniwind } from "uniwind";
+import { appLockBlocks, installAppLock, useAppLock } from "@/features/app-lock/model/app-lock";
 import { MobileSessionProvider, useMobileSession } from "@/features/auth/context/mobile-session-context";
 import { AudioWaveformHost } from "@/features/chat/components/audio-waveform-host";
 import { MermaidRendererHost } from "@/features/chat/components/mermaid-renderer-host";
@@ -23,8 +24,11 @@ import { navigationFonts } from "@/shared/lib/app-font";
 import { isAndroid } from "@/shared/lib/platform";
 import { queryClient } from "@/shared/lib/query-client";
 import { useText } from "@/shared/lib/text";
+import { chatBubbleNative } from "../chat-bubble-native";
 import { ChatBubbleErrorBoundary } from "../components/chat-bubble-error-boundary";
 import { ChatBubbleHeader, ChatBubbleScreen } from "./chat-bubble-screen";
+
+installAppLock();
 
 const UniwindGestureHandlerRootView = withUniwind(GestureHandlerRootView);
 const Stack = createNativeStackNavigator();
@@ -46,9 +50,28 @@ const BUBBLE_STATE = {
   type: "stack",
 };
 
+function BubbleLocked() {
+  const { t } = useText();
+  return (
+    <View className="flex-1 bg-background">
+      <ChatBubbleHeader title={t("mobile.settings.chatBubble.title")} />
+      <View className="gap-3 px-4">
+        <Typography.Paragraph type="body-sm" className="text-muted">
+          {t("mobile.settings.chatBubble.locked")}
+        </Typography.Paragraph>
+        <Button size="sm" className="self-start rounded-full" onPress={() => chatBubbleNative?.openApp()}>
+          <Button.Label className="font-sans font-semibold">{t("mobile.settings.chatBubble.openApp")}</Button.Label>
+        </Button>
+      </View>
+    </View>
+  );
+}
+
 function BubbleContent() {
   const { t } = useText();
   const { loading, session } = useMobileSession();
+  const locked = useAppLock(appLockBlocks);
+  if (locked) return <BubbleLocked />;
   if (loading) return null;
   if (!session) {
     return (

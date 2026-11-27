@@ -40,6 +40,14 @@ class ChatBubbleModule : Module() {
       appContext.currentActivity?.finish()
       Unit
     }
+
+    Function("openApp") {
+      val context = appContext.reactContext ?: return@Function
+      val intent = context.packageManager.getLaunchIntentForPackage(context.packageName) ?: return@Function
+      intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+      runCatching { context.startActivity(intent) }
+      Unit
+    }
   }
 
   private fun bubblesEnabled(): Boolean {

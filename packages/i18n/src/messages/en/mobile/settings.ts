@@ -283,6 +283,8 @@ export const messages = defineMessages("mobile.settings", {
   "mobile.settings.chatBubble.noSession": "Sign in to OpenBot to read this chat.",
   "mobile.settings.chatBubble.noAgent": "This agent is not available now.",
   "mobile.settings.chatBubble.close": "Close",
+  "mobile.settings.chatBubble.locked": "OpenBot is locked. Open the app and unlock it to read this chat.",
+  "mobile.settings.chatBubble.openApp": "Open app",
   "mobile.settings.chatBubble.error": "The chat did not open. Close the bubble and try again.",
   "mobile.settings.notifications.title": "Notifications",
   "mobile.settings.notifications.toggle": "Allow notifications",

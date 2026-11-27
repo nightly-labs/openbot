@@ -4805,6 +4805,22 @@
     "tr",
     "zh"
   ],
+  "mobile.settings.chatBubble.locked": [
+    "ar",
+    "de",
+    "es",
+    "fr",
+    "he",
+    "it",
+    "ja",
+    "ko",
+    "nl",
+    "pl",
+    "pt",
+    "ru",
+    "tr",
+    "zh"
+  ],
   "mobile.settings.chatBubble.noAgent": [
     "ar",
     "de",
@@ -4822,6 +4838,22 @@
     "zh"
   ],
   "mobile.settings.chatBubble.noSession": [
+    "ar",
+    "de",
+    "es",
+    "fr",
+    "he",
+    "it",
+    "ja",
+    "ko",
+    "nl",
+    "pl",
+    "pt",
+    "ru",
+    "tr",
+    "zh"
+  ],
+  "mobile.settings.chatBubble.openApp": [
     "ar",
     "de",
     "es",

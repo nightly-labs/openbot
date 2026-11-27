@@ -7,11 +7,16 @@ const CONFIG_FILE = "chat-bubble.json";
 
 let writtenConfig: string | null = null;
 
-export function writeChatBubbleConfig(preference: ChatBubblePreference, agents: readonly BubbleAgent[]): void {
+export function writeChatBubbleConfig(
+  preference: ChatBubblePreference,
+  agents: readonly BubbleAgent[],
+  locked: boolean,
+): void {
   if (!isAndroid) return;
   const text = JSON.stringify({
     version: 1,
     enabled: preference.enabled,
+    locked,
     agents: resolvedBubbleAgents(preference, agents),
   });
   if (text === writtenConfig) return;
