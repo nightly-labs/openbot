@@ -266,6 +266,15 @@ export const WhatsAppPostNeedsConfirmation = Context.Reference<boolean>("openbot
   defaultValue: () => false,
 });
 
+export class WhatsAppPostUnconfirmed extends Error {
+  readonly messageId: string;
+  constructor(messageId: string) {
+    super("not_confirmed");
+    this.name = "WhatsAppPostUnconfirmed";
+    this.messageId = messageId;
+  }
+}
+
 export class WhatsAppRefusedError extends Error {
   readonly code: string;
   constructor(errorCode: string) {

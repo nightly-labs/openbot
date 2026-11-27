@@ -29,6 +29,7 @@ import {
   type RecentMessages,
   type StatusReaction,
   WhatsAppAnswerPartlySent,
+  WhatsAppPostUnconfirmed,
   WhatsAppRefusedError,
 } from "../messaging-types";
 import { WhatsAppArchive } from "./whatsapp-archive";
@@ -441,17 +442,30 @@ class WhatsAppAdapter implements MessagingAdapter {
       const options: MiscMessageGenerationOptions | undefined = quoteId
         ? { quoted: this.#quoted(target, quoteId) }
         : undefined;
-      const sent = yield* this.#session().send(target.platformChannelId, content, options);
+      const sent = yield* this.#session()
+        .send(target.platformChannelId, content, options)
+        .pipe(
+          Effect.tapError((failure) => {
+            const cause = failure.cause;
+            return cause instanceof WhatsAppPostUnconfirmed
+              ? Effect.sync(() => this.#track(target, cause.messageId))
+              : Effect.void;
+          }),
+        );
       const id = sent.key.id ?? "";
-      this.#sentAt.set(id, Date.now());
-      if (this.#sentAt.size > 1_000) {
-        const oldest = this.#sentAt.keys().next().value;
-        if (oldest !== undefined) this.#sentAt.delete(oldest);
-      }
-      this.#handle.store.putPost(id, { chatJid: target.platformChannelId, threadKey: this.#threadKey(target, id) });
-      this.#handle.chats.rememberKey(id, { fromMe: true, participant: null, text: "" });
+      this.#track(target, id);
       return id;
     });
+  }
+
+  #track(target: MessageTarget, id: string): void {
+    this.#sentAt.set(id, Date.now());
+    if (this.#sentAt.size > 1_000) {
+      const oldest = this.#sentAt.keys().next().value;
+      if (oldest !== undefined) this.#sentAt.delete(oldest);
+    }
+    this.#handle.store.putPost(id, { chatJid: target.platformChannelId, threadKey: this.#threadKey(target, id) });
+    this.#handle.chats.rememberKey(id, { fromMe: true, participant: null, text: "" });
   }
 
   #threadKey(target: MessageTarget, postId: string): string {

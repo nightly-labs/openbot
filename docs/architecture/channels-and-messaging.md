@@ -941,8 +941,11 @@ is one linked number (`workspace_id` is the number in digits).
   seconds after the send, and no other post waits for its ack, the session reconnects too; this does
   not count as a stall. A post from the agent's `messaging_post` tool that WhatsApp does not confirm in
   those 10 seconds fails as `not_confirmed`, so the agent tells the user to check the chat and the post
-  history does not record it (`WhatsAppPostNeedsConfirmation`). Answers, edits and reactions still
-  count as sent: an answer that fails is replaced by a failure note, which a slow ack must not cause.
+  history does not record it (`WhatsAppPostNeedsConfirmation`). OpenBot still keeps the post's thread
+  and the agent's ping, so a reply to a post that arrived late reaches the agent. Answers, edits,
+  reactions, file uploads, routine results and workflow outputs still count as sent: an answer that
+  fails is replaced by a failure note, and a file that fails counts as skipped, which a slow ack must
+  not cause.
   Posts wait up to 5 minutes
   for the socket, keep at least a second between posts to one chat, and get their message id before
   the send, so an echo in the owner's own chat is never read as a request.

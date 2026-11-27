@@ -62,6 +62,7 @@ const OWNER = "48600100200";
 const OWNER_JID = `${OWNER}@s.whatsapp.net`;
 const OWNER_LID = "777001";
 const FRIEND = "48600100300";
+const UNCONFIRMED_CONTACT = "48600117557";
 const STRANGER = "48600100400";
 const LID_FRIEND = "48600100500";
 const LID_FRIEND_CHAT = "999123@lid";
@@ -1931,6 +1932,72 @@ try {
       assert.deepEqual(answer.content.mentions, [`${FRIEND}@s.whatsapp.net`], "The answer did not list the person.");
       return { mentions: answer.content.mentions };
     });
+
+    await step(
+      "unconfirmed post: messaging_post fails, the history does not record it, a reply finds it (#17557)",
+      async () => {
+        const sales = agents.listAgents().find((agent) => agent.name === "Sales");
+        assert.ok(sales, "No Sales agent.");
+        const jid = `${UNCONFIRMED_CONTACT}@s.whatsapp.net`;
+        await runCauseEffect(
+          messaging.addWhatsAppSender(OWNER, { id: UNCONFIRMED_CONTACT, kind: "contact", name: "Ola" }),
+        );
+        try {
+          await postAs(agents, sales.id, jid, "CONFIRMED-17557");
+          const socket = phone.current();
+          phone.holdAcks = true;
+          const unconfirmed = await runCauseEffect(
+            agents.messaging.outboundTool(
+              sales.id,
+              { threadId: `thread-${sales.id}`, turnId: `turn-${sales.id}` },
+              "messaging_post",
+              { connection: connectionId(agents), place: jid, text: "UNCONFIRMED-17557" },
+              () => Effect.succeed([]),
+            ),
+          );
+          phone.holdAcks = false;
+          const text = unconfirmed.contentItems[0]?.text ?? "";
+          assert.equal(unconfirmed.success, false, `An unconfirmed post counted as sent: ${text}`);
+          assert.ok(text.includes("WhatsApp did not confirm the message"), `The agent was not told: ${text}`);
+          assert.ok(text.includes("check the chat"), `The agent was not told to have the chat checked: ${text}`);
+          assert.ok(phone.textsTo(jid).includes("UNCONFIRMED-17557"), "The unconfirmed post never reached the server.");
+          await until(
+            () => socket.ended && connection(messaging)?.state === "connected",
+            "connected again after the unconfirmed post",
+            20_000,
+          );
+          const history = (await readHistory(agents, { place: jid })).messages.map((entry) => entry.text);
+          assert.ok(
+            history.some((entry) => entry.includes("CONFIRMED-17557")),
+            "The confirmed post is not in the history.",
+          );
+          assert.ok(
+            !history.some((entry) => entry.includes("UNCONFIRMED-17557")),
+            "The history records the unconfirmed post as sent.",
+          );
+          const reply = message({ chat: jid, text: "Got both, thanks." });
+          phone.current().receive([reply]);
+          await until(() => received(agents, jid, reply.key.id ?? ""), "the contact's reply in a mailbox");
+          const link = agents.messaging.store.linkByKey(connectionId(agents), jid, "dm");
+          assert.ok(link, "No conversation for the contact's reply.");
+          const request = mailbox.unresolvedMessagingDeliveries(link.linkId)[0];
+          assert.ok(request, "No request waits in the contact's chat.");
+          const prepared = await runCauseEffect(
+            agents.messaging.prepare({ delivery: request.delivery, managedAttachments: [] }),
+          );
+          assert.ok(
+            prepared?.text.includes("UNCONFIRMED-17557"),
+            "The reply to an unconfirmed post that arrived does not show that post.",
+          );
+          await runCauseEffect(mailbox.markStarting(request.delivery.id));
+          await runCauseEffect(mailbox.markTerminal(request.delivery.id, "completed", null));
+          return { unconfirmed: "not_confirmed", history: history.length, replySeesPost: true };
+        } finally {
+          phone.holdAcks = false;
+          await runCauseEffect(messaging.removeWhatsAppSender(OWNER, UNCONFIRMED_CONTACT));
+        }
+      },
+    );
   });
 
   const crash = await (async () => {
@@ -1960,49 +2027,6 @@ try {
         return { replayed: crash.lostId };
       },
     );
-
-    await step("unconfirmed post: messaging_post fails, and the history does not record it (#17557)", async () => {
-      const jid = `${FRIEND}@s.whatsapp.net`;
-      await runCauseEffect(messaging.addWhatsAppSender(OWNER, { id: FRIEND, kind: "contact", name: "Ewa" }));
-      try {
-        await postAs(agents, "agent-whatsapp-e2e", jid, "CONFIRMED-17557");
-        const socket = phone.current();
-        phone.holdAcks = true;
-        const unconfirmed = await runCauseEffect(
-          agents.messaging.outboundTool(
-            "agent-whatsapp-e2e",
-            { threadId: "thread-whatsapp-e2e", turnId: "turn-whatsapp-e2e" },
-            "messaging_post",
-            { connection: connectionId(agents), place: jid, text: "UNCONFIRMED-17557" },
-            () => Effect.succeed([]),
-          ),
-        );
-        phone.holdAcks = false;
-        const text = unconfirmed.contentItems[0]?.text ?? "";
-        assert.equal(unconfirmed.success, false, `An unconfirmed post counted as sent: ${text}`);
-        assert.ok(text.includes("WhatsApp did not confirm the message"), `The agent was not told: ${text}`);
-        assert.ok(text.includes("check the chat"), `The agent was not told to have the chat checked: ${text}`);
-        assert.ok(phone.textsTo(jid).includes("UNCONFIRMED-17557"), "The unconfirmed post never reached the server.");
-        await until(
-          () => socket.ended && connection(messaging)?.state === "connected",
-          "connected again after the unconfirmed post",
-          20_000,
-        );
-        const history = (await readHistory(agents, { place: jid })).messages.map((entry) => entry.text);
-        assert.ok(
-          history.some((entry) => entry.includes("CONFIRMED-17557")),
-          "The confirmed post is not in the history.",
-        );
-        assert.ok(
-          !history.some((entry) => entry.includes("UNCONFIRMED-17557")),
-          "The history records the unconfirmed post as sent.",
-        );
-        return { unconfirmed: "not_confirmed", history: history.length };
-      } finally {
-        phone.holdAcks = false;
-        await runCauseEffect(messaging.removeWhatsAppSender(OWNER, FRIEND));
-      }
-    });
 
     await step("restart: the number connects again from its store and keeps reading", async () => {
       await until(() => connection(messaging)?.state === "connected", "connected after restart");

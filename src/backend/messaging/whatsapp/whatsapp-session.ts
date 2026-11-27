@@ -24,7 +24,12 @@ import {
   type WAVersion,
 } from "@openbot/whatsapp/baileys";
 import { Effect } from "effect";
-import { MessagingAdapterError, WhatsAppPostNeedsConfirmation, WhatsAppRefusedError } from "../messaging-types";
+import {
+  MessagingAdapterError,
+  WhatsAppPostNeedsConfirmation,
+  WhatsAppPostUnconfirmed,
+  WhatsAppRefusedError,
+} from "../messaging-types";
 import type { WhatsAppUpsertWindow } from "./whatsapp-events";
 
 const logger = createOpenBotLogger("whatsapp");
@@ -577,8 +582,8 @@ export class WhatsAppSession {
         if (typeof result === "object" && result.error)
           throw attempt > 1 ? new Error("not_confirmed") : new WhatsAppRefusedError(result.error);
         if (sent.message) this.#store.putOutbound(sent.key.id, sent.message);
-        if (result === "timeout" && needsConfirmation) throw new Error("not_confirmed");
         if (isPnUser(jid)) remember(this.#postChats, messageId, address);
+        if (result === "timeout" && needsConfirmation) throw new WhatsAppPostUnconfirmed(sent.key.id);
         return sent;
       } finally {
         ack.cancel();

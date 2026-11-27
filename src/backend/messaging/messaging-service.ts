@@ -84,6 +84,7 @@ import {
   TelegramCallError,
   WhatsAppAnswerPartlySent,
   WhatsAppPostNeedsConfirmation,
+  WhatsAppPostUnconfirmed,
   WhatsAppRefusedError,
 } from "./messaging-types";
 import { type SlackAppPort, SlackConnect, type SlackConnectFailed } from "./slack/slack-connect";
@@ -287,9 +288,7 @@ export class MessagingService {
       places: (connectionId) => this.#outboundPlaces(connectionId),
       history: (connectionId, placeId, limit, filter) => this.#outboundHistory(connectionId, placeId, limit, filter),
       post: (connectionId, target, markdown, files, embeds) =>
-        this.#outboundPost(connectionId, target, markdown, files, embeds).pipe(
-          Effect.provideService(WhatsAppPostNeedsConfirmation, true),
-        ),
+        this.#outboundPost(connectionId, target, markdown, files, embeds),
       discord: (connectionId, send) => this.#outboundDiscord(connectionId, send),
       telegram: (connectionId, send) => this.#outboundTelegram(connectionId, send),
       slack: (connectionId, send) => this.#outboundSlack(connectionId, send),
@@ -1698,7 +1697,9 @@ export class MessagingService {
           }
         : {};
     if (!text.trim() && !embeds.length && files.length) {
-      const result = yield* Effect.result(live.adapter.upload(target, files));
+      const result = yield* Effect.result(
+        live.adapter.upload(target, files).pipe(Effect.provideService(WhatsAppPostNeedsConfirmation, false)),
+      );
       if (Result.isFailure(result))
         return {
           error: `${refusal(result.failure)} A file can be in the place already. Do not post it again only because of this error.`,
@@ -1755,12 +1756,14 @@ export class MessagingService {
         Effect.succeed({
           error: `${refusal(failure)} A long text goes in more than one post, so a part of it can be posted already. Do not post it again only because of this error.`,
           failure: "unknown" as const,
+          ...(failure.cause instanceof WhatsAppPostUnconfirmed ? directPing(text) : {}),
         }),
       ),
     );
     if (!("posted" in posted)) return posted;
     const skippedFiles = files.length
       ? yield* live.adapter.upload(target, files).pipe(
+          Effect.provideService(WhatsAppPostNeedsConfirmation, false),
           Effect.map((uploaded) => uploaded.skipped),
           Effect.catch((failure) =>
             Effect.sync(() => {
