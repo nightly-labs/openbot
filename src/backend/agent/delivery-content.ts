@@ -511,7 +511,9 @@ export function deliveryPromptInput(context: DeliveryContext, sources: DeliveryP
             "Never acknowledge without a Status line.",
             sources.externalChat
               ? EXTERNAL_CHAT_ANSWER
-              : "The user does not see your written answer to this request. When only the user can give what you need, call openbot.ask_user (Claude: AskUserQuestion) and wait; never ask the user in a written answer.",
+              : relaysAnswer
+                ? `Your written answer goes to ${senderName}. When only the user can give what you need, call openbot.ask_user (Claude: AskUserQuestion) and wait; never ask the user in a written answer.`
+                : "The user does not see your written answer to this request. When only the user can give what you need, call openbot.ask_user (Claude: AskUserQuestion) and wait; never ask the user in a written answer.",
           ];
     text = [
       `${TEAMMATE_HEADER} ${senderName} (${senderAgentId}).`,
