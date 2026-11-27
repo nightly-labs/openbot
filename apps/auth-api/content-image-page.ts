@@ -288,7 +288,7 @@ function drawLockup(context: CanvasRenderingContext2D, job: ContentImageJob, loc
 function drawCenteredLockup(context: CanvasRenderingContext2D, job: ContentImageJob, lockup: ContentImageLockup): void {
   const unit = job.width / 1200;
   const plateWidth = 600 * unit;
-  const plateHeight = 216 * unit;
+  const plateHeight = 240 * unit;
   const logoSize = 96 * unit;
   const x = (job.width - plateWidth) / 2;
   const y = (job.height - plateHeight) / 2;
@@ -342,7 +342,7 @@ function drawCenteredMarkRow(
   const size = 48 * unit;
   const gap = 28 * unit;
   const padX = 48 * unit;
-  const padY = 44 * unit;
+  const padY = 54 * unit;
   const plateWidth = padX * 2 + size * marks.length + gap * (marks.length - 1);
   const plateHeight = padY * 2 + size;
   const x = (job.width - plateWidth) / 2;
@@ -380,8 +380,10 @@ function drawMarkRow(
 }
 
 /**
- * A patch of black felt sewn onto the card: a stitch just inside its edge, a
- * cut edge lit from above and a short shadow.
+ * A patch of black felt sewn onto the felt of the card. It reads as a real
+ * patch through its depth (a tight contact shadow and a wider soft one, edges
+ * that curve away under an inner shade), a cut edge of loose fibres, and a
+ * running stitch of dark thread whose stitches sink into the felt.
  */
 function drawFeltPatch(
   context: CanvasRenderingContext2D,
@@ -393,53 +395,184 @@ function drawFeltPatch(
 ): void {
   const unit = job.width / 1200;
   const radius = 36 * unit;
+  const random = seededRandom(job.slug);
   const under = document.createElement("canvas");
   under.width = job.width;
   under.height = job.height;
   under.getContext("2d")?.drawImage(context.canvas, 0, 0);
 
-  context.save();
-  context.shadowColor = "rgba(12, 10, 24, 0.32)";
-  context.shadowBlur = 14 * unit;
-  context.shadowOffsetY = 5 * unit;
-  roundedRect(context, x, y, width, height, radius);
-  context.fillStyle = "#000000";
-  context.fill();
-  context.restore();
+  // Depth: a wide soft shadow, then a tight one where the patch meets the felt.
+  for (const shadow of [
+    { color: "rgba(0, 0, 0, 0.3)", blur: 24, offset: 7 },
+    { color: "rgba(0, 0, 0, 0.55)", blur: 3, offset: 1.5 },
+  ]) {
+    context.save();
+    context.shadowColor = shadow.color;
+    context.shadowBlur = shadow.blur * unit;
+    context.shadowOffsetY = shadow.offset * unit;
+    roundedRect(context, x, y, width, height, radius);
+    context.fillStyle = "#000000";
+    context.fill();
+    context.restore();
+  }
 
   context.save();
   roundedRect(context, x, y, width, height, radius);
   context.clip();
   // Black felt: the card's own felt without its colour, turned half a turn about
   // the middle of the card so its fibres do not line up and it covers any plate.
+  context.save();
   context.translate(job.width / 2, job.height / 2);
   context.rotate(Math.PI);
   context.filter = "grayscale(1) contrast(1.8) brightness(0.26)";
   context.drawImage(under, -job.width / 2, -job.height / 2);
   context.restore();
-
-  // The cut edge: lit at the top, in shade at the bottom.
-  const edge = context.createLinearGradient(0, y, 0, y + height);
-  edge.addColorStop(0, "rgba(255, 255, 255, 0.3)");
-  edge.addColorStop(1, "rgba(0, 0, 0, 0.18)");
-  context.save();
-  roundedRect(context, x + unit, y + unit, width - 2 * unit, height - 2 * unit, radius);
-  context.strokeStyle = edge;
-  context.lineWidth = 2 * unit;
-  context.stroke();
-
-  // The stitch.
-  const inset = 12 * unit;
-  roundedRect(context, x + inset, y + inset, width - inset * 2, height - inset * 2, radius - inset);
-  context.setLineDash([9 * unit, 7 * unit]);
-  context.lineCap = "round";
-  context.strokeStyle = "rgba(255, 255, 255, 0.6)";
-  context.lineWidth = 2 * unit;
-  context.shadowColor = "rgba(0, 0, 0, 0.3)";
-  context.shadowBlur = 2 * unit;
-  context.shadowOffsetY = unit;
-  context.stroke();
+  // Light from above, and edges that curve away into shade.
+  const light = context.createLinearGradient(0, y, 0, y + height);
+  light.addColorStop(0, "rgba(255, 255, 255, 0.07)");
+  light.addColorStop(0.5, "rgba(255, 255, 255, 0)");
+  light.addColorStop(1, "rgba(0, 0, 0, 0.12)");
+  context.fillStyle = light;
+  context.fillRect(x, y, width, height);
+  context.beginPath();
+  context.rect(x - 60 * unit, y - 60 * unit, width + 120 * unit, height + 120 * unit);
+  context.roundRect(x, y, width, height, radius);
+  context.shadowColor = "rgba(0, 0, 0, 0.7)";
+  context.shadowBlur = 14 * unit;
+  context.fillStyle = "#000000";
+  context.fill("evenodd");
   context.restore();
+
+  // The cut edge: loose fibres across it, dark over the felt and a little lighter on the patch.
+  const perimeter = roundedRectPerimeter(width, height, radius);
+  const fibres = Math.round(perimeter / (0.9 * unit));
+  context.save();
+  context.lineCap = "round";
+  for (let index = 0; index < fibres; index += 1) {
+    const point = roundedRectPoint(x, y, width, height, radius, random() * perimeter);
+    const along = (random() - 0.5) * 3 * unit;
+    const angle = Math.atan2(point.ny, point.nx) + (random() - 0.5) * 2.2;
+    const length = (1.5 + random() * 4.5) * unit;
+    const startX = point.x + point.nx * along;
+    const startY = point.y + point.ny * along;
+    context.strokeStyle = random() < 0.75 ? `rgba(14, 14, 16, ${0.55 + random() * 0.4})` : "rgba(90, 90, 96, 0.35)";
+    context.lineWidth = (0.5 + random() * 0.7) * unit;
+    context.beginPath();
+    context.moveTo(startX, startY);
+    context.lineTo(startX + Math.cos(angle) * length, startY + Math.sin(angle) * length);
+    context.stroke();
+  }
+  context.restore();
+
+  // The running stitch of dark thread, just inside the edge.
+  const inset = 13 * unit;
+  const stitchRadius = radius - inset;
+  const stitchWidth = width - inset * 2;
+  const stitchHeight = height - inset * 2;
+  const stitchPerimeter = roundedRectPerimeter(stitchWidth, stitchHeight, stitchRadius);
+  const pitch = 15 * unit;
+  const stitchLength = 9 * unit;
+  const count = Math.round(stitchPerimeter / pitch);
+  context.save();
+  context.lineCap = "round";
+  for (let index = 0; index < count; index += 1) {
+    const from = (index / count) * stitchPerimeter;
+    const start = roundedRectPoint(x + inset, y + inset, stitchWidth, stitchHeight, stitchRadius, from);
+    const end = roundedRectPoint(
+      x + inset,
+      y + inset,
+      stitchWidth,
+      stitchHeight,
+      stitchRadius,
+      from + stitchLength + (random() - 0.5) * unit,
+    );
+    // The holes the needle left, pressed into the felt.
+    context.fillStyle = "rgba(0, 0, 0, 0.85)";
+    for (const hole of [start, end]) {
+      context.beginPath();
+      context.arc(hole.x, hole.y + 0.4 * unit, 1.6 * unit, 0, Math.PI * 2);
+      context.fill();
+    }
+    // The thread, then the light on its top.
+    context.strokeStyle = "#2c2b30";
+    context.lineWidth = 2.6 * unit;
+    context.beginPath();
+    context.moveTo(start.x, start.y);
+    context.lineTo(end.x, end.y);
+    context.stroke();
+    context.strokeStyle = "rgba(255, 255, 255, 0.16)";
+    context.lineWidth = 0.9 * unit;
+    context.beginPath();
+    context.moveTo(start.x, start.y - 0.6 * unit);
+    context.lineTo(end.x, end.y - 0.6 * unit);
+    context.stroke();
+  }
+  context.restore();
+}
+
+function roundedRectPerimeter(width: number, height: number, radius: number): number {
+  return 2 * (width - 2 * radius) + 2 * (height - 2 * radius) + 2 * Math.PI * radius;
+}
+
+/**
+ * The point at `distance` along the edge of a rounded rectangle, clockwise from
+ * the start of the top side, with the outward normal there.
+ */
+function roundedRectPoint(
+  x: number,
+  y: number,
+  width: number,
+  height: number,
+  radius: number,
+  distance: number,
+): { x: number; y: number; nx: number; ny: number } {
+  const straightX = width - 2 * radius;
+  const straightY = height - 2 * radius;
+  const arc = (Math.PI * radius) / 2;
+  const corners = [
+    { cx: x + width - radius, cy: y + radius, from: -Math.PI / 2 },
+    { cx: x + width - radius, cy: y + height - radius, from: 0 },
+    { cx: x + radius, cy: y + height - radius, from: Math.PI / 2 },
+    { cx: x + radius, cy: y + radius, from: Math.PI },
+  ] as const;
+  const sides = [
+    { length: straightX, at: (t: number) => ({ x: x + radius + t, y, nx: 0, ny: -1 }) },
+    { length: straightY, at: (t: number) => ({ x: x + width, y: y + radius + t, nx: 1, ny: 0 }) },
+    { length: straightX, at: (t: number) => ({ x: x + width - radius - t, y: y + height, nx: 0, ny: 1 }) },
+    { length: straightY, at: (t: number) => ({ x, y: y + height - radius - t, nx: -1, ny: 0 }) },
+  ] as const;
+  let rest =
+    ((distance % roundedRectPerimeter(width, height, radius)) + roundedRectPerimeter(width, height, radius)) %
+    roundedRectPerimeter(width, height, radius);
+  for (let index = 0; index < 4; index += 1) {
+    const side = sides[index];
+    const corner = corners[index];
+    if (!side || !corner) break;
+    if (rest <= side.length) return side.at(rest);
+    rest -= side.length;
+    if (rest <= arc) {
+      const angle = corner.from + rest / radius;
+      const nx = Math.cos(angle);
+      const ny = Math.sin(angle);
+      return { x: corner.cx + nx * radius, y: corner.cy + ny * radius, nx, ny };
+    }
+    rest -= arc;
+  }
+  return { x: x + radius, y, nx: 0, ny: -1 };
+}
+
+/** Mulberry32, seeded with an FNV-1a hash of the text, so two runs draw the same bytes. */
+function seededRandom(text: string): () => number {
+  let state = 2166136261;
+  for (let index = 0; index < text.length; index += 1) {
+    state = Math.imul(state ^ text.charCodeAt(index), 16777619);
+  }
+  return () => {
+    state = (state + 0x6d2b79f5) | 0;
+    let value = Math.imul(state ^ (state >>> 15), 1 | state);
+    value = (value + Math.imul(value ^ (value >>> 7), 61 | value)) ^ value;
+    return ((value ^ (value >>> 14)) >>> 0) / 4294967296;
+  };
 }
 
 /** The average luma of an area, from a sparse sample of its pixels. */
