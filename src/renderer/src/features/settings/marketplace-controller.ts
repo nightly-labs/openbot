@@ -919,7 +919,7 @@ export function createMarketplaceController(
             id: `custom:${server.id}`,
             name: server.name,
             tagline: serverAddress(server),
-            status: server.enabled ? "connected" : "idle",
+            status: "connected",
             server,
           }),
         ),

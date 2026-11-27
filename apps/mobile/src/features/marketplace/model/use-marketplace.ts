@@ -166,7 +166,7 @@ export function useMarketplaceInstalled(serverId: string) {
       if (listing.kind === "agent") return agentFor(listing.id) !== undefined;
       if (listing.kind === "skill") return skillAgentIds(listing.id).length > 0;
       if (listing.source === "connector") return listing.connected;
-      if (listing.source === "custom") return listing.server.enabled;
+      if (listing.source === "custom") return true;
       return pluginInstalled(listing.plugin, mcpServers.data ?? []);
     };
     return { agents, agentFor, skillAgentIds, usableSkillAgentIds, installed, mcpServers: mcpServers.data ?? null };
