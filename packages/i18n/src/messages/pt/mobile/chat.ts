@@ -142,6 +142,7 @@ export const messages = {
   "mobile.chat.attachment.typeFile": "ARQUIVO",
   "mobile.chat.attachment.tooLargeForMobile": "Este arquivo excede o limite de {limit} do celular. Abra no computador.",
   "mobile.chat.backdrop.agentSet": "{name} definiu o fundo",
+  "mobile.chat.backdrop.agentRemoved": "{name} removeu o fundo",
   "mobile.chat.backdrop.undo": "Desfazer",
   "mobile.chat.backdrop.dismiss": "Fechar",
   "mobile.chat.attachment.sharingUnavailable": "O compartilhamento de arquivos está indisponível neste dispositivo.",

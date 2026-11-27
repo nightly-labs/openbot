@@ -408,6 +408,7 @@ export const messages = {
   "chat.menu.backdropSet": "Der Fensterhintergrund ist festgelegt.",
   "chat.menu.backdropFailed": "Diese Datei kann kein Fensterhintergrund sein.",
   "chat.backdrop.agentSet": "Ein Agent hat den Hintergrund geändert: {name}",
+  "chat.backdrop.agentRemoved": "Ein Agent hat den Hintergrund entfernt.",
   "chat.backdrop.undo": "Rückgängig",
   "chat.pins.title": "Angeheftete Nachrichten",
   "chat.pins.emptyTitle": "Keine angehefteten Nachrichten",

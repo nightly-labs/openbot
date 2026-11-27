@@ -106,6 +106,7 @@ export const messages = {
   "status.agent.memoriesUpdating": "メモリーを更新しています…",
   "status.agent.skillUsing": "スキル {name} を使用しています…",
   "status.agent.backdropSetting": "背景を変更しています…",
+  "status.agent.backdropRemoved": "背景を削除しました",
   "status.agent.skillReading": "スキルを読み込んでいます…",
   "status.agent.toolStepFailed": "ツールのステップが失敗しました。結果を確認し、次に試すことを判断しています…",
   "status.agent.toolResultReviewing": "最新のツール結果を確認しています…",

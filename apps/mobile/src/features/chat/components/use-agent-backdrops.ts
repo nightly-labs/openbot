@@ -1,8 +1,8 @@
-import { CHAT_VISUAL_PAGE_LIMIT, chatBackdropPage, chatBackdropRequesters } from "@openbot/contracts/chat-visual";
+import { CHAT_VISUAL_PAGE_LIMIT, chatBackdropChange, chatBackdropRequesters } from "@openbot/contracts/chat-visual";
 import type { AttachmentSummary, ConversationMessage } from "@openbot/contracts/ipc";
 import { File, Paths } from "expo-file-system";
 import { useEffect, useRef } from "react";
-import { setAgentBackdrop, useChatBackdrop } from "@/features/settings/model/chat-backdrop";
+import { clearAgentBackdrop, setAgentBackdrop, useChatBackdrop } from "@/features/settings/model/chat-backdrop";
 import { useMobileWorkspaceActions } from "@/features/workspace/context/workspace-store";
 import { largeDownloadOf } from "../model/large-files";
 import { HtmlPage } from "./html-page";
@@ -50,18 +50,20 @@ export function useAgentBackdrops({
     const readerAccount = accountUserId ? `local-user:${accountUserId}` : null;
     const isReader = (id: string) => id === reader || id === readerAccount;
     const mark = useChatBackdrop.getState().mark;
-    let newest: { message: ConversationMessage; attachment: AttachmentSummary; time: number } | undefined;
+    let newest:
+      | { message: ConversationMessage; attachment: AttachmentSummary; clear: boolean; time: number }
+      | undefined;
     for (const message of messages) {
-      const attachment = chatBackdropPage(message);
+      const change = chatBackdropChange(message);
       const time = Date.parse(message.createdAt);
-      if (!attachment || !(time > mark) || (newest && newest.time >= time)) continue;
-      if (attachment.size > CHAT_VISUAL_PAGE_LIMIT) continue;
+      if (!change || !(time > mark) || (newest && newest.time >= time)) continue;
+      if (change.attachment.size > CHAT_VISUAL_PAGE_LIMIT) continue;
       if (pending.has(message.id) || failed.has(message.id)) continue;
       if (requesters.get(message.id)?.some(isReader) === false) continue;
-      newest = { message, attachment, time };
+      newest = { message, ...change, time };
     }
     if (!newest) return;
-    const { message, attachment, time } = newest;
+    const { message, attachment, clear, time } = newest;
     pending.add(message.id);
     queue = queue.then(async () => {
       try {
@@ -71,6 +73,10 @@ export function useAgentBackdrops({
         const askedBy = chatBackdropRequesters(html);
         requesters.set(message.id, askedBy);
         if (!askedBy.some(isReader)) return;
+        if (clear) {
+          await clearAgentBackdrop({ serverId, agentId, messageId: message.id }, time, { offerUndo: chatOpen.current });
+          return;
+        }
         await setAgentBackdrop(
           { serverId, agentId, messageId: message.id, name: message.text, bubbles: null },
           html,

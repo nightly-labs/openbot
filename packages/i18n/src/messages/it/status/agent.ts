@@ -110,6 +110,7 @@ export const messages = {
   "status.agent.memoriesUpdating": "Aggiornamento delle sue memorie…",
   "status.agent.skillUsing": "Uso della skill {name}…",
   "status.agent.backdropSetting": "Modifica dello sfondo…",
+  "status.agent.backdropRemoved": "Sfondo rimosso",
   "status.agent.skillReading": "Lettura di una skill…",
   "status.agent.toolStepFailed":
     "Un passaggio dello strumento è fallito; analisi del risultato e scelta del prossimo tentativo…",

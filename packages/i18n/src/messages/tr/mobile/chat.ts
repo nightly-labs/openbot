@@ -142,6 +142,7 @@ export const messages = {
   "mobile.chat.attachment.typeFile": "DOSYA",
   "mobile.chat.attachment.tooLargeForMobile": "Bu dosya mobil {limit} sınırını aşıyor. Masaüstünde açın.",
   "mobile.chat.backdrop.agentSet": "{name} arka planı ayarladı",
+  "mobile.chat.backdrop.agentRemoved": "{name} arka planı kaldırdı",
   "mobile.chat.backdrop.undo": "Geri al",
   "mobile.chat.backdrop.dismiss": "Kapat",
   "mobile.chat.attachment.sharingUnavailable": "Bu cihazda dosya paylaşımı kullanılamıyor.",

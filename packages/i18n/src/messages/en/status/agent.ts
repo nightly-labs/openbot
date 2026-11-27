@@ -116,6 +116,7 @@ export const messages = defineMessages("status.agent", {
   "status.agent.memoriesUpdating": "Updating its memories…",
   "status.agent.skillUsing": "Using the skill {name}…",
   "status.agent.backdropSetting": "Changing the backdrop…",
+  "status.agent.backdropRemoved": "Removed the backdrop",
   "status.agent.skillReading": "Reading a skill…",
   "status.agent.toolStepFailed": "A tool step failed; reviewing the result and deciding what to try next…",
   "status.agent.toolResultReviewing": "Reviewing the latest tool result…",

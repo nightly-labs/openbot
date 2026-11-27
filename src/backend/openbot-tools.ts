@@ -364,6 +364,12 @@ export const OPENBOT_TOOL_DEFINITIONS: readonly OpenBotToolDefinition[] = [
     shape: setBackdropToolSchema.shape,
   },
   {
+    name: "clear_backdrop",
+    description:
+      "Remove the backdrop behind the user's whole OpenBot window, also one that the user chose, so the window shows its normal look. Use it when the user asks to remove the backdrop, the scene or the page behind the window, or to go back to the default look. The user can undo it. Do not repeat it in your reply.",
+    shape: {},
+  },
+  {
     name: "list_capture_sources",
     description:
       "List the displays and windows of this computer that capture_screen can capture: display ids, desktop bounds in points, scale factors, and window ids and titles.",

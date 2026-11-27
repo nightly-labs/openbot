@@ -401,6 +401,7 @@ export const messages = {
   "chat.menu.backdropSet": "Arka plan ayarlandı.",
   "chat.menu.backdropFailed": "Bu dosya arka plan olamaz.",
   "chat.backdrop.agentSet": "Bir ajan arka planı değiştirdi: {name}",
+  "chat.backdrop.agentRemoved": "Bir ajan arka planı kaldırdı.",
   "chat.backdrop.undo": "Geri al",
   "chat.pins.title": "Sabitlenen mesajlar",
   "chat.pins.emptyTitle": "Sabitlenen mesaj yok",

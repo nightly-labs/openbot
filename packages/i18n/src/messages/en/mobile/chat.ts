@@ -141,6 +141,7 @@ export const messages = defineMessages("mobile.chat", {
   "mobile.chat.attachment.typeFile": "FILE",
   "mobile.chat.attachment.tooLargeForMobile": "This file exceeds the mobile {limit} limit. Open it on desktop.",
   "mobile.chat.backdrop.agentSet": "{name} set the backdrop",
+  "mobile.chat.backdrop.agentRemoved": "{name} removed the backdrop",
   "mobile.chat.backdrop.undo": "Undo",
   "mobile.chat.backdrop.dismiss": "Close",
   "mobile.chat.attachment.sharingUnavailable": "File sharing is unavailable on this device.",

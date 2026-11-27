@@ -377,6 +377,7 @@ export const messages = {
   "chat.menu.backdropSet": "背景を設定しました。",
   "chat.menu.backdropFailed": "このファイルは背景にできません。",
   "chat.backdrop.agentSet": "エージェントが背景を変更しました: {name}",
+  "chat.backdrop.agentRemoved": "エージェントが背景を削除しました。",
   "chat.backdrop.undo": "元に戻す",
   "chat.pins.title": "ピン留めしたメッセージ",
   "chat.pins.emptyTitle": "ピン留めしたメッセージはありません",

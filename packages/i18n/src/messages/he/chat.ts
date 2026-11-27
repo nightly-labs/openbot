@@ -400,6 +400,7 @@ export const messages = {
   "chat.menu.backdropSet": "הרקע הוגדר.",
   "chat.menu.backdropFailed": "הקובץ הזה לא יכול להיות רקע.",
   "chat.backdrop.agentSet": "סוכן שינה את הרקע: {name}",
+  "chat.backdrop.agentRemoved": "סוכן הסיר את הרקע.",
   "chat.backdrop.undo": "ביטול",
   "chat.pins.title": "הודעות מוצמדות",
   "chat.pins.emptyTitle": "אין הודעות מוצמדות",

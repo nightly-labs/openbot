@@ -143,6 +143,7 @@ export const messages = {
   "mobile.chat.attachment.tooLargeForMobile":
     "このファイルはモバイルの上限 {limit} を超えています。パソコンで開いてください。",
   "mobile.chat.backdrop.agentSet": "{name} が背景を設定しました",
+  "mobile.chat.backdrop.agentRemoved": "{name} が背景を削除しました",
   "mobile.chat.backdrop.undo": "元に戻す",
   "mobile.chat.backdrop.dismiss": "閉じる",
   "mobile.chat.attachment.sharingUnavailable": "このデバイスではファイルの共有を利用できません。",

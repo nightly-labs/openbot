@@ -383,6 +383,7 @@ export const messages = {
   "chat.menu.backdropSet": "背景已设置。",
   "chat.menu.backdropFailed": "此文件不能用作背景。",
   "chat.backdrop.agentSet": "一个智能体更改了背景：{name}",
+  "chat.backdrop.agentRemoved": "一个智能体移除了背景。",
   "chat.backdrop.undo": "撤销",
   "chat.pins.title": "置顶消息",
   "chat.pins.emptyTitle": "没有置顶消息",

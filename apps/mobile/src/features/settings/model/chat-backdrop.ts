@@ -30,6 +30,7 @@ interface AgentBackdropUndo {
   messageId: string;
   choice: ChatBackdropChoice;
   page: { meta: AgentBackdropPage; html: string } | null;
+  removed?: true;
 }
 
 export const CHAT_BACKDROP_STRENGTH = { min: 0.1, max: 1, default: 0.55 } as const;
@@ -230,6 +231,27 @@ export async function setAgentBackdrop(
   return true;
 }
 
+export async function clearAgentBackdrop(
+  source: Pick<AgentBackdropUndo, "serverId" | "agentId" | "messageId">,
+  time: number,
+  { offerUndo }: { offerUndo: boolean },
+): Promise<boolean> {
+  const state = useChatBackdrop.getState();
+  if (!state.ready || time <= state.mark) return false;
+  const shown = state.choice !== "none";
+  useChatBackdrop.setState({
+    mark: time,
+    ...(shown
+      ? {
+          choice: "none" as const,
+          undo: offerUndo ? { ...source, choice: state.choice, page: null, removed: true as const } : null,
+        }
+      : {}),
+  });
+  await persist();
+  return shown;
+}
+
 export async function undoAgentBackdrop(): Promise<void> {
   const { undo, pageVersion } = useChatBackdrop.getState();
   if (!undo) return;
@@ -237,7 +259,7 @@ export async function undoAgentBackdrop(): Promise<void> {
     createBackdropFolder();
     await agentBackdropFile().write(undo.page.html);
     useChatBackdrop.setState({ agentPage: undo.page.meta, pageVersion: pageVersion + 1 });
-  } else if (undo.choice !== "agent") {
+  } else if (undo.choice !== "agent" && !undo.removed) {
     deleteQuietly(agentBackdropFile());
     useChatBackdrop.setState({ agentPage: null });
   }

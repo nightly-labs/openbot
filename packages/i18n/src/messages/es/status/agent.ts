@@ -106,6 +106,7 @@ export const messages = {
   "status.agent.memoriesUpdating": "Actualizando sus recuerdos…",
   "status.agent.skillUsing": "Usando la habilidad {name}…",
   "status.agent.backdropSetting": "Cambiando el fondo…",
+  "status.agent.backdropRemoved": "Se quitó el fondo",
   "status.agent.skillReading": "Leyendo una habilidad…",
   "status.agent.toolStepFailed":
     "Un paso de herramienta falló; revisando el resultado y decidiendo qué probar después…",

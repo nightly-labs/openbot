@@ -135,6 +135,7 @@ export const messages = {
   "mobile.chat.attachment.tooLargeForMobile":
     "Dit bestand is groter dan de mobiele limiet van {limit}. Open het op je computer.",
   "mobile.chat.backdrop.agentSet": "{name} heeft de achtergrond ingesteld",
+  "mobile.chat.backdrop.agentRemoved": "{name} heeft de achtergrond verwijderd",
   "mobile.chat.backdrop.undo": "Ongedaan maken",
   "mobile.chat.backdrop.dismiss": "Sluiten",
   "mobile.chat.attachment.sharingUnavailable": "Bestanden delen is niet beschikbaar op dit apparaat.",

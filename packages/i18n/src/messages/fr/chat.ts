@@ -393,6 +393,7 @@ export const messages = {
   "chat.menu.backdropSet": "L’arrière-plan est défini.",
   "chat.menu.backdropFailed": "Ce fichier ne peut pas servir d’arrière-plan.",
   "chat.backdrop.agentSet": "Un agent a changé l’arrière-plan : {name}",
+  "chat.backdrop.agentRemoved": "Un agent a retiré l’arrière-plan.",
   "chat.backdrop.undo": "Annuler",
   "chat.pins.title": "Messages épinglés",
   "chat.pins.emptyTitle": "Aucun message épinglé",

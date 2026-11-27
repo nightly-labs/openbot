@@ -108,6 +108,7 @@ export const messages = {
   "status.agent.memoriesUpdating": "Обновление памяти…",
   "status.agent.skillUsing": "Использование навыка {name}…",
   "status.agent.backdropSetting": "Изменение фона…",
+  "status.agent.backdropRemoved": "Фон удалён",
   "status.agent.skillReading": "Чтение навыка…",
   "status.agent.toolStepFailed": "Шаг инструмента завершился ошибкой; просмотр результата и выбор следующего действия…",
   "status.agent.toolResultReviewing": "Просмотр последнего результата инструмента…",

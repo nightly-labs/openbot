@@ -101,6 +101,7 @@ export const messages = {
   "status.agent.memoriesUpdating": "מעדכן את הזיכרונות שלו…",
   "status.agent.skillUsing": "משתמש במיומנות {name}…",
   "status.agent.backdropSetting": "משנה את הרקע…",
+  "status.agent.backdropRemoved": "הרקע הוסר",
   "status.agent.skillReading": "קורא מיומנות…",
   "status.agent.toolStepFailed": "שלב בכלי נכשל; בודק את התוצאה ומחליט מה לנסות עכשיו…",
   "status.agent.toolResultReviewing": "בודק את התוצאה האחרונה של הכלי…",

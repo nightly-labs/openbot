@@ -109,6 +109,7 @@ export const messages = {
   "status.agent.memoriesUpdating": "Mise à jour de ses souvenirs…",
   "status.agent.skillUsing": "Utilisation de la compétence {name}…",
   "status.agent.backdropSetting": "Changement de l’arrière-plan…",
+  "status.agent.backdropRemoved": "Arrière-plan retiré",
   "status.agent.skillReading": "Lecture d’une compétence…",
   "status.agent.toolStepFailed":
     "Une étape d’outil a échoué ; analyse du résultat et recherche de la prochaine tentative…",

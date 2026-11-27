@@ -393,6 +393,7 @@ export const messages = {
   "chat.menu.backdropSet": "De achtergrond is ingesteld.",
   "chat.menu.backdropFailed": "Dit bestand kan geen achtergrond zijn.",
   "chat.backdrop.agentSet": "Een agent heeft de achtergrond gewijzigd: {name}",
+  "chat.backdrop.agentRemoved": "Een agent heeft de achtergrond verwijderd.",
   "chat.backdrop.undo": "Ongedaan maken",
   "chat.pins.title": "Vastgemaakte berichten",
   "chat.pins.emptyTitle": "Geen vastgemaakte berichten",
