@@ -24,9 +24,9 @@ the [root changelog](../../CHANGELOG.md).
   than one question, the watch asks each question in turn and shows all answers before it sends them.
   A private answer stays on iPhone; the watch shows the question.
 - Listen to an agent's last reply on the watch, and stop a working agent.
-- A watch complication shows how many agents wait for you. Tap it to open the first agent that waits.
-  The complication also updates when the watch app is closed, and it moves up in the Smart Stack when an
-  agent waits.
+- OpenBot complications on the watch face. They show the OpenBot eyes: the eyes open wide when an agent waits for you, and look to the side while agents work. The circular complication shows the number of agents that wait, or in blue the number of chats with unread messages. The corner label is short: the number that waits, the number of unread chats, "Working" or "All clear". Tap the circular or the corner complication to open the first agent that waits. The complications also update when the watch app is closed.
+- An OpenBot card in the Apple Watch Smart Stack. It shows one agent: the agent that waits for you, else the newest agent with unread messages, else the agent with the newest update. The card keeps that agent until another agent has an update. The card has the color and the picture of the agent, its state and its current line. An orange "+N" shows how many other agents wait for you, and a blue "+N" how many other chats have unread messages. A tap opens the agent. The card moves up in the Smart Stack when an agent waits.
+- The OpenBot card and complications show only the server that you chose in the watch app. With more than one server, you can add an OpenBot card or complication for each server: choose "OpenBot · <server>" when you add it. "OpenBot" alone follows the server that you chose in the watch app. The card shows the server name after the state. When a new message arrives, the iPhone sends it to the watch at once, so the card and the complications change soon.
 - On watchOS 11 and later, double-tap to send a reviewed message.
 - When the wrist is down, the watch hides the request, question and reply text.
 - The watch connects to your servers directly, so it works when OpenBot on iPhone is in the background
@@ -39,24 +39,21 @@ the [root changelog](../../CHANGELOG.md).
   marks it as read.
 - Opening an agent on the watch marks its chat as read. Agents with unread messages show a count and
   stay near the top of the list.
-- A new privacy setting, "Load remote content in chats", in Server Settings > Agents. It is off by default. While it is off, chats do not load pictures or site icons from other websites: links show with a plain link icon, a diagram that uses a picture from another website shows a "Load diagram" button, and pages from agents show without scripts until you tap "Run page". Agent backdrop pages show without scripts. Owners and admins change the setting, and it applies to everyone on the server. The server must be on the OpenBot version with this setting.
+- A new privacy setting, "Load remote content in chats", in Server Settings > Agents. It is off by default. While it is off, chats do not load pictures or site icons from other websites: links show with a plain link icon, a diagram that uses a picture from another website shows a "Load diagram" button, and pages from agents show without scripts until you tap "Run page". Agent backdrop pages show without scripts. Owners and admins change the setting, and it applies to everyone on the server. With an older server, the app also does not load this content, and the setting shows only when the server is on the new OpenBot version.
 - On watchOS 26 and later, the OpenBot card and complications update soon after your agents change, also when the watch app is closed. Your server tells the watch, and the widget gets the new state itself. The server must also be on this version.
+- The Apple Watch app shows the logo and the color of each server: the same plush or uploaded logo as on the iPhone. The home screen has a background in the main color of the logo, with a large server logo that continues on the agent list page, and the server name, the counts, their dots and the unread badges show in tones of that color. Each row in Servers has the logo and the color of its server. When the watch gets data directly from a server, the server must also be on the newest OpenBot version to send its color. To turn the server colors off, swipe right from the home screen to the Settings page. The Servers list keeps its logos and colors.
+- On the Apple Watch, "Working" on an agent or channel page and the working icon on a pinned agent show in the color of that agent or channel. The Server colors switch does not change them.
 
 ### Changed
 
-- The Apple Watch app now shows the logo and the color of each server: the same plush or uploaded logo as on the iPhone. The home screen has a background in the main color of the logo, with a large server logo that continues on the agent list page, and the server name, the counts, their dots and the unread badges show in tones of that color. Each row in Servers has the logo and the color of its server. When the watch gets data directly from a server, the server must also be on the newest OpenBot version to send its color. To turn the server colors off, swipe right from the home screen to the new Settings page. The Servers list keeps its logos and colors.
-- On the Apple Watch, "Working" on an agent or channel page and the working icon on a pinned agent now show in the color of that agent or channel, not in blue. The Server colors switch does not change them.
 - Links in chats no longer show the icon of their website until an owner or admin turns on "Load remote content in chats".
 - The Apps tab of the Marketplace now loads the app list from openbot.run. A new app shows in the iPhone app without an app update. A new app that runs a local command shows only when the server is also on the new OpenBot version.
-- Muting an agent, a channel task command, and cancelling, steering or moving a queued message now
+- Muting or unmuting an agent, a channel task command, and cancelling, steering or moving a queued message now
   show at once. Before, each one waited for the server. If the server refuses the change, the old
   value comes back.
 - The agents, channels, pins, routines, queued messages and the newest chat and channel messages
   now stay up to date by themselves. The server sends only what changed. The server must also be
   on the new version; with an older server, the app reads the data as before.
-- The OpenBot card in the Apple Watch Smart Stack and the OpenBot complications show only the server that you chose in the watch app. The card shows one agent: the agent that waits for you, else the newest agent with unread messages, else the agent with the newest update. The card keeps that agent until another agent has an update. When a new message arrives, the iPhone sends it to the watch at once, so the card and the complications change sooner. The card has the color and the picture of the agent, its state and its current line. An orange "+N" shows how many other agents wait for you, and a blue "+N" how many other chats have unread messages. A tap opens the agent.
-- The OpenBot complications on the watch face show the OpenBot eyes. The eyes open wide when an agent waits for you, look to the side while agents work, and the circular complication shows the number of agents that wait, or in blue the number of chats with unread messages. The corner label is short: the number that waits, the number of unread chats, "Working" or "All clear".
-- With more than one server, you can add an OpenBot card or complication for each server: choose "OpenBot · <server>" when you add it. "OpenBot" alone follows the server that you chose in the watch app. The card shows the server name after the state.
 - The app shows your saved agents, sections and channels sooner when it starts. It reads the saved chat pages after the agent list shows, and the start screen reads the appearance and motion settings before the other settings.
 - The app loads the code of a feature when it first uses it, not when it starts. A server change, such as a new agent state, now updates fewer of the screens that are under an open sheet or page, and a navigation no longer prepares the options of all screens again.
 - The agent list on the home screen and the iPad rail stays smooth with many agents. Before, a reply from one agent made all rows draw again.
@@ -66,15 +63,11 @@ the [root changelog](../../CHANGELOG.md).
   app tries again at once.
 - Long chats scroll and stream more smoothly. A new piece of a reply now updates only the reply that changes, not each message in the chat.
 
-### Removed
-
-- The one-line OpenBot complication at the top of some watch faces. Choose the circular or the corner OpenBot complication in its place.
-
 ### Fixed
 
 - A workflow asset step that has a video or audio file shows the file name. Before, the step said that the file was no longer on the server. When you choose a picture for that step, it becomes a picture step again.
 - A reply in a thread, such as the own chat of a routine, that comes while the app is open now sends a notification when you leave the app, if you did not open that thread. Before, the reply showed only in that thread, and no notification came. The computer or server that runs your agents must be on the new OpenBot version.
-- After you update the app from the App Store, dictation with the phone recognizer listens in the
+- After you update the app from the App Store or Google Play, dictation with the phone recognizer listens in the
   language of the keyboard you type with when Dictation language is Automatic. Before, it used the
   first language in your phone settings, so on a phone set to English, speech in Portuguese came out
   as English words.
