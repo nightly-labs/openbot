@@ -1,4 +1,4 @@
-import { type CentralAuthUser, LOCAL_SERVER_ID } from "@openbot/contracts/ipc";
+import type { CentralAuthUser } from "@openbot/contracts/ipc";
 import { AGENT_TASKS_CAPABILITY } from "@openbot/contracts/team-protocol/agent-tasks-v1";
 import { CRM_CAPABILITY } from "@openbot/contracts/team-protocol/crm-v1";
 import {
@@ -354,7 +354,7 @@ export function WorkspaceShell(props: {
 
   return (
     <ConnectorsProvider>
-      <WindowBackdrop remoteContent={remoteChatContent.enabled(activeServer()?.id ?? LOCAL_SERVER_ID)} />
+      <WindowBackdrop remoteContent={servers().every((server) => remoteChatContent.enabled(server.id))} />
       <div class="app-window">
         <WorkspacePageRail hidden={chatWindow || remoteDesktopWorkspaceVisible()} />
         <WorkspaceFrame

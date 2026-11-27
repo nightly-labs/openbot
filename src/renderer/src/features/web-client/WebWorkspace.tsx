@@ -90,6 +90,7 @@ import { MESSAGE_DELETE_CAPABILITY } from "@openbot/contracts/team-protocol/mess
 import { MESSAGE_PINS_CAPABILITY } from "@openbot/contracts/team-protocol/message-pins-v1";
 import { OWNER_TRANSFER_CAPABILITY } from "@openbot/contracts/team-protocol/owner-transfer-v1";
 import { PROVIDER_ACCOUNTS_CAPABILITY } from "@openbot/contracts/team-protocol/provider-accounts-v1";
+import { REMOTE_CHAT_CONTENT_CAPABILITY } from "@openbot/contracts/team-protocol/remote-chat-content-v1";
 import { ROUTINE_RECOVERY_CAPABILITY } from "@openbot/contracts/team-protocol/routine-recovery-v1";
 import { ROUTINE_RUN_PLACE_CAPABILITY } from "@openbot/contracts/team-protocol/routine-run-place-v1";
 import { ROUTINES_ONCE_CAPABILITY } from "@openbot/contracts/team-protocol/routines-once-v1";
@@ -1858,7 +1859,9 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
   };
   const remoteChatContent = createRemoteChatContent({
     getRemoteChatContent: async (serverId) =>
-      runTeamEffect(getHostRemoteChatContent(hostRequest(serverId)).pipe(Effect.mapError((error) => error.cause))),
+      workspace.state.capabilities.includes(REMOTE_CHAT_CONTENT_CAPABILITY)
+        ? runTeamEffect(getHostRemoteChatContent(hostRequest(serverId)).pipe(Effect.mapError((error) => error.cause)))
+        : { enabled: false },
     setRemoteChatContent: async (enabled, serverId) =>
       runTeamEffect(
         setHostRemoteChatContent(hostRequest(serverId), enabled).pipe(Effect.mapError((error) => error.cause)),
@@ -3059,7 +3062,10 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
             </div>
           }
         >
-          <WindowBackdrop pages="srcdoc" remoteContent={remoteChatContent.enabled(server()?.id)} />
+          <WindowBackdrop
+            pages="srcdoc"
+            remoteContent={servers().every((item) => remoteChatContent.enabled(item.id))}
+          />
           <div
             class="app-window web-app-window"
             data-loading-waited-long={loadingCover() && loadingWaitedLong() ? "" : undefined}
