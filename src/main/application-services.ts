@@ -705,6 +705,7 @@ export interface ApplicationServices {
   crm: CrmHandle;
   routineResults: RoutineResultsHandle;
   providerRuntimes: ProviderRuntimeManager;
+  closeDatabase: () => void;
   providerCredentials: ProviderCredentialStore;
   messaging: MessagingService;
   teamWebRtcBridge: TeamWebRtcBridge;
@@ -1310,7 +1311,8 @@ export async function createApplicationServices({
   performance.mark("openbot:services.pre-store");
   await runCauseEffect(store.initialize());
   performance.mark("openbot:services.store");
-  teardown.push(TEARDOWN_ORDER.database, "the database", () => store.database.close(), { afterAbandonedSteps: true });
+  const closeDatabase = () => store.database.close();
+  teardown.push(TEARDOWN_ORDER.database, "the database", closeDatabase, { afterAbandonedSteps: true });
   const managedSkills = new ManagedSkillService(
     app.isPackaged
       ? join(process.resourcesPath, "managed-skills", "openbot-site-hosting", "SKILL.md")
@@ -4557,6 +4559,7 @@ export async function createApplicationServices({
     crm,
     routineResults: routineResultRuntime,
     providerRuntimes,
+    closeDatabase,
     providerCredentials,
     messaging,
     teamWebRtcBridge,
