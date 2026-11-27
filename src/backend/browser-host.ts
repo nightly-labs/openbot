@@ -63,6 +63,7 @@ import {
   WebContentsView,
   type WebContentsWillFrameNavigateEventParams,
   webContents,
+  webFrameMain,
 } from "electron";
 import { writeJsonFileAtomically } from "./atomic-json-file";
 import type { BrowserCardFillResult } from "./browser-card-fill";
@@ -197,6 +198,7 @@ import {
   parseBrowserToolArguments,
   parseBrowserToolCall,
 } from "./browser-tools";
+import { pageHoldsUnsentText, watchUserEdits } from "./browser-unsent-text";
 import { runCauseEffect } from "./effect-boundary";
 import {
   BROWSER_STRING_MORE,
@@ -307,6 +309,7 @@ const IDLE_TAB_SWEEP_MS = 60_000;
 const MAX_IDLE_AWAKE_TABS = 3;
 const AWAKE_TAB_GRACE_MS = 2 * 60_000;
 const IDLE_TAB_FREEZE_MS = 2 * 60_000;
+const UNSENT_TEXT_CHECK_MS = 2_000;
 const IDLE_UNLOAD_NOTE =
   "Note: this tab was not used for some time, so its page was unloaded to free memory and loaded again from its address. Scripts that you injected, page variables, form input and the tab history from before are gone. Set them up again if you need them. An idle tab unloads sooner when several other tabs are open: close the tabs that you no longer need.";
 const PAGE_CLOSED_TAB_ERROR = (tabId: string) =>
@@ -796,9 +799,42 @@ export class BrowserHost {
         tab.contents.setBackgroundThrottling(true);
         this.#setIdleFocus(tab, false);
       }
-      if (this.#mayFreeze(tab) && now - tab.lastUsedAt >= this.#idleTabFreezeMs) this.#setFrozen(tab, true);
+      if (this.#mayFreeze(tab) && now - tab.lastUsedAt >= this.#idleTabFreezeMs) this.#freeze(tab);
     }
   }
+
+  #freeze(tab: BrowserHostTab): void {
+    if (tab.closing) return;
+    if (tab.engine.frozen) {
+      this.#setFrozen(tab, true);
+      return;
+    }
+    Effect.runFork(
+      this.#holdsUnsentText(tab).pipe(
+        Effect.andThen(
+          Effect.sync(() => {
+            if (this.#viewShown(tab.view) || this.#tabBusy(tab) || !this.#mayFreeze(tab)) return;
+            this.#setFrozen(tab, true);
+          }),
+        ),
+        Effect.forkIn(tab.scope, { startImmediately: true }),
+      ),
+    );
+  }
+
+  readonly #holdsUnsentText = Effect.fn("BrowserHost.holdsUnsentText")(function* (
+    this: BrowserHost,
+    tab: BrowserHostTab,
+  ) {
+    if (tab.engine.frozen) return tab.unsentText === true;
+    const contents = tab.contents;
+    const held = yield* browserCall(() => pageHoldsUnsentText(contents)).pipe(
+      Effect.timeoutOption(UNSENT_TEXT_CHECK_MS),
+      Effect.catch(() => Effect.succeed(Option.none<boolean>())),
+    );
+    if (Option.isSome(held)) tab.unsentText = held.value;
+    return tab.unsentText === true;
+  });
 
   #unthrottle(tab: BrowserHostTab): void {
     if (tab.contents.isDestroyed()) return;
@@ -874,6 +910,7 @@ export class BrowserHost {
   }
 
   readonly #sleep = Effect.fn("BrowserHost.sleep")(function* (this: BrowserHost, tab: BrowserHostTab) {
+    if (yield* this.#holdsUnsentText(tab)) return;
     const saved = savedPreview(tab);
     const capture = saved ? undefined : yield* this.#previewCapture(tab);
     const sleeping: NonNullable<BrowserHostTab["sleeping"]> = { title: tab.contents.getTitle(), preview: null };
@@ -889,6 +926,12 @@ export class BrowserHost {
               saved ??
               (capture ? yield* Deferred.await(capture.frame).pipe(Effect.catch(() => Effect.succeed(null))) : null);
             if (tab.sleeping !== sleeping || tab.closing || tab.contents.isDestroyed()) return;
+            if (yield* this.#holdsUnsentText(tab)) {
+              tab.sleeping = undefined;
+              tab.pendingRestore = undefined;
+              this.#emitChanged();
+              return;
+            }
             unloaded = true;
             tab.idleUnloadNoted = new Set();
             yield* this.#closeRenderer(tab);
@@ -4111,7 +4154,11 @@ export class BrowserHost {
     });
     this.#bindUserBrowsing(tab);
     contents.on("did-start-loading", changed);
+    contents.on("did-frame-finish-load", (_event, _isMainFrame, processId, routingId) =>
+      watchUserEdits(webFrameMain.fromId(processId, routingId)),
+    );
     contents.on("dom-ready", () => {
+      watchUserEdits(contents.mainFrame);
       void contents.insertCSS(":where(html) { scrollbar-gutter: stable; }").catch(() => undefined);
       if (this.#agentRunsTab(tab)) refuseCookieBanners(contents);
     });

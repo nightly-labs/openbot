@@ -738,6 +738,37 @@ async function main(): Promise<void> {
     );
     recordCases("slept-tab-wakes-on-next-call");
 
+    const openSleepTab = async (path: string) => {
+      const url = `${origin}${path}`;
+      const tab = await runCauseEffect(sleepy.open(url, "fixture-thread", "fixture-agent"));
+      const contents = webContents.getAllWebContents().find((item) => !item.isDestroyed() && item.getURL() === url);
+      assert(contents, `Missing contents of ${path}.`);
+      return { tab, contents };
+    };
+    const draft = await openSleepTab("/draft");
+    const typedDraft = await runCauseEffect(
+      sleepy.handleDynamicTool(
+        params("type", { tabId: draft.tab.id, target: { kind: "css", selector: "#draft" }, text: "Unsent post" }),
+      ),
+    );
+    assert.equal(typedDraft.success, true, text(typedDraft));
+    const later: Electron.WebContents[] = [];
+    for (const index of [1, 2, 3, 4, 5, 6]) later.push((await openSleepTab(`/form?later=${index}`)).contents);
+    const [firstLater, secondLater] = later;
+    assert(firstLater && secondLater, "Missing later sleep tabs.");
+    await unloaded(firstLater);
+    await unloaded(secondLater);
+    assert(!draft.contents.isDestroyed(), "A tab with unsent text slept.");
+    assert.equal(
+      await draft.contents.executeJavaScript("document.querySelector('#draft').textContent"),
+      "Unsent post",
+      "A tab with unsent text lost its text.",
+    );
+    recordCases("tab-with-unsent-text-stays-loaded");
+    await draft.contents.executeJavaScript("document.querySelector('#draft').textContent = ''");
+    await unloaded(draft.contents);
+    recordCases("tab-sleeps-after-its-text-is-cleared");
+
     const report = {
       status: "passed",
       runId,
@@ -783,6 +814,8 @@ function recordCases(...names: string[]): void {
 }
 
 const PAGES: Record<string, string> = {
+  "/draft": `<!doctype html><meta charset="utf-8"><title>Draft</title>
+    <div id="draft" contenteditable="true" role="textbox" aria-label="Post"></div>`,
   "/skeleton": `<!doctype html><meta charset="utf-8"><title>Skeleton</title>
     <main><div class="skeleton" aria-busy="true" style="width:240px;height:40px;background:#ddd"></div></main>
     <script>
