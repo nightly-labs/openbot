@@ -24,6 +24,7 @@ const CONFIG = {
   from: "sender@example.com",
 };
 const OVERFLOW = { username: "overflow@example.com", password: "overflow-password" };
+const OVERFLOW_2 = { username: "overflow-2@example.com", password: "overflow-2-password" };
 
 type Behavior = "normal" | "silent" | "stall_after_data" | "sender_limit" | "auth_refused";
 type Route = "direct" | "relay" | "relay_unreachable" | "relay_crashed";
@@ -216,7 +217,7 @@ async function runFallbackCase(
   outcome: "accept" | "daily_limit",
   code = "ABCD-EFGH",
   replyTo?: string,
-  overflow = false,
+  overflowMailboxes: 0 | 1 | 2 = 0,
 ): Promise<FallbackCaseReport & { sent: EmailMessageBuilder[] }> {
   const relay = await startRelay(behaviors);
   const handler = createEmailRelayHandler(relay.connector);
@@ -230,8 +231,11 @@ async function runFallbackCase(
       EMAIL_SMTP_PASSWORD: CONFIG.password,
       EMAIL_FROM: CONFIG.from,
       ...(replyTo ? { EMAIL_REPLY_TO: replyTo } : {}),
-      ...(overflow
+      ...(overflowMailboxes >= 1
         ? { EMAIL_SMTP_OVERFLOW_USERNAME: OVERFLOW.username, EMAIL_SMTP_OVERFLOW_PASSWORD: OVERFLOW.password }
+        : {}),
+      ...(overflowMailboxes >= 2
+        ? { EMAIL_SMTP_OVERFLOW_2_USERNAME: OVERFLOW_2.username, EMAIL_SMTP_OVERFLOW_2_PASSWORD: OVERFLOW_2.password }
         : {}),
       EMAIL_RELAY: {
         fetch: (input, init) => handler.fetch(new Request(input, init)),
@@ -378,7 +382,7 @@ try {
     "accept",
     "ABCD-EFGH",
     undefined,
-    true,
+    1,
   );
   report.cases.push(overflowSent);
   assert.equal(overflowSent.result, "sent");
@@ -393,7 +397,7 @@ try {
     "accept",
     "ABCD-EFGH",
     undefined,
-    true,
+    1,
   );
   const { sent: overflowFallbackMessages, ...overflowLimitedReport } = overflowLimited;
   report.cases.push(overflowLimitedReport);
@@ -413,7 +417,7 @@ try {
     "accept",
     "ABCD-EFGH",
     undefined,
-    true,
+    1,
   );
   report.cases.push(noOverflowAfterUnknown);
   assert.equal(noOverflowAfterUnknown.result, "smtp_delivery_unknown");
@@ -426,7 +430,7 @@ try {
     "daily_limit",
     "ABCD-EFGH",
     undefined,
-    true,
+    1,
   );
   report.cases.push(overflowRefused);
   assert.equal(overflowRefused.result, RATE_LIMITED_DELIVERY_ERROR);
@@ -435,6 +439,64 @@ try {
     "email_sent:rate_limited:primary",
     "email_sent:failed:overflow",
     "email_fallback_sent:failed",
+  ]);
+
+  const secondOverflowSent = await runFallbackCase(
+    "second_overflow_after_two_limits",
+    ["sender_limit", "sender_limit", "normal"],
+    "daily_limit",
+    "ABCD-EFGH",
+    undefined,
+    2,
+  );
+  report.cases.push(secondOverflowSent);
+  assert.equal(secondOverflowSent.result, "sent");
+  assert.equal(secondOverflowSent.messages, 1);
+  assert.equal(secondOverflowSent.fallbackSends, 0);
+  assert.deepEqual(secondOverflowSent.mailFrom, [
+    `<${CONFIG.from}>`,
+    `<${OVERFLOW.username}>`,
+    `<${OVERFLOW_2.username}>`,
+  ]);
+  assert.deepEqual(secondOverflowSent.events, [
+    "email_sent:rate_limited:primary",
+    "email_sent:rate_limited:overflow",
+    "email_sent:accepted:overflow_2",
+  ]);
+
+  const secondOverflowAfterRefusal = await runFallbackCase(
+    "second_overflow_after_overflow_auth_refused",
+    ["sender_limit", "auth_refused", "normal"],
+    "daily_limit",
+    "ABCD-EFGH",
+    undefined,
+    2,
+  );
+  report.cases.push(secondOverflowAfterRefusal);
+  assert.equal(secondOverflowAfterRefusal.result, "sent");
+  assert.deepEqual(secondOverflowAfterRefusal.events, [
+    "email_sent:rate_limited:primary",
+    "email_sent:failed:overflow",
+    "email_sent:accepted:overflow_2",
+  ]);
+
+  const allMailboxesLimited = await runFallbackCase(
+    "fallback_after_all_mailboxes_limited",
+    ["sender_limit", "sender_limit", "sender_limit"],
+    "accept",
+    "ABCD-EFGH",
+    undefined,
+    2,
+  );
+  report.cases.push(allMailboxesLimited);
+  assert.equal(allMailboxesLimited.result, "sent");
+  assert.equal(allMailboxesLimited.connections, 3);
+  assert.equal(allMailboxesLimited.fallbackSends, 1);
+  assert.deepEqual(allMailboxesLimited.events, [
+    "email_sent:rate_limited:primary",
+    "email_sent:rate_limited:overflow",
+    "email_sent:rate_limited:overflow_2",
+    "email_fallback_sent:accepted",
   ]);
 
   report.passed = true;
