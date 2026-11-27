@@ -1,9 +1,17 @@
 // @vitest-environment node
 
 import { describe, expect, it } from "vitest";
-import { decodeVaultImportResult, decodeVaultState } from "./vault-decoding";
+import { decodeVaultCodes, decodeVaultImportResult, decodeVaultState } from "./vault-decoding";
 
-const LOGIN = { id: "l1", kind: "login", website: "github.com", username: "ada", notes: "", hasPassword: true };
+const LOGIN = {
+  id: "l1",
+  kind: "login",
+  website: "github.com",
+  username: "ada",
+  notes: "",
+  hasPassword: true,
+  hasTwoStep: true,
+};
 const CARD = {
   id: "c1",
   kind: "card",
@@ -43,6 +51,7 @@ describe("decodeVaultState", () => {
     ["a card number", { ...CARD, number: "4242424242424242" }],
     ["a security code", { ...CARD, securityCode: "123" }],
     ["an API key", { ...API_KEY, key: "sk-test-1234567890" }],
+    ["a two-step key", { ...LOGIN, twoStepKey: "JBSWY3DPEHPK3PXP" }],
   ])("refuses a summary that carries %s", (_name, item) => {
     expect(() => decodeVaultState({ status: "ready", items: [item] })).toThrow();
   });
@@ -53,6 +62,14 @@ describe("decodeVaultState", () => {
     expect(() => decodeVaultState({ status: "ready", items: [{ ...LOGIN, addedBy: 7 }] })).toThrow();
   });
 
+  it("keeps the agents of an item and whether the Vault keeps them", () => {
+    const state = { status: "ready", items: [{ ...API_KEY, agents: ["a1", "a2"] }, LOGIN], agentScope: true };
+    expect(decodeVaultState(state)).toEqual(state);
+    expect(() => decodeVaultState({ status: "ready", items: [{ ...LOGIN, agents: "a1" }] })).toThrow();
+    expect(() => decodeVaultState({ status: "ready", items: [{ ...LOGIN, agents: [1] }] })).toThrow();
+    expect(() => decodeVaultState({ status: "ready", items: [], agentScope: "yes" })).toThrow();
+  });
+
   it("refuses a card whose last four are not four digits", () => {
     expect(() => decodeVaultState({ status: "ready", items: [{ ...CARD, last4: "4242424242424242" }] })).toThrow();
   });
@@ -61,6 +78,18 @@ describe("decodeVaultState", () => {
     expect(() => decodeVaultState({ status: "open", items: [] })).toThrow();
     expect(() => decodeVaultState({ status: "ready", items: [{ ...LOGIN, kind: "note" }] })).toThrow();
     expect(() => decodeVaultState({ status: "ready", items: [{ ...CARD, brand: "jcb" }] })).toThrow();
+  });
+});
+
+describe("decodeVaultCodes", () => {
+  it("keeps the codes", () => {
+    const codes = { codes: [{ id: "l1", code: "287082", period: 30, remainingMs: 12_000 }] };
+    expect(decodeVaultCodes(codes)).toEqual(codes);
+  });
+
+  it("refuses a code that is not 6 to 8 digits, such as a key", () => {
+    for (const code of ["12345", "123456789", "JBSWY3DPEHPK3PXP"])
+      expect(() => decodeVaultCodes({ codes: [{ id: "l1", code, period: 30, remainingMs: 1 }] })).toThrow();
   });
 });
 

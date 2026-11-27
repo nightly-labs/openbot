@@ -5,8 +5,13 @@ export const messages = {
   "error.billing.lifecycleFailed": "Nie udało się zmienić planu serwera. Odśwież Rozliczenia i spróbuj ponownie.",
   "error.billing.confirmMismatch": "Wpisz nazwę serwera, aby go usunąć.",
   "error.billing.restartBusy": "Serwera nie można teraz uruchomić ponownie. Spróbuj ponownie za minutę.",
+  "error.billing.restartUnavailable":
+    "Tego serwera nie można uruchomić ponownie z tego miejsca. Skontaktuj się z pomocą techniczną.",
   "error.billing.planRequired": "Plan tego serwera się skończył. Odnów go, aby uruchomić serwer.",
   "error.billing.planSoldOut": "Ten plan jest wyprzedany. Wybierz inny plan.",
+  "error.billing.storageUnavailable": "Ta pamięć nie jest dostępna dla tego serwera.",
+  "error.billing.storagePaymentFailed":
+    "Płatność za pamięć nie powiodła się. Zaktualizuj metodę płatności i spróbuj ponownie.",
   "error.billing.licenseExists": "To konto ma już licencję. Zamiast tego zmień liczbę jej użytkowników.",
   "error.billing.licenseCurrency": "Licencja musi używać waluty Twoich innych planów.",
   "error.billing.planCurrency": "Nowy plan musi używać waluty Twoich innych planów.",
@@ -15,10 +20,19 @@ export const messages = {
   "error.billing.licensePaymentFailed":
     "Płatność za dodanych użytkowników nie powiodła się. Zaktualizuj metodę płatności i spróbuj ponownie.",
   "error.billing.licenseUnavailable": "Licencje są teraz niedostępne.",
+  "error.billing.mediaContentRefused":
+    "Kontrola bezpieczeństwa modelu odrzuciła prompt lub obrazy. Często odrzuca prawdziwe osoby, znane postacie, marki, przemoc i treści dla dorosłych. Zmień je i spróbuj ponownie. Nie użyto żadnych kredytów.",
   "error.billing.licenseOneUser": "Ta licencja obejmuje 1 użytkownika. Zmień ją na Team, aby dodać użytkowników.",
   "error.billing.licensePlanChange": "Tej licencji nie można zmienić na ten plan. Anuluj ją i kup nowy plan.",
   "error.billing.noLicense": "To konto nie ma licencji.",
+  "error.billing.countryRequired":
+    "Podaj kraj rozliczenia przed płatnością. Zaktualizuj OpenBot, aby to zrobić, i spróbuj ponownie.",
+  "error.billing.detailsInvalid": "Sprawdź kraj i numer VAT. Numer VAT musi należeć do wybranego kraju.",
+  "error.billing.vatIdInvalid": "System VAT UE nie zna tego numeru VAT. Sprawdź numer lub kontynuuj bez numeru VAT.",
+  "error.billing.vatUnavailable": "Płatność jest teraz niedostępna. Spróbuj później.",
   "error.billing.invalidRequest": "Żądanie rozliczeniowe jest nieprawidłowe.",
   "error.billing.invalidResponse": "Odpowiedź rozliczeniowa jest nieprawidłowa.",
   "error.billing.notStripePage": "Strona rozliczeń nie jest stroną Stripe.",
+  "error.billing.customServerOfferMissing": "Ten serwer nie ma planu do opłacenia.",
+  "error.billing.checkoutUnavailable": "Nie można teraz rozpocząć płatności. Spróbuj ponownie za minutę.",
 } as const satisfies PartialTranslation<typeof source>;

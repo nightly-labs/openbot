@@ -1,34 +1,33 @@
+import { readFile } from "node:fs/promises";
+import { isAvatarMimeType } from "@openbot/contracts/avatar-images";
+import { AVATAR_IMAGE_LIMITS, INPUT_LIMITS } from "@openbot/contracts/input-limits";
 import {
   BROWSER_SECRET_RESPONSE_PATH,
+  type CreateAgentInput,
   canAdministerServer,
+  type DuplicateAgentResult,
   parseAgentAnalyticsInput,
   parseBrowserSecretResponse,
   parseGenerateAgentProfile,
   parseHostAnalyticsInput,
   parseSaveAgentProfile,
+  WORKFLOWS_USAGE_ID,
 } from "@openbot/contracts/ipc";
-import { hiddenProviderAgentIds, isPeerHiddenProvider } from "./provider-visibility";
-// Agents: the collection, the sidebar that arranges them, and everything under one agent's id.
-//
-// The order in this file is the one thing about it that is not free. The static collection paths -
-// `/v1/agents/status`, `usage`, `models`, `conversation-reads` - are matched before the parametric
-// regex, which would otherwise read `status` as an agent id and answer 404 for a route that exists.
-// Keeping them in the same file as the regex is what makes that ordering reviewable; splitting them
-// apart is how it gets broken.
-//
-// `agentId` is decoded once, above the action switch, and handed to the four sub-modules as an
-// `AgentRouteTarget`. A sub-module that re-derived it below its own method check would turn today's
-// 400 on a malformed identifier into a 404 for some methods and not others.
-
-import { readFile } from "node:fs/promises";
-import { isAvatarMimeType } from "@openbot/contracts/avatar-images";
-import { AVATAR_IMAGE_LIMITS, INPUT_LIMITS } from "@openbot/contracts/input-limits";
-import { type CreateAgentInput, type DuplicateAgentResult, WORKFLOWS_USAGE_ID } from "@openbot/contracts/ipc";
 import { TEAM_API_ROUTES } from "@openbot/contracts/team-api-routes";
+import { AGENT_WELCOME_CAPABILITY } from "@openbot/contracts/team-protocol/agent-welcome-v1";
 import {
   BROWSER_SECRET_VAULT_CAPABILITY,
   BROWSER_SECRET_VAULT_ROUTES,
 } from "@openbot/contracts/team-protocol/browser-secret-vault-v1";
+import {
+  PROVIDER_MODEL_SOURCE_CAPABILITY,
+  PROVIDER_MODEL_SOURCE_ROUTES,
+} from "@openbot/contracts/team-protocol/provider-model-source-v1";
+import { SKILL_PROBLEMS_CAPABILITY } from "@openbot/contracts/team-protocol/skill-problems-v1";
+import {
+  TEAM_USAGE_READ_FAILED_CAPABILITY,
+  usageWithoutReadFailed,
+} from "@openbot/contracts/team-protocol/usage-read-failed-v1";
 import { V5_AGENT_MODEL } from "@openbot/contracts/team-protocol/v5-adapter";
 import { V6_AGENT_MODEL } from "@openbot/contracts/team-protocol/v6-adapter";
 import { WORKFLOWS_CAPABILITY } from "@openbot/contracts/team-protocol/workflows-v1";
@@ -39,8 +38,9 @@ import { ForbiddenAttentionAnswer, InactiveAttentionRequest } from "../../backen
 import { runCauseEffect } from "../../backend/effect-boundary";
 import { parseSidebarLayoutAction } from "../ipc/agent-inputs";
 import type { ModelVisibility } from "../model-visibility";
-import type { TeamApiAgents, TeamApiOptions, TeamApiSidebarLayout } from "./dependencies";
+import type { TeamApiAgents, TeamApiLibraryFolders, TeamApiOptions, TeamApiSidebarLayout } from "./dependencies";
 import { HttpError } from "./http-error";
+import { hiddenProviderAgentIds, isPeerHiddenProvider } from "./provider-visibility";
 import type { RouteOutcome, TeamApiRequestContext } from "./request-context";
 import {
   agentCreate,
@@ -55,7 +55,6 @@ import {
   promptRequestId,
   readBinary,
   readJson,
-  requireAdmin,
   requireAgentLevel,
   stringField,
 } from "./request-helpers";
@@ -63,21 +62,20 @@ import { routeAgentConversation } from "./route-agent-conversation";
 import { routeAgentMemories } from "./route-agent-memories";
 import { routeAgentQueue } from "./route-agent-queue";
 import { routeAgentRoutines } from "./route-agent-routines";
+import { searchPageWithinFrame } from "./route-thread-message-search";
 
 export interface AgentRouteDependencies {
-  // The whole service, unlike every other module here, because this one forwards it to four
-  // sub-modules that between them reach most of it. The narrowing that means something is theirs.
   agents: TeamApiAgents;
   skills?: TeamApiOptions["skills"];
   sidebarLayout: Pick<TeamApiSidebarLayout, "getSnapshot" | "mutate" | "removeAgent" | "withProfileAssignment">;
+  libraryFolders?: Pick<TeamApiLibraryFolders, "removeAgent"> | undefined;
   duplicateAgent: (agentId: string, operationId: string) => Effect.Effect<DuplicateAgentResult, AgentDuplicationFailed>;
-  /** `model-visibility-v1`: the models that the model picker of this server shows. */
   visibleModels?: Pick<ModelVisibility, "picker">;
 }
 
 export async function routeAgents(
   context: TeamApiRequestContext,
-  { agents, skills, sidebarLayout, duplicateAgent, visibleModels }: AgentRouteDependencies,
+  { agents, skills, sidebarLayout, libraryFolders, duplicateAgent, visibleModels }: AgentRouteDependencies,
 ): Promise<RouteOutcome> {
   const { method, url, request, response, member, capabilities, json, empty } = context;
   const hidden = hiddenProviderAgentIds(agents.listAgents(), context.protocol);
@@ -86,11 +84,6 @@ export async function routeAgents(
       throw new HttpError(400, sourceText("error.team.defaultProviderRequiresV4"));
     }
   }
-  /**
-   * A peer cannot start an agent on a provider that its protocol does not show: the agent would be
-   * hidden from the peer that made it. A named model decides the provider too; with neither named,
-   * the provider is the one the host starts a new agent on.
-   */
   function requireVisibleProvider(input: Pick<CreateAgentInput, "provider" | "model"> = {}): void {
     if (input.provider !== undefined) {
       if (isPeerHiddenProvider(input.provider, context.protocol)) throw new HttpError(400, "provider is invalid.");
@@ -104,8 +97,6 @@ export async function routeAgents(
   function requireVisible(id: string | undefined | null): void {
     if (id && hidden.has(id)) throw new HttpError(404, sourceText("error.team.agentNotFound"));
   }
-  // An answer to a prompt, an approval or a browser request acts for its agent, so it needs `chat`.
-  // The agent service refuses a request that is not pending.
   function requireRequestAgent(agentId: string | undefined): void {
     if (agentId === undefined) return;
     if (context.agentLevel(agentId) === "none") throw new HttpError(404, sourceText("error.team.agentNotFound"));
@@ -121,7 +112,6 @@ export async function routeAgents(
       endDate: url.searchParams.get("endDate"),
       timeZone: url.searchParams.get("timeZone"),
     });
-    // A peer without workflows-v1 does not know the Workflows row.
     const workflows = capabilities.has(WORKFLOWS_CAPABILITY);
     if (
       input.agentId &&
@@ -129,7 +119,7 @@ export async function routeAgents(
       !agents.listAgents().some((agent) => agent.id === input.agentId)
     )
       throw new HttpError(404, sourceText("error.team.agentNotFound"));
-    const report = agents.getHostAnalytics(input);
+    const { skills: _localOnly, ...report } = await runCauseEffect(agents.getHostAnalytics(input));
     return json(
       200,
       workflows ? report : { ...report, agents: report.agents.filter((row) => row.agentId !== WORKFLOWS_USAGE_ID) },
@@ -165,20 +155,27 @@ export async function routeAgents(
     if (!query.trim() || query.length > INPUT_LIMITS.messageText) {
       throw new HttpError(400, sourceText("error.team.searchQueryRequired"));
     }
+    const agentId = url.searchParams.get("botId") ?? undefined;
+    const cursor = url.searchParams.get("cursor") ?? undefined;
     return json(
       200,
-      agents.searchConversationMessages(
-        query,
-        // A query parameter is part of the released URL, and the versioned adapters translate JSON
-        // bodies only. `botId` is what every shipped client sends and what every shipped host reads.
-        url.searchParams.get("botId") ?? undefined,
-        url.searchParams.get("cursor") ?? undefined,
+      searchPageWithinFrame(
+        (limit) => agents.searchConversationMessages(query, agentId, cursor, limit),
         pageLimit(url),
       ),
     );
   }
   if (method === "GET" && url.pathname === TEAM_API_ROUTES.agents.status) {
     return json(200, agents.getStatus());
+  }
+  if (method === "POST" && url.pathname === PROVIDER_MODEL_SOURCE_ROUTES.list) {
+    if (!capabilities.has(PROVIDER_MODEL_SOURCE_CAPABILITY))
+      throw new HttpError(400, sourceText("error.team.providerModelSourceUnsupported"));
+    await readJson(request);
+    const sources = (agents.getStatus().providers ?? []).flatMap((row) =>
+      row.modelSource ? [{ provider: row.id, source: row.modelSource }] : [],
+    );
+    return json(200, { sources });
   }
   if (method === "GET" && url.pathname === TEAM_API_ROUTES.sidebarLayout.state) {
     return json(200, sidebarLayout.getSnapshot());
@@ -191,18 +188,20 @@ export async function routeAgents(
     return json(200, layout);
   }
   if (method === "GET" && url.pathname === TEAM_API_ROUTES.agents.usage) {
-    // The provider's own sign-in only: a released client reads one limit per provider, and
-    // `provider-accounts-v1` gives the accounts after it.
     const usage = await runCauseEffect(agents.getUsage());
-    return json(200, { ...usage, limits: usage.limits.filter((limit) => limit.accountId === undefined) });
+    const signIns = { ...usage, limits: usage.limits.filter((limit) => limit.accountId === undefined) };
+    return json(200, capabilities.has(TEAM_USAGE_READ_FAILED_CAPABILITY) ? signIns : usageWithoutReadFailed(signIns));
   }
   if (method === "GET" && url.pathname === TEAM_API_ROUTES.agents.models) {
-    // Only ids the peer's protocol accepts: its model list decoder fails closed on the whole array, and
-    // `isAgentModel` also accepts `=` and `,`, which only protocol 6 knows.
     const modelId = context.protocol < 6 ? V5_AGENT_MODEL : V6_AGENT_MODEL;
-    const models = (await agents.listModels()).filter((model) => modelId.test(model.id));
-    if (!visibleModels) return json(200, models);
-    // The released model list does not carry `listing`; `model-visibility-v1` gives it on its own route.
+    const models = (await agents.listModels())
+      .filter((model) => modelId.test(model.id))
+      .map(({ steersTurns: _steersTurns, ...model }) => model);
+    if (!visibleModels)
+      return json(
+        200,
+        models.map(({ listing: _listing, ...model }) => model),
+      );
     const listed = await runCauseEffect(visibleModels.picker(models));
     return json(
       200,
@@ -219,14 +218,17 @@ export async function routeAgents(
     requireCompatibleDefault();
     const input = agentCreate(await readJson(request));
     requireVisibleProvider(input);
-    return json(201, await runCauseEffect(agents.createAgent(input, undefined, undefined, memberSender(member))));
+    const welcome = capabilities.has(AGENT_WELCOME_CAPABILITY);
+    return json(
+      201,
+      await runCauseEffect(agents.createAgent(input, undefined, undefined, memberSender(member), welcome)),
+    );
   }
 
   const agentMatch = url.pathname.match(/^\/v1\/agents\/([^/]+)(?:\/(.*))?$/);
   if (agentMatch) {
     const agentId = pathIdentifier(agentMatch[1], "agentId");
     const action = agentMatch[2] ?? "";
-    // Delete keeps its own admin check and message.
     if (method !== "GET" && !(method === "DELETE" && !action))
       requireAgentLevel(context, agentId, agentWriteLevel(action));
     if (method === "GET" && action === "analytics") {
@@ -246,12 +248,12 @@ export async function routeAgents(
       return json(200, await runCauseEffect(agents.getUsage(agentId)));
     }
     if (method === "GET" && action === "skills") {
-      return json(200, skills ? await runCauseEffect(skills.listInstalledForChatTags(agentId)) : []);
+      const problems = capabilities.has(SKILL_PROBLEMS_CAPABILITY);
+      return json(200, skills ? await runCauseEffect(skills.listInstalledForChatTags(agentId, { problems })) : []);
     }
     if (method === "PATCH" && !action) {
       const input = agentUpdate(await readJson(request), agentId);
       if (input.provider !== undefined) requireVisibleProvider({ provider: input.provider });
-      // The released protocol has no `pendingRuntime`, so a provider change during work is refused.
       return json(200, await runCauseEffect(agents.updateAgent(input, undefined, false)));
     }
     if (method === "POST" && action === "duplicate") {
@@ -261,8 +263,15 @@ export async function routeAgents(
     if (method === "DELETE" && !action) {
       if (!canAdministerServer(member.role))
         throw new HttpError(403, sourceText("error.team.membersCannotDeleteAgents"));
-      await runCauseEffect(agents.deleteAgent(agentId));
+      try {
+        await runCauseEffect(agents.deleteAgent(agentId));
+      } catch (error) {
+        if (error instanceof Error && DELETE_REFUSALS().includes(error.message))
+          throw new HttpError(409, error.message);
+        throw error;
+      }
       await runCauseEffect(sidebarLayout.removeAgent(agentId));
+      if (libraryFolders) await runCauseEffect(libraryFolders.removeAgent(agentId));
       return empty(204);
     }
     if (action === "avatar") {
@@ -309,7 +318,6 @@ export async function routeAgents(
     await runCauseEffect(
       agents.respondToPrompt(
         { requestId, answers: promptAnswers(body.answers) },
-        // A UI block's privileged action is for the owner and admins only.
         { ...(sender ? { sender } : {}), privileged: member.role !== "member" },
       ),
     ).catch(refusedPromptAnswer);
@@ -322,7 +330,6 @@ export async function routeAgents(
     await runCauseEffect(
       agents.respondToApproval(
         { requestId, decision: approvalDecision(body.decision) },
-        // Some approvals let agents use what is the owner's alone, such as a saved card.
         { owner: member.role === "owner" },
       ),
     ).catch(refusedPromptAnswer);
@@ -332,22 +339,18 @@ export async function routeAgents(
     if (!capabilities.has("browser-secret-handoff"))
       throw new HttpError(400, sourceText("error.team.secureAuthUnsupported"));
     const input = parseBrowserSecretResponse(await readJson(request));
-    // The agent service refuses an agent ID that is not the request's own.
     requireRequestAgent(input.agentId);
-    await runCauseEffect(agents.respondToBrowserSecret(input));
+    await runCauseEffect(agents.respondToBrowserSecret(input)).catch(inactiveAsConflict);
     return empty(204);
   }
   if (method === "POST" && url.pathname === BROWSER_SECRET_VAULT_ROUTES.respond) {
-    // The submit has the gates of the released route; the save adds its own.
     if (!capabilities.has("browser-secret-handoff"))
       throw new HttpError(400, sourceText("error.team.secureAuthUnsupported"));
     if (!capabilities.has(BROWSER_SECRET_VAULT_CAPABILITY))
       throw new HttpError(400, sourceText("error.team.vaultUnsupported"));
-    // The Vault is the owner's and the admins', as on the `vault-v1` routes.
-    requireAdmin(member);
     const input = parseBrowserSecretResponse({ ...(await readJson(request)), decision: "submit" });
     requireRequestAgent(input.agentId);
-    await runCauseEffect(agents.respondToBrowserSecret({ ...input, saveToVault: true }));
+    await runCauseEffect(agents.respondToBrowserSecret({ ...input, saveToVault: true })).catch(inactiveAsConflict);
     return json(200, {});
   }
   if (method === "POST" && url.pathname === TEAM_API_ROUTES.respond.browserTakeover) {
@@ -355,10 +358,13 @@ export async function routeAgents(
     const requestId = promptRequestId(body.requestId);
     requireRequestAgent(agents.agentIdForRequest(requestId));
     await runCauseEffect(
-      agents.respondToBrowserTakeover({
-        requestId,
-        decision: browserTakeoverDecision(body.decision),
-      }),
+      agents.respondToBrowserTakeover(
+        {
+          requestId,
+          decision: browserTakeoverDecision(body.decision),
+        },
+        true,
+      ),
     );
     return empty(204);
   }
@@ -366,10 +372,7 @@ export async function routeAgents(
   return "unmatched";
 }
 
-// What a member does here as one person. The read markers are the member's own, so `view` is enough.
 const OWN_ACTIONS = new Set(["conversation/read", "conversation/unread"]);
-// Talking to the agent. Any other write on an agent path changes the agent, so a new action needs
-// `manage` until it is put here.
 const CHAT_ACTIONS = new Set([
   "messages",
   "reactions",
@@ -387,17 +390,18 @@ function agentWriteLevel(action: string): "view" | "chat" | "manage" {
   return CHAT_ACTIONS.has(action) ? "chat" : "manage";
 }
 
-/**
- * Another client answered the request first, or its turn ended. A conflict, not a host failure: the
- * client shows that the request is gone instead of offering a retry.
- */
 function inactiveAsConflict(error: unknown): never {
   if (error instanceof InactiveAttentionRequest) throw new HttpError(409, error.message);
   throw error;
 }
 
-/** As `inactiveAsConflict`, and an answer that the member's role may not give is forbidden. */
 function refusedPromptAnswer(error: unknown): never {
   if (error instanceof ForbiddenAttentionAnswer) throw new HttpError(403, error.message);
   return inactiveAsConflict(error);
 }
+
+const DELETE_REFUSALS = () => [
+  sourceText("error.agent.stopBeforeDelete"),
+  sourceText("error.agent.deletionBusy"),
+  sourceText("error.agent.deleteWhenFolderFree"),
+];

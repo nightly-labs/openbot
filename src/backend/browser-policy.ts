@@ -1,7 +1,7 @@
 import { INPUT_LIMITS } from "@openbot/contracts/input-limits";
 import { sourceText } from "@openbot/i18n/source";
 import { app } from "electron";
-import { browserClientHints, browserRequestUserAgent } from "./browser-identity";
+import { browserClientHints, browserHighEntropyClientHints, browserRequestUserAgent } from "./browser-identity";
 import { isPersistableBrowserUrl } from "./browser-state";
 
 export function normalizeBrowserUrl(input: string): string {
@@ -20,38 +20,74 @@ export function browserLoadOptions(): { extraHeaders: string } {
   return { extraHeaders: "Cache-Control: no-cache\nPragma: no-cache" };
 }
 
-export function browserRequestHeaders(url: string, requestHeaders: Record<string, string>): Record<string, string> {
+export function browserRequestHeaders(
+  url: string,
+  requestHeaders: Record<string, string>,
+  requestedHints?: ReadonlySet<string>,
+): Record<string, string> {
   const headers = { ...requestHeaders };
   const userAgent = Object.entries(headers).find(([name]) => name.toLowerCase() === "user-agent");
   if (userAgent) {
     setRequestHeader(headers, "User-Agent", browserRequestUserAgent(url, userAgent[1], process.versions.electron));
   }
-  // Send only low-entropy hints, on secure origins. Keep any hints Chromium supplies.
   const target = URL.parse(url);
   if (
     target?.protocol === "https:" ||
     (target?.protocol === "http:" && ["localhost", "127.0.0.1", "[::1]"].includes(target.hostname))
   ) {
-    for (const [name, value] of Object.entries(browserClientHints(process.versions.chrome, process.platform))) {
+    const requested = requestedHints
+      ? Object.entries(
+          browserHighEntropyClientHints({
+            chromeVersion: process.versions.chrome,
+            platform: process.platform,
+            arch: process.arch,
+            systemVersion: process.getSystemVersion(),
+          }),
+        ).filter(([name]) => requestedHints.has(name.toLowerCase()))
+      : [];
+    for (const [name, value] of [
+      ...Object.entries(browserClientHints(process.versions.chrome, process.platform)),
+      ...requested,
+    ]) {
       if (!Object.keys(headers).some((candidate) => candidate.toLowerCase() === name.toLowerCase())) {
         headers[name] = value;
       }
     }
   }
-  setRequestHeader(headers, "Accept-Language", preferredBrowserLanguages());
   return headers;
 }
 
-function preferredBrowserLanguages(): string {
-  return preferredBrowserLanguageCodes()
-    .split(",")
-    .map((language, index) => (index === 0 ? language : `${language};q=${Math.max(1 - index * 0.1, 0.1).toFixed(1)}`))
-    .join(",");
+export function preferredBrowserLanguageCodes(): string {
+  const languages = validLanguageTags(app.getPreferredSystemLanguages());
+  const codes = languages.length > 0 ? languages : [app.getLocale()];
+  const base = (code: string) => code.split("-")[0] ?? code;
+  const expanded: string[] = [];
+  for (const [index, code] of codes.entries()) {
+    if (!expanded.includes(code)) expanded.push(code);
+    const next = codes[index + 1];
+    if (code.includes("-") && (next === undefined || base(next) !== base(code)) && !expanded.includes(base(code)))
+      expanded.push(base(code));
+  }
+  return expanded.join(",");
 }
 
-export function preferredBrowserLanguageCodes(): string {
+export function replaceInvalidLinuxSystemLanguages(): void {
+  if (process.platform !== "linux") return;
   const languages = app.getPreferredSystemLanguages();
-  return (languages.length > 0 ? languages : [app.getLocale()]).join(",");
+  const valid = validLanguageTags(languages);
+  if (valid.length === languages.length) return;
+  const [locale = "en-US"] = validLanguageTags([app.getLocale()]);
+  process.env.LANGUAGE = (valid.length > 0 ? valid : [locale]).map((tag) => tag.replaceAll("-", "_")).join(":");
+}
+
+function validLanguageTags(values: readonly string[]): string[] {
+  return values.filter((value) => {
+    try {
+      return /^[a-z]{2,3}(?:-|$)/.test(Intl.getCanonicalLocales(value)[0] ?? "");
+    } catch {
+      return false;
+    }
+  });
 }
 
 function setRequestHeader(headers: Record<string, string>, name: string, value: string): void {
@@ -64,23 +100,10 @@ export function isAllowedMainUrl(value: string): boolean {
   return value === "about:blank" || isPersistableBrowserUrl(value);
 }
 
-/**
- * The embedded browser grants exactly one page permission: writing plain, sanitized content to the
- * clipboard. Chromium only asks for it behind a user gesture, which is what a page's own "copy
- * link" button is, and refusing it left such a button silently doing nothing. Reading the clipboard
- * stays refused -- a page must never see what the user copied elsewhere -- and so does everything
- * else, so camera, microphone, location and notifications are unchanged.
- */
 export function isAllowedBrowserPermission(permission: string): boolean {
-  return permission === "clipboard-sanitized-write";
+  return permission === "clipboard-sanitized-write" || permission === "storage-access";
 }
 
-/**
- * The host of a tab's URL, for a log line. `diagnosticUrl` below keeps the path, which is right for a
- * diagnostic the user reads back in the app but wrong for a log: a path carries tokens often enough
- * (`/reset/<secret>`, `/invite/<secret>`) that writing one to disk breaks the redaction rule. The host
- * is enough to tell which tab an agent closed.
- */
 export function logUrlHost(value: string): string | undefined {
   try {
     return new URL(value).hostname;

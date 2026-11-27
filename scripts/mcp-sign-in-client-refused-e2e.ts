@@ -1,11 +1,3 @@
-// Drives the MCP probe and McpOAuth against a local MCP server for issue #3429.
-// bun scripts/mcp-sign-in-client-refused-e2e.ts
-// The authorization server acts as Railway's does: registration gives a client secret, and the token
-// endpoint refuses every request that carries that secret. A public client (`none`) is accepted.
-// A server that lists `none` must get a public registration and a working sign-in. A server that
-// does not list it gets a secret client, and the refusal must say that the server did not accept
-// OpenBot, not the SDK's "Existing OAuth client information is required" text.
-// Make lists only `client_secret_post` and refuses a registration that names no method it lists.
 import assert from "node:assert/strict";
 import { mkdir, writeFile } from "node:fs/promises";
 import { createServer, type IncomingMessage, type Server, type ServerResponse } from "node:http";
@@ -16,7 +8,7 @@ import { Effect } from "effect";
 import { z } from "zod";
 import { runCauseEffect } from "../src/backend/effect-boundary";
 import { McpOAuth, type McpOAuthRecord } from "../src/backend/mcp-oauth-provider";
-import { testMcpServer } from "../src/backend/mcp-probe";
+import { inspectMcpServer, testMcpServer } from "../src/backend/mcp-probe";
 
 const out = resolve(import.meta.dirname, "../.openbot-build/mcp-sign-in-client-refused-e2e");
 const ACCESS_TOKEN = "e2e-access-token";
@@ -24,27 +16,33 @@ const CLIENT_SECRET = "e2e-client-secret";
 
 const registrationRequest = z.object({
   token_endpoint_auth_method: z.string().optional(),
+  scope: z.string().optional(),
   redirect_uris: z.array(z.string()),
 });
 const rpcRequest = z.object({ id: z.union([z.number(), z.string()]).optional(), method: z.string() });
 
 interface FakeServer {
   url: string;
-  /** The `token_endpoint_auth_method` each registration asked for, in order. */
   registrations: (string | null)[];
-  /** Whether each token request carried the client secret, in order. */
+  registrationScopes: (string | null)[];
   tokenRequestsWithSecret: boolean[];
-  /** One entry for each `tools/list` that carried the token. */
   toolLists: boolean[];
+  pagesOpened: string[];
+  redirects: string[];
   close: () => Promise<void>;
 }
 
 interface Case {
   name: string;
   attempts: { toolCount: number; error: string | null }[];
+  silentTest?: { error: string | null; needs: string | null };
   registrations: (string | null)[];
+  registrationScopes: (string | null)[];
+  pageScopes: (string | null)[];
   tokenRequestsWithSecret: boolean[];
   toolLists: boolean[];
+  pagesOpened: number;
+  redirects: string[];
   storedClient: boolean;
   signedIn: boolean;
   failures: string[];
@@ -63,18 +61,65 @@ function json(response: ServerResponse, status: number, value: unknown, headers:
   response.end(JSON.stringify(value));
 }
 
-/**
- * `secretAccepted` is Make: the token endpoint takes the secret in the body. Without it, the server
- * is Railway and refuses every secret it issued.
- */
-async function fakeServer(authMethods: string[], secretAccepted: boolean): Promise<FakeServer> {
-  const state: Omit<FakeServer, "url" | "close"> = { registrations: [], tokenRequestsWithSecret: [], toolLists: [] };
+const REGISTRATION_REFUSALS = {
+  revenueCat: {
+    error: "invalid_client",
+    error_description: "The client is not registered. Contact support if you need to register a new client.",
+  },
+  omnisend: { error: "invalid_client_metadata", error_description: "unknown application: OpenBot" },
+  tessie: {
+    error: "invalid_client_metadata",
+    error_description: "No dynamic client registration template matched this request.",
+  },
+} as const;
+type RegistrationRefusal = keyof typeof REGISTRATION_REFUSALS;
+
+const REGISTRATION_FORBIDDEN = {
+  error: "registration_not_supported",
+  error_description:
+    "Dynamic client registration is not supported. Only pre-registered MCP trusted partners are allowed.",
+};
+type RegistrationForbidden = "dropbox" | "forbidden" | "namecheap";
+type AccountRefusal = "forbidden" | "insufficientScope";
+
+const DROPBOX_REDIRECTS = ["http://localhost/callback", "http://127.0.0.1/callback", "http://127.0.0.1"];
+const NAMECHEAP_REDIRECTS = ["https://claude.ai/api/mcp/auth_callback", "https://vscode.dev/redirect"];
+
+interface ScopeMetadata {
+  resource?: string[] | null;
+  server?: string[];
+}
+
+async function fakeServer(
+  authMethods: string[],
+  secretAccepted: boolean,
+  registrationRefused: RegistrationRefusal | null,
+  scopes: ScopeMetadata = {},
+  registrationForbidden: RegistrationForbidden | null = null,
+  accountRefused: AccountRefusal | null = null,
+  tokenForbidden = false,
+  secretForPublic = false,
+): Promise<FakeServer> {
+  const state: Omit<FakeServer, "url" | "close"> = {
+    registrations: [],
+    registrationScopes: [],
+    tokenRequestsWithSecret: [],
+    toolLists: [],
+    pagesOpened: [],
+    redirects: [],
+  };
   let base = "";
   const server: Server = createServer((request, response) => {
     void (async () => {
       const path = new URL(request.url ?? "/", base).pathname;
       if (request.method === "GET" && path === "/.well-known/oauth-protected-resource/mcp")
-        return json(response, 200, { resource: `${base}/mcp`, authorization_servers: [base] });
+        return scopes.resource === null
+          ? json(response, 404, { error: "not_found" })
+          : json(response, 200, {
+              resource: `${base}/mcp`,
+              authorization_servers: [base],
+              ...(scopes.resource ? { scopes_supported: scopes.resource } : {}),
+            });
       if (request.method === "GET" && path === "/.well-known/oauth-authorization-server")
         return json(response, 200, {
           issuer: base,
@@ -85,13 +130,32 @@ async function fakeServer(authMethods: string[], secretAccepted: boolean): Promi
           code_challenge_methods_supported: ["S256"],
           grant_types_supported: ["authorization_code", "refresh_token"],
           token_endpoint_auth_methods_supported: authMethods,
+          ...(scopes.server ? { scopes_supported: scopes.server } : {}),
         });
       if (request.method === "POST" && path === "/register") {
         const asked = registrationRequest.parse(JSON.parse(await body(request)));
         state.registrations.push(asked.token_endpoint_auth_method ?? null);
+        state.registrationScopes.push(asked.scope ?? null);
         const id = `e2e-client-${state.registrations.length}`;
-        // RFC 7591: a registration that names no method asks for `client_secret_basic`.
+        state.redirects.push(`register ${asked.redirect_uris.join(" ")}`);
+        if (registrationForbidden) {
+          const path = URL.parse(asked.redirect_uris[0] ?? "")?.pathname;
+          if (registrationForbidden === "namecheap")
+            return json(response, 201, {
+              client_id: id,
+              token_endpoint_auth_method: "none",
+              redirect_uris: path === "/callback" ? asked.redirect_uris : NAMECHEAP_REDIRECTS,
+            });
+          if (registrationForbidden === "forbidden" || path !== "/callback")
+            return json(response, 403, REGISTRATION_FORBIDDEN);
+          return json(response, 201, {
+            client_id: id,
+            token_endpoint_auth_method: "none",
+            redirect_uris: DROPBOX_REDIRECTS,
+          });
+        }
         const method = asked.token_endpoint_auth_method ?? "client_secret_basic";
+        if (registrationRefused) return json(response, 400, REGISTRATION_REFUSALS[registrationRefused]);
         if (!authMethods.includes(method))
           return json(response, 400, {
             code: "SC400",
@@ -100,19 +164,20 @@ async function fakeServer(authMethods: string[], secretAccepted: boolean): Promi
           });
         return json(response, 201, {
           client_id: id,
-          ...(method === "none" ? {} : { client_secret: CLIENT_SECRET }),
+          ...(method === "none" && !secretForPublic ? {} : { client_secret: CLIENT_SECRET }),
           token_endpoint_auth_method: method,
           redirect_uris: asked.redirect_uris,
         });
       }
       if (request.method === "POST" && path === "/token") {
         const form = new URLSearchParams(await body(request));
+        state.redirects.push(`token ${form.get("redirect_uri")}`);
         const withSecret = request.headers.authorization !== undefined || form.has("client_secret");
         state.tokenRequestsWithSecret.push(withSecret);
         const secretInBody = request.headers.authorization === undefined && form.get("client_secret") === CLIENT_SECRET;
-        // Railway: the secret it issued is refused. Make: the secret must come in the body.
         if (secretAccepted ? !secretInBody : withSecret)
           return json(response, 401, { error: "invalid_client", error_description: "client authentication failed" });
+        if (tokenForbidden) return json(response, 403, { message: "403 Forbidden" });
         if (form.get("code") !== "e2e-grant") return json(response, 400, { error: "invalid_grant" });
         return json(response, 200, { access_token: ACCESS_TOKEN, token_type: "Bearer", expires_in: 3600 });
       }
@@ -123,6 +188,16 @@ async function fakeServer(authMethods: string[], secretAccepted: boolean): Promi
           401,
           { error: "unauthorized" },
           { "www-authenticate": `Bearer resource_metadata="${base}/.well-known/oauth-protected-resource/mcp"` },
+        );
+      if (accountRefused === "forbidden") return json(response, 403, { message: "403 Forbidden" });
+      if (accountRefused === "insufficientScope")
+        return json(
+          response,
+          403,
+          { error: "insufficient_scope" },
+          {
+            "www-authenticate": `Bearer error="insufficient_scope", scope="mcp", resource_metadata="${base}/.well-known/oauth-protected-resource/mcp"`,
+          },
         );
       const message = rpcRequest.parse(JSON.parse(await body(request)));
       if (message.id === undefined) {
@@ -179,19 +254,71 @@ function httpConfig(url: string): McpServerConfig {
   };
 }
 
-/**
- * Signs in `attempts` times in a row against one server and one store. With `storedDiscovery`, the
- * store starts with only the discovery state, as an earlier sign-in that ended before the token
- * leaves it: the SDK reads that state and no server metadata.
- */
 async function runCase(
   name: string,
   authMethods: string[],
   attempts: number,
-  { storedDiscovery = false, secretAccepted = false } = {},
+  {
+    storedDiscovery = false,
+    secretAccepted = false,
+    registrationRefused = null,
+    scopes = {},
+    registrationForbidden = null,
+    storedClient = null,
+    storedClientRedirects = DROPBOX_REDIRECTS,
+    storedClientLost = false,
+    relayDeepLink,
+    accountRefused = null,
+    tokenForbidden = false,
+    storedTokens = false,
+    secretForPublic = false,
+  }: {
+    storedDiscovery?: boolean;
+    secretAccepted?: boolean;
+    registrationRefused?: RegistrationRefusal | null;
+    scopes?: ScopeMetadata;
+    registrationForbidden?: RegistrationForbidden | null;
+    storedClient?: string | null;
+    storedClientRedirects?: string[];
+    storedClientLost?: boolean;
+    relayDeepLink?: string | null;
+    accountRefused?: AccountRefusal | null;
+    tokenForbidden?: boolean;
+    storedTokens?: boolean;
+    secretForPublic?: boolean;
+  } = {},
 ): Promise<Case> {
-  const server = await fakeServer(authMethods, secretAccepted);
+  const server = await fakeServer(
+    authMethods,
+    secretAccepted,
+    registrationRefused,
+    scopes,
+    registrationForbidden,
+    accountRefused,
+    tokenForbidden,
+    secretForPublic,
+  );
   const records = new Map<string, McpOAuthRecord>();
+  if (storedClient)
+    records.set(server.url, {
+      client: {
+        client_id: storedClient,
+        token_endpoint_auth_method: "none",
+        redirect_uris: storedClientRedirects,
+        issuer: new URL(server.url).origin,
+      },
+      ...(storedClientLost ? { lostAt: Date.now() } : {}),
+    });
+  if (storedTokens)
+    records.set(server.url, {
+      client: { client_id: "e2e-client", token_endpoint_auth_method: "none", redirect_uris: [] },
+      tokens: { access_token: ACCESS_TOKEN, token_type: "Bearer", expires_in: 3600 },
+      obtainedAt: Date.now(),
+      discovery: {
+        authorizationServerUrl: new URL(server.url).origin,
+        resourceMetadataUrl: `${new URL(server.url).origin}/.well-known/oauth-protected-resource/mcp`,
+      },
+    });
   if (storedDiscovery)
     records.set(server.url, {
       discovery: {
@@ -205,8 +332,9 @@ async function runCase(
       write: (resource, record) => Effect.sync(() => void records.set(resource, record)),
       clear: (resource) => Effect.sync(() => void records.delete(resource)),
     },
-    // The browser: the authorization server sends the grant straight back.
     openExternal: async (page) => {
+      server.pagesOpened.push(page);
+      server.redirects.push(`page ${new URL(page).searchParams.get("redirect_uri")}`);
       const state = new URL(page).searchParams.get("state");
       assert.ok(state, "the page has a state");
       setTimeout(() => oauth.receiveAuthorizationCode(state, "e2e-grant"), 50);
@@ -214,20 +342,41 @@ async function runCase(
     redirectUrl: "http://127.0.0.1:28417/mcp-auth",
     signInTimeoutMs: 10_000,
   });
+  let attempt = 0;
+  const relayed = async (page: string) => {
+    server.pagesOpened.push(page);
+    server.redirects.push(`page ${new URL(page).searchParams.get("redirect_uri")}`);
+    const state = new URL(page).searchParams.get("state");
+    assert.ok(state, "the page has a state");
+    setTimeout(() => {
+      if (attempt < attempts - 1) oauth.cancelSignIn(server.url);
+      else oauth.receiveAuthorizationCode(state, "e2e-grant");
+    }, 50);
+  };
   try {
     const authority = {
       accessToken: (url: string) => oauth.accessToken(url),
-      signIn: (url: string) => oauth.signIn(url),
+      signIn: (url: string) =>
+        relayDeepLink === undefined ? oauth.signIn(url) : oauth.signIn(url, relayed, relayDeepLink ?? undefined),
     };
     const results: Case["attempts"] = [];
-    for (let attempt = 0; attempt < attempts; attempt++)
+    for (attempt = 0; attempt < attempts; attempt++)
       results.push(await runCauseEffect(testMcpServer(httpConfig(server.url), 10_000, undefined, authority, "here")));
+    const silent = { accessToken: (url: string) => oauth.accessToken(url), signIn: () => null };
+    const silentTest = accountRefused
+      ? await runCauseEffect(inspectMcpServer(httpConfig(server.url), 10_000, undefined, silent, "here"))
+      : null;
     return {
       name,
       attempts: results,
+      ...(silentTest ? { silentTest: { error: silentTest.error, needs: silentTest.needs } } : {}),
       registrations: [...server.registrations],
+      registrationScopes: [...server.registrationScopes],
+      pageScopes: server.pagesOpened.map((page) => new URL(page).searchParams.get("scope")),
       tokenRequestsWithSecret: [...server.tokenRequestsWithSecret],
       toolLists: [...server.toolLists],
+      pagesOpened: server.pagesOpened.length,
+      redirects: [...server.redirects],
       storedClient: records.get(server.url)?.client !== undefined,
       signedIn: oauth.signedIn(server.url),
       failures: [],
@@ -245,7 +394,6 @@ function check(entry: Case, condition: boolean, text: string): void {
 async function main(): Promise<void> {
   await mkdir(out, { recursive: true });
   try {
-    // Railway's metadata lists `none`: OpenBot registers a public client and the sign-in works.
     const listed = await runCase("public-client-when-listed", ["client_secret_basic", "client_secret_post", "none"], 1);
     const [first] = listed.attempts;
     check(listed, first?.error === null, `the sign-in failed: ${first?.error}`);
@@ -255,7 +403,6 @@ async function main(): Promise<void> {
     check(listed, listed.signedIn, "no token is stored after the sign-in");
     report.cases.push(listed);
 
-    // The same server, with a discovery state already on file: the registration is still public.
     const cached = await runCase("public-client-with-stored-discovery", ["client_secret_basic", "none"], 1, {
       storedDiscovery: true,
     });
@@ -265,8 +412,6 @@ async function main(): Promise<void> {
     check(cached, cached.signedIn, "no token is stored after the sign-in");
     report.cases.push(cached);
 
-    // A server that does not list `none` chooses the method. Its refusal of the secret is reported
-    // as a refusal, and the next sign-in registers again instead of reusing the refused client.
     const unlisted = await runCase("secret-client-refused", ["client_secret_basic"], 2);
     const refused = sourceText("error.backend.mcpSignInClientRefused");
     for (const [index, attempt] of unlisted.attempts.entries()) {
@@ -278,8 +423,6 @@ async function main(): Promise<void> {
     check(unlisted, !unlisted.signedIn, "a token is stored after a refused sign-in");
     report.cases.push(unlisted);
 
-    // Make lists only `client_secret_post`. A registration that names no method asks for
-    // `client_secret_basic`, and Make answers 400, so OpenBot must ask for `client_secret_post`.
     const make = await runCase("secret-post-only", ["client_secret_post"], 1, { secretAccepted: true });
     check(make, make.attempts[0]?.error === null, `the sign-in failed: ${make.attempts[0]?.error}`);
     check(make, make.attempts[0]?.toolCount === 1, "the tools were not listed after the sign-in");
@@ -292,7 +435,6 @@ async function main(): Promise<void> {
     check(make, make.signedIn, "no token is stored after the sign-in");
     report.cases.push(make);
 
-    // The same server, with a discovery state already on file: the registration still names the method.
     const makeCached = await runCase("secret-post-only-with-stored-discovery", ["client_secret_post"], 1, {
       storedDiscovery: true,
       secretAccepted: true,
@@ -305,6 +447,289 @@ async function main(): Promise<void> {
     );
     check(makeCached, makeCached.signedIn, "no token is stored after the sign-in");
     report.cases.push(makeCached);
+
+    const revenueCat = await runCase("registration-refused-invalid-client", ["client_secret_basic", "none"], 2, {
+      registrationRefused: "revenueCat",
+    });
+    const registrationRefused = sourceText("error.backend.mcpRegistrationRefused");
+    for (const [index, attempt] of revenueCat.attempts.entries())
+      check(revenueCat, attempt.error === registrationRefused, `attempt ${index + 1} reported: ${attempt.error}`);
+    check(
+      revenueCat,
+      revenueCat.registrations.join() === "none,none,none,none",
+      `the registrations were ${revenueCat.registrations.join()}`,
+    );
+    check(revenueCat, revenueCat.pagesOpened === 0, "a sign-in page opened with no registered client");
+    check(revenueCat, !revenueCat.storedClient, "a client is stored after a refused registration");
+    check(revenueCat, !revenueCat.signedIn, "a token is stored after a refused registration");
+    report.cases.push(revenueCat);
+
+    const omnisend = await runCase("registration-refused-unknown-application", ["none"], 2, {
+      registrationRefused: "omnisend",
+    });
+    for (const [index, attempt] of omnisend.attempts.entries())
+      check(omnisend, attempt.error === registrationRefused, `attempt ${index + 1} reported: ${attempt.error}`);
+    check(omnisend, omnisend.pagesOpened === 0, "a sign-in page opened with no registered client");
+    check(omnisend, !omnisend.storedClient, "a client is stored after a refused registration");
+    check(omnisend, !omnisend.signedIn, "a token is stored after a refused registration");
+    report.cases.push(omnisend);
+
+    const tessie = await runCase("registration-refused-no-template", ["none"], 1, { registrationRefused: "tessie" });
+    const [tessieAttempt] = tessie.attempts;
+    check(tessie, tessieAttempt?.error === registrationRefused, `the attempt reported: ${tessieAttempt?.error}`);
+    check(tessie, tessie.pagesOpened === 0, "a sign-in page opened with no registered client");
+    check(tessie, !tessie.storedClient, "a client is stored after a refused registration");
+    check(tessie, !tessie.signedIn, "a token is stored after a refused registration");
+    report.cases.push(tessie);
+
+    const accountRefused = sourceText("error.backend.mcpSignInAccountRefused");
+    const gitlab = await runCase("account-refused-after-sign-in", ["none"], 1, { accountRefused: "forbidden" });
+    const [signInAttempt] = gitlab.attempts;
+    check(gitlab, signInAttempt?.error === accountRefused, `the sign-in reported: ${signInAttempt?.error}`);
+    check(gitlab, gitlab.signedIn, "no token is stored after the sign-in");
+    check(
+      gitlab,
+      gitlab.silentTest?.error === accountRefused,
+      `the Test with the saved sign-in reported: ${gitlab.silentTest?.error}`,
+    );
+    check(gitlab, gitlab.silentTest?.needs === null, `the Test asked for: ${gitlab.silentTest?.needs}`);
+    report.cases.push(gitlab);
+
+    const stepUp = await runCase("account-scope-step-up", ["none"], 0, {
+      accountRefused: "insufficientScope",
+      storedTokens: true,
+    });
+    const signInRequired = sourceText("error.backend.mcpSignInRequired");
+    check(
+      stepUp,
+      stepUp.silentTest?.error === signInRequired,
+      `the Test with the saved sign-in reported: ${stepUp.silentTest?.error}`,
+    );
+    check(stepUp, stepUp.silentTest?.needs === "sign_in", `the Test asked for: ${stepUp.silentTest?.needs}`);
+    report.cases.push(stepUp);
+
+    const enrich = await runCase("public-registration-with-secret", ["client_secret_post", "none"], 1, {
+      secretAccepted: true,
+      secretForPublic: true,
+    });
+    check(enrich, enrich.attempts[0]?.error === null, `the sign-in failed: ${enrich.attempts[0]?.error}`);
+    check(enrich, enrich.attempts[0]?.toolCount === 1, "the tools were not listed after the sign-in");
+    check(enrich, enrich.registrations.join() === "none", `the registration asked for ${enrich.registrations.join()}`);
+    check(
+      enrich,
+      enrich.tokenRequestsWithSecret.join() === "true",
+      "the token request did not carry the client secret",
+    );
+    check(enrich, enrich.signedIn, "no token is stored after the sign-in");
+    report.cases.push(enrich);
+
+    const tokenRefused = await runCase("token-endpoint-forbidden", ["none"], 1, { tokenForbidden: true });
+    const notAccepted = sourceText("error.backend.mcpSignInNotAccepted");
+    check(
+      tokenRefused,
+      tokenRefused.attempts[0]?.error === notAccepted,
+      `the sign-in reported: ${tokenRefused.attempts[0]?.error}`,
+    );
+    check(tokenRefused, !tokenRefused.signedIn, "a token is stored after a refused grant");
+    report.cases.push(tokenRefused);
+
+    const callback = "http://127.0.0.1:28417/callback";
+    const dropbox = await runCase("registration-forbidden-except-callback", ["none"], 1, {
+      registrationForbidden: "dropbox",
+    });
+    check(dropbox, dropbox.attempts[0]?.error === null, `the sign-in failed: ${dropbox.attempts[0]?.error}`);
+    check(dropbox, dropbox.attempts[0]?.toolCount === 1, "the tools were not listed after the sign-in");
+    check(
+      dropbox,
+      dropbox.redirects.join() === [`register ${callback}`, `page ${callback}`, `token ${callback}`].join(),
+      `the addresses were ${dropbox.redirects.join()}`,
+    );
+    check(dropbox, dropbox.storedClient, "no client is stored after the sign-in");
+    check(dropbox, dropbox.signedIn, "no token is stored after the sign-in");
+    report.cases.push(dropbox);
+
+    const dropboxStored = await runCase("registration-with-no-port-used-again", ["none"], 1, {
+      registrationForbidden: "dropbox",
+      storedClient: "e2e-dropbox-client",
+    });
+    check(
+      dropboxStored,
+      dropboxStored.attempts[0]?.error === null,
+      `the sign-in failed: ${dropboxStored.attempts[0]?.error}`,
+    );
+    check(
+      dropboxStored,
+      dropboxStored.redirects.join() === [`page ${callback}`, `token ${callback}`].join(),
+      `the addresses were ${dropboxStored.redirects.join()}`,
+    );
+    check(dropboxStored, dropboxStored.signedIn, "no token is stored after the sign-in");
+    report.cases.push(dropboxStored);
+
+    const unfinished = await runCase("unfinished-client-registers-callback", ["none"], 1, {
+      storedClient: "e2e-unfinished-client",
+      storedClientRedirects: ["http://127.0.0.1:28417/mcp-auth"],
+    });
+    check(unfinished, unfinished.attempts[0]?.error === null, `the sign-in failed: ${unfinished.attempts[0]?.error}`);
+    check(
+      unfinished,
+      unfinished.redirects.join() === [`register ${callback}`, `page ${callback}`, `token ${callback}`].join(),
+      `the addresses were ${unfinished.redirects.join()}`,
+    );
+    check(unfinished, unfinished.signedIn, "no token is stored after the sign-in");
+    report.cases.push(unfinished);
+
+    const signedInBefore = "http://127.0.0.1:28417/mcp-auth";
+    const lost = await runCase("lost-sign-in-keeps-its-address", ["none"], 1, {
+      storedClient: "e2e-lost-client",
+      storedClientRedirects: [signedInBefore],
+      storedClientLost: true,
+    });
+    check(lost, lost.attempts[0]?.error === null, `the sign-in failed: ${lost.attempts[0]?.error}`);
+    check(
+      lost,
+      lost.redirects.join() === [`page ${signedInBefore}`, `token ${signedInBefore}`].join(),
+      `the addresses were ${lost.redirects.join()}`,
+    );
+    check(lost, lost.signedIn, "no token is stored after the sign-in");
+    report.cases.push(lost);
+
+    const ownListener = "http://127.0.0.1:28417/mcp-auth";
+    const openedElsewhere = await runCase("opened-elsewhere-keeps-mcp-auth", ["none"], 1, {
+      storedClient: "e2e-unfinished-callback-client",
+      storedClientRedirects: [callback],
+      relayDeepLink: null,
+    });
+    check(
+      openedElsewhere,
+      openedElsewhere.attempts[0]?.error === null,
+      `the sign-in failed: ${openedElsewhere.attempts[0]?.error}`,
+    );
+    check(
+      openedElsewhere,
+      openedElsewhere.redirects.join() ===
+        [`register ${ownListener}`, `page ${ownListener}`, `token ${ownListener}`].join(),
+      `the addresses were ${openedElsewhere.redirects.join()}`,
+    );
+    check(openedElsewhere, openedElsewhere.signedIn, "no token is stored after the sign-in");
+    report.cases.push(openedElsewhere);
+
+    const lostElsewhere = await runCase("opened-elsewhere-after-lost-callback-sign-in", ["none"], 1, {
+      storedClient: "e2e-lost-callback-client",
+      storedClientRedirects: [callback],
+      storedClientLost: true,
+      relayDeepLink: null,
+    });
+    check(
+      lostElsewhere,
+      lostElsewhere.attempts[0]?.error === null,
+      `the sign-in failed: ${lostElsewhere.attempts[0]?.error}`,
+    );
+    check(
+      lostElsewhere,
+      lostElsewhere.redirects.join() ===
+        [`register ${ownListener}`, `page ${ownListener}`, `token ${ownListener}`].join(),
+      `the addresses were ${lostElsewhere.redirects.join()}`,
+    );
+    check(lostElsewhere, lostElsewhere.signedIn, "no token is stored after the sign-in");
+    report.cases.push(lostElsewhere);
+
+    const namecheap = await runCase("registration-replaces-address-except-callback", ["none"], 1, {
+      registrationForbidden: "namecheap",
+    });
+    check(namecheap, namecheap.attempts[0]?.error === null, `the sign-in failed: ${namecheap.attempts[0]?.error}`);
+    check(
+      namecheap,
+      namecheap.redirects.join() === [`register ${callback}`, `page ${callback}`, `token ${callback}`].join(),
+      `the addresses were ${namecheap.redirects.join()}`,
+    );
+    check(namecheap, namecheap.signedIn, "no token is stored after the sign-in");
+    report.cases.push(namecheap);
+
+    const namecheapElsewhere = await runCase("opened-elsewhere-registration-replaces-address", ["none"], 1, {
+      registrationForbidden: "namecheap",
+      relayDeepLink: null,
+    });
+    check(
+      namecheapElsewhere,
+      namecheapElsewhere.attempts[0]?.error === null,
+      `the sign-in failed: ${namecheapElsewhere.attempts[0]?.error}`,
+    );
+    check(
+      namecheapElsewhere,
+      namecheapElsewhere.redirects.join() ===
+        [`register ${ownListener}`, `register ${callback}`, `page ${callback}`, `token ${callback}`].join(),
+      `the addresses were ${namecheapElsewhere.redirects.join()}`,
+    );
+    check(namecheapElsewhere, namecheapElsewhere.signedIn, "no token is stored after the sign-in");
+    report.cases.push(namecheapElsewhere);
+
+    const forbidden = await runCase("registration-forbidden", ["none"], 1, { registrationForbidden: "forbidden" });
+    check(
+      forbidden,
+      forbidden.attempts[0]?.error === registrationRefused,
+      `the attempt reported: ${forbidden.attempts[0]?.error}`,
+    );
+    check(forbidden, forbidden.pagesOpened === 0, "a sign-in page opened with no registered client");
+    check(forbidden, !forbidden.signedIn, "a token is stored after a refused registration");
+    report.cases.push(forbidden);
+
+    const entraScopes = ["api://e2e-resource/.default", "offline_access", "openid", "email"];
+    const scopeCases: { name: string; scopes: ScopeMetadata; expected: string | null }[] = [
+      {
+        name: "scope-from-authorization-server",
+        scopes: { resource: null, server: entraScopes },
+        expected: entraScopes.join(" "),
+      },
+      {
+        name: "scope-from-resource-metadata",
+        scopes: { resource: ["read"], server: entraScopes },
+        expected: "read offline_access",
+      },
+      { name: "no-scope-in-resource-metadata", scopes: { resource: [], server: entraScopes }, expected: null },
+      { name: "no-scope-anywhere", scopes: { resource: null }, expected: null },
+    ];
+    const loopback = "http://127.0.0.1:28417/mcp-auth";
+    const localhost = "http://localhost:28417/mcp-auth";
+    const deepLink = "openbot://mcp-auth";
+    const pages = (entry: Case) =>
+      entry.redirects.filter((line) => line.startsWith("page ")).map((line) => line.slice("page ".length));
+    const relayed = await runCase("relay-with-deep-link", ["none"], 3, { relayDeepLink: deepLink });
+    check(
+      relayed,
+      pages(relayed).join(" ") === [loopback, localhost, deepLink].join(" "),
+      `the pages returned to ${pages(relayed).join(", ")}`,
+    );
+    check(relayed, relayed.redirects.includes(`register ${deepLink}`), "the deep link was not registered");
+    check(relayed, relayed.redirects.at(-1) === `token ${deepLink}`, "the token request did not name the link");
+    check(relayed, relayed.attempts[2]?.error === null, `the third sign-in failed: ${relayed.attempts[2]?.error}`);
+    check(relayed, relayed.signedIn, "no token is stored after the sign-in");
+    report.cases.push(relayed);
+    const relayedLoopback = await runCase("relay-without-deep-link", ["none"], 3, { relayDeepLink: null });
+    check(
+      relayedLoopback,
+      pages(relayedLoopback).join(" ") === [loopback, localhost, loopback].join(" "),
+      `the pages returned to ${pages(relayedLoopback).join(", ")}`,
+    );
+    check(
+      relayedLoopback,
+      !relayedLoopback.redirects.some((line) => line.includes(deepLink)),
+      "a client without the link got it",
+    );
+    check(relayedLoopback, relayedLoopback.signedIn, "no token is stored after the sign-in");
+    report.cases.push(relayedLoopback);
+
+    for (const { name, scopes, expected } of scopeCases) {
+      const entry = await runCase(name, ["none"], 1, { scopes });
+      check(entry, entry.attempts[0]?.error === null, `the sign-in failed: ${entry.attempts[0]?.error}`);
+      check(entry, entry.pageScopes.join() === (expected ?? ""), `the page asked for ${entry.pageScopes.join()}`);
+      check(
+        entry,
+        entry.registrationScopes.join() === (expected ?? ""),
+        `the registration asked for ${entry.registrationScopes.join()}`,
+      );
+      check(entry, entry.signedIn, "no token is stored after the sign-in");
+      report.cases.push(entry);
+    }
   } catch (error) {
     report.failures.push(error instanceof Error ? error.message : String(error));
   }

@@ -1,21 +1,12 @@
-/*
- * The separator a transcript draws when the messages under it fall on a later day than the messages
- * above it. Both the agent chat and the channel chat use it, so the rule that decides when a
- * separator appears is here, away from either timeline, and is a pure function of two timestamps.
- */
-
 import type { AppFormat, AppTranslate } from "@openbot/i18n";
 import { currentText } from "@openbot/ui/text";
 
-/** The clock a caller can replace, so a test does not depend on the day the test runs. */
 export interface DayMarkerOptions {
   now?: Date;
-  /** The locale of the date and time when the caller gives no `format`. */
   locale?: string;
-  /** The interface text. Without it, the label uses the text of the app's provider. */
   t?: AppTranslate;
-  /** The interface formats. Without it, the date and time use `locale`. */
   format?: AppFormat;
+  gapMs?: number;
 }
 
 function startOfDay(value: Date): number {
@@ -36,13 +27,6 @@ function dateOf(value: Date, options: DayMarkerOptions): string {
   return options.format ? options.format.date(value, date) : value.toLocaleDateString(options.locale, date);
 }
 
-/**
- * The label for the separator above a message, or `null` when the message needs none.
- *
- * `previousIso` is the time of the message above it, and is absent for the first message of the
- * transcript, which always gets a separator. An unreadable timestamp gives no separator, because a
- * separator that cannot name its day tells the reader nothing.
- */
 export function dayMarkerLabel(
   previousIso: string | undefined,
   currentIso: string,
@@ -52,7 +36,9 @@ export function dayMarkerLabel(
   if (Number.isNaN(current.getTime())) return null;
   if (previousIso !== undefined) {
     const previous = new Date(previousIso);
-    if (!Number.isNaN(previous.getTime()) && dayDifference(previous, current) === 0) return null;
+    const sameDay = !Number.isNaN(previous.getTime()) && dayDifference(previous, current) === 0;
+    const longGap = options.gapMs !== undefined && current.getTime() - previous.getTime() >= options.gapMs;
+    if (sameDay && !longGap) return null;
   }
   const now = options.now ?? new Date();
   const age = dayDifference(current, now);

@@ -101,6 +101,10 @@ OpenBot quits, OpenBot stops listening and deletes the files.
 
 Each request needs `Authorization: Bearer <token>`.
 
+Responses remove secrets from text. These ID fields always have their real values: `id`, `agentId`,
+`recipientAgentId`, `threadId`, `turnId`, `requestId`, `messageId`, `deliveryId`, `runId` and
+`providerAccountId`.
+
 ### `GET /v1/agents`
 
 The agents that allow local scripts, with their routines:
@@ -123,6 +127,13 @@ routine or has this routine. A run with `waitId` wakes only that wait. When no s
 the run starts without a wait. The run's input repeats the request and the agent's note, so the
 agent can continue the request.
 
+A side thread that the user opened can open a wait too. The wait continues in the side thread where it
+opened. A run with the `waitId` of a side-thread wait runs in that side thread. Any other run that
+wakes a side-thread wait stays in its usual place, and the side thread gets its own message with
+the run's instruction and the wait. That message continues the wait; it does not do the routine task again. An archived side thread opens again. When the side thread is
+gone, or no more side threads can be open, the wait continues in the run's place. A channel or
+messaging conversation cannot open a wait.
+
 Answer: `202 { "runId": string, "deliveryId": string | null }`.
 
 `202` means that the run is in the queue, not that it ran. When the agent's provider account is at
@@ -138,7 +149,7 @@ set to skip at the limit drops the run instead, and its run history shows it as 
 | 409 | The agent cannot take the run now, for example while it is being deleted. |
 | 413 | The body is larger than 32 KiB, or the payload is longer than 4,000 characters. |
 | 415 | `Content-Type` is not `application/json`. |
-| 429 | The agent got 30 runs from local scripts in the last hour. |
+| 429 | The agent got its limit of messages and runs from local scripts in the last hour (30 by default). |
 
 An agent can have at most 20 open waits. `openbot.list_waits` shows an agent's open waits with their
 IDs, and `openbot.close_wait` closes one by ID. With `agentId`, both tools act on another local
@@ -244,9 +255,16 @@ The agent must still allow Local scripts for every read and response. A request 
 agent, an expired request, or a secret question cannot be answered through this API. Expired
 requests return `409`; refresh the pending list instead of retrying the old response.
 
-All request bodies have a 32 KiB limit. Messages and routine runs share the limit of 30 accepted
-requests per agent per hour, including message retries. Reads, attention responses, settings
-changes and new chats do not use that limit. Routine runs have no retry key; retrying a run can start it twice.
+A script is not the server owner, because an agent can run one. It cannot press a card button that
+only the owner or an admin can press (a danger button or a button with confirm), or accept an
+approval that only the owner can give. These answers return `403`; ask the person to answer in
+OpenBot.
+
+All request bodies have a 32 KiB limit. Messages and routine runs share a limit of accepted
+requests per agent per hour, including message retries. The limit is 30 by default; change it in
+Server Settings › Agent defaults › Local scripts › Requests an hour: 30, 60, 120, 300 or 1,000. Reads, attention
+responses, settings changes and new chats do not use that limit. Routine runs have no retry key;
+retrying a run can start it twice.
 
 ## Windows
 

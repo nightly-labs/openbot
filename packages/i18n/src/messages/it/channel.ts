@@ -9,7 +9,12 @@ export const messages = {
   "channel.stoppedTask.reassignLabel": "Riassegna l'attività interrotta di {name}",
   "channel.stoppedTask.reassign": "Riassegna",
   "channel.stoppedTask.cancel": "Annulla attività",
+  "channel.stoppedTask.assignmentLoop":
+    "{names} si sono passati questa attività troppe volte. È stata interrotta per evitare un ciclo.",
+  "channel.stoppedTask.assignmentLoopMembers":
+    "I membri si sono passati questa attività troppe volte. È stata interrotta per evitare un ciclo.",
   "channel.conversation.noMembers": "Aggiungi agenti nelle impostazioni del canale per iniziare a lavorare.",
+  "channel.conversation.waitFull": "In attesa - {name} inizia quando termina un'attività in corso",
   "channel.conversation.archivedNotice": "Canale eliminato. Solo anteprima.",
   "channel.composer.label": "Messaggio al canale",
   "channel.composer.placeholder": "Scrivi a {name}",
@@ -17,10 +22,40 @@ export const messages = {
   "channel.panel.close": "Chiudi il pannello del canale",
   "channel.settings.title": "Impostazioni del canale",
   "channel.settings.memories": "Memorie",
+  "channel.settings.folders.title": "Cartelle",
+  "channel.settings.folders.description":
+    "Tutti i membri di {channel} possono modificare file ed eseguire comandi in queste cartelle.",
+  "channel.settings.folders.toastAdded": "I membri di {channel} ora possono modificare i file in {folder}",
+  "channel.settings.folders.toastRemoved": "I membri di {channel} non possono più modificare i file in {folder}",
   "channel.settings.isolated": "Tieni le memorie in questo canale",
   "channel.settings.isolatedDescription":
     "Gli agenti salvano ciò che imparano qui come memorie del canale. Le loro altre chat non le vedono.",
+  "channel.settings.browser": "Browser",
+  "channel.settings.browserEveryone": "Tutti i membri",
+  "channel.settings.browserNone": "Nessuno",
   "channel.settings.memoryCount": { one: "{count} salvata", other: "{count} salvate" },
+  "channel.settings.newConversation.title": "Nuova conversazione",
+  "channel.settings.newConversation.description":
+    "I membri dimenticano i messaggi precedenti. Le impostazioni del canale restano.",
+  "channel.settings.newConversation.button": "Avvia",
+  "channel.settings.newConversation.confirmTitle": "Avviare una nuova conversazione in {name}?",
+  "channel.settings.newConversation.confirmDescription":
+    "I membri dimenticano i messaggi precedenti di questo canale. I messaggi restano visibili sopra un divisore. Membri, istruzioni, ricordi e routine non cambiano.",
+  "channel.settings.newConversation.confirm": "Avvia nuova conversazione",
+  "channel.settings.newConversation.failed": "Impossibile avviare una nuova conversazione.",
+  "channel.settings.compact.title": "Compatta contesto",
+  "channel.settings.compact.description":
+    "I membri conservano un breve riepilogo della sessione del canale e usano meno token.",
+  "channel.settings.compact.failed": "Impossibile compattare il contesto del canale.",
+  "channel.settings.deleteHistory.title": "Elimina cronologia",
+  "channel.settings.deleteHistory.description":
+    "I messaggi vengono eliminati e i membri li dimenticano. La configurazione del canale resta.",
+  "channel.settings.deleteHistory.button": "Elimina",
+  "channel.settings.deleteHistory.confirmTitle": "Eliminare la cronologia di {name}?",
+  "channel.settings.deleteHistory.confirmDescription":
+    "Tutti i messaggi e i file di questo canale vengono eliminati da OpenBot e i membri li dimenticano. Non puoi annullare. Membri, istruzioni, memorie, routine e attività non cambiano.",
+  "channel.settings.deleteHistory.confirm": "Elimina cronologia",
+  "channel.settings.deleteHistory.failed": "Impossibile eliminare la cronologia.",
   "channel.settings.routines": "Routine",
   "channel.settings.routineCount": { one: "{count} configurata", other: "{count} configurate" },
   "channel.create.close": "Chiudi il nuovo canale",

@@ -7,21 +7,16 @@ import { Button } from "../../button";
 import { Brain, ChevronRight, Puzzle, Sparkles } from "../../icons";
 import { type TextValue, useText } from "../../text";
 import { prefersReducedMotion } from "../../utils";
+import { ActivityShine } from "./ActivityShine";
 import { useDuration } from "./Subagents";
 import { type TraceKeyboard, type TraceSpan, TraceWaterfallDialog } from "./TraceWaterfall";
 
-/**
- * One step of an agent's turn: a thought, a progress line of the host, or a memory change that the
- * turn committed. `memory-summary` is the count that a host without the changes sends instead.
- * The text of `progress` and `memory-summary` is the host's English source text.
- */
 export type AgentStep =
   | { id: string; kind: "thinking"; text: string }
-  | { id: string; kind: "progress"; text: string }
+  | { id: string; kind: "progress"; text: string; error?: string | undefined }
   | { id: string; kind: "memory"; change: ConversationMemoryChange }
   | { id: string; kind: "memory-summary"; text: string };
 
-/** How tall the list grows before it scrolls, and before a live list glides to its newest step. */
 const STEPS_MAX_HEIGHT = 220;
 
 const MEMORY_ACTION_LABEL = {
@@ -31,15 +26,10 @@ const MEMORY_ACTION_LABEL = {
   notChanged: "chat.steps.notChanged",
 } as const;
 
-/**
- * The steps of a turn, in order. While the turn runs, `live` marks the newest step and the list
- * glides so that step stays at the bottom edge; after the turn the list scrolls.
- */
 export function AgentStepList(props: {
   steps: readonly AgentStep[];
   live: boolean;
   id?: string;
-  /** The step to scroll to and light up, such as the one that the user picked in the trace. */
   focus?: { id: string } | null | undefined;
 }) {
   const { t } = useText();
@@ -70,7 +60,6 @@ export function AgentStepList(props: {
       aria-label={t("chat.steps.list")}
       data-capped={capped() ? "" : undefined}
       data-scrolls={scrolls() ? "" : undefined}
-      // A list that scrolls needs a keyboard stop of its own.
       tabindex={scrolls() ? 0 : undefined}
     >
       <ol ref={content} class="agent-steps-list" style={{ transform: `translateY(${offset()}px)` }}>
@@ -94,7 +83,12 @@ export function AgentStepList(props: {
 
 function StepBody(props: { step: AgentStep; newest: boolean }) {
   const text = useText();
-  return <>{stepBody(props.step, props.newest, text)}</>;
+  const failure = () => (props.step.kind === "progress" && props.step.error ? props.step : undefined);
+  return (
+    <Show when={failure()} fallback={stepBody(props.step, props.newest, text)}>
+      {(step) => <FailedStep text={text.sourceText(step().text)} error={step().error} newest={props.newest} />}
+    </Show>
+  );
 }
 
 function stepBody(step: AgentStep, newest: boolean, text: TextValue): JSX.Element {
@@ -115,14 +109,55 @@ function stepBody(step: AgentStep, newest: boolean, text: TextValue): JSX.Elemen
     );
   }
   if (step.kind === "thinking") {
-    // The agent's own words take their direction from their letters; a progress line is interface text.
     return (
       <span class={["agent-step-text", { "agent-activity-label": newest }]} dir="auto">
         {step.text}
+        {newest && <ActivityShine text={step.text} />}
       </span>
     );
   }
-  return <span class={["agent-step-text", { "agent-activity-label": newest }]}>{text.sourceText(step.text)}</span>;
+  const label = text.sourceText(step.text);
+  return (
+    <span class={["agent-step-text", { "agent-activity-label": newest }]}>
+      {label}
+      {newest && <ActivityShine text={label} />}
+    </span>
+  );
+}
+
+function FailedStep(props: { text: string; error: string | undefined; newest: boolean }) {
+  const { t } = useText();
+  const outputId = createUniqueId();
+  const [open, setOpen] = createSignal(false);
+  const expanded = () => (open() ? "true" : "false");
+  const controls = () => (open() ? outputId : undefined);
+  const label = () => t(open() ? "chat.steps.hideError" : "chat.steps.showError");
+  return (
+    <div class="agent-step-failed">
+      <span class={["agent-step-text", { "agent-activity-label": props.newest }]}>
+        {props.text}
+        <Show when={props.newest}>
+          <ActivityShine text={props.text} />
+        </Show>
+      </span>
+      <Button
+        type="button"
+        variant="ghost"
+        class="agent-step-error-toggle"
+        aria-expanded={expanded()}
+        aria-controls={controls()}
+        onClick={() => setOpen(!open())}
+      >
+        <ChevronRight class="agent-steps-chevron" aria-hidden="true" />
+        {label()}
+      </Button>
+      <Show when={open()}>
+        <pre id={outputId} class="agent-step-error" dir="auto">
+          {props.error}
+        </pre>
+      </Show>
+    </div>
+  );
 }
 
 function StepIcon(props: { kind: AgentStep["kind"] }) {
@@ -139,7 +174,6 @@ function StepIcon(props: { kind: AgentStep["kind"] }) {
   );
 }
 
-/** The one-line summary of a finished turn's steps: "9 steps · Memory: 2 saved and 1 forgotten". */
 function stepsSummary(steps: readonly AgentStep[], text: TextValue): string {
   const work = steps.filter((step) => step.kind === "thinking" || step.kind === "progress").length;
   const changes = steps.flatMap((step) => (step.kind === "memory" ? [step.change] : []));
@@ -162,51 +196,37 @@ function stepsSummary(steps: readonly AgentStep[], text: TextValue): string {
     .join(" · ");
 }
 
-/** The trace of a turn, which its steps row opens in a dialog. */
 export interface AgentStepsTrace {
-  /** Read only while the dialog is open. */
   spans: () => readonly TraceSpan[];
   keyboard: TraceKeyboard;
-  /** The spans that are not steps of the list but that the chat can show, such as subagents. */
   canSelectSpan?: (id: string) => boolean;
   onSelectSpan?: (id: string) => void;
 }
 
-/** The facts of a finished turn that its steps row shows. */
 export interface AgentStepsFacts {
   durationMs: number;
-  /** The steps and subagents that failed. */
   failed: number;
 }
 
-/**
- * The steps of a finished turn, above its answer: a closed summary row that opens the list, or the
- * trace when the turn has one. The row looks like the header of the subagents above it. The "Show
- * agent steps" setting opens the list at first. An open list, also one that a step picked in the
- * trace opened, closes from the row.
- */
 export function AgentStepsDisclosure(props: {
   steps: readonly AgentStep[];
   defaultOpen: boolean;
   trace?: AgentStepsTrace | undefined;
   facts?: AgentStepsFacts | undefined;
+  list?: boolean | undefined;
 }) {
   const text = useText();
   const duration = useDuration();
-  /** Whole seconds, rounded as the trace rounds the turn, so that the row and the trace agree. */
   const turnTime = (ms: number) => duration(Math.round(ms / 1_000) * 1_000);
   const panelId = createUniqueId();
   const [choice, setChoice] = createSignal<boolean>();
-  // The time the trace opened: a finished turn does not move, so its "now" stays at that time.
   const [traceOpenedAt, setTraceOpenedAt] = createSignal<number | null>(null);
-  // A long chat has a row for each turn, so a row builds its trace dialog when it first opens.
   const [traceUsed, setTraceUsed] = createSignal(false);
-  const open = () => choice() ?? props.defaultOpen;
-  // The step that the user picked in the trace. A new object each time scrolls to it again.
+  const open = () => props.list !== false && (choice() ?? props.defaultOpen);
   const [focus, setFocus] = createSignal<{ id: string } | null>(null);
   const isStep = (id: string) => props.steps.some((step) => step.id === id);
-  const canSelectSpan = (id: string) => isStep(id) || (props.trace?.canSelectSpan?.(id) ?? false);
-  /** Closes the trace and shows the step in the list, or lets the chat show it. */
+  const canSelectSpan = (id: string) =>
+    (props.list !== false && isStep(id)) || (props.trace?.canSelectSpan?.(id) ?? false);
   const selectSpan = (id: string) => {
     setTraceOpenedAt(null);
     if (!isStep(id)) {
@@ -216,7 +236,6 @@ export function AgentStepsDisclosure(props: {
     setChoice(true);
     setFocus({ id });
   };
-  /** The row opens the trace, unless it has none or its list is open. */
   const opensTrace = () => props.trace !== undefined && !open();
   const expanded = () => {
     if (opensTrace()) return undefined;
@@ -265,7 +284,6 @@ export function AgentStepsDisclosure(props: {
       </Button>
       <Show when={traceUsed() && props.trace}>
         {(trace) => {
-          // The waterfall reads its spans many times for each change; this builds them once.
           const spans = createMemo(() => trace().spans());
           return (
             <TraceWaterfallDialog
@@ -282,7 +300,6 @@ export function AgentStepsDisclosure(props: {
           );
         }}
       </Show>
-      {/* A long chat has a row for each turn, so a closed row builds no list. */}
       <Show when={open()}>
         <div class="agent-steps-panel">
           <AgentStepList id={panelId} steps={props.steps} live={false} focus={focus()} />

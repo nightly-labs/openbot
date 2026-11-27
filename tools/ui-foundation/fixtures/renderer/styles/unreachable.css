@@ -32,3 +32,13 @@
 .reachable-family-hover {
   opacity: 1;
 }
+
+/* lucide-solid adds `lucide-<name>` from the import path in components/ui/icons.ts. */
+.lucide-imported-glyph > * {
+  fill: none;
+}
+
+/* No import path names this icon. */
+.lucide-unimported-glyph > * {
+  fill: none;
+}

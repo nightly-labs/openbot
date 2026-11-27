@@ -1,4 +1,3 @@
-import type { AgentEvent, TeamRealtimeEvent } from "@openbot/contracts/ipc";
 import { sourceText } from "@openbot/i18n/source";
 import {
   createRemoteConnectionRecovery,
@@ -8,22 +7,24 @@ import {
   type RemoteTeamDirectoryClient,
   remoteConnectionFailureDetails,
 } from "@openbot/team-client";
-import { REMOTE_PEER_LOST_AFTER_MS, type RemoteTeamConnectionUpdate } from "@openbot/team-client/remote-peer";
+import {
+  REMOTE_PEER_LOST_AFTER_MS,
+  type RemoteTeamConnectionUpdate,
+  type RemoteTeamDiagnostic,
+  type RemoteTeamEvent,
+} from "@openbot/team-client/remote-peer";
+import { errorReference } from "@openbot/user-errors/reference";
 import { memo, useCallback, useEffect, useRef, useState } from "react";
 import { MobileConnectionAnalytics } from "@/features/analytics/connection";
 import { mobileAnalytics } from "@/features/analytics/mobile-analytics";
+import { phoneVpn } from "@/features/support/model/phone-network-capture";
 import { supportLog, supportLogValue } from "@/features/support/model/support-log";
 import { referencedError } from "@/features/workspace/model/referenced-error";
+import { subscribeNetworkMoves } from "@/shared/lib/network-path";
 import { RemoteTeamTransport, type RemoteTeamTransportRef } from "./remote-team-transport";
 
-/**
- * How long the first attempt after a return to the app runs without a reconnect status. The app
- * stops its connection work in the background on iOS and Android, so the connection must come back
- * on each return. Most returns are online again in this time, and the app looks as the user left it.
- */
 const QUIET_RESUME_MS = 5_000;
 
-/** A failed attempt or a stop ends the quiet return: the user then sees the reconnect status. */
 function endsQuietResume(status: RemoteRecoveryStatus): boolean {
   return (
     status.phase === "online" ||
@@ -36,26 +37,24 @@ function endsQuietResume(status: RemoteRecoveryStatus): boolean {
 export interface ServerConnectionHandle {
   client: RemoteTeamTransportRef;
   refresh(): void;
-  /**
-   * The phone shows this server from its cache, so the first attempt after the start runs in a quiet
-   * time, as a return to the app does. Only once, and only before that attempt ends.
-   */
+  reconnect(): void;
   quietStart(): void;
 }
 
 export interface ServerLoadContext {
   isCurrent(): boolean;
   stage: RemoteConnectionStage;
+  check: boolean;
 }
 
 interface Props {
   hostId: string;
   publicKey: string;
   active: boolean;
+  background: boolean;
   directory: RemoteTeamDirectoryClient;
   register(hostId: string, handle: ServerConnectionHandle | null): void;
   load(hostId: string, publicKey: string, client: RemoteTeamTransportRef, context: ServerLoadContext): Promise<void>;
-  /** `resuming` is true while a return to the app connects again in its quiet time. */
   onStatus(
     hostId: string,
     status: RemoteRecoveryStatus,
@@ -63,19 +62,15 @@ interface Props {
     resuming: boolean,
   ): void;
   onMembershipChanged?(): Promise<void>;
-  onTeamEvent(hostId: string, event: AgentEvent | TeamRealtimeEvent): void;
-  /** An attempt of this server failed in the foreground, or Signal says that its host is offline. */
+  onTeamEvent(hostId: string, event: RemoteTeamEvent): void;
   onUnavailable?(hostId: string): void;
 }
 
-/**
- * Each mounted membership owns its transport; selection does not change its lifetime. Memoized: a
- * render of the transport sends its props to its hidden page, so a workspace render must not reach it.
- */
 export const ServerConnection = memo(function ServerConnection({
   hostId,
   publicKey,
   active,
+  background,
   directory,
   register,
   load,
@@ -90,19 +85,18 @@ export const ServerConnection = memo(function ServerConnection({
   const controller = useRef<ReturnType<typeof createRemoteConnectionRecovery> | null>(null);
   const activeRef = useRef(active);
   activeRef.current = active;
+  const backgroundRef = useRef(background);
+  backgroundRef.current = background;
   const generation = useRef(0);
-  const [analytics] = useState(() => new MobileConnectionAnalytics(mobileAnalytics));
+  const [analytics] = useState(() => new MobileConnectionAnalytics(mobileAnalytics, phoneVpn));
   const membershipRefreshPending = useRef(false);
-  /** When this connection last became inactive, such as when the app went to the background. */
   const inactiveSince = useRef<number | null>(null);
   const lastStatus = useRef<{ status: RemoteRecoveryStatus; failure: RemoteConnectionFailure | null } | null>(null);
   const resuming = useRef(false);
   const resumeTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
-  /** Set when the connection becomes inactive online, or in its quiet return. */
   const resumeOnReturn = useRef(false);
   const onStatusRef = useRef(onStatus);
   onStatusRef.current = onStatus;
-  /** Shows the status that the quiet time held back, such as an attempt that still connects. */
   const endResume = useCallback(() => {
     clearTimeout(resumeTimer.current);
     resumeTimer.current = undefined;
@@ -129,17 +123,34 @@ export const ServerConnection = memo(function ServerConnection({
     supportLog.add("info", "connection", `${hostId} network restored`);
     controller.current?.networkRestored();
   }, [hostId]);
+  const networkMoved = useRef(false);
+  const clientRef = useRef(client);
+  clientRef.current = client;
+  useEffect(() => {
+    if (!client) return;
+    return subscribeNetworkMoves(() => {
+      supportLog.add("info", "connection", `${hostId} network changed${activeRef.current ? "" : " while inactive"}`);
+      if (activeRef.current) client.networkChanged();
+      else networkMoved.current = true;
+    });
+  }, [client, hostId]);
+  const handleDiagnostic = useCallback(
+    (step: RemoteTeamDiagnostic["step"], detail: string | undefined) => analytics.diagnostic(step, detail),
+    [analytics],
+  );
+  const lostAfterMs = useRef(REMOTE_PEER_LOST_AFTER_MS);
   const handleConnectionUpdate = useCallback(
     (update: RemoteTeamConnectionUpdate) => {
       if (update.hostId !== hostId) return;
       supportLog.add(
         update.state === "offline" ? "warn" : "info",
         "connection",
-        `${hostId} ${update.state}${update.code ? ` (${update.code})` : ""}${update.message ? `: ${update.message}` : ""}${update.resync ? ", resync" : ""}`,
+        `${hostId} ${update.state}${update.code ? ` (${update.code})` : ""}${update.message ? `: ${update.message}` : ""}${update.reference ? ` [${update.reference}]` : ""}${update.hostOffline ? ", host not on Signal" : ""}${update.resync ? ", resync" : ""}`,
       );
       if (update.hostOffline && activeRef.current) onUnavailableRef.current?.(hostId);
+      if (update.state === "online" && update.lostAfterMs !== undefined) lostAfterMs.current = update.lostAfterMs;
       if (update.state === "offline") {
-        if (activeRef.current) analytics.lost();
+        if (activeRef.current && !backgroundRef.current) analytics.lost();
         if (update.code === "session_revoked") {
           if (activeRef.current) void onMembershipChangedRef.current?.().catch(() => undefined);
           else membershipRefreshPending.current = true;
@@ -158,32 +169,34 @@ export const ServerConnection = memo(function ServerConnection({
     let disposed = false;
     let failure: RemoteConnectionFailure | null = null;
     let loggedStatus = "";
-    let context: ServerLoadContext = { stage: "connection", isCurrent: () => false };
+    let context: ServerLoadContext = { stage: "connection", isCurrent: () => false, check: false };
     const recovery = createRemoteConnectionRecovery(
-      () => {
+      (check) => {
         const attempt = ++generation.current;
         context = {
           stage: "connection",
           isCurrent: () => !disposed && activeRef.current && attempt === generation.current,
+          check,
         };
-        const finish = analytics.attempt();
+        const finish = backgroundRef.current ? null : analytics.attempt();
         const initiatingContext = context;
         const started = Date.now();
-        supportLog.add("info", "connection", `${hostId} attempt ${attempt} started`);
+        supportLog.add("info", "connection", `${hostId} attempt ${attempt} started${check ? ", check" : ""}`);
         return load(hostId, publicKey, client, initiatingContext).then(
           () => {
-            if (initiatingContext.isCurrent()) finish("succeeded", initiatingContext.stage);
+            if (initiatingContext.isCurrent()) finish?.("succeeded", initiatingContext.stage);
             supportLog.add("info", "connection", `${hostId} attempt ${attempt} loaded (${Date.now() - started} ms)`);
           },
           (error) => {
             if (initiatingContext.isCurrent()) {
-              finish("failed", initiatingContext.stage);
+              finish?.("failed", initiatingContext.stage);
               onUnavailableRef.current?.(hostId);
             }
+            const reference = errorReference(error);
             supportLog.add(
               "warn",
               "connection",
-              `${hostId} attempt ${attempt} failed at ${initiatingContext.stage} (${Date.now() - started} ms): ${supportLogValue(error)}`,
+              `${hostId} attempt ${attempt} failed at ${initiatingContext.stage} (${Date.now() - started} ms): ${supportLogValue(error)}${reference ? ` [${reference}]` : ""}`,
             );
             throw error;
           },
@@ -194,7 +207,6 @@ export const ServerConnection = memo(function ServerConnection({
       },
       (status) => {
         if (disposed) return;
-        // The status repeats each second for its countdown. Log only a new phase or attempt.
         const logged = `${status.phase}:${status.attempt}`;
         if (logged !== loggedStatus) {
           loggedStatus = logged;
@@ -215,7 +227,15 @@ export const ServerConnection = memo(function ServerConnection({
       },
     );
     controller.current = recovery;
-    register(hostId, { client, refresh: () => recovery.refresh(), quietStart });
+    register(hostId, {
+      client,
+      refresh: () => recovery.refresh(),
+      reconnect: () => {
+        if (activeRef.current && lastStatus.current && lastStatus.current.status.phase !== "online") client.newPage();
+        recovery.refresh();
+      },
+      quietStart,
+    });
     recovery.setActive(activeRef.current);
     return () => {
       disposed = true;
@@ -232,30 +252,26 @@ export const ServerConnection = memo(function ServerConnection({
       generation.current += 1;
       analytics.background();
       inactiveSince.current ??= Date.now();
-      // The workspace keeps the server as the user left it. The next return starts a new quiet time.
       resumeOnReturn.current ||= resuming.current || lastStatus.current?.status.phase === "online";
       clearTimeout(resumeTimer.current);
       resumeTimer.current = undefined;
       resuming.current = false;
     } else if (inactiveSince.current !== null) {
-      // Set before the controller starts the attempt, so its first status is already quiet.
       if (resumeOnReturn.current) {
         resumeOnReturn.current = false;
         resuming.current = true;
         resumeTimer.current = setTimeout(endResume, QUIET_RESUME_MS);
-        // An attempt that still runs from the last visit sends no new status, so repeat the last one.
         const last = lastStatus.current;
         if (last && last.status.phase !== "online") onStatusRef.current(hostId, last.status, last.failure, true);
       }
-      // After this long the peer replaces its connection when it becomes active, so the first attempt
-      // shows that it connects instead of an online server whose requests fail. In the quiet time
-      // the server still shows online, and its requests wait for the new connection.
-      if (Date.now() - inactiveSince.current >= REMOTE_PEER_LOST_AFTER_MS) controller.current?.offline();
+      if (Date.now() - inactiveSince.current >= lostAfterMs.current) controller.current?.offline();
       inactiveSince.current = null;
     }
     controller.current?.setActive(active);
-    // The user opened the app to use this server. A wait from before, such as the cooldown after five
-    // failed attempts, does not continue: one attempt starts now, and a failure starts the backoff again.
+    if (active && networkMoved.current) {
+      networkMoved.current = false;
+      clientRef.current?.networkChanged();
+    }
     const phase = lastStatus.current?.status.phase;
     if (returned && (phase === "waiting" || phase === "cooldown")) controller.current?.refresh();
     if (active && membershipRefreshPending.current) {
@@ -263,6 +279,13 @@ export const ServerConnection = memo(function ServerConnection({
       void onMembershipChanged?.().catch(() => undefined);
     }
   }, [active, hostId, onMembershipChanged, analytics, endResume]);
+
+  const wasBackground = useRef(background);
+  useEffect(() => {
+    const opened = wasBackground.current && !background;
+    wasBackground.current = background;
+    if (opened) controller.current?.resetBackoff();
+  }, [background]);
 
   return (
     <RemoteTeamTransport
@@ -274,6 +297,7 @@ export const ServerConnection = memo(function ServerConnection({
       onNetworkRestored={handleNetworkRestored}
       onTeamEvent={onTeamEvent}
       onConnectionUpdate={handleConnectionUpdate}
+      onDiagnostic={handleDiagnostic}
     />
   );
 });

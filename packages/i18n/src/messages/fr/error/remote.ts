@@ -2,13 +2,14 @@ import type { PartialTranslation } from "../../../message";
 import type { messages as source } from "../../en/error/remote";
 
 export const messages = {
-  // Errors from remote servers, WebRTC transport, remote desktop, and the team client.
   "error.remote.desktopSetupClientUpdate":
     "Mettez à jour le client pour utiliser la configuration du bureau à distance.",
   "error.remote.desktopSetupUnavailable": "La configuration du bureau à distance n’est pas disponible.",
   "error.remote.desktopTestUnavailable": "Le test du bureau à distance n’est pas disponible.",
   "error.remote.controlUnavailable": "Le contrôle à distance n’est pas disponible.",
   "error.remote.controlSessionNotFound": "Session de contrôle à distance introuvable.",
+  "error.remote.controlNotAllowed": "Le propriétaire de cet ordinateur ne permet pas à votre rôle de le contrôler.",
+  "error.remote.controlDeclined": "La personne devant cet ordinateur n’a pas autorisé le contrôle à distance.",
   "error.remote.testRuntimeUpdate": "Mettez à jour le runtime macOS du bureau à distance pour lancer ce test.",
   "error.remote.testOtherSessions": "Terminez les autres sessions de bureau à distance avant de lancer un test.",
   "error.remote.testPermissions":
@@ -23,6 +24,18 @@ export const messages = {
   "error.remote.testActive": "Un test du bureau à distance est en cours. Réessayez quand il sera terminé.",
   "error.remote.screenRecordingDenied":
     "L’hôte n’a pas autorisé OpenBot à enregistrer son écran. Autorisez l’enregistrement de l’écran sur l’hôte, puis réessayez.",
+  "error.remote.windowsSessionDisconnected":
+    "La session Windows de l’hôte est déconnectée : elle n’a aucun écran à partager. Connectez-vous à Windows sur l’écran de l’hôte, puis réessayez.",
+  "error.remote.windowsCaptureDenied":
+    "Windows sur l’hôte n’autorise pas OpenBot à enregistrer son écran. Déverrouillez Windows sur l’écran de l’hôte, fermez toute invite d’administrateur, puis réessayez. Si le problème persiste, redémarrez l’hôte.",
+  "error.remote.macScreenLocked":
+    "Le Mac est verrouillé : il ne peut pas partager son écran. Déverrouillez le Mac sur son écran, puis réessayez.",
+  "error.remote.streamTooSlowLowerQuality":
+    "La connexion à l’hôte est trop lente pour l’image. Réessayez : la prochaine connexion utilisera une qualité inférieure.",
+  "error.remote.streamTooSlow":
+    "La connexion à l’hôte est trop lente pour l’image. Utilisez un réseau plus rapide, puis réessayez.",
+  "error.remote.noPictureSwitchEncoder":
+    "L’hôte n’a envoyé aucune image. Réessayez : la prochaine connexion utilise un réglage vidéo qui fonctionne sur plus d’ordinateurs.",
   "error.remote.teamSessionExpired": "La session de l’équipe a expiré.",
   "error.remote.finishTestBeforeSwitch": "Terminez le test du bureau à distance avant de changer d’écran.",
   "error.remote.displayNotFound": "Écran distant introuvable.",
@@ -82,10 +95,18 @@ export const messages = {
   "error.remote.ownerOnlyRemove": "Seul le propriétaire peut supprimer ce serveur.",
   "error.remote.requestTimeout": "La requête distante a expiré.",
   "error.remote.requestFailed": "La requête distante a échoué.",
-  "error.remote.pinnedKeyMissing": "L’hôte distant n’a pas de clé d’appareil épinglée.",
-  "error.remote.hostDidNotConnect": "L’hôte WebRTC ne s’est pas connecté.",
+  "error.remote.hostKeyMissing":
+    "OpenBot ne peut pas vérifier ce serveur, car sa clé de sécurité est absente ou a changé. Demandez au propriétaire du serveur de le vérifier.",
+  "error.remote.connectionNotStarted":
+    "OpenBot n’a pas pu démarrer la connexion à ce serveur. Si le problème persiste, quittez OpenBot et rouvrez-le.",
+  "error.remote.connectionServiceUnreachable":
+    "Cet ordinateur ne peut pas joindre le service de connexion d’OpenBot. Vérifiez sa connexion Internet. OpenBot se reconnecte automatiquement.",
+  "error.remote.serverAnswerTimeout": "Le serveur n’a pas répondu à temps. OpenBot se reconnecte automatiquement.",
+  "error.remote.signInConnectionClosed":
+    "La connexion au serveur s’est fermée pendant la connexion. Si cela continue, vérifiez la date et l’heure du serveur et de cet appareil.",
   "error.remote.connectionCancelled": "La connexion distante a été annulée.",
-  "error.remote.hostDisconnected": "L’hôte WebRTC s’est déconnecté.",
+  "error.remote.hostDisconnected":
+    "La connexion au serveur a été perdue. Vérifiez si l’action a abouti, puis réessayez.",
   "error.remote.eventGap": "La séquence d’événements de l’hôte présente un trou.",
   "error.remote.malformedKnownEvent": "L’hôte a renvoyé un événement connu mal formé.",
   "error.remote.fileTransportIsStopped": "Le transport de fichiers WebRTC est arrêté.",
@@ -151,6 +172,7 @@ export const messages = {
   "error.remote.attachmentRejected": "L’hôte a refusé la pièce jointe.",
   "error.remote.attachmentTooLarge": "Les pièces jointes doivent faire 10 Mo au maximum.",
   "error.remote.attachmentBusy": "Attendez la fin de l’envoi de la pièce jointe en cours.",
+  "error.remote.attachmentChanged": "Le fichier a changé ou n’est pas disponible. Sélectionnez-le à nouveau.",
   "error.remote.uploadTimeout": "L’envoi de la pièce jointe a expiré.",
   "error.remote.hostSessionActive": "L’hôte a déjà une session distante active.",
   "error.remote.tooManyConnections": "Trop de connexions distantes actives.",
@@ -180,6 +202,8 @@ export const messages = {
   "error.remote.iceFailed":
     "Impossible d’établir une connexion directe avec l’hôte. Un pare-feu, un VPN ou un proxy peut la bloquer.",
   "error.remote.iceDisconnected": "La connexion directe avec l’hôte a été perdue.",
+  "error.remote.webrtcBlocked":
+    "Cet appareil bloque la connexion dont OpenBot a besoin. Si le mode Isolement est activé, désactivez-le pour OpenBot dans Réglages > Confidentialité et sécurité > Mode Isolement.",
   "error.remote.directoryUnreachable": "OpenBot n’a pas pu joindre le service OpenBot. Vérifiez votre connexion.",
   "error.remote.directoryTimeout": "Le service OpenBot n’a pas répondu à temps. Réessayez.",
   "error.remote.inviteAlreadyUsed": "Cette invitation a déjà été utilisée. Demandez une nouvelle invitation.",
@@ -191,18 +215,28 @@ export const messages = {
   "error.remote.hostNotRegistered": "Cet hôte n’est plus enregistré auprès du service OpenBot.",
   "error.remote.membershipEnded":
     "Vous n’êtes plus membre de cet hôte. Demandez une nouvelle invitation au propriétaire.",
+  "error.remote.membershipChanged": "Quelqu’un a modifié ce membre au même moment. Rechargez les membres et réessayez.",
   "error.remote.accountSessionInactive": "Votre connexion n’est plus active. Reconnectez-vous.",
   "error.remote.hostOtherAccount": "Cet hôte appartient à un autre compte.",
   "error.remote.remoteNotConfigured": "Les connexions à distance ne sont pas configurées sur ce service OpenBot.",
   "error.remote.hostRefused": "L’hôte a refusé la demande ({status}).",
   "error.remote.formUnavailable": "Ce formulaire n’est plus disponible.",
   "error.remote.hostedServerRemoval": "Utilisez « Facturation » pour supprimer un serveur hébergé.",
+  "error.remote.hostRemoved": "Le propriétaire a retiré ce serveur du compte.",
+  "error.remote.ownerTransferSelf":
+    "Vous êtes déjà propriétaire de ce serveur. Saisissez l'e-mail du nouveau propriétaire.",
+  "error.remote.ownerTransferHosted": "Un serveur hébergé par OpenBot ne peut pas changer de propriétaire.",
+  "error.remote.ownerTransferInvalid":
+    "Ce transfert de propriété n'est plus disponible. Demandez au propriétaire de l'envoyer à nouveau.",
   "error.remote.channelsUnsupported": "Mettez à jour ce serveur de bureau pour utiliser les canaux.",
   "error.remote.channelDeleteUnsupported": "Mettez à jour ce serveur de bureau pour supprimer des canaux.",
   "error.remote.historyRefreshFailed":
     "Le message a été envoyé, mais l’historique de la discussion n’a pas pu être actualisé.",
   "error.remote.taskHistoryRefreshFailed":
     "La tâche a été modifiée, mais l’historique de la discussion n’a pas pu être actualisé.",
+  "error.remote.serverNotLoaded": "OpenBot n'a pas pu charger le serveur. Réessayez.",
+  "error.remote.localServerNotStarted":
+    "Le serveur sur cet ordinateur n'a pas démarré. Réessayez. S'il ne démarre toujours pas, redémarrez OpenBot sur cet ordinateur.",
   "error.remote.localServerAccountRemovalFailed":
     "Le serveur est supprimé sur son ordinateur, mais le compte l’affiche encore. Supprimez-le à nouveau pour le retirer du compte.",
 } as const satisfies PartialTranslation<typeof source>;

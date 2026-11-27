@@ -1,9 +1,10 @@
 import type { AppTextKey } from "@openbot/i18n";
-import { Clock3, Split, X } from "@openbot/ui";
+import { Clock3, Hourglass, Split, X } from "@openbot/ui";
 import { TypingDots } from "@openbot/ui/components/TypingDots";
 import { SidebarWaitIcon } from "@openbot/ui/features/sidebar/SidebarAgentIndicator";
 import type { SidebarWaitReason } from "@openbot/ui/features/sidebar/sidebar-types";
 import { type TextValue, useText } from "@openbot/ui/text";
+import type { JSX } from "@solidjs/web";
 import { Show } from "solid-js";
 import type { ThreadStatus } from "./thread-types";
 
@@ -13,7 +14,6 @@ const WAIT_TEXT = {
   takeover: "sidebar.state.waitingTakeover",
 } as const satisfies Record<SidebarWaitReason, AppTextKey>;
 
-/** What a thread does now, for a screen reader. An idle thread has no label. */
 function threadStatusLabel(status: ThreadStatus, t: TextValue["t"]): string {
   switch (status.kind) {
     case "working":
@@ -24,23 +24,29 @@ function threadStatusLabel(status: ThreadStatus, t: TextValue["t"]): string {
       return t(WAIT_TEXT[status.reason]);
     case "failed":
       return t("conversation.threads.state.failed");
+    case "awaiting":
+      return t("chat.awaiting.title");
     default:
       return "";
   }
 }
 
-/** A thread that needs the user wears the tint of its badge. */
+type ThreadMark = ThreadStatus | { kind: "unread" };
+
+function threadMark(status: ThreadStatus, unread: number | undefined): ThreadMark {
+  return (status.kind === "idle" || status.kind === "awaiting") && (unread ?? 0) > 0 ? { kind: "unread" } : status;
+}
+
 export function threadAttention(status: ThreadStatus): "waiting" | "failed" | undefined {
   if (status.kind === "waiting" || status.kind === "failed") return status.kind;
   return undefined;
 }
 
-function waitReason(status: ThreadStatus): SidebarWaitReason | undefined {
+function waitReason(status: ThreadMark): SidebarWaitReason | undefined {
   return status.kind === "waiting" ? status.reason : undefined;
 }
 
-/** The badge of a status, with the colors of the sidebar badges. An idle thread has no badge. */
-function StatusBadge(props: { status: ThreadStatus }) {
+function StatusBadge(props: { status: ThreadMark }) {
   return (
     <span class="agent-threads-tab-mark" data-kind={props.status.kind}>
       <Show when={props.status.kind === "working"}>
@@ -60,21 +66,25 @@ function StatusBadge(props: { status: ThreadStatus }) {
           <Clock3 />
         </span>
       </Show>
+      <Show when={props.status.kind === "awaiting"}>
+        <span class="agent-threads-state agent-threads-state-icon">
+          <Hourglass />
+        </span>
+      </Show>
       <Show when={props.status.kind === "failed"}>
         <span class="agent-threads-state agent-threads-state-icon">
           <X />
         </span>
       </Show>
+      <Show when={props.status.kind === "unread"}>
+        <span class="agent-threads-state agent-threads-unread" />
+      </Show>
     </span>
   );
 }
 
-/**
- * The icon of a status. When the state ends, the mark keeps its last icon and narrows to nothing, so
- * the menu row does not jump to its new width.
- */
-function StatusIcon(props: { status: ThreadStatus }) {
-  let last: ThreadStatus = { kind: "idle" };
+function StatusIcon(props: { status: ThreadMark }) {
+  let last: ThreadMark = { kind: "idle" };
   const shown = () => {
     if (props.status.kind !== "idle") last = props.status;
     return last;
@@ -87,30 +97,37 @@ function StatusIcon(props: { status: ThreadStatus }) {
   );
 }
 
-/**
- * The icon slot of a thread tab, in the chat header and in the side panel: the badge of the thread's
- * state, or the thread icon while the thread is idle.
- */
-export function ThreadTabIcon(props: { status: ThreadStatus }) {
+export function ThreadTabIcon(props: {
+  status: ThreadStatus;
+  unread?: number | undefined;
+  idle?: (() => JSX.Element) | undefined;
+}) {
+  const mark = () => threadMark(props.status, props.unread);
   return (
-    <Show when={props.status.kind !== "idle"} fallback={<Split aria-hidden="true" />}>
-      <StatusBadge status={props.status} />
+    <Show when={mark().kind !== "idle"} fallback={props.idle?.() ?? <Split aria-hidden="true" />}>
+      <StatusBadge status={mark()} />
     </Show>
   );
 }
 
-/** What a thread does now, for a screen reader, as the tab title says it. An idle thread has no label. */
-export function ThreadStatusText(props: { status: ThreadStatus }) {
+export function ThreadStatusText(props: { status: ThreadStatus; unread?: number | undefined }) {
   const { t } = useText();
-  return <Show when={threadStatusLabel(props.status, t)}>{(label) => <span class="sr-only">{label()}</span>}</Show>;
-}
-
-/** The state of a thread, as on a sidebar row, with its label for a screen reader. */
-export function ThreadStatusMark(props: { status: ThreadStatus }) {
+  const unread = () => props.unread ?? 0;
   return (
     <>
-      <StatusIcon status={props.status} />
-      <ThreadStatusText status={props.status} />
+      <Show when={threadStatusLabel(props.status, t)}>{(label) => <span class="sr-only">{label()}</span>}</Show>
+      <Show when={unread() > 0}>
+        <span class="sr-only">{t("sidebar.state.unread", { count: unread() })}</span>
+      </Show>
+    </>
+  );
+}
+
+export function ThreadStatusMark(props: { status: ThreadStatus; unread?: number | undefined }) {
+  return (
+    <>
+      <StatusIcon status={threadMark(props.status, props.unread)} />
+      <ThreadStatusText status={props.status} unread={props.unread} />
     </>
   );
 }

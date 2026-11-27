@@ -39,7 +39,6 @@ import { type RepeatableColumn, RepeatableRows } from "./RepeatableRows";
 
 const CHECK_MODELS_SHOWN = 6;
 
-// Examples of identifiers and commands. They are not words, so they are the same in each language.
 const AGENT_ID_PLACEHOLDER = "my-agent";
 const COMMAND_PLACEHOLDER = "my-agent";
 const ARGS_PLACEHOLDER = "acp";
@@ -55,14 +54,8 @@ function cloneDraft(draft: CustomAcpAgentDraft): CustomAcpAgentDraft {
 interface CustomAcpAgentDialogProps {
   open: boolean;
   draft?: CustomAcpAgentDraft | undefined;
-  /** Known agents whose command fills the form in one press. A saved agent is not offered them. */
   presets?: readonly AcpAgentPreset[] | undefined;
-  /**
-   * The draft is a saved agent: its ID cannot change, and a saved variable with an empty value keeps
-   * the value that main holds.
-   */
   editing?: boolean | undefined;
-  /** The last trial start. The host owns it because it starts a process. */
   check?: AcpAgentCheck | undefined;
   onCheck?: ((value: CustomAcpAgentDraft) => void) | undefined;
   showErrors?: boolean | undefined;
@@ -72,6 +65,7 @@ interface CustomAcpAgentDialogProps {
   onSubmit: (value: CustomAcpAgentDraft) => void;
   onCancel: () => void;
   onBack?: (() => void) | undefined;
+  host?: boolean | undefined;
 }
 
 export function CustomAcpAgentDialog(props: CustomAcpAgentDialogProps) {
@@ -81,7 +75,6 @@ export function CustomAcpAgentDialog(props: CustomAcpAgentDialogProps) {
   );
   const [submitted, setSubmitted] = createSignal(untrack(() => Boolean(props.showErrors)));
 
-  // The same reopen rule as the endpoint form: a second open starts from the given draft again.
   createEffect(
     () => props.open,
     (open, previous) => {
@@ -271,7 +264,9 @@ export function CustomAcpAgentDialog(props: CustomAcpAgentDialogProps) {
 
                 <Field
                   label={t("customProvider.acp.command")}
-                  description={t("customProvider.acp.commandHint")}
+                  description={t(
+                    props.host ? "customProvider.acp.commandHintServer" : "customProvider.acp.commandHint",
+                  )}
                   error={shown()?.command}
                   required
                 >
@@ -438,8 +433,14 @@ export function CustomAcpAgentDialog(props: CustomAcpAgentDialogProps) {
                     <ShieldCheck />
                   </AlertIcon>
                   <AlertContent>
-                    <AlertTitle>{t("customProvider.acp.trustTitle")}</AlertTitle>
-                    <AlertDescription>{t("customProvider.acp.trustDescription")}</AlertDescription>
+                    <AlertTitle>
+                      {t(props.host ? "customProvider.acp.hostTrustTitle" : "customProvider.acp.trustTitle")}
+                    </AlertTitle>
+                    <AlertDescription>
+                      {t(
+                        props.host ? "customProvider.acp.hostTrustDescription" : "customProvider.acp.trustDescription",
+                      )}
+                    </AlertDescription>
                   </AlertContent>
                 </Alert>
               </div>
@@ -464,7 +465,6 @@ export function CustomAcpAgentDialog(props: CustomAcpAgentDialogProps) {
   );
 }
 
-/** The first model names, enough to recognize the agent's catalog; the count gives the rest. */
 function modelSummary(models: readonly string[]): string {
   const shown = models.slice(0, CHECK_MODELS_SHOWN).join(", ");
   return models.length > CHECK_MODELS_SHOWN ? `${shown}, …` : shown;

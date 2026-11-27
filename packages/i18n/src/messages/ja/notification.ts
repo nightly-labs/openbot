@@ -5,13 +5,14 @@ export const messages = {
   "notification.needsInput": "入力が必要です。",
   "notification.needsApproval": "承認が必要です。",
   "notification.needsBrowserStep": "ブラウザーでの操作が必要です。",
+  "notification.waitsForSignIn": "{provider} へのサインインを待っています。",
   "notification.needsApprovalFor": "承認が必要です: {action}",
   "notification.finished": "作業が完了しました。",
-  // A workflow step that waits for a person to approve or reject it.
   "notification.workflowApproval": "ステップがあなたの承認を待っています。",
-  // A workflow output step that tells the user its result.
   "notification.workflowOutput": "ワークフローに新しい結果があります。",
   "notification.failed": "エラーで停止しました。",
+  "notification.subagentFailed": "サブエージェントがエラーで停止しました。",
+  "notification.subagentFailedFor": "サブエージェントがエラーで停止しました: {task}",
   "notification.channelTitle": "{channel} の {agent}",
   "notification.channelMessage": "メッセージを送信しました。",
   "notification.usageLimit.title": "{provider} のアカウントが上限に達しました",

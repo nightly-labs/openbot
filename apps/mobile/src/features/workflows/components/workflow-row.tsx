@@ -2,7 +2,7 @@ import type { WorkflowSummary } from "@openbot/contracts/ipc";
 import { Typography } from "heroui-native";
 import ChevronRight from "lucide-react-native/icons/chevron-right";
 import Pin from "lucide-react-native/icons/pin";
-import WorkflowIcon from "lucide-react-native/icons/workflow";
+import Waypoints from "lucide-react-native/icons/waypoints";
 import { useRef, useState } from "react";
 import { Pressable, View } from "react-native";
 import { useCSSVariable, useUniwind } from "uniwind";
@@ -12,11 +12,11 @@ import { formatUpdatedAt } from "@/shared/lib/format-updated-at";
 import { haptics } from "@/shared/lib/haptics";
 import { isAndroid, longPressDelay } from "@/shared/lib/platform";
 import { useText } from "@/shared/lib/text";
+import { MIRROR_IN_RTL } from "@/shared/lib/text-direction";
 import { typeScale } from "@/shared/lib/type-scale";
 
 export type WorkflowRowAction = "pin" | "run" | "edit";
 
-/** The colour class of a run status line. */
 export function runStatusClass(lastRun: WorkflowSummary["lastRun"]) {
   switch (lastRun?.status) {
     case "running":
@@ -31,7 +31,6 @@ export function runStatusClass(lastRun: WorkflowSummary["lastRun"]) {
   }
 }
 
-/** One workflow of the list: its name, its last run, and a pin when the drawer shows it. */
 export function WorkflowRow({
   workflow,
   pinned,
@@ -52,15 +51,15 @@ export function WorkflowRow({
     "--openbot-file-default-soft",
   ]);
   const menu = useRef<MenuComponentRef | null>(null);
-  // The iOS menu host takes the size of its content, so the row gets the width of its slot.
   const [width, setWidth] = useState<number>();
   const last = workflow.lastRun;
-  const status = last
+  const lastRunText = last
     ? t("mobile.workflow.list.lastRun", {
         status: t(RUN_STATUS_LABEL[last.status]),
         time: formatUpdatedAt(last.at, format),
       })
     : t("mobile.workflow.list.neverRun");
+  const status = workflow.paused ? t("mobile.workflow.list.paused") : lastRunText;
   return (
     <View onLayout={(event) => setWidth(event.nativeEvent.layout.width)}>
       <MenuView
@@ -99,8 +98,6 @@ export function WorkflowRow({
             void haptics.impact("soft");
             onPress();
           }}
-          // The native context menu does not cancel this touch. Without a long-press handler, lifting the
-          // finger after the menu opens counts as a tap. Android opens its menu from the row.
           delayLongPress={longPressDelay}
           onLongPress={() => {
             void haptics.longPress();
@@ -111,7 +108,7 @@ export function WorkflowRow({
             className="items-center justify-center"
             style={{ width: 32, height: 32, borderRadius: 9, backgroundColor: String(iconBackground) }}
           >
-            <WorkflowIcon color={String(iconColor)} size={18} strokeWidth={1.9} />
+            <Waypoints color={String(iconColor)} size={18} strokeWidth={1.9} />
           </View>
           <View className="min-w-0 flex-1">
             <View className="flex-row items-center gap-1.5">
@@ -120,11 +117,15 @@ export function WorkflowRow({
                 {workflow.title}
               </Typography.Paragraph>
             </View>
-            <Typography.Paragraph className={runStatusClass(last)} numberOfLines={1} style={typeScale.caption}>
+            <Typography.Paragraph
+              className={workflow.paused ? "text-text-secondary" : runStatusClass(last)}
+              numberOfLines={1}
+              style={typeScale.caption}
+            >
               {status}
             </Typography.Paragraph>
           </View>
-          <ChevronRight color={String(muted)} size={18} strokeWidth={1.5} />
+          <ChevronRight color={String(muted)} size={18} strokeWidth={1.5} style={MIRROR_IN_RTL} />
         </Pressable>
       </MenuView>
     </View>

@@ -1,10 +1,7 @@
 import { Stack } from "expo-router/stack";
 import { useCSSVariable } from "uniwind";
-import { androidBackOptions } from "@/shared/components/android-header-button";
-import { headerFontOptions } from "@/shared/lib/app-font";
-import { isIOS } from "@/shared/lib/platform";
+import { sheetStackOptions } from "@/shared/components/sheet-page-stack";
 import { sheetBackHaptics } from "@/shared/lib/sheet-back-haptics";
-import { sheetHeaderInsetOptions } from "@/shared/lib/sheet-header";
 import { useText } from "@/shared/lib/text";
 
 export const unstable_settings = { anchor: "index" };
@@ -13,38 +10,36 @@ export default function SettingsLayout() {
   const { t } = useText();
   const background = String(useCSSVariable("--openbot-bg-sheet"));
   return (
-    <Stack
-      screenListeners={sheetBackHaptics}
-      screenOptions={(props) => ({
-        ...androidBackOptions(props),
-        ...sheetHeaderInsetOptions,
-        presentation: "card",
-        headerBackButtonDisplayMode: "minimal",
-        ...headerFontOptions,
-        headerShadowVisible: false,
-        headerTransparent: isIOS,
-        headerStyle: { backgroundColor: isIOS ? "transparent" : background },
-        headerBlurEffect: "none",
-        scrollEdgeEffects: { top: "hidden", bottom: "soft" },
-        contentStyle: { backgroundColor: background },
-      })}
-    >
+    <Stack screenListeners={sheetBackHaptics} screenOptions={sheetStackOptions(background)}>
       <Stack.Screen name="index" options={{ title: t("mobile.app.route.settings") }} />
       <Stack.Screen name="profile" options={{ title: t("mobile.app.route.profile") }} />
       <Stack.Screen name="appearance" options={{ title: t("mobile.settings.appearance.title") }} />
+      <Stack.Screen name="app-icon" options={{ title: t("mobile.settings.appearance.appIcon") }} />
       <Stack.Screen name="animations" options={{ title: t("mobile.settings.animations.title") }} />
       <Stack.Screen name="language" options={{ title: t("mobile.settings.language.title") }} />
       <Stack.Screen name="voice" options={{ title: t("mobile.settings.voice.title") }} />
       <Stack.Screen name="voice-choice" options={{ title: t("mobile.settings.voice.voice") }} />
       <Stack.Screen name="elevenlabs-key" options={{ title: t("mobile.settings.voice.elevenLabs.key") }} />
+      <Stack.Screen name="voice-server" options={{ title: t("mobile.settings.voice.server.title") }} />
+      <Stack.Screen name="quick-actions" options={{ title: t("mobile.settings.quickActions.title") }} />
+      <Stack.Screen name="shortcuts" options={{ title: t("mobile.settings.shortcuts.title") }} />
       <Stack.Screen name="haptics" options={{ title: t("mobile.settings.feedback.haptics") }} />
+      <Stack.Screen name="agents" options={{ title: t("mobile.settings.agents.title") }} />
+      <Stack.Screen name="agent-defaults" options={{ title: t("mobile.settings.agents.title") }} />
       <Stack.Screen name="notifications" options={{ title: t("mobile.settings.notifications.title") }} />
       <Stack.Screen name="privacy" options={{ title: t("mobile.settings.privacy.title") }} />
       <Stack.Screen name="app-lock" options={{ title: t("mobile.appLock.title") }} />
       <Stack.Screen name="app-lock-pin" options={{ title: t("mobile.appLock.pinSetup.title") }} />
       <Stack.Screen name="sessions" options={{ title: t("mobile.app.route.accountSessions") }} />
+      <Stack.Screen name="billing" options={{ title: t("mobile.settings.billing.title") }} />
+      <Stack.Screen name="credits" options={{ title: t("mobile.settings.credits.title") }} />
+      <Stack.Screen name="credits-move" options={{ title: t("mobile.settings.credits.move.title") }} />
+      <Stack.Screen name="credits-activity" options={{ title: t("mobile.settings.credits.activity.title") }} />
+      <Stack.Screen name="invite" options={{ title: t("mobile.settings.invite.title") }} />
       <Stack.Screen name="about" options={{ title: t("mobile.app.route.about") }} />
       <Stack.Screen name="support" options={{ title: t("mobile.app.route.support") }} />
+      <Stack.Screen name="support-log" options={{ title: t("mobile.app.route.supportLog") }} />
+      <Stack.Screen name="conversations" options={{ title: t("mobile.settings.conversations.title") }} />
       <Stack.Screen name="hidden-chats" options={{ title: t("mobile.app.route.hiddenChats") }} />
       <Stack.Screen name="crop-photo" options={{ title: t("mobile.app.route.cropPhoto") }} />
     </Stack>

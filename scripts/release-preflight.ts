@@ -4,7 +4,9 @@ import { isDynamicRecord, isString } from "@openbot/contracts/runtime-values";
 import { createOpenBotLogger } from "@openbot/logging";
 import { roleIdProblems } from "./discord-announcement";
 import { ANNOUNCEMENT_FILE, announcementProblems, ROLE_VARIABLE } from "./discord-release-announcement";
+import { unpublishedCatalogEntries } from "./publish-production-catalog";
 import { releaseNotesProblems } from "./release-notes";
+import { whatsNewTranslationProblems } from "./whats-new-translations";
 
 const logger = createOpenBotLogger("release-preflight");
 
@@ -18,6 +20,7 @@ const failures: string[] = [];
 if (!/^\d+\.\d+\.\d+$/.test(packageJson.version)) failures.push("package version is not semver");
 failures.push(...releaseNotesProblems(changelog, packageJson.version));
 failures.push(...announcementProblems(await readFile(ANNOUNCEMENT_FILE, "utf8"), packageJson.version));
+failures.push(...whatsNewTranslationProblems(packageJson.version));
 if (run("git", ["status", "--porcelain"])) failures.push("working tree is not clean");
 if (run("git", ["rev-list", "--left-right", "--count", "origin/main...HEAD"]) !== "0\t0") {
   failures.push("main is not synchronized with origin/main");
@@ -47,7 +50,6 @@ for (const name of [
     failures.push(`GitHub release secret ${name} is missing`);
   }
 }
-// The Discord post mentions this role. Without it, the post job fails after the release.
 try {
   const roleId = run("gh", [
     "variable",
@@ -72,7 +74,6 @@ try {
   if (!run("gh", ["variable", "get", "CLOUDFLARE_ACCOUNT_ID", "--env", "cloudflare-production"])) {
     failures.push("GitHub cloudflare-production variable CLOUDFLARE_ACCOUNT_ID is missing");
   }
-  // Production previously admitted only main. The hosted release also needs stable tags.
   const environment = JSON.parse(run("gh", ["api", "repos/{owner}/{repo}/environments/cloudflare-production"]));
   if (!isDynamicRecord(environment)) throw new Error("Invalid production environment response.");
   const policy = environment.deployment_branch_policy;
@@ -90,6 +91,19 @@ try {
   }
 } catch {
   failures.push("The hosted release environment settings could not be verified.");
+}
+
+try {
+  const unpublished = await unpublishedCatalogEntries();
+  if (unpublished.length > 0) {
+    failures.push(
+      `the live Marketplace does not have the catalog on main (${unpublished.length} entries, such as ${unpublished.slice(0, 5).join(", ")}); run \`bun run marketplace:publish:production -- --apply --confirm-production\``,
+    );
+  }
+} catch (error) {
+  failures.push(
+    `The live Marketplace catalog could not be checked: ${error instanceof Error ? error.message : String(error)}`,
+  );
 }
 
 if (failures.length > 0) {

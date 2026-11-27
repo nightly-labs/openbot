@@ -1,12 +1,3 @@
-// The Signal protocol's server half: the shapes come from `@openbot/contracts/signal-protocol`, and
-// what stays here is the validation of untrusted *client* input - byte limits, identifier patterns
-// and a closed discriminated union that a client-side decoder has no reason to carry. The other
-// direction is `@openbot/contracts/signal-protocol/decode`, which is what a peer runs over this
-// service's output. One validator per trust direction, on purpose.
-//
-// The re-exports below are what the rest of this workspace imports, so moving the types out did not
-// churn `signal-service.ts` or `tokens.ts`.
-
 import {
   type SignalClientMessage,
   type SignalServerMessage,
@@ -18,6 +9,11 @@ import {
   type TelegramCallMethod,
   type TelegramCallParams,
 } from "@openbot/contracts/signal-protocol/telegram-route";
+import {
+  isWatchRelaySealed,
+  WATCH_RELAY_REPLY_SEALED_LIMIT,
+  type WatchRelayHostStatus,
+} from "@openbot/contracts/signal-protocol/watch-relay";
 import { z } from "zod";
 
 export type {
@@ -30,6 +26,8 @@ export type {
   WebhookDeliveryStatus,
 } from "@openbot/contracts/signal-protocol/messages";
 export {
+  SIGNAL_CLIENT_RECONNECT_GRACE_MS,
+  SIGNAL_DEFAULT_RECONNECT_GRACE_MS,
   SIGNAL_MESSAGE_BYTES_LIMIT,
   SIGNAL_TURN_CREDENTIAL_TTL_SECONDS,
   SLACK_DELIVERY_BODY_BYTES_LIMIT,
@@ -59,11 +57,9 @@ const signalMessageTypeSchema = z.enum([
   "github-delivery-result",
   "telegram-call",
   "queued-delivery-ack",
+  "watch-delivery-result",
 ]);
 
-// The Bot API calls an `ingress` socket can make (`TelegramCallParams`). Every object is strict: an
-// extra key, such as `reply_parameters.chat_id`, could reach a chat of another host, so it fails the
-// frame.
 const telegramChatIdSchema = z.int();
 const telegramMessageIdSchema = z.int().positive();
 const telegramTextSchema = z.string().min(1).max(TELEGRAM_TEXT_LIMIT);
@@ -163,9 +159,8 @@ const signalClientMessageSchema = z.discriminatedUnion("type", [
     githubRoute: z.string().min(1).max(16_384).optional(),
     telegramRoute: z.string().min(1).max(16_384).optional(),
     queueKey: z.string().max(128).optional(),
-    // Unknown formats are kept but never used: Signal sends only the formats it knows. A list that a
-    // later host sends in a shape this Signal does not know is dropped, not the whole hello.
     webhookFormats: z.array(z.string().min(1).max(64)).max(8).optional().catch(undefined),
+    watchRelay: z.boolean().optional(),
   }),
   z.object({
     type: z.enum(["offer", "answer"]),
@@ -233,10 +228,28 @@ const signalClientMessageSchema = z.discriminatedUnion("type", [
     requestId: identifierSchema,
     status: z.union([z.literal(202), z.literal(400), z.literal(404), z.literal(503)]),
   }),
+  z.object({
+    type: z.literal("watch-delivery-result"),
+    version: z.literal(1),
+    requestId: identifierSchema,
+    status: z.union([
+      z.literal(200),
+      z.literal(400),
+      z.literal(401),
+      z.literal(403),
+      z.literal(404),
+      z.literal(413),
+      z.literal(429),
+      z.literal(503),
+    ]) satisfies z.ZodType<WatchRelayHostStatus>,
+    sealed: z
+      .string()
+      .refine((value) => isWatchRelaySealed(value, WATCH_RELAY_REPLY_SEALED_LIMIT))
+      .optional(),
+  }),
   telegramCallSchema,
 ]) satisfies z.ZodType<SignalClientMessage>;
 
-/** A decoded client frame. A `telegram-call` keeps the link between its `method` and its `params`. */
 export type DecodedSignalClientMessage = z.output<typeof signalClientMessageSchema>;
 export type TelegramCall = z.output<typeof telegramCallSchema>;
 

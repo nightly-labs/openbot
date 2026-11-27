@@ -2,25 +2,34 @@ import { EventEmitter } from "node:events";
 import { existsSync } from "node:fs";
 import { join } from "node:path";
 import {
+  cloudSpeechModel,
   SPEECH_MODEL_ID,
   SPEECH_VOICES,
   type SpeechAudio,
   type SpeechInput,
+  type SpeechLanguage,
   type SpeechModelStatus,
   type SpeechSettings,
+  VOICE_KEY_PROVIDER_NAMES,
 } from "@openbot/contracts/ipc";
 import { sourceText } from "@openbot/i18n/source";
 import { createOpenBotLogger } from "@openbot/logging";
 import { Effect, Exit, Scope, Semaphore } from "effect";
 import type { SpeechPreferenceStore } from "./speech-preference-store";
-import { VOICE_RUNTIME_ADDON, VoiceModelService, VoiceOperationError } from "./voice-model-service";
+import { savedKeyError, type VoiceApiKeyStore } from "./voice-api-key-store";
+import { type SpeechFetch, speakInCloud } from "./voice-cloud-speech";
+import {
+  SPEECH_HOST_THREADS,
+  SPEECH_SESSION_CONFIG,
+  VOICE_RUNTIME_ADDON,
+  VoiceModelService,
+  VoiceOperationError,
+} from "./voice-model-service";
 import type { VoiceSpeechFailure, VoiceSpeechHostProcess, VoiceSpeechResponse } from "./voice-speech-protocol";
 
 const logger = createOpenBotLogger("voice-speech-service");
 
-/** One request is at most `SPEECH_LIMITS.maximumTextLength` characters: about a minute of speech. */
 const SPEECH_TIMEOUT_MS = 120_000;
-/** The loaded model holds about 300 MB. A reply asks for its next part while the part before plays. */
 const HOST_IDLE_MS = 60_000;
 
 interface VoiceSpeechEvents {
@@ -32,14 +41,19 @@ interface VoiceSpeechServiceOptions {
   modelDirectory: string;
   preferences: SpeechPreferenceStore;
   spawnHost: () => VoiceSpeechHostProcess;
-  fetch?: (input: string | URL | Request, init?: RequestInit) => Promise<Response>;
+  apiKeys: { elevenlabs: VoiceApiKeyStore; xai: VoiceApiKeyStore };
+  fetch?: SpeechFetch;
+  modelFetch?: SpeechFetch;
 }
 
-/** A failure the host reported. Only its category is known; the addon's own message stays there. */
 class HostFailure extends Error {
   constructor(readonly category: VoiceSpeechFailure | "host-exited") {
     super(category);
   }
+}
+
+interface LocalSpeechInput extends SpeechInput {
+  language: SpeechLanguage;
 }
 
 interface PendingRequest {
@@ -47,14 +61,14 @@ interface PendingRequest {
   settle: (result: Effect.Effect<SpeechAudio, VoiceOperationError>) => void;
 }
 
-/** Reads replies aloud with Supertonic 3 on this computer. Nothing leaves the computer. */
 export class VoiceSpeechService extends EventEmitter<VoiceSpeechEvents> {
   readonly #scope = Scope.makeUnsafe();
   readonly #addonPath: string;
   readonly #model: VoiceModelService<typeof SPEECH_MODEL_ID>;
   readonly #preferences: SpeechPreferenceStore;
   readonly #spawnHost: () => VoiceSpeechHostProcess;
-  /** The host synthesizes one text at a time, so a request waits for the one before it. */
+  readonly #apiKeys: VoiceSpeechServiceOptions["apiKeys"];
+  readonly #fetch: SpeechFetch;
   readonly #requests = Semaphore.makeUnsafe(1);
   #host: VoiceSpeechHostProcess | null = null;
   #pending: PendingRequest | null = null;
@@ -66,12 +80,17 @@ export class VoiceSpeechService extends EventEmitter<VoiceSpeechEvents> {
     this.#addonPath = join(options.resourcesRoot, "runtime", VOICE_RUNTIME_ADDON);
     this.#preferences = options.preferences;
     this.#spawnHost = options.spawnHost;
+    this.#apiKeys = options.apiKeys;
+    this.#fetch = options.fetch ?? fetch;
+    const modelFetch = options.modelFetch ?? options.fetch;
     this.#model = new VoiceModelService({
       modelId: SPEECH_MODEL_ID,
       directory: options.modelDirectory,
-      ...(options.fetch === undefined ? {} : { fetch: options.fetch }),
+      ...(modelFetch === undefined ? {} : { fetch: modelFetch }),
     });
-    this.#model.on("status", (status) => this.emit("modelStatus", status));
+    this.#model.on("status", (status) => {
+      if (this.#preferences.get().modelId === SPEECH_MODEL_ID) this.emit("modelStatus", status);
+    });
   }
 
   getSettings(): SpeechSettings {
@@ -82,41 +101,89 @@ export class VoiceSpeechService extends EventEmitter<VoiceSpeechEvents> {
     this: VoiceSpeechService,
     settings: SpeechSettings,
   ) {
-    return yield* this.#preferences.set(settings);
+    const before = this.#preferences.get().modelId;
+    const saved = yield* this.#preferences.set(settings);
+    if (saved.modelId !== before) {
+      if (before === SPEECH_MODEL_ID) yield* this.#model.cancel();
+      yield* this.announceStatus();
+    }
+    return saved;
   }).bind(this);
 
   readonly getModelStatus = Effect.fn("VoiceSpeech.getModelStatus")(function* (this: VoiceSpeechService) {
-    return this.#runtimeMissing() ?? (yield* this.#model.getStatus());
+    return this.#cloudStatus() ?? this.#runtimeMissing() ?? (yield* this.#model.getStatus());
+  }).bind(this);
+
+  readonly announceStatus = Effect.fn("VoiceSpeech.announceStatus")(function* (this: VoiceSpeechService) {
+    const status = yield* this.getModelStatus();
+    this.emit("modelStatus", status);
+    return status;
+  }).bind(this);
+
+  readonly setXaiApiKey = Effect.fn("VoiceSpeech.setXaiApiKey")(function* (
+    this: VoiceSpeechService,
+    key: string | null,
+  ) {
+    yield* this.#apiKeys.xai
+      .set(key)
+      .pipe(Effect.mapError(({ cause }) => new VoiceOperationError({ cause: savedKeyError(cause, "xai") })));
+    return yield* this.announceStatus();
   }).bind(this);
 
   readonly downloadModel = Effect.fn("VoiceSpeech.downloadModel")(function* (this: VoiceSpeechService) {
-    return this.#runtimeMissing() ?? (yield* this.#model.prepare());
+    return this.#cloudStatus() ?? this.#runtimeMissing() ?? (yield* this.#model.prepare());
   }).bind(this);
 
   readonly cancelModelDownload = Effect.fn("VoiceSpeech.cancelModelDownload")(function* (this: VoiceSpeechService) {
-    return this.#runtimeMissing() ?? (yield* this.#model.cancel());
+    return this.#cloudStatus() ?? this.#runtimeMissing() ?? (yield* this.#model.cancel());
   }).bind(this);
 
-  /**
-   * Deletes the model from this computer, and stops its download first. A part that is read now
-   * finishes before the host ends. Replies are not read aloud until the model is downloaded again.
-   */
   readonly removeModel = Effect.fn("VoiceSpeech.removeModel")(function* (this: VoiceSpeechService) {
-    return yield* this.#requests.withPermit(this.#model.remove(Effect.suspend(() => this.#endHost())));
+    const removed = yield* this.#requests.withPermit(this.#model.remove(Effect.suspend(() => this.#endHost())));
+    return this.#cloudStatus() ?? removed;
   }).bind(this);
 
-  /** Reads one part of a reply with the voice in the settings. It does not download the model. */
   readonly speak = Effect.fn("VoiceSpeech.speak")(function* (this: VoiceSpeechService, input: SpeechInput) {
-    const speakerId = SPEECH_VOICES.indexOf(this.#preferences.get().voice);
+    const settings = this.#preferences.get();
+    const cloud = cloudSpeechModel(settings.modelId);
+    if (cloud) {
+      const key = this.#apiKeys[cloud.provider].get();
+      if (!key)
+        return yield* new VoiceOperationError({
+          cause: new Error(
+            sourceText("error.voice.cloud.keyRequired", { provider: VOICE_KEY_PROVIDER_NAMES[cloud.provider] }),
+          ),
+        });
+      const startedAt = Date.now();
+      return yield* speakInCloud(this.#fetch, {
+        model: cloud,
+        key,
+        text: input.text,
+        language: input.language,
+        elevenLabsVoice: settings.elevenLabsVoice,
+        xaiVoice: settings.xaiVoice,
+      }).pipe(
+        Effect.tapError(() =>
+          Effect.sync(() =>
+            logger.warn(
+              `${cloud.provider} speech of ${input.text.length} characters failed after ${Date.now() - startedAt}ms.`,
+            ),
+          ),
+        ),
+      );
+    }
+    const { language } = input;
+    if (language === null)
+      return yield* new VoiceOperationError({ cause: new Error(sourceText("error.voice.speech.failed")) });
+    const speakerId = SPEECH_VOICES.indexOf(settings.voice);
     const startedAt = Date.now();
-    // The status is read with the permit: a removal that holds it can delete the model first.
     const speech = Effect.gen({ self: this }, function* () {
       const status = yield* this.getModelStatus();
       if (status.phase !== "ready")
         return yield* new VoiceOperationError({
           cause: new Error(status.message ?? sourceText("error.voice.speech.modelRequired")),
         });
-      return yield* this.#request(input, speakerId).pipe(
+      return yield* this.#request({ text: input.text, language }, speakerId).pipe(
         Effect.mapError((error) => {
           logger.error(
             `Speech of ${input.text.length} characters failed after ${Date.now() - startedAt}ms.`,
@@ -139,15 +206,11 @@ export class VoiceSpeechService extends EventEmitter<VoiceSpeechEvents> {
       );
   }).bind(this);
 
-  /**
-   * Loads the model in the host, so the next `speak` does not wait for it. The host stays loaded
-   * until it is idle. A failure is only logged: the `speak` that follows reports it to the user.
-   */
   readonly warm = Effect.fn("VoiceSpeech.warm")(function* (this: VoiceSpeechService) {
+    if (this.#preferences.get().modelId !== SPEECH_MODEL_ID) return;
     const startedAt = Date.now();
     yield* this.#requests.withPermit(
       Effect.gen({ self: this }, function* () {
-        // As in `speak`, a removal that holds the permit can delete the model first.
         const status = yield* this.getModelStatus();
         if (status.phase !== "ready") return;
         yield* this.#request({ text: "", language: "en" }, 0, true).pipe(
@@ -166,7 +229,22 @@ export class VoiceSpeechService extends EventEmitter<VoiceSpeechEvents> {
     yield* Scope.close(this.#scope, Exit.void);
   }, Effect.uninterruptible).bind(this);
 
-  /** Reports a build with no bundled sherpa-onnx runtime, as dictation does. */
+  #cloudStatus(): SpeechModelStatus | null {
+    const { modelId } = this.#preferences.get();
+    const cloud = cloudSpeechModel(modelId);
+    if (!cloud) return null;
+    return this.#apiKeys[cloud.provider].get()
+      ? { modelId, phase: "ready", progress: 100, message: null }
+      : {
+          modelId,
+          phase: "missing",
+          progress: null,
+          message: sourceText("error.voice.cloud.keyRequired", {
+            provider: VOICE_KEY_PROVIDER_NAMES[cloud.provider],
+          }),
+        };
+  }
+
   #runtimeMissing(): SpeechModelStatus | null {
     if (existsSync(this.#addonPath)) return null;
     const status: SpeechModelStatus = {
@@ -179,8 +257,11 @@ export class VoiceSpeechService extends EventEmitter<VoiceSpeechEvents> {
     return status;
   }
 
-  /** Sends one request to the host, starting it if needed, and keeps it loaded until it is idle. */
-  #request(input: SpeechInput, speakerId: number, loadOnly = false): Effect.Effect<SpeechAudio, VoiceOperationError> {
+  #request(
+    input: LocalSpeechInput,
+    speakerId: number,
+    loadOnly = false,
+  ): Effect.Effect<SpeechAudio, VoiceOperationError> {
     return Effect.callback<SpeechAudio, VoiceOperationError>((resume) => {
       this.#cancelIdleStop();
       const host = this.#ensureHost();
@@ -201,10 +282,11 @@ export class VoiceSpeechService extends EventEmitter<VoiceSpeechEvents> {
         language: input.language,
         speakerId,
         loadOnly,
+        numThreads: SPEECH_HOST_THREADS,
+        sessionConfig: SPEECH_SESSION_CONFIG,
       });
       return Effect.sync(() => {
         if (this.#pending?.id === id) this.#pending = null;
-        // A synthesis cannot be cancelled, and a host that still works on it would answer late.
         if (!settled) this.#stopHost();
       });
     }).pipe(
@@ -255,7 +337,6 @@ export class VoiceSpeechService extends EventEmitter<VoiceSpeechEvents> {
     this.#idleTimer = null;
   }
 
-  /** Ends the host and waits until it exits, so that no process has the model files open. */
   #endHost(): Effect.Effect<void> {
     const host = this.#host;
     if (!host) return Effect.void;
@@ -265,7 +346,6 @@ export class VoiceSpeechService extends EventEmitter<VoiceSpeechEvents> {
     });
   }
 
-  /** Ends the host. Its exit is not reported as a failure: nothing waits on it any more. */
   #stopHost(): void {
     this.#cancelIdleStop();
     const host = this.#host;

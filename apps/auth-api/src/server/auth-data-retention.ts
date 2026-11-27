@@ -1,13 +1,16 @@
 import { Context, Effect, Layer, Schema } from "effect";
 
 const RATE_LIMIT_WINDOW_MS = 15 * 60_000;
+const CREDIT_CODE_LIMIT_WINDOW_MS = 60 * 60_000;
 
 export interface AuthRetentionResult {
   challenges: number;
   sessions: number;
   rateLimits: number;
+  creditCodeLimits: number;
   teamTickets: number;
   remoteSessions: number;
+  watchSessions: number;
   remoteInvites: number;
   mobileConnectLinks: number;
   serverClaims: number;
@@ -38,6 +41,11 @@ function authRetentionOperations(now: number): AuthRetentionOperation[] {
       cutoff: now - RATE_LIMIT_WINDOW_MS,
     },
     {
+      name: "creditCodeLimits",
+      sql: "DELETE FROM credit_code_limits WHERE window_start <= ?",
+      cutoff: now - CREDIT_CODE_LIMIT_WINDOW_MS,
+    },
+    {
       name: "teamTickets",
       sql: "DELETE FROM team_auth_tickets WHERE expires_at <= ? OR consumed_at IS NOT NULL",
       cutoff: now,
@@ -51,6 +59,11 @@ function authRetentionOperations(now: number): AuthRetentionOperation[] {
       name: "remoteSessions",
       sql: "DELETE FROM remote_sessions WHERE ended_at IS NOT NULL AND ended_at <= ?",
       cutoff: now - 10 * 60_000,
+    },
+    {
+      name: "watchSessions",
+      sql: "DELETE FROM watch_sessions WHERE expires_at <= ? OR revoked_at IS NOT NULL",
+      cutoff: now,
     },
     {
       name: "remoteInvites",
@@ -67,7 +80,6 @@ function authRetentionOperations(now: number): AuthRetentionOperation[] {
       sql: "DELETE FROM remote_invites WHERE revoked_at IS NOT NULL AND revoked_at <= ?",
       cutoff: now - 24 * 60 * 60_000,
     },
-    // A revoked link signs in no phone. Revoke finds the phones it signed in by host, not by this row.
     {
       name: "mobileConnectLinks",
       sql: "DELETE FROM mobile_connect_links WHERE revoked_at IS NOT NULL AND revoked_at <= ?",
@@ -110,8 +122,10 @@ const prune = Effect.fn("AuthRetention.prune")(function* (now: number) {
     challenges: 0,
     sessions: 0,
     rateLimits: 0,
+    creditCodeLimits: 0,
     teamTickets: 0,
     remoteSessions: 0,
+    watchSessions: 0,
     remoteInvites: 0,
     mobileConnectLinks: 0,
     serverClaims: 0,

@@ -59,11 +59,7 @@ services:
       REMOTE_TRUST_PROXY: ${REMOTE_TRUST_PROXY:-false}
       TURN_SHARED_SECRET: ${TURN_SHARED_SECRET:?TURN_SHARED_SECRET is required}
       TURN_HOST: ${TURN_DOMAIN}
-      # Other coturn servers with the same TURN_SHARED_SECRET and ports, comma-separated: on production
-      # `turn2.openbot.run`, on the standby `turn.openbot.run`. Each host gets one relay (`turn-relays.ts`).
       TURN_EXTRA_HOSTS: ${TURN_EXTRA_HOSTS:-}
-      # Two Signal machines (README "Two Signal machines"). SIGNAL_ID is the name in the `signal` ticket
-      # claim. SIGNAL_ENTRY_HOST and SIGNAL_PUBLIC_IPV4 go together: without them this Signal is always the entry.
       SIGNAL_ID: ${SIGNAL_ID:-}
       SIGNAL_ENTRY_HOST: ${SIGNAL_ENTRY_HOST:-}
       SIGNAL_PUBLIC_IPV4: ${SIGNAL_PUBLIC_IPV4:-}
@@ -71,7 +67,6 @@ services:
       TURN_TLS_PORT: 5349
     ports:
       - "${REMOTE_SIGNAL_BIND_ADDRESS:-0.0.0.0}:${REMOTE_SIGNAL_PUBLIC_PORT:-443}:${REMOTE_SIGNAL_PORT:-8443}/tcp"
-      # Health and metrics for the capacity reporter, on the host loopback address only.
       - "127.0.0.1:9642:8080/tcp"
     group_add:
       - "${ACME_CERTIFICATE_GROUP_ID:-2000}"
@@ -114,9 +109,6 @@ services:
       timeout: 5s
       retries: 3
 
-  # Sends the TURN and Signal counts to OpenPanel every 5 minutes (see ANALYTICS.md, `signal_capacity`).
-  # It uses the host network to read the coturn metrics on 127.0.0.1:9641. Without the OpenPanel server
-  # client it exits at start and stays stopped.
   capacity-report:
     build:
       context: ..

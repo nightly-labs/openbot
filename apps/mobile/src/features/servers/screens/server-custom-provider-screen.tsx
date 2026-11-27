@@ -1,13 +1,19 @@
 import { INPUT_LIMITS } from "@openbot/contracts/input-limits";
-import { agentProviderName, CUSTOM_PROVIDER_LIMITS, type CustomProviderSummary } from "@openbot/contracts/ipc";
+import {
+  agentProviderName,
+  CUSTOM_PROVIDER_LIMITS,
+  type CustomProviderResult,
+  type CustomProviderSummary,
+  type UpdateCustomProviderInput,
+} from "@openbot/contracts/ipc";
 import type { MobileTextKey } from "@openbot/i18n/mobile";
 import { router, Stack, useLocalSearchParams } from "expo-router";
-import { usePreventRemove } from "expo-router/react-navigation";
 import { Typography } from "heroui-native";
 import Bot from "lucide-react-native/icons/bot";
 import Globe from "lucide-react-native/icons/globe";
 import HardDrive from "lucide-react-native/icons/hard-drive";
 import PackageSearch from "lucide-react-native/icons/package-search";
+import Trash2 from "lucide-react-native/icons/trash";
 import { useEffect, useRef, useState } from "react";
 import { Alert, View } from "react-native";
 import { useCSSVariable } from "uniwind";
@@ -20,8 +26,10 @@ import {
   customProviderErrors,
   customProviderInput,
   customProviderReady,
+  customProviderUpdateInput,
   isCustomProviderPreset,
   presetCustomProviderDraft,
+  savedCustomProviderDraft,
   suggestedCustomProviderId,
 } from "@/features/servers/model/custom-provider-draft";
 import type { ProviderAdmin } from "@/features/servers/model/provider-admin";
@@ -32,25 +40,19 @@ import {
   SettingsRow,
   SettingsSection,
 } from "@/features/settings/components/settings-content";
+import { RowIcon } from "@/features/settings/components/settings-row-icon";
 import { SheetFormField } from "@/shared/components/sheet-form-field";
 import { SheetSaveAction } from "@/shared/components/sheet-save-action";
 import { haptics } from "@/shared/lib/haptics";
 import { useText } from "@/shared/lib/text";
+import { useDiscardGuard } from "@/shared/lib/use-discard-guard";
 
-/** The wire limit of a header name. */
 const HEADER_NAME_LIMIT = 128;
 
-// Examples, the same in each language. The desktop form shows the same ones.
 const PROVIDER_ID_PLACEHOLDER = "my-provider";
 const MODEL_ID_PLACEHOLDER = "model-id";
 const HEADER_NAME_PLACEHOLDER = "Header-Name";
 
-/**
- * Server settings > Providers > a custom provider of the host. Without `customProviderId` the page
- * lists the presets, and with `preset` it is the form of a new endpoint. The Team API has no edit
- * route, so a saved endpoint shows its settings and can be removed. The key and the header values go
- * to the host only, and the phone does not keep them.
- */
 export function ServerCustomProviderScreen() {
   const { t, errorMessage } = useText();
   const { serverId, customProviderId, preset } = useLocalSearchParams<{
@@ -75,6 +77,18 @@ export function ServerCustomProviderScreen() {
         </SettingsNote>
       </SettingsContent>
     );
+  if (saved && admin.updateCustom && saved.headerNames !== undefined)
+    return (
+      <CustomProviderForm
+        key={saved.id}
+        serverId={serverId}
+        saved={saved}
+        update={admin.updateCustom}
+        admin={admin}
+        taken={[]}
+        onList={custom.applyList}
+      />
+    );
   if (saved) return <SavedCustomProvider provider={saved} admin={admin} onList={custom.applyList} />;
   if (!isCustomProviderPreset(preset))
     return (
@@ -85,7 +99,7 @@ export function ServerCustomProviderScreen() {
       />
     );
   return (
-    <NewCustomProvider
+    <CustomProviderForm
       key={preset}
       serverId={serverId}
       preset={preset}
@@ -122,7 +136,6 @@ const PRESET_ROWS = [
   description: MobileTextKey;
 }[];
 
-/** The first page of the add flow, as the preset list of desktop. A preset opens the form with its values. */
 function CustomProviderPresets({
   serverId,
   registry,
@@ -158,7 +171,6 @@ function CustomProviderPresets({
           </SettingsRow>
         ))}
       </SettingsSection>
-      {/* A host without `custom-agents-v1` has no route that adds an ACP agent, so the row says where to add one. */}
       <SettingsSection
         title={t("mobile.server.customProviders.agents")}
         footer={t(
@@ -209,11 +221,9 @@ function CustomProviderPresets({
   );
 }
 
-/** Runs one change at a time, and leaves the page after it succeeds. */
 function useLeavingAction(onFailure: (cause: unknown) => void, leave: () => void = () => router.back()) {
   const locked = useRef(false);
   const [pending, setPending] = useState(false);
-  // Navigation runs a render later, once the discard guard reads `leaving`.
   const [leaving, setLeaving] = useState(false);
   const after = useRef<(() => void) | null>(null);
   const leaveRef = useRef(leave);
@@ -234,7 +244,6 @@ function useLeavingAction(onFailure: (cause: unknown) => void, leave: () => void
       operation()
         .then((next) => {
           void haptics.notification("success");
-          // The list without a removed endpoint shows after this page goes, so the page does not say "gone".
           after.current = next;
           setLeaving(true);
         })
@@ -250,55 +259,60 @@ function useLeavingAction(onFailure: (cause: unknown) => void, leave: () => void
   };
 }
 
-function NewCustomProvider({
+function CustomProviderForm({
   serverId,
-  preset,
   admin,
   taken,
   onList,
+  ...from
 }: {
   serverId: string;
-  preset: CustomProviderPreset;
   admin: ProviderAdmin;
   taken: readonly string[];
   onList: (providers: CustomProviderSummary[]) => Promise<void>;
-}) {
+} & (
+  | { preset: CustomProviderPreset; saved?: undefined; update?: undefined }
+  | {
+      saved: CustomProviderSummary;
+      update: (input: UpdateCustomProviderInput) => Promise<CustomProviderResult>;
+      preset?: undefined;
+    }
+)) {
   const { t, errorMessage } = useText();
-  const [draft, setDraft] = useState<CustomProviderDraft>(() => presetCustomProviderDraft(preset));
+  const [opened] = useState(from);
+  const saved = opened.saved;
+  const [draft, setDraft] = useState<CustomProviderDraft>(() =>
+    opened.saved ? savedCustomProviderDraft(opened.saved) : presetCustomProviderDraft(opened.preset),
+  );
   const initial = useRef(draft);
   const [error, setError] = useState<string | null>(null);
-  // A new endpoint closes the preset page too, and shows the Providers page with it.
+  const removing = useRef(false);
   const action = useLeavingAction(
-    (cause) => setError(errorMessage(cause, t("mobile.server.customProviders.saveFailed"))),
-    () => router.dismissTo({ pathname: "/server-settings/providers", params: { serverId } }),
+    (cause) =>
+      setError(
+        errorMessage(
+          cause,
+          t(
+            removing.current
+              ? "mobile.server.customProviders.removeFailed"
+              : saved
+                ? "mobile.server.customProviders.updateFailed"
+                : "mobile.server.customProviders.saveFailed",
+          ),
+        ),
+      ),
+    saved ? undefined : () => router.dismissTo({ pathname: "/server-settings/providers", params: { serverId } }),
   );
-  const errors = customProviderErrors(draft, taken, t);
+  const errors = customProviderErrors(draft, taken, t, saved);
   const ready = customProviderReady(draft, errors);
   const dirty = customProviderDraftChanged(draft, initial.current);
   const locked = action.pending;
 
-  // Discard turns prevention off before it repeats the action, so the hook does not warn.
-  const [discarding, setDiscarding] = useState(false);
-  usePreventRemove(!discarding && (dirty || action.pending) && !action.leaving, ({ repeat }) => {
-    if (action.pending) return;
-    void haptics.notification("warning");
-    Alert.alert(t("mobile.agent.discard.title"), t("mobile.agent.discard.body"), [
-      { text: t("mobile.agent.discard.keepEditing"), style: "cancel" },
-      {
-        text: t("mobile.agent.discard.discard"),
-        style: "destructive",
-        onPress: () => {
-          setDiscarding(true);
-          repeat();
-        },
-      },
-    ]);
-  });
+  useDiscardGuard((dirty || action.pending) && !action.leaving, { busy: () => action.pending, warn: true });
 
   function edit(change: Partial<CustomProviderDraft>) {
     setDraft((current) => {
       const next = { ...current, ...change };
-      // The ID follows the name until the user types one.
       return change.name !== undefined && !next.idEdited ? { ...next, id: suggestedCustomProviderId(next.name) } : next;
     });
     setError(null);
@@ -306,17 +320,19 @@ function NewCustomProvider({
 
   return (
     <SettingsContent>
-      <Stack.Screen options={{ title: t("mobile.server.customProviders.add") }} />
-      {/* A preset fills the form, so Add shows also before the first change. */}
+      <Stack.Screen options={{ title: saved ? saved.name : t("mobile.server.customProviders.add") }} />
       <SheetSaveAction
-        dirty={dirty || ready}
-        canSave={ready}
-        pending={action.pending}
-        label={t("mobile.server.customProviders.addConfirm")}
-        pendingLabel={t("mobile.server.customProviders.adding")}
+        dirty={saved ? dirty : dirty || ready}
+        canSave={ready && !action.pending}
+        pending={action.pending && !removing.current}
+        label={saved ? undefined : t("mobile.server.customProviders.addConfirm")}
+        pendingLabel={saved ? undefined : t("mobile.server.customProviders.adding")}
         onSave={() =>
           action.run(async () => {
-            const result = await admin.saveCustom(customProviderInput(draft));
+            removing.current = false;
+            const result = from.saved
+              ? await from.update(customProviderUpdateInput(draft, saved ?? from.saved))
+              : await admin.saveCustom(customProviderInput(draft));
             return () => void onList(result.providers);
           })
         }
@@ -344,9 +360,11 @@ function NewCustomProvider({
           autoCapitalize="none"
           autoCorrect={false}
           maxLength={INPUT_LIMITS.identifier}
-          editable={!locked}
+          editable={!locked && !saved}
           value={draft.id}
-          hint={errors.id ?? t("mobile.server.customProviders.idHint")}
+          hint={
+            errors.id ?? t(saved ? "mobile.server.customProviders.idSavedHint" : "mobile.server.customProviders.idHint")
+          }
           onChangeText={(id) => edit({ id, idEdited: id.length > 0 })}
         />
         <SheetFormField
@@ -371,7 +389,11 @@ function NewCustomProvider({
           maxLength={CUSTOM_PROVIDER_LIMITS.apiKey}
           editable={!locked}
           value={draft.apiKey}
-          hint={t("mobile.server.customProviders.apiKeyHint")}
+          hint={t(
+            saved?.hasApiKey
+              ? "mobile.server.customProviders.apiKeyKeptHint"
+              : "mobile.server.customProviders.apiKeyHint",
+          )}
           onChangeText={(apiKey) => edit({ apiKey })}
         />
       </View>
@@ -393,7 +415,14 @@ function NewCustomProvider({
       />
       <PairField
         title={t("mobile.server.customProviders.headers")}
-        footer={errors.headers ?? t("mobile.server.customProviders.headersHint")}
+        footer={
+          errors.headers ??
+          t(
+            saved?.headerNames?.length
+              ? "mobile.server.customProviders.headersKeptHint"
+              : "mobile.server.customProviders.headersHint",
+          )
+        }
         items={draft.headers}
         maxItems={CUSTOM_PROVIDER_LIMITS.headers}
         maxKeyLength={HEADER_NAME_LIMIT}
@@ -407,6 +436,20 @@ function NewCustomProvider({
         disabled={locked}
         onChange={(headers) => edit({ headers })}
       />
+      {saved ? (
+        <RemoveCustomProviderRow
+          name={saved.name}
+          disabled={locked}
+          onRemove={() =>
+            action.run(async () => {
+              removing.current = true;
+              setError(null);
+              const result = await admin.deleteCustom(saved.id);
+              return () => void onList(result.providers);
+            })
+          }
+        />
+      ) : null}
     </SettingsContent>
   );
 }
@@ -470,35 +513,52 @@ function SavedCustomProvider({
           </SettingsRow>
         ))}
       </SettingsSection>
-      <SettingsSection>
-        <SettingsRow
-          disclosure={false}
-          disabled={action.pending}
-          onPress={() =>
-            Alert.alert(
-              t("mobile.server.customProviders.removeTitle", { name: provider.name }),
-              t("mobile.server.customProviders.removeBody"),
-              [
-                { text: t("common.cancel"), style: "cancel" },
-                {
-                  text: t("mobile.server.customProviders.remove"),
-                  style: "destructive",
-                  onPress: () =>
-                    action.run(async () => {
-                      setError(null);
-                      const result = await admin.deleteCustom(provider.id);
-                      return () => void onList(result.providers);
-                    }),
-                },
-              ],
-            )
-          }
-        >
-          <Typography.Paragraph className="text-danger-text">
-            {t("mobile.server.customProviders.remove")}
-          </Typography.Paragraph>
-        </SettingsRow>
-      </SettingsSection>
+      <RemoveCustomProviderRow
+        name={provider.name}
+        disabled={action.pending}
+        onRemove={() =>
+          action.run(async () => {
+            setError(null);
+            const result = await admin.deleteCustom(provider.id);
+            return () => void onList(result.providers);
+          })
+        }
+      />
     </SettingsContent>
+  );
+}
+
+function RemoveCustomProviderRow({
+  name,
+  disabled,
+  onRemove,
+}: {
+  name: string;
+  disabled: boolean;
+  onRemove: () => void;
+}) {
+  const { t } = useText();
+  return (
+    <SettingsSection>
+      <SettingsRow
+        disclosure={false}
+        disabled={disabled}
+        leading={<RowIcon icon={Trash2} tone="danger" />}
+        onPress={() =>
+          Alert.alert(
+            t("mobile.server.customProviders.removeTitle", { name }),
+            t("mobile.server.customProviders.removeBody"),
+            [
+              { text: t("common.cancel"), style: "cancel" },
+              { text: t("mobile.server.customProviders.remove"), style: "destructive", onPress: onRemove },
+            ],
+          )
+        }
+      >
+        <Typography.Paragraph className="text-danger-text">
+          {t("mobile.server.customProviders.remove")}
+        </Typography.Paragraph>
+      </SettingsRow>
+    </SettingsSection>
   );
 }

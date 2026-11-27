@@ -5,35 +5,38 @@ import { createUniqueId, Show } from "solid-js";
 import { useText } from "../../text";
 import { HermesLogo } from "./HermesImportView";
 
-/** Product names, the same in each language. */
 const HERMES_AGENT = "Hermes Agent";
 const GROK_BOT = "Grok Bot";
 
 export interface AgentImportSourcesProps {
-  /** The Transfer tab is there: this computer, or a server the user administers. */
   transfer: boolean;
+  hermesFolder?: "computer" | "server" | undefined;
+  onServer?: boolean | undefined;
   onHermes: () => void;
   onGrok: () => void;
   onTransfer: () => void;
 }
 
-/** Server settings > Import, first: where the agents are now. Each source has its own steps after this. */
 export function AgentImportSources(props: AgentImportSourcesProps) {
   const { t } = useText();
   const headingId = `agent-import-sources-${createUniqueId()}`;
+  function hermesNote() {
+    if (props.hermesFolder === "server") return "import.source.hermesNoteServer";
+    return props.hermesFolder === "computer" ? "import.source.hermesNote" : "import.source.hermesNoteExport";
+  }
   return (
     <section class="agent-import-guide" aria-labelledby={headingId}>
       <header class="agent-import-intro">
         <h3 id={headingId} class="agent-import-heading">
           {t("import.source.title")}
         </h3>
-        <p class="agent-import-lede">{t("import.source.lede")}</p>
+        <p class="agent-import-lede">{t(props.onServer ? "import.source.ledeServer" : "import.source.lede")}</p>
       </header>
       <ul class="agent-import-sources">
         <li>
           <SourceButton
             title={HERMES_AGENT}
-            note={t("import.source.hermesNote")}
+            note={t(hermesNote())}
             icon={<HermesLogo class="agent-import-source-logo" />}
             onClick={props.onHermes}
           />

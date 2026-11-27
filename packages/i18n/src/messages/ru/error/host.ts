@@ -20,9 +20,12 @@ export const messages = {
   "error.host.publishFailed": "Не удалось опубликовать этот OpenBot.",
   "error.host.mobileConnectPublishFailed": "Не удалось опубликовать этот OpenBot для Mobile Connect.",
   "error.host.mobileConnectHostChanged": "Хост Mobile Connect изменился. Повторите попытку.",
+  "error.host.mobileConnectHostMismatch": "В вашем аккаунте другой ключ для этого сервера. Повторите попытку.",
   "error.host.noServer": "На этом компьютере нет сервера, который можно изменить.",
   "error.host.identityLocalOnly": "Название и логотип сервера можно изменить только на компьютере, где он работает.",
   "error.host.timezoneInvalid": "Этот часовой пояс неизвестен.",
+  "error.host.signalHomeUnknown": "Этот сервер Signal недоступен.",
+  "error.host.turnLimitInvalid": "Это ограничение потоков недопустимо.",
   "error.host.maintenanceInterrupted":
     "Обслуживание хоста прервано. Проверьте приложение и сбросьте состояние хоста, прежде чем повторять.",
   "error.host.updateFailed":
@@ -31,4 +34,5 @@ export const messages = {
   "error.host.tenantShutdownTimeout": "Время остановки тенантов истекло. Замена приложения не начата.",
   "error.host.tenantHealthMissing":
     "После перезапуска отчёты о состоянии тенантов отсутствуют или показывают сбой. Проверьте сессии тенантов, прежде чем обновлять снова.",
+  "error.host.personalityInvalid": "Этот стиль ответов неизвестен.",
 } as const satisfies PartialTranslation<typeof source>;

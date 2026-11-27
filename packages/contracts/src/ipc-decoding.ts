@@ -1,22 +1,3 @@
-// The throwing field readers every untrusted-input boundary needs.
-//
-// `src/preload/index.ts` decodes what the main process sends the renderer; the
-// `src/main/remote-*-decoding.ts` family decodes what a remote team server sends this machine;
-// `src/main/central-auth-manager.ts` decodes what the account API answers; `src/backend/protocol.ts`
-// decodes what a provider CLI writes to its own stdout; `remote-control-plane.ts` beside this file
-// decodes the account API's `/v2/remote/*` shapes. Each had a hand-written copy of the same readers,
-// with identical logic and identical messages, and each was the kind of function whose second copy
-// drifts silently.
-//
-// This is deliberately only the *identical* half. Several decoders share a name across the two files
-// and are not the same function - `decodeAgentStatus` accepts any string phase in the preload and
-// enumerates the phases in the server client - because they guard different boundaries: main is
-// trusted by the renderer, a remote host is trusted by nobody. Merging those on the looser one would
-// weaken the network boundary, so they stay apart and say in their names which side they guard.
-//
-// These throw, which is why they are not in `runtime-values.ts`: that file is pure non-throwing
-// predicates, imported by the renderer, the backend and the preload alike.
-
 import { type DynamicRecord, isBoolean, isDynamicRecord, isNumber, isString } from "./runtime-values";
 
 export function decodeRecord(value: unknown, label: string): DynamicRecord {
@@ -60,7 +41,6 @@ export function nullableNumber(record: DynamicRecord, field: string): number | n
   throw new Error(`Invalid ${field}.`);
 }
 
-/** The optional unloaded length of a history page: its older message count and oldest time. */
 export function optionalHistoryExtent(record: DynamicRecord): { olderCount?: number; oldestAt?: string } {
   const { olderCount, oldestAt } = record;
   if (olderCount !== undefined && !(isNumber(olderCount) && Number.isSafeInteger(olderCount) && olderCount >= 0)) {
@@ -73,10 +53,6 @@ export function optionalHistoryExtent(record: DynamicRecord): { olderCount?: num
   };
 }
 
-// A decoder is a `(value: unknown) => T` callback, so the label cannot be a parameter of the decoder
-// itself without every call site wrapping it in a lambda. These build one instead, which keeps each
-// boundary's own wording - the message is what tells a reader which side rejected the payload.
-/** Decodes an array whose items are each records, with one decoder for every item. */
 export function decodeList<T>(value: unknown, label: string, decodeItem: (item: DynamicRecord) => T): T[] {
   if (!Array.isArray(value)) throw new Error(`Invalid ${label}.`);
   return value.map((item) => decodeItem(decodeRecord(item, label)));
@@ -96,8 +72,6 @@ export function guardedListDecoder<T>(guard: (value: unknown) => value is T, lab
   };
 }
 
-// A channel that answers with nothing has to reject a payload rather than ignore it: data where none
-// was expected means the two sides disagree about the channel.
 export function emptyDecoder(message: string): (value: unknown) => undefined {
   return (value) => {
     if (value !== undefined && value !== null) throw new Error(message);

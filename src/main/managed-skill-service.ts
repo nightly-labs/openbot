@@ -1,6 +1,6 @@
 import { lstat, mkdir, readdir, readFile, realpath, rename, unlink, writeFile } from "node:fs/promises";
 import { dirname, join, relative, resolve, sep } from "node:path";
-import { agentProviderDescriptor } from "@openbot/contracts/agent-providers";
+import { agentProviderDescriptor, MANAGED_SKILL_FOLDERS } from "@openbot/contracts/agent-providers";
 import type { AgentSummary, InstalledSkill } from "@openbot/contracts/ipc";
 import { isDynamicRecord } from "@openbot/contracts/runtime-values";
 import { createOpenBotLogger, toLogValue } from "@openbot/logging";
@@ -8,20 +8,18 @@ import { Effect, Result, Schema } from "effect";
 import { parse as parseYaml } from "yaml";
 import { causeHelpers } from "../backend/effect-boundary";
 import { isMissingFileError } from "../backend/file-errors";
+import { SKILL_OWNERSHIP_MARKER } from "../backend/home-skills";
 import { isPathInside } from "../backend/path-containment";
 
 const MANAGED_SKILL_SLUG = "openbot-site-hosting";
 export const SKILL_CREATOR_SKILL_SLUG = "openbot-skill-creator";
 export const DATA_SKILL_SLUG = "openbot-data";
-/** The skills OpenBot writes into every agent workspace. Add a new managed skill here too. */
 export const MANAGED_SKILL_SLUGS: ReadonlySet<string> = new Set([
   MANAGED_SKILL_SLUG,
   SKILL_CREATOR_SKILL_SLUG,
   DATA_SKILL_SLUG,
 ]);
-export const OWNERSHIP_MARKER = ".openbot-managed.json";
-/** The workspace skill folders OpenBot writes. Each provider reads at least one of them. */
-export const MANAGED_SKILL_FOLDERS = [".agents/skills", ".claude/skills"] as const;
+export const OWNERSHIP_MARKER = SKILL_OWNERSHIP_MARKER;
 
 const logger = createOpenBotLogger("managed-skill-service");
 
@@ -129,6 +127,7 @@ const syncTarget = Effect.fn("ManagedSkill.syncTarget")(function* (
   yield* rejectSymlink(marker);
   if (yield* fileExists(target)) {
     if ((yield* optionalText(marker)) !== ownershipContent) return "collision";
+    if ((yield* optionalText(target)) === content) return "synced";
     yield* atomicWrite(workspaceRoot, target, content);
     return "synced";
   }
@@ -237,7 +236,6 @@ function isFileExistsError(error: unknown): boolean {
   return error instanceof Error && "code" in error && error.code === "EEXIST";
 }
 
-/** Read only OpenBot-owned skills from the active provider's skill folder. */
 export const listManagedSkillsForChat = Effect.fn("ManagedSkill.listForChat")(function* (agent: AgentSummary) {
   const root = yield* managedIO(() => realpath(agent.workspacePath));
   const reads = agentProviderDescriptor(agent.provider).skillFolders;

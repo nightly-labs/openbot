@@ -1,85 +1,193 @@
+import { ATTACHMENT_LIMITS } from "@openbot/contracts/input-limits";
 import {
   type AgentAccessLevels,
   MESSAGING_LIMITS,
   type OpenBotDesktopApi,
   type ServerSummary,
+  STORAGE_CAPABILITY,
+  type StorageUsage,
+  type StoredFileRow,
+  WORKFLOW_ASSET_TYPES,
+  WORKFLOW_PICTURE_TYPES,
+  type WorkflowFileMediaKind,
+  type WorkflowFolderAction,
+  type WorkflowFoldersSnapshot,
+  workflowAssetClipMedia,
+  workflowAssetType,
 } from "@openbot/contracts/ipc";
+import { ATTACHMENT_PREVIEW_CAPABILITY } from "@openbot/contracts/team-protocol/attachment-preview-v1";
+import { WORKFLOW_FOLDERS_CAPABILITY } from "@openbot/contracts/team-protocol/workflow-folders-v1";
+import {
+  WORKFLOW_PRESENCE_CAPABILITY,
+  WORKFLOW_SPOT_EVENT,
+  type WorkflowSpotEvent,
+  type WorkflowSpotInput,
+} from "@openbot/contracts/team-protocol/workflow-presence-v1";
+import { WORKFLOWS_AGENT_FILES_CAPABILITY } from "@openbot/contracts/team-protocol/workflows-agent-files-v1";
+import { WORKFLOWS_ANSWERS_CAPABILITY } from "@openbot/contracts/team-protocol/workflows-answers-v1";
+import { WORKFLOWS_MEDIA_ACCOUNT_CAPABILITY } from "@openbot/contracts/team-protocol/workflows-media-account-v1";
+import { WORKFLOWS_MEDIA_CLIPS_CAPABILITY } from "@openbot/contracts/team-protocol/workflows-media-clips-v1";
+import { WORKFLOWS_MEDIA_SIZE_CAPABILITY } from "@openbot/contracts/team-protocol/workflows-media-size-v1";
+import { WORKFLOWS_MEDIA_TRANSPARENT_CAPABILITY } from "@openbot/contracts/team-protocol/workflows-media-transparent-v1";
+import { WORKFLOWS_PAUSE_CAPABILITY } from "@openbot/contracts/team-protocol/workflows-pause-v1";
+import { WORKFLOWS_PORTABLE_CAPABILITY } from "@openbot/contracts/team-protocol/workflows-portable-v1";
+import { WORKFLOWS_STEP_SETTINGS_CAPABILITY } from "@openbot/contracts/team-protocol/workflows-step-settings-v1";
 import type {
+  WorkflowChannel,
   WorkflowDiscordServer,
   WorkflowPlace,
   WorkflowSlackWorkspace,
   WorkflowTelegramChat,
 } from "@openbot/ui/features/workflows/workflow-model";
+import { currentText } from "@openbot/ui/text";
 import {
   type GitHubConnectorPort,
   githubConnectorPort,
   hostGitHubConnectorPort,
 } from "../connectors/github-connector-port";
-import { serverRoleCanAdminister, serverSupportsCapability } from "../servers/server-capabilities";
+import { serverCanAdminister, serverRoleCanAdminister, serverSupportsCapability } from "../servers/server-capabilities";
 
 type WorkflowsApi = OpenBotDesktopApi["workflows"];
-/** The methods that take only the server. */
-type NoInputMethod = "list" | "githubCatalog";
-/** Each method with its input only; `list` and `githubCatalog` take none. */
+type NoInputMethod = "list" | "githubCatalog" | "mediaProviders" | "mediaCredits" | "mediaCatalog" | "folders";
 type BoundWorkflowsApi = {
   [Name in Exclude<keyof WorkflowsApi, NoInputMethod>]: (
     input: Parameters<WorkflowsApi[Name]>[0],
   ) => ReturnType<WorkflowsApi[Name]>;
 } & { [Name in NoInputMethod]: () => ReturnType<WorkflowsApi[Name]> };
 
-/**
- * What the Workflows page reaches on one server: the workflows, the changes that make one stale, and
- * the messaging places an output can post to. The desktop app reaches this computer or a joined
- * server through main.
- */
 export interface WorkflowHost {
-  /** Called without a server: the host already names one. */
   workflows: BoundWorkflowsApi;
-  /**
-   * Calls `changed` with the workflow that changed, or null when all can be stale: the server came
-   * back, or the agent levels changed.
-   */
-  onChanged(changed: (workflowId: string | null) => void): () => void;
-  /** Only this computer keeps messaging places; a joined server gives none. */
+  onChanged(changed: (workflowId: string | null, agentId?: string) => void): () => void;
   places(): Promise<WorkflowPlace[]>;
-  /** Only this computer runs Discord triggers and outputs; a joined server gives none. */
+  channels(): Promise<WorkflowChannel[]>;
   discordServers(): Promise<WorkflowDiscordServer[]>;
-  /** Only this computer runs Telegram triggers and outputs; a joined server gives none. */
   telegramChats(): Promise<WorkflowTelegramChat[]>;
-  /** Only this computer runs Slack triggers and outputs; a joined server gives none. */
   slackWorkspaces(): Promise<WorkflowSlackWorkspace[]>;
-  /** The level of this account on each agent that it sees, or null when it manages all of them. */
   agentLevels(): Promise<AgentAccessLevels | null>;
-  /**
-   * Whether the host runs GitHub triggers and outputs: this computer always, and a joined server only
-   * when it advertises `workflows-github-v1`.
-   */
   githubSupported(): boolean;
-  /** The GitHub connection that the host's GitHub triggers and outputs use. */
+  mediaSupported(): boolean;
+  clipsSupported(): boolean;
+  mediaAccountSupported(): boolean;
+  mediaTransparentSupported(): boolean;
+  mediaSizeSupported(): boolean;
+  agentFilesSupported(): boolean;
+  answersSupported(): boolean;
+  stepSettingsSupported(): boolean;
+  pauseSupported(): boolean;
+  portableSupported(): boolean;
+  foldersSupported(): boolean;
+  folders(): Promise<WorkflowFoldersSnapshot>;
+  folderAction(action: WorkflowFolderAction): Promise<WorkflowFoldersSnapshot>;
+  onFoldersChanged(changed: () => void): () => void;
+  presenceSupported(): boolean;
+  setSpot(input: WorkflowSpotInput): void;
+  onSpot(changed: (event: WorkflowSpotEvent) => void): () => void;
+  pictures(): Promise<readonly StoredFileRow[]>;
+  uploadPicture(file: File): Promise<StoredFileRow>;
+  downloadMedia?(attachmentId: string): Promise<void>;
+  mediaUrl(attachmentId: string, kind: WorkflowFileMediaKind): string | null | undefined;
+  mediaPreviewUrl(attachmentId: string): string | null | undefined;
   githubConnector: GitHubConnectorPort;
-  /** The joined server, as its server row names it, or undefined for this computer. */
   hostName(): string | undefined;
-  /** Opens an http or https page in the browser. */
+  remote(): boolean;
   openUrl(url: string): Promise<void>;
 }
 
-/**
- * The desktop adapter for one server. `window.openbot` and `server` are read on each call: tests and
- * stories replace them per case, and a role can change.
- */
+export function libraryPictures(usage: StorageUsage | null, clips: boolean): readonly StoredFileRow[] {
+  const types = clips ? WORKFLOW_ASSET_TYPES : WORKFLOW_PICTURE_TYPES;
+  return (usage?.files ?? [])
+    .filter((file) => file.status === "available" && types.has(file.mimeType))
+    .sort((left, right) => right.createdAt.localeCompare(left.createdAt));
+}
+
+export function checkPicture(file: File, maxBytes: number, clips: boolean): string {
+  const { t } = currentText();
+  const mimeType = workflowAssetType(file, clips);
+  if (!mimeType) throw new Error(t(clips ? "error.workflow.assetType" : "error.workflow.pictureType"));
+  if (file.size > maxBytes) throw new Error(t("error.attachment.fileTooLarge"));
+  return mimeType;
+}
+
+export function keptPicture(fileId: string, file: File, mimeType: string, previewUrl: string | null): StoredFileRow {
+  const clip = workflowAssetClipMedia(mimeType);
+  return {
+    id: fileId,
+    name: file.name,
+    size: file.size,
+    kind: clip ? "file" : "image",
+    mimeType,
+    previewKind: clip ? "none" : "image",
+    previewUrl,
+    source: "generated",
+    agentId: null,
+    conversation: null,
+    messageId: null,
+    createdAt: new Date().toISOString(),
+    status: "available",
+    deletable: true,
+  };
+}
+
+export function desktopMediaCredits(serverId: string) {
+  return window.openbot.workflows.mediaCredits(serverId);
+}
+
+export function desktopWorkflowList(serverId: string) {
+  return window.openbot.workflows.list(serverId);
+}
+
+export function onDesktopWorkflowsChanged(
+  changed: (serverId: string, workflowId: string, agentId: string | undefined) => void,
+): () => void {
+  return window.openbot.agent.onScopedEvent((scoped) => {
+    if (scoped.event.type === "workflows-changed")
+      changed(scoped.serverId, scoped.event.workflowId, scoped.event.agentId);
+  });
+}
+
 export function desktopWorkflowHost(serverId: string, server: () => ServerSummary | undefined): WorkflowHost {
   const api = () => window.openbot.workflows;
-  /** A server that has not loaded yet is this computer, as the page reads it. */
   const local = () => server()?.kind !== "remote";
+  const placesSupported = () => local() || serverCanAdminister(server(), "routine-results-v1");
+  const chatsSupported = () => local() || (placesSupported() && serverCanAdminister(server(), "workflows-chats-v1"));
+  const channelsSupported = () => local() || serverCanAdminister(server(), "workflows-channels-v1");
+  let optionsCall: ReturnType<OpenBotDesktopApi["routineResults"]["options"]> | undefined;
+  const options = () => {
+    optionsCall ??= window.openbot.routineResults.options(serverId).finally(() => {
+      optionsCall = undefined;
+    });
+    return optionsCall;
+  };
   const githubSupported = () => serverSupportsCapability(server(), "workflows-github-v1");
-  // A joined server without GitHub workflows gets no call: its port rejects before main.
+  const mediaSupported = () => local() || serverSupportsCapability(server(), "workflows-media-v1");
+  const mediaAccountSupported = () =>
+    mediaSupported() && (local() || serverSupportsCapability(server(), WORKFLOWS_MEDIA_ACCOUNT_CAPABILITY));
+  const mediaTransparentSupported = () =>
+    mediaSupported() && (local() || serverSupportsCapability(server(), WORKFLOWS_MEDIA_TRANSPARENT_CAPABILITY));
+  const mediaSizeSupported = () =>
+    mediaSupported() && (local() || serverSupportsCapability(server(), WORKFLOWS_MEDIA_SIZE_CAPABILITY));
+  const agentFilesSupported = () => local() || serverSupportsCapability(server(), WORKFLOWS_AGENT_FILES_CAPABILITY);
+  const foldersSupported = () => local() || serverSupportsCapability(server(), WORKFLOW_FOLDERS_CAPABILITY);
+  const presenceSupported = () => local() || serverSupportsCapability(server(), WORKFLOW_PRESENCE_CAPABILITY);
   const hostGitHub = hostGitHubConnectorPort(() => (githubSupported() ? serverId : undefined));
+  const mediaUrl = (attachmentId: string) =>
+    local()
+      ? `openbot-attachment://file/${encodeURIComponent(attachmentId)}`
+      : `openbot-remote-attachment://${encodeURIComponent(serverId)}/${encodeURIComponent(attachmentId)}`;
+  const clipsSupported = () =>
+    mediaSupported() && (local() || serverSupportsCapability(server(), WORKFLOWS_MEDIA_CLIPS_CAPABILITY));
+  const mediaPreviewUrl = (attachmentId: string) =>
+    local() || serverSupportsCapability(server(), ATTACHMENT_PREVIEW_CAPABILITY)
+      ? `${mediaUrl(attachmentId)}?preview=1`
+      : mediaUrl(attachmentId);
   return {
     workflows: {
       list: () => api().list(serverId),
       get: (workflowId) => api().get(workflowId, serverId),
       create: (input) => api().create(input, serverId),
       rename: (input) => api().rename(input, serverId),
+      setPaused: (input) => api().setPaused(input, serverId),
+      exportFile: (workflowId) => api().exportFile(workflowId, serverId),
       delete: (workflowId) => api().delete(workflowId, serverId),
       saveGraph: (input) => api().saveGraph(input, serverId),
       versions: (workflowId) => api().versions(workflowId, serverId),
@@ -93,16 +201,25 @@ export function desktopWorkflowHost(serverId: string, server: () => ServerSummar
       decide: (input) => api().decide(input, serverId),
       runs: (input) => api().runs(input, serverId),
       run: (runId) => api().run(runId, serverId),
+      stepSettings: (stepId) => api().stepSettings(stepId, serverId),
       rotateWebhookSecret: (input) => api().rotateWebhookSecret(input, serverId),
       githubCatalog: () => api().githubCatalog(serverId),
       githubOptions: (input) => api().githubOptions(input, serverId),
       githubHistory: (workflowId) => api().githubHistory(workflowId, serverId),
       githubRunLastEvent: (input) => api().githubRunLastEvent(input, serverId),
+      keepPicture: (draftId) => api().keepPicture(draftId, serverId),
+      mediaProviders: () => api().mediaProviders(serverId),
+      mediaCredits: () => api().mediaCredits(serverId),
+      mediaCatalog: () => api().mediaCatalog(serverId),
+      mediaPrice: (input) => api().mediaPrice(input, serverId),
+      folders: () => api().folders(serverId),
+      folderAction: (action) => api().folderAction(action, serverId),
+      setSpot: (input) => api().setSpot(input, serverId),
     },
     onChanged(changed) {
       const unsubscribe = window.openbot.agent.onScopedEvent((scoped) => {
         if (scoped.serverId !== serverId) return;
-        if (scoped.event.type === "workflows-changed") changed(scoped.event.workflowId);
+        if (scoped.event.type === "workflows-changed") changed(scoped.event.workflowId, scoped.event.agentId);
         else if (scoped.event.type === "agent-access-changed") changed(null);
       });
       const reconnect = window.openbot.servers.onEvent((servers) => {
@@ -113,27 +230,49 @@ export function desktopWorkflowHost(serverId: string, server: () => ServerSummar
         reconnect();
       };
     },
+    foldersSupported,
+    folders: () => api().folders(serverId),
+    folderAction: (action) => api().folderAction(action, serverId),
+    onFoldersChanged: (changed) =>
+      window.openbot.agent.onScopedEvent((scoped) => {
+        if (scoped.serverId === serverId && scoped.event.type === "workflow-folders-changed") changed();
+      }),
+    presenceSupported,
+    setSpot(input) {
+      if (presenceSupported())
+        void api()
+          .setSpot(input, serverId)
+          .catch(() => undefined);
+    },
+    onSpot: (changed) =>
+      window.openbot.agent.onScopedEvent((scoped) => {
+        if (scoped.serverId === serverId && scoped.event.type === WORKFLOW_SPOT_EVENT) changed(scoped.event);
+      }),
     async places() {
-      if (!local()) return [];
-      const connections = await window.openbot.routineResults.options();
+      if (!placesSupported()) return [];
+      const connections = await options();
       return connections.flatMap((connection) =>
         connection.places.map((place) => ({
           connectionId: connection.connectionId,
           placeId: place.id,
           label: `${connection.connectionName} · ${place.name}`,
+          platform: connection.platform,
+          connection: connection.connectionName,
+          name: place.name,
         })),
       );
     },
+    async channels() {
+      if (!channelsSupported()) return [];
+      const channels = await window.openbot.agent.listChannels(serverId);
+      return channels.filter((channel) => !channel.archived).map((channel) => ({ id: channel.id, name: channel.name }));
+    },
     async discordServers() {
       if (!local()) return [];
-      const [options, overview] = await Promise.all([
-        window.openbot.routineResults.options(),
-        window.openbot.messaging.getDiscordOverview(),
-      ]);
-      const discord = options.filter((option) => option.platform === "discord");
+      const [connections, overview] = await Promise.all([options(), window.openbot.messaging.getDiscordOverview()]);
+      const discord = connections.filter((option) => option.platform === "discord");
       return Promise.all(
         discord.map(async (option) => {
-          // The options name a server only by its name; two servers with one name get no roles.
           const guilds = overview.connections.filter(
             (connection) => connection.workspaceName.slice(0, MESSAGING_LIMITS.name) === option.connectionName,
           );
@@ -147,7 +286,6 @@ export function desktopWorkflowHost(serverId: string, server: () => ServerSummar
           return {
             connectionId: option.connectionId,
             name: option.connectionName,
-            // The driver names a channel "#general"; the Discord rows show their own "#" icon.
             channels: option.places.map((place) => ({ id: place.id, name: place.name.replace(/^#/u, "") })),
             roles,
           };
@@ -155,21 +293,18 @@ export function desktopWorkflowHost(serverId: string, server: () => ServerSummar
       );
     },
     async telegramChats() {
-      if (!local()) return [];
-      const options = await window.openbot.routineResults.options();
-      return options
+      if (!chatsSupported()) return [];
+      return (await options())
         .filter((option) => option.platform === "telegram")
         .map((option) => ({ connectionId: option.connectionId, name: option.connectionName }));
     },
     async slackWorkspaces() {
-      if (!local()) return [];
-      const options = await window.openbot.routineResults.options();
-      return options
+      if (!chatsSupported()) return [];
+      return (await options())
         .filter((option) => option.platform === "slack")
         .map((option) => ({
           connectionId: option.connectionId,
           name: option.connectionName,
-          // The rows show their own "#" icon.
           channels: option.places.map((place) => ({ id: place.id, name: place.name.replace(/^#/u, "") })),
         }));
     },
@@ -177,11 +312,43 @@ export function desktopWorkflowHost(serverId: string, server: () => ServerSummar
       if (local() || serverRoleCanAdminister(server())) return null;
       return (await window.openbot.hostAdmin.getAgentAccess(serverId)).mine;
     },
+    async pictures() {
+      if (!mediaSupported() || !(local() || serverSupportsCapability(server(), STORAGE_CAPABILITY))) return [];
+      return libraryPictures(await window.openbot.storage.getUsage({ scope: "host" }, serverId), clipsSupported());
+    },
+    async uploadPicture(file) {
+      const mimeType = checkPicture(file, ATTACHMENT_LIMITS.fileBytes, clipsSupported());
+      const bytes = new Uint8Array(await file.arrayBuffer());
+      const [draft] = await window.openbot.agent.importAttachmentData([{ name: file.name, mimeType, bytes }], serverId);
+      if (!draft) throw new Error(currentText().t("error.workflow.pictureMissing"));
+      const fileId = await api()
+        .keepPicture(draft.id, serverId)
+        .catch(async (error: unknown) => {
+          await window.openbot.agent.discardDraftAttachment(draft.id, serverId).catch(() => undefined);
+          throw error;
+        });
+      return keptPicture(fileId, file, mimeType, mediaUrl(fileId));
+    },
+    downloadMedia: (attachmentId) =>
+      window.openbot.agent.openAttachment({ attachmentId, action: "download" }, serverId),
     githubSupported,
+    mediaSupported,
+    clipsSupported,
+    mediaAccountSupported,
+    mediaTransparentSupported,
+    mediaSizeSupported,
+    agentFilesSupported,
+    answersSupported: () => local() || serverSupportsCapability(server(), WORKFLOWS_ANSWERS_CAPABILITY),
+    stepSettingsSupported: () => local() || serverSupportsCapability(server(), WORKFLOWS_STEP_SETTINGS_CAPABILITY),
+    pauseSupported: () => local() || serverSupportsCapability(server(), WORKFLOWS_PAUSE_CAPABILITY),
+    portableSupported: () => local() || serverSupportsCapability(server(), WORKFLOWS_PORTABLE_CAPABILITY),
+    mediaUrl,
+    mediaPreviewUrl,
     get githubConnector() {
       return local() ? githubConnectorPort() : hostGitHub;
     },
     hostName: () => (local() ? undefined : server()?.name),
+    remote: () => !local(),
     openUrl: (url) => window.openbot.openUrl(url),
   };
 }

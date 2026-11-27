@@ -1,0 +1,49 @@
+{
+  "slug": "omnisend",
+  "name": "Omnisend",
+  "tagline": "Email and SMS marketing",
+  "description": "Omnisend lets agents read campaign and form reports, find contacts and segments, and create and edit campaigns, automations, email templates, forms and products. Each user connects with an API key from their own Omnisend account. Agents can do what the key allows, which can include sending campaigns and deleting data.",
+  "category": "automation",
+  "creatorName": "Omnisend",
+  "iconUrl": "https://www.omnisend.com/wp-content/uploads/2022/07/cropped-favi-192x192.png",
+  "version": "1.1.0",
+  "prompts": [
+    { "id": "prompt-last-campaign", "text": "How did last week's campaigns perform compared to the week before?" },
+    { "id": "prompt-segment", "text": "How many contacts are in the VIP segment, and how did it change this month?" },
+    { "id": "prompt-draft-campaign", "text": "Draft a campaign for the new collection, but do not send it." }
+  ],
+  "apps": [
+    {
+      "id": "app-omnisend-mcp",
+      "name": "Omnisend",
+      "description": "Campaigns, automations, contacts, segments, forms and reports, over Omnisend's MCP server with an API key.",
+      "iconUrl": "https://www.omnisend.com/wp-content/uploads/2022/07/cropped-favi-192x192.png",
+      "server": {
+        "name": "omnisend",
+        "transport": "http",
+        "url": "https://mcp.omnisend.com/mcp",
+        "auth": [
+          {
+            "id": "omnisend-key",
+            "kind": "key",
+            "label": "API key",
+            "fields": [
+              {
+                "id": "api-key",
+                "label": "API key",
+                "header": "X-Api-Key",
+                "hint": "In Omnisend, open Store settings > API keys and create a key."
+              }
+            ],
+            "docsUrl": "https://app.omnisend.com/integrations/api-keys",
+            "docsLabel": "Create a key"
+          }
+        ]
+      }
+    }
+  ],
+  "skills": [],
+  "websiteUrl": "https://www.omnisend.com",
+  "privacyPolicyUrl": "https://www.omnisend.com/privacy/",
+  "termsUrl": "https://www.omnisend.com/terms/"
+}

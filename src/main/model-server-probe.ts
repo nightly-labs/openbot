@@ -1,19 +1,17 @@
-// One `GET {baseUrl}/models` request to an OpenAI-compatible server, made in main because the
-// renderer's content security policy blocks a local address and a stored key must not go back to
-// the page.
-//
-// An error names the host only. The path and the query of a base URL can hold a token, and the key
-// and the header values are credentials, so no message and no log line contains them.
-
 import { INPUT_LIMITS } from "@openbot/contracts/input-limits";
-import type { CustomProviderHeader, DetectedModel } from "@openbot/contracts/ipc";
-import { PROVIDER_DETECTION_LIMITS } from "@openbot/contracts/ipc";
-import { isDynamicRecord, isString } from "@openbot/contracts/runtime-values";
+import type { CustomProviderHeader, CustomProviderInputKind, DetectedModel } from "@openbot/contracts/ipc";
+import {
+  CUSTOM_PROVIDER_INPUT_KINDS,
+  CUSTOM_PROVIDER_REASONING_EFFORTS,
+  isCustomProviderContextWindow,
+  isCustomProviderMaxOutput,
+  PROVIDER_DETECTION_LIMITS,
+} from "@openbot/contracts/ipc";
+import { type DynamicRecord, isDynamicRecord, isString } from "@openbot/contracts/runtime-values";
 import { sourceText } from "@openbot/i18n/source";
 import { Context, Effect, Layer, Schema } from "effect";
 import { readLimitedBody } from "../backend/limited-body";
 
-/** A model list is a small JSON object. A larger body is not a model list. */
 const MODEL_LIST_BODY_LIMIT = 1024 * 1024;
 
 interface ModelServerTarget {
@@ -22,7 +20,6 @@ interface ModelServerTarget {
   headers: readonly CustomProviderHeader[];
 }
 
-/** The part of an address that an error may name. */
 function hostOf(baseUrl: string): string {
   try {
     return new URL(baseUrl).host;
@@ -64,10 +61,8 @@ export type ProbeError =
   | InvalidModelList
   | ModelListTooLarge;
 
-// The envelope is strict; individual entries remain tolerant for server compatibility.
 const ModelListEnvelope = Schema.Struct({ data: Schema.Array(Schema.Unknown) });
 
-/** Secret-bearing request details and causes never enter errors or tracing attributes. */
 export const probeModels = Effect.fn("ModelServerProbe.probe")(function* (
   target: ModelServerTarget,
   timeoutMs: number,
@@ -141,7 +136,6 @@ const readLimited = Effect.fn("ModelServerProbe.readLimited")(function* (respons
   return body.toString("utf8");
 });
 
-/** Skip unusable entries, deduplicate ids, and stop at the public limit. */
 function parseModelList(entries: readonly unknown[]): DetectedModel[] {
   const seen = new Set<string>();
   const models: DetectedModel[] = [];
@@ -151,7 +145,40 @@ function parseModelList(entries: readonly unknown[]): DetectedModel[] {
     const id = entry.id.trim();
     if (!id || id.length > INPUT_LIMITS.identifier || seen.has(id)) continue;
     seen.add(id);
-    models.push({ id });
+    models.push({ id, ...modelDetails(entry) });
   }
   return models;
+}
+
+const LISTED_INPUT_KINDS: ReadonlyMap<string, CustomProviderInputKind> = new Map([
+  ["image", "image"],
+  ["pdf", "pdf"],
+  ["file", "pdf"],
+]);
+
+function modelDetails(entry: DynamicRecord): Omit<DetectedModel, "id"> {
+  const limit = isDynamicRecord(entry.limit) ? entry.limit : {};
+  const topProvider = isDynamicRecord(entry.top_provider) ? entry.top_provider : {};
+  const contextWindow = [limit.context, entry.context_length, entry.max_model_len].find(isCustomProviderContextWindow);
+  const maxOutput = [limit.output, topProvider.max_completion_tokens].find(isCustomProviderMaxOutput);
+  const listed = [
+    isDynamicRecord(entry.modalities) ? entry.modalities.input : undefined,
+    isDynamicRecord(entry.architecture) ? entry.architecture.input_modalities : undefined,
+  ].find(Array.isArray);
+  const inputs = Array.isArray(listed)
+    ? CUSTOM_PROVIDER_INPUT_KINDS.filter((kind) =>
+        listed.some((name) => isString(name) && LISTED_INPUT_KINDS.get(name) === kind),
+      )
+    : undefined;
+  const reasoning = isDynamicRecord(entry.reasoning) ? entry.reasoning : {};
+  const listedEfforts = [reasoning.supported_efforts, entry.reasoning_efforts].find(Array.isArray);
+  const reasoningEfforts = Array.isArray(listedEfforts)
+    ? CUSTOM_PROVIDER_REASONING_EFFORTS.filter((effort) => listedEfforts.includes(effort))
+    : [];
+  return {
+    ...(inputs ? { inputs } : {}),
+    ...(reasoningEfforts.length > 0 ? { reasoningEfforts } : {}),
+    ...(contextWindow !== undefined ? { contextWindow } : {}),
+    ...(contextWindow !== undefined && maxOutput !== undefined && maxOutput < contextWindow ? { maxOutput } : {}),
+  };
 }

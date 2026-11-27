@@ -1,43 +1,130 @@
 import type { ConversationPlan, ConversationPlanStep } from "@openbot/contracts/ipc";
-import { nextStepContinuationPrompt, planContinuationPrompt } from "./delivery-content";
+import {
+  compactionContinuationPrompt,
+  finishCheckContinuationPrompt,
+  nextStepContinuationPrompt,
+  planContinuationPrompt,
+  providerExitContinuationPrompt,
+} from "./delivery-content";
 
 export interface PlanContinuationOptions {
-  /** The most automatic continuations of one request. */
   limit: number;
 }
 
-/** Why a turn continues: open steps in its plan, or a next step that it named but did not do. */
-type ContinuationKind = "plan" | "nextStep";
+type ContinuationKind = "plan" | "nextStep" | "finishCheck" | "compaction" | "providerExit";
 
-/** The most next-step continuations of one request. Each one has no plan to measure progress. */
+export type FinishCheckMode = "no" | "allowed" | "only";
+
+export interface FinishCheckPending {
+  kind: "check";
+  continuations: number;
+  earlierGaps: readonly string[];
+}
+
+const STOPPED = { kind: "stopped" } as const;
+
+const LIMIT_REACHED = { kind: "limitReached" } as const;
+
+const FINISH_CHECK_LIMIT = 3;
+
 const NEXT_STEP_LIMIT = 2;
-/** A longer answer is a report, not a turn that stopped before the step it named. */
 const NEXT_STEP_ANSWER_MAX = 400;
-/** Verbs that mean "go on with the same work". "Proceed" and "go ahead" ask for approval, so they block. */
 const CONTINUE_VERB = "(?:continue|keep going|go on|carry on|move on)";
-const REST_OF_WORK = String.raw`(?:\s+(?:with|to|on)\s+(?:the\s+)?(?:next(?:\s+(?:steps?|ones?|parts?|phases?|items?))?|rest(?:\s+of\s+(?:it|them|the\s+(?:steps|work|plan|list)))?|remaining(?:\s+(?:steps|work|items|parts|ones))?|steps?\s+\d+))?`;
-/**
- * A last line that only asks whether to go on with the work, such as "Shall I continue?" or "Step
- * one is done. Want me to continue with the next step?". Text in front of the question must end a
- * statement, so another question in the line still blocks. A question about a named action, such as
- * "Should I continue with the deploy?" or "Proceed?", does not match: the user must answer it.
- */
+const WORK_PARTS =
+  "(?:steps|work|items|parts|ones|tasks|files|tests|changes|fixes|edits|checks|pages|sections|list|plan)";
+const REST_OF_WORK = String.raw`(?:\s+(?:with|to|on)\s+(?:the\s+)?(?:next(?:\s+(?:steps?|ones?|parts?|phases?|items?))?|rest(?:\s+of\s+(?:it|them|the\s+${WORK_PARTS}))?|remaining(?:\s+${WORK_PARTS})?|steps?\s+\d+))?`;
 const ASKS_TO_CONTINUE = new RegExp(
   String.raw`^(?:[^?？]*[.!]\s+)?(?:(?:(?:shall|should|can|may)\s+i|(?:do\s+you\s+)?want\s+me\s+to|would\s+you\s+like\s+me\s+to|ok(?:ay)?\s+(?:if\s+i|to))\s+)?${CONTINUE_VERB}${REST_OF_WORK}\s*\?+$`,
   "i",
 );
-/**
- * A short answer whose last words name the agent's next step, such as "I'll now run the tests." An
- * answer that says the agent waits, holds or stops does not match.
- */
-const NAMES_NEXT_STEP =
-  /(?:\blet me now\b|\bnow let me\b|\bi['\u2019]ll now\b|\bi will now\b|\bnow i(?:['\u2019]ll| will)\b|\bnext,?\s+i(?:['\u2019]ll| will)\b)(?!\s+(?:wait|hold|pause|stop)\b)[^.!?\n]{0,100}[.:\u2026]?\s*$/i;
+const SENTENCE_CHAR = String.raw`(?:[^.!?\n]|\.(?=\S))`;
+const NOT_WAITING = String.raw`(?!${SENTENCE_CHAR}*\b(?:(?:if|when|once|after|unless|until|as\s+soon\s+as)\s+(?:you|your)|get\s+back|once\s+approved|(?:your|the\s+user['’]s)\s+(?:approval|confirmation|permission)|later|tomorrow|next\s+(?:week|month|time)|back\s+in)\b)`;
+const NAMES_NEXT_STEP = new RegExp(
+  String.raw`(?:\blet me now\b|\bnow let me\b|\bi['’]ll now\b|\bi will now\b|\bnow i(?:['’]ll| will)\b|\bnext,?\s+i(?:['’]ll| will)\b)(?!\s+(?:wait|hold|pause|stop)\b)${NOT_WAITING}[^.!?\n]{0,100}[.:…]?\s*$`,
+  "i",
+);
 
-/** A last line that says the agent waits for the user, such as "I'll now wait for your approval." */
+const WORK_VERB = String.raw`(?:run|re-?run|check|test|fix|update|edit|write|create|add|build|install|open|read|look|search|inspect|review|verify|start|try|apply|implement|rename|move|refactor|debug|finish|continue|configure|set\s+up|generate|download|compile|patch|query|consult(?!\s+with\b)|fetch|retrieve|pull)`;
+const WORK_GERUND = String.raw`(?:(?:re-?)?running(?!\s+(?:late|low|out|behind|into)\b)|checking(?!\s+with\b)|testing|fixing|updating|editing|writing(?!\s+to\b)|creating|adding|building|installing|opening|reading|looking\s+(?:at|into|up|through|for(?!\s+your\b))|searching|inspecting|reviewing|verifying|trying(?!\s+(?:my|our)\b)|applying|implementing|refactoring|debugging|configuring|generating|downloading|compiling|patching|querying|consulting(?!\s+with\b)|fetching|retrieving|pulling)`;
+const SENTENCE_START = String.raw`(?:^|[.!:…–—]\s+|\s-\s+|\n\s*)`;
+const ANNOUNCES_WORK = new RegExp(
+  String.raw`${SENTENCE_START}(?:(?:ok(?:ay)?|now|next|first|then|so)[,:]?\s+)*(?:let\s+me|i['’]ll|i\s+will|i['’]m\s+going\s+to|i\s+am\s+going\s+to)\s+(?:(?:now|first|next|then|also|quickly)\s+)?${WORK_VERB}\b(?!\s+you\b)${NOT_WAITING}${SENTENCE_CHAR}{0,120}[.:…]?\s*$`,
+  "i",
+);
+const STATES_WORK = new RegExp(
+  String.raw`${SENTENCE_START}(?:(?:ok(?:ay)?|now|so)[,:]?\s+)*(?:(?:i['’]m|i\s+am)\s+(?:now\s+)?${WORK_GERUND}\b(?!\s+you\b)${NOT_WAITING}${SENTENCE_CHAR}{0,120}[.:…]?|${WORK_GERUND}\b${NOT_WAITING}${SENTENCE_CHAR}{0,120}(?:…|\.{3}))\s*$`,
+  "i",
+);
+
+const PT_WORK_VERBS = [
+  "ver",
+  "olhar",
+  "dar uma olhada",
+  "rodar",
+  "executar",
+  "verificar",
+  "checar",
+  "conferir",
+  "testar",
+  "corrigir",
+  "consertar",
+  "atualizar",
+  "editar",
+  "escrever",
+  "criar",
+  "adicionar",
+  "compilar",
+  "instalar",
+  "abrir",
+  "ler",
+  "procurar",
+  "buscar",
+  "pesquisar",
+  "inspecionar",
+  "revisar",
+  "analisar",
+  "investigar",
+  "consultar",
+  "acessar",
+  "baixar",
+  "carregar",
+  "listar",
+  "obter",
+  "puxar",
+  "aplicar",
+  "implementar",
+  "renomear",
+  "mover",
+  "refatorar",
+  "depurar",
+  "validar",
+  "tentar",
+  "iniciar",
+  "começar",
+  "continuar",
+  "terminar",
+  "finalizar",
+  "configurar",
+  "gerar",
+];
+const ptPattern = (verbs: readonly string[]) =>
+  `(?:${verbs.map((verb) => verb.replaceAll(" ", "\\s+")).join("|")})(?!\\p{L})`;
+const PT_WORK_VERB = ptPattern(PT_WORK_VERBS);
+const PT_WORK_GERUND = ptPattern(
+  PT_WORK_VERBS.filter((verb) => verb !== "ver").map((verb) => verb.replace(/r(?=\s|$)/, "ndo")),
+);
+const PT_NOT_WAITING = String.raw`(?!${SENTENCE_CHAR}*(?:\b(?:se|quando|assim\s+que|depois\s+que|logo\s+que|caso)\s+(?:você|voce|vc|o\s+senhor|a\s+senhora)|\b(?:se|caso|quando)\s+(?:quiser|queira|preferir|prefira|desejar|deseje|puder|possa|achar|ache|precisar|precise)(?!\p{L})|\b(?:sua|tua)\s+(?:aprovação|aprovacao|confirmação|confirmacao|autorização|autorizacao|permissão|permissao|resposta)|\bmais\s+tarde|\bem\s+breve|\bdaqui\s+a\s+pouco|\bdepois(?=\s*[.!…]*\s*$)|\bamanh|\bpróxima\s+(?:semana|vez)|\bdepois\s+(?:te|lhe)\s+(?:aviso|falo)|\b(?:te|lhe)\s+(?:retorno|dou\s+(?:um\s+)?retorno)|\b(?:retorno|volto)\s+(?:em|mais|depois)))`;
+const PT_ANNOUNCES_WORK = new RegExp(
+  String.raw`${SENTENCE_START}(?:(?:ok(?:ay)?|certo|beleza|agora|então|primeiro|em\s+seguida)[,:]?\s+)*(?:(?:(?:eu\s+)?(?:vou|irei)\s+(?:agora\s+|já\s+|primeiro\s+)?|deix[ae](?:-me|\s+eu)\s+)${PT_WORK_VERB}${PT_NOT_WAITING}${SENTENCE_CHAR}{0,120}[.:…]?|(?:eu\s+)?(?:estou|tô)\s+(?:agora\s+)?${PT_WORK_GERUND}${PT_NOT_WAITING}${SENTENCE_CHAR}{0,120}[.:…]?|${PT_WORK_GERUND}${PT_NOT_WAITING}${SENTENCE_CHAR}{0,120}(?:…|\.{3}))\s*$`,
+  "iu",
+);
+
+const NOTHING_FROM_USER =
+  /(?:(?<=[.!…])\s+|\s*\n\s*)(?:nothing\s+(?:else\s+)?(?:(?:needed|required)\s+)?(?:from\s+you|for\s+you\s+to\s+do)|no\s+action\s+(?:needed|required)\s+from\s+you|(?:de\s+(?:você|voce|vc)|da\s+sua\s+parte)[,:]?\s+nada|nada\s+(?:de\s+(?:você|voce|vc)|da\s+sua\s+parte|para\s+(?:você|voce|vc)\s+fazer)|(?:você|voce|vc)\s+não\s+precisa\s+fazer\s+nada)[.!]?\s*$/iu;
+
 const WAITS_FOR_USER =
   /\b(?:i['\u2019]ll|i will|i['\u2019]m going to|let me)\s+(?:now\s+)?(?:wait|hold|pause|stop)\b|\bwaiting\s+(?:for|on)\s+(?:you|your)\b/i;
 
-/** The last line of an answer, without Markdown emphasis, code, quote or heading marks. */
 function lastLine(answer: string | undefined): string {
   return (answer?.trimEnd().split("\n").at(-1) ?? "").replace(/[*_`>#]/g, "").trim();
 }
@@ -46,21 +133,35 @@ function asksToContinue(answer: string | undefined): boolean {
   return ASKS_TO_CONTINUE.test(lastLine(answer));
 }
 
-/**
- * Whether the last line of the answer waits for the user: it asks a question, or says that the agent
- * waits. A question anywhere in the line counts, so Markdown or a closing remark after it does not
- * hide it. A question that only asks whether to continue does not count: the work continues by itself.
- */
 export function waitsForUser(answer: string | undefined): boolean {
   const line = lastLine(answer);
   return (/[?？]/.test(line) && !ASKS_TO_CONTINUE.test(line)) || WAITS_FOR_USER.test(line);
 }
 
-/** Whether a turn stopped before the next step: it named the step, or asked whether to continue. */
 function stoppedBeforeNextStep(answer: string | undefined): boolean {
   if (asksToContinue(answer)) return true;
   const text = answer?.trim() ?? "";
-  return text.length > 0 && text.length <= NEXT_STEP_ANSWER_MAX && NAMES_NEXT_STEP.test(text.slice(-160));
+  if (text.length === 0 || text.length > NEXT_STEP_ANSWER_MAX) return false;
+  if (NAMES_NEXT_STEP.test(text.slice(-160))) return true;
+  const plain = text
+    .replace(/[*_`>#]/g, "")
+    .trimEnd()
+    .replace(NOTHING_FROM_USER, "");
+  return ANNOUNCES_WORK.test(plain) || STATES_WORK.test(plain) || PT_ANNOUNCES_WORK.test(plain);
+}
+
+const PROMISES_WORK =
+  /(?:^|[^\p{L}'’])(?<!(?:^|[^\p{L}])(?:não|nao|nunca)\s+)(?:i['’]ll|i\s+will|let\s+me|i['’]m\s+going\s+to|i\s+am\s+going\s+to|(?:eu\s+)?vou|(?:eu\s+)?irei|deix[ae](?:-me|\s+eu))\s+(?!(?:not|never|know|wait|hold|pause|stop|be\s+here|aguardar|esperar|ficar\s+(?:aguardando|esperando|no\s+aguardo))(?!\p{L}))\p{L}/iu;
+
+export function promisesWork(answer: string | undefined): boolean {
+  const text = answer?.trim() ?? "";
+  if (text.length === 0 || text.length > NEXT_STEP_ANSWER_MAX || waitsForUser(answer)) return false;
+  const plain = text
+    .replace(/[*_`>#]/g, "")
+    .trimEnd()
+    .replace(NOTHING_FROM_USER, "");
+  const lastSentence = plain.split(/(?<=[.!…])\s+|\n+/u).at(-1) ?? "";
+  return PROMISES_WORK.test(lastSentence);
 }
 
 interface ContinuationCount {
@@ -72,15 +173,15 @@ interface Chain {
   deliveryIds: ReadonlySet<string>;
   count: number;
   kind: ContinuationKind;
-  /** The number and the limit that the chat line and the note show for the last continuation. */
   shown: ContinuationCount;
-  /** The next-step continuations of the chain. */
   nextSteps: number;
-  /** The plan of the last turn of the chain. A turn that sends no plan update keeps it. */
+  checks: number;
+  gap: string | null;
+  earlierGaps: readonly string[];
+  final?: true;
+  failureContinued: boolean;
   plan: ConversationPlan | null;
-  /** The open steps of that plan, by text and status, to see whether a turn made progress. */
   openSteps: string;
-  /** The open steps of the chat's plan before the request, by text and status. */
   earlierSteps: ReadonlySet<string>;
 }
 
@@ -94,17 +195,6 @@ function openSteps(plan: ConversationPlan, earlierSteps: ReadonlySet<string>): C
   return plan.steps.filter((step) => step.status !== "completed" && !earlierSteps.has(stepKey(step)));
 }
 
-/**
- * Owns the in-memory chains of automatic plan continuations: for each lane (the agent's own chat or
- * one task), the deliveries of the request, the count, and the plan of the last turn. A turn that
- * ends with open steps in the agent's own plan runs once more with a short note, until the plan is
- * done, the limit is reached, or a turn makes no progress. A step that was open, with the same text
- * and status, in the plan from before the request is left from earlier work and does not count.
- * A turn with no open step also continues, at most `NEXT_STEP_LIMIT` times, when its answer only asks
- * whether to continue, or is short and ends on a next step that it did not do. A restart forgets every
- * chain, and the drain then settles the waiting deliveries. It never imports the mailbox or the
- * service facade.
- */
 export class PlanContinuation {
   readonly #limit: number;
   readonly #chains = new Map<string, Chain>();
@@ -117,28 +207,22 @@ export class PlanContinuation {
     return this.#limit;
   }
 
-  /**
-   * Decides whether the turn that just ended continues. `plan` is the plan of that turn, or null when
-   * the turn sent none. `earlierPlan` is the chat's last plan from before that turn; only the first
-   * turn of a request reads it. Returns the kind of this continuation, with its number and limit, or
-   * null; null also ends the chain. A next-step continuation counts against `NEXT_STEP_LIMIT`.
-   */
   consider(input: {
     agentId: string;
     taskId: string | null;
     deliveryIds: readonly string[];
     plan: ConversationPlan | null;
     earlierPlan: ConversationPlan | null;
-    /** The answer of that turn. */
     answer: string | undefined;
-  }): ({ kind: ContinuationKind } & ContinuationCount) | null {
+    finishCheck?: FinishCheckMode;
+    nextStep?: boolean;
+  }): ({ kind: ContinuationKind } & ContinuationCount) | typeof STOPPED | FinishCheckPending | null {
     const key = laneKey(input.agentId, input.taskId);
     const previous = this.#chains.get(key);
     this.#chains.delete(key);
     const chained =
       previous !== undefined &&
       input.deliveryIds.length > 0 &&
-      // A message steered into a continuation turn joins the request, so the chain keeps its count.
       input.deliveryIds.some((deliveryId) => previous.deliveryIds.has(deliveryId));
     const plan = input.plan ?? (chained ? previous.plan : null);
     const earlierSteps = chained
@@ -147,16 +231,66 @@ export class PlanContinuation {
           (input.earlierPlan?.steps ?? []).filter((step) => step.status !== "completed").map((step) => stepKey(step)),
         );
     const count = chained ? previous.count : 0;
-    if (count >= this.#limit) return null;
     const open = plan ? openSteps(plan, earlierSteps) : [];
     const nextSteps = chained ? previous.nextSteps : 0;
+    const checks = chained ? previous.checks : 0;
+    const earlierGaps = chained ? previous.earlierGaps : [];
+    const mode = input.finishCheck ?? "no";
+    const checkAtLimit = (): FinishCheckPending | null => {
+      if (!chained || mode === "no") return null;
+      this.#chains.set(key, {
+        deliveryIds: new Set(input.deliveryIds),
+        count,
+        kind: "finishCheck",
+        shown: previous.shown,
+        nextSteps,
+        checks,
+        gap: null,
+        earlierGaps,
+        final: true,
+        failureContinued: previous.failureContinued,
+        plan,
+        openSteps: JSON.stringify(open.map(stepKey)),
+        earlierSteps,
+      });
+      return { kind: "check", continuations: count, earlierGaps };
+    };
+    if (count >= this.#limit) return chained && open.length > 0 ? STOPPED : checkAtLimit();
     let kind: ContinuationKind;
-    if (open.length > 0) {
+    if (open.length > 0 && mode !== "only") {
       const signature = JSON.stringify(open.map(stepKey));
-      if (chained && previous.kind === "plan" && previous.openSteps === signature) return null;
+      if (
+        chained &&
+        previous.kind !== "nextStep" &&
+        previous.kind !== "finishCheck" &&
+        previous.openSteps === signature
+      )
+        return STOPPED;
       kind = "plan";
-    } else if (nextSteps < NEXT_STEP_LIMIT && stoppedBeforeNextStep(input.answer)) kind = "nextStep";
-    else return null;
+    } else if (
+      mode !== "only" &&
+      input.nextStep !== false &&
+      nextSteps < NEXT_STEP_LIMIT &&
+      stoppedBeforeNextStep(input.answer)
+    )
+      kind = "nextStep";
+    else if (mode !== "no" && checks < FINISH_CHECK_LIMIT) {
+      this.#chains.set(key, {
+        deliveryIds: new Set(input.deliveryIds),
+        count,
+        kind: "finishCheck",
+        shown: { current: checks, limit: FINISH_CHECK_LIMIT },
+        nextSteps,
+        checks,
+        gap: null,
+        earlierGaps,
+        failureContinued: chained ? previous.failureContinued : false,
+        plan,
+        openSteps: JSON.stringify(open.map(stepKey)),
+        earlierSteps,
+      });
+      return { kind: "check", continuations: count, earlierGaps };
+    } else return checkAtLimit();
     const shown =
       kind === "plan"
         ? { current: count + 1, limit: this.#limit }
@@ -167,6 +301,10 @@ export class PlanContinuation {
       kind,
       shown,
       nextSteps: kind === "nextStep" ? nextSteps + 1 : nextSteps,
+      checks,
+      gap: null,
+      earlierGaps,
+      failureContinued: chained ? previous.failureContinued : false,
       plan,
       openSteps: JSON.stringify(open.map(stepKey)),
       earlierSteps,
@@ -174,11 +312,98 @@ export class PlanContinuation {
     return { kind, ...shown };
   }
 
-  /**
-   * The note that starts the continuation of this delivery, or null when no chain waits for it:
-   * after a restart, a Stop, a new chat, or when other messages wait in the lane (`othersQueued`).
-   * A start that goes back to the queue, as during a compaction, claims the same note again.
-   */
+  afterFinishCheck(
+    agentId: string,
+    taskId: string | null,
+    gap: string,
+  ): ({ kind: ContinuationKind } & ContinuationCount) | typeof LIMIT_REACHED | null {
+    const key = laneKey(agentId, taskId);
+    const chain = this.#chains.get(key);
+    if (chain?.kind !== "finishCheck" || chain.gap !== null || chain.final) {
+      this.#chains.delete(key);
+      return chain?.final ? LIMIT_REACHED : null;
+    }
+    const shown = {
+      current: chain.checks + 1,
+      limit: chain.checks + Math.min(FINISH_CHECK_LIMIT - chain.checks, this.#limit - chain.count),
+    };
+    this.#chains.set(key, {
+      ...chain,
+      count: chain.count + 1,
+      checks: chain.checks + 1,
+      gap,
+      earlierGaps: [...chain.earlierGaps, gap],
+      shown,
+    });
+    return { kind: "finishCheck", ...shown };
+  }
+
+  waitsForCheck(agentId: string, taskId: string | null): boolean {
+    const chain = this.#chains.get(laneKey(agentId, taskId));
+    return chain?.kind === "finishCheck" && chain.gap === null;
+  }
+
+  afterFailedCompaction(input: {
+    agentId: string;
+    taskId: string | null;
+    deliveryIds: readonly string[];
+    plan: ConversationPlan | null;
+    earlierPlan: ConversationPlan | null;
+  }): ({ kind: ContinuationKind } & ContinuationCount) | null {
+    return this.#afterFailure("compaction", input);
+  }
+
+  afterProviderExit(input: {
+    agentId: string;
+    taskId: string | null;
+    deliveryIds: readonly string[];
+    plan: ConversationPlan | null;
+    earlierPlan: ConversationPlan | null;
+  }): ({ kind: ContinuationKind } & ContinuationCount) | null {
+    return this.#afterFailure("providerExit", input);
+  }
+
+  #afterFailure(
+    kind: "compaction" | "providerExit",
+    input: {
+      agentId: string;
+      taskId: string | null;
+      deliveryIds: readonly string[];
+      plan: ConversationPlan | null;
+      earlierPlan: ConversationPlan | null;
+    },
+  ): ({ kind: ContinuationKind } & ContinuationCount) | null {
+    const key = laneKey(input.agentId, input.taskId);
+    const previous = this.#chains.get(key);
+    this.#chains.delete(key);
+    const chained =
+      previous !== undefined && input.deliveryIds.some((deliveryId) => previous.deliveryIds.has(deliveryId));
+    const count = chained ? previous.count : 0;
+    if (count >= this.#limit || (chained && previous.failureContinued)) return null;
+    const plan = input.plan ?? (chained ? previous.plan : null);
+    const earlierSteps = chained
+      ? previous.earlierSteps
+      : new Set(
+          (input.earlierPlan?.steps ?? []).filter((step) => step.status !== "completed").map((step) => stepKey(step)),
+        );
+    const shown = { current: 1, limit: 1 };
+    this.#chains.set(key, {
+      deliveryIds: new Set(input.deliveryIds),
+      count: count + 1,
+      kind,
+      shown,
+      nextSteps: chained ? previous.nextSteps : 0,
+      checks: chained ? previous.checks : 0,
+      gap: null,
+      earlierGaps: chained ? previous.earlierGaps : [],
+      failureContinued: true,
+      plan,
+      openSteps: JSON.stringify((plan ? openSteps(plan, earlierSteps) : []).map(stepKey)),
+      earlierSteps,
+    });
+    return { kind, ...shown };
+  }
+
   claim(agentId: string, taskId: string | null, deliveryId: string, othersQueued: boolean): string | null {
     const key = laneKey(agentId, taskId);
     const chain = this.#chains.get(key);
@@ -186,12 +411,15 @@ export class PlanContinuation {
       this.#chains.delete(key);
       return null;
     }
+    if (chain.kind === "compaction") return compactionContinuationPrompt();
+    if (chain.kind === "providerExit") return providerExitContinuationPrompt();
+    if (chain.kind === "finishCheck" && chain.gap !== null)
+      return finishCheckContinuationPrompt(chain.gap, chain.shown.current, chain.shown.limit);
     return chain.kind === "plan" && chain.plan
       ? planContinuationPrompt(openSteps(chain.plan, chain.earlierSteps), chain.shown.current, chain.shown.limit)
       : nextStepContinuationPrompt(chain.shown.current, chain.shown.limit);
   }
 
-  /** Ends the chain of one lane, or of every lane of the agent when `taskId` is undefined. */
   cancel(agentId: string, taskId?: string | null): void {
     if (taskId !== undefined) {
       this.#chains.delete(laneKey(agentId, taskId));

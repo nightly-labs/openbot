@@ -1,27 +1,31 @@
-import type { PlanLimitRow, PlanLimits } from "@openbot/team-client/plan-limits";
+import type { PlanLimitListedWindow, PlanLimitRow, PlanLimits } from "@openbot/team-client/plan-limits";
 import { router } from "expo-router";
 import { Typography } from "heroui-native";
 import { Pressable, View, type ViewStyle } from "react-native";
-import { lowestPlanLimitsFirst, planLimitName, planLimitWindowLabel } from "@/features/servers/model/plan-limits";
-import { ChromeGlassSheen } from "@/shared/components/chrome-glass-sheen";
+import {
+  lowestPlanLimitsFirst,
+  planLimitListedWindowLabel,
+  planLimitName,
+  planLimitWindowLabel,
+} from "@/features/servers/model/plan-limits";
 import { haptics } from "@/shared/lib/haptics";
 import { isAndroid } from "@/shared/lib/platform";
 import { useText } from "@/shared/lib/text";
+import { END_X } from "@/shared/lib/text-direction";
 import { PlanLimitRing } from "./plan-limit-ring";
 
 const RING_SIZE = 30;
-/** How far the second ring goes under the first. */
 const OVERLAP = 8;
-/** The clear space around the first ring where the second goes under it. */
 const CUTOUT_GAP = 2;
 const HEADER_RIPPLE = { borderless: true, radius: 24 } as const;
 
-/**
- * The plan limits in the home header: the rings of the two providers with the least left, the first
- * over the second, then the number of the others. It keeps its width for any number of providers.
- * A tap opens the limits of every provider. Offline, it keeps the last reading and does not open:
- * it does not fade, so a connection that drops and returns does not make it blink.
- */
+function lowestListedWindow(row: PlanLimitRow): PlanLimitListedWindow | undefined {
+  return row.listedWindows.reduce<PlanLimitListedWindow | undefined>(
+    (lowest, window) => (lowest === undefined || window.remainingPercent < lowest.remainingPercent ? window : lowest),
+    undefined,
+  );
+}
+
 export function PlanLimitsHeaderButton({
   serverId,
   rows,
@@ -32,9 +36,7 @@ export function PlanLimitsHeaderButton({
   serverId: string;
   rows: readonly PlanLimitRow[];
   accounts: PlanLimits["accounts"];
-  /** True while the server is offline. */
   disabled: boolean;
-  /** The glass of the other Android header buttons. iOS gives the toolbar item its own glass. */
   androidGlass: ViewStyle;
 }) {
   const { t } = useText();
@@ -43,15 +45,13 @@ export function PlanLimitsHeaderButton({
   const more = lowest.length - shown.length;
   const summary = lowest
     .map((row) => {
-      const window = row.windows.find((item) => item.remainingPercent === row.remainingPercent) ?? row.windows[0];
+      const window = lowestListedWindow(row);
       return `${planLimitName(row, accounts, t)} ${t("mobile.server.planLimits.windowLeft", {
-        window: planLimitWindowLabel(window?.durationMins ?? null, t),
-        percent: row.remainingPercent,
+        window: window ? planLimitListedWindowLabel(window, t) : planLimitWindowLabel(null, t),
+        percent: window?.remainingPercent ?? row.remainingPercent,
       })}`;
     })
     .join(", ");
-  // One ring is a circle, as the other header buttons are; more rings make a capsule. The iOS toolbar
-  // adds about 4 pt of glass on each side, so 36 pt there makes the 44 pt circle of the menu button.
   const single = shown.length === 1 && more === 0;
   const content = (
     <View
@@ -69,7 +69,13 @@ export function PlanLimitsHeaderButton({
             row={row}
             size={RING_SIZE}
             cutout={
-              index > 0 ? { cx: OVERLAP - RING_SIZE / 2, cy: RING_SIZE / 2, r: RING_SIZE / 2 + CUTOUT_GAP } : undefined
+              index > 0
+                ? {
+                    cx: END_X === 1 ? OVERLAP - RING_SIZE / 2 : RING_SIZE * 1.5 - OVERLAP,
+                    cy: RING_SIZE / 2,
+                    r: RING_SIZE / 2 + CUTOUT_GAP,
+                  }
+                : undefined
             }
           />
         </View>
@@ -98,7 +104,6 @@ export function PlanLimitsHeaderButton({
     >
       {isAndroid ? (
         <View className="overflow-hidden rounded-full" style={androidGlass}>
-          <ChromeGlassSheen />
           {content}
         </View>
       ) : (

@@ -1,16 +1,45 @@
-/** An asset step: a workspace file as an input. The output type follows the file. */
-
-import type { StoredFileRow } from "@openbot/contracts/ipc";
+import { attachmentMimeTypeForName } from "@openbot/contracts/attachment-files";
+import {
+  type StoredFileRow,
+  WORKFLOW_CLIP_TYPES,
+  WORKFLOW_PICTURE_TYPES,
+  type WorkflowAssetClipMedia,
+  workflowAssetClipMedia,
+} from "@openbot/contracts/ipc";
 import type { AppTextKey } from "@openbot/i18n";
-import { Button, Download, File, FileInput, Input, Maximize2, Popover, Search, SlidingTabs, Upload } from "@openbot/ui";
+import {
+  AudioLines,
+  Button,
+  Download,
+  File,
+  FileInput,
+  Film,
+  Input,
+  Maximize2,
+  Popover,
+  Search,
+  SlidingTabs,
+  toast,
+  Upload,
+} from "@openbot/ui";
 import { createSignal, createStore, For, onCleanup, Show, untrack } from "solid-js";
 import { createScrollFades } from "../../components/createScrollFades";
 import { useText } from "../../text";
 import { ImageLightbox, type ImageLightboxOpening } from "../conversation/ImageLightbox";
+import { VideoPlayer } from "../conversation/VideoPlayer";
+import { usePictureShape } from "./picture-shape";
 import { useBoard, type WfnBoard } from "./workflow-board";
-import { asString, download, NodeShell, NodeToolbar, ToolAction, useField, useLocked } from "./workflow-node-parts";
-
-/* --------------------------------------------------------------- Asset */
+import { workflowClipsAllowed } from "./workflow-model";
+import {
+  asString,
+  downloadMedia,
+  NodeShell,
+  NodeToolbar,
+  ToolAction,
+  useField,
+  useLocked,
+} from "./workflow-node-parts";
+import { CardPicture, CardPictureLoading } from "./workflow-picture";
 
 type AssetFilter = "recent" | "images" | "files";
 
@@ -20,12 +49,51 @@ const ASSET_FILTERS: readonly { value: AssetFilter; label: AppTextKey }[] = [
   { value: "files", label: "workflow.asset.filter.files" },
 ];
 
-/** The files of the library: the files from the computer of this board, newest first, then the workspace files. */
 const libraryFiles = (board: WfnBoard) => [...board.uploads(), ...board.catalogs().files];
 
-/** The files of a drag from the computer, or none when the drag holds no files. */
+const PICTURE_ACCEPT = [...WORKFLOW_PICTURE_TYPES].join(",");
+const CLIP_EXTENSIONS = [".mp4", ".mov", ".mp3", ".m4a", ".wav", ".aac", ".ogg", ".oga", ".opus", ".flac"];
+const ASSET_ACCEPT = [...WORKFLOW_PICTURE_TYPES, ...WORKFLOW_CLIP_TYPES, ...CLIP_EXTENSIONS].join(",");
+
+export function assetFields(file: StoredFileRow): Record<string, string> {
+  const media = workflowAssetClipMedia(file.mimeType);
+  return media ? { file: file.name, fileId: file.id, media } : { file: file.name, fileId: file.id };
+}
+
+function clipOf(file: StoredFileRow | undefined): WorkflowAssetClipMedia | null {
+  return file ? workflowAssetClipMedia(file.mimeType) : null;
+}
+
+function clipType(name: string, media: WorkflowAssetClipMedia) {
+  const named = attachmentMimeTypeForName(name);
+  if (WORKFLOW_CLIP_TYPES.has(named)) return named;
+  return media === "audio" ? "audio/mpeg" : "video/mp4";
+}
+
 const draggedFiles = (event: DragEvent) =>
   event.dataTransfer?.types.includes("Files") ? [...event.dataTransfer.files] : [];
+
+function hostFile(board: WfnBoard, id: string, name: string, media: string): StoredFileRow | undefined {
+  const clip = media === "video" || media === "audio" ? media : null;
+  const url = (clip ? board.localCopyOf(id) : undefined) ?? board.catalogs().media?.(id, clip ?? "image");
+  if (!url) return undefined;
+  return {
+    id,
+    name,
+    size: 0,
+    kind: clip ? "file" : "image",
+    mimeType: clip ? clipType(name, clip) : "image/png",
+    previewKind: clip ? "none" : "image",
+    previewUrl: url,
+    source: "generated",
+    agentId: null,
+    conversation: null,
+    messageId: null,
+    createdAt: "",
+    status: "available",
+    deletable: false,
+  };
+}
 
 function assetsFor(board: WfnBoard, filter: AssetFilter): readonly StoredFileRow[] {
   const available = libraryFiles(board).filter((file) => file.status === "available");
@@ -38,23 +106,73 @@ function fileExtension(name: string): string {
   return name.split(".").pop()?.toUpperCase() ?? "";
 }
 
-function AssetThumb(props: { file: StoredFileRow }) {
+function thumbUrl(board: WfnBoard, file: StoredFileRow): string | null | undefined {
+  if (file.previewKind !== "image") return null;
+  const copy = board.localCopyOf(file.id);
+  if (copy) return copy;
+  const preview = board.catalogs().mediaPreview;
+  if (!preview || file.previewKind !== "image" || board.uploads().includes(file)) return file.previewUrl;
+  return preview(file.id);
+}
+
+function clipUrl(board: WfnBoard, file: StoredFileRow, media: WorkflowAssetClipMedia): string | undefined {
+  return board.localCopyOf(file.id) ?? board.catalogs().media?.(file.id, media) ?? file.previewUrl ?? undefined;
+}
+
+function findFile(board: WfnBoard, fileId: string, name: string, media: string): StoredFileRow | undefined {
+  const files = libraryFiles(board);
+  return (
+    (fileId ? files.find((candidate) => candidate.id === fileId) : undefined) ??
+    (name ? files.find((candidate) => candidate.name === name) : undefined) ??
+    (fileId ? hostFile(board, fileId, name, media) : undefined)
+  );
+}
+
+function assetFile(board: WfnBoard, id: string): StoredFileRow | undefined {
+  const text = (key: string) => {
+    const value = board.field(id, key);
+    return typeof value === "string" ? value : "";
+  };
+  return findFile(board, text("fileId"), text("file"), text("media"));
+}
+
+export function assetPicture(board: WfnBoard, id: string): string | undefined {
+  const file = assetFile(board, id);
+  return file?.previewKind === "image" ? (thumbUrl(board, file) ?? undefined) : undefined;
+}
+
+function AssetThumb(props: { file: StoredFileRow; card?: boolean }) {
+  const board = useBoard();
   return (
     <Show
-      when={props.file.previewUrl}
+      when={thumbUrl(board, props.file)}
       fallback={
-        <span class="wfn-asset-glyph" aria-hidden="true">
-          <File />
-          <span>{fileExtension(props.file.name)}</span>
-        </span>
+        <Show
+          when={props.card && thumbUrl(board, props.file) === undefined}
+          fallback={
+            <span class="wfn-asset-glyph" aria-hidden="true">
+              <Show when={clipOf(props.file)} fallback={<File />}>
+                {(media) => (media() === "audio" ? <AudioLines /> : <Film />)}
+              </Show>
+              <span>{fileExtension(props.file.name)}</span>
+            </span>
+          }
+        >
+          <CardPictureLoading />
+        </Show>
       }
     >
-      {(url) => <img class="wfn-media" src={url()} alt="" />}
+      {(url) =>
+        props.card ? (
+          <CardPicture src={url()} alt="" />
+        ) : (
+          <img class="wfn-media" src={url()} alt="" decoding="async" draggable="false" />
+        )
+      }
     </Show>
   );
 }
 
-/** The files of one library tab whose names hold the query. Recent narrows nothing once the user searches. */
 function assetsMatching(board: WfnBoard, filter: AssetFilter, query: string): readonly StoredFileRow[] {
   const needle = query.trim().toLowerCase();
   if (!needle) return assetsFor(board, filter);
@@ -63,11 +181,6 @@ function assetsMatching(board: WfnBoard, filter: AssetFilter, query: string): re
   return pool.filter((file) => file.name.toLowerCase().includes(needle));
 }
 
-/**
- * One library tab: a grid that scrolls under the shared top and bottom fades. A thin thumb in the
- * popover padding replaces the native bar; it shows on hover or focus, drags, and pages on a track
- * press. The wheel, the trackpad and the keyboard still scroll the grid itself.
- */
 function LibraryGrid(props: {
   files: readonly StoredFileRow[];
   query: string;
@@ -91,7 +204,6 @@ function LibraryGrid(props: {
   };
   const observer = new ResizeObserver(measure);
   onCleanup(() => observer.disconnect());
-  // Pixels of scroll for one pixel of thumb travel.
   const ratio = () =>
     scroller ? (scroller.scrollHeight - scroller.clientHeight) / (scroller.clientHeight - thumb.size) : 0;
   const drag = (event: PointerEvent & { currentTarget: HTMLElement }) => {
@@ -178,14 +290,13 @@ function LibraryGrid(props: {
   );
 }
 
-/** Opens the file dialog of the computer. The file goes into the workspace library. */
-function UploadButton(props: { onAdd: (file: StoredFileRow) => void }) {
+function UploadButton(props: { busy: boolean; onChoose: (file: File) => void }) {
   const board = useBoard();
   const { t } = useText();
   let input: HTMLInputElement | undefined;
   return (
     <>
-      <Button variant="ghost" size="xs" onClick={() => input?.click()}>
+      <Button variant="ghost" size="xs" disabled={props.busy} onClick={() => input?.click()}>
         <Upload aria-hidden="true" />
         {t("workflow.asset.upload")}
       </Button>
@@ -195,19 +306,21 @@ function UploadButton(props: { onAdd: (file: StoredFileRow) => void }) {
         }}
         class="sr-only"
         type="file"
+        accept={
+          board.catalogs().upload ? (workflowClipsAllowed(board.features()) ? ASSET_ACCEPT : PICTURE_ACCEPT) : undefined
+        }
         tabindex={-1}
         aria-label={t("workflow.asset.upload")}
         onChange={(event) => {
           const chosen = event.currentTarget.files?.[0];
           event.currentTarget.value = "";
-          if (chosen) props.onAdd(board.upload(chosen));
+          if (chosen) props.onChoose(chosen);
         }}
       />
     </>
   );
 }
 
-/** The workspace library, as the Higgsfield Assets panel: filter pills and a grid of files. */
 function AssetLibrary(props: { selected?: string | undefined; onPick: (file: StoredFileRow) => void }) {
   const board = useBoard();
   const { t } = useText();
@@ -262,10 +375,9 @@ function AssetLibrary(props: { selected?: string | undefined; onPick: (file: Sto
   );
 }
 
-/** A workspace file as an input. The card opens the library; the output type follows the file. */
 export function AssetNode(props: { id: string; file?: string }) {
   const board = useBoard();
-  const { t, format } = useText();
+  const { t, format, errorMessage } = useText();
   const [fileName] = useField(
     () => props.id,
     "file",
@@ -273,31 +385,54 @@ export function AssetNode(props: { id: string; file?: string }) {
     asString,
   );
   const [fileId] = useField(() => props.id, "fileId", "", asString);
-  /** The file by its id, so two files with one name stay apart. A graph saved before the id finds it by name. */
-  const file = () => {
-    const files = libraryFiles(board);
-    const id = fileId();
-    return (
-      (id ? files.find((candidate) => candidate.id === id) : undefined) ??
-      files.find((candidate) => candidate.name === fileName())
-    );
+  const [mediaField] = useField(() => props.id, "media", "", asString);
+  const file = () => findFile(board, fileId(), fileName(), mediaField());
+  const clip = () => clipOf(file());
+  const clipSource = () => {
+    const current = file();
+    const media = clip();
+    return current && media ? clipUrl(board, current, media) : undefined;
   };
-  const setFile = (next: StoredFileRow) => board.setFields(props.id, { file: next.name, fileId: next.id });
-  /** Files from the computer stay on this computer, so a host that cannot read them does not offer them. */
+  const [videoReady, setVideoReady] = createSignal<string>();
+  const setFile = (next: StoredFileRow) => {
+    const fields = assetFields(next);
+    board.setFields(props.id, fields.media || !mediaField() ? fields : { ...fields, media: "" });
+  };
   const uploads = () => board.features()?.uploads !== false;
   const [open, setOpen] = createSignal(false);
   const [locked, setLocked] = useLocked(() => props.id);
   const [viewer, setViewer] = createSignal<ImageLightboxOpening>();
   const [dropping, setDropping] = createSignal(false);
   const isImage = () => file()?.previewKind === "image";
-  /** A file from the computer, dropped on the card, goes into the library and becomes the asset. */
+  const shape = usePictureShape(() => {
+    const current = file();
+    return current && isImage() ? (thumbUrl(board, current) ?? undefined) : undefined;
+  });
+  const clear = () => (isImage() ? shape()?.clear === true : false);
+  const [sending, setSending] = createSignal(false);
+  const send = (chosen: File) => {
+    setSending(true);
+    setOpen(false);
+    board
+      .upload(chosen)
+      .then(setFile, (error: unknown) => toast.error(errorMessage(error, t("composer.upload.failed"))))
+      .finally(() => setSending(false));
+  };
+  const onDragOver = (event: DragEvent) => {
+    if (locked() || !uploads() || !event.dataTransfer?.types.includes("Files")) return;
+    event.preventDefault();
+    event.dataTransfer.dropEffect = "copy";
+    setDropping(true);
+  };
   const onDrop = (event: DragEvent) => {
     setDropping(false);
-    const [dropped] = draggedFiles(event);
-    if (!dropped || locked() || !uploads()) return;
+    const files = draggedFiles(event);
+    const [dropped] = files;
+    if (!dropped || locked() || !uploads() || sending()) return;
     event.preventDefault();
-    setFile(board.upload(dropped));
-    setOpen(false);
+    event.stopPropagation();
+    if (files.length > 1 && board.dropFiles) board.dropFiles(props.id, files);
+    else send(dropped);
   };
   return (
     <>
@@ -305,8 +440,9 @@ export function AssetNode(props: { id: string; file?: string }) {
         id={props.id}
         label={t("workflow.asset.title")}
         kind="asset"
-        media={isImage()}
-        style={{ "--wfn-aspect": "4 / 3" }}
+        media={isImage() || clip() === "video"}
+        clear={clear()}
+        style={{ "--wfn-aspect": clear() ? String(shape()?.ratio ?? 4 / 3) : "4 / 3" }}
         output={file() ? (isImage() ? "image" : "file") : undefined}
         toolbar={
           <NodeToolbar id={props.id} name={t("workflow.asset.name")} locked={locked()} onLock={setLocked}>
@@ -337,7 +473,7 @@ export function AssetNode(props: { id: string; file?: string }) {
                       text={t("workflow.node.toolbar.download")}
                       label={t("workflow.asset.download")}
                       icon={<Download />}
-                      onClick={() => download(url(), current().name)}
+                      onClick={() => downloadMedia(board, current().id, url(), current().name)}
                     />
                   )}
                 </Show>
@@ -346,81 +482,102 @@ export function AssetNode(props: { id: string; file?: string }) {
           </NodeToolbar>
         }
       >
-        <Popover.Root open={open()} onOpenChange={setOpen} placement="right-start" gutter={56}>
-          <Popover.Trigger
-            class="wfn-asset-trigger"
-            disabled={locked()}
-            data-dropping={dropping() ? "" : undefined}
-            onDragOver={(event: DragEvent) => {
-              if (locked() || !uploads() || !event.dataTransfer?.types.includes("Files")) return;
-              event.preventDefault();
-              event.dataTransfer.dropEffect = "copy";
-              setDropping(true);
-            }}
-            onDragLeave={() => setDropping(false)}
-            onDrop={onDrop}
-            aria-label={file() ? t("workflow.asset.current", { name: file()?.name ?? "" }) : t("workflow.asset.choose")}
-          >
-            <Show
-              when={file()}
-              fallback={
-                <span class="wfn-asset-empty">
-                  <span class="wfn-asset-icon" aria-hidden="true">
-                    <File />
-                  </span>
-                  {t("workflow.asset.choose")}
-                </span>
+        <fieldset
+          class="wfn-asset-drop"
+          aria-label={t("workflow.asset.title")}
+          onDragOver={onDragOver}
+          onDragLeave={() => setDropping(false)}
+          onDrop={onDrop}
+        >
+          <Popover.Root open={open()} onOpenChange={setOpen} placement="right-start" gutter={56}>
+            <Popover.Trigger
+              class="wfn-asset-trigger"
+              disabled={locked()}
+              aria-busy={sending() ? "true" : undefined}
+              data-dropping={dropping() ? "" : undefined}
+              aria-label={
+                file() ? t("workflow.asset.current", { name: file()?.name ?? "" }) : t("workflow.asset.choose")
               }
             >
-              {(current) => (
-                <Show
-                  when={isImage()}
-                  fallback={
-                    <span class="wfn-asset-file">
-                      <AssetThumb file={current()} />
-                      <span class="wfn-asset-text">
-                        <span class="wfn-asset-name">{current().name}</span>
-                        <span class="wfn-asset-meta">{format.fileSize(current().size)}</span>
-                      </span>
+              <Show
+                when={file()}
+                fallback={
+                  <span class="wfn-asset-empty">
+                    <span class="wfn-asset-icon" aria-hidden="true">
+                      <File />
                     </span>
-                  }
-                >
-                  <AssetThumb file={current()} />
-                  <span class="wfn-chip wfn-asset-caption">{current().name}</span>
-                </Show>
-              )}
-            </Show>
-          </Popover.Trigger>
-          <Popover.Portal>
-            <Popover.Content class="ui-popover-menu-surface wfn-popover" data-wfn-portal="">
-              <div class="wfn-popover-head">
-                <Popover.Title class="wfn-popover-title">{t("workflow.asset.library")}</Popover.Title>
-                <Show when={uploads()}>
-                  <UploadButton
-                    onAdd={(next) => {
-                      setFile(next);
-                      setOpen(false);
-                    }}
-                  />
-                </Show>
-              </div>
-              <AssetLibrary
-                selected={file()?.id}
-                onPick={(next) => {
-                  setFile(next);
-                  setOpen(false);
-                }}
-              />
-            </Popover.Content>
-          </Popover.Portal>
-        </Popover.Root>
+                    {t("workflow.asset.choose")}
+                  </span>
+                }
+              >
+                {(current) => (
+                  <Show
+                    when={isImage() || clip() === "video"}
+                    fallback={
+                      <span class="wfn-asset-file">
+                        <AssetThumb file={current()} />
+                        <span class="wfn-asset-text">
+                          <span class="wfn-asset-name">{current().name}</span>
+                          <span class="wfn-asset-meta">{format.fileSize(current().size)}</span>
+                        </span>
+                      </span>
+                    }
+                  >
+                    <Show when={isImage()}>
+                      <AssetThumb file={current()} card />
+                      <span class="wfn-chip wfn-asset-caption">{current().name}</span>
+                    </Show>
+                  </Show>
+                )}
+              </Show>
+            </Popover.Trigger>
+            <Popover.Portal>
+              <Popover.Content class="ui-popover-menu-surface wfn-popover" data-wfn-portal="">
+                <div class="wfn-popover-head">
+                  <Popover.Title class="wfn-popover-title">{t("workflow.asset.library")}</Popover.Title>
+                  <Show when={uploads()}>
+                    <UploadButton busy={sending()} onChoose={send} />
+                  </Show>
+                </div>
+                <AssetLibrary
+                  selected={file()?.id}
+                  onPick={(next) => {
+                    setFile(next);
+                    setOpen(false);
+                  }}
+                />
+              </Popover.Content>
+            </Popover.Portal>
+          </Popover.Root>
+          <Show when={clipSource()}>
+            {(url) => (
+              <Show
+                when={clip() === "video"}
+                fallback={
+                  <audio class="wfn-asset-audio" controls preload="metadata" src={url()} aria-label={fileName()}>
+                    <track kind="captions" />
+                  </audio>
+                }
+              >
+                <VideoPlayer
+                  src={url()}
+                  label={fileName()}
+                  fullControls
+                  loading={videoReady() !== url()}
+                  onMetadata={() => setVideoReady(url())}
+                  onError={() => setVideoReady(url())}
+                />
+              </Show>
+            )}
+          </Show>
+        </fieldset>
       </NodeShell>
       <Show when={viewer()}>
         {(opening) => (
           <ImageLightbox
             opening={opening()}
             onDownload={(attachment) => {
-              if (attachment.previewUrl) download(attachment.previewUrl, attachment.name);
+              if (attachment.previewUrl) downloadMedia(board, attachment.id, attachment.previewUrl, attachment.name);
             }}
             onClose={() => setViewer(undefined)}
           />

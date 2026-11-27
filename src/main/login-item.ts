@@ -11,36 +11,23 @@ export class LoginItemFailure extends Schema.TaggedError<LoginItemFailure>()("Lo
   cause: Schema.Defect(),
 }) {}
 
-/** Whether the operating system opens OpenBot when the user signs in. The system holds the value. */
 export interface LoginItem {
   read: () => Effect.Effect<boolean, LoginItemFailure>;
   write: (enabled: boolean) => Effect.Effect<void, LoginItemFailure>;
-  /** Points an existing item at the running copy of OpenBot. Called once at start. */
   refresh: () => Effect.Effect<void, LoginItemFailure>;
 }
 
-/**
- * Null where OpenBot must not open itself at login: a development run would register the Electron
- * binary with no app, and a server starts from its own service unit.
- */
 export function createLoginItem(options: { appVariant: AppVariant; server: boolean }): LoginItem | null {
   if (!app.isPackaged || options.server) return null;
   if (process.platform !== "linux") return electronLoginItem();
   const configHome = process.env.XDG_CONFIG_HOME;
   return linuxAutostartLoginItem({
-    // The XDG Base Directory Specification ignores a relative path.
     configHome: configHome && isAbsolute(configHome) ? configHome : join(homedir(), ".config"),
     fileName: options.appVariant === "production" ? "openbot.desktop" : `openbot-${options.appVariant}.desktop`,
-    // The AppImage runtime names its own file here. `execPath` is inside the mount, which ends with the run.
     executablePath: process.env.APPIMAGE || process.execPath,
   });
 }
 
-/**
- * macOS and Windows register the running executable through Electron. The user can turn the item
- * off in the system settings, so each read asks the system again. On Windows only
- * `executableWillLaunchAtLogin` includes the switch in Task Manager; a write sets it again.
- */
 function electronLoginItem(): LoginItem {
   return {
     read: () =>
@@ -56,19 +43,10 @@ function electronLoginItem(): LoginItem {
         try: () => app.setLoginItemSettings({ openAtLogin: enabled }),
         catch: (cause) => new LoginItemFailure({ cause }),
       }),
-    // The item names the executable, and an update keeps its path.
     refresh: () => Effect.void,
   };
 }
 
-/**
- * Linux has no Electron login item. The desktop opens each entry in the XDG autostart directory at
- * sign-in, so the file is the switch. A desktop settings app can turn the entry off in place, with
- * `Hidden=true` or, on GNOME, `X-GNOME-Autostart-enabled=false`; such an entry reads as off.
- *
- * An update of the AppImage can give it a new file name, so `refresh` writes the entry again with
- * the path of the running copy.
- */
 function linuxAutostartLoginItem(options: { configHome: string; fileName: string; executablePath: string }): LoginItem {
   const path = join(options.configHome, "autostart", options.fileName);
   const read = () =>
@@ -103,7 +81,6 @@ function linuxAutostartLoginItem(options: { configHome: string; fileName: string
   };
 }
 
-/** Reads only the `[Desktop Entry]` group, where the XDG Autostart Specification puts both keys. */
 function isEnabledAutostartEntry(contents: string): boolean {
   let group = "";
   for (const line of contents.split(/\r?\n/)) {
@@ -130,10 +107,6 @@ function autostartEntry(executablePath: string): string {
   ].join("\n");
 }
 
-/**
- * The Desktop Entry Specification quotes `"`, `` ` ``, `$` and `\` in a quoted argument, and then
- * escapes each backslash again as a string value. A literal `%` is `%%`.
- */
 function desktopEntryExec(executablePath: string): string {
   if (/[\n\r]/.test(executablePath)) throw new Error("The executable path contains a line break.");
   const quoted = `"${executablePath.replace(/["`$\\]/g, (character) => `\\${character}`)}"`;

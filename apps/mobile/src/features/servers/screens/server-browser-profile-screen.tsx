@@ -6,7 +6,6 @@ import {
   nextBrowserProfileHue,
 } from "@openbot/contracts/ipc";
 import { router, Stack, useLocalSearchParams } from "expo-router";
-import { usePreventRemove } from "expo-router/react-navigation";
 import { Button, Typography } from "heroui-native";
 import Plus from "lucide-react-native/icons/plus";
 import { useMemo, useRef, useState } from "react";
@@ -14,8 +13,14 @@ import { Alert, View } from "react-native";
 import { useCSSVariable } from "uniwind";
 import { HUE_LABELS } from "@/features/agents/components/agent-appearance-picker";
 import { BloubAvatar } from "@/features/agents/components/bloub-avatar";
-import { type BrowserProfileStack, openBrowserProfileAgentsPage } from "@/features/servers/model/browser-profile-pages";
+import { TrailingValue } from "@/features/servers/components/trailing-value";
+import {
+  type BrowserProfileStack,
+  openBrowserProfileAgentsPage,
+  openBrowserProfileProxyPage,
+} from "@/features/servers/model/browser-profile-pages";
 import { useAgentBrowserProfile, useServerBrowserProfiles } from "@/features/servers/model/use-server-browser-profiles";
+import { useBrowserProxyChoices, useServerBrowserProxies } from "@/features/servers/model/use-server-browser-proxies";
 import { useBrowserProfileUsage } from "@/features/servers/screens/server-browser-profiles-screen";
 import {
   SettingsContent,
@@ -28,17 +33,10 @@ import { SheetFormField } from "@/shared/components/sheet-form-field";
 import { SheetSaveAction } from "@/shared/components/sheet-save-action";
 import { haptics } from "@/shared/lib/haptics";
 import { useText } from "@/shared/lib/text";
+import { useDiscardGuard } from "@/shared/lib/use-discard-guard";
 
-/**
- * Browser profiles > one profile, or a new one without `profileId`. A new profile takes its name and
- * color on this page, and Add makes it and goes back; from an agent's choice (`assignTo`) it also
- * goes to that agent. For a saved profile the name saves with the header action and the color saves
- * at once. Clear data signs the profile out of every site, and Delete moves its agents to the shared
- * profile.
- */
 export function ServerBrowserProfileScreen() {
   const { t, errorMessage } = useText();
-  // `agentId` is set when the agent settings show this page.
   const { serverId, profileId, assignTo, agentId } = useLocalSearchParams<{
     serverId: string;
     profileId?: string;
@@ -49,49 +47,27 @@ export function ServerBrowserProfileScreen() {
   const profiles = useServerBrowserProfiles(serverId);
   const assignment = useAgentBrowserProfile(serverId, assignTo || undefined);
   const usage = useBrowserProfileUsage();
+  const proxies = useServerBrowserProxies(serverId);
+  const proxyChoices = useBrowserProxyChoices(proxies.list);
   const accent = String(useCSSVariable("--openbot-accent"));
-  // The selector returns the stored list, so the page does not render again for a new copy.
   const allAgents = useMobileWorkspaceSelector((workspace) => workspace.agents);
   const agents = useMemo(() => allAgents.filter((agent) => agent.serverId === serverId), [allAgents, serverId]);
-  // Kept after Delete, so the page does not say "gone" while it goes back.
   const [removed, setRemoved] = useState<BrowserProfileSummary | null>(null);
   const profile =
     (profileId ? profiles.profiles?.find((candidate) => candidate.id === profileId) : undefined) ??
     (removed?.id === profileId ? removed : undefined);
   const [draftName, setDraftName] = useState<string | undefined>();
-  /** The color of a new profile. Undefined is the color that the host gives: the one that the fewest profiles use. */
   const [draftHue, setDraftHue] = useState<AvatarHue | undefined>();
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const locked = useRef(false);
-  /** True after Delete or an assigned new profile: the page leaves without the question about the name. */
   const leaving = useRef(false);
   const name = draftName ?? profile?.name ?? "";
   const trimmed = name.trim();
   const dirty = draftName !== undefined && trimmed !== (profile?.name ?? "");
 
-  const [discarding, setDiscarding] = useState(false);
-  usePreventRemove(!discarding && dirty, ({ repeat }) => {
-    if (leaving.current) {
-      setDiscarding(true);
-      repeat();
-      return;
-    }
-    void haptics.notification("warning");
-    Alert.alert(t("mobile.agent.discard.title"), t("mobile.agent.discard.body"), [
-      { text: t("mobile.agent.discard.keepEditing"), style: "cancel" },
-      {
-        text: t("mobile.agent.discard.discard"),
-        style: "destructive",
-        onPress: () => {
-          setDiscarding(true);
-          repeat();
-        },
-      },
-    ]);
-  });
+  useDiscardGuard(dirty, { leaving: () => leaving.current, warn: true });
 
-  /** Runs one change at a time. Resolves true when it succeeds. */
   async function perform(operation: () => Promise<void>): Promise<boolean> {
     if (locked.current) return false;
     locked.current = true;
@@ -138,7 +114,6 @@ export function ServerBrowserProfileScreen() {
     const hue = draftHue;
     void perform(async () => {
       created = await profiles.create(trimmed);
-      // The create route takes only the name, so a color that the host did not give saves after it.
       if (hue !== undefined && hue !== created.hue) await profiles.recolor(created.id, hue);
       if (assignTo) await assignment.choose({ kind: "profile", profileId: created.id });
     }).then((saved) => {
@@ -149,7 +124,6 @@ export function ServerBrowserProfileScreen() {
         router.back();
         return;
       }
-      // The profile exists, also when its color or the agent did not save: the page now shows it.
       router.setParams({ profileId: created.id, assignTo: undefined });
     });
   }
@@ -273,8 +247,33 @@ export function ServerBrowserProfileScreen() {
           })}
         </View>
       </SettingsSection>
+      {!profile && assignTo ? (
+        <Typography.Paragraph type="body-xs" className="px-4 text-warning-text">
+          {t("mobile.agent.browserProfile.movedNote")}
+        </Typography.Paragraph>
+      ) : null}
       {profile ? (
         <>
+          {proxies.available ? (
+            <SettingsSection footer={t("mobile.server.browserProxies.profileHint")}>
+              <SettingsRow
+                disabled={pending}
+                trailing={
+                  proxies.list ? (
+                    <TrailingValue
+                      value={
+                        proxyChoices.find((choice) => choice.profileIds.includes(profile.id))?.name ??
+                        t("mobile.server.browserProxies.automatic")
+                      }
+                    />
+                  ) : undefined
+                }
+                onPress={() => openBrowserProfileProxyPage(stack, serverId, profile.id)}
+              >
+                <Typography.Paragraph>{t("mobile.server.browserProxies.menu")}</Typography.Paragraph>
+              </SettingsRow>
+            </SettingsSection>
+          ) : null}
           <SettingsSection
             title={t("mobile.server.browserProfiles.agentsTitle")}
             footer={usage(profile.agentIds.length, profile.tabCount)}

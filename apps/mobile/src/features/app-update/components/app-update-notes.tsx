@@ -20,31 +20,20 @@ import { useReducedMotion } from "@/shared/lib/motion";
 import { type MobileText, useText } from "@/shared/lib/text";
 
 const DATE_FORMAT: Intl.DateTimeFormatOptions = { dateStyle: "medium" };
-/** The space between the block's edge and the first note. */
 const NOTES_TOP_GAP = 20;
-/** The depth of the blur under the block's edge, below its round corners. */
 const EDGE_BLUR = 56;
-// A line fades, lifts and shrinks over this distance as it goes under the edge, and rises into
-// place over it as it comes in at the bottom: about two lines of text.
 const ROW_FADE = 44;
 const ROW_LIFT = 4;
 const ROW_RISE = 6;
 const ROW_SCALE = 0.985;
-/** A line at the bottom keeps a little of its text, so the list reads as one that goes on. */
 const ROW_BOTTOM_OPACITY = 0.2;
 
 interface RowScroll {
   scrollY: SharedValue<number>;
-  /** The visible height of the panel; 0 until it is measured. */
   viewport: SharedValue<number>;
   reduced: boolean;
 }
 
-/**
- * One line of the notes. Its place in the panel sets its look on the UI thread: clear in the middle,
- * and fading, lifting and shrinking a little at the top and the bottom. `baseY` is the place of the
- * parent in the scroll content, for a line inside an item.
- */
 function ScrollRow({
   scroll,
   baseY,
@@ -85,30 +74,51 @@ function ScrollRow({
   );
 }
 
-/** The dot and the gap before the text of an item. */
 const ITEM_TEXT_INSET = 16;
 
-/**
- * One item, line by line. A hidden copy of the text gives the lines as the screen wraps them, and
- * each line follows the scroll on its own, so only the lines at an edge move. Until the lines are
- * known, the item shows as one block. A screen reader reads the whole item once.
- */
-function NoteItem({ item, scroll, dot }: { item: string; scroll: RowScroll; dot: string }) {
+export interface NoteLineRow {
+  key: number;
+  baseY: SharedValue<number>;
+  className: string;
+  children: ReactNode;
+}
+
+export function NoteItem({
+  item,
+  dot,
+  textColor,
+  compact = false,
+  renderRow,
+}: {
+  item: string;
+  dot: string;
+  textColor?: string;
+  compact?: boolean;
+  renderRow: (row: NoteLineRow) => ReactNode;
+}) {
   const itemY = useSharedValue(0);
   const [lines, setLines] = useState<{ start: number; text: string }[] | null>(null);
-  const dotView = <View className="mt-[9px] size-1.5 rounded-full" style={{ backgroundColor: dot }} />;
+  const type = compact ? "body-sm" : "body";
+  const textClassName = textColor ? "flex-1" : "flex-1 text-text-secondary";
+  const textStyle = textColor ? { color: textColor } : undefined;
+  const dotView = (
+    <View
+      className={compact ? "mt-[8px] size-1.5 rounded-full" : "mt-[9px] size-1.5 rounded-full"}
+      style={{ backgroundColor: dot }}
+    />
+  );
   return (
     <View
       accessible
       accessibilityLabel={item}
-      className="mb-2.5"
+      className={compact ? "mb-1.5" : "mb-2.5"}
       onLayout={(event) => itemY.set(event.nativeEvent.layout.y)}
     >
       <View pointerEvents="none" style={{ position: "absolute", left: ITEM_TEXT_INSET, right: 0, opacity: 0 }}>
         <Typography.Paragraph
+          type={type}
           className="text-text-secondary"
           onTextLayout={(event) => {
-            // Each line keeps its place in the item, which also names it.
             let start = 0;
             const next = event.nativeEvent.lines.map((line) => {
               const entry = { start, text: line.text.trimEnd() };
@@ -126,26 +136,46 @@ function NoteItem({ item, scroll, dot }: { item: string; scroll: RowScroll; dot:
           {item}
         </Typography.Paragraph>
       </View>
-      {lines ? (
-        lines.map((line) => (
-          <ScrollRow key={line.start} scroll={scroll} baseY={itemY} className="flex-row gap-2.5">
-            {line.start === 0 ? dotView : <View className="size-1.5" />}
-            <Typography.Paragraph numberOfLines={1} ellipsizeMode="clip" className="flex-1 text-text-secondary">
-              {line.text}
-            </Typography.Paragraph>
-          </ScrollRow>
-        ))
-      ) : (
-        <ScrollRow scroll={scroll} baseY={itemY} className="flex-row gap-2.5">
-          {dotView}
-          <Typography.Paragraph className="flex-1 text-text-secondary">{item}</Typography.Paragraph>
-        </ScrollRow>
-      )}
+      {lines
+        ? lines.map((line) =>
+            renderRow({
+              key: line.start,
+              baseY: itemY,
+              className: "flex-row gap-2.5",
+              children: (
+                <>
+                  {line.start === 0 ? dotView : <View className="size-1.5" />}
+                  <Typography.Paragraph
+                    type={type}
+                    numberOfLines={1}
+                    ellipsizeMode="clip"
+                    className={textClassName}
+                    style={textStyle}
+                  >
+                    {line.text}
+                  </Typography.Paragraph>
+                </>
+              ),
+            }),
+          )
+        : renderRow({
+            key: -1,
+            baseY: itemY,
+            className: "flex-row gap-2.5",
+            children: (
+              <>
+                {dotView}
+                <Typography.Paragraph type={type} className={textClassName} style={textStyle}>
+                  {item}
+                </Typography.Paragraph>
+              </>
+            ),
+          })}
     </View>
   );
 }
 
-function groupTitle(t: MobileText["t"], group: MobileReleaseNoteGroup): string {
+export function groupTitle(t: MobileText["t"], group: MobileReleaseNoteGroup): string {
   switch (group.type) {
     case "notice":
       return t("mobile.app.update.group.notice");
@@ -166,7 +196,6 @@ function groupTitle(t: MobileText["t"], group: MobileReleaseNoteGroup): string {
   }
 }
 
-/** The notes as one row for each title and item, so each row can follow the scroll on its own. */
 function releaseRows(
   releases: readonly MobileReleaseNotes[],
   scroll: RowScroll,
@@ -196,29 +225,33 @@ function releaseRows(
             {groupTitle(t, group)}
           </Typography.Paragraph>
         </ScrollRow>,
-        ...group.items.map((item) => <NoteItem key={`${groupKey}-${item}`} item={item} scroll={scroll} dot={dot} />),
+        ...group.items.map((item) => (
+          <NoteItem
+            key={`${groupKey}-${item}`}
+            item={item}
+            dot={dot}
+            renderRow={(row) => (
+              <ScrollRow key={row.key} scroll={scroll} baseY={row.baseY} className={row.className}>
+                {row.children}
+              </ScrollRow>
+            )}
+          />
+        )),
       ];
     });
     return [heading, ...groups];
   });
 }
 
-/**
- * The release notes on the surface of the screen, under the update header. They slide down from
- * behind the block's edge over the list, and back up when they close. Their top lies under the
- * block's round corners. They load when they open.
- */
 export function AppUpdateNotes({
   open,
   expanded,
   top,
   height,
 }: {
-  /** 0 is closed behind the block, 1 open over the list. */
   open: SharedValue<number>;
   expanded: boolean;
   top: number;
-  /** From `top` to the bottom of home. */
   height: number;
 }) {
   const { t, format } = useText();
@@ -233,7 +266,6 @@ export function AppUpdateNotes({
   const [foreground, muted] = useThemeColor(["foreground", "muted"]);
   const notes = useAppUpdateNotes(expanded);
   const style = useAnimatedStyle(() => ({
-    // Closed, the panel hides: a scrolled list moves the block's edge above the panel's place.
     opacity: open.get() > 0 ? 1 : 0,
     transform: [{ translateY: -(1 - open.get()) * height }],
   }));
@@ -251,7 +283,6 @@ export function AppUpdateNotes({
         showsVerticalScrollIndicator={false}
         scrollEventThrottle={16}
         onScroll={onScroll}
-        // The home indicator covers the last points, so a row fades out above it.
         onLayout={(event) => viewport.set(event.nativeEvent.layout.height - insets.bottom / 2)}
         contentContainerStyle={{
           paddingHorizontal: 24,
@@ -292,7 +323,6 @@ export function AppUpdateNotes({
           </Pressable>
         </ScrollRow>
       </Animated.ScrollView>
-      {/* The rows blur as they go under the block's edge, as the list does under the bar. */}
       <SheetScrollEdgeEffect
         style={{ position: "absolute", top: 0, left: 0, right: 0, height: BLOUB_RADIUS + EDGE_BLUR }}
       />

@@ -1,8 +1,3 @@
-// Run with `node --import tsx scripts/browser-menu-cover-e2e.ts --allow-mutations` in a dev app.
-// Open a local agent's conversation and the browser view on a loaded page with two or more tabs first.
-// A local page is a native view above the window. While the page shows, main also shows the dock in
-// its overlay view, so the window's own dock field exists only while the page is hidden.
-// The check runs on the tab menus of the first and last tabs and on the page menu.
 import assert from "node:assert/strict";
 import { mkdirSync, writeFileSync } from "node:fs";
 import { resolve } from "node:path";
@@ -31,11 +26,9 @@ const out = resolve(".openbot-build/browser-menu-cover-e2e");
 mkdirSync(out, { recursive: true });
 const results: string[] = [];
 
-/** Two frames, so a focus request or a show that the open scheduled has run. */
 const settle = (page: Page) =>
   page.evaluate(() => new Promise((done) => requestAnimationFrame(() => requestAnimationFrame(() => done(undefined)))));
 
-/** Opens a menu, checks that the page is hidden under it and keeps the focus, then closes it. */
 async function checkMenu(page: Page, dockField: Locator, name: string, open: () => Promise<void>) {
   await open();
   const menu = page.getByRole("menu");
@@ -61,7 +54,6 @@ try {
   page.setDefaultTimeout(10_000);
   const view = page.getByRole("region", { name: "Browser", exact: true });
   await view.waitFor();
-  // A modal menu hides the rest of the window from the accessibility tree.
   const dockField = page.getByRole("textbox", { name: /^Message to /, includeHidden: true });
   await dockField.waitFor({ state: "detached" });
   const tabs = view.getByRole("tablist", { name: "Browser tabs", exact: true }).getByRole("tab");

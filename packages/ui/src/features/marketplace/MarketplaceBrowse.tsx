@@ -1,11 +1,14 @@
+import type { SkillCategory } from "@openbot/contracts/ipc";
 import { Button, Heading, Input, Plus, Search, Text } from "@openbot/ui";
 import { useText } from "@openbot/ui/text";
-import { createEffect, For, Match, Show, Switch } from "solid-js";
+import { createEffect, For, Match, Show, Switch, untrack } from "solid-js";
 import { AgentLibrary, agentFromSource } from "./MarketplaceAgents";
 import { AppRow } from "./MarketplaceCards";
+import { MarketplaceNoMatchPlush } from "./MarketplaceNoMatchPlush";
 import { MissingNotice } from "./MarketplaceParts";
-import { SkillLibrary } from "./MarketplaceSkills";
+import { GroupHead, MarketplaceSearch, SkillLibrary } from "./MarketplaceSkills";
 import { CATEGORY_LABELS } from "./marketplace-listing";
+import type { MarketplaceApp } from "./marketplace-model";
 import {
   appCategories,
   MARKETPLACE_TABS,
@@ -13,6 +16,8 @@ import {
   type MarketplaceTab,
   matchesApp,
 } from "./marketplace-view";
+
+const APP_GROUP_LIMIT = 6;
 
 const NO_MATCH = {
   agents: "marketplace.noMatch.agents",
@@ -32,7 +37,6 @@ const SHOW_TAB = {
   skills: "marketplace.noMatch.showSkills",
 } as const;
 
-/** A tab with nothing to show: the filters hide it, the search finds nothing, or the catalog is empty. */
 function NoMatch(props: {
   scope: MarketplaceScope;
   tab: MarketplaceTab;
@@ -46,6 +50,7 @@ function NoMatch(props: {
   const others = () => MARKETPLACE_TABS.filter((tab) => tab !== props.tab && props.counts()[tab] > 0);
   return (
     <div class="marketplace-empty">
+      <MarketplaceNoMatchPlush />
       <Text as="p" variant="body-sm" tone="muted">
         {props.filtered ? t("marketplace.noMatch.filters") : searching() ? t(NO_MATCH[props.tab]) : t(EMPTY[props.tab])}
       </Text>
@@ -83,12 +88,10 @@ function NoMatch(props: {
   );
 }
 
-/** The rows of each kind after the search and the filters, and their counts. The side panel shows the counts too. */
 export function createBrowseLists(scope: MarketplaceScope) {
   const { format } = useText();
   const model = () => scope.model;
   const state = () => scope.nav.state;
-  // A Worker before the `verified` filter sends every agent, so the list filters by source too.
   const agents = () => scope.agents.items().filter((listing) => agentFromSource(listing, state().agentSource));
   const skills = () => scope.skills.items();
   const apps = () =>
@@ -106,7 +109,6 @@ export function createBrowseLists(scope: MarketplaceScope) {
     apps,
     counts,
     searching: () => state().query.trim() !== "",
-    /** A listing that pages shows "50+" while the server holds more rows than the loaded ones. */
     countLabel: (tab: MarketplaceTab) => {
       const more = (tab === "agents" && scope.agents.hasMore()) || (tab === "skills" && scope.skills.hasMore());
       return `${format.number(counts()[tab])}${more ? "+" : ""}`;
@@ -116,9 +118,18 @@ export function createBrowseLists(scope: MarketplaceScope) {
 
 export type BrowseLists = ReturnType<typeof createBrowseLists>;
 
-/** The apps by category, in two columns of rows. */
+function AppRows(props: { scope: MarketplaceScope; apps: readonly MarketplaceApp[] }) {
+  return (
+    <ul class="marketplace-app-list">
+      <For each={props.apps} keyed={(app) => app.id}>
+        {(app) => <AppRow scope={props.scope} app={app()} />}
+      </For>
+    </ul>
+  );
+}
+
 function AppList(props: { scope: MarketplaceScope; lists: BrowseLists }) {
-  const { t, format } = useText();
+  const { t } = useText();
   return (
     <Show
       when={props.lists.apps().length > 0}
@@ -134,18 +145,19 @@ function AppList(props: { scope: MarketplaceScope; lists: BrowseLists }) {
     >
       <For each={appCategories(props.lists.apps())} keyed={(group) => group.category}>
         {(group) => (
-          <section class="marketplace-app-group" aria-labelledby={`marketplace-apps-${group().category}`}>
-            <h4 id={`marketplace-apps-${group().category}`} class="marketplace-app-group-title">
-              {t(CATEGORY_LABELS[group().category])}
-              <span class="marketplace-app-group-count">{format.number(group().apps.length)}</span>
-            </h4>
-            {/* Each read of the host makes new app objects, so the rows are kept by id: the element
-                under the pointer or the focus stays. */}
-            <ul class="marketplace-app-list">
-              <For each={group().apps} keyed={(app) => app.id}>
-                {(app) => <AppRow scope={props.scope} app={app()} />}
-              </For>
-            </ul>
+          <section
+            class="marketplace-app-group"
+            aria-labelledby={`marketplace-apps-${group().category}`}
+            data-marketplace-shared={props.scope.nav.state.appGroup === group().category ? "" : undefined}
+          >
+            <GroupHead
+              id={`marketplace-apps-${group().category}`}
+              label={t(CATEGORY_LABELS[group().category])}
+              count={group().apps.length}
+              more={group().apps.length > APP_GROUP_LIMIT}
+              onSeeAll={() => props.scope.nav.go({ kind: "appGroup", category: group().category })}
+            />
+            <AppRows scope={props.scope} apps={group().apps.slice(0, APP_GROUP_LIMIT)} />
           </section>
         )}
       </For>
@@ -153,14 +165,47 @@ function AppList(props: { scope: MarketplaceScope; lists: BrowseLists }) {
   );
 }
 
-/** The list of the kind that the side panel selected: its title and the search, then the rows. */
+export function AppGroupPage(props: { scope: MarketplaceScope; category: SkillCategory }) {
+  const { t } = useText();
+  const category = untrack(() => props.category);
+  const nav = () => props.scope.nav;
+  const label = () => t(CATEGORY_LABELS[category]);
+  const apps = () =>
+    appCategories(props.scope.model.apps().filter((app) => matchesApp(app, nav().state.query))).find(
+      (group) => group.category === category,
+    )?.apps ?? [];
+  return (
+    <div class="marketplace-view marketplace-browse marketplace-skill-group-page" data-marketplace-shared="">
+      <header class="marketplace-browse-copy">
+        <Heading as="h3" size="lg" class="marketplace-browse-title">
+          {label()}
+        </Heading>
+      </header>
+      <div class="marketplace-toolbar marketplace-skill-group-bar">
+        <MarketplaceSearch nav={nav()} label={t("marketplace.skills.searchIn", { name: label() })} />
+      </div>
+      <Show
+        when={apps().length > 0}
+        fallback={
+          <Text as="p" variant="body" tone="muted">
+            {t("marketplace.noMatch.apps")}
+          </Text>
+        }
+      >
+        <section class="marketplace-skill-group-list" aria-label={label()}>
+          <AppRows scope={props.scope} apps={apps()} />
+        </section>
+      </Show>
+    </div>
+  );
+}
+
 export function MarketplaceBrowse(props: { scope: MarketplaceScope; lists: BrowseLists }) {
   const { t } = useText();
   const model = () => props.scope.model;
   const nav = () => props.scope.nav;
   const state = () => props.scope.nav.state;
 
-  /* "Your skills" and the agents of each skill row need each agent's skills. */
   createEffect(
     () => state().tab,
     (tab) => {
@@ -234,13 +279,11 @@ export function MarketplaceBrowse(props: { scope: MarketplaceScope; lists: Brows
                   }}
                 />
               </label>
-              <Show when={model().addServer}>
-                {(add) => (
-                  <Button type="button" size="sm" onClick={() => add()()}>
-                    <Plus aria-hidden="true" />
-                    {t("marketplace.app.addCustom")}
-                  </Button>
-                )}
+              <Show when={model().servers}>
+                <Button type="button" size="sm" onClick={() => nav().go({ kind: "server", id: null })}>
+                  <Plus aria-hidden="true" />
+                  {t("marketplace.app.addCustom")}
+                </Button>
               </Show>
             </div>
           </header>

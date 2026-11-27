@@ -2,35 +2,41 @@ import { HelpMenu, type HelpMenuNews } from "@openbot/ui/features/updates/HelpMe
 import { whatsNewEntry } from "@openbot/ui/features/updates/whats-new";
 import { createSignal } from "solid-js";
 import { desktopAnalytics } from "../../analytics";
+import { useI18n } from "../../i18n-context";
+import { useCreditModels } from "../credits/credits-context";
+import { openCreditPrices } from "../servers/credit-prices";
 import { compareReleaseVersions } from "../updates/whats-new-history";
 import { loadWhatsNewReleases } from "../updates/whats-new-releases";
 
-/** The newest releases that the Help menu lists, one line each. */
+type HelpLink = "changelog" | "guides" | "discord" | "report-problem" | "feedback";
+
 const HELP_NEWS_COUNT = 3;
 
-/**
- * The Help menu of the rail, on desktop and on the web. The first time it opens, it reads the release
- * notes in the app and lists the first note of each of the newest releases, up to `version`. The web
- * has no version: it always runs the newest release.
- */
 export function RailHelpMenu(props: {
   version: string | null;
   onOpenWhatsNew: () => void;
-  onOpenLink: (destination: "changelog" | "guides" | "discord" | "feedback") => void;
+  onOpenLink: (destination: HelpLink) => void;
+  onOpenUrl: (url: string) => Promise<void>;
 }) {
+  const i18n = useI18n();
+  const creditModels = useCreditModels();
   const [news, setNews] = createSignal<readonly HelpMenuNews[]>([]);
-  const openLink = (destination: "changelog" | "guides" | "discord" | "feedback") => {
+  let newsLocale: string | null = null;
+  const openLink = (destination: HelpLink) => {
     desktopAnalytics.track("help_link_opened", { destination });
     props.onOpenLink(destination);
   };
-  let loading = false;
+  let loadingLocale: string | null = null;
 
   async function loadNews() {
-    if (loading || news().length > 0) return;
-    loading = true;
+    const locale = i18n.locale();
+    if (loadingLocale === locale || (news().length > 0 && newsLocale === locale)) return;
+    loadingLocale = locale;
+    if (newsLocale !== locale) setNews([]);
     try {
       const version = props.version;
-      const releases = await loadWhatsNewReleases(AbortSignal.timeout(10_000));
+      const releases = await loadWhatsNewReleases(AbortSignal.timeout(10_000), locale);
+      if (loadingLocale !== locale) return;
       setNews(
         releases
           .filter((release) => !version || compareReleaseVersions(release.version, version) <= 0)
@@ -41,23 +47,27 @@ export function RailHelpMenu(props: {
           })
           .slice(0, HELP_NEWS_COUNT),
       );
+      newsLocale = locale;
     } catch {
-      // The menu shows its links without the list. The next opening tries again.
     } finally {
-      loading = false;
+      if (loadingLocale === locale) loadingLocale = null;
     }
   }
 
   return (
     <HelpMenu
       news={news()}
+      creditModels={creditModels()}
       triggerClass="window-rail-button"
       onOpen={() => void loadNews()}
       onOpenWhatsNew={props.onOpenWhatsNew}
       onOpenChangelog={() => openLink("changelog")}
       onOpenGuides={() => openLink("guides")}
       onOpenDiscord={() => openLink("discord")}
+      onReportProblem={() => openLink("report-problem")}
       onSendFeedback={() => openLink("feedback")}
+      onOpenCreditsExplainer={() => desktopAnalytics.track("help_link_opened", { destination: "credits-explainer" })}
+      onOpenCreditPrices={() => openCreditPrices(props.onOpenUrl)}
     />
   );
 }

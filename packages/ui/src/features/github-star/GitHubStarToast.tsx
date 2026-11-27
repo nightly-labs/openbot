@@ -5,25 +5,18 @@ import { currentText } from "../../text";
 import { GitHubMark } from "../settings/brand-marks";
 
 interface GitHubStarToastProps {
-  /** True after the user chose to star. The toast then thanks them in place of the question. */
   thanked: boolean;
   onStar: () => void;
   onClose: () => void;
 }
 
-/**
- * The one-time request for a GitHub star. Raise it unstyled, with sonner's own timer and close
- * button off (`duration: Infinity`), in the `github-star-toast-host` class. The caller holds the
- * `thanked` state: sonner renders the content more than once, and each copy would get its own.
- */
 export function GitHubStarToast(props: GitHubStarToastProps) {
-  // The app's Toaster renders outside the text provider, so `useText()` would always give English.
   const { t } = currentText();
   const titleId = `github-star-toast-${createUniqueId()}`;
   return (
     <section class="github-star-toast" aria-labelledby={titleId}>
       <IconButton
-        class="github-star-toast-close"
+        class="ui-toast-card-close"
         size="icon-xs"
         variant="ghost"
         label={t("common.close")}
@@ -40,7 +33,7 @@ export function GitHubStarToast(props: GitHubStarToastProps) {
               <strong id={titleId}>{t("app.githubStar.title")}</strong>
             </div>
             <p class="github-star-toast-body">{t("app.githubStar.description")}</p>
-            <div class="github-star-toast-actions">
+            <div class="github-star-toast-actions ui-toast-card-actions">
               <Button type="button" variant="ghost" size="sm" onClick={() => props.onClose()}>
                 {t("app.githubStar.notNow")}
               </Button>

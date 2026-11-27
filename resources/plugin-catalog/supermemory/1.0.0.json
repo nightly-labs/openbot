@@ -1,0 +1,33 @@
+{
+  "slug": "supermemory",
+  "name": "Supermemory",
+  "tagline": "Memory across conversations",
+  "description": "Supermemory lets agents save facts and preferences, and recall them later in other conversations and tools. Each user signs in to their own Supermemory account through the browser.",
+  "category": "productivity",
+  "creatorName": "Supermemory",
+  "iconUrl": "https://supermemory.ai/apple-touch-icon.png",
+  "version": "1.0.0",
+  "prompts": [
+    { "id": "prompt-recall", "text": "What do you remember about my preferences for code reviews?" },
+    { "id": "prompt-save", "text": "Remember that the staging database moves to the new region next week." },
+    { "id": "prompt-project", "text": "What did we decide about the onboarding project last month?" }
+  ],
+  "apps": [
+    {
+      "id": "app-supermemory-mcp",
+      "name": "Supermemory",
+      "description": "Memory save and recall, over Supermemory's MCP server with browser sign-in.",
+      "iconUrl": "https://supermemory.ai/apple-touch-icon.png",
+      "server": {
+        "name": "supermemory",
+        "transport": "http",
+        "url": "https://mcp.supermemory.ai/mcp",
+        "auth": [{ "id": "supermemory-oauth", "kind": "link", "label": "Sign in" }]
+      }
+    }
+  ],
+  "websiteUrl": "https://supermemory.ai",
+  "privacyPolicyUrl": "https://supermemory.ai/privacy/",
+  "termsUrl": "https://supermemory.ai/terms/",
+  "skills": []
+}

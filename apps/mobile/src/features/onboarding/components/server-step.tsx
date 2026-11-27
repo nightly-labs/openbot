@@ -14,6 +14,7 @@ import type { MobileServer } from "@/features/workspace/model/workspace-types";
 import { useBloubStageRequest } from "@/shared/components/bloub-stage/bloub-stage-context";
 import { BLOUB_PRIORITY } from "@/shared/components/bloub-stage/bloub-stage-store";
 import { useText } from "@/shared/lib/text";
+import { MIRROR_IN_RTL } from "@/shared/lib/text-direction";
 
 interface ServerOption {
   id: string;
@@ -44,17 +45,13 @@ function OptionRow({ option, index }: { option: ServerOption; index: number }) {
               {option.description}
             </Typography.Paragraph>
           </View>
-          <ChevronRight size={18} color={String(muted)} strokeWidth={1.75} />
+          <ChevronRight size={18} color={String(muted)} strokeWidth={1.75} style={MIRROR_IN_RTL} />
         </View>
       </GlassChoice>
     </View>
   );
 }
 
-/**
- * Where the agents will run. Each choice opens the flow that already does that job. A server that
- * was added and still connects shows here until it is online; then the flow moves on by itself.
- */
 export function ServerStep({
   motion,
   connecting,
@@ -65,18 +62,14 @@ export function ServerStep({
   onSkip,
 }: {
   motion: OnboardingMotion;
-  /** A server that the account has but that is not online yet. */
   connecting: MobileServer | null;
   onComputer: () => void;
-  /** Absent when the account cannot have a cloud server. */
   onCloud: (() => void) | null;
   onInvitation: () => void;
-  /** The flow's own Back and Skip are under the loader, so the loader offers one of them. */
   onBack: (() => void) | null;
   onSkip: (() => void) | null;
 }) {
   const { t } = useText();
-  // The app loader covers the step while the server connects, and rolls up when it is online.
   const focused = useIsFocused();
   useBloubStageRequest(
     connecting && focused

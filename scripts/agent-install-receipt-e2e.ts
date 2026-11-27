@@ -1,7 +1,3 @@
-// Run: bun scripts/agent-install-receipt-e2e.ts
-// Report: .openbot-build/agent-install-receipt-e2e.json
-// Drives the real agent marketplace service with injected auth, agent and skill boundaries.
-
 import assert from "node:assert/strict";
 import { randomUUID } from "node:crypto";
 import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
@@ -29,8 +25,8 @@ interface ScenarioOptions {
   receiptInterrupt?: boolean;
   receiptFailure?: boolean;
   skillFailure?: boolean;
-  /** Start from a saved copy of an older version, so the install is an update. */
   update?: boolean;
+  modifiedSkills?: boolean;
   receiptAttempts?: number;
 }
 
@@ -40,6 +36,7 @@ interface ScenarioState {
   agents: Map<string, AgentSummary>;
   routines: Map<string, RoutineInput>;
   skillInstalls: string[];
+  skillUninstalls: string[];
   receipts: string[];
 }
 
@@ -55,7 +52,6 @@ interface CaseReport {
 
 const decodeReceipt = Schema.decodeUnknownSync(Schema.fromJsonString(Schema.Struct({ receiptId: Schema.String })));
 
-// Do not copy messages, stacks, causes or assertion values into diagnostics.
 function failureReason(error: unknown, phase: string): string {
   if (error instanceof assert.AssertionError) return `Assertion failed during ${phase}.`;
   return `An operation failed during ${phase}.`;
@@ -97,6 +93,7 @@ const detail: MarketplaceAgentDetail = {
   ],
 };
 const timezone = "UTC";
+const DROPPED_SKILL_ID = "receipt-dropped-skill";
 const report: { status: "running" | "pass" | "fail"; cases: CaseReport[] } = { status: "running", cases: [] };
 
 function summary(id: string, workspace: string, values: Partial<AgentSummary>): AgentSummary {
@@ -120,7 +117,6 @@ function summary(id: string, workspace: string, values: Partial<AgentSummary>): 
   };
 }
 
-/** The saved state of an added agent: its profile, its marketplace source and its routines. */
 function assertSaved(state: Pick<ScenarioState, "agents" | "routines">, agentId: string): AgentSummary {
   const agent = state.agents.get(agentId);
   assert.ok(agent);
@@ -153,6 +149,7 @@ async function scenario(
   const agents = new Map<string, AgentSummary>();
   const routines = new Map<string, RoutineInput>();
   const skillInstalls: string[] = [];
+  const skillUninstalls: string[] = [];
   const receipts: string[] = [];
   let phase = "service setup";
   let receiptAttempts = 0;
@@ -164,7 +161,7 @@ async function scenario(
     ): Effect.Effect<T, CentralAuthOperationError> {
       return Effect.gen(function* () {
         if (init.method === "GET") {
-          assert.equal(path, `/v1/marketplace/agents/${detail.id}`);
+          assert.equal(path, `/v1/marketplace/agents/${detail.id}/listing`);
           return decode(detail);
         }
         assert.equal(init.method, "POST");
@@ -172,7 +169,6 @@ async function scenario(
         receiptAttempts += 1;
         assert.ok(typeof init.body === "string", "Receipt body must be a string.");
         const { receiptId } = decodeReceipt(init.body);
-        // The receipt is sent only after the agent is saved.
         const saved = [...agents.values()].filter((agent) => agent.marketplaceSource?.listingId === detail.id);
         assert.equal(saved.length, 1);
         assertSaved({ agents, routines }, saved[0]?.id ?? "");
@@ -228,13 +224,25 @@ async function scenario(
         for (const [id, routine] of routines) if (routine.agentId === agentId) routines.delete(id);
       }),
   };
+  const changed = (skillId: string) => ({
+    skillId,
+    slug: skillId,
+    name: skillId,
+    installedVersion: 1,
+    availableVersion: 2,
+    state: "modified" as const,
+  });
   const skillStore: SkillStore = {
+    listInstalled: () =>
+      Effect.succeed(
+        options.modifiedSkills ? [changed(detail.skills[0]?.skillId ?? ""), changed(DROPPED_SKILL_ID)] : [],
+      ),
     listPublishable: () => Effect.succeed([]),
     installVersion: ({ skillId, versionId }) =>
       options.skillFailure
         ? Effect.fail(new SkillMarketplaceFailure({ cause: "test-skill" }))
         : Effect.sync(() => void skillInstalls.push(`${skillId}@${versionId}`)),
-    uninstall: () => Effect.void,
+    uninstall: ({ skillId }) => Effect.sync(() => void skillUninstalls.push(skillId)),
   };
   try {
     const auth = new ReceiptAuth({
@@ -253,7 +261,7 @@ async function scenario(
           listingId: detail.id,
           versionId: "receipt-listing-version-1",
           version: 1,
-          skillIds: [],
+          skillIds: options.modifiedSkills ? [DROPPED_SKILL_ID] : [],
           routineIds: [oldRoutineId],
         },
       });
@@ -270,7 +278,7 @@ async function scenario(
     }
     phase = "install";
     const result = await Effect.runPromiseExit(service.install(input));
-    const state: ScenarioState = { service, result, agents, routines, skillInstalls, receipts };
+    const state: ScenarioState = { service, result, agents, routines, skillInstalls, skillUninstalls, receipts };
     phase = "case checks";
     await check(state, input);
     phase = "receipt attempt count check";
@@ -311,7 +319,6 @@ function addedAgent(state: ScenarioState, input: InstallMarketplaceAgentInput): 
   return agent;
 }
 
-/** A receipt that dies or is interrupted keeps its error path. The saved agent stays, as before. */
 function keptAfterReceiptError(state: ScenarioState): void {
   assert.ok(Exit.isFailure(state.result));
   assert.equal(state.agents.size, 1);
@@ -325,8 +332,6 @@ await scenario("successful receipt", {}, async (state, input) => {
 });
 await scenario("failed receipt after commit", { receiptFailure: true }, async (state, input) => {
   const agent = addedAgent(state, input);
-  // The listing shows the agent as added, so the user can only open or update it. The same version is
-  // already saved: the service returns the agent and sends no second receipt.
   const again = await Effect.runPromise(
     state.service.install({ ...input, agentId: agent.id, receiptId: randomUUID() }),
   );
@@ -349,6 +354,17 @@ await scenario("update sends no receipt", { update: true, receiptAttempts: 0 }, 
   assert.equal(state.routines.size, detail.routines.length);
   assert.deepEqual(state.receipts, []);
 });
+await scenario(
+  "update keeps changed skills",
+  { update: true, modifiedSkills: true, receiptAttempts: 0 },
+  async (state, input) => {
+    assert.ok(Exit.isSuccess(state.result));
+    const agent = assertSaved(state, input.agentId ?? "");
+    assert.equal(agent.marketplaceSource?.versionId, detail.versionId);
+    assert.deepEqual(state.skillInstalls, []);
+    assert.deepEqual(state.skillUninstalls, []);
+  },
+);
 await scenario("receipt defect", { receiptDefect: true }, async (state) => {
   assert.ok(Exit.hasDies(state.result));
   keptAfterReceiptError(state);

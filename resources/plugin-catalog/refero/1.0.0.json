@@ -1,0 +1,33 @@
+{
+  "slug": "refero",
+  "name": "Refero",
+  "tagline": "UI design references",
+  "description": "Refero lets agents search a library of screens, flows, and styles from real apps and websites for design reference. It needs a Refero Pro subscription.",
+  "category": "design",
+  "creatorName": "Refero",
+  "iconUrl": "https://refero.design/apple-icon-180x180.png",
+  "version": "1.0.0",
+  "prompts": [
+    { "id": "prompt-onboarding", "text": "Find onboarding screens from fintech apps." },
+    { "id": "prompt-pricing", "text": "Show me pricing pages that have a monthly and yearly toggle." },
+    { "id": "prompt-empty-states", "text": "Find empty state designs for a task manager." }
+  ],
+  "apps": [
+    {
+      "id": "app-refero-mcp",
+      "name": "Refero",
+      "description": "Design reference search, over Refero's MCP server with browser sign-in.",
+      "iconUrl": "https://refero.design/apple-icon-180x180.png",
+      "server": {
+        "name": "refero",
+        "transport": "http",
+        "url": "https://api.refero.design/mcp",
+        "auth": [{ "id": "refero-oauth", "kind": "link", "label": "Sign in" }]
+      }
+    }
+  ],
+  "websiteUrl": "https://refero.design",
+  "privacyPolicyUrl": "https://doc.refero.design/legal/privacy-policy",
+  "termsUrl": "https://doc.refero.design/legal/terms-of-use",
+  "skills": []
+}

@@ -1,11 +1,3 @@
-// Runs the real invitation acceptance of the account server on a migrated SQLite database. A member who
-// opens a link again keeps their role, their sessions and the host auth epoch, and does not use a
-// single-use link. A removed member cannot join again with a link that they still have, and a new
-// invitation brings them back. The cap of outstanding single-use invitations holds when owners create
-// them at the same time.
-//
-// Run: bun run test:invite-acceptance
-// It writes .openbot-build/invite-acceptance-e2e/report.json and exits non-zero on a failure.
 import { randomUUID } from "node:crypto";
 import { mkdir, readdir, readFile, writeFile } from "node:fs/promises";
 import { join, resolve } from "node:path";
@@ -26,6 +18,7 @@ const OWNER: AuthUser = {
   name: "Owner",
   avatarUrl: null,
   analyticsEnabled: null,
+  chatColor: null,
 };
 const MEMBER: AuthUser = {
   id: "user-member",
@@ -33,6 +26,7 @@ const MEMBER: AuthUser = {
   name: "Member",
   avatarUrl: null,
   analyticsEnabled: null,
+  chatColor: null,
 };
 
 const checks: { name: string; passed: boolean; detail?: unknown }[] = [];
@@ -54,12 +48,10 @@ const { publicKey, privateKey } = await crypto.subtle.generateKey({ name: "ECDSA
 const publicJwk = await crypto.subtle.exportKey("jwk", publicKey);
 const privateJwk = await crypto.subtle.exportKey("jwk", privateKey);
 
-/** A migrated database with two users and a host that the first one owns, and the real control plane over it. */
 async function setup() {
   const database = await migratedDatabase();
   const now = Date.now();
   let clock = now;
-  /** Moves the clock of the control plane, so that a later write has a later time. */
   const advance = (ms: number) => {
     clock += ms;
   };
@@ -117,7 +109,6 @@ async function setup() {
   return { database, now, advance, plane, epoch, membership, invite, openSessions, openSession, createInvite };
 }
 
-/** The error code of an operation, or null when it succeeds. */
 async function failureCode<A, E extends object>(operation: Effect.Effect<A, E>) {
   const result = await Effect.runPromise(Effect.result(operation));
   if (result._tag === "Success") return { code: null, value: result.success };

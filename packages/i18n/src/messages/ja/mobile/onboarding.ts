@@ -19,7 +19,7 @@ export const messages = {
   "mobile.onboarding.server.invitationBody": "ほかの人から共有されたサーバーに参加します。",
   "mobile.onboarding.server.computerTitle": "コンピューターを接続",
   "mobile.onboarding.server.computerSteps":
-    "このスマートフォンでサインアウトします。次に、コンピューターで OpenBot を開き、設定 → Mobile Connect に移動して「QR コードを生成」を選択し、このスマートフォンでスキャンします。",
+    "このスマートフォンでサインアウトします。次に、コンピューターで OpenBot を開き、設定 → Mobile Connect に移動して「スマートフォンを追加」→「はい、サインイン」を選択し、このスマートフォンでコードをスキャンします。",
   "mobile.onboarding.server.signOut": "サインアウト",
   "mobile.onboarding.server.connecting": "{name} に接続しています…",
   "mobile.onboarding.agent.title": "最初のエージェントを選びましょう",
@@ -63,6 +63,7 @@ export const messages = {
   "mobile.onboarding.task.creating": "作成中…",
   "mobile.onboarding.task.withoutTask": "タスクなしで作成",
   "mobile.onboarding.task.failed": "エージェントを作成できませんでした。もう一度お試しください。",
+  "mobile.onboarding.task.sendFailed": "最初のタスクを送信できませんでした。チャットで送信してください。",
   "mobile.onboarding.idea.builder1": "シンプルな ToDo リストの Web アプリを作ってください。",
   "mobile.onboarding.idea.builder2": "Git のブランチの仕組みを、例を使って説明してください。",
   "mobile.onboarding.idea.builder3": "写真を日付順に並べ替えるスクリプトを書いてください。",

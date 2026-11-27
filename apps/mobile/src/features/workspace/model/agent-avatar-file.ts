@@ -1,3 +1,4 @@
+import type { AvatarMood } from "@openbot/brand/bloub-avatar-motion";
 import { type Directory, File } from "expo-file-system";
 import { nameHash, PLUSH_STYLE, renderPlushPicture } from "@/features/agents/model/plush/plush-picture";
 import { supportLog, supportLogValue } from "@/features/support/model/support-log";
@@ -11,18 +12,10 @@ export type AvatarFileAgent = Pick<
 
 interface AvatarFile {
   name: string;
-  /**
-   * Writes the picture, or starts to draw it. A drawn plush is written later, and only while `wanted`
-   * is true; its promise ends when it is written.
-   */
   write: (file: File, wanted: () => boolean) => Promise<void> | null;
 }
 
-/**
- * The agent's photo when this phone has saved it, else its plush drawn at `pixels`, as a file that a
- * native extension or service can read. The name changes when the picture changes.
- */
-export function agentAvatarFile(agent: AvatarFileAgent, pixels: number): AvatarFile {
+export function agentAvatarFile(agent: AvatarFileAgent, pixels: number, mood: AvatarMood = "idle"): AvatarFile {
   const photo = agent.avatarUrl ? savedAgentAvatar(agent.serverId, agent.id, agent.avatarUrl) : null;
   if (photo) {
     const source = new File(photo);
@@ -35,14 +28,13 @@ export function agentAvatarFile(agent: AvatarFileAgent, pixels: number): AvatarF
     };
   }
   return {
-    // An agent without a colour keeps the name of an older build.
-    name: `${nameHash(`${PLUSH_STYLE}|${agent.avatarSeed}|${agent.avatarHue}${agent.avatarColor ? `|${agent.avatarColor}` : ""}`)}.png`,
+    name: `${nameHash(`${PLUSH_STYLE}|${agent.avatarSeed}|${agent.avatarHue}${agent.avatarColor ? `|${agent.avatarColor}` : ""}${mood === "idle" ? "" : `|${mood}`}`)}.png`,
     write: async (file, wanted) => {
       const data = await renderPlushPicture({
         seed: agent.avatarSeed,
         hue: agent.avatarHue,
         color: agent.avatarColor,
-        mood: "idle",
+        mood,
         pixels,
         saturation: 1,
       });
@@ -51,39 +43,36 @@ export function agentAvatarFile(agent: AvatarFileAgent, pixels: number): AvatarF
   };
 }
 
-/** The names that each folder must hold, from its latest sync. */
 const wantedNames = new Map<string, ReadonlySet<string>>();
-/** The files that are being drawn. */
 const writing = new Set<string>();
 
-/**
- * Writes the pictures of `agents` that `named` holds and `folder` does not have, and deletes the
- * files that `named` does not hold. A picture that fails is logged as `label` and left out. A plush
- * picture is drawn in the background; its file shows up when it is drawn.
- */
 export function syncAvatarFolder(
   folder: Directory,
   named: ReadonlySet<string>,
   agents: readonly AvatarFileAgent[],
   pixels: number,
   label: string,
+  moods: readonly AvatarMood[] = ["idle"],
 ): void {
   folder.create({ intermediates: true, idempotent: true });
   wantedNames.set(folder.uri, named);
   const fail = (error: unknown) => supportLog.add("warn", "app", `${label} not saved: ${supportLogValue(error)}`);
-  for (const agent of agents) {
-    const source = agentAvatarFile(agent, pixels);
-    const file = new File(folder, source.name);
-    if (!named.has(source.name) || file.exists || writing.has(file.uri)) continue;
-    try {
-      // Sign-out deletes the folder; a picture drawn after it is not written.
-      const written = source.write(file, () => folder.exists && wantedNames.get(folder.uri)?.has(source.name) === true);
-      if (!written) continue;
-      writing.add(file.uri);
-      void written.catch(fail).finally(() => writing.delete(file.uri));
-    } catch (error) {
-      fail(error);
+  for (const agent of agents)
+    for (const mood of moods) {
+      const source = agentAvatarFile(agent, pixels, mood);
+      const file = new File(folder, source.name);
+      if (!named.has(source.name) || file.exists || writing.has(file.uri)) continue;
+      try {
+        const written = source.write(
+          file,
+          () => folder.exists && wantedNames.get(folder.uri)?.has(source.name) === true,
+        );
+        if (!written) continue;
+        writing.add(file.uri);
+        void written.catch(fail).finally(() => writing.delete(file.uri));
+      } catch (error) {
+        fail(error);
+      }
     }
-  }
   for (const entry of folder.list()) if (!named.has(entry.name)) entry.delete();
 }

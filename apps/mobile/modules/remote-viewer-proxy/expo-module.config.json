@@ -1,0 +1,9 @@
+{
+  "platforms": ["apple", "android"],
+  "apple": {
+    "modules": ["RemoteViewerProxyModule"]
+  },
+  "android": {
+    "modules": ["run.openbot.remoteviewerproxy.RemoteViewerProxyModule"]
+  }
+}

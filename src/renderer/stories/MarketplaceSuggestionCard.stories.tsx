@@ -10,12 +10,6 @@ import { fn } from "storybook/test";
 import type { Meta, StoryObj } from "storybook-solidjs-vite";
 import { requireFixture, STORY_AGENTS } from "./fixtures";
 
-/*
- * Issue #1291: an agent suggests a Marketplace app or skill in the conversation. The person
- * connects it from the chat, opens its listing, or dismisses it. The connect step itself, with its
- * approval and sign-in dialogs, stays in the renderer.
- */
-
 const chief = requireFixture(STORY_AGENTS[0], "Story agent 0");
 
 function tile(svg: string): string {
@@ -63,15 +57,12 @@ const meta = {
 export default meta;
 type Story = StoryObj<typeof meta>;
 
-/** The compact card, as in the issue reference. */
 export const Available: Story = {};
 
-/** The connect step runs. Sign-in and approval dialogs open from the renderer. */
 export const Connecting: Story = { args: { state: "busy" } };
 
 export const Connected: Story = { args: { state: "connected" } };
 
-/** The app was connected before, and its sign-in has expired. */
 export const NeedsAttention: Story = {
   args: {
     kind: "app",
@@ -82,7 +73,6 @@ export const NeedsAttention: Story = {
   },
 };
 
-/** A skill installs on the agent instead of connecting a service. */
 export const Skill: Story = {
   args: {
     kind: "skill",
@@ -94,7 +84,35 @@ export const Skill: Story = {
 
 export const SkillInstalled: Story = { args: { ...Skill.args, state: "connected" } };
 
-/** A member of a joined server can see the suggestion but cannot connect apps. */
+export const SkillQuestion: Story = {
+  args: {
+    kind: "skill",
+    skillAction: "save",
+    fullDescription: true,
+    name: "Git commit subject writing",
+    description:
+      "You corrected my commit subjects three times: imperative mood, at most 50 characters, and the area in brackets first, as in [auth] Fix login timeout. You said this is the method you want every time, in every repository, also for squash merges and release commits. I can keep it as a skill, so I follow these rules in each new chat, and your other agents can install it too. It would also keep my last check: count the characters and remove filler words such as “update” or “changes”. Should I save this as a new skill named Git commit subject writing?",
+    iconUrl: null,
+    onOpenDetails: undefined,
+  },
+  render: (args) => (
+    <main style={{ width: "min(560px, 100vw)", padding: "var(--openbot-space-4)" }}>
+      <CardStage {...args} />
+    </main>
+  ),
+};
+
+export const SkillQuestionSaved: Story = { args: { ...SkillQuestion.args, state: "connected" } };
+
+export const SkillQuestionNarrow: Story = {
+  args: SkillQuestion.args,
+  render: (args) => (
+    <main style={{ width: "320px", padding: "var(--openbot-space-4)" }}>
+      <CardStage {...args} />
+    </main>
+  ),
+};
+
 export const Unavailable: Story = {
   args: {
     state: "unavailable",
@@ -103,10 +121,8 @@ export const Unavailable: Story = {
   },
 };
 
-/** A dismissed card stays as one line, so the person can undo. */
 export const Dismissed: Story = { args: { dismissed: true } };
 
-/** No icon, a long name and a long description, in a narrow chat. */
 export const NarrowNoIcon: Story = {
   args: {
     name: "Company password manager for the finance team",
@@ -120,7 +136,6 @@ export const NarrowNoIcon: Story = {
   ),
 };
 
-/** Holds the card state, so Connect, Dismiss and Undo can be tried. Connect takes a moment. */
 function CardStage(props: MarketplaceSuggestionCardProps) {
   const [card, setCard] = createStore<{ state: MarketplaceSuggestionState; dismissed: boolean }>({
     state: untrack(() => props.state),
@@ -180,7 +195,6 @@ const reply = message(
   "2:39 PM",
 );
 
-/** The card under the agent's reply, at the width of a chat. */
 export const InConversation: Story = {
   parameters: { layout: "fullscreen" },
   render: (args) => (

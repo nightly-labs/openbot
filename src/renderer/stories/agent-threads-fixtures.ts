@@ -1,7 +1,6 @@
-import type { AgentTask, ConversationMessage, ConversationSnapshot } from "@openbot/contracts/ipc";
+import type { AgentTask, ConversationMessage, ConversationSnapshot, QueueDelivery } from "@openbot/contracts/ipc";
 import type { MockOpenBotOptions } from "../src/preview/mock-openbot";
 
-/** Side threads of Chief for the desktop and web thread stories. */
 export const AGENT_ID = "chief";
 export const TABS_KEY = "openbot:thread-tabs:v1";
 
@@ -32,7 +31,6 @@ function thread(id: string, title: string, updatedAt: string, fields: Partial<Ag
 
 const PRICING = thread("pricing", "Pricing page copy", "2026-08-19T09:58:00.000Z");
 
-/** A branch of "Pricing page copy" through its headline answer. The menu nests it under its source. */
 const PRICING_SHORT = thread("pricing-short", "Pricing page copy #2", "2026-08-19T10:04:00.000Z", {
   branch: {
     sourceTaskId: PRICING.id,
@@ -42,7 +40,6 @@ const PRICING_SHORT = thread("pricing-short", "Pricing page copy #2", "2026-08-1
   },
 });
 
-/** A branch whose source thread was deleted. Its divider has no link. */
 const PRICING_ORPHAN = thread("pricing-orphan", "Pricing FAQ", "2026-08-19T08:20:00.000Z", {
   branch: {
     sourceTaskId: "deleted-thread",
@@ -63,7 +60,6 @@ const THREADS: AgentTask[] = [
       throughMessageId: "pricing-long-2",
     },
   }),
-  // A branch of a branch: the line of "#2" runs on past it to "#3".
   thread("pricing-short-alt", "Pricing page copy #4", "2026-08-19T10:06:00.000Z", {
     branch: {
       sourceTaskId: PRICING_SHORT.id,
@@ -104,7 +100,6 @@ function snapshot(task: AgentTask, messages: ConversationMessage[]): Conversatio
 
 export const THREAD_OPTIONS: MockOpenBotOptions = {
   tasks: { [AGENT_ID]: THREADS },
-  // The open thread shows its context meter, with the Compact action.
   runtimeSnapshot: {
     threadContextStates: [
       {
@@ -172,4 +167,89 @@ export const THREAD_OPTIONS: MockOpenBotOptions = {
       ),
     ]),
   },
+};
+
+const COMPETITORS = requireThread("competitors");
+
+function requireThread(id: string): AgentTask {
+  const task = THREADS.find((candidate) => candidate.id === id);
+  if (!task) throw new Error(`No thread fixture: ${id}`);
+  return task;
+}
+
+function queued(id: string, position: number, text: string): QueueDelivery {
+  return {
+    id,
+    messageId: `message-${id}`,
+    recipientAgentId: AGENT_ID,
+    sender: { kind: "user" },
+    text,
+    attachments: [],
+    replyToMessageId: null,
+    status: "queued",
+    position,
+    turnId: null,
+    error: null,
+    createdAt: "2026-08-19T10:01:00.000Z",
+    expectsReply: false,
+  };
+}
+
+export const THREAD_QUEUE_OPTIONS: MockOpenBotOptions = {
+  ...THREAD_OPTIONS,
+  tasks: {
+    [AGENT_ID]: THREADS.map((task) =>
+      task.id === COMPETITORS.id
+        ? {
+            ...task,
+            queue: [
+              queued("competitors-queue-1", 1, "Also add the two newest competitors."),
+              queued("competitors-queue-2", 2, "Keep the summary under one page."),
+            ],
+          }
+        : task,
+    ),
+  },
+  taskConversations: {
+    ...THREAD_OPTIONS.taskConversations,
+    competitors: snapshot(COMPETITORS, [
+      message(
+        "competitors-queue-message-1",
+        "user",
+        "Compare the pricing pages of our three closest competitors.",
+        "2026-08-19T09:50:00.000Z",
+      ),
+      message(
+        "competitors-queue-message-2",
+        "assistant",
+        "I have the first two pages. The third one loads its prices late, so I read it again.",
+        "2026-08-19T09:56:00.000Z",
+      ),
+    ]),
+  },
+};
+
+const COMPETITORS_DONE = thread("competitors", "Competitor scan", "2026-08-19T10:07:00.000Z");
+
+export const UNREAD_OPTIONS: MockOpenBotOptions = {
+  ...THREAD_OPTIONS,
+  tasks: { [AGENT_ID]: THREADS.map((task) => (task.id === COMPETITORS_DONE.id ? COMPETITORS_DONE : task)) },
+  taskConversations: {
+    ...THREAD_OPTIONS.taskConversations,
+    competitors: snapshot(COMPETITORS_DONE, [
+      message(
+        "competitors-1",
+        "user",
+        "Compare the pricing pages of our three closest competitors.",
+        "2026-08-19T09:50:00.000Z",
+      ),
+      message(
+        "competitors-2",
+        "assistant",
+        "All three charge per seat. Only one has a free plan, and none keeps data on the computer. The table is in `competitors.md`.",
+        "2026-08-19T10:07:00.000Z",
+      ),
+    ]),
+  },
+  taskUnread: { pricing: 1, competitors: 1, "pricing-orphan": 2 },
 };

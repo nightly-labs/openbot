@@ -2,7 +2,6 @@ import type { PartialTranslation } from "../../../message";
 import type { messages as source } from "../../en/error/site";
 
 export const messages = {
-  // Hosted site errors.
   "error.site.absolutePath": "请选择站点目录的绝对路径。",
   "error.site.rootSymlink": "托管站点不允许使用符号链接。",
   "error.site.notDirectory": "站点源必须是一个目录。",
@@ -31,6 +30,9 @@ export const messages = {
     one: "该服务器已达到 {count} 个活跃站点的上限。要发布其他站点，请删除一个站点，或使用站点更多套餐的云服务器。",
     other: "该服务器已达到 {count} 个活跃站点的上限。要发布其他站点，请删除一个站点，或使用站点更多套餐的云服务器。",
   },
+  "error.site.sharedLimit":
+    "您账户中没有套餐的服务器共享其活跃站点，且已全部占用。要在此发布站点，请删除这些服务器之一上的站点、为许可证添加用户，或使用套餐包含更多站点的云服务器。",
+  "error.site.accountLimit": "您的账户在其所有服务器上的活跃站点已达上限：{count}。要发布另一个站点，请删除一个站点。",
   "error.site.unlinkedLimit": {
     one: "该电脑不是服务器，其账户已达到 {count} 个活跃站点的上限。要发布其他站点，请删除一个站点，或使用站点更多套餐的云服务器。",
     other:

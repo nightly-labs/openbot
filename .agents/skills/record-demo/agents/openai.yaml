@@ -1,0 +1,4 @@
+interface:
+  display_name: "Record demo"
+  short_description: "Record a video of a change in the local app and attach it to the PR"
+  default_prompt: "Use $record-demo to record a short video of the current change in the local dev app and attach it to the pull request."

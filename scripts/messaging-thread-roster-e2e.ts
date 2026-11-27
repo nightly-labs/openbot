@@ -1,7 +1,3 @@
-// Checks that a restart never makes the thread of a Discord or Slack conversation an agent's own chat,
-// and that an agent which an earlier build gave one keeps it with one conversation snapshot. Boots the
-// real agent store on a temporary profile three times: `bun scripts/messaging-thread-roster-e2e.ts`.
-// Writes .openbot-build/messaging-thread-roster-e2e/report.json.
 import assert from "node:assert/strict";
 import { mkdirSync, writeFileSync } from "node:fs";
 import { mkdtemp, rm } from "node:fs/promises";
@@ -42,7 +38,6 @@ async function boot<T>(use: (store: AgentStore, database: OpenBotDatabase) => T 
 }
 
 try {
-  // A Discord conversation reaches an agent that was never opened, so the agent has no chat of its own.
   const { agentId, messagingThreadId } = await boot(async (store, database) => {
     const agent = await runCauseEffect(
       store.createAgent({ name: "Discord Orchestrator", description: "", avatarSeed: "seed", avatarHue: null }),
@@ -62,13 +57,11 @@ try {
   });
   report.messagingThreadId = messagingThreadId;
 
-  // A restart must not adopt the conversation's thread as the agent's chat.
   report.threadAfterRestart = await boot(
     (store) => store.list().find((agent) => agent.id === agentId)?.threadId ?? null,
   );
   assert.notEqual(report.threadAfterRestart, messagingThreadId, "A restart adopted the messaging thread.");
 
-  // The state an earlier build left: the agent's chat is the conversation's thread.
   await boot((store, database) => {
     const agents = store
       .list()
@@ -77,7 +70,6 @@ try {
   });
 
   await boot((store, database) => {
-    // The agent keeps the thread: its chat history is there now.
     report.threadAfterRestartShared = store.list().find((agent) => agent.id === agentId)?.threadId ?? null;
     assert.equal(report.threadAfterRestartShared, messagingThreadId, "The agent lost the thread with its chat.");
     const messaging = new MessagingStore(database);
@@ -91,8 +83,6 @@ try {
       isDirect: false,
       title: "#general · again",
     });
-    // Boot recovery registers every conversation thread. The agent's own chat keeps one snapshot,
-    // so the end of a turn there clears the turn that holds the agent's queue.
     const conversation = new ConversationRuntime(
       store,
       () => {},

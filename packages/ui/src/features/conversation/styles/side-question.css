@@ -1,4 +1,3 @@
-/* The side question pane, in the place of the other side panels. */
 .side-question-empty {
   display: flex;
   min-height: 0;
@@ -16,7 +15,7 @@
   height: var(--openbot-icon-lg);
   margin-bottom: var(--openbot-space-1);
   color: var(--openbot-text-muted);
-  stroke-width: var(--openbot-icon-stroke);
+  stroke-width: var(--openbot-icon-stroke-lg);
 }
 
 .side-question-empty > strong {
@@ -33,7 +32,6 @@
   line-height: var(--openbot-leading-sm);
 }
 
-/* The chat composer's compact row, without its attach button: the editor and the send button. */
 .side-question-composer.composer[data-compact] {
   grid-template-columns: minmax(0, 1fr) auto;
 }

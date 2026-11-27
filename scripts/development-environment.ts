@@ -13,6 +13,8 @@ const LOCAL_IDENTITY_KEYS = [
   "SKILLS_ADMIN_TOKEN",
 ] as const;
 
+const MANUAL_TEST_KEYS = new Set(["INCEPTION_API_KEY", "DEV_TEST_GMAIL_ADDRESS", "DEV_TEST_GMAIL_PASSWORD"]);
+
 export function withoutDecryptionKeys(environment: NodeJS.ProcessEnv): NodeJS.ProcessEnv {
   return Object.fromEntries(Object.entries(environment).filter(([key]) => !key.startsWith("DOTENV_")));
 }
@@ -23,11 +25,12 @@ export async function loadSharedDevelopmentEnvironment(
 ): Promise<Record<string, string>> {
   const privateKey = environment.DOTENV_PRIVATE_KEY_DEV;
   if (!privateKey?.trim()) return {};
-  return decryptEnvironment(
+  const values = await decryptEnvironment(
     join(projectRoot, "apps/auth-api/.env.dev"),
     { DOTENV_PRIVATE_KEY_DEV: privateKey },
     "Cannot decrypt shared development settings. Check the development key.",
   );
+  return Object.fromEntries(Object.entries(values).filter(([key]) => !MANUAL_TEST_KEYS.has(key)));
 }
 
 async function decryptEnvironment(
@@ -51,7 +54,6 @@ async function decryptEnvironment(
     if (result.error || Object.values(values).some((value) => value.startsWith("encrypted:"))) throw new Error(message);
     return Object.fromEntries(Object.entries(values).filter(([key]) => !key.startsWith("DOTENV_")));
   } catch {
-    // Library errors can contain private-key details. Do not retain their cause.
     throw new Error(message);
   }
 }
@@ -62,7 +64,6 @@ export async function loadDevelopmentEnvironment(
 ): Promise<NodeJS.ProcessEnv> {
   const state = readDevelopmentState(projectRoot);
   const shared = await loadSharedDevelopmentEnvironment(projectRoot, environment);
-  // Shared service credentials must not change the identity of an existing local instance.
   for (const key of LOCAL_IDENTITY_KEYS) delete shared[key];
   return withoutDecryptionKeys({
     ...state.defaults,
@@ -176,7 +177,6 @@ export function developmentChildEnvironment(
   return child;
 }
 
-/** Only the API receives the full account configuration. Signal receives its verification values. */
 export function developmentSettingsForService(
   environment: NodeJS.ProcessEnv,
   service: "api" | "remote" | "app" | "test-client",

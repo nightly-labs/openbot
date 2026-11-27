@@ -4,6 +4,14 @@
   min-width: 0;
   font-size: var(--openbot-text-sm);
 }
+.ui-chart-empty {
+  display: grid;
+  place-items: center;
+  height: 300px;
+  margin: 0;
+  color: var(--openbot-text-muted);
+  font-size: var(--openbot-text-sm);
+}
 .ui-chart-tooltip {
   background: var(--openbot-bg-surface);
   color: var(--openbot-text-primary);
@@ -13,8 +21,7 @@
   font-size: var(--openbot-text-sm);
   font-variant-numeric: tabular-nums;
 }
-/* One row per series: mark, name, value. The value column takes the remaining width so
-   the numbers line up under each other however long the names are. */
+
 .ui-chart-tooltip-row {
   display: grid;
   grid-template-columns: var(--openbot-space-4) auto 1fr;
@@ -33,4 +40,7 @@
   border-top: 1px solid var(--openbot-border-strong);
   padding-top: var(--openbot-space-2);
   color: var(--openbot-text-muted);
+}
+.ui-chart-cursor {
+  fill: var(--openbot-bg-control-hover);
 }

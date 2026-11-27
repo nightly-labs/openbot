@@ -1,12 +1,3 @@
-// Checks that Codex usage is metered in the agent's own chat and in its tasks, once, with the list
-// price (#2686). Runs the real agent service on a temporary profile with a fake Codex app-server
-// that reports `thread/tokenUsage/updated` as Codex 0.160.1 does: cumulative `total` and per-request
-// `last` counts, with cache writes in `cacheWriteInputTokens`. A message `prompts=<a>,<b>` makes one
-// model request per number, each with that many input tokens. Cases: a chat turn, a task turn, a task
-// request of 250,000 input tokens (short-context price), one of 300,000 (long-context price), and a
-// chat session that the counter before this change counted (its first update records only its own
-// request).
-// `bun scripts/codex-usage-metering-e2e.ts`. Writes .openbot-build/codex-usage-metering-e2e/report.json.
 import assert from "node:assert/strict";
 import { mkdirSync, writeFileSync } from "node:fs";
 import { mkdtemp, rm, writeFile } from "node:fs/promises";
@@ -23,7 +14,6 @@ const userData = join(root, "user-data");
 const home = join(root, "home");
 const fakeCodex = join(root, "codex");
 
-// Before the service modules load: the Codex process and the stores read the home folder.
 process.env.HOME = home;
 process.env.CODEX_HOME = join(home, ".codex");
 process.env.OPENBOT_CODEX_PATH = fakeCodex;
@@ -35,10 +25,6 @@ const { runCauseEffect } = await import("../src/backend/effect-boundary");
 const { MailboxStore } = await import("../src/backend/mailbox-store");
 const { OpenBotDatabase } = await import("../src/backend/openbot-database");
 
-/**
- * A Codex app-server with the methods that the service calls. Each request reuses the prompt of the
- * request before it as cached input, and writes half of its new input to the cache.
- */
 const FAKE_CODEX = `#!/usr/bin/env node
 if (process.argv.includes("--version")) {
   process.stdout.write("codex-cli 0.160.1\\n");
@@ -48,7 +34,6 @@ const config = { config: { mcp_servers: {} }, layers: [{ name: { type: "user", f
 let buffer = "";
 let threads = 0;
 let turns = 0;
-/** threadId -> cumulative counts and the prompt of the last request. */
 const usage = new Map();
 process.stdout.on("error", (error) => {
   if (error.code === "EPIPE") process.exit(0);
@@ -117,12 +102,9 @@ process.stdin.on("data", (chunk) => {
 });
 `;
 
-// The GPT-6 Luna list prices, per million tokens, from https://developers.openai.com/api/docs/pricing
-// on 2026-10-21. "Long context: >272K input tokens".
 const SHORT = { input: 0.1, cached: 0.01, cacheWrite: 0.125, output: 0.5 };
 const LONG = { input: 0.2, cached: 0.02, cacheWrite: 0.25, output: 0.75 };
 
-/** The records and the cost that the fake's requests of one turn must give. */
 function expected(prompts: number[], previousPrompt: number) {
   let prompt = previousPrompt;
   return prompts.map((next) => {
@@ -174,6 +156,7 @@ const report: {
 const unused = () => Effect.die(new Error("Not used by this check."));
 const browser: AgentBrowserHost = {
   listTabs: () => [],
+  toolCanUseTab: () => false,
   beginTakeover: unused,
   endTakeover: () => {},
   resolveUploadTarget: unused,
@@ -187,9 +170,11 @@ const browser: AgentBrowserHost = {
   endControl: () => {},
   close: () => Effect.void,
   clearAgentSession: () => Effect.void,
+  shareTab: () => undefined,
+  unshareThread: () => undefined,
+  agentTab: () => null,
 };
 
-/** Waits for a state of the service or of its database. */
 async function waitFor<T>(label: string, read: () => T | null | undefined | false, timeoutMs = 20_000): Promise<T> {
   const deadline = Date.now() + timeoutMs;
   for (;;) {
@@ -211,7 +196,6 @@ const agents = new AgentService({
   preferredProvider: "codex",
   offProviders: AGENT_PROVIDERS.filter((provider) => provider !== "codex"),
 });
-// A second connection reads the usage tables and sets up the counter of an earlier release.
 let connection: DatabaseSync | null = null;
 const sqlite = () => {
   connection ??= new DatabaseSync(database.path);
@@ -219,7 +203,6 @@ const sqlite = () => {
 };
 const closeReader = () => connection?.close();
 
-/** The usage records of one provider turn, with the public thread of their session. */
 function records(turnId: string): UsageRecord[] {
   return sqlite()
     .prepare(
@@ -239,7 +222,6 @@ function records(turnId: string): UsageRecord[] {
     }));
 }
 
-/** The provider turns that ran in one public thread, oldest first. */
 function turnsOf(threadId: string): string[] {
   return sqlite()
     .prepare(
@@ -319,7 +301,6 @@ try {
   await waitFor("the task turn to end", () => agents.listTasks(agent.id).tasks.find((t) => t.id === task.id)?.outcome);
   check("task turn", task.threadId, taskTurn, agent.id, expected([12000, 15000], 0));
 
-  // Under the old rule, any update with 200,000 or more input tokens stayed unpriced.
   for (const [index, prompt] of [250_000, 300_000].entries()) {
     const receipt = await runCauseEffect(
       agents.sendMessage({ agentId: agent.id, taskId: task.id, text: `prompts=${prompt}` }),
@@ -338,8 +319,6 @@ try {
     );
   }
 
-  // A session from before collection started, that the release before this change counted: its
-  // counter has no cache writes.
   const sessionId = String(
     sqlite().prepare("SELECT id FROM projection_provider_sessions WHERE thread_id = ?").get(chatThread)?.id,
   );
@@ -362,7 +341,6 @@ try {
   await settled(upgradeDelivery, "chat turn after the upgrade");
   const upgradeTurn = turnsOf(chatThread)[1];
   assert.ok(upgradeTurn, "chat turn after the upgrade: no turn");
-  // The new counter starts from the totals before the first request, so both requests count once.
   check("chat turn after the upgrade", chatThread, upgradeTurn, agent.id, expected([20000, 21000], 15000));
 
   const today = new Date().toISOString().slice(0, 10);

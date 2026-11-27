@@ -6,20 +6,19 @@ import {
   agentNextProviderAccountId,
   DEFAULT_PROVIDER_ACCOUNT_ID,
   providerDisplayName,
+  workspaceAccessEnforced,
 } from "@openbot/contracts/ipc";
-import { AGENT_FAST_MODE_CAPABILITY } from "@openbot/contracts/team-protocol/agent-fast-mode-v1";
 import { reasoningLabel } from "@openbot/ui/components/ProviderModelPicker";
-import { providerAccountName } from "@openbot/ui/components/provider-accounts";
+import { findModelOption, providerAccountName } from "@openbot/ui/components/provider-accounts";
 import { ConversationHeader as SharedConversationHeader } from "@openbot/ui/features/conversation/ConversationHeader";
 import { ThreadHeader } from "@openbot/ui/features/conversation/threads/ThreadHeader";
-import { MAIN_THREAD_ID } from "@openbot/ui/features/conversation/threads/thread-types";
+import { DRAFT_THREAD_ID, MAIN_THREAD_ID } from "@openbot/ui/features/conversation/threads/thread-types";
 import { Show } from "solid-js";
-import { serverSupportsCapability } from "../servers/server-capabilities";
+import { actionToast } from "../../action-toast";
 import { useConversationViewScope } from "./conversation-scope";
 
 const loadAgentSettingsPanel = () => import("./AgentSettingsPanel");
 
-/** The runtime of the running turn, or of the next one, as the "After this turn" badge names it. */
 interface BadgeRuntime {
   provider: AgentProviderRef;
   model: AgentModelId;
@@ -29,16 +28,14 @@ interface BadgeRuntime {
 
 import { useText } from "@openbot/ui/text";
 
-/** @internal Stable HMR boundary for conversation header. */
 export function ConversationHeader() {
   const { t } = useText();
   const {
-    actingBrowserControl,
     agentActivity,
-    browserControlAgent,
-    changeFastMode,
     channel,
     fastMode,
+    ultrafast,
+    fastModeChange,
     props,
     runningTurnRuntime,
     selectAndConfirmModel,
@@ -47,19 +44,47 @@ export function ConversationHeader() {
     settingsModel,
     settingsProvider,
     settingsReasoning,
-    sidePanelOpen,
     sideThreadOpen,
-    toggleSidePanel,
+    messagePins,
+    replyJump,
     moveThreadToPanel,
+    startNewThread,
   } = useConversationViewScope();
   const runningThreads = () => props.threads?.running ?? 0;
-  /** While a side thread is open, the agent's name goes back to the agent's own chat. */
   const openMainChat = () => {
     const header = props.threads?.header;
     return header && sideThreadOpen() ? () => header.onOpen(MAIN_THREAD_ID) : undefined;
   };
-  /** With thread tabs, the agent's name is the tab of the agent's own chat. */
   const titleSelected = () => (props.threads ? !sideThreadOpen() : undefined);
+  const viewTaskId = () => (sideThreadOpen() ? (props.threads?.open?.id ?? DRAFT_THREAD_ID) : undefined);
+  let pinOpens = 0;
+  async function openPin(key: string): Promise<void> {
+    const pin = messagePins.pin(key);
+    if (!pin) return;
+    const open = ++pinOpens;
+    const opened =
+      pin.taskId === null && !sideThreadOpen()
+        ? await replyJump.jumpTo(pin.messageId)
+        : ((await props.threads?.onOpenMessage(pin.taskId, pin.messageId)) ?? false);
+    if (opened || open !== pinOpens) return;
+    actionToast.error(t("chat.pins.missing"));
+    messagePins.load();
+  }
+  const pinnedMessages = () => {
+    if (!messagePins.available()) return undefined;
+    return {
+      pins: messagePins.items(viewTaskId()),
+      agents: props.agents,
+      onOpenChange: (open: boolean) => {
+        if (open) messagePins.load();
+      },
+      onJump: (key: string) => void openPin(key),
+      onUnpin: (key: string) => {
+        const pin = messagePins.pin(key);
+        if (pin) messagePins.set(pin.taskId ?? undefined, pin.messageId, false);
+      },
+    };
+  };
   const working = () => agentActivity() === "Working";
   const providerName = (provider: AgentProviderRef) =>
     isKnownAgentProvider(provider) ? providerDisplayName(provider) : String(provider);
@@ -70,10 +95,9 @@ export function ConversationHeader() {
       props.agentStatus?.providers?.find((status) => status.id === runtime.provider)?.accounts ?? [],
       accountId(runtime),
     );
-  /** Each part shows only where the two runtimes differ, so a model change alone names only the models. */
   const runtimeLabel = (runtime: BadgeRuntime, other: BadgeRuntime) => {
     const parts = [
-      props.modelOptions.find((option) => option.provider === runtime.provider && option.id === runtime.model)?.name ??
+      findModelOption(props.modelOptions, props.agentStatus?.providers, runtime.provider, runtime.model)?.name ??
         runtime.model,
     ];
     if (runtime.provider !== other.provider) parts.unshift(providerName(runtime.provider));
@@ -81,7 +105,6 @@ export function ConversationHeader() {
     if (runtime.reasoningEffort !== other.reasoningEffort) parts.push(reasoningLabel(runtime.reasoningEffort, t));
     return parts.join(" · ");
   };
-  /** A change chosen during a turn, in any thread. It applies from the next turn. */
   const pendingModel = () => {
     const agent = props.agent;
     if (!agent || !(working() || runningThreads() > 0)) return undefined;
@@ -125,21 +148,17 @@ export function ConversationHeader() {
         onConnectProvider: props.onConnectProvider,
         canConnectProvider: props.canConnectProvider,
         onManageProviders: props.onManageProviders,
-        // A model, effort, provider or account chosen during a turn applies from the next turn.
         disabledReason: t("conversation.header.modelsUnavailable"),
         accountChoice: true,
         providerAccountId: props.agent ? agentNextProviderAccountId(props.agent) : undefined,
+        workspaceOnly: props.agent ? workspaceAccessEnforced(props.agent) : false,
         accountUsage: props.accountUsage,
         onChange: (model, provider, accountId, effort) =>
           void selectAndConfirmModel(model, provider, accountId, effort),
         onReasoningEffortChange: (effort) => void selectAndConfirmReasoning(effort),
-        // Codex only for now: on this computer, or on a joined server with `agent-fast-mode-v1`.
         fastMode: fastMode(),
-        onFastModeChange:
-          settingsProvider() === "codex" &&
-          (props.server?.kind === "local" || serverSupportsCapability(props.server, AGENT_FAST_MODE_CAPABILITY))
-            ? (next) => void changeFastMode(next)
-            : undefined,
+        ultrafast: ultrafast(),
+        onFastModeChange: fastModeChange(),
       }}
       remoteControl={
         props.remoteDesktopEnabled !== false && props.server?.kind === "remote"
@@ -155,20 +174,10 @@ export function ConversationHeader() {
       }
       threads={
         <Show when={props.threads}>
-          {(threads) => <ThreadHeader {...threads().header} onMoveToSide={moveThreadToPanel} />}
+          {(threads) => <ThreadHeader {...threads().header} onNew={startNewThread} onMoveToSide={moveThreadToPanel} />}
         </Show>
       }
-      sidePanel={
-        channel?.readOnly()
-          ? undefined
-          : {
-              open: sidePanelOpen(),
-              actingAgentName: actingBrowserControl()
-                ? (browserControlAgent()?.name ?? t("conversation.header.agentFallback"))
-                : undefined,
-              onToggle: toggleSidePanel,
-            }
-      }
+      pinnedMessages={pinnedMessages()}
     />
   );
 }

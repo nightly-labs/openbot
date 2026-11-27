@@ -9,7 +9,12 @@ export const messages = {
   "channel.stoppedTask.reassignLabel": "Przydziel ponownie zatrzymane zadanie: {name}",
   "channel.stoppedTask.reassign": "Przekaż",
   "channel.stoppedTask.cancel": "Anuluj zadanie",
+  "channel.stoppedTask.assignmentLoop":
+    "{names} przekazywali sobie to zadanie zbyt wiele razy. Zatrzymano je, aby uniknąć pętli.",
+  "channel.stoppedTask.assignmentLoopMembers":
+    "Członkowie przekazywali sobie to zadanie zbyt wiele razy. Zatrzymano je, aby uniknąć pętli.",
   "channel.conversation.noMembers": "Dodaj agentów w ustawieniach kanału, aby rozpocząć pracę.",
+  "channel.conversation.waitFull": "Oczekiwanie – {name} zacznie, gdy skończy się trwające zadanie",
   "channel.conversation.archivedNotice": "Usunięty kanał. Tylko podgląd.",
   "channel.composer.label": "Wiadomość do kanału",
   "channel.composer.placeholder": "Wiadomość do: {name}",
@@ -17,15 +22,45 @@ export const messages = {
   "channel.panel.close": "Zamknij panel kanału",
   "channel.settings.title": "Ustawienia kanału",
   "channel.settings.memories": "Wspomnienia",
+  "channel.settings.folders.title": "Foldery",
+  "channel.settings.folders.description":
+    "Wszyscy członkowie kanału {channel} mogą zmieniać pliki i uruchamiać polecenia w tych folderach.",
+  "channel.settings.folders.toastAdded": "Członkowie kanału {channel} mogą teraz zmieniać pliki w {folder}",
+  "channel.settings.folders.toastRemoved": "Członkowie kanału {channel} nie mogą już zmieniać plików w {folder}",
   "channel.settings.isolated": "Zachowaj wspomnienia w tym kanale",
   "channel.settings.isolatedDescription":
     "Agenci zapisują to, czego się tu nauczą, jako wspomnienia kanału. Ich inne czaty ich nie widzą.",
+  "channel.settings.browser": "Przeglądarka",
+  "channel.settings.browserEveryone": "Każdy członek",
+  "channel.settings.browserNone": "Nikt",
   "channel.settings.memoryCount": {
     one: "{count} zapisane",
     few: "{count} zapisane",
     many: "{count} zapisanych",
     other: "{count} zapisanego",
   },
+  "channel.settings.newConversation.title": "Nowa rozmowa",
+  "channel.settings.newConversation.description":
+    "Członkowie zapominają wcześniejsze wiadomości. Ustawienia kanału zostają.",
+  "channel.settings.newConversation.button": "Rozpocznij",
+  "channel.settings.newConversation.confirmTitle": "Rozpocząć nową rozmowę w {name}?",
+  "channel.settings.newConversation.confirmDescription":
+    "Członkowie zapominają wcześniejsze wiadomości tego kanału. Wiadomości zostają widoczne nad separatorem. Członkowie, instrukcje, wspomnienia i rutyny się nie zmieniają.",
+  "channel.settings.newConversation.confirm": "Rozpocznij nową rozmowę",
+  "channel.settings.newConversation.failed": "Nie udało się rozpocząć nowej rozmowy.",
+  "channel.settings.compact.title": "Kompaktuj kontekst",
+  "channel.settings.compact.description":
+    "Członkowie zachowują krótkie podsumowanie sesji kanału i zużywają mniej tokenów.",
+  "channel.settings.compact.failed": "Nie udało się skompaktować kontekstu kanału.",
+  "channel.settings.deleteHistory.title": "Usuń historię",
+  "channel.settings.deleteHistory.description":
+    "Wiadomości znikają, a członkowie o nich zapominają. Konfiguracja kanału zostaje.",
+  "channel.settings.deleteHistory.button": "Usuń",
+  "channel.settings.deleteHistory.confirmTitle": "Usunąć historię kanału {name}?",
+  "channel.settings.deleteHistory.confirmDescription":
+    "Wszystkie wiadomości i pliki tego kanału znikną z OpenBot, a członkowie o nich zapomną. Nie można tego cofnąć. Członkowie, instrukcje, wspomnienia, rutyny i zadania się nie zmienią.",
+  "channel.settings.deleteHistory.confirm": "Usuń historię",
+  "channel.settings.deleteHistory.failed": "Nie udało się usunąć historii.",
   "channel.settings.routines": "Rutyny",
   "channel.settings.routineCount": {
     one: "{count} skonfigurowana",

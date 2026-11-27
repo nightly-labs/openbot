@@ -2,7 +2,6 @@ import type { PartialTranslation } from "../../../message";
 import type { messages as source } from "../../en/error/marketplace";
 
 export const messages = {
-  // Agent marketplace and agent link errors.
   "error.marketplace.timezoneInvalid": "本地时区无效。",
   "error.marketplace.installedAgentMissing": "已安装的助手已不存在。",
   "error.marketplace.differentListing": "该本地助手是从另一个市场助手安装的。",
@@ -40,12 +39,10 @@ export const messages = {
     one: "自动化任务“{name}”需要不超过 {count} 个字符的名称和一条指令。",
     other: "自动化任务“{name}”需要不超过 {count} 个字符的名称和一条指令。",
   },
-  // Fills `{name}` above when the routine has no name.
   "error.marketplace.templateRoutineNoName": "未命名",
   "error.marketplace.templateTooLarge": "该助手体积过大无法发布，请精简其指令、技能或自动化任务。",
   "error.marketplace.linkInvalid": "助手链接无效。",
   "error.marketplace.changedSinceOpened": "该助手在你打开之后发生了变化，请重新打开链接查看新版本。",
-  "error.marketplace.skillNameConflict": "你已有一个不同的同名本地技能“{name}”，请重命名或移除它后再添加该助手。",
   "error.marketplace.avatarInvalid": "助手头像无效。",
   "error.marketplace.secretInName": "发布前请从名称中移除密钥或邮箱地址。",
   "error.marketplace.secretInTitle": "发布前请从称号中移除密钥或邮箱地址。",

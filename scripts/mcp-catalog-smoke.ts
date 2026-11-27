@@ -1,12 +1,3 @@
-// Checks each http MCP server in the Marketplace catalog against the live server, with no account
-// and no key. A server with no sign-in must answer `initialize`. A server with a `link` sign-in must
-// refuse it with a Bearer challenge, and its metadata must offer what `McpOAuth` needs: dynamic
-// registration and S256 PKCE. Metadata goes through `secureOAuthFetch`, so the app's https, size,
-// time, redirect and private-network rules apply. The script never registers a client and never
-// sends a credential.
-//
-// It needs the network and the vendors' servers, so it is a manual run, not a CI gate.
-// `bun run test:mcp-catalog`. Writes .openbot-build/mcp-catalog-smoke/report.json.
 import { mkdir, writeFile } from "node:fs/promises";
 import { join, resolve } from "node:path";
 import {
@@ -29,7 +20,6 @@ const OUT = resolve(import.meta.dirname, "../.openbot-build/mcp-catalog-smoke");
 const TIMEOUT_MS = 20_000;
 const logger = createOpenBotLogger("mcp-catalog-smoke");
 
-/** `open`: the catalog names no sign-in. `link`: the user signs in in the browser. */
 type Kind = "open" | "link";
 
 interface Checked {
@@ -40,7 +30,6 @@ interface Checked {
   ok: boolean;
   failure: string | null;
   details: OpenDetails | LinkDetails | null;
-  /** Every request the check sent, as `METHOD url`. */
   requests: string[];
 }
 
@@ -53,7 +42,8 @@ interface LinkDetails {
   challenge: string;
   resourceMetadataUrl: string | null;
   issuer: string;
-  registrationEndpoint: string;
+  registrationEndpoint: string | null;
+  clientIdMetadataDocument: boolean;
   revocation: boolean;
 }
 
@@ -63,11 +53,9 @@ interface Skipped {
   reason: string;
 }
 
-/** The server to check and how, or why the entry is out of scope. */
 function scope(app: PluginApp): { kind: Kind; url: string } | { reason: string } {
   const server = app.server;
   if (server.transport !== "http") return { reason: "stdio server" };
-  // Google's servers register no client, so OpenBot brings its own Google sign-in app for them.
   if (Object.hasOwn(GOOGLE_MCP_SCOPES, server.url)) return { reason: "OpenBot's own Google sign-in app" };
   const kinds = new Set((server.auth ?? []).map((flow) => flow.kind));
   if (kinds.has("link")) return { kind: "link", url: server.url };
@@ -81,17 +69,14 @@ function check(condition: unknown, failure: string): asserts condition {
   if (!condition) throw new CheckFailed(failure);
 }
 
-/** A fetch that records each request, and refuses a POST anywhere but the MCP server, redirects included. */
 function recording(fetchFn: FetchLike, url: string, requests: string[]): FetchLike {
   const server = withoutHash(new URL(url));
   return (input, init) => {
     const target = new URL(input instanceof URL ? input.toString() : input);
     const method = init?.method ?? "GET";
     requests.push(`${method} ${withoutHash(target)}`);
-    // Registration and token requests are POSTs to the authorization server. This check sends none.
     if (method !== "GET" && withoutHash(target) !== server)
       return Promise.reject(new Error(`Refused ${method} to ${target.origin}: the smoke never registers.`));
-    // A followed 307 or 308 sends the POST again to its target, past the check above.
     return fetchFn(input, method === "GET" ? init : { ...init, redirect: "manual" });
   };
 }
@@ -100,10 +85,6 @@ function withoutHash(url: URL): string {
   return `${url.origin}${url.pathname}${url.search}`;
 }
 
-/**
- * The SDK transport classes declare their handlers and `sessionId` as `T | undefined`, which
- * `exactOptionalPropertyTypes` does not accept as a `Transport`. This one forwards to such a class.
- */
 function asTransport(inner: {
   start(): Promise<void>;
   send: Transport["send"];
@@ -127,7 +108,6 @@ function asTransport(inner: {
   return transport;
 }
 
-/** An open server answers `initialize` from the SDK client with no credential. */
 async function checkOpen(url: string, requests: string[]): Promise<OpenDetails> {
   const client = new Client({ name: "openbot-catalog-smoke", version: "1.0.0" });
   const transport = asTransport(
@@ -145,11 +125,6 @@ async function checkOpen(url: string, requests: string[]): Promise<OpenDetails> 
   }
 }
 
-/**
- * A sign-in server refuses `initialize` with a Bearer challenge, then names an authorization server
- * that registers clients and supports S256. The endpoints that get credentials in a real sign-in
- * must use https and public addresses, as `secureOAuthFetch` requires when it sends to them.
- */
 async function checkLink(url: string, requests: string[]): Promise<LinkDetails> {
   const answer = await recording(
     (input, init) => fetch(input, init),
@@ -186,7 +161,16 @@ async function checkLink(url: string, requests: string[]): Promise<LinkDetails> 
   check(issuer, "the protected-resource metadata names no authorization server");
   const metadata = await discoverAuthorizationServerMetadata(issuer, { fetchFn: oauthFetch });
   check(metadata, `no authorization server metadata at ${issuer}`);
-  check(metadata.registration_endpoint, "no registration_endpoint: the user would need a sign-in app");
+  const clientIdMetadataDocument = metadata.client_id_metadata_document_supported === true;
+  check(
+    metadata.registration_endpoint || clientIdMetadataDocument,
+    "no registration_endpoint and no client metadata document: the user would need a sign-in app",
+  );
+  const methods = metadata.token_endpoint_auth_methods_supported;
+  check(
+    metadata.registration_endpoint || methods?.includes("none"),
+    "the client metadata document needs the none token endpoint auth method",
+  );
   check(metadata.code_challenge_methods_supported?.includes("S256"), "S256 PKCE is not listed");
   check(metadata.response_types_supported.includes("code"), "response type code is not supported");
 
@@ -207,7 +191,8 @@ async function checkLink(url: string, requests: string[]): Promise<LinkDetails> 
     challenge,
     resourceMetadataUrl: resourceMetadataUrl?.toString() ?? null,
     issuer,
-    registrationEndpoint: metadata.registration_endpoint,
+    registrationEndpoint: metadata.registration_endpoint ?? null,
+    clientIdMetadataDocument,
     revocation: revocation !== undefined,
   };
 }

@@ -70,7 +70,14 @@ describe("marketplace presentation migration", () => {
   it("stores the publisher's category and keeps consent when an older client submits a new version", async () => {
     const database = presentationDatabase();
     const agents = new AgentMarketplace({ DB: d1(database), SKILLS: unusedBucket() });
-    const user = { id: "user-1", name: "Owner", email: "owner@example.com", avatarUrl: null, analyticsEnabled: null };
+    const user = {
+      id: "user-1",
+      name: "Owner",
+      email: "owner@example.com",
+      avatarUrl: null,
+      analyticsEnabled: null,
+      chatColor: null,
+    };
     const snapshot = {
       botId: "local",
       name: "Writer",
@@ -107,7 +114,6 @@ describe("marketplace presentation migration", () => {
     const skills = new SkillMarketplace(bindings);
     expect((await runApiEffect(skills.list({ query: "Owner" }))).skills.map((item) => item.id)).toEqual(["skill-1"]);
     expect((await runApiEffect(agents.list({ query: "Owner" }))).agents.map((item) => item.id)).toEqual(["agent-1"]);
-    // A creator with no display name stays anonymous: the email is not shown and does not match a search.
     database.exec("UPDATE users SET name = NULL");
     expect((await runApiEffect(skills.list({ query: "owner@example.com" }))).skills).toEqual([]);
     expect((await runApiEffect(agents.list({ query: "owner@example.com" }))).agents).toEqual([]);

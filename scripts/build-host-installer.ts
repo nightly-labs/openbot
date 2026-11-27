@@ -118,7 +118,6 @@ async function build(): Promise<void> {
       join(payload, HOST_MANAGER_DIRECTORY, "host-release.json"),
       `${JSON.stringify({ version, commit, arch: "arm64" })}\n`,
     );
-    // Only fixed payload artifacts enter the package. No config, state, home, source or dependencies.
     for (const path of HOST_FILES) await chmod(join(payload, path), hostFileMode(path));
     for (const path of expectedHostPaths()) {
       if (!HOST_FILES.some((file) => `.${file}` === path)) await chmod(join(payload, path), 0o755);

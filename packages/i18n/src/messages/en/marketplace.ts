@@ -1,7 +1,6 @@
 import { defineMessages } from "../../message";
 
 export const messages = defineMessages("marketplace", {
-  // The listing: categories, rows, and the words for each kind of listing.
   "marketplace.category.coding": "Coding",
   "marketplace.category.design": "Design",
   "marketplace.category.dataAnalytics": "Data & Analytics",
@@ -18,7 +17,6 @@ export const messages = defineMessages("marketplace", {
   "marketplace.loadMore": "Load more",
   "marketplace.version": "Version {version}",
 
-  // The dialog frame: title, close and tabs.
   "marketplace.title": "Marketplace",
   "marketplace.kinds": "Marketplace content types",
   "marketplace.tab.agents": "Agents",
@@ -27,10 +25,8 @@ export const messages = defineMessages("marketplace", {
   "marketplace.description.agents": "Ready-made agents with their own instructions and skills.",
   "marketplace.description.skills": "Instructions that teach an agent a task or a tool.",
 
-  // A plugin link.
   "marketplace.plugins.missing": "This plugin is not in the OpenBot catalog.",
 
-  // The agent page.
   "marketplace.agents.loadingDetail": "Loading agent details…",
   "marketplace.agents.skills": "Skills",
   "marketplace.agents.routines": "Routines",
@@ -48,7 +44,6 @@ export const messages = defineMessages("marketplace", {
     "Shared by its creator before OpenBot reviewed it. It can act on your behalf once added.",
   "marketplace.agents.source.pending": "Not reviewed yet",
 
-  // The skill page, and why Try is off.
   "marketplace.skill.loading": "Loading skill",
   "marketplace.try.readFailed": "OpenBot could not read this agent's skills. Try again.",
   "marketplace.try.enable": "Enable this skill in agent settings to try it.",
@@ -56,7 +51,6 @@ export const messages = defineMessages("marketplace", {
   "marketplace.try.update": "Update this skill to try this version.",
   "marketplace.try.composerUnavailable": "The agent composer is unavailable.",
 
-  // The Marketplace window. {name} is an agent, app or skill name. {count} is a number.
   "marketplace.open": "Open {name}",
   "marketplace.tab.apps": "Apps",
   "marketplace.crumbs.label": "Location",
@@ -78,7 +72,6 @@ export const messages = defineMessages("marketplace", {
   "marketplace.properties.updated": "Updated",
   "marketplace.properties.installs": "Installs",
 
-  // Agents.
   "marketplace.agent.add": "Add",
   "marketplace.agent.addNamed": "Add {name}",
   "marketplace.agent.addAgent": "Add agent",
@@ -87,17 +80,33 @@ export const messages = defineMessages("marketplace", {
   "marketplace.agent.update": "Update",
   "marketplace.agent.openChat": "Open chat",
 
-  // Apps.
+  "marketplace.agentUpdate.title": "Update {name}?",
+  "marketplace.agentUpdate.body": {
+    one: "{count} skill has local changes. It stays as it is unless you choose Replace.",
+    other: "{count} skills have local changes. They stay as they are unless you choose Replace.",
+  },
+  "marketplace.agentUpdate.listLabel": "Skills with local changes",
+  "marketplace.agentUpdate.keep": "Your changes stay",
+  "marketplace.agentUpdate.lost": "Your changes will be lost",
+  "marketplace.agentUpdate.choiceLabel": "Keep or replace {name}",
+  "marketplace.agentUpdate.keepOption": "Keep",
+  "marketplace.agentUpdate.replace": "Replace",
+  "marketplace.agentUpdate.others": {
+    one: "{count} other skill also updates.",
+    other: "{count} other skills also update.",
+  },
+  "marketplace.agentUpdate.confirm": "Update agent",
+
   "marketplace.app.connect": "Connect",
   "marketplace.app.reconnect": "Reconnect",
   "marketplace.app.connectNamed": "Connect {name}",
   "marketplace.app.reconnectNamed": "Reconnect {name}",
   "marketplace.app.connected": "Connected",
   "marketplace.app.attention": "Needs attention",
-  // The plugin page alert when only some of its apps or skills are installed. {name} is the plugin name.
   "marketplace.app.partialTitle": "{name} is not complete",
   "marketplace.app.partialDescription": "Some of its apps or skills are not installed. Reconnect installs them.",
   "marketplace.app.notConnected": "Not connected",
+  "marketplace.app.paused": "Paused",
   "marketplace.app.custom": "MCP server",
   "marketplace.app.githubTagline": "Repositories, issues and pull requests",
   "marketplace.app.onePasswordTagline": "Sign in to sites with logins you share",
@@ -106,7 +115,48 @@ export const messages = defineMessages("marketplace", {
   "marketplace.app.telegramTagline": "Groups and direct chats in Telegram",
   "marketplace.app.whatsappTagline": "Your own chat and the people you allow in WhatsApp",
   "marketplace.app.bitwardenTagline": "Sign in to sites with logins from a shared folder",
-  // The category row in the information of a password manager page: 1Password and Bitwarden.
+  "marketplace.app.protonPassTagline": "Sign in to sites with logins from a shared vault",
+  "marketplace.xApp.title": "X",
+  "marketplace.xApp.tagline": "Reply to a post on X with @openbot_, and an agent does the work",
+  "marketplace.xApp.description":
+    "X adds one agent, also called X, to this server. On X, reply to any post and mention @openbot_ with what you want: summarize it, translate it, draft a reply, save a note or set a reminder. The OpenBot extension for Chrome reads the post and sends it to the X agent, and X posts your reply as usual. The answer waits in the X chat in OpenBot. The X agent never posts, likes, follows or sends messages on X.",
+  "marketplace.xApp.developer": "OpenBot",
+  "marketplace.xApp.notSetUp": "Not set up",
+  "marketplace.xApp.setUp": "Set up",
+  "marketplace.xApp.howTitle": "How it works",
+  "marketplace.xApp.howReplyTitle": "Reply on X.",
+  "marketplace.xApp.howReply":
+    "Reply to any post and mention @openbot_ with what you want, for example “@openbot_ summarize this”.",
+  "marketplace.xApp.howSendTitle": "The extension sends it.",
+  "marketplace.xApp.howSend":
+    "OpenBot for Chrome reads the post and the posts above it and sends them to the X agent. X posts your reply as usual.",
+  "marketplace.xApp.howWorkTitle": "X does the work.",
+  "marketplace.xApp.howWork": "The answer waits in the X chat in OpenBot. Nothing from OpenBot shows on X.",
+  "marketplace.xApp.agentTitle": "Agent",
+  "marketplace.xApp.agentDescription": "X answers each post that you send from X in its own chat.",
+  "marketplace.xApp.extensionTitle": "In Chrome",
+  "marketplace.xApp.extensionDescription": "X works only through the OpenBot extension for Chrome.",
+  "marketplace.xApp.extensionName": "OpenBot for Chrome",
+  "marketplace.xApp.extensionNote":
+    "Open its side panel and sign in to this server. It reads a post only when you reply with @openbot_.",
+  "marketplace.xApp.getExtension": "Get the extension",
+  "marketplace.xApp.stepExtension": "Extension",
+  "marketplace.xApp.stepAgent": "Agent",
+  "marketplace.xApp.next": "Next",
+  "marketplace.xApp.extensionStepTitle": "Add OpenBot to Chrome",
+  "marketplace.xApp.extensionStepDescription":
+    "The extension reads a post on X when you reply with @openbot_ and sends it to this server.",
+  "marketplace.xApp.extensionStepStore": "Open the OpenBot page in the Chrome Web Store",
+  "marketplace.xApp.extensionStepAdd": "Click Add to Chrome",
+  "marketplace.xApp.extensionStepSignIn": "Open the OpenBot side panel and sign in to this server",
+  "marketplace.xApp.agentStepTitle": "Add the X agent",
+  "marketplace.xApp.agentStepDescription": "X gets the posts that you send from X. OpenBot adds it to this server.",
+  "marketplace.xApp.agentDoesReceive": "Gets each post that you answer on X with @openbot_",
+  "marketplace.xApp.agentDoesWork": "Summarizes, translates, drafts replies, saves notes and sets reminders",
+  "marketplace.xApp.agentDoesNoPost": "Never posts on X: the answer waits in its chat",
+  "marketplace.xApp.addAgent": "Add agent",
+  "marketplace.xApp.doneTitle": "X is ready",
+  "marketplace.xApp.doneDescription": "Reply to a post on X and mention @openbot_. The answer waits in the X chat.",
   "marketplace.app.onePasswordCategory": "Login and Credential Management",
   "marketplace.app.yourApps": "Your apps",
   "marketplace.app.addCustom": "Add custom",
@@ -122,17 +172,28 @@ export const messages = defineMessages("marketplace", {
   "marketplace.app.remove.action": "Remove",
   "marketplace.app.remove.confirmTitle": "Remove {name}?",
   "marketplace.app.remove.keep": "Keep",
-  // The plugin page section with one row for each app, and the row text by how the app connects.
-  // {name} is the app name, {field} the label of its key field, {host} "this computer" or a server name.
+  "marketplace.app.replace.title": "Replace {server}?",
+  "marketplace.app.replace.description":
+    "You already have a server named {server}, but it is not {name}. Replace it with {name}? Its address and saved keys are deleted.",
+  "marketplace.app.replace.action": "Replace",
   "marketplace.app.connection": "Connection",
+  "marketplace.app.access.use": "Can use",
+  "marketplace.app.access.noAgents": "No agents",
+  "marketplace.app.access.agentsOf": "Agents that can use {name}",
+  "marketplace.app.access.chooseAgents": "{name}: {summary}. Choose agents",
+  "marketplace.app.access.level": "Access of {role} to {name}",
   "marketplace.app.setup.account": "Sign in with your {name} account in the browser.",
   "marketplace.app.setup.key": "Needs an API key from your {name} account.",
   "marketplace.app.setup.keySaved": "{field} saved on {host}.",
-  // {host} is "this computer" or a server name.
   "marketplace.app.account.removeDescription": "OpenBot deletes the sign-in of this account on {host}.",
   "marketplace.app.setup.desktop": "Runs in the {name} desktop app at {address}.",
   "marketplace.app.setup.desktopConnected": "Connected to {address}.",
   "marketplace.app.setup.open": "No sign-in or key needed.",
+  "marketplace.app.blocked.update":
+    "{host} runs an older OpenBot version that cannot connect apps. Update OpenBot on {host}, or ask its owner to update it.",
+  "marketplace.app.blocked.member":
+    "Only an owner or admin of {host} can connect apps there. Ask one of them to connect {name}, or to update OpenBot on {host} so that members can connect apps.",
+  "marketplace.app.blocked.mac": "{name} works only on a Mac that runs OpenBot.",
   "marketplace.app.connectAgain": "Connect again",
   "marketplace.app.automation.askOnInstall": "Ask macOS for access at install",
   "marketplace.app.automation.title": "Access to Apple apps",
@@ -150,14 +211,10 @@ export const messages = defineMessages("marketplace", {
   "marketplace.app.automation.app.reminders": "Reminders",
   "marketplace.app.automation.app.messages": "Messages",
   "marketplace.app.automation.app.safari": "Safari",
-  // The plugin page alert when the server refused an app's saved sign-in.
   "marketplace.app.signInTitle": "Sign in to {name} again",
   "marketplace.app.signInDescription":
     "{name} refused the saved sign-in. Your agents cannot use it until you sign in again.",
 
-  // The catalog apps' listing text, by slug. Each English text is the catalog's own text, byte for
-  // byte: a key whose English no longer matches the catalog is not used. The prompts are requests that
-  // the user sends to an agent.
   "marketplace.plugin.aave.tagline": "Aave data and transactions",
   "marketplace.plugin.aave.description":
     "Aave helps users explore live Aave V3 and V4 markets, review wallet positions and DAO governance, simulate lending actions, and prepare non-custodial transactions. Every transaction is returned unsigned: the plugin reads the markets and writes the call, and the wallet stays with the user.",
@@ -199,6 +256,26 @@ export const messages = defineMessages("marketplace", {
   "marketplace.plugin.cobrain.prompt.startSession": "Load my Cobrain context for this project before we start.",
   "marketplace.plugin.cobrain.prompt.searchDecision": "Search my Cobrain notes for what we decided about pricing.",
   "marketplace.plugin.cobrain.prompt.saveNote": "Save a note in Cobrain with what we did today and what is left.",
+  "marketplace.plugin.honcho.tagline": "Your memory across AI tools",
+  "marketplace.plugin.honcho.description":
+    "Honcho by Plastic Labs gives agents a long-term memory of you that other AI tools you connect can share. Agents save what they learn, and Honcho reasons over it to build a model of your preferences, goals and ways of working. Agents ask it questions before they start. OpenBot agents keep their own memory too; Honcho is the memory that follows you to other tools. Messages that agents save go to your Honcho account.",
+  "marketplace.plugin.honcho.app": "Save and query long-term memory in your Honcho workspaces over one MCP server.",
+  "marketplace.plugin.honcho.prompt.recall": "Ask Honcho what it knows about how I like to work before we start.",
+  "marketplace.plugin.honcho.prompt.save": "Save the decisions from this thread to Honcho.",
+  "marketplace.plugin.honcho.prompt.preferences": "What does Honcho say about my writing style? Use it for this draft.",
+  "marketplace.plugin.honcho.hint.apiKey": "Create a key at app.honcho.dev.",
+  "marketplace.plugin.hindsight.tagline": "Memory that learns over time",
+  "marketplace.plugin.hindsight.description":
+    "Hindsight by Vectorize gives agents a long-term memory in Hindsight Cloud. Agents retain facts and events, recall them by meaning, time and entity, and reflect on them to form mental models. Memories are kept in banks, and agents can make a bank for each project or person. OpenBot agents keep their own memory too; Hindsight is the memory that other AI tools you connect can share. What agents retain goes to your Hindsight Cloud account.",
+  "marketplace.plugin.hindsight.app":
+    "Retain, recall and reflect on memories in your Hindsight Cloud banks over one MCP server.",
+  "marketplace.plugin.hindsight.prompt.recall":
+    "Recall from Hindsight what we know about this project before we start.",
+  "marketplace.plugin.hindsight.prompt.retain":
+    "Retain the decisions and open questions from this thread in Hindsight.",
+  "marketplace.plugin.hindsight.prompt.reflect":
+    "Reflect on my Hindsight memories: what patterns do you see in my last month of work?",
+  "marketplace.plugin.hindsight.hint.apiKey": "Create a key on the Connect page of Hindsight Cloud.",
   "marketplace.plugin.figma.tagline": "Designs and prototypes",
   "marketplace.plugin.figma.description":
     "Figma lets agents read design files, inspect components, styles and variables, and hand production specs to engineers. It connects to the MCP server in the Figma desktop app, on this computer. The server can read designs only; write support is in progress.",
@@ -218,6 +295,34 @@ export const messages = defineMessages("marketplace", {
     "Use the styles in this repository and design a settings page in Paper.",
   "marketplace.plugin.paper.prompt.tokens":
     "List the design tokens in the open Paper file and compare them with our theme.",
+  "marketplace.plugin.higgsfield.tagline": "AI images, videos and audio",
+  "marketplace.plugin.higgsfield.description":
+    "Higgsfield lets agents generate images, videos, characters and audio with Higgsfield models such as Seedance, Kling, Veo and MiniMax Hailuo, check the credit balance, and browse the Asset Library. Results are saved to the user's Higgsfield Assets. Each user signs in to their own Higgsfield account through the browser. Every generation uses credits of that account at standard rates, also on an unlimited plan.",
+  "marketplace.plugin.higgsfield.app":
+    "Image, video and audio generation, characters, credits and assets, over Higgsfield's MCP server with browser sign-in.",
+  "marketplace.plugin.higgsfield.prompt.credits": "How many Higgsfield credits do I have?",
+  "marketplace.plugin.higgsfield.prompt.productShot":
+    "Make a Higgsfield product photo of a ceramic mug on a wooden table.",
+  "marketplace.plugin.higgsfield.prompt.clip": "Make a 5-second Higgsfield video of waves at sunset.",
+  "marketplace.plugin.sunra.tagline": "AI images, videos, audio and 3D",
+  "marketplace.plugin.sunra.description":
+    "Sunra lets agents make images, videos, audio and 3D models with models such as GPT Image, Nano Banana, Seedream, FLUX, Seedance, Kling and Veo, check the credit balance, and read the results. Results go to a project in the user's Sunra account. Each user signs in to their own Sunra account through the browser. Sunra first quotes the cost of each generation, and spends credits of that account only after it is confirmed.",
+  "marketplace.plugin.sunra.app":
+    "Image, video, audio and 3D generation, credits and results, over Sunra's MCP server with browser sign-in.",
+  "marketplace.plugin.sunra.prompt.balance": "How many Sunra credits do I have?",
+  "marketplace.plugin.sunra.prompt.poster": "Make a Sunra poster of a night market in the rain, in portrait format.",
+  "marketplace.plugin.sunra.prompt.clip":
+    "Make a 5-second Sunra video of a paper boat on a river. Tell me the cost first.",
+  "marketplace.plugin.elevenlabs.tagline": "Speech, voices and voice agents",
+  "marketplace.plugin.elevenlabs.description":
+    "ElevenLabs lets agents turn text into speech, work with voices, and create, test and review ElevenLabs voice agents and their conversations. Generated audio comes back as a short-lived download link. Each user signs in to their own ElevenLabs account through the browser, and each generation uses credits of that account.",
+  "marketplace.plugin.elevenlabs.app":
+    "Text to speech, voices, and voice agent management, over ElevenLabs' MCP server with browser sign-in.",
+  "marketplace.plugin.elevenlabs.prompt.speech":
+    "Read this paragraph aloud with a calm ElevenLabs voice and give me the audio.",
+  "marketplace.plugin.elevenlabs.prompt.agents": "List my ElevenLabs voice agents and the voice each one uses.",
+  "marketplace.plugin.elevenlabs.prompt.conversations":
+    "Summarize the last ten conversations of my support voice agent.",
   "marketplace.plugin.appleApps.tagline": "Mail, Calendar and more on your Mac",
   "marketplace.plugin.appleApps.description":
     "Apple apps lets agents use Mail, Calendar, Contacts, Reminders, Notes, Messages and Safari on this Mac. It works on macOS only. OpenBot starts mcp-icloud, a community server that is not made by Apple or OpenBot. The server controls the apps through AppleScript, on this computer, and needs no account and no key. When you install it, OpenBot can ask macOS for access to all of these apps at once, with one prompt for each app. If you do not, macOS asks the first time an agent uses an app. To change this later, open System Settings › Privacy & Security › Automation. Agents can send email and iMessages, and change or delete events, contacts and reminders, so review each write before you approve it. What the tools read, such as email text, goes to the model provider of the agent.",
@@ -235,6 +340,14 @@ export const messages = defineMessages("marketplace", {
   "marketplace.plugin.sentry.prompt.newErrors": "What new errors appeared since yesterday's deploy?",
   "marketplace.plugin.sentry.prompt.topCrash": "Explain the top crash in the mobile project and its likely cause.",
   "marketplace.plugin.sentry.prompt.releaseHealth": "How healthy is the current release compared to the last one?",
+  "marketplace.plugin.gitlab.tagline": "Issues, merge requests and pipelines",
+  "marketplace.plugin.gitlab.description":
+    "GitLab lets agents search projects, read and create issues, review and update merge requests, read repository files and commits, and check CI pipelines and jobs on GitLab.com. Each user signs in to their own GitLab account through the browser. Agents get the same permissions as the user: they can push commits, change issues and merge requests, and merge them. For a self-hosted GitLab, add an MCP server with your GitLab address followed by /api/v4/mcp in the MCP servers settings, and sign in there.",
+  "marketplace.plugin.gitlab.app":
+    "Projects, issues, merge requests, repositories and CI pipelines, over GitLab's MCP server with browser sign-in.",
+  "marketplace.plugin.gitlab.prompt.reviewQueue": "Which merge requests wait for my review?",
+  "marketplace.plugin.gitlab.prompt.failedPipeline": "Why did the last pipeline on the default branch fail?",
+  "marketplace.plugin.gitlab.prompt.newIssue": "File an issue for the crash in the sync queue with reproduction steps.",
   "marketplace.plugin.vercel.tagline": "Deployments, build logs and projects",
   "marketplace.plugin.vercel.description":
     "Vercel lets agents list projects and recent deployments, read build and runtime logs, and find why a build failed. Each user signs in to their own Vercel account through the browser and chooses the teams that agents can use. In those teams, agents get the same rights as the user's account. They can also change environment variables, domains, DNS records and deployments, and buy domains.",
@@ -275,6 +388,18 @@ export const messages = defineMessages("marketplace", {
   "marketplace.plugin.stripe.prompt.payment": "Look up this payment and explain why it failed.",
   "marketplace.plugin.stripe.prompt.customer": "Summarize this customer's invoices and outstanding balance.",
   "marketplace.plugin.stripe.prompt.link": "Draft a payment link for the Pro plan at 49 per month.",
+  "marketplace.plugin.revenuecat.tagline": "Subscriptions, products and paywalls",
+  "marketplace.plugin.revenuecat.description":
+    "RevenueCat lets agents read and change the setup of your in-app subscriptions: apps, products, entitlements, offerings, packages, paywalls and experiments. Agents can also look up customers and their purchases, and read charts and metrics. A RevenueCat secret API key goes into one Authorization header. The key reaches one project. With a read-only key, agents can only read. With a write key, agents can submit products to the App Store for review, grant entitlements to customers, and delete packages, targeting rules and webhooks.",
+  "marketplace.plugin.revenuecat.app":
+    "Products, entitlements, offerings, paywalls and metrics, over RevenueCat's MCP server with a secret API key.",
+  "marketplace.plugin.revenuecat.prompt.offerings": "Which offerings and packages does my RevenueCat project have?",
+  "marketplace.plugin.revenuecat.prompt.revenue":
+    "How did my RevenueCat revenue and active subscriptions change this month?",
+  "marketplace.plugin.revenuecat.prompt.customer":
+    "Which entitlements does this RevenueCat customer have, and when do they expire?",
+  "marketplace.plugin.revenuecat.hint.apiKey":
+    "In the RevenueCat dashboard, open API keys in your project and create a secret API key. A read-only key is enough to view data.",
   "marketplace.plugin.posthog.tagline": "Product analytics and flags",
   "marketplace.plugin.posthog.description":
     "PostHog lets agents query events and funnels, inspect feature flags, and summarize what changed after a release. A personal API key from the project settings goes into one Authorization header.",
@@ -314,8 +439,7 @@ export const messages = defineMessages("marketplace", {
   "marketplace.plugin.obsidian.prompt.recall": "What do my notes say about the decisions on this project?",
   "marketplace.plugin.obsidian.prompt.save": "Save this decision as a new note in my vault.",
   "marketplace.plugin.obsidian.prompt.log": "Add a summary of today's work to my Work log note.",
-  "marketplace.plugin.obsidian.hint.apiKey":
-    'In Obsidian, open Settings > Local REST API. Copy the API key and turn on "Enable non-encrypted (HTTP) server".',
+  "marketplace.plugin.obsidian.hint.apiKey": "In Obsidian, open Settings > Local REST API and copy the API key.",
   "marketplace.plugin.resend.tagline": "Transactional email",
   "marketplace.plugin.resend.description":
     "Resend lets agents send transactional email and check delivery through one API. An API key from the Resend dashboard is passed to the local server as one environment variable.",
@@ -323,16 +447,41 @@ export const messages = defineMessages("marketplace", {
   "marketplace.plugin.resend.prompt.send": "Send the launch announcement draft to the beta list.",
   "marketplace.plugin.resend.prompt.status": "Did the invoice email reach the customer?",
   "marketplace.plugin.resend.prompt.template": "Draft a password-reset email for the new flow.",
-  "marketplace.plugin.composio.tagline": "Many apps through your own Composio link",
+  "marketplace.plugin.omnisend.tagline": "Email and SMS marketing",
+  "marketplace.plugin.omnisend.description":
+    "Omnisend lets agents read campaign and form reports, find contacts and segments, and create and edit campaigns, automations, email templates, forms and products. Each user connects with an API key from their own Omnisend account. Agents can do what the key allows, which can include sending campaigns and deleting data.",
+  "marketplace.plugin.omnisend.app":
+    "Campaigns, automations, contacts, segments, forms and reports, over Omnisend's MCP server with an API key.",
+  "marketplace.plugin.omnisend.prompt.lastCampaign":
+    "How did last week's campaigns perform compared to the week before?",
+  "marketplace.plugin.omnisend.prompt.segment":
+    "How many contacts are in the VIP segment, and how did it change this month?",
+  "marketplace.plugin.omnisend.prompt.draftCampaign": "Draft a campaign for the new collection, but do not send it.",
+  "marketplace.plugin.postiz.tagline": "Social media scheduling",
+  "marketplace.plugin.omnisend.hint.apiKey": "In Omnisend, open Store settings > API keys and create a key.",
+  "marketplace.plugin.postiz.description":
+    "Postiz lets agents list your social media channels, and draft, schedule and publish posts on more than 30 networks, such as X, LinkedIn, Instagram and TikTok. Agents can also upload media and make AI images and videos. Sign in to your Postiz account through the browser, or paste the API key from Settings › Developers in Postiz. All Postiz cloud plans include API access. Agents can publish a post immediately, so review each post before you approve it.",
+  "marketplace.plugin.postiz.app":
+    "Channels, drafts, scheduled posts and media, over Postiz's MCP server with browser sign-in or an API key.",
+  "marketplace.plugin.postiz.prompt.channels": "Which social media channels are connected to Postiz?",
+  "marketplace.plugin.postiz.prompt.week": "Which posts are scheduled for next week?",
+  "marketplace.plugin.postiz.prompt.draft": "Draft a LinkedIn post about our new release, but do not schedule it.",
+  "marketplace.plugin.trypost.tagline": "Social media scheduling",
+  "marketplace.plugin.trypost.description":
+    "TryPost lets agents list your connected channels, and draft, schedule, queue and publish posts on X, LinkedIn, Instagram, Facebook, TikTok, YouTube, Threads, Bluesky, Mastodon, Pinterest and more. Agents can also read analytics, manage ideas and approvals, and set posting times. Sign in to your TryPost account through the browser and choose a workspace. Agents can publish a post immediately, so review each post before you approve it.",
+  "marketplace.plugin.trypost.app":
+    "Channels, posts, queue, ideas and analytics, over TryPost's MCP server with browser sign-in.",
+  "marketplace.plugin.trypost.prompt.week": "Which posts are scheduled for this week?",
+  "marketplace.plugin.trypost.prompt.draft": "Draft a LinkedIn post about our new release, but do not schedule it.",
+  "marketplace.plugin.trypost.prompt.analytics": "Which of my posts from last month had the most engagement?",
+  "marketplace.plugin.composio.tagline": "Gmail, Slack, GitHub and 1,000+ more apps",
   "marketplace.plugin.composio.description":
-    "Composio connects agents to Gmail, Slack, GitHub, and hundreds of other apps through one MCP server. Connect the apps you want in your Composio account, then paste its MCP URL and API key here.",
+    "Composio connects your agents to Gmail, Slack, GitHub and more than 1,000 other apps through one MCP server. Sign in with your Composio account. When an agent needs an app, it asks you to connect that app.",
   "marketplace.plugin.composio.app":
-    "The apps you add to your Composio MCP server, over the link from your Composio account.",
+    "The apps you connect in your Composio account. An agent asks you to connect an app when it needs it.",
   "marketplace.plugin.composio.prompt.inbox": "Summarize my unread email and draft replies to the urgent ones.",
   "marketplace.plugin.composio.prompt.handoff": "Post a summary of this pull request to our team channel.",
   "marketplace.plugin.composio.prompt.apps": "Which apps and actions can you use through Composio?",
-  // The connect form text of the catalog listings. Each English text is the catalog's own text, byte for byte.
-  "marketplace.plugin.composio.hint.url": "The URL of an MCP server in your Composio account",
   "marketplace.plugin.composio.hint.apiKey": "Find it in your Composio account, in Settings > Sessions & API Key.",
   "marketplace.plugin.neon.tagline": "Postgres projects, branches and migrations",
   "marketplace.plugin.neon.description":
@@ -391,6 +540,14 @@ export const messages = defineMessages("marketplace", {
   "marketplace.plugin.todoist.prompt.today": "Which Todoist tasks are due today?",
   "marketplace.plugin.todoist.prompt.capture": "Add these action items to my Todoist Inbox.",
   "marketplace.plugin.todoist.prompt.overdue": "Move my overdue Todoist tasks to tomorrow.",
+  "marketplace.plugin.ticktick.tagline": "Tasks, lists, habits and focus",
+  "marketplace.plugin.ticktick.description":
+    "TickTick lets agents search and filter tasks, add and update tasks, and manage lists, sections, folders, tags and comments. Agents can also read and change habits and focus records, and read events from the calendars connected to TickTick. Each user signs in to their own TickTick account through the browser. Agents get read and write access: they can complete, move and delete tasks, and delete tags and focus records.",
+  "marketplace.plugin.ticktick.app":
+    "Tasks, lists, habits and focus records, over TickTick's MCP server with browser sign-in.",
+  "marketplace.plugin.ticktick.prompt.today": "Which TickTick tasks are due today?",
+  "marketplace.plugin.ticktick.prompt.capture": "Add these action items to my TickTick Inbox.",
+  "marketplace.plugin.ticktick.prompt.week": "Which TickTick tasks did I complete last week?",
   "marketplace.plugin.trello.tagline": "Boards, lists and cards",
   "marketplace.plugin.trello.description":
     "Trello lets agents search and read boards, lists, cards, checklists and comments, create boards and cards, move lists and cards, mark cards done, and add checklists, comments and labels. Agents can also read and add cards in the user's Trello Inbox, and read Planner events, which can come from a connected Google or Outlook calendar. Each user signs in to their own Trello account through the browser and chooses the workspaces on a consent screen. Agents get the same permissions as the user in those workspaces. They can archive cards and lists, but the server cannot delete anything permanently.",
@@ -459,6 +616,23 @@ export const messages = defineMessages("marketplace", {
   "marketplace.plugin.clickup.prompt.createTask": "Create a ClickUp task for these action items and assign it to me.",
   "marketplace.plugin.clickup.prompt.summarizeDoc":
     "Find the latest project update in ClickUp and summarize the open questions.",
+  "marketplace.plugin.coinbase.tagline": "Crypto prices, portfolios and trading",
+  "marketplace.plugin.coinbase.description":
+    "Coinbase lets agents read prices, balances, portfolios, orders and fees in Coinbase Advanced Trade, preview and place orders, convert between assets, and move funds between portfolios. Each user signs in to their own Coinbase account through the browser. Agents get the same permissions as the user. Orders and conversions use real funds, and agents can pay for x402 requests from the USDC balance.",
+  "marketplace.plugin.coinbase.app":
+    "Prices, balances, portfolios, orders and conversions, over Coinbase's MCP server with browser sign-in.",
+  "marketplace.plugin.coinbase.prompt.balances": "What are my Coinbase balances in each portfolio?",
+  "marketplace.plugin.coinbase.prompt.price": "Show the BTC-USD price on Coinbase and how it moved this week.",
+  "marketplace.plugin.coinbase.prompt.previewOrder":
+    "Preview a 50 USD market buy of ETH on Coinbase. Do not place the order.",
+  "marketplace.plugin.robinhood.tagline": "Brokerage accounts and agentic trading",
+  "marketplace.plugin.robinhood.description":
+    "Robinhood lets agents read the accounts, positions, balances, transaction history and watchlists of a Robinhood customer, read market data, and place stock, options and crypto orders. Each user signs in to their own Robinhood account through the browser. At the first sign-in, Robinhood asks the user to open a separate Agentic account. Agents can trade only in that account, and by default they place orders without asking the user to approve each one.",
+  "marketplace.plugin.robinhood.app":
+    "Accounts, positions, market data and trades, over Robinhood's MCP server with browser sign-in.",
+  "marketplace.plugin.robinhood.prompt.positions": "Summarize my Robinhood positions and how they moved today.",
+  "marketplace.plugin.robinhood.prompt.watchlist": "How did each stock on my Robinhood watchlist move this week?",
+  "marketplace.plugin.robinhood.prompt.agenticCash": "How much cash is in my Robinhood Agentic account?",
   "marketplace.plugin.huggingface.tagline": "Models, datasets and papers on the Hub",
   "marketplace.plugin.huggingface.description":
     "Hugging Face lets agents search models, datasets, Spaces, collections and papers on the Hugging Face Hub, read model cards and repository files, preview datasets, and search the Hugging Face documentation. It uses public Hub data and needs no account and no key. The tools only read: agents cannot create repositories or run jobs.",
@@ -469,15 +643,11 @@ export const messages = defineMessages("marketplace", {
   "marketplace.plugin.huggingface.prompt.dataset": "Find a dataset of weather time series and show its columns.",
   "marketplace.auth.apiKey": "API key",
   "marketplace.auth.personalApiKey": "Personal API key",
-  "marketplace.auth.mcpUrl": "MCP URL",
   "marketplace.auth.createKey": "Create a key",
 
-  // Skills.
   "marketplace.skill.doc": "SKILL.md",
   "marketplace.try.in": "Try in {name}",
 
-  // The Skills tab. {name} is a skill, a group or a sort name. {agents} is a list of agent names,
-  // "all agents" or "4 agents". {agent} is one agent name. {state} is one or more states.
   "marketplace.skills.yours": "Your skills",
   "marketplace.skills.seeAll": "See all",
   "marketplace.skills.seeAllName": "See all: {name}",
@@ -508,6 +678,13 @@ export const messages = defineMessages("marketplace", {
   "marketplace.skills.origin.local": "Made on this computer",
   "marketplace.skills.origin.workspace": "In this agent's folder",
   "marketplace.skills.origin.marketplace": "From the Marketplace · version {version}",
+  "marketplace.skills.origin.github": "From GitHub · {repository}",
+  "marketplace.skills.github.search": "Search, or paste a GitHub link",
+  "marketplace.skills.github.reading": "Looking for skills in the repository",
+  "marketplace.skills.github.trust": "OpenBot did not review skills from GitHub. Read a skill before you add it.",
+  "marketplace.skills.github.source": "GitHub · {repository} at {commit}",
+  "marketplace.skills.github.open": "GitHub",
+  "marketplace.skills.github.openName": "Open {repository} on GitHub",
   "marketplace.skills.status.notAdded": "Not added",
   "marketplace.skills.status.on": "On {agents}",
   "marketplace.skills.agentCount": { one: "{count} agent", other: "{count} agents" },
@@ -542,7 +719,6 @@ export const messages = defineMessages("marketplace", {
   "marketplace.skills.dialog.unread": "Skills not read",
   "marketplace.skills.local.gone": "No agent has this skill now.",
 
-  // Results that a screen reader hears. {agents} is a list of agent names.
   "marketplace.notice.agentAdded": "{name} added.",
   "marketplace.notice.agentUpdated": "{name} updated.",
   "marketplace.notice.appConnected": "{name} connected.",
@@ -558,7 +734,6 @@ export const messages = defineMessages("marketplace", {
   },
   "marketplace.error.skillPartial": "{name} did not change on these agents: {agents}. {reason}",
 
-  // Errors. {reason} is an error message. {failures} is a list of error messages.
   "marketplace.error.openLink": "Could not open the link.",
   "marketplace.error.copyLink": "Could not copy the link.",
   "marketplace.error.connectNoServer": "Select a local server to connect this app.",
@@ -569,6 +744,7 @@ export const messages = defineMessages("marketplace", {
   "marketplace.error.installOnHost":
     "Install {name} on the computer that runs these agents: its app needs a browser sign-in.",
   "marketplace.error.appInvalid": "{name} cannot be added: {reason}",
+  "marketplace.error.appNotConnected": "Could not connect {name}: {reason}",
   "marketplace.error.uninstallNoServer": "Select a local server to uninstall a plugin.",
   "marketplace.error.uninstallPartial": "Some of {name} could not be removed. {failures}",
   "marketplace.error.actionFailed": "Could not complete the marketplace action. Try again.",

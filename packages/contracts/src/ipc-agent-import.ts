@@ -1,50 +1,26 @@
-/**
- * Agent import: agents exported from another app as one `.zip`, read by the local host.
- *
- * The main process reads and checks the archive, keeps it under a token, and answers a preview.
- * The renderer never receives a path or the archive bytes: it names the token and the agents and
- * channels to import. A remote host is reached with `agent-import-v1`: its preview has no avatars
- * and its result names the new agents only, so the client reads them with the agent list.
- */
-
 import { INPUT_LIMITS } from "./input-limits";
 import { type ClientAgentSummary, isClientAgentSummary } from "./ipc-agents";
 import { isBoundedString, isIdentifier, isNullableBoundedString } from "./ipc-bounded-values";
 import { isBoolean, isDynamicRecord, isNumber, isString } from "./runtime-values";
 
-/** The Grok Bot page of the ready export agent. */
-export const GROK_BOT_EXPORT_URL = "https://x.ai/bot/gI0XdhhDYPJeyQaqQBC0O";
+export const GROK_BOT_EXPORT_URL = "https://x.ai/bot/pOUBH2kQK8CKvM7nW8stG";
 
-/** The apps OpenBot ships an export skill for. Each is also the `source.app` its export writes. */
 export const AGENT_IMPORT_SKILL_SOURCES = ["grok-bot", "hermes-agent"] as const;
 export type AgentImportSkillSource = (typeof AGENT_IMPORT_SKILL_SOURCES)[number];
 
-/**
- * The export skill in OpenBot's own repository, as Hermes installs it from GitHub with
- * `/skills install`. The path is the skill folder on the default branch.
- */
 export const HERMES_EXPORT_SKILL_ID = "nightly-labs/openbot/resources/agent-import/hermes-agent";
 
-/** What the user types in a Hermes chat to install the export skill. */
 export const HERMES_SKILL_COMMAND = `/skills install ${HERMES_EXPORT_SKILL_ID}`;
 
-/**
- * What the user says to the Grok Bot export agent, and what runs the Hermes export skill. The export
- * agent and skill answer these exact words, so each app copies the same text.
- */
 export const AGENT_IMPORT_PROMPT = "Export my agents for OpenBot";
 export const HERMES_EXPORT_PROMPT = "/openbot-export";
 
-/** The name of the export agent on its Grok Bot page. */
 export const AGENT_IMPORT_EXPORT_AGENT_NAME = "OpenBot export";
 
 export const AGENT_IMPORT_LIMITS = {
-  archiveBytes: 500 * 1024 * 1024,
-  files: 5_000,
-  /** One key names one agent in the archive: lowercase letters, digits and hyphens. */
+  files: 200_000,
   key: 64,
   sourceApp: 64,
-  /** Group chats in one export. Each becomes a channel. */
   channels: 100,
   message: 500,
   warnings: 200,
@@ -55,24 +31,20 @@ export interface AgentImportPreviewAgent {
   name: string;
   title: string;
   description: string;
-  /** A `data:` URL of the checked avatar, or null when the archive has none. */
   avatarUrl: string | null;
   skillCount: number;
   routineCount: number;
   memoryCount: number;
   fileCount: number;
   fileBytes: number;
-  /** An agent on this server already has this name. The import adds another one beside it. */
   nameExists: boolean;
 }
 
-/** A group chat in the export. Its members are agent keys of the same export. */
 export interface AgentImportPreviewChannel {
   key: string;
   name: string;
   title: string;
   memberKeys: string[];
-  /** One of `memberKeys`, or null when the group chat has no lead. */
   leadKey: string | null;
   memoryCount: number;
   routineCount: number;
@@ -107,7 +79,6 @@ export interface AgentImportResult {
   warnings: string[];
 }
 
-/** A channel the import created. */
 export interface AgentImportChannel {
   id: string;
   name: string;
@@ -273,7 +244,6 @@ export function decodeAgentImportResult(value: unknown): AgentImportResult {
   };
 }
 
-/** A remote host's preview: `agent-import-v1` carries no avatars. */
 export function decodeRemoteAgentImportPreview(value: unknown): AgentImportPreview {
   const preview = record(value, "import preview");
   if (!Array.isArray(preview.agents)) invalid("import preview");
@@ -283,7 +253,6 @@ export function decodeRemoteAgentImportPreview(value: unknown): AgentImportPrevi
   return decoded;
 }
 
-/** A remote host's result: the new agents by id and name. */
 export interface RemoteAgentImportResult extends Omit<AgentImportResult, "agents"> {
   agents: { agentId: string; name: string }[];
 }
@@ -299,7 +268,6 @@ export function decodeRemoteAgentImportResult(value: unknown): RemoteAgentImport
   return { ...decodeAgentImportResult({ ...result, agents: [] }), agents };
 }
 
-/** The remote result, with the new agents read from the host's agent list. */
 export function resolveRemoteAgentImportResult(
   result: RemoteAgentImportResult,
   agents: readonly ClientAgentSummary[],

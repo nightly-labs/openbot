@@ -1,0 +1,36 @@
+{
+  "slug": "greenhouse",
+  "name": "Greenhouse",
+  "tagline": "Recruiting and candidates",
+  "description": "Greenhouse lets agents read jobs, candidates, applications, and interview feedback in the signed-in Greenhouse account. Each user signs in to their own Greenhouse account through the browser.",
+  "category": "productivity",
+  "creatorName": "Greenhouse",
+  "iconUrl": "https://cdn.prod.website-files.com/6668a687e71e2722fccb8357/679a83f9b21b5caab0c682c9_GH-logo-web.png",
+  "version": "1.0.0",
+  "prompts": [
+    { "id": "prompt-open-jobs", "text": "List my open jobs and how many active candidates each has." },
+    {
+      "id": "prompt-candidate-summary",
+      "text": "Summarize the interview feedback for the latest backend engineer candidate."
+    },
+    { "id": "prompt-stuck", "text": "Which applications have stayed in the same stage for more than two weeks?" }
+  ],
+  "apps": [
+    {
+      "id": "app-greenhouse-mcp",
+      "name": "Greenhouse",
+      "description": "Job, candidate, application, and feedback access, over Greenhouse's MCP server with browser sign-in.",
+      "iconUrl": "https://cdn.prod.website-files.com/6668a687e71e2722fccb8357/679a83f9b21b5caab0c682c9_GH-logo-web.png",
+      "server": {
+        "name": "greenhouse",
+        "transport": "http",
+        "url": "https://mcp.greenhouse.io/mcp",
+        "auth": [{ "id": "greenhouse-oauth", "kind": "link", "label": "Sign in" }]
+      }
+    }
+  ],
+  "websiteUrl": "https://www.greenhouse.com",
+  "privacyPolicyUrl": "https://www.greenhouse.com/privacy-policy",
+  "termsUrl": "https://www.greenhouse.com/legal",
+  "skills": []
+}

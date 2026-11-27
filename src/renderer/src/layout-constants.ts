@@ -1,16 +1,10 @@
-/**
- * Geometry for the workspace shell. These are module constants, not state: the
- * controller only used to hand them through its context because the view could
- * not import `App.tsx` without closing an import cycle.
- */
-
 export const LEFT_PANEL_STORAGE_KEY = "openbot:left-panel-width";
 export const LEFT_PANEL_COLLAPSED_STORAGE_KEY = "openbot:left-panel-collapsed";
+export const LEFT_PANEL_CLOSED_STORAGE_KEY = "openbot:left-panel-closed";
 export const SERVER_VIEW_STORAGE_KEY = "openbot:server-view";
-/** Whether the middle shows the open agent's chat or its routines. */
-export const SIDEBAR_VIEW_STORAGE_KEY = "openbot:sidebar-view";
-/** The pages that the user pinned to the page rail or took off it: a JSON record of booleans. */
+export const SIDEBAR_CHAT_ORDER_STORAGE_KEY = "openbot:sidebar-chat-order";
 export const RAIL_PINS_STORAGE_KEY = "openbot:rail-pins";
+export const RAIL_HIDDEN_STORAGE_KEY = "openbot:rail-hidden";
 export const LEFT_PANEL_DEFAULT = 280;
 export const LEFT_PANEL_MIN = 128;
 export const LEFT_PANEL_MAX = 400;

@@ -22,6 +22,71 @@ server shows in the server list of that account. Its name is "OpenBot"; give ano
 Then connect a provider from the app, as on a hosted server (see
 [Providers](hosted-servers.md#providers)).
 
+### Install from the app
+
+In the desktop app, select Add server, then Other options, then New server on another computer.
+The app shows one command with a one-time claim of your account:
+
+```sh
+{ echo OPENBOT_CLAIM=<claim>; curl -fsSL https://raw.githubusercontent.com/nightly-labs/openbot/main/scripts/install-server.sh; } | sudo bash -s
+```
+
+Run it on the server, or give it to an AI agent there with Copy for an AI agent. It asks no
+questions. It installs OpenBot, signs the server in with the claim (`openbot login --claim`), waits
+until the server is online, and ends with "OpenBot is connected to your account." and exit code 0.
+The app sees the new server in the server list and shows Open server.
+
+- The account service makes the claim for the signed-in user with `POST /v2/server-claims` (at most
+  20 claims in 15 minutes). The claim works once, for 15 minutes. The service keeps only its hash.
+- The claim goes to the install script on standard input, in a line before the script. It is not an
+  argument or a sudo variable, because sudo logs both (`COMMAND=` and `ENV=` in `/var/log/auth.log`
+  and the journal), and `ps` shows arguments to each user. A command that you paste stays in the
+  history of your shell. Make a new command when it expired or when somebody else saw it.
+- The install refuses a claim on a server that is signed in already. Run `sudo openbot logout` first.
+
+### Install from a chat
+
+An agent can install the server over SSH. Write the request in a chat, for example "Install
+OpenBot on root@203.0.113.7 and name it Office server", or select Set up with an agent in the
+install dialog: it puts a short request into the composer of the open chat.
+
+The agent calls the OpenBot tool `create_server_install_command` with the server name. The owner
+of the agent's server approves each command. The tool then makes a claim, as the dialog does, and
+gives the command with `--name` only to the agent. The agent runs it as root over SSH.
+
+The chat shows a card with the name. It waits for a new server with that name, then shows Open
+server when the server is online. The card keeps only the name and the expiry time. The claim is
+not in the chat, and OpenBot logs redact it. The agent's own tool history keeps the command; the
+claim in it stops working after one use or 15 minutes.
+
+### Hermes Agent
+
+OpenBot uses the Hermes Agent of the service user, as it uses the user's own Hermes on a desktop
+(see [Hermes](architecture/providers.md#hermes)). Open the server's provider settings and select
+Download on the Hermes row. OpenBot runs the official Hermes installer as the service user, then the
+row shows Connect. To install Hermes from a terminal instead, run the installer as that user, then
+restart OpenBot:
+
+```sh
+sudo -u openbot -i bash -c 'curl -fsSL https://hermes-agent.nousresearch.com/install.sh | bash -s -- --non-interactive'
+sudo openbot restart
+```
+
+In Docker, the service user is the image user, and its home folder is the data volume:
+
+```sh
+docker exec openbot bash -c 'curl -fsSL https://hermes-agent.nousresearch.com/install.sh | bash -s -- --non-interactive'
+docker restart openbot
+```
+
+Hermes keeps its settings, sign-ins and memories in `~/.hermes` of that user. Then select Connect on
+the Hermes row of the server's provider settings: it shows a Nous Portal code. Alternatively, run
+`hermes setup` or `hermes model` as that user. OpenBot sees a change to `config.yaml`, `.env` or
+`auth.json` with no restart. A Hermes that another user installed is not used.
+
+The Hermes installer needs `git` and `curl`, and downloads Node.js, which needs `libatomic1`. The
+service user has no sudo, so the server packages include them. `bun run test:hermes-server` checks this setup in Docker.
+
 ### Sign in with a server claim
 
 An operator who sets up a server for somebody else can sign it in with no code. The operator makes a
@@ -49,7 +114,9 @@ in a terminal, for the same reason.
   answer, make a new claim.
 
 Anyone with the admin token can get a session for any email, also of an existing account. Keep the
-token on the operator's computer only. The owner sees each claimed server session in their account
+token on the operator's computer only: it is in the encrypted `apps/auth-api/.env.production`. For a
+Leaseweb VPS, `leaseweb-pool.ts custom` makes the claim and does all the other steps
+(see [Leaseweb VPS](hosted-servers.md#leaseweb-vps)). The owner sees each claimed server session in their account
 sessions, and can revoke it there.
 
 Install options go after `sudo bash -s --`:
@@ -59,6 +126,7 @@ Install options go after `sudo bash -s --`:
 | `--user <name>` | the installed user, else `openbot` | The user that runs OpenBot and its agents. The install makes it when it does not exist, with its home folder in `/var/lib/<name>`. |
 | `--auth-api-url <origin>` | the installed one, else the URL in the build | Another account server, for example the `test` Worker or a [self-hosted account service](self-hosting.md). |
 | `--display-size <W>x<H>` | the installed one, else `1280x800` | The size of the virtual display that computer use reads (see [Display size](#display-size)). |
+| `--name <name>` | `OpenBot` | The server name, with a claim from the app (see [Install from the app](#install-from-the-app)). |
 
 Run the install again to reinstall or upgrade. The data stays in the home folder of the service
 user. A reinstall keeps the user and the account server, because the sign-in belongs to them, and
@@ -81,6 +149,18 @@ open a database that a newer one migrated. It also refuses a computer that is a 
 | `sudo openbot uninstall` | Sign out and remove OpenBot. The data stays (see [Remove](#remove)). |
 | `openbot version` | Show the installed version. |
 
+An owner or admin can also restart the server from the app: select Restart server in the server
+menu, or in Server settings on the phone. OpenBot closes, and `openbot.service` starts it again after
+about 10 seconds. In Docker, the container must have a restart policy, such as `--restart
+unless-stopped`; without one, the container stays stopped. When the server does not answer, use
+`sudo openbot restart`.
+
+When the start of OpenBot fails again and again, the service stops, and systemd does not start it again
+(see [Start loop](hosted-servers.md#start-loop)). `openbot status` then says so. Read the reason with
+`openbot logs`. Install a newer release with `sudo openbot update`, or try again with
+`sudo openbot restart`. The update timer also starts the service again about each hour, with a
+newer release when one is staged.
+
 Run the account commands with `sudo` or as the service user. Other users cannot open the control
 socket.
 
@@ -89,8 +169,9 @@ socket.
 A self-hosted server uses the memory guards of a hosted server (see
 [Memory](hosted-servers.md#memory)). When free memory is low, new turns wait in the queue and start
 again when memory is available. A message from a person starts first. The browser opens no new tab
-and unloads idle pages sooner. A fixed number of turns run at the same time: 2 up to 5 GiB of memory,
-8 up to 10 GiB, and 16 above.
+and unloads idle pages sooner. By default, a fixed number of turns run at the same time: 2 up to
+5 GiB of memory, 8 up to 10 GiB, and 16 above. An owner or admin can choose another number, 1 to 128, or
+Unlimited, in Server Settings > Agent defaults > Threads at the same time. Low memory still holds a new turn.
 
 The memory ceiling is the smaller of the machine memory and the limit of `openbot.service`
 (`MemoryMax=90%`). To give OpenBot less memory, lower the limit with
@@ -172,7 +253,7 @@ An image costs `⌈width / 28⌉ × ⌈height / 28⌉` visual tokens on Claude. 
 
 ### Screenshots and clicks
 
-The computer use driver (cua-driver, `cua-driver-rs-v0.34.0`) has two screenshots on Linux:
+The computer use driver (cua-driver, `cua-driver-rs-v0.52.9`) has two screenshots on Linux:
 
 - **One window** (`get_window_state`). The driver makes the image 1.15 megapixels or less, with a long
   edge of 1568 px or less, and changes the x and y of each click back to screen pixels. A 1260x780
@@ -216,11 +297,14 @@ already in its server list. Remove a phone from the account in the desktop app, 
 `sudo openbot uninstall` signs out, then removes the service, the units, the AppArmor profile, the
 `openbot` command and the server files in `/opt/OpenBot`. It keeps the home folder of the service user
 and the keyring in `/srv/openbot-hosted`. The keyring has the key of the encrypted data in that home
-folder, so keep or delete the two together. An install with the same `--user` uses them again. To
-delete the data too:
+folder, so keep or delete the two together. `/srv/openbot-keyring` has a copy of the keyring that only
+root can read: the server restores it when an agent damages the keyring (see
+[Keyring guard](hosted-servers.md#keyring-guard)). An install with the same `--user` uses them again.
+Before you put the data of another server on this computer, delete `/srv/openbot-keyring`. To delete
+the data too:
 
 ```sh
-sudo userdel --remove openbot && sudo rm -rf /srv/openbot-hosted
+sudo userdel --remove openbot && sudo rm -rf /srv/openbot-hosted /srv/openbot-keyring
 ```
 
 The server stays in the server list of the account, offline. Remove it there.
@@ -234,25 +318,49 @@ install steps always match the build that they install. A release before this fe
 file, and the install stops with a message.
 
 `openbot-server-setup` uses the install steps of a hosted server (`openbot-hosted-update`): it
-installs the packages in `packages.txt`, copies the release to `/opt/OpenBot/app`, and installs the
-scripts, the AppArmor profile and the units. It writes `self` to `/opt/OpenBot/hosted/mode` and
-links `/usr/local/bin/openbot`.
+installs the packages in `packages.txt` and `optional-packages.txt`, copies the release to
+`/opt/OpenBot/app`, and installs the scripts, the AppArmor profile and the units. It writes `self`
+to `/opt/OpenBot/hosted/mode` and links `/usr/local/bin/openbot`.
+
+apt never removes a package of the computer for OpenBot (`--no-remove`). When a package in
+`packages.txt` needs a removal, the install stops. A package in `optional-packages.txt` is skipped
+when a command with its name already exists, or when it needs a removal. For example, on Raspberry
+Pi OS `pcmanfm-pi` gives the `pcmanfm` command, and the `pcmanfm` package would remove the desktop
+of the Pi.
+
+The AppArmor profile (`/etc/apparmor.d/openbot-hosted`) needs AppArmor 4 (`abi <abi/4.0>` and the
+`userns` rule). When `/etc/apparmor.d/abi/4.0` does not exist and `apparmor_parser` cannot read the
+profile, for example on Debian 12 with AppArmor 3.0, the install does not write the profile and
+removes an old copy. These systems do not restrict user namespaces by default, so OpenBot does not need it.
+
+When Ubuntu's `bwrap-userns-restrict` profile is loaded (the default on Ubuntu 26.04), the install
+and each start of OpenBot add one rule to `/etc/apparmor.d/local/bwrap-userns-restrict`:
+`priority=1 allow pix /** -> &bwrap,`. The Ubuntu profile of `/usr/bin/bwrap` removes all
+capabilities from the programs that `bwrap` starts, and the Claude sandbox ("Workspace only") needs
+`CAP_SYS_ADMIN` there. With the rule, those programs keep the profile of `bwrap`, for all users of
+the computer. `sudo openbot uninstall` removes the rule.
 
 With `mode` set to `self`, `openbot-hosted-server` does not wait for a claim or for a boat desktop.
 It starts a D-Bus session with an unlocked keyring, as on a hosted server, and runs OpenBot under
 Xvfb with `OPENBOT_SERVER=1`. Main (`src/main/server-mode.ts`) then opens the control socket
-`/run/openbot/control.sock` and publishes the host after each sign-in.
+`/run/openbot/control.sock` and publishes the host after each sign-in. The
+[watchdog](hosted-servers.md#watchdog) also runs: when main stops updating its heartbeat file for 10
+minutes, the watchdog stops OpenBot and systemd starts it again.
 
 The server has two Xvfb displays, one in each of two nested `xvfb-run` commands that share one
 authority file. The outer one starts the agent display, at the [display size](#display-size), and
 the script names it in `OPENBOT_AGENT_DISPLAY`. The inner one starts the display that OpenBot shows
 its windows on, at 1280x800. Main gives that display to Computer Use, to remote desktop and to the agent
-processes, so an agent's screenshot and remote desktop do not show the OpenBot window. See
+processes, so an agent's screenshot and remote desktop do not show the OpenBot window. The agent
+display has a window manager (Openbox) and a dark background with the OpenBot logo: windows have
+title bars, and a right-click on the empty screen opens a menu with a terminal and a file manager. See
 [Computer Use and remote desktop](architecture/computer-use.md#agent-display-on-a-server).
 
 Updates work as on a hosted server (see [Updates](hosted-servers.md#updates)): the timer stages a
 new release, and it starts at the next boot, or when an owner, an admin or a permitted member
-installs it in Server Settings > Updates. `sudo openbot update` stages, stops the service, applies
+installs it in Server Settings > Updates. When an owner turns on the automatic update switch (it is
+off by default), the server also installs it when it is idle. A hosted server always does this, and
+also waits until no connected client uses it. `sudo openbot update` stages, stops the service, applies
 and starts the service again. When a step fails or a signal stops it, the command completes an
 interrupted copy, starts the service, and exits with an error.
 

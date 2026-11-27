@@ -1,3 +1,5 @@
+import { agentMentionRank } from "@openbot/contracts/agent-mention-rank";
+import { expandAttachmentReferences } from "@openbot/contracts/attachment-references";
 import { expandChatTagReferences } from "@openbot/contracts/chat-tag-references";
 import type { AppTextKey } from "@openbot/i18n";
 import {
@@ -35,6 +37,7 @@ import {
   untrack,
 } from "solid-js";
 import { createScrollFades } from "./createScrollFades";
+import { GlobalSearchPlush } from "./GlobalSearchPlush";
 import { playDialogExit, trackResultHighlight, trackResultsHeight } from "./global-search-motion";
 import { matchParts, normalizedSearchText, snippetAround } from "./global-search-text";
 import { VirtualListbox, type VirtualRowProps } from "./VirtualListbox";
@@ -45,7 +48,6 @@ type SearchTab = (typeof SEARCH_TABS)[number];
 export interface GlobalSearchChannel {
   id: string;
   name: string;
-  /** The last message, as one line. */
   detail?: string | undefined;
 }
 
@@ -60,20 +62,16 @@ export interface GlobalSearchFile {
 export interface GlobalSearchRoutine {
   id: string;
   name: string;
-  /** The agent that runs the routine. A channel routine has none and shows an icon. */
   agentId?: string;
-  /** The owner and the schedule, as one line. */
   detail: string;
 }
 
 export interface GlobalSearchAction {
   id: string;
   label: string;
-  /** Actions do things; settings open a settings page. The two show as separate groups. */
   group: "actions" | "settings";
   icon: typeof Settings;
   detail?: string | undefined;
-  /** More words that find the action, such as the English name in another language. */
   keywords?: string;
   run: () => void;
 }
@@ -85,10 +83,6 @@ type FileResult = { kind: "file"; agent: AgentProfile; file: GlobalSearchFile };
 type RoutineResult = { kind: "routine"; routine: GlobalSearchRoutine; agent: AgentProfile | undefined };
 type ActionResult = { kind: "action"; action: GlobalSearchAction };
 type ResultData = AgentResult | ChannelResult | MessageResult | FileResult | RoutineResult | ActionResult;
-/**
- * The option key, label and search text are set when the result is made. Kobalte reads them in its
- * effects, where a read of the agent or the message would be an untracked read of the store.
- */
 type Option = { key: string; label: string; text: string };
 type GlobalSearchResult = ResultData & Option;
 
@@ -97,17 +91,13 @@ type SectionKey = "agents" | "channels" | "messages" | "files" | "routines" | "a
 interface GlobalSearchSection {
   key: SectionKey;
   total: number;
-  /** More results exist than `total` counts: the source loads pages and does not count them. */
   more: boolean;
   items: GlobalSearchResult[];
 }
 
-/** One page of a search that another process answers. */
 export interface GlobalSearchPage<T> {
   results: T[];
-  /** All results, when the source counts them. */
   total?: number | undefined;
-  /** Gives the next page; null on the last page. */
   nextCursor: string | null;
 }
 
@@ -117,30 +107,21 @@ type MessageHit = { agentId: string; message: AgentMessage };
 interface GlobalSearchProps {
   open: boolean;
   agents: AgentProfile[];
-  /** Omit to hide the Channels filter, for a client or server without channels. */
   channels?: GlobalSearchChannel[] | undefined;
-  /** Omit to hide the Routines filter. */
-  routines?: GlobalSearchRoutine[];
+  routines?: GlobalSearchRoutine[] | undefined;
   routinesLoading?: boolean;
-  /** Commands and settings pages. They show in All when the query matches. */
   actions?: GlobalSearchAction[];
-  /** Omit to hide the Messages filter. The Messages filter loads the next page as the user scrolls. */
   onSearchMessages?: PagedSearch<MessageHit>;
-  /** Omit to hide the Files filter. An empty query lists the newest files. */
   onSearchFiles?: PagedSearch<GlobalSearchFile> | undefined;
   onOpenChange: (open: boolean) => void;
   onSelectAgent: (agentId: string) => void;
   onSelectChannel?: (channelId: string) => void;
-  /** A message result, and a file result, which opens the message that carries the file. */
   onSelectMessage: (agentId: string, messageId: string) => void;
   onSelectRoutine?: (routine: GlobalSearchRoutine) => void;
 }
 
-// All shows a preview of each kind; a filter shows the full list.
 const ALL_SECTION_LIMIT = 5;
 const SEARCH_DEBOUNCE_MS = 150;
-// First guesses for the virtual list, from the CSS: a row is control-lg high, and a section header
-// is control-sm high, with space-1-5 above it when a row comes before it.
 const RESULT_HEIGHT = 36;
 const SECTION_HEIGHT = 28;
 const SPACED_SECTION_HEIGHT = 34;
@@ -169,8 +150,10 @@ function isSearchTab(value: string): value is SearchTab {
 }
 
 function messagePreview(message: AgentMessage): string {
-  return expandChatTagReferences(message.body, (reference) =>
-    reference.kind === "quote" ? `“${reference.name}”` : undefined,
+  return expandAttachmentReferences(
+    expandChatTagReferences(message.body, (reference) =>
+      reference.kind === "quote" ? `“${reference.name}”` : undefined,
+    ),
   )
     .trim()
     .replace(/\s+/g, " ");
@@ -246,6 +229,15 @@ function matching<T extends GlobalSearchResult>(items: T[], query: string): T[] 
   return query ? items.filter((item) => item.text.includes(query)) : items;
 }
 
+function matchingAgents(items: Array<AgentResult & Option>, query: string): Array<AgentResult & Option> {
+  const ranked = matching(items, query).map((item) => ({
+    item,
+    rank: agentMentionRank(item.agent, query) ?? Number.MAX_VALUE,
+  }));
+  ranked.sort((left, right) => left.rank - right.rank);
+  return ranked.map(({ item }) => item);
+}
+
 function section(
   key: SectionKey,
   results: GlobalSearchResult[],
@@ -259,7 +251,6 @@ function section(
   };
 }
 
-// A Kobalte collection node holds a section or a result.
 function sectionOf(value: GlobalSearchResult | GlobalSearchSection): GlobalSearchSection | undefined {
   return "items" in value ? value : undefined;
 }
@@ -273,59 +264,56 @@ interface RemoteSearch<T> {
   total: Accessor<number | undefined>;
   hasMore: Accessor<boolean>;
   pending: Accessor<boolean>;
-  /** A page failed. The list holds only the pages before it. */
   failed: Accessor<boolean>;
-  /** Loads the page that failed again. */
   retry: () => void;
-  /** Loads the next page. It does nothing while a page loads or when no page follows. */
   loadMore: () => void;
 }
 
-/**
- * A search that another process answers, debounced and in pages. `request` returns null when the
- * current tab or query does not need it; a stale answer is dropped. `key` drops a result that a
- * later page gives again, as offset pages do when new results arrive between two pages.
- */
 function createRemoteSearch<T>(
   request: () => { search: PagedSearch<T>; query: string } | null,
   key: (item: T) => string,
 ): RemoteSearch<T> {
+  type Request = ReturnType<typeof request>;
   type Loaded = { items: T[]; total?: number | undefined; cursor: string | null };
   const empty: Loaded = { items: [], cursor: null };
+  const requested = createMemo(request);
+  const [answered, setAnswered] = createSignal<Request>(null);
+  const pending = () => {
+    const current = requested();
+    return current !== null && answered() !== current;
+  };
   const [loaded, setLoaded] = createSignal<Loaded>(empty);
-  const [pending, setPending] = createSignal(false);
   const [failed, setFailed] = createSignal(false);
   let timer: ReturnType<typeof setTimeout> | undefined;
   let latest = 0;
-  // loadMore runs in an effect, so it reads plain copies, not the signals.
   let active: { search: PagedSearch<T>; query: string } | null = null;
   let cursor: string | null = null;
-  // The cursor of the page that failed; null when the first page failed.
   let failedCursor: string | null = null;
   let loading = false;
   const show = (next: Loaded) => {
     cursor = next.cursor;
     loading = false;
     setLoaded(next);
-    setPending(false);
   };
   function loadFirst(next: { search: PagedSearch<T>; query: string }): void {
     const current = latest;
     loading = true;
-    setPending(true);
     next.search(next.query).then(
       (page) => {
-        if (current === latest) show({ items: page.results, total: page.total, cursor: page.nextCursor });
+        if (current !== latest) return;
+        show({ items: page.results, total: page.total, cursor: page.nextCursor });
+        setAnswered(next);
       },
       () => {
         if (current !== latest) return;
         show(empty);
+        setAnswered(next);
         failedCursor = null;
         setFailed(true);
       },
     );
   }
-  createEffect(request, (next) => {
+  createEffect(requested, (next) => {
     if (timer) clearTimeout(timer);
     ++latest;
     active = next;
@@ -336,7 +324,6 @@ function createRemoteSearch<T>(
       return;
     }
     loading = true;
-    setPending(true);
     timer = setTimeout(() => loadFirst(next), SEARCH_DEBOUNCE_MS);
   });
   onCleanup(() => {
@@ -364,7 +351,6 @@ function createRemoteSearch<T>(
       },
       () => {
         if (current !== latest) return;
-        // A page that fails is not asked for again, so a scroll does not repeat the error.
         cursor = null;
         loading = false;
         failedCursor = requested;
@@ -379,6 +365,7 @@ function createRemoteSearch<T>(
     setFailed(false);
     if (failedCursor === null) {
       ++latest;
+      setAnswered(null);
       loadFirst(active);
       return;
     }
@@ -410,7 +397,6 @@ function Highlighted(props: { text: string; query: string }) {
   );
 }
 
-/** The highlight that slides under the active row. It sits first in the results, behind the rows. */
 function ResultHighlight(props: { onActiveRow: (row: HTMLElement | undefined) => void }) {
   let element: HTMLDivElement | undefined;
   let stop: (() => void) | undefined;
@@ -422,7 +408,6 @@ function ResultHighlight(props: { onActiveRow: (row: HTMLElement | undefined) =>
   return <div ref={element} class="global-search-highlight" aria-hidden="true" hidden />;
 }
 
-/** The content of the results. The results follow its height with a transition. */
 function ResultsBody(props: { children: JSX.Element; onResize: () => void }) {
   let element: HTMLDivElement | undefined;
   let stop: (() => void) | undefined;
@@ -438,7 +423,6 @@ function ResultsBody(props: { children: JSX.Element; onResize: () => void }) {
   );
 }
 
-/** Plays the exit of the dialog when the search closes. */
 function DialogExitMotion(props: { dialog: () => HTMLElement | undefined }) {
   onCleanup(() => {
     const dialog = props.dialog();
@@ -447,7 +431,6 @@ function DialogExitMotion(props: { dialog: () => HTMLElement | undefined }) {
   return undefined;
 }
 
-/** The pill behind the selected filter. It moves only after its first place, so it does not slide in on open. */
 function FilterPill() {
   let element: HTMLDivElement | undefined;
   let frame: number | undefined;
@@ -482,7 +465,6 @@ function ResultIcon(props: { icon: typeof Settings }) {
   );
 }
 
-/** A row with a name that matches the query and one line of detail. */
 function NamedRow(props: { name: string; detail?: string | undefined; time?: string | undefined; query: string }) {
   return (
     <>
@@ -522,7 +504,6 @@ function MessageResultRow(props: { result: MessageResult; query: string }) {
 }
 
 function ResultRow(props: { result: GlobalSearchResult; query: string }) {
-  // The row is keyed by its result, so the kind and the parts to show do not change.
   const result = untrack(() => props.result);
   switch (result.kind) {
     case "agent":
@@ -583,9 +564,6 @@ export function GlobalSearch(props: GlobalSearchProps) {
   let dialog: HTMLDivElement | undefined;
   let results: HTMLElement | undefined;
   let scrollToKey: ((key: string) => void) | undefined;
-  // The overlay mounts the search when it opens and removes it when it closes, so the dialog gets no
-  // close event. A dismissed search gives focus back to the element that had it before; an opened
-  // result leaves focus to the view it opens.
   const focused = document.activeElement;
   const opener = focused instanceof HTMLElement && focused !== document.body ? focused : undefined;
   let resultOpened = false;
@@ -626,14 +604,12 @@ export function GlobalSearch(props: GlobalSearchProps) {
       const search = props.onSearchFiles;
       const value = normalizedQuery();
       const category = tab();
-      // The Files filter lists the newest files before the user types.
       if (!props.open || !search || (category === "all" ? !value : category !== "files")) return null;
       return { search, query: value };
     },
     (file) => `${file.agentId}:${file.messageId}:${file.id}`,
   );
 
-  // Search text memoized per list change; the filter runs on every input.
   const agentItems = createMemo(() => indexed(props.agents.map((agent): AgentResult => ({ kind: "agent", agent }))));
   const channelItems = createMemo(() =>
     indexed((props.channels ?? []).map((channel): ChannelResult => ({ kind: "channel", channel }))),
@@ -675,14 +651,13 @@ export function GlobalSearch(props: GlobalSearchProps) {
     const value = normalizedQuery();
     const category = tab();
     const list = (key: SectionKey, items: GlobalSearchResult[]) => [section(key, items)];
-    // A remote section counts the results that are not loaded yet.
     const remote = (search: RemoteSearch<unknown>, limit?: number) => ({
       limit,
       total: search.total(),
       more: search.hasMore() && search.total() === undefined,
     });
     let groups: GlobalSearchSection[];
-    if (category === "agents") groups = list("agents", matching(agentItems(), value));
+    if (category === "agents") groups = list("agents", matchingAgents(agentItems(), value));
     else if (category === "channels") groups = list("channels", matching(channelItems(), value));
     else if (category === "messages")
       groups = [section("messages", value ? matching(messageItems(), value) : [], remote(messageSearch))];
@@ -694,12 +669,11 @@ export function GlobalSearch(props: GlobalSearchProps) {
       const actions = matching(actionItems(), value);
       const preview = { limit: ALL_SECTION_LIMIT };
       groups = [
-        section("agents", matching(agentItems(), value), preview),
+        section("agents", matchingAgents(agentItems(), value), preview),
         section("channels", matching(channelItems(), value), preview),
         section("messages", matching(messageItems(), value), remote(messageSearch, ALL_SECTION_LIMIT)),
         section("files", matching(fileItems(), value), remote(fileSearch, ALL_SECTION_LIMIT)),
         section("routines", matching(routineItems(), value), preview),
-        // Actions and settings have no filter tab, so they show every match.
         section(
           "actions",
           actions.filter((result) => result.action.group === "actions"),
@@ -712,19 +686,20 @@ export function GlobalSearch(props: GlobalSearchProps) {
     }
     return groups.filter((group) => group.items.length > 0);
   });
-  // Visible order, for Enter on the first result and ⌘1–9.
   const flatResults = createMemo(() => sections().flatMap((group) => group.items));
   const firstKey = createMemo(() => flatResults()[0]?.key);
   const routinesPending = () =>
     props.routinesLoading === true && (tab() === "routines" || (tab() === "all" && normalizedQuery() !== ""));
   const pending = () => messageSearch.pending() || fileSearch.pending() || routinesPending();
-  // A failed search is not an empty one: the user can retry it instead of reading "No results".
   const failed = () => messageSearch.failed() || fileSearch.failed();
   const retry = () => {
     messageSearch.retry();
     fileSearch.retry();
   };
-  // A source that is still loading and has nothing to show yet gets a spinner under the list.
+  const nothingFound = createMemo<boolean>((previous) => {
+    if (flatResults().length > 0 || failed()) return false;
+    return pending() ? previous === true : true;
+  });
   const searching = () => {
     const shown = new Set(sections().map((group) => group.key));
     return (
@@ -743,7 +718,6 @@ export function GlobalSearch(props: GlobalSearchProps) {
       requestAnimationFrame(() => input?.focus());
     },
   );
-  // A new list starts at its top. The scroll of the old list can hide the new first rows.
   createEffect(
     () => `${tab()} ${normalizedQuery()}`,
     () => {
@@ -777,15 +751,12 @@ export function GlobalSearch(props: GlobalSearchProps) {
     }
   }
 
-  // Only a filter shows the full list; All shows a preview of each source.
   const loadMore = () => {
     if (tab() === "messages") return messageSearch.loadMore;
     if (tab() === "files") return fileSearch.loadMore;
     return undefined;
   };
 
-  // Kobalte looks for the active row only when the active key changes. In the virtual list that row
-  // can render later, as after a wrap from the first row to the last, so the input follows the row.
   function followActiveRow(row: HTMLElement | undefined): void {
     if (row?.id) input?.setAttribute("aria-activedescendant", row.id);
     else input?.removeAttribute("aria-activedescendant");
@@ -801,7 +772,6 @@ export function GlobalSearch(props: GlobalSearchProps) {
     if (event.isComposing) return;
     if (event.key === "Tab" && !event.metaKey && !event.ctrlKey && !event.altKey) {
       event.preventDefault();
-      // Tab cycles the filters, so a failed search's Retry is reached here and not in the tab order.
       if (!event.shiftKey && retryButton?.isConnected) retryButton.focus();
       else cycleTab(event.shiftKey ? -1 : 1);
       return;
@@ -816,7 +786,6 @@ export function GlobalSearch(props: GlobalSearchProps) {
     if (!(event.metaKey || event.ctrlKey) || event.altKey || event.shiftKey) return;
     const index = Number(event.key) - 1;
     if (!Number.isInteger(index) || index < 0 || index > 8) return;
-    // With no such result, the key still stops here: the server rail uses the same shortcut.
     event.preventDefault();
     activate(flatResults()[index]);
   }
@@ -882,8 +851,6 @@ export function GlobalSearch(props: GlobalSearchProps) {
               </Tabs.Root>
             </Combobox.Control>
 
-            {/* The always-open results are the top Kobalte layer, so they get outside presses, not the dialog.
-                Close as the modal Dialog does: not for a context menu, a press inside, or a toast. */}
             <Combobox.Content
               ref={(element) => {
                 results = element;
@@ -909,7 +876,6 @@ export function GlobalSearch(props: GlobalSearchProps) {
                     <VirtualListbox
                       collection={collection()}
                       nodeKey={(node) => {
-                        // Kobalte gives every section the key "".
                         const group = sectionOf(node.rawValue);
                         return group ? `section:${group.key}` : node.key;
                       }}
@@ -946,7 +912,7 @@ export function GlobalSearch(props: GlobalSearchProps) {
                     />
                   )}
                 </Combobox.Listbox>
-                <Show when={searching()}>
+                <Show when={searching() && !nothingFound()}>
                   <div class="global-search-status">
                     <Spinner size="sm" />
                     <span>{t("conversation.globalSearch.searching")}</span>
@@ -968,8 +934,11 @@ export function GlobalSearch(props: GlobalSearchProps) {
                     </Button>
                   </div>
                 </Show>
-                <Show when={flatResults().length === 0 && !pending() && !failed()}>
-                  <div class="global-search-empty">{t("conversation.globalSearch.empty")}</div>
+                <Show when={nothingFound()}>
+                  <div class="global-search-empty">
+                    <GlobalSearchPlush input={() => input} searching={pending()} />
+                    {t("conversation.globalSearch.empty")}
+                  </div>
                 </Show>
               </ResultsBody>
             </Combobox.Content>

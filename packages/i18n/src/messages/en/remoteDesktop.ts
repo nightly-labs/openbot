@@ -71,4 +71,14 @@ export const messages = defineMessages("remoteDesktop", {
   "remoteDesktop.setup.seeDesktop": "I can see my desktop",
   "remoteDesktop.setup.seeTestPanel": "I can see the test panel",
   "remoteDesktop.setup.finishTest": "Finish test",
+  "remoteDesktop.host.questionTitle": "{name} wants to control this computer",
+  "remoteDesktop.host.questionDetail":
+    "{name} will see your screen and can use your mouse and keyboard. If you do not answer in 30 seconds, OpenBot refuses the request.",
+  "remoteDesktop.host.allow": "Allow",
+  "remoteDesktop.host.deny": "Deny",
+  "remoteDesktop.host.startedTitle": "Remote control started",
+  "remoteDesktop.host.startedBody": "{name} controls this computer now.",
+  "remoteDesktop.host.trayTooltip": "OpenBot: remote control is on",
+  "remoteDesktop.host.trayControlledBy": "{name} controls this computer",
+  "remoteDesktop.host.stopAll": "Stop all remote control",
 });

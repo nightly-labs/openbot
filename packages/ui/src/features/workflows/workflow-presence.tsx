@@ -1,29 +1,24 @@
-/**
- * Other people on the same canvas: a cursor with a name in the colour of each person's avatar, a ring
- * on the node that the person selected, and their avatars in the top bar. A press on an avatar moves
- * the camera to that person's cursor. The host gives the places from its presence feed.
- */
-
 import type { TeamPresenceMember } from "@openbot/contracts/ipc";
 import { Button, LabelTooltipTrigger } from "@openbot/ui";
-import { For, Show } from "solid-js";
+import { createMemo, createSignal, For, onSettled, Show } from "solid-js";
 import { avatarHeadColor } from "../../bloub-avatar";
 import { useText } from "../../text";
 import { TeamPersonAvatar, teamMemberName, teamMemberSeed } from "../team/TeamPersonAvatar";
 import { Hint, type WfnPoint } from "./workflow-board";
 
-/** Where another person is on the canvas, in world pixels. */
 export interface WorkflowPeerSpot {
-  at: WfnPoint;
-  /** The node that the person selected. */
+  at: WfnPoint | undefined;
   selected: string | undefined;
 }
 
+export interface WorkflowOwnSpot {
+  at: WfnPoint | null;
+  selected: string | null;
+}
+
 export interface WorkflowPresence {
-  /** The member id of the person who uses this canvas. */
-  self: string;
+  self: string | null;
   members: readonly TeamPresenceMember[];
-  /** The place of each other person, by member id. A person with no place shows only in the top bar. */
   spots: Readonly<Record<string, WorkflowPeerSpot>>;
 }
 
@@ -33,43 +28,99 @@ export interface WorkflowPeer {
   color: string;
 }
 
-/** The presence feed sends about 20 updates a second. The cursor eases between two updates. */
-export const WORKFLOW_PRESENCE_FEED_INTERVAL = 50;
-
-/** The other people who are online, each in the colour of their avatar. */
-export function peersOf(presence: Pick<WorkflowPresence, "self" | "members">): readonly WorkflowPeer[] {
-  return presence.members
-    .filter((member) => member.online && !member.disabled && member.id !== presence.self)
-    .map((member) => ({ member, name: teamMemberName(member), color: avatarHeadColor(teamMemberSeed(member), null) }));
+export interface WorkflowCursorRoom {
+  right: number;
+  bottom: number;
 }
 
-/**
- * The cursors, in world pixels, at their screen size at every zoom: a soft arrow and the full name in
- * a pill under it. They take no pointer events.
- */
+export const WORKFLOW_PRESENCE_FEED_INTERVAL = 50;
+
+const CURSOR_NAME_LEFT = 8;
+const CURSOR_NAME_TOP = 17;
+const CURSOR_EDGE_GAP = 4;
+
+export function peersOf(
+  presence: Pick<WorkflowPresence, "self" | "members">,
+  previous: readonly WorkflowPeer[] = [],
+): readonly WorkflowPeer[] {
+  const known = new Map(previous.map((peer) => [peer.member, peer]));
+  const next = presence.members
+    .filter((member) => member.online && !member.disabled && member.id !== presence.self)
+    .map(
+      (member) =>
+        known.get(member) ?? {
+          member,
+          name: teamMemberName(member),
+          color: avatarHeadColor(teamMemberSeed(member), null),
+        },
+    );
+  const unchanged = next.length === previous.length && next.every((peer, index) => peer === previous[index]);
+  return unchanged ? previous : next;
+}
+
+function Cursor(props: {
+  name: string;
+  color: string;
+  at: WfnPoint;
+  glide: number;
+  ease?: string | undefined;
+  leaving?: boolean | undefined;
+  room: (at: WfnPoint) => WorkflowCursorRoom;
+}) {
+  let nameElement: HTMLSpanElement | undefined;
+  const [nameSize, setNameSize] = createSignal({ width: 0, height: 0 });
+  onSettled(() => {
+    if (nameElement) setNameSize({ width: nameElement.offsetWidth, height: nameElement.offsetHeight });
+  });
+  const flip = createMemo(() => {
+    const room = props.room(props.at);
+    const size = nameSize();
+    return {
+      x: room.right < CURSOR_NAME_LEFT + size.width + CURSOR_EDGE_GAP,
+      y: room.bottom < CURSOR_NAME_TOP + size.height + CURSOR_EDGE_GAP,
+    };
+  });
+  return (
+    <div
+      class="wfn-peer-cursor"
+      data-leaving={props.leaving ? "" : undefined}
+      data-flip-x={flip().x ? "" : undefined}
+      data-flip-y={flip().y ? "" : undefined}
+      style={{
+        "--wfn-peer": props.color,
+        "--wfn-peer-feed": `${props.glide}ms`,
+        "--wfn-peer-ease": props.ease,
+        translate: `${props.at.x}px ${props.at.y}px`,
+      }}
+      aria-hidden="true"
+    >
+      <svg class="wfn-peer-arrow" viewBox="0 0 19 20" aria-hidden="true">
+        <path d="M3.41 2.75 15.59 9.25Q17 10 15.45 10.39L9.78 11.81Q9 12 8.6 12.69L6.31 16.62Q5.5 18 5.16 16.44L2.34 3.56Q2 2 3.41 2.75Z" />
+      </svg>
+      <span ref={nameElement} class="wfn-peer-name">
+        {props.name}
+      </span>
+    </div>
+  );
+}
+
 export function PeerCursors(props: {
   peers: readonly WorkflowPeer[];
   spots: Readonly<Record<string, WorkflowPeerSpot>>;
+  room: (at: WfnPoint) => WorkflowCursorRoom;
 }) {
   return (
     <For each={props.peers}>
       {(peer) => (
-        <Show when={props.spots[peer.member.id]}>
-          {(spot) => (
-            <div
-              class="wfn-peer-cursor"
-              style={{
-                "--wfn-peer": peer.color,
-                "--wfn-peer-feed": `${WORKFLOW_PRESENCE_FEED_INTERVAL}ms`,
-                translate: `${spot().at.x}px ${spot().at.y}px`,
-              }}
-              aria-hidden="true"
-            >
-              <svg class="wfn-peer-arrow" viewBox="0 0 19 20" aria-hidden="true">
-                <path d="M3.41 2.75 15.59 9.25Q17 10 15.45 10.39L9.78 11.81Q9 12 8.6 12.69L6.31 16.62Q5.5 18 5.16 16.44L2.34 3.56Q2 2 3.41 2.75Z" />
-              </svg>
-              <span class="wfn-peer-name">{peer.name}</span>
-            </div>
+        <Show when={props.spots[peer.member.id]?.at}>
+          {(at) => (
+            <Cursor
+              name={peer.name}
+              color={peer.color}
+              at={at()}
+              glide={WORKFLOW_PRESENCE_FEED_INTERVAL}
+              room={props.room}
+            />
           )}
         </Show>
       )}
@@ -77,11 +128,35 @@ export function PeerCursors(props: {
   );
 }
 
-/** The people on this canvas, next to the run controls. You come last. A click follows a person. */
+export interface WorkflowBuilderSpot {
+  name: string;
+  color: string;
+  at: WfnPoint;
+  on: string | undefined;
+  leaving: boolean;
+}
+
+export function BuilderCursor(props: {
+  spot: WorkflowBuilderSpot;
+  glide: number;
+  room: (at: WfnPoint) => WorkflowCursorRoom;
+}) {
+  return (
+    <Cursor
+      name={props.spot.name}
+      color={props.spot.color}
+      at={props.spot.at}
+      glide={props.glide}
+      ease="var(--openbot-ease-in-out)"
+      leaving={props.spot.leaving}
+      room={props.room}
+    />
+  );
+}
+
 export function PresenceBar(props: {
   self: TeamPresenceMember | undefined;
   peers: readonly WorkflowPeer[];
-  /** The person whose cursor the camera follows, or `undefined`. */
   following: string | undefined;
   onFollow: (peer: WorkflowPeer) => void;
 }) {
@@ -122,7 +197,6 @@ export function PresenceBar(props: {
   );
 }
 
-/** While you follow a person, a frame in their colour holds the view, with their name at the top. */
 export function FollowFrame(props: { peer: WorkflowPeer }) {
   const { t } = useText();
   return (

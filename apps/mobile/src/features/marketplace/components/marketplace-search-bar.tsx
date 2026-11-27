@@ -19,6 +19,7 @@ import { useReducedMotion } from "@/shared/lib/motion";
 import { isAndroid } from "@/shared/lib/platform";
 import { selectionColorProps } from "@/shared/lib/selection-color";
 import { useText } from "@/shared/lib/text";
+import { fieldDirectionStyle } from "@/shared/lib/text-direction";
 import { typeScale } from "@/shared/lib/type-scale";
 import { useLiquidGlass } from "@/shared/lib/use-liquid-glass";
 import {
@@ -28,15 +29,11 @@ import {
   MARKETPLACE_CATEGORIES,
   MARKETPLACE_KINDS,
   type MarketplaceFilter,
+  marketplaceFilterTokens,
 } from "../model/marketplace-listings";
 
-/** The gap between the field and the keyboard, as home search. */
 const KEYBOARD_GAP = 8;
 
-/**
- * The field at the bottom of the Marketplace. It is the home search field, with a filter button that
- * opens a native menu; each filter that is set shows as a token in the field and narrows the page.
- */
 export function MarketplaceSearchBar({
   query,
   onQueryChange,
@@ -60,7 +57,6 @@ export function MarketplaceSearchBar({
   const reduced = useReducedMotion();
   const [foreground, muted, fieldBackground] = useThemeColor(["foreground", "muted", "default"]);
   const accent = String(useCSSVariable("--openbot-accent-text"));
-  // As home search: iOS sets the field into the home indicator area; Android stays above the handle.
   const { height: fieldHeight, bottomGap } = useBottomFieldMetrics();
   const { height: keyboardHeight } = useReanimatedKeyboardAnimation();
   const barStyle = useAnimatedStyle(() => ({
@@ -106,8 +102,6 @@ export function MarketplaceSearchBar({
       id: "category",
       title: t("mobile.marketplace.filter.category"),
       image: "folder",
-      // Android draws a sub-menu as a layer under its row, which runs off the screen above a bottom
-      // field, and a menu with a sub-menu cannot scroll. The categories are one more group there.
       displayInline: isAndroid,
       subactions: [
         {
@@ -132,11 +126,7 @@ export function MarketplaceSearchBar({
     },
   ];
 
-  const tokens = [
-    filter.kind ? { id: "kind", label: t(KIND_LABELS[filter.kind]) } : null,
-    filter.category ? { id: "category", label: t(CATEGORY_LABELS[filter.category]) } : null,
-    filter.installed ? { id: "installed", label: t("mobile.marketplace.installed") } : null,
-  ].filter((token) => token !== null);
+  const tokens = marketplaceFilterTokens(filter, t);
 
   function removeToken(id: string) {
     void haptics.impact("soft");
@@ -188,7 +178,14 @@ export function MarketplaceSearchBar({
               submitBehavior="blurAndSubmit"
               {...selectionColorProps(String(foreground))}
               className="h-10 min-w-0 flex-1 font-sans text-foreground"
-              style={{ fontSize: 16, lineHeight: 20, paddingBottom: 0, paddingTop: 0, textAlignVertical: "center" }}
+              style={{
+                fontSize: 16,
+                lineHeight: 20,
+                paddingBottom: 0,
+                paddingTop: 0,
+                textAlignVertical: "center",
+                ...fieldDirectionStyle(query),
+              }}
             />
             {query ? (
               <Pressable
@@ -207,8 +204,6 @@ export function MarketplaceSearchBar({
           </View>
         </GlassCapsule>
       </View>
-      {/* Its own capsule, beside the field: the iOS menu grows out of the button it opens from, so a
-          button inside the field would take the whole field into the menu. */}
       <MenuView
         colorScheme={theme === "dark" ? "dark" : "light"}
         title={t("mobile.marketplace.filter.title")}

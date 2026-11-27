@@ -1,8 +1,3 @@
-/* The steps of an agent's turn: under the activity line while it runs, above the answer after. */
-
-/* The working rings reach about 10px past a face, and the channel's faces sit 2px from the edge.
-   The clip margin keeps the rings whole. It goes when the line leaves, so open steps do not show
-   below the closing row. */
 .agent-activity-body {
   min-height: 0;
   overflow: clip;
@@ -13,7 +8,6 @@
   overflow-clip-margin: 0;
 }
 
-/* The entry ignores the pointer so the chat scrolls under it; its controls take it back. */
 .agent-activity-content .agent-steps-toggle,
 .agent-activity-steps {
   pointer-events: auto;
@@ -24,7 +18,6 @@
   color: var(--openbot-text-muted);
 }
 
-/* The open list is not a lit toggle, so the chevron has no fill. */
 .agent-activity-content .agent-steps-toggle[aria-expanded="true"]:not(:hover) {
   background: transparent;
 }
@@ -46,7 +39,6 @@
   rotate: 180deg;
 }
 
-/* The row's chevron points right, as the subagents header's does, and down when its list is open. */
 .agent-steps-header[aria-expanded="true"] .agent-steps-chevron {
   rotate: 90deg;
 }
@@ -57,7 +49,6 @@
   margin-bottom: var(--openbot-space-1);
 }
 
-/* The row looks like the header of the subagents above it. */
 .agent-steps .agent-steps-header {
   display: flex;
   height: auto;
@@ -75,7 +66,6 @@
   text-align: start;
 }
 
-/* The open list is not a lit toggle, so the header has no fill. */
 .agent-steps .agent-steps-header[aria-expanded="true"]:not(:hover) {
   background: transparent;
   color: inherit;
@@ -118,7 +108,6 @@
     opacity var(--openbot-duration-normal) var(--openbot-ease-out);
 }
 
-/* The panel exists only while the row is open, so it opens from its first frame. */
 @starting-style {
   .agent-steps-panel {
     grid-template-rows: 0fr;
@@ -162,8 +151,6 @@
   animation: message-in var(--openbot-duration-normal) var(--openbot-ease-out) both;
 }
 
-/* The step that the user picked in the trace lights up, then fades back. A colour change is not
- * motion, so it stays with reduced motion. */
 .agent-step[data-focused] {
   border-radius: var(--openbot-radius-xs);
   animation: agent-step-picked calc(var(--openbot-duration-overlay) * 6) var(--openbot-ease-out) both;
@@ -206,6 +193,48 @@
   color: var(--openbot-text-muted);
 }
 
+.agent-step-failed {
+  display: grid;
+  min-width: 0;
+  flex: 1 1 auto;
+  justify-items: start;
+}
+
+.agent-step .agent-step-error-toggle {
+  display: inline-flex;
+  height: auto;
+  align-items: center;
+  gap: var(--openbot-space-1);
+  margin-inline-start: calc(-1 * var(--openbot-space-1));
+  border-radius: var(--openbot-radius-xs);
+  padding: 0 var(--openbot-space-1);
+  color: var(--openbot-text-muted);
+  font-size: inherit;
+  font-weight: var(--openbot-weight-regular);
+  line-height: inherit;
+}
+
+.agent-step-error-toggle[aria-expanded="true"] .agent-steps-chevron {
+  rotate: 90deg;
+}
+
+.agent-step-error {
+  max-height: 160px;
+  justify-self: stretch;
+  margin: var(--openbot-space-1) 0 0;
+  overflow: auto;
+  border: 1px solid var(--openbot-border);
+  border-radius: var(--openbot-radius-xs);
+  background: var(--openbot-bg-control);
+  padding: var(--openbot-space-1-5) var(--openbot-space-2);
+  color: var(--openbot-text-secondary);
+  font-family: var(--openbot-font-mono);
+  font-size: var(--openbot-text-sm);
+  line-height: var(--openbot-leading-sm);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
 @media (prefers-reduced-motion: reduce) {
   .agent-steps-chevron,
   .agent-steps-panel,
@@ -218,11 +247,11 @@
   }
 }
 
-/* In RTL the right chevron points left, so the open row turns it the other way to point down. */
 :dir(rtl) svg[class~="lucide-chevron-right"].agent-steps-chevron {
   transform: scaleX(-1);
 }
 
-:dir(rtl) .agent-steps-header[aria-expanded="true"] svg[class~="lucide-chevron-right"].agent-steps-chevron {
+:dir(rtl) .agent-steps-header[aria-expanded="true"] svg[class~="lucide-chevron-right"].agent-steps-chevron,
+:dir(rtl) .agent-step-error-toggle[aria-expanded="true"] svg[class~="lucide-chevron-right"].agent-steps-chevron {
   rotate: -90deg;
 }

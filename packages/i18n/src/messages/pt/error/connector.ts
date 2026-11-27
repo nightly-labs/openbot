@@ -9,29 +9,107 @@ export const messages = {
   "error.connector.githubClientUnknown": "O GitHub não reconhece o Client ID deste GitHub App.",
   "error.connector.githubUnexpected": "O GitHub enviou uma resposta inesperada: {detail}",
   "error.connector.githubUnreachable": "O OpenBot não consegue acessar o GitHub: {detail}",
+  "error.connector.githubOffline":
+    "O OpenBot não consegue acessar o GitHub. Verifique a conexão com a internet e as configurações de DNS do computador ou servidor que executa o OpenBot e tente de novo.",
   "error.connector.githubExpired": "A conexão com o GitHub expirou. Conecte o GitHub novamente.",
   "error.connector.githubFileUnreadable": "O arquivo de conexão com o GitHub não pode ser lido.",
   "error.connector.githubFileTooLarge": "O arquivo de conexão com o GitHub é muito grande.",
+  "error.connector.nearSignIn": "Entre no OpenBot para usar a carteira cripto.",
+  "error.connector.nearServiceUnavailable":
+    "O serviço da carteira cripto não está disponível. Tente novamente mais tarde.",
+  "error.connector.nearWalletNotFound": "Esta carteira não pertence a esta conta ou servidor do OpenBot.",
+  "error.connector.nearWalletLimit": "Muitas carteiras novas hoje. Tente novamente amanhã.",
+  "error.connector.nearProviderBusy":
+    "O NEAR Intents não está respondendo no momento. Tente novamente em alguns minutos.",
+  "error.connector.nearNoWallet":
+    "Nenhuma carteira cripto está configurada. Configure em Configurações do servidor > Vault > Cripto.",
+  "error.connector.nearWalletExists": "Uma carteira cripto já está configurada.",
+  "error.connector.nearFrozen":
+    "Os pagamentos pela carteira cripto estão pausados. Retome em Configurações do servidor > Vault > Cripto.",
+  "error.connector.nearAgentNotAllowed":
+    "Este agente não pode pagar pela carteira cripto. Ative em Configurações do servidor > Vault > Cripto.",
+  "error.connector.nearGrantExpired":
+    "O OpenBot não tem permissão de pagamento para a carteira cripto. Renove em Configurações do servidor > Vault > Cripto.",
+  "error.connector.nearUnknownAsset": "A carteira cripto não tem o ativo {asset}.",
+  "error.connector.nearAmountInvalid": "{amount} não é um valor válido de {asset}.",
+  "error.connector.nearRecipientInvalid": "{recipient} não é uma conta NEAR nem um endereço chain:address.",
+  "error.connector.nearRefused": "A NEAR Intents Agent API recusou a solicitação: {detail}",
+  "error.connector.nearUnexpected": "A NEAR Intents Agent API enviou uma resposta inesperada: {detail}",
+  "error.connector.nearUnreachable": "O OpenBot não consegue acessar a NEAR Intents Agent API: {detail}",
+  "error.connector.nearFileUnreadable": "Não é possível ler o arquivo da carteira cripto.",
+  "error.connector.nearFileTooLarge": "O arquivo da carteira cripto é grande demais.",
+  "error.connector.nearSigningCanceled": "A assinatura foi cancelada.",
+  "error.connector.nearSigningExpired": "A assinatura não chegou a tempo. Tente novamente.",
+  "error.connector.nearSigningInvalid": "A assinatura do navegador não é válida.",
+  "error.connector.nearSigningBusy":
+    "Outra assinatura está aguardando no navegador. Conclua ou cancele essa assinatura primeiro.",
+  "error.connector.nearPolicyCooldown": "Você poderá alterar as regras da carteira novamente a partir de {time}.",
+  "error.connector.nearPolicyPending": "A alteração das regras não foi concluída. Tente novamente em alguns minutos.",
+  "error.connector.nearDeclined": "O proprietário recusou o pagamento.",
+  "error.connector.nearUncertain":
+    "O OpenBot não sabe se o pagamento foi enviado. Não pague de novo. O proprietário pode verificar o histórico da carteira.",
+  "error.connector.nearPaymentFailed": "O pagamento falhou: {detail}",
+  "error.connector.nearPaymentUnknown": "Este pagamento não aguarda mais uma resposta.",
+  "error.connector.nearRuleFull": "Uma regra de pagamento pode ter no máximo {limit} destinatários.",
+  "error.connector.nearRulesFull": "A carteira pode ter no máximo {limit} regras de pagamento.",
   "error.connector.onePasswordCliMissing":
     "O OpenBot não encontrou a CLI do 1Password. Instale-a e ative a integração no app do 1Password, ou use um token de conta de serviço.",
   "error.connector.onePasswordCliInstallFailed":
     "O OpenBot não conseguiu instalar a CLI do 1Password. Verifique a conexão com a internet e tente novamente.",
   "error.connector.onePasswordCliSignedOut":
     "A CLI do 1Password não está conectada. Ative a integração no app do 1Password e conecte novamente.",
+  "error.connector.onePasswordAppUnreachable":
+    "O OpenBot não consegue acessar o app do 1Password. Abra o 1Password e desbloqueie-o. Em Ajustes > Desenvolvedor, confira se “Integrar com a CLI do 1Password” está ativado. Depois tente novamente.",
   "error.connector.onePasswordCliFailed": "A CLI do 1Password falhou: {detail}",
+  "error.connector.onePasswordCliForbidden":
+    "Sua conta do 1Password não permite que você crie o cofre compartilhado nem uma conta de serviço. Peça essa permissão a um proprietário ou administrador da conta, ou peça um token de conta de serviço e clique em “Usar token”.",
   "error.connector.onePasswordUnexpected": "O 1Password enviou uma resposta inesperada: {detail}",
   "error.connector.onePasswordTokenRejected": "O 1Password não aceitou o token da conta de serviço.",
+  "error.connector.onePasswordUnreachable":
+    "O OpenBot não conseguiu se conectar ao 1Password. Verifique a conexão com a internet e tente novamente.",
+  "error.connector.onePasswordRateLimited":
+    "O 1Password recebeu solicitações demais. Aguarde alguns minutos e tente novamente.",
   "error.connector.onePasswordNoVault":
     "A conta de serviço não consegue ler nenhum cofre. Dê acesso a um cofre e tente novamente.",
+  "error.connector.onePasswordReadFailed":
+    "O OpenBot não consegue ler seus logins no 1Password. Desconecte o 1Password e conecte-o novamente.",
   "error.connector.onePasswordFileUnreadable": "O arquivo de conexão com o 1Password não pode ser lido.",
   "error.connector.onePasswordFileTooLarge": "O arquivo de conexão com o 1Password é muito grande.",
   "error.connector.bitwardenFailed":
     "Não foi possível ler o Bitwarden. Instale a CLI bw, entre, desbloqueie e crie uma pasta chamada Shared with OpenBot. Conecte com uma nova chave de sessão.",
+  "error.connector.bitwardenCliMissing":
+    "O OpenBot não encontra a CLI do Bitwarden. Instale o bw, confirme que ele funciona em um novo terminal e conecte novamente.",
+  "error.connector.bitwardenFolderMissing":
+    "O Bitwarden precisa ter exatamente uma pasta chamada Shared with OpenBot. Crie a pasta ou remova a pasta extra e conecte novamente.",
   "error.connector.bitwardenHostInput":
     "Informe um endereço de servidor HTTPS, o client_id e o client_secret da chave de API e a senha mestra.",
   "error.connector.bitwardenHostFailed":
     "Não foi possível abrir o Bitwarden neste servidor. Verifique o endereço do servidor, a chave de API e a senha mestra, e confirme que uma pasta se chama Shared with OpenBot. Depois, conecte de novo.",
+  "error.connector.bitwardenHostSignInFailed":
+    "Não foi possível entrar no Bitwarden neste servidor. Verifique o endereço do servidor e a chave de API e conecte de novo.",
+  "error.connector.bitwardenHostUnlockFailed":
+    "Não foi possível desbloquear o Bitwarden neste servidor. Verifique a senha mestra e conecte de novo.",
   "error.connector.bitwardenCliInstallFailed":
     "Não foi possível instalar a CLI do Bitwarden neste servidor. Verifique a conexão de rede dele e conecte de novo.",
+  "error.connector.bitwardenCliCannotStart":
+    "A CLI do Bitwarden não iniciou neste servidor. Conecte de novo. Se ainda não iniciar, escolha Ajuda > Relatar um problema.",
   "error.connector.bitwardenFileUnreadable": "O arquivo de conexão do Bitwarden não pode ser lido.",
+  "error.connector.passwordManagerUnknown": "O OpenBot não conhece este gestor de senhas.",
+  "error.connector.passwordManagerMethod": "Este gestor de senhas não pode se conectar desta forma.",
+  "error.connector.passwordManagerNoSignIn": "Nenhuma página de login está aberta. Conecte novamente.",
+  "error.connector.protonPassFailed": "Não foi possível conectar o Proton Pass. Conecte novamente.",
+  "error.connector.protonPassCliInstallFailed":
+    "Não foi possível instalar a CLI do Proton Pass. Verifique a conexão de rede e conecte novamente.",
+  "error.connector.protonPassPlan":
+    "Seu plano Proton não permite a CLI do Proton Pass. Mude o plano e conecte novamente.",
+  "error.connector.protonPassPlanMissing":
+    "Seu plano Proton não inclui a CLI do Proton Pass. Ela precisa de um plano do Proton que inclua o Pass Plus. Mude o plano e conecte novamente.",
+  "error.connector.protonPassExpired": "O acesso ao Proton Pass terminou. Conecte novamente.",
+  "error.connector.protonPassKeyInvalid": "Insira uma chave de acesso do Proton Pass que comece com pst_.",
+  "error.connector.protonPassExtraPassword": "A senha adicional não está correta. Insira-a novamente.",
+  "error.connector.protonPassExtraPasswordNotAsked": "O Proton Pass não pediu uma senha adicional.",
+  "error.connector.protonPassFileUnreadable": "O arquivo de conexão do Proton Pass não pode ser lido.",
+  "error.connector.protonPassSignInTimeout": "O login no Proton demorou demais. Conecte novamente.",
+  "error.connector.protonPassSetupFailed":
+    "Não foi possível criar o cofre Shared with OpenBot ou a chave de acesso dele no Proton Pass. Conecte novamente.",
 } as const satisfies PartialTranslation<typeof source>;

@@ -1,73 +1,81 @@
-import type { ClientAgentSummary, ConversationMessage, QueueDeliveryStatus } from "@openbot/contracts/ipc";
+import { feedbackSentIssue } from "@openbot/contracts/feedback";
+import { serverInstallEvent } from "@openbot/contracts/hosted-servers";
+import type { ConversationMessage, ConversationSearchPage, QueueDeliveryStatus } from "@openbot/contracts/ipc";
 import {
   AGENT_INSTRUCTIONS_CHANGE_ITEM_TYPE,
+  AGENT_WELCOME_ITEM_TYPE,
+  CHANNEL_RESUME_ITEM_TYPE,
   CONVERSATION_MEMORY_CHANGES_ITEM_TYPE,
   CONVERSATION_PLAN_ITEM_TYPE,
   CONVERSATION_SUBAGENTS_ITEM_TYPE,
   hostedSiteConversationEvent,
   isChannelChangeMarker,
   isContextResetMarker,
+  isNoAnswerNotice,
   isPlanContinuationMarker,
   isVaultChangeMarker,
   marketplaceSuggestionEvent,
   mcpSignInEvent,
   modelSwitchReason,
   parseConversationPlanText,
+  replacedConversationPlans,
   routineConversationEvent,
   routineRunConversationEvent,
+  settingLinkEvent,
+  signInFailureProvider,
   skillConversationEvent,
+  skillSuggestionEvent,
 } from "@openbot/contracts/ipc";
-import { markdownPreviewText } from "@openbot/contracts/markdown-preview-text";
+import { sourceText as englishSourceText } from "@openbot/i18n/source";
 import { cleanAgentMessageText } from "@openbot/team-client/agent-message-text";
+
+export { toAgentProfile } from "@openbot/ui/features/agents/agent-profile";
+
 import type {
   AgentDeliveryMarkerStatus,
   AgentMessage,
   AgentMessagePlan,
   AgentProfile,
   ChatActionMarkerModel,
+  ComposerThreadMessageMatch,
 } from "@openbot/ui/data";
 import { formatChatTimestamp } from "@openbot/ui/features/conversation/chat-timestamp";
 import type { TaskListItem } from "@openbot/ui/features/conversation/TaskList";
 import { currentText } from "@openbot/ui/text";
 import { isRoutineEventItem } from "./features/conversation/conversation-read-state";
 
-export function toAgentProfile(stored: ClientAgentSummary): AgentProfile {
-  return {
-    id: stored.id,
-    name: stored.name,
-    title: stored.title,
-    description: stored.description,
-    notifications: stored.notifications,
-    provider: stored.provider,
-    model: stored.model,
-    reasoningEffort: stored.reasoningEffort,
-    ...(stored.providerAccountId === undefined ? {} : { providerAccountId: stored.providerAccountId }),
-    ...(stored.access === undefined ? {} : { access: stored.access }),
-    ...(stored.computerUse === undefined ? {} : { computerUse: stored.computerUse }),
-    ...(stored.allowAutomation === undefined ? {} : { allowAutomation: stored.allowAutomation }),
-    ...(stored.allowNewChat === undefined ? {} : { allowNewChat: stored.allowNewChat }),
-    ...(stored.quickAcknowledgement === undefined ? {} : { quickAcknowledgement: stored.quickAcknowledgement }),
-    ...(stored.fastMode === undefined ? {} : { fastMode: stored.fastMode }),
-    ...(stored.ownBrowserSession === undefined ? {} : { ownBrowserSession: stored.ownBrowserSession }),
-    ...(stored.browserProfileId === undefined ? {} : { browserProfileId: stored.browserProfileId }),
-    ...(stored.busyMessageMode === undefined ? {} : { busyMessageMode: stored.busyMessageMode }),
-    ...(stored.taskLimit === undefined ? {} : { taskLimit: stored.taskLimit }),
-    ...(stored.backupModels === undefined ? {} : { backupModels: stored.backupModels }),
-    ...(stored.additionalFolders === undefined ? {} : { additionalFolders: stored.additionalFolders }),
-    ...(stored.excludedFolders === undefined ? {} : { excludedFolders: stored.excludedFolders }),
-    ...(stored.usageLimitReturn === undefined ? {} : { usageLimitReturn: stored.usageLimitReturn }),
-    ...(stored.pendingRuntime === undefined ? {} : { pendingRuntime: stored.pendingRuntime }),
-    threadId: stored.threadId,
-    workspacePath: stored.workspacePath,
-    avatarSeed: stored.avatarSeed,
-    avatarHue: stored.avatarHue,
-    ...(stored.avatarColor == null ? {} : { avatarColor: stored.avatarColor }),
-    avatarUrl: stored.avatarUrl,
-    ...(stored.marketplaceSource === undefined ? {} : { marketplaceSource: stored.marketplaceSource }),
-    updatedAt: stored.updatedAt,
-    time: stored.updatedAt ? formatTime(stored.updatedAt) : currentText().t("chat.day.now"),
-    preview: cleanPreview(stored.preview),
-  };
+function feedbackSentTitle(text: string): string {
+  for (const key of ["status.agent.feedbackSent", "status.agent.feedbackWithdrawn"] as const) {
+    const prefix = englishSourceText(key, { title: "" });
+    if (text.startsWith(prefix)) return text.slice(prefix.length);
+  }
+  return "";
+}
+
+function conversationMessageBody(message: ConversationMessage): string {
+  return message.author === "user" ? message.text : cleanAgentMessageText(message.text);
+}
+
+const THREAD_MESSAGE_SEARCH_PAGES = 3;
+const THREAD_MESSAGE_SEARCH_THREADS = 10;
+
+export async function collectThreadMessageMatches(
+  readPage: (cursor: string | undefined) => Promise<ConversationSearchPage>,
+): Promise<ComposerThreadMessageMatch[]> {
+  const matches: ComposerThreadMessageMatch[] = [];
+  const threads = new Set<string>();
+  let cursor: string | undefined;
+  for (let page = 0; page < THREAD_MESSAGE_SEARCH_PAGES; page += 1) {
+    const result = await readPage(cursor);
+    for (const { taskId, message } of result.results) {
+      if (!taskId) continue;
+      threads.add(taskId);
+      matches.push({ threadId: taskId, body: conversationMessageBody(message) });
+    }
+    if (!result.nextCursor || threads.size >= THREAD_MESSAGE_SEARCH_THREADS) break;
+    cursor = result.nextCursor;
+  }
+  return matches;
 }
 
 export function toAgentMessage(message: ConversationMessage, ownerAgentId?: string): AgentMessage {
@@ -96,30 +104,35 @@ export function toAgentMessage(message: ConversationMessage, ownerAgentId?: stri
     id: message.id,
     ...(message.turnId === undefined ? {} : { turnId: message.turnId }),
     author: message.author === "user" ? "you" : "agent",
-    body: message.author === "user" ? message.text : cleanAgentMessageText(message.text),
+    body: conversationMessageBody(message),
     time: formatMessageTime(message.createdAt),
     createdAt: message.createdAt,
     streaming: message.status === "streaming",
     ...(message.itemType === undefined ? {} : { itemType: message.itemType }),
     kind: message.questionPrompt
       ? "question"
-      : actionMarker
-        ? "action-marker"
-        : plan
-          ? "plan"
-          : subagents?.length
-            ? "subagents"
-            : memoryChanges
-              ? "memory-changes"
-              : "text",
+      : message.nearPayment
+        ? "near-payment"
+        : actionMarker
+          ? "action-marker"
+          : plan
+            ? "plan"
+            : subagents?.length
+              ? "subagents"
+              : memoryChanges
+                ? "memory-changes"
+                : "text",
     ...(exchangeSenderId === undefined ? {} : { senderAgentId: exchangeSenderId }),
     ...(senderMember === undefined ? {} : { senderMember }),
     ...(message.replyToMessageId === undefined ? {} : { replyToMessageId: message.replyToMessageId }),
+    ...(message.steered ? { steered: true as const } : {}),
     ...(message.attachments === undefined ? {} : { attachments: message.attachments }),
     ...(message.voiceRecording === undefined ? {} : { voiceRecording: message.voiceRecording }),
     ...(message.imageGeneration === undefined ? {} : { imageGeneration: message.imageGeneration }),
+    ...(message.videoGeneration === undefined ? {} : { videoGeneration: message.videoGeneration }),
     ...(message.questionPrompt === undefined ? {} : { questionPrompt: message.questionPrompt }),
     ...(message.uiBlock ? { uiBlock: message.uiBlock } : {}),
+    ...(message.nearPayment ? { nearPayment: message.nearPayment } : {}),
     ...(message.exchange === undefined ? {} : { exchange: message.exchange }),
     ...(message.reaction === undefined ? {} : { reaction: message.reaction }),
     reactions:
@@ -134,10 +147,6 @@ export function toAgentMessage(message: ConversationMessage, ownerAgentId?: stri
   };
 }
 
-/**
- * The plan of a `plan` message. A peer on a released Team API protocol sends only the checklist
- * text, so the plan is read back from it.
- */
 function messagePlan(message: ConversationMessage): AgentMessagePlan | null {
   if (message.author !== "assistant" || message.itemType !== CONVERSATION_PLAN_ITEM_TYPE) return null;
   const plan = message.plan ?? parseConversationPlanText(message.text);
@@ -145,10 +154,6 @@ function messagePlan(message: ConversationMessage): AgentMessagePlan | null {
   return { ...plan, stopped: message.status === "interrupted" || message.status === "failed" };
 }
 
-/**
- * The rows of a plan block. A step runs only while its turn runs: after the turn ends, a step that
- * was not finished shows as not started.
- */
 export function planItems(plan: AgentMessagePlan, streaming: boolean): TaskListItem[] {
   return plan.steps.map((step) => {
     const state =
@@ -159,18 +164,28 @@ export function planItems(plan: AgentMessagePlan, streaming: boolean): TaskListI
 
 const PLAN_TITLE_LIMIT = 80;
 
-/** The header of a plan block: a short explanation, else "Tasks", or "Stopped" for a stopped plan. */
-export function planTitle(plan: AgentMessagePlan): string {
+export function replacedPlanIds(messages: readonly AgentMessage[]): ReadonlySet<string> {
+  return replacedConversationPlans(
+    messages.map((message) => ({
+      id: message.id,
+      turnId: message.turnId,
+      agent:
+        message.author === "agent" && !message.exchange && !message.actionMarker && message.kind !== "memory-changes"
+          ? (message.senderAgentId ?? "")
+          : null,
+      plan: message.kind === "plan",
+    })),
+  );
+}
+
+export function planTitle(plan: AgentMessagePlan, replaced: boolean): string {
   const { t } = currentText();
-  if (plan.stopped && plan.steps.some((step) => step.status !== "completed")) return t("chat.taskList.stopped");
+  if (plan.stopped && !replaced && plan.steps.some((step) => step.status !== "completed"))
+    return t("chat.taskList.stopped");
   if (plan.explanation && plan.explanation.length <= PLAN_TITLE_LIMIT) return plan.explanation;
   return t("chat.taskList.title");
 }
 
-/**
- * The chat rows of stored messages. `convert` gives the row of the message at an index; a caller
- * that keeps the rows of unchanged messages passes it.
- */
 export function toAgentMessages(
   messages: readonly ConversationMessage[],
   ownerAgentId?: string,
@@ -183,6 +198,7 @@ export function toAgentMessages(
     if ((message.delivery?.status === "queued" || message.delivery?.status === "cancelled") && !message.routine) {
       continue;
     }
+    if (message.itemType === AGENT_WELCOME_ITEM_TYPE || message.itemType === CHANNEL_RESUME_ITEM_TYPE) continue;
     if (message.author !== "assistant" || message.itemType !== "commentary") {
       result.push(convert(message, index));
       continue;
@@ -195,6 +211,7 @@ export function toAgentMessages(
       existing.items = [...(existing.items ?? []), text];
       existing.itemIds = [...(existing.itemIds ?? []), message.id];
       existing.itemCreatedAt = [...(existing.itemCreatedAt ?? []), message.createdAt];
+      existing.itemStreaming = [...(existing.itemStreaming ?? []), message.status === "streaming"];
       existing.streaming = existing.streaming || message.status === "streaming";
       if (message.trace) existing.trace = message.trace;
       continue;
@@ -214,6 +231,7 @@ export function toAgentMessages(
       items: [text],
       itemIds: [message.id],
       itemCreatedAt: [message.createdAt],
+      itemStreaming: [message.status === "streaming"],
       ...(message.trace === undefined ? {} : { trace: message.trace }),
     };
     thinkingByTurn.set(key, thinking);
@@ -243,7 +261,9 @@ export function agentProfilesEqual(left: AgentProfile, right: AgentProfile): boo
     left.allowAutomation === right.allowAutomation &&
     left.allowNewChat === right.allowNewChat &&
     left.quickAcknowledgement === right.quickAcknowledgement &&
+    left.memory === right.memory &&
     left.fastMode === right.fastMode &&
+    left.ultrafast === right.ultrafast &&
     left.ownBrowserSession === right.ownBrowserSession &&
     left.browserProfileId === right.browserProfileId &&
     left.busyMessageMode === right.busyMessageMode &&
@@ -252,6 +272,7 @@ export function agentProfilesEqual(left: AgentProfile, right: AgentProfile): boo
     left.avatarSeed === right.avatarSeed &&
     left.avatarHue === right.avatarHue &&
     (left.avatarColor ?? null) === (right.avatarColor ?? null) &&
+    left.chatColor === right.chatColor &&
     left.avatarUrl === right.avatarUrl &&
     marketplaceSourcesEqual(left.marketplaceSource, right.marketplaceSource) &&
     left.updatedAt === right.updatedAt &&
@@ -279,12 +300,14 @@ function stringArraysEqual(left: string[], right: string[]): boolean {
 }
 
 export function agentMessagesEqual(left: AgentMessage, right: AgentMessage): boolean {
+  if (left === right) return true;
   return (
     left.id === right.id &&
     left.turnId === right.turnId &&
     left.author === right.author &&
     left.body === right.body &&
     left.time === right.time &&
+    left.createdAt === right.createdAt &&
     left.kind === right.kind &&
     left.streaming === right.streaming &&
     left.itemType === right.itemType &&
@@ -293,19 +316,80 @@ export function agentMessagesEqual(left: AgentMessage, right: AgentMessage): boo
     left.senderMember?.id === right.senderMember?.id &&
     left.senderMember?.name === right.senderMember?.name &&
     left.replyToMessageId === right.replyToMessageId &&
+    left.steered === right.steered &&
     left.reaction === right.reaction &&
-    JSON.stringify(left.reactions) === JSON.stringify(right.reactions) &&
-    JSON.stringify(left.reactionSummary) === JSON.stringify(right.reactionSummary) &&
-    JSON.stringify(left.attachments) === JSON.stringify(right.attachments) &&
-    JSON.stringify(left.questionPrompt) === JSON.stringify(right.questionPrompt) &&
-    JSON.stringify(left.exchange) === JSON.stringify(right.exchange) &&
-    JSON.stringify(left.routine) === JSON.stringify(right.routine) &&
-    JSON.stringify(left.actionMarker) === JSON.stringify(right.actionMarker) &&
-    JSON.stringify(left.items) === JSON.stringify(right.items) &&
-    JSON.stringify(left.itemIds) === JSON.stringify(right.itemIds) &&
-    JSON.stringify(left.plan) === JSON.stringify(right.plan) &&
-    JSON.stringify(left.subagents) === JSON.stringify(right.subagents)
+    sameJson(left.reactions, right.reactions) &&
+    sameJson(left.reactionSummary, right.reactionSummary) &&
+    sameJson(left.attachments, right.attachments) &&
+    sameJson(left.questionPrompt, right.questionPrompt) &&
+    sameJson(left.exchange, right.exchange) &&
+    sameJson(left.routine, right.routine) &&
+    sameJson(left.actionMarker, right.actionMarker) &&
+    sameJson(left.items, right.items) &&
+    sameJson(left.itemIds, right.itemIds) &&
+    sameJson(left.itemStreaming, right.itemStreaming) &&
+    sameJson(left.itemCreatedAt, right.itemCreatedAt) &&
+    sameJson(left.plan, right.plan) &&
+    sameJson(left.subagents, right.subagents) &&
+    sameJson(left.voiceRecording, right.voiceRecording) &&
+    sameJson(left.imageGeneration, right.imageGeneration) &&
+    sameJson(left.videoGeneration, right.videoGeneration) &&
+    sameJson(left.uiBlock, right.uiBlock) &&
+    sameJson(left.nearPayment, right.nearPayment) &&
+    sameJson(left.memoryChanges, right.memoryChanges) &&
+    sameJson(left.trace, right.trace)
   );
+}
+
+function sameJson(left: unknown, right: unknown): boolean {
+  if (left === right) return true;
+  if (hasOwnJson(left) || hasOwnJson(right)) return JSON.stringify(left) === JSON.stringify(right);
+  if (Array.isArray(left) || Array.isArray(right)) {
+    if (!Array.isArray(left) || !Array.isArray(right)) return false;
+    if (left.some(hasOwnJson) || right.some(hasOwnJson)) return JSON.stringify(left) === JSON.stringify(right);
+    return left.length === right.length && left.every((item, index) => sameJsonArrayItem(item, right[index]));
+  }
+  if (isJsonObject(left) || isJsonObject(right)) {
+    if (!isJsonObject(left) || !isJsonObject(right)) return false;
+    const leftEntries = Object.entries(left).filter(([, value]) => !leftOutOfJson(value));
+    const rightEntries = Object.entries(right).filter(([, value]) => !leftOutOfJson(value));
+    const ownJson = ([, value]: [string, unknown]) => hasOwnJson(value);
+    if (leftEntries.some(ownJson) || rightEntries.some(ownJson)) return JSON.stringify(left) === JSON.stringify(right);
+    return (
+      leftEntries.length === rightEntries.length &&
+      leftEntries.every(([key, value], index) => {
+        const other = rightEntries[index];
+        return other !== undefined && other[0] === key && sameJson(value, other[1]);
+      })
+    );
+  }
+  return jsonScalar(left) === jsonScalar(right);
+}
+
+function hasOwnJson(value: unknown): boolean {
+  if (typeof value === "bigint") return true;
+  if (typeof value !== "object" || value === null) return false;
+  if ("toJSON" in value) return true;
+  const prototype = Object.getPrototypeOf(value);
+  return prototype !== Object.prototype && prototype !== Array.prototype && prototype !== null;
+}
+
+function isJsonObject(value: unknown): value is object {
+  return typeof value === "object" && value !== null;
+}
+
+function leftOutOfJson(value: unknown): boolean {
+  return typeof value === "undefined" || typeof value === "function" || typeof value === "symbol";
+}
+
+function sameJsonArrayItem(left: unknown, right: unknown): boolean {
+  return sameJson(leftOutOfJson(left) ? null : left, leftOutOfJson(right) ? null : right);
+}
+
+function jsonScalar(value: unknown): string | number | boolean | null | undefined {
+  if (typeof value === "string" || typeof value === "boolean") return value;
+  if (typeof value === "number") return Number.isFinite(value) ? value : null;
+  return value === null ? null : undefined;
 }
 
 function chatActionMarker(
@@ -334,6 +418,7 @@ function chatActionMarker(
       messageId: message.exchange.messageId,
       replyToMessageId: message.exchange.replyToMessageId,
       expectsReply: message.exchange.expectsReply !== false,
+      ...(message.exchange.senderTaskId === undefined ? {} : { senderTaskId: message.exchange.senderTaskId }),
     };
   }
   if (isContextResetMarker(message)) return { kind: "context-reset", timestamp: message.createdAt };
@@ -345,6 +430,10 @@ function chatActionMarker(
   if (isVaultChangeMarker(message)) return { kind: "vault-change", text: message.text, timestamp: message.createdAt };
   if (isPlanContinuationMarker(message))
     return { kind: "plan-continuation", text: message.text, timestamp: message.createdAt };
+  if (isNoAnswerNotice(message)) return { kind: "no-answer", text: message.text, timestamp: message.createdAt };
+  const signInProvider = signInFailureProvider(message);
+  if (signInProvider)
+    return { kind: "sign-in-failure", provider: signInProvider, text: message.text, timestamp: message.createdAt };
   if (message.author === "system" && message.itemType === AGENT_INSTRUCTIONS_CHANGE_ITEM_TYPE)
     return {
       kind: "instructions-change",
@@ -357,8 +446,23 @@ function chatActionMarker(
   if (skillEvent) return { ...skillEvent, kind: "skill-lifecycle", timestamp: message.createdAt };
   const suggestion = marketplaceSuggestionEvent(message);
   if (suggestion) return { kind: "marketplace-suggestion", appId: suggestion.appId, timestamp: message.createdAt };
+  const settingLink = settingLinkEvent(message);
+  if (settingLink) return { kind: "setting-link", settingId: settingLink.settingId, timestamp: message.createdAt };
+  const skillSuggestion = skillSuggestionEvent(message);
+  if (skillSuggestion) return { ...skillSuggestion, kind: "skill-suggestion", timestamp: message.createdAt };
   const signIn = mcpSignInEvent(message);
   if (signIn) return { kind: "mcp-sign-in", mcpServerId: signIn.mcpServerId, timestamp: message.createdAt };
+  const install = serverInstallEvent(message);
+  if (install) return { kind: "server-install", ...install, timestamp: message.createdAt };
+  const issue = feedbackSentIssue(message);
+  if (issue)
+    return {
+      kind: "feedback-sent",
+      messageId: message.id,
+      ...issue,
+      title: feedbackSentTitle(message.text),
+      timestamp: message.createdAt,
+    };
   if (routineEvent) {
     return {
       kind: "routine-lifecycle",
@@ -433,43 +537,37 @@ function deliveryStatus(status: QueueDeliveryStatus | undefined): Exclude<AgentD
   return status;
 }
 
-export function retainThinkingMessages(previous: AgentMessage[], next: AgentMessage[]): AgentMessage[] {
+export function retainThinkingMessages(
+  previous: AgentMessage[],
+  next: AgentMessage[],
+  activeTurnId: string | null,
+): AgentMessage[] {
   const result = [...next];
   const nextIds = new Set(result.map((message) => message.id));
   for (const thinking of previous) {
     if (thinking.kind !== "thinking" || nextIds.has(thinking.id) || !thinking.turnId) continue;
+    if (thinking.turnId !== activeTurnId) continue;
     const sameTurnIndexes = result.flatMap((message, index) => (message.turnId === thinking.turnId ? [index] : []));
     if (sameTurnIndexes.length === 0) continue;
     const finalAnswerIndex = result.findIndex(
       (message) => message.turnId === thinking.turnId && message.author === "agent" && message.kind !== "thinking",
     );
     const insertionIndex = finalAnswerIndex >= 0 ? finalAnswerIndex : (sameTurnIndexes.at(-1) ?? result.length - 1) + 1;
-    result.splice(insertionIndex, 0, { ...thinking, streaming: false });
+    result.splice(insertionIndex, 0, {
+      ...thinking,
+      streaming: false,
+      ...(thinking.itemStreaming ? { itemStreaming: thinking.itemStreaming.map(() => false) } : {}),
+    });
     nextIds.add(thinking.id);
   }
   return result;
 }
 
 export function withoutAgent<T>(values: Record<string, T>, agentId: string): Record<string, T> {
+  if (!Object.hasOwn(values, agentId)) return values;
   const next = { ...values };
   delete next[agentId];
   return next;
-}
-
-function cleanPreview(preview: string): string {
-  // The stored preview is the start of the message as written, Markdown and all.
-  const cleaned = markdownPreviewText(cleanAgentMessageText(preview))
-    .replace(/\binbox\s+at\s+zero\b[:,]?\s*/gi, "")
-    .replace(/\s{2,}/g, " ")
-    .trim();
-  return cleaned || currentText().t("app.agent.noMessages");
-}
-
-function formatTime(value: string): string {
-  const date = new Date(value);
-  const { t, format } = currentText();
-  if (Number.isNaN(date.getTime())) return t("chat.day.now");
-  return format.date(date, { hour: "2-digit", minute: "2-digit" });
 }
 
 export function formatMessageTime(value: string): string {

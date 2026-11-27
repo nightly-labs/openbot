@@ -13,9 +13,15 @@ The overlays that both clients raise - join, marketplace, shared agent, server s
 search and channel creation - are prop-driven views in `WorkspaceOverlayViews.tsx`.
 `WorkspaceOverlays` fills them from the desktop contexts, and the web client fills them from its
 host connection, so what an overlay decides from its server is decided in one place.
+An open overlay hides the page of a local tab, because that page is a native view above the window.
+A toast does not hide the page. While the full view shows the page of a local tab, the toasts are
+hidden (`native-browser-page.ts`), so the page does not cut them. A toast that stays until the user
+closes it shows again when the page is hidden; a toast with a timer can end while it is hidden, and
+it is then not reported as shown. A host's tab shows in the window, under the toasts.
 The web client gives `PlatformProvider` a fixed `appInfo` in place of the main-process answer.
 There is no separate web dashboard.
-Small screens switch between the same conversation and workspace components. The shared browser
+On a phone, `WebPhoneAppScreen` first points to the phone app. After "Continue in browser", small
+screens switch between the same conversation and workspace components. The shared browser
 panel receives the web live-view runtime and hides unsupported native controls. `BrowserLiveView`
 accepts an explicit runtime; desktop and the existing preview still default to the preload-compatible
 API. The web Storybook runtime uses
@@ -35,7 +41,7 @@ checks still apply. `web-account.ts` makes these calls, and the Profile tab of t
 
 An owner or admin gets the host controls of a desktop remote admin. Shared components keep their
 desktop port as the default and take injected calls: `web-server-settings.ts` gives
-`ServerSettingsModal` the host identity, MCP, and storage routes through
+`ServerSettingsModal` the host identity and storage routes through
 `@openbot/team-client/team-admin-requests`, and member and invitation calls through the closed
 `/api/browser/*` list. The Worker applies the same `RemoteControlPlane` role checks as the bearer
 routes. A member or role change revokes every session on the host; the browser reconnects once when
@@ -96,11 +102,28 @@ policy. The browser client shows an SVG thumbnail from a `data:` URL, never from
 object URL has the origin of the app. Remote support is additive through the
 `svg-attachments` capability, which only protocol 9 peers get.
 
+A file whose name has no known type is stored as `application/octet-stream` with `kind: "file"` and
+`previewKind: "none"`. Import drops a MIME type that the importer supplies for such a name, because a
+sent attachment takes its type from the name, and because a HEIC or TIFF must not become an image
+block that a provider refuses. For the same reason, a HEIF photo with an image name, such as `.jpg`,
+is also an opaque file: the host reads its first bytes. Only the voice recording keeps its
+`audio/webm` type. Delivery sends the path as a mention. The desktop app never opens such a file with the default app (`OPENABLE_ATTACHMENT_EXTENSIONS`). Remote support is
+additive through the `any-file-attachments` capability, which only protocol 9 peers get. Clients keep
+the extension list for a host without it.
+
 ## Browser tool execution
 
 `browser-tools.ts` defines provider schemas and parses each call into a typed tool and its arguments.
 `browser-tool-actions.ts` maps input tools to CDP operations. It does not own tabs or import the host.
 `BrowserHost` owns tab access checks, operation queues, focus, deadlines, and persistent browser state.
+The main chat and each side thread of an agent can use the tabs that the main chat, a side thread
+of that agent, or no chat opened. `list_tabs` and `status` give each tab its `chat` (`this chat`,
+`main chat`, a side thread with its title and `taskId`, `another conversation`, or `none`). They
+set `otherChatWorking` when another chat has a browser call on the tab or used it in the last 2
+minutes. It is a hint to the agent, not a lock. A channel or messaging thread uses only its own
+tabs, and its tabs stay out of the other chats. Any chat also uses the tabs that a person tags
+with @ in it (`sharedThreadIds`).
+`request_takeover`, `submit_secret` and `list_logins` use the same check (`toolCanUseTab`).
 Targeted typing checks that the target still holds focus before the End key, the text, and the
 Enter key. A page focus or input handler that moves focus stops it with an error that says if the
 text is already in the field. The check also reads each frame element that holds the target,
@@ -108,16 +131,48 @@ because a frame in another process can keep its active element after the page ta
 `bun run test:browser --scenario=typing-focus` covers it and writes
 `.openbot-build/browser-typing-focus.json`.
 The browser session and service-worker fallback remove the `OpenBot/` and `Electron/` user-agent
-tokens. They keep the installed Chromium version and host platform. Requests to `accounts.google.com`
+tokens. They keep the installed Chromium major version and host platform, and give the other version
+parts as `0.0.0` (`Chrome/156.0.0.0`), as Chrome does: some bot checks refuse the full version that
+Electron sends. The `Accept-Language` header adds the base language of each regional language
+(`en-GB,en;q=0.9`), also as Chrome does. The session sets it, not the request hook, so a value that
+a page sets on its own request stays: a site can sign that header. The header leaves out a system
+language that is not a valid language tag. On Linux, Electron gives `c` for the `C.UTF-8` locale and
+`posix` for `POSIX`, and adds them to `navigator.languages` of each page, where `Intl` throws on them.
+When the system list has such a value, the main process sets `LANGUAGE` at `ready`, before the
+first window, to the valid languages of the list, or to the app locale (`en_US`) when none is valid.
+A `C.UTF-8` server then gives pages `["en-US","en"]`. A list with only valid languages stays as it
+is. Child processes inherit the new `LANGUAGE`. Requests to `accounts.google.com`
 keep the `Electron/` token because Google rejects the account identifier step without it. This
 exception does not change the page identity or the identity sent to other sites.
 Electron provides native `navigator.userAgentData` but no client-hint request headers. On HTTPS and
 loopback HTTP, the host supplies the brand list, desktop flag, and platform hints. The brand list must
 be the same as `navigator.userAgentData.brands`, with the GREASE brand and its order (Chromium
 chooses both from the major version). Cloudflare rejects a request whose brands differ from the page.
-It preserves hints supplied by Chromium and does not add high-entropy hints. The focused check is
+It preserves hints supplied by Chromium. As Chrome does, it adds a high-entropy hint (full version,
+platform version, architecture, bitness, model, form factor) only after the response of a page load
+of that origin asks for it with `Accept-CH`, and only on requests from a page of that origin. Each
+value is the one that `getHighEntropyValues()` gives the page. The record is in memory, so the first
+load after a restart is as a first visit. Windows sends no platform version: the page reads a
+contract version that the host cannot compute. The focused check is
 `bun run test:browser --scenario=identity`; add `--google-live` for the Google identifier check.
 The local identity report is `.openbot-build/browser-identity.json`.
+The tab preload (`src/preload/browser-page.ts`) makes page values agree with Chrome: the outer size,
+the screen position, `window.chrome` and the passkey dialog. It also makes `window.print()` do
+nothing in each window that it installs in: the page, a frame that loads, and a blank frame that the
+page reaches through `contentWindow` or `contentDocument`. Thus a page in an agent tab cannot open the
+system Print dialog over the app, also not for a person in takeover. A blank frame that the page
+reaches only by index or name (`frames[0]`) is not covered. Each replaced function is a Proxy that
+reads as native code. Its `setPrototypeOf` trap throws `Cyclic __proto__ value` as a native function
+does, because V8 stops that check at a Proxy and bot checks find a Proxy that way. CDP calls do not
+turn on the `Runtime` domain: while it is on, Chromium formats each console argument for DevTools,
+and DataDome and other bot checks see that from the page (`Error.prepareStackTrace` runs). On a
+Linux server with no GPU, WebGL runs on SwiftShader, which bot checks read as headless Chrome. There,
+the WebGL vendor and renderer names in each tab are those of a common Intel laptop GPU; the
+rendering, the limits and the extensions stay those of SwiftShader. The preload does not run in a
+worker, so WebGL on an `OffscreenCanvas` in a worker still names SwiftShader. A computer with a GPU
+keeps its real names. The check is `bun scripts/browser-fingerprint-e2e.ts`; on Linux it uses the server GPU
+switches, so CI checks the SwiftShader case. Its report is
+`.openbot-build/browser-fingerprint-e2e/report.json`.
 Website popups are adopted into managed `WebContentsView` tabs through Electron's window creation
 hook. Native guests retain their opener, request body, and the browser session of the opener. Local tab and
 agent tool results expose `openerTabId` while that relationship is live. Independent `noopener`
@@ -141,6 +196,218 @@ then verify authenticated navigation. This recovery does not run during secure h
 non-login work. The host does not rewrite site scripts or weaken cross-origin security policies.
 Input dispatch runs inside those checks and queues. Upload staging also uses the shared parser before
 it checks local file access.
+
+An agent tab refuses cookie banners (`browser-consent.ts`). On `dom-ready`, the host runs a small
+script of its own in an isolated world of the main frame. For up to 15 seconds, it looks for one
+visible reject button: the button of a common consent platform, or a button whose whole label
+refuses optional cookies ("Reject all", "Only necessary", and the same in some other languages)
+inside a dialog, a fixed or sticky box, or a consent container that shows the word "cookie". Text
+such as "consent" alone does not count, because sign-in and terms dialogs show it too. It also
+looks in open shadow roots, because some platforms build the banner from web components. It clicks
+that button once and stops. It never accepts, so a banner with no reject button stays. A tab that a
+person opened keeps its banner, and so does a secret tab. A takeover, user control or secret entry
+stops the script of the current page. The site stores the refusal in the profile of the tab, so a
+later tab on that site in the same profile shows no banner either. Banners in frames (for example
+Sourcepoint) are not handled. `bun run test:browser --scenario=cookie-banner` covers it and writes
+`.openbot-build/browser-cookie-banner.json`.
+
+Each snapshot also looks for a bot check (`browser-challenge.ts`). It reads the DOM of the main frame
+in an isolated world: vendor markers of the interstitial page (Cloudflare, DataDome, PerimeterX,
+Imperva, Akamai, AWS WAF) and, only on a short page, captcha frames and phrases such as "verify you
+are human". A long page that only mentions a captcha does not count. Akamai markers also count only
+on a short page, because Akamai can leave them, hidden, on the normal page after its check passed. A check that passes by itself
+(`non-interactive`) makes the tab read wait: it reads the page again every second for up to 15
+seconds, and stops at once when the tab closes, a person takes control, or the tab holds a secret.
+All reads of one document share the 15 seconds: a read with a shorter timeout, such as `navigate`,
+leaves the rest for the next read and reports `checking`, whose `next` asks for a snapshot. A
+check that stays after the full wait reads as `needs-user` at once.
+The snapshot then has a `challenge` field with `status` (`cleared`, `checking`, `click-once`,
+`needs-user` or `blocked`), the vendor, the wait, and `next`, the step that the agent takes. A check
+that needs a person asks for `request_takeover` (in a routine run, a report). A block asks for a
+report. Each `next` also tells the agent not to solve, reload, or retry the check, so the guidance
+needs no separate rule.
+
+Many checks of the Turnstile, reCAPTCHA and hCaptcha widgets pass with one click on their checkbox.
+The script finds the frame of a widget of the normal size in the viewport and gives the checkbox
+point, 28 px from the left edge and in the middle. Turnstile puts its frame in a closed shadow root,
+which the page script cannot see, and its host element is as wide as the form. When the script
+finds a Turnstile response field without a token, the main process finds the frame through CDP:
+`DOM.getFrameOwner` for each child frame, also for frames in other processes, then the frame's
+`src` and its box from `DOM.getBoxModel`. A field without a visible frame (invisible mode) is not a
+check. A Turnstile widget often passes by itself in 1 to 2 seconds, and an early click can look like
+a bot, so the read that would offer its checkbox first waits up to 3 seconds for a token. The first
+read of a document that still needs a person then has `click-once` and a `point` target in place of `needs-user`. The agent clicks it with the
+ordinary `click` tool, so ownership, user control and the cursor stay the same. The next read of
+that document waits up to 6 seconds for the check to pass; a visible image puzzle or a block ends the
+wait at once, because only a person solves a puzzle. Later reads of the document ask for a person
+and do not offer the click again. A widget whose response field has a token passed: neither its
+frame nor the generic phrases count then, because the page keeps its text. The host never solves a
+puzzle and sends no page data to a solver service. The idea and the vendor
+list come from anomalyco/browse; the code is our own.
+
+`bun run bench:browser-tools --tasks=challenge-interstitial,challenge-interactive` measures it with
+loopback pages (Haiku, 5 runs each, 2026-11-07). On a check that needs a person, the agent before
+clicked "I am human" and read the page again: median 7 tool calls, $0.033 for 5 runs. With the
+`challenge` field, it stopped at once in every run: median 2 calls, $0.016. On a check that passes
+after 4 seconds, the agent opens the page with `navigate`. Before, it waited and read again: median
+4 calls and 129k input tokens. After, `navigate` returned the page behind the check: median 2 calls
+and 75k tokens.
+
+A memory can name a site (`site`, migration 60): a lowercase host without `www.`. The agent sets it
+with `openbot.remember` (a host or a URL), for example how to work a site. A snapshot of a page then
+has `siteMemories`, up to 5 of the agent's memories for the page's host and its parent domains
+(`app.example.com` also shows `example.com`), newest first. A tab shows them one time per host and
+turn, so the next pages of the same site in that turn do not show them again. A secret tab shows none.
+An essential memory is already in the agent's instructions with its site, so a snapshot leaves it out.
+Only a snapshot that reached the agent counts as shown. The host reads them from SQLite
+(`AgentMemoryStore.forHost`); nothing leaves the computer except the snapshot that goes to the
+provider, as for every other snapshot field. The Team API leaves out `site`, so the released memory
+shape stays the same. An instance transfer does not carry the site.
+The background memory review can add or update a memory with a `site` too. Its prompt asks it to keep
+how one site works, as the agent found it in the chat (where a control is, a step that worked after
+one failed), as a site memory, and a class of task as a skill. The review drops a site that is not a
+host and keeps the fact. The browser guidance has no site memory text: the agent context budget
+(`tools/agent-context/budget.json`) leaves no space for it, and the review saves these steps.
+
+"Learn from my browsing" (Server settings → Memory, off by default, `browsing-memory-v1`)
+lets the review also learn from what a person does in an agent's tab. `BrowserHost` records steps only
+while a person holds the tab (takeover or Take control), so no step is the agent's own. It skips a
+secret tab, a private sign-in, a tab without an owner agent, and a page that is not http(s). A step is
+a page that loads (host, path and title, without the query or the hash; `stepPlace` replaces a
+path part that looks like a code, such as a reset token, with `:id`) or a press on a control
+(`before-mouse-event` mouseDown; `browser-user-click.ts` reads the role and the name in the CDP
+automation world, with a 1 second limit). The read goes into open shadow roots and into frames, also
+frames of another process. A press in such a frame gives no `input-event` and its point is in the
+frame's own pixels, so a press without an `input-event` finds its frame by `:hover` (#10912). A live
+view's press does not move `:hover`; the engine gives its point in the page's pixels. A press
+outside a control, on a password field, or on a field whose
+`autocomplete` is a password, a one-time code or a card value, gives no step. A field gives its label,
+never its value; key presses are never read. `UserBrowsingLog` keeps the steps in
+`openbot-browsing-steps-v1.json` (no migration), the newest 80 per agent. The next memory review of the
+agent reads all of them in a `<user_browsing>` block, with secrets redacted, and deletes the steps
+that it read after its result decodes. A step that no review read goes after 30 days (at start and at
+each change). Turning the setting off deletes the file, and deleting an agent deletes its steps. Only
+the review reads the steps; the agent has no tool to search them. Browsing alone does not start a
+review: the steps wait for the next review of that chat. `bun scripts/browser-user-control-e2e.ts`
+covers the capture rules in Electron, and `bun run test:memory-review` covers the review.
+
+"Teach a task" (composer `+` menu, `browser-teach-v1`) uses the same step recorder for a task that a
+person shows on purpose. It does not depend on the setting above. The menu item opens the full view
+with a teach bar above the page (`BrowserTeachBar`) and no dock; "Start recording" in the bar calls
+`startTeach`. `BrowserHost.startTeach` gives the
+agent's tab to the person and keeps the steps in memory for that tab, not in `UserBrowsingLog`: at
+most 200 steps and 10 minutes, with the same rules for a page and a press. The bar then shows the
+time on a button that saves the recording, a discard button, and a frame around the page. `stopTeach` gives the tab back; only the
+holder that started the recording can end it, and it gets the steps only with `save`. The recording
+also ends, with no steps, when the control of the tab ends. On Save the client sends a short
+user message that asks for a skill and a plain answer, with the numbered steps in an attached text
+file `recorded-task.txt` (`browser-teach-message.ts`, `sendCardFile`), and closes the full view so that
+the chat shows. The request is in the message, not in the file: an agent does not obey a file. A
+recording with no step after its first page sends nothing and shows a toast. When the chat cannot
+send, the steps go to the draft as text. The host stores no step. The
+menu item is not in a channel and not on mobile: a task of many steps on a web page does not fit a
+phone. `bun scripts/browser-user-control-e2e.ts` covers the recording, and
+`bun run test:team-api-routes` covers the routes.
+
+When the first read of a snapshot finds a loading marker that a person can see (`aria-busy="true"`,
+or a class that contains `skeleton` or `shimmer`), the snapshot waits in the page until the markers
+go and the DOM is unchanged for 150 ms, for up to 2 seconds, and reads again (`browser-settle.ts`).
+A page that keeps its marker for the full wait does not wait again until its next document. A
+document younger than 2.5 seconds with no controls waits for its first change: for up to 1 second
+while it loads, and only until 500 ms after its load event once it has loaded. A loaded static page
+without controls, or a document that already waited for its first change, does not wait. Each
+wait ends 1 second before the read's timeout.
+Without this wait, the agent read the placeholders and took a second snapshot. Chromium already
+leaves the content outside a modal dialog (`showModal()`) out of the accessibility tree, so the
+snapshot has no modal-first order.
+
+`bun run bench:browser-tools --tasks=spa-skeleton` opens a page that shows a skeleton for 1.5 seconds.
+Before, `navigate` returned only the heading, and the agent took a second snapshot in all 5 runs:
+3 calls and 101k input tokens. After, `navigate` returned the prices: 2 calls and 75k tokens in all
+5 runs.
+
+Three changes remove agent turns at the start of a browser task:
+
+- `open` returns the first snapshot of the new tab, as `navigate` does. A failed read returns the tab
+  and a redacted `snapshotError`.
+- The first browser result in a thread brings the schemas and guidance of `open`, `snapshot`,
+  `navigate`, `click`, `type`, `wait_for` and `run_script` (`browserToolsPrimer` in
+  `tool-catalog.ts`), unless a search or describe result already gave them. The developer
+  instructions show the exact `tool_call` form for `open`, `list_tabs` and `snapshot`, so the agent
+  can call one before any `tool_search`. Without the exact form, the agent guessed the argument shape.
+- The `run_script` helpers accept the forms that models write from other libraries:
+  `waitFor("text", "x")`, `waitFor({ selector })`, `waitFor(cond, 5000)`, `{ timeout }`, the states
+  `visible`, `attached` (a target wait already waits for a box) and `networkidle` (as `dom-quiet`),
+  and `role("button", { name })`. `sleep(ms)`, `setTimeout` and `waitFor(ms)` run a `sleep` step of
+  at most 25 seconds. An unknown form throws a message with the accepted forms.
+
+`bun run bench:browser-tools --tasks=open-order,open-quotes,click-wait,herokuapp-dynamic` measures
+them (Haiku, 5 runs each, 2026-11-07; `open-order` and `open-quotes` start with no tab). Medians:
+
+| Task | Before | `open` snapshot + helpers | + first-result schemas |
+| --- | --- | --- | --- |
+| open-order | 3 calls, 101k tokens | 2 calls, 74k | 1 call, 51k |
+| open-quotes | 4 calls, 129k | 2 calls, 76k | 1–2 calls, 52–76k |
+| click-wait | 4 calls, 129k | 4 calls, 129k | 5 calls, 138k |
+| herokuapp-dynamic | 4 calls, 131k | 4 calls, 131k | 3 calls, 104k |
+
+All 20 runs were correct in each column. With the schemas in the first result, 19 of 30 runs (with
+`consent-overlay` and `spa-skeleton`) made no `tool_search`; before, every run made one. On
+`click-wait`, `wait_for` with `dom-quiet` returns before the 3-second timer of the page, so the agent
+waits again; that cost did not change. The helpers did not change a median. The forms that they
+accept come from failed scripts in the bench transcripts.
+
+On the 10 default tasks (3 runs each), all 30 runs were correct before and after. Tool calls went
+from 97 to 84 and input tokens from 1.12M to 0.97M; 23 of 30 runs made no `tool_search`.
+
+### Repair argument forms that agents write
+
+Each refused call costs the agent one turn of about 27k input tokens. Before the decoder of a tool or
+a `run_script` step reads the arguments, `browser-tool-input.ts` rewrites the forms that agent
+transcripts show again and again. The advertised schemas do not change, and a form that can mean two
+things stays a refusal:
+
+- A target can be a ref string (`"3:main:12"`), a whole snapshot line (`3:main:12 link "Travel"`), a
+  role line (`link "Travel"`), `css #main`, or a CSS selector. The `run_script` helpers send a string
+  target as it is, so a step takes the same forms. An object without `kind` gets it from its fields (`ref`, `selector` or `css`, `role`, `text`,
+  or `x` and `y`). A ref target without `revision` takes it from the ref, and a top-level `ref` on an
+  action tool becomes its `target`.
+- `type` takes `replace` or `clear` as `mode`: `true` is `"replace"`, and `false` is `"append"`.
+- `wait_for` drops `snapshot` and a `condition` that names a field of the call
+  (`{ condition: "text", text }`), maps the Playwright and Puppeteer states (`networkidle`, `idle`,
+  `quiet` as `dom-quiet`; `complete` as `load`; `interactive` as `domcontentloaded`), and drops
+  `visible` and `attached` on a target wait.
+- `fill_fields` takes `value` as `text`, and takes `revision` from the refs when they all have the
+  same one.
+- `open` drops a `tabId` and opens a new tab, so the page in that tab stays. A call written as
+  `{ name: "openbot_browser.<tool>", arguments }` is unwrapped, and a snake_case field such as
+  `tab_id` takes its camelCase name when the call does not also give that name. The user-control
+  check reads the same repaired `tabId`.
+- The Vault, secret and payment tools (`submit_secret`, `fill_card`, `list_logins`,
+  `list_vault_items`, `save_vault_item`, `request_vault_item`, `delete_vault_item`,
+  `request_link_payment`) get no repair. Their targets must come from a snapshot, and
+  `save_vault_item` registers the raw `password` for redaction before the decoder runs.
+
+In `run_script`, `role(role, name, { exact })`, `waitFor(role(...))`, `waitFor("Done", "text")` and
+`waitFor("#done", "visible")` work. A `waitFor` function
+that calls `evaluate`, `snapshot` or `step` is written for the sandbox, so the script polls it once a
+second until its timeout; other `waitFor` functions, such as one that calls `document.evaluate`,
+still run in the page. A `ReferenceError`
+for `document`, `window`, `location`, `page` or `$` says that the script runs in a sandbox and reads
+the page with `evaluate`.
+
+A replay of the 173 failed calls since 2026-10-30 that the current tools can run again (from the
+desktop agent transcripts, against the current decoders and a fake page) gave 79 accepted calls
+before this change and 140 after. Most of the others read page globals in the sandbox, call removed
+tools, or fail on the fake page.
+
+`bun run bench:browser-tools --variants=S --tasks=herokuapp-dynamic,herokuapp-add-remove,books-travel,wikipedia-rust,spa-skeleton,click-wait,quotes-love-tag --repeats=3`
+(Haiku, 2026-11-08) counts failed calls in each run. All 21 runs were correct before and after.
+Tool calls went from 72 to 64 and input tokens from 2.07M to 1.95M; failed calls stayed at 6, because
+each run fails on different forms. `herokuapp-dynamic` went from 4–6 calls and 116k median input
+tokens to 2 calls and 63k in all 3 runs. The failures that stay are agent mistakes: an ambiguous
+target, which the tools refuse on purpose, `document` read in the sandbox, and the Playwright
+`>> nth=N` selector, which has no CSS form.
 
 ### Fill inspected ordinary fields
 
@@ -196,8 +463,11 @@ task takes fewer turns.
 
 `run_script` takes JavaScript that awaits helpers named after the action tools (`navigate`, `click`,
 `type`, `press`, `hover`, `scroll`, `selectOption`, `setChecked`, `waitFor`, `evaluate`, and
-`snapshot`), or `step({ action, ...fields })` with the fields of that tool and no `tabId`. Each
-helper sends one step to the host. The script returns a JSON value of at most 64 KB.
+`snapshot`), or `step({ action, ...fields })` with the fields of that tool and no `tabId`. `action`
+is the name of a helper in snake_case, such as `select_option`, or `sleep`. Other tools, such as
+`screenshot`, do not work in a script. Each helper sends one step to the host. The script returns
+a JSON value of at most 64 KB. An `evaluate` step gives its value to the script, not to the model,
+so it can return up to 1 MB, such as the whole text of a page.
 
 An earlier `run_steps` tool took a fixed list of steps. A benchmark with Claude Haiku 5.5 on 10 public
 site tasks (3 repeats) gave `run_script` 118k median input tokens and 30 of 30 correct answers, and
@@ -251,7 +521,8 @@ profile, so they share its sign-ins; a profile has no owner agent, and the tab r
 change. The name is a label only and never becomes a path or a partition, so a rename keeps the
 data. An agent with `browserProfileId` also has `ownBrowserSession: true`. After a downgrade, an
 older build thus opens such an agent in a session of its own, never in the shared one. A duplicate
-and an imported agent start with Shared. The user's tabs in an agent's panel use the agent's partition, so
+keeps the named profile of its source. Other duplicates and imported agents start with Shared, because
+an "Only this agent" copy would get a new, empty partition. The user's tabs in an agent's panel use the agent's partition, so
 the user can sign in for the agent there.
 
 `openPrivate` opens a sign-in page for another person in an in-memory partition. The tab is not
@@ -266,6 +537,10 @@ deleted profile, is dropped, so it never opens signed in to another account. A n
 whose profile no longer exists fails with `browserProfileMissing`; it never falls back to Shared.
 `#configureSession` applies the same user agent, headers, permissions and download policy to every
 partition. Shutdown and `flushPersistentStorage` flush every persistent partition.
+
+A reload, by the person or by an agent, uses `reloadIgnoringCache`: it gets the files of the page
+from the site again. A site can send a bad file that the browser keeps for hours, and a normal
+reload used that file again (#7772). Opening an address keeps the saved files.
 
 `src/main/browser-profile-service.ts` owns the operations: list, create (name of 1 to 60
 characters, unique, at most 100 profiles), update (name or color), clear data, delete, and assign.
@@ -283,6 +558,66 @@ answers `agentSettingsUnsupported`, and the client shows no select, section or l
 with `browser-profiles-events-v1` sends `browser-profiles-changed` after each change, so every open
 list and agent setting reads the profiles again. The phone shows the same operations in Server
 settings > Browser profiles and in Agent info > Advanced > Browser profile.
+
+A named profile can use a saved proxy (migration 56: `browser_proxies` and `browser_profile_proxies`).
+Without one it is "Automatic": `{ mode: "system" }`, the proxy settings of the computer that runs
+OpenBot. The shared profile and "Only this agent" are always Automatic. A proxy is one address,
+`scheme://[user[:password]@]host[:port]` with socks5, http or https (`parseBrowserProxyAddress`).
+Without a scheme it is http and needs a port: `user:password@host:port` or the
+`host:port:user:password` form of proxy sellers. The password can contain a raw `/`, `#` or `@`.
+Chromium does not sign in to SOCKS5, so a SOCKS5 proxy with a sign-in goes through a relay in main
+(`browser-proxy-relay.ts`): an HTTP proxy on a random port of 127.0.0.1 with a random sign-in, which
+the `login` handler gives. The relay signs in to the SOCKS5 proxy (RFC 1929), sends the site name
+for the proxy to resolve, and opens one SOCKS5 connection for each browser connection. A plain http
+request closes its connection after the answer. When the SOCKS5 proxy refuses or does not answer,
+the relay answers 502. A proxy change, a session clear and the host shutdown stop the relay and its
+connections, also when the new proxy fails to apply. The password goes to
+`SecretStorageCipher` before it is saved, is decrypted only in main when a tab needs it, and never
+goes back to a client or a log. The Edit dialog shows a saved password as a mask; a save that keeps
+the mask sends `keepPassword`, and the host keeps the password. Without it, an address with no
+password removes the password. A save that does not change the address sends nothing, so it closes
+no tabs. At most 50 proxies. The clients name a proxy by its host; when two saved proxies have the
+same host, the name adds the port, then the user name, then the scheme (`browserProxyName`). The
+page error of the host names the host only. Chromium's implicit bypass rules stay: `localhost` and
+loopback addresses go direct on the host, not through the proxy. Before a tab opens, `BrowserHost.#applyProfileProxy` sets the proxy on the partition, closes
+its open connections and clears its auth cache. When that fails the tab does not open: there is no
+direct fallback. A tab with a proxy uses the WebRTC policy `disable_non_proxied_udp`, so WebRTC does
+not show the real address. The `login` handler answers a proxy sign-in at most 8 times for each page.
+A main-frame connection error marks the proxy `unreachable`. A 407, a SOCKS5 refusal of the
+sign-in that the relay records, or an HTTP proxy sign-in that the `login` handler stops answering,
+marks it `signIn`; Chromium reports that last one as a failed tunnel. The next page that loads
+clears the mark. The page error takes the mark that the network error recorded, and it reads the
+Chromium code when a failed load gives no error name. A page error names the proxy (`browserProxyUnreachable`, `browserProxySignInRefused`,
+`browserProxyComputerUnreachable`); each change sends `browser-profiles-changed`. `ERR_EMPTY_RESPONSE` (-324) is not a proxy
+error: a site that sends nothing gives it too, with or without a proxy. When `resolveProxy` gives a proxy for the page, the
+page error says that the site or the proxy closed the connection (`browserSystemProxyOrSiteClosed`,
+`browserProfileProxyOrSiteClosed`) and does not mark the proxy. A page with no proxy keeps the Chromium error. The check
+uses the address that the load asked for, not the address of a redirect. A change of a profile's proxy, or of a
+proxy that profiles use, closes their tabs; the settings ask first when tabs are open. A delete moves the profiles to Automatic (foreign key
+`ON DELETE CASCADE`). Changes run one at a time. Two admins can still change one proxy: a save sends
+the address that the dialog opened with, and a delete sends the profiles that the question showed.
+The host refuses either one when the proxy is different now (`browserProxyChanged`), so a profile
+never changes to Automatic without an admin seeing it. Server settings > Browser profiles shows a
+Proxies section and a Proxy submenu in each named profile's menu when the host has
+`browser-proxies-v1`. The phone shows the same proxy list, Edit page and Proxy choice (`server-browser-proxy-screen.tsx`), with the same checks of `previousAddress`, `keepPassword` and the profiles that a delete saw; it cannot share its own connection, because the phone app has no TCP sockets. For an owner or an admin, the agent's
+profile select and the toolbar label of a tab also show the proxy. The renderer matches the tab
+profile to the proxy list by name, so `BrowserTabProfile` of `browser-profiles-v1` does not change.
+
+A proxy can also be the computer of a member (`kind = 'computer'`, one row for each `member_id`).
+The member selects "Use your computer…" in the Proxy submenu, or Share in the Proxies section, of a
+joined server. The desktop app then stores the server id in `browserEgressServerIds`
+(`remote-server-store.ts`), calls `/v1/admin/browser-proxies/computer`, and opens the
+`openbot.browser-egress.v1` data channel while it is connected (`BrowserEgressClient`). The host binds
+the channel to the membership that signed in on that peer (`BrowserEgressHost.peerMemberChanged`);
+the newest open peer of a member carries its connections. A tab of a profile with a computer proxy
+uses the same loopback relay, with `BrowserEgressHost.exit` as its exit: each browser connection
+becomes one stream of the channel (`browser-egress-mux.ts`). The client resolves the name itself
+and connects only to a public address (`isPublicAddress`), on any port; it refuses loopback,
+private, link-local, carrier-grade NAT, multicast and reserved addresses, so the server cannot reach
+the member's network. When the member's app is closed or stops sharing, the computer is offline:
+its connections fail with 502, there is no direct fallback, and the list shows it offline. Stop
+sharing closes the channel; the row stays until an admin deletes it. Neither end logs a target or
+a byte. Only an owner or an admin can share, because the routes are `browser-proxies-v1` admin routes.
 
 ### Tab lifetime
 
@@ -304,12 +639,15 @@ refusal in `AgentService` stays beside it rather than being folded in: it also c
 | Turn succeeds | Stay open unless the agent called `close_tab`. |
 | Cancelled, interrupted, or failed | Stay open. Completion clears the control session only. |
 | Retry | Same thread and agent, so the same tabs are still reachable. |
-| Restart | Restored from the browser's own state file. |
-| Idle 30 min (5 min when memory is low) | Stays open, but its page unloads and its renderer process ends. The next use loads the page again. |
+| Restart | Restored from the browser's own state file. A tab loads its page only when a person shows it or an agent uses it, the selected tab too. |
+| Not shown and idle 2 min | Stays open and loaded, but its page is frozen with `Page.setWebLifecycleState`: timers, animation and scripts stop. The next use (agent call, preview, live view, takeover or recording) makes it active again first. A tab with an open dialog or a pending restore is not frozen. |
+| Idle 15 min (5 min when memory is low) | Stays open, but its page unloads and its renderer process ends. The next use loads the page again. |
+| More than 3 idle tabs loaded | The least recently used ones beyond 3 sleep as above once they are idle for 2 min. A tab in use (shown to a person, busy, held, recording, playing audio, or with a secret) does not count. |
 | Agent deleted | That agent's tabs are closed, including a legacy tab holding only its thread id. Its own browser session is cleared. |
 | Browser profile changed | That agent's tabs are closed. Its next tab opens in the profile it chose. Both profiles keep their data. |
 | Profile cleared or deleted | Every tab in that profile is closed, then its data is cleared. |
 | Takeover held | No agent tool touches that tab, `close_tab` included. |
+| Renderer crashed | Stays open. The next browser call loads the page again (see below). |
 
 Deleting an agent is the one sweep, and it exists because those tabs are otherwise unreachable: no
 agent passes the owner check for them, and the renderer lists tabs per agent, so they would hold a
@@ -317,11 +655,56 @@ view the user cannot see to close, across restarts. Closing is idempotent -- `cl
 on an id it does not hold -- and tab ids are UUIDs with no reorder feature at any layer, so a stale id
 can never name a tab that took its place.
 
+When the renderer of an agent tab crashes (`render-process-gone`), the host adds a `load` diagnostic
+and keeps the tab. The next browser call on the tab loads the same address again with `loadURL`
+before it runs, because a CDP command to the crashed page gets no answer. The next snapshot reports
+the crash and says that refs from before it are stale. A `run_script` that runs during the crash
+stops at once with `page_crashed`, and its final snapshot loads the page again. Before, the step
+waited for its timeout. A tab with a secret, a typed card, a takeover or user control is not loaded
+again, because a reload could send a form again or lose the work of the person.
+`bun run test:browser-steps` covers the crash, the settle wait and the bot check, and writes
+`.openbot-build/browser-steps-e2e/report.json`.
+
+### Location requests
+
+A page that asks for the location (`geolocation`) waits for a person. `BrowserLocationRequests`
+(`src/backend/browser-location.ts`) keeps one pending request for each tab, and `BrowserTab`
+carries it as `permissionRequest` (`{ id, origin, permission: "geolocation" }`). The chat of the
+agent that owns the tab, and the phone (browser screen and chat), show "<site> wants to know your
+location" with Block, Allow always and Allow. The browser panel and the detached browser window do not show it, and
+the web client does not show it. A tab that no agent or thread owns gets Block at once, because no
+chat can show its request. The answer holds for the tab while it stays on the same origin. A load of another origin, a
+close or a sleep of the tab blocks the pending request and forgets the answer. A secret tab, a
+private session tab, a closing tab and a page that is not `http` or `https` get Block at once. A tab
+with a pending request does not sleep. A request with no answer after 10 minutes gets Block, so a
+client that does not show the question (the web client or an older client) does not keep the tab awake.
+
+Allow always from the computer that runs the browser grants the origin in every tab that an agent or
+thread owns, and answers the pending requests of that origin in those tabs. An answer for a tab clears
+an earlier Block of that origin in the other tabs. A remote Allow always carries the location of the
+member's device, so it grants the origin only in the tabs of the same agent (or thread), and the host
+sets that location on each of those tabs that the origin asks from. The host keeps these grants in
+memory only, so a restart of the app or the server forgets them. When the client cannot read the
+location of its device, it sends no answer, and the request stays open.
+
+An answer from the computer that runs the browser lets Chromium read the location of that computer.
+An answer from a joined server (desktop or phone) sends the location of the member's
+device. The host sets it on the tab with `Emulation.setGeolocationOverride` before it grants the
+request, and keeps the debugger attached while the override is set. If the debugger detaches, the
+host attaches again and sets the override again. A load of another origin clears the override. A
+remote Allow without a location gets HTTP 400, so a page on a server never gets the location of the
+server. If the host cannot set the override, the request gets Block.
+
 ### Page dialogs
 
-A page `alert` or `confirm` that an agent action opens goes to that agent; every other dialog stays in
-Electron's native box for a person. `runTabAction` watches for a dialog only while the agent's own
-input action runs (`BrowserDialogTurn` names the thread and turn), and until the page settles after it.
+A page `alert` or `confirm` that an agent action opens goes to that agent. An `alert` that the page
+opens by itself in a tab that an agent runs (not a person's tab, a takeover, person control or a
+sign-in) gets OK at once, and its redacted text goes to the agent as a `console` warning in the next
+snapshot. An alert in the 5 s after a person presses the mouse or a key in the tab stays for the
+person: the engine counts that input only while no agent command holds the debugger, because CDP
+input also fires `before-mouse-event`. Electron shows that box on the main window, so it would block the whole app. Every other
+dialog stays in Electron's native box for a person. `runTabAction` watches for a dialog only while
+the agent's own input action runs (`BrowserDialogTurn` names the thread and turn), and until the page settles after it.
 The engine then sends `Page.enable` on its own debugger and keeps the debugger attached while a watch
 runs, so it also sees a dialog that a page load or a timer opens with no command in flight. A tab
 queue drain ends the watch. `Page.javascriptDialogOpening` ends the action with the dialog:
@@ -334,18 +717,44 @@ Electron shows its own box for the same dialog, after the CDP event. After the C
 emits Electron's internal `-cancel-dialogs` on the tab, which aborts the box without its callback. The
 agent gets a dialog only when the engine owns the debugger and Electron has a `-cancel-dialogs`
 listener. Otherwise, for example under an external debugger, the result says that a person must answer.
+For a page's own `alert` with no watch, the engine calls the reply callback of Electron's internal
+`-run-dialog` event with OK, then emits `-cancel-dialogs`, so it needs no debugger.
 `scripts/browser-dialogs-e2e.ts` fails if an Electron upgrade changes these internal events.
 
 | Event | Dialog |
 | --- | --- |
-| Person's click, or a tool that is not an input action | Native box. The agent is not told. |
+| Page's own `alert` in an agent tab, with no agent action and no person input in the last 5 s | OK at once. The agent gets the text in its next snapshot. |
+| Person's click, or a `confirm` from a tool that is not an input action, or any dialog in a person's tab | Native box. The agent is not told. A live view with `browser-view-dialog-v1` shows it (below). |
 | Turn ends | Handed off: the box stays for a person, and the agent can no longer answer it. |
 | Person answers first | `handle_dialog` fails with "This dialog is closed". |
 | Tab closed or browser destroyed | The engine detaches its debugger, so the tab queue drains. Then it cancels every box of the tab, a person's box too, also a box that shows after the close: Electron keeps a box open after its page closes. |
 | `prompt()` or `beforeunload` | Electron answers `prompt` with no box, and `will-prevent-unload` handles `beforeunload`. Not intercepted. |
 
-The agent never gets a dialog that an `evaluate`, `wait_for`, or `fill_fields` call opens, or one in a
-cross-origin frame: those dialogs stay native.
+The agent never gets a dialog id for a dialog that an `evaluate`, `wait_for`, or `fill_fields` call opens,
+or one in a cross-origin frame. A `confirm` there stays native. An `alert` there in an agent tab gets
+OK at once, as above, and the agent gets its text in the next snapshot.
+
+A member on a joined server cannot see the native box: it opens on the host's screen. While a dialog
+is open, the page answers no CDP command that needs its renderer, so a live view that starts then
+waits in the lease before `Page.startScreencast`, and the client showed "Connecting" with no end
+(#12651). A host with `browser-view-dialog-v1` sends the open dialog (id, type, message, the same
+redacted text that the agent gets) as a `dialog` message to a socket opened with `dialog=1`, and
+`dialog: null` when it closes. `startView` sends it before the screencast starts, so the member sees
+it while the start waits. The member answers with a `dialog` input. The gateway handles that input
+when it arrives, not in the input queue, because queued input waits behind the dialog too. The answer
+uses the same CDP answer and `-cancel-dialogs` as `handle_dialog`, with no turn check: a person can
+answer every dialog. Then the waiting start continues. While a view runs, the engine keeps `Page`
+events on, so it also sees a dialog that the member's own click opens. A pointer or key press from a
+view with `dialog=1` counts as person input, so a page `alert` that it opens in an agent tab stays for
+the member and is not answered with OK at once. A view without `dialog=1` cannot show the alert, so
+its input does not count. A dialog that opened while
+the engine did not watch stays unknown: `Page.enable` waits behind it and reports nothing. While a
+dialog is open, the gateway drops pointer and key input and answers `copy` with no text. The desktop
+and web clients show the dialog as a sheet at the top of the page area, named after the site of the
+tab ("openbot.run says"). It dims only the page: the tabs, the address and the chat box stay usable.
+A click outside it does not answer it, and OK has the focus. Escape answers Cancel only when the focus
+is on the sheet or the page, not in the chat box or the address. Before the first
+frame, the page area says that the page waits for the answer. The phone shows it in `Alert.alert`.
 
 A member on a remote server cannot see the host's tab, because the tab is a native view on the host's
 own screen. `browser-view-gateway.ts` answers that with a session and a websocket: `BrowserHost`
@@ -367,7 +776,17 @@ no native menu: that menu would show on the host's screen. Only http and https a
 message. A host with `browser-view-viewport` holds the page at the size a socket asks for with
 `viewport=WxH` while that socket is open, through the same device metrics override as an agent's
 `set_environment`, so a resize of the host's window does not change the page. A tab with a custom
-size from `set_environment` keeps it. The phone asks for 1280x800. On the phone, the view runs in the
+size from `set_environment` keeps it. A host with `browser-view-page-copy-v1` sends the text that the
+page itself copies (a "Copy code" button: `navigator.clipboard.writeText` or `write`, or a trusted
+`copy` event) as a `pageCopied` message to a socket opened with `pageCopy=1`. While that view runs,
+the CDP engine keeps one `Runtime.evaluate` with `awaitPromise` open in the page's main world. It hooks
+those calls, and trusted `copy` events in the capture phase, once a document. It answers every open
+view with the text of the next one made during a user action. It turns on no CDP domain:
+`Runtime.enable` is a sign of automation that bot checks look for. The host sends the text only
+within 5 seconds of that socket's own click or key, and the client also drops it after that time.
+So a copy with no recent input from that member, such as one an agent makes alone, stays on the host. The desktop client writes it with Electron's clipboard, the web
+client with `navigator.clipboard` (a toast with a Copy button when the browser refuses), and the
+phone with `expo-clipboard`. The phone asks for 1280x800. On the phone, the view runs in the
 hidden page that holds the Team peer (`features/browser/model/browser-view-bridge.ts`). That page
 sends each frame to the screen as base64 and holds the newest frame until the screen has drawn the
 previous one. Back, forward, reload, new tab and close tab use the released `browser-control`
@@ -384,16 +803,18 @@ Frozen protocol projections continue to show ordinary takeover to older clients.
 carry validated metadata beside those projections. There is no database schema change.
 
 A password can also go to the Vault of the server that runs the agent. The local app sends
-`saveToVault` over IPC. A remote client sends the same submit on `browser-secret-vault-v1`, which
-only an owner or admin can use; the released route keeps its fields. The card shows the save box on
-every password request, and for a member or an older host it shows the box off with the reason.
+`saveToVault` over IPC. A remote client sends the same submit on `browser-secret-vault-v1`; the
+released route keeps its fields. A host with `vault-member-save-v1` takes the save from any member;
+an older host takes it only from an owner or admin. The card shows the save box checked on every
+password request, and for a member of an older host, or an older host without the route, it shows
+the box off with the reason.
 
 `openbot_browser.request_vault_item` asks the user to add a login, a card or contact info that the
 Vault does not have. The attention registry surfaces a `form` UI block with `uiBlock.vault.kind`.
 The agent can fill in the fields that are not secret; the password, card number and security code
 are secret form fields, so the stored block never holds them. The desktop card opens the Vault
-dialog with the agent's values. The host saves the answer through `VaultItems.addEntered` (owner or
-admin only) and answers the tool with only the item's id, kind and name. The `ui-blocks-v1` wire
+dialog with the agent's values. The host saves the answer through `VaultItems.addEntered` (any
+member on a host with `vault-member-save-v1`, an owner or admin on an older host) and answers the tool with only the item's id, kind and name. The `ui-blocks-v1` wire
 leaves out `vault`; `ui-block-vault-v1` (protocol 9) adds it back, and the mobile app then shows the
 same card, which opens its Vault item form with the agent's values and answers the prompt with the
 form's field ids. Another remote client shows the ordinary form. Messaging threads refuse the tool.
@@ -403,11 +824,22 @@ resolves fields before consent and checks the document and origin again before e
 stops recording, suppresses page diagnostics, blocks inspection and capture, rejects remote input,
 and invalidates existing live-view streams. Capture protection remains after same-document navigation
 or an uncertain submission. After a completed submit action without document replacement, the host
-waits up to five seconds, then empties the filled fields. When every field is empty and an automation-world scan finds the
+waits up to five seconds, then empties the filled fields and their `value` attributes, which React
+keeps in step with the value. When every field is empty and an automation-world scan finds the
 value in no title, URL, text node, value, or attribute, including open shadow roots, it keeps the
 document so a single-page sign-in can show its next step, and blocks evaluation and recording in the
 opener group until a main-frame navigation, which also clears history. Otherwise it loads the current
 URL with GET to replace the document without replaying a form POST. Failure retains protection and falls back to takeover. A new document releases it and
 clears navigation history; manual takeover
 completion alone cannot release it. Secrets are not retried. Authentication inside unsupported frames,
-unclear OAuth account selection, CAPTCHA, passkeys, and payment confirmation use takeover.
+unclear OAuth account selection, CAPTCHA (after the one checkbox click that a snapshot offers),
+passkeys, and a payment confirmation that the agent cannot complete, such as approval in a bank app,
+use takeover.
+
+A bank's payment code at checkout (3-D Secure) is not an OpenBot secret. When the code is in an email
+or SMS that the agent can read, such as a mail tab that it reloads, the agent types it into the bank's frame, so a weekly order
+does not wait for a person. The browser core guidance (`tool-guidance.ts`) limits this to a checkout
+that the user approved, and to a message that names the same merchant and amount; the agent types the
+newest code once. Any other case, or a refused code, goes to takeover, or in a routine run to the report.
+`bun run bench:browser-tools --variants=S --tasks=checkout-3ds-inbox-tab,checkout-3ds,checkout-3ds-mismatch`
+checks these cases on a loopback shop, bank frame and inbox.

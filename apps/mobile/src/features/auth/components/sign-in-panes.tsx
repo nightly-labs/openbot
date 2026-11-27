@@ -26,25 +26,23 @@ import {
   SIGN_IN_TEXT_EASE,
   signInMotion,
 } from "@/features/auth/components/sign-in-motion";
-import { type EmailSignIn, formatTimer } from "@/features/auth/model/use-email-sign-in";
+import type { EmailSignIn } from "@/features/auth/model/use-email-sign-in";
 import { BLOUB_MOVE_MS } from "@/shared/components/bloub-stage/bloub-look";
+import { formatTimer } from "@/shared/lib/countdown";
 import { haptics } from "@/shared/lib/haptics";
 import { SPLASH_EASE_IN_OUT } from "@/shared/lib/splash-motion";
 import { useText } from "@/shared/lib/text";
 
-// A label change is a quiet fade: the old label leaves, and the new one comes as it is nearly gone.
 const LABEL_OUT = FadeOut.duration(120).easing(SIGN_IN_TEXT_EASE);
 const LABEL_IN = FadeIn.duration(180).delay(100).easing(SIGN_IN_TEXT_EASE);
 const MESSAGE_HEIGHT = 20;
 
-/** How the elements of a pane come in. Without it, nothing animates: the copy that measures. */
 export interface PaneMotion {
   from: PaneDirection;
   startMs: number;
   reduced: boolean;
 }
 
-/** One element of a pane. The elements come in one after another. */
 function PaneItem({
   index,
   motion,
@@ -66,7 +64,6 @@ function PaneItem({
   );
 }
 
-/** A full-width sign-in button. The lilac one is the main action; the gray one the other choice. */
 function SignInButton({
   label,
   labelKey = label,
@@ -78,14 +75,11 @@ function SignInButton({
   reduced,
 }: {
   label: string;
-  /** The label fades to the new one when this changes. A countdown keeps one key. */
   labelKey?: string;
   brand: boolean;
   icon?: LucideIcon;
   onPress: () => void;
-  /** Shows a spinner and ignores presses. */
   busy?: boolean;
-  /** Ignores presses and dims the label, such as during a countdown. */
   waiting?: boolean;
   reduced: boolean;
 }) {
@@ -129,7 +123,6 @@ function SignInButton({
   );
 }
 
-/** A quiet text action, such as "Change email". */
 function TextAction({
   label,
   labelKey = label,
@@ -167,7 +160,6 @@ function TextAction({
   );
 }
 
-/** One line under a field: an error, a notice, or the verification state. */
 function PaneMessage({
   message,
   spinner,
@@ -203,7 +195,6 @@ function PaneMessage({
   );
 }
 
-/** Opens the help with the block: the pane and the block move up by the height of the help. */
 function HelpToggle({
   open,
   onToggle,
@@ -219,7 +210,6 @@ function HelpToggle({
   const colors = useSignInColors();
   const shown = useSharedValue(open ? 1 : 0);
   useEffect(() => {
-    // The steps fade in once the pane has started to rise, and leave at once.
     shown.set(
       reduced
         ? withTiming(open ? 1 : 0, { duration: 160 })
@@ -273,10 +263,6 @@ function HelpToggle({
   );
 }
 
-/**
- * The sign-in choices under the block. The help lies below the pane and the pane rises to show
- * it, so opening the help changes no layout: only the pane and the block move.
- */
 export function OptionsPane({
   motion,
   notice,
@@ -292,7 +278,6 @@ export function OptionsPane({
   motion: PaneMotion | null;
   notice?: ReactNode;
   helpOpen: boolean;
-  /** How far the pane rises for the open help. */
   helpShift: SharedValue<number>;
   onToggleHelp: () => void;
   onScan: () => void;
@@ -329,7 +314,6 @@ export function OptionsPane({
   );
 }
 
-/** The email step: the field, the send button and a way to the scanner. */
 export function EmailPane({
   signIn,
   motion,
@@ -347,20 +331,37 @@ export function EmailPane({
 }) {
   const { t } = useText();
   const colors = useSignInColors();
-  const { retryIn, deliveryUnconfirmed, sending } = signIn;
-  const label = sending
-    ? t("mobile.auth.email.sending")
-    : deliveryUnconfirmed
-      ? retryIn > 0
-        ? t("mobile.auth.email.checkAgainIn", { time: formatTimer(retryIn) })
-        : t("mobile.auth.email.checkDelivery")
+  const { retryIn, deliveryUnconfirmed, sending, companySignIn, usesCompanySignIn } = signIn;
+  const label = companySignIn
+    ? t("mobile.auth.email.companyWaiting")
+    : sending
+      ? t("mobile.auth.email.sending")
+      : usesCompanySignIn && retryIn === 0
+        ? t("mobile.auth.email.companyContinue")
+        : deliveryUnconfirmed
+          ? retryIn > 0
+            ? t("mobile.auth.email.checkAgainIn", { time: formatTimer(retryIn) })
+            : t("mobile.auth.email.checkDelivery")
+          : retryIn > 0
+            ? t("mobile.auth.email.tryAgainIn", { time: formatTimer(retryIn) })
+            : t("mobile.auth.email.send");
+  const labelKey = companySignIn
+    ? "company-waiting"
+    : sending
+      ? "sending"
       : retryIn > 0
-        ? t("mobile.auth.email.tryAgainIn", { time: formatTimer(retryIn) })
-        : t("mobile.auth.email.send");
-  const labelKey = sending ? "sending" : retryIn > 0 ? "wait" : deliveryUnconfirmed ? "check" : "send";
+        ? "wait"
+        : usesCompanySignIn
+          ? "company"
+          : deliveryUnconfirmed
+            ? "check"
+            : "send";
+  const inviteRejected = signIn.emailIssue?.code === "invalid_invite_code";
   const message = signIn.emailIssue
     ? { key: `email-${signIn.rejection}`, text: signIn.emailIssue.message, color: colors.danger }
-    : null;
+    : usesCompanySignIn
+      ? { key: "company", text: t("mobile.auth.email.companyNotice"), color: colors.muted }
+      : null;
   return (
     <View onLayout={({ nativeEvent: { layout } }) => onLayout(layout.height)}>
       <PaneItem index={0} motion={motion}>
@@ -380,11 +381,26 @@ export function EmailPane({
           placeholder={t("mobile.auth.email.placeholder")}
           label={t("mobile.auth.email.label")}
           invalid={signIn.emailIssue?.code === "invalid_email"}
-          rejection={signIn.rejection}
+          rejection={inviteRejected ? 0 : signIn.rejection}
           editable={!sending}
           visible
           reduced={reduced}
         />
+        <View className="mt-2">
+          <EmailField
+            kind="invite"
+            value={signIn.invite}
+            onChangeText={signIn.setInvite}
+            onSubmit={signIn.sendCode}
+            placeholder={t("mobile.auth.email.inviteCode")}
+            label={t("mobile.auth.email.inviteCode")}
+            invalid={inviteRejected}
+            rejection={inviteRejected ? signIn.rejection : 0}
+            editable={!sending}
+            visible
+            reduced={reduced}
+          />
+        </View>
         <PaneMessage message={message} spinner={false} reduced={reduced} />
       </PaneItem>
       <PaneItem index={3} motion={motion} className="mt-2">
@@ -410,7 +426,6 @@ export function EmailPane({
   );
 }
 
-/** The code step: eight slots, their state, a resend and a way back to the address. */
 export function CodePane({
   signIn,
   motion,
@@ -427,13 +442,11 @@ export function CodePane({
   const { t } = useText();
   const colors = useSignInColors();
   const { resendIn, resending, needsNewCode } = signIn;
-  // The slots rise in after the text above them.
   const slotMotion = (() => {
     const base = signInMotion(reduced);
     const start = motion.startMs + 2 * PANE_STAGGER_MS;
     return { ...base, enter: (delay = 0) => base.enter(reduced ? delay : start + delay) };
   })();
-  // A failure that is not about the code itself, such as no network, keeps the code for a retry.
   const canRetry = Boolean(
     signIn.codeIssue && !signIn.codeRejected && !needsNewCode && signIn.code.length === ONE_TIME_CODE_LENGTH,
   );
@@ -515,5 +528,4 @@ export function CodePane({
   );
 }
 
-/** The help rises with the block's own move. */
 export const HELP_MOVE = { duration: BLOUB_MOVE_MS, easing: SPLASH_EASE_IN_OUT };

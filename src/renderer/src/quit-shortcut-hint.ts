@@ -1,15 +1,13 @@
+import type { ClientAgentSummary } from "@openbot/contracts/ipc";
 import { createSignal } from "solid-js";
 import { appPort } from "./app-port";
 
-/**
- * Whether the window shows how to quit after one press of `Cmd + Q` on a Mac. A browser tab is a
- * native view over the page, so the conversations hide it while this is true, as for a toast.
- */
-const [quitShortcutHintShown, setQuitShortcutHintShown] = createSignal(false);
+const [quitShortcutHintAgents, setQuitShortcutHintAgents] = createSignal<ClientAgentSummary[] | null>(null);
 
-/** Follows the hint state from main. Returns the unsubscribe. */
+const quitShortcutHintShown = () => quitShortcutHintAgents() !== null;
+
 export function watchQuitShortcutHint(): () => void {
-  return appPort().onQuitShortcutHint((visible) => setQuitShortcutHintShown(visible));
+  return appPort().onQuitShortcutHint((agents) => setQuitShortcutHintAgents(agents));
 }
 
-export { quitShortcutHintShown };
+export { quitShortcutHintAgents, quitShortcutHintShown };

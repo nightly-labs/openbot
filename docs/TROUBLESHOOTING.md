@@ -76,14 +76,31 @@ voice prompts show an error. Use a newer distribution. The arm64 AppImage needs 
 
 On Linux, OpenBot uses the GPU until the GPU fails on your computer. If the GPU process crashes, or a
 start stops in its first 30 seconds, OpenBot writes `gpu-crash.json` or `gpu-start.json` in
-`~/.config/OpenBot`. While one of these files is there, OpenBot renders on the CPU. Dialogs and
-panels with a blurred background are then slower. An update with a new Chromium version tries the
-GPU again. A GPU process restart after a lost GPU context, for example after suspend, does not
-count. A server (`OPENBOT_SERVER=1` or a hosted server) always renders on the CPU.
+`~/.config/OpenBot`. While one of these files is there, OpenBot renders on the CPU. A start that
+stops with no crash, for example a kill or a power loss, gets one more try with the GPU; a second
+stop in a row turns it off. An update with a new Chromium version tries the GPU again. OpenBot
+ignores these files when OpenBot 0.75.0 or earlier wrote them: those versions could write them by
+mistake after a reboot or a GPU reset. A GPU process restart after a lost GPU context, for example
+after suspend, does not count. A GPU process that stops while OpenBot quits or the computer shuts down
+or restarts does not count either. A server (`OPENBOT_SERVER=1` or a hosted server) always renders on the
+CPU, and its browser runs WebGL on the CPU (SwiftShader) for sites such as the Figma editor. A GPU
+process crash on a server writes `gpu-crash.json` and turns off WebGL at the next start. Chromium
+also renders on the CPU when it blocks the GPU driver, for example in a remote desktop.
+
+When OpenBot renders on the CPU, dialogs and panels do not blur what is behind them, agent
+avatars do not move, and a theme change does not show its sweep. These effects used the most CPU time.
+The agents' browser keeps WebGL on the CPU (SwiftShader), so sites such as CapCut and the Figma editor
+still open.
+
+On a Wayland session, a start that renders on the CPU opens OpenBot again on XWayland: on Wayland,
+Chromium can leave the window empty, and KDE then shows only a 1x1 taskbar entry. The log then shows
+"Software rendering is on, so OpenBot uses XWayland". Without XWayland (no `DISPLAY`), OpenBot stays
+on Wayland. To stay on Wayland, start OpenBot with `--ozone-platform=wayland`.
 
 - To try the GPU again, for example after a driver update, remove the file. The log names it.
-- To always use the GPU, start OpenBot with `OPENBOT_DISABLE_GPU=0`.
+- To always use the GPU, start OpenBot with `OPENBOT_DISABLE_GPU=0`. A server ignores this value.
 - If OpenBot stops at each start, start it with `OPENBOT_DISABLE_GPU=1` to always render on the CPU.
+  This value also turns off WebGL.
 
 ## OpenBot does not start on Linux when the monitor is off
 
@@ -198,6 +215,58 @@ On Windows, the same file is at `%APPDATA%\OpenBot\openbot.db`.
 Report the field the message names, together with the details below. The output holds your own file
 paths, so review it before you publish it.
 
+## OpenBot did not open, several times in a row
+
+When one version stops before it opens several times in a row, the next start shows a recovery
+window. Your local data was not reset or overwritten. The window lets you try again, export the
+diagnostics, open the data folder, or download a version.
+
+The window offers the previous version only when that version can open your data. Each version
+keeps a list of the database changes that it knows, and a version cannot open data that a newer
+version changed. OpenBot reads the newest change in your data, without a write, and compares it with
+the last version that opened. When that version cannot open the data, or when OpenBot is not sure,
+the window offers the latest version instead. An older version would only stop again with the
+message below.
+
+## Security software stops OpenBot on Windows
+
+When security software stops the OpenBot window as it starts, OpenBot says "Security software on
+this computer probably stopped the OpenBot window." Older versions show
+`ERR_FAILED (-2) loading 'openbot-app://app/index.html'`. A new version can be blocked although an
+earlier version worked, because the security software does not know the new `OpenBot.exe` yet. The
+same can occur after an update of the security software. Your local data was not reset or
+overwritten.
+
+1. To find the OpenBot folder, right-click the OpenBot shortcut and click **Open file location**.
+2. In your security software, add `OpenBot.exe` from that folder as a trusted application. In
+   Kaspersky, open **Exclusions and actions on object detection** in the security settings, then
+   **Specify trusted applications**. Add `OpenBot.exe`, and select **Do not monitor application
+   activity** and **Do not monitor child application activity** (apply recursively).
+3. Start OpenBot again.
+
+Do not start OpenBot with `--no-sandbox`. It is not a supported workaround.
+
+## OpenBot says a newer version saved your data
+
+An older OpenBot started after a newer one opened your data, for example from an old shortcut or a
+second installation. An older OpenBot cannot read data that a newer one updated, so it stops before
+it writes anything. Your data is intact.
+
+Do not follow the reset steps below, and do not move the folder. When in-app updates and automatic
+downloads are on, OpenBot installs the latest version and opens again. Otherwise, or when the
+update fails, install the latest version from [openbot.run/download](https://openbot.run/download).
+
+When the latest version is the one that did not open several times in a row, OpenBot does not install
+it again. It says that the latest OpenBot did not open, and it keeps your data as it is. Install a
+version newer than the one it names when one is available on the
+[releases page](https://github.com/nightly-labs/openbot/releases), and report the problem with the
+details below.
+
+Then remove the older copy. On Windows, look for a second OpenBot in Settings → Apps, and pin the
+new OpenBot again if a taskbar or desktop shortcut opens the old one. Older versions show the
+message `OpenBot database version <n> is newer than this application supports (<m>).` The same
+steps apply.
+
 ## Routines do not run while the computer sleeps
 
 A routine runs only while the computer is awake and OpenBot is open.
@@ -207,7 +276,7 @@ A routine runs only while the computer is awake and OpenBot is open.
 - After OpenBot was closed, the routine setting "If OpenBot was closed at the scheduled time"
   decides: skip the run, or run it one time when OpenBot opens.
 
-On macOS and Windows, turn on Settings → General → **Keep this computer awake**. While the computer
+On macOS and Windows, turn on Settings → App behavior → **Keep this computer awake**. While the computer
 is connected to power, it then does not sleep when idle. The display can still turn off. A closed
 laptop lid, or a sleep that you select, still sleeps the computer, unless macOS uses an external
 display (closed-display mode). On battery power, the computer sleeps as usual, unless you also turn
@@ -252,6 +321,26 @@ host receives.
 If the filter puts `openbot.run` in a blocked category, the administrator can ask the vendor to
 review it. For Fortinet, use the FortiGuard web filter lookup.
 
+## A server connects slowly through a VPN or proxy app
+
+A proxy app, such as Clash, Mihomo, Shadowrocket, or Surge, can send OpenBot traffic through a
+remote proxy. Many proxies do not carry UDP. Then the connection to a joined server uses a slower
+path, it fails more frequently, and it must reconnect more often when you open the app again.
+
+Send OpenBot traffic directly, not through the proxy. Add this rule above the other rules of the
+proxy app:
+
+```text
+DOMAIN-SUFFIX,openbot.run,DIRECT
+```
+
+If the app uses fake-IP DNS, also add `+.openbot.run` to the fake-IP filter (`fake-ip-filter` in a
+Clash or Mihomo configuration). Then the connection uses the real addresses of the OpenBot hosts.
+
+This rule covers sign-in, Signal, and the TURN relays. It does not cover a direct path to the
+server, because that path uses an address, not a name. When the direct path fails, OpenBot uses a
+TURN relay.
+
 ## Reset OpenBot
 
 Quit OpenBot before moving data. To reset application state and the shared browser profile while
@@ -282,10 +371,17 @@ are independent and are not removed with OpenBot.
 
 Use the [bug report form](https://github.com/nightly-labs/openbot/issues/new?template=bug_report.yml)
 for reproducible bugs. It asks for the platform, the OpenBot version (Settings → Updates on the
-desktop, Settings → About on the phone), the operating system and hardware, the provider and its CLI
-version, the steps, and the expected and actual results. When a provider row shows an error, select
-**Copy diagnostics** in its menu and paste the result into the form. On the phone, Settings →
-Support → **Save log file** makes a log that you can attach. Never publish tokens, `~/.codex`,
+desktop), the operating system and hardware, the provider and its CLI version, the steps, and the
+expected and actual results. When a provider row shows an error, select **Copy diagnostics** in its
+menu and paste the result into the form.
+
+For a problem in the iPhone or Android app, use the
+[mobile app bug report form](https://github.com/nightly-labs/openbot/issues/new?template=mobile_bug_report.yml).
+It asks for the full app version line from Settings → About. Settings → Support → **Save log file**
+makes a log that you can attach. Attach it for a connection or network problem: we will most
+probably close such a report without it.
+
+Never publish tokens, `~/.codex`,
 `~/.claude`, conversations, private files, Electron user data, or full unreviewed diagnostics.
 
 When the desktop app closes by itself, look in the `logs` folder of its user data
@@ -295,6 +391,11 @@ When the desktop app closes by itself, look in the `logs` folder of its user dat
 - `main/main.log` has a `Quitting: <reason>.` line when OpenBot quit by itself or was closed.
 - `trace.ndjson` has an `exit` line with the same reason, and a `crash` line for each renderer or
   helper process that stopped.
+
+When OpenBot or a server freezes again and again, `stall-profiles.ndjson` in the same folder has a line
+for a minute in which the main process stopped for 2 seconds or more, twice in a row. The line names
+the OpenBot functions that used the time (`top`) and their callers (`stack`). It holds no paths and
+none of your data, so you can attach it to a report.
 
 A dump in the `Crashpad` folder next to `logs` means a process crashed. Tell us that a dump exists,
 but do not attach it publicly: it can hold secrets. When neither file has a reason and there is no

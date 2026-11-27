@@ -56,7 +56,7 @@ export const PreviewUnavailable: Story = {
 
 export const Narrow: Story = {
   render: (args) => (
-    <div style={{ width: "280px", "max-width": "100%" }}>
+    <div style={{ width: "340px", "max-width": "100%" }}>
       <BrowserTakeoverCard {...args} />
     </div>
   ),
@@ -66,7 +66,6 @@ export const Completed: Story = {
   args: { decision: "complete" },
 };
 
-/** A resolved card, and the channel view, have no browser panel to open: the preview is static. */
 export const NotOpenable: Story = {
   args: { onOpen: undefined },
 };
@@ -79,7 +78,6 @@ export const TabUnavailable: Story = {
   args: { tab: undefined, preview: null, previewStatus: "failed" },
 };
 
-/** On a remote server, the desktop app offers a sign-in on this computer for a site that refuses the server. */
 export const SignInOnThisComputer: Story = {
   args: {
     tab: { ...tab, title: "Log in to X / X", url: "https://x.com/i/flow/login" },
@@ -89,7 +87,6 @@ export const SignInOnThisComputer: Story = {
 
 const blockedTab: BrowserTab = { ...tab, title: "Log in to X / X", url: "https://x.com/i/flow/login" };
 
-/** The agent found that the site refused the sign-in from the server: the card asks only for that sign-in. */
 export const SignInBlocked: Story = {
   args: { tab: blockedTab, onSignInLocally: fn(), signInBlocked: { server: "Hello", signingIn: false } },
 };

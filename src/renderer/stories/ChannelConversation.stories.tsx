@@ -1,3 +1,4 @@
+import { CHANNEL_ASSIGNMENT_LIMIT_ERROR } from "@openbot/contracts/ipc";
 import type { AgentMessage } from "@openbot/ui/data";
 import type { AwaitingReplyItem } from "@openbot/ui/features/conversation/AwaitingReplies";
 import { createSignal, onCleanup } from "solid-js";
@@ -12,14 +13,6 @@ import {
   StoryChannelConversation,
   CHANNEL_STORY_SALES as sales,
 } from "./channel-story-support";
-
-/*
- * A channel in the conversation view, as the app shows it. What is under test here is what the
- * reader sees: the coloured author name and the face beside the bubble that opens a run, the run of
- * messages that names its author once, the reader's own messages on the right and other members' with
- * their name, one activity row for every agent at work, and the blocks above the
- * composer. Compare with `Conversation/Conversation`: the two chats draw the same rows.
- */
 
 const meta = {
   title: "Conversation/Channel",
@@ -40,7 +33,6 @@ export const SeveralAuthors: Story = {
   },
 };
 
-/** One agent at work: the sentence has to read for a single name too. */
 export const OneWorker: Story = {
   args: {
     messages: messages.slice(0, 4),
@@ -49,7 +41,6 @@ export const OneWorker: Story = {
   },
 };
 
-/** Wrapped text, a long name, and an author whose profile is no longer available. */
 export const AuthorLayout: Story = {
   args: {
     messages: [
@@ -64,7 +55,6 @@ export const AuthorLayout: Story = {
   },
 };
 
-/** The plan of a member's run, as in an agent chat. */
 export const PlanCard: Story = {
   args: {
     activeTurnId: "turn-channel-plan",
@@ -116,9 +106,21 @@ const waitingSubtasks: AwaitingReplyItem[] = [
 const stoppedTask = (agentId: string, long = false) => ({
   id: `stopped-${agentId}`,
   ownerAgentId: agentId,
-  error: long
-    ? "The automatic assignment limit was reached. Continue or reassign this task. The source report still needs review before the team can complete the work."
-    : "The agent could not complete this task.",
+  instruction:
+    agentId === sales.id
+      ? "Check the sources in the notes and mark each claim that has no source"
+      : agentId === research.id
+        ? "Compare the three pricing pages and list what each one leaves out"
+        : "Draft the pricing section for the launch post",
+  ...(long
+    ? {
+        error: CHANNEL_ASSIGNMENT_LIMIT_ERROR,
+        runAgentIds: [
+          agentId,
+          ...[chief.id, sales.id, research.id].filter((id) => id !== agentId).slice(0, agentId === chief.id ? 1 : 2),
+        ],
+      }
+    : { error: "The agent could not complete this task." }),
 });
 
 const longHistory = (length: number): AgentMessage[] =>
@@ -137,12 +139,10 @@ const longHistory = (length: number): AgentMessage[] =>
     return { ...message, createdAt: createdAt.toISOString() };
   });
 
-/** Scroll the messages while the stopped task stays above the input. */
 export const StoppedTaskAboveComposer: Story = {
   args: { messages: longHistory(40), stopped: [stoppedTask(chief.id)] },
 };
 
-/** Resize the viewport to check the composer with several long stopped tasks. */
 export const StoppedTasks: Story = {
   args: {
     messages: longHistory(40),
@@ -150,7 +150,6 @@ export const StoppedTasks: Story = {
   },
 };
 
-/** An owner waits for its sub-tasks while another task is stopped: the two blocks stack. */
 export const WaitingSubtasksAboveStoppedTask: Story = {
   args: { messages: longHistory(40), awaiting: waitingSubtasks, stopped: [stoppedTask(sales.id)] },
 };
@@ -159,17 +158,12 @@ export const WaitingSubtasksAboveComposer: Story = {
   args: { messages: longHistory(40), awaiting: waitingSubtasks },
 };
 
-/** Five days of history, 120 messages: the scroll rail is on the right edge. */
 export const LongHistory: Story = {
   args: { messages: longHistory(120) },
 };
 
 const streamSentence = "I am still checking the launch plan and adding each finding to this reply. ";
 
-/**
- * A reply that grows for as long as the story is open, under a history that is long enough to scroll.
- * The reader can scroll up while an agent works. `scripts/chat-scroll-streaming-e2e.ts` drives it.
- */
 function StreamingWhileReadingHistoryChannel(props: { args: ChannelStoryProps; history: AgentMessage[] }) {
   const [tick, setTick] = createSignal(0);
   const reply = channelStoryAgentMessage("reading-history-reply", chief.id, "", "13:10", true);
@@ -190,10 +184,6 @@ function StreamingWhileReadingHistoryChannel(props: { args: ChannelStoryProps; h
   );
 }
 
-/**
- * A new message from one of the agents every 400ms for as long as the story is open, and the newest one
- * is still streaming. The reader can scroll up and read. `scripts/chat-scroll-streaming-e2e.ts` drives it.
- */
 function ReplyBurstChannel(props: { args: ChannelStoryProps; history: AgentMessage[] }) {
   const [count, setCount] = createSignal(1);
   const replies = () =>
@@ -217,7 +207,6 @@ function ReplyBurstChannel(props: { args: ChannelStoryProps; history: AgentMessa
   );
 }
 
-/** The reader and the agents in turn, as in the agent chat's scroll stories, so both chats scroll the same rows. */
 const readingHistory = (length: number): AgentMessage[] =>
   Array.from({ length }, (_, index) =>
     index % 2 === 0
@@ -234,7 +223,6 @@ const readingHistory = (length: number): AgentMessage[] =>
         ),
   );
 const shortReadingHistory = readingHistory(40);
-/** More than 100 rows, so the timeline draws only the rows near the screen. */
 const longReadingHistory = readingHistory(120);
 
 export const StreamingWhileReadingHistory: Story = {
@@ -253,17 +241,14 @@ export const ReplyBurstWhileReadingLongHistory: Story = {
   render: (args) => <ReplyBurstChannel args={args} history={longReadingHistory} />,
 };
 
-/** New replies since the reader was here: the divider stands above the first one. */
 export const UnreadReplies: Story = {
   args: { messages: longHistory(40), unreadCount: 4, firstUnreadMessageId: "long-35" },
 };
 
-/** An archived channel takes no message: the notice stands in place of the composer. */
 export const Archived: Story = {
   args: { archived: true },
 };
 
-/** A channel with no message shows its name, title and instructions. */
 export const Empty: Story = {
   args: { messages: [] },
 };

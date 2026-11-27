@@ -13,6 +13,7 @@ import { Typography } from "heroui-native";
 import { useUniwind } from "uniwind";
 import { SettingsNote, SettingsRow, SettingsSection } from "@/features/settings/components/settings-content";
 import { SettingsPicker, SettingsSwitch } from "@/features/settings/components/settings-controls";
+import { ValueRow } from "@/features/workflows/components/workflow-value-row";
 import { useWorkflowGitHubCatalog } from "@/features/workflows/model/use-workflows";
 import { draftGraph, useWorkflowDraft, type WorkflowDraft } from "@/features/workflows/model/workflow-draft";
 import {
@@ -34,20 +35,16 @@ import { SheetFormField } from "@/shared/components/sheet-form-field";
 import { haptics } from "@/shared/lib/haptics";
 import { useText } from "@/shared/lib/text";
 
-/** The longest text of a filter field that `workflows-v1` carries. */
+const TITLE_PLACEHOLDER = "fix:";
+
 const FILTER_LIMIT = 200;
 
 export type GitHubPickField = "repository" | "labels" | "person";
 
-/** Opens the list of repositories, labels or people of a GitHub step. */
 function openGitHubPick(nodeId: string, field: GitHubPickField) {
   router.push({ pathname: "/workflow-editor/github-pick", params: { nodeId, field } });
 }
 
-/**
- * Who may change a GitHub step on this server, and the host's GitHub connection. The host takes a
- * change of a GitHub step only from an owner or admin, and gives the catalog only to them.
- */
 export function useGitHubAccess(draft: Pick<WorkflowDraft, "serverId" | "mode"> | null) {
   const serverId = draft?.serverId ?? "";
   const admin = useMobileWorkspaceSelector((current) =>
@@ -62,7 +59,6 @@ export function useGitHubAccess(draft: Pick<WorkflowDraft, "serverId" | "mode"> 
   };
 }
 
-/** A note that tells why the person cannot change the step, or what GitHub needs. */
 function GitHubNotes({
   admin,
   catalog,
@@ -88,33 +84,6 @@ function GitHubNotes({
   ) : null;
 }
 
-function PickRow({
-  label,
-  value,
-  disabled,
-  onPress,
-}: {
-  label: string;
-  value: string;
-  disabled: boolean;
-  onPress: () => void;
-}) {
-  return (
-    <SettingsRow
-      disabled={disabled}
-      onPress={onPress}
-      trailing={
-        <Typography.Paragraph className="text-grouped-secondary" numberOfLines={1}>
-          {value}
-        </Typography.Paragraph>
-      }
-    >
-      <Typography.Paragraph>{label}</Typography.Paragraph>
-    </SettingsRow>
-  );
-}
-
-/** The settings of a GitHub trigger: its repository, its event, its labels and its filters. */
 export function GitHubTriggerFields({ node, draft }: { node: WorkflowNode; draft: WorkflowDraft }) {
   const { t } = useText();
   const { theme } = useUniwind();
@@ -134,9 +103,17 @@ export function GitHubTriggerFields({ node, draft }: { node: WorkflowNode; draft
   return (
     <>
       <SettingsSection title={t("mobile.workflow.trigger.github")}>
-        <PickRow
-          label={t("mobile.workflow.github.repository")}
-          value={settings.repository || t("mobile.workflow.github.chooseRepository")}
+        <ValueRow
+          label={t(
+            settings.repositories.length > 1
+              ? "mobile.workflow.github.repositories"
+              : "mobile.workflow.github.repository",
+          )}
+          value={
+            settings.repositories.length > 0
+              ? settings.repositories.join(", ")
+              : settings.repository || t("mobile.workflow.github.chooseRepository")
+          }
           disabled={!editable}
           onPress={() => openGitHubPick(node.id, "repository")}
         />
@@ -154,7 +131,7 @@ export function GitHubTriggerFields({ node, draft }: { node: WorkflowNode; draft
         >
           <Typography.Paragraph>{t("mobile.workflow.github.trigger.event")}</Typography.Paragraph>
         </SettingsRow>
-        <PickRow
+        <ValueRow
           label={labelsName}
           value={settings.labels.length > 0 ? settings.labels.join(", ") : t("mobile.workflow.github.trigger.anyLabel")}
           disabled={!editable || !settings.repository}
@@ -180,6 +157,7 @@ export function GitHubTriggerFields({ node, draft }: { node: WorkflowNode; draft
       {settings.filters.includes("title") ? (
         <SheetFormField
           label={t("mobile.workflow.github.trigger.titleHas")}
+          placeholder={TITLE_PLACEHOLDER}
           value={settings.titleText}
           maxLength={FILTER_LIMIT}
           editable={editable}
@@ -209,7 +187,6 @@ export function GitHubTriggerFields({ node, draft }: { node: WorkflowNode; draft
   );
 }
 
-/** The settings of a GitHub output: the repository, the item, the action and what the action needs. */
 export function GitHubOutputFields({ node, draft }: { node: WorkflowNode; draft: WorkflowDraft }) {
   const { t } = useText();
   const { theme } = useUniwind();
@@ -244,7 +221,7 @@ export function GitHubOutputFields({ node, draft }: { node: WorkflowNode; draft:
   return (
     <>
       <SettingsSection title={t("mobile.workflow.output.github")}>
-        <PickRow
+        <ValueRow
           label={t("mobile.workflow.github.repository")}
           value={repositoryValue}
           disabled={!editable}
@@ -281,7 +258,7 @@ export function GitHubOutputFields({ node, draft }: { node: WorkflowNode; draft:
           <Typography.Paragraph>{t("mobile.workflow.github.output.action")}</Typography.Paragraph>
         </SettingsRow>
         {settings.usesLabels ? (
-          <PickRow
+          <ValueRow
             label={t("mobile.workflow.github.output.labels")}
             value={labelsValue}
             disabled={!editable || !settings.target}
@@ -289,7 +266,7 @@ export function GitHubOutputFields({ node, draft }: { node: WorkflowNode; draft:
           />
         ) : null}
         {settings.usesPerson ? (
-          <PickRow
+          <ValueRow
             label={t("mobile.workflow.github.output.person")}
             value={personValue}
             disabled={!editable || !settings.target}

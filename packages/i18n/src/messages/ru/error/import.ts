@@ -32,18 +32,29 @@ export const messages = {
   "error.import.fileRenamed": "{name}: {file} уже существует, поэтому эта копия сохранена как {saved}.",
   "error.import.fileSkipped": "{name}: файл {file} пропущен. {reason}",
   "error.import.chooseZip": "Выберите файл .zip.",
-  "error.import.zipTooLarge": "Экспорт должен быть файлом .zip размером до 500 МБ.",
   "error.import.unsafeFile": "В экспорте есть небезопасный файл: {name}",
-  "error.import.expandedTooLarge":
+  "error.import.tooManyFiles": "В экспорте должно быть не более {limit} файлов.",
+  "error.import.diskSpace":
+    "{name}: файлам нужно {size} ГБ свободного места на диске, а свободно {free} ГБ. Освободите место и импортируйте агента снова.",
+  "error.import.remoteExpandedTooLarge":
     "После распаковки экспорт должен занимать менее 500 МБ и содержать не более {limit} файлов.",
   "error.import.zipInvalid":
     "Выбранный файл — некорректный .zip. Если Grok Bot ещё сохраняет его, подождите и выберите файл снова.",
+  "error.import.entryDamaged": "Файл в экспорте повреждён.",
+  "error.import.foldersSkipped":
+    "Файлы в папках .git и node_modules не импортируются: {number}. Инструмент может создать их снова.",
   "error.import.empty": "Экспорт пуст.",
   "error.import.remoteZipTooLarge":
     "Чтобы импортировать на подключённый сервер, экспорт должен быть файлом .zip размером до 100 МБ.",
   "error.import.hostBusy": "Сервер читает другие экспорты. Повторите попытку через несколько минут.",
+  "error.import.uploadDiskSpace":
+    "Для экспорта нужно {size} ГБ свободного места на сервере, а свободно {free} ГБ. Освободите место на сервере и выберите экспорт снова.",
+  "error.import.remoteZipTooLargeOldHost":
+    "Этот сервер принимает экспорт размером до 100 МБ. Обновите OpenBot на сервере, чтобы импортировать экспорт большего размера.",
   "error.import.skillKept":
     "{name}: на сервере уже есть навык «{skill}», поэтому агент использует его. Попросите администратора обновить его.",
+  "error.import.skillRenamed":
+    "{name}: имя навыка «{skill}» слишком похоже на имя другого навыка, поэтому он сохранён как «{renamed}».",
   "error.import.transferRemoteTooLarge":
     "Файл переноса для присоединённого сервера должен быть меньше 100 МБ. Выключите файлы рабочих пространств или экспортируйте меньше агентов.",
   "error.import.transferNotFile": "Это не файл переноса OpenBot.",
@@ -56,6 +67,22 @@ export const messages = {
   "error.import.transferModelMissing":
     "{name}: модель «{model}» здесь пока недоступна, поэтому агент использует модель по умолчанию. Выберите модель снова, когда её провайдер будет готов.",
   "error.import.transferSettingSkipped": "{name}: не импортировано. {reason}",
+  "error.import.transferRunsSkipped": "{name}: история запусков регулярной задачи «{routine}» не импортирована.",
+  "error.import.transferSharedSkillsSkipped": "Не удалось прочитать общие навыки, поэтому их нет в файле.",
+  "error.import.transferSharedSkillsNotAdded": "Не удалось добавить на этот сервер общие навыки из файла.",
+  "error.import.transferMemberPreferencesSkipped": {
+    one: "Не удалось сохранить выбор {count} участника.",
+    few: "Не удалось сохранить выбор {count} участников.",
+    many: "Не удалось сохранить выбор {count} участников.",
+    other: "Не удалось сохранить выбор {count} участника.",
+  },
+  "error.import.transferSharedSkillExists": "На этом сервере уже есть общий навык с таким названием и другими файлами.",
+  "error.import.transferServerPreferencesSkipped": {
+    one: "{count} параметр сервера в файле здесь недопустим, поэтому он не импортируется.",
+    few: "{count} параметра сервера в файле здесь недопустимы, поэтому они не импортируются.",
+    many: "{count} параметров сервера в файле здесь недопустимы, поэтому они не импортируются.",
+    other: "{count} параметра сервера в файле здесь недопустимы, поэтому они не импортируются.",
+  },
   "error.import.transferRoutineFlowSkipped": "Схема регулярной задачи не импортирована. {reason}",
   "error.import.transferCustomAgentCommand":
     "{name}: собственные агенты не импортируются, потому что они запускают команду. Проверьте команду «{command}» и снова добавьте агента в настройках.",
@@ -65,9 +92,13 @@ export const messages = {
   "error.import.transferProviderKey": "{name}: снова введите API-ключ в настройках.",
   "error.import.transferAgentEnv": "{name}: снова введите значения {names} в настройках.",
   "error.import.transferMcpValues":
-    "{name}: сервер MCP добавлен выключенным. Проверьте его команду, снова введите значения и полный адрес и включите его в настройках MCP.",
+    "{name}: сервер MCP добавлен выключенным. Проверьте его команду, снова введите значения и полный адрес и включите его в разделе Каталог, Приложения.",
+  "error.import.transferMcpSignIn":
+    "{name}: приложение добавлено выключенным. Подключите его снова и включите в разделе Каталог, Приложения.",
   "error.import.transferValuesCleared":
     "{name}: значения, которые могут содержать секрет, удалены из аргументов или адреса. Снова введите их в настройках.",
   "error.import.transferSharedKept":
     "Файлы в общей папке ({number}) уже есть здесь, поэтому они оставлены без изменений.",
+  "error.import.transferPartSkipped":
+    "Некоторые части файла не удалось импортировать. Остальные части уже на этом сервере, поэтому не импортируйте файл повторно.",
 } as const satisfies PartialTranslation<typeof source>;

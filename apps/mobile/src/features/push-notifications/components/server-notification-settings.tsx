@@ -19,7 +19,6 @@ export const NOTIFICATION_LEVEL_KEYS = {
   nothing: "mobile.settings.notifications.level.nothing",
 } as const satisfies Record<ServerNotificationLevel, MobileTextKey>;
 
-/** In the order of `SERVER_MUTE_DURATIONS_MS`, which the desktop server menu offers too. */
 const MUTE_KEYS = [
   "mobile.settings.notifications.mute.for15Minutes",
   "mobile.settings.notifications.mute.for1Hour",
@@ -30,7 +29,6 @@ const MUTE_KEYS = [
 
 type MuteChoice = "current" | "off" | "forever" | `${number}`;
 
-/** The end of a timed mute: the time today, or the day and the time. */
 function muteEnd(until: number, format: MobileText["format"]): string {
   const end = new Date(until);
   return format.date(end, {
@@ -40,10 +38,6 @@ function muteEnd(until: number, format: MobileText["format"]): string {
   });
 }
 
-/**
- * The mute of one server on this phone, as the desktop server menu has it. The mute applies to this
- * phone only: the other devices of the user keep their notifications.
- */
 export function ServerMuteRow({
   serverId,
   enabled,
@@ -51,7 +45,6 @@ export function ServerMuteRow({
 }: {
   serverId: string;
   enabled: boolean;
-  /** The text of a failed save, or `null` when a save starts. */
   onError: (message: string | null) => void;
 }) {
   const { t, format } = useText();
@@ -78,7 +71,6 @@ export function ServerMuteRow({
         <SettingsPicker<MuteChoice>
           value={mute}
           options={[
-            // A timed mute shows its end, as no choice below names it.
             ...(until !== null && until !== Number.POSITIVE_INFINITY
               ? [
                   {

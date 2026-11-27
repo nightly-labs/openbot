@@ -40,8 +40,6 @@ async function run() {
     await Effect.runPromise(files.initialize());
     await mkdir(join(root, "sources"), { recursive: true });
 
-    // The user attaches an SVG. It is stored unchanged. It is a file, so the agent gets its path and
-    // not a raster image block, and the chat shows it as an image.
     const userDrawing = join(root, "sources", "logo.svg");
     await writeFile(userDrawing, drawing);
     const drafts = await Effect.runPromise(files.prepareDrafts([userDrawing], []));
@@ -63,8 +61,6 @@ async function run() {
     assert.equal(inbound.sha256, digest(drawing));
     assert.deepEqual(await readFile(inbound.path), Buffer.from(drawing));
 
-    // A browser or a remote member sends the bytes with its own MIME type. The extension wins, so an
-    // SVG never becomes a raster image for the provider.
     const uploaderTypes = ["image/png", "image/svg+xml", "text/plain", "application/octet-stream", ""];
     const uploaded = await Effect.runPromise(
       files.prepareDrafts(
@@ -78,7 +74,6 @@ async function run() {
       assert.equal(draft.previewKind, "image");
     }
 
-    // The agent returns an SVG with attach_files_to_response.
     const agentDrawing = join(root, "sources", "chart.svg");
     await writeFile(agentDrawing, drawing);
     const handle = await open(agentDrawing, "r");
@@ -92,22 +87,19 @@ async function run() {
     assert.equal(outbound.mimeType, "image/svg+xml");
     assert.equal(outbound.previewKind, "image");
 
-    // A browser can run an SVG as a page, so the desktop app does not open it with the default app.
     assert.equal(isOpenableAttachmentName("chart.svg"), false);
     assert.doesNotThrow(() => assertSupportedAttachmentName("chart.svg"));
-    // A remote host without svg-attachments does not get SVG files.
-    const oldHost = { eml: true, media: true, zip: true, mp4: true, svg: false };
+    const oldHost = { eml: true, media: true, zip: true, mp4: true, svg: false, anyFile: false };
     assert.equal(supportedAttachmentExtensions(oldHost).includes("svg"), false);
     assert.equal(supportedAttachmentExtensions(oldHost).includes("png"), true);
     assert.equal(isSupportedAttachmentNameFor("logo.svg", oldHost), false);
     assert.equal(isSupportedAttachmentNameFor("logo.svg", { ...oldHost, svg: true }), true);
-    // Protocols 6 to 8 have full capability lists, so only a protocol 9 peer gets the capability.
     assert.equal(legacyTeamCapabilities(TEAM_CURRENT_CAPABILITIES).includes(TEAM_SVG_ATTACHMENTS_CAPABILITY), false);
     assert.equal(TEAM_PROTOCOL_V9_ONLY_CAPABILITIES.has(TEAM_SVG_ATTACHMENTS_CAPABILITY), true);
     assert.equal(teamCapabilitiesForProtocol(8).includes(TEAM_SVG_ATTACHMENTS_CAPABILITY), false);
     assert.equal(teamCapabilitiesForProtocol(9).includes(TEAM_SVG_ATTACHMENTS_CAPABILITY), true);
     assert.ok(teamCapabilitiesForProtocol(8).length <= 128);
-    assert.ok(TEAM_CURRENT_CAPABILITIES.length <= TEAM_PROTOCOL_V9_CAPABILITY_LIMIT);
+    assert.ok(teamCapabilitiesForProtocol(9).length <= TEAM_PROTOCOL_V9_CAPABILITY_LIMIT);
 
     return {
       status: "pass",

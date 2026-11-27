@@ -1,0 +1,267 @@
+import type { BrowserChallenge } from "@openbot/contracts/ipc";
+import { isDynamicRecord, isString } from "@openbot/contracts/runtime-values";
+import { Effect, Option } from "effect";
+import type { WebContents } from "electron";
+import {
+  automationContextId,
+  frameIds,
+  isFiniteNumber,
+  numberValue,
+  recordValue,
+  type SendCommand,
+  stringValue,
+} from "./browser-cdp-values";
+
+export const CHALLENGE_WAIT_MS = 15_000;
+
+export const CHALLENGE_POLL_MS = 1_000;
+
+export const CHALLENGE_CLICK_WAIT_MS = 6_000;
+
+export const TURNSTILE_SELF_PASS_MS = 3_000;
+
+const CHECK_TIMEOUT_MS = 1_000;
+
+export interface DetectedChallenge {
+  vendor: string;
+  kind: "non-interactive" | "interactive" | "block";
+  signal: string;
+  checkbox: { x: number; y: number } | null;
+  puzzle: boolean;
+}
+
+const CHALLENGE_SCRIPT = String.raw`(() => {
+  const body = document.body;
+  const title = (document.title || "").trim();
+  const raw = body ? body.textContent || "" : "";
+  const text = raw.length < 8000 && body ? (body.innerText || "").replace(/\s+/g, " ").trim() : "";
+  const short = raw.length < 8000 && text.length < 1500;
+  const has = (selector) => document.querySelector(selector) !== null;
+  const visible = (element) => {
+    const rect = element.getBoundingClientRect();
+    return rect.width > 20 && rect.height > 20;
+  };
+  const frame = (pattern) =>
+    [...document.querySelectorAll("iframe")].some((element) => {
+      const source = element.src || "";
+      return pattern.test(source) && !/size=invisible/.test(source) && visible(element);
+    });
+  const filled = (selector) => [...document.querySelectorAll(selector)].some((element) => (element.value || "").length > 0);
+  const turnstilePassed = filled("input[name='cf-turnstile-response']");
+  const recaptchaPassed = filled("textarea[name='g-recaptcha-response']");
+  const hcaptchaPassed = filled("textarea[name='h-captcha-response']");
+  const puzzle = [...document.querySelectorAll("iframe")].some((element) => {
+    if (!/\/recaptcha\/(api2|enterprise)\/bframe|hcaptcha\.com.*frame=challenge/.test(element.src || "")) return false;
+    const rect = element.getBoundingClientRect();
+    return rect.width > 100 && rect.height > 100 && getComputedStyle(element).visibility !== "hidden";
+  });
+  const checkbox = (() => {
+    if (puzzle) return null;
+    const widgets = [...document.querySelectorAll("iframe")].filter((element) => {
+      const source = element.src || "";
+      return (
+        (!turnstilePassed && /challenges\.cloudflare\.com/.test(source)) ||
+        (!recaptchaPassed && /\/recaptcha\/(api2|enterprise)\/anchor/.test(source) && !/size=invisible/.test(source)) ||
+        (!hcaptchaPassed && /hcaptcha\.com.*frame=checkbox/.test(source))
+      );
+    });
+    for (const widget of widgets) {
+      const rect = widget.getBoundingClientRect();
+      if (rect.width < 200 || rect.width > 420 || rect.height < 50 || rect.height > 100) continue;
+      if (rect.left < 0 || rect.top < 0 || rect.right > innerWidth || rect.bottom > innerHeight) continue;
+      return { x: Math.round(rect.left + 28), y: Math.round(rect.top + rect.height / 2) };
+    }
+    return null;
+  })();
+  const turnstileField = !turnstilePassed && checkbox === null && has("input[name='cf-turnstile-response']");
+  const viewport = { width: innerWidth, height: innerHeight };
+  const found = (vendor, kind, signal) =>
+    kind === "block"
+      ? { vendor, kind, signal, checkbox: null, puzzle, turnstileField: false, viewport }
+      : { vendor, kind, signal, checkbox, puzzle, turnstileField, viewport };
+
+  if ((has("#cf-error-details") || has(".cf-error-code")) && /blocked|error 10(0[0-9]|20)|access denied/i.test(text))
+    return found("cloudflare", "block", "cloudflare-error-page");
+  const cloudflare = frame(/challenges\.cloudflare\.com/) || has("script[src*='/cdn-cgi/challenge-platform/']");
+  if ((cloudflare || short) && has("#challenge-form, #challenge-running, #challenge-stage, #cf-challenge-running, .cf-browser-verification, #cf-please-wait"))
+    return found("cloudflare", "non-interactive", "cloudflare-challenge-markup");
+  const challengePage = has("script[src*='/cdn-cgi/challenge-platform/'][src*='/orchestrate/chl_page/']");
+  if ((/^(just a moment|attention required)/i.test(title) && (short || challengePage)) || (/^one more step/i.test(title) && cloudflare))
+    return found("cloudflare", "non-interactive", "cloudflare-title");
+  if (frame(/captcha-delivery\.com/)) return found("datadome", "interactive", "datadome-frame");
+  if (has("#px-captcha")) return found("perimeterx", "interactive", "px-captcha");
+  if (/incapsula incident id/i.test(text)) return found("imperva", "block", "incapsula-incident");
+  if (short && frame(/_Incapsula_Resource/)) return found("imperva", "interactive", "incapsula-frame");
+  if (/^access denied/i.test(title) && /reference #\s*\d+\.[0-9a-f]+/i.test(text))
+    return found("akamai", "block", "akamai-reference");
+  if (short && has("#sec-if-cpt-container, #sec-cpt-if, #sec-container"))
+    return found("akamai", "non-interactive", "akamai-sec-cpt");
+  if (has("html:has(head > script[src*='.awswaf.com/'][src$='/captcha.js']) > body > #captcha-container"))
+    return found("aws-waf", "interactive", "aws-waf-captcha");
+  if (has("html:has(head > script[src*='.awswaf.com/'][src$='/challenge.js']) > body > #challenge-container"))
+    return found("aws-waf", "non-interactive", "aws-waf-challenge");
+  if (!short) return null;
+  if (!turnstilePassed && frame(/challenges\.cloudflare\.com/)) return found("turnstile", "interactive", "turnstile-frame");
+  if (turnstileField) return found("turnstile", "interactive", "turnstile-field");
+  if (!hcaptchaPassed && frame(/hcaptcha\.com/)) return found("hcaptcha", "interactive", "hcaptcha-frame");
+  if (!recaptchaPassed && frame(/\/recaptcha\/(api2|enterprise)\/|recaptcha\.net/))
+    return found("recaptcha", "interactive", "recaptcha-frame");
+  if (/you have been blocked|your request (has been|was) blocked|request blocked/i.test(text) || /^(access denied|403 forbidden)/i.test(title))
+    return found("generic", "block", "block-text");
+  if (/checking (if the site connection is secure|your browser)|verifying you are human|please wait while we (verify|check)/i.test(text))
+    return found("generic", "non-interactive", "wait-text");
+  if (turnstilePassed || recaptchaPassed || hcaptchaPassed) return null;
+  if (/verify (that )?you are (a )?human|are you a robot|press (and|&) hold|complete the security check|unusual traffic from your (computer|network)/i.test(text))
+    return found("generic", "interactive", "captcha-text");
+  return null;
+})()`;
+
+function challengeKind(value: unknown): DetectedChallenge["kind"] | null {
+  return value === "non-interactive" || value === "interactive" || value === "block" ? value : null;
+}
+
+function readCheckbox(value: unknown): DetectedChallenge["checkbox"] {
+  if (!isDynamicRecord(value)) return null;
+  const { x, y } = value;
+  return typeof x === "number" && typeof y === "number" && x >= 0 && y >= 0 ? { x, y } : null;
+}
+
+function readChallenge(value: unknown): DetectedChallenge | null {
+  if (!isDynamicRecord(value)) return null;
+  const kind = challengeKind(value.kind);
+  if (!kind || !isString(value.vendor) || !isString(value.signal)) return null;
+  return {
+    vendor: value.vendor,
+    kind,
+    signal: value.signal,
+    checkbox: readCheckbox(value.checkbox),
+    puzzle: value.puzzle === true,
+  };
+}
+
+const MAX_WIDGET_FRAMES = 12;
+
+interface FrameBox {
+  left: number;
+  top: number;
+  width: number;
+  height: number;
+}
+
+const turnstileFrameBox = Effect.fn("Browser.turnstileFrameBox")(function* (
+  send: SendCommand,
+  childFrameIds: readonly string[],
+) {
+  const local = frameIds(yield* send("Page.getFrameTree", {})).slice(1);
+  for (const frameId of [...new Set([...local, ...childFrameIds])].slice(0, MAX_WIDGET_FRAMES)) {
+    const box = yield* Effect.gen(function* () {
+      const owner = numberValue((yield* send("DOM.getFrameOwner", { frameId })).backendNodeId);
+      if (!owner) return null;
+      const node = recordValue((yield* send("DOM.describeNode", { backendNodeId: owner })).node);
+      const attributes = Array.isArray(node?.attributes) ? node.attributes.map(stringValue) : [];
+      const source = attributes.find((_, index) => index % 2 === 1 && attributes[index - 1] === "src") ?? "";
+      if (!/challenges\.cloudflare\.com/.test(source)) return null;
+      const quad = recordValue((yield* send("DOM.getBoxModel", { backendNodeId: owner })).model)?.border;
+      const corners = Array.isArray(quad) ? quad.filter(isFiniteNumber).slice(0, 8) : [];
+      if (corners.length < 8) return null;
+      const xs = corners.filter((_, index) => index % 2 === 0);
+      const ys = corners.filter((_, index) => index % 2 === 1);
+      const left = Math.min(...xs);
+      const top = Math.min(...ys);
+      return { left, top, width: Math.max(...xs) - left, height: Math.max(...ys) - top };
+    }).pipe(Effect.catch(() => Effect.succeed(null)));
+    if (box && box.width > 20 && box.height > 20) return box;
+  }
+  return null;
+});
+
+function widgetCheckbox(box: FrameBox, viewport: unknown): DetectedChallenge["checkbox"] {
+  const size = recordValue(viewport);
+  const width = numberValue(size?.width);
+  const height = numberValue(size?.height);
+  if (box.width < 200 || box.width > 420 || box.height < 50 || box.height > 100) return null;
+  if (box.left < 0 || box.top < 0 || box.left + box.width > width || box.top + box.height > height) return null;
+  return { x: Math.round(box.left + 28), y: Math.round(box.top + box.height / 2) };
+}
+
+export const detectChallenge = Effect.fn("Browser.detectChallenge")(function* (
+  contents: WebContents,
+  send: SendCommand,
+  childFrameIds: readonly string[] = [],
+) {
+  if (contents.isDestroyed()) return null;
+  const url = contents.getURL();
+  if (!url.startsWith("https://") && !url.startsWith("http://")) return null;
+  return yield* Effect.gen(function* () {
+    const contextId = yield* automationContextId(send);
+    const result = yield* send("Runtime.evaluate", { expression: CHALLENGE_SCRIPT, contextId, returnByValue: true });
+    const value = isDynamicRecord(result.result) ? result.result.value : undefined;
+    const detected = readChallenge(value);
+    if (!detected || !isDynamicRecord(value) || value.turnstileField !== true || detected.puzzle) return detected;
+    const box = yield* turnstileFrameBox(send, childFrameIds);
+    if (!box) return detected.signal === "turnstile-field" ? null : detected;
+    return { ...detected, checkbox: widgetCheckbox(box, value.viewport) };
+  }).pipe(
+    Effect.timeoutOption(CHECK_TIMEOUT_MS),
+    Effect.map((option) => Option.getOrNull(option)),
+    Effect.catch(() => Effect.succeed(null)),
+  );
+});
+
+const NEEDS_USER_NEXT =
+  "A person must pass this security check. Do not reload, click, or try to solve it. Call request_takeover so the user solves it; in a routine run, report it.";
+
+const HTTP_SIGN_IN_NEXT =
+  "The site asks for a username and password in its own sign-in prompt, not in the page, so the page has no fields to fill. Call request_takeover: the user types them in the sign-in box of the browser. Never ask for them in chat. In a routine run, report the sign-in requirement.";
+
+export function httpSignInChallenge(): BrowserChallenge {
+  return { vendor: "http-sign-in", status: "needs-user", waitedMs: 0, next: HTTP_SIGN_IN_NEXT };
+}
+
+export function describeChallenge(
+  detected: DetectedChallenge | null,
+  clearedVendor: string | null,
+  waitedMs: number,
+  checking = false,
+  clickOnce: DetectedChallenge["checkbox"] = null,
+  afterTakeover = false,
+): BrowserChallenge | undefined {
+  if (detected?.kind === "block")
+    return {
+      vendor: detected.vendor,
+      status: "blocked",
+      waitedMs,
+      next: "The site's bot protection refuses this browser. Do not reload or retry; report it to the user.",
+    };
+  if (detected?.kind === "non-interactive" && checking)
+    return {
+      vendor: detected.vendor,
+      status: "checking",
+      waitedMs,
+      next: "The security check is still running. Do not reload or click it; call snapshot, which waits for it.",
+    };
+  if (detected && afterTakeover)
+    return {
+      vendor: detected.vendor,
+      status: "blocked",
+      waitedMs,
+      next: "The user took over this tab, and the security check is still here: the site refuses this browser, often because of its network address. Do not reload, retry, or call request_takeover for it again unless the user asks. In one plain sentence, tell the user that the site blocks this browser.",
+    };
+  if (detected && clickOnce)
+    return {
+      vendor: detected.vendor,
+      status: "click-once",
+      waitedMs,
+      target: { kind: "point", x: clickOnce.x, y: clickOnce.y },
+      next: "This check can pass with one click on its checkbox. Call click with target, then call snapshot, which waits for the check. Click it only once, and do not reload or solve a puzzle. If the check stays, call request_takeover so the user solves it; in a routine run, report it.",
+    };
+  if (detected) return { vendor: detected.vendor, status: "needs-user", waitedMs, next: NEEDS_USER_NEXT };
+  if (clearedVendor)
+    return {
+      vendor: clearedVendor,
+      status: "cleared",
+      waitedMs,
+      next: "The security check passed while OpenBot waited. Continue with this snapshot.",
+    };
+  return undefined;
+}

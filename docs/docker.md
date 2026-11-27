@@ -28,6 +28,17 @@ docker run -d --name openbot --restart unless-stopped \
 docker exec -it openbot openbot login
 ```
 
+These commands get the files from `main` and run `latest`. To pin a release (see [Tags](#tags)),
+get the files of the same release tag, and use its version in the image. For example, for 0.76.1:
+
+```sh
+curl -fsSLO https://raw.githubusercontent.com/nightly-labs/openbot/v0.76.1/docker/compose.yaml
+curl -fsSLO https://raw.githubusercontent.com/nightly-labs/openbot/v0.76.1/docker/seccomp.json
+```
+
+Then set `image: ghcr.io/nightly-labs/openbot:0.76.1` in `compose.yaml`, or use
+`ghcr.io/nightly-labs/openbot:0.76.1` in `docker run`.
+
 `openbot login` asks for your email and the code that OpenBot sends to it. An operator who sets up
 the container for somebody else can use `openbot login --claim` instead (see
 [server claims](self-hosted-server.md#sign-in-with-a-server-claim)). After the sign-in, the
@@ -55,7 +66,8 @@ For Amazon ECS, see [AWS ECS](aws-ecs.md).
 
 The container publishes no port. OpenBot only connects out: to the account server, to the providers,
 and to Signal and TURN for remote use. The Team API listens on `127.0.0.1` in the container.
-The container does not serve a web interface. After `openbot login`, use
+The container does not serve a web interface, except the setup page of
+`OPENBOT_SETUP_PAGE_PORT` (see [Umbrel](umbrel.md#the-setup-page)). After `openbot login`, use
 [`openbot.run/app`](https://openbot.run/app) with the same account to select the server. A web
 client at your own origin is not included in this image. The
 [self-hosted account service](self-hosting.md#what-changes) is a separate deployment with its own
@@ -111,7 +123,13 @@ that user and keep everything there:
 | `/data/.config/OpenBot` | The database `openbot.db`, logs, the downloaded provider runtimes and the browser data. |
 | `/data/OpenBot` | The agent workspaces (`Agents`), `Shared` and `Downloads`. |
 | `/data/.local/share/keyrings`, `/data/.config/openbot-container` | The keyring and its password. The keyring has the key of the encrypted data in `/data`. |
+| `/data/.local/bin` | Programs that you or agents install, for example with `uv` or `pipx`. The image puts this folder on `PATH`. |
 | Other files in `/data` | Provider sign-ins and the files of agent tools, for example `~/.codex` and `~/.claude`. |
+
+An update makes a new container from the new image, so a package that you install outside `/data`,
+for example with `apt-get`, goes away. Install tools as the user `openbot` into `~/.local`. For
+example, `curl -LsSf https://astral.sh/uv/install.sh | sh`, then `~/.local/bin/uv python install`,
+gives agents a Python that stays after updates.
 
 Keep `/data` as one unit. The encrypted data cannot open without the keyring, and the keyring cannot
 open without its password file. Use one volume for one container at a time.
@@ -368,6 +386,17 @@ the backup. When it has less, copy the old data to another disk, delete it from
 
 ## Upgrades
 
+When OpenBot cannot start, for example after a failed start of a new image, it stops its start loop
+and runs its safe mode: each member's app shows why the server does not start and which version it
+runs. The safe mode opens no database. After one hour it exits, and the restart policy starts the
+container again. A newer image is the fix. See [hosted servers](hosted-servers.md#start-loop).
+
+The entrypoint also starts the [watchdog](hosted-servers.md#watchdog) of the hosted servers. When
+main stops updating its heartbeat file for 10 minutes, for example because its main thread is
+blocked, the watchdog stops OpenBot with `SIGKILL`. The container then exits, and the restart policy
+starts it again. A blocked main thread cannot answer `docker stop`, so without the watchdog the
+container stayed running and did not answer until someone restarted it.
+
 OpenBot does not update itself in a container. A new image replaces it. An instance of
 `docker/instances` can ask the host for that from the app, see
 [Updates from the app](#updates-from-the-app). Do not go back to an older tag: an older OpenBot cannot
@@ -444,9 +473,11 @@ environment of OpenBot, so they can read these values.
 | Variable | Use |
 | --- | --- |
 | `XAI_API_KEY`, `CURSOR_API_KEY`, `CLINE_API_KEY` | A provider API key. |
-| `OPENBOT_CODEX_PATH`, `OPENBOT_CLAUDE_PATH`, `OPENBOT_GROK_PATH`, `OPENBOT_OPENCODE_PATH`, `OPENBOT_CURSOR_PATH`, `OPENBOT_CLINE_PATH`, `OPENBOT_KIMI_PATH`, `OPENBOT_DEVIN_PATH`, `OPENBOT_ANTIGRAVITY_PATH`, `OPENBOT_PI_PATH`, `OPENBOT_MUSE_PATH` | Another provider executable. Mount it read-only in the container. |
+| `OPENBOT_CODEX_PATH`, `OPENBOT_CLAUDE_PATH`, `OPENBOT_GROK_PATH`, `OPENBOT_OPENCODE_PATH`, `OPENBOT_CURSOR_PATH`, `OPENBOT_CLINE_PATH`, `OPENBOT_KIMI_PATH`, `OPENBOT_DEVIN_PATH`, `OPENBOT_COPILOT_PATH`, `OPENBOT_MISTRAL_PATH`, `OPENBOT_ANTIGRAVITY_PATH`, `OPENBOT_PI_PATH`, `OPENBOT_MUSE_PATH`, `OPENBOT_HERMES_PATH` | Another provider executable. Mount it read-only in the container. With `OPENBOT_HERMES_PATH`, OpenBot does not offer the Hermes download. |
 | `OPENBOT_AUTH_API_URL` | Another account server, for example a [self-hosted account service](self-hosting.md). |
+| `OPENBOT_REMOTE_SIGNAL_URL` | The Signal of a [self-hosted account service](self-hosting.md#4-start-the-app), as a `wss:` URL. Set it together with `OPENBOT_AUTH_API_URL`. Without that variable, OpenBot does not start. |
 | `OPENBOT_DISPLAY_SIZE` | The size of the virtual display that computer use reads, as `WIDTHxHEIGHT` from 640x480 to 2576x2576. The default is 1280x800. A value that is not valid writes a warning in `docker logs`, and the container starts with 1280x800. See [Display size](self-hosted-server.md#display-size) for when to use 1920x1080. `docker/instances/compose.yaml` does not pass it, so an instance uses 1280x800. |
+| `OPENBOT_SETUP_PAGE_PORT` | A port from 1024 to 65535 for the [setup page](umbrel.md#the-setup-page), which signs the server in from a browser. The Umbrel app sets it. Publish the port only behind a proxy that asks for a password: any client that reaches it can sign in a server that is signed out. |
 
 ## Security
 
@@ -459,12 +490,19 @@ environment of OpenBot, so they can read these values.
 - **Not root.** The image runs as UID 1000. Root owns the release, so agents cannot change it. The
   release has no SUID file. `no-new-privileges` keeps it that way.
 - **Agents have full access in the container.** They run commands, change all of `/data` and use the
-  network. The container is the boundary. Do not mount the Docker socket, your home folder or another
+  network. The container is the boundary. All agents run as UID 1000, so an agent can read the files
+  and processes of the other agents, also the API key files of a Vault key that is for other agents.
+  Put agents that must not share keys in different containers. Do not mount the Docker socket, your home folder or another
   host folder that agents must not change.
-- **Check the image.** Each release image has a build provenance attestation:
+- **Check the image.** Each release image has a build provenance attestation from the release
+  workflow. This command accepts only an attestation that this workflow made for the tag of that
+  release:
 
   ```sh
-  gh attestation verify oci://ghcr.io/nightly-labs/openbot:<version> --repo nightly-labs/openbot
+  gh attestation verify oci://ghcr.io/nightly-labs/openbot:<version> \
+    --repo nightly-labs/openbot \
+    --signer-workflow nightly-labs/openbot/.github/workflows/release.yml \
+    --source-ref refs/tags/v<version>
   ```
 
 ## How it works
@@ -480,7 +518,8 @@ that it can make a user namespace, starts D-Bus, two virtual displays and the ke
 becomes OpenBot with `OPENBOT_SERVER=1`. OpenBot shows its windows on `:0`, at 1280x800. The agents
 work on `:1`, at the size of `OPENBOT_DISPLAY_SIZE`, which the script names in
 `OPENBOT_AGENT_DISPLAY`. Computer Use and remote desktop use `:1`, so they do not show the OpenBot
-window. On a stop, tini gives the signal to OpenBot and waits for it.
+window. `:1` has a window manager (Openbox, from `openbot-desktop`), which tini adopts as it adopts
+Xvfb. On a stop, tini gives the signal to OpenBot and waits for it.
 `/opt/OpenBot/hosted/mode` is `container`, so the `openbot` command talks to the control socket and
 does not use systemd.
 
@@ -511,7 +550,14 @@ does not use systemd.
   bridge network connected in 2.0 to 2.6 s and host networking in 2.0 to 2.4 s.
 - The two displays of the entrypoint were tested with a stand-in for OpenBot: `:0` is 1280x800 and
   `:1` has the display size. Computer Use and remote desktop on `:1` were not tested.
+- The Openbox desktop on `:1` was tested in Ubuntu 24.04 and 26.04 containers (arm64) with the
+  steps of `openbot-container` and a stand-in for OpenBot: the background, the menu, the terminal
+  and the file manager, focus, Alt+Tab, Alt+F4, title bar drag, maximize, the close button, and a
+  restart after a kill. The image itself was not built with it.
 - Not tested: a Codex agent with Workspace only access in a container. Codex runs its commands in
   bubblewrap, which mounts its root in a user namespace. The seccomp profile allows `mount` only with
   `CAP_SYS_ADMIN` and always refuses `pivot_root`, and the `docker-default` AppArmor profile refuses
-  `mount`, so these commands can fail. An agent with Full access does not use bubblewrap.
+  `mount`, so these commands can fail. A user report confirms the failure
+  (`bwrap: Failed to make / slave: Operation not permitted`, #9694). The chat then shows a warning
+  that tells the user to choose Ask first or Full access. Agents with these two options do not use
+  bubblewrap.

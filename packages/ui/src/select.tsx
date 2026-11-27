@@ -76,7 +76,6 @@ export function SelectValue<Option>(props: SelectValueProps<Option>): JSX.Elemen
 export type SelectContentProps = PolymorphicProps<"div", SelectPrimitive.SelectContentProps<"div">> &
   Pick<ComponentProps<"div">, "class"> & {
     mount?: Element | undefined;
-    /** Under the options and outside the listbox, such as a form that adds an option. */
     footer?: JSX.Element;
   };
 
@@ -123,18 +122,21 @@ export function SelectItem(props: SelectItemProps): JSX.Element {
   );
 }
 
-/** "new_york", "new york" and "America/New-York" match each other. */
+export type SelectSectionProps = PolymorphicProps<"li", SelectPrimitive.SelectSectionProps<"li">> &
+  Pick<ComponentProps<"li">, "class" | "children">;
+
+export function SelectSection(props: SelectSectionProps): JSX.Element {
+  const others = omit(props, "class");
+  return <SelectPrimitive.Section class={cx("ui-select-section", props.class)} {...others} />;
+}
+
 const searchText = (text: string) =>
   text
     .toLowerCase()
     .replace(/[\s_/-]+/g, " ")
     .trim();
 
-/**
- * Makes the current value the active row when the list opens, as `Select` does: it scrolls into
- * view, the arrow keys move from it, and Enter keeps it.
- */
-function ActiveCurrentRow(props: { key: string }) {
+export function ActiveCurrentRow(props: { key: string }) {
   const context = useComboboxContext();
   onSettled(() => context.listState().selectionManager().setFocusedKey(props.key));
   return null;
@@ -142,35 +144,22 @@ function ActiveCurrentRow(props: { key: string }) {
 
 export interface SearchSelectProps<Option> {
   options: Option[];
-  /** Null when the list is an action, such as "Add backup model": no row is the current value. */
   value: Option | null;
   onChange: (option: Option) => void;
-  /** The text of the trigger and of a row. */
   label: (option: Option) => string;
-  /** A key that is unique in the list. The default is `String(option)`. */
   optionValue?: (option: Option) => string;
-  /** The text that the search reads. The default is `label`. */
   optionTextValue?: (option: Option) => string;
-  /** The content of a row. The default is `label`. */
   itemContent?: (option: Option) => JSX.Element;
-  /** The content of the trigger in place of the value. */
   children?: JSX.Element;
   class?: string | undefined;
   disabled?: boolean | undefined;
   placement?: PopoverRootProps["placement"];
   mount?: Element | undefined;
   size?: "sm" | "md" | undefined;
-  /** The id of the setting's label. The trigger adds its value to the name. */
   "aria-labelledby"?: string | undefined;
-  /** The name of the trigger and the list when no label element names them. */
   "aria-label"?: string | undefined;
 }
 
-/**
- * A select for a long list, such as the timezones: the open list has a search field at the top.
- * Typing filters the rows, the arrows move through them, Enter takes the active row or the first
- * match, and Escape closes the list. The trigger looks as `SelectTrigger` does.
- */
 export function SearchSelect<Option>(props: SearchSelectProps<Option>): JSX.Element {
   const { t } = useText();
   const [open, setOpen] = createSignal(false);
@@ -178,8 +167,6 @@ export function SearchSelect<Option>(props: SearchSelectProps<Option>): JSX.Elem
   const valueId = `ui-search-select-value-${createUniqueId()}`;
   let input: HTMLInputElement | undefined;
   const press = createPressedPopupCue();
-  // Kobalte finds a row with an unescaped `[data-key="…"]` selector, to scroll it into view and to
-  // name the active row. A key with `"`, `\` or U+0000 matches no row, so the key is encoded.
   const key = (option: Option) => encodeURIComponent(props.optionValue?.(option) ?? String(option));
   const isCurrent = (option: Option) => props.value !== null && key(option) === key(props.value);
   const matches = createMemo(() => {
@@ -188,8 +175,6 @@ export function SearchSelect<Option>(props: SearchSelectProps<Option>): JSX.Elem
     const read = props.optionTextValue ?? props.label;
     return props.options.filter((option) => searchText(read(option)).includes(text));
   });
-  // Kobalte keys a string or number row by its text and skips `optionValue`, but it finds the chosen
-  // option with `optionValue`. So each row is an object, and Kobalte reads its key from `optionValue`.
   const rows = createMemo(() => matches().map((option) => ({ option })));
   const choose = (option: Option) => {
     setOpen(false);
@@ -217,7 +202,6 @@ export function SearchSelect<Option>(props: SearchSelectProps<Option>): JSX.Elem
           }
           disabled={props.disabled}
           onKeyDown={(event: KeyboardEvent) => {
-            // The arrow keys open the list, as on `SelectTrigger`.
             if (event.key !== "ArrowDown" && event.key !== "ArrowUp") return;
             event.preventDefault();
             toggle(true);
@@ -266,7 +250,6 @@ export function SearchSelect<Option>(props: SearchSelectProps<Option>): JSX.Elem
                 data-slot="select-item"
                 data-cuelume-select=""
                 data-checked={isCurrent(item.item.rawValue.option) ? "" : undefined}
-                // The combobox has no selection, so the search field starts empty. The row says it is the value.
                 aria-selected={isCurrent(item.item.rawValue.option) ? "true" : "false"}
               >
                 <Combobox.ItemLabel class="ui-select-item-label">
@@ -294,7 +277,6 @@ export function SearchSelect<Option>(props: SearchSelectProps<Option>): JSX.Elem
                 autocapitalize="none"
                 spellcheck={false}
                 onKeyDown={(event: KeyboardEvent) => {
-                  // After typing, no row is active: then Enter takes the first match.
                   if (event.key !== "Enter" || event.isComposing || !searchText(query())) return;
                   if (input?.getAttribute("aria-activedescendant")) return;
                   const [first] = matches();

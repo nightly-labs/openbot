@@ -1,10 +1,3 @@
-// Checks hourly routines between two times that cross midnight (#2922). Each draft goes through the
-// shared draft conversion, the real routine store on a temporary SQLite file, and the real cron
-// schedule. The runs must match the window, and the saved schedule must read back as the same draft.
-// The days of a run are the days of its own date, as cron checks them.
-//
-// Run: bun scripts/routine-overnight-window-e2e.ts
-// Writes .openbot-build/routine-overnight-window-e2e/report.json and exits non-zero on a failure.
 import assert from "node:assert/strict";
 import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
@@ -30,12 +23,10 @@ interface WindowCase {
   draft: HourlyDraft;
   cron: string;
   runsPerDay: number;
-  /** The draft the saved schedule reads back as. A window end moves to its last run. */
   readBack: HourlyDraft;
 }
 
 const OUT = resolve(import.meta.dirname, "../.openbot-build/routine-overnight-window-e2e");
-// A Monday, so a Monday-to-Friday window has a Saturday and a Sunday in the 7 days checked.
 const START = new Date("2035-01-01T00:00:00.000Z");
 const DAYS_CHECKED = 7;
 const MINUTE_MS = 60_000;
@@ -110,7 +101,6 @@ const cases: WindowCase[] = [
   },
 ];
 
-/** The runs a window gives in the checked days, from its own rule: steps from the start, on the days of each run's date. */
 function expectedRuns(draft: HourlyDraft): string[] {
   const window = draft.window;
   assert.ok(window);
@@ -121,7 +111,6 @@ function expectedRuns(draft: HourlyDraft): string[] {
   const start = minutes(window.start);
   const end = minutes(window.end) < start ? minutes(window.end) + 24 * 60 : minutes(window.end);
   const runs: string[] = [];
-  // The window of the day before the first day can have runs after its midnight.
   for (let day = -1; day < DAYS_CHECKED; day += 1) {
     for (let offset = start; offset <= end; offset += draft.everyHours * 60) {
       const run = new Date(START.getTime() + (day * 24 * 60 + offset) * MINUTE_MS);
@@ -160,13 +149,11 @@ try {
         timezone: "UTC",
         schedule: routineScheduleFromDraft(fixture.draft),
       },
-      // Just before the checked days, so the first run is the first one inside them.
       new Date(START.getTime() - MINUTE_MS),
     );
     return { fixture, routine };
   });
 
-  // Reads come from the reopened SQLite file, not from the rows the create returned.
   database.close();
   await Effect.runPromise(database.initialize());
   const reopened = new AgentRoutineStore(database);
@@ -198,7 +185,6 @@ try {
       report.runs = runs.length;
       report.firstRuns = runs.slice(0, 6);
       assert.deepEqual(routineScheduleToDraft(schedule), fixture.readBack);
-      // A second save of the read-back draft writes the same cron, so an edit does not move the runs.
       assert.deepEqual(routineScheduleFromDraft(fixture.readBack), schedule);
       report.passed = true;
     } catch (error) {

@@ -18,7 +18,7 @@ export const messages = defineMessages("mobile.onboarding", {
   "mobile.onboarding.server.invitationBody": "Join a server that someone shared with you.",
   "mobile.onboarding.server.computerTitle": "Connect your computer",
   "mobile.onboarding.server.computerSteps":
-    "Sign out on this phone. Then open OpenBot on your computer, go to Settings → Mobile Connect, choose Generate QR code and scan it with this phone.",
+    "Sign out on this phone. Then open OpenBot on your computer, go to Settings → Mobile Connect, choose Add phone → Yes, sign in, and scan the code with this phone.",
   "mobile.onboarding.server.signOut": "Sign out",
   "mobile.onboarding.server.connecting": "Connecting to {name}…",
   "mobile.onboarding.agent.title": "Pick your first agent",
@@ -62,6 +62,7 @@ export const messages = defineMessages("mobile.onboarding", {
   "mobile.onboarding.task.creating": "Creating…",
   "mobile.onboarding.task.withoutTask": "Create without a task",
   "mobile.onboarding.task.failed": "Could not create the agent. Try again.",
+  "mobile.onboarding.task.sendFailed": "Your first task was not sent. Send it in the chat.",
   "mobile.onboarding.idea.builder1": "Make a small to-do list web app.",
   "mobile.onboarding.idea.builder2": "Explain how Git branches work, with examples.",
   "mobile.onboarding.idea.builder3": "Write a script that sorts my photos by date.",

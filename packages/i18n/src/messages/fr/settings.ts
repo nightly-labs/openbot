@@ -2,11 +2,9 @@ import type { PartialTranslation } from "../../message";
 import type { messages as source } from "../en/settings";
 
 export const messages = {
-  // The language setting itself.
   "settings.language.title": "Langue",
   "settings.language.description": "OpenBot affiche les menus, les boutons et les messages dans cette langue.",
   "settings.language.system": "Langue du système",
-  // The logo color setting, General tab.
   "settings.appearance.title": "Apparence",
   "settings.appearance.theme.title": "Thème",
   "settings.appearance.theme.description":
@@ -19,6 +17,22 @@ export const messages = {
     "Affiche le bureau flouté derrière la fenêtre. Les sites et les menus suivent alors le thème de l’app.",
   "settings.interfaceSize.title": "Taille de l’interface",
   "settings.interfaceSize.description": "La taille du texte et des commandes dans OpenBot.",
+  "settings.interfaceFont.title": "Police de l’interface",
+  "settings.interfaceFont.description": "La police des menus, des discussions et des réglages.",
+  "settings.interfaceFont.default": "Par défaut (Inter)",
+  "settings.interfaceFont.defaultSystem": "Police système",
+  "settings.codeFont.title": "Police du code",
+  "settings.codeFont.description": "La police du code, des terminaux et des chemins de fichier.",
+  "settings.codeFont.default": "Par défaut",
+  "settings.motion.title": "Mouvement",
+  "settings.backgroundBlur.title": "Flou d’arrière-plan",
+  "settings.backgroundBlur.description":
+    "Flou derrière les menus et les dialogues. Désactivé au départ sur un ordinateur sans GPU.",
+  "settings.movingFaces.title": "Visages d’agents animés",
+  "settings.movingFaces.description":
+    "Les visages des agents clignent et bougent. Immobiles au départ sur un ordinateur sans GPU.",
+  "settings.startupAnimation.title": "Animation de démarrage",
+  "settings.startupAnimation.description": "Affiche l’animation des agents pendant l’ouverture d’OpenBot.",
   "settings.logoColor.title": "Couleur du logo",
   "settings.logoColor.description": "Affichée dans le Dock, la barre des tâches et l’îlot dynamique.",
   "settings.logoColor.buildNote":
@@ -33,7 +47,52 @@ export const messages = {
   "settings.logoColor.beige": "Beige",
   "settings.logoColor.gray": "Gris",
   "settings.logoColor.white": "Blanc",
-  // The Settings window, General tab.
+  "settings.chatBackground.title": "Arrière-plan du chat",
+  "settings.chatBackground.description":
+    "Chaque thème garde sa propre couleur. Une couleur qui rend le texte difficile à lire devient plus foncée ou plus claire.",
+  "settings.chatBackground.light": "Arrière-plan du chat en thème Clair",
+  "settings.chatBackground.dark": "Arrière-plan du chat en thème Sombre",
+  "settings.chatBackground.default": "Par défaut",
+  "settings.chatBackdrop.title": "Arrière-plan de la fenêtre",
+  "settings.chatBackdrop.description":
+    "Une scène, une image, un GIF ou une vidéo derrière toute la fenêtre sur cet appareil. Demandez une scène à un agent, puis choisissez « Utiliser comme arrière-plan » sur sa réponse.",
+  "settings.chatBackdrop.none": "Aucun",
+  "settings.chatBackdrop.pond": "Bassin à koïs",
+  "settings.chatBackdrop.jellyfish": "Méduses",
+  "settings.chatBackdrop.sunset": "Coucher de soleil rétro",
+  "settings.chatBackdrop.snowfall": "Chute de neige",
+  "settings.chatBackdrop.fireflies": "Lucioles",
+  "settings.chatBackdrop.coast": "Côte néon",
+  "settings.chatBackdrop.upload": "Importer…",
+  "settings.chatBackdrop.uploadRefused":
+    "Utilisez une image PNG, JPEG, GIF, WebP ou AVIF de 20 Mo au plus, ou une vidéo MP4 ou WebM de 100 Mo au plus.",
+  "settings.chatBackdrop.saveFailed": "L’arrière-plan n’a pas été enregistré.",
+  "settings.chatBackdrop.removeFailed": "L’arrière-plan n’a pas été supprimé.",
+  "settings.chatColor.title": "Couleur du chat",
+  "settings.chatColor.description": "Teinte les bulles de vos messages. Les personnes de vos serveurs la voient aussi.",
+  "settings.chatColor.yours": "Votre couleur de chat",
+  "settings.chatColor.agentLabel": "Couleur de chat de {name}",
+  "settings.chatColor.none": "Aucune",
+  "settings.chatColor.noColor": "Aucune couleur",
+  "settings.chatColor.area": "Saturation et luminosité",
+  "settings.chatColor.areaValue": "Saturation {saturation} %, luminosité {brightness} %",
+  "settings.chatColor.hue": "Teinte",
+  "settings.chatColor.hueValue": "{degrees} degrés",
+  "settings.chatColor.eyeDropper": "Choisir une couleur à l’écran",
+  "settings.chatColor.hex": "Couleur hexadécimale",
+  "settings.chatColor.format": "Format {format}, passer à {next}",
+  "settings.chatColor.presets": "Couleurs prédéfinies",
+  "settings.chatColor.saturation": "Saturation",
+  "settings.chatColor.lightness": "Luminance",
+  "settings.chatColor.red": "Rouge",
+  "settings.chatColor.green": "Vert",
+  "settings.chatColor.blue": "Bleu",
+  "settings.bubbleStyle.title": "Vos bulles",
+  "settings.bubbleStyle.description":
+    "Dans une discussion avec un agent, vos bulles prennent la couleur de l'agent. Vous seul la voyez.",
+  "settings.bubbleStyle.solid": "Plein",
+  "settings.bubbleStyle.tint": "Teinte",
+  "settings.bubbleStyle.classic": "Classique",
   "settings.appBehavior.title": "Comportement de l’application",
   "settings.conversations.title": "Conversations",
   "settings.launchAtLogin.title": "Lancer OpenBot à l’ouverture de session",
@@ -50,10 +109,15 @@ export const messages = {
     "Garder l’ordinateur éveillé aussi sur batterie. La batterie se décharge plus vite.",
   "settings.restoreWorkspace.title": "Restaurer le dernier espace de travail au lancement",
   "settings.restoreWorkspace.description": "Rouvrir l’espace de travail et les tâches de votre session précédente.",
+  "settings.quitGuard.title": "Maintenir ⌘Q pour quitter",
+  "settings.quitGuard.description":
+    "Maintenez ⌘Q ou appuyez deux fois pour quitter. Avec « Jamais », un seul ⌘Q quitte et arrête les agents.",
+  "settings.quitGuard.working": "Quand des agents travaillent",
+  "settings.quitGuard.always": "Toujours",
+  "settings.quitGuard.never": "Jamais",
   "settings.externalLinks.title": "Ouvrir les liens externes dans",
   "settings.externalLinks.description":
-    "Les liens des discussions, des pages de connexion et de facturation s’ouvrent ici.",
-  // The two link targets. The saved value stays in English; only the label is translated.
+    "Les liens des discussions, des pages de connexion et de facturation s’ouvrent ici. Avec OpenBot, seuls les liens des discussions de la fenêtre principale avec des agents de cet ordinateur s’ouvrent dans OpenBot. Les autres liens s’ouvrent dans le navigateur par défaut.",
   "settings.externalLinks.defaultBrowser": "Navigateur par défaut",
   "settings.externalLinks.openbot": "OpenBot",
   "settings.externalLinks.defaultBrowserNamed": "Navigateur par défaut ({name})",
@@ -67,15 +131,20 @@ export const messages = {
   "settings.sendShortcut.title": "Raccourci d’envoi",
   "settings.sendShortcut.description":
     "Choisissez les touches qui envoient un message sur cet appareil et dans ce navigateur.",
+  "settings.chatOrder.description":
+    "Choisissez comment la barre latérale trie les discussions sur cet appareil. Manuel et Activité récente désactivent le groupe Non lues.",
   "settings.sendShortcut.enter": "Entrée pour envoyer",
   "settings.sendShortcut.modEnterMac": "⌘Entrée pour envoyer",
   "settings.sendShortcut.modEnterWin": "Ctrl+Entrée pour envoyer",
   "settings.showAgentSteps.title": "Afficher les étapes de l’agent",
   "settings.showAgentSteps.description":
     "Ouvre par défaut la réflexion, les étapes d’outils et les changements de souvenirs de chaque tour sur cet appareil et ce navigateur.",
+  "settings.compactMessageActions.title": "Actions de message compactes",
+  "settings.compactMessageActions.description":
+    "Affiche Réagir, Répondre et Plus à côté d’un message, et l’heure entre les messages. Désactivé, toutes les actions et l’heure s’affichent sous chaque message.",
   "settings.busyMessage.title": "Orienter les agents pendant leur travail",
   "settings.busyMessage.description":
-    "Les nouveaux messages rejoignent le travail en cours de l’agent, pas la file. Fonctionne avec ChatGPT et Claude.",
+    "Les nouveaux messages rejoignent le travail en cours de l’agent, pas la file. Avec les agents qui ne le permettent pas, ils attendent dans la file.",
   "settings.agentDefaults.title": "Valeurs par défaut",
   "settings.agentDefaults.description": "Les agents suivent ces valeurs, sauf si vous les modifiez pour un agent.",
   "settings.agentDefaults.value": "Par défaut : {value}",
@@ -93,6 +162,32 @@ export const messages = {
   "settings.agentDefaults.setAllLabel": "Régler {setting} pour tous les agents",
   "settings.agentDefaults.agentLabel": "{setting} pour {agent}",
   "settings.agentDefaults.loadFailed": "Impossible de lire les agents.",
+  "settings.commitCoAuthor.sectionTitle": "Commits Git",
+  "settings.commitCoAuthor.title": "Créditer OpenBot dans les commits",
+  "settings.commitCoAuthor.description":
+    "Les agents ajoutent OpenBot comme coauteur de leurs commits. Vous restez l’auteur.",
+  "settings.planStart.title": "Démarrer le travail",
+  "settings.planStart.wait": "Quand j’appuie sur Démarrer",
+  "settings.planStart.after": "Après {time}",
+  "settings.planStart.custom": "Personnalisé…",
+  "settings.planStart.waitNote": "Le plan attend que vous appuyiez sur Démarrer. Vous recevez une notification.",
+  "settings.planStart.afterNote": "Le travail commence après {time}, ou quand vous appuyez sur Démarrer.",
+  "settings.planStart.customTitle": "Durée personnalisée",
+  "settings.planStart.customPrefix": "Après",
+  "settings.planStart.amountLabel": "Délai avant le début du travail",
+  "settings.planStart.unitLabel": "Unité",
+  "settings.planStart.seconds": "s",
+  "settings.planStart.minutes": "min",
+  "settings.planStart.customHint": "Au moins 5 secondes.",
+  "settings.planStart.customInvalid": "Saisissez un nombre entier d’au moins 5 secondes.",
+  "settings.planStart.set": "Définir",
+  "settings.automationLimit.sectionTitle": "Limite",
+  "settings.automationLimit.sectionDescription": "Elle s’applique à tous les agents de cet ordinateur.",
+  "settings.automationLimit.sectionDescriptionServer": "Elle s’applique à tous les agents de ce serveur.",
+  "settings.automationLimit.title": "Requêtes par heure",
+  "settings.automationLimit.option": "{limit} par heure",
+  "settings.automationLimit.note":
+    "Le nombre maximal de messages et d’exécutions de routines que les scripts locaux peuvent envoyer à chaque agent en une heure.",
   "settings.backgroundProcesses.title": "Processus en arrière-plan",
   "settings.backgroundProcesses.description":
     "Programmes que les agents ont lancés et laissés en marche, comme des serveurs de développement. Ils continuent après la fin du chat et quand vous quittez OpenBot.",
@@ -152,8 +247,15 @@ export const messages = {
   "settings.soundTheme.play": "Écouter {name}",
   "settings.notch.title": "Comportement",
   "settings.notch.show.title": "Afficher l’état dans l’encoche du MacBook",
+  "settings.notch.show.titleTopOfScreen": "Afficher l’état en haut de l’écran",
   "settings.notch.show.description":
     "Afficher l’activité des agents et les éléments nécessitant votre attention en haut de chaque écran.",
+  "settings.notch.xwayland.title": "Redémarrage requis",
+  "settings.notch.xwayland.description":
+    "Sous Wayland, OpenBot doit utiliser XWayland pour afficher l’îlot dynamique au-dessus des autres apps. D’ici là, l’îlot ne s’affiche pas.",
+  "settings.notch.xwayland.unsupported":
+    "Sur ce bureau Wayland, l’îlot dynamique ne peut pas s’afficher au-dessus des autres apps.",
+  "settings.notch.xwayland.restart": "Redémarrer",
   "settings.notch.idle.title": "Afficher l’îlot au repos",
   "settings.notch.idle.description": "Afficher le logo OpenBot et un message d’accueil lorsqu’aucun état n’est actif.",
   "settings.notch.displays.title": "Afficher sur les écrans supplémentaires",
@@ -171,14 +273,59 @@ export const messages = {
   "settings.notch.size.height": "Hauteur",
   "settings.notch.size.previewNotch": "Écran intégré",
   "settings.notch.size.previewIsland": "Écran externe",
+  "settings.agentDock.title": "Comportement",
+  "settings.agentDock.show.title": "Afficher le dock des agents",
+  "settings.agentDock.show.description": "Affiche vos agents sur le bord de l’écran, prêts pour une discussion rapide.",
+  "settings.agentDock.placement.title": "Position",
+  "settings.agentDock.placement.description":
+    "« Au-dessus des autres apps » garde le dock à l’écran quand OpenBot est en arrière-plan.",
+  "settings.agentDock.placement.screen": "Au-dessus des autres apps",
+  "settings.agentDock.placement.window": "Dans la fenêtre OpenBot",
+  "settings.agentDock.xwayland.title": "Redémarrage requis",
+  "settings.agentDock.xwayland.description":
+    "Sous Wayland, OpenBot doit utiliser XWayland pour afficher le dock au-dessus des autres apps. D’ici là, le dock s’affiche dans la fenêtre OpenBot.",
+  "settings.agentDock.xwayland.unsupported":
+    "Sur ce bureau Wayland, le dock ne peut pas s’afficher au-dessus des autres apps. Il s’affiche dans la fenêtre OpenBot.",
+  "settings.agentDock.xwayland.restart": "Redémarrer",
+  "settings.agentDock.noCompositor.title": "Dans la fenêtre OpenBot",
+  "settings.agentDock.noCompositor.description":
+    "Votre bureau ne peut pas afficher de fenêtres transparentes : le dock s’affiche donc dans la fenêtre OpenBot. Pour l’afficher au-dessus des autres apps, activez les effets de bureau (un compositeur) dans les réglages du système, puis redémarrez OpenBot.",
+  "settings.agentDock.display.title": "Écran",
+  "settings.agentDock.display.description":
+    "Si cet écran n’est pas connecté, le dock passe sur l’écran de la fenêtre OpenBot.",
+  "settings.agentDock.display.window": "Avec la fenêtre OpenBot",
+  "settings.agentDock.display.primary": "Écran principal",
+  "settings.agentDock.display.all": "Tous les écrans",
+  "settings.agentDock.display.unnamed": "Écran {number}",
+  "settings.agentDock.display.disconnected": "Écran non connecté",
+  "settings.agentDock.edge.title": "Bord de l’écran",
+  "settings.agentDock.edge.description":
+    "Faites glisser le dock vers le haut ou le bas pour le déplacer le long du bord.",
+  "settings.agentDock.edge.right": "Droite",
+  "settings.agentDock.edge.left": "Gauche",
+  "settings.agentDock.size.title": "Taille du dock",
+  "settings.agentDock.size.description":
+    "Faites glisser pour changer la taille du dock au-dessus des autres apps. Dans la fenêtre principale, le dock suit la taille de l’interface.",
+  "settings.agentDock.autoHide.title": "Masquer quand inutilisé",
+  "settings.agentDock.autoHide.description": "Le dock glisse dans le bord. Amenez le pointeur au bord pour l’afficher.",
+  "settings.agentDock.edgeStrip.title": "Afficher une bande au bord",
+  "settings.agentDock.edgeStrip.description":
+    "Une fine bande reste là où le dock se cache. Approchez le pointeur pour afficher le dock. Une vague de couleur monte dans la bande quand un agent vous pose une question.",
+  "settings.agentDock.results.title": "Afficher le travail terminé",
+  "settings.agentDock.results.description": "Les résultats des agents s’affichent un instant à côté du dock.",
+  "settings.agentDock.activeSeats.title": "Afficher les agents avec du nouveau",
+  "settings.agentDock.activeSeats.description":
+    "Un agent ou un canal absent du dock s’y affiche tant qu’il a un nouveau message ou vous attend.",
+  "settings.agentDock.agents.title": "Agents dans le dock",
+  "settings.agentDock.agents.description": "Les agents de {server}. Chaque serveur a son propre dock.",
+  "settings.agentDock.agents.empty": "Ce serveur n’a pas encore d’agents.",
   "settings.analytics.title": "Lier les données analytiques à mon compte",
   "settings.analytics.description":
     "Activé : les métadonnées d’utilisation et de fiabilité sont envoyées aux services analytiques auto-hébergés d’OpenBot avec l’identifiant et l’e-mail de votre compte, ainsi que les sites web que vous et vos agents visitez, l’utilisation des outils et un résumé quotidien de votre configuration. Désactivé : seule l’utilisation de base, comme les tours et le nombre de tokens, est envoyée avec un identifiant d’installation aléatoire. Les conversations, fichiers et prompts ne sont jamais envoyés.",
   "settings.analytics.webDescription":
     "Activé : les métadonnées d’utilisation et de fiabilité sont envoyées aux services analytiques auto-hébergés d’OpenBot avec l’identifiant et l’e-mail de votre compte. Désactivé : les mêmes métadonnées sont envoyées avec un identifiant d’installation aléatoire uniquement. Les conversations, fichiers et prompts ne sont jamais envoyés. Ce réglage s’applique à ce navigateur.",
-  // The Settings window shell: its tab list, headers and save bar.
   "settings.tab.general.title": "Général",
-  "settings.tab.general.description": "Contrôler le comportement d’OpenBot sur cet ordinateur.",
+  "settings.tab.general.description": "Choisir le fonctionnement des discussions et ce qu’OpenBot partage.",
   "settings.tab.agents.title": "Agents",
   "settings.tab.agents.description":
     "Choisir ce que les agents de cet ordinateur peuvent faire quand vous ne le réglez pas pour un agent.",
@@ -186,7 +333,7 @@ export const messages = {
   "settings.tab.notifications.description": "Choisir comment OpenBot vous alerte.",
   "settings.tab.voice.title": "Voix",
   "settings.tab.voice.description":
-    "Dictée dans la zone de message. Les modèles locaux s’exécutent sur cet ordinateur ; ElevenLabs s’exécute dans le cloud.",
+    "Dictée dans la zone de message. Les modèles locaux s’exécutent sur cet ordinateur ; ElevenLabs et Groq s’exécutent dans le cloud.",
   "settings.tab.computerUse.title": "Computer Use",
   "settings.tab.computerUse.description":
     "Autoriser les agents de l'OpenBot de cet ordinateur à voir et utiliser ses apps. Les agents d'un autre serveur utilisent l'ordinateur de ce serveur.",
@@ -196,6 +343,8 @@ export const messages = {
   "settings.tab.mobileConnect.description": "Se connecter en toute sécurité depuis votre téléphone.",
   "settings.tab.dynamicIsland.title": "Îlot dynamique",
   "settings.tab.dynamicIsland.description": "Choisir quand l’îlot s’affiche et sa taille.",
+  "settings.tab.agentDock.title": "Dock des agents",
+  "settings.tab.agentDock.description": "Choisissez où le dock s’affiche et quels agents il contient.",
   "settings.tab.updates.title": "Mises à jour",
   "settings.tab.updates.description": "Garder OpenBot à jour sur cet ordinateur.",
   "settings.tab.billing.title": "Facturation",
@@ -203,6 +352,14 @@ export const messages = {
   "settings.tab.hostedServers.title": "Serveurs hébergés",
   "settings.tab.hostedServers.description":
     "Créer des serveurs OpenBot qui fonctionnent quand cet ordinateur est éteint.",
+  "settings.tab.appearance.description": "Choisir le thème, les couleurs, la langue et les polices.",
+  "settings.tab.appBehavior.description": "Choisir comment OpenBot démarre et fonctionne sur cet ordinateur.",
+  "settings.appearance.colorsTitle": "Couleurs",
+  "settings.appearance.textTitle": "Langue et texte",
+  "settings.appBehavior.startTitle": "Démarrage et sortie",
+  "settings.appBehavior.backgroundTitle": "Arrière-plan",
+  "settings.sections.group.account": "Compte",
+  "settings.sections.group.thisComputer": "Cet ordinateur",
   "settings.sections.label": "Sections des réglages",
   "settings.panel.resize": "Redimensionner le panneau de droite",
   "settings.preferences.loadFailed": "Impossible de charger vos réglages.",
@@ -336,7 +493,6 @@ export const messages = {
   "settings.profile.share.copyFailed": "Impossible de copier l’image.",
   "settings.profile.share.createFailed": "Impossible de créer l’image.",
   "settings.profile.share.fileName": "openbot-activity.png",
-  // The text in the image to share.
   "settings.profile.share.caption": "Mes six derniers mois avec OpenBot",
   "settings.profile.activity.title": "Activité sur cet ordinateur",
   "settings.profile.activity.activeDays": {
@@ -346,7 +502,6 @@ export const messages = {
   "settings.profile.activity.empty": "Aucune activité pour l’instant",
   "settings.profile.activity.loading": "Chargement de l’activité…",
   "settings.profile.activity.loadFailed": "Impossible de charger votre activité.",
-  // {tokens} is a short number, such as 1.2M.
   "settings.profile.activity.heatmapLabel": {
     one: "{tokens} jetons en {count} jour actif sur un an",
     other: "{tokens} jetons en {count} jours actifs sur un an",
@@ -422,6 +577,8 @@ export const messages = {
   "settings.updates.status.ready": "{target} est prête. Redémarrez pour l’appliquer.",
   "settings.updates.status.installing": "Redémarrage pour appliquer {target}…",
   "settings.updates.status.upToDate": "OpenBot est à jour sur le canal Stable.",
+  "settings.updates.status.staged":
+    "{target} est déployé progressivement. Recherchez les mises à jour pour l'obtenir maintenant.",
   "settings.updates.status.checkFailed": "OpenBot n’a pas pu rechercher les mises à jour. Réessayez.",
   "settings.updates.status.unsupported": "Les mises à jour ne sont pas disponibles dans cette version.",
   "settings.updates.actionFailed": "Impossible de mettre à jour OpenBot.",
@@ -469,6 +626,7 @@ export const messages = {
   "settings.hostedServers.state.planEnded": "Forfait terminé",
   "settings.hostedServers.state.creating": "Création",
   "settings.hostedServers.state.starting": "Démarrage",
+  "settings.hostedServers.state.restoring": "Restauration des données",
   "settings.hostedServers.state.running": "En marche",
   "settings.hostedServers.state.stopping": "Arrêt en cours",
   "settings.hostedServers.state.stopped": "Arrêté",
@@ -479,6 +637,8 @@ export const messages = {
   "settings.hostedServers.paymentDescription": "La configuration commence quand Stripe confirme le paiement.",
   "settings.hostedServers.planEndedDescription":
     "Le forfait a pris fin, donc le serveur s’est arrêté. Ses données sont conservées. Renouvelez le forfait pour le démarrer.",
+  "settings.hostedServers.planEndedKeptUntil":
+    "Le forfait a pris fin, donc le serveur s’est arrêté. Ses données sont conservées jusqu’au {date}. Renouvelez le forfait avant cette date pour le démarrer.",
   "settings.hostedServers.pay": "Ouvrir la page de paiement",
   "settings.hostedServers.payLabel": "Ouvrir la page de paiement de {name}",
   "settings.hostedServers.renew": "Renouveler le forfait",
@@ -518,32 +678,39 @@ export const messages = {
   "settings.hostedServers.plan.standard.summary": "Pour une petite équipe avec des routines quotidiennes.",
   "settings.hostedServers.plan.pro.name": "Pro",
   "settings.hostedServers.plan.pro.summary": "Pour de nombreux agents et un usage intensif du navigateur.",
-  // The Voice tab: dictation models and the dictation language.
-  "settings.voice.models.title": "Modèle de dictée",
+  "settings.voice.dictation.section": "Dictée",
   "settings.voice.model.parakeet.description": "Rapide. Détecte seul la langue parlée, parmi 25 langues européennes.",
+  "settings.voice.model.parakeetUnified.description":
+    "Rapide. Anglais uniquement. Met la ponctuation, avec moins d’erreurs que Parakeet TDT.",
   "settings.voice.model.bark.description":
     "Rapide. Anglais uniquement. Écrit surtout en minuscules, avec peu de ponctuation.",
   "settings.voice.model.whisper.description": "Plus lent. Environ 100 langues, et vous pouvez fixer la langue parlée.",
+  "settings.voice.model.cohere.description":
+    "Plus lent. 14 langues. Vous fixez la langue parlée. Utilise environ 4 Go de mémoire.",
   "settings.voice.model.size": "Taille du téléchargement : {size}",
-  "settings.voice.model.downloading": "Téléchargement · {received} sur {total}",
   "settings.voice.model.failed": "Le téléchargement s’est arrêté. Vérifiez la connexion et réessayez.",
   "settings.voice.model.progressLabel": "Téléchargement de {name}",
   "settings.voice.model.use": "Utiliser",
-  "settings.voice.model.inUse": "Utilisé",
   "settings.voice.model.downloadLabel": "Télécharger {name}",
-  "settings.voice.model.cancelLabel": "Arrêter le téléchargement de {name}",
   "settings.voice.model.retryLabel": "Télécharger {name} à nouveau",
   "settings.voice.model.useLabel": "Utiliser {name} pour la dictée",
   "settings.voice.model.removeLabel": "Retirer {name} de cet ordinateur",
   "settings.voice.language.section": "Langue",
-  "settings.voice.language.title": "Langue de la dictée",
   "settings.voice.language.description":
     "La langue que vous parlez. « Automatique » la détecte à partir de l’enregistrement.",
+  "settings.voice.language.modelLanguages":
+    "La langue que vous parlez. Ce modèle ne connaît que ces langues et ne détecte pas la langue lui-même.",
   "settings.voice.language.modelDetects":
-    "Parakeet détecte seul la langue parlée. Pour fixer une langue, utilisez Whisper ou ElevenLabs.",
+    "Parakeet détecte seul la langue parlée. Pour fixer une langue, utilisez Whisper, Cohere ou ElevenLabs.",
   "settings.voice.language.englishOnly":
-    "Bark reconnaît uniquement l’anglais. Pour fixer une langue, utilisez Whisper ou ElevenLabs.",
+    "Bark reconnaît uniquement l’anglais. Pour fixer une langue, utilisez Whisper, Cohere ou ElevenLabs.",
+  "settings.voice.language.parakeetUnifiedEnglishOnly":
+    "Parakeet Unified reconnaît uniquement l’anglais. Pour fixer une langue, utilisez Whisper, Cohere ou ElevenLabs.",
   "settings.voice.language.automatic": "Automatique",
+  "settings.voice.pause.title": "Pause avant l’envoi",
+  "settings.voice.pause.description":
+    "Dans une conversation vocale, OpenBot envoie vos mots quand vous arrêtez de parler pendant cette durée. Choisissez une pause plus longue si vous parlez lentement ou vous arrêtez pour réfléchir. La voix en direct Codex détecte la fin elle-même.",
+  "settings.voice.pause.seconds": "{seconds} s",
   "settings.voice.loadFailed": "Impossible de lire les modèles vocaux.",
   "settings.voice.saveFailed": "Impossible d’enregistrer le réglage vocal. Réessayez.",
   "settings.voice.downloadFailed": "Impossible de lancer le téléchargement. Réessayez.",
@@ -551,9 +718,10 @@ export const messages = {
   "settings.voice.removeFailed": "Impossible de retirer le modèle. Réessayez.",
   "settings.voice.model.elevenlabs.description":
     "Envoie votre voix à ElevenLabs. Le texte s’affiche pendant que vous parlez et reste stable. Utilise votre propre clé API, et ElevenLabs facture chaque utilisation.",
-  "settings.voice.model.keySaved": "Clé API enregistrée",
-  "settings.voice.model.keyMissing": "Nécessite une clé API ElevenLabs",
-  "settings.voice.apiKey.label": "Clé API ElevenLabs",
+  "settings.voice.model.groqTurbo.description":
+    "Envoie chaque enregistrement à Groq quand vous arrêtez. Rapide, avec de nombreuses langues. Utilise votre propre clé API, et Groq facture chaque utilisation.",
+  "settings.voice.model.groqLarge.description":
+    "Envoie chaque enregistrement à Groq quand vous arrêtez. Plus précis que turbo, mais plus lent. Utilise votre propre clé API, et Groq facture chaque utilisation.",
   "settings.voice.apiKey.placeholder": "Collez la clé",
   "settings.voice.apiKey.save": "Enregistrer la clé",
   "settings.voice.apiKey.remove": "Supprimer la clé",
@@ -564,6 +732,11 @@ export const messages = {
   "settings.voice.speech.readReplies.title": "Lire les réponses à voix haute",
   "settings.voice.speech.readReplies.description":
     "Quand vous dictez un message, la réponse est lue à voix haute. Dictez à nouveau pour l’arrêter.",
+  "settings.voice.speech.codexLive.title": "Voix en direct Codex",
+  "settings.voice.speech.codexLive.description":
+    "Les conversations vocales avec n’importe quel agent utilisent la voix en direct d’OpenAI avec votre connexion Codex. Votre voix, vos demandes et les réponses de l’agent sont envoyées à OpenAI.",
+  "settings.voice.speech.codexLive.serverDescription":
+    "Les conversations vocales avec n’importe quel agent utilisent la voix en direct d’OpenAI avec la connexion Codex du serveur. Votre voix, vos demandes et les réponses de l’agent sont envoyées à OpenAI.",
   "settings.voice.speech.speed.title": "Vitesse",
   "settings.voice.speech.voice.title": "Voix",
   "settings.voice.speech.voice.female": "Voix féminine {number}",
@@ -572,6 +745,45 @@ export const messages = {
   "settings.voice.speech.voice.stop": "Arrêter",
   "settings.voice.speech.sample": "Bonjour. Voici comment vos réponses sonneront.",
   "settings.voice.speech.listenFailed": "Impossible de lire l’extrait.",
+  "settings.voice.live.section": "Voix en direct",
+  "settings.voice.talk.section": "Conversation vocale",
+  "settings.voice.talkKey.title": "Touche pour parler",
+  "settings.voice.talkKey.description": "Maintenez ces touches enfoncées pour parler dans une conversation vocale.",
+  "settings.voice.talkKey.change": "Changer la touche pour parler",
+  "settings.voice.talkKey.recording": "Appuyez sur les touches",
+  "settings.voice.talkKey.refused": "Ajoutez une autre touche",
+  "settings.voice.talkKey.reset": "Rétablir",
+  "settings.tab.keyboard.title": "Clavier",
+  "settings.tab.keyboard.description": "Modifiez les raccourcis clavier sur cet appareil.",
+  "settings.shortcuts.section": "Raccourcis",
+  "settings.shortcuts.fixed.section": "Raccourcis fixes",
+  "settings.shortcuts.command.newThread": "Nouveau fil",
+  "settings.shortcuts.command.previousThread": "Fil précédent",
+  "settings.shortcuts.command.nextThread": "Fil suivant",
+  "settings.shortcuts.command.newAgent": "Nouvel agent",
+  "settings.shortcuts.command.globalSearch": "Tout rechercher",
+  "settings.shortcuts.command.searchChat": "Rechercher dans le chat",
+  "settings.shortcuts.command.focusComposer": "Aller à la zone de message",
+  "settings.shortcuts.command.back": "Précédent",
+  "settings.shortcuts.command.forward": "Suivant",
+  "settings.shortcuts.command.toggleSidebar": "Afficher ou masquer la barre latérale",
+  "settings.shortcuts.command.showShortcuts": "Afficher les raccourcis clavier",
+  "settings.shortcuts.command.openSettings": "Ouvrir les réglages",
+  "settings.shortcuts.command.stopAllAgents": "Arrêter tous les agents",
+  "settings.shortcuts.command.switchServer": "Changer de serveur",
+  "settings.shortcuts.command.zoom": "Zoom",
+  "settings.shortcuts.refused.invalid": "Ajoutez une touche de modification",
+  "settings.shortcuts.refused.reserved": "Le système utilise ce raccourci",
+  "settings.shortcuts.refused.taken": "Utilisé par {command}",
+  "settings.shortcuts.recording": "Appuyez sur les touches",
+  "settings.shortcuts.change": "Modifier le raccourci de {command}",
+  "settings.shortcuts.reset": "Rétablir",
+  "settings.shortcuts.resetAll": "Tout rétablir",
+  "settings.voice.live.signIn": "Connectez-vous à Codex avec votre compte ChatGPT pour utiliser la voix en direct.",
+  "settings.voice.live.account": "Compte",
+  "settings.voice.live.accountAutomatic": "Automatique",
+  "settings.voice.live.accountDescription":
+    "Le compte ChatGPT qu'utilise la voix en direct. Choisissez un compte dont l'abonnement inclut la voix.",
   "settings.transfer.title": "Déplacer ce serveur vers un autre ordinateur",
   "settings.transfer.lede":
     "Vos agents, leurs compétences, routines, souvenirs et fichiers sont réunis dans un seul fichier.",
@@ -583,8 +795,6 @@ export const messages = {
   "settings.transfer.old.text": "Enregistrez ses agents et ses réglages de serveur dans un fichier.",
   "settings.transfer.new.title": "Importer dans ce serveur",
   "settings.transfer.new.text": "Ajoutez les agents et les réglages de serveur d’un fichier.",
-  "settings.transfer.notMoved":
-    "Les clés API, les connexions aux comptes, les connecteurs, les préférences de l’app et l’historique des discussions ne sont pas déplacés. Configurez-les de nouveau sur le nouveau serveur.",
   "settings.transfer.back": "Retour",
   "settings.transfer.loading": "Lecture de vos agents…",
   "settings.transfer.summary.label": "Contenu du fichier",
@@ -594,12 +804,26 @@ export const messages = {
   "settings.transfer.count.noSettings": "Aucun réglage de serveur",
   "settings.transfer.includeAgent": "Inclure {name}",
   "settings.transfer.export.title": "Exporter ce serveur",
-  "settings.transfer.export.files": "Inclure les fichiers des espaces de travail",
-  "settings.transfer.export.filesDescription":
-    "Les fichiers créés par vos agents et le dossier partagé. Désactivez cette option pour obtenir un fichier léger.",
-  "settings.transfer.export.settings": "Inclure les réglages du serveur",
+  "settings.transfer.preset.label": "Contenu du fichier",
+  "settings.transfer.preset.templates": "Modèles",
+  "settings.transfer.preset.everything": "Tout",
+  "settings.transfer.meter.files": "sur {total} de fichiers des espaces de travail",
+  "settings.transfer.part.agents": "Agents et leur configuration",
+  "settings.transfer.part.agentsDescription": "{contents}. Toujours dans le fichier.",
+  "settings.transfer.part.settings": "Réglages du serveur",
+  "settings.transfer.part.chats": "Historique des discussions",
+  "settings.transfer.part.chatsDescription":
+    "Les discussions et les fils secondaires avec leurs fichiers, et l’historique des exécutions des routines. Les agents poursuivent ces discussions avec leur contexte.",
+  "settings.transfer.part.channels": "Messages des canaux",
+  "settings.transfer.part.channelsDescription":
+    "Les messages des canaux auxquels participent les agents exportés, avec leurs fichiers et l’historique des exécutions des routines des canaux.",
+  "settings.transfer.part.files": "Fichiers des espaces de travail",
+  "settings.transfer.part.filesDescription": "Les fichiers créés par vos agents et le dossier partagé.",
+  "settings.transfer.part.preferences": "Préférences du serveur",
+  "settings.transfer.part.preferencesDescription":
+    "Nom, logo, fuseau horaire, personnalité, valeurs par défaut des agents, choix de modèles, réglages des souvenirs et des compétences, et les niveaux de notifications et éléments épinglés de chaque personne.",
   "settings.transfer.export.settingsDescription":
-    "Serveurs MCP, fournisseurs de modèles personnalisés, sections de la barre latérale et flux de routines.",
+    "Serveurs MCP, fournisseurs de modèles personnalisés, sections de la barre latérale, flux de routines et compétences partagées.",
   "settings.transfer.export.chooseAgents": "Choisir les agents ({selected} sur {total})",
   "settings.transfer.export.hideAgents": "Masquer les agents",
   "settings.transfer.export.agentsLabel": "Agents à exporter",
@@ -618,6 +842,13 @@ export const messages = {
   "settings.transfer.import.lede": "Choisissez le fichier exporté depuis l’autre serveur. Son nom se termine par .zip.",
   "settings.transfer.import.choose": "Choisir un fichier…",
   "settings.transfer.import.reading": "Lecture du fichier…",
+  "settings.transfer.upload.label": "Envoi vers le serveur",
+  "settings.transfer.upload.sending": "Envoi du fichier…",
+  "settings.transfer.upload.sent": "{sent} sur {total} envoyés",
+  "settings.transfer.upload.serverReading": "Le serveur lit le fichier…",
+  "settings.transfer.upload.etaSoon": "Moins d’une minute restante",
+  "settings.transfer.upload.etaMinutes": "Environ {minutes} min restantes",
+  "settings.transfer.upload.etaHours": "Environ {hours} h {minutes} min restantes",
   "settings.transfer.import.openFailed": "Impossible d’ouvrir le fichier",
   "settings.transfer.import.contains": "Ce fichier contient",
   "settings.transfer.import.source": "OpenBot {version} · exporté le {date}",
@@ -626,8 +857,11 @@ export const messages = {
   "settings.transfer.import.agentsLabel": "Agents du fichier",
   "settings.transfer.import.nameExists": "Nom déjà utilisé",
   "settings.transfer.import.settings": "Importer les réglages du serveur",
-  "settings.transfer.import.settingsDescription":
-    "Ajoute les serveurs MCP, les fournisseurs de modèles personnalisés et les sections de la barre latérale que ce serveur n’a pas.",
+  "settings.transfer.import.settingsAndPreferences":
+    "Ajoute les serveurs MCP, les fournisseurs de modèles personnalisés, les sections de la barre latérale et les compétences partagées que ce serveur n’a pas.",
+  "settings.transfer.import.preferences": "Importer les préférences du serveur",
+  "settings.transfer.import.preferencesDescription":
+    "Remplace le nom, le logo et les préférences de ce serveur, ainsi que les niveaux de notification et les éléments épinglés de chaque personne, par ceux du fichier.",
   "settings.transfer.import.submit": { one: "Importer {count} agent", other: "Importer {count} agents" },
   "settings.transfer.import.submitSettings": "Importer les réglages du serveur",
   "settings.transfer.import.importing": "Import…",
@@ -640,4 +874,30 @@ export const messages = {
   "settings.transfer.result.signInButton": "Se connecter à {provider}",
   "settings.transfer.result.notImported": "Non importé",
   "settings.transfer.result.warnings": "À vérifier",
+  "settings.transfer.copy.tileTitle": "Copier vers un autre serveur",
+  "settings.transfer.copy.tileText": "Envoyez des agents vers un autre de vos serveurs.",
+  "settings.transfer.copy.title": "Copier des agents vers un autre serveur",
+  "settings.transfer.copy.from": "De",
+  "settings.transfer.copy.to": "Vers",
+  "settings.transfer.copy.chooseServer": "Choisir un serveur",
+  "settings.transfer.copy.search": "Rechercher des agents",
+  "settings.transfer.copy.agentsOn": "Agents sur {server}",
+  "settings.transfer.copy.all": { one: "Tous les agents ({count})", other: "Tous les agents ({count})" },
+  "settings.transfer.copy.noAgents": "Ce serveur n’a aucun agent.",
+  "settings.transfer.copy.new": "Nouveau",
+  "settings.transfer.copy.notCopied":
+    "Leurs canaux, flux de routines, workflows et le dossier partagé sont aussi copiés. Les clés d’API, les connexions, les connecteurs et l’historique des chats ne sont pas copiés. Configurez-les à nouveau sur l’autre serveur.",
+  "settings.transfer.copy.submit": { one: "Copier {count} agent", other: "Copier {count} agents" },
+  "settings.transfer.copy.duplicatesTitle": "Copier des agents en double ?",
+  "settings.transfer.copy.duplicatesDescription":
+    "{server} a déjà des agents avec ces noms : {names}. La copie ajoute un deuxième agent pour chacun. Chaque copie est un agent distinct, avec ses propres discussions, fichiers et souvenirs.",
+  "settings.transfer.copy.duplicatesConfirm": "Copier les doublons",
+  "settings.transfer.copy.copying": "Copie…",
+  "settings.transfer.copy.done": {
+    one: "{count} agent copié vers {server}.",
+    other: "{count} agents copiés vers {server}.",
+  },
+  "settings.transfer.copy.open": "Ouvrir {server}",
+  "settings.transfer.copy.loadFailed": "Les agents n’ont pas pu être lus",
+  "settings.transfer.copy.failed": "La copie n’a pas abouti",
 } as const satisfies PartialTranslation<typeof source>;

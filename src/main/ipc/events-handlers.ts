@@ -1,4 +1,5 @@
 import {
+  decodeAgentWebhookSecret,
   decodeEventActivity,
   decodeEventRoutineRuns,
   decodeEventRoutines,
@@ -6,18 +7,45 @@ import {
   decodeSaveEventRoutineResult,
   decodeWebhookSecret,
   decodeWebhookTestResult,
+  type EventRoutine,
+  type EventRoutineOwner,
+  type ListEventRoutinesInput,
 } from "@openbot/contracts/ipc-events";
 import { EVENTS_CAPABILITY, EVENTS_ROUTES } from "@openbot/contracts/team-protocol/events-v1";
+import {
+  decodeRoutinePauseReasons,
+  ROUTINE_PAUSE_REASONS_CAPABILITY,
+  ROUTINE_PAUSE_REASONS_ROUTES,
+} from "@openbot/contracts/team-protocol/routine-pause-reasons-v1";
 import {
   ROUTINE_RECOVERY_CAPABILITY,
   ROUTINE_RECOVERY_ROUTES,
 } from "@openbot/contracts/team-protocol/routine-recovery-v1";
+import {
+  decodeRoutineRunPlace,
+  decodeRoutineRunPlaces,
+  ROUTINE_RUN_PLACE_CAPABILITY,
+  ROUTINE_RUN_PLACE_ROUTES,
+} from "@openbot/contracts/team-protocol/routine-run-place-v1";
+import { ROUTINES_ONCE_CAPABILITY } from "@openbot/contracts/team-protocol/routines-once-v1";
+import {
+  WEBHOOK_AGENT_SECRET_CAPABILITY,
+  WEBHOOK_AGENT_SECRET_ROUTES,
+} from "@openbot/contracts/team-protocol/webhook-agent-secret-v1";
 import {
   WEBHOOK_SENDER_SECRET_CAPABILITY,
   WEBHOOK_SENDER_SECRET_ROUTES,
 } from "@openbot/contracts/team-protocol/webhook-sender-secret-v1";
 import { WEBHOOK_TESTS_CAPABILITY, WEBHOOK_TESTS_ROUTES } from "@openbot/contracts/team-protocol/webhook-tests-v1";
 import { sourceText } from "@openbot/i18n/source";
+import { createOpenBotLogger } from "@openbot/logging";
+import {
+  listOnceEventRoutines,
+  type RoutinesOncePost,
+  requireReleasedScheduleOn,
+  saveOnceEventRoutine,
+} from "@openbot/team-client/routines-once";
+import { withRoutinePauseReasons, withRoutineRunPlaces } from "@openbot/team-client/team-api-requests";
 import type { Effect } from "effect";
 import { runCauseEffect } from "../../backend/effect-boundary";
 import type { HostEventsApi } from "../host-events-api";
@@ -35,14 +63,20 @@ import type { RemoteWorkflowError } from "../remote-service-effects";
 import type { IpcGroupHandlers } from "./define-ipc-group";
 import { scopedHandler, scopedQueryHandler } from "./scoped-handler";
 
+const runPlaceLogger = createOpenBotLogger("routine-run-place");
+
 interface EventsRemoteServers {
   supportsCapability(
     serverId: string,
     capability:
       | typeof EVENTS_CAPABILITY
       | typeof ROUTINE_RECOVERY_CAPABILITY
+      | typeof ROUTINE_PAUSE_REASONS_CAPABILITY
+      | typeof ROUTINE_RUN_PLACE_CAPABILITY
+      | typeof ROUTINES_ONCE_CAPABILITY
       | typeof WEBHOOK_TESTS_CAPABILITY
-      | typeof WEBHOOK_SENDER_SECRET_CAPABILITY,
+      | typeof WEBHOOK_SENDER_SECRET_CAPABILITY
+      | typeof WEBHOOK_AGENT_SECRET_CAPABILITY,
   ): boolean;
   request<T>(
     serverId: string,
@@ -63,9 +97,40 @@ export function eventsIpcHandlers({ events, remoteServers }: EventsIpcDependenci
       throw new Error(sourceText("error.backend.eventsUnavailable"));
     return runCauseEffect(remoteServers.request(serverId, path, decoder, { method: "POST", body }));
   }
-  /** A host with `routine-recovery-v1` reads and saves `missedPolicy`, which the `events-v1` routes drop. */
   function recovery(serverId: string): boolean {
     return remoteServers.supportsCapability(serverId, ROUTINE_RECOVERY_CAPABILITY);
+  }
+  async function listReleased(input: ListEventRoutinesInput, serverId: string): Promise<EventRoutine[]> {
+    const routines = remote(
+      serverId,
+      recovery(serverId) ? ROUTINE_RECOVERY_ROUTES.listRoutines : EVENTS_ROUTES.listRoutines,
+      decodeEventRoutines,
+      input,
+    );
+    const agentId = runPlaceAgent(serverId, input.owner);
+    const pausedAgentId =
+      input.owner.kind === "agent" && remoteServers.supportsCapability(serverId, ROUTINE_PAUSE_REASONS_CAPABILITY)
+        ? input.owner.id
+        : null;
+    if (agentId === null && pausedAgentId === null) return routines;
+    const [list, places, reasons] = await Promise.all([
+      routines,
+      agentId === null ? [] : remote(serverId, ROUTINE_RUN_PLACE_ROUTES.list, decodeRoutineRunPlaces, { agentId }),
+      pausedAgentId === null
+        ? []
+        : remote(serverId, ROUTINE_PAUSE_REASONS_ROUTES.list, decodeRoutinePauseReasons, { agentId: pausedAgentId }),
+    ]);
+    return withRoutinePauseReasons(withRoutineRunPlaces(list, places), reasons);
+  }
+  function runPlaceAgent(serverId: string, owner: EventRoutineOwner): string | null {
+    return owner.kind === "agent" && remoteServers.supportsCapability(serverId, ROUTINE_RUN_PLACE_CAPABILITY)
+      ? owner.id
+      : null;
+  }
+  function onceSend(serverId: string): RoutinesOncePost | null {
+    if (!remoteServers.supportsCapability(serverId, ROUTINES_ONCE_CAPABILITY)) return null;
+    return (path, decode, body) =>
+      runCauseEffect(remoteServers.request(serverId, path, decode, { method: "POST", body }));
   }
   return {
     events: {
@@ -78,23 +143,47 @@ export function eventsIpcHandlers({ events, remoteServers }: EventsIpcDependenci
       }),
       listRoutines: scopedHandler(parseListEventRoutines, {
         local: (input) => runCauseEffect(events.listRoutines(input)),
-        remote: (input, serverId) =>
-          remote(
-            serverId,
-            recovery(serverId) ? ROUTINE_RECOVERY_ROUTES.listRoutines : EVENTS_ROUTES.listRoutines,
-            decodeEventRoutines,
-            input,
-          ),
+        remote: async (input, serverId) => {
+          const send = onceSend(serverId);
+          const [released, once] = await Promise.all([
+            listReleased(input, serverId),
+            send ? listOnceEventRoutines(send, input.owner) : [],
+          ]);
+          return [...released, ...once];
+        },
       }),
       saveRoutine: scopedHandler(parseSaveEventRoutine, {
         local: (input) => runCauseEffect(events.saveRoutine(input)),
-        remote: (input, serverId) =>
-          remote(
+        remote: async (input, serverId) => {
+          const send = onceSend(serverId);
+          if (send) {
+            const once = await saveOnceEventRoutine(send, input);
+            if (once) return once;
+          } else if (input.trigger.kind === "schedule") requireReleasedScheduleOn(input.trigger.schedule, false);
+          const saved = await remote(
             serverId,
             recovery(serverId) ? ROUTINE_RECOVERY_ROUTES.saveRoutine : EVENTS_ROUTES.saveRoutine,
             decodeSaveEventRoutineResult,
             input,
-          ),
+          );
+          const agentId = runPlaceAgent(serverId, input.owner);
+          if (agentId === null || input.runIn === undefined) return saved;
+          const placed = remote(serverId, ROUTINE_RUN_PLACE_ROUTES.set, decodeRoutineRunPlace, {
+            agentId,
+            routineId: saved.routine.id,
+            runIn: input.runIn,
+          });
+          const place =
+            input.id === undefined
+              ? await placed.catch(() => {
+                  runPlaceLogger.warn(
+                    "The run place of a new remote routine was not set. The routine runs in the chat.",
+                  );
+                  return { runIn: "chat" as const };
+                })
+              : await placed;
+          return { ...saved, routine: { ...saved.routine, runIn: place.runIn } };
+        },
       }),
       deleteRoutine: scopedHandler(parseEventRoutineRef, {
         local: (input) => runCauseEffect(events.deleteRoutine(input)),
@@ -114,6 +203,14 @@ export function eventsIpcHandlers({ events, remoteServers }: EventsIpcDependenci
           if (!remoteServers.supportsCapability(serverId, WEBHOOK_SENDER_SECRET_CAPABILITY))
             throw new Error(sourceText("error.backend.eventsUnavailable"));
           return remote(serverId, WEBHOOK_SENDER_SECRET_ROUTES.set, acceptEmpty, input);
+        },
+      }),
+      giveSecretToAgent: scopedHandler(parseEventRoutineRef, {
+        local: (input) => runCauseEffect(events.giveSecretToAgent(input)),
+        remote: (input, serverId) => {
+          if (!remoteServers.supportsCapability(serverId, WEBHOOK_AGENT_SECRET_CAPABILITY))
+            throw new Error(sourceText("error.backend.eventsUnavailable"));
+          return remote(serverId, WEBHOOK_AGENT_SECRET_ROUTES.give, decodeAgentWebhookSecret, input);
         },
       }),
       sendTestEvent: scopedHandler(parseEventRoutineRef, {

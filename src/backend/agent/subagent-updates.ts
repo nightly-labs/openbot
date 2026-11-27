@@ -10,20 +10,13 @@ import {
 import { type DynamicRecord, isString } from "@openbot/contracts/runtime-values";
 import { isRecord } from "../protocol";
 
-/**
- * The notification that carries the subagents of a turn:
- * `{ threadId, turnId, subagents: ConversationSubagent[] }`, always the full list of that turn.
- * A background subagent can end after its turn, so an update can name a turn that has ended.
- */
 export const SUBAGENTS_UPDATED_METHOD = "turn/subagents/updated";
 
-/** The subagents in a `turn/subagents/updated` notification, or null. */
 export function subagentsFromNotification(params: unknown): ConversationSubagent[] | null {
   if (!isRecord(params) || !isConversationSubagents(params.subagents)) return null;
   return clampConversationSubagents(params.subagents);
 }
 
-/** The step that a subagent's tool call shows: the kind gives the icon, the text is the target. */
 function subagentToolStep(name: string, input: unknown): { kind: ConversationSubagentStepKind; text: string } {
   const fields = isRecord(input) ? input : {};
   const field = (key: string) => (isString(fields[key]) ? fields[key] : "");
@@ -50,11 +43,7 @@ function subagentToolStep(name: string, input: unknown): { kind: ConversationSub
   }
 }
 
-/**
- * Adds a step, or replaces the step with the same id, and keeps only the newest steps, so a long
- * run holds bounded memory. Returns false for a blank step, which is not added.
- */
-function pushSubagentStep(subagent: ConversationSubagent, step: ConversationSubagentStep): boolean {
+export function pushSubagentStep(subagent: ConversationSubagent, step: ConversationSubagentStep): boolean {
   const text = step.text.trim();
   if (!text) return false;
   const existing = subagent.steps.findIndex((candidate) => candidate.id === step.id);
@@ -65,15 +54,13 @@ function pushSubagentStep(subagent: ConversationSubagent, step: ConversationSuba
   return true;
 }
 
-/** The final report as the last step, unless the subagent already wrote the same text. */
-function pushSubagentReport(subagent: ConversationSubagent, text: string): void {
+export function pushSubagentReport(subagent: ConversationSubagent, text: string): void {
   const last = subagent.steps.at(-1);
   if (last?.kind === "text" && last.id !== `${subagent.id}:result` && last.text === text.trim()) return;
   pushSubagentStep(subagent, { id: `${subagent.id}:result`, kind: "text", text });
 }
 
-/** Ends a subagent once. A later end, such as a tool result after the task notification, keeps the first. */
-function endSubagent(
+export function endSubagent(
   subagent: ConversationSubagent,
   status: Exclude<ConversationSubagentStatus, "running">,
   endedAt: string,
@@ -86,61 +73,74 @@ function endSubagent(
   return true;
 }
 
-/** The subagents of one turn, in start order. */
 interface SubagentTurn {
   subagents: ConversationSubagent[];
-  /** The turn ended. A later `Agent` call can still come while it runs, so its list stays until then. */
   ended: boolean;
 }
 
-/**
- * The subagents that Claude starts with its `Agent` tool (`Task` before Claude Code 2). The state
- * lives with the Claude session, because a background subagent ends after its turn, and the CLI then
- * reports it in a turn of its own. A turn's entry goes when the turn ended and none of its subagents
- * still runs.
- */
-export interface ClaudeSubagentState {
+export interface SubagentState {
   turns: Map<string, SubagentTurn>;
-  /** The turn of each subagent, under the tool-use id of its `Agent` call. */
   turnOf: Map<string, string>;
-  /** The tool-use id of each subagent under its CLI task id: `task_updated` names only the task. */
-  toolOfTask: Map<string, string>;
+  aliases: Map<string, string>;
+  streams: Map<string, Map<string, string>>;
 }
 
-export function newClaudeSubagentState(): ClaudeSubagentState {
-  return { turns: new Map(), turnOf: new Map(), toolOfTask: new Map() };
+export function newSubagentState(): SubagentState {
+  return { turns: new Map(), turnOf: new Map(), aliases: new Map(), streams: new Map() };
 }
 
 const CLAUDE_SUBAGENT_TOOLS = new Set(["Agent", "Task"]);
 
-/** The turn whose list changed and its full list, for one notification. */
 export interface SubagentChange {
   turnId: string;
   subagents: ConversationSubagent[];
 }
 
-function change(state: ClaudeSubagentState, turnId: string | undefined): SubagentChange | null {
+export function subagentChange(state: SubagentState, turnId: string | undefined): SubagentChange | null {
   const turn = turnId ? state.turns.get(turnId) : undefined;
   if (!turnId || !turn) return null;
   const subagents = clampConversationSubagents(turn.subagents) ?? [];
   if (turn.ended && turn.subagents.every((subagent) => subagent.status !== "running")) {
     state.turns.delete(turnId);
-    for (const subagent of turn.subagents) state.turnOf.delete(subagent.id);
-    for (const [taskId, toolUseId] of state.toolOfTask)
-      if (!state.turnOf.has(toolUseId)) state.toolOfTask.delete(taskId);
+    for (const subagent of turn.subagents) {
+      state.turnOf.delete(subagent.id);
+      state.streams.delete(subagent.id);
+    }
+    for (const [alias, id] of state.aliases) if (!state.turnOf.has(id)) state.aliases.delete(alias);
   }
   return { turnId, subagents };
 }
 
-function subagentFor(state: ClaudeSubagentState, toolUseId: unknown): ConversationSubagent | undefined {
-  if (!isString(toolUseId)) return undefined;
-  const turnId = state.turnOf.get(toolUseId);
-  return turnId ? state.turns.get(turnId)?.subagents.find((subagent) => subagent.id === toolUseId) : undefined;
+export function subagentFor(state: SubagentState, id: unknown): ConversationSubagent | undefined {
+  if (!isString(id)) return undefined;
+  const turnId = state.turnOf.get(id);
+  return turnId ? state.turns.get(turnId)?.subagents.find((subagent) => subagent.id === id) : undefined;
 }
 
-/** Starts a subagent for an `Agent` call of the main agent. Returns null for every other tool. */
+export function startSubagent(
+  state: SubagentState,
+  turnId: string,
+  subagent: ConversationSubagent,
+): SubagentChange | null {
+  const turn = state.turns.get(turnId) ?? { subagents: [], ended: false };
+  turn.subagents.push(subagent);
+  state.turns.set(turnId, turn);
+  state.turnOf.set(subagent.id, turnId);
+  return subagentChange(state, turnId);
+}
+
+export function dropSubagent(state: SubagentState, id: string): SubagentChange | null {
+  const turnId = state.turnOf.get(id);
+  const turn = turnId ? state.turns.get(turnId) : undefined;
+  if (!turnId || !turn) return null;
+  turn.subagents = turn.subagents.filter((subagent) => subagent.id !== id);
+  state.turnOf.delete(id);
+  state.streams.delete(id);
+  return subagentChange(state, turnId);
+}
+
 export function foldClaudeSubagentCall(
-  state: ClaudeSubagentState,
+  state: SubagentState,
   turnId: string,
   call: { id: string; name: string; input: unknown },
   now: string,
@@ -148,7 +148,7 @@ export function foldClaudeSubagentCall(
   if (!CLAUDE_SUBAGENT_TOOLS.has(call.name) || state.turnOf.has(call.id)) return null;
   const input = isRecord(call.input) ? call.input : {};
   const agentType = isString(input.subagent_type) ? input.subagent_type : null;
-  const subagent: ConversationSubagent = {
+  return startSubagent(state, turnId, {
     id: call.id,
     title: isString(input.description) ? input.description : (agentType ?? ""),
     agentType,
@@ -159,20 +159,11 @@ export function foldClaudeSubagentCall(
     steps: [],
     error: null,
     ...(input.run_in_background === true ? { background: true as const } : {}),
-  };
-  const turn = state.turns.get(turnId) ?? { subagents: [], ended: false };
-  turn.subagents.push(subagent);
-  state.turns.set(turnId, turn);
-  state.turnOf.set(call.id, turnId);
-  return change(state, turnId);
+  });
 }
 
-/**
- * Applies a message that a subagent wrote: its `parent_tool_use_id` names the `Agent` call. Each
- * thought, text, and tool call becomes a step.
- */
 export function foldClaudeSubagentMessage(
-  state: ClaudeSubagentState,
+  state: SubagentState,
   parentToolUseId: string,
   messageId: string,
   message: unknown,
@@ -193,16 +184,11 @@ export function foldClaudeSubagentMessage(
             : null;
     if (step && pushSubagentStep(subagent, step)) changed = true;
   });
-  return changed ? change(state, state.turnOf.get(parentToolUseId)) : null;
+  return changed ? subagentChange(state, state.turnOf.get(parentToolUseId)) : null;
 }
 
-/**
- * Applies the main agent's result of an `Agent` call. A background call answers at once that the
- * subagent started, so only a foreground result ends the subagent. An error ends both: a background
- * call that failed started no task, so no `task_notification` ends it later.
- */
 export function foldClaudeSubagentResult(
-  state: ClaudeSubagentState,
+  state: SubagentState,
   toolUseId: string,
   result: unknown,
   isError: boolean,
@@ -213,7 +199,7 @@ export function foldClaudeSubagentResult(
   if (!subagent) return null;
   if (isError) {
     endSubagent(subagent, "failed", now, text);
-    return change(state, state.turnOf.get(toolUseId));
+    return subagentChange(state, state.turnOf.get(toolUseId));
   }
   if (isRecord(result) && (result.isAsync === true || result.status === "async_launched")) {
     subagent.background = true;
@@ -222,10 +208,9 @@ export function foldClaudeSubagentResult(
   if (subagent.background) return null;
   pushSubagentReport(subagent, claudeResultText(result));
   endSubagent(subagent, "completed", now);
-  return change(state, state.turnOf.get(toolUseId));
+  return subagentChange(state, state.turnOf.get(toolUseId));
 }
 
-/** The final report in the structured result. The text form is wrapped in a frame for the model. */
 function claudeResultText(result: unknown): string {
   if (!isRecord(result) || !Array.isArray(result.content)) return "";
   return result.content
@@ -234,16 +219,7 @@ function claudeResultText(result: unknown): string {
     .join("\n");
 }
 
-/**
- * Applies the CLI's own record of a subagent: `task_started`, `task_updated`, and
- * `task_notification`, which carries the end state and the final report. These come for background
- * subagents after their turn too.
- */
-export function foldClaudeTaskMessage(
-  state: ClaudeSubagentState,
-  message: unknown,
-  now: string,
-): SubagentChange | null {
+export function foldClaudeTaskMessage(state: SubagentState, message: unknown, now: string): SubagentChange | null {
   if (!isRecord(message) || message.type !== "system") return null;
   if (
     message.subtype === "task_started" &&
@@ -251,9 +227,8 @@ export function foldClaudeTaskMessage(
     isString(message.tool_use_id) &&
     state.turnOf.has(message.tool_use_id)
   )
-    state.toolOfTask.set(message.task_id, message.tool_use_id);
-  const toolUseId =
-    message.tool_use_id ?? (isString(message.task_id) ? state.toolOfTask.get(message.task_id) : undefined);
+    state.aliases.set(message.task_id, message.tool_use_id);
+  const toolUseId = message.tool_use_id ?? (isString(message.task_id) ? state.aliases.get(message.task_id) : undefined);
   const subagent = subagentFor(state, toolUseId);
   if (!subagent) return null;
   const turnId = state.turnOf.get(subagent.id);
@@ -262,7 +237,7 @@ export function foldClaudeTaskMessage(
       message.is_backgrounded === true || (isRecord(message.patch) && message.patch.is_backgrounded === true);
     if (!backgrounded || subagent.background) return null;
     subagent.background = true;
-    return change(state, turnId);
+    return subagentChange(state, turnId);
   }
   if (message.subtype !== "task_notification") return null;
   const summary = isString(message.summary) ? message.summary : "";
@@ -270,55 +245,43 @@ export function foldClaudeTaskMessage(
     pushSubagentReport(subagent, summary);
     endSubagent(subagent, "completed", now);
   } else endSubagent(subagent, message.status === "failed" ? "failed" : "stopped", now, summary || null);
-  return change(state, turnId);
+  return subagentChange(state, turnId);
 }
 
-/**
- * The turn ended. A foreground subagent that still runs has stopped with it, for example when the
- * person stopped the turn. A background subagent works on.
- */
-export function endClaudeSubagentTurn(state: ClaudeSubagentState, turnId: string, now: string): SubagentChange | null {
+export function endSubagentTurn(state: SubagentState, turnId: string, now: string): SubagentChange | null {
   const turn = state.turns.get(turnId);
   if (!turn) return null;
   turn.ended = true;
   let changed = false;
   for (const subagent of turn.subagents)
     if (!subagent.background) changed = endSubagent(subagent, "stopped", now) || changed;
-  const update = change(state, turnId);
+  const update = subagentChange(state, turnId);
   return changed ? update : null;
 }
 
-/** The process ended, and each subagent that still ran ended with it. */
-export function stopClaudeSubagents(state: ClaudeSubagentState, now: string): SubagentChange[] {
+export function stopSubagents(state: SubagentState, now: string, turnIds?: ReadonlySet<string>): SubagentChange[] {
   return [...state.turns].flatMap(([turnId, turn]) => {
+    if (turnIds && !turnIds.has(turnId)) return [];
     turn.ended = true;
     let changed = false;
     for (const subagent of turn.subagents) changed = endSubagent(subagent, "stopped", now) || changed;
-    const update = change(state, turnId);
+    const update = subagentChange(state, turnId);
     return changed && update ? [update] : [];
   });
 }
 
-/**
- * Ends the subagents in a stored list that still run. `background` keeps a background subagent,
- * which works on after its turn. Returns true when the list changed.
- */
 export function stopRunningSubagents(
   subagents: ConversationSubagent[] | undefined,
   now: string,
-  { background }: { background: boolean },
+  { background, keep }: { background: boolean; keep?: ReadonlySet<string> },
 ): boolean {
   let changed = false;
   for (const subagent of subagents ?? [])
-    if (background || !subagent.background) changed = endSubagent(subagent, "stopped", now) || changed;
+    if ((background || !subagent.background) && !keep?.has(subagent.id))
+      changed = endSubagent(subagent, "stopped", now) || changed;
   return changed;
 }
 
-/**
- * Applies a Codex `collabAgentToolCall` item to the subagents of a turn. `spawnAgent` starts one
- * subagent for each receiver thread; the other tools (`wait`, `closeAgent`) report the state of
- * subagents that already exist. Returns the new list, or null when nothing changed.
- */
 export function foldCodexSubagentItem(
   current: readonly ConversationSubagent[],
   item: DynamicRecord,
@@ -362,10 +325,64 @@ export function foldCodexSubagentItem(
   return changed ? subagents : null;
 }
 
-/** The end state of a Codex agent, or null while it still works. */
 function codexSubagentStatus(status: unknown): Exclude<ConversationSubagentStatus, "running"> | null {
   if (status === "completed") return "completed";
   if (status === "errored" || status === "failed") return "failed";
   if (status === "shutdown" || status === "notFound" || status === "interrupted") return "stopped";
   return null;
+}
+
+export function foldCodexChildItem(
+  current: readonly ConversationSubagent[],
+  childThreadId: string,
+  item: DynamicRecord,
+): ConversationSubagent[] | null {
+  const index = current.findIndex((subagent) => subagent.id === childThreadId && subagent.status === "running");
+  const step = index >= 0 ? codexChildStep(item) : null;
+  if (!step) return null;
+  const subagents = current.map((subagent) => ({ ...subagent, steps: [...subagent.steps] }));
+  const subagent = subagents[index];
+  return subagent && pushSubagentStep(subagent, step) ? subagents : null;
+}
+
+export function endCodexChild(
+  current: readonly ConversationSubagent[],
+  childThreadId: string,
+  turnStatus: string | null,
+  now: string,
+): ConversationSubagent[] | null {
+  const subagents = current.map((subagent) => ({ ...subagent, steps: [...subagent.steps] }));
+  const subagent = subagents.find((candidate) => candidate.id === childThreadId);
+  const status = turnStatus === "failed" ? "failed" : turnStatus === "interrupted" ? "stopped" : "completed";
+  return subagent && endSubagent(subagent, status, now) ? subagents : null;
+}
+
+function codexChildStep(item: DynamicRecord): ConversationSubagentStep | null {
+  if (!isString(item.id)) return null;
+  const id = item.id;
+  const field = (record: unknown, key: string) => (isRecord(record) && isString(record[key]) ? record[key] : "");
+  const lines = (value: unknown) => (Array.isArray(value) ? value.filter(isString).join("\n") : "");
+  switch (item.type) {
+    case "commandExecution":
+      return { id, kind: "command", text: field(item, "command") };
+    case "fileChange":
+      return {
+        id,
+        kind: "edit",
+        text: Array.isArray(item.changes) ? item.changes.map((change) => field(change, "path")).join(", ") : "",
+      };
+    case "webSearch":
+      return { id, kind: "web", text: field(item, "query") || field(item.action, "url") };
+    case "imageView":
+      return { id, kind: "read", text: field(item, "path") };
+    case "mcpToolCall":
+    case "dynamicToolCall":
+      return { id, kind: "tool", text: field(item, "tool") };
+    case "agentMessage":
+      return { id, kind: "text", text: field(item, "text") };
+    case "reasoning":
+      return { id, kind: "thinking", text: lines(item.summary) || lines(item.content) };
+    default:
+      return null;
+  }
 }

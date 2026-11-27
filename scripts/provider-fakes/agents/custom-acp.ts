@@ -1,7 +1,3 @@
-// The custom agent of `custom-acp-agent-e2e.ts`. `FAKE_TITLE` names it in each answer, `FAKE_MODELS`
-// gives it two models, `FAKE_TOKEN` stands for a secret in its env, `FAKE_CRASH` makes it stop at
-// its first input with the secret on stderr, and `FAKE_SIGN_IN` makes it refuse `session/new` as an
-// agent that needs sign-in does.
 import { type LogValue, logEntry, serveFakeAcpAgent } from "../acp-agent";
 
 const title = process.env.FAKE_TITLE;
@@ -34,12 +30,14 @@ serveFakeAcpAgent(
               availableModels: [
                 { modelId: "fast", name: "Fast" },
                 { modelId: "deep", name: "Deep" },
+                { modelId: '["deep","v2"]', name: "Deep v2" },
               ],
               currentModelId: "fast",
             },
           }
         : {};
-      peer.reply(request, { sessionId: `s-${sessions}`, ...models });
+      const response = { sessionId: `s-${sessions}`, ...models };
+      setTimeout(() => peer.reply(request, response), Number(process.env.FAKE_SESSION_DELAY_MS ?? 0));
     },
     "session/prompt": (request, peer) => {
       const text = (request.params.prompt ?? [])
@@ -52,6 +50,11 @@ serveFakeAcpAgent(
   },
   {
     onRequest: (request) =>
-      log({ event: "request", method: request.method, sessionId: request.params.sessionId ?? null }),
+      log({
+        event: "request",
+        method: request.method,
+        sessionId: request.params.sessionId ?? null,
+        modelId: request.params.modelId ?? null,
+      }),
   },
 );

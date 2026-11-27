@@ -18,9 +18,12 @@ export const messages = {
   "error.host.publishFailed": "이 OpenBot을 게시할 수 없어요.",
   "error.host.mobileConnectPublishFailed": "모바일 연결용으로 이 OpenBot을 게시할 수 없어요.",
   "error.host.mobileConnectHostChanged": "모바일 연결 호스트가 변경되었어요. 다시 시도해 주세요.",
+  "error.host.mobileConnectHostMismatch": "계정에 이 서버의 다른 키가 등록되어 있어요. 다시 시도해 주세요.",
   "error.host.noServer": "이 컴퓨터에는 변경할 서버가 없어요.",
   "error.host.identityLocalOnly": "서버 이름과 로고는 서버를 실행하는 컴퓨터에서만 변경할 수 있어요.",
   "error.host.timezoneInvalid": "알 수 없는 시간대예요.",
+  "error.host.signalHomeUnknown": "이 Signal 서버를 사용할 수 없어요.",
+  "error.host.turnLimitInvalid": "올바르지 않은 스레드 한도예요.",
   "error.host.maintenanceInterrupted":
     "호스트 유지 관리가 중단되었어요. 다시 시도하기 전에 애플리케이션을 확인하고 호스트 상태를 재설정해 주세요.",
   "error.host.updateFailed":
@@ -29,4 +32,5 @@ export const messages = {
   "error.host.tenantShutdownTimeout": "테넌트 종료 시간이 초과되었어요. 애플리케이션 교체를 시작하지 않았어요.",
   "error.host.tenantHealthMissing":
     "다시 시작한 후 테넌트 상태 보고서가 없거나 비정상이에요. 다른 업데이트를 하기 전에 테넌트 세션을 점검해 주세요.",
+  "error.host.personalityInvalid": "알 수 없는 응답 스타일이에요.",
 } as const satisfies PartialTranslation<typeof source>;

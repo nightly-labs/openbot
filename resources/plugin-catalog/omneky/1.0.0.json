@@ -1,0 +1,33 @@
+{
+  "slug": "omneky",
+  "name": "Omneky",
+  "tagline": "AI ad creative generation",
+  "description": "Omneky lets agents read brand data and generate image and video ad creatives. Generation uses Omneky credits.",
+  "category": "design",
+  "creatorName": "Omneky",
+  "iconUrl": "https://www.omneky.com/apple-icon.png",
+  "version": "1.0.0",
+  "prompts": [
+    { "id": "prompt-brand", "text": "Summarize the brand guidelines saved in my Omneky account." },
+    { "id": "prompt-image-ads", "text": "Generate three image ad options for our summer sale." },
+    { "id": "prompt-ad-copy", "text": "Draft headlines for a video ad about our new product." }
+  ],
+  "apps": [
+    {
+      "id": "app-omneky-mcp",
+      "name": "Omneky",
+      "description": "Brand data and ad creative generation, over Omneky's MCP server with browser sign-in.",
+      "iconUrl": "https://www.omneky.com/apple-icon.png",
+      "server": {
+        "name": "omneky",
+        "transport": "http",
+        "url": "https://mcp.omneky.com/mcp",
+        "auth": [{ "id": "omneky-oauth", "kind": "link", "label": "Sign in" }]
+      }
+    }
+  ],
+  "websiteUrl": "https://www.omneky.com",
+  "privacyPolicyUrl": "https://www.omneky.com/privacy-policy",
+  "termsUrl": "https://www.omneky.com/terms",
+  "skills": []
+}

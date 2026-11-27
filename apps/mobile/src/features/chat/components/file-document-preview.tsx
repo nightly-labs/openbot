@@ -11,7 +11,6 @@ import SpreadsheetPreview from "./spreadsheet-preview.dom";
 export interface DocumentPreviewProps {
   uri: string;
   title: string;
-  /** The space that the floating header and the home indicator cover. */
   insets: { top: number; bottom: number };
 }
 
@@ -22,7 +21,6 @@ export const DOM_OPTIONS = {
   scrollEnabled: false,
 };
 
-/** An `.xlsx` file as tables, one for each sheet. */
 export function SpreadsheetFilePreview({ uri, title, insets }: DocumentPreviewProps) {
   const { t, format } = useText();
   const [background, foreground, muted, border, field] = useThemeColor([
@@ -49,6 +47,7 @@ export function SpreadsheetFilePreview({ uri, title, insets }: DocumentPreviewPr
         field: String(field),
       }}
       failedText={t("mobile.chat.preview.spreadsheetFailed")}
+      tooLargeText={t("mobile.chat.preview.spreadsheetTooLarge")}
       truncatedText={t("mobile.chat.preview.spreadsheetTruncated", {
         rows: format.number(SPREADSHEET_MAX_ROWS),
         columns: format.number(SPREADSHEET_MAX_COLUMNS),
@@ -66,7 +65,6 @@ export function PreviewMessage({ text }: { text: string }) {
   );
 }
 
-/** The file as Base64 for a DOM component, which cannot read the app's files. Null `uri` reads nothing. */
 export function useFileBase64(uri: string | null) {
   const [state, setState] = useState<{ value: string | null; error: boolean }>({ value: null, error: false });
   useEffect(() => {

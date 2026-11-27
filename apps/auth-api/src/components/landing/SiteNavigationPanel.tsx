@@ -16,26 +16,16 @@ import { ArticleGradient } from "../content/ArticleGradient";
 import { PluginIcon } from "../plugins/PluginIcon";
 import { hasPluginLogo, PluginLogo } from "../plugins/PluginLogo";
 import { LandingIcon } from "./LandingIcon";
-
-// The contents of one header section. The desktop menu and the mobile sheet draw
-// the same component, and differ only in the frame around it.
-//
-// The small artwork is the CSS approximation of the article gradient, not the
-// shader: a menu can show a dozen of these at once, and a WebGL context each would
-// spend the browser's whole budget on a panel that is open for a second. Only the
-// featured card moves, and only while the panel is on screen.
+import { useSiteChrome } from "./SiteText";
 
 export interface SiteNavigationPanelProps {
   section: SiteNavigationSection;
-  /**
-   * Whether the featured artwork animates. The frame sets this only while the
-   * reader can see the panel, because the animation holds a WebGL context and the
-   * browser drops the oldest one past a small number.
-   */
   live: boolean;
 }
 
 export function SiteNavigationPanel(props: SiteNavigationPanelProps) {
+  const chrome = useSiteChrome();
+  const text = () => chrome().text.sections[props.section.id];
   return (
     <div class="site-panel" data-kind={props.section.kind}>
       <Switch>
@@ -50,12 +40,12 @@ export function SiteNavigationPanel(props: SiteNavigationPanelProps) {
         </Match>
       </Switch>
       <div class="site-panel-footer">
-        <span class="site-panel-summary">{props.section.summary}</span>
+        <span class="site-panel-summary">{text().summary}</span>
         <Switch>
           <Match when={props.section.kind !== "resources" && props.section}>
             {(section) => (
               <Link class="site-panel-index" to={section().indexRoute}>
-                {section().indexLabel}
+                {text().index}
                 <LandingIcon name="arrow-right" />
               </Link>
             )}
@@ -63,7 +53,7 @@ export function SiteNavigationPanel(props: SiteNavigationPanelProps) {
           <Match when={props.section.kind === "resources" && props.section}>
             {(section) => (
               <a class="site-panel-index" href={section().footer.href} target="_blank" rel={EXTERNAL_LINK_REL}>
-                {section().footer.label}
+                {text().index}
                 <LandingIcon name="arrow-up-right" />
               </a>
             )}
@@ -79,6 +69,7 @@ function artwork(title: string): string {
 }
 
 function ArticlePanelBody(props: { section: ArticleNavigationSection; live: boolean }) {
+  const chrome = useSiteChrome();
   const featured = () => props.section.articles[0];
   const others = () => props.section.articles.slice(1);
 
@@ -92,14 +83,14 @@ function ArticlePanelBody(props: { section: ArticleNavigationSection; live: bool
             params={{ slug: article().slug }}
             style={{ "--site-panel-art": artwork(article().title) }}
           >
-            {/* The shader's host paints the same CSS gradient until its canvas has
-                drawn, so the card never shows an empty frame. */}
             <Show when={props.live} fallback={<span class="site-panel-feature-art" aria-hidden="true" />}>
               <ArticleGradient title={article().title} mode="live" class="site-panel-feature-art" />
             </Show>
-            <span class="site-panel-feature-badge">Latest</span>
+            <span class="site-panel-feature-badge">{chrome().text.latest}</span>
             <span class="site-panel-feature-copy">
-              <span class="site-panel-feature-title">{article().title}</span>
+              <span class="site-panel-feature-title" dir="auto">
+                {article().title}
+              </span>
               <span class="site-panel-meta">{formatArticleDate(article().publishedAt)}</span>
             </span>
           </Link>
@@ -117,7 +108,9 @@ function ArticlePanelBody(props: { section: ArticleNavigationSection; live: bool
               >
                 <span class="site-panel-row-art" aria-hidden="true" />
                 <span class="site-panel-row-copy">
-                  <span class="site-panel-row-title">{article.title}</span>
+                  <span class="site-panel-row-title" dir="auto">
+                    {article.title}
+                  </span>
                   <span class="site-panel-meta">{formatArticleDate(article.publishedAt)}</span>
                 </span>
               </Link>
@@ -156,7 +149,9 @@ function PluginPanelBody(props: { section: PluginNavigationSection }) {
                 </Show>
               </span>
               <span class="site-panel-row-copy">
-                <span class="site-panel-row-title">{plugin.name}</span>
+                <span class="site-panel-row-title" dir="auto">
+                  {plugin.name}
+                </span>
                 <span class="site-panel-meta">{plugin.tagline}</span>
               </span>
             </Link>
@@ -181,7 +176,6 @@ function ResourcePanelBody(props: { section: ResourceNavigationSection }) {
   );
 }
 
-// Named accessors, not conditionals in props: a conditional prop moves the SSR hydration keys.
 function ResourceRow(props: { link: ResourceLink }) {
   const href = () => ("href" in props.link ? props.link.href : undefined);
   const route = () => ("to" in props.link ? props.link.to : undefined);
@@ -205,15 +199,16 @@ function ResourceRow(props: { link: ResourceLink }) {
   );
 }
 
-// An icon sits on the same gradient as a plugin's mark. The Brand row shows the app icon itself.
 function ResourceRowContents(props: { link: ResourceLink }) {
+  const chrome = useSiteChrome();
+  const text = () => chrome().text.resources[props.link.id];
   const icon = () => (props.link.icon === "logo" ? undefined : props.link.icon);
   return (
     <>
       <Switch>
         <Match when={icon()}>
           {(name) => (
-            <span class="site-panel-plugin-mark" style={{ "--site-panel-art": artwork(props.link.label) }}>
+            <span class="site-panel-plugin-mark" style={{ "--site-panel-art": artwork(props.link.seed) }}>
               <LandingIcon name={name()} class="site-panel-resource-icon" />
             </span>
           )}
@@ -223,8 +218,8 @@ function ResourceRowContents(props: { link: ResourceLink }) {
         </Match>
       </Switch>
       <span class="site-panel-row-copy">
-        <span class="site-panel-row-title">{props.link.label}</span>
-        <span class="site-panel-meta">{props.link.description}</span>
+        <span class="site-panel-row-title">{text().label}</span>
+        <span class="site-panel-meta">{text().description}</span>
       </span>
     </>
   );

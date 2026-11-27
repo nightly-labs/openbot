@@ -1,13 +1,8 @@
 import { chunkMarkdown, FENCE } from "../messaging-chunks";
 
-/** Slack cuts a message at 40,000 characters and folds long ones; this keeps each post readable. */
 const SLACK_CHUNK_CHARACTERS = 3_900;
 
-/**
- * Markdown as Slack `mrkdwn`. Content `&`, `<` and `>` are escaped, also in code, as Slack
- * requires. That also makes `<!channel>` and `<@U…>` inert: an answer cannot ping a workspace.
- */
-export function slackMrkdwn(markdown: string): string {
+export function slackMrkdwn(markdown: string, userMentions = false): string {
   const lines = escapeSlack(markdown).split("\n");
   let inFence = false;
   return lines
@@ -16,9 +11,15 @@ export function slackMrkdwn(markdown: string): string {
         inFence = !inFence;
         return FENCE;
       }
-      return inFence ? line : inlineMrkdwn(blockMrkdwn(line));
+      return inFence ? line : inlineMrkdwn(blockMrkdwn(line), userMentions);
     })
     .join("\n");
+}
+
+export function slackPingedUsers(markdown: string): string[] {
+  return [
+    ...new Set(Array.from(slackMrkdwn(markdown, true).matchAll(/<@([UW][A-Z0-9]+)>/g), (match) => match[1] ?? "")),
+  ];
 }
 
 function escapeSlack(text: string): string {
@@ -35,14 +36,13 @@ function blockMrkdwn(line: string): string {
   return line;
 }
 
-function inlineMrkdwn(line: string): string {
-  // Code spans keep their text; everything else is converted between them.
+function inlineMrkdwn(line: string, userMentions: boolean): string {
   return line
     .split(/(`[^`]*`)/)
     .map((part) => {
       if (part.startsWith("`") && part.endsWith("`") && part.length > 1) return part;
       const bold: string[] = [];
-      return part
+      const converted = part
         .replace(/\*\*(.+?)\*\*|__(.+?)__/g, (_match, a: string | undefined, b: string | undefined) => {
           bold.push(a ?? b ?? "");
           return `\uE001${bold.length - 1}\uE001`;
@@ -51,11 +51,15 @@ function inlineMrkdwn(line: string): string {
         .replace(/~~(.+?)~~/g, "~$1~")
         .replace(/\[([^\]]+)\]\((https?:\/\/[^)\s]+)\)/g, "<$2|$1>")
         .replace(/\uE001(\d+)\uE001/g, (_match, index: string) => `*${bold[Number(index)]}*`);
+      if (!userMentions) return converted;
+      return converted
+        .split(/(<[^>]*>)/)
+        .map((text) => (text.startsWith("<") ? text : text.replace(/&lt;@([UW][A-Z0-9]+)&gt;/g, "<@$1>")))
+        .join("");
     })
     .join("");
 }
 
-/** Splits `mrkdwn` into posts of at most `limit` characters (`chunkMarkdown`). */
 export function slackChunks(text: string, limit = SLACK_CHUNK_CHARACTERS): string[] {
   return chunkMarkdown(text, limit);
 }

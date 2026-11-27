@@ -1,5 +1,4 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { AppState } from "react-native";
 import { useDerivedValue, useFrameCallback, useSharedValue } from "react-native-reanimated";
 import { scheduleOnRN } from "react-native-worklets";
 import {
@@ -14,25 +13,17 @@ import {
 } from "@/features/agents/model/plush/plush-frames";
 import { useAppDrawerShownOnUI } from "@/features/servers/components/app-drawer-activity";
 import { isAndroid } from "@/shared/lib/platform";
+import { useAppActive } from "@/shared/lib/use-app-active";
 
 interface Playback {
   frames: PlushFrame[];
   index: number;
-  /** The frame a loop goes back to, or `null` for a sequence that holds its last frame. */
   loopStart: number | null;
 }
 
-/**
- * The frames of a moving plush. `animate` is false while the face must hold still: reduced motion, a
- * screen out of focus, a disconnected agent, or a resting mood on a surface that rests.
- *
- * A mood loops: the eyes drift and blink, and the felt decor of the state moves. A new mood on the
- * same body glides from the frame on screen, and its loop goes on from where the glide ends.
- */
 export function usePlushFrame(geometry: PlushGeometry, animate: boolean) {
   const still = useMemo(() => plushStillSequence(geometry), [geometry]);
   const playback = useSharedValue<Playback>({ frames: still.frames, index: 0, loopStart: null });
-  /** The frame index for the JS thread, which must not copy the frames back from the UI thread. */
   const cursor = useSharedValue(0);
   const elapsed = useSharedValue(0);
   const shown = useRef<{ geometry: PlushGeometry; sequence: PlushSequence; loop: boolean }>({
@@ -41,11 +32,8 @@ export function usePlushFrame(geometry: PlushGeometry, animate: boolean) {
     loop: false,
   });
   const onEnd = useRef<(() => void) | null>(null);
-  /** Each shown sequence has a number, so the end of an older one cannot end the next. */
   const shownCount = useSharedValue(0);
   const [playing, setPlaying] = useState(false);
-  // Android: the drawer and its scrim cover the avatars of home. The face holds its frame until the
-  // drawer has closed. The gate is on the UI thread, so the drawer does not render every avatar again.
   const drawerShown = useAppDrawerShownOnUI();
 
   const show = useCallback(
@@ -90,15 +78,11 @@ export function usePlushFrame(geometry: PlushGeometry, animate: boolean) {
     if (current.loopStart === null && index >= last) scheduleOnRN(ended, shownCount.get());
   }, false);
 
+  const appActive = useAppActive();
   useEffect(() => {
-    const update = () => clock.setActive(playing && animate && AppState.currentState === "active");
-    update();
-    const subscription = AppState.addEventListener("change", update);
-    return () => {
-      subscription.remove();
-      clock.setActive(false);
-    };
-  }, [animate, clock, playing]);
+    clock.setActive(playing && animate && appActive);
+    return () => clock.setActive(false);
+  }, [animate, appActive, clock, playing]);
 
   useEffect(() => {
     onEnd.current = null;
@@ -113,12 +97,9 @@ export function usePlushFrame(geometry: PlushGeometry, animate: boolean) {
       cancel = preparePlushLoop(geometry, (sequence) => show(geometry, sequence, entry % sequence.frames.length, true));
     };
     if (previous.geometry.key === geometry.key || previous.geometry.shape !== geometry.shape) {
-      // A new body, or the first motion of this face: the loop starts from its first frame, which is
-      // the still face, and the still face shows while the loop is prepared.
       if (previous.geometry.key !== geometry.key) show(geometry, still, 0, false);
       loop(0);
     } else {
-      // The face holds the frame on screen while the glide is prepared.
       const index = Math.min(Math.floor(cursor.get()), previous.sequence.frames.length - 1);
       const frame = previous.sequence.frames[index];
       const source = previous.sequence.sources[index];

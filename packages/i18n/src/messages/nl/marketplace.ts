@@ -85,6 +85,7 @@ export const messages = {
   "marketplace.app.partialDescription":
     "Sommige apps of vaardigheden ervan zijn niet geïnstalleerd. “Opnieuw koppelen” installeert ze.",
   "marketplace.app.notConnected": "Niet gekoppeld",
+  "marketplace.app.paused": "Gepauzeerd",
   "marketplace.app.custom": "MCP-server",
   "marketplace.app.githubTagline": "Repository’s, issues en pull requests",
   "marketplace.app.onePasswordTagline": "Log in op sites met logins die je deelt",
@@ -93,6 +94,50 @@ export const messages = {
   "marketplace.app.telegramTagline": "Groepen en privéchats in Telegram",
   "marketplace.app.whatsappTagline": "Je eigen chat en de mensen die je toestaat in WhatsApp",
   "marketplace.app.bitwardenTagline": "Log in op sites met logins uit een gedeelde map",
+  "marketplace.app.protonPassTagline": "Log in op sites met logins uit een gedeelde kluis",
+  "marketplace.xApp.title": "X",
+  "marketplace.xApp.tagline": "Reageer op een post op X met @openbot_ en een agent doet het werk",
+  "marketplace.xApp.description":
+    "X voegt één agent toe aan deze server, die ook X heet. Reageer op X op een willekeurige post en noem @openbot_ met wat je wilt: samenvatten, vertalen, een reactie opstellen, een notitie opslaan of een herinnering instellen. De OpenBot-extensie voor Chrome leest de post en stuurt hem naar de X-agent, en X plaatst je reactie zoals gewoonlijk. Het antwoord wacht in de X-chat in OpenBot. De X-agent plaatst nooit iets, liket niets, volgt niemand en stuurt geen berichten op X.",
+  "marketplace.xApp.developer": "OpenBot",
+  "marketplace.xApp.notSetUp": "Niet ingesteld",
+  "marketplace.xApp.setUp": "Instellen",
+  "marketplace.xApp.howTitle": "Zo werkt het",
+  "marketplace.xApp.howReplyTitle": "Reageer op X.",
+  "marketplace.xApp.howReply":
+    "Reageer op een willekeurige post en noem @openbot_ met wat je wilt, bijvoorbeeld “@openbot_ vat dit samen”.",
+  "marketplace.xApp.howSendTitle": "De extensie stuurt het door.",
+  "marketplace.xApp.howSend":
+    "OpenBot voor Chrome leest de post en de posts erboven en stuurt ze naar de X-agent. X plaatst je reactie zoals gewoonlijk.",
+  "marketplace.xApp.howWorkTitle": "X doet het werk.",
+  "marketplace.xApp.howWork": "Het antwoord wacht in de X-chat in OpenBot. Niets van OpenBot verschijnt op X.",
+  "marketplace.xApp.agentTitle": "Agent",
+  "marketplace.xApp.agentDescription": "X beantwoordt elke post die je vanaf X stuurt in een eigen chat.",
+  "marketplace.xApp.extensionTitle": "In Chrome",
+  "marketplace.xApp.extensionDescription": "X werkt alleen via de OpenBot-extensie voor Chrome.",
+  "marketplace.xApp.extensionName": "OpenBot voor Chrome",
+  "marketplace.xApp.extensionNote":
+    "Open het zijpaneel en log in op deze server. De extensie leest een post alleen als je reageert met @openbot_.",
+  "marketplace.xApp.getExtension": "Extensie ophalen",
+  "marketplace.xApp.stepExtension": "Extensie",
+  "marketplace.xApp.stepAgent": "Agent",
+  "marketplace.xApp.next": "Volgende",
+  "marketplace.xApp.extensionStepTitle": "OpenBot toevoegen aan Chrome",
+  "marketplace.xApp.extensionStepDescription":
+    "De extensie leest een post op X als je reageert met @openbot_ en stuurt hem naar deze server.",
+  "marketplace.xApp.extensionStepStore": "Open de OpenBot-pagina in de Chrome Web Store",
+  "marketplace.xApp.extensionStepAdd": "Klik op “Toevoegen aan Chrome”",
+  "marketplace.xApp.extensionStepSignIn": "Open het OpenBot-zijpaneel en log in op deze server",
+  "marketplace.xApp.agentStepTitle": "De X-agent toevoegen",
+  "marketplace.xApp.agentStepDescription":
+    "X krijgt de posts die je vanaf X stuurt. OpenBot voegt hem toe aan deze server.",
+  "marketplace.xApp.agentDoesReceive": "Krijgt elke post waarop je op X reageert met @openbot_",
+  "marketplace.xApp.agentDoesWork":
+    "Vat samen, vertaalt, stelt reacties op, slaat notities op en stelt herinneringen in",
+  "marketplace.xApp.agentDoesNoPost": "Plaatst nooit iets op X: het antwoord wacht in zijn chat",
+  "marketplace.xApp.addAgent": "Agent toevoegen",
+  "marketplace.xApp.doneTitle": "X is klaar",
+  "marketplace.xApp.doneDescription": "Reageer op een post op X en noem @openbot_. Het antwoord wacht in de X-chat.",
   "marketplace.app.onePasswordCategory": "Beheer van logins en inloggegevens",
   "marketplace.app.yourApps": "Jouw apps",
   "marketplace.app.addCustom": "Eigen toevoegen",
@@ -109,7 +154,16 @@ export const messages = {
   "marketplace.app.remove.action": "Verwijderen",
   "marketplace.app.remove.confirmTitle": "{name} verwijderen?",
   "marketplace.app.remove.keep": "Behouden",
+  "marketplace.app.replace.title": "{server} vervangen?",
+  "marketplace.app.replace.description":
+    "Je hebt al een server met de naam {server}, maar dat is niet {name}. Vervangen door {name}? Het adres en de opgeslagen sleutels worden verwijderd.",
+  "marketplace.app.replace.action": "Vervangen",
   "marketplace.app.connection": "Verbinding",
+  "marketplace.app.access.use": "Mag gebruiken",
+  "marketplace.app.access.noAgents": "Geen agents",
+  "marketplace.app.access.agentsOf": "Agents die {name} mogen gebruiken",
+  "marketplace.app.access.chooseAgents": "{name}: {summary}. Agents kiezen",
+  "marketplace.app.access.level": "Toegang van {role} tot {name}",
   "marketplace.app.setup.account": "Log via de browser in met je {name}-account.",
   "marketplace.app.setup.key": "Vereist een API-sleutel van je {name}-account.",
   "marketplace.app.setup.keySaved": "{field} opgeslagen op {host}.",
@@ -117,6 +171,11 @@ export const messages = {
   "marketplace.app.setup.desktop": "Draait in de desktop-app van {name} op {address}.",
   "marketplace.app.setup.desktopConnected": "Verbonden met {address}.",
   "marketplace.app.setup.open": "Geen login of sleutel nodig.",
+  "marketplace.app.blocked.update":
+    "{host} draait een oudere OpenBot-versie die geen apps kan koppelen. Werk OpenBot op {host} bij, of vraag de eigenaar dat te doen.",
+  "marketplace.app.blocked.member":
+    "Alleen een eigenaar of beheerder van {host} kan daar apps koppelen. Vraag een van hen om {name} te koppelen, of om OpenBot op {host} bij te werken zodat leden apps kunnen koppelen.",
+  "marketplace.app.blocked.mac": "{name} werkt alleen op een Mac waarop OpenBot draait.",
   "marketplace.app.connectAgain": "Opnieuw koppelen",
   "marketplace.app.automation.askOnInstall": "Bij installatie macOS om toegang vragen",
   "marketplace.app.automation.title": "Toegang tot Apple-apps",
@@ -183,6 +242,27 @@ export const messages = {
     "Zoek in mijn Cobrain-notities wat we over de prijzen hebben besloten.",
   "marketplace.plugin.cobrain.prompt.saveNote":
     "Sla een notitie op in Cobrain met wat we vandaag hebben gedaan en wat er nog moet.",
+  "marketplace.plugin.honcho.tagline": "Je geheugen in al je AI-tools",
+  "marketplace.plugin.honcho.description":
+    "Honcho van Plastic Labs geeft agents een langetermijngeheugen over jou dat andere gekoppelde AI-tools kunnen delen. Agents slaan op wat ze leren, en Honcho redeneert erover om een model te maken van je voorkeuren, doelen en manier van werken. Agents stellen het vragen voordat ze beginnen. OpenBot-agents hebben ook hun eigen geheugen; Honcho is het geheugen dat je naar andere tools volgt. Berichten die agents opslaan, gaan naar je Honcho-account.",
+  "marketplace.plugin.honcho.app":
+    "Langetermijngeheugen in je Honcho-werkruimten opslaan en bevragen via één MCP-server.",
+  "marketplace.plugin.honcho.prompt.recall": "Vraag Honcho voordat we beginnen wat het weet over hoe ik graag werk.",
+  "marketplace.plugin.honcho.prompt.save": "Sla de beslissingen uit deze thread op in Honcho.",
+  "marketplace.plugin.honcho.prompt.preferences":
+    "Wat zegt Honcho over mijn schrijfstijl? Gebruik het voor dit concept.",
+  "marketplace.plugin.honcho.hint.apiKey": "Maak een sleutel op app.honcho.dev.",
+  "marketplace.plugin.hindsight.tagline": "Geheugen dat leert met de tijd",
+  "marketplace.plugin.hindsight.description":
+    "Hindsight van Vectorize geeft agents een langetermijngeheugen in Hindsight Cloud. Agents onthouden feiten en gebeurtenissen, halen ze op naar betekenis, tijd en entiteit, en denken erover na om mentale modellen te vormen. Herinneringen staan in banken, en agents kunnen een bank maken voor elk project of elke persoon. OpenBot-agents hebben ook hun eigen geheugen; Hindsight is het geheugen dat andere gekoppelde AI-tools kunnen delen. Wat agents onthouden, gaat naar je Hindsight Cloud-account.",
+  "marketplace.plugin.hindsight.app":
+    "Herinneringen in je Hindsight Cloud-banken onthouden, ophalen en overdenken via één MCP-server.",
+  "marketplace.plugin.hindsight.prompt.recall":
+    "Haal voordat we beginnen uit Hindsight op wat we over dit project weten.",
+  "marketplace.plugin.hindsight.prompt.retain": "Onthoud de beslissingen en open vragen uit deze thread in Hindsight.",
+  "marketplace.plugin.hindsight.prompt.reflect":
+    "Denk na over mijn herinneringen in Hindsight: welke patronen zie je in mijn werk van de afgelopen maand?",
+  "marketplace.plugin.hindsight.hint.apiKey": "Maak een sleutel op de pagina Connect van Hindsight Cloud.",
   "marketplace.plugin.figma.tagline": "Ontwerpen en prototypes",
   "marketplace.plugin.figma.description":
     "Met Figma kunnen agents ontwerpbestanden lezen, componenten, stijlen en variabelen inspecteren en productiespecificaties aan ontwikkelaars overdragen. Het koppelt met de MCP-server in de Figma-desktopapp op deze computer. De server kan alleen ontwerpen lezen; ondersteuning voor schrijven komt eraan.",
@@ -202,6 +282,36 @@ export const messages = {
     "Gebruik de stijlen in deze repository en ontwerp een instellingenpagina in Paper.",
   "marketplace.plugin.paper.prompt.tokens":
     "Toon de designtokens in het open Paper-bestand en vergelijk ze met ons thema.",
+  "marketplace.plugin.higgsfield.tagline": "AI-afbeeldingen, -video's en -audio",
+  "marketplace.plugin.higgsfield.description":
+    "Met Higgsfield maken agents afbeeldingen, video's, personages en audio met Higgsfield-modellen zoals Seedance, Kling, Veo en MiniMax Hailuo, controleren ze het creditsaldo en bladeren ze door de Asset Library. Resultaten worden opgeslagen in de Higgsfield Assets van de gebruiker. Elke gebruiker meldt zich in de browser aan bij een eigen Higgsfield-account. Elke generatie gebruikt credits van dat account tegen het standaardtarief, ook met een onbeperkt abonnement.",
+  "marketplace.plugin.higgsfield.app":
+    "Afbeeldingen, video en audio genereren, personages, credits en assets, via de MCP-server van Higgsfield met aanmelden in de browser.",
+  "marketplace.plugin.higgsfield.prompt.credits": "Hoeveel Higgsfield-credits heb ik?",
+  "marketplace.plugin.higgsfield.prompt.productShot":
+    "Maak met Higgsfield een productfoto van een keramische mok op een houten tafel.",
+  "marketplace.plugin.higgsfield.prompt.clip":
+    "Maak met Higgsfield een video van 5 seconden met golven bij zonsondergang.",
+  "marketplace.plugin.sunra.tagline": "AI-afbeeldingen, -video's, -audio en 3D",
+  "marketplace.plugin.sunra.description":
+    "Met Sunra maken agents afbeeldingen, video's, audio en 3D-modellen met modellen zoals GPT Image, Nano Banana, Seedream, FLUX, Seedance, Kling en Veo, controleren ze het creditsaldo en halen ze de resultaten op. Resultaten komen in een project in het Sunra-account van de gebruiker. Elke gebruiker meldt zich in de browser aan bij een eigen Sunra-account. Sunra noemt eerst de kosten van elke generatie en gebruikt pas na bevestiging credits van dat account.",
+  "marketplace.plugin.sunra.app":
+    "Afbeeldingen, video, audio en 3D genereren, credits en resultaten, via de MCP-server van Sunra met aanmelden in de browser.",
+  "marketplace.plugin.sunra.prompt.balance": "Hoeveel Sunra-credits heb ik?",
+  "marketplace.plugin.sunra.prompt.poster":
+    "Maak met Sunra een poster van een nachtmarkt in de regen, in staand formaat.",
+  "marketplace.plugin.sunra.prompt.clip":
+    "Maak met Sunra een video van 5 seconden van een papieren bootje op een rivier. Vertel me eerst wat het kost.",
+  "marketplace.plugin.elevenlabs.tagline": "Spraak, stemmen en spraakagenten",
+  "marketplace.plugin.elevenlabs.description":
+    "Met ElevenLabs zetten agenten tekst om in spraak, werken ze met stemmen, en maken, testen en bekijken ze ElevenLabs-spraakagenten en hun gesprekken. Gegenereerde audio komt terug als een kortlevende downloadlink. Elke gebruiker meldt zich in de browser aan bij een eigen ElevenLabs-account, en elke generatie gebruikt credits van dat account.",
+  "marketplace.plugin.elevenlabs.app":
+    "Tekst naar spraak, stemmen en beheer van spraakagenten, via de MCP-server van ElevenLabs met aanmelding in de browser.",
+  "marketplace.plugin.elevenlabs.prompt.speech":
+    "Lees deze alinea voor met een rustige ElevenLabs-stem en geef me de audio.",
+  "marketplace.plugin.elevenlabs.prompt.agents": "Toon mijn ElevenLabs-spraakagenten en de stem die elk gebruikt.",
+  "marketplace.plugin.elevenlabs.prompt.conversations":
+    "Vat de laatste tien gesprekken van mijn spraakagent voor support samen.",
   "marketplace.plugin.appleApps.tagline": "Mail, Agenda en meer op je Mac",
   "marketplace.plugin.appleApps.description":
     "Met Apple-apps kunnen agents Mail, Agenda, Contacten, Herinneringen, Notities, Berichten en Safari op deze Mac gebruiken. Het werkt alleen op macOS. OpenBot start mcp-icloud, een communityserver die niet van Apple of OpenBot is. De server bestuurt de apps via AppleScript op deze computer en heeft geen account en geen sleutel nodig. Bij de installatie kan OpenBot macOS in één keer om toegang tot al deze apps vragen, met één vraag per app. Anders vraagt macOS het de eerste keer dat een agent een app gebruikt. Om dit later te wijzigen, open je Systeeminstellingen › Privacy en beveiliging › Automatisering. Agents kunnen e-mail en iMessages versturen en afspraken, contacten en herinneringen wijzigen of verwijderen, dus controleer elke wijziging voordat je die goedkeurt. Wat de tools lezen, zoals de tekst van e-mails, gaat naar de modelaanbieder van de agent.",
@@ -220,6 +330,15 @@ export const messages = {
   "marketplace.plugin.sentry.prompt.topCrash":
     "Leg de meest voorkomende crash in het mobiele project uit en de waarschijnlijke oorzaak.",
   "marketplace.plugin.sentry.prompt.releaseHealth": "Hoe gezond is de huidige release vergeleken met de vorige?",
+  "marketplace.plugin.gitlab.tagline": "Issues, merge requests en pipelines",
+  "marketplace.plugin.gitlab.description":
+    "Met GitLab kunnen agents projecten zoeken, issues lezen en maken, merge requests reviewen en bijwerken, bestanden en commits in de repository lezen, en CI-pipelines en jobs op GitLab.com controleren. Elke gebruiker logt via de browser in met een eigen GitLab-account. Agents krijgen dezelfde rechten als de gebruiker: ze kunnen commits pushen, issues en merge requests wijzigen en ze mergen. Voor een zelfgehoste GitLab voeg je in de instellingen voor MCP-servers een server toe met je GitLab-adres gevolgd door /api/v4/mcp, en log je daar in.",
+  "marketplace.plugin.gitlab.app":
+    "Projecten, issues, merge requests, repository's en CI-pipelines, via de MCP-server van GitLab met inloggen in de browser.",
+  "marketplace.plugin.gitlab.prompt.reviewQueue": "Welke merge requests wachten op mijn review?",
+  "marketplace.plugin.gitlab.prompt.failedPipeline": "Waarom is de laatste pipeline op de standaardbranch mislukt?",
+  "marketplace.plugin.gitlab.prompt.newIssue":
+    "Maak een issue aan voor de crash in de sync-wachtrij, met stappen om die te reproduceren.",
   "marketplace.plugin.vercel.tagline": "Deployments, buildlogs en projecten",
   "marketplace.plugin.vercel.description":
     "Met Vercel kunnen agents projecten en recente deployments tonen, build- en runtimelogs lezen en uitzoeken waarom een build mislukte. Elke gebruiker logt via de browser in met een eigen Vercel-account en kiest de teams die agents mogen gebruiken. In die teams krijgen agents dezelfde rechten als het account van de gebruiker. Ze kunnen ook omgevingsvariabelen, domeinen, DNS-records en deployments wijzigen, en domeinen kopen.",
@@ -261,6 +380,18 @@ export const messages = {
   "marketplace.plugin.stripe.prompt.payment": "Zoek deze betaling op en leg uit waarom die mislukte.",
   "marketplace.plugin.stripe.prompt.customer": "Vat de facturen en het openstaande saldo van deze klant samen.",
   "marketplace.plugin.stripe.prompt.link": "Stel een betaallink op voor het Pro-abonnement van 49 per maand.",
+  "marketplace.plugin.revenuecat.tagline": "Abonnementen, producten en paywalls",
+  "marketplace.plugin.revenuecat.description":
+    "Met RevenueCat kunnen agents de instellingen van je in-app-abonnementen lezen en wijzigen: apps, producten, entitlements, offerings, pakketten, paywalls en experimenten. Agents kunnen ook klanten en hun aankopen opzoeken, en grafieken en statistieken lezen. Een geheime RevenueCat-API-sleutel gaat in één Authorization-header. De sleutel geeft toegang tot één project. Met een alleen-lezensleutel kunnen agents alleen lezen. Met een schrijfsleutel kunnen agents producten ter beoordeling naar de App Store sturen, klanten entitlements geven en pakketten, targetingregels en webhooks verwijderen.",
+  "marketplace.plugin.revenuecat.app":
+    "Producten, entitlements, offerings, paywalls en statistieken, via de MCP-server van RevenueCat met een geheime API-sleutel.",
+  "marketplace.plugin.revenuecat.prompt.offerings": "Welke offerings en pakketten heeft mijn RevenueCat-project?",
+  "marketplace.plugin.revenuecat.prompt.revenue":
+    "Hoe zijn mijn RevenueCat-omzet en actieve abonnementen deze maand veranderd?",
+  "marketplace.plugin.revenuecat.prompt.customer":
+    "Welke entitlements heeft deze RevenueCat-klant, en wanneer verlopen ze?",
+  "marketplace.plugin.revenuecat.hint.apiKey":
+    "Open in het RevenueCat-dashboard API keys in je project en maak een geheime API-sleutel. Een alleen-lezensleutel is genoeg om gegevens te bekijken.",
   "marketplace.plugin.posthog.tagline": "Productanalyse en flags",
   "marketplace.plugin.posthog.description":
     "Met PostHog kunnen agents events en funnels opvragen, feature flags inspecteren en samenvatten wat er na een release veranderde. Een persoonlijke API-sleutel uit de projectinstellingen gaat in één Authorization-header.",
@@ -302,8 +433,7 @@ export const messages = {
   "marketplace.plugin.obsidian.prompt.save": "Sla deze beslissing op als nieuwe notitie in mijn kluis.",
   "marketplace.plugin.obsidian.prompt.log":
     "Voeg een samenvatting van het werk van vandaag toe aan mijn notitie Work log.",
-  "marketplace.plugin.obsidian.hint.apiKey":
-    "Open in Obsidian Settings > Local REST API. Kopieer de API-sleutel en zet “Enable non-encrypted (HTTP) server” aan.",
+  "marketplace.plugin.obsidian.hint.apiKey": "Open in Obsidian Settings > Local REST API en kopieer de API-sleutel.",
   "marketplace.plugin.resend.tagline": "Transactionele e-mail",
   "marketplace.plugin.resend.description":
     "Met Resend kunnen agents transactionele e-mail versturen en de bezorging controleren via één API. Een API-sleutel uit het Resend-dashboard gaat als één omgevingsvariabele naar de lokale server.",
@@ -313,16 +443,45 @@ export const messages = {
   "marketplace.plugin.resend.prompt.status": "Is de factuurmail bij de klant aangekomen?",
   "marketplace.plugin.resend.prompt.template":
     "Stel een e-mail op voor het opnieuw instellen van een wachtwoord in de nieuwe flow.",
-  "marketplace.plugin.composio.tagline": "Veel apps via je eigen Composio-link",
+  "marketplace.plugin.omnisend.tagline": "E-mail- en sms-marketing",
+  "marketplace.plugin.omnisend.description":
+    "Met Omnisend lezen agents rapporten van campagnes en formulieren, vinden ze contacten en segmenten, en maken en bewerken ze campagnes, automatiseringen, e-mailsjablonen, formulieren en producten. Elke gebruiker maakt verbinding met een API-sleutel uit het eigen Omnisend-account. Agents kunnen doen wat de sleutel toestaat, ook campagnes versturen en gegevens verwijderen.",
+  "marketplace.plugin.omnisend.app":
+    "Campagnes, automatiseringen, contacten, segmenten, formulieren en rapporten, via de MCP-server van Omnisend met een API-sleutel.",
+  "marketplace.plugin.omnisend.prompt.lastCampaign":
+    "Hoe presteerden de campagnes van vorige week ten opzichte van de week ervoor?",
+  "marketplace.plugin.omnisend.prompt.segment":
+    "Hoeveel contacten zitten er in het VIP-segment, en hoe is dat deze maand veranderd?",
+  "marketplace.plugin.omnisend.prompt.draftCampaign":
+    "Maak een concept van een campagne voor de nieuwe collectie, maar verstuur die niet.",
+  "marketplace.plugin.postiz.tagline": "Socialemediaplanning",
+  "marketplace.plugin.omnisend.hint.apiKey": "Open in Omnisend Store settings > API keys en maak een sleutel.",
+  "marketplace.plugin.postiz.description":
+    "Met Postiz kunnen agents je socialemediakanalen tonen en berichten opstellen, inplannen en publiceren op meer dan 30 netwerken, zoals X, LinkedIn, Instagram en TikTok. Agents kunnen ook media uploaden en AI-afbeeldingen en -video's maken. Log in de browser in op je Postiz-account, of plak de API-sleutel uit Settings › Developers in Postiz. Alle cloudabonnementen van Postiz bevatten API-toegang. Agents kunnen een bericht direct publiceren, dus controleer elk bericht voordat je het goedkeurt.",
+  "marketplace.plugin.postiz.app":
+    "Kanalen, concepten, ingeplande berichten en media, via de MCP-server van Postiz met inloggen in de browser of een API-sleutel.",
+  "marketplace.plugin.postiz.prompt.channels": "Welke socialemediakanalen zijn met Postiz verbonden?",
+  "marketplace.plugin.postiz.prompt.week": "Welke berichten zijn voor volgende week ingepland?",
+  "marketplace.plugin.postiz.prompt.draft":
+    "Stel een LinkedIn-bericht op over onze nieuwe release, maar plan het niet in.",
+  "marketplace.plugin.trypost.tagline": "Socialemediaplanning",
+  "marketplace.plugin.trypost.description":
+    "Met TryPost kunnen agents je gekoppelde kanalen weergeven en posts opstellen, inplannen, in de wachtrij zetten en publiceren op X, LinkedIn, Instagram, Facebook, TikTok, YouTube, Threads, Bluesky, Mastodon, Pinterest en meer. Agents kunnen ook statistieken lezen, ideeën en goedkeuringen beheren en publicatietijden instellen. Log in de browser in op je TryPost-account en kies een workspace. Agents kunnen een post direct publiceren, dus controleer elke post voordat je hem goedkeurt.",
+  "marketplace.plugin.trypost.app":
+    "Kanalen, posts, wachtrij, ideeën en statistieken, via de MCP-server van TryPost met inloggen in de browser.",
+  "marketplace.plugin.trypost.prompt.week": "Welke posts staan deze week ingepland?",
+  "marketplace.plugin.trypost.prompt.draft":
+    "Schrijf een concept voor een LinkedIn-post over onze nieuwe release, maar plan hem niet in.",
+  "marketplace.plugin.trypost.prompt.analytics": "Welke van mijn posts van vorige maand hadden de meeste interactie?",
+  "marketplace.plugin.composio.tagline": "Gmail, Slack, GitHub en meer dan 1000 andere apps",
   "marketplace.plugin.composio.description":
-    "Composio koppelt agents met Gmail, Slack, GitHub en honderden andere apps via één MCP-server. Koppel de apps die je wilt in je Composio-account en plak hier de MCP-URL en API-sleutel ervan.",
+    "Composio koppelt je agents via één MCP-server met Gmail, Slack, GitHub en meer dan 1000 andere apps. Log in met je Composio-account. Als een agent een app nodig heeft, vraagt hij je die app te koppelen.",
   "marketplace.plugin.composio.app":
-    "De apps die je toevoegt aan je Composio-MCP-server, via de link uit je Composio-account.",
+    "De apps die je koppelt in je Composio-account. Een agent vraagt je een app te koppelen wanneer hij die nodig heeft.",
   "marketplace.plugin.composio.prompt.inbox":
     "Vat mijn ongelezen e-mail samen en stel antwoorden op voor de dringende.",
   "marketplace.plugin.composio.prompt.handoff": "Plaats een samenvatting van deze pull request in ons teamkanaal.",
   "marketplace.plugin.composio.prompt.apps": "Welke apps en acties kun je via Composio gebruiken?",
-  "marketplace.plugin.composio.hint.url": "De URL van een MCP-server in je Composio-account",
   "marketplace.plugin.composio.hint.apiKey":
     "Je vindt deze in je Composio-account, onder Settings > Sessions & API Key.",
   "marketplace.plugin.neon.tagline": "Postgres-projecten, branches en migraties",
@@ -385,6 +544,14 @@ export const messages = {
   "marketplace.plugin.todoist.prompt.today": "Welke Todoist-taken moeten vandaag af?",
   "marketplace.plugin.todoist.prompt.capture": "Zet deze actiepunten in mijn Todoist-inbox.",
   "marketplace.plugin.todoist.prompt.overdue": "Verzet mijn achterstallige Todoist-taken naar morgen.",
+  "marketplace.plugin.ticktick.tagline": "Taken, lijsten, gewoonten en focus",
+  "marketplace.plugin.ticktick.description":
+    "Met TickTick kunnen agents taken zoeken en filteren, taken toevoegen en wijzigen, en lijsten, secties, mappen, tags en opmerkingen beheren. Agents kunnen ook gewoonten en focusrecords lezen en wijzigen, en afspraken lezen uit de agenda's die aan TickTick gekoppeld zijn. Elke gebruiker meldt zich in de browser aan bij een eigen TickTick-account. Agents krijgen lees- en schrijftoegang: ze kunnen taken afronden, verplaatsen en verwijderen, en tags en focusrecords verwijderen.",
+  "marketplace.plugin.ticktick.app":
+    "Taken, lijsten, gewoonten en focusrecords, via de MCP-server van TickTick met aanmelding in de browser.",
+  "marketplace.plugin.ticktick.prompt.today": "Welke TickTick-taken zijn vandaag aan de beurt?",
+  "marketplace.plugin.ticktick.prompt.capture": "Zet deze actiepunten in mijn TickTick-inbox.",
+  "marketplace.plugin.ticktick.prompt.week": "Welke TickTick-taken heb ik vorige week afgerond?",
   "marketplace.plugin.trello.tagline": "Borden, lijsten en kaarten",
   "marketplace.plugin.trello.description":
     "Met Trello kunnen agents borden, lijsten, kaarten, checklists en opmerkingen zoeken en lezen, borden en kaarten maken, lijsten en kaarten verplaatsen, kaarten als klaar markeren, en checklists, opmerkingen en labels toevoegen. Agents kunnen ook kaarten in de Trello-inbox van de gebruiker lezen en toevoegen, en Planner-events lezen, die uit een gekoppelde Google- of Outlook-agenda kunnen komen. Elke gebruiker logt via de browser in met een eigen Trello-account en kiest de werkruimten op een toestemmingsscherm. Agents krijgen dezelfde rechten als de gebruiker in die werkruimten. Ze kunnen kaarten en lijsten archiveren, maar de server kan niets definitief verwijderen.",
@@ -458,6 +625,24 @@ export const messages = {
   "marketplace.plugin.clickup.prompt.createTask": "Maak een ClickUp-taak van deze actiepunten en wijs die aan mij toe.",
   "marketplace.plugin.clickup.prompt.summarizeDoc":
     "Zoek de nieuwste projectupdate in ClickUp en vat de open vragen samen.",
+  "marketplace.plugin.coinbase.tagline": "Cryptokoersen, portefeuilles en handel",
+  "marketplace.plugin.coinbase.description":
+    "Met Coinbase lezen agents koersen, saldi, portefeuilles, orders en kosten in Coinbase Advanced Trade, bekijken en plaatsen ze orders, wisselen ze tussen assets en verplaatsen ze geld tussen portefeuilles. Elke gebruiker meldt zich in de browser aan bij een eigen Coinbase-account. Agents hebben dezelfde rechten als de gebruiker. Orders en omwisselingen gebruiken echt geld, en agents kunnen x402-verzoeken betalen met het USDC-saldo.",
+  "marketplace.plugin.coinbase.app":
+    "Koersen, saldi, portefeuilles, orders en omwisselingen, via de MCP-server van Coinbase met aanmelden in de browser.",
+  "marketplace.plugin.coinbase.prompt.balances": "Wat zijn mijn Coinbase-saldi in elke portefeuille?",
+  "marketplace.plugin.coinbase.prompt.price": "Toon de BTC-USD-koers op Coinbase en hoe die deze week bewoog.",
+  "marketplace.plugin.coinbase.prompt.previewOrder":
+    "Bekijk vooraf een marktaankoop van 50 USD aan ETH op Coinbase. Plaats de order niet.",
+  "marketplace.plugin.robinhood.tagline": "Beleggingsrekeningen en handel door agents",
+  "marketplace.plugin.robinhood.description":
+    "Met Robinhood lezen agents de rekeningen, posities, saldi, transactiegeschiedenis en volglijsten van een Robinhood-klant, lezen ze marktgegevens en plaatsen ze orders voor aandelen, opties en crypto. Elke gebruiker meldt zich in de browser aan bij een eigen Robinhood-account. Bij de eerste aanmelding vraagt Robinhood de gebruiker om een aparte Agentic-rekening te openen. Agents kunnen alleen op die rekening handelen en plaatsen standaard orders zonder de gebruiker om goedkeuring per order te vragen.",
+  "marketplace.plugin.robinhood.app":
+    "Rekeningen, posities, marktgegevens en transacties, via de MCP-server van Robinhood met aanmelden in de browser.",
+  "marketplace.plugin.robinhood.prompt.positions": "Vat mijn Robinhood-posities samen en hoe ze vandaag bewogen.",
+  "marketplace.plugin.robinhood.prompt.watchlist": "Hoe bewoog elk aandeel op mijn Robinhood-volglijst deze week?",
+  "marketplace.plugin.robinhood.prompt.agenticCash":
+    "Hoeveel contant geld staat er op mijn Robinhood Agentic-rekening?",
   "marketplace.plugin.huggingface.tagline": "Modellen, datasets en papers op de Hub",
   "marketplace.plugin.huggingface.description":
     "Met Hugging Face kunnen agents modellen, datasets, Spaces, collecties en papers op de Hugging Face Hub zoeken, modelkaarten en repositorybestanden lezen, datasets bekijken en de Hugging Face-documentatie doorzoeken. Het gebruikt openbare Hub-data en heeft geen account en geen sleutel nodig. De tools lezen alleen: agents kunnen geen repository’s maken of jobs uitvoeren.",
@@ -468,7 +653,6 @@ export const messages = {
   "marketplace.plugin.huggingface.prompt.dataset": "Zoek een dataset met weertijdreeksen en toon de kolommen.",
   "marketplace.auth.apiKey": "API-sleutel",
   "marketplace.auth.personalApiKey": "Persoonlijke API-sleutel",
-  "marketplace.auth.mcpUrl": "MCP-URL",
   "marketplace.auth.createKey": "Sleutel maken",
   "marketplace.skill.doc": "SKILL.md",
   "marketplace.try.in": "Probeer in {name}",
@@ -503,6 +687,14 @@ export const messages = {
   "marketplace.skills.origin.local": "Gemaakt op deze computer",
   "marketplace.skills.origin.workspace": "In de map van deze agent",
   "marketplace.skills.origin.marketplace": "Uit de Marktplaats · versie {version}",
+  "marketplace.skills.origin.github": "Van GitHub · {repository}",
+  "marketplace.skills.github.search": "Zoek, of plak een GitHub-link",
+  "marketplace.skills.github.reading": "Vaardigheden zoeken in de repository",
+  "marketplace.skills.github.trust":
+    "OpenBot heeft vaardigheden van GitHub niet gecontroleerd. Lees een vaardigheid voordat je die toevoegt.",
+  "marketplace.skills.github.source": "GitHub · {repository} op {commit}",
+  "marketplace.skills.github.open": "GitHub",
+  "marketplace.skills.github.openName": "{repository} openen op GitHub",
   "marketplace.skills.status.notAdded": "Niet toegevoegd",
   "marketplace.skills.status.on": "Aan op {agents}",
   "marketplace.skills.agentCount": { one: "{count} agent", other: "{count} agents" },
@@ -560,6 +752,7 @@ export const messages = {
   "marketplace.error.installOnHost":
     "Installeer {name} op de computer waarop deze agents draaien: de app ervan vereist inloggen in de browser.",
   "marketplace.error.appInvalid": "{name} kan niet worden toegevoegd: {reason}",
+  "marketplace.error.appNotConnected": "{name} kan niet worden gekoppeld: {reason}",
   "marketplace.error.uninstallNoServer": "Kies een lokale server om een plug-in te verwijderen.",
   "marketplace.error.uninstallPartial": "Een deel van {name} kon niet worden verwijderd. {failures}",
   "marketplace.error.actionFailed": "Kan de marktplaatsactie niet voltooien. Probeer het opnieuw.",

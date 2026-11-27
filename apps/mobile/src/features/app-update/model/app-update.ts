@@ -4,6 +4,7 @@ import {
   type MobileReleaseNotes,
   parseMobileReleaseNotes,
 } from "@openbot/contracts/mobile-features";
+import { isDynamicRecord, isString } from "@openbot/contracts/runtime-values";
 import { useQuery } from "@tanstack/react-query";
 import * as SecureStore from "expo-secure-store";
 import * as Updates from "expo-updates";
@@ -11,32 +12,47 @@ import { useEffect } from "react";
 import { AppState, Linking } from "react-native";
 import { create } from "zustand";
 import { useMobileSession } from "@/features/auth/context/mobile-session-context";
+import { storedFields } from "@/features/settings/model/stored-fields";
+import { supportLog } from "@/features/support/model/support-log";
 import { devLatestAppVersion } from "@/shared/lib/dev-feature-overrides";
-import { currentAppVersion, refreshMobileFeatures, useLatestAppVersion } from "@/shared/lib/mobile-features";
+import { currentAppVersion, useLatestAppVersion, useMobileFeaturesRefresh } from "@/shared/lib/mobile-features";
 import { isIOS } from "@/shared/lib/platform";
 
-/**
- * An update the app can offer. `ready` is an over-the-air bundle that `expo-updates` has already
- * downloaded: a restart installs it without the store. `store` is a newer native version, which only
- * the store can install.
- */
-export type AppUpdate = { kind: "ready"; id: string } | { kind: "store"; id: string; version: string };
+export type AppUpdate =
+  | { kind: "ready"; id: string; updateId: string | null }
+  | { kind: "store"; id: string; version: string };
 
-// The store pages of the app. The web pages are the fallback when the store app does not open.
 const IOS_STORE_URL = "itms-apps://apps.apple.com/app/id6807024266";
 const IOS_STORE_WEB_URL = "https://apps.apple.com/app/id6807024266";
 const ANDROID_STORE_URL = "market://details?id=run.openbot.mobile";
-const ANDROID_STORE_WEB_URL = "https://play.google.com/store/apps/details?id=run.openbot.mobile";
+const ANDROID_STORE_WEB_URL = "https://openbot.run/download/android";
 
-/** The public changelog, for when the notes cannot load. */
 export const MOBILE_CHANGELOG_URL = "https://openbot.run/changelog?platform=mobile";
 const NOTES_TIMEOUT_MS = 10_000;
-// The notes of a version do not change after the store has it.
 const NOTES_STALE_MS = 10 * 60_000;
 
 const key = "openbot.mobile.appUpdate.dismissed.v1";
+const otaNotesKey = "openbot.mobile.appUpdate.otaNotes.v1";
 
-/** The update that the user put off with Later. A newer update shows again. */
+const UPDATE_CHECK_INTERVAL_MS = 15 * 60_000;
+let lastUpdateCheck = Date.now();
+let updateCheckRuns = false;
+
+async function checkForDownloadableUpdate(): Promise<void> {
+  if (__DEV__ || !Updates.isEnabled || updateCheckRuns) return;
+  if (Date.now() - lastUpdateCheck < UPDATE_CHECK_INTERVAL_MS) return;
+  lastUpdateCheck = Date.now();
+  updateCheckRuns = true;
+  try {
+    const result = await Updates.checkForUpdateAsync();
+    if (result.isAvailable || result.isRollBackToEmbedded) await Updates.fetchUpdateAsync();
+  } catch (error) {
+    supportLog.add("warn", "app", `The update check failed: ${error instanceof Error ? error.message : String(error)}`);
+  } finally {
+    updateCheckRuns = false;
+  }
+}
+
 const useDismissedAppUpdate = create<{ dismissed: string | null; ready: boolean }>(() => ({
   dismissed: null,
   ready: false,
@@ -46,60 +62,123 @@ async function loadDismissedAppUpdate(): Promise<void> {
   if (useDismissedAppUpdate.getState().ready) return;
   try {
     const stored = await SecureStore.getItemAsync(key);
-    // A second startup read must not overwrite a Later from this session.
     if (!useDismissedAppUpdate.getState().ready) useDismissedAppUpdate.setState({ dismissed: stored });
   } finally {
     useDismissedAppUpdate.setState({ ready: true });
   }
 }
 
-/** Hides `update` until a newer one comes. The header hides at once, also when storage fails. */
 export async function dismissAppUpdate(update: AppUpdate): Promise<void> {
   useDismissedAppUpdate.setState({ dismissed: update.id, ready: true });
   await SecureStore.setItemAsync(key, update.id);
 }
 
-/**
- * The update to offer on home, or null. A downloaded bundle comes first, because it installs in
- * place. The account server names the newest store version; it reads again when the app comes back
- * to the foreground, at most once a minute.
- */
+interface OtaNotesRecord {
+  seen: string | null;
+  pending: { updateId: string; version: string } | null;
+}
+
+const useOtaNotesSeen = create<{ seen: string | null; ready: boolean }>(() => ({ seen: null, ready: false }));
+let otaNotesRecord: OtaNotesRecord = { seen: null, pending: null };
+
+function parseOtaNotesRecord(raw: string | null): OtaNotesRecord {
+  const fields = storedFields(raw);
+  const seen = fields?.get("seen");
+  const pending = fields?.get("pending");
+  return {
+    seen: isString(seen) ? seen : null,
+    pending:
+      isDynamicRecord(pending) && isString(pending.updateId) && isString(pending.version)
+        ? { updateId: pending.updateId, version: pending.version }
+        : null,
+  };
+}
+
+async function loadOtaNotesSeen(): Promise<void> {
+  if (useOtaNotesSeen.getState().ready) return;
+  try {
+    const record = parseOtaNotesRecord(await SecureStore.getItemAsync(otaNotesKey));
+    const running = Updates.isEmbeddedLaunch ? null : Updates.updateId;
+    const installed = record.pending && running && record.pending.updateId.toLowerCase() === running.toLowerCase();
+    otaNotesRecord = installed && record.pending ? { seen: record.pending.version, pending: null } : record;
+    if (installed) await SecureStore.setItemAsync(otaNotesKey, JSON.stringify(otaNotesRecord));
+    useOtaNotesSeen.setState({ seen: otaNotesRecord.seen });
+  } catch (error) {
+    supportLog.add(
+      "warn",
+      "app",
+      `The update notes state could not load: ${error instanceof Error ? error.message : String(error)}`,
+    );
+  } finally {
+    useOtaNotesSeen.setState({ ready: true });
+  }
+}
+
+export async function rememberShownOtaNotes(updateId: string, version: string): Promise<void> {
+  if (!useOtaNotesSeen.getState().ready) return;
+  otaNotesRecord = { ...otaNotesRecord, pending: { updateId, version } };
+  await SecureStore.setItemAsync(otaNotesKey, JSON.stringify(otaNotesRecord));
+}
+
+let rollbackFetched = false;
+
+async function fetchRollback(): Promise<void> {
+  if (__DEV__ || !Updates.isEnabled || Updates.isEmbeddedLaunch || rollbackFetched) return;
+  rollbackFetched = true;
+  try {
+    await Updates.fetchUpdateAsync();
+  } catch (error) {
+    supportLog.add(
+      "warn",
+      "app",
+      `The rollback fetch failed: ${error instanceof Error ? error.message : String(error)}`,
+    );
+  }
+}
+
+function downloadedUpdateId(update: Updates.UpdateInfo): string {
+  return update.type === Updates.UpdateInfoType.NEW
+    ? `ota:${update.updateId}`
+    : `ota:rollback:${update.createdAt.toISOString()}`;
+}
+
 export function useAppUpdate(): AppUpdate | null {
   const { session } = useMobileSession();
   const apiUrl = session?.apiUrl ?? null;
   const latest = useLatestAppVersion(apiUrl ?? "");
-  const { isUpdatePending, downloadedUpdate } = Updates.useUpdates();
+  const { isUpdatePending, downloadedUpdate, availableUpdate } = Updates.useUpdates();
+  const rollbackWaits = availableUpdate?.type === Updates.UpdateInfoType.ROLLBACK && !isUpdatePending;
   const dismissed = useDismissedAppUpdate((state) => (state.ready ? state.dismissed : undefined));
 
   useEffect(() => {
     void loadDismissedAppUpdate();
   }, []);
   useEffect(() => {
-    if (!apiUrl) return;
-    void refreshMobileFeatures(apiUrl);
     const subscription = AppState.addEventListener("change", (state) => {
-      if (state === "active") void refreshMobileFeatures(apiUrl);
+      if (state === "active") void checkForDownloadableUpdate();
     });
     return () => subscription.remove();
-  }, [apiUrl]);
+  }, []);
+  useEffect(() => {
+    if (rollbackWaits) void fetchRollback();
+  }, [rollbackWaits]);
+  useMobileFeaturesRefresh(apiUrl, { onAppActive: true });
 
-  // Until the stored Later is read, nothing shows, so a dismissed header does not flash.
   if (dismissed === undefined) return null;
   const current = currentAppVersion();
   const update: AppUpdate | null =
-    isUpdatePending && downloadedUpdate?.type === Updates.UpdateInfoType.NEW
-      ? { kind: "ready", id: `ota:${downloadedUpdate.updateId}` }
+    isUpdatePending && downloadedUpdate
+      ? {
+          kind: "ready",
+          id: downloadedUpdateId(downloadedUpdate),
+          updateId: downloadedUpdate.type === Updates.UpdateInfoType.NEW ? downloadedUpdate.updateId : null,
+        }
       : latest && current && isNewerMobileVersion(latest, current)
         ? { kind: "store", id: `store:${latest}`, version: latest }
         : null;
   return update && update.id !== dismissed ? update : null;
 }
 
-/**
- * Installs `update`. A downloaded bundle restarts the app in place, behind a reload screen in the
- * color of the splash. A store version opens the store page; Apple does not let an app install a
- * new native version itself.
- */
 export async function installAppUpdate(update: AppUpdate, reloadColor: string): Promise<void> {
   if (update.kind === "ready") {
     await Updates.reloadAsync({
@@ -107,8 +186,13 @@ export async function installAppUpdate(update: AppUpdate, reloadColor: string): 
     });
     return;
   }
+  await openStorePage();
+}
+
+export async function openStorePage({ review = false }: { review?: boolean } = {}): Promise<void> {
+  const query = review && isIOS ? "?action=write-review" : "";
   const [url, webUrl] = isIOS ? [IOS_STORE_URL, IOS_STORE_WEB_URL] : [ANDROID_STORE_URL, ANDROID_STORE_WEB_URL];
-  await Linking.openURL(url).catch(() => Linking.openURL(webUrl));
+  await Linking.openURL(`${url}${query}`).catch(() => Linking.openURL(`${webUrl}${query}`));
 }
 
 async function fetchReleaseNotes(apiUrl: string, after: string | null, signal: AbortSignal) {
@@ -131,15 +215,9 @@ async function fetchReleaseNotes(apiUrl: string, after: string | null, signal: A
   }
 }
 
-/**
- * The release notes of the store versions after the running one, newest first. They load when the
- * user opens What's new, from the account server, which reads the mobile changelog.
- */
 export function useAppUpdateNotes(enabled: boolean) {
   const { session } = useMobileSession();
   const apiUrl = session?.apiUrl ?? null;
-  // With the development override there is no newer version, so a development build reads every
-  // released version instead.
   const after = devLatestAppVersion() ? null : currentAppVersion();
   return useQuery<MobileReleaseNotes[]>({
     queryKey: ["app-update-notes", apiUrl, after],
@@ -147,5 +225,41 @@ export function useAppUpdateNotes(enabled: boolean) {
     retry: false,
     staleTime: NOTES_STALE_MS,
     queryFn: ({ signal }) => fetchReleaseNotes(apiUrl ?? "", after, signal),
+  });
+}
+
+function isUpdateOf(version: string, base: string): boolean {
+  return version.startsWith(`${base}.`) && version.split(".").length === 4;
+}
+
+export function newestReleaseVersion(releases: readonly MobileReleaseNotes[]): string | null {
+  return releases.reduce<string | null>(
+    (newest, release) => (newest === null || isNewerMobileVersion(release.version, newest) ? release.version : newest),
+    null,
+  );
+}
+
+export function useOtaUpdateNotes(enabled: boolean) {
+  const { session } = useMobileSession();
+  const apiUrl = session?.apiUrl ?? null;
+  const base = currentAppVersion();
+  const seen = useOtaNotesSeen((state) => (state.ready ? state.seen : undefined));
+  useEffect(() => {
+    void loadOtaNotesSeen();
+  }, []);
+  return useQuery<MobileReleaseNotes[]>({
+    queryKey: ["ota-update-notes", apiUrl, base, seen],
+    enabled: enabled && apiUrl !== null && base !== null && seen !== undefined,
+    retry: false,
+    staleTime: NOTES_STALE_MS,
+    queryFn: async ({ signal }) => {
+      const releases = await fetchReleaseNotes(apiUrl ?? "", base, signal);
+      return releases.filter(
+        (release) =>
+          base !== null &&
+          isUpdateOf(release.version, base) &&
+          (!seen || !isUpdateOf(seen, base) || isNewerMobileVersion(release.version, seen)),
+      );
+    },
   });
 }

@@ -1,11 +1,3 @@
-// Checks how often the account usage is read. Runs the real agent service on a temporary profile with a
-// fake Codex app-server that logs each `account/rateLimits/read` and answers it with an error, as HTTP 429,
-// while a flag file exists. The service clock moves forward in place of a wait. Cases: polls from many
-// views at once share one read; a poll within four minutes of a read reads nothing; a failed read keeps
-// the last reading and the next read waits 5, 10, 20 and 40 minutes, up to an hour; a read that succeeds
-// ends the wait; a window that had reset before the read does not start a read at each poll and stays on the
-// rail; after a credential change, no view shows the old credential's reading.
-// `bun scripts/usage-read-pacing-e2e.ts`. Writes .openbot-build/usage-read-pacing-e2e/report.json.
 import assert from "node:assert/strict";
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { mkdtemp, rm, writeFile } from "node:fs/promises";
@@ -29,7 +21,6 @@ process.env.CODEX_HOME = join(home, ".codex");
 process.env.OPENBOT_CODEX_PATH = fakeCodex;
 mkdirSync(home, { recursive: true });
 
-// The service reads the clock through `Date.now`. Moving it is the wait for the next read.
 const realNow = Date.now.bind(Date);
 let skewMs = 0;
 Date.now = () => realNow() + skewMs;
@@ -41,7 +32,6 @@ const { runCauseEffect } = await import("../src/backend/effect-boundary");
 const { MailboxStore } = await import("../src/backend/mailbox-store");
 const { OpenBotDatabase } = await import("../src/backend/openbot-database");
 
-/** A Codex app-server with the methods that a start and a usage read call. Each reading has a new percent. */
 const FAKE_CODEX = `#!/usr/bin/env node
 const { appendFileSync, existsSync } = require("node:fs");
 if (process.argv.includes("--version")) {
@@ -49,7 +39,6 @@ if (process.argv.includes("--version")) {
   process.exit(0);
 }
 const config = { config: { mcp_servers: {} }, layers: [{ name: { type: "user", file: "/fake/.codex/config.toml", profile: null }, version: "1", config: { mcp_servers: {} } }] };
-// Far after any time that the moved clock reaches, so no window resets during the check.
 const resetsAt = Math.floor(Date.now() / 1000) + 30 * 86400;
 let buffer = "";
 let reads = 0;
@@ -68,7 +57,6 @@ const answer = (message) => {
       if (failed) return write({ id: message.id, error: { code: -32000, message: "HTTP 429 Too Many Requests" } });
       reads += 1;
       return write({ id: message.id, result: {
-        // A window that has not rolled yet: its reset time is already over when the reading is sent.
         rateLimits: { limitId: "codex", primary: { usedPercent: reads, windowDurationMins: 300, resetsAt: existsSync(${JSON.stringify(pastFlag)}) ? 1 : resetsAt }, secondary: null },
         rateLimitsByLimitId: null,
       } });
@@ -108,6 +96,7 @@ const report: { cases: CaseReport[]; passed: boolean; error?: string } = { cases
 const unused = () => Effect.die(new Error("Not used by this check."));
 const browser: AgentBrowserHost = {
   listTabs: () => [],
+  toolCanUseTab: () => false,
   beginTakeover: unused,
   endTakeover: () => {},
   resolveUploadTarget: unused,
@@ -121,9 +110,11 @@ const browser: AgentBrowserHost = {
   endControl: () => {},
   close: () => Effect.void,
   clearAgentSession: () => Effect.void,
+  shareTab: () => undefined,
+  unshareThread: () => undefined,
+  agentTab: () => null,
 };
 
-/** Waits for a state of the service, on the real clock. */
 async function waitFor<T>(label: string, read: () => T | null | undefined | false, timeoutMs = 20_000): Promise<T> {
   const deadline = realNow() + timeoutMs;
   for (;;) {
@@ -154,13 +145,11 @@ const agents = new AgentService({
   offProviders: AGENT_PROVIDERS.filter((provider) => provider !== "codex"),
 });
 
-/** One dock poll: the percent of the Codex reading that it answers, or null with no reading. */
 async function poll(): Promise<number | null> {
   const usage = await runCauseEffect(agents.getUsage());
   return usage.limits.find((limit) => limit.id === "codex")?.primary?.usedPercent ?? null;
 }
 
-/** Moves the clock, polls, and answers how many reads the poll sent. */
 async function pollAfter(minutes: number): Promise<{ sent: number; percent: number | null }> {
   skewMs += minutes * MINUTE;
   const before = reads().length;
@@ -170,7 +159,6 @@ async function pollAfter(minutes: number): Promise<{ sent: number; percent: numb
 
 try {
   await runCauseEffect(agents.initialize());
-  // The first poll starts Codex. Its start reads the usage once, and the poll reads it once.
   const first = await poll();
   await waitFor("the reads of the start", () => reads().length >= 2);
   assert.ok(first !== null, "The first poll has a reading.");
@@ -196,7 +184,6 @@ try {
   assert.equal(failed.sent, 1, "The poll after the interval reads.");
   assert.equal(failed.percent, together[0], "A failed read keeps the last reading.");
   const waits: { minutes: number; early: number; due: number }[] = [];
-  // After each failure, a poll one minute before the wait ends sends nothing, and one after it reads.
   for (const minutes of [5, 10, 20, 40, 60, 60]) {
     const early = await pollAfter(minutes - 1);
     const due = await pollAfter(1);
@@ -241,7 +228,6 @@ try {
 
   const pid = reads().at(-1)?.pid;
   const oldPercent = (await poll()) ?? 0;
-  // The new credential's first reads fail: no view shows the old credential's reading in its place.
   writeFileSync(failFlag, "");
   await runCauseEffect(agents.changeProviderCredential("codex", () => Effect.void));
   await waitFor("the read of the new process", () => reads().some((read) => read.pid !== pid));

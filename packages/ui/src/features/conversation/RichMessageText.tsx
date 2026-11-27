@@ -1,7 +1,7 @@
 import { type ChatTagKind, chatTagReferences } from "@openbot/contracts/chat-tag-references";
 import type { AttachmentSummary } from "@openbot/contracts/ipc";
 import type { AppTextKey } from "@openbot/i18n";
-import { Blocks, Button, Puzzle, TextQuote } from "@openbot/ui";
+import { AppWindow, Blocks, Button, Puzzle, Split, TextQuote } from "@openbot/ui";
 import { ReferenceChip } from "@openbot/ui/reference-chip";
 import { usesTouchLayout } from "@openbot/ui/utils";
 import type { JSX } from "@solidjs/web";
@@ -30,17 +30,12 @@ export interface RichMessageTextProps {
   onSelectAgent: (agentId: string) => void;
   onOpenLink: (url: string) => void;
   onOpenAttachment?: ((attachment: AttachmentSummary) => void) | undefined;
-  onOpenSharedFile?: ((path: string) => void) | undefined;
-  onOpenWorkspaceFile?: ((path: string) => void) | undefined;
-  /** Shows the passage that a quote tag names. Without it, a quote is a chip that does nothing. */
+  onOpenSharedFile?: ((path: string, asWritten?: string) => void) | undefined;
+  onOpenWorkspaceFile?: ((path: string, asWritten?: string) => void) | undefined;
   onOpenQuote?: ((messageId: string, text: string) => void) | undefined;
+  onOpenTag?: ((kind: "tab" | "thread", id: string) => void) | undefined;
   showCitationFooter?: boolean;
-  /** The characters of a streaming body after this text. It fades the words revealed last. */
   streamingTailAfter?: number | undefined;
-  /**
-   * False shows only the link icon, so that no linked site is asked for its favicon. Use it for
-   * text that another person wrote, such as the instructions of a shared agent.
-   */
   linkFavicons?: boolean | undefined;
 }
 
@@ -50,13 +45,10 @@ const UNAVAILABLE_TAG_LABELS = {
   mcp: "chat.tag.unavailableMcp",
 } as const satisfies Record<UnavailableTagKind, AppTextKey>;
 
-/* A quote carries its own text, so it never depends on something that can go away. */
-type UnavailableTagKind = Exclude<ChatTagKind, "quote">;
+type UnavailableTagKind = Exclude<ChatTagKind, "quote" | "tab" | "thread">;
 
 export function RichMessageText(props: RichMessageTextProps) {
   const { t } = useText();
-  // The parent gives new props when an agent changes. These memos keep the same lists, so the maps
-  // below, the parsed parts and their chips are not made again.
   const citationList = createMemo(() => props.citations);
   const attachmentList = createMemo(() => props.attachments);
   const skillList = createMemo(() => props.skills);
@@ -66,8 +58,6 @@ export function RichMessageText(props: RichMessageTextProps) {
   const attachmentsById = createMemo(
     () => new Map((attachmentList() ?? []).map((attachment) => [attachment.id, attachment])),
   );
-  // The parser reads only the id and the name of each agent. So a new avatar does not parse each
-  // message again and build its chips again: a chip gets its agent's avatar from `agentsById`.
   const taggedAgents = createMemo(() => props.agents, { equals: sameAgentNames });
   const agentsById = createMemo(() => new Map(props.agents.map((agent) => [agent.id, agent])));
   const liveAgent = (agent: ComposerAgent) => agentsById().get(agent.id) ?? agent;
@@ -93,7 +83,6 @@ export function RichMessageText(props: RichMessageTextProps) {
   } | null>(null);
 
   const openTooltip = (anchor: HTMLElement, content: string, onlyWhenTruncated = false) => {
-    // The chip, not its inline name, clips the name and shows the ellipsis.
     if (onlyWhenTruncated && anchor.scrollWidth <= anchor.clientWidth + 1) {
       setTooltip(null);
       return;
@@ -197,6 +186,19 @@ export function RichMessageText(props: RichMessageTextProps) {
               />
             );
           }
+          if (part.reference) {
+            const reference = part.reference;
+            const onOpenTag = props.onOpenTag;
+            return (
+              <ReferenceChip
+                kind={reference.kind}
+                name={part.text}
+                class="message-reference-chip"
+                icon={reference.kind === "tab" ? <AppWindow /> : <Split />}
+                onClick={onOpenTag ? () => onOpenTag(reference.kind, reference.id) : undefined}
+              />
+            );
+          }
           if (part.unavailableKind) {
             return (
               <span class="message-tag-unavailable">
@@ -294,8 +296,6 @@ function StreamingTailText(props: { body: string; after: number }) {
       {parts().prefix}
       <For each={parts().chunks}>
         {(chunk) => (
-          /* The block that holds the tail renders again on each step. A delay of minus the step's
-             age continues its fade where it was, instead of starting it again. */
           <span
             class="t-stream-w"
             style={{ "animation-delay": `${Math.min(0, chunk.revealedAt - performance.now())}ms` }}
@@ -310,15 +310,9 @@ function StreamingTailText(props: { body: string; after: number }) {
 
 export function MessageLink(props: {
   url: string;
-  /** The native tooltip. Omit it when the link text already shows the URL. */
   title?: string | undefined;
   children: JSX.Element;
-  /** False keeps the request for the linked site's favicon from being made. */
   favicon?: boolean;
-  /**
-   * True when the link text is the URL. The URL then gets its own direction, so its punctuation
-   * does not mix with the text around it in a right-to-left paragraph.
-   */
   isolate?: boolean | undefined;
   onOpenLink: (url: string) => void;
 }) {
@@ -353,13 +347,13 @@ export function MessageLink(props: {
   );
 }
 
-/** A part that shows its source text as it is, so its length counts body characters. */
 function plainTextPart(part: RichMessagePart): boolean {
   return !(
     part.agent ||
     part.skill ||
     part.mcpName ||
     part.quote ||
+    part.reference ||
     part.unavailableKind ||
     part.citation ||
     part.attachment ||
@@ -371,13 +365,9 @@ interface RichMessagePart {
   text: string;
   agent?: ComposerAgent | undefined;
   skill?: ComposerSkill;
-  /**
-   * An MCP server tag carries the name it was written with, and nothing looks it up. A message is a
-   * record of what the user asked, and a server removed since does not make that record wrong.
-   */
   mcpName?: string;
-  /** Text the user quoted from a message of this chat. */
   quote?: { messageId: string; text: string };
+  reference?: { kind: "tab" | "thread"; id: string };
   unavailableKind?: UnavailableTagKind;
   citation?: MessageCitation;
   attachment?: AttachmentSummary;
@@ -385,7 +375,6 @@ interface RichMessagePart {
   url?: string;
 }
 
-/** True when both lists have the same agents, in the same order, with the same names. */
 function sameAgentNames(left: ComposerAgent[], right: ComposerAgent[]): boolean {
   return (
     left.length === right.length &&
@@ -407,6 +396,7 @@ function richMessageParts(
       taggedReference.skill ||
       taggedReference.mcpName ||
       taggedReference.quote ||
+      taggedReference.reference ||
       taggedReference.unavailableKind
     ) {
       parts.push(taggedReference);
@@ -448,9 +438,12 @@ function semanticTagParts(body: string, agents: ComposerAgent[], skills: Compose
       parts.push({ text: reference.name, mcpName: reference.name });
     } else if (reference.kind === "quote") {
       parts.push({ text: reference.name, quote: { messageId: reference.id, text: reference.name } });
+    } else if (reference.kind === "tab" || reference.kind === "thread") {
+      parts.push({ text: reference.name, reference: { kind: reference.kind, id: reference.id } });
     } else {
       const skill = skills.find(
-        (candidate) => candidate.skillId === reference.id && candidate.state !== "needs-repair",
+        (candidate) =>
+          candidate.skillId === reference.id && candidate.state !== "needs-repair" && candidate.problem === undefined,
       );
       parts.push(skill ? { text: skill.name, skill } : { text: reference.name, unavailableKind: "skill" });
     }
@@ -521,7 +514,6 @@ function linkedMessageParts(body: string): RichMessagePart[] {
   return parts.length > 0 ? parts : [{ text: body }];
 }
 
-/** The URL as a tooltip, unless the link text is already that URL. */
 export function linkTitle(text: string, url: string): string | undefined {
   return text === url || `${text}/` === url ? undefined : url;
 }

@@ -1,16 +1,11 @@
-// The test side of the fake agents in `agents/`: install one as an executable, read its log, and drive
-// the real `AgentClient` through a thread and a turn.
 import { chmod, mkdir, readFile, writeFile } from "node:fs/promises";
 import { dirname, resolve } from "node:path";
+import type { MemoryContext } from "../../src/backend/agent/developer-instructions";
 import type { AgentClient } from "../../src/backend/agent-client";
 import { runCauseEffect } from "../../src/backend/effect-boundary";
 import { type AppServerNotification, getRecord, getString, isRecord } from "../../src/backend/protocol";
 import type { CustomProviderCipher } from "../../src/main/custom-provider-store";
 
-/**
- * Writes an executable that starts `agents/<agent>.ts` with the Bun that runs the test. `env` is set
- * for this executable only, so one test can run several fakes that act differently.
- */
 export async function installFakeAgent(
   executable: string,
   agent: string,
@@ -25,7 +20,6 @@ export async function installFakeAgent(
   await chmod(executable, 0o755);
 }
 
-/** Reads the JSON lines that a fake wrote with `logEntry`. A missing file is an empty log. */
 export async function readJsonl<T>(path: string): Promise<T[]> {
   const text = await readFile(path, "utf8").catch(() => "");
   return text
@@ -34,7 +28,6 @@ export async function readJsonl<T>(path: string): Promise<T[]> {
     .map((line) => JSON.parse(line));
 }
 
-/** Replaces the operating system's secret storage, which exists only in Electron. */
 export const xorCipher: CustomProviderCipher = {
   canPersist: () => true,
   encrypt: (value) => Buffer.from(Buffer.from(value, "utf8").map((byte) => byte ^ 0x5a)),
@@ -46,32 +39,28 @@ export interface ThreadStartParams {
   model?: string;
   runtimeWorkspaceRoots?: string[];
   developerInstructions?: string;
+  memoryContext?: MemoryContext;
 }
 
 export async function startThread(client: AgentClient, params: ThreadStartParams): Promise<string> {
   const response = await runCauseEffect(client.request("thread/start", params, (value) => value));
-  const id = JSON.stringify(response).match(/"id":"([^"]+)"/)?.[1];
+  const id = getString(getRecord(response, "thread"), "id");
   if (!id) throw new Error("thread/start answers no thread id.");
   return id;
 }
 
 export interface TurnResult {
-  /** The text of the completed agent items. */
   reply: string;
-  /** The message of the turn's error notification, or null. */
   error: string | null;
-  /** The status of `turn/completed`, such as `completed` or `interrupted`. */
   status: string | null;
 }
 
-/** A turn that has not completed by then fails, so that a run writes its report before the job timeout. */
 const TURN_TIMEOUT_MS = 300_000;
 
-/** Starts a turn and waits for its completion, also after an error. It fails when the agent exits. */
 export async function runTurn(
   client: AgentClient,
   thread: string,
-  options: { model?: string; text?: string; timeoutMs?: number } = {},
+  options: { model?: string; effort?: string; text?: string; images?: readonly string[]; timeoutMs?: number } = {},
 ): Promise<TurnResult> {
   const result: TurnResult = { reply: "", error: null, status: null };
   let finished = false;
@@ -97,14 +86,21 @@ export async function runTurn(
     const timeoutMs = options.timeoutMs ?? TURN_TIMEOUT_MS;
     timer = setTimeout(() => fail(new Error(`The turn did not complete in ${timeoutMs / 1000} s.`)), timeoutMs);
   });
-  // `turn/start` can fail first; then nothing awaits `done`.
   done.catch(() => undefined);
   try {
-    const input = [{ type: "text", text: options.text ?? "hello", text_elements: [] }];
+    const input = [
+      { type: "text", text: options.text ?? "hello", text_elements: [] },
+      ...(options.images ?? []).map((path) => ({ type: "localImage", path })),
+    ];
     await runCauseEffect(
       client.request(
         "turn/start",
-        { threadId: thread, ...(options.model ? { model: options.model } : {}), input },
+        {
+          threadId: thread,
+          ...(options.model ? { model: options.model } : {}),
+          ...(options.effort ? { effort: options.effort } : {}),
+          input,
+        },
         (value) => value,
       ),
     );

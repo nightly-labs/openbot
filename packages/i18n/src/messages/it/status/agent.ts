@@ -8,25 +8,90 @@ export const messages = {
   "status.agent.instructionsChanged": "Ha aggiornato le sue istruzioni",
   "status.agent.modelSwitchedForLimit": "Limite di utilizzo raggiunto. Passato a {model}.",
   "status.agent.modelReturnedAfterLimit": "Limite di utilizzo terminato. Tornato a {model}.",
+  "status.agent.routineSkippedRunOpen": "Saltata: l'ultima esecuzione non era finita",
+  "status.agent.routineSkippedUsageLimit": "Saltata: limite di utilizzo raggiunto",
   "status.agent.modelSwitchedForError": "Errore del provider. Passato a {model}.",
+  "status.agent.modelSwitchedForSpentBalance":
+    "{previous} non ha più crediti. Passaggio a {model}. Per usarlo di nuovo, aggiungi crediti e poi selezionalo.",
   "status.agent.modelReturnedAfterError": "Tornato a {model} dopo l’errore del provider.",
+  "status.agent.modelSwitchedForRemovedModel": "{previous} non è più disponibile. Passato a {model}.",
   "status.agent.marketplaceSuggested": "Ha suggerito un'app del Marketplace: {app}.",
+  "status.agent.settingShown": "Ha mostrato un'impostazione: {setting}.",
   "status.agent.channelMemberAdded": "{agent} ha aggiunto {member} al canale. Lo ha chiesto {person}.",
   "status.agent.channelMemberRemoved": "{agent} ha rimosso {member} dal canale. Lo ha chiesto {person}.",
   "status.agent.channelInstructionsChanged": "{agent} ha modificato le istruzioni del canale. Lo ha chiesto {person}.",
   "status.agent.channelRoutineCreated": "{agent} ha creato la routine {routine}. Lo ha chiesto {person}.",
   "status.agent.channelRoutineUpdated": "{agent} ha modificato la routine {routine}. Lo ha chiesto {person}.",
   "status.agent.channelRoutineDeleted": "{agent} ha eliminato la routine {routine}. Lo ha chiesto {person}.",
+  "status.agent.channelTaskCancelled":
+    "{agent} ha annullato l’attività «{task}» e le sue sottoattività. Lo ha chiesto {person}.",
   "status.agent.screenCaptureScreen":
     "Acquisizione dello schermo principale e invio dell'immagine al modello dell'agente.",
   "status.agent.screenCaptureChannel":
     "L'immagine appare nel canale {channel} e ogni membro di questo server che legge il canale può vederla.",
+  "status.agent.creditImageApproval": "Genera un’immagine con {model}. Costa {credits} crediti.",
+  "status.agent.creditVideoApproval": "Genera un video con {model}. Costa {credits} crediti.",
+  "status.agent.creditMediaChannel":
+    "Il risultato appare nel canale {channel} e ogni membro di questo server che legge il canale può vederlo.",
+  "status.agent.creditsHoldBalance": "Usa {credits} crediti e il saldo è di {balance} crediti.",
+  "status.agent.creditsHoldAgentsOff": "Gli agenti di questo server non possono usare i crediti.",
+  "status.agent.screenCapturePermissionNext":
+    "Poi macOS può chiederti di consentire a OpenBot la registrazione dello schermo.",
   "status.agent.screenCaptureDisplay":
     "Acquisizione dello schermo {name} e invio dell'immagine al modello dell'agente.",
   "status.agent.screenCaptureWindow":
     "Acquisizione della finestra {name} e invio dell'immagine al modello dell'agente.",
   "status.agent.screenCaptureRegion":
     "Acquisizione dell'area dello schermo a {x}, {y}, {width} × {height} punti e invio dell'immagine al modello dell'agente.",
+  "status.agent.reportProblem":
+    "Diventerà una issue pubblica su GitHub, con la versione dell'app e il tuo sistema. Il tuo nome non viene mostrato.",
+  "status.agent.reportPhoneProblem":
+    "Diventerà una issue pubblica su GitHub, con la versione dell'app, il tuo sistema e la versione, il sistema e il log di assistenza del tuo telefono. Il tuo nome non viene mostrato.",
+  "status.agent.sendIdea": "Diventa una issue pubblica su GitHub. Il tuo nome non viene mostrato.",
+  "status.agent.feedbackRecentErrors": "Errori recenti nella chat:",
+  "status.agent.feedbackSameAs": "Si aggiunge alla issue #{issue}",
+  "status.agent.feedbackSent": "Inviato al team di OpenBot: {title}",
+  "status.agent.feedbackWithdrawn": "Rimosso da GitHub: {title}",
+  "status.agent.feedbackWithdrawCommand": "Rimuovi la segnalazione #{issue} da GitHub",
+  "status.agent.feedbackWithdrawReason":
+    "Nessuno potrà più vedere questa segnalazione su GitHub. Non puoi annullare l’operazione. Per correggerla, l’agente può inviare una segnalazione corretta.",
+  "status.agent.feedbackWithdrawing": "Rimozione della segnalazione da GitHub…",
+  "status.agent.serverInstallCommand":
+    "Crea un comando monouso che installa OpenBot su un altro computer come server {name} e lo collega al tuo account. L'agente lo esegue lì.",
+  "status.agent.serverInstallCard": "Comando di installazione per il server {name}",
+  "status.agent.browserProfileNamed":
+    "Sposta {agents} nel profilo del browser {profile}. Ricevono i suoi accessi e cookie. Le loro schede aperte si chiudono.",
+  "status.agent.commitCoAuthorOff": "Non aggiungere più OpenBot come coautore nei commit di tutti gli agenti.",
+  "status.agent.commitCoAuthorOn": "Aggiungere di nuovo OpenBot come coautore nei commit di tutti gli agenti.",
+  "status.agent.browserProfileNew":
+    "Crea il nuovo profilo del browser {profile} e sposta {agents} lì. Non ha accessi. Le loro schede aperte si chiudono.",
+  "status.agent.browserProfileShared":
+    "Sposta {agents} nel profilo del browser condiviso. Ricevono i suoi accessi e cookie. Le loro schede aperte si chiudono.",
+  "status.agent.browserProfileOwn":
+    "Dai a {agents} un profilo del browser proprio per ciascuno. Le loro schede aperte si chiudono.",
+  "status.agent.feedbackSending": "Invio del tuo feedback al team di OpenBot…",
+  "status.agent.workflowDelete":
+    "Elimina il flusso di lavoro {title} con le sue esecuzioni e versioni. I suoi passaggi aperti si fermano.",
+  "status.agent.deleteAgents": "Elimina {agents} con le loro chat e i loro file. Non puoi annullare l'operazione.",
+  "status.agent.nearSignatureReceived": "OpenBot ha ricevuto la firma. Puoi chiudere questa scheda.",
+  "status.agent.nearSignatureUnknown": "OpenBot non sta aspettando questa firma. Avviala di nuovo in OpenBot.",
+  "status.agent.nearPayment": "Pagamento di {amount} {symbol} a {recipient} dal wallet crypto, per {domain}: {reason}",
+  "status.agent.nearPaymentSending": "Pagamento di {amount} per {domain}: {reason}",
+  "status.agent.nearPaymentPaid": "Pagato {amount} per {domain}: {reason}",
+  "status.agent.nearPaymentNotPaid": "Non pagato: {amount} per {domain}: {reason}",
+  "status.agent.nearPaymentUncertain": "Non confermato: {amount} per {domain}: {reason}",
+  "status.agent.nearSummaryCreate":
+    "Tutti gli agenti possono pagare fino a {amount} USD al giorno. Puoi cambiarlo in seguito in OpenBot.",
+  "status.agent.nearSummaryGrant":
+    "Consenti a questa app OpenBot di pagare dal wallet per {days} giorni, entro le tue regole.",
+  "status.agent.nearSummaryBudget": "Imposta il budget giornaliero del wallet a {amount} USD.",
+  "status.agent.nearSummaryAutoPay":
+    "Consenti a OpenBot di pagare senza la tua firma quando una regola di pagamento lo permette. Per gli altri pagamenti ti viene comunque chiesto in chat.",
+  "status.agent.nearSummaryManualPay":
+    "Non resta nessuna regola di pagamento. OpenBot chiederà di nuovo la tua firma per ogni pagamento.",
+  "status.agent.nearSummaryPayment": "Approva il pagamento di {amount} a {recipient}.",
+  "status.agent.nearSummaryFreeze": "Gli agenti non possono pagare da questo wallet finché non riprendi i pagamenti.",
+  "status.agent.nearSummaryUnfreeze": "Gli agenti possono di nuovo pagare da questo wallet, entro le tue regole.",
   "status.agent.screenCaptureProgress": "Richiesta di acquisizione dello schermo…",
   "status.agent.screenCaptureReviewing": "Analisi dell'acquisizione dello schermo…",
   "status.agent.browserOpening": "Apertura di una pagina web…",
@@ -34,14 +99,17 @@ export const messages = {
   "status.agent.browserClicking": "Clic sulla pagina web…",
   "status.agent.browserTyping": "Digitazione nella pagina web…",
   "status.agent.browserActing": "Uso della pagina web…",
+  "status.agent.browserPaying": "Invio del pagamento…",
   "status.agent.browserReviewing": "Analisi della pagina web…",
   "status.agent.memoriesSearching": "Ricerca nelle sue memorie…",
+  "status.agent.chatsSearching": "Ricerca nelle sue chat precedenti…",
   "status.agent.memoriesSearched": {
     one: "Ha cercato nelle sue memorie: {count} trovata",
     other: "Ha cercato nelle sue memorie: {count} trovate",
   },
   "status.agent.memoriesUpdating": "Aggiornamento delle sue memorie…",
   "status.agent.skillUsing": "Uso della skill {name}…",
+  "status.agent.backdropSetting": "Modifica dello sfondo…",
   "status.agent.skillReading": "Lettura di una skill…",
   "status.agent.toolStepFailed":
     "Un passaggio dello strumento è fallito; analisi del risultato e scelta del prossimo tentativo…",
@@ -56,13 +124,39 @@ export const messages = {
   "status.agent.changesReviewing": "Analisi delle modifiche effettuate…",
   "status.agent.agentCoordinating": "Coordinamento con un altro agente…",
   "status.agent.agentResponseReviewing": "Analisi della risposta dell’altro agente…",
+  "status.agent.commandRunningUnnamed": "Esecuzione di un comando…",
   "status.agent.toolStepWorking": "Elaborazione del prossimo passaggio assistito dallo strumento…",
+  "status.agent.webSearching": "Ricerca sul web di «{query}»…",
+  "status.agent.urlFetching": "Apertura di {host}…",
+  "status.agent.fileReading": "Lettura di {name}…",
+  "status.agent.filesReading": "Lettura dei file…",
+  "status.agent.filesListing": "Esame di {path}…",
+  "status.agent.filesLooking": "Esame dei file…",
+  "status.agent.textSearching": "Ricerca di «{query}»…",
+  "status.agent.filesSearchingText": "Ricerca nei file…",
+  "status.agent.folderSizesMeasuring": "Misurazione delle dimensioni delle cartelle…",
+  "status.agent.diskSpaceChecking": "Controllo dello spazio libero su disco…",
+  "status.agent.processesChecking": "Controllo dei processi in esecuzione…",
+  "status.agent.gitChecking": "Controllo del repository Git…",
+  "status.agent.commandRunning": "Esecuzione di {program}…",
   "status.agent.memoryChanges": "Memorie: {saved} salvate, {updated} aggiornate, {forgotten} dimenticate.",
   "status.agent.memoryChangesWithConflicts":
     "Memorie: {saved} salvate, {updated} aggiornate, {forgotten} dimenticate, {notChanged} non modificate perché un altro thread le ha modificate prima.",
+  "status.agent.mcpToolCall": "Eseguire lo strumento {tool} del server MCP {name}.",
+  "status.agent.uiBlockClosedByMessage": "Chiuso da un nuovo messaggio",
+  "status.agent.location.field": "La tua posizione",
+  "status.agent.location.placeholder": "Città, indirizzo o luogo",
+  "status.agent.location.submit": "Condividi",
+  "status.agent.location.shared": "Posizione condivisa",
   "status.agent.nextStepContinues":
     "L'agente si è fermato prima del passaggio successivo. Continua ({current} di {limit}).",
   "status.agent.planContinues": "Il piano ha passaggi aperti. L'agente continua ({current} di {limit}).",
+  "status.agent.planStopped": "L'agente si è fermato con passaggi aperti nel piano. Invia un messaggio per continuare.",
+  "status.agent.continuationLimitReached":
+    "L'agente si è fermato prima di finire la richiesta. Non può più continuare da solo. Invia un messaggio per continuare.",
+  "status.agent.compactionContinues":
+    "La connessione si è interrotta mentre l'agente compattava il contesto. L'agente continua.",
+  "status.agent.providerExitContinues": "L'agente si è fermato prima di finire la risposta. L'agente continua.",
   "status.agent.branchTitle": "Chat ramificata",
   "status.agent.gmailSend.title": "Inviare questa email?",
   "status.agent.gmailSend.from": "Da",

@@ -6,6 +6,7 @@ import { useState } from "react";
 import { Pressable, View } from "react-native";
 import { useCSSVariable } from "uniwind";
 import { AvatarThumbnail } from "@/features/agents/components/bloub-avatar";
+import { ConnectorLogo } from "@/features/servers/components/connector-logo";
 import { SettingsRow } from "@/features/settings/components/settings-content";
 import { haptics } from "@/shared/lib/haptics";
 import { useText } from "@/shared/lib/text";
@@ -13,15 +14,12 @@ import { typeScale } from "@/shared/lib/type-scale";
 import { CATEGORY_LABELS, KIND_SINGULAR_LABELS, type MarketplaceListing } from "../model/marketplace-listings";
 import { ListingGradient } from "./listing-gradient";
 
-/**
- * The picture of a listing: an agent's avatar is round, as in the chat list; an app or a skill has a
- * rounded square, as an app icon. A listing without an image, or one that fails to load, draws the
- * agent's own avatar or the first letter of its name.
- */
 export function ListingIcon({ listing, size = 44 }: { listing: MarketplaceListing; size?: number }) {
   const [failed, setFailed] = useState(false);
   const [surface, muted] = useThemeColor(["surface-secondary", "muted"]);
   const radius = listing.kind === "agent" ? size / 2 : Math.round(size * 0.23);
+  if (listing.kind === "app" && listing.source === "connector")
+    return <ConnectorLogo id={listing.connector} size={size} />;
   if (listing.imageUrl && !failed)
     return (
       <Image
@@ -55,7 +53,6 @@ export function ListingIcon({ listing, size = 44 }: { listing: MarketplaceListin
   );
 }
 
-/** The kind and the category of a listing, for the line under its name. */
 export function useListingSubtitle(): (listing: MarketplaceListing, showKind: boolean) => string {
   const { t } = useText();
   return (listing, showKind) =>
@@ -67,7 +64,6 @@ export function useListingSubtitle(): (listing: MarketplaceListing, showKind: bo
       .join(" · ");
 }
 
-/** One listing in a grouped list. A listing the server has shows a check mark. */
 export function ListingRow({
   listing,
   installed,
@@ -97,7 +93,6 @@ export function ListingRow({
   );
 }
 
-/** The text on a listing's gradient: a dark panel, so that white text reads on every palette. */
 const ON_GRADIENT = {
   panel: "rgba(0, 0, 0, 0.42)",
   text: "#ffffff",
@@ -105,11 +100,6 @@ const ON_GRADIENT = {
   muted: "rgba(255, 255, 255, 0.72)",
 };
 
-/**
- * A card of the agent shelf: the agent's gradient with its avatar, as in the banner above it, then the
- * name, two lines about it, and the category and installs on the card's own surface. An agent the
- * server has carries a check mark.
- */
 export function AgentCard({
   listing,
   installed,
@@ -170,7 +160,6 @@ export function AgentCard({
   );
 }
 
-/** One app of the grid: the icon over its name. An app the server has carries a check mark. */
 export function AppTile({
   listing,
   installed,
@@ -209,11 +198,6 @@ export function AppTile({
   );
 }
 
-/**
- * The agent with the most installs, at the top of the overview: its avatar large on the listing's
- * gradient, as on the desktop page, and the name over a dark panel so that the text reads on every
- * palette.
- */
 export function FeaturedAgent({
   listing,
   installed,

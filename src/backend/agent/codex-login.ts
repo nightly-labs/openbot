@@ -8,12 +8,14 @@ import { causeHelpers } from "../effect-boundary";
 import {
   type AccountLoginCompletedResult,
   type AccountReadResult,
+  CODEX_MODEL_PROVIDER_ACCOUNT_TYPE,
   decodeAccountDeviceCodeLoginStartResult,
   decodeAccountLoginStartResult,
-  decodeAccountReadResult,
+  decodeCodexAccountReadResult,
   decodeRecordResponse,
   isCodexLoginType,
 } from "./../protocol";
+import { ProviderSignInError, signInReason } from "../provider-client-effects";
 import { recordRestartActivity } from "../restart-activity";
 
 const CODEX_LOGIN_TIMEOUT_MS = 10 * 60_000;
@@ -25,16 +27,13 @@ interface PendingCodexLogin {
   loginId: string;
   timer: NodeJS.Timeout;
   completing: boolean;
-  /** Settles when the login ends: true when it signed Codex in. */
   ended: Deferred.Deferred<boolean>;
 }
 
-/** What the ChatGPT sign-in needs from the provider runtime that owns the Codex status and client. */
 export interface CodexLoginHost {
   bundledExecutable(): string | null | undefined;
-  /** A new Codex client, bound to the runtime's events but not started. */
+  installedChosen(): boolean;
   createClient(cli: CodexCliInfo): AgentClient;
-  /** True when this client, or any client when none is given, is the active Codex client. */
   hasActiveClient(client?: AgentClient): boolean;
   activate(
     client: AgentClient,
@@ -48,11 +47,6 @@ export interface CodexLoginHost {
   setFailure(error: unknown, version?: string | null): void;
 }
 
-/**
- * The ChatGPT sign-in of the Codex provider, in its browser and its code shapes. At most one is
- * pending. Its client stays running until the provider reports the end, so the token it issues
- * stays with that client.
- */
 export class CodexLoginFlow {
   readonly #host: CodexLoginHost;
   #pending: PendingCodexLogin | null = null;
@@ -65,7 +59,6 @@ export class CodexLoginFlow {
     return this.#pending !== null;
   }
 
-  /** Stops the timer and returns the pending login's client, which the caller stops. */
   dispose(): AgentClient | null {
     const pending = this.#pending;
     this.#pending = null;
@@ -103,14 +96,6 @@ export class CodexLoginFlow {
     );
   }, Effect.uninterruptible).bind(this);
 
-  /**
-   * Starts the sign-in the user finishes on another device, and reports the code to show.
-   *
-   * Only the code and the page it is typed on cross back: the token the provider issues for that
-   * code stays with the Codex client this method leaves running, exactly as it does for the browser
-   * sign-in. How this one ends reaches the renderer the same way too, through the provider's status.
-   */
-
   readonly startDevice = Effect.fn("CodexLogin.startDevice")(function* (
     this: CodexLoginFlow,
   ): Effect.fn.Return<ProviderCodeLoginStart, CodexLoginFailed> {
@@ -132,15 +117,14 @@ export class CodexLoginFlow {
     return started ?? { kind: "connected" };
   }, Effect.uninterruptible).bind(this);
 
-  /**
-   * Saves an OpenAI API key as Codex's login, in a client of its own that stops at the end. Codex
-   * keeps the key in its home, as `codex login --with-api-key` does, so OpenBot stores no copy and
-   * Disconnect removes it. The caller restarts Codex on the new login. Codex checks the key on the
-   * first request, not here.
-   */
   readonly saveApiKey = Effect.fn("CodexLogin.saveApiKey")(function* (this: CodexLoginFlow, apiKey: string) {
     const bundledExecutable = this.#host.bundledExecutable();
-    const cli = yield* resolveInstalledFirst(resolveCodexCli, bundledExecutable, true).pipe(toCodexLoginFailed);
+    const cli = yield* resolveInstalledFirst(
+      resolveCodexCli,
+      bundledExecutable,
+      true,
+      this.#host.installedChosen(),
+    ).pipe(toCodexLoginFailed);
     yield* Effect.acquireUseRelease(
       loginStep(() => this.#host.createClient(cli)),
       (client) =>
@@ -150,11 +134,15 @@ export class CodexLoginFlow {
             .request("account/login/start", { type: "apiKey", apiKey }, decodeRecordResponse)
             .pipe(toCodexLoginFailed);
           const { account } = yield* client
-            .request("account/read", { refreshToken: false }, decodeAccountReadResult)
+            .request("account/read", { refreshToken: false }, decodeCodexAccountReadResult)
             .pipe(toCodexLoginFailed);
           if (account?.type !== "apiKey") {
             return yield* new CodexLoginFailed({
-              cause: new Error(sourceText("error.provider.noAuthenticatedAccount", { provider: "ChatGPT" })),
+              cause: new Error(
+                account?.type === CODEX_MODEL_PROVIDER_ACCOUNT_TYPE
+                  ? sourceText("error.provider.codexModelProvider")
+                  : sourceText("error.provider.noAuthenticatedAccount", { provider: "ChatGPT" }),
+              ),
             });
           }
         }),
@@ -175,14 +163,26 @@ export class CodexLoginFlow {
     clearTimeout(pending.timer);
 
     if (!completion.success) {
-      yield* this.#fail(pending, "ChatGPT connection was not completed. Try again.");
+      const reason = signInReason(completion.error);
+      yield* this.#fail(
+        pending,
+        reason
+          ? new ProviderSignInError({ message: sourceText("error.provider.acpSignInFailedReason", { reason }) })
+          : "ChatGPT connection was not completed. Try again.",
+      );
       return;
     }
 
     yield* Effect.gen({ self: this }, function* () {
       const account = yield* pending.client
-        .request("account/read", { refreshToken: true }, decodeAccountReadResult)
+        .request("account/read", { refreshToken: false }, decodeCodexAccountReadResult)
         .pipe(toCodexLoginFailed);
+      if (account.account?.type === CODEX_MODEL_PROVIDER_ACCOUNT_TYPE) {
+        return yield* this.#fail(
+          pending,
+          new ProviderSignInError({ message: sourceText("error.provider.codexModelProvider") }),
+        );
+      }
       if (account.account?.type !== "chatgpt") {
         return yield* new CodexLoginFailed({
           cause: new Error(sourceText("error.provider.noAuthenticatedAccount", { provider: "ChatGPT" })),
@@ -200,7 +200,6 @@ export class CodexLoginFlow {
     }).pipe(Effect.catch(() => this.#fail(pending, UNVERIFIED_MESSAGE)));
   }, Effect.uninterruptible).bind(this);
 
-  /** Ends the pending login after a completion the runtime could not decode. */
   readonly failUnverified = Effect.fn("CodexLogin.failUnverified")(function* (this: CodexLoginFlow) {
     const pending = this.#pending;
     if (pending) yield* this.#fail(pending, UNVERIFIED_MESSAGE);
@@ -225,17 +224,11 @@ export class CodexLoginFlow {
     else this.#host.clearConnectionState();
   }, Effect.uninterruptible).bind(this);
 
-  /**
-   * Waits until the pending login ends, and answers whether it signed Codex in. `null` when no login
-   * is pending: it did not start, or it already ended.
-   */
   readonly settled = Effect.fn("CodexLogin.settled")(function* (this: CodexLoginFlow) {
     const pending = this.#pending;
     if (!pending) return null;
     return yield* Deferred.await(pending.ended);
   }).bind(this);
-
-  /** Keeps a login the user already finished, and cancels one they did not, before a provider refresh. */
 
   readonly settleForRefresh = Effect.fn("CodexLogin.settleForRefresh")(function* (this: CodexLoginFlow) {
     const pending = this.#pending;
@@ -248,7 +241,7 @@ export class CodexLoginFlow {
     const activated = yield* Effect.result(
       Effect.gen({ self: this }, function* () {
         const result = yield* pending.client
-          .request("account/read", { refreshToken: true }, decodeAccountReadResult)
+          .request("account/read", { refreshToken: false }, decodeCodexAccountReadResult)
           .pipe(toCodexLoginFailed);
         const account = result.account;
         if (account?.type !== "chatgpt") return false;
@@ -266,14 +259,6 @@ export class CodexLoginFlow {
     this.#host.clearConnectionState();
   }, Effect.uninterruptible).bind(this);
 
-  /**
-   * Brings a Codex client up to the point where a sign-in can start, and hands it to `run`.
-   *
-   * Returns null when the client turned out to be signed in already: the account was activated and
-   * there is no login to start. Both sign-in shapes share this because everything before the
-   * `account/login/start` call - the CLI, the handshake, the account already on this computer - and
-   * everything the failure path has to undo is the same for a browser hand-off and for a code.
-   */
   readonly #withLoginClientEffect = Effect.fn("CodexLogin.withClient")(function* <T>(
     this: CodexLoginFlow,
     run: (client: AgentClient, cli: CodexCliInfo) => Effect.Effect<T, CodexLoginFailed>,
@@ -282,8 +267,12 @@ export class CodexLoginFlow {
     this.#host.setConnecting();
     return yield* Effect.gen({ self: this }, function* () {
       const bundledExecutable = this.#host.bundledExecutable();
-      // The CLI that the provider runs: the user's when it is as new as OpenBot's copy.
-      const resolved = yield* resolveInstalledFirst(resolveCodexCli, bundledExecutable, true).pipe(toCodexLoginFailed);
+      const resolved = yield* resolveInstalledFirst(
+        resolveCodexCli,
+        bundledExecutable,
+        true,
+        this.#host.installedChosen(),
+      ).pipe(toCodexLoginFailed);
       cli = resolved;
       return yield* Effect.acquireUseRelease(
         loginStep(() => this.#host.createClient(resolved)),
@@ -292,11 +281,9 @@ export class CodexLoginFlow {
             yield* initializeLoginClient(client);
             if (!this.#host.hasActiveClient()) {
               const existing = yield* client
-                .request("account/read", { refreshToken: false }, decodeAccountReadResult)
+                .request("account/read", { refreshToken: false }, decodeCodexAccountReadResult)
                 .pipe(
                   toCodexLoginFailed,
-                  // An expired sign-in fails this check too, such as "workspace routing discovery
-                  // unauthorized (401)". Read it as no account, so that the new sign-in can start.
                   Effect.catchIf(
                     (failure) => classifyUserError(failure.cause) === "auth",
                     () => Effect.succeed({ account: null }),
@@ -324,12 +311,6 @@ export class CodexLoginFlow {
     );
   }, Effect.uninterruptible);
 
-  /**
-   * Holds a started login open until the provider reports it finished, or until it times out.
-   *
-   * The deadline is OpenBot's, not the provider's. The code flow counts down to the same moment on
-   * screen, so the number the user reads is the one this timer acts on.
-   */
   #track(client: AgentClient, cli: CodexCliInfo, loginId: string): PendingCodexLogin {
     let pending: PendingCodexLogin;
     const timer = setTimeout(() => {
@@ -350,18 +331,17 @@ export class CodexLoginFlow {
   readonly #fail = Effect.fn("CodexLogin.fail")(function* (
     this: CodexLoginFlow,
     pending: PendingCodexLogin,
-    message: string,
+    failure: string | ProviderSignInError,
   ) {
     if (this.#pending !== pending) return;
     clearTimeout(pending.timer);
     this.#pending = null;
     end(pending, false);
     yield* pending.client.stop().pipe(toCodexLoginFailed).pipe(Effect.ignore);
-    this.#host.setFailure(new Error(message), pending.cli.version);
+    this.#host.setFailure(typeof failure === "string" ? new Error(failure) : failure, pending.cli.version);
   }, Effect.uninterruptible);
 }
 
-/** Starts a login client and completes its handshake. */
 function initializeLoginClient(client: AgentClient): Effect.Effect<void, CodexLoginFailed> {
   return Effect.gen(function* () {
     yield* loginStep(() => client.start());

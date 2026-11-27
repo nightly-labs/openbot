@@ -33,7 +33,6 @@ async function run() {
     });
     await mkdir(join(root, "sources"), { recursive: true });
 
-    // The user attaches an archive. It is stored unchanged, as a file with no inline preview.
     const userZip = join(root, "sources", "input.zip");
     await writeFile(userZip, archive);
     const drafts = await Effect.runPromise(files.prepareDrafts([userZip], []));
@@ -55,8 +54,6 @@ async function run() {
     assert.equal(inbound.sha256, digest(archive));
     assert.deepEqual(Object.keys(unzipSync(await readFile(inbound.path))).sort(), ["data/rows.csv", "notes.txt"]);
 
-    // A browser or a remote member sends the bytes with its own MIME type. The extension wins, so an
-    // archive never becomes an image for the provider or a text preview.
     const uploaderTypes = ["image/png", "text/plain", "application/x-zip-compressed", ""];
     const uploaded = await Effect.runPromise(
       files.prepareDrafts(
@@ -70,7 +67,6 @@ async function run() {
       assert.equal(draft.previewKind, "none");
     }
 
-    // The agent returns an archive with attach_files_to_response.
     const agentZip = join(root, "sources", "output.zip");
     await writeFile(agentZip, archive);
     const handle = await open(agentZip, "r");
@@ -84,11 +80,9 @@ async function run() {
     assert.equal(outbound.previewKind, "none");
     assert.deepEqual(await readFile(outbound.path), Buffer.from(archive));
 
-    // An archive can hold programs, so the desktop app shows it in the file manager.
     assert.equal(isOpenableAttachmentName("output.zip"), false);
     assert.doesNotThrow(() => assertSupportedAttachmentName("output.zip"));
-    // A remote host without the zip-attachments capability does not get archives.
-    const oldHost = { eml: true, media: true, zip: false, mp4: true, svg: true };
+    const oldHost = { eml: true, media: true, zip: false, mp4: true, svg: true, anyFile: false };
     assert.equal(supportedAttachmentExtensions(oldHost).includes("zip"), false);
     assert.equal(isSupportedAttachmentNameFor("input.zip", oldHost), false);
     assert.equal(isSupportedAttachmentNameFor("input.zip", { ...oldHost, zip: true }), true);

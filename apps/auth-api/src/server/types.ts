@@ -1,8 +1,10 @@
+import type { AvatarColor } from "@openbot/contracts/ipc";
 import type { AccountSession } from "@openbot/contracts/mobile-connect";
 import { isDynamicRecord, isFunction } from "@openbot/contracts/runtime-values";
 import type { Effect } from "effect";
 import type { AuthStoreError } from "./d1-auth-repository";
 import type { EmailDeliveryError } from "./email-delivery";
+import { observedD1 } from "./observed-d1";
 import type { SmtpContactMessage, SmtpFailure, SmtpLicenseMessage, SmtpWelcomeMessage } from "./smtp-email-delivery";
 
 export interface WorkerBindings {
@@ -15,113 +17,89 @@ export interface WorkerBindings {
   MARKETPLACE_UPLOAD_RATE_LIMITER: RateLimit;
   SITE_REPORT_RATE_LIMITER: RateLimit;
   GITHUB_TOKEN_RATE_LIMITER: RateLimit;
-  /** Checked by the Live Activity relay only, so a Worker without it keeps its other routes. */
   LIVE_ACTIVITY_RATE_LIMITER?: RateLimit;
+  FEEDBACK_RATE_LIMITER?: RateLimit;
+  WATCH_TICKET_RATE_LIMITER?: RateLimit;
   AUTH_EXPOSE_DEVELOPMENT_CODE?: string;
+  BROWSER_EXTENSION_IDS?: string;
   EMAIL_SMTP_HOST?: string;
   EMAIL_SMTP_PORT?: string;
   EMAIL_SMTP_USERNAME?: string;
   EMAIL_SMTP_PASSWORD?: string;
+  EMAIL_SMTP_OVERFLOW_USERNAME?: string;
+  EMAIL_SMTP_OVERFLOW_PASSWORD?: string;
   EMAIL_FROM?: string;
-  /** The sender of license emails. Empty uses `EMAIL_FROM`. The SMTP account must be allowed to send as it. */
+  EMAIL_REPLY_TO?: string;
   EMAIL_LICENSE_FROM?: string;
-  /** The email relay Worker. Without it, email leaves from this Worker's own socket. */
+  EMAIL_LICENSE_REPLY_TO?: string;
   EMAIL_RELAY?: Fetcher;
+  EMAIL_FALLBACK?: SendEmail;
   EMAIL_DELIVERY_WEBHOOK_URL?: string;
   EMAIL_DELIVERY_WEBHOOK_SECRET?: string;
   SKILLS_ADMIN_TOKEN?: string;
+  MEDIA_GATEWAY?: Fetcher;
+  NEAR_INTENTS_PARTNER_KEY?: string;
+  NEAR_INTENTS_AGENT_API_URL?: string;
   SITE_OPERATIONS_ADMIN_TOKEN?: string;
   SERVER_CLAIMS_ADMIN_TOKEN?: string;
+  STORE_REVIEW_EMAIL?: string;
+  STORE_REVIEW_CODE?: string;
   SITE_REPORT_HASH_SECRET?: string;
-  /** Encrypts the client secrets of company sign-in and signs its DNS records. At least 32 bytes. */
   COMPANY_SIGN_IN_SECRET?: string;
+  HOSTED_ARCHIVE_KEY_SECRET?: string;
+  B2_WORKER_KEY_ID_EU?: string;
+  B2_WORKER_APPLICATION_KEY_EU?: string;
   SITE_COOKIE_ISOLATION_READY?: string;
   SITE_PUBLISH_ENABLED?: string;
   SITE_LOCAL_ORIGIN?: string;
   REMOTE_TICKET_PRIVATE_JWK?: string;
   REMOTE_TICKET_PUBLIC_JWKS?: string;
   REMOTE_TICKET_KEY_ID?: string;
-  /** The entry Signal: released hosts, ingress, bots, and hosts with no home. */
   REMOTE_SIGNAL_URL?: string;
-  /**
-   * The Signal machines that a host can have as its home, as `id=url,id=url`. Empty = no homes, and
-   * each ticket names `REMOTE_SIGNAL_URL`.
-   */
   REMOTE_SIGNAL_HOMES?: string;
+  REMOTE_SIGNAL_HOME_LOCATIONS?: string;
+  REMOTE_SIGNAL_HOME_COUNTRIES?: string;
   REMOTE_AUTH_WEBHOOK_URL?: string;
-  /** Each Signal that gets the auth events, as `url,url`. Empty = only `REMOTE_AUTH_WEBHOOK_URL`. */
   REMOTE_AUTH_WEBHOOK_URLS?: string;
   REMOTE_AUTH_WEBHOOK_SECRET?: string;
-  /**
-   * The Cloudflare zone of the `REMOTE_SIGNAL_URL` name. With `SIGNAL_ENTRY_DNS_TOKEN` and two homes, the
-   * cron moves that name to a home that answers when its machine stops (`signal-entry-failover.ts`).
-   */
   SIGNAL_ENTRY_ZONE_ID?: string;
-  /** A Cloudflare API token that can read and edit the DNS records of `SIGNAL_ENTRY_ZONE_ID` only. */
   SIGNAL_ENTRY_DNS_TOKEN?: string;
-  /** Signs Slack route tickets. Its public key must also be in `REMOTE_TICKET_PUBLIC_JWKS`. */
   SLACK_ROUTE_PRIVATE_JWK?: string;
   SLACK_ROUTE_KEY_ID?: string;
-  /** The OpenBot Slack app, which every workspace installs. */
   SLACK_CLIENT_ID?: string;
   SLACK_CLIENT_SECRET?: string;
-  /** Signs the OAuth `state` of the Slack install. At least 32 bytes. */
   SLACK_STATE_SECRET?: string;
-  /** Development only: the public HTTPS tunnel of a local API, which Slack can send the browser back to. */
   SLACK_DEV_PUBLIC_ORIGIN?: string;
-  /** Signs Discord route tickets. Its public key must also be in `REMOTE_TICKET_PUBLIC_JWKS`. */
   DISCORD_ROUTE_PRIVATE_JWK?: string;
   DISCORD_ROUTE_KEY_ID?: string;
-  /** The OpenBot Discord app, which every Discord server adds. Its bot token is only in Signal. */
   DISCORD_CLIENT_ID?: string;
   DISCORD_CLIENT_SECRET?: string;
-  /** Signs the OAuth `state` of the Discord install. At least 32 bytes. */
   DISCORD_STATE_SECRET?: string;
-  /** Development only: the public origin of a local API, which Discord can send the browser back to. */
   DISCORD_DEV_PUBLIC_ORIGIN?: string;
-  /**
-   * The OpenBot Telegram bot, which every chat adds: its ID (the part of the token before the colon)
-   * and its username. Not secret. Without them, the Telegram routes answer 503. The Telegram route
-   * ticket uses the Slack route key.
-   */
   TELEGRAM_BOT_ID?: string;
   TELEGRAM_BOT_USERNAME?: string;
-  /** A Stripe sandbox (`sk_test_`) key in development and test. */
   STRIPE_SECRET_KEY?: string;
   STRIPE_WEBHOOK_SECRET?: string;
-  /**
-   * An ISO 8601 time. A license bought more than 2 days before it is free until then. Empty or absent:
-   * a new license is paid at once.
-   */
+  VIES_REQUESTER_VAT_ID?: string;
   LICENSE_TRIAL_END?: string;
+  BILLING_COUNTRY_REQUIRED?: string;
   HOSTED_SERVERS_ENABLED?: string;
-  /** Comma-separated account IDs or emails that can create hosted servers. `*` allows each account. */
   HOSTED_SERVERS_ALLOWED_USER_IDS?: string;
-  /** A request with this key in `OpenBot-Hosting-Developer-Key` can create hosted servers. Test Worker only. */
   HOSTED_SERVERS_DEVELOPER_KEY?: string;
-  /** The boat named snapshot that new hosted servers start from. */
   HOSTED_SERVER_TEMPLATE?: string;
   BOAT_API_KEY?: string;
   BOAT_WEBHOOK_SECRET?: string;
-  /** An OpenPanel server client and its write-only secret, for account events. Set only in production. */
+  HOSTED_POOL_ALERT_WEBHOOK_URL?: string;
   OPENPANEL_CLIENT_ID?: string;
   OPENPANEL_CLIENT_SECRET?: string;
-  /** The public Client ID of the OpenBot GitHub App. */
   GITHUB_APP_CLIENT_ID?: string;
-  /** The private key of the OpenBot GitHub App as a PKCS #8 PEM. Without it, no installation token is issued. */
   GITHUB_APP_PRIVATE_KEY?: string;
-  /** The Apple Push Notification service key (`.p8`, PEM text). The Live Activity relay is off without it. */
+  FEEDBACK_WITHDRAWN_REPOSITORY?: string;
   APNS_PRIVATE_KEY?: string;
   APNS_KEY_ID?: string;
   APNS_TEAM_ID?: string;
-  /** The iOS app bundle ID. */
   APNS_TOPIC?: string;
-  /** Local development only: the development server that forwards to Apple over HTTP/2. */
   APNS_ORIGIN?: string;
-  /**
-   * The Firebase service account key file (JSON) that sends Android notifications through Firebase
-   * Cloud Messaging. The Android notification relay is off without it.
-   */
   FCM_SERVICE_ACCOUNT?: string;
 }
 
@@ -167,11 +145,17 @@ function isWorkerBindings(value: unknown): value is WorkerBindings {
   return true;
 }
 
+const observedBindings = new WeakMap<WorkerBindings, WorkerBindings>();
+
 export function requireWorkerBindings(value: unknown): WorkerBindings {
   if (!isWorkerBindings(value)) {
     throw new Error("Cloudflare worker bindings are unavailable.");
   }
-  return value;
+  const known = observedBindings.get(value);
+  if (known) return known;
+  const observed = { ...value, DB: observedD1(value.DB) };
+  observedBindings.set(value, observed);
+  return observed;
 }
 
 export interface MobileAuthSessionResult {
@@ -185,8 +169,8 @@ export interface AuthUser {
   email: string;
   name: string | null;
   avatarUrl: string | null;
-  /** The latest product analytics answer from any device. Null until the user answers. */
   analyticsEnabled: boolean | null;
+  chatColor: AvatarColor | null;
 }
 
 export interface MobileAuthDevice {
@@ -195,7 +179,6 @@ export interface MobileAuthDevice {
   platform: "ios" | "android" | "unknown";
   connectedAt: number;
   lastActiveAt: number;
-  /** How the phone signed in: a one-time code, or a permanent link. */
   via: "code" | "link";
 }
 
@@ -213,6 +196,15 @@ export interface EmailCodeDelivery {
   }): Effect.Effect<void, EmailDeliveryError | SmtpFailure>;
 }
 
+export interface OwnerTransferEmailDelivery {
+  send(message: {
+    email: string;
+    fromEmail: string;
+    serverName: string;
+    appUrl: string;
+  }): Effect.Effect<void, EmailDeliveryError | SmtpFailure>;
+}
+
 export interface TeamInviteEmailDelivery {
   send(message: {
     email: string;
@@ -224,15 +216,15 @@ export interface TeamInviteEmailDelivery {
 }
 
 export interface WelcomeEmailDelivery {
-  send(message: SmtpWelcomeMessage): Effect.Effect<void, SmtpFailure>;
+  send(message: SmtpWelcomeMessage): Effect.Effect<void, EmailDeliveryError | SmtpFailure>;
 }
 
 export interface LicenseEmailDelivery {
-  send(message: SmtpLicenseMessage): Effect.Effect<void, SmtpFailure>;
+  send(message: SmtpLicenseMessage): Effect.Effect<void, EmailDeliveryError | SmtpFailure>;
 }
 
 export interface ContactMessageDelivery {
-  send(message: SmtpContactMessage): Effect.Effect<void, SmtpFailure>;
+  send(message: SmtpContactMessage): Effect.Effect<void, EmailDeliveryError | SmtpFailure>;
 }
 
 export type EmailVerificationResult =
@@ -272,7 +264,6 @@ export interface AuthRepository {
     state: "sent" | "failed",
     now: number,
   ): Effect.Effect<void, AuthStoreError>;
-  /** With `device`, the new session is a mobile session of that device. */
   verifyEmailChallenge(input: {
     idHash: string;
     codeHash: string;
@@ -296,6 +287,11 @@ export interface AuthRepository {
     answeredAt: number,
     now: number,
   ): Effect.Effect<AuthUser, AuthStoreError>;
+  updateUserChatColor(
+    userId: string,
+    chatColor: AvatarColor | null,
+    now: number,
+  ): Effect.Effect<AuthUser, AuthStoreError>;
   updateUserAvatar(
     userId: string,
     avatarUrl: string | null,
@@ -317,7 +313,6 @@ export interface AuthRepository {
     createdAt: number;
     expiresAt: number;
   }): Effect.Effect<void, AuthStoreError>;
-  /** Spends the unused Mobile Connect tickets of the user for one desktop host. */
   cancelMobileAuthTickets(input: {
     userId: string;
     serverId: string;
@@ -336,7 +331,6 @@ export interface AuthRepository {
     session: { id: string; token: string; expiresAt: number };
     device: MobileAuthDeviceIdentity;
   }): Effect.Effect<MobileAuthSessionResult | null, AuthStoreError>;
-  /** Stores a new link and revokes the earlier links of the same user and host. False when the session or host does not match. */
   replaceMobileConnectLink(input: {
     linkHash: string;
     desktopSessionToken: string;
@@ -352,21 +346,24 @@ export interface AuthRepository {
     device: MobileAuthDeviceIdentity;
   }): Effect.Effect<MobileAuthSessionResult | null, AuthStoreError>;
   authenticateMobileSession(sessionToken: string, now: number): Effect.Effect<AuthUser | null, AuthStoreError>;
-  /** With a host, only the phones that can open it: none when the host is not in the account directory. */
   listMobileAuthDevices(
     userId: string,
     now: number,
     hostId: string | null,
   ): Effect.Effect<MobileAuthDevice[], AuthStoreError>;
   revokeMobileAuthDevice(userId: string, sessionId: string, now: number): Effect.Effect<boolean, AuthStoreError>;
-  /** Creates the user of the email when there is none. */
   createServerClaim(input: {
     claimHash: string;
     email: string;
     createdAt: number;
     expiresAt: number;
   }): Effect.Effect<void, AuthStoreError>;
-  /** Spends the claim and makes a desktop session. Null when the claim is unknown, used or expired. */
+  createServerClaimForUser(input: {
+    claimHash: string;
+    userId: string;
+    createdAt: number;
+    expiresAt: number;
+  }): Effect.Effect<void, AuthStoreError>;
   redeemServerClaim(input: {
     claimHash: string;
     now: number;

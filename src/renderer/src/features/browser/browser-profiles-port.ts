@@ -1,18 +1,33 @@
 import {
   type AgentBrowserProfile,
+  type BrowserComputerSharing,
   type BrowserProfileList,
   type BrowserProfileSummary,
+  type BrowserProxyList,
+  type BrowserProxySummary,
   type BrowserTabProfile,
   type ClearBrowserDataInput,
+  type DeleteBrowserProxyInput,
   LOCAL_SERVER_ID,
+  type SaveBrowserProxyInput,
+  type SetBrowserProfileProxyInput,
   type UpdateAgentBrowserProfileInput,
   type UpdateBrowserProfileInput,
 } from "@openbot/contracts/ipc";
 
-/**
- * The browser profiles of one server, and the profile of each of its agents. Desktop reaches them
- * through main for this computer and for a joined server; the web client asks the host directly.
- */
+interface BrowserProxyCalls {
+  list(): Promise<BrowserProxyList | null>;
+  save(input: SaveBrowserProxyInput): Promise<BrowserProxySummary>;
+  remove(input: DeleteBrowserProxyInput): Promise<void>;
+  setProfileProxy(input: SetBrowserProfileProxyInput): Promise<void>;
+  computerSharing?: BrowserComputerSharingCalls;
+}
+
+interface BrowserComputerSharingCalls {
+  read(): Promise<BrowserComputerSharing | null>;
+  set(sharing: boolean): Promise<void>;
+}
+
 export interface BrowserProfileCalls {
   list(): Promise<BrowserProfileList>;
   create(name: string): Promise<BrowserProfileSummary>;
@@ -21,16 +36,11 @@ export interface BrowserProfileCalls {
   remove(profileId: string): Promise<void>;
   readAgent(agentId: string): Promise<AgentBrowserProfile>;
   updateAgent(input: UpdateAgentBrowserProfileInput): Promise<AgentBrowserProfile>;
-  /** The profile of each open tab that is not in the shared session. */
   tabProfiles(): Promise<BrowserTabProfile[]>;
-  /**
-   * Calls `listener` each time the host reports a change of its profiles or of an agent's profile,
-   * also one made on another device. Absent when the host does not report changes.
-   */
+  proxies?: BrowserProxyCalls;
   onChanged?(listener: () => void): () => void;
 }
 
-/** The desktop calls for one server. Reads `window.openbot` on each call: stories replace it per case. */
 export function desktopBrowserProfileCalls(serverId?: string): BrowserProfileCalls {
   const agent = () => window.openbot.agent;
   const eventServerId = serverId ?? LOCAL_SERVER_ID;
@@ -43,6 +53,20 @@ export function desktopBrowserProfileCalls(serverId?: string): BrowserProfileCal
     readAgent: (agentId) => agent().getAgentBrowserProfile(agentId, serverId),
     updateAgent: (input) => agent().updateAgentBrowserProfile(input, serverId),
     tabProfiles: () => agent().listBrowserTabProfiles(serverId),
+    proxies: {
+      list: () => agent().listBrowserProxies(serverId),
+      save: (input) => agent().saveBrowserProxy(input, serverId),
+      remove: (input) => agent().deleteBrowserProxy(input, serverId),
+      setProfileProxy: (input) => agent().setBrowserProfileProxy(input, serverId),
+      ...(serverId === undefined || serverId === LOCAL_SERVER_ID
+        ? {}
+        : {
+            computerSharing: {
+              read: () => agent().getBrowserComputerSharing(serverId),
+              set: (sharing) => agent().setBrowserComputerSharing({ sharing }, serverId),
+            },
+          }),
+    },
     onChanged: (listener) =>
       agent().onScopedEvent((scoped) => {
         if (scoped.serverId === eventServerId && scoped.event.type === "browser-profiles-changed") listener();

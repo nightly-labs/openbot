@@ -1,7 +1,7 @@
 import type { AgentEvent, AgentSummary } from "@openbot/contracts/ipc";
 import { sourceText } from "@openbot/i18n/source";
 import type { Logger } from "@openbot/logging";
-import { Effect, Result, Schema } from "effect";
+import { Cause, Effect, Exit, Option, Result, Schema } from "effect";
 import type { AgentApiKeys } from "../agent-api-keys";
 import type { AgentClient, AgentProvider } from "../agent-client";
 import type { AgentStore } from "../agent-store";
@@ -22,17 +22,14 @@ import type { AgentBrowserHost, TurnLifecycle } from "./turn-lifecycle";
 export interface AgentRemovalHooks {
   emit(event: AgentEvent): void;
   listAgents(): AgentSummary[];
-  /** Removes the agent's tasks, with their threads and provider session files. */
   deleteTasks(agentId: string): Effect.Effect<void, AgentRemovalFailed>;
-  /** Ends the agent's background memory review, so that it does not write to a deleted agent. */
+  clearChannelContexts(agentId: string): Effect.Effect<void, AgentRemovalFailed>;
   cancelMemoryReview(agentId: string): Effect.Effect<void>;
-  /** Stops the agent's own provider process, which runs in its workspace. */
-  stopAgentProcess(agentId: string): Effect.Effect<void, AgentRemovalFailed>;
-  /** The provider's shared client, which can hold a session of the agent that the conversation does not list. */
+  stopAgentProcess(agentId: string): Effect.Effect<boolean, AgentRemovalFailed>;
+  releaseFolderHolders(agentId: string): Effect.Effect<boolean, AgentRemovalFailed>;
+  folderHeld(agentId: string): boolean;
   currentClient(provider: AgentProvider): AgentClient | null;
-  /** Whether a usage limit holds the agent's queue. */
   usageLimitHolds(agentId: string): boolean;
-  /** Waits for a model move of the agent that already runs. A move that starts later sees the deletion. */
   settleModelMoves(agentId: string): Effect.Effect<void>;
 }
 
@@ -50,27 +47,20 @@ export interface AgentRemovalOptions {
   turn: TurnLifecycle;
   hostedSites: HostedSiteCoordinator;
   compaction: ContextCompaction;
-  /** The API keys that users saved for agents; null where nothing saves them. */
   apiKeys?: AgentApiKeys | null | undefined;
-  /** Runs `remove` with the agent's approvals revoked. The main process gives it. */
   deleteWithRevokedApproval: (
     agentId: string,
     remove: () => Effect.Effect<void, AgentRemovalFailed>,
   ) => Effect.Effect<void, AgentRemovalFailed>;
-  /** The `agent-removal` logger. The main process keeps its lines in the agent log file. */
   logger: Logger;
   hooks: AgentRemovalHooks;
 }
 
-/**
- * Owns the deletion of an agent: the set of agents being deleted, the close of its provider
- * sessions and the removal of its provider files, mailbox data, files and record, in that order,
- * and the release of everything the running app still holds for it, its browser tabs included.
- *
- * It never imports the agent service facade.
- */
+const WORK_SETTLE_WAIT_MS = 30_000;
+
 export class AgentRemoval {
   readonly #deleting = new Set<string>();
+  readonly #heldFolders = new Set<string>();
   readonly #store: AgentStore;
   readonly #mailbox: MailboxStore;
   readonly #conversation: ConversationRuntime;
@@ -109,22 +99,22 @@ export class AgentRemoval {
     this.#hooks = options.hooks;
   }
 
-  /** The agents whose deletion is running. The routine scheduler leaves them out. */
   deleting(): ReadonlySet<string> {
     return this.#deleting;
   }
 
-  /**
-   * Fails as `delete` would when the agent is being deleted, has an active turn or compaction, or an
-   * unfinished delivery.
-   * While a usage limit holds the agent, only started work blocks: the hold can last for days, and
-   * the messages that wait for it go with the agent.
-   */
+  heldFoldersReleased(): string[] {
+    if (this.#heldFolders.size === 0) return [];
+    const listed = new Set(this.#store.list().map((agent) => agent.id));
+    for (const agentId of this.#heldFolders) if (!listed.has(agentId)) this.#heldFolders.delete(agentId);
+    return [...this.#heldFolders].filter((agentId) => !this.#deleting.has(agentId) && !this.#hooks.folderHeld(agentId));
+  }
+
   readonly ensureDeletable = Effect.fn("AgentRemoval.ensureDeletable")(function* (this: AgentRemoval, agentId: string) {
     yield* removalStep(() => this.#deletable(agentId));
   });
 
-  readonly delete = Effect.fn("AgentRemoval.delete")(function* (this: AgentRemoval, agentId: string) {
+  readonly #deleteAgent = Effect.fn("AgentRemoval.delete")(function* (this: AgentRemoval, agentId: string) {
     const agent = yield* removalStep(() => this.#deletable(agentId));
     yield* Effect.acquireUseRelease(
       removalStep(() => {
@@ -135,10 +125,7 @@ export class AgentRemoval {
       }),
       ({ wasPending }) =>
         Effect.gen({ self: this }, function* () {
-          // The drain and the model moves now leave this agent alone. Work that started before can still
-          // start a queued message, a compaction or a model move, so wait for it and check again.
-          yield* this.#drain.taskFor(agentId)?.pipe(Effect.ignore) ?? Effect.void;
-          yield* this.#hooks.settleModelMoves(agentId);
+          yield* this.#settleWork(agentId);
           const current = yield* removalStep(() => {
             this.#assertIdle(agentId);
             return this.#store.list().find((entry) => entry.id === agentId) ?? agent;
@@ -162,6 +149,38 @@ export class AgentRemoval {
     );
   }, Effect.uninterruptible);
 
+  delete(agentId: string): Effect.Effect<void, AgentRemovalFailed> {
+    return this.#deleteAgent(agentId).pipe(
+      Effect.mapError((failure) =>
+        isFolderInUse(failure)
+          ? new AgentRemovalFailed({ cause: new AgentFolderInUse(sourceText("error.agent.deleteWhenFolderFree")) })
+          : failure,
+      ),
+      Effect.onExit((exit) =>
+        Effect.sync(() => {
+          if (Exit.isFailure(exit) && Option.exists(Cause.findErrorOption(exit.cause), isFolderInUse))
+            this.#heldFolders.add(agentId);
+          else this.#heldFolders.delete(agentId);
+        }),
+      ),
+    );
+  }
+
+  #settleWork(agentId: string): Effect.Effect<void, AgentRemovalFailed> {
+    return Effect.interruptible(
+      Effect.andThen(
+        this.#drain.taskFor(agentId)?.pipe(Effect.ignore) ?? Effect.void,
+        this.#hooks.settleModelMoves(agentId),
+      ),
+    ).pipe(
+      Effect.timeoutOrElse({
+        duration: WORK_SETTLE_WAIT_MS,
+        orElse: () =>
+          Effect.fail(new AgentRemovalFailed({ cause: new Error(sourceText("error.agent.stopBeforeDelete")) })),
+      }),
+    );
+  }
+
   #deletable(agentId: string): AgentSummary | undefined {
     if (this.#deleting.has(agentId)) throw new Error(sourceText("error.agent.deletionBusy"));
     this.#assertIdle(agentId);
@@ -169,7 +188,6 @@ export class AgentRemoval {
   }
 
   #assertIdle(agentId: string): void {
-    // A held channel delivery keeps its assignment active, and the channel would wait for it forever.
     const pendingWork = this.#hooks.usageLimitHolds(agentId)
       ? this.#mailbox.hasStartedDelivery(agentId) || this.#channels.queueHold(agentId) !== null
       : this.#mailbox.hasUnfinishedDelivery(agentId);
@@ -186,10 +204,12 @@ export class AgentRemoval {
     this: AgentRemoval,
     agent: Pick<AgentSummary, "id" | "threadId">,
   ) {
-    // Approval revocation remains owned by the main-process gate. Its callback runs the
-    // complete ordered removal before the gate can restore an approval on failure.
     yield* this.#deleteWithRevokedApproval(agent.id, () => this.#removeAgentDataEffect(agent)).pipe(
-      Effect.mapError(() => new AgentRemovalFailed({ cause: new Error(sourceText("error.agent.deleteIncomplete")) })),
+      Effect.mapError((failure) =>
+        failure.cause instanceof AgentFolderInUse || failure.cause instanceof AgentFolderLocked
+          ? failure
+          : new AgentRemovalFailed({ cause: new Error(sourceText("error.agent.deleteIncomplete")) }),
+      ),
     );
   }, Effect.uninterruptible);
 
@@ -201,9 +221,6 @@ export class AgentRemoval {
     const providerSessions = yield* removalStep(() =>
       agent.threadId ? this.#store.database.listProviderSessions(agent.threadId) : [],
     );
-    // Keep provider session records until their private files have been removed. A shared client
-    // can still hold a recorded session that the conversation forgot, such as after another
-    // provider's exit or a history read (#4346).
     yield* this.#threads.releaseAgentSessions(
       agent.id,
       providerSessions.map((session) => ({
@@ -212,37 +229,74 @@ export class AgentRemoval {
       })),
     );
     let stage = "provider-files";
+    let orchestratorOf: readonly string[] = [];
+    let processKeptForWork = false;
     yield* Effect.gen({ self: this }, function* () {
       for (const session of providerSessions)
         yield* this.#threads
           .deleteProviderSessionFiles(session.externalSessionId, session.id)
           .pipe(toAgentRemovalFailed);
       stage = "messaging";
-      yield* this.#messaging.deleteForAgent(agent.id).pipe(toAgentRemovalFailed);
+      orchestratorOf = yield* this.#messaging.deleteForAgent(agent.id).pipe(toAgentRemovalFailed);
       stage = "tasks";
       yield* this.#hooks.deleteTasks(agent.id);
       stage = "mailbox";
       yield* this.#mailbox
         .deleteAgentData(agent.id, this.#channels.store.allContextThreads())
         .pipe(toAgentRemovalFailed);
+      stage = "channel-contexts";
+      yield* this.#hooks.clearChannelContexts(agent.id);
       stage = "api-keys";
       if (this.#apiKeys) yield* this.#apiKeys.removeAgent(agent.id).pipe(toAgentRemovalFailed);
-      // Just before the files go, so that no later stage can start the process again. A failed stop is
-      // logged: the removal reports whether the files could go.
       const stopped = yield* Effect.result(this.#hooks.stopAgentProcess(agent.id));
       if (Result.isFailure(stopped))
         this.#logger.warn("Could not stop a deleted agent's provider process.", removalErrorCode(stopped.failure));
+      else processKeptForWork = stopped.success;
       stage = "agent-files-and-record";
-      yield* this.#store.deleteAgent(agent.id).pipe(toAgentRemovalFailed);
+      yield* this.#store.deleteAgent(agent.id).pipe(
+        toAgentRemovalFailed,
+        Effect.catch((failure) =>
+          removalErrorCode(failure).code === "EBUSY"
+            ? this.#hooks.releaseFolderHolders(agent.id).pipe(
+                Effect.tap((kept) =>
+                  Effect.sync(() => {
+                    if (kept) processKeptForWork = true;
+                  }),
+                ),
+                Effect.andThen(this.#store.deleteAgent(agent.id).pipe(toAgentRemovalFailed)),
+              )
+            : Effect.fail(failure),
+        ),
+      );
     }).pipe(
+      Effect.tapError(() =>
+        removalStep(() => {
+          if (this.#store.list().some((candidate) => candidate.id === agent.id))
+            this.#messaging.store.restoreOrchestrator(agent.id, orchestratorOf);
+        }).pipe(
+          Effect.catch((failure) =>
+            Effect.sync(() =>
+              this.#logger.warn("Could not restore a deleted agent's orchestrator role.", removalErrorCode(failure)),
+            ),
+          ),
+        ),
+      ),
       Effect.mapError((failure) => {
-        // File-system errors can contain private paths. Log only the failed stage and the error code.
-        this.#logger.warn("Agent deletion failed.", { stage, ...removalErrorCode(failure) });
+        const code = removalErrorCode(failure);
+        this.#logger.warn("Agent deletion failed.", { stage, ...code });
+        if (stage === "agent-files-and-record" && code.code === "EBUSY") {
+          if (processKeptForWork)
+            return new AgentRemovalFailed({ cause: new AgentFolderInUse(sourceText("error.agent.deleteFolderInUse")) });
+          if (process.platform === "win32")
+            return new AgentRemovalFailed({
+              cause: new AgentFolderLocked(sourceText("error.agent.deleteFolderLocked")),
+            });
+        }
         return new AgentRemovalFailed({ cause: new Error(sourceText("error.agent.deleteIncomplete")) });
       }),
     );
     yield* this.closeBrowserTabs(agent);
-    // Nobody can use the sign-ins of a deleted agent again.
+    yield* this.#hooks.cancelMemoryReview(agent.id);
     const cleared = yield* Effect.result(this.#browser.clearAgentSession(agent.id));
     if (Result.isFailure(cleared))
       this.#logger.warn("Could not clear a deleted agent's browser session.", removalErrorCode(cleared.failure));
@@ -262,18 +316,6 @@ export class AgentRemoval {
     });
   });
 
-  /**
-   * A deleted agent's tabs are reachable by nobody: no agent passes the host's owner check for them,
-   * and the renderer lists tabs per agent, so they hold a view the user cannot even see to close.
-   * They also survive a restart, because the browser persists its tabs outside `openbot.db`.
-   *
-   * The owner test matches the renderer's, so a tab the user could see under this agent is a tab this
-   * closes -- including a legacy tab carrying only the thread id. Runs after the agent record is
-   * already gone, so a failure here must not fail the deletion the user asked for.
-   *
-   * A change of the agent's own browser session closes its tabs too: each tab keeps the session it
-   * opened in.
-   */
   readonly closeBrowserTabs = Effect.fn("AgentRemoval.closeBrowserTabs")(function* (
     this: AgentRemoval,
     agent: Pick<AgentSummary, "id" | "threadId">,
@@ -301,7 +343,13 @@ export class AgentRemovalFailed extends Schema.TaggedError<AgentRemovalFailed>()
 
 const { sync: removalStep, rewrap: toAgentRemovalFailed } = causeHelpers(AgentRemovalFailed);
 
-/** The first error code in the cause chain, such as `EBUSY` or `ERR_SQLITE_ERROR`. Never a message or a path. */
+class AgentFolderInUse extends Error {}
+
+class AgentFolderLocked extends Error {}
+
+const isFolderInUse = (failure: unknown): boolean =>
+  failure instanceof AgentRemovalFailed && failure.cause instanceof AgentFolderInUse;
+
 function removalErrorCode(failure: unknown): { code?: string; errcode?: number } {
   let cause = failure;
   for (let depth = 0; depth < 8 && isRecord(cause); depth += 1) {

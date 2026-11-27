@@ -8,9 +8,7 @@ import { useText } from "../../text";
 
 interface LanguageWheelProps {
   variant: AppVariant;
-  /** The computer's language tag, such as `en-GB`. It picks the flag of a language spoken in several countries. */
   systemLocale: string;
-  /** The language in the centre. The screen draws its own text in it. */
   language: TranslatedLocale;
   onChange: (language: TranslatedLocale) => void;
   onContinue: () => void;
@@ -24,19 +22,18 @@ interface WheelEntry {
 const PRODUCT_NAME = "OpenBot";
 const TITLE_ID = "language-wheel-title";
 
-/** The catalog languages in selector order. "System default" is not a row: the wheel opens on it. */
 const WHEEL: readonly WheelEntry[] = APP_LANGUAGE_OPTIONS.flatMap((option) => {
   const id = TRANSLATED_LOCALES.find((locale) => locale === option.id);
   return id ? [{ id, option }] : [];
 });
 
-/** The usual country of each catalog. Portuguese is the Brazilian catalog, so it keeps Brazil. */
 const FLAG_REGION: Record<TranslatedLocale, string> = {
   en: "US",
   ar: "SA",
   de: "DE",
   es: "ES",
   fr: "FR",
+  he: "IL",
   it: "IT",
   ja: "JP",
   ko: "KR",
@@ -48,57 +45,35 @@ const FLAG_REGION: Record<TranslatedLocale, string> = {
   zh: "CN",
 };
 
-/**
- * A language is not a country, so the flag follows the computer where it can: English on an
- * `en-GB` computer shows the British flag, Spanish on `es-MX` the Mexican one.
- */
 function flagFor(id: TranslatedLocale, systemLocale: string): string {
   let region = FLAG_REGION[id];
   try {
     const locale = new Intl.Locale(systemLocale);
     if (id !== "pt" && locale.language === id && locale.region) region = locale.region;
-  } catch {
-    // An invalid system locale keeps the usual country.
-  }
+  } catch {}
   return String.fromCodePoint(...[...region.toUpperCase()].map((letter) => 0x1f1e6 + letter.charCodeAt(0) - 65));
 }
 
-/** Wheel and trackpad deltas below this move nothing; one gesture past it moves one row. */
 const WHEEL_STEP_DELTA = 24;
-/** The pause after a wheel step. A trackpad sends a burst of events for one swipe. */
 const WHEEL_STEP_COOLDOWN_MS = 140;
-/** Pointer travel before a press becomes a drag, so a click on a name still selects it. */
 const DRAG_THRESHOLD_PX = 6;
 
-/** Keys that turn the wheel from anywhere on the screen, not only from a focused radio. */
 const WHEEL_KEY_STEP: Record<string, number> = { ArrowUp: -1, ArrowLeft: -1, ArrowDown: 1, ArrowRight: 1 };
 
-/** The wheel is a loop, so every row index, however far a drag goes, names a language. */
 function wheelIndex(index: number): number {
   return ((index % WHEEL.length) + WHEEL.length) % WHEEL.length;
 }
 
-/**
- * Rows from the centre to `row`, the short way round: from minus half the wheel to just under half.
- * The one row at the far side jumps between the two ends, and it is invisible there.
- */
 function wheelOffset(row: number, position: number): number {
   return wheelIndex(row - position + WHEEL.length / 2) - WHEEL.length / 2;
 }
 
-/** A key typed into one of these is text, not a wheel command. */
 function isTextEntry(target: EventTarget | null): boolean {
   if (!(target instanceof HTMLElement)) return false;
   if (target.isContentEditable || target instanceof HTMLTextAreaElement) return true;
   return target instanceof HTMLInputElement && target.type !== "radio";
 }
 
-/**
- * The wheel itself, a loop with no first or last row, so the language it opens on is always in the
- * centre with others above and below. Five ways to turn it: the arrow buttons, the scroll wheel or
- * a trackpad swipe, a drag, the arrow keys, and a click on a name. The keys work without focus
- * first, because this is the whole screen. Enter confirms.
- */
 function LanguageWheelPicker(props: {
   systemLocale: string;
   language: TranslatedLocale;
@@ -117,13 +92,11 @@ function LanguageWheelPicker(props: {
     const next = WHEEL[wheelIndex(to)];
     if (next && next.id !== props.language) props.onChange(next.id);
   };
-  // While dragging, the wheel follows the pointer between rows, so sizes ease with it.
   const position = () => (drag.active ? drag.anchor + drag.offset / drag.row : index());
 
   onSettled(() => {
     const found = viewport();
     if (!found) return;
-    // Typed here, so the listeners below keep the narrowing.
     const element: HTMLElement = found;
     const rowHeight = () => element.querySelector<HTMLElement>(".language-wheel-item")?.offsetHeight ?? 1;
 
@@ -155,7 +128,6 @@ function LanguageWheelPicker(props: {
     }
     function onPointerMove(event: PointerEvent): void {
       if (event.pointerId !== pointerId) return;
-      // A press released outside the wheel before the drag captured the pointer sent no `pointerup` here.
       if (event.buttons === 0) {
         onPointerEnd(event);
         return;
@@ -180,7 +152,6 @@ function LanguageWheelPicker(props: {
         state.offset = 0;
       });
     }
-    // The click that ends a drag must not select the name under the pointer.
     function onClickCapture(event: MouseEvent): void {
       if (!dragged) return;
       dragged = false;
@@ -188,8 +159,6 @@ function LanguageWheelPicker(props: {
       event.stopPropagation();
     }
 
-    // Replaces the radios' own arrow handling so the keys work unfocused, and keeps focus on the
-    // radio that is now checked when the wheel has it.
     function onKeyDown(event: KeyboardEvent): void {
       if (event.defaultPrevented || event.altKey || event.ctrlKey || event.metaKey) return;
       if (isTextEntry(event.target)) return;
@@ -281,10 +250,6 @@ function LanguageWheelPicker(props: {
   );
 }
 
-/**
- * The first screen OpenBot shows, before sign-in, with the same brand lockup as the sign-in screen
- * after it. The screen text follows the language in the centre, so a reader sees each choice at once.
- */
 export function LanguageWheel(props: LanguageWheelProps) {
   const { t } = useText();
   return (

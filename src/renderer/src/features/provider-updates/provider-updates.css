@@ -1,6 +1,3 @@
-/* The provider mark in the update notification's icon slot. The sizes match the slot the Toaster
-   reserves for a status glyph, and the fill is the brand colour the provider row already uses, so
-   the notification and the row that offers the same update read as one thing. */
 .provider-update-toast-logo {
   width: var(--openbot-icon-md);
   height: var(--openbot-icon-md);
@@ -8,43 +5,20 @@
   fill: var(--openbot-provider-current);
 }
 
-/* The action sits beside the words it acts on, centred on the title and the version line, rather than
-   in a row of its own under them. The words stop at the button while it is there; a state with no
-   button gives them the full width, so the running update's bar reaches the right edge. */
-.provider-update-toast[data-sonner-toast][data-styled="true"] [data-action] {
-  grid-row: 1;
-  align-self: center;
-}
-
-.provider-update-toast[data-sonner-toast][data-styled="true"]:has(.provider-update-toast-action:not([data-idle="true"]))
-  [data-content] {
-  grid-column: 2;
-}
-
-/* In the first row the button is under the close control, which floats over the top right corner,
-   so it keeps the same room clear that the words keep. */
-.ui-toaster.ui-toaster-closeable .provider-update-toast[data-sonner-toast][data-styled="true"] [data-action],
-.ui-toaster .provider-update-toast[data-sonner-toast][data-styled="true"]:has([data-close-button]) [data-action] {
-  margin-inline-end: var(--openbot-space-6);
-}
-
-/* A state with nothing to offer marks its label instead of losing it, and the button goes out of the
-   layout. Sonner renders its action button for as long as an action exists on the toast, and taking
-   the action away means replacing the notification, which is the one thing this flow will not do.
-   Hiding the button also keeps a control with no accessible name out of the tree. */
 .ui-toaster [data-sonner-toast] [data-action]:has(.provider-update-toast-action[data-idle="true"]) {
   display: none;
 }
 
-/* The running update puts its bar under the version line. Sonner builds the toast's children itself,
-   so the bar cannot be one of them - it goes in the description, as a line of its own. */
+.ui-toaster
+  .provider-update-toast[data-sonner-toast][data-styled="true"]:has(.provider-update-toast-action[data-idle="true"]) {
+  padding-bottom: var(--openbot-space-3);
+}
+
 .provider-update-toast[data-sonner-toast][data-styled="true"] [data-description]:has(.provider-update-toast-progress) {
   display: flex;
   flex-direction: column;
 }
 
-/* A block, so the ellipsis applies in a state with no bar too, where the description is not a flex
-   column. */
 .provider-update-toast-line {
   display: block;
   min-width: 0;
@@ -54,8 +28,6 @@
   white-space: nowrap;
 }
 
-/* A failure is a sentence, not a version. It wraps, also inside a long path or address, and stops
-   after three lines until the user opens it. */
 .provider-update-toast-line[data-failed="true"] {
   display: -webkit-box;
   overflow-wrap: anywhere;
@@ -72,8 +44,6 @@
   line-clamp: none;
 }
 
-/* The control that opens the rest of the failure sits under it, at the start of the line, in the
-   description's colour. */
 .provider-update-toast .provider-update-toast-details {
   margin-top: var(--openbot-space-1);
   color: inherit;
@@ -81,7 +51,6 @@
   text-decoration: underline;
 }
 
-/* The bar and the percentage, on one line under the version. */
 .provider-update-toast-progress {
   display: flex;
   align-items: center;
@@ -89,27 +58,15 @@
   margin-top: var(--openbot-space-2);
 }
 
-/* The content column keeps its words clear of the close control, which floats over the top right
-   corner. The progress row is below that corner, so it takes the room back and ends at the card's
-   right padding. */
-.ui-toaster.ui-toaster-closeable .provider-update-toast .provider-update-toast-progress,
-.ui-toaster .provider-update-toast:has([data-close-button]) .provider-update-toast-progress {
-  margin-inline-end: calc(-1 * var(--openbot-space-6));
-}
-
 .provider-update-toast-bar {
   flex: 1;
   min-width: 0;
 }
 
-/* The bar carries the provider's colour, the same one the mark above it carries, so the running
-   update is legible as this provider's at a glance rather than as generic progress. */
 .provider-update-toast-bar[data-provider] .ui-progress-fill {
   background: var(--openbot-provider-current);
 }
 
-/* A short movement leaves most of each 400 ms display interval still and readable.
-   Move the whole value together; staggered digits make fast changes hard to read. */
 .provider-update-toast-percent {
   --digit-dur: var(--openbot-duration-fast);
   --digit-distance: var(--openbot-space-1);

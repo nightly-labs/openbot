@@ -4,21 +4,21 @@ import { playActionSound } from "../../action-sounds";
 import { useLayout } from "../../layout";
 import { usePlatform } from "../../platform";
 import { useServerActions } from "./server-actions";
-import { useServers } from "./servers-context";
 
-/**
- * The rail of team servers down the left edge. It is drawn once main has
- * reported the build and the user has not chosen the server menu instead,
- * which `serverRailVisible` answers; the shell asks the same question to
- * decide whether the frame has to leave room for it. The server shortcuts
- * work in both views.
- */
 export function WorkspaceServerRail() {
   const platform = usePlatform();
   const layout = useLayout();
-  const { reorderServers } = useServers();
-  const { orderedServers, select, add, addMenuCreateLocal, addCreatesServer, hiddenLocal, callbacks } =
-    useServerActions();
+  const {
+    orderedServers,
+    reorder,
+    select,
+    add,
+    addMenuCreateLocal,
+    addMenuInstallServer,
+    addCreatesServer,
+    hiddenServers,
+    callbacks,
+  } = useServerActions();
 
   onSettled(() => {
     const handleServerShortcut = (event: KeyboardEvent) => {
@@ -41,7 +41,6 @@ export function WorkspaceServerRail() {
       event.preventDefault();
       event.stopImmediatePropagation();
       if (server.active) return;
-      // A click on the rail plays its own cue. This key press clicks nothing.
       playActionSound("navigate");
       select(server.id);
     };
@@ -54,11 +53,12 @@ export function WorkspaceServerRail() {
       <ServerRail
         servers={orderedServers()}
         onSelect={select}
-        onReorder={(serverIds) => void reorderServers(serverIds)}
+        onReorder={reorder}
         onAdd={add}
         onCreateLocal={addMenuCreateLocal()}
+        onInstallServer={addMenuInstallServer()}
         addCreatesServer={addCreatesServer()}
-        hiddenLocal={hiddenLocal()}
+        hiddenServers={hiddenServers()}
         {...callbacks}
       />
     </Show>

@@ -1,0 +1,122 @@
+import type { PartialTranslation } from "../../../message";
+import type { messages as source } from "../../en/error/workflow";
+
+export const messages = {
+  "error.workflow.missing": "תהליך העבודה הזה כבר לא קיים.",
+  "error.workflow.versionMissing": "הגרסה הזו של תהליך העבודה כבר לא קיימת.",
+  "error.workflow.annotation": "אי אפשר לחבר טקסט, הערות וצורות.",
+  "error.workflow.port": "שלב לא יכול לקבל סוג קלט כזה.",
+  "error.workflow.unknownValue": "ה-OpenBot הזה לא מכיר הגדרה של שלב. יש לעדכן את OpenBot ולנסות שוב.",
+  "error.workflow.branch": "רק לתנאי יכולים להיות חיבורי כן ולא.",
+  "error.workflow.conditionBranch": "כל חיבור היוצא מתנאי חייב להיות כן או לא.",
+  "error.workflow.duplicateEdge": "שני השלבים האלה כבר מחוברים כך.",
+  "error.workflow.serverTooOld": "השרת הזה אינו תומך בתהליכי עבודה. יש לעדכן את OpenBot במחשב שמפעיל אותו.",
+  "error.workflow.newerSteps": "בתהליך העבודה הזה יש שלבים מ-OpenBot חדש יותר. יש לעדכן את OpenBot כדי לשנות אותו.",
+  "error.workflow.nodeUnsupported": "הגרסה הזו של OpenBot עדיין לא יכולה להריץ שלבי תמונה, קובץ והודעה.",
+  "error.workflow.interrupted": "OpenBot נעצר בזמן שהשלב הזה רץ. יש להריץ אותו שוב.",
+  "error.workflow.agentMissing": "יש לבחור סוכן לשלב הזה.",
+  "error.workflow.handoffFailed": "OpenBot לא הצליח לשלוח את השלב הזה לסוכן שלו.",
+  "error.workflow.agentStepEnded": "ההודעה של הסוכן לשלב הזה הוסרה לפני שהוא ענה.",
+  "error.workflow.agentStepStopped": "הסוכן נעצר לפני שענה על השלב הזה. יש להריץ את השלב שוב.",
+  "error.workflow.conditionUnclear": "המודל לא ענה כן או לא.",
+  "error.workflow.answerInvalid": "התשובה לא כללה את השדות שהשלב הזה מבקש: {fields}. יש להריץ את השלב שוב.",
+  "error.workflow.answerSetup":
+    "יש בעיה בשדות התשובה של תהליך העבודה הזה כאן: {fields}. תקן את תהליך העבודה ואז הרץ את השלב שוב.",
+  "error.workflow.answerSourceEnded":
+    "לשדות האלה אין ערך, כי השלב שנותן אותם לא הסתיים: {fields}. הרץ קודם את השלב הזה שוב.",
+  "error.workflow.runInputInvalid":
+    "הקלט של ההרצה לא מתאים לשדות התשובה של הטריגר: {fields}. שלח אובייקט JSON אחד עם השדות האלה.",
+  "error.workflow.sourceNotDone": "שלב קודם נכשל או נעצר בפעם האחרונה שרץ. הרץ קודם את השלב הזה שוב.",
+  "error.workflow.checkInvalid": "הבדיקה של השלב הזה לא תקינה. יש לתקן אותה ולהריץ את השלב שוב.",
+  "error.workflow.modelFailed": "המודל לא הצליח לענות. יש להריץ את השלב שוב.",
+  "error.workflow.modelTimedOut":
+    "המודל לא ענה בזמן. יש לבחור רמת מאמץ נמוכה יותר או מודל מהיר יותר לשלב הזה, ואז להריץ אותו שוב.",
+  "error.workflow.modelToolUse":
+    "המודל ניסה להשתמש בכלי, אבל השלב הזה יכול לענות רק בטקסט. יש להריץ את השלב שוב, או לבחור לו מודל אחר.",
+  "error.workflow.modelImageUnsupported":
+    "המודל של השלב הזה לא יכול לקרוא תמונות. בחר מודל שיכול, או הסר את חיבור התמונה.",
+  "error.workflow.modelImageType": "שלב מודל יכול לקרוא רק תמונות PNG,‏ JPEG,‏ GIF ו-WebP. חבר תמונה מאחד הסוגים האלה.",
+  "error.workflow.modelUnavailable": "המודל של השלב הזה לא זמין. יש לבחור מודל אחר לשלב הזה.",
+  "error.workflow.providerBusy": "הספק עמוס. יש להמתין כמה דקות ואז להריץ את השלב שוב.",
+  "error.workflow.providerOffline": "ל-OpenBot אין גישה לספק. יש לבדוק את החיבור לאינטרנט ואז להריץ את השלב שוב.",
+  "error.workflow.providerBilling":
+    "אין יתרה בחשבון, או שהתוכנית שלו לא כוללת את המודל הזה. יש לבדוק את התוכנית, או לבחור מודל אחר.",
+  "error.workflow.modelRefused": "הספק לא מאפשר את המודל הזה לחשבון הזה. יש לבחור מודל אחר.",
+  "error.workflow.modelRefusedReason": 'יש לבחור מודל אחר. הספק לא מאפשר את המודל הזה לחשבון הזה: "{reason}"',
+  "error.workflow.contentBlocked": "הספק חסם את הקלט. יש לשנות את הקלט או את ההנחיה ואז להריץ את השלב שוב.",
+  "error.workflow.inputTooLong": "הקלט ארוך מדי בשביל המודל הזה. יש לקצר אותו, או לבחור מודל אחר.",
+  "error.workflow.requestRefused": "הספק לא קיבל את השלב הזה. יש לבחור מודל אחר.",
+  "error.workflow.requestRefusedReason": 'יש לבחור מודל אחר. הספק לא קיבל את השלב הזה: "{reason}"',
+  "error.workflow.providerRefused": 'יש לבחור מודל אחר, או להריץ את השלב שוב. הספק אמר: "{reason}"',
+  "error.workflow.modelBusy": "בקשה אחרת למודל רצה כעת. יש להריץ את השלב שוב בעוד רגע.",
+  "error.workflow.mediaFailed": "המודל לא הצליח ליצור את התמונה או את הווידאו. יש להריץ את השלב שוב.",
+  "error.workflow.mediaNotMade": "המודל לא יצר את התמונה או את הווידאו. תשובתו: {answer}",
+  "error.workflow.pictureMissing": "התמונה כבר לא בשרת. יש לשלוח אותה שוב.",
+  "error.workflow.pictureType": "יש להשתמש בתמונה בפורמט PNG,‏ JPEG או WebP.",
+  "error.workflow.assetType":
+    "יש להשתמש בתמונה בפורמט PNG,‏ JPEG או WebP, בסרטון MP4 או MOV, או בקובץ שמע MP3,‏ M4A,‏ WAV,‏ AAC,‏ OGG או FLAC.",
+  "error.workflow.mediaInputMissing": "תמונה משלב קודם אינה זמינה. יש להריץ את השלב הזה שוב.",
+  "error.workflow.mediaEmptyRequest": "יש לכתוב תיאור, או להריץ את השלבים שלפני השלב הזה כדי שיגיע טקסט או תמונה.",
+  "error.workflow.mediaInputNotImage": "שלב זה מקבל רק תמונות, לא סרטונים. יש להסיר את החיבור מהסרטון.",
+  "error.workflow.mediaInputNotClip": "הקלט הזה מקבל רק סרטונים וקובצי שמע. יש להסיר את החיבור מהקובץ.",
+  "error.workflow.stepMissing": "השלב הזה כבר לא קיים.",
+  "error.workflow.nodeMissing": "השלב הזה אינו בתהליך העבודה.",
+  "error.workflow.runMissing": "ההרצה הזו כבר לא קיימת.",
+  "error.workflow.notRetryable": "אפשר להריץ שוב רק שלב שנכשל או שנעצר.",
+  "error.workflow.noDecision": "השלב הזה לא ממתין להחלטה.",
+  "error.workflow.outputPlaceMissing": "יש לבחור מקום הודעות לפלט הזה.",
+  "error.workflow.outputChannelMissing": "בחרו ערוץ לפלט הזה.",
+  "error.workflow.outputChannelFailed": "OpenBot לא הצליח לפרסם את התוצאה בערוץ. הריצו את השלב שוב.",
+  "error.workflow.discordNoMessage":
+    "הפלט הזה פועל על הודעת Discord שהפעילה את ההרצה. יש להפעיל את ההרצה מאזכור ב-Discord, או לבחור ״פרסום בערוץ״.",
+  "error.workflow.slackNoMessage":
+    "הפלט הזה פועל על הודעת Slack שהפעילה את ההרצה. יש להפעיל את ההרצה מאזכור ב-Slack, או לבחור ״פרסום בערוץ״.",
+  "error.workflow.telegramNoMessage":
+    "הפלט הזה פועל על הודעת Telegram שהפעילה את ההרצה. יש להפעיל את ההרצה מאזכור ב-Telegram, או לבחור ״פרסום בצ'אט״.",
+  "error.workflow.outputConnectionOff": "חיבור ההודעות של הפלט הזה כבוי או הוסר. יש לבחור מקום מחדש.",
+  "error.workflow.outputNotRunning": "חיבור ההודעות אינו פועל כעת. יש לנסות שוב כשיפעל.",
+  "error.workflow.outputRefused": "המקום דחה את הפרסום. יש לוודא ש-OpenBot יכול לפרסם שם.",
+  "error.workflow.outputUncertain": "הפרסום נעצר באמצע. ייתכן שחלק ממנו נמצא במקום. יש לבדוק שם לפני שמנסים שוב.",
+  "error.workflow.tooLarge": "תהליך העבודה הזה גדול מדי לשמירה. יש להסיר חלק מהציורים או מהטקסטים הארוכים ולנסות שוב.",
+  "error.workflow.tooLargeToSend": "תהליך העבודה הזה גדול מדי לשליחה למחשב אחר. יש לפתוח אותו במחשב שמפעיל את השרת.",
+  "error.workflow.webhookMissing": "השלב הזה אינו טריגר webhook. יש לשמור את תהליך העבודה ולנסות שוב.",
+  "error.workflow.githubActionMissing": "יש לבחור מה הפלט הזה עושה ב-GitHub.",
+  "error.workflow.githubRepositoryMissing": "יש לבחור מאגר לפלט הזה.",
+  "error.workflow.githubItemMissing":
+    "לפלט הזה אין issue או pull request. יש להפעיל את ההרצה מאירוע GitHub, או להזין את המספר בקלט שלו.",
+  "error.workflow.githubPullRequestOnly": "הפעולה הזו פועלת רק על pull requests.",
+  "error.workflow.githubTextMissing": "לפלט הזה אין טקסט לשליחה. יש לחבר שלב שכותב אותו.",
+  "error.workflow.githubEventText":
+    "הפלט הזה לא יכול לשלוח את האירוע הגולמי של הטריגר. יש להציב סוכן בין הטריגר לפלט הזה.",
+  "error.workflow.githubChoiceMissing": "יש לבחור את התוויות או את האדם לפלט הזה.",
+  "error.workflow.githubChoseNothing": "המודל לא בחר תווית או אדם מהמאגר הזה.",
+  "error.workflow.githubNotConnected": "יש לחבר את GitHub במחשב שמפעיל את תהליך העבודה הזה.",
+  "error.workflow.githubNoAccess": "ל-OpenBot GitHub App אין גישה למאגר או לפריט הזה. יש לפתוח את GitHub ולתת לו גישה.",
+  "error.workflow.githubNoWrite": "OpenBot GitHub App לא יכול לשנות את המאגר הזה. יש לפתוח את GitHub ולתת לו גישה.",
+  "error.workflow.githubLocked": "השיחה הזו נעולה ב-GitHub.",
+  "error.workflow.githubRefused": "GitHub דחה את השינוי: {detail}",
+  "error.workflow.githubUnreachable": "OpenBot לא הצליח להגיע ל-GitHub. יש להריץ את השלב שוב.",
+  "error.workflow.githubUncertain":
+    "השינוי נעצר באמצע. ייתכן שהוא נמצא ב-GitHub. יש לבדוק שם לפני שמריצים את השלב שוב.",
+  "error.workflow.githubNoEvent": "ב-GitHub אין issue או pull request שהטריגר הזה מתחיל מהם.",
+  "error.workflow.sunraSignIn": "כדי להשתמש במודלים של Sunra, צריך להתחבר ל-Sunra באפליקציות.",
+  "error.workflow.sunraNoCredits":
+    "אין מספיק קרדיטים בחשבון Sunra שלך. אפשר להוסיף קרדיטים ב-sunra.ai/pricing ואז להריץ את השלב שוב.",
+  "error.workflow.sunraNeedsPlan":
+    "המודל הזה של Sunra דורש תוכנית Sunra. אפשר לבחור תוכנית ב-sunra.ai/pricing או לבחור מודל אחר.",
+  "error.workflow.sunraTeamInputs":
+    "Sunra משתמש בתמונות קלט רק עם חשבון אישי. צריך לבחור את החשבון האישי ב-Sunra או להסיר את חיבורי התמונות.",
+  "error.workflow.sunraFailed": "Sunra לא הצליח ליצור את הקובץ: {reason}",
+  "error.workflow.sunraTimeout":
+    "Sunra לא סיים את הקובץ בזמן. כדאי לבדוק את הפרויקט OpenBot ב-sunra.ai לפני שמריצים את השלב שוב.",
+  "error.workflow.higgsfieldSignIn": "יש להתחבר ל-Higgsfield ב״אפליקציות״ כדי להשתמש במודלים של Higgsfield.",
+  "error.workflow.higgsfieldNoCredits":
+    "בחשבון Higgsfield אין מספיק קרדיטים. אפשר להוסיף קרדיטים ב-higgsfield.ai/pricing ואז להריץ את השלב שוב.",
+  "error.workflow.higgsfieldNeedsPlan":
+    "מודל Higgsfield זה דורש תוכנית Higgsfield. אפשר לבחור תוכנית ב-higgsfield.ai/pricing או לבחור מודל אחר.",
+  "error.workflow.higgsfieldBlocked":
+    "Higgsfield לא יצר את הקובץ כי בדיקת התוכן עצרה אותו. יש לשנות את ההנחיה או את תמונות הקלט ואז להריץ את השלב שוב.",
+  "error.workflow.higgsfieldFailed": "Higgsfield לא הצליח ליצור את הקובץ: {reason}",
+  "error.workflow.higgsfieldTimeout":
+    "Higgsfield לא סיים את הקובץ בזמן. כדאי לבדוק את ההיסטוריה ב-higgsfield.ai לפני שמריצים את השלב שוב.",
+} as const satisfies PartialTranslation<typeof source>;

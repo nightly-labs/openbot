@@ -13,18 +13,14 @@ import { createEffect, createStore, Show, untrack } from "solid-js";
 import { serverCanAdminister } from "./server-capabilities";
 import type { ServerSettingsSectionHost } from "./server-settings-section";
 
-/** The role calls of one server's host. The desktop reaches them through main. */
 export type HostAgentAccessCalls = Pick<OpenBotDesktopApi["hostAdmin"], "getAgentAccess" | "setAgentAccess">;
 
 export interface ServerAgentAccessOptions {
-  /** The calls of a client with no `window.openbot`, such as the web client. */
   calls?: HostAgentAccessCalls;
-  /** The agents of this dialog's server, in their order. */
   listAgents: () => Promise<readonly RoleAgent[]>;
 }
 
 interface RolesState {
-  /** The roles as an owner or admin reads them, or null before they load. */
   snapshot: AgentAccessSnapshot | null;
   agents: readonly RoleAgent[];
   loadError: string | null;
@@ -32,12 +28,9 @@ interface RolesState {
 }
 
 export interface ServerRolesSection {
-  /** True when this account manages the roles of this server: the Roles tab shows then. */
   available: () => boolean;
   Panel: () => JSX.Element;
-  /** The role page, for the dialog header `Roles › Legal`. */
   crumb: () => { title: string; back: () => void } | null;
-  /** The custom roles, for the role menu of each member row. Undefined before they load. */
   roles: () => readonly AgentAccessRole[] | undefined;
   setMemberRole(roleId: string, memberId: string, on: boolean): void;
   resetForServer(): void;
@@ -55,11 +48,6 @@ function copyChange(snapshot: AgentAccessSnapshot): AgentAccessChange {
   };
 }
 
-/**
- * Server Settings > Roles (`agent-access-v1`), and the roles of the member rows. Each change saves
- * the whole set with the revision that it read; the host refuses a stale one, and the section reads
- * the roles again.
- */
 export function createServerRolesSection(host: ServerSettingsSectionHost, visible: () => boolean): ServerRolesSection {
   const { t, errorMessage } = useText();
   const { props, configured, actionsAvailable, busy, run } = host;
@@ -70,7 +58,6 @@ export function createServerRolesSection(host: ServerSettingsSectionHost, visibl
     loadError: null,
     page: { kind: "list" },
   });
-  /** Bumped for each read, so an answer for an earlier server or read is dropped. */
   let generation = 0;
 
   const available = () =>
@@ -101,7 +88,6 @@ export function createServerRolesSection(host: ServerSettingsSectionHost, visibl
     );
   }
 
-  // Read again each time Roles or Members shows, so the changes of another admin appear.
   createEffect(
     () => (props.open && visible() && available() ? props.server.id : null),
     (serverId) => {
@@ -125,7 +111,6 @@ export function createServerRolesSection(host: ServerSettingsSectionHost, visibl
         });
         after?.();
       } catch (error) {
-        // Another admin saved first, or the host refused the change: show what it holds now.
         if (request === generation) load(serverId);
         throw error;
       }
@@ -189,14 +174,14 @@ export function createServerRolesSection(host: ServerSettingsSectionHost, visibl
                   () => setPage({ kind: "list" }),
                 )
               }
-              onSetEveryoneLevel={(agentIds, level) =>
+              onSetEveryoneLevels={(levels) =>
                 save((change) => {
-                  for (const agentId of agentIds) change.everyone[agentId] = level;
+                  for (const [agentId, level] of levels) change.everyone[agentId] = level;
                 })
               }
-              onSetRoleLevel={(roleId, agentIds, level) =>
+              onSetRoleLevels={(roleId, levels) =>
                 editRole(roleId, (role) => {
-                  for (const agentId of agentIds) role.agents[agentId] = level;
+                  for (const [agentId, level] of levels) role.agents[agentId] = level;
                 })
               }
             />

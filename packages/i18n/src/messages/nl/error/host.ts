@@ -19,10 +19,13 @@ export const messages = {
   "error.host.publishFailed": "Deze OpenBot kon niet worden gepubliceerd.",
   "error.host.mobileConnectPublishFailed": "Deze OpenBot kon niet worden gepubliceerd voor Mobile Connect.",
   "error.host.mobileConnectHostChanged": "De host voor Mobile Connect is gewijzigd. Probeer het opnieuw.",
+  "error.host.mobileConnectHostMismatch": "Je account heeft een andere sleutel voor deze server. Probeer het opnieuw.",
   "error.host.noServer": "Deze computer heeft geen server om te wijzigen.",
   "error.host.identityLocalOnly":
     "De naam en het logo van de server kun je alleen wijzigen op de computer waarop de server draait.",
   "error.host.timezoneInvalid": "Deze tijdzone is onbekend.",
+  "error.host.signalHomeUnknown": "Deze Signal-server is niet beschikbaar.",
+  "error.host.turnLimitInvalid": "Deze threadlimiet is ongeldig.",
   "error.host.maintenanceInterrupted":
     "Onderhoud van de host is onderbroken. Controleer de app en zet de status van de host terug voordat je het opnieuw probeert.",
   "error.host.updateFailed":
@@ -31,4 +34,5 @@ export const messages = {
   "error.host.tenantShutdownTimeout": "Het afsluiten van tenants duurde te lang. Er is geen app vervangen.",
   "error.host.tenantHealthMissing":
     "Statusrapporten van tenants ontbreken of zijn niet in orde na de herstart. Controleer de sessies van tenants voor een volgende update.",
+  "error.host.personalityInvalid": "Deze antwoordstijl is onbekend.",
 } as const satisfies PartialTranslation<typeof source>;

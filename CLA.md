@@ -1,129 +1,207 @@
-# OpenBot Contributor Assignment Agreement
+# OpenBot Contributor License Agreement
 
-Version: 1.0
+Version: 2.0
 
-Date: 2026-10-16
+Date: 2026-11-04
 
-This agreement is between you and Synthetify Labs spółka z ograniczoną odpowiedzialnością
-("Synthetify Labs", "we", "us"). It applies to each Contribution that you give to the Project. Read
-all of it before you sign. If you do not agree, do not send a Contribution.
+## How to sign
 
-## 1. Definitions
+1. Download the agreement as a PDF from [openbot.run/cla](https://openbot.run/cla).
+2. Fill in the contributor type and the contributor details, then sign and date it.
+3. Send the signed PDF to licenses@openbot.run. In the email, write your GitHub login and the link
+   to your pull request.
+4. A maintainer records your signature on the `cla-signatures` branch and the `CLA` check runs again.
 
-- **You** are the person who signs this agreement.
-- **Project** is OpenBot and all other software, documentation and material that Synthetify Labs
-  owns or manages, including the repository `github.com/nightly-labs/openbot`.
-- **Contribution** is each work that you send to the Project in any form, including source code,
-  object code, documentation, translations, images, designs, tests and text in pull requests,
-  commits, patches, issues and comments. A Contribution includes work that you sent before the
-  date that you sign this agreement. A Contribution does not include material that you mark in
-  writing as "Not a Contribution" when you send it.
-- **Copyright** is all economic rights in a work under the copyright law of each country,
-  including rights in computer programs and databases and all related rights.
+You sign one time. The signature applies to all your contributions to OpenBot. If you signed the
+OpenBot Contributor Assignment Agreement 1.0, you do not sign again: that agreement continues to
+apply to your contributions.
 
-## 2. Assignment of Copyright
+The text of the agreement follows. It is the same text as the PDF.
 
-1. You assign to Synthetify Labs all Copyright in each Contribution, worldwide, for the full term
-   of protection. You get no payment for this assignment.
-2. The assignment includes all fields of exploitation that are known on the date that you sign,
-   specifically:
-   1. Fixing and reproduction by all techniques, including print, magnetic, optical and digital
-      techniques, in source code and object code.
-   2. Loading into computer memory, running, showing, transmission and storage.
-   3. Translation, adaptation, arrangement, modification and all other changes, and combination
-      with other works.
-   4. Distribution of the original or copies, including sale, lending and rental.
-   5. Making available to the public so that each person can get access at a place and a time
-      that the person selects, including on the internet and as a hosted service.
-   6. Public performance, display, broadcasting and rebroadcasting.
-   7. Grant of licences and sublicences on all terms, including commercial, proprietary, closed
-      source and open source terms.
-3. You also transfer to Synthetify Labs the exclusive right to permit the exercise of derivative
-   rights in each Contribution.
-4. Ownership of each Contribution goes to Synthetify Labs when you send it, or when you sign this
-   agreement for a Contribution that you sent before.
-5. At our request and cost, you will sign the documents that are necessary to confirm or record
-   the assignment, including a document in written form if a law requires it.
+---
 
-## 3. Licence if the assignment is not valid
+## For Individual and Corporate Contributors
 
-If a part of the assignment in section 2 is not valid or not enforceable for a Contribution, for
-example because a law requires a different form, you grant to Synthetify Labs for that part a
-perpetual, irrevocable, worldwide, royalty-free and transferable licence to do all the things in
-section 2, with the right to grant sublicences through many tiers. The licence is exclusive where
-the law permits it. Otherwise, it is non-exclusive.
+This Contributor License Agreement ("Agreement" or "CLA") is entered into between Synthetify Labs
+sp. z o.o., with its registered address at Trzebunia 513, 32-438 Trzebunia, Poland, operating the
+OpenBot project ("OpenBot"), and the individual or legal entity identified below (the
+"Contributor").
 
-## 4. Moral rights
+The purpose of this Agreement is to clarify the intellectual property rights granted to OpenBot in
+connection with Contributions made to the OpenBot project.
 
-1. To the extent that the law permits, you waive all moral rights in each Contribution.
-2. Where the law does not permit a waiver, you agree not to exercise your moral rights against
-   Synthetify Labs, its licensees, its successors and the persons who get the Project from them.
-   You permit Synthetify Labs to exercise these rights for you. Specifically, Synthetify Labs can
-   decide when to publish each Contribution for the first time, can change it without your
-   approval, can publish it with or without your name, and can supervise how it is used.
+This Agreement applies to Contributions specifically identified and voluntarily submitted by the
+Contributor to OpenBot, including Contributions submitted after the execution of this Agreement.
+Each Contribution becomes subject to this Agreement upon its submission.
 
-## 5. Patent licence
+Except for the licenses expressly granted under this Agreement, the Contributor retains all rights,
+title, and interest in their Contributions.
 
-You grant to Synthetify Labs, and to each person who gets software from Synthetify Labs, a
-perpetual, irrevocable, worldwide, non-exclusive, royalty-free patent licence to make, have made,
-use, sell, offer to sell, import and transfer each Contribution, alone or in combination with the
-Project. This licence covers each patent claim that you can license and that the Contribution, alone
-or in combination with the Project, would infringe.
+Please complete and sign this Agreement, and then email a pdf copy to licenses@openbot.run only.
+Read this document carefully before signing and keep a copy for your records.
 
-## 6. No rights stay with you
+## Contributor Type (select one)
 
-1. You keep no right or licence to your Contributions, except the rights that the public licence of
-   the Project gives to all persons.
-2. Synthetify Labs can use, license, sell, change, publish or not use each Contribution on all
-   terms that it selects, including commercial and closed source terms.
-3. Synthetify Labs does not have to pay you, name you or use your Contribution.
+- Individual Contributor – a natural person contributing on their own behalf.
+- Corporate Contributor – a legal entity contributing through its authorised representative,
+  employees, or other persons acting on its behalf.
 
-## 7. Your statements
+## Contributor Details
 
-You state that:
+- Full Legal Name / Legal Entity Name
+- Country of Residence / Registration
+- Address
+- Email Address
 
-1. Each Contribution is your original work. If a Contribution includes material from a different
-   person, you identify the material, its source and its licence when you send it.
-2. You have the right to make this agreement. If an employer, a client or a different person has
-   rights in your work, that person gave you written permission to make this agreement or waived
-   those rights.
-3. You do not know of a claim that a Contribution infringes the rights of a different person.
-4. You are old enough to make a binding agreement where you live.
-5. You will tell Synthetify Labs at licenses@openbot.run if one of these statements becomes
-   incorrect.
+**For Corporate Contributors only:**
 
-If you make Contributions for an organization, and the organization owns your work, the
-organization must also sign an agreement. Write to licenses@openbot.run.
+- Name of Authorised Representative
+- Position / Title
 
-## 8. No warranty
+## Definitions
 
-Except for the statements in section 7, you give each Contribution "as is", without warranty of
-any kind.
+**"Contributor", "You", or "Your"** means the individual or legal entity entering into this
+Agreement and granting the licenses specified herein.
 
-## 9. Law and courts
+**"Contribution"** means any original work of authorship, including source code, software
+modifications, documentation, fixes, improvements, and other materials intentionally submitted by
+the Contributor to OpenBot for inclusion in, or use in connection with, the OpenBot project.
 
-Polish law applies to this agreement. The courts that have jurisdiction for the registered office
-of Synthetify Labs decide all disputes about it. This section does not remove the protection that
-the mandatory law of your country gives you.
+**"Submitted"** means communicated to OpenBot or its authorised representatives through source code
+repositories, pull requests, issue tracking systems, electronic communications, or other
+contribution channels designated or accepted by OpenBot for the purpose of improving the project.
 
-## 10. How to sign
+**"Work"** means the OpenBot software project and associated materials maintained or managed by
+OpenBot, including modifications, extensions, and derivative works.
 
-1. If you open the pull request, tick this box in its description:
+**"Corporate Contributor"** means a legal entity that owns or is otherwise legally authorised to
+license the intellectual property rights in Contributions submitted on its behalf.
 
-   ```markdown
-   - [x] I have read the OpenBot Contributor Assignment Agreement 1.0 and I agree to it.
-   ```
+## Grant of Copyright License
 
-2. If you are an author of a commit in a pull request that a different person opened, add a
-   comment to that pull request with this line:
+Subject to the terms and conditions of this Agreement, You hereby grant to OpenBot and recipients
+of software distributed by OpenBot a worldwide, non-exclusive, no-charge, royalty-free copyright
+license, granted for an indefinite period, with the right to grant an unlimited number of
+non-exclusive sublicenses, including for commercial purposes, to:
 
-   ```text
-   I have read the OpenBot Contributor Assignment Agreement 1.0 and I agree to it.
-   ```
+- reproduce, store, load, execute, and otherwise use Your Contributions, in whole or in part;
+- publish, display, publicly perform, and make Your Contributions available to the public,
+  including through electronic networks;
+- modify, translate, adapt, and prepare derivative works based upon or containing Your
+  Contributions, and combine them with other software;
+- distribute, license, sublicense, and commercially exploit Your Contributions and derivative
+  works, including as part of open-source, source-available, or proprietary software products.
 
-3. The ticked box or the comment from your GitHub account is your electronic signature. It applies
-   to all Contributions that you sent and will send with that account.
-4. Synthetify Labs keeps a record of each signature: your GitHub login, your GitHub user ID, the
-   pull request, the time and the line that you ticked or wrote.
-5. A new version of this agreement applies only after you sign it. This version continues to apply
-   to the Contributions that you sent before.
+You expressly authorise OpenBot to exercise and authorise third parties to exercise the rights
+necessary to use and exploit modifications and derivative works of Your Contributions within the
+scope of this Agreement.
+
+The license is granted without additional remuneration.
+
+The Parties agree that the copyright license is granted for an indefinite period and may be
+terminated by the Contributor in accordance with applicable law.
+
+Nothing in this Agreement shall affect Your moral rights in Your Contributions to the extent such
+rights are recognised and cannot be waived under applicable law.
+
+You retain ownership of the copyright in Your Contributions and remain free to use and license them
+independently, subject to any applicable third-party rights. Nothing in this Agreement transfers
+copyright ownership to OpenBot.
+
+## Grant of Patent License
+
+Subject to the terms and conditions of this Agreement, You hereby grant to OpenBot and recipients
+of software distributed by OpenBot a worldwide, non-exclusive, royalty-free patent license,
+effective for the duration of the applicable patent rights and irrevocable (except as stated
+below), to make, have made, use, sell, offer for sale, import, and otherwise transfer Your
+Contributions, whether independently or in combination with the Work, including portions of such
+combinations.
+
+You expressly authorise OpenBot to grant non-exclusive patent sublicenses to third parties,
+including for commercial purposes. The recipients of such sublicenses shall not be authorised to
+grant further patent sublicenses.
+
+This license applies only to patent claims licensable by You that are necessarily infringed by Your
+Contributions alone or by combination of Your Contributions with the Work to which they were
+submitted.
+
+If any entity institutes patent litigation against You or another entity, including a cross-claim
+or counterclaim, alleging that a Contribution or the Work incorporating it constitutes direct or
+contributory patent infringement, any patent license granted to that entity under this Agreement
+for the relevant Contribution or Work shall terminate as of the date such litigation is filed.
+
+## Authority to Submit Contributions
+
+You represent that You are legally entitled to grant the licenses specified in this Agreement.
+
+For Individual Contributors: If an employer, client, or another third party holds intellectual
+property rights in Your Contributions, You represent that You have obtained the necessary
+permission, waiver, or other legal authorisation to submit those Contributions and grant the
+licenses under this Agreement.
+
+For Corporate Contributors: You represent that the person signing this Agreement on Your behalf is
+duly authorised to do so, that the individuals submitting Contributions on Your behalf are
+authorised to make such submissions, and that You own or otherwise hold the rights necessary to
+grant the licenses specified herein.
+
+If You are a Corporate Contributor, You agree to ensure that Contributions submitted on Your behalf
+are identifiable as such and to notify OpenBot of any changes affecting the authorisation of
+individuals submitting Contributions on Your behalf.
+
+## Original Contributions and Third-Party Rights
+
+You represent that each of Your Contributions is Your original creation or that You otherwise
+possess the rights and authorisations necessary to submit and license it.
+
+You further represent that You have disclosed all third-party licenses, patents, trademarks, or
+other restrictions known to You that may affect OpenBot's use, modification, licensing, or
+distribution of Your Contributions.
+
+## No Obligation to Provide Support
+
+You are not required to provide support, maintenance, updates, or other assistance in connection
+with Your Contributions unless separately agreed.
+
+Unless required by applicable law or expressly agreed in writing, You provide Your Contributions on
+an "AS IS" BASIS, without warranties or conditions of any kind, express or implied, including
+warranties of merchantability, fitness for a particular purpose, and non-infringement.
+
+Nothing in this section limits Your express representations concerning Your authority to grant
+licenses under this Agreement.
+
+## Third-Party Contributions
+
+If You wish to submit materials that are not Your original creation, You shall identify those
+materials separately and provide information reasonably available to You concerning their source
+and any applicable licenses, intellectual property rights, or restrictions.
+
+Such materials must be clearly identified as third-party materials.
+
+OpenBot may determine whether the submitted materials can be legally incorporated into the Work.
+Submission of third-party materials does not grant OpenBot rights that You are not legally entitled
+to license.
+
+## Miscellaneous
+
+By signing this Agreement, You confirm that You have read and understood its terms, agree to be
+bound by them, and have the authority necessary to grant the licenses specified herein.
+
+This Agreement shall be governed by and construed in accordance with the laws of Poland. Any
+disputes arising out of or in connection with this Agreement shall be subject to the exclusive
+jurisdiction of the competent courts of Poland, to the extent permitted by applicable law.
+
+This Agreement constitutes the entire agreement between You and OpenBot concerning the licenses
+granted for Your Contributions under this CLA and supersedes any prior agreements or understandings
+relating specifically to those licenses, unless otherwise expressly agreed in writing.
+
+You agree to notify OpenBot of any facts or circumstances of which you become aware that would make
+this Agreement inaccurate in any respect. If You are a Corporate Contributor, this obligation also
+includes changes concerning the authority of individuals submitting Contributions on Your behalf.
+
+**Please sign:**
+
+- Signature
+- Date
+
+This is a legal contract containing Personally Identifiable Information. Please refer to
+https://openbot.run/privacy for the policy governing how this information is used and shared.

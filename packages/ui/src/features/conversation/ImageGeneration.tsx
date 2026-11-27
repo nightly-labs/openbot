@@ -1,11 +1,27 @@
-import type { AttachmentSummary, ImageGenerationAspectRatio } from "@openbot/contracts/ipc";
-import { Button, X } from "@openbot/ui";
-import { createEffect, createSignal, Show } from "solid-js";
+import {
+  type AttachmentSummary,
+  type ImageGenerationAspectRatio,
+  imageAspectRatioOf,
+  imagePixelSize,
+} from "@openbot/contracts/ipc";
+import { ATTACHMENT_PREVIEW_EDGE } from "@openbot/contracts/team-protocol/attachment-preview-v1";
+import { Button, Download, Maximize2 } from "@openbot/ui";
+import { createEffect, createSignal, Show, untrack } from "solid-js";
 import { useText } from "../../text";
-import { DownloadIcon } from "./ConversationIcons";
+import {
+  FAILED_MEDIA_RATIO,
+  MediaGenerationCanvas,
+  MediaGenerationFailure,
+  MediaGenerationSpecs,
+  type MediaGenerationStatus,
+  mediaRatioValue,
+} from "./media-generation-frame";
+import { rememberedMediaSize, rememberMediaSize } from "./media-size-memory";
+import { createSteadyImageUrl } from "./steady-image-url";
 
-export type ImageGenerationStatus = "generating" | "completed" | "failed" | "interrupted";
+const TILE_WIDTH = 420;
 
+export type ImageGenerationStatus = MediaGenerationStatus;
 export interface ImageGenerationProps {
   status: ImageGenerationStatus;
   presentation?: "generated" | "attachment";
@@ -13,8 +29,9 @@ export interface ImageGenerationProps {
   resolution?: string;
   aspectRatio: ImageGenerationAspectRatio;
   attachment?: AttachmentSummary | undefined;
+  copyUrl?: string | undefined;
   error?: string | undefined;
-  /** `origin` is the clicked image, for a viewer that zooms out of it. */
+  loading?: boolean | undefined;
   onPreview?: (attachment: AttachmentSummary, origin: HTMLElement) => void;
   onDownload?: ((attachment: AttachmentSummary) => void) | undefined;
 }
@@ -22,16 +39,41 @@ export interface ImageGenerationProps {
 export function ImageGeneration(props: ImageGenerationProps) {
   const { t, errorMessage } = useText();
   const [previewError, setPreviewError] = createSignal(false);
-  const [imageRatio, setImageRatio] = createSignal<string | null>(null);
+  const [copyFailed, setCopyFailed] = createSignal(false);
+  const [imageSize, setImageSize] = createSignal(
+    untrack(() => {
+      const id = props.attachment?.id;
+      return id ? (rememberedMediaSize(id) ?? rememberedMediaSize(copySizeKey(id))) : null;
+    }),
+  );
+  const copyIsSharp = () => {
+    const size = imageSize();
+    const tallness = size ? Math.max(1, size.height / size.width) : 1;
+    return TILE_WIDTH * tallness * (globalThis.devicePixelRatio || 1) <= ATTACHMENT_PREVIEW_EDGE;
+  };
+  const copy = () =>
+    props.presentation === "attachment" && !copyFailed() && copyIsSharp() ? props.copyUrl : undefined;
+  const imageUrl = createSteadyImageUrl(() => copy() ?? props.attachment?.previewUrl);
+  let image: HTMLImageElement | undefined;
+  const readRatio = (element: HTMLImageElement) => {
+    const { naturalHeight, naturalWidth } = element;
+    if (naturalWidth <= 0 || naturalHeight <= 0) return;
+    const size = { width: naturalWidth, height: naturalHeight };
+    const fromCopy = element.src === untrack(copy);
+    setImageSize(size);
+    const id = props.attachment?.id;
+    if (id) rememberMediaSize(fromCopy ? copySizeKey(id) : id, size);
+  };
   createEffect(
-    () => `${props.attachment?.id ?? ""}:${props.attachment?.previewUrl ?? ""}`,
+    () => imageUrl(),
     () => {
       setPreviewError(false);
-      setImageRatio(null);
+      if (image?.complete) readRatio(image);
     },
   );
 
-  const previewUnavailable = () => props.status === "completed" && !props.attachment?.previewUrl;
+  const previewUnavailable = () =>
+    props.status === "completed" && !props.attachment?.previewUrl && props.loading !== true;
   const isAttachment = () => props.presentation === "attachment";
   const hasImage = () => props.status === "completed" && Boolean(props.attachment?.previewUrl) && !previewError();
   const hasFailure = () =>
@@ -60,7 +102,27 @@ export function ImageGeneration(props: ImageGenerationProps) {
     isAttachment()
       ? t("chat.image.download", { name: props.attachment?.name ?? t("chat.image.attachedFallback") })
       : t("chat.image.downloadGenerated");
-  const stageRatio = () => (hasImage() && imageRatio() ? imageRatio() : ratioValue(props.aspectRatio));
+  const knownSize = () => imageSize() ?? imagePixelSize(props.resolution);
+  const size = () => {
+    const known = knownSize();
+    return known ? t("chat.media.size", { width: known.width, height: known.height }) : props.resolution;
+  };
+  const frameSize = () => {
+    const loaded = imageSize();
+    if (loaded) return loaded;
+    const host = imagePixelSize(props.resolution);
+    return host && imageAspectRatioOf(host) === props.aspectRatio ? host : null;
+  };
+  const stageRatio = () => {
+    const known = frameSize();
+    if (hasFailure() && !isAttachment()) return FAILED_MEDIA_RATIO;
+    if (props.status === "completed" && known) return `${known.width} / ${known.height}`;
+    return mediaRatioValue(props.aspectRatio, "image");
+  };
+  const preview = (event: MouseEvent & { currentTarget: HTMLElement }) => {
+    if (props.attachment) props.onPreview?.(props.attachment, event.currentTarget);
+  };
+  const showsMeta = () => props.loading !== true && (!hasImage() || !isAttachment());
 
   return (
     <section
@@ -71,38 +133,26 @@ export function ImageGeneration(props: ImageGenerationProps) {
           "image-generation-failed": hasFailure(),
         },
       ]}
+      data-status={props.status}
       aria-label={hasImage() ? label() : isAttachment() ? t("chat.image.attachment") : t("chat.image.generation")}
       aria-live={props.status === "generating" ? "polite" : undefined}
     >
       <div class="image-generation-stage" style={`--image-generation-ratio: ${stageRatio()}`}>
-        <div
-          class={[
-            "image-generation-canvas",
-            {
-              "image-generation-canvas-visible": !hasImage(),
-              "image-generation-canvas-failed": hasFailure(),
-            },
-          ]}
-          role="img"
-          aria-label={hasImage() ? undefined : label()}
-          aria-hidden={hasImage() ? "true" : undefined}
-          aria-busy={props.status === "generating" ? "true" : undefined}
-        >
-          <Show
-            when={!hasFailure()}
-            fallback={
-              <span class="image-generation-failure-mark" aria-hidden="true">
-                <X />
-              </span>
-            }
+        <Show when={!hasImage()}>
+          <div
+            class="image-generation-state"
+            role="img"
+            aria-label={label()}
+            aria-busy={props.status === "generating" || props.loading === true ? "true" : undefined}
           >
-            <div class="image-generation-dots" aria-hidden="true" />
-            <div class="image-generation-glow" aria-hidden="true" />
-          </Show>
-          <Show when={props.resolution}>
-            <span class="image-generation-resolution">{props.resolution}</span>
-          </Show>
-        </div>
+            <Show when={hasFailure()} fallback={<MediaGenerationCanvas />}>
+              <MediaGenerationFailure />
+            </Show>
+          </div>
+        </Show>
+        <Show when={props.status === "generating"}>
+          <MediaGenerationSpecs class="media-generation-chip" values={[props.resolution]} />
+        </Show>
         <Show when={Boolean(props.attachment?.previewUrl) && !previewError()}>
           <Button
             variant="ghost"
@@ -110,50 +160,69 @@ export function ImageGeneration(props: ImageGenerationProps) {
             class={["image-generation-preview", { "image-generation-preview-visible": hasImage() }]}
             aria-label={previewLabel()}
             data-attachment-id={props.attachment?.id}
-            onClick={(event) => {
-              if (props.attachment) props.onPreview?.(props.attachment, event.currentTarget);
-            }}
+            onClick={preview}
           >
             <img
-              src={props.attachment?.previewUrl ?? ""}
+              src={imageUrl() ?? ""}
               alt={props.prompt ?? t("chat.image.generated")}
               loading="lazy"
               decoding="async"
-              onLoad={(event) => {
-                const { naturalHeight, naturalWidth } = event.currentTarget;
-                if (naturalWidth > 0 && naturalHeight > 0) setImageRatio(`${naturalWidth} / ${naturalHeight}`);
+              ref={(element) => {
+                image = element;
               }}
-              onError={() => setPreviewError(true)}
+              onLoad={(event) => readRatio(event.currentTarget)}
+              onError={(event) => {
+                if (event.currentTarget.src === untrack(copy)) setCopyFailed(true);
+                else setPreviewError(true);
+              }}
             />
           </Button>
         </Show>
-        <Show when={props.status === "completed" && props.attachment && props.onDownload}>
-          <Button
-            variant="ghost"
-            type="button"
-            class="image-generation-hover-download"
-            aria-label={downloadLabel()}
-            title={downloadLabel()}
-            onClick={(event) => {
-              event.stopPropagation();
-              if (props.attachment) props.onDownload?.(props.attachment);
-            }}
-          >
-            <DownloadIcon />
-            {t("common.download")}
-          </Button>
+        <Show when={hasImage() && props.attachment && props.onDownload}>
+          <div class="media-generation-actions">
+            <Button
+              variant="ghost"
+              size="icon-sm"
+              type="button"
+              aria-label={downloadLabel()}
+              title={downloadLabel()}
+              onClick={(event) => {
+                event.stopPropagation();
+                if (props.attachment) props.onDownload?.(props.attachment);
+              }}
+            >
+              <Download aria-hidden="true" />
+            </Button>
+            <Show when={props.onPreview}>
+              <Button
+                variant="ghost"
+                size="icon-sm"
+                type="button"
+                aria-label={previewLabel()}
+                title={previewLabel()}
+                onClick={preview}
+              >
+                <Maximize2 aria-hidden="true" />
+              </Button>
+            </Show>
+          </div>
         </Show>
       </div>
-      <Show when={!hasImage()}>
-        <div class="image-generation-meta">
-          <span class="image-generation-label">{label()}</span>
-          <Show when={props.prompt}>
-            <span class="image-generation-prompt">{t("chat.image.prompt", { prompt: props.prompt ?? "" })}</span>
-          </Show>
+      <Show when={showsMeta()}>
+        <div class="media-generation-meta">
+          <span class="media-generation-label" data-shine={props.status === "generating" ? "" : undefined}>
+            {label()}
+            <Show when={hasImage()}>
+              <MediaGenerationSpecs class="media-generation-specs" values={[size()]} />
+            </Show>
+          </span>
           <Show when={hasFailure()}>
-            <span class="image-generation-error" role="alert">
+            <span class="media-generation-error" role="alert">
               {failure()}
             </span>
+          </Show>
+          <Show when={props.prompt}>
+            <span class="media-generation-prompt">{t("chat.image.prompt", { prompt: props.prompt ?? "" })}</span>
           </Show>
         </div>
       </Show>
@@ -161,8 +230,6 @@ export function ImageGeneration(props: ImageGenerationProps) {
   );
 }
 
-function ratioValue(aspectRatio: ImageGenerationAspectRatio): "4 / 5" | "4 / 3" | "1 / 1" {
-  if (aspectRatio === "portrait") return "4 / 5";
-  if (aspectRatio === "landscape") return "4 / 3";
-  return "1 / 1";
+function copySizeKey(attachmentId: string): string {
+  return `${attachmentId}#copy`;
 }

@@ -2,7 +2,6 @@ import type { PartialTranslation } from "../../../message";
 import type { messages as source } from "../../en/status/remote";
 
 export const messages = {
-  // Status lines of remote desktop setup and remote connection recovery.
   "status.remote.setupMacOnly": "権限の設定は macOS で利用できます。",
   "status.remote.setupInstallHost":
     "リモートデスクトップのホストコンポーネントをインストールしてから、もう一度確認してください。",
@@ -32,4 +31,6 @@ export const messages = {
   "status.remote.attemptFailed": { other: "接続の試行に失敗しました。{count} 秒後に再試行します。" },
   "status.remote.reconnectingDetail": { other: "再接続しています {attempt}/{count}\n{detail}" },
   "status.remote.reconnecting": { other: "再接続しています {attempt}/{count}" },
+  "status.remote.messageCut":
+    "[このメッセージのうち {size} MB はこのデバイスに表示されません。全文を読むには、サーバーを実行しているコンピューターで開いてください。]",
 } as const satisfies PartialTranslation<typeof source>;

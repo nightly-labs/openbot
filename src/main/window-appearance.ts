@@ -6,10 +6,8 @@ import {
 } from "@openbot/contracts/app-appearance";
 import { type BrowserWindow, nativeTheme } from "electron";
 
-/** The light canvas, `--openbot-bg-canvas` in `tokens-light.css`, so a light window opens without a dark frame. */
 const LIGHT_WINDOW_BACKGROUND = "#f5f5f6";
 
-/** The macOS material behind a transparent main window. The page paints its own tint over it. */
 const GLASS_VIBRANCY = "under-window";
 
 let current: AppAppearancePreference = {
@@ -17,17 +15,13 @@ let current: AppAppearancePreference = {
   transparentWindow: DEFAULT_TRANSPARENT_WINDOW,
   palette: null,
   palettes: [],
+  chatBackgroundLight: null,
+  chatBackgroundDark: null,
+  interfaceFont: null,
+  codeFont: null,
 };
 const listeners = new Set<() => void>();
 
-/**
- * Sets the appearance that window backgrounds follow. While the window is opaque, main leaves
- * `nativeTheme.themeSource` on the system: visited websites and the native menus follow the computer.
- * The blur behind a transparent window takes its light or dark shade from `themeSource`, so while the
- * window is transparent, `themeSource` follows the appearance, or the scheme of the selected theme
- * palette, and websites and menus follow it too.
- * Main reports `transparentWindow` as `false` where the window cannot blur.
- */
 export function setWindowAppearance(preference: AppAppearancePreference): void {
   current = { ...preference };
   const appearance = selectedThemePalette(preference)?.scheme ?? preference.appearance;
@@ -35,11 +29,6 @@ export function setWindowAppearance(preference: AppAppearancePreference): void {
   for (const listener of listeners) listener();
 }
 
-/**
- * The background a window shows before its page paints, and around it while it resizes. A theme
- * palette gives its own canvas, without its alpha: Electron reads eight hex digits as `#aarrggbb`,
- * and the window under the page is opaque.
- */
 export function windowBackgroundColor(darkColor: string): string {
   const palette = selectedThemePalette(current);
   if (palette !== null) return palette.colors.canvas.slice(0, 7);
@@ -47,7 +36,6 @@ export function windowBackgroundColor(darkColor: string): string {
   return dark ? darkColor : LIGHT_WINDOW_BACKGROUND;
 }
 
-/** Keeps an opaque window's background on the current appearance until the window closes. */
 export function followAppearance(window: BrowserWindow, darkColor: string): void {
   const update = () => {
     if (!window.isDestroyed()) window.setBackgroundColor(windowBackgroundColor(darkColor));
@@ -55,15 +43,20 @@ export function followAppearance(window: BrowserWindow, darkColor: string): void
   follow(window, update);
 }
 
-/**
- * Keeps the main window opaque or transparent, as the preference says, until the window closes. A
- * transparent window shows the macOS blur; the page then paints a translucent tint over it. The
- * blur keeps Electron's default `visualEffectState`, `followWindow`, so an inactive window stops the
- * live blur. Main applies the saved preference before the window shows.
- */
+export function setInitialWindowGlass(transparentWindow: boolean): void {
+  current = { ...current, transparentWindow };
+}
+
+export function glassWindowOptions(
+  darkColor: string,
+): { vibrancy: typeof GLASS_VIBRANCY } | { backgroundColor: string } {
+  return current.transparentWindow
+    ? { vibrancy: GLASS_VIBRANCY }
+    : { backgroundColor: windowBackgroundColor(darkColor) };
+}
+
 export function followWindowGlass(window: BrowserWindow, darkColor: string): void {
-  // The window is built opaque. A window opened again while the preference is on takes the blur here.
-  let glass = false;
+  let glass = current.transparentWindow;
   const update = () => {
     if (window.isDestroyed()) return;
     if (current.transparentWindow !== glass) {

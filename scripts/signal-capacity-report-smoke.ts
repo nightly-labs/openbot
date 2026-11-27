@@ -1,16 +1,10 @@
-// Smoke test of the Signal capacity reporter (`remote/api/src/capacity-report.ts`).
-//   bun scripts/signal-capacity-report-smoke.ts
-// Starts the real Signal server, opens two WebSockets to it, and serves a fake coturn metrics page and a
-// local OpenPanel capture server. Runs the real reporter against them and checks its first event: the
-// counts, the server client headers, and that no token or secret is in the event or the log. Then runs
-// the reporter without the OpenPanel client and checks that it stops and sends nothing.
-// Writes .openbot-build/signal-capacity-report/report.json.
 import assert from "node:assert/strict";
 import { type ChildProcess, spawn } from "node:child_process";
 import { generateKeyPairSync, randomBytes } from "node:crypto";
-import { mkdirSync, writeFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { createServer, type IncomingMessage, type Server } from "node:http";
-import { resolve } from "node:path";
+import { tmpdir } from "node:os";
+import { join, resolve } from "node:path";
 import { createOpenBotLogger } from "@openbot/logging";
 import { exportJWK } from "jose";
 
@@ -21,6 +15,7 @@ const reporterPath = resolve(root, "remote/api/src/capacity-report.ts");
 const metricsToken = randomBytes(24).toString("hex");
 const clientSecret = `sec_${randomBytes(16).toString("hex")}`;
 const OPEN_SOCKETS = 2;
+const REPORT_INTERVAL_MS = 1_500;
 
 const TURN_PAGE = [
   "# TYPE turn_total_allocations gauge",
@@ -28,6 +23,29 @@ const TURN_PAGE = [
   'turn_total_allocations{type="TCP"} 710',
   'turn_total_allocations{type="TLS/TCP"} 616',
 ].join("\n");
+
+const ROUTE_PAGE = [
+  "Iface\tDestination\tGateway \tFlags\tRefCnt\tUse\tMetric\tMask\t\tMTU\tWindow\tIRTT",
+  "docker0\t000011AC\t00000000\t0001\t0\t0\t0\t0000FFFF\t0\t0\t0",
+  "eth0\t00000000\t0100A8C0\t0003\t0\t0\t100\t00000000\t0\t0\t0",
+  "eth0\t0000A8C0\t00000000\t0001\t0\t0\t100\t00FFFFFF\t0\t0\t0",
+].join("\n");
+const NETWORK_BASE = { received: 7_000_000_000_000, sent: 6_500_000_000_000 };
+const NETWORK_ADDED = { received: 123_456_789, sent: 987_654_321 };
+const NETWORK_ADDED_LATER = { received: 5_000_000, sent: 7_000_000 };
+const devicePage = (received: number, sent: number) =>
+  [
+    "Inter-|   Receive                                                |  Transmit",
+    " face |bytes    packets errs drop fifo frame compressed multicast|bytes    packets errs drop fifo colls carrier compressed",
+    `    lo: ${received * 3} 100 0 0 0 0 0 0 ${received * 3} 100 0 0 0 0 0 0`,
+    `  eth0: ${received} 2000 0 0 0 0 0 0 ${sent} 1500 0 0 0 0 0 0`,
+    `docker0: ${received * 2} 500 0 0 0 0 0 0 ${sent * 2} 400 0 0 0 0 0 0`,
+  ].join("\n");
+const networkDirectory = mkdtempSync(join(tmpdir(), "openbot-capacity-network-"));
+const networkRoutePath = join(networkDirectory, "route");
+const networkDevicePath = join(networkDirectory, "dev");
+writeFileSync(networkRoutePath, ROUTE_PAGE);
+writeFileSync(networkDevicePath, devicePage(NETWORK_BASE.received, NETWORK_BASE.sent));
 
 const listen = (server: Server) =>
   new Promise<number>((done) =>
@@ -67,7 +85,6 @@ function collect(child: ChildProcess) {
 
 const exitOf = (child: ChildProcess) => new Promise<number | null>((done) => child.on("exit", done));
 
-/** Polls the real Signal metrics until `check` accepts the page. */
 async function waitForMetrics(url: string, signal: ChildProcess, check: (page: string) => boolean) {
   const deadline = Date.now() + 30_000;
   while (Date.now() < deadline) {
@@ -93,16 +110,29 @@ interface Capture {
   text: string;
 }
 const captures: Capture[] = [];
-let resolveCapture: (capture: Capture) => void = () => undefined;
-const captured = new Promise<Capture>((done) => {
-  resolveCapture = done;
-});
+const captureWaiters: { count: number; done: (capture: Capture) => void }[] = [];
+const captured = (count: number) =>
+  new Promise<Capture>((done) => {
+    const capture = captures[count - 1];
+    if (capture) done(capture);
+    else captureWaiters.push({ count, done });
+  });
 const captureServer = createServer(async (request, response) => {
   const capture = { headers: request.headers, text: await body(request) };
   captures.push(capture);
   response.writeHead(202).end();
-  resolveCapture(capture);
+  for (const waiter of captureWaiters.filter((item) => item.count === captures.length)) waiter.done(capture);
 });
+
+async function webhookRequest(routeId: string, headers: Record<string, string>) {
+  const response = await fetch(`http://127.0.0.1:${signalPort}/v1/webhooks/${routeId}`, {
+    method: "POST",
+    headers,
+    body: JSON.stringify({ type: "smoke", data: {} }),
+  });
+  await response.body?.cancel();
+  return response.status;
+}
 
 const [turnPort, capturePort, signalPort, healthPort, controlPlanePort] = await Promise.all([
   listen(turnServer),
@@ -116,7 +146,6 @@ const { publicKey } = generateKeyPairSync("ec", { namedCurve: "P-256" });
 const publicJwk = { ...(await exportJWK(publicKey)), kid: "capacity-smoke", alg: "ES256", use: "sig" };
 const signal = spawn("bun", [resolve(root, "remote/api/src/index.ts")], {
   cwd: resolve(root, "remote/api"),
-  // Only what Signal needs, so no developer or production secret reaches it.
   env: {
     PATH: process.env.PATH ?? "",
     HOME: process.env.HOME ?? "",
@@ -126,7 +155,6 @@ const signal = spawn("bun", [resolve(root, "remote/api/src/index.ts")], {
     REMOTE_HEALTH_PORT: String(healthPort),
     REMOTE_TLS_DISABLED: "true",
     REMOTE_TICKET_PUBLIC_KEYS: JSON.stringify({ keys: [publicJwk] }),
-    // The sockets never send `hello`, so Signal never calls the control plane.
     REMOTE_CONTROL_PLANE_URL: `http://127.0.0.1:${controlPlanePort}`,
     REMOTE_SESSION_SECRET: randomBytes(32).toString("base64url"),
     REMOTE_AUTH_WEBHOOK_SECRET: randomBytes(32).toString("base64url"),
@@ -152,11 +180,14 @@ try {
 
   const reporterEnvironment = {
     PATH: process.env.PATH ?? "",
+    CAPACITY_REPORT_INTERVAL_MS: String(REPORT_INTERVAL_MS),
     OPENPANEL_TRACK_URL: `http://127.0.0.1:${capturePort}/track`,
     REMOTE_METRICS_TOKEN: metricsToken,
     TURN_DOMAIN: "turn.example.com",
     TURN_METRICS_URL: `http://127.0.0.1:${turnPort}/metrics`,
     SIGNAL_METRICS_URL: signalMetricsUrl,
+    NETWORK_ROUTE_PATH: networkRoutePath,
+    NETWORK_DEVICE_PATH: networkDevicePath,
   };
   const reporter = spawn("bun", [reporterPath], {
     cwd: root,
@@ -165,14 +196,76 @@ try {
   });
   const reporterOutput = collect(reporter);
   const reporterExited = exitOf(reporter);
-  const capture = await Promise.race([
-    captured,
-    reporterExited.then((code) => {
-      throw new Error(`The reporter exited with ${code} before it sent an event: ${reporterOutput.text}`);
-    }),
-  ]);
+  const reporterFailed = reporterExited.then((code) => {
+    throw new Error(`The reporter exited with ${code} before it sent its events: ${reporterOutput.text}`);
+  });
+  const capture = await Promise.race([captured(1), reporterFailed]);
+  writeFileSync(
+    networkDevicePath,
+    devicePage(NETWORK_BASE.received + NETWORK_ADDED.received, NETWORK_BASE.sent + NETWORK_ADDED.sent),
+  );
+  const networkEvent = JSON.parse((await Promise.race([captured(2), reporterFailed])).text);
+  rmSync(networkDevicePath);
+  const unreadEvent = JSON.parse((await Promise.race([captured(3), reporterFailed])).text);
+  writeFileSync(
+    networkDevicePath,
+    devicePage(
+      NETWORK_BASE.received + NETWORK_ADDED.received + NETWORK_ADDED_LATER.received,
+      NETWORK_BASE.sent + NETWORK_ADDED.sent + NETWORK_ADDED_LATER.sent,
+    ),
+  );
+  const restoredEvent = JSON.parse((await Promise.race([captured(4), reporterFailed])).text);
+
+  const json = { "content-type": "application/json" };
+  const signed = {
+    ...json,
+    "x-openbot-timestamp": String(Math.floor(Date.now() / 1000)),
+    "x-openbot-delivery-id": "smoke-delivery-1",
+    "x-openbot-signature": `sha256=${"0".repeat(64)}`,
+  };
+  const webhookStatuses = [
+    await webhookRequest("a".repeat(129), json),
+    await webhookRequest("smoke-route", { "content-type": "text/plain" }),
+    await webhookRequest("smoke-route", json),
+    await webhookRequest("smoke-route", signed),
+    await webhookRequest("smoke-route", signed),
+  ];
+  assert.deepEqual(webhookStatuses, [404, 415, 401, 503, 503]);
+  let webhookEvent: { payload: { properties: Record<string, string | number> } } | null = null;
+  for (let count = 5; count <= 7 && !webhookEvent; count += 1) {
+    const next = JSON.parse((await Promise.race([captured(count), reporterFailed])).text);
+    if (next.payload.properties.webhook_answers_503 === 2) webhookEvent = next;
+  }
   reporter.kill("SIGTERM");
   await reporterExited;
+  assert.ok(webhookEvent, "An event counts the webhook answers.");
+  const networkProperties = networkEvent.payload.properties;
+  assert.equal(networkProperties.network_in_bytes, NETWORK_ADDED.received, "The second event has the traffic in.");
+  assert.equal(networkProperties.network_out_bytes, NETWORK_ADDED.sent, "The second event has the traffic out.");
+  assert.ok(
+    !("network_in_bytes" in unreadEvent.payload.properties || "network_out_bytes" in unreadEvent.payload.properties),
+    "An event with no counters has no traffic.",
+  );
+  assert.equal(restoredEvent.payload.properties.network_in_bytes, NETWORK_ADDED_LATER.received);
+  assert.equal(restoredEvent.payload.properties.network_out_bytes, NETWORK_ADDED_LATER.sent);
+  const webhookProperties = webhookEvent.payload.properties;
+  assert.deepEqual(
+    Object.fromEntries(Object.entries(webhookProperties).filter(([key]) => key.startsWith("webhook_"))),
+    {
+      webhook_answers_200: 0,
+      webhook_answers_202: 0,
+      webhook_answers_400: 0,
+      webhook_answers_401: 1,
+      webhook_answers_404: 1,
+      webhook_answers_413: 0,
+      webhook_answers_415: 1,
+      webhook_answers_429: 0,
+      webhook_answers_503: 2,
+      webhook_waits: 0,
+      webhook_slow_waits: 0,
+    },
+  );
+  const eventsBeforeOff = captures.length;
 
   const event = JSON.parse(capture.text);
   assert.equal(capture.headers["openpanel-client-id"], "smoke-client");
@@ -184,7 +277,7 @@ try {
       properties: {
         surface: "signal",
         environment: "production",
-        event_schema_version: 1,
+        event_schema_version: 3,
         turn_host: "turn.example.com",
         turn_allocations: 2669,
         turn_allocations_udp: 1343,
@@ -202,20 +295,33 @@ try {
     "The log has no secret.",
   );
 
-  // Without the OpenPanel server client the reporter stops at once and reads and sends nothing.
   const turnRequestsBefore = turnRequests;
   const off = spawn("bun", [reporterPath], { cwd: root, env: reporterEnvironment, stdio: ["ignore", "pipe", "pipe"] });
   const offOutput = collect(off);
   assert.equal(await exitOf(off), 0, `The reporter without a client exits with 0: ${offOutput.text}`);
   assert.match(offOutput.text, /Capacity report off/u);
-  assert.equal(captures.length, 1, "The reporter without a client sends no event.");
+  assert.equal(captures.length, eventsBeforeOff, "The reporter without a client sends no event.");
   assert.equal(turnRequests, turnRequestsBefore, "The reporter without a client reads no metrics.");
 
   mkdirSync(outputDirectory, { recursive: true });
   const reportPath = resolve(outputDirectory, "report.json");
   writeFileSync(
     reportPath,
-    `${JSON.stringify({ passed: true, event: event.payload, offPathExitCode: 0, eventsSent: captures.length }, null, 2)}\n`,
+    `${JSON.stringify(
+      {
+        passed: true,
+        event: event.payload,
+        webhookStatuses,
+        webhookEvent: webhookEvent.payload,
+        networkEvent: networkEvent.payload,
+        unreadEvent: unreadEvent.payload,
+        restoredEvent: restoredEvent.payload,
+        offPathExitCode: 0,
+        eventsSent: captures.length,
+      },
+      null,
+      2,
+    )}\n`,
   );
   logger.info(`Passed. Report: ${reportPath}`);
 } catch (error) {
@@ -226,4 +332,5 @@ try {
   signal.kill("SIGTERM");
   await signalExited;
   for (const server of [turnServer, captureServer]) server.close();
+  rmSync(networkDirectory, { recursive: true, force: true });
 }

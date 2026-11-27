@@ -1,32 +1,82 @@
 import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import type { CustomProviderReasoningEffort } from "@openbot/contracts/ipc";
 import { Effect } from "effect";
-import { type CustomProviderConfig, customModelOutputLimit } from "./opencode-config";
+import { type CustomProviderConfig, customModelOutputLimit, isMistralApi } from "./opencode-config";
 import type { PiMcpExtension } from "./pi-mcp";
 import { providerCall } from "./provider-client-effects";
 
 const VARIABLE = "OPENBOT_PI_CUSTOM_ENDPOINTS";
 
-/** Pi's default for a model with no context window (Pi 1.4.0 `models-configuration.md`). */
 const DEFAULT_CONTEXT_WINDOW = 128_000;
 
-/** What the extension reads from the environment: the endpoints with their keys and header values. */
 interface EndpointPayload {
   readonly id: string;
   readonly name: string;
+  readonly api: "openai-completions" | "mistral-conversations";
   readonly baseUrl: string;
   readonly apiKey: string | null;
+  readonly authHeader: boolean;
   readonly headers: Readonly<Record<string, string>>;
-  readonly models: readonly { id: string; name: string; contextWindow: number; maxTokens: number }[];
+  readonly models: readonly PiModelPayload[];
+  readonly compat?: PiCompat;
 }
 
-// As in `pi-key-providers.ts`, the endpoints come from the environment, and the extension removes
-// them before a tool can start a child process. Pi runs an extension again when it switches
-// sessions, so the endpoints stay in a process slot for those later runs. Pi reads `$` in an apiKey
-// or a header value as an environment reference, and a leading `!` as a shell command, so both are
-// escaped to stay literal. Pi lists a model only when its provider has a key, so a keyless endpoint
-// gets a placeholder key, as Pi's own Ollama example does; a local server ignores it.
+interface PiCompat {
+  readonly supportsStore: false;
+  readonly supportsDeveloperRole: false;
+  readonly supportsLongCacheRetention: false;
+}
+
+function keepsPiCompat(baseUrl: string): boolean {
+  const host = URL.parse(baseUrl)?.hostname ?? "";
+  return (
+    host === "api.openai.com" ||
+    host.endsWith(".openai.azure.com") ||
+    host.endsWith(".cognitiveservices.azure.com") ||
+    host.endsWith(".services.ai.azure.com") ||
+    host === "openrouter.ai"
+  );
+}
+
+function piEndpoint(baseUrl: string): Pick<EndpointPayload, "api" | "baseUrl" | "compat"> {
+  if (isMistralApi(baseUrl)) return { api: "mistral-conversations", baseUrl: baseUrl.replace(/\/v1\/*$/u, "") };
+  return {
+    api: "openai-completions",
+    baseUrl,
+    ...(keepsPiCompat(baseUrl)
+      ? {}
+      : { compat: { supportsStore: false, supportsDeveloperRole: false, supportsLongCacheRetention: false } }),
+  };
+}
+
+interface PiModelPayload {
+  readonly id: string;
+  readonly name: string;
+  readonly contextWindow: number;
+  readonly maxTokens: number;
+  readonly thinkingLevelMap?: PiThinkingLevelMap;
+  readonly input: readonly ("text" | "image")[];
+}
+
+type PiThinkingLevelMap = Readonly<
+  Record<"off" | "minimal" | "low" | "medium" | "high" | "xhigh" | "max", CustomProviderReasoningEffort | null>
+>;
+
+function thinkingLevelMap(efforts: readonly CustomProviderReasoningEffort[]): PiThinkingLevelMap {
+  const accepted = (effort: CustomProviderReasoningEffort) => (efforts.includes(effort) ? effort : null);
+  return {
+    off: accepted("none"),
+    minimal: accepted("minimal"),
+    low: accepted("low"),
+    medium: accepted("medium"),
+    high: accepted("high"),
+    xhigh: accepted("xhigh"),
+    max: accepted("max"),
+  };
+}
+
 const SOURCE = `export default function (pi) {
   const slot = Symbol.for("openbot.pi.customEndpoints");
   globalThis[slot] ??= process.env.${VARIABLE};
@@ -38,15 +88,18 @@ const SOURCE = `export default function (pi) {
     pi.registerProvider(endpoint.id, {
       name: endpoint.name,
       baseUrl: endpoint.baseUrl,
-      api: "openai-completions",
+      api: endpoint.api,
       apiKey: endpoint.apiKey ? literal(endpoint.apiKey) : "openbot",
+      ...(endpoint.authHeader ? { authHeader: true } : {}),
       headers: Object.fromEntries(Object.entries(endpoint.headers).map(([name, value]) => [name, literal(value)])),
       models: endpoint.models.map((model) => ({
         type: "chat",
         id: model.id,
         name: model.name,
-        reasoning: false,
-        input: ["text"],
+        reasoning: model.thinkingLevelMap !== undefined,
+        ...(model.thinkingLevelMap ? { thinkingLevelMap: model.thinkingLevelMap } : {}),
+        input: model.input,
+        ...(endpoint.compat ? { compat: endpoint.compat } : {}),
         cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
         contextWindow: model.contextWindow,
         maxTokens: model.maxTokens,
@@ -57,26 +110,39 @@ const SOURCE = `export default function (pi) {
 `;
 
 function payload(endpoint: CustomProviderConfig): EndpointPayload {
+  const piApi = piEndpoint(endpoint.baseUrl);
   return {
     id: endpoint.id,
     name: endpoint.name,
-    baseUrl: endpoint.baseUrl,
+    ...piApi,
     apiKey: endpoint.apiKey,
+    authHeader: piApi.api === "openai-completions" && Boolean(endpoint.apiKey),
     headers: Object.fromEntries(endpoint.headers.map((header) => [header.name, header.value])),
     models: endpoint.models.map((model) => {
       const contextWindow = model.contextWindow ?? DEFAULT_CONTEXT_WINDOW;
-      // Pi cuts `maxTokens` to the room that the prompt leaves in the window, so a saved max output
-      // above the window does not overflow (`clampMaxTokensToContext`, Pi 1.1.0:
-      // https://github.com/earendil-works/pi/blob/abe508e1b89912adde45528136c3221eb69acdd7/packages/ai/src/api/simple-options.ts#L18-L22).
-      return { id: model.id, name: model.name, contextWindow, maxTokens: customModelOutputLimit(model, contextWindow) };
+      return {
+        id: model.id,
+        name: model.name,
+        contextWindow,
+        maxTokens: customModelOutputLimit(model, contextWindow),
+        ...(model.reasoningEfforts?.length ? { thinkingLevelMap: thinkingLevelMap(model.reasoningEfforts) } : {}),
+        input: model.inputs?.includes("image") ? ["text", "image"] : ["text"],
+      };
     }),
   };
 }
 
-/**
- * Owns one temporary extension file that registers the custom endpoints that run on Pi. The keys and
- * header values never reach the file. Null when no endpoint with a model runs on Pi.
- */
+export function piCustomEndpointSecrets(endpoints: readonly CustomProviderConfig[]): string[] {
+  return endpoints
+    .filter((endpoint) => endpoint.models.length > 0)
+    .flatMap((endpoint) => {
+      const names = new Set([endpoint.id.toLowerCase(), endpoint.name.toLowerCase()]);
+      return [endpoint.apiKey ?? "", ...endpoint.headers.map((header) => header.value)].filter(
+        (value) => value.length > 0 && !names.has(value.toLowerCase()),
+      );
+    });
+}
+
 export const createPiCustomEndpointExtension = Effect.fn("PiCustomEndpoints.createExtension")(function* (
   endpoints: readonly CustomProviderConfig[],
   directory?: string,
@@ -90,14 +156,10 @@ export const createPiCustomEndpointExtension = Effect.fn("PiCustomEndpoints.crea
   yield* providerCall(() => writeFile(path, SOURCE, { mode: 0o600 })).pipe(
     Effect.onError(() => providerCall(() => rm(folder, { recursive: true, force: true })).pipe(Effect.orDie)),
   );
-  const secrets = usable.flatMap((endpoint) => [
-    ...(endpoint.apiKey ? [endpoint.apiKey] : []),
-    ...endpoint.headers.map((header) => header.value).filter((value) => value.length > 0),
-  ]);
   return {
     path,
     environment: { [VARIABLE]: JSON.stringify(usable.map(payload)) },
-    secrets,
+    secrets: piCustomEndpointSecrets(usable),
     close: () => providerCall(() => rm(folder, { recursive: true, force: true })),
   } satisfies PiMcpExtension;
 });

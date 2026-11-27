@@ -1,0 +1,33 @@
+{
+  "slug": "spacefast",
+  "name": "Spacefast",
+  "tagline": "Publish pages as Spaces",
+  "description": "Spacefast lets agents publish websites, reports, and dashboards as Spaces, and list and update the Spaces of the signed-in user.",
+  "category": "productivity",
+  "creatorName": "Automattic",
+  "iconUrl": "https://spacefast.com/apple-touch-icon.png;sf-icon",
+  "version": "1.0.0",
+  "prompts": [
+    { "id": "prompt-publish-report", "text": "Publish this report as a Space." },
+    { "id": "prompt-list-spaces", "text": "List my Spaces and when each was last updated." },
+    { "id": "prompt-bakery-site", "text": "Make a one-page website for my bakery and publish it as a Space." }
+  ],
+  "apps": [
+    {
+      "id": "app-spacefast-mcp",
+      "name": "Spacefast",
+      "description": "Space publishing and updates, over Spacefast's MCP server with browser sign-in.",
+      "iconUrl": "https://spacefast.com/apple-touch-icon.png;sf-icon",
+      "server": {
+        "name": "spacefast",
+        "transport": "http",
+        "url": "https://mcp.spacefast.com",
+        "auth": [{ "id": "spacefast-oauth", "kind": "link", "label": "Sign in" }]
+      }
+    }
+  ],
+  "websiteUrl": "https://spacefast.com",
+  "privacyPolicyUrl": "https://automattic.com/privacy/",
+  "termsUrl": "https://automattic.com/tos/",
+  "skills": []
+}

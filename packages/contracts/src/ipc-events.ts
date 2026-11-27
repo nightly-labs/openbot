@@ -1,15 +1,19 @@
 import {
+  isRoutinePausedByRun,
   isRoutineRunFields,
   isRoutineSchedule,
   ROUTINE_MISSED_POLICIES,
+  ROUTINE_RUN_PLACES,
   type RoutineLimitPolicy,
   type RoutineMissedPolicy,
+  type RoutinePausedByRun,
   type RoutineRunFields,
+  type RoutineRunPlace,
   type RoutineSchedule,
 } from "./ipc-routines";
+import { API_KEY_NAME_PATTERN } from "./ipc-vault";
 import { isDynamicRecord, isNumber, isOneOf, isString } from "./runtime-values";
 
-/** JSON values accepted from a webhook request. */
 export type EventJsonValue =
   | string
   | number
@@ -18,7 +22,6 @@ export type EventJsonValue =
   | EventJsonValue[]
   | { readonly [key: string]: EventJsonValue };
 
-/** A sender's delivery ID. Senders choose it, so the bound is wider than an ID. */
 export const EVENT_DELIVERY_ID_MAX_LENGTH = 512;
 
 export type EventScalar = string | number | boolean | null;
@@ -29,7 +32,6 @@ export interface EventStatus {
 }
 
 export interface EventFilter {
-  /** A JSON Pointer into the request `data`. The empty pointer selects the complete value. */
   pointer: string;
   value: EventScalar;
 }
@@ -39,14 +41,9 @@ export interface RoutineScheduleTrigger {
   schedule: RoutineSchedule;
 }
 
-/**
- * A webhook trigger belongs to one routine. The host makes its URL and signing secret. The URL is
- * null until the account service registers the route. The secret is never part of a read.
- */
 export interface RoutineWebhookTrigger {
   kind: "webhook";
   url: string | null;
-  /** Null accepts every event type. */
   eventType: string | null;
   filters: EventFilter[];
 }
@@ -68,6 +65,8 @@ export interface EventRoutine {
   trigger: EventRoutineTrigger;
   limitPolicy?: RoutineLimitPolicy;
   missedPolicy?: RoutineMissedPolicy;
+  runIn?: RoutineRunPlace;
+  pausedByRun?: RoutinePausedByRun;
   createdAt: string;
   updatedAt: string;
 }
@@ -82,9 +81,9 @@ export interface SaveEventRoutineInput {
   trigger: EventRoutineTriggerInput;
   limitPolicy?: RoutineLimitPolicy;
   missedPolicy?: RoutineMissedPolicy;
+  runIn?: RoutineRunPlace;
 }
 
-/** `secret` is set only when this save made a new webhook trigger. The host does not show it again. */
 export interface SaveEventRoutineResult {
   routine: EventRoutine;
   secret: string | null;
@@ -94,7 +93,10 @@ export interface WebhookSecret {
   secret: string;
 }
 
-/** A signing secret that the sender made, such as a Composio or Svix webhook secret. */
+export interface AgentWebhookSecret {
+  name: string;
+}
+
 export interface SetWebhookSecretInput extends EventRoutineRef {
   secret: string;
 }
@@ -103,7 +105,6 @@ export interface ListEventRoutinesInput {
   owner: EventRoutineOwner;
 }
 
-/** Names one routine. Routine actions and every per-routine list use it. */
 export interface EventRoutineRef {
   id: string;
   owner: EventRoutineOwner;
@@ -115,23 +116,17 @@ export interface ListEventActivityInput {
   limit?: number;
 }
 
-/** The newest runs of one routine, with the records of the occurrences it missed. */
 export interface ListEventRoutineRunsInput {
   owner: EventRoutineOwner;
   routineId: string;
   limit?: number;
 }
 
-/**
- * One run in the history of an event routine. An agent run names the chat message it posted in
- * `deliveryId`, and a channel run names its channel message in `requestMessageId`.
- */
 export interface EventRoutineRun extends RoutineRunFields {
   deliveryId?: string | null;
   requestMessageId?: string | null;
 }
 
-/** The verified request that starts a webhook routine. Secrets and signature headers are never part of it. */
 export interface EventEnvelope {
   version: 1;
   id: string;
@@ -142,10 +137,8 @@ export interface EventEnvelope {
   data: EventJsonValue;
 }
 
-/** Why a received request did not start a run. */
 export type WebhookReceiptReason = "event-type" | "filter" | "inactive";
 
-/** One request that the webhook of a routine received. */
 export interface EventActivity {
   kind: "received";
   id: string;
@@ -157,12 +150,7 @@ export interface EventActivity {
   occurredAt: string;
 }
 
-/**
- * The answer to a test event. The host makes an event that matches the routine's event type and
- * filters, signs it with the routine secret, and receives it as it receives a relayed request.
- */
 export interface WebhookTestResult {
-  /** The type of the event that the host sent. */
   eventType: string;
   status: "started" | "ignored";
   reason: WebhookReceiptReason | null;
@@ -260,6 +248,8 @@ function isEventRoutine(value: unknown): value is EventRoutine {
     isEventRoutineTrigger(value.trigger) &&
     (value.limitPolicy === undefined || value.limitPolicy === "wait" || value.limitPolicy === "skip") &&
     (value.missedPolicy === undefined || isOneOf(ROUTINE_MISSED_POLICIES, value.missedPolicy)) &&
+    (value.runIn === undefined || isOneOf(ROUTINE_RUN_PLACES, value.runIn)) &&
+    (value.pausedByRun === undefined || isRoutinePausedByRun(value.pausedByRun)) &&
     isTimestamp(value.createdAt) &&
     isTimestamp(value.updatedAt)
   );
@@ -271,6 +261,10 @@ function isSaveEventRoutineResult(value: unknown): value is SaveEventRoutineResu
 
 function isWebhookSecret(value: unknown): value is WebhookSecret {
   return isDynamicRecord(value) && isString(value.secret) && value.secret.length > 0;
+}
+
+function isAgentWebhookSecret(value: unknown): value is AgentWebhookSecret {
+  return isDynamicRecord(value) && isString(value.name) && API_KEY_NAME_PATTERN.test(value.name);
 }
 
 function isDeliveryId(value: unknown): value is string {
@@ -324,6 +318,7 @@ export const decodeEventActivity = decodeList(isEventActivity, "Invalid event ac
 export const decodeEventRoutines = decodeList(isEventRoutine, "Invalid event routine response.");
 export const decodeSaveEventRoutineResult = decodeOne(isSaveEventRoutineResult, "Invalid event routine response.");
 export const decodeWebhookSecret = decodeOne(isWebhookSecret, "Invalid webhook secret response.");
+export const decodeAgentWebhookSecret = decodeOne(isAgentWebhookSecret, "Invalid webhook secret response.");
 export const decodeWebhookTestResult = decodeOne(isWebhookTestResult, "Invalid webhook test response.");
 function isEventRoutineRun(value: unknown): value is EventRoutineRun {
   return (

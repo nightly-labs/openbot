@@ -59,4 +59,6 @@ export const messages = {
     many: "Повторное подключение {attempt}/{count}",
     other: "Повторное подключение {attempt}/{count}",
   },
+  "status.remote.messageCut":
+    "[{size} МБ этого сообщения не показаны на этом устройстве. Откройте его на компьютере, где работает сервер, чтобы прочитать полностью.]",
 } as const satisfies PartialTranslation<typeof source>;

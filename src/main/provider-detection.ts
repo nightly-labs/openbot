@@ -1,10 +1,3 @@
-// The local model server scan and the model list of one endpoint. Both run in main: see
-// `model-server-probe.ts`.
-//
-// A scan sends no key to any address. A model list for a saved endpoint uses the stored key and
-// headers only when the user leaves them blank and the address keeps the saved origin, so an edited
-// address never receives the old credentials.
-
 import { INPUT_LIMITS } from "@openbot/contracts/input-limits";
 import type {
   DetectedAcpAgent,
@@ -23,10 +16,9 @@ import { Context, Effect, Exit, Fiber, Layer, ManagedRuntime, Scope } from "effe
 import { scanAcpAgents } from "../backend/acp-agent-scan";
 import type { CustomProviderConfig } from "../backend/opencode-config";
 import { ModelServerProbe, type ProbeError } from "./model-server-probe";
+import type { ModelReleaseCatalog } from "./model-visibility";
 
-/** A server on this computer answers at once, so a slow address is not held for long. */
 const SCAN_TIMEOUT_MS = 1_500;
-/** The user asked for this list, and a remote server can be slow. */
 const DISCOVER_TIMEOUT_MS = 8_000;
 
 interface KnownServer {
@@ -40,15 +32,12 @@ export interface ProviderDetectionDependencies {
   customProviders: { configs(): readonly CustomProviderConfig[] };
   customAgents: { configs(): readonly { id: string }[] };
   probe?: Context.Service.Shape<typeof ModelServerProbe>["probe"];
+  catalog?: ModelReleaseCatalog;
   scanAgents?: typeof scanAcpAgents;
 }
 
 export type ProviderDetection = Context.Service.Shape<typeof ProviderDiscovery>;
 
-/**
- * A free endpoint id for a server: its known id, or `server-<host>-<port>`. A taken id gets `-2`,
- * `-3` and so on.
- */
 function suggestServerId(base: string, taken: ReadonlySet<string>): string {
   const limit = INPUT_LIMITS.identifier - 4;
   const stem =
@@ -65,7 +54,6 @@ function suggestServerId(base: string, taken: ReadonlySet<string>): string {
   }
 }
 
-/** The servers to probe: the defaults, then the user's addresses, one row for each endpoint key. */
 function scanTargets(addresses: readonly string[]): KnownServer[] {
   const targets: KnownServer[] = [];
   const keys = new Set<string>();
@@ -85,7 +73,6 @@ function scanTargets(addresses: readonly string[]): KnownServer[] {
     } catch {
       continue;
     }
-    // The settings parser refuses these already. A file edited by hand is checked again here.
     if ((url.protocol !== "http:" && url.protocol !== "https:") || url.username || url.password) continue;
     add({ id: `server-${url.hostname}-${url.port || url.protocol.slice(0, -1)}`, name: url.host, baseUrl });
   }
@@ -173,9 +160,6 @@ class ProviderDiscovery extends Context.Service<
           const saved = input.savedProviderId
             ? dependencies.customProviders.configs().find((config) => config.id === input.savedProviderId)
             : undefined;
-          // Blank fields retain credentials only when the destination keeps the stored origin.
-          // An empty header value is a saved header that the form shows by name only. A saved header
-          // that the form no longer lists is not sent.
           if (saved && sameCustomProviderOrigin(saved.baseUrl, input.baseUrl)) {
             if (!apiKey) apiKey = saved.apiKey;
             headers = headers.map((header) =>
@@ -188,7 +172,15 @@ class ProviderDiscovery extends Context.Service<
             scope,
             { startImmediately: true },
           );
-          return { models: yield* Fiber.join(request) };
+          const models = yield* Fiber.join(request);
+          const catalog = dependencies.catalog;
+          if (!catalog) return { models };
+          const lookup = yield* catalog.lookup();
+          return {
+            models: models.map((model) =>
+              model.contextWindow === undefined ? { ...model, ...lookup.limits(model.id) } : model,
+            ),
+          };
         });
         return ProviderDiscovery.of({
           scanModelServers: scan,
@@ -200,7 +192,6 @@ class ProviderDiscovery extends Context.Service<
   }
 }
 
-/** Constructs the service once; the application executes its operations and owns shutdown. */
 export const createProviderDetection = Effect.fn("ProviderDiscovery.create")(function* (
   dependencies: ProviderDetectionDependencies,
 ) {

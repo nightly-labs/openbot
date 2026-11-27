@@ -1,0 +1,46 @@
+.theme-sweep-canvas {
+  position: fixed;
+  inset: 0;
+  inline-size: 100vw;
+  block-size: 100vh;
+  pointer-events: none;
+  view-transition-name: theme-sweep;
+}
+
+.theme-sweep-beam {
+  position: fixed;
+  inset: 0;
+  z-index: calc(var(--openbot-layer-tooltip) + 1);
+  inline-size: 100vw;
+  block-size: 100vh;
+  pointer-events: none;
+}
+
+.theme-sweep-ripple {
+  position: absolute;
+  inline-size: 0;
+  block-size: 0;
+}
+
+html:active-view-transition-type(theme-sweep)::view-transition-group(*),
+html:active-view-transition-type(theme-sweep)::view-transition-old(*),
+html:active-view-transition-type(theme-sweep)::view-transition-new(*) {
+  animation: none;
+}
+
+html:active-view-transition-type(theme-sweep)::view-transition-new(root) {
+  mix-blend-mode: normal;
+  mask-image: radial-gradient(
+    100% var(--theme-sweep-radius) at 50% var(--theme-sweep-origin, 100%),
+    var(--openbot-text-primary) var(--theme-sweep-reveal-from),
+    var(--openbot-transparent) var(--theme-sweep-reveal-to)
+  );
+}
+
+html:active-view-transition-type(theme-sweep)::view-transition-image-pair(root) {
+  filter: url("#theme-sweep-ripple");
+}
+
+html:active-view-transition-type(theme-sweep)::view-transition-new(theme-sweep) {
+  mix-blend-mode: normal;
+}

@@ -1,45 +1,62 @@
 import {
   assertSupportedAttachmentName,
-  attachmentFileExtension,
+  isSupportedAttachmentNameFor,
   rasterImageMimeType,
-  supportedAttachmentExtensions,
 } from "@openbot/contracts/attachment-files";
 import { isAvatarMimeType } from "@openbot/contracts/avatar-images";
 import type {
   AccountUsage,
+  AgentApproval,
   AgentColors,
   AgentEvent,
   AgentNotificationLevelsSnapshot,
+  AgentRuntimePrompt,
   AgentStatus,
+  AgentWaitsSnapshot,
   AttachmentSummary,
   AvatarImageInput,
+  BrowserHttpSignIn,
+  BrowserHttpSignInInput,
   BrowserLiveViewEvent,
   BrowserNavigateInput,
   BrowserOpenInput,
   BrowserPreview,
   BrowserTab,
+  BrowserTeachStep,
+  BrowserTeachStopInput,
   CancelQueuedMessageInput,
+  Channel,
+  ChatColors,
   ClientAgentModelOption,
   ClientAgentSummary,
+  ConversationFileSearchPage,
   ConversationPage,
   ConversationReadState,
   ConversationSearchPage,
   CreateAgentInput,
+  CreditsHold,
   DuplicateAgentResult,
   EditQueuedMessageInput,
   HiddenAgentsSnapshot,
   InvitePreview,
   LocalBrowserSecretResponse,
+  MediaApprovalRead,
+  PinnedMessagesSnapshot,
+  ProviderModelSourceEntry,
   QueueSnapshot,
+  ReadMediaApprovalInput,
+  ReadPendingApprovalInput,
   ReorderQueueInput,
   RespondToApprovalInput,
   RespondToBrowserTakeoverInput,
+  RespondToCreditsHoldInput,
+  RespondToMediaApprovalInput,
   RespondToPromptInput,
-  Routine,
-  RoutineRun,
   ServerNotificationLevel,
   SetAgentHiddenInput,
   SetAgentNotificationLevelInput,
+  SetChannelImageInput,
+  SetMessagePinnedInput,
   SetMessageReactionInput,
   SidebarLayoutAction,
   SidebarLayoutSnapshot,
@@ -49,19 +66,23 @@ import type {
   TeamInviteSummary,
   TeamMemberSummary,
   TeamRealtimeEvent,
-  TestRoutineInput,
   UpdateAgentInput,
   UpdateQueuedMessageInput,
-  UpdateRoutineInput,
   WorkspaceDirectory,
 } from "@openbot/contracts/ipc";
 import {
   canAdministerServer,
+  DEFAULT_PROVIDER_ACCOUNT_ID,
   decodeAgentFastModels,
   decodeAgentModelListings,
+  decodeAgentSteeringModels,
+  decodeCreditsAskMuted,
+  decodeProviderModelSources,
+  decodeUsageCredits,
   decodeWorkspaceDirectory,
   isAccountUsage,
   isAgentStatus,
+  isChannel,
   isClientAgentModelOption,
   isClientAgentSummary,
   isConversationMessage,
@@ -72,22 +93,59 @@ import {
   isSidebarLayoutSnapshot,
   isTeamPresenceSnapshot,
   withFastServiceTiers,
+  withKeptModels,
   withModelListings,
+  withModelSources,
+  withSteeringModels,
+  withUsageCredits,
+  withWorkspaceOnlyLimit,
 } from "@openbot/contracts/ipc";
 import { guardedListDecoder, optionalHistoryExtent, requiredString } from "@openbot/contracts/ipc-decoding";
+import type { AcceptedOwnerTransfer, OwnerTransfer } from "@openbot/contracts/owner-transfer";
 import { isDynamicRecord, isNumber, isString } from "@openbot/contracts/runtime-values";
-import { TEAM_API_ROUTES } from "@openbot/contracts/team-api-routes";
+import { TEAM_API_ROUTES, WORKSPACE_FILE_EXACT_PATH_QUERY } from "@openbot/contracts/team-api-routes";
+import {
+  AGENT_ACTIVE_QUEUES_ROUTES,
+  type AgentActiveQueues,
+  decodeAgentActiveQueues,
+} from "@openbot/contracts/team-protocol/agent-active-queues-v1";
 import { AGENT_COLORS_CAPABILITY } from "@openbot/contracts/team-protocol/agent-colors-v1";
+import { AGENT_CREATE_OPERATION_CAPABILITY } from "@openbot/contracts/team-protocol/agent-create-operation-v1";
 import {
   AGENT_FAST_MODE_CAPABILITY,
   AGENT_FAST_MODE_ROUTES,
 } from "@openbot/contracts/team-protocol/agent-fast-mode-v1";
 import { AGENT_NOTIFICATION_LEVELS_CAPABILITY } from "@openbot/contracts/team-protocol/agent-notification-levels-v1";
 import {
+  AGENT_PENDING_RUNTIME_CAPABILITY,
+  AGENT_PENDING_RUNTIME_ROUTES,
+  pendingRuntimeUpdateBody,
+} from "@openbot/contracts/team-protocol/agent-pending-runtime-v1";
+import { AGENT_SPEED_CAPABILITY, AGENT_SPEED_ROUTES } from "@openbot/contracts/team-protocol/agent-speed-v1";
+import {
+  AGENT_USAGE_LIMIT_CAPABILITY,
+  AGENT_USAGE_LIMIT_ROUTES,
+} from "@openbot/contracts/team-protocol/agent-usage-limit-v1";
+import {
+  AGENT_WAITS_CAPABILITY,
+  AGENT_WAITS_ROUTES,
+  decodeAgentWaitsResponse,
+} from "@openbot/contracts/team-protocol/agent-waits-v1";
+import {
+  BROWSER_HTTP_SIGN_IN_CAPABILITY,
+  BROWSER_HTTP_SIGN_IN_ROUTES,
+  decodeBrowserHttpSignInSnapshot,
+} from "@openbot/contracts/team-protocol/browser-http-sign-in-v1";
+import {
   BROWSER_PAGE_STATE_CAPABILITY,
   BROWSER_PAGE_STATE_ROUTES,
   decodeBrowserPageStateSnapshot,
 } from "@openbot/contracts/team-protocol/browser-page-state-v1";
+import {
+  BROWSER_TEACH_CAPABILITY,
+  BROWSER_TEACH_ROUTES,
+  decodeBrowserTeachSteps,
+} from "@openbot/contracts/team-protocol/browser-teach-v1";
 import {
   BROWSER_USER_CONTROL_CAPABILITY,
   BROWSER_USER_CONTROL_ROUTES,
@@ -96,29 +154,101 @@ import {
 import {
   decodeBrowserViewInputValue,
   TEAM_BROWSER_VIEW_CLIPBOARD_CAPABILITY,
+  TEAM_BROWSER_VIEW_DIALOG_CAPABILITY,
   TEAM_BROWSER_VIEW_FRAME_POINT_CAPABILITY,
+  TEAM_BROWSER_VIEW_FRAME_SIZE_CAPABILITY,
+  TEAM_BROWSER_VIEW_PAGE_COPY_CAPABILITY,
 } from "@openbot/contracts/team-protocol/browser-view-v1";
-import { TEAM_BROWSER_NAVIGATION_CAPABILITY } from "@openbot/contracts/team-protocol/current";
+import {
+  CHANNEL_COMPACT_AVAILABILITY_CAPABILITY,
+  CHANNEL_COMPACT_AVAILABILITY_ROUTE,
+  type ChannelCompactAvailability,
+  decodeChannelCompactAvailability,
+} from "@openbot/contracts/team-protocol/channel-compact-availability-v1";
+import {
+  CHANNEL_PICTURE_CAPABILITY,
+  CHANNEL_PICTURE_ROUTES,
+} from "@openbot/contracts/team-protocol/channel-picture-v1";
+import { CHAT_COLORS_CAPABILITY } from "@openbot/contracts/team-protocol/chat-colors-v1";
+import { CHAT_HISTORY_CAPABILITY, CHAT_HISTORY_ROUTES } from "@openbot/contracts/team-protocol/chat-history-v1";
+import {
+  CONTEXT_COMPACT_CAPABILITY,
+  CONTEXT_COMPACT_ROUTES,
+} from "@openbot/contracts/team-protocol/context-compact-v1";
+import {
+  CONVERSATION_FILE_SEARCH_CAPABILITY,
+  CONVERSATION_FILE_SEARCH_PAGE_LIMIT,
+  CONVERSATION_FILE_SEARCH_ROUTES,
+  decodeConversationFileSearchResponse,
+} from "@openbot/contracts/team-protocol/conversation-file-search-v1";
+import {
+  CONVERSATION_UNREAD_FROM_CAPABILITY,
+  CONVERSATION_UNREAD_FROM_ROUTE,
+} from "@openbot/contracts/team-protocol/conversation-unread-from-v1";
+import { TEAM_BROWSER_NAVIGATION_CAPABILITY, TEAM_WEB_CLIENT_PROTOCOL } from "@openbot/contracts/team-protocol/current";
 import { FOCUS_USE_ROUTES } from "@openbot/contracts/team-protocol/focus-use-v1";
+import {
+  decodeCreditsHoldResponse,
+  decodeMediaApprovalReadResponse,
+  MEDIA_APPROVAL_CHOICE_CAPABILITY,
+  MEDIA_APPROVAL_CHOICE_ROUTES,
+} from "@openbot/contracts/team-protocol/media-approval-choice-v1";
 import { MESSAGE_DELETE_CAPABILITY, MESSAGE_DELETE_ROUTES } from "@openbot/contracts/team-protocol/message-delete-v1";
+import {
+  decodeMessagePinsResponse,
+  MESSAGE_PINS_CAPABILITY,
+  MESSAGE_PINS_ROUTES,
+} from "@openbot/contracts/team-protocol/message-pins-v1";
+import { MODEL_STEERING_CAPABILITY, MODEL_STEERING_ROUTES } from "@openbot/contracts/team-protocol/model-steering-v1";
+import {
+  MODEL_VISIBILITY_KEPT_CAPABILITY,
+  MODEL_VISIBILITY_KEPT_ROUTES,
+} from "@openbot/contracts/team-protocol/model-visibility-kept-v1";
 import {
   MODEL_VISIBILITY_CAPABILITY,
   MODEL_VISIBILITY_ROUTES,
 } from "@openbot/contracts/team-protocol/model-visibility-v1";
+import {
+  decodePendingApprovalResponse,
+  PENDING_APPROVAL_CAPABILITY,
+  PENDING_APPROVAL_ROUTES,
+} from "@openbot/contracts/team-protocol/pending-approval-v1";
+import {
+  decodePendingPromptsResponse,
+  PENDING_PROMPTS_CAPABILITY,
+  PENDING_PROMPTS_ROUTES,
+} from "@openbot/contracts/team-protocol/pending-prompts-v1";
 import { PROVIDER_ACCOUNTS_CAPABILITY } from "@openbot/contracts/team-protocol/provider-accounts-v1";
-import { ROUTINE_FLOWS_CAPABILITY } from "@openbot/contracts/team-protocol/routine-flows-v1";
+import {
+  PROVIDER_MODEL_SOURCE_CAPABILITY,
+  PROVIDER_MODEL_SOURCE_ROUTES,
+} from "@openbot/contracts/team-protocol/provider-model-source-v1";
+import { ROUTINES_ONCE_CAPABILITY } from "@openbot/contracts/team-protocol/routines-once-v1";
+import {
+  decodeServerSafeModeReason,
+  SERVER_SAFE_MODE_CAPABILITY,
+  SERVER_SAFE_MODE_ROUTES,
+  type ServerSafeModeReason,
+} from "@openbot/contracts/team-protocol/server-safe-mode-v1";
 import {
   SIDEBAR_FOLDERS_CAPABILITY,
   SIDEBAR_FOLDERS_ROUTES,
 } from "@openbot/contracts/team-protocol/sidebar-folders-v1";
-import { type TeamProtocolSupportV1, teamProtocolUpdateDirection } from "@openbot/contracts/team-protocol/v1";
-import type { TeamProtocolV2Json } from "@openbot/contracts/team-protocol/v2";
-import { TEAM_PROTOCOL_V3 } from "@openbot/contracts/team-protocol/v3";
-import { decodeTeamProtocolSupportV9 } from "@openbot/contracts/team-protocol/v9";
+import {
+  decodeThreadMessageSearchResponse,
+  THREAD_MESSAGE_SEARCH_CAPABILITY,
+  THREAD_MESSAGE_SEARCH_PAGE_LIMIT,
+  THREAD_MESSAGE_SEARCH_ROUTES,
+} from "@openbot/contracts/team-protocol/thread-message-search-v1";
+import { USAGE_CREDITS_CAPABILITY, USAGE_CREDITS_ROUTES } from "@openbot/contracts/team-protocol/usage-credits-v1";
+import type { TeamProtocolSupportV1 } from "@openbot/contracts/team-protocol/v1";
+import { TEAM_PROTOCOL_V2_MAX_FILE_BYTES, type TeamProtocolV2Json } from "@openbot/contracts/team-protocol/v2";
+import type { WorkflowSpotInput } from "@openbot/contracts/team-protocol/workflow-presence-v1";
 import {
   WORKSPACE_DIRECTORY_CAPABILITY,
   WORKSPACE_DIRECTORY_ROUTES,
 } from "@openbot/contracts/team-protocol/workspace-directory-v1";
+import { WORKSPACE_ONLY_PROCESS_LIMIT_CAPABILITY } from "@openbot/contracts/team-protocol/workspace-only-process-limit-v1";
 import { runTeamEffect } from "@openbot/team-client";
 import { bytesToBase64 } from "@openbot/team-client/base64";
 import { createRemoteBrowserView, type RemoteBrowserView } from "@openbot/team-client/browser-view";
@@ -132,19 +262,23 @@ import {
 } from "@openbot/team-client/remote-directory";
 import {
   createRemoteTeamPeer,
-  MOBILE_ATTACHMENT_BYTES,
+  type RemoteDownloadWatch,
   type RemoteFileUpload,
+  type RemoteLargeDownload,
   type RemoteTeamCommandResult,
   type RemoteTeamConnectionUpdate,
   type RemoteTeamPeerActions,
 } from "@openbot/team-client/remote-peer";
 import { remoteWorkspaceReadTimeout } from "@openbot/team-client/remote-recovery";
+import { retryOperationIds } from "@openbot/team-client/retry-operation-id";
 import {
   listAgentNotificationLevels,
   listHiddenAgents,
   readAgentColors,
+  readChatColors,
   readSidebarPins,
   seedSidebarPins,
+  setAgentChatColor,
   setAgentColor,
   setAgentHidden,
   setAgentNotificationLevel,
@@ -163,18 +297,17 @@ import {
   steerQueuedMessage,
   type TeamApiRequest,
   type TeamChannelsApi,
-  type TeamRoutineFlowsApi,
-  teamAgentRoutinesApi,
   teamChannelsApi,
-  teamRoutineFlowsApi,
   updateQueuedMessage,
   uploadAttachmentDraft,
 } from "@openbot/team-client/team-api-requests";
 import type { BrowserViewRuntime } from "@openbot/ui/features/browser/BrowserLiveView";
 import { currentText } from "@openbot/ui/text";
+import { toast } from "@openbot/ui/toast";
 import { referenceFrom } from "@openbot/user-errors";
 import { Effect } from "effect";
 import type { ServerAdminPort } from "../servers/servers-port";
+import { readWebHostCompatibility } from "./web-host-compatibility";
 import {
   createWebHostConnections,
   type WebHostConnections,
@@ -190,14 +323,11 @@ import {
   type WebHostState,
   type WebHostTabMessage,
 } from "./web-host-lock";
+import { closeWebChatNotifications } from "./web-notifications";
 
-/**
- * The host controls of the connected host. The host answers the Team API routes, and the account
- * service answers the member and invitation routes; both refuse a `member`, so the UI gate is not
- * the only one.
- */
 export interface WebAdminRuntime {
   request: TeamApiRequest;
+  download: TeamApiRequest;
   team: ServerAdminPort;
 }
 
@@ -217,14 +347,23 @@ interface WebConnectOptions {
   early?: WebEarlyReads;
 }
 
-/** The message that `message-delete-v1` deletes: in the chat of an agent, or in a channel. */
 type WebMessageDelete =
   | { kind: "agent"; agentId: string; messageId: string }
   | { kind: "channel"; channelId: string; messageId: string };
 
+type WebHistoryDelete = { kind: "agent"; agentId: string } | { kind: "channel"; channelId: string };
+
+interface WebOwnerTransfers {
+  pending(hostId: string): Promise<OwnerTransfer | null>;
+  start(hostId: string, email: string): Promise<OwnerTransfer>;
+  cancel(hostId: string): Promise<void>;
+  incoming(): Promise<OwnerTransfer[]>;
+  accept(transferId: string): Promise<AcceptedOwnerTransfer>;
+  decline(transferId: string): Promise<void>;
+}
+
 export interface WebWorkspaceRuntime {
   admin?: WebAdminRuntime;
-  /** The status connections of the hosts that this tab has not opened. */
   hosts?: WebHostConnections;
   browser: BrowserViewRuntime;
   browserTabs(): Promise<BrowserTab[]>;
@@ -232,50 +371,55 @@ export interface WebWorkspaceRuntime {
   openBrowserTab(input: BrowserOpenInput): Promise<BrowserTab>;
   navigateBrowserTab(input: BrowserNavigateInput): Promise<void>;
   reloadBrowserTab(tabId: string): Promise<void>;
-  /** Behind `browser-page-state`. */
   stopBrowserTab(tabId: string): Promise<void>;
+  answerBrowserHttpSignIn(input: BrowserHttpSignInInput): Promise<void>;
   closeBrowserTab(tabId: string): Promise<void>;
-  /** Behind `browser-user-control`: the owning agent waits on the tab until the release. */
   takeBrowserControl(tabId: string): Promise<void>;
   releaseBrowserControl(tabId: string): Promise<void>;
+  startBrowserTeach(tabId: string): Promise<void>;
+  stopBrowserTeach(input: BrowserTeachStopInput): Promise<BrowserTeachStep[]>;
   respondToBrowserSecret?: (input: LocalBrowserSecretResponse) => Promise<void>;
   getSidebarLayout?: () => Promise<SidebarLayoutSnapshot>;
   mutateSidebarLayout?: (action: SidebarLayoutAction) => Promise<SidebarLayoutSnapshot>;
-  /** The host's channel routes. A channel page arrives without host file URLs. */
-  channels?: TeamChannelsApi;
-  /** The team member this connection signs in as, which is how the host names this reader's messages. */
+  channels?: TeamChannelsApi & {
+    setChannelImage(input: SetChannelImageInput): Promise<Channel>;
+    onPictures?(listener: () => void): () => void;
+  };
   currentMemberId?: () => Promise<string>;
   respondToTakeover(input: RespondToBrowserTakeoverInput): Promise<void>;
   listHosts(): Promise<RemoteTeamHost[]>;
-  /** Ends this account's membership of a host. The account service refuses the owner. */
   leaveHost(hostId: string, membershipId: string): Promise<void>;
   removeOwnedHost?: (hostId: string) => Promise<void>;
+  setHostHidden?: (hostId: string, hidden: boolean) => Promise<void>;
+  ownerTransfers?: WebOwnerTransfers;
   previewInvite(url: string): Promise<InvitePreview>;
   acceptInvite(url: string): Promise<RemoteTeamHost>;
-  /**
-   * Connects and reads the host's compatibility. When the host protocol of an earlier connection is
-   * known, `early.start` runs as the data channels open, so the first reads go beside that read.
-   * `early.drop` runs when the read gives another protocol: those reads used the wrong capabilities.
-   * With `takeOver`, a tab that has the host open closes it, and `hostTaken` tells that tab.
-   */
   connect(host: RemoteTeamHost, options?: WebConnectOptions): Promise<string[]>;
   disconnect(): Promise<void>;
   listAgents(): Promise<ClientAgentSummary[]>;
   conversation(agentId: string, before?: string): Promise<ConversationPage>;
-  /** The page of an agent's conversation around one message, or the newest page from an older host. */
-  conversationAround?: (agentId: string, messageId: string) => Promise<ConversationPage>;
-  /** Marks this member's messages from the agent read through `throughMessageId`, or all when it is null. */
+  conversationAround?: (agentId: string, messageId: string, limit?: number) => Promise<ConversationPage>;
   markRead(agentId: string, throughMessageId: string | null): Promise<ConversationReadState>;
-  /** This member's read state for each agent, keyed by agent id. Invalid entries are left out. */
+  markUnreadFrom(agentId: string, fromMessageId: string): Promise<ConversationReadState>;
   conversationReads(): Promise<Record<string, ConversationReadState>>;
-  /**
-   * Deletes one message of an agent's chat or of a channel, with `message-delete-v1`. A host
-   * without it refuses before a request goes out.
-   */
   deleteMessage?: (input: WebMessageDelete) => Promise<void>;
-  /** Tells a hosted server that this tab has focus. Send it only to a host with `focus-use-v1`. */
+  compactContext?: (agentId: string, taskId?: string) => Promise<void>;
+  deleteHistory?: (input: WebHistoryDelete) => Promise<void>;
+  clearChannelContext?: (channelId: string) => Promise<void>;
+  compactChannelContext?: (channelId: string) => Promise<void>;
+  channelCompactAvailability?: (channelId: string) => Promise<ChannelCompactAvailability>;
+  listWaits?: (agentId: string) => Promise<AgentWaitsSnapshot>;
+  listPinnedMessages?: (agentId: string) => Promise<PinnedMessagesSnapshot>;
+  setMessagePinned?: (input: SetMessagePinnedInput) => Promise<PinnedMessagesSnapshot>;
+  cancelWait?: (agentId: string, waitId: string) => Promise<void>;
+  readPendingApproval?: (input: ReadPendingApprovalInput) => Promise<AgentApproval | null>;
+  readMediaApproval?: (input: ReadMediaApprovalInput) => Promise<MediaApprovalRead>;
+  respondToMediaApproval?: (input: RespondToMediaApprovalInput) => Promise<void>;
+  respondToCreditsHold?: (input: RespondToCreditsHoldInput) => Promise<CreditsHold | null>;
+  setCreditsAskMuted?: (input: { muted: boolean }) => Promise<void>;
+  readCreditsAskMuted?: () => Promise<{ muted: boolean }>;
+  listPendingPrompts?: () => Promise<AgentRuntimePrompt[]>;
   focusUse(): Promise<void>;
-  /** Resolves to the conversation message the host stored: the delivery id of the receipt. */
   send(
     agentId: string,
     text: string,
@@ -284,9 +428,10 @@ export interface WebWorkspaceRuntime {
     clientMessageId?: string,
   ): Promise<string>;
   stop(agentId: string, turnId: string): Promise<void>;
-  /** Sends which agent this member is writing to, or `null`. It does nothing while the host is offline. */
   setTyping(agentId: string | null, typing: boolean): void;
+  setWorkflowSpot(input: WorkflowSpotInput): void;
   queue(agentId: string): Promise<QueueSnapshot>;
+  activeQueues(agentIds: string[]): Promise<AgentActiveQueues>;
   editQueue(input: EditQueuedMessageInput): Promise<QueueSnapshot>;
   cancelQueued(input: CancelQueuedMessageInput): Promise<void>;
   steerQueued(input: SteerQueuedMessageInput): Promise<void>;
@@ -297,71 +442,49 @@ export interface WebWorkspaceRuntime {
   upload(file: File): Promise<AttachmentSummary>;
   cancelUpload(): Promise<void>;
   discard(attachmentId: string): Promise<void>;
-  download(attachmentId: string): Promise<WebFile>;
-  /** A file under the host's shared folder. */
+  download(attachmentId: string, progress?: RemoteDownloadWatch): Promise<WebFile>;
+  downloadPreview(attachmentId: string): Promise<WebFile>;
   sharedFile(path: string): Promise<WebFile>;
-  /** A file in one agent's workspace on the host. */
-  workspaceFile(agentId: string, path: string): Promise<WebFile>;
-  /** A folder in one agent's workspace on the host. */
+  workspaceFile(agentId: string, path: string, options?: { exactPath?: boolean }): Promise<WebFile>;
   workspaceDirectory(agentId: string, path: string): Promise<WorkspaceDirectory>;
-  /** The routine canvas routes. Each call refuses while the host does not serve `routine-flows-v1`. */
-  routineFlows?: TeamRoutineFlowsApi;
-  /** Changes an agent routine, such as its instruction. */
-  updateRoutine?: (input: UpdateRoutineInput) => Promise<Routine>;
-  /** Runs an agent routine now. */
-  testRoutine?: (input: TestRoutineInput) => Promise<RoutineRun>;
-  /** The agents that a user hid on the host. Any member can call it on a host with `agent-hidden-v1`. */
   listHiddenAgents?: () => Promise<HiddenAgentsSnapshot>;
-  /** Hides or restores an agent, and returns the host's hidden list. Needs `agent-hidden-v1`. */
   setAgentHidden?: (input: SetAgentHiddenInput) => Promise<HiddenAgentsSnapshot>;
-  /** The exact colours of the agents on the host. A host without `agent-colors-v1` has none. */
   listAgentColors?: () => Promise<AgentColors>;
-  /** The user's own pinned chats on the open host, for all of their devices. Needs `sidebar-pins-v1`. */
+  listChatColors?: () => Promise<ChatColors>;
   sidebarPins?: {
     read: () => Promise<SidebarPinsSnapshot>;
     set: (items: SidebarPin[]) => Promise<SidebarPinsSnapshot>;
-    /** Saves `items` only when the user has no list on the host yet. */
     seed: (items: SidebarPin[]) => Promise<SidebarPinsSnapshot>;
   };
-  /**
-   * The user's own level for each agent of a host: the open host, or a host with a status connection.
-   * Any member can call it. A host without `agent-notification-levels-v1` has no levels.
-   */
   listAgentNotificationLevels?: (hostId: string) => Promise<AgentNotificationLevelsSnapshot>;
-  /** Sets the user's own level for one agent of the open host. Needs `agent-notification-levels-v1`. */
   setAgentNotificationLevel?: (input: SetAgentNotificationLevelInput) => Promise<AgentNotificationLevelsSnapshot>;
-  /**
-   * The agents and the user's own levels of a host, for the notification settings: the open host, or
-   * a host with a status connection. `levels` is null on a host without `agent-notification-levels-v1`.
-   */
   notificationSettings?: (hostId: string) => Promise<WebHostNotificationSettings>;
-  /** Sets the user's own level for one agent of a host. Needs `agent-notification-levels-v1`. */
   setHostAgentNotificationLevel?: (
     hostId: string,
     input: SetAgentNotificationLevelInput,
   ) => Promise<AgentNotificationLevelsSnapshot>;
-  /** Sets the user's own level of a host, for all of their devices. Needs `agent-notification-levels-v1`. */
   setOwnServerNotificationLevel?: (
     hostId: string,
     level: ServerNotificationLevel | null,
   ) => Promise<AgentNotificationLevelsSnapshot>;
   react(input: SetMessageReactionInput): Promise<void>;
   setAvatar(agentId: string, image: AvatarImageInput | null): Promise<void>;
-  /** The agent image as a data URL. The browser cannot open the host's `openbot-avatar:` URL. */
   agentAvatar(agentId: string, avatarUrl: string): Promise<string>;
   models(): Promise<ClientAgentModelOption[]>;
   status(): Promise<AgentStatus>;
+  modelSources?: () => Promise<ProviderModelSourceEntry[]>;
   accountUsage?: () => Promise<AccountUsage>;
   createAgent(input: CreateAgentInput): Promise<ClientAgentSummary>;
   duplicateAgent(agentId: string): Promise<DuplicateAgentResult>;
   updateAgent(input: UpdateAgentInput): Promise<void>;
   deleteAgent(agentId: string): Promise<void>;
-  /** Searches one agent's conversation, or every conversation on the host when `agentId` is not set. */
-  search(agentId: string | undefined, query: string, cursor?: string): Promise<ConversationSearchPage>;
-  /**
-   * `sessionsEnded`: the account service already ended this account's remote sessions, as sign-out
-   * does. The browser then sends no end request, which the revoked cookie would only have refused.
-   */
+  search(
+    agentId: string | undefined,
+    query: string,
+    cursor?: string,
+    includeSideThreads?: boolean,
+  ): Promise<ConversationSearchPage>;
+  searchFiles?: (query: string, cursor?: string) => Promise<ConversationFileSearchPage>;
   dispose(options?: { sessionsEnded?: boolean }): Promise<void>;
 }
 
@@ -370,24 +493,24 @@ export interface WebRuntimeEvents {
   accessDenied?(hostId: string, error: WebHostConnectionError): void;
   event(hostId: string, event: AgentEvent | TeamRealtimeEvent): void;
   accountChanged(): Promise<void>;
-  /** The state of a host this tab has not opened. */
+  serversChanged?(): Promise<void>;
   hostState?(hostId: string, state: WebHostState): void;
-  /** A host that this tab has not opened revoked its session. */
   hostSessionRevoked?(): void;
-  /** Another tab took the host that this tab has open. The runtime closes it after this call. */
   hostTaken?(hostId: string): void;
-  /** An event of a host this tab has not opened that a notification can show. */
   hostNotice?(hostId: string, event: WebHostNotice, agents: ClientAgentSummary[]): void;
 }
 
-/** The host speaks no Team API protocol that this web build speaks. The workspace shows it in full. */
 export class WebHostIncompatibleError extends Error {
-  readonly code: "client_update_required" | "host_update_required";
+  readonly code: "client_update_required" | "host_update_required" | "server_safe_mode";
   readonly hostAppVersion: string;
   readonly hostProtocol: TeamProtocolSupportV1["protocol"];
 
-  constructor(support: TeamProtocolSupportV1, code: WebHostIncompatibleError["code"]) {
-    super(currentText().t("webClient.error.incompatible"));
+  constructor(
+    support: TeamProtocolSupportV1,
+    code: WebHostIncompatibleError["code"],
+    message = currentText().t("webClient.error.incompatible"),
+  ) {
+    super(message);
     this.code = code;
     this.hostAppVersion = support.appVersion;
     this.hostProtocol = support.protocol;
@@ -395,7 +518,6 @@ export class WebHostIncompatibleError extends Error {
 }
 
 export class WebHostConnectionError extends Error {
-  /** The code a user can copy, such as `http/401`. */
   readonly reference: string | null;
 
   constructor(
@@ -409,11 +531,45 @@ export class WebHostConnectionError extends Error {
   }
 }
 
+function serverSafeModeText({ reason, appVersion }: ServerSafeModeReason): string {
+  return currentText().t(
+    reason === "newer_database" ? "error.team.serverSafeModeNewerDatabase" : "error.team.serverSafeModeStartFailed",
+    { version: appVersion },
+  );
+}
+
 interface WebConnectionDependencies {
   createPeer: typeof createRemoteTeamPeer;
   acquireHostLock: typeof acquireWebHostLock;
-  /** The channel between the tabs of the account. Without one, this tab keeps no status connections. */
   openHostChannel?: (accountId: string) => BroadcastChannel | null;
+}
+
+const USAGE_LIMIT_MOVE_FIELDS: ReadonlySet<string> = new Set([
+  "agentId",
+  "provider",
+  "model",
+  "reasoningEffort",
+  "providerAccountId",
+  "leaveUsageLimit",
+]);
+
+function writePageCopy(text: string): void {
+  const write = () => {
+    try {
+      return navigator.clipboard.writeText(text);
+    } catch (error) {
+      return Promise.reject(error);
+    }
+  };
+  void write().catch(() => {
+    const { t } = currentText();
+    toast(t("browser.liveView.pageCopied"), {
+      action: {
+        label: t("common.copy"),
+        onClick: () => void write().catch(() => toast.error(t("browser.liveView.copyFailed"))),
+      },
+    });
+  });
 }
 
 function hostProtocolKey(accountId: string, hostId: string): string {
@@ -425,7 +581,6 @@ function savedHostProtocol(accountId: string, hostId: string): number | undefine
   return Number.isSafeInteger(protocol) && protocol > 0 ? protocol : undefined;
 }
 
-/** Pin after directory validation and before connecting. Never silently replace a saved identity. */
 function pinWebHostKey(accountId: string, host: RemoteTeamHost): void {
   const key = `openbot.web.host-key:${accountId}:${host.hostId}`;
   const pinned = localStorage.getItem(key);
@@ -447,7 +602,6 @@ export function createWebWorkspaceRuntime(
     apiUrl: window.location.origin,
     authentication: { kind: "browser" },
     fetch: accountFetch,
-    // `bun run dev:api` serves this page and the account service from `http://localhost:<port>`.
     inviteLinks: { allowLocalDevelopmentApiUrl: import.meta.env.DEV },
     verifyHostKeySignature: verifyEd25519Base64Url,
     hostKeys: {
@@ -461,7 +615,6 @@ export function createWebWorkspaceRuntime(
       try {
         return await runTeamEffect(directory.createBootstrap(id, key, sessionId));
       } catch (error) {
-        // The reference keeps 401 apart from 403 and names the account service code, such as `session_inactive`.
         if (error instanceof RemoteDirectoryError && (error.status === 401 || error.status === 403))
           events.connection({
             hostId: id,
@@ -477,12 +630,11 @@ export function createWebWorkspaceRuntime(
       if (!sessionsEnded) await runTeamEffect(directory.endSession(id));
     },
   };
-  /** The host of a connect attempt that Signal holds until the host is online. */
+  const downloadProgress = new Map<string, RemoteDownloadWatch["onProgress"]>();
   let waitingHostId: string | null = null;
   const openedActions: RemoteTeamPeerActions = {
     ...sessionActions,
     onConnectionUpdate: async (update) => {
-      // A `connecting` update without `hostOffline`, such as a `rate_limited` reply, does not end the hold.
       if (update.hostOffline) waitingHostId = update.hostId;
       else if (update.state !== "connecting") waitingHostId = null;
       if (update.state !== "online") {
@@ -497,25 +649,27 @@ export function createWebWorkspaceRuntime(
     onHostStreamData: (data) => browserView.receive(data),
     onTeamEvent: async (id, event) => events.event(id, event),
     onAccountProfileChanged: events.accountChanged,
+    onAccountServersChanged: async () => events.serversChanged?.(),
+    onDownloadProgress: async ({ commandId, received, total }) => downloadProgress.get(commandId)?.(received, total),
   };
-  // A new page sends its first reads with the protocol of the last visit, beside the compatibility
-  // read. `connectHost` reads them again when the protocol changed.
   const hostProtocols = {
     get: (id: string) => savedHostProtocol(accountId, id),
     set: (id: string, protocol: number) => localStorage.setItem(hostProtocolKey(accountId, id), String(protocol)),
   };
   function createOpenedPeer() {
     const actions = { current: openedActions };
-    return { peer: dependencies.createPeer(actions, { waitForHost: true, hostProtocols }), actions };
+    return {
+      peer: dependencies.createPeer(actions, {
+        waitForHost: true,
+        hostProtocols,
+        clientProtocol: TEAM_WEB_CLIENT_PROTOCOL,
+      }),
+      actions,
+    };
   }
-  // Each host switch replaces the peer, so the old host's session can end while the new host connects.
   let { peer, actions: peerActions } = createOpenedPeer();
-  /** Peers of earlier hosts that are still ending their sessions. */
   const retiring = new Set<Promise<void>>();
-  /** Ends the peer's sessions in the background, then releases its host's lock. */
   function retire(previous: typeof peer, actions: typeof peerActions, releaseLock: (() => void) | null): void {
-    // The account service gives a new connection to the host the same session while it is active,
-    // so the lock waits for the end. The old peer reports nothing more to the workspace.
     actions.current = {
       ...sessionActions,
       onConnectionUpdate: async () => undefined,
@@ -537,12 +691,11 @@ export function createWebWorkspaceRuntime(
         channel: hostChannel,
         actions: sessionActions,
         createPeer: dependencies.createPeer,
-        peerOptions: { hostProtocols },
+        peerOptions: { hostProtocols, clientProtocol: TEAM_WEB_CLIENT_PROTOCOL },
         acquireHostLock: dependencies.acquireHostLock,
         pinHostKey: (host) => pinWebHostKey(accountId, host),
         onState: (hostId, state) => events.hostState?.(hostId, state),
         onSessionRevoked: () => events.hostSessionRevoked?.(),
-        // Without a listener, the status connections read no agent list.
         ...(events.hostNotice
           ? {
               onNotice: (hostId: string, event: WebHostNotice, agents: ClientAgentSummary[]) =>
@@ -551,7 +704,6 @@ export function createWebWorkspaceRuntime(
           : {}),
       })
     : undefined;
-  // Another tab asks for the host that this tab has open: it stays here, unless the user takes it there.
   hostChannel?.addEventListener("message", (event) => {
     const message = decodeWebHostTabMessage(event.data);
     if (!message || disposed || !("requestId" in message) || message.hostId !== lockedHostId) return;
@@ -563,7 +715,6 @@ export function createWebWorkspaceRuntime(
       } satisfies WebHostTabMessage);
     else if (message.type === "take") {
       events.hostTaken?.(message.hostId);
-      // The selection stays, so no status connection of this tab asks for the host again.
       hosts?.holdSelected(message.hostId, false);
       void giveUpHost(message.hostId).catch(() => undefined);
     }
@@ -575,12 +726,10 @@ export function createWebWorkspaceRuntime(
   let uploadGeneration = 0;
   let capabilities: string[] = [];
   let connectedHost: RemoteTeamHost | null = null;
-  const duplicateOperationIds = new Map<string, string>();
+  const duplicateIds = retryOperationIds(() => crypto.randomUUID());
+  const createOperationId = retryOperationIds(() => crypto.randomUUID());
   const completedDraftIdsByHost = new Map<string, Set<string>>();
   const draftCleanupRetryHosts = new Set<string>();
-  // The host names a draft's preview with the desktop `openbot-attachment:` scheme, so a draft image
-  // shows from its local bytes. A discard revokes the URL. A sent draft keeps it until the runtime ends:
-  // the pending row of the message shows it until the host's row comes.
   const localDraftPreviews = new Map<string, string>();
   function localDraftPreview(id: string, file: File): string | null {
     const type = rasterImageMimeType(file.name);
@@ -599,8 +748,6 @@ export function createWebWorkspaceRuntime(
   }
   function trackCompletedDraft(id: string, hostId = lockedHostId): void {
     if (!hostId) return;
-    // The released API has no draft listing. A request that commits before returning cannot be
-    // recovered if its response is lost, so only returned identifiers enter this cleanup set.
     let ids = completedDraftIdsByHost.get(hostId);
     if (!ids) {
       ids = new Set<string>();
@@ -635,14 +782,11 @@ export function createWebWorkspaceRuntime(
         ids.delete(id);
         if (!ids.size) completedDraftIdsByHost.delete(hostId);
       } catch {
-        // Cleanup is best effort. Keep an unconfirmed draft for a same-host reconnect;
-        // never send its identifier to another host.
         draftCleanupRetryHosts.add(hostId);
       }
     }
     if (!completedDraftIdsByHost.has(hostId)) draftCleanupRetryHosts.delete(hostId);
   }
-  /** With `sidebar-folders-v1`, the layout has the parent of each folder. */
   async function readSidebarLayout(): Promise<SidebarLayoutSnapshot> {
     const value = capabilities.includes(SIDEBAR_FOLDERS_CAPABILITY)
       ? await request("POST", SIDEBAR_FOLDERS_ROUTES.read, {})
@@ -650,24 +794,41 @@ export function createWebWorkspaceRuntime(
     if (!isSidebarLayoutSnapshot(value)) throw new Error(currentText().t("error.remote.invalidData"));
     return value;
   }
-  async function request(method: string, path: string, body: TeamProtocolV2Json = {}, upload?: RemoteFileUpload) {
+  function readModelSources(): Promise<ProviderModelSourceEntry[]> {
+    return capabilities.includes(PROVIDER_MODEL_SOURCE_CAPABILITY)
+      ? request("POST", PROVIDER_MODEL_SOURCE_ROUTES.list, {}).then(decodeProviderModelSources, () => [])
+      : Promise.resolve([]);
+  }
+  async function request(
+    method: string,
+    path: string,
+    body: TeamProtocolV2Json = {},
+    upload?: RemoteFileUpload,
+    largeDownload?: RemoteLargeDownload,
+    download?: RemoteDownloadWatch,
+  ) {
     if (disposed) throw new Error(currentText().t("webClient.error.connectionClosed"));
     const current = generation;
     const requestHostId = lockedHostId;
     const timeoutMs =
       method === "GET" && path === TEAM_API_ROUTES.me ? 15_000 : remoteWorkspaceReadTimeout(method, path);
-    const result = await peer.execute({
-      id: crypto.randomUUID(),
-      type: "request",
-      method,
-      path,
-      body,
-      ...(upload === undefined ? {} : { upload }),
-      ...(timeoutMs === undefined ? {} : { timeoutMs }),
-    });
+    const id = crypto.randomUUID();
+    if (download) downloadProgress.set(id, download.onProgress);
+    const result = await peer
+      .execute({
+        id,
+        type: "request",
+        method,
+        path,
+        body,
+        ...(upload === undefined ? {} : { upload }),
+        ...(timeoutMs === undefined ? {} : { timeoutMs }),
+        ...(largeDownload === undefined ? {} : { largeDownload }),
+        ...(download === undefined ? {} : { downloadSize: download.size }),
+      })
+      .finally(() => downloadProgress.delete(id));
     if (disposed || generation !== current) throw new Error(currentText().t("webClient.error.hostChanged"));
     const membershipRead = method === "GET" && path === TEAM_API_ROUTES.me;
-    // An action can be forbidden while membership remains valid. Confirm access before clearing drafts.
     if (result.status === 403 && !membershipRead) {
       await request("GET", TEAM_API_ROUTES.me);
       if (disposed || generation !== current) throw new Error(currentText().t("webClient.error.hostChanged"));
@@ -687,8 +848,6 @@ export function createWebWorkspaceRuntime(
       );
     return result.body;
   }
-  // The shared Team API requests decode their own responses. A declaration, like `request`, so the
-  // draft cleanup above can reach it.
   async function teamApi<T>(
     method: string,
     path: string,
@@ -698,15 +857,55 @@ export function createWebWorkspaceRuntime(
   ): Promise<T> {
     return decode(await request(method, path, body, upload));
   }
+  async function teamApiDownload<T>(
+    method: string,
+    path: string,
+    decode: (value: unknown) => T,
+    body?: TeamProtocolV2Json,
+    upload?: RemoteFileUpload,
+  ): Promise<T> {
+    return decode(await request(method, path, body, upload, WEB_FILE_DOWNLOAD));
+  }
   function requireHost(): RemoteTeamHost {
     if (!connectedHost) throw new Error(currentText().t("webClient.error.hostNotConnected"));
     return connectedHost;
   }
+  async function withCreatedAgentAccount(
+    agent: ClientAgentSummary,
+    accountId: string | undefined,
+  ): Promise<ClientAgentSummary> {
+    if (
+      accountId === undefined ||
+      accountId === DEFAULT_PROVIDER_ACCOUNT_ID ||
+      !capabilities.includes(PROVIDER_ACCOUNTS_CAPABILITY)
+    )
+      return agent;
+    return runTeamEffect(
+      setAgentProviderAccount(teamApi, { agentId: agent.id, accountId }).pipe(Effect.mapError((error) => error.cause)),
+    ).then(
+      () => ({ ...agent, providerAccountId: accountId }),
+      () => agent,
+    );
+  }
+  async function listChatColors(): Promise<ChatColors> {
+    if (!capabilities.includes(CHAT_COLORS_CAPABILITY)) return { agents: [], members: [] };
+    return runTeamEffect(readChatColors(teamApi).pipe(Effect.mapError((error) => error.cause)));
+  }
   async function listMembers(): Promise<TeamMemberSummary[]> {
-    return (await runTeamEffect(directory.listMembers(requireHost().hostId))).map(toTeamMember);
+    const [members, colors] = await Promise.all([
+      runTeamEffect(directory.listMembers(requireHost().hostId)),
+      listChatColors().catch(() => undefined),
+    ]);
+    const chatColors = new Map(colors?.members.map((entry) => [entry.memberId, entry.color]));
+    return members.map((member) => {
+      const summary = toTeamMember(member);
+      const chatColor = chatColors.get(summary.id);
+      return chatColor ? { ...summary, chatColor } : summary;
+    });
   }
   const admin: WebAdminRuntime = {
     request: teamApi,
+    download: teamApiDownload,
     team: {
       async getPresence() {
         const value = await request("GET", TEAM_API_ROUTES.team.presence);
@@ -735,8 +934,6 @@ export function createWebWorkspaceRuntime(
           inviteUrl: invite.inviteUrl,
         };
       },
-      // The account service returns nothing useful, so the member is read back. The read before the
-      // change refuses an owner, as the desktop does.
       async updateMember(input) {
         const hostId = requireHost().hostId;
         const current = (await listMembers()).find((member) => member.id === input.memberId);
@@ -754,25 +951,86 @@ export function createWebWorkspaceRuntime(
       revokeInvite: (inviteId) => runTeamEffect(directory.revokeInvite(inviteId)),
     },
   };
-  const channels = teamChannelsApi(teamApi);
-  /** The routine flow routes, sent only to a host that negotiated them. */
-  async function routineFlowsRequest<T>(
-    method: string,
-    path: string,
-    decode: (value: unknown) => T,
-    body?: TeamProtocolV2Json,
-  ): Promise<T> {
-    if (!capabilities.includes(ROUTINE_FLOWS_CAPABILITY))
-      throw new Error(currentText().t("error.team.routineFlowsUnsupported"));
-    return teamApi(method, path, decode, body);
+  const routinesOnce = () => capabilities.includes(ROUTINES_ONCE_CAPABILITY);
+  const channels = teamChannelsApi(teamApi, routinesOnce, true);
+  const channelPictures = new Map<string, ChannelPicture>();
+  const pictureListeners = new Set<() => void>();
+  let pictureReads = 0;
+  const waitingPictureReads: (() => void)[] = [];
+  async function pictureSlot<T>(read: () => Promise<T>): Promise<T> {
+    if (pictureReads >= CHANNEL_PICTURE_READS) await new Promise<void>((resolve) => waitingPictureReads.push(resolve));
+    pictureReads += 1;
+    try {
+      return await read();
+    } finally {
+      pictureReads -= 1;
+      waitingPictureReads.shift()?.();
+    }
   }
-  const routineFlows = teamRoutineFlowsApi(routineFlowsRequest);
-  const agentRoutines = teamAgentRoutinesApi(teamApi);
+  function channelPicture(channelId: string, source: string): { picture: ChannelPicture; started: boolean } | null {
+    const version = capabilities.includes(CHANNEL_PICTURE_CAPABILITY) ? channelPictureVersion(source, channelId) : null;
+    if (!version) return null;
+    const known = channelPictures.get(channelId);
+    if (known?.source === source) return { picture: known, started: false };
+    const path = `${CHANNEL_PICTURE_ROUTES.image}?${new URLSearchParams({ channelId, v: version })}`;
+    const picture: ChannelPicture = {
+      source,
+      url: undefined,
+      read: pictureSlot(() => request("GET", path)).then(
+        (value) =>
+          isDynamicRecord(value) &&
+          isString(value.mimeType) &&
+          isAvatarMimeType(value.mimeType) &&
+          isString(value.base64)
+            ? `data:${value.mimeType};base64,${value.base64}`
+            : null,
+        () => null,
+      ),
+    };
+    void picture.read.then((url) => {
+      picture.url = url;
+    });
+    channelPictures.set(channelId, picture);
+    return { picture, started: true };
+  }
+  function readChannelPicture(channelId: string, source: string): Promise<string | null> {
+    return channelPicture(channelId, source)?.picture.read ?? Promise.resolve(null);
+  }
+  async function withChannelPicture<T extends Channel>(channel: T): Promise<T> {
+    const source = channel.imageUrl;
+    if (!source?.startsWith("openbot-avatar:")) return channel;
+    return { ...channel, imageUrl: await readChannelPicture(channel.id, source) };
+  }
+  function withKnownChannelPictures<T extends Channel>(list: T[]): T[] {
+    const started: Promise<string | null>[] = [];
+    const listed = list.map((channel) => {
+      const source = channel.imageUrl;
+      if (!source?.startsWith("openbot-avatar:")) return channel;
+      const entry = channelPicture(channel.id, source);
+      if (entry?.started) started.push(entry.picture.read);
+      return { ...channel, imageUrl: entry?.picture.url ?? null };
+    });
+    if (started.length)
+      void Promise.all(started).then((urls) => {
+        if (urls.some((url) => url !== null)) for (const listener of pictureListeners) listener();
+      });
+    return listed;
+  }
   const browserView = createRemoteBrowserView(
     (data) => peer.sendHostStreamData(data),
     request,
     () => capabilities.includes(TEAM_BROWSER_VIEW_FRAME_POINT_CAPABILITY),
     () => capabilities.includes(TEAM_BROWSER_VIEW_CLIPBOARD_CAPABILITY),
+    () => ({
+      cursor: false,
+      contextMenu: false,
+      viewport: null,
+      pageCopy: capabilities.includes(TEAM_BROWSER_VIEW_PAGE_COPY_CAPABILITY),
+      dialog: capabilities.includes(TEAM_BROWSER_VIEW_DIALOG_CAPABILITY),
+      frameSize: capabilities.includes(TEAM_BROWSER_VIEW_FRAME_SIZE_CAPABILITY)
+        ? { width: window.innerWidth * window.devicePixelRatio, height: window.innerHeight * window.devicePixelRatio }
+        : null,
+    }),
   );
   let liveView: RemoteBrowserView | null = null;
   let liveViewGeneration = 0;
@@ -783,7 +1041,6 @@ export function createWebWorkspaceRuntime(
     if (current) {
       await runTeamEffect(current.close()).catch(() => undefined);
     } else {
-      // Also cancel an open request that has not installed its session yet.
       browserView.disconnect();
     }
   }
@@ -791,7 +1048,6 @@ export function createWebWorkspaceRuntime(
   const emitView = (event: BrowserLiveViewEvent) => {
     for (const listener of viewListeners) listener(event);
   };
-  /** Ends the connection of the opened host and gives up its lock. */
   async function closeOpenedHost(): Promise<void> {
     const hostForCleanup = lockedHostId;
     try {
@@ -808,17 +1064,12 @@ export function createWebWorkspaceRuntime(
       connectedHost = null;
     }
   }
-  /**
-   * Closes a host that another tab takes. An attempt in progress ends first: a reconnect keeps the lock and
-   * does not acquire it again, so a close before its `connect` leaves a peer without the lock.
-   */
   async function giveUpHost(hostId: string): Promise<void> {
     const attempt = connecting;
     if (attempt) {
       if (connectingHostId === hostId) await peer.execute({ id: crypto.randomUUID(), type: "disconnect" });
       await attempt.catch(() => undefined);
     }
-    // An attempt for another host already let this host go.
     if (lockedHostId === hostId) await closeOpenedHost();
   }
   async function connectHost(host: RemoteTeamHost, { takeOver = false, early }: WebConnectOptions): Promise<string[]> {
@@ -833,8 +1084,6 @@ export function createWebWorkspaceRuntime(
         const previous = { peer, actions: peerActions, releaseLock: releaseHostLock };
         releaseHostLock = null;
         lockedHostId = null;
-        // This tab's online status connection of the host becomes the opened host, with its session,
-        // path and lock. Otherwise the status connection gives the host up first.
         const handover = hosts?.handOver(host.hostId) ?? null;
         if (handover) {
           handover.actions.current = openedActions;
@@ -877,13 +1126,20 @@ export function createWebWorkspaceRuntime(
         );
       const knownProtocol = savedHostProtocol(accountId, host.hostId);
       if (knownProtocol !== undefined) early?.start();
-      const support = decodeTeamProtocolSupportV9(await request("GET", TEAM_API_ROUTES.compatibility));
-      if (knownProtocol !== undefined && support.protocol.maximum !== knownProtocol) early?.drop();
-      const updateDirection = teamProtocolUpdateDirection(
-        { minimum: TEAM_PROTOCOL_V3, maximum: TEAM_PROTOCOL_V3 },
-        support.protocol,
+      const { support, negotiated } = await readWebHostCompatibility(() =>
+        request("GET", TEAM_API_ROUTES.compatibility),
       );
-      if (updateDirection) throw new WebHostIncompatibleError(support, updateDirection);
+      if (knownProtocol !== undefined && negotiated.protocol !== knownProtocol) early?.drop();
+      if (negotiated.update) throw new WebHostIncompatibleError(support, negotiated.update);
+      if (support.capabilities.includes(SERVER_SAFE_MODE_CAPABILITY))
+        throw new WebHostIncompatibleError(
+          support,
+          "server_safe_mode",
+          await request("GET", SERVER_SAFE_MODE_ROUTES.reason).then(
+            (value) => serverSafeModeText(decodeServerSafeModeReason(value)),
+            () => currentText().t("error.team.serverSafeMode"),
+          ),
+        );
       capabilities = support.capabilities;
       if (retryDraftCleanup) await discardCompletedDrafts(host.hostId);
       return capabilities;
@@ -914,6 +1170,10 @@ export function createWebWorkspaceRuntime(
             (reason) =>
               emitView({ type: "stopped", tabId, reason: reason || currentText().t("webClient.error.viewEnded") }),
             (copied) => emitView({ ...copied, tabId }),
+            (message) => {
+              if (message.type === "pageCopied") writePageCopy(message.text);
+              else if (message.type === "dialog") emitView({ type: "dialog", tabId, dialog: message.dialog });
+            },
           ),
         );
         if (currentGeneration !== liveViewGeneration) {
@@ -938,8 +1198,6 @@ export function createWebWorkspaceRuntime(
     async browserTabs() {
       const value = await request("GET", TEAM_API_ROUTES.browser.tabs);
       if (!Array.isArray(value)) throw new Error(currentText().t("error.remote.invalidData"));
-      // The frozen tab list has no field for a person's control or the history state, so the host
-      // answers on their own routes.
       const held = capabilities.includes(BROWSER_USER_CONTROL_CAPABILITY)
         ? new Set(decodeBrowserUserControlSnapshot(await request("POST", BROWSER_USER_CONTROL_ROUTES.state, {})).tabIds)
         : new Set<string>();
@@ -950,11 +1208,22 @@ export function createWebWorkspaceRuntime(
             ),
           )
         : new Map<string, { canGoBack: boolean; canGoForward: boolean }>();
-      return value.map(decodeWebBrowserTab).map((tab) => ({
-        ...tab,
-        ...(held.has(tab.id) ? { userControl: true as const } : {}),
-        ...pageStates.get(tab.id),
-      }));
+      const httpSignIns = capabilities.includes(BROWSER_HTTP_SIGN_IN_CAPABILITY)
+        ? new Map(
+            decodeBrowserHttpSignInSnapshot(await request("POST", BROWSER_HTTP_SIGN_IN_ROUTES.state, {})).tabs.map(
+              ({ tabId, origin, refused }) => [tabId, { origin, ...(refused ? { refused: true as const } : {}) }],
+            ),
+          )
+        : new Map<string, BrowserHttpSignIn>();
+      return value.map(decodeWebBrowserTab).map((tab) => {
+        const httpSignIn = httpSignIns.get(tab.id);
+        return {
+          ...tab,
+          ...(held.has(tab.id) ? { userControl: true as const } : {}),
+          ...pageStates.get(tab.id),
+          ...(httpSignIn ? { httpSignIn } : {}),
+        };
+      });
     },
     async openBrowserTab(input) {
       return decodeWebBrowserTab(await request("POST", TEAM_API_ROUTES.browser.open, { ...input }));
@@ -964,8 +1233,6 @@ export function createWebWorkspaceRuntime(
         await request("POST", TEAM_API_ROUTES.browser.navigate, { ...input });
         return;
       }
-      // An older host has no route that moves an existing tab to an address; the browser store
-      // opens a new tab for it instead.
       if (!capabilities.includes(TEAM_BROWSER_NAVIGATION_CAPABILITY))
         throw new Error(currentText().t("error.backend.browserNavigateUnsupported"));
       await request("POST", TEAM_API_ROUTES.browser.load, { ...input });
@@ -977,6 +1244,11 @@ export function createWebWorkspaceRuntime(
       if (!capabilities.includes(BROWSER_PAGE_STATE_CAPABILITY))
         throw new Error(currentText().t("error.backend.browserStopUnsupported"));
       decodeBrowserPageStateSnapshot(await request("POST", BROWSER_PAGE_STATE_ROUTES.stop, { tabId }));
+    },
+    async answerBrowserHttpSignIn(input) {
+      if (!capabilities.includes(BROWSER_HTTP_SIGN_IN_CAPABILITY))
+        throw new Error(currentText().t("error.backend.browserHttpSignInUnsupported"));
+      decodeBrowserHttpSignInSnapshot(await request("POST", BROWSER_HTTP_SIGN_IN_ROUTES.answer, { ...input }));
     },
     async closeBrowserTab(tabId) {
       await request("POST", TEAM_API_ROUTES.browser.close, { tabId });
@@ -991,13 +1263,24 @@ export function createWebWorkspaceRuntime(
         throw new Error(currentText().t("error.backend.browserUserControlUnsupported"));
       decodeBrowserUserControlSnapshot(await request("POST", BROWSER_USER_CONTROL_ROUTES.release, { tabId }));
     },
+    async startBrowserTeach(tabId) {
+      if (!capabilities.includes(BROWSER_TEACH_CAPABILITY))
+        throw new Error(currentText().t("error.backend.browserTeachUnsupported"));
+      await request("POST", BROWSER_TEACH_ROUTES.start, { tabId });
+    },
+    async stopBrowserTeach(input) {
+      if (!capabilities.includes(BROWSER_TEACH_CAPABILITY))
+        throw new Error(currentText().t("error.backend.browserTeachUnsupported"));
+      return decodeBrowserTeachSteps(
+        await request("POST", BROWSER_TEACH_ROUTES.stop, { tabId: input.tabId, save: input.save }),
+      );
+    },
     async browserPreview(tabId) {
       return decodeWebBrowserPreview(await request("POST", TEAM_API_ROUTES.browser.preview, { tabId }));
     },
     getSidebarLayout: readSidebarLayout,
     async mutateSidebarLayout(action) {
       const folders = capabilities.includes(SIDEBAR_FOLDERS_CAPABILITY);
-      // The released route has every folder at the top: it refuses `nest`, and would drop a parent.
       if (!folders && (action.type === "nest" || (action.type === "create" && action.parentId !== undefined)))
         throw new Error(currentText().t("error.team.sidebarFoldersUnsupported"));
       const value = await request(
@@ -1010,11 +1293,20 @@ export function createWebWorkspaceRuntime(
     },
     channels: {
       ...channels,
+      async listChannels() {
+        return withKnownChannelPictures(await channels.listChannels());
+      },
+      onPictures(listener) {
+        pictureListeners.add(listener);
+        return () => {
+          pictureListeners.delete(listener);
+        };
+      },
       async readChannel(input) {
         const page = await channels.readChannel(input);
-        // A host file URL must not reach the browser; attachments are downloaded through the host.
         return {
           ...page,
+          channel: await withChannelPicture(page.channel),
           messages: page.messages.map((entry) => {
             const attachments = entry.message.attachments;
             if (!attachments) return entry;
@@ -1029,9 +1321,26 @@ export function createWebWorkspaceRuntime(
         };
       },
       async channelCommand(command) {
+        if (command.type === "read" && lockedHostId)
+          closeWebChatNotifications(lockedHostId, { channelId: command.channelId });
         const channel = await channels.channelCommand(command);
         if (command.type === "send") removeCompletedDrafts(command.attachmentDraftIds);
-        return channel;
+        return withChannelPicture(channel);
+      },
+      async setChannelImage({ channelId, image }) {
+        if (!capabilities.includes(CHANNEL_PICTURE_CAPABILITY))
+          throw new Error(currentText().t("error.team.channelPictureUnsupported"));
+        const path = `${CHANNEL_PICTURE_ROUTES.image}?${new URLSearchParams({ channelId })}`;
+        const value = image
+          ? await request(
+              "PUT",
+              path,
+              {},
+              { name: "channel-image", mimeType: image.mimeType, base64: bytesToBase64(image.bytes) },
+            )
+          : await request("DELETE", path);
+        if (!isChannel(value)) throw new Error(currentText().t("error.remote.invalidData"));
+        return withChannelPicture(value);
       },
     },
     async currentMemberId() {
@@ -1045,6 +1354,15 @@ export function createWebWorkspaceRuntime(
       Effect.runPromise(respondToBrowserTakeover(teamApi, input).pipe(Effect.mapError((error) => error.cause))),
     listHosts: () => runTeamEffect(directory.listHosts()),
     leaveHost: (hostId, membershipId) => runTeamEffect(directory.leaveHost(hostId, membershipId)),
+    setHostHidden: (hostId, hidden) => runTeamEffect(directory.setHostHidden(hostId, hidden)),
+    ownerTransfers: {
+      pending: (hostId) => runTeamEffect(directory.pendingOwnerTransfer(hostId)),
+      start: (hostId, email) => runTeamEffect(directory.startOwnerTransfer(hostId, email)),
+      cancel: (hostId) => runTeamEffect(directory.cancelOwnerTransfer(hostId)),
+      incoming: () => runTeamEffect(directory.incomingOwnerTransfers()),
+      accept: (transferId) => runTeamEffect(directory.acceptOwnerTransfer(transferId)),
+      decline: (transferId) => runTeamEffect(directory.declineOwnerTransfer(transferId)),
+    },
     async removeOwnedHost(hostId) {
       const response = await accountFetch(`/api/browser/v2/remote/hosts/${encodeURIComponent(hostId)}`, {
         method: "DELETE",
@@ -1068,7 +1386,6 @@ export function createWebWorkspaceRuntime(
     },
     acceptInvite: (url) => runTeamEffect(directory.acceptInvite(url)),
     async connect(host, options) {
-      // An attempt that waits for an offline host has no deadline, so another host replaces it.
       if (connecting && waitingHostId !== null && waitingHostId !== host.hostId) {
         const previous = connecting;
         await peer.execute({ id: crypto.randomUUID(), type: "disconnect" });
@@ -1105,14 +1422,22 @@ export function createWebWorkspaceRuntime(
       const query = new URLSearchParams({ limit: "50", ...(before ? { before } : {}) });
       return decodeWebConversationPage(await request("GET", `${TEAM_API_ROUTES.agent.conversationPage(id)}?${query}`));
     },
-    async conversationAround(id, messageId) {
+    async conversationAround(id, messageId, limit = 50) {
       if (!capabilities.includes("conversation-pagination"))
         return decodeWebConversationSnapshot(await request("GET", TEAM_API_ROUTES.agent.conversation(id)));
-      const query = new URLSearchParams({ limit: "50", around: messageId });
+      const query = new URLSearchParams({ limit: String(limit), around: messageId });
       return decodeWebConversationPage(await request("GET", `${TEAM_API_ROUTES.agent.conversationPage(id)}?${query}`));
     },
     async markRead(id, throughMessageId) {
+      if (lockedHostId) closeWebChatNotifications(lockedHostId, { agentId: id });
       const value = await request("POST", TEAM_API_ROUTES.agent.conversationRead(id), { throughMessageId });
+      if (!isConversationReadState(value)) throw new Error(currentText().t("error.remote.invalidData"));
+      return value;
+    },
+    async markUnreadFrom(agentId, fromMessageId) {
+      if (!capabilities.includes(CONVERSATION_UNREAD_FROM_CAPABILITY))
+        throw new Error(currentText().t("error.backend.markUnreadRemoteUnsupported"));
+      const value = await request("POST", CONVERSATION_UNREAD_FROM_ROUTE, { agentId, fromMessageId });
       if (!isConversationReadState(value)) throw new Error(currentText().t("error.remote.invalidData"));
       return value;
     },
@@ -1129,6 +1454,91 @@ export function createWebWorkspaceRuntime(
           channelId: input.channelId,
           messageId: input.messageId,
         });
+    },
+    async compactContext(agentId, taskId) {
+      if (!capabilities.includes(CONTEXT_COMPACT_CAPABILITY))
+        throw new Error(currentText().t("error.team.contextCompactUnsupported"));
+      if (taskId === undefined) await request("POST", CONTEXT_COMPACT_ROUTES.compact, { agentId });
+      else await request("POST", CONTEXT_COMPACT_ROUTES.compactTask, { agentId, taskId });
+    },
+    async deleteHistory(input) {
+      if (!capabilities.includes(CHAT_HISTORY_CAPABILITY))
+        throw new Error(currentText().t("error.team.historyDeleteUnsupported"));
+      if (input.kind === "agent") await request("POST", CHAT_HISTORY_ROUTES.agentDelete, { agentId: input.agentId });
+      else await request("POST", CHAT_HISTORY_ROUTES.channelDelete, { channelId: input.channelId });
+    },
+    async clearChannelContext(channelId) {
+      if (!capabilities.includes(CHAT_HISTORY_CAPABILITY))
+        throw new Error(currentText().t("error.team.channelContextUnsupported"));
+      await request("POST", CHAT_HISTORY_ROUTES.channelClear, { channelId });
+    },
+    async compactChannelContext(channelId) {
+      if (!capabilities.includes(CHAT_HISTORY_CAPABILITY))
+        throw new Error(currentText().t("error.team.channelContextUnsupported"));
+      await request("POST", CHAT_HISTORY_ROUTES.channelCompact, { channelId });
+    },
+    async channelCompactAvailability(channelId) {
+      if (!capabilities.includes(CHANNEL_COMPACT_AVAILABILITY_CAPABILITY)) return { available: true };
+      return decodeChannelCompactAvailability(await request("POST", CHANNEL_COMPACT_AVAILABILITY_ROUTE, { channelId }));
+    },
+    async listWaits(agentId) {
+      if (!capabilities.includes(AGENT_WAITS_CAPABILITY))
+        throw new Error(currentText().t("error.team.agentWaitsUnsupported"));
+      return decodeAgentWaitsResponse(await request("POST", AGENT_WAITS_ROUTES.list, { agentId }));
+    },
+    async listPinnedMessages(agentId) {
+      if (!capabilities.includes(MESSAGE_PINS_CAPABILITY))
+        throw new Error(currentText().t("error.team.messagePinsUnsupported"));
+      return decodeMessagePinsResponse(await request("POST", MESSAGE_PINS_ROUTES.list, { agentId }));
+    },
+    async setMessagePinned(input) {
+      if (!capabilities.includes(MESSAGE_PINS_CAPABILITY))
+        throw new Error(currentText().t("error.team.messagePinsUnsupported"));
+      return decodeMessagePinsResponse(
+        await request("POST", MESSAGE_PINS_ROUTES.set, {
+          agentId: input.agentId,
+          taskId: input.taskId ?? null,
+          messageId: input.messageId,
+          pinned: input.pinned,
+        }),
+      );
+    },
+    async readPendingApproval(input) {
+      if (!capabilities.includes(PENDING_APPROVAL_CAPABILITY)) return null;
+      return decodePendingApprovalResponse(await request("POST", PENDING_APPROVAL_ROUTES.read, { ...input }));
+    },
+    async readMediaApproval(input) {
+      if (!capabilities.includes(MEDIA_APPROVAL_CHOICE_CAPABILITY)) return { media: null, hold: null };
+      return decodeMediaApprovalReadResponse(await request("POST", MEDIA_APPROVAL_CHOICE_ROUTES.read, { ...input }));
+    },
+    async respondToMediaApproval(input) {
+      if (!capabilities.includes(MEDIA_APPROVAL_CHOICE_CAPABILITY))
+        throw new Error(currentText().t("error.team.mediaApprovalChoiceUnsupported"));
+      await request("POST", MEDIA_APPROVAL_CHOICE_ROUTES.respond, { ...input, choice: { ...input.choice } });
+    },
+    async respondToCreditsHold(input) {
+      if (!capabilities.includes(MEDIA_APPROVAL_CHOICE_CAPABILITY))
+        throw new Error(currentText().t("error.team.mediaApprovalChoiceUnsupported"));
+      return decodeCreditsHoldResponse(await request("POST", MEDIA_APPROVAL_CHOICE_ROUTES.hold, { ...input }));
+    },
+    async setCreditsAskMuted(input) {
+      if (!capabilities.includes(MEDIA_APPROVAL_CHOICE_CAPABILITY))
+        throw new Error(currentText().t("error.team.mediaApprovalChoiceUnsupported"));
+      await request("POST", MEDIA_APPROVAL_CHOICE_ROUTES.muted, { muted: input.muted });
+    },
+    async readCreditsAskMuted() {
+      if (!capabilities.includes(MEDIA_APPROVAL_CHOICE_CAPABILITY))
+        throw new Error(currentText().t("error.team.mediaApprovalChoiceUnsupported"));
+      return decodeCreditsAskMuted(await request("POST", MEDIA_APPROVAL_CHOICE_ROUTES.mutedRead, {}));
+    },
+    async listPendingPrompts() {
+      if (!capabilities.includes(PENDING_PROMPTS_CAPABILITY)) return [];
+      return decodePendingPromptsResponse(await request("POST", PENDING_PROMPTS_ROUTES.list, {}));
+    },
+    async cancelWait(agentId, waitId) {
+      if (!capabilities.includes(AGENT_WAITS_CAPABILITY))
+        throw new Error(currentText().t("error.team.agentWaitsUnsupported"));
+      await request("POST", AGENT_WAITS_ROUTES.cancel, { agentId, waitId });
     },
     async conversationReads() {
       const value = await request("GET", TEAM_API_ROUTES.agents.conversationReads);
@@ -1178,9 +1588,7 @@ export function createWebWorkspaceRuntime(
         text,
         attachmentDraftIds,
         replyToMessageId,
-        // The host uses this browser's zone for a routine the agent creates from the message.
         timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
-        // A host with `message-client-id-v1` answers a retry with the first receipt.
         ...(clientMessageId ? { clientMessageId } : {}),
       });
       if (!isQueuedMessageReceipt(result)) throw new Error(currentText().t("webClient.error.sendUnconfirmed"));
@@ -1190,6 +1598,7 @@ export function createWebWorkspaceRuntime(
     stop: (id, turnId) =>
       Effect.runPromise(interruptAgentTurn(teamApi, id, turnId).pipe(Effect.mapError((error) => error.cause))),
     queue: (id) => teamApi("GET", TEAM_API_ROUTES.agent.queue(id), (value) => queueSnapshot(id, value)),
+    activeQueues: (agentIds) => teamApi("POST", AGENT_ACTIVE_QUEUES_ROUTES.list, decodeAgentActiveQueues, { agentIds }),
     editQueue: ({ agentId, ...edit }) =>
       teamApi("POST", TEAM_API_ROUTES.agent.queueEdit(agentId), (value) => queueSnapshot(agentId, value), edit),
     cancelQueued: (input) =>
@@ -1209,25 +1618,29 @@ export function createWebWorkspaceRuntime(
     async upload(file) {
       const uploadHostGeneration = generation;
       const currentUpload = ++uploadGeneration;
-      assertSupportedAttachmentName(file.name);
-      const extension = attachmentFileExtension(file.name);
-      const supported = supportedAttachmentExtensions({
+      const support = {
         eml: capabilities.includes("eml-attachments"),
         media: capabilities.includes("media-attachments"),
         zip: capabilities.includes("zip-attachments"),
         mp4: capabilities.includes("mp4-attachments"),
         svg: capabilities.includes("svg-attachments"),
-      });
-      if (extension && !supported.includes(extension)) throw new Error(currentText().t("webClient.error.fileType"));
-      if (file.size > MOBILE_ATTACHMENT_BYTES) throw new Error(currentText().t("error.remote.attachmentTooLarge"));
+        anyFile: capabilities.includes("any-file-attachments"),
+      };
+      if (!support.anyFile) assertSupportedAttachmentName(file.name);
+      if (!isSupportedAttachmentNameFor(file.name, support))
+        throw new Error(currentText().t("webClient.error.fileType"));
+      if (file.size > WEB_FILE_BYTES) throw new Error(currentText().t("error.remote.fileTooLarge"));
       const bytes = new Uint8Array(await file.arrayBuffer());
       if (currentUpload !== uploadGeneration || uploadHostGeneration !== generation)
         throw new Error(currentText().t("webClient.error.uploadCancelled"));
       const mimeType = file.type || "application/octet-stream";
       const value = await Effect.runPromise(
-        uploadAttachmentDraft(teamApi, { name: file.name, mimeType, base64: bytesToBase64(bytes) }).pipe(
-          Effect.mapError((error) => error.cause),
-        ),
+        uploadAttachmentDraft(teamApi, {
+          name: file.name,
+          mimeType,
+          base64: bytesToBase64(bytes),
+          maxBytes: WEB_FILE_BYTES,
+        }).pipe(Effect.mapError((error) => error.cause)),
       );
       if (currentUpload !== uploadGeneration) {
         if (uploadHostGeneration === generation)
@@ -1242,6 +1655,9 @@ export function createWebWorkspaceRuntime(
     setTyping(agentId, typing) {
       peer.setTyping(agentId, typing);
     },
+    setWorkflowSpot(input) {
+      peer.setWorkflowSpot(input);
+    },
     async cancelUpload() {
       uploadGeneration += 1;
       await peer.cancelUpload();
@@ -1251,26 +1667,34 @@ export function createWebWorkspaceRuntime(
       removeCompletedDrafts([id]);
       revokeLocalDraftPreviews([id]);
     },
-    async download(id) {
-      return decodeWebFile(await request("GET", TEAM_API_ROUTES.attachment(id)));
+    async download(id, progress) {
+      return decodeWebFile(
+        await request("GET", TEAM_API_ROUTES.attachment(id), {}, undefined, WEB_FILE_DOWNLOAD, progress),
+      );
+    },
+    async downloadPreview(id) {
+      return decodeWebFile(
+        await request("GET", TEAM_API_ROUTES.attachmentPreview(id), {}, undefined, WEB_FILE_DOWNLOAD),
+      );
     },
     async sharedFile(path) {
       const query = new URLSearchParams({ path });
-      return decodeWebFile(await request("GET", `${TEAM_API_ROUTES.sharedFiles}?${query}`));
+      return decodeWebFile(
+        await request("GET", `${TEAM_API_ROUTES.sharedFiles}?${query}`, {}, undefined, WEB_FILE_DOWNLOAD),
+      );
     },
-    async workspaceFile(agentId, path) {
-      // The released URL spells the agent `botId`.
+    async workspaceFile(agentId, path, options) {
       const query = new URLSearchParams({ botId: agentId, path });
-      return decodeWebFile(await request("GET", `${TEAM_API_ROUTES.workspaceFiles}?${query}`));
+      if (options?.exactPath) query.set(WORKSPACE_FILE_EXACT_PATH_QUERY, "1");
+      return decodeWebFile(
+        await request("GET", `${TEAM_API_ROUTES.workspaceFiles}?${query}`, {}, undefined, WEB_FILE_DOWNLOAD),
+      );
     },
     async workspaceDirectory(agentId, path) {
       if (!capabilities.includes(WORKSPACE_DIRECTORY_CAPABILITY))
         throw new Error(currentText().t("error.team.workspaceDirectoryUnsupported"));
       return decodeWorkspaceDirectory(await request("POST", WORKSPACE_DIRECTORY_ROUTES.list, { agentId, path }));
     },
-    routineFlows,
-    updateRoutine: agentRoutines.updateRoutine,
-    testRoutine: agentRoutines.testRoutine,
     listHiddenAgents: () => runTeamEffect(listHiddenAgents(teamApi).pipe(Effect.mapError((error) => error.cause))),
     setAgentHidden: (input) =>
       runTeamEffect(setAgentHidden(teamApi, input).pipe(Effect.mapError((error) => error.cause))),
@@ -1278,6 +1702,7 @@ export function createWebWorkspaceRuntime(
       if (!capabilities.includes(AGENT_COLORS_CAPABILITY)) return { agents: [] };
       return runTeamEffect(readAgentColors(teamApi).pipe(Effect.mapError((error) => error.cause)));
     },
+    listChatColors,
     sidebarPins: {
       read: () => runTeamEffect(readSidebarPins(teamApi).pipe(Effect.mapError((error) => error.cause))),
       set: (items) => runTeamEffect(setSidebarPins(teamApi, items).pipe(Effect.mapError((error) => error.cause))),
@@ -1332,36 +1757,63 @@ export function createWebWorkspaceRuntime(
         isClientAgentModelOption,
         "models",
       )(await request("GET", TEAM_API_ROUTES.agents.models));
-      // The fast tiers and the picker listing are optional: when a route fails, the picker gets the
-      // models with no Fast switch or listing.
-      const [fast, listings] = await Promise.all([
-        capabilities.includes(AGENT_FAST_MODE_CAPABILITY)
-          ? request("POST", AGENT_FAST_MODE_ROUTES.models, {}).then(decodeAgentFastModels, () => [])
-          : [],
+      const [fast, listings, steering, kept] = await Promise.all([
+        capabilities.includes(AGENT_SPEED_CAPABILITY)
+          ? request("POST", AGENT_SPEED_ROUTES.models, {}).then(decodeAgentFastModels, () => [])
+          : capabilities.includes(AGENT_FAST_MODE_CAPABILITY)
+            ? request("POST", AGENT_FAST_MODE_ROUTES.models, {}).then(decodeAgentFastModels, () => [])
+            : [],
         capabilities.includes(MODEL_VISIBILITY_CAPABILITY)
           ? request("POST", MODEL_VISIBILITY_ROUTES.listing, {}).then(decodeAgentModelListings, () => [])
           : [],
+        capabilities.includes(MODEL_STEERING_CAPABILITY)
+          ? request("POST", MODEL_STEERING_ROUTES.list, {}).then(decodeAgentSteeringModels, () => [])
+          : [],
+        capabilities.includes(MODEL_VISIBILITY_KEPT_CAPABILITY)
+          ? request("POST", MODEL_VISIBILITY_KEPT_ROUTES.list, {}).then(decodeAgentSteeringModels, () => [])
+          : [],
       ]);
-      return withModelListings(withFastServiceTiers(models, fast), listings);
+      return withWorkspaceOnlyLimit(
+        withSteeringModels(
+          withKeptModels(withModelListings(withFastServiceTiers(models, fast), listings), kept),
+          steering,
+        ),
+        capabilities.includes(WORKSPACE_ONLY_PROCESS_LIMIT_CAPABILITY),
+      );
     },
     async status() {
-      const value = await request("GET", TEAM_API_ROUTES.agents.status);
+      const [value, sources] = await Promise.all([request("GET", TEAM_API_ROUTES.agents.status), readModelSources()]);
       if (!isAgentStatus(value)) throw new Error(currentText().t("error.remote.invalidData"));
-      return value;
+      return withModelSources(value, sources);
     },
+    modelSources: readModelSources,
     async accountUsage() {
-      const value = await request("GET", TEAM_API_ROUTES.agents.usage);
+      const [value, credits] = await Promise.all([
+        request("GET", TEAM_API_ROUTES.agents.usage),
+        capabilities.includes(USAGE_CREDITS_CAPABILITY)
+          ? request("POST", USAGE_CREDITS_ROUTES.list, {})
+              .then((rows) => decodeUsageCredits(isDynamicRecord(rows) ? rows.accounts : null))
+              .catch(() => [])
+          : [],
+      ]);
       if (!isAccountUsage(value)) throw new Error(currentText().t("error.remote.invalidData"));
-      return value;
+      return withUsageCredits(value, credits);
     },
     async createAgent(input) {
-      // The released route keeps the nearest hue. The exact colour goes on `agent-colors-v1` after it.
-      const { avatarColor, ...profile } = input;
-      const value = await request("POST", TEAM_API_ROUTES.agents.all, { ...profile });
+      const { avatarColor, providerAccountId, ...profile } = input;
+      const operation = capabilities.includes(AGENT_CREATE_OPERATION_CAPABILITY)
+        ? createOperationId([lockedHostId, profile])
+        : null;
+      const value = await request("POST", TEAM_API_ROUTES.agents.all, {
+        ...profile,
+        ...(operation ? { operationId: operation.id } : {}),
+      }).catch((error: unknown) => {
+        operation?.failed();
+        throw error;
+      });
       if (!isClientAgentSummary(value)) throw new Error(currentText().t("error.remote.invalidData"));
-      const agent: ClientAgentSummary = value;
+      const agent: ClientAgentSummary = await withCreatedAgentAccount(value, providerAccountId);
       if (!avatarColor || !capabilities.includes(AGENT_COLORS_CAPABILITY)) return agent;
-      // The agent exists, so a failed colour change does not fail the create: the agent keeps its hue.
       const colored = await runTeamEffect(
         setAgentColor(teamApi, { agentId: agent.id, color: avatarColor }).pipe(Effect.mapError((error) => error.cause)),
       ).then(
@@ -1372,15 +1824,17 @@ export function createWebWorkspaceRuntime(
     },
     async duplicateAgent(agentId) {
       if (!capabilities.includes("agent-duplication")) throw new Error(currentText().t("webClient.error.duplication"));
-      const operationKey = `${lockedHostId ?? ""}\0${agentId}`;
-      const operationId = duplicateOperationIds.get(operationKey) ?? crypto.randomUUID();
-      duplicateOperationIds.set(operationKey, operationId);
-      const value = await request("POST", TEAM_API_ROUTES.agent.duplicate(agentId), { operationId });
-      if (!isDynamicRecord(value) || !isClientAgentSummary(value.agent) || !isSidebarLayoutSnapshot(value.layout))
+      const duplicate = duplicateIds([lockedHostId, agentId]);
+      const value = await request("POST", TEAM_API_ROUTES.agent.duplicate(agentId), {
+        operationId: duplicate.id,
+      }).catch((error: unknown) => {
+        duplicate.failed();
+        throw error;
+      });
+      if (!isDynamicRecord(value) || !isClientAgentSummary(value.agent) || !isSidebarLayoutSnapshot(value.layout)) {
+        duplicate.failed();
         throw new Error(currentText().t("error.remote.invalidData"));
-      duplicateOperationIds.delete(operationKey);
-      // The released route answers the layout without the parents of the folders. The copy exists, so a
-      // failed read keeps that layout rather than failing the copy; the next layout event has the parents.
+      }
       const answered = value.layout;
       const layout = capabilities.includes(SIDEBAR_FOLDERS_CAPABILITY)
         ? await readSidebarLayout().catch(() => answered)
@@ -1388,24 +1842,56 @@ export function createWebWorkspaceRuntime(
       return { agent: value.agent, layout } satisfies DuplicateAgentResult;
     },
     async updateAgent(input) {
-      // The released agent route ignores the account, so it goes on `provider-accounts-v1` after the
-      // profile: a provider change there returns the agent to the new provider's own sign-in.
-      // Backup models stay on the host computer: the Team API does not carry them.
+      if (input.leaveUsageLimit !== undefined) {
+        const { agentId, provider, model, reasoningEffort, providerAccountId } = input;
+        if (
+          input.leaveUsageLimit !== true ||
+          provider === undefined ||
+          model === undefined ||
+          reasoningEffort === undefined ||
+          !capabilities.includes(AGENT_USAGE_LIMIT_CAPABILITY) ||
+          Object.entries(input).some(([key, value]) => value !== undefined && !USAGE_LIMIT_MOVE_FIELDS.has(key))
+        )
+          throw new Error(currentText().t("error.team.usageLimitUnsupported"));
+        await request("POST", AGENT_USAGE_LIMIT_ROUTES.switch, {
+          agentId,
+          provider,
+          model,
+          reasoningEffort,
+          ...(providerAccountId ? { providerAccountId } : {}),
+        });
+        return;
+      }
+      const runtimeChange = capabilities.includes(AGENT_PENDING_RUNTIME_CAPABILITY)
+        ? pendingRuntimeUpdateBody(input)
+        : null;
+      if (runtimeChange) {
+        await request("POST", AGENT_PENDING_RUNTIME_ROUTES.update, runtimeChange);
+        return;
+      }
       const {
         providerAccountId,
         backupModels: _backupModels,
         leaveUsageLimit: _leaveUsageLimit,
         avatarColor,
+        chatColor,
         ...fields
       } = input;
       if (providerAccountId !== undefined && !capabilities.includes(PROVIDER_ACCOUNTS_CAPABILITY))
         throw new Error(currentText().t("error.team.providersUnsupported"));
-      // The released agent route does not carry the exact colour. With `agent-colors-v1` it goes on its
-      // own route first. That route also sets the nearest hue, so the profile change then leaves the hue
-      // out: on the released route a hue removes the colour. A removed colour keeps the hue, which then
-      // sets the colour that the user chose. The released route removes the colour only when the hue
-      // changes, so a removed colour always goes on the colour route. Without the capability, only the
-      // hue goes.
+      const chatColors = capabilities.includes(CHAT_COLORS_CAPABILITY);
+      if (
+        chatColor !== undefined &&
+        !chatColors &&
+        Object.entries(input).every(([key, value]) => key === "agentId" || key === "chatColor" || value === undefined)
+      )
+        throw new Error(currentText().t("error.team.chatColorsUnsupported"));
+      if (chatColors && chatColor !== undefined)
+        await runTeamEffect(
+          setAgentChatColor(teamApi, { agentId: input.agentId, color: chatColor }).pipe(
+            Effect.mapError((error) => error.cause),
+          ),
+        );
       const colors = capabilities.includes(AGENT_COLORS_CAPABILITY);
       const { avatarHue: _avatarHue, ...withoutHue } = fields;
       const profile = colors && avatarColor ? withoutHue : fields;
@@ -1415,7 +1901,9 @@ export function createWebWorkspaceRuntime(
             Effect.mapError((error) => error.cause),
           ),
         );
-      await request("PATCH", TEAM_API_ROUTES.agent.one(input.agentId), { ...profile });
+      const colourRouted = (chatColors && chatColor !== undefined) || (colors && avatarColor !== undefined);
+      if (!colourRouted || Object.entries(profile).some(([key, value]) => key !== "agentId" && value !== undefined))
+        await request("PATCH", TEAM_API_ROUTES.agent.one(input.agentId), { ...profile });
       if (providerAccountId === undefined) return;
       await runTeamEffect(
         setAgentProviderAccount(teamApi, { agentId: input.agentId, accountId: providerAccountId }).pipe(
@@ -1428,7 +1916,14 @@ export function createWebWorkspaceRuntime(
         throw new Error(currentText().t("error.team.membersCannotDeleteAgents"));
       await Effect.runPromise(deleteAgent(teamApi, agentId).pipe(Effect.mapError((error) => error.cause)));
     },
-    async search(agentId, query, cursor) {
+    async search(agentId, query, cursor, includeSideThreads = false) {
+      if (includeSideThreads && capabilities.includes(THREAD_MESSAGE_SEARCH_CAPABILITY))
+        return teamApi("POST", THREAD_MESSAGE_SEARCH_ROUTES.search, decodeThreadMessageSearchResponse, {
+          query,
+          agentId: agentId ?? null,
+          cursor: cursor ?? null,
+          limit: THREAD_MESSAGE_SEARCH_PAGE_LIMIT,
+        });
       const params = new URLSearchParams({
         ...(agentId ? { botId: agentId } : {}),
         q: query,
@@ -1450,6 +1945,15 @@ export function createWebWorkspaceRuntime(
       });
       return { results, total: value.total, nextCursor: value.nextCursor };
     },
+    async searchFiles(query, cursor) {
+      if (!capabilities.includes(CONVERSATION_FILE_SEARCH_CAPABILITY))
+        throw new Error(currentText().t("error.team.conversationFileSearchUnsupported"));
+      return teamApi("POST", CONVERSATION_FILE_SEARCH_ROUTES.search, decodeConversationFileSearchResponse, {
+        query,
+        cursor: cursor ?? null,
+        limit: CONVERSATION_FILE_SEARCH_PAGE_LIMIT,
+      });
+    },
     async dispose(options) {
       if (options?.sessionsEnded) sessionsEnded = true;
       await discardCompletedDrafts();
@@ -1459,7 +1963,6 @@ export function createWebWorkspaceRuntime(
       disposed = true;
       generation += 1;
       connectedHost = null;
-      duplicateOperationIds.clear();
       revokeLocalDraftPreviews([...localDraftPreviews.keys()]);
       try {
         await Promise.all([peer.dispose(), hosts?.dispose(), ...retiring]);
@@ -1472,13 +1975,32 @@ export function createWebWorkspaceRuntime(
   };
 }
 
+const WEB_FILE_BYTES = TEAM_PROTOCOL_V2_MAX_FILE_BYTES;
+const WEB_FILE_DOWNLOAD: RemoteLargeDownload = { maxBytes: WEB_FILE_BYTES };
+
+interface ChannelPicture {
+  source: string;
+  url: string | null | undefined;
+  read: Promise<string | null>;
+}
+
+const CHANNEL_PICTURE_READS = 4;
+
+function channelPictureVersion(source: string, channelId: string): string | null {
+  try {
+    const url = new URL(source);
+    if (url.hostname !== "channel" || decodeURIComponent(url.pathname.slice(1)) !== channelId) return null;
+    return url.searchParams.get("v") || null;
+  } catch {
+    return null;
+  }
+}
+
 function decodeWebFile(value: unknown): WebFile {
   if (!isDynamicRecord(value)) throw new Error(currentText().t("error.remote.invalidData"));
   const base64 = requiredString(value, "base64");
-  if (base64.length > Math.ceil(MOBILE_ATTACHMENT_BYTES / 3) * 4)
-    throw new Error(currentText().t("error.remote.attachmentTooLarge"));
-  if (atob(base64).length > MOBILE_ATTACHMENT_BYTES)
-    throw new Error(currentText().t("error.remote.attachmentTooLarge"));
+  const padding = base64.endsWith("==") ? 2 : base64.endsWith("=") ? 1 : 0;
+  if ((base64.length / 4) * 3 - padding > WEB_FILE_BYTES) throw new Error(currentText().t("error.remote.fileTooLarge"));
   return {
     name: requiredString(value, "name"),
     mimeType: requiredString(value, "mimeType"),
@@ -1486,11 +2008,6 @@ function decodeWebFile(value: unknown): WebFile {
   };
 }
 
-/**
- * The host's own reason for a refusal. It redacts it; a server failure keeps the generic text. Over
- * WebRTC the host sends a refusal as an error frame, so it arrives as a failed command whose
- * reference is `host/<4xx status>/<code>`.
- */
 function hostRefusal(result: RemoteTeamCommandResult): string | null {
   const status = result.ok ? result.status : Number(/^host\/(\d{3})(?:\/|$)/u.exec(result.reference ?? "")?.[1]);
   if (status === undefined || !(status >= 400 && status < 500)) return null;
@@ -1595,7 +2112,6 @@ function decodeWebConversationPage(value: unknown): ConversationPage {
     pageInfo: {
       hasOlder: value.pageInfo.hasOlder,
       olderCursor: value.pageInfo.olderCursor,
-      // history-extent-v1: the host sends the unloaded length only when it was negotiated.
       ...optionalHistoryExtent(value.pageInfo),
     },
   };

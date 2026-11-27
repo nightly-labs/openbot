@@ -1,0 +1,4 @@
+interface:
+  display_name: "Release extension safely"
+  short_description: "Audit a pending Chrome extension release before the tag publishes it"
+  default_prompt: "Use $release-extension-safely to audit the extension changes since the last published version and check the automatic Chrome Web Store run."

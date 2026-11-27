@@ -12,9 +12,6 @@ export function decodeProviderRuntimeSnapshot(value: unknown): ProviderRuntimeSn
   }
   const providers = value.providers;
   const toolRuntimes = value.toolRuntimes;
-  // One line per managed runtime, and the object literals are what enumerate them: an id added to
-  // `ManagedProviderId` or `ManagedToolRuntimeId` without a line here is a compile error naming it,
-  // so a new runtime can never arrive at the renderer undecoded.
   return {
     revision: value.revision,
     providers: {
@@ -29,6 +26,9 @@ export function decodeProviderRuntimeSnapshot(value: unknown): ProviderRuntimeSn
       pi: decodeProviderRuntimeStatus(providers.pi),
       muse: decodeProviderRuntimeStatus(providers.muse),
       devin: decodeProviderRuntimeStatus(providers.devin),
+      copilot: decodeProviderRuntimeStatus(providers.copilot),
+      mistral: decodeProviderRuntimeStatus(providers.mistral),
+      ...(providers.hermes === undefined ? {} : { hermes: decodeProviderRuntimeStatus(providers.hermes) }),
     },
     toolRuntimes: { bun: decodeProviderRuntimeStatus(toolRuntimes.bun) },
   };

@@ -1,6 +1,3 @@
-// The one renderer-to-main payload that carries a secret. No message here quotes any part of the
-// input, because the field it would name is the API key or a header value.
-
 import { INPUT_LIMITS } from "@openbot/contracts/input-limits";
 import type {
   CustomProviderHarness,
@@ -19,7 +16,9 @@ import {
   isCustomProviderHarness,
   isCustomProviderHeaderName,
   isCustomProviderId,
+  isCustomProviderInputs,
   isCustomProviderMaxOutput,
+  isCustomProviderModelEfforts,
   isNewCustomProviderId,
 } from "@openbot/contracts/ipc";
 import { isString } from "@openbot/contracts/runtime-values";
@@ -27,13 +26,10 @@ import { sourceText } from "@openbot/i18n/source";
 import { isObject, requireString } from "./validation";
 
 function parseProviderId(value: unknown): string {
-  // `isNewCustomProviderId` also refuses every built-in provider id: an endpoint under a built-in
-  // provider's name would shadow that provider's own models in the picker.
   if (!isNewCustomProviderId(value)) throw new Error(sourceText("error.provider.idInvalid"));
   return value;
 }
 
-/** A delete names a saved endpoint, which can have an id that a newer built-in provider now uses. */
 function parseSavedProviderId(value: unknown): string {
   if (!isCustomProviderId(value)) throw new Error(sourceText("error.provider.idInvalid"));
   return value;
@@ -47,15 +43,9 @@ export function parseBaseUrl(value: unknown): string {
   } catch {
     throw new Error(sourceText("error.provider.baseUrlInvalid"));
   }
-  // The CLI is given this URL to call. A `file:` or `data:` endpoint is not an HTTP API, and every
-  // other scheme is a way to make the provider process read something local.
   if (url.protocol !== "http:" && url.protocol !== "https:") {
     throw new Error(sourceText("error.provider.baseUrlProtocol"));
   }
-  // `https://user:password@host/v1` is a credential in a field that is not a credential field: the
-  // base URL is stored outside the encrypted secret and is read back to the renderer for the
-  // endpoint list, so it would be kept and shown as plain text, on a computer with no secure storage
-  // as well. The key field and the headers are the two places a credential may go.
   if (url.username || url.password) {
     throw new Error(sourceText("error.provider.baseUrlCredentials"));
   }
@@ -70,13 +60,10 @@ function parseModels(providerId: string, value: unknown): CustomProviderModel[] 
   for (const entry of value) {
     if (!isObject(entry)) throw new Error("Every model needs an ID and a name.");
     const id = requireString(entry.id, "Model ID", INPUT_LIMITS.identifier);
-    // The composed id is what reaches the agent roster, the model picker and the Team API, and every
-    // one of those list decoders rejects a whole array when a single id is malformed. Checking the
-    // halves would let a legal id and a legal provider name compose into an illegal model.
-    if (!isAgentModel(composedCustomModelId(providerId, id)))
-      throw new Error(sourceText("error.provider.modelIdCharacter"));
-    if (seen.has(id)) throw new Error(sourceText("error.provider.modelIdDuplicate"));
-    seen.add(id);
+    const listed = composedCustomModelId(providerId, id);
+    if (!isAgentModel(listed)) throw new Error(sourceText("error.provider.modelIdCharacter"));
+    if (seen.has(listed)) throw new Error(sourceText("error.provider.modelIdDuplicate"));
+    seen.add(listed);
     const name = requireString(entry.name, "Model name", INPUT_LIMITS.modelName);
     const model: CustomProviderModel = { id, name };
     if (entry.contextWindow !== undefined) {
@@ -101,6 +88,15 @@ function parseModels(providerId: string, value: unknown): CustomProviderModel[] 
       }
       model.maxOutput = entry.maxOutput;
     }
+    if (entry.reasoningEfforts !== undefined) {
+      if (!isCustomProviderModelEfforts(entry.reasoningEfforts))
+        throw new Error(sourceText("error.provider.reasoningEffortsInvalid"));
+      model.reasoningEfforts = [...entry.reasoningEfforts];
+    }
+    if (entry.inputs !== undefined) {
+      if (!isCustomProviderInputs(entry.inputs)) throw new Error(sourceText("error.provider.inputsInvalid"));
+      model.inputs = [...entry.inputs];
+    }
     models.push(model);
   }
   return models;
@@ -110,13 +106,11 @@ export function parseHeaders(value: unknown): CustomProviderHeader[] {
   return parseHeaderList(value, parseHeaderValue);
 }
 
-/** The headers of an edit: a `null` value keeps the saved value of that name. */
 function parseHeaderInputs(value: unknown): CustomProviderHeaderInput[] {
   return parseHeaderList(value, (entry) => (entry === null ? null : parseHeaderValue(entry)));
 }
 
 function parseHeaderValue(value: unknown): string {
-  // A header value is bounded like the key, because it is as often a credential as the key is.
   if (!isString(value) || value.length > CUSTOM_PROVIDER_LIMITS.apiKey) {
     throw new Error(sourceText("error.provider.headerValueInvalid"));
   }
@@ -144,10 +138,6 @@ function parseHeaderList<T extends string | null>(
   return headers;
 }
 
-/**
- * `apiKey: null` is accepted and kept as null: a local endpoint that needs no key is the common case,
- * and an empty string would be sent as a blank Authorization header.
- */
 export function parseApiKey(value: unknown): string | null {
   if (value === null || value === undefined) return null;
   if (!isString(value)) throw new Error("The API key is not text.");
@@ -157,7 +147,6 @@ export function parseApiKey(value: unknown): string | null {
   return trimmed;
 }
 
-/** Absent is the released default, OpenCode, on a save and "keep the saved one" on an edit. */
 function parseHarness(value: unknown): CustomProviderHarness | undefined {
   if (value === undefined) return undefined;
   if (!isCustomProviderHarness(value)) throw new Error("Invalid harness.");
@@ -179,11 +168,6 @@ export function parseSaveCustomProvider(input: unknown): SaveCustomProviderInput
   };
 }
 
-/**
- * An edit. The id names a saved endpoint. An absent key or header list keeps the stored one, and a
- * header with a `null` value keeps its stored value. A `null` key is refused, because an edit cannot
- * say "no key" without discarding one that the user did not see.
- */
 export function parseUpdateCustomProvider(input: unknown): UpdateCustomProviderInput {
   if (!isObject(input)) throw new Error("Invalid endpoint.");
   const id = parseSavedProviderId(input.id);

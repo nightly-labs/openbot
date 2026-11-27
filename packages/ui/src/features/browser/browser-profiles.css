@@ -1,11 +1,9 @@
-/* The browser profiles section of the server settings: the list, then the new profile form. */
 .browser-profiles-panel {
   display: flex;
   flex-direction: column;
   gap: var(--openbot-space-3);
 }
 
-/* The name field row of the new profile form and of an inline rename. */
 .browser-profiles-row {
   display: flex;
   min-width: 0;
@@ -19,7 +17,6 @@
   flex: 1;
 }
 
-/* "New profile" closes the list of the agent settings select, under a line. */
 .ui-select-item.browser-profile-select-new {
   margin-top: calc(var(--openbot-space-1) * 2 + 1px);
 }
@@ -45,7 +42,27 @@
   gap: var(--openbot-space-2);
 }
 
-/* The column of the profile colors and the "New profile" plus. */
+.browser-profile-select-proxy {
+  display: inline-flex;
+  min-width: 0;
+  align-items: center;
+  gap: var(--openbot-space-1);
+  color: var(--openbot-text-muted);
+}
+
+.browser-profile-select-proxy svg {
+  width: var(--openbot-icon-sm);
+  height: var(--openbot-icon-sm);
+  flex: 0 0 auto;
+}
+
+.browser-profile-select-proxy span {
+  overflow: hidden;
+  min-width: 0;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .browser-profile-select-mark {
   display: inline-flex;
   width: var(--openbot-icon-sm);
@@ -59,8 +76,6 @@
   height: var(--openbot-icon-sm);
 }
 
-/* In the settings the dot is the button that opens the colors. */
-/* The shared profile has no color menu. Its dot takes the place of the menu button. */
 .browser-profile-shared-mark {
   display: inline-flex;
   width: var(--openbot-control-md);
@@ -82,7 +97,6 @@
   flex: 1 1 auto;
 }
 
-/* The name field takes the place of "New profile". Its text lines up with the option labels. */
 .browser-profile-select-form {
   display: flex;
   flex-direction: column;
@@ -95,4 +109,42 @@
 
 .browser-profile-select-form .ui-text {
   padding-inline: var(--openbot-space-2);
+}
+
+.browser-profiles-panel:has(> .ui-settings-section) {
+  gap: var(--openbot-space-6);
+}
+
+.browser-profiles-panel > .ui-settings-section {
+  display: flex;
+  flex-direction: column;
+  gap: var(--openbot-space-3);
+}
+
+.browser-profiles-panel > .ui-settings-section .browser-profiles-row {
+  flex: none;
+}
+
+.browser-proxy-badge svg {
+  width: var(--openbot-icon-xs);
+  height: var(--openbot-icon-xs);
+}
+
+.browser-proxy-icon {
+  display: inline-flex;
+  width: var(--openbot-control-md);
+  height: var(--openbot-control-md);
+  align-items: center;
+  justify-content: center;
+  color: var(--openbot-text-muted);
+}
+
+.browser-proxy-icon svg {
+  width: var(--openbot-icon-sm);
+  height: var(--openbot-icon-sm);
+}
+
+.browser-proxy-submenu-chevron {
+  margin-inline-start: auto;
+  color: var(--openbot-text-muted);
 }

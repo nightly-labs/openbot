@@ -1,7 +1,3 @@
-// The browser dock over a local page. A local tab is a native view above the renderer, so main draws
-// the dock in a transparent overlay view above it. The main renderer owns the conversation: it
-// publishes what the dock shows and does the actions that the overlay sends back.
-
 import { INPUT_LIMITS } from "./input-limits";
 import { type AvatarHue, isAvatarHue } from "./ipc-agent-identity";
 import {
@@ -24,23 +20,19 @@ import { isQueueDelivery, isQueueHold, type QueueDelivery, type QueueHold } from
 import { INSTALLED_SKILL_ORIGINS, type InstalledSkill } from "./ipc-skills";
 import { isBoolean, isDynamicRecord, isOneOf, isString } from "./runtime-values";
 
-/** The bounds of one presentation and one frame. A larger value is not valid, so main rejects the whole value. */
 export const BROWSER_DOCK_LIMITS = {
   skills: 500,
-  /** A skill id, slug, name or description. A host does not bound all of them, so this bound is generous. */
   skillText: 4_096,
   deliveries: 200,
-  /** The glass shapes that the overlay reports. The dock has far fewer. */
   glass: 16,
-  /** The largest size, in CSS pixels, of the dock frame and of each glass shape. */
   frameSize: 16_384,
-  /** The largest blur radius, in CSS pixels. */
   blur: 64,
   replyBody: INPUT_LIMITS.messageText,
   label: 600,
 } as const;
 
-/** The agent fields that the dock reads. */
+export const BROWSER_DOCK_OVERLAY_WIDTH = 688;
+
 export interface BrowserDockAgent {
   id: string;
   name: string;
@@ -51,23 +43,16 @@ export interface BrowserDockAgent {
   avatarUrl: string | null;
 }
 
-/** The skill fields that the composer reads. */
 export type BrowserDockSkill = Pick<
   InstalledSkill,
   "skillId" | "slug" | "name" | "state" | "enabled" | "origin" | "description"
 >;
 
-/** The MCP server fields that the composer reads. The environment and the headers can hold secrets: never sent. */
 export type BrowserDockMcpServer = Pick<
   McpServerConfig,
   "id" | "name" | "enabled" | "transport" | "command" | "args" | "url"
 >;
 
-/**
- * What the island shows: the step of the agent, the page the user controls, the page the agent asked the
- * user to use, the code or password the agent asks for, the questions or the approval that the user answers
- * on the page, or what the agent said. `attempt` changes when an answer fails, so the card shows again.
- */
 export type BrowserDockIsland =
   | { kind: "activity"; control: "agent"; label: string }
   | { kind: "activity"; control: "user" | "request" }
@@ -79,15 +64,10 @@ export type BrowserDockIsland =
 export type BrowserDockSendShortcut = "enter" | "meta-enter" | "ctrl-enter";
 
 export interface BrowserDockPresentation {
-  /** The agent that owns the tab. */
   agent: BrowserDockAgent;
   agents: BrowserDockAgent[];
   skills: BrowserDockSkill[];
   mcpServers: BrowserDockMcpServer[];
-  /**
-   * The draft of the conversation. The revision changes only when the draft changes outside the overlay,
-   * so the overlay keeps its own text while the user types in it.
-   */
   draft: { text: string; revision: number };
   focusRequest: number;
   sendShortcut: BrowserDockSendShortcut;
@@ -96,7 +76,6 @@ export interface BrowserDockPresentation {
   hold: QueueHold | null;
   editingDeliveryId: string | null;
   canSteer: boolean;
-  /** Whether the agent's provider can steer a running turn at all. */
   steerSupported: boolean;
   canRunAsTask: boolean;
   island: BrowserDockIsland | null;
@@ -122,11 +101,6 @@ export type BrowserDockAction =
   | { type: "select-agent"; agentId: string }
   | { type: "open-link"; url: string };
 
-/**
- * One glass shape of the dock, in CSS pixels of the overlay. `bottom` is the space from the bottom of the
- * overlay to the bottom of the shape: the dock stays at the bottom when the overlay changes height, so a
- * shape keeps its place. Main draws its blur under the overlay.
- */
 export interface BrowserDockGlass {
   left: number;
   bottom: number;
@@ -136,14 +110,15 @@ export interface BrowserDockGlass {
   blur: number;
 }
 
-/**
- * The space that the dock needs at the bottom of the page, in CSS pixels, and its glass shapes. `seq`
- * increases with each frame, so main ignores a frame that arrives late.
- */
+export interface BrowserDockAnchor {
+  width: number;
+}
+
 export interface BrowserDockFrame {
   seq: number;
   height: number;
   glass: BrowserDockGlass[];
+  anchor?: BrowserDockAnchor;
 }
 
 export function isBrowserDockPresentation(value: unknown): value is BrowserDockPresentation {
@@ -207,8 +182,13 @@ export function isBrowserDockFrame(value: unknown): value is BrowserDockFrame {
     isDynamicRecord(value) &&
     integerInRange(value.seq, 0, Number.MAX_SAFE_INTEGER) &&
     isSize(value.height) &&
-    isList(value.glass, BROWSER_DOCK_LIMITS.glass, isGlass)
+    isList(value.glass, BROWSER_DOCK_LIMITS.glass, isGlass) &&
+    (value.anchor === undefined || isAnchor(value.anchor))
   );
+}
+
+function isAnchor(value: unknown): value is BrowserDockAnchor {
+  return isDynamicRecord(value) && isSize(value.width);
 }
 
 function isGlass(value: unknown): value is BrowserDockGlass {
@@ -245,18 +225,13 @@ function isDraft(value: unknown): value is BrowserDockPresentation["draft"] {
   return isDynamicRecord(value) && isBoundedString(value.text, INPUT_LIMITS.messageText) && isCount(value.revision);
 }
 
-/**
- * The answers of a question card: no entry when the user cancels, and no answer for a skipped question. Main
- * checks them again when the main renderer sends them on.
- */
-function isPromptAnswers(value: unknown): value is Record<string, string[]> {
+export function isPromptAnswers(value: unknown): value is Record<string, string[]> {
   if (!isDynamicRecord(value)) return false;
   const entries = Object.entries(value);
   if (entries.length > INPUT_LIMITS.promptQuestions) return false;
   let total = 0;
   for (const [questionId, answers] of entries) {
     if (
-      // The same bound as the id of a question on the card, which can be empty.
       !isBoundedString(questionId, INPUT_LIMITS.identifier) ||
       !Array.isArray(answers) ||
       answers.length > INPUT_LIMITS.promptAnswersPerQuestion

@@ -1,49 +1,35 @@
-// The /download pages: one per operating system and phone app, and a hub that lists them. Each
-// statement here comes from the release configuration, README.md or docs/TROUBLESHOOTING.md, and for
-// the phone apps from the native module minimums, the Mobile Connect settings and the mobile changelog. Keep it to what the
-// released app does, because these pages are what a search engine shows for "OpenBot for Linux".
-
+import { ANDROID_APK_AVAILABLE } from "./android-apk";
 import { DOWNLOAD_PLATFORM_ORDER, type DownloadPlatform } from "./download-platforms";
-import { LANDING_FAQ, type LandingQuestion } from "./landing-faq";
-import { OPENBOT_ALTERNATE_DOWNLOAD_LINKS, OPENBOT_DOWNLOAD_LINKS, OPENBOT_DOWNLOAD_PAGE_LINKS } from "./landing-links";
-import { MOBILE_APP_ORDER, MOBILE_APPS, type MobilePlatform } from "./mobile-apps";
+import { faqStructuredData, type LandingQuestion } from "./landing-faq";
 import {
-  OPENBOT_SITE_URL,
-  OPENBOT_SOCIAL_IMAGE_ALT,
-  OPENBOT_SOCIAL_IMAGE_META,
-  OPENBOT_SOCIAL_IMAGE_URL,
-  OPENBOT_X_HANDLE,
-} from "./site-metadata";
+  OPENBOT_ALTERNATE_DOWNLOAD_LINKS,
+  OPENBOT_ANDROID_APK_LINK,
+  OPENBOT_DOWNLOAD_LINKS,
+  OPENBOT_DOWNLOAD_PAGE_LINKS,
+} from "./landing-links";
+import { MOBILE_APP_ORDER, MOBILE_APPS, type MobilePlatform } from "./mobile-apps";
+import { OPENBOT_SITE_URL, OPENBOT_X_HANDLE, type PageSocialImage, pageSocialImageMeta } from "./site-metadata";
 import { OPENBOT_SOFTWARE_APPLICATION } from "./software-application";
 
-/** The sitemap date of the pages. Change it when their text changes. */
 export const DOWNLOAD_PAGES_UPDATED_AT = "2026-10-15";
 
-/** A system with its own page: a desktop installer or a phone app. */
 export type DownloadPagePlatform = DownloadPlatform | MobilePlatform;
 
-/** The desktop systems first, then the phone apps, as the hub and the landing page list them. */
 export const DOWNLOAD_PAGE_ORDER: readonly DownloadPagePlatform[] = [...DOWNLOAD_PLATFORM_ORDER, ...MOBILE_APP_ORDER];
 
 export interface DownloadInstaller {
-  /** The button text where the system is not on screen, such as a list of every installer. */
   label: string;
-  /** The button text inside a card or panel that already names the system. */
   shortLabel: string;
-  /** Which computer the file is for, for a reader who has to choose between two. */
   detail: string;
   href: string;
-  /** A store page on another site, which opens in a new tab. */
   external?: boolean;
 }
 
-/** One line of the spec sheet: what the computer needs, or what the download is. */
 interface DownloadSpec {
   label: string;
   value: string;
 }
 
-/** One instruction. `code` is a command to copy, shown under the text. */
 export interface DownloadStep {
   text: string;
   code?: string;
@@ -56,7 +42,6 @@ interface DownloadPageSection {
 
 export interface DownloadPageContent {
   platform: DownloadPagePlatform;
-  /** The name a reader uses for the system, which the headings and the breadcrumb show. */
   name: string;
   title: string;
   description: string;
@@ -65,15 +50,14 @@ export interface DownloadPageContent {
   installers: readonly DownloadInstaller[];
   specs: readonly DownloadSpec[];
   installSteps: readonly DownloadStep[];
-  /** Optional steps for one situation, such as a distribution that needs a security profile. */
   extraSections: readonly DownloadPageSection[];
   notes: readonly string[];
   faq: readonly LandingQuestion[];
-  /** schema.org `operatingSystem` for this page's installer. */
   operatingSystem: string;
 }
 
-const PROVIDERS_ANSWER = LANDING_FAQ.find((entry) => entry.question === "Which AI models can OpenBot use?")?.answer;
+const PROVIDERS_ANSWER =
+  "Codex, Claude Code, Gemini, Grok, OpenCode, Cursor, Cline, Muse Code and Pi, and Inception's Mercury models. You can also run any agent that speaks the Agent Client Protocol, such as Goose or Qwen Code, connect any OpenAI-compatible endpoint, and use local models in Ollama or LM Studio.";
 const FREE_ANSWER =
   "Yes, for personal and other noncommercial use. The app costs $0, with no locked features. You pay only your AI provider, through the plan or API key you already have. Commercial use needs a license.";
 const CONNECT_STEP: DownloadStep = {
@@ -103,12 +87,46 @@ const PHONE_COMPUTER_QUESTION: LandingQuestion = {
 const PHONE_FREE_ANSWER =
   "Yes. The app costs $0. You pay only your AI provider, through the plan or API key you already have.";
 
+const ANDROID_APK = {
+  installer: {
+    label: "Download the APK",
+    shortLabel: "APK",
+    detail: "For a phone with no Google Play",
+    href: OPENBOT_ANDROID_APK_LINK,
+  },
+  section: {
+    title: "Install from the APK",
+    steps: [
+      {
+        text: "Use the APK when your phone has no Google Play. On the phone, open this page in the browser and select Download the APK.",
+      },
+      {
+        text: "Open the downloaded file. Android asks you to let the browser install apps: allow it, then select Install.",
+      },
+      { text: "Open OpenBot and connect it to your computer with the QR code, as the steps above show." },
+    ],
+  },
+  notes: [
+    "The APK is the build that Google Play has, with the same signature.",
+    "With the APK, the app tells you when a new version is ready. Download the APK from this page again and install it over the app. You keep your sign-in.",
+    "Notifications come through Google's push service. A phone with no Google Play services gets none.",
+  ],
+  question: {
+    question: "Can I install OpenBot for Android without Google Play?",
+    answer:
+      "Yes. Download the APK from this page and open it on your phone. It is the build that Google Play has, and it is free.",
+  },
+} satisfies {
+  installer: DownloadInstaller;
+  section: DownloadPageSection;
+  notes: readonly string[];
+  question: LandingQuestion;
+};
+
 function providersQuestion(system: string): LandingQuestion {
   return {
     question: `Which AI agents can I run on ${system}?`,
-    answer:
-      PROVIDERS_ANSWER ??
-      "Codex, Claude Code, Gemini, Grok and OpenCode, and any OpenAI-compatible endpoint, also one on your own computer.",
+    answer: PROVIDERS_ANSWER,
   };
 }
 
@@ -349,11 +367,13 @@ export const DOWNLOAD_PAGES: Record<DownloadPagePlatform, DownloadPageContent> =
     platform: "android",
     name: "Android",
     title: "Download OpenBot for Android: your AI agents on your phone",
-    description:
-      "Get OpenBot for Android on Google Play. Chat with the AI agents on your computer, follow their work and send files from anywhere.",
+    description: ANDROID_APK_AVAILABLE
+      ? "Get OpenBot for Android on Google Play or as an APK. Chat with the AI agents on your computer, follow their work and send files from anywhere."
+      : "Get OpenBot for Android on Google Play. Chat with the AI agents on your computer, follow their work and send files from anywhere.",
     heading: "OpenBot for Android",
-    intro:
-      "Chat with the agents on your computer from anywhere, follow their progress and send them files. Get the app on Google Play.",
+    intro: ANDROID_APK_AVAILABLE
+      ? "Chat with the agents on your computer from anywhere, follow their progress and send them files. Get the app on Google Play, or download the APK."
+      : "Chat with the agents on your computer from anywhere, follow their progress and send them files. Get the app on Google Play.",
     installers: [
       {
         label: "Get it on Google Play",
@@ -362,12 +382,13 @@ export const DOWNLOAD_PAGES: Record<DownloadPagePlatform, DownloadPageContent> =
         href: MOBILE_APPS.android.href,
         external: true,
       },
+      ...(ANDROID_APK_AVAILABLE ? [ANDROID_APK.installer] : []),
     ],
     specs: [
       { label: "System", value: "Android 7.0 or later" },
-      { label: "Store", value: "Google Play" },
+      { label: "Store", value: ANDROID_APK_AVAILABLE ? "Google Play, or an APK" : "Google Play" },
       { label: "Needs", value: "OpenBot on a computer" },
-      { label: "Updates", value: "Through Google Play" },
+      { label: "Updates", value: ANDROID_APK_AVAILABLE ? "Google Play, or a new APK" : "Through Google Play" },
     ],
     installSteps: [
       COMPUTER_STEP,
@@ -375,12 +396,17 @@ export const DOWNLOAD_PAGES: Record<DownloadPagePlatform, DownloadPageContent> =
       GENERATE_CODE_STEP,
       { text: "Open OpenBot on your phone, choose Scan QR code and point the camera at the code." },
     ],
-    extraSections: [],
+    extraSections: ANDROID_APK_AVAILABLE ? [ANDROID_APK.section] : [],
     notes: [
       ...PHONE_NOTES,
       "The app does not ask for access to all your photos and videos. You choose photos and files with the system picker.",
+      ...(ANDROID_APK_AVAILABLE ? ANDROID_APK.notes : []),
     ],
-    faq: [{ question: "Is OpenBot for Android free?", answer: PHONE_FREE_ANSWER }, PHONE_COMPUTER_QUESTION],
+    faq: [
+      { question: "Is OpenBot for Android free?", answer: PHONE_FREE_ANSWER },
+      PHONE_COMPUTER_QUESTION,
+      ...(ANDROID_APK_AVAILABLE ? [ANDROID_APK.question] : []),
+    ],
     operatingSystem: "Android 7.0 or later",
   },
 };
@@ -393,6 +419,11 @@ export const DOWNLOAD_HUB = {
   intro:
     "Free for Mac, Windows and Linux, with apps for iPhone and Android. Get the installer for this computer, or choose a system below for its requirements and install steps.",
 } as const;
+
+const DOWNLOAD_SOCIAL_IMAGE: PageSocialImage = {
+  path: "/social/download.jpg",
+  alt: "Teamwork. Now installing. OpenBot agents around a glass ring",
+};
 
 export function downloadPagePath(platform: DownloadPagePlatform | "hub"): string {
   return OPENBOT_DOWNLOAD_PAGE_LINKS[platform];
@@ -420,18 +451,6 @@ function breadcrumbData(platform: DownloadPagePlatform | "hub", siteUrl: string)
   };
 }
 
-function faqData(faq: readonly LandingQuestion[]) {
-  return {
-    "@context": "https://schema.org",
-    "@type": "FAQPage",
-    mainEntity: faq.map((entry) => ({
-      "@type": "Question",
-      name: entry.question,
-      acceptedAnswer: { "@type": "Answer", text: entry.answer },
-    })),
-  };
-}
-
 export function downloadPageHead(platform: DownloadPagePlatform | "hub", siteUrl: string) {
   const page = platform === "hub" ? undefined : DOWNLOAD_PAGES[platform];
   const title = page?.title ?? DOWNLOAD_HUB.title;
@@ -444,6 +463,7 @@ export function downloadPageHead(platform: DownloadPagePlatform | "hub", siteUrl
         downloadUrl: page.installers.map((installer) => new URL(installer.href, siteUrl).toString()),
       }
     : OPENBOT_SOFTWARE_APPLICATION;
+  const image = pageSocialImageMeta(DOWNLOAD_SOCIAL_IMAGE, siteUrl);
 
   return {
     meta: [
@@ -455,16 +475,15 @@ export function downloadPageHead(platform: DownloadPagePlatform | "hub", siteUrl
       { property: "og:url", content: url },
       { property: "og:title", content: title },
       { property: "og:description", content: description },
-      ...OPENBOT_SOCIAL_IMAGE_META,
+      ...image.openGraph,
       { name: "twitter:card", content: "summary_large_image" },
       { name: "twitter:site", content: OPENBOT_X_HANDLE },
       { name: "twitter:title", content: title },
       { name: "twitter:description", content: description },
-      { name: "twitter:image", content: OPENBOT_SOCIAL_IMAGE_URL },
-      { name: "twitter:image:alt", content: OPENBOT_SOCIAL_IMAGE_ALT },
+      ...image.twitter,
       { "script:ld+json": application },
       { "script:ld+json": breadcrumbData(platform, siteUrl) },
-      ...(page ? [{ "script:ld+json": faqData(page.faq) }] : []),
+      ...(page ? [{ "script:ld+json": faqStructuredData(page.faq) }] : []),
     ],
     links: [{ rel: "canonical", href: url }],
   };

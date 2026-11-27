@@ -1,5 +1,3 @@
-/* The menu panel sits on the same color as the sidebar and the conversation panel. A light edge, a
- * top highlight and a deep shadow lift it from them. */
 :root {
   --ui-menu-radius: var(--openbot-radius-card);
   --ui-menu-padding: var(--openbot-space-1-5);
@@ -10,14 +8,11 @@
   --ui-menu-highlight: color-mix(in srgb, var(--openbot-text-primary) 5%, transparent);
   --ui-menu-shadow: var(--openbot-shadow-menu);
   --ui-menu-item-hover: color-mix(in srgb, var(--openbot-text-primary) 6%, transparent);
-  /* The highlighted row as one opaque color, for the parts of an icon that are cut out of its fill. */
-  --ui-menu-row-highlight: color-mix(in srgb, var(--openbot-text-primary) 6%, var(--ui-menu-bg));
   --ui-menu-panel-shadow:
     inset 0 1px 0 var(--ui-menu-highlight), 0 0 0 1px var(--ui-menu-edge), 0 4px 6px -1px var(--ui-menu-shadow),
     0 2px 4px -2px var(--ui-menu-shadow);
   --ui-menu-ease: cubic-bezier(0.16, 1, 0.3, 1);
   --ui-menu-duration: 150ms;
-  /* A submenu opens and closes slower than the root menu, on a softer curve. */
   --ui-submenu-ease: cubic-bezier(0.32, 0.72, 0, 1);
   --ui-submenu-duration: var(--openbot-duration-slow);
 }
@@ -52,13 +47,10 @@
   animation: ui-menu-in var(--ui-menu-duration) var(--ui-menu-ease) both;
 }
 
-/* Kobalte removes a closed menu at once. The copy that menu-motion.tsx leaves in its place has no
- * data-expanded, and plays this exit. */
 .ui-action-menu:not([data-expanded]) {
   animation: ui-menu-out var(--ui-menu-duration) var(--ui-menu-ease) both;
 }
 
-/* Kobalte labels a submenu with the id of its sub-trigger. The exit copy keeps the label. */
 .ui-action-menu[aria-labelledby*="sub-trigger"] {
   animation-duration: var(--ui-submenu-duration);
   animation-timing-function: var(--ui-submenu-ease);
@@ -89,7 +81,6 @@
     color var(--openbot-duration-hover) var(--openbot-ease-out);
 }
 
-/* A long translated label ends with an ellipsis instead of a hard cut. */
 .ui-action-menu:not([data-menu-layout="grid"])
   :is([role="menuitem"], [role="menuitemcheckbox"], [role="menuitemradio"])
   > span:not(:has(svg), .ui-menu-trailing) {
@@ -122,28 +113,37 @@
   width: var(--openbot-icon-md);
   height: var(--openbot-icon-md);
   flex: 0 0 auto;
-  /* fill and stroke belong here beside the colour and the weight: this rule owns how a
-   * menu icon paints. Lucide sets both as attributes, so every menu built out of the
-   * barrel looked right and hid the gap - until a hand-drawn SVG landed in one and took
-   * the SVG defaults instead, painting itself as an opaque filled shape with no outline. */
+
   fill: none;
   stroke: currentColor;
-  color: var(--openbot-text-secondary);
+  color: var(--openbot-text-muted);
   stroke-linecap: round;
   stroke-linejoin: round;
 }
 
-/* Lucide ships stroke-width="2" as an attribute, so the weight has to be set here to tame
- * it - but this selector outranks the zero-specificity :where(.ui-glyph-*) classes, and
- * setting it unconditionally would undo their viewBox scaling for any hand-drawn icon in
- * a menu. They are excluded and keep the weight their own grid asks for. */
+.ui-action-menu:not([data-menu-layout="grid"])
+  :is([role="menuitem"], [role="menuitemcheckbox"], [role="menuitemradio"]):is(
+    :hover,
+    :focus-visible,
+    [data-highlighted],
+    [aria-expanded="true"]
+  )
+  > svg {
+  color: var(--openbot-text-primary);
+}
+
+.ui-action-menu:not([data-menu-layout="grid"])
+  :is([role="menuitem"], [role="menuitemcheckbox"], [role="menuitemradio"])[data-disabled]
+  > svg {
+  color: var(--openbot-text-muted);
+}
+
 .ui-action-menu:not([data-menu-layout="grid"])
   :is([role="menuitem"], [role="menuitemcheckbox"], [role="menuitemradio"])
   > svg:not(.ui-glyph-20, .ui-glyph-16) {
   stroke-width: var(--openbot-icon-stroke);
 }
 
-/* The separator runs to both edges of the panel. */
 .ui-action-menu > hr,
 .ui-action-menu [role="separator"] {
   height: 1px;
@@ -170,7 +170,6 @@
   color: var(--openbot-danger);
 }
 
-/* A heading inside a menu. Each item still names itself, so the heading is aria-hidden. */
 .ui-menu-label {
   padding: var(--openbot-space-1-5) var(--ui-menu-inset);
   color: var(--openbot-text-muted);
@@ -178,7 +177,6 @@
   line-height: var(--openbot-leading-sm);
 }
 
-/* The check of a selected item: a filled circle on the left, an empty ring when not selected. */
 .ui-menu-check {
   display: grid;
   width: var(--openbot-icon-md);
@@ -207,7 +205,6 @@
   stroke-width: 2.5;
 }
 
-/* A value or a shortcut at the end of an item. */
 .ui-menu-trailing {
   margin-inline-start: auto;
   color: var(--openbot-text-muted);
@@ -220,46 +217,6 @@
   color: var(--openbot-text-muted);
 }
 
-/* Item icons are muted outlines at rest. On the highlighted row they take the text color and fill in.
- * The swap has no transition. Only the closed shapes fill: open lines stay outlines, and details
- * take the row color, so they are cut out of the fill as in a solid icon set. */
-.ui-action-menu .agent-context-icon {
-  color: var(--openbot-text-muted);
-}
-
-.ui-action-menu .agent-context-icon > * {
-  fill: currentColor;
-  fill-opacity: 0;
-}
-
-.ui-action-menu [class~="lucide-chart-area"] > path:first-child,
-.ui-action-menu [class~="lucide-bell-off"] > path:nth-child(3),
-.ui-action-menu [class~="lucide-app-window"] > path,
-.ui-action-menu [class~="lucide-bot"] > *,
-.ui-action-menu [class~="lucide-calendar-clock"] > * {
-  fill: none;
-}
-
-.ui-action-menu :is(:hover, [data-highlighted], [aria-expanded="true"]) > .agent-context-icon {
-  color: var(--openbot-text-primary);
-}
-
-.ui-action-menu :is(:hover, [data-highlighted], [aria-expanded="true"]) > .agent-context-icon > * {
-  fill-opacity: 1;
-}
-
-/* Cut-outs: the window bar, and the lights on the server racks. */
-.ui-action-menu :is(:hover, [data-highlighted], [aria-expanded="true"]) > [class~="lucide-app-window"] > path,
-.ui-action-menu
-  :is(:hover, [data-highlighted], [aria-expanded="true"])
-  > .ui-glyph-20:has(> rect + rect + circle)
-  > circle {
-  fill: var(--ui-menu-row-highlight);
-  stroke: var(--ui-menu-row-highlight);
-}
-
-/* A tooltip that opens and closes with the motion of a submenu, and moves to the next trigger of its
- * group. menu-motion.tsx leaves the copy that plays the exit. */
 .ui-motion-tooltip-trigger {
   display: flex;
 }
@@ -274,12 +231,10 @@
   animation: ui-menu-out var(--ui-submenu-duration) var(--ui-submenu-ease) both;
 }
 
-/* While the panel moves, its size changes and its content stays as it is: no scroll bar shows. */
 .ui-motion-tooltip:is([data-menu-hold], [data-menu-moving], [data-menu-swap-out]) {
   overflow: hidden;
 }
 
-/* A tooltip that is a label, such as the name of a rail button, on the surface of a menu panel. */
 .ui-motion-tooltip-label {
   overflow: hidden;
   max-width: min(240px, calc(100vw - var(--openbot-space-4)));
@@ -299,8 +254,6 @@
   display: block;
 }
 
-/* States that menu-motion.tsx sets while a copy waits for the next submenu or tooltip, or while
- * one of them moves to the place of the next one. */
 .ui-action-menu:is([data-menu-hold], [data-menu-swap-in], [data-menu-swap-out]),
 .ui-motion-tooltip:is([data-menu-hold], [data-menu-swap-in], [data-menu-swap-out]) {
   animation: none;

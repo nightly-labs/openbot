@@ -56,7 +56,6 @@ export const messages = {
   "connector.github.disconnectEffectTools": "Todos os agentes perdem as ferramentas do GitHub, gh e git.",
   "connector.github.disconnectEffectRevoke": "Em seguida, o GitHub abre para você revogar o OpenBot.",
   "connector.github.disconnectEffectKept": "Os chats, arquivos e a memória dos agentes continuam neste computador.",
-  // The same text for the connection of a joined server. {host} is the server name, such as Studio.
   "connector.github.descriptionHost":
     "Todos os agentes em {host} podem usar seus repositórios, issues e pull requests do GitHub, além de gh e git.",
   "connector.github.connectedSummaryHost": {
@@ -274,6 +273,8 @@ export const messages = {
   "connector.telegram.helpRelayUnavailableHost":
     "O OpenBot em {host} não consegue receber mensagens do Telegram. Em {host}, entre na sua conta, dê um nome ao servidor nas Configurações do servidor e mantenha o OpenBot aberto.",
   "connector.telegram.helpError": "O OpenBot não consegue acessar este chat. Reconecte ou desconecte o chat.",
+  "connector.telegram.helpNotLinked":
+    "Este chat não está vinculado a este servidor. Selecione Reconectar para vinculá-lo.",
   "connector.telegram.retryAt": "O Telegram pediu para o OpenBot aguardar. Ele tentará novamente às {time}.",
   "connector.telegram.pause": "Pausar",
   "connector.telegram.resume": "Retomar",
@@ -353,13 +354,15 @@ export const messages = {
   "connector.whatsapp.ownNumberNote":
     "Seu chat “Mensagem para você mesmo” e as pessoas que você permitir falam com o OpenBot.",
   "connector.whatsapp.dedicatedNote":
-    "As pessoas que você permitir falam com o OpenBot. Outras pessoas recebem um código para passar a você.",
+    "Seu chat “Mensagem para você mesmo” e as pessoas que você permitir falam com o OpenBot. Outras pessoas recebem um código para passar a você.",
   "connector.whatsapp.helpLoggedOut":
     "O WhatsApp removeu este computador dos dispositivos conectados. Vincule o número novamente.",
   "connector.whatsapp.helpLoggedOutHost":
     "O WhatsApp removeu este servidor dos dispositivos conectados. Vincule o número novamente.",
   "connector.whatsapp.helpError":
     "O OpenBot não consegue acessar o WhatsApp neste número. Reconecte ou desconecte o número.",
+  "connector.whatsapp.helpKeysUnreadable":
+    "O OpenBot não consegue ler as chaves salvas deste número. Vincule o número novamente.",
   "connector.whatsapp.retryAt": "O WhatsApp pediu para o OpenBot aguardar. Ele tentará novamente às {time}.",
   "connector.whatsapp.pause": "Pausar",
   "connector.whatsapp.resume": "Retomar",
@@ -374,7 +377,13 @@ export const messages = {
   "connector.whatsapp.rowAction": "{action}: {name}",
   "connector.whatsapp.ownNumber": "Número pessoal",
   "connector.whatsapp.ownNumberDescription":
-    "Só o seu chat “Mensagem para você mesmo” e as pessoas que você permitir podem escrever. Desative para um número só para o OpenBot.",
+    "Só o seu chat “Mensagem para você mesmo” e as pessoas que você permitir podem escrever. Outras pessoas não recebem resposta. Quando desativado, o OpenBot responde a pessoas desconhecidas com um código.",
+  "connector.whatsapp.workingMessage": "Mensagem “Trabalhando nisso…”",
+  "connector.whatsapp.workingMessageDescription":
+    "O OpenBot a envia enquanto o agente trabalha e depois a substitui pela resposta. Uma solicitação que espera outra anterior também recebe uma mensagem de espera. Em um número pessoal, só o seu chat “Mensagem para você mesmo” recebe essas mensagens. Desative para enviar só a resposta.",
+  "connector.whatsapp.statusReactions": "Reações de status",
+  "connector.whatsapp.statusReactionsDescription":
+    "O OpenBot reage com 👀 quando uma mensagem chega e com ✅ quando a resposta está pronta. Desative para não enviar reações.",
   "connector.whatsapp.orchestratorTitle": "Orquestrador do WhatsApp",
   "connector.whatsapp.orchestratorDescription":
     "Este agente recebe as mensagens para o OpenBot de todos os seus números vinculados. Ele mesmo responde às curtas, encaminha o restante do trabalho ao agente certo e responde no WhatsApp.",
@@ -393,10 +402,10 @@ export const messages = {
   "connector.whatsapp.kindLabel": "Número",
   "connector.whatsapp.kindPersonal": "Meu número pessoal",
   "connector.whatsapp.kindPersonalDescription":
-    "O OpenBot responde só ao seu chat “Mensagem para você mesmo” e às pessoas que você permitir.",
+    "O OpenBot responde só ao seu chat “Mensagem para você mesmo” e às pessoas que você permitir. Outras pessoas não recebem resposta.",
   "connector.whatsapp.kindDedicated": "Um número só para o OpenBot",
   "connector.whatsapp.kindDedicatedDescription":
-    "Pessoas desconhecidas recebem um código para passar a você. Você as aprova aqui.",
+    "O OpenBot responde deste número a cada pessoa desconhecida com um código para passar a você. Você as aprova aqui.",
   "connector.whatsapp.methodLabel": "Como vincular",
   "connector.whatsapp.methodQr": "Código QR",
   "connector.whatsapp.methodCode": "Código de pareamento",
@@ -451,6 +460,9 @@ export const messages = {
   "connector.whatsapp.sendersLimit": "Um número pode permitir até {count} contatos e grupos.",
   "connector.whatsapp.senderGroup": "Grupo",
   "connector.whatsapp.removeSender": "Remover",
+  "connector.whatsapp.senderAccess": "Acesso de {name}",
+  "connector.whatsapp.senderReplies": "Pode dar tarefas",
+  "connector.whatsapp.senderReadOnly": "Somente leitura",
   "connector.whatsapp.addContact": "Adicionar contato",
   "connector.whatsapp.addGroup": "Adicionar grupo",
   "connector.whatsapp.contactTitle": "Adicionar um contato",
@@ -459,7 +471,8 @@ export const messages = {
   "connector.whatsapp.contactNameDescription": "Opcional. Se ficar vazio, a lista mostra o número de telefone.",
   "connector.whatsapp.add": "Adicionar",
   "connector.whatsapp.groupTitle": "Adicionar um grupo",
-  "connector.whatsapp.groupDescription": "As pessoas deste grupo podem passar trabalho para seus agentes.",
+  "connector.whatsapp.groupDescription":
+    "As pessoas deste grupo podem passar trabalho para seus agentes quando mencionam o número ou respondem às mensagens dele.",
   "connector.whatsapp.groupSearch": "Buscar grupos",
   "connector.whatsapp.groupsLoading": "Lendo os grupos…",
   "connector.whatsapp.groupsLoadFailed": "O OpenBot não conseguiu ler os grupos",
@@ -564,4 +577,73 @@ export const messages = {
   "connector.bitwarden.clientSecret": "client_secret da chave de API",
   "connector.bitwarden.masterPassword": "Senha mestra",
   "connector.bitwarden.connecting": "Conectando",
+  "connector.protonPass.title": "Proton Pass",
+  "connector.protonPass.description":
+    "Os agentes entram em sites com os logins de um cofre compartilhado do Proton Pass.",
+  "connector.protonPass.descriptionHost":
+    "Os agentes em {host} entram em sites com os logins de um cofre compartilhado do Proton Pass.",
+  "connector.protonPass.connect": "Conectar",
+  "connector.protonPass.moreWays": "Outras formas de conectar",
+  "connector.protonPass.useKey": "Usar uma chave de acesso",
+  "connector.protonPass.keyLabel": "Chave de acesso",
+  "connector.protonPass.keyPlaceholder": "pst_…",
+  "connector.protonPass.setupTitle": "Configurar",
+  "connector.protonPass.setupDescription":
+    "Conectar abre o login do Proton no seu navegador. Depois, o OpenBot cria o cofre compartilhado e guarda só uma chave somente leitura.",
+  "connector.protonPass.setupDescriptionHost":
+    "Conectar abre o login do Proton no seu navegador. Depois, {host} cria o cofre compartilhado e guarda só uma chave somente leitura.",
+  "connector.protonPass.vaultName": "Shared with OpenBot",
+  "connector.protonPass.vaultSetup":
+    "O OpenBot cria este cofre quando você conecta. Mova logins para ele para compartilhá-los.",
+  "connector.protonPass.showSteps": "Ver etapas",
+  "connector.protonPass.stepsLabel": "Etapas da conexão",
+  "connector.protonPass.stepSignIn": "Entrar",
+  "connector.protonPass.stepVault": "Criar o cofre compartilhado",
+  "connector.protonPass.stepDone": "Pronto",
+  "connector.protonPass.signInTitle": "Entre no Proton",
+  "connector.protonPass.signInStarting": "O OpenBot inicia o login. A página do Proton abre no seu navegador.",
+  "connector.protonPass.signInDescription":
+    "O login está aberto no seu navegador. O Proton pede sua senha e seu segundo fator.",
+  "connector.protonPass.signInDescriptionHost":
+    "O login para {host} está aberto no seu navegador. O Proton pede sua senha e seu segundo fator.",
+  "connector.protonPass.extraPasswordDescription": "O Proton Pass pede sua senha extra.",
+  "connector.protonPass.extraPasswordWrong": "A senha extra não está correta. Digite-a de novo.",
+  "connector.protonPass.extraPasswordLabel": "Senha extra",
+  "connector.protonPass.continue": "Continuar",
+  "connector.protonPass.setupStepTitle": "Criando o cofre compartilhado",
+  "connector.protonPass.setupStepDescription":
+    "O OpenBot cria o cofre “{vault}” e uma chave somente leitura para ele. Depois, encerra sua sessão do Proton.",
+  "connector.protonPass.doneTitle": "O Proton Pass está conectado",
+  "connector.protonPass.doneDescription": "Mova logins para “{vault}” para que os agentes entrem com eles.",
+  "connector.protonPass.failedTitle": "O Proton Pass não conectou",
+  "connector.protonPass.copyLink": "Copiar link",
+  "connector.protonPass.linkCopied": "Copiado",
+  "connector.protonPass.openAgain": "Abrir de novo",
+  "connector.protonPass.done": "Pronto",
+  "connector.protonPass.close": "Fechar",
+  "connector.protonPass.statusConnecting": "Conectando",
+  "connector.protonPass.statusConnected": "Conectado",
+  "connector.protonPass.statusExpired": "Chave expirada",
+  "connector.protonPass.expiredTitle": "A chave do Proton Pass expirou",
+  "connector.protonPass.expiredDescription":
+    "Os agentes não podem entrar com seus logins compartilhados até você entrar de novo.",
+  "connector.protonPass.reconnect": "Reconectar",
+  "connector.protonPass.planTitle": "O Proton Pass precisa de um plano com Pass Plus",
+  "connector.protonPass.planDescription":
+    "A CLI do Proton Pass precisa de um plano do Proton que inclua o Pass Plus. Outros planos pagos, como o Mail Plus, não a incluem. Mude seu plano e conecte de novo.",
+  "connector.protonPass.vaultTitle": "Cofre compartilhado",
+  "connector.protonPass.vaultDescription":
+    "Os agentes podem entrar com os logins deste cofre. Mova um login para ele para compartilhá-lo.",
+  "connector.protonPass.loginCount": { one: "{count} login", other: "{count} logins" },
+  "connector.protonPass.loginsLoading": "Contando logins…",
+  "connector.protonPass.keyExpires": "Somente leitura. Expira em {date}.",
+  "connector.protonPass.keyExpired": "Somente leitura. Expirou em {date}.",
+  "connector.protonPass.keyNoExpiry": "Somente leitura. Não expira.",
+  "connector.protonPass.disconnectTitle": "Desconectar o Proton Pass",
+  "connector.protonPass.disconnectSummary":
+    "O OpenBot exclui a chave de acesso dele neste computador. O cofre e os logins dele ficam na sua conta Proton.",
+  "connector.protonPass.disconnectSummaryHost":
+    "O OpenBot exclui a chave de acesso dele em {host}. O cofre e os logins dele ficam na sua conta Proton.",
+  "connector.protonPass.disconnect": "Desconectar",
+  "connector.protonPass.actionFailed": "O OpenBot não conseguiu alterar a conexão do Proton Pass.",
 } as const satisfies PartialTranslation<typeof source>;

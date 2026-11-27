@@ -1,0 +1,33 @@
+{
+  "slug": "ynab",
+  "name": "YNAB",
+  "tagline": "Budget and spending review",
+  "description": "YNAB lets agents read the budgets, categories, accounts, and transactions of the signed-in account, so they can answer questions about spending and plans. Each user signs in to their own YNAB account through the browser.",
+  "category": "productivity",
+  "creatorName": "YNAB",
+  "iconUrl": "https://cdn.prod.website-files.com/640f69143ec11b21d42015c6/6732b255e4999d561f33e7bb_Frame%202%20(1).png",
+  "version": "1.0.0",
+  "prompts": [
+    { "id": "prompt-overspent", "text": "Which categories are overspent this month?" },
+    { "id": "prompt-dining", "text": "How much did I spend on dining out in each of the last three months?" },
+    { "id": "prompt-uncategorized", "text": "List transactions from the last two weeks that have no category." }
+  ],
+  "apps": [
+    {
+      "id": "app-ynab-mcp",
+      "name": "YNAB",
+      "description": "Budget, category, and transaction lookup, over YNAB's MCP server with browser sign-in.",
+      "iconUrl": "https://cdn.prod.website-files.com/640f69143ec11b21d42015c6/6732b255e4999d561f33e7bb_Frame%202%20(1).png",
+      "server": {
+        "name": "ynab",
+        "transport": "http",
+        "url": "https://api.ynab.com/mcp",
+        "auth": [{ "id": "ynab-oauth", "kind": "link", "label": "Sign in" }]
+      }
+    }
+  ],
+  "websiteUrl": "https://www.ynab.com",
+  "privacyPolicyUrl": "https://www.ynab.com/privacy-policy",
+  "termsUrl": "https://www.ynab.com/terms",
+  "skills": []
+}

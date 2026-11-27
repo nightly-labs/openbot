@@ -1,0 +1,33 @@
+{
+  "slug": "clickhouse",
+  "name": "ClickHouse Cloud",
+  "tagline": "Read-only ClickHouse Cloud queries",
+  "description": "ClickHouse Cloud lets agents list services, databases and tables, run read-only SELECT queries, and read backups, ClickPipes and costs. Each user signs in to their own ClickHouse Cloud account through the browser, and the remote MCP server must be turned on for each service.",
+  "category": "data-analytics",
+  "creatorName": "ClickHouse",
+  "iconUrl": "https://clickhouse.com/favicon.ico",
+  "version": "1.0.0",
+  "prompts": [
+    { "id": "prompt-tables", "text": "Which tables are in the analytics database of my production service?" },
+    { "id": "prompt-query", "text": "How many events per day did we store last week?" },
+    { "id": "prompt-cost", "text": "What did my ClickHouse Cloud organization cost last month?" }
+  ],
+  "apps": [
+    {
+      "id": "app-clickhouse-mcp",
+      "name": "ClickHouse Cloud",
+      "description": "Services, schemas, read-only queries, and costs, over ClickHouse Cloud's MCP server with browser sign-in.",
+      "iconUrl": "https://clickhouse.com/favicon.ico",
+      "server": {
+        "name": "clickhouse",
+        "transport": "http",
+        "url": "https://mcp.clickhouse.cloud/mcp",
+        "auth": [{ "id": "clickhouse-oauth", "kind": "link", "label": "Sign in" }]
+      }
+    }
+  ],
+  "websiteUrl": "https://clickhouse.com",
+  "privacyPolicyUrl": "https://clickhouse.com/legal/privacy-policy",
+  "termsUrl": "https://clickhouse.com/legal/agreements/terms-of-service",
+  "skills": []
+}

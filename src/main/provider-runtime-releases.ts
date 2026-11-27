@@ -14,20 +14,6 @@ import {
 } from "./provider-runtime-descriptors";
 import { ProviderRuntimeFailure, runtimeIO, runtimeSync } from "./provider-runtime-effects";
 
-/**
- * The latest release of each provider CLI, read from the source that publishes it.
- *
- * OpenBot used to install only the version `native-runtime.lock.json` pinned, so a new CLI reached
- * users with the next OpenBot release. Providers ship faster than that, so the update offer now
- * follows upstream. The lock still names the version a first install uses when no source answers.
- *
- * Every download keeps a hash from its source: GitHub's asset `digest` for Codex, Pi and Kimi, the
- * Meta and Cognition manifests for Muse and Devin, and npm's `dist.integrity` for Claude, OpenCode
- * and Cline. x.ai publishes no hash for Grok, so a Grok release is trusted on TLS alone, and so are
- * Antigravity and Cursor from the ACP registry. Bun is a tool runtime rather than a provider, and
- * stays on the lock.
- */
-
 type Fetch = (input: string | URL | Request, init?: RequestInit) => Promise<Response>;
 
 export interface LatestReleaseContext {
@@ -36,30 +22,18 @@ export interface LatestReleaseContext {
   fetch: Fetch;
 }
 
-/**
- * Versions the OpenBot repository asks every installation not to offer.
- *
- * This is the one way to stop a broken upstream release without shipping an OpenBot release. It is a
- * block list, not an allow list: a new release is offered at once, and only a version named here is
- * held back. A list that cannot be read blocks nothing.
- */
 const BLOCKED_VERSIONS_URL =
   "https://raw.githubusercontent.com/nightly-labs/openbot/main/provider-runtime-blocklist.json";
 
 const REQUEST_TIMEOUT_MS = 30_000;
 const MAX_METADATA_BYTES = 4 * 1024 * 1024;
 const VERSION = /^\d+\.\d+\.\d+$/u;
-/**
- * Cursor's registry version is the date; the download folder adds the commit, and in the newer form
- * that Cursor's launcher accepts, the time before it.
- */
 const CURSOR_DATE = /^\d{4}\.\d{2}\.\d{2}$/u;
 const CURSOR_BUILD = /^\d{4}\.\d{2}\.\d{2}(?:-\d{2}-\d{2}-\d{2})?-[0-9a-f]{7,40}$/u;
 const HEADERS = { "User-Agent": "OpenBot-runtime-installer" };
 
 export type BlockedVersions = ReadonlyMap<ManagedProviderId, ReadonlySet<string>>;
 
-/** The ACP registry's name for each target. */
 const ACP_REGISTRY_TARGETS: Record<RuntimeTarget, string> = {
   "darwin-arm64": "darwin-aarch64",
   "darwin-x64": "darwin-x86_64",
@@ -68,39 +42,75 @@ const ACP_REGISTRY_TARGETS: Record<RuntimeTarget, string> = {
   "win32-x64": "windows-x86_64",
 };
 
+const ANTIGRAVITY_TARGETS: Record<RuntimeTarget, string> = {
+  "darwin-arm64": "mac_arm64",
+  "darwin-x64": "mac_x64",
+  "linux-x64": "linux_x64",
+  "linux-arm64": "linux_arm64",
+  "win32-x64": "windows_x64",
+};
+
+const latestGitHubAsset = Effect.fn("ProviderRelease.github")(function* (
+  fetch: Fetch,
+  repo: string,
+  assetNameOf: (version: string) => string,
+  pinned: RuntimeSpec,
+  tagPrefix: "v" | "" = "v",
+) {
+  const release = yield* fetchJsonEffect(fetch, `https://api.github.com/repos/${repo}/releases/latest`, {
+    Accept: "application/vnd.github+json",
+  });
+  const version = isString(release.tag_name) ? versionFromTag(release.tag_name, tagPrefix) : null;
+  const assetName = version ? assetNameOf(version) : null;
+  const asset = Array.isArray(release.assets)
+    ? release.assets.find((entry: unknown) => isDynamicRecord(entry) && entry.name === assetName)
+    : null;
+  if (
+    !version ||
+    !assetName ||
+    !isDynamicRecord(asset) ||
+    !isString(asset.digest) ||
+    !/^sha256:[a-f0-9]{64}$/u.test(asset.digest) ||
+    !isNumber(asset.size) ||
+    asset.size <= 0
+  )
+    return yield* new ProviderRuntimeFailure({ cause: new Error(sourceText("error.provider.nativeArchiveInvalid")) });
+  return {
+    ...pinned,
+    source: "latest" as const,
+    version,
+    packageVersion: version,
+    url: `https://github.com/${repo}/releases/download/${tagPrefix}${version}/${assetName}`,
+    archiveDigest: { algorithm: "sha256" as const, hex: asset.digest.slice(7) },
+    downloadBytes: asset.size,
+  };
+});
+
 const LATEST_RELEASES: Record<
   ManagedProviderId,
   (context: LatestReleaseContext) => Effect.Effect<RuntimeSpec, ProviderRuntimeFailure>
 > = {
-  pi: Effect.fn("ProviderRelease.pi")(function* ({ target, lock, fetch }: LatestReleaseContext) {
-    const pinned = providerRuntimeDescriptor("pi").spec(target, lock);
-    const release = yield* fetchJsonEffect(fetch, "https://api.github.com/repos/earendil-works/pi/releases/latest", {
-      Accept: "application/vnd.github+json",
-    });
-    const version = isString(release.tag_name) ? versionFromTag(release.tag_name, "v") : null;
-    const assetName = `pi-${target.replace("win32", "windows")}.${target === "win32-x64" ? "zip" : "tar.gz"}`;
-    const asset = Array.isArray(release.assets)
-      ? release.assets.find((entry: unknown) => isDynamicRecord(entry) && entry.name === assetName)
-      : null;
-    if (
-      !version ||
-      !isDynamicRecord(asset) ||
-      !isString(asset.digest) ||
-      !/^sha256:[a-f0-9]{64}$/u.test(asset.digest) ||
-      !isNumber(asset.size) ||
-      asset.size <= 0
-    )
-      return yield* new ProviderRuntimeFailure({ cause: new Error(sourceText("error.provider.nativeArchiveInvalid")) });
-    return {
-      ...pinned,
-      source: "latest" as const,
-      version,
-      packageVersion: version,
-      url: `https://github.com/earendil-works/pi/releases/download/v${version}/${assetName}`,
-      archiveDigest: { algorithm: "sha256" as const, hex: asset.digest.slice(7) },
-      downloadBytes: asset.size,
-    };
-  }),
+  pi: ({ target, lock, fetch }) =>
+    latestGitHubAsset(
+      fetch,
+      "earendil-works/pi",
+      () => `pi-${target.replace("win32", "windows")}.${target === "win32-x64" ? "zip" : "tar.gz"}`,
+      providerRuntimeDescriptor("pi").spec(target, lock),
+    ),
+  copilot: ({ target, lock, fetch }) =>
+    latestGitHubAsset(
+      fetch,
+      "github/copilot-cli",
+      () => `copilot-${target}.${target === "win32-x64" ? "zip" : "tar.gz"}`,
+      providerRuntimeDescriptor("copilot").spec(target, lock),
+    ),
+  mistral: ({ target, lock, fetch }) =>
+    latestGitHubAsset(
+      fetch,
+      "mistralai/mistral-vibe",
+      (version) => `vibe-acp-${ACP_REGISTRY_TARGETS[target]}-${version}.${target === "win32-x64" ? "zip" : "tar.gz"}`,
+      providerRuntimeDescriptor("mistral").spec(target, lock),
+    ),
   muse: Effect.fn("ProviderRelease.muse")(function* ({ target, lock, fetch }: LatestReleaseContext) {
     const pinned = providerRuntimeDescriptor("muse").spec(target, lock);
     const channel = yield* fetchJsonEffect(fetch, "https://api.meta.ai/muse-code/channels/muse-stable");
@@ -146,10 +156,6 @@ const LATEST_RELEASES: Record<
       installedBytes: asset.size,
     };
   }),
-  /**
-   * Cognition's manifest names each target's archive and its hash, but not its size. The download
-   * must stay on Cognition's release path for the manifest's version.
-   */
   devin: Effect.fn("ProviderRelease.devin")(function* ({ target, lock, fetch }: LatestReleaseContext) {
     const pinned = providerRuntimeDescriptor("devin").spec(target, lock);
     const manifest = yield* fetchJsonEffect(fetch, "https://static.devin.ai/cli/current/manifest.json");
@@ -225,7 +231,6 @@ const LATEST_RELEASES: Record<
     fetch,
   }: LatestReleaseContext): Effect.fn.Return<RuntimeSpec, ProviderRuntimeFailure> {
     const pinned = providerRuntimeDescriptor("claude").spec(target, lock);
-    // The SDK's own package names the CLI version its platform packages carry.
     const sdk = yield* fetchJsonEffect(fetch, `${lock.claude.registry}/@anthropic-ai/claude-agent-sdk/latest`);
     const sdkVersion = isString(sdk.version) ? sdk.version : null;
     const cliVersion = isString(sdk.claudeCodeVersion) ? sdk.claudeCodeVersion : null;
@@ -246,8 +251,6 @@ const LATEST_RELEASES: Record<
     fetch,
   }: LatestReleaseContext): Effect.fn.Return<RuntimeSpec, ProviderRuntimeFailure> {
     const pinned = providerRuntimeDescriptor("opencode").spec(target, lock);
-    // The umbrella package names the release, so a platform package published before it is not
-    // offered yet.
     const umbrella = yield* fetchJsonEffect(fetch, `${lock.opencode.registry}/${OPENCODE_CLI_PACKAGE}/latest`);
     const version = isString(umbrella.version) && VERSION.test(umbrella.version) ? umbrella.version : null;
     if (!version)
@@ -284,53 +287,14 @@ const LATEST_RELEASES: Record<
       downloadBytes: yield* downloadSizeEffect(fetch, url),
     };
   }),
-  /**
-   * Google publishes the server in the ACP registry, with no hash, so the latest release is trusted
-   * on TLS alone, like Grok's. The download must stay on Google's release path and keep the layout
-   * the pinned version has: a changed command means a changed archive, which staging would refuse.
-   */
-  antigravity: Effect.fn("ProviderRelease.antigravity")(function* ({
-    target,
-    lock,
-    fetch,
-  }: LatestReleaseContext): Effect.fn.Return<RuntimeSpec, ProviderRuntimeFailure> {
-    const pinned = providerRuntimeDescriptor("antigravity").spec(target, lock);
-    const agent = yield* fetchJsonEffect(fetch, lock.antigravity.registry);
-    const version = isString(agent.version) ? agent.version : null;
-    const binary = isDynamicRecord(agent.distribution) ? agent.distribution.binary : null;
-    const entry = isDynamicRecord(binary) ? binary[ACP_REGISTRY_TARGETS[target]] : null;
-    const artifact = lock.antigravity.artifacts[target];
-    const url = isDynamicRecord(entry) && isString(entry.archive) ? entry.archive : null;
-    const expectedUrl = version
-      ? `${lock.antigravity.distribution}/${artifact.platformDirectory}/${artifact.asset.replace(
-          `-${lock.antigravity.version}-`,
-          `-${version}-`,
-        )}`
-      : null;
-    if (
-      !(version && VERSION.test(version) && url !== null && url === expectedUrl) ||
-      !isDynamicRecord(entry) ||
-      entry.cmd !== `./${artifact.executable}`
-    ) {
-      return yield* new ProviderRuntimeFailure({
-        cause: new Error(sourceText("error.provider.antigravityReleaseShape")),
-      });
-    }
-    return {
-      ...pinned,
-      version,
-      packageVersion: version,
-      source: "latest",
-      url,
-      archiveDigest: null,
-      downloadBytes: yield* downloadSizeEffect(fetch, url),
-    };
-  }),
-  /**
-   * Cursor publishes the CLI in the ACP registry, with no hash, so the latest release is trusted on
-   * TLS alone. The registry names the date; the build, a date and a commit, is only in the URL. The
-   * download must stay on Cursor's path for the pinned target and keep the pinned command.
-   */
+  antigravity: ({ target, lock, fetch }) =>
+    latestGitHubAsset(
+      fetch,
+      "google-antigravity/antigravity-cli",
+      () => `agy_cli_${ANTIGRAVITY_TARGETS[target]}.${target === "win32-x64" ? "zip" : "tar.gz"}`,
+      providerRuntimeDescriptor("antigravity").spec(target, lock),
+      "",
+    ),
   cursor: Effect.fn("ProviderRelease.cursor")(function* ({
     target,
     lock,
@@ -379,7 +343,6 @@ const LATEST_RELEASES: Record<
     );
     return { ...pinned, ...artifact, version: artifact.packageVersion, source: "latest" };
   }),
-  // Kimi tags a release with the bare version.
   kimi: Effect.fn("ProviderRelease.kimi")(function* ({ target, lock, fetch }: LatestReleaseContext) {
     const pinned = providerRuntimeDescriptor("kimi").spec(target, lock);
     const release = yield* fetchJsonEffect(fetch, "https://api.github.com/repos/MoonshotAI/kimi-cli/releases/latest", {
@@ -433,7 +396,6 @@ export const fetchBlockedVersions = Effect.fn("ProviderRelease.fetchBlockedVersi
   return blocked;
 });
 
-/** The parts of a spec one npm platform package decides. */
 const npmArtifactEffect = Effect.fn("ProviderRelease.npmArtifact")(function* (
   fetch: Fetch,
   registry: string,
@@ -448,7 +410,6 @@ const npmArtifactEffect = Effect.fn("ProviderRelease.npmArtifact")(function* (
   const packageVersion = isString(manifest.version) ? manifest.version : null;
   const tarball = isDynamicRecord(dist) && isString(dist.tarball) ? dist.tarball : null;
   const integrity = isDynamicRecord(dist) && isString(dist.integrity) ? sha512Hex(dist.integrity) : null;
-  // The download stays on the registry the lock names, whatever the manifest points at.
   if (
     !(packageVersion && VERSION.test(packageVersion) && tarball?.startsWith(`${registry}/${packageName}/-/`)) ||
     !integrity
@@ -465,24 +426,16 @@ const npmArtifactEffect = Effect.fn("ProviderRelease.npmArtifact")(function* (
   };
 });
 
-/** npm writes `sha512-<base64>`; the manager compares hex. */
 function sha512Hex(integrity: string): string | null {
   const match = /^sha512-([A-Za-z0-9+/]{86}==)$/u.exec(integrity);
   return match?.[1] ? Buffer.from(match[1], "base64").toString("hex") : null;
 }
 
-/** Codex tags each release `rust-v<version>`, and Pi tags it `v<version>`. */
-function versionFromTag(tag: string, prefix: "rust-v" | "v"): string | null {
+function versionFromTag(tag: string, prefix: "rust-v" | "v" | ""): string | null {
   const version = tag.startsWith(prefix) ? tag.slice(prefix.length) : "";
   return VERSION.test(version) ? version : null;
 }
 
-/**
- * The size of a download, from a request for its first byte.
- *
- * The npm registry answers `HEAD` without a length, and the manager needs one before it starts: the
- * free-space check, the progress and the final size check all depend on it.
- */
 const downloadSizeEffect = Effect.fn("ProviderRelease.downloadSize")(function* (
   fetch: Fetch,
   url: string,
@@ -507,7 +460,6 @@ const downloadSizeEffect = Effect.fn("ProviderRelease.downloadSize")(function* (
   return total;
 });
 
-/** Every source answers with a JSON object; anything else is a failed check, not a value. */
 const fetchJsonEffect = Effect.fn("ProviderRelease.fetchJson")(function* (
   fetch: Fetch,
   url: string,

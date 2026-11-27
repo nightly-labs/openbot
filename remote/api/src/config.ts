@@ -4,8 +4,6 @@ import { TELEGRAM_BOT_ID_PATTERN } from "@openbot/contracts/signal-protocol/tele
 export interface RemoteApiConfig {
   host: string;
   port: number;
-  // The health and metrics server. Compose binds it to all addresses in the container and publishes it
-  // on the loopback address of the host only, for the capacity reporter.
   healthHost: string;
   healthPort: number;
   tlsCertificatePath: string | null;
@@ -16,8 +14,6 @@ export interface RemoteApiConfig {
   sessionSecret: string;
   authWebhookSecret: string;
   turnSecret: string;
-  // The coturn servers that share `TURN_SHARED_SECRET` and the TURN ports: `TURN_HOST` first, then
-  // `TURN_EXTRA_HOSTS`. Each host gets one of them for itself and its clients (`turn-relays.ts`).
   turnHosts: string[];
   turnPort: number;
   turnTlsPort: number;
@@ -26,59 +22,36 @@ export interface RemoteApiConfig {
   maximumConnectionsPerIp: number;
   maximumMessagesPerMinute: number;
   trustProxy: boolean;
-  // The repository commit of this build, from the image. `/health/live` shows it, so a deploy can be
-  // compared with a release tag. `unknown` for a build without it.
   sourceCommit: string;
-  // The signing secret of each OpenBot Slack app, production and development, which share this
-  // Signal. A request must name the app whose secret signed it. Without one, the Slack route answers 503.
   slackSigningSecrets: SlackSigningSecret[];
-  // The webhook secret of the OpenBot GitHub App (`GITHUB_WEBHOOK_SECRET`). Without it, or with a weak
-  // one, the GitHub route answers 503.
   githubWebhookSecret: string | null;
-  // The OpenBot Telegram bots, production and development, which share this Signal. Without them,
-  // the Telegram routes answer 404 and `ready` names no `telegram` capability.
   telegram: TelegramConfig | null;
-  // The OpenBot Discord bot. Without it, Signal keeps no Gateway connection and the Discord API route
-  // answers 503.
   discord: DiscordBotConfig | null;
-  // The ID of this Signal machine (`SIGNAL_ID`). Signal refuses a ticket whose `signal` claim names
-  // another machine. Null: Signal does not check the claim.
   signalId: string | null;
-  // The entry rule (`entry.ts`). Null: this machine is always the entry.
   entry: SignalEntryConfig | null;
-  // The OpenBot Google sign-in apps, production and development, which share this Signal. Without
-  // them, the Google token route answers 503.
   google: GoogleOAuthConfig | null;
 }
 
 interface GoogleOAuthClient {
   clientId: string;
-  // Only Signal has it: never log it or put it in an answer.
   clientSecret: string;
 }
 
 export interface GoogleOAuthConfig {
   clients: GoogleOAuthClient[];
-  // Google's token endpoint. Only a test changes it.
   tokenUrl: string;
 }
 
 export interface SignalEntryConfig {
-  // The DNS name of the entry Signal, such as `signal.openbot.run` (`SIGNAL_ENTRY_HOST`).
   host: string;
-  // The public IPv4 address of this machine (`SIGNAL_PUBLIC_IPV4`).
   publicIpv4: string;
-  // The time between two lookups. 30 seconds; `SIGNAL_ENTRY_TEST_CHECK_SECONDS` sets it for tests only.
   checkIntervalMilliseconds: number;
-  // The DNS server to ask, `<IPv4>:<port>`. Null: the servers of the system. For tests only
-  // (`SIGNAL_ENTRY_TEST_DNS_SERVER`).
   dnsServer: string | null;
 }
 
 export interface DiscordBotConfig {
   botToken: string;
   applicationId: string;
-  /** Asks for the privileged Message Content intent, by default. Signal falls back without it when Discord refuses. */
   messageContent: boolean;
 }
 
@@ -89,22 +62,16 @@ interface SlackSigningSecret {
 
 interface TelegramBot {
   botId: string;
-  // The bot token. Only Signal has it: never log it or put it in a frame.
   token: string;
 }
 
 export interface TelegramConfig {
   bots: TelegramBot[];
-  // Signal derives the webhook secret of each bot from it (`telegramWebhookSecret`).
   webhookSecret: string;
-  // The public https origin of this Signal. With it, Signal sets the webhook of each bot when it starts.
   webhookOrigin: string | null;
+  apiOrigin: string | null;
 }
 
-/**
- * `SLACK_SIGNING_SECRET` is a comma-separated list of `<app ID>:<signing secret>`. A malformed value
- * turns off only the Slack route, which then answers 503: the remote sessions keep running.
- */
 function readSlackSigningSecrets(value: string | undefined): SlackSigningSecret[] {
   const secrets: SlackSigningSecret[] = [];
   for (const entry of (value ?? "").split(",").map((part) => part.trim())) {
@@ -119,11 +86,6 @@ function readSlackSigningSecrets(value: string | undefined): SlackSigningSecret[
   return secrets;
 }
 
-/**
- * `TELEGRAM_BOT_TOKENS` is a comma-separated list of bot tokens, `<bot ID>:<secret>`. A malformed
- * value, or a missing or weak `TELEGRAM_WEBHOOK_SECRET`, turns off only Telegram: the remote sessions
- * and the Slack route keep running.
- */
 function readTelegramConfig(environment: Record<string, string | undefined>): TelegramConfig | null {
   const off = (message: string) => {
     console.error(`${message} Telegram is off.`);
@@ -150,7 +112,11 @@ function readTelegramConfig(environment: Record<string, string | undefined>): Te
   const origin = optional(environment.TELEGRAM_WEBHOOK_ORIGIN);
   const webhookOrigin = origin ? httpsOrigin(origin) : null;
   if (origin && !webhookOrigin) return off("TELEGRAM_WEBHOOK_ORIGIN must be an https origin.");
-  return { bots, webhookSecret, webhookOrigin };
+  const testOrigin = optional(environment.TELEGRAM_TEST_API_ORIGIN);
+  const apiOrigin = testOrigin && /^http:\/\/127\.0\.0\.1:[0-9]{1,5}$/u.test(testOrigin) ? testOrigin : null;
+  if (testOrigin && !apiOrigin)
+    console.error("TELEGRAM_TEST_API_ORIGIN must be http://127.0.0.1:<port>. It is ignored.");
+  return { bots, webhookSecret, webhookOrigin, apiOrigin };
 }
 
 function httpsOrigin(value: string): string | null {
@@ -162,11 +128,6 @@ function httpsOrigin(value: string): string | null {
   }
 }
 
-/**
- * `DISCORD_BOT_TOKEN` and `DISCORD_APPLICATION_ID` turn on the Discord bot together. A missing or
- * malformed value turns off only Discord: the remote sessions and the Slack route keep running.
- * Signal asks for the Message Content intent unless `DISCORD_MESSAGE_CONTENT` is `false`.
- */
 function readDiscordBot(
   token: string | undefined,
   applicationId: string | undefined,
@@ -180,11 +141,6 @@ function readDiscordBot(
   return { botToken, applicationId: id, messageContent: messageContent !== "false" };
 }
 
-/**
- * `GOOGLE_OAUTH_CLIENTS` is a comma-separated list of `<client ID>:<client secret>`. A malformed value
- * turns off only the Google token route, which then answers 503: the remote sessions keep running.
- * `GOOGLE_OAUTH_TOKEN_URL` replaces Google's token endpoint, for a test only.
- */
 function readGoogleOAuthConfig(environment: Record<string, string | undefined>): GoogleOAuthConfig | null {
   const off = (message: string) => {
     console.error(`${message} The Google token route is off.`);
@@ -253,7 +209,6 @@ export function readRemoteApiConfig(environment: Record<string, string | undefin
   };
 }
 
-/** A missing or weak secret turns off only the GitHub route: the remote sessions keep running. */
 function readGitHubWebhookSecret(value: string | undefined): string | null {
   const secret = value?.trim() ?? "";
   if (!secret) return null;
@@ -273,7 +228,6 @@ function readSignalId(value: string | undefined): string | null {
 const IPV4_PATTERN =
   /^(?:(?:25[0-5]|2[0-4][0-9]|1[0-9]{2}|[1-9]?[0-9])\.){3}(?:25[0-5]|2[0-4][0-9]|1[0-9]{2}|[1-9]?[0-9])$/u;
 
-/** `SIGNAL_ENTRY_HOST` and `SIGNAL_PUBLIC_IPV4` turn on the entry rule together. One without the other stops the start. */
 function readEntryConfig(environment: Record<string, string | undefined>): SignalEntryConfig | null {
   const host = optional(environment.SIGNAL_ENTRY_HOST)?.toLowerCase() ?? null;
   const publicIpv4 = optional(environment.SIGNAL_PUBLIC_IPV4);
@@ -293,7 +247,6 @@ function readEntryConfig(environment: Record<string, string | undefined>): Signa
   };
 }
 
-// A host name goes into the ICE server URLs, so only DNS names and IPv4 addresses are allowed.
 const TURN_HOST_PATTERN = /^[A-Za-z0-9](?:[A-Za-z0-9.-]{0,251}[A-Za-z0-9])?$/u;
 
 function readTurnHosts(primary: string, extra: string | undefined): string[] {

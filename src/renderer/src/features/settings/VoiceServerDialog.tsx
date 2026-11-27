@@ -9,6 +9,7 @@ import {
   type VoiceServerRoutes,
   type VoiceServerSettings,
 } from "@openbot/contracts/ipc";
+import { fitVoiceServerRoutes, shortVoiceServerModel } from "@openbot/contracts/voice-server";
 import type { AppTextKey } from "@openbot/i18n";
 import {
   Button,
@@ -39,44 +40,12 @@ const NO_ROUTES: VoiceServerRoutes = {
   voice: null,
 };
 
-/** The example in the empty address field: a Speaches server on the local network. */
 const ADDRESS_EXAMPLE = "http://studio.local:8000/v1";
 
-/** The last part of a model ID, which is the part that a person reads. */
-export function shortModel(model: string | null): string {
-  if (!model) return "";
-  return model.split("/").pop() || model;
-}
-
-/** `studio.local:8000` for `http://studio.local:8000/v1`: the destination that the user knows. */
-export function voiceServerHost(address: string): string {
-  try {
-    return new URL(address).host;
-  } catch {
-    return address;
-  }
-}
-
-/** The key goes into an HTTP header, so main refuses other characters. Checked here to put the error on the key. */
 function keyProblem(apiKey: string): AppTextKey | undefined {
   if (apiKey.length > VOICE_SERVER_LIMITS.apiKey) return "error.provider.apiKeyTooLong";
   if (apiKey && !/^[\x21-\x7e]+$/u.test(apiKey)) return "error.provider.keyInvalidCharacters";
   return undefined;
-}
-
-/**
- * Makes the routes agree with what a test found. A route that the server does not have turns off; a
- * route that had no model yet turns on, so a new server is in use when its setup is done.
- */
-function fitRoutes(routes: VoiceServerRoutes, models: VoiceServerModels): void {
-  const known = (list: readonly string[], value: string | null) => (value && list.includes(value) ? value : null);
-  if (!routes.transcriptionModel && models.transcription.length > 0) routes.dictation = true;
-  if (!routes.speechModel && models.speech.length > 0) routes.speech = true;
-  routes.transcriptionModel = known(models.transcription, routes.transcriptionModel) ?? models.transcription[0] ?? null;
-  routes.speechModel = known(models.speech, routes.speechModel) ?? models.speech[0] ?? null;
-  routes.voice = known(models.voices, routes.voice) ?? models.voices[0] ?? null;
-  if (!routes.transcriptionModel) routes.dictation = false;
-  if (!routes.speechModel || !routes.voice) routes.speech = false;
 }
 
 type TestState =
@@ -85,10 +54,6 @@ type TestState =
   | { status: "found" }
   | { status: "failed"; field: VoiceServerProbeField; message: string };
 
-/**
- * The dialog's draft. `known` is what the last good test found: it stays after an edit of the
- * address or the key, so the routes stay in place, disabled, until the next test.
- */
 function createServerForm(
   saved: VoiceServerSettings | null,
   probe: (connection: VoiceServerConnection) => Promise<VoiceServerProbe>,
@@ -122,7 +87,6 @@ function createServerForm(
     setForm((draft) => {
       draft.test = { status: "loading" };
     });
-    // An empty key keeps the saved one, when the server is the same.
     const result = await probe({ address: form.address.trim(), apiKey: apiKey || null }).catch(
       (error: unknown): VoiceServerProbe => ({
         ok: false,
@@ -139,17 +103,15 @@ function createServerForm(
         speech: [...result.models.speech],
         voices: [...result.models.voices],
       };
-      fitRoutes(draft.routes, result.models);
+      draft.routes = fitVoiceServerRoutes(draft.routes, result.models);
     });
   };
   return {
     form,
     connected: () => form.test.status === "found",
     testing: () => form.test.status === "loading",
-    /** The message of a failed test, on the field that caused it. */
     error: (field: VoiceServerProbeField) =>
       form.test.status === "failed" && form.test.field === field ? form.test.message : undefined,
-    /** A change to the address or the key makes the last test out of date. */
     edit: (patch: { address?: string; apiKey?: string }) => {
       run += 1;
       setForm((draft) => {
@@ -171,7 +133,6 @@ function createServerForm(
   };
 }
 
-/** A select list of plain strings, with the same trigger as the rest of the Voice tab. */
 function OptionSelect(props: {
   label: string;
   options: readonly string[];
@@ -222,13 +183,11 @@ const ROUTES = [
 interface RoutesProps {
   models: VoiceServerModels;
   routes: VoiceServerRoutes;
-  /** The address or the key changed after the last test: the routes wait for the next one. */
   disabled: boolean;
   mount: HTMLElement | undefined;
   setRoutes: (change: (routes: VoiceServerRoutes) => void) => void;
 }
 
-/** One line for each route: the name, its select lists, and a switch at the end. */
 function RouteLines(props: RoutesProps) {
   const { t } = useText();
   const keep = (value: string) => value;
@@ -271,7 +230,7 @@ function RouteLines(props: RoutesProps) {
                     value={model()}
                     disabled={props.disabled}
                     mount={props.mount}
-                    format={shortModel}
+                    format={shortVoiceServerModel}
                     onChange={setModel}
                   />
                 </div>
@@ -305,18 +264,12 @@ function RouteLines(props: RoutesProps) {
 }
 
 export interface VoiceServerDialogProps {
-  /** The saved server, or null to set up a new one. */
   saved: VoiceServerSettings | null;
   probe: (connection: VoiceServerConnection) => Promise<VoiceServerProbe>;
-  /** Resolves true when main saved the server. */
   onSave: (input: VoiceServerInput) => Promise<boolean>;
   onClose: () => void;
 }
 
-/**
- * Address and key, then what to use the server for. One button connects first and saves after: an
- * error goes under the field that caused it, and the routes come in when the server answers.
- */
 export function VoiceServerDialog(props: VoiceServerDialogProps) {
   const { t } = useText();
   const saved = untrack(() => props.saved);
@@ -324,7 +277,6 @@ export function VoiceServerDialog(props: VoiceServerDialogProps) {
   const [mount, setMount] = createSignal<HTMLElement | undefined>(undefined);
   const title = t(saved ? "settings.voice.server.dialog.editTitle" : "settings.voice.server.dialog.setUpTitle");
   const action = () => t(server.connected() ? "common.save" : "settings.voice.server.connect");
-  // Main sends the saved key only to the saved origin, so another address shows no saved key.
   const keySaved = () => saved?.hasApiKey === true && sameCustomProviderOrigin(saved.address, server.form.address);
   const keyPlaceholder = () => (keySaved() ? t("settings.voice.server.apiKeySaved") : undefined);
   const busy = () => server.testing() || server.form.saving;
@@ -339,7 +291,6 @@ export function VoiceServerDialog(props: VoiceServerDialogProps) {
     server.setSaving(false);
     if (done) props.onClose();
   };
-  // A saved server is tested again at once, so its routes come in with what it has now.
   onSettled(() => {
     if (saved) void server.connect();
   });

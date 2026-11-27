@@ -222,6 +222,41 @@ export function InstallOpenBotVPS() {
         routines and their times before leaving scheduled work running.
       </p>
 
+      <h3>Use Hermes Agent on the server</h3>
+
+      <p>
+        Open the server's provider settings and select Download on the Hermes row. OpenBot installs Hermes Agent for its
+        service user, then the row shows Connect.
+      </p>
+
+      <p>
+        To install Hermes from a terminal instead, install it as the service user, not as your SSH login. For the Ubuntu
+        installer, run this on the VPS:
+      </p>
+
+      <pre>
+        <code>
+          {
+            "sudo -u openbot -i bash -c \\\n  'curl -fsSL https://hermes-agent.nousresearch.com/install.sh | bash -s -- --non-interactive'\nsudo openbot restart"
+          }
+        </code>
+      </pre>
+
+      <p>For Docker, install it in the container. Hermes stays in the data volume when you replace the container:</p>
+
+      <pre>
+        <code>
+          {
+            "sudo docker compose exec openbot bash -c \\\n  'curl -fsSL https://hermes-agent.nousresearch.com/install.sh | bash -s -- --non-interactive'\nsudo docker compose restart openbot"
+          }
+        </code>
+      </pre>
+
+      <p>
+        Then select Connect on the Hermes row and enter the Nous Portal code. You can also run <code>hermes setup</code>{" "}
+        or <code>hermes model</code> as that user to choose another model provider.
+      </p>
+
       <h2>5. Read logs and keep the server updated</h2>
 
       <p>For the direct Ubuntu installation, these are the main commands:</p>
@@ -300,6 +335,12 @@ export function InstallOpenBotVPS() {
         another service user, back up that user's actual home instead.
       </p>
 
+      <p>
+        OpenBot also keeps a root-only copy of the keyring at <code>/srv/openbot-keyring</code>, and restores it if
+        something on the server damages the keyring. Your backup does not need it. Before you restore a backup from
+        another server onto this VPS, delete <code>/srv/openbot-keyring</code>.
+      </p>
+
       <p>Stop OpenBot before making a consistent copy, then start it again when the copy is complete:</p>
 
       <pre>
@@ -368,9 +409,11 @@ export function InstallOpenBotVPS() {
       </p>
 
       <p>
-        <strong>Can I move my existing agents to the VPS?</strong> Yes. Choose the VPS as the destination when using an
-        appropriate import or transfer flow. Reading local Hermes folders belongs to the local desktop flow; a joined
-        VPS uses a ZIP import.
+        <strong>Can I move my existing agents to the VPS?</strong> Yes. If you administer both servers, open{" "}
+        <strong>Transfer</strong> in <strong>Server settings</strong> in the desktop app and choose{" "}
+        <strong>Copy to another server</strong>. Pick the server that has the agents and choose this VPS as the
+        destination. You can copy the agents in one step without handling a file. ZIP import still works. To read a
+        local Hermes folder, use the OpenBot desktop app on the computer where the folder is stored.
       </p>
     </>
   );

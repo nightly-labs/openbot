@@ -4,6 +4,7 @@ import {
   type AgentAccessLevel,
   type AgentAccessLevels,
   type AgentAccessRole,
+  agentAccessRank,
 } from "@openbot/contracts/ipc";
 import type { AppTextKey } from "@openbot/i18n";
 import {
@@ -38,10 +39,8 @@ import type { AgentProfile } from "../../data";
 import { useText } from "../../text";
 import { AgentAvatar } from "../agents/AgentAvatar";
 
-/** An agent as the role pages show it. */
 export type RoleAgent = Pick<AgentProfile, "id" | "name" | "avatarSeed" | "avatarHue" | "avatarUrl">;
 
-/** The page that the Roles section shows: the list, Everyone, or one role. */
 export type ServerRolePage = { kind: "list" } | { kind: "everyone" } | { kind: "role"; roleId: string };
 
 const LEVEL_LABELS = {
@@ -51,7 +50,6 @@ const LEVEL_LABELS = {
   manage: "server.agentAccess.level.manage",
 } as const satisfies Record<AgentAccessLevel, AppTextKey>;
 
-/** Everyone gives `manage` for an agent that it does not list; another role gives `none`. */
 export function everyoneLevel(everyone: AgentAccessLevels, agentId: string): AgentAccessLevel {
   return everyone[agentId] ?? "manage";
 }
@@ -86,7 +84,6 @@ function AgentFaces(props: { agents: RoleAgent[] }) {
   );
 }
 
-/** A row that opens a role page. The whole row is the button, as on the Connectors page. */
 function RoleRow(props: { name: string; icon: JSX.Element; agents: RoleAgent[]; members: string; onOpen: () => void }) {
   const { t } = useText();
   return (
@@ -113,16 +110,32 @@ function RoleRow(props: { name: string; icon: JSX.Element; agents: RoleAgent[]; 
   );
 }
 
-/** One agent with the level that the open role gives it. */
+type LevelOption = AgentAccessLevel | "everyone";
+const EVERYONE_OPTIONS: LevelOption[] = [...AGENT_ACCESS_LEVELS];
+const ROLE_OPTIONS: LevelOption[] = [...AGENT_ACCESS_LEVELS, "everyone"];
+
+function memberLevel(role: AgentAccessLevel, everyone: AgentAccessLevel): AgentAccessLevel {
+  return agentAccessRank(everyone) >= agentAccessRank(role) ? everyone : role;
+}
+
 function AgentAccessRow(props: {
   agent: RoleAgent;
   label: string;
   level: AgentAccessLevel;
+  everyone: AgentAccessLevel | undefined;
   disabled: boolean;
   menuMount: HTMLElement | undefined;
   onChange: (level: AgentAccessLevel) => void;
+  onOpenEveryone: () => void;
 }) {
   const { t } = useText();
+  const fromEveryone = () =>
+    props.everyone !== undefined && props.everyone !== "none" && props.level === props.everyone;
+  const below = (option: LevelOption) => {
+    const everyone = props.everyone;
+    return option !== "everyone" && everyone !== undefined && agentAccessRank(option) < agentAccessRank(everyone);
+  };
+  const options = () => (props.everyone === undefined ? EVERYONE_OPTIONS : ROLE_OPTIONS);
   return (
     <Item class="settings-modal-row">
       <ItemMedia>
@@ -134,30 +147,51 @@ function AgentAccessRow(props: {
         <ItemTitle>{props.agent.name}</ItemTitle>
       </ItemContent>
       <ItemActions>
-        <Select<AgentAccessLevel>
-          options={[...AGENT_ACCESS_LEVELS]}
+        <Select<LevelOption>
+          options={options()}
           value={props.level}
           disabled={props.disabled}
           placement="bottom-end"
-          onChange={(level) => {
-            if (level && level !== props.level) props.onChange(level);
+          optionDisabled={below}
+          disallowEmptySelection={true}
+          allowDuplicateSelectionEvents={true}
+          onChange={(option) => {
+            if (option === "everyone") props.onOpenEveryone();
+            else if (option) props.onChange(option);
           }}
-          itemComponent={(item) => <SelectItem item={item.item}>{t(LEVEL_LABELS[item.item.rawValue])}</SelectItem>}
+          itemComponent={(item) => {
+            const option = item.item.rawValue;
+            return option === "everyone" ? (
+              <SelectItem item={item.item} class="server-roles-open-everyone">
+                {t("server.roles.changeInEveryone")}
+              </SelectItem>
+            ) : (
+              <SelectItem item={item.item}>{t(LEVEL_LABELS[option])}</SelectItem>
+            );
+          }}
         >
-          <SelectTrigger size="sm" class="server-roles-level" aria-label={props.label}>
-            <SelectValue<AgentAccessLevel>>{(state) => t(LEVEL_LABELS[state.selectedOption()])}</SelectValue>
+          <SelectTrigger size="sm" class="server-roles-level server-roles-agent-level" aria-label={props.label}>
+            <SelectValue<LevelOption>>
+              {() => (
+                <>
+                  {t(LEVEL_LABELS[props.level])}
+                  <Show when={fromEveryone()}>
+                    <span class="server-roles-level-source">
+                      {" · "}
+                      {t("server.roles.everyone")}
+                    </span>
+                  </Show>
+                </>
+              )}
+            </SelectValue>
           </SelectTrigger>
-          <SelectContent mount={props.menuMount} />
+          <SelectContent mount={props.menuMount} class="server-roles-level-menu" />
         </Select>
       </ItemActions>
     </Item>
   );
 }
 
-/**
- * The menu that gives one level to every agent of the open role. Its mark shows the level when all
- * agents have the same one.
- */
 function SetAllLevelsMenu(props: {
   title: string;
   levels: AgentAccessLevel[];
@@ -180,10 +214,8 @@ function SetAllLevelsMenu(props: {
         <span class="server-roles-member-summary">{t("server.roles.setAll")}</span>
         <ChevronDown aria-hidden="true" />
       </DropdownMenu.Trigger>
-      {/* A portal without a mount uses the document body. */}
       <DropdownMenu.Portal mount={props.mount ?? document.body}>
         <DropdownMenu.Content>
-          {/* With mixed levels no item is checked, so each choice is a change. */}
           <DropdownMenu.RadioGroup
             aria-label={t("server.roles.setAllLabel", { role: props.title })}
             value={common() ?? ""}
@@ -207,10 +239,8 @@ function SetAllLevelsMenu(props: {
   );
 }
 
-/** The name field of a role. It saves on Enter or when it loses focus, not on each key. */
 function RoleNameField(props: { name: string; disabled: boolean; onRename: (name: string) => void }) {
   const { t } = useText();
-  // A saved name, or a rename by another admin, replaces the draft.
   const [draft, setDraft] = createSignal(() => props.name);
   function commit() {
     const name = draft().trim();
@@ -243,15 +273,10 @@ export interface ServerRolesPanelProps {
   onCreate: () => void;
   onRename: (roleId: string, name: string) => void;
   onDelete: (roleId: string) => void;
-  /** Gives `level` to each agent of `agentIds`, in one save. */
-  onSetEveryoneLevel: (agentIds: readonly string[], level: AgentAccessLevel) => void;
-  onSetRoleLevel: (roleId: string, agentIds: readonly string[], level: AgentAccessLevel) => void;
+  onSetEveryoneLevels: (levels: ReadonlyMap<string, AgentAccessLevel>) => void;
+  onSetRoleLevels: (roleId: string, levels: ReadonlyMap<string, AgentAccessLevel>) => void;
 }
 
-/**
- * Server Settings > Roles, as Discord has them. Every member gets the agents of Everyone; each other
- * role adds agents for the members that have it. The caller saves each change.
- */
 export function ServerRolesPanel(props: ServerRolesPanelProps) {
   const { t } = useText();
   const [deleteId, setDeleteId] = createSignal<string | null>(null);
@@ -264,52 +289,72 @@ export function ServerRolesPanel(props: ServerRolesPanelProps) {
   const agentList = (
     title: string,
     level: (agentId: string) => AgentAccessLevel,
-    onChange: (agentIds: readonly string[], level: AgentAccessLevel) => void,
-  ) => (
-    <SettingsSection
-      title={t("server.roles.agents")}
-      actions={
-        props.agents.length > 1 ? (
-          <SetAllLevelsMenu
-            title={title}
-            levels={props.agents.map((agent) => level(agent.id))}
-            disabled={props.disabled}
-            mount={props.menuMount}
-            onChange={(next) => {
-              const changed = props.agents.filter((agent) => level(agent.id) !== next).map((agent) => agent.id);
-              if (changed.length > 0) onChange(changed, next);
-            }}
-          />
-        ) : undefined
+    onChange: (levels: ReadonlyMap<string, AgentAccessLevel>) => void,
+    everyone?: (agentId: string) => AgentAccessLevel,
+  ) => {
+    const shown = (agentId: string) => {
+      const floor = everyone?.(agentId);
+      return floor === undefined ? level(agentId) : memberLevel(level(agentId), floor);
+    };
+    const give = (agentIds: readonly string[], next: AgentAccessLevel) => {
+      const levels = new Map<string, AgentAccessLevel>();
+      for (const agentId of agentIds) {
+        const floor = everyone?.(agentId);
+        const kept = floor !== undefined && agentAccessRank(next) <= agentAccessRank(floor) ? "none" : next;
+        if (kept !== level(agentId)) levels.set(agentId, kept);
       }
-    >
-      <ItemGroup class="settings-modal-card">
-        <For
-          each={props.agents}
-          fallback={
-            <Item class="server-settings-empty-row">
-              <ItemContent>
-                <Text variant="caption" tone="muted">
-                  {t("server.roles.noAgents")}
-                </Text>
-              </ItemContent>
-            </Item>
-          }
-        >
-          {(agent) => (
-            <AgentAccessRow
-              agent={agent}
-              label={t("server.roles.agentLevel", { role: title, agent: agent.name })}
-              level={level(agent.id)}
+      if (levels.size > 0) onChange(levels);
+    };
+    return (
+      <SettingsSection
+        title={t("server.roles.agents")}
+        actions={
+          props.agents.length > 1 ? (
+            <SetAllLevelsMenu
+              title={title}
+              levels={props.agents.map((agent) => shown(agent.id))}
               disabled={props.disabled}
-              menuMount={props.menuMount}
-              onChange={(next) => onChange([agent.id], next)}
+              mount={props.menuMount}
+              onChange={(next) =>
+                give(
+                  props.agents.map((agent) => agent.id),
+                  next,
+                )
+              }
             />
-          )}
-        </For>
-      </ItemGroup>
-    </SettingsSection>
-  );
+          ) : undefined
+        }
+      >
+        <ItemGroup class="settings-modal-card">
+          <For
+            each={props.agents}
+            fallback={
+              <Item class="server-settings-empty-row">
+                <ItemContent>
+                  <Text variant="caption" tone="muted">
+                    {t("server.roles.noAgents")}
+                  </Text>
+                </ItemContent>
+              </Item>
+            }
+          >
+            {(agent) => (
+              <AgentAccessRow
+                agent={agent}
+                label={t("server.roles.agentLevel", { role: title, agent: agent.name })}
+                level={shown(agent.id)}
+                everyone={everyone?.(agent.id)}
+                disabled={props.disabled}
+                menuMount={props.menuMount}
+                onChange={(next) => give([agent.id], next)}
+                onOpenEveryone={() => props.onPage({ kind: "everyone" })}
+              />
+            )}
+          </For>
+        </ItemGroup>
+      </SettingsSection>
+    );
+  };
 
   const list = () => (
     <>
@@ -365,7 +410,7 @@ export function ServerRolesPanel(props: ServerRolesPanelProps) {
             {agentList(
               t("server.roles.everyone"),
               (agentId) => everyoneLevel(props.everyone, agentId),
-              props.onSetEveryoneLevel,
+              props.onSetEveryoneLevels,
             )}
           </Show>
         }
@@ -391,7 +436,8 @@ export function ServerRolesPanel(props: ServerRolesPanelProps) {
             {agentList(
               role().name,
               (agentId) => roleLevel(role(), agentId),
-              (agentIds, level) => props.onSetRoleLevel(role().id, agentIds, level),
+              (levels) => props.onSetRoleLevels(role().id, levels),
+              (agentId) => everyoneLevel(props.everyone, agentId),
             )}
           </>
         )}
@@ -416,7 +462,6 @@ export function ServerRolesPanel(props: ServerRolesPanelProps) {
   );
 }
 
-/** The check mark of the marketplace menus, for a checkbox or radio item. */
 function MenuMark(props: { on: boolean }) {
   return (
     <span class="ui-menu-check" data-checked={props.on ? "" : undefined}>
@@ -435,20 +480,14 @@ const SERVER_ROLE_LABELS = {
 export interface MemberRoleMenuProps {
   memberName: string;
   serverRole: "admin" | "member";
-  /** The roles of the server, or nothing when its host has no roles. */
   roles: readonly Pick<AgentAccessRole, "id" | "name" | "memberIds">[] | undefined;
   memberId: string;
   disabled: boolean;
   mount: HTMLElement | undefined;
-  /** The caller confirms the change; `trigger` gets the focus back. */
   onServerRole: (role: "admin" | "member", trigger: HTMLElement) => void;
   onToggleRole: (roleId: string, on: boolean) => void;
 }
 
-/**
- * The role menu at the end of a member row: the server role, then the roles. Its button names the
- * roles of the member. Roles apply only to a member, so an admin sees the server role only.
- */
 export function MemberRoleMenu(props: MemberRoleMenuProps) {
   const { t } = useText();
   let triggerElement: HTMLElement | undefined;
@@ -470,7 +509,6 @@ export function MemberRoleMenu(props: MemberRoleMenuProps) {
         <span class="server-roles-member-summary">{summary()}</span>
         <ChevronDown aria-hidden="true" />
       </DropdownMenu.Trigger>
-      {/* A portal without a mount uses the document body. */}
       <DropdownMenu.Portal mount={props.mount ?? document.body}>
         <DropdownMenu.Content>
           <span class="ui-menu-label" aria-hidden="true">

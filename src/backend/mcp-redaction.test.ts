@@ -1,23 +1,46 @@
-// A provider record goes to the renderer and to history after this redaction. It must stay a valid
-// record, and a value that the MCP configuration knows must not reach either place.
 import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import type { McpServerConfig } from "@openbot/contracts/ipc";
-import { registerSecretValue } from "@openbot/logging";
+import { redactText, registerSecretValue } from "@openbot/logging";
 import { Effect } from "effect";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { mcpSecretValues, redactMcpRecord } from "./mcp-redaction";
+import { mcpSecretValues, redactMcpModelText, redactMcpRecord } from "./mcp-redaction";
+import { piCustomEndpointSecrets } from "./pi-custom-endpoints";
 import { createPiMcpExtension } from "./pi-mcp";
 
+describe("redactMcpModelText", () => {
+  it("masks a known key format and a value of the agent's apps", () => {
+    expect(redactMcpModelText("Key sk-ant-api03-abcdefghijkl, header magpie-token-77", ["magpie-token-77"])).toBe(
+      "Key [redacted], header •••",
+    );
+  });
+
+  it("keeps a word around a saved value, and the full rule stays for logs and tool output", () => {
+    registerSecretValue("pazq", { allowShort: true });
+    expect(redactMcpModelText("Let me bypazq it. The code is pazq.", [])).toBe(
+      "Let me bypazq it. The code is [redacted].",
+    );
+    expect(redactText("Let me bypazq it.")).toBe("Let me [redacted] it.");
+    expect(redactMcpRecord({ output: "bypazq" }, [])).toEqual({ output: "[redacted]" });
+  });
+});
+
 describe("redactMcpRecord", () => {
-  it("keeps JSON literals when a known value is `true` or `null`", () => {
-    const record = { path: "README.md", enabled: true, note: null, label: "true story" };
-    expect(redactMcpRecord(record, ["true", "null"])).toEqual({
+  it("keeps JSON literals and setting words when a known value is `true` or `null`", () => {
+    const record = { path: "README.md", enabled: true, note: null, label: "true story", flag: "QA_READY=TRUE" };
+    expect(redactMcpRecord(record, ["true", "null", "TRUE", "false"])).toEqual({
       path: "README.md",
       enabled: true,
       note: null,
-      label: "••• story",
+      label: "true story",
+      flag: "QA_READY=TRUE",
+    });
+  });
+
+  it("still masks a known value next to a setting word", () => {
+    expect(redactMcpRecord({ line: "PIN=hunter22 DEBUG=true" }, ["true", "hunter22"])).toEqual({
+      line: "PIN=••• DEBUG=true",
     });
   });
 
@@ -36,11 +59,56 @@ describe("redactMcpRecord", () => {
     expect(redacted).not.toContain("abcd1234efgh");
     expect(redacted).not.toContain("sig_part");
   });
+
+  it("keeps an email address and still redacts secrets", () => {
+    const record = { item: { type: "agentMessage", text: "Sign in as admin@example.com. password=hunter2" } };
+    expect(redactMcpRecord(record, [])).toEqual({
+      item: { type: "agentMessage", text: "Sign in as admin@example.com. password=[redacted]" },
+    });
+  });
+
+  it("keeps the custom provider's name and still masks its other values", () => {
+    const values = piCustomEndpointSecrets([
+      {
+        id: "magpie",
+        name: "Magpie",
+        baseUrl: "http://127.0.0.1:8080/v1",
+        apiKey: "magpie",
+        headers: [
+          { name: "X-Provider", value: "MAGPIE" },
+          { name: "X-Gateway-Token", value: "mg-7Kq2x" },
+        ],
+        models: [{ id: "auto", name: "auto" }],
+      },
+    ]);
+    const record = { item: { type: "agentMessage", text: "Provider `magpie` (Magpie), token mg-7Kq2x" } };
+    expect(redactMcpRecord(record, values)).toEqual({
+      item: { type: "agentMessage", text: "Provider `magpie` (Magpie), token •••" },
+    });
+  });
+
+  it("keeps a long html answer with many CSS rules whole (#9778)", () => {
+    const rules = Array.from({ length: 40 }, (_, index) => `.card-${index}{display:flex;color:#fff}`);
+    const jsx = "{items.map((item) => <li key={item.id}>{item.name}</li>)}";
+    const text = ["```html", '<div class="digest">', "<style>", ...rules, "</style>", jsx, "</div>", "```"].join("\n");
+    expect(redactMcpRecord({ item: { type: "agentMessage", text } }, [])).toEqual({
+      item: { type: "agentMessage", text },
+    });
+  });
+
+  it("still redacts secrets after many brace runs in an answer", () => {
+    const rules = Array.from({ length: 20 }, (_, index) => `.card-${index}{color:#fff}`).join("\n");
+    const record = (tail: string) => ({ item: { type: "agentMessage", text: `${rules}\n${tail}` } });
+    const keyed = JSON.stringify(redactMcpRecord(record("key sk-ant-abcdefghijklmnop"), []));
+    expect(keyed).not.toContain("sk-ant-abcdefghijklmnop");
+    expect(keyed).toContain(".card-19{color:#fff}");
+    const named = JSON.stringify(redactMcpRecord(record('{"name":"api_key","value":"plain-value-1"}'), []));
+    expect(named).not.toContain("plain-value-1");
+    for (const tail of ['"tokens": {\n  "prod": "plain-value-2"\n}', "tokens = {'prod': 'plain-value-2'}"])
+      expect(JSON.stringify(redactMcpRecord(record(tail), []))).not.toContain("plain-value-2");
+  });
 });
 
-// The Computer Use server inherits HOME, USER and TMPDIR. Masking HOME broke each Shared file link
-// in a Pi or Muse transcript (#4863). A credential beside them, or a value typed under a profile
-// name, must stay masked.
 describe("mcpSecretValues", () => {
   const home = "/Users/smoke-home";
   const originalHome = process.env.HOME;
@@ -87,7 +155,15 @@ describe("mcpSecretValues", () => {
   it("gives Pi each value but only the credentials as secrets", async () => {
     const directory = await mkdtemp(join(tmpdir(), "openbot-pi-mcp-test-"));
     try {
-      const local = { servers: [], setThreadId: () => {}, reached: () => false, close: () => {} };
+      const local = {
+        servers: [],
+        setThreadId: () => {},
+        reached: () => false,
+        dropped: () => false,
+        listedWithin: () => false,
+        renew: () => [],
+        close: () => {},
+      };
       const extension = await Effect.runPromise(
         createPiMcpExtension(
           {

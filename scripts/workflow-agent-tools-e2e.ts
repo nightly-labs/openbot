@@ -1,0 +1,893 @@
+import assert from "node:assert/strict";
+import { mkdirSync, writeFileSync } from "node:fs";
+import { mkdtemp, rm } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join, resolve } from "node:path";
+import { Effect } from "effect";
+import { z } from "zod";
+import { deferredCallArgumentsError, discoverTools, resolveDeferredTool } from "../src/backend/agent/tool-catalog";
+import { runCauseEffect } from "../src/backend/effect-boundary";
+import { OpenBotDatabase } from "../src/backend/openbot-database";
+import type { DynamicToolCallParams } from "../src/backend/protocol";
+import { WorkflowGitHubStore } from "../src/backend/workflows/workflow-github-store";
+import { WorkflowRunStore } from "../src/backend/workflows/workflow-run-store";
+import { WorkflowStore } from "../src/backend/workflows/workflow-store";
+import { handleWorkflowTool } from "../src/backend/workflows/workflow-tools";
+import { workflowScheduleDueAt } from "../src/backend/workflows/workflow-triggers";
+import { createWorkflows, type WorkflowsHandle } from "../src/backend/workflows/workflows";
+
+const OUT = resolve(import.meta.dirname, "../.openbot-build/workflow-agent-tools-e2e");
+const WAIT_MS = 5_000;
+const AGENTS = new Set(["agent-research"]);
+const TITLE_ANSWER = "A red bicycle at dawn";
+const CALLER = "agent-builder";
+const REQUESTER_TIMEZONE = "Europe/Warsaw";
+
+const created = z.object({ workflowId: z.string(), ids: z.record(z.string(), z.string()) });
+const workflowRead = z.object({
+  title: z.string(),
+  nodes: z.array(
+    z.object({
+      id: z.string(),
+      kind: z.string(),
+      fields: z.record(z.string(), z.unknown()),
+      at: z.unknown().optional(),
+    }),
+  ),
+  edges: z.array(
+    z.object({ from: z.string(), to: z.string(), branch: z.string().optional(), type: z.string().optional() }),
+  ),
+});
+const point = z.object({ x: z.number(), y: z.number() });
+const laidOut = z.object({
+  nodes: z.array(
+    z.object({
+      id: z.string(),
+      kind: z.string(),
+      at: point,
+      size: z.object({ width: z.number(), height: z.number() }),
+    }),
+  ),
+  edges: z.array(z.object({ from: z.string(), to: z.string() })),
+});
+const runStarted = z.object({ runId: z.string() });
+const runList = z.object({ runs: z.array(z.object({})) });
+const stepStarted = z.object({ stepId: z.string(), status: z.string() });
+const stepList = z.object({
+  steps: z
+    .array(
+      z.object({
+        stepId: z.string(),
+        nodeId: z.string(),
+        status: z.string(),
+        output: z.string().optional(),
+        settings: z.record(z.string(), z.unknown()).optional(),
+        inputs: z.array(z.object({ from: z.string(), type: z.string(), stepId: z.string().optional() })).optional(),
+      }),
+    )
+    .optional(),
+});
+const runRead = z.object({
+  steps: z.array(
+    z.object({
+      nodeId: z.string(),
+      status: z.string(),
+      kind: z.string().optional(),
+      label: z.string().optional(),
+      output: z.string().optional(),
+    }),
+  ),
+});
+
+interface Report {
+  checks: string[];
+  bytes: Record<string, number>;
+  changed: string[];
+  passed: boolean;
+  failure?: string;
+}
+
+const report: Report = { checks: [], bytes: {}, changed: [], passed: false };
+const check = (name: string, ok: boolean, detail?: unknown) => {
+  assert.ok(ok, `${name}${detail === undefined ? "" : `: ${JSON.stringify(detail)}`}`);
+  report.checks.push(name);
+};
+
+const params = (tool: string, args: unknown): DynamicToolCallParams => ({
+  threadId: "thread-e2e",
+  turnId: "turn-e2e",
+  callId: crypto.randomUUID(),
+  namespace: "openbot",
+  tool,
+  arguments: args,
+});
+
+const directory = await mkdtemp(join(tmpdir(), "openbot-workflow-agent-tools-"));
+const database = new OpenBotDatabase(directory);
+let workflows: WorkflowsHandle | null = null;
+
+const handoffs: string[] = [];
+
+const deleteAsked: string[] = [];
+let deleteAnswer = true;
+const confirmDelete = (title: string) =>
+  Effect.sync(() => {
+    deleteAsked.push(title);
+    return deleteAnswer;
+  });
+
+const COLUMN_GAP = 120;
+const ROW_GAP = 64;
+
+async function layoutProblems(label: string, workflowId: string) {
+  const graph = laidOut.parse((await call(label, "read_workflow", { workflowId, layout: true })).value);
+  const byId = new Map(graph.nodes.map((node) => [node.id, node]));
+  const problems: string[] = [];
+  for (const edge of graph.edges) {
+    const from = byId.get(edge.from);
+    const to = byId.get(edge.to);
+    if (from && to && to.at.x < from.at.x + from.size.width + COLUMN_GAP)
+      problems.push(`no room for ${from.kind} > ${to.kind}`);
+  }
+  graph.nodes.forEach((a, index) => {
+    for (const b of graph.nodes.slice(index + 1)) {
+      const apart =
+        a.at.x + a.size.width + COLUMN_GAP <= b.at.x ||
+        b.at.x + b.size.width + COLUMN_GAP <= a.at.x ||
+        a.at.y + a.size.height + ROW_GAP <= b.at.y ||
+        b.at.y + b.size.height + ROW_GAP <= a.at.y;
+      if (!apart) problems.push(`${a.kind} crowds ${b.kind}`);
+    }
+  });
+  return { problems, nodes: byId };
+}
+
+let calls = 0;
+
+async function call(
+  label: string,
+  name: string,
+  args: unknown,
+  callKey = `call-${++calls}`,
+): Promise<{ ok: boolean; value: unknown }> {
+  assert.ok(workflows);
+  const resolved = resolveDeferredTool(params("tool_call", { name: `openbot.${name}`, arguments: args }), "codex");
+  assert.ok(resolved, `tool_call refused openbot.${name}`);
+  const response = await runCauseEffect(
+    handleWorkflowTool(
+      resolved.tool,
+      resolved.arguments,
+      workflows,
+      CALLER,
+      callKey,
+      AGENTS,
+      REQUESTER_TIMEZONE,
+      confirmDelete,
+    ),
+  );
+  assert.ok(response, `no handler for ${name}`);
+  const item = response.contentItems[0];
+  assert.ok(item && item.type === "inputText");
+  report.bytes[label] = Buffer.byteLength(item.text);
+  return { ok: response.success, value: JSON.parse(item.text) };
+}
+
+try {
+  await Effect.runPromise(database.initialize());
+  workflows = await Effect.runPromise(
+    createWorkflows({
+      store: new WorkflowStore({ database, nextDueAt: workflowScheduleDueAt(() => "UTC") }),
+      runs: new WorkflowRunStore({ database }),
+      github: new WorkflowGitHubStore({ database }),
+      githubApp: () => null,
+      delivery: () => ({ status: "running", turnId: null, error: null }),
+      turnAnswer: () => null,
+      sendHandoff: (handoff) =>
+        Effect.sync(() => {
+          handoffs.push(handoff.text);
+          return `delivery-${crypto.randomUUID()}`;
+        }),
+      stopDelivery: () => Effect.void,
+      generateText: (request) =>
+        request.prompt.includes("Write a title")
+          ? Effect.succeed(TITLE_ANSWER)
+          : Effect.fail({ message: "Only the title step runs a model in this test." }),
+      notify: () => {},
+      connectionOn: () => false,
+      post: () => Effect.die(new Error("No output step runs in this test.")),
+      changed: (workflowId, agentId) => report.changed.push(agentId ? `${workflowId} by ${agentId}` : workflowId),
+      rearm: () => {},
+      timezone: () => "UTC",
+    }),
+  );
+
+  const search = discoverTools(params("tool_search", { query: "create workflow routine with approval" }), "codex");
+  report.bytes.search = Buffer.byteLength(JSON.stringify(search));
+  const ready = search.tools.filter((tool) => "inputSchema" in tool).map((tool) => tool.name);
+  check(
+    "a workflow search gives all 6 workflow tools with schemas, and the guidance",
+    ready.filter((name) => name.includes("workflow") && !name.endsWith(".workflow_answer")).length === 6 &&
+      (search.guidance ?? []).some((text) => text.includes("Fields by kind")),
+    search,
+  );
+  check(
+    "a workflow search loads no other schema or guidance",
+    ready.every((name) => name.includes("workflow")) &&
+      !(search.guidance ?? []).some((text) => text.includes("Manage scheduled work")),
+    { ready, guidance: search.guidance },
+  );
+  const canvas = discoverTools(params("tool_search", { query: "create a canvas" }), "claude");
+  check(
+    "a canvas search gives all 6 workflow tools with schemas",
+    canvas.tools.filter(
+      (tool) => tool.name.includes("workflow") && !tool.name.endsWith(".workflow_answer") && "inputSchema" in tool,
+    ).length === 6,
+    canvas.tools.map((tool) => tool.name),
+  );
+  const otherReady = ["click canvas", "connect routine agents canvas"].flatMap((query) =>
+    discoverTools(params("tool_search", { query }), "claude")
+      .tools.filter((tool) => "inputSchema" in tool)
+      .map((tool) => tool.name),
+  );
+  check(
+    "a canvas search keeps the browser and routine schemas that it finds",
+    ["openbot_browser.click", "openbot.connect_routine_agents", "openbot.edit_workflow"].every((name) =>
+      otherReady.includes(name),
+    ),
+    otherReady,
+  );
+  const mixed = discoverTools(params("tool_search", { queries: ["workflow", "openbot_browser.snapshot"] }), "codex");
+  check(
+    "a workflow search keeps the schema of a tool that another query names exactly",
+    mixed.tools.some((tool) => tool.name === "openbot_browser.snapshot" && "inputSchema" in tool),
+    mixed.tools.map((tool) => tool.name),
+  );
+  check(
+    "a workflow search says to run the tools with tool_call, and has no browser note",
+    search.call?.includes("tool_call") === true && !("note" in search),
+    search,
+  );
+  const alias = resolveDeferredTool(params("tool_call", { tool: "openbot.list_workflows", arguments: {} }), "codex");
+  check("tool_call accepts the qualified name as tool", alias?.tool === "list_workflows", alias);
+  const mcpName = resolveDeferredTool(params("tool_call", { name: "mcp__openbot__list_workflows" }), "acp");
+  check(
+    "tool_call accepts an MCP tool name and no arguments",
+    mcpName?.tool === "list_workflows" && JSON.stringify(mcpName.arguments) === "{}",
+    mcpName,
+  );
+  const bareName = params("tool_call", { name: "list_workflows", arguments: {} });
+  const bareError = resolveDeferredTool(bareName, "acp") ? null : deferredCallArgumentsError(bareName, "acp");
+  check(
+    "tool_call names the catalog tool for a name without its namespace",
+    bareError?.includes("openbot.list_workflows") === true,
+    bareError,
+  );
+
+  const built = await call("create", "edit_workflow", {
+    title: "Morning news",
+    ops: [
+      { op: "add", ref: "start", kind: "trigger", fields: { trigger: "manual", stepName: " Morning start " } },
+      {
+        op: "add",
+        ref: "news",
+        kind: "agent",
+        from: "start",
+        fields: { agentId: "agent-research", task: "Find the news." },
+      },
+      { op: "add", ref: "check", kind: "condition", from: "news", fields: { rule: "Is there news?" } },
+      { op: "add", ref: "quiet", kind: "output", from: "check", branch: "no", fields: { title: "No news" } },
+      { op: "add", ref: "tell", kind: "output", from: "check", branch: "yes" },
+      { op: "add", ref: "label", kind: "note", fields: { text: "Built by an agent" } },
+    ],
+  });
+  check("edit_workflow creates the workflow", built.ok, built.value);
+  const { workflowId, ids } = created.parse(built.value);
+  check("the result gives an id for each ref", Object.keys(ids).length === 6, ids);
+  check(
+    "the create, with its graph, is one change that names the agent that built it",
+    report.changed.filter((change) => change === `${workflowId} by ${CALLER}`).length === 1,
+    report.changed,
+  );
+
+  const read = await call("read", "read_workflow", { workflowId });
+  const graph = workflowRead.parse(read.value);
+  check("read_workflow has the 6 nodes and 4 edges", graph.nodes.length === 6 && graph.edges.length === 4, graph);
+  check(
+    "read_workflow gives the step name, trimmed",
+    graph.nodes.some((node) => node.id === ids.start && node.fields.stepName === "Morning start"),
+    graph,
+  );
+  const textBoolean = await call("read-layout-text", "read_workflow", { workflowId, layout: "true" });
+  check(
+    "tool_call gives a boolean sent as text its type",
+    laidOut.safeParse(textBoolean.value).success,
+    textBoolean.value,
+  );
+  const typed = resolveDeferredTool(
+    params("tool_call", {
+      name: "openbot.read_workflow_runs",
+      arguments: { workflowId: "12", runId: "true", limit: "1" },
+    }),
+    "codex",
+  );
+  check(
+    "tool_call keeps text where the schema takes text, and makes a number of an integer sent as text",
+    JSON.stringify(typed?.arguments) === JSON.stringify({ workflowId: "12", runId: "true", limit: 1 }),
+    typed?.arguments,
+  );
+  const untyped = resolveDeferredTool(
+    params("tool_call", { name: "openbot.read_workflow_runs", arguments: { workflowId, limit: "1.5", x: "2" } }),
+    "codex",
+  );
+  check(
+    "tool_call keeps text that is not an integer, and a key that the schema does not have",
+    JSON.stringify(untyped?.arguments) === JSON.stringify({ workflowId, limit: "1.5", x: "2" }),
+    untyped?.arguments,
+  );
+  check(
+    "the output gets the notify target, and the condition edge its branch",
+    graph.nodes.some((node) => node.id === ids.tell && node.fields.target === "notify") &&
+      graph.edges.some((edge) => edge.from === ids.check && edge.to === ids.tell && edge.branch === "yes"),
+    graph,
+  );
+  check(
+    "a read without layout has no positions",
+    graph.nodes.every((node) => node.at === undefined),
+    graph,
+  );
+
+  const stored = await runCauseEffect(workflows.get(workflowId));
+  const at = (id: string | undefined) => stored.graph.nodes.find((node) => node.id === id)?.at;
+  const start = at(ids.start);
+  const news = at(ids.news);
+  check(
+    "automatic layout puts a step right of the node before it",
+    start !== undefined && news !== undefined && news.x > start.x && news.y === start.y,
+    { start, news },
+  );
+  const points = stored.graph.nodes.map((node) => `${node.at.x},${node.at.y}`);
+  check("no two nodes share a position", new Set(points).size === points.length, points);
+  const fresh = await layoutProblems("read-layout-new", workflowId);
+  check("a new workflow has room for each connection, and no card crowds another", fresh.problems.length === 0, fresh);
+  const yes = fresh.nodes.get(ids.tell ?? "");
+  const no = fresh.nodes.get(ids.quiet ?? "");
+  check(
+    "a condition's yes child is beside it and its no child is below the yes child",
+    yes !== undefined &&
+      no !== undefined &&
+      yes.at.y === fresh.nodes.get(ids.check ?? "")?.at.y &&
+      no.at.x === yes.at.x &&
+      no.at.y >= yes.at.y + yes.size.height + ROW_GAP,
+    { yes, no },
+  );
+
+  const edited = await call("edit", "edit_workflow", {
+    workflowId,
+    title: "Morning news digest",
+    ops: [
+      { op: "move", node: ids.label, at: { x: 0, y: -400 } },
+      { op: "update", node: ids.news, fields: { task: "Find three news items." } },
+      { op: "remove", node: ids.label },
+    ],
+  });
+  check("edit_workflow moves, changes and removes", edited.ok, edited.value);
+  const after = await call("read-layout", "read_workflow", { workflowId, layout: true });
+  const afterGraph = workflowRead.parse(after.value);
+  check(
+    "the rename, the new task and the removal are saved",
+    afterGraph.title === "Morning news digest" &&
+      afterGraph.nodes.length === 5 &&
+      afterGraph.nodes.some((node) => node.fields.task === "Find three news items."),
+    afterGraph,
+  );
+  check(
+    "a read with layout has positions",
+    afterGraph.nodes.every((node) => node.at !== undefined),
+    afterGraph,
+  );
+
+  const before = await runCauseEffect(workflows.get(workflowId));
+  const was = (id: string | undefined) => before.graph.nodes.find((node) => node.id === id)?.at;
+  const inserted = await call("insert", "edit_workflow", {
+    workflowId,
+    ops: [
+      { op: "disconnect", from: ids.news, to: ids.check },
+      { op: "add", ref: "gate", kind: "approval", from: ids.news, fields: { question: "Go on?" } },
+      { op: "connect", from: "gate", to: ids.check },
+    ],
+  });
+  check("edit_workflow puts a step between two nodes", inserted.ok, inserted.value);
+  const gateId = created.parse(inserted.value).ids.gate;
+  const moved = await runCauseEffect(workflows.get(workflowId));
+  const now = (id: string | undefined) => moved.graph.nodes.find((node) => node.id === id)?.at;
+  const layout = {
+    news: now(ids.news),
+    gate: now(gateId),
+    check: now(ids.check),
+    tell: now(ids.tell),
+    checkBefore: was(ids.check),
+    tellBefore: was(ids.tell),
+  };
+  check(
+    "the inserted step takes the old column, and the later steps move right by its column",
+    layout.news !== undefined &&
+      layout.gate?.x === layout.news.x + 350 + COLUMN_GAP &&
+      layout.gate.y === layout.news.y &&
+      layout.check?.x === (layout.checkBefore?.x ?? 0) + 300 + COLUMN_GAP &&
+      layout.tell?.x === (layout.tellBefore?.x ?? 0) + 300 + COLUMN_GAP,
+    layout,
+  );
+  const afterInsert = await layoutProblems("read-layout-insert", workflowId);
+  check(
+    "after the insert, each connection has room and no card crowds another",
+    afterInsert.problems.length === 0,
+    afterInsert,
+  );
+
+  const messy = await call("mess", "edit_workflow", {
+    workflowId,
+    ops: [
+      { op: "move", node: gateId, at: { x: 40, y: 30 } },
+      { op: "move", node: ids.tell, at: { x: -500, y: 600 } },
+    ],
+  });
+  check(
+    "move ops put cards on top of each other",
+    messy.ok && (await layoutProblems("read-layout-mess", workflowId)).problems.length > 0,
+    messy.value,
+  );
+  const tidied = await call("tidy", "edit_workflow", { workflowId, tidy: true });
+  const tidy = await layoutProblems("read-layout-tidy", workflowId);
+  check("tidy lays the graph out again with room for each connection", tidied.ok && tidy.problems.length === 0, tidy);
+
+  const badEdge = await call("failure-edge", "edit_workflow", {
+    workflowId,
+    ops: [{ op: "connect", from: ids.news, to: ids.tell, branch: "no" }],
+  });
+  check(
+    "a branch edge from an agent is refused with the reason",
+    !badEdge.ok && JSON.stringify(badEdge.value).includes("only an edge from a condition"),
+    badEdge.value,
+  );
+  const badAgent = await call("failure-agent", "edit_workflow", {
+    workflowId,
+    ops: [{ op: "update", node: ids.news, fields: { agentId: "agent-gone" } }],
+  });
+  check(
+    "an unknown agent is refused",
+    !badAgent.ok && JSON.stringify(badAgent.value).includes("agent-gone"),
+    badAgent.value,
+  );
+  const badModel = await call("failure-model", "edit_workflow", {
+    workflowId,
+    ops: [{ op: "update", node: ids.news, fields: { provider: "grok", model: "grok-4.7" } }],
+  });
+  const clearedModel = await call("clear-model", "edit_workflow", {
+    workflowId,
+    ops: [{ op: "update", node: ids.news, fields: { provider: null, model: "", effort: null } }],
+  });
+  check("an empty or null model on an agent step is accepted as a clear", clearedModel.ok, clearedModel.value);
+  const newsAfterModel = (await runCauseEffect(workflows.get(workflowId))).graph.nodes.find(
+    (node) => node.id === ids.news,
+  );
+  check(
+    "a model on an agent step is refused, with the llm step as the way, and is not saved",
+    !badModel.ok &&
+      JSON.stringify(badModel.value).includes("llm step") &&
+      newsAfterModel !== undefined &&
+      newsAfterModel.fields.model !== "grok-4.7",
+    badModel.value,
+  );
+  const lockedDetail = await runCauseEffect(workflows.get(workflowId));
+  const saved = await runCauseEffect(
+    workflows.saveGraph({
+      workflowId,
+      baseRevision: lockedDetail.revision,
+      graph: {
+        ...lockedDetail.graph,
+        nodes: lockedDetail.graph.nodes.map((node) => (node.id === ids.start ? { ...node, locked: true } : node)),
+      },
+    }),
+  );
+  assert.ok(saved.ok);
+  const locked = await call("failure-locked", "edit_workflow", {
+    workflowId,
+    title: "Renamed by mistake",
+    ops: [{ op: "move", node: ids.start, at: { x: 900, y: 900 } }],
+  });
+  check("a locked node does not move", !locked.ok && JSON.stringify(locked.value).includes("locked"), locked.value);
+  const unchanged = await runCauseEffect(workflows.get(workflowId));
+  check(
+    "a refused edit saves nothing, also not its rename",
+    unchanged.revision === saved.revision && unchanged.summary.title === "Morning news digest",
+    unchanged.summary,
+  );
+  const libraryBefore = (await runCauseEffect(workflows.list())).length;
+  const badNew = await call("failure-new", "edit_workflow", {
+    title: "Broken",
+    ops: [
+      { op: "add", ref: "go", kind: "trigger" },
+      { op: "remove", node: "missing" },
+    ],
+  });
+  const libraryAfter = (await runCauseEffect(workflows.list())).length;
+  check("a refused new workflow is not made", !badNew.ok && libraryAfter === libraryBefore, {
+    result: badNew.value,
+    libraryBefore,
+    libraryAfter,
+  });
+
+  const badEvent = await call("failure-event", "edit_workflow", {
+    title: "Pull request review",
+    ops: [{ op: "add", kind: "trigger", fields: { trigger: "github", event: "pull_request.opened" } }],
+  });
+  check(
+    "an unknown trigger event is refused with the events to use, and makes no workflow",
+    !badEvent.ok &&
+      JSON.stringify(badEvent.value).includes("pull_request.opened") &&
+      JSON.stringify(badEvent.value).includes("pr.opened") &&
+      (await runCauseEffect(workflows.list())).length === libraryBefore,
+    badEvent.value,
+  );
+  const noEvent = await call("failure-no-event", "edit_workflow", {
+    title: "Telegram mentions",
+    ops: [{ op: "add", kind: "trigger", fields: { trigger: "telegram" } }],
+  });
+  check(
+    "a messaging trigger without an event is refused, and makes no workflow",
+    !noEvent.ok &&
+      JSON.stringify(noEvent.value).includes("mention") &&
+      (await runCauseEffect(workflows.list())).length === libraryBefore,
+    noEvent.value,
+  );
+  const review = await call("event", "edit_workflow", {
+    title: "Pull request review",
+    ops: [
+      { op: "add", ref: "pr", kind: "trigger", fields: { trigger: "github", repositories: "acme/app" } },
+      { op: "update", node: "pr", fields: { event: "pr.opened" } },
+    ],
+  });
+  const reviewId = z.object({ workflowId: z.string() }).parse(review.value).workflowId;
+  const reviewDetail = await runCauseEffect(workflows.get(reviewId));
+  const prTrigger = reviewDetail.graph.nodes.find((node) => node.kind === "trigger");
+  check(
+    "a later op of the same call can give a new trigger its event",
+    review.ok && prTrigger?.fields.event === "pr.opened",
+    prTrigger,
+  );
+  assert.ok(prTrigger);
+  database.connection
+    .prepare("UPDATE workflow_nodes SET fields_json = ? WHERE workflow_id = ? AND node_id = ?")
+    .run(JSON.stringify({ ...prTrigger.fields, event: "pull_request.opened" }), reviewId, prTrigger.id);
+  const otherField = await call("event-kept", "edit_workflow", {
+    workflowId: reviewId,
+    ops: [{ op: "update", node: prTrigger.id, fields: { filters: "notBot" } }],
+  });
+  const keptTrigger = (await runCauseEffect(workflows.get(reviewId))).graph.nodes.find(
+    (node) => node.id === prTrigger.id,
+  );
+  check(
+    "an edit that does not change the event keeps a saved event as it is",
+    otherField.ok && keptTrigger?.fields.event === "pull_request.opened" && keptTrigger.fields.filters === "notBot",
+    { result: otherField.value, trigger: keptTrigger },
+  );
+
+  const caseInput = "Shipment 4417: review the packet from the supplier in Gdansk.";
+  const fromNode = await call("failure-run-from-node", "run_workflow", {
+    workflowId,
+    fromNodeId: ids.news,
+    input: caseInput,
+  });
+  check(
+    "run_workflow refuses input with the fromNodeId of a later node and starts no run",
+    !fromNode.ok &&
+      JSON.stringify(fromNode.value).includes("full run") &&
+      (await runCauseEffect(workflows.runs({ workflowId, limit: 1 }))).runs.length === 0,
+    fromNode.value,
+  );
+  const run = await call("run", "run_workflow", { workflowId, input: caseInput }, "run-call");
+  check("run_workflow starts a run", run.ok, run.value);
+  const { runId } = runStarted.parse(run.value);
+  const repeated = await call("run-repeated", "run_workflow", { workflowId, input: caseInput }, "run-call");
+  check(
+    "a repeated run_workflow call starts no second run",
+    repeated.ok && runStarted.parse(repeated.value).runId === runId,
+    repeated.value,
+  );
+  const deadline = Date.now() + WAIT_MS;
+  let runs = await call("runs", "read_workflow_runs", { workflowId, runId });
+  const agentRunning = () =>
+    runRead.parse(runs.value).steps.some((step) => step.nodeId === ids.news && step.status === "running");
+  while (!agentRunning()) {
+    if (Date.now() > deadline) throw new Error(`The agent step did not start: ${JSON.stringify(runs.value)}`);
+    await new Promise((done) => setImmediate(done));
+    runs = await call("runs", "read_workflow_runs", { workflowId, runId });
+  }
+  check("read_workflow_runs shows the agent step running", runs.ok, runs.value);
+  check(
+    "the trigger of a run gives the run input as its output",
+    runRead.parse(runs.value).steps.some((step) => step.nodeId === ids.start && step.output === caseInput),
+    runs.value,
+  );
+  check(
+    "the agent step after the trigger gets the run input",
+    handoffs.length === 1 && handoffs[0]?.includes(caseInput) === true,
+    handoffs,
+  );
+  check(
+    "each step of a run read gives its kind and label",
+    runRead
+      .parse(runs.value)
+      .steps.some((step) => step.nodeId === ids.news && step.kind === "agent" && step.label === "agent-research"),
+    runs.value,
+  );
+  check(
+    "a run read gives the step name as the label of a named step",
+    runRead
+      .parse(runs.value)
+      .steps.some((step) => step.nodeId === ids.start && step.kind === "trigger" && step.label === "Morning start"),
+    runs.value,
+  );
+  const triggerInput = "Shipment 4418: review the packet from the supplier in Poznan.";
+  const fromTrigger = await call(
+    "run-from-trigger",
+    "run_workflow",
+    { workflowId, fromNodeId: ids.start, input: triggerInput },
+    "run-from-trigger-call",
+  );
+  check("run_workflow takes input in a run from a trigger", fromTrigger.ok, fromTrigger.value);
+  const triggerRunId = runStarted.parse(fromTrigger.value).runId;
+  let triggerRun = await call("runs-from-trigger", "read_workflow_runs", { workflowId, runId: triggerRunId });
+  const triggerAnswered = () =>
+    runRead.parse(triggerRun.value).steps.some((step) => step.nodeId === ids.start && step.status === "done");
+  while (!triggerAnswered()) {
+    if (Date.now() > deadline) throw new Error(`The trigger did not answer: ${JSON.stringify(triggerRun.value)}`);
+    await new Promise((done) => setImmediate(done));
+    triggerRun = await call("runs-from-trigger", "read_workflow_runs", { workflowId, runId: triggerRunId });
+  }
+  const textLimit = await call("runs-limit-text", "read_workflow_runs", { workflowId, limit: "2" });
+  check(
+    "tool_call gives an integer sent as text its type",
+    runList.safeParse(textLimit.value).data?.runs.length === 2,
+    textLimit.value,
+  );
+  check(
+    "the trigger of a run from that trigger gives the run input as its output",
+    runRead.parse(triggerRun.value).steps.some((step) => step.nodeId === ids.start && step.output === triggerInput),
+    triggerRun.value,
+  );
+  const badMediaModel = await call("failure-media-model", "edit_workflow", {
+    workflowId,
+    ops: [{ op: "add", kind: "image", fields: { prompt: "A poster", model: "no-such-model" } }],
+  });
+  check(
+    "an image node with an unknown model is refused with the models to use",
+    !badMediaModel.ok && JSON.stringify(badMediaModel.value).includes("gpt-image"),
+    badMediaModel.value,
+  );
+  const videoModel = await call("failure-media-kind", "edit_workflow", {
+    workflowId,
+    ops: [{ op: "add", kind: "image", fields: { prompt: "A clip", media: "video", model: "gpt-image" } }],
+  });
+  check(
+    "an image model that cannot make video is refused for a video node",
+    !videoModel.ok && JSON.stringify(videoModel.value).includes("grok-imagine"),
+    videoModel.value,
+  );
+  const badMedia = await call("failure-media", "edit_workflow", {
+    workflowId,
+    ops: [{ op: "add", kind: "image", fields: { prompt: "A song", media: "audio" } }],
+  });
+  check(
+    "an unknown media kind is refused",
+    !badMedia.ok && JSON.stringify(badMedia.value).includes("video"),
+    badMedia.value,
+  );
+  const badEffort = await call("failure-effort", "edit_workflow", {
+    workflowId,
+    ops: [{ op: "add", kind: "llm", fields: { prompt: "Say hi.", effort: "turbo" } }],
+  });
+  check(
+    "an unknown registry value is refused with the values to use",
+    !badEffort.ok &&
+      JSON.stringify(badEffort.value).includes("Set effort to one of: ") &&
+      JSON.stringify(badEffort.value).includes("high"),
+    badEffort.value,
+  );
+  const badAction = await call("failure-action", "edit_workflow", {
+    workflowId,
+    ops: [{ op: "add", kind: "output", fields: { target: "discord", action: "edit" } }],
+  });
+  check(
+    "an unknown output action is refused",
+    !badAction.ok && JSON.stringify(badAction.value).includes("Set action to one of: "),
+    badAction.value,
+  );
+  const media = await call("media", "edit_workflow", {
+    workflowId,
+    ops: [
+      { op: "add", ref: "idea", kind: "prompt", fields: { text: "A bicycle poster for a spring sale." } },
+      { op: "add", ref: "title", kind: "llm", from: "idea", fields: { prompt: "Write a title for this poster." } },
+      {
+        op: "add",
+        ref: "poster",
+        kind: "image",
+        from: "title",
+        fields: { prompt: "Draw the poster.", media: "image", model: "gpt-image", aspect: "16:9" },
+      },
+    ],
+  });
+  check("edit_workflow adds an image step after a model step", media.ok, media.value);
+  const mediaIds = z.object({ ids: created.shape.ids }).parse(media.value).ids;
+  const poster = (await runCauseEffect(workflows.get(workflowId))).graph.nodes.find(
+    (node) => node.id === mediaIds.poster,
+  );
+  check(
+    "the image step keeps its media, model and aspect",
+    poster?.kind === "image" && poster.fields.model === "gpt-image" && poster.fields.aspect === "16:9",
+    poster,
+  );
+  const missingStep = await call("failure-step-missing", "run_workflow", {
+    workflowId,
+    fromNodeId: "no-such-node",
+    only: true,
+  });
+  check("run_workflow only on a missing node is a tool failure", !missingStep.ok, missingStep.value);
+  const onlyNoNode = await call("failure-only-no-node", "run_workflow", { workflowId, only: true });
+  check("run_workflow only with no fromNodeId is a tool failure", !onlyNoNode.ok, onlyNoNode.value);
+  const onlyInput = await call("failure-only-input", "run_workflow", {
+    workflowId,
+    fromNodeId: mediaIds.title,
+    only: true,
+    input: "case",
+  });
+  check("run_workflow only with input is a tool failure", !onlyInput.ok, onlyInput.value);
+  const stepDeadline = Date.now() + WAIT_MS;
+  const soloSteps = async (label: string) =>
+    stepList.parse((await call(label, "read_workflow_runs", { workflowId })).value).steps ?? [];
+  const ideaRun = await call("run-step-idea", "run_workflow", { workflowId, fromNodeId: mediaIds.idea, only: true });
+  const ideaStepId = stepStarted.parse(ideaRun.value).stepId;
+  while ((await soloSteps("runs-steps")).find((step) => step.stepId === ideaStepId)?.status !== "done") {
+    if (Date.now() > stepDeadline) throw new Error("The prompt step did not end.");
+    await new Promise((done) => setImmediate(done));
+  }
+  const stepRun = await call(
+    "run-step",
+    "run_workflow",
+    { workflowId, fromNodeId: mediaIds.title, only: true },
+    "run-step-call",
+  );
+  check("run_workflow only starts one step", stepRun.ok, stepRun.value);
+  const { stepId } = stepStarted.parse(stepRun.value);
+  const stepAgain = await call(
+    "run-step-repeated",
+    "run_workflow",
+    { workflowId, fromNodeId: mediaIds.title, only: true },
+    "run-step-call",
+  );
+  check(
+    "a repeated run_workflow only call starts no second step",
+    stepAgain.ok && stepStarted.parse(stepAgain.value).stepId === stepId,
+    stepAgain.value,
+  );
+  let answered = (await soloSteps("runs-steps")).find((step) => step.stepId === stepId);
+  while (answered?.status !== "done") {
+    if (Date.now() > stepDeadline) throw new Error(`The single step did not end: ${JSON.stringify(answered)}`);
+    await new Promise((done) => setImmediate(done));
+    answered = (await soloSteps("runs-steps")).find((step) => step.stepId === stepId);
+  }
+  check("read_workflow_runs lists the single step with its output", answered.output === TITLE_ANSWER, answered);
+  check(
+    "the single step gives the settings that it used",
+    answered.settings?.prompt === "Write a title for this poster.",
+    answered,
+  );
+  check(
+    "the single step names the node and the step that gave its input",
+    answered.inputs?.some(
+      (source) => source.from === mediaIds.idea && source.type === "text" && source.stepId === ideaStepId,
+    ) === true,
+    answered,
+  );
+  const changedTitle = await call("media-update", "edit_workflow", {
+    workflowId,
+    ops: [{ op: "update", node: mediaIds.title, fields: { prompt: "Write a short title." } }],
+  });
+  check("edit_workflow changes the model step after its run", changedTitle.ok, changedTitle.value);
+  const keptStep = (await soloSteps("runs-steps-after-edit")).find((step) => step.stepId === stepId);
+  check(
+    "a step keeps the settings that it used after the node changes",
+    keptStep?.settings?.prompt === "Write a title for this poster.",
+    keptStep,
+  );
+
+  const list = await call("list", "list_workflows", {});
+  check(
+    "list_workflows shows the workflow with its last run",
+    list.ok &&
+      JSON.stringify(list.value).includes("Morning news digest") &&
+      JSON.stringify(list.value).includes("lastRun"),
+    list.value,
+  );
+
+  const scheduled = await call("schedule", "edit_workflow", {
+    workflowId,
+    ops: [{ op: "update", node: ids.start, schedule: { kind: "daily", time: "08:00" } }],
+  });
+  const scheduledDetail = await runCauseEffect(workflows.get(workflowId));
+  const trigger = scheduledDetail.graph.nodes.find((node) => node.id === ids.start);
+  check(
+    "a schedule on a manual trigger makes it a schedule trigger",
+    scheduled.ok && trigger?.fields.trigger === "schedule" && JSON.stringify(trigger.schedule).includes("08:00"),
+    trigger,
+  );
+  const nextDueAt = scheduledDetail.triggers.find((state) => state.nodeId === ids.start)?.nextDueAt;
+  const requesterClock =
+    nextDueAt &&
+    new Intl.DateTimeFormat("en-GB", {
+      hour: "2-digit",
+      minute: "2-digit",
+      hourCycle: "h23",
+      timeZone: REQUESTER_TIMEZONE,
+    }).format(new Date(nextDueAt));
+  check(
+    "a schedule that an agent sets runs at that time in the requester's time zone, not the host's",
+    trigger?.fields.timezone === REQUESTER_TIMEZONE && requesterClock === "08:00",
+    { timezone: trigger?.fields.timezone, nextDueAt },
+  );
+
+  deleteAnswer = false;
+  const declined = await call("failure-delete-declined", "delete_workflow", { workflowId });
+  const kept = await call("read-after-decline", "read_workflow", { workflowId });
+  check(
+    "a declined delete_workflow is a tool failure and keeps the workflow",
+    !declined.ok && JSON.stringify(declined.value).includes("declined") && kept.ok && deleteAsked.length === 1,
+    declined.value,
+  );
+  deleteAnswer = true;
+  const removed = await call("delete", "delete_workflow", { workflowId });
+  check("delete_workflow removes it after the approval", removed.ok && deleteAsked.length === 2, removed.value);
+  const gone = await call("failure-missing", "read_workflow", { workflowId });
+  check("a deleted workflow reads as a tool failure", !gone.ok, gone.value);
+
+  const untriggered = await call("create-no-trigger", "edit_workflow", {
+    title: "Poster title",
+    ops: [
+      { op: "add", ref: "idea", kind: "prompt", fields: { text: "A bicycle poster for a spring sale." } },
+      { op: "add", ref: "title", kind: "llm", from: "idea", fields: { prompt: "Write a title for this poster." } },
+    ],
+  });
+  check("edit_workflow makes a workflow with no trigger", untriggered.ok, untriggered.value);
+  const plain = created.parse(untriggered.value);
+  const plainRun = await call("run-no-trigger", "run_workflow", { workflowId: plain.workflowId });
+  check("run_workflow runs a workflow with no trigger", plainRun.ok, plainRun.value);
+  const plainRunId = runStarted.parse(plainRun.value).runId;
+  const plainDeadline = Date.now() + WAIT_MS;
+  const plainTitle = async () =>
+    runRead
+      .parse(
+        (await call("runs-no-trigger", "read_workflow_runs", { workflowId: plain.workflowId, runId: plainRunId }))
+          .value,
+      )
+      .steps.find((step) => step.nodeId === plain.ids.title);
+  let titled = await plainTitle();
+  while (titled?.status !== "done") {
+    if (Date.now() > plainDeadline) throw new Error(`The run with no trigger did not end: ${JSON.stringify(titled)}`);
+    await new Promise((done) => setImmediate(done));
+    titled = await plainTitle();
+  }
+  check("each step of a run with no trigger runs", titled.output === TITLE_ANSWER, titled);
+
+  report.passed = true;
+} catch (error) {
+  report.failure = error instanceof Error ? (error.stack ?? error.message) : String(error);
+} finally {
+  if (workflows) await Effect.runPromise(workflows.close()).catch(() => {});
+  database.close();
+  await rm(directory, { recursive: true, force: true });
+  mkdirSync(OUT, { recursive: true });
+  writeFileSync(join(OUT, "report.json"), `${JSON.stringify(report, null, 2)}\n`);
+  process.stdout.write(`${report.passed ? "passed" : "FAILED"}: ${report.checks.length} checks; ${OUT}/report.json\n`);
+  if (report.failure) process.stderr.write(`${report.failure}\n`);
+  process.exitCode = report.passed ? 0 : 1;
+}

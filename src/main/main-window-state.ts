@@ -14,6 +14,7 @@ interface WindowSize {
 interface MainWindowPresentationTarget {
   isMinimized(): boolean;
   restore(): void;
+  hide(): void;
   show(): void;
   focus(): void;
 }
@@ -32,29 +33,24 @@ export function presentMainWindow(
   window: MainWindowPresentationTarget,
   platform: NodeJS.Platform,
   showApplication: () => void,
+  waylandWindows: boolean,
 ): void {
   if (platform === "darwin") showApplication();
-  if (window.isMinimized()) window.restore();
+  if (window.isMinimized()) {
+    window.restore();
+    if (waylandWindows) window.hide();
+  }
   window.show();
   window.focus();
 }
 
 export interface SecondLaunchState {
-  /** Windows is ending the session; nothing may start again. */
   sessionEnding: boolean;
   quitting: boolean;
   hasMainWindow: boolean;
-  /** Startup has built the services, so a closed main window can be built again. */
   started: boolean;
 }
 
-/**
- * - `present`: show and focus the main window that exists.
- * - `reopen`: build the main window again. Outside macOS, closing it destroys it.
- * - `relaunch`: start a new instance once this one exits. The launch that asked has already exited
- *   because this process holds the single-instance lock, so without this nothing would open.
- * - `ignore`: startup is still building the window and will show it.
- */
 export type SecondLaunchResponse = "present" | "reopen" | "relaunch" | "ignore";
 
 export function secondLaunchResponse(state: SecondLaunchState): SecondLaunchResponse {
@@ -100,27 +96,13 @@ export const writeMainWindowBounds = Effect.fn("MainWindow.writeBounds")(functio
   yield* writeJsonFileAtomically(path, { version: 1, ...bounds }).pipe(toRemoteWorkflowError);
 });
 
-/**
- * The window the recorder reads. Structural, like `MainWindowPresentationTarget` above, so this
- * module still imports no Electron value and its tests still need no mock.
- */
 interface MainWindowBoundsSource {
   isDestroyed(): boolean;
   getNormalBounds(): Rectangle;
 }
 
 export interface MainWindowBoundsDependencies {
-  /**
-   * Read on every call, never captured: the `closed` handler drops the main window and a later
-   * relaunch builds a new one, so a captured reference would flush a destroyed window.
-   */
   getMainWindow: () => MainWindowBoundsSource | null;
-  /**
-   * The recorder decides *when* to persist; the caller decides *where*. Both of these are
-   * `readMainWindowBounds` / `writeMainWindowBounds` above bound to a path in production - they are
-   * parameters so that this file's own tests can observe how often a write actually happens, which
-   * is the whole point of the debounce and is not otherwise visible from outside.
-   */
   readBounds: () => Effect.Effect<Rectangle | null, RemoteWorkflowError>;
   writeBounds: (bounds: Rectangle) => Effect.Effect<void, RemoteWorkflowError>;
   reportError: (message: string, error: unknown) => void;
@@ -130,11 +112,9 @@ export interface MainWindowBoundsRecorder {
   restoreMainWindowBounds: () => Effect.Effect<void>;
   currentMainWindowBounds: () => Rectangle | null;
   rememberMainWindowBounds: (bounds: Rectangle) => void;
-  /** Clears the pending debounce as soon as it runs, before it waits for anything. */
   flushMainWindowBounds: () => Effect.Effect<void, RemoteWorkflowError>;
 }
 
-/** Long enough that a drag-resize writes once, short enough to survive a quit that follows it. */
 const BOUNDS_WRITE_DELAY_MS = 250;
 
 export function createMainWindowBoundsRecorder({
@@ -199,8 +179,6 @@ export function createMainWindowBoundsRecorder({
       Effect.suspend(() => {
         const window = getMainWindow();
         if (window && !window.isDestroyed()) bounds = window.getNormalBounds();
-        // Cleared before the first wait: Windows session-end runs this from a synchronous handler
-        // it never awaits, so a pending timer left here can outlive the decision to quit.
         if (writeTimer) {
           clearTimeout(writeTimer);
           writeTimer = null;

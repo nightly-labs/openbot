@@ -1,55 +1,44 @@
+import type { AgentSummary, QuitGuard } from "@openbot/contracts/ipc";
 import type { BrowserWindow, Input } from "electron";
 
-/** How long `Cmd + Q` must be held before OpenBot quits. */
 const HOLD_MS = 1_200;
-/** The longest time between two presses that still counts as a double press. */
 const DOUBLE_PRESS_MS = 500;
-/** How long the hint stays after the last press or repeat. */
 const HINT_MS = 1_200;
-/** The shortest quiet time after the last repeat that counts as a release. */
 const RELEASE_QUIET_MS = 600;
-/**
- * The quiet time before the first repeat. The longest "Delay until repeat" in the macOS keyboard
- * settings is 1.8 s, and a shorter wait would quit while a held second press is still down.
- */
 const FIRST_REPEAT_QUIET_MS = 2_000;
 
 export interface QuitShortcutOptions {
-  /** Starts the quit. */
   quit: () => void;
   isQuitting: () => boolean;
-  /** Shows or removes the hint in the window. */
-  showHint: (window: BrowserWindow, visible: boolean) => void;
+  workingAgents: () => AgentSummary[];
+  guard: () => QuitGuard;
+  showHint: (window: BrowserWindow, agents: AgentSummary[] | null) => void;
 }
 
 export interface QuitShortcut {
-  /** True when the key is part of `Cmd + Q`. The caller then stops it, which also stops the menu item. */
   handleInput: (window: BrowserWindow, input: Input) => boolean;
-  /** Focus went to another window or app, so the keys that follow are not for this window. */
   handleBlur: (window: BrowserWindow) => void;
 }
 
 interface Hold {
   window: BrowserWindow;
+  agents: AgentSummary[];
   startedAt: number;
   lastKeyAt: number;
   repeatGapMs: number;
 }
 
-/**
- * `Cmd + Q` is next to `Cmd + W` and `Cmd + A`, and one press stopped OpenBot with its agents and
- * routines (#4149). In a focused OpenBot page, OpenBot quits only when the user holds the keys or
- * presses them twice, and a hint in the window tells how.
- *
- * macOS sends no key up for Q while Command is held, so the repeats of the held key show the hold.
- * The keys stay held when the hold is complete. If OpenBot quit then, macOS would give the next
- * repeats to the app that comes to the front, and that app would quit too. OpenBot therefore hides
- * the window and waits for the release: a key up, the loss of focus, or a quiet time with no repeat.
- */
-export function createQuitShortcut({ quit, isQuitting, showHint }: QuitShortcutOptions): QuitShortcut {
+export function createQuitShortcut({
+  quit,
+  isQuitting,
+  workingAgents,
+  guard,
+  showHint,
+}: QuitShortcutOptions): QuitShortcut {
   let lastPress: { window: BrowserWindow; at: number } | null = null;
   let hold: Hold | null = null;
   let hintWindow: BrowserWindow | null = null;
+  let hintAgents: AgentSummary[] = [];
   let hintTimer: ReturnType<typeof setTimeout> | null = null;
   let releaseTimer: ReturnType<typeof setTimeout> | null = null;
   let waitingForRelease = false;
@@ -59,14 +48,15 @@ export function createQuitShortcut({ quit, isQuitting, showHint }: QuitShortcutO
     hintTimer = null;
     const window = hintWindow;
     hintWindow = null;
-    if (window && !window.isDestroyed()) showHint(window, false);
+    if (window && !window.isDestroyed()) showHint(window, null);
   }
 
-  function keepHint(window: BrowserWindow): void {
-    if (hintWindow !== window) {
-      hideHint();
+  function keepHint(window: BrowserWindow, agents: AgentSummary[]): void {
+    if (hintWindow !== window) hideHint();
+    if (hintWindow !== window || hintAgents !== agents) {
       hintWindow = window;
-      showHint(window, true);
+      hintAgents = agents;
+      showHint(window, agents);
     }
     if (hintTimer) clearTimeout(hintTimer);
     hintTimer = setTimeout(hideHint, HINT_MS);
@@ -90,8 +80,6 @@ export function createQuitShortcut({ quit, isQuitting, showHint }: QuitShortcutO
   function complete(current: Hold): void {
     waitingForRelease = true;
     hideHint();
-    // A full-screen window cannot be made clear. It stays until the quit hides every window. A clear
-    // window lets clicks through to the app that the user sees behind it.
     if (!current.window.isDestroyed() && !current.window.isFullScreen()) {
       current.window.setOpacity(0);
       current.window.setIgnoreMouseEvents(true);
@@ -120,16 +108,18 @@ export function createQuitShortcut({ quit, isQuitting, showHint }: QuitShortcutO
         if (hold?.window !== window) return true;
         hold.repeatGapMs = now - hold.lastKeyAt;
         hold.lastKeyAt = now;
-        keepHint(window);
+        keepHint(window, hold.agents);
         if (now - hold.startedAt >= HOLD_MS) complete(hold);
         return true;
       }
-      // Two presses count only in one window, which showed the hint after the first.
       const doublePress = lastPress?.window === window && now - lastPress.at <= DOUBLE_PRESS_MS;
       lastPress = { window, at: now };
-      hold = { window, startedAt: now, lastKeyAt: now, repeatGapMs: 0 };
-      if (doublePress) complete(hold);
-      else keepHint(window);
+      const choice = doublePress ? "never" : guard();
+      const agents = choice === "never" ? [] : workingAgents();
+      const guarded = isQuitGuarded(choice, agents);
+      hold = { window, agents, startedAt: now, lastKeyAt: now, repeatGapMs: 0 };
+      if (guarded) keepHint(window, agents);
+      else complete(hold);
       return true;
     },
     handleBlur(window) {
@@ -140,10 +130,10 @@ export function createQuitShortcut({ quit, isQuitting, showHint }: QuitShortcutO
   };
 }
 
-/**
- * The menu item matches the typed character, so `Cmd + Q` follows the keyboard layout. A layout with
- * no Latin letters, such as Russian, uses the key in the Q place, as macOS does for menu items.
- */
+export function isQuitGuarded(choice: QuitGuard, agents: readonly AgentSummary[]): boolean {
+  return choice === "always" || (choice === "working" && agents.length > 0);
+}
+
 function isQuitShortcut(input: Input): boolean {
   if (input.type !== "keyDown" || !input.meta || input.control || input.alt || input.shift) return false;
   const key = input.key.toLowerCase();

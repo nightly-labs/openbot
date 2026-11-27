@@ -1,8 +1,3 @@
-// Checks that the Codex warning "Falling back from WebSockets to HTTPS transport." shows no banner,
-// and that a final failure after it still does (#2559). Codex sends that warning when it changes
-// transport, and the same turn continues over HTTPS. Runs the real agent service on a temporary
-// profile with a fake Codex app-server. Two cases: the HTTPS attempt completes, and it fails.
-// `bun scripts/codex-transport-fallback-e2e.ts`. Writes .openbot-build/codex-transport-fallback-e2e/report.json.
 import assert from "node:assert/strict";
 import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { mkdtemp, rm, writeFile } from "node:fs/promises";
@@ -23,8 +18,13 @@ const controlPath = join(root, "control.json");
 const fakeCodex = join(root, "codex");
 const FALLBACK = "Falling back from WebSockets to HTTPS transport.";
 const FINAL_FAILURE = "stream disconnected before completion: Connection refused (os error 61)";
+const UNSTABLE_FEATURES =
+  "Under-development features enabled: async_compaction. Under-development features are incomplete and may behave unpredictably. To suppress this warning, set `suppress_unstable_features_warning = true` in /home/user/.codex/config.toml.";
+const SKILL_BUDGET_WARNINGS = [
+  "Exceeded skills context budget. All skill descriptions were removed and 3 additional skills were not included in the model-visible skills list.",
+  "Exceeded skills context budget of 2%. Loaded skill descriptions were truncated by an average of 40 characters per skill.",
+];
 
-// Before the service modules load: the Codex process and the stores read the home folder.
 process.env.HOME = home;
 process.env.CODEX_HOME = join(home, ".codex");
 process.env.OPENBOT_CODEX_PATH = fakeCodex;
@@ -38,11 +38,6 @@ const { runCauseEffect } = await import("../src/backend/effect-boundary");
 const { MailboxStore } = await import("../src/backend/mailbox-store");
 const { OpenBotDatabase } = await import("../src/backend/openbot-database");
 
-/**
- * A Codex app-server with the methods that the service calls. Each turn sends the transport
- * warning, as `codex-rs/core/src/responses_retry.rs` does, and then completes or fails as
- * `control.json` says.
- */
 const FAKE_CODEX = `#!/usr/bin/env node
 const fs = require("node:fs");
 if (process.argv.includes("--version")) {
@@ -70,8 +65,14 @@ const answer = (message) => {
     case "plugin/list": return write({ id: message.id, result: { marketplaces: [] } });
     case "config/read": return write({ id: message.id, result: config });
     case "config/batchWrite": return write({ id: message.id, result: {} });
-    case "thread/start": return write({ id: message.id, result: { thread: { id: "thread-" + (++threads), turns: [] } } });
-    case "thread/resume": return write({ id: message.id, result: { thread: { id: params.threadId, turns: [] } } });
+    case "thread/start":
+    case "thread/resume": {
+      const threadId = message.method === "thread/start" ? "thread-" + (++threads) : params.threadId;
+      write({ id: message.id, result: { thread: { id: threadId, turns: [] } } });
+      for (const skillBudget of ${JSON.stringify(SKILL_BUDGET_WARNINGS)})
+        write({ method: "warning", params: { threadId, message: skillBudget } });
+      return write({ method: "warning", params: { threadId, message: ${JSON.stringify(UNSTABLE_FEATURES)} } });
+    }
     case "thread/unsubscribe": return write({ id: message.id, result: { status: "Unsubscribed" } });
     case "thread/turns/list":
     case "thread/items/list": return write({ id: message.id, result: { data: [], nextCursor: null } });
@@ -130,6 +131,8 @@ interface CaseReport {
   finalError: string | null;
   errorEvents: { code: string; message: string }[];
   warningLogLines: string[];
+  unstableFeaturesLogLines: number;
+  skillBudgetLogLines: number;
   passed: boolean;
 }
 
@@ -138,6 +141,7 @@ const report: { cases: CaseReport[]; passed: boolean; error?: string } = { cases
 const unused = () => Effect.die(new Error("Not used by this check."));
 const browser: AgentBrowserHost = {
   listTabs: () => [],
+  toolCanUseTab: () => false,
   beginTakeover: unused,
   endTakeover: () => {},
   resolveUploadTarget: unused,
@@ -151,9 +155,11 @@ const browser: AgentBrowserHost = {
   endControl: () => {},
   close: () => Effect.void,
   clearAgentSession: () => Effect.void,
+  shareTab: () => undefined,
+  unshareThread: () => undefined,
+  agentTab: () => null,
 };
 
-/** The `turn/start` requests that OpenBot sent on a thread. */
 function turnStarts(threadId: string): number {
   return readFileSync(logPath, "utf8")
     .split("\n")
@@ -168,7 +174,6 @@ function turnStarts(threadId: string): number {
     ).length;
 }
 
-/** Waits for a state of the service or of the fake Codex. */
 async function waitFor<T>(label: string, read: () => T | null | undefined | false, timeoutMs = 20_000): Promise<T> {
   const deadline = Date.now() + timeoutMs;
   for (;;) {
@@ -209,6 +214,7 @@ try {
   for (const [index, entry] of cases.entries()) {
     await writeFile(controlPath, JSON.stringify(entry));
     const firstLogLine = logLines.length;
+    const firstErrorEvent = errorEvents.length;
     const agent = await runCauseEffect(
       agents.createAgent({
         name: `Fallback ${index + 1}`,
@@ -234,7 +240,17 @@ try {
         .map(({ code, message }) => ({ code, message })),
       warningLogLines: logLines
         .slice(firstLogLine)
-        .filter((line) => line.includes("A provider warning needs no action.")),
+        .filter((line) => line.includes("A provider warning needs no action.") && line.includes(FALLBACK)),
+      unstableFeaturesLogLines: logLines
+        .slice(firstLogLine)
+        .filter((line) => line.includes("A provider warning needs no action.") && line.includes("async_compaction"))
+        .length,
+      skillBudgetLogLines: logLines
+        .slice(firstLogLine)
+        .filter(
+          (line) =>
+            line.includes("A provider warning needs no action.") && line.includes("Exceeded skills context budget"),
+        ).length,
       passed: false,
     };
     report.cases.push(result);
@@ -243,6 +259,22 @@ try {
     assert.ok(
       result.errorEvents.every((event) => !event.message.includes(FALLBACK)),
       `${entry.name}: the transport warning reached the banner`,
+    );
+    assert.ok(
+      errorEvents.slice(firstErrorEvent).every((event) => !event.message.includes("Under-development features")),
+      `${entry.name}: the under-development features warning reached a banner or a toast`,
+    );
+    assert.ok(
+      errorEvents.slice(firstErrorEvent).every((event) => !event.message.includes("Exceeded skills context budget")),
+      `${entry.name}: the skills context budget warning reached a banner or a toast`,
+    );
+    assert.ok(
+      result.skillBudgetLogLines >= SKILL_BUDGET_WARNINGS.length,
+      `${entry.name}: the skills context budget warnings were not logged`,
+    );
+    assert.ok(
+      result.unstableFeaturesLogLines >= 1,
+      `${entry.name}: the under-development features warning was not logged`,
     );
     assert.equal(result.warningLogLines.length, 1, `${entry.name}: the warning was not logged one time`);
     assert.ok(result.warningLogLines[0]?.includes(FINAL_FAILURE), `${entry.name}: the log lost the close reason`);

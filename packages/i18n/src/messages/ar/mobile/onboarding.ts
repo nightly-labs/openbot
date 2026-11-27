@@ -18,7 +18,7 @@ export const messages = {
   "mobile.onboarding.server.invitationBody": "انضم إلى خادم شاركه شخص معك.",
   "mobile.onboarding.server.computerTitle": "اربط حاسوبك",
   "mobile.onboarding.server.computerSteps":
-    "سجّل الخروج على هذا الهاتف. ثم افتح OpenBot على حاسوبك، وانتقل إلى الإعدادات → Mobile Connect، واختر إنشاء رمز QR وامسحه بهذا الهاتف.",
+    "سجّل الخروج على هذا الهاتف. ثم افتح OpenBot على حاسوبك، وانتقل إلى الإعدادات → Mobile Connect، واختر «إضافة هاتف» → «نعم، تسجيل الدخول»، وامسح الرمز بهذا الهاتف.",
   "mobile.onboarding.server.signOut": "تسجيل الخروج",
   "mobile.onboarding.server.connecting": "جارٍ الاتصال بـ {name}…",
   "mobile.onboarding.agent.title": "اختر وكيلك الأول",
@@ -62,6 +62,7 @@ export const messages = {
   "mobile.onboarding.task.creating": "جارٍ الإنشاء…",
   "mobile.onboarding.task.withoutTask": "إنشاء بدون مهمة",
   "mobile.onboarding.task.failed": "تعذّر إنشاء الوكيل. أعد المحاولة.",
+  "mobile.onboarding.task.sendFailed": "لم تُرسَل مهمتك الأولى. أرسلها في المحادثة.",
   "mobile.onboarding.idea.builder1": "اصنع تطبيق ويب صغيرًا لقائمة المهام.",
   "mobile.onboarding.idea.builder2": "اشرح كيف تعمل فروع Git، مع أمثلة.",
   "mobile.onboarding.idea.builder3": "اكتب برنامجًا نصيًا يرتّب صوري حسب التاريخ.",

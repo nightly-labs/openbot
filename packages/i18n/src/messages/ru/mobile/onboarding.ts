@@ -18,7 +18,7 @@ export const messages = {
   "mobile.onboarding.server.invitationBody": "Присоединитесь к серверу, к которому вам дали доступ.",
   "mobile.onboarding.server.computerTitle": "Подключите компьютер",
   "mobile.onboarding.server.computerSteps":
-    "Выйдите из аккаунта на этом телефоне. Затем откройте OpenBot на компьютере, перейдите в «Настройки» → «Mobile Connect», нажмите «Создать QR-код» и отсканируйте его этим телефоном.",
+    "Выйдите из аккаунта на этом телефоне. Затем откройте OpenBot на компьютере, перейдите в «Настройки» → «Mobile Connect», нажмите «Добавить телефон» → «Да, войти» и отсканируйте код этим телефоном.",
   "mobile.onboarding.server.signOut": "Выйти",
   "mobile.onboarding.server.connecting": "Подключение к серверу {name}…",
   "mobile.onboarding.agent.title": "Выберите первого агента",
@@ -62,6 +62,7 @@ export const messages = {
   "mobile.onboarding.task.creating": "Создание…",
   "mobile.onboarding.task.withoutTask": "Создать без задачи",
   "mobile.onboarding.task.failed": "Не удалось создать агента. Повторите попытку.",
+  "mobile.onboarding.task.sendFailed": "Первая задача не отправлена. Отправьте её в чате.",
   "mobile.onboarding.idea.builder1": "Сделайте небольшое веб-приложение для списка дел.",
   "mobile.onboarding.idea.builder2": "Объясните на примерах, как работают ветки в Git.",
   "mobile.onboarding.idea.builder3": "Напишите скрипт, который сортирует мои фото по дате.",

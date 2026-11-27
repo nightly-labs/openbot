@@ -1,6 +1,8 @@
 import { isKnownAgentProvider } from "@openbot/contracts/agent-providers";
-import type { AgentStatus, ClientAgentModelOption, CustomProviderSummary } from "@openbot/contracts/ipc";
-import { TEAM_AGENT_CREATE_MODEL_CAPABILITY } from "@openbot/contracts/team-protocol/current";
+import type { AccountUsage, AgentStatus, ClientAgentModelOption, CustomProviderSummary } from "@openbot/contracts/ipc";
+import { AGENT_WELCOME_CAPABILITY, TEAM_AGENT_CREATE_MODEL_CAPABILITY } from "@openbot/contracts/team-protocol/current";
+import { type CreationPreference, resolveCreationModel } from "@openbot/ui/features/agents/agent-creation-model";
+import { createAgentInitialMessage } from "@openbot/ui/features/agents/agent-initial-message";
 import {
   createFirstAgentDraft,
   FIRST_AGENT_SUGGESTIONS,
@@ -9,32 +11,23 @@ import {
 } from "@openbot/ui/features/agents/FirstAgentSetup";
 import { useText } from "@openbot/ui/text";
 import { createEffect, createStore, onSettled } from "solid-js";
-import { type CreationPreference, resolveCreationModel } from "../agents/agent-creation-model";
-import { createAgentInitialMessage } from "../agents/agent-initial-message";
 import type { WebWorkspaceRuntime } from "./web-runtime";
 
 export function WebAgentSettings(props: {
   runtime: WebWorkspaceRuntime;
   capabilities: string[];
-  /** The host has no agents yet: the form shows the first-agent copy and cannot be cancelled. */
   first: boolean;
-  /** The provider that the server's provider step chose, for the model the draft starts on. */
   preference?: CreationPreference | null | undefined;
-  /** The host's endpoints, so the picker lists their models on its Custom tab. */
   customProviders?: readonly CustomProviderSummary[] | undefined;
-  /** Opens the host's provider settings from a plus button in the model picker. */
   onManageProviders?: ((trigger: HTMLElement) => void) | undefined;
-  /**
-   * The workspace's live catalog. A provider that the user connects while the form is open, such as
-   * from the picker's plus button, comes in here; the form's own read only starts it.
-   */
   liveModels?: ClientAgentModelOption[] | undefined;
   liveStatus?: AgentStatus | undefined;
-  /** The draft the form starts from. */
+  accountChoice?: boolean | undefined;
+  accountUsage?: AccountUsage | null | undefined;
   initialDraft?: FirstAgentDraft;
   onDraftChange?: (draft: FirstAgentDraft) => void;
   onClose: () => void;
-  onSaved: () => Promise<void>;
+  onSaved: (agentId: string) => Promise<void>;
 }) {
   const { t } = useText();
   const [state, setState] = createStore<{
@@ -44,7 +37,6 @@ export function WebAgentSettings(props: {
     busy: boolean;
     error: string | null;
     uncertain: boolean;
-    /** The user picked a model, so a new catalog no longer replaces it. */
     modelTouched: boolean;
   }>({
     draft: props.initialDraft ?? createFirstAgentDraft(),
@@ -75,8 +67,6 @@ export function WebAgentSettings(props: {
         (model) => model.provider === draft.draft.provider && model.id === draft.draft.model,
       );
       if (draft.modelTouched && selected) return;
-      // As in the desktop app. The web client does not know the host's saved setup choice, so
-      // only the server's provider step names a provider.
       const resolved = resolveCreationModel(props.preference ?? null, models, status);
       if (resolved) {
         draft.draft.provider = resolved.provider;
@@ -90,7 +80,6 @@ export function WebAgentSettings(props: {
     () => ({ models: props.liveModels, status: props.liveStatus }),
     ({ models, status }) => {
       if (!supportsModelSelection() || !models?.length || status?.phase !== "ready") return;
-      // A newer read wins, so the form's own read that is still in flight does not replace it.
       modelRequestGeneration += 1;
       showCatalog(models, status);
     },
@@ -140,10 +129,10 @@ export function WebAgentSettings(props: {
     let created = false;
     try {
       const selectedModel = state.models.find((model) => model.provider === value.provider && model.id === value.model);
-      await props.runtime.createAgent({
+      const agent = await props.runtime.createAgent({
         name: value.name,
         description: value.purpose,
-        initialMessage: createAgentInitialMessage(value),
+        initialMessage: createAgentInitialMessage(value, props.capabilities.includes(AGENT_WELCOME_CAPABILITY)),
         avatarSeed: value.avatarSeed,
         avatarHue: value.avatarHue,
         ...(supportsModelSelection() && selectedModel && isKnownAgentProvider(selectedModel.provider)
@@ -151,12 +140,15 @@ export function WebAgentSettings(props: {
               provider: selectedModel.provider,
               model: selectedModel.id,
               ...(value.reasoningEffort ? { reasoningEffort: value.reasoningEffort } : {}),
+              ...(props.accountChoice && value.providerAccountId !== undefined
+                ? { providerAccountId: value.providerAccountId }
+                : {}),
             }
           : {}),
       });
       created = true;
       if (!disposed) {
-        await props.onSaved();
+        await props.onSaved(agent.id);
         props.onClose();
       }
     } catch {
@@ -181,6 +173,8 @@ export function WebAgentSettings(props: {
       error={state.error}
       modelOptions={supportsModelSelection() && state.models.length > 0 ? state.models : undefined}
       agentStatus={state.status ?? undefined}
+      accountChoice={props.accountChoice}
+      accountUsage={props.accountUsage}
       customProviders={props.customProviders}
       onManageProviders={props.onManageProviders}
       onChange={(value) => {
@@ -188,7 +182,8 @@ export function WebAgentSettings(props: {
           if (
             value.provider !== draft.draft.provider ||
             value.model !== draft.draft.model ||
-            value.reasoningEffort !== draft.draft.reasoningEffort
+            value.reasoningEffort !== draft.draft.reasoningEffort ||
+            value.providerAccountId !== draft.draft.providerAccountId
           )
             draft.modelTouched = true;
           draft.draft = value;

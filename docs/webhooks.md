@@ -23,13 +23,24 @@ secret. A card in the chat shows the URL; press the regenerate button on the car
 secret, then copy it. Only a person who can manage the host's webhook routines sees the card. When
 the agent makes the routine for another agent, get the secret in that agent's routine editor.
 
+The agent can also add the secret to the sender itself, for example when it sets up the sender
+through an API. Press **Give the signing secret to <agent>** (the agent button next to the
+regenerate button) on the card or in the routine editor, and confirm. The host makes a new secret
+and saves it as an API key of that agent only, with a name such as `WEBHOOK_SECRET_3F2A…` (the routine ID in upper case, with no dashes). The old
+secret stops working immediately. Nobody copies the secret, and it does not show in the chat. The
+agent reads it from the key file (`openbot.list_api_keys` gives the path). When you regenerate the
+secret or use the sender's secret later, the host also updates the key. When you delete the
+routine or change its trigger to a schedule, the host deletes the key. A channel routine has no single agent, so it does not show the
+button.
+
 To change the event type or the filters from the chat, ask the agent: it calls
 `openbot.update_webhook_routine`. You can also change them on the card and press **Save**. The URL
 and the secret stay the same. Only a person's message can start these tools: a routine run or
 another agent's message cannot make or change a webhook routine.
 
 To replace the secret, make a new one in the routine editor and update the sender. The old secret
-stops working immediately. A secret has the format `whsec_<43 base64url characters>`.
+stops working immediately. A secret has the format `whsec_<44 base64 characters>`, as the
+[Standard Webhooks](https://www.standardwebhooks.com/) specification says.
 
 When you change the routine to **Schedule**, or delete the routine, its URL stops working. If you
 change it back to **Webhook**, the routine gets a new URL and a new secret.
@@ -131,7 +142,8 @@ if (response.status !== 200 && response.status !== 202) {
 
 A `202` response does not mean that the run is complete. Look at the routine history for the run
 result. The relay does not keep requests while the host is offline. If you do not retry, the event
-is lost.
+is lost. When the host is a hosted server that sleeps, the `503` also starts it, so retry: a hosted
+server is usually online again within a few minutes.
 
 ### Retries and duplicates
 
@@ -168,6 +180,8 @@ you cannot give them the OpenBot secret:
 Svix also sends these headers with the `svix-` prefix. OpenBot accepts both names. The signed bytes
 are `<webhook-id>.<webhook-timestamp>.<body>`. The HMAC key is the base64 data after `whsec_` in the
 secret, as the specification says, or the complete secret as UTF-8 text, as Composio uses it.
+A secret that an older OpenBot version made is base64url (`-` and `_`, no `=`). Standard Webhooks
+senders need base64, so make a new secret in the routine editor and copy it into the sender.
 
 The body must be a JSON object with a `type` string. OpenBot reads the request as follows:
 

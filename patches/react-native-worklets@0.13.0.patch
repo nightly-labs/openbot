@@ -1,0 +1,34 @@
+diff --git a/lib/module/memory/serializable.native.js b/lib/module/memory/serializable.native.js
+index fff291fadf0622f9f6455939e12ccf74876f741e..7f537035a4d495c46d5f74271362d96132152ee1 100644
+--- a/lib/module/memory/serializable.native.js
++++ b/lib/module/memory/serializable.native.js
+@@ -267,7 +267,11 @@ function cloneObjectProperties(value, shouldPersistRemote, depth) {
+     // We don't need to clone __initData field as it contains long strings
+     // representing the worklet code, source map, and location, and we will
+     // serialize/deserialize it once.
+-    if (key === '__initData' && clonedProps.__initData !== undefined) {
++    // OpenBot patch: the old check read `clonedProps.__initData` of the new empty object, so it
++    // never skipped. Each worklet instance then cloned `__initData` without persistence first,
++    // the cache kept that clone, and the UI runtime got its own copy of the code for each instance.
++    // `cloneWorklet` clones `__initData` itself, persistent, and only worklets are functions here.
++    if (key === '__initData' && typeof value === 'function') {
+       continue;
+     }
+     if (__DEV__) {
+diff --git a/src/memory/serializable.native.ts b/src/memory/serializable.native.ts
+index 78a98750434e1c8f181caaaeabf6743f2085c3ee..1e1f96eaef85d8ecfa14fe46a5c92b57b6090500 100644
+--- a/src/memory/serializable.native.ts
++++ b/src/memory/serializable.native.ts
+@@ -369,7 +369,11 @@ function cloneObjectProperties<T extends object>(
+     // We don't need to clone __initData field as it contains long strings
+     // representing the worklet code, source map, and location, and we will
+     // serialize/deserialize it once.
+-    if (key === '__initData' && clonedProps.__initData !== undefined) {
++    // OpenBot patch: the old check read `clonedProps.__initData` of the new empty object, so it
++    // never skipped. Each worklet instance then cloned `__initData` without persistence first,
++    // the cache kept that clone, and the UI runtime got its own copy of the code for each instance.
++    // `cloneWorklet` clones `__initData` itself, persistent, and only worklets are functions here.
++    if (key === '__initData' && typeof value === 'function') {
+       continue;
+     }
+     if (__DEV__) {

@@ -1,10 +1,3 @@
-/**
- * Every sidebar change that leaves the component: `onMutateLayout`, `onPin`, `onUnpin`,
- * `onReorderPinned` and `onReorderPeople`, each paired with what it announces. Gathered here so the
- * list of things the sidebar can ask its host to do is one file, reachable from the drag engine,
- * from the context menus and from the keyboard reorder shortcuts alike.
- */
-
 import {
   SIDEBAR_UNASSIGNED_SECTION_ID,
   type SidebarLayoutAction,
@@ -20,7 +13,7 @@ import type {
   SidebarDropTarget,
 } from "../sidebar-drag-model";
 import { type SidebarPinnedItem, sidebarPinnedItemKey } from "../sidebar-pins";
-import type { SidebarChatItem, SidebarProps } from "../sidebar-types";
+import { type SidebarChatItem, type SidebarProps, sidebarChatOrderSortsSections } from "../sidebar-types";
 
 export function createSidebarLayoutActions(deps: {
   chatPinnedItems: () => SidebarPinnedItem[];
@@ -31,7 +24,6 @@ export function createSidebarLayoutActions(deps: {
   chatName: (chatId: string) => string;
   draggedSidebarItem: () => SidebarPinnedItem | null;
   filteredChatsBySection: () => Map<string, SidebarChatItem[]>;
-  /** The host keeps folders in folders, so a folder moves among its siblings with `nest`. */
   foldersSupported: () => boolean;
   layoutMutable: () => boolean;
   orderedPeople: () => TeamPresenceMember[];
@@ -67,13 +59,11 @@ export function createSidebarLayoutActions(deps: {
   } = deps;
   const { t } = currentText();
 
-  /** The folders next to this one, in its parent or at the top, and its index among them. */
   function sectionSiblingIndex(sectionId: string): { index: number; total: number } {
     const siblings = foldersSupported() ? sectionChildren(sectionParent(sectionId)) : visibleSectionIds();
     return { index: siblings.indexOf(sectionId), total: siblings.length };
   }
 
-  /** Puts a folder with its folders in `parentId` (null: the top), before `beforeSectionId` or last. */
   function nestSection(sectionId: string, parentId: string | null, beforeSectionId: string | null): void {
     if (!sectionCanNest(sectionId, parentId)) return;
     void props.onMutateLayout({ type: "nest", sectionId, parentId, beforeSectionId }).then(() => {
@@ -88,7 +78,6 @@ export function createSidebarLayoutActions(deps: {
     }, announceError);
   }
 
-  /** The folder menu's "Move to": the end of another folder, or of the top of the list. */
   function moveFolderTo(sectionId: string, parentId: string | null): void {
     if (sectionParent(sectionId) === parentId) return;
     nestSection(sectionId, parentId, null);
@@ -118,20 +107,14 @@ export function createSidebarLayoutActions(deps: {
     void props.onMutateLayout({ type: "move", sectionId, direction, steps }).catch(announceError);
   }
 
-  /** The host reports a failed copy itself; the live region only needs to hear that it failed. */
   function duplicateSection(sectionId: string): void {
     void props.onDuplicateSection?.(sectionId).catch(announceError);
   }
 
-  /**
-   * Moves one chat into a section, or out of every section when `sectionId` is null. The action
-   * keeps its released `agentId` field name; a channel id travels in it the same way.
-   */
   function assignChatSection(chatId: string, sectionId: string | null): void {
     void props.onMutateLayout({ type: "assign", agentId: chatId, sectionId }).catch(announceError);
   }
 
-  /** The ids a section shows, in order, without the chat that is being dragged out of it. */
   function sectionChatIdsWithout(sectionId: string, chatId: string): string[] {
     return (filteredChatsBySection().get(sectionId) ?? [])
       .map((item) => item.id)
@@ -229,6 +212,7 @@ export function createSidebarLayoutActions(deps: {
   }
 
   function moveChatAction(chatId: string, target: ChatDropTarget): SidebarLayoutAction | null {
+    if (sidebarChatOrderSortsSections(props.chatOrder)) return appendChatAction(chatId, target.sectionId);
     const idsWithoutSource = sectionChatIdsWithout(target.sectionId, chatId);
     const targetIndex = idsWithoutSource.indexOf(target.chatId);
     if (targetIndex < 0) return null;
@@ -249,7 +233,6 @@ export function createSidebarLayoutActions(deps: {
     };
   }
 
-  /** The pin a dragged tile stands for, found by the key the tile carries. */
   function pinnedRef(key: string): SidebarPinnedItem | undefined {
     return chatPinnedItems().find((item) => sidebarPinnedItemKey(item) === key);
   }
@@ -282,11 +265,6 @@ export function createSidebarLayoutActions(deps: {
     }
   }
 
-  /**
-   * The one signature that takes its source as a parameter. Everything below decides where a drag
-   * lands, and the engine holds the only source that is current in this tick - reading it back off
-   * the drag store would be one flush stale, and would land the drag in the previous target.
-   */
   function commitSidebarDrop(source: SidebarDragSource, target: SidebarDropTarget | null): void {
     if ("origin" in source && source.origin === "pinned") {
       if (target?.kind === "pinned") {

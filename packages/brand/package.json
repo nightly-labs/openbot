@@ -7,6 +7,8 @@
     ".": "./src/index.ts",
     "./bloub-avatar": "./src/bloub-avatar.ts",
     "./bloub-avatar-motion": "./src/bloub-avatar-motion.ts",
+    "./chat-colors": "./src/chat-colors.ts",
+    "./chat-backdrop-scenes": "./src/chat-backdrop-scenes.ts",
     "./logo.css": "./src/logo.css",
     "./tokens.css": "./src/tokens.css",
     "./tokens-light.css": "./src/tokens-light.css",
@@ -27,7 +29,7 @@
   },
   "peerDependencies": {
     "@solidjs/web": "catalog:",
-    "solid-js": "2.0.0-rc.18"
+    "solid-js": "2.0.3"
   },
   "devDependencies": {
     "typescript": "catalog:"

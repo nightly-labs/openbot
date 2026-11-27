@@ -8,7 +8,11 @@ export const messages = {
   "error.update.downloadStalled": "Der Download der Aktualisierung reagiert nicht mehr. Versuche es erneut.",
   "error.update.installFailed":
     "Die Aktualisierung konnte nicht installiert werden. Beende und öffne OpenBot erneut und versuche es noch einmal.",
+  "error.update.notInstalled":
+    "Beim letzten Neustart wurde die Aktualisierung nicht installiert. Starte neu, um es noch einmal zu versuchen.",
   "error.update.downloadFailed": "Die Aktualisierung konnte nicht heruntergeladen werden. Versuche es erneut.",
+  "error.update.signatureNotConfirmed":
+    "OpenBot konnte die Aktualisierung nicht prüfen. Versuche es erneut. Wenn der Fehler bleibt, lade OpenBot von openbot.run/download herunter.",
   "error.update.checkFailed": "Es konnte nicht nach Aktualisierungen gesucht werden. Versuche es erneut.",
   "error.update.checkStalled": "Die Suche nach Aktualisierungen reagiert nicht mehr. Versuche es erneut.",
   "error.update.checkOffline":
@@ -27,6 +31,12 @@ export const messages = {
     "Ein anderer OpenBot-Prozess läuft noch in diesem Benutzerkonto. Beende ihn und installiere die Aktualisierung erneut.",
   "error.update.siblingCheckFailed":
     "Andere OpenBot-Sitzungen konnten nicht überprüft werden. Versuche es vor der Installation erneut.",
+  "error.update.readOnlyLocation":
+    "OpenBot kann von diesem Ort aus keine Aktualisierungen installieren. Beende OpenBot. Ziehe OpenBot im Finder in den Ordner „Programme“ (wenn es schon dort ist, ziehe es heraus und wieder hinein). Öffne OpenBot dann und installiere die Aktualisierung erneut.",
+  "error.update.appImageMissing":
+    "OpenBot kann das Update nicht installieren, weil seine AppImage-Datei verschoben, umbenannt oder ersetzt wurde. Beende OpenBot und öffne die AppImage-Datei dann erneut.",
+  "error.update.appImageReadOnly":
+    "OpenBot kann im Ordner seiner AppImage-Datei keine Updates installieren. Beende OpenBot, verschiebe die AppImage-Datei in einen Ordner in deinem Home-Ordner, öffne sie dann und installiere das Update erneut.",
   "error.update.remoteDisabled": "Aktualisierungen durch Serveradministratoren sind auf diesem Computer deaktiviert.",
   "error.update.restartStarted": "OpenBot startet bereits zur Installation der Aktualisierung neu.",
   "error.update.alreadyRestarting": "OpenBot startet bereits neu.",

@@ -1,13 +1,3 @@
-// Checks the browser profile of each agent through the real profile service, agent service, agent store
-// and profile store on a temporary database. The agents move between the shared profile, their own
-// session and named profiles; a profile is deleted; then the stores start again from the database, as
-// the app does at its next launch. A choice of the shared profile, and the delete of a named profile,
-// must leave no profile id on the agent, before and after the restart. The browser is a stub: no tab is
-// open, so a profile change closes nothing.
-// The agent service is not initialized, so no provider CLI starts.
-// Run: `bun scripts/browser-profile-agents-e2e.ts`.
-// Writes .openbot-build/browser-profile-agents-e2e/report.json.
-
 import assert from "node:assert/strict";
 import { mkdirSync, writeFileSync } from "node:fs";
 import { mkdtemp, rm } from "node:fs/promises";
@@ -19,6 +9,7 @@ import type { AgentBrowserHost } from "../src/backend/agent/turn-lifecycle";
 import { AgentService } from "../src/backend/agent-service";
 import { AgentStore } from "../src/backend/agent-store";
 import { BrowserProfileStore } from "../src/backend/browser-profiles/browser-profile-store";
+import { BrowserProxyStore } from "../src/backend/browser-profiles/browser-proxy-store";
 import { runCauseEffect } from "../src/backend/effect-boundary";
 import { MailboxStore } from "../src/backend/mailbox-store";
 import { OpenBotDatabase } from "../src/backend/openbot-database";
@@ -44,6 +35,7 @@ function pass(name: string, condition: boolean, detail?: unknown) {
 const unused = () => Effect.die(new Error("Not used by this check."));
 const agentBrowser: AgentBrowserHost = {
   listTabs: () => [],
+  toolCanUseTab: () => false,
   beginTakeover: unused,
   endTakeover: () => {},
   userControlTabFor: () => null,
@@ -57,6 +49,9 @@ const agentBrowser: AgentBrowserHost = {
   endControl: () => {},
   close: () => Effect.void,
   clearAgentSession: () => Effect.void,
+  shareTab: () => undefined,
+  unshareThread: () => undefined,
+  agentTab: () => null,
 };
 
 interface Host {
@@ -66,7 +61,6 @@ interface Host {
   profiles: BrowserProfileService;
 }
 
-/** Starts the stores on the profile, as the app does at each launch. */
 async function startHost(): Promise<Host> {
   const database = new OpenBotDatabase(userData);
   const store = new AgentStore(userData, home, database);
@@ -76,18 +70,22 @@ async function startHost(): Promise<Host> {
   const agents = new AgentService({ store, mailbox, browser: agentBrowser });
   const profiles = createBrowserProfileService({
     store: new BrowserProfileStore(store.database),
+    proxies: new BrowserProxyStore(store.database),
+    cipher: { canPersist: () => true, encrypt: (value) => Buffer.from(value, "utf8") },
     agents,
     browser: {
       tabIdsInSession: () => [],
       listTabSessions: () => [],
       close: () => Effect.void,
+      proxyFailure: () => null,
+      forgetProxyFailure: () => undefined,
       clearTabSession: () => Effect.void,
+      releaseProfileProxy: () => Effect.void,
     },
   });
   return { database, store, agents, profiles };
 }
 
-/** The stored fields that choose the session, as the next launch reads them. */
 function stored(host: Host, agentId: string) {
   const agent = host.store.list().find((candidate) => candidate.id === agentId);
   assert.ok(agent, "An agent is missing.");

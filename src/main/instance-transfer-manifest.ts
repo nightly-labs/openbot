@@ -1,11 +1,3 @@
-// The `openbot-transfer.json` manifest at the root of an instance transfer file. OpenBot writes it
-// on one computer and reads it on another, so the format is a contract between app versions: add
-// optional fields only, and a change of meaning needs a new `version`. The format is described in
-// `docs/architecture/instance-transfer.md`.
-//
-// A file with an invalid structure is refused. One invalid agent is reported and the others are
-// still offered, and invalid settings are left out with a warning.
-
 import { isAgentProvider } from "@openbot/contracts/agent-providers";
 import { INPUT_LIMITS } from "@openbot/contracts/input-limits";
 import {
@@ -18,16 +10,25 @@ import {
   isRoutineSchedule,
   ROUTINE_LIMIT_POLICIES,
   ROUTINE_MISSED_POLICIES,
+  ROUTINE_RUN_PLACES,
 } from "@openbot/contracts/ipc";
 import { sourceText } from "@openbot/i18n/source";
 import { Result, Schema } from "effect";
+import { ServerPreferencesInFile, type TransferServerPreferences } from "./instance-transfer-server-preferences";
+import { TRANSFER_WORKFLOWS } from "./instance-transfer-workflows";
 import { isUnsafeArchivePath } from "./skill-package";
 
-export const INSTANCE_TRANSFER_MANIFEST = "openbot-transfer.json";
+export { INSTANCE_TRANSFER_MANIFEST } from "@openbot/team-client/instance-transfer-copy";
 export const INSTANCE_TRANSFER_FORMAT = "openbot-instance-transfer";
 export const INSTANCE_TRANSFER_VERSION = 1;
-/** Where the files of `~/OpenBot/Shared` are in the archive. */
 export const SHARED_FOLDER = "shared";
+export const SERVER_FOLDER = "server";
+export const LIBRARY_FOLDER = "library";
+const TRANSFER_MEMBERS = 1000;
+export const TRANSFER_SHARED_SKILLS = 1000;
+export const SHARED_SKILL_BYTES = 10 * 1024 * 1024;
+export const TRANSFER_CHANNELS = 1000;
+const INSTANCE_TRANSFER_CHANNEL_FILES = 50_000;
 
 const text = (limit: number) => Schema.String.check(Schema.isMaxLength(limit));
 const name = (limit: number) => text(limit).check(Schema.isMinLength(1));
@@ -36,7 +37,6 @@ const Key = guarded(isAgentImportKey);
 const Provider = guarded(isAgentProvider);
 
 const Routine = Schema.Struct({
-  /** The routine id on the computer that made the file. Routine flows name routines by it. */
   key: name(INPUT_LIMITS.identifier),
   name: name(INPUT_LIMITS.routineName),
   instruction: name(INPUT_LIMITS.routineInstruction),
@@ -45,11 +45,12 @@ const Routine = Schema.Struct({
   schedule: guarded(isRoutineSchedule),
   limitPolicy: Schema.optionalKey(Schema.Literals(ROUTINE_LIMIT_POLICIES)),
   missedPolicy: Schema.optionalKey(Schema.Literals(ROUTINE_MISSED_POLICIES)),
+  runIn: Schema.optionalKey(Schema.Literals(ROUTINE_RUN_PLACES)),
+  runs: Schema.optionalKey(Schema.Array(Schema.Unknown).check(Schema.isMaxLength(INPUT_LIMITS.routineRunsPage))),
 });
 
 const Memory = Schema.Struct({
   text: name(INPUT_LIMITS.agentMemoryText),
-  /** Only a choice the user made is kept; the rest is chosen again on import. */
   inclusion: Schema.optionalKey(Schema.Literals(["essential", "searchable"])),
 });
 
@@ -60,13 +61,8 @@ const Agent = Schema.Struct({
   description: text(INPUT_LIMITS.agentDescription),
   avatarSeed: text(128),
   avatarHue: Schema.NullOr(guarded(isAvatarHue)),
-  /**
-   * Added after version 1 shipped: the exact colour, `#rrggbb`. An older app ignores it and draws
-   * `avatarHue`, which is the nearest hue. The import drops an invalid value, so that a newer colour
-   * format cannot refuse the agent.
-   */
   avatarColor: Schema.optionalKey(Schema.String),
-  /** An archive path inside `agents/<key>/`, checked below. */
+  chatColor: Schema.optionalKey(Schema.String),
   avatar: Schema.NullOr(text(512)),
   provider: Provider,
   model: name(256),
@@ -77,16 +73,16 @@ const Agent = Schema.Struct({
   skills: Schema.Array(text(512)).check(Schema.isMaxLength(INPUT_LIMITS.agentSkills)),
   files: Schema.NullOr(text(512)),
   routines: Schema.Array(Routine).check(Schema.isMaxLength(INPUT_LIMITS.agentRoutines)),
-  /**
-   * Routines with a `once` schedule. They are not in `routines`: an app with no one-time schedule
-   * refuses an agent with one there, but it ignores this field and keeps the agent.
-   */
   oneTimeRoutines: Schema.optionalKey(Schema.Array(Routine).check(Schema.isMaxLength(INPUT_LIMITS.agentRoutines))),
   memories: Schema.Array(Memory).check(Schema.isMaxLength(512)),
+  preferences: Schema.optionalKey(Schema.Unknown),
+  history: Schema.optionalKey(text(512)),
+  webhookRoutines: Schema.optionalKey(
+    Schema.Array(Schema.Unknown).check(Schema.isMaxLength(INPUT_LIMITS.agentRoutines)),
+  ),
 });
 
 const Settings = Schema.Struct({
-  /** Every environment and header value is empty: only the names travel. */
   mcpServers: Schema.Array(guarded(isMcpServerConfig)).check(Schema.isMaxLength(INPUT_LIMITS.mcpServers)),
   customProviders: Schema.Array(
     Schema.Struct({
@@ -97,22 +93,13 @@ const Settings = Schema.Struct({
         Schema.Struct({
           id: name(256),
           name: text(256),
-          /**
-           * Added after version 1 shipped. An older app ignores it and uses OpenCode's default. The import
-           * drops a value out of range, so that a newer limit cannot refuse the whole Settings section.
-           */
           contextWindow: Schema.optionalKey(Schema.Number),
-          /** Added after `contextWindow`, with the same rules. */
           maxOutput: Schema.optionalKey(Schema.Number),
+          reasoningEfforts: Schema.optionalKey(Schema.Array(Schema.String).check(Schema.isMaxLength(16))),
+          inputs: Schema.optionalKey(Schema.Array(Schema.String).check(Schema.isMaxLength(16))),
         }),
       ).check(Schema.isMaxLength(256)),
-      /** The provider had a saved key. The key itself is never in the file. */
       needsApiKey: Schema.Boolean,
-      /**
-       * Added after version 1 shipped, and only for an endpoint that runs on Pi. An older app ignores
-       * it and runs the endpoint on OpenCode. The import drops an unknown value, so that a harness a
-       * newer app adds cannot refuse the whole Settings section.
-       */
       harness: Schema.optionalKey(Schema.String),
     }),
   ).check(Schema.isMaxLength(32)),
@@ -136,8 +123,34 @@ const Settings = Schema.Struct({
       instruction: text(INPUT_LIMITS.routineInstruction),
     }),
   ).check(Schema.isMaxLength(512)),
-  /** MCP servers, providers and custom agents whose argument or URL values the export removed. */
   cleared: Schema.optionalKey(Schema.Array(name(128)).check(Schema.isMaxLength(128))),
+  workflows: Schema.optionalKey(Schema.Array(Schema.Unknown).check(Schema.isMaxLength(TRANSFER_WORKFLOWS))),
+  routineFlowPositions: Schema.optionalKey(
+    Schema.Array(
+      Schema.Struct({ agentKey: Key, nodeKey: name(INPUT_LIMITS.identifier + 16), x: Schema.Number, y: Schema.Number }),
+    ).check(Schema.isMaxLength(5_000)),
+  ),
+});
+
+const Channel = Schema.Struct({
+  key: name(INPUT_LIMITS.identifier),
+  name: name(INPUT_LIMITS.agentName),
+  title: text(INPUT_LIMITS.agentTitle),
+  instructions: text(INPUT_LIMITS.agentDescription),
+  members: Schema.Array(Key).check(Schema.isMaxLength(INPUT_LIMITS.agents)),
+  lead: Schema.NullOr(Key),
+  isolated: Schema.optionalKey(Schema.Boolean),
+  browser: Schema.optionalKey(Schema.Unknown),
+  icon: Schema.optionalKey(Schema.Unknown),
+  image: Schema.NullOr(text(512)),
+  archived: Schema.Boolean,
+  memories: Schema.Array(name(INPUT_LIMITS.agentMemoryText)).check(Schema.isMaxLength(INPUT_LIMITS.channelMemories)),
+  routines: Schema.Array(Routine).check(Schema.isMaxLength(INPUT_LIMITS.agentRoutines)),
+  webhookRoutines: Schema.optionalKey(
+    Schema.Array(Schema.Unknown).check(Schema.isMaxLength(INPUT_LIMITS.agentRoutines)),
+  ),
+  messages: Schema.optionalKey(Schema.Array(text(512)).check(Schema.isMaxLength(10_000))),
+  files: Schema.optionalKey(Schema.Array(Schema.Unknown).check(Schema.isMaxLength(INSTANCE_TRANSFER_CHANNEL_FILES))),
 });
 
 const Manifest = Schema.Struct({
@@ -147,12 +160,18 @@ const Manifest = Schema.Struct({
   agents: Schema.Array(Schema.Unknown).check(Schema.isMaxLength(INPUT_LIMITS.agents)),
   settings: Schema.NullOr(Schema.Unknown),
   shared: Schema.NullOr(Schema.Literal(SHARED_FOLDER)),
-  /** Providers that were signed in on the computer that made the file. Never a token. */
   signedIn: Schema.Array(Provider).check(Schema.isMaxLength(32)),
+  channels: Schema.optionalKey(Schema.Array(Schema.Unknown).check(Schema.isMaxLength(TRANSFER_CHANNELS))),
+  exporter: Schema.optionalKey(text(128)),
+  serverPreferences: Schema.optionalKey(ServerPreferencesInFile),
+  serverIdentity: Schema.optionalKey(Schema.Unknown),
+  sharedSkills: Schema.optionalKey(Schema.Array(Schema.Unknown).check(Schema.isMaxLength(TRANSFER_SHARED_SKILLS))),
+  memberPreferences: Schema.optionalKey(Schema.Array(Schema.Unknown).check(Schema.isMaxLength(TRANSFER_MEMBERS))),
 });
 
 export type TransferAgent = typeof Agent.Type;
 export type TransferSettings = typeof Settings.Type;
+export type TransferChannel = typeof Channel.Type;
 
 export interface TransferManifest {
   appVersion: string;
@@ -161,9 +180,14 @@ export interface TransferManifest {
   settings: TransferSettings | null;
   shared: string | null;
   signedIn: readonly (typeof Provider.Type)[];
+  channels: TransferChannel[];
+  exporter: string | null;
+  serverPreferences: typeof ServerPreferencesInFile.Type | null;
+  serverIdentity: unknown;
+  sharedSkills: readonly unknown[];
+  memberPreferences: readonly unknown[];
 }
 
-/** What the export writes. The same shape that `decodeTransferManifest` reads. */
 export interface TransferManifestFile {
   format: typeof INSTANCE_TRANSFER_FORMAT;
   version: typeof INSTANCE_TRANSFER_VERSION;
@@ -172,11 +196,25 @@ export interface TransferManifestFile {
   settings: TransferSettings | null;
   shared: typeof SHARED_FOLDER | null;
   signedIn: (typeof Provider.Type)[];
+  channels?: TransferChannel[];
+  exporter?: string;
+  serverPreferences?: TransferServerPreferences;
+  serverIdentity?: { name: string; logo: { path: string; mimeType: string } | null } | undefined;
+  sharedSkills?: { slug: string; name: string; path: string; files: string[] }[];
+  memberPreferences?:
+    | {
+        accountId: string;
+        server: string | null;
+        agents: { agentId: string; level: string }[];
+        pins: { kind: string; id: string }[];
+      }[]
+    | undefined;
 }
 
 const decodeManifest = Schema.decodeUnknownResult(Manifest);
 const decodeAgent = Schema.decodeUnknownResult(Agent);
 const decodeSettings = Schema.decodeUnknownResult(Settings);
+const decodeChannel = Schema.decodeUnknownResult(Channel);
 
 export function decodeTransferManifest(bytes: Uint8Array): { manifest: TransferManifest; warnings: string[] } {
   let value: unknown;
@@ -208,7 +246,8 @@ export function decodeTransferManifest(bytes: Uint8Array): { manifest: TransferM
     if (Result.isSuccess(result)) settings = result.success;
     else warnings.push(sourceText("error.import.transferSettingsInvalid"));
   }
-  if (agents.length === 0 && settings === null) throw new Error(sourceText("error.import.transferEmpty"));
+  if (agents.length === 0 && settings === null && !file.serverPreferences)
+    throw new Error(sourceText("error.import.transferEmpty"));
   return {
     manifest: {
       appVersion: file.source.appVersion || "unknown",
@@ -218,15 +257,55 @@ export function decodeTransferManifest(bytes: Uint8Array): { manifest: TransferM
       settings,
       shared: file.shared,
       signedIn: file.signedIn,
+      channels: decodeChannels(file.channels ?? [], keys, warnings),
+      exporter: file.exporter ?? null,
+      serverPreferences: file.serverPreferences ?? null,
+      serverIdentity: file.serverIdentity ?? null,
+      sharedSkills: file.sharedSkills ?? [],
+      memberPreferences: file.memberPreferences ?? [],
     },
     warnings,
   };
 }
 
-/** Every path an agent names is inside its own `agents/<key>/` folder. */
+function decodeChannels(
+  values: readonly unknown[],
+  agentKeys: ReadonlySet<string>,
+  warnings: string[],
+): TransferChannel[] {
+  const keys = new Set<string>();
+  const channels: TransferChannel[] = [];
+  for (const [index, item] of values.entries()) {
+    const decoded = decodeChannel(item);
+    const channel = Result.isSuccess(decoded) ? decoded.success : null;
+    const prefix = channel ? channelPrefix(channel.key) : "";
+    if (
+      !channel ||
+      keys.has(channel.key) ||
+      !isAgentImportKey(channel.key) ||
+      (channel.image !== null && (!channel.image.startsWith(prefix) || isUnsafeArchivePath(channel.image))) ||
+      (channel.messages ?? []).some((path) => !path.startsWith(prefix) || isUnsafeArchivePath(path))
+    ) {
+      warnings.push(sourceText("error.import.transferChannelInvalid", { number: index + 1 }));
+      continue;
+    }
+    keys.add(channel.key);
+    const members = [...new Set(channel.members)].filter((key) => agentKeys.has(key));
+    if (members.length === 0) continue;
+    channels.push({ ...channel, members, lead: channel.lead && members.includes(channel.lead) ? channel.lead : null });
+  }
+  return channels;
+}
+
+export function channelPrefix(key: string): string {
+  return `channels/${key}/`;
+}
+
 function hasSafePaths(agent: TransferAgent): boolean {
   const prefix = `agents/${agent.key}/`;
-  const paths = [agent.avatar, agent.files, ...agent.skills].filter((path): path is string => path !== null);
+  const paths = [agent.avatar, agent.files, agent.history ?? null, ...agent.skills].filter(
+    (path): path is string => path !== null,
+  );
   return paths.every((path) => path.startsWith(prefix) && !isUnsafeArchivePath(path));
 }
 

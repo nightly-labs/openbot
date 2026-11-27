@@ -1,16 +1,3 @@
-import type { CentralAuthOperationError } from "./central-auth-effects";
-// Members and invitations -- the one place the two transports answer to different authorities.
-//
-// Everywhere else in this family a WebRTC host and an HTTPS host are the same server reached two
-// ways. Here they are not. An HTTPS server owns its own roster and answers on `TEAM_API_ROUTES.team`
-// like every other route. A WebRTC host does not: its memberships and invitations live in the
-// account service, which is a *different server* with a different trust story, and this file is the
-// only one that talks to it. `revokeInvite(inviteId)` does not even take a host id -- that is the
-// tell, and it is why `RemoteControlPlaneTransport` is named for the plane rather than the host.
-//
-// So the two arms stay visible. Hiding them behind one method would read as tidier and would cost
-// the next reader an hour the first time an invitation goes missing from the wrong server.
-
 import { createInviteUrl, selfHostedApiOrigin } from "@openbot/contracts/invite-links";
 import type {
   InviteSummary,
@@ -21,6 +8,7 @@ import type {
 import { TEAM_API_ROUTES } from "@openbot/contracts/team-api-routes";
 import { sourceText } from "@openbot/i18n/source";
 import { Effect } from "effect";
+import type { CentralAuthOperationError } from "./central-auth-effects";
 import type { RemoteInviteRecord, RemoteMemberRecord } from "./central-auth-records";
 import { decodeVoid } from "./remote-host-decoding";
 import type { RemoteRequestFn } from "./remote-server-client";
@@ -28,7 +16,6 @@ import type { RemoteServerDirectory } from "./remote-server-store";
 import { RemoteRequest, RemoteWorkflowError, remoteDecode, toRemoteWorkflowError } from "./remote-service-effects";
 import { decodeInviteSummary, decodeTeamInvites, decodeTeamMember, decodeTeamMembers } from "./remote-team-decoding";
 
-// The account service, not the host. Every method here crosses to a second authority.
 export interface RemoteControlPlaneTransport {
   readonly controlPlaneUrl: string;
   listMembers(hostId: string): Effect.Effect<RemoteMemberRecord[], RemoteWorkflowError>;
@@ -54,8 +41,8 @@ export interface RemoteTeamDirectoryOptions {
   servers: Pick<RemoteServerDirectory, "require">;
   request: RemoteRequestFn;
   transport: RemoteControlPlaneTransport | null;
-  // Read through a callback rather than held, so an account that gains email delivery later is not
-  // frozen out by whatever was true when this object was built.
+  isRegisteredThisComputer: (serverId: string) => boolean;
+  allowLocalDevelopmentApiUrl: boolean;
   sendInviteEmail: (input: {
     email: string;
     serverName: string;
@@ -68,12 +55,16 @@ export class RemoteTeamDirectory {
   readonly #servers: RemoteTeamDirectoryOptions["servers"];
   readonly #request: RemoteRequestFn;
   readonly #transport: RemoteControlPlaneTransport | null;
+  readonly #isRegisteredThisComputer: RemoteTeamDirectoryOptions["isRegisteredThisComputer"];
+  readonly #allowLocalDevelopmentApiUrl: boolean;
   readonly #sendInviteEmail: RemoteTeamDirectoryOptions["sendInviteEmail"];
 
   constructor(options: RemoteTeamDirectoryOptions) {
     this.#servers = options.servers;
     this.#request = options.request;
     this.#transport = options.transport;
+    this.#isRegisteredThisComputer = options.isRegisteredThisComputer;
+    this.#allowLocalDevelopmentApiUrl = options.allowLocalDevelopmentApiUrl;
     this.#sendInviteEmail = options.sendInviteEmail;
   }
 
@@ -196,7 +187,6 @@ export class RemoteTeamDirectory {
       if (transport) {
         if (!server.fingerprint)
           return yield* new RemoteWorkflowError({ cause: new Error(sourceText("error.remote.inviteNeedsConnection")) });
-        // The account service cannot email links for a self-hosted service.
         if (input.email && selfHostedApiOrigin(transport.controlPlaneUrl))
           return yield* new RemoteWorkflowError({
             cause: new Error(sourceText("error.remote.selfHostedInviteNoEmail")),
@@ -217,12 +207,14 @@ export class RemoteTeamDirectory {
               fingerprint: server.fingerprint,
               token: invite.token,
             },
-            { selfHostedApiOrigin: selfHostedApiOrigin(transport.controlPlaneUrl) },
+            {
+              allowLocalDevelopmentApiUrl: this.#allowLocalDevelopmentApiUrl,
+              selfHostedApiOrigin: selfHostedApiOrigin(transport.controlPlaneUrl),
+            },
           ),
         }));
         const email = input.email;
         if (email) {
-          // A mail failure must revoke the undisclosed credential, preserving the original error.
           yield* this.#sendInviteEmail({
             email,
             serverName: server.name,
@@ -254,6 +246,6 @@ export class RemoteTeamDirectory {
 
   #controlPlaneFor(serverId: string): RemoteControlPlaneTransport | null {
     const server = this.#servers.require(serverId);
-    return server.transport === "webrtc-v2" ? this.#transport : null;
+    return server.transport === "webrtc-v2" || this.#isRegisteredThisComputer(server.id) ? this.#transport : null;
   }
 }

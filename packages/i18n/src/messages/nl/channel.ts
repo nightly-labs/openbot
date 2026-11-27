@@ -9,7 +9,12 @@ export const messages = {
   "channel.stoppedTask.reassignLabel": "Gestopte taak van {name} opnieuw toewijzen",
   "channel.stoppedTask.reassign": "Opnieuw toewijzen",
   "channel.stoppedTask.cancel": "Taak annuleren",
+  "channel.stoppedTask.assignmentLoop":
+    "{names} gaven deze taak te vaak aan elkaar door. De taak is gestopt om een lus te voorkomen.",
+  "channel.stoppedTask.assignmentLoopMembers":
+    "De leden gaven deze taak te vaak aan elkaar door. De taak is gestopt om een lus te voorkomen.",
   "channel.conversation.noMembers": "Voeg agents toe in de kanaalinstellingen om te beginnen.",
+  "channel.conversation.waitFull": "Wachten - {name} begint als een lopende taak klaar is",
   "channel.conversation.archivedNotice": "Verwijderd kanaal. Alleen voorvertoning.",
   "channel.composer.label": "Bericht aan kanaal",
   "channel.composer.placeholder": "Bericht aan {name}",
@@ -17,10 +22,40 @@ export const messages = {
   "channel.panel.close": "Kanaalpaneel sluiten",
   "channel.settings.title": "Kanaalinstellingen",
   "channel.settings.memories": "Herinneringen",
+  "channel.settings.folders.title": "Mappen",
+  "channel.settings.folders.description":
+    "Alle leden van {channel} kunnen in deze mappen bestanden wijzigen en opdrachten uitvoeren.",
+  "channel.settings.folders.toastAdded": "Leden van {channel} kunnen nu bestanden in {folder} wijzigen",
+  "channel.settings.folders.toastRemoved": "Leden van {channel} kunnen geen bestanden in {folder} meer wijzigen",
   "channel.settings.isolated": "Herinneringen in dit kanaal houden",
   "channel.settings.isolatedDescription":
     "Agenten bewaren wat ze hier leren als kanaalherinneringen. Hun andere chats zien ze niet.",
+  "channel.settings.browser": "Browser",
+  "channel.settings.browserEveryone": "Alle leden",
+  "channel.settings.browserNone": "Niemand",
   "channel.settings.memoryCount": { one: "{count} opgeslagen", other: "{count} opgeslagen" },
+  "channel.settings.newConversation.title": "Nieuw gesprek",
+  "channel.settings.newConversation.description":
+    "De leden vergeten de eerdere berichten. De kanaalinstellingen blijven.",
+  "channel.settings.newConversation.button": "Starten",
+  "channel.settings.newConversation.confirmTitle": "Een nieuw gesprek starten in {name}?",
+  "channel.settings.newConversation.confirmDescription":
+    "De leden vergeten de eerdere berichten van dit kanaal. De berichten blijven zichtbaar boven een scheidingslijn. Leden, instructies, herinneringen en routines veranderen niet.",
+  "channel.settings.newConversation.confirm": "Nieuw gesprek starten",
+  "channel.settings.newConversation.failed": "Kan geen nieuw gesprek starten.",
+  "channel.settings.compact.title": "Context comprimeren",
+  "channel.settings.compact.description":
+    "De leden houden een korte samenvatting van hun kanaalsessie en gebruiken minder tokens.",
+  "channel.settings.compact.failed": "Kan de kanaalcontext niet comprimeren.",
+  "channel.settings.deleteHistory.title": "Geschiedenis wissen",
+  "channel.settings.deleteHistory.description":
+    "De berichten worden gewist en de leden vergeten ze. De kanaalinstellingen blijven.",
+  "channel.settings.deleteHistory.button": "Wissen",
+  "channel.settings.deleteHistory.confirmTitle": "Geschiedenis van {name} wissen?",
+  "channel.settings.deleteHistory.confirmDescription":
+    "Alle berichten en bestanden van dit kanaal worden uit OpenBot gewist en de leden vergeten ze. Dit kun je niet ongedaan maken. Leden, instructies, herinneringen, routines en taken veranderen niet.",
+  "channel.settings.deleteHistory.confirm": "Geschiedenis wissen",
+  "channel.settings.deleteHistory.failed": "Kan de geschiedenis niet wissen.",
   "channel.settings.routines": "Routines",
   "channel.settings.routineCount": { one: "{count} ingesteld", other: "{count} ingesteld" },
   "channel.create.close": "Nieuw kanaal sluiten",

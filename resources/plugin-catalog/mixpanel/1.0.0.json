@@ -1,0 +1,33 @@
+{
+  "slug": "mixpanel",
+  "name": "Mixpanel",
+  "tagline": "Product analytics and reports",
+  "description": "Mixpanel lets agents query events, funnels, retention, and saved reports in the projects the user can access. Each user signs in to their own Mixpanel account through the browser.",
+  "category": "data-analytics",
+  "creatorName": "Mixpanel",
+  "iconUrl": "https://framerusercontent.com/images/j6EPdIw4BKPE9dPx3zrTjkkAM14.png",
+  "version": "1.0.0",
+  "prompts": [
+    { "id": "prompt-signups", "text": "How many sign-ups did we get each week this quarter?" },
+    { "id": "prompt-funnel", "text": "Where do users drop off in the onboarding funnel?" },
+    { "id": "prompt-retention", "text": "Compare 30-day retention for users from the last two releases." }
+  ],
+  "apps": [
+    {
+      "id": "app-mixpanel-mcp",
+      "name": "Mixpanel",
+      "description": "Event, funnel, and retention queries, over Mixpanel's MCP server with browser sign-in.",
+      "iconUrl": "https://framerusercontent.com/images/j6EPdIw4BKPE9dPx3zrTjkkAM14.png",
+      "server": {
+        "name": "mixpanel",
+        "transport": "http",
+        "url": "https://mcp.mixpanel.com/mcp",
+        "auth": [{ "id": "mixpanel-oauth", "kind": "link", "label": "Sign in" }]
+      }
+    }
+  ],
+  "websiteUrl": "https://mixpanel.com",
+  "privacyPolicyUrl": "https://mixpanel.com/legal/privacy-policy/",
+  "termsUrl": "https://mixpanel.com/legal/terms-of-use/",
+  "skills": []
+}

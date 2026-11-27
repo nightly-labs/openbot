@@ -14,7 +14,7 @@ import {
   writeFile,
 } from "node:fs/promises";
 import { basename, dirname, extname, isAbsolute, join, relative } from "node:path";
-import { assertSupportedAttachmentName, attachmentMimeTypeForName } from "@openbot/contracts/attachment-files";
+import { attachmentMimeTypeForName, isSupportedAttachmentName } from "@openbot/contracts/attachment-files";
 import { ATTACHMENT_LIMITS, INPUT_LIMITS } from "@openbot/contracts/input-limits";
 import type {
   AttachmentDataInput,
@@ -24,7 +24,8 @@ import type {
   QueueDelivery,
 } from "@openbot/contracts/ipc";
 import { sourceText } from "@openbot/i18n/source";
-import { Effect } from "effect";
+import { Effect, Result } from "effect";
+import { isHeldTargetError } from "./atomic-json-file";
 import { type AttachmentOperationError, attachmentCall, attachmentFailure, attachmentSync } from "./attachment-effects";
 import { sha256File } from "./file-hash";
 import { isWithin } from "./workspace-paths";
@@ -33,14 +34,11 @@ const MAX_ATTACHMENTS = INPUT_LIMITS.attachments;
 const MAX_FILE_BYTES = ATTACHMENT_LIMITS.fileBytes;
 const MAX_TOTAL_BYTES = ATTACHMENT_LIMITS.totalBytes;
 const TRANSFER_MANIFEST_FILE = ".openbot-transfer.json";
+const HELD_TRANSFER_WAITS_MS: readonly number[] = [10, 50, 100, 250, 500, 1000, 1000];
 
 export interface StoredAttachment extends AttachmentSummary {
   path: string;
   sha256: string;
-  /**
-   * ISO time the user deleted the file from Storage. The record stays, so the message that sent it
-   * keeps its card and says the file is not found. Absent on every record from before the field.
-   */
   deletedAt?: string;
 }
 
@@ -51,18 +49,11 @@ export interface StoredGeneratedAttachment extends StoredAttachment {
 
 export interface StoredDraft extends StoredAttachment {
   ownerEditId?: string | undefined;
-  /** Released edit drafts can still belong to a durable composer backup. */
   preserveOnRestart?: boolean | undefined;
   createdAt: string;
 }
 
 interface TransferManifest {
-  /**
-   * 2, because the rename changed the field names inside: `recipientBotIds` became `recipientAgentIds` and
-   * `ownerBotId` became `ownerAgentId`. Nothing in the app reads this sidecar back -- it is written for the
-   * user and the model looking at the transfer directory -- but a released version 1 on disk spells those
-   * fields the old way, and leaving both shapes under one number would make the version say nothing.
-   */
   version: 2;
   kind: "message-transfer" | "generated-attachment";
   transferId?: string;
@@ -100,7 +91,6 @@ export interface AttachmentFilesOptions {
   sharedRoot: string;
 }
 
-/** Owns managed attachment files, verification, sidecars, and cleanup. Never imports MailboxStore or writes mailbox state. */
 export class AttachmentFiles {
   readonly #draftsRoot: string;
   readonly #transfersRoot: string;
@@ -144,11 +134,6 @@ export class AttachmentFiles {
   generatedRootForPath(path: string): string | null {
     return generatedRootForPath(this.#transfersRoot, path);
   }
-
-  /**
-   * The real path of a managed transfer file, or null when the file is gone or resolves outside
-   * the Transfers folder. A delete from Storage removes only a path this returns.
-   */
 
   managedTransferFile(path: string): Effect.Effect<string | null, AttachmentOperationError> {
     return Effect.gen({ self: this }, function* () {
@@ -202,7 +187,6 @@ export class AttachmentFiles {
     this: AttachmentFiles,
     paths: string[],
     data: AttachmentDataInput[],
-    /** A voice recording is a WebM file, which the user cannot attach. It never reaches a provider. */
     options: { voiceRecording?: boolean } = {},
   ): Effect.fn.Return<StoredDraft[], AttachmentOperationError> {
     if (paths.some((path) => !path || path.length > INPUT_LIMITS.path)) {
@@ -228,18 +212,21 @@ export class AttachmentFiles {
           const targetDirectory = join(this.#draftsRoot, id);
           preparedRoots.push(targetDirectory);
           const name = sanitizeName(source.path);
-          assertSupportedAttachmentName(name);
           const targetPath = join(targetDirectory, name);
           yield* attachmentCall(() => mkdir(targetDirectory, { recursive: true, mode: 0o700 })).pipe(
             Effect.uninterruptible,
           );
           yield* attachmentCall(() => copyFile(source.path, targetPath)).pipe(Effect.uninterruptible);
           const copied = yield* attachmentCall(() => stat(targetPath));
-          if (copied.size > MAX_FILE_BYTES) {
+          if (copied.size === 0 || copied.size > MAX_FILE_BYTES) {
             yield* attachmentCall(() => rm(targetDirectory, { recursive: true, force: true })).pipe(
               Effect.uninterruptible,
             );
-            throw new Error(`${name} exceeds the 100 MB limit.`);
+            throw new Error(
+              copied.size === 0
+                ? sourceText("error.attachment.emptyFile", { name })
+                : sourceText("error.attachment.namedFileTooLarge", { name }),
+            );
           }
           total += copied.size;
           if (total > MAX_TOTAL_BYTES) {
@@ -255,22 +242,28 @@ export class AttachmentFiles {
               copied.size,
               targetPath,
               yield* sha256File(targetPath).pipe(Effect.mapError((error) => attachmentFailure(error.cause))),
+              yield* heifSafeFileMimeType(name, targetPath),
             ),
             createdAt: new Date().toISOString(),
           });
         }
         for (const item of data) {
           const bytes = normalizeBytes(item.bytes);
+          const name = sanitizeName(item.name || "pasted-image.png");
+          if (bytes.byteLength === 0) throw new Error(sourceText("error.attachment.emptyFile", { name }));
           if (bytes.byteLength > MAX_FILE_BYTES) {
-            throw new Error(`${item.name} exceeds the 100 MB limit.`);
+            throw new Error(sourceText("error.attachment.namedFileTooLarge", { name: item.name }));
           }
           total += bytes.byteLength;
           if (total > MAX_TOTAL_BYTES) throw new Error(sourceText("error.attachment.totalTooLarge"));
           const id = randomUUID();
           const targetDirectory = join(this.#draftsRoot, id);
           preparedRoots.push(targetDirectory);
-          const name = sanitizeName(item.name || "pasted-image.png");
-          if (!options.voiceRecording) assertSupportedAttachmentName(name);
+          const mimeType = heifSafeMimeType(
+            name,
+            bytes,
+            options.voiceRecording || isSupportedAttachmentName(name) ? item.mimeType : undefined,
+          );
           const targetPath = join(targetDirectory, name);
           yield* attachmentCall(() => mkdir(targetDirectory, { recursive: true, mode: 0o700 })).pipe(
             Effect.uninterruptible,
@@ -283,7 +276,7 @@ export class AttachmentFiles {
               bytes.byteLength,
               targetPath,
               createHash("sha256").update(bytes).digest("hex"),
-              item.mimeType,
+              mimeType,
             ),
             createdAt: new Date().toISOString(),
           });
@@ -346,7 +339,7 @@ export class AttachmentFiles {
           const id = randomUUID();
           const targetPath = join(temporaryRoot, name);
           const copied = yield* attachmentCall(() => stat(targetPath));
-          if (copied.size > MAX_FILE_BYTES) throw new Error(`${name} exceeds the 100 MB limit.`);
+          if (copied.size > MAX_FILE_BYTES) throw new Error(sourceText("error.attachment.namedFileTooLarge", { name }));
           total += copied.size;
           if (total > MAX_TOTAL_BYTES) throw new Error(sourceText("error.attachment.totalTooLarge"));
           attachments.push(
@@ -356,6 +349,7 @@ export class AttachmentFiles {
               copied.size,
               join(finalRoot, name),
               yield* sha256File(targetPath).pipe(Effect.mapError((error) => attachmentFailure(error.cause))),
+              yield* heifSafeFileMimeType(name, targetPath),
             ),
           );
         }
@@ -369,7 +363,15 @@ export class AttachmentFiles {
           createdAt,
           attachments: attachments.map(manifestAttachment),
         });
-        yield* attachmentCall(() => rename(temporaryRoot, finalRoot)).pipe(Effect.uninterruptible);
+        for (let attempt = 0; ; attempt += 1) {
+          const renamed = yield* Effect.result(
+            attachmentCall(() => rename(temporaryRoot, finalRoot)).pipe(Effect.uninterruptible),
+          );
+          if (Result.isSuccess(renamed)) break;
+          const wait = HELD_TRANSFER_WAITS_MS[attempt];
+          if (wait === undefined || !isHeldTargetError(renamed.failure.cause)) return yield* renamed.failure;
+          yield* Effect.sleep(wait);
+        }
         completed = true;
         return attachments;
       } catch (error) {
@@ -407,7 +409,6 @@ export class AttachmentFiles {
             );
           if (metadata.size > MAX_FILE_BYTES)
             return yield* attachmentFailure(new Error(`${basename(source.path)} exceeds the 100 MB limit.`));
-          yield* attachmentSync(() => assertSupportedAttachmentName(source.path));
           return { ...source, size: metadata.size };
         }),
       { concurrency: "unbounded" },
@@ -474,6 +475,7 @@ export class AttachmentFiles {
     input: {
       sourcePath?: string;
       bytes?: Uint8Array;
+      kind?: "image" | "video";
       name?: string;
       mimeType?: string;
       ownerAgentId?: string;
@@ -489,8 +491,10 @@ export class AttachmentFiles {
     const inputBytes = input.bytes;
     const bytes = inputBytes === undefined ? null : yield* attachmentSync(() => normalizeBytes(inputBytes));
     const size = source?.size ?? bytes?.byteLength ?? 0;
-    if (size > MAX_FILE_BYTES)
-      return yield* attachmentFailure(new Error(sourceText("error.backend.generatedImageTooLarge")));
+    const tooLargeText = sourceText(
+      input.kind === "video" ? "error.backend.generatedVideoTooLarge" : "error.backend.generatedImageTooLarge",
+    );
+    if (size > MAX_FILE_BYTES) return yield* attachmentFailure(new Error(tooLargeText));
 
     const name = sanitizeName(input.name ?? (source ? basename(source.path) : "generated-image.png"));
     const generatedRoot = join(this.#transfersRoot, "generated", id);
@@ -507,7 +511,7 @@ export class AttachmentFiles {
           yield* attachmentCall(() => writeFile(targetPath, bytes, { mode: 0o600 })).pipe(Effect.uninterruptible);
         else throw new Error("Generated image bytes are missing.");
         const stored = yield* attachmentCall(() => stat(targetPath));
-        if (stored.size > MAX_FILE_BYTES) throw new Error(sourceText("error.backend.generatedImageTooLarge"));
+        if (stored.size > MAX_FILE_BYTES) throw new Error(tooLargeText);
         const generatedAttachment: StoredGeneratedAttachment = {
           ...attachmentRecord(
             id,
@@ -647,13 +651,15 @@ const inspectSourceEffect = Effect.fn("Attachments.inspectSource")(function* (
       new Error(sourceText("error.backend.attachmentNotRegularFile", { name: basename(path) })),
     );
   if (metadata.size > MAX_FILE_BYTES)
-    return yield* attachmentFailure(new Error(`${basename(path)} exceeds the 100 MB limit.`));
+    return yield* attachmentFailure(
+      new Error(sourceText("error.attachment.namedFileTooLarge", { name: basename(path) })),
+    );
   return { path, size: metadata.size };
 });
 
 function sanitizeName(path: string): string {
   const value = basename(path)
-    .replace(/[^\p{L}\p{N}._ -]+/gu, "-")
+    .replace(/[^\p{L}\p{M}\p{N}._ -]+/gu, "-")
     .replace(/^\.+/, "")
     .trim();
   if (!value) return "attachment";
@@ -666,13 +672,12 @@ function sanitizeName(path: string): string {
 function safeArchiveSegment(value: string): string {
   return (
     basename(value)
-      .replace(/[^\p{L}\p{N}._ -]+/gu, "-")
+      .replace(/[^\p{L}\p{M}\p{N}._ -]+/gu, "-")
       .replace(/^\.+/, "")
       .slice(0, 120) || "item"
   );
 }
 
-/** `used` holds lower-case names: macOS and Windows see "Report.txt" and "report.txt" as one file. */
 function uniqueName(name: string, used: Set<string>): string {
   if (!used.has(name.toLowerCase())) {
     used.add(name.toLowerCase());
@@ -692,7 +697,6 @@ function attachmentMetadata(
   explicitMimeType?: string,
 ): { kind: AttachmentKind; mimeType: string; previewKind: AttachmentPreviewKind } {
   const inferred = attachmentMimeTypeForName(name);
-  // Media, archives and SVG keep the type of their name even if an importer supplies another MIME type.
   const mimeType =
     inferred.startsWith("audio/") ||
     inferred.startsWith("video/") ||
@@ -705,15 +709,52 @@ function attachmentMetadata(
     : mimeType === "application/pdf"
       ? "pdf"
       : // An email is RFC 822 text, so the lightbox shows it with the text branch. `text` is a
-        // released wire value, and only a server that advertises the eml capability sends an
-        // email at all, so no shipped adapter sees a changed meaning.
         mimeType.startsWith("text/") || mimeType === "application/json" || mimeType === "message/rfc822"
         ? "text"
         : "none";
-  // Providers take only raster image blocks, so an SVG is a file that the agent reads as text.
   const svg = mimeType.split(";", 1)[0]?.trim().toLowerCase() === "image/svg+xml";
   return { kind: previewKind === "image" && !svg ? "image" : "file", mimeType, previewKind };
 }
+
+const HEIF_BRANDS = new Set(["heic", "heix", "heim", "heis", "hevc", "hevx", "mif1", "mif2", "msf1"]);
+const HEIF_HEADER_BYTES = 64;
+
+function isHeifImage(header: Uint8Array): boolean {
+  const bytes = Buffer.from(header.subarray(0, HEIF_HEADER_BYTES));
+  if (bytes.length < 12 || bytes.toString("latin1", 4, 8) !== "ftyp") return false;
+  const end = Math.min(bytes.readUInt32BE(0), bytes.length);
+  const brands: string[] = [];
+  for (let offset = 8; offset + 4 <= end; offset += offset === 8 ? 8 : 4) {
+    brands.push(bytes.toString("latin1", offset, offset + 4));
+  }
+  return (
+    !brands.some((brand) => brand === "avif" || brand === "avis") && brands.some((brand) => HEIF_BRANDS.has(brand))
+  );
+}
+
+function heifSafeMimeType(name: string, header: Uint8Array, mimeType?: string): string | undefined {
+  return attachmentMetadata(name, mimeType).kind === "image" && isHeifImage(header)
+    ? "application/octet-stream"
+    : mimeType;
+}
+
+const heifSafeFileMimeType = Effect.fn("Attachments.heifSafeFileMimeType")(function* (
+  name: string,
+  path: string,
+): Effect.fn.Return<string | undefined, AttachmentOperationError> {
+  if (attachmentMetadata(name).kind !== "image") return undefined;
+  const header = yield* attachmentCall(async () => {
+    const file = await open(path, "r");
+    try {
+      const buffer = Buffer.alloc(HEIF_HEADER_BYTES);
+      const { bytesRead } = await file.read(buffer, 0, buffer.length, 0);
+      return buffer.subarray(0, bytesRead);
+    } finally {
+      await file.close();
+    }
+  });
+  return heifSafeMimeType(name, header);
+});
 
 function attachmentPreviewUrl(id: string): string {
   return `openbot-attachment://file/${id}`;
@@ -726,10 +767,6 @@ export function toAttachmentSummary(attachment: StoredAttachment): AttachmentSum
     name: attachment.name,
     size: attachment.size,
     ...metadata,
-    // `isStoredAttachment` accepts a persisted attachment with no `previewUrl` at all, from before
-    // the field existed. `StoredAttachment extends AttachmentSummary` claims `string | null`, so
-    // tsc cannot see the gap — and an `undefined` reaching the summary fails `isAttachmentSummary`
-    // at the IPC boundary, which would take the whole conversation down with it.
     previewUrl: attachment.previewUrl ?? null,
   };
 }

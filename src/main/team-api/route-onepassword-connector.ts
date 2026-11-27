@@ -16,11 +16,6 @@ import { readJson, requireAdmin, stringField } from "./request-helpers";
 const ROUTES: ReadonlySet<string> = new Set(Object.values(ONEPASSWORD_CONNECTOR_ROUTES));
 const ERROR_LIMIT = 2_000;
 
-/**
- * The wire status of `onepassword-connector-v1`. A client connects with a token only, so an account
- * choice that the CLI started on this host shows as not connected. Names and the error are cut to the
- * codec's bounds, so a long vault name cannot make the client refuse the whole answer.
- */
 function wireStatus(status: OnePasswordConnectorStatus) {
   const connected = status.state === "connected";
   return {
@@ -35,12 +30,6 @@ function wireStatus(status: OnePasswordConnectorStatus) {
   };
 }
 
-/**
- * The 1Password connection of this host, which an owner or administrator connects from their own
- * computer with a service account token. Frozen by `onepassword-connector-v1`.
- *
- * The token arrives once, in the connect body; no answer carries it. `requireAdmin` runs on every route.
- */
 export async function routeOnePasswordConnector(
   context: TeamApiRequestContext,
   connector: TeamApiOnePasswordConnector | undefined,
@@ -50,7 +39,6 @@ export async function routeOnePasswordConnector(
   if (!connector || !capabilities.has(ONEPASSWORD_CONNECTOR_CAPABILITY))
     throw new HttpError(400, sourceText("error.team.connectorsUnsupported"));
   requireAdmin(member);
-  // `readJson` has already run the body through the `onepassword-connector-v1` codec.
   const body = await readJson(request);
   switch (url.pathname) {
     case ONEPASSWORD_CONNECTOR_ROUTES.connect:

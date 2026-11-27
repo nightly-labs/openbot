@@ -1,5 +1,11 @@
 import { font } from "@expo/ui/swift-ui/modifiers";
+import { useMemo } from "react";
+import { useTextScale } from "@/features/settings/model/text-size-store";
 import { APP_FONT } from "@/shared/lib/app-font";
 
-/** Puts the app font on the label of an `@expo/ui` control at the body size, with Dynamic Type. */
-export const nativeLabelFont = [font({ family: APP_FONT, textStyle: "body" })];
+const BODY_SIZE = 17;
+
+export function useNativeLabelFont() {
+  const scale = useTextScale();
+  return useMemo(() => [font({ family: APP_FONT, textStyle: "body", size: BODY_SIZE * scale })], [scale]);
+}

@@ -7,39 +7,33 @@ import type { SidebarAgentWait } from "../sidebar/sidebar-agent-states";
 import { SIDEBAR_WAIT_ACTION, SIDEBAR_WAIT_TITLE, sidebarUsageResetTime } from "../sidebar/sidebar-filtering";
 import { createTaskListPlayState, TaskListHeader, TaskMark, type TaskMarkState } from "./TaskList";
 
-export type AwaitingReplyState = "asked" | "working" | "replied" | "failed";
+export type AwaitingReplyState = "asked" | "working" | "replied" | "failed" | "stopped";
+
+export function awaitingReplyEnded(state: AwaitingReplyState): boolean {
+  return state === "replied" || state === "failed" || state === "stopped";
+}
 
 export interface AwaitingReplyItem {
   id: string;
-  /** The agent that owes the reply. A remote or removed agent has no profile. */
   agent?: AgentProfile | undefined;
   name: string;
   state: AwaitingReplyState;
-  /** A line under the name, such as the start of a reply that waits in the queue. */
   preview?: string;
-  /** A short note after the state, such as who reads the reply next. */
   detail?: string | undefined;
-  /** The queued delivery of a reply, which the user can steer into the running turn. */
   deliveryId?: string | undefined;
-  /**
-   * What stops an agent that was asked before it can reply: a question, an approval or a browser
-   * takeover in its own chat, or a usage limit. The row names it in place of "Working".
-   */
   wait?: SidebarAgentWait | undefined;
+  stoppable?: boolean | undefined;
 }
 
 export interface AwaitingReplyListProps {
   items: readonly AwaitingReplyItem[];
-  /** The header text. The default is "Waiting for replies". */
   title?: string | undefined;
-  /** The list starts collapsed when this is false. */
   defaultOpen?: boolean;
-  /** Hides the block. It has a close button only when this is set and no agent still works. */
   onDismiss?: () => void;
-  /** Opens the chat of an agent that waits for the user, where the user can answer it. */
   onOpenAgent?: ((agentId: string) => void) | undefined;
-  /** Takes a queued reply into the running turn. Set only while a turn runs. */
   onSteer?: ((deliveryId: string) => void) | undefined;
+  onStop?: ((id: string) => void) | undefined;
+  stopDisplay?: "button" | "icon" | undefined;
   class?: string;
 }
 
@@ -48,6 +42,7 @@ const MARK_STATE: Record<AwaitingReplyState, TaskMarkState> = {
   working: "active",
   replied: "done",
   failed: "failed",
+  stopped: "failed",
 };
 
 const STATE_LABEL = {
@@ -55,13 +50,9 @@ const STATE_LABEL = {
   working: "chat.awaiting.state.working",
   replied: "chat.awaiting.state.replied",
   failed: "chat.awaiting.state.failed",
+  stopped: "chat.awaiting.state.stopped",
 } as const;
 
-/**
- * The block above the composer while an agent waits for other agents: one row for each agent it
- * asked, with the state of the answer. It has the same card and motion as the task list, and it
- * renders nothing when nothing waits.
- */
 export function AwaitingReplies(props: AwaitingReplyListProps) {
   return (
     <Show when={props.items.length > 0}>
@@ -77,7 +68,6 @@ function AwaitingReplyList(props: AwaitingReplyListProps) {
   const [open, setOpen] = createSignal(untrack(() => props.defaultOpen ?? true));
   const total = () => props.items.length;
   const done = () => props.items.filter((item) => item.state === "replied").length;
-  // A wait comes before work, because the work cannot go on until the wait ends.
   const active = () => {
     const waiting = props.items.find((entry) => entry.wait);
     if (waiting?.wait) {
@@ -97,7 +87,6 @@ function AwaitingReplyList(props: AwaitingReplyListProps) {
     }
     return t(STATE_LABEL[item.state]);
   };
-  /** The question or the command of a wait, else the line the row has. */
   const preview = (item: AwaitingReplyItem): string | undefined =>
     (item.wait?.kind === "waiting" ? item.wait.detail : null) ?? item.preview;
   const openAction = (item: AwaitingReplyItem) => {
@@ -113,8 +102,15 @@ function AwaitingReplyList(props: AwaitingReplyListProps) {
     if (item.state !== "replied" || !deliveryId || !steer) return undefined;
     return () => steer(deliveryId);
   };
-  // Every agent replied or failed, so nothing more comes for these rows.
-  const settled = () => props.items.every((item) => item.state === "replied" || item.state === "failed");
+  const stopAction = (item: AwaitingReplyItem) => {
+    const stop = props.onStop;
+    if (item.stoppable === false || (item.state !== "asked" && item.state !== "working") || !stop) return undefined;
+    return () => stop(item.id);
+  };
+  const settled = () => props.items.every((item) => awaitingReplyEnded(item.state));
+  const stopIcon = () => props.stopDisplay === "icon";
+  const failed = () => props.items.filter((item) => item.state === "failed").length;
+  const ended = () => failed() > 0 && done() + failed() === total();
   return (
     <section
       style={{ "--task-list-play-state": playState() }}
@@ -128,10 +124,19 @@ function AwaitingReplyList(props: AwaitingReplyListProps) {
           panelId={panelId}
           done={done()}
           total={total()}
-          title={props.title ?? t("chat.awaiting.title")}
+          title={ended() ? t("chat.awaiting.ended") : (props.title ?? t("chat.awaiting.title"))}
           active={active()}
-          summary={t("chat.awaiting.summary", { done: done(), total: total() })}
-          count={t("chat.awaiting.count", { done: done(), total: total() })}
+          summary={
+            ended()
+              ? t("chat.awaiting.endedSummary", { done: done(), failed: failed() })
+              : t("chat.awaiting.summary", { done: done(), total: total() })
+          }
+          count={
+            ended()
+              ? t("chat.awaiting.endedCount", { done: done(), failed: failed() })
+              : t("chat.awaiting.count", { done: done(), total: total() })
+          }
+          mark={ended() ? "failed" : undefined}
         />
         <Show when={settled() && props.onDismiss}>
           {(dismiss) => (
@@ -152,13 +157,13 @@ function AwaitingReplyList(props: AwaitingReplyListProps) {
         <ol class="task-list-items">
           <For each={props.items} keyed={(item) => item.id}>
             {(item, index) => {
-              // Two rows can have the same action word, so the button also names the agent.
               const rowId = createUniqueId();
               return (
                 <li
                   class="task-list-item awaiting-replies-item"
                   data-state={markState(item())}
                   data-wait={item().wait ? "" : undefined}
+                  data-stopped={item().state === "stopped" ? "" : undefined}
                   style={{ "--task-list-index": index() }}
                 >
                   <AgentAvatar
@@ -179,8 +184,25 @@ function AwaitingReplyList(props: AwaitingReplyListProps) {
                       {(detail) => <span class="awaiting-replies-detail">{detail()}</span>}
                     </Show>
                     <span class="awaiting-replies-state-label">{stateLabel(item())}</span>
-                    <span class="task-list-item-mark" aria-hidden="true">
-                      <TaskMark state={markState(item())} />
+                    <span class="awaiting-replies-mark">
+                      <span class="task-list-item-mark" aria-hidden="true">
+                        <TaskMark state={markState(item())} />
+                      </span>
+                      <Show when={stopIcon() && stopAction(item())}>
+                        {(stop) => (
+                          <IconButton
+                            id={`${rowId}-stop`}
+                            class="awaiting-replies-stop-icon"
+                            label={t("chat.awaiting.stop")}
+                            aria-labelledby={`${rowId}-stop ${rowId}-name`}
+                            variant="ghost"
+                            size="icon-xs"
+                            onClick={() => stop()()}
+                          >
+                            <X aria-hidden="true" />
+                          </IconButton>
+                        )}
+                      </Show>
                     </span>
                   </span>
                   <Show when={openAction(item())}>
@@ -208,6 +230,20 @@ function AwaitingReplyList(props: AwaitingReplyListProps) {
                         onClick={() => steer()()}
                       >
                         {t("queue.item.steer")}
+                      </Button>
+                    )}
+                  </Show>
+                  <Show when={!stopIcon() && stopAction(item())}>
+                    {(stop) => (
+                      <Button
+                        id={`${rowId}-stop`}
+                        size="xs"
+                        variant="secondary"
+                        class="awaiting-replies-stop"
+                        aria-labelledby={`${rowId}-stop ${rowId}-name`}
+                        onClick={() => stop()()}
+                      >
+                        {t("chat.awaiting.stop")}
                       </Button>
                     )}
                   </Show>

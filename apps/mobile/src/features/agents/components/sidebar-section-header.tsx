@@ -26,13 +26,11 @@ import { type MenuAction, MenuView } from "@/shared/components/menu-view";
 import { haptics } from "@/shared/lib/haptics";
 import { useReducedMotion } from "@/shared/lib/motion";
 import { currentText, useText } from "@/shared/lib/text";
+import { END_X, MIRROR_IN_RTL } from "@/shared/lib/text-direction";
 import { typeScale } from "@/shared/lib/type-scale";
 
-/**
- * A folder header, as on the desktop: folders do not indent, so a folder in a folder names its parent
- * first ("Parent / Name"). A folder of the user ends with a folder icon; the "Agents" group keeps the
- * chevron.
- */
+const OPEN_ROTATION = `${90 * END_X}deg`;
+
 export const SidebarSectionHeader = memo(function SidebarSectionHeader({
   id,
   name,
@@ -43,19 +41,19 @@ export const SidebarSectionHeader = memo(function SidebarSectionHeader({
   unread,
   visibleSectionIds,
   collapsed,
+  first,
   onToggle,
 }: {
   id: string;
-  /** The path of the folder, for accessibility and the delete question. */
   name: string;
   title: string;
   parentName: string | null;
   custom: boolean;
   empty: boolean;
-  /** The unread messages in a closed folder and in the folders in it; 0 for an open folder. */
   unread: number;
   visibleSectionIds: readonly string[];
   collapsed: boolean;
+  first: boolean;
   onToggle: (sectionId: string) => void;
 }) {
   const { t, format } = useText();
@@ -75,8 +73,6 @@ export const SidebarSectionHeader = memo(function SidebarSectionHeader({
   const pending = useRef(false);
   const [saving, setSaving] = useState(false);
   const index = layout?.order.indexOf(id) ?? -1;
-  // A folder moves among the folders next to it. Only a host with `sidebar-folders-v1` sends parents,
-  // and that host takes `nest`; a flat `move` over the order can leave a folder in a folder in place.
   const parents = layout ? sidebarFolderParents(layout) : new Map<string, string>();
   const nested = parents.size > 0;
   const parentId = parents.get(id) ?? null;
@@ -86,7 +82,6 @@ export const SidebarSectionHeader = memo(function SidebarSectionHeader({
   const visibleIndex = siblings.indexOf(id);
   const customIds = new Set(layout?.sections.map((section) => section.id));
   const depth = sidebarFolderAncestors(parents, id).length;
-  /** Not into itself or a folder in it, and three levels at most with the folders it holds. */
   const canNestIn = (targetId: string) =>
     customIds.has(targetId) &&
     targetId !== id &&
@@ -158,7 +153,7 @@ export const SidebarSectionHeader = memo(function SidebarSectionHeader({
   const showUnread = custom && collapsed && unread > 0;
   const toggleLabel = t(collapsed ? "mobile.agent.section.expand" : "mobile.agent.section.collapse", { name });
   return (
-    <View className="pt-2.5 pr-3 pb-0.5 pl-5">
+    <View className={first ? "pr-3 pl-5" : "pt-7.5 pr-3 pl-5"}>
       <View className="flex-row items-center">
         <Pressable
           accessibilityRole="button"
@@ -194,13 +189,13 @@ export const SidebarSectionHeader = memo(function SidebarSectionHeader({
           ) : (
             <Animated.View
               style={{
-                transform: [{ rotate: collapsed ? "0deg" : "90deg" }],
+                transform: [{ rotate: collapsed ? "0deg" : OPEN_ROTATION }],
                 transitionProperty: "transform",
                 transitionDuration: reducedMotion ? 0 : 120,
                 transitionTimingFunction: cubicBezier(0.23, 1, 0.32, 1),
               }}
             >
-              <ChevronRight size={14} color={muted} strokeWidth={2.2} />
+              <ChevronRight size={14} color={muted} strokeWidth={2.2} style={MIRROR_IN_RTL} />
             </Animated.View>
           )}
         </Pressable>

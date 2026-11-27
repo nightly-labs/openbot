@@ -7,6 +7,8 @@ export const messages = {
   "mcp.connect.notConnected": "Niet verbonden",
   "mcp.connect.close": "Verbinden met {name} sluiten",
   "mcp.connect.getKey": "Sleutel ophalen",
+  "mcp.connect.useKey": "Liever een API-sleutel",
+  "mcp.connect.useSignIn": "Liever inloggen",
   "mcp.connect.keyDescription":
     "Plak een inloggegeven van je {name}-account. OpenBot verbindt ermee en bewaart het op {host}.",
   "mcp.connect.thisComputer": "deze computer",
@@ -26,7 +28,10 @@ export const messages = {
   "mcp.signIn.waiting": "Wachten op de browser…",
   "mcp.signIn.continue": "Doorgaan naar {name}",
   "mcp.signIn.pageDescription": "Deze pagina is geopend in de browser op {host}. Log hier in.",
-  "mcp.server.loadFailed": "De MCP-servers konden niet worden geladen.",
+  "mcp.signIn.copyHint": "Laadt de pagina niet? Kopieer de link en open hem in een andere browser.",
+  "mcp.signIn.copyLink": "Link kopiëren",
+  "mcp.signIn.pasteHint":
+    "Meld je je aan op een ander apparaat? Kopieer aan het eind het adres uit die browser en plak het hier.",
   "mcp.test.connected": { one: "Verbonden · {count} tool", other: "Verbonden · {count} tools" },
   "mcp.status.testing": "Testen…",
   "mcp.status.failed": "Mislukt",
@@ -35,6 +40,7 @@ export const messages = {
   "mcp.status.signedIn": "Ingelogd",
   "mcp.status.signingIn": "Inloggen…",
   "mcp.status.signInNeeded": "Inloggen nodig",
+  "mcp.status.signInAppNeeded": "Inlog-app nodig",
   "mcp.status.refused": "Geweigerd",
   "mcp.status.checkUrl": "Controleer de URL",
   "mcp.status.noAnswer": "Geen antwoord",
@@ -52,12 +58,6 @@ export const messages = {
   "mcp.panel.noAnswer": "Die server heeft niet geantwoord.",
   "mcp.panel.connectTitle": "Verbinden met een eigen MCP",
   "mcp.panel.editTitle": "MCP-server bewerken",
-  "mcp.panel.changesNotSaved": "Wijzigingen niet opgeslagen",
-  "mcp.panel.title": "MCP-servers",
-  "mcp.panel.description":
-    "Model Context Protocol-servers geven de agents van deze server extra tools. Claude- en Codex-agents krijgen alleen de servers in deze lijst; OpenCode- en Grok-agents kunnen ook servers starten vanuit hun eigen configuratiebestanden.",
-  "mcp.panel.connectCustom": "Eigen MCP verbinden",
-  "mcp.panel.empty": "Nog geen MCP-servers.",
   "mcp.panel.enable": "{name} inschakelen",
   "mcp.panel.detailsTitle": "Details",
   "mcp.panel.detailsDescription": "Geef deze server een naam en kies hoe OpenBot hem bereikt.",
@@ -99,17 +99,11 @@ export const messages = {
     "Verbindt één keer met deze instellingen en toont de tools die worden aangeboden. Er wordt niets opgeslagen of bewaard.",
   "mcp.panel.testConnection": "Verbinding testen",
   "mcp.panel.notTested": "Nog niet getest.",
-  "mcp.panel.removeTitle": "{name} verwijderen?",
-  "mcp.panel.removeDescription":
-    "De tools worden niet meer aangeboden aan de agents van deze server. De configuratie wordt niet bewaard.",
-  "mcp.panel.removeConfirm": "MCP-server verwijderen",
-  "mcp.panel.actionsFor": "Acties voor {name}",
-  "mcp.panel.testUnavailable": "Deze server kan hier niet worden getest.",
   "mcp.panel.signIn": "Inloggen",
   "mcp.panel.signOut": "Uitloggen",
   "mcp.panel.cancelSignIn": "Inloggen annuleren",
+  "mcp.panel.useAddress": "Dit adres gebruiken",
   "mcp.panel.signInTo": "Inloggen bij {name}",
-  "mcp.panel.cancelSignInTo": "Inloggen bij {name} annuleren",
   "mcp.panel.signInWaiting": {
     one: "Rond het inloggen af in je browser. OpenBot stopt met wachten na {count} minuut.",
     other: "Rond het inloggen af in je browser. OpenBot stopt met wachten na {count} minuten.",
@@ -143,12 +137,13 @@ export const messages = {
   "mcp.panel.appSaved": "App opgeslagen. Log in om hem te gebruiken.",
   "mcp.panel.appRemoved": "App verwijderd.",
   "mcp.signIn.relayDescription":
-    "Controleer of de inlogpagina op {page} staat en open hem daarna in je browser. Als je klaar bent, stuurt OpenBot de login naar {host}.",
+    "Log in je browser in op {page}. Als je klaar bent, stuurt OpenBot de login naar {host}.",
   "mcp.signIn.relayOpenDescription":
-    "Open de inlogpagina van {page} in je browser. Als je klaar bent, plak je hier het adres dat de browser toont. OpenBot stuurt de login daarna naar {host}.",
+    "Log in je browser in op {page}. Als je klaar bent, plak je hier het adres dat de browser toont. OpenBot stuurt de login daarna naar {host}.",
   "mcp.signIn.relayDeviceDescription":
-    "Controleer of de inlogpagina op {page} staat, open hem daarna in je browser en rond het daar af. {host} ziet de login vanzelf.",
+    "Log in je browser in op {page} en rond het daar af. {host} ziet de login vanzelf.",
   "mcp.signIn.relayOpen": "Inlogpagina openen",
+  "mcp.signIn.relayCopy": "Link kopiëren",
   "mcp.signIn.relayPasteHint":
     "Als de browser niet terugkeert naar OpenBot, kopieer dan het adres dat hij toont en plak het hier.",
   "mcp.signIn.relayPasteRequired":

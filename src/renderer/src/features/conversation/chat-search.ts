@@ -12,7 +12,6 @@ interface TextSegment {
   end: number;
 }
 
-/** Lowercased text. When lowercasing changed the length, each unit keeps its source offsets. */
 interface LowercaseText {
   text: string;
   starts?: number[];
@@ -49,7 +48,6 @@ export function renderChatSearchHighlights(matches: ChatSearchMatch[], currentIn
 
 const HIDDEN_TEXT = '[aria-hidden="true"], .sr-only, .message-actions';
 
-/** Elements that start a new rendered line. */
 const LINE_CONTAINER_TAGS = new Set([
   "ADDRESS",
   "ARTICLE",
@@ -86,7 +84,6 @@ const LINE_CONTAINER_TAGS = new Set([
   "UL",
 ]);
 
-/** A code block renders each line as its own span, with no newline between them. */
 const CODE_LINE_CLASS = "message-code-line";
 
 function lineContainer(text: Text, message: HTMLElement): Element {
@@ -100,21 +97,11 @@ function escapeRegExp(value: string): string {
   return value.replace(/[.*+?^${}()|[\]\\]/gu, "\\$&");
 }
 
-/**
- * The query as a pattern whose spaces match any run of whitespace, as the backend search does. A
- * stored newline renders as `<br>` and carries no character, so the caller puts a space at each
- * line boundary.
- */
 function searchPattern(query: string): RegExp | null {
   const terms = query.trim().toLocaleLowerCase().split(/\s+/u).filter(Boolean).map(escapeRegExp);
   return terms.length > 0 ? new RegExp(terms.join("\\s+"), "gu") : null;
 }
 
-/**
- * The text lowercased for the locale, as the query is. The whole text is lowercased at once, so a
- * context rule such as the Greek final sigma applies across text nodes. Lowercasing can change the
- * length, such as `İ` outside Turkish. Then each unit keeps the source offsets of its character.
- */
 function lowercase(source: string): LowercaseText {
   const whole = source.toLocaleLowerCase();
   if (whole.length === source.length) return { text: whole };
@@ -129,10 +116,22 @@ function lowercase(source: string): LowercaseText {
     }
     offset += character.length;
   }
-  // A Turkish or Lithuanian context rule can change the length of a character sequence. Then the
-  // lengths do not add up, and each character is lowercased alone.
   const text = starts.length === whole.length ? whole : characters.map(({ lower }) => lower).join("");
   return { text, starts, ends };
+}
+
+const SEARCH_OPENS_CHARACTERS = 300_000;
+
+export function chatSearchCanOpen(text: string): boolean {
+  return text.length <= SEARCH_OPENS_CHARACTERS;
+}
+
+export function chatSearchOpensMessage(text: string, query: string): boolean {
+  if (!chatSearchCanOpen(text)) return false;
+  const terms = query.trim().toLocaleLowerCase().split(/\s+/u).filter(Boolean);
+  if (terms.length === 0) return false;
+  const lower = text.toLocaleLowerCase();
+  return terms.every((term) => lower.includes(term));
 }
 
 export function findChatSearchMatches(root: HTMLElement, query: string): ChatSearchMatch[] {
@@ -160,7 +159,6 @@ export function findChatSearchMatches(root: HTMLElement, query: string): ChatSea
     while (node) {
       if (node instanceof Text) {
         const container = lineContainer(node, message);
-        // The space belongs to no segment, so a match across it still maps to the text on both sides.
         if (segments.length > 0 && (lineBreak || container !== line)) text += " ";
         lineBreak = false;
         line = container;
@@ -173,9 +171,6 @@ export function findChatSearchMatches(root: HTMLElement, query: string): ChatSea
       node = walker.nextNode();
     }
 
-    // Matches come in order, so each lookup continues from the segment of the previous match. A
-    // match starts and ends on a query character, never on an added space, so both ends are in a
-    // segment.
     const lower = lowercase(text);
     let index = 0;
     for (const found of lower.text.matchAll(pattern)) {

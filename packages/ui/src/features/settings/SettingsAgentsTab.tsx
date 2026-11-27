@@ -1,4 +1,10 @@
-import type { AgentDefaultKey, AgentDefaults, ClientAgentSummary } from "@openbot/contracts/ipc";
+import type {
+  AgentDefaultChoice,
+  AgentDefaultKey,
+  AgentDefaultSetting,
+  AgentDefaults,
+  ClientAgentSummary,
+} from "@openbot/contracts/ipc";
 import type { AppTextKey } from "@openbot/i18n";
 import {
   Alert,
@@ -29,22 +35,16 @@ import {
 import { For, Show } from "solid-js";
 import { useText } from "../../text";
 import { AgentAvatar } from "../agents/AgentAvatar";
-
-/** A setting of the Agents tab: the three account defaults, and "Steer agents while they work". */
-export type AgentDefaultSetting = AgentDefaultKey | "busyMessageMode";
-
-/** What one agent does for a setting: follow the default, or its own value. */
-export type AgentDefaultChoice = "default" | "on" | "off";
+import { AutomationLimitRow } from "./AutomationLimitRow";
+import { PlanStartRow } from "./PlanStartRow";
 
 const CHOICES: AgentDefaultChoice[] = ["default", "on", "off"];
 
-/** An agent as the Agents tab shows it. */
 export type AgentDefaultsAgent = Pick<
   ClientAgentSummary,
   "id" | "name" | "avatarSeed" | "avatarHue" | "avatarUrl" | AgentDefaultKey | "busyMessageMode"
 >;
 
-/** The settings in page order, with the title and description that agent settings show. */
 export const AGENT_DEFAULT_SETTINGS = [
   {
     key: "allowAutomation",
@@ -68,7 +68,6 @@ export function agentDefaultSettingTitle(setting: AgentDefaultSetting): AppTextK
   return AGENT_DEFAULT_SETTINGS.find((item) => item.key === setting)?.title ?? "settings.tab.agents.title";
 }
 
-/** The value that the agent stores, or "default" when it has none and follows the default. */
 export function agentDefaultChoice(agent: AgentDefaultsAgent, setting: AgentDefaultSetting): AgentDefaultChoice {
   if (setting === "busyMessageMode") {
     if (agent.busyMessageMode === undefined) return "default";
@@ -118,28 +117,21 @@ function MenuMark(props: { on: boolean }) {
 }
 
 export interface SettingsAgentsTabProps {
-  /** The agents on this computer. */
   agents: readonly AgentDefaultsAgent[];
-  /** True when the agents could not be read. */
   loadFailed: boolean;
   defaults: AgentDefaults;
-  /** The app default of "Steer agents while they work". */
   steer: boolean;
-  /** The open setting, or null for the list of settings. */
   setting: AgentDefaultSetting | null;
-  /** The dialog element that the menus portal into. */
+  scope?: "computer" | "server";
   menuMount: HTMLElement | undefined;
   onOpen: (setting: AgentDefaultSetting) => void;
   onDefaultChange: (setting: AgentDefaultSetting, on: boolean) => void;
-  /** Gives `choice` to each agent of `agentIds`. */
+  onPlanStartChange: (value: number | null) => void;
+  onAutomationLimitChange: (value: number) => void;
+  onCommitCoAuthorChange: (on: boolean) => void;
   onChoiceChange: (agentIds: readonly string[], setting: AgentDefaultSetting, choice: AgentDefaultChoice) => void;
 }
 
-/**
- * Settings › Agents, in the design of Server settings › Roles. The list has one row for each
- * setting, with the agents that have it on. A setting page has its default, and each agent with a
- * menu and Set all. An agent with no value of its own follows the default.
- */
 export function SettingsAgentsTab(props: SettingsAgentsTabProps) {
   const { t } = useText();
   const defaultOn = (setting: AgentDefaultSetting) =>
@@ -211,6 +203,19 @@ export function SettingsAgentsTab(props: SettingsAgentsTabProps) {
     </SettingsSection>
   );
 
+  const commitSection = () => (
+    <SettingsSection title={t("settings.commitCoAuthor.sectionTitle")}>
+      <ItemGroup class="settings-modal-card">
+        <SwitchField
+          checked={props.defaults.commitCoAuthor}
+          onChange={props.onCommitCoAuthorChange}
+          label={t("settings.commitCoAuthor.title")}
+          description={t("settings.commitCoAuthor.description")}
+        />
+      </ItemGroup>
+    </SettingsSection>
+  );
+
   const settingPage = (setting: AgentDefaultSetting) => {
     const title = () => t(agentDefaultSettingTitle(setting));
     const description = () =>
@@ -234,6 +239,13 @@ export function SettingsAgentsTab(props: SettingsAgentsTabProps) {
               label={title()}
               description={description()}
             />
+            <Show when={setting === "quickAcknowledgement"}>
+              <PlanStartRow
+                value={props.defaults.planStartAfterMs}
+                menuMount={props.menuMount}
+                onChange={props.onPlanStartChange}
+              />
+            </Show>
           </ItemGroup>
         </SettingsSection>
         <Show when={props.agents.length > 0}>
@@ -248,10 +260,8 @@ export function SettingsAgentsTab(props: SettingsAgentsTabProps) {
                   <span class="server-roles-member-summary">{t("settings.agentDefaults.setAll")}</span>
                   <ChevronDown aria-hidden="true" />
                 </DropdownMenu.Trigger>
-                {/* A portal without a mount uses the document body. */}
                 <DropdownMenu.Portal mount={props.menuMount ?? document.body}>
                   <DropdownMenu.Content>
-                    {/* With mixed values no item is checked, so each choice is a change. */}
                     <DropdownMenu.RadioGroup
                       aria-label={setAllLabel()}
                       value={common() ?? ""}
@@ -321,6 +331,24 @@ export function SettingsAgentsTab(props: SettingsAgentsTabProps) {
             </ItemGroup>
           </SettingsSection>
         </Show>
+        <Show when={setting === "allowAutomation"}>
+          <SettingsSection
+            title={t("settings.automationLimit.sectionTitle")}
+            description={t(
+              props.scope === "server"
+                ? "settings.automationLimit.sectionDescriptionServer"
+                : "settings.automationLimit.sectionDescription",
+            )}
+          >
+            <ItemGroup class="settings-modal-card">
+              <AutomationLimitRow
+                value={props.defaults.automationRunsPerHour}
+                menuMount={props.menuMount}
+                onChange={props.onAutomationLimitChange}
+              />
+            </ItemGroup>
+          </SettingsSection>
+        </Show>
       </>
     );
   };
@@ -328,7 +356,16 @@ export function SettingsAgentsTab(props: SettingsAgentsTabProps) {
   return (
     <>
       {loadError()}
-      <Show when={props.setting} fallback={list()} keyed>
+      <Show
+        when={props.setting}
+        fallback={
+          <>
+            {list()}
+            {commitSection()}
+          </>
+        }
+        keyed
+      >
         {(setting) => settingPage(setting)}
       </Show>
     </>

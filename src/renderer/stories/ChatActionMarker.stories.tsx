@@ -1,3 +1,4 @@
+import type { WithdrawFeedbackStatus } from "@openbot/contracts/ipc";
 import { Heading, Text } from "@openbot/ui";
 import type { AgentProfile, ChatActionMarkerModel } from "@openbot/ui/data";
 import { ChatActionMarker } from "@openbot/ui/features/conversation/ChatActionMarker";
@@ -14,6 +15,7 @@ const agents: AgentProfile[] = [
 const onSelectAgent = fn();
 const onOpenRoutine = fn();
 const onOpenHostedSite = fn();
+const onSignInProvider = fn();
 
 const meta = {
   title: "Conversation/Chat Action Marker",
@@ -74,8 +76,18 @@ export const AllStates: Story = {
             agents={agents}
             onSelectAgent={onSelectAgent}
             onOpenRoutine={onOpenRoutine}
+            routineRunFailure={(runId) =>
+              runId === "run-failed" ? "The calendar service did not answer, so the brief has no meetings." : undefined
+            }
           />
         ))}
+        <ChatActionMarker
+          marker={{ ...routineMarker("failed"), runId: "run-failed-long" }}
+          agents={agents}
+          onSelectAgent={onSelectAgent}
+          onOpenRoutine={onOpenRoutine}
+          routineRunFailure={() => longRunError}
+        />
         {routineActions.map((action) => (
           <ChatActionMarker
             marker={lifecycleMarker(action)}
@@ -101,6 +113,17 @@ export const AllStates: Story = {
           onSelectAgent={onSelectAgent}
         />
         <ChatActionMarker marker={{ kind: "context-reset", timestamp }} agents={agents} onSelectAgent={onSelectAgent} />
+        <ChatActionMarker
+          marker={{
+            kind: "sign-in-failure",
+            provider: "claude",
+            text: "Your Claude sign-in expired. Sign in again to continue.",
+            timestamp,
+          }}
+          agents={agents}
+          onSelectAgent={onSelectAgent}
+          onSignInProvider={onSignInProvider}
+        />
       </section>
     </main>
   ),
@@ -184,6 +207,47 @@ export const ReducedMotion: Story = {
   ),
   parameters: { chromatic: { prefersReducedMotion: "reduce" } },
 };
+
+function FeedbackSentStory(props: { withdrawn: boolean; result?: WithdrawFeedbackStatus; remote?: boolean }) {
+  return (
+    <main class="foundation-story">
+      <section class="chat-primitives-stage chat-primitives-stage-narrow" aria-label="Feedback sent card">
+        <ChatActionMarker
+          marker={{
+            kind: "feedback-sent",
+            messageId: "feedback-card",
+            title: "The chat stops scrolling after a long reply",
+            number: 5712,
+            url: "https://github.com/nightly-labs/openbot/issues/5712",
+            withdrawn: props.withdrawn,
+            timestamp: "2026-11-08T10:02:00.000Z",
+          }}
+          agents={agents}
+          onSelectAgent={onSelectAgent}
+          onWithdrawFeedback={
+            props.remote
+              ? undefined
+              : () =>
+                  new Promise<WithdrawFeedbackStatus>((resolve) =>
+                    setTimeout(() => resolve(props.result ?? "withdrawn"), 1200),
+                  )
+          }
+          onRequestFeedbackChange={() => {}}
+        />
+      </section>
+    </main>
+  );
+}
+
+export const FeedbackSent: Story = { render: () => <FeedbackSentStory withdrawn={false} /> };
+
+export const FeedbackSentRemoveFails: Story = {
+  render: () => <FeedbackSentStory withdrawn={false} result="unavailable" />,
+};
+
+export const FeedbackSentJoinedServer: Story = { render: () => <FeedbackSentStory withdrawn={false} remote /> };
+
+export const FeedbackWithdrawn: Story = { render: () => <FeedbackSentStory withdrawn /> };
 
 export const RoutineRunSummary: Story = {
   render: () => (
@@ -288,7 +352,6 @@ export const AgentMessageGroup: Story = {
   ),
 };
 
-/** The chat draws the text of an open message in the slot under its marker. */
 export const AgentMessageText: Story = {
   render: () => {
     const [open, setOpen] = createSignal(true);
@@ -356,6 +419,8 @@ function agentMarker(
     expectsReply: true,
   };
 }
+
+const longRunError = `Provider request failed: 529 overloaded_error. ${"The service is busy now. Try the request again later. ".repeat(12)}request_id=req_011CXa9`;
 
 function routineMarker(
   status: Extract<ChatActionMarkerModel, { kind: "routine-run" }>["status"],
@@ -488,11 +553,26 @@ function SkillMarkers() {
           onOpenSkill={setSelected}
         />
       ))}
+      <ChatActionMarker
+        marker={{
+          kind: "skill-lifecycle",
+          action: "installed",
+          skillId: "skill-release-notes",
+          revision: 3,
+          skillName: "Release notes",
+          timestamp: "2026-09-13T12:01:00Z",
+          installMessageIds: Array.from({ length: 38 }, (_, index) => `install-${index}`),
+        }}
+        agents={agents}
+        onSelectAgent={onSelectAgent}
+        onOpenSkill={setSelected}
+      />
       <AgentSkillsModal
         open={Boolean(selected())}
         selectionRequest={selected()}
         agentId="chief"
         agentName="Chief"
+        agentProvider="claude"
         onOpenChange={(open) => {
           if (!open) setSelected(null);
         }}

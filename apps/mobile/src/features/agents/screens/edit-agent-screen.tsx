@@ -5,15 +5,26 @@ import {
   DEFAULT_PROVIDER_ACCOUNT_ID,
   type HostProviderAccounts,
   type UpdateAgentInput,
+  workspaceAccessEnforced,
 } from "@openbot/contracts/ipc";
 import { useQueryClient } from "@tanstack/react-query";
 import { router, Stack, useLocalSearchParams } from "expo-router";
-import { usePreventRemove } from "expo-router/react-navigation";
 import { Typography } from "heroui-native";
 import { useThemeColor } from "heroui-native/hooks";
+import BookBookmark from "lucide-react-native/icons/book-bookmark";
+import CalendarClock from "lucide-react-native/icons/calendar-clock";
+import Cpu from "lucide-react-native/icons/cpu";
+import FileText from "lucide-react-native/icons/file-text";
+import Folder from "lucide-react-native/icons/folder";
+import Gauge from "lucide-react-native/icons/gauge";
 import Pencil from "lucide-react-native/icons/pencil";
+import Puzzle from "lucide-react-native/icons/puzzle";
+import ShieldCheck from "lucide-react-native/icons/shield-check";
+import SlidersHorizontal from "lucide-react-native/icons/sliders-horizontal";
+import Table2 from "lucide-react-native/icons/table-2";
+import Upload from "lucide-react-native/icons/upload";
 import { useCallback, useMemo, useRef, useState } from "react";
-import { Alert, Pressable, View } from "react-native";
+import { Pressable, View } from "react-native";
 import {
   AgentAccessFields,
   PERMISSION_LABEL,
@@ -27,12 +38,14 @@ import {
 } from "@/features/agents/components/agent-backup-models";
 import { AgentBrowserProfileRow } from "@/features/agents/components/agent-browser-profile";
 import {
-  AgentCompactSection,
+  AgentDeleteHistoryRow,
   AgentNewChatSection,
   AgentNotificationLevelRow,
 } from "@/features/agents/components/agent-chat-settings";
+import { AgentDeleteSection } from "@/features/agents/components/agent-delete-section";
 import { AgentFolderBrowser, AgentFolders, AgentFoldersRow } from "@/features/agents/components/agent-folders";
 import {
+  AgentBuiltinMemoryField,
   AgentBusyMessageField,
   AgentHostPermissionFields,
   AgentNewChatAllowedField,
@@ -49,18 +62,22 @@ import { AgentSharedTables } from "@/features/agents/components/agent-shared-tab
 import { AgentTasksRow } from "@/features/agents/components/agent-tasks-row";
 import { BloubAvatarPreview } from "@/features/agents/components/bloub-avatar";
 import { InstructionsLimit, instructionsTooLong } from "@/features/agents/components/instructions-limit";
-import { SettingsRow, SettingsSection } from "@/features/settings/components/settings-content";
+import { useAgentAccessLevel } from "@/features/servers/model/use-server-roles";
+import { SettingsGroupRow, SettingsRow, SettingsSection } from "@/features/settings/components/settings-content";
+import { RowIcon } from "@/features/settings/components/settings-row-icon";
 import {
   type MobileAgent,
   type MobileServer,
   useMobileWorkspace,
 } from "@/features/workspace/context/mobile-workspace-context";
 import { showsOnline } from "@/features/workspace/model/server-status";
+import { SaveError } from "@/shared/components/save-error";
 import { SheetFormField } from "@/shared/components/sheet-form-field";
 import { SheetSaveAction } from "@/shared/components/sheet-save-action";
 import { SheetScrollView } from "@/shared/components/sheet-scroll-view";
 import { haptics } from "@/shared/lib/haptics";
 import { useText } from "@/shared/lib/text";
+import { useDiscardGuard } from "@/shared/lib/use-discard-guard";
 
 type AgentEdits = Pick<
   UpdateAgentInput,
@@ -103,7 +120,6 @@ export function EditAgentScreen({ page = "info" }: { page?: AgentPage }) {
   const [hostId] = useState(serverId ?? workspace.activeServer.id);
   const agent = workspace.agents.find((candidate) => candidate.id === agentId && candidate.serverId === hostId);
   const host = workspace.servers.find((candidate) => candidate.id === hostId);
-  // Keep the mounted form and its edits if the agent disappears during a reconnect or deletion.
   const lastAgent = useRef(agent);
   if (agent) lastAgent.current = agent;
   const displayed = agent ?? lastAgent.current;
@@ -137,35 +153,40 @@ function AgentForm({
     canManageSharedTables,
     canPublishAgent,
     canStartNewChat,
-    canCompactContext,
+    canDeleteChatHistory,
     canManageAgentInstructions,
     canManageAgentAccess,
     canManageAgentHostSettings,
     canManageAgentTaskLimit,
     canManageAgentNewChat,
     canManageAgentPlanCard,
+    canManageAgentBuiltinMemory,
     canManageBrowserProfiles,
     canManageAgentFolders,
     canSetAgentNotificationLevel,
     setAgentProviderAccount,
   } = useMobileWorkspace();
   const queryClient = useQueryClient();
-  // The Permissions row shows the access, as on desktop. Its page reads the same host answer.
-  const { settings: adminSettings } = useAgentAdminSettings(agent, host, available && page === "info");
+  const { settings: adminSettings } = useAgentAdminSettings(
+    agent,
+    host,
+    available && (page === "info" || page === "runtime"),
+  );
   const showPermissions = canManageAgentAccess(agent.serverId) || canManageAgentHostSettings(agent.serverId);
   const showFolders = canManageAgentFolders(agent.serverId);
-  // The user's own level of the agent, on a host that keeps it for each member. Settings > Notifications
-  // is the one place that changes notifications, so the agent has no switch of its own here.
   const showNotificationLevel = agent.notifications !== undefined && canSetAgentNotificationLevel(agent.serverId);
-  const showAdvanced =
-    Boolean(agent.workspacePath) ||
-    canStartNewChat(agent.serverId) ||
-    canCompactContext(agent.serverId) ||
+  const accessLevel = useAgentAccessLevel(agent.serverId, agent.id);
+  const showDeleteHistory = canDeleteChatHistory(agent.serverId) && accessLevel === "manage";
+  const showBehavior =
     canManageAgentHostSettings(agent.serverId) ||
     canManageAgentTaskLimit(agent.serverId) ||
     canManageAgentNewChat(agent.serverId) ||
     canManageAgentPlanCard(agent.serverId) ||
-    canManageBrowserProfiles(agent.serverId);
+    canManageAgentBuiltinMemory(agent.serverId);
+  const showWorkspace = Boolean(agent.workspacePath) || canManageBrowserProfiles(agent.serverId);
+  const showNewChat = canStartNewChat(agent.serverId) && accessLevel !== "view";
+  const showChatActions = showNewChat || showDeleteHistory;
+  const showAdvanced = showBehavior || showWorkspace || showChatActions;
   const [edits, setEdits] = useState<AgentEdits>({});
   const foreground = useThemeColor("foreground");
   const [photo, setPhoto] = useState<AgentPhotoDraft | null | undefined>();
@@ -173,13 +194,10 @@ function AgentForm({
   const [saving, setSaving] = useState(false);
   const pending = useRef(false);
   const [error, setError] = useState<string | null>(null);
-  // The account is not in the agent summary. Only an owner or admin of a host with
-  // `provider-accounts-v1` reads it.
   const { queryKey: accountsKey, accounts: hostAccounts } = useProviderAccounts(agent, available && page === "runtime");
   const [account, setAccount] = useState<string | undefined>();
   const provider = edits.provider ?? agent.provider;
   const providerAccounts = hostAccounts?.providers.find((entry) => entry.provider === provider)?.accounts ?? [];
-  // A provider change returns the agent to the new provider's own sign-in.
   const savedAccount =
     provider === agent.provider
       ? (hostAccounts?.agents.find((entry) => entry.agentId === agent.id)?.accountId ?? DEFAULT_PROVIDER_ACCOUNT_ID)
@@ -204,35 +222,20 @@ function AgentForm({
     (edits.model !== undefined && edits.model !== agent.model) ||
     (edits.reasoningEffort !== undefined && edits.reasoningEffort !== agent.reasoningEffort) ||
     accountChanged;
+  const nameMissing = page === "info" && !name.trim();
+  const [triedSave, setTriedSave] = useState(false);
   const valid =
     page !== "info" ||
-    (Boolean(name.trim()) &&
-      name.length <= INPUT_LIMITS.agentName &&
+    (name.length <= INPUT_LIMITS.agentName &&
       title.length <= INPUT_LIMITS.agentTitle &&
       !instructionsTooLong(description));
 
-  // Discard turns prevention off before it repeats the action, so the hook does not warn.
-  const [discarding, setDiscarding] = useState(false);
-  usePreventRemove(!discarding && (dirty || saving || pickingPhoto), ({ repeat }) => {
-    if (pending.current || pickingPhoto) return;
-    Alert.alert(t("mobile.agent.discard.title"), t("mobile.agent.discard.body"), [
-      { text: t("mobile.agent.discard.keepEditing"), style: "cancel" },
-      {
-        text: t("mobile.agent.discard.discard"),
-        style: "destructive",
-        onPress: () => {
-          setDiscarding(true);
-          repeat();
-        },
-      },
-    ]);
-  });
+  useDiscardGuard(dirty || saving || pickingPhoto, { busy: () => pending.current || pickingPhoto });
 
   function change(value: AgentEdits) {
     setEdits((current) => ({ ...current, ...value }));
     setError(null);
   }
-  // Stable handlers let the memoized face and color choices skip unrelated renders.
   const changeAvatarSeed = useCallback((avatarSeed: string) => {
     setEdits((current) => ({ ...current, avatarSeed }));
     setError(null);
@@ -262,10 +265,19 @@ function AgentForm({
   );
 
   async function submit(): Promise<void> {
+    if (nameMissing) {
+      setTriedSave(true);
+      void haptics.notification("error");
+      return;
+    }
     if (!valid || !dirty || !available || pickingPhoto || pending.current) return;
     pending.current = true;
     setSaving(true);
     setError(null);
+    const accountId = account === undefined || account === DEFAULT_PROVIDER_ACCOUNT_ID ? null : account;
+    const accountWithRuntime =
+      accountChanged &&
+      (edits.provider !== undefined || edits.model !== undefined || edits.reasoningEffort !== undefined);
     try {
       if (Object.keys(edits).length > 0)
         await updateAgent(
@@ -280,13 +292,14 @@ function AgentForm({
             ...(edits.provider === undefined ? {} : { provider: edits.provider }),
             ...(edits.model === undefined ? {} : { model: edits.model }),
             ...(edits.reasoningEffort === undefined ? {} : { reasoningEffort: edits.reasoningEffort }),
+            ...(accountWithRuntime ? { providerAccountId: accountId } : {}),
           },
           agent.serverId,
         );
       setEdits({});
       if (accountChanged || (edits.provider !== undefined && edits.provider !== agent.provider)) {
-        const accountId = account === undefined || account === DEFAULT_PROVIDER_ACCOUNT_ID ? null : account;
-        if (accountChanged) await setAgentProviderAccount({ agentId: agent.id, accountId }, agent.serverId);
+        if (accountChanged && !accountWithRuntime)
+          await setAgentProviderAccount({ agentId: agent.id, accountId }, agent.serverId);
         setAccount(undefined);
         queryClient.setQueryData<HostProviderAccounts | null>(accountsKey, (current) =>
           current
@@ -321,7 +334,6 @@ function AgentForm({
       keyboardDismissMode="interactive"
       keyboardShouldPersistTaps="handled"
     >
-      {/* The server Usage screen opens this page too, so the title names the agent. */}
       {page === "usage" ? (
         <Stack.Screen options={{ title: t("mobile.agent.info.usage.agentTitle", { name: agent.name }) }} />
       ) : null}
@@ -348,7 +360,6 @@ function AgentForm({
                 color={avatarColor}
                 size={112}
               />
-              {/* A photo fills the circle; the generated avatar leaves space around its shape. */}
               <View
                 className={`absolute size-9 items-center justify-center rounded-full border-4 border-sheet bg-grouped ${agent.avatarUrl ? "right-0 bottom-0" : "right-3 bottom-3"}`}
               >
@@ -362,6 +373,7 @@ function AgentForm({
               maxLength={INPUT_LIMITS.agentName}
               value={name}
               editable={!saving}
+              error={triedSave && nameMissing ? t("mobile.agent.add.nameRequired") : undefined}
               onChangeText={(value) => change({ name: value })}
             />
           </View>
@@ -406,6 +418,10 @@ function AgentForm({
       {page === "runtime" ? (
         <AgentRuntimeFields
           serverId={agent.serverId}
+          modelPickerRoute={{
+            pathname: "/agent-info/[agentId]/model-picker",
+            params: { agentId: agent.id, serverId: agent.serverId },
+          }}
           available={available}
           saving={saving}
           provider={provider}
@@ -414,16 +430,15 @@ function AgentForm({
           reasoningEffort={edits.reasoningEffort ?? agent.reasoningEffort}
           accounts={providerAccounts}
           accountId={account ?? savedAccount}
+          workspaceOnly={adminSettings ? workspaceAccessEnforced(adminSettings) : false}
           onChange={(value) => {
             change(value);
-            // An account belongs to one provider.
             if (value.provider !== undefined) setAccount(undefined);
           }}
           onAccountChange={(value) => {
             setAccount(value);
             setError(null);
           }}
-          // The switch saves at once, for the saved model. An unsaved model change hides it.
           fastMode={
             provider === agent.provider && (edits.model ?? agent.model) === agent.model
               ? { agent, server: host, available }
@@ -443,24 +458,36 @@ function AgentForm({
       ) : null}
       {page === "advanced" ? (
         <>
-          <AgentBusyMessageField agent={agent} server={host} available={available} />
-          <AgentTaskLimitField agent={agent} server={host} available={available} />
-          {/* After the task limit, as in the desktop Advanced group. */}
-          <AgentBrowserProfileRow agent={agent} />
-          {agent.workspacePath ? (
-            <SettingsSection title={t("mobile.agent.workspace.title")} footer={t("mobile.agent.workspace.footer")}>
-              <SettingsRow>
-                <Typography.Paragraph selectable type="body-sm">
-                  {agent.workspacePath}
-                </Typography.Paragraph>
-              </SettingsRow>
+          {showBehavior ? (
+            <SettingsSection title={t("mobile.agent.advanced.behavior")} rowsDrawSeparators>
+              <AgentBusyMessageField agent={agent} server={host} available={available} />
+              <AgentTaskLimitField agent={agent} server={host} available={available} />
+              <AgentNewChatAllowedField agent={agent} server={host} available={available} />
+              <AgentPlanCardField agent={agent} server={host} available={available} />
+              <AgentBuiltinMemoryField agent={agent} server={host} available={available} />
             </SettingsSection>
           ) : null}
-          {canStartNewChat(agent.serverId) ? <AgentNewChatSection agent={agent} available={available} /> : null}
-          {canCompactContext(agent.serverId) ? <AgentCompactSection agent={agent} available={available} /> : null}
-          <AgentNewChatAllowedField agent={agent} server={host} available={available} />
-          {/* After the new-chat switch, as in the desktop Advanced group. */}
-          <AgentPlanCardField agent={agent} server={host} available={available} />
+          {showWorkspace ? (
+            <SettingsSection title={t("mobile.agent.advanced.workspace")} rowsDrawSeparators>
+              <AgentBrowserProfileRow agent={agent} />
+              {agent.workspacePath ? (
+                <SettingsGroupRow>
+                  <SettingsRow description={t("mobile.agent.workspace.footer")}>
+                    <Typography.Paragraph>{t("mobile.agent.workspace.title")}</Typography.Paragraph>
+                    <Typography.Paragraph selectable type="body-xs" className="text-grouped-secondary">
+                      {agent.workspacePath}
+                    </Typography.Paragraph>
+                  </SettingsRow>
+                </SettingsGroupRow>
+              ) : null}
+            </SettingsSection>
+          ) : null}
+          {showChatActions ? (
+            <SettingsSection title={t("mobile.agent.advanced.chat")} rowsDrawSeparators>
+              {showNewChat ? <AgentNewChatSection agent={agent} available={available} grouped /> : null}
+              {showDeleteHistory ? <AgentDeleteHistoryRow agent={agent} available={available} /> : null}
+            </SettingsSection>
+          ) : null}
         </>
       ) : null}
       {page === "folders" ? <AgentFolders agent={agent} host={host} available={available} /> : null}
@@ -478,11 +505,7 @@ function AgentForm({
         <AgentInformation agent={agent} available={available} section={page} />
       ) : null}
       {!available ? <Typography.Paragraph>{t("mobile.agent.edit.unavailable")}</Typography.Paragraph> : null}
-      {error ? (
-        <Typography.Paragraph accessibilityRole="alert" className="text-danger-text">
-          {error}
-        </Typography.Paragraph>
-      ) : null}
+      <SaveError error={error} />
       {page === "info" || page === "appearance" || page === "runtime" ? (
         <SheetSaveAction
           dirty={dirty}
@@ -491,11 +514,11 @@ function AgentForm({
           onSave={() => void submit()}
         />
       ) : null}
-      {/* The groups and their order follow the desktop agent settings. */}
       {page === "info" ? (
         <>
           <SettingsSection title={t("mobile.agent.groups.brain")}>
             <SettingsRow
+              leading={<RowIcon icon={Cpu} />}
               supportingText={agent.model}
               onPress={() =>
                 router.push({
@@ -509,9 +532,9 @@ function AgentForm({
             <AgentBackupModelsRow agent={agent} server={host} available={available} />
           </SettingsSection>
           <SettingsSection title={t("mobile.agent.groups.knows")}>
-            {/* First, as in the desktop group. */}
             {canManageAgentInstructions(agent.serverId) ? (
               <SettingsRow
+                leading={<RowIcon icon={FileText} />}
                 onPress={() =>
                   router.push({
                     pathname: "/agent-info/[agentId]/instructions",
@@ -523,6 +546,7 @@ function AgentForm({
               </SettingsRow>
             ) : null}
             <SettingsRow
+              leading={<RowIcon icon={BookBookmark} />}
               onPress={() =>
                 router.push({
                   pathname: "/agent-info/[agentId]/memories",
@@ -533,6 +557,7 @@ function AgentForm({
               <Typography.Paragraph>{t("mobile.agent.info.memories.title")}</Typography.Paragraph>
             </SettingsRow>
             <SettingsRow
+              leading={<RowIcon icon={Puzzle} />}
               onPress={() =>
                 router.push({
                   pathname: "/agent-info/[agentId]/skills",
@@ -543,6 +568,7 @@ function AgentForm({
               <Typography.Paragraph>{t("mobile.agent.info.skills.title")}</Typography.Paragraph>
             </SettingsRow>
             <SettingsRow
+              leading={<RowIcon icon={Folder} />}
               onPress={() =>
                 router.push({
                   pathname: "/agent-info/[agentId]/files",
@@ -554,6 +580,7 @@ function AgentForm({
             </SettingsRow>
             {canManageSharedTables(agent.serverId) ? (
               <SettingsRow
+                leading={<RowIcon icon={Table2} />}
                 onPress={() =>
                   router.push({
                     pathname: "/agent-info/[agentId]/tables",
@@ -568,6 +595,7 @@ function AgentForm({
           <SettingsSection title={t("mobile.agent.groups.does")}>
             <AgentTasksRow agent={agent} />
             <SettingsRow
+              leading={<RowIcon icon={CalendarClock} />}
               onPress={() =>
                 router.push({
                   pathname: "/agent-info/[agentId]/routines",
@@ -578,6 +606,7 @@ function AgentForm({
               <Typography.Paragraph>{t("mobile.agent.info.routines.title")}</Typography.Paragraph>
             </SettingsRow>
             <SettingsRow
+              leading={<RowIcon icon={Gauge} />}
               onPress={() =>
                 router.push({
                   pathname: "/agent-info/[agentId]/usage",
@@ -589,6 +618,7 @@ function AgentForm({
             </SettingsRow>
             {canPublishAgent(agent.serverId) ? (
               <SettingsRow
+                leading={<RowIcon icon={Upload} />}
                 onPress={() =>
                   router.push({
                     pathname: "/agent-info/[agentId]/publish",
@@ -610,6 +640,7 @@ function AgentForm({
             >
               {showPermissions ? (
                 <SettingsRow
+                  leading={<RowIcon icon={ShieldCheck} />}
                   supportingText={adminSettings ? t(PERMISSION_LABEL[agentPermissionLevel(adminSettings)]) : undefined}
                   onPress={() =>
                     router.push({
@@ -625,6 +656,7 @@ function AgentForm({
               {showNotificationLevel ? <AgentNotificationLevelRow agent={agent} /> : null}
               {showAdvanced ? (
                 <SettingsRow
+                  leading={<RowIcon icon={SlidersHorizontal} />}
                   onPress={() =>
                     router.push({
                       pathname: "/agent-info/[agentId]/advanced",
@@ -636,6 +668,9 @@ function AgentForm({
                 </SettingsRow>
               ) : null}
             </SettingsSection>
+          ) : null}
+          {host && canAdministerServer(host.role) ? (
+            <AgentDeleteSection agent={agent} disabled={!available || saving || dirty} />
           ) : null}
         </>
       ) : null}

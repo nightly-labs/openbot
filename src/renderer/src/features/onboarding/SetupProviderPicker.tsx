@@ -3,11 +3,17 @@ import {
   type AgentModelId,
   type AgentProviderId,
   type AgentStatus,
+  CUSTOM_PROVIDER_HARNESSES,
+  type CustomProviderHarness,
   type CustomProviderRestart,
   type CustomProviderSummary,
+  customProviderOfModel,
+  DEFAULT_CUSTOM_PROVIDER_HARNESS,
+  isCustomProviderHarness,
   isLocalOnlyProvider,
   type ProviderRuntimeStatus,
   type SaveCustomProviderInput,
+  savedCustomModelId,
 } from "@openbot/contracts/ipc";
 import type { AppTextKey } from "@openbot/i18n";
 import {
@@ -15,8 +21,11 @@ import {
   ProviderPicker,
   type ProviderPickerOption,
 } from "@openbot/ui/components/ProviderPicker";
-import { freeModelsReady } from "@openbot/ui/components/provider-row";
-import { CustomProviderDialog } from "@openbot/ui/features/custom-providers/CustomProviderDialog";
+import { freeModelsReady, servesCustomProvider } from "@openbot/ui/components/provider-row";
+import {
+  CustomProviderDialog,
+  type CustomProviderHarnessChoice,
+} from "@openbot/ui/features/custom-providers/CustomProviderDialog";
 import { CustomProviderListDialog } from "@openbot/ui/features/custom-providers/CustomProviderListDialog";
 import { DetectedProviders } from "@openbot/ui/features/custom-providers/DetectedProviders";
 import type { DetectedProviderApi, ProviderDetection } from "@openbot/ui/features/custom-providers/detected-providers";
@@ -35,17 +44,12 @@ import { createCustomProviderHostState } from "../custom-providers/custom-provid
 import { FREE_PROVIDER, onboardingProviderRows } from "./onboarding-provider-rows";
 import { fallbackProviderState } from "./onboarding-provider-state";
 
-/** The providers of this computer, and the actions on them, as both setup screens take them. */
 export interface SetupProviderProps {
   agentStatus: AgentStatus;
-  /**
-   * The providers are those of a joined server's host. A provider that stays on its computer, such
-   * as Cursor, then has a row only when the host's status lists it, as in Settings.
-   */
   hostProviders?: boolean | undefined;
+  customProviderHarnessChoice?: boolean | undefined;
   refreshingProviders?: boolean | undefined;
   providerRuntimeStatuses?: Partial<Record<AgentProviderId, ProviderRuntimeStatus>> | undefined;
-  /** The newer runtime main offers per provider; the row's actions menu offers it as in Settings. */
   providerAvailableVersions?: Partial<Record<AgentProviderId, string | null>> | undefined;
   onUpdateProvider?: ((provider: AgentProviderId) => void | Promise<void>) | undefined;
   onCancelProviderSignIn?: ((provider: AgentProviderId) => void | Promise<void>) | undefined;
@@ -53,60 +57,28 @@ export interface SetupProviderProps {
   onCancelProviderDownload?: ((provider: AgentProviderId) => void | Promise<void>) | undefined;
   onInstallProvider?: ((provider: AgentProviderId) => void | Promise<void>) | undefined;
   onSignInProvider?: ((provider: AgentProviderId) => void | Promise<void>) | undefined;
-  /**
-   * Saves the optional OpenCode Go key. OpenCode runs free models without it, so its Connect row
-   * button opens the key dialog rather than gating the step.
-   */
   providerKeys?: ProviderKeyApi | undefined;
-  /**
-   * How each row signs in. First run needs its ⋯ menu most: the browser this computer opens is the
-   * part of the hand-off that is most likely to be missing or wrong here.
-   */
   connection?: ProviderConnectionApi | undefined;
   onRefreshProviders?: (() => void | Promise<void>) | undefined;
-  /** Accepts a described endpoint. Without it the step offers no custom provider at all. */
   onAddCustomProvider?: ((value: SaveCustomProviderInput) => Promise<CustomProviderRestart>) | undefined;
   onDeleteCustomProvider?: ((id: string) => Promise<CustomProviderRestart>) | undefined;
-  /**
-   * The endpoints already saved. They share one Custom provider row, which counts them and becomes a
-   * choice beside the built-in providers, and a duplicate ID is a field error before the round trip.
-   */
   customProviders?: readonly CustomProviderSummary[] | undefined;
-  /**
-   * Local model servers and ACP agents that the host found. Without it, or when a scan finds
-   * nothing, the step shows no such list. Setup does not scan again, so there is no scan control.
-   */
   providerDetection?: ProviderDetection | undefined;
-  /** Saves, hides and checks what the scan found. Without it the step shows no such list. */
   detectedProviderApi?: DetectedProviderApi | undefined;
-  /** Saved custom agent IDs, so a found agent's ID is checked before the round trip. */
   takenAgentIds?: readonly string[] | undefined;
 }
 
-/** How a screen shows the providers. */
 export interface SetupProviderOptions {
-  /**
-   * Whether the free provider is a row and a choice the step can make by itself. First run asks
-   * for it separately, so its plan step shows plan rows only. Without it, it is a row.
-   */
   includeFree?: () => boolean;
 }
 
-/** The choice a screen opens with. A review opens with the saved one; the first run with none. */
 export interface SetupProviderChoice {
   provider: AgentProviderId | null;
-  /**
-   * Set when the saved model is one of a custom endpoint, so the custom row holds the check. The
-   * endpoint list loads after the screen opens, so the value can arrive late.
-   */
   customModel: () => AgentModelId | null;
 }
 
-// The line that the plan providers share. It tells nothing about one row, so those rows show their
-// version there.
 const INCLUDED_DESCRIPTION = "Included with OpenBot";
 
-// A custom agent is not a first provider: it is added from the detected list or in Settings.
 const SETUP_PROVIDERS: Array<{ id: AgentProviderId; name: string; description: string | null }> =
   AGENT_PROVIDER_DESCRIPTORS.filter((descriptor) => descriptor.id !== "acp").map((descriptor) => ({
     id: descriptor.id,
@@ -114,10 +86,6 @@ const SETUP_PROVIDERS: Array<{ id: AgentProviderId; name: string; description: s
     description: descriptor.onboardingDescription === INCLUDED_DESCRIPTION ? null : descriptor.onboardingDescription,
   }));
 
-/**
- * The provider registry carries its onboarding line in English. A line that has no key here, such
- * as one a newer registry adds, shows as it is.
- */
 const PROVIDER_DESCRIPTION_KEYS: Readonly<Record<string, AppTextKey>> = {
   "Free models, no account needed": "onboarding.provider.freeModels",
   "Google AI Pro or Ultra plan": "onboarding.provider.googlePlan",
@@ -125,76 +93,62 @@ const PROVIDER_DESCRIPTION_KEYS: Readonly<Record<string, AppTextKey>> = {
   "Free models with a Cline account": "onboarding.provider.clineAccount",
   "Kimi models with a Kimi Code account": "onboarding.provider.kimiAccount",
   "Many models with a Devin account": "onboarding.provider.devinAccount",
+  "Many models with a Copilot plan": "onboarding.provider.copilotAccount",
+  "Mistral models with a Mistral account": "onboarding.provider.mistralAccount",
   "Mercury models with an Inception API key": "onboarding.provider.inceptionKey",
   "DeepSeek models with a DeepSeek API key": "onboarding.provider.deepseekKey",
   "Many models with an OpenRouter API key": "onboarding.provider.openrouterKey",
   "Nous Portal plan or your Hermes setup": "onboarding.provider.hermesNous",
 };
 
-/**
- * Whether setup can continue with this provider. A signed-in provider can; so can a downloaded
- * provider that runs free models, because it has no sign-in to wait for.
- */
 function providerReady(option: ProviderPickerOption): boolean {
   return option.state === "available" || freeModelsReady(option);
 }
 
-/** The saved model when it names a custom endpoint, which OpenCode calls `<endpoint id>/<model id>`. */
 export function savedCustomModel(
   provider: AgentProviderId | null,
   model: AgentModelId | null,
   customProviders: readonly CustomProviderSummary[] | undefined,
 ): AgentModelId | null {
-  if (provider !== FREE_PROVIDER || !model) return null;
-  return (customProviders ?? []).some((endpoint) => model.startsWith(`${endpoint.id}/`)) ? model : null;
+  if (!isCustomProviderHarness(provider) || !model) return null;
+  const endpoint = customProviderOfModel(model, customProviders ?? []);
+  return endpoint && harnessOf(endpoint) === provider ? model : null;
+}
+
+function harnessOf(endpoint: CustomProviderSummary): CustomProviderHarness {
+  return endpoint.harness ?? DEFAULT_CUSTOM_PROVIDER_HARNESS;
 }
 
 export type SetupProviders = ReturnType<typeof createSetupProviders>;
 
-/**
- * The provider step of setup: its rows, its choice, the actions on a row, and the errors those
- * actions leave. The first-run flow and the setup dialog both hold one, so a provider is chosen,
- * connected and added the same way on each.
- */
 export function createSetupProviders(
   props: SetupProviderProps,
   initial?: SetupProviderChoice,
   settings: SetupProviderOptions = {},
 ) {
-  const { t } = useText();
+  const { t, errorMessage } = useText();
   const includeFree = () => settings.includeFree?.() ?? true;
   const [selectedProvider, setSelectedProvider] = createSignal<AgentProviderId | null>(initial?.provider ?? null);
-  /**
-   * Whether the user chose their own endpoints rather than a built-in provider. `selectedProvider`
-   * stays `opencode` beside it, because that is the provider setup records: which endpoint an agent
-   * uses is a model choice, which comes later than this step.
-   */
   const [customSelected, setCustomSelected] = createSignal(Boolean(untrack(() => initial?.customModel())));
-  /**
-   * The model a new agent starts on while the custom row holds the choice. Only an endpoint saved
-   * here names one: the user listed its models in the dialog a moment ago, and nothing else on this
-   * screen chooses a model. Without one the provider falls back to the first model it lists.
-   */
   const [customModel, setCustomModel] = createSignal<AgentModelId | null>(
     untrack(() => initial?.customModel()) ?? null,
   );
-  // A saved choice is the user's own, so the automatic choice below does not replace it.
   const [providerSelectedByUser, setProviderSelectedByUser] = createSignal(Boolean(initial?.provider));
-  /** The user chose a row on this screen, so a late saved choice does not replace it. */
   let choiceChanged = false;
   const [keyProvider, setKeyProvider] = createSignal<KeyDialogProvider | null>(null);
   const [error, setErrorText] = createSignal("");
   const [errorCode, setErrorCode] = createSignal<UserErrorDetails | null>(null);
-  /** Shows `message`, with the code of `cause` when a failure gave one. */
   const setError = (message: string, cause?: unknown) => {
     setErrorText(message);
     const reference = cause === undefined ? null : errorReference(cause);
     setErrorCode(reference ? { message, reference } : null);
   };
   const [providerErrors, setProviderErrors] = createSignal<Partial<Record<AgentProviderId, string>>>({});
-  const visibleError = createMemo(
-    () => error() || SETUP_PROVIDERS.map((provider) => providerErrors()[provider.id]).find(Boolean) || "",
-  );
+  const selectedProviderError = () => {
+    const selected = selectedProvider();
+    return selected ? providerErrors()[selected] : undefined;
+  };
+  const visibleError = createMemo(() => error() || selectedProviderError() || "");
   const previousConnectionStates = new Map<AgentProviderId, boolean>();
   const connectionStartingMessages = new Map<AgentProviderId, string | null>();
   const refreshedConnectionStates = new Set<AgentProviderId>();
@@ -223,8 +177,6 @@ export function createSetupProviders(
         checkError: status?.checkError,
         availableVersion: props.providerAvailableVersions?.[provider.id] ?? null,
         freeModels: provider.id === "opencode",
-        // For a user with no account anywhere, this row is the way forward, and among four rows it
-        // reads like any other; the note points it out.
         callout:
           provider.id === "opencode"
             ? { title: t("onboarding.provider.tryFree"), detail: t("onboarding.provider.noSignIn") }
@@ -236,36 +188,40 @@ export function createSetupProviders(
       };
     }),
   );
-  /**
-   * The plan rows that stay in the list, in their order, or `null` until the user first acts on the
-   * list. Until then the row rule can change the list when the provider status arrives. After that,
-   * a row never moves or goes away under the pointer.
-   */
   const [keptProviders, setKeptProviders] = createSignal<AgentProviderId[] | null>(null);
-  /** The user chose the custom provider in "More providers", so it is a row from now on. */
   const [customRevealed, setCustomRevealed] = createSignal(false);
-  /** The free row shows when the step includes it, or when the user chose it in "More providers". */
   const freeRow = () =>
     includeFree() || (selectedProvider() === FREE_PROVIDER && providerSelectedByUser() && !customSelected());
   const providerRows = createMemo(() => {
     const kept = keptProviders();
-    const rows = onboardingProviderRows(providerOptions(), kept ?? [], freeRow());
-    // A saved choice that the row rule hides still shows, after the rows the rule gives.
+    const host = Boolean(props.hostProviders);
+    const rows = onboardingProviderRows(providerOptions(), kept ?? [], freeRow(), host);
     const saved = initial?.provider;
     if (kept || !saved || rows.listed.some((option) => option.id === saved)) return rows;
-    return onboardingProviderRows(providerOptions(), [...planRowIds(rows.listed), saved], freeRow());
+    return onboardingProviderRows(providerOptions(), [...planRowIds(rows.listed), saved], freeRow(), host);
   });
+  const providersReported = createMemo(
+    () =>
+      Boolean(props.hostProviders) &&
+      props.agentStatus.phase !== "starting" &&
+      props.agentStatus.phase !== "restarting" &&
+      providerOptions().every((option) => option.state !== "checking"),
+  );
+  createEffect(
+    () => (providersReported() && keptProviders() === null ? planRowIds(providerRows().listed) : null),
+    (rows) => {
+      if (rows) setKeptProviders(rows);
+    },
+  );
   const customInMore = () =>
     Boolean(props.onAddCustomProvider) && (props.customProviders ?? []).length === 0 && !customRevealed();
 
-  /** Keeps the rows that the user sees now, and adds `provider` after them if it is not a row. */
   function keepProviderRows(provider?: AgentProviderId): void {
     const kept = keptProviders() ?? planRowIds(providerRows().listed);
     const next = provider && provider !== FREE_PROVIDER && !kept.includes(provider) ? [...kept, provider] : kept;
     if (next !== keptProviders()) setKeptProviders(next);
   }
 
-  /** Chooses a row, or a provider in "More providers", which then becomes a row. */
   function chooseProvider(provider: AgentProviderId): void {
     keepProviderRows(provider);
     choiceChanged = true;
@@ -274,63 +230,68 @@ export function createSetupProviders(
     setCustomSelected(false);
   }
 
-  /** OpenCode runs the custom endpoints, so the form opens only when OpenCode can run one. */
+  const harnesses = createMemo((): CustomProviderHarnessChoice[] | undefined =>
+    props.hostProviders && !props.customProviderHarnessChoice
+      ? undefined
+      : CUSTOM_PROVIDER_HARNESSES.map((id) => {
+          const option = providerOptions().find((item) => item.id === id);
+          return { id, ready: servesCustomProvider(option), runtime: option?.runtimeStatus };
+        }),
+  );
+  function customHarness(): CustomProviderHarness {
+    const endpoint = customProviderOfModel(customModel() ?? firstSavedCustomModel(), props.customProviders ?? []);
+    if (endpoint) return harnessOf(endpoint);
+    return harnesses()?.find((choice) => choice.ready)?.id ?? DEFAULT_CUSTOM_PROVIDER_HARNESS;
+  }
+  const [harnessError, setHarnessError] = createSignal("");
+  async function downloadHarness(harness: CustomProviderHarness): Promise<void> {
+    if (!props.onDownloadProvider) return;
+    setHarnessError("");
+    try {
+      await props.onDownloadProvider(harness);
+    } catch (cause) {
+      setHarnessError(errorMessage(cause, t("onboarding.error.download", { provider: providerName(harness) })));
+    }
+  }
+
+  function openCustomForm(): void {
+    setHarnessError("");
+    host.openForm();
+  }
+
   function chooseMoreCustom(): void {
     keepProviderRows();
     setCustomRevealed(true);
-    const openCode = providerOptions().find((option) => option.id === FREE_PROVIDER);
-    if (openCode?.state === "available" || openCode?.state === "sign-in-required") host.openForm();
+    if (servesCustomProvider(providerOptions().find((option) => option.id === customHarness()))) openCustomForm();
   }
 
-  /**
-   * The dialogs that add and remove an endpoint. The state is shared with Settings, which carries the
-   * same removal sentence and the same busy row; what happens after a save or a removal is this
-   * step's own, because only this step starts an agent on the model it just learned about.
-   */
   const host = createCustomProviderHostState({
     onAdd: (value) => props.onAddCustomProvider?.(value),
     onDelete: (id) => props.onDeleteCustomProvider?.(id),
+    discoverModels: () => props.detectedProviderApi?.discoverModels,
     onSaved: selectSavedEndpoint,
     onRemoved: (id) => {
-      // The save reads these two to decide whether to send a model, so a model of an endpoint that
-      // is gone would be stored on the first agent. The remaining endpoints keep the row selected.
       if (customModel()?.startsWith(`${id}/`)) setCustomModel(null);
-      // The row stays where the user saw it, and does not go back into "More providers".
       setCustomRevealed(true);
       if ((props.customProviders ?? []).length === 0) setCustomSelected(false);
+      else if (customSelected()) setSelectedProvider(customHarness());
     },
   });
 
-  /**
-   * A model of an endpoint saved before this screen opened.
-   *
-   * Without it the custom choice would reach setup with no model, and a new agent would start on the
-   * first model the catalog lists - a hosted one, because free models come first. The endpoint the
-   * user selected would then be unused, which is the opposite of what the row says. OpenCode names a
-   * custom model `<endpoint id>/<model id>`, so the id is composed rather than looked up in a list
-   * the CLI has not published yet.
-   */
   function firstSavedCustomModel(): AgentModelId | null {
     for (const provider of props.customProviders ?? []) {
       const [model] = provider.models;
-      if (model) return `${provider.id}/${model.id}`;
+      if (model) return savedCustomModelId(provider.id, provider.harness, model.id);
     }
     return null;
   }
 
-  /**
-   * The endpoint the user just described is what they came here to use, so the step selects the
-   * custom row rather than leaving the choice on whichever provider connected first, and its first
-   * model becomes the one a new agent starts on. OpenCode names a custom model by its endpoint, so
-   * the id is composed here rather than looked up in a catalog it has yet to list.
-   */
   function selectSavedEndpoint(value: SaveCustomProviderInput): void {
-    selectCustomProvider();
+    selectCustomProvider(value.harness ?? DEFAULT_CUSTOM_PROVIDER_HARNESS);
     const [firstModel] = value.models;
-    if (firstModel) setCustomModel(`${value.id}/${firstModel.id}`);
+    if (firstModel) setCustomModel(savedCustomModelId(value.id, value.harness, firstModel.id));
   }
 
-  /** A found server that the user saves is selected like one added with the form. */
   const detectedApi = createMemo((): DetectedProviderApi | undefined => {
     const api = props.detectedProviderApi;
     if (!api) return undefined;
@@ -344,12 +305,11 @@ export function createSetupProviders(
     };
   });
 
-  /** OpenCode runs every custom endpoint, so choosing them chooses that provider along with them. */
-  function selectCustomProvider(): void {
+  function selectCustomProvider(harness: CustomProviderHarness = customHarness()): void {
     keepProviderRows();
     choiceChanged = true;
     setProviderSelectedByUser(true);
-    setSelectedProvider("opencode");
+    setSelectedProvider(harness);
     setCustomSelected(true);
   }
 
@@ -364,9 +324,9 @@ export function createSetupProviders(
 
   const selectedProviderConnected = createMemo(() => {
     const selected = selectedProvider();
-    return Boolean(
-      selected && providerOptions().some((provider) => provider.id === selected && providerReady(provider)),
-    );
+    const option = selected ? providerOptions().find((provider) => provider.id === selected) : undefined;
+    if (!option) return false;
+    return customSelected() && isCustomProviderHarness(selected) ? servesCustomProvider(option) : providerReady(option);
   });
 
   createEffect(
@@ -378,13 +338,12 @@ export function createSetupProviders(
     }),
     ({ options: allOptions, selected, selectedByUser, withFree }) => {
       if (selectedByUser && selected && allOptions.some((provider) => provider.id === selected)) return;
-      // A step without the free row does not choose the free provider by itself.
       const options = withFree ? allOptions : allOptions.filter((provider) => provider.id !== FREE_PROVIDER);
-      if (selected && options.some((provider) => provider.id === selected && providerReady(provider))) return;
-      // A signed-in provider comes first, then one whose CLI is on the computer. Free models are the
-      // way in when the user has neither.
+      const signedIn = options.find((provider) => provider.state === "available" && !provider.freeModels);
+      const selectedReady = options.some((provider) => provider.id === selected && providerReady(provider));
+      if (selectedReady && !(signedIn && selected === FREE_PROVIDER)) return;
       const ready =
-        options.find((provider) => provider.state === "available") ??
+        signedIn ??
         options.find((provider) => provider.state === "sign-in-required" && !provider.freeModels) ??
         options.find((provider) => providerReady(provider));
       setSelectedProvider(ready?.id ?? null);
@@ -427,9 +386,6 @@ export function createSetupProviders(
         focusRefreshTimer = setTimeout(synchronize, 250);
         return;
       }
-      // A refresh cancels a sign-in that OpenBot runs, such as Gemini's Google sign-in. The browser
-      // takes focus, so the user often comes back before the sign-in is complete. That sign-in
-      // reports its own result.
       const signingIn = props.agentStatus.providers?.some(
         (status) => providersAwaitingFocusRefresh.has(status.id) && status.connectionState === "connecting",
       );
@@ -478,11 +434,6 @@ export function createSetupProviders(
     }
   }
 
-  /**
-   * OpenCode, Muse and Gemini sign in with a pasted key, so their rows open the key dialog; the rest
-   * open a guide. Claude's and Codex's keys are an option on their Providers page, so their Sign in
-   * stays the guide.
-   */
   function signInProvider(provider: AgentProviderId): void {
     if (isKeyDialogProvider(provider) && provider !== "claude" && provider !== "codex" && props.providerKeys) {
       setKeyProvider(provider);
@@ -491,12 +442,10 @@ export function createSetupProviders(
     void openProviderGuide(provider, props.onSignInProvider, "sign-in");
   }
 
-  /** Resolves `false` when the request failed; the error then says why. */
   function connectProvider(provider: AgentProviderId): Promise<boolean> {
     return followSignIn(provider, (connection) => connection.connect(provider));
   }
 
-  /** Signs in on the provider's mainland China site, as `connectProvider` does on its default site. */
   function connectProviderInMainlandChina(provider: AgentProviderId): Promise<boolean> {
     return followSignIn(provider, (connection) => connection.connectInMainlandChina?.(provider) ?? Promise.resolve());
   }
@@ -508,12 +457,11 @@ export function createSetupProviders(
     const connection = props.connection;
     const kind = connection?.connectKind(provider);
     if (!connection || !kind || props.refreshingProviders) return true;
-    // A dialog sign-in reports itself in its dialog. The browser sign-in reports in the row.
+    chooseProvider(provider);
     if (kind === "dialog") {
       await start(connection);
       return true;
     }
-    keepProviderRows();
     setError("");
     setProviderErrors((current) => ({ ...current, [provider]: undefined }));
     providersAwaitingFocusRefresh.add(provider);
@@ -532,7 +480,6 @@ export function createSetupProviders(
     }
   }
 
-  /** Resolves `false` when the request failed; the error then says why. */
   async function downloadProvider(provider: AgentProviderId): Promise<boolean> {
     if (!props.onDownloadProvider) return true;
     keepProviderRows();
@@ -582,13 +529,10 @@ export function createSetupProviders(
     customInMore,
     selectedProvider,
     customSelected,
-    /** The model to save with the custom row: the one described here, else one saved before. */
     customModel: () => customModel() ?? firstSavedCustomModel(),
     detectedApi,
     selectedProviderConnected,
-    /** A provider action's error, or the message of a connection that ended without success. */
     error: visibleError,
-    /** The code of the shown error, when a failure gave one. */
     errorReference: () => {
       const code = errorCode();
       return code && code.message === visibleError() ? code.reference : null;
@@ -601,6 +545,11 @@ export function createSetupProviders(
     keyProvider,
     closeKeyDialog: () => setKeyProvider(null),
     host,
+    harnesses,
+    harnessError,
+    downloadHarness,
+    openCustomForm,
+    customEngine: () => providerOptions().find((option) => option.id === customHarness()),
     chooseProvider,
     chooseMoreCustom,
     selectCustomProvider,
@@ -608,7 +557,6 @@ export function createSetupProviders(
     connectProvider,
     connectProviderInMainlandChina,
     downloadProvider,
-    /** Forgets the user's choice, so the step chooses again from the rows it shows. */
     clearChoice: () => {
       choiceChanged = true;
       setProviderSelectedByUser(false);
@@ -631,16 +579,13 @@ export interface SetupProviderPickerProps {
   label: string;
   hint: string;
   disabled: boolean;
-  /** Where the row menus mount. A screen on the dialog layer passes itself, or they paint behind it. */
   menuMount: HTMLElement | undefined;
 }
 
-/** The provider list of setup, with the dialogs its rows open. */
 export function SetupProviderPicker(props: SetupProviderPickerProps) {
   const { t } = useText();
   const source = () => props.providers.props;
   const lazyProviderMode = () => Boolean(source().providerRuntimeStatuses || source().onDownloadProvider);
-  /** The rows' Connect goes through the step, which follows the browser sign-in it starts. */
   const connection = createMemo((): ProviderConnection | undefined => {
     const api = source().connection;
     return api
@@ -699,14 +644,14 @@ export function SetupProviderPicker(props: SetupProviderPickerProps) {
         onRefreshProviders={
           !lazyProviderMode() && source().onRefreshProviders ? props.providers.refreshProviders : undefined
         }
-        onAddCustomProvider={source().onAddCustomProvider ? props.providers.host.openForm : undefined}
+        onAddCustomProvider={source().onAddCustomProvider ? props.providers.openCustomForm : undefined}
         customProviders={source().customProviders}
         customSelected={props.providers.customSelected()}
         onSelectCustomProvider={source().onAddCustomProvider ? props.providers.selectCustomProvider : undefined}
         onManageCustomProviders={source().onAddCustomProvider ? props.providers.host.openList : undefined}
         moreProviders={props.providers.rows().hidden}
         customInMore={props.providers.customInMore()}
-        customEngine={props.providers.options().find((option) => option.id === FREE_PROVIDER)}
+        customEngine={props.providers.customEngine()}
         versionInDetail
         moreCallout={{
           title: t("onboarding.provider.moreTitle"),
@@ -715,8 +660,6 @@ export function SetupProviderPicker(props: SetupProviderPickerProps) {
         onChooseMoreProvider={props.providers.chooseProvider}
         onChooseMoreCustom={props.providers.chooseMoreCustom}
         detected={
-          // In setup a scan that found nothing is noise, so the list goes away. Hidden rows keep it:
-          // Show hidden is the only way back to them in this step.
           <Show
             when={
               source().providerDetection?.scanning ||
@@ -747,6 +690,13 @@ export function SetupProviderPicker(props: SetupProviderPickerProps) {
         <CustomProviderDialog
           open={props.providers.host.state.open}
           contextWindows={!source().hostProviders}
+          harnesses={props.providers.harnesses()}
+          onDownloadHarness={
+            source().onDownloadProvider ? (harness) => void props.providers.downloadHarness(harness) : undefined
+          }
+          harnessError={props.providers.harnessError()}
+          discovery={props.providers.host.discovery()}
+          onDiscoverModels={props.providers.host.discover()}
           busy={props.providers.host.state.saving}
           submitError={props.providers.host.state.submitError}
           takenProviderIds={(source().customProviders ?? []).map((provider) => provider.id)}
@@ -784,8 +734,6 @@ export function SetupProviderPicker(props: SetupProviderPickerProps) {
           </Show>
         )}
       </Show>
-      {/* Sits beside the picker it was started from, so the code covers the row rather
-          than a step the user has not reached. */}
       <ProviderSignInDialogs api={source().connection} />
     </>
   );

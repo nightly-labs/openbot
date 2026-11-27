@@ -7,6 +7,7 @@ import type {
   HostStatus,
   InvitePreview,
   InviteSummary,
+  RemoteControlPolicy,
   RemoteDesktopConnectResult,
   RemoteDesktopSession,
   ScopedDirectMessageEvent,
@@ -30,6 +31,7 @@ import {
   decodeInviteSummary,
   decodeInviteUrl,
   decodePendingInvite,
+  decodeRemoteControlPolicy,
   decodeRemoteDesktopConnectResult,
   decodeRemoteDesktopSessions,
   decodeScopedDirectMessage,
@@ -52,9 +54,11 @@ const hostStatus = {
   serverName: "Studio",
   apiUrl: "https://studio.example.test",
   logoUrl: null,
+  appearance: null,
   apiOnline: true,
   remoteDesktopReady: false,
   remoteDesktopScreenRecordingDenied: false,
+  remoteDesktopNeedsX11Session: false,
   remoteDesktopUnattended: false,
   remoteDesktopActiveSessions: 0,
   remoteDesktopMaxSessions: 4,
@@ -72,6 +76,8 @@ const member = {
 } satisfies TeamMemberSummary;
 
 const memberWithAvatar = { ...member, avatarUrl: "https://example.test/ada.png" } satisfies TeamMemberSummary;
+
+const memberWithChatColor = { ...member, chatColor: "#3a7bd5" } satisfies TeamMemberSummary;
 
 const presence = {
   serverId: null,
@@ -202,6 +208,17 @@ const typingEvent = {
   event: { type: "team-direct-typing", senderMemberId: "member-1", recipientMemberId: "member-2", typing: true },
 } satisfies ScopedDirectTypingEvent;
 
+const customPlan = {
+  name: "Business",
+  amount: 89_000,
+  currency: "eur",
+  interval: "month",
+  vcpu: 16,
+  memoryGb: 64,
+  storageGb: 500,
+  personalizedSupport: true,
+};
+
 describe("team decoders", () => {
   it.each([
     ["host status", decodeHostStatus, hostStatus],
@@ -209,6 +226,12 @@ describe("team decoders", () => {
     ["team member with an avatar", decodeTeamMember, memberWithAvatar],
     ["team member list", decodeTeamMembers, [member, memberWithAvatar]],
     ["team presence", decodeTeamPresenceSnapshot, presence],
+    ["team member with a chat colour", decodeTeamMember, memberWithChatColor],
+    [
+      "team presence with a chat colour",
+      decodeTeamPresenceSnapshot,
+      { ...presence, members: [{ ...memberWithChatColor, online: true, typingAgentId: null }] },
+    ],
     ["team session list", decodeTeamSessions, [session]],
     ["team invite list", decodeTeamInvites, [teamInvite]],
     ["created invite", decodeInviteSummary, invite],
@@ -238,9 +261,19 @@ describe("team decoders", () => {
       decodeServer,
       { ...remoteServer, hostedSleep: "waking", hostedStart: { step: "provider_limit", startedAt: 1 } },
     ],
+    [
+      "server with a hosted restore",
+      decodeServer,
+      { ...remoteServer, hostedSleep: "waking", hostedStart: { step: "restore", startedAt: 1 } },
+    ],
     ["server with no hosted start", decodeServer, { ...remoteServer, hostedStart: null }],
     ["server on this computer", decodeServer, { ...remoteServer, thisComputer: true }],
+    ["joined server with its username", decodeServer, { ...remoteServer, username: "member@example.com" }],
+    ["hosted server with plan storage", decodeServer, { ...remoteServer, hosted: true, storageGb: 50 }],
+    ["hosted server with no restart", decodeServer, { ...remoteServer, hosted: true, restartAvailable: false }],
     ["server with a key change time", decodeServer, { ...remoteServer, keyChangedAt: 1_700_000_000_000 }],
+    ["custom server that waits for payment", decodeServer, { ...remoteServer, paymentRequired: true }],
+    ["custom server with its plan", decodeServer, { ...remoteServer, paymentRequired: true, customPlan }],
     ["invite preview", decodeInvitePreview, invitePreview],
     ["invite link", decodeInviteUrl, "openbot://join/invite-1"],
     ["pending invite", decodePendingInvite, "openbot://join/invite-1"],
@@ -270,6 +303,11 @@ describe("team decoders", () => {
     ["direct read state", decodeDirectReadState, readState],
     ["direct message event", decodeScopedDirectMessage, directEvent],
     ["direct typing event", decodeScopedDirectTyping, typingEvent],
+    [
+      "remote control policy",
+      decodeRemoteControlPolicy,
+      { access: "admins", askOnHost: true } satisfies RemoteControlPolicy,
+    ],
   ] as const)("keeps a valid %s", (_name, decode: (value: unknown) => unknown, value) => {
     expect(decode(value)).toEqual(value);
   });
@@ -278,6 +316,8 @@ describe("team decoders", () => {
     ["host status with an unknown phase", decodeHostStatus, { ...hostStatus, phase: "sleeping" }],
     ["team member with an unknown role", decodeTeamMember, { ...member, role: "guest" }],
     ["team member with a numeric avatar", decodeTeamMember, { ...member, avatarUrl: 1 }],
+    ["team member with an upper-case chat colour", decodeTeamMember, { ...member, chatColor: "#3A7BD5" }],
+    ["team member with a chat colour that is not hex", decodeTeamMember, { ...member, chatColor: "blue" }],
     ["team member list that is not an array", decodeTeamMembers, member],
     ["team presence without typing state", decodeTeamPresenceSnapshot, { ...presence, members: [member] }],
     ["team session without a member", decodeTeamSessions, [{ ...session, memberId: null }]],
@@ -294,6 +334,8 @@ describe("team decoders", () => {
       { status: "refused", errorCode: "busy", message: "No." },
     ],
     ["remote desktop connection with an unknown status", decodeRemoteDesktopConnectResult, { status: "pending" }],
+    ["remote control policy with an unknown access", decodeRemoteControlPolicy, { access: "guests", askOnHost: false }],
+    ["remote control policy without a question choice", decodeRemoteControlPolicy, { access: "owner" }],
     ["server with an unknown state", decodeServers, [{ ...localServer, state: "asleep" }]],
     ["server without a role", decodeServer, { ...localServer, role: undefined }],
     [
@@ -307,7 +349,9 @@ describe("team decoders", () => {
       { ...remoteServer, compatibility: { ...remoteServer.compatibility, localProtocol: { minimum: 1 } } },
     ],
     ["server with a text connection sequence", decodeServer, { ...remoteServer, connectionSequence: "2" }],
+    ["server with a false capability wait", decodeServer, { ...remoteServer, capabilitiesPending: false }],
     ["server with an invalid hosted issue", decodeServer, { ...remoteServer, hostedIssue: "<script>" }],
+    ["server with an invalid restart flag", decodeServer, { ...remoteServer, restartAvailable: "false" }],
     [
       "server with an invalid hosted start step",
       decodeServer,
@@ -315,6 +359,21 @@ describe("team decoders", () => {
     ],
     ["server with a hosted start without a time", decodeServer, { ...remoteServer, hostedStart: { step: "machine" } }],
     ["server on this computer marked false", decodeServer, { ...remoteServer, thisComputer: false }],
+    ["server with a numeric username", decodeServer, { ...remoteServer, username: 7 }],
+    ["server with a fractional plan storage", decodeServer, { ...remoteServer, storageGb: 1.5 }],
+    ["server with a text plan storage", decodeServer, { ...remoteServer, storageGb: "50" }],
+    ["custom server with payment marked false", decodeServer, { ...remoteServer, paymentRequired: false }],
+    [
+      "custom server with a text price",
+      decodeServer,
+      { ...remoteServer, customPlan: { ...customPlan, amount: "890" } },
+    ],
+    [
+      "custom server with an unknown currency",
+      decodeServer,
+      { ...remoteServer, customPlan: { ...customPlan, currency: "btc" } },
+    ],
+    ["custom server with no memory", decodeServer, { ...remoteServer, customPlan: { ...customPlan, memoryGb: 0 } }],
     ["server with a text key change time", decodeServer, { ...remoteServer, keyChangedAt: "2026-10-31" }],
     ["server with a negative key change time", decodeServer, { ...remoteServer, keyChangedAt: -1 }],
     ["invite preview for an owner", decodeInvitePreview, { ...invitePreview, role: "owner" }],

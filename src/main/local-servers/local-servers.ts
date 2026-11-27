@@ -1,39 +1,27 @@
-// The servers on this computer: each one is OpenBot itself, started as a child process with its own
-// user data directory and agent root (`local-server-child.ts`). The desktop app reaches each one
-// over the loopback Team API, as it reaches a joined server, and logs in as its owner at each start.
-//
-// A child ends when its control pipe closes, so it stops also when this process is killed. The
-// supervisor starts a child again after it stops on its own, a few times only, so a child that cannot
-// start does not use the computer's power in a loop.
-//
-// The owner password goes to the child in its environment, and the child removes it from there at
-// once. No password or session token is written to a log.
-//
-// While the desktop app is signed in, each running server is registered for its account, with the
-// child's key and owner member. The machine token of the registration goes to the child on its
-// control pipe, so the child meets the owner's devices on Signal and sends their notifications. A
-// sign-out tells each child to stop that. A deleted server is removed from the account; until the
-// account service confirms it, the registry keeps its id, so the directory sync does not list it.
-
 import { type ChildProcess, type SpawnOptions, spawn as spawnProcess } from "node:child_process";
 import { randomBytes, randomUUID } from "node:crypto";
 import { mkdir, stat } from "node:fs/promises";
 import { join } from "node:path";
 import { createInterface } from "node:readline";
 import { Readable, Writable } from "node:stream";
-import { LOCAL_SERVER_LIMIT, type ServerSummary } from "@openbot/contracts/ipc";
+import { type AgentSummary, isAgentSummary, LOCAL_SERVER_LIMIT, type ServerSummary } from "@openbot/contracts/ipc";
 import { sourceText } from "@openbot/i18n/source";
 import { registerSecretValue } from "@openbot/logging";
 import { Deferred, Duration, Effect, Exit, Schema, Scope, Semaphore } from "effect";
 import { causeHelpers } from "../../backend/effect-boundary";
+import type { RemoteMemberRecord } from "../central-auth-records";
 import {
   formatLocalServerCommand,
   LOCAL_SERVER_CONTROL_FD,
   LOCAL_SERVER_ENVIRONMENT,
+  LOCAL_SERVER_MEMBERS_REQUEST,
   LOCAL_SERVER_OWNER_USERNAME,
   LOCAL_SERVER_READY_PREFIX,
+  LOCAL_SERVER_WORKING_PREFIX,
   type LocalServerCommand,
+  type LocalServerMarketplaceRequest,
   type LocalServerReady,
+  parseLocalServerMarketplaceRequest,
 } from "../local-server-child";
 import type { LocalServerAttachInput, RemoteServerManager } from "../remote-server-manager";
 import type { TokenCipher } from "../remote-server-store";
@@ -48,33 +36,55 @@ export class LocalServerFailure extends Schema.TaggedError<LocalServerFailure>()
 
 const { io: localIO, sync: localSync, rewrap: toLocalServerFailure } = causeHelpers(LocalServerFailure);
 
-/** A first start makes the database and the identity keys, so it can take longer than a later one. */
 const READY_TIMEOUT = Duration.seconds(90);
-/** The child quits on its own when its control pipe closes. After this it is killed. */
 const STOP_GRACE_MS = 6_000;
 const RESTART_DELAY = Duration.seconds(5);
 const RESTART_WINDOW_MS = 10 * 60_000;
 const RESTART_LIMIT = 3;
-/** A team session lasts 30 days, and use does not extend it. The desktop logs in again well before. */
 const SESSION_RENEW_AFTER_MS = 7 * 24 * 60 * 60_000;
 const SESSION_CHECK_INTERVAL = Duration.hours(1);
+const PROVIDER_HOMES_FOLDER = "provider-homes";
+const PROVIDER_HOME_VARIABLES = {
+  claude: "CLAUDE_CONFIG_DIR",
+  codex: "CODEX_HOME",
+  grok: "GROK_HOME",
+} as const;
 
-/**
- * Variables that the child must not take from this process: they choose the Node mode, the profile,
- * the debugging port and the role of a development stack, and a child with them would open another
- * profile or take a port that this process holds.
- */
+const pathExists = (path: string) =>
+  localIO(() => stat(path)).pipe(
+    Effect.as(true),
+    Effect.catch(({ cause }) =>
+      cause instanceof Error && "code" in cause && cause.code === "ENOENT"
+        ? Effect.succeed(false)
+        : Effect.fail(new LocalServerFailure({ cause })),
+    ),
+  );
+
+const ownProviderHomes = Effect.fn("LocalServers.ownProviderHomes")(function* (userData: string) {
+  const root = join(userData, PROVIDER_HOMES_FOLDER);
+  const homes: Record<string, string> = {};
+  if (!(yield* pathExists(root))) return homes;
+  for (const [folder, variable] of Object.entries(PROVIDER_HOME_VARIABLES)) {
+    const home = join(root, folder);
+    yield* localIO(() => mkdir(home, { recursive: true, mode: 0o700 }));
+    homes[variable] = home;
+  }
+  return homes;
+});
+
 function childEnvironment(
   entry: StoredLocalServer,
   agentRoot: string,
   runtimeRoot: string,
   secret: string,
+  providerHomes: Readonly<Record<string, string>>,
 ): NodeJS.ProcessEnv {
   const environment: NodeJS.ProcessEnv = {};
   for (const [name, value] of Object.entries(process.env)) {
     if (name === "ELECTRON_RUN_AS_NODE" || name.startsWith("OPENBOT_DEV_")) continue;
     environment[name] = value;
   }
+  Object.assign(environment, providerHomes);
   environment[LOCAL_SERVER_ENVIRONMENT.child] = "1";
   environment[LOCAL_SERVER_ENVIRONMENT.agentRoot] = agentRoot;
   environment[LOCAL_SERVER_ENVIRONMENT.runtimeRoot] = runtimeRoot;
@@ -93,7 +103,6 @@ const readySchema = Schema.Struct({
 });
 const decodeReady = Schema.decodeUnknownSync(readySchema);
 
-/** Only a loopback address is accepted: the session token goes to it. */
 function parseReadyLine(line: string): LocalServerReady | null {
   if (!line.startsWith(LOCAL_SERVER_READY_PREFIX)) return null;
   try {
@@ -104,25 +113,31 @@ function parseReadyLine(line: string): LocalServerReady | null {
   }
 }
 
-/** The parent's end of the child's control pipe: `LOCAL_SERVER_CONTROL_FD` on Windows, else standard input. */
+function parseWorkingLine(line: string): AgentSummary[] | null {
+  if (!line.startsWith(LOCAL_SERVER_WORKING_PREFIX)) return null;
+  try {
+    const value = JSON.parse(line.slice(LOCAL_SERVER_WORKING_PREFIX.length));
+    return Array.isArray(value) ? value.filter(isAgentSummary).map((agent) => ({ ...agent, avatarUrl: null })) : null;
+  } catch {
+    return null;
+  }
+}
+
 function controlPipe(child: ChildProcess, platform: NodeJS.Platform): Writable | null {
   const stream = platform === "win32" ? child.stdio[LOCAL_SERVER_CONTROL_FD] : child.stdin;
   return stream instanceof Writable ? stream : null;
 }
 
 function startFailure(): LocalServerFailure {
-  return new LocalServerFailure({ cause: new Error(sourceText("error.remote.localServerStartFailed")) });
+  return new LocalServerFailure({ cause: new Error(sourceText("error.remote.localServerNotStarted")) });
 }
 
 interface RunningChild {
   readonly child: ChildProcess;
-  /** Set before this process ends the child, so that its exit does not start it again. */
   stopping: boolean;
 }
 
-/** The account of the desktop app, for which each server is registered while it is signed in. */
 interface LocalServerAccount {
-  /** The signed-in account, or null. */
   accountId(): string | null;
   register(input: {
     hostId: string;
@@ -130,34 +145,109 @@ interface LocalServerAccount {
     ownerMembershipId: string;
     devicePublicKey: string;
   }): Effect.Effect<void, RemoteWorkflowError>;
-  /** The machine token of a registered server. Never logged. */
   credential(hostId: string): string | null;
-  /** Removes a deleted server. A server that the account service refuses for good counts as removed. */
+  listMembers(hostId: string): Effect.Effect<RemoteMemberRecord[], RemoteWorkflowError>;
   remove(hostId: string): Effect.Effect<void, RemoteWorkflowError>;
+  apiOrigin: string;
+  requestAuthorized(path: string, init: RequestInit): Effect.Effect<unknown, RemoteWorkflowError>;
+  downloadAuthorized(path: string): Effect.Effect<Uint8Array, RemoteWorkflowError>;
 }
 
-/** A server on this computer, as the owner's other devices see it (`local-servers-v1`). */
+const MARKETPLACE_READS: ReadonlyArray<{ method: "GET" | "POST"; download: boolean; path: RegExp }> = [
+  { method: "GET", download: false, path: /^\/v1\/marketplace\/agents\/[^/]+\/listing$/u },
+  { method: "GET", download: true, path: /^\/v1\/marketplace\/agents\/[^/]+\/avatar$/u },
+  { method: "GET", download: false, path: /^\/v1\/skills\/(?!mine$)[^/]+$/u },
+  { method: "GET", download: true, path: /^\/v1\/skills\/[^/]+\/content$/u },
+  { method: "GET", download: false, path: /^\/v1\/skills\/[^/]+\/versions\/[^/]+$/u },
+  { method: "GET", download: true, path: /^\/v1\/skills\/[^/]+\/versions\/[^/]+\/content$/u },
+  { method: "GET", download: false, path: /^\/v1\/agent-templates\/(?!mine$)[^/]+$/u },
+  { method: "GET", download: true, path: /^\/v1\/agent-templates\/[^/]+\/avatar$/u },
+  { method: "POST", download: false, path: /^\/v1\/marketplace\/agents\/[^/]+\/install$/u },
+  { method: "POST", download: false, path: /^\/v1\/skills\/[^/]+\/install$/u },
+];
+
+const CONNECT_STARTS: ReadonlySet<string> = new Set(["/v2/slack/authorize", "/v2/discord/authorize"]);
+
+const installReceiptSchema = Schema.Struct({ receiptId: Schema.String });
+const decodeInstallReceipt = Schema.decodeUnknownSync(Schema.fromJsonString(installReceiptSchema));
+const connectStartSchema = Schema.Struct({
+  hostId: Schema.String,
+  hostNonce: Schema.String,
+  hostPublicKey: Schema.String,
+});
+const decodeConnectStart = Schema.decodeUnknownSync(Schema.fromJsonString(connectStartSchema));
+
+function allowedConnectStart(
+  request: LocalServerMarketplaceRequest,
+  path: string,
+  hostId: string | null,
+): { path: string; init: RequestInit } | null {
+  if (hostId === null || request.method !== "POST" || request.download) return null;
+  try {
+    const body = decodeConnectStart(request.body);
+    if (body.hostId.toLowerCase() !== hostId.toLowerCase()) return null;
+    return {
+      path,
+      init: {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ hostId: body.hostId, hostNonce: body.hostNonce, hostPublicKey: body.hostPublicKey }),
+      },
+    };
+  } catch {
+    return null;
+  }
+}
+
+function allowedMarketplaceRead(
+  request: LocalServerMarketplaceRequest,
+  apiOrigin: string,
+  hostId: string | null,
+): { path: string; init: RequestInit } | null {
+  let url: URL;
+  try {
+    url = new URL(request.path, apiOrigin);
+  } catch {
+    return null;
+  }
+  if (url.origin !== apiOrigin || url.pathname.includes("%")) return null;
+  if (CONNECT_STARTS.has(url.pathname))
+    return url.search === "" ? allowedConnectStart(request, url.pathname, hostId) : null;
+  const allowed = MARKETPLACE_READS.some(
+    (read) => read.method === request.method && read.download === request.download && read.path.test(url.pathname),
+  );
+  if (!allowed) return null;
+  const path = `${url.pathname}${url.search}`;
+  if (request.method === "GET") return request.body === undefined ? { path, init: { method: "GET" } } : null;
+  try {
+    const { receiptId } = decodeInstallReceipt(request.body);
+    return {
+      path,
+      init: { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ receiptId }) },
+    };
+  } catch {
+    return null;
+  }
+}
+
 export interface LocalServerListing {
   serverId: string;
   name: string;
-  /** Registered for the account, so the owner's devices list it. */
   published: boolean;
 }
 
 export interface LocalServersOptions {
   registryPath: string;
-  /** One user data directory for each server, named by its id. */
   userDataRoot: string;
-  /** One agent root for each server, named by its id: `~/OpenBot/Servers`. */
   agentRoot: string;
-  /** The provider CLI store of this app. A child has its own user data, but not its own copy of each CLI. */
   runtimeRoot: string;
   cipher: TokenCipher;
-  remoteServers: Pick<RemoteServerManager, "setThisComputerServers" | "attachLocalServer" | "detachLocalServer">;
+  remoteServers: Pick<
+    RemoteServerManager,
+    "setThisComputerServers" | "setRegisteredThisComputerServers" | "attachLocalServer" | "detachLocalServer"
+  >;
   account: LocalServerAccount;
-  /** This executable, and the app path when it is not packaged. */
   command: { executable: string; args: readonly string[] };
-  /** Moves a folder to the Trash. A deleted server's data stays recoverable. */
   trash: (path: string) => Promise<void>;
   log: { info: (message: string) => void; warn: (message: string, detail?: unknown) => void };
   platform: NodeJS.Platform;
@@ -166,20 +256,25 @@ export interface LocalServersOptions {
 
 export type SpawnChild = (command: string, args: readonly string[], options: SpawnOptions) => ChildProcess;
 
+export function sandboxArguments(argv: readonly string[]): string[] {
+  const end = argv.indexOf("--");
+  return (end === -1 ? argv : argv.slice(0, end)).includes("--no-sandbox") ? ["--no-sandbox"] : [];
+}
+
 export class LocalServers {
   readonly #options: LocalServersOptions;
   readonly #registry: LocalServerRegistry;
   readonly #spawn: SpawnChild;
   readonly #scope = Scope.makeUnsafe("parallel");
   readonly #running = new Map<string, RunningChild>();
-  /** The times each server stopped on its own, in the last `RESTART_WINDOW_MS`. */
   readonly #exits = new Map<string, number[]>();
-  /** The last ready line of each running server, by registry id. */
+  readonly #restartPending = new Set<string>();
+  readonly #starts = new Map<string, Deferred.Deferred<ServerSummary, LocalServerFailure>>();
+  readonly #working = new Map<string, AgentSummary[]>();
   readonly #ready = new Map<string, LocalServerReady>();
-  /** The registry ids of the children that have a machine token, and the account it belongs to. */
   readonly #published = new Set<string>();
   #publishedAccountId: string | null = null;
-  /** One account step at a time, so a publish cannot reach a child after the unpublish of a sign-out. */
+  readonly #memberReads = new Map<string, boolean>();
   readonly #accountSteps = Semaphore.makeUnsafe(1);
   #stopped = false;
 
@@ -189,14 +284,16 @@ export class LocalServers {
     this.#spawn = options.spawn ?? spawnProcess;
   }
 
-  /** The process ids of the children, which the update install does not wait for. */
+  workingAgents(): AgentSummary[] {
+    return [...this.#working.values()].flat();
+  }
+
   pids(): ReadonlySet<number> {
     const pids = new Set<number>();
     for (const { child } of this.#running.values()) if (child.pid !== undefined) pids.add(child.pid);
     return pids;
   }
 
-  /** `local-servers-v1`: the servers that started at least once, with the name of their last start. */
   list(): { servers: LocalServerListing[]; limit: number } {
     return {
       servers: this.#registry.servers.flatMap((entry) =>
@@ -214,10 +311,6 @@ export class LocalServers {
     };
   }
 
-  /**
-   * The desktop app signed in, signed out, or changed account. Each running server is registered for
-   * the signed-in account, and a sign-out or another account tells each child to stop meeting devices.
-   */
   readonly accountChanged = Effect.fn("LocalServers.accountChanged")(
     function* (this: LocalServers) {
       if (this.#stopped) return;
@@ -226,6 +319,7 @@ export class LocalServers {
         for (const id of this.#published) this.#send(id, { type: "unpublish" });
         this.#published.clear();
         this.#publishedAccountId = null;
+        this.#announcePublished();
       }
       if (accountId === null) return;
       yield* this.#removeDeletedHosts();
@@ -237,7 +331,6 @@ export class LocalServers {
     (operation) => this.#accountSteps.withPermit(operation),
   );
 
-  /** Before `remoteServers.initialize()`, so that the account's directory sync keeps these servers. */
   readonly load = Effect.fn("LocalServers.load")(function* (this: LocalServers) {
     yield* this.#registry
       .load()
@@ -249,11 +342,6 @@ export class LocalServers {
     this.#announce();
   });
 
-  /**
-   * After `remoteServers.initialize()` and before the event connections start. The entries that the
-   * last run left are made safe first: a run that crashed left the old port and session in them.
-   * Then every server starts, in the background.
-   */
   readonly initialize = Effect.fn("LocalServers.initialize")(function* (this: LocalServers) {
     for (const entry of this.#registry.servers) {
       if (entry.serverId)
@@ -261,13 +349,19 @@ export class LocalServers {
           .detachLocalServer(entry.serverId, false)
           .pipe(Effect.catch(() => Effect.void));
     }
-    for (const entry of this.#registry.servers) this.#background(this.#start(entry, false));
+    for (const entry of this.#registry.servers) this.#startInBackground(entry);
   });
 
-  /**
-   * The desktop app's create opens the new server. A create from another device leaves the app as it is,
-   * and answers after the registration, so the device finds the server in the account's list.
-   */
+  readonly startStopped = Effect.fn("LocalServers.startStopped")(function* (
+    this: LocalServers,
+    serverId: string,
+  ): Effect.fn.Return<ServerSummary | null, LocalServerFailure> {
+    const entry = this.#registry.findByServerId(serverId);
+    if (!entry) return null;
+    if (!this.#running.has(entry.id)) this.#exits.delete(entry.id);
+    return yield* this.#startIfStopped(entry);
+  });
+
   readonly create = Effect.fn("LocalServers.create")(function* (
     this: LocalServers,
     name: string,
@@ -290,9 +384,11 @@ export class LocalServers {
       publicKey: null,
     };
     yield* this.#registry.add(entry, LOCAL_SERVER_LIMIT).pipe(toLocalServerFailure);
-    return yield* this.#start(entry, from === "desktop", from === "device").pipe(
+    return yield* localIO(() =>
+      mkdir(join(this.#paths(entry).userData, PROVIDER_HOMES_FOLDER), { recursive: true, mode: 0o700 }),
+    ).pipe(
+      Effect.andThen(this.#start(entry, from === "device")),
       Effect.tapError(() =>
-        // A server that never started holds nothing of the user's yet.
         this.#forget(entry).pipe(
           Effect.catch(({ cause }) =>
             Effect.sync(() => this.#options.log.warn("A server that did not start could not be removed.", cause)),
@@ -302,19 +398,13 @@ export class LocalServers {
     );
   });
 
-  /** Stops the server, then starts it again with a new port and a new session. */
   readonly restart = Effect.fn("LocalServers.restart")(function* (this: LocalServers, serverId: string) {
     const entry = yield* this.#entry(serverId);
     yield* this.#stopChild(entry);
     this.#exits.delete(entry.id);
-    yield* this.#start(entry, false);
+    yield* this.#start(entry);
   });
 
-  /**
-   * Moves the server's database, agents and files to the Trash. A delete from another device answers after the account service removed the server, and fails when
-   * it did not: the device would list the server again. The same delete again then repeats only the
-   * account removal, because the server is already gone from this computer.
-   */
   readonly delete = Effect.fn("LocalServers.delete")(function* (
     this: LocalServers,
     serverId: string,
@@ -353,16 +443,115 @@ export class LocalServers {
     return { userData: join(this.#options.userDataRoot, entry.id), agentRoot: join(this.#options.agentRoot, entry.id) };
   }
 
-  /** The remote server manager keeps these entries through the account's directory sync. */
   #announce(): void {
     this.#options.remoteServers.setThisComputerServers([
       ...this.#registry.servers.flatMap((entry) => (entry.serverId ? [entry.serverId] : [])),
-      // A deleted server that the account service can still list must not come back as a joined server.
       ...this.#registry.removedHostIds,
     ]);
   }
 
-  /** Writes one command to the child's control pipe. A child that is gone gets nothing. */
+  #announcePublished(): void {
+    this.#options.remoteServers.setRegisteredThisComputerServers(
+      this.#registry.servers.flatMap((entry) =>
+        entry.serverId && this.#published.has(entry.id) ? [entry.serverId] : [],
+      ),
+    );
+  }
+
+  sendMembers(serverId: string): void {
+    const entry = this.#registry.findByServerId(serverId);
+    if (entry) this.#readMembers(entry.id);
+  }
+
+  #readMembers(id: string): void {
+    if (this.#memberReads.has(id)) {
+      this.#memberReads.set(id, true);
+      return;
+    }
+    const ready = this.#ready.get(id);
+    const running = this.#running.get(id);
+    if (!ready || !running || !this.#published.has(id)) {
+      this.#send(id, { type: "members-unavailable" });
+      return;
+    }
+    this.#memberReads.set(id, false);
+    Effect.runFork(
+      Effect.forkIn(
+        this.#options.account.listMembers(ready.serverId).pipe(
+          Effect.map((members): LocalServerCommand => ({ type: "members", members })),
+          Effect.catch(({ cause }) =>
+            Effect.sync((): LocalServerCommand => {
+              this.#options.log.warn("The members of a server on this computer did not load.", cause);
+              return { type: "members-unavailable" };
+            }),
+          ),
+          Effect.flatMap((command) =>
+            Effect.sync(() => {
+              if (this.#running.get(id) === running) this.#send(id, command);
+            }),
+          ),
+          Effect.ensuring(
+            Effect.sync(() => {
+              const again = this.#memberReads.get(id) === true;
+              this.#memberReads.delete(id);
+              if (again) this.#readMembers(id);
+            }),
+          ),
+        ),
+        this.#scope,
+        { startImmediately: true },
+      ),
+    );
+  }
+
+  #readMarketplace(id: string, running: RunningChild, request: LocalServerMarketplaceRequest): void {
+    const read = allowedMarketplaceRead(
+      request,
+      this.#options.account.apiOrigin,
+      this.#ready.get(id)?.serverId ?? null,
+    );
+    if (!read)
+      this.#options.log.warn("A server on this computer asked for an account read that is not allowed.", {
+        method: request.method,
+        path: request.path,
+      });
+    const answer: Effect.Effect<LocalServerCommand, RemoteWorkflowError> = !read
+      ? Effect.succeed({ type: "marketplace", id: request.id, error: sourceText("error.team.requestFailed") })
+      : request.download
+        ? this.#options.account.downloadAuthorized(read.path).pipe(
+            Effect.map(
+              (bytes): LocalServerCommand => ({
+                type: "marketplace",
+                id: request.id,
+                bytes: Buffer.from(bytes).toString("base64"),
+              }),
+            ),
+          )
+        : this.#options.account
+            .requestAuthorized(read.path, read.init)
+            .pipe(Effect.map((value): LocalServerCommand => ({ type: "marketplace", id: request.id, value })));
+    Effect.runFork(
+      Effect.forkIn(
+        answer.pipe(
+          Effect.catch(({ cause }) =>
+            Effect.succeed<LocalServerCommand>({
+              type: "marketplace",
+              id: request.id,
+              error: cause instanceof Error ? cause.message : sourceText("error.team.requestFailed"),
+            }),
+          ),
+          Effect.flatMap((command) =>
+            Effect.sync(() => {
+              if (this.#running.get(id) === running) this.#send(id, command);
+            }),
+          ),
+        ),
+        this.#scope,
+        { startImmediately: true },
+      ),
+    );
+  }
+
   #send(id: string, command: LocalServerCommand): void {
     const running = this.#running.get(id);
     const control = running && !running.stopping ? controlPipe(running.child, this.#options.platform) : null;
@@ -370,7 +559,6 @@ export class LocalServers {
     control.write(formatLocalServerCommand(command));
   }
 
-  /** Registers a running server for the signed-in account and gives the child its machine token. */
   readonly #publishUnlocked = Effect.fn("LocalServers.publish")(function* (
     this: LocalServers,
     entry: StoredLocalServer,
@@ -390,7 +578,6 @@ export class LocalServers {
         Effect.andThen(
           Effect.sync(() => {
             const machineToken = this.#options.account.credential(ready.serverId);
-            // The account or the child changed while the registration ran: the next account step or start publishes.
             if (
               !machineToken ||
               this.#options.account.accountId() !== accountId ||
@@ -401,6 +588,7 @@ export class LocalServers {
             this.#send(entry.id, { type: "publish", machineToken });
             this.#published.add(entry.id);
             this.#publishedAccountId = accountId;
+            this.#announcePublished();
           }),
         ),
         Effect.catch(({ cause }) =>
@@ -411,7 +599,6 @@ export class LocalServers {
       );
   });
 
-  /** Removes the deleted servers from the account. One that fails stays for the next try. */
   readonly #removeDeletedHosts = Effect.fn("LocalServers.removeDeletedHosts")(function* (this: LocalServers) {
     for (const hostId of this.#registry.removedHostIds) {
       const removed = yield* this.#options.account.remove(hostId).pipe(
@@ -450,7 +637,6 @@ export class LocalServers {
   readonly #start = Effect.fn("LocalServers.start")(function* (
     this: LocalServers,
     entry: StoredLocalServer,
-    select: boolean,
     awaitRegistration = false,
   ): Effect.fn.Return<ServerSummary, LocalServerFailure> {
     if (this.#stopped) return yield* startFailure();
@@ -459,15 +645,14 @@ export class LocalServers {
     const paths = this.#paths(entry);
     yield* localIO(() => mkdir(paths.userData, { recursive: true, mode: 0o700 }));
     yield* localIO(() => mkdir(paths.agentRoot, { recursive: true }));
+    const providerHomes = yield* ownProviderHomes(paths.userData);
 
     const child = yield* localSync(() =>
       this.#spawn(
         this.#options.command.executable,
         [...this.#options.command.args, `--user-data-dir=${paths.userData}`],
         {
-          env: childEnvironment(entry, paths.agentRoot, this.#options.runtimeRoot, secret),
-          // The control pipe carries only the account commands, and it closes when OpenBot ends. On
-          // Windows it is fd 3: Electron gives the child a `process.stdin` that only ends (#4868).
+          env: childEnvironment(entry, paths.agentRoot, this.#options.runtimeRoot, secret, providerHomes),
           stdio: this.#options.platform === "win32" ? ["ignore", "pipe", "pipe", "pipe"] : ["pipe", "pipe", "pipe"],
           windowsHide: true,
         },
@@ -476,22 +661,32 @@ export class LocalServers {
     const running: RunningChild = { child, stopping: false };
     this.#running.set(entry.id, running);
     const ready = Deferred.makeUnsafe<LocalServerReady, LocalServerFailure>();
-    // The child writes its own log file. Its output is read only for the ready line, and the rest is
-    // read and dropped so that a full pipe cannot stop the child.
     if (child.stdout)
       createInterface({ input: child.stdout }).on("line", (line) => {
+        if (line === LOCAL_SERVER_MEMBERS_REQUEST) {
+          this.#readMembers(entry.id);
+          return;
+        }
+        const marketplace = parseLocalServerMarketplaceRequest(line);
+        if (marketplace) {
+          this.#readMarketplace(entry.id, running, marketplace);
+          return;
+        }
+        const working = parseWorkingLine(line);
+        if (working) {
+          if (this.#running.get(entry.id) === running) this.#working.set(entry.id, working);
+          return;
+        }
         const value = parseReadyLine(line);
         if (value) Deferred.doneUnsafe(ready, Exit.succeed(value));
       });
     child.stderr?.resume();
-    // A command can reach a child that stopped before its exit event: the closed pipe then fails the
-    // write. The exit handler deals with the child, so the write error is dropped.
     const control = controlPipe(child, this.#options.platform);
     control?.on("error", () => undefined);
-    // The parent's end of fd 3 is also readable. Reading it to its end closes it when the child exits.
     if (control instanceof Readable && control.readable) control.resume();
     child.once("error", (error: Error) => {
-      Deferred.doneUnsafe(ready, Exit.fail(new LocalServerFailure({ cause: error })));
+      this.#options.log.warn("A server process on this computer reported an error.", error);
+      Deferred.doneUnsafe(ready, Exit.fail(startFailure()));
     });
     child.once("exit", (code, signal) => {
       Deferred.doneUnsafe(ready, Exit.fail(startFailure()));
@@ -511,21 +706,18 @@ export class LocalServers {
         publicKey: pinned.publicKey,
         username: LOCAL_SERVER_OWNER_USERNAME,
         password: secret,
-        select,
       };
       const summary = yield* this.#options.remoteServers.attachLocalServer(attach).pipe(toLocalServerFailure);
       this.#options.log.info(`A server on this computer started (pid ${child.pid ?? "unknown"}).`);
       this.#ready.set(entry.id, value);
-      // The desktop app does not wait for the account service: the server runs already.
       const register = this.#accountSteps.withPermit(this.#publishUnlocked(entry, running));
       if (awaitRegistration) yield* register;
       else this.#background(register);
-      this.#background(this.#renewSession(entry, running, { ...attach, select: false }));
+      this.#background(this.#renewSession(entry, running, attach));
       return summary;
     }).pipe(Effect.tapError(() => this.#stopChild(entry, running)));
   });
 
-  /** The first start pins the identity. A later start must report the same one. */
   readonly #pin = Effect.fn("LocalServers.pin")(function* (
     this: LocalServers,
     entry: StoredLocalServer,
@@ -550,35 +742,63 @@ export class LocalServers {
   #exited(entry: StoredLocalServer, running: RunningChild, code: number | null, signal: NodeJS.Signals | null): void {
     if (this.#running.get(entry.id) === running) {
       this.#running.delete(entry.id);
-      // The next child gets its machine token again when it starts.
+      this.#working.delete(entry.id);
       this.#published.delete(entry.id);
+      this.#announcePublished();
     }
     if (running.stopping || this.#stopped) return;
     this.#options.log.warn(`A server on this computer stopped (code ${code ?? "none"}, signal ${signal ?? "none"}).`);
     const serverId = this.#registry.find(entry.id)?.serverId;
     if (serverId)
       this.#background(this.#options.remoteServers.detachLocalServer(serverId, false).pipe(toLocalServerFailure));
+    this.#scheduleRestart(entry);
+  }
+
+  #startInBackground(entry: StoredLocalServer): void {
+    this.#background(
+      this.#startIfStopped(entry).pipe(Effect.tapError(() => Effect.sync(() => this.#scheduleRestart(entry)))),
+    );
+  }
+
+  #scheduleRestart(entry: StoredLocalServer): void {
+    if (this.#stopped || this.#restartPending.has(entry.id)) return;
     const now = Date.now();
     const exits = (this.#exits.get(entry.id) ?? []).filter((time) => now - time < RESTART_WINDOW_MS);
     exits.push(now);
     this.#exits.set(entry.id, exits);
     if (exits.length > RESTART_LIMIT) return;
+    this.#restartPending.add(entry.id);
     this.#background(
       Effect.sleep(RESTART_DELAY).pipe(
         Effect.andThen(
-          Effect.suspend(() => {
+          Effect.sync(() => {
+            this.#restartPending.delete(entry.id);
             const current = this.#registry.find(entry.id);
-            return current && !this.#running.has(entry.id) ? this.#start(current, false) : Effect.void;
+            if (current) this.#startInBackground(current);
           }),
         ),
       ),
     );
   }
 
-  /**
-   * The computer can run for longer than a session lasts: it sleeps, and the app does not quit. The
-   * check uses the wall clock, because a timer does not count the time that the computer sleeps.
-   */
+  #startIfStopped(entry: StoredLocalServer): Effect.Effect<ServerSummary | null, LocalServerFailure> {
+    return Effect.suspend(() => {
+      const pending = this.#starts.get(entry.id);
+      if (pending) return Deferred.await(pending);
+      if (this.#running.has(entry.id)) return Effect.succeed(null);
+      const done = Deferred.makeUnsafe<ServerSummary, LocalServerFailure>();
+      this.#starts.set(entry.id, done);
+      return this.#start(entry).pipe(
+        Effect.onExit((exit) =>
+          Effect.sync(() => {
+            if (this.#starts.get(entry.id) === done) this.#starts.delete(entry.id);
+            Deferred.doneUnsafe(done, exit);
+          }),
+        ),
+      );
+    });
+  }
+
   readonly #renewSession = Effect.fn("LocalServers.renewSession")(function* (
     this: LocalServers,
     entry: StoredLocalServer,
@@ -603,11 +823,6 @@ export class LocalServers {
     }
   });
 
-  /**
-   * Ends the child: its control pipe closes, then a kill after the grace time. A failed start names
-   * its own child in `only`: a restart can already have stopped it, or started a newer child that now
-   * holds the entry.
-   */
   readonly #stopChild = Effect.fn("LocalServers.stopChild")(function* (
     this: LocalServers,
     entry: StoredLocalServer,
@@ -621,6 +836,7 @@ export class LocalServers {
       if (this.#running.get(entry.id) === running) {
         this.#running.delete(entry.id);
         this.#published.delete(entry.id);
+        this.#announcePublished();
       }
     }
     if (only && this.#running.has(entry.id)) return;
@@ -629,7 +845,6 @@ export class LocalServers {
       yield* this.#options.remoteServers.detachLocalServer(serverId, false).pipe(Effect.catch(() => Effect.void));
   });
 
-  /** Stops the server, moves its folders to the Trash, and removes it from both lists. */
   readonly #forget = Effect.fn("LocalServers.forget")(function* (
     this: LocalServers,
     entry: StoredLocalServer,
@@ -638,19 +853,9 @@ export class LocalServers {
     yield* this.#stopChild(entry);
     const paths = this.#paths(entry);
     for (const path of [paths.userData, paths.agentRoot]) {
-      const exists = yield* localIO(() => stat(path)).pipe(
-        Effect.as(true),
-        Effect.catch(({ cause }) =>
-          cause instanceof Error && "code" in cause && cause.code === "ENOENT"
-            ? Effect.succeed(false)
-            : Effect.fail(new LocalServerFailure({ cause })),
-        ),
-      );
-      if (exists) yield* localIO(() => this.#options.trash(path));
+      if (yield* pathExists(path)) yield* localIO(() => this.#options.trash(path));
     }
     const serverId = this.#registry.find(entry.id)?.serverId ?? null;
-    // The account service can list the server even when this app does not know that it was registered:
-    // a registration from before a sign-out. The removal confirms either way.
     yield* this.#registry.remove(entry.id, serverId).pipe(toLocalServerFailure);
     this.#exits.delete(entry.id);
     this.#ready.delete(entry.id);
@@ -672,10 +877,8 @@ function terminate(child: ChildProcess, platform: NodeJS.Platform): Effect.Effec
       clearTimeout(timer);
       resume(Effect.void);
     });
-    // On Windows, `end()` leaves a pipe that is also readable open, so the child would not see its end.
     const control = controlPipe(child, platform);
     control?.end(() => control.destroy());
-    // On Windows a signal ends the process at once, so the closed pipe is the only request there.
     if (platform !== "win32") child.kill("SIGTERM");
   });
 }

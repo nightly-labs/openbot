@@ -45,6 +45,7 @@ export const messages = {
   "agentSettings.folders.missing": "{folder} 不是此电脑上的文件夹",
   "agentSettings.folders.limit": { one: "最多可添加 {count} 个文件夹", other: "最多可添加 {count} 个文件夹" },
   "agentSettings.folders.browse.places": "前往",
+  "agentSettings.folders.browse.path": "文件夹路径",
   "agentSettings.folders.browse.home": "主文件夹",
   "agentSettings.folders.browse.parent": "向上：{folder}",
   "agentSettings.folders.browse.failed": "无法打开此文件夹。",
@@ -75,7 +76,7 @@ export const messages = {
   "agentSettings.backupModels.valueCount": { one: "{mode} · {count}", other: "{mode} · {count}" },
   "agentSettings.backupModels.intro": "如果 {model} 在 {name} 开始输出之前就用完了额度，{name} 会询问你要用哪个模型。",
   "agentSettings.backupModels.introAutomatic":
-    "如果 {model} 在 {name} 开始输出之前就用完了额度或出现服务商错误，{name} 会按顺序切换到第一个可用模型。",
+    "如果 {model} 用完了额度，{name} 会按顺序切换到第一个可用模型。如果 {model} 在 {name} 开始输出之前出现服务商错误，{name} 也会切换。",
   "agentSettings.backupModels.ask": "切换前询问",
   "agentSettings.backupModels.order": "顺序",
   "agentSettings.backupModels.listLabel": "备用模型（按顺序）",
@@ -87,6 +88,7 @@ export const messages = {
   "agentSettings.backupModels.limited": "额度已用完 · 已跳过",
   "agentSettings.backupModels.unavailable": "当前不可用 · 已跳过",
   "agentSettings.backupModels.withAccount": "{model} · {account}",
+  "agentSettings.backupModels.withProvider": "{model} · {provider}",
   "agentSettings.backupModels.note":
     "{name} 开始工作后若因用量上限停止，会用顺序中第一个可用的模型继续同一项工作。额度重置后会回到 {model}；出现服务商错误时，则在 10 分钟后回到 {model}。",
   "agentSettings.groups.brain": "核心",
@@ -138,16 +140,10 @@ export const messages = {
 
   "agentSettings.runtime.model": "助手模型",
   "agentSettings.runtime.modelUnavailable": "助手 CLI 连接后即可选择模型。",
-  "agentSettings.runtime.reasoning": "推理",
-  "agentSettings.runtime.reasoningLabel": "助手推理强度",
-  "agentSettings.runtime.selectReasoning": "选择推理强度",
-  "agentSettings.runtime.reasoningSetByProvider": "由 {provider} 决定",
   "agentSettings.runtime.access": "访问权限",
   "agentSettings.runtime.accessLabel": "助手访问权限",
   "agentSettings.runtime.busyMessage": "忙碌时",
   "agentSettings.runtime.busyMessageLabel": "助手工作期间收到的消息",
-  "agentSettings.runtime.taskLimit": "并行话题数",
-  "agentSettings.runtime.taskLimitLabel": "同时运行的话题",
   "agentSettings.runtime.workingDirectory": "工作目录",
   "agentSettings.runtime.notAvailable": "暂不可用",
   "agentSettings.runtime.fullAccessNote": "助手可从其工作区和共享文件夹获得完整的电脑访问权限。",
@@ -164,8 +160,6 @@ export const messages = {
   "agentSettings.busyMessage.queue": "排队",
   "agentSettings.busyMessage.steer": "引导",
   "agentSettings.busyMessage.steerUnsupported": "{provider} 无法在运行中引导。助手工作期间发送的消息会进入队列等待。",
-  "agentSettings.taskLimit.default": "默认（{count}）",
-  "agentSettings.taskLimit.oneTurn": "{provider} 一次只运行一轮。该助手的话题会互相等待。",
 
   "agentSettings.notificationLevel.title": "通知我",
   "agentSettings.notificationLevel.server": "服务器默认（{level}）",
@@ -173,13 +167,25 @@ export const messages = {
     "此选择仅对你生效，并应用于你的所有设备。服务器已静音或设为“不提醒”时，此助手也不会提醒。",
 
   "agentSettings.newChat.title": "新对话",
-  "agentSettings.newChat.description": "助手会忘记当前对话，但保留已有设置。",
+  "agentSettings.newChat.description": "助手会重新开始，需要时仍可查找当前对话，已有设置保持不变。",
   "agentSettings.newChat.button": "开始",
   "agentSettings.newChat.confirmTitle": "与 {name} 开始新对话？",
   "agentSettings.newChat.confirmDescription":
-    "助手会忘记当前对话，消息仍显示在分隔线之上。指令、模型、工具、记忆、工作区和浏览器都不会改变。",
+    "助手会重新开始，需要时仍可查找当前对话。消息仍显示在分隔线之上。指令、模型、工具、记忆、工作区和浏览器都不会改变。",
   "agentSettings.newChat.confirm": "开始新对话",
   "agentSettings.newChat.failed": "无法开始新对话。",
+  "agentSettings.newChat.busy": "助手正在工作。要开始新对话，请等待它完成或停止它。",
+  "agentSettings.deleteHistory.title": "删除历史记录",
+  "agentSettings.deleteHistory.description": "此对话的消息会被删除，智能体也会忘记它们。设置保持不变。",
+  "agentSettings.deleteHistory.button": "删除",
+  "agentSettings.deleteHistory.confirmTitle": "删除与 {name} 的对话历史记录？",
+  "agentSettings.deleteHistory.confirmDescription":
+    "此对话的所有消息和文件都会从 OpenBot 中删除，智能体也会忘记它们。此操作无法撤销。侧边线程、指令、模型、工具、记忆、工作区和浏览器不会改变。",
+  "agentSettings.deleteHistory.confirm": "删除历史记录",
+  "agentSettings.deleteHistory.failed": "无法删除历史记录。",
+  "agentSettings.deleteAgent.title": "删除助手",
+  "agentSettings.deleteAgent.description": "助手及其对话、记忆、自动化任务和工作区将从 OpenBot 中删除。",
+  "agentSettings.deleteAgent.button": "删除",
 
   "agentSettings.fullAccess.title": "授予该助手完全访问权限？",
   "agentSettings.fullAccess.askTitle": "允许该助手在其工作区之外工作？",
@@ -190,6 +196,8 @@ export const messages = {
   "agentSettings.fullAccess.askConfirm": "使用“先询问”",
 
   "agentSettings.links.usage": "用量",
+  "agentSettings.links.apps": "应用",
+  "agentSettings.links.appsScope": "所有助手",
   "agentSettings.links.memories": "记忆",
   "agentSettings.links.memoriesCount": { one: "已保存 {count} 条", other: "已保存 {count} 条" },
   "agentSettings.links.skills": "技能",
@@ -212,8 +220,10 @@ export const messages = {
   "agentSettings.agentNewChat.title": "助手自行开始新对话",
   "agentSettings.agentNewChat.description": "对话变长时，让助手自行开始新对话。它会先保存笔记。",
   "agentSettings.quickAcknowledgement.title": "长任务开始前显示计划",
-  "agentSettings.quickAcknowledgement.description":
-    "长任务开始前，助手会先显示计划。10 秒后或你点按“开始”时，任务开始。",
+  "agentSettings.quickAcknowledgement.description": "长任务开始前，助手会先显示计划。",
+  "agentSettings.builtinMemory.title": "OpenBot 记忆",
+  "agentSettings.builtinMemory.description":
+    "助手会保存并读取自己的记忆。关闭后只使用记忆应用，例如 Mem0。已保存的记忆会保留。",
   "agentSettings.browserProfile.label": "浏览器配置文件",
   "agentSettings.browserProfile.shared": "共享",
   "agentSettings.browserProfile.agent": "仅该助手",
@@ -223,6 +233,7 @@ export const messages = {
   "agentSettings.browserProfile.manageDescription":
     "每个配置都有各自的登录状态和 Cookie。更改后，助手已打开的标签页会关闭。",
   "agentSettings.browserProfile.manage": "管理",
+  "agentSettings.browserProfile.movedNote": "网站登录状态保留在旧配置中。助手必须重新登录这些网站。",
   "agentSettings.runtime.workspaceEnforcedProcess":
     "整个 {provider} 进程运行在沙盒中，因此工作区外的写入会失败。仅在 macOS 上可用。",
 } as const satisfies PartialTranslation<typeof source>;

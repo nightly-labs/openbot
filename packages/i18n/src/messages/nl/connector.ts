@@ -272,6 +272,8 @@ export const messages = {
   "connector.telegram.helpRelayUnavailableHost":
     "OpenBot op {host} kan geen Telegram-berichten ontvangen. Log op {host} in, geef de server een naam in Serverinstellingen en houd OpenBot open.",
   "connector.telegram.helpError": "OpenBot kan deze chat niet bereiken. Verbind opnieuw of koppel de chat los.",
+  "connector.telegram.helpNotLinked":
+    "Deze chat is niet gekoppeld aan deze server. Kies Opnieuw verbinden om hem te koppelen.",
   "connector.telegram.retryAt": "Telegram vroeg OpenBot te wachten. Het probeert het opnieuw om {time}.",
   "connector.telegram.pause": "Pauzeren",
   "connector.telegram.resume": "Hervatten",
@@ -349,13 +351,15 @@ export const messages = {
   "connector.whatsapp.linkNumber": "Koppel een nummer",
   "connector.whatsapp.ownNumberNote": "Je chat “Bericht aan jezelf” en de mensen die je toestaat bereiken OpenBot.",
   "connector.whatsapp.dedicatedNote":
-    "De mensen die je toestaat bereiken OpenBot. Anderen krijgen een code om aan jou te geven.",
+    "Je chat “Bericht aan jezelf” en de mensen die je toestaat bereiken OpenBot. Anderen krijgen een code om aan jou te geven.",
   "connector.whatsapp.helpLoggedOut":
     "WhatsApp heeft deze computer uit de gekoppelde apparaten verwijderd. Koppel het nummer opnieuw.",
   "connector.whatsapp.helpLoggedOutHost":
     "WhatsApp heeft deze server uit de gekoppelde apparaten verwijderd. Koppel het nummer opnieuw.",
   "connector.whatsapp.helpError":
     "OpenBot kan WhatsApp op dit nummer niet bereiken. Verbind opnieuw of koppel het nummer los.",
+  "connector.whatsapp.helpKeysUnreadable":
+    "OpenBot kan de opgeslagen sleutels van dit nummer niet lezen. Koppel het nummer opnieuw.",
   "connector.whatsapp.retryAt": "WhatsApp vroeg OpenBot te wachten. Het probeert het opnieuw om {time}.",
   "connector.whatsapp.pause": "Pauzeren",
   "connector.whatsapp.resume": "Hervatten",
@@ -370,7 +374,13 @@ export const messages = {
   "connector.whatsapp.rowAction": "{action}: {name}",
   "connector.whatsapp.ownNumber": "Persoonlijk nummer",
   "connector.whatsapp.ownNumberDescription":
-    "Alleen je chat “Bericht aan jezelf” en de mensen die je toestaat kunnen schrijven. Zet dit uit voor een nummer alleen voor OpenBot.",
+    "Alleen je chat “Bericht aan jezelf” en de mensen die je toestaat kunnen schrijven. Andere mensen krijgen geen antwoord. Als dit uit staat, antwoordt OpenBot onbekende mensen met een code.",
+  "connector.whatsapp.workingMessage": "Bericht “Mee bezig…”",
+  "connector.whatsapp.workingMessageDescription":
+    "OpenBot stuurt het terwijl de agent werkt en vervangt het daarna door het antwoord. Een verzoek dat op een eerder verzoek wacht, krijgt ook een wachtbericht. Bij een persoonlijk nummer krijgt alleen je chat “Bericht aan jezelf” deze berichten. Zet dit uit om alleen het antwoord te sturen.",
+  "connector.whatsapp.statusReactions": "Statusreacties",
+  "connector.whatsapp.statusReactionsDescription":
+    "OpenBot reageert met 👀 als er een bericht binnenkomt en met ✅ als het antwoord klaar is. Zet dit uit om geen reacties te sturen.",
   "connector.whatsapp.orchestratorTitle": "WhatsApp Orchestrator",
   "connector.whatsapp.orchestratorDescription":
     "Deze agent ontvangt de berichten voor OpenBot van al je gekoppelde nummers. Korte berichten beantwoordt hij zelf, ander werk geeft hij aan de juiste agent, en hij antwoordt in WhatsApp.",
@@ -389,10 +399,10 @@ export const messages = {
   "connector.whatsapp.kindLabel": "Nummer",
   "connector.whatsapp.kindPersonal": "Mijn persoonlijke nummer",
   "connector.whatsapp.kindPersonalDescription":
-    "OpenBot antwoordt alleen in je chat “Bericht aan jezelf” en aan de mensen die je toestaat.",
+    "OpenBot antwoordt alleen in je chat “Bericht aan jezelf” en aan de mensen die je toestaat. Andere mensen krijgen geen antwoord.",
   "connector.whatsapp.kindDedicated": "Een nummer alleen voor OpenBot",
   "connector.whatsapp.kindDedicatedDescription":
-    "Onbekende mensen krijgen een code om aan jou te geven. Je keurt ze hier goed.",
+    "OpenBot antwoordt vanaf dit nummer elke onbekende persoon met een code om aan jou te geven. Je keurt ze hier goed.",
   "connector.whatsapp.methodLabel": "Koppelmethode",
   "connector.whatsapp.methodQr": "QR-code",
   "connector.whatsapp.methodCode": "Koppelcode",
@@ -447,6 +457,9 @@ export const messages = {
   "connector.whatsapp.sendersLimit": "Een nummer kan maximaal {count} contacten en groepen toestaan.",
   "connector.whatsapp.senderGroup": "Groep",
   "connector.whatsapp.removeSender": "Verwijderen",
+  "connector.whatsapp.senderAccess": "Toegang voor {name}",
+  "connector.whatsapp.senderReplies": "Kan taken geven",
+  "connector.whatsapp.senderReadOnly": "Alleen lezen",
   "connector.whatsapp.addContact": "Contact toevoegen",
   "connector.whatsapp.addGroup": "Groep toevoegen",
   "connector.whatsapp.contactTitle": "Voeg een contact toe",
@@ -455,7 +468,8 @@ export const messages = {
   "connector.whatsapp.contactNameDescription": "Optioneel. Zonder naam toont de lijst het telefoonnummer.",
   "connector.whatsapp.add": "Toevoegen",
   "connector.whatsapp.groupTitle": "Voeg een groep toe",
-  "connector.whatsapp.groupDescription": "Mensen in deze groep kunnen werk geven aan je agents.",
+  "connector.whatsapp.groupDescription":
+    "Mensen in deze groep kunnen werk geven aan je agents als ze het nummer vermelden of op de berichten ervan reageren.",
   "connector.whatsapp.groupSearch": "Zoek groepen",
   "connector.whatsapp.groupsLoading": "Groepen lezen…",
   "connector.whatsapp.groupsLoadFailed": "OpenBot kon de groepen niet lezen",
@@ -559,4 +573,72 @@ export const messages = {
   "connector.bitwarden.clientSecret": "client_secret van API-sleutel",
   "connector.bitwarden.masterPassword": "Hoofdwachtwoord",
   "connector.bitwarden.connecting": "Verbinden",
+  "connector.protonPass.title": "Proton Pass",
+  "connector.protonPass.description": "Agents loggen in op sites met de logins uit een gedeelde Proton Pass-kluis.",
+  "connector.protonPass.descriptionHost":
+    "Agents op {host} loggen in op sites met de logins uit een gedeelde Proton Pass-kluis.",
+  "connector.protonPass.connect": "Verbinden",
+  "connector.protonPass.moreWays": "Meer manieren om te verbinden",
+  "connector.protonPass.useKey": "Een toegangssleutel gebruiken",
+  "connector.protonPass.keyLabel": "Toegangssleutel",
+  "connector.protonPass.keyPlaceholder": "pst_…",
+  "connector.protonPass.setupTitle": "Instellen",
+  "connector.protonPass.setupDescription":
+    "Verbinden opent de Proton-aanmelding in je browser. Daarna maakt OpenBot de gedeelde kluis en bewaart het alleen een sleutel met leestoegang.",
+  "connector.protonPass.setupDescriptionHost":
+    "Verbinden opent de Proton-aanmelding in je browser. Daarna maakt {host} de gedeelde kluis en bewaart het alleen een sleutel met leestoegang.",
+  "connector.protonPass.vaultName": "Shared with OpenBot",
+  "connector.protonPass.vaultSetup":
+    "OpenBot maakt deze kluis wanneer je verbindt. Verplaats logins erheen om ze te delen.",
+  "connector.protonPass.showSteps": "Stappen tonen",
+  "connector.protonPass.stepsLabel": "Verbindingsstappen",
+  "connector.protonPass.stepSignIn": "Aanmelden",
+  "connector.protonPass.stepVault": "Gedeelde kluis maken",
+  "connector.protonPass.stepDone": "Klaar",
+  "connector.protonPass.signInTitle": "Aanmelden bij Proton",
+  "connector.protonPass.signInStarting": "OpenBot start de aanmelding. De Proton-pagina opent in je browser.",
+  "connector.protonPass.signInDescription":
+    "De aanmelding is open in je browser. Proton vraagt om je wachtwoord en je tweede factor.",
+  "connector.protonPass.signInDescriptionHost":
+    "De aanmelding voor {host} is open in je browser. Proton vraagt om je wachtwoord en je tweede factor.",
+  "connector.protonPass.extraPasswordDescription": "Proton Pass vraagt om je extra wachtwoord.",
+  "connector.protonPass.extraPasswordWrong": "Het extra wachtwoord is niet juist. Voer het opnieuw in.",
+  "connector.protonPass.extraPasswordLabel": "Extra wachtwoord",
+  "connector.protonPass.continue": "Doorgaan",
+  "connector.protonPass.setupStepTitle": "Gedeelde kluis maken",
+  "connector.protonPass.setupStepDescription":
+    "OpenBot maakt de kluis ‘{vault}’ en een sleutel met leestoegang. Daarna meldt het je Proton-sessie af.",
+  "connector.protonPass.doneTitle": "Proton Pass is verbonden",
+  "connector.protonPass.doneDescription": "Verplaats logins naar ‘{vault}’ zodat agents ermee kunnen inloggen.",
+  "connector.protonPass.failedTitle": "Proton Pass is niet verbonden",
+  "connector.protonPass.copyLink": "Link kopiëren",
+  "connector.protonPass.linkCopied": "Gekopieerd",
+  "connector.protonPass.openAgain": "Opnieuw openen",
+  "connector.protonPass.done": "Klaar",
+  "connector.protonPass.close": "Sluiten",
+  "connector.protonPass.statusConnecting": "Verbinden",
+  "connector.protonPass.statusConnected": "Verbonden",
+  "connector.protonPass.statusExpired": "Sleutel verlopen",
+  "connector.protonPass.expiredTitle": "De Proton Pass-sleutel is verlopen",
+  "connector.protonPass.expiredDescription":
+    "Agents kunnen niet inloggen met je gedeelde logins tot je opnieuw aanmeldt.",
+  "connector.protonPass.reconnect": "Opnieuw verbinden",
+  "connector.protonPass.planTitle": "Proton Pass heeft een abonnement met Pass Plus nodig",
+  "connector.protonPass.planDescription":
+    "De Proton Pass CLI heeft een Proton-abonnement nodig waarin Pass Plus zit. Andere betaalde abonnementen, zoals Mail Plus, bevatten hem niet. Wijzig je abonnement en verbind opnieuw.",
+  "connector.protonPass.vaultTitle": "Gedeelde kluis",
+  "connector.protonPass.vaultDescription":
+    "Agents kunnen inloggen met de logins in deze kluis. Verplaats een login erheen om hem te delen.",
+  "connector.protonPass.loginCount": { one: "{count} login", other: "{count} logins" },
+  "connector.protonPass.loginsLoading": "Logins tellen…",
+  "connector.protonPass.keyExpires": "Alleen lezen. Verloopt op {date}.",
+  "connector.protonPass.keyExpired": "Alleen lezen. Verlopen op {date}.",
+  "connector.protonPass.keyNoExpiry": "Alleen lezen. Verloopt niet.",
+  "connector.protonPass.disconnectTitle": "Proton Pass loskoppelen",
+  "connector.protonPass.disconnectSummary":
+    "OpenBot verwijdert zijn toegangssleutel op deze computer. De kluis en de logins erin blijven in je Proton-account.",
+  "connector.protonPass.disconnectSummaryHost":
+    "OpenBot verwijdert zijn toegangssleutel op {host}. De kluis en de logins erin blijven in je Proton-account.",
+  "connector.protonPass.disconnect": "Loskoppelen",
+  "connector.protonPass.actionFailed": "OpenBot kon de Proton Pass-verbinding niet wijzigen.",
 } as const satisfies PartialTranslation<typeof source>;

@@ -2,7 +2,6 @@ import type { PartialTranslation } from "../../message";
 import type { messages as source } from "../en/billing";
 
 export const messages = {
-  // The Billing tab in Settings and the Billing dialog in the web client.
   "billing.title": "お支払い",
   "billing.description": "サーバーごとにプランがあります。お支払いは Stripe が処理します。",
   "billing.loading": "お支払い情報を読み込んでいます…",
@@ -30,10 +29,13 @@ export const messages = {
   "billing.status.paused": "一時停止中",
   "billing.otherServers": "その他のサーバー",
   "billing.action.menu": "{server} のプラン操作",
-  "billing.action.change": "プランを変更",
+  "billing.action.addStorage": "ストレージを追加",
   "billing.action.cancel": "プランを解約",
   "billing.action.renew": "プランを再開",
   "billing.action.updatePayment": "支払い方法を更新",
+  "billing.storage.title": "{server} の容量を増やす",
+  "billing.storage.add": "{size} を追加",
+  "billing.storage.failed": "ストレージを追加できませんでした。",
   "billing.lifecycle.cancelRenewal": "更新をキャンセル",
   "billing.lifecycle.cancelTitle": "{name} の更新をキャンセルしますか？",
   "billing.lifecycle.cancelDescription":
@@ -42,8 +44,6 @@ export const messages = {
     "このサーバーの自動更新が再開されます。エージェント、会話、ファイルは残ります。",
   "billing.lifecycle.dataStays": "更新はオフです。プランが終了してもデータは残ります。",
   "billing.lifecycle.deleteServer": "サーバーを削除…",
-  "billing.lifecycle.whenDelete": "このサーバーをいつ削除しますか？",
-  "billing.lifecycle.atPeriodEnd": "期間の終了時 · {date}",
   "billing.lifecycle.planEndsLabel": "プランの終了",
   "billing.lifecycle.plansDescription": "サーバーごとに個別に管理します。更新をキャンセルしてもデータは残ります。",
   "billing.lifecycle.actions": "{name} の操作",
@@ -51,15 +51,12 @@ export const messages = {
   "billing.lifecycle.renewalLabel": "次回の更新",
   "billing.lifecycle.deletionLabel": "削除日",
   "billing.lifecycle.billingLabel": "お支払い",
-  "billing.lifecycle.immediately": "今すぐ",
   "billing.lifecycle.automatic": "自動更新が再開されます",
-  "billing.lifecycle.noRefund": "未使用期間の返金はありません",
   "billing.lifecycle.noRenewal": "今後の更新はありません",
   "billing.lifecycle.dateUtc": "{date} UTC",
   "billing.lifecycle.renews": "自動更新はオンです。",
   "billing.lifecycle.schedule": "期間の終了時に削除",
   "billing.lifecycle.keep": "サーバーを残す",
-  "billing.lifecycle.deleteNow": "今すぐ削除",
   "billing.lifecycle.deletesOn": "{date}に削除",
   "billing.lifecycle.scheduledDescription": "更新はオフです。サーバーとデータは削除されます。",
   "billing.lifecycle.scheduleDescription":
@@ -68,14 +65,10 @@ export const messages = {
   "billing.lifecycle.keepDescription":
     "サーバーとそのデータは残ります。予定された削除は止まり、自動更新が再開されます。",
   "billing.lifecycle.deleteTitle": "{name} を削除しますか？",
-  "billing.lifecycle.deleteDescription":
-    "このサーバーと、そのエージェント、会話、ファイルを完全に削除します。サブスクリプションは今すぐ終了します。この操作は元に戻せません。",
   "billing.lifecycle.saving": "保存中…",
   "billing.lifecycle.failed": "変更を確認できませんでした。「お支払い」を再読み込みして、もう一度お試しください。",
-  "billing.lifecycle.deleted": "{name} を削除しました。サブスクリプションは終了しました。",
   "billing.lifecycle.label": "デザインプレビュー · 操作は模擬のみ",
   "billing.lifecycle.reset": "プレビューをリセット",
-  // The commercial license of the account, above the server plans.
   "billing.license.title": "ライセンス",
   "billing.license.description": "企業での業務向けです。サーバーは含まれません。",
   "billing.license.loadFailed": "ライセンスを読み込めませんでした。",
@@ -144,7 +137,6 @@ export const messages = {
   "billing.license.cancel.description": "ライセンスは{date}まで有効で、その後終了します。サーバーには影響しません。",
   "billing.license.cancel.descriptionNow": "ライセンスは支払い済み期間の終了時に終了します。サーバーには影響しません。",
   "billing.license.cancel.keep": "ライセンスを維持",
-  // The order form: a hosted server and a license in one order. The pricing page and Billing show it.
   "billing.order.billing": "お支払いサイクル",
   "billing.order.currency": "通貨",
   "billing.order.monthly": "月払い",
@@ -154,6 +146,7 @@ export const messages = {
   "billing.order.server.summary": "チームのために OpenBot を運用します。",
   "billing.order.server.none": "サーバーなし",
   "billing.order.server.noneDetail": "自分のコンピューターで OpenBot を実行",
+  "billing.order.server.thisComputer": "自分のコンピューター",
   "billing.order.server.bestValue": "おすすめ",
   "billing.order.server.bestFor.starter": "1 人での利用に最適",
   "billing.order.server.bestFor.standard": "小規模なチームに最適",
@@ -189,7 +182,7 @@ export const messages = {
   "billing.order.cta.server": "サーバーを作成",
   "billing.order.cta.license": "ライセンスを購入",
   "billing.order.cta.download": "ダウンロード",
-  // Shown before an invite that makes the license too small.
+  "billing.order.cta.keepComputer": "このコンピューターで続ける",
   "billing.license.invite.title": "ライセンスにユーザーを追加しますか？",
   "billing.license.invite.description": "この招待でライセンスにユーザーが 1 人追加され、月額が {price} 増えます。",
   "billing.license.invite.confirm": "追加して招待",
@@ -200,4 +193,34 @@ export const messages = {
     other:
       "ライセンスのユーザー数は上限の {count} 人です。より大きなライセンスについてはお問い合わせください。新しい人はサーバーに参加できません。",
   },
+  "billing.details.country": "請求先の国",
+  "billing.details.countryPlaceholder": "国を選択",
+  "billing.details.vatId": "EU VAT ID（任意）",
+  "billing.details.vatIdInvalid": "選択した国の VAT ID ではありません。",
+  "billing.details.countryMissing": "請求先の国を選択してください。",
+  "billing.details.saveFailed": "請求先情報を保存できませんでした",
+  "billing.credits.explainer.title": "クレジットとは？",
+  "billing.credits.explainer.page": "{page} / {total}",
+  "billing.credits.explainer.pages": "ページ",
+  "billing.credits.explainer.mediaTitle": "クレジットはメディアの支払いに使います",
+  "billing.credits.explainer.mediaText": "エージェントが画像、動画、音声を作ると、クレジットを使います。",
+  "billing.credits.explainer.chatTitle": "チャットは無料です",
+  "billing.credits.explainer.chatText":
+    "チャットはご自身の AI プロバイダーを使います。エージェントとの会話でクレジットは減りません。",
+  "billing.credits.explainer.chatFree": "0 クレジット",
+  "billing.credits.explainer.modelsTitle": "モデルごとに料金があります",
+  "billing.credits.explainer.modelsText":
+    "高性能なモデルほど高くなります。画像は {pictureMin}～{pictureMax} クレジット、{seconds} 秒の動画は {videoMin}～{videoMax} クレジットです。",
+  "billing.credits.explainer.perPicture": "/ 画像",
+  "billing.credits.explainer.perClip": "/ {seconds} 秒の動画",
+  "billing.credits.explainer.getTitle": "クレジットを入手",
+  "billing.credits.explainer.getText":
+    "足りないときはパックを購入できます。大きいパックほど 1 クレジットあたりの価格がお得です。",
+  "billing.credits.explainer.freeEnd": "毎月の無料クレジットには有効期限があります",
+  "billing.credits.explainer.welcome": "新しいアカウントには、一部のモデルを試せる無料クレジット {amount} が付きます",
+  "billing.credits.welcomeIncluded": "無料クレジット: {amount}",
+  "billing.credits.explainer.allPrices": "全{count}モデル",
+  "billing.credits.explainer.next": "次へ",
+  "billing.credits.explainer.gotIt": "OK",
+  "billing.credits.explainer.place": "OpenBot",
 } as const satisfies PartialTranslation<typeof source>;

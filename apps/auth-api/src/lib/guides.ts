@@ -1,9 +1,3 @@
-// The one list of published guides. Same shape as the news registry, and read by
-// the same pages, feed, sitemap and image generator.
-//
-// The public guides explain how OpenBot works and how to use it. Contributor
-// instructions for adding a guide live in CONTRIBUTING.md instead.
-
 import { type ContentCollection, publishedFirst } from "./content-collection";
 import { NEWS_AUTHOR } from "./news";
 
@@ -15,11 +9,55 @@ export const GUIDES_COLLECTION: ContentCollection<"guides"> = {
   indexTitle: "OpenBot Guides: How to Run a Team of AI Agents",
   indexDescription:
     "How OpenBot works and how to run a team of AI agents. Start with how to set up your first agent, then explore practical guides to models, agents, and the Marketplace.",
+  indexSocialImage: {
+    path: "/social/guides.jpg",
+    alt: "From idea to done. OpenBot agents on a folded paper path",
+  },
   feedTitle: "OpenBot guides",
   backLabel: "All guides",
   moreTitle: "More guides",
   imageEyebrow: "OPENBOT · GUIDES",
   articles: publishedFirst([
+    {
+      slug: "ai-agent-productivity",
+      title: "AI Agent Productivity: Why Persistence Beats a Blank Chat",
+      description:
+        "See how persistent OpenBot agents can help with recurring work. Follow a weekly client update and check whether saved context reduces setup and corrections.",
+      publishedAt: "2026-11-19",
+      author: NEWS_AUTHOR,
+    },
+    {
+      slug: "ai-agent-workflows",
+      title: "AI Agent Workflows: 12 Repeatable Processes for Small Teams",
+      description:
+        "Build a small team of OpenBot agents and reuse it across 12 practical workflows. Set roles, share files and connect research, writing and review.",
+      publishedAt: "2026-11-17",
+      author: NEWS_AUTHOR,
+    },
+    {
+      slug: "ai-agent-workflow",
+      title: "AI Agent Workflow: From Task to Finished Result",
+      description:
+        "Follow a practical AI agent workflow in OpenBot. Write a clear brief, check official sources, save a result and review it before you share it.",
+      publishedAt: "2026-11-12",
+      author: NEWS_AUTHOR,
+    },
+    {
+      slug: "ai-teammates-vs-ai-chatbots",
+      title: "AI Teammates vs AI Chatbots: When You Need More Than One Conversation",
+      description:
+        "See when a quick AI chat is enough and how to divide research, writing and review between OpenBot agents that can pass files to each other.",
+      publishedAt: "2026-11-10",
+      author: NEWS_AUTHOR,
+    },
+    {
+      slug: "ai-workspace-vs-chat",
+      title: "AI Agent Workspace vs Chat History: What Changes in Practice?",
+      description:
+        "Compare an AI agent workspace with chat history in OpenBot. See how saved files, shared work and model changes affect an ongoing research task.",
+      publishedAt: "2026-11-03",
+      author: NEWS_AUTHOR,
+    },
     {
       slug: "install-openbot-vps",
       title: "How to Install OpenBot on a VPS: Ubuntu and Docker Guide",

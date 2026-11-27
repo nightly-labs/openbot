@@ -18,6 +18,11 @@ import {
   type OnePasswordConnectorPanelProps,
 } from "../settings/OnePasswordConnectorPanel";
 import {
+  ProtonPassConnectorPanel,
+  type ProtonPassConnectorPanelProps,
+  protonPassStatus,
+} from "../settings/ProtonPassConnectorPanel";
+import {
   messagingPlatformText,
   messagingStateUnknown,
   SlackIntegrationPanel,
@@ -38,27 +43,22 @@ import {
   whatsappOrchestrator,
 } from "../settings/WhatsAppIntegrationPanel";
 
-/**
- * The page of one connector, with its live state and actions, as Marketplace › Apps shows it. Read the props through getters, so the page follows them.
- */
 export type ConnectorDetail =
   | { id: "github"; props: GitHubConnectorPanelProps }
   | { id: "onepassword"; props: OnePasswordConnectorPanelProps }
   | { id: "bitwarden"; props: BitwardenConnectorPanelProps }
+  | { id: "protonpass"; props: ProtonPassConnectorPanelProps }
   | { id: "slack" | "discord"; props: SlackIntegrationPanelProps }
   | { id: "telegram"; props: TelegramIntegrationPanelProps }
   | { id: "whatsapp"; props: WhatsAppIntegrationPanelProps };
 
-/** What a list of connectors shows for one connector: its status and one line about it. */
 export interface ConnectorSummary {
   status: IntegrationStatus;
   statusLabel: string;
   summary: string;
-  /** The agents that answer through the connector, when some agents do and the others do not. */
   agents?: IntegrationAgent[] | undefined;
 }
 
-/** What a list shows for a connector whose state OpenBot could not read. */
 function unknownSummary(t: TextValue["t"]): ConnectorSummary {
   return { status: UNKNOWN_STATUS.status, statusLabel: t(UNKNOWN_STATUS.label), summary: t("connector.readFailed") };
 }
@@ -106,6 +106,24 @@ export function connectorSummary(detail: ConnectorDetail, t: TextValue["t"]): Co
         status: header.status,
         statusLabel: t(header.label),
         summary: host ? t("connector.bitwarden.descriptionHost", { host }) : t("connector.bitwarden.description"),
+      };
+    }
+    case "protonpass": {
+      if (detail.props.statusError) return unknownSummary(t);
+      const status = detail.props.status;
+      const header = protonPassStatus(detail.props);
+      const host = detail.props.hostName;
+      return {
+        status: header.status,
+        statusLabel: t(header.label),
+        summary:
+          header.status === "attention"
+            ? t("connector.protonPass.expiredTitle")
+            : status.state === "connected" && status.loginCount !== null
+              ? t("connector.protonPass.loginCount", { count: status.loginCount })
+              : host
+                ? t("connector.protonPass.descriptionHost", { host })
+                : t("connector.protonPass.description"),
       };
     }
     case "slack":
@@ -188,7 +206,6 @@ export function connectorSummary(detail: ConnectorDetail, t: TextValue["t"]): Co
   }
 }
 
-/** What the connector gives, for its information: the text that its page header shows without a tagline. */
 export function connectorDescription(detail: ConnectorDetail, t: TextValue["t"]): string {
   switch (detail.id) {
     case "github": {
@@ -203,6 +220,10 @@ export function connectorDescription(detail: ConnectorDetail, t: TextValue["t"])
       const host = detail.props.hostName;
       return host ? t("connector.bitwarden.descriptionHost", { host }) : t("connector.bitwarden.description");
     }
+    case "protonpass": {
+      const host = detail.props.hostName;
+      return host ? t("connector.protonPass.descriptionHost", { host }) : t("connector.protonPass.description");
+    }
     case "slack":
     case "discord":
       return t(messagingPlatformText(detail.id).description);
@@ -213,14 +234,11 @@ export function connectorDescription(detail: ConnectorDetail, t: TextValue["t"])
   }
 }
 
-/**
- * The page of the connector that `detail` names. `intro` and `details` are what the page that shows it adds,
- * such as the Marketplace information.
- */
 export function ConnectorDetailPanel(props: { detail: ConnectorDetail } & IntegrationPageSlots) {
   const github = () => (props.detail.id === "github" ? props.detail : undefined);
   const onePassword = () => (props.detail.id === "onepassword" ? props.detail : undefined);
   const bitwarden = () => (props.detail.id === "bitwarden" ? props.detail : undefined);
+  const protonPass = () => (props.detail.id === "protonpass" ? props.detail : undefined);
   const workspace = () => (props.detail.id === "slack" || props.detail.id === "discord" ? props.detail : undefined);
   const telegram = () => (props.detail.id === "telegram" ? props.detail : undefined);
   const whatsapp = () => (props.detail.id === "whatsapp" ? props.detail : undefined);
@@ -249,6 +267,16 @@ export function ConnectorDetailPanel(props: { detail: ConnectorDetail } & Integr
       <Match when={bitwarden()}>
         {(detail) => (
           <BitwardenConnectorPanel
+            {...detail().props}
+            tagline={props.tagline}
+            intro={props.intro}
+            details={props.details}
+          />
+        )}
+      </Match>
+      <Match when={protonPass()}>
+        {(detail) => (
+          <ProtonPassConnectorPanel
             {...detail().props}
             tagline={props.tagline}
             intro={props.intro}

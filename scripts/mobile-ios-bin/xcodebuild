@@ -1,11 +1,43 @@
 #!/bin/sh
-# `bun mobile:ios` puts this directory first on PATH. Expo runs `xcodebuild` without
-# `-derivedDataPath`, so Xcode would write the build to ~/Library/Developer/Xcode/DerivedData in a
-# folder named after the worktree path, which stays there after the worktree is removed. Expo reads
-# the app path from CONFIGURATION_BUILD_DIR in the build output, so the build can be in the worktree.
 for arg in "$@"; do
   if [ "$arg" = "-derivedDataPath" ]; then exec /usr/bin/xcodebuild "$@"; fi
 done
+
+previous=""
+device_build=""
+signing_updates=""
+for arg in "$@"; do
+  if [ "$arg" = "-allowProvisioningUpdates" ]; then signing_updates=1; fi
+  if [ "$previous" = "-destination" ]; then
+    case "$arg" in
+      id=*)
+        udid="${arg#id=}"
+        if ! xcrun simctl list devices 2>/dev/null | grep -q "$udid"; then device_build=1; fi
+        ;;
+    esac
+  fi
+  previous="$arg"
+done
+if [ -n "$device_build" ] && [ -z "$signing_updates" ]; then
+  set -- "$@" -allowProvisioningUpdates -allowProvisioningDeviceRegistration
+fi
+
+for arg in "$@"; do
+  if [ "$arg" = "-destination" ] && [ -n "$OPENBOT_XCODE_COMPILATION_CACHE" ]; then
+    set -- "$@" \
+      COMPILATION_CACHE_ENABLE_CACHING=YES \
+      "COMPILATION_CACHE_CAS_PATH=$OPENBOT_XCODE_COMPILATION_CACHE" \
+      COMPILATION_CACHE_LIMIT_SIZE=20G \
+      CLANG_ENABLE_PREFIX_MAPPING=YES \
+      CLANG_ENABLE_PROJECT_PREFIX_MAPPING=YES \
+      SWIFT_ENABLE_PREFIX_MAPPING=YES \
+      SWIFT_ENABLE_PROJECT_PREFIX_MAPPING=YES \
+      "CLANG_OTHER_PREFIX_MAPPINGS=$OPENBOT_XCODE_PREFIX_MAPPINGS" \
+      "SWIFT_OTHER_PREFIX_MAPPINGS=$OPENBOT_XCODE_PREFIX_MAPPINGS"
+    break
+  fi
+done
+
 if [ -n "$OPENBOT_XCODE_DERIVED_DATA" ]; then
   exec /usr/bin/xcodebuild -derivedDataPath "$OPENBOT_XCODE_DERIVED_DATA" "$@"
 fi

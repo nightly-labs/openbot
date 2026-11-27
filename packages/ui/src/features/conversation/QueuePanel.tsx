@@ -1,3 +1,5 @@
+import { providerDisplayName } from "@openbot/contracts/agent-providers";
+import { expandAttachmentReferences } from "@openbot/contracts/attachment-references";
 import { expandChatTagReferences } from "@openbot/contracts/chat-tag-references";
 import type { QueueDelivery, QueueHold, QueueSteerFallback } from "@openbot/contracts/ipc";
 import type { AppTextKey } from "@openbot/i18n";
@@ -13,20 +15,18 @@ import { createSmoothHeightResize } from "./createSmoothHeightResize";
 
 interface QueuePanelProps {
   deliveries: QueueDelivery[];
-  /** Why the queue is waiting, when the cause is not a turn this conversation can show. */
   hold?: QueueHold | null | undefined;
   agents?: ComposerAgent[];
   skills?: ComposerSkill[] | undefined;
   editingDeliveryId?: string | null | undefined;
   canSteer: boolean;
-  /** Steers a queued message into the running turn. Absent where the agent's provider cannot steer. */
   onSteer?: ((deliveryId: string) => void) | undefined;
-  /** Starts a separate task with a queued message. Absent where the host keeps no tasks. */
+  sendsNow?: boolean | undefined;
+  routineRuns?: boolean | undefined;
   onRunAsTask?: ((deliveryId: string) => void) | undefined;
   onCancel: (deliveryId: string) => void;
   onEdit: (delivery: QueueDelivery) => void;
   onReorder: (deliveryIds: string[]) => void;
-  /** `floating` is the glass queue over a browser page, with quiet glass row actions. */
   variant?: "docked" | "floating";
 }
 
@@ -73,9 +73,12 @@ export function QueuePanel(props: QueuePanelProps) {
   );
   let knownSourceIds = new Set(initialSourceDeliveries.map((delivery) => delivery.id));
 
-  // A message another editor holds keeps its place, so it stays out of the order this panel sends.
   const editedElsewhere = (delivery: QueueDelivery) =>
     Boolean(delivery.editing) && delivery.id !== props.editingDeliveryId;
+  const headEdited = createMemo(
+    () =>
+      Boolean(props.sendsNow) && Boolean(props.deliveries.find((delivery) => delivery.status === "queued")?.editing),
+  );
   const queueIds = createMemo(() =>
     visibleDeliveries()
       .filter(
@@ -358,14 +361,19 @@ export function QueuePanel(props: QueuePanelProps) {
   function messagePreview(delivery: QueueDelivery): string {
     const agentNames = new Map((props.agents ?? []).map((agent) => [agent.id, agent.name]));
     const skillNames = new Map((props.skills ?? []).map((skill) => [skill.skillId, skill.name]));
-    const text = expandChatTagReferences(delivery.text.trim(), (reference) => {
-      if (reference.kind === "quote") return `“${reference.name}”`;
-      return reference.kind === "agent" ? agentNames.get(reference.id) : skillNames.get(reference.id);
-    });
+    const text = expandAttachmentReferences(
+      expandChatTagReferences(delivery.text.trim(), (reference) => {
+        if (reference.kind === "quote") return `“${reference.name}”`;
+        return reference.kind === "agent" ? agentNames.get(reference.id) : skillNames.get(reference.id);
+      }),
+    );
     return text || delivery.attachments.map((attachment) => attachment.name).join(", ") || t("queue.attachment");
   }
 
   function holdText(hold: QueueHold): string {
+    if (hold.reason === "provider-restart")
+      return t("queue.hold.providerRestart", { provider: providerDisplayName(hold.provider) });
+    if (hold.reason === "sign-in") return t("queue.hold.signIn", { provider: providerDisplayName(hold.provider) });
     const name = (props.agents ?? []).find((agent) => agent.id === hold.agentId)?.name;
     return name
       ? t("queue.hold.named", { name, channel: hold.channelName })
@@ -494,28 +502,50 @@ export function QueuePanel(props: QueuePanelProps) {
                         <span class="agent-queue-editing-badge">{t("queue.item.editing")}</span>
                       </Show>
                       <Show when={!editing && delivery.status === "queued" && delivery.steerFallback}>
-                        {(fallback) => (
-                          <span class="agent-queue-editing-badge" title={t(STEER_FALLBACK_REASON[fallback()])}>
-                            {t("queue.item.notSteered")}
-                            <span class="sr-only"> {t(STEER_FALLBACK_REASON[fallback()])}</span>
-                          </span>
-                        )}
+                        {(fallback) => {
+                          const reason = () =>
+                            t(
+                              fallback() === "steer-failed" && props.routineRuns
+                                ? "queue.item.steerFallback.routineRun"
+                                : STEER_FALLBACK_REASON[fallback()],
+                            );
+                          return (
+                            <span class="agent-queue-editing-badge" title={reason()}>
+                              {t("queue.item.notSteered")}
+                              <span class="sr-only"> {reason()}</span>
+                            </span>
+                          );
+                        }}
                       </Show>
                       <Show when={props.onSteer}>
                         {(steer) => (
-                          <LabelTooltip content={t("queue.item.steerTooltip")}>
+                          <LabelTooltip
+                            content={t(
+                              props.sendsNow
+                                ? "queue.item.sendNowTooltip"
+                                : props.routineRuns && !props.canSteer
+                                  ? "queue.item.steerFallback.routineRun"
+                                  : "queue.item.steerTooltip",
+                            )}
+                          >
                             <LabelTooltipTrigger
                               as={Button}
                               variant="ghost"
                               type="button"
                               class="agent-queue-steer"
-                              disabled={!props.canSteer || !actionable}
-                              aria-label={t("queue.item.steerLabel", { position: delivery.position ?? "" })}
+                              disabled={!props.canSteer || !actionable || headEdited()}
+                              aria-label={t(props.sendsNow ? "queue.item.sendNowLabel" : "queue.item.steerLabel", {
+                                position: delivery.position ?? "",
+                              })}
                               onClick={() => steer()(delivery.id)}
                             >
                               <SteerIcon />
                               <span>
-                                {delivery.status === "starting" ? t("queue.item.steering") : t("queue.item.steer")}
+                                {props.sendsNow
+                                  ? t("queue.item.sendNow")
+                                  : delivery.status === "starting"
+                                    ? t("queue.item.steering")
+                                    : t("queue.item.steer")}
                               </span>
                             </LabelTooltipTrigger>
                           </LabelTooltip>

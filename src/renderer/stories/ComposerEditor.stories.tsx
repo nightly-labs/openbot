@@ -1,6 +1,7 @@
 import { serializeAttachmentReference } from "@openbot/contracts/attachment-references";
 import { serializeChatTagReference } from "@openbot/contracts/chat-tag-references";
 import type { DraftAttachment, InstalledSkill } from "@openbot/contracts/ipc";
+import type { ComposerBrowserTab, ComposerThread } from "@openbot/ui/data";
 import { ComposerEditor } from "@openbot/ui/features/conversation/ComposerEditor";
 import { createSignal } from "solid-js";
 import { fn } from "storybook/test";
@@ -104,14 +105,53 @@ const longDescriptionSkill: InstalledSkill = {
     "Collects the timeline, the alerts and the chat around an incident, then writes the review the team reads the next morning, with the contributing causes, the repair work and the owner of each follow-up item.",
 };
 
-/**
- * The picker grows out of the top edge of the composer, so a picker story keeps empty room above
- * the composer. A compact composer holds the editor in the middle grid column, and the picker
- * stretches back out to the edges of the composer.
- */
+const browserTabs: ComposerBrowserTab[] = [
+  { id: "browser-tab-docs", title: "OpenBot documentation", url: "https://openbot.run/docs" },
+  { id: "browser-tab-linear", title: "Plans and pricing – Linear", url: "https://linear.app/pricing" },
+  {
+    id: "browser-tab-github",
+    title: "Let a channel lead cancel its own runs at a person's request · Pull Request #4981 · openbot/openbot",
+    url: "https://github.com/openbot/openbot/pull/4981",
+  },
+];
+
+const threads: ComposerThread[] = [
+  {
+    id: "task-pricing",
+    title: "Compare competitor pricing",
+    state: "running",
+    outcome: null,
+    progress: "Reading the Linear pricing page",
+    error: null,
+  },
+  {
+    id: "task-release",
+    title: "Draft the release notes",
+    state: "idle",
+    outcome: "completed",
+    progress: null,
+    error: null,
+  },
+  {
+    id: "task-links",
+    title: "Check the broken links",
+    state: "idle",
+    outcome: "failed",
+    progress: null,
+    error: "The site did not answer.",
+  },
+  {
+    id: "task-queued",
+    title: "Summarize the support inbox",
+    state: "queued",
+    outcome: null,
+    progress: null,
+    error: null,
+  },
+];
+
 function composerFrame(storyArgs: Parameters<typeof ComposerEditor>[0], options: { width: string; compact?: boolean }) {
   const [value, setValue] = createSignal(storyArgs.value);
-  // The picker hangs off the composer inside `.composer-wrap`, the way the conversation renders it.
   return (
     <div
       class="composer-wrap"
@@ -197,7 +237,6 @@ export const SkillPickerLongDescription: Story = {
   render: (storyArgs) => composerFrame(storyArgs, { width: "480px" }),
 };
 
-/** A workspace copy and a marketplace copy share a name, so each row shows its slug. */
 export const SkillPickerDuplicateNames: Story = {
   args: {
     skills: [
@@ -266,4 +305,19 @@ export const LongFileReference: Story = {
       </div>
     </div>
   ),
+};
+
+export const TabAndThreadPicker: Story = {
+  args: { browserTabs, threads, onOpenTag: fn() },
+  render: (storyArgs) => composerFrame(storyArgs, { width: "480px" }),
+};
+
+export const WithTabAndThreadTags: Story = {
+  args: {
+    browserTabs,
+    threads,
+    onOpenTag: fn(),
+    value: `Compare ${serializeChatTagReference("tab", "Plans and pricing – Linear", "browser-tab-linear")} with ${serializeChatTagReference("thread", "Compare competitor pricing", "task-pricing")}, not ${serializeChatTagReference("tab", "Old page", "browser-tab-closed")} or ${serializeChatTagReference("thread", "Old thread", "task-deleted")}.`,
+  },
+  render: (storyArgs) => composerFrame(storyArgs, { width: "480px", compact: true }),
 };

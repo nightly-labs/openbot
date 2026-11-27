@@ -1,15 +1,9 @@
-// Runs the real `pi` provider driver and the real Pi binary against a fake OpenAI-compatible server,
-// to check that a custom endpoint saved with "Runs on: Pi" runs through Pi, and that an endpoint that
-// runs on OpenCode stays out of Pi. Pi reads `$` and a leading `!` in a key or a header as an
-// environment reference or a shell command, so the key and the header must arrive literally. The
-// key and the header value must not reach the extension file or an error message. A saved output
-// limit must reach the request as the model's budget (#4234).
-// `PI_CLI=<pi> bun run test:custom-provider-pi`. Writes .openbot-build/custom-provider-pi-harness/report.json.
 import assert from "node:assert/strict";
 import { mkdir, mkdtemp, readdir, readFile, rm, writeFile } from "node:fs/promises";
 import { createServer, type IncomingMessage, type ServerResponse } from "node:http";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
+import { isAgentModel, savedCustomModelId } from "@openbot/contracts/ipc";
 import type { AgentClient } from "../src/backend/agent-client";
 import { resolvePiCli } from "../src/backend/cli";
 import { runCauseEffect } from "../src/backend/effect-boundary";
@@ -28,20 +22,30 @@ const REPLY = "pong from the fake endpoint";
 const KEY = "!sk-e2e-$HOME-literal";
 const HEADER_VALUE = "team-$PATH";
 const FAILING_MODEL = "fake-broken";
+const EFFORT_MODEL = "fake-thinker";
+const SAVED_EFFORTS = ["none", "low", "max"] as const;
+const VISION_MODEL = "fake-vision";
+const VENDOR_MODEL = "@cf/openai/gpt-oss-120b";
+const PNG = Buffer.from(
+  "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII=",
+  "base64",
+);
 
 interface Request {
   path: string;
   authorization: string | null;
   header: string | null;
   model: string | null;
-  /** `max_completion_tokens` or `max_tokens`, whichever Pi sent. */
   budget: number | null;
+  reasoningEffort: string | null;
+  images: number;
 }
 
 interface Report {
   passed: boolean;
   piVersion?: string;
   models?: string[];
+  efforts?: Record<string, string[]>;
   requests: Request[];
   reply?: string;
   status?: string | null;
@@ -60,18 +64,21 @@ function header(request: IncomingMessage, name: string): string | null {
   return typeof value === "string" ? value : null;
 }
 
-/** The model that a chat completion request names, and the output budget that it asks for. */
-async function requestedModel(request: IncomingMessage): Promise<Pick<Request, "model" | "budget">> {
+async function requestedModel(
+  request: IncomingMessage,
+): Promise<Pick<Request, "model" | "budget" | "reasoningEffort" | "images">> {
   const chunks: Buffer[] = [];
   for await (const part of request) chunks.push(Buffer.from(part));
   const text = Buffer.concat(chunks).toString("utf8");
   const value = text ? JSON.parse(text) : null;
   const sent = isRecord(value) ? (value.max_completion_tokens ?? value.max_tokens) : null;
   const budget = typeof sent === "number" ? sent : null;
-  return { model: getString(value, "model"), budget };
+  const images = getArray(value, "messages")
+    .flatMap((message) => getArray(message, "content"))
+    .filter((part) => getString(part, "type") === "image_url").length;
+  return { model: getString(value, "model"), budget, reasoningEffort: getString(value, "reasoning_effort"), images };
 }
 
-/** One server-sent event of a streamed chat completion: the reply text, or the end of the reply. */
 function chunk(model: string, content: string | null): string {
   const choice = content
     ? { index: 0, delta: { role: "assistant", content }, finish_reason: null }
@@ -82,11 +89,11 @@ function chunk(model: string, content: string | null): string {
 
 const server = createServer((request: IncomingMessage, response: ServerResponse) => {
   void (async () => {
-    const { model, budget } = await requestedModel(request);
+    const sent = await requestedModel(request);
+    const { model } = sent;
     const authorization = header(request, "authorization");
-    report.requests.push({ path: request.url ?? "", authorization, header: header(request, "x-e2e"), model, budget });
+    report.requests.push({ path: request.url ?? "", authorization, header: header(request, "x-e2e"), ...sent });
     if (model === FAILING_MODEL) {
-      // A server that names the key it refused. Pi passes the body on, so OpenBot must redact it.
       response.writeHead(401, { "content-type": "application/json" });
       response.end(JSON.stringify({ error: { message: `Key refused: ${authorization}`, type: "invalid_key" } }));
       return;
@@ -101,7 +108,6 @@ const server = createServer((request: IncomingMessage, response: ServerResponse)
   });
 });
 
-/** The text of every file in the extension folders that Pi got. */
 async function extensionFiles(directory: string): Promise<{ names: string[]; text: string }> {
   const names: string[] = [];
   let text = "";
@@ -121,7 +127,6 @@ try {
   if (!address || typeof address === "string") throw new Error("The fake endpoint has no port.");
   const baseUrl = `http://127.0.0.1:${address.port}/v1`;
 
-  // Pi must not read the developer's own providers and keys.
   const agentDirectory = join(root, "agent");
   await mkdir(agentDirectory, { recursive: true });
   await writeFile(join(agentDirectory, "settings.json"), "{}\n");
@@ -140,6 +145,9 @@ try {
     models: [
       { id: "fake-coder", name: "Fake coder", contextWindow: 32_768, maxOutput: 12_000 },
       { id: FAILING_MODEL, name: "Fake broken" },
+      { id: EFFORT_MODEL, name: "Fake thinker", reasoningEfforts: [...SAVED_EFFORTS] },
+      { id: VISION_MODEL, name: "Fake vision", inputs: ["image", "pdf"] },
+      { id: VENDOR_MODEL, name: VENDOR_MODEL },
     ],
     harness: "pi",
   };
@@ -154,7 +162,6 @@ try {
   };
   const source = () => [onPi, onOpenCode];
 
-  // OpenCode gets only its own endpoint.
   const layer = openCodeConfigEnv(OPENCODE_PROFILE_CONFIG, customProvidersOn(source, "opencode"), null);
   report.openCodeEndpoints = Object.keys(
     getRecord(JSON.parse(layer.OPENCODE_CONFIG_CONTENT ?? "{}"), "provider") ?? {},
@@ -180,6 +187,18 @@ try {
   report.models = getArray(listed, "data").flatMap((model) => getString(model, "model") ?? []);
   assert.ok(report.models.includes("spark-e2e/fake-coder"), "Pi must list the endpoint's model.");
   assert.ok(!report.models.some((model) => model.startsWith("oc-only/")), "Pi must not list the OpenCode endpoint.");
+  report.efforts = Object.fromEntries(
+    getArray(listed, "data").map((model) => [
+      getString(model, "model") ?? "",
+      getArray(model, "supportedReasoningEfforts").flatMap((effort) => getString(effort, "reasoningEffort") ?? []),
+    ]),
+  );
+  assert.deepEqual(
+    report.efforts[`spark-e2e/${EFFORT_MODEL}`],
+    [...SAVED_EFFORTS],
+    "A model with saved efforts must list exactly those efforts.",
+  );
+  assert.deepEqual(report.efforts["spark-e2e/fake-coder"], [], "A model with no saved efforts must not reason.");
 
   const thread = await startThread(client, { cwd: workspace, model: "spark-e2e/fake-coder" });
   const files = await extensionFiles(stateDirectory);
@@ -202,8 +221,55 @@ try {
   assert.equal(sent.authorization, `Bearer ${KEY}`, "Pi must send the key literally.");
   assert.equal(sent.header, HEADER_VALUE, "Pi must send the header literally.");
   assert.equal(sent.budget, 12_000, "Pi must ask for the saved output limit.");
+  assert.equal(sent.reasoningEffort, null, "A model with no saved efforts must not send an effort.");
 
-  // A refused request: the error reaches the user, but not the key.
+  const vendorModel = savedCustomModelId("spark-e2e", "pi", VENDOR_MODEL);
+  assert.ok(isAgentModel(vendorModel), `${vendorModel} must be a valid model id.`);
+  assert.ok(report.models.includes(vendorModel), `Pi must list ${VENDOR_MODEL} as ${vendorModel}.`);
+  const vendorTurn = await runTurn(client, thread, { model: vendorModel, text: "Say pong.", timeoutMs: 60_000 });
+  assert.equal(vendorTurn.error, null, `The turn on ${vendorModel} failed: ${vendorTurn.error}`);
+  assert.ok(
+    report.requests.some((request) => request.model === VENDOR_MODEL),
+    "A turn must send the vendor's own model id.",
+  );
+
+  for (const effort of ["max", "none"] as const) {
+    const effortTurn = await runTurn(client, thread, {
+      model: `spark-e2e/${EFFORT_MODEL}`,
+      effort,
+      text: "Think.",
+      timeoutMs: 60_000,
+    });
+    assert.equal(effortTurn.error, null, `The turn at ${effort} failed: ${effortTurn.error}`);
+    const last = report.requests.filter((request) => request.model === EFFORT_MODEL).at(-1);
+    assert.equal(last?.reasoningEffort, effort, `Pi must send the effort ${effort}.`);
+  }
+
+  const image = join(workspace, "pixel.png");
+  await writeFile(image, PNG);
+  const visionTurn = await runTurn(client, thread, {
+    model: `spark-e2e/${VISION_MODEL}`,
+    text: "What is in the image?",
+    images: [image],
+    timeoutMs: 60_000,
+  });
+  assert.equal(visionTurn.error, null, `The turn with an image failed: ${visionTurn.error}`);
+  const visionRequest = report.requests.filter((request) => request.model === VISION_MODEL).at(-1);
+  assert.ok(visionRequest, `The endpoint got no request for ${VISION_MODEL}.`);
+  assert.equal(visionRequest.images, 1, "Pi must send the image to a model saved with image input.");
+  const textTurns = report.requests.filter((request) => request.model === "fake-coder").length;
+  await runTurn(client, thread, {
+    model: "spark-e2e/fake-coder",
+    text: "What is in the image?",
+    images: [image],
+    timeoutMs: 60_000,
+  });
+  const textRequests = report.requests.filter((request) => request.model === "fake-coder").slice(textTurns);
+  assert.ok(textRequests.length > 0, "The endpoint got no request for the text-only model.");
+  for (const request of textRequests) {
+    assert.equal(request.images, 0, "Pi must not send an image to a text-only model.");
+  }
+
   const failure = await runTurn(client, thread, {
     model: `spark-e2e/${FAILING_MODEL}`,
     text: "Fail.",
@@ -233,7 +299,6 @@ try {
   server.close();
   await rm(root, { recursive: true, force: true });
   await mkdir(OUT, { recursive: true });
-  // The report holds the fake key and the fake header only; neither is a real secret.
   await writeFile(join(OUT, "report.json"), `${JSON.stringify(report, null, 2)}\n`);
   process.stdout.write(`${report.passed ? "passed" : "failed"}: ${join(OUT, "report.json")}\n`);
 }

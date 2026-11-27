@@ -12,8 +12,10 @@ import {
   isConversationSubagents,
 } from "./ipc-conversation-subagents";
 import { type ConversationTurnTrace, isConversationTurnTrace } from "./ipc-conversation-trace";
+import { type ConversationNearPayment, isConversationNearPayment } from "./ipc-near-wallet";
 import { QUEUE_DELIVERY_STATUSES, type QueueDelivery } from "./ipc-queue";
 import { isBoolean, isDynamicRecord, isNumber, isOneOf, isString } from "./runtime-values";
+import { type ConversationSkillSuggestion, isConversationSkillSuggestion } from "./skill-suggestion-events";
 import { type ConversationUiBlock, isConversationUiBlock } from "./ui-blocks";
 
 export type ConversationMessageAuthor = "user" | "assistant" | "agent" | "system";
@@ -32,6 +34,42 @@ export function isImageGenerationAspectRatio(value: unknown): value is ImageGene
   return isOneOf(IMAGE_GENERATION_ASPECT_RATIOS, value);
 }
 
+export interface ImagePixelSize {
+  width: number;
+  height: number;
+}
+
+export function imagePixelSize(value: string | undefined): ImagePixelSize | null {
+  const match = /^\s*(\d{1,5})\s*[×xX]\s*(\d{1,5})\s*$/.exec(value ?? "");
+  const width = Number(match?.[1] ?? 0);
+  const height = Number(match?.[2] ?? 0);
+  return width > 0 && height > 0 ? { width, height } : null;
+}
+
+export function imagePixelSizeText(size: ImagePixelSize): string {
+  return `${size.width} × ${size.height}`;
+}
+
+export function imageAspectRatioOf(size: ImagePixelSize): ImageGenerationAspectRatio {
+  const ratio = size.width / size.height;
+  if (ratio > 1.05) return "landscape";
+  if (ratio < 1 / 1.05) return "portrait";
+  return "square";
+}
+
+export function mergeImageGenerationInfo(
+  stored: ImageGenerationInfo | undefined,
+  update: ImageGenerationInfo | undefined,
+): ImageGenerationInfo | undefined {
+  if (!stored || !update) return update ?? stored;
+  const keepSize = imagePixelSize(stored.resolution) !== null && imagePixelSize(update.resolution) === null;
+  return {
+    ...update,
+    ...(update.prompt === undefined && stored.prompt !== undefined ? { prompt: stored.prompt } : {}),
+    ...(keepSize ? { resolution: stored.resolution, aspectRatio: stored.aspectRatio } : {}),
+  };
+}
+
 export function isImageGenerationInfo(value: unknown): value is ImageGenerationInfo {
   return (
     isDynamicRecord(value) &&
@@ -42,19 +80,35 @@ export function isImageGenerationInfo(value: unknown): value is ImageGenerationI
   );
 }
 
-/**
- * The id of the question that asks the user to allow or block an MCP plugin request. The plugin
- * takes only one of its options; a typed answer cancels the request.
- */
+export interface VideoGenerationInfo {
+  prompt?: string | undefined;
+  aspectRatio: ImageGenerationAspectRatio;
+  durationSeconds?: number | undefined;
+  resolution?: string | undefined;
+  error?: string | undefined;
+}
+
+export function isVideoGenerationInfo(value: unknown): value is VideoGenerationInfo {
+  return (
+    isDynamicRecord(value) &&
+    (value.prompt === undefined || isString(value.prompt)) &&
+    isImageGenerationAspectRatio(value.aspectRatio) &&
+    (value.durationSeconds === undefined ||
+      (isNumber(value.durationSeconds) && Number.isFinite(value.durationSeconds) && value.durationSeconds > 0)) &&
+    (value.resolution === undefined || isBoundedString(value.resolution, 40)) &&
+    (value.error === undefined || isString(value.error))
+  );
+}
+
 export const MCP_ELICITATION_DECISION_QUESTION_ID = "mcp-elicitation-decision";
 
 export interface AgentPromptQuestion {
   id: string;
   header: string;
   question: string;
+  detail?: string;
   isSecret: boolean;
   options: Array<{ label: string; description: string }> | null;
-  /** The user can pick more than one option. Set only when true. */
   multiSelect?: boolean;
 }
 
@@ -64,6 +118,7 @@ export function isAgentPromptQuestion(value: unknown): value is AgentPromptQuest
     isBoundedString(value.id, INPUT_LIMITS.identifier) &&
     isBoundedString(value.header, INPUT_LIMITS.promptHeader) &&
     isBoundedString(value.question, INPUT_LIMITS.promptQuestion) &&
+    (value.detail === undefined || isBoundedString(value.detail, INPUT_LIMITS.promptQuestion)) &&
     isBoolean(value.isSecret) &&
     (value.multiSelect === undefined || isBoolean(value.multiSelect)) &&
     (value.options === null ||
@@ -149,8 +204,23 @@ export interface AgentExchangeSummary {
   recipientAgentIds: string[];
   replyToMessageId: string | null;
   deliveries: Array<Pick<QueueDelivery, "id" | "recipientAgentId" | "status" | "position" | "error">>;
-  /** Absent means the sender waits for an answer. See `QueueDelivery.expectsReply`. */
   expectsReply?: boolean;
+  senderTaskId?: string;
+}
+
+export function openExchangesOutside(
+  loaded: readonly { id: string; exchange?: AgentExchangeSummary | undefined }[],
+  page: readonly { id: string }[],
+): string[] {
+  const onPage = new Set(page.map((message) => message.id));
+  return loaded.flatMap(({ id, exchange }) =>
+    !onPage.has(id) &&
+    exchange?.direction === "outgoing" &&
+    exchange.expectsReply !== false &&
+    exchange.deliveries.some(({ status }) => status === "queued" || status === "starting" || status === "running")
+      ? [id]
+      : [],
+  );
 }
 
 function isAgentExchangeSummary(value: unknown): value is AgentExchangeSummary {
@@ -175,14 +245,11 @@ function isAgentExchangeSummary(value: unknown): value is AgentExchangeSummary {
           (isNumber(delivery.position) && Number.isInteger(delivery.position) && delivery.position >= 1)) &&
         (delivery.error === null || isBoundedString(delivery.error, INPUT_LIMITS.messageText)),
     ) &&
-    (value.expectsReply === undefined || isBoolean(value.expectsReply))
+    (value.expectsReply === undefined || isBoolean(value.expectsReply)) &&
+    (value.senderTaskId === undefined || isIdentifier(value.senderTaskId))
   );
 }
 
-/**
- * The person who wrote a user message, as the host saw them when it arrived. The host stamps it;
- * the sender never names itself. `name` is the name at send time, for a member who has since left.
- */
 export interface ConversationMessageSender {
   id: string;
   name: string;
@@ -192,7 +259,6 @@ export function isConversationMessageSender(value: unknown): value is Conversati
   return isDynamicRecord(value) && isIdentifier(value.id) && isBoundedString(value.name, INPUT_LIMITS.accountName);
 }
 
-/** The sender the host stamps, with the name cut to the bound every reader checks. */
 export function conversationMessageSender(id: string, name: string): ConversationMessageSender | undefined {
   return isIdentifier(id) ? { id, name: name.slice(0, INPUT_LIMITS.accountName) } : undefined;
 }
@@ -207,14 +273,14 @@ export interface ConversationMessage {
   itemType?: string | undefined;
   source?: "user" | "assistant" | "agent" | "system" | "routine" | undefined;
   senderAgentId?: string | undefined;
-  /** Absent on a message from before senders were kept, and on one from an older host. */
   senderMember?: ConversationMessageSender | undefined;
   replyToMessageId?: string | null | undefined;
   attachments?: AttachmentSummary[] | undefined;
-  /** What the user said, on a message that a voice turn sent. The agent got only the text. */
   voiceRecording?: AttachmentSummary | undefined;
   imageGeneration?: ImageGenerationInfo | undefined;
+  videoGeneration?: VideoGenerationInfo | undefined;
   delivery?: Pick<QueueDelivery, "id" | "status" | "position"> | undefined;
+  steered?: true | undefined;
   exchange?: AgentExchangeSummary | undefined;
   reaction?: MessageReaction | null | undefined;
   reactions?: ConversationReaction[] | undefined;
@@ -227,23 +293,13 @@ export interface ConversationMessage {
       }
     | undefined;
   questionPrompt?: ConversationQuestionPrompt | undefined;
-  /** Set on the one `plan` message of a turn. The text holds the same plan as a checklist. */
   plan?: ConversationPlan | undefined;
-  /** Set on the one `subagents` message of a turn. The text lists the same subagents by title. */
   subagents?: ConversationSubagent[] | undefined;
-  /** Set on the one `memory-changes` message of a turn. The text counts the same changes. */
   memoryChanges?: ConversationMemoryChange[] | undefined;
-  /** Set on an `instructions-change` message. */
   instructionsChange?: AgentInstructionsChange | undefined;
-  /**
-   * An interactive block from `ask_ui` (see `ui-blocks.ts`). It rides on a `question_prompt` message
-   * beside `questionPrompt`. Absent on a message from an older host.
-   */
+  skillSuggestion?: ConversationSkillSuggestion | undefined;
   uiBlock?: ConversationUiBlock | undefined;
-  /**
-   * The timing, tokens and cost of the turn, on one message of a finished turn (see
-   * `ipc-conversation-trace.ts`). It stays on this computer: the Team API projections drop it.
-   */
+  nearPayment?: ConversationNearPayment | undefined;
   trace?: ConversationTurnTrace | undefined;
 }
 
@@ -274,6 +330,7 @@ export function isConversationMessage(value: unknown): value is ConversationMess
         value.attachments.every(isAttachmentSummary))) &&
     (value.voiceRecording === undefined || isAttachmentSummary(value.voiceRecording)) &&
     (value.delivery === undefined || isConversationDelivery(value.delivery)) &&
+    (value.steered === undefined || value.steered === true) &&
     (value.exchange === undefined || isAgentExchangeSummary(value.exchange)) &&
     (value.reaction === undefined || value.reaction === null || isMessageReaction(value.reaction)) &&
     (value.reactions === undefined ||
@@ -287,12 +344,15 @@ export function isConversationMessage(value: unknown): value is ConversationMess
         isBoundedString(value.routine.name, INPUT_LIMITS.routineName) &&
         isBoundedString(value.routine.scheduledFor, 160))) &&
     (value.imageGeneration === undefined || isImageGenerationInfo(value.imageGeneration)) &&
+    (value.videoGeneration === undefined || isVideoGenerationInfo(value.videoGeneration)) &&
     (value.questionPrompt === undefined || isConversationQuestionPrompt(value.questionPrompt)) &&
     (value.plan === undefined || isConversationPlan(value.plan)) &&
     (value.subagents === undefined || isConversationSubagents(value.subagents)) &&
     (value.memoryChanges === undefined || isConversationMemoryChanges(value.memoryChanges)) &&
     (value.instructionsChange === undefined || isAgentInstructionsChange(value.instructionsChange)) &&
+    (value.skillSuggestion === undefined || isConversationSkillSuggestion(value.skillSuggestion)) &&
     (value.uiBlock === undefined || isConversationUiBlock(value.uiBlock)) &&
+    (value.nearPayment === undefined || isConversationNearPayment(value.nearPayment)) &&
     (value.trace === undefined || isConversationTurnTrace(value.trace))
   );
 }
@@ -306,17 +366,16 @@ function isConversationDelivery(value: unknown): boolean {
   );
 }
 
-/**
- * The item type of a text answer that a quiet routine run kept: the run had nothing to report, so the
- * answer is not news. It does not count as unread, change the preview, or go to a Team API client.
- * The desktop chat shows it inside the run, which starts collapsed.
- */
 export const ROUTINE_QUIET_ANSWER_ITEM_TYPE = "routine_quiet_answer";
 
-/**
- * An agent message that says something to the reader. Commentary, a question prompt, a plan, the
- * subagents and a quiet routine answer are not an answer.
- */
+export function routineQuietStepsItemId(turnId: string): string {
+  return `${turnId}:quiet-steps`;
+}
+
+export const AGENT_WELCOME_ITEM_TYPE = "agent_welcome";
+
+export const CHANNEL_RESUME_ITEM_TYPE = "channel_resume";
+
 export function isAgentAnswer(message: ConversationMessage): boolean {
   return (
     message.author === "assistant" &&
@@ -329,7 +388,6 @@ export function isAgentAnswer(message: ConversationMessage): boolean {
   );
 }
 
-/** The answer an agent gave in one turn: its last message of that turn that says something to the reader. */
 export function latestTurnAnswer(
   messages: readonly ConversationMessage[],
   turnId: string,

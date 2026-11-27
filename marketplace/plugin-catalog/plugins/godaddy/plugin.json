@@ -1,0 +1,34 @@
+{
+  "slug": "godaddy",
+  "name": "GoDaddy",
+  "tagline": "Domain name search",
+  "description": "GoDaddy lets agents check whether domain names are available and suggest names from keywords or a business description. It reads public domain data only and cannot buy domains or change DNS. It needs no account and no key.",
+  "category": "other",
+  "creatorName": "GoDaddy",
+  "iconUrl": "https://is1-ssl.mzstatic.com/image/thumb/Purple211/v4/71/70/4f/71704f77-7c26-d166-ec77-ebcf5235e269/GoDaddy-App-Icon-0-0-1x_U007epad-0-1-0-0-85-220.png/512x512bb.jpg",
+  "version": "1.0.0",
+  "prompts": [
+    {
+      "id": "prompt-availability",
+      "text": "Is northwind-bakery.com available? Check the .com, .co, and .shop names too."
+    },
+    { "id": "prompt-suggest", "text": "Suggest ten short domain names for a mobile dog grooming business." },
+    {
+      "id": "prompt-compare",
+      "text": "Which of these five names are still available: brightdesk, deskly, workbay, tasknest, plannr?"
+    }
+  ],
+  "apps": [
+    {
+      "id": "app-godaddy-mcp",
+      "name": "GoDaddy",
+      "description": "Domain availability checks and name suggestions, over the GoDaddy MCP server with no sign-in.",
+      "iconUrl": "https://is1-ssl.mzstatic.com/image/thumb/Purple211/v4/71/70/4f/71704f77-7c26-d166-ec77-ebcf5235e269/GoDaddy-App-Icon-0-0-1x_U007epad-0-1-0-0-85-220.png/512x512bb.jpg",
+      "server": { "name": "godaddy", "transport": "http", "url": "https://mcp.godaddy.com" }
+    }
+  ],
+  "skills": [],
+  "websiteUrl": "https://www.godaddy.com",
+  "privacyPolicyUrl": "https://www.godaddy.com/legal/agreements/privacy-policy",
+  "termsUrl": "https://www.godaddy.com/legal/agreements/universal-terms-of-service-agreement"
+}

@@ -1,23 +1,16 @@
 import type { AgentSummary } from "@openbot/contracts/ipc";
 import { BrowserProfilesPanel } from "@openbot/ui/features/browser/BrowserProfilesPanel";
+import type { BrowserProfileProxies } from "@openbot/ui/features/browser/BrowserProxies";
 import { useText } from "@openbot/ui/text";
 import { createEffect, createSignal } from "solid-js";
 import { actionToast } from "../../action-toast";
 import type { BrowserProfilesStore } from "./stores/browser-profiles-store";
 
 export interface ServerBrowserProfilesOptions {
-  /** The profiles of the server whose settings are open. A new store means another server. */
   store: Omit<BrowserProfilesStore, "assign">;
-  /** The agents of the same server, for the names in the delete question. */
   listAgents: () => Promise<readonly Pick<AgentSummary, "id" | "name">[]>;
 }
 
-/**
- * The Browser profiles section of the server settings. It lists the profiles each time it opens,
- * and again when the settings change to another server. The list also counts the agents of the
- * shared profile, and each change lists it again, because a delete moves agents. A change made on
- * another device, such as the phone, shows while the section is open.
- */
 export function ServerBrowserProfilesPanel(
   props: ServerBrowserProfilesOptions & { menuMount: HTMLElement | undefined },
 ) {
@@ -32,7 +25,6 @@ export function ServerBrowserProfilesPanel(
       store
         .refresh()
         .catch((error: unknown) => actionToast.error(errorMessage(error, t("browser.profiles.loadFailed"))));
-      // A name only makes the delete question clearer, so a failed read leaves it out.
       props.listAgents().then(
         (agents) => {
           if (current === request) setAgentNames(new Map(agents.map((agent) => [agent.id, agent.name])));
@@ -42,6 +34,19 @@ export function ServerBrowserProfilesPanel(
       return store.follow();
     },
   );
+  const proxies = (): BrowserProfileProxies | undefined => {
+    const list = props.store.state.proxies;
+    if (!list) return undefined;
+    return {
+      list,
+      computers: props.store.state.computers ?? [],
+      sharing: props.store.state.sharing,
+      onSave: props.store.saveProxy,
+      onDelete: props.store.removeProxy,
+      onSetProfileProxy: props.store.setProfileProxy,
+      onSetSharing: props.store.setSharing,
+    };
+  };
   return (
     <BrowserProfilesPanel
       profiles={props.store.state.profiles}
@@ -55,6 +60,7 @@ export function ServerBrowserProfilesPanel(
       onClear={props.store.clear}
       onDelete={props.store.remove}
       menuMount={props.menuMount}
+      proxies={proxies()}
     />
   );
 }

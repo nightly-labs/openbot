@@ -4,6 +4,9 @@ import type { messages as source } from "../../en/error/backend";
 export const messages = {
   "error.backend.eventsUnavailable": "Auf diesem Host sind keine Ereignisse verfügbar.",
   "error.backend.databaseIntegrity": "Die OpenBot-Datenbank hat die Integritätsprüfung nicht bestanden.",
+  "error.backend.creditsHoldAdminOnly":
+    "Nur ein Eigentümer oder Admin dieses Servers kann Agenten erlauben, Credits zu verwenden.",
+  "error.backend.creditsHoldShort": "Es sind noch nicht genug Credits vorhanden.",
   "error.backend.webhookRouteLimit": "Ein Host kann höchstens {limit} Webhook-Routinen haben.",
   "error.backend.webhookSettingsInvalid": "Prüfe die Webhook-Einstellungen und versuche es erneut.",
   "error.backend.webhookSenderSecretInvalid":
@@ -47,13 +50,26 @@ export const messages = {
     "Dieser entfernte Host unterstützt die Navigation über die Adressleiste in einem vorhandenen Tab nicht.",
   "error.backend.browserUserControlBusy":
     "Dieser Browser-Tab wartet auf ein Geheimnis. Beantworte zuerst die Anfrage nach dem Geheimnis.",
+  "error.backend.browserTeachBusy":
+    "Eine andere Person steuert diesen Browser-Tab. Versuche es erneut, wenn sie fertig ist.",
+  "error.backend.browserTeachUnavailable": "Dieser Browser-Tab hat keinen Agenten, der eine Aufgabe lernen kann.",
+  "error.backend.browserTeachUnsupported": "Dieser Remote-Host unterstützt die Aufzeichnung einer Aufgabe nicht.",
   "error.backend.browserUserControlUnsupported":
     "Dieser entfernte Host unterstützt die Übernahme eines Browser-Tabs nicht.",
   "error.backend.browserSignInUnsupported":
     "Dieser entfernte Host kann keine Anmeldung von diesem Computer übernehmen.",
   "error.backend.browserSignInOpenFailed": "OpenBot konnte das Anmeldefenster nicht öffnen.",
+  "error.backend.browserSignInLoadFailed":
+    "OpenBot konnte die Seite im Anmeldefenster nicht laden. Prüfe die Internetverbindung und öffne das Anmeldefenster dann erneut.",
   "error.backend.browserSignInReadFailed": "OpenBot konnte die Anmeldung im Fenster nicht lesen.",
   "error.backend.browserStopUnsupported": "Dieser entfernte Host kann das Laden einer Seite nicht stoppen.",
+  "error.backend.browserLocationFailed": "Der Standort für die Seite konnte nicht festgelegt werden.",
+  "error.backend.browserPermissionsUnsupported": "Dieser entfernte Host kann Standortanfragen nicht beantworten.",
+  "error.backend.browserLocationRequired": "Sende den Gerätestandort, um die Anfrage zu erlauben.",
+  "error.backend.browserHttpSignInInactive":
+    "Diese Website fragt nicht mehr nach einer Anmeldung. Lade die Seite neu, um es noch einmal zu versuchen.",
+  "error.backend.browserHttpSignInUnsupported":
+    "Dieser entfernte Host kann keine Anmeldung bei einer Website übernehmen.",
   "error.backend.sharedDataLocalOnly":
     "Geteilte Daten werden auf dem Computer verwaltet, auf dem diese Agenten laufen.",
   "error.backend.browserUrlProtocol": "Im Browser sind nur HTTP(S)-URLs erlaubt.",
@@ -62,6 +78,16 @@ export const messages = {
   "error.backend.channelLeadModelUnavailable": "Das Modell der Kanalleitung ist nicht verfügbar.",
   "error.backend.contextCompactionIneffective":
     "Die Komprimierung macht diesen Chat nicht kleiner: Nach zwei Komprimierungen nutzt er noch {percent}% des Kontextfensters des Modells, daher komprimiert OpenBot ihn nicht mehr. Tools und Anweisungen nutzen den größten Teil des Fensters. Schalte die MCP-Server oder die Computersteuerung aus, die dieser Agent nicht braucht, oder wähle ein Modell mit größerem Fenster. Starte dann einen neuen Chat.",
+  "error.backend.contextCompactionStopped":
+    "Zwei Komprimierungen dieses Chats sind nacheinander fehlgeschlagen, daher komprimiert OpenBot ihn nicht mehr automatisch. Jeder Versuch sendet den ganzen Chat an das Modell und verbraucht dein Planlimit. Wähle „Jetzt komprimieren“, um es erneut zu versuchen, oder starte einen neuen Chat.",
+  "error.backend.contextCompactionRetrying":
+    "Der Anbieter konnte diesen Chat nicht komprimieren und versucht es erneut. Neue Nachrichten in diesem Chat warten, bis die Komprimierung endet. Wenn sie nicht bald endet, stoppt OpenBot sie und sendet deine Nachrichten.",
+  "error.backend.contextCompactionFailed":
+    "Die Komprimierung dieses Chats ist fehlgeschlagen. Der Chat wurde nicht geändert. Wartende Nachrichten gehen jetzt an den Agenten.",
+  "error.backend.contextCompactionTimedOut":
+    "Die Komprimierung dieses Chats hat zu lange gedauert, daher hat OpenBot sie gestoppt. Der Chat wurde nicht geändert. Wartende Nachrichten gehen jetzt an den Agenten.",
+  "error.backend.providerModelAtCapacity":
+    "Das Modell ist ausgelastet. Der Anbieter versucht es in einigen Minuten erneut. Um sofort weiterzumachen, stoppe den Durchlauf und wähle ein anderes Modell.",
   "error.backend.providerRetrying":
     "Der Anbieter hat diese Anfrage {attempts}-mal nicht ausgeführt und versucht es erneut. Wenn der Agent nicht weitermacht, stoppe den Durchlauf.",
   "error.backend.providerRetryingLargeContext":
@@ -72,8 +98,24 @@ export const messages = {
     "Im Kanal gibt es einen unbestätigten Auftragsstart. Prüfe das Ergebnis, bevor du den Kanal löschst.",
   "error.backend.channelNotFound": "Kanal nicht gefunden.",
   "error.backend.channelMemberUnavailable": "Ein Kanalmitglied ist nicht verfügbar.",
+  "error.backend.channelInstructionsTooLong":
+    "Kürze die Anweisungen auf 2.000 Zeichen. Längere Anweisungen werden nicht gespeichert.",
+  "error.backend.channelWaitBeforeNewConversation":
+    "Warte, bis die Arbeit in diesem Kanal endet, und starte dann eine neue Unterhaltung.",
+  "error.backend.channelWaitBeforeCompact": "Warte, bis die Arbeit in diesem Kanal endet, und komprimiere ihn dann.",
+  "error.backend.channelWaitBeforeDeleteHistory":
+    "Warte, bis die Arbeit in diesem Kanal endet, und lösche dann seinen Verlauf.",
+  "error.backend.channelCompactUnavailable":
+    "Kein Mitglied dieses Kanals kann seinen Kontext jetzt komprimieren. Ein Mitglied muss zuerst im Kanal antworten, und sein Anbieter muss das Komprimieren unterstützen.",
+  "error.backend.channelCompactNoSession":
+    "Die Mitglieder dieses Kanals haben noch keine Unterhaltung zum Komprimieren. Komprimiere ihn, nachdem ein Mitglied im Kanal geantwortet hat.",
+  "error.backend.channelCompactNotSupported":
+    "Kein Mitglied dieses Kanals kann auf Anfrage komprimieren. Mitglieder, die es unterstützen, komprimieren ihren Kontext automatisch, wenn er fast voll ist.",
+  "error.backend.channelCompactProviderUnavailable":
+    "Der Anbieter der Kanalmitglieder funktioniert gerade nicht. Aktualisiere die Anbieter und komprimiere den Kanal dann erneut.",
   "error.backend.channelArchived":
     "Stelle diesen Kanal wieder her, bevor du Nachrichten sendest oder Aufgaben änderst.",
+  "error.backend.channelArchiveRunning": "Stoppe die laufende Arbeit in diesem Kanal und lösche ihn dann.",
   "error.backend.channelReferenceUnavailable": "Die referenzierte Kanalnachricht ist nicht verfügbar.",
   "error.backend.channelTaskNotFound": "Kanalaufgabe nicht gefunden.",
   "error.backend.channelTaskComplete": "Diese Aufgabe ist bereits abgeschlossen.",
@@ -91,6 +133,16 @@ export const messages = {
     "Die Kanalleitung hat nicht rechtzeitig geantwortet. Wähle ein Mitglied oder versuche es erneut.",
   "error.backend.channelLeadFailed":
     "Die Kanalleitung konnte diese Nachricht nicht zuweisen. Wähle ein Mitglied oder versuche es erneut.",
+  "error.backend.channelLeadBusy":
+    "Das Modell der Kanalleitung ist gerade ausgelastet. Versuche es in ein paar Minuten erneut, oder wähle ein Mitglied.",
+  "error.backend.channelLeadOffline":
+    "Das Modell der Kanalleitung hat die Verbindung verloren. Versuche es erneut, oder wähle ein Mitglied.",
+  "error.backend.channelLeadSignIn":
+    "Die Anmeldung beim Anbieter der Kanalleitung ist abgelaufen. Melde dich erneut an, oder wähle ein Mitglied.",
+  "error.backend.channelLeadModelGone":
+    "Das Modell der Kanalleitung ist nicht verfügbar. Wähle ein anderes Modell für die Leitung, oder wähle ein Mitglied.",
+  "error.backend.channelLeadRefused":
+    "Das Modell der Kanalleitung hat diese Anfrage abgelehnt. Wähle ein Mitglied oder ein anderes Modell für die Leitung.",
   "error.backend.channelRequestMemberRequired": "Wähle ein Mitglied für diese Anfrage.",
   "error.backend.channelDeliveryNotCreated": "Die Kanalzustellung wurde nicht erstellt.",
   "error.backend.channelAssignmentStopped": "Dieser Kanalauftrag wurde gestoppt oder ersetzt.",
@@ -108,7 +160,14 @@ export const messages = {
   "error.backend.memoryOperationFailed": "Der Vorgang für die Erinnerung ist fehlgeschlagen. Versuche es erneut.",
   "error.backend.memoryGone": "Diese Erinnerung existiert nicht mehr.",
   "error.backend.routineGone": "Diese Routine existiert nicht mehr.",
+  "error.backend.routineRunGone": "Dieser Routinelauf existiert nicht mehr.",
+  "error.backend.routineRunFailedNoReason":
+    "Der Lauf wurde mit einem Fehler beendet, aber ohne Grund. Öffne den Lauf, um zu sehen, was der Agent getan hat.",
   "error.backend.turnNotStarted": "Der Anbieter hat diesen Durchlauf nicht gestartet.",
+  "error.backend.turnStartUnconfirmed":
+    "{provider} hat nicht rechtzeitig bestätigt, dass diese Nachricht gestartet wurde. OpenBot sendet sie nicht erneut, damit die Arbeit nicht doppelt läuft. OpenBot wartet bis zu 5 Minuten, bis der Agent startet.",
+  "error.backend.turnStartAbandoned":
+    "Der Agent hat diese Nachricht in 5 Minuten nicht gestartet. Sende die Nachricht erneut.",
   "error.backend.routineResultConnectionOff":
     "Diese Messaging-Verbindung ist aus oder entfernt. Wähle einen anderen Ort.",
   "error.backend.routineResultNoDelivery": "Diese Ausführung hat keine Antwort, die erneut gesendet werden kann.",
@@ -154,9 +213,19 @@ export const messages = {
   "error.backend.recipientDeleting":
     "Der Empfänger wird gelöscht. Versuche es nach Abschluss des Löschvorgangs erneut.",
   "error.backend.recipientHidden": "Dieser Agent ist ausgeblendet. Stelle ihn wieder her, um Nachrichten zu senden.",
+  "error.backend.agentIdUnknown":
+    "Kein Agent hat die ID {id}. Hole die IDs mit openbot.list_agents und versuche es erneut.",
+  "error.backend.agentIdNear":
+    "Kein Agent hat die ID {id}. Der Agent {name} hat die fast gleiche ID {nearId}. Wenn du diesen Agenten meinst, versuche es mit seiner ID erneut.",
   "error.backend.attachBetween": "Hänge zwischen 1 und {limit} Dateien an.",
   "error.backend.attachmentNotFile": "Der Anhang ist keine Datei: {path}",
   "error.backend.generatedImageTooLarge": "Das erstellte Bild überschreitet die Grenze von 100 MB.",
+  "error.backend.generatedVideoTooLarge": "Das erstellte Video überschreitet die Grenze von 100 MB.",
+  "error.backend.videoGenerationFailed": "Die Videoerstellung ist fehlgeschlagen.",
+  "error.backend.videoGenerationNoVideo": "Die Videoerstellung hat kein Video zurückgegeben.",
+  "error.backend.videoGenerationInterrupted": "Die Videoerstellung wurde unterbrochen.",
+  "error.backend.grokVideoNoQuota":
+    "Dein Grok-Konto kann keine Videos erstellen. Erstelle das Video stattdessen mit Credits.",
   "error.backend.attachmentNotRegularFile": "Nur reguläre Dateien können angehängt werden: {name}",
   "error.backend.attachmentCopyFailed": "OpenBot konnte {name} nicht kopieren.",
   "error.backend.routineNameRequired": "Ein Name für die Routine ist erforderlich.",
@@ -188,6 +257,8 @@ export const messages = {
   "error.backend.interruptSelf": "Ein Agent kann sich nicht selbst unterbrechen.",
   "error.backend.interruptOtherWork":
     "Dieser Agent arbeitet an einer Aufgabe, die nicht durch deine Nachricht gestartet wurde. Nur der Benutzer oder der Absender dieser Aufgabe kann ihn stoppen.",
+  "error.backend.interruptSharedWork":
+    "Der Durchgang dieses Agenten bearbeitet deine Nachricht und auch eine Nachricht des Benutzers oder eines anderen Agenten. Nur der Benutzer kann ihn stoppen, mit Agenten stoppen im Chat dieses Agenten.",
   "error.backend.interruptStarting":
     "Dieser Agent startet noch einen Durchlauf. Versuche es erneut, sobald der Durchlauf beginnt.",
   "error.backend.interruptNoSession":
@@ -211,13 +282,11 @@ export const messages = {
   "error.backend.agentWaitNoRequest":
     "Ein Wartevorgang braucht eine Nachricht, um fortzufahren. Dieser Durchlauf hat keine Nachricht.",
   "error.backend.agentWaitOwnChatOnly":
-    "Öffne einen Wartevorgang nur in deinem eigenen Chat. Eine Kanal- oder Messaging-Aufgabe kann nicht warten.",
+    "Öffne einen Wartevorgang in deinem eigenen Chat oder in einem Nebenthread. Eine Kanal- oder Messaging-Unterhaltung kann nicht warten.",
   "error.backend.agentWaitNoteRequired": "Gib eine kurze Notiz an, wofür der Wartevorgang ist.",
   "error.backend.agentWaitRoutineGone": "Dieser Agent hat keine Routine mit dieser ID.",
   "error.backend.agentWaitNoRoutine":
     "Nur eine Ausführung einer deiner Routinen weckt einen Wartevorgang, und du hast keine Routine. Erstelle eine mit openbot.create_routine und öffne dann den Wartevorgang.",
-  "error.backend.agentWaitRemoteUnsupported":
-    "Offene Wartevorgänge sind nur für Agenten auf diesem Computer verfügbar.",
   "error.backend.markUnreadRemoteUnsupported":
     "Eine Nachricht als ungelesen markieren ist nur für Agenten auf diesem Computer verfügbar.",
   "error.backend.messageDeleteUnsupported": "Dieser Server unterstützt das Löschen von Nachrichten nicht.",
@@ -225,21 +294,38 @@ export const messages = {
   "error.backend.messageDeleteBusy":
     "Diese Nachricht gehört zu einem laufenden Durchlauf. Lösche sie, wenn der Durchlauf endet.",
   "error.backend.messageDeleteForbidden": "Du kannst nur die Nachrichten löschen, die du gesendet hast.",
+  "error.backend.messagePinNotFound": "Diese Nachricht ist nicht im Chat.",
+  "error.backend.messagePinLimit":
+    "Dieser Chat hat 50 angeheftete Nachrichten. Löse eine, bevor du eine weitere anheftest.",
   "error.backend.routineFlowHandoffFailed": "Die Routine konnte die Arbeit nicht an diesen Agenten übergeben.",
   "error.backend.mcpServerLimit": "OpenBot verwaltet bis zu {limit} MCP-Server.",
   "error.backend.mcpServerNameTaken": "Ein MCP-Server mit dem Namen {name} existiert bereits.",
   "error.backend.mcpServerInvalid": "OpenBot kann diese MCP-Server-Konfiguration nicht speichern.",
+  "error.backend.mcpHeaderNameInvalid":
+    "Header-Namen dürfen keine Leerzeichen oder Zeichen wie : ( ) / enthalten. Verwende einen Namen wie Authorization und trage den Schlüssel oder das Token unter Wert ein.",
   "error.backend.mcpServerNoAnswer": "Der Server hat innerhalb von {seconds} Sekunden nicht geantwortet.",
   "error.backend.mcpSignInNotAccepted": "Der Server hat diese Anmeldung nicht akzeptiert.",
+  "error.backend.mcpSignInGrantRefused":
+    "Der Server hat die Anmeldung nicht akzeptiert. Melde dich erneut an. Wenn das Problem bleibt, prüfe, ob dein Konto auf derselben Site oder in derselben Region wie diese App ist.",
+  "error.backend.mcpSignInAccountRefused":
+    "Der Server hat das Konto abgelehnt, mit dem du dich angemeldet hast. Prüfe, ob dieses Konto den Dienst nutzen darf. Für ein anderes Konto melde dich ab und dann wieder an.",
   "error.backend.mcpSignInClientRefused":
     "Der Anmeldeserver hat OpenBot beim Abschluss der Anmeldung nicht akzeptiert. Melde dich erneut an: OpenBot registriert sich erneut beim Server.",
   "error.backend.googleSignInNeedsAccount":
     "Melde dich zuerst bei deinem OpenBot-Konto an. OpenBot braucht es, um eine Google-Anmeldung abzuschließen.",
   "error.backend.googleSignInUnavailable":
     "OpenBot konnte die Google-Anmeldung nicht abschließen. Versuche es später erneut.",
+  "error.backend.mcpSignInAppRefused":
+    "Der Anmeldeserver hat die Anmelde-App dieses Servers nicht akzeptiert. Prüfe die Client-ID und das Client-Secret der Anmelde-App und melde dich dann erneut an.",
   "error.backend.mcpCommandNotFound": "Befehl nicht gefunden: {command}",
+  "error.backend.mcpProviderLimit":
+    "Dieser Agent kann nur eine begrenzte Anzahl von MCP-Servern nutzen. Um diesen Server zu nutzen, schalte einen MCP-Server aus, den der Agent nicht braucht.",
   "error.backend.mcpRegistrationRefused":
     "Der Anmeldeserver akzeptiert OpenBot noch nicht als Anwendung. Dein Konto ist nicht die Ursache. Verwende eine andere Verbindungsmethode, etwa einen lokalen MCP-Server.",
+  "error.backend.mcpRegistrationUnavailable":
+    "Der Anmeldeserver kann OpenBot nicht als Anwendung registrieren. Dein Konto ist nicht die Ursache. Speichere zum Verbinden diesen Server unter Marketplace, Apps und füge ihm dann eine Anmelde-App hinzu.",
+  "error.backend.mcpSignInAppNeeded":
+    "Der Anmeldeserver kann OpenBot nicht als Anwendung registrieren. Dein Konto ist nicht die Ursache. Öffne zum Verbinden diesen Server unter Marketplace, Apps, klicke auf Verbindung testen und füge dann eine Anmelde-App hinzu.",
   "error.backend.mcpSignInAbandonedGeneric": "Die Anmeldung wurde abgebrochen.",
   "error.backend.mcpSignInForgotten": "Die MCP-Anmeldung wurde während ihrer Ausführung verworfen.",
   "error.backend.mcpSignInAbandoned": "Die MCP-Anmeldung wurde abgebrochen.",
@@ -251,18 +337,52 @@ export const messages = {
     "Dieser Server verlangt eine Anmeldung. Melde dich in OpenBot auf dem Host-Computer bei ihm an.",
   "error.backend.mcpSignInNeedsHttps":
     "Dieser Server verlangt eine Anmeldung, und OpenBot meldet sich nur über https an. Ändere die URL in {url}.",
+  "error.backend.mcpSignInOtherAddress":
+    "Dieser Server meldet sich nur unter {url} an. Ändere die URL in diese Adresse und melde dich dann erneut an.",
   "error.backend.mcpSignInCancelled": "Die Anmeldung wurde abgebrochen.",
   "error.backend.mcpSignInTimedOut": "Die Anmeldung wurde im Browser nicht abgeschlossen.",
+  "error.backend.mcpSignInRefused": "Die Anmeldeseite hat den Zugriff abgelehnt. Melde dich erneut an.",
   "error.backend.mcpSignInResponseTimedOut": "Die Antwort auf die Anmeldung kam nicht rechtzeitig an.",
   "error.backend.mcpSignInMetadataUnreadable":
     "OpenBot konnte die Anmeldeinformationen dieses Servers nicht lesen. Prüfe die Serveradresse und versuche es erneut.",
+  "error.backend.mcpSignInAnswerUnreadable":
+    "Der Anmeldeserver hat eine Antwort gesendet, die OpenBot nicht lesen kann. Wenn der Dienst dir einen API-Schlüssel oder ein Token gibt, füge ihn in den Einstellungen dieses Servers hinzu und teste die Verbindung erneut.",
   "error.backend.mcpServerExited":
     "Der Server wurde beendet, bevor er geantwortet hat. Führe den Befehl in einem Terminal aus, um seinen Fehler zu sehen.",
+  "error.backend.mcpServerExitedWithOutput": "Der Server wurde beendet, bevor er geantwortet hat. Er schrieb: {detail}",
+  "error.backend.mcpServerDownloadFailed":
+    "Der Server ist nicht gestartet, weil sein Download fehlgeschlagen ist. Prüfe die Internetverbindung und versuche es dann erneut.",
   "error.backend.mcpServerFailedToStart": "Der Server ist nicht gestartet: {reason}",
+  "error.backend.mcpServerProgramMissing":
+    "OpenBot konnte den MCP-Server {name} nicht starten, weil sein Programm nicht auf dem Computer installiert ist, auf dem OpenBot läuft. Installiere die App, die {name} bereitstellt, auf diesem Computer, oder schalte {name} unter Marketplace, Apps aus.",
+  "error.backend.mcpServerStartAbandoned":
+    "{provider} hat nicht mehr gewartet, bevor der Server gestartet ist. Seine Agenten erhalten die Tools dieses Servers daher nicht.",
+  "error.backend.mcpServerStoppedDuringCall":
+    "Der MCP-Server hat angehalten, bevor er auf diesen Aufruf geantwortet hat.",
+  "error.backend.mcpToolSchemaRefused":
+    "Sein Tool {tool} hat ein Eingabeformat, das dieser Anbieter nicht lesen kann. Agenten mit anderen Anbietern erhalten den Server weiterhin.",
+  "error.backend.mcpServerSignInForProvider":
+    "{provider} konnte den MCP-Server {name} nicht verwenden, weil der Server eine Anmeldung verlangt. Öffne {name} unter Marketplace, Apps und wähle Anmelden.",
+  "error.backend.mcpServerKeyForProvider":
+    "{provider} konnte den MCP-Server {name} nicht verwenden, weil der Server einen Schlüssel verlangt. Öffne {name} unter Marketplace, Apps, wähle Bearbeiten und gib unter Header den richtigen Schlüssel ein.",
+  "error.backend.mcpServerFailedForProvider":
+    "{provider} konnte den MCP-Server {name} nicht starten. Öffne {name} unter Marketplace, Apps und wähle Verbindung testen, um die Ursache zu sehen.",
+  "error.backend.mcpServerFailedInProvider":
+    "{provider} konnte den MCP-Server {name} nicht starten. Seine Werkzeuge stehen {provider} nicht zur Verfügung. {provider} startet den Server selbst, daher kann der Verbindungstest in OpenBot erfolgreich sein. Starte einen neuen Chat, um es erneut zu versuchen.",
+  "error.backend.mcpServerTimedOutInProvider":
+    "{provider} konnte den MCP-Server {name} nicht starten, weil der Server nicht rechtzeitig geantwortet hat. Starte einen neuen Chat, um es erneut zu versuchen.",
+  "error.backend.mcpServerUnavailableInProvider":
+    "{provider} konnte den MCP-Server {name} nicht starten, weil der Server gerade nicht erreichbar ist. Warte ein paar Minuten und starte dann einen neuen Chat, um es erneut zu versuchen.",
+  "error.backend.mcpServerUnreachableInProvider":
+    "{provider} konnte den MCP-Server {name} nicht erreichen. Öffne {name} unter Marketplace, Apps und prüfe, ob die Adresse stimmt und der Server läuft. Starte dann einen neuen Chat, um es erneut zu versuchen.",
+  "error.backend.githubToolsNotStarted":
+    "{provider} konnte die GitHub-Tools nicht laden, weil GitHub nicht geantwortet hat. Öffne GitHub unter Marketplace, Apps und verbinde es erneut, wenn du dazu aufgefordert wirst. Starte dann einen neuen Chat, um es erneut zu versuchen.",
   "error.backend.mcpOAuthProxyUnavailable":
     "OpenBot konnte die lokale Anmeldeverbindung für diesen Server nicht starten. Starte OpenBot neu und versuche es dann erneut.",
   "error.backend.mcpOAuthSignInNeeded":
     "Die Anmeldung bei diesem MCP-Server ist beendet. Der Benutzer muss sich in OpenBot erneut anmelden.",
+  "error.backend.mcpOAuthRenewalFailed":
+    "OpenBot konnte die Anmeldung bei diesem MCP-Server gerade nicht erneuern. Die Anmeldung bleibt erhalten, und die nächste Anfrage versucht es erneut. Wenn dieser Fehler bleibt, kann sich der Nutzer in OpenBot vom Server abmelden und erneut anmelden.",
   "error.backend.mcpServerUnreachable": "OpenBot konnte den Server nicht erreichen. Prüfe die URL und dein Netzwerk.",
   "error.backend.mcpLocalServerOff":
     "Unter {address} antwortet auf diesem Computer kein Server. Starte den Server oder schalte ihn in der App ein, die ihn ausführt, und versuche es dann erneut.",
@@ -270,6 +390,8 @@ export const messages = {
     "Dieser Computer hat die Verbindung zum Server blockiert. Prüfe deine Firewall oder Sicherheitssoftware und versuche es dann erneut.",
   "error.backend.mcpServerIncompatible":
     "Unter dieser Adresse hat etwas geantwortet, aber nicht als MCP-Server über Streamable HTTP. Prüfe die URL und aktualisiere die App, die den Server ausführt.",
+  "error.backend.mcpServerKeyNotAccepted":
+    "Der Server hat den API-Schlüssel nicht akzeptiert. Prüfe den Schlüssel und versuche es erneut.",
   "error.backend.mcpRemoteBridge":
     "{reason} Dieser Befehl startet die mcp-remote-Brücke. Wähle stattdessen Streamable HTTP mit der URL {url}, dann meldet OpenBot dich an.",
   "error.backend.oauthNotHttps":
@@ -287,6 +409,15 @@ export const messages = {
   "error.backend.sectionNameTooLong": "Der Abschnittsname ist zu lang.",
   "error.backend.sidebarFolderTooDeep": "Ordner können nur drei Ebenen tief sein.",
   "error.backend.sidebarFolderMoveInvalid": "Dieser Ordner kann nicht dorthin verschoben werden.",
+  "error.backend.libraryFolderName": "Ein Ordnername muss 1 bis {limit} Zeichen haben.",
+  "error.backend.libraryFolderLimit": "Ein Server kann bis zu {limit} Bibliotheksordner haben.",
+  "error.backend.libraryFolderFileLimit": "In den Bibliotheksordnern sind zu viele Dateien.",
+  "error.backend.libraryFolderTooDeep": "Bibliotheksordner können nur {limit} Ebenen tief sein.",
+  "error.backend.libraryFolderGone": "Der Ordner existiert nicht oder wurde bereits gelöscht.",
+  "error.backend.libraryFolderOtherAgent": "Eine Datei kann nur in einen Ordner ihres Agenten verschoben werden.",
+  "error.backend.libraryFolderMoveInvalid": "Dieser Ordner kann nicht dorthin verschoben werden.",
+  "error.backend.workflowFolderLimit": "Ein Server kann bis zu {limit} Workflow-Ordner haben.",
+  "error.backend.workflowFolderPlacementLimit": "In den Ordnern sind zu viele Workflows.",
   "error.backend.sectionNameDuplicate": "Abschnittsnamen müssen eindeutig sein.",
   "error.backend.directMessageRequired": "Schreibe zuerst eine Nachricht.",
   "error.backend.directMessageTooLong": "Eine Direktnachricht kann bis zu {limit} Zeichen haben.",
@@ -318,11 +449,15 @@ export const messages = {
   "error.backend.promptInactive": "Diese Rückfrage ist nicht mehr aktiv.",
   "error.backend.promptAnswerMismatch": "Eine Antwort passt zu keiner aktiven Frage.",
   "error.backend.approvalInactive": "Diese Genehmigung ist nicht mehr aktiv.",
+  "error.backend.feedbackNeedsPhone":
+    "Nur die OpenBot-Telefon-App kann diesen Bericht senden, weil sie Version und Supportprotokoll des Telefons hinzufügt. Öffne diesen Chat auf dem Telefon. Wenn du diese Meldung dort siehst, aktualisiere die Telefon-App.",
   "error.backend.takeoverInactive": "Diese Browserübernahme ist nicht mehr aktiv.",
   "error.backend.authSubmitting": "Die Authentifizierung wird bereits übermittelt.",
+  "error.backend.apiKeyListFailed": "OpenBot konnte die gespeicherten API-Schlüssel nicht lesen.",
   "error.backend.apiKeySaveFailed": "OpenBot konnte den API-Schlüssel nicht speichern. Versuche es erneut.",
-  "error.backend.apiKeyNotAllowed": "Nur der Serverinhaber oder ein Admin kann einen API-Schlüssel eingeben.",
   "error.backend.apiKeySaving": "Der API-Schlüssel wird bereits gespeichert.",
+  "error.backend.apiKeyAnswerUnreadable":
+    "OpenBot konnte den API-Schlüssel nicht lesen. Gib einen Schlüssel mit höchstens 8.000 Zeichen ein und wähle, wer ihn nutzen darf.",
   "error.backend.authRequestInactive": "Diese sichere Authentifizierungsanfrage ist nicht mehr aktiv.",
   "error.backend.secureAuthUnavailable": "Die sichere Authentifizierung ist nicht verfügbar.",
   "error.backend.browserUrlRequired": "Eine Browser-URL ist erforderlich.",
@@ -334,8 +469,32 @@ export const messages = {
   "error.backend.browserProfileNameTaken": "Es gibt bereits ein Browserprofil mit diesem Namen.",
   "error.backend.browserSessionInUse": "Ein Tab verwendet diese Browsersitzung noch. Versuche es noch einmal.",
   "error.backend.browserProfileLimit": "Du kannst bis zu {limit} Browserprofile haben.",
+  "error.backend.browserProxyNotFound": "Dieser Proxy existiert nicht mehr.",
+  "error.backend.browserProxyAddressInvalid":
+    "Gib eine Proxy-Adresse ein, etwa socks5://host:1080 oder http://user:password@host:3128.",
+  "error.backend.browserProxyLimit": "Du kannst bis zu {limit} Proxys haben.",
+  "error.backend.browserProxyTaken": "Ein Proxy mit dieser Adresse existiert bereits.",
+  "error.backend.browserProxyChanged":
+    "Dieser Proxy wurde geändert, nachdem du ihn geöffnet hast. Sieh ihn dir erneut an und versuche es noch einmal.",
+  "error.backend.browserProxyUnreachable": "Der Proxy {name} antwortet nicht, daher wurde die Seite nicht geöffnet.",
+  "error.backend.browserProxySignInRefused":
+    "Der Proxy {name} hat die Anmeldung abgelehnt, daher wurde die Seite nicht geöffnet.",
+  "error.backend.browserSystemProxyFailed":
+    "Der Proxy in den Einstellungen des Computers, auf dem OpenBot läuft, antwortet nicht oder hat die Verbindung abgelehnt, daher wurde die Seite nicht geöffnet. Prüfe die Proxy-Einstellungen dieses Computers.",
+  "error.backend.browserSystemProxyOrSiteClosed":
+    "Die Website oder der Proxy in den Einstellungen des Computers, auf dem OpenBot läuft, hat die Verbindung ohne Antwort geschlossen, daher wurde die Seite nicht geöffnet. Wenn sich keine Website öffnet, prüfe die Proxy-Einstellungen dieses Computers.",
+  "error.backend.browserProfileProxyOrSiteClosed":
+    "Die Website oder der Proxy dieses Browserprofils hat die Verbindung ohne Antwort geschlossen, daher wurde die Seite nicht geöffnet. Wenn sich keine Website öffnet, prüfe den Proxy des Profils.",
+  "error.backend.browserProxyComputerUnreachable":
+    "Der Computer dieses Profils antwortet nicht, daher wurde die Seite nicht geöffnet.",
+  "error.backend.browserProxyComputerLocalAddress":
+    "Der Computer, den dieses Profil verwendet, öffnet nur öffentliche Websites. Adressen in einem lokalen Netzwerk öffnet er nicht, daher wurde die Seite nicht geöffnet.",
+  "error.backend.browserCertificateUntrusted":
+    "Das Sicherheitszertifikat dieser Website ist nicht vertrauenswürdig, daher wurde die Seite nicht geöffnet.",
   "error.backend.browserLowMemory":
     "Dieser Server hat wenig freien Arbeitsspeicher. Der Browser kann daher keinen weiteren Tab öffnen. Schließe einen Tab oder warte, bis andere Agenten fertig sind.",
+  "error.backend.browserNoMemory":
+    "Der Arbeitsspeicher dieses Servers ist fast voll. Der Browser kann daher jetzt keinen Tab öffnen. Warte, bis andere Agenten fertig sind, und versuche es dann erneut.",
   "error.backend.browserOpenFailed": "{url} konnte nicht geöffnet werden: {reason}",
   "error.backend.popupSecureInput":
     "Pop-ups sind während der sicheren Eingabe blockiert. Beende die sichere Eingabe oder brich sie ab und versuche es dann erneut auf der Seite.",
@@ -349,7 +508,7 @@ export const messages = {
     "Das Pop-up konnte nicht geladen werden. Versuche die Anmeldung erneut auf der ursprünglichen Seite.",
   "error.backend.browserTabNotFound": "Browser-Tab nicht gefunden.",
   "error.backend.authActive": "Die Authentifizierung ist bereits aktiv.",
-  "error.backend.authHttpsRequired": "Die sichere Authentifizierung erfordert HTTPS.",
+  "error.backend.authWebPageRequired": "Die sichere Authentifizierung erfordert HTTP/HTTPS.",
   "error.backend.authDigitsRange": "Authentifizierungscodes benötigen 4–12 Ziffern.",
   "error.backend.authExpired": "Die Authentifizierungsanfrage ist abgelaufen.",
   "error.backend.authDigitsRequired": "Gib die angeforderte Anzahl an Ziffern ein.",
@@ -361,6 +520,8 @@ export const messages = {
     "Der Server hat mit {status} geantwortet. Prüfe den API-Schlüssel oder andere Zugangsdaten.",
   "error.backend.mcpServerHttpUrl":
     "Der Server hat mit {status} geantwortet. Prüfe die URL. Der Link ist möglicherweise falsch, abgelaufen oder gelöscht.",
+  "error.backend.mcpServerBearerKey":
+    "Dieser Server nutzt einen API-Schlüssel, keine Anmeldung. Setze unter Header den Schlüssel auf Authorization und den Wert auf Bearer, ein Leerzeichen und deinen API-Schlüssel.",
   "error.backend.mcpSignInAppUrl": "Die Anmelde-App braucht eine gültige Server-URL.",
   "error.backend.mcpSignInAppClientId": "Gib die Client-ID der Anmelde-App ein.",
   "error.backend.mcpSignInAppIssuerChanged":
@@ -383,11 +544,14 @@ export const messages = {
   "error.backend.branchSourceBusy": "Stoppe die laufende Runde, bevor du diesen Chat abzweigst.",
   "error.backend.branchMessageNotFound": "Du kannst nur von einer fertigen Antwort des Agenten abzweigen.",
   "error.backend.branchRemoteUnsupported": "Abzweigungen sind nur für Agenten auf diesem Computer verfügbar.",
+  "error.backend.feedbackWithdrawRemoteUnsupported": "Bitte den Agenten, diesen Bericht zu entfernen.",
   "error.backend.threadMoveRefused":
     "Nur eine Nachricht, die du allein an diesen Agenten gesendet hast, kann in einem neuen Thread laufen.",
   "error.backend.taskTitleRequired": "Gib der Aufgabe einen kurzen Titel.",
   "error.backend.taskToolInvalid":
     "Gib der Aufgabe einen Titel mit höchstens 120 Zeichen und eine kurze Beschreibung, was zu tun ist.",
+  "error.backend.taskControlInvalid":
+    "Gib die taskId einer Aufgabe an, die du gestartet hast. Eine Nachricht braucht auch Text.",
   "error.backend.taskOwnChatOnly":
     "Starte eine Aufgabe nur aus deinem eigenen Chat. Ein Kanal, eine Messaging-Unterhaltung oder eine andere Aufgabe kann keine starten.",
   "error.backend.taskUnfinishedLimit":
@@ -395,6 +559,8 @@ export const messages = {
   "error.backend.taskOpenLimitReached":
     "Dieser Agent hat {count} offene Aufgaben. Schließe eine Aufgabe und starte oder öffne dann eine andere.",
   "error.backend.taskRemoteUnsupported": "Aufgaben sind nur für Agenten auf diesem Computer verfügbar.",
+  "error.backend.taskMessageFailed":
+    "OpenBot konnte die Nachricht nicht an die Aufgabe senden. Versuche es später erneut.",
   "error.backend.taskStartFailed":
     "OpenBot konnte die Aufgabe nicht starten. Erledige die Arbeit stattdessen in diesem Durchlauf.",
   "error.backend.uiBlockActionRunning": "OpenBot führt das noch aus. Warte, bis es fertig ist.",

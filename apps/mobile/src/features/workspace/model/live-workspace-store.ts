@@ -1,35 +1,40 @@
 import type { BrowserTakeoverRequest } from "@openbot/contracts/ipc";
-import type { MobileBrowserTabs } from "@/features/browser/model/browser-tabs";
+import type { BrowserPermissionRequestState } from "@openbot/contracts/team-protocol/browser-permissions-v1";
+import type { MobileBrowserTabs, MobileHttpSignIns } from "@/features/browser/model/browser-tabs";
 import type { MobileAgentActivities } from "./agent-activity";
+import type { MobileContextStates } from "./context-states";
 import type { PendingApproval } from "./pending-approvals";
+import type { MobileThreadWait } from "./thread-waits";
 import type { TurnStepLines } from "./turn-step-lines";
 
-/** Workspace state that host events change many times in one turn. */
 export interface LiveWorkspaceState {
   activityByServer: Record<string, MobileAgentActivities>;
-  /** The progress lines of the newest turns, by server. The host stores none. */
+  contextByServer: Record<string, MobileContextStates>;
+  threadWaitsByServer: Record<string, readonly MobileThreadWait[]>;
   turnLinesByServer: Record<string, TurnStepLines>;
   unreadAgentIds: string[];
-  /** The unread message count of each agent, from the host read state. `unreadAgentIds` decides which count. */
   unreadCounts: Record<string, number>;
+  firstUnreadMessageIds: Record<string, string | null>;
   browserRequests: Record<string, BrowserTakeoverRequest[]>;
-  /** The host's browser tabs, by server. Absent for a host that serves no live view. */
   browserTabs: Record<string, MobileBrowserTabs>;
+  browserPermissions: Record<string, readonly BrowserPermissionRequestState[]>;
+  browserHttpSignIns: Record<string, MobileHttpSignIns>;
   approvalRequests: Record<string, readonly PendingApproval[]>;
 }
 
-/**
- * Keeps this state out of the workspace context value. A context change re-renders every consumer,
- * so each consumer reads only the part it shows through a selector, and only that part re-renders.
- */
 export class LiveWorkspaceStore {
   #state: LiveWorkspaceState = {
     activityByServer: {},
+    contextByServer: {},
+    threadWaitsByServer: {},
     turnLinesByServer: {},
     unreadAgentIds: [],
     unreadCounts: {},
+    firstUnreadMessageIds: {},
     browserRequests: {},
     browserTabs: {},
+    browserPermissions: {},
+    browserHttpSignIns: {},
     approvalRequests: {},
   };
   readonly #listeners = new Set<() => void>();
@@ -43,7 +48,6 @@ export class LiveWorkspaceStore {
     };
   };
 
-  /** Applies `change` to one field. An unchanged result notifies no subscriber. */
   update<Key extends keyof LiveWorkspaceState>(
     key: Key,
     change: (current: LiveWorkspaceState[Key]) => LiveWorkspaceState[Key],

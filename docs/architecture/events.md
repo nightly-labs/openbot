@@ -42,7 +42,7 @@ runs do not change.
 ## Route lifecycle
 
 The backend makes the route ID (a UUID) when a routine first gets a webhook trigger. Main makes the
-secret, `whsec_` and 32 random bytes in base64url, and encrypts it with the host secret cipher
+secret, `whsec_` and 32 random bytes in base64 (the Standard Webhooks format), and encrypts it with the host secret cipher
 (Electron `safeStorage`). The save result returns the secret one time. `rotateSecret` replaces the
 stored ciphertext; the next request uses the new secret, so the old secret stops working at once.
 A host has at most `WEBHOOK_ROUTES_LIMIT` (64) routes. Main and the account service both check it.
@@ -115,6 +115,18 @@ event is kept only in the run instruction, between `--- external event input ---
 restart that resumes the run still has it. Runs use the existing agent and channel queues, provider
 limits, and approval controls. While a restart waits for idle agents (`holdRoutines`), the host
 answers 503 and writes no receipt, so the sender retries after the restart.
+
+### Analytics
+
+`HostEventsService` gives each request that it processed, and each test event, to its `onDelivery`
+option as a `WebhookDeliveryReport`: owner kind, format, result, ignored reason, status, body size,
+handle time and, for a request with a valid signature, the delivery age. The application services
+send it as `system_webhook_delivery`, at most 60 each minute (`HostAnalytics.handleWebhookDelivery`).
+The report has no route ID, delivery ID, secret, event type or body. A request that Signal refuses
+before the host does not reach it: Signal counts its answers by status and its waits for the host in
+`/metrics` (`openbot_remote_webhook_*`), and the capacity reporter sends the change of each 5 minutes
+in `signal_capacity`. `bun run test:webhook-analytics` checks the host side. See
+[ANALYTICS.md](../../ANALYTICS.md).
 
 ### Workflow webhook triggers
 
@@ -234,6 +246,17 @@ owner or admin changes a Slack node (`route-workflows.ts`).
   such as Composio and Svix, make their own secret. The host encrypts the value in the same column as
   a secret that it made, so no migration is necessary. The answer is empty. For a host without the
   capability, the editor and the chat card leave out the button.
+- Remote hosts with `webhook-agent-secret-v1` (`WEBHOOK_AGENT_SECRET_ROUTES`) also give a new secret
+  of an agent routine to that agent (`HostEventsService.giveSecretToAgent`). Under the write lock,
+  the host makes a secret, replaces the routine secret, and then saves the secret as an API key of
+  the agent only (`webhookSecretKeyName`: `WEBHOOK_SECRET_` and the routine ID in upper case with no
+  dashes, in `AgentApiKeys`). When the key write fails, the routine gets its old secret back. The
+  answer has only the key name; the secret does not leave the host. While the agent has that key,
+  `rotateSecret` and `setSecret` update it the same way. The `routineDeleted` hook of the agent
+  service removes it for each delete path, and a save that changes the trigger kind removes it too.
+  A channel routine has no single agent, so the host refuses it and the channel views
+  leave out the button. For a host without the capability, the editor, the chat card and mobile
+  leave out the button.
 - Signal accepts the `X-OpenBot-*` headers, or the Standard Webhooks `webhook-*` or `svix-*`
   headers. It relays a Standard Webhooks request only to an ingress socket whose hello lists
   `standard-webhooks` in `webhookFormats`; for an older host it answers `401`. The host checks the
@@ -246,8 +269,10 @@ owner or admin changes a Slack node (`route-workflows.ts`).
 - Workflow GitHub triggers and outputs: the `workflows` IPC group and the `workflows-github-v1` Team
   API capability (`WORKFLOWS_GITHUB_ROUTES`: catalog, options, history, run with last event). All
   routes need a host administrator. A client without the capability does not offer GitHub.
-- Workflow Discord, Telegram and Slack triggers and outputs: no route of their own. Only the desktop that
-  hosts the workflows offers them, and the `workflows-v1` graph save refuses a change from a member.
+- Workflow Discord, Telegram and Slack triggers and outputs: no route of their own, and the `workflows-v1`
+  graph save refuses a change from a member. The desktop that hosts the workflows offers all three. With
+  `workflows-chats-v1`, an owner or admin of a joined server also adds and changes Telegram and Slack
+  nodes, with the chats and channels of the `routine-results-v1` options.
 - Desktop and web use the shared routine editor components in
   `packages/ui/src/features/conversation`. Mobile uses native components in
   `apps/mobile/src/features/agents/components`.
@@ -277,5 +302,5 @@ Controls:
 ## Rollout
 
 Deploy the account service and Signal before the desktop release. Keep the Slack and Discord ingress
-contracts unchanged. The migration must preserve released schemas, update the latest schema, and
-pass schema parity and rollback checks.
+contracts unchanged. The migration must preserve released schemas and pass schema parity and
+rollback checks.

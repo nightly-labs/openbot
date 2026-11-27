@@ -1,15 +1,28 @@
 import { TEAM_API_ROUTES } from "@openbot/contracts/team-api-routes";
 import {
+  BROWSER_HTTP_SIGN_IN_CAPABILITY,
+  BROWSER_HTTP_SIGN_IN_ROUTES,
+  decodeBrowserHttpSignInSnapshot,
+} from "@openbot/contracts/team-protocol/browser-http-sign-in-v1";
+import {
+  BROWSER_PERMISSIONS_CAPABILITY,
+  BROWSER_PERMISSIONS_ROUTES,
+  decodeBrowserPermissionsSnapshot,
+} from "@openbot/contracts/team-protocol/browser-permissions-v1";
+import {
   TEAM_BROWSER_VIEW_CLIPBOARD_CAPABILITY,
   TEAM_BROWSER_VIEW_CONTEXT_MENU_CAPABILITY,
   TEAM_BROWSER_VIEW_CURSOR_CAPABILITY,
+  TEAM_BROWSER_VIEW_DIALOG_CAPABILITY,
   TEAM_BROWSER_VIEW_FRAME_POINT_CAPABILITY,
+  TEAM_BROWSER_VIEW_PAGE_COPY_CAPABILITY,
   TEAM_BROWSER_VIEW_VIEWPORT_CAPABILITY,
 } from "@openbot/contracts/team-protocol/browser-view-v1";
 import { TEAM_BROWSER_NAVIGATION_CAPABILITY } from "@openbot/contracts/team-protocol/current";
 import {
   decodeMobileBrowserTab,
   decodeMobileBrowserTabs,
+  mobileHttpSignIns,
   withBrowserTab,
   withoutBrowserTab,
 } from "@/features/browser/model/browser-tabs";
@@ -21,7 +34,6 @@ import { type ServerCapabilities, supportsBrowserView } from "@/features/workspa
 import { ignoreResponse } from "@/features/workspace/model/workspace-records";
 import type { MobileWorkspaceContextValue } from "@/features/workspace/model/workspace-types";
 
-/** The live view and the tab controls of a host's browser, through the released `browser-control` routes. */
 export function createBrowserActions({
   request,
   liveState,
@@ -30,10 +42,12 @@ export function createBrowserActions({
 }: {
   request: WorkspaceRequest;
   liveState: LiveWorkspaceStore;
-  /** The connected peer of a server, or undefined while it is not connected. */
   client: (serverId: string) => RemoteTeamTransportRef | undefined;
   capabilities: ServerCapabilities;
-}): Pick<MobileWorkspaceContextValue, "browserViewSupport" | "openBrowserView" | "controlBrowserTab"> {
+}): Pick<
+  MobileWorkspaceContextValue,
+  "browserViewSupport" | "openBrowserView" | "controlBrowserTab" | "answerBrowserPermission" | "answerBrowserHttpSignIn"
+> {
   return {
     browserViewSupport: (serverId) => {
       const advertised = capabilities.get(serverId) ?? [];
@@ -44,7 +58,22 @@ export function createBrowserActions({
         contextMenu: view && advertised.includes(TEAM_BROWSER_VIEW_CONTEXT_MENU_CAPABILITY),
         viewport: view && advertised.includes(TEAM_BROWSER_VIEW_VIEWPORT_CAPABILITY),
         navigation: view && advertised.includes(TEAM_BROWSER_NAVIGATION_CAPABILITY),
+        permissions: view && advertised.includes(BROWSER_PERMISSIONS_CAPABILITY),
+        httpSignIn: view && advertised.includes(BROWSER_HTTP_SIGN_IN_CAPABILITY),
       };
+    },
+    answerBrowserHttpSignIn: async (serverId, input) => {
+      const snapshot = await request(
+        "POST",
+        BROWSER_HTTP_SIGN_IN_ROUTES.answer,
+        decodeBrowserHttpSignInSnapshot,
+        { ...input },
+        serverId,
+      );
+      liveState.update("browserHttpSignIns", (current) => ({
+        ...current,
+        [serverId]: mobileHttpSignIns(snapshot.tabs),
+      }));
     },
     openBrowserView: (serverId, tabId, listener) => {
       const peer = client(serverId);
@@ -58,13 +87,25 @@ export function createBrowserActions({
           clipboard: advertised.includes(TEAM_BROWSER_VIEW_CLIPBOARD_CAPABILITY),
           contextMenu: advertised.includes(TEAM_BROWSER_VIEW_CONTEXT_MENU_CAPABILITY),
           viewport: advertised.includes(TEAM_BROWSER_VIEW_VIEWPORT_CAPABILITY) ? BROWSER_VIEW_PAGE_SIZE : null,
+          pageCopy: advertised.includes(TEAM_BROWSER_VIEW_PAGE_COPY_CAPABILITY),
+          dialog: advertised.includes(TEAM_BROWSER_VIEW_DIALOG_CAPABILITY),
         },
         listener,
       );
     },
+    answerBrowserPermission: async (serverId, answer) => {
+      const { location, ...decision } = answer;
+      const body = location ? { ...decision, location: { ...location } } : decision;
+      const { requests } = await request(
+        "POST",
+        BROWSER_PERMISSIONS_ROUTES.answer,
+        decodeBrowserPermissionsSnapshot,
+        body,
+        serverId,
+      );
+      liveState.update("browserPermissions", (current) => ({ ...current, [serverId]: requests }));
+    },
     controlBrowserTab: async (serverId, action) => {
-      // The host also sends `browser-changed` for an open or a close. The phone does not wait for
-      // it: the tab list changes at once, and is read again in case the event does not arrive.
       const readTabs = () =>
         void request("GET", TEAM_API_ROUTES.browser.tabs, decodeMobileBrowserTabs, undefined, serverId)
           .then((tabs) =>
@@ -75,8 +116,6 @@ export function createBrowserActions({
           )
           .catch(() => undefined);
       if (action.type === "open") {
-        // The desktop opens a new tab for the agent in the same way. `focus` stays false: the
-        // phone does not move the host's own browser to the tab.
         const opened = await request(
           "POST",
           TEAM_API_ROUTES.browser.open,
@@ -95,7 +134,6 @@ export function createBrowserActions({
         const body = { tabId: action.tabId, direction: action.direction };
         await request("POST", TEAM_API_ROUTES.browser.navigate, ignoreResponse, body, serverId);
       } else if (action.type === "load") {
-        // Behind `browser-navigation`: the screen opens a new tab on a host without it.
         const body = { tabId: action.tabId, url: action.url };
         await request("POST", TEAM_API_ROUTES.browser.load, ignoreResponse, body, serverId);
       } else if (action.type === "reload") {

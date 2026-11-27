@@ -57,22 +57,53 @@ export const messages = {
   "error.team.tooManySignInAttempts": "Troppi tentativi di accesso. Riprova più tardi.",
   "error.team.clientUpdateRequired": "Aggiorna questo client OpenBot prima di connetterti a questo host.",
   "error.team.hostUpdateRequired": "Aggiorna OpenBot sull'host prima di connetterti.",
+  "error.team.serverSafeMode": "Questo server è in modalità provvisoria perché OpenBot non si avvia.",
+  "error.team.serverSafeModeNewerDatabase":
+    "OpenBot {version} su questo server non può aprire i suoi dati perché una versione più recente di OpenBot li ha salvati. Una versione più recente di OpenBot sul server risolve il problema.",
+  "error.team.serverSafeModeStartFailed":
+    "OpenBot {version} su questo server si è fermato dopo molti avvii non riusciti. Una versione più recente di OpenBot sul server risolve il problema.",
   "error.team.sidebarLayoutUnavailable": "Il layout della barra laterale non è disponibile.",
   "error.team.providersUnsupported": "Le impostazioni dei provider non sono supportate da questa connessione.",
   "error.team.providerNotManaged": "OpenBot non gestisce la CLI di questo provider.",
   "error.team.channelsUnsupported": "Le chat dei canali non sono supportate da questa connessione.",
+  "error.team.channelContextUnsupported":
+    "Questa connessione non supporta una nuova conversazione né la compattazione in un canale.",
   "error.team.channelPictureUnsupported": "Le immagini dei canali non sono supportate da questa connessione.",
   "error.team.channelDeleteUnsupported": "L'eliminazione dei canali non è supportata da questa connessione.",
+  "error.team.historyDeleteUnsupported": "L'eliminazione della cronologia non è supportata da questa connessione.",
   "error.team.channelTaskCancelUnsupported":
     "L'annullamento delle attività dei canali non è supportato da questa connessione.",
   "error.team.membersCannotDeleteChannels": "I membri non possono eliminare i canali.",
+  "error.team.membersCannotDeleteChannelHistory": "I membri non possono eliminare la cronologia del canale.",
   "error.team.membersCannotArchiveChannels": "I membri non possono archiviare i canali.",
   "error.team.membersCannotRestoreChannels": "I membri non possono ripristinare i canali.",
   "error.team.sharedDataUnsupported": "I dati condivisi non sono supportati da questa connessione.",
   "error.team.agentInstallUnsupported": "L'aggiunta di agenti non è supportata da questa connessione.",
   "error.team.agentHideUnsupported": "Nascondere gli agenti non è supportato da questa connessione.",
   "error.team.agentColorsUnsupported": "I colori degli agenti non sono supportati da questa connessione.",
+  "error.team.chatColorsUnsupported": "I colori della chat non sono supportati da questa connessione.",
+  "error.team.routineRunPlaceUnsupported": "Questa connessione non può cambiare dove viene eseguita una routine.",
+  "error.team.routinePauseReasonsUnsupported": "Questa connessione non può mostrare perché una routine è in pausa.",
+  "error.team.activeQueuesUnsupported": "Questa connessione non può mostrare le code di tutti gli agenti.",
+  "error.team.routinesOnceUnsupported": "Questa connessione non può salvare routine che vengono eseguite una volta.",
+  "error.team.routineRunCommandUnsupported":
+    "Questa connessione non può fornire il comando di esecuzione di una routine.",
+  "error.team.threadQueueUnsupported": "Questa connessione non può mostrare la coda di un thread secondario.",
+  "error.team.threadRequestsUnsupported":
+    "Questa connessione non può mostrare le richieste di un thread secondario ad altri agenti.",
+  "error.team.hostTurnLimitsUnsupported":
+    "Questa connessione non può mostrare né modificare i limiti dei thread del server.",
+  "error.team.usageLimitUnsupported":
+    "Questa connessione non può mostrare né modificare i limiti di utilizzo degli agenti.",
+  "error.team.hermesImportUnsupported": "Questa connessione non può importare profili Hermes dal server.",
+  "error.team.providerDetectionUnsupported":
+    "Questa connessione non può trovare i server di modelli e gli agenti del server.",
+  "error.team.providerModelSourceUnsupported":
+    "Questa connessione non può mostrare da dove arrivano i modelli di un provider.",
+  "error.team.routineFlowStopUnsupported": "Questa connessione non può fermare l’esecuzione di una routine.",
   "error.team.sidebarFoldersUnsupported": "Le cartelle nelle cartelle non sono supportate da questa connessione.",
+  "error.team.libraryFoldersUnsupported": "Le cartelle della Libreria non sono supportate da questa connessione.",
+  "error.team.workflowFoldersUnsupported": "Questa connessione non supporta le cartelle di workflow.",
   "error.team.agentNotificationLevelsUnsupported":
     "Questo server non può salvare il tuo livello di notifiche per ogni agente. Aggiorna OpenBot sul computer che lo esegue.",
   "error.team.sidebarPinsUnsupported":
@@ -87,7 +118,10 @@ export const messages = {
   "error.team.workspaceDirectoryUnsupported":
     "La visualizzazione delle cartelle non è supportata da questa connessione.",
   "error.team.conversationFileSearchUnsupported": "Questa connessione non supporta la ricerca nei file.",
+  "error.team.threadMessageSearchUnsupported": "Questa connessione non supporta la ricerca nei thread secondari.",
   "error.team.sideQuestionUnsupported": "Questa connessione non supporta le domande a parte.",
+  "error.team.liveVoiceUnsupported":
+    "Questo server non supporta la voce dal vivo di Codex. Aggiorna OpenBot sul computer che lo esegue.",
   "error.team.routineFlowsUnsupported":
     "Questo server non supporta i flussi di routine. Aggiorna OpenBot sul computer che lo esegue.",
   "error.team.routineCanvasTooLarge":
@@ -104,14 +138,32 @@ export const messages = {
   "error.team.hostIdentityUnsupported": "La modifica dell'identità del server non è supportata da questa connessione.",
   "error.team.hostUpdateUnsupported": "Gli aggiornamenti dell'host non sono supportati da questa connessione.",
   "error.team.hostTimezoneUnsupported": "Questa connessione non supporta il fuso orario del server.",
+  "error.team.hostSignalHomeUnsupported": "Questa connessione non supporta la scelta del server Signal.",
+  "error.team.hostVoiceModelUnsupported":
+    "Questa connessione non supporta il modello di riconoscimento vocale del server.",
+  "error.team.hostRestartUnsupported": "Questa connessione non supporta il riavvio del server.",
+  "error.team.ownerTransferUnsupported": "Questo server non supporta il trasferimento della proprietà.",
   "error.team.hostKeyRotationUnsupported": "Questa connessione non supporta il cambio della chiave del server.",
   "error.team.localServersUnsupported": "Questa connessione non supporta i server su questo computer.",
   "error.team.routineResultsUnsupported": "Questa connessione non supporta le destinazioni delle routine.",
   "error.team.agentMemoryLimitUnsupported": "Questa connessione non supporta il limite di memorie degli agenti.",
   "error.team.agentFoldersUnsupported": "Questa connessione non supporta le cartelle degli agenti.",
+  "error.team.channelFoldersUnsupported": "Questa connessione non supporta le cartelle dei canali.",
   "error.team.folderUnavailable": "Questa cartella non è disponibile sul computer host.",
   "error.team.memoryReviewUnsupported": "Questa connessione non supporta la revisione delle memorie.",
+  "error.team.skillLearningUnsupported": "Questa connessione non supporta l’apprendimento delle skill.",
+  "error.team.browsingMemoryUnsupported": "Questa connessione non supporta l'apprendimento dalla navigazione.",
   "error.team.promptCacheTtlUnsupported": "Questa connessione non supporta la durata della cache dei prompt.",
+  "error.team.claudeUserSetupUnsupported":
+    "Questa connessione non supporta l’interruttore della configurazione di Claude Code.",
+  "error.team.claudeCompactWindowUnsupported":
+    "Questa connessione non supporta la dimensione di compattazione di Claude.",
+  "error.team.cacheExpiryCompactionUnsupported":
+    "Questa connessione non supporta la compattazione prima della scadenza della cache.",
+  "error.team.mediaApprovalCreditsUnsupported":
+    "Questa connessione non supporta la soglia di approvazione dei crediti.",
+  "error.team.mediaApprovalCreditsInvalid": "Inserisci un numero intero di crediti da 0 a 100.000.",
+  "error.team.providerEnvironmentUnsupported": "Questa connessione non supporta le variabili del provider.",
   "error.team.modelVisibilityUnsupported": "Questa connessione non supporta l'elenco dei modelli.",
   "error.team.providerDefaultUnsupported": "Questa connessione non supporta il provider predefinito.",
   "error.team.attachmentNameRequired": "Serve un nome di allegato sicuro.",
@@ -121,6 +173,10 @@ export const messages = {
   "error.team.browserViewUnavailable": "La vista in diretta del browser non è disponibile.",
   "error.team.browserSessionNotFound": "Sessione della vista del browser non trovata.",
   "error.team.mcpUnsupported": "I server MCP non sono supportati da questa connessione.",
+  "error.team.mcpServerListNeedsUpdate":
+    "Aggiorna OpenBot su questo dispositivo per usare più di {limit} server MCP su questo server.",
+  "error.team.providerAccountListNeedsUpdate":
+    "Aggiorna OpenBot su questo dispositivo per usare più di {limit} account di un provider su questo server.",
   "error.team.storageUnsupported": "L'archiviazione non è supportata da questa connessione.",
   "error.team.machineResourcesUnsupported": "L'uso della macchina non è supportato da questa connessione.",
   "error.team.machineAlertMemberInvalid":
@@ -146,6 +202,9 @@ export const messages = {
   "error.team.secureAuthUnsupported": "L'autenticazione sicura non è supportata da questo client.",
   "error.team.agentSettingsUnsupported": "Le impostazioni dell'agente non sono supportate da questa connessione.",
   "error.team.adminRequired": "Serve l'accesso come amministratore.",
+  "error.team.mcpAccessStale": "Qualcuno ha modificato l’accesso a questo server MCP. Ripeti la modifica.",
+  "error.team.mcpServerNotYours":
+    "Solo la persona che ha aggiunto questo server MCP, o un amministratore, può modificarlo.",
   "error.team.ownerRequired": "Solo il proprietario di questo server può farlo.",
   "error.team.requestTooLarge": "Il corpo della richiesta è troppo grande.",
   "error.team.signInRelayUnsupported": "Questo server non può inoltrare gli accessi. Aggiorna OpenBot sull'host.",
@@ -158,4 +217,20 @@ export const messages = {
   "error.team.signInRelayUsed": "Questo accesso è già stato inviato.",
   "error.team.signInRelayMismatch": "Questo indirizzo non appartiene a questo accesso.",
   "error.team.signInRelayLinkUnknown": "Nessun agente su questo server ha mostrato questo link di accesso.",
+  "error.team.hostPersonalityUnsupported": "Questa connessione non supporta la personalità del server.",
+  "error.team.agentWaitsUnsupported": "Questa connessione non supporta le attese aperte.",
+  "error.team.pendingApprovalUnsupported": "Questa connessione non permette di leggere un'approvazione completa.",
+  "error.team.pendingPromptsUnsupported": "Questa connessione non permette di leggere le domande aperte.",
+  "error.team.phoneFeedbackUnsupported":
+    "Questa connessione non permette di inviare una segnalazione dall'app del telefono.",
+  "error.team.messagePinsUnsupported": "Questa connessione non supporta i messaggi fissati.",
+  "error.team.queuedMessageThreadUnsupported":
+    "Questa connessione non supporta l’esecuzione di un messaggio in coda come nuovo thread.",
+  "error.team.backgroundProcessesUnsupported": "Questa connessione non supporta i processi in background.",
+  "error.team.providerUseUnsupported":
+    "Questa connessione non supporta l’attivazione e la disattivazione dei provider.",
+  "error.team.providerUseInvalid": "Questo provider non ha un interruttore di attivazione.",
+  "error.team.mediaApprovalChoiceUnsupported":
+    "Questo server non supporta la scelta del modello nelle approvazioni dei contenuti multimediali. Aggiorna OpenBot sul server.",
+  "error.team.mediaApprovalChoiceInvalid": "La scelta dell'approvazione multimediale non è valida.",
 } as const satisfies PartialTranslation<typeof source>;

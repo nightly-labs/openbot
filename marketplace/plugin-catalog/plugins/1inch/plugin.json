@@ -1,0 +1,28 @@
+{
+  "slug": "1inch",
+  "name": "1inch",
+  "tagline": "API docs and SDK examples",
+  "description": "1inch lets agents search the 1inch Business API documentation and read SDK code examples for swaps, limit orders, and other integrations. Documentation search and SDK examples need no account and no key.",
+  "category": "coding",
+  "creatorName": "1inch",
+  "iconUrl": "https://business.1inch.com/favicon/apple-touch-icon.png",
+  "version": "1.0.0",
+  "prompts": [
+    { "id": "prompt-swap-api", "text": "How do I get a swap quote with the 1inch API? Show the request parameters." },
+    { "id": "prompt-sdk-example", "text": "Show the SDK example for creating a limit order." },
+    { "id": "prompt-chains", "text": "Which chains does the 1inch Swap API support?" }
+  ],
+  "apps": [
+    {
+      "id": "app-1inch-mcp",
+      "name": "1inch",
+      "description": "1inch documentation search and SDK examples, over the 1inch MCP server with no sign-in.",
+      "iconUrl": "https://business.1inch.com/favicon/apple-touch-icon.png",
+      "server": { "name": "1inch", "transport": "http", "url": "https://api.1inch.com/mcp/protocol" }
+    }
+  ],
+  "skills": [],
+  "websiteUrl": "https://business.1inch.com",
+  "privacyPolicyUrl": "https://business.1inch.com/portal/privacy-policy",
+  "termsUrl": "https://business.1inch.com/portal/terms-of-service"
+}

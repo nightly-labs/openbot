@@ -10,13 +10,14 @@ export const referenceChipClasses = {
   name: "reference-chip-name",
 };
 
-/** What a reader hears before the name, so a chip is not just a word in the sentence. */
 const CHIP_KIND_LABELS = {
   agent: "chat.reference.kind.agent",
   mcp: "chat.reference.kind.mcp",
   plugin: "chat.reference.kind.plugin",
   quote: "chat.reference.kind.quote",
   skill: "chat.reference.kind.skill",
+  tab: "chat.reference.kind.tab",
+  thread: "chat.reference.kind.thread",
 } as const satisfies Record<ReferenceChipKind, AppTextKey>;
 
 const CHIP_OPEN_LABELS = {
@@ -25,11 +26,12 @@ const CHIP_OPEN_LABELS = {
   plugin: "chat.reference.open.plugin",
   quote: "chat.reference.open.quote",
   skill: "chat.reference.open.skill",
+  tab: "chat.reference.open.tab",
+  thread: "chat.reference.open.thread",
 } as const satisfies Record<ReferenceChipKind, string>;
 
-export type ReferenceChipKind = "agent" | "mcp" | "plugin" | "quote" | "skill";
+export type ReferenceChipKind = "agent" | "mcp" | "plugin" | "quote" | "skill" | "tab" | "thread";
 
-/** Shared appearance for rendered references and contenteditable tokens. */
 export function ReferenceChip(props: {
   name: string;
   icon: JSX.Element;
@@ -37,7 +39,6 @@ export function ReferenceChip(props: {
   class?: string;
   style?: JSX.CSSProperties;
   onClick?: ((event: MouseEvent) => void) | undefined;
-  /** Sound cue for the click. The default is `open`. */
   "data-cuelume-tap"?: string;
 }) {
   const { t } = useText();
@@ -46,7 +47,6 @@ export function ReferenceChip(props: {
       <span class={referenceChipClasses.icon} aria-hidden="true">
         {props.icon}
       </span>
-      {/* The name is the user's text, so it takes its direction from its own letters. */}
       <span class={referenceChipClasses.name} dir="auto">
         {props.name}
       </span>

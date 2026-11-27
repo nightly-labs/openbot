@@ -1,13 +1,14 @@
 import { defineMessages } from "../../../message";
 
 export const messages = defineMessages("error.auth", {
-  // Errors from the OpenBot account service.
   "error.auth.serviceUnavailable":
     "OpenBot could not reach the account service. Check that the API is running, then try again.",
+  "error.auth.sessionTimeout": "OpenBot did not answer in time. Check your internet connection, then try again.",
   "error.auth.networkBlocked":
     "A firewall or proxy on this network blocked OpenBot from reaching {host}. Ask your network administrator to allow {host}, then try again.",
   "error.auth.signInFirst": "Sign in to OpenBot first.",
   "error.auth.signInRequired": "Sign in is required.",
+  "error.auth.chatColorUnavailable": "The account service does not support chat colors yet. Try again later.",
   "error.auth.accountChangedDuringRegister": "The signed-in account changed while this server was being registered.",
   "error.auth.hostCredentialUnavailable": "The remote host credential is unavailable. Register the host again.",
   "error.auth.codeNotVerified": "The sign-in code could not be verified.",
@@ -17,6 +18,7 @@ export const messages = defineMessages("error.auth", {
   "error.auth.serviceTimeout": "The account service did not answer in time. Try again.",
   "error.auth.serviceStatus": "The account service returned an error ({status}). Try again later.",
   "error.auth.invalidHostedServer": "The account service returned an invalid hosted server.",
+  "error.auth.invalidServerClaim": "The account service returned an invalid server claim.",
   "error.auth.codeNotSent": "OpenBot could not send the sign-in code.",
   "error.auth.deliveryTimeout":
     "OpenBot could not confirm delivery in time. The code may still arrive; check delivery before sending again.",
@@ -24,7 +26,6 @@ export const messages = defineMessages("error.auth", {
     "The connection ended before OpenBot confirmed delivery. Check delivery to avoid sending another code.",
   "error.auth.deliveryUnknown":
     "OpenBot could not confirm whether the sign-in code was sent. Check delivery before sending again.",
-  // Company sign-in, which the company's provider does in the browser.
   "error.auth.companySignInFailed": "The company sign-in did not finish. Try again.",
   "error.auth.companySignInCancelled": "The company sign-in was cancelled.",
   "error.auth.companySignInTimeout": "The company sign-in took too long. Open the sign-in page again.",

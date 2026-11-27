@@ -1,7 +1,3 @@
-/* Server settings > Import. The review and result use the Storage page's summary, section and
-   row styles (features/files/files.css), so the two tabs read as one set. The guide is a single
-   sequence: three connected steps, and the file button as the one strong control. */
-
 .agent-import-guide {
   display: flex;
   max-width: 560px;
@@ -30,7 +26,6 @@
   line-height: 1.5;
 }
 
-/* The steps are a real sequence, so they keep their numbers. A rule between the markers joins them. */
 .agent-import-steps {
   display: flex;
   flex-direction: column;
@@ -98,7 +93,6 @@
   line-height: 1.45;
 }
 
-/* Two ways into Grok Bot share step 1: the ready agent from its link, or the skill added by hand. */
 .agent-import-setup {
   display: flex;
   width: 100%;
@@ -111,8 +105,6 @@
   width: 100%;
 }
 
-/* The folder panel is the tallest and has no steps after it, so when it is hidden it takes no space.
-   The panels that do have steps after them share one height, so steps 2 and 3 never move. */
 .agent-import-setup-folder:not([data-selected]) {
   display: none;
 }
@@ -124,8 +116,6 @@
   gap: var(--openbot-space-2);
 }
 
-/* One card per way in, the same shape in both panels, so step 2 stays where it is: the ready agent
-   with its link, or the skill file with both ways to take it. */
 .agent-import-card {
   display: flex;
   width: 100%;
@@ -167,7 +157,6 @@
   white-space: nowrap;
 }
 
-/* The exact words to send, shown as the text itself rather than described. */
 .agent-import-prompt {
   display: flex;
   width: 100%;
@@ -228,7 +217,7 @@
   height: var(--openbot-icon-lg);
   flex: 0 0 auto;
   color: var(--openbot-text-secondary);
-  stroke-width: var(--openbot-icon-stroke);
+  stroke-width: var(--openbot-icon-stroke-lg);
 }
 
 .agent-import-picker-copy {
@@ -248,8 +237,6 @@
   color: var(--openbot-text-muted);
   font-size: var(--openbot-text-sm);
 }
-
-/* Review and result rows. */
 
 .agent-import-row {
   display: flex;
@@ -297,7 +284,7 @@ label.agent-import-row:has(input:disabled) {
   height: 32px;
   flex: 0 0 auto;
   color: var(--openbot-success-text);
-  stroke-width: var(--openbot-icon-stroke);
+  stroke-width: var(--openbot-icon-stroke-lg);
 }
 
 .agent-import-skipped-icon {
@@ -311,7 +298,6 @@ label.agent-import-row:has(input:disabled) {
   gap: var(--openbot-space-2);
 }
 
-/* The name and, for a name already on this server, the hint that the import adds another one. */
 .agent-import-row-title {
   display: flex;
   min-width: 0;
@@ -337,7 +323,6 @@ label.agent-import-row:has(input:disabled) {
   stroke-width: var(--openbot-icon-stroke);
 }
 
-/* A channel row shows up to three of its members, overlapped, where an agent row has one avatar. */
 .agent-import-members {
   display: flex;
   flex: none;
@@ -364,7 +349,6 @@ label.agent-import-row:has(input:disabled) {
   stroke-width: var(--openbot-icon-stroke);
 }
 
-/* The first screen: one large button for each place the agents can be now. */
 .agent-import-sources {
   display: flex;
   flex-direction: column;
@@ -395,12 +379,10 @@ label.agent-import-row:has(input:disabled) {
   height: var(--openbot-icon-sm);
 }
 
-/* Right to left, the arrow points the other way. */
 .agent-import-back.ui-button > svg[class~="lucide-arrow-left"]:dir(rtl) {
   transform: scaleX(-1);
 }
 
-/* The Hermes app icon: a light tile on a dark theme and a dark one on a light theme, as Hermes ships both. */
 .hermes-logo-tile {
   fill: var(--openbot-text-primary);
 }
@@ -421,7 +403,6 @@ label.agent-import-row:has(input:disabled) {
   flex: 0 0 auto;
 }
 
-/* A Hermes profile: its head row, then every item it holds. */
 .agent-import-profile {
   gap: var(--openbot-space-2);
 }
@@ -474,7 +455,6 @@ label.agent-import-row:has(input:disabled) {
   cursor: pointer;
 }
 
-/* A command is the exact text to type, so it reads as code and wraps rather than hides its end. */
 .agent-import-command {
   font-family: var(--openbot-font-mono);
   font-size: var(--openbot-text-sm);

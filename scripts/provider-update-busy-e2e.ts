@@ -1,10 +1,3 @@
-// Updates a managed provider CLI end to end on the real driver and `ProviderRuntime` while a turn
-// runs on the provider (#2473), with a fake Gemini ACP server for the installed and the new version.
-// Checks that the update waits for the turn instead of failing, holds new turns meanwhile, keeps an
-// idle restart of the app away while it waits, installs when the turn ends without a restart of the
-// app, never runs two installs at once when it is asked for again while it waits, and that a cancel
-// ends the wait with nothing installed.
-// `bun scripts/provider-update-busy-e2e.ts`. Writes .openbot-build/provider-update-busy-e2e/report.json.
 import assert from "node:assert/strict";
 import { chmod, mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
@@ -13,7 +6,6 @@ import { Effect, Result } from "effect";
 import { ConversationRuntime } from "../src/backend/agent/conversation-runtime";
 import { ProviderRuntime } from "../src/backend/agent/provider-runtime";
 import { AgentStore } from "../src/backend/agent-store";
-import { ANTIGRAVITY_MANIFEST } from "../src/backend/cli";
 import { runCauseEffect } from "../src/backend/effect-boundary";
 import { OpenBotDatabase } from "../src/backend/openbot-database";
 import { BUILT_IN_PROVIDER_DRIVERS, NO_PROVIDER_CREDENTIALS } from "../src/backend/provider-drivers";
@@ -21,13 +13,16 @@ import { checkProviderAccountReload } from "./provider-account-reload-e2e";
 
 const OUT = resolve(import.meta.dirname, "../.openbot-build/provider-update-busy-e2e");
 const WAIT_MS = 15_000;
-const INSTALLED = "1.2.1";
-const NEWER = "1.2.2";
+const INSTALLED = "1.5.3";
+const NEWER = "1.5.4";
 
-// An ACP server with one model. It writes its pid to `FAKE_AGY_LOG` when it starts.
-const FAKE_AGY = `#!/usr/bin/env node
+const fakeAgy = (version: string) => `#!/usr/bin/env node
 const fs = require("node:fs");
 const NL = String.fromCharCode(10);
+if (process.argv[2] === "--version") {
+  process.stdout.write("${version}" + NL);
+  process.exit(0);
+}
 fs.appendFileSync(process.env.FAKE_AGY_LOG, process.pid + NL);
 const write = (message) => process.stdout.write(JSON.stringify({ jsonrpc: "2.0", ...message }) + NL);
 function handle(message) {
@@ -67,14 +62,30 @@ interface Report {
   turnEnded?: { installs: number; version: string | null | undefined; holdsNewTurns: boolean; resumed: number };
   askedAgain?: { installs: number; maxConcurrentInstalls: number; holdsNewTurns: boolean };
   cancelled?: { failure: string | undefined; installs: number; holdsNewTurns: boolean; resumed: number };
+  settingsChanged?: {
+    restartPending: boolean;
+    holdsNewTurns: boolean;
+    holdsAfterRestartAsked: boolean;
+    restartedWhenIdle: boolean;
+    holdsAfterRestart: boolean;
+  };
+  heldWork?: {
+    updateWaitsForOpenSession: boolean;
+    updateInstallsWhileHeld: number;
+    updateHoldsNewTurns: boolean;
+    updateInstallsAfterWork: number;
+    restartPendingWhileHeld: boolean;
+    restartHoldsNewTurns: boolean;
+    restartedAfterWork: boolean;
+  };
 }
 
 const root = await mkdtemp(join(tmpdir(), "openbot-provider-update-busy-e2e-"));
 const log = join(root, "agy.log");
 const report: Report = { passed: false };
 process.env.FAKE_AGY_LOG = log;
+process.env.GEMINI_HOME = join(root, "gemini");
 
-/** Waits for a condition that another fiber or process changes, and fails after `WAIT_MS`. */
 async function waitFor(label: string, check: () => boolean): Promise<void> {
   const deadline = Date.now() + WAIT_MS;
   while (!check()) {
@@ -84,10 +95,9 @@ async function waitFor(label: string, check: () => boolean): Promise<void> {
 }
 
 async function installVersion(version: string): Promise<string> {
-  const executable = join(root, "agy", version, "bin", "agy_acp_server");
+  const executable = join(root, "agy", version, "bin", "antigravity");
   await mkdir(join(root, "agy", version, "bin"), { recursive: true });
-  await writeFile(join(root, "agy", version, ANTIGRAVITY_MANIFEST), JSON.stringify({ version }));
-  await writeFile(executable, FAKE_AGY);
+  await writeFile(executable, fakeAgy(version));
   await chmod(executable, 0o755);
   return executable;
 }
@@ -99,7 +109,6 @@ let running = 0;
 let maxConcurrentInstalls = 0;
 let release: (() => void) | null = null;
 
-/** The install that main hands over: it counts, and the test can hold it open. */
 function install(executable: string, hold = false) {
   return () =>
     Effect.promise(async () => {
@@ -155,8 +164,6 @@ try {
   assert.equal(row()?.state, "available");
   assert.equal(row()?.version, INSTALLED);
 
-  // 1. An update asked for while a turn runs waits for it. It does not fail, installs nothing yet,
-  // and new turns of the provider wait for it.
   busy = true;
   let waited = false;
   const update = runCauseEffect(
@@ -175,11 +182,10 @@ try {
     state: row()?.state,
   };
   assert.equal(installs, 0, "nothing is installed while the turn runs");
-  assert.ok(report.queued.holdsNewTurns, "new turns wait for the update");
+  assert.equal(report.queued.holdsNewTurns, false, "other agents keep starting turns while the update waits");
   assert.ok(report.queued.countsAsActiveWork, "an idle restart of the app does not cut the wait");
   assert.equal(row()?.state, "available", "the provider keeps its row while the update waits");
 
-  // 2. The turn ends: the update installs, the provider runs the new version, and turns go on.
   const resumedBefore = resumed;
   busy = false;
   const updated = await update;
@@ -196,8 +202,6 @@ try {
   assert.equal(report.turnEnded.holdsNewTurns, false);
   assert.ok(report.turnEnded.resumed >= 1, "held turns are told to go on");
 
-  // 3. Asked for again while it waits, as a second press of Update or Retry would: the two never
-  // install at the same time.
   installs = 0;
   busy = true;
   let waitedFirst = false;
@@ -229,7 +233,6 @@ try {
   assert.equal(report.askedAgain.holdsNewTurns, false);
   assert.equal(row()?.state, "available");
 
-  // 4. A cancel while it waits ends the update with an abort and installs nothing. Turns go on.
   installs = 0;
   busy = true;
   const controller = new AbortController();
@@ -258,7 +261,98 @@ try {
   assert.equal(report.cancelled.holdsNewTurns, false);
   assert.equal(report.cancelled.resumed, 1);
   assert.equal(row()?.state, "available");
+
+  await runCauseEffect(providers.startSettingsChanged("antigravity"));
+  const restartPending = row()?.restartPending === true;
+  const holdsNewTurns = providers.isReplacingCli("antigravity");
+  assert.ok(restartPending, "the restart waits for the running turn");
+  assert.equal(holdsNewTurns, false, "other agents keep starting turns while the restart waits");
+  await runCauseEffect(providers.restartProviderWhenIdle("antigravity"));
+  const holdsAfterRestartAsked = providers.isReplacingCli("antigravity");
+  assert.ok(holdsAfterRestartAsked, "a restart that holds turns still holds them when it joins the wait");
+  providers.cancelProviderRestart("antigravity");
+  assert.equal(providers.isReplacingCli("antigravity"), false);
+  await runCauseEffect(providers.startSettingsChanged("antigravity"));
+  const spawnsBefore = (await readFile(log, "utf8")).split("\n").filter(Boolean).length;
   busy = false;
+  await waitFor("the restart to run when no turn runs", () => row()?.restartPending !== true);
+  const restartedWhenIdle = (await readFile(log, "utf8")).split("\n").filter(Boolean).length > spawnsBefore;
+  report.settingsChanged = {
+    restartPending,
+    holdsNewTurns,
+    holdsAfterRestartAsked,
+    restartedWhenIdle,
+    holdsAfterRestart: providers.isReplacingCli("antigravity"),
+  };
+  assert.ok(restartedWhenIdle, "the provider restarts with the new settings");
+  assert.equal(report.settingsChanged.holdsAfterRestart, false);
+  assert.equal(row()?.state, "available");
+
+  let backgroundWorkRuns = true;
+  const holdBackgroundWork = () => {
+    const client = providers.currentClient("antigravity");
+    assert.ok(client, "the provider runs");
+    Object.defineProperty(client, "runsBackgroundWork", { value: () => backgroundWorkRuns, configurable: true });
+  };
+  const spawnCount = async () => (await readFile(log, "utf8")).split("\n").filter(Boolean).length;
+  const sessionClient = providers.currentClient("antigravity");
+  assert.ok(sessionClient, "the provider runs");
+  Object.defineProperty(sessionClient, "canReleaseProcess", { value: () => false, configurable: true });
+  installs = 0;
+  let waitedForSession = false;
+  const sessionUpdate = await runCauseEffect(
+    providers
+      .updateProviderCli("antigravity", install(newerExecutable), new AbortController().signal, () => {
+        waitedForSession = true;
+      })
+      .pipe(Effect.result),
+  );
+  const updateWaitsForOpenSession = waitedForSession || installs !== 1;
+  assert.ok(Result.isSuccess(sessionUpdate));
+  assert.equal(updateWaitsForOpenSession, false, "an open session with no background work does not delay the update");
+
+  holdBackgroundWork();
+  installs = 0;
+  let waitedForWork = false;
+  const heldUpdate = runCauseEffect(
+    providers
+      .updateProviderCli("antigravity", install(newerExecutable), new AbortController().signal, () => {
+        waitedForWork = true;
+      })
+      .pipe(Effect.result),
+  );
+  await waitFor("the update to wait for the background work", () => waitedForWork);
+  const updateInstallsWhileHeld = installs;
+  const updateHoldsNewTurns = providers.isReplacingCli("antigravity");
+  assert.equal(updateInstallsWhileHeld, 0, "the update does not stop background work that still runs");
+  assert.equal(updateHoldsNewTurns, false, "agents keep starting turns while only background work runs");
+  backgroundWorkRuns = false;
+  assert.ok(Result.isSuccess(await heldUpdate), "the update runs after the background work");
+  const updateInstallsAfterWork = installs;
+  assert.equal(updateInstallsAfterWork, 1);
+
+  backgroundWorkRuns = true;
+  holdBackgroundWork();
+  const spawnsBeforeHeldRestart = await spawnCount();
+  await runCauseEffect(providers.startSettingsChanged("antigravity"));
+  const restartPendingWhileHeld = row()?.restartPending === true && (await spawnCount()) === spawnsBeforeHeldRestart;
+  const restartHoldsNewTurns = providers.isReplacingCli("antigravity");
+  assert.ok(restartPendingWhileHeld, "the settings restart waits for the background work");
+  assert.equal(restartHoldsNewTurns, false, "agents keep starting turns while the restart waits");
+  backgroundWorkRuns = false;
+  await waitFor("the restart to run after the background work", () => row()?.restartPending !== true);
+  const restartedAfterWork = (await spawnCount()) > spawnsBeforeHeldRestart;
+  assert.ok(restartedAfterWork, "the provider restarts once the background work ends");
+  report.heldWork = {
+    updateWaitsForOpenSession,
+    updateInstallsWhileHeld,
+    updateHoldsNewTurns,
+    updateInstallsAfterWork,
+    restartPendingWhileHeld,
+    restartHoldsNewTurns,
+    restartedAfterWork,
+  };
+  assert.equal(row()?.state, "available");
 
   await checkProviderAccountReload();
   report.passed = true;
@@ -268,9 +362,7 @@ try {
   for (const pid of pids) {
     try {
       process.kill(pid);
-    } catch {
-      // Already stopped.
-    }
+    } catch {}
   }
   await mkdir(OUT, { recursive: true });
   await writeFile(join(OUT, "report.json"), `${JSON.stringify(report, null, 2)}\n`);

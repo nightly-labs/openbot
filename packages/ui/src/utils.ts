@@ -26,30 +26,43 @@ export function truncateMiddle(value: string, maxLength: number): string {
   return `${value.slice(0, startLength)}…${value.slice(-endLength)}`;
 }
 
-/**
- * Whether the user asked for less animation. Import this instead of redeclaring it; several
- * modules once held their own copy under different names. `matchMedia` is optional for jsdom.
- */
+export const REDUCED_MOTION_QUERY = "(prefers-reduced-motion: reduce)";
+
 export function prefersReducedMotion(): boolean {
-  return window.matchMedia?.("(prefers-reduced-motion: reduce)").matches ?? false;
+  return window.matchMedia?.(REDUCED_MOTION_QUERY).matches ?? false;
 }
 
-/** Whether the pointer is coarse and hoverless (touch screen). Kept beside `prefersReducedMotion`. */
 export function usesTouchLayout(): boolean {
   return window.matchMedia?.("(hover: none), (pointer: coarse)").matches ?? false;
 }
 
-/** Constrains `value` to the inclusive range. */
 export function clamp(value: number, minimum: number, maximum: number): number {
   return Math.min(maximum, Math.max(minimum, value));
 }
 
-/** Linear interpolation from `start` to `end`, for a `progress` an animation drives from 0 to 1. */
 export function mix(start: number, end: number, progress: number): number {
   return start + (end - start) * progress;
 }
 
-/** Reads a CSS time custom property from the root element, in milliseconds. */
+const flagHolders = new WeakMap<Element, Map<string, number>>();
+
+export function holdFlag(element: Element, name: string): () => void {
+  const holders = flagHolders.get(element) ?? new Map<string, number>();
+  flagHolders.set(element, holders);
+  const count = holders.get(name) ?? 0;
+  holders.set(name, count + 1);
+  if (count === 0) element.setAttribute(`data-${name}`, "");
+  return () => {
+    const left = (holders.get(name) ?? 1) - 1;
+    if (left > 0) {
+      holders.set(name, left);
+      return;
+    }
+    holders.delete(name);
+    element.removeAttribute(`data-${name}`);
+  };
+}
+
 export function motionDuration(name: string, fallback: number): number {
   const value = getComputedStyle(document.documentElement).getPropertyValue(name).trim();
   if (value.endsWith("ms")) return Number.parseFloat(value) || fallback;
@@ -57,11 +70,6 @@ export function motionDuration(name: string, fallback: number): number {
   return Number.parseFloat(value) || fallback;
 }
 
-/**
- * Sound cue for a trigger that opens and closes its popup on pointerdown, such as a menu or a select.
- * The click that plays the cue comes after the change, so keep the state that the pointerdown found:
- * `close` when the popup was open. Put `cue()` on `data-cuelume-open` and add `ref` to the trigger.
- */
 export function createPressedPopupCue(): { ref: (element: HTMLElement) => void; cue: () => string } {
   const [closing, setClosing] = createSignal(false);
   return {

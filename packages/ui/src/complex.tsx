@@ -11,7 +11,7 @@ import * as KobalteSelect from "@kobalte/core/select";
 import * as TabsPrimitive from "@kobalte/core/tabs";
 import * as TooltipPrimitive from "@kobalte/core/tooltip";
 import type { ValidComponent } from "@solidjs/web";
-import { createContext, createEffect, merge, onCleanup, untrack, useContext } from "solid-js";
+import { createContext, createEffect, createSignal, merge, onCleanup, onSettled, untrack, useContext } from "solid-js";
 import { useMenuMotion } from "./menu-motion";
 import { createPressedPopupCue } from "./utils";
 
@@ -25,10 +25,7 @@ function focusRestoreHandler(upstream: () => OpenChangeHandler | undefined): Ope
   let restoreTarget: HTMLElement | null = null;
   return (open) => {
     if (open) {
-      restoreTarget =
-        document.activeElement instanceof HTMLElement && document.activeElement !== document.body
-          ? document.activeElement
-          : null;
+      restoreTarget = focusedElement();
     } else {
       const openTrigger = Array.from(
         document.querySelectorAll<HTMLElement>('[aria-haspopup][aria-expanded="true"][aria-controls]'),
@@ -39,8 +36,6 @@ function focusRestoreHandler(upstream: () => OpenChangeHandler | undefined): Ope
       });
       restoreTarget = openTrigger ?? restoreTarget;
     }
-    // The surface owns focus while focus is on the page, its trigger or a dialog. Focus elsewhere, such as in the
-    // composer, stays there.
     const focusAtClose = document.activeElement;
     const surfaceOwnedFocus =
       focusAtClose === null ||
@@ -54,7 +49,6 @@ function focusRestoreHandler(upstream: () => OpenChangeHandler | undefined): Ope
       const target = restoreTarget;
       window.requestAnimationFrame(() =>
         window.requestAnimationFrame(() => {
-          // A click outside or the closing action may move focus. Keep it there.
           const active = document.activeElement;
           if (active === null || active === document.body || active === focusAtClose) target.focus();
         }),
@@ -63,14 +57,16 @@ function focusRestoreHandler(upstream: () => OpenChangeHandler | undefined): Ope
   };
 }
 
-/** A menu may restore focus only while its closing surface still owns it. */
+function focusedElement(): HTMLElement | null {
+  return document.activeElement instanceof HTMLElement && document.activeElement !== document.body
+    ? document.activeElement
+    : null;
+}
+
 function createMenuFocusRestore(props: { open?: boolean; defaultOpen?: boolean; onOpenChange?: OpenChangeHandler }) {
-  let target =
-    document.activeElement instanceof HTMLElement && document.activeElement !== document.body
-      ? document.activeElement
-      : null;
   let content: HTMLElement | undefined;
   let open = untrack(() => props.open ?? props.defaultOpen ?? false);
+  let target = open ? focusedElement() : null;
   let epoch = 0;
   let selection: (() => void) | undefined;
   let handedOff = false;
@@ -90,10 +86,7 @@ function createMenuFocusRestore(props: { open?: boolean; defaultOpen?: boolean; 
         epoch++;
         selection = undefined;
         handedOff = false;
-        target =
-          document.activeElement instanceof HTMLElement && document.activeElement !== document.body
-            ? document.activeElement
-            : null;
+        target = focusedElement();
       } else {
         target =
           Array.from(
@@ -133,17 +126,13 @@ function createMenuFocusRestore(props: { open?: boolean; defaultOpen?: boolean; 
       const closingEpoch = epoch;
       const action = selection;
       selection = undefined;
-      // The portal's cleanup proves the surface has left; pending primitive focus work
-      // cannot focus its detached elements. Do not execute an action in a disposed owner.
       queueMicrotask(() => {
         if (open || epoch !== closingEpoch) return;
-        // Give a new dialog a connected return anchor before it claims focus.
         if (target?.isConnected) target.focus();
         if (!open && epoch === closingEpoch) action();
       });
     },
     onOpenChange: (next: boolean) => {
-      // A controlled owner may decline a close; only its committed open value grants it.
       if (props.open !== undefined) props.onOpenChange?.(next);
       else changeOpen(next, true);
     },
@@ -156,7 +145,6 @@ type MenuItemAfterCloseProps<T extends ValidComponent = "div"> = PolymorphicProp
   T,
   DropdownMenuPrimitive.DropdownMenuItemProps<T>
 > & {
-  /** Hand focus to an editor or overlay after the normal Menu.Portal surface unmounts. */
   onSelectAfterClose?: (() => void) | undefined;
 };
 
@@ -204,22 +192,40 @@ interface DialogApi {
   CloseButton: typeof DialogPrimitive.CloseButton;
 }
 
+export function dialogOpen(): boolean {
+  return document.querySelector(".ui-dialog-content") !== null;
+}
+
+const [mountedDialogs, setMountedDialogs] = createSignal(0);
+
+export const dialogShown = () => mountedDialogs() > 0;
+
+function countMountedDialog() {
+  onSettled(() => {
+    setMountedDialogs((count) => count + 1);
+    return () => setMountedDialogs((count) => count - 1);
+  });
+}
+
 export const Dialog: DialogApi = {
   Root: (props) => <DialogPrimitive.Root {...props} onOpenChange={focusRestoreHandler(() => props.onOpenChange)} />,
   Portal: (props) => <DialogPrimitive.Portal {...props} />,
   Trigger: (props) => <DialogPrimitive.Trigger data-cuelume-open="" {...props} />,
   Overlay: (props) => <DialogPrimitive.Overlay {...props} class={withBaseClass("ui-dialog-overlay", props.class)} />,
-  Content: (props) => (
-    <DialogPrimitive.Content
-      {...props}
-      class={withBaseClass("ui-dialog-content", props.class)}
-      onInteractOutside={(event) => {
-        props.onInteractOutside?.(event);
-        const target = event.detail.originalEvent.target;
-        if (target instanceof Element && target.closest("[data-kb-top-layer]")) event.preventDefault();
-      }}
-    />
-  ),
+  Content: (props) => {
+    countMountedDialog();
+    return (
+      <DialogPrimitive.Content
+        {...props}
+        class={withBaseClass("ui-dialog-content", props.class)}
+        onInteractOutside={(event) => {
+          props.onInteractOutside?.(event);
+          const target = event.detail.originalEvent.target;
+          if (target instanceof Element && target.closest("[data-kb-top-layer]")) event.preventDefault();
+        }}
+      />
+    );
+  },
   Title: (props) => <DialogPrimitive.Title {...props} />,
   Description: (props) => <DialogPrimitive.Description {...props} />,
   CloseButton: (props) => <DialogPrimitive.CloseButton data-cuelume-close="" {...props} />,
@@ -245,9 +251,10 @@ export const AlertDialog: AlertDialogApi = {
   Overlay: (props) => (
     <AlertDialogPrimitive.Overlay {...props} class={withBaseClass("ui-dialog-overlay", props.class)} />
   ),
-  Content: (props) => (
-    <AlertDialogPrimitive.Content {...props} class={withBaseClass("ui-dialog-content", props.class)} />
-  ),
+  Content: (props) => {
+    countMountedDialog();
+    return <AlertDialogPrimitive.Content {...props} class={withBaseClass("ui-dialog-content", props.class)} />;
+  },
   Title: (props) => <AlertDialogPrimitive.Title {...props} />,
   Description: (props) => <AlertDialogPrimitive.Description {...props} />,
   CloseButton: (props) => <AlertDialogPrimitive.CloseButton data-cuelume-close="" {...props} />,
@@ -410,7 +417,6 @@ export const Popover: PopoverApi = {
   Portal: (props) => <PopoverPrimitive.Portal {...props} />,
   Trigger: (props) => {
     const context = PopoverPrimitive.usePopoverContext();
-    // Kobalte toggles the popover after the click cue reads this state.
     return (
       <PopoverPrimitive.Trigger
         data-cuelume-open={context.isOpen() ? "close" : ""}

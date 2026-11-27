@@ -1,30 +1,26 @@
-/* Sonner gives an unstyled toast no width, so the host takes the toaster width. */
 .agent-delete-undo-toast-host {
   width: var(--width);
 }
 
-/* The same raised surface, border, and shadow as the shared toast. The bottom padding keeps the bar
-   clear of the text. */
 .agent-delete-undo-toast {
   position: relative;
   display: grid;
-  grid-template-columns: auto minmax(0, 1fr) auto;
+  grid-template-columns: auto minmax(0, 1fr);
   align-items: center;
   gap: var(--openbot-space-3);
   overflow: hidden;
-  padding: var(--openbot-space-3);
-  padding-bottom: calc(var(--openbot-space-3) + var(--openbot-space-1));
-  border-radius: var(--openbot-radius-lg);
+  padding: var(--openbot-space-3) var(--openbot-space-4) var(--openbot-space-2);
+  border-radius: var(--openbot-radius-card);
   background: var(--openbot-bg-surface-raised);
-  box-shadow:
-    0 0 0 1px var(--openbot-border),
-    var(--openbot-shadow-raised);
+  box-shadow: 0 0 0 1px var(--openbot-border);
   color: var(--openbot-text-primary);
   font-family: var(--openbot-font-sans);
 }
 
-/* Without a fixed track, the grid row grows to the drawing's width, and the drawing's 128% height
-   then resolves against that row. The drawing becomes taller than wide and the body sits low. */
+.agent-delete-undo-toast-actions {
+  grid-column: 1 / -1;
+}
+
 .agent-delete-undo-toast-avatar {
   grid-template: minmax(0, 1fr) / minmax(0, 1fr);
   width: 32px;
@@ -55,7 +51,6 @@
   white-space: nowrap;
 }
 
-/* The bar sits on the bottom edge, inside the rounded corners. */
 .agent-delete-undo-toast-bar {
   position: absolute;
   right: 0;

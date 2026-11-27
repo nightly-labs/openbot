@@ -1,11 +1,21 @@
 import { fileReferenceName, isFileReference } from "@openbot/brand/file-reference";
-import { blockChatMath, chatMathBlockStart, chatMathStart, inlineChatMath } from "@openbot/contracts/chat-math";
+import { attachmentReferenceAt } from "@openbot/contracts/attachment-references";
+import {
+  blockChatMath,
+  chatMathBlockInterrupts,
+  chatMathBlockStart,
+  chatMathStart,
+  inlineChatMath,
+} from "@openbot/contracts/chat-math";
 import { chatPreviewKind } from "@openbot/contracts/chat-preview";
 import { INPUT_LIMITS } from "@openbot/contracts/input-limits";
+import { markdownImageName } from "@openbot/contracts/markdown-preview-text";
 import { Button, Checkbox } from "@openbot/ui";
 import { Dynamic } from "@solidjs/web";
 import { Marked, type Token, type Tokens, type TokensList } from "marked";
-import { createMemo, For, Show } from "solid-js";
+import markedCjkFriendly from "marked-cjk-friendly";
+import { createMemo, createSignal, For, Show } from "solid-js";
+import { ScrollEdges } from "../../components/ScrollEdges";
 import { textDirection } from "../../content-direction";
 import { useText } from "../../text";
 import { AttachmentReferenceVisual, attachmentReferenceTone } from "./AttachmentReference";
@@ -26,18 +36,14 @@ type MarkdownMessageTextProps = Omit<RichMessageTextProps, "showCitationFooter">
   showCitationFooter?: boolean;
   streaming?: boolean;
   imagesAsLinks?: boolean | undefined;
-  /** Opens a markdown image in the image viewer. Without it, an image is only a picture. */
   onOpenImage?: ((image: HTMLImageElement) => void) | undefined;
-  /**
-   * A short preview, such as a reply quote: only the first blocks, and each code fence as plain
-   * text, with no highlight, toolbar or live preview.
-   */
   excerpt?: boolean | undefined;
+  document?: boolean | undefined;
 };
 
 type MarkdownContentProps = Omit<
   MarkdownMessageTextProps,
-  "body" | "showCitationFooter" | "streaming" | "streamingTailAfter"
+  "body" | "showCitationFooter" | "streaming" | "streamingTailAfter" | "document"
 > & {
   fileDirectory: FileDirectoryContext | null;
 };
@@ -64,6 +70,13 @@ interface MarkdownTokenByType {
   escape: Tokens.Escape;
   blockMath: MathToken;
   inlineMath: MathToken;
+  attachmentTag: AttachmentTagToken;
+}
+
+interface AttachmentTagToken extends Tokens.Generic {
+  type: "attachmentTag";
+  text: string;
+  attachmentId: string;
 }
 
 interface MathToken extends Tokens.Generic {
@@ -75,6 +88,12 @@ interface MathToken extends Tokens.Generic {
 const markdown = new Marked({
   gfm: true,
   breaks: true,
+  tokenizer: {
+    lheading(source) {
+      const heading = this.rules.block.lheading.exec(source);
+      return heading && chatMathBlockInterrupts(source, heading[0].length) ? undefined : false;
+    },
+  },
   extensions: [
     {
       name: "blockMath",
@@ -94,8 +113,24 @@ const markdown = new Marked({
         if (math) return { type: "inlineMath", raw: math.raw, text: math.tex, display: math.display };
       },
     },
+    {
+      name: "attachmentTag",
+      level: "inline",
+      start: (source) => source.indexOf("@["),
+      tokenizer(source): AttachmentTagToken | undefined {
+        const reference = attachmentReferenceAt(source);
+        if (!reference) return undefined;
+        return {
+          type: "attachmentTag",
+          raw: reference.marker,
+          text: reference.name,
+          attachmentId: reference.attachmentId,
+        };
+      },
+    },
   ],
 });
+markdown.use(markedCjkFriendly());
 
 const VOID_HTML_ELEMENTS = new Set([
   "area",
@@ -113,7 +148,6 @@ const VOID_HTML_ELEMENTS = new Set([
   "wbr",
 ]);
 
-/** A reply quote shows four lines, and each block takes at least one. */
 const EXCERPT_BLOCK_LIMIT = 4;
 
 function tokenIs<K extends keyof MarkdownTokenByType>(token: Token, type: K): token is MarkdownTokenByType[K] {
@@ -129,22 +163,37 @@ function headingLevel(depth: number): 1 | 2 | 3 | 4 | 5 | 6 {
   return 6;
 }
 
-// Lexed tokens are shared across re-renders of identical bodies (scroll
-// virtualization re-renders settled messages often). Cap the size so a long
-// session cannot grow this without bound.
 const LEXER_CACHE_LIMIT = 200;
-const lexerCache = new Map<string, TokensList>();
-const inlineLexerCache = new Map<string, Token[]>();
+const LEXER_CACHE_CHARACTERS = 2 * 1024 * 1024;
+
+class LexerCache<T> {
+  readonly #entries = new Map<string, T>();
+  #characters = 0;
+
+  get(body: string): T | undefined {
+    return this.#entries.get(body);
+  }
+
+  set(body: string, tokens: T): void {
+    if (body.length > LEXER_CACHE_CHARACTERS || this.#entries.has(body)) return;
+    this.#entries.set(body, tokens);
+    this.#characters += body.length;
+    for (const oldest of this.#entries.keys()) {
+      if (this.#entries.size <= LEXER_CACHE_LIMIT && this.#characters <= LEXER_CACHE_CHARACTERS) break;
+      this.#entries.delete(oldest);
+      this.#characters -= oldest.length;
+    }
+  }
+}
+
+const lexerCache = new LexerCache<TokensList>();
+const inlineLexerCache = new LexerCache<Token[]>();
 
 function lexBlockTokens(body: string, cache: boolean): TokensList {
   if (!cache) return markdown.lexer(body);
   const cached = lexerCache.get(body);
   if (cached) return cached;
   const tokens = markdown.lexer(body);
-  if (lexerCache.size >= LEXER_CACHE_LIMIT) {
-    const oldest = lexerCache.keys().next();
-    if (!oldest.done) lexerCache.delete(oldest.value);
-  }
   lexerCache.set(body, tokens);
   return tokens;
 }
@@ -154,13 +203,6 @@ interface StreamedTokens {
   tokens: TokensList;
 }
 
-/**
- * The tokens of a streaming body, which only grows. A block that has a blank line after it and a
- * block after that is final, so only the text from that blank line is lexed again. Text with no
- * blank line before it can still join the block before it, such as `#1234` after a paragraph line.
- * A body that does not extend the previous one, or a link reference definition, which changes how
- * earlier blocks read, lexes the whole body. The settled body is lexed whole.
- */
 function lexStreamingTokens(body: string, previous: StreamedTokens | undefined): TokensList {
   if (!previous || !body.startsWith(previous.body) || Object.keys(previous.tokens.links).length > 0) {
     return markdown.lexer(body);
@@ -168,7 +210,6 @@ function lexStreamingTokens(body: string, previous: StreamedTokens | undefined):
   let kept = previous.tokens.length - 1;
   while (kept > 0 && previous.tokens[kept]?.type === "space") kept -= 1;
   while (kept > 0 && previous.tokens[kept]?.type !== "space") kept -= 1;
-  // Display math can span blank lines. Until its closing delimiter arrives, it reads as paragraphs.
   const openMath = previous.tokens.findIndex(
     (token, index) =>
       index < kept &&
@@ -179,7 +220,6 @@ function lexStreamingTokens(body: string, previous: StreamedTokens | undefined):
   if (openMath !== -1) kept = openMath;
   const settled = previous.tokens.slice(0, kept);
   const settledLength = settled.reduce((length, token) => length + token.raw.length, 0);
-  // The lexer normalizes line endings, and then the sources no longer add up to the body.
   const previousLength = previous.tokens.reduce((length, token) => length + token.raw.length, 0);
   if (settled.length === 0 || previousLength !== previous.body.length) return markdown.lexer(body);
   const tail = markdown.lexer(body.slice(settledLength));
@@ -191,18 +231,11 @@ function lexInlineTokens(body: string): Token[] {
   const cached = inlineLexerCache.get(body);
   if (cached) return cached;
   const tokens = markdown.Lexer.lexInline(body, markdown.defaults);
-  if (inlineLexerCache.size >= LEXER_CACHE_LIMIT) {
-    const oldest = inlineLexerCache.keys().next();
-    if (!oldest.done) inlineLexerCache.delete(oldest.value);
-  }
   inlineLexerCache.set(body, tokens);
   return tokens;
 }
 
 export function MarkdownMessageText(props: MarkdownMessageTextProps) {
-  // A streaming reply passes each growing prefix here. Caching those would
-  // retain up to 200 obsolete token trees and evict completed messages, so
-  // only a settled body enters the shared cache.
   let streamed: StreamedTokens | undefined;
   const tokens = createMemo(() => {
     const body = props.body;
@@ -214,16 +247,13 @@ export function MarkdownMessageText(props: MarkdownMessageTextProps) {
     streamed = { body, tokens };
     return tokens;
   });
-  // An excerpt shows only a few lines, so it renders only the blocks that can fill them.
   const shownTokens = createMemo((): TokensList => {
     const all = tokens();
     if (props.excerpt !== true) return all;
     const blocks = all.filter((token) => token.type !== "space").slice(0, EXCERPT_BLOCK_LIMIT);
     return Object.assign(blocks, { links: all.links });
   });
-  // A memo, so each revealed word of a streaming reply does not give the kept blocks a new
-  // `content` object and run their reads again. Only a new directory changes it.
-  const fileDirectory = createMemo(() => messageFileDirectory(props.body), {
+  const fileDirectory = createMemo(() => (props.document === true ? null : messageFileDirectory(props.body)), {
     equals: (previous, next) => previous?.path === next?.path && previous?.kind === next?.kind,
   });
   const contentProps = createMemo(
@@ -241,6 +271,7 @@ export function MarkdownMessageText(props: MarkdownMessageTextProps) {
       onOpenSharedFile: props.onOpenSharedFile,
       onOpenWorkspaceFile: props.onOpenWorkspaceFile,
       onOpenQuote: props.onOpenQuote,
+      onOpenTag: props.onOpenTag,
       linkFavicons: props.linkFavicons,
       fileDirectory: fileDirectory(),
     }),
@@ -279,6 +310,7 @@ export function MarkdownInlineText(
     onOpenSharedFile: props.onOpenSharedFile,
     onOpenWorkspaceFile: props.onOpenWorkspaceFile,
     onOpenQuote: props.onOpenQuote,
+    onOpenTag: props.onOpenTag,
     linkFavicons: props.linkFavicons,
     fileDirectory: messageFileDirectory(props.body),
   });
@@ -290,10 +322,6 @@ interface RenderedToken {
   streaming: boolean;
 }
 
-/**
- * The characters of the streaming body after each token, so each text node fades the words
- * revealed in it. A memo compared by value, so the blocks with no fade do not update on each step.
- */
 function createTailOffsets(tokens: () => readonly { raw: string }[], after: () => number | undefined) {
   const trail = useStreamingReveal();
   return createMemo(
@@ -307,17 +335,12 @@ function createTailOffsets(tokens: () => readonly { raw: string }[], after: () =
   );
 }
 
-/** The characters after the children of `token`, from the characters after `token`. */
 function tailInside(token: Token, children: readonly Token[] | undefined, after: number | undefined) {
   return children ? streamingTailInside(token.raw, children, after) : after;
 }
 
 function MarkdownBlocks(props: {
   tokens: Token[];
-  /**
-   * The document's link reference definitions. A new definition can turn text in an earlier
-   * block into a link, so a change here renders every block again.
-   */
   linkDefinitions?: string;
   content: MarkdownContentProps;
   streaming?: boolean | undefined;
@@ -325,9 +348,6 @@ function MarkdownBlocks(props: {
 }) {
   const tokens = createMemo(() => props.tokens);
   const tailAfter = createTailOffsets(tokens, () => props.streamingTailAfter);
-  // A streaming reply gives new tokens for the whole body on each revealed word. Keeping the
-  // earlier item for a token with the same source keeps its block mounted, so only the growing
-  // tail renders again.
   const renderedTokens = createMemo<{ linkDefinitions: string | undefined; items: RenderedToken[] }>((previous) => {
     const values = tokens();
     const linkDefinitions = props.linkDefinitions;
@@ -397,7 +417,7 @@ function MarkdownBlock(props: {
     case "blockquote": {
       if (!tokenIs(token, "blockquote")) return token.raw;
       return (
-        <blockquote dir={tokensDirection(token.tokens)}>
+        <blockquote dir={tokensDirection(token.tokens)} data-holds-table={holdsTableAttribute(token.tokens)}>
           <MarkdownBlocks
             tokens={token.tokens}
             content={props.content}
@@ -506,16 +526,8 @@ function MarkdownList(props: {
   });
   const list = () => (
     <For each={renderedItems()}>
-      {(renderedItem, index) => (
-        <li class={renderedItem.item.task ? "message-markdown-task" : undefined} dir="auto">
-          <Show when={renderedItem.item.task}>
-            <Checkbox
-              class="message-markdown-checkbox"
-              checked={renderedItem.item.checked === true}
-              disabled
-              aria-label={renderedItem.item.text}
-            />
-          </Show>
+      {(renderedItem, index) => {
+        const blocks = () => (
           <MarkdownBlocks
             tokens={renderedItem.item.tokens.filter((child) => child.type !== "checkbox")}
             content={props.content}
@@ -526,19 +538,46 @@ function MarkdownList(props: {
               tailAfter()[index()],
             )}
           />
-        </li>
-      )}
+        );
+        return (
+          <li
+            class={renderedItem.item.task ? "message-markdown-task" : undefined}
+            dir="auto"
+            data-holds-table={holdsTableAttribute(renderedItem.item.tokens)}
+          >
+            <Show when={renderedItem.item.task}>
+              <Checkbox
+                class="message-markdown-checkbox"
+                checked={renderedItem.item.checked === true}
+                disabled
+                aria-label={renderedItem.item.text}
+              />
+            </Show>
+            <Show when={renderedItem.item.task} fallback={blocks()}>
+              <div class="message-markdown-task-body" data-holds-table={holdsTableAttribute(renderedItem.item.tokens)}>
+                {blocks()}
+              </div>
+            </Show>
+          </li>
+        );
+      }}
     </For>
   );
 
-  // The marker side and the indent follow the list's own text, not the interface language.
   const direction = createMemo(() => tokensDirection(items()));
+  const listHoldsTable = createMemo(() => holdsTableAttribute(items().flatMap((item) => item.tokens)));
   return props.token.ordered ? (
-    <ol start={props.token.start === "" ? undefined : props.token.start} dir={direction()}>
+    <ol
+      start={props.token.start === "" ? undefined : props.token.start}
+      dir={direction()}
+      data-holds-table={listHoldsTable()}
+    >
       {list()}
     </ol>
   ) : (
-    <ul dir={direction()}>{list()}</ul>
+    <ul dir={direction()} data-holds-table={listHoldsTable()}>
+      {list()}
+    </ul>
   );
 }
 
@@ -550,7 +589,12 @@ function MarkdownTable(props: { token: Tokens.Table; content: MarkdownContentPro
   );
   const { t } = useText();
   return (
-    <section class="message-markdown-table-scroll" aria-label={t("chat.table.data")} tabindex="0">
+    <ScrollEdges
+      axis="x"
+      class="message-table-frame message-markdown-table-frame"
+      viewClass="message-markdown-table-scroll"
+      label={t("chat.table.data")}
+    >
       <table
         class="message-markdown-table"
         style={`--message-markdown-table-columns: ${headers().length}`}
@@ -587,7 +631,7 @@ function MarkdownTable(props: { token: Tokens.Table; content: MarkdownContentPro
           </For>
         </tbody>
       </table>
-    </section>
+    </ScrollEdges>
   );
 }
 
@@ -653,19 +697,21 @@ function MarkdownInline(props: {
           case "codespan": {
             if (!tokenIs(token, "codespan")) return token.raw;
             const file = mentionedFileTarget(token.text, props.content.fileDirectory);
-            return file && file.kind === "shared" && props.content.onOpenSharedFile ? (
+            const openShared = props.content.onOpenSharedFile;
+            const openWorkspace = props.content.onOpenWorkspaceFile;
+            return file && file.kind === "shared" && openShared ? (
               <LocalFileLink
                 path={file.path}
                 label={token.text}
                 kind="shared"
-                onOpen={props.content.onOpenSharedFile}
+                onOpen={(path) => openShared(path, file.asWritten)}
               />
-            ) : file && file.kind === "workspace" && props.content.onOpenWorkspaceFile ? (
+            ) : file && file.kind === "workspace" && openWorkspace ? (
               <LocalFileLink
                 path={file.path}
                 label={token.text}
                 kind="workspace"
-                onOpen={props.content.onOpenWorkspaceFile}
+                onOpen={(path) => openWorkspace(path, file.asWritten)}
               />
             ) : (
               <code dir="ltr">{token.text}</code>
@@ -682,7 +728,7 @@ function MarkdownInline(props: {
               return <RichText body={item.semanticTag} content={props.content} streamingTailAfter={after()} />;
             }
             const url = safeBrowserUrl(token.href);
-            const { shared: sharedPath, workspace: workspacePath } = linkFileTargets(token.href);
+            const { shared: sharedPath, workspace: workspacePath } = linkFileTargets(writtenLinkTarget(token));
             return url ? (
               <MessageLink
                 url={url}
@@ -737,34 +783,13 @@ function MarkdownInline(props: {
             if (!url) {
               return <RichText body={token.text || token.raw} content={props.content} streamingTailAfter={after()} />;
             }
-            const image = (
-              <img
-                class="message-markdown-image"
-                src={url}
+            return (
+              <MarkdownImage
+                url={url}
                 alt={token.text}
                 title={token.title ?? undefined}
-                loading="lazy"
-                decoding="async"
-                referrerpolicy="no-referrer"
+                onOpenImage={props.content.onOpenImage}
               />
-            );
-            const onOpenImage = props.content.onOpenImage;
-            return onOpenImage ? (
-              <Button
-                variant="ghost"
-                type="button"
-                class="message-markdown-image-button"
-                aria-label={t("chat.image.preview", { name: markdownImageName(token.text, url) })}
-                data-cuelume-tap="open"
-                onClick={(event) => {
-                  const picture = event.currentTarget.querySelector("img");
-                  if (picture) onOpenImage(picture);
-                }}
-              >
-                {image}
-              </Button>
-            ) : (
-              image
             );
           }
           case "html":
@@ -791,6 +816,13 @@ function MarkdownInline(props: {
               />
             );
           }
+          case "attachmentTag": {
+            if (!tokenIs(token, "attachmentTag")) return token.raw;
+            const held = props.content.attachments?.some((attachment) => attachment.id === token.attachmentId);
+            return (
+              <RichText body={held ? token.raw : token.text} content={props.content} streamingTailAfter={after()} />
+            );
+          }
           case "checkbox":
             return null;
           default:
@@ -801,13 +833,6 @@ function MarkdownInline(props: {
   );
 }
 
-/**
- * The base direction of a list, a quote or a table, from its first letter, as `dir="auto"` finds
- * it for a paragraph. `dir="auto"` skips the descendants that set their own direction, and each
- * block in these containers does, so the container reads its text here. Code, math, raw HTML and
- * bare URLs are skipped, as they are left to right and isolated. Undefined keeps the inherited
- * direction.
- */
 function tokensDirection(tokens: readonly Token[]): "ltr" | "rtl" | undefined {
   for (const token of tokens) {
     const direction = tokenDirection(token);
@@ -841,8 +866,64 @@ function textTokenEndsWithTagMarker(token: Token | undefined): boolean {
 
 function semanticChatTag(token: Token | undefined): string | null {
   if (!token || !tokenIs(token, "link")) return null;
-  const target = /^(agent|skill|quote)(?:\+uri)?:([^\r\n]+)$/u.exec(token.href);
+  const target = /^(agent|skill|mcp|quote|tab|thread)(?:\+uri)?:([^\r\n]+)$/u.exec(token.href);
   return target?.[2] ? `@${token.raw}` : null;
+}
+
+function MarkdownImage(props: {
+  url: string;
+  alt: string;
+  title: string | undefined;
+  onOpenImage: ((image: HTMLImageElement) => void) | undefined;
+}) {
+  const { t } = useText();
+  const [failedUrl, setFailedUrl] = createSignal<string>();
+  const loadingUrl = () => (failedUrl() === props.url ? undefined : props.url);
+  return (
+    <Show
+      when={loadingUrl()}
+      keyed
+      fallback={
+        <span class="message-markdown-image-unavailable">
+          {t("chat.image.unavailableNamed", { name: markdownImageName(props.alt, props.url) })}
+        </span>
+      }
+    >
+      {(url) => {
+        const image = () => (
+          <img
+            class="message-markdown-image"
+            src={url}
+            alt={props.alt}
+            title={props.title}
+            loading="lazy"
+            decoding="async"
+            referrerpolicy="no-referrer"
+            onError={() => setFailedUrl(url)}
+          />
+        );
+        return (
+          <Show when={props.onOpenImage} fallback={image()}>
+            {(onOpenImage) => (
+              <Button
+                variant="ghost"
+                type="button"
+                class="message-markdown-image-button"
+                aria-label={t("chat.image.preview", { name: markdownImageName(props.alt, url) })}
+                data-cuelume-tap="open"
+                onClick={(event) => {
+                  const picture = event.currentTarget.querySelector("img");
+                  if (picture) onOpenImage()(picture);
+                }}
+              >
+                {image()}
+              </Button>
+            )}
+          </Show>
+        );
+      }}
+    </Show>
+  );
 }
 
 function RichText(props: {
@@ -990,6 +1071,19 @@ function activeStreamingTableCellIndex(token: Tokens.Table): number {
   return cellIndex < row.length ? cellIndex : -1;
 }
 
+function holdsTable(tokens: readonly Token[]): boolean {
+  return tokens.some(
+    (token) =>
+      tokenIs(token, "table") ||
+      (tokenIs(token, "blockquote") && holdsTable(token.tokens)) ||
+      (tokenIs(token, "list") && token.items.some((item) => holdsTable(item.tokens))),
+  );
+}
+
+function holdsTableAttribute(tokens: readonly Token[]): "" | undefined {
+  return holdsTable(tokens) ? "" : undefined;
+}
+
 function containerClosesFinalNestedTable(token: Tokens.Blockquote | Tokens.List): boolean {
   if (!/\n[\t ]*$/u.test(token.raw)) return false;
   return finalNestedBlockToken(token) === "table";
@@ -1020,7 +1114,6 @@ function isEscapedMarkdownCharacter(value: string, index: number): boolean {
   return slashCount % 2 === 1;
 }
 
-/** The text of inline Markdown with no syntax, such as a link's label without its address. */
 export function markdownPlainText(body: string): string {
   return markdownInlinePlainText(lexInlineTokens(body));
 }
@@ -1035,6 +1128,7 @@ function markdownInlinePlainText(tokens: Token[]): string {
       if (tokenIs(token, "text")) return token.tokens ? markdownInlinePlainText(token.tokens) : token.text;
       if (tokenIs(token, "codespan") || tokenIs(token, "escape") || tokenIs(token, "image")) return token.text;
       if (tokenIs(token, "inlineMath")) return token.raw;
+      if (tokenIs(token, "attachmentTag")) return token.text;
       if (token.type === "br") return "\n";
       return token.raw;
     })
@@ -1048,7 +1142,6 @@ function LocalFileLink(props: {
   onOpen: (path: string) => void;
 }) {
   const { t } = useText();
-  // A workspace path that ends with a separator is a folder chip, such as `research/eyeliner/`.
   const folder = props.kind === "workspace" && /[/\\]$/u.test(props.path);
   const name = fileReferenceName(folder ? props.path.replace(/[/\\]+$/u, "") : props.path);
   const label = () => {
@@ -1185,10 +1278,6 @@ function localFileTarget(value: string): string | null {
   return /^(?:~[/\\]|[/\\]|[A-Za-z]:[/\\])/u.test(path) || isFileReference(path) ? workspace : null;
 }
 
-/**
- * The path of a `file://` link, such as `file:///Users/me/a%20b.md` or `file:///C:/notes.md`. It stays
- * percent-encoded like any other link target, so the workspace resolver decodes it once.
- */
 function fileUrlPath(value: string): string | null {
   const match = /^file:\/\/(?:localhost)?(\/.*)$/iu.exec(value.trim());
   if (!match?.[1]) return null;
@@ -1199,7 +1288,6 @@ function decodedFileUrlPath(path: string): string {
   try {
     return decodeURIComponent(path);
   } catch {
-    // A literal percent sign can be part of a file name.
     return path;
   }
 }
@@ -1225,12 +1313,24 @@ function messageFileDirectory(body: string): FileDirectoryContext | null {
   return contexts.size === 1 ? (contexts.values().next().value ?? null) : null;
 }
 
-function mentionedFileTarget(value: string, directory: FileDirectoryContext | null): FileDirectoryContext | null {
+const ABSOLUTE_PATH = /^(?:~[/\\]|[/\\]|[A-Za-z]:[/\\])/u;
+
+function absoluteFilePath(path: string): boolean {
+  if (!ABSOLUTE_PATH.test(path) || /^[/\\]{2}/u.test(path) || /[\0\r\n]/u.test(path)) return false;
+  if (!/^[^.].*\.[\p{L}\p{N}_-]*\p{L}[\p{L}\p{N}_-]*$/u.test(fileReferenceName(path))) return false;
+  if (!/\s/u.test(path)) return true;
+  return !/\s-+\p{L}/u.test(path) && !/[/\\]s?bin[/\\]/u.test(path.split(/\s/u)[0] ?? "");
+}
+
+function mentionedFileTarget(
+  value: string,
+  directory: FileDirectoryContext | null,
+): (FileDirectoryContext & { asWritten?: string }) | null {
   const path = value.trim();
-  if (!isFileReference(path)) return null;
+  if (!isFileReference(path) && !absoluteFilePath(path)) return null;
   const shared = sharedFileTarget(path);
   if (shared) return { path: shared, kind: "shared" };
-  if (/^(?:~[/\\]|[/\\]|[A-Za-z]:[/\\])/u.test(path)) {
+  if (ABSOLUTE_PATH.test(path)) {
     const workspace = workspaceFileTarget(path);
     return workspace ? { path: workspace, kind: "workspace" } : null;
   }
@@ -1239,20 +1339,15 @@ function mentionedFileTarget(value: string, directory: FileDirectoryContext | nu
   return {
     path: `${directory.path.replace(/[/\\]+$/u, "")}${separator}${path}`,
     kind: directory.kind,
+    asWritten: path,
   };
 }
 
 const IMAGE_FILE_PATTERN = /\.(?:avif|gif|jpe?g|png|svg|webp)$/iu;
-/** A message shows at most this many named image files, as many as it can attach. */
 const IMAGE_FILE_LIMIT = INPUT_LIMITS.attachments;
 
-/** A local image file that a message names, in a code span or a file link. */
 export type MessageImageFile = FileDirectoryContext;
 
-/**
- * The image files that the text blocks of a message name in code spans and file links, in order,
- * without repeats. Each block resolves a file name against its own folder, as its chips do.
- */
 export function messageImageFiles(blocks: readonly string[]): MessageImageFile[] {
   const files = new Map<string, MessageImageFile>();
   for (const body of blocks) {
@@ -1261,41 +1356,48 @@ export function messageImageFiles(blocks: readonly string[]): MessageImageFile[]
       const file = tokenIs(token, "codespan")
         ? mentionedFileTarget(token.text, directory)
         : tokenIs(token, "link")
-          ? linkFileTarget(token.href)
+          ? linkFileTarget(writtenLinkTarget(token))
           : null;
-      if (file && IMAGE_FILE_PATTERN.test(fileReferenceName(file.path))) files.set(`${file.kind}:${file.path}`, file);
+      if (file && IMAGE_FILE_PATTERN.test(fileReferenceName(file.path)))
+        files.set(`${file.kind}:${file.path}`, { path: file.path, kind: file.kind });
     });
   }
   return [...files.values()].slice(0, IMAGE_FILE_LIMIT);
 }
 
-/** The shared and workspace paths that a link target can open as a chip. */
+const MARKDOWN_ESCAPABLE = /[!-/:-@[-`{-~]/u;
+const WINDOWS_ABSOLUTE_PATH = /^(?:[A-Za-z]:[/\\]|\\\\)/u;
+
+function writtenLinkTarget(token: { raw: string; href: string }): string {
+  const { raw, href } = token;
+  for (const match of raw.matchAll(/\]\(\s*<?/gu)) {
+    const start = match.index + match[0].length;
+    let index = start;
+    let parsed = 0;
+    while (parsed < href.length && index < raw.length) {
+      const escaped = raw[index] === "\\" && MARKDOWN_ESCAPABLE.test(raw[index + 1] ?? "");
+      if ((escaped ? raw[index + 1] : raw[index]) !== href[parsed]) break;
+      index += escaped ? 2 : 1;
+      parsed += 1;
+    }
+    const written = raw.slice(start, index);
+    if (parsed !== href.length || !WINDOWS_ABSOLUTE_PATH.test(written)) continue;
+    return written.slice(2).includes("\\\\") ? href : written;
+  }
+  return href;
+}
+
 function linkFileTargets(href: string): { shared: string | null; workspace: string | null } {
   const fileUrl = fileUrlPath(href);
-  // The shared-file resolver does not decode, and the workspace resolver does.
   return {
-    shared: sharedFileTarget(fileUrl === null ? href : decodedFileUrlPath(fileUrl)),
+    shared: sharedFileTarget(decodedFileUrlPath(fileUrl ?? href)),
     workspace: workspaceFileTarget(fileUrl ?? href),
   };
 }
 
-/** The file that a link opens as a chip, as the `link` token draws it. */
 function linkFileTarget(href: string): FileDirectoryContext | null {
   if (safeBrowserUrl(href)) return null;
   const { shared, workspace } = linkFileTargets(href);
   if (shared) return { path: shared, kind: "shared" };
   return workspace ? { path: workspace, kind: "workspace" } : null;
-}
-
-/** What the image viewer calls a markdown image: its alt text, else the file name in its URL. */
-export function markdownImageName(alt: string, url: string): string {
-  if (alt.trim()) return alt.trim();
-  try {
-    const path = new URL(url).pathname;
-    const name = decodeURIComponent(path.slice(path.lastIndexOf("/") + 1));
-    if (name) return name;
-  } catch {
-    // A URL that does not parse keeps its own text as the name.
-  }
-  return url;
 }

@@ -111,10 +111,9 @@ guide.
 Every push to a branch in this repository runs the automated reviewer, and it blocks the merge on
 an unresolved P0 or P1 finding. A pull request from a fork is the exception: GitHub gives a fork's
 push run a read-only token, so it could not publish a review even if it produced one. Ask a
-maintainer to add the `norbiai` label, or to comment `/norbiai review`. Both run this
-repository's own copy of the workflow, where the token can publish, and either can be repeated
-after a push — the label is removed once the review runs, so re-applying it asks again. Two ways
-past a finding:
+maintainer to comment `/norbiai review`. The comment runs this repository's own copy of the
+workflow, where the token can publish, and it can be repeated after a push. A draft gets no review
+on push either; the same comment asks for one. Two ways past a finding:
 
 1. Fix it and push. The next review classifies the finding `[RESOLVED]`.
 2. Show it is wrong. Comment the concrete reason — the guard it misses, the line that already
@@ -128,8 +127,7 @@ comments from someone who can merge the pull request are read — organization m
 is not enough, and on a fork that means the recheck has to be asked for by a maintainer rather than
 by you — and only those written after the review being answered, plus the comment that asked for
 the recheck whatever its timestamp says. That one is passed to the reviewer whole; the older
-responses share a size budget and are dropped from the oldest end. A label carries no argument of
-its own, so write the rebuttal as a comment first and label afterwards.
+responses share a size budget and are dropped from the oldest end.
 
 ### The reviewer
 
@@ -142,8 +140,8 @@ large diff can reach the job's time limit: split the pull request.
 A review after a push reads only the commits since the last successful review, and rechecks the
 earlier findings against the full current code. A rebuttal on an unchanged commit reads no new code.
 The first review, a review after a rebase or a merge of the base branch, and a review asked for with
-the `norbiai` label read the whole pull request. Add the label when a change since the last review
-needs the whole pull request read again.
+a `/norbiai full review` comment read the whole pull request. Use that comment when a change since
+the last review needs the whole pull request read again.
 
 Claude Code can only read: it gets the Read, Grep and Glob tools and the `git diff`, `git show`,
 `git log` and `git ls-files` commands. It does not load the pull request's own settings, hooks,
@@ -156,7 +154,9 @@ Preserve the following boundaries, and their tests where they exist:
 - Electron sandboxing, context isolation, navigation policy, and IPC sender validation.
 - Attachment realpath, MIME, size, quota, and managed-protocol checks.
 - Queue serialization, idempotency, crash reconciliation, and atomic persistence.
-- The remote browser session's lack of preload and `window.openbot` access.
+- The browser tabs' page preload (`src/preload/browser-page.ts`): it only changes page values in the
+  page world. It has no IPC and exposes no world, so a page gets no `window.openbot` and no path to
+  main. `scripts/verify-preload-bundle.ts` checks this.
 - Secret redaction and agent child-process cleanup.
 
 Full agent access is intentional today, but new privileges or network surfaces still require an
@@ -177,22 +177,23 @@ Bun does not resolve a version that is less than 3 days old (`minimumReleaseAge`
 and Dependabot waits the same time. Only `@norbert_bodziony/bloub`, which the maintainer publishes,
 is excluded. Only the packages in `trustedDependencies` in `package.json` can
 run install scripts. If a new dependency needs its install script, add it to that list and give the
-reason in the `bunfig.toml` comment. `bun pm untrusted` shows the blocked scripts.
+reason in the pull request. `bun pm untrusted` shows the blocked scripts.
 
 ## Licensing
 
 Each author of a pull request must sign the
-[OpenBot Contributor Assignment Agreement](CLA.md). The agreement assigns the copyright in your
-contributions to Synthetify Labs spółka z ograniczoną odpowiedzialnością. Organization members,
+[OpenBot Contributor License Agreement](CLA.md). You keep the copyright in your contributions and
+give Synthetify Labs sp. z o.o. a copyright and patent license to use them. Organization members,
 users with write access to this repository and bots do not sign.
 
-To sign, tick the agreement box in the description of your pull request. The pull request template
-has no box, because most authors do not sign. When you must sign, the `CLA` workflow adds the box to
-the end of the description. A coding agent ticks the box only when you tell it to. An author of a
-commit in a pull request that a different person opened signs with a comment instead, as section 10
-of the agreement says. You sign one time for each version. The `CLA` workflow records the signature on the `cla-signatures` branch
-and sets the `CLA` status. Its rules are in `scripts/cla.ts`. Each commit author email must be
-linked to a GitHub account, so that the workflow can find who must sign.
+To sign, download the agreement as a PDF from [openbot.run/cla](https://openbot.run/cla). Fill it
+in, sign it, and send it to licenses@openbot.run with your GitHub login and the link to your pull
+request. A coding agent never signs or sends the agreement for you. You sign one time. When you
+must sign, the `CLA` workflow adds a comment to your pull request and sets the `CLA` status to
+failed. A maintainer records your signature with `bun scripts/cla.ts record <login> <pull request>`,
+which adds it to the `cla-signatures` branch and sets the status again. If you signed the OpenBot
+Contributor Assignment Agreement 1.0, you do not sign again. The rules are in `scripts/cla.ts`. Each
+commit author email must be linked to a GitHub account, so that the workflow can find who must sign.
 
 A contribution must be your original work, or you must identify the source and the license of the
 material that you did not write. Do not submit copied UI assets, proprietary code, private plugin

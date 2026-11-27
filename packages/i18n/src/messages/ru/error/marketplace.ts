@@ -59,8 +59,6 @@ export const messages = {
   "error.marketplace.linkInvalid": "Ссылка на агента некорректна.",
   "error.marketplace.changedSinceOpened":
     "Агент изменился после того, как вы его открыли. Откройте ссылку снова, чтобы посмотреть новую версию.",
-  "error.marketplace.skillNameConflict":
-    "У вас уже есть другой локальный навык с именем «{name}». Переименуйте или удалите его и добавьте агента снова.",
   "error.marketplace.avatarInvalid": "Аватар агента некорректен.",
   "error.marketplace.secretInName": "Удалите секрет или адрес электронной почты из имени, прежде чем публиковать.",
   "error.marketplace.secretInTitle": "Удалите секрет или адрес электронной почты из названия, прежде чем публиковать.",

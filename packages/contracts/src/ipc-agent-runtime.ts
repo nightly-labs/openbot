@@ -68,9 +68,9 @@ export interface AgentRuntimePromptQuestion {
   id: string;
   header: string;
   question: string;
+  detail?: string;
   isSecret: boolean;
   options: Array<{ label: string; description: string }> | null;
-  /** See `AgentPromptQuestion.multiSelect`. */
   multiSelect?: boolean;
 }
 
@@ -80,6 +80,7 @@ function isRuntimePromptQuestion(value: unknown): value is AgentRuntimePromptQue
     isIdentifier(value.id) &&
     isBoundedString(value.header, AGENT_RUNTIME_QUESTION_HEADER_LIMIT) &&
     isBoundedString(value.question, AGENT_RUNTIME_TEXT_LIMIT) &&
+    (value.detail === undefined || isBoundedString(value.detail, AGENT_RUNTIME_TEXT_LIMIT)) &&
     isBoolean(value.isSecret) &&
     (value.multiSelect === undefined || isBoolean(value.multiSelect)) &&
     (value.options === null ||
@@ -115,9 +116,6 @@ function isRuntimeApproval(value: unknown): value is AgentRuntimeApproval {
   );
 }
 
-// The twin of `isAgentApprovalPermissions` in `ipc-approvals.ts`, bounded by the snapshot's tighter
-// limits instead of the IPC ones. Kept apart on purpose: merging them onto either bound would either
-// let a snapshot exceed its byte cap or reject a legitimate full approval.
 function isRuntimeApprovalPermissions(value: unknown): value is AgentApprovalPermissions {
   return (
     isDynamicRecord(value) &&
@@ -136,7 +134,9 @@ function isRuntimePathList(value: unknown): value is string[] {
   );
 }
 
-/** What fills a part of the context window, in the order the popover lists it. */
+const AGENT_CONTEXT_COMPACTION_REASONS = ["cacheExpiry"] as const;
+export type AgentContextCompactionReason = (typeof AGENT_CONTEXT_COMPACTION_REASONS)[number];
+
 export const AGENT_CONTEXT_CATEGORIES = [
   "systemPrompt",
   "memoryFiles",
@@ -154,11 +154,6 @@ export interface AgentContextCategoryUsage {
   tokens: number;
 }
 
-/**
- * How full the context window of one chat is. The Team API carries it only under context-usage-v1, with
- * the keys and values that `team-protocol/context-usage-v1.ts` freezes: a new key or value goes only to a
- * later capability.
- */
 export interface AgentContextState {
   agentId: string;
   threadId: string;
@@ -168,7 +163,6 @@ export interface AgentContextState {
     autoCompactAt: number | null;
     nativeManaged: boolean;
     estimated?: boolean;
-    /** The provider's estimate of what fills `usedTokens`. Absent when the provider gives only a total. */
     categories?: AgentContextCategoryUsage[];
   } | null;
   compaction: {
@@ -178,6 +172,7 @@ export interface AgentContextState {
     beforeTokens?: number;
     afterTokens?: number;
     expectedMs?: number;
+    reason?: AgentContextCompactionReason;
   } | null;
 }
 
@@ -185,7 +180,6 @@ function isContextCount(value: unknown): value is number {
   return typeof value === "number" && Number.isFinite(value) && value >= 0;
 }
 
-/** One row per category at most, each a token count. */
 export function isAgentContextCategories(value: unknown): value is AgentContextCategoryUsage[] {
   return (
     Array.isArray(value) &&
@@ -218,13 +212,13 @@ function isAgentContextState(value: unknown): value is AgentContextState {
         isOneOf(["running", "completed", "failed"] as const, compaction.status) &&
         (compaction.beforeTokens === undefined || isContextCount(compaction.beforeTokens)) &&
         (compaction.afterTokens === undefined || isContextCount(compaction.afterTokens)) &&
-        (compaction.expectedMs === undefined || isContextCount(compaction.expectedMs))))
+        (compaction.expectedMs === undefined || isContextCount(compaction.expectedMs)) &&
+        (compaction.reason === undefined || isOneOf(AGENT_CONTEXT_COMPACTION_REASONS, compaction.reason))))
   );
 }
 
 export interface AgentRuntimeSnapshot {
   contextStates?: AgentContextState[];
-  /** The context of each side thread that reported one, by its `threadId`. Team API: as `contextStates`. */
   threadContextStates?: AgentContextState[];
   agents: AgentRuntimeRosterEntry[];
   activeTurns: Array<{ agentId: string; threadId: string; turnId: string }>;
@@ -237,20 +231,16 @@ export interface AgentRuntimeSnapshot {
     threadId: string;
     turnId: string;
     questions: AgentRuntimePromptQuestion[];
+    detached?: true;
   }>;
   pendingApprovals: AgentRuntimeApproval[];
   pendingBrowserTakeovers: BrowserTakeoverRequest[];
   failedTurns: Array<{ agentId: string; turnId: string }>;
-  /**
-   * The agents whose queue waits for a provider plan limit to reset, in epoch seconds. Absent from
-   * a released Team API snapshot: its adapters project a fixed key list.
-   */
   usageLimits?: Array<{ agentId: string; resetsAt: number | null }>;
-  /**
-   * Each provider account and model that a usage limit holds, also when no agent is on it now. Absent
-   * from a released Team API snapshot, as `usageLimits` is.
-   */
   usageLimitedModels?: AgentModelChoice[];
+  failedModels?: AgentModelChoice[];
+  subagentTurns?: Array<{ agentId: string; turnId: string }>;
+  backgroundWork?: Array<{ agentId: string; taskId: string | null; since: number }>;
 }
 
 export function isAgentRuntimeSnapshot(value: unknown): value is AgentRuntimeSnapshot {
@@ -315,11 +305,34 @@ export function isAgentRuntimeSnapshot(value: unknown): value is AgentRuntimeSna
     (value.usageLimitedModels === undefined ||
       (Array.isArray(value.usageLimitedModels) &&
         value.usageLimitedModels.length <= INPUT_LIMITS.agents &&
-        value.usageLimitedModels.every(isAgentModelChoice)))
+        value.usageLimitedModels.every(isAgentModelChoice))) &&
+    (value.failedModels === undefined ||
+      (Array.isArray(value.failedModels) &&
+        value.failedModels.length <= INPUT_LIMITS.agents &&
+        value.failedModels.every(isAgentModelChoice))) &&
+    (value.subagentTurns === undefined ||
+      (Array.isArray(value.subagentTurns) &&
+        value.subagentTurns.length <= INPUT_LIMITS.agents &&
+        value.subagentTurns.every(
+          (turn) => isDynamicRecord(turn) && isIdentifier(turn.agentId) && isIdentifier(turn.turnId),
+        ))) &&
+    (value.backgroundWork === undefined ||
+      (Array.isArray(value.backgroundWork) &&
+        value.backgroundWork.length <= INPUT_LIMITS.agents &&
+        value.backgroundWork.every(
+          (work) =>
+            isDynamicRecord(work) &&
+            isIdentifier(work.agentId) &&
+            (work.taskId === null || isIdentifier(work.taskId)) &&
+            typeof work.since === "number" &&
+            Number.isFinite(work.since),
+        )))
   );
 }
 
-function isRuntimePrompt(value: unknown): value is AgentRuntimeSnapshot["pendingPrompts"][number] {
+export type AgentRuntimePrompt = AgentRuntimeSnapshot["pendingPrompts"][number];
+
+export function isRuntimePrompt(value: unknown): value is AgentRuntimePrompt {
   return (
     isDynamicRecord(value) &&
     isRequestId(value.requestId) &&
@@ -328,6 +341,7 @@ function isRuntimePrompt(value: unknown): value is AgentRuntimeSnapshot["pending
     isIdentifier(value.turnId) &&
     Array.isArray(value.questions) &&
     value.questions.length <= INPUT_LIMITS.promptQuestions &&
-    value.questions.every(isRuntimePromptQuestion)
+    value.questions.every(isRuntimePromptQuestion) &&
+    (value.detached === undefined || value.detached === true)
   );
 }

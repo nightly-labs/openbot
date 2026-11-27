@@ -2,7 +2,6 @@ import type { PartialTranslation } from "../../../message";
 import type { messages as source } from "../../en/error/computerUse";
 
 export const messages = {
-  // Computer Use driver and permission window errors.
   "error.computerUse.noAppToDrag": "该版本的 OpenBot 没有可拖动的应用。",
   "error.computerUse.helpWindowChanged": "权限帮助窗口在拖动开始前发生了变化。",
   "error.computerUse.noAppToShow": "该版本的 OpenBot 没有可显示的应用。",

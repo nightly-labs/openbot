@@ -1,42 +1,32 @@
 import { createHash } from "node:crypto";
-import { readFile } from "node:fs/promises";
 import { INPUT_LIMITS } from "@openbot/contracts/input-limits";
 import { type BrowserBounds, type BrowserEnvironment, isBrowserProfileId } from "@openbot/contracts/ipc";
-import { isBoolean, isNumber, isString } from "@openbot/contracts/runtime-values";
+import { type DynamicRecord, isBoolean, isNumber, isString } from "@openbot/contracts/runtime-values";
 import { legacyAgentId } from "@openbot/contracts/validation";
 import { Effect } from "effect";
-import { browserCall, browserSync } from "./browser-effects";
 import type { BrowserToolArguments } from "./browser-tools";
-import { isMissingFileError } from "./file-errors";
 import { isRecord } from "./protocol";
+import { readVersionedJsonFile, type VersionedJsonFormat } from "./versioned-json-store";
 
 export interface StoredBrowserTab {
   id: string;
   url: string;
   ownerThreadId: string | null;
   ownerAgentId: string | null;
-  /** Absent in a v1 file, and in a v2 file whose environment did not survive validation. */
   environment?: BrowserEnvironment;
-  /** The key of the agent session the tab opened in. Absent: the shared session. See `agentBrowserSessionKey`. */
   agentSession?: string;
-  /**
-   * The id of the named profile the tab opened in. It comes before `agentSession`, which a profile tab
-   * also stores, so an older build opens it in a session of its own and never in the shared one.
-   */
   profile?: string;
+  sharedThreadIds?: string[];
 }
 
-/** The persistent session of a tab other than the shared one. Fixed for the life of the tab. */
 export type BrowserTabSession = { kind: "agent"; key: string } | { kind: "profile"; profileId: string };
 
-/** The directory name of a session under `Partitions`. Its partition is `persist:` and this name. */
 export function browserTabPartition(tabSession: BrowserTabSession): string {
   return tabSession.kind === "agent"
     ? `openbot-browser-agent-${tabSession.key}`
     : `openbot-browser-profile-${tabSession.profileId}`;
 }
 
-/** The session of a saved tab. Undefined: the shared session. */
 export function storedTabSession(
   tab: Pick<StoredBrowserTab, "agentSession" | "profile">,
 ): BrowserTabSession | undefined {
@@ -44,7 +34,6 @@ export function storedTabSession(
   return tab.agentSession === undefined ? undefined : { kind: "agent", key: tab.agentSession };
 }
 
-/** The saved fields of a tab session. A profile tab also names a session that an older build reads. */
 export function storedSessionFields(
   tabSession: BrowserTabSession | undefined,
 ): Pick<StoredBrowserTab, "agentSession" | "profile"> {
@@ -56,10 +45,6 @@ export function storedSessionFields(
   };
 }
 
-/**
- * The partition key of an agent's own browser session. A hash, so an agent id never becomes part of
- * a directory name, and the same agent always gets the same cookies back.
- */
 export function agentBrowserSessionKey(agentId: string): string {
   return createHash("sha256").update(agentId).digest("hex").slice(0, 32);
 }
@@ -68,10 +53,6 @@ function isAgentBrowserSessionKey(value: unknown): value is string {
   return isString(value) && /^[0-9a-f]{32}$/.test(value);
 }
 
-/**
- * A viewport this large would allocate a backing store big enough to take the whole app down, and the
- * bound is on the *physical* pixels, so a modest CSS size with a 4x scale factor still trips it.
- */
 const MAX_PHYSICAL_VIEWPORT_PIXELS = 8_388_608;
 
 function isSafeViewportSize(width: number, height: number, deviceScaleFactor: number): boolean {
@@ -86,11 +67,6 @@ export function defaultBrowserEnvironment(): BrowserEnvironment {
   };
 }
 
-/**
- * A per-tab environment read back from the user's own file. Every bound is re-checked rather than
- * trusted, because a hand-edited or truncated file would otherwise hand a viewport straight to
- * `Emulation.setDeviceMetricsOverride`.
- */
 function browserEnvironment(value: unknown): BrowserEnvironment | null {
   if (!isRecord(value) || !isRecord(value.viewport)) return null;
   const viewport = value.viewport;
@@ -143,8 +119,6 @@ export function persistentBrowserUrl(value: string, options: { popup?: boolean }
     return X_LANDING_URL;
   }
   if (options.popup) {
-    // A restart cannot resume the popup's live authorization exchange. Keep ordinary
-    // query parameters, but do not save or replay callback credentials.
     url.username = "";
     url.password = "";
     const fragment = new URLSearchParams(url.hash.slice(1));
@@ -170,14 +144,6 @@ export function isPersistableBrowserUrl(value: string): boolean {
   }
 }
 
-/**
- * A tab a released build wrote spells the owner key `ownerBotId`, and rejecting it would filter out every
- * tab open at the moment of the upgrade, so the user's browser would come back empty. Only the key is
- * translated here. The id *values* beside it are left exactly as they were found, because syntax cannot
- * tell which of them migration v13 rewrote -- it declines on a collision, and an agent imported from
- * `bots.json` after the migrations ran never went through it at all. `reownStoredBrowserTab` does that
- * part against the roster, which knows.
- */
 function storedBrowserTab(value: unknown): StoredBrowserTab | null {
   if (
     !isRecord(value) ||
@@ -198,11 +164,10 @@ function storedBrowserTab(value: unknown): StoredBrowserTab | null {
     return null;
   }
   if (!isPersistableBrowserUrl(value.url)) return null;
-  // A tab whose session cannot be read is dropped: loading it in the shared session would show it
-  // signed in to another account.
   if (value.agentSession !== undefined && !isAgentBrowserSessionKey(value.agentSession)) return null;
   if (value.profile !== undefined && !isBrowserProfileId(value.profile)) return null;
   const environment = browserEnvironment(value.environment);
+  const sharedThreadIds = storedSharedThreadIds(value.sharedThreadIds);
   return {
     id: value.id,
     url: value.url,
@@ -211,45 +176,33 @@ function storedBrowserTab(value: unknown): StoredBrowserTab | null {
     ...(environment === null ? {} : { environment }),
     ...(value.agentSession === undefined ? {} : { agentSession: value.agentSession }),
     ...(value.profile === undefined ? {} : { profile: value.profile }),
+    ...(sharedThreadIds.length === 0 ? {} : { sharedThreadIds }),
   };
 }
 
-/** Enough of an agent to say which of two spellings of an id is the one it answers to now. */
+const SHARED_THREAD_LIMIT = 64;
+
+function storedSharedThreadIds(value: unknown): string[] {
+  if (!Array.isArray(value)) return [];
+  const ids = value.filter((id): id is string => isString(id) && id.length > 0 && id.length <= INPUT_LIMITS.identifier);
+  return [...new Set(ids)].slice(0, SHARED_THREAD_LIMIT);
+}
+
 export interface BrowserTabOwner {
   id: string;
   threadId: string | null;
 }
 
-/**
- * Points a tab a released build wrote at the agent that owns it now. Migration v13 renamed agents inside
- * the database and rewrote their thread ids with them, but a JSON file outside the database kept the old
- * spellings -- so the tab's owner matches nothing, and `#canUseToolTab` compares a thread id that no
- * longer exists and refuses every tool call against the tab the agent itself opened.
- *
- * The mapping comes from the roster rather than from the shape of the id, because the shape does not know
- * which agents v13 actually renamed: it declines when the `agent-` spelling is already taken, and an agent
- * imported from `bots.json` after the migrations ran never went through it. An owner that resolves to
- * nobody keeps the id it was found with -- inventing one hands the tab to a stranger.
- */
 export function reownStoredBrowserTab(tab: StoredBrowserTab, agents: readonly BrowserTabOwner[]): StoredBrowserTab {
   if (tab.ownerAgentId === null && tab.ownerThreadId === null) return tab;
   const owner = tabOwner(tab, agents);
   if (!owner) return tab;
-  // Both fields are brought to the owner, not just the one that failed to match. A generated agent's
-  // thread id is `openbot-thread-<uuid>` with no agent id inside it, so v13 never touched it and it
-  // matches on its own -- while the owner id beside it is still the pre-rename spelling. Stopping at the
-  // first match would call that tab correct and leave `#canUseToolTab`, which checks both, refusing it.
   const ownerThreadId = tab.ownerThreadId === null || owner.threadId === null ? tab.ownerThreadId : owner.threadId;
   const ownerAgentId = tab.ownerAgentId === null ? null : owner.id;
   if (ownerThreadId === tab.ownerThreadId && ownerAgentId === tab.ownerAgentId) return tab;
   return { ...tab, ownerThreadId, ownerAgentId };
 }
 
-/**
- * The roster entry a tab belongs to. Both current spellings are asked before either historical one,
- * because v13 declines to rename onto an id that is taken: a `bot-<uuid>` agent can be sitting beside the
- * `agent-<uuid>` it would otherwise have become, and the one that literally holds the id owns the tab.
- */
 function tabOwner(tab: StoredBrowserTab, agents: readonly BrowserTabOwner[]): BrowserTabOwner | undefined {
   const claims: ((agent: BrowserTabOwner) => boolean)[] = [
     (agent) => agent.id === tab.ownerAgentId,
@@ -264,59 +217,44 @@ function tabOwner(tab: StoredBrowserTab, agents: readonly BrowserTabOwner[]): Br
   return undefined;
 }
 
-/**
- * The thread id this agent's thread carried before the rename. A thread id either embeds the agent id, in
- * which case migration v13 rewrote it along with the id, or is a bare UUID it never touched -- so
- * substituting the agent's own id is the whole of the difference.
- */
 function legacyThreadId(agent: BrowserTabOwner): string | null {
   if (agent.threadId === null) return null;
   return agent.threadId.replace(agent.id, legacyAgentId(agent.id));
 }
 
-/**
- * The file is always rewritten as v2. A v1 file is still read -- `storedBrowserTab` accepts both owner
- * spellings, and a tab that arrives without an environment is given the default rather than dropped.
- */
 export interface StoredBrowserStateV2 {
   version: 2;
   activeTabId: string | null;
   tabs: Array<StoredBrowserTab & { environment: BrowserEnvironment }>;
 }
-export const readBrowserState = Effect.fn("Browser.readState")((path: string) =>
-  Effect.gen(function* () {
-    const content = yield* browserCall((signal) => readFile(path, { encoding: "utf8", signal }));
-    return yield* browserSync((): StoredBrowserStateV2 => {
-      const parsed = JSON.parse(content);
-      if (!isRecord(parsed) || (parsed.version !== 1 && parsed.version !== 2)) {
-        return { version: 2, activeTabId: null, tabs: [] };
-      }
-      const tabs = Array.isArray(parsed.tabs)
-        ? parsed.tabs
-            .map(storedBrowserTab)
-            .filter((tab) => tab !== null)
-            .map((tab) => ({
-              ...tab,
-              url: persistentBrowserUrl(tab.url),
-              // A v1 file never wrote an environment, so anything sitting under that key in one is not
-              // ours to trust -- the tab starts from the default instead.
-              environment: (parsed.version === 2 ? tab.environment : undefined) ?? defaultBrowserEnvironment(),
-            }))
-        : [];
-      return {
-        version: 2,
-        activeTabId: isString(parsed.activeTabId) ? parsed.activeTabId : null,
-        tabs: tabs.filter((tab, index) => tabs.findIndex((candidate) => candidate.id === tab.id) === index),
-      };
-    });
-  }).pipe(
-    Effect.catch((error) =>
-      isMissingFileError(error.cause) || error.cause instanceof SyntaxError
-        ? Effect.succeed<StoredBrowserStateV2>({ version: 2, activeTabId: null, tabs: [] })
-        : Effect.fail(error),
-    ),
-  ),
-);
+const BROWSER_STATE_FORMAT: VersionedJsonFormat<StoredBrowserStateV2> = {
+  current: 2,
+  releases: { 1: (file) => browserStateFromFile(file, 1), 2: (file) => browserStateFromFile(file, 2) },
+};
+
+export const readBrowserState = Effect.fn("Browser.readState")(function* (path: string) {
+  const loaded = yield* readVersionedJsonFile(path, BROWSER_STATE_FORMAT);
+  const state: StoredBrowserStateV2 = loaded.value ?? { version: 2, activeTabId: null, tabs: [] };
+  return { state, writePath: loaded.writePath };
+});
+
+function browserStateFromFile(file: DynamicRecord, version: 1 | 2): StoredBrowserStateV2 {
+  const tabs = Array.isArray(file.tabs)
+    ? file.tabs
+        .map(storedBrowserTab)
+        .filter((tab) => tab !== null)
+        .map((tab) => ({
+          ...tab,
+          url: persistentBrowserUrl(tab.url),
+          environment: (version === 2 ? tab.environment : undefined) ?? defaultBrowserEnvironment(),
+        }))
+    : [];
+  return {
+    version: 2,
+    activeTabId: isString(file.activeTabId) ? file.activeTabId : null,
+    tabs: tabs.filter((tab, index) => tabs.findIndex((candidate) => candidate.id === tab.id) === index),
+  };
+}
 
 export function resolveEnvironment(
   value: BrowserToolArguments<"set_environment">,
@@ -354,7 +292,6 @@ export function resolveEnvironment(
   ) {
     throw new Error("Viewport dimensions are outside the supported range.");
   }
-  // Fill clears the device metrics override, so it cannot inherit a custom emulation scale.
   const scale =
     mode === "fill" ? 1 : (value.deviceScaleFactor ?? presetSize?.scale ?? current.viewport.deviceScaleFactor);
   if (scale < 0.5 || scale > 4) throw new Error("deviceScaleFactor must be between 0.5 and 4.");

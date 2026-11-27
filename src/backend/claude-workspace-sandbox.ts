@@ -1,7 +1,7 @@
 import { createHash, randomUUID } from "node:crypto";
 import { lstat, mkdir, readlink, realpath, rename, rm, symlink, writeFile } from "node:fs/promises";
 import { basename, dirname, join, resolve } from "node:path";
-import type { HookCallbackMatcher, Options, SdkPluginConfig } from "@anthropic-ai/claude-agent-sdk";
+import type { HookCallbackMatcher, Options, SdkPluginConfig, Settings } from "@anthropic-ai/claude-agent-sdk";
 import { isDynamicRecord, isString } from "@openbot/contracts/runtime-values";
 import { Effect, Result } from "effect";
 import { workspaceTemporaryPaths } from "./agent/workspace-sandbox";
@@ -11,30 +11,10 @@ import { listHomeSkills, skillFolderNames } from "./home-skills";
 import { isPathInside } from "./path-containment";
 import { type ProviderClientOperationError, providerCall, providerFailure } from "./provider-client-effects";
 
-/**
- * Workspace only for Claude has two parts, because the Claude sandbox covers Bash and nothing else.
- *
- * - Bash runs in the Claude sandbox, which lets it write only in the roots and the temporary folders. `failIfUnavailable` stops
- *   the query when the computer cannot make that sandbox, and no command may leave it.
- * - The file tools do not run in that sandbox. A `PreToolUse` hook returns `ask` for a write outside
- *   the roots and the temporary folders. Unlike `canUseTool`, a hook runs even when an allow rule in the user's Claude settings
- *   matches the tool, and `ask` then sends the write to `canUseTool`, which asks the user.
- *
- * Reads, the network and the MCP servers stay open, as the Access setting says. The folders that the
- * user excluded are denied in both parts: the sandbox denies Bash writes there, and the hook denies a
- * file tool's write there with no question to the user.
- *
- * The files in `.claude` of the workspace are not trusted: a Codex agent can write them before a
- * switch to Claude, because Codex cannot deny one path in a writable root while it takes a sandbox
- * mode. The Grok and OpenCode sandboxes deny them. Their `sandbox.filesystem.allowWrite`, `Edit(...)`
- * rules and hooks would widen this sandbox or run outside it. So the query loads the user settings
- * only, the workspace skills come back through `claudeWorkspaceSkillPlugin`, and
- * `CLAUDE_WORKSPACE_MANAGED_SETTINGS` stops the hooks of settings and skills.
- */
 export function claudeWorkspaceSandbox(
   roots: readonly string[],
   excluded: readonly string[] = [],
-): NonNullable<Options["sandbox"]> {
+): NonNullable<Settings["sandbox"]> {
   return {
     enabled: true,
     failIfUnavailable: true,
@@ -44,20 +24,10 @@ export function claudeWorkspaceSandbox(
   };
 }
 
-/**
- * Only the hooks of managed settings run, and OpenBot gives none. The SDK hook of
- * `claudeWorkspaceHooks` still runs. A hook in the frontmatter of a workspace skill does not.
- */
 export const CLAUDE_WORKSPACE_MANAGED_SETTINGS: NonNullable<Options["managedSettings"]> = {
   allowManagedHooksOnly: true,
 };
 
-/**
- * A plugin named `openbot` whose `skills` links to `.claude/skills` of the workspace, because Claude
- * reads that folder only with the project settings. Claude lists each skill as `openbot:<name>` and
- * `/<name>` still works. The plugin folder is in `stateDirectory`, outside every root the agent can
- * write: a plugin can also start hooks and language servers, which run outside the sandbox.
- */
 export const claudeWorkspaceSkillPlugin = Effect.fn("ClaudeWorkspace.skillPlugin")(function* (
   stateDirectory: string,
   cwd: string,
@@ -70,8 +40,6 @@ export const claudeWorkspaceSkillPlugin = Effect.fn("ClaudeWorkspace.skillPlugin
   const link = join(directory, "skills");
   const target = join(cwd, ".claude", "skills");
   if ((yield* currentLink(link)) !== target) {
-    // A link made aside and renamed over the old one, so a query that starts at the same time never
-    // sees the plugin without its skills.
     const staged = `${link}.${randomUUID()}`;
     yield* providerCall(() => symlink(target, staged, "junction"));
     yield* providerCall(() => rename(staged, link));
@@ -79,14 +47,6 @@ export const claudeWorkspaceSkillPlugin = Effect.fn("ClaudeWorkspace.skillPlugin
   return { type: "local", path: directory };
 });
 
-/**
- * A plugin named `agents` with the user's skills in `~/.agents/skills`, because Claude does not read
- * that folder. A skill that Claude already reads from `<configDirectory>/skills` or `.claude/skills`
- * of the workspace is left out, so a skill that `npx skills` linked into both folders is listed once.
- * Claude lists each skill as `agents:<name>`, and `/<name>` still works. Each set of skills has a
- * folder of its own, named by its hash and never changed, so a query that runs keeps its skills when
- * the next one gets another set. Null when no skill is left.
- */
 export const claudeHomeSkillPlugin = Effect.fn("ClaudeWorkspace.homeSkillPlugin")(function* (
   stateDirectory: string,
   configDirectory: string,
@@ -104,7 +64,6 @@ export const claudeHomeSkillPlugin = Effect.fn("ClaudeWorkspace.homeSkillPlugin"
   const directory = join(stateDirectory, "claude-skill-plugins", `home-${hash}`);
   const manifest = join(directory, ".claude-plugin", "plugin.json");
   if (yield* pathExists(manifest)) return { type: "local", path: directory };
-  // Made aside and renamed into place, so a query never sees a plugin without all its skills.
   const staged = `${directory}.${randomUUID()}`;
   yield* providerCall(() => mkdir(join(staged, ".claude-plugin"), { recursive: true, mode: 0o700 }));
   yield* providerCall(() =>
@@ -115,7 +74,6 @@ export const claudeHomeSkillPlugin = Effect.fn("ClaudeWorkspace.homeSkillPlugin"
     yield* providerCall(() => symlink(skill.directory, join(staged, "skills", skill.slug), "junction"));
   const moved = yield* Effect.result(providerCall(() => rename(staged, directory)));
   if (Result.isFailure(moved)) {
-    // A query that started at the same time made the same folder first.
     yield* providerCall(() => rm(staged, { recursive: true, force: true }));
     if (!(yield* pathExists(manifest))) return yield* Effect.fail(moved.failure);
   }
@@ -137,10 +95,6 @@ const currentLink = Effect.fn("ClaudeWorkspace.currentLink")((path: string) =>
 
 const WRITE_TOOLS = ["Write", "Edit", "MultiEdit", "NotebookEdit"];
 
-/**
- * The `PreToolUse` hook that denies a file tool's write in an excluded folder and sends one outside
- * the roots to `canUseTool`.
- */
 export function claudeWorkspaceHooks(
   cwd: string,
   roots: readonly string[],
@@ -175,13 +129,6 @@ export function claudeWorkspaceHooks(
   return { PreToolUse: [matcher] };
 }
 
-/**
- * The path a file tool would write outside the roots and the temporary folders, or null when it writes
- * inside them or is not a file tool. Symbolic links are resolved, also a link to a file that does not
- * exist yet, so a link in the workspace that points outside it counts as outside. A path that cannot be
- * resolved counts as outside. Claude's own settings files in a root count as outside too: Workspace
- * only ignores them, but a Full access session or Claude in a terminal loads them and runs their hooks.
- */
 export const claudeWriteOutsideRoots = Effect.fn("ClaudeWorkspace.writeOutsideRoots")(function* (
   toolName: string,
   toolInput: unknown,
@@ -201,15 +148,10 @@ export const claudeWriteOutsideRoots = Effect.fn("ClaudeWorkspace.writeOutsideRo
   }).pipe(Effect.catch(() => Effect.succeed(path)));
 });
 
-/** What Claude reads when the hook or `canUseTool` denies a write in an excluded folder. */
 export function claudeExcludedWriteMessage(path: string): string {
   return `Workspace only: the user excluded the folder that holds ${path}. Do not write there.`;
 }
 
-/**
- * The path a file tool would write in an excluded folder, or null. A path that cannot be resolved
- * counts as in one when there are excluded folders, the same as `claudeWriteOutsideRoots`.
- */
 export const claudeWriteInExcluded = Effect.fn("ClaudeWorkspace.writeInExcluded")(function* (
   toolName: string,
   toolInput: unknown,
@@ -240,14 +182,8 @@ function isClaudeSettingsFile(path: string): boolean {
   return basename(dirname(path)) === ".claude" && /^settings(\.local)?\.json$/.test(basename(path));
 }
 
-/** The same limit as Linux, so a loop of links fails and counts as outside. */
 const MAX_LINKS = 40;
 
-/**
- * The real path of `path`. A file that does not exist is resolved through its nearest folder that
- * does, and a link to a file that does not exist through the link's target. It throws for any other
- * error and for a loop of links.
- */
 const resolveExisting = Effect.fn("ClaudeWorkspace.resolveExisting")(function* (
   path: string,
   links = 0,

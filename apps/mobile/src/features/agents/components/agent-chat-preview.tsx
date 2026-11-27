@@ -2,22 +2,21 @@ import { Link } from "expo-router";
 import { Typography } from "heroui-native";
 import { useThemeColor } from "heroui-native/hooks";
 import { useState } from "react";
-import { useWindowDimensions, View } from "react-native";
+import { View } from "react-native";
 import { BloubAvatar } from "@/features/agents/components/bloub-avatar";
 import { ChatMarkdown } from "@/features/chat/components/chat-markdown";
 import { type MobileAgent, useMobileWorkspaceSelector } from "@/features/workspace/context/mobile-workspace-context";
 import { useColumnWidth } from "@/shared/components/adaptive-split";
+import { useFontScale } from "@/shared/lib/font-scale";
 import { isIOS } from "@/shared/lib/platform";
 
 const HEADER_HEIGHT = 64;
 const SIDE_INSET = 16;
 const BUBBLE_MARGIN = 12;
-/** The host keeps only this many characters of the latest message (`AgentStore.updatePreview`). */
 const HOST_PREVIEW_LIMIT = 180;
 const FALLBACK_LINE_HEIGHT = 27;
 const FALLBACK_CHARACTER_WIDTH = 7;
 
-/** Ends a preview that the host cut at its limit on a whole word, so it does not stop inside one. */
 function previewText(preview: string): string {
   const text = preview.trim();
   if (preview.length < HOST_PREVIEW_LIMIT) return text;
@@ -39,20 +38,8 @@ function PreviewBubble({ text, onHeight }: { text: string; onHeight?: (height: n
   );
 }
 
-/**
- * The long-press preview of an agent chat: who it is and the latest message, as iOS Messages shows it.
- *
- * `preview` is the `Link.Preview` element itself: `Link` finds its preview by element type, so a
- * wrapper component would be ignored. The native preview reads its size once, when it opens, and
- * renders its content only after that. So `measurer` lays out an invisible copy of the bubble in the
- * row when a touch starts (`onPressIn`), before the long press opens the preview.
- *
- * Only iOS shows the preview. On Android the hook returns no preview and measures nothing, so a tap
- * that opens the chat does not also parse the latest message.
- */
 export function useAgentChatPreview(agent: MobileAgent) {
-  const { fontScale } = useWindowDimensions();
-  // In the chat list pane, the preview has the width of the pane, not of the whole window.
+  const fontScale = useFontScale();
   const screenWidth = useColumnWidth();
   const [measuring, setMeasuring] = useState(false);
   const [bubbleHeight, setBubbleHeight] = useState<number | null>(null);

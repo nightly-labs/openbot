@@ -21,20 +21,26 @@ import {
 import { currentText } from "@openbot/ui/text";
 import type { VirtualItem } from "@tanstack/virtual-core";
 import { createEffect, createMemo, createSignal, onCleanup, untrack } from "solid-js";
-import { groupAgentMessageMarkers, markOpenAgentMessages } from "../agent-message-timeline";
+import { groupAgentMessageMarkers, markOpenAgentMessages, teammateTurnAnswers } from "../agent-message-timeline";
 import type { ConversationProps, ConversationTarget } from "../conversation-types";
 import { summarizeHostedSiteMessages } from "../hosted-site-timeline";
+import { narrationRows, placeTurnRowsByTime, placeUpdatesAfterSteers } from "../narration-rows";
 import {
   expandRoutineRunGroups,
   groupRoutineRunMarkers,
   placeRoutineRunTurns,
+  quietRunStepsRow,
   type RoutineRunOpenState,
   routineRunToggleKey,
   routineRunTurnMessages,
   summarizeRoutineRunMessages,
 } from "../routine-run-timeline";
+import { groupSkillInstallMarkers } from "../skill-install-timeline";
 import { isTurnAnswer } from "../turn-steps";
+import { createTurnStreamHold, heldWhileWritten } from "../turn-stream-hold";
 import { conversationOwnerId } from "./composer-store";
+
+const PROMPT_SEND_HOLD_MS = 2000;
 
 interface ScrollElements {
   scrollElement: () => HTMLDivElement | undefined;
@@ -46,6 +52,8 @@ interface ScrollStickyState {
   getStickToLatest: () => boolean;
   setStickToLatest: (value: boolean) => void;
   getCurrentUnreadCount: () => number;
+  followLatest: (element: HTMLDivElement) => void;
+  followReaderScroll: (element: HTMLDivElement) => void;
 }
 
 export interface ScrollStoreDeps {
@@ -53,10 +61,11 @@ export interface ScrollStoreDeps {
   markingRead: () => boolean;
   setMarkingRead: (reading: boolean) => void;
   setComposerError: (error: string | null, targetOverride?: ConversationTarget) => void;
-  /** The user's messages the host has not drawn yet. They follow the transcript. */
   pendingMessages: () => AgentMessage[];
+  handedOverRowKeys: () => ReadonlyMap<string, string>;
   elements: ScrollElements;
   sticky: ScrollStickyState;
+  drawLatestFirst: () => boolean;
 }
 
 export function createScrollStore(deps: ScrollStoreDeps) {
@@ -66,38 +75,163 @@ export function createScrollStore(deps: ScrollStoreDeps) {
   const [atHistoryBoundary, setAtHistoryBoundary] = createSignal(false);
   const [unreadDividerVisible, setUnreadDividerVisible] = createSignal(false);
   const [newMessageCount, setNewMessageCount] = createSignal(0);
+  const [usedPageIds, setUsedPageIds] = createSignal<ReadonlySet<string>>(new Set());
   let unreadVisibilityFrame: number | undefined;
   let firstRenderedIndex = 0;
   let newMessages: NewMessageTally = { count: 0, anchorId: undefined };
   let talliedConversationIdentity: string | undefined;
 
   const [openRoutineRuns, setOpenRoutineRuns] = createSignal<RoutineRunOpenState>(new Map());
-  // The thinking and the memory changes of a turn show in the steps above its answer. A turn with
-  // no answer shows its memory changes in a row of their own.
   const answeredTurns = createMemo(
     () => new Set(deps.props.messages.flatMap((message) => (isTurnAnswer(message) ? [message.turnId] : []))),
   );
-  const shownMessages = createMemo(() =>
-    summarizeHostedSiteMessages(
-      deps.props.messages.filter(
-        (message) =>
-          message.kind !== "thinking" &&
-          !(message.kind === "memory-changes" && answeredTurns().has(message.turnId)) &&
-          !silentAgentAnswer(message),
-      ),
-    ),
+  const thinkingRowHiddenTurns = createMemo(
+    () =>
+      new Set([
+        ...answeredTurns(),
+        ...deps.props.messages.flatMap((message) =>
+          message.kind === "memory-changes" || silentAgentAnswer(message) ? [message.turnId] : [],
+        ),
+        deps.props.activeTurnId ?? undefined,
+        ...(deps.props.channel?.workingTurns() ?? []),
+      ]),
   );
+  const channelAnswerTimes = createMemo(() => {
+    const times = new Map<string, string>();
+    if (!deps.props.channel) return times;
+    for (const message of deps.props.messages)
+      if (
+        message.turnId &&
+        message.createdAt &&
+        message.body.trim() &&
+        isTurnAnswer(message) &&
+        !times.has(message.turnId)
+      )
+        times.set(message.turnId, message.createdAt);
+    return times;
+  });
+  const progressRows = (thinking: AgentMessage): AgentMessage[] => {
+    const channel = deps.props.channel;
+    if (!channel) return narrationRows(thinking, deps.props.agent?.provider);
+    const answeredAt = thinking.turnId ? channelAnswerTimes().get(thinking.turnId) : undefined;
+    return turnNarration(thinking).filter((row) => !answeredAt || !row.createdAt || row.createdAt <= answeredAt);
+  };
+  const turnNarration = (thinking: AgentMessage): AgentMessage[] =>
+    narrationRows(
+      thinking,
+      deps.props.channel ? deps.props.channel.author(thinking).agent?.provider : deps.props.agent?.provider,
+    );
+  const channelWriters = createMemo(() => new Set(deps.props.channel?.workers().map((worker) => worker.id) ?? []));
+  const turnHeld = createTurnStreamHold(() => deps.props.activeTurnId);
+  const held = (message: AgentMessage): boolean =>
+    deps.props.channel
+      ? heldWhileWritten(message) && message.senderAgentId !== undefined && channelWriters().has(message.senderAgentId)
+      : turnHeld(message);
+  const updateAnswers = createMemo(() => teammateTurnAnswers(deps.props.messages));
+  const foldedAnswerIds = createMemo(
+    () => new Set([...updateAnswers().values()].flatMap((answers) => answers.map((answer) => answer.id))),
+  );
+  const shownMessages = createMemo(() => {
+    const progressUpdates = deps.props.responseStyle === "natural";
+    const turnRowsList: AgentMessage[][] = [];
+    const listed = deps.props.messages.flatMap((message) => {
+      if (message.kind === "thinking") {
+        const rows = progressUpdates ? progressRows(message) : [];
+        const showsSteps =
+          message.turnId &&
+          !thinkingRowHiddenTurns().has(message.turnId) &&
+          (message.items?.some((item) => item.trim()) || quietRunStepsRow(message));
+        const turnRows = showsSteps ? [...rows, message] : rows;
+        turnRowsList.push(turnRows);
+        return deps.props.channel ? [] : turnRows;
+      }
+      if (message.kind === "memory-changes" && answeredTurns().has(message.turnId)) return [];
+      return silentAgentAnswer(message) || foldedAnswerIds().has(message.id) ? [] : [message];
+    });
+    const shown = deps.props.channel
+      ? placeTurnRowsByTime(listed, turnRowsList)
+      : placeUpdatesAfterSteers(listed, turnRowsList);
+    const complete = progressUpdates ? shown.filter((message) => !held(message)) : shown;
+    return summarizeHostedSiteMessages(
+      withQuestionContext(complete, deps.props.messages, deps.props.prompt?.turnId, turnNarration),
+    );
+  });
   const routineRunTurns = createMemo(() => routineRunTurnMessages(deps.props.messages, shownMessages()));
-  /* The messages of a routine run follow its row and open and close with it. */
-  const drawnMessages = createMemo(() => [
-    ...placeRoutineRunTurns(summarizeRoutineRunMessages(shownMessages()), routineRunTurns(), openRoutineRuns()),
-    ...deps.pendingMessages(),
-  ]);
+  const userRowSeenAt = new Map<string, number>();
+  let waitingQuestion:
+    | { key: string; owner: string; turnId: string; requestId: string; at: number; closedAt: number | undefined }
+    | undefined;
+  const [promptHoldClock, setPromptHoldClock] = createSignal(0);
+  const promptHold = createMemo(() => {
+    promptHoldClock();
+    const held = new Set<string>();
+    let revealAt: number | undefined;
+    const now = Date.now();
+    const owner = `${deps.props.server?.id ?? "local"}:${conversationOwnerId(deps.props) ?? ""}`;
+    const prompt = deps.props.channel ? undefined : deps.props.prompt;
+    const closesForMessage = prompt !== undefined && !prompt.detached && prompt.turnId === deps.props.activeTurnId;
+    if (waitingQuestion?.owner !== owner) waitingQuestion = undefined;
+    if (prompt && closesForMessage) {
+      const key = JSON.stringify([prompt.turnId, String(prompt.requestId)]);
+      if (waitingQuestion?.key !== key)
+        waitingQuestion = {
+          key,
+          owner,
+          turnId: prompt.turnId,
+          requestId: String(prompt.requestId),
+          at: now,
+          closedAt: undefined,
+        };
+    } else if (prompt) waitingQuestion = undefined;
+    else if (waitingQuestion) waitingQuestion.closedAt ??= now;
+    const waiting = waitingQuestion;
+    if (!waiting) {
+      userRowSeenAt.clear();
+      return { held, revealAt };
+    }
+    const question = deps.props.messages.find(
+      (message) => message.turnId === waiting.turnId && String(message.questionPrompt?.requestId) === waiting.requestId,
+    );
+    const rowDone = Boolean(question?.questionPrompt?.resolution);
+    const closedLongAgo = waiting.closedAt !== undefined && now - waiting.closedAt >= PROMPT_SEND_HOLD_MS;
+    if (!prompt && (rowDone || closedLongAgo)) {
+      waitingQuestion = undefined;
+      userRowSeenAt.clear();
+      return { held, revealAt };
+    }
+    const rows = [...shownMessages(), ...deps.pendingMessages()].filter((message) => message.author === "you");
+    for (const message of rows) {
+      if (!userRowSeenAt.has(message.id)) userRowSeenAt.set(message.id, now);
+      const seenAt = userRowSeenAt.get(message.id) ?? now;
+      const until = seenAt + PROMPT_SEND_HOLD_MS;
+      const beforeQuestion =
+        question?.createdAt !== undefined && message.createdAt !== undefined && message.createdAt <= question.createdAt;
+      if (beforeQuestion || seenAt <= waiting.at || until <= now) continue;
+      held.add(message.id);
+      revealAt = Math.min(revealAt ?? until, until);
+    }
+    return { held, revealAt };
+  });
+  createEffect(
+    () => promptHold().revealAt,
+    (revealAt) => {
+      if (revealAt === undefined) return;
+      const timer = setTimeout(() => setPromptHoldClock((tick) => tick + 1), Math.max(0, revealAt - Date.now()));
+      return () => clearTimeout(timer);
+    },
+  );
+  const drawnMessages = createMemo(() => {
+    const { held } = promptHold();
+    const drawn = [
+      ...placeRoutineRunTurns(summarizeRoutineRunMessages(shownMessages()), routineRunTurns(), openRoutineRuns()),
+      ...deps.pendingMessages(),
+    ];
+    return held.size === 0 ? drawn : drawn.filter((message) => !held.has(message.id));
+  });
   function toggleRoutineRun(marker: RoutineRunToggleMarkerModel): void {
     const key = routineRunToggleKey(marker);
     setOpenRoutineRuns((open) => new Map(open).set(key, marker.expanded !== true));
   }
-  /* The exchange ids of the agent messages whose text shows under their marker. */
   const [openAgentMessages, setOpenAgentMessages] = createSignal<ReadonlySet<string>>(new Set());
   function toggleAgentMessage(messageId: string): void {
     setOpenAgentMessages((open) => {
@@ -106,21 +240,12 @@ export function createScrollStore(deps: ScrollStoreDeps) {
       return next;
     });
   }
-  /*
-   * An open chat marks its messages read at once, so read state loses the first unread message.
-   * The visit keeps it until the reader opens another chat. A newer unread message replaces it.
-   */
   const visitUnread = createMemo<{ identity: string; messageId: string | null }>((previous) => {
     const identity = `${deps.props.server?.id ?? "local"}:${conversationOwnerId(deps.props) ?? ""}`;
     const messageId = deps.props.firstUnreadMessageId;
     if (previous?.identity === identity && !messageId) return previous;
     return { identity, messageId };
   });
-  /*
-   * The unread divider sits on the first unread row the timeline draws. A silent answer has no row,
-   * so the divider moves to the next row that has one; read state keeps the stored message. A
-   * message that is not loaded keeps its id, so the jump can open its page.
-   */
   const unreadBoundaryMessageId = createMemo(() => {
     const firstUnreadMessageId = visitUnread().messageId;
     const start = deps.props.messages.findIndex((message) => message.id === firstUnreadMessageId);
@@ -128,16 +253,21 @@ export function createScrollStore(deps: ScrollStoreDeps) {
     const drawn = new Set(drawnMessages().map((message) => message.id));
     return deps.props.messages.slice(start).find((message) => drawn.has(message.id))?.id ?? null;
   });
-  /* A group of agent messages or routine runs stops at the unread divider, so the divider keeps its row. */
   const timelineMessages = createMemo(() => {
     const group = (messages: readonly AgentMessage[]) =>
-      groupRoutineRunMarkers(groupAgentMessageMarkers(messages, unreadBoundaryMessageId()), unreadBoundaryMessageId());
+      groupSkillInstallMarkers(
+        groupRoutineRunMarkers(
+          groupAgentMessageMarkers(messages, unreadBoundaryMessageId()),
+          unreadBoundaryMessageId(),
+        ),
+        unreadBoundaryMessageId(),
+      );
     const state = deps.props.contextState;
     const startedAt =
       state?.agentId === deps.props.agent?.id && state?.threadId === deps.props.agent?.threadId
         ? state?.compaction?.startedAt
         : undefined;
-    const messages = markOpenAgentMessages(drawnMessages(), openAgentMessages());
+    const messages = markOpenAgentMessages(drawnMessages(), openAgentMessages(), updateAnswers());
     const boundary =
       startedAt === undefined
         ? -1
@@ -146,14 +276,15 @@ export function createScrollStore(deps: ScrollStoreDeps) {
       boundary < 0 ? group(messages) : [...group(messages.slice(0, boundary)), ...group(messages.slice(boundary))];
     return expandRoutineRunGroups(rows, messages, routineRunTurns(), openRoutineRuns());
   });
-  /*
-   * A row finds its message by id. The virtualizer gives a row its new index one tick after the list
-   * changes, so a lookup by index draws the neighbouring message in the row for that tick.
-   */
-  const timelineIndexById = createMemo(
-    () => new Map<VirtualItem["key"], number>(timelineMessages().map((message, index) => [message.id, index])),
-  );
-  /* Every row anchors the count, but only some rows add to it. */
+  const rowKey = (message: AgentMessage): string => deps.handedOverRowKeys().get(message.id) ?? message.id;
+  const timelineIndexById = createMemo(() => {
+    const indexes = new Map<VirtualItem["key"], number>();
+    timelineMessages().forEach((message, index) => {
+      indexes.set(message.id, index);
+      indexes.set(rowKey(message), index);
+    });
+    return indexes;
+  });
   const timelineRows = createMemo(() =>
     deps.props.messages.map((message) => ({ id: message.id, countable: countableTimelineMessage(message) })),
   );
@@ -163,11 +294,6 @@ export function createScrollStore(deps: ScrollStoreDeps) {
     setNewMessageCount(0);
   }
 
-  /*
-   * The count owns its identity guard instead of leaning on the effect that follows the bottom:
-   * that one is created later, so on a thread switch this would run first and carry the count of
-   * the thread the reader left into the thread they opened.
-   */
   createEffect(
     () => {
       const rows = timelineRows();
@@ -183,6 +309,7 @@ export function createScrollStore(deps: ScrollStoreDeps) {
         talliedConversationIdentity = identity;
         newMessages = anchorNewMessages(rows);
         setNewMessageCount(0);
+        setUsedPageIds(new Set<string>());
         return;
       }
       newMessages = tallyNewMessages(newMessages, rows, deps.sticky.getStickToLatest());
@@ -198,20 +325,45 @@ export function createScrollStore(deps: ScrollStoreDeps) {
       !deps.props.loadingOlder &&
       !deps.props.olderError,
     (needsOlderPage) => {
-      if (needsOlderPage) deps.props.onLoadOlder?.();
+      if (!needsOlderPage) return;
+      if (untrack(() => timelineMessages().length) > 0 && !updateHistoryBoundary()) return;
+      deps.props.onLoadOlder?.();
     },
   );
 
-  // A channel row is mostly a short message under an author; an agent row is often a longer answer.
+  function keepPageDrawn(messageId: string): void {
+    if (untrack(usedPageIds).has(messageId)) return;
+    setUsedPageIds((ids) => new Set([...ids, messageId]));
+  }
+  const usedPageIndexes = createMemo(
+    () => {
+      const indexes = timelineIndexById();
+      return [...usedPageIds()].flatMap((id) => indexes.get(id) ?? []);
+    },
+    { equals: (left, right) => left.length === right.length && left.every((index, at) => index === right[at]) },
+  );
+
   const rowEstimate = untrack(() => deps.props.channel) ? 84 : 128;
   const messageVirtualizer = createChatVirtualizer<HTMLDivElement, HTMLDivElement>({
     count: () => timelineMessages().length,
     getScrollElement: () => deps.elements.scrollElement() ?? null,
     estimateSize: () => rowEstimate,
-    getItemKey: (index) => timelineMessages()[index]?.id ?? index,
-    keyVersion: () => `${timelineMessages()[0]?.id ?? ""}:${timelineMessages().at(-1)?.id ?? ""}`,
+    getItemKey: (index) => {
+      const message = timelineMessages()[index];
+      return message ? rowKey(message) : index;
+    },
+    keyVersion: () => {
+      const messages = timelineMessages();
+      const first = messages[0];
+      const last = messages.at(-1);
+      return `${first ? rowKey(first) : ""}:${last ? rowKey(last) : ""}`;
+    },
     scrollMargin: virtualScrollMargin,
+    keptIndexes: usedPageIndexes,
     stickToLatest: deps.sticky.getStickToLatest,
+    followLatest: deps.sticky.followLatest,
+    drawLatestFirst: deps.drawLatestFirst,
+    onRowsDrawn: deps.sticky.followReaderScroll,
     onChange: (instance) => {
       const first = instance.getVirtualItems()[0];
       if (!first) return;
@@ -220,9 +372,22 @@ export function createScrollStore(deps: ScrollStoreDeps) {
     },
   });
 
-  /* One writer for the boundary: the row the virtualizer renders first, read where the reader is. */
-  function updateHistoryBoundary(element = deps.elements.scrollElement()): void {
-    setAtHistoryBoundary(chatHistoryBoundaryReached(element, firstRenderedIndex));
+  function updateHistoryBoundary(element = deps.elements.scrollElement()): boolean {
+    const followsLatest = deps.sticky.getStickToLatest();
+    const firstRow = Math.max(firstRenderedIndex, messageVirtualizer.firstDrawnIndex());
+    const reached =
+      chatHistoryBoundaryReached(element, firstRow, followsLatest) && (!followsLatest || currentRowsRendered(element));
+    setAtHistoryBoundary(reached);
+    return reached;
+  }
+
+  function currentRowsRendered(element: HTMLElement | undefined): boolean {
+    const messages = untrack(timelineMessages);
+    if (!element || messages.length === 0) return true;
+    const marks = element.querySelectorAll("[data-chat-search-message]");
+    const lastId = marks[marks.length - 1]?.getAttribute("data-chat-search-message");
+    if (!lastId) return element.querySelector(".virtual-chat-row") !== null;
+    return messages.findLastIndex((message) => message.id === lastId) !== -1;
   }
 
   function updateScrollFade(element = deps.elements.scrollElement()) {
@@ -230,7 +395,7 @@ export function createScrollStore(deps: ScrollStoreDeps) {
     scrollFades.measure();
     updateHistoryBoundary(element);
     const remaining = element.scrollHeight - element.scrollTop - element.clientHeight;
-    setShowScrollToLatest(remaining > 80);
+    setShowScrollToLatest(remaining > 80 && !deps.sticky.getStickToLatest());
     if (remaining <= 80) clearNewMessages();
   }
 
@@ -285,7 +450,6 @@ export function createScrollStore(deps: ScrollStoreDeps) {
     if (!scrollElement) return;
     const unreadBoundary = unreadBoundaryMessageId();
     if (!unreadBoundary) {
-      // Every unread row is a silent answer: there is no row to scroll to, only read state to move.
       if (deps.props.firstUnreadMessageId) await markUnreadMessages();
       return;
     }
@@ -312,7 +476,6 @@ export function createScrollStore(deps: ScrollStoreDeps) {
     const scrollElement = deps.elements.scrollElement();
     if (!scrollElement) return;
     deps.sticky.setStickToLatest(true);
-    // A smooth scroll fires no scroll event in a test environment, so the count clears here too.
     clearNewMessages();
     if (deps.props.discontinuous) {
       await deps.props.onLoadLatest?.();
@@ -323,6 +486,7 @@ export function createScrollStore(deps: ScrollStoreDeps) {
 
   return {
     scrollFades,
+    shownMessages,
     virtualScrollMargin,
     showScrollToLatest,
     setShowScrollToLatest,
@@ -334,7 +498,9 @@ export function createScrollStore(deps: ScrollStoreDeps) {
     timelineMessages,
     toggleRoutineRun,
     toggleAgentMessage,
+    updateAnswers,
     timelineIndexById,
+    keepPageDrawn,
     unreadBoundaryMessageId,
     updateScrollFade,
     updateVirtualScrollMargin,
@@ -344,4 +510,39 @@ export function createScrollStore(deps: ScrollStoreDeps) {
     jumpToUnreadMessages,
     jumpToLatestMessage,
   };
+}
+
+export function withQuestionContext(
+  shown: AgentMessage[],
+  messages: readonly AgentMessage[],
+  waitingTurnId: string | undefined,
+  narration: (thinking: AgentMessage) => AgentMessage[],
+): AgentMessage[] {
+  const thinkingByTurn = new Map(
+    messages.flatMap((message) =>
+      message.kind === "thinking" && message.turnId ? [[message.turnId, message] as const] : [],
+    ),
+  );
+  const placed = new Set(shown.map((message) => message.id));
+  const contextOf = (turnId: string | undefined, askedAt?: string): AgentMessage | undefined => {
+    const thinking = turnId ? thinkingByTurn.get(turnId) : undefined;
+    const rows = thinking ? narration(thinking) : [];
+    const context =
+      askedAt === undefined ? rows.at(-1) : rows.findLast((row) => row.createdAt && row.createdAt <= askedAt);
+    if (!context || placed.has(context.id)) return undefined;
+    placed.add(context.id);
+    return context;
+  };
+  const rows = shown.flatMap((message) => {
+    const context =
+      message.questionPrompt?.resolution && message.createdAt
+        ? contextOf(message.turnId, message.createdAt)
+        : undefined;
+    return context ? [context, message] : [message];
+  });
+  const waiting = contextOf(waitingTurnId);
+  if (!waiting) return rows;
+  const turnEnd = rows.findLastIndex((message) => message.turnId === waitingTurnId) + 1;
+  const at = turnEnd > 0 ? turnEnd : rows.length;
+  return [...rows.slice(0, at), waiting, ...rows.slice(at)];
 }

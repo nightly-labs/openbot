@@ -5,13 +5,14 @@ export const messages = {
   "notification.needsInput": "Necesita tu respuesta.",
   "notification.needsApproval": "Necesita tu aprobación.",
   "notification.needsBrowserStep": "Necesita que completes un paso en el navegador.",
+  "notification.waitsForSignIn": "Espera a que inicies sesión en {provider}.",
   "notification.needsApprovalFor": "Necesita tu aprobación: {action}",
   "notification.finished": "Ha terminado de trabajar.",
-  // A workflow step that waits for a person to approve or reject it.
   "notification.workflowApproval": "Un paso espera tu aprobación.",
-  // A workflow output step that tells the user its result.
   "notification.workflowOutput": "Un flujo de trabajo tiene un resultado nuevo.",
   "notification.failed": "Se detuvo con un error.",
+  "notification.subagentFailed": "Un subagente se detuvo con un error.",
+  "notification.subagentFailedFor": "Un subagente se detuvo con un error: {task}",
   "notification.channelTitle": "{agent} en {channel}",
   "notification.channelMessage": "Envió un mensaje.",
   "notification.usageLimit.title": "La cuenta de {provider} alcanzó su límite",

@@ -2,28 +2,38 @@ import type { AgentTask } from "@openbot/contracts/ipc";
 import type { SidebarWaitReason } from "@openbot/ui/features/sidebar/sidebar-types";
 import { DRAFT_THREAD_ID, MAIN_THREAD_ID, type ThreadItem, type ThreadStatus } from "./thread-types";
 
-/** What a side thread does now. A turn that waits for an approval or an answer waits for the user. */
 export function agentTaskThreadStatus(task: AgentTask, waitsFor: SidebarWaitReason | undefined): ThreadStatus {
   if (task.state === "running") return waitsFor ? { kind: "waiting", reason: waitsFor } : { kind: "working" };
   if (task.state === "queued") return { kind: "queued" };
   if (task.outcome === "failed") return { kind: "failed" };
-  return { kind: "idle" };
+  return task.awaitedReplies?.length ? { kind: "awaiting" } : { kind: "idle" };
+}
+
+export function sideThreadItem(
+  task: AgentTask,
+  waitsFor: SidebarWaitReason | undefined,
+  unread: number | undefined,
+): ThreadItem {
+  const item: ThreadItem = {
+    id: task.id,
+    kind: "side",
+    title: task.title,
+    updatedAt: task.updatedAt,
+    status: agentTaskThreadStatus(task, waitsFor),
+  };
+  if (unread !== undefined) item.unread = unread;
+  return item;
 }
 
 export interface ThreadListsInput {
-  /** When the agent's own chat changed last. The new thread tab shows this time. */
   mainUpdatedAt: string;
-  /** The side threads of the agent: open ones and archived (`closed`) ones. */
   tasks: readonly AgentTask[];
-  /** The side threads that have a tab on this device, in tab order. */
   open: readonly string[];
-  /** Whether the new thread tab shows. */
   draft: boolean;
   draftTitle: string;
-  /** Side threads that wait to be deleted: they show nowhere. */
   hidden: ReadonlySet<string>;
-  /** What the running turn of a side thread waits for the user to do, if anything. */
   waitsFor: (task: AgentTask) => SidebarWaitReason | undefined;
+  unread?: ((task: AgentTask) => number) | undefined;
 }
 
 export interface ThreadLists {
@@ -32,24 +42,13 @@ export interface ThreadLists {
   archived: ThreadItem[];
 }
 
-/**
- * The thread lists of the header. The agent's own chat is in neither list: the agent's name in the
- * header opens it. The menu lists the side threads that changed last first. A tab of a thread that is
- * archived or deleted, also on another device, does not show.
- */
 export function threadLists(input: ThreadListsInput): ThreadLists {
   const items = new Map<string, ThreadItem>();
   const archived: ThreadItem[] = [];
   const open: ThreadItem[] = [];
   for (const task of input.tasks) {
     if (input.hidden.has(task.id)) continue;
-    const item: ThreadItem = {
-      id: task.id,
-      kind: "side",
-      title: task.title,
-      updatedAt: task.updatedAt,
-      status: agentTaskThreadStatus(task, input.waitsFor(task)),
-    };
+    const item = sideThreadItem(task, input.waitsFor(task), input.unread?.(task));
     if (task.state === "closed") archived.push(item);
     else {
       items.set(task.id, item);
@@ -79,17 +78,8 @@ export function threadLists(input: ThreadListsInput): ThreadLists {
   return { threads: nestedBranches(open, (id) => sources.get(id)), tabs, archived };
 }
 
-/**
- * The deepest level of the tree lines in the thread menu. A deeper branch shows at this level, below
- * its source, so that its title stays readable in the menu.
- */
 const BRANCH_LEVELS = 4;
 
-/**
- * Puts each branch under the open thread that it came from, with tree lines before its title. A
- * branch whose source is archived or deleted, or of the agent's own chat, stays at the top. Each
- * level keeps the order of `items`. The items of the tabs do not change.
- */
 function nestedBranches(items: readonly ThreadItem[], sourceOf: (id: string) => string | undefined): ThreadItem[] {
   const ids = new Set(items.map((item) => item.id));
   const parent = (item: ThreadItem): string | null => {
@@ -109,7 +99,6 @@ function nestedBranches(items: readonly ThreadItem[], sourceOf: (id: string) => 
       return [{ item, level }, ...walk(item.id, Math.min(level + 1, BRANCH_LEVELS))];
     });
   const rows = walk(null, 0);
-  // The line of a level continues down to the next row on that level, if no row above it comes first.
   const continues = (from: number, level: number) => {
     for (const row of rows.slice(from + 1)) if (row.level <= level) return row.level === level;
     return false;
@@ -125,11 +114,9 @@ function nestedBranches(items: readonly ThreadItem[], sourceOf: (id: string) => 
           },
         },
   );
-  // A loop of sources has no top. Its threads still show, at the top.
   return [...nested, ...items.filter((item) => !placed.has(item.id))];
 }
 
-/** The open tab, or the agent's own chat when it is open or the open tab no longer shows. */
 export function activeThreadId(tabs: readonly ThreadItem[], active: string | null): string {
   return active !== null && tabs.some((tab) => tab.id === active) ? active : MAIN_THREAD_ID;
 }

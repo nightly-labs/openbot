@@ -1,0 +1,33 @@
+{
+  "slug": "restream",
+  "name": "Restream",
+  "tagline": "Live streams and recordings",
+  "description": "Restream lets agents read and manage streaming events, destinations, recordings, clips, and stream analytics in the account of the signed-in user. Each user signs in to their own Restream account through the browser.",
+  "category": "productivity",
+  "creatorName": "Restream",
+  "iconUrl": "https://restream.io/apple-touch-icon.png",
+  "version": "1.0.0",
+  "prompts": [
+    { "id": "prompt-upcoming", "text": "List my upcoming scheduled streams." },
+    { "id": "prompt-viewers", "text": "Which of my destinations had the most viewers on my last stream?" },
+    { "id": "prompt-recordings", "text": "Find the recordings of my streams from last week." }
+  ],
+  "apps": [
+    {
+      "id": "app-restream-mcp",
+      "name": "Restream",
+      "description": "Events, destinations, recordings, and analytics, over Restream's MCP server with browser sign-in.",
+      "iconUrl": "https://restream.io/apple-touch-icon.png",
+      "server": {
+        "name": "restream",
+        "transport": "http",
+        "url": "https://mcp.restream.io/mcp",
+        "auth": [{ "id": "restream-oauth", "kind": "link", "label": "Sign in" }]
+      }
+    }
+  ],
+  "skills": [],
+  "websiteUrl": "https://restream.io",
+  "privacyPolicyUrl": "https://restream.io/privacy-policy",
+  "termsUrl": "https://restream.io/terms-of-service"
+}

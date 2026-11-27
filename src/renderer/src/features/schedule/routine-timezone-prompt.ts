@@ -15,10 +15,6 @@ import { desktopEventRoutinesApi, type EventRoutinesApi } from "../conversation/
 import type { HostTimezoneCalls } from "../servers/ServerTimezoneSetting";
 import { serverCanAdminister } from "../servers/server-capabilities";
 
-/**
- * One server whose routines the user can move: an owner or admin of a host with `events-v1`, or this
- * computer. `timezone` is set when the host also has `host-timezone-v1`.
- */
 export interface RoutineZoneTarget {
   id: string;
   name: string;
@@ -27,7 +23,6 @@ export interface RoutineZoneTarget {
   timezone?: HostTimezoneCalls | undefined;
 }
 
-/** This computer and each joined server that is online and lets this account move its routines. */
 export function desktopRoutineZoneTargets(servers: readonly ServerSummary[]): RoutineZoneTarget[] {
   return servers
     .filter((server) => server.state === "online" && serverCanAdminister(server, "events-v1"))
@@ -42,15 +37,12 @@ export function desktopRoutineZoneTargets(servers: readonly ServerSummary[]): Ro
 
 const toastId = (serverId: string) => `routine-timezone-move:${serverId}`;
 const storageKey = (serverId: string) => `openbot:routine-timezone-answers:${serverId}`;
+const checkedKey = (serverId: string) => `openbot:routine-timezone-checked:${serverId}`;
 
 function deviceZone(): string {
   return Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC";
 }
 
-/**
- * The routine zones that the user answered on `serverId` for the device zone `zone`. The stored value
- * is one zone name for each line: the device zone first, then the answered zones.
- */
 function answeredZones(serverId: string, zone: string): string[] {
   try {
     const [stored, ...answered] = (window.localStorage.getItem(storageKey(serverId)) ?? "").split("\n");
@@ -63,15 +55,23 @@ function answeredZones(serverId: string, zone: string): string[] {
 function writeAnswer(serverId: string, zone: string, from: string): void {
   try {
     window.localStorage.setItem(storageKey(serverId), [zone, ...answeredZones(serverId, zone), from].join("\n"));
+  } catch {}
+}
+
+function storedCheckedZone(serverId: string): string | null {
+  try {
+    return window.localStorage.getItem(checkedKey(serverId));
   } catch {
-    // Blocked storage asks again on the next check.
+    return null;
   }
 }
 
-/**
- * Whether a move changes when the routine runs. An interval routine counts from its anchor instant. A
- * one-time routine whose time passed keeps that time as the record of its run.
- */
+function storeCheckedZone(serverId: string, zone: string): void {
+  try {
+    window.localStorage.setItem(checkedKey(serverId), zone);
+  } catch {}
+}
+
 function followsClock(routine: RoutineCalendarRoutine, now: Date): boolean {
   const { schedule } = routine;
   if (schedule.kind === "interval") return false;
@@ -84,7 +84,6 @@ function eventOwner(owner: RoutineCalendarOwner): EventRoutineOwner {
 
 const zoneLabel = (zone: string) => zone.replaceAll("_", " ");
 
-/** The routines of `target` whose zone moves their clock times, by zone. */
 async function routinesByZone(target: RoutineZoneTarget): Promise<Map<string, RoutineCalendarRoutine[]>> {
   const from = new Date(Date.now() + 60_000);
   const calendar = await target.calendar({
@@ -100,12 +99,7 @@ async function routinesByZone(target: RoutineZoneTarget): Promise<Map<string, Ro
   return byZone;
 }
 
-/**
- * Saves each routine in `from` again in `to`. The host keeps its ID and runs and computes the next run
- * at the same clock time in `to`. A Server Settings zone of `from` follows, so new routines match.
- */
 async function moveRoutines(target: RoutineZoneTarget, from: string, to: string) {
-  // Read the routines again: the toast can show for a long time before the click.
   const routines = (await routinesByZone(target)).get(from) ?? [];
   const owners = new Map<string, EventRoutineOwner>();
   for (const routine of routines) {
@@ -134,7 +128,6 @@ async function moveRoutines(target: RoutineZoneTarget, from: string, to: string)
         if (saved.routine.timezone === to) moved += 1;
         else failed += 1;
       } catch {
-        // For example a one-time run whose time is already past in the new zone.
         failed += 1;
       }
     }
@@ -151,19 +144,13 @@ async function moveRoutines(target: RoutineZoneTarget, from: string, to: string)
   return { moved, failed, settingFailed };
 }
 
-/**
- * Asks to move the routines of each server in `targets` to the device's zone after the zone changed.
- * It asks once for each zone that routines use on a server, and again only after the next change of
- * the device zone.
- */
 export function createRoutineTimezonePrompt(targets: () => RoutineZoneTarget[]): void {
   const checking = new Set<string>();
-  /** The servers whose routines move now. A check waits for the move, so it does not ask again. */
   const moving = new Set<string>();
-  /** The source and device zone of the toast that shows for each server. */
   const shown = new Map<string, string>();
-  /** For each server, the source and device zones of toasts closed with no answer until the zone changes. */
   const dismissed = new Map<string, Set<string>>();
+  const checkedZones = new Map<string, string>();
+  const checkedIn = (serverId: string) => checkedZones.get(serverId) ?? storedCheckedZone(serverId);
 
   async function check(target: RoutineZoneTarget): Promise<void> {
     if (checking.has(target.id) || moving.has(target.id)) return;
@@ -171,7 +158,7 @@ export function createRoutineTimezonePrompt(targets: () => RoutineZoneTarget[]):
     try {
       const zone = deviceZone();
       const byZone = await routinesByZone(target);
-      // Read the answers after the wait: the user can answer or start a move while the list loads.
+      checkedZones.set(target.id, zone);
       if (moving.has(target.id)) return;
       const answered = answeredZones(target.id, zone);
       const next = [...byZone.entries()]
@@ -180,6 +167,7 @@ export function createRoutineTimezonePrompt(targets: () => RoutineZoneTarget[]):
             source !== zone && !answered.includes(source) && !dismissed.get(target.id)?.has(`${source}>${zone}`),
         )
         .sort((a, b) => b[1].length - a[1].length)[0];
+      if (!next) storeCheckedZone(target.id, zone);
       const key = next ? `${next[0]}>${zone}` : undefined;
       if (key === shown.get(target.id)) return;
       if (!next) {
@@ -193,11 +181,11 @@ export function createRoutineTimezonePrompt(targets: () => RoutineZoneTarget[]):
       const { t } = currentText();
       const answer = (move: boolean) => {
         shown.delete(target.id);
-        if (move) {
+        if (move && deviceZone() === zone) {
           void runMove(target, source, zone);
           return;
         }
-        writeAnswer(target.id, zone, source);
+        if (!move) writeAnswer(target.id, zone, source);
         void check(target);
       };
       toast(t("routine.timezoneMove.title", { zone: zoneLabel(zone) }), {
@@ -208,9 +196,7 @@ export function createRoutineTimezonePrompt(targets: () => RoutineZoneTarget[]):
           from: zoneLabel(source),
           zone: zoneLabel(zone),
         }),
-        // A toast closed without an answer comes back after the next start or zone change.
         duration: Number.POSITIVE_INFINITY,
-        // The code removes `shown` before it closes a toast, so this is a close by the user.
         onDismiss: () => {
           if (shown.get(target.id) !== shownKey) return;
           shown.delete(target.id);
@@ -220,13 +206,11 @@ export function createRoutineTimezonePrompt(targets: () => RoutineZoneTarget[]):
         cancel: { label: t("routine.timezoneMove.keep"), onClick: () => answer(false) },
       });
     } catch {
-      // The host is not ready or does not answer. The next check tries again.
     } finally {
       checking.delete(target.id);
     }
   }
 
-  /** A move that stops before its end keeps the question open, so the next check asks again. */
   async function runMove(target: RoutineZoneTarget, from: string, to: string): Promise<void> {
     const text = currentText();
     moving.add(target.id);
@@ -251,7 +235,6 @@ export function createRoutineTimezonePrompt(targets: () => RoutineZoneTarget[]):
     await check(target);
   }
 
-  /** The device zone of the last check of every server. */
   let checkedZone = deviceZone();
 
   function checkAll(): void {
@@ -262,13 +245,12 @@ export function createRoutineTimezonePrompt(targets: () => RoutineZoneTarget[]):
     for (const serverId of shown.keys()) {
       if (current.some((target) => target.id === serverId)) continue;
       shown.delete(serverId);
+      checkedZones.delete(serverId);
       toast.dismiss(toastId(serverId));
     }
-    for (const target of current) void check(target);
+    for (const target of current) if (checkedIn(target.id) !== zone) void check(target);
   }
 
-  // An effect runs again each time its key is computed. The server summaries change while a workspace
-  // loads, so the key is a memo: only a changed list of servers reads every calendar again.
   createEffect(
     createMemo(() =>
       targets()
@@ -277,8 +259,6 @@ export function createRoutineTimezonePrompt(targets: () => RoutineZoneTarget[]):
     ),
     () => checkAll(),
   );
-  // A focus reads every server only after the device zone changed. Otherwise it reads only the servers
-  // with a prompt, so a prompt closes when another device moved those routines.
   const recheck = () => {
     if (document.visibilityState !== "visible") return;
     if (deviceZone() !== checkedZone) {

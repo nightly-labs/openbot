@@ -1,35 +1,25 @@
-// Checks that an agent lists the provider accounts and reads and sets another agent's account and backup
-// models with `openbot.list_models`, `openbot.read_agent` and `openbot.update_profile`.
-// Runs the real agent service, tool router and provider account store on a temporary profile with a fake
-// Codex app-server and a second Codex account. The fake calls the tools through `tool_call`, as a model
-// does, and logs the tool result that it gets.
-// The check asserts that the accounts list with their id and label and without their folders, that
-// list_models lists a short list of models with the models in use and finds the others with a query, that
-// create_agent accepts a model that the short list leaves out, that the
-// account and the backup models are written and read back, that an unknown account or model is a tool
-// failure that changes nothing, that a reset returns both to their defaults, and that a delete stops the
-// process that the agent runs on with the second account.
-// `bun scripts/agent-profile-accounts-e2e.ts`. Writes .openbot-build/agent-profile-accounts-e2e/report.json.
 import assert from "node:assert/strict";
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
-import { mkdtemp, rm, writeFile } from "node:fs/promises";
+import { copyFile, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { AGENT_PROVIDERS, type AgentSummary } from "@openbot/contracts/ipc";
+import type { DynamicRecord } from "@openbot/contracts/runtime-values";
 import { Effect } from "effect";
 import type { z } from "zod";
 import type {
   createAgentToolSchema,
   listModelsToolSchema,
+  updateAgentsToolSchema,
   updateProfileToolSchema,
 } from "../src/backend/agent/profile-tools";
 import type { AgentBrowserHost } from "../src/backend/agent/turn-lifecycle";
 import { isProcessAlive } from "./dev-automation/registry-files";
 
-/** The arguments the fake passes to a profile tool; read_agent takes a subset. */
 type ProfileToolArgs = z.input<typeof updateProfileToolSchema> &
   Pick<z.input<typeof createAgentToolSchema>, "initialMessage"> &
-  z.input<typeof listModelsToolSchema>;
+  z.input<typeof listModelsToolSchema> &
+  Pick<z.input<typeof updateAgentsToolSchema>, "agentIds">;
 
 const OUT = resolve(import.meta.dirname, "../.openbot-build/agent-profile-accounts-e2e");
 const root = await mkdtemp(join(tmpdir(), "openbot-profile-accounts-"));
@@ -39,7 +29,6 @@ const accountsRoot = join(root, "provider-accounts");
 const fakeCodex = join(root, "codex");
 const fakeLog = join(root, "codex.jsonl");
 
-// Before the service modules load: the Codex process and the stores read the home folder.
 process.env.HOME = home;
 process.env.CODEX_HOME = join(home, ".codex");
 process.env.OPENBOT_CODEX_PATH = fakeCodex;
@@ -51,23 +40,29 @@ const { ProviderAccountStore } = await import("../src/backend/agent/provider-acc
 const { runCauseEffect } = await import("../src/backend/effect-boundary");
 const { MailboxStore } = await import("../src/backend/mailbox-store");
 const { OpenBotDatabase } = await import("../src/backend/openbot-database");
+const { NO_PROVIDER_CREDENTIALS } = await import("../src/backend/provider-drivers");
 
 const CALL_MARK = "PROFILE-CALL";
 const MODEL = "gpt-6-luna";
 const OTHER_MODEL = "gpt-6-sol";
-/** More models than the short list of list_models holds: 8 a provider. OTHER_MODEL is last in the catalog. */
+const ACCOUNT_MODEL = "gpt-6.1-sol";
 const EXTRA_MODELS = Array.from({ length: 10 }, (_, index) => `gpt-6-extra-${index + 1}`);
 const CATALOG = [
   { model: MODEL, displayName: "GPT-6 Luna" },
   ...EXTRA_MODELS.map((model, index) => ({ model, displayName: `GPT-6 Extra ${index + 1}` })),
   { model: OTHER_MODEL, displayName: "GPT-6 Sol" },
 ];
+const ACCOUNT_CATALOG = [...CATALOG, { model: ACCOUNT_MODEL, displayName: "GPT-6.1 Sol" }];
+const ENDPOINT = {
+  id: "gateway",
+  name: "Gateway",
+  baseUrl: "http://127.0.0.1:9/v1",
+  apiKey: "sk-endpoint-secret-6471",
+  models: [{ id: "chat-model", name: "Chat Model" }],
+  headers: [],
+  harness: "opencode",
+} as const;
 
-/**
- * A Codex app-server with the methods that the service calls. A turn whose input has
- * `PROFILE-CALL <<ARGS{json}ARGS>>` calls the `__tool` that the JSON names with the other fields through
- * `tool_call`, logs the result, and ends. Other turns answer "Done.".
- */
 const FAKE_CODEX = `#!/usr/bin/env node
 const { appendFileSync } = require("node:fs");
 if (process.argv.includes("--version")) {
@@ -79,7 +74,6 @@ const config = { config: { mcp_servers: {} }, layers: [{ name: { type: "user", f
 let buffer = "";
 let threads = 0;
 let turns = 0;
-/** Tool request id -> the turn that waits for its result. */
 const waiting = new Map();
 process.stdout.on("error", (error) => {
   if (error.code === "EPIPE") process.exit(0);
@@ -98,7 +92,7 @@ const answer = (message) => {
     case "initialize": return write({ id: message.id, result: {} });
     case "account/read": return write({ id: message.id, result: { account: { type: "chatgpt", email: process.env.CODEX_HOME.startsWith(${JSON.stringify(accountsRoot)}) ? "team-b@example.com" : "codex@example.com" } } });
     case "account/rateLimits/read": return write({ id: message.id, result: { rateLimits: { limitId: "codex", primary: null, secondary: null }, rateLimitsByLimitId: null } });
-    case "model/list": return write({ id: message.id, result: { data: ${JSON.stringify(CATALOG)} } });
+    case "model/list": return write({ id: message.id, result: { data: process.env.CODEX_HOME.startsWith(${JSON.stringify(accountsRoot)}) ? ${JSON.stringify(ACCOUNT_CATALOG)} : ${JSON.stringify(CATALOG)} } });
     case "plugin/list": return write({ id: message.id, result: { marketplaces: [] } });
     case "config/read": return write({ id: message.id, result: config });
     case "config/batchWrite": return write({ id: message.id, result: {} });
@@ -173,25 +167,31 @@ interface ChoiceBody {
   providerAccountId: string;
 }
 
-/** The fields of a tool result that the check reads. The router sends them as JSON text. */
 interface ProfileToolBody {
   providers?: {
     provider: string;
     models?: { id: string }[];
     omittedModels?: number;
-    accounts?: { id: string; label: string | null; state: string }[];
+    accounts?: { id: string; label: string | null; state: string; models?: { id: string }[] }[];
   }[];
   model?: string;
   name?: string;
   providerAccountId?: string;
   backupModels?: { automatic: boolean; order: ChoiceBody[] } | null;
   usageLimitReturn?: unknown;
+  customProviders?: {
+    settings: string;
+    endpoints: { id: string; name: string; provider: string; models: string[]; message?: string }[];
+  };
+  updated?: number;
 }
 
 const report: {
   calls: { name: string; turnId: string; success: boolean | null; text: string }[];
   stored?: Pick<AgentSummary, "providerAccountId" | "backupModels">;
   deletedAgent?: { ownProcessStopped: boolean; workspaceRemoved: boolean };
+  pool?: { second: string | null; default: string | null; null: string | null };
+  liveVoice?: { saved: string | null; afterRemove: string | null; automatic: string | null };
   checks: { name: string; passed: boolean }[];
   passed: boolean;
   error?: string;
@@ -200,6 +200,7 @@ const report: {
 const unused = () => Effect.die(new Error("Not used by this check."));
 const browser: AgentBrowserHost = {
   listTabs: () => [],
+  toolCanUseTab: () => false,
   beginTakeover: unused,
   endTakeover: () => {},
   resolveUploadTarget: unused,
@@ -213,9 +214,11 @@ const browser: AgentBrowserHost = {
   endControl: () => {},
   close: () => Effect.void,
   clearAgentSession: () => Effect.void,
+  shareTab: () => undefined,
+  unshareThread: () => undefined,
+  agentTab: () => null,
 };
 
-/** Waits for a state of the service or the fake's log. */
 async function waitFor<T>(label: string, read: () => T | null | undefined | false, timeoutMs = 20_000): Promise<T> {
   const deadline = Date.now() + timeoutMs;
   for (;;) {
@@ -260,6 +263,7 @@ const agents = new AgentService({
   providerAccounts: accounts,
   preferredProvider: "codex",
   offProviders: AGENT_PROVIDERS.filter((provider) => provider !== "codex"),
+  credentials: { ...NO_PROVIDER_CREDENTIALS, customProviders: () => [ENDPOINT] },
 });
 
 const idle = (agentId: string) =>
@@ -267,8 +271,12 @@ const idle = (agentId: string) =>
     .listQueue(agentId)
     .deliveries.every((delivery) => !["queued", "starting", "running"].includes(delivery.status));
 
-/** Sends a chat message that makes the fake call the tool, and returns the tool result it logged. */
-async function callTool(name: string, agentId: string, tool: string, args: Partial<ProfileToolArgs> = {}) {
+async function callTool(
+  name: string,
+  agentId: string,
+  tool: string,
+  args: Partial<ProfileToolArgs> | DynamicRecord = {},
+) {
   const receipt = await runCauseEffect(
     agents.sendMessage({ agentId, text: `${CALL_MARK} <<ARGS${JSON.stringify({ __tool: tool, ...args })}ARGS>>` }),
   );
@@ -285,9 +293,7 @@ async function callTool(name: string, agentId: string, tool: string, args: Parti
   let body: ProfileToolBody | null = null;
   try {
     body = text ? JSON.parse(text) : null;
-  } catch {
-    // A failure is plain text.
-  }
+  } catch {}
   return { success: entry.result?.success === true, text, body };
 }
 
@@ -316,10 +322,11 @@ try {
     agents
       .getStatus()
       .providers?.find((row) => row.id === "codex")
-      ?.accounts?.some((account) => account.id === second.id && account.state === "connected"),
+      ?.accounts?.some(
+        (account) => account.id === second.id && account.state === "connected" && account.models?.length === 1,
+      ),
   );
 
-  // 1. list_models lists both accounts, the provider's own sign-in first, without emails or folders.
   const listed = await callTool("list models", coordinator.id, "list_models", { provider: "codex" });
   const listedAccounts = listed.body?.providers?.find((row) => row.provider === "codex")?.accounts ?? [];
   pass("list_models succeeds", listed.success, listed.text);
@@ -343,6 +350,13 @@ try {
     listed.text,
   );
   pass(
+    "list_models lists the model that only the second account serves under that account",
+    listedAccounts[1]?.models?.map((model) => model.id).join(",") === ACCOUNT_MODEL &&
+      listedAccounts[0]?.models === undefined &&
+      codexModels(listed)?.models?.some((model) => model.id === ACCOUNT_MODEL) === false,
+    listed.text,
+  );
+  pass(
     "list_models has no account email or folder",
     !listed.text.includes("@") &&
       !listed.text.includes("redacted") &&
@@ -350,9 +364,31 @@ try {
       !listed.text.includes(home),
     listed.text,
   );
+  pass(
+    "A list_models call for another provider leaves the custom endpoints out",
+    listed.body?.customProviders === undefined,
+    listed.text,
+  );
 
-  // 2. update_profile sets the account and the backup models. Equal choices are kept once, and the
-  // model and account that the agent has after the call are not a backup.
+  const listedAll = await callTool("list all models", coordinator.id, "list_models");
+  const endpointRow = listedAll.body?.customProviders?.endpoints[0];
+  pass(
+    "list_models names the saved custom endpoint and where the user changes it",
+    listedAll.body?.customProviders?.settings === "Server settings > Providers > Custom provider" &&
+      listedAll.body.customProviders.endpoints.length === 1 &&
+      endpointRow?.id === ENDPOINT.id &&
+      endpointRow.name === ENDPOINT.name &&
+      endpointRow.provider === "opencode" &&
+      endpointRow.models.length === 0 &&
+      endpointRow.message?.startsWith("OpenCode runs this endpoint and cannot run now.") === true,
+    listedAll.text,
+  );
+  pass(
+    "list_models has no base URL or key of a custom endpoint",
+    !listedAll.text.includes(ENDPOINT.baseUrl) && !listedAll.text.includes(ENDPOINT.apiKey),
+    listedAll.text,
+  );
+
   const updated = await callTool("set account and backups", coordinator.id, "update_profile", {
     agentId: worker.id,
     providerAccountId: second.id,
@@ -387,7 +423,6 @@ try {
   );
   pass("The update_profile result has the account", updated.body?.providerAccountId === second.id, updated.text);
 
-  // 3. list_models lists a backup model that the short list left out, and a query finds the others.
   const listedInUse = await callTool("list models in use", coordinator.id, "list_models", { provider: "codex" });
   pass(
     "list_models lists a model that an agent uses as a backup model",
@@ -416,7 +451,6 @@ try {
     created.text,
   );
 
-  // 4. read_agent returns the account, the backup models and no usage limit return.
   const read = await callTool("read worker", coordinator.id, "read_agent", { agentId: worker.id });
   pass(
     "read_agent returns the account and the backup models",
@@ -427,7 +461,6 @@ try {
     read.text,
   );
 
-  // 5. An unknown account, an unknown backup account or an unknown backup model changes nothing.
   const unknownAccount = await callTool("unknown account", coordinator.id, "update_profile", {
     agentId: worker.id,
     name: "Renamed",
@@ -460,6 +493,33 @@ try {
       refused(badId, "Use an account id from list_models"),
     [unknownAccount, unknownBackupAccount, unknownBackupModel, badId].map((call) => call.text).join("\n"),
   );
+  const extraBackupField = await callTool("extra backupModels field", coordinator.id, "update_profile", {
+    agentId: worker.id,
+    name: "Renamed",
+    backupModels: { models: [{ provider: "codex", model: MODEL }], automatic: true, order: [] },
+  });
+  const extraEntryField = await callTool("extra backup entry field", coordinator.id, "update_profile", {
+    agentId: worker.id,
+    backupModels: { automatic: true, order: [{ provider: "codex", model: MODEL, effortLevel: "high" }] },
+  });
+  const extraToolField = await callTool("extra update_profile field", coordinator.id, "update_profile", {
+    agentId: worker.id,
+    fallbackModels: [MODEL],
+  });
+  const entryFields = "Each backupModels.order entry takes only: provider, model, providerAccountId.";
+  pass(
+    "A field that update_profile does not take is refused with the fields that its object takes",
+    refused(
+      extraBackupField,
+      `Remove unsupported profile fields. backupModels takes only: automatic, order. ${entryFields}`,
+    ) &&
+      refused(extraEntryField, `Remove unsupported profile fields. ${entryFields}`) &&
+      refused(extraToolField, "Remove unsupported profile fields. update_profile takes only: agentId, name,") &&
+      [extraBackupField, extraEntryField, extraToolField].every(
+        (call) => !call.text.includes("effortLevel") && !call.text.includes("fallbackModels"),
+      ),
+    [extraBackupField, extraEntryField, extraToolField].map((call) => call.text).join("\n"),
+  );
   const afterFailures = storedAgent(worker.id);
   pass(
     "A refused request changes nothing, the name in the same call included",
@@ -468,8 +528,6 @@ try {
       JSON.stringify(afterFailures.backupModels) === JSON.stringify(afterUpdate.backupModels),
   );
 
-  // 6. A null account returns the agent to the provider's own sign-in. An order that asks first with
-  // no model is no saved backup models, as the settings page saves it.
   const reset = await callTool("reset", coordinator.id, "update_profile", {
     agentId: worker.id,
     providerAccountId: null,
@@ -486,8 +544,59 @@ try {
     reset.text,
   );
 
-  // 7. A delete stops the agent's own process. On Windows a live process in the workspace makes the
-  // folder removal fail with EBUSY until the app restarts (#3205).
+  const ownSignIn = await callTool("account model on the own sign-in", coordinator.id, "update_profile", {
+    agentId: worker.id,
+    model: ACCOUNT_MODEL,
+  });
+  const ownSignInBackup = await callTool("account model backup on the own sign-in", coordinator.id, "update_profile", {
+    agentId: worker.id,
+    backupModels: { automatic: false, order: [{ provider: "codex", model: ACCOUNT_MODEL }] },
+  });
+  pass(
+    "A model that only the second account serves is refused on the own sign-in",
+    refused(ownSignIn, "Available models") &&
+      refused(ownSignInBackup, "Available models") &&
+      storedAgent(worker.id).model === MODEL &&
+      storedAgent(worker.id).backupModels === undefined,
+    [ownSignIn, ownSignInBackup].map((call) => call.text).join("\n"),
+  );
+  const accountModel = await callTool("account model with its account", coordinator.id, "update_profile", {
+    agentId: worker.id,
+    providerAccountId: second.id,
+    model: ACCOUNT_MODEL,
+    backupModels: {
+      automatic: false,
+      order: [
+        { provider: "codex", model: ACCOUNT_MODEL, providerAccountId: second.id },
+        { provider: "codex", model: MODEL },
+      ],
+    },
+  });
+  const afterAccountModel = storedAgent(worker.id);
+  pass(
+    "update_profile sets a model that only the agent's account serves",
+    accountModel.success &&
+      accountModel.body?.model === ACCOUNT_MODEL &&
+      afterAccountModel.model === ACCOUNT_MODEL &&
+      afterAccountModel.providerAccountId === second.id &&
+      JSON.stringify(afterAccountModel.backupModels) ===
+        JSON.stringify({ automatic: false, order: [{ provider: "codex", model: MODEL }] }),
+    `${accountModel.text}\n${JSON.stringify(afterAccountModel.backupModels)}`,
+  );
+  const bulkModel = await callTool("update_agents to the account model", coordinator.id, "update_agents", {
+    agentIds: [worker.id],
+    model: ACCOUNT_MODEL,
+  });
+  const bulkEffort = await callTool("update_agents effort on the account model", coordinator.id, "update_agents", {
+    agentIds: [worker.id],
+    reasoningEffort: "medium",
+  });
+  pass(
+    "update_agents accepts a model that only the agent's account serves",
+    bulkModel.body?.updated === 1 && bulkEffort.body?.updated === 1 && storedAgent(worker.id).model === ACCOUNT_MODEL,
+    `${bulkModel.text}\n${bulkEffort.text}`,
+  );
+
   const reassigned = await callTool("set account again", coordinator.id, "update_profile", {
     agentId: worker.id,
     providerAccountId: second.id,
@@ -497,18 +606,106 @@ try {
   const deliveryId = receipt.deliveries[0]?.id;
   assert.ok(deliveryId, "own process turn: no delivery");
   await waitFor("the worker's turn to end", () => mailbox.getDelivery(deliveryId)?.delivery.status === "completed");
-  // The fake names each turn `turn-<pid>-<n>`.
   const ownPid = Number(mailbox.getDelivery(deliveryId)?.delivery.turnId?.split("-")[1]);
   pass("The worker's turn ran on a live process of its own", Number.isInteger(ownPid) && isProcessAlive(ownPid));
   const { workspacePath } = storedAgent(worker.id);
   await runCauseEffect(agents.deleteAgent(worker.id));
-  // The delete waits for the stop: on Windows the folder removal after it needs the process gone.
   const stopped = !isProcessAlive(ownPid);
   report.deletedAgent = { ownProcessStopped: stopped, workspaceRemoved: !existsSync(workspacePath) };
   pass("The delete stops the agent's own process", stopped);
   pass(
     "The delete removes the workspace and the record",
     report.deletedAgent.workspaceRemoved && !store.list().some((candidate) => candidate.id === worker.id),
+  );
+
+  await runCauseEffect(accounts.setPool("codex", { leftOut: [] }));
+  const pooled = await create("Pooled");
+  await waitFor("the pooled agent's first turn to end", () => idle(pooled.id));
+  const pinnedSecond = await callTool("pin the second account", coordinator.id, "update_profile", {
+    agentId: pooled.id,
+    providerAccountId: second.id,
+  });
+  const pinSecond = storedAgent(pooled.id).pinnedAccountId;
+  const pinnedDefault = await callTool("pin the own sign-in", coordinator.id, "update_profile", {
+    agentId: pooled.id,
+    providerAccountId: "default",
+  });
+  const afterDefault = storedAgent(pooled.id);
+  const pooledAgain = await callTool("give the account to the pool", coordinator.id, "update_profile", {
+    agentId: pooled.id,
+    providerAccountId: null,
+  });
+  const afterNull = storedAgent(pooled.id);
+  report.pool = {
+    second: pinSecond ?? null,
+    default: afterDefault.pinnedAccountId ?? null,
+    null: afterNull.pinnedAccountId ?? null,
+  };
+  pass(
+    "With Pool accounts on, an agent that names an account keeps it, also the own sign-in",
+    pinnedSecond.success &&
+      pinSecond === second.id &&
+      pinnedDefault.success &&
+      afterDefault.providerAccountId === undefined &&
+      afterDefault.pinnedAccountId === "default",
+    `${pinnedSecond.text}\n${pinnedDefault.text}`,
+  );
+  pass(
+    "With Pool accounts on, a null account gives the agent to the pool",
+    pooledAgain.success && afterNull.providerAccountId === undefined && afterNull.pinnedAccountId === undefined,
+    pooledAgain.text,
+  );
+  await runCauseEffect(accounts.setPool("codex", null));
+
+  await runCauseEffect(accounts.setLiveVoiceAccount(second.id));
+  const reloaded = new ProviderAccountStore(join(userData, "openbot-provider-accounts-v1.json"), accountsRoot);
+  await runCauseEffect(reloaded.load());
+  const saved = reloaded.liveVoiceAccount();
+  const removable = await runCauseEffect(accounts.create("codex"));
+  assert.ok(removable, "live voice: no account to remove");
+  await runCauseEffect(accounts.setLiveVoiceAccount(removable.id));
+  await runCauseEffect(accounts.remove(removable));
+  const afterRemove = accounts.liveVoiceAccount();
+  await runCauseEffect(accounts.setLiveVoiceAccount(second.id));
+  await runCauseEffect(accounts.setLiveVoiceAccount(null));
+  report.liveVoice = { saved, afterRemove, automatic: accounts.liveVoiceAccount() };
+  pass(
+    "The live voice account is saved, a removed account is no longer the choice, and null goes back to automatic",
+    saved === second.id &&
+      afterRemove === null &&
+      report.liveVoice.automatic === null &&
+      reloaded.list("codex").length > 0,
+  );
+
+  const photoSource = join(root, "photo.png");
+  await copyFile(resolve(import.meta.dirname, "../apps/auth-api/public/apple-touch-icon.png"), photoSource);
+  const photo = await callTool("set photo", coordinator.id, "update_profile", {
+    agentId: coordinator.id,
+    avatarPath: photoSource,
+  });
+  const photoUrl = storedAgent(coordinator.id).avatarUrl;
+  const photoFile = store.resolveAvatar(coordinator.id)?.path ?? "";
+  pass("update_profile sets a photo", photo.success && photoUrl !== null && existsSync(photoFile), photo.text);
+  const color = await callTool("set color", coordinator.id, "update_profile", {
+    agentId: coordinator.id,
+    avatarHue: 0,
+  });
+  pass(
+    "update_profile with avatarHue keeps the photo and its file",
+    color.success &&
+      storedAgent(coordinator.id).avatarHue === 0 &&
+      storedAgent(coordinator.id).avatarUrl === photoUrl &&
+      existsSync(photoFile),
+    color.text,
+  );
+  const face = await callTool("set generated face", coordinator.id, "update_profile", {
+    agentId: coordinator.id,
+    avatarSeed: storedAgent(coordinator.id).avatarSeed,
+  });
+  pass(
+    "update_profile with avatarSeed removes the photo and its file",
+    face.success && storedAgent(coordinator.id).avatarUrl === null && !existsSync(photoFile),
+    face.text,
   );
   report.passed = true;
 } catch (error) {

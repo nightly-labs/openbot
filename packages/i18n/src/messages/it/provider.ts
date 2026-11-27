@@ -64,6 +64,7 @@ export const messages = {
   "provider.aria.install": "Installa {name}",
   "provider.aria.signIn": "Accedi a {name}",
   "provider.aria.codeFallback": "Accedi a {name} con un codice",
+  "provider.aria.addressFallback": "Incolla l’indirizzo di accesso per {name}",
   "provider.aria.moreActions": "Altre azioni per {name}",
 
   "provider.aria.use": "Usa {name} in OpenBot",
@@ -92,10 +93,17 @@ export const messages = {
   "provider.codeLogin.pasteExpiresIn": "In attesa. Questo accesso si interrompe tra {time}.",
   "provider.codeLogin.linkTitle": "Accedi a {name} su un altro dispositivo",
   "provider.codeLogin.pageTitle": "Accedi a {name}",
+  "provider.codeLogin.addressDescription":
+    "Completa l’accesso nel browser. Questa finestra si chiude quando l’accesso è completato.",
   "provider.codeLogin.pageDescription": "Questa pagina è aperta nel browser su {host}. Accedi da qui.",
   "provider.codeLogin.relayStarting": "Avvio dell'accesso a {name} su {host}…",
   "provider.codeLogin.pageOpening": "Apertura della pagina di accesso di {name} su {host}…",
   "provider.codeLogin.linkStep": "Accedi a {name}. OpenBot continua da solo.",
+  "provider.codeLogin.thisComputerDescription":
+    "Apri questo link in un browser su questo computer. OpenBot attende qui.",
+  "provider.codeLogin.copyLink": "Copia link",
+  "provider.codeLogin.chatgptDeviceSetting":
+    "In ChatGPT su un computer, apri le impostazioni di sicurezza e attiva l’accesso con codice dispositivo per Codex. Per un account di lavoro, lo attiva l’amministratore del workspace.",
   "provider.useApp.title": "Connetti {name} nell'app OpenBot",
   "provider.useApp.description":
     "L'accesso a {name} torna al computer che lo ha avviato, e una scheda del browser non può riceverlo. Connetti {name} nell'app OpenBot. L'app completa l'accesso da sola.",
@@ -115,11 +123,25 @@ export const messages = {
   "provider.picker.download": "Download di {name}",
   "provider.picker.search": "Cerca modelli",
   "provider.picker.noMatches": "Nessun modello corrisponde alla ricerca.",
+  "provider.picker.openrouterNoMatches":
+    "Nessun modello corrisponde alla ricerca. Le tue impostazioni di privacy, provider e guardrail su openrouter.ai possono nascondere modelli da questo elenco.",
+  "provider.picker.workspaceOnlyUnavailable":
+    "Questi modelli non funzionano con «Solo workspace» su Windows e Linux. Per usarli, cambia «Permessi» nelle impostazioni dell'agente.",
   "provider.picker.olderModels": "Modelli precedenti",
   "provider.picker.olderModelsList": "Modelli {name} precedenti",
-  "provider.picker.noModels": "{name} non ha modelli disponibili.",
+  "provider.picker.noModels":
+    "Qui non compare nessun modello di {name}. Se sono disattivati, un amministratore può attivarli in Impostazioni server > Provider > {name} > Modelli.",
+  "provider.picker.endpointModelsInCustom":
+    "{name} esegue i tuoi endpoint personalizzati. I loro modelli sono nella scheda Personalizzato.",
+  "provider.picker.showCustomModels": "Mostra modelli",
+  "provider.picker.museNoModels":
+    "Muse non ha inviato modelli per questo account. Muse potrebbe non essere disponibile nel paese in cui viene eseguito questo agente. Scegli un modello di un altro provider.",
   "provider.picker.customEmpty":
     "Aggiungi un endpoint compatibile con OpenAI: un server di modelli su questo computer, o qualsiasi servizio con un URL di base e una chiave.",
+  "provider.picker.customPending":
+    "I modelli dei tuoi endpoint non sono ancora caricati. Il provider li legge dopo la fine della sua attività in corso.",
+  "provider.picker.customUnlisted": "{name} non elenca i modelli dei tuoi endpoint.",
+  "provider.picker.editEndpoints": "Modifica endpoint",
   "provider.picker.defaultModelLabel": "{name}, predefinito",
   "provider.picker.usageLimit": "Limite di utilizzo raggiunto",
   "provider.picker.usageLimitWindow": "Limite ({window})",
@@ -129,11 +151,19 @@ export const messages = {
   "provider.picker.effort": "Impegno",
   "provider.picker.effortLabel": "Impegno di ragionamento dell'agente",
   "provider.picker.effortFixed": "{effort}, fissato da {provider}",
+  "provider.picker.effortLimited": "Le impostazioni di Claude o la tua organizzazione limitano l’impegno a {effort}.",
   "provider.picker.fast": "Veloce",
-  "provider.picker.fastLabel": "Modalità veloce",
+  "provider.picker.fastText": "Risposte più rapide, utilizzo maggiore",
+  "provider.picker.speed": "Velocità",
+  "provider.picker.standard": "Standard",
+  "provider.picker.standardText": "Velocità predefinita",
+  "provider.picker.ultrafast": "Ultraveloce",
+  "provider.picker.ultrafastText": "Le risposte più rapide, utilizzo molto maggiore",
   "provider.picker.selectEffort": "Seleziona l'impegno",
   "provider.picker.custom": "Personalizzato",
   "provider.picker.cliReady": "{cli} pronto",
+  "provider.picker.modelSourceProvider": "Usa {name} dalle impostazioni di {cli}",
+  "provider.picker.modelSourceCatalog": "Usa un elenco di modelli dalle impostazioni di {cli}",
   "provider.status.signInRequired": "Accesso richiesto",
   "provider.model.free": "Gratuito",
   "provider.model.new": "Nuovo",
@@ -153,22 +183,36 @@ export const messages = {
   "provider.geminiKey.title": "Chiave API di Gemini",
   "provider.geminiKey.description":
     "Salva una chiave API di Gemini su questo computer. Una chiave salvata viene usata al posto del tuo account Google. Per accedere con Google, rimuovi la chiave e seleziona «Connetti» nella riga di Gemini.",
+  "provider.geminiKey.descriptionHost":
+    "Salva una chiave API di Gemini sull'host. Una chiave salvata viene usata al posto del tuo account Google. Per accedere con Google, rimuovi la chiave e seleziona «Connetti» nella riga di Gemini.",
   "provider.geminiKey.label": "Chiave API di Gemini",
   "provider.claudeKey.title": "Chiave API di Anthropic",
   "provider.claudeKey.description":
-    "Salva una chiave API di Anthropic sull'host. Anthropic addebita ogni richiesta alla chiave. Per usarla per un agente, seleziona l'account «Chiave API» nel menu dei modelli dell'agente. Se Claude non ha un accesso, tutti gli agenti usano la chiave.",
+    "Salva una chiave API di Anthropic sull'host. Anthropic addebita ogni richiesta al credito API della chiave, non al tuo piano Claude. Per usarla per un agente, seleziona l'account «Chiave API» nel menu dei modelli dell'agente. Se Claude non ha un accesso, tutti gli agenti usano la chiave.",
   "provider.claudeKey.label": "Chiave API di Anthropic",
+  "provider.cursorKey.title": "Chiave API di Cursor",
+  "provider.cursorKey.description":
+    "Ogni account Cursor dopo il primo usa una chiave API. Crea una chiave nella dashboard di Cursor, in Integrations, e incollala qui. La chiave viene salvata su questo computer.",
+  "provider.cursorKey.descriptionHost":
+    "Ogni account Cursor dopo il primo usa una chiave API. Crea una chiave nella dashboard di Cursor, in Integrations, e incollala qui. La chiave viene salvata sull'host.",
+  "provider.cursorKey.label": "Chiave API di Cursor",
   "provider.inceptionKey.title": "Chiave API di Inception",
   "provider.inceptionKey.description":
     "Salva una chiave API di Inception su questo computer per usare i modelli Mercury. OpenBot li esegue nella CLI di Pi che scarica.",
+  "provider.inceptionKey.descriptionHost":
+    "Salva una chiave API di Inception sull'host per usare i modelli Mercury. OpenBot li esegue nella CLI di Pi che scarica.",
   "provider.inceptionKey.label": "Chiave API di Inception",
   "provider.deepseekKey.title": "Chiave API di DeepSeek",
   "provider.deepseekKey.description":
     "Salva una chiave API di DeepSeek su questo computer per usare i modelli DeepSeek. OpenBot li esegue nella CLI di Pi che scarica.",
+  "provider.deepseekKey.descriptionHost":
+    "Salva una chiave API di DeepSeek sull'host per usare i modelli DeepSeek. OpenBot li esegue nella CLI di Pi che scarica.",
   "provider.deepseekKey.label": "Chiave API di DeepSeek",
   "provider.openrouterKey.title": "Chiave API di OpenRouter",
   "provider.openrouterKey.description":
     "Salva una chiave API di OpenRouter su questo computer per usare i modelli di OpenRouter. OpenBot li esegue nella CLI di Pi che scarica.",
+  "provider.openrouterKey.descriptionHost":
+    "Salva una chiave API di OpenRouter sull'host per usare i modelli di OpenRouter. OpenBot li esegue nella CLI di Pi che scarica.",
   "provider.openrouterKey.label": "Chiave API di OpenRouter",
 
   "provider.openCodeKey.title": "Accedi a OpenCode Go",
@@ -186,11 +230,13 @@ export const messages = {
   "provider.openCodeKey.reconnectFailed": "Impossibile riconnettersi.",
   "provider.account.add": "Aggiungi account",
   "provider.account.addLabel": "Aggiungi un altro account {name}",
+  "provider.account.addWithCode": "Aggiungi account con codice",
   "provider.account.count": { one: "{count} account", other: "{count} account" },
   "provider.account.numbered": "Account {number}",
   "provider.account.apiKey": "Chiave API",
   "provider.account.listLabel": "Account {name}",
   "provider.account.usedBy": "Usato da {agents}",
+  "provider.account.sameEmail": "Stessa email di {name}",
   "provider.account.failed": "Accesso non riuscito",
   "provider.account.moreActions": "Altre azioni per {name}",
   "provider.account.renameLabel": "Nome di {name}",
@@ -213,20 +259,88 @@ export const messages = {
   "provider.account.resetUsageNoCredit": "{name} non ha più crediti di azzeramento dell'utilizzo.",
   "provider.account.resetUsageAlreadyRedeemed": "Questo credito di azzeramento di {name} è già stato usato.",
   "provider.account.resetUsageFailed": "Impossibile azzerare l'utilizzo di {name}.",
+  "provider.account.pool": "Raggruppa account",
+  "provider.account.poolDescription":
+    "Gli agenti usano un account finché non si avvicina a un limite di utilizzo, poi l'account il cui limite si azzera per primo.",
+  "provider.account.poolStrategy": "Usa gli account",
+  "provider.account.poolFillFirst": "Riempi prima",
+  "provider.account.poolSpread": "Distribuisci",
+  "provider.account.poolSpreadDescription":
+    "Gli agenti si distribuiscono sugli account con più utilizzo rimasto. Un agente cambia account solo quando un altro account ha molto più margine.",
+  "provider.account.inUse": "In uso",
+  "provider.account.notInPool": "Fuori dal pool",
+  "provider.account.leaveOutOfPool": "Escludi dal pool",
+  "provider.account.putBackInPool": "Rimetti nel pool",
+  "provider.account.poolChip": "Pool",
+  "provider.account.poolCount": "Pool di {accounts}",
+  "provider.account.poolInUse": "{pool} · {name} in uso",
+  "provider.settings.accountsPooledDescription": "{count} di {max}. Gli agenti condividono questi account.",
   "provider.settings.disconnectTitle": "Disconnettere {name}?",
   "provider.settings.disconnectOthers": "Gli altri account {provider} attendono finché non ricolleghi {provider}.",
   "provider.settings.disconnectLocal":
     "OpenBot disconnette {provider} su questo computer. Anche la CLI {provider} nel terminale viene disconnessa.",
   "provider.settings.disconnectHost": "OpenBot disconnette {provider} sul server.",
+  "provider.settings.geminiKeyReplacesAccount":
+    "Una chiave API Gemini salvata viene usata al posto di un accesso con Google. Per usare un piano Google e i suoi modelli, rimuovi la chiave.",
+  "provider.settings.museKeyInUse":
+    "Muse usa questa chiave, non il tuo accesso. Per usare il tuo accesso, rimuovi la chiave.",
   "provider.settings.versionInstalledByUser": "{version} · installata da te",
   "provider.settings.versionDownloaded": "{version} · scaricata da OpenBot",
+  "provider.settings.otherVersionInstalledByUser": "Non in uso: {version} · installata da te",
+  "provider.settings.otherVersionDownloaded": "Non in uso: {version} · scaricata da OpenBot",
+  "provider.settings.installedVersionIncomplete":
+    "Alcuni modelli richiedono un componente che manca in questa versione. Scarica la versione di OpenBot per usarli.",
+  "provider.settings.useInstalledVersion": "Usa quella installata",
+  "provider.settings.useDownloadedVersion": "Usa quella di OpenBot",
   "provider.settings.cache": "Cache",
   "provider.settings.promptCache": "Cache dei prompt",
   "provider.settings.promptCacheDescription":
-    "Per quanto tempo Claude tiene in cache il contesto di un agente tra un turno e l'altro.",
+    "Per quanto tempo Claude e Pi tengono il contesto di un agente nella cache tra un turno e l’altro.",
   "provider.settings.promptCacheHour": "1 ora",
-  "provider.settings.promptCacheDefault": "Predefinito di Claude Code",
+  "provider.settings.promptCacheDefault": "Predefinito del provider",
   "provider.settings.promptCacheLoadFailed": "Impossibile caricare la durata della cache dei prompt di questo server.",
+  "provider.settings.cacheExpiryCompaction": "Compatta prima della scadenza della cache",
+  "provider.settings.cacheExpiryCompactionDescription":
+    "Quando una chat con 200K o più token di contesto è inattiva con una cache di 1 ora, l’agente compatta il contesto prima della scadenza della cache. Così il messaggio successivo non rilegge tutto il contesto senza cache.",
+  "provider.settings.cacheExpiryCompactionLoadFailed":
+    "Impossibile caricare l’impostazione di compattazione di questo server.",
+  "provider.settings.claudeSetup": "Claude Code",
+  "provider.settings.claudeUserSetup": "Usa la mia configurazione di Claude Code",
+  "provider.settings.claudeUserSetupDescription":
+    "Gli agenti caricano CLAUDE.md, skill, agenti, hook e plugin da ~/.claude. Disattivato, ogni turno invia un prompt più breve. I file dello spazio di lavoro vengono comunque caricati.",
+  "provider.settings.claudeUserSetupServerDescription":
+    "Gli agenti caricano CLAUDE.md, skill, agenti, hook e plugin da ~/.claude sul server. Se disattivato, ogni turno invia un prompt più breve. I file dello spazio di lavoro vengono comunque caricati.",
+  "provider.settings.claudeUserSetupLoadFailed": "Impossibile caricare l’impostazione di Claude Code.",
+  "provider.settings.context": "Contesto",
+  "provider.settings.compactWindow": "Compatta le chat a",
+  "provider.settings.compactWindowDescription":
+    "Claude Code riassume i turni più vecchi di una chat quando la chat raggiunge questa dimensione. Più basso mantiene i turni rapidi ed economici. Più alto conserva più dettagli. Un modello con una finestra più piccola compatta al proprio limite.",
+  "provider.settings.compactWindowDefault": "Predefinito di Claude Code",
+  "provider.settings.compactWindowTokens": "{size} token",
+  "provider.settings.compactWindowLoadFailed": "Impossibile caricare la dimensione di compattazione di questo server.",
+  "provider.settings.environment": "Ambiente",
+  "provider.settings.environmentVariables": "Variabili",
+  "provider.settings.environmentDescription":
+    "Chiavi API, URL di base e altre impostazioni che riceve ogni processo di {name}. Una modifica si applica quando finiscono i turni in corso.",
+  "provider.settings.environmentCodexHint":
+    "OPENAI_BASE_URL, con OPENAI_API_KEY come chiave, invia le richieste ai modelli di ChatGPT a quell’indirizzo.",
+  "provider.settings.environmentShellNote": "I comandi che gli agenti eseguono possono leggere questi valori.",
+  "provider.settings.environmentAdd": "Aggiungi variabile",
+  "provider.settings.environmentNamePlaceholder": "VARIABLE_NAME",
+  "provider.settings.environmentValuePlaceholder": "Valore",
+  "provider.settings.environmentSaved": "Salvata",
+  "provider.settings.environmentSensitive": "Sensibile",
+  "provider.settings.environmentNameLabel": "Nome della variabile {index}",
+  "provider.settings.environmentValueLabel": "Valore di {name}",
+  "provider.settings.environmentSensitiveLabel": "Tieni {name} segreta",
+  "provider.settings.environmentRemoveLabel": "Rimuovi {name}",
+  "provider.settings.environmentUnnamed": "variabile {index}",
+  "provider.settings.environmentPending":
+    "Il salvataggio riavvia {name} quando finiscono i turni in corso. I valori sensibili restano sul server.",
+  "provider.settings.environmentDone": "Salvato. {name} si riavvia quando finiscono i turni in corso.",
+  "provider.settings.environmentDiscard": "Annulla",
+  "provider.settings.environmentSave": "Salva",
+  "provider.settings.environmentLoadFailed": "Impossibile caricare le variabili di {name}.",
   "provider.settings.models": "Modelli",
   "provider.settings.modelsDescription": {
     one: "{shown} di {count} modello appare nel selettore dei modelli.",
@@ -239,17 +353,13 @@ export const messages = {
   "provider.settings.modelShow": "Mostra {name} ({id}) nel selettore dei modelli",
   "provider.settings.modelsNoMatch": "Nessun modello corrisponde alla ricerca.",
   "provider.settings.modelsLoadFailed": "Impossibile caricare i modelli di questo server.",
-  "provider.settings.download": "Download",
-  "provider.settings.downloadedCli": "CLI di {name}",
-  "provider.settings.downloadDetail": {
-    one: "{version} · 1 versione · {size}",
-    other: "{version} · {count} versioni · {size}",
-  },
-  "provider.settings.downloadVersions": { one: "1 versione · {size}", other: "{count} versioni · {size}" },
-  "provider.settings.downloadAgain": "Quando attivi {name}, OpenBot scarica di nuovo la sua CLI.",
-  "provider.settings.removeDownloadConfirm": "Rimuovere {size}?",
-  "provider.settings.removeDownloadKeeps": "Account, accessi e agenti restano.",
-  "provider.settings.removeDownload": "Rimuovi download",
-  "provider.settings.removingDownload": "Rimozione…",
+  "provider.settings.deleteTitle": "Elimina {name}",
+  "provider.settings.deleteOn":
+    "Disattiva {name} ed elimina la CLI scaricata da OpenBot. Account, accessi e agenti restano.",
+  "provider.settings.deleteOff":
+    "Elimina la CLI che OpenBot ha scaricato per {name} ({size}). Account, accessi e agenti restano.",
   "provider.settings.removeDownloadFailed": "Impossibile rimuovere il download.",
+  "provider.settings.disconnectLocalOnly":
+    "OpenBot disconnette {provider} su questo computer. La CLI di {provider} nel tuo terminale mantiene il proprio accesso.",
+  "provider.settings.updateAll": "Aggiorna tutti",
 } as const satisfies PartialTranslation<typeof source>;

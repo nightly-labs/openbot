@@ -1,8 +1,5 @@
 import type { PluginGuide } from "./plugin-guide";
 
-// Every statement about Prisma here is taken from prisma.io. Each page used is in
-// `sources`. Check the sources again, and move `checkedAt`, whenever this file changes.
-
 export const PRISMA_PLUGIN_GUIDE: PluginGuide = {
   uses: [
     {

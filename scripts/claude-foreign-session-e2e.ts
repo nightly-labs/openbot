@@ -1,13 +1,3 @@
-// Checks that a Claude agent never resumes a session ID that another provider made (#2475). Runs the
-// real agent service on a temporary profile. Claude is the real `ClaudeAgentClient`, which the
-// Claude Agent SDK connects to a stand-in `claude` executable: it records its arguments, answers
-// control requests, and ends each turn with a result. OpenCode is a fake client that names its
-// sessions `ses_<n>`. Scenarios:
-// 1. A database with an OpenCode ID in the active Claude row: the next turn starts a new Claude
-//    session, and no `claude --resume ses_...` runs.
-// 2. Claude -> OpenCode -> Claude with a message after each switch: each session row has the
-//    provider that made its ID.
-// `bun run test:claude-foreign-session`. Writes .openbot-build/claude-foreign-session-e2e/report.json.
 import { randomUUID } from "node:crypto";
 import { EventEmitter } from "node:events";
 import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
@@ -41,7 +31,6 @@ const CLAUDE_MODEL = defaultProviderModel("claude");
 const OPENCODE_MODEL = "opencode/big-pickle";
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
-// Before the service modules load: the stores and the CLI search read these.
 process.env.HOME = home;
 process.env.OPENBOT_CLAUDE_PATH = claudeExecutable;
 process.env.OPENBOT_OPENCODE_PATH = opencodeExecutable;
@@ -54,8 +43,6 @@ const { runCauseEffect } = await import("../src/backend/effect-boundary");
 const { MailboxStore } = await import("../src/backend/mailbox-store");
 const { OpenBotDatabase } = await import("../src/backend/openbot-database");
 
-// The stand-in for the Claude CLI. Like the real CLI, it refuses a `--resume` ID that is not a UUID
-// and exits. Otherwise it speaks just enough of the stream-json protocol for a turn to end.
 const STAND_IN_CLAUDE = `#!${process.execPath}
 const fs = require("node:fs");
 const { randomUUID } = require("node:crypto");
@@ -65,7 +52,6 @@ if (args.includes("--version")) {
   process.exit(0);
 }
 fs.appendFileSync(${JSON.stringify(spawnLog)}, JSON.stringify({ pid: process.pid, argv: args }) + "\\n");
-// The SDK passes \`--resume=<id>\` and \`--session-id=<id>\`; a terminal passes \`--resume <id>\`.
 const option = (name) => {
   const index = args.findIndex((arg) => arg === name || arg.startsWith(name + "="));
   if (index < 0) return null;
@@ -108,10 +94,6 @@ interface ClientEvents {
   diagnostic: [message: string, origin?: DiagnosticOrigin];
 }
 
-/**
- * The real Claude client. Only the account, usage and model reads are answered here: the real ones
- * run `claude auth status` or a probe query. Sessions, turns and events go to the real client.
- */
 class ClaudeStandIn extends EventEmitter<ClientEvents> implements AgentClient {
   readonly provider = "claude";
   readonly contextCompaction = "native";
@@ -177,10 +159,8 @@ class ClaudeStandIn extends EventEmitter<ClientEvents> implements AgentClient {
   }
 }
 
-/** The sessions that the fake OpenCode clients started. */
 let openCodeSessions = 0;
 
-/** An OpenCode client with no process. Its turns end by themselves with one answer. */
 class FakeOpenCode extends EventEmitter<ClientEvents> implements AgentClient {
   readonly provider = "opencode";
   #running = false;
@@ -258,6 +238,7 @@ const report: {
 const unused = () => Effect.die(new Error("Not used by this check."));
 const browser: AgentBrowserHost = {
   listTabs: () => [],
+  toolCanUseTab: () => false,
   beginTakeover: unused,
   endTakeover: () => {},
   userControlTabFor: () => null,
@@ -271,9 +252,11 @@ const browser: AgentBrowserHost = {
   endControl: () => {},
   close: () => Effect.void,
   clearAgentSession: () => Effect.void,
+  shareTab: () => undefined,
+  unshareThread: () => undefined,
+  agentTab: () => null,
 };
 
-/** Each start of the stand-in Claude CLI for a session: its pid and its session arguments. */
 function claudeSpawns(): { pid: number; resume: string | null; sessionId: string | null }[] {
   let text = "";
   try {
@@ -298,7 +281,6 @@ function spawnEntry(entry: unknown) {
   return { pid, resume: option("--resume"), sessionId: option("--session-id") };
 }
 
-/** Waits for a state of the service or of a stand-in. */
 async function waitFor<T>(label: string, read: () => T | null | undefined | false, timeoutMs = 20_000): Promise<T> {
   const deadline = Date.now() + timeoutMs;
   for (;;) {
@@ -309,7 +291,6 @@ async function waitFor<T>(label: string, read: () => T | null | undefined | fals
   }
 }
 
-/** Waits for a state, and gives null instead of a stop when it does not come. */
 async function settle<T>(label: string, read: () => T | null | undefined | false, timeoutMs?: number) {
   return waitFor(label, read, timeoutMs).catch(() => null);
 }
@@ -343,7 +324,6 @@ function sessionSummary(agentId: string) {
   return sessions(agentId).map(({ provider, externalSessionId, state }) => ({ provider, externalSessionId, state }));
 }
 
-/** A Claude ID is a UUID and an OpenCode ID starts with `ses_`. */
 function rowsMatchTheirProvider(agentId: string): boolean {
   return sessions(agentId).every((session) =>
     session.provider === "claude"
@@ -376,7 +356,6 @@ async function createClaudeAgent(name: string) {
   return agent;
 }
 
-/** Sends one message and waits for its final state. */
 async function send(agentId: string, text: string) {
   const receipt = await runCauseEffect(agents.sendMessage({ agentId, text }));
   const deliveryId = receipt.deliveries[0]?.id;
@@ -397,7 +376,6 @@ function switchTo(agentId: string, provider: "claude" | "opencode") {
 try {
   await runCauseEffect(agents.initialize());
 
-  // 1. A database that #2475 broke: the active Claude row holds an OpenCode ID.
   const broken = await createClaudeAgent("Broken database");
   const brokenThread = agentNow(broken.id).threadId;
   if (!brokenThread) throw new Error("The agent has no thread.");
@@ -430,7 +408,6 @@ try {
   );
   check("1. the message after the damage completes", healed.status === "completed", healed);
 
-  // 2. Claude -> OpenCode -> Claude, as in the report, with a message after each switch.
   const switching = await createClaudeAgent("Provider switch");
   await switchTo(switching.id, "opencode");
   const onOpenCode = await send(switching.id, "A message on OpenCode.");

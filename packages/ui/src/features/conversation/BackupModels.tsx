@@ -12,14 +12,12 @@ import {
 } from "@openbot/contracts/ipc";
 import {
   ArrowLeftRight,
-  Badge,
   Button,
   Checkbox,
   ChevronDown,
   ChevronUp,
   ErrorReference,
   IconButton,
-  LoaderCircle,
   Plus,
   SearchSelect,
   Select,
@@ -37,26 +35,23 @@ import { createSignal, createUniqueId, For, Show } from "solid-js";
 import { providerAccountName } from "../../components/provider-accounts";
 import { currentText, useText } from "../../text";
 import { formatUsageReset } from "./ComposerNotice";
+import { UiBlockCard } from "./ui-blocks/UiBlockCard";
 
-/** `limit`: a usage limit holds it now. `unavailable`: its provider or account cannot run it now. */
 export type BackupModelState = "ready" | "limit" | "unavailable";
 
-/** One model and account an agent can move to, as the backup model controls show it. */
 export interface BackupModelOption {
   key: string;
   choice: AgentModelChoice;
   model: string;
-  /** Set only when the provider has more than one account, so the user can tell them apart. */
   account: string | null;
   state: BackupModelState;
 }
 
-/** What the options are built from: the host's models and providers, and its usage limits. */
 export interface BackupModelSource {
   modelOptions: readonly ClientAgentModelOption[];
   providers: AgentStatus["providers"];
-  /** Whether a usage limit holds this model and account now. */
   limited?: ((choice: AgentModelChoice) => boolean) | undefined;
+  failed?: ((choice: AgentModelChoice) => boolean) | undefined;
 }
 
 export function backupModelOption(choice: AgentModelChoice, source: BackupModelSource): BackupModelOption {
@@ -64,7 +59,9 @@ export function backupModelOption(choice: AgentModelChoice, source: BackupModelS
   const provider = source.providers?.find((status) => status.id === choice.provider);
   const accounts = provider?.accounts;
   const account = accounts?.find((candidate) => candidate.id === accountId);
-  const model = source.modelOptions.find((option) => option.provider === choice.provider && option.id === choice.model);
+  const model =
+    source.modelOptions.find((option) => option.provider === choice.provider && option.id === choice.model) ??
+    account?.models?.find((option) => option.id === choice.model);
   const usable =
     provider !== undefined &&
     provider.off !== true &&
@@ -80,34 +77,52 @@ export function backupModelOption(choice: AgentModelChoice, source: BackupModelS
   };
 }
 
-/** Every model of every provider and account the host has, except the ones in `exclude`. */
 export function backupModelOptions(
   source: BackupModelSource,
   exclude: readonly AgentModelChoice[],
 ): BackupModelOption[] {
-  return source.modelOptions.flatMap((model) => {
-    // A provider that this build does not know cannot be a backup: its model cannot be chosen here.
+  const option = (choice: AgentModelChoice) =>
+    exclude.some((other) => sameAgentModelChoice(other, choice)) ? [] : [backupModelOption(choice, source)];
+  const shared = source.modelOptions.flatMap((model) => {
+    if (model.listing === "kept") return [];
     const modelProvider = model.provider;
     if (!isKnownAgentProvider(modelProvider)) return [];
     const provider = source.providers?.find((status) => status.id === modelProvider);
     const accountIds = provider?.accounts?.map((account) => account.id) ?? [DEFAULT_PROVIDER_ACCOUNT_ID];
-    return accountIds.flatMap((accountId) => {
-      const choice: AgentModelChoice = {
+    return accountIds.flatMap((accountId) =>
+      option({
         provider: modelProvider,
         model: model.id,
         ...(accountId === DEFAULT_PROVIDER_ACCOUNT_ID ? {} : { providerAccountId: accountId }),
-      };
-      return exclude.some((other) => sameAgentModelChoice(other, choice)) ? [] : [backupModelOption(choice, source)];
-    });
+      }),
+    );
   });
+  const own = (source.providers ?? []).flatMap((provider) => {
+    const providerId = provider.id;
+    if (!isKnownAgentProvider(providerId)) return [];
+    return (provider.accounts ?? []).flatMap((account) =>
+      account.id === DEFAULT_PROVIDER_ACCOUNT_ID
+        ? []
+        : (account.models ?? [])
+            .filter(
+              (model) =>
+                !source.modelOptions.some((listed) => listed.provider === providerId && listed.id === model.id),
+            )
+            .flatMap((model) => option({ provider: providerId, model: model.id, providerAccountId: account.id })),
+    );
+  });
+  return [...shared, ...own];
 }
 
 function useOptionLabel() {
   const { t } = useText();
-  return (option: BackupModelOption) =>
-    option.account
-      ? t("agentSettings.backupModels.withAccount", { model: option.model, account: option.account })
-      : option.model;
+  return (option: BackupModelOption) => {
+    const model = t("agentSettings.backupModels.withProvider", {
+      model: option.model,
+      provider: agentProviderName(option.choice.provider),
+    });
+    return option.account ? t("agentSettings.backupModels.withAccount", { model, account: option.account }) : model;
+  };
 }
 
 function OptionLogo(props: { provider: AgentProviderId }) {
@@ -138,25 +153,27 @@ function move<T>(list: readonly T[], index: number, by: -1 | 1): T[] {
 
 export interface BackupModelsPageProps {
   agentName: string;
-  /** The agent's own model: the one it leaves at a usage limit and goes back to. */
   ownModel: string;
   own: AgentModelChoice;
   value: AgentBackupModels | null;
   source: BackupModelSource;
-  /** Null returns the agent to the default: ask, with no saved order. */
   onChange: (next: AgentBackupModels | null) => void;
 }
 
-/** The agent settings page that sets what the agent does when a usage limit holds a message. */
 export function BackupModelsPage(props: BackupModelsPageProps) {
   const { t } = useText();
   const label = useOptionLabel();
   const automatic = () => props.value?.automatic === true;
   const order = () => props.value?.order ?? [];
-  const entries = () => order().map((choice) => backupModelOption(choice, props.source));
+  const entries = () =>
+    order().map((choice) => {
+      const option = backupModelOption(choice, props.source);
+      return option.state === "ready" && props.source.failed?.(choice)
+        ? { ...option, state: "unavailable" as const }
+        : option;
+    });
   const addable = () =>
     backupModelOptions(props.source, [props.own, ...order()]).filter((option) => option.state !== "unavailable");
-  // The value can come from a store, and IPC cannot clone a store proxy, so each choice is copied.
   const save = (next: AgentBackupModels) =>
     props.onChange(
       next.automatic || next.order.length > 0
@@ -262,10 +279,7 @@ export function BackupModelsPage(props: BackupModelsPageProps) {
             value={null}
             optionValue={(option) => option.key}
             label={label}
-            // OpenRouter lists hundreds of models, so the search also reads the provider and the model id.
-            optionTextValue={(option) =>
-              `${label(option)} ${agentProviderName(option.choice.provider)} ${option.choice.model}`
-            }
+            optionTextValue={(option) => `${label(option)} ${option.choice.model}`}
             itemContent={(option) => <OptionContent option={option} />}
             onChange={(option) => save({ automatic: automatic(), order: [...order(), option.choice] })}
           >
@@ -284,22 +298,19 @@ export function BackupModelsPage(props: BackupModelsPageProps) {
 }
 
 export interface UsageLimitAskCardProps {
-  /** The provider whose usage limit holds the message. */
   provider: AgentProviderId;
-  /** Epoch seconds, or null when the provider has not said. */
+  model?: string | undefined;
+  agentName?: string | undefined;
   resetsAt: number | null;
-  /** The models that can take the message now, the first one preselected. */
   options: readonly BackupModelOption[];
-  /** Moves the agent. `remember` saves the choice first in the order and switches without asking next time. */
+  rememberable?: boolean;
   onSend: (option: BackupModelOption, remember: boolean) => Promise<void>;
   onWait: () => void;
 }
 
-/** In the chat: a usage limit holds a message that has not started. The user moves it or waits. */
 export function UsageLimitAskCard(props: UsageLimitAskCardProps) {
   const { t, format, errorMessage } = useText();
   const label = useOptionLabel();
-  const titleId = createUniqueId();
   const rememberId = createUniqueId();
   const [choice, setChoice] = createSignal<BackupModelOption>();
   const picked = () => {
@@ -311,13 +322,18 @@ export function UsageLimitAskCard(props: UsageLimitAskCardProps) {
   const [failure, setFailure] = createSignal<{ message: string; reference: string | null } | null>(null);
   const body = () => {
     const reset = formatUsageReset(props.resetsAt, format);
+    const name = props.agentName;
+    if (name)
+      return reset
+        ? t("chat.usageLimit.channelBodyReset", { name, reset })
+        : t("chat.usageLimit.channelBody", { name });
     return reset ? t("chat.usageLimit.bodyReset", { reset }) : t("chat.usageLimit.body");
   };
   async function send(option: BackupModelOption): Promise<void> {
     setFailure(null);
     setSending(true);
     try {
-      await props.onSend(option, remember());
+      await props.onSend(option, props.rememberable !== false && remember());
     } catch (error) {
       setFailure({ message: errorMessage(error, t("chat.usageLimit.failed")), reference: errorReference(error) });
     } finally {
@@ -325,50 +341,74 @@ export function UsageLimitAskCard(props: UsageLimitAskCardProps) {
     }
   }
   return (
-    <section class="conversation-interaction-card usage-limit-ask-card" aria-labelledby={titleId}>
-      <header class="conversation-interaction-header">
-        <strong id={titleId}>{t("chat.usageLimit.title", { provider: agentProviderName(props.provider) })}</strong>
-        <Badge variant="warning-light" class="conversation-interaction-status" role="status">
-          <LoaderCircle class="conversation-interaction-spinner" data-icon="inline-start" aria-hidden="true" />
-          {t("chat.usageLimit.onHold")}
-        </Badge>
-      </header>
-      <p class="usage-limit-ask-body">{body()}</p>
-      <Select<BackupModelOption>
-        class="usage-limit-ask-select"
-        options={[...props.options]}
-        optionValue="key"
-        optionTextValue={label}
-        value={picked() ?? null}
-        disabled={sending()}
-        onChange={(option) => {
-          if (option) setChoice(option);
-        }}
-        itemComponent={(item) => (
-          <SelectItem item={item.item}>
-            <OptionContent option={item.item.rawValue} />
-          </SelectItem>
-        )}
-      >
-        <SelectTrigger aria-label={t("chat.usageLimit.sendTo")}>
-          <SelectValue<BackupModelOption>>
-            {(state) => {
-              const option = state.selectedOption();
-              return option ? <OptionContent option={option} /> : null;
-            }}
-          </SelectValue>
-        </SelectTrigger>
-        <SelectContent />
-      </Select>
-      <label class="usage-limit-ask-remember" for={rememberId}>
-        <Checkbox
-          id={rememberId}
-          checked={remember()}
+    <UiBlockCard
+      class="usage-limit-ask-card"
+      status="pending"
+      title={
+        props.model
+          ? t("chat.usageLimit.modelTitle", { model: props.model })
+          : t("chat.usageLimit.title", { provider: agentProviderName(props.provider) })
+      }
+      subtitle={body()}
+      busy={sending()}
+      waiting
+      waitingLabel={t("chat.usageLimit.onHold")}
+      footerStart={
+        <Select<BackupModelOption>
+          class="ui-block-footer-select"
+          sameWidth={false}
+          placement="bottom-start"
+          options={[...props.options]}
+          optionValue="key"
+          optionTextValue={label}
+          value={picked() ?? null}
           disabled={sending()}
-          onChange={(event) => setRemember(event.currentTarget.checked)}
-        />
-        {t("chat.usageLimit.remember")}
-      </label>
+          onChange={(option) => {
+            if (option) setChoice(option);
+          }}
+          itemComponent={(item) => (
+            <SelectItem item={item.item}>
+              <OptionContent option={item.item.rawValue} />
+            </SelectItem>
+          )}
+        >
+          <SelectTrigger aria-label={t("chat.usageLimit.sendTo")} size="sm">
+            <SelectValue<BackupModelOption>>
+              {(state) => {
+                const option = state.selectedOption();
+                return option ? <OptionContent option={option} /> : null;
+              }}
+            </SelectValue>
+          </SelectTrigger>
+          <SelectContent />
+        </Select>
+      }
+      actions={
+        <>
+          <Button type="button" variant="secondary" size="sm" disabled={sending()} onClick={() => props.onWait()}>
+            {t("chat.usageLimit.wait")}
+          </Button>
+          <Show when={picked()}>
+            {(option) => (
+              <Button type="button" size="sm" disabled={sending()} onClick={() => void send(option())}>
+                {t("chat.usageLimit.send", { model: option().model })}
+              </Button>
+            )}
+          </Show>
+        </>
+      }
+    >
+      <Show when={props.rememberable !== false}>
+        <label class="usage-limit-ask-remember" for={rememberId}>
+          <Checkbox
+            id={rememberId}
+            checked={remember()}
+            disabled={sending()}
+            onChange={(event) => setRemember(event.currentTarget.checked)}
+          />
+          {t("chat.usageLimit.remember")}
+        </label>
+      </Show>
       <Show when={failure()}>
         {(details) => (
           <p class="usage-limit-ask-error" role="alert">
@@ -377,23 +417,10 @@ export function UsageLimitAskCard(props: UsageLimitAskCardProps) {
           </p>
         )}
       </Show>
-      <div class="usage-limit-ask-actions">
-        <Button type="button" variant="outline" disabled={sending()} onClick={() => props.onWait()}>
-          {t("chat.usageLimit.wait")}
-        </Button>
-        <Show when={picked()}>
-          {(option) => (
-            <Button type="button" loading={sending()} onClick={() => void send(option())}>
-              {t("chat.usageLimit.send", { model: option().model })}
-            </Button>
-          )}
-        </Show>
-      </div>
-    </section>
+    </UiBlockCard>
   );
 }
 
-/** The ready options for the ask card: the saved order first, then every other ready model. */
 export function usageLimitAskOptions(
   own: AgentModelChoice,
   backupModels: AgentBackupModels | undefined,
@@ -406,13 +433,11 @@ export function usageLimitAskOptions(
   ].filter((option) => option.state === "ready");
 }
 
-/** The saved order after the user chose `choice` with "switch without asking": it goes first. */
 export function rememberedBackupModels(
   choice: AgentModelChoice,
   backupModels: AgentBackupModels | undefined,
 ): AgentBackupModels {
   const rest = (backupModels?.order ?? []).filter((other) => !sameAgentModelChoice(other, choice));
-  // Copies, as in `BackupModelsPage`: the saved order can come from a store, and IPC cannot clone a proxy.
   return {
     automatic: true,
     order: [choice, ...rest].slice(0, AGENT_BACKUP_MODEL_LIMIT).map((other) => ({ ...other })),

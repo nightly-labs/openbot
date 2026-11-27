@@ -7,24 +7,46 @@ export const messages = {
   "error.voice.removeBusy": "Attendez la fin de la transcription vocale, puis retirez le modèle.",
   "error.voice.removeFailed": "Impossible de retirer le modèle vocal. Réessayez.",
   "error.voice.runtimeUnavailable": "La transcription vocale locale n’est pas disponible sur cette plateforme.",
-  "error.voice.busy": "Une transcription vocale est déjà en cours.",
   "error.voice.modelUnavailable": "Le modèle vocal est indisponible.",
   "error.voice.transcriptionTimedOut": "La transcription vocale a expiré.",
   "error.voice.prepareRequired":
     "La transcription vocale locale est indisponible. Exécutez `bun run voice:prepare` et redémarrez OpenBot.",
   "error.voice.transcriptionFailed": "OpenBot n’a pas pu transcrire cet enregistrement.",
-  "error.voice.cloud.keyRequired": "Ajoutez votre clé API ElevenLabs dans Réglages → Voix.",
-  "error.voice.cloud.keyRejected": "ElevenLabs n’a pas accepté la clé API. Vérifiez la clé dans Réglages → Voix.",
-  "error.voice.cloud.quotaExceeded": "Votre quota ElevenLabs est épuisé.",
-  "error.voice.cloud.rateLimited": "ElevenLabs est occupé. Réessayez dans un instant.",
+  "error.voice.videoModelMissing":
+    "Aucun modèle de reconnaissance vocale pour les enregistrements n’est configuré dans Réglages → Voix.",
+  "error.voice.videoModelMissingServer":
+    "Aucun modèle de reconnaissance vocale n’est configuré sur ce serveur. Un propriétaire ou un administrateur peut configurer un modèle dans les réglages du serveur, dans Reconnaissance vocale.",
+  "error.voice.cloud.keyRequired": "Ajoutez votre clé API {provider} dans Réglages → Voix.",
+  "error.voice.cloud.keyRejected": "{provider} n’a pas accepté la clé API. Vérifiez la clé dans Réglages → Voix.",
+  "error.voice.cloud.quotaExceeded": "Votre quota {provider} est épuisé.",
+  "error.voice.cloud.rateLimited": "{provider} est occupé. Réessayez dans un instant.",
   "error.voice.cloud.termsRequired":
     "Acceptez les conditions d’ElevenLabs dans votre compte ElevenLabs, puis réessayez.",
   "error.voice.cloud.streamEnded": "Le flux de dictée s’est arrêté. Enregistrez à nouveau.",
   "error.voice.cloud.tooLong": "L’enregistrement est trop long.",
-  "error.voice.cloud.keySaveFailed": "Impossible d’enregistrer la clé API ElevenLabs.",
+  "error.voice.cloud.keySaveFailed": "Impossible d’enregistrer la clé API {provider}.",
   "error.voice.speech.runtimeUnavailable": "La synthèse vocale locale n’est pas disponible sur cette plateforme.",
   "error.voice.speech.modelRequired": "Téléchargez le modèle de synthèse vocale dans Réglages → Voix.",
   "error.voice.speech.timedOut": "La lecture à voix haute de la réponse a expiré.",
   "error.voice.speech.failed": "OpenBot n’a pas pu lire la réponse à voix haute.",
+  "error.voice.speech.providerRefused": "{provider} a refusé de créer l’audio : {reason}",
   "error.voice.recordingNotKept": "OpenBot n’a pas pu conserver l’enregistrement vocal.",
+  "error.voice.live.timedOut": "La voix en direct Codex n’a pas démarré à temps. Réessayez.",
+  "error.voice.live.failed": "La voix en direct s’est arrêtée : {reason}",
+  "error.voice.live.disconnected": "La voix en direct est déconnectée.",
+  "error.voice.live.connectionLost": "La voix en direct a perdu la connexion. Réactivez le micro pour la relancer.",
+  "error.voice.live.startFailed":
+    "La voix en direct n’a pas pu démarrer. Mettez à jour Codex et connectez-vous avec ChatGPT sur l’ordinateur qui exécute l’agent, puis réessayez. Raison : {reason}",
+  "error.voice.live.hostFailed":
+    "Codex sur le serveur n’a pas pu démarrer la voix en direct. Demandez à son propriétaire de mettre à jour Codex sur cet ordinateur et de se connecter avec ChatGPT, puis réessayez.",
+  "error.voice.live.signIn": "Connectez-vous à Codex avec votre compte ChatGPT pour utiliser la voix en direct.",
+  "error.voice.live.chooseAccount":
+    "Ce compte ChatGPT ne peut pas utiliser la voix en direct. Dans Réglages → Voix, choisissez un compte dont l'abonnement inclut la voix.",
+  "error.voice.live.unavailable":
+    "OpenAI n'a pas pu démarrer la voix en direct. Le problème vient d'OpenAI. Réessayez plus tard.",
+  "error.voice.live.refused":
+    "OpenAI a refusé de démarrer la voix en direct. Réessayez plus tard, ou désactivez la voix en direct dans Réglages pour parler à la voix.",
+  "error.voice.live.off": "La voix en direct Codex est désactivée. Activez-la dans Réglages → Voix.",
+  "error.voice.server.modelUnsupported":
+    "{host} ne peut pas transcrire avec {model}. Dans Réglages → Voix, choisissez un autre modèle de dictée pour le serveur vocal.",
 } as const satisfies PartialTranslation<typeof source>;

@@ -9,7 +9,12 @@ export const messages = {
   "channel.stoppedTask.reassignLabel": "Переназначить остановленную задачу {name}",
   "channel.stoppedTask.reassign": "Переназначить",
   "channel.stoppedTask.cancel": "Отменить задачу",
+  "channel.stoppedTask.assignmentLoop":
+    "{names} передавали эту задачу друг другу слишком много раз. Она остановлена, чтобы не зациклиться.",
+  "channel.stoppedTask.assignmentLoopMembers":
+    "Участники передавали эту задачу друг другу слишком много раз. Она остановлена, чтобы не зациклиться.",
   "channel.conversation.noMembers": "Добавьте агентов в настройках канала, чтобы начать работу.",
+  "channel.conversation.waitFull": "Ожидание — {name} начнёт, когда завершится одна из текущих задач",
   "channel.conversation.archivedNotice": "Канал удалён. Только просмотр.",
   "channel.composer.label": "Сообщение в канал",
   "channel.composer.placeholder": "Сообщение: {name}",
@@ -17,15 +22,43 @@ export const messages = {
   "channel.panel.close": "Закрыть панель канала",
   "channel.settings.title": "Настройки канала",
   "channel.settings.memories": "Память",
+  "channel.settings.folders.title": "Папки",
+  "channel.settings.folders.description":
+    "Все участники канала {channel} могут изменять файлы и выполнять команды в этих папках.",
+  "channel.settings.folders.toastAdded": "Участники канала {channel} теперь могут изменять файлы в {folder}",
+  "channel.settings.folders.toastRemoved": "Участники канала {channel} больше не могут изменять файлы в {folder}",
   "channel.settings.isolated": "Хранить память в этом канале",
   "channel.settings.isolatedDescription":
     "Агенты сохраняют то, что узнали здесь, как память канала. Их другие чаты её не видят.",
+  "channel.settings.browser": "Браузер",
+  "channel.settings.browserEveryone": "Все участники",
+  "channel.settings.browserNone": "Никто",
   "channel.settings.memoryCount": {
     one: "Сохранено: {count}",
     few: "Сохранено: {count}",
     many: "Сохранено: {count}",
     other: "Сохранено: {count}",
   },
+  "channel.settings.newConversation.title": "Новый разговор",
+  "channel.settings.newConversation.description": "Участники забывают прежние сообщения. Настройки канала сохраняются.",
+  "channel.settings.newConversation.button": "Начать",
+  "channel.settings.newConversation.confirmTitle": "Начать новый разговор в {name}?",
+  "channel.settings.newConversation.confirmDescription":
+    "Участники забывают прежние сообщения этого канала. Сообщения остаются видны над разделителем. Участники, инструкции, воспоминания и рутины не меняются.",
+  "channel.settings.newConversation.confirm": "Начать новый разговор",
+  "channel.settings.newConversation.failed": "Не удалось начать новый разговор.",
+  "channel.settings.compact.title": "Сжать контекст",
+  "channel.settings.compact.description": "Участники сохраняют краткую сводку сессии канала и тратят меньше токенов.",
+  "channel.settings.compact.failed": "Не удалось сжать контекст канала.",
+  "channel.settings.deleteHistory.title": "Удалить историю",
+  "channel.settings.deleteHistory.description":
+    "Сообщения удаляются, и участники их забывают. Настройки канала остаются.",
+  "channel.settings.deleteHistory.button": "Удалить",
+  "channel.settings.deleteHistory.confirmTitle": "Удалить историю канала {name}?",
+  "channel.settings.deleteHistory.confirmDescription":
+    "Все сообщения и файлы этого канала будут удалены из OpenBot, и участники их забудут. Это нельзя отменить. Участники, инструкции, воспоминания, рутины и задачи не изменятся.",
+  "channel.settings.deleteHistory.confirm": "Удалить историю",
+  "channel.settings.deleteHistory.failed": "Не удалось удалить историю.",
   "channel.settings.routines": "Регулярные задачи",
   "channel.settings.routineCount": {
     one: "Настроено: {count}",

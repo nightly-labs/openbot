@@ -1,37 +1,45 @@
 import type { ConversationReaction } from "@openbot/contracts/ipc";
+import type { MobileTextKey } from "@openbot/i18n/mobile";
 import { Typography } from "heroui-native";
 import { useThemeColor } from "heroui-native/hooks";
 import Ellipsis from "lucide-react-native/icons/ellipsis";
 import { useState } from "react";
-import { Pressable, View } from "react-native";
+import { Alert, Pressable, View } from "react-native";
 import { showFailureAlert } from "@/features/analytics/failure-reports";
 import type { MobileAgent } from "@/features/workspace/context/mobile-workspace-context";
 import { haptics } from "@/shared/lib/haptics";
-import { useText } from "@/shared/lib/text";
-import { openMessageActions } from "../model/message-actions-sheet";
+import { currentText, useText } from "@/shared/lib/text";
+import { type MessageChannelTargets, type MessageFiles, openMessageActions } from "../model/message-actions-sheet";
 
-/** A message that has actions: it is on the host and does not stream. */
 export interface MessageActionsInput {
   messageId: string;
-  /** The text that Copy puts on the clipboard. Empty for a message of files only. */
   copyText: string;
   createdAt?: string;
   reactions?: readonly ConversationReaction[];
-  /** Unset where a reaction cannot be saved. `null` removes the reader's reaction. */
   onReact?: (emoji: string | null) => Promise<void>;
   onReply?: () => void;
-  /** Unset where the message has no branch: it is not the last answer of a finished turn. */
   onBranch?: () => void;
   onSelectText?: () => void;
-  /** The message that Read aloud reads. Unset where the app cannot read aloud. */
   readAloudId?: string;
+  sendToChannel?: MessageChannelTargets;
+  onDelete?: () => Promise<void>;
+  onMarkUnread?: () => void;
+  pinned?: boolean;
+  onTogglePin?: () => Promise<void>;
+  files?: MessageFiles;
 }
 
-/**
- * The reactions of a message, and the sheet with its actions. The reader's reaction shows at once;
- * the host sends the saved list after it, and that list wins. `open` is unset for a message
- * without actions.
- */
+export function reportTeamResult(work: Promise<void>, failedTitle: MobileTextKey): Promise<void> {
+  return work.then(
+    () => void haptics.notification("success"),
+    (error: unknown) => {
+      void haptics.notification("error");
+      const title = currentText().t(failedTitle);
+      showFailureAlert(error, "team", title, currentText().errorMessage(error, title));
+    },
+  );
+}
+
 export function useMessageActions(input: MessageActionsInput | null) {
   const { t } = useText();
   const reactions = input?.reactions;
@@ -58,6 +66,22 @@ export function useMessageActions(input: MessageActionsInput | null) {
         });
       }
     : undefined;
+  const onDelete = input?.onDelete;
+  const confirmDelete = onDelete
+    ? () => {
+        const text = currentText();
+        Alert.alert(text.t("mobile.chat.message.deleteTitle"), text.t("mobile.chat.message.deleteBody"), [
+          { text: text.t("common.cancel"), style: "cancel" },
+          {
+            text: text.t("common.delete"),
+            style: "destructive",
+            onPress: () => reportTeamResult(onDelete(), "mobile.chat.message.deleteFailed"),
+          },
+        ]);
+      }
+    : undefined;
+  const onTogglePin = input?.onTogglePin;
+  const togglePin = onTogglePin ? () => reportTeamResult(onTogglePin(), "mobile.chat.pins.failed") : undefined;
   const open = input
     ? () =>
         openMessageActions({
@@ -70,27 +94,26 @@ export function useMessageActions(input: MessageActionsInput | null) {
           onReply: input.onReply,
           onBranch: input.onBranch,
           onSelectText: input.onSelectText,
+          onMarkUnread: input.onMarkUnread,
+          pinned: input.pinned ?? false,
+          onTogglePin: togglePin,
+          sendToChannel: input.sendToChannel,
+          onDelete: confirmDelete,
+          files: input.files,
         })
     : undefined;
   return { shown, react, open };
 }
 
-/**
- * The reactions of a message, in a pill on the bottom corner of its bubble toward the middle of the
- * chat, as on desktop: bottom left for the reader's own message, bottom right for an agent's. The
- * parent keeps room under the bubble for the part of the pill that hangs below it.
- */
 export function ChatMessageReactions({
   align,
   reactions,
   agentsById,
   onReact,
 }: {
-  /** The side of the chat the bubble sits on. */
   align: "start" | "end";
   reactions: readonly ConversationReaction[];
   agentsById: ReadonlyMap<string, MobileAgent>;
-  /** Unset where a reaction cannot be saved. `null` removes the reader's reaction. */
   onReact?: (emoji: string | null) => void;
 }) {
   const { t } = useText();
@@ -137,10 +160,6 @@ export function ChatMessageReactions({
   );
 }
 
-/**
- * A touch and hold on the bubble opens the message actions. A screen reader cannot find that
- * gesture, so while one runs, each message gets this button under it.
- */
 export function ChatMessageActionsButton({ align, onOpen }: { align: "start" | "end"; onOpen: () => void }) {
   const { t } = useText();
   const muted = useThemeColor("muted");

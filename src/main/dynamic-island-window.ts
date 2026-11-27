@@ -1,5 +1,6 @@
 import { isDeepStrictEqual } from "node:util";
 import type {
+  AgentDockInputRect,
   DynamicIslandAction,
   DynamicIslandNotchSize,
   DynamicIslandPreference,
@@ -18,18 +19,16 @@ import type { BrowserWindow, Display, Rectangle } from "electron";
 import { causeHelpers } from "../backend/effect-boundary";
 import type { CriticalAction } from "./dynamic-island-actions";
 import { readDynamicIslandPreference, writeDynamicIslandPreference } from "./dynamic-island-preference-store";
+import { forceActivateX11Window } from "./linux-x11-activation";
+import { letPointerThrough, type PointerForwardingGate } from "./pointer-forwarding-gate";
 import { sendToRenderer } from "./renderer-ipc";
+import type { WindowsTopmostKeeper } from "./windows-topmost-keeper";
 
 const logger = createOpenBotLogger("dynamic-island-window");
 
 const DYNAMIC_ISLAND_WINDOW_SIZE = { width: 614, height: 380 } as const;
 const DYNAMIC_ISLAND_COMPACT_WINDOW_HEIGHT = 50;
-// Room below the compact island for its hover growth and hit band, which the window must not clip.
 const DYNAMIC_ISLAND_COMPACT_WINDOW_HOVER_ROOM = 18;
-// Leaving interaction starts a collapse the renderer animates for roughly 600ms: the panel fades,
-// then the shell springs back down to the notch. The window is the only thing clipping it, so
-// dropping to the compact height on the same tick guillotines the still-tall island - the lower
-// half disappears at once while the top morphs. Hold the tall window until the shell has landed.
 const DYNAMIC_ISLAND_COLLAPSE_SETTLE_MS = 700;
 
 const MACBOOK_NOTCH_REFERENCE = {
@@ -40,63 +39,77 @@ const MACBOOK_NOTCH_REFERENCE = {
 } as const;
 const MACBOOK_NOTCH_ASPECT_RATIO_TOLERANCE = 0.01;
 
-/** A Dynamic Island operation that failed. The cause is what the renderer reads. */
 export class DynamicIslandFailed extends Schema.TaggedError<DynamicIslandFailed>()("DynamicIslandFailed", {
   cause: Schema.Defect(),
 }) {}
 
 export const { rewrap: toDynamicIslandFailed } = causeHelpers(DynamicIslandFailed);
 
+type DynamicIslandWindowKind = "panel" | "tool" | "x11";
+
 export interface DynamicIslandWindowControllerOptions {
-  platform: NodeJS.Platform;
+  windowKind: DynamicIslandWindowKind | null;
   preferencePath: string;
+  defaultPreference?: DynamicIslandPreference;
   createWindow: (bounds: Rectangle, display: Display) => BrowserWindow;
   loadWindow: (window: BrowserWindow, display: Display) => Promise<void>;
   getDisplays: () => Display[];
+  getPrimaryDisplay: () => Display;
   getMainWindow: () => BrowserWindow | null;
+  getFocusedWindow: () => BrowserWindow | null;
   ensureMainWindow?: () => Promise<BrowserWindow>;
   presentMainWindow: (window: BrowserWindow) => void;
   performHaptic: () => void;
   performCriticalAction: (action: CriticalAction) => Effect.Effect<void, DynamicIslandFailed>;
+  showContextMenu?: (window: BrowserWindow) => void;
+  pointerForwarding?: PointerForwardingGate | null;
+  topmost?: WindowsTopmostKeeper | null;
   logger?: Logger;
 }
 
 export class DynamicIslandWindowController {
   readonly #options: DynamicIslandWindowControllerOptions;
-  #preference: DynamicIslandPreference = { ...DEFAULT_DYNAMIC_ISLAND_PREFERENCE };
+  #preference: DynamicIslandPreference;
   #presentation = IDLE_DYNAMIC_ISLAND_PRESENTATION;
   readonly #windows = new Map<number, BrowserWindow>();
   readonly #interactiveDisplays = new Set<number>();
-  /** One run per critical action, shared by the overlays and IPC retries that send it again. */
   readonly #criticalActions = new Map<string, Deferred.Deferred<void, DynamicIslandFailed>>();
   readonly #notchSizes = new Map<number, { width: number; height: number }>();
   readonly #collapseTimers = new Map<number, ReturnType<typeof setTimeout>>();
+  readonly #inputRegions = new Map<number, AgentDockInputRect[]>();
+  readonly #appliedShapes = new WeakMap<BrowserWindow, string>();
+  readonly #keyboardReturn = new Map<number, BrowserWindow | null>();
   readonly #preferenceMutation = Semaphore.makeUnsafe(1);
   readonly #windowReconciliation = Semaphore.makeUnsafe(1);
   #destroyed = false;
 
   constructor(options: DynamicIslandWindowControllerOptions) {
     this.#options = options;
+    this.#preference = { ...(options.defaultPreference ?? DEFAULT_DYNAMIC_ISLAND_PREFERENCE) };
   }
 
-  // Reads only the saved preference. The caller starts `reconcileWindow`, so the island page loads do
-  // not hold back the main window.
   readonly initialize = Effect.fn("DynamicIsland.initialize")(function* (this: DynamicIslandWindowController) {
-    this.#preference = yield* readDynamicIslandPreference(this.#options.preferencePath);
+    this.#preference = yield* readDynamicIslandPreference(
+      this.#options.preferencePath,
+      this.#options.defaultPreference,
+    );
   }).bind(this);
 
   get preference(): DynamicIslandPreference {
     return { ...this.#preference };
   }
 
+  get available(): boolean {
+    return this.#options.windowKind !== null;
+  }
+
   get presentation(): DynamicIslandPresentation {
     return this.#presentation;
   }
 
-  /** The notch of the built-in display, or null when there is no built-in display or it has no notch. */
   get builtInDisplayGeometry(): DynamicIslandNotchSize | null {
     const builtIn = this.#options.getDisplays().find((display) => display.internal);
-    return (builtIn && dynamicIslandNotchSizeForDisplay(builtIn)) ?? null;
+    return (builtIn && this.#notchSize(builtIn)) ?? null;
   }
 
   get mainRendererIds(): ReadonlySet<number> {
@@ -110,18 +123,32 @@ export class DynamicIslandWindowController {
     );
   }
 
-  /** Writes run in the order of the calls; each one reconciles the windows before the next. */
   setPreference(preference: DynamicIslandPreference): Effect.Effect<DynamicIslandPreference, DynamicIslandFailed> {
+    return this.#updatePreference(() => preference);
+  }
+
+  #updatePreference(
+    change: (current: DynamicIslandPreference) => DynamicIslandPreference,
+  ): Effect.Effect<DynamicIslandPreference, DynamicIslandFailed> {
     return this.#preferenceMutation.withPermit(
       Effect.gen({ self: this }, function* () {
-        const savedPreference = yield* writeDynamicIslandPreference(this.#options.preferencePath, preference).pipe(
-          toDynamicIslandFailed,
-        );
+        const savedPreference = yield* writeDynamicIslandPreference(
+          this.#options.preferencePath,
+          change(this.#preference),
+        ).pipe(toDynamicIslandFailed);
         this.#preference = savedPreference;
         yield* this.reconcileWindow();
         this.publishPreference();
         return { ...savedPreference };
       }),
+    );
+  }
+
+  hide(): Effect.Effect<DynamicIslandPreference, DynamicIslandFailed> {
+    return this.#updatePreference((current) => ({ ...current, enabled: false })).pipe(
+      Effect.tap((saved) =>
+        Effect.sync(() => sendToRenderer(this.#options.getMainWindow(), IPC_ENDPOINTS.dynamicIsland.preference, saved)),
+      ),
     );
   }
 
@@ -147,42 +174,89 @@ export class DynamicIslandWindowController {
     if (interactive) this.#interactiveDisplays.add(displayId);
     else this.#interactiveDisplays.delete(displayId);
     const display = this.#options.getDisplays().find((candidate) => candidate.id === displayId);
-    const bounds = display ? dynamicIslandWindowBounds(display) : undefined;
+    const bounds = display ? this.#islandBounds(display) : undefined;
     this.#cancelCollapse(displayId);
     if (interactive && bounds) window.setBounds(bounds, false);
-    window.setIgnoreMouseEvents(!interactive, { forward: true });
-    // On macOS, focusability also allows the panel to become a main window in AltTab. The panel is
-    // focusable only while a text field on it needs key input. A panel becomes key without
-    // activating the app, so the main window stays where it is.
+    if (this.#options.windowKind === "x11") this.#applyShape(displayId, window);
+    else letPointerThrough(this.#options.pointerForwarding, window, !interactive);
     const wantsKeyboard = interactive && keyboard;
+    if (wantsKeyboard && this.#options.windowKind === "panel" && !this.#keyboardReturn.has(displayId)) {
+      const focused = this.#options.getFocusedWindow();
+      const island = [...this.#windows].find(([, candidate]) => candidate === focused);
+      this.#keyboardReturn.set(displayId, island ? (this.#keyboardReturn.get(island[0]) ?? null) : focused);
+    }
+    const keyboardReturn = interactive ? undefined : this.#keyboardReturn.get(displayId);
+    if (!interactive) this.#keyboardReturn.delete(displayId);
     window.setFocusable(wantsKeyboard);
-    if (wantsKeyboard && !window.isFocused()) window.focus();
-    if (interactive || !bounds) return;
+    if (wantsKeyboard && !window.isFocused()) {
+      window.focus();
+      if (this.#options.windowKind === "x11") forceActivateX11Window(window);
+    }
+    if (!interactive && bounds) this.#scheduleCollapse(displayId, window);
+    if (
+      keyboardReturn &&
+      keyboardReturn !== window &&
+      !keyboardReturn.isDestroyed() &&
+      keyboardReturn.isVisible() &&
+      !keyboardReturn.isMinimized() &&
+      window.isFocused()
+    ) {
+      keyboardReturn.focus();
+    }
+  }
+
+  #scheduleCollapse(displayId: number, window: BrowserWindow): void {
     this.#collapseTimers.set(
       displayId,
       setTimeout(() => {
         this.#collapseTimers.delete(displayId);
         if (this.#interactiveDisplays.has(displayId) || window.isDestroyed()) return;
-        // The display can be rearranged while the island animates shut, and reconciliation will
-        // have moved the still-tall window to the new geometry. Ask where the window belongs now
-        // rather than replaying the rectangle captured when the pointer left.
         const current = this.#options.getDisplays().find((candidate) => candidate.id === displayId);
         if (!current) return;
-        window.setBounds(this.#windowBounds(current, dynamicIslandWindowBounds(current), false), false);
+        window.setBounds(this.#windowBounds(current, this.#islandBounds(current), false), false);
+        if (this.#options.windowKind === "x11") this.#applyShape(displayId, window);
       }, DYNAMIC_ISLAND_COLLAPSE_SETTLE_MS),
     );
   }
 
-  #windowBounds(display: Pick<Display, "bounds" | "internal">, bounds: Rectangle, interactive: boolean): Rectangle {
-    if (interactive) return bounds;
-    const compactHeight = dynamicIslandCompactHeight(
-      notchSizeForDisplay(display)?.height,
-      this.#preference.heightPercent,
+  setInputRegion(rendererId: number, rects: AgentDockInputRect[]): void {
+    if (this.#options.windowKind !== "x11") return;
+    const entry = [...this.#windows].find(
+      ([, candidate]) => !candidate.isDestroyed() && candidate.webContents.id === rendererId,
     );
+    if (!entry) return;
+    const [displayId, window] = entry;
+    this.#inputRegions.set(displayId, rects);
+    this.#applyShape(displayId, window);
+  }
+
+  #applyShape(displayId: number, window: BrowserWindow): void {
+    const scaleFactor = this.#options.getDisplays().find((candidate) => candidate.id === displayId)?.scaleFactor;
+    this.#setShape(window, this.#inputRegions.get(displayId) ?? [], scaleFactor);
+  }
+
+  #setShape(window: BrowserWindow, shape: Rectangle[], scaleFactor: number | undefined): void {
+    const key = `${scaleFactor ?? ""}:${JSON.stringify(shape)}`;
+    if (this.#appliedShapes.get(window) === key) return;
+    window.setShape(shape);
+    this.#appliedShapes.set(window, key);
+  }
+
+  #islandBounds(display: Pick<Display, "bounds" | "workArea">): Rectangle {
+    return dynamicIslandWindowBounds(display, this.#options.windowKind === "panel" ? "screen" : "work-area");
+  }
+
+  #windowBounds(display: Pick<Display, "bounds" | "internal">, bounds: Rectangle, interactive: boolean): Rectangle {
+    if (interactive || this.#options.windowKind === "x11") return bounds;
+    const compactHeight = dynamicIslandCompactHeight(this.#notchSize(display)?.height, this.#preference.heightPercent);
     return {
       ...bounds,
       height: Math.max(DYNAMIC_ISLAND_COMPACT_WINDOW_HEIGHT, compactHeight + DYNAMIC_ISLAND_COMPACT_WINDOW_HOVER_ROOM),
     };
+  }
+
+  #notchSize(display: Pick<Display, "bounds" | "internal">): DynamicIslandNotchSize | undefined {
+    return this.#options.windowKind === "panel" ? dynamicIslandNotchSizeForDisplay(display, "darwin") : undefined;
   }
 
   #cancelCollapse(displayId: number): void {
@@ -204,7 +278,6 @@ export class DynamicIslandWindowController {
       }
       return Effect.gen({ self: this }, function* () {
         const window = yield* this.#ensureMainWindow();
-        // A dismissal changes only the island, so the main window stays where it is.
         if (action.type !== "dismiss-failure") this.#options.presentMainWindow(window);
         if (action.type !== "open-app" && !sendToRenderer(window, IPC_ENDPOINTS.dynamicIsland.action, action)) {
           return yield* new DynamicIslandFailed({
@@ -222,8 +295,6 @@ export class DynamicIslandWindowController {
     const done = Deferred.makeUnsafe<void, DynamicIslandFailed>();
     this.#criticalActions.set(key, done);
     return Effect.gen({ self: this }, function* () {
-      // The main renderer clears an answered request at once. A reply or a stop changes only the
-      // agent: its events reach the main window by themselves, so the island does not need it.
       const window =
         action.type === "answer-prompt" || action.type === "respond-approval" ? yield* this.#ensureMainWindow() : null;
       yield* this.#options.performCriticalAction(action);
@@ -254,7 +325,6 @@ export class DynamicIslandWindowController {
     });
   }
 
-  /** Reconciliations run one at a time, in the order of the calls. A window that fails to load is logged. */
   reconcileWindow(): Effect.Effect<void> {
     return this.#windowReconciliation.withPermit(this.#reconcileWindows());
   }
@@ -262,28 +332,34 @@ export class DynamicIslandWindowController {
   readonly #reconcileWindows = Effect.fn("DynamicIsland.reconcileWindows")(function* (
     this: DynamicIslandWindowController,
   ) {
-    if (this.#destroyed || this.#options.platform !== "darwin" || !this.#preference.enabled) {
+    if (this.#destroyed || this.#options.windowKind === null || !this.#preference.enabled) {
       this.destroyWindows();
       return;
     }
 
-    const displays = this.#options
-      .getDisplays()
-      .filter((display) => this.#preference.additionalDisplaysEnabled || display.internal);
+    const allDisplays = this.#options.getDisplays();
+    const builtInDisplays = allDisplays.filter((display) => display.internal);
+    const displays = this.#preference.additionalDisplaysEnabled
+      ? allDisplays
+      : builtInDisplays.length > 0
+        ? builtInDisplays
+        : [this.#options.getPrimaryDisplay()];
     const displayIds = new Set(displays.map((display) => display.id));
     for (const [displayId, window] of this.#windows) {
       if (displayIds.has(displayId) && !window.isDestroyed()) continue;
       this.#windows.delete(displayId);
       this.#interactiveDisplays.delete(displayId);
       this.#notchSizes.delete(displayId);
+      this.#inputRegions.delete(displayId);
+      this.#keyboardReturn.delete(displayId);
       this.#cancelCollapse(displayId);
       if (!window.isDestroyed()) window.destroy();
     }
 
     for (const display of displays) {
       if (this.#destroyed) return;
-      const bounds = dynamicIslandWindowBounds(display);
-      const notchSize = notchSizeForDisplay(display);
+      const bounds = this.#islandBounds(display);
+      const notchSize = this.#notchSize(display);
       const current = this.#windows.get(display.id);
       if (current && !current.isDestroyed()) {
         current.setBounds(
@@ -299,7 +375,7 @@ export class DynamicIslandWindowController {
             this.#rememberNotchSize(display.id, notchSize);
           }
         }
-        current.showInactive();
+        this.#show(current);
         continue;
       }
       yield* this.#createDisplayWindow(display, bounds).pipe(
@@ -315,7 +391,11 @@ export class DynamicIslandWindowController {
     }
   }).bind(this);
 
-  /** A window that cannot be created or loaded fails here, so that the other displays still get theirs. */
+  #show(window: BrowserWindow): void {
+    window.showInactive();
+    if (this.#options.windowKind === "x11") window.setVisibleOnAllWorkspaces(true);
+  }
+
   #createDisplayWindow(display: Display, bounds: Rectangle): Effect.Effect<void, DynamicIslandFailed> {
     return Effect.try({
       try: () => this.#openDisplayWindow(display, bounds),
@@ -323,41 +403,63 @@ export class DynamicIslandWindowController {
     }).pipe(Effect.flatten);
   }
 
-  /** Creates the window now and returns its load. */
   #openDisplayWindow(display: Display, bounds: Rectangle): Effect.Effect<void, DynamicIslandFailed> {
     const window = this.#options.createWindow(this.#windowBounds(display, bounds, false), display);
-    window.excludedFromShownWindowsMenu = true;
     this.#windows.set(display.id, window);
     window.setHasShadow(false);
-    window.setWindowButtonVisibility(false);
-    window.setAlwaysOnTop(true, "status");
-    window.setVisibleOnAllWorkspaces(true, {
-      visibleOnFullScreen: true,
-      skipTransformProcessType: true,
-    });
-    window.setHiddenInMissionControl(true);
+    window.setAlwaysOnTop(true, this.#options.windowKind === "panel" ? "status" : "normal");
+    this.#options.topmost?.keep(window);
+    if (this.#options.windowKind === "panel") {
+      window.excludedFromShownWindowsMenu = true;
+      window.setWindowButtonVisibility(false);
+      window.setVisibleOnAllWorkspaces(true, {
+        visibleOnFullScreen: true,
+        skipTransformProcessType: true,
+      });
+      window.setHiddenInMissionControl(true);
+    }
+    if (this.#options.windowKind === "x11") {
+      this.#setShape(window, [], display.scaleFactor);
+    } else {
+      letPointerThrough(this.#options.pointerForwarding, window, true);
+    }
     window.setFocusable(false);
-    window.setIgnoreMouseEvents(true, { forward: true });
     window.webContents.on("did-finish-load", () => {
       if (this.#windows.get(display.id) !== window || window.isDestroyed()) return;
       const currentDisplay = this.#options.getDisplays().find((candidate) => candidate.id === display.id) ?? display;
       sendToRenderer(window, IPC_ENDPOINTS.dynamicIsland.presentation, this.#presentation);
       sendToRenderer(window, IPC_ENDPOINTS.dynamicIsland.preference, this.#preference);
-      const notchSize = notchSizeForDisplay(currentDisplay);
+      const notchSize = this.#notchSize(currentDisplay);
       if (sendToRenderer(window, IPC_ENDPOINTS.dynamicIsland.geometry, notchSize ?? null)) {
         this.#rememberNotchSize(display.id, notchSize);
       }
     });
     window.once("ready-to-show", () => {
       if (this.#windows.get(display.id) !== window || window.isDestroyed()) return;
-      window.showInactive();
+      this.#show(window);
     });
     window.on("blur", () => this.setInteractive(window.webContents.id, false));
+    window.webContents.on("context-menu", (_event, params) => {
+      if (params.isEditable || this.#windows.get(display.id) !== window || window.isDestroyed()) return;
+      this.#options.showContextMenu?.(window);
+    });
+    window.on("move", () => {
+      if (this.#windows.get(display.id) !== window || window.isDestroyed()) return;
+      const current = this.#options.getDisplays().find((candidate) => candidate.id === display.id);
+      if (!current) return;
+      const bounds = this.#islandBounds(current);
+      const { x, y } = window.getBounds();
+      if (x === bounds.x && y === bounds.y) return;
+      const interactive = this.#interactiveDisplays.has(display.id) || this.#collapseTimers.has(display.id);
+      window.setBounds(this.#windowBounds(current, bounds, interactive), false);
+    });
     window.on("closed", () => {
       if (this.#windows.get(display.id) === window) {
         this.#windows.delete(display.id);
         this.#interactiveDisplays.delete(display.id);
         this.#notchSizes.delete(display.id);
+        this.#inputRegions.delete(display.id);
+        this.#keyboardReturn.delete(display.id);
         this.#cancelCollapse(display.id);
       }
     });
@@ -397,6 +499,8 @@ export class DynamicIslandWindowController {
     this.#windows.clear();
     this.#interactiveDisplays.clear();
     this.#notchSizes.clear();
+    this.#inputRegions.clear();
+    this.#keyboardReturn.clear();
     for (const window of windows) {
       if (!window.isDestroyed()) window.destroy();
     }
@@ -405,8 +509,9 @@ export class DynamicIslandWindowController {
 
 export function dynamicIslandNotchSizeForDisplay(
   display: Pick<Display, "bounds" | "internal">,
+  platform: NodeJS.Platform,
 ): DynamicIslandNotchSize | undefined {
-  if (!display.internal || !isRecognizedNotchedMacBookDisplay(display)) return undefined;
+  if (platform !== "darwin" || !display.internal || !isRecognizedNotchedMacBookDisplay(display)) return undefined;
   return dynamicIslandNotchSize(display);
 }
 
@@ -415,10 +520,6 @@ function isRecognizedNotchedMacBookDisplay(display: Pick<Display, "bounds">): bo
   if (width <= 0 || height <= 0) return false;
   const referenceAspectRatio = MACBOOK_NOTCH_REFERENCE.displayWidth / MACBOOK_NOTCH_REFERENCE.displayHeight;
   return Math.abs(width / height - referenceAspectRatio) <= MACBOOK_NOTCH_ASPECT_RATIO_TOLERANCE;
-}
-
-function notchSizeForDisplay(display: Pick<Display, "bounds" | "internal">): DynamicIslandNotchSize | undefined {
-  return dynamicIslandNotchSizeForDisplay(display);
 }
 
 function notchSizeChanged(
@@ -438,22 +539,17 @@ function criticalActionKey(action: CriticalAction): string {
   return [action.type, action.serverId, action.agentId, id].join("\u0000");
 }
 
-function dynamicIslandWindowBounds(display: Pick<Display, "bounds">): Rectangle {
+function dynamicIslandWindowBounds(
+  display: Pick<Display, "bounds" | "workArea">,
+  top: "screen" | "work-area",
+): Rectangle {
   return {
     x: Math.round(display.bounds.x + (display.bounds.width - DYNAMIC_ISLAND_WINDOW_SIZE.width) / 2),
-    y: display.bounds.y,
+    y: top === "work-area" ? display.workArea.y : display.bounds.y,
     ...DYNAMIC_ISLAND_WINDOW_SIZE,
   };
 }
 
-/**
- * Returns the notch size in Electron's display points.
- *
- * Apple keeps the camera housing proportional across notched MacBooks, while
- * the selected display scale changes the logical display width. Scaling the
- * measured 14-inch reference therefore covers the 13-inch Air, 14-inch Pro,
- * 15-inch Air, and 16-inch Pro without a model-name lookup.
- */
 function dynamicIslandNotchSize(display: Pick<Display, "bounds">): DynamicIslandNotchSize {
   const displayScale = display.bounds.width / MACBOOK_NOTCH_REFERENCE.displayWidth;
   return {

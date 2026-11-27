@@ -4,9 +4,30 @@ import type { messages as source } from "../../en/error/agent";
 export const messages = {
   "error.agent.historyUnavailable":
     "Bu istek için geçmiş kullanılamıyor. Son geçmişi tekrar okuyun veya kanal çalışması için channel_history kullanın.",
+  "error.agent.historyArgumentsInvalid":
+    "Geçmiş bağımsız değişkenleri yanlış: {detail} Bağımsız değişkenleri düzeltip yeniden dene. openbot.tool_describe şemayı verir.",
   "error.agent.toolRequestInvalid":
     "Geçersiz araç keşfi bağımsız değişkenleri. Bildirilen şemayı ve özgün nitelikli araç adını kullanın.",
-  // Agent errors that the main process and the backend send.
+  "error.agent.toolCallArgumentsNotObject":
+    "Araç çalışmadı. tool_call içinde arguments metin değil, bir JSON nesnesi olmalı. Çağrıyı arguments bir nesne olacak şekilde yeniden gönderin.",
+  "error.agent.toolCallDiscoveryTool":
+    "Araç çalışmadı. tool_call, openbot.tool_search veya openbot.tool_describe çalıştıramaz. Bunları aynı bağımsız değişkenlerle doğrudan çağırın.",
+  "error.agent.toolCallEnvelopeKeys":
+    "Araç çalışmadı. tool_call yalnızca name ve arguments alır. Aracın bağımsız değişkenlerini arguments içine nesne olarak koyun ve çağrıyı yeniden gönderin.",
+  "error.agent.toolCallMissingName":
+    "Araç çalışmadı. tool_call içinde name yok. name alanına tool_search'ün verdiği tam nitelikli adı yazın, örneğin openbot.history_read, ve çağrıyı yeniden gönderin.",
+  "error.agent.toolCallUnknownTool":
+    "Araç çalışmadı. tool_call bu adla bir araç bulamadı. tool_search'ün verdiği tam nitelikli adı kullanın, örneğin openbot_browser.snapshot.",
+  "error.agent.toolCallUnknownToolSuggest":
+    "Araç çalışmadı. tool_call bu adla bir araç bulamadı. Nitelikli ad büyük olasılıkla {name}. Öyleyse çağrıyı bu adla yeniden gönderin.",
+  "error.agent.toolCallNullValue":
+    "Araç çalışmadı. {name}, {paths} konumunda bir nesne veya liste bekliyor, ancak bu liste öğelerinin her biri null olarak geldi. Çağrıyı yeniden gönderin ve bu öğelerin her birini JSON'unu içeren bir dize olarak verin.",
+  "error.agent.toolDescribeUnknownNames":
+    "tool_describe, {names} adında bir OpenBot aracı bulamadı. Yalnızca openbot.tool_search'ün listelediği OpenBot ve tarayıcı araçlarını açıklar, MCP araçlarını açıklamaz.",
+  "error.agent.toolDescribeDiscoveryNames":
+    "{names} araçlarını doğrudan çağır. tool_describe arama araçlarını açıklamaz.",
+  "error.agent.routineScheduleArgumentsInvalid":
+    "Rutin zamanlaması geçersiz: {detail} Zamanlamayı düzeltip yeniden deneyin. openbot.tool_describe şemayı verir.",
   "error.agent.approvalWhileDeleting": "Ajan silinirken onay verilemez.",
   "error.agent.accessLocalOnly": "Ajan erişimi yalnızca ajanı çalıştıran bilgisayarda değiştirilebilir.",
   "error.agent.duplicateCleanupFailed": "Ajan çoğaltma başarısız oldu ve tamamlanmamış kopya kaldırılamadı.",
@@ -34,6 +55,10 @@ export const messages = {
   "error.agent.setupCleanupFailed": "Ajan kurulumu başarısız oldu ve tamamlanmamış ajan kaldırılamadı.",
   "error.agent.modelUnavailable": "Seçilen ajan modeli kullanılamıyor.",
   "error.agent.modelProviderNotConnected": 'Seçilen ajan modeli "{model}" kullanılamıyor: {provider} bağlı değil.',
+  "error.agent.modelProviderSignInRequired":
+    'Seçilen ajan modeli "{model}" kullanılamıyor: {provider} oturum açmayı gerektiriyor. {provider} hesabında oturum açıp yeniden dene.',
+  "error.agent.modelProviderNotInstalled": 'Seçilen ajan modeli "{model}" kullanılamıyor: {provider} yüklü değil.',
+  "error.agent.modelProviderOutdated": 'Seçilen ajan modeli "{model}" kullanılamıyor: {provider} güncellenmeli.',
   "error.agent.modelListEmpty":
     'Seçilen ajan modeli "{model}" kullanılamıyor: {provider} hiç model listelemedi. Son hata: {detail}',
   "error.agent.modelListEmptyNoError":
@@ -46,8 +71,12 @@ export const messages = {
   "error.agent.modelNotListed": '"{model}" modeli mevcut değil. Kullanılabilir modeller: {models}.',
   "error.agent.providerNotListed":
     "Şu anda hiçbir {provider} modeli mevcut değil. Kullanılabilir modelleri görmek için list_models çağrısı yapın.",
+  "error.agent.creatorModelNotListed":
+    '"{model}" modeliniz şu anda model listesinde yok, bu yüzden yeni ajan bu modelle başlayamaz. Birkaç saniye sonra yeniden deneyin veya provider ve model alanlarına list_models\'in gösterdiği bir model yazın.',
   "error.agent.reasoningEffortUnsupported":
     '"{model}" modeli "{effort}" akıl yürütme eforunu desteklemiyor. Desteklenen eforlar: {efforts}.',
+  "error.agent.reasoningEffortNotConfigurable":
+    '"{model}" modelinin akıl yürütme eforu ayarı yok, bu yüzden eforunu değiştiremezsiniz.',
   "error.agent.noStartingModelInSettings":
     "{provider} için kullanılabilir model yok ve oturum açılmış diğer sağlayıcılarda da yok. Bir sağlayıcıda oturum açın veya Sunucu ayarları → Sağlayıcılar bölümünden varsayılan sağlayıcıyı değiştirin.",
   "error.agent.noStartingModel":
@@ -57,6 +86,7 @@ export const messages = {
     "Bu ajanın görevleri çalışıyor. Sağlayıcıyı değiştirmeden önce bitmelerini bekleyin veya onları durdurun.",
   "error.agent.waitBeforeClearContext": "Yeni bir sohbet başlatmadan önce etkin turun ve kuyruğun bitmesini bekleyin.",
   "error.agent.waitBeforeCompactContext": "Bağlamı sıkıştırmadan önce etkin turun ve kuyruğun bitmesini bekleyin.",
+  "error.agent.waitBeforeDeleteHistory": "Geçmişi silmeden önce etkin turun ve kuyruğun bitmesini bekleyin.",
   "error.agent.compactContextUnavailable": "Bu ajan bağlamını şu anda sıkıştıramaz.",
   "error.agent.unknown": "Bilinmeyen ajan: {id}",
   "error.agent.onlyUserWidensSettings":
@@ -74,6 +104,16 @@ export const messages = {
   "error.agent.endpointRemoved": "Bu ajanın kullandığı uç nokta kaldırıldı. Ajan için başka bir model seçin.",
   "error.agent.turnStalled":
     "{provider} yanıt vermeyi bıraktı, bu yüzden OpenBot bu turu bitirdi. Mesajı yeniden gönderin veya başka bir model seçin.",
+  "error.agent.promptCancelled": "{provider} bu mesajı başlamadan önce iptal etti. Mesajı yeniden gönderin.",
+  "error.agent.toolLoopStopped":
+    "{provider} başarısız bir adımı birçok kez tekrarladı, bu yüzden OpenBot bu turu durdurdu. Mesajı yeniden gönderin veya başka bir model seçin.",
+  "error.agent.answerCutOff": "Ajan yanıtını bitirmeden durdu, bu yüzden yanıt eksik. Mesajı yeniden gönderin.",
+  "error.agent.compactionConnectionLost":
+    "Ajan bağlamını sıkıştırırken bağlantı kesildi, bu yüzden görev durdu. İnternet bağlantınızı kontrol edin, ardından devam etmek için bir mesaj gönderin.",
+  "error.agent.compactionConnectionLostAddress":
+    "Ajan bağlamını sıkıştırırken bağlantı kesildi, bu yüzden görev durdu. İnternet bağlantınızı kontrol edin. {provider} ayarlarında Değişkenler altındaki {variable} değerinin model hizmetinizin API adresi olduğundan da emin olun (çoğu zaman /v1 ile biter). Ardından bir mesaj gönderin.",
+  "error.agent.compactionLoopStopped":
+    "{provider} bağlamı tekrar tekrar sıkıştırdı ve her seferinde devam edemeyecek kadar dolu kaldı, bu yüzden OpenBot bu turu durdurdu. Bu ajanın gerek duymadığı MCP sunucularını veya bilgisayar kullanımını kapatın, ardından bir mesaj gönderin. Siz veya ajan {provider} uygulamasının ne zaman sıkıştırdığını değiştirdiyseniz, bu değişikliği geri alın.",
   "error.agent.selectedGone": "Seçilen ajan artık mevcut değil.",
   "error.agent.profileEndpointsChanged": "Bu işlem oluşturulurken özel uç noktalar değişti. Tekrar deneyin.",
   "error.agent.profileInvalid": "Sağlayıcı geçersiz bir profil döndürdü. İsteminizi revize etmeyi deneyin.",
@@ -88,6 +128,12 @@ export const messages = {
   "error.agent.deletionBusy": "Ajan silme işlemi zaten devam ediyor.",
   "error.agent.stopBeforeDelete": "Ajanı silmeden önce durdurun ve kuyruğa alınmış mesajlarını iptal edin.",
   "error.agent.deleteIncomplete": "Ajan verileri tamamen kaldırılamadı. Ajanı silmeyi tekrar deneyin.",
+  "error.agent.deleteFolderInUse":
+    "Başka bir ajanın işi bu ajanın klasörünü hâlâ kullanıyor. Bu iş bittiğinde veya OpenBot'u yeniden başlattıktan sonra ajanı tekrar silin.",
+  "error.agent.deleteFolderLocked":
+    "Başka bir program, örneğin ajanın başlattığı bir program, bu ajanın klasörünü hâlâ kullanıyor. O programı kapatın veya bu ajanın çalıştığı bilgisayarı yeniden başlatın, sonra ajanı tekrar silin.",
+  "error.agent.deleteWhenFolderFree":
+    "Başka bir ajanın işi bu ajanın klasörünü hâlâ kullanıyor. Bu iş bittiğinde OpenBot bu ajanı siler.",
   "error.agent.duplicationBusy": "Bu ajan zaten kopyalanıyor.",
   "error.agent.waitBeforeDuplicate": "Ajanı kopyalamadan önce bitmesini ve kuyruğunu temizlemesini bekleyin.",
   "error.agent.saveOtherAgent": "Bu kayıt başka bir ajana ait.",
@@ -96,7 +142,6 @@ export const messages = {
     'Kayıtlı bir ajan profili okunamayan bir "{field}" değerine sahip; OpenBot\'u başlatmadan önce verileri güncelleyin.',
   "error.agent.storedProfileUnreadableId":
     '{id} kayıtlı ajan profili okunamayan bir "{field}" değerine sahip; OpenBot\'u başlatmadan önce verileri güncelleyin.',
-  // Written by `QueueEditRejectedError` in @openbot/contracts, which cannot import this package.
   "error.agent.queueEditRejected": "Kuyruk düzenlemesi reddedildi: {reason}",
   "error.agent.computerUseLocalOnly": "Bilgisayar Kullanımı yalnızca ajanı çalıştıran bilgisayarda değiştirilebilir.",
   "error.agent.automationLocalOnly": "Yerel betiklere yalnızca ajanı çalıştıran bilgisayarda izin verilebilir.",
@@ -104,9 +149,14 @@ export const messages = {
   "error.agent.quickAcknowledgementLocalOnly": "Bu ayarı yalnızca ajanı çalıştıran bilgisayar değiştirebilir.",
   "error.agent.sideQuestionBusy": "Çok fazla yan soru çalışıyor. Kısa bir süre sonra tekrar deneyin.",
   "error.agent.sideQuestionFailed": "Ajan yan soruyu yanıtlayamadı. Tekrar deneyin.",
+  "error.agent.webSearchSignIn": "Web araması için bir ChatGPT hesabıyla Codex'te oturum açmanız gerekir.",
+  "error.agent.webSearchBusy": "Çalışan çok fazla arama ve yan soru var. Biraz sonra yeniden deneyin.",
+  "error.agent.webSearchFailed": "Web araması tamamlanmadı. Yeniden deneyin.",
   "error.agent.busyMessageModeLocalOnly":
     "Ajan çalışırken mesajların ne yapacağı yalnızca ajanı çalıştıran bilgisayarda ayarlanabilir.",
   "error.agent.backupModelsLocalOnly": "Yedek modeller yalnızca ajanı çalıştıran bilgisayarda ayarlanabilir.",
+  "error.agent.backupModelsAtLimit":
+    "Şu anda hiçbir yedek model devralamaz: her biri kullanım sınırına ulaştı ya da kısa süre önce başarısız oldu. Bir hesabın modelleri tek bir sınırı paylaşabilir. Şimdi devam etmek için başka bir sağlayıcıdan veya başka bir hesaptan yedek model ekleyin ya da sınırın sıfırlanmasını bekleyin.",
   "error.agent.taskLimitLocalOnly": "Görev limiti yalnızca ajanı çalıştıran bilgisayarda ayarlanabilir.",
   "error.agent.localScriptsOff": "Bu ajan yerel betiklere izin vermiyor.",
   "error.agent.localScriptsRateLimited":
@@ -123,14 +173,23 @@ export const messages = {
     "Bu sunucunun belleği azaldı. Mesajınız kuyrukta bekler ve bellek boşaldığında başlar.",
   "error.agent.workspaceOnlyToolMissing":
     "“Yalnızca çalışma alanı” seçeneği, OpenBot'un bulamadığı {tool} aracına ihtiyaç duyar. Aracı yükleyin veya ajan ayarlarından Tam erişim'i seçin.",
+  "error.agent.codexSandboxUnavailable":
+    "“Yalnızca çalışma alanı” Codex korumalı alanına ihtiyaç duyar, ancak Codex bu bilgisayarda onu başlatamıyor, bu yüzden ajanın komutları başarısız oluyor. Ajan ayarlarından Önce sor'u veya Tam erişim'i seçin.",
   "error.agent.claudeSandboxUnavailable":
     "“Yalnızca çalışma alanı” Claude korumalı alanına ihtiyaç duyar, ancak Claude bu bilgisayarda onu başlatamıyor: {reason}. Ajan ayarlarından Tam erişim'i veya başka bir sağlayıcıyı seçin.",
+  "error.agent.claudeNoSandbox":
+    "Claude bu bilgisayarda korumalı alan kullanamıyor, bu yüzden “Yalnızca çalışma alanı” onunla çalışmaz. Ajan ayarlarından Tam erişim'i veya başka bir sağlayıcıyı seçin.",
+  "error.agent.claudeSandboxBlocked":
+    "“Yalnızca çalışma alanı” Claude korumalı alanına ihtiyaç duyar, ancak Claude bu bilgisayarda onu başlatamıyor, bu yüzden ajanın komutları başarısız oluyor. Ajan ayarlarından Tam erişim'i veya başka bir sağlayıcıyı seçin.",
   "error.agent.screenCaptureOff":
     "Bu ajan için ekran yakalama kapalı. Kullanıcı, ajan ayarlarında Bilgisayar Kullanımı'nı açabilir.",
   "error.agent.screenCaptureUnavailable": "Ekran yakalama bu bilgisayarda kullanılamıyor.",
   "error.agent.screenCaptureShared":
     "Ekran yakalama bir Slack, Discord ya da Telegram konuşmasında çalışmaz, çünkü dosyalarını başka kişiler de alır.",
   "error.agent.screenCaptureDeclined": "Kullanıcı bu ekran yakalamaya izin vermedi. Hiçbir şey yakalanmadı.",
+  "error.agent.creditMediaDeclined": "Kullanıcı bu oluşturmaya izin vermedi. Hiç kredi harcanmadı.",
+  "error.agent.creditMediaNotSaved": "Dosya oluşturuldu, ancak OpenBot onu sohbete kaydedemedi.",
+  "error.agent.mcpToolDeclined": "Kullanıcı bu MCP aracı çağrısına izin vermedi. Araç çalışmadı.",
   "error.agent.screenCaptureWindowMissing":
     "Bu pencere şu anda açık değil. Geçerli pencere kimliklerini almak için list_capture_sources çağırın.",
   "error.agent.screenCaptureDisplayMissing":
@@ -139,6 +198,8 @@ export const messages = {
     "Bölge tek bir ekranın içinde değil. list_capture_sources sonucundaki tek bir ekranın sınırları içinde kalan masaüstü noktaları kullanın.",
   "error.agent.screenCapturePermissionMissing":
     "OpenBot'un Ekran Kaydı izni yok. Kullanıcıdan Sistem Ayarları > Gizlilik ve Güvenlik > Ekran ve Sistem Sesi Kaydı bölümünü açmasını, OpenBot'u etkinleştirmesini, sonra OpenBot'tan çıkıp yeniden açmasını isteyin.",
+  "error.agent.screenCaptureListPermission":
+    "OpenBot'un henüz Ekran Kaydı izni yok, bu yüzden pencereleri listeleyemez. Bir ekranı yakalamak için capture_screen'i target screen ile çağırın. Kullanıcı önce yakalamayı onaylar, sonra macOS kullanıcıdan izin isteyebilir.",
   "error.agent.screenCaptureEmptyWindows":
     "Windows boş bir görüntü verdi. Kullanıcıdan bilgisayarın kilidini açmasını ve korumalı içeriği kapatmasını isteyin. Bir kuruluş ilkesi de ekran yakalamayı engelleyebilir.",
   "error.agent.screenCaptureFailed": "Ekran yakalama başarısız oldu. Tekrar deneyin.",

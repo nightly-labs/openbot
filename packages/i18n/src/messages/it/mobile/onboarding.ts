@@ -19,7 +19,7 @@ export const messages = {
   "mobile.onboarding.server.invitationBody": "Unisciti a un server che qualcuno ha condiviso con te.",
   "mobile.onboarding.server.computerTitle": "Collega il computer",
   "mobile.onboarding.server.computerSteps":
-    "Esci dall'account su questo telefono. Poi apri OpenBot sul tuo computer, vai in Impostazioni → Mobile Connect, scegli «Genera codice QR» e scansionalo con questo telefono.",
+    "Esci dall'account su questo telefono. Poi apri OpenBot sul tuo computer, vai in Impostazioni → Mobile Connect, scegli «Aggiungi telefono» → «Sì, accedi» e scansiona il codice con questo telefono.",
   "mobile.onboarding.server.signOut": "Esci",
   "mobile.onboarding.server.connecting": "Connessione a {name}…",
   "mobile.onboarding.agent.title": "Scegli il tuo primo agente",
@@ -63,6 +63,7 @@ export const messages = {
   "mobile.onboarding.task.creating": "Creazione…",
   "mobile.onboarding.task.withoutTask": "Crea senza attività",
   "mobile.onboarding.task.failed": "Impossibile creare l'agente. Riprova.",
+  "mobile.onboarding.task.sendFailed": "La prima attività non è stata inviata. Inviala nella chat.",
   "mobile.onboarding.idea.builder1": "Crea una piccola web app per una lista di cose da fare.",
   "mobile.onboarding.idea.builder2": "Spiegami come funzionano i branch di Git, con degli esempi.",
   "mobile.onboarding.idea.builder3": "Scrivi uno script che ordini le mie foto per data.",

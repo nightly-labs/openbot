@@ -20,9 +20,12 @@ export const messages = {
   "error.host.publishFailed": "Non è stato possibile pubblicare questo OpenBot.",
   "error.host.mobileConnectPublishFailed": "Non è stato possibile pubblicare questo OpenBot per Mobile Connect.",
   "error.host.mobileConnectHostChanged": "L'host di Mobile Connect è cambiato. Riprova.",
+  "error.host.mobileConnectHostMismatch": "Il tuo account ha un'altra chiave per questo server. Riprova.",
   "error.host.noServer": "Questo computer non ha nessun server da modificare.",
   "error.host.identityLocalOnly": "Il nome e il logo del server si possono cambiare solo sul computer che lo esegue.",
   "error.host.timezoneInvalid": "Questo fuso orario non è noto.",
+  "error.host.signalHomeUnknown": "Questo server Signal non è disponibile.",
+  "error.host.turnLimitInvalid": "Questo limite di thread non è valido.",
   "error.host.maintenanceInterrupted":
     "Manutenzione dell'host interrotta. Verifica l'applicazione e reimposta lo stato dell'host prima di riprovare.",
   "error.host.updateFailed":
@@ -32,4 +35,5 @@ export const messages = {
     "L'arresto dei tenant è scaduto. Non è stata avviata nessuna sostituzione dell'applicazione.",
   "error.host.tenantHealthMissing":
     "I report di salute dei tenant mancano o non sono in buono stato dopo il riavvio. Controlla le sessioni dei tenant prima di un altro aggiornamento.",
+  "error.host.personalityInvalid": "Questo stile di risposta non è noto.",
 } as const satisfies PartialTranslation<typeof source>;

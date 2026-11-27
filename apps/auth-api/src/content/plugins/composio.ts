@@ -1,8 +1,5 @@
 import type { PluginGuide } from "./plugin-guide";
 
-// Every statement about Composio here is taken from docs.composio.dev. Each page used is in
-// `sources`. Check the sources again, and move `checkedAt`, whenever this file changes.
-
 export const COMPOSIO_PLUGIN_GUIDE: PluginGuide = {
   uses: [
     {
@@ -26,7 +23,7 @@ export const COMPOSIO_PLUGIN_GUIDE: PluginGuide = {
     {
       question: "Does the Composio plugin need an API key?",
       answer:
-        "Yes. Type the MCP URL and your consumer API key from your Composio account, in Settings > Sessions & API Key. OpenBot sends the key in the x-consumer-api-key header. If you regenerate the key, Composio stops the old key at once, so type the new key in OpenBot.",
+        "No. Select Connect and sign in with your Composio account in the browser: Composio starts its own sign-in for MCP clients that support auth. To use a key, select Use an API key instead, and type the consumer API key from your Composio account, in Settings > Sessions & API Key. OpenBot sends the key in the x-consumer-api-key header. If you regenerate the key, Composio stops the old key at once, so type the new key in OpenBot.",
     },
     {
       question: "Which apps can the Composio MCP server reach?",
@@ -55,5 +52,5 @@ export const COMPOSIO_PLUGIN_GUIDE: PluginGuide = {
     },
     { label: "Composio: Platform or For You", url: "https://docs.composio.dev/docs" },
   ],
-  checkedAt: "2026-10-23",
+  checkedAt: "2026-11-08",
 };

@@ -1,12 +1,3 @@
-/**
- * Instance transfer: move the agents and app settings of this computer to another OpenBot computer
- * with one `.zip` file. It is a different format from the Grok Bot agent import.
- *
- * Main writes and reads the file. The renderer never receives a path or the file's bytes: it names
- * agents and a token. No secret goes into the file: API keys, sign-ins, connector tokens and the
- * values of MCP variables and headers stay on the computer that made it.
- */
-
 import { type AgentProviderId, isAgentProvider, isAgentProviderRef } from "./agent-providers";
 import { INPUT_LIMITS } from "./input-limits";
 import { type AvatarHue, isAvatarHue } from "./ipc-agent-identity";
@@ -23,13 +14,11 @@ import { isBoundedString, isIdentifier, isNullableBoundedString } from "./ipc-bo
 import { isBoolean, isDynamicRecord, isNumber, isString } from "./runtime-values";
 
 export const INSTANCE_TRANSFER_LIMITS = {
-  /** The file is read into memory on import, so it stays below 2 GiB. */
   archiveBytes: 2 * 1024 ** 3 - 1,
   files: 50_000,
   appVersion: 64,
 } as const;
 
-/** One agent on this computer, as the export screen lists it. */
 export interface InstanceTransferAgent {
   id: string;
   name: string;
@@ -40,7 +29,6 @@ export interface InstanceTransferAgent {
   skillCount: number;
   routineCount: number;
   memoryCount: number;
-  /** Workspace files that an export with files carries. */
   fileCount: number;
   fileBytes: number;
 }
@@ -53,38 +41,48 @@ export interface ExportInstanceInput {
   agentIds: string[];
   includeFiles: boolean;
   includeSettings: boolean;
+  includeHistory?: boolean;
+  includeChannelMessages?: boolean;
+  includeServerPreferences?: boolean;
 }
 
 export interface InstanceExportResult {
-  /** False when the user closed the save dialog. */
   saved: boolean;
-  /** The name of the saved file, for display. `showExport` reveals it. */
   fileName: string | null;
   warnings: string[];
 }
 
 export interface InstanceTransferPreview {
   token: string;
-  /** The OpenBot version that made the file. */
   appVersion: string;
   exportedAt: string | null;
   agents: AgentImportPreviewAgent[];
-  /** The file carries app settings. */
   hasSettings: boolean;
+  hasServerPreferences?: boolean;
   warnings: string[];
 }
 
 export interface ApplyInstanceTransferInput {
   token: string;
-  /** May be empty when only the settings are imported. */
   keys: string[];
   includeSettings: boolean;
+  includeServerPreferences?: boolean;
+}
+
+export interface CopyInstanceAgentsInput {
+  fromServerId: string;
+  agentIds: string[];
+}
+
+export interface InstanceTransferUploadProgress {
+  serverId: string;
+  sent: number;
+  total: number;
 }
 
 export interface InstanceTransferResult {
   agents: ClientAgentSummary[];
   skipped: AgentImportSkipped[];
-  /** Providers that were signed in on the other computer and are not signed in here. */
   signIn: AgentProviderId[];
   warnings: string[];
 }
@@ -126,7 +124,16 @@ export function parseExportInstanceInput(value: unknown): ExportInstanceInput {
   if (!isUniqueList(input.agentIds, INPUT_LIMITS.agents, isIdentifier) || input.agentIds.length === 0)
     invalid("agent selection");
   if (!isBoolean(input.includeFiles) || !isBoolean(input.includeSettings)) invalid("export request");
-  return { agentIds: input.agentIds, includeFiles: input.includeFiles, includeSettings: input.includeSettings };
+  for (const key of ["includeHistory", "includeChannelMessages", "includeServerPreferences"] as const)
+    if (input[key] !== undefined && !isBoolean(input[key])) invalid("export request");
+  return {
+    agentIds: input.agentIds,
+    includeFiles: input.includeFiles,
+    includeSettings: input.includeSettings,
+    ...(input.includeHistory ? { includeHistory: true } : {}),
+    ...(isBoolean(input.includeChannelMessages) ? { includeChannelMessages: input.includeChannelMessages } : {}),
+    ...(input.includeServerPreferences ? { includeServerPreferences: true } : {}),
+  };
 }
 
 export function parseApplyInstanceTransferInput(value: unknown): ApplyInstanceTransferInput {
@@ -134,8 +141,24 @@ export function parseApplyInstanceTransferInput(value: unknown): ApplyInstanceTr
   if (!isIdentifier(input.token)) invalid("import token");
   if (!isUniqueList(input.keys, INPUT_LIMITS.agents, isAgentImportKey)) invalid("agent selection");
   if (!isBoolean(input.includeSettings)) invalid("import request");
-  if (input.keys.length === 0 && !input.includeSettings) invalid("import request");
-  return { token: input.token, keys: input.keys, includeSettings: input.includeSettings };
+  if (input.includeServerPreferences !== undefined && !isBoolean(input.includeServerPreferences))
+    invalid("import request");
+  const includeServerPreferences = input.includeServerPreferences === true;
+  if (input.keys.length === 0 && !input.includeSettings && !includeServerPreferences) invalid("import request");
+  return {
+    token: input.token,
+    keys: input.keys,
+    includeSettings: input.includeSettings,
+    ...(includeServerPreferences ? { includeServerPreferences: true } : {}),
+  };
+}
+
+export function parseCopyInstanceAgentsInput(value: unknown): CopyInstanceAgentsInput {
+  const input = record(value, "copy request");
+  if (!isIdentifier(input.fromServerId)) invalid("source server");
+  if (!isUniqueList(input.agentIds, INPUT_LIMITS.agents, isIdentifier) || input.agentIds.length === 0)
+    invalid("agent selection");
+  return { fromServerId: input.fromServerId, agentIds: input.agentIds };
 }
 
 function decodeTransferAgent(value: unknown): InstanceTransferAgent {
@@ -194,6 +217,7 @@ export function decodeInstanceTransferPreview(value: unknown): InstanceTransferP
     exportedAt: preview.exportedAt,
     agents: preview.agents.map(decodeAgentImportPreviewAgent),
     hasSettings: preview.hasSettings,
+    ...(isBoolean(preview.hasServerPreferences) ? { hasServerPreferences: preview.hasServerPreferences } : {}),
     warnings: messages(preview.warnings, "transfer warnings"),
   };
 }
@@ -210,7 +234,15 @@ export function decodeInstanceTransferResult(value: unknown): InstanceTransferRe
   };
 }
 
-/** A remote host's summary: `instance-transfer-v1` carries no avatar addresses. */
+export function decodeInstanceTransferUploadProgress(value: unknown): InstanceTransferUploadProgress {
+  const progress = record(value, "transfer upload progress");
+  if (!isIdentifier(progress.serverId)) invalid("transfer upload progress");
+  const sent = count(progress.sent, "transfer upload progress");
+  const total = count(progress.total, "transfer upload progress");
+  if (sent > total) invalid("transfer upload progress");
+  return { serverId: progress.serverId, sent, total };
+}
+
 export function decodeRemoteInstanceTransferSummary(value: unknown): InstanceTransferSummary {
   const summary = record(value, "transfer summary");
   if (!Array.isArray(summary.agents)) invalid("transfer summary");
@@ -219,7 +251,6 @@ export function decodeRemoteInstanceTransferSummary(value: unknown): InstanceTra
   });
 }
 
-/** A remote host's preview: `instance-transfer-v1` carries no avatars. */
 export function decodeRemoteInstanceTransferPreview(value: unknown): InstanceTransferPreview {
   const preview = record(value, "transfer preview");
   if (!Array.isArray(preview.agents)) invalid("transfer preview");
@@ -231,7 +262,6 @@ export function decodeRemoteInstanceTransferPreview(value: unknown): InstanceTra
   return decoded;
 }
 
-/** A remote host's result: the new agents by id and name. */
 export interface RemoteInstanceTransferResult extends Omit<InstanceTransferResult, "agents"> {
   agents: { agentId: string; name: string }[];
 }
@@ -245,13 +275,11 @@ export function decodeRemoteInstanceTransferResult(value: unknown): RemoteInstan
       invalid("transferred agent");
     return { agentId: entry.agentId, name: entry.name };
   });
-  // A newer host can name a provider that this OpenBot does not know. Its sign-in cannot start here.
   if (!isUniqueList(result.signIn, 32, isAgentProviderRef)) invalid("transfer result");
   const signIn = result.signIn.filter(isAgentProvider);
   return { ...decodeInstanceTransferResult({ ...result, agents: [], signIn }), agents };
 }
 
-/** The remote result, with the new agents read from the host's agent list. */
 export function resolveRemoteInstanceTransferResult(
   result: RemoteInstanceTransferResult,
   agents: readonly ClientAgentSummary[],

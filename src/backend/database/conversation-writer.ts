@@ -1,11 +1,13 @@
 import { randomUUID } from "node:crypto";
 import type { DatabaseSync } from "node:sqlite";
 import { isDeepStrictEqual } from "node:util";
-import type { ConversationMessage, ConversationSnapshot } from "@openbot/contracts/ipc";
-import { isDynamicRecord, isString } from "@openbot/contracts/runtime-values";
+import type { ConversationMessage, ConversationSnapshot, ImageGenerationInfo } from "@openbot/contracts/ipc";
+import { mergeImageGenerationInfo } from "@openbot/contracts/ipc";
+import { type DynamicRecord, isDynamicRecord, isString } from "@openbot/contracts/runtime-values";
+import { perfTimed } from "../perf-probe-hooks";
 import type { AgentRoster } from "./agent-roster";
 import { recordUsageMessage } from "./agent-usage";
-import { type DatabaseCore, deleteReceiptsOf } from "./database-core";
+import { type DatabaseCore, deleteReceiptsOf, deleteThreadAttachments } from "./database-core";
 import {
   databaseRow,
   databaseRows,
@@ -16,35 +18,34 @@ import {
 import {
   deletedThreadMessageIds,
   isDeletedThreadMessage,
+  recordDeletedThreadHistory,
   recordDeletedThreadMessage,
   withoutDeletedMessages,
 } from "./deleted-thread-messages";
 import { currentConversationMessage } from "./legacy-conversation-message";
 import { readOrderInputs, refreshChangedOrder, refreshThreadOrder } from "./thread-message-order";
 
+export function withoutQueuePositions(message: ConversationMessage): ConversationMessage {
+  const { delivery, exchange } = message;
+  if (!delivery && !exchange) return message;
+  return {
+    ...message,
+    ...(delivery ? { delivery: { ...delivery, position: null } } : {}),
+    ...(exchange
+      ? { exchange: { ...exchange, deliveries: exchange.deliveries.map((item) => ({ ...item, position: null })) } }
+      : {}),
+  };
+}
+
 export interface ConversationWriterOptions {
   core: DatabaseCore;
   roster: AgentRoster;
 }
 
-/**
- * The write side of a thread's conversation: a whole snapshot, one appended message, or one message
- * of a run of streamed text.
- *
- * Owns `projection_thread_messages` and `projection_thread_activities`, and compacts the thread
- * aggregate so the log keeps only the newest full snapshot and the streamed messages after it. Each
- * entry point runs inside a single dispatch, so a caller already in a transaction has these writes
- * pulled into it, and none of them opens a transaction of its own. The agent lookup and the thread
- * projection row come from the roster. Every entry point also keeps the stored shown-order keys of the
- * rows it wrote, through `thread-message-order.ts`. The class never imports the facade.
- *
- * Pick by how much is known to have changed, not by convenience: `persistConversation` costs as
- * much as the thread is long, so a caller on a hot path that changed one message must use
- * `persistStreamingMessage` instead.
- */
 export class ConversationWriter {
   readonly #core: DatabaseCore;
   readonly #roster: AgentRoster;
+  readonly #streamedEvents = new StreamedEventSequences();
 
   constructor(options: ConversationWriterOptions) {
     this.#core = options.core;
@@ -59,7 +60,6 @@ export class ConversationWriter {
   ): ConversationSnapshot {
     if (!written.threadId) return structuredClone(written);
     const threadId = written.threadId;
-    // A message that a person deleted stays deleted, also when a held snapshot still has it.
     const snapshot = {
       ...written,
       messages: withoutDeletedMessages(this.#core.connection, threadId, written.messages),
@@ -77,7 +77,7 @@ export class ConversationWriter {
       ],
       (db, sequences) => {
         const sequence = sequences[0] ?? snapshot.revision;
-        const agent = this.#roster.listAgents().find((candidate) => candidate.id === snapshot.agentId);
+        const agent = this.#roster.getAgent(snapshot.agentId);
         if (!agent) throw new Error(`Unknown agent for conversation: ${snapshot.agentId}`);
         this.#roster.ensureThreadProjection(db, agent, sequence);
         db.prepare(
@@ -158,7 +158,6 @@ export class ConversationWriter {
           new Date().toISOString(),
           sequence,
         );
-        // A late write for a turn that already ended must not open it again (#2214).
         if (snapshot.activeTurnId) {
           db.prepare(`
             INSERT INTO projection_turns
@@ -171,12 +170,7 @@ export class ConversationWriter {
             WHERE projection_turns.completed_at IS NULL
           `).run(snapshot.activeTurnId, snapshot.threadId, snapshot.threadId, new Date().toISOString(), sequence);
         }
-        if (
-          ["turn.completed", "turn.reconciled-after-restart", "turn.interrupted-by-restart"].includes(eventType) &&
-          isDynamicRecord(payload) &&
-          "turnId" in payload &&
-          isString(payload.turnId)
-        ) {
+        if (isTurnEndEvent(eventType) && isDynamicRecord(payload) && "turnId" in payload && isString(payload.turnId)) {
           const status =
             "status" in payload && isString(payload.status)
               ? payload.status
@@ -189,7 +183,6 @@ export class ConversationWriter {
              WHERE thread_id = ? AND turn_id = ?`,
           ).run(status, new Date().toISOString(), sequence, snapshot.threadId, payload.turnId);
         }
-        // The ordinals follow the snapshot, so any turn can have moved.
         refreshThreadOrder(db, threadId);
         pruneConversationSnapshots(db, threadId, sequence);
         return { revision: sequence };
@@ -198,29 +191,6 @@ export class ConversationWriter {
     return { ...structuredClone(snapshot), revision: result.revision };
   }
 
-  /**
-   * The write behind one flushed run of streamed text.
-   *
-   * `persistConversation` rewrites the whole thread: it puts the entire snapshot in the event
-   * payload, re-upserts every message, and clones the snapshot back out. A streaming flush arrives
-   * ten times a second per streaming message, so that cost - which grows with the thread's whole
-   * history - was paid ten times a second per agent, on the main process, inside a write
-   * transaction that every other agent then queued behind. A six-agent channel on mature threads
-   * saturated the main process with it.
-   *
-   * Only one message changes, so only that message is written. The event carries the message
-   * whole rather than the delta, because the text is not always an append: `item/completed`
-   * replaces it outright, so summing deltas would not rebuild it. A whole message also makes each
-   * event idempotent and order-independent, which is what keeps a replay correct after a prune
-   * removes some of the run.
-   *
-   * The previous unsuperseded event for the same message is deleted in the same transaction, so a
-   * streaming message holds one event rather than one per flush and the log grows with the text,
-   * not with the square of it.
-   *
-   * Returns the new revision alone. Returning the snapshot would clone the whole history back to a
-   * caller that only reads `revision` from it.
-   */
   persistStreamingMessage(input: {
     snapshot: ConversationSnapshot;
     messageId: string;
@@ -230,19 +200,12 @@ export class ConversationWriter {
   }): number {
     const { snapshot, messageId } = input;
     const threadId = snapshot.threadId;
-    // A thread is required to address a projection row, and the message has to be in the snapshot
-    // for its ordinal to be known. Neither holds for a flush that races a thread reset, so fall
-    // back to the whole-snapshot write rather than drop the text.
-    // A late flush of a message that a person deleted writes nothing.
     if (threadId && isDeletedThreadMessage(this.#core.connection, threadId, messageId)) {
       return this.#threadRevision(threadId);
     }
-    const ordinal = threadId ? snapshot.messages.findIndex((message) => message.id === messageId) : -1;
-    if (!threadId || ordinal < 0) {
-      return this.persistConversation(snapshot, input.eventType, input.detail ?? {}, input.commandId).revision;
-    }
-    const message = snapshot.messages[ordinal];
-    if (!message) throw new Error(`Streamed message is missing from the snapshot: ${messageId}`);
+    if (!threadId) return snapshot.revision;
+    const message = snapshot.messages.find((candidate) => candidate.id === messageId);
+    if (!message) return this.#threadRevision(threadId);
     return this.#core.dispatch(
       input.commandId ?? `conversation:${input.eventType}:${randomUUID()}`,
       [
@@ -259,12 +222,27 @@ export class ConversationWriter {
       ],
       (db, sequences) => {
         const sequence = sequences[0] ?? snapshot.revision;
-        const agent = this.#roster.listAgents().find((candidate) => candidate.id === snapshot.agentId);
+        const agent = this.#roster.getAgent(snapshot.agentId);
         if (!agent) throw new Error(`Unknown agent for conversation: ${snapshot.agentId}`);
         this.#roster.ensureThreadProjection(db, agent, sequence);
-        supersedeStreamedMessageEvents(db, threadId, messageId, input.eventType, sequence);
+        const streamedEvent = { threadId, messageId, eventType: input.eventType };
+        perfTimed("db.supersedeStreamed", () =>
+          supersedeStreamedMessageEvents(this.#core, streamedEvent, sequence, this.#streamedEvents.get(streamedEvent)),
+        );
+        this.#streamedEvents.set(streamedEvent, sequence);
         const orderBefore = readOrderInputs(db, threadId, [message.id]);
-        db.prepare(`
+        const stored = storedMessageKey(this.#core, threadId, message.id);
+        if (stored && hasStoredKey(stored, message)) {
+          this.#core
+            .statement(
+              `UPDATE projection_thread_messages SET status = ?, message_json = ?, last_event_sequence = ?
+               WHERE thread_id = ? AND message_id = ?`,
+            )
+            .run(message.status, JSON.stringify(message), sequence, threadId, message.id);
+        } else {
+          const ordinal = stored ? requiredNumberColumn(stored, "ordinal") : nextOrdinal(this.#core, threadId);
+          this.#core
+            .statement(`
           INSERT INTO projection_thread_messages (
             thread_id, message_id, turn_id, author, status, item_type, created_at,
             ordinal, message_json, last_event_sequence
@@ -278,26 +256,28 @@ export class ConversationWriter {
             ordinal = excluded.ordinal,
             message_json = excluded.message_json,
             last_event_sequence = excluded.last_event_sequence
-        `).run(
-          threadId,
-          message.id,
-          message.turnId ?? null,
-          message.author,
-          message.status,
-          message.itemType ?? null,
-          message.createdAt,
-          ordinal,
-          JSON.stringify(message),
-          sequence,
-        );
+        `)
+            .run(
+              threadId,
+              message.id,
+              message.turnId ?? null,
+              message.author,
+              message.status,
+              message.itemType ?? null,
+              message.createdAt,
+              ordinal,
+              JSON.stringify(message),
+              sequence,
+            );
+        }
         refreshChangedOrder(db, threadId, orderBefore, [message.id]);
-        // A no-op while the message streams - the helper ignores anything but a settled message -
-        // and the one call that matters if a flush ever lands on a completed one.
         recordUsageMessage(db, agent.id, message, agent.provider, agent.model);
-        db.prepare(
-          `UPDATE projection_threads
-           SET active_turn_id = ?, updated_at = ?, last_event_sequence = ? WHERE thread_id = ?`,
-        ).run(snapshot.activeTurnId, new Date().toISOString(), sequence, threadId);
+        this.#core
+          .statement(
+            `UPDATE projection_threads
+             SET active_turn_id = ?, updated_at = ?, last_event_sequence = ? WHERE thread_id = ?`,
+          )
+          .run(snapshot.activeTurnId, new Date().toISOString(), sequence, threadId);
         return { revision: sequence };
       },
     ).revision;
@@ -332,7 +312,7 @@ export class ConversationWriter {
       ],
       (db, sequences) => {
         const sequence = sequences[0] ?? 0;
-        const agent = this.#roster.listAgents().find((candidate) => candidate.id === input.agentId);
+        const agent = this.#roster.getAgent(input.agentId);
         if (!agent || agent.threadId !== input.threadId) {
           throw new Error(`Unknown agent thread for conversation append: ${input.agentId}`);
         }
@@ -402,43 +382,38 @@ export class ConversationWriter {
     return result.revision;
   }
 
-  /**
-   * The messages that `persistConversationChanges` would store differently: a message with no row,
-   * or one whose merge into its row changes the stored value. Key order does not count, because
-   * the merge keeps the key order of the row.
-   */
-  changedConversationMessages(threadId: string, written: readonly ConversationMessage[]): ConversationMessage[] {
-    // A message that a person deleted is never a change: the writer skips it.
+  changedConversationMessages(
+    threadId: string,
+    written: readonly ConversationMessage[],
+    known: ReadonlyMap<string, ConversationMessage> = new Map(),
+  ): ConversationMessage[] {
     const messages = withoutDeletedMessages(this.#core.connection, threadId, written);
     if (messages.length === 0) return [];
-    const stored = new Map(
-      databaseRows(
+    const unknown = messages.filter((message) => !known.has(message.id));
+    const fetched = new Map<string, ConversationMessage | null>();
+    if (unknown.length > 0)
+      for (const row of databaseRows(
         this.#core.connection
           .prepare(
             `SELECT message_id, message_json FROM projection_thread_messages
-             WHERE thread_id = ? AND message_id IN (${messages.map(() => "?").join(", ")})`,
+             WHERE thread_id = ? AND message_id IN (${unknown.map(() => "?").join(", ")})`,
           )
-          .all(threadId, ...messages.map((message) => message.id)),
-      ).map((row) => [
-        requiredStringColumn(row, "message_id"),
-        currentConversationMessage(JSON.parse(requiredStringColumn(row, "message_json"))),
-      ]),
-    );
+          .all(threadId, ...unknown.map((message) => message.id)),
+      ))
+        fetched.set(
+          requiredStringColumn(row, "message_id"),
+          currentConversationMessage(JSON.parse(requiredStringColumn(row, "message_json"))),
+        );
     return messages.filter((message) => {
-      const existing = stored.get(message.id);
+      const existing = known.get(message.id) ?? fetched.get(message.id);
       if (!existing) return true;
-      // The JSON round trip drops `undefined` keys, as the stored row does.
-      return !isDeepStrictEqual(JSON.parse(JSON.stringify(mergeLiveMessage(existing, message))), existing);
+      return !isDeepStrictEqual(
+        JSON.parse(JSON.stringify(withoutQueuePositions(mergeLiveMessage(existing, message)))),
+        withoutQueuePositions(existing),
+      );
     });
   }
 
-  /**
-   * Applies the changed part of a bounded conversation projection.
-   *
-   * The caller may omit older messages. This method only upserts the messages it receives and
-   * removes the explicit ids, so a bounded working snapshot can never delete an omitted durable
-   * row. The event payload is also incremental, which keeps replay independent of the full chat.
-   */
   persistConversationChanges(input: {
     agentId: string;
     threadId: string;
@@ -448,10 +423,6 @@ export class ConversationWriter {
     eventType: string;
     detail?: unknown;
     commandId?: string;
-    /**
-     * The shown messages that a person deletes. Each one is recorded, so no later write brings it
-     * back, and is removed with its attachments like a removed id.
-     */
     deletedMessageIds?: readonly string[];
   }): number {
     const deletedMessageIds = input.deletedMessageIds ?? [];
@@ -476,9 +447,9 @@ export class ConversationWriter {
       ],
       (db, sequences) => {
         const sequence = sequences[0] ?? 0;
-        const agent = this.#roster.listAgents().find((candidate) => candidate.id === input.agentId);
+        const agent = this.#roster.getAgent(input.agentId);
         const threadOwner = databaseRow(
-          db.prepare("SELECT agent_id FROM projection_threads WHERE thread_id = ?").get(input.threadId),
+          this.#core.statement("SELECT agent_id FROM projection_threads WHERE thread_id = ?").get(input.threadId),
         );
         if (
           !agent ||
@@ -489,13 +460,13 @@ export class ConversationWriter {
         if (!threadOwner) this.#roster.ensureThreadProjection(db, agent, sequence);
         const writtenMessageIds = [...changedMessages.map((message) => message.id), ...removedMessageIds];
         const orderBefore = readOrderInputs(db, input.threadId, writtenMessageIds);
-        const findOrdinal = db.prepare(
+        const findOrdinal = this.#core.statement(
           "SELECT ordinal, message_json FROM projection_thread_messages WHERE thread_id = ? AND message_id = ?",
         );
-        const nextOrdinal = db.prepare(
+        const nextOrdinal = this.#core.statement(
           "SELECT COALESCE(MAX(ordinal), -1) + 1 AS ordinal FROM projection_thread_messages WHERE thread_id = ?",
         );
-        const upsert = db.prepare(`
+        const upsert = this.#core.statement(`
           INSERT INTO projection_thread_messages (
             thread_id, message_id, turn_id, author, status, item_type, created_at,
             ordinal, message_json, last_event_sequence
@@ -510,26 +481,32 @@ export class ConversationWriter {
             message_json = excluded.message_json,
             last_event_sequence = excluded.last_event_sequence
         `);
-        const deleteAttachments = db.prepare(
+        const deleteAttachments = this.#core.statement(
           "DELETE FROM projection_attachments WHERE owner_kind = 'thread-message' AND owner_id = ?",
         );
-        const insertAttachment = db.prepare(`
+        const insertAttachment = this.#core.statement(`
           INSERT OR REPLACE INTO projection_attachments
             (attachment_id, owner_kind, owner_id, name, path, metadata_json, created_at, last_event_sequence)
           VALUES (?, 'thread-message', ?, ?, '', ?, ?, ?)
         `);
+        let appendOrdinal: number | undefined;
         for (const imported of changedMessages) {
           const existingRow = databaseRow(findOrdinal.get(input.threadId, imported.id));
           const existing = existingRow
             ? currentConversationMessage(JSON.parse(requiredStringColumn(existingRow, "message_json")))
             : null;
-          // This is a live projection update. Provider-history reconciliation uses the additive
-          // merge below, but a streamed update must replace status and text from the caller. The
-          // historical merge keeps the old turn id and can therefore preserve stale live state.
           const message = existing ? mergeLiveMessage(existing, imported) : imported;
-          const ordinal = existingRow
-            ? requiredNumberColumn(existingRow, "ordinal")
-            : requiredNumberColumn(databaseRow(nextOrdinal.get(input.threadId)) ?? { ordinal: 0 }, "ordinal");
+          let ordinal: number;
+          if (existingRow) {
+            ordinal = requiredNumberColumn(existingRow, "ordinal");
+          } else {
+            appendOrdinal ??= requiredNumberColumn(
+              databaseRow(nextOrdinal.get(input.threadId)) ?? { ordinal: 0 },
+              "ordinal",
+            );
+            ordinal = appendOrdinal;
+            appendOrdinal += 1;
+          }
           upsert.run(
             input.threadId,
             message.id,
@@ -555,10 +532,9 @@ export class ConversationWriter {
             );
           }
         }
-        const deleteMessage = db.prepare(
+        const deleteMessage = this.#core.statement(
           "DELETE FROM projection_thread_messages WHERE thread_id = ? AND message_id = ?",
         );
-        // Before the rows go: a read cursor on a deleted message moves to the message shown before it.
         const deletedAt = new Date().toISOString();
         for (const messageId of deletedMessageIds) recordDeletedThreadMessage(db, input.threadId, messageId, deletedAt);
         for (const messageId of removedMessageIds) {
@@ -566,13 +542,15 @@ export class ConversationWriter {
           deleteMessage.run(input.threadId, messageId);
         }
         refreshChangedOrder(db, input.threadId, orderBefore, writtenMessageIds);
-        db.prepare(
-          `UPDATE projection_threads
+        this.#core
+          .statement(
+            `UPDATE projection_threads
            SET active_turn_id = ?, updated_at = ?, last_event_sequence = ? WHERE thread_id = ?`,
-        ).run(input.activeTurnId, new Date().toISOString(), sequence, input.threadId);
-        // A late write for a turn that already ended must not open it again (#2214).
+          )
+          .run(input.activeTurnId, new Date().toISOString(), sequence, input.threadId);
         if (input.activeTurnId) {
-          db.prepare(`
+          this.#core
+            .statement(`
             INSERT INTO projection_turns
               (turn_id, thread_id, provider_session_id, status, started_at, completed_at, last_event_sequence)
             VALUES (?, ?, (
@@ -581,12 +559,11 @@ export class ConversationWriter {
             ), 'running', ?, NULL, ?)
             ON CONFLICT(turn_id) DO UPDATE SET status = 'running', last_event_sequence = excluded.last_event_sequence
             WHERE projection_turns.completed_at IS NULL
-          `).run(input.activeTurnId, input.threadId, input.threadId, new Date().toISOString(), sequence);
+          `)
+            .run(input.activeTurnId, input.threadId, input.threadId, new Date().toISOString(), sequence);
         }
         if (
-          ["turn.completed", "turn.reconciled-after-restart", "turn.interrupted-by-restart"].includes(
-            input.eventType,
-          ) &&
+          isTurnEndEvent(input.eventType) &&
           isDynamicRecord(input.detail) &&
           "turnId" in input.detail &&
           isString(input.detail.turnId)
@@ -597,48 +574,89 @@ export class ConversationWriter {
               : input.eventType === "turn.interrupted-by-restart"
                 ? "interrupted"
                 : "completed";
-          db.prepare(
-            `UPDATE projection_turns
+          this.#core
+            .statement(
+              `UPDATE projection_turns
              SET status = ?, completed_at = ?, last_event_sequence = ?
              WHERE thread_id = ? AND turn_id = ?`,
-          ).run(status, new Date().toISOString(), sequence, input.threadId, input.detail.turnId);
+            )
+            .run(status, new Date().toISOString(), sequence, input.threadId, input.detail.turnId);
         }
         if (input.eventType === "turn.interrupted-by-restart") {
-          // Restart recovery runs before any provider starts, so no turn of this thread runs.
-          // A running row that is not the thread's active turn has no other writer (#2214).
-          db.prepare(
-            `UPDATE projection_turns
+          this.#core
+            .statement(
+              `UPDATE projection_turns
              SET status = 'interrupted', completed_at = COALESCE(completed_at, ?), last_event_sequence = ?
              WHERE thread_id = ? AND status = 'running'`,
-          ).run(new Date().toISOString(), sequence, input.threadId);
+            )
+            .run(new Date().toISOString(), sequence, input.threadId);
         }
-        db.prepare(`
+        this.#core
+          .statement(`
           INSERT INTO projection_thread_activities
             (activity_id, thread_id, turn_id, activity_type, payload_json, created_at, last_event_sequence)
           VALUES (?, ?, ?, ?, ?, ?, ?)
-        `).run(
-          randomUUID(),
-          input.threadId,
-          activityTurnId(input.eventType, input.detail, input.activeTurnId),
-          input.eventType,
-          JSON.stringify(input.detail ?? {}),
-          new Date().toISOString(),
-          sequence,
-        );
+        `)
+          .run(
+            input.eventType === CONVERSATION_UPDATED ? updateActivityId(sequence) : randomUUID(),
+            input.threadId,
+            activityTurnId(input.eventType, input.detail, input.activeTurnId),
+            input.eventType,
+            JSON.stringify(input.detail ?? {}),
+            new Date().toISOString(),
+            sequence,
+          );
+        if (input.eventType === CONVERSATION_UPDATED && input.commandId === undefined)
+          supersedePreviousConversationUpdate(db, input.threadId, sequence, changedMessages, input.activeTurnId);
         return { revision: sequence };
       },
     );
     return result.revision;
   }
 
-  /**
-   * Upserts one message learned from a paged provider history read.
-   *
-   * This operation never removes rows that are absent from the provider page. Existing local
-   * identity, author, ordering, delivery, attachments and reactions are retained while provider
-   * text/status fields are refreshed. The event contains this one message, so replay has the same
-   * non-destructive behavior without rebuilding a full conversation snapshot.
-   */
+  deleteThreadHistory(input: { agentId: string; threadId: string }): number {
+    const eventType = "conversation.history-deleted";
+    return this.#core.dispatch(
+      `conversation:${eventType}:${randomUUID()}`,
+      [
+        {
+          aggregateType: "thread",
+          aggregateId: input.threadId,
+          eventType,
+          payload: { detail: {}, changedMessages: [], removedMessageIds: [], activeTurnId: null },
+        },
+      ],
+      (db, sequences) => {
+        const sequence = sequences[0] ?? 0;
+        const threadOwner = databaseRow(
+          db.prepare("SELECT agent_id FROM projection_threads WHERE thread_id = ?").get(input.threadId),
+        );
+        if (!threadOwner || requiredStringColumn(threadOwner, "agent_id") !== input.agentId)
+          throw new Error(`Unknown agent for conversation changes: ${input.agentId}`);
+        recordDeletedThreadHistory(db, input.threadId, new Date().toISOString());
+        deleteThreadAttachments(db, input.threadId);
+        db.prepare("DELETE FROM projection_thread_messages WHERE thread_id = ?").run(input.threadId);
+        db.prepare("DELETE FROM projection_thread_summaries WHERE thread_id = ?").run(input.threadId);
+        const summaryEvents =
+          "FROM orchestration_events WHERE aggregate_type = 'thread' AND aggregate_id = ? AND event_type = 'thread.summary-created'";
+        const summaryCommands = databaseRows(
+          db.prepare(`SELECT DISTINCT command_id ${summaryEvents}`).all(input.threadId),
+        ).map((row) => requiredStringColumn(row, "command_id"));
+        db.prepare(
+          `DELETE FROM projection_thread_activities WHERE thread_id = ? AND last_event_sequence IN (SELECT sequence ${summaryEvents})`,
+        ).run(input.threadId, input.threadId);
+        db.prepare(`DELETE ${summaryEvents}`).run(input.threadId);
+        deleteReceiptsOf(db, summaryCommands);
+        db.prepare("UPDATE projection_threads SET updated_at = ?, last_event_sequence = ? WHERE thread_id = ?").run(
+          new Date().toISOString(),
+          sequence,
+          input.threadId,
+        );
+        return sequence;
+      },
+    );
+  }
+
   upsertProviderHistoryMessage(input: {
     agentId: string;
     threadId: string;
@@ -649,7 +667,6 @@ export class ConversationWriter {
     commandId?: string;
   }): number {
     const eventType = input.eventType ?? "provider-history.message-imported";
-    // A provider keeps its own history, so an import can meet a message that a person deleted here.
     if (isDeletedThreadMessage(this.#core.connection, input.threadId, input.message.id)) {
       return this.#threadRevision(input.threadId);
     }
@@ -689,7 +706,7 @@ export class ConversationWriter {
       ],
       (db, sequences) => {
         const sequence = sequences[0] ?? 0;
-        const agent = this.#roster.listAgents().find((candidate) => candidate.id === input.agentId);
+        const agent = this.#roster.getAgent(input.agentId);
         if (!agent) {
           throw new Error(`Unknown agent thread for provider history: ${input.agentId}`);
         }
@@ -804,7 +821,6 @@ export class ConversationWriter {
     return result.revision;
   }
 
-  /** The thread's revision, for a write that changes nothing. */
   #threadRevision(threadId: string): number {
     const revision = databaseRow(
       this.#core.connection
@@ -815,19 +831,69 @@ export class ConversationWriter {
   }
 }
 
-/** A turn-end event clears the active turn, so the turn it ends is only in its detail (#3722). */
+export function isTurnEndEvent(eventType: string): boolean {
+  return ["turn.completed", "turn.reconciled-after-restart", "turn.interrupted-by-restart"].includes(eventType);
+}
+
 export function activityTurnId(eventType: string, detail: unknown, activeTurnId: string | null): string | null {
-  return ["turn.completed", "turn.reconciled-after-restart", "turn.interrupted-by-restart"].includes(eventType) &&
-    isDynamicRecord(detail) &&
-    isString(detail.turnId)
-    ? detail.turnId
-    : activeTurnId;
+  return isTurnEndEvent(eventType) && isDynamicRecord(detail) && isString(detail.turnId) ? detail.turnId : activeTurnId;
+}
+
+export function keptUnsavedImage(
+  existing: ConversationMessage,
+  imported: ConversationMessage,
+  imageGeneration: ImageGenerationInfo | undefined,
+): Partial<ConversationMessage> {
+  if (
+    existing.itemType !== "image_generation" ||
+    (existing.status !== "failed" && existing.status !== "interrupted") ||
+    existing.attachments?.length ||
+    imported.attachments?.length
+  )
+    return {};
+  const stored = existing.imageGeneration;
+  return {
+    status: existing.status,
+    ...(stored?.error === undefined
+      ? {}
+      : { imageGeneration: { ...(imageGeneration ?? stored), error: stored.error } }),
+  };
+}
+
+function storedMessageKey(core: DatabaseCore, threadId: string, messageId: string): DynamicRecord | null {
+  return databaseRow(
+    core
+      .statement(
+        `SELECT ordinal, turn_id, author, item_type, created_at FROM projection_thread_messages
+         WHERE thread_id = ? AND message_id = ?`,
+      )
+      .get(threadId, messageId),
+  );
+}
+
+function hasStoredKey(stored: DynamicRecord, message: ConversationMessage): boolean {
+  return (
+    stored.turn_id === (message.turnId ?? null) &&
+    stored.author === message.author &&
+    stored.item_type === (message.itemType ?? null) &&
+    stored.created_at === message.createdAt
+  );
+}
+
+function nextOrdinal(core: DatabaseCore, threadId: string): number {
+  const next = databaseRow(
+    core
+      .statement("SELECT COALESCE(MAX(ordinal), -1) + 1 AS ordinal FROM projection_thread_messages WHERE thread_id = ?")
+      .get(threadId),
+  );
+  return next ? requiredNumberColumn(next, "ordinal") : 0;
 }
 
 function mergeImportedMessage(existing: ConversationMessage, imported: ConversationMessage): ConversationMessage {
   const attachments = mergeValues(existing.attachments, imported.attachments, (attachment) => attachment.id);
   const reactions = mergeValues(existing.reactions, imported.reactions, (reaction) => JSON.stringify(reaction));
   const turnId = existing.turnId ?? imported.turnId;
+  const imageGeneration = mergeImageGenerationInfo(existing.imageGeneration, imported.imageGeneration);
   return {
     ...existing,
     ...imported,
@@ -840,6 +906,8 @@ function mergeImportedMessage(existing: ConversationMessage, imported: Conversat
     ...(imported.delivery === undefined && existing.delivery ? { delivery: existing.delivery } : {}),
     ...(imported.exchange === undefined && existing.exchange ? { exchange: existing.exchange } : {}),
     ...(imported.senderMember === undefined && existing.senderMember ? { senderMember: existing.senderMember } : {}),
+    ...(imageGeneration ? { imageGeneration } : {}),
+    ...keptUnsavedImage(existing, imported, imageGeneration),
   };
 }
 
@@ -850,7 +918,6 @@ function mergeLiveMessage(existing: ConversationMessage, updated: ConversationMe
     ...updated,
     id: existing.id,
     author: existing.author,
-    // Mailbox updates can move a queued message to the time it joined a running turn.
     createdAt: updated.delivery ? updated.createdAt : existing.createdAt,
     ...(turnId === undefined ? {} : { turnId }),
   };
@@ -894,47 +961,130 @@ function conversationRecoveryState(
   return { turnProviderSessionIds };
 }
 
-/**
- * Drops the earlier events for a message that is still streaming, so the log holds one event per
- * streaming message instead of one per 100 ms flush.
- *
- * The receipt of each dropped event goes with it. The command ids are read first so each receipt is
- * deleted by key: this runs on the flush path, and a scan of the whole receipts table is the cost
- * this write path exists to remove.
- */
+interface StreamedEvent {
+  threadId: string;
+  messageId: string;
+  eventType: string;
+}
+
+const REMEMBERED_STREAMED_EVENTS = 1024;
+
+class StreamedEventSequences {
+  readonly #sequences = new Map<string, number>();
+
+  get(event: StreamedEvent): number | undefined {
+    return this.#sequences.get(streamedEventKey(event));
+  }
+
+  set(event: StreamedEvent, sequence: number): void {
+    const key = streamedEventKey(event);
+    this.#sequences.delete(key);
+    this.#sequences.set(key, sequence);
+    if (this.#sequences.size <= REMEMBERED_STREAMED_EVENTS) return;
+    const oldest = this.#sequences.keys().next().value;
+    if (oldest !== undefined) this.#sequences.delete(oldest);
+  }
+}
+
+function streamedEventKey(event: StreamedEvent): string {
+  return JSON.stringify([event.threadId, event.eventType, event.messageId]);
+}
+
 function supersedeStreamedMessageEvents(
+  core: DatabaseCore,
+  event: StreamedEvent,
+  retainedSequence: number,
+  rememberedSequence: number | undefined,
+): void {
+  const { threadId, messageId, eventType } = event;
+  const previous =
+    databaseRow(
+      core
+        .statement(
+          `SELECT e.sequence, e.command_id FROM projection_thread_messages m
+         JOIN orchestration_events e ON e.sequence = m.last_event_sequence
+         WHERE m.thread_id = ? AND m.message_id = ? AND e.aggregate_type = 'thread' AND e.aggregate_id = ?
+           AND e.event_type = ? AND e.sequence < ? AND json_extract(e.payload_json, '$.streamedMessage.id') = ?`,
+        )
+        .get(threadId, messageId, threadId, eventType, retainedSequence, messageId),
+    ) ??
+    (rememberedSequence === undefined
+      ? undefined
+      : databaseRow(
+          core
+            .statement(
+              `SELECT sequence, command_id FROM orchestration_events
+               WHERE sequence = ? AND aggregate_type = 'thread' AND aggregate_id = ? AND event_type = ?
+                 AND sequence < ? AND json_extract(payload_json, '$.streamedMessage.id') = ?`,
+            )
+            .get(rememberedSequence, threadId, eventType, retainedSequence, messageId),
+        ));
+  if (!previous) return;
+  core.statement("DELETE FROM orchestration_events WHERE sequence = ?").run(requiredNumberColumn(previous, "sequence"));
+  deleteReceiptsOf(core.connection, [requiredStringColumn(previous, "command_id")]);
+}
+
+export const CONVERSATION_UPDATED = "conversation.snapshot-updated";
+export const GENERATED_UPDATE_COMMAND =
+  /^conversation:conversation\.snapshot-updated:[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
+
+function updateActivityId(sequence: number): string {
+  return `${CONVERSATION_UPDATED}:${sequence}`;
+}
+
+function supersedePreviousConversationUpdate(
   db: DatabaseSync,
   threadId: string,
-  messageId: string,
-  eventType: string,
-  retainedSequence: number,
+  sequence: number,
+  changedMessages: readonly ConversationMessage[],
+  activeTurnId: string | null,
 ): void {
-  // `event_type` is matched before the payload is read on purpose. A thread keeps one whole
-  // snapshot, whose payload holds every message, and `json_extract` over it costs as much as the
-  // history is long - the very cost this path exists to avoid. The type match rejects that row
-  // without parsing it, and leaves only the short streamed-message payloads to read.
-  const matchSuperseded = `
-    aggregate_type = 'thread' AND aggregate_id = ? AND event_type = ? AND sequence < ?
-      AND json_extract(payload_json, '$.streamedMessage.id') = ?`;
-  const supersededCommandIds = databaseRows(
+  const previous = databaseRow(
     db
-      .prepare(`SELECT command_id FROM orchestration_events WHERE ${matchSuperseded}`)
-      .all(threadId, eventType, retainedSequence, messageId),
-  ).map((row) => requiredStringColumn(row, "command_id"));
-  if (supersededCommandIds.length === 0) return;
-  db.prepare(`DELETE FROM orchestration_events WHERE ${matchSuperseded}`).run(
-    threadId,
-    eventType,
-    retainedSequence,
-    messageId,
+      .prepare(
+        `SELECT sequence, command_id, event_type FROM orchestration_events
+         WHERE aggregate_type = 'thread' AND aggregate_id = ? AND sequence < ?
+         ORDER BY sequence DESC LIMIT 1`,
+      )
+      .get(threadId, sequence),
   );
-  deleteReceiptsOf(db, supersededCommandIds);
+  if (!previous || requiredStringColumn(previous, "event_type") !== CONVERSATION_UPDATED) return;
+  const commandId = requiredStringColumn(previous, "command_id");
+  if (!GENERATED_UPDATE_COMMAND.test(commandId)) return;
+  const previousSequence = requiredNumberColumn(previous, "sequence");
+  const payload = databaseRow(
+    db.prepare("SELECT payload_json FROM orchestration_events WHERE sequence = ?").get(previousSequence),
+  );
+  if (
+    !payload ||
+    !replacedUpdate(JSON.parse(requiredStringColumn(payload, "payload_json")), changedMessages, activeTurnId)
+  )
+    return;
+  db.prepare("DELETE FROM projection_thread_activities WHERE activity_id = ?").run(updateActivityId(previousSequence));
+  db.prepare("DELETE FROM orchestration_events WHERE sequence = ?").run(previousSequence);
+  deleteReceiptsOf(db, [commandId]);
+}
+
+function replacedUpdate(
+  previous: unknown,
+  changedMessages: readonly ConversationMessage[],
+  activeTurnId: string | null,
+): boolean {
+  if (!isDynamicRecord(previous) || previous.activeTurnId !== activeTurnId) return false;
+  if (!Array.isArray(previous.removedMessageIds) || previous.removedMessageIds.length > 0) return false;
+  const messages = previous.changedMessages;
+  if (!Array.isArray(messages) || messages.length > changedMessages.length) return false;
+  return messages.every((message, index) => {
+    const next = changedMessages[index];
+    if (!isDynamicRecord(message) || next === undefined || message.id !== next.id) return false;
+    if (message.author !== next.author || (next.delivery === undefined && message.createdAt !== next.createdAt))
+      return false;
+    const nextKeys = new Set(Object.entries(next).flatMap(([key, value]) => (value === undefined ? [] : [key])));
+    return Object.keys(message).every((key) => nextKeys.has(key));
+  });
 }
 
 function pruneConversationSnapshots(db: DatabaseSync, threadId: string, retainedSequence: number): void {
-  // A streamed-message event is superseded by any later whole snapshot exactly as an older snapshot
-  // is: the snapshot carries that message's text too. Leaving them would let the flushes of an
-  // interrupted turn stay in the log for the life of the thread.
   const supersededEvents = `
     aggregate_type = 'thread' AND aggregate_id = ? AND sequence < ?
       AND (json_type(payload_json, '$.snapshot') = 'object'

@@ -1,12 +1,3 @@
-// Runs the real `deepseek` provider driver over the real Pi CLI with Workspace only access on macOS,
-// to check that Pi can read its credential store in the sandbox (#3336). Pi 1.4.0 makes a lock
-// folder beside `auth.json` for each read, and writes an empty `auth.json` when there is none. Before
-// the fix the sandbox denied both: each turn stopped with "Credential store read failed for deepseek:
-// EPERM ... auth.json.lock", and with no `auth.json` Pi exited at the start. The key is not valid, so
-// the turn must stop with DeepSeek's answer, not with the sandbox. The last part runs commands in the
-// same sandbox to check that only the lock folders became writable.
-// `PI_CLI=<path to pi> bun scripts/pi-workspace-only-smoke.ts`. Needs the network.
-// Writes .openbot-build/pi-workspace-only-smoke/report.json.
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
 import { existsSync } from "node:fs";
@@ -24,7 +15,6 @@ const OUT = resolve(import.meta.dirname, "../.openbot-build/pi-workspace-only-sm
 const SANDBOX_FAILURE = /Credential store read failed|EPERM|Operation not permitted|\.lock/u;
 
 interface TurnCase {
-  /** The `auth.json` before the start, or null when there is none. */
   authJson: string | null;
   models?: string[];
   status?: string | null;
@@ -46,7 +36,6 @@ interface Report {
   failure?: string;
 }
 
-// Not in the temporary folder: the sandbox lets every confined process write there.
 await mkdir(OUT, { recursive: true });
 const root = await mkdtemp(join(OUT, "run-"));
 const agentDirectory = join(root, "pi-agent");
@@ -55,10 +44,6 @@ const confinement = { writableRoots: [workspace] };
 const report: Report = { passed: false, turns: [] };
 const clients: AgentClient[] = [];
 
-/**
- * One turn of a fresh client, in a new Pi folder. The folder holds `settings.json`, because Pi takes
- * a lock to read it only when it exists.
- */
 async function runPi(turn: TurnCase): Promise<void> {
   report.turns.push(turn);
   await rm(agentDirectory, { recursive: true, force: true });
@@ -104,12 +89,9 @@ try {
   if (process.platform !== "darwin") throw new Error("Workspace only runs only on macOS.");
   await mkdir(workspace, { recursive: true });
   process.env.PI_CODING_AGENT_DIR = agentDirectory;
-  // As in the issue: Pi ran with Full access before, so `auth.json` exists and is empty.
   await runPi({ authJson: "{}", errors: [] });
-  // A user who never ran Pi with Full access has no `auth.json`. OpenBot makes it before the start.
   await runPi({ authJson: null, errors: [] });
 
-  // The same sandbox, with commands in place of Pi.
   const state = piStatePaths({ PI_CODING_AGENT_DIR: agentDirectory });
   const lock = join(agentDirectory, "auth.json.lock");
   const checks: [string[], Probe["expected"]][] = [
@@ -125,6 +107,8 @@ try {
     [["/bin/mkdir", join(agentDirectory, "models.json.lock")], "denied"],
     [["/bin/mkdir", join(agentDirectory, "settings.json.lock")], "allowed"],
     [["/bin/mkdir", join(agentDirectory, "trust.json.lock")], "allowed"],
+    [["/bin/mkdir", join(agentDirectory, "models-store.json.lock")], "allowed"],
+    [["/bin/sh", "-c", `printf x > ${JSON.stringify(join(agentDirectory, "models-store.json"))}`], "denied"],
   ];
   report.probes = checks.map(([[command = "", ...args], expected]) => {
     const target = confineSpawnTarget({ command, args, windowsVerbatimArguments: false }, confinement, state);

@@ -19,7 +19,7 @@ export const messages = {
   "mobile.onboarding.server.invitationBody": "Birinin sizinle paylaştığı bir sunucuya katılın.",
   "mobile.onboarding.server.computerTitle": "Bilgisayarınızı bağlayın",
   "mobile.onboarding.server.computerSteps":
-    "Bu telefonda oturumu kapatın. Ardından bilgisayarınızda OpenBot'u açın, Ayarlar → Mobile Connect bölümüne gidin, “QR kodu oluştur” seçeneğini seçin ve kodu bu telefonla tarayın.",
+    "Bu telefonda oturumu kapatın. Ardından bilgisayarınızda OpenBot'u açın, Ayarlar → Mobil Bağlantı bölümüne gidin, “Telefon ekle” → “Evet, oturum aç” seçeneğini seçin ve kodu bu telefonla tarayın.",
   "mobile.onboarding.server.signOut": "Oturumu kapat",
   "mobile.onboarding.server.connecting": "{name} sunucusuna bağlanılıyor…",
   "mobile.onboarding.agent.title": "İlk ajanınızı seçin",
@@ -63,6 +63,7 @@ export const messages = {
   "mobile.onboarding.task.creating": "Oluşturuluyor…",
   "mobile.onboarding.task.withoutTask": "Görev olmadan oluştur",
   "mobile.onboarding.task.failed": "Ajan oluşturulamadı. Tekrar deneyin.",
+  "mobile.onboarding.task.sendFailed": "İlk göreviniz gönderilmedi. Sohbette gönderin.",
   "mobile.onboarding.idea.builder1": "Küçük bir yapılacaklar listesi web uygulaması yapın.",
   "mobile.onboarding.idea.builder2": "Git dallarının nasıl çalıştığını örneklerle açıklayın.",
   "mobile.onboarding.idea.builder3": "Fotoğraflarımı tarihe göre sıralayan bir betik yazın.",

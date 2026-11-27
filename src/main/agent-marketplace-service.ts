@@ -4,6 +4,7 @@ import type {
   AgentSubmission,
   AgentSummary,
   AvatarImageInput,
+  InstalledSkill,
   InstallMarketplaceAgentInput,
   InstallMarketplaceAgentResult,
   MarketplaceAgentDetail,
@@ -87,6 +88,7 @@ interface AgentMarketplaceAgents {
 }
 
 interface AgentMarketplaceSkills {
+  listInstalled(agentId: string): Effect.Effect<InstalledSkill[], SkillMarketplaceFailure>;
   listPublishable(agentId: string): Effect.Effect<MarketplaceAgentSkill[], SkillMarketplaceFailure>;
   installVersion(input: {
     agentId: string;
@@ -126,11 +128,6 @@ export class AgentMarketplaceService {
     });
   }
 
-  /**
-   * The agent a shared link names: the approved version, else the version that waits for its first
-   * review, marked `pending`. The listing page shows it, and Add installs it, so that Add works on a
-   * pending agent that its creator shared.
-   */
   getListing(agentId: string): Effect.Effect<MarketplaceAgentDetail, AgentMarketplaceFailure> {
     return Effect.gen({ self: this }, function* (): Effect.fn.Return<MarketplaceAgentDetail, AgentMarketplaceFailure> {
       const detail = yield* this.auth
@@ -159,10 +156,13 @@ export class AgentMarketplaceService {
       if (!agent)
         return yield* new AgentMarketplaceFailure({ cause: new Error(sourceText("error.skill.chooseLocalAgent")) });
       const skills = yield* this.skills.listPublishable(agentId).pipe(toAgentMarketplaceFailure);
-      const routines = this.agents.listRoutines(agentId).flatMap(({ name, instruction, active, trigger }) =>
-        // A `once` routine names one date, so it is not part of a template.
-        isReleasedRoutineSchedule(trigger.schedule) ? [{ name, instruction, active, schedule: trigger.schedule }] : [],
-      );
+      const routines = this.agents
+        .listRoutines(agentId)
+        .flatMap(({ name, instruction, active, trigger }) =>
+          isReleasedRoutineSchedule(trigger.schedule)
+            ? [{ name, instruction, active, schedule: trigger.schedule }]
+            : [],
+        );
       return {
         agentId: agentId,
         name: agent.name,
@@ -184,7 +184,6 @@ export class AgentMarketplaceService {
       if (input.category) form.set("category", input.category);
       if (input.showCreatorAvatar !== undefined) form.set("showCreatorAvatar", String(input.showCreatorAvatar));
       form.set("snapshot", JSON.stringify(toMarketplaceSnapshotWire(snapshot)));
-      // The multipart field names the marketplace listing being updated, and is the deployed spelling.
       if (input.listingId) form.set("agentId", input.listingId);
       const avatar = this.agents.resolveAvatar(input.agentId);
       if (avatar) {
@@ -245,11 +244,19 @@ export class AgentMarketplaceService {
             avatarHue: detail.avatarHue,
           })
           .pipe(toAgentMarketplaceFailure));
+      const modified = existing
+        ? new Set(
+            (yield* this.skills.listInstalled(agent.id).pipe(toAgentMarketplaceFailure))
+              .filter((skill) => skill.state === "modified")
+              .map((skill) => skill.skillId),
+          )
+        : new Set<string>();
       const createdRoutineIds: string[] = [];
       {
         const outcome = yield* Effect.result(
           Effect.gen({ self: this }, function* () {
             for (const skill of detail.skills) {
+              if (modified.has(skill.skillId)) continue;
               yield* this.skills
                 .installVersion({ agentId: agent.id, skillId: skill.skillId, versionId: skill.versionId })
                 .pipe(toAgentMarketplaceFailure);
@@ -285,7 +292,7 @@ export class AgentMarketplaceService {
             agent = yield* this.agents.setAvatar(agent.id, avatar).pipe(toAgentMarketplaceFailure);
             const nextSkillIds = new Set(detail.skills.map((skill) => skill.skillId));
             for (const skillId of existing?.marketplaceSource?.skillIds ?? []) {
-              if (!nextSkillIds.has(skillId))
+              if (!nextSkillIds.has(skillId) && !modified.has(skillId))
                 yield* this.skills.uninstall({ agentId: agent.id, skillId }).pipe(toAgentMarketplaceFailure);
             }
             agent = yield* marketplaceSync(() =>
@@ -321,7 +328,6 @@ export class AgentMarketplaceService {
           return yield* new AgentMarketplaceFailure({ cause: error });
         }
       }
-      // The agent is saved at this point. A failed install-count receipt does not make the install fail.
       if (!existing) {
         yield* this.auth
           .requestAuthorized(
@@ -388,12 +394,6 @@ function decodeInstallReceipt(value: unknown): { installed: true } {
   return { installed: true };
 }
 
-/**
- * The published snapshot and the submission the account Worker returns still spell the two ids the way
- * the deployed Worker does: `agentId` for the local agent inside a snapshot, `agentId` for the
- * marketplace listing. A Worker deploy can land either side of a desktop release, so the two
- * converters here are the only place the desktop's `agentId`/`listingId` vocabulary meets that wire.
- */
 type AgentSubmissionWire = Omit<AgentSubmission, "listingId"> & { agentId: string };
 
 type MarketplaceSnapshotWire = Omit<AgentPublicationPreview, "agentId"> & { botId: string };

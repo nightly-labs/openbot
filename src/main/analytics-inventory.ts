@@ -16,7 +16,6 @@ import type { SkillMarketplaceService } from "./skill-marketplace-service";
 
 const DAY_PATTERN = /^\d{4}-\d{2}-\d{2}$/u;
 
-/** Stores the local day of the last inventory event. A malformed file counts as sent today. */
 export function analyticsInventoryDayStore(path: string): AnalyticsInventoryDayStore {
   return {
     read: () =>
@@ -42,6 +41,8 @@ const BUILTIN_SERVER_NAMES = new Set<string>([...RESERVED_MCP_SERVER_NAMES, COMP
 export interface AnalyticsInventorySources {
   agents: () => AgentSummary[];
   routines: (agentId: string) => Routine[];
+  enabledWebhookRoutineCount: (agentId: string) => number;
+  webhookRouteCount: () => number;
   workflowCount: () => number;
   skills: SkillMarketplaceService["listInstalledForChatTags"];
   mcpServers: () => McpServerConfig[];
@@ -49,10 +50,6 @@ export interface AnalyticsInventorySources {
   computerUseEnabled: () => boolean;
 }
 
-/**
- * Counts what this computer has set up. Only OpenBot's own catalog names leave this function:
- * a custom server, a community listing or a local skill is a count, never a name.
- */
 export const collectAnalyticsInventory = Effect.fn("Analytics.collectInventory")(function* (
   sources: AnalyticsInventorySources,
 ) {
@@ -69,11 +66,12 @@ export const collectAnalyticsInventory = Effect.fn("Analytics.collectInventory")
   let localSkillCount = 0;
   let communitySkillCount = 0;
   let enabledRoutineCount = 0;
+  let enabledWebhookRoutineCount = 0;
   for (const agent of agents) {
     enabledRoutineCount += sources.routines(agent.id).filter((routine) => routine.active).length;
+    enabledWebhookRoutineCount += sources.enabledWebhookRoutineCount(agent.id);
     const skills = yield* sources.skills(agent.id).pipe(Effect.catch(() => Effect.succeed([])));
     for (const skill of skills) {
-      // A home skill is the host user's and the same for every agent, so it is not counted per agent.
       if (skill.enabled === false || isHomeSkillId(skill.skillId)) continue;
       if (skill.skillId.startsWith(CURATED_SKILL_PREFIX))
         curatedSkills.add(skill.skillId.slice(CURATED_SKILL_PREFIX.length));
@@ -88,6 +86,8 @@ export const collectAnalyticsInventory = Effect.fn("Analytics.collectInventory")
   return {
     agentCount: agents.length,
     enabledRoutineCount,
+    enabledWebhookRoutineCount,
+    webhookRouteCount: sources.webhookRouteCount(),
     workflowCount: sources.workflowCount(),
     customMcpServerCount,
     plugins: [...plugins],

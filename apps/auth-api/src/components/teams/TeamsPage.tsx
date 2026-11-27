@@ -2,25 +2,16 @@ import type { JSX } from "@solidjs/web";
 import { createSignal, For, lazy, onCleanup, onSettled, Show } from "solid-js";
 import { landingAnalytics } from "../../lib/analytics";
 import { LANDING_TEAM, type LandingTeammate } from "../../lib/landing-content";
-import {
-  TEAMS_AUDIENCE,
-  TEAMS_BENEFITS,
-  TEAMS_CLOSING,
-  TEAMS_CUSTOM,
-  TEAMS_HERO,
-  TEAMS_ROUTE,
-  TEAMS_SETUPS,
-  TEAMS_SETUPS_SECTION,
-  type TeamsSetupId,
-} from "../../lib/teams-page";
+import { TEAMS_BENEFIT_ICONS, TEAMS_ROUTE, TEAMS_SETUP_IDS, type TeamsSetupId } from "../../lib/teams-page";
 import { createLandingReveal } from "../landing/createLandingReveal";
 import { LandingFooter } from "../landing/LandingFooter";
 import { LandingGlow } from "../landing/LandingGlow";
 import { LandingIcon, type LandingIconName } from "../landing/LandingIcon";
 import { SiteHeader } from "../landing/SiteHeader";
+import { useSitePath } from "../landing/SiteText";
 import { ButtonLink } from "../ui/button";
+import type { TeamsPageText } from "./teams-page-text";
 
-// Loaded after the page is in the browser, as in `FeaturesSection`: the avatar engine is large.
 const AgentAvatar = lazy(() =>
   import("@openbot/ui/features/agents/AgentAvatar").then((module) => ({ default: module.AgentAvatar })),
 );
@@ -31,72 +22,62 @@ const SETUP_ICONS: Record<TeamsSetupId, LandingIconName> = {
   custom: "blocks",
 };
 
-/** One icon for each item of `TEAMS_CUSTOM.items`, in the same order. */
 const CUSTOM_ICONS = ["cpu", "users", "puzzle", "blocks", "clock"] as const satisfies readonly LandingIconName[];
 
-/** One icon for each item of `TEAMS_AUDIENCE.items`, in the same order. */
 const AUDIENCE_ICONS = ["users", "globe", "clock", "puzzle", "contact"] as const satisfies readonly LandingIconName[];
 
-/** The two marquee rows, as indexes of `TEAMS_AUDIENCE.items`. Each row repeats its items, so the loop has no gap. */
 const MARQUEE_ROWS = [
   [0, 1, 2, 0, 1, 2],
   [3, 4, 3, 4, 3, 4],
 ] as const;
 
-/** The words of the closing title that get the setup colours. */
-const ACCENT_WORDS = new Set(["AI", "coworkers"]);
-
 const pad = (value: number) => String(value).padStart(2, "0");
 
-/** A random number from `min` to `max`. */
 const between = (min: number, max: number) => min + Math.random() * (max - min);
 
-// The page for companies: the team in the title, the setups in the colours of the Teams cards on the
-// landing page, what a server adds, the steps of a custom project, who it is for, and one closing call.
-// Each button opens the contact form.
-export function TeamsPage() {
+export function TeamsPage(props: { lang: string; text: TeamsPageText }) {
   onSettled(() => landingAnalytics.start(document, window.location.hostname, TEAMS_ROUTE));
 
   return (
-    <div class="landing-page teams-page">
+    <div class="landing-page teams-page" lang={props.lang}>
       <SiteHeader page="content" />
 
       <main class="teams-main">
-        <TeamsHero />
+        <TeamsHero text={props.text} />
 
         <RevealSection id="setups" labelledBy="teams-setups-title">
           <header class="teams-heading teams-heading-center">
-            <h2 id="teams-setups-title">{TEAMS_SETUPS_SECTION.heading}</h2>
+            <h2 id="teams-setups-title">{props.text.setupsSection.heading}</h2>
           </header>
           <ol class="teams-setups">
-            <For each={TEAMS_SETUPS}>
-              {(setup) => (
-                <li class="teams-setup" data-setup={setup.id}>
+            <For each={TEAMS_SETUP_IDS}>
+              {(id) => (
+                <li class="teams-setup" data-setup={id}>
                   <div class="landing-download-card-top">
-                    <LandingIcon name={SETUP_ICONS[setup.id]} class="teams-setup-icon" />
-                    <span class="landing-download-status">{setup.label}</span>
+                    <LandingIcon name={SETUP_ICONS[id]} class="teams-setup-icon" />
+                    <span class="landing-download-status">{props.text.setups[id].label}</span>
                   </div>
                   <div class="landing-download-card-copy">
-                    <h3>{setup.title}</h3>
-                    <p>{setup.description}</p>
+                    <h3>{props.text.setups[id].title}</h3>
+                    <p>{props.text.setups[id].description}</p>
                   </div>
                 </li>
               )}
             </For>
           </ol>
           <p class="teams-help">
-            {TEAMS_SETUPS_SECTION.question}
-            <ContactButton label={TEAMS_SETUPS_SECTION.action} size="sm" variant="secondary" />
+            {props.text.setupsSection.question}
+            <ContactButton label={props.text.setupsSection.action} size="sm" variant="secondary" />
           </p>
         </RevealSection>
 
         <RevealSection id="benefits">
           <ul class="teams-bento">
-            <For each={TEAMS_BENEFITS}>
+            <For each={props.text.benefits}>
               {(benefit, index) => (
                 <li class="teams-tile" data-tile={index()}>
                   <div class="teams-tile-art" aria-hidden="true">
-                    <LandingIcon name={benefit.icon} />
+                    <LandingIcon name={TEAMS_BENEFIT_ICONS[index()] ?? "check"} />
                   </div>
                   <div class="teams-tile-copy">
                     <h2>{benefit.title}</h2>
@@ -108,11 +89,11 @@ export function TeamsPage() {
           </ul>
         </RevealSection>
 
-        <CustomTimeline />
+        <CustomTimeline text={props.text.custom} />
 
-        <AudienceMarquee />
+        <AudienceMarquee text={props.text.audience} />
 
-        <ClosingSection />
+        <ClosingSection text={props.text.closing} />
       </main>
 
       <LandingFooter />
@@ -122,14 +103,14 @@ export function TeamsPage() {
 }
 
 function ContactButton(props: { label: string; size?: "sm" | "lg"; variant?: "primary" | "secondary" }) {
+  const path = useSitePath();
   return (
-    <ButtonLink to="/contact" variant={props.variant ?? "primary"} size={props.size ?? "lg"} icon="contact">
+    <ButtonLink to={path("/contact")} variant={props.variant ?? "primary"} size={props.size ?? "lg"} icon="contact">
       {props.label}
     </ButtonLink>
   );
 }
 
-/** A section that fades in when it scrolls into view, as the landing sections do. */
 function RevealSection(props: { id: string; labelledBy?: string; children: JSX.Element }) {
   let sectionRef: HTMLElement | undefined;
   const revealed = createLandingReveal(() => sectionRef);
@@ -146,13 +127,7 @@ function RevealSection(props: { id: string; labelledBy?: string; children: JSX.E
   );
 }
 
-// The hero ----------------------------------------------------------------------------------------
-
-/** "Bring a team of AI coworkers …": the avatars go after "of". */
-const [titleLead, titleRest] = TEAMS_HERO.heading.split(" of ");
-
-/** As the home hero puts the logo in "Meet OpenBot", this title holds the team. Their eyes follow the pointer. */
-function TeamsHero() {
+function TeamsHero(props: { text: TeamsPageText }) {
   return (
     <section class="landing-hero teams-hero" aria-labelledby="teams-title">
       <div class="landing-hero-grid" aria-hidden="true" />
@@ -162,32 +137,31 @@ function TeamsHero() {
       <div class="landing-hero-copy">
         <p class="teams-pill landing-hero-line" style={{ "--landing-hero-line": 0 }}>
           <span class="teams-pill-dots" aria-hidden="true">
-            <For each={TEAMS_SETUPS}>{(setup) => <span data-setup={setup.id} />}</For>
+            <For each={TEAMS_SETUP_IDS}>{(id) => <span data-setup={id} />}</For>
           </span>
-          <span class="teams-pill-label">OpenBot for Teams</span>
+          <span class="teams-pill-label">{props.text.title}</span>
         </p>
         <h1 id="teams-title" class="teams-title landing-hero-line" style={{ "--landing-hero-line": 1 }}>
-          <span>{titleLead}</span>{" "}
+          <span>{props.text.hero.lead}</span>{" "}
           <span class="teams-title-keep">
-            of{" "}
+            {props.text.hero.keep}{" "}
             <span class="teams-title-team" aria-hidden="true">
               <For each={LANDING_TEAM}>{(teammate) => <TitleAvatar teammate={teammate} />}</For>
             </span>
           </span>{" "}
-          <span>{titleRest}</span>
+          <span>{props.text.hero.rest}</span>
         </h1>
         <p class="landing-description landing-hero-line" style={{ "--landing-hero-line": 2 }}>
-          {TEAMS_HERO.intro}
+          {props.text.description}
         </p>
         <div class="landing-actions landing-hero-line" style={{ "--landing-hero-line": 3 }}>
-          <ContactButton label={TEAMS_CLOSING.action} />
+          <ContactButton label={props.text.closing.action} />
         </div>
       </div>
     </section>
   );
 }
 
-/** An agent avatar. The Worker renders an empty circle of its size, and the browser fills it in. */
 function TitleAvatar(props: { teammate: LandingTeammate }) {
   const [mounted, setMounted] = createSignal(false);
   onSettled(() => {
@@ -206,18 +180,12 @@ function TitleAvatar(props: { teammate: LandingTeammate }) {
   );
 }
 
-/** The area of each cursor, as parts of the hero's width and height. The areas overlap the title edges. */
 const CURSOR_AREAS = [
   { left: 0.02, top: 0.1, width: 0.32, height: 0.46 },
   { left: 0.68, top: 0.18, width: 0.28, height: 0.52 },
   { left: 0.05, top: 0.56, width: 0.34, height: 0.36 },
 ] as const;
 
-/**
- * A name cursor that moves as a hand moves a mouse. It steers to a random point in its area: its speed
- * lags behind the wanted speed (inertia), it slows down near the point, and a bend makes the path a curve.
- * Then it waits and chooses a new point. Each cursor has its own random values, so they never move together.
- */
 function Cursor(props: { teammate: LandingTeammate; index: number }) {
   let element: HTMLSpanElement | undefined;
   let frame = 0;
@@ -226,14 +194,12 @@ function Cursor(props: { teammate: LandingTeammate; index: number }) {
   const velocity = { x: 0, y: 0 };
   const move = { x: 0, y: 0, speed: 0, grip: 0, bend: 0, waitUntil: 0 };
 
-  /** Chooses the next point. The cursor starts to it at `startAt`. */
   const pickTarget = (startAt: number) => {
     const area = CURSOR_AREAS[props.index] ?? CURSOR_AREAS[0];
     const box = element?.parentElement?.getBoundingClientRect();
     if (!box) return;
     move.x = between(area.left, area.left + area.width) * box.width;
     move.y = between(area.top, area.top + area.height) * box.height;
-    // Top speed in px/s, how fast the speed follows the wanted speed, and how much the path curves.
     move.speed = between(260, 720);
     move.grip = between(2.4, 4.2);
     move.bend = between(-0.45, 0.45);
@@ -242,7 +208,6 @@ function Cursor(props: { teammate: LandingTeammate; index: number }) {
 
   const draw = () => {
     if (!element) return;
-    // The arrow leans a little into a sideways move.
     const lean = Math.max(-10, Math.min(10, velocity.x * 0.02));
     element.style.transform = `translate3d(${position.x.toFixed(1)}px, ${position.y.toFixed(1)}px, 0)`;
     element.style.setProperty("--teams-lean", `${lean.toFixed(2)}deg`);
@@ -257,10 +222,8 @@ function Cursor(props: { teammate: LandingTeammate; index: number }) {
     const speed = Math.hypot(velocity.x, velocity.y);
     if (now >= move.waitUntil) {
       if (distance < 3 && speed < 12) {
-        // Arrived: rest for a moment, then go on.
         pickTarget(now + between(400, 2600));
       } else {
-        // The wanted speed falls near the point, so the cursor slows down instead of stopping hard.
         const wanted = Math.min(move.speed, distance * 2.6);
         const nx = dx / (distance || 1);
         const ny = dy / (distance || 1);
@@ -282,7 +245,6 @@ function Cursor(props: { teammate: LandingTeammate; index: number }) {
 
   let stop = () => {};
 
-  /** Puts the cursor on its first point and shows it. A hidden hero (phone width) has no size. */
   const place = () => {
     if (!element || element.dataset.placed) return;
     const box = element.parentElement?.getBoundingClientRect();
@@ -302,7 +264,6 @@ function Cursor(props: { teammate: LandingTeammate; index: number }) {
       cancelAnimationFrame(frame);
       frame = 0;
     };
-    // The cursor moves only while the hero shows. A hero that is hidden or scrolled away uses no frames.
     const observer = new IntersectionObserver(([entry]) => {
       if (!entry?.isIntersecting) return pause();
       place();
@@ -317,7 +278,6 @@ function Cursor(props: { teammate: LandingTeammate; index: number }) {
       pause();
     };
   });
-  // The Worker also runs this cleanup. It has no `IntersectionObserver`, and `stop` changes only in the browser.
   onCleanup(() => stop());
 
   return (
@@ -330,18 +290,15 @@ function Cursor(props: { teammate: LandingTeammate; index: number }) {
   );
 }
 
-// The custom-deployment section ---------------------------------------------------------------
-
-/** The five items are the steps of one project. One time, a spark runs along the line and lights each step. */
-function CustomTimeline() {
+function CustomTimeline(props: { text: TeamsPageText["custom"] }) {
   let timeline: HTMLDivElement | undefined;
   const playing = createLandingReveal(() => timeline, { rootMargin: "0px 0px -25% 0px" });
 
   return (
     <RevealSection id="custom" labelledBy="teams-custom-title">
       <header class="teams-heading teams-heading-center">
-        <h2 id="teams-custom-title">{TEAMS_CUSTOM.heading}</h2>
-        <p>{TEAMS_CUSTOM.intro}</p>
+        <h2 id="teams-custom-title">{props.text.heading}</h2>
+        <p>{props.text.intro}</p>
       </header>
       <div ref={timeline} class="teams-timeline" data-play={playing() ? "true" : "false"}>
         <span class="teams-timeline-line" aria-hidden="true">
@@ -349,7 +306,7 @@ function CustomTimeline() {
           <span class="teams-timeline-spark" />
         </span>
         <ol class="teams-timeline-track">
-          <For each={TEAMS_CUSTOM.items}>
+          <For each={props.text.items}>
             {(item, index) => (
               <li class="teams-step" data-tile={index() % 4} style={{ "--teams-index": index() }}>
                 <span class="teams-step-node">
@@ -366,16 +323,14 @@ function CustomTimeline() {
   );
 }
 
-// The audience section --------------------------------------------------------------------------
-
-/** "Companies introducing AI agents …" gives "Companies" and "introducing AI agents …". */
 function splitLead(item: string) {
   const space = item.indexOf(" ");
+  if (space < 0) return { lead: "", rest: item };
   return { lead: item.slice(0, space), rest: item.slice(space + 1) };
 }
 
-function AudienceChip(props: { index: number }) {
-  const parts = () => splitLead(TEAMS_AUDIENCE.items[props.index] ?? "");
+function AudienceChip(props: { item: string; index: number }) {
+  const parts = () => splitLead(props.item);
   return (
     <span class="teams-chip" data-tile={props.index % 4}>
       <span class="teams-chip-icon">
@@ -388,16 +343,15 @@ function AudienceChip(props: { index: number }) {
   );
 }
 
-/** Two rows of chips that move in opposite directions. The pointer on a row stops it. */
-function AudienceMarquee() {
+function AudienceMarquee(props: { text: TeamsPageText["audience"] }) {
   return (
     <RevealSection id="audience" labelledBy="teams-audience-title">
       <header class="teams-heading teams-heading-center">
-        <h2 id="teams-audience-title">{TEAMS_AUDIENCE.heading}</h2>
+        <h2 id="teams-audience-title">{props.text.heading}</h2>
       </header>
       <div class="teams-marquee">
         <ul class="landing-visually-hidden">
-          <For each={TEAMS_AUDIENCE.items}>{(item) => <li>{item}</li>}</For>
+          <For each={props.text.items}>{(item) => <li>{item}</li>}</For>
         </ul>
         <For each={MARQUEE_ROWS}>
           {(row, rowIndex) => (
@@ -406,7 +360,9 @@ function AudienceMarquee() {
                 <For each={[0, 1]}>
                   {() => (
                     <div class="teams-marquee-group">
-                      <For each={row}>{(index) => <AudienceChip index={index} />}</For>
+                      <For each={row}>
+                        {(index) => <AudienceChip item={props.text.items[index] ?? ""} index={index} />}
+                      </For>
                     </div>
                   )}
                 </For>
@@ -419,14 +375,10 @@ function AudienceMarquee() {
   );
 }
 
-// The closing section ---------------------------------------------------------------------------
-
-/** Each word of the title becomes bright as you scroll. A coloured grid follows the pointer. */
-function ClosingSection() {
+function ClosingSection(props: { text: TeamsPageText["closing"] }) {
   let section: HTMLElement | undefined;
   let heading: HTMLHeadingElement | undefined;
   let spot: HTMLDivElement | undefined;
-  const words = TEAMS_CLOSING.heading.split(" ");
   let stop = () => {};
 
   onSettled(() => {
@@ -436,8 +388,6 @@ function ClosingSection() {
       section.dataset.done = "true";
       return;
     }
-    // The scroll sets a target: 0 when the title top is at 92% of the window, 1 at 38%. The shown value
-    // follows the target with inertia, so a fast scroll or a wheel step does not make the words jump.
     let target = 0;
     let shown = 0;
     let frame = 0;
@@ -445,7 +395,6 @@ function ClosingSection() {
     const draw = () => {
       if (!section) return;
       section.style.setProperty("--teams-progress", shown.toFixed(4));
-      // Two limits, so the glow does not turn on and off at the edge.
       if (shown > 0.99) section.dataset.done = "true";
       else if (shown < 0.9) section.dataset.done = "false";
     };
@@ -493,23 +442,24 @@ function ClosingSection() {
     >
       <div class="landing-hero-grid" aria-hidden="true" />
       <div ref={spot} class="landing-hero-grid teams-closing-spot" aria-hidden="true" />
-      <h2 ref={heading} id="teams-closing-title" style={{ "--teams-count": words.length }}>
-        <For each={words}>
+      <h2 ref={heading} id="teams-closing-title" style={{ "--teams-count": props.text.words.length }}>
+        <For each={props.text.words}>
           {(word, index) => (
             <>
               <span
                 class="teams-closing-word"
-                data-accent={ACCENT_WORDS.has(word) ? "true" : undefined}
+                data-accent={word.accent ? "true" : undefined}
                 style={{ "--teams-word": index() }}
               >
-                {word}
-              </span>{" "}
+                {word.word}
+              </span>
+              {word.spaceAfter ? " " : ""}
             </>
           )}
         </For>
       </h2>
       <span class="teams-closing-action">
-        <ContactButton label={TEAMS_CLOSING.action} />
+        <ContactButton label={props.text.action} />
       </span>
     </section>
   );

@@ -1,0 +1,68 @@
+import { existsSync, readFileSync, statSync, writeFileSync } from "node:fs";
+import { join } from "node:path";
+import { app, safeStorage } from "electron";
+import { configureLinuxPasswordStore } from "../src/main/linux-password-store";
+import { createSecretStorage, SECRET_STORAGE_KEY_FILE } from "../src/main/secret-storage-cipher";
+
+interface StepReport {
+  backend: string;
+  keyringAvailable: boolean;
+  canPersistBeforeReady: boolean;
+  keyFileBeforeReady: boolean;
+  canPersist?: boolean;
+  format?: string;
+  value?: string;
+  error?: string;
+  madeKeyFile?: boolean;
+  keyFileMode?: string | null;
+}
+
+function argument(name: string): string {
+  const value = process.argv.find((item) => item.startsWith(`--${name}=`));
+  if (!value) throw new Error(`Missing --${name}=`);
+  return value.slice(name.length + 3);
+}
+
+process.stdout.on("error", () => undefined);
+process.stderr.on("error", () => undefined);
+app.setPath("userData", argument("user-data"));
+configureLinuxPasswordStore();
+const keyPath = join(app.getPath("userData"), SECRET_STORAGE_KEY_FILE);
+const platformArgument = process.argv.find((item) => item.startsWith("--platform="));
+const storage = createSecretStorage({
+  keyPath,
+  ...(platformArgument === "--platform=darwin" ? { platform: "darwin" as const } : {}),
+});
+const cipher = storage.cipher(() => "No secret storage.");
+const canPersistBeforeReady = cipher.canPersist();
+const keyFileBeforeReady = existsSync(keyPath);
+void app.whenReady().then(() => {
+  const blobPath = argument("blob");
+  const step = argument("step");
+  const result: StepReport = {
+    backend: safeStorage.getSelectedStorageBackend(),
+    keyringAvailable: safeStorage.isEncryptionAvailable(),
+    canPersistBeforeReady,
+    keyFileBeforeReady,
+  };
+  try {
+    if (step === "legacy-write") {
+      writeFileSync(blobPath, safeStorage.encryptString(argument("value")));
+      result.format = readFileSync(blobPath).subarray(0, 3).toString("latin1");
+    } else if (step === "write") {
+      result.canPersist = cipher.canPersist();
+      const blob = cipher.encrypt(argument("value"));
+      writeFileSync(blobPath, blob);
+      const prefix = blob.subarray(0, 4).toString("latin1");
+      result.format = prefix === "obk1" ? prefix : prefix.slice(0, 3);
+    } else {
+      result.value = cipher.decrypt(readFileSync(blobPath));
+    }
+  } catch (error) {
+    result.error = error instanceof Error ? error.message : String(error);
+  }
+  result.madeKeyFile = storage.madeKeyFile();
+  result.keyFileMode = existsSync(keyPath) ? (statSync(keyPath).mode & 0o777).toString(8) : null;
+  writeFileSync(argument("ready-file"), JSON.stringify(result));
+  app.quit();
+});

@@ -1,6 +1,3 @@
-// The 1Password connection of this computer: a service account that reads the vault the user shares
-// with OpenBot. The embedded browser fills logins from it; agents see titles and usernames only.
-
 import { execFile } from "node:child_process";
 import { constants } from "node:fs";
 import { access } from "node:fs/promises";
@@ -14,7 +11,7 @@ import {
 } from "@openbot/contracts/ipc";
 import { sourceText } from "@openbot/i18n/source";
 import { createOpenBotLogger, redactText, registerSecretValue, toLogValue } from "@openbot/logging";
-import { Deferred, Effect, Exit, Scope } from "effect";
+import { Deferred, Effect, Exit, Schedule, Scope, Semaphore } from "effect";
 import { z } from "zod";
 import {
   type PasswordVault,
@@ -31,21 +28,16 @@ import type { RuntimeTarget } from "./provider-runtime-descriptors";
 
 const logger = createOpenBotLogger("onepassword-connector");
 
-/** The vault that Connect creates. The user moves the logins that OpenBot may use into it. */
 const ONEPASSWORD_SHARED_VAULT = "Shared with OpenBot";
-/** `op service-account create` needs this version. */
 const MIN_CLI_VERSION = [2, 18] as const;
-/** 1Password can wait for the user to approve the CLI in the desktop app. */
 const CLI_TIMEOUT_MS = 2 * 60_000;
-/** A setup check reads only local state; one that takes longer counts as not ready. */
 const SETUP_CHECK_TIMEOUT_MS = 15_000;
-/** Where Open 1Password goes when the app is not installed. */
 const ONEPASSWORD_DOWNLOAD_URL = "https://1password.com/downloads/";
-/** Service accounts have hourly read limits, so the list of logins is read again only this often. */
+const APP_UNREACHABLE = /cannot connect to 1Password app/i;
+const APP_UNREACHABLE_RETRIES = 3;
+const APP_UNREACHABLE_FIRST_WAIT = "250 millis";
 const INDEX_MAX_AGE_MS = 5 * 60_000;
-/** A page that opens reads a list older than this again, so the count follows the user's changes. */
 const INDEX_REFRESH_ON_VIEW_MS = 30_000;
-/** Each listed login costs one read. A page with more saved logins than this lists the first ones. */
 const MAX_LISTED_LOGINS = 10;
 
 const accountListSchema = z.array(
@@ -54,10 +46,8 @@ const accountListSchema = z.array(
 const vaultListSchema = z.array(z.object({ id: z.string().min(1), name: z.string() }));
 const vaultSchema = z.object({ id: z.string().min(1) });
 
-/** Runs one 1Password CLI executable and returns its standard output. */
 export type OnePasswordCliRunner = (executable: string, args: string[], signal: AbortSignal) => Promise<string>;
 
-/** The part of the 1Password SDK client this service uses, so a test can pass a fake. */
 export interface OnePasswordClient {
   vaults: { list(): Promise<Array<{ id: string; title: string }>> };
   items: {
@@ -78,13 +68,10 @@ export interface OnePasswordClient {
 
 export interface OnePasswordConnectorServiceOptions {
   store: OnePasswordConnectorStore;
-  /** Names the service account, so the user can find it on 1Password.com. */
   hostName: string;
   appVersion: string;
-  /** Where Install puts the CLI, or null when OpenBot has no CLI build for this computer. */
   cliInstall: { directory: string; target: RuntimeTarget } | null;
   openExternal: (url: string) => Promise<void>;
-  /** The CLI executables to try, in order. A test passes a fake. */
   findCli?: () => Effect.Effect<string[]>;
   runCli?: OnePasswordCliRunner;
   installCli?: ((signal: AbortSignal) => Effect.Effect<string, OnePasswordOperationError>) | undefined;
@@ -115,7 +102,6 @@ function vaultWebsites(websites: ReadonlyArray<{ url: string; autofillBehavior: 
   return websites.map((site) => ({ url: site.url, autofill: autofill(site.autofillBehavior) }));
 }
 
-/** Whether 1Password lets a login with these websites fill the page at `origin`. */
 function savedFor(websites: ReadonlyArray<{ url: string; autofillBehavior: string }>, origin: string): boolean {
   return vaultWebsites(websites).some((site) => websiteMatchesOrigin(site, origin));
 }
@@ -130,22 +116,36 @@ function accountLabel(account: z.infer<typeof accountListSchema>[number]): strin
   return account.email ?? account.url ?? account.account_uuid;
 }
 
-/** A failure whose message is already a `sourceText` sentence for the user. */
 class OnePasswordConnectError extends Error {}
+
+class OnePasswordAppUnreachableError extends OnePasswordConnectError {}
 
 function connectFailure(message: string): OnePasswordOperationError {
   return new OnePasswordOperationError({ cause: new OnePasswordConnectError(message) });
 }
 
-/** Parses the JSON that the CLI writes to its standard output. */
+class OnePasswordCliError extends OnePasswordConnectError {
+  readonly forbidden: boolean;
+
+  constructor(message: string, forbidden: boolean) {
+    super(message);
+    this.forbidden = forbidden;
+  }
+}
+
+const explainRefusedCreate = Effect.fn("OnePasswordConnector.explainRefusedCreate")(function* (
+  error: OnePasswordOperationError,
+) {
+  const cause = error.cause;
+  if (!(cause instanceof OnePasswordCliError) || !cause.forbidden) return yield* error;
+  logger.warn("1Password refused to create the shared vault or the service account", { detail: cause.message });
+  return yield* connectFailure(sourceText("error.connector.onePasswordCliForbidden"));
+});
+
 function cliJson<T>(schema: z.ZodType<T>) {
   return (output: string) => onePasswordDecode(() => schema.parse(JSON.parse(output)));
 }
 
-/**
- * The CLIs to try, in order: the user's own, where installers put it (a Finder launch has no shell
- * `PATH`), then the copy that Install put in OpenBot's folder.
- */
 const findCliExecutables = Effect.fn("OnePasswordConnector.findCli")(function* (
   install: OnePasswordConnectorServiceOptions["cliInstall"],
 ) {
@@ -164,10 +164,8 @@ const findCliExecutables = Effect.fn("OnePasswordConnector.findCli")(function* (
   return managed ? [...found, managed] : found;
 });
 
-/** Variables that would make `op` act as another identity than the user's own session. */
 const CLI_IDENTITY_VARIABLES = new Set(["OP_SERVICE_ACCOUNT_TOKEN", "OP_CONNECT_TOKEN", "OP_CONNECT_HOST"]);
 
-/** Runs `op` with no shell, as the user's own CLI session. */
 const runOnePasswordCli: OnePasswordCliRunner = async (executable, args, signal) => {
   const env = Object.fromEntries(Object.entries(process.env).filter(([name]) => !CLI_IDENTITY_VARIABLES.has(name)));
   return new Promise((resolve, reject) => {
@@ -184,8 +182,16 @@ const runOnePasswordCli: OnePasswordCliRunner = async (executable, args, signal)
           reject(error);
           return;
         }
+        if (APP_UNREACHABLE.test(String(stderr))) {
+          logger.warn("The 1Password CLI could not reach the 1Password app", {
+            detail: redactText(String(stderr).trim()),
+          });
+          reject(new OnePasswordAppUnreachableError(sourceText("error.connector.onePasswordAppUnreachable")));
+          return;
+        }
         const detail = redactText(String(stderr).trim().split("\n").at(-1) || error.message);
-        reject(new OnePasswordConnectError(sourceText("error.connector.onePasswordCliFailed", { detail })));
+        const forbidden = /\(403\)|\bforbidden\b/i.test(String(stderr));
+        reject(new OnePasswordCliError(sourceText("error.connector.onePasswordCliFailed", { detail }), forbidden));
       },
     );
   });
@@ -203,29 +209,44 @@ async function createSdkClient(token: string, appVersion: string): Promise<OnePa
   };
 }
 
-/**
- * Owns the 1Password connection: Connect through the CLI, a pasted token, the stored token, and the
- * list of logins it reads. It never imports the agent service, which reads it as a `PasswordVault`.
- *
- * Connect uses the CLI only once, to create the vault "Shared with OpenBot" and a service account
- * that can only read it. The CLI session is the user's own; OpenBot keeps only the service account
- * token. The token never leaves the main process except to 1Password, and it is registered for
- * redaction before it is used. Passwords and codes go to the browser only.
- */
+function tokenConnectErrorText(error: unknown): string {
+  if (error instanceof OnePasswordConnectError) return error.message;
+  const passing = passingFailureText(error);
+  if (passing) return passing;
+  const message = error instanceof Error ? error.message : String(error);
+  if (/(invalid|bad) service account token|create another token|you are not authenticated/i.test(message))
+    return sourceText("error.connector.onePasswordTokenRejected");
+  return sourceText("error.connector.onePasswordUnexpected", { detail: redactText(message) });
+}
+
+function passingFailureText(error: unknown): string | null {
+  const message = error instanceof Error ? error.message : String(error);
+  if (
+    (error instanceof Error && error.constructor.name === "RateLimitExceededError") ||
+    /rate limit exceeded/i.test(message)
+  )
+    return sourceText("error.connector.onePasswordRateLimited");
+  if (/error sending request|request timeout/i.test(message))
+    return sourceText("error.connector.onePasswordUnreachable");
+  return null;
+}
+
+function readErrorText(error: unknown): string {
+  return passingFailureText(error) ?? sourceText("error.connector.onePasswordReadFailed");
+}
+
 export class OnePasswordConnectorService implements PasswordVault {
   readonly #store: OnePasswordConnectorStore;
   readonly #hostName: string;
   readonly #findCli: () => Effect.Effect<string[]>;
   readonly #runCli: OnePasswordCliRunner;
-  /** Null when OpenBot has no CLI build for this computer. */
   readonly #installCli: ((signal: AbortSignal) => Effect.Effect<string, OnePasswordOperationError>) | null;
   readonly #openExternal: (url: string) => Promise<void>;
   readonly #createClient: (token: string) => Promise<OnePasswordClient>;
   readonly #now: () => number;
   readonly #listeners = new Set<(status: OnePasswordConnectorStatus) => void>();
-  /** Owns the login list reads that run in the background. Dispose stops them. */
   readonly #scope = Scope.makeUnsafe();
-  /** The CLI that the last setup check found, or null. */
+  readonly #cliTurn = Semaphore.makeUnsafe(1);
   #cliPath: string | null = null;
   #setup: OnePasswordSetup;
   #checking: Deferred.Deferred<void> | null = null;
@@ -233,10 +254,10 @@ export class OnePasswordConnectorService implements PasswordVault {
   #connecting: AbortController | null = null;
   #accounts: OnePasswordAccount[] = [];
   #error: string | null = null;
+  #readError: string | null = null;
   #client: { token: string; client: Deferred.Deferred<OnePasswordClient, OnePasswordOperationError> } | null = null;
   #index: LoginIndex | null = null;
   #indexing: Deferred.Deferred<LoginIndex, OnePasswordOperationError> | null = null;
-  /** Changes each time the token is replaced or removed. A read that started before does not keep its answer. */
   #generation = 0;
 
   constructor(options: OnePasswordConnectorServiceOptions) {
@@ -256,7 +277,6 @@ export class OnePasswordConnectorService implements PasswordVault {
     this.#now = options.now ?? Date.now;
   }
 
-  /** Reads the stored token. A file that cannot be read is logged and treated as no connection. */
   readonly load = Effect.fn("OnePasswordConnector.load")(function* (
     this: OnePasswordConnectorService,
   ): Effect.fn.Return<void> {
@@ -265,7 +285,6 @@ export class OnePasswordConnectorService implements PasswordVault {
     const record = this.#store.read();
     if (!record) return;
     registerSecretValue(record.token);
-    // The vault names and the login count come from 1Password; the app does not wait for them.
     yield* this.#readIndexInBackground(INDEX_MAX_AGE_MS);
   }).bind(this);
 
@@ -284,7 +303,7 @@ export class OnePasswordConnectorService implements PasswordVault {
       accounts: this.#connecting || connected ? [] : [...this.#accounts],
       vaultNames: connected ? [...(this.#index?.vaultNames ?? [])] : [],
       loginCount: connected ? (this.#index?.logins.length ?? null) : null,
-      error: this.#error,
+      error: this.#error ?? (connected ? this.#readError : null),
     };
   }
 
@@ -293,11 +312,6 @@ export class OnePasswordConnectorService implements PasswordVault {
     return () => this.#listeners.delete(listener);
   }
 
-  /**
-   * Looks for a CLI that Connect can run and asks it whether the 1Password app lets it use an
-   * account. Nothing here asks 1Password to unlock or approve anything. Checks that overlap share one
-   * run, and a check during Install waits for the next one.
-   */
   readonly checkSetup = Effect.fn("OnePasswordConnector.checkSetup")(function* (
     this: OnePasswordConnectorService,
   ): Effect.fn.Return<OnePasswordConnectorStatus> {
@@ -305,11 +319,6 @@ export class OnePasswordConnectorService implements PasswordVault {
     return yield* this.refreshLogins();
   }).bind(this);
 
-  /**
-   * The user moves logins into the vault in the 1Password app, outside this window. A page that
-   * opens or gets the focus back reads the list again; the answer arrives as a status event. A joined
-   * server's page has no event, so it reads the status again until the count arrives.
-   */
   readonly refreshLogins = Effect.fn("OnePasswordConnector.refreshLogins")(function* (
     this: OnePasswordConnectorService,
   ): Effect.fn.Return<OnePasswordConnectorStatus> {
@@ -317,7 +326,6 @@ export class OnePasswordConnectorService implements PasswordVault {
     return this.status();
   }).bind(this);
 
-  /** Downloads OpenBot's copy of the CLI, then checks the setup again. */
   readonly installCli = Effect.fn("OnePasswordConnector.installCli")(function* (
     this: OnePasswordConnectorService,
   ): Effect.fn.Return<OnePasswordConnectorStatus> {
@@ -345,17 +353,12 @@ export class OnePasswordConnectorService implements PasswordVault {
     return yield* this.checkSetup();
   }).bind(this);
 
-  /** Opens the 1Password app, where the user turns on the CLI integration, or its download page. */
   readonly openApp = Effect.fn("OnePasswordConnector.openApp")(function* (
     this: OnePasswordConnectorService,
   ): Effect.fn.Return<void, OnePasswordOperationError> {
     yield* this.#open("onepassword://").pipe(Effect.catch(() => this.#open(ONEPASSWORD_DOWNLOAD_URL)));
   }).bind(this);
 
-  /**
-   * Creates the shared vault and a service account that reads it, with the user's CLI session. With
-   * several accounts and none named, it answers `choose-account` and creates nothing.
-   */
   readonly connect = Effect.fn("OnePasswordConnector.connect")(function* (
     this: OnePasswordConnectorService,
     { accountId }: OnePasswordConnectInput,
@@ -369,12 +372,7 @@ export class OnePasswordConnectorService implements PasswordVault {
         Effect.sync(() => {
           if (this.#connecting !== controller || controller.signal.aborted) return;
           logger.warn("Unable to connect 1Password", { cause: toLogValue(error) });
-          this.#error =
-            error instanceof OnePasswordConnectError
-              ? error.message
-              : sourceText("error.connector.onePasswordUnexpected", {
-                  detail: redactText(error instanceof Error ? error.message : String(error)),
-                });
+          this.#error = tokenConnectErrorText(error);
         }),
       ),
       Effect.ensuring(this.#finishConnecting(controller)),
@@ -382,24 +380,19 @@ export class OnePasswordConnectorService implements PasswordVault {
     return this.status();
   }).bind(this);
 
-  /** Connects with a service account token the user created on 1Password.com. */
   readonly connectWithToken = Effect.fn("OnePasswordConnector.connectWithToken")(function* (
     this: OnePasswordConnectorService,
     token: string,
   ): Effect.fn.Return<OnePasswordConnectorStatus> {
     const trimmed = token.trim();
     registerSecretValue(trimmed);
-    // Tracked like a CLI connect, so Cancel, Disconnect and a newer connection stop this one.
     const controller = this.#startConnecting();
     yield* this.#save({ token: trimmed, accountId: null, connectedAt: this.#now() }, controller.signal).pipe(
       Effect.catch(({ cause: error }) =>
         Effect.sync(() => {
           if (this.#connecting !== controller || controller.signal.aborted) return;
           logger.warn("Unable to connect 1Password with a token", { cause: toLogValue(error) });
-          this.#error =
-            error instanceof OnePasswordConnectError
-              ? error.message
-              : sourceText("error.connector.onePasswordTokenRejected");
+          this.#error = tokenConnectErrorText(error);
         }),
       ),
       Effect.ensuring(this.#finishConnecting(controller)),
@@ -416,10 +409,6 @@ export class OnePasswordConnectorService implements PasswordVault {
     return this.status();
   }
 
-  /**
-   * Forgets the token. The vault and the service account stay in 1Password: only the user can remove
-   * them there, and the panel says so.
-   */
   readonly disconnect = Effect.fn("OnePasswordConnector.disconnect")(function* (
     this: OnePasswordConnectorService,
   ): Effect.fn.Return<OnePasswordConnectorStatus, OnePasswordOperationError> {
@@ -427,6 +416,7 @@ export class OnePasswordConnectorService implements PasswordVault {
     this.#connecting = null;
     this.#accounts = [];
     this.#error = null;
+    this.#readError = null;
     this.#generation += 1;
     this.#client = null;
     this.#index = null;
@@ -446,7 +436,6 @@ export class OnePasswordConnectorService implements PasswordVault {
       origin: string,
     ): Effect.fn.Return<VaultLogin[] | null, OnePasswordOperationError> {
       if (!this.#store.read()) return null;
-      // An answer read from a connection that Disconnect removed or a new one replaced is dropped.
       const generation = this.#generation;
       const index = yield* this.#readIndex();
       const client = yield* this.#clientForToken();
@@ -460,6 +449,7 @@ export class OnePasswordConnectorService implements PasswordVault {
         { concurrency: "unbounded" },
       );
       if (generation !== this.#generation) return null;
+      if (items.length > 0) this.#readWorked(generation);
       return items
         .filter(({ item }) => savedFor(item.websites, origin))
         .map(({ login, item }) => ({
@@ -469,7 +459,7 @@ export class OnePasswordConnectorService implements PasswordVault {
           hasOneTimePassword: item.fields.some((field) => field.fieldType === "Totp"),
         }));
     },
-    (operation) => operation.pipe(Effect.mapError(({ cause }) => new PasswordVaultError({ cause }))),
+    (operation) => this.#reported(operation).pipe(Effect.mapError(({ cause }) => new PasswordVaultError({ cause }))),
   ).bind(this);
 
   readonly secretFor = Effect.fn("OnePasswordConnector.secretFor")(
@@ -485,7 +475,7 @@ export class OnePasswordConnectorService implements PasswordVault {
       if (!login) return null;
       const client = yield* this.#clientForToken();
       const item = yield* onePasswordCall(() => client.items.get(login.vaultId, login.id));
-      // The index can be minutes old: the item's websites as 1Password holds them now decide.
+      this.#readWorked(generation);
       if (generation !== this.#generation || !savedFor(item.websites, origin)) return null;
       const value =
         kind === "password"
@@ -495,10 +485,9 @@ export class OnePasswordConnectorService implements PasswordVault {
       registerSecretValue(value);
       return value;
     },
-    (operation) => operation.pipe(Effect.mapError(({ cause }) => new PasswordVaultError({ cause }))),
+    (operation) => this.#reported(operation).pipe(Effect.mapError(({ cause }) => new PasswordVaultError({ cause }))),
   ).bind(this);
 
-  /** Stops a connection attempt, an install, and the login list reads that run in the background. */
   readonly dispose = Effect.fn("OnePasswordConnector.dispose")(function* (
     this: OnePasswordConnectorService,
   ): Effect.fn.Return<void> {
@@ -510,7 +499,6 @@ export class OnePasswordConnectorService implements PasswordVault {
     yield* Scope.close(this.#scope, Exit.void);
   }).bind(this);
 
-  /** Stops the attempt that runs, if any, and starts a new one. */
   #startConnecting(): AbortController {
     this.#connecting?.abort();
     const controller = new AbortController();
@@ -528,7 +516,6 @@ export class OnePasswordConnectorService implements PasswordVault {
     });
   }
 
-  /** Checks that overlap share one run. */
   readonly #sharedCheck = Effect.fn("OnePasswordConnector.sharedCheck")(function* (
     this: OnePasswordConnectorService,
   ): Effect.fn.Return<void> {
@@ -550,7 +537,7 @@ export class OnePasswordConnectorService implements PasswordVault {
   ): Effect.fn.Return<void> {
     let found: { path: string; version: string } | null = null;
     for (const path of yield* this.#findCli()) {
-      const version = yield* this.#run(path, ["--version"], AbortSignal.timeout(SETUP_CHECK_TIMEOUT_MS)).pipe(
+      const version = yield* this.#run(path, ["--version"], { timeoutMs: SETUP_CHECK_TIMEOUT_MS }).pipe(
         Effect.map((output) => output.trim()),
         Effect.orElseSucceed(() => null),
       );
@@ -560,13 +547,10 @@ export class OnePasswordConnectorService implements PasswordVault {
       }
     }
     this.#cliPath = found?.path ?? null;
-    // No account means the app integration is off: the CLI then has no session to create anything with.
     const appIntegration = found
-      ? yield* this.#run(
-          found.path,
-          ["account", "list", "--format", "json"],
-          AbortSignal.timeout(SETUP_CHECK_TIMEOUT_MS),
-        ).pipe(
+      ? yield* this.#run(found.path, ["account", "list", "--format", "json"], {
+          timeoutMs: SETUP_CHECK_TIMEOUT_MS,
+        }).pipe(
           Effect.flatMap(cliJson(accountListSchema)),
           Effect.map((accounts) => accounts.length > 0),
           Effect.orElseSucceed(() => false),
@@ -581,12 +565,29 @@ export class OnePasswordConnectorService implements PasswordVault {
     this.#emitStatus();
   });
 
-  /** Runs one CLI executable. An interrupt stops the process, as `signal` does. */
-  #run(executable: string, args: string[], signal: AbortSignal): Effect.Effect<string, OnePasswordOperationError> {
-    return onePasswordCall((interrupted) => this.#runCli(executable, args, AbortSignal.any([signal, interrupted])));
+  #run(
+    executable: string,
+    args: string[],
+    { signal, timeoutMs }: { signal?: AbortSignal; timeoutMs?: number },
+  ): Effect.Effect<string, OnePasswordOperationError> {
+    return this.#cliTurn.withPermit(
+      Effect.suspend(() => {
+        const stops = [signal, timeoutMs === undefined ? undefined : AbortSignal.timeout(timeoutMs)].filter(
+          (stop) => stop !== undefined,
+        );
+        return onePasswordCall((interrupted) =>
+          this.#runCli(executable, args, AbortSignal.any([...stops, interrupted])),
+        ).pipe(
+          Effect.retry({
+            times: APP_UNREACHABLE_RETRIES,
+            schedule: Schedule.exponential(APP_UNREACHABLE_FIRST_WAIT),
+            while: ({ cause }) => cause instanceof OnePasswordAppUnreachableError,
+          }),
+        );
+      }),
+    );
   }
 
-  /** Runs the CLI that the setup check found, looking again when there is none yet. */
   readonly #cli = Effect.fn("OnePasswordConnector.cli")(function* (
     this: OnePasswordConnectorService,
     args: string[],
@@ -594,10 +595,9 @@ export class OnePasswordConnectorService implements PasswordVault {
   ): Effect.fn.Return<string, OnePasswordOperationError> {
     if (!this.#cliPath) yield* this.checkSetup();
     if (!this.#cliPath) return yield* connectFailure(sourceText("error.connector.onePasswordCliMissing"));
-    return yield* this.#run(this.#cliPath, args, signal);
+    return yield* this.#run(this.#cliPath, args, { signal });
   });
 
-  /** The new token, or null when the user must first choose an account. */
   readonly #createServiceAccount = Effect.fn("OnePasswordConnector.createServiceAccount")(function* (
     this: OnePasswordConnectorService,
     accountId: string | null,
@@ -635,7 +635,7 @@ export class OnePasswordConnectorService implements PasswordVault {
           "json",
         ],
         signal,
-      ).pipe(Effect.flatMap(cliJson(vaultSchema)))).id;
+      ).pipe(Effect.catch(explainRefusedCreate), Effect.flatMap(cliJson(vaultSchema)))).id;
     const token = (yield* this.#cli(
       [
         "service-account",
@@ -647,13 +647,12 @@ export class OnePasswordConnectorService implements PasswordVault {
         "--raw",
       ],
       signal,
-    )).trim();
+    ).pipe(Effect.catch(explainRefusedCreate))).trim();
     if (!token) return yield* connectFailure(sourceText("error.connector.onePasswordTokenRejected"));
     registerSecretValue(token);
     return token;
   });
 
-  /** Checks the token with 1Password, then stores it. A token that reads no vault is refused. */
   readonly #save = Effect.fn("OnePasswordConnector.save")(function* (
     this: OnePasswordConnectorService,
     record: OnePasswordConnectorRecord,
@@ -662,17 +661,16 @@ export class OnePasswordConnectorService implements PasswordVault {
     const client = yield* onePasswordCall(() => this.#createClient(record.token));
     const index = yield* this.#buildIndex(client);
     if (index.vaultNames.length === 0) return yield* connectFailure(sourceText("error.connector.onePasswordNoVault"));
-    // Asked inside the store's queued write, so a stop during the write keeps nothing.
     if (!(yield* this.#store.write(record, () => !signal.aborted))) return;
     const ready = Deferred.makeUnsafe<OnePasswordClient, OnePasswordOperationError>();
     yield* Deferred.succeed(ready, client);
     this.#generation += 1;
+    this.#readError = null;
     this.#client = { token: record.token, client: ready };
     this.#index = index;
     this.#indexing = null;
   });
 
-  /** One client for each token. Reads that start together share its start. */
   readonly #clientForToken = Effect.fn("OnePasswordConnector.clientForToken")(function* (
     this: OnePasswordConnectorService,
   ): Effect.fn.Return<OnePasswordClient, OnePasswordOperationError> {
@@ -688,7 +686,6 @@ export class OnePasswordConnectorService implements PasswordVault {
     return yield* onePasswordCall(() => this.#createClient(record.token)).pipe(
       Effect.onExit((exit) =>
         Effect.gen({ self: this }, function* () {
-          // A failed start is tried again at the next read.
           if (Exit.isFailure(exit) && this.#client === entry) this.#client = null;
           yield* Deferred.done(entry.client, exit);
         }),
@@ -696,7 +693,6 @@ export class OnePasswordConnectorService implements PasswordVault {
     );
   });
 
-  /** Reads the login list when it is older than `maxAgeMs`. Reads that overlap share one run. */
   readonly #readIndex = Effect.fn("OnePasswordConnector.readIndex")(function* (
     this: OnePasswordConnectorService,
     maxAgeMs: number = INDEX_MAX_AGE_MS,
@@ -710,7 +706,7 @@ export class OnePasswordConnectorService implements PasswordVault {
       const index = yield* this.#buildIndex(yield* this.#clientForToken());
       if (generation === this.#generation) {
         this.#index = index;
-        // The page shows the vault names and the login count from this list.
+        this.#readError = null;
         this.#emitStatus();
       }
       return index;
@@ -724,10 +720,9 @@ export class OnePasswordConnectorService implements PasswordVault {
     );
   });
 
-  /** Reads the login list in the service's own scope. A failure is logged only. */
   #readIndexInBackground(maxAgeMs: number): Effect.Effect<void> {
     return Effect.forkIn(
-      this.#readIndex(maxAgeMs).pipe(
+      this.#reported(this.#readIndex(maxAgeMs)).pipe(
         Effect.catch(({ cause }) =>
           Effect.sync(() => {
             logger.warn("The 1Password vault could not be read.", { cause: toLogValue(cause) });
@@ -736,6 +731,28 @@ export class OnePasswordConnectorService implements PasswordVault {
       ),
       this.#scope,
     ).pipe(Effect.asVoid);
+  }
+
+  #reported<A>(read: Effect.Effect<A, OnePasswordOperationError>): Effect.Effect<A, OnePasswordOperationError> {
+    return Effect.suspend(() => {
+      const generation = this.#generation;
+      return read.pipe(
+        Effect.tapError(({ cause }) =>
+          Effect.sync(() => {
+            const text = readErrorText(cause);
+            if (generation !== this.#generation || this.#readError === text) return;
+            this.#readError = text;
+            this.#emitStatus();
+          }),
+        ),
+      );
+    });
+  }
+
+  #readWorked(generation: number): void {
+    if (generation !== this.#generation || this.#readError === null) return;
+    this.#readError = null;
+    this.#emitStatus();
   }
 
   readonly #buildIndex = Effect.fn("OnePasswordConnector.buildIndex")(function* (

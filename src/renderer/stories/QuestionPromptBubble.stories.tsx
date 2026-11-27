@@ -23,6 +23,7 @@ const multipleQuestions: AgentPromptQuestion[] = [
     id: "approach",
     header: "Approach",
     question: "Which auth approach should we use?",
+    detail: "Sign-in for the desktop app and the web client.",
     isSecret: false,
     options: [
       { label: "Session cookies", description: "Best fit for the desktop session." },
@@ -99,7 +100,6 @@ const meta = {
     onSubmit: fn(async () => false),
     onOpenLink: fn(),
   },
-  // The bubble alone on a canvas. "In chat" sets `stage: false`, because the real chat fills the window.
   decorators: [
     (Story, context) =>
       context.parameters.stage === false ? (
@@ -116,7 +116,6 @@ const meta = {
 export default meta;
 type Story = StoryObj<typeof meta>;
 
-/** The real chat with a pending prompt: the timeline, the header and the composer of the app. */
 export const InChat: Story = {
   name: "In chat",
   args: { questions: multipleQuestions, onSubmit: fn(async () => true) },
@@ -156,6 +155,10 @@ export const SingleQuestion: Story = {};
 
 export const MultipleQuestions: Story = {
   args: { questions: multipleQuestions },
+};
+
+export const AnswersSent: Story = {
+  args: { questions: multipleQuestions, onSubmit: fn(async () => true) },
 };
 
 export const CustomAnswer: Story = {
@@ -201,6 +204,20 @@ export const PersistedAnswered: Story = {
       },
     },
   },
+};
+
+export const PersistedMultiSelect: Story = {
+  args: {
+    questions: multiSelectQuestion,
+    resolution: {
+      status: "answered",
+      responses: { checks: { status: "answered", answers: ["Unit tests", "Smoke test", "Lint the changed files"] } },
+    },
+  },
+};
+
+export const PersistedCancelled: Story = {
+  args: { questions: multipleQuestions, resolution: { status: "cancelled" } },
 };
 
 export const PersistedExpired: Story = {

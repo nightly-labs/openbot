@@ -1,19 +1,7 @@
-import { Deferred, Effect, Exit, Result } from "effect";
-import { type ArchiveOperationError, archiveCall, archiveFailure, archiveSync } from "./archive-effects";
-// Agent import into this host from one `.zip` export: chosen by the local user, or sent by a member
-// of a joined client with `agent-import-v1`.
-//
-// `stage` reads only the manifest and the avatars and measures the other entries without
-// inflating them, so a large export previews quickly. `apply` inflates one agent at a time.
-// Each agent is created through the same services the user reaches by hand. When one step fails,
-// that agent is deleted and reported, and the other agents continue. A workspace file that cannot
-// be written is a warning, not a failed step, so the agent still imports. Group chats become channels
-// after the agents, with the members that imported; a channel needs at least one, as in OpenBot.
-
-import { randomUUID } from "node:crypto";
-import { mkdir, rm, writeFile } from "node:fs/promises";
+import { createHash, randomUUID } from "node:crypto";
+import { mkdir, open, rm, writeFile } from "node:fs/promises";
 import { join } from "node:path";
-import { INPUT_LIMITS } from "@openbot/contracts/input-limits";
+import { AVATAR_IMAGE_LIMITS, INPUT_LIMITS } from "@openbot/contracts/input-limits";
 import {
   AGENT_IMPORT_LIMITS,
   type AgentImportChannel,
@@ -31,18 +19,22 @@ import {
   isChannelDraft,
 } from "@openbot/contracts/ipc";
 import { sourceText } from "@openbot/i18n/source";
+import { Deferred, Effect, Exit, Result } from "effect";
 import { zipSync } from "fflate";
+import { parseDocument } from "yaml";
 import type { AgentService } from "../backend/agent-service";
 import type { ChannelService } from "../backend/channel-service";
 import { runCauseEffect } from "../backend/effect-boundary";
+import { diskSpace } from "../backend/storage-usage";
 import {
+  type ArchiveEntry,
+  type ArchiveFile,
   type ArchiveLimits,
   avatarImage,
-  extract,
-  listEntries,
+  MANIFEST_MAX_BYTES,
   readArchiveEffect,
-  type ArchiveEntry as StagedEntry,
-  sha256,
+  readEntriesEffect,
+  readSkillEffect,
   writeImportedFilesEffect,
   writeTreeEffect,
 } from "./agent-archive";
@@ -53,20 +45,23 @@ import {
   type ImportChannel,
 } from "./agent-import-manifest";
 import { validTimezone } from "./agent-marketplace-service";
+import { type ArchiveOperationError, archiveCall, archiveFailure, archiveSync } from "./archive-effects";
 import type { LocalSkillLibrary } from "./local-skill-library";
 import type { SkillMarketplaceFailure } from "./skill-marketplace-service";
-import { inspectArchive } from "./skill-package";
+import { inspectArchive, SKILL_FRONTMATTER } from "./skill-package";
 
-/** Skill folders are copied here, published to the local library, and removed again. */
 const SKILL_STAGING = ".openbot/import-skills";
-/** Workspace files of an imported agent go under this folder, so they never replace OpenBot's own. */
 const IMPORTED_FILES = "imported";
-/** Archive limits and the errors that name them. */
 const IMPORT_ARCHIVE: ArchiveLimits = {
-  archiveBytes: AGENT_IMPORT_LIMITS.archiveBytes,
   files: AGENT_IMPORT_LIMITS.files,
-  tooLarge: sourceText("error.import.zipTooLarge"),
-  expandedTooLarge: sourceText("error.import.expandedTooLarge", { limit: AGENT_IMPORT_LIMITS.files }),
+  expandedTooLarge: sourceText("error.import.tooManyFiles", { limit: AGENT_IMPORT_LIMITS.files }),
+  invalid: sourceText("error.import.zipInvalid"),
+};
+const REMOTE_IMPORT_FILES = 5_000;
+const REMOTE_IMPORT_ARCHIVE: ArchiveLimits = {
+  files: REMOTE_IMPORT_FILES,
+  bytes: { limit: 500 * 1024 * 1024, tooLarge: sourceText("error.import.remoteZipTooLarge") },
+  expandedTooLarge: sourceText("error.import.remoteExpandedTooLarge", { limit: REMOTE_IMPORT_FILES }),
   invalid: sourceText("error.import.zipInvalid"),
 };
 
@@ -91,7 +86,6 @@ export interface AgentImportAgents {
   deleteChannel(channelId: string): ReturnType<AgentService["deleteChannel"]>;
 }
 
-/** Who creates an imported channel: the local user or the member who imports, as when they create one by hand. */
 export interface ChannelActor {
   id: string;
   name: string;
@@ -108,8 +102,8 @@ export interface AgentImportSkills {
 
 interface StagedImport {
   path: string;
-  /** The archive `apply` reads must be the one the preview checked. */
-  sha256: string;
+  fingerprint: string;
+  limits: ArchiveLimits;
   agents: ImportAgent[];
   channels: ImportChannel[];
   wrapper: string;
@@ -117,22 +111,16 @@ interface StagedImport {
 }
 
 interface StagedSlot {
-  /** Only the owner can apply or discard the token. */
   owner: string;
   value: StagedImport;
-  /** An uploaded export: the service wrote the file and removes it. */
   temporary: boolean;
-  /** Releases an uploaded export nobody applied or discarded. */
   expiry: ReturnType<typeof setTimeout> | null;
 }
 
-/** Who applies an export: the local user, or a member of a joined client. */
 export interface AgentImportCaller {
   owner: string;
   actor: ChannelActor;
-  /** The caller's zone, for a routine the export gives none. */
   timezone?: string;
-  /** False for a member: a skill already in the library is installed as it is, never revised. */
   reviseSkills: boolean;
 }
 
@@ -140,20 +128,33 @@ interface ImportContext {
   actor: ChannelActor;
   timezone: string;
   reviseSkills: boolean;
+  skills: Map<string, string>;
+  renamed: Map<string, ImportSkill>;
 }
 
-/** The owner of the exports the local user stages. A member's owner is the member id. */
+interface ImportSkill {
+  files: Array<readonly [string, Uint8Array]>;
+  slug: string;
+}
+
 const LOCAL_IMPORT_OWNER = "local";
-/** Uploaded exports kept at one time, across all members. */
 const UPLOAD_SLOTS = 4;
-/** An uploaded export nobody applied is released after this. */
 const UPLOAD_TTL_MS = 30 * 60_000;
+const PART_UPLOAD_IDLE_MS = 10 * 60_000;
+
+interface PartUpload {
+  owner: string;
+  path: string;
+  size: number;
+  received: number;
+  writing: boolean;
+  expiry: ReturnType<typeof setTimeout> | null;
+}
 
 export class AgentImportService {
   readonly #staged = new Map<string, StagedSlot>();
-  /** Uploaded files that are not in `#staged`: being staged, or being applied. */
+  readonly #uploads = new Map<string, PartUpload>();
   #busyUploads = 0;
-  /** Files left by an earlier run are removed before the first upload. */
   #uploadDirectoryReady: Deferred.Deferred<void, ArchiveOperationError> | null = null;
 
   constructor(
@@ -162,16 +163,17 @@ export class AgentImportService {
     private readonly channelActor: () => ChannelActor,
     private readonly timezone: () => string = () => Intl.DateTimeFormat().resolvedOptions().timeZone,
     private readonly uploadDirectory: string | null = null,
+    private readonly freeDiskBytes: (path: string) => Effect.Effect<number | null> = (path) =>
+      diskSpace(path).pipe(Effect.map((disk) => disk.freeBytes)),
   ) {}
 
-  /** Reads and checks an export. A new stage by the same owner replaces the owner's previous one. */
   readonly stage = Effect.fn("AgentImportService.stage")(function* (
     this: AgentImportService,
     path: string,
     owner = LOCAL_IMPORT_OWNER,
   ) {
     yield* this.#release(owner);
-    return yield* this.#stageFile(path, owner, false);
+    return yield* this.#stageFile(path, owner, false, IMPORT_ARCHIVE);
   }).bind(this);
 
   readonly stageUpload = Effect.fn("AgentImportService.stageUpload")(function* (
@@ -182,26 +184,18 @@ export class AgentImportService {
     const directory = this.uploadDirectory;
     if (!directory) return yield* archiveFailure(new Error("Agent import uploads are not available."));
     yield* this.#release(owner);
-    const held = [...this.#staged.values()].filter((slot) => slot.temporary).length;
-    if (held + this.#busyUploads >= UPLOAD_SLOTS)
+    if (this.#heldUploads() >= UPLOAD_SLOTS)
       return yield* archiveFailure(new Error(sourceText("error.import.hostBusy")));
     this.#busyUploads += 1;
     return yield* Effect.gen({ self: this }, function* () {
       const bytes = yield* archiveCall(() => read());
       yield* this.#prepareUploadDirectory(directory);
       const path = join(directory, `${randomUUID()}.zip`);
-      let retained = false;
-      return yield* Effect.acquireUseRelease(
-        Effect.succeed(path),
-        () =>
-          Effect.gen({ self: this }, function* () {
-            yield* archiveCall(() => writeFile(path, bytes, { flag: "wx", mode: 0o600 })).pipe(Effect.uninterruptible);
-            const preview = yield* this.#stageFile(path, owner, true);
-            retained = true;
-            return preview;
-          }),
-        () => (retained ? Effect.void : archiveCall(() => rm(path, { force: true }))),
+      yield* archiveCall(() => writeFile(path, bytes, { flag: "wx", mode: 0o600 })).pipe(
+        Effect.uninterruptible,
+        Effect.tapError(() => archiveCall(() => rm(path, { force: true })).pipe(Effect.ignore)),
       );
+      return yield* this.#stageUploadedFile(path, owner, REMOTE_IMPORT_ARCHIVE);
     }).pipe(
       Effect.ensuring(
         Effect.sync(() => {
@@ -210,6 +204,176 @@ export class AgentImportService {
       ),
     );
   }).bind(this);
+
+  readonly openUpload = Effect.fn("AgentImportService.openUpload")(function* (
+    this: AgentImportService,
+    size: number,
+    owner: string,
+  ): Effect.fn.Return<string, ArchiveOperationError> {
+    const directory = this.uploadDirectory;
+    if (!directory) return yield* archiveFailure(new Error("Agent import uploads are not available."));
+    if (size === 0) return yield* archiveFailure(new Error(sourceText("error.import.chooseZip")));
+    yield* this.#release(owner);
+    if (this.#heldUploads() >= UPLOAD_SLOTS)
+      return yield* archiveFailure(new Error(sourceText("error.import.hostBusy")));
+    this.#busyUploads += 1;
+    return yield* Effect.gen({ self: this }, function* () {
+      yield* this.#prepareUploadDirectory(directory);
+      const disk = yield* this.freeDiskBytes(directory);
+      const earlier = [...this.#uploads].filter(([, other]) => other.owner === owner);
+      const reserved = [...this.#uploads.values()]
+        .filter((other) => other.owner !== owner)
+        .reduce((total, other) => total + other.size - other.received, 0);
+      const free = disk === null ? null : Math.max(0, disk - reserved);
+      if (free !== null && size > free)
+        return yield* archiveFailure(
+          new Error(
+            sourceText("error.import.uploadDiskSpace", {
+              size: gigabytes(size, Math.ceil),
+              free: gigabytes(free, Math.floor),
+            }),
+          ),
+        );
+      const uploadId = randomUUID();
+      const upload: PartUpload = {
+        owner,
+        path: join(directory, `${randomUUID()}.zip`),
+        size,
+        received: 0,
+        writing: false,
+        expiry: null,
+      };
+      this.#uploads.set(uploadId, upload);
+      yield* Effect.forEach(earlier, ([id, other]) => this.#dropUpload(id, other), { discard: true });
+      yield* archiveCall(() => writeFile(upload.path, new Uint8Array(), { flag: "wx", mode: 0o600 })).pipe(
+        Effect.tapError(() => this.#dropUpload(uploadId, upload)),
+      );
+      this.#keepUpload(uploadId, upload);
+      return uploadId;
+    }).pipe(
+      Effect.ensuring(
+        Effect.sync(() => {
+          this.#busyUploads -= 1;
+        }),
+      ),
+    );
+  }).bind(this);
+
+  readonly writeUpload = Effect.fn("AgentImportService.writeUpload")(function* (
+    this: AgentImportService,
+    uploadId: string,
+    offset: number,
+    read: () => Promise<Uint8Array>,
+    owner: string,
+  ): Effect.fn.Return<number, ArchiveOperationError> {
+    const upload = this.#uploads.get(uploadId);
+    if (!upload || upload.owner !== owner)
+      return yield* archiveFailure(new Error(sourceText("error.import.exportClosed")));
+    if (upload.writing || offset !== upload.received)
+      return yield* archiveFailure(new Error("The part does not start where the upload ends."));
+    upload.writing = true;
+    return yield* Effect.gen({ self: this }, function* () {
+      this.#keepUpload(uploadId, upload);
+      const bytes = yield* archiveCall(() => read());
+      if (bytes.length === 0 || upload.received + bytes.length > upload.size)
+        return yield* archiveFailure(new Error("The part does not fit the size of the upload."));
+      const closed = () => this.#uploads.get(uploadId) !== upload;
+      yield* archiveCall(async () => {
+        const handle = await open(upload.path, "r+");
+        try {
+          let written = 0;
+          while (written < bytes.length) {
+            const { bytesWritten } = await handle.write(bytes, written, bytes.length - written, offset + written);
+            if (bytesWritten === 0) throw Object.assign(new Error("The part was not written."), { code: "EIO" });
+            written += bytesWritten;
+          }
+        } finally {
+          await handle.close();
+        }
+      }).pipe(
+        Effect.uninterruptible,
+        Effect.catch((error) => (closed() ? Effect.void : Effect.fail(error))),
+      );
+      if (closed()) {
+        yield* archiveCall(() => rm(upload.path, { force: true })).pipe(Effect.ignore);
+        return yield* archiveFailure(new Error(sourceText("error.import.exportClosed")));
+      }
+      upload.received += bytes.length;
+      this.#keepUpload(uploadId, upload);
+      return upload.received;
+    }).pipe(
+      Effect.ensuring(
+        Effect.sync(() => {
+          upload.writing = false;
+        }),
+      ),
+    );
+  }).bind(this);
+
+  readonly stageParts = Effect.fn("AgentImportService.stageParts")(function* (
+    this: AgentImportService,
+    uploadId: string,
+    owner: string,
+  ): Effect.fn.Return<AgentImportPreview, ArchiveOperationError> {
+    const upload = this.#uploads.get(uploadId);
+    if (!upload || upload.owner !== owner)
+      return yield* archiveFailure(new Error(sourceText("error.import.exportClosed")));
+    if (upload.writing || upload.received !== upload.size)
+      return yield* archiveFailure(new Error("The upload is not complete."));
+    this.#uploads.delete(uploadId);
+    if (upload.expiry) clearTimeout(upload.expiry);
+    this.#busyUploads += 1;
+    return yield* this.#stageUploadedFile(upload.path, owner, IMPORT_ARCHIVE).pipe(
+      Effect.ensuring(
+        Effect.sync(() => {
+          this.#busyUploads -= 1;
+        }),
+      ),
+    );
+  }).bind(this);
+
+  #heldUploads(): number {
+    const staged = [...this.#staged.values()].filter((slot) => slot.temporary).length;
+    return staged + this.#busyUploads + this.#uploads.size;
+  }
+
+  #keepUpload(uploadId: string, upload: PartUpload) {
+    if (upload.expiry) clearTimeout(upload.expiry);
+    upload.expiry = setTimeout(() => {
+      void runCauseEffect(this.#dropUpload(uploadId, upload));
+    }, PART_UPLOAD_IDLE_MS);
+    upload.expiry.unref();
+  }
+
+  readonly #dropUpload = Effect.fn("AgentImportService.dropUpload")(function* (
+    this: AgentImportService,
+    uploadId: string,
+    upload: PartUpload,
+  ) {
+    if (this.#uploads.get(uploadId) !== upload) return;
+    this.#uploads.delete(uploadId);
+    if (upload.expiry) clearTimeout(upload.expiry);
+    yield* archiveCall(() => rm(upload.path, { force: true })).pipe(Effect.ignore);
+  });
+
+  readonly #stageUploadedFile = Effect.fn("AgentImportService.stageUploadedFile")(function* (
+    this: AgentImportService,
+    path: string,
+    owner: string,
+    limits: ArchiveLimits,
+  ): Effect.fn.Return<AgentImportPreview, ArchiveOperationError> {
+    let retained = false;
+    return yield* Effect.acquireUseRelease(
+      Effect.succeed(path),
+      () =>
+        Effect.gen({ self: this }, function* () {
+          const preview = yield* this.#stageFile(path, owner, true, limits);
+          retained = true;
+          return preview;
+        }),
+      () => (retained ? Effect.void : archiveCall(() => rm(path, { force: true })).pipe(Effect.ignore)),
+    );
+  });
 
   readonly #prepareUploadDirectory = Effect.fn("AgentImportService.prepareUploadDirectory")(function* (
     this: AgentImportService,
@@ -234,9 +398,10 @@ export class AgentImportService {
     path: string,
     owner: string,
     temporary: boolean,
+    limits: ArchiveLimits,
   ): Effect.fn.Return<AgentImportPreview, ArchiveOperationError> {
-    const bytes = yield* readArchiveEffect(path, IMPORT_ARCHIVE);
-    const entries = yield* archiveSync(() => listEntries(bytes, IMPORT_ARCHIVE));
+    const archive = yield* readArchiveEffect(path, limits);
+    const entries = archive.entries;
     const wrapper = wrapperFolder([...entries.keys()]);
     const inner = new Map([...entries].map(([name, entry]) => [name.slice(wrapper.length), entry]));
     const manifestName = `${wrapper}${AGENT_IMPORT_MANIFEST}`;
@@ -244,15 +409,15 @@ export class AgentImportService {
       return yield* archiveFailure(
         new Error(sourceText("error.import.manifestMissing", { manifest: AGENT_IMPORT_MANIFEST })),
       );
+    const manifestBytes =
+      (yield* readEntriesEffect(archive, [manifestName], MANIFEST_MAX_BYTES))[manifestName] ?? new Uint8Array();
     const { manifest, warnings } = yield* archiveSync(() =>
-      decodeImportManifest(
-        extract(bytes, (name) => name === manifestName)[manifestName] ?? new Uint8Array(),
-        this.agents.memoryLimit(),
-      ),
+      decodeImportManifest(manifestBytes, this.agents.memoryLimit()),
     );
+    if (archive.skipped) warnings.push(sourceText("error.import.foldersSkipped", { number: archive.skipped }));
 
     const avatarPaths = new Set(manifest.agents.flatMap((agent) => (agent.avatar ? [wrapper + agent.avatar] : [])));
-    const avatarBytes = yield* archiveSync(() => extract(bytes, (name) => avatarPaths.has(name)));
+    const avatarBytes = yield* readEntriesEffect(archive, avatarPaths, AVATAR_IMAGE_LIMITS.sourceBytes);
     const avatars = new Map<string, AvatarImageInput>();
     const existing = new Set(this.agents.listAgents().map((agent) => agent.name.toLowerCase()));
     for (const agent of manifest.agents) {
@@ -269,11 +434,18 @@ export class AgentImportService {
     }
 
     const token = randomUUID();
-    // A second stage by the same owner can finish first: the owner keeps one export.
     yield* this.#release(owner);
     const slot: StagedSlot = {
       owner,
-      value: { path, sha256: sha256(bytes), agents: manifest.agents, channels: manifest.channels, wrapper, avatars },
+      value: {
+        path,
+        fingerprint: archive.fingerprint,
+        limits,
+        agents: manifest.agents,
+        channels: manifest.channels,
+        wrapper,
+        avatars,
+      },
       temporary,
       expiry: null,
     };
@@ -333,18 +505,18 @@ export class AgentImportService {
     caller?: AgentImportCaller,
   ): Effect.fn.Return<AgentImportResult, ArchiveOperationError> {
     const slot = this.#staged.get(input.token);
-    // Another member's token reads as a closed export, so the answer does not show that it exists.
     if (!slot || slot.owner !== (caller?.owner ?? LOCAL_IMPORT_OWNER))
       return yield* archiveFailure(new Error(sourceText("error.import.exportClosed")));
     this.#staged.delete(input.token);
     if (slot.expiry) clearTimeout(slot.expiry);
-    // The file stays on disk until the import ends, so it keeps its upload slot until then.
     if (slot.temporary) this.#busyUploads += 1;
     return yield* Effect.gen({ self: this }, function* () {
       return yield* this.#importSelected(slot.value, input, {
         actor: caller?.actor ?? this.channelActor(),
         timezone: caller?.timezone && validTimezone(caller.timezone) ? caller.timezone : this.timezone(),
         reviseSkills: caller?.reviseSkills ?? true,
+        skills: new Map(),
+        renamed: new Map(),
       });
     }).pipe(
       Effect.ensuring(
@@ -360,6 +532,8 @@ export class AgentImportService {
 
   readonly #release = Effect.fn("AgentImportService.release")(function* (this: AgentImportService, owner: string) {
     for (const [token, slot] of this.#staged) if (slot.owner === owner) yield* this.#drop(token, slot);
+    for (const [uploadId, upload] of this.#uploads)
+      if (upload.owner === owner) yield* this.#dropUpload(uploadId, upload);
   });
 
   readonly #drop = Effect.fn("AgentImportService.drop")(function* (
@@ -390,17 +564,15 @@ export class AgentImportService {
         new Error(sourceText("error.import.serverAgentLimit", { limit: INPUT_LIMITS.agents })),
       );
 
-    // The archive is read again rather than held since `stage`: an export can be hundreds of MB.
-    // The file can change in between, so only the same bytes are accepted.
-    const bytes = yield* readArchiveEffect(staged.path, IMPORT_ARCHIVE);
-    if (sha256(bytes) !== staged.sha256)
+    const archive = yield* readArchiveEffect(staged.path, staged.limits);
+    if (archive.fingerprint !== staged.fingerprint)
       return yield* archiveFailure(new Error(sourceText("error.import.exportChanged")));
     const imported: AgentSummary[] = [];
     const skipped: AgentImportSkipped[] = [];
     const warnings: string[] = [];
     const agentIds = new Map<string, string>();
     for (const agent of selected) {
-      const importedAgent = yield* Effect.result(this.#importAgent(bytes, staged, agent, context, warnings));
+      const importedAgent = yield* Effect.result(this.#importAgent(archive, staged, agent, context, warnings));
       if (Result.isFailure(importedAgent)) {
         skipped.push({ key: agent.key, name: agent.name, reason: message(importedAgent.failure.cause) });
       } else {
@@ -489,25 +661,52 @@ export class AgentImportService {
 
   readonly #importAgent = Effect.fn("AgentImportService.importAgent")(function* (
     this: AgentImportService,
-    bytes: Uint8Array,
+    archive: ArchiveFile,
     staged: StagedImport,
     source: ImportAgent,
     context: ImportContext,
     warnings: string[],
   ): Effect.fn.Return<AgentSummary, ArchiveOperationError> {
     const prefix = `${staged.wrapper}agents/${source.key}/`;
-    const files = yield* archiveSync(() => extract(bytes, (name) => name.startsWith(prefix)));
-    const read = (path: string) =>
-      Object.entries(files)
-        .filter(([name]) => name.startsWith(`${staged.wrapper}${path}/`))
-        .map(([name, data]) => [name.slice(staged.wrapper.length + path.length + 1), data] as const);
-    // Every skill is checked before the agent exists, so a bad one publishes nothing.
-    const skills = yield* archiveSync(() =>
-      source.skills.map((skill) => {
-        const skillFiles = read(skill);
-        return { files: skillFiles, slug: inspectArchive(zipSync(Object.fromEntries(skillFiles))).slug };
-      }),
-    );
+    const agentEntries = [...archive.entries.values()].filter((entry) => entry.name.startsWith(prefix));
+    const under = (path: string) => {
+      const folder = `${staged.wrapper}${path}/`;
+      return agentEntries
+        .filter((entry) => entry.name.startsWith(folder))
+        .map((entry) => [entry.name.slice(folder.length), entry] as const);
+    };
+    const skills: ImportSkill[] = [];
+    const planned = new Map(context.skills);
+    const renames = new Map(context.renamed);
+    for (const path of source.skills) {
+      const skill = yield* readSkillEffect(archive, under(path));
+      const digest = skillDigest(skill.files);
+      const key = `${skill.slug}\0${digest}`;
+      const renamedBefore = renames.get(key);
+      if (renamedBefore) {
+        skills.push(renamedBefore);
+        continue;
+      }
+      const earlier = planned.get(skill.slug);
+      if (earlier === undefined || earlier === digest) {
+        planned.set(skill.slug, digest);
+        skills.push(skill);
+        continue;
+      }
+      const library = yield* this.skills
+        .library()
+        .list()
+        .pipe(Effect.mapError((error) => archiveFailure(error.cause)));
+      const names = new Map(library.map((candidate) => [candidate.slug, candidate.name]));
+      const renamed = yield* archiveSync(() => renameSkill(skill.files, planned, names));
+      warnings.push(
+        sourceText("error.import.skillRenamed", { name: source.name, skill: renamed.from, renamed: renamed.name }),
+      );
+      planned.set(renamed.slug, digest);
+      renames.set(key, renamed);
+      skills.push(renamed);
+    }
+    const files = source.files ? under(source.files) : [];
 
     const published: Array<{ id: string; revision: number }> = [];
     let completed = false;
@@ -525,13 +724,27 @@ export class AgentImportService {
         Effect.gen({ self: this }, function* () {
           let agent = created;
           try {
-            if (source.files)
+            if (files.length) {
+              const needed = files.reduce((total, [, entry]) => total + Math.ceil(entry.size / 4096) * 4096, 0);
+              const free = yield* this.freeDiskBytes(agent.workspacePath);
+              if (free !== null && needed > free)
+                return yield* archiveFailure(
+                  new Error(
+                    sourceText("error.import.diskSpace", {
+                      name: source.name,
+                      size: gigabytes(needed, Math.ceil),
+                      free: gigabytes(free, Math.floor),
+                    }),
+                  ),
+                );
               yield* writeImportedFilesEffect(
                 join(agent.workspacePath, IMPORTED_FILES),
-                read(source.files),
+                archive,
+                files,
                 source.name,
                 warnings,
               );
+            }
             for (const skill of skills) {
               const library = this.skills.library();
               const current = (yield* library
@@ -554,7 +767,6 @@ export class AgentImportService {
                 () =>
                   Effect.gen({ self: this }, function* () {
                     yield* writeTreeEffect(target, skill.files);
-                    // A new revision retains the existing library entry.
                     const revision = yield* Effect.gen(function* () {
                       const revision = yield* (
                         current
@@ -600,7 +812,6 @@ export class AgentImportService {
                 );
               }
             }
-            // The limit can be lower now than when the archive was read.
             const memoryLimit = this.agents.memoryLimit();
             if (source.memories.length > memoryLimit)
               warnings.push(sourceText("error.import.memoryLimit", { name: source.name, limit: memoryLimit }));
@@ -613,6 +824,8 @@ export class AgentImportService {
                 .setAvatar(agent.id, avatar)
                 .pipe(Effect.mapError((error) => archiveFailure(error.cause)))
                 .pipe(Effect.uninterruptible);
+            for (const [slug, digest] of planned) context.skills.set(slug, digest);
+            for (const [key, skill] of renames) context.renamed.set(key, skill);
             completed = true;
             return agent;
           } catch (error) {
@@ -631,7 +844,41 @@ export class AgentImportService {
   });
 }
 
-/** A zip made by compressing a folder puts everything in that folder. */
+function skillDigest(files: ReadonlyArray<readonly [string, Uint8Array]>): string {
+  const hash = createHash("sha256");
+  for (const [name, data] of [...files].sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0)))
+    hash.update(`${name}\0${data.byteLength}\0`).update(data);
+  return hash.digest("hex");
+}
+
+function renameSkill(
+  files: ReadonlyArray<readonly [string, Uint8Array]>,
+  planned: ReadonlyMap<string, string>,
+  library: ReadonlyMap<string, string>,
+) {
+  const index = files.findIndex(([name]) => name === "SKILL.md");
+  const text = new TextDecoder("utf-8", { fatal: true }).decode(files[index]?.[1]);
+  const match = text.match(SKILL_FRONTMATTER);
+  const frontmatter = parseDocument(match?.[1] ?? "");
+  const from = String(frontmatter.get("name")).trim();
+  const base = from.slice(0, 56).trimEnd();
+  for (let number = 2; number <= planned.size + library.size + 2; number++) {
+    const name = `${base} ${number}`;
+    frontmatter.set("name", name);
+    const head = `---\n${frontmatter.toString({ lineWidth: 0 })}---\n`;
+    const skillFile = new TextEncoder().encode(head + text.slice(match?.[0].length ?? 0));
+    const { slug } = inspectArchive(zipSync({ "SKILL.md": skillFile }));
+    if (!planned.has(slug) && (library.get(slug) ?? name) === name)
+      return {
+        files: files.map((file, at) => (at === index ? (["SKILL.md", skillFile] as const) : file)),
+        slug,
+        from,
+        name,
+      };
+  }
+  throw new Error(sourceText("error.skill.localNameTaken"));
+}
+
 function wrapperFolder(names: string[]): string {
   if (names.includes(AGENT_IMPORT_MANIFEST)) return "";
   const roots = new Set(names.map((name) => name.split("/")[0]));
@@ -639,8 +886,12 @@ function wrapperFolder(names: string[]): string {
   return roots.size === 1 && root && names.every((name) => name.includes("/")) ? `${root}/` : "";
 }
 
-function filesUnder(entries: Map<string, StagedEntry>, folder: string): Array<[string, StagedEntry]> {
+function filesUnder(entries: Map<string, ArchiveEntry>, folder: string): Array<[string, ArchiveEntry]> {
   return [...entries].filter(([name]) => name.startsWith(`${folder}/`));
+}
+
+function gigabytes(bytes: number, round: (value: number) => number): string {
+  return (round((bytes / 1024 ** 3) * 10) / 10).toFixed(1);
 }
 
 function bounded(warnings: string[]): string[] {

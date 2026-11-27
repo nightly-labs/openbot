@@ -6,16 +6,25 @@ import type {
   FilePreview,
   OpenBotDesktopApi,
   ResetAgentSessionSettingInput,
+  SaveSkillSuggestionInput,
+  SaveSkillSuggestionResult,
   SetAgentSessionSettingInput,
+  TestRoutineInput,
+  WithdrawFeedbackResult,
 } from "@openbot/contracts/ipc";
 import type { AttachmentMediaSource } from "@openbot/ui/features/conversation/AttachmentCards";
-import type { AgentSkillCalls } from "../../skills-port";
+import type { ImageCopies } from "@openbot/ui/features/conversation/ImageLightbox";
+import type { AgentSkillCalls, SkillCatalogCalls } from "../../skills-port";
 import type { AgentTemplatePublishCalls } from "../agent-templates/agent-templates-port";
 import type { BrowserProfileCalls } from "../browser/browser-profiles-port";
+import type { FilesPort } from "../files/files-port";
+import type { AgentFoldersApi, AgentInstructionsApi } from "./agent-folders-port";
 import type { SharedTableCalls } from "./conversation-port";
 import type { ConversationProps } from "./conversation-types";
+import type { AgentMemoriesApi } from "./memories-port";
 import type { EventRoutinesApi } from "./routine-webhooks-api";
-import type { AgentRoutinesApi } from "./routines-port";
+import type { AgentRoutinesApi, RoutineResultsCalls } from "./routines-port";
+import type { CodexLivePort } from "./stores/codex-live-conversation-store";
 
 export interface ConversationRuntime {
   agent: Pick<
@@ -36,32 +45,41 @@ export interface ConversationRuntime {
     | "respondToBrowserSecret"
     | "setMessageReaction"
   > &
-    // A joined server's sign-in link that the host relays. Absent, a link opens with `openUrl`.
     Partial<Pick<OpenBotDesktopApi["agent"], "openMessageLink" | "pasteMessageLink" | "cancelMessageLink">> &
-    // The progress and stop of an attachment download from a joined server. Absent, a card shows no progress.
     Partial<Pick<OpenBotDesktopApi["agent"], "stopAttachmentDownload" | "onAttachmentDownload">> &
-    // Retry and remove of a failed file import. Absent, a failed upload chip has only its remove button.
-    Partial<Pick<OpenBotDesktopApi["agent"], "retryAttachmentImport" | "discardAttachmentImport">>;
+    Partial<Pick<OpenBotDesktopApi["agent"], "retryAttachmentImport" | "discardAttachmentImport">> &
+    Partial<Pick<OpenBotDesktopApi["agent"], "testMcpServer">>;
   browser: Pick<
     OpenBotDesktopApi["browser"],
     | "capturePreview"
     | "closePictureInPicture"
+    | "closeWindow"
+    | "focusWindow"
     | "navigate"
     | "onPictureInPictureEvent"
+    | "onWindowEvent"
     | "open"
     | "openPictureInPicture"
+    | "openWindow"
+    | "publishWindowModel"
     | "reload"
     | "stop"
+    | "answerPermission"
+    | "answerHttpSignIn"
     | "releaseControl"
     | "setVisible"
+    | "startTeach"
+    | "stopTeach"
     | "takeControl"
   >;
   voice: Pick<
     OpenBotDesktopApi["voice"],
     | "getSettings"
+    | "setSettings"
     | "getServer"
     | "onModelStatus"
     | "prepareModel"
+    | "downloadModel"
     | "transcribe"
     | "startStream"
     | "appendStream"
@@ -70,31 +88,28 @@ export interface ConversationRuntime {
     | "onStreamTranscript"
   >;
   openUrl: OpenBotDesktopApi["openUrl"];
-  /** Asks the connected host a side question. Absent, the host does not serve `side-question-v1`. */
   askSideQuestion?: ((input: AskSideQuestionInput) => Promise<string>) | undefined;
+  sideQuestionThreads?: boolean | undefined;
+  liveVoice?: CodexLivePort | undefined;
+  skillCatalog?: SkillCatalogCalls | undefined;
+  withdrawFeedback?: ((input: { agentId: string; messageId: string }) => Promise<WithdrawFeedbackResult>) | undefined;
+  saveSkillSuggestion?: ((input: SaveSkillSuggestionInput) => Promise<SaveSkillSuggestionResult>) | undefined;
   previewAttachment?: (attachment: AttachmentSummary) => Promise<FilePreview>;
-  /** Loads attachment images and media for a client that gets no `previewUrl`. */
   attachmentMedia?: AttachmentMediaSource;
-  /**
-   * The HTML of a visual reply page, for a client that has no page URL. Only the browser client
-   * has it: the frame shows the page as `srcdoc`, which the desktop renderer policy would block.
-   */
+  imageCopies?: ImageCopies | undefined;
   visualPage?: (attachment: AttachmentSummary) => Promise<string>;
   importFiles?: (files: File[]) => Promise<void>;
   cancelImportFiles?: () => Promise<void>;
-  /**
-   * The browser profile calls of a host that serves `browser-profiles-v1`, for a client without the
-   * desktop port. Any member reads tab labels; only an owner or admin gets the other calls.
-   */
   browserProfiles?: BrowserProfileCalls | undefined;
-  /** The agent routine calls of a client without the desktop port. */
   routines?: AgentRoutinesApi | undefined;
-  /**
-   * The user's own notification level of each agent, for a client without the desktop port. Any member
-   * can call it. The caller asks only a server that serves `agent-notification-levels-v1`.
-   */
+  agentMemories?: AgentMemoriesApi | undefined;
+  agentFolders?: AgentFoldersApi | undefined;
+  agentInstructions?: AgentInstructionsApi | undefined;
+  routineResultCalls?: RoutineResultsCalls | undefined;
+  routineRunCommand?: ((input: TestRoutineInput) => Promise<string>) | undefined;
+  agentMemoryLimit?: (() => Promise<number>) | undefined;
+  storageCalls?: FilesPort | undefined;
   agentNotificationLevels?: AgentNotificationLevelCalls | undefined;
-  /** The host admin calls of a client without the desktop port. Absent, skills, tables and publishing are hidden. */
   admin?:
     | {
         skills: AgentSkillCalls;
@@ -113,10 +128,8 @@ export interface ConversationRuntime {
     | undefined;
 }
 
-/** Reads the user's own level of each agent. The notification settings are the one place that changes them. */
 export interface AgentNotificationLevelCalls {
   list(): Promise<AgentNotificationLevelsSnapshot>;
-  /** Calls `listener` with all levels after a change on any device of the user. Returns the unsubscribe. */
   subscribe?(listener: (levels: AgentNotificationLevelsSnapshot) => void): () => void;
 }
 

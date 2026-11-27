@@ -1,9 +1,5 @@
 import type { PluginGuide } from "./plugin-guide";
 
-// Every statement about Google Sheets here is taken from Google's documentation of the Google Workspace
-// MCP servers. Each page used is in `sources`. The statements about the sign-in describe OpenBot's
-// own Google sign-in app. Check the sources again, and move `checkedAt`, whenever this file changes.
-
 export const GOOGLE_SHEETS_PLUGIN_GUIDE: PluginGuide = {
   uses: [
     {

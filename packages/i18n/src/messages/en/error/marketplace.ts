@@ -1,7 +1,6 @@
 import { defineMessages } from "../../../message";
 
 export const messages = defineMessages("error.marketplace", {
-  // Agent marketplace and agent link errors.
   "error.marketplace.timezoneInvalid": "The local timezone is invalid.",
   "error.marketplace.installedAgentMissing": "The installed agent no longer exists.",
   "error.marketplace.differentListing": "This local agent was installed from a different marketplace agent.",
@@ -39,15 +38,12 @@ export const messages = defineMessages("error.marketplace", {
     one: 'The routine "{name}" needs a name of up to {count} characters and an instruction.',
     other: 'The routine "{name}" needs a name of up to {count} characters and an instruction.',
   },
-  // Fills `{name}` above when the routine has no name.
   "error.marketplace.templateRoutineNoName": "without a name",
   "error.marketplace.templateTooLarge":
     "This agent is too large to publish. Shorten its instructions, skills or routines.",
   "error.marketplace.linkInvalid": "The agent link is invalid.",
   "error.marketplace.changedSinceOpened":
     "This agent changed after you opened it. Open the link again to review the new version.",
-  "error.marketplace.skillNameConflict":
-    'You already have a different local skill named "{name}". Rename or remove it, then add this agent again.',
   "error.marketplace.avatarInvalid": "The agent avatar is invalid.",
   "error.marketplace.secretInName": "Remove the secret or email address from the name before publishing.",
   "error.marketplace.secretInTitle": "Remove the secret or email address from the title before publishing.",

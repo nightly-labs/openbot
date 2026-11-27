@@ -3,15 +3,11 @@ import { DatabaseSync } from "node:sqlite";
 import { afterEach, describe, expect, it } from "vitest";
 import { migrateOpenBotDatabase } from "./openbot-database-schema";
 
-// Failure modes: an upgrade loses or changes a routine run, flow link or flow step; a partial migration
-// survives a failure; a retry fails on an index that the failed run left; a newer or incomplete history is
-// changed.
 const databases: DatabaseSync[] = [];
 afterEach(() => {
   for (const db of databases.splice(0)) db.close();
 });
 
-/** The routine run table is the v8 baseline's. Migration 31 added the flow tables. */
 const ROUTINE_FLOWS_SINCE = 31;
 
 const INDEXES = {
@@ -31,7 +27,6 @@ function databaseAt(version: number): DatabaseSync {
   return db;
 }
 
-/** A routine with an ended and a running run, and from v31 a flow link and its steps, in the columns every release has. */
 function seedRoutineFlow(db: DatabaseSync, version: number): void {
   db.exec(`INSERT INTO projection_agent_routines (routine_id, agent_id, name, instruction, active, timezone,
       created_at, updated_at, last_event_sequence)
@@ -65,6 +60,11 @@ function contents(db: DatabaseSync) {
   );
 }
 
+function withChatRunPlace(rows: ReturnType<typeof contents>): ReturnType<typeof contents> {
+  const routines = rows.projection_agent_routines;
+  return routines ? { ...rows, projection_agent_routines: routines.map((row) => ({ ...row, run_in: "chat" })) } : rows;
+}
+
 function indexColumns(db: DatabaseSync) {
   return Object.fromEntries(
     Object.keys(INDEXES).map((name) => [
@@ -78,7 +78,7 @@ function indexColumns(db: DatabaseSync) {
 }
 
 function expectHealthy(db: DatabaseSync): void {
-  expect(db.prepare("SELECT MAX(version) AS version FROM schema_migrations").get()).toEqual({ version: 55 });
+  expect(db.prepare("SELECT MAX(version) AS version FROM schema_migrations").get()).toEqual({ version: 70 });
   expect(db.prepare("PRAGMA foreign_keys").get()).toEqual({ foreign_keys: 1 });
   expect(db.prepare("PRAGMA foreign_key_check").all()).toEqual([]);
   expect(db.prepare("PRAGMA integrity_check").get()).toEqual({ integrity_check: "ok" });
@@ -87,8 +87,6 @@ function expectHealthy(db: DatabaseSync): void {
 const NO_INDEXES = { routine_runs_status_updated: [], routine_flow_steps_running: [], routine_flow_steps_updated: [] };
 
 describe("routine flow sweep index migration", () => {
-  // The oldest released schema, the first with the flow tables, the newest released schema (v0.42.0), and
-  // migration 41 on main.
   it.each([8, ROUTINE_FLOWS_SINCE, 40, 41])("upgrades v%i and keeps every run, link and step", (version) => {
     const db = databaseAt(version);
     seedRoutineFlow(db, version);
@@ -111,7 +109,7 @@ describe("routine flow sweep index migration", () => {
     expect(db.prepare("SELECT version FROM schema_migrations WHERE version = 42").all()).toEqual([]);
     db.exec("DROP TRIGGER fail_marker");
     migrateOpenBotDatabase(db);
-    expect(contents(db)).toEqual(before);
+    expect(contents(db)).toEqual(withChatRunPlace(before));
     expect(indexColumns(db)).toEqual(INDEXES);
     expectHealthy(db);
   });
@@ -120,8 +118,6 @@ describe("routine flow sweep index migration", () => {
     const db = databaseAt(41);
     seedRoutineFlow(db, 41);
     const before = contents(db);
-    // The last of the three: the two before it are made and must roll back. SQLite refuses an index whose
-    // name a table holds, even with IF NOT EXISTS.
     db.exec("CREATE TABLE routine_flow_steps_updated (conflict TEXT)");
     expect(() => migrateOpenBotDatabase(db)).toThrow("migration to version 42 failed");
     expect(db.prepare("SELECT version FROM schema_migrations WHERE version = 42").all()).toEqual([]);
@@ -129,7 +125,7 @@ describe("routine flow sweep index migration", () => {
     expect(contents(db)).toEqual(before);
     db.exec("DROP TABLE routine_flow_steps_updated");
     migrateOpenBotDatabase(db);
-    expect(contents(db)).toEqual(before);
+    expect(contents(db)).toEqual(withChatRunPlace(before));
     expect(indexColumns(db)).toEqual(INDEXES);
     expectHealthy(db);
   });
@@ -138,9 +134,9 @@ describe("routine flow sweep index migration", () => {
     const db = databaseAt(41);
     seedRoutineFlow(db, 41);
     const before = contents(db);
-    db.exec("INSERT INTO schema_migrations VALUES(56, 'now')");
+    db.exec("INSERT INTO schema_migrations VALUES(71, 'now')");
     expect(() => migrateOpenBotDatabase(db)).toThrow("newer than this application supports");
-    db.exec("DELETE FROM schema_migrations WHERE version = 56; DELETE FROM schema_migrations WHERE version = 20");
+    db.exec("DELETE FROM schema_migrations WHERE version = 71; DELETE FROM schema_migrations WHERE version = 20");
     expect(() => migrateOpenBotDatabase(db)).toThrow("missing version 20");
     expect(contents(db)).toEqual(before);
     expect(indexColumns(db)).toEqual(NO_INDEXES);

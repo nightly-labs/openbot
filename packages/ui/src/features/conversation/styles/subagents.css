@@ -1,13 +1,9 @@
-/* The subagents of one turn: the chat card and the side panel pane. */
-
 .subagents-elapsed {
   flex: 0 0 auto;
   color: var(--openbot-text-muted);
   font-size: var(--openbot-text-sm);
   font-variant-numeric: tabular-nums;
 }
-
-/* The live line: the icon of the current step and its text. */
 
 .subagents-live {
   display: flex;
@@ -38,8 +34,6 @@
   color: var(--openbot-danger-text);
 }
 
-/* The group: the header with the progress, and the list. */
-
 .subagents-group {
   display: flex;
   width: 100%;
@@ -63,7 +57,6 @@
   text-align: start;
 }
 
-/* The open list is not a lit toggle, so the header has no fill. */
 .subagents-group .subagents-group-header[aria-expanded="true"]:not(:hover) {
   background: transparent;
   color: inherit;
@@ -118,7 +111,54 @@
   }
 }
 
-/* The list: one quiet card, as wide as the agent's message bubble. */
+.subagents-dock {
+  position: relative;
+  z-index: 3;
+  width: calc(100% - 2 * var(--openbot-space-3));
+  max-width: var(--conversation-column-width, none);
+  height: 0;
+  flex: 0 0 auto;
+  margin-inline: auto;
+}
+
+.subagents-dock .subagents-dock-bar {
+  position: absolute;
+  top: var(--openbot-space-1);
+  inset-inline-start: 0;
+  display: flex;
+  width: var(--message-wide-bubble-width);
+  height: auto;
+  align-items: center;
+  gap: var(--openbot-space-2);
+  border: 1px solid var(--openbot-border);
+  border-radius: var(--openbot-radius-card);
+  background: var(--openbot-bg-canvas);
+  padding: var(--openbot-space-1-5) var(--openbot-space-3);
+  color: inherit;
+  font-size: var(--openbot-text-md);
+  font-weight: var(--openbot-weight-regular);
+  line-height: var(--openbot-leading-md);
+  text-align: start;
+}
+
+.subagents-dock .subagents-dock-bar:hover {
+  border-color: var(--openbot-border-strong);
+  background: var(--openbot-bg-canvas);
+}
+
+.subagents-dock-live {
+  display: flex;
+  min-width: 0;
+  flex: 1 1 auto;
+}
+
+.subagents-dock-chevron {
+  width: var(--openbot-icon-xs);
+  height: var(--openbot-icon-xs);
+  flex: 0 0 auto;
+  color: var(--openbot-text-muted);
+  rotate: 90deg;
+}
 
 .subagents-list {
   display: flex;
@@ -132,8 +172,6 @@
   list-style: none;
 }
 
-/* Two lines on one grid: the status and step icons share the first column, so both texts start
-   at the same x. */
 .subagents-list .subagents-row {
   display: grid;
   width: 100%;
@@ -219,8 +257,6 @@
     transition: none;
   }
 }
-
-/* The side panel pane: the steps of one subagent. */
 
 .subagents-panel {
   overflow: hidden;
@@ -338,8 +374,6 @@
   margin-top: 2px;
 }
 
-/* Status icons: the same icons and colours as the chat action markers. */
-
 .subagents-status {
   display: inline-flex;
   width: var(--openbot-icon-sm);
@@ -380,7 +414,6 @@
   }
 }
 
-/* In RTL the right chevron points left, so the open group turns it the other way to point down. */
 :dir(rtl) svg[class~="lucide-chevron-right"].subagents-group-chevron {
   transform: scaleX(-1);
 }

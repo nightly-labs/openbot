@@ -1,13 +1,3 @@
-// Checks that Gemini token usage through Antigravity is metered once per turn, with thinking as
-// output. Runs the real agent service on a temporary profile with a fake Antigravity ACP server that
-// answers `session/prompt` as Antigravity 1.4.3 does: `usage` holds the tokens of that prompt only
-// (`_extract_turn_usage` subtracts the session's total at the turn's start), and `thoughtTokens` is
-// apart from `outputTokens`. A message `tokens=<input>,<cached>,<output>,<thought>` sets the usage of
-// its turn. Cases: a first turn, a smaller second turn in the same session (the session counter
-// before this change booked 0 for it), a larger third turn (it booked only the excess over the
-// largest turn), and a turn after the provider process starts again and resumes the session.
-// `bun scripts/antigravity-usage-metering-e2e.ts`. Writes
-// .openbot-build/antigravity-usage-metering-e2e/report.json.
 import assert from "node:assert/strict";
 import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
@@ -22,15 +12,29 @@ const OUT = resolve(import.meta.dirname, "../.openbot-build/antigravity-usage-me
 const root = await mkdtemp(join(tmpdir(), "openbot-antigravity-metering-"));
 const userData = join(root, "user-data");
 const home = join(root, "home");
-const install = join(root, "antigravity");
-const fakeAgy = join(install, "bin", "agy_acp_server");
+const install = join(root, "antigravity", "1.5.4");
+const fakeAgy = join(install, "bin", "antigravity");
 const logPath = join(root, "agy.jsonl");
+const geminiHome = join(home, ".gemini");
+const ACCESS_TOKEN = "fake-metering-access-token";
 
-// Before the service modules load: the stores read the home folder.
 process.env.HOME = home;
+process.env.GEMINI_HOME = geminiHome;
 process.env.OPENBOT_ANTIGRAVITY_PATH = fakeAgy;
 process.env.FAKE_AGY_LOG = logPath;
 mkdirSync(home, { recursive: true });
+
+const googleRequests: string[] = [];
+const sendRequest = globalThis.fetch;
+globalThis.fetch = Object.assign(
+  (input: string | URL | Request, init?: RequestInit) => {
+    const url = new URL(input instanceof Request ? input.url : input);
+    if (!url.hostname.endsWith("googleapis.com")) return sendRequest(input, init);
+    googleRequests.push(url.origin + url.pathname);
+    return Promise.reject(new Error("This check sends nothing to Google."));
+  },
+  { preconnect: sendRequest.preconnect },
+);
 
 const { AgentService } = await import("../src/backend/agent-service");
 const { AgentStore } = await import("../src/backend/agent-store");
@@ -38,8 +42,11 @@ const { runCauseEffect } = await import("../src/backend/effect-boundary");
 const { MailboxStore } = await import("../src/backend/mailbox-store");
 const { OpenBotDatabase } = await import("../src/backend/openbot-database");
 
-/** An Antigravity ACP server with the methods that the service calls. `/usage` has no plan quota. */
 const FAKE_AGY = `#!/usr/bin/env node
+if (process.argv[2] === "--version") {
+  process.stdout.write("1.5.4\\n");
+  process.exit(0);
+}
 const fs = require("node:fs");
 const NL = String.fromCharCode(10);
 const log = (entry) => fs.appendFileSync(process.env.FAKE_AGY_LOG, JSON.stringify({ pid: process.pid, ...entry }) + NL);
@@ -58,6 +65,7 @@ function handle(message) {
   if (message.method === "session/resume" || message.method === "session/load") return write({ id: message.id, result: setup(params.sessionId) });
   if (message.method === "session/prompt") {
     const text = params.prompt.map((block) => block.text ?? "").join("");
+    log({ prompt: text });
     const match = /tokens=(\\d+),(\\d+),(\\d+),(\\d+)/.exec(text);
     write({ method: "session/update", params: { sessionId: params.sessionId, update: { sessionUpdate: "agent_message_chunk", content: { type: "text", text: "Done." } } } });
     if (!match) return write({ id: message.id, result: { stopReason: "end_turn" } });
@@ -102,6 +110,7 @@ const report: {
   model?: string;
   cases: CaseReport[];
   analytics?: { processedTokens: number; turns: number; missingUsageTurns: number };
+  planUsage?: { windows: number; googleRequests: string[]; prompts: number };
   passed: boolean;
   error?: string;
 } = { cases: [], passed: false };
@@ -109,6 +118,7 @@ const report: {
 const unused = () => Effect.die(new Error("Not used by this check."));
 const browser: AgentBrowserHost = {
   listTabs: () => [],
+  toolCanUseTab: () => false,
   beginTakeover: unused,
   endTakeover: () => {},
   resolveUploadTarget: unused,
@@ -122,9 +132,11 @@ const browser: AgentBrowserHost = {
   endControl: () => {},
   close: () => Effect.void,
   clearAgentSession: () => Effect.void,
+  shareTab: () => undefined,
+  unshareThread: () => undefined,
+  agentTab: () => null,
 };
 
-/** Waits for a state of the service or of its database. */
 async function waitFor<T>(label: string, read: () => T | null | undefined | false, timeoutMs = 20_000): Promise<T> {
   const deadline = Date.now() + timeoutMs;
   for (;;) {
@@ -140,6 +152,7 @@ interface LogEntry {
   start?: boolean;
   method?: string;
   sessionId?: string | null;
+  prompt?: string;
 }
 
 function protocol(): LogEntry[] {
@@ -156,8 +169,22 @@ function protocol(): LogEntry[] {
 }
 
 await mkdir(join(install, "bin"), { recursive: true });
-await writeFile(join(install, "antigravity-package.json"), `${JSON.stringify({ version: "1.4.3" })}\n`);
 await writeFile(fakeAgy, FAKE_AGY, { mode: 0o755 });
+await mkdir(join(geminiHome, "antigravity-acp"), { recursive: true });
+await writeFile(
+  join(geminiHome, "antigravity-acp", "antigravity-oauth-token"),
+  JSON.stringify({
+    token: {
+      access_token: ACCESS_TOKEN,
+      token_type: "Bearer",
+      refresh_token: "fake-refresh",
+      expiry: new Date(Date.now() + 3_600_000).toISOString(),
+    },
+    auth_method: "consumer",
+    id_token_email: "",
+  }),
+  { mode: 0o600 },
+);
 const database = new OpenBotDatabase(userData);
 const store = new AgentStore(userData, home, database);
 const mailbox = new MailboxStore(userData, store.sharedRoot, store.database);
@@ -175,7 +202,6 @@ const sqlite = () => {
 };
 const closeReader = () => connection?.close();
 
-/** The usage records of one provider turn. */
 function records(turnId: string): UsageTokens[] {
   return sqlite()
     .prepare("SELECT tokens_json FROM agent_usage_records WHERE turn_id = ? ORDER BY recorded_at, rowid")
@@ -183,7 +209,6 @@ function records(turnId: string): UsageTokens[] {
     .map((row) => decodeUsageTokens(JSON.parse(String(row.tokens_json))));
 }
 
-/** The provider turns that ran in one public thread, oldest first. */
 function turnsOf(threadId: string): string[] {
   return sqlite()
     .prepare(
@@ -196,7 +221,6 @@ function turnsOf(threadId: string): string[] {
 
 const message = (turn: Turn) => `tokens=${turn.input},${turn.cached},${turn.output},${turn.thought}`;
 
-/** Checks that the turn at `index` of the thread has one record with the tokens of `sent`. */
 async function check(name: string, threadId: string, index: number, sent: Turn): Promise<void> {
   const turnId = await waitFor(`${name}: usage`, () => {
     const id = turnsOf(threadId)[index];
@@ -209,7 +233,7 @@ async function check(name: string, threadId: string, index: number, sent: Turn):
   assert.deepEqual(
     recorded[0],
     {
-      uncachedInput: sent.input - sent.cached,
+      uncachedInput: sent.input,
       cachedInput: sent.cached,
       cacheCreation: 0,
       output: sent.output + sent.thought,
@@ -258,23 +282,40 @@ try {
   await send(agent.id, { input: 15_000, cached: 6_000, output: 900, thought: 400 }, "larger third turn");
   await check("larger third turn", threadId, 2, { input: 15_000, cached: 6_000, output: 900, thought: 400 });
 
-  // The provider process stops between turns. The runtime starts it again and resumes the session,
-  // and Antigravity measures the next turn from the restored total.
+  const cacheRead: Turn = { input: 3_165, cached: 100_717, output: 700, thought: 120 };
+  await send(agent.id, cacheRead, "turn with more cache reads than input");
+  await check("turn with more cache reads than input", threadId, 3, cacheRead);
+
   const session = store.activeProviderSession(agent.id)?.externalSessionId;
   assert.ok(session, "the agent has a provider session");
   const killedPid = protocol().find((entry) => entry.start)?.pid ?? 0;
   assert.ok(killedPid, "the fake server logged its start");
-  // Each session has a process of its own, so a start before the kill is not the restart.
   const startsBefore = protocol().filter((entry) => entry.start).length;
   process.kill(killedPid, "SIGTERM");
   await waitFor("Antigravity to start again", () => protocol().filter((entry) => entry.start).length > startsBefore);
   await waitFor("the provider to be ready again", () => agents.getStatus().phase === "ready");
   await send(agent.id, { input: 7_000, cached: 6_500, output: 100, thought: 50 }, "turn after a restart");
-  await check("turn after a restart", threadId, 3, { input: 7_000, cached: 6_500, output: 100, thought: 50 });
+  await check("turn after a restart", threadId, 4, { input: 7_000, cached: 6_500, output: 100, thought: 50 });
   assert.equal(
     store.activeProviderSession(agent.id)?.externalSessionId,
     session,
     "the turn after a restart resumes the session",
+  );
+
+  const promptsBefore = protocol().filter((entry) => entry.prompt !== undefined).length;
+  const plan = await runCauseEffect(agents.getUsage(agent.id));
+  const prompts = protocol().flatMap((entry) => (entry.prompt === undefined ? [] : [entry.prompt]));
+  report.planUsage = {
+    windows: plan.limits.filter((limit) => limit.primary || limit.secondary).length,
+    googleRequests: [...googleRequests],
+    prompts: prompts.length,
+  };
+  assert.equal(report.planUsage.windows, 0, "Gemini shows no plan usage");
+  assert.deepEqual(report.planUsage.googleRequests, [], "the usage read sends nothing to Google");
+  assert.equal(prompts.length, promptsBefore, "the usage read sends no prompt");
+  assert.ok(
+    prompts.every((prompt) => !prompt.startsWith("/usage")),
+    "no prompt is `/usage`",
   );
 
   const today = new Date().toISOString().slice(0, 10);
@@ -284,8 +325,11 @@ try {
     turns: analytics.totals.turns,
     missingUsageTurns: analytics.totals.missingUsageTurns,
   };
-  const sent = report.cases.reduce((sum, entry) => sum + entry.sent.input + entry.sent.output + entry.sent.thought, 0);
-  assert.equal(analytics.totals.turns, 4, "Analytics count every turn.");
+  const sent = report.cases.reduce(
+    (sum, entry) => sum + entry.sent.input + entry.sent.cached + entry.sent.output + entry.sent.thought,
+    0,
+  );
+  assert.equal(analytics.totals.turns, 5, "Analytics count every turn.");
   assert.equal(analytics.totals.missingUsageTurns, 0, "Every turn has usage.");
   assert.equal(analytics.totals.processedTokens, sent, "Analytics count every turn's tokens once.");
   report.passed = true;

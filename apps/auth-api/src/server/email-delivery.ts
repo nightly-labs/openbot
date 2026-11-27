@@ -1,19 +1,26 @@
-import { Cause, Effect, Exit, Option, Schema } from "effect";
-import type { AccountAnalytics, EmailKind, EmailResult } from "./account-analytics";
+import { Cause, Effect, Exit, Option, Result, Schema } from "effect";
+import type { AccountAnalytics, EmailKind, EmailMailbox, EmailResult } from "./account-analytics";
 import {
   AMBIGUOUS_DELIVERY_ERRORS,
+  AUTOMATED_EMAIL_HEADERS,
+  EMAIL_CODE_DELIVERY_BUDGET_MS,
+  type PreparedEmailMessage,
+  prepareContactMessage,
+  prepareEmailCode,
+  prepareLicenseEmail,
+  prepareOwnerTransferEmail,
+  prepareTeamInvite,
+  prepareWelcomeEmail,
   RATE_LIMITED_DELIVERY_ERROR,
   type SmtpEmailConfig,
-  sendPrivateContactMessage,
-  sendPrivateEmailCode,
-  sendPrivateLicenseEmail,
-  sendPrivateTeamInvite,
-  sendPrivateWelcomeEmail,
+  type SmtpFailure,
+  sendPrivateEmail,
 } from "./smtp-email-delivery";
 import type {
   ContactMessageDelivery,
   EmailCodeDelivery,
   LicenseEmailDelivery,
+  OwnerTransferEmailDelivery,
   TeamInviteEmailDelivery,
   WelcomeEmailDelivery,
   WorkerBindings,
@@ -29,22 +36,32 @@ export type EmailDeliveryBindings = Pick<
   | "EMAIL_SMTP_PORT"
   | "EMAIL_SMTP_USERNAME"
   | "EMAIL_SMTP_PASSWORD"
+  | "EMAIL_SMTP_OVERFLOW_USERNAME"
+  | "EMAIL_SMTP_OVERFLOW_PASSWORD"
   | "EMAIL_FROM"
+  | "EMAIL_REPLY_TO"
   | "EMAIL_LICENSE_FROM"
+  | "EMAIL_LICENSE_REPLY_TO"
   | "EMAIL_RELAY"
+  | "EMAIL_FALLBACK"
   | "EMAIL_DELIVERY_WEBHOOK_URL"
   | "EMAIL_DELIVERY_WEBHOOK_SECRET"
 >;
+
+interface EmailSenders {
+  smtp: SmtpEmailConfig;
+  overflow: SmtpEmailConfig | null;
+  fallback: SendEmail | null;
+  inbox: string;
+}
 
 export function createEmailCodeDelivery(
   bindings: EmailDeliveryBindings,
   analytics: AccountAnalytics,
 ): EmailCodeDelivery | null {
-  const smtp = readSmtpConfig(bindings);
-  if (smtp) {
-    return {
-      send: (message) => tracked(analytics, "sign_in_code", sendPrivateEmailCode(smtp, message)),
-    };
+  const senders = readEmailSenders(bindings);
+  if (senders) {
+    return { send: (message) => deliver(analytics, "sign_in_code", senders, prepareEmailCode(message)) };
   }
 
   const webhookUrl = bindings.EMAIL_DELIVERY_WEBHOOK_URL?.trim();
@@ -75,62 +92,218 @@ export function createTeamInviteEmailDelivery(
   bindings: EmailDeliveryBindings,
   analytics: AccountAnalytics,
 ): TeamInviteEmailDelivery | null {
-  const smtp = readSmtpConfig(bindings);
-  return smtp ? { send: (message) => tracked(analytics, "team_invite", sendPrivateTeamInvite(smtp, message)) } : null;
+  const senders = readEmailSenders(bindings);
+  return senders ? { send: (message) => deliver(analytics, "team_invite", senders, prepareTeamInvite(message)) } : null;
+}
+
+export function createOwnerTransferEmailDelivery(
+  bindings: EmailDeliveryBindings,
+  analytics: AccountAnalytics,
+): OwnerTransferEmailDelivery | null {
+  const senders = readEmailSenders(bindings);
+  return senders
+    ? { send: (message) => deliver(analytics, "owner_transfer", senders, prepareOwnerTransferEmail(message)) }
+    : null;
 }
 
 export function createContactMessageDelivery(
   bindings: EmailDeliveryBindings,
   analytics: AccountAnalytics,
 ): ContactMessageDelivery | null {
-  const smtp = readSmtpConfig(bindings);
-  return smtp ? { send: (message) => tracked(analytics, "contact", sendPrivateContactMessage(smtp, message)) } : null;
+  const senders = readEmailSenders(bindings);
+  return senders
+    ? {
+        send: (message) => deliver(analytics, "contact", senders, prepareContactMessage(senders.inbox, message)),
+      }
+    : null;
 }
 
 export function createWelcomeEmailDelivery(
   bindings: EmailDeliveryBindings,
   analytics: AccountAnalytics,
 ): WelcomeEmailDelivery | null {
-  const smtp = readSmtpConfig(bindings);
-  return smtp ? { send: (message) => tracked(analytics, "welcome", sendPrivateWelcomeEmail(smtp, message)) } : null;
+  const senders = readEmailSenders(bindings);
+  return senders ? { send: (message) => deliver(analytics, "welcome", senders, prepareWelcomeEmail(message)) } : null;
 }
 
-/**
- * License emails go from `EMAIL_LICENSE_FROM` through the same SMTP account, so that account must be
- * allowed to send as it. An empty value uses `EMAIL_FROM`.
- */
 export function createLicenseEmailDelivery(
   bindings: EmailDeliveryBindings,
   analytics: AccountAnalytics,
 ): LicenseEmailDelivery | null {
-  const smtp = readSmtpConfig(bindings);
-  if (!smtp) return null;
-  const config = { ...smtp, from: bindings.EMAIL_LICENSE_FROM?.trim() || smtp.from };
-  return { send: (message) => tracked(analytics, "license", sendPrivateLicenseEmail(config, message)) };
+  const senders = readEmailSenders(bindings);
+  if (!senders) return null;
+  const from = bindings.EMAIL_LICENSE_FROM?.trim() || senders.smtp.from;
+  const licenseSenders = {
+    ...senders,
+    smtp: { ...senders.smtp, from },
+    inbox: bindings.EMAIL_LICENSE_REPLY_TO?.trim() || from,
+  };
+  return { send: (message) => deliver(analytics, "license", licenseSenders, prepareLicenseEmail(message)) };
 }
 
-/**
- * Sends one `email_sent` event with the result of an SMTP send, so a dashboard can show the use of the
- * hourly quota of the mailbox. The webhook path does not use the mailbox, so it sends none.
- */
-function tracked<E extends { message: string }>(
+const deliver = Effect.fn("EmailDelivery.deliver")(function* (
+  analytics: AccountAnalytics,
+  kind: EmailKind,
+  senders: EmailSenders,
+  prepare: Effect.Effect<PreparedEmailMessage, SmtpFailure>,
+): Effect.fn.Return<void, SmtpFailure | EmailDeliveryError> {
+  const prepared = yield* Effect.result(prepare);
+  if (Result.isFailure(prepared)) {
+    analytics.track(null, { name: "email_sent", kind, result: "failed", mailbox: "primary" });
+    return yield* prepared.failure;
+  }
+  const message = withInboxReply(senders, prepared.success);
+  const startedAt = Date.now();
+  const primary = yield* Effect.result(
+    trackedSmtp(analytics, kind, "primary", sendPrivateEmail(senders.smtp, message)),
+  );
+  if (Result.isSuccess(primary)) return;
+  const smtp = yield* Effect.result(sendThroughOverflow(analytics, kind, senders, message, primary.failure, startedAt));
+  if (Result.isSuccess(smtp)) return;
+  if (!senders.fallback || !canFallBack(smtp.failure.message)) return yield* smtp.failure;
+  const remainingMs = EMAIL_CODE_DELIVERY_BUDGET_MS - (Date.now() - startedAt);
+  if (remainingMs < MIN_SEND_MS) return yield* smtp.failure;
+  console.warn("Email delivery falls back to Cloudflare:", { kind, reason: smtp.failure.message });
+  const fallback = yield* Effect.result(
+    trackedFallback(
+      analytics,
+      kind,
+      sendThroughCloudflare(
+        senders.fallback,
+        senders.smtp.from,
+        message,
+        Math.min(CLOUDFLARE_SEND_TIMEOUT_MS, remainingMs),
+      ),
+    ),
+  );
+  if (Result.isSuccess(fallback)) return;
+  return yield* AMBIGUOUS_DELIVERY_ERRORS.has(fallback.failure.message) ? fallback.failure : smtp.failure;
+});
+
+const sendThroughOverflow = Effect.fn("EmailDelivery.overflow")(function* (
+  analytics: AccountAnalytics,
+  kind: EmailKind,
+  senders: EmailSenders,
+  message: PreparedEmailMessage,
+  primaryFailure: SmtpFailure,
+  startedAt: number,
+): Effect.fn.Return<void, SmtpFailure | EmailDeliveryError> {
+  const remainingMs = EMAIL_CODE_DELIVERY_BUDGET_MS - (Date.now() - startedAt);
+  if (!senders.overflow || primaryFailure.message !== RATE_LIMITED_DELIVERY_ERROR || remainingMs < MIN_SEND_MS) {
+    return yield* primaryFailure;
+  }
+  const overflow = yield* Effect.result(
+    trackedSmtp(
+      analytics,
+      kind,
+      "overflow",
+      sendPrivateEmail(senders.overflow, message).pipe(
+        Effect.timeoutOrElse({
+          duration: remainingMs,
+          orElse: () => Effect.fail(new EmailDeliveryError({ message: "email_delivery_unknown" })),
+        }),
+      ),
+    ),
+  );
+  if (Result.isSuccess(overflow)) return;
+  return yield* AMBIGUOUS_DELIVERY_ERRORS.has(overflow.failure.message) ? overflow.failure : primaryFailure;
+});
+
+function canFallBack(message: string): boolean {
+  return (
+    !AMBIGUOUS_DELIVERY_ERRORS.has(message) &&
+    !message.startsWith("smtp_invalid_") &&
+    message !== "smtp_port_must_be_465" &&
+    message !== "smtp_recipient_failed"
+  );
+}
+
+const CLOUDFLARE_SEND_TIMEOUT_MS = 10_000;
+const MIN_SEND_MS = 2_000;
+
+const sendThroughCloudflare = Effect.fn("EmailDelivery.cloudflare")(function* (
+  binding: SendEmail,
+  from: string,
+  message: PreparedEmailMessage,
+  timeoutMs: number,
+): Effect.fn.Return<void, EmailDeliveryError> {
+  const { subject, text, html } = message.content;
+  yield* Effect.tryPromise({
+    try: () =>
+      binding.send({
+        from: { name: "OpenBot", email: from },
+        to: message.email,
+        ...(message.replyTo ? { replyTo: message.replyTo } : {}),
+        subject,
+        text,
+        html,
+        headers: { ...AUTOMATED_EMAIL_HEADERS },
+      }),
+    catch: (error) => {
+      console.warn("Cloudflare email delivery failed:", cloudflareErrorCode(error));
+      return new EmailDeliveryError({ message: "email_delivery_fallback_failed" });
+    },
+  }).pipe(
+    Effect.timeoutOrElse({
+      duration: timeoutMs,
+      orElse: () => Effect.fail(new EmailDeliveryError({ message: "email_delivery_unknown" })),
+    }),
+  );
+});
+
+function cloudflareErrorCode(error: unknown): string {
+  const code = error instanceof Error && "code" in error ? error.code : undefined;
+  if (typeof code === "string" && /^[A-Za-z0-9_.-]{1,64}$/u.test(code)) return code;
+  return error instanceof Error ? error.name : typeof error;
+}
+
+function trackedSmtp<E extends { message: string }>(
+  analytics: AccountAnalytics,
+  kind: EmailKind,
+  mailbox: EmailMailbox,
+  send: Effect.Effect<void, E>,
+): Effect.Effect<void, E> {
+  return Effect.onExit(send, (exit) =>
+    Effect.sync(() => analytics.track(null, { name: "email_sent", kind, result: sendResult(exit), mailbox })),
+  );
+}
+
+function trackedFallback<E extends { message: string }>(
   analytics: AccountAnalytics,
   kind: EmailKind,
   send: Effect.Effect<void, E>,
 ): Effect.Effect<void, E> {
   return Effect.onExit(send, (exit) =>
-    Effect.sync(() => analytics.track(null, { name: "email_sent", kind, result: sendResult(exit) })),
+    Effect.sync(() => analytics.track(null, { name: "email_fallback_sent", kind, result: sendResult(exit) })),
   );
 }
 
 function sendResult(exit: Exit.Exit<void, { message: string }>): EmailResult {
   if (Exit.isSuccess(exit)) return "accepted";
-  // A stopped send can stop after the server took the message.
   if (Cause.hasInterruptsOnly(exit.cause)) return "unknown";
   const error = Cause.findErrorOption(exit.cause);
   if (Option.isNone(error)) return "failed";
   if (error.value.message === RATE_LIMITED_DELIVERY_ERROR) return "rate_limited";
   return AMBIGUOUS_DELIVERY_ERRORS.has(error.value.message) ? "unknown" : "failed";
+}
+
+function readEmailSenders(bindings: EmailDeliveryBindings): EmailSenders | null {
+  const smtp = readSmtpConfig(bindings);
+  if (!smtp) return null;
+  const inbox = bindings.EMAIL_REPLY_TO?.trim() || smtp.from;
+  return { smtp, overflow: readOverflowSmtpConfig(bindings, smtp), fallback: bindings.EMAIL_FALLBACK ?? null, inbox };
+}
+
+function readOverflowSmtpConfig(bindings: EmailDeliveryBindings, primary: SmtpEmailConfig): SmtpEmailConfig | null {
+  const username = bindings.EMAIL_SMTP_OVERFLOW_USERNAME?.trim();
+  const password = bindings.EMAIL_SMTP_OVERFLOW_PASSWORD;
+  if (!username || !password) return null;
+  return { ...primary, username, password, from: username };
+}
+
+function withInboxReply(senders: EmailSenders, message: PreparedEmailMessage): PreparedEmailMessage {
+  if (message.replyTo || senders.inbox === senders.smtp.from) return message;
+  return { ...message, replyTo: senders.inbox };
 }
 
 function readSmtpConfig(bindings: EmailDeliveryBindings): SmtpEmailConfig | null {

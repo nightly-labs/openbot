@@ -1,26 +1,38 @@
+import { router } from "expo-router";
 import { Alert } from "react-native";
 import { create } from "zustand";
 import { currentText } from "@/shared/lib/text";
-import { REPLY_VOICE_FAILURE_TEXT, type ReplyReading, readReply } from "./reply-voice";
+import { type ReplyReading, type ReplyVoiceFailure, readReply, replyVoiceFailureText } from "./reply-voice";
 import { speechNative } from "./speech-native";
+import { useVoiceSettings } from "./voice-settings";
 
-/** The message that Read aloud reads now. One message reads at a time. */
 const useMessageReading = create<{ messageId: string | null }>(() => ({ messageId: null }));
 
 let reading: ReplyReading | null = null;
 
-/** The build can read aloud: it has the speech module. The voice can still need a download. */
 export const canReadAloud = speechNative !== null;
 
-/** True while Read aloud reads the message with `messageId`. */
 export function useReadingAloud(messageId: string): boolean {
   return useMessageReading((state) => state.messageId === messageId);
 }
 
-/**
- * Reads a message aloud with the reply voice from the settings, or stops it when it reads now.
- * Another message, a voice conversation or a voice sample stops the message that reads.
- */
+function showReadAloudFailure(failure: ReplyVoiceFailure, reason: string | null): void {
+  const { t } = currentText();
+  const title = t("mobile.chat.message.readAloudFailed");
+  if (failure !== "not-ready" && failure !== "language") {
+    Alert.alert(title, replyVoiceFailureText(failure, reason));
+    return;
+  }
+  const message =
+    failure === "not-ready" && useVoiceSettings.getState().engine === "supertonic"
+      ? t("mobile.chat.message.readAloudModelMissing")
+      : replyVoiceFailureText(failure, reason);
+  Alert.alert(title, message, [
+    { text: t("common.cancel"), style: "cancel" },
+    { text: t("mobile.chat.composer.voiceSettings"), onPress: () => router.push("/settings/voice") },
+  ]);
+}
+
 export function toggleReadAloud(messageId: string, markdown: string): void {
   const same = useMessageReading.getState().messageId === messageId;
   stopReadAloud();
@@ -33,17 +45,15 @@ export function toggleReadAloud(messageId: string, markdown: string): void {
   const own = readReply(markdown, {
     onPart: () => undefined,
     onDone: finish,
-    onError: (failure) => {
+    onError: (failure, reason) => {
       finish();
-      const { t } = currentText();
-      Alert.alert(t("mobile.chat.message.readAloudFailed"), t(REPLY_VOICE_FAILURE_TEXT[failure]));
+      showReadAloudFailure(failure, reason);
     },
   });
   reading = own;
   useMessageReading.setState({ messageId });
 }
 
-/** Stops Read aloud, such as when the chat closes. */
 export function stopReadAloud(): void {
   reading?.stop();
   reading = null;

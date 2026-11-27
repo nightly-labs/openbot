@@ -5,13 +5,14 @@ export const messages = {
   "notification.needsInput": "Нужен ваш ответ.",
   "notification.needsApproval": "Нужно ваше подтверждение.",
   "notification.needsBrowserStep": "Нужно, чтобы вы завершили шаг в браузере.",
+  "notification.waitsForSignIn": "Ждёт входа в {provider}.",
   "notification.needsApprovalFor": "Нужно ваше подтверждение: {action}",
   "notification.finished": "Работа завершена.",
-  // A workflow step that waits for a person to approve or reject it.
   "notification.workflowApproval": "Шаг ждет вашего одобрения.",
-  // A workflow output step that tells the user its result.
   "notification.workflowOutput": "У рабочего процесса есть новый результат.",
   "notification.failed": "Остановлено из-за ошибки.",
+  "notification.subagentFailed": "Субагент остановлен из-за ошибки.",
+  "notification.subagentFailedFor": "Субагент остановлен из-за ошибки: {task}",
   "notification.channelTitle": "{agent} в канале {channel}",
   "notification.channelMessage": "Новое сообщение.",
   "notification.usageLimit.title": "Аккаунт {provider} достиг лимита",

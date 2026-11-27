@@ -22,15 +22,12 @@ import { haptics } from "@/shared/lib/haptics";
 import { isIOS } from "@/shared/lib/platform";
 import { selectionColorProps } from "@/shared/lib/selection-color";
 import { useText } from "@/shared/lib/text";
+import { MIRROR_IN_RTL } from "@/shared/lib/text-direction";
 import { latestBrowserSheetControls, useBrowserSheetControls } from "../model/browser-sheet-bridge";
 import { browserAddressUrl, browserTabHost, browserTabTitle } from "../model/browser-tabs";
 
 const COPIED_MS = 1_500;
 
-/**
- * The sheet of the browser's tab button: the address of the tab on screen with its page actions,
- * and the agent's tabs. The browser screen under it does the work.
- */
 export function BrowserTabsSheet() {
   const { agentId, serverId } = useLocalSearchParams<{ agentId: string; serverId: string }>();
   const { t } = useText();
@@ -53,7 +50,6 @@ export function BrowserTabsSheet() {
     return () => clearTimeout(timer);
   }, [copied]);
 
-  /** Runs an action on the browser screen. A page action closes the sheet, so the page shows. */
   const run = (action: (screen: NonNullable<typeof controls>) => void, close = true) => {
     const screen = latestBrowserSheetControls(serverId, agentId);
     if (!screen) return;
@@ -85,7 +81,6 @@ export function BrowserTabsSheet() {
     run((screen) => screen.loadUrl(browserAddressUrl(text)));
   };
 
-  // A page address shows only its site, as the tab list does. The full address is there to edit.
   const shownAddress = tab ? browserTabHost(tab) || tab.url : "";
 
   return (
@@ -101,7 +96,7 @@ export function BrowserTabsSheet() {
               isDisabled={!canUseTab}
               onPress={() => run((screen) => screen.navigate("back"))}
             >
-              <ChevronLeft color={iconColor} size={20} strokeWidth={2} />
+              <ChevronLeft color={iconColor} size={20} strokeWidth={2} style={MIRROR_IN_RTL} />
             </Button>
             <Button
               isIconOnly
@@ -111,7 +106,7 @@ export function BrowserTabsSheet() {
               isDisabled={!canUseTab}
               onPress={() => run((screen) => screen.navigate("forward"))}
             >
-              <ChevronRight color={iconColor} size={20} strokeWidth={2} />
+              <ChevronRight color={iconColor} size={20} strokeWidth={2} style={MIRROR_IN_RTL} />
             </Button>
           </>
         )}
@@ -138,7 +133,6 @@ export function BrowserTabsSheet() {
             const url = tab?.url ?? "";
             setDraft(url);
             setEditing(true);
-            // The field shows the site until it has focus, so the whole address is selected after it shows.
             requestAnimationFrame(() => addressField.current?.setSelection(0, url.length));
           }}
           onBlur={() => setEditing(false)}

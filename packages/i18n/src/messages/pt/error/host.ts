@@ -19,9 +19,12 @@ export const messages = {
   "error.host.publishFailed": "Não foi possível publicar este OpenBot.",
   "error.host.mobileConnectPublishFailed": "Não foi possível publicar este OpenBot para Conectar celular.",
   "error.host.mobileConnectHostChanged": "O computador anfitrião de Conectar celular mudou. Tente novamente.",
+  "error.host.mobileConnectHostMismatch": "Sua conta tem outra chave para este servidor. Tente novamente.",
   "error.host.noServer": "Este computador não tem um servidor para alterar.",
   "error.host.identityLocalOnly": "O nome e o logotipo do servidor só podem ser alterados no computador que o executa.",
   "error.host.timezoneInvalid": "Este fuso horário não é conhecido.",
+  "error.host.signalHomeUnknown": "Este servidor do Signal não está disponível.",
+  "error.host.turnLimitInvalid": "Este limite de threads não é válido.",
   "error.host.maintenanceInterrupted":
     "A manutenção do computador anfitrião foi interrompida. Verifique o aplicativo e redefina o estado do computador anfitrião antes de tentar novamente.",
   "error.host.updateFailed":
@@ -32,4 +35,5 @@ export const messages = {
     "O tempo para encerrar o ambiente de usuário esgotou. Nenhuma substituição do aplicativo foi iniciada.",
   "error.host.tenantHealthMissing":
     "Os relatórios de integridade dos ambientes de usuário estão ausentes ou indicam falhas após a reinicialização. Verifique as sessões dos ambientes de usuário antes de outra atualização.",
+  "error.host.personalityInvalid": "Este estilo de resposta não é conhecido.",
 } as const satisfies PartialTranslation<typeof source>;

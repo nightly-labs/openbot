@@ -34,9 +34,67 @@ commands continue to use that file.
 ### Stripe sandbox
 
 `bun run api:stripe:bootstrap` creates the six plan Prices (lookup keys `openbot_{plan}_{month|year}`),
-the license Price (`openbot_license_month`) and the Customer Portal settings in the Stripe account of `STRIPE_SECRET_KEY`. It is safe to run
-again: a changed amount makes a new Price and moves the lookup key to it. In the Portal, an upgrade
-is charged at once, and a downgrade or a shorter interval starts at the next period.
+the twelve storage add-on Prices (`openbot_storage_{plan}_{1|2}_{month|year}`, one Product for each
+plan), the license Prices, the Polish VAT Tax Rate and the Customer Portal settings in the Stripe account of
+`STRIPE_SECRET_KEY`.
+It is safe to run again: a changed amount makes a new Price and moves the lookup key to it. The Portal
+has no plan change (`subscription_update` is off); it cancels plans and updates payment methods.
+`POST /v1/me/billing/storage` (and `/api/browser/v1/me/billing/storage`) with
+`{subscriptionId, tier}` buys a storage tier for a server on a VPS of the operator. See
+[Hosted servers](../../docs/hosted-servers.md#storage-tiers).
+The bootstrap also creates the `openbot_credits` Product and one Price for each credit amount
+(`openbot_credits_<n>`). `GET /v1/me/credits` returns the balance of the account and of its servers,
+`POST /v1/me/credits/checkout` with `{credits, currency, serverId?}` opens a Checkout, and
+`POST /v1/me/credits/transfer` with `{serverId, direction, credits}` moves credits between the account
+and a server that it owns. `POST /v1/me/credits/redeem` with `{code, serverId?}` redeems a credit code
+for the account or for a server that the account is a member of. The web client uses the same routes
+under `/api/browser`. `bun run test:credits` checks them.
+
+Make credit codes with `bun apps/auth-api/scripts/credit-codes.ts`:
+
+```sh
+bun apps/auth-api/scripts/credit-codes.ts create --credits 500 --count 200 --expires 2027-03-31 --campaign launch-week --note "Launch" --out ~/launch-codes.csv --production --confirm-production --apply
+bun apps/auth-api/scripts/credit-codes.ts list --campaign launch-week --production
+bun apps/auth-api/scripts/credit-codes.ts disable <code id> --production --confirm-production --apply
+```
+
+A code has 16 random characters from a 32-character alphabet (80 bits), for example
+`7KQ2-M9XD-4TPA-HW3C`. The script shows each code one time. D1 keeps only the SHA-256 hash of the
+code, so nobody can read a code back from the database. `--max-redemptions <m>` lets up to `<m>`
+accounts redeem the same code, one time each (default 1). The credits are free credits that end
+`--grant-days` days after the redemption (default 365). An account can redeem each code one time and
+any number of different codes. `--count` makes up to 1000 codes in one run. `--campaign` (lower-case
+letters, digits and dashes) groups codes in `list` and in the OpenPanel Credits dashboard. `--out`
+writes the codes to a new CSV file with mode 0600 instead of the terminal. `disable` stops a code;
+credits that accounts already redeemed stay.
+
+Redemptions have hourly limits (`CREDIT_CODE_LIMITS` in `src/server/credit-codes.ts`): 30 tries and 10
+wrong codes for each account, 120 tries and 30 wrong codes for each network address (IPv6 to its /64),
+and 20 redemptions of one code from one network. Only a code that does not exist or is disabled is a
+wrong code; a used, expired or already redeemed code counts only as a try. A try over a limit gets
+`429 credit_code_attempts`.
+D1 keeps only SHA-256 hashes of the counted keys in `credit_code_limits`, and the retention job deletes
+old hours.
+Without `--apply` the script makes no change. `--local` (the default) and `--test` work the same way.
+
+Each account gets 10 welcome credits once, with no end date. They pay only for the models that the
+media gateway gives a welcome route. The Worker reaches the media generation processor only through
+the private Worker `openbot-media-gateway` (service binding `MEDIA_GATEWAY`, production only). D1 keeps
+the models, prices, holds and ledger; the gateway keeps the adapters, routes and keys. Its source is
+in the private repository [`nightly-labs/openbot-media-gateway`](https://github.com/nightly-labs/openbot-media-gateway):
+change processors, routes and welcome routes there, then deploy that Worker. Without the
+binding, as in local development, every credits model is unavailable. `bun run test:credit-media`
+checks the service against a fake gateway.
+
+The optional Worker variable `VIES_REQUESTER_VAT_ID` is the seller's EU VAT ID (for example
+`PL1234567890`). With it, the EU VIES check of a buyer's VAT ID returns a consultation number, which the
+Stripe customer keeps as proof of the check. Without it, the check works and has no number.
+`bun scripts/stripe-vat-migrate.ts` moves the subscriptions that used Stripe Tax to the Tax Rate; it is
+a dry run unless you give `--apply`.
+The Worker variable `BILLING_COUNTRY_REQUIRED=true` refuses a Checkout of an account with no billing
+country (409 `billing_country_required`). `wrangler.jsonc` sets it, so production and local development
+refuse. With `false`, such an account gets a Stripe Tax Checkout, so that a desktop app older than 0.72.0
+can still buy. Set `BILLING_COUNTRY_REQUIRED=false` in the shell to try that path locally.
 
 For a local Worker, forward the webhooks and set the secret that `stripe listen` prints in your
 shell as `STRIPE_WEBHOOK_SECRET`:
@@ -53,9 +111,12 @@ also sets the allow list from `HOSTED_SERVERS_TEST_ALLOW_LIST` and the developer
 
 `scripts/stripe-flows-e2e.ts` checks the plan flows against the sandbox and a local Worker: renewal,
 failed renewal, cancel at the period end, plan change, renew, delete, another account's server, a
-deleted customer, a refund, a dispute, and the welcome email of a first plan. The `license-*`
+deleted customer, a refund, a dispute, the welcome email of a first plan, and the storage tiers
+(`storage-tier`, which needs the storage Prices of the bootstrap). The `license-*`
 scenarios check the license: buy, Checkout, one open Checkout page, change users, the user count,
-renewal, failed renewal, currency, isolation from the server plans, and the user limit at a join. Each scenario uses a Stripe
+renewal, failed renewal, currency, isolation from the server plans, and the user limit at a join. The `credits`
+scenario buys the smallest credit pack and checks the invoice: Polish VAT for PL and DE, the OSS amount for DE, and no VAT
+for US. Each scenario uses a Stripe
 test clock and deletes it at the end. Start the Worker
 with `HOSTED_SERVERS_ENABLED=true`, `HOSTED_SERVERS_ALLOWED_USER_IDS` set to the output of
 `bun scripts/stripe-flows-e2e.ts --print-user-ids`, `HOSTED_SERVER_TEMPLATE=e2e-template`, and
@@ -68,8 +129,20 @@ repository root:
 bun scripts/stripe-flows-e2e.ts --api http://127.0.0.1:<port> [scenario ...]
 ```
 
-The `portal` scenario prints a Customer Portal cancel page and then an update page, and waits until
-you use them. The report goes to `.openbot-build/stripe-flows-e2e.json`.
+The `promotion-link` scenario makes a coupon with two promotion codes in the sandbox and checks the
+Checkout pages of a discount link (`?promo=CODE`): an active code is applied, and a code that does not
+fit the order or does not exist gives the code field. A copy of the Brazil partner code (BRL server plans only)
+gives a discount on a BRL server page and the code field on a EUR server page and a license page. It deletes the
+coupons and turns off the codes at the end.
+
+The `invite` scenario checks the invite rewards: a referred friend gets the first-payment coupon only on the
+first purchase, the coupon goes after the first paid invoice, a yearly payment gives 12 credit parts 30 days
+apart, the cron (`/cdn-cgi/handler/scheduled`) sends the due parts, and a refund takes the newest unsent parts
+first and then the sent credit. The scenario moves `ready_at` in D1, because the parts use the Worker clock,
+not the Stripe test clock.
+
+The `portal` scenario prints a Customer Portal cancel page and waits until you use it. Then it checks
+that the plan change flow of an old app opens the Portal home, and that the Portal has no plan change. The report goes to `.openbot-build/stripe-flows-e2e.json`.
 
 The `boat` scenario runs only when you name it. It pays for a server, waits until OpenBot in the VM
 signs in and publishes the host, restarts the service to check the stored session, and deletes the
@@ -153,15 +226,33 @@ exercise real delivery locally, put a full set in the ignored `.dev.vars` file:
 ```dotenv
 EMAIL_SMTP_HOST=mail.privateemail.com
 EMAIL_SMTP_PORT=465
-EMAIL_SMTP_USERNAME=hello@openbot.run
+EMAIL_SMTP_USERNAME=no_reply@openbot.run
 EMAIL_SMTP_PASSWORD=<PRIVATE_EMAIL_APP_PASSWORD>
-EMAIL_FROM=hello@openbot.run
-EMAIL_LICENSE_FROM=licenses@openbot.run
+EMAIL_FROM=no_reply@openbot.run
+EMAIL_REPLY_TO=hello@openbot.run
+EMAIL_LICENSE_REPLY_TO=licenses@openbot.run
 ```
+
+Sign-in codes, invitations and welcome emails go from `EMAIL_FROM`, the `no_reply@openbot.run`
+mailbox, with `EMAIL_REPLY_TO` in `Reply-To`, so a reply goes to the team's inbox. An empty
+`EMAIL_REPLY_TO` uses `EMAIL_FROM` and adds no `Reply-To`. `EMAIL_SMTP_PASSWORD` is the password of
+the `EMAIL_SMTP_USERNAME` mailbox. The CI deploy reads it from the `EMAIL_SMTP_PASSWORD` secret of the
+`cloudflare-production` GitHub Environment, not from `.env.production`: when the mailbox changes,
+change both, at the time of the merge.
 
 License emails (the first payment, a failed renewal payment, and the end of a license) go from
 `EMAIL_LICENSE_FROM`. The SMTP account must be allowed to send as that address: on Private Email,
-make it an alias of the `EMAIL_SMTP_USERNAME` mailbox. An empty value uses `EMAIL_FROM`.
+make it an alias of the `EMAIL_SMTP_USERNAME` mailbox. An empty value uses `EMAIL_FROM`, as production
+does. A reply goes to `EMAIL_LICENSE_REPLY_TO` (`licenses@openbot.run` in production), or to the
+license sender when it is empty.
+
+When the `no_reply@openbot.run` mailbox reaches its sender limit (500 messages an hour), the email goes
+again from the overflow mailbox `EMAIL_SMTP_OVERFLOW_USERNAME` (`hello@openbot.run` in production),
+with that address as the sender. Its password is the `EMAIL_SMTP_OVERFLOW_PASSWORD` secret, in the
+same places as `EMAIL_SMTP_PASSWORD`; it is optional, and without it the overflow mailbox is off.
+When the overflow mailbox also reaches its limit, Cloudflare Email Service sends the email from
+`EMAIL_FROM` (`EMAIL_FALLBACK`). Cloudflare also has a daily quota: past it, the binding refuses with
+`E_DAILY_LIMIT_EXCEEDED`.
 
 `bun run env:set:smtp` encrypts the app password into `.env.production` only.
 
@@ -172,7 +263,8 @@ Cloudflare places that Worker near the mail host. The relay has no route and kee
 binding request carries the SMTP settings and the message. CI and `bun run api:deploy` deploy the
 relay before the production Worker. When you change `EMAIL_SMTP_HOST` or `EMAIL_SMTP_PORT`, also
 change `placement.host` in `wrangler.email-relay.jsonc`. The test Worker and local `vite dev` send
-from their own socket. To see where the relay runs, read the `colo` of its Workers Logs events.
+from their own socket. Workers Logs are off. To see where the relay runs, read the `colo` of its events in
+`bunx wrangler tail openbot-email-relay`.
 
 For a deployed Worker, `bun run api:deploy` decrypts `.env.production`. It sends
 `EMAIL_SMTP_PASSWORD`, `SKILLS_ADMIN_TOKEN`, `REMOTE_TICKET_PRIVATE_JWK`,
@@ -189,7 +281,16 @@ before remote changes. Test deployments do not send account analytics.
 `GITHUB_APP_PRIVATE_KEY` is the OpenBot GitHub App's private key as a PKCS #8 PEM. GitHub gives a
 PKCS #1 key; convert it with `openssl pkcs8 -topk8 -nocrypt -in <key>.pem`. With the key, the
 Worker gives the desktop installation tokens, so GitHub shows `openbotgit[bot]` as the author of an
-agent's work. With no key, the desktop acts as the signed-in user. In GitHub Actions the secret is
+agent's work. The key also lets `POST /v1/feedback` open an approved bug report or feature idea from the app as
+an issue in `nightly-labs/openbot`, for any signed-in account, three times a minute (`FEEDBACK_RATE_LIMITER`) and 10 times a UTC day (`feedback_daily_counts` in D1). The Worker does not store or log the text. With `sameAs`, the report is a comment on that open app issue. Before the card, `POST /v1/feedback/similar` finds open app issues with a similar title, three times a minute for each account (the same limiter, with its own key); the title is in the body, so request logs do not keep it. Each report ends with a hidden owner mark
+(`feedback-owner.ts`): a random value and an HMAC of it and the account ID, with a key that HKDF derives
+from the app key. `POST /v1/feedback/withdraw` takes `{ number }` and, for the account whose mark ends
+the text, deletes its comments on that issue or moves its issue to `FEEDBACK_WITHDRAWN_REPOSITORY`, a
+private repository where the app has Issues write access. GitHub keeps every earlier version of an
+edited text, so the route never edits. Without that variable, an issue answers 503
+`feedback_withdraw_unavailable`; a comment can still go. A new app key makes the earlier marks invalid.
+With no key, the route answers 503, the app gives the GitHub form link instead, and the desktop acts
+as the signed-in user. In GitHub Actions the secret is
 `OPENBOT_GITHUB_APP_PRIVATE_KEY`, because GitHub refuses secret names that start with `GITHUB_`.
 Secrets are never passed as process arguments. The other values are Worker
 variables. The SMTP connection uses TLS from the start and accepts only port 465.
@@ -204,8 +305,44 @@ value, each company must enter its client secret again. Without it, company sign
 everyone signs in with an email code. GitHub Actions reads it from the `cloudflare-production`
 Environment; a local deployment reads it from the encrypted `.env.production`.
 
+`HOSTED_ARCHIVE_KEY_SECRET` (32 random bytes in base64), `B2_WORKER_KEY_ID_EU` and
+`B2_WORKER_APPLICATION_KEY_EU` are set together or not at all. They are for the archives of ended
+pool servers ([plan 012](../../plans/012-pool-server-archive.md)). The first encrypts the `age` key
+of each archive in `hosted_server_archives`; with another value, no archive can be restored. The B2
+key reads the `openbot-pool-archive-eu` bucket and nothing else. The encrypted `.env.production` has
+all three, and GitHub Actions reads them from the `cloudflare-production` Environment. When you
+change one, change it in both places and deploy the Worker.
+`BROWSER_EXTENSION_IDS` lists the ids of the published OpenBot browser extensions, separated by
+commas (a Chrome id is 32 letters from `a` to `p`). Only they get a sign-in from the web app: the
+extension opens `/app?extension=<id>&challenge=<c>&state=<s>` in its sign-in window, the person
+allows it, `/api/browser/extension/code` gives a one-time code, and the extension spends it with its
+verifier at `/v1/mobile-auth/company/exchange` (`platform: "unknown"`), as the phone does after a company sign-in. The extension first asks with no window (`&silent=1`,
+`launchWebAuthFlow` not interactive): the web app gives the code at once when this account allowed this
+extension in this browser before (`openbot.web.extension-allowed.v1` in local storage), and else answers
+`login_required` or `consent_required`, and the extension opens the window. Without the variable, production gives no extension a
+code; a development API (`AUTH_EXPOSE_DEVELOPMENT_CODE`) accepts any extension id, because an
+unpacked extension gets its id from its folder. It is not a secret: set it in `wrangler.jsonc` `vars`
+when the store gives the extension its id.
+
+`GET /v1/browser-extension/x-rules?hash=<hex>` answers the CSS selectors that the extension uses on
+X (`server/browser-extension-x-rules.ts`) as `{ hash, rules }`, with `rules: null` when the extension
+already has that hash. When X changes its page, put new selectors in that file and deploy: extensions
+take them within an hour, with no store review. It holds selectors only, never code.
+
 `SERVER_CLAIMS_ADMIN_TOKEN` lets an operator sign a new server in for a user without an email code: see
 [server claims](../../docs/self-hosted-server.md#sign-in-with-a-server-claim). Without it, the endpoint answers 401.
+The encrypted `.env.production` has it, so `scripts/hosting/leaseweb-pool.ts custom` can sign a custom
+server in for its owner. GitHub Actions reads it from the `cloudflare-production` Environment. When you
+change it, change it in both places and deploy the Worker.
+
+`STORE_REVIEW_EMAIL` and `STORE_REVIEW_CODE` give app store reviewers a sign-in that does not need an
+inbox. A sign-in that starts with this one email sends no email, and its code is `STORE_REVIEW_CODE`
+(8 characters from the sign-in code alphabet). The expiry, the 5 tries and the rate limits stay the
+same, and every other email works as before. Set both or neither: a value that is not a valid email or
+code turns the sign-in off. The account must be a member of the review server only, because each person
+who has the code can sign in to it. Change the code after a review. The encrypted `.env.production`
+has both values, and `scripts/deploy-auth-api.ts` puts them. The CI deploy keeps the values that the
+Worker has.
 
 Use `bun run api:deploy:test` for the isolated `openbot-auth-api-test` Worker
 and the `openbot-auth-test` D1 database.
@@ -230,8 +367,20 @@ for a team invitation. The message is never sent in that case, so the app can
 ask again later. Namecheap Private Email allows 500 messages an hour for each
 mailbox, and every sign-in code and invitation spends that same quota.
 
+Production has a fallback: the `EMAIL_FALLBACK` `send_email` binding of Cloudflare Email Service.
+When SMTP surely did not send a message (a sender limit, a refusal of the sender or the message, or
+a connection that stopped before `DATA`), the Worker sends the same message through Cloudflare. It
+does not fall back after `smtp_delivery_unknown`, an invalid input or configuration, or a refused
+recipient. The fallback uses only the time left in the 25-second delivery budget of a sign-in code,
+and it does not start with less than 2 seconds left, as after three SMTP timeouts. When
+Cloudflare also fails, the answer stays the SMTP failure, so a sender limit keeps its 429. Each
+fallback sends an `email_fallback_sent` analytics event. Before the first deploy with the binding,
+onboard `openbot.run` in the Cloudflare dashboard under Email Sending, and keep
+`allowed_sender_addresses` equal to `EMAIL_FROM` and `EMAIL_LICENSE_FROM`. The preview and test
+Workers have no fallback.
+
 The contact form on `/contact` posts to `/v1/contact`. The Worker sends each message to
-`EMAIL_FROM` through SMTP, with the visitor's address in `Reply-To`, and stores nothing.
+`EMAIL_REPLY_TO` (or `EMAIL_FROM` when it is empty) through SMTP, with the visitor's address in `Reply-To`, and stores nothing.
 The D1 counter of sign-in allows 3 messages for each IP address and 15 in total in each 15-minute
 window, so the form cannot spend the quota that sign-in codes need. A Cloudflare rate-limit binding
 counts in each location separately, so it cannot hold a total. Without SMTP the route answers 503
@@ -261,9 +410,11 @@ code.
 
 `/v1/sites` takes two optional headers: `OpenBot-Host-Id` and `OpenBot-Host-Token`, the machine token
 of a registered server. With them, a request sees only that server's sites, and a new site counts
-against the server plan's limit. A wrong token gets 401 `host_unauthorized`. Without them, a new site
-goes into the account's unlinked bucket of one site; `GET /v1/sites?scope=unlinked` lists only that
-bucket. `GET /v1/sites` returns `{ sites, limit, used }`.
+against the server's limit: a `server_site_limits` row, else its plan's limit, else the account's shared
+pool (3 sites for each license user, else 1), within an account cap of 300. A wrong token gets 401
+`host_unauthorized`. Without them, a new site goes into the account's unlinked bucket of one site;
+`GET /v1/sites?scope=unlinked` lists only that bucket. `GET /v1/sites` returns `{ sites, limit, used }`, plus an optional `limitReason`: `shared` for a
+server in the shared pool, `account` when the account cap is full.
 
 ## Authentication data retention
 
@@ -306,7 +457,26 @@ ticket names `REMOTE_SIGNAL_URL`, as before.
   `remote_hosts.signal_home` keeps, and a ticket with the `signal` claim. The host keeps its home
   until it sends that home's URL as `failedSignalUrl`. Session tickets of the host name the same
   home. Other host tickets (ingress, the webhook relay, released hosts) and hosts with no home use
-  `REMOTE_SIGNAL_URL`, which stays the entry Signal.
+  `REMOTE_SIGNAL_URL`, which stays the entry Signal. A host ticket request with `signalHome: true` can
+  also send `preferredSignalHome`, the ID of the home that an owner or admin chose. The host gets that
+  home when it is not the `failedSignalUrl` and its `/health/ready` answers in 2 seconds; otherwise the
+  rules below choose. An ID that is not a home is ignored. `POST /v2/remote/hosts/:hostId/signal-homes`
+  with the machine token lists the homes (`{ homes: [{ id, url }] }`).
+- `REMOTE_SIGNAL_HOME_LOCATIONS`: the place of each home, as `id=latitude:longitude,...`, for example
+  `a=60.17:24.94,us=37.34:-121.89`. Empty means no places. Otherwise it must name each home of
+  `REMOTE_SIGNAL_HOMES` one time, or each ticket request fails with `503 remote_not_configured`. With
+  places, a host gets one of the homes at most 1000 km farther from it than the nearest home, from the
+  Cloudflare request location. A host keeps its home while that home is near; otherwise it moves at its
+  next ticket. The variable has no effect when `REMOTE_SIGNAL_HOMES` is empty.
+- `REMOTE_SIGNAL_HOME_COUNTRIES`: the homes of the hosts in a country, as `CC=id+id,...` with the
+  Cloudflare country code (`request.cf.country`), for example `CN=us+au`. A host in a listed country
+  gets one of its homes by the same hash, and the distance rule does not apply to it. When its home
+  fails, the host moves to another home of its country; when its country has no other home, the
+  distance rule chooses. A host reports only one failed home, so with two homes that are both down it
+  goes between them, as with the distance rule. Empty means the distance rule for each
+  country. Each ID must be a home of `REMOTE_SIGNAL_HOMES`, or each ticket request fails with
+  `503 remote_not_configured`, so remove a home from this list in the same deploy. Use it where the
+  network routes do not follow the map. The variable has no effect when `REMOTE_SIGNAL_HOMES` is empty.
 - `REMOTE_AUTH_WEBHOOK_URLS`: each Signal that gets the auth events, as `url,url`. Empty means
   `REMOTE_AUTH_WEBHOOK_URL` only. The outbox deletes an event when each URL accepted it, and sends it
   again only to the URLs that failed.
@@ -331,6 +501,15 @@ on Apple Watch only); a host cannot give the text.
 It has its own key in `LIVE_ACTIVITY_RATE_LIMITER`, and it sends nothing for a device session that
 has ended (`RemoteControlPlane.sessionOpen`), because the host does not learn about the end. The
 alert has "OpenBot" as its only text and `mutable-content`; the app opens the sealed bytes.
+
+`POST /v2/remote/watch/sessions` pairs an Apple Watch with the phone account session that sends it
+(`watch_sessions` in D1). The body is `{ publicKey }`, the raw P-256 key of the watch. The answer is
+`{ watchSessionId, token, expiresAt }`; D1 keeps only the hash of the token. The watch session ends
+after 30 days, or when its phone session ends. The same key again replaces the old session, and an
+account keeps at most 5. `DELETE /v2/remote/watch/sessions/:watchSessionId` revokes one.
+`POST /v2/remote/watch/ticket` takes the watch token and a signed `{ hostId, ts, proof }`, checks the
+membership on the host, and gives an ES256 ticket with `aud: "openbot-watch"` from the remote ticket
+key. `WATCH_TICKET_RATE_LIMITER` limits each watch session to 30 tickets a minute.
 
 The relay is off until `APNS_PRIVATE_KEY` (the `.p8` key text) and `APNS_KEY_ID` are set. Create
 the key in Apple Developer > Keys with the Apple Push Notifications service, then add both to the

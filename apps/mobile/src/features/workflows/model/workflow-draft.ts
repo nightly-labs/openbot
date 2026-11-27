@@ -8,8 +8,9 @@ import type {
 } from "@openbot/contracts/ipc";
 import * as Crypto from "expo-crypto";
 import { create } from "zustand";
+import { type AddKey, addFields, addKind } from "./workflow-add";
+import { type GraphPlace, insertAtPlace } from "./workflow-graph-edit";
 import {
-  type AddableKind,
   connectStep,
   type FlowList,
   graphWithOutline,
@@ -17,6 +18,7 @@ import {
   insertCondition,
   insertStep,
   moveStep,
+  outlineFits,
   outlineListOf,
   removeStep,
   type WorkflowEditMode,
@@ -24,10 +26,6 @@ import {
   workflowOutline,
 } from "./workflow-outline";
 
-/**
- * The workflow that the editor sheet changes. Its pages share one draft: the step and trigger pages
- * change it, and the first page saves it. A new workflow has no id and no revision.
- */
 export interface WorkflowDraft {
   serverId: string;
   workflowId: string | null;
@@ -36,26 +34,12 @@ export interface WorkflowDraft {
   graph: WorkflowGraph;
   outline: WorkflowOutline | null;
   mode: WorkflowEditMode;
-  /** The title and graph as saved, to tell a change from the saved workflow. */
   savedTitle: string;
   savedGraph: string;
-  /** The path of the condition that the outline shows. */
   branch: WorkflowBranch;
-  /** The schedule on the trigger page cannot be saved, such as a custom schedule without an expression. */
   triggerProblem: boolean;
 }
 
-/** What a new step of each kind starts with. An output tells the person; the phone does not choose a place. */
-const NEW_FIELDS: Record<AddableKind, Record<string, WorkflowFieldValue>> = {
-  agent: {},
-  llm: {},
-  condition: {},
-  approval: {},
-  prompt: {},
-  output: { target: "notify" },
-};
-
-/** A new manual workflow: one trigger, as the desktop starts one. */
 const NEW_WORKFLOW_GRAPH: WorkflowGraph = {
   nodes: [{ id: "trigger-start", kind: "trigger", at: { x: 0, y: 0 }, fields: { trigger: "manual" } }],
   edges: [],
@@ -85,7 +69,6 @@ export function draftFrom(serverId: string, detail: WorkflowDetail | null, title
   };
 }
 
-/** The graph that a save sends: the outline writes the edges of its steps. */
 export function draftGraph(draft: WorkflowDraft): WorkflowGraph {
   return draft.outline ? graphWithOutline(draft.graph, draft.outline) : draft.graph;
 }
@@ -103,16 +86,13 @@ interface DraftStore {
   start: (draft: WorkflowDraft) => void;
   clear: () => void;
   setTitle: (title: string) => void;
-  /** The graph is saved as `revision`: a later save starts from it. */
   graphSaved: (revision: number) => void;
   setBranch: (branch: WorkflowBranch) => void;
   setTriggerProblem: (problem: boolean) => void;
-  /** Sets fields of a node; `undefined` removes a field. */
   setFields: (nodeId: string, fields: Record<string, WorkflowFieldValue | undefined>) => void;
   setSchedule: (nodeId: string, schedule: RoutineSchedule | undefined) => void;
-  /** Adds a step at `index` of `list` and answers its id. */
-  add: (kind: AddableKind, list: FlowList, index: number) => string | null;
-  /** Puts a loose step at the end of the steps that run. */
+  add: (key: AddKey, list: FlowList, index: number) => string | null;
+  addAt: (key: AddKey, place: GraphPlace) => string | null;
   connect: (nodeId: string) => void;
   remove: (nodeId: string) => void;
   move: (nodeId: string, direction: -1 | 1) => boolean;
@@ -132,7 +112,6 @@ const mapNode = (graph: WorkflowGraph, nodeId: string, change: (node: WorkflowNo
 });
 
 export const useWorkflowDraft = create<DraftStore>((set, get) => {
-  /** Changes the draft of an outline workflow; a draft of another mode keeps its steps. */
   const changeOutline = (change: (draft: WorkflowDraft, outline: WorkflowOutline) => Partial<WorkflowDraft> | null) => {
     const draft = get().draft;
     if (!draft?.outline || draft.mode !== "outline") return false;
@@ -184,8 +163,9 @@ export const useWorkflowDraft = create<DraftStore>((set, get) => {
       });
       set({ draft: { ...draft, graph } });
     },
-    add: (kind, list, index) => {
-      const node = newNode(kind, NEW_FIELDS[kind]);
+    add: (key, list, index) => {
+      const kind = addKind(key);
+      const node = newNode(kind, addFields(key));
       const added = changeOutline((draft, outline) => {
         const next =
           kind === "condition"
@@ -197,6 +177,15 @@ export const useWorkflowDraft = create<DraftStore>((set, get) => {
         return { ...next, branch: list === "no" ? "no" : list === "yes" ? "yes" : draft.branch };
       });
       return added ? node.id : null;
+    },
+    addAt: (key, place) => {
+      const draft = get().draft;
+      if (draft?.mode !== "fields") return null;
+      const node = newNode(addKind(key), addFields(key));
+      const graph = insertAtPlace(draft.graph, place, node, () => `edge-${Crypto.randomUUID()}`);
+      if (!graph) return null;
+      set({ draft: { ...draft, graph } });
+      return node.id;
     },
     connect: (nodeId) => {
       changeOutline((draft, outline) => connectStep(draft.graph, outline, nodeId));
@@ -215,7 +204,10 @@ export const useWorkflowDraft = create<DraftStore>((set, get) => {
         ...(source.size ? { size: source.size } : {}),
       };
       const index = draft.outline[list].indexOf(nodeId) + 1;
-      const added = changeOutline((current, outline) => insertStep(current.graph, outline, list, index, copy));
+      const added = changeOutline((current, outline) => {
+        const next = insertStep(current.graph, outline, list, index, copy);
+        return outlineFits(next.graph, next.outline) ? next : null;
+      });
       return added ? copy.id : null;
     },
   };

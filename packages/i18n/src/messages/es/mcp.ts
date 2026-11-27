@@ -7,6 +7,8 @@ export const messages = {
   "mcp.connect.notConnected": "Sin conexión",
   "mcp.connect.close": "Cerrar el diálogo de conexión con {name}",
   "mcp.connect.getKey": "Obtener clave",
+  "mcp.connect.useKey": "Usar una clave de API en su lugar",
+  "mcp.connect.useSignIn": "Iniciar sesión en su lugar",
   "mcp.connect.keyDescription":
     "Pega una credencial de tu cuenta de {name}. OpenBot se conecta con ella y la guarda en {host}.",
   "mcp.connect.thisComputer": "este equipo",
@@ -26,7 +28,10 @@ export const messages = {
   "mcp.signIn.waiting": "Esperando al navegador…",
   "mcp.signIn.continue": "Continuar en {name}",
   "mcp.signIn.pageDescription": "Esta página está abierta en el navegador de {host}. Inicia sesión aquí.",
-  "mcp.server.loadFailed": "No se pudieron cargar los servidores MCP.",
+  "mcp.signIn.copyHint": "Si la página no carga, copia el enlace y ábrelo en otro navegador.",
+  "mcp.signIn.copyLink": "Copiar enlace",
+  "mcp.signIn.pasteHint":
+    "Si inicias sesión en otro dispositivo, copia la dirección que muestra su navegador al final y pégala aquí.",
   "mcp.test.connected": {
     one: "Conectado · {count} herramienta",
     other: "Conectado · {count} herramientas",
@@ -38,6 +43,7 @@ export const messages = {
   "mcp.status.signedIn": "Sesión iniciada",
   "mcp.status.signingIn": "Iniciando sesión…",
   "mcp.status.signInNeeded": "Requiere inicio de sesión",
+  "mcp.status.signInAppNeeded": "Requiere app de inicio de sesión",
   "mcp.status.refused": "Rechazado",
   "mcp.status.checkUrl": "Revisa la URL",
   "mcp.status.noAnswer": "Sin respuesta",
@@ -55,12 +61,6 @@ export const messages = {
   "mcp.panel.noAnswer": "Ese servidor no respondió.",
   "mcp.panel.connectTitle": "Conectar a un MCP personalizado",
   "mcp.panel.editTitle": "Editar servidor MCP",
-  "mcp.panel.changesNotSaved": "Cambios sin guardar",
-  "mcp.panel.title": "Servidores MCP",
-  "mcp.panel.description":
-    "Los servidores de Model Context Protocol proporcionan herramientas adicionales a los agentes de este servidor. Los agentes de Claude y Codex solo reciben los servidores de esta lista; los agentes de OpenCode y Grok también pueden iniciar servidores desde sus propios archivos de configuración.",
-  "mcp.panel.connectCustom": "Conectar un MCP personalizado",
-  "mcp.panel.empty": "Aún no hay servidores MCP.",
   "mcp.panel.enable": "Activar {name}",
   "mcp.panel.detailsTitle": "Detalles",
   "mcp.panel.detailsDescription": "Asigna un nombre a este servidor y elige cómo accede OpenBot a él.",
@@ -102,17 +102,11 @@ export const messages = {
     "Se conecta una vez con estos ajustes e informa de las herramientas que ofrece. No se guarda ni conserva nada.",
   "mcp.panel.testConnection": "Probar conexión",
   "mcp.panel.notTested": "Aún sin probar.",
-  "mcp.panel.removeTitle": "¿Eliminar {name}?",
-  "mcp.panel.removeDescription":
-    "Sus herramientas dejarán de ofrecerse a los agentes de este servidor. La configuración no se conserva.",
-  "mcp.panel.removeConfirm": "Eliminar servidor MCP",
-  "mcp.panel.actionsFor": "Acciones para {name}",
-  "mcp.panel.testUnavailable": "Este servidor no se puede probar aquí.",
   "mcp.panel.signIn": "Iniciar sesión",
   "mcp.panel.signOut": "Cerrar sesión",
   "mcp.panel.cancelSignIn": "Cancelar",
+  "mcp.panel.useAddress": "Usar esta dirección",
   "mcp.panel.signInTo": "Iniciar sesión en {name}",
-  "mcp.panel.cancelSignInTo": "Cancelar inicio de sesión en {name}",
   "mcp.panel.signInWaiting": {
     one: "Completa el inicio de sesión en tu navegador. OpenBot deja de esperar después de {count} minuto.",
     other: "Completa el inicio de sesión en tu navegador. OpenBot deja de esperar después de {count} minutos.",
@@ -147,12 +141,13 @@ export const messages = {
   "mcp.panel.appSaved": "App guardada. Inicia sesión para usarla.",
   "mcp.panel.appRemoved": "App eliminada.",
   "mcp.signIn.relayDescription":
-    "Comprueba que la página de inicio de sesión está en {page} y ábrela en tu navegador. Al terminar, OpenBot envía el inicio de sesión a {host}.",
+    "Inicia sesión en {page} en tu navegador. Al terminar, OpenBot envía el inicio de sesión a {host}.",
   "mcp.signIn.relayOpenDescription":
-    "Abre la página de inicio de sesión de {page} en tu navegador. Al terminar, pega aquí la dirección que muestra el navegador. Después, OpenBot envía el inicio de sesión a {host}.",
+    "Inicia sesión en {page} en tu navegador. Al terminar, pega aquí la dirección que muestra el navegador. Después, OpenBot envía el inicio de sesión a {host}.",
   "mcp.signIn.relayDeviceDescription":
-    "Comprueba que la página de inicio de sesión está en {page}, ábrela en tu navegador y termina allí. {host} detecta el inicio de sesión por sí mismo.",
+    "Inicia sesión en {page} en tu navegador y termina allí. {host} detecta el inicio de sesión por sí mismo.",
   "mcp.signIn.relayOpen": "Abrir inicio de sesión",
+  "mcp.signIn.relayCopy": "Copiar enlace",
   "mcp.signIn.relayPasteHint": "Si el navegador no vuelve a OpenBot, copia la dirección que muestra y pégala aquí.",
   "mcp.signIn.relayPasteRequired":
     "OpenBot no puede obtener por sí solo el inicio de sesión del navegador. Al terminar, copia la dirección que muestra el navegador y pégala aquí.",

@@ -7,6 +7,8 @@ export const messages = {
   "mcp.connect.notConnected": "Não conectado",
   "mcp.connect.close": "Fechar janela de conexão de {name}",
   "mcp.connect.getKey": "Obter uma chave",
+  "mcp.connect.useKey": "Usar uma chave de API em vez disso",
+  "mcp.connect.useSignIn": "Entrar em vez disso",
   "mcp.connect.keyDescription":
     "Cole uma credencial da sua conta de {name}. O OpenBot usa a credencial para conectar. Local de armazenamento: {host}.",
   "mcp.connect.thisComputer": "este computador",
@@ -26,7 +28,10 @@ export const messages = {
   "mcp.signIn.waiting": "Aguardando o navegador…",
   "mcp.signIn.continue": "Continuar para {name}",
   "mcp.signIn.pageDescription": "Esta página está aberta no navegador de {host}. Entre aqui.",
-  "mcp.server.loadFailed": "Não foi possível carregar os servidores MCP.",
+  "mcp.signIn.copyHint": "Se a página não carregar, copie o link e abra-o em outro navegador.",
+  "mcp.signIn.copyLink": "Copiar link",
+  "mcp.signIn.pasteHint":
+    "Se você entrar em outro dispositivo, copie o endereço que o navegador dele mostra no final e cole-o aqui.",
   "mcp.test.connected": { one: "Conectado · {count} ferramenta", other: "Conectado · {count} ferramentas" },
   "mcp.status.testing": "Testando…",
   "mcp.status.failed": "Falhou",
@@ -35,6 +40,7 @@ export const messages = {
   "mcp.status.signedIn": "Conectado",
   "mcp.status.signingIn": "Entrando…",
   "mcp.status.signInNeeded": "Requer login",
+  "mcp.status.signInAppNeeded": "Requer app de login",
   "mcp.status.refused": "Recusado",
   "mcp.status.checkUrl": "Verifique a URL",
   "mcp.status.noAnswer": "Sem resposta",
@@ -52,12 +58,6 @@ export const messages = {
   "mcp.panel.noAnswer": "Esse servidor não respondeu.",
   "mcp.panel.connectTitle": "Conectar a um MCP personalizado",
   "mcp.panel.editTitle": "Editar servidor MCP",
-  "mcp.panel.changesNotSaved": "Alterações não salvas",
-  "mcp.panel.title": "Servidores MCP",
-  "mcp.panel.description":
-    "Os servidores Model Context Protocol fornecem ferramentas adicionais aos agentes deste servidor. Os agentes Claude e Codex recebem somente os servidores desta lista; os agentes OpenCode e Grok também podem iniciar servidores a partir dos próprios arquivos de configuração.",
-  "mcp.panel.connectCustom": "Conectar um MCP personalizado",
-  "mcp.panel.empty": "Nenhum servidor MCP ainda.",
   "mcp.panel.enable": "Ativar {name}",
   "mcp.panel.detailsTitle": "Detalhes",
   "mcp.panel.detailsDescription": "Dê um nome a este servidor e escolha como o OpenBot o acessa.",
@@ -99,17 +99,11 @@ export const messages = {
     "Conecta uma vez com estas configurações e informa as ferramentas disponíveis. Nada é salvo ou mantido.",
   "mcp.panel.testConnection": "Testar conexão",
   "mcp.panel.notTested": "Ainda não testado.",
-  "mcp.panel.removeTitle": "Remover {name}?",
-  "mcp.panel.removeDescription":
-    "As ferramentas deixam de ser oferecidas aos agentes deste servidor. A configuração não é mantida.",
-  "mcp.panel.removeConfirm": "Remover servidor MCP",
-  "mcp.panel.actionsFor": "Ações para {name}",
-  "mcp.panel.testUnavailable": "Este servidor não pode ser testado aqui.",
   "mcp.panel.signIn": "Entrar",
   "mcp.panel.signOut": "Sair",
   "mcp.panel.cancelSignIn": "Cancelar login",
+  "mcp.panel.useAddress": "Usar este endereço",
   "mcp.panel.signInTo": "Entrar em {name}",
-  "mcp.panel.cancelSignInTo": "Cancelar login em {name}",
   "mcp.panel.signInWaiting": {
     one: "Conclua o login no navegador. O OpenBot para de esperar após {count} minuto.",
     other: "Conclua o login no navegador. O OpenBot para de esperar após {count} minutos.",
@@ -143,12 +137,13 @@ export const messages = {
   "mcp.panel.appSaved": "App salvo. Entre para usá-lo.",
   "mcp.panel.appRemoved": "App removido.",
   "mcp.signIn.relayDescription":
-    "Confirme que a página de login está em {page} e abra-a no seu navegador. Quando você terminar, o OpenBot envia o login para {host}.",
+    "Faça login em {page} no seu navegador. Quando você terminar, o OpenBot envia o login para {host}.",
   "mcp.signIn.relayOpenDescription":
-    "Abra a página de login de {page} no seu navegador. Quando terminar, cole aqui o endereço que o navegador mostra. O OpenBot então envia o login para {host}.",
+    "Faça login em {page} no seu navegador. Quando terminar, cole aqui o endereço que o navegador mostra. O OpenBot então envia o login para {host}.",
   "mcp.signIn.relayDeviceDescription":
-    "Confirme que a página de login está em {page}, abra-a no seu navegador e termine lá. {host} detecta o login sozinho.",
+    "Faça login em {page} no seu navegador e termine lá. {host} detecta o login sozinho.",
   "mcp.signIn.relayOpen": "Abrir página de login",
+  "mcp.signIn.relayCopy": "Copiar link",
   "mcp.signIn.relayPasteHint": "Se o navegador não voltar ao OpenBot, copie o endereço que ele mostra e cole aqui.",
   "mcp.signIn.relayPasteRequired":
     "O OpenBot não consegue receber o login do navegador sozinho. Quando terminar, copie o endereço que o navegador mostra e cole aqui.",

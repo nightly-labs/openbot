@@ -68,7 +68,16 @@ export function ReplyIcon() {
   );
 }
 
-/** A new thread that goes out from a message. */
+export function MoreIcon() {
+  return (
+    <svg aria-hidden="true" viewBox="0 0 20 20" class="ui-glyph-20">
+      <circle cx="4.75" cy="10" r="1.35" />
+      <circle cx="10" cy="10" r="1.35" />
+      <circle cx="15.25" cy="10" r="1.35" />
+    </svg>
+  );
+}
+
 export function BranchIcon() {
   return (
     <svg aria-hidden="true" viewBox="0 0 20 20" class="ui-glyph-20 fill-none stroke-current">

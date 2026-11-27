@@ -1,0 +1,54 @@
+import { randomUUID } from "node:crypto";
+import { mkdir, writeFile } from "node:fs/promises";
+import { join } from "node:path";
+import { createOpenBotLogger, toLogValue } from "@openbot/logging";
+import { Effect } from "effect";
+import { parseBrowserToolCall } from "../browser-tools";
+import type { DynamicToolResult } from "../protocol";
+
+const logger = createOpenBotLogger("browser-screenshot-file");
+
+export const saveBrowserScreenshot = Effect.fn("saveBrowserScreenshot")(function* (
+  workspacePath: () => string,
+  args: unknown,
+  result: DynamicToolResult,
+) {
+  if (!result.success || !savesFile(args)) return result;
+  const image = result.contentItems.find((item) => item.type === "inputImage");
+  const match = image && /^data:image\/(png|jpeg);base64,(.+)$/su.exec(image.imageUrl);
+  if (!match) return withNote(result, "The image was not saved as a file.");
+  const [, extension, data] = match;
+  return yield* Effect.tryPromise(async () => {
+    const folder = join(workspacePath(), "browser-screenshots");
+    const path = join(
+      folder,
+      `screenshot-${new Date().toISOString().replace(/[:.]/g, "-")}-${randomUUID().slice(0, 8)}.${extension === "jpeg" ? "jpg" : "png"}`,
+    );
+    await mkdir(folder, { recursive: true, mode: 0o700 });
+    await writeFile(path, Buffer.from(data ?? "", "base64"), { flag: "wx", mode: 0o600 });
+    return withNote(
+      result,
+      `Saved as ${path}. To show it to the user, pass this path to openbot.attach_files_to_response.`,
+    );
+  }).pipe(
+    Effect.catch((failure) =>
+      Effect.sync(() => {
+        logger.warn("Could not save a browser screenshot.", { error: toLogValue(failure.cause) });
+        return withNote(result, "The image was not saved as a file: the workspace folder cannot be written.");
+      }),
+    ),
+  );
+});
+
+function savesFile(args: unknown): boolean {
+  try {
+    const call = parseBrowserToolCall("screenshot", args);
+    return call.tool === "screenshot" && call.args.save === true;
+  } catch {
+    return false;
+  }
+}
+
+function withNote(result: DynamicToolResult, text: string): DynamicToolResult {
+  return { ...result, contentItems: [{ type: "inputText", text }, ...result.contentItems] };
+}

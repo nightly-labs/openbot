@@ -21,7 +21,6 @@ const CATEGORIES: { category: StorageCategory; label: MobileTextKey }[] = [
 ];
 const CHAT_ROWS = 4;
 
-/** Agent info > Files: what this agent keeps on the host, like the desktop agent settings. */
 export function AgentFiles({
   agent,
   usage,
@@ -30,9 +29,7 @@ export function AgentFiles({
 }: {
   agent: MobileAgent;
   usage: StorageUsage;
-  /** Owners and admins delete files. A member only reads. */
   canDelete: boolean;
-  /** Measures again after a deletion, whether it succeeded or not. */
   onChanged: () => void;
 }) {
   const bytes = (category: StorageCategory) => usage.breakdown.find((entry) => entry.category === category)?.bytes ?? 0;
@@ -89,7 +86,30 @@ export function Size({ bytes }: { bytes: number }) {
   return <Typography className="text-grouped-secondary">{format.fileSize(bytes)}</Typography>;
 }
 
-/** A stored file opens on the preview screen, as in the chat, or else in the share sheet, like a queued file. */
+export function RowDeleteButton({
+  label,
+  deleting,
+  onPress,
+}: {
+  label: string;
+  deleting: boolean;
+  onPress: () => void;
+}) {
+  const danger = useThemeColor("danger");
+  return (
+    <Pressable
+      accessibilityRole="button"
+      accessibilityLabel={label}
+      accessibilityState={{ disabled: deleting }}
+      disabled={deleting}
+      hitSlop={8}
+      onPress={onPress}
+    >
+      <Trash2 size={18} color={String(danger)} />
+    </Pressable>
+  );
+}
+
 export function StoredFile({
   serverId,
   file,
@@ -102,9 +122,7 @@ export function StoredFile({
   onChanged: () => void;
 }) {
   const { t, format } = useText();
-  const { deleteStoredFile } = useMobileWorkspaceActions();
-  const danger = useThemeColor("danger");
-  const [deleting, setDeleting] = useState(false);
+  const { deleting, confirmDelete } = useStoredFileDelete(serverId, file, onChanged);
   const image = showsAsImage(file);
   const missing = file.status === "missing";
   const attachment = useAttachmentFile(serverId, file, image && !missing);
@@ -117,6 +135,36 @@ export function StoredFile({
   ]
     .filter(Boolean)
     .join(" · ");
+
+  return (
+    <SettingsRow
+      disclosure={false}
+      disabled={deleting}
+      leading={<AttachmentThumbnail name={file.name} uri={image ? attachment.uri : null} />}
+      supportingText={attachment.busy || preview.opening ? t("mobile.agent.files.downloading") : details}
+      trailing={
+        canDelete ? (
+          <RowDeleteButton
+            label={t(missing ? "mobile.agent.files.removeNamed" : "mobile.agent.files.deleteNamed", {
+              name: file.name,
+            })}
+            deleting={deleting}
+            onPress={confirmDelete}
+          />
+        ) : undefined
+      }
+      onPress={missing ? undefined : preview.kind ? preview.open : attachment.share}
+    >
+      <Typography numberOfLines={1}>{file.name}</Typography>
+    </SettingsRow>
+  );
+}
+
+export function useStoredFileDelete(serverId: string, file: StoredFileRow, onChanged: () => void) {
+  const { t } = useText();
+  const { deleteStoredFile } = useMobileWorkspaceActions();
+  const [deleting, setDeleting] = useState(false);
+  const missing = file.status === "missing";
 
   function confirmDelete() {
     Alert.alert(
@@ -155,31 +203,5 @@ export function StoredFile({
     );
   }
 
-  return (
-    <SettingsRow
-      disclosure={false}
-      disabled={deleting}
-      leading={<AttachmentThumbnail name={file.name} uri={image ? attachment.uri : null} />}
-      supportingText={attachment.busy || preview.opening ? t("mobile.agent.files.downloading") : details}
-      trailing={
-        canDelete ? (
-          <Pressable
-            accessibilityRole="button"
-            accessibilityLabel={t(missing ? "mobile.agent.files.removeNamed" : "mobile.agent.files.deleteNamed", {
-              name: file.name,
-            })}
-            accessibilityState={{ disabled: deleting }}
-            disabled={deleting}
-            hitSlop={8}
-            onPress={confirmDelete}
-          >
-            <Trash2 size={18} color={String(danger)} />
-          </Pressable>
-        ) : undefined
-      }
-      onPress={missing ? undefined : preview.kind ? preview.open : attachment.share}
-    >
-      <Typography numberOfLines={1}>{file.name}</Typography>
-    </SettingsRow>
-  );
+  return { deleting, confirmDelete };
 }

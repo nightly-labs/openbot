@@ -1,13 +1,15 @@
-import { isAgentProvider, providerDisplayName } from "@openbot/contracts/ipc";
-import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { isInstallerProvider } from "@openbot/contracts/agent-providers";
+import { isAgentProvider, type ProviderRuntimeSnapshot, providerDisplayName } from "@openbot/contracts/ipc";
 import { router, useLocalSearchParams } from "expo-router";
 import { Typography } from "heroui-native";
+import CircleArrowUp from "lucide-react-native/icons/circle-arrow-up";
 import Plus from "lucide-react-native/icons/plus";
+import RefreshCw from "lucide-react-native/icons/refresh-cw";
+import RotateCcw from "lucide-react-native/icons/rotate-ccw";
 import Server from "lucide-react-native/icons/server";
 import { useState } from "react";
 import { View } from "react-native";
 import { useCSSVariable, useUniwind } from "uniwind";
-import { useQueryScope } from "@/features/auth/context/mobile-session-context";
 import { ProviderMark } from "@/features/servers/components/provider-mark";
 import { TrailingValue } from "@/features/servers/components/trailing-value";
 import {
@@ -17,6 +19,7 @@ import {
   providerStatusText,
 } from "@/features/servers/model/provider-admin";
 import {
+  useHostProviderDefault,
   useServerCustomAgents,
   useServerCustomProviders,
   useServerProviders,
@@ -28,21 +31,15 @@ import {
   SettingsSection,
 } from "@/features/settings/components/settings-content";
 import { SettingsPicker } from "@/features/settings/components/settings-controls";
-import { queryKeys } from "@/features/workspace/model/query-keys";
+import { RowIcon } from "@/features/settings/components/settings-row-icon";
 import { haptics } from "@/shared/lib/haptics";
 import { currentText, type MobileText, useText } from "@/shared/lib/text";
 
-/** The status of a row, as the desktop Providers tab shows it. */
 export function providerStatusLabel(row: ProviderRow, { t, format }: Pick<MobileText, "t" | "format">): string {
   const text = providerStatusText(row);
   return "percent" in text ? format.percent(Math.round(text.percent * 100) / 100) : t(text.key);
 }
 
-/**
- * Server settings > Providers: the AI providers of the computer that runs the server, for an owner or
- * admin of a host that serves `providers-v1`. A tap opens the provider, where it signs in, downloads
- * or updates on the host.
- */
 export function ServerProvidersScreen() {
   const text = useText();
   const { t, errorMessage } = text;
@@ -50,6 +47,7 @@ export function ServerProvidersScreen() {
   const { available, admin, status, runtimes, rows, applyRuntimes } = useServerProviders(serverId);
   const [checking, setChecking] = useState(false);
   const [checkResult, setCheckResult] = useState<string | null>(null);
+  const [updatingAll, setUpdatingAll] = useState(false);
   if (!available || !status.data)
     return (
       <SettingsContent>
@@ -62,8 +60,38 @@ export function ServerProvidersScreen() {
         </SettingsNote>
       </SettingsContent>
     );
-  // The connected providers first, then the others; a group with no provider is not shown.
   const connected = rows.filter((row) => row.status?.state === "available");
+  const updates = rows.flatMap((row) =>
+    row.updatable && row.runtime && !row.status?.off && !isInstallerProvider(row.runtime.provider)
+      ? [row.runtime.provider]
+      : [],
+  );
+  const updateAll = async (providerAdmin: ProviderAdmin) => {
+    setUpdatingAll(true);
+    setCheckResult(null);
+    let failure: unknown = null;
+    let snapshot: ProviderRuntimeSnapshot | null = null;
+    try {
+      for (const provider of updates) {
+        try {
+          snapshot = await providerAdmin.download(provider);
+        } catch (cause) {
+          failure ??= cause;
+        }
+      }
+      if (snapshot) await applyRuntimes(snapshot);
+    } catch (cause) {
+      failure ??= cause;
+    } finally {
+      setUpdatingAll(false);
+    }
+    if (failure === null) {
+      void haptics.notification("success");
+      return;
+    }
+    setCheckResult(currentText().errorMessage(failure, currentText().t("mobile.server.providers.updateAllFailed")));
+    void haptics.notification("error");
+  };
   const sections = [
     { title: t("mobile.server.providers.connectedTitle"), rows: connected },
     { title: t("mobile.server.providers.otherTitle"), rows: rows.filter((row) => !connected.includes(row)) },
@@ -106,12 +134,24 @@ export function ServerProvidersScreen() {
       ))}
       {admin ? <CustomProvidersSection serverId={serverId} admin={admin} /> : null}
       {admin && (admin.registry || admin.customAgents) ? <AgentsSection serverId={serverId} admin={admin} /> : null}
-      {/* Only a host that downloads runtimes has updates to check. */}
       {runtimes.data && admin ? (
         <SettingsSection footer={checkResult ?? undefined}>
+          {updates.length > 0 ? (
+            <SettingsRow
+              disclosure={false}
+              disabled={updatingAll || checking}
+              leading={<RowIcon icon={CircleArrowUp} tone="accent" />}
+              onPress={() => void updateAll(admin)}
+            >
+              <Typography.Paragraph className="text-accent">
+                {t("mobile.server.providers.updateAll")}
+              </Typography.Paragraph>
+            </SettingsRow>
+          ) : null}
           <SettingsRow
             disclosure={false}
-            disabled={checking}
+            disabled={checking || updatingAll}
+            leading={<RowIcon icon={RefreshCw} tone="accent" />}
             onPress={() => {
               setChecking(true);
               setCheckResult(null);
@@ -146,10 +186,6 @@ export function ServerProvidersScreen() {
   );
 }
 
-/**
- * The OpenAI-compatible endpoints of the host, as the Custom providers list of the desktop Providers
- * tab. A tap opens an endpoint; the last row adds one.
- */
 function CustomProvidersSection({ serverId, admin }: { serverId: string; admin: ProviderAdmin }) {
   const { t, errorMessage } = useText();
   const [muted, accent] = useCSSVariable(["--openbot-text-grouped-secondary", "--openbot-accent"]);
@@ -193,7 +229,12 @@ function CustomProvidersSection({ serverId, admin }: { serverId: string; admin: 
         </SettingsRow>
       ))}
       {list.isError ? (
-        <SettingsRow disclosure={false} disabled={list.isFetching} onPress={() => void list.refetch()}>
+        <SettingsRow
+          disclosure={false}
+          disabled={list.isFetching}
+          leading={<RowIcon icon={RotateCcw} tone="accent" />}
+          onPress={() => void list.refetch()}
+        >
           <Typography.Paragraph className="text-accent">{t("mobile.server.providers.retry")}</Typography.Paragraph>
         </SettingsRow>
       ) : (
@@ -213,10 +254,6 @@ function CustomProvidersSection({ serverId, admin }: { serverId: string; admin: 
   );
 }
 
-/**
- * The ACP agents of the host: its custom agents (`custom-agents-v1`) and the ACP registry
- * (`acp-registry-v1`), as the Agents part of the desktop Providers tab.
- */
 function AgentsSection({ serverId, admin }: { serverId: string; admin: ProviderAdmin }) {
   const { t, errorMessage } = useText();
   const accent = useCSSVariable("--openbot-accent");
@@ -242,7 +279,12 @@ function AgentsSection({ serverId, admin }: { serverId: string; admin: ProviderA
         </SettingsRow>
       ) : null}
       {list.isError ? (
-        <SettingsRow disclosure={false} disabled={list.isFetching} onPress={() => void list.refetch()}>
+        <SettingsRow
+          disclosure={false}
+          disabled={list.isFetching}
+          leading={<RowIcon icon={RotateCcw} tone="accent" />}
+          onPress={() => void list.refetch()}
+        >
           <Typography.Paragraph className="text-accent">{t("mobile.server.providers.retry")}</Typography.Paragraph>
         </SettingsRow>
       ) : null}
@@ -284,10 +326,6 @@ function AgentsSection({ serverId, admin }: { serverId: string; admin: ProviderA
   );
 }
 
-/**
- * The provider that a new agent of the host starts on (`provider-default-v1`), as the Default
- * provider select of the desktop Providers tab: the connected providers and the current choice.
- */
 function DefaultProviderSection({
   serverId,
   setting,
@@ -299,12 +337,7 @@ function DefaultProviderSection({
 }) {
   const { t, errorMessage } = useText();
   const { theme } = useUniwind();
-  const queryScope = useQueryScope();
-  const queryClient = useQueryClient();
-  const queryKey = queryKeys.providerDefault(queryScope, serverId);
-  const current = useQuery({ queryKey, retry: false, staleTime: 0, queryFn: () => setting.read() });
-  const [saving, setSaving] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const { current, saving, error, choose } = useHostProviderDefault(serverId, setting);
   const value = current.data?.provider ?? null;
   const options: { value: string; label: string }[] = rows
     .filter((row) => (row.status?.state === "available" && !row.status.off) || row.id === value)
@@ -333,21 +366,7 @@ function DefaultProviderSection({
             dark={theme === "dark"}
             label={label}
             onChange={(next) => {
-              if (!isAgentProvider(next) || next === value) return;
-              setSaving(true);
-              setError(null);
-              setting
-                .set(next)
-                .then(async (saved) => {
-                  await queryClient.cancelQueries({ queryKey, exact: true });
-                  queryClient.setQueryData(queryKey, saved);
-                  void haptics.notification("success");
-                })
-                .catch((cause: unknown) => {
-                  setError(errorMessage(cause, t("mobile.server.providers.actionFailed")));
-                  void haptics.notification("error");
-                })
-                .finally(() => setSaving(false));
+              if (isAgentProvider(next)) choose(next);
             }}
           />
         }

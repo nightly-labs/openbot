@@ -1,0 +1,36 @@
+{
+  "slug": "zapier",
+  "name": "Zapier",
+  "tagline": "Actions across connected apps",
+  "description": "Zapier lets agents run actions in the apps that the signed-in user connected in Zapier, such as finding a spreadsheet row or drafting an email. Each user signs in to their own Zapier account through the browser and picks the actions the agent can use.",
+  "category": "automation",
+  "creatorName": "Zapier",
+  "iconUrl": "https://zapier.com/favicon.ico",
+  "version": "1.0.0",
+  "prompts": [
+    { "id": "prompt-list-actions", "text": "Which Zapier actions can you use for me right now?" },
+    { "id": "prompt-find-row", "text": "Find the row for order 1042 in my orders spreadsheet." },
+    {
+      "id": "prompt-draft-email",
+      "text": "Draft a Gmail reply to the latest message from the design team, but do not send it."
+    }
+  ],
+  "apps": [
+    {
+      "id": "app-zapier-mcp",
+      "name": "Zapier",
+      "description": "Actions in connected apps, over Zapier's MCP server with browser sign-in.",
+      "iconUrl": "https://zapier.com/favicon.ico",
+      "server": {
+        "name": "zapier",
+        "transport": "http",
+        "url": "https://mcp.zapier.com/api/v1/connect",
+        "auth": [{ "id": "zapier-oauth", "kind": "link", "label": "Sign in" }]
+      }
+    }
+  ],
+  "skills": [],
+  "websiteUrl": "https://zapier.com",
+  "privacyPolicyUrl": "https://zapier.com/privacy",
+  "termsUrl": "https://zapier.com/legal/terms-of-service"
+}

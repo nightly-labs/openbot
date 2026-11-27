@@ -1,5 +1,7 @@
+import type { TranslatedLocale } from "@openbot/i18n";
 import { summarizeWhatsNew, type WhatsNewNotes, type WhatsNewRelease } from "@openbot/ui/features/updates/whats-new";
 import { createEffect, createStore, onSettled } from "solid-js";
+import { useI18n } from "../../i18n-context";
 import { usePlatform } from "../../platform";
 import { createSimpleContext } from "../../simple-context";
 import {
@@ -13,9 +15,11 @@ import { loadWhatsNewReleases } from "./whats-new-releases";
 
 const WhatsNew = createSimpleContext({
   name: "WhatsNew",
-  init: (props: { loadReleases?: (signal: AbortSignal) => Promise<readonly WhatsNewRelease[]> }) => {
+  init: (props: {
+    loadReleases?: (signal: AbortSignal, locale: TranslatedLocale) => Promise<readonly WhatsNewRelease[]>;
+  }) => {
     const platform = usePlatform();
-    // Capture the old analytics value before Settings writes this launch's version.
+    const i18n = useI18n();
     const storage = {
       getItem: (key: string) => window.localStorage.getItem(key),
       setItem: (key: string, value: string) => window.localStorage.setItem(key, value),
@@ -30,6 +34,7 @@ const WhatsNew = createSimpleContext({
     let initialized = false;
     let request = 0;
     let pending: AbortController | undefined;
+    let shown: { locale: TranslatedLocale; automatic: boolean } | undefined;
     onSettled(() => () => {
       request++;
       pending?.abort();
@@ -40,6 +45,8 @@ const WhatsNew = createSimpleContext({
       pending?.abort();
       const controller = new AbortController();
       pending = controller;
+      const locale = i18n.locale();
+      shown = { locale, automatic };
       setState((draft) => {
         draft.version = version;
         draft.previousVersion = from;
@@ -50,20 +57,29 @@ const WhatsNew = createSimpleContext({
       try {
         const whatsNewReleases = await (props.loadReleases ?? loadWhatsNewReleases)(
           AbortSignal.any([controller.signal, AbortSignal.timeout(10_000)]),
+          locale,
         );
         notes = { status: "ready", releases: selectWhatsNewReleases(whatsNewReleases, version, from) };
       } catch {
         notes = { status: "failed" };
       }
       if (id !== request) return;
-      // Empty releases are consumed silently. A failure opens once and can be retried in Settings.
-      if (automatic && !claimWhatsNewVersion(storage, version)) return;
+      if (automatic && !claimWhatsNewVersion(storage, version)) {
+        shown = undefined;
+        return;
+      }
       const summary = notes.status === "ready" ? summarizeWhatsNew(notes.releases) : null;
       setState((draft) => {
         draft.notes = notes;
         if (automatic) draft.open = summary === null || summary.notices.length > 0 || summary.groups.length > 0;
       });
+      if (!state.open) shown = undefined;
     }
+
+    createEffect(i18n.locale, (locale) => {
+      if (!shown || shown.locale === locale) return;
+      void load(shown.automatic && !state.open, state.version, state.previousVersion);
+    });
 
     createEffect(platform.appInfo, (info) => {
       if (initialized || platform.landingPreview || !platform.appInfoLoadedFromHost()) return;
@@ -77,7 +93,6 @@ const WhatsNew = createSimpleContext({
       if (previous === null) {
         claimWhatsNewVersion(storage, current);
       } else if (compareReleaseVersions(current, previous) > 0) {
-        // The workspace calls start after login and setup, so notes do not cover onboarding.
         setState((draft) => {
           draft.previousVersion = previous;
         });
@@ -94,7 +109,6 @@ const WhatsNew = createSimpleContext({
     function reopen(): void {
       const version = state.version;
       if (!version) return;
-      // Manual opening also consumes a pending automatic display.
       claimWhatsNewVersion(storage, version);
       started = true;
       void load(false, version, null);
@@ -110,6 +124,7 @@ const WhatsNew = createSimpleContext({
       close: () => {
         request++;
         pending?.abort();
+        shown = undefined;
         setState((draft) => {
           draft.open = false;
         });

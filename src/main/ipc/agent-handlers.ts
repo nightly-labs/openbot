@@ -1,31 +1,4 @@
-import { AGENT_COLORS_CAPABILITY } from "@openbot/contracts/team-protocol/agent-colors-v1";
-import {
-  AGENT_FAST_MODE_CAPABILITY,
-  AGENT_FAST_MODE_ROUTES,
-} from "@openbot/contracts/team-protocol/agent-fast-mode-v1";
-import { AGENT_HIDDEN_CAPABILITY, AGENT_HIDDEN_ROUTES } from "@openbot/contracts/team-protocol/agent-hidden-v1";
-import {
-  AGENT_SESSION_SETTINGS_CAPABILITY,
-  AGENT_SESSION_SETTINGS_ROUTES,
-} from "@openbot/contracts/team-protocol/agent-session-settings-v1";
-import {
-  BROWSER_SECRET_VAULT_CAPABILITY,
-  BROWSER_SECRET_VAULT_ROUTES,
-} from "@openbot/contracts/team-protocol/browser-secret-vault-v1";
-import {
-  MODEL_VISIBILITY_CAPABILITY,
-  MODEL_VISIBILITY_ROUTES,
-} from "@openbot/contracts/team-protocol/model-visibility-v1";
-import {
-  SIDEBAR_FOLDERS_CAPABILITY,
-  SIDEBAR_FOLDERS_ROUTES,
-} from "@openbot/contracts/team-protocol/sidebar-folders-v1";
-import { SIDEBAR_PINS_CAPABILITY, SIDEBAR_PINS_ROUTES } from "@openbot/contracts/team-protocol/sidebar-pins-v1";
-// An agent's core surface: status, agents, conversations, the queue and the prompts
-// a turn can raise. Memories, routines and attachments are their own registrars.
-// Every one of these routes to the local service or to a remote server by the
-// `serverId` in the request.
-
+import { randomUUID } from "node:crypto";
 import {
   type AgentTaskInput,
   analyticsQuery,
@@ -33,14 +6,18 @@ import {
   assertHostAnalyticsScope,
   BROWSER_SECRET_RESPONSE_PATH,
   CHANNEL_DELETE_CAPABILITY,
+  type ClientAgentSummary,
   DEFAULT_PROVIDER_ACCOUNT_ID,
   decodeAgentFastModels,
   decodeAgentModelListings,
   decodeAgentProfileDraft,
+  decodeAgentSteeringModels,
   decodeChannel,
   decodeChannelPage,
   decodeChannelSummaries,
+  decodeCreditsAskMuted,
   decodeSaveAgentProfileResult,
+  decodeSaveSkillSuggestionResult,
   hostAnalyticsQuery,
   isAgentModelOption,
   LOCAL_SERVER_ID,
@@ -48,11 +25,16 @@ import {
   parseAskSideQuestion,
   parseChannelCommand,
   parseChannelRead,
+  parseCreditsAskMutedInput,
   parseGenerateAgentProfile,
   parseHostAnalyticsInput,
   parseLocalBrowserSecretResponse,
+  parseReadMediaApprovalInput,
   parseResetAgentSessionSetting,
+  parseRespondToCreditsHoldInput,
+  parseRespondToMediaApprovalInput,
   parseSaveAgentProfile,
+  parseSaveSkillSuggestion,
   parseSetAgentHiddenInput,
   parseSetAgentNotificationLevelInput,
   parseSetAgentSessionSetting,
@@ -62,10 +44,44 @@ import {
   type SidebarLayoutAction,
   type SidebarLayoutSnapshot,
   withFastServiceTiers,
+  withKeptModels,
   withModelListings,
+  withSteeringModels,
+  withUsageCredits,
+  withWorkspaceOnlyLimit,
 } from "@openbot/contracts/ipc";
 import { isDynamicRecord } from "@openbot/contracts/runtime-values";
 import { TEAM_API_ROUTES } from "@openbot/contracts/team-api-routes";
+import {
+  AGENT_ACTIVE_QUEUES_CAPABILITY,
+  AGENT_ACTIVE_QUEUES_ROUTES,
+  decodeAgentActiveQueues,
+} from "@openbot/contracts/team-protocol/agent-active-queues-v1";
+import {
+  AGENT_ARCHIVED_THREADS_CAPABILITY,
+  AGENT_ARCHIVED_THREADS_ROUTES,
+} from "@openbot/contracts/team-protocol/agent-archived-threads-v1";
+import { AGENT_COLORS_CAPABILITY } from "@openbot/contracts/team-protocol/agent-colors-v1";
+import { AGENT_CREATE_OPERATION_CAPABILITY } from "@openbot/contracts/team-protocol/agent-create-operation-v1";
+import {
+  AGENT_FAST_MODE_CAPABILITY,
+  AGENT_FAST_MODE_ROUTES,
+} from "@openbot/contracts/team-protocol/agent-fast-mode-v1";
+import { AGENT_HIDDEN_CAPABILITY, AGENT_HIDDEN_ROUTES } from "@openbot/contracts/team-protocol/agent-hidden-v1";
+import {
+  AGENT_PENDING_RUNTIME_CAPABILITY,
+  AGENT_PENDING_RUNTIME_ROUTES,
+  pendingRuntimeUpdateBody,
+} from "@openbot/contracts/team-protocol/agent-pending-runtime-v1";
+import {
+  AGENT_QUEUE_TASK_CAPABILITY,
+  AGENT_QUEUE_TASK_ROUTES,
+} from "@openbot/contracts/team-protocol/agent-queue-task-v1";
+import {
+  AGENT_SESSION_SETTINGS_CAPABILITY,
+  AGENT_SESSION_SETTINGS_ROUTES,
+} from "@openbot/contracts/team-protocol/agent-session-settings-v1";
+import { AGENT_SPEED_CAPABILITY, AGENT_SPEED_ROUTES } from "@openbot/contracts/team-protocol/agent-speed-v1";
 import { AGENT_TASKS_CAPABILITY, AGENT_TASKS_ROUTES } from "@openbot/contracts/team-protocol/agent-tasks-v1";
 import {
   AGENT_THREAD_BRANCHES_CAPABILITY,
@@ -77,6 +93,15 @@ import {
   AGENT_THREAD_FILES_ROUTES,
 } from "@openbot/contracts/team-protocol/agent-thread-files-v1";
 import {
+  AGENT_THREAD_PAGES_CAPABILITY,
+  AGENT_THREAD_PAGES_ROUTES,
+} from "@openbot/contracts/team-protocol/agent-thread-pages-v1";
+import {
+  AGENT_THREAD_QUEUE_CAPABILITY,
+  AGENT_THREAD_QUEUE_ROUTES,
+  withAgentThreadQueues,
+} from "@openbot/contracts/team-protocol/agent-thread-queue-v1";
+import {
   AGENT_THREAD_READS_CAPABILITY,
   AGENT_THREAD_READS_ROUTES,
 } from "@openbot/contracts/team-protocol/agent-thread-reads-v1";
@@ -84,14 +109,84 @@ import {
   AGENT_THREAD_REPLIES_CAPABILITY,
   AGENT_THREAD_REPLIES_ROUTES,
 } from "@openbot/contracts/team-protocol/agent-thread-replies-v1";
+import {
+  AGENT_THREAD_REQUESTS_CAPABILITY,
+  AGENT_THREAD_REQUESTS_ROUTES,
+  withAgentThreadRequests,
+} from "@openbot/contracts/team-protocol/agent-thread-requests-v1";
 import { AGENT_THREADS_CAPABILITY, AGENT_THREADS_ROUTES } from "@openbot/contracts/team-protocol/agent-threads-v1";
+import {
+  AGENT_USAGE_LIMIT_CAPABILITY,
+  AGENT_USAGE_LIMIT_ROUTES,
+} from "@openbot/contracts/team-protocol/agent-usage-limit-v1";
+import {
+  AGENT_WAITS_CAPABILITY,
+  AGENT_WAITS_ROUTES,
+  decodeAgentWaitsResponse,
+} from "@openbot/contracts/team-protocol/agent-waits-v1";
+import {
+  BROWSER_SECRET_VAULT_CAPABILITY,
+  BROWSER_SECRET_VAULT_ROUTES,
+} from "@openbot/contracts/team-protocol/browser-secret-vault-v1";
+import {
+  CHANNEL_COMPACT_AVAILABILITY_CAPABILITY,
+  CHANNEL_COMPACT_AVAILABILITY_ROUTE,
+  decodeChannelCompactAvailability,
+} from "@openbot/contracts/team-protocol/channel-compact-availability-v1";
 import { CHANNEL_ROUTES } from "@openbot/contracts/team-protocol/channels-v1";
+import { CHAT_COLORS_CAPABILITY } from "@openbot/contracts/team-protocol/chat-colors-v1";
+import { CHAT_HISTORY_CAPABILITY, CHAT_HISTORY_ROUTES } from "@openbot/contracts/team-protocol/chat-history-v1";
 import {
   CONTEXT_COMPACT_CAPABILITY,
   CONTEXT_COMPACT_ROUTES,
 } from "@openbot/contracts/team-protocol/context-compact-v1";
 import { CONTEXT_RESET_CAPABILITY, CONTEXT_RESET_ROUTES } from "@openbot/contracts/team-protocol/context-reset-v1";
+import {
+  CONVERSATION_FILE_SEARCH_CAPABILITY,
+  CONVERSATION_FILE_SEARCH_ROUTES,
+  decodeConversationFileSearchResponse,
+} from "@openbot/contracts/team-protocol/conversation-file-search-v1";
+import {
+  CONVERSATION_UNREAD_FROM_CAPABILITY,
+  CONVERSATION_UNREAD_FROM_ROUTE,
+} from "@openbot/contracts/team-protocol/conversation-unread-from-v1";
+import {
+  decodeFeedbackWithdrawResult,
+  FEEDBACK_WITHDRAW_CAPABILITY,
+  FEEDBACK_WITHDRAW_ROUTES,
+} from "@openbot/contracts/team-protocol/feedback-withdraw-v1";
+import {
+  decodeCreditsHoldResponse,
+  decodeMediaApprovalReadResponse,
+  MEDIA_APPROVAL_CHOICE_CAPABILITY,
+  MEDIA_APPROVAL_CHOICE_ROUTES,
+} from "@openbot/contracts/team-protocol/media-approval-choice-v1";
 import { MESSAGE_DELETE_CAPABILITY, MESSAGE_DELETE_ROUTES } from "@openbot/contracts/team-protocol/message-delete-v1";
+import {
+  decodeMessagePinsResponse,
+  MESSAGE_PINS_CAPABILITY,
+  MESSAGE_PINS_ROUTES,
+} from "@openbot/contracts/team-protocol/message-pins-v1";
+import { MODEL_STEERING_CAPABILITY, MODEL_STEERING_ROUTES } from "@openbot/contracts/team-protocol/model-steering-v1";
+import {
+  MODEL_VISIBILITY_KEPT_CAPABILITY,
+  MODEL_VISIBILITY_KEPT_ROUTES,
+} from "@openbot/contracts/team-protocol/model-visibility-kept-v1";
+import {
+  MODEL_VISIBILITY_CAPABILITY,
+  MODEL_VISIBILITY_ROUTES,
+} from "@openbot/contracts/team-protocol/model-visibility-v1";
+import {
+  decodePendingApprovalResponse,
+  PENDING_APPROVAL_CAPABILITY,
+  PENDING_APPROVAL_ROUTES,
+} from "@openbot/contracts/team-protocol/pending-approval-v1";
+import {
+  decodePendingPromptsResponse,
+  PENDING_PROMPTS_CAPABILITY,
+  PENDING_PROMPTS_ROUTES,
+  pendingPromptsWithinLimits,
+} from "@openbot/contracts/team-protocol/pending-prompts-v1";
 import {
   PROVIDER_ACCOUNTS_CAPABILITY,
   PROVIDER_ACCOUNTS_ROUTES,
@@ -100,24 +195,38 @@ import {
   decodeSideQuestionResponse,
   SIDE_QUESTION_CAPABILITY,
   SIDE_QUESTION_ROUTES,
+  SIDE_QUESTION_THREADS_CAPABILITY,
 } from "@openbot/contracts/team-protocol/side-question-v1";
+import {
+  SIDEBAR_FOLDERS_CAPABILITY,
+  SIDEBAR_FOLDERS_ROUTES,
+} from "@openbot/contracts/team-protocol/sidebar-folders-v1";
+import { SIDEBAR_PINS_CAPABILITY, SIDEBAR_PINS_ROUTES } from "@openbot/contracts/team-protocol/sidebar-pins-v1";
+import { SKILL_LEARNING_CAPABILITY, SKILL_LEARNING_ROUTES } from "@openbot/contracts/team-protocol/skill-learning-v1";
+import { USAGE_CREDITS_CAPABILITY, USAGE_CREDITS_ROUTES } from "@openbot/contracts/team-protocol/usage-credits-v1";
+import { WORKSPACE_ONLY_PROCESS_LIMIT_CAPABILITY } from "@openbot/contracts/team-protocol/workspace-only-process-limit-v1";
 import { sourceText } from "@openbot/i18n/source";
 import { createOpenBotLogger } from "@openbot/logging";
+import { retryOperationIds } from "@openbot/team-client/retry-operation-id";
 import { Effect } from "effect";
 import { duplicateAgentIntoLayout } from "../../backend/agent/duplication-gate";
 import type { AgentService } from "../../backend/agent-service";
 import { runCauseEffect } from "../../backend/effect-boundary";
+import { canConfineProcesses } from "../../backend/process-confinement";
 import type { SidebarLayoutStore } from "../../backend/sidebar-layout-store";
+import type { NotificationChat } from "../desktop-notifications";
 import type { HostService } from "../host-service";
+import type { LibraryFoldersService } from "../library-folders-service";
+import type { CreditAsksControl } from "../media-approval-credits-preference-store";
 import { runMessageDelete } from "../message-delete-refusal";
-import { type MessageLinkRelay, openHttpLink } from "../message-link-relay";
+import { type MessageLinkRelay, openMessageLink } from "../message-link-relay";
+import { runMessagePin } from "../message-pin-refusal";
 import type { ModelVisibility } from "../model-visibility";
 import {
   decodeAccountUsageFromHost,
   decodeAgentAnalyticsFromHost,
   decodeAgentModelOptions,
   decodeAgentSessionSettingsFromHost,
-  decodeAgentStatusFromHost,
   decodeAgentSummaries,
   decodeAgentSummary,
   decodeHiddenAgentsFromHost,
@@ -128,11 +237,19 @@ import {
   decodeRemoteAgentTask,
   decodeRemoteAgentTasks,
   decodeRemoteAgentThreadBranches,
+  decodeRemoteAgentThreadQueues,
+  decodeRemoteAgentThreadRequests,
+  decodeRemoteArchivedAgentTasks,
   decodeRemoteTaskConversation,
+  decodeRemoteTaskPage,
   decodeRemoteTaskReadState,
+  decodeRemoteTaskReadStates,
+  decodeRemoteTaskWindow,
   decodeSidebarLayoutSnapshot,
   decodeSidebarPinsFromHost,
+  decodeUsageCreditsList,
 } from "../remote-agent-decoding";
+import { decodeConversationReadState } from "../remote-conversation-decoding";
 import { acceptEmpty, decodeVoid, type ResponseDecoder } from "../remote-host-decoding";
 import type { RemoteServerManager } from "../remote-server-manager";
 import { OWNER_PIN_KEY, type SidebarPinStore } from "../sidebar-pin-store";
@@ -140,6 +257,7 @@ import type { SkillMarketplaceService } from "../skill-marketplace-service";
 import {
   parseAcknowledgeFailedTurn,
   parseAgentId,
+  parseAgentIdList,
   parseAgentTask,
   parseApprovalResponse,
   parseBranchAgentTask,
@@ -152,6 +270,7 @@ import {
   parseDeleteChannelMessage,
   parseDeleteConversationMessage,
   parseInterrupt,
+  parseListArchivedAgentTasks,
   parseMarkAgentTaskRead,
   parseMarkConversationRead,
   parseMarkConversationUnread,
@@ -161,7 +280,10 @@ import {
   parsePasteMessageLink,
   parsePromptResponse,
   parseQueueEdit,
+  parseReadAgentTaskAround,
+  parseReadAgentTaskPage,
   parseReadConversationPage,
+  parseReadPendingApprovalInput,
   parseRenameAgentTask,
   parseReorderQueue,
   parseRunQueuedMessageAsTask,
@@ -170,29 +292,36 @@ import {
   parseSendMessage,
   parseSetAgentAvatar,
   parseSetChannelImage,
+  parseSetMessagePinned,
   parseSidebarFolderAction,
   parseStartAgentTask,
   parseSteerQueuedMessage,
   parseUpdateAgent,
   parseUpdateQueuedMessage,
+  parseWithdrawFeedback,
 } from "./agent-inputs";
-import { type IpcGroupHandlers, payloadHandler } from "./define-ipc-group";
+import type { IpcGroupHandlers } from "./define-ipc-group";
+import { readRemoteAgentStatus } from "./remote-agent-status";
 import { scopedHandler, scopedQueryHandler } from "./scoped-handler";
 
-/** Its lines also go to the provider log. See `PROVIDER_LOG_PREFIXES`. */
+const USAGE_LIMIT_MOVE_FIELDS: ReadonlySet<string> = new Set([
+  "agentId",
+  "provider",
+  "model",
+  "reasoningEffort",
+  "providerAccountId",
+  "leaveUsageLimit",
+]);
+
 const modelLogger = createOpenBotLogger("provider-models");
 const colorLogger = createOpenBotLogger("agent-colors");
+const createOperationId = retryOperationIds(randomUUID);
+const accountLogger = createOpenBotLogger("provider-accounts");
 
-/** A joined server without `agent-tasks-v1`, or a task request that it cannot carry, fails with a reason. */
 function taskRemoteUnsupported(): never {
   throw new Error(sourceText("error.backend.threadRemoteUnsupported"));
 }
 
-/**
- * The body of an `agent-tasks-v1` request: the agent, with the task, the text of a start or message, or
- * both. Only the `agent-thread-files-v1` and `agent-thread-replies-v1` routes carry `attachmentDraftIds`,
- * and only `agent-thread-replies-v1` carries `replyToMessageId`.
- */
 interface RemoteTaskBody {
   agentId: string;
   taskId?: string;
@@ -200,17 +329,13 @@ interface RemoteTaskBody {
   attachmentDraftIds?: string[];
   replyToMessageId?: string;
   clientMessageId?: string;
+  deliveryId?: string;
 }
 
 function agentTaskBody(input: AgentTaskInput): AgentTaskInput {
   return { agentId: input.agentId, taskId: input.taskId };
 }
 
-/**
- * Names each member of a model list that fails `isAgentModelOption`, and returns the list unchanged.
- * The preload refuses the whole list for one such member and has no log of its own, so without this
- * the window shows "Invalid agent model response." and nothing records which model it was.
- */
 function logRejectedModels<T>(models: T, source: "local" | "remote"): T {
   if (!Array.isArray(models)) return models;
   for (const model of models) {
@@ -227,19 +352,22 @@ function logRejectedModels<T>(models: T, source: "local" | "remote"): T {
 export interface AgentIpcDependencies {
   service: AgentService;
   sidebarLayout: SidebarLayoutStore;
+  libraryFolders: Pick<LibraryFoldersService, "removeAgent">;
   sidebarPins: SidebarPinStore;
   host: HostService;
   remoteServers: RemoteServerManager;
   skills: SkillMarketplaceService;
   messageLinks: MessageLinkRelay;
   openExternal: (url: string) => Promise<void>;
-  /** The models that the model picker shows. Only the local list is filtered here; a host filters its own. */
   modelVisibility: Pick<ModelVisibility, "picker">;
+  closeChatNotifications: (serverId: string, chat: NotificationChat) => void;
+  creditAsks: Pick<CreditAsksControl, "setMuted" | "mutedFor">;
 }
 
 export function agentIpcHandlers({
   service,
   sidebarLayout,
+  libraryFolders,
   sidebarPins,
   host,
   remoteServers,
@@ -247,10 +375,11 @@ export function agentIpcHandlers({
   messageLinks,
   openExternal,
   modelVisibility,
+  closeChatNotifications,
+  creditAsks,
 }: AgentIpcDependencies): Pick<IpcGroupHandlers, "agent"> {
   const remoteTaskRequest = <T>(serverId: string, path: string, decoder: ResponseDecoder<T>, body: RemoteTaskBody) => {
     if (!remoteServers.supportsCapability(serverId, AGENT_TASKS_CAPABILITY)) taskRemoteUnsupported();
-    // `agent-tasks-v1` carries text only; a host with `agent-thread-files-v1` takes files on its own routes.
     if (body.attachmentDraftIds?.length && !remoteServers.supportsCapability(serverId, AGENT_THREAD_FILES_CAPABILITY))
       taskRemoteUnsupported();
     if (body.replyToMessageId && !remoteServers.supportsCapability(serverId, AGENT_THREAD_REPLIES_CAPABILITY))
@@ -262,13 +391,20 @@ export function agentIpcHandlers({
       throw new Error(sourceText("error.team.sidebarPinsUnsupported"));
     return runCauseEffect(remoteServers.request(serverId, path, decodeSidebarPinsFromHost, { method: "POST", body }));
   };
-  // The context-compact-v1 codec has already checked the empty reply.
   const remoteCompact = async (serverId: string, path: string, body: AgentTaskInput | { agentId: string }) => {
     if (!remoteServers.supportsCapability(serverId, CONTEXT_COMPACT_CAPABILITY))
       throw new Error(sourceText("error.team.contextCompactUnsupported"));
     await runCauseEffect(remoteServers.request(serverId, path, acceptEmpty, { method: "POST", body }));
   };
-  // The message-delete-v1 codec has already checked the empty reply. The host says why it refuses.
+  const remoteChatHistory = async (
+    serverId: string,
+    path: string,
+    body: { agentId: string } | { channelId: string },
+    unsupported: "error.team.channelContextUnsupported" | "error.team.historyDeleteUnsupported",
+  ) => {
+    if (!remoteServers.supportsCapability(serverId, CHAT_HISTORY_CAPABILITY)) throw new Error(sourceText(unsupported));
+    await runCauseEffect(remoteServers.request(serverId, path, acceptEmpty, { method: "POST", body }));
+  };
   const remoteMessageDelete = async (
     serverId: string,
     path: string,
@@ -282,8 +418,6 @@ export function agentIpcHandlers({
     if (!remoteServers.supportsCapability(serverId, AGENT_THREADS_CAPABILITY)) taskRemoteUnsupported();
     return runCauseEffect(remoteServers.request(serverId, path, acceptEmpty, { method: "POST", body }));
   };
-  // `sidebar-folders-v1` reads the layout with the parent of each folder. A released route answers it
-  // without them, so a result of one is read again: the renderer would show the folders flat.
   const remoteFolderLayout = (serverId: string, body: SidebarLayoutAction | Record<string, never>) =>
     runCauseEffect(
       remoteServers.request(
@@ -293,18 +427,39 @@ export function agentIpcHandlers({
         { method: "POST", body },
       ),
     );
-  // The save or the copy is done when the second read starts. A failed read keeps the layout of the
-  // answer, so the caller does not try again and make a second agent; the next layout event has the parents.
   const withRemoteFolders = async <T extends { layout: SidebarLayoutSnapshot }>(serverId: string, result: T) =>
     remoteServers.supportsCapability(serverId, SIDEBAR_FOLDERS_CAPABILITY)
       ? { ...result, layout: await remoteFolderLayout(serverId, {}).catch(() => result.layout) }
       : result;
+  const withCreatedAgentAccount = async (
+    serverId: string,
+    agent: ClientAgentSummary,
+    accountId: string | undefined,
+  ): Promise<ClientAgentSummary> => {
+    if (
+      accountId === undefined ||
+      accountId === DEFAULT_PROVIDER_ACCOUNT_ID ||
+      !remoteServers.supportsCapability(serverId, PROVIDER_ACCOUNTS_CAPABILITY)
+    )
+      return agent;
+    try {
+      await runCauseEffect(
+        remoteServers.request(serverId, PROVIDER_ACCOUNTS_ROUTES.agent, acceptEmpty, {
+          method: "POST",
+          body: { agentId: agent.id, accountId },
+        }),
+      );
+      return { ...agent, providerAccountId: accountId };
+    } catch {
+      accountLogger.warn("The account of a new remote agent was not set. The agent uses the provider's own sign-in.");
+      return agent;
+    }
+  };
   return {
     agent: {
       getStatus: scopedQueryHandler({
         local: () => service.getStatus(),
-        remote: (serverId) =>
-          runCauseEffect(remoteServers.request(serverId, TEAM_API_ROUTES.agents.status, decodeAgentStatusFromHost)),
+        remote: (serverId) => runCauseEffect(readRemoteAgentStatus(remoteServers, serverId)),
       }),
       getRuntimeSnapshot: scopedQueryHandler({
         local: () => service.getRuntimeSnapshot(),
@@ -314,7 +469,7 @@ export function agentIpcHandlers({
         },
       }),
       getHostAnalytics: scopedHandler(parseHostAnalyticsInput, {
-        local: (input) => service.getHostAnalytics(input),
+        local: (input) => runCauseEffect(service.getHostAnalytics(input)),
         remote: (input, serverId) =>
           remoteServers.supportsCapability(serverId, "host-analytics")
             ? runCauseEffect(
@@ -339,29 +494,44 @@ export function agentIpcHandlers({
       }),
       getUsage: scopedHandler(parseOptionalAgentId, {
         local: (agentId) => runCauseEffect(service.getUsage(agentId)),
-        remote: (agentId, serverId) =>
-          agentId
-            ? remoteServers.supportsCapability(serverId, "model-scoped-usage")
-              ? runCauseEffect(
-                  remoteServers.request(serverId, TEAM_API_ROUTES.agent.usage(agentId), decodeAccountUsageFromHost),
-                )
-              : { limits: [] }
-            : runCauseEffect(remoteServers.request(serverId, TEAM_API_ROUTES.agents.usage, decodeAccountUsageFromHost)),
+        remote: (agentId, serverId) => {
+          if (agentId && !remoteServers.supportsCapability(serverId, "model-scoped-usage")) return { limits: [] };
+          const usage = remoteServers.request(
+            serverId,
+            agentId ? TEAM_API_ROUTES.agent.usage(agentId) : TEAM_API_ROUTES.agents.usage,
+            decodeAccountUsageFromHost,
+          );
+          if (!remoteServers.supportsCapability(serverId, USAGE_CREDITS_CAPABILITY)) return runCauseEffect(usage);
+          const credits = remoteServers
+            .request(serverId, USAGE_CREDITS_ROUTES.list, decodeUsageCreditsList, { method: "POST", body: {} })
+            .pipe(Effect.orElseSucceed(() => []));
+          return runCauseEffect(
+            Effect.all([usage, credits], { concurrency: "unbounded" }).pipe(
+              Effect.map(([reading, rows]) => withUsageCredits(reading, rows)),
+            ),
+          );
+        },
       }),
       listModels: scopedQueryHandler({
-        local: () => runCauseEffect(modelVisibility.picker(logRejectedModels(service.listModels(), "local"))),
+        local: async () =>
+          withWorkspaceOnlyLimit(
+            await runCauseEffect(modelVisibility.picker(logRejectedModels(service.listModels(), "local"))),
+            !canConfineProcesses(),
+          ),
         remote: (serverId) => {
           const models = remoteServers.request(serverId, TEAM_API_ROUTES.agents.models, (value) =>
             decodeAgentModelOptions(logRejectedModels(value, "remote")),
           );
-          // The released model list drops the fast tier and the picker listing, so a host with
-          // `agent-fast-mode-v1` or `model-visibility-v1` gives them on their own routes. Both are
-          // optional: when a route fails, the picker gets the models with no Fast switch or listing.
+          const fastRoute = remoteServers.supportsCapability(serverId, AGENT_SPEED_CAPABILITY)
+            ? AGENT_SPEED_ROUTES.models
+            : remoteServers.supportsCapability(serverId, AGENT_FAST_MODE_CAPABILITY)
+              ? AGENT_FAST_MODE_ROUTES.models
+              : null;
           return runCauseEffect(
             Effect.gen(function* () {
-              const fast = remoteServers.supportsCapability(serverId, AGENT_FAST_MODE_CAPABILITY)
+              const fast = fastRoute
                 ? remoteServers
-                    .request(serverId, AGENT_FAST_MODE_ROUTES.models, decodeAgentFastModels, {
+                    .request(serverId, fastRoute, decodeAgentFastModels, {
                       method: "POST",
                       body: {},
                     })
@@ -375,11 +545,33 @@ export function agentIpcHandlers({
                     })
                     .pipe(Effect.orElseSucceed(() => []))
                 : Effect.succeed([]);
-              // The three requests go to the same host at the same time.
-              const [options, fastModels, listed] = yield* Effect.all([models, fast, listings], {
-                concurrency: "unbounded",
-              });
-              return withModelListings(withFastServiceTiers(options, fastModels), listed);
+              const steering = remoteServers.supportsCapability(serverId, MODEL_STEERING_CAPABILITY)
+                ? remoteServers
+                    .request(serverId, MODEL_STEERING_ROUTES.list, decodeAgentSteeringModels, {
+                      method: "POST",
+                      body: {},
+                    })
+                    .pipe(Effect.orElseSucceed(() => []))
+                : Effect.succeed([]);
+              const kept = remoteServers.supportsCapability(serverId, MODEL_VISIBILITY_KEPT_CAPABILITY)
+                ? remoteServers
+                    .request(serverId, MODEL_VISIBILITY_KEPT_ROUTES.list, decodeAgentSteeringModels, {
+                      method: "POST",
+                      body: {},
+                    })
+                    .pipe(Effect.orElseSucceed(() => []))
+                : Effect.succeed([]);
+              const [options, fastModels, listed, steered, keptModels] = yield* Effect.all(
+                [models, fast, listings, steering, kept],
+                { concurrency: "unbounded" },
+              );
+              return withWorkspaceOnlyLimit(
+                withSteeringModels(
+                  withKeptModels(withModelListings(withFastServiceTiers(options, fastModels), listed), keptModels),
+                  steered,
+                ),
+                remoteServers.supportsCapability(serverId, WORKSPACE_ONLY_PROCESS_LIMIT_CAPABILITY),
+              );
             }),
           );
         },
@@ -425,7 +617,6 @@ export function agentIpcHandlers({
       }),
       listHiddenAgents: scopedQueryHandler({
         local: () => service.listHiddenAgents(),
-        // A server without `agent-hidden-v1` cannot hide an agent, so it has no hidden agents.
         remote: (serverId) => {
           if (!remoteServers.supportsCapability(serverId, AGENT_HIDDEN_CAPABILITY)) return { agents: [] };
           return runCauseEffect(
@@ -449,7 +640,6 @@ export function agentIpcHandlers({
           );
         },
       }),
-      // The manager keeps the levels of each server, so the server list shows the level that they set.
       listAgentNotificationLevels: scopedQueryHandler({
         local: () => remoteServers.cachedNotificationLevels(LOCAL_SERVER_ID),
         remote: (serverId) => runCauseEffect(remoteServers.notificationLevels(serverId)),
@@ -460,22 +650,20 @@ export function agentIpcHandlers({
       }),
       listAgents: scopedQueryHandler({
         local: () => service.listAgents(),
-        // The released agent list has no exact colour, so `agent-colors-v1` gives it on its own route.
         remote: (serverId) =>
           runCauseEffect(
             Effect.all(
               [
                 remoteServers.request(serverId, TEAM_API_ROUTES.agents.all, decodeAgentSummaries),
-                // A failed read keeps the last colours. An agent without a colour shows its hue.
                 remoteServers.readAgentColors(serverId).pipe(Effect.catch(() => Effect.void)),
+                remoteServers.readChatColors(serverId).pipe(Effect.catch(() => Effect.void)),
               ],
               { concurrency: "unbounded" },
             ).pipe(Effect.map(([agents]) => remoteServers.withAgentColors(serverId, agents))),
           ),
       }),
       listInstalledSkills: scopedHandler(parseAgentId, {
-        local: (agentId) => runCauseEffect(skills.listInstalledForChatTags(agentId)),
-        // A server too old to know the endpoint would answer 404, so ask its advertised capabilities first.
+        local: (agentId) => runCauseEffect(skills.listInstalledForChatTags(agentId, { problems: true })),
         remote: (agentId, serverId) =>
           remoteServers
             .list()
@@ -487,25 +675,28 @@ export function agentIpcHandlers({
             : Promise.resolve([]),
       }),
       listChannels: scopedQueryHandler({
-        // The reader here is the host user of this computer, so messages they wrote before they
-        // signed in are their own.
         local: () => service.channels.store.list(host.channelActor().id, true),
         remote: (serverId) =>
           runCauseEffect(remoteServers.request(serverId, CHANNEL_ROUTES.list, decodeChannelSummaries)),
       }),
       readChannel: scopedHandler(parseChannelRead, {
-        local: (input) => service.channels.store.page(input.channelId, input.beforeSequence),
+        local: (input) => service.channels.page(input.channelId, input.beforeSequence),
         remote: (input, serverId) =>
           runCauseEffect(
             remoteServers.request(serverId, CHANNEL_ROUTES.read, decodeChannelPage, { method: "POST", body: input }),
           ),
       }),
       channelCommand: scopedHandler(parseChannelCommand, {
-        local: (input) => runCauseEffect(service.channels.command(input, host.channelActor())),
-        remote: (input, serverId) =>
-          runCauseEffect(
+        local: (input) => {
+          if (input.type === "read") closeChatNotifications(LOCAL_SERVER_ID, { channelId: input.channelId });
+          return runCauseEffect(service.channels.command(input, host.channelActor()));
+        },
+        remote: (input, serverId) => {
+          if (input.type === "read") closeChatNotifications(serverId, { channelId: input.channelId });
+          return runCauseEffect(
             remoteServers.request(serverId, CHANNEL_ROUTES.command, decodeChannel, { method: "POST", body: input }),
-          ),
+          );
+        },
       }),
       deleteChannel: scopedHandler(parseChannelId, {
         local: (channelId) => runCauseEffect(service.deleteChannel(channelId)),
@@ -520,7 +711,6 @@ export function agentIpcHandlers({
           );
         },
       }),
-      // The user of this computer can delete any message of a local channel.
       deleteChannelMessage: scopedHandler(parseDeleteChannelMessage, {
         local: (input) => runMessageDelete(service.channels.deleteMessage(input, { memberId: null, deleteAny: true })),
         remote: (input, serverId) =>
@@ -531,10 +721,50 @@ export function agentIpcHandlers({
       }),
       setChannelImage: scopedHandler(parseSetChannelImage, {
         local: (input) => runCauseEffect(service.channels.setImage(input.channelId, input.image)),
-        // The channel editor offers an image only for this computer, so only a programming error gets here.
-        remote: () => {
-          throw new Error(sourceText("error.team.channelPictureUnsupported"));
-        },
+        remote: (input, serverId) =>
+          runCauseEffect(remoteServers.setChannelImage(input.channelId, input.image, serverId)),
+      }),
+      clearChannelContext: scopedHandler(parseChannelId, {
+        local: (channelId) => runCauseEffect(service.clearChannelContext(channelId, host.channelActor())),
+        remote: (channelId, serverId) =>
+          remoteChatHistory(
+            serverId,
+            CHAT_HISTORY_ROUTES.channelClear,
+            { channelId },
+            "error.team.channelContextUnsupported",
+          ),
+      }),
+      deleteChannelHistory: scopedHandler(parseChannelId, {
+        local: (channelId) => runCauseEffect(service.deleteChannelHistory(channelId)),
+        remote: (channelId, serverId) =>
+          remoteChatHistory(
+            serverId,
+            CHAT_HISTORY_ROUTES.channelDelete,
+            { channelId },
+            "error.team.historyDeleteUnsupported",
+          ),
+      }),
+      compactChannelContext: scopedHandler(parseChannelId, {
+        local: (channelId) => runCauseEffect(service.compactChannelContext(channelId)),
+        remote: (channelId, serverId) =>
+          remoteChatHistory(
+            serverId,
+            CHAT_HISTORY_ROUTES.channelCompact,
+            { channelId },
+            "error.team.channelContextUnsupported",
+          ),
+      }),
+      channelCompactAvailability: scopedHandler(parseChannelId, {
+        local: (channelId) => ({ available: service.channelCompactAvailable(channelId) }),
+        remote: (channelId, serverId) =>
+          remoteServers.supportsCapability(serverId, CHANNEL_COMPACT_AVAILABILITY_CAPABILITY)
+            ? runCauseEffect(
+                remoteServers.request(serverId, CHANNEL_COMPACT_AVAILABILITY_ROUTE, decodeChannelCompactAvailability, {
+                  method: "POST",
+                  body: { channelId },
+                }),
+              )
+            : { available: true },
       }),
       getSidebarLayout: scopedQueryHandler({
         local: () => sidebarLayout.getSnapshot(),
@@ -550,7 +780,6 @@ export function agentIpcHandlers({
         remote: (action, serverId) => {
           if (remoteServers.supportsCapability(serverId, SIDEBAR_FOLDERS_CAPABILITY))
             return remoteFolderLayout(serverId, action);
-          // The released route has every folder at the top: it refuses `nest`, and would drop a parent.
           if (action.type === "nest" || (action.type === "create" && action.parentId !== undefined))
             throw new Error(sourceText("error.team.sidebarFoldersUnsupported"));
           return runCauseEffect(
@@ -561,7 +790,6 @@ export function agentIpcHandlers({
           );
         },
       }),
-      // The owner of this computer shares the pins of this server with their phones.
       getSidebarPins: scopedQueryHandler({
         local: () => sidebarPins.snapshot(OWNER_PIN_KEY),
         remote: (serverId) => {
@@ -597,17 +825,34 @@ export function agentIpcHandlers({
       askSideQuestion: scopedHandler(parseAskSideQuestion, {
         local: (input) => runCauseEffect(service.askSideQuestion(input)),
         remote: (input, serverId) => {
-          if (!remoteServers.supportsCapability(serverId, SIDE_QUESTION_CAPABILITY))
+          if (
+            !remoteServers.supportsCapability(serverId, SIDE_QUESTION_CAPABILITY) ||
+            (input.taskId !== undefined &&
+              !remoteServers.supportsCapability(serverId, SIDE_QUESTION_THREADS_CAPABILITY))
+          )
             throw new Error(sourceText("error.team.sideQuestionUnsupported"));
           return runCauseEffect(
             remoteServers.request(serverId, SIDE_QUESTION_ROUTES.ask, decodeSideQuestionResponse, {
               method: "POST",
-              // The wire fields only, so that a new IPC field does not cross the frozen contract.
               body: {
                 agentId: input.agentId,
                 question: input.question,
                 earlier: input.earlier.map(({ question, answer }) => ({ question, answer })),
+                ...(input.taskId === undefined ? {} : { taskId: input.taskId }),
               },
+              timeoutMs: 150_000,
+            }),
+          );
+        },
+      }),
+      saveSkillSuggestion: scopedHandler(parseSaveSkillSuggestion, {
+        local: (input) => runCauseEffect(service.saveSkillSuggestion(input)),
+        remote: async (input, serverId) => {
+          if (!remoteServers.supportsCapability(serverId, SKILL_LEARNING_CAPABILITY)) return { saved: false };
+          return runCauseEffect(
+            remoteServers.request(serverId, SKILL_LEARNING_ROUTES.save, decodeSaveSkillSuggestionResult, {
+              method: "POST",
+              body: { agentId: input.agentId, messageId: input.messageId },
               timeoutMs: 150_000,
             }),
           );
@@ -627,18 +872,24 @@ export function agentIpcHandlers({
           ),
       }),
       createAgent: scopedHandler(parseCreateAgent, {
-        local: (parsed) => runCauseEffect(service.createAgent(parsed, undefined, undefined, host.conversationSender())),
+        local: (parsed) =>
+          runCauseEffect(service.createAgent(parsed, undefined, undefined, host.conversationSender(), true)),
         remote: async (parsed, serverId) => {
-          // The released route keeps the nearest hue. The exact colour goes on `agent-colors-v1` after it.
-          const { avatarColor, ...input } = parsed;
-          const agent = await runCauseEffect(
+          const { avatarColor, providerAccountId, ...input } = parsed;
+          const operation = remoteServers.supportsCapability(serverId, AGENT_CREATE_OPERATION_CAPABILITY)
+            ? createOperationId([serverId, input])
+            : null;
+          const created = await runCauseEffect(
             remoteServers.request(serverId, TEAM_API_ROUTES.agents.all, decodeAgentSummary, {
               method: "POST",
-              body: input,
+              body: operation ? { ...input, operationId: operation.id } : input,
             }),
-          );
+          ).catch((error: unknown) => {
+            operation?.failed();
+            throw error;
+          });
+          const agent = await withCreatedAgentAccount(serverId, created, providerAccountId);
           if (!avatarColor || !remoteServers.supportsCapability(serverId, AGENT_COLORS_CAPABILITY)) return agent;
-          // The agent exists, so a failed colour change does not fail the create: the agent keeps its hue.
           await runCauseEffect(
             remoteServers
               .setAgentColor(serverId, { agentId: agent.id, color: avatarColor })
@@ -666,7 +917,6 @@ export function agentIpcHandlers({
       updateAgent: scopedHandler(parseUpdateAgent, {
         local: (input) => runCauseEffect(service.updateAgent(input)),
         remote: async (input, serverId) => {
-          // The Team API does not carry access, and a team member must not be able to widen it.
           if (input.access !== undefined) {
             throw new Error(sourceText("error.agent.accessLocalOnly"));
           }
@@ -679,49 +929,111 @@ export function agentIpcHandlers({
           if (input.allowNewChat !== undefined) {
             throw new Error(sourceText("error.agent.newChatLocalOnly"));
           }
-          // The released agent route does not carry it; the renderer sends it on `agent-plan-card-v1`.
           if (input.quickAcknowledgement !== undefined) {
             throw new Error(sourceText("error.agent.quickAcknowledgementLocalOnly"));
           }
-          if (input.fastMode !== undefined) {
+          if (input.fastMode !== undefined || input.ultrafast !== undefined || input.memory !== undefined) {
             throw new Error(sourceText("error.agent.settingsLocalOnly"));
           }
           if (input.busyMessageMode !== undefined) {
             throw new Error(sourceText("error.agent.busyMessageModeLocalOnly"));
           }
-          // The released agent route does not carry the task limit; the renderer sends it on `agent-task-limit-v1`.
           if (input.taskLimit !== undefined) {
             throw new Error(sourceText("error.agent.taskLimitLocalOnly"));
           }
-          if (input.backupModels !== undefined || input.leaveUsageLimit !== undefined) {
+          if (input.backupModels !== undefined) {
             throw new Error(sourceText("error.agent.backupModelsLocalOnly"));
           }
-          // The released agent route does not carry the account, so it changes on its own route after
-          // the rest: a provider change on the host returns the agent to the new provider's own sign-in.
-          const { providerAccountId, avatarColor, ...fields } = input;
+          if (input.leaveUsageLimit !== undefined) {
+            const { agentId, provider, model, reasoningEffort, providerAccountId } = input;
+            if (
+              input.leaveUsageLimit !== true ||
+              provider === undefined ||
+              model === undefined ||
+              reasoningEffort === undefined ||
+              !remoteServers.supportsCapability(serverId, AGENT_USAGE_LIMIT_CAPABILITY) ||
+              Object.entries(input).some(([key, value]) => value !== undefined && !USAGE_LIMIT_MOVE_FIELDS.has(key))
+            )
+              throw new Error(sourceText("error.team.usageLimitUnsupported"));
+            await runCauseEffect(
+              remoteServers.request(serverId, AGENT_USAGE_LIMIT_ROUTES.switch, acceptEmpty, {
+                method: "POST",
+                body: {
+                  agentId,
+                  provider,
+                  model,
+                  reasoningEffort,
+                  ...(providerAccountId ? { providerAccountId } : {}),
+                },
+              }),
+            );
+            const moved = (
+              await runCauseEffect(remoteServers.request(serverId, TEAM_API_ROUTES.agents.all, decodeAgentSummaries))
+            ).find((agent) => agent.id === agentId);
+            if (!moved) throw new Error(sourceText("error.team.agentNotFound"));
+            const agent = remoteServers.agentWithColor(serverId, moved);
+            return providerAccountId && providerAccountId !== DEFAULT_PROVIDER_ACCOUNT_ID
+              ? { ...agent, providerAccountId }
+              : agent;
+          }
+          const runtimeChange = remoteServers.supportsCapability(serverId, AGENT_PENDING_RUNTIME_CAPABILITY)
+            ? pendingRuntimeUpdateBody(input)
+            : null;
+          if (runtimeChange) {
+            const { agentId, providerAccountId } = input;
+            await runCauseEffect(
+              remoteServers.request(serverId, AGENT_PENDING_RUNTIME_ROUTES.update, acceptEmpty, {
+                method: "POST",
+                body: runtimeChange,
+              }),
+            );
+            const changed = (
+              await runCauseEffect(remoteServers.request(serverId, TEAM_API_ROUTES.agents.all, decodeAgentSummaries))
+            ).find((agent) => agent.id === agentId);
+            if (!changed) throw new Error(sourceText("error.team.agentNotFound"));
+            const agent = remoteServers.agentWithColor(serverId, changed);
+            return !agent.pendingRuntime && providerAccountId && providerAccountId !== DEFAULT_PROVIDER_ACCOUNT_ID
+              ? { ...agent, providerAccountId }
+              : agent;
+          }
+          const { providerAccountId, avatarColor, chatColor, ...fields } = input;
           if (
             providerAccountId !== undefined &&
             !remoteServers.supportsCapability(serverId, PROVIDER_ACCOUNTS_CAPABILITY)
           )
             throw new Error(sourceText("error.team.providersUnsupported"));
-          // The released agent route does not carry the exact colour. With `agent-colors-v1` it goes on
-          // its own route first. That route also sets the nearest hue, so the profile change then leaves
-          // the hue out: on the released route a hue removes the colour. A removed colour keeps the hue,
-          // which then sets the colour that the user chose. The released route removes the colour only
-          // when the hue changes, so a removed colour always goes on the colour route. Without the
-          // capability, only the hue goes.
+          const chatColors = remoteServers.supportsCapability(serverId, CHAT_COLORS_CAPABILITY);
+          if (
+            chatColor !== undefined &&
+            !chatColors &&
+            Object.entries(input).every(
+              ([key, value]) => key === "agentId" || key === "chatColor" || value === undefined,
+            )
+          )
+            throw new Error(sourceText("error.team.chatColorsUnsupported"));
+          if (chatColors && chatColor !== undefined)
+            await runCauseEffect(
+              remoteServers.setAgentChatColor(serverId, { agentId: input.agentId, color: chatColor }),
+            );
           const colors = remoteServers.supportsCapability(serverId, AGENT_COLORS_CAPABILITY);
           const { avatarHue, ...rest } = fields;
           const update = colors && avatarColor ? rest : fields;
           if (colors && avatarColor !== undefined)
             await runCauseEffect(remoteServers.setAgentColor(serverId, { agentId: input.agentId, color: avatarColor }));
-          const patched = await runCauseEffect(
-            remoteServers.request(serverId, TEAM_API_ROUTES.agent.one(input.agentId), decodeAgentSummary, {
-              method: "PATCH",
-              body: update,
-            }),
-          );
-          // A hue alone removes the colour on the host. Read the colours again, so the answer has none.
+          const colourRouted = (chatColors && chatColor !== undefined) || (colors && avatarColor !== undefined);
+          const profileChanged =
+            !colourRouted || Object.entries(update).some(([key, value]) => key !== "agentId" && value !== undefined);
+          const patched = profileChanged
+            ? await runCauseEffect(
+                remoteServers.request(serverId, TEAM_API_ROUTES.agent.one(input.agentId), decodeAgentSummary, {
+                  method: "PATCH",
+                  body: update,
+                }),
+              )
+            : (
+                await runCauseEffect(remoteServers.request(serverId, TEAM_API_ROUTES.agents.all, decodeAgentSummaries))
+              ).find((agent) => agent.id === input.agentId);
+          if (!patched) throw new Error(sourceText("error.team.agentNotFound"));
           if (colors && avatarColor === undefined && avatarHue !== undefined)
             await runCauseEffect(remoteServers.readAgentColors(serverId).pipe(Effect.catch(() => Effect.void)));
           const agent = remoteServers.agentWithColor(serverId, patched);
@@ -746,6 +1058,7 @@ export function agentIpcHandlers({
         local: async (agentId) => {
           await runCauseEffect(service.deleteAgent(agentId));
           await runCauseEffect(sidebarLayout.removeAgent(agentId));
+          await runCauseEffect(libraryFolders.removeAgent(agentId));
         },
         remote: async (agentId, serverId) => {
           await runCauseEffect(
@@ -766,7 +1079,7 @@ export function agentIpcHandlers({
       }),
       openMessageLink: scopedHandler(parseOpenMessageLink, {
         local: async ({ url }) => {
-          await openHttpLink(url, openExternal);
+          await openMessageLink(url, openExternal);
           return null;
         },
         remote: ({ agentId, url }, serverId) => runCauseEffect(messageLinks.open(serverId, agentId, url)),
@@ -796,27 +1109,59 @@ export function agentIpcHandlers({
               parsed.cursor,
               parsed.limit,
               serverId,
+              parsed.includeSideThreads,
             ),
           ),
       }),
-      searchConversationFiles: payloadHandler(parseSearchConversationFiles, (parsed) =>
-        host.searchAgentConversationFiles(parsed.query, parsed.cursor, parsed.limit),
-      ),
+      searchConversationFiles: scopedHandler(parseSearchConversationFiles, {
+        local: (parsed) => host.searchAgentConversationFiles(parsed.query, parsed.cursor, parsed.limit),
+        remote: (parsed, serverId) => {
+          if (!remoteServers.supportsCapability(serverId, CONVERSATION_FILE_SEARCH_CAPABILITY))
+            throw new Error(sourceText("error.team.conversationFileSearchUnsupported"));
+          return runCauseEffect(
+            remoteServers.request(
+              serverId,
+              CONVERSATION_FILE_SEARCH_ROUTES.search,
+              decodeConversationFileSearchResponse,
+              {
+                method: "POST",
+                body: {
+                  query: parsed.query,
+                  cursor: parsed.cursor ?? null,
+                  ...(parsed.limit === undefined ? {} : { limit: parsed.limit }),
+                },
+              },
+            ),
+          );
+        },
+      }),
       listConversationReads: scopedQueryHandler({
         local: () => host.listAgentConversationReads(),
         remote: (serverId) => runCauseEffect(remoteServers.listAgentConversationReads(serverId)),
       }),
       markConversationRead: scopedHandler(parseMarkConversationRead, {
-        local: (parsed) => runCauseEffect(host.markAgentConversationRead(parsed)),
-        remote: (parsed, serverId) => runCauseEffect(remoteServers.markAgentConversationRead(parsed, serverId)),
+        local: (parsed) => {
+          closeChatNotifications(LOCAL_SERVER_ID, { agentId: parsed.agentId });
+          return runCauseEffect(host.markAgentConversationRead(parsed));
+        },
+        remote: (parsed, serverId) => {
+          closeChatNotifications(serverId, { agentId: parsed.agentId });
+          return runCauseEffect(remoteServers.markAgentConversationRead(parsed, serverId));
+        },
       }),
       markConversationUnread: scopedHandler(parseMarkConversationUnread, {
         local: (parsed) => runCauseEffect(host.markAgentConversationUnread(parsed)),
-        remote: () => {
-          throw new Error(sourceText("error.backend.markUnreadRemoteUnsupported"));
+        remote: (parsed, serverId) => {
+          if (!remoteServers.supportsCapability(serverId, CONVERSATION_UNREAD_FROM_CAPABILITY))
+            throw new Error(sourceText("error.backend.markUnreadRemoteUnsupported"));
+          return runCauseEffect(
+            remoteServers.request(serverId, CONVERSATION_UNREAD_FROM_ROUTE, decodeConversationReadState, {
+              method: "POST",
+              body: { agentId: parsed.agentId, fromMessageId: parsed.fromMessageId },
+            }),
+          );
         },
       }),
-      // The user of this computer can delete any message of a local agent.
       deleteConversationMessage: scopedHandler(parseDeleteConversationMessage, {
         local: (input) =>
           runMessageDelete(service.deleteConversationMessage(input, { memberId: null, deleteAny: true })),
@@ -831,6 +1176,19 @@ export function agentIpcHandlers({
                 taskId: input.taskId,
                 messageId: input.messageId,
               }),
+      }),
+      withdrawFeedback: scopedHandler(parseWithdrawFeedback, {
+        local: (input) => runCauseEffect(service.withdrawFeedback(input)),
+        remote: (input, serverId) => {
+          if (!remoteServers.supportsCapability(serverId, FEEDBACK_WITHDRAW_CAPABILITY))
+            throw new Error(sourceText("error.backend.feedbackWithdrawRemoteUnsupported"));
+          return runCauseEffect(
+            remoteServers.request(serverId, FEEDBACK_WITHDRAW_ROUTES.withdraw, decodeFeedbackWithdrawResult, {
+              method: "POST",
+              body: { agentId: input.agentId, messageId: input.messageId },
+            }),
+          );
+        },
       }),
       sendMessage: scopedHandler(parseSendMessage, {
         local: (input) => runCauseEffect(service.sendMessage(input, host.conversationSender())),
@@ -863,14 +1221,13 @@ export function agentIpcHandlers({
           return runCauseEffect(
             remoteServers.request(serverId, TEAM_API_ROUTES.agent.messages(input.agentId), decodeQueuedMessageReceipt, {
               method: "POST",
-              // The host uses this computer's zone for a routine the agent creates from the message.
               body: { ...input, timezone: Intl.DateTimeFormat().resolvedOptions().timeZone },
             }),
           );
         },
       }),
       setMessageReaction: scopedHandler(parseMessageReaction, {
-        local: (parsed) => runCauseEffect(service.setMessageReaction(parsed)),
+        local: (parsed) => runCauseEffect(service.setMessageReaction(parsed, host.conversationSender())),
         remote: (parsed, serverId) =>
           runCauseEffect(
             remoteServers.request(serverId, TEAM_API_ROUTES.agent.reactions(parsed.agentId), decodeVoid, {
@@ -884,39 +1241,119 @@ export function agentIpcHandlers({
         remote: (agentId, serverId) =>
           runCauseEffect(remoteServers.request(serverId, TEAM_API_ROUTES.agent.queue(agentId), decodeQueueSnapshot)),
       }),
-      // Open waits are local only: the Team API has no route for them.
+      listActiveQueues: scopedHandler(parseAgentIdList, {
+        local: (agentIds) => {
+          const known = new Set(service.listAgents().map((agent) => agent.id));
+          return { queues: service.listActiveQueues(agentIds.filter((id) => known.has(id))), omitted: [] };
+        },
+        remote: (agentIds, serverId) => {
+          if (!remoteServers.supportsCapability(serverId, AGENT_ACTIVE_QUEUES_CAPABILITY)) return null;
+          return runCauseEffect(
+            remoteServers.request(serverId, AGENT_ACTIVE_QUEUES_ROUTES.list, decodeAgentActiveQueues, {
+              method: "POST",
+              body: { agentIds },
+            }),
+          );
+        },
+      }),
       listWaits: scopedHandler(parseAgentId, {
         local: (agentId) => service.listWaits(agentId),
-        remote: (agentId) => ({ agentId, waits: [] }),
+        remote: (agentId, serverId) => {
+          if (!remoteServers.supportsCapability(serverId, AGENT_WAITS_CAPABILITY)) return { agentId, waits: [] };
+          return runCauseEffect(
+            remoteServers.request(serverId, AGENT_WAITS_ROUTES.list, decodeAgentWaitsResponse, {
+              method: "POST",
+              body: { agentId },
+            }),
+          );
+        },
+      }),
+      listPinnedMessages: scopedHandler(parseAgentId, {
+        local: (agentId) => service.listPinnedMessages(agentId),
+        remote: (agentId, serverId) => {
+          if (!remoteServers.supportsCapability(serverId, MESSAGE_PINS_CAPABILITY)) return { agentId, pins: [] };
+          return runCauseEffect(
+            remoteServers.request(serverId, MESSAGE_PINS_ROUTES.list, decodeMessagePinsResponse, {
+              method: "POST",
+              body: { agentId },
+            }),
+          );
+        },
+      }),
+      setMessagePinned: scopedHandler(parseSetMessagePinned, {
+        local: (input) => runMessagePin(service.setMessagePinned(input, { kind: "person", sender: null })),
+        remote: (input, serverId) => {
+          if (!remoteServers.supportsCapability(serverId, MESSAGE_PINS_CAPABILITY))
+            throw new Error(sourceText("error.team.messagePinsUnsupported"));
+          return runCauseEffect(
+            remoteServers.request(serverId, MESSAGE_PINS_ROUTES.set, decodeMessagePinsResponse, {
+              method: "POST",
+              body: {
+                agentId: input.agentId,
+                taskId: input.taskId ?? null,
+                messageId: input.messageId,
+                pinned: input.pinned,
+              },
+            }),
+          );
+        },
       }),
       cancelWait: scopedHandler(parseCancelAgentWait, {
         local: (parsed) => service.cancelWait(parsed.agentId, parsed.waitId),
-        remote: () => {
-          throw new Error(sourceText("error.backend.agentWaitRemoteUnsupported"));
+        remote: async (parsed, serverId) => {
+          if (!remoteServers.supportsCapability(serverId, AGENT_WAITS_CAPABILITY))
+            throw new Error(sourceText("error.team.agentWaitsUnsupported"));
+          await runCauseEffect(
+            remoteServers.request(serverId, AGENT_WAITS_ROUTES.cancel, acceptEmpty, {
+              method: "POST",
+              body: { agentId: parsed.agentId, waitId: parsed.waitId },
+            }),
+          );
         },
       }),
-      // A joined server has tasks through `agent-tasks-v1`. A server without it shows no task. A server
-      // with `agent-thread-branches-v1` also gives the branch links, read after the tasks so that each
-      // listed branch has its link.
       listTasks: scopedHandler(parseAgentId, {
         local: (agentId) => service.listTasks(agentId),
         remote: (agentId, serverId) => {
           if (!remoteServers.supportsCapability(serverId, AGENT_TASKS_CAPABILITY))
             return { agentId, tasks: [], limit: 1 };
           const init = { method: "POST", body: { agentId } } as const;
-          const tasks = remoteServers.request(serverId, AGENT_TASKS_ROUTES.list, decodeRemoteAgentTasks, init);
-          if (!remoteServers.supportsCapability(serverId, AGENT_THREAD_BRANCHES_CAPABILITY))
-            return runCauseEffect(tasks);
+          const branched = remoteServers.supportsCapability(serverId, AGENT_THREAD_BRANCHES_CAPABILITY);
+          const queued = remoteServers.supportsCapability(serverId, AGENT_THREAD_QUEUE_CAPABILITY);
+          const requested = remoteServers.supportsCapability(serverId, AGENT_THREAD_REQUESTS_CAPABILITY);
           return runCauseEffect(
             Effect.gen(function* () {
-              const snapshot = yield* tasks;
-              const links = yield* remoteServers.request(
+              let snapshot = yield* remoteServers.request(
                 serverId,
-                AGENT_THREAD_BRANCHES_ROUTES.list,
-                decodeRemoteAgentThreadBranches,
+                AGENT_TASKS_ROUTES.list,
+                decodeRemoteAgentTasks,
                 init,
               );
-              return withAgentThreadBranches(snapshot, links.branches);
+              if (branched) {
+                const links = yield* remoteServers.request(
+                  serverId,
+                  AGENT_THREAD_BRANCHES_ROUTES.list,
+                  decodeRemoteAgentThreadBranches,
+                  init,
+                );
+                snapshot = withAgentThreadBranches(snapshot, links.branches);
+              }
+              if (requested) {
+                const requests = yield* remoteServers.request(
+                  serverId,
+                  AGENT_THREAD_REQUESTS_ROUTES.list,
+                  decodeRemoteAgentThreadRequests,
+                  init,
+                );
+                snapshot = withAgentThreadRequests(snapshot, requests);
+              }
+              if (!queued) return snapshot;
+              const queues = yield* remoteServers.request(
+                serverId,
+                AGENT_THREAD_QUEUE_ROUTES.list,
+                decodeRemoteAgentThreadQueues,
+                init,
+              );
+              return withAgentThreadQueues(snapshot, queues);
             }),
           );
         },
@@ -925,6 +1362,52 @@ export function agentIpcHandlers({
         local: (parsed) => service.readTask(parsed.agentId, parsed.taskId),
         remote: (parsed, serverId) =>
           remoteTaskRequest(serverId, AGENT_TASKS_ROUTES.read, decodeRemoteTaskConversation, agentTaskBody(parsed)),
+      }),
+      listArchivedTasks: scopedHandler(parseListArchivedAgentTasks, {
+        local: (input) => service.listArchivedTasks(input),
+        remote: (input, serverId) => {
+          if (!remoteServers.supportsCapability(serverId, AGENT_ARCHIVED_THREADS_CAPABILITY)) taskRemoteUnsupported();
+          return runCauseEffect(
+            remoteServers.request(serverId, AGENT_ARCHIVED_THREADS_ROUTES.list, decodeRemoteArchivedAgentTasks, {
+              method: "POST",
+              body: { agentId: input.agentId, before: input.before },
+            }),
+          );
+        },
+      }),
+      readTaskPage: scopedHandler(parseReadAgentTaskPage, {
+        local: (parsed) => service.readTaskPage(parsed),
+        remote: (parsed, serverId) => {
+          if (!remoteServers.supportsCapability(serverId, AGENT_THREAD_PAGES_CAPABILITY)) taskRemoteUnsupported();
+          return runCauseEffect(
+            remoteServers.request(serverId, AGENT_THREAD_PAGES_ROUTES.readOlder, decodeRemoteTaskPage, {
+              method: "POST",
+              body: {
+                agentId: parsed.agentId,
+                taskId: parsed.taskId,
+                beforeMessageId: parsed.beforeMessageId,
+                limit: parsed.limit,
+              },
+            }),
+          );
+        },
+      }),
+      readTaskAround: scopedHandler(parseReadAgentTaskAround, {
+        local: (parsed) => service.readTaskAround(parsed),
+        remote: (parsed, serverId) => {
+          if (!remoteServers.supportsCapability(serverId, MESSAGE_PINS_CAPABILITY)) taskRemoteUnsupported();
+          return runCauseEffect(
+            remoteServers.request(serverId, MESSAGE_PINS_ROUTES.readThread, decodeRemoteTaskWindow, {
+              method: "POST",
+              body: {
+                agentId: parsed.agentId,
+                taskId: parsed.taskId,
+                messageId: parsed.messageId,
+                limit: parsed.limit,
+              },
+            }),
+          );
+        },
       }),
       startTask: scopedHandler(parseStartAgentTask, {
         local: (input) => runCauseEffect(service.startTask(input, host.conversationSender())),
@@ -943,12 +1426,17 @@ export function agentIpcHandlers({
           );
         },
       }),
-      // Local only: `agent-tasks-v1` does not move a queued message into a task.
       runQueuedMessageAsTask: scopedHandler(parseRunQueuedMessageAsTask, {
         local: (parsed) => runCauseEffect(service.runQueuedMessageAsTask(parsed)),
-        remote: taskRemoteUnsupported,
+        remote: (parsed, serverId) => {
+          if (!remoteServers.supportsCapability(serverId, AGENT_QUEUE_TASK_CAPABILITY))
+            throw new Error(sourceText("error.team.queuedMessageThreadUnsupported"));
+          return remoteTaskRequest(serverId, AGENT_QUEUE_TASK_ROUTES.run, decodeRemoteAgentTask, {
+            agentId: parsed.agentId,
+            deliveryId: parsed.deliveryId,
+          });
+        },
       }),
-      // A joined server branches through `agent-thread-branches-v1`; an older one cannot branch.
       branchTask: scopedHandler(parseBranchAgentTask, {
         local: (parsed) => runCauseEffect(host.branchAgentTask(parsed)),
         remote: (parsed, serverId) => {
@@ -982,7 +1470,6 @@ export function agentIpcHandlers({
         remote: (parsed, serverId) =>
           remoteTaskRequest(serverId, AGENT_TASKS_ROUTES.reopen, acceptEmpty, agentTaskBody(parsed)),
       }),
-      // A joined server renames and deletes through `agent-threads-v1`; `agent-tasks-v1` has neither.
       renameTask: scopedHandler(parseRenameAgentTask, {
         local: (parsed) => service.renameTask(parsed, parsed.title),
         remote: (parsed, serverId) =>
@@ -996,7 +1483,18 @@ export function agentIpcHandlers({
         local: (parsed) => runCauseEffect(service.deleteTask(parsed)),
         remote: (parsed, serverId) => remoteThreadRequest(serverId, AGENT_THREADS_ROUTES.delete, agentTaskBody(parsed)),
       }),
-      // A joined server keeps the member's read marks through `agent-thread-reads-v1`.
+      listTaskReads: scopedHandler(parseAgentId, {
+        local: (agentId) => host.listAgentTaskReads(agentId),
+        remote: (agentId, serverId) => {
+          if (!remoteServers.supportsCapability(serverId, AGENT_THREAD_READS_CAPABILITY)) return [];
+          return runCauseEffect(
+            remoteServers.request(serverId, AGENT_THREAD_READS_ROUTES.list, decodeRemoteTaskReadStates, {
+              method: "POST",
+              body: { agentId },
+            }),
+          );
+        },
+      }),
       markTaskRead: scopedHandler(parseMarkAgentTaskRead, {
         local: (parsed) => host.markAgentTaskRead(parsed),
         remote: (parsed, serverId) => {
@@ -1067,13 +1565,24 @@ export function agentIpcHandlers({
       }),
       reorderQueue: scopedHandler(parseReorderQueue, {
         local: (parsed) => runCauseEffect(service.reorderQueue(parsed)),
-        remote: (parsed, serverId) =>
-          runCauseEffect(
+        remote: (parsed, serverId) => {
+          if (parsed.taskId !== undefined) {
+            if (!remoteServers.supportsCapability(serverId, AGENT_THREAD_QUEUE_CAPABILITY))
+              throw new Error(sourceText("error.team.threadQueueUnsupported"));
+            return runCauseEffect(
+              remoteServers.request(serverId, AGENT_THREAD_QUEUE_ROUTES.reorder, acceptEmpty, {
+                method: "POST",
+                body: { agentId: parsed.agentId, taskId: parsed.taskId, deliveryIds: parsed.deliveryIds },
+              }),
+            );
+          }
+          return runCauseEffect(
             remoteServers.request(serverId, TEAM_API_ROUTES.agent.queueReorder(parsed.agentId), decodeVoid, {
               method: "POST",
               body: { deliveryIds: parsed.deliveryIds },
             }),
-          ),
+          );
+        },
       }),
       interrupt: scopedHandler(parseInterrupt, {
         local: (parsed) => runCauseEffect(service.interrupt(parsed.agentId, parsed.turnId)),
@@ -1090,7 +1599,6 @@ export function agentIpcHandlers({
         remote: async (agentId, serverId) => {
           if (!remoteServers.supportsCapability(serverId, CONTEXT_RESET_CAPABILITY))
             throw new Error(sourceText("error.team.contextResetUnsupported"));
-          // The context-reset-v1 codec has already checked the empty reply.
           await runCauseEffect(
             remoteServers.request(serverId, CONTEXT_RESET_ROUTES.clear, () => undefined, {
               method: "POST",
@@ -1099,7 +1607,16 @@ export function agentIpcHandlers({
           );
         },
       }),
-      // A joined server compacts with `context-compact-v1`.
+      deleteHistory: scopedHandler(parseAgentId, {
+        local: (agentId) => runCauseEffect(service.deleteAgentHistory(agentId)),
+        remote: (agentId, serverId) =>
+          remoteChatHistory(
+            serverId,
+            CHAT_HISTORY_ROUTES.agentDelete,
+            { agentId },
+            "error.team.historyDeleteUnsupported",
+          ),
+      }),
       compactContext: scopedHandler(parseAgentId, {
         local: (agentId) => runCauseEffect(service.compactAgentContext(agentId)),
         remote: (agentId, serverId) => remoteCompact(serverId, CONTEXT_COMPACT_ROUTES.compact, { agentId }),
@@ -1110,7 +1627,10 @@ export function agentIpcHandlers({
           remoteCompact(serverId, CONTEXT_COMPACT_ROUTES.compactTask, { agentId, taskId }),
       }),
       respondToPrompt: scopedHandler(parsePromptResponse, {
-        local: (parsed) => runCauseEffect(service.respondToPrompt(parsed)),
+        local: (parsed) => {
+          const sender = host.conversationSender();
+          return runCauseEffect(service.respondToPrompt(parsed, { ...(sender ? { sender } : {}), privileged: true }));
+        },
         remote: (parsed, serverId) =>
           runCauseEffect(
             remoteServers.request(serverId, TEAM_API_ROUTES.respond.prompt, decodeVoid, {
@@ -1129,10 +1649,104 @@ export function agentIpcHandlers({
             }),
           ),
       }),
+      readPendingApproval: scopedHandler(parseReadPendingApprovalInput, {
+        local: ({ agentId, requestId }) => {
+          const approval = service.pendingApproval(requestId);
+          return approval?.agentId === agentId ? approval : null;
+        },
+        remote: (parsed, serverId) => {
+          if (!remoteServers.supportsCapability(serverId, PENDING_APPROVAL_CAPABILITY)) return null;
+          return runCauseEffect(
+            remoteServers.request(serverId, PENDING_APPROVAL_ROUTES.read, decodePendingApprovalResponse, {
+              method: "POST",
+              body: { ...parsed },
+            }),
+          );
+        },
+      }),
+      readMediaApproval: scopedHandler(parseReadMediaApprovalInput, {
+        local: ({ agentId, requestId }) => ({
+          media: service.pendingMediaApproval(agentId, requestId) ?? null,
+          hold: service.pendingCreditsHold(agentId, requestId, true) ?? null,
+        }),
+        remote: (parsed, serverId) => {
+          if (!remoteServers.supportsCapability(serverId, MEDIA_APPROVAL_CHOICE_CAPABILITY))
+            return { media: null, hold: null };
+          return runCauseEffect(
+            remoteServers.request(serverId, MEDIA_APPROVAL_CHOICE_ROUTES.read, decodeMediaApprovalReadResponse, {
+              method: "POST",
+              body: { ...parsed },
+            }),
+          );
+        },
+      }),
+      respondToMediaApproval: scopedHandler(parseRespondToMediaApprovalInput, {
+        local: (parsed) => runCauseEffect(service.respondToMediaApproval(parsed)),
+        remote: (parsed, serverId) => {
+          if (!remoteServers.supportsCapability(serverId, MEDIA_APPROVAL_CHOICE_CAPABILITY))
+            throw new Error(sourceText("error.team.mediaApprovalChoiceUnsupported"));
+          return runCauseEffect(
+            remoteServers.request(serverId, MEDIA_APPROVAL_CHOICE_ROUTES.respond, decodeVoid, {
+              method: "POST",
+              body: { ...parsed },
+            }),
+          );
+        },
+      }),
+      respondToCreditsHold: scopedHandler(parseRespondToCreditsHoldInput, {
+        local: (parsed) => runCauseEffect(service.respondToCreditsHold(parsed)),
+        remote: (parsed, serverId) => {
+          if (!remoteServers.supportsCapability(serverId, MEDIA_APPROVAL_CHOICE_CAPABILITY))
+            throw new Error(sourceText("error.team.mediaApprovalChoiceUnsupported"));
+          return runCauseEffect(
+            remoteServers.request(serverId, MEDIA_APPROVAL_CHOICE_ROUTES.hold, decodeCreditsHoldResponse, {
+              method: "POST",
+              body: { ...parsed },
+            }),
+          );
+        },
+      }),
+      setCreditsAskMuted: scopedHandler(parseCreditsAskMutedInput, {
+        local: ({ muted }) => runCauseEffect(creditAsks.setMuted(null, muted)),
+        remote: ({ muted }, serverId) => {
+          if (!remoteServers.supportsCapability(serverId, MEDIA_APPROVAL_CHOICE_CAPABILITY))
+            throw new Error(sourceText("error.team.mediaApprovalChoiceUnsupported"));
+          return runCauseEffect(
+            remoteServers.request(serverId, MEDIA_APPROVAL_CHOICE_ROUTES.muted, decodeVoid, {
+              method: "POST",
+              body: { muted },
+            }),
+          );
+        },
+      }),
+      readCreditsAskMuted: scopedQueryHandler({
+        local: () => ({ muted: creditAsks.mutedFor(null) }),
+        remote: (serverId) => {
+          if (!remoteServers.supportsCapability(serverId, MEDIA_APPROVAL_CHOICE_CAPABILITY))
+            throw new Error(sourceText("error.team.mediaApprovalChoiceUnsupported"));
+          return runCauseEffect(
+            remoteServers.request(serverId, MEDIA_APPROVAL_CHOICE_ROUTES.mutedRead, decodeCreditsAskMuted, {
+              method: "POST",
+              body: {},
+            }),
+          );
+        },
+      }),
+      listPendingPrompts: scopedQueryHandler({
+        local: () => pendingPromptsWithinLimits(service.pendingPrompts()),
+        remote: (serverId) => {
+          if (!remoteServers.supportsCapability(serverId, PENDING_PROMPTS_CAPABILITY)) return [];
+          return runCauseEffect(
+            remoteServers.request(serverId, PENDING_PROMPTS_ROUTES.list, decodePendingPromptsResponse, {
+              method: "POST",
+              body: {},
+            }),
+          );
+        },
+      }),
       respondToBrowserSecret: scopedHandler(parseLocalBrowserSecretResponse, {
         local: (parsed) => runCauseEffect(service.respondToBrowserSecret(parsed)),
         remote: (parsed, serverId) => {
-          // A save goes to the Vault of the joined server, on the route that only its owner or an admin can use.
           if (parsed.decision !== "submit" || !parsed.saveToVault)
             return runCauseEffect(
               remoteServers.request(serverId, BROWSER_SECRET_RESPONSE_PATH, decodeVoid, {

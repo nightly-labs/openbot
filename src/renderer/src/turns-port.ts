@@ -1,9 +1,5 @@
 import type { OpenBotDesktopApi } from "@openbot/contracts/ipc";
 
-/**
- * What turn state reaches in main: the queue, the routine ids, and the answers to prompts,
- * approvals and browser takeovers.
- */
 export interface TurnsPort {
   agent: Pick<
     OpenBotDesktopApi["agent"],
@@ -12,20 +8,26 @@ export interface TurnsPort {
     | "clearContext"
     | "compactContext"
     | "compactTaskContext"
+    | "deleteHistory"
     | "interrupt"
+    | "listActiveQueues"
     | "listQueue"
     | "listRoutines"
     | "listWaits"
+    | "readMediaApproval"
+    | "readPendingApproval"
     | "reorderQueue"
     | "respondToApproval"
     | "respondToBrowserTakeover"
+    | "respondToCreditsHold"
+    | "respondToMediaApproval"
     | "respondToPrompt"
+    | "setCreditsAskMuted"
     | "steerQueuedMessage"
     | "updateQueuedMessage"
   >;
 }
 
-/** Read on each call: tests and stories replace `window.openbot` per case. */
 export function turnsPort(): TurnsPort {
   return window.openbot;
 }

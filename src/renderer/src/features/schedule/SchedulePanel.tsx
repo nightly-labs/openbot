@@ -9,12 +9,18 @@ import {
   type RoutineCalendarRoutine,
   type RoutineCalendarStatus,
 } from "@openbot/ui/features/conversation/RoutineCalendar";
+import { useText } from "@openbot/ui/text";
 import { createEffect, createMemo, createSignal, createStore, onSettled } from "solid-js";
+import { actionToast } from "../../action-toast";
 import { useNavigation } from "../../navigation";
 import { useAgents } from "../agents/agents-context";
 import { useChannels } from "../channels/channels-context";
+import type { RoutinesPort } from "../conversation/routines-port";
+import { useServers } from "../servers/servers-context";
+import { createPageHeaderFrame } from "../window/page-header-frame";
 import { useWindowPage } from "../window/window-page-context";
 import { desktopScheduleSource, type ScheduleSource } from "./schedule-port";
+import { scheduleRoutineCreate, scheduleRoutinePorts } from "./schedule-routine-create";
 
 const DAY = 86_400_000;
 
@@ -29,25 +35,18 @@ export type ScheduleRoutine = HostCalendar["routines"][number];
 interface ScheduleViewProps extends SchedulePanelProps {
   source: ScheduleSource;
   agents: RoutineCalendarAgent[];
-  /** The channels of the server. A channel routine shows on the agents of its channel. */
   channels: readonly { id: string; members: readonly { agentId: string }[] }[];
-  /** False when this server cannot open channels; the calendar then leaves out channel routines. */
   channelsSupported: boolean;
   onOpenAgent: (agentId: string) => void;
   onOpenRoutine: (routine: ScheduleRoutine) => void;
-  /** Opens the routine settings of the agent on a new routine. */
   onCreateRoutine: (agentId: string) => void;
+  routinePorts?: ((agentId: string) => RoutinesPort) | undefined;
 }
 
-/**
- * The calendar range in instants. A calendar day in the viewer's zone can start up to 14 hours
- * either side of UTC midnight, so each end takes one more day; the calendar drops what it does not show.
- */
 function rangeAround(first: number, last: number): RoutineCalendarInput {
   return { from: new Date(first - DAY).toISOString(), to: new Date(last + 2 * DAY).toISOString() };
 }
 
-/** Before a run, the routine state says what happens; after it, the outcome does. */
 function calendarStatus(status: RoutineCalendarRunStatus, routineActive: boolean): RoutineCalendarStatus {
   switch (status) {
     case "scheduled":
@@ -65,23 +64,26 @@ function calendarStatus(status: RoutineCalendarRunStatus, routineActive: boolean
   }
 }
 
-/** The schedule page on desktop: the calendar of a server, read through main. */
 export function SchedulePanel(props: SchedulePanelProps) {
   const { agentList, agentSetupOpen, creatingAgent, setSettingsRequest } = useAgents();
   const { selectAgent } = useNavigation();
   const channels = useChannels();
   const windowPage = useWindowPage();
+  const { servers } = useServers();
+  const routinePorts = createMemo(() =>
+    scheduleRoutinePorts(
+      servers().find((server) => server.id === props.serverId),
+      undefined,
+    ),
+  );
 
   function openRoutine(routine: ScheduleRoutine): void {
     if (routine.owner.kind === "channel") {
-      // An open channel does not open again, so its settings would stay under the pane.
       windowPage.showAgents();
-      // The channel settings hold its routines one step down.
       void channels.editChannel(routine.owner.channelId);
       return;
     }
     const agentId = routine.owner.agentId;
-    // As in the global search: the agent cannot change while a new agent is being created.
     if (agentSetupOpen() && creatingAgent()) return;
     selectAgent(agentId);
     setSettingsRequest({ agentId, nonce: Date.now(), routine: { routineId: routine.id, name: routine.name } });
@@ -103,23 +105,22 @@ export function SchedulePanel(props: SchedulePanelProps) {
       onOpenAgent={selectAgent}
       onOpenRoutine={openRoutine}
       onCreateRoutine={createRoutine}
+      routinePorts={routinePorts()}
     />
   );
 }
 
-/** The calendar of the routines of a server. The desktop and the web client give its source and actions. */
 export function ScheduleView(props: ScheduleViewProps) {
+  const { t } = useText();
   const timeZone = Intl.DateTimeFormat().resolvedOptions().timeZone;
   const [now, setNow] = createSignal(new Date());
   const [state, setState] = createStore<{ phase: "loading" | "ready" | "error"; calendar: HostCalendar | null }>({
     phase: "loading",
     calendar: null,
   });
-  // Today's week, wherever today falls in it, until the calendar reports the days it shows.
   let range = rangeAround(Date.now() - 7 * DAY, Date.now() + 7 * DAY);
   let generation = 0;
 
-  /** A refresh that an event starts keeps the calendar on screen; only the first load and Retry blank it. */
   async function load(background = false): Promise<void> {
     const request = ++generation;
     const serverId = props.serverId;
@@ -136,7 +137,6 @@ export function ScheduleView(props: ScheduleViewProps) {
         draft.phase = "ready";
       });
     } catch {
-      // A failed refresh keeps the calendar on screen, unless a range change already blanked it.
       if (request !== generation || (background && state.calendar && state.phase !== "loading")) return;
       setState((draft) => {
         draft.phase = "error";
@@ -144,7 +144,6 @@ export function ScheduleView(props: ScheduleViewProps) {
     }
   }
 
-  /** A channel routine that cannot open would leave its pane loading, so it does not show. */
   const visibleRoutines = createMemo(() =>
     (state.calendar?.routines ?? []).filter((routine) => props.channelsSupported || routine.owner.kind !== "channel"),
   );
@@ -178,7 +177,6 @@ export function ScheduleView(props: ScheduleViewProps) {
     if (routine) props.onOpenRoutine(routine);
   }
 
-  // The page stays open when the user switches the server, so the calendar clears, loads and listens again.
   createEffect(
     () => props.serverId,
     (serverId) => {
@@ -194,11 +192,22 @@ export function ScheduleView(props: ScheduleViewProps) {
     },
   );
   onSettled(() => {
-    // A planned run that passes without a result keeps its place; the clock only moves "now".
     const clock = window.setInterval(() => setNow(new Date()), 60_000);
     return () => window.clearInterval(clock);
   });
 
+  const create = createMemo(() => {
+    const ports = props.routinePorts;
+    return ports
+      ? scheduleRoutineCreate(
+          ports,
+          () => void load(true),
+          () => actionToast.warning(t("routine.settings.runInSaveFailed")),
+        )
+      : undefined;
+  });
+
+  const headerFrame = createPageHeaderFrame();
   return (
     <div class="schedule-pane">
       <RoutineCalendar
@@ -217,7 +226,9 @@ export function ScheduleView(props: ScheduleViewProps) {
         onOpenAgent={props.onOpenAgent}
         onRetry={() => void load()}
         onCreateRoutine={props.onCreateRoutine}
+        create={create()}
         onBack={props.onBack}
+        frame={headerFrame()}
       />
     </div>
   );

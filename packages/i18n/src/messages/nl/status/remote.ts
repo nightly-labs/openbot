@@ -47,4 +47,6 @@ export const messages = {
     one: "Opnieuw verbinden {attempt}/{count}",
     other: "Opnieuw verbinden {attempt}/{count}",
   },
+  "status.remote.messageCut":
+    "[{size} MB van dit bericht wordt niet getoond op dit apparaat. Open het op de computer waarop de server draait om alles te lezen.]",
 } as const satisfies PartialTranslation<typeof source>;

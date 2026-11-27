@@ -2,7 +2,6 @@ import type { PartialTranslation } from "../../../message";
 import type { messages as source } from "../../en/error/site";
 
 export const messages = {
-  // Hosted site errors.
   "error.site.absolutePath": "サイトのディレクトリには絶対パスを指定してください。",
   "error.site.rootSymlink": "ホストするサイトではシンボリックリンクを使用できません。",
   "error.site.notDirectory": "サイトのソースはディレクトリである必要があります。",
@@ -32,6 +31,10 @@ export const messages = {
     other:
       "このサーバーは有効なサイトの上限（{count} 件）に達しています。別のサイトを公開するには、サイトを削除するか、サイト数の多いプランのクラウドサーバーを使ってください。",
   },
+  "error.site.sharedLimit":
+    "プランのないアカウントのサーバーはアクティブなサイトを共有しており、すべて使用中です。ここでサイトを公開するには、これらのサーバーのいずれかでサイトを削除するか、ライセンスにユーザーを追加するか、より多くのサイトを含むプランのクラウドサーバーを使用してください。",
+  "error.site.accountLimit":
+    "アカウントのすべてのサーバーにあるアクティブなサイトが上限に達しています: {count}。別のサイトを公開するには、サイトを削除してください。",
   "error.site.unlinkedLimit": {
     other:
       "このコンピューターはサーバーではなく、そのアカウントは有効なサイトの上限（{count} 件）に達しています。別のサイトを公開するには、サイトを削除するか、サイト数の多いプランのクラウドサーバーを使ってください。",

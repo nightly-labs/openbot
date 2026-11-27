@@ -1,6 +1,3 @@
-// Reads the logins of a password export in CSV format: Chrome, Edge, Safari, Firefox, 1Password,
-// Bitwarden and LastPass all write a header row that names the address, user name and password columns.
-
 import { sourceText } from "@openbot/i18n/source";
 
 export interface CsvLogin {
@@ -8,6 +5,7 @@ export interface CsvLogin {
   username: string;
   password: string;
   notes: string;
+  twoStepKey: string;
 }
 
 const COLUMNS = {
@@ -15,10 +13,10 @@ const COLUMNS = {
   username: ["username", "login_username", "user name", "login", "email"],
   password: ["password", "login_password"],
   notes: ["notes", "note", "extra", "comments"],
+  twoStepKey: ["login_totp", "totp", "otpauth"],
   type: ["type"],
 } as const;
 
-/** RFC 4180 rows: quoted fields may hold commas, line breaks and doubled quotes. */
 function parseRows(source: string): string[][] {
   const rows: string[][] = [];
   let row: string[] = [];
@@ -53,7 +51,6 @@ function parseRows(source: string): string[][] {
   return rows.filter((cells) => cells.some((cell) => cell.trim()));
 }
 
-/** The logins in `source`. A row of another kind, such as a Bitwarden card or note, is left out. */
 export function parseLoginCsv(source: string): { logins: CsvLogin[]; otherRows: number } {
   const [header, ...rows] = parseRows(source);
   if (!header) throw new Error(sourceText("error.vault.csvInvalid"));
@@ -62,8 +59,9 @@ export function parseLoginCsv(source: string): { logins: CsvLogin[]; otherRows: 
   const website = column(COLUMNS.website);
   const password = column(COLUMNS.password);
   if (website < 0 || password < 0) throw new Error(sourceText("error.vault.csvInvalid"));
-  const username = column(COLUMNS.username);
+  const userNames = names.flatMap((name, index) => (COLUMNS.username.some((choice) => choice === name) ? [index] : []));
   const notes = column(COLUMNS.notes);
+  const twoStepKey = column(COLUMNS.twoStepKey);
   const type = column(COLUMNS.type);
   const logins: CsvLogin[] = [];
   let otherRows = 0;
@@ -74,9 +72,10 @@ export function parseLoginCsv(source: string): { logins: CsvLogin[]; otherRows: 
     }
     logins.push({
       website: cells[website]?.trim() ?? "",
-      username: username < 0 ? "" : (cells[username]?.trim() ?? ""),
+      username: userNames.map((index) => cells[index]?.trim()).find(Boolean) ?? "",
       password: cells[password] ?? "",
       notes: notes < 0 ? "" : (cells[notes]?.trim() ?? ""),
+      twoStepKey: twoStepKey < 0 ? "" : (cells[twoStepKey]?.trim() ?? ""),
     });
   }
   return { logins, otherRows };

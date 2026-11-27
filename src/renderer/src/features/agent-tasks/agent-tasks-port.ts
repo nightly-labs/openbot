@@ -1,6 +1,6 @@
 import type { AgentTaskInput, OpenBotDesktopApi } from "@openbot/contracts/ipc";
+import { noteAgentRequest } from "../../agent-requests";
 
-/** What the side thread state reaches on a server: the list, a thread's conversation, and the thread actions. */
 export interface AgentTasksPort
   extends Pick<
     OpenBotDesktopApi["agent"],
@@ -14,7 +14,7 @@ export interface AgentTasksPort
     | "startTask"
     | "stopTask"
   > {
-  /** Steers the thread's running turn, or queues the message in the thread. */
+  listTaskReads?: OpenBotDesktopApi["agent"]["listTaskReads"];
   sendToTask(
     input: AgentTaskInput & {
       text: string;
@@ -23,34 +23,48 @@ export interface AgentTasksPort
       clientMessageId: string;
     },
   ): Promise<unknown>;
-  /** Missing where the server cannot move a queued message of the agent's own chat to a new thread. */
   runQueuedMessageAsTask?: OpenBotDesktopApi["agent"]["runQueuedMessageAsTask"];
-  /** Missing where the server cannot branch a conversation. The branch actions then do not show. */
+  listArchivedTasks?: OpenBotDesktopApi["agent"]["listArchivedTasks"];
+  readTaskPage?: OpenBotDesktopApi["agent"]["readTaskPage"];
+  readTaskAround?: OpenBotDesktopApi["agent"]["readTaskAround"];
   branchTask?: OpenBotDesktopApi["agent"]["branchTask"];
-  /** Deletes one message of a thread. Missing where the server cannot delete messages. */
   deleteTaskMessage?: ((input: { agentId: string; taskId: string; messageId: string }) => Promise<void>) | undefined;
+  queue?: Pick<OpenBotDesktopApi["agent"], "cancelQueuedMessage" | "steerQueuedMessage" | "reorderQueue"> | undefined;
 }
 
-/**
- * The side threads on desktop: main reaches the active server, or the server that a call names. A
- * delete that waits for its Undo time names its server, so a server switch does not move it.
- * Read on each call: tests and stories replace `window.openbot` per case.
- */
-export function agentTasksPort(): AgentTasksPort {
+export function agentTasksPort(server: string): AgentTasksPort {
   const { agent } = window.openbot;
   return {
-    listTasks: (agentId) => agent.listTasks(agentId),
-    readTask: (input) => agent.readTask(input),
-    startTask: (input) => agent.startTask(input),
-    sendToTask: (input) => agent.sendMessage(input),
-    runQueuedMessageAsTask: (input) => agent.runQueuedMessageAsTask(input),
-    branchTask: (input) => agent.branchTask(input),
-    stopTask: (input) => agent.stopTask(input),
-    closeTask: (input, serverId) => agent.closeTask(input, serverId),
-    reopenTask: (input, serverId) => agent.reopenTask(input, serverId),
-    renameTask: (input) => agent.renameTask(input),
-    deleteTask: (input, serverId) => agent.deleteTask(input, serverId),
-    deleteTaskMessage: (input) => agent.deleteConversationMessage(input),
-    markTaskRead: (input) => agent.markTaskRead(input),
+    listTasks: (agentId) => agent.listTasks(agentId, server),
+    listArchivedTasks: (input) => agent.listArchivedTasks(input, server),
+    readTask: (input) => agent.readTask(input, server),
+    readTaskPage: (input) => agent.readTaskPage(input, server),
+    readTaskAround: (input) => agent.readTaskAround(input, server),
+    startTask: (input) => {
+      noteAgentRequest(server, input.agentId);
+      return agent.startTask(input, server);
+    },
+    sendToTask: (input) => {
+      noteAgentRequest(server, input.agentId);
+      return agent.sendMessage(input, server);
+    },
+    runQueuedMessageAsTask: (input) => {
+      noteAgentRequest(server, input.agentId);
+      return agent.runQueuedMessageAsTask(input, server);
+    },
+    branchTask: (input) => agent.branchTask(input, server),
+    stopTask: (input) => agent.stopTask(input, server),
+    closeTask: (input, serverId) => agent.closeTask(input, serverId ?? server),
+    reopenTask: (input, serverId) => agent.reopenTask(input, serverId ?? server),
+    renameTask: (input) => agent.renameTask(input, server),
+    deleteTask: (input, serverId) => agent.deleteTask(input, serverId ?? server),
+    deleteTaskMessage: (input) => agent.deleteConversationMessage(input, server),
+    listTaskReads: (agentId) => agent.listTaskReads(agentId, server),
+    markTaskRead: (input) => agent.markTaskRead(input, server),
+    queue: {
+      cancelQueuedMessage: (input) => agent.cancelQueuedMessage(input, server),
+      steerQueuedMessage: (input) => agent.steerQueuedMessage(input, server),
+      reorderQueue: (input) => agent.reorderQueue(input, server),
+    },
   };
 }

@@ -1,4 +1,6 @@
 import { randomUUID } from "node:crypto";
+import type { CreditMediaGenerationKind } from "@openbot/contracts/credit-media";
+import type { FeedbackPhone } from "@openbot/contracts/feedback";
 import type {
   AgentApproval,
   AgentApprovalKind,
@@ -8,14 +10,29 @@ import type {
   AgentRuntimeSnapshot,
   BrowserTab,
   BrowserTakeoverRequest,
+  BrowserVaultSkipReason,
   ConversationMessageSender,
+  ConversationNearPayment,
+  CreditsHold,
   LocalBrowserSecretResponse,
+  MediaApprovalChoice,
+  MediaApprovalOffer,
   RespondToApprovalInput,
   RespondToBrowserTakeoverInput,
+  RespondToCreditsHoldInput,
+  RespondToMediaApprovalInput,
   RespondToPromptInput,
 } from "@openbot/contracts/ipc";
-import { AGENT_RUNTIME_ATTENTION_LIMIT, BROWSER_TAKEOVER_REASONS, cardBrand } from "@openbot/contracts/ipc";
-import { type DynamicRecord, isOneOf } from "@openbot/contracts/runtime-values";
+import {
+  AGENT_RUNTIME_ATTENTION_LIMIT,
+  AGENT_WELCOME_ITEM_TYPE,
+  BROWSER_TAKEOVER_REASONS,
+  cardBrand,
+  NEAR_PAYMENT_ITEM_TYPE,
+  NEAR_WALLET_LIMITS,
+} from "@openbot/contracts/ipc";
+import { type DynamicRecord, isOneOf, isString } from "@openbot/contracts/runtime-values";
+import { normalizeTwoStepKey, twoStepKeySecret } from "@openbot/contracts/two-step-code";
 import {
   type ConversationUiBlock,
   normalizeConversationUiBlock,
@@ -35,30 +52,49 @@ import {
   uiBlockHasPrivilegedAction,
   uiBlockOutcomeText,
   uiBlockResponseFromAnswers,
+  uiConfirmPreviewEdit,
   validateUiBlockResponse,
 } from "@openbot/contracts/ui-blocks";
 import { sourceText } from "@openbot/i18n/source";
-import { createOpenBotLogger, redactText, toLogValue } from "@openbot/logging";
-import { Deferred, Effect, Result, Schema } from "effect";
+import { createOpenBotLogger, redactText, registerSecretValue, toLogValue } from "@openbot/logging";
+import { Deferred, Effect, Option, Result, Schema } from "effect";
 import { getDomain } from "tldts";
-import type { AgentApiKeys } from "../agent-api-keys";
-import type { AgentClient } from "../agent-client";
-import { type BrowserOperationError, browserFailure } from "../browser-effects";
+import type { AgentApiKeys, SavedApiKey } from "../agent-api-keys";
+import type { AgentClient, AgentProvider } from "../agent-client";
+import { type BrowserOperationError, browserFailure, secureInputFailure } from "../browser-effects";
 import type { PreparedBrowserSecret } from "../browser-host";
 import type { BrowserCardVault } from "../browser-tool-actions";
+import { repairBrowserToolInput } from "../browser-tool-input";
 import { type BrowserToolArguments, parseBrowserToolCall } from "../browser-tools";
 import { causeHelpers } from "../effect-boundary";
 import { LINK_CARD_ID_PREFIX, type LinkWallet } from "../link-wallet";
-import type { PasswordVault, PasswordVaultError } from "../password-vault";
+import type { NearPaymentResult, NearWallet } from "../near-wallet";
+import {
+  isWebProtocol,
+  type PasswordVault,
+  type PasswordVaultError,
+  type VaultLogin,
+  websiteUrl,
+} from "../password-vault";
 import {
   type AppServerRequest,
   type DynamicToolCallParams,
   type DynamicToolResult,
+  getArray,
   getRecord,
   getString,
+  isRecord,
   type RequestId,
 } from "../protocol";
-import type { VaultAgentChange, VaultAgentResult, VaultEnteredItem, VaultItems } from "../vault-items";
+import {
+  type VaultAgent,
+  type VaultAgentChange,
+  type VaultAgentResult,
+  type VaultEnteredItem,
+  type VaultItems,
+  type VaultTypedLogin,
+  vaultClosedText,
+} from "../vault-items";
 import { type ApprovalAutomationPolicy, NO_APPROVAL_AUTOMATION, shouldAutoApprove } from "./approval-automation";
 import type { ConversationRuntime } from "./conversation-runtime";
 import type { HostedSiteOperationFailed } from "./hosted-site-coordinator";
@@ -69,26 +105,41 @@ import {
 } from "./hosted-site-coordinator";
 import type { HostedSiteMutationTool } from "./hosted-site-events";
 import { ForbiddenAttentionAnswer, InactiveAttentionRequest } from "./inactive-attention-request";
+import { nearPaymentText } from "./near-payment-message";
 import {
   API_KEY_FIELD_ID,
+  API_KEY_SCOPE_AGENT,
+  API_KEY_SCOPE_FIELD_ID,
   apiKeyPromptResult,
   approvalPermissions,
   browserTakeoverError,
+  browserTakeoverExpiredResult,
+  browserTakeoverLateNotes,
+  browserTakeoverReleasedResult,
   browserTakeoverResult,
+  browserTakeoverWaitingResult,
   type ConfirmedActionOutput,
   commandText,
   confirmedActionPromptResult,
+  declinedMcpElicitationText,
+  detachedPromptResult,
   dynamicPromptResult,
+  editedPreviewQuestions,
   expiredPromptResult,
+  lateAnswerText,
+  locationPromptResult,
   MCP_TOOL_CONSENT_ALLOW_ONCE,
   mcpElicitationQuestions,
   mcpElicitationResult,
   mcpToolCallConsent,
   promptQuestions,
+  promptQuestionsProblem,
   promptResolution,
   questionPromptText,
   uiBlockPromptResult,
+  userMessagePromptResult,
   validPromptQuestions,
+  vaultLateAnswerText,
   vaultPromptResult,
   vaultRequestFormSpec,
 } from "./prompts";
@@ -106,59 +157,106 @@ interface PendingPrompt {
   publicThreadId: string;
   turnId: string;
   messageId: string;
-  /** For `ui-block`, the fallback questions of the block. */
   questions: AgentPromptQuestion[];
-  /** Set exactly when `responseKind` is `ui-block`. */
   uiBlock?: SurfacedUiBlock;
-  /**
-   * True while the answer of a `request_api_key` or `request_vault_item` block is saved, or while the
-   * host runs the `confirmed` action of a block.
-   */
   saving?: boolean;
-  /** The block's own answer, and the timer that gives it. Removing the prompt clears the timer. */
   autoAnswer?: { state: UiBlockAutoAnswer; timer: ReturnType<typeof setTimeout> };
+  detach?: { target: LateAnswerTarget; timer?: ReturnType<typeof setTimeout> };
+  detached?: LateAnswerTarget;
+  expireTimer?: ReturnType<typeof setTimeout>;
+  subagent?: true;
 }
 
-/**
- * An `ask_ui` block, or the form of `request_api_key` or `request_vault_item`. With `apiKey`, the value
- * of its secret field `API_KEY_FIELD_ID` is saved for the agent under that name, and the agent gets the
- * file path only. With `vault`, the answer is saved as a new Vault item, and the agent gets its name only.
- */
+function outlivesTurn(pending: PendingPrompt): boolean {
+  return pending.detached !== undefined || pending.subagent === true;
+}
+
+function plainBlock(
+  block: SurfacedUiBlock,
+  auto: UiBlockAutoAnswer | undefined,
+  questions: AgentPromptQuestion[],
+): boolean {
+  return (
+    !block.vault &&
+    !block.apiKey &&
+    !block.location &&
+    auto === undefined &&
+    !questions.some((question) => question.isSecret)
+  );
+}
+
+function providerStopsCall(request: AppServerRequest): boolean {
+  return request.detachAfterMs !== undefined || request.answerBeforeMs !== undefined;
+}
+
+export type AgentPersonWait = "approval" | "answer" | "browser";
+
+export interface LateAnswerTarget {
+  taskId?: string;
+}
+
 export interface SurfacedUiBlock {
   blockId: string;
   spec: UiBlockSpec;
-  apiKey?: { name: string };
+  apiKey?: { name: string; vault?: boolean };
   vault?: { kind: UiVaultRequestKind };
-  /**
-   * What the host does itself when the server owner or an admin presses `actionId`, such as sending
-   * the Gmail draft that the card shows. It runs before the agent gets the answer, and a failure
-   * leaves the block open. The agent gets what `run` returns, so the agent cannot act in the user's
-   * name without the press. It never goes on the wire.
-   */
   confirmed?: { actionId: string; run: () => Effect.Effect<ConfirmedActionOutput, { readonly cause: unknown }> };
+  location?: true;
 }
 
-/**
- * Who answers a prompt. Absent means the person at this computer, who owns the server. A team member
- * answers through the Team API, which knows their role.
- */
 export interface PromptResponder {
   sender?: ConversationMessageSender;
-  /** The server owner or an admin. Only they may take a privileged UI block action. */
   privileged: boolean;
-  /** The host gave the block's auto answer: nobody answered in time. */
   automatic?: boolean;
 }
 
 const AUTOMATIC_RESPONDER: PromptResponder = { privileged: true, automatic: true };
 
-/**
- * Who answers an approval. Absent means the person at this computer, who owns the server. A team
- * member, a chat app user or a local script gives `owner: false`, and the Team API gives the owner's
- * own clients `owner: true`.
- */
 export interface ApprovalResponder {
   owner: boolean;
+  phone?: FeedbackPhone;
+  person?: { id: string; canAdminister: boolean };
+}
+
+export interface CreditsHoldCall {
+  kind: CreditMediaGenerationKind;
+  cost: number;
+}
+
+export interface CreditsHoldWallet {
+  agentsAllowed: () => boolean;
+  enableAgents: () => Effect.Effect<void, unknown>;
+  balance: () => Effect.Effect<number | null>;
+}
+
+export type CreditAnswerVia = "local" | "remote" | "automatic";
+
+function answerVia(responder: ApprovalResponder | undefined): CreditAnswerVia {
+  return responder ? "remote" : "local";
+}
+
+export interface CreditsHoldAnswer {
+  action: "continue" | "skip" | "mute";
+  responder?: ApprovalResponder;
+  via?: CreditAnswerVia;
+  enabled?: boolean;
+  stopped?: boolean;
+}
+
+interface PendingCreditsHold {
+  call: CreditsHoldCall;
+  balance: number | null;
+  wallet: CreditsHoldWallet;
+  answer: (answer: CreditsHoldAnswer) => void;
+}
+
+function respondsAsAdmin(responder: ApprovalResponder | undefined): boolean {
+  if (!responder) return true;
+  return responder.person?.canAdminister ?? responder.owner;
+}
+
+function creditsSum(values: readonly number[]): number {
+  return Math.round(values.reduce((total, value) => total + value, 0) * 1000) / 1000;
 }
 
 interface PendingApproval {
@@ -167,38 +265,69 @@ interface PendingApproval {
   method: string;
   params: unknown;
   approval: AgentApproval;
+  executionThreadId: string;
   hostedSiteMutation?: HostedSiteMutationContext;
-  /** A built-in tool waits for this answer and does the work itself. "cancel" means nobody answered. */
-  decide?: (decision: ToolApprovalDecision) => void;
-  /** The tool asks even when the agent has Full access, so a later grant does not answer it. */
+  decide?: (decision: ToolApprovalDecision, responder?: ApprovalResponder, choice?: MediaApprovalChoice) => void;
+  media?: MediaApprovalOffer;
+  creditsHold?: PendingCreditsHold;
   alwaysAsk?: boolean;
-  /** Only the owner can answer, because the approval lets agents use what is the owner's alone. */
   ownerOnly?: boolean;
+  needsPhone?: boolean;
 }
 
-type ToolApprovalDecision = "accept" | "decline" | "cancel";
+export type ToolApprovalDecision = "accept" | "decline" | "cancel";
+
+interface MediaApprovalAnswer {
+  readonly decision: ToolApprovalDecision;
+  readonly choice?: MediaApprovalChoice;
+  readonly via: CreditAnswerVia;
+}
 
 const TOOL_APPROVAL_METHOD = "openbot/tool-approval";
-/** The agent reads this, not the user: it says how to ask in an external chat turn (Slack, Discord, Telegram, WhatsApp). */
 const MESSAGING_QUESTION_REFUSED =
   "This conversation is in an external chat, where nobody can answer a question card. Ask the question in your answer: the person replies in the conversation.";
+const MESSAGING_REQUEST_CARD_REFUSED =
+  "This request came from an external chat (Slack, Discord, Telegram or WhatsApp) through another agent, and nobody can answer a card here. Decide on your own and continue. When only the OpenBot user can unblock you, such as a sign-in, a key or a password, stop and say in your answer exactly what the OpenBot user must do in OpenBot.";
+const MCP_TOOL_CONSENT_UNANSWERABLE = {
+  action: "cancel",
+  content: null,
+  _meta: { codex_approval_cancellation_reason: "non_interactive" },
+} as const;
 
-/** The agent reads these, not the user. */
+const TAKEOVER_TAB_ID_MISSING = "Give tabId: the id of the tab, from open or list_tabs.";
+const TAKEOVER_TAB_OF_OTHER_CHAT =
+  "This chat cannot use this tab. Open the page in this chat with open, then call this tool with the new tabId.";
+const USER_ANSWER_LIMIT_MS = 10 * 60_000;
+const TAKEOVER_ALREADY_WAITING = "A takeover of this tab already waits for the user. Wait for it to return.";
 const VAULT_UNAVAILABLE = "No Vault is available on this computer. Ask the user.";
-const VAULT_LOGIN_ADD_REFUSED =
-  "You cannot add a login: a password comes only from the user. Call request_vault_item kind=login, or sign in with submit_secret, and the user can save the password from the card. In a Slack, Discord or Telegram chat, ask the user to add it in Server settings > Vault.";
+const ROUTINE_SAVED_LOGIN_NOT_FILLED =
+  "This is a routine run, so nobody can answer a password card. When this text says how to correct the call, correct it and call submit_secret again with the loginId. Else stop the sign-in and say in your report that the user must sign in, and why OpenBot did not fill the saved login. Do not call submit_secret without loginId or request_takeover.";
+const NO_LOGIN_FOR_SITE =
+  "No saved login is for the site of this page. A login fits only the site of a website saved in it, with its subdomains, and a sign-in page can be on a different site than the service. When the user says that a login for this account is saved, tell them what to check. In a password manager: add the address of this sign-in page as a website of the login, and keep the login where they share logins with OpenBot; the page of each password manager in Marketplace shows where. In the OpenBot Vault, a login has one website: save a second login for the address of this sign-in page in Server settings > Vault, and let this agent use the login under Agents. Until then, continue as for a site with no saved login.";
+const VAULT_LOGIN_ADD_FIELDS =
+  "A new login needs website and password. When you do not have the password, call request_vault_item kind=login.";
+const VAULT_PASSWORD_EXTERNAL_REFUSED =
+  "You cannot save a password in an external chat. Ask the user to add it in Server settings > Vault.";
+const VAULT_PASSWORD_PERSON_ONLY =
+  "Only a person's message, in your OpenBot chat or a thread they opened, can save a password or a two-step key. Ask the user to add it in Server settings > Vault.";
+const decodePasswordArgument = Schema.decodeUnknownOption(Schema.Struct({ password: Schema.String }));
+const VAULT_TWO_STEP_KEY_INVALID =
+  "twoStepKey is not an authenticator setup key. Give the base32 key (at least 16 characters) or the otpauth://totp/ link that the site shows with its QR code.";
+const decodeTwoStepKeyArgument = Schema.decodeUnknownOption(Schema.Struct({ twoStepKey: Schema.String }));
 const VAULT_CARD_ADD_REFUSED =
   "You cannot add a card: its number comes only from the user. Call request_vault_item kind=card. In a Slack, Discord or Telegram chat, ask the user to add it in Server settings > Vault.";
 const VAULT_FIELDS: Record<BrowserToolArguments<"save_vault_item">["kind"], readonly string[]> = {
   contact: ["label", "fullName", "address", "address2", "city", "region", "postalCode", "country", "phone", "email"],
-  login: ["username"],
+  login: ["website", "username", "password", "twoStepKey"],
   card: ["label", "nameOnCard", "expMonth", "expYear", "billingContactId"],
 };
 
 const LINK_UNAVAILABLE =
   "Link is not connected. Ask the user to connect Link in Server settings > Vault > Cards, or use a saved card.";
 
-/** The host name of an https address, or null. */
+const NEAR_UNAVAILABLE =
+  "The NEAR Intents wallet is not ready. Ask the user to set it up or unfreeze it in Server settings > Vault > Crypto.";
+
 function httpsHost(address: string): string | null {
   try {
     const url = new URL(address);
@@ -208,10 +337,6 @@ function httpsHost(address: string): string | null {
   }
 }
 
-/**
- * The merchant's own site: the same registrable domain, such as shop.example.com for example.com. A
- * public suffix, such as `myshopify.com` or `co.uk`, is never a site.
- */
 function sameSite(address: string, merchant: string): boolean {
   const host = httpsHost(address);
   if (!host) return false;
@@ -219,15 +344,37 @@ function sameSite(address: string, merchant: string): boolean {
   return domain !== null && domain === getDomain(merchant, { allowPrivateDomains: true });
 }
 
-/** The change that `save_vault_item` asks for, or the text that tells the agent what is wrong. */
-function vaultChange(args: BrowserToolArguments<"save_vault_item">): VaultAgentChange | string {
+type VaultAgentSave = VaultAgentChange | { kind: "newLogin"; login: VaultTypedLogin; twoStepKey?: string | undefined };
+
+function vaultChange(args: BrowserToolArguments<"save_vault_item">): VaultAgentSave | string {
   const allowed = VAULT_FIELDS[args.kind];
   const misplaced = Object.entries(args).find(
     ([key, value]) => value !== undefined && key !== "kind" && key !== "id" && !allowed.includes(key),
   );
   if (misplaced) return `${misplaced[0]} is not a field of a ${args.kind}. Its fields are: ${allowed.join(", ")}.`;
-  if (args.kind === "login")
-    return args.id ? { kind: "login", id: args.id, username: args.username } : VAULT_LOGIN_ADD_REFUSED;
+  if (args.kind === "login") {
+    if (args.twoStepKey && normalizeTwoStepKey(args.twoStepKey) === null) return VAULT_TWO_STEP_KEY_INVALID;
+    if (args.id) {
+      if (args.website !== undefined)
+        return "A saved login keeps its website. Omit website, or omit id to add a login.";
+      return {
+        kind: "login",
+        id: args.id,
+        username: args.username,
+        password: args.password,
+        twoStepKey: args.twoStepKey,
+      };
+    }
+    if (!args.website?.trim() || !args.password?.trim()) return VAULT_LOGIN_ADD_FIELDS;
+    const url = websiteUrl(args.website);
+    if (!url || !isWebProtocol(url) || !url.hostname)
+      return "website must be an HTTP or HTTPS website, such as example.com or http://192.168.1.1.";
+    return {
+      kind: "newLogin",
+      login: { origin: url.origin, username: args.username ?? "", password: args.password },
+      twoStepKey: args.twoStepKey || undefined,
+    };
+  }
   if (args.kind === "card")
     return args.id
       ? {
@@ -256,10 +403,6 @@ function vaultChange(args: BrowserToolArguments<"save_vault_item">): VaultAgentC
   return { kind: "contact", id: args.id, fields };
 }
 
-/**
- * A refused change tells the agent why: the Vault's own errors are user text with no secret in them.
- * A file error is logged and the agent gets a fixed text.
- */
 function vaultFailure(action: "save" | "delete", failure: PasswordVaultError): DynamicToolResult {
   logger.warn(`Unable to ${action} a Vault item for an agent`, { error: toLogValue(failure.cause) });
   const { cause } = failure;
@@ -272,7 +415,6 @@ function vaultResult(value: { status: string } & VaultAgentResult): DynamicToolR
   return { success: true, contentItems: [{ type: "inputText", text: JSON.stringify(value) }] };
 }
 
-/** MM/YY or MM/YYYY. A wrong expiry gives NaN, which the Vault refuses with text for the user. */
 function enteredExpiry(text: string): { expMonth: number; expYear: number } {
   const match = /^(\d{1,2})\s*\/\s*(\d{2}|\d{4})$/u.exec(text.trim());
   if (!match?.[1] || !match[2]) return { expMonth: Number.NaN, expYear: Number.NaN };
@@ -280,7 +422,6 @@ function enteredExpiry(text: string): { expMonth: number; expYear: number } {
   return { expMonth: Number(match[1]), expYear: year < 100 ? 2000 + year : year };
 }
 
-/** The Vault item in the answer of a `request_vault_item` form. Null when the user typed nothing. */
 function enteredVaultItem(
   kind: UiVaultRequestKind,
   values: Readonly<Record<string, UiBlockValue>>,
@@ -298,7 +439,6 @@ function enteredVaultItem(
         website: text("website"),
         username: text("username"),
         notes: "",
-        // A password keeps its spaces, as the Vault page keeps them.
         password: typeof values.password === "string" ? values.password : "",
       };
     case "card":
@@ -332,25 +472,49 @@ function enteredVaultItem(
   }
 }
 
+const TYPED_PASSWORD_NOT_SAVED =
+  "The password was not saved in the Vault: the secure input did not complete. Tell the user in one short sentence that the password was not saved.";
+
 interface PendingBrowserTakeover {
   client: AgentClient;
-  /** The provider's request. `submit_secret` keys the entry by a new id, so it is kept here. */
   providerRequestId: RequestId;
   secret?: PreparedBrowserSecret | undefined;
   submitting?: boolean;
-  /** The saved login that OpenBot filled without the card, so the agent does not credit the user. */
   vaultLoginId?: string;
-  /** Why OpenBot did not fill a saved login, so the agent can tell the user and correct its call. */
   vaultSkipped?: string;
+  personCompleted?: true;
+  memberCompleted?: true;
+  personCancelled?: true;
+  vaultNotSaved?: true;
+  secureInputFailed?: string;
   params: DynamicToolCallParams;
   request: BrowserTakeoverRequest;
   resolve: (result: DynamicToolResult) => void;
+  releaseAt: number;
+  detached?: true;
+  released?: LateAnswerTarget;
+  subagent?: true;
 }
 
-/**
- * The hosted-site half of an approval, narrow enough that the registry never learns what a site is.
- * `HostedSiteCoordinator` satisfies it.
- */
+function heldTakeoverKey(tabId: string, threadId: string): string {
+  return JSON.stringify([tabId, threadId]);
+}
+
+interface HeldTakeoverResult {
+  tabId: string;
+  threadId: string;
+  turnId: string;
+  result: DynamicToolResult;
+}
+
+function takeoverCall() {
+  const completion = Deferred.makeUnsafe<DynamicToolResult>();
+  const resolve = (result: DynamicToolResult) => {
+    Deferred.doneUnsafe(completion, Effect.succeed(result));
+  };
+  return { completion, resolve };
+}
+
 export interface HostedSiteApprovals {
   prepareApproval(
     client: AgentClient,
@@ -365,27 +529,21 @@ export interface HostedSiteApprovals {
   ): Effect.Effect<void, HostedSiteOperationFailed>;
 }
 
-/**
- * How an outstanding question feeds back into a routine run's status. Implemented by the facade in
- * this PR and handed to `RoutineScheduler` in the next.
- */
 export interface RoutineAttention {
   markNeedsAttention(turnId: string | null): void;
   markRunningForTurn(turnId: string | null): void;
+  runsTurn(turnId: string): boolean;
 }
 
-/**
- * The browser surface a takeover needs: the tab roster, to check that the agent asking owns the tab it
- * names, and the pair of calls that suspend and resume agent control of it. `BrowserHost` satisfies it.
- */
 export interface AttentionBrowserHost {
   prepareSecret?(params: DynamicToolCallParams): Effect.Effect<PreparedBrowserSecret, BrowserOperationError>;
   listTabs(): BrowserTab[];
+  toolCanUseTab(params: DynamicToolCallParams, tabId: string): boolean;
   beginTakeover(tabId: string): Effect.Effect<void, BrowserOperationError>;
-  endTakeover(tabId: string): void;
+  endTakeover(tabId: string, completed?: boolean): void;
+  takeoverSignInArrived?(tabId: string): boolean;
 }
 
-/** What the registry reads of the conversation runtime, so a test can give it a small one. */
 type AttentionConversation = Pick<
   ConversationRuntime,
   "agentForThread" | "emitConversation" | "ensureSnapshot" | "publicThreadId"
@@ -396,37 +554,37 @@ export interface AttentionRegistryOptions {
   browser: AttentionBrowserHost;
   hostedSites: HostedSiteApprovals;
   routines: RoutineAttention;
-  /** Read at each approval, so a grant the user gives now applies to the next request. */
   approvalAutomation?: ApprovalAutomationPolicy | undefined;
-  /**
-   * Whether the agent runs in the workspace sandbox now. Each approval it raises asks to go outside
-   * the limit the user chose, so Full access does not answer it.
-   */
   workspaceSandboxed?(agentId: string): boolean;
-  /**
-   * Whether this thread answers an external chat conversation (Slack, Discord, Telegram, WhatsApp). Nobody there can answer a
-   * question card, and the turn would wait for one with no limit while every other conversation of
-   * the agent waits behind it.
-   */
+  confinedWritesAllowed?(agentId: string, paths: readonly string[]): boolean;
   messagingThread?(threadId: string): boolean;
+  messagingRequestTurn?(agentId: string, turnId: string): boolean;
+  approvalChatThread?(agentId: string, threadId: string): string;
   emit(event: AgentEvent): void;
   emitError(code: string, error: unknown, agentId?: string): void;
   emitRuntimeSnapshot(): void;
-  /**
-   * The vault the user shared with OpenBot, or null. A password or authenticator request for a login
-   * saved there is filled without a card: putting the login in the shared vault is the consent.
-   */
   passwordVault?: PasswordVault | null | undefined;
-  /** The cards and contact info of the Vault, or null. `fill_card` types a card without the agent reading it. */
   vaultItems?: VaultItems | null | undefined;
-  /** The Link account of this computer, or null. Agents ask it for one-time cards that the user approves in Link. */
   linkWallet?: LinkWallet | null | undefined;
-  /** The name of an agent now. An item that an agent adds to the Vault keeps it. */
+  nearWallet?: NearWallet | null | undefined;
   agentName?(agentId: string): string | undefined;
-  /** Adds a note to the chat that an agent changed the Vault. `text` is source text. */
   noteVaultChange?(agentId: string, threadId: string, turnId: string, text: string): void;
-  /** Where the answer of `request_api_key` is saved; null where nothing can save it. */
   apiKeys?: AgentApiKeys | null | undefined;
+  codexSubagentParent?(childThreadId: string): CodexSubagentParent | undefined;
+  lateAnswerTarget?(agentId: string, publicThreadId: string): LateAnswerTarget | null;
+  sendLateAnswer?(
+    agentId: string,
+    target: LateAnswerTarget,
+    text: string,
+    sender: ConversationMessageSender | undefined,
+  ): void;
+  userAnswerLimitMs?: number;
+}
+
+export interface CodexSubagentParent {
+  agentId: string;
+  threadId: string;
+  turnId: string;
 }
 
 export type RuntimeAttention = Pick<
@@ -438,18 +596,7 @@ export type LocalAttentionResponse =
   | { kind: "prompt"; requestId: string; answers: Record<string, string[]> }
   | { kind: "approval"; requestId: string; decision: "accept" | "decline" };
 
-/**
- * Everything an agent can be blocked on waiting for the user: a question, an approval, a request to
- * take over a browser tab.
- *
- * The three live together because they are one queue as far as the product is concerned — the
- * runtime snapshot budgets them against a single attention limit in that order, duplication refuses
- * while any of them is outstanding, and a turn ending clears all three at once. Each also owes the
- * provider a response, so every path out of these maps either answers the request or cancels it;
- * an entry silently dropped is an agent stuck forever.
- */
 export class AttentionRegistry {
-  // A handle belongs to one pending object, even when a provider reuses its request ID.
   readonly #localHandles = new WeakMap<PendingPrompt | PendingApproval | PendingBrowserTakeover, string>();
   readonly #conversation: AttentionConversation;
   readonly #browser: AttentionBrowserHost;
@@ -457,19 +604,28 @@ export class AttentionRegistry {
   readonly #routines: RoutineAttention;
   readonly #approvalAutomation: ApprovalAutomationPolicy;
   readonly #workspaceSandboxed: (agentId: string) => boolean;
+  readonly #confinedWritesAllowed: (agentId: string, paths: readonly string[]) => boolean;
   readonly #messagingThread: (threadId: string) => boolean;
+  readonly #messagingRequestTurn: (agentId: string, turnId: string) => boolean;
+  readonly #approvalChatThread: (agentId: string, threadId: string) => string;
   readonly #emit: (event: AgentEvent) => void;
   readonly #emitError: (code: string, error: unknown, agentId?: string) => void;
   readonly #emitRuntimeSnapshot: () => void;
   readonly #passwordVault: PasswordVault | null;
   readonly #vaultItems: VaultItems | null;
   readonly #linkWallet: LinkWallet | null;
+  readonly #nearWallet: NearWallet | null;
   readonly #agentName: (agentId: string) => string | undefined;
   readonly #noteVaultChange: (agentId: string, threadId: string, turnId: string, text: string) => void;
   readonly #apiKeys: AgentApiKeys | null;
+  readonly #codexSubagentParent: (childThreadId: string) => CodexSubagentParent | undefined;
+  readonly #lateAnswerTarget: (agentId: string, publicThreadId: string) => LateAnswerTarget | null;
+  readonly #sendLateAnswer: NonNullable<AttentionRegistryOptions["sendLateAnswer"]>;
+  readonly #userAnswerLimitMs: number;
   readonly #prompts = new Map<RequestId, PendingPrompt>();
   readonly #approvals = new Map<RequestId, PendingApproval>();
   readonly #takeovers = new Map<RequestId, PendingBrowserTakeover>();
+  readonly #heldTakeoverResults = new Map<string, HeldTakeoverResult>();
 
   constructor(options: AttentionRegistryOptions) {
     this.#conversation = options.conversation;
@@ -478,25 +634,158 @@ export class AttentionRegistry {
     this.#routines = options.routines;
     this.#approvalAutomation = options.approvalAutomation ?? NO_APPROVAL_AUTOMATION;
     this.#workspaceSandboxed = options.workspaceSandboxed ?? (() => false);
+    this.#confinedWritesAllowed = options.confinedWritesAllowed ?? (() => false);
     this.#messagingThread = options.messagingThread ?? (() => false);
+    this.#messagingRequestTurn = options.messagingRequestTurn ?? (() => false);
+    this.#approvalChatThread = options.approvalChatThread ?? ((_agentId, threadId) => threadId);
     this.#emit = options.emit;
     this.#emitError = options.emitError;
     this.#emitRuntimeSnapshot = options.emitRuntimeSnapshot;
     this.#passwordVault = options.passwordVault ?? null;
     this.#vaultItems = options.vaultItems ?? null;
     this.#linkWallet = options.linkWallet ?? null;
+    this.#nearWallet = options.nearWallet ?? null;
     this.#agentName = options.agentName ?? (() => undefined);
     this.#noteVaultChange = options.noteVaultChange ?? (() => undefined);
     this.#apiKeys = options.apiKeys ?? null;
+    this.#lateAnswerTarget = options.lateAnswerTarget ?? (() => null);
+    this.#sendLateAnswer = options.sendLateAnswer ?? (() => undefined);
+    this.#userAnswerLimitMs = options.userAnswerLimitMs ?? USER_ANSWER_LIMIT_MS;
+    this.#codexSubagentParent = options.codexSubagentParent ?? (() => undefined);
   }
 
-  /** The agent that asks `requestId`: a prompt, an approval, a browser takeover or a browser secret. */
+  #vaultAgent(agentId: string): VaultAgent {
+    return { id: agentId, name: this.#agentName(agentId) };
+  }
+
   agentIdForRequest(requestId: RequestId): string | undefined {
     return (
       this.#prompts.get(requestId)?.agentId ??
       this.#approvals.get(requestId)?.approval.agentId ??
       this.#takeovers.get(requestId)?.request.agentId
     );
+  }
+
+  pendingApproval(requestId: RequestId): AgentApproval | undefined {
+    const pending = this.#approvals.get(requestId);
+    return pending ? structuredClone(pending.approval) : undefined;
+  }
+
+  pendingMediaApproval(agentId: string, requestId: RequestId): MediaApprovalOffer | undefined {
+    const pending = this.#approvals.get(requestId);
+    if (!pending?.media || pending.approval.agentId !== agentId) return undefined;
+    return structuredClone(pending.media);
+  }
+
+  pendingCreditsHold(agentId: string, requestId: RequestId, canEnable: boolean): CreditsHold | undefined {
+    const pending = this.#approvals.get(requestId);
+    if (!pending?.creditsHold || pending.approval.agentId !== agentId) return undefined;
+    return this.#creditsHoldSummary(pending, pending.creditsHold, canEnable);
+  }
+
+  #creditsHoldGroup(pending: PendingApproval): PendingApproval[] {
+    const { agentId, threadId, turnId } = pending.approval;
+    return [...this.#approvals.values()].filter(
+      (other) =>
+        other.creditsHold !== undefined &&
+        other.approval.agentId === agentId &&
+        other.approval.threadId === threadId &&
+        other.approval.turnId === turnId,
+    );
+  }
+
+  #creditsHoldSummary(pending: PendingApproval, hold: PendingCreditsHold, canEnable: boolean): CreditsHold {
+    const calls = this.#creditsHoldGroup(pending).flatMap((other) =>
+      other.creditsHold ? [other.creditsHold.call] : [],
+    );
+    return {
+      reason: hold.wallet.agentsAllowed() ? "balance" : "agentsOff",
+      images: calls.filter((call) => call.kind === "image").length,
+      videos: calls.filter((call) => call.kind === "video").length,
+      cost: creditsSum(calls.map((call) => call.cost)),
+      balance: hold.balance,
+      canEnable,
+    };
+  }
+
+  #resolveCreditsHolds(group: readonly PendingApproval[], answer: CreditsHoldAnswer): void {
+    for (const pending of group) {
+      if (this.#approvals.get(pending.id) !== pending) continue;
+      this.#approvals.delete(pending.id);
+      this.#routines.markRunningForTurn(pending.approval.turnId);
+      this.#emitInputResolved("approval", pending.id, pending.approval.agentId);
+      pending.creditsHold?.answer(answer);
+    }
+    this.#emitRuntimeSnapshot();
+  }
+
+  readonly respondToCreditsHold = Effect.fn("AttentionRegistry.respondToCreditsHold")(function* (
+    this: AttentionRegistry,
+    input: RespondToCreditsHoldInput,
+    responder?: ApprovalResponder,
+    automatic = false,
+  ) {
+    const { pending, hold } = yield* attentionStep(() => {
+      const value = this.#approvals.get(input.requestId);
+      if (!value?.creditsHold || value.approval.agentId !== input.agentId)
+        throw new InactiveAttentionRequest(sourceText("error.backend.approvalInactive"));
+      if (input.action === "enable" && !respondsAsAdmin(responder))
+        throw new ForbiddenAttentionAnswer(sourceText("error.backend.creditsHoldAdminOnly"));
+      return { pending: value, hold: value.creditsHold };
+    });
+    const canEnable = respondsAsAdmin(responder);
+    const via = automatic ? "automatic" : answerVia(responder);
+    if (input.action === "skip" || input.action === "mute") {
+      this.#resolveCreditsHolds(this.#creditsHoldGroup(pending), {
+        action: input.action,
+        via,
+        ...(responder ? { responder } : {}),
+      });
+      return null;
+    }
+    if (input.action === "enable" && !hold.wallet.agentsAllowed())
+      yield* hold.wallet.enableAgents().pipe(Effect.mapError((cause) => new AttentionOperationFailed({ cause })));
+    if (!hold.wallet.agentsAllowed()) return this.#creditsHoldSummary(pending, hold, canEnable);
+    const balance = yield* hold.wallet.balance();
+    const group = this.#creditsHoldGroup(pending);
+    const cost = creditsSum(group.flatMap((other) => (other.creditsHold ? [other.creditsHold.call.cost] : [])));
+    if (balance !== null && balance < cost) {
+      for (const other of group) if (other.creditsHold) other.creditsHold.balance = balance;
+      return this.#creditsHoldSummary(pending, hold, canEnable);
+    }
+    this.#resolveCreditsHolds(group, {
+      action: "continue",
+      via,
+      ...(input.action === "enable" ? { enabled: true } : {}),
+      ...(responder ? { responder } : {}),
+    });
+    return null;
+  }, Effect.uninterruptible).bind(this);
+
+  recheckCreditsHolds(): void {
+    const seen = new Set<string>();
+    for (const pending of [...this.#approvals.values()]) {
+      if (!pending.creditsHold) continue;
+      const key = `${pending.approval.agentId}\u0000${pending.approval.threadId}\u0000${pending.approval.turnId}`;
+      if (seen.has(key)) continue;
+      seen.add(key);
+      const report = (error: unknown) =>
+        Effect.sync(() => {
+          if (this.#approvals.get(pending.id) === pending)
+            this.#emitError("credits_hold_recheck_failed", error, pending.approval.agentId);
+        });
+      Effect.runFork(
+        this.respondToCreditsHold(
+          {
+            agentId: pending.approval.agentId,
+            requestId: pending.id,
+            action: "continue",
+          },
+          undefined,
+          true,
+        ).pipe(Effect.catch(report), Effect.catchDefect(report)),
+      );
+    }
   }
 
   hasAttentionFor(agentId: string): boolean {
@@ -507,7 +796,34 @@ export class AttentionRegistry {
     );
   }
 
-  /** Full details for one agent; the UI snapshot has a separate size budget. */
+  waitsFor(agentId: string): AgentPersonWait[] {
+    const kinds: AgentPersonWait[] = [];
+    if ([...this.#approvals.values()].some((pending) => pending.approval.agentId === agentId)) kinds.push("approval");
+    if ([...this.#prompts.values()].some((pending) => pending.agentId === agentId && pending.detached === undefined))
+      kinds.push("answer");
+    if ([...this.#takeovers.values()].some((pending) => pending.request.agentId === agentId)) kinds.push("browser");
+    return kinds;
+  }
+
+  hasAttentionForTurn(threadId: string, turnId: string): boolean {
+    return (
+      [...this.#prompts.values()].some(
+        (pending) =>
+          !pending.detached &&
+          getString(pending.params, "threadId") === threadId &&
+          getString(pending.params, "turnId") === turnId,
+      ) ||
+      [...this.#approvals.values()].some(
+        (pending) =>
+          (getString(pending.params, "threadId") ?? getString(pending.params, "conversationId")) === threadId &&
+          (getString(pending.params, "turnId") ?? turnId) === turnId,
+      ) ||
+      [...this.#takeovers.values()].some(
+        (pending) => !pending.released && pending.params.threadId === threadId && pending.params.turnId === turnId,
+      )
+    );
+  }
+
   localAttention(agentId: string) {
     return {
       prompts: [...this.#prompts.values()]
@@ -540,7 +856,7 @@ export class AttentionRegistry {
           throw new InactiveAttentionRequest(sourceText("error.backend.promptInactive"));
         });
       }
-      return yield* this.respondToPrompt({ requestId: pending.id, answers: input.answers });
+      return yield* this.respondToPrompt({ requestId: pending.id, answers: input.answers }, { privileged: false });
     }
     const pending = [...this.#approvals.values()].find(
       (entry) => entry.approval.agentId === agentId && this.#localHandles.get(entry) === input.requestId,
@@ -550,7 +866,6 @@ export class AttentionRegistry {
         throw new InactiveAttentionRequest(sourceText("error.backend.approvalInactive"));
       });
     }
-    // A local script is not the owner: an agent can run one.
     return yield* this.respondToApproval({ requestId: pending.id, decision: input.decision }, { owner: false });
   }).bind(this);
 
@@ -562,18 +877,22 @@ export class AttentionRegistry {
     return handle;
   }
 
-  /** The attention section of the runtime snapshot, budgeted prompts first and takeovers last. */
-  runtimeAttention(): RuntimeAttention {
-    const attentionComplete =
-      this.#prompts.size + this.#approvals.size + this.#takeovers.size <= AGENT_RUNTIME_ATTENTION_LIMIT;
-    let remainingAttention = AGENT_RUNTIME_ATTENTION_LIMIT;
-    const pendingPrompts = [...this.#prompts.values()].slice(0, remainingAttention).map((pending) => ({
+  pendingPrompts(): RuntimeAttention["pendingPrompts"] {
+    return [...this.#prompts.values()].map((pending) => ({
       requestId: pending.id,
       agentId: pending.agentId,
       threadId: pending.publicThreadId,
       turnId: pending.turnId,
       questions: pending.questions.map(compactRuntimeQuestion),
+      ...(outlivesTurn(pending) ? { detached: true as const } : {}),
     }));
+  }
+
+  runtimeAttention(): RuntimeAttention {
+    const attentionComplete =
+      this.#prompts.size + this.#approvals.size + this.#takeovers.size <= AGENT_RUNTIME_ATTENTION_LIMIT;
+    let remainingAttention = AGENT_RUNTIME_ATTENTION_LIMIT;
+    const pendingPrompts = this.pendingPrompts().slice(0, remainingAttention);
     remainingAttention -= pendingPrompts.length;
     const pendingApprovals = [...this.#approvals.values()]
       .slice(0, remainingAttention)
@@ -595,49 +914,54 @@ export class AttentionRegistry {
     const done = yield* this.#runConfirmedAction(input, responder);
     yield* attentionStep(() => {
       const pending = this.#prompts.get(input.requestId);
-      // The turn ended while the key or the item was saved. It stays saved, and the agent can list it.
       if (saved && pending !== saved.pending) return;
       if (savedItem && pending !== savedItem.pending) return;
-      // The turn ended while the host acted. The action is done; nobody waits for its answer.
       if (done && pending !== done.pending) return;
       if (!pending) throw new InactiveAttentionRequest(sourceText("error.backend.promptInactive"));
+      const edit = pending.uiBlock
+        ? uiConfirmPreviewEdit(pending.uiBlock.spec, input.answers)
+        : { answers: input.answers };
+      if (!edit) throw new Error(sourceText("error.backend.uiBlockAnswerInvalid"));
+      const { answers } = edit;
       const questionIds = new Set(pending.questions.map((question) => question.id));
-      if (Object.keys(input.answers).some((id) => !questionIds.has(id))) {
+      if (Object.keys(answers).some((id) => !questionIds.has(id))) {
         throw new Error(sourceText("error.backend.promptAnswerMismatch"));
       }
-      // A refused UI block answer leaves the block open for an answer that fits.
-      const uiBlockResponse = pending.uiBlock ? uiBlockAnswer(pending.uiBlock.spec, input.answers, responder) : null;
+      const uiBlockResponse = pending.uiBlock ? uiBlockAnswer(pending.uiBlock.spec, answers, responder) : null;
+      const preview = uiBlockResponse ? edit.preview : undefined;
       this.#routines.markRunningForTurn(getString(pending.params, "turnId"));
 
-      // The forms of `request_api_key` and `request_vault_item` never give the agent their values.
       const result = done
         ? confirmedActionPromptResult(done.pending.uiBlock?.blockId ?? "", done.output)
         : pending.uiBlock?.apiKey
           ? apiKeyPromptResult(pending.uiBlock.blockId, saved?.key ?? null)
           : pending.uiBlock?.vault
             ? vaultPromptResult(pending.uiBlock.blockId, savedItem?.item ?? null)
-            : pending.uiBlock
-              ? uiBlockPromptResult(
-                  uiBlockResponse
-                    ? { status: "answered", blockId: pending.uiBlock.blockId, response: uiBlockResponse }
-                    : { status: "skipped", blockId: pending.uiBlock.blockId },
-                )
-              : pending.responseKind === "dynamic-tool"
-                ? dynamicPromptResult(input.answers)
-                : pending.responseKind === "mcp-elicitation"
-                  ? mcpElicitationResult(pending.params, input.answers)
-                  : {
-                      answers: Object.fromEntries(
-                        Object.entries(input.answers).map(([id, values]) => [id, { answers: values }]),
-                      ),
-                    };
-      pending.client.respond(pending.id, result);
+            : pending.uiBlock?.location
+              ? locationPromptResult(pending.uiBlock.blockId, uiBlockResponse)
+              : pending.uiBlock
+                ? uiBlockPromptResult(
+                    uiBlockResponse
+                      ? { status: "answered", blockId: pending.uiBlock.blockId, response: uiBlockResponse, preview }
+                      : { status: "skipped", blockId: pending.uiBlock.blockId },
+                  )
+                : pending.responseKind === "dynamic-tool"
+                  ? dynamicPromptResult(pending.questions, answers)
+                  : pending.responseKind === "mcp-elicitation"
+                    ? mcpElicitationResult(pending.params, answers)
+                    : {
+                        answers: Object.fromEntries(
+                          Object.entries(answers).map(([id, values]) => [id, { answers: values }]),
+                        ),
+                      };
+      if (!pending.detached) pending.client.respond(pending.id, result);
       this.#prompts.delete(input.requestId);
       clearTimeout(pending.autoAnswer?.timer);
+      clearTimeout(pending.detach?.timer);
+      clearTimeout(pending.expireTimer);
       this.#emitInputResolved("prompt", input.requestId, pending.agentId);
       try {
         if (pending.uiBlock) {
-          // A Vault request that saved nothing, such as an empty form from an older client, is closed.
           const frozenResponse = pending.uiBlock.vault && !savedItem ? null : uiBlockResponse;
           const state = answeredUiBlockState(
             pending.uiBlock.spec,
@@ -645,31 +969,42 @@ export class AttentionRegistry {
             responder,
             pending.autoAnswer?.state,
           );
-          // Notifications and the history read the outcome line. It names the item, and must fit the limit.
           if (savedItem)
             state.outcome = sourceText("status.agent.vaultAdded", {
               name: savedItem.item.name || (pending.uiBlock.spec.title ?? ""),
             }).slice(0, UI_BLOCK_LIMITS.outcome);
+          else if (pending.uiBlock.location && uiBlockResponse)
+            state.outcome = sourceText("status.agent.location.shared").slice(0, UI_BLOCK_LIMITS.outcome);
+          else if (saved && saved.created !== null)
+            state.outcome = sourceText(saved.created ? "status.agent.vaultAdded" : "status.agent.vaultUpdated", {
+              name: saved.key.name,
+            }).slice(0, UI_BLOCK_LIMITS.outcome);
           this.#resolvePersistedPrompt(
             pending,
-            frozenResponse ? promptResolution(pending.questions, input.answers) : { status: "cancelled" },
+            frozenResponse ? promptResolution(pending.questions, answers) : { status: "cancelled" },
             state,
             savedItem?.saved,
+            preview,
           );
         } else {
-          this.#resolvePersistedPrompt(pending, promptResolution(pending.questions, input.answers));
+          const resolution = promptResolution(pending.questions, answers);
+          this.#resolvePersistedPrompt(pending, resolution);
+          this.#showWelcomeAnswer(pending, resolution, responder);
         }
       } catch (error) {
         this.#emitError("prompt_persistence_failed", error, pending.agentId);
       }
+      const lateAnswer = !pending.detached
+        ? ""
+        : pending.uiBlock?.vault
+          ? vaultLateAnswerText(pending.uiBlock.spec.title ?? "", savedItem ? savedItem.item.name : null)
+          : lateAnswerText(editedPreviewQuestions(pending.questions, pending.uiBlock?.spec, preview), answers);
+      if (pending.detached && lateAnswer)
+        this.#sendLateAnswer(pending.agentId, pending.detached, lateAnswer, responder?.sender);
       this.#emitRuntimeSnapshot();
     });
   }).bind(this);
 
-  /**
-   * Saves the key of a submitted `request_api_key` form before its prompt resolves, so a failed write
-   * leaves the form open for another try. Null for every other prompt and answer.
-   */
   readonly #saveApiKeyAnswer = Effect.fn("AttentionRegistry.saveApiKeyAnswer")(function* (
     this: AttentionRegistry,
     input: RespondToPromptInput,
@@ -680,35 +1015,54 @@ export class AttentionRegistry {
       const apiKey = pending?.uiBlock?.apiKey;
       if (!pending?.uiBlock || !apiKey) return null;
       if (pending.saving) throw new Error(sourceText("error.backend.apiKeySaving"));
-      const answered = uiBlockAnswer(pending.uiBlock.spec, input.answers, responder)?.values?.[API_KEY_FIELD_ID];
-      // A pasted key often brings a space or a line break, which the service would refuse.
+      const values = uiBlockAnswer(pending.uiBlock.spec, input.answers, responder)?.values;
+      const answered = values?.[API_KEY_FIELD_ID];
       const value = typeof answered === "string" ? answered.trim() : "";
-      // A skip saves nothing, so a member may give it: the turn must not wait for an owner.
-      if (value === "") return null;
-      // The key goes to an agent of this server that every member may run.
-      if (responder && !responder.privileged)
-        throw new ForbiddenAttentionAnswer(sourceText("error.backend.apiKeyNotAllowed"));
+      const typed = value !== "" || input.answers[API_KEY_FIELD_ID]?.some((answer) => answer.trim() !== "");
+      if (!typed) return null;
+      if (value === "") throw new Error(sourceText("error.backend.apiKeyAnswerUnreadable"));
       if (!this.#apiKeys) throw new Error(sourceText("error.backend.apiKeySaveFailed"));
+      const toVault = apiKey.vault === true && values?.[API_KEY_SCOPE_FIELD_ID] !== API_KEY_SCOPE_AGENT;
+      if (toVault && !this.#vaultItems) throw new Error(sourceText("error.vault.unavailable"));
       pending.saving = true;
-      return { pending, apiKeys: this.#apiKeys, name: apiKey.name, value };
+      return {
+        pending,
+        apiKeys: this.#apiKeys,
+        vaultItems: toVault ? this.#vaultItems : null,
+        name: apiKey.name,
+        value,
+      };
     });
     if (!answer) return null;
-    const key = yield* answer.apiKeys.save(answer.pending.agentId, answer.name, answer.value).pipe(
-      toAttentionOperationFailed,
+    const { pending, apiKeys, vaultItems, name, value } = answer;
+    const save: Effect.Effect<{ key: SavedApiKey; created: boolean | null }, AttentionOperationFailed> = vaultItems
+      ? Effect.gen({ self: this }, function* () {
+          const saved = yield* vaultItems
+            .saveApiKey({ name, key: value }, this.#vaultAgent(pending.agentId), false)
+            .pipe(toAttentionOperationFailed);
+          yield* apiKeys.remove(pending.agentId, name).pipe(toAttentionOperationFailed);
+          const keys = yield* apiKeys.list(pending.agentId).pipe(toAttentionOperationFailed);
+          const key = keys.find((entry) => entry.name === name && entry.source === "vault");
+          if (!key)
+            return yield* new AttentionOperationFailed({
+              cause: new Error(sourceText("error.backend.apiKeySaveFailed")),
+            });
+          return { key, created: saved.created };
+        })
+      : apiKeys.save(this.#vaultAgent(pending.agentId), name, value).pipe(
+          toAttentionOperationFailed,
+          Effect.map((key) => ({ key, created: null })),
+        );
+    const saved = yield* save.pipe(
       Effect.ensuring(
         Effect.sync(() => {
-          answer.pending.saving = false;
+          pending.saving = false;
         }),
       ),
     );
-    return { pending: answer.pending, key };
+    return { pending, ...saved };
   });
 
-  /**
-   * Saves the item of a submitted `request_vault_item` form before its prompt resolves, so a refused
-   * value, such as a card number that fails the check, leaves the form open for a correction. Null for
-   * every other prompt and answer.
-   */
   readonly #saveVaultAnswer = Effect.fn("AttentionRegistry.saveVaultAnswer")(function* (
     this: AttentionRegistry,
     input: RespondToPromptInput,
@@ -721,17 +1075,13 @@ export class AttentionRegistry {
       if (pending.saving) throw new Error(sourceText("error.backend.vaultItemSaving"));
       const response = uiBlockAnswer(pending.uiBlock.spec, input.answers, responder);
       const item = response?.values ? enteredVaultItem(vault.kind, response.values) : null;
-      // A skip saves nothing, so a member may give it: the turn must not wait for an owner.
       if (!item) return null;
-      // Every member may run the agents of this server, and they use what the Vault holds.
-      if (responder && !responder.privileged)
-        throw new ForbiddenAttentionAnswer(sourceText("error.backend.vaultItemNotAllowed"));
       if (!this.#vaultItems) throw new Error(sourceText("error.vault.unavailable"));
       pending.saving = true;
       return { pending, vaultItems: this.#vaultItems, item };
     });
     if (!answer) return null;
-    const item = yield* answer.vaultItems.addEntered(answer.item, this.#agentName(answer.pending.agentId)).pipe(
+    const item = yield* answer.vaultItems.addEntered(answer.item, this.#vaultAgent(answer.pending.agentId)).pipe(
       toAttentionOperationFailed,
       Effect.ensuring(
         Effect.sync(() => {
@@ -750,10 +1100,6 @@ export class AttentionRegistry {
     return { pending: answer.pending, item, saved };
   });
 
-  /**
-   * Runs the `confirmed` action of a block when its button is pressed, before the prompt resolves, so a
-   * failure leaves the block open for another try. Null for every other prompt and answer.
-   */
   readonly #runConfirmedAction = Effect.fn("AttentionRegistry.runConfirmedAction")(function* (
     this: AttentionRegistry,
     input: RespondToPromptInput,
@@ -764,9 +1110,10 @@ export class AttentionRegistry {
       const confirmed = pending?.uiBlock?.confirmed;
       if (!pending?.uiBlock || !confirmed) return null;
       if (pending.saving) throw new Error(sourceText("error.backend.uiBlockActionRunning"));
-      const response = uiBlockAnswer(pending.uiBlock.spec, input.answers, responder);
+      const edit = uiConfirmPreviewEdit(pending.uiBlock.spec, input.answers);
+      if (!edit) return null;
+      const response = uiBlockAnswer(pending.uiBlock.spec, edit.answers, responder);
       if (response?.actionId !== confirmed.actionId) return null;
-      // The action works with the owner's accounts, whatever the block's buttons say.
       if (responder && !responder.privileged)
         throw new ForbiddenAttentionAnswer(sourceText("error.backend.uiBlockActionNotAllowed"));
       pending.saving = true;
@@ -784,23 +1131,58 @@ export class AttentionRegistry {
     return { pending: answer.pending, output };
   });
 
+  readonly respondToMediaApproval = Effect.fn("AttentionRegistry.respondToMediaApproval")(function* (
+    this: AttentionRegistry,
+    input: RespondToMediaApprovalInput,
+    responder?: ApprovalResponder,
+  ) {
+    yield* attentionStep(() => {
+      if (!this.pendingMediaApproval(input.agentId, input.requestId))
+        throw new InactiveAttentionRequest(sourceText("error.backend.approvalInactive"));
+    });
+    yield* this.respondToApproval({ requestId: input.requestId, decision: "accept" }, responder, input.choice);
+  }).bind(this);
+
   readonly respondToApproval = Effect.fn("AttentionRegistry.respondToApproval")(function* (
     this: AttentionRegistry,
     input: RespondToApprovalInput,
     responder?: ApprovalResponder,
+    choice?: MediaApprovalChoice,
   ) {
+    const held = this.#approvals.get(input.requestId);
+    if (held?.creditsHold) {
+      const still = yield* this.respondToCreditsHold(
+        {
+          agentId: held.approval.agentId,
+          requestId: input.requestId,
+          action: input.decision === "accept" ? "continue" : "skip",
+        },
+        responder,
+      );
+      if (still)
+        yield* attentionStep(() => {
+          throw new ForbiddenAttentionAnswer(sourceText("error.backend.creditsHoldShort"));
+        });
+      return;
+    }
     const pending = yield* attentionStep(() => {
       const value = this.#approvals.get(input.requestId);
       if (!value) throw new InactiveAttentionRequest(sourceText("error.backend.approvalInactive"));
+      if (choice && !value.media?.models.some((model) => model.id === choice.model))
+        throw new InactiveAttentionRequest(sourceText("error.backend.approvalInactive"));
       if (value.ownerOnly && responder && !responder.owner)
         throw new ForbiddenAttentionAnswer(sourceText("error.backend.approvalOwnerOnly"));
+      if (value.needsPhone && input.decision === "accept" && !responder?.phone)
+        throw new ForbiddenAttentionAnswer(sourceText("error.backend.feedbackNeedsPhone"));
+      if (responder?.phone && !value.needsPhone)
+        throw new InactiveAttentionRequest(sourceText("error.backend.approvalInactive"));
       return value;
     });
     this.#routines.markRunningForTurn(getString(pending.params, "turnId"));
 
     const mutation = pending.hostedSiteMutation;
     if (pending.decide) {
-      pending.decide(input.decision);
+      pending.decide(input.decision, responder, choice);
     } else if (mutation) {
       this.#approvals.delete(input.requestId);
       yield* this.#hostedSites
@@ -821,23 +1203,24 @@ export class AttentionRegistry {
     this.#emitRuntimeSnapshot();
   }, Effect.uninterruptible).bind(this);
 
-  /**
-   * Whether this agent is waiting on a takeover. Its browser tools are refused while one is outstanding:
-   * the user has the tab, every reference the agent holds is already stale, and a tool call landing
-   * mid-login would act on a page the user is in the middle of.
-   */
-  hasBrowserTakeoverForAgent(agentId: string): boolean {
-    return [...this.#takeovers.values()].some((pending) => pending.request.agentId === agentId);
+  browserTakeoverBlocks(agentId: string, threadId: string, tabId: string | undefined): boolean {
+    return [...this.#takeovers.values()].some(
+      ({ request }) => request.agentId === agentId && (request.tabId === tabId || request.threadId === threadId),
+    );
   }
 
   readonly respondToBrowserTakeover = Effect.fn("AttentionRegistry.respondToBrowserTakeover")(
-    (input: RespondToBrowserTakeoverInput) =>
+    (input: RespondToBrowserTakeoverInput, fromMember = false) =>
       attentionStep(() => {
         const pending = this.#takeovers.get(input.requestId);
         if (!pending) throw new Error(sourceText("error.backend.takeoverInactive"));
         if (pending.submitting) throw new Error(sourceText("error.backend.authSubmitting"));
         pending.secret?.cancel();
         this.#routines.markRunningForTurn(pending.request.turnId);
+        if (input.decision === "complete") {
+          pending.personCompleted = true;
+          if (fromMember) pending.memberCompleted = true;
+        } else pending.personCancelled = true;
         this.#resolveBrowserTakeover(input.requestId, pending, input.decision);
       }),
   ).bind(this);
@@ -845,15 +1228,18 @@ export class AttentionRegistry {
   readonly respondToBrowserSecret = Effect.fnUntraced(function* (
     this: AttentionRegistry,
     input: LocalBrowserSecretResponse,
+    vaultCode?: string,
   ) {
     const { pending, secret } = yield* attentionStep(() => {
       const value = this.#takeovers.get(input.requestId);
-      if (!value?.secret || value.request.agentId !== input.agentId || value.submitting)
-        throw new Error(sourceText("error.backend.authRequestInactive"));
+      if (!value?.secret || value.request.agentId !== input.agentId)
+        throw new InactiveAttentionRequest(sourceText("error.backend.authRequestInactive"));
+      if (value.submitting) throw new Error(sourceText("error.backend.authSubmitting"));
       return { pending: value, secret: value.secret };
     });
     if (input.decision === "cancel") {
       secret.cancel();
+      pending.personCancelled = true;
       this.#resolveBrowserTakeover(input.requestId, pending, "cancel");
       return;
     }
@@ -861,8 +1247,15 @@ export class AttentionRegistry {
       secret.cancel();
     } else {
       pending.submitting = true;
-      const outcome = yield* secret.submit(input.secret, pending.vaultLoginId !== undefined).pipe(
-        Effect.catch(() => Effect.succeed("takeover")),
+      const outcome = yield* secret.submit(input.secret, pending.vaultLoginId !== undefined, vaultCode).pipe(
+        Effect.catch((error) =>
+          Effect.sync(() => {
+            const reason = secureInputFailure(error) ?? "";
+            logger.warn("Unable to complete the secure browser input", { reason: reason || "unknown" });
+            pending.secureInputFailed = reason;
+            return "takeover" as const;
+          }),
+        ),
         Effect.ensuring(
           Effect.sync(() => {
             pending.submitting = false;
@@ -880,11 +1273,23 @@ export class AttentionRegistry {
         this.#resolveBrowserTakeover(input.requestId, pending, "complete", vault);
         return;
       }
+      if (pending.vaultLoginId !== undefined && this.#routines.runsTurn(pending.request.turnId)) {
+        const reason = pending.secureInputFailed ? ` ${pending.secureInputFailed}` : "";
+        pending.resolve(
+          browserTakeoverError(
+            `OpenBot could not finish filling saved login ${pending.vaultLoginId}.${reason} ${ROUTINE_SAVED_LOGIN_NOT_FILLED}`,
+          ),
+        );
+        this.#resolveBrowserTakeover(input.requestId, pending, "cancel");
+        return;
+      }
     }
     secret.cancel();
     delete pending.secret;
-    // The user finishes in the tab, so a later completion is theirs.
     delete pending.vaultLoginId;
+    delete pending.request.vaultSkip;
+    if (input.decision === "submit" && input.saveToVault && secret.request.method === "password")
+      pending.vaultNotSaved = true;
     if (input.decision === "submit" && pending.request.secret)
       pending.request.secret = { ...pending.request.secret, requiresReload: true };
     else delete pending.request.secret;
@@ -893,39 +1298,22 @@ export class AttentionRegistry {
     this.#emitRuntimeSnapshot();
   }, Effect.uninterruptible);
 
-  /**
-   * Answers an approval the user has already consented to, and reports whether it did.
-   *
-   * Nothing is registered and no `approval` event is emitted on this path, which is the whole point:
-   * an emitted approval opens a card, raises an operating-system notification and lights the
-   * Dynamic Island, and an automated grant that did all three before resolving itself a moment
-   * later would be worse than the prompt it replaced. What the agent then does is still visible -
-   * the command and the file change are ordinary timeline items either way.
-   *
-   * The response shape is the one `respondToApproval` uses for an accepted request.
-   */
   #answerWithoutAsking(client: AgentClient, request: AppServerRequest, approval: AgentApproval): boolean {
-    if (!this.#answersForAgent(approval.agentId)) return false;
+    if (!this.#answersForAgent(approval.agentId) && !this.#confinedWrite(request, approval)) return false;
     client.respond(request.id, approvalReply(request.method, request.params, "accept", ""));
     return true;
   }
 
-  /**
-   * The one rule for every approval OpenBot could answer itself: the agent has Full access. A
-   * Workspace only agent asks to go outside the limit the user chose, so its approvals always reach
-   * the user, and an agent at Ask first has no standing grant.
-   */
+  #confinedWrite(request: AppServerRequest, approval: AgentApproval): boolean {
+    if (approval.kind !== "file-change") return false;
+    const paths = getArray(request.params, "confinedWritePaths").filter(isString);
+    return this.#confinedWritesAllowed(approval.agentId, paths);
+  }
+
   #answersForAgent(agentId: string): boolean {
     return !this.#workspaceSandboxed(agentId) && shouldAutoApprove(this.#approvalAutomation, { agentId });
   }
 
-  /**
-   * Answers what already waits for an agent that now has Full access. The grant is read when a request
-   * arrives, so without this a card stays open after the user moves the agent to Full access, presses
-   * Always allow on another of its cards, or an admin changes it from another computer. The rule is the
-   * one for a new request: a Workspace only agent and a tool that always asks keep their card, and a
-   * question is never answered.
-   */
   answerGrantedRequests(): void {
     const report = (agentId: string) => (error: unknown) =>
       Effect.sync(() => this.#emitError("auto_approval_failed", error, agentId));
@@ -951,6 +1339,21 @@ export class AttentionRegistry {
     }
   }
 
+  #holdApproval(pending: Omit<PendingApproval, "executionThreadId">): void {
+    const executionThreadId = pending.approval.threadId;
+    const approval = {
+      ...pending.approval,
+      threadId: this.#approvalChatThread(pending.approval.agentId, executionThreadId),
+    };
+    this.#approvals.set(pending.id, { ...pending, approval, executionThreadId });
+    this.#routines.markNeedsAttention(approval.turnId);
+    this.#emit({ type: "approval", approval });
+  }
+
+  approvalExecutionThreadId(requestId: RequestId): string | undefined {
+    return this.#approvals.get(requestId)?.executionThreadId;
+  }
+
   surfaceApproval(client: AgentClient, request: AppServerRequest, kind: AgentApprovalKind): void {
     const threadId = getString(request.params, "threadId");
     const turnId = getString(request.params, "turnId") ?? (kind === "file-change" ? String(request.id) : null);
@@ -973,22 +1376,9 @@ export class AttentionRegistry {
       permissions: kind === "permissions" ? approvalPermissions(request.params) : null,
     };
     if (this.#answerWithoutAsking(client, request, approval)) return;
-    this.#approvals.set(request.id, {
-      client,
-      id: request.id,
-      method: request.method,
-      params: request.params,
-      approval,
-    });
-    this.#routines.markNeedsAttention(turnId);
-    this.#emit({ type: "approval", approval });
+    this.#holdApproval({ client, id: request.id, method: request.method, params: request.params, approval });
   }
 
-  /**
-   * Asks the user to approve a built-in tool call, and gives the answer to the tool. The tool does
-   * nothing before "accept". An agent with Full access is answered for, as for a hosted-site change,
-   * unless `alwaysAsk` is set. A turn that ends or a request that the provider abandons gives "cancel".
-   */
   readonly awaitToolApproval = Effect.fn("AttentionRegistry.awaitToolApproval")(function* (
     this: AttentionRegistry,
     client: AgentClient,
@@ -996,23 +1386,102 @@ export class AttentionRegistry {
     approval: AgentApproval,
     options: { readonly alwaysAsk?: boolean; readonly ownerOnly?: boolean } = {},
   ) {
-    if (request.signal?.aborted) return "cancel" as const;
-    const alwaysAsk = options.alwaysAsk || options.ownerOnly;
-    if (!alwaysAsk && this.#answersForAgent(approval.agentId)) return "accept" as const;
-    const decision = Deferred.makeUnsafe<ToolApprovalDecision>();
-    this.#approvals.set(request.id, {
+    return (yield* this.#awaitToolAnswer(client, request, approval, options)).decision;
+  }).bind(this);
+
+  readonly awaitMediaApproval = Effect.fn("AttentionRegistry.awaitMediaApproval")(function* (
+    this: AttentionRegistry,
+    client: AgentClient,
+    request: AppServerRequest,
+    approval: AgentApproval,
+    media: MediaApprovalOffer,
+  ) {
+    const answer = yield* this.#awaitToolAnswer(client, request, approval, { alwaysAsk: true, media });
+    const choice = "choice" in answer ? answer.choice : undefined;
+    const via = "via" in answer && answer.via ? answer.via : "local";
+    return { decision: answer.decision, via, ...(choice ? { choice } : {}) } satisfies MediaApprovalAnswer;
+  }).bind(this);
+
+  readonly awaitCreditsHold = Effect.fn("AttentionRegistry.awaitCreditsHold")(function* (
+    this: AttentionRegistry,
+    client: AgentClient,
+    request: AppServerRequest,
+    approval: AgentApproval,
+    hold: { call: CreditsHoldCall; balance: number | null; wallet: CreditsHoldWallet },
+  ) {
+    if (request.signal?.aborted) return { action: "skip" } satisfies CreditsHoldAnswer;
+    const answer = Deferred.makeUnsafe<CreditsHoldAnswer>();
+    const settle = (value: CreditsHoldAnswer) => Deferred.doneUnsafe(answer, Effect.succeed(value));
+    this.#holdApproval({
       client,
       id: request.id,
       method: TOOL_APPROVAL_METHOD,
       params: request.params,
       approval,
-      decide: (value) => Deferred.doneUnsafe(decision, Effect.succeed(value)),
+      decide: (decision, responder) =>
+        settle(
+          decision === "cancel"
+            ? { action: "skip", stopped: true }
+            : { action: decision === "accept" ? "continue" : "skip", via: answerVia(responder) },
+        ),
+      creditsHold: { ...hold, answer: settle },
+      alwaysAsk: true,
+    });
+    return yield* Deferred.await(answer);
+  }).bind(this);
+
+  readonly awaitPhoneFeedbackApproval = Effect.fn("AttentionRegistry.awaitPhoneFeedbackApproval")(function* (
+    this: AttentionRegistry,
+    client: AgentClient,
+    request: AppServerRequest,
+    approval: AgentApproval,
+  ) {
+    return yield* this.#awaitToolAnswer(client, request, approval, { ownerOnly: true, needsPhone: true });
+  }).bind(this);
+
+  readonly #awaitToolAnswer = Effect.fn("AttentionRegistry.awaitToolAnswer")(function* (
+    this: AttentionRegistry,
+    client: AgentClient,
+    request: AppServerRequest,
+    approval: AgentApproval,
+    options: {
+      readonly alwaysAsk?: boolean;
+      readonly ownerOnly?: boolean;
+      readonly needsPhone?: boolean;
+      readonly media?: MediaApprovalOffer;
+    },
+  ) {
+    if (request.signal?.aborted) return { decision: "cancel" } as const;
+    const alwaysAsk = options.alwaysAsk || options.ownerOnly;
+    if (!alwaysAsk && this.#answersForAgent(approval.agentId)) return { decision: "accept" } as const;
+    const answer = Deferred.makeUnsafe<{
+      decision: ToolApprovalDecision;
+      phone?: FeedbackPhone;
+      choice?: MediaApprovalChoice;
+      via?: CreditAnswerVia;
+    }>();
+    this.#holdApproval({
+      client,
+      id: request.id,
+      method: TOOL_APPROVAL_METHOD,
+      params: request.params,
+      approval,
+      decide: (decision, responder, choice) =>
+        Deferred.doneUnsafe(
+          answer,
+          Effect.succeed({
+            decision,
+            via: answerVia(responder),
+            ...(responder?.phone ? { phone: responder.phone } : {}),
+            ...(choice && decision === "accept" ? { choice } : {}),
+          }),
+        ),
+      ...(options.media ? { media: options.media } : {}),
       ...(alwaysAsk ? { alwaysAsk: true } : {}),
       ...(options.ownerOnly ? { ownerOnly: true } : {}),
+      ...(options.needsPhone ? { needsPhone: true } : {}),
     });
-    this.#routines.markNeedsAttention(approval.turnId);
-    this.#emit({ type: "approval", approval });
-    return yield* Deferred.await(decision);
+    return yield* Deferred.await(answer);
   }).bind(this);
 
   readonly surfaceHostedSiteApproval = Effect.fn("AttentionRegistry.surfaceHostedSiteApproval")(function* (
@@ -1025,7 +1494,6 @@ export class AttentionRegistry {
     const prepared = yield* this.#hostedSites
       .prepareApproval(client, request, params, tool)
       .pipe(toAttentionOperationFailed);
-    // A request the provider abandoned during the preparation has nobody to report the decision to.
     if (!prepared || request.signal?.aborted) return;
     if (this.#answersForAgent(prepared.approval.agentId)) {
       yield* this.#hostedSites
@@ -1033,7 +1501,7 @@ export class AttentionRegistry {
         .pipe(toAttentionOperationFailed);
       return;
     }
-    this.#approvals.set(request.id, {
+    this.#holdApproval({
       client,
       id: request.id,
       method: HOSTED_SITE_APPROVAL_METHOD,
@@ -1041,8 +1509,6 @@ export class AttentionRegistry {
       approval: prepared.approval,
       hostedSiteMutation: prepared.mutation,
     });
-    this.#routines.markNeedsAttention(prepared.approval.turnId);
-    this.#emit({ type: "approval", approval: prepared.approval });
   }, Effect.uninterruptible).bind(this);
 
   surfaceLegacyApproval(client: AgentClient, request: AppServerRequest): void {
@@ -1067,15 +1533,7 @@ export class AttentionRegistry {
       permissions: null,
     };
     if (this.#answerWithoutAsking(client, request, approval)) return;
-    this.#approvals.set(request.id, {
-      client,
-      id: request.id,
-      method: request.method,
-      params: request.params,
-      approval,
-    });
-    this.#routines.markNeedsAttention(approval.turnId);
-    this.#emit({ type: "approval", approval });
+    this.#holdApproval({ client, id: request.id, method: request.method, params: request.params, approval });
   }
 
   readonly surfaceBrowserTakeover = Effect.fn("AttentionRegistry.surfaceBrowserTakeover")(function* (
@@ -1087,24 +1545,57 @@ export class AttentionRegistry {
     const params = request.params;
     const { threadId, turnId } = params;
     const agentId = this.#conversation.agentForThread(threadId);
-    const args = getRecord(params, "arguments");
-    const tabId = getString(args, "tabId");
     const publicThreadId = agentId ? this.#conversation.publicThreadId(agentId, threadId) : null;
-    const tab = tabId ? this.#browser.listTabs().find((candidate) => candidate.id === tabId) : undefined;
-    if (
-      !agentId ||
-      !turnId ||
-      !tabId ||
-      !publicThreadId ||
-      !tab ||
-      tab.ownerThreadId !== publicThreadId ||
-      tab.ownerAgentId !== agentId ||
-      // A second request for a tab the user already holds would be answered by whichever card they
-      // happened to press, and resolving either one would hand control back while the other still waits.
-      [...this.#takeovers.values()].some((pending) => pending.request.tabId === tabId)
-    ) {
-      return browserTakeoverError();
+    if (!agentId || !turnId || !publicThreadId) return browserTakeoverError();
+    const args = repairBrowserToolInput(params.tool, params.arguments).value;
+    const tabId = getString(args, "tabId");
+    if (!tabId) return browserTakeoverError(TAKEOVER_TAB_ID_MISSING);
+    const tab = this.#browser.listTabs().find((candidate) => candidate.id === tabId);
+    if (!tab || (tab.ownerAgentId !== agentId && tab.ownerThreadId !== publicThreadId))
+      return browserTakeoverError(sourceText("error.backend.browserTabNotFound"));
+    if (!this.#browser.toolCanUseTab({ ...params, threadId: publicThreadId, ownerAgentId: agentId }, tabId))
+      return browserTakeoverError(TAKEOVER_TAB_OF_OTHER_CHAT);
+    const heldKey = heldTakeoverKey(tabId, threadId);
+    const held = this.#heldTakeoverResults.get(heldKey);
+    if (held) {
+      this.#heldTakeoverResults.delete(heldKey);
+      if (held.turnId === turnId) return held.result;
     }
+    const waiting = [...this.#takeovers].find(([, pending]) => pending.request.tabId === tabId);
+    if (waiting) {
+      const [waitingId, pending] = waiting;
+      if (pending.released && pending.request.threadId === publicThreadId && pending.params.tool === params.tool) {
+        if (pending.params.turnId === turnId) return browserTakeoverReleasedResult(params.tool, tabId);
+        const call = takeoverCall();
+        delete pending.released;
+        pending.client = client;
+        pending.providerRequestId = request.id;
+        pending.params = params;
+        pending.request.turnId = turnId;
+        pending.releaseAt = Date.now() + this.#userAnswerLimitMs;
+        pending.resolve = call.resolve;
+        if (request.subagent) pending.subagent = true;
+        else delete pending.subagent;
+        this.#routines.markNeedsAttention(turnId);
+        this.#emitRuntimeSnapshot();
+        return yield* this.#awaitBrowserTakeover(waitingId, pending, request, call.completion, Effect.void);
+      }
+      if (
+        !pending.detached ||
+        pending.params.threadId !== threadId ||
+        pending.params.turnId !== turnId ||
+        pending.params.tool !== params.tool
+      )
+        return browserTakeoverError(TAKEOVER_ALREADY_WAITING);
+      const call = takeoverCall();
+      pending.client = client;
+      pending.providerRequestId = request.id;
+      pending.resolve = call.resolve;
+      delete pending.detached;
+      return yield* this.#awaitBrowserTakeover(waitingId, pending, request, call.completion, Effect.void);
+    }
+    if (params.tool === "request_takeover" && this.#messagingRequestTurn(agentId, turnId))
+      return browserTakeoverError(MESSAGING_REQUEST_CARD_REFUSED);
 
     const requestId = params.tool === "submit_secret" ? randomUUID() : request.id;
     const reason = getString(args, "reason");
@@ -1116,20 +1607,18 @@ export class AttentionRegistry {
       tabId,
       ...(params.tool === "request_takeover" && isOneOf(BROWSER_TAKEOVER_REASONS, reason) ? { reason } : {}),
     };
-    const completion = Deferred.makeUnsafe<DynamicToolResult>();
-    const resolve = (result: DynamicToolResult) => Deferred.doneUnsafe(completion, Effect.succeed(result));
+    const call = takeoverCall();
     const pending: PendingBrowserTakeover = {
       client,
       providerRequestId: request.id,
       params,
       request: takeover,
-      resolve,
+      resolve: call.resolve,
+      releaseAt: Date.now() + this.#userAnswerLimitMs,
+      ...(request.subagent ? { subagent: true as const } : {}),
     };
     this.#takeovers.set(requestId, pending);
-    return yield* Effect.gen({ self: this }, function* () {
-      // The card is only shown once the tab has actually been handed over -- references invalidated,
-      // diagnostics cleared, any recording stopped. Asking the user for control OpenBot then failed to
-      // give them would leave the agent acting on the page underneath them.
+    const show = Effect.gen({ self: this }, function* () {
       const prepare = Effect.gen({ self: this }, function* () {
         if (params.tool === "submit_secret") {
           const prepareSecret = this.#browser.prepareSecret?.bind(this.#browser);
@@ -1147,7 +1636,7 @@ export class AttentionRegistry {
             return;
           }
           pending.secret = secret;
-          pending.request.secret = secret.request;
+          if (websiteUrl(secret.request.origin)?.protocol !== "http:") pending.request.secret = secret.request;
         } else yield* this.#browser.beginTakeover(takeover.tabId).pipe(toAttentionOperationFailed);
       });
       const prepared = yield* Effect.result(prepare);
@@ -1157,15 +1646,48 @@ export class AttentionRegistry {
           !(yield* this.#fillFromVault(requestId, pending)) &&
           this.#takeovers.get(requestId) === pending
         ) {
-          this.#routines.markNeedsAttention(turnId);
-          this.#emit({ type: "browser-takeover-requested", request: takeover });
+          if (this.#messagingRequestTurn(agentId, turnId)) {
+            pending.resolve(browserTakeoverError(MESSAGING_REQUEST_CARD_REFUSED));
+            this.#resolveBrowserTakeover(requestId, pending, "cancel");
+          } else if (getString(args, "loginId") && this.#routines.runsTurn(turnId)) {
+            pending.resolve(
+              browserTakeoverError(
+                `${pending.vaultSkipped ?? "OpenBot did not fill a saved login: no password manager is connected."} ${ROUTINE_SAVED_LOGIN_NOT_FILLED}`,
+              ),
+            );
+            this.#resolveBrowserTakeover(requestId, pending, "cancel");
+          } else if (pending.secret?.withCode) {
+            pending.resolve(
+              browserTakeoverError(
+                `${pending.vaultSkipped ?? "OpenBot did not fill a saved login: no password manager is connected."} Correct the call, or use request_takeover so that the user signs in.`,
+              ),
+            );
+            this.#resolveBrowserTakeover(requestId, pending, "cancel");
+          } else if (pending.secret && websiteUrl(pending.secret.request.origin)?.protocol === "http:") {
+            pending.resolve(
+              browserTakeoverError(
+                `${pending.vaultSkipped ?? "OpenBot did not fill a saved login: no password manager is connected."} On an HTTP page, OpenBot fills only a saved login. Use request_takeover so that the user signs in.`,
+              ),
+            );
+            this.#resolveBrowserTakeover(requestId, pending, "cancel");
+          } else if (pending.request.vaultSkip === "agent-script") {
+            pending.resolve(
+              browserTakeoverError(
+                `${pending.vaultSkipped} When OpenBot still does not fill the saved login, call submit_secret without loginId so that the user types the password, or use request_takeover.`,
+              ),
+            );
+            this.#resolveBrowserTakeover(requestId, pending, "cancel");
+          } else {
+            this.#routines.markNeedsAttention(turnId);
+            this.#emit({ type: "browser-takeover-requested", request: takeover });
+          }
         }
       } else {
         const error = prepared.failure.cause;
         logger.warn("Unable to prepare browser takeover", { tool: params.tool, error: toLogValue(error) });
         if (this.#takeovers.get(requestId) === pending) {
           this.#takeovers.delete(requestId);
-          resolve(
+          pending.resolve(
             params.tool === "submit_secret" && error instanceof Error
               ? browserTakeoverError(error.message)
               : browserTakeoverError(),
@@ -1173,20 +1695,69 @@ export class AttentionRegistry {
           this.#emitRuntimeSnapshot();
         }
       }
-      return yield* Deferred.await(completion);
-    }).pipe(
+    });
+    return yield* this.#awaitBrowserTakeover(requestId, pending, request, call.completion, show);
+  }).bind(this);
+
+  #awaitBrowserTakeover<E, R>(
+    requestId: RequestId,
+    pending: PendingBrowserTakeover,
+    request: AppServerRequest,
+    completion: Deferred.Deferred<DynamicToolResult>,
+    show: Effect.Effect<void, E, R>,
+  ): Effect.Effect<DynamicToolResult, E, R> {
+    const detach =
+      request.answerBeforeMs === undefined
+        ? undefined
+        : setTimeout(() => this.#detachBrowserTakeover(requestId, pending), request.answerBeforeMs);
+    const release = setTimeout(
+      () => this.#releaseBrowserTakeover(requestId, pending),
+      Math.max(0, pending.releaseAt - Date.now()),
+    );
+    return show.pipe(
+      Effect.andThen(Deferred.await(completion)),
       Effect.ensuring(
         Effect.sync(() => {
-          if (this.#takeovers.get(requestId) === pending) this.#resolveBrowserTakeover(requestId, pending, "cancel");
+          clearTimeout(detach);
+          clearTimeout(release);
+          if (this.#takeovers.get(requestId) === pending && !pending.detached && !pending.released)
+            this.#resolveBrowserTakeover(requestId, pending, "cancel");
         }),
       ),
     );
-  }).bind(this);
+  }
 
-  /**
-   * Answers `list_vault_items`: the saved cards without their number or security code, and the saved
-   * contact info in full, which the agent types itself.
-   */
+  #releaseBrowserTakeover(requestId: RequestId, pending: PendingBrowserTakeover): void {
+    if (this.#takeovers.get(requestId) !== pending || pending.detached || pending.released) return;
+    const answerCall = pending.resolve;
+    const target = this.#lateAnswerTarget(pending.request.agentId, pending.request.threadId);
+    if (!target) {
+      pending.resolve = () => answerCall(browserTakeoverExpiredResult());
+      this.#resolveBrowserTakeover(requestId, pending, "cancel");
+      return;
+    }
+    pending.released = target;
+    pending.resolve = () => undefined;
+    this.#routines.markRunningForTurn(pending.request.turnId);
+    this.#emitRuntimeSnapshot();
+    answerCall(browserTakeoverReleasedResult(pending.params.tool, pending.request.tabId));
+  }
+
+  #detachBrowserTakeover(requestId: RequestId, pending: PendingBrowserTakeover): void {
+    if (this.#takeovers.get(requestId) !== pending || pending.detached || pending.released) return;
+    const answerCall = pending.resolve;
+    const { threadId, turnId, tool } = pending.params;
+    const { tabId } = pending.request;
+    let held = false;
+    pending.detached = true;
+    pending.resolve = (result) => {
+      if (held) return;
+      held = true;
+      this.#heldTakeoverResults.set(heldTakeoverKey(tabId, threadId), { tabId, threadId, turnId, result });
+    };
+    answerCall(browserTakeoverWaitingResult(tool, tabId));
+  }
+
   readonly listVaultItems = Effect.fn("AttentionRegistry.listVaultItems")(function* (
     this: AttentionRegistry,
     params: DynamicToolCallParams,
@@ -1194,7 +1765,12 @@ export class AttentionRegistry {
     const call = yield* attentionStep(() => parseBrowserToolCall("list_vault_items", params.arguments));
     if (call.tool !== "list_vault_items")
       return yield* new AttentionOperationFailed({ cause: new Error("Invalid Vault list request.") });
-    const listed = yield* Effect.result(attentionStep(() => this.#vaultItems?.listForAgent() ?? null));
+    const agentId = params.ownerAgentId;
+    if (this.#vaultItems && !this.#vaultItems.ready())
+      return browserTakeoverError(`${vaultClosedText(this.#vaultItems.status())} Or use request_takeover.`);
+    const listed = yield* Effect.result(
+      attentionStep(() => (agentId ? (this.#vaultItems?.listForAgent(agentId) ?? null) : null)),
+    );
     if (Result.isFailure(listed)) {
       logger.warn("Unable to list the Vault items", { error: toLogValue(listed.failure.cause) });
       return browserTakeoverError("The Vault could not be read. Ask the user, or use request_takeover.");
@@ -1216,11 +1792,6 @@ export class AttentionRegistry {
     return result;
   }).bind(this);
 
-  /**
-   * The saved cards for one `fill_card` call. Their values go to the browser host only, never to the
-   * agent. A fill on a page that the owner did not approve for the card waits for the owner, with Full
-   * access too: a page or a team member can tell an agent to fill a card into a form that sends it away.
-   */
   cardVault(
     client: AgentClient,
     request: AppServerRequest,
@@ -1230,11 +1801,11 @@ export class AttentionRegistry {
     const agentId = params.ownerAgentId;
     if (!vault || !agentId) return undefined;
     return {
-      secret: (cardId) => vault.cardSecret(cardId),
+      secret: (cardId) => vault.cardSecret(cardId, agentId),
       approved: (cardId, page, frames) => vault.cardFillApproved(cardId, page, frames),
       approve: (cardId, page, frames) =>
         Effect.gen({ self: this }, function* () {
-          const card = vault.listForAgent().cards.find(({ id }) => id === cardId);
+          const card = vault.listForAgent(agentId).cards.find(({ id }) => id === cardId);
           if (!card) return false;
           const others = frames.filter((frame) => frame !== page);
           const reason = [
@@ -1267,11 +1838,6 @@ export class AttentionRegistry {
     };
   }
 
-  /**
-   * Answers `request_link_payment`: asks Link for a one-time card, and waits while the user approves or
-   * declines the payment in Link. The answer names the card for `fill_card`, never its number or code.
-   * Link's approval is the user's consent, so OpenBot asks nothing more here.
-   */
   readonly requestLinkPayment = Effect.fn("AttentionRegistry.requestLinkPayment")(function* (
     this: AttentionRegistry,
     params: DynamicToolCallParams,
@@ -1294,12 +1860,93 @@ export class AttentionRegistry {
     } satisfies DynamicToolResult;
   }).bind(this);
 
-  /**
-   * The one-time Link card for a `fill_card` call with a Link `cardId`, or null for a saved card. A
-   * fill on the merchant site that the user approved in Link runs at once; a fill on another site
-   * waits for the owner, because a page can tell an agent to type the card into a form that sends it
-   * away. That approval is not kept.
-   */
+  readonly requestNearPayment = Effect.fn("AttentionRegistry.requestNearPayment")(function* (
+    this: AttentionRegistry,
+    client: AgentClient,
+    request: AppServerRequest,
+    params: DynamicToolCallParams,
+  ) {
+    const call = yield* attentionStep(() => parseBrowserToolCall("request_near_payment", params.arguments));
+    if (call.tool !== "request_near_payment")
+      return yield* new AttentionOperationFailed({ cause: new Error("Invalid NEAR payment request.") });
+    const wallet = this.#nearWallet;
+    const agentId = params.ownerAgentId;
+    if (!wallet?.ready() || !agentId) return browserTakeoverError(NEAR_UNAVAILABLE);
+    if (this.#messagingThread(params.threadId) || this.#messagingRequestTurn(agentId, params.turnId))
+      return browserTakeoverError(
+        "request_near_payment does not work for a request from a Slack, Discord or Telegram chat. Ask the user to start the payment in the OpenBot chat.",
+      );
+    const requestId = String(request.id);
+    const plan = yield* Effect.result(wallet.prepare({ agentId, threadId: params.threadId, requestId, ...call.args }));
+    if (Result.isFailure(plan))
+      return browserTakeoverError(`NEAR payment refused: ${plan.failure.message} Do not try again; tell the user.`);
+    const record = (state: ConversationNearPayment["state"], transactionHash: string | null, detail: string | null) =>
+      this.#recordNearPayment(agentId, params.threadId, params.turnId, requestId, {
+        domain: call.args.domain,
+        amount: plan.success.amount.slice(0, NEAR_WALLET_LIMITS.amount),
+        symbol: plan.success.symbol.slice(0, NEAR_WALLET_LIMITS.asset),
+        reason: call.args.reason.slice(0, NEAR_WALLET_LIMITS.reason),
+        state,
+        automatic: plan.success.kind === "auto",
+        transactionHash,
+        detail: detail === null ? null : detail.slice(0, NEAR_WALLET_LIMITS.paymentDetail),
+      });
+    if (plan.success.kind === "ask") {
+      const decision = yield* this.awaitToolApproval(
+        client,
+        request,
+        {
+          requestId: request.id,
+          agentId,
+          threadId: params.threadId,
+          turnId: params.turnId,
+          kind: "permissions",
+          command: null,
+          cwd: null,
+          reason: sourceText("status.agent.nearPayment", {
+            amount: plan.success.amount,
+            symbol: plan.success.symbol,
+            recipient: call.args.recipient,
+            domain: call.args.domain,
+            reason: call.args.reason,
+          }),
+          grantRoot: null,
+          permissions: null,
+        },
+        { ownerOnly: true },
+      ).pipe(Effect.onInterrupt(() => Effect.sync(() => wallet.drop(requestId))));
+      if (decision !== "accept") {
+        wallet.drop(requestId);
+        record("rejected", null, null);
+        return browserTakeoverError("The owner declined this NEAR payment. Do not ask again; tell the user.");
+      }
+    }
+    record("sending", null, null);
+    const paid = yield* Effect.result(wallet.pay(requestId)).pipe(
+      Effect.onInterrupt(() =>
+        Effect.sync(() => record("uncertain", null, sourceText("error.connector.nearUncertain"))),
+      ),
+    );
+    if (Result.isFailure(paid)) {
+      record("failed", null, paid.failure.message);
+      return browserTakeoverError(`NEAR payment failed: ${paid.failure.message}`);
+    }
+    const result = paid.success;
+    record(NEAR_PAYMENT_RESULT_STATE[result.status], result.transactionHash, result.detail);
+    const next =
+      result.status === "paid"
+        ? result.transactionHash
+          ? "Go back to the site and continue."
+          : "The payment is settled. Some payments have no public NEAR transaction hash; this is normal. Do not tell the user that the payment is not confirmed. Go back to the site and continue."
+        : result.status === "uncertain"
+          ? "Do not pay again. OpenBot finishes this payment; tell the user to check the wallet in Server settings > Vault > Crypto."
+          : "Do not try again; tell the user.";
+    return {
+      success: result.status === "paid",
+      contentItems: [{ type: "inputText", text: JSON.stringify({ ...result, next }) }],
+    } satisfies DynamicToolResult;
+  }).bind(this);
+
   readonly linkCardVault = Effect.fn("AttentionRegistry.linkCardVault")(function* (
     this: AttentionRegistry,
     client: AgentClient,
@@ -1320,7 +1967,6 @@ export class AttentionRegistry {
     if (!card) return browserTakeoverError("Link has no approved card with this id. Call request_link_payment first.");
     const merchant = httpsHost(card.merchantUrl);
     const onMerchant = (address: string) => merchant !== null && sameSite(address, merchant);
-    // The pages and frames that the owner let this one fill use. The approval is not kept.
     const approvedFrames = new Map<string, Set<string>>();
     return {
       secret: (id) => (id === cardId ? card.secret : null),
@@ -1364,26 +2010,51 @@ export class AttentionRegistry {
     } satisfies BrowserCardVault;
   }).bind(this);
 
-  /**
-   * Answers `save_vault_item`: adds or changes contact info, or changes the fields of a login or a card
-   * that are not secret. The user does not approve it: the chat shows a note, and a new item keeps the
-   * agent's name.
-   */
   readonly saveVaultItem = Effect.fn("AttentionRegistry.saveVaultItem")(function* (
     this: AttentionRegistry,
     params: DynamicToolCallParams,
+    requestedByPerson: () => boolean,
   ) {
+    const raw = decodePasswordArgument(params.arguments);
+    if (Option.isSome(raw)) registerSecretValue(raw.value.password);
+    const rawKey = decodeTwoStepKeyArgument(params.arguments);
+    if (Option.isSome(rawKey) && rawKey.value.twoStepKey) {
+      registerSecretValue(rawKey.value.twoStepKey);
+      const secret = twoStepKeySecret(rawKey.value.twoStepKey);
+      if (secret) registerSecretValue(secret);
+    }
     const call = yield* attentionStep(() => parseBrowserToolCall("save_vault_item", params.arguments));
     if (call.tool !== "save_vault_item")
       return yield* new AttentionOperationFailed({ cause: new Error("Invalid Vault save request.") });
+    if (call.args.password !== undefined) {
+      if (this.#messagingThread(params.threadId)) return browserTakeoverError(VAULT_PASSWORD_EXTERNAL_REFUSED);
+      if (!requestedByPerson()) return browserTakeoverError(VAULT_PASSWORD_PERSON_ONLY);
+    }
+    if (call.args.twoStepKey !== undefined && !requestedByPerson())
+      return browserTakeoverError(VAULT_PASSWORD_PERSON_ONLY);
     const vault = this.#vaultItems;
     const agentId = params.ownerAgentId;
     if (!vault || !agentId) return browserTakeoverError(VAULT_UNAVAILABLE);
+    if (!vault.ready()) return browserTakeoverError(vaultClosedText(vault.status()));
     const change = vaultChange(call.args);
     if (typeof change === "string") return browserTakeoverError(change);
-    const saved = yield* Effect.result(vault.save(change, this.#agentName(agentId)));
+    const agent = this.#vaultAgent(agentId);
+    const saved = yield* Effect.result(
+      change.kind === "newLogin" ? vault.saveLogin(change.login, agent) : vault.save(change, agent),
+    );
     if (Result.isFailure(saved)) return vaultFailure("save", saved.failure);
-    const { created, ...item } = saved.success;
+    let keySaved = false;
+    if (change.kind === "newLogin" && change.twoStepKey !== undefined) {
+      const keyed = yield* Effect.result(
+        vault.save({ kind: "login", id: saved.success.id, twoStepKey: change.twoStepKey }, agent),
+      );
+      if (Result.isFailure(keyed)) return vaultFailure("save", keyed.failure);
+      keySaved = true;
+    }
+    const { created, id, kind, name } = saved.success;
+    const item = { id, kind, name };
+    if ("changed" in saved.success && !saved.success.changed && !keySaved)
+      return vaultResult({ status: "unchanged", ...item });
     this.#noteVaultChange(
       agentId,
       params.threadId,
@@ -1393,11 +2064,6 @@ export class AttentionRegistry {
     return vaultResult({ status: created ? "added" : "updated", ...item });
   }).bind(this);
 
-  /**
-   * Shows the card of `request_vault_item`. The user types the item into the Vault form, and
-   * `respondToPrompt` saves it; the agent gets its id and name, never a value. Gives the refusal, or
-   * null while the card waits for the answer.
-   */
   readonly requestVaultItem = Effect.fn("AttentionRegistry.requestVaultItem")(function* (
     this: AttentionRegistry,
     client: AgentClient,
@@ -1407,7 +2073,7 @@ export class AttentionRegistry {
     const call = yield* attentionStep(() => parseBrowserToolCall("request_vault_item", params.arguments));
     if (call.tool !== "request_vault_item")
       return yield* new AttentionOperationFailed({ cause: new Error("Invalid Vault request.") });
-    if (!this.#vaultItems?.ready()) return browserTakeoverError(VAULT_UNAVAILABLE);
+    if (!this.#vaultItems?.ready()) return browserTakeoverError(vaultClosedText(this.#vaultItems?.status()));
     if (this.#messagingThread(params.threadId))
       return browserTakeoverError(
         "request_vault_item does not work in a Slack, Discord or Telegram chat. Ask the user to add the item in Server settings > Vault.",
@@ -1418,7 +2084,6 @@ export class AttentionRegistry {
     return null;
   }).bind(this);
 
-  /** Answers `delete_vault_item`. The chat shows a note, as for a save. */
   readonly deleteVaultItem = Effect.fn("AttentionRegistry.deleteVaultItem")(function* (
     this: AttentionRegistry,
     params: DynamicToolCallParams,
@@ -1429,7 +2094,8 @@ export class AttentionRegistry {
     const vault = this.#vaultItems;
     const agentId = params.ownerAgentId;
     if (!vault || !agentId) return browserTakeoverError(VAULT_UNAVAILABLE);
-    const deleted = yield* Effect.result(vault.delete(call.args.id));
+    if (!vault.ready()) return browserTakeoverError(vaultClosedText(vault.status()));
+    const deleted = yield* Effect.result(vault.delete(call.args.id, agentId));
     if (Result.isFailure(deleted)) return vaultFailure("delete", deleted.failure);
     if (deleted.success === null) return browserTakeoverError("No Vault item has this id. Call list_vault_items.");
     this.#noteVaultChange(
@@ -1441,10 +2107,6 @@ export class AttentionRegistry {
     return vaultResult({ status: "deleted", ...deleted.success });
   }).bind(this);
 
-  /**
-   * Keeps a password that the user typed into the secure input and asked to save. The agent never
-   * sees it: the answer says only what was saved. A failed save does not stop the sign-in.
-   */
   readonly #saveTypedPassword = Effect.fn("AttentionRegistry.saveTypedPassword")(function* (
     this: AttentionRegistry,
     pending: PendingBrowserTakeover,
@@ -1457,9 +2119,18 @@ export class AttentionRegistry {
     const call = yield* Effect.result(
       attentionStep(() => parseBrowserToolCall("submit_secret", pending.params.arguments)),
     );
-    const username = Result.isSuccess(call) && call.success.tool === "submit_secret" ? call.success.args.username : "";
+    const args = Result.isSuccess(call) && call.success.tool === "submit_secret" ? call.success.args : undefined;
+    const loginId = args?.loginId;
+    const chosen =
+      loginId && this.#passwordVault
+        ? yield* this.#passwordVault.loginsFor(origin, agentId).pipe(
+            Effect.catch((error) => Effect.succeed(error.logins)),
+            Effect.map((logins) => logins?.find((login) => login.id === loginId)),
+          )
+        : undefined;
+    const username = chosen?.username ?? args?.username;
     const saved = yield* Effect.result(
-      vault.saveLogin({ origin, username: username ?? "", password }, this.#agentName(agentId)),
+      vault.saveLogin({ origin, username: username ?? "", password }, this.#vaultAgent(agentId)),
     );
     if (Result.isFailure(saved)) {
       logger.warn("Unable to save the typed password in the Vault", { error: toLogValue(saved.failure.cause) });
@@ -1476,10 +2147,6 @@ export class AttentionRegistry {
     return `The user saved this password in the Vault as login ${id} (${name}).`;
   }).bind(this);
 
-  /**
-   * Answers `list_logins`: the logins of the shared vault for the tab's current site. `params` carries
-   * the public thread id and the owner agent, as the browser host receives them.
-   */
   readonly listVaultLogins = Effect.fn("AttentionRegistry.listVaultLogins")(function* (
     this: AttentionRegistry,
     params: DynamicToolCallParams,
@@ -1489,20 +2156,32 @@ export class AttentionRegistry {
       return yield* new AttentionOperationFailed({ cause: new Error("Invalid login list request.") });
     const { tabId } = call.args;
     const tab = this.#browser.listTabs().find((candidate) => candidate.id === tabId);
-    if (!tab || tab.ownerAgentId !== params.ownerAgentId || tab.ownerThreadId !== params.threadId)
+    if (!tab || tab.ownerAgentId !== params.ownerAgentId || !this.#browser.toolCanUseTab(params, tabId))
       return browserTakeoverError(sourceText("error.backend.browserTabNotFound"));
     const listed = yield* Effect.result(
-      this.#passwordVault ? this.#passwordVault.loginsFor(tab.url) : Effect.succeed(null),
+      this.#passwordVault
+        ? this.#passwordVault.loginsFor(tab.url, tab.ownerAgentId ?? undefined)
+        : Effect.succeed(null),
     );
-    if (Result.isFailure(listed)) {
+    const unreadable = Result.isFailure(listed) ? listed.failure.sources : undefined;
+    if (Result.isFailure(listed) && !unreadable) {
       logger.warn("Unable to list the shared logins", { error: toLogValue(listed.failure.cause) });
       return browserTakeoverError("The shared password vault could not be read. Use submit_secret without loginId.");
     }
-    const logins = listed.success;
-    const answer =
-      logins === null
+    const logins = Result.isFailure(listed) ? (listed.failure.logins ?? []) : listed.success;
+    const answer = unreadable
+      ? {
+          connected: true,
+          logins,
+          unreadable,
+          next: `OpenBot could not read the saved logins of ${unreadable.join(", ")}, so this list can be incomplete. Tell the user which of them could not be read: the page of each password manager in Marketplace shows what to do. Use a listed login only when it is the account for the task; else use submit_secret without loginId.`,
+        }
+      : logins === null
         ? { connected: false, logins: [], next: "No password vault is connected. Use submit_secret without loginId." }
-        : { connected: true, logins };
+        : logins.length === 0
+          ? // A login matches only pages of its own site, and a sign-in can be on another site (#10502).
+            { connected: true, logins, next: NO_LOGIN_FOR_SITE }
+          : { connected: true, logins };
     const result: DynamicToolResult = {
       success: true,
       contentItems: [{ type: "inputText", text: JSON.stringify(answer) }],
@@ -1517,13 +2196,16 @@ export class AttentionRegistry {
     const publicThreadId = threadId && agentId ? this.#conversation.publicThreadId(agentId, threadId) : null;
     const args = getRecord(request.params, "arguments");
     const questions = promptQuestions(args);
-    if (!threadId || !turnId || !agentId || !publicThreadId || !validPromptQuestions(questions)) {
+    const problem = promptQuestionsProblem(questions);
+    if (!threadId || !turnId || !agentId || !publicThreadId || problem) {
       client.respond(request.id, {
         success: false,
         contentItems: [
           {
             type: "inputText",
-            text: "OpenBot could not create a user question.",
+            text: problem
+              ? `OpenBot could not create a user question: ${problem} Correct the arguments and retry.`
+              : "OpenBot could not create a user question.",
           },
         ],
       });
@@ -1536,9 +2218,17 @@ export class AttentionRegistry {
       });
       return;
     }
+    if (this.#messagingRequestTurn(agentId, turnId)) {
+      client.respond(request.id, {
+        success: false,
+        contentItems: [{ type: "inputText", text: MESSAGING_REQUEST_CARD_REFUSED }],
+      });
+      return;
+    }
 
     const messageId = this.#persistQuestionPrompt(agentId, publicThreadId, turnId, request.id, questions);
-    this.#prompts.set(request.id, {
+    this.#expireDetachedInChat(agentId, publicThreadId, turnId);
+    const pending: PendingPrompt = {
       client,
       id: request.id,
       responseKind: "dynamic-tool",
@@ -1548,7 +2238,10 @@ export class AttentionRegistry {
       turnId,
       messageId,
       questions,
-    });
+      ...(request.subagent ? { subagent: true as const } : {}),
+    };
+    this.#limitQuestion(request, pending);
+    this.#prompts.set(request.id, pending);
     this.#routines.markNeedsAttention(turnId);
     this.#emit({
       type: "prompt",
@@ -1556,16 +2249,11 @@ export class AttentionRegistry {
       agentId,
       threadId: publicThreadId,
       turnId,
+      ...(request.subagent ? { detached: true as const } : {}),
       questions,
     });
   }
 
-  /**
-   * Shows an `ask_ui` block and waits for its answer. The block is a question prompt: its fallback
-   * questions let a client that does not know `uiBlock` answer it through `respondToPrompt`. The
-   * caller has checked the spec and refused a channel. With `autoAnswer`, the host answers that action
-   * itself after `afterMs` when nobody answered first.
-   */
   surfaceUiBlock(
     client: AgentClient,
     request: AppServerRequest,
@@ -1581,13 +2269,14 @@ export class AttentionRegistry {
       actionId: autoAnswer.actionId,
       at: new Date(Date.now() + autoAnswer.afterMs).toISOString(),
     };
-    // Store only what the contract reads back: a block it refuses would make the whole page unreadable.
     const uiBlock = normalizeConversationUiBlock({
       version: UI_BLOCK_VERSION,
       blockId: block.blockId,
       spec: block.spec,
       state: auto ? { status: "pending", autoAnswer: auto } : { status: "pending" },
       ...(block.vault ? { vault: { kind: block.vault.kind } } : {}),
+      ...(block.apiKey?.vault ? { apiKey: true } : {}),
+      ...(block.location ? { location: true } : {}),
     });
     if (!threadId || !turnId || !agentId || !publicThreadId || !uiBlock || !validPromptQuestions(questions)) {
       client.respond(request.id, {
@@ -1596,15 +2285,30 @@ export class AttentionRegistry {
       });
       return;
     }
+    if (this.#messagingThread(publicThreadId)) {
+      client.respond(request.id, {
+        success: false,
+        contentItems: [{ type: "inputText", text: MESSAGING_QUESTION_REFUSED }],
+      });
+      return;
+    }
+    if (!auto && this.#messagingRequestTurn(agentId, turnId)) {
+      client.respond(request.id, {
+        success: false,
+        contentItems: [{ type: "inputText", text: MESSAGING_REQUEST_CARD_REFUSED }],
+      });
+      return;
+    }
 
     const messageId = this.#persistQuestionPrompt(agentId, publicThreadId, turnId, request.id, questions, uiBlock);
+    this.#expireDetachedInChat(agentId, publicThreadId, turnId);
     let autoAnswerTimer: PendingPrompt["autoAnswer"];
     if (auto && autoAnswer) {
       const timer = setTimeout(() => this.#answerAutomatically(request.id), autoAnswer.afterMs);
       timer.unref?.();
       autoAnswerTimer = { state: auto, timer };
     }
-    this.#prompts.set(request.id, {
+    const pending: PendingPrompt = {
       client,
       id: request.id,
       responseKind: "ui-block",
@@ -1616,7 +2320,11 @@ export class AttentionRegistry {
       questions,
       uiBlock: block,
       ...(autoAnswerTimer ? { autoAnswer: autoAnswerTimer } : {}),
-    });
+      ...(request.subagent ? { subagent: true as const } : {}),
+    };
+    if (block.vault || (plainBlock(block, auto, questions) && providerStopsCall(request)))
+      this.#scheduleDetach(request, pending);
+    this.#prompts.set(request.id, pending);
     this.#routines.markNeedsAttention(turnId);
     this.#emit({
       type: "prompt",
@@ -1624,11 +2332,11 @@ export class AttentionRegistry {
       agentId,
       threadId: publicThreadId,
       turnId,
+      ...(request.subagent ? { detached: true as const } : {}),
       questions,
     });
   }
 
-  /** Nobody answered the block before its time, so the host presses its auto answer action. */
   #answerAutomatically(requestId: RequestId): void {
     const pending = this.#prompts.get(requestId);
     if (!pending?.uiBlock || !pending.autoAnswer) return;
@@ -1658,13 +2366,13 @@ export class AttentionRegistry {
       return;
     }
     const publicThreadId = this.#conversation.publicThreadId(agentId, threadId);
-    // No answers is what the provider gets for a question that nobody answered.
-    if (this.#messagingThread(publicThreadId)) {
+    if (this.#messagingThread(publicThreadId) || this.#messagingRequestTurn(agentId, turnId)) {
       client.respond(request.id, { answers: {} });
       return;
     }
     const messageId = this.#persistQuestionPrompt(agentId, publicThreadId, turnId, request.id, questions);
-    this.#prompts.set(request.id, {
+    this.#expireDetachedInChat(agentId, publicThreadId, turnId);
+    const pending: PendingPrompt = {
       client,
       id: request.id,
       responseKind: "user-input",
@@ -1674,7 +2382,9 @@ export class AttentionRegistry {
       turnId,
       messageId,
       questions,
-    });
+    };
+    if (client.userInputNote) this.#limitQuestion(request, pending);
+    this.#prompts.set(request.id, pending);
     this.#routines.markNeedsAttention(turnId);
     this.#emit({
       type: "prompt",
@@ -1686,53 +2396,59 @@ export class AttentionRegistry {
     });
   }
 
-  /**
-   * Accepts Codex's consent to run one MCP tool, once, when the agent's grant covers it. Nothing is
-   * saved: "Always allow" stays the user's choice in the card, and Codex keeps it per server and tool.
-   */
   #answerMcpToolConsentWithoutAsking(client: AgentClient, request: AppServerRequest, agentId: string): boolean {
     if (!this.#answersMcpToolConsent(request.params, agentId)) return false;
     client.respond(request.id, { action: "accept", content: {}, _meta: null });
     return true;
   }
 
-  /**
-   * Only the consent that Codex marks is covered, a tool set to ask every time included. A form, a
-   * hand-off, a sign-in and any request that OpenBot does not know still reach the user. A Workspace
-   * only agent keeps its card: it asks to go outside the limit the user chose. Computer Use is
-   * covered too: its own switch already lets the agent control apps, and Full access means no card.
-   */
   #answersMcpToolConsent(params: unknown, agentId: string): boolean {
     return mcpToolCallConsent(params) && this.#answersForAgent(agentId);
   }
 
+  #requestOwner(params: unknown): { agentId: string; publicThreadId: string; turnId: string; params: unknown } | null {
+    const threadId = getString(params, "threadId");
+    const turnId = getString(params, "turnId");
+    if (!threadId || !turnId) return null;
+    const agentId = this.#conversation.agentForThread(threadId);
+    if (agentId)
+      return { agentId, publicThreadId: this.#conversation.publicThreadId(agentId, threadId), turnId, params };
+    const parent = this.#codexSubagentParent(threadId);
+    if (!parent || !isRecord(params) || this.#conversation.agentForThread(parent.threadId) !== parent.agentId)
+      return null;
+    return {
+      agentId: parent.agentId,
+      publicThreadId: this.#conversation.publicThreadId(parent.agentId, parent.threadId),
+      turnId: parent.turnId,
+      params: { ...params, threadId: parent.threadId, turnId: parent.turnId },
+    };
+  }
+
   surfaceMcpElicitation(client: AgentClient, request: AppServerRequest): void {
-    const threadId = getString(request.params, "threadId");
-    const turnId = getString(request.params, "turnId");
-    const agentId = threadId ? this.#conversation.agentForThread(threadId) : undefined;
-    const publicThreadId = threadId && agentId ? this.#conversation.publicThreadId(agentId, threadId) : null;
+    const owner = this.#requestOwner(request.params);
     const questions = mcpElicitationQuestions(request.params);
-    if (!threadId || !turnId || !agentId || !publicThreadId || !questions) {
+    if (!owner || !questions) {
       client.respond(request.id, { action: "decline", content: null, _meta: null });
-      this.#emitError(
-        "mcp_safety_handoff",
-        "A local plugin requested an unsupported security hand-off, so OpenBot declined it.",
-        agentId,
-      );
+      this.#emitError("mcp_safety_handoff", declinedMcpElicitationText(request.params), owner?.agentId);
       return;
     }
+    const { agentId, publicThreadId, turnId, params } = owner;
     if (this.#answerMcpToolConsentWithoutAsking(client, request, agentId)) return;
-    if (this.#messagingThread(publicThreadId)) {
-      client.respond(request.id, { action: "cancel", content: null, _meta: null });
+    if (this.#messagingThread(publicThreadId) || this.#messagingRequestTurn(agentId, turnId)) {
+      client.respond(
+        request.id,
+        mcpToolCallConsent(params) ? MCP_TOOL_CONSENT_UNANSWERABLE : { action: "cancel", content: null, _meta: null },
+      );
       return;
     }
 
     const messageId = this.#persistQuestionPrompt(agentId, publicThreadId, turnId, request.id, questions);
+    this.#expireDetachedInChat(agentId, publicThreadId, turnId);
     this.#prompts.set(request.id, {
       client,
       id: request.id,
       responseKind: "mcp-elicitation",
-      params: request.params,
+      params,
       agentId,
       publicThreadId,
       turnId,
@@ -1750,16 +2466,12 @@ export class AttentionRegistry {
     });
   }
 
-  /**
-   * A turn ending expires its questions, drops its approvals and cancels its takeovers. Each removal
-   * emits its resolved event: a compaction turn sends no `turn-completed`, so a client learns about
-   * the removal only from that event.
-   */
-  clearForTurn(threadId: string, turnId: string): void {
+  clearForTurn(threadId: string, turnId: string, completed: boolean): void {
     for (const [requestId, pending] of this.#prompts) {
       const pendingThreadId = getString(pending.params, "threadId");
       const pendingTurnId = getString(pending.params, "turnId");
-      if (pendingThreadId === threadId && pendingTurnId === turnId) this.#expirePrompt(requestId, pending);
+      if (pendingThreadId !== threadId || pendingTurnId !== turnId || (completed && outlivesTurn(pending))) continue;
+      this.#expirePrompt(requestId, pending);
     }
     for (const [requestId, pending] of this.#approvals) {
       const pendingThreadId = getString(pending.params, "threadId") ?? getString(pending.params, "conversationId");
@@ -1770,31 +2482,105 @@ export class AttentionRegistry {
       }
     }
     for (const [requestId, pending] of this.#takeovers) {
-      if (pending.params.threadId === threadId && pending.params.turnId === turnId) {
-        this.#resolveBrowserTakeover(requestId, pending, "cancel");
-      }
+      if (pending.params.threadId !== threadId || pending.params.turnId !== turnId) continue;
+      if (completed && (pending.released || (pending.subagent && !pending.detached))) continue;
+      this.#resolveBrowserTakeover(requestId, pending, "cancel");
+    }
+    for (const [key, held] of this.#heldTakeoverResults) {
+      if (held.threadId === threadId && held.turnId === turnId) this.#heldTakeoverResults.delete(key);
     }
   }
 
-  /** Expires the prompts of one lost provider client, or of all clients when none is given. */
+  releaseForUserMessage(agentId: string, publicThreadId: string, turnId: string): void {
+    let changed = false;
+    for (const [requestId, pending] of this.#prompts) {
+      if (pending.agentId !== agentId || pending.publicThreadId !== publicThreadId || pending.turnId !== turnId)
+        continue;
+      if (pending.saving || pending.detached || pending.responseKind === "mcp-elicitation") continue;
+      this.#routines.markRunningForTurn(turnId);
+      this.#closeForUserMessage(requestId, pending);
+      changed = true;
+    }
+    if (changed) this.#emitRuntimeSnapshot();
+  }
+
+  closeDetachedForUserMessage(agentId: string, publicThreadId: string): void {
+    let changed = false;
+    for (const [requestId, pending] of this.#prompts) {
+      if (!pending.detached || pending.saving) continue;
+      if (pending.agentId !== agentId || pending.publicThreadId !== publicThreadId) continue;
+      if (this.#closeForUserMessage(requestId, pending)) changed = true;
+    }
+    if (changed) this.#emitRuntimeSnapshot();
+    for (const [requestId, pending] of this.#takeovers) {
+      if (!pending.released || pending.submitting) continue;
+      if (pending.request.agentId !== agentId || pending.request.threadId !== publicThreadId) continue;
+      this.#resolveBrowserTakeover(requestId, pending, "cancel");
+    }
+  }
+
+  #closeForUserMessage(requestId: RequestId, pending: PendingPrompt): boolean {
+    if (pending.responseKind === "mcp-elicitation") return false;
+    const uiBlockState = pending.uiBlock
+      ? answeredUiBlockState(pending.uiBlock.spec, null, undefined, undefined)
+      : undefined;
+    if (uiBlockState) uiBlockState.outcome = sourceText("status.agent.uiBlockClosedByMessage");
+    this.#closePrompt(
+      requestId,
+      pending,
+      userMessagePromptResult(pending.responseKind, pending.uiBlock?.blockId, pending.client.userInputNote),
+      { status: "cancelled" },
+      uiBlockState,
+    );
+    return true;
+  }
+
+  #expireDetachedInChat(agentId: string, publicThreadId: string, turnId: string): void {
+    const routineQuestion = this.#routines.runsTurn(turnId);
+    let changed = false;
+    for (const [requestId, pending] of this.#prompts) {
+      if (!pending.detached || pending.saving) continue;
+      if (pending.agentId !== agentId || pending.publicThreadId !== publicThreadId) continue;
+      if (routineQuestion && !this.#routines.runsTurn(pending.turnId)) continue;
+      this.#expirePrompt(requestId, pending);
+      changed = true;
+    }
+    if (changed) this.#emitRuntimeSnapshot();
+  }
+
+  expireDetached(agentId: string | null, publicThreadId: string | null): void {
+    let changed = false;
+    for (const [requestId, pending] of this.#prompts) {
+      if (!outlivesTurn(pending)) continue;
+      if (agentId !== null && pending.agentId !== agentId) continue;
+      if (publicThreadId !== null && pending.publicThreadId !== publicThreadId) continue;
+      this.#expirePrompt(requestId, pending);
+      changed = true;
+    }
+    if (changed) this.#emitRuntimeSnapshot();
+    for (const [requestId, pending] of this.#takeovers) {
+      if (!pending.subagent && !pending.released) continue;
+      if (agentId !== null && pending.request.agentId !== agentId) continue;
+      if (publicThreadId !== null && pending.request.threadId !== publicThreadId) continue;
+      this.#resolveBrowserTakeover(requestId, pending, "cancel");
+    }
+  }
+
   clearPrompts(client?: AgentClient): void {
     for (const [requestId, pending] of this.#prompts) {
-      if (client && pending.client !== client) continue;
+      if (client && (pending.client !== client || pending.detached)) continue;
       this.#expirePrompt(requestId, pending);
     }
   }
 
-  /**
-   * The provider stopped waiting for this request, such as an MCP client whose tool call timed out.
-   * An answer now reaches nobody, so the question expires and the approval or takeover closes. The
-   * turn continues without it.
-   */
-  cancelRequest(client: AgentClient, requestId: RequestId): void {
+  cancelRequest(client: AgentClient, requestId: RequestId, providerStoppedWaiting = false): void {
     let changed = false;
     const prompt = this.#prompts.get(requestId);
-    if (prompt?.client === client) {
-      this.#routines.markRunningForTurn(prompt.turnId);
-      this.#expirePrompt(requestId, prompt);
+    if (prompt?.client === client && !prompt.detached) {
+      if (!providerStoppedWaiting || !this.#detachForLateAnswer(requestId, prompt)) {
+        this.#routines.markRunningForTurn(prompt.turnId);
+        this.#expirePrompt(requestId, prompt);
+      }
       changed = true;
     }
     const approval = this.#approvals.get(requestId);
@@ -1805,64 +2591,116 @@ export class AttentionRegistry {
       changed = true;
     }
     for (const [key, takeover] of this.#takeovers) {
-      // Resolving emits its own runtime snapshot.
-      if (takeover.client === client && takeover.providerRequestId === requestId) {
-        this.#resolveBrowserTakeover(key, takeover, "cancel");
+      if (
+        takeover.client === client &&
+        takeover.providerRequestId === requestId &&
+        !takeover.detached &&
+        !takeover.released
+      ) {
+        if (providerStoppedWaiting) this.#releaseBrowserTakeover(key, takeover);
+        else this.#resolveBrowserTakeover(key, takeover, "cancel");
       }
     }
     if (changed) this.#emitRuntimeSnapshot();
   }
 
-  /**
-   * A failed write must not stop the clear: the remaining requests would stay, and the provider
-   * paths that clear a stopped client would fail after the client is gone.
-   *
-   * A client that still runs can still wait for the answer, for example an ACP turn that ended while
-   * its MCP tool call stayed open. It gets a refusal, so its request does not wait forever. A client
-   * that forgot the request ignores the answer.
-   */
-  #expirePrompt(requestId: RequestId, pending: PendingPrompt): void {
-    this.#prompts.delete(requestId);
-    clearTimeout(pending.autoAnswer?.timer);
-    this.#emitInputResolved("prompt", requestId, pending.agentId);
+  #scheduleDetach(request: AppServerRequest, pending: PendingPrompt): void {
+    const target = this.#lateAnswerTarget(pending.agentId, pending.publicThreadId);
+    if (!target) return;
+    const deadlines = [request.detachAfterMs, request.answerBeforeMs].filter((ms) => ms !== undefined);
+    pending.detach = {
+      target,
+      timer: setTimeout(() => this.#detachPrompt(request.id, pending), Math.min(this.#userAnswerLimitMs, ...deadlines)),
+    };
+  }
+
+  #limitQuestion(request: AppServerRequest, pending: PendingPrompt): void {
+    if (!pending.questions.some((question) => question.isSecret)) this.#scheduleDetach(request, pending);
+    if (pending.detach) return;
+    pending.expireTimer = setTimeout(() => this.#expireUnanswered(request.id, pending), this.#userAnswerLimitMs);
+  }
+
+  #expireUnanswered(requestId: RequestId, pending: PendingPrompt): void {
+    if (this.#prompts.get(requestId) !== pending || pending.saving) return;
+    this.#routines.markRunningForTurn(pending.turnId);
+    this.#expirePrompt(requestId, pending);
+    this.#emitRuntimeSnapshot();
+  }
+
+  detachPromptsOf(provider: AgentProvider): void {
+    for (const [requestId, pending] of this.#prompts)
+      if (pending.client.provider === provider && pending.detach && !pending.saving)
+        this.#detachPrompt(requestId, pending);
+  }
+
+  #detachForLateAnswer(requestId: RequestId, pending: PendingPrompt): boolean {
+    if (pending.saving || pending.questions.some((question) => question.isSecret)) return false;
+    const target = this.#lateAnswerTarget(pending.agentId, pending.publicThreadId);
+    return target !== null && this.#detachPrompt(requestId, pending, target);
+  }
+
+  #detachPrompt(requestId: RequestId, pending: PendingPrompt, target = pending.detach?.target): boolean {
+    if (this.#prompts.get(requestId) !== pending || !target) return false;
+    clearTimeout(pending.detach?.timer);
+    delete pending.detach;
+    pending.detached = target;
+    this.#routines.markRunningForTurn(pending.turnId);
     if (pending.client.running) {
       try {
-        pending.client.respond(
-          pending.id,
-          pending.uiBlock
-            ? uiBlockPromptResult({ status: "expired", blockId: pending.uiBlock.blockId })
-            : expiredPromptResult(pending.responseKind),
-        );
+        pending.client.respond(pending.id, detachedPromptResult(pending.responseKind));
       } catch (error) {
-        logger.warn("Unable to answer an expired prompt", { error: toLogValue(error) });
+        logger.warn("Unable to answer a detached prompt", { error: toLogValue(error) });
+      }
+    }
+    this.#emitRuntimeSnapshot();
+    return true;
+  }
+
+  #expirePrompt(requestId: RequestId, pending: PendingPrompt): void {
+    this.#closePrompt(
+      requestId,
+      pending,
+      pending.uiBlock
+        ? uiBlockPromptResult({ status: "expired", blockId: pending.uiBlock.blockId })
+        : expiredPromptResult(pending.responseKind),
+      { status: "expired" },
+      { status: "expired" },
+    );
+  }
+
+  #closePrompt(
+    requestId: RequestId,
+    pending: PendingPrompt,
+    result: unknown,
+    resolution: AgentPromptResolution,
+    uiBlockState: UiBlockState | undefined,
+  ): void {
+    this.#prompts.delete(requestId);
+    clearTimeout(pending.autoAnswer?.timer);
+    clearTimeout(pending.detach?.timer);
+    clearTimeout(pending.expireTimer);
+    this.#emitInputResolved("prompt", requestId, pending.agentId);
+    if (pending.client.running && !pending.detached) {
+      try {
+        pending.client.respond(pending.id, result);
+      } catch (error) {
+        logger.warn("Unable to answer a closed prompt", { error: toLogValue(error) });
       }
     }
     try {
-      this.#resolvePersistedPrompt(pending, { status: "expired" }, { status: "expired" });
+      this.#resolvePersistedPrompt(pending, resolution, uiBlockState);
     } catch (error) {
       this.#emitError("prompt_persistence_failed", error, pending.agentId);
     }
   }
 
-  /** Cancels the takeovers of one lost provider client, or of all clients when none is given. */
   clearBrowserTakeovers(client?: AgentClient): void {
     for (const [requestId, pending] of this.#takeovers) {
-      if (client && pending.client !== client) continue;
+      if (client && (pending.client !== client || pending.released)) continue;
       this.#resolveBrowserTakeover(requestId, pending, "cancel");
     }
   }
 
-  /**
-   * Cancels one pending approval the way each waiter needs it, and every cancelled entry still emits
-   * its resolved event: the UI removes its card on that event alone, and a compaction turn sends no
-   * other notice. A built-in tool hears "cancel" through `decide` and answers the provider itself,
-   * so answering its request here too would answer it twice. A hosted site goes through its own
-   * resolver, which declines the provider and records the terminal event; the resolver reports its
-   * own failures, so this only keeps one from interrupting the remaining removals. A native approval
-   * that the provider still waits on gets the refusal a `respondToApproval` answer would send, so
-   * its request does not wait forever; a client that forgot the request ignores the answer (#4165).
-   * A client that no longer runs has nobody to answer, for a hosted site too: its write fails.
-   */
   #cancelApproval(pending: PendingApproval): void {
     this.#emitInputResolved("approval", pending.id, pending.approval.agentId);
     pending.decide?.("cancel");
@@ -1891,10 +2729,6 @@ export class AttentionRegistry {
     }
   }
 
-  /**
-   * Drops the approvals of one lost provider client, or of all clients when none is given. The other
-   * clients are still running and wait for an answer, so their approvals stay.
-   */
   clearApprovals(client?: AgentClient): void {
     for (const [requestId, pending] of this.#approvals) {
       if (client && pending.client !== client) continue;
@@ -1907,12 +2741,14 @@ export class AttentionRegistry {
     this.#emit({ type: "agent-input-resolved", kind, requestId, agentId });
   }
 
-  /** A takeover whose tab disappeared can never be answered, so the tab list closing one cancels it. */
   cancelTakeoversForMissingTabs(tabs: BrowserTab[]): void {
     for (const [requestId, pending] of this.#takeovers) {
       if (!tabs.some((tab) => tab.id === pending.request.tabId)) {
         this.#resolveBrowserTakeover(requestId, pending, "cancel");
       }
+    }
+    for (const [key, held] of this.#heldTakeoverResults) {
+      if (!tabs.some((tab) => tab.id === held.tabId)) this.#heldTakeoverResults.delete(key);
     }
   }
 
@@ -1923,11 +2759,6 @@ export class AttentionRegistry {
     );
   }
 
-  /**
-   * Fills a password or authenticator request from the shared vault, without a card. True when the
-   * request was answered this way. With no login for the site, or several and no `loginId`, the card
-   * opens as before. The value goes to the browser only; the agent gets the usual result.
-   */
   readonly #fillFromVault = Effect.fn("AttentionRegistry.fillFromVault")(function* (
     this: AttentionRegistry,
     requestId: RequestId,
@@ -1937,69 +2768,123 @@ export class AttentionRegistry {
     const request = pending.secret?.request;
     if (!vault?.connected() || !request || request.method === "otp") return false;
     const kind = request.method === "password" ? "password" : "totp";
-    const skip = (reason: string, note: string, loginId?: string) => {
+    const { agentId } = pending.request;
+    const skip = (
+      reason: string,
+      note: string,
+      { loginId, card }: { loginId?: string; card?: BrowserVaultSkipReason } = {},
+    ) => {
       logger.info("Shared vault fill skipped", { origin: request.origin, method: request.method, loginId, reason });
       pending.vaultSkipped = `OpenBot did not fill a saved login: ${note}`;
+      if (card) pending.request.vaultSkip = card;
       return false;
     };
-    // A script the agent ran on this site can read what is filled, and a field built for something
-    // else can carry the value into a URL. In both cases the card lets the user decide.
+    const parsed = yield* Effect.result(
+      attentionStep(() => parseBrowserToolCall("submit_secret", pending.params.arguments)),
+    );
+    const args = Result.isSuccess(parsed) && parsed.success.tool === "submit_secret" ? parsed.success.args : undefined;
+    const loginId = args?.loginId;
+    const namedCard = (card: BrowserVaultSkipReason) => (loginId ? { loginId, card } : {});
     if (pending.secret?.agentScriptedOrigin !== false)
-      return skip("agent-scripted-origin", "you ran a script on this site since OpenBot started.");
+      return skip(
+        "agent-scripted-origin",
+        "a script that you ran with evaluate can still run in this page or in another open page of this site. First close or navigate each other tab of this site, also a popup or opener tab where you did not run evaluate. A tab of another agent or a channel can also block the fill, and list_tabs does not show it: when no other tab of this site is in list_tabs, ask the user to close the other tabs of this site. Then reload this page with navigate direction=reload, not with evaluate or by opening its address again, and call submit_secret again.",
+        namedCard("agent-script"),
+      );
+    const withCode = pending.secret.withCode;
+    const codeFields =
+      'A code field has autocomplete="one-time-code", or is a text, tel, or number input with a word such as otp, totp, authentication code, or verification code in its id, name, aria-label, placeholder, title, or label, or a field named "code" or "passcode" in a form whose visible text names an authenticator app and no email or SMS. Its name and label have no backup, recovery, mail, phone, SMS, name, label, promo, coupon, voucher, discount, gift, invite, referral, zip, postal, country, card, CVC, CVV, or CSC word.';
     if (pending.secret.vaultFillable !== true)
       return skip(
         "field-kind",
-        kind === "password"
-          ? "the field target is not a password input."
-          : 'the field targets do not have autocomplete="one-time-code".',
+        withCode
+          ? `the field target is not a password input, or the code targets are not code fields. ${codeFields}`
+          : kind === "password"
+            ? "the field target is not a password input."
+            : `the field targets are not code fields. ${codeFields}`,
+        namedCard("field-kind"),
       );
+    const fits = (login: VaultLogin) => kind === "password" || login.hasOneTimePassword;
     const found = yield* Effect.result(
       Effect.gen(function* () {
-        const call = yield* attentionStep(() => parseBrowserToolCall("submit_secret", pending.params.arguments));
-        const loginId = call.tool === "submit_secret" ? call.args.loginId : undefined;
-        const candidates = loginId
-          ? []
-          : ((yield* vault.loginsFor(request.origin)) ?? []).filter(
-              (login) => kind === "password" || login.hasOneTimePassword,
-            );
-        const chosen = loginId ?? (candidates.length === 1 ? candidates[0]?.id : undefined);
-        return chosen ? { loginId: chosen, secret: yield* vault.secretFor(chosen, request.origin, kind) } : null;
+        if (Result.isFailure(parsed)) return yield* parsed.failure;
+        const candidates = loginId ? [] : ((yield* vault.loginsFor(request.origin, agentId)) ?? []).filter(fits);
+        const account = (name: string | null | undefined) => name?.trim().toLowerCase() ?? "";
+        const wanted = account(args?.username);
+        const only = candidates.length === 1 ? candidates[0] : undefined;
+        const saved = account(only?.username);
+        if (only && wanted && saved && saved !== wanted)
+          return { chosen: false as const, several: false, otherAccount: true };
+        const chosen = loginId ?? only?.id;
+        if (!chosen) return { chosen: false as const, several: candidates.length > 1, otherAccount: false };
+        const secret = yield* vault.secretFor(chosen, request.origin, kind, agentId);
+        const listed = secret || !loginId ? null : yield* Effect.result(vault.loginsFor(request.origin, agentId));
+        const sitesLogins = listed !== null && Result.isSuccess(listed) ? (listed.success ?? []) : null;
+        const unknown = sitesLogins !== null && !sitesLogins.some((candidate) => candidate.id === loginId);
+        const code = withCode && secret ? yield* vault.secretFor(chosen, request.origin, "totp", agentId) : undefined;
+        return {
+          chosen: true as const,
+          loginId: chosen,
+          secret,
+          code,
+          unknown,
+          listUnread: listed !== null && Result.isFailure(listed),
+          otherLogins: Boolean(sitesLogins?.some(fits)),
+        };
       }),
     );
     if (Result.isFailure(found)) {
       logger.warn("Unable to fill from the shared vault", { error: toLogValue(found.failure.cause) });
       pending.vaultSkipped = "OpenBot did not fill a saved login: the password manager could not be read.";
+      if (Result.isSuccess(parsed)) pending.request.vaultSkip = "vault-unreadable";
       return false;
     }
     const login = found.success;
     if (this.#takeovers.get(requestId) !== pending) return false;
-    if (!login)
+    if (!login.chosen && login.otherAccount)
+      return skip(
+        "other-username",
+        "the only saved login for this site has another username than this sign-in, so the user types the password. When the sign-in is for that saved account, call list_logins and use its loginId.",
+      );
+    if (!login.chosen)
       return skip(
         "no-login",
         "no saved login matches this site, or several match and the call has no loginId from list_logins.",
+        login.several ? { card: "login-choice" } : {},
+      );
+    if (login.unknown)
+      return skip(
+        "unknown-login",
+        `no saved login for this site has the id ${login.loginId}. Call list_logins and give the id of a login exactly as list_logins shows it, with its prefix, for example openbot:.`,
+        { loginId: login.loginId, ...(login.otherLogins ? { card: "login-choice" } : {}) },
       );
     if (!login.secret)
       return skip(
         "no-secret",
         `saved login ${login.loginId} has no ${kind === "password" ? "password" : "authenticator key"} for this site.`,
-        login.loginId,
+        { loginId: login.loginId, ...(login.listUnread ? {} : { card: "no-secret" }) },
       );
+    if (withCode && !login.code)
+      return skip("no-code", `saved login ${login.loginId} has no authenticator key for this site.`, {
+        loginId: login.loginId,
+      });
     pending.vaultLoginId = login.loginId;
     const submitted = yield* Effect.result(
-      this.respondToBrowserSecret({
-        requestId,
-        agentId: pending.request.agentId,
-        decision: "submit",
-        secret: login.secret,
-      }),
+      this.respondToBrowserSecret(
+        {
+          requestId,
+          agentId: pending.request.agentId,
+          decision: "submit",
+          secret: login.secret,
+        },
+        login.code ?? undefined,
+      ),
     );
     if (Result.isFailure(submitted)) {
-      // The tab could not be handed to the user. Answer the agent, so it does not wait forever.
       logger.warn("Unable to submit the shared login", { error: toLogValue(submitted.failure.cause) });
       if (this.#takeovers.get(requestId) === pending) this.#resolveBrowserTakeover(requestId, pending, "cancel");
       return true;
     }
-    // A failed fill hands the tab to the user, as a failed card submission does.
     if (this.#takeovers.get(requestId) === pending) this.#routines.markNeedsAttention(pending.request.turnId);
     return true;
   }).bind(this);
@@ -2013,10 +2898,13 @@ export class AttentionRegistry {
     pending.secret?.cancel();
     this.#routines.markRunningForTurn(pending.request.turnId);
     this.#takeovers.delete(requestId);
-    // `surfaceBrowserTakeover` refuses a second request for the same tab, so this is belt and braces --
-    // but returning control while another request still waits on the tab would be the worse mistake.
+    const signInMissing =
+      decision === "complete" &&
+      pending.memberCompleted === true &&
+      pending.request.reason === "sign-in-blocked" &&
+      this.#browser.takeoverSignInArrived?.(pending.request.tabId) === false;
     if (![...this.#takeovers.values()].some((candidate) => candidate.request.tabId === pending.request.tabId)) {
-      this.#browser.endTakeover(pending.request.tabId);
+      this.#browser.endTakeover(pending.request.tabId, pending.personCompleted === true);
     }
     this.#emit({
       type: "browser-takeover-resolved",
@@ -2024,7 +2912,65 @@ export class AttentionRegistry {
       agentId: pending.request.agentId,
     });
     this.#emitRuntimeSnapshot();
-    pending.resolve(browserTakeoverResult(decision, vault, pending.vaultSkipped));
+    const vaultNote = vault ?? (pending.vaultNotSaved ? TYPED_PASSWORD_NOT_SAVED : undefined);
+    if (pending.released && (decision === "complete" || pending.personCancelled)) {
+      const lateText = sourceText(
+        decision === "complete" ? "status.agent.takeoverLateCompleted" : "status.agent.takeoverLateCancelled",
+        { tabId: pending.request.tabId },
+      );
+      const lateNotes = browserTakeoverLateNotes(
+        vaultNote,
+        pending.vaultSkipped,
+        signInMissing,
+        pending.secureInputFailed,
+      );
+      this.#sendLateAnswer(
+        pending.request.agentId,
+        pending.released,
+        lateNotes ? `${lateText}\n${lateNotes}` : lateText,
+        undefined,
+      );
+    }
+    pending.resolve(
+      browserTakeoverResult(
+        decision,
+        vaultNote,
+        pending.vaultSkipped,
+        signInMissing,
+        pending.personCancelled === true,
+        pending.secureInputFailed,
+      ),
+    );
+  }
+
+  #recordNearPayment(
+    agentId: string,
+    threadId: string,
+    turnId: string,
+    requestId: string,
+    payment: ConversationNearPayment,
+  ): void {
+    const snapshot = this.#conversation.ensureSnapshot(agentId, this.#conversation.publicThreadId(agentId, threadId));
+    const id = `near-payment:${turnId}:${requestId}`;
+    const text = nearPaymentText(payment);
+    const existing = snapshot.messages.find((message) => message.id === id);
+    if (existing) {
+      existing.nearPayment = payment;
+      existing.text = text;
+    } else {
+      snapshot.messages.push({
+        id,
+        turnId,
+        author: "system",
+        source: "system",
+        status: "completed",
+        createdAt: new Date().toISOString(),
+        itemType: NEAR_PAYMENT_ITEM_TYPE,
+        text,
+        nearPayment: payment,
+      });
+    }
+    this.#conversation.emitConversation(snapshot);
   }
 
   #persistQuestionPrompt(
@@ -2060,23 +3006,28 @@ export class AttentionRegistry {
     return messageId;
   }
 
-  /**
-   * `uiBlockState` freezes the message's UI block, when it has one, in the same write. `vaultSaved`
-   * names the item that the user saved from a Vault request.
-   */
   #resolvePersistedPrompt(
     pending: PendingPrompt,
     resolution: AgentPromptResolution,
     uiBlockState?: UiBlockState,
     vaultSaved?: UiVaultSavedItem,
+    preview?: string,
   ): void {
     const snapshot = this.#conversation.ensureSnapshot(pending.agentId, pending.publicThreadId);
     const message = snapshot.messages.find((candidate) => candidate.id === pending.messageId);
     if (!message?.questionPrompt || message.questionPrompt.resolution !== null) return;
     message.questionPrompt.resolution = structuredClone(resolution);
+    const edited =
+      preview && message.uiBlock?.spec.type === "confirm"
+        ? normalizeConversationUiBlock({ ...message.uiBlock, spec: { ...message.uiBlock.spec, preview } })
+        : null;
+    const editedQuestions = edited ? uiBlockFallbackQuestions(edited.spec) : null;
+    if (edited && message.uiBlock && editedQuestions && validPromptQuestions(editedQuestions)) {
+      message.uiBlock.spec = edited.spec;
+      message.questionPrompt.questions = editedQuestions;
+    }
     message.text = questionPromptText(message.questionPrompt.questions, resolution);
     if (message.uiBlock && uiBlockState) {
-      // The read drops a secret form value; storing the read result keeps it out of the database.
       const vault = message.uiBlock.vault && vaultSaved ? { ...message.uiBlock.vault, saved: vaultSaved } : undefined;
       const frozen = normalizeConversationUiBlock({
         ...message.uiBlock,
@@ -2094,14 +3045,50 @@ export class AttentionRegistry {
       status: resolution.status,
     });
   }
+
+  #showWelcomeAnswer(
+    pending: PendingPrompt,
+    resolution: AgentPromptResolution,
+    responder: PromptResponder | undefined,
+  ): void {
+    if (pending.detached || pending.subagent || pending.responseKind === "mcp-elicitation" || responder?.automatic)
+      return;
+    const text = welcomeAnswerText(pending.questions, resolution);
+    if (!text) return;
+    const snapshot = this.#conversation.ensureSnapshot(pending.agentId, pending.publicThreadId);
+    const inTurn = snapshot.messages.filter((message) => message.turnId === pending.turnId);
+    const welcomeTurn = inTurn.some((message) => message.itemType === AGENT_WELCOME_ITEM_TYPE);
+    const firstQuestion = inTurn.find((message) => message.questionPrompt)?.id === pending.messageId;
+    const id = `welcome-answer:${pending.turnId}:${String(pending.id)}`;
+    if (!welcomeTurn || !firstQuestion || inTurn.some((message) => message.id === id)) return;
+    snapshot.messages.push({
+      id,
+      turnId: pending.turnId,
+      author: "user",
+      source: "user",
+      ...(responder?.sender ? { senderMember: structuredClone(responder.sender) } : {}),
+      text,
+      createdAt: new Date().toISOString(),
+      status: "completed",
+    });
+    this.#conversation.emitConversation(snapshot);
+  }
 }
 
-/**
- * The response the answers give, or null when the person skipped the block. The answers come keyed by
- * the fallback questions, from a client that knows the block (`uiBlockAnswersFromResponse`) or from one
- * that only showed the questions. Throws when the answer does not fit, or when a member who is not the
- * owner or an admin takes a privileged action.
- */
+const NEAR_PAYMENT_RESULT_STATE = {
+  paid: "paid",
+  declined: "rejected",
+  failed: "failed",
+  uncertain: "uncertain",
+} as const satisfies Record<NearPaymentResult["status"], ConversationNearPayment["state"]>;
+
+function welcomeAnswerText(questions: AgentPromptQuestion[], resolution: AgentPromptResolution): string {
+  const [question] = questions;
+  if (questions.length !== 1 || !question || question.isSecret || resolution.status !== "answered") return "";
+  const response = resolution.responses[question.id];
+  return response?.status === "answered" && response.answers ? response.answers.join(", ").trim() : "";
+}
+
 function uiBlockAnswer(
   spec: UiBlockSpec,
   answers: Readonly<Record<string, readonly string[]>>,
@@ -2111,8 +3098,6 @@ function uiBlockAnswer(
   if (!read) return null;
   const response = validateUiBlockResponse(spec, read);
   if (!response) throw new Error(sourceText("error.backend.uiBlockAnswerInvalid"));
-  // On a block with a privileged action an answer in words is privileged too: a member could
-  // otherwise write "yes" to an action they may not press.
   const privileged =
     response.actionId === UI_BLOCK_TEXT_ACTION_ID
       ? uiBlockHasPrivilegedAction(spec)
@@ -2130,10 +3115,8 @@ function answeredUiBlockState(
   autoAnswer: UiBlockAutoAnswer | undefined,
 ): UiBlockState {
   const state: UiBlockState = response ? { status: "answered", response } : { status: "closed" };
-  // The contract refuses a blank outcome, such as a form sent with every optional field empty.
   const outcome = response ? uiBlockOutcomeText(spec, response) : "";
   if (outcome.trim()) state.outcome = outcome;
-  // The frozen block says that the host chose, not a person.
   if (autoAnswer && responder?.automatic) state.autoAnswer = { ...autoAnswer, done: true };
   if (responder?.sender) state.respondedBy = structuredClone(responder.sender);
   state.respondedAt = new Date().toISOString();
@@ -2144,7 +3127,6 @@ class AttentionOperationFailed extends Schema.TaggedError<AttentionOperationFail
   cause: Schema.Defect(),
 }) {}
 
-/** Redacted choice labels and IDs cannot be sent back as the provider's original values. */
 function localQuestionNeedsOpenBot(question: AgentPromptQuestion): boolean {
   return (
     question.isSecret ||
@@ -2160,7 +3142,6 @@ type ApprovalReply =
   | { decision: "approved" | { denied: { rejection: string } } }
   | { decision: "accept" | "decline" };
 
-/** The reply each approval method's provider understands for a decision. */
 function approvalReply(
   method: string,
   params: unknown,

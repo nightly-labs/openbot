@@ -1,0 +1,68 @@
+.library-panel {
+  display: grid;
+  height: 100%;
+  min-height: 0;
+  grid-template-rows: minmax(0, 1fr);
+}
+
+.library-panel > * {
+  grid-row: 1;
+  grid-column: 1;
+  min-height: 0;
+}
+
+@media (min-width: 721px) {
+  .app-frame-edge[data-window-page-kind="titled"] > .window-page > .library-panel {
+    grid-template-rows: var(--left-header-height) minmax(0, 1fr);
+  }
+
+  .app-frame-edge[data-window-page-kind="titled"] > .window-page > .library-panel > * {
+    grid-row: 2;
+    pointer-events: auto;
+  }
+
+  .app-frame-edge[data-window-page-kind="titled"]
+    > .window-page
+    > .library-panel
+    > .library-panel-content[data-folders] {
+    --library-head-height: var(--left-header-height);
+    --library-side-row: 2;
+
+    grid-row: 1 / -1;
+    pointer-events: none;
+  }
+
+  .app-frame-edge[data-window-page-kind="titled"]
+    > .window-page
+    > .library-panel
+    > .library-panel-content[data-folders]
+    :is(.library-side, .library-frame, .library-path, .library-path-tools) {
+    pointer-events: auto;
+    -webkit-app-region: no-drag;
+  }
+}
+
+.library-panel-content[inert] {
+  visibility: hidden;
+}
+
+.library-viewer {
+  position: relative;
+  overflow: hidden;
+  border-end-start-radius: calc(var(--openbot-radius-card) - 1px);
+  border-end-end-radius: calc(var(--openbot-radius-card) - 1px);
+  outline: none;
+}
+
+.library-viewer .browser-panel {
+  width: 100%;
+  border-inline-start: 0;
+}
+
+.library-viewer :is(.browser-panel, .file-preview-header)::before {
+  content: none;
+}
+
+.library-viewer .right-panel-resizer {
+  display: none;
+}

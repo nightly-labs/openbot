@@ -7,23 +7,11 @@ import {
   taskSections,
   taskTone,
 } from "@openbot/team-client/agent-tasks";
-import {
-  ArrowLeft,
-  ArrowUp,
-  Button,
-  buttonVariants,
-  Check,
-  ChevronDown,
-  DropdownMenu,
-  IconButton,
-  LoaderCircle,
-  Mic,
-  PanelLeft,
-  X,
-} from "@openbot/ui";
-import { SwapLabel, type SwapMotion } from "@openbot/ui/components/SwapLabel";
+import { ArrowUp, Button, LoaderCircle, Mic, X } from "@openbot/ui";
+import { PanelResizer } from "@openbot/ui/components/PanelResizer";
 import type { AgentProfile } from "@openbot/ui/data";
 import { AgentAvatar } from "@openbot/ui/features/agents/AgentAvatar";
+import { AgentSearchSelect, agentOf } from "@openbot/ui/features/agents/AgentSearchSelect";
 import { AgentTaskMark, type AgentTaskWait, agentTaskStatus } from "@openbot/ui/features/conversation/AgentTasks";
 import {
   ComposerAttachmentRow,
@@ -35,70 +23,57 @@ import {
   type ComposerSelection,
 } from "@openbot/ui/features/conversation/ComposerEditor";
 import { ComposerNotice } from "@openbot/ui/features/conversation/ComposerNotice";
+import { ComposerStackCard } from "@openbot/ui/features/conversation/ComposerStackCard";
 import type { SendShortcut } from "@openbot/ui/features/conversation/send-shortcut";
 import {
   type VoicePhase,
   VoiceRecordingMorph,
   voiceButtonLabel,
 } from "@openbot/ui/features/conversation/VoiceRecordingMorph";
+import { PageHeader, type PageHeaderFrame } from "@openbot/ui/features/window/PageHeader";
 import { useText } from "@openbot/ui/text";
 import { prefersReducedMotion } from "@openbot/ui/utils";
 import type { JSX } from "@solidjs/web";
 import { createEffect, createStore, createUniqueId, For, onCleanup, onSettled, Show, untrack } from "solid-js";
+import { createComposerRowsResize } from "../conversation/createComposerRowsResize";
 import { TasksEmptyBoard, TasksEmptyPitch } from "./TasksEmpty";
 
-/** The microphone of the Tasks composer. The page shows it; the app records and transcribes. */
 export interface TasksVoice {
   phase: VoicePhase;
   levels: readonly number[];
   elapsedSeconds: number;
-  /** The words the recording heard so far. */
   liveText: string;
-  /** The download progress of the voice model, in percent, while the phase is "preparing". */
   modelProgress: number | null;
   onStart: () => void;
   onCancel: () => void;
   onFinish: () => void;
+  blocked?: boolean | undefined;
 }
 
-/** The task of the last start, in the line under the composer. */
 interface TasksTook {
   task: AgentTask;
-  /** True while the start waits: Undo cancels it, and the agent can change. */
   pending: boolean;
 }
 
 interface TasksPageProps {
   hostName: string;
   onBack?: (() => void) | undefined;
-  /** Whether the agent list shows beside the page. */
-  agentsOpen?: boolean | undefined;
-  /** Shows or hides the agent list. Without it, the header has no button for the list. */
-  onToggleAgents?: (() => void) | undefined;
+  frame?: PageHeaderFrame | undefined;
   agents: AgentProfile[];
-  /** The tasks of all agents, also a start that waits. */
   tasks: readonly AgentTask[];
-  /** Whether the task lists of all agents loaded. Only then does a page with no task show how tasks work. */
   loaded?: boolean | undefined;
-  /** The agent of the next task. */
   agentId: string;
   onAgentChange: (agentId: string) => void;
   draft: string;
   onDraftChange: (text: string) => void;
-  /** The files of the next task. The text names each one where it was added. */
   files?: readonly DraftAttachment[] | undefined;
-  /** The files in the thumbnail row: each image, and each other file that the text no longer names. */
   rowFiles?: readonly DraftAttachment[] | undefined;
-  /** The pasted images that still import, with their local previews. */
   pendingImages?: readonly ComposerPendingImage[] | undefined;
   onRemoveFile?: ((attachment: DraftAttachment) => void) | undefined;
-  /** Receives pasted files and long text pastes, as `ComposerEditor` says. Without it, a file paste does nothing here. */
   onPasteFiles?:
     | ((files: File[], selection: ComposerSelection, text?: string) => Promise<ComposerPasteResult | undefined>)
     | undefined;
-  /** Each change moves the focus to the composer. */
   focusRequest: number;
-  /** The text of a start that failed. The draft is back in the composer. */
   startError: string | null;
   onDismissStartError: () => void;
   onStart: () => void;
@@ -108,97 +83,23 @@ interface TasksPageProps {
   onUndo: () => void;
   onOpenTook: () => void;
   onDismissTook: () => void;
-  /** The task in the side panel. */
   selectedId: string | null;
   onSelect: (taskId: string | null) => void;
-  /** The conversation of one task, for the side panel. */
   panel: (taskId: string) => JSX.Element;
-  /** What the task's running turn waits for from the person: an approval, or an answer in the chat. */
+  sideWidth: number;
+  onSideResize: (width: number) => void;
+  onSideResizeEnd: (width: number) => void;
   waitOf?: ((task: AgentTask) => AgentTaskWait) | undefined;
-  /** The user's send shortcut for the composer. */
   sendShortcut?: SendShortcut | undefined;
+  macWindowControls?: boolean | undefined;
 }
 
-const agentOf = (agents: readonly AgentProfile[], agentId: string) => agents.find((agent) => agent.id === agentId);
-
-/** The trigger motion of the header model switcher: mostly a blur, so the old and new name cross in place. */
-const AGENT_SWAP: SwapMotion = {
-  distance: 6,
-  blur: 6,
-  enter: { duration: 320, easing: "cubic-bezier(0.33, 1, 0.68, 1)" },
-  leave: { duration: 180, easing: "ease" },
-};
-
-/**
- * The agent of a task, as a menu with the agent's face. A task has one agent, so the menu marks only
- * the chosen agent, as the routine trigger menu does.
- */
-function TaskAgentSelect(props: {
-  agents: AgentProfile[];
-  agentId: string;
-  /** The task title, when the select changes the agent of a task that is already sent. */
-  title?: string;
-  onChange: (agentId: string) => void;
-}) {
-  const { t } = useText();
-  const agent = () => agentOf(props.agents, props.agentId);
-  let shownId = untrack(() => props.agentId);
-  return (
-    <DropdownMenu.Root placement="bottom-start" gutter={4}>
-      <DropdownMenu.Trigger
-        class={`${buttonVariants({ variant: "ghost", size: "sm" })} tasks-page-agent`}
-        aria-label={
-          props.title === undefined
-            ? t("conversation.tasks.page.agent", { name: agent()?.name ?? props.agentId })
-            : t("conversation.tasks.page.reassign", { title: props.title, name: agent()?.name ?? props.agentId })
-        }
-      >
-        {/* Keyed by agent, so the face of a newly chosen agent springs in, as the model mark does. */}
-        <For each={[props.agentId]} keyed={(id) => id}>
-          {(id) => {
-            const entering = untrack(id) !== shownId;
-            shownId = untrack(id);
-            return (
-              <span class="tasks-page-agent-face" data-entering={entering ? "" : undefined}>
-                <AgentAvatar agent={agentOf(props.agents, id())} class="tasks-page-avatar" />
-              </span>
-            );
-          }}
-        </For>
-        <SwapLabel text={agent()?.name ?? props.agentId} motion={AGENT_SWAP} />
-        <ChevronDown class="tasks-page-agent-chevron" aria-hidden="true" />
-      </DropdownMenu.Trigger>
-      <DropdownMenu.Portal>
-        <DropdownMenu.Content class="tasks-page-agent-menu">
-          <DropdownMenu.RadioGroup value={props.agentId} onChange={(value) => props.onChange(value)}>
-            <For each={props.agents} keyed={(option) => option.id}>
-              {(option) => (
-                <DropdownMenu.RadioItem value={option().id} closeOnSelect class="tasks-page-agent-option">
-                  <AgentAvatar agent={option()} class="tasks-page-avatar" />
-                  <span>{option().name}</span>
-                  <Show when={props.agentId === option().id}>
-                    <Check aria-hidden="true" class="tasks-page-agent-check" />
-                  </Show>
-                </DropdownMenu.RadioItem>
-              )}
-            </For>
-          </DropdownMenu.RadioGroup>
-        </DropdownMenu.Content>
-      </DropdownMenu.Portal>
-    </DropdownMenu.Root>
-  );
-}
-
-/**
- * The composer of the Tasks page: the conversation composer, and the agent selector in its toolbar.
- * Enter starts the task and Shift+Enter adds a line. The microphone dictates the task, as in a chat.
- */
 function TasksComposer(props: TasksPageProps) {
   const { t } = useText();
   const phase = (): VoicePhase => props.voice?.phase ?? "idle";
   const busy = () => phase() === "requesting" || phase() === "preparing" || phase() === "transcribing";
+  const draftRows = createComposerRowsResize();
   const hasRow = () => (props.rowFiles?.length ?? 0) > 0 || (props.pendingImages?.length ?? 0) > 0;
-  // A start of files only names them, so it has a title too.
   const canStart = () =>
     phase() === "recording" ||
     (phase() === "idle" && (plainTaskTitle(props.draft) !== "" || (props.files?.length ?? 0) > 0));
@@ -218,18 +119,22 @@ function TasksComposer(props: TasksPageProps) {
   );
   return (
     <div class="composer-wrap tasks-page-composer">
-      <Show when={props.startError}>
-        {(body) => (
-          <ComposerNotice
-            tone="danger"
-            title={t("conversation.tasks.error.start")}
-            body={body()}
-            onDismiss={props.onDismissStartError}
-          />
-        )}
-      </Show>
+      <div class="composer-stack">
+        <ComposerStackCard when={props.startError}>
+          {(body) => (
+            <ComposerNotice
+              tone="danger"
+              title={t("conversation.tasks.error.start")}
+              body={body()}
+              onDismiss={props.onDismissStartError}
+            />
+          )}
+        </ComposerStackCard>
+      </div>
       <form
+        ref={draftRows.form}
         class="composer"
+        data-compact={hasRow() ? undefined : ""}
         data-has-attachments={hasRow() ? "" : undefined}
         onSubmit={(event) => {
           event.preventDefault();
@@ -241,8 +146,9 @@ function TasksComposer(props: TasksPageProps) {
           pending={props.pendingImages}
           removeDisabled={phase() === "transcribing"}
           onRemove={(attachment) => props.onRemoveFile?.(attachment)}
+          macWindowControls={props.macWindowControls}
         />
-        <div class="composer-input-label">
+        <div class="composer-input-label" ref={draftRows.label}>
           <ComposerEditor
             agentId={undefined}
             agents={props.agents}
@@ -261,13 +167,20 @@ function TasksComposer(props: TasksPageProps) {
         </div>
         <div class="composer-toolbar">
           <div class="tasks-page-composer-agent">
-            <TaskAgentSelect agents={props.agents} agentId={props.agentId} onChange={props.onAgentChange} />
+            <AgentSearchSelect
+              agents={props.agents}
+              agentId={props.agentId}
+              label={t("conversation.tasks.page.agent", {
+                name: agentOf(props.agents, props.agentId)?.name ?? props.agentId,
+              })}
+              onChange={props.onAgentChange}
+            />
           </div>
           <div class="composer-primary-actions">
             <Show when={props.voice} fallback={send()}>
               {(voice) => (
                 <>
-                  <Show when={phase() === "preparing"}>
+                  <Show when={phase() === "preparing" && voice().modelProgress !== null}>
                     <span class="voice-model-progress" role="status">
                       {t("composer.voice.progress", { progress: voice().modelProgress ?? 0 })}
                     </span>
@@ -278,14 +191,15 @@ function TasksComposer(props: TasksPageProps) {
                     elapsedSeconds={voice().elapsedSeconds}
                     onCancel={() => voice().onCancel()}
                     onFinish={() => voice().onFinish()}
+                    onSend={start}
                     send={send()}
                   >
                     <Button
                       type="button"
                       variant="ghost"
                       class="dictation-button"
-                      aria-label={t(voiceButtonLabel(phase()))}
-                      disabled={busy()}
+                      aria-label={t(voiceButtonLabel(phase(), voice().modelProgress))}
+                      disabled={busy() || voice().blocked === true}
                       onClick={() => voice().onStart()}
                     >
                       <Show when={busy()} fallback={<Mic aria-hidden="true" />}>
@@ -303,7 +217,6 @@ function TasksComposer(props: TasksPageProps) {
   );
 }
 
-/** The line under the composer after a start: the agent that took the task, Undo, and Open. */
 function TaskTookLine(props: TasksPageProps & { took: TasksTook }) {
   const { t } = useText();
   const agent = () => agentOf(props.agents, props.took.task.agentId);
@@ -318,10 +231,13 @@ function TaskTookLine(props: TasksPageProps & { took: TasksTook }) {
           </span>
         }
       >
-        <TaskAgentSelect
+        <AgentSearchSelect
           agents={props.agents}
           agentId={props.took.task.agentId}
-          title={props.took.task.title}
+          label={t("conversation.tasks.page.reassign", {
+            title: props.took.task.title,
+            name: agent()?.name ?? props.took.task.agentId,
+          })}
           onChange={props.onTookAgentChange}
         />
       </Show>
@@ -347,7 +263,6 @@ function TaskTookLine(props: TasksPageProps & { took: TasksTook }) {
   );
 }
 
-/** One task in the list: its mark, title and state, and the face of its agent at the end. */
 function TaskRow(props: {
   task: AgentTask;
   agent: AgentProfile | undefined;
@@ -392,7 +307,6 @@ const SECTION_TITLE = {
   closed: "conversation.threads.archived",
 } as const satisfies Record<TasksSectionId, AppTextKey>;
 
-/** The tasks by what they need, each section with its heading. The archived tasks are faded. */
 function TasksList(props: TasksPageProps) {
   const { t } = useText();
   const ids = createUniqueId();
@@ -452,20 +366,32 @@ function TasksList(props: TasksPageProps) {
   );
 }
 
-/** The close transition is 200ms; this ends a close whose `transitionend` does not come. */
 const SIDE_CLOSE_FALLBACK_MS = 300;
 
-/**
- * The task panel at the right of the page. It makes the list narrower; it does not cover it. The
- * panel slides in from the right and out again, so it stays shown until its close ends.
- */
+export const TASKS_SIDE_DEFAULT = 420;
+export const TASKS_SIDE_MIN = 320;
+const TASKS_LIST_MIN = 320;
+
 function TasksSidePanel(props: {
   tasks: readonly AgentTask[];
   taskId: string | null;
   panel: (taskId: string) => JSX.Element;
   onClose: () => void;
+  width: number;
+  onResize: (width: number) => void;
+  onResizeEnd: (width: number) => void;
 }) {
-  const [view, setView] = createStore({ shownId: untrack(() => props.taskId), closing: false });
+  const { t } = useText();
+  const sideId = createUniqueId();
+  const [view, setView] = createStore<{
+    shownId: string | null;
+    closing: boolean;
+    pageWidth: number | null;
+  }>({ shownId: untrack(() => props.taskId), closing: false, pageWidth: null });
+  let side: HTMLDivElement | undefined;
+  const maxFor = (page: number | null | undefined) =>
+    page == null ? Number.POSITIVE_INFINITY : Math.max(TASKS_SIDE_MIN, page - TASKS_LIST_MIN);
+  const width = () => Math.round(Math.min(maxFor(view.pageWidth), Math.max(TASKS_SIDE_MIN, props.width)));
   let closeTimer: ReturnType<typeof setTimeout> | undefined;
   const finishClose = () => {
     clearTimeout(closeTimer);
@@ -498,7 +424,6 @@ function TasksSidePanel(props: {
     const id = view.shownId;
     return id && props.tasks.some((task) => task.id === id) ? id : null;
   };
-  /* The first task of an open slides in with the panel; only a change to a different task fades in. */
   let contentId: string | null = null;
   return (
     <Show when={shown()}>
@@ -506,8 +431,6 @@ function TasksSidePanel(props: {
         onCleanup(() => {
           contentId = null;
         });
-        // Escape closes the panel, as on the settings page: on the document and after the delegated
-        // handlers, so a control that handles Escape keeps it. An open popup or another text field also keeps it.
         onSettled(() => {
           const closeOnEscape = (event: KeyboardEvent) => {
             if (event.key !== "Escape" || event.defaultPrevented || event.isComposing) return;
@@ -527,7 +450,10 @@ function TasksSidePanel(props: {
         });
         return (
           <div
+            ref={(element) => (side = element)}
+            id={sideId}
             class="tasks-page-side"
+            style={{ "--tasks-page-side-width": `${width()}px` }}
             data-closing={view.closing ? "" : undefined}
             onTransitionEnd={(event) => {
               if (event.target === event.currentTarget && event.propertyName === "flex-basis" && view.closing) {
@@ -535,18 +461,37 @@ function TasksSidePanel(props: {
               }
             }}
           >
-            <For each={[taskId()]} keyed={(id) => id}>
-              {(id) => {
-                const current = untrack(id);
-                const entering = contentId !== null && contentId !== current;
-                contentId = current;
-                return (
-                  <div class="tasks-page-side-content" data-entering={entering ? "" : undefined}>
-                    {props.panel(current)}
-                  </div>
-                );
-              }}
-            </For>
+            <PanelResizer
+              class="right-panel-resizer"
+              label={t("conversation.tasks.panel.resize")}
+              controls={sideId}
+              direction="right"
+              value={width()}
+              defaultValue={TASKS_SIDE_DEFAULT}
+              min={TASKS_SIDE_MIN}
+              max={() => maxFor(side?.parentElement?.clientWidth)}
+              onResize={props.onResize}
+              onResizeEnd={props.onResizeEnd}
+              onParentResize={() =>
+                setView((draft) => {
+                  draft.pageWidth = side?.parentElement?.clientWidth ?? null;
+                })
+              }
+            />
+            <div class="tasks-page-side-clip">
+              <For each={[taskId()]} keyed={(id) => id}>
+                {(id) => {
+                  const current = untrack(id);
+                  const entering = contentId !== null && contentId !== current;
+                  contentId = current;
+                  return (
+                    <div class="tasks-page-side-content" data-entering={entering ? "" : undefined}>
+                      {props.panel(current)}
+                    </div>
+                  );
+                }}
+              </For>
+            </div>
           </div>
         );
       }}
@@ -554,66 +499,31 @@ function TasksSidePanel(props: {
   );
 }
 
-/**
- * The Tasks page of a server, on desktop and on the web: one calm column for the tasks of all agents.
- * The composer is at the top, with the agent selector. Below it, the tasks by what they need. A start
- * can be undone for a few seconds. A task opens in the panel beside the list.
- */
+function markComposerStuck(scroll: HTMLElement): void {
+  const composer = scroll.querySelector(".tasks-page-composer");
+  const stuck =
+    composer !== null &&
+    scroll.scrollTop > 0 &&
+    Math.abs(composer.getBoundingClientRect().top - scroll.getBoundingClientRect().top) <= 1;
+  scroll.toggleAttribute("data-composer-stuck", stuck);
+}
+
 export function TasksPage(props: TasksPageProps) {
   const { t } = useText();
   const headingId = createUniqueId();
-  let heading: HTMLHeadingElement | undefined;
-  const agentsLabel = () =>
-    t(props.agentsOpen ? "conversation.tasks.page.hideAgents" : "conversation.tasks.page.showAgents");
-  // The first start adds a task that waits, so the page shows the list as soon as the user sends.
   const empty = () => props.loaded === true && props.tasks.length === 0;
-  onSettled(() => {
-    if (untrack(() => props.onBack)) heading?.focus();
-  });
   return (
     <section class="tasks-page" aria-labelledby={headingId} data-empty={empty() ? "" : undefined}>
-      <div class="tasks-page-scroll">
+      <div class="tasks-page-scroll" onScroll={(event) => markComposerStuck(event.currentTarget)}>
         <div class="tasks-page-column">
-          <header class="tasks-page-header">
-            <Show when={props.onBack}>
-              {(back) => (
-                <IconButton
-                  variant="ghost"
-                  label={t("common.back")}
-                  data-cuelume-tap="navigate"
-                  onClick={() => back()()}
-                >
-                  <ArrowLeft />
-                </IconButton>
-              )}
-            </Show>
-            <Show when={props.onToggleAgents}>
-              {(toggle) => (
-                <Button
-                  variant="ghost"
-                  type="button"
-                  class="header-panel-toggle side-panel-toggle"
-                  aria-label={agentsLabel()}
-                  title={agentsLabel()}
-                  aria-expanded={props.agentsOpen ? "true" : "false"}
-                  onClick={() => toggle()()}
-                >
-                  <PanelLeft aria-hidden="true" class="size-[14px]" />
-                </Button>
-              )}
-            </Show>
-            <h2 id={headingId} ref={heading} tabindex={-1}>
-              {t("conversation.tasks.title")}
-              <Show when={props.hostName}>
-                {(host) => (
-                  <>
-                    {" "}
-                    <span aria-hidden="true">/</span> <span>{host()}</span>
-                  </>
-                )}
-              </Show>
-            </h2>
-          </header>
+          <PageHeader
+            class="tasks-page-header"
+            title={t("conversation.tasks.title")}
+            hostName={props.hostName}
+            headingId={headingId}
+            onBack={props.onBack}
+            frame={props.frame}
+          />
           <Show when={empty()}>
             <TasksEmptyPitch />
           </Show>
@@ -632,6 +542,9 @@ export function TasksPage(props: TasksPageProps) {
         taskId={props.selectedId}
         panel={props.panel}
         onClose={() => props.onSelect(null)}
+        width={props.sideWidth}
+        onResize={props.onSideResize}
+        onResizeEnd={props.onSideResizeEnd}
       />
     </section>
   );

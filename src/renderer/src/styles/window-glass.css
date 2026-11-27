@@ -1,11 +1,121 @@
-/* The transparent window on macOS. Main gives the main window the system blur and a clear
- * background, and sets `data-openbot-window-glass` on the root. Only the layers that make the page
- * change here: the frame, the content card and the pages that fill the card. The surface tokens do
- * not change, so dialogs, menus, tooltips, toasts, the composer and the cards stay solid. A browser
- * tab, an iframe or a canvas stays opaque: CSS cannot make a native view clear. */
 :root[data-openbot-window-glass] {
   --window-glass-frame: color-mix(in srgb, var(--openbot-bg-frame) 20%, transparent);
-  --window-glass-card: color-mix(in srgb, var(--openbot-bg-canvas) 45%, transparent);
+  --window-glass-card: color-mix(in srgb, var(--openbot-bg-canvas) 30%, transparent);
+
+  --window-glass-canvas: color-mix(in srgb, var(--openbot-bg-canvas) 25%, transparent);
+  --window-glass-sidebar: color-mix(in srgb, var(--openbot-bg-sidebar) 25%, transparent);
+  --window-glass-frame-fill: color-mix(in srgb, var(--openbot-bg-frame) 30%, transparent);
+  --window-glass-sheet: color-mix(in srgb, var(--openbot-bg-sheet) 35%, transparent);
+  --window-glass-sheet-inset: color-mix(in srgb, var(--openbot-bg-sheet-inset) 25%, transparent);
+  --window-glass-grouped: color-mix(in srgb, var(--openbot-bg-grouped) 35%, transparent);
+  --window-glass-surface: color-mix(in srgb, var(--openbot-bg-surface) 35%, transparent);
+  --window-glass-surface-raised: color-mix(in srgb, var(--openbot-bg-surface-raised) 40%, transparent);
+  --window-glass-control: color-mix(in srgb, var(--openbot-bg-control) 35%, transparent);
+  --window-glass-control-hover: color-mix(in srgb, var(--openbot-bg-control-hover) 45%, transparent);
+  --window-glass-control-active: color-mix(in srgb, var(--openbot-bg-control-active) 55%, transparent);
+  --window-glass-tabs-bar: color-mix(in srgb, var(--openbot-tabs-bar-bg) 35%, transparent);
+  --window-glass-tabs-pill: color-mix(in srgb, var(--openbot-tabs-pill-bg) 45%, transparent);
+
+  --window-solid-canvas: var(--openbot-bg-canvas);
+  --window-solid-sidebar: var(--openbot-bg-sidebar);
+  --window-solid-frame: var(--openbot-bg-frame);
+  --window-solid-sheet: var(--openbot-bg-sheet);
+  --window-solid-sheet-inset: var(--openbot-bg-sheet-inset);
+  --window-solid-grouped: var(--openbot-bg-grouped);
+  --window-solid-surface: var(--openbot-bg-surface);
+  --window-solid-surface-raised: var(--openbot-bg-surface-raised);
+  --window-solid-control: var(--openbot-bg-control);
+  --window-solid-control-hover: var(--openbot-bg-control-hover);
+  --window-solid-control-active: var(--openbot-bg-control-active);
+  --window-solid-tabs-bar: var(--openbot-tabs-bar-bg);
+  --window-solid-tabs-pill: var(--openbot-tabs-pill-bg);
+}
+
+:root[data-openbot-window-glass] .app-window {
+  --openbot-bg-canvas: var(--window-glass-canvas);
+  --openbot-bg-sidebar: var(--window-glass-sidebar);
+  --openbot-bg-frame: var(--window-glass-frame-fill);
+  --openbot-bg-sheet: var(--window-glass-sheet);
+  --openbot-bg-sheet-inset: var(--window-glass-sheet-inset);
+  --openbot-bg-grouped: var(--window-glass-grouped);
+  --openbot-bg-surface: var(--window-glass-surface);
+  --openbot-bg-surface-raised: var(--window-glass-surface-raised);
+  --openbot-bg-control: var(--window-glass-control);
+  --openbot-bg-control-hover: var(--window-glass-control-hover);
+  --openbot-bg-control-active: var(--window-glass-control-active);
+  --openbot-tabs-bar-bg: var(--window-glass-tabs-bar);
+  --openbot-tabs-pill-bg: var(--window-glass-tabs-pill);
+  --openbot-queue-surface: var(--openbot-bg-surface);
+  --background: var(--openbot-bg-canvas);
+  --surface: var(--openbot-bg-surface);
+}
+
+:root[data-openbot-window-glass]
+  .app-window
+  :is(
+    [data-popper-positioner],
+    [role="dialog"],
+    [role="alertdialog"],
+    [role="menu"],
+    [role="listbox"],
+    [role="tooltip"],
+    .ui-popover-menu-surface,
+    .mention-picker,
+    .chat-search,
+    .subagents-dock-bar,
+    .scroll-to-latest,
+    .side-panel-drop,
+    .attachment-drop-overlay,
+    .agent-folders-chat-drop,
+    .browser-preview-open-label,
+    .browser-takeover-preview-open-label,
+    .chat-visual-box:popover-open,
+    .file-preview-truncated,
+    .library-pill,
+    .skills-marketplace-error,
+    .media-generation-chip,
+    .agent-settings-avatar-badge,
+    .profile-edit-photo-badge,
+    .server-install-card-badge,
+    .server-rail-muted,
+    .app-loading,
+    .server-onboarding-screen,
+    .sidebar-agent-drag-preview,
+    .sidebar-person-drag-preview,
+    .sidebar-section-drag-preview,
+    .crm-drawer
+  ) {
+  --openbot-bg-canvas: var(--window-solid-canvas);
+  --openbot-bg-sidebar: var(--window-solid-sidebar);
+  --openbot-bg-frame: var(--window-solid-frame);
+  --openbot-bg-sheet: var(--window-solid-sheet);
+  --openbot-bg-sheet-inset: var(--window-solid-sheet-inset);
+  --openbot-bg-grouped: var(--window-solid-grouped);
+  --openbot-bg-surface: var(--window-solid-surface);
+  --openbot-bg-surface-raised: var(--window-solid-surface-raised);
+  --openbot-bg-control: var(--window-solid-control);
+  --openbot-bg-control-hover: var(--window-solid-control-hover);
+  --openbot-bg-control-active: var(--window-solid-control-active);
+  --openbot-tabs-bar-bg: var(--window-solid-tabs-bar);
+  --openbot-tabs-pill-bg: var(--window-solid-tabs-pill);
+  --openbot-queue-surface: var(--openbot-bg-surface);
+  --background: var(--openbot-bg-canvas);
+  --surface: var(--openbot-bg-surface);
+}
+
+:root[data-openbot-window-glass] .app-window .crm-sheet-scroll[data-fade-top] .crm-sheet thead :is(th, td),
+:root[data-openbot-window-glass] .app-window .crm-sheet-scroll[data-fade-bottom] .crm-sheet tfoot td,
+:root[data-openbot-window-glass]
+  .app-window
+  .crm-sheet-scroll[data-fade-left]
+  .crm-sheet
+  :is(.crm-sheet-index, :is(th, td):nth-child(2)),
+:root[data-openbot-window-glass] .app-window .crm-sheet-scroll[data-fade-right] .crm-sheet .crm-sheet-action {
+  --crm-sheet-bg: var(--window-solid-canvas);
+}
+
+:root[data-openbot-window-glass] .app-window :is(.agent-row-agent-status, .ui-bubble-reactions) {
+  --openbot-bg-surface: var(--window-solid-surface);
 }
 
 :root[data-openbot-window-glass] body {
@@ -16,7 +126,6 @@
   --window-frame: var(--window-glass-frame);
 }
 
-/* The narrow window has no card: the panes sit on the frame. */
 @media (max-width: 720px) {
   :root[data-openbot-window-glass] .app-window > .app-frame-edge {
     background: var(--window-glass-card);
@@ -24,8 +133,6 @@
 }
 
 @media (min-width: 721px) {
-  /* The window paints the frame once. Opaque, these layers repeat its color; translucent, each one
-   * would add its tint again, and the top row would show darker than the page rail. */
   :root[data-openbot-window-glass] .app-window > .app-frame-edge,
   :root[data-openbot-window-glass] .app-window > .app-frame-edge > .server-rail {
     background: transparent;
@@ -36,15 +143,11 @@
     .app-window
     > .app-frame-edge
     .side-panel-maximized
-    > :is(.settings-panel, .browser-panel),
-  :root[data-openbot-window-glass] .app-frame-edge .diagram-view-body {
+    > :is(.settings-panel, .browser-panel) {
     background: var(--window-glass-card);
   }
 }
 
-/* The sidebar, the card and the top row are clear, so no ring colour matches what shows through them:
- * an avatar outline there would be a halo. A row that paints its own hover or selected fill sets the
- * outline again. */
 :root[data-openbot-window-glass] .app-window > .app-frame-edge > .sidebar,
 :root[data-openbot-window-glass] .app-window > .app-frame-edge :is(.channel-empty, .channel-title),
 :root[data-openbot-window-glass]
@@ -56,8 +159,24 @@
   --agent-avatar-outline: transparent;
 }
 
-/* With no outline, faces that overlap would merge into one shape, so the channel title and the empty
- * state put them side by side. This also covers the title's hover fill, which has no clear part. */
+:root[data-openbot-window-glass]
+  .app-window
+  > .app-frame-edge
+  > .sidebar
+  .agent-row:not(:hover, .agent-row-active)
+  .channel-avatar-cluster
+  .agent-avatar:has(> .bloub-avatar-svg image),
+:root[data-openbot-window-glass]
+  .app-window
+  > .app-frame-edge
+  > .sidebar
+  .agent-list[data-sidebar-dragging]
+  .agent-row:hover:not(.agent-row-active)
+  .channel-avatar-cluster
+  .agent-avatar:has(> .bloub-avatar-svg image) {
+  filter: none;
+}
+
 :root[data-openbot-window-glass]
   .app-window
   > .app-frame-edge
@@ -68,20 +187,21 @@
   margin-inline-start: 0;
 }
 
-/* The pages in the card are clear, so the card's tint shows once and not twice. */
 :root[data-openbot-window-glass]
   .app-window
-  :is(.schedule-pane, .agent-usage, .tasks-page, .diagram-view, .settings-page-content .agent-files-view) {
+  :is(.schedule-pane, .agent-usage, .tasks-page, .workflows-notice, .settings-page-content .agent-files-view) {
   background: transparent;
 }
 
-:root[data-openbot-window-glass] .app-window .diagram-board-viewport {
-  background-color: transparent;
+:root[data-openbot-window-glass] .app-window .tasks-page-composer.composer-wrap {
+  background: transparent;
 }
 
-/* The composer at the top of the tasks list and the Settings fades cover the rows that scroll under
- * them, so they take the card's tint. */
-:root[data-openbot-window-glass] .app-window .tasks-page-composer.composer-wrap {
+:root[data-openbot-window-glass]
+  .app-window
+  .tasks-page:not([data-empty])
+  > .tasks-page-scroll[data-composer-stuck]
+  .tasks-page-composer.composer-wrap {
   background: var(--window-glass-card);
 }
 
@@ -93,7 +213,114 @@
   background: linear-gradient(to top, var(--window-glass-card) 28%, transparent 100%);
 }
 
-/* The full-bleed browser covers the window with its own frame and card. */
-:root[data-openbot-window-glass] .browser-full-view {
-  background: var(--window-glass-frame);
+:root[data-openbot-window-glass]
+  .app-window
+  :is(
+    .sidebar-folder > header,
+    .marketplace-skill-group-bar,
+    .agent-instructions-bar,
+    .tasks-page:not([data-empty]) > .tasks-page-scroll[data-composer-stuck] .tasks-page-composer.composer-wrap,
+    .trace-row[data-parent],
+    .trace-axis-row
+  ) {
+  backdrop-filter: blur(var(--openbot-space-4));
+}
+
+:root[data-openbot-window-glass] .app-window .composer-stack {
+  clip-path: inset(0 0 var(--composer-stack-overlap) 0);
+}
+
+:root[data-openbot-window-glass] .app-window .wfn-stage {
+  --wfn-glass: color-mix(in srgb, var(--window-solid-surface-raised) 75%, transparent);
+  --wfn-card: var(--window-solid-canvas);
+  --wfn-field: var(--window-solid-surface-raised);
+  --wfn-port: color-mix(in srgb, var(--openbot-text-primary) 10%, var(--window-solid-canvas));
+}
+
+:root[data-openbot-window-glass][data-openbot-color-scheme="light"] .app-window .wfn-stage {
+  --wfn-card: var(--window-solid-surface);
+  --wfn-field: var(--window-solid-control-hover);
+}
+
+:root[data-openbot-window-glass] .app-window .ui-bubble.message-bubble-colored > .ui-bubble-content {
+  --openbot-bg-canvas: var(--window-glass-canvas);
+  --openbot-bg-sidebar: var(--window-glass-sidebar);
+  --openbot-bg-surface: var(--window-glass-surface);
+  --openbot-bg-surface-raised: var(--window-glass-surface-raised);
+  --openbot-bg-control: var(--window-glass-control);
+  --openbot-bg-control-hover: var(--window-glass-control-hover);
+  --openbot-bg-control-active: var(--window-glass-control-active);
+}
+
+:root[data-openbot-window-glass] .app-window .ui-bubble.message-bubble-member > .ui-bubble-content {
+  background: color-mix(
+    in srgb,
+    color-mix(in srgb, var(--message-author-color, var(--openbot-accent)) 22%, var(--window-solid-surface-raised)) 40%,
+    transparent
+  );
+}
+
+:root[data-openbot-window-glass]
+  .app-window
+  .message-entry-agent
+  .ui-bubble-variant-muted.message-bubble-colored
+  > .ui-bubble-content,
+:root[data-openbot-window-glass]
+  .app-window
+  .agent-dock-bubble.ui-bubble-variant-muted.message-bubble-colored
+  > .ui-bubble-content {
+  background: color-mix(
+    in srgb,
+    color-mix(in srgb, var(--message-chat-color) var(--message-bubble-tint-amount), var(--window-solid-surface)) 35%,
+    transparent
+  );
+}
+
+:root[data-openbot-window-glass]
+  .app-window
+  .message-entry-user
+  .ui-bubble.message-bubble-colored
+  > .ui-bubble-content {
+  background: color-mix(
+    in srgb,
+    color-mix(in srgb, var(--message-chat-color) var(--message-bubble-tint-amount), var(--window-solid-surface-raised))
+      40%,
+    transparent
+  );
+}
+
+:root[data-openbot-window-glass]
+  .app-window
+  .message-entry-user
+  .ui-bubble.message-bubble-colored.message-bubble-solid
+  > .ui-bubble-content {
+  --message-solid-surface: color-mix(
+    in srgb,
+    color-mix(in srgb, var(--openbot-text-primary) var(--message-surface-lift), var(--message-chat-color)) 45%,
+    transparent
+  );
+  --openbot-bg-canvas: var(--message-solid-surface);
+  --openbot-bg-sidebar: var(--message-solid-surface);
+  --openbot-bg-surface: var(--message-solid-surface);
+  --openbot-bg-surface-raised: var(--message-solid-surface);
+  --openbot-bg-control: var(--message-solid-surface);
+  --openbot-bg-control-hover: var(--message-solid-surface);
+  --openbot-bg-control-active: var(--message-solid-surface);
+  background: color-mix(in srgb, var(--message-chat-color) var(--message-glass-solid-opacity, 55%), transparent);
+}
+
+:root[data-openbot-window-glass][data-openbot-color-scheme="light"]
+  .app-window
+  .message-entry-user
+  .ui-bubble.message-bubble-colored.message-bubble-solid
+  > .ui-bubble-content {
+  --message-glass-solid-opacity: 80%;
+}
+
+:root[data-openbot-window-glass]
+  .app-window
+  .message-entry-user
+  .ui-bubble.message-bubble-colored.message-bubble-solid.message-bubble-solid-dark-text
+  > .ui-bubble-content {
+  --message-glass-solid-opacity: 90%;
 }

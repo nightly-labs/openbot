@@ -1,0 +1,28 @@
+{
+  "slug": "coingecko",
+  "name": "CoinGecko",
+  "tagline": "Crypto market data",
+  "description": "CoinGecko lets agents read current and historical crypto prices, market capitalization, trading volume, and token data from the CoinGecko API. The public server needs no account and no key.",
+  "category": "data-analytics",
+  "creatorName": "CoinGecko",
+  "iconUrl": "https://is1-ssl.mzstatic.com/image/thumb/Purple221/v4/0a/b6/e7/0ab6e79d-7aee-d6dd-f978-88e5763e5af6/CoinGecko_Liquid_Glass-0-0-1x_U007epad-0-1-0-sRGB-85-220.png/512x512bb.jpg",
+  "version": "1.0.0",
+  "prompts": [
+    { "id": "prompt-price", "text": "What are the current prices of Bitcoin and Ethereum in EUR?" },
+    { "id": "prompt-top-movers", "text": "Which of the top 100 coins moved the most in the last 24 hours?" },
+    { "id": "prompt-history", "text": "Show the daily closing price of Solana for the last 30 days." }
+  ],
+  "apps": [
+    {
+      "id": "app-coingecko-mcp",
+      "name": "CoinGecko",
+      "description": "Crypto prices and market data, over the CoinGecko MCP server with no sign-in.",
+      "iconUrl": "https://is1-ssl.mzstatic.com/image/thumb/Purple221/v4/0a/b6/e7/0ab6e79d-7aee-d6dd-f978-88e5763e5af6/CoinGecko_Liquid_Glass-0-0-1x_U007epad-0-1-0-sRGB-85-220.png/512x512bb.jpg",
+      "server": { "name": "coingecko", "transport": "http", "url": "https://mcp.api.coingecko.com/mcp" }
+    }
+  ],
+  "skills": [],
+  "websiteUrl": "https://www.coingecko.com",
+  "privacyPolicyUrl": "https://www.coingecko.com/en/privacy",
+  "termsUrl": "https://www.coingecko.com/en/terms"
+}

@@ -1,6 +1,3 @@
-/* The Billing panel in desktop Settings and the web Billing dialog: one row for each server that has
- * a plan, and the Customer Portal button above them. */
-
 .billing-panel {
   display: flex;
   flex-direction: column;
@@ -36,9 +33,7 @@
 }
 
 .billing-server-logo {
-  width: 32px;
-  height: 32px;
-  border-radius: var(--openbot-radius-md);
+  --server-plush-logo-size: 32px;
 }
 
 .billing-server-title {
@@ -57,7 +52,6 @@
   white-space: nowrap;
 }
 
-/* The web client's Billing dialog. */
 .billing-dialog-backdrop {
   background: var(--openbot-bg-overlay);
 }
@@ -107,8 +101,6 @@
   padding: 0 var(--openbot-space-6) var(--openbot-space-6);
 }
 
-/* The License part above the server plans. The buy form is the lower part of the license card. */
-
 .billing-license {
   container-type: inline-size;
   display: flex;
@@ -116,7 +108,6 @@
   gap: var(--openbot-space-3);
 }
 
-/* The button goes under the text, so that a long button label does not cover the text. */
 @container (max-width: 560px) {
   .billing-license .ui-alert {
     grid-template-columns: auto minmax(0, 1fr);
@@ -142,13 +133,13 @@
 .billing-license-icon svg {
   width: 18px;
   height: 18px;
+  stroke-width: var(--openbot-icon-stroke-lg);
 }
 
 .billing-license-row .ui-item-actions {
   gap: var(--openbot-space-2);
 }
 
-/* Billing opens on the dialog-host layer on the web, so the menu must open above it. */
 .billing-license-menu.ui-action-menu {
   z-index: var(--openbot-layer-dialog-host);
 }
@@ -211,4 +202,15 @@
 .billing-license-users {
   max-height: 320px;
   overflow-y: auto;
+}
+
+.billing-details-fields {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  align-items: start;
+  gap: var(--openbot-space-3);
+}
+
+.billing-details-country[data-empty] {
+  color: var(--openbot-text-muted);
 }

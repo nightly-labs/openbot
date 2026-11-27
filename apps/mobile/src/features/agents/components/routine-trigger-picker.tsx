@@ -1,5 +1,9 @@
 import type { MobileTextKey } from "@openbot/i18n/mobile";
-import { ROUTINE_SAVED_DRAFT_KIND_VALUES, type RoutineDraftKind } from "@openbot/team-client/routine-schedule-draft";
+import {
+  ROUTINE_DRAFT_KIND_VALUES,
+  ROUTINE_SAVED_DRAFT_KIND_VALUES,
+  type RoutineDraftKind,
+} from "@openbot/team-client/routine-schedule-draft";
 import { Typography } from "heroui-native";
 import AlarmClock from "lucide-react-native/icons/alarm-clock";
 import Check from "lucide-react-native/icons/check";
@@ -13,10 +17,9 @@ import { SettingsRow } from "@/features/settings/components/settings-content";
 import { haptics } from "@/shared/lib/haptics";
 import { useText } from "@/shared/lib/text";
 
-/** What starts a routine: a schedule frequency, or a request to its webhook. */
 export type RoutineTriggerChoice = RoutineDraftKind | "webhook";
 
-const TRIGGER_TEXT = {
+export const TRIGGER_TEXT = {
   once: { title: "mobile.agent.record.repeat.once", description: "mobile.agent.trigger.onceDescription" },
   hourly: { title: "mobile.agent.record.repeat.hourly", description: "mobile.agent.trigger.hourlyDescription" },
   daily: { title: "mobile.agent.record.repeat.daily", description: "mobile.agent.trigger.dailyDescription" },
@@ -32,11 +35,11 @@ function TriggerIcon({ choice, color }: { choice: RoutineTriggerChoice; color: s
   return <Icon size={20} color={color} strokeWidth={1.75} />;
 }
 
-function Divider() {
+export function Divider() {
   return <View className="ml-4 h-px bg-grouped-border" />;
 }
 
-function GroupLabel({ children }: { children: string }) {
+export function GroupLabel({ children }: { children: string }) {
   return (
     <View className="px-4 pb-1 pt-3">
       <Typography type="body-xs" className="text-grouped-secondary">
@@ -46,20 +49,16 @@ function GroupLabel({ children }: { children: string }) {
   );
 }
 
-/**
- * The first row of the trigger card: what starts the routine, with one line that tells when it runs.
- * A press shows the choices below it, as on desktop: the schedule frequencies first, then the webhook
- * in its own group. The selected choice has a check.
- */
 export function RoutineTriggerPicker({
   value,
   webhook,
+  once = false,
   disabled,
   onSelect,
 }: {
   value: RoutineTriggerChoice;
-  /** False hides the webhook choice, for a host that cannot receive webhooks. */
   webhook: boolean;
+  once?: boolean;
   disabled: boolean;
   onSelect: (choice: RoutineTriggerChoice) => void;
 }) {
@@ -107,7 +106,7 @@ export function RoutineTriggerPicker({
         <>
           <Divider />
           <GroupLabel>{t("mobile.agent.record.schedule")}</GroupLabel>
-          {ROUTINE_SAVED_DRAFT_KIND_VALUES.map(option)}
+          {(once ? ROUTINE_DRAFT_KIND_VALUES : ROUTINE_SAVED_DRAFT_KIND_VALUES).map(option)}
           {webhook ? (
             <>
               <Divider />

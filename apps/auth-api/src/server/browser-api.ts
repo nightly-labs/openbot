@@ -1,6 +1,14 @@
 import { isAvatarMimeType } from "@openbot/contracts/avatar-images";
-import { parseBillingPortalRequest } from "@openbot/contracts/billing";
+import { parseBillingPortalRequest, parseBillingStorageRequest } from "@openbot/contracts/billing";
+import { parseBillingDetailsRequest } from "@openbot/contracts/billing-details";
 import { WEB_APP_COMPANY_SIGN_IN_ERROR_PARAM } from "@openbot/contracts/company-sign-in";
+import {
+  CREDITS_UNAVAILABLE_STATE,
+  EMPTY_CREDIT_ACTIVITY,
+  parseCreditCheckoutRequest,
+  parseCreditRedeemRequest,
+  parseCreditTransferRequest,
+} from "@openbot/contracts/credits";
 import { parseHostedServerLifecycleInput } from "@openbot/contracts/hosted-servers";
 import {
   LICENSE_UNAVAILABLE_STATE,
@@ -9,33 +17,35 @@ import {
   parseLicenseRenewalRequest,
   parseLicenseUsersRequest,
 } from "@openbot/contracts/license";
+import { parsePromotionCode } from "@openbot/contracts/promotion-code";
+import { isReferralCode } from "@openbot/contracts/referral";
 import { type DynamicRecord, isBoolean, isNumber, isString } from "@openbot/contracts/runtime-values";
 import { sourceText } from "@openbot/i18n/source";
 import { Cause, Effect } from "effect";
 import { type AccountAttribution, requestFirstTouch } from "./account-attribution";
-import { type AuthService, AuthServiceError, readAnalyticsAnswer } from "./auth-service";
+import { type AuthService, AuthServiceError, readAnalyticsAnswer, readChatColor } from "./auth-service";
 import { AvatarUploadError, readAvatarUpload, removeAccountAvatar, storeAccountAvatar } from "./avatar-storage";
 import { BILLING_UNAVAILABLE_STATE, BillingError, type BillingService } from "./billing-service";
-import { companySignInApiOrigin } from "./canonical-redirect";
+import { withSuggestedCountry } from "./billing-tax";
+import { companySignInApiOrigin, inviteLinkOrigin } from "./canonical-redirect";
 import { CompanySignInError, type CompanySignInService, WEB_RETURN_PATH } from "./company-sign-in";
 import { randomToken, sha256 } from "./crypto";
+import type { CustomServerOffers } from "./custom-server-offers";
 import { runApiResponse } from "./effect-runtime";
 import type { readHostLogo } from "./host-logo";
 import type { HostedServerService } from "./hosted-server-service";
 import { HostedSiteInputError, requireIdempotencyKey } from "./hosted-site-contract";
 import type { HostedSiteService } from "./hosted-site-service";
 import { readJsonObject } from "./json-body";
+import { startOwnerTransfer } from "./owner-transfer";
+import { type Referrals, referralPageQuery, referralState } from "./referrals";
 import { type RemoteControlPlane, RemoteControlPlaneError } from "./remote-control-plane";
 import { sendTeamInviteEmail } from "./team-invite-email";
-import type { AuthUser, TeamInviteEmailDelivery } from "./types";
+import type { AuthUser, OwnerTransferEmailDelivery, TeamInviteEmailDelivery } from "./types";
 
 const COOKIE = "__Host-openbot-web";
 const PREFIX = "/api/browser/";
 const COOKIE_ATTRIBUTES = "Path=/; Secure; HttpOnly; SameSite=Lax";
-/**
- * The company sign-in that this browser started: its state and verifier. Only this browser can finish
- * it, so a provider page that someone else opened cannot sign this browser in.
- */
 const COMPANY_COOKIE = "__Host-openbot-company";
 const COMPANY_FLOW_SECONDS = 600;
 
@@ -47,15 +57,18 @@ export interface BrowserApiServices {
     | "authenticate"
     | "enforceTeamInviteRateLimit"
     | "updateAnalytics"
+    | "updateChatColor"
     | "updateName"
     | "updateAvatar"
     | "listAccountSessions"
     | "revokeAccountSession"
+    | "createServerClaimForUser"
   >;
   remote: Pick<
     RemoteControlPlane,
     | "listHosts"
     | "removeOwnedHost"
+    | "setHostHidden"
     | "startSession"
     | "issueSessionTicket"
     | "endSession"
@@ -69,19 +82,36 @@ export interface BrowserApiServices {
     | "changeMembership"
     | "hostAsset"
     | "emailableInvite"
+    | "createOwnerTransfer"
+    | "pendingOwnerTransfer"
+    | "cancelOwnerTransfer"
+    | "incomingOwnerTransfers"
+    | "acceptOwnerTransfer"
+    | "declineOwnerTransfer"
   >;
-  /** The methods bind their service, so this is the whole service. */
   companySignIn: () => CompanySignInService;
-  /** The stored logo of one host version, or null. The handler checks membership and the version first. */
   hostLogo: (hostId: string, version: string) => ReturnType<typeof readHostLogo>;
   hosting: () => Pick<
     HostedServerService,
     "list" | "plans" | "create" | "checkout" | "delete" | "wake" | "restart" | "status" | "lifecycle"
   >;
+  customServerOffers: () => CustomServerOffers;
   inviteEmailDelivery: () => TeamInviteEmailDelivery | null;
+  ownerTransferEmailDelivery: () => OwnerTransferEmailDelivery | null;
+  schedule: (work: Effect.Effect<void>) => void;
   attribution: () => Pick<AccountAttribution, "recordCheckout">;
-  /** The billing service, or null when this deployment has no Stripe key. */
-  billing: () => Pick<BillingService, "getState" | "createPortal" | "license"> | null;
+  billing: () => Pick<
+    BillingService,
+    | "getState"
+    | "createPortal"
+    | "buyStorage"
+    | "getBillingDetails"
+    | "setBillingDetails"
+    | "license"
+    | "credits"
+    | "referralCredit"
+  > | null;
+  referrals: () => Pick<Referrals, "page">;
   avatarBucket: () => R2Bucket;
   hostedSites: () => Pick<HostedSiteService, "list" | "delete">;
   sourceIp: (request: Request) => string;
@@ -95,7 +125,6 @@ function requiredString(value: DynamicRecord, field: string): Effect.Effect<stri
     : Effect.fail(new AuthServiceError(400, "invalid_browser_request", "The request is invalid."));
 }
 
-/** The same checks and messages as the bearer member and invite routes. */
 function invalidRemoteRequest(message: string): RemoteControlPlaneError {
   return new RemoteControlPlaneError(400, "invalid_remote_request", message);
 }
@@ -107,12 +136,10 @@ function json<T>(value: T, status = 200): Response {
   });
 }
 
-/** The same `{ error: { code, message } }` shape as every other account API refusal. */
 function failure(status: number, code: string, message: string): Response {
   return json({ error: { code, message } }, status);
 }
 
-/** Answers one refusal class with its own status, whether the operation failed with it or threw it. */
 function refuseWith(refusal: abstract new (...args: never) => { status: number; code: string; message: string }) {
   return <A, E, R>(operation: Effect.Effect<A, E, R>) =>
     operation.pipe(
@@ -143,11 +170,6 @@ function browserSessionToken(request: Request): string | null {
 const METHODS: ReadonlySet<string> = new Set(["GET", "POST", "PUT", "PATCH", "DELETE"]);
 const AVATAR_PATH = "v1/me/avatar";
 
-/**
- * Every write sends JSON, except an avatar upload, which sends the image bytes as the bearer route
- * does. The `X-OpenBot-Browser` header and the same-origin check still apply to it: a cross-site
- * page cannot send that header without a CORS preflight, which this API never answers.
- */
 function browserWriteContentTypeAllowed(request: Request, path: string): boolean {
   const contentType = request.headers.get("Content-Type")?.toLowerCase() ?? "";
   if (path === AVATAR_PATH && request.method === "PUT")
@@ -155,12 +177,6 @@ function browserWriteContentTypeAllowed(request: Request, path: string): boolean
   return contentType.startsWith("application/json");
 }
 
-/**
- * A closed list of account operations. Chat traffic never passes through this handler.
- *
- * The member and invite operations are the bearer `/v2/remote/...` routes for a signed-in browser:
- * they call the same control-plane methods, so the host role checks there are the only gate.
- */
 export function handleBrowserApi(request: Request, services: BrowserApiServices): Promise<Response> {
   const path = new URL(request.url).pathname.slice(PREFIX.length).replace(/\/$/u, "");
   if (!METHODS.has(request.method))
@@ -172,8 +188,6 @@ export function handleBrowserApi(request: Request, services: BrowserApiServices)
       !browserWriteContentTypeAllowed(request, path))
   )
     return Promise.resolve(failure(403, "browser_request_refused", "The browser request was refused."));
-  // The company provider sends the browser here, so this navigation is cross-site. The flow cookie
-  // of the browser that started the sign-in is its check.
   if (path === "company/return" && request.method === "GET")
     return runApiResponse(finishCompanySignIn(request, services), services.errorResponse);
   if (request.headers.get("Sec-Fetch-Site") === "cross-site")
@@ -181,10 +195,6 @@ export function handleBrowserApi(request: Request, services: BrowserApiServices)
   return runApiResponse(handleBrowserOperation(request, path, services), services.errorResponse);
 }
 
-/**
- * The provider's return through the account service. A sign-in that finished gets the session cookie,
- * as an email code does. Every answer goes back to the web app and removes the flow cookie.
- */
 const finishCompanySignIn = Effect.fn("BrowserApi.finishCompanySignIn")(function* (
   request: Request,
   services: BrowserApiServices,
@@ -247,6 +257,7 @@ const handleBrowserOperation = Effect.fn("BrowserApi.handleOperation")(function*
       sourceIp: services.sourceIp(request),
       surface: "web",
       firstTouch: requestFirstTouch(body.firstTouch),
+      referralCode: isReferralCode(body.referralCode) ? body.referralCode : null,
     });
     const previous = browserSessionToken(request);
     if (previous) {
@@ -258,7 +269,6 @@ const handleBrowserOperation = Effect.fn("BrowserApi.handleOperation")(function*
     return response;
   }
   if (path === "company/start" && request.method === "POST") {
-    // The email start answered `company_sign_in_required`. The page goes to the answer in this tab.
     const body = yield* readJsonObject(request);
     const email = yield* requiredString(body, "email");
     const site = new URL(request.url);
@@ -290,7 +300,6 @@ const handleBrowserOperation = Effect.fn("BrowserApi.handleOperation")(function*
       );
   }
   if (path === "checkout-attribution" && request.method === "POST") {
-    // The page after a desktop checkout. The session ID that Stripe put in its URL is the only proof.
     const body = yield* readJsonObject(request);
     const firstTouch = requestFirstTouch(body.firstTouch);
     if (isString(body.sessionId) && firstTouch) {
@@ -311,6 +320,15 @@ const handleBrowserOperation = Effect.fn("BrowserApi.handleOperation")(function*
   }
   if (!token || !user) return failure(401, "sign_in_required", "Sign in is required.");
   if (path === "session" && request.method === "GET") return json({ user });
+  if (path === "extension/code" && request.method === "POST") {
+    const body = yield* readJsonObject(request);
+    const extensionId = yield* requiredString(body, "extensionId");
+    const clientChallenge = yield* requiredString(body, "clientChallenge");
+    return yield* services
+      .companySignIn()
+      .issueBrowserExtensionCode(user.id, { extensionId, clientChallenge })
+      .pipe(Effect.map(json), refuseWith(CompanySignInError));
+  }
   if (path === "v2/remote/hosts" && request.method === "GET")
     return json({ hosts: yield* services.remote.listHosts(user.id) });
   const [, removedHostId] = /^v2\/remote\/hosts\/([^/]+)$/u.exec(path) ?? [];
@@ -318,10 +336,31 @@ const handleBrowserOperation = Effect.fn("BrowserApi.handleOperation")(function*
     yield* services.remote.removeOwnedHost(user.id, decodeURIComponent(removedHostId));
     return new Response(null, { status: 204 });
   }
+  const [, hiddenHostId] = /^v2\/remote\/hosts\/([^/]+)\/hidden$/u.exec(path) ?? [];
+  if (hiddenHostId !== undefined && request.method === "PUT") {
+    const body = yield* readJsonObject(request);
+    if (!isBoolean(body.hidden)) return yield* invalidRemoteRequest("The request is invalid.");
+    yield* services.remote.setHostHidden(user.id, decodeURIComponent(hiddenHostId), body.hidden);
+    return new Response(null, { status: 204 });
+  }
+  const [, checkoutHostId] = /^v2\/remote\/hosts\/([^/]+)\/checkout$/u.exec(path) ?? [];
+  if (checkoutHostId !== undefined && request.method === "POST") {
+    const body = yield* readJsonObject(request);
+    return yield* Effect.map(
+      services
+        .customServerOffers()
+        .checkout(
+          user,
+          decodeURIComponent(checkoutHostId),
+          { target: "web", origin: new URL(request.url).origin },
+          { earlyStart: body.earlyStart },
+        ),
+      json,
+    ).pipe(refuseWith(BillingError));
+  }
   const [, encodedLogoHostId] = /^v2\/remote\/hosts\/([^/]+)\/logo$/u.exec(path) ?? [];
   if (encodedLogoHostId !== undefined && request.method === "GET") {
     const hostId = decodeURIComponent(encodedLogoHostId);
-    // Any member may read the logo. The version keeps a cached image from outliving a logo change.
     const { logoKey } = yield* services.remote.hostAsset(user.id, hostId);
     const logo =
       logoKey && new URL(request.url).searchParams.get("v") === logoKey
@@ -335,6 +374,8 @@ const handleBrowserOperation = Effect.fn("BrowserApi.handleOperation")(function*
   if (hosting) return hosting;
   const hostedSites = yield* handleHostedSites(request, path, user, services);
   if (hostedSites) return hostedSites;
+  const ownerTransfer = yield* handleOwnerTransfer(request, path, user, services);
+  if (ownerTransfer) return ownerTransfer;
   const administration = yield* handleAdministration(request, path, user, services);
   if (administration) return administration;
   if (request.method !== "POST")
@@ -377,10 +418,6 @@ const handleBrowserOperation = Effect.fn("BrowserApi.handleOperation")(function*
   return failure(404, "browser_operation_not_found", "This browser operation is not available.");
 });
 
-/**
- * The signed-in account's profile, avatar and sessions: the bearer `/v1/me/...` and
- * `/v1/mobile-auth/devices?includeDesktop=true` routes for a browser. Returns null for any other path.
- */
 const handleAccount = Effect.fn("BrowserApi.handleAccount")(function* (
   request: Request,
   path: string,
@@ -400,6 +437,12 @@ const handleAccount = Effect.fn("BrowserApi.handleAccount")(function* (
       return yield* new AuthServiceError(400, "invalid_analytics_preference", "The analytics setting is not valid.");
     return json(yield* services.auth.updateAnalytics(token, answer));
   }
+  if (path === "v1/me/chat-color" && request.method === "PUT") {
+    const chatColor = readChatColor(yield* readJsonObject(request));
+    if (chatColor === undefined)
+      return yield* new AuthServiceError(400, "invalid_chat_color", "The chat color is not valid.");
+    return json(yield* services.auth.updateChatColor(token, chatColor));
+  }
   if (path === AVATAR_PATH && request.method === "PUT") {
     return yield* Effect.gen(function* () {
       const upload = yield* readAvatarUpload(request);
@@ -410,9 +453,25 @@ const handleAccount = Effect.fn("BrowserApi.handleAccount")(function* (
     return json(yield* removeAccountAvatar(services.auth, services.avatarBucket(), token, user));
   if (path === "v1/me/sessions" && request.method === "GET")
     return json({ sessions: yield* services.auth.listAccountSessions(token) });
+  if (path === "v2/server-claims" && request.method === "POST")
+    return json(yield* services.auth.createServerClaimForUser(user.id));
   if (path.startsWith("v1/me/billing") || path.startsWith("v1/me/license"))
     return yield* handleBilling(request, path, user, services);
-  // A session ID is a UUID, so the segment needs no decoding; the service refuses any other value.
+  if (path === "v1/me/credits" || path.startsWith("v1/me/credits/"))
+    return yield* handleCredits(request, path, user, services);
+  if (path === "v1/me/referrals" && request.method === "GET") {
+    const url = new URL(request.url);
+    const billing = services.billing();
+    return json(
+      yield* referralState(
+        services.referrals(),
+        billing ? (userId) => billing.referralCredit(userId) : null,
+        user.id,
+        referralPageQuery(url),
+        inviteLinkOrigin(url),
+      ).pipe(refuseWith(BillingError)),
+    );
+  }
   const [, sessionId] = /^v1\/me\/sessions\/([^/]+)$/u.exec(path) ?? [];
   if (sessionId !== undefined && request.method === "DELETE") {
     yield* services.auth.revokeAccountSession(token, sessionId);
@@ -421,10 +480,6 @@ const handleAccount = Effect.fn("BrowserApi.handleAccount")(function* (
   return null;
 });
 
-/**
- * The bearer `/v1/me/billing...` and `/v1/me/license...` routes for a browser. Stripe sends the user back to `/app`, not to the
- * desktop return page. Returns null for any other path.
- */
 const handleBilling = Effect.fn("BrowserApi.handleBilling")(function* (
   request: Request,
   path: string,
@@ -435,11 +490,24 @@ const handleBilling = Effect.fn("BrowserApi.handleBilling")(function* (
   const billing = services.billing();
   if (path === "v1/me/billing" && request.method === "GET")
     return json(billing ? yield* billing.getState(user.id) : BILLING_UNAVAILABLE_STATE);
+  if (path === "v1/me/billing/details" && (request.method === "GET" || request.method === "PUT")) {
+    if (!billing) return failure(503, "billing_unavailable", "Billing is not available.");
+    if (request.method === "GET") return json(withSuggestedCountry(yield* billing.getBillingDetails(user.id), request));
+    const input = parseBillingDetailsRequest(yield* readJsonObject(request));
+    if (!input) return failure(400, "invalid_billing_details", sourceText("error.billing.detailsInvalid"));
+    return json(yield* billing.setBillingDetails(user, input));
+  }
   if (path === "v1/me/billing/portal" && request.method === "POST") {
     if (!billing) return failure(503, "billing_unavailable", "Billing is not available.");
     const input = parseBillingPortalRequest(yield* readJsonObject(request));
     if (!input) return failure(400, "invalid_billing_request", "The billing request is invalid.");
     return json({ url: yield* billing.createPortal(user.id, input, "web", origin) });
+  }
+  if (path === "v1/me/billing/storage" && request.method === "POST") {
+    if (!billing) return failure(503, "billing_unavailable", "Billing is not available.");
+    const input = parseBillingStorageRequest(yield* readJsonObject(request));
+    if (!input) return failure(400, "invalid_billing_request", "The billing request is invalid.");
+    return json(yield* billing.buyStorage(user.id, input));
   }
   if (path === "v1/me/license" && request.method === "GET")
     return json(billing ? yield* billing.license.getState(user.id) : LICENSE_UNAVAILABLE_STATE);
@@ -449,7 +517,8 @@ const handleBilling = Effect.fn("BrowserApi.handleBilling")(function* (
   if (path === "v1/me/license/checkout") {
     const input = parseLicenseCheckoutRequest(body);
     if (!input) return failure(400, "invalid_billing_request", "The billing request is invalid.");
-    return json({ url: yield* billing.license.createCheckout(user, input, "web", origin) });
+    const promotionCode = parsePromotionCode(body.promotionCode);
+    return json({ url: yield* billing.license.createCheckout(user, input, "web", origin, promotionCode) });
   }
   if (path === "v1/me/license/users") {
     const input = parseLicenseUsersRequest(body);
@@ -469,20 +538,52 @@ const handleBilling = Effect.fn("BrowserApi.handleBilling")(function* (
   return null;
 }, refuseWith(BillingError));
 
-/** The hosted servers of the account. Returns null when the path is not one of them. */
+const handleCredits = Effect.fn("BrowserApi.handleCredits")(function* (
+  request: Request,
+  path: string,
+  user: AuthUser,
+  services: BrowserApiServices,
+) {
+  const billing = services.billing();
+  if (path === "v1/me/credits" && request.method === "GET")
+    return json(billing ? yield* billing.credits.getState(user.id) : CREDITS_UNAVAILABLE_STATE);
+  if (path === "v1/me/credits/activity" && request.method === "GET")
+    return json(billing ? yield* billing.credits.activity(user.id) : EMPTY_CREDIT_ACTIVITY);
+  if (request.method !== "POST") return null;
+  if (!billing) return failure(503, "billing_unavailable", "Billing is not available.");
+  const body = yield* readJsonObject(request);
+  if (path === "v1/me/credits/checkout") {
+    const input = parseCreditCheckoutRequest(body);
+    if (!input) return failure(400, "invalid_billing_request", "The billing request is invalid.");
+    const origin = new URL(request.url).origin;
+    return json(yield* billing.credits.createCheckout({ user, request: input, target: "web", origin }));
+  }
+  if (path === "v1/me/credits/transfer") {
+    const input = parseCreditTransferRequest(body);
+    if (!input) return failure(400, "invalid_billing_request", "The billing request is invalid.");
+    return json(yield* billing.credits.transfer(user.id, input));
+  }
+  if (path === "v1/me/credits/redeem") {
+    const input = parseCreditRedeemRequest(body);
+    if (!input) return failure(400, "invalid_billing_request", "The billing request is invalid.");
+    return json(yield* billing.credits.redeem(user.id, input, services.sourceIp(request)));
+  }
+  return null;
+}, refuseWith(BillingError));
+
 const handleHosting = Effect.fn("BrowserApi.handleHosting")(function* (
   request: Request,
   path: string,
   user: AuthUser,
   services: BrowserApiServices,
 ) {
-  // Stripe sends the user back to `/app` on this origin, not to the desktop return page.
   const returnTo = { target: "web", origin: new URL(request.url).origin } as const;
   if (path === "v2/hosting/plans" && request.method === "GET") return json(yield* services.hosting().plans(user));
   if (path === "v2/hosting/servers") {
     if (request.method === "GET") return json(yield* services.hosting().list(user));
     if (request.method !== "POST") return null;
     const body = yield* readJsonObject(request);
+    const promotionCode = parsePromotionCode(body.promotionCode);
     return json(
       yield* services.hosting().create(
         user,
@@ -493,9 +594,10 @@ const handleHosting = Effect.fn("BrowserApi.handleHosting")(function* (
           currency: body.currency,
           entryPoint: body.entryPoint,
           license: body.license,
+          earlyStart: body.earlyStart,
         },
         request.headers.get("Idempotency-Key"),
-        returnTo,
+        promotionCode ? { ...returnTo, promotionCode } : returnTo,
       ),
       201,
     );
@@ -515,7 +617,10 @@ const handleHosting = Effect.fn("BrowserApi.handleHosting")(function* (
   if (action === "restart" && request.method === "POST") return json(yield* services.hosting().restart(user, serverId));
   if (action === "status" && request.method === "GET") return json(yield* services.hosting().status(user, serverId));
   if (action === "checkout" && request.method === "POST") {
-    return json(yield* services.hosting().checkout(user, serverId, returnTo));
+    const promotionCode = parsePromotionCode((yield* readJsonObject(request)).promotionCode);
+    return json(
+      yield* services.hosting().checkout(user, serverId, promotionCode ? { ...returnTo, promotionCode } : returnTo),
+    );
   }
   if (action === undefined && request.method === "DELETE") {
     const body = yield* readJsonObject(request);
@@ -525,10 +630,6 @@ const handleHosting = Effect.fn("BrowserApi.handleHosting")(function* (
   return null;
 });
 
-/**
- * The account's published sites: the bearer `/v1/sites/` list and delete routes for a browser.
- * Publishing reads a local folder, so it stays on the desktop. Returns null for any other path.
- */
 const handleHostedSites = Effect.fn("BrowserApi.handleHostedSites")(function* (
   request: Request,
   path: string,
@@ -544,7 +645,51 @@ const handleHostedSites = Effect.fn("BrowserApi.handleHostedSites")(function* (
   return json({ deleted: true });
 }, refuseWith(HostedSiteInputError));
 
-/** Members and invites of one host. Returns null when the path and method are not one of them. */
+const handleOwnerTransfer = Effect.fn("BrowserApi.handleOwnerTransfer")(function* (
+  request: Request,
+  path: string,
+  user: AuthUser,
+  services: BrowserApiServices,
+) {
+  const noContent = () => new Response(null, { status: 204, headers: { "Cache-Control": "no-store" } });
+  if (path === "v2/remote/owner-transfers" && request.method === "GET")
+    return json({ transfers: yield* services.remote.incomingOwnerTransfers(user) });
+  const [, encodedTransferId, answer] = /^v2\/remote\/owner-transfers\/([^/]+)\/(accept|decline)$/u.exec(path) ?? [];
+  if (encodedTransferId !== undefined && request.method === "POST") {
+    const transferId = decodeURIComponent(encodedTransferId);
+    if (answer === "accept") return json(yield* services.remote.acceptOwnerTransfer(user, transferId));
+    yield* services.remote.declineOwnerTransfer(user, transferId);
+    return noContent();
+  }
+  const [, encodedHostId] = /^v2\/remote\/hosts\/([^/]+)\/owner-transfer$/u.exec(path) ?? [];
+  if (encodedHostId === undefined) return null;
+  const hostId = decodeURIComponent(encodedHostId);
+  if (request.method === "GET") return json({ transfer: yield* services.remote.pendingOwnerTransfer(user, hostId) });
+  if (request.method === "DELETE") {
+    yield* services.remote.cancelOwnerTransfer(user, hostId);
+    return noContent();
+  }
+  if (request.method !== "POST") return null;
+  return json(
+    yield* startOwnerTransfer(
+      {
+        auth: services.auth,
+        remote: services.remote,
+        delivery: services.ownerTransferEmailDelivery,
+        schedule: services.schedule,
+      },
+      user,
+      {
+        hostId,
+        body: yield* readJsonObject(request),
+        sourceIp: services.sourceIp(request),
+        appUrl: new URL("/app", request.url).toString(),
+      },
+    ),
+    201,
+  );
+});
+
 const handleAdministration = Effect.fn("BrowserApi.handleAdministration")(function* (
   request: Request,
   path: string,

@@ -2,7 +2,6 @@ import type { PartialTranslation } from "../../../message";
 import type { messages as source } from "../../en/error/app";
 
 export const messages = {
-  // Uygulama, bildirim ve gizli anahtar depolama eylemlerinden kaynaklanan hatalar.
   "error.app.externalLinkProtocol": "Harici tarayıcıda yalnızca HTTP(S) bağlantıları açılabilir.",
   "error.app.notificationsUnsupported": "Bu sistem masaüstü bildirimlerini desteklemiyor.",
   "error.app.notificationSettingsMissing": "Bu sistemin bildirim ayarları sayfası yok.",
@@ -12,4 +11,6 @@ export const messages = {
   "error.app.remoteIdentityUnavailable": "Uzak ana makine kimliği kullanılamıyor.",
   "error.app.iceServersMissing": "Remote Signal henüz ICE sunucularını sağlamadı.",
   "error.app.finishLocalTest": "Ekranları değiştirmeden önce yerel testi bitirin.",
+  "error.app.windowBlockedBySecuritySoftware":
+    "Bu bilgisayardaki güvenlik yazılımı muhtemelen OpenBot penceresini durdurdu. Güvenlik yazılımınızda, örneğin Kaspersky'de, OpenBot.exe dosyasını güvenilir uygulama olarak ekleyin. Ardından OpenBot'u yeniden başlatın.",
 } as const satisfies PartialTranslation<typeof source>;

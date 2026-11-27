@@ -65,7 +65,6 @@
   background: var(--openbot-accent);
 }
 
-/* The width of the Settings modal content column, so a settings row is reviewed at its real size. */
 .settings-story-panel {
   width: min(560px, 100%);
   display: grid;
@@ -471,8 +470,6 @@
   transform: translateX(-50%);
 }
 
-/* The production overlay keeps an enlarged hover target. Storybook uses only
-   the visible island so its preview cannot retrigger hover at the target edge. */
 .dynamic-island-story-stage .dynamic-island-idle::before {
   content: none;
   pointer-events: none;
@@ -552,7 +549,6 @@
   }
 }
 
-/* The stand-in desktop window under the Computer Use tint. Story-only, like every rule here. */
 .highlight-story-desktop {
   width: 420px;
   padding: var(--openbot-space-6);
@@ -636,11 +632,6 @@
   color: rgba(236, 238, 242, 0.45);
 }
 
-/*
- * A second window in front of the marked one. It starts where the covered area the story gives the
- * rim starts, and runs to both far edges, so the cut and the window agree whatever size the mock
- * window takes.
- */
 .highlight-story-cover {
   position: absolute;
   inset: 150px 0 0 210px;
@@ -670,4 +661,10 @@
 
 .files-story-chat {
   height: 100vh;
+}
+
+.library-story-stage {
+  height: 100vh;
+  background: var(--openbot-bg-canvas);
+  color: var(--openbot-text-primary);
 }

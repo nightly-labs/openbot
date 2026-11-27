@@ -3,7 +3,6 @@ import { Button, CopyButton, Field, Input, SettingsSection, Text, Trash2 } from 
 import { useText } from "@openbot/ui/text";
 import { createEffect, createStore, Show } from "solid-js";
 
-/** The pre-registered OAuth app of a saved http row, for a server that does not register OpenBot by itself. */
 export interface McpPanelSignInApp {
   load: (mcpServerId: string) => Promise<McpSignInAppState>;
   save: (input: SaveMcpSignInAppInput) => Promise<McpSignInAppState>;
@@ -14,9 +13,7 @@ interface AppFormState {
   stored: McpSignInAppState | null;
   loadError: string;
   clientId: string;
-  /** Only what the user typed. The stored secret never comes back from the host. */
   clientSecret: string;
-  /** The saved secret is removed on the next save. */
   clearSecret: boolean;
   scope: string;
   busy: "save" | "remove" | null;
@@ -24,23 +21,15 @@ interface AppFormState {
   error: string;
 }
 
-/**
- * The app is kept with the saved address, so it is offered only for a saved row whose address the
- * form has not changed. Its save is separate from the form's: the secret goes once to the host and
- * is not kept in the draft.
- */
 export function McpSignInAppSection(props: {
   api: McpPanelSignInApp;
-  /** `null` for a server that is not saved yet. */
   mcpServerId: string | null;
   urlChanged: boolean;
-  /** The joined server whose own browser signs in, so its loopback address receives the grant. */
   hostName?: string | undefined;
-  /** The joined server relays its sign-ins (`sign-in-relay-v1`), so the callback opens on this computer. */
   relayed?: boolean | undefined;
   disabled: boolean;
 }) {
-  const { t, sourceText } = useText();
+  const { t, errorMessage } = useText();
   const [state, setState] = createStore<AppFormState>({
     stored: null,
     loadError: "",
@@ -66,18 +55,18 @@ export function McpSignInAppSection(props: {
   }
 
   createEffect(
-    () => props.mcpServerId,
-    (mcpServerId) => {
+    () => ({ mcpServerId: props.mcpServerId, load: props.api.load }),
+    ({ mcpServerId, load }) => {
       const run = ++loadRun;
       if (!mcpServerId) return;
-      props.api.load(mcpServerId).then(
+      load(mcpServerId).then(
         (stored) => {
           if (run === loadRun) show(stored);
         },
         (error: unknown) => {
           if (run !== loadRun) return;
           setState((current) => {
-            current.loadError = error instanceof Error ? sourceText(error.message) : t("mcp.panel.appLoadFailed");
+            current.loadError = errorMessage(error, t("mcp.panel.appLoadFailed"));
           });
         },
       );
@@ -111,7 +100,7 @@ export function McpSignInAppSection(props: {
       });
     } catch (error) {
       setState((current) => {
-        current.error = error instanceof Error ? sourceText(error.message) : t("mcp.panel.saveFailed");
+        current.error = errorMessage(error, t("mcp.panel.saveFailed"));
       });
     } finally {
       setState((current) => {

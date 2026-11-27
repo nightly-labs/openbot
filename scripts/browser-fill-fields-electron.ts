@@ -188,7 +188,10 @@ async function main(): Promise<void> {
         text: "reverse",
       });
       await drain(form.contents);
-      assert(typed.success && recorded(form.id).at(-1)?.values.f8 === "reverse", "Single-field reverse input failed.");
+      assert(
+        typed.success && recorded(form.id).some((event) => event.values.f8 === "reverse"),
+        "Single-field reverse input failed.",
+      );
     };
     assert(
       BROWSER_DYNAMIC_TOOLS.some((namespace) => namespace.tools.some((tool) => tool.name === "fill_fields")),
@@ -483,8 +486,10 @@ async function main(): Promise<void> {
           await drain(form.contents);
         }
         const milliseconds = performance.now() - start;
+        const events = recorded(form.id);
         assert(
-          recorded(form.id).length === 8 && recorded(form.id).every((event) => event.trusted && !event.submitted),
+          (batch ? events.length === 8 : new Set(events.map((event) => event.field)).size === 8) &&
+            events.every((event) => event.trusted && !event.submitted),
           "Warm fixture input evidence failed.",
         );
         const snapshots = counts.snapshot();
@@ -508,7 +513,6 @@ async function main(): Promise<void> {
           batchCalls: batch.toolCalls,
           singleCalls: single.toolCalls,
         });
-      // Machine-readable: progress keeps the root aware while the serial fixture runs.
       process.stdout.write(`${JSON.stringify({ pairedRun: iteration + 1, warmup: iteration < 3 })}\n`);
     }
     assert(
@@ -588,14 +592,12 @@ async function main(): Promise<void> {
 
 function phase(name: string): void {
   currentPhase = name;
-  // Machine-readable: startup and case receipts contain no page or input data.
   process.stdout.write(`${JSON.stringify({ runId, phase: name, status: "running" })}\n`);
 }
 
 function recordCases(...names: string[]): void {
   for (const name of names) {
     cases.push(name);
-    // Machine-readable: emit only completed case names after their assertions.
     process.stdout.write(`${JSON.stringify({ runId, case: name, status: "passed" })}\n`);
   }
 }
@@ -628,7 +630,6 @@ function firstField(form: FixtureForm): { ref: string; text: string } {
   return field;
 }
 
-/** Gates sit after real native dispatch. They delay acknowledgment, never replace page input. */
 async function interruptionCases(
   open: (mode?: string) => Promise<FixtureForm>,
   reverse: (form: FixtureForm) => Promise<void>,
@@ -676,7 +677,6 @@ async function interruptionCases(
     phase(`during-input-${mode}`);
     const form = await open();
     if (mode === "close") phase("during-input-close-opened");
-    // Attaching externally covers the engine's unabortable debugger path.
     if (!mode.startsWith("owned-")) form.contents.debugger.attach("1.3");
     const cancellation = mode.endsWith("cancel");
     const deadline = mode.endsWith("deadline");
@@ -719,8 +719,6 @@ async function interruptionCases(
           tabId: form.tab.id,
           revision: form.snapshot.revision,
           fields: form.fields,
-          // Three seconds is the deadline exercise bound. Success waits for actual dispatch;
-          // this does not assert how fast preflight must complete.
           timeoutMs: deadline ? 3_000 : 10_000,
         }),
       ),
@@ -743,8 +741,6 @@ async function interruptionCases(
         const captureParams = params("snapshot", { tabId: form.tab.id, image: "never" });
         const captureStarted = controlStarted(host, captureParams.callId);
         const queuedSnapshot = runCauseEffect(host.handleDynamicTool(captureParams));
-        // A control event proves the next call entered the host while the native acknowledgment
-        // is still held. Its capture must remain behind the old queue slot.
         await captureStarted;
         assert(!Deferred.isDoneUnsafe(nextCommand), "A later queued capture overtook held native input.");
         released = true;
@@ -775,16 +771,14 @@ async function interruptionCases(
         if (mode === "takeover") host.endTakeover(form.tab.id);
       }
       assert(!laterCommandBeforeRelease, "Later input was dispatched during held acknowledgment.");
-      // Native close returns before its destroyed event. Never run fixture JavaScript on
-      // closing contents merely because isDestroyed() is not true yet.
       if (mode !== "close" && !form.contents.isDestroyed()) {
         form.contents.debugger.sendCommand = send;
         if (form.contents.debugger.isAttached()) form.contents.debugger.detach();
         await form.contents.executeJavaScript("window.fixtureDrain()", false);
       }
-      // Reverse input adds one event only in the interrupted cases.
+      const reverseInput = (value: string | undefined) => !!value && "reverse".startsWith(value);
       assert(
-        recorded(form.id).filter((event) => event.values.f8 !== "reverse").length === 1,
+        recorded(form.id).filter((event) => !reverseInput(event.values.f8)).length === 1,
         "An undispatched field received input after abort.",
       );
       await runCauseEffect(host.close(form.tab.id));

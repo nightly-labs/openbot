@@ -1,7 +1,6 @@
 import { defineMessages } from "../../message";
 
 export const messages = defineMessages("provider", {
-  // The provider list, shown in Settings and during onboarding.
   "provider.availableHere": "Available on this computer",
   "provider.availableOnHost": "Runs on {name}",
   "provider.custom.name": "Custom provider",
@@ -16,8 +15,6 @@ export const messages = defineMessages("provider", {
   "provider.refreshingLabel": "Checking providers",
   "provider.refreshing": "Checking…",
 
-  // What a provider row reports about itself. A percentage while downloading is a number, not a
-  // message, so it has no key.
   "provider.status.connecting": "Connecting",
   "provider.status.updateAvailable": "Update available",
   "provider.status.settingUp": "Setting up",
@@ -36,12 +33,8 @@ export const messages = defineMessages("provider", {
   "provider.gemini.hostSignIn":
     "To connect Gemini, open OpenBot on the host and select Connect in Server settings > Providers. Google sign-in needs a browser on that host. Remote sign-in is not supported.",
 
-  // Which account tier the OpenCode row runs on. It shows only while it adds to the runtime
-  // badge: a saved key leaves the runtime "Connected" to speak for the row.
   "provider.key.free": "Free",
 
-  // The buttons on a provider row, and the name a screen reader reads for each. The name repeats
-  // the provider, because a list of rows all saying "Connect" tells a screen reader user nothing.
   "provider.action.connect": "Connect",
   "provider.action.reconnect": "Reconnect",
   "provider.action.restart": "Restart",
@@ -70,10 +63,9 @@ export const messages = defineMessages("provider", {
   "provider.aria.install": "Install {name}",
   "provider.aria.signIn": "Sign in to {name}",
   "provider.aria.codeFallback": "Log in to {name} with a code",
+  "provider.aria.addressFallback": "Paste the sign-in address for {name}",
   "provider.aria.moreActions": "More actions for {name}",
 
-  // The switch that turns a provider on or off in OpenBot. While an agent uses the provider, the
-  // switch stays on and a toast names the agent, or counts the agents when there are more.
   "provider.aria.use": "Use {name} in OpenBot",
   "provider.use.inUseOne": "{agent} uses {name}. Change the model of this agent, then turn {name} off.",
   "provider.use.inUse": {
@@ -81,7 +73,6 @@ export const messages = defineMessages("provider", {
     other: "{count} agents use {name}. Change the model of these agents, then turn {name} off.",
   },
 
-  // The dialog that signs in to a provider with a code on another device.
   "provider.codeLogin.title": "Log in to {name} with a code",
   "provider.codeLogin.description": "Finish on your phone or another browser. OpenBot waits here.",
   "provider.codeLogin.starting": "Getting a code from {name}…",
@@ -101,18 +92,22 @@ export const messages = defineMessages("provider", {
   "provider.codeLogin.pasteExpiresIn": "Waiting for you. This login stops in {time}.",
   "provider.codeLogin.linkTitle": "Log in to {name} on another device",
   "provider.codeLogin.pageTitle": "Sign in to {name}",
+  "provider.codeLogin.addressDescription":
+    "Finish the sign-in in your browser. This window closes when the sign-in is complete.",
   "provider.codeLogin.pageDescription": "This page is open in the browser on {host}. Sign in here.",
   "provider.codeLogin.relayStarting": "Starting the {name} sign-in on {host}…",
   "provider.codeLogin.pageOpening": "Opening the {name} sign-in page on {host}…",
   "provider.codeLogin.linkStep": "Log in to {name}. OpenBot continues by itself.",
+  "provider.codeLogin.thisComputerDescription": "Open this link in a browser on this computer. OpenBot waits here.",
+  "provider.codeLogin.copyLink": "Copy link",
+  "provider.codeLogin.chatgptDeviceSetting":
+    "In ChatGPT on a computer, open the security settings and turn on device code sign-in for Codex. For a work account, your workspace admin turns it on.",
 
-  // A provider that only the OpenBot app can sign in, from a browser tab.
   "provider.useApp.title": "Connect {name} in the OpenBot app",
   "provider.useApp.description":
     "The {name} sign-in returns to the computer that started it, and a browser tab cannot receive it. Connect {name} in the OpenBot app. The app finishes the sign-in by itself.",
   "provider.useApp.download": "Get the app",
 
-  // The agent model picker.
   "provider.picker.noEndpoints": "No endpoints yet",
   "provider.picker.customCounts": "{endpoints} · {agents}",
   "provider.picker.agentModel": "Agent model",
@@ -127,11 +122,24 @@ export const messages = defineMessages("provider", {
   "provider.picker.download": "{name} download",
   "provider.picker.search": "Search models",
   "provider.picker.noMatches": "No models match your search.",
+  "provider.picker.openrouterNoMatches":
+    "No models match your search. Your privacy, provider and guardrail settings on openrouter.ai can hide models from this list.",
+  "provider.picker.workspaceOnlyUnavailable":
+    "These models do not work with Workspace only on Windows and Linux. To use them, change Permissions in the agent settings.",
   "provider.picker.olderModels": "Older models",
   "provider.picker.olderModelsList": "Older {name} models",
-  "provider.picker.noModels": "No models are available from {name}.",
+  "provider.picker.noModels":
+    "No {name} models show here. If they are turned off, an admin can turn them on in Server settings > Providers > {name} > Models.",
+  "provider.picker.endpointModelsInCustom": "{name} runs your custom endpoints. Their models are on the Custom tab.",
+  "provider.picker.showCustomModels": "Show models",
+  "provider.picker.museNoModels":
+    "Muse sent no models for this account. Muse may not be available in the country where this agent runs. Choose a model from another provider.",
   "provider.picker.customEmpty":
     "Add an OpenAI-compatible endpoint — a model server on this computer, or any service with a base URL and a key.",
+  "provider.picker.customPending":
+    "The models of your endpoints are not loaded yet. The provider reads them after its current task stops.",
+  "provider.picker.customUnlisted": "{name} does not list the models of your endpoints.",
+  "provider.picker.editEndpoints": "Edit endpoints",
   "provider.picker.defaultModelLabel": "{name}, default",
   "provider.picker.usageLimit": "Usage limit reached",
   "provider.picker.usageLimitWindow": "{window} limit",
@@ -141,11 +149,19 @@ export const messages = defineMessages("provider", {
   "provider.picker.effort": "Effort",
   "provider.picker.effortLabel": "Agent reasoning effort",
   "provider.picker.effortFixed": "{effort}, set by {provider}",
+  "provider.picker.effortLimited": "Your Claude settings or organization limit the effort to {effort}.",
   "provider.picker.fast": "Fast",
-  "provider.picker.fastLabel": "Fast mode",
+  "provider.picker.fastText": "Faster responses, increased usage",
+  "provider.picker.speed": "Speed",
+  "provider.picker.standard": "Standard",
+  "provider.picker.standardText": "Default speed",
+  "provider.picker.ultrafast": "Ultrafast",
+  "provider.picker.ultrafastText": "The fastest responses, much higher usage",
   "provider.picker.selectEffort": "Select effort",
   "provider.picker.custom": "Custom",
   "provider.picker.cliReady": "{cli} ready",
+  "provider.picker.modelSourceProvider": "Uses {name} from your {cli} settings",
+  "provider.picker.modelSourceCatalog": "Uses a model list from your {cli} settings",
   "provider.status.signInRequired": "Sign in required",
   "provider.model.free": "Free",
   "provider.model.new": "New",
@@ -165,29 +181,44 @@ export const messages = defineMessages("provider", {
   "provider.geminiKey.title": "Gemini API key",
   "provider.geminiKey.description":
     "Save a Gemini API key on this computer. A saved key is used instead of your Google account. To sign in with Google, remove the key and select Connect on the Gemini row.",
+  "provider.geminiKey.descriptionHost":
+    "Save a Gemini API key on the host. A saved key is used instead of your Google account. To sign in with Google, remove the key and select Connect on the Gemini row.",
   "provider.geminiKey.label": "Gemini API key",
   "provider.claudeKey.title": "Anthropic API key",
   "provider.claudeKey.description":
-    "Save an Anthropic API key on the host. Anthropic bills each request to the key. To use it for an agent, select the API key account in the agent's model menu. When Claude is not signed in, all agents use the key.",
+    "Save an Anthropic API key on the host. Anthropic bills each request to the key's API credit, not to your Claude plan. To use it for an agent, select the API key account in the agent's model menu. When Claude is not signed in, all agents use the key.",
   "provider.claudeKey.label": "Anthropic API key",
   "provider.codexKey.title": "Log in with an OpenAI API key",
   "provider.codexKey.description":
     "Codex saves the key on this computer. OpenAI bills each request to the key, not to your ChatGPT plan. To use the plan again, disconnect the account and connect ChatGPT.",
+  "provider.codexKey.descriptionHost":
+    "Codex saves the key on the host. OpenAI bills each request to the key, not to your ChatGPT plan. To use the plan again, disconnect the account and connect ChatGPT.",
   "provider.codexKey.label": "OpenAI API key",
+  "provider.cursorKey.title": "Cursor API key",
+  "provider.cursorKey.description":
+    "Each Cursor account after the first uses an API key. Make a key in the Cursor dashboard, under Integrations, and paste it here. The key is saved on this computer.",
+  "provider.cursorKey.descriptionHost":
+    "Each Cursor account after the first uses an API key. Make a key in the Cursor dashboard, under Integrations, and paste it here. The key is saved on the host.",
+  "provider.cursorKey.label": "Cursor API key",
   "provider.inceptionKey.title": "Inception API key",
   "provider.inceptionKey.description":
     "Save an Inception API key on this computer to use the Mercury models. OpenBot runs them in the Pi CLI that it downloads.",
+  "provider.inceptionKey.descriptionHost":
+    "Save an Inception API key on the host to use the Mercury models. OpenBot runs them in the Pi CLI that it downloads.",
   "provider.inceptionKey.label": "Inception API key",
   "provider.deepseekKey.title": "DeepSeek API key",
   "provider.deepseekKey.description":
     "Save a DeepSeek API key on this computer to use the DeepSeek models. OpenBot runs them in the Pi CLI that it downloads.",
+  "provider.deepseekKey.descriptionHost":
+    "Save a DeepSeek API key on the host to use the DeepSeek models. OpenBot runs them in the Pi CLI that it downloads.",
   "provider.deepseekKey.label": "DeepSeek API key",
   "provider.openrouterKey.title": "OpenRouter API key",
   "provider.openrouterKey.description":
     "Save an OpenRouter API key on this computer to use the models that OpenRouter serves. OpenBot runs them in the Pi CLI that it downloads.",
+  "provider.openrouterKey.descriptionHost":
+    "Save an OpenRouter API key on the host to use the models that OpenRouter serves. OpenBot runs them in the Pi CLI that it downloads.",
   "provider.openrouterKey.label": "OpenRouter API key",
 
-  // The optional OpenCode Go key dialog.
   "provider.openCodeKey.title": "Sign in to OpenCode Go",
   "provider.openCodeKey.description": "Free models need no account. A key unlocks the paid Go models.",
   "provider.openCodeKey.unreadable": "Saved key is unreadable. Paste it again, or remove it.",
@@ -202,11 +233,13 @@ export const messages = defineMessages("provider", {
   "provider.openCodeKey.reconnectFailed": "Could not reconnect.",
   "provider.account.add": "Add account",
   "provider.account.addLabel": "Add another {name} account",
+  "provider.account.addWithCode": "Add account with code",
   "provider.account.count": { one: "{count} account", other: "{count} accounts" },
   "provider.account.numbered": "Account {number}",
   "provider.account.apiKey": "API key",
   "provider.account.listLabel": "{name} accounts",
   "provider.account.usedBy": "Used by {agents}",
+  "provider.account.sameEmail": "Same email as {name}",
   "provider.account.failed": "Sign-in failed",
   "provider.account.moreActions": "More actions for {name}",
   "provider.account.renameLabel": "Name of {name}",
@@ -229,8 +262,22 @@ export const messages = defineMessages("provider", {
   "provider.account.resetUsageNoCredit": "{name} has no usage reset credits left.",
   "provider.account.resetUsageAlreadyRedeemed": "This reset credit of {name} was already used.",
   "provider.account.resetUsageFailed": "Could not reset the usage of {name}.",
+  "provider.account.pool": "Pool accounts",
+  "provider.account.poolDescription":
+    "Agents use one account until it nears a usage limit, then the account whose limit resets first.",
+  "provider.account.poolStrategy": "Use accounts",
+  "provider.account.poolFillFirst": "Fill first",
+  "provider.account.poolSpread": "Spread",
+  "provider.account.poolSpreadDescription":
+    "Agents spread over the accounts with the most usage left. An agent changes accounts only when another account has much more room.",
+  "provider.account.inUse": "In use",
+  "provider.account.notInPool": "Not in pool",
+  "provider.account.leaveOutOfPool": "Leave out of pool",
+  "provider.account.putBackInPool": "Put back in pool",
+  "provider.account.poolChip": "Pool",
+  "provider.account.poolCount": "Pool of {accounts}",
+  "provider.account.poolInUse": "{pool} · {name} in use",
 
-  // Settings > Providers: a list of providers, and one page for each provider.
   "provider.settings.connected": "Connected",
   "provider.settings.other": "Other providers",
   "provider.settings.search": "Search providers",
@@ -252,6 +299,7 @@ export const messages = defineMessages("provider", {
   "provider.settings.defaultSubtitle": "Default for new agents · {use}",
   "provider.settings.accounts": "Accounts",
   "provider.settings.accountsDescription": "{count} of {max}. Each agent uses one account.",
+  "provider.settings.accountsPooledDescription": "{count} of {max}. Agents share these accounts.",
   "provider.settings.accountBlocked": "{agents} cannot run until you sign in again.",
   "provider.settings.removeTitle": "Remove {name}?",
   "provider.settings.removeMoves": "{agents} will use {name}.",
@@ -271,11 +319,14 @@ export const messages = defineMessages("provider", {
   "provider.settings.keyOptional": "Optional. A key adds paid models.",
   "provider.settings.keyAlternative": "Or paste a {name} API key.",
   "provider.settings.geminiKeyInUse": "Gemini uses this key, not your Google AI plan. The plan's usage is not shown.",
+  "provider.settings.geminiKeyReplacesAccount":
+    "A saved Gemini API key is used instead of a Google sign-in. To use a Google plan and its models, remove the key.",
   "provider.settings.claudeKeyInUse":
-    "Select the API key account in an agent's model menu. When Claude is not signed in, all agents use the key.",
+    "Anthropic bills the key's API credit, not your Claude plan. Select the API key account in an agent's model menu. When Claude is not signed in, all agents use the key.",
   "provider.settings.codexKeyInUse":
     "ChatGPT uses this key, not your ChatGPT plan. OpenAI bills each request to the key. The plan's usage is not shown.",
   "provider.settings.codexKeyAlternative": "Or log in with an OpenAI API key. OpenAI bills each request to the key.",
+  "provider.settings.museKeyInUse": "Muse uses this key, not your sign-in. To use your sign-in, remove the key.",
   "provider.settings.addKey": "Add key",
   "provider.settings.changeKey": "Change key",
   "provider.settings.runtime": "Runtime",
@@ -283,16 +334,63 @@ export const messages = defineMessages("provider", {
   "provider.settings.versionAvailable": "{installed} · {available} is available",
   "provider.settings.versionInstalledByUser": "{version} · installed by you",
   "provider.settings.versionDownloaded": "{version} · downloaded by OpenBot",
+  "provider.settings.otherVersionInstalledByUser": "Not in use: {version} · installed by you",
+  "provider.settings.otherVersionDownloaded": "Not in use: {version} · downloaded by OpenBot",
+  "provider.settings.installedVersionIncomplete":
+    "Some models need a part that this version does not have. Download OpenBot's version to use them.",
+  "provider.settings.useInstalledVersion": "Use installed version",
+  "provider.settings.useDownloadedVersion": "Use OpenBot's version",
   "provider.settings.update": "Update",
   "provider.settings.downloadLabel": "Download of {name}",
   "provider.settings.diagnostics": "Diagnostics",
   "provider.settings.cache": "Cache",
   "provider.settings.promptCache": "Prompt cache",
   "provider.settings.promptCacheDescription":
-    "How long Claude keeps the context of an agent in the cache between turns.",
+    "How long Claude and Pi keep the context of an agent in the cache between turns.",
   "provider.settings.promptCacheHour": "1 hour",
-  "provider.settings.promptCacheDefault": "Claude Code default",
+  "provider.settings.promptCacheDefault": "Provider default",
   "provider.settings.promptCacheLoadFailed": "Could not load the prompt cache time of this server.",
+  "provider.settings.cacheExpiryCompaction": "Compact before the cache expires",
+  "provider.settings.cacheExpiryCompactionDescription":
+    "When a chat with 200K or more tokens of context is idle with a 1 hour cache, the agent compacts the context before the cache expires. Then the next message does not read the full context again with no cache.",
+  "provider.settings.cacheExpiryCompactionLoadFailed": "Could not load the compaction setting of this server.",
+  "provider.settings.claudeSetup": "Claude Code",
+  "provider.settings.claudeUserSetup": "Use my Claude Code setup",
+  "provider.settings.claudeUserSetupDescription":
+    "Agents load your CLAUDE.md, skills, agents, hooks and plugins from ~/.claude. Off, each turn sends a shorter prompt. Workspace files still load.",
+  "provider.settings.claudeUserSetupServerDescription":
+    "Agents load the CLAUDE.md, skills, agents, hooks and plugins from ~/.claude on the server. Off, each turn sends a shorter prompt. Workspace files still load.",
+  "provider.settings.claudeUserSetupLoadFailed": "Could not load the Claude Code setting.",
+  "provider.settings.context": "Context",
+  "provider.settings.compactWindow": "Compact chats at",
+  "provider.settings.compactWindowDescription":
+    "Claude Code sums up the older turns of a chat when the chat reaches this size. Lower keeps turns fast and cheap. Higher keeps more detail. A model with a smaller window compacts at its own limit.",
+  "provider.settings.compactWindowDefault": "Claude Code default",
+  "provider.settings.compactWindowTokens": "{size} tokens",
+  "provider.settings.compactWindowLoadFailed": "Could not load the compaction size of this server.",
+  "provider.settings.environment": "Environment",
+  "provider.settings.environmentVariables": "Variables",
+  "provider.settings.environmentDescription":
+    "API keys, base URLs and other settings that each {name} process gets. A change applies when the current turns end.",
+  "provider.settings.environmentCodexHint":
+    "OPENAI_BASE_URL, with OPENAI_API_KEY as its key, sends the model requests of ChatGPT to that address.",
+  "provider.settings.environmentShellNote": "The commands that agents run can read these values.",
+  "provider.settings.environmentAdd": "Add variable",
+  "provider.settings.environmentNamePlaceholder": "VARIABLE_NAME",
+  "provider.settings.environmentValuePlaceholder": "Value",
+  "provider.settings.environmentSaved": "Saved",
+  "provider.settings.environmentSensitive": "Sensitive",
+  "provider.settings.environmentNameLabel": "Variable name {index}",
+  "provider.settings.environmentValueLabel": "Value of {name}",
+  "provider.settings.environmentSensitiveLabel": "Keep {name} secret",
+  "provider.settings.environmentRemoveLabel": "Remove {name}",
+  "provider.settings.environmentUnnamed": "variable {index}",
+  "provider.settings.environmentPending":
+    "Saving restarts {name} when its current turns end. Sensitive values stay on the server.",
+  "provider.settings.environmentDone": "Saved. {name} restarts when its current turns end.",
+  "provider.settings.environmentDiscard": "Discard",
+  "provider.settings.environmentSave": "Save",
+  "provider.settings.environmentLoadFailed": "Could not load the variables of {name}.",
   "provider.settings.models": "Models",
   "provider.settings.modelsDescription": {
     one: "{shown} of {count} model shows in the model picker.",
@@ -312,20 +410,16 @@ export const messages = defineMessages("provider", {
   "provider.settings.turnOnFirst": "Turn {name} on first.",
   "provider.settings.makeDefault": "Make default",
   "provider.settings.useTitle": "Use {name}",
-  "provider.settings.download": "Download",
-  "provider.settings.downloadedCli": "{name} CLI",
-  "provider.settings.downloadDetail": {
-    one: "{version} · 1 version · {size}",
-    other: "{version} · {count} versions · {size}",
-  },
-  "provider.settings.downloadVersions": { one: "1 version · {size}", other: "{count} versions · {size}" },
-  "provider.settings.downloadAgain": "When you turn {name} on, OpenBot downloads its CLI again.",
-  "provider.settings.removeDownloadConfirm": "Remove {size}?",
-  "provider.settings.removeDownloadKeeps": "Accounts, sign-ins and agents stay.",
-  "provider.settings.removeDownload": "Remove download",
-  "provider.settings.removingDownload": "Removing…",
+  "provider.settings.deleteTitle": "Delete {name}",
+  "provider.settings.deleteOn":
+    "Turns {name} off and deletes the CLI that OpenBot downloaded. Accounts, sign-ins and agents stay.",
+  "provider.settings.deleteOff":
+    "Deletes the CLI that OpenBot downloaded for {name} ({size}). Accounts, sign-ins and agents stay.",
   "provider.settings.removeDownloadFailed": "Could not remove the download.",
   "provider.settings.endpoints": "Endpoints",
   "provider.settings.noEndpoints": "No endpoints.",
   "provider.settings.endpointModels": { one: "{url} · 1 model", other: "{url} · {count} models" },
+  "provider.settings.disconnectLocalOnly":
+    "OpenBot signs {provider} out on this computer. The {provider} CLI in your terminal keeps its own sign-in.",
+  "provider.settings.updateAll": "Update all",
 });

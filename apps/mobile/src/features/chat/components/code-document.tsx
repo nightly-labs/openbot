@@ -1,29 +1,20 @@
 import { Typography } from "heroui-native";
 import { type ReactNode, useEffect, useMemo, useState } from "react";
-import { ScrollView, TextInput, type TextStyle, View } from "react-native";
+import { ScrollView, Text, TextInput, type TextStyle, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { isIOS } from "@/shared/lib/platform";
 import { useText } from "@/shared/lib/text";
+import { CODE_LAYOUT_STYLE, CODE_TEXT_STYLE } from "@/shared/lib/text-direction";
 import { type CodeToken, highlightCode } from "../model/code-highlight";
-import { useCodeTokenColors } from "./chat-code-block";
+import { codeRuns, useCodeTokenColors } from "./chat-code-block";
 
 const FONT_SIZE = 13;
 const LINE_HEIGHT = 20;
-/** The monospace font of `Typography.Code` on each platform. */
 const CODE_FONT = isIOS ? "Menlo" : "monospace";
-/** The width of one digit of the code font, in points, so the gutter fits the last line number. */
 const DIGIT_WIDTH = 8;
 const GUTTER_GAP = 14;
 const SIDE_PADDING = 16;
 
-/**
- * The code of a preview on its own screen, as an editor shows a file: the screen background, a
- * column of line numbers, and the colours of the code block in the chat. The code is one text, so
- * a finger selects any part of it with the system handles and copies it. iOS `Text` copies only
- * the whole text, so on iOS the code is a read-only text field, as Select Text in a message is.
- * Without wrap the lines scroll sideways together and the numbers stay in place. With wrap a
- * line can take several rows, so the numbers would no longer match their lines and are hidden.
- */
 export function CodeDocument({
   text,
   language,
@@ -31,7 +22,7 @@ export function CodeDocument({
   wrap,
   topInset,
   bottomInset,
-  note,
+  firstLine = 1,
 }: {
   text: string;
   language?: string;
@@ -39,11 +30,9 @@ export function CodeDocument({
   wrap: boolean;
   topInset: number;
   bottomInset: number;
-  /** A line under the code, such as that the file goes on past what it shows. */
-  note?: string | null;
+  firstLine?: number;
 }) {
   const { foreground, muted, colors } = useCodeTokenColors();
-  // The code keeps clear of the side insets: the rail of iPhone Duo and the edges in landscape.
   const insets = useSafeAreaInsets();
   const sides = { paddingLeft: insets.left + SIDE_PADDING, paddingRight: insets.right + SIDE_PADDING };
   const [tokens, setTokens] = useState<CodeToken[] | null>(null);
@@ -61,20 +50,33 @@ export function CodeDocument({
   }, [text, language]);
   const lineCount = useMemo(() => text.split("\n").length, [text]);
   const codeStyle: TextStyle = {
+    ...CODE_TEXT_STYLE,
     fontFamily: CODE_FONT,
     fontSize: FONT_SIZE,
     lineHeight: LINE_HEIGHT,
     color: foreground,
   };
-  const runs = (tokens ?? [{ text, offset: 0 }]).map((token) => (
-    <Typography.Code
-      key={token.offset}
-      className="bg-transparent p-0"
-      style={{ ...codeStyle, color: token.type ? (colors[token.type] ?? foreground) : foreground }}
-    >
-      {token.text}
-    </Typography.Code>
-  ));
+  const androidRuns = isIOS ? null : codeRuns(tokens ?? [{ text, offset: 0 }], colors, foreground);
+  const runs = androidRuns
+    ? // Android: plain native spans in one run for each colour, inside the code style of
+      androidRuns.map((run) =>
+        run.color === undefined ? (
+          run.text
+        ) : (
+          <Text key={run.offset} style={{ color: run.color }}>
+            {run.text}
+          </Text>
+        ),
+      )
+    : (tokens ?? [{ text, offset: 0 }]).map((token) => (
+        <Typography.Code
+          key={token.offset}
+          className="bg-transparent p-0"
+          style={{ ...codeStyle, color: token.type ? (colors[token.type] ?? foreground) : foreground }}
+        >
+          {token.text}
+        </Typography.Code>
+      ));
   const code = <SelectableCode label={title} style={codeStyle} runs={runs} />;
 
   return (
@@ -85,9 +87,9 @@ export function CodeDocument({
       contentContainerStyle={{ paddingTop: topInset, paddingBottom: bottomInset + SIDE_PADDING }}
     >
       {wrap ? (
-        <View style={sides}>{code}</View>
+        <View style={[CODE_LAYOUT_STYLE, sides]}>{code}</View>
       ) : (
-        <View className="flex-row" style={{ paddingLeft: sides.paddingLeft }}>
+        <View className="flex-row" style={[CODE_LAYOUT_STYLE, { paddingLeft: sides.paddingLeft }]}>
           <Typography.Code
             selectable={false}
             accessibilityElementsHidden
@@ -97,11 +99,11 @@ export function CodeDocument({
               ...codeStyle,
               color: muted,
               opacity: 0.6,
-              width: String(lineCount).length * DIGIT_WIDTH,
+              width: String(firstLine + lineCount - 1).length * DIGIT_WIDTH,
               textAlign: "right",
             }}
           >
-            {Array.from({ length: lineCount }, (_, row) => row + 1).join("\n")}
+            {Array.from({ length: lineCount }, (_, row) => row + firstLine).join("\n")}
           </Typography.Code>
           <ScrollView
             horizontal
@@ -112,11 +114,6 @@ export function CodeDocument({
           </ScrollView>
         </View>
       )}
-      {note ? (
-        <Typography.Paragraph type="body-sm" className="text-muted" style={{ ...sides, paddingTop: 12 }}>
-          {note}
-        </Typography.Paragraph>
-      ) : null}
     </ScrollView>
   );
 }

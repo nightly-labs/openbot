@@ -66,7 +66,6 @@ export const messages = {
   "connector.github.disconnectEffectTools": "Все агенты потеряют инструменты GitHub, gh и git.",
   "connector.github.disconnectEffectRevoke": "Затем откроется GitHub, где можно отозвать доступ OpenBot.",
   "connector.github.disconnectEffectKept": "Чаты, файлы и память агентов останутся на этом компьютере.",
-  // The same text for the connection of a joined server. {host} is the server name, such as Studio.
   "connector.github.descriptionHost":
     "Каждый агент на сервере {host} может работать с вашими репозиториями, задачами и пул-реквестами GitHub, а также с gh и git.",
   "connector.github.connectedSummaryHost": {
@@ -302,6 +301,8 @@ export const messages = {
   "connector.telegram.helpRelayUnavailableHost":
     "OpenBot на {host} не может получать сообщения Telegram. На {host} войдите в аккаунт, задайте серверу имя в настройках сервера и не закрывайте OpenBot.",
   "connector.telegram.helpError": "OpenBot не может связаться с этим чатом. Подключите его заново или отключите чат.",
+  "connector.telegram.helpNotLinked":
+    "Этот чат не связан с этим сервером. Выберите «Переподключить», чтобы связать его.",
   "connector.telegram.retryAt": "Telegram попросил OpenBot подождать. Следующая попытка в {time}.",
   "connector.telegram.pause": "Приостановить",
   "connector.telegram.resume": "Возобновить",
@@ -386,11 +387,13 @@ export const messages = {
   "connector.whatsapp.ownNumberNote":
     "OpenBot получает сообщения из вашего чата «Сообщение себе» и от людей, которым вы разрешили писать.",
   "connector.whatsapp.dedicatedNote":
-    "OpenBot получает сообщения от людей, которым вы разрешили писать. Остальные получают код, который нужно передать вам.",
+    "OpenBot получает сообщения из вашего чата «Сообщение себе» и от людей, которым вы разрешили писать. Остальные получают код, который нужно передать вам.",
   "connector.whatsapp.helpLoggedOut": "WhatsApp удалил этот компьютер из связанных устройств. Привяжите номер заново.",
   "connector.whatsapp.helpLoggedOutHost": "WhatsApp удалил этот сервер из связанных устройств. Привяжите номер заново.",
   "connector.whatsapp.helpError":
     "OpenBot не может связаться с WhatsApp на этом номере. Переподключите или отключите номер.",
+  "connector.whatsapp.helpKeysUnreadable":
+    "OpenBot не может прочитать сохранённые ключи этого номера. Привяжите номер заново.",
   "connector.whatsapp.retryAt": "WhatsApp попросил OpenBot подождать. Следующая попытка в {time}.",
   "connector.whatsapp.pause": "Приостановить",
   "connector.whatsapp.resume": "Возобновить",
@@ -405,7 +408,13 @@ export const messages = {
   "connector.whatsapp.rowAction": "{action}: {name}",
   "connector.whatsapp.ownNumber": "Личный номер",
   "connector.whatsapp.ownNumberDescription":
-    "Писать могут только вы в чате «Сообщение себе» и люди, которым вы разрешили. Выключите, если номер только для OpenBot.",
+    "Писать могут только вы в чате «Сообщение себе» и люди, которым вы разрешили. Другие люди не получают ответа. Если выключено, OpenBot отвечает незнакомым людям кодом.",
+  "connector.whatsapp.workingMessage": "Сообщение «Уже работаю…»",
+  "connector.whatsapp.workingMessageDescription":
+    "OpenBot отправляет его, пока агент работает, а затем заменяет ответом. Запрос, который ждёт предыдущий, тоже получает сообщение об ожидании. На личном номере эти сообщения получает только чат «Сообщение себе». Выключите, чтобы отправлять только ответ.",
+  "connector.whatsapp.statusReactions": "Реакции статуса",
+  "connector.whatsapp.statusReactionsDescription":
+    "OpenBot ставит 👀, когда приходит сообщение, и ✅, когда ответ готов. Выключите, чтобы не отправлять реакции.",
   "connector.whatsapp.orchestratorTitle": "Оркестратор WhatsApp",
   "connector.whatsapp.orchestratorDescription":
     "Этот агент получает сообщения для OpenBot со всех ваших привязанных номеров. Короткие он обрабатывает сам, остальную работу передаёт нужному агенту и отвечает в WhatsApp.",
@@ -421,10 +430,10 @@ export const messages = {
   "connector.whatsapp.kindLabel": "Номер",
   "connector.whatsapp.kindPersonal": "Мой личный номер",
   "connector.whatsapp.kindPersonalDescription":
-    "OpenBot отвечает только в вашем чате «Сообщение себе» и людям, которым вы разрешили.",
+    "OpenBot отвечает только в вашем чате «Сообщение себе» и людям, которым вы разрешили. Другие люди не получают ответа.",
   "connector.whatsapp.kindDedicated": "Номер только для OpenBot",
   "connector.whatsapp.kindDedicatedDescription":
-    "Незнакомые люди получают код, который нужно передать вам. Вы одобряете их здесь.",
+    "OpenBot отвечает с этого номера каждому незнакомому человеку кодом, который нужно передать вам. Вы одобряете их здесь.",
   "connector.whatsapp.methodLabel": "Способ привязки",
   "connector.whatsapp.methodQr": "QR-код",
   "connector.whatsapp.methodCode": "Код привязки",
@@ -478,6 +487,9 @@ export const messages = {
   "connector.whatsapp.sendersLimit": "Номер может разрешить не более {count} контактов и групп.",
   "connector.whatsapp.senderGroup": "Группа",
   "connector.whatsapp.removeSender": "Удалить",
+  "connector.whatsapp.senderAccess": "Доступ: {name}",
+  "connector.whatsapp.senderReplies": "Может давать задачи",
+  "connector.whatsapp.senderReadOnly": "Только чтение",
   "connector.whatsapp.addContact": "Добавить контакт",
   "connector.whatsapp.addGroup": "Добавить группу",
   "connector.whatsapp.contactTitle": "Добавить контакт",
@@ -486,7 +498,8 @@ export const messages = {
   "connector.whatsapp.contactNameDescription": "Необязательно. Если пусто, в списке будет номер телефона.",
   "connector.whatsapp.add": "Добавить",
   "connector.whatsapp.groupTitle": "Добавить группу",
-  "connector.whatsapp.groupDescription": "Участники этой группы могут поручать работу вашим агентам.",
+  "connector.whatsapp.groupDescription":
+    "Участники этой группы могут поручать работу вашим агентам, когда упоминают этот номер или отвечают на его сообщения.",
   "connector.whatsapp.groupSearch": "Поиск групп",
   "connector.whatsapp.groupsLoading": "Загрузка групп…",
   "connector.whatsapp.groupsLoadFailed": "OpenBot не смог прочитать группы",
@@ -594,4 +607,76 @@ export const messages = {
   "connector.bitwarden.clientSecret": "client_secret ключа API",
   "connector.bitwarden.masterPassword": "Мастер-пароль",
   "connector.bitwarden.connecting": "Подключение",
+  "connector.protonPass.title": "Proton Pass",
+  "connector.protonPass.description": "Агенты входят на сайты с учётными данными из общего хранилища Proton Pass.",
+  "connector.protonPass.descriptionHost":
+    "Агенты на {host} входят на сайты с учётными данными из общего хранилища Proton Pass.",
+  "connector.protonPass.connect": "Подключить",
+  "connector.protonPass.moreWays": "Другие способы подключения",
+  "connector.protonPass.useKey": "Использовать ключ доступа",
+  "connector.protonPass.keyLabel": "Ключ доступа",
+  "connector.protonPass.keyPlaceholder": "pst_…",
+  "connector.protonPass.setupTitle": "Настройка",
+  "connector.protonPass.setupDescription":
+    "Кнопка «Подключить» открывает вход в Proton в браузере. Затем OpenBot создаёт общее хранилище и хранит только ключ для чтения.",
+  "connector.protonPass.setupDescriptionHost":
+    "Кнопка «Подключить» открывает вход в Proton в браузере. Затем {host} создаёт общее хранилище и хранит только ключ для чтения.",
+  "connector.protonPass.vaultName": "Shared with OpenBot",
+  "connector.protonPass.vaultSetup":
+    "OpenBot создаёт это хранилище при подключении. Переместите в него учётные данные, чтобы поделиться ими.",
+  "connector.protonPass.showSteps": "Показать шаги",
+  "connector.protonPass.stepsLabel": "Шаги подключения",
+  "connector.protonPass.stepSignIn": "Вход",
+  "connector.protonPass.stepVault": "Создание хранилища",
+  "connector.protonPass.stepDone": "Готово",
+  "connector.protonPass.signInTitle": "Вход в Proton",
+  "connector.protonPass.signInStarting": "OpenBot начинает вход. Страница Proton откроется в браузере.",
+  "connector.protonPass.signInDescription": "Вход открыт в браузере. Proton запросит пароль и второй фактор.",
+  "connector.protonPass.signInDescriptionHost":
+    "Вход для {host} открыт в браузере. Proton запросит пароль и второй фактор.",
+  "connector.protonPass.extraPasswordDescription": "Proton Pass запрашивает дополнительный пароль.",
+  "connector.protonPass.extraPasswordWrong": "Дополнительный пароль неверен. Введите его снова.",
+  "connector.protonPass.extraPasswordLabel": "Дополнительный пароль",
+  "connector.protonPass.continue": "Продолжить",
+  "connector.protonPass.setupStepTitle": "Создание общего хранилища",
+  "connector.protonPass.setupStepDescription":
+    "OpenBot создаёт хранилище «{vault}» и ключ для чтения. Затем завершает сеанс Proton.",
+  "connector.protonPass.doneTitle": "Proton Pass подключён",
+  "connector.protonPass.doneDescription": "Переместите учётные данные в «{vault}», чтобы агенты могли входить с ними.",
+  "connector.protonPass.failedTitle": "Proton Pass не подключён",
+  "connector.protonPass.copyLink": "Копировать ссылку",
+  "connector.protonPass.linkCopied": "Скопировано",
+  "connector.protonPass.openAgain": "Открыть снова",
+  "connector.protonPass.done": "Готово",
+  "connector.protonPass.close": "Закрыть",
+  "connector.protonPass.statusConnecting": "Подключение",
+  "connector.protonPass.statusConnected": "Подключено",
+  "connector.protonPass.statusExpired": "Ключ истёк",
+  "connector.protonPass.expiredTitle": "Срок ключа Proton Pass истёк",
+  "connector.protonPass.expiredDescription":
+    "Агенты не могут входить с общими учётными данными, пока вы не войдёте снова.",
+  "connector.protonPass.reconnect": "Переподключить",
+  "connector.protonPass.planTitle": "Для Proton Pass нужен план с Pass Plus",
+  "connector.protonPass.planDescription":
+    "Для Proton Pass CLI нужен план Proton, который включает Pass Plus. Другие платные планы, например Mail Plus, его не включают. Смените план и подключитесь снова.",
+  "connector.protonPass.vaultTitle": "Общее хранилище",
+  "connector.protonPass.vaultDescription":
+    "Агенты могут входить с учётными данными из этого хранилища. Переместите в него учётные данные, чтобы поделиться ими.",
+  "connector.protonPass.loginCount": {
+    one: "{count} логин",
+    few: "{count} логина",
+    many: "{count} логинов",
+    other: "{count} логина",
+  },
+  "connector.protonPass.loginsLoading": "Подсчёт учётных данных…",
+  "connector.protonPass.keyExpires": "Только чтение. Истекает {date}.",
+  "connector.protonPass.keyExpired": "Только чтение. Истёк {date}.",
+  "connector.protonPass.keyNoExpiry": "Только чтение. Бессрочно.",
+  "connector.protonPass.disconnectTitle": "Отключить Proton Pass",
+  "connector.protonPass.disconnectSummary":
+    "OpenBot удаляет свой ключ доступа на этом компьютере. Хранилище и его учётные данные остаются в вашем аккаунте Proton.",
+  "connector.protonPass.disconnectSummaryHost":
+    "OpenBot удаляет свой ключ доступа на {host}. Хранилище и его учётные данные остаются в вашем аккаунте Proton.",
+  "connector.protonPass.disconnect": "Отключить",
+  "connector.protonPass.actionFailed": "OpenBot не смог изменить подключение Proton Pass.",
 } as const satisfies PartialTranslation<typeof source>;

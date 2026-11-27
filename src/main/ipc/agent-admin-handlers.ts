@@ -1,19 +1,22 @@
-import type { Effect } from "effect";
-import type { RemoteWorkflowError } from "../remote-service-effects";
-// Access, auto-approve and skills of one agent, and adding an agent from the marketplace or a
-// shared template. On a joined server they belong to the host, so the request goes there, and the
-// host answers only an owner or admin.
-
 import {
   type AddedAgent,
   type AgentAdminSettings,
+  type AgentFastModeSettings,
+  agentFastModeSettings,
+  agentSpeed,
+  type BrowserComputerSharing,
   decodeAgentAdminSettings,
   decodeAgentBackupModelSettings,
   decodeAgentBrowserProfile,
+  decodeAgentBuiltinMemorySettings,
+  decodeAgentDefaultsOverview,
   decodeAgentPlanCardSettings,
-  decodeAgentTaskLimitSettings,
+  decodeAgentSpeedSettings,
+  decodeBrowserComputerSharing,
   decodeBrowserProfileList,
   decodeBrowserProfileSummary,
+  decodeBrowserProxyList,
+  decodeBrowserProxySummary,
   decodeHostAddedAgent,
   decodeHostAgentTemplatePreview,
   decodeHostAgentTemplatePublication,
@@ -23,21 +26,32 @@ import {
   parseBrowserProfileId,
   parseBrowserProfileName,
   parseClearBrowserDataInput,
+  parseDeleteBrowserProxyInput,
+  parseSaveBrowserProxyInput,
+  parseSetAgentDefaultChoiceInput,
+  parseSetBrowserProfileProxyInput,
   parseUpdateAgentAdminSettingsInput,
   parseUpdateAgentBackupModelsInput,
   parseUpdateAgentBrowserProfileInput,
+  parseUpdateAgentBuiltinMemoryInput,
+  parseUpdateAgentDefaultsInput,
   parseUpdateAgentFastModeInput,
   parseUpdateAgentHostSettingsInput,
   parseUpdateAgentNewChatInput,
   parseUpdateAgentPlanCardInput,
-  parseUpdateAgentTaskLimitInput,
   parseUpdateBrowserProfileInput,
+  type UpdateAgentFastModeInput,
 } from "@openbot/contracts/ipc";
 import { AGENT_ADMIN_CAPABILITY, AGENT_ADMIN_ROUTES } from "@openbot/contracts/team-protocol/agent-admin-v1";
 import {
   AGENT_BACKUP_MODELS_CAPABILITY,
   AGENT_BACKUP_MODELS_ROUTES,
 } from "@openbot/contracts/team-protocol/agent-backup-models-v1";
+import {
+  AGENT_BUILTIN_MEMORY_CAPABILITY,
+  AGENT_BUILTIN_MEMORY_ROUTES,
+} from "@openbot/contracts/team-protocol/agent-builtin-memory-v1";
+import { AGENT_DEFAULTS_CAPABILITY, AGENT_DEFAULTS_ROUTES } from "@openbot/contracts/team-protocol/agent-defaults-v1";
 import {
   AGENT_FAST_MODE_CAPABILITY,
   AGENT_FAST_MODE_ROUTES,
@@ -57,31 +71,37 @@ import {
   AGENT_PUBLISH_IMAGE_BYTES,
   AGENT_PUBLISH_ROUTES,
 } from "@openbot/contracts/team-protocol/agent-publish-v1";
-import {
-  AGENT_TASK_LIMIT_CAPABILITY,
-  AGENT_TASK_LIMIT_ROUTES,
-} from "@openbot/contracts/team-protocol/agent-task-limit-v1";
+import { AGENT_SPEED_CAPABILITY, AGENT_SPEED_ROUTES } from "@openbot/contracts/team-protocol/agent-speed-v1";
 import { AGENT_UPDATE_CAPABILITY, AGENT_UPDATE_ROUTES } from "@openbot/contracts/team-protocol/agent-update-v1";
 import {
   BROWSER_PROFILES_CAPABILITY,
   BROWSER_PROFILES_ROUTES,
 } from "@openbot/contracts/team-protocol/browser-profiles-v1";
+import {
+  BROWSER_PROXIES_CAPABILITY,
+  BROWSER_PROXIES_ROUTES,
+} from "@openbot/contracts/team-protocol/browser-proxies-v1";
 import type { TeamCurrentCapability } from "@openbot/contracts/team-protocol/current";
+import { GITHUB_SKILLS_CAPABILITY, GITHUB_SKILLS_ROUTES } from "@openbot/contracts/team-protocol/github-skills-v1";
 import { SKILLS_ADMIN_CAPABILITY, SKILLS_ADMIN_ROUTES } from "@openbot/contracts/team-protocol/skills-admin-v1";
 import { sourceText } from "@openbot/i18n/source";
+import type { Effect } from "effect";
 import { runCauseEffect } from "../../backend/effect-boundary";
 import type { AgentAdminSettingsService } from "../agent-admin-settings";
+import type { AgentDefaultsSettingsService } from "../agent-defaults-settings";
 import type { AgentHostSettingsService } from "../agent-host-settings";
 import type { AgentMarketplaceService } from "../agent-marketplace-service";
 import type { AgentTemplateService } from "../agent-template-service";
 import type { BrowserProfileService } from "../browser-profile-service";
 import {
   decodeAgentHostSettingsFromHost,
+  decodeGithubSkillSourceFromHost,
   decodeRemoteAgentFastModeSettings,
   decodeRemoteAgentNewChatSettings,
 } from "../remote-agent-decoding";
 import { acceptEmpty, type ResponseDecoder } from "../remote-host-decoding";
 import type { RemoteRequestInit } from "../remote-server-client";
+import type { RemoteWorkflowError } from "../remote-service-effects";
 import type { SkillMarketplaceService } from "../skill-marketplace-service";
 import { parseInstallAgentTemplate, parsePublishAgentTemplate } from "./agent-template-handlers";
 import {
@@ -96,6 +116,8 @@ import { requireString } from "./validation";
 
 interface AgentAdminRemoteServers {
   supportsCapability(serverId: string, capability: TeamCurrentCapability): boolean;
+  browserComputerSharing(serverId: string): BrowserComputerSharing | null;
+  setBrowserComputerSharing(serverId: string, sharing: boolean): Effect.Effect<void, RemoteWorkflowError>;
   request<T>(
     serverId: string,
     path: string,
@@ -107,8 +129,9 @@ interface AgentAdminRemoteServers {
 interface AgentAdminIpcDependencies {
   settings: AgentAdminSettingsService;
   hostSettings: AgentHostSettingsService;
+  defaultsSettings: AgentDefaultsSettingsService;
   browserProfiles: BrowserProfileService;
-  skills: Pick<SkillMarketplaceService, "listInstalled" | "install" | "uninstall" | "setEnabled">;
+  skills: Pick<SkillMarketplaceService, "listInstalled" | "install" | "uninstall" | "setEnabled" | "readGithub">;
   marketplaceAgents: Pick<AgentMarketplaceService, "install">;
   agentTemplates: Pick<AgentTemplateService, "install" | "preview" | "publish" | "unpublish">;
   remoteServers: AgentAdminRemoteServers;
@@ -123,6 +146,7 @@ function decodeRemoteInstalledSkill(value: unknown): InstalledSkill {
 export function agentAdminIpcHandlers({
   settings,
   hostSettings,
+  defaultsSettings,
   browserProfiles,
   skills,
   marketplaceAgents,
@@ -176,14 +200,6 @@ export function agentAdminIpcHandlers({
         local: (input) => runCauseEffect(hostSettings.updateBackupModels(input)),
         remote: (input, serverId) => remoteBackupModels(serverId, AGENT_BACKUP_MODELS_ROUTES.update, input),
       }),
-      getAgentTaskLimit: scopedHandler((value) => requireString(value, "agentId"), {
-        local: (agentId) => hostSettings.readTaskLimit(agentId),
-        remote: (agentId, serverId) => remoteTaskLimit(serverId, AGENT_TASK_LIMIT_ROUTES.settings, { agentId }),
-      }),
-      updateAgentTaskLimit: scopedHandler(parseUpdateAgentTaskLimitInput, {
-        local: (input) => runCauseEffect(hostSettings.updateTaskLimit(input)),
-        remote: (input, serverId) => remoteTaskLimit(serverId, AGENT_TASK_LIMIT_ROUTES.update, input),
-      }),
       getAgentNewChat: scopedHandler((value) => requireString(value, "agentId"), {
         local: (agentId) => hostSettings.readNewChat(agentId),
         remote: (agentId, serverId) => remoteNewChat(serverId, AGENT_NEW_CHAT_ROUTES.settings, { agentId }),
@@ -200,13 +216,21 @@ export function agentAdminIpcHandlers({
         local: (input) => runCauseEffect(hostSettings.updatePlanCard(input)),
         remote: (input, serverId) => remotePlanCard(serverId, AGENT_PLAN_CARD_ROUTES.update, input),
       }),
+      getAgentBuiltinMemory: scopedHandler((value) => requireString(value, "agentId"), {
+        local: (agentId) => hostSettings.readBuiltinMemory(agentId),
+        remote: (agentId, serverId) => remoteBuiltinMemory(serverId, AGENT_BUILTIN_MEMORY_ROUTES.settings, { agentId }),
+      }),
+      updateAgentBuiltinMemory: scopedHandler(parseUpdateAgentBuiltinMemoryInput, {
+        local: (input) => runCauseEffect(hostSettings.updateBuiltinMemory(input)),
+        remote: (input, serverId) => remoteBuiltinMemory(serverId, AGENT_BUILTIN_MEMORY_ROUTES.update, input),
+      }),
       getAgentFastMode: scopedHandler((value) => requireString(value, "agentId"), {
         local: (agentId) => hostSettings.readFastMode(agentId),
-        remote: (agentId, serverId) => remoteFastMode(serverId, AGENT_FAST_MODE_ROUTES.settings, { agentId }),
+        remote: (agentId, serverId) => remoteFastMode(serverId, { agentId }),
       }),
       updateAgentFastMode: scopedHandler(parseUpdateAgentFastModeInput, {
         local: (input) => runCauseEffect(hostSettings.updateFastMode(input)),
-        remote: (input, serverId) => remoteFastMode(serverId, AGENT_FAST_MODE_ROUTES.update, input),
+        remote: (input, serverId) => remoteFastMode(serverId, { agentId: input.agentId }, input),
       }),
       listBrowserProfiles: scopedQueryHandler({
         local: () => browserProfiles.list(),
@@ -242,9 +266,50 @@ export function agentAdminIpcHandlers({
         remote: (input, serverId) =>
           remoteBrowserProfiles(serverId, BROWSER_PROFILES_ROUTES.updateAgent, input, decodeAgentBrowserProfile),
       }),
+      getAgentDefaultsOverview: scopedQueryHandler({
+        local: () => defaultsSettings.read(),
+        remote: (serverId) => remoteAgentDefaults(serverId, AGENT_DEFAULTS_ROUTES.settings, {}),
+      }),
+      updateAgentDefaultsOverview: scopedHandler(parseUpdateAgentDefaultsInput, {
+        local: (input) => runCauseEffect(defaultsSettings.update(input)),
+        remote: (input, serverId) => remoteAgentDefaults(serverId, AGENT_DEFAULTS_ROUTES.update, input),
+      }),
+      setAgentDefaultChoice: scopedHandler(parseSetAgentDefaultChoiceInput, {
+        local: (input) => runCauseEffect(defaultsSettings.setChoice(input)),
+        remote: (input, serverId) => remoteAgentDefaults(serverId, AGENT_DEFAULTS_ROUTES.choice, input),
+      }),
+      listBrowserProxies: scopedQueryHandler({
+        local: () => browserProfiles.listProxies(),
+        remote: (serverId) =>
+          remoteServers.supportsCapability(serverId, BROWSER_PROXIES_CAPABILITY)
+            ? remoteBrowserProxies(serverId, BROWSER_PROXIES_ROUTES.list, {}, decodeBrowserProxyList)
+            : null,
+      }),
+      saveBrowserProxy: scopedHandler(parseSaveBrowserProxyInput, {
+        local: (input) => runCauseEffect(browserProfiles.saveProxy(input)),
+        remote: (input, serverId) =>
+          remoteBrowserProxies(serverId, BROWSER_PROXIES_ROUTES.save, input, decodeBrowserProxySummary),
+      }),
+      deleteBrowserProxy: scopedHandler(parseDeleteBrowserProxyInput, {
+        local: (input) => runCauseEffect(browserProfiles.deleteProxy(input)),
+        remote: (input, serverId) => remoteBrowserProxies(serverId, BROWSER_PROXIES_ROUTES.delete, input, acceptEmpty),
+      }),
+      setBrowserProfileProxy: scopedHandler(parseSetBrowserProfileProxyInput, {
+        local: (input) => runCauseEffect(browserProfiles.setProfileProxy(input)),
+        remote: (input, serverId) => remoteBrowserProxies(serverId, BROWSER_PROXIES_ROUTES.profile, input, acceptEmpty),
+      }),
+      getBrowserComputerSharing: scopedQueryHandler({
+        local: () => null,
+        remote: (serverId) => remoteServers.browserComputerSharing(serverId),
+      }),
+      setBrowserComputerSharing: scopedHandler(decodeBrowserComputerSharing, {
+        local: () => {
+          throw new Error(sourceText("error.team.agentSettingsUnsupported"));
+        },
+        remote: ({ sharing }, serverId) => runCauseEffect(remoteServers.setBrowserComputerSharing(serverId, sharing)),
+      }),
       listBrowserTabProfiles: scopedQueryHandler({
         local: () => browserProfiles.tabProfiles(),
-        // A host without the capability shows no label: its tabs are all in its one shared session.
         remote: (serverId) =>
           remoteServers.supportsCapability(serverId, BROWSER_PROFILES_CAPABILITY)
             ? remoteBrowserProfiles(serverId, BROWSER_PROFILES_ROUTES.tabs, {}, decodeHostBrowserTabProfiles)
@@ -277,10 +342,21 @@ export function agentAdminIpcHandlers({
         remote: (input, serverId) =>
           remoteSkills(serverId, SKILLS_ADMIN_ROUTES.setEnabled, input, decodeRemoteInstalledSkill),
       }),
+      readGithubSkills: scopedHandler((value) => requireString(value, "link", 2048), {
+        local: (link) => runCauseEffect(skills.readGithub(link)),
+        remote: (link, serverId) => {
+          if (!remoteServers.supportsCapability(serverId, GITHUB_SKILLS_CAPABILITY))
+            throw new Error(sourceText("error.skill.githubHostTooOld"));
+          return runCauseEffect(
+            remoteServers.request(serverId, GITHUB_SKILLS_ROUTES.read, decodeGithubSkillSourceFromHost, {
+              method: "POST",
+              body: { link },
+            }),
+          );
+        },
+      }),
       addMarketplaceAgent: scopedHandler(parseInstallMarketplaceAgent, {
         local: async (input) => addedAgent(await runCauseEffect(marketplaceAgents.install(input))),
-        // agent-install-v1 only adds a new agent, so an update goes to its own route: dropping the id
-        // would add a copy instead of updating.
         remote: (input, serverId) =>
           input.agentId === undefined
             ? remoteAdd(serverId, AGENT_INSTALL_ROUTES.marketplace, input)
@@ -297,8 +373,6 @@ export function agentAdminIpcHandlers({
       }),
       publishAgentTemplate: scopedHandler(parsePublishAgentTemplate, {
         local: (input) => runCauseEffect(agentTemplates.publish(input)),
-        // The host publishes with its own account. A card too large for the wire is left out, as the
-        // web client does.
         remote: ({ agentId, card }, serverId) =>
           remotePublish(
             serverId,
@@ -340,25 +414,36 @@ export function agentAdminIpcHandlers({
     );
   }
 
-  // A joined server has no browser profile routes yet.
   function remoteBrowserProfiles<A>(serverId: string, path: string, body: unknown, decode: ResponseDecoder<A>) {
     if (!remoteServers.supportsCapability(serverId, BROWSER_PROFILES_CAPABILITY))
       throw new Error(sourceText("error.team.agentSettingsUnsupported"));
     return runCauseEffect(remoteServers.request(serverId, path, decode, { method: "POST", body }));
   }
 
-  function remoteTaskLimit(serverId: string, path: string, body: unknown) {
-    if (!remoteServers.supportsCapability(serverId, AGENT_TASK_LIMIT_CAPABILITY))
+  function remoteBrowserProxies<A>(serverId: string, path: string, body: unknown, decode: ResponseDecoder<A>) {
+    if (!remoteServers.supportsCapability(serverId, BROWSER_PROXIES_CAPABILITY))
       throw new Error(sourceText("error.team.agentSettingsUnsupported"));
-    return runCauseEffect(
-      remoteServers.request(serverId, path, decodeAgentTaskLimitSettings, { method: "POST", body }),
-    );
+    return runCauseEffect(remoteServers.request(serverId, path, decode, { method: "POST", body }));
+  }
+
+  function remoteAgentDefaults(serverId: string, path: string, body: unknown) {
+    if (!remoteServers.supportsCapability(serverId, AGENT_DEFAULTS_CAPABILITY))
+      throw new Error(sourceText("error.team.agentSettingsUnsupported"));
+    return runCauseEffect(remoteServers.request(serverId, path, decodeAgentDefaultsOverview, { method: "POST", body }));
   }
 
   function remotePlanCard(serverId: string, path: string, body: unknown) {
     if (!remoteServers.supportsCapability(serverId, AGENT_PLAN_CARD_CAPABILITY))
       throw new Error(sourceText("error.team.agentSettingsUnsupported"));
     return runCauseEffect(remoteServers.request(serverId, path, decodeAgentPlanCardSettings, { method: "POST", body }));
+  }
+
+  function remoteBuiltinMemory(serverId: string, path: string, body: unknown) {
+    if (!remoteServers.supportsCapability(serverId, AGENT_BUILTIN_MEMORY_CAPABILITY))
+      throw new Error(sourceText("error.team.agentSettingsUnsupported"));
+    return runCauseEffect(
+      remoteServers.request(serverId, path, decodeAgentBuiltinMemorySettings, { method: "POST", body }),
+    );
   }
 
   function remoteNewChat(serverId: string, path: string, body: unknown) {
@@ -369,9 +454,24 @@ export function agentAdminIpcHandlers({
     );
   }
 
-  function remoteFastMode(serverId: string, path: string, body: unknown) {
+  async function remoteFastMode(
+    serverId: string,
+    { agentId }: { agentId: string },
+    update?: UpdateAgentFastModeInput,
+  ): Promise<AgentFastModeSettings> {
+    if (remoteServers.supportsCapability(serverId, AGENT_SPEED_CAPABILITY)) {
+      const path = update ? AGENT_SPEED_ROUTES.update : AGENT_SPEED_ROUTES.settings;
+      const body = update ? { agentId, speed: agentSpeed(update) } : { agentId };
+      const settings = await runCauseEffect(
+        remoteServers.request(serverId, path, decodeAgentSpeedSettings, { method: "POST", body }),
+      );
+      return agentFastModeSettings(settings);
+    }
     if (!remoteServers.supportsCapability(serverId, AGENT_FAST_MODE_CAPABILITY))
       throw new Error(sourceText("error.team.agentSettingsUnsupported"));
+    if (update?.ultrafast) throw new Error(sourceText("error.agent.settingsLocalOnly"));
+    const path = update ? AGENT_FAST_MODE_ROUTES.update : AGENT_FAST_MODE_ROUTES.settings;
+    const body = update ? { agentId, fastMode: update.fastMode } : { agentId };
     return runCauseEffect(
       remoteServers.request(serverId, path, decodeRemoteAgentFastModeSettings, { method: "POST", body }),
     );

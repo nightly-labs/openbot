@@ -1,52 +1,73 @@
 "use dom";
 
 import { isDynamicRecord, isString } from "@openbot/contracts/runtime-values";
+import { TEAM_WEB_CLIENT_PROTOCOL } from "@openbot/contracts/team-protocol/current";
 import { sourceText } from "@openbot/i18n/source";
 import {
   createRemoteTeamPeer,
   decodeRemoteTeamCommand,
   type RemoteTeamCommandResult,
+  type RemoteTeamEvent,
   type RemoteTeamPeerActions,
 } from "@openbot/team-client/remote-peer";
 import { createTeamRequestId } from "@openbot/team-client/request-id";
 import { type DOMImperativeFactory, useDOMImperativeHandle } from "expo/dom";
 import { type Ref, useEffect, useRef } from "react";
 import { type BrowserViewBridgeEvent, createBrowserViewBridge } from "@/features/browser/model/browser-view-bridge";
+import {
+  createRemoteDesktopRelay,
+  type RemoteDesktopRelayEvent,
+} from "@/features/remote-desktop/model/remote-desktop-relay";
 
 type BridgeJson = Parameters<DOMImperativeFactory[string]>[0];
 
-/** The native side's handle on this page. A command crosses as JSON and is read again here. */
 export type RemoteTeamBridgeHandle = {
   browserView: (command: BridgeJson) => void;
-  /**
-   * Team commands to run: each new one, and all outstanding ones again when the page says it is
-   * ready. A command whose ID the page has already had does not run again.
-   */
+  remoteDesktop: (command: BridgeJson) => void;
   teamCommands: (commands: BridgeJson) => void;
-  /**
-   * The foreground state, before the commands that follow it. The `active` prop arrives through a
-   * render, so a `connect` sent at a return to the app ran before it and failed as in the background.
-   */
   setActive: (active: BridgeJson) => void;
+  networkChanged: (value: BridgeJson) => void;
+  cancelUpload: (value: BridgeJson) => void;
 };
 
-interface RemoteTeamBridgeProps extends RemoteTeamPeerActions {
+interface RemoteTeamBridgeProps extends Omit<RemoteTeamPeerActions, "onTeamEvent"> {
   ref?: Ref<RemoteTeamBridgeHandle>;
   active: boolean;
+  onTeamEvents: (hostId: string, events: RemoteTeamEvent[]) => Promise<void>;
   onCommandResult: (result: RemoteTeamCommandResult) => Promise<void>;
-  /** The page can take commands. It calls this once per load, after its handle is registered. */
   onReady?: () => Promise<void>;
   onBrowserViewEvent?: (event: BrowserViewBridgeEvent) => Promise<void>;
+  onRemoteDesktopEvent?: (event: RemoteDesktopRelayEvent) => Promise<void>;
   dom?: import("expo/dom").DOMProps;
 }
 
-/**
- * How many command IDs the page keeps. The native side sends the outstanding commands again when the
- * page is ready, and its first commands can arrive before that, or finish before the repeat comes.
- */
 const KNOWN_COMMAND_LIMIT = 1_000;
+const TEAM_EVENT_BATCH_MS = 16;
 
-/** The host's own error text for a refused request, such as a view the host cannot open. */
+function createTeamEventBatch(
+  deliver: (hostId: string, events: RemoteTeamEvent[]) => Promise<void>,
+  failed: () => void,
+) {
+  let pending: { hostId: string; events: RemoteTeamEvent[] }[] = [];
+  let timer: ReturnType<typeof setTimeout> | null = null;
+  const flush = () => {
+    if (timer !== null) clearTimeout(timer);
+    timer = null;
+    const runs = pending;
+    pending = [];
+    for (const run of runs) void deliver(run.hostId, run.events).catch(failed);
+  };
+  return {
+    push(hostId: string, event: RemoteTeamEvent) {
+      const last = pending.at(-1);
+      if (last?.hostId === hostId) last.events.push(event);
+      else pending.push({ hostId, events: [event] });
+      timer ??= setTimeout(flush, TEAM_EVENT_BATCH_MS);
+    },
+    flush,
+  };
+}
+
 function requestError(body: unknown): string {
   return isDynamicRecord(body) && isString(body.error) && body.error
     ? body.error
@@ -59,22 +80,54 @@ export default function RemoteTeamBridge({
   onCommandResult,
   onReady,
   onBrowserViewEvent,
+  onRemoteDesktopEvent,
+  onTeamEvents,
   ...callbacks
 }: RemoteTeamBridgeProps) {
+  const teamEvents = useRef(onTeamEvents);
+  teamEvents.current = onTeamEvents;
+  const runtime = useRef<ReturnType<typeof createRemoteTeamPeer> | null>(null);
+  const eventBatch = useRef<ReturnType<typeof createTeamEventBatch> | null>(null);
+  eventBatch.current ??= createTeamEventBatch(
+    (hostId, events) => teamEvents.current(hostId, events),
+    () => runtime.current?.eventsFailed(),
+  );
+  const pendingEvents = eventBatch.current;
   const browserViewEvent = useRef(onBrowserViewEvent);
   browserViewEvent.current = onBrowserViewEvent;
+  const remoteDesktopEvent = useRef(onRemoteDesktopEvent);
+  remoteDesktopEvent.current = onRemoteDesktopEvent;
   const browserView = useRef<ReturnType<typeof createBrowserViewBridge> | null>(null);
-  const actions = useRef<RemoteTeamPeerActions>(callbacks);
+  const remoteDesktop = useRef<ReturnType<typeof createRemoteDesktopRelay> | null>(null);
+  const queueTeamEvent = async (hostId: string, event: RemoteTeamEvent) => pendingEvents.push(hostId, event);
+  const afterTeamEvents = <Args extends unknown[]>(callback: ((...args: Args) => Promise<void>) | undefined) =>
+    callback &&
+    (async (...args: Args) => {
+      pendingEvents.flush();
+      await callback(...args);
+    });
+  const actions = useRef<RemoteTeamPeerActions>({ ...callbacks, onTeamEvent: queueTeamEvent });
   actions.current = {
     ...callbacks,
-    onHostStreamData: (data) => browserView.current?.receive(data),
+    onTeamEvent: queueTeamEvent,
+    onUploadProgress: afterTeamEvents(callbacks.onUploadProgress),
+    onDownloadProgress: afterTeamEvents(callbacks.onDownloadProgress),
+    onAccountProfileChanged: afterTeamEvents(callbacks.onAccountProfileChanged),
+    onAccountServersChanged: afterTeamEvents(callbacks.onAccountServersChanged),
+    onHostStreamData: (data) => {
+      browserView.current?.receive(data);
+      remoteDesktop.current?.receive(data);
+    },
     onConnectionUpdate: async (update) => {
-      if (update.state !== "online") browserView.current?.disconnect(update.message);
+      pendingEvents.flush();
+      if (update.state !== "online") {
+        browserView.current?.disconnect(update.message);
+        remoteDesktop.current?.disconnect(update.message);
+      }
       await callbacks.onConnectionUpdate(update);
     },
   };
-  const runtime = useRef<ReturnType<typeof createRemoteTeamPeer> | null>(null);
-  if (!runtime.current) runtime.current = createRemoteTeamPeer(actions);
+  if (!runtime.current) runtime.current = createRemoteTeamPeer(actions, { clientProtocol: TEAM_WEB_CLIENT_PROTOCOL });
   const peer = runtime.current;
   if (!browserView.current)
     browserView.current = createBrowserViewBridge(
@@ -94,19 +147,27 @@ export default function RemoteTeamBridge({
       (event) => void browserViewEvent.current?.(event),
     );
   const views = browserView.current;
+  if (!remoteDesktop.current)
+    remoteDesktop.current = createRemoteDesktopRelay(
+      (data) => peer.sendHostStreamData(data),
+      (event) => void remoteDesktopEvent.current?.(event),
+    );
+  const desktopStreams = remoteDesktop.current;
   const commandResult = useRef(onCommandResult);
   commandResult.current = onCommandResult;
   const runCommands = useRef<((commands: unknown) => void) | null>(null);
   if (!runCommands.current) {
     const knownCommandIds = new Set<string>();
-    const answer = (result: RemoteTeamCommandResult) => void commandResult.current(result);
+    const answer = (result: RemoteTeamCommandResult) => {
+      pendingEvents.flush();
+      void commandResult.current(result);
+    };
     runCommands.current = (commands) => {
       if (!Array.isArray(commands)) return;
       for (const value of commands) {
         const { command, commandId } = decodeRemoteTeamCommand(value);
         if (commandId === null || knownCommandIds.has(commandId)) continue;
         knownCommandIds.add(commandId);
-        // A set keeps insertion order, so the first ID is the oldest.
         if (knownCommandIds.size > KNOWN_COMMAND_LIMIT)
           for (const oldest of knownCommandIds) {
             knownCommandIds.delete(oldest);
@@ -118,7 +179,6 @@ export default function RemoteTeamBridge({
     };
   }
   const teamCommands = runCommands.current;
-  // The handle and the first prop both send the state. A repeated state must not run a second return.
   const appliedActive = useRef<boolean | null>(null);
   const applyActive = useRef<((value: unknown) => void) | null>(null);
   if (!applyActive.current)
@@ -128,15 +188,24 @@ export default function RemoteTeamBridge({
       peer.setActive(value);
     };
   const setActive = applyActive.current;
+  const networkChanged = useRef(() => peer.networkMoved()).current;
+  const cancelUpload = useRef(() => {
+    void peer.cancelUpload().catch(() => undefined);
+  }).current;
 
   useDOMImperativeHandle<RemoteTeamBridgeHandle>(
     ref ?? null,
-    () => ({ browserView: views.command, teamCommands, setActive }),
-    [views, teamCommands, setActive],
+    () => ({
+      browserView: views.command,
+      remoteDesktop: desktopStreams.command,
+      teamCommands,
+      setActive,
+      networkChanged,
+      cancelUpload,
+    }),
+    [views, desktopStreams, teamCommands, setActive, networkChanged, cancelUpload],
   );
 
-  // After the handle effect above, so the native side knows the handle before it sends the commands.
-  // In Expo Go on Android `onReady` arrives with the second props; see expo-go-dom.ts.
   const readySent = useRef(false);
   useEffect(() => {
     if (!onReady || readySent.current) return;
@@ -144,13 +213,10 @@ export default function RemoteTeamBridge({
     void onReady();
   }, [onReady]);
 
-  // The first state of a page that loads. After it, the handle sends each state before its commands,
-  // and a prop render that arrives later carries an older state.
   useEffect(() => {
     if (appliedActive.current === null) setActive(active);
   }, [active, setActive]);
 
-  // The WebView has no network details, but it sends `online` when the phone gets a network again.
   useEffect(() => {
     const restore = () => peer.networkRestored();
     window.addEventListener("online", restore);
@@ -159,10 +225,12 @@ export default function RemoteTeamBridge({
 
   useEffect(
     () => () => {
+      pendingEvents.flush();
       browserView.current?.disconnect(null);
+      remoteDesktop.current?.disconnect(null);
       void peer.dispose();
     },
-    [peer],
+    [peer, pendingEvents],
   );
   return null;
 }

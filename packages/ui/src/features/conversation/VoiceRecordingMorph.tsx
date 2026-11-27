@@ -8,18 +8,21 @@ import { prefersReducedMotion } from "../../utils";
 
 export type VoicePhase = "idle" | "preparing" | "requesting" | "recording" | "transcribing";
 
-/** The bar counts down the time left in this many last seconds of a recording. */
 export const VOICE_LIMIT_COUNTDOWN_SECONDS = 15;
-/** This many seconds before the limit, the countdown turns orange and a warning plays. */
 export const VOICE_LIMIT_WARNING_SECONDS = 10;
 
-/** The catalog key of the voice button's accessible name. */
-export function voiceButtonLabel(phase: VoicePhase): AppTextKey {
+export function voiceButtonLabel(phase: VoicePhase, modelProgress: number | null): AppTextKey {
   if (phase === "recording") return "composer.voice.stop";
-  if (phase === "preparing") return "composer.voice.preparing";
+  if (phase === "preparing") return modelProgress === null ? "composer.voice.starting" : "composer.voice.preparing";
   if (phase === "requesting") return "composer.voice.requesting";
   if (phase === "transcribing") return "composer.voice.transcribing";
   return "composer.voice.start";
+}
+
+function enterSendsRecording(event: KeyboardEvent): boolean {
+  if (event.key !== "Enter" || event.defaultPrevented || event.isComposing || event.repeat) return false;
+  if (event.shiftKey || event.altKey || event.metaKey || event.ctrlKey) return false;
+  return event.target === document.body || event.target === document.documentElement;
 }
 
 function formatVoiceDuration(totalSeconds: number): string {
@@ -28,36 +31,60 @@ function formatVoiceDuration(totalSeconds: number): string {
   return `${minutes}:${seconds}`;
 }
 
-/**
- * The microphone and send controls, which melt into a recording bar while you speak: the
- * microphone stretches into a waveform with Cancel, and Finish buds off the send button.
- *
- * The shapes under the controls go through one SVG "goo" filter (blur, then a hard alpha
- * threshold), so two shapes that come close join with a liquid neck instead of overlapping.
- * The controls themselves are drawn on top without the filter, so their icons stay sharp.
- */
+function voiceLimit(elapsedSeconds: () => number) {
+  const remainingSeconds = () => Math.max(0, VOICE_AUDIO_LIMITS.maximumSeconds - elapsedSeconds());
+  return {
+    remainingSeconds,
+    countingDown: () => remainingSeconds() <= VOICE_LIMIT_COUNTDOWN_SECONDS,
+    warning: () => remainingSeconds() <= VOICE_LIMIT_WARNING_SECONDS,
+  };
+}
+
+function VoiceLimitNotice(props: { limit: ReturnType<typeof voiceLimit> }): JSX.Element {
+  const { t } = useText();
+  return (
+    <>
+      <Show when={props.limit.countingDown()}>
+        <span class="voice-recording-remaining" aria-hidden="true">
+          {formatVoiceDuration(props.limit.remainingSeconds())}
+        </span>
+      </Show>
+      <span class="sr-only" role="status">
+        {props.limit.warning() ? t("composer.voice.limitSoon", { seconds: VOICE_LIMIT_WARNING_SECONDS }) : ""}
+      </span>
+    </>
+  );
+}
+
 export function VoiceRecordingMorph(props: {
   recording: boolean;
-  /** Microphone loudness, 0 to 1, oldest first. */
   levels: readonly number[];
   elapsedSeconds: number;
   onCancel: () => void;
   onFinish: () => void;
-  /** The microphone control, shown when not recording. */
+  onSend: () => void;
   children: JSX.Element;
-  /** The send control. Finish buds off it. */
   send: JSX.Element;
 }): JSX.Element {
   const { t } = useText();
   const filterId = `voice-morph-goo-${createUniqueId()}`;
-  const remainingSeconds = () => Math.max(0, VOICE_AUDIO_LIMITS.maximumSeconds - props.elapsedSeconds);
-  const countingDown = () => remainingSeconds() <= VOICE_LIMIT_COUNTDOWN_SECONDS;
-  const warning = () => remainingSeconds() <= VOICE_LIMIT_WARNING_SECONDS;
+  const limit = voiceLimit(() => props.elapsedSeconds);
+  createEffect(
+    () => props.recording,
+    (recording) => {
+      if (!recording) return;
+      const sendOnEnter = (event: KeyboardEvent) => {
+        if (enterSendsRecording(event)) props.onSend();
+      };
+      document.addEventListener("keydown", sendOnEnter);
+      return () => document.removeEventListener("keydown", sendOnEnter);
+    },
+  );
   return (
     <div
       class="voice-morph"
       data-recording={props.recording ? "" : undefined}
-      data-countdown={props.recording && countingDown() ? "" : undefined}
+      data-countdown={props.recording && limit.countingDown() ? "" : undefined}
     >
       <svg class="voice-morph-filter" aria-hidden="true">
         <filter id={filterId} color-interpolation-filters="sRGB">
@@ -76,22 +103,14 @@ export function VoiceRecordingMorph(props: {
         <Show when={props.recording} fallback={props.children}>
           <fieldset
             class="voice-recording-status"
-            data-tone={warning() ? "warning" : undefined}
+            data-tone={limit.warning() ? "warning" : undefined}
             aria-label={t("composer.voice.recording")}
           >
             <VoiceWaveform levels={props.levels} />
             <time class="sr-only" datetime={`PT${props.elapsedSeconds}S`}>
               {formatVoiceDuration(props.elapsedSeconds)}
             </time>
-            <Show when={countingDown()}>
-              <span class="voice-recording-remaining" aria-hidden="true">
-                {formatVoiceDuration(remainingSeconds())}
-              </span>
-            </Show>
-            {/* Present from the start, so screen readers announce the text when it appears. */}
-            <span class="sr-only" role="status">
-              {warning() ? t("composer.voice.limitSoon", { seconds: VOICE_LIMIT_WARNING_SECONDS }) : ""}
-            </span>
+            <VoiceLimitNotice limit={limit} />
             <Button
               variant="ghost"
               type="button"
@@ -118,28 +137,22 @@ export function VoiceRecordingMorph(props: {
   );
 }
 
-/**
- * The dictation controls of a message box: the speech model progress while it is prepared, then the
- * microphone and the send control in one recording morph. The main chat and side threads share them.
- */
 export function ComposerVoiceControls(props: {
   phase: VoicePhase;
   levels: readonly number[];
   elapsedSeconds: number;
-  /** The download progress of the speech model, in percent, while it is prepared. */
   modelProgress: number | null;
-  /** The microphone cannot start a recording now. It is always disabled outside the idle phase. */
   blocked: boolean;
   onStart: () => void;
   onCancel: () => void;
   onFinish: () => void;
-  /** The send control. Finish buds off it. */
+  onSend: () => void;
   send: JSX.Element;
 }): JSX.Element {
   const { t } = useText();
   return (
     <>
-      <Show when={props.phase === "preparing"}>
+      <Show when={props.phase === "preparing" && props.modelProgress !== null}>
         <span class="voice-model-progress" role="status">
           {t("composer.voice.progress", { progress: props.modelProgress ?? 0 })}
         </span>
@@ -150,13 +163,14 @@ export function ComposerVoiceControls(props: {
         elapsedSeconds={props.elapsedSeconds}
         onCancel={() => props.onCancel()}
         onFinish={() => props.onFinish()}
+        onSend={() => props.onSend()}
         send={props.send}
       >
         <Button
           variant="ghost"
           type="button"
           class="dictation-button"
-          aria-label={t(voiceButtonLabel(props.phase))}
+          aria-label={t(voiceButtonLabel(props.phase, props.modelProgress))}
           disabled={props.blocked || props.phase !== "idle"}
           onClick={() => props.onStart()}
         >
@@ -169,11 +183,60 @@ export function ComposerVoiceControls(props: {
   );
 }
 
-/**
- * Each new level enters on the right and pushes the others one dot to the left. The dots keep their
- * places, so the track is moved back by one step and slides home over the time until the next level:
- * the waveform scrolls instead of jumping.
- */
+export function CoveredVoiceRecording(props: {
+  levels: readonly number[];
+  elapsedSeconds: number;
+  onCancel: () => void;
+  onFinish: () => void;
+}): JSX.Element {
+  const { t } = useText();
+  const limit = voiceLimit(() => props.elapsedSeconds);
+  return (
+    <section
+      class="covered-voice-recording"
+      data-tone={limit.warning() ? "warning" : undefined}
+      aria-label={t("composer.voice.recording")}
+    >
+      <Mic class="covered-voice-recording-icon" aria-hidden="true" />
+      <span class="covered-voice-recording-label">{t("composer.voice.recording")}</span>
+      <VoiceWaveform levels={props.levels} class="covered-voice-recording-waveform" />
+      <Show
+        when={limit.countingDown()}
+        fallback={
+          <time class="covered-voice-recording-time" datetime={`PT${props.elapsedSeconds}S`}>
+            {formatVoiceDuration(props.elapsedSeconds)}
+          </time>
+        }
+      >
+        <time class="sr-only" datetime={`PT${props.elapsedSeconds}S`}>
+          {formatVoiceDuration(props.elapsedSeconds)}
+        </time>
+      </Show>
+      <VoiceLimitNotice limit={limit} />
+      <Button
+        variant="ghost"
+        size="icon-sm"
+        type="button"
+        aria-label={t("composer.voice.cancel")}
+        title={t("composer.voice.cancel")}
+        onClick={() => props.onCancel()}
+      >
+        <X aria-hidden="true" />
+      </Button>
+      <Button
+        variant="ghost"
+        size="icon-sm"
+        type="button"
+        aria-label={t("composer.voice.stop")}
+        title={t("composer.voice.stop")}
+        onClick={() => props.onFinish()}
+      >
+        <Check aria-hidden="true" />
+      </Button>
+    </section>
+  );
+}
+
 export function VoiceWaveform(props: { levels: readonly number[]; class?: string }): JSX.Element {
   let track: HTMLSpanElement | undefined;
   let lastUpdate = 0;

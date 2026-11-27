@@ -45,7 +45,7 @@ Native ownership takes priority over HeroUI for navigation chrome. HeroUI owners
 - Do not replace native headers, tab bars, toolbars, or search bars with `GlassView`. `expo-glass-effect` is for deliberate custom content surfaces, not for rebuilding system chrome.
 - Preserve platform safe-area and scroll-edge behavior. Ordinary screens normally use automatic content inset adjustment. Native sheets use the shared `SheetScrollView` header handling described below; do not add a second automatic inset or screen-local spacer.
 - The home list is the fallback exception for a full screen: iOS 27 shows no native scroll edge effect under its header. Its native header is transparent on iOS and Android, the native top edge is hidden, and the screen draws the canvas `SheetScrollEdgeEffect` of the chat header under the native buttons
-(on iOS; Android draws the solid Material bar of the big header). Android pads the list by the header height, because it has no content inset.
+(on iOS; Android draws the bar header blur of the big header, and the solid Material bar before Android 12). Android pads the list by the header height, because it has no content inset.
 - Avoid forcing opaque colors or bespoke backgrounds onto native chrome unless the product requirement explicitly calls for it. Let the operating system adapt materials to the platform version, appearance, accessibility settings, and scroll state.
 - Treat older iOS versions and Android as first-class fallbacks. The interface must remain complete and readable when Liquid Glass is unavailable or reduced transparency is enabled.
 - Use platform-native icons in native navigation (`sf` on iOS and the corresponding Material icon on Android). Use the existing application icon convention for HeroUI content.
@@ -61,18 +61,20 @@ large title does not work under the custom scroll edge effect on iOS 27, and And
   34 pt bold title. On iOS a pull past the top grows it a little, as the native title does.
 - `LargeTitleBar` draws the scroll edge effect and the 17 pt small title. The small title fades in,
   4 pt up, in 200 ms when the text of the big title reaches the bottom of the bar.
-- Android uses Material 3, not an iOS copy: a 28 dp bold title (a medium top app bar), the surface
-  solid under the bar and a 32 dp fade below it, as the top fade of the design,
-  a 22 dp regular small title on the 72 dp line, and 48 dp icon buttons with a round ripple: a 40 dp glass circle on full screens, the plain icon in sheets.
-- Android has no Liquid Glass, and its blur does not work over a scroll view. The search field and the
-  bar buttons use `useChromeGlass()`: the solid glass of the design (`--openbot-bg-chrome-glass`, 94-96%
-  opaque), a hairline edge, a soft shadow and the top light of `ChromeGlassSheen`. The home search
-  field has a real blur on Android 12 and later: the home content is in a `BlurTargetView`, and the
-  field draws a `BlurView` of it (radius 24) under the lighter `--openbot-bg-chrome-blur` fill. While
-  the results are open, the field shows the solid glass over the blur, because the results are not in
-  the target. iOS without Liquid Glass keeps the solid capsule.
-  Stacks set `androidBackOptions` in `screenOptions`, so the back button of every inner page, in
-  sheets too, is the same round button and not the native arrow.
+- Android uses Material 3, not an iOS copy: a 28 dp bold title (a medium top app bar), the bar header
+  blur described below (the surface solid under the bar and a 32 dp fade below it before Android 12),
+  a 22 dp regular small title on the 72 dp line, and 48 dp icon buttons with a round ripple: a 40 dp filled circle on full screens, the plain icon in sheets.
+- Android has no Liquid Glass. The search fields and the bar buttons are plain: the opaque HeroUI
+  `default` fill (`--openbot-bg-control`) of the chat composer and its buttons, with no edge, shadow,
+  sheen or blur. `GlassCapsule` and `useChromeGlass()` give them that fill. iOS without Liquid Glass
+  keeps the solid `default` capsule with a soft shadow for the search fields, and the solid glass of
+  the design (`--openbot-bg-chrome-glass`) for the bar buttons.
+- Android 12 and later blur the content under the bar with `AndroidHeaderBlur`
+  (`src/shared/components/android-header-blur.tsx`): the scroll content is in an `AndroidBlurTarget`
+  on the surface color. The bar draws the usual Expo progressive blur: a `BlurView` of the target
+  (intensity 40) with the surface color at 80% over it, in a `MaskedView` whose eased gradient fades it out below the bar. A sheet bar reaches 28 dp
+  below the bar and is full over its top 45%; a full screen bar reaches 32 dp below and is full over
+  its top 68%, because its title sits lower. It needs no native change. `LargeTitleBar` takes the target as `blurTarget`.
 - `LargeTitleScrollView` puts grouped content under a big header on the sheet surface.
 
 The native header stays, transparent, with an empty title. It keeps the native Liquid Glass buttons on
@@ -89,6 +91,24 @@ takes focus, the results come in over the list (220 ms, opacity and 8 pt up; opa
 reduced motion), a close button comes in beside the field, and the drawer pan stops. Close, Android
 Back, or a result closes them in 160 ms. With no query the results show shortcuts and the agents of
 the server; a query shows the same sections as before, with `BlurSwap` between states.
+
+### Home chat rows
+
+Agent and channel rows on Home use `ChatRowHeading` (`features/agents/components/chat-row.tsx`):
+
+- The avatar is 60 pt (`CHAT_ROW_AVATAR_SIZE`) and a row is at least 68 pt high. A row has two lines: the name (17.5 pt semibold) and
+  the title (15.5 pt, muted) on the first line, the last message (15.5 pt) on the second.
+- The title gets the room that the name does not use. When less than 64 pt (scaled with the text
+  size) is left, the title goes to a hidden second line, so the name never gets shorter for it.
+- A pinned avatar is 70 pt (`PINNED_AVATAR_SIZE`) with the name below it and no title.
+- A section title has 30 pt above it and none below it, so it stays with its own rows. The first
+  section title has no space above it.
+- The unread badge does not grow above the size of a 54 pt avatar. Its edge is 1 pt inside the
+  avatar edge, and the gap ring around it is 3 pt.
+- On a pinned avatar, the ring around a badge or the unread dot is a hole cut out of the avatar
+  (`AvatarCutout`), so the backdrop shows through it. A row paints the ring with the row color,
+  because a row is opaque.
+- Home shows no server name. The drawer shows the servers.
 
 ### Marketplace search
 
@@ -288,17 +308,26 @@ Use `src/shared/components/sheet-scroll-view.tsx` as the root scroll container. 
 
 ### Palette, groups and text
 
-On iOS, sheet edges use `ProgressiveSheetBlur`: six weak native blur layers with separate,
-overlapping smooth masks. Each mask becomes transparent before the physical view edge.
+On iOS, sheet edges use `ProgressiveSheetBlur`: three native blur layers (two on an edge shorter
+than 40 pt) with separate, overlapping smooth masks. Each layer blurs the content again on each
+scroll frame, so do not add layers. Each mask becomes transparent before the physical view edge.
 The material follows the system theme. In dark mode a masked `bg-sheet` layer at 70% opacity
 covers it, because the dark material is lighter than the dark sheet. Render it
 following the scrolling content so the native blur samples that content. The masks are static;
 scrolling does not update React state. This approximates a variable blur radius using public
 Expo APIs, as described in [Beautiful Expo](https://github.com/davidmokos/beautiful-expo).
-Android sheets draw no edge blur. Below the opaque native header, or at the top of a sheet with no
-header, the content fades into a 32 dp masked `bg-sheet` layer. The fade follows the same rule as the
-iOS blur. A sticky custom header, such as search, uses the opaque `bg-sheet` color. Chat, home list
-and drawer edges keep their canvas effect.
+On Android 12 and later, a `SheetScrollView` under a native header replaces that header with
+`AndroidBlurHeader`, a custom Material 3 small top app bar (64 dp) over `AndroidHeaderBlur`. It sets
+the `header` option in a layout effect, and puts the native header back when it unmounts. The custom
+header draws the page's `headerLeft`, title and `headerRight`, so `androidBackOptions`,
+`AndroidHeaderButton` and `SheetSaveAction` keep working. The stack measures it, and the content
+clears exactly that height. A sheet header (`sheetHeaderInsetOptions`, see `isSheetHeader`) does not
+reach the status bar; a full screen adds it. A page without `SheetScrollView`, such as a scanner or a
+PIN page, keeps the opaque native header. A page that puts a `Stack.SearchBar` in the header (the
+audit log) sets `androidNativeHeader`, because the custom header cannot draw it. Before Android 12, and at the top of a sheet with no header, the
+content fades into a 32 dp masked `bg-sheet` layer below the opaque header.
+The fade follows the same rule as the iOS blur. A sticky custom header, such as search, uses the opaque `bg-sheet` color. Chat and drawer
+edges keep their canvas effect.
 
 The values belong to `packages/brand/src/tokens.css` and `tokens-native.css`; `global.css` only
 maps them to utilities. Do not copy these hex values into components.
@@ -378,6 +407,50 @@ respective media or identity roles. Do not replace these with foreground/backgro
 - Support light and dark appearance, dynamic type, reduced motion, reduced transparency, and sufficient contrast.
 - Favor composition and shared variants over copying styled JSX between screens.
 - Keep status and instructional copy evidence-based. Do not introduce badges, alerts, or lifecycle requirements that cannot be derived from the actual session, connectivity, or persistence implementation.
+
+### Appearance settings
+
+Settings › Appearance is a Studio: a live preview of a chat (`AppearancePreview`), then four tabs
+(`UsageSegments`): Theme (theme, text size, app icon), Colors (message color, bubble style, chat
+background), Backdrop (scene, strength, See-through bubbles) and Chat (reply details, routine
+collapse, full visuals). Each tab holds the sections of one topic, so the page stays short. The
+preview follows every setting, the text size too, so add a new appearance setting to a tab and to
+the preview when it changes how a chat looks. The preview and the tabs scroll with the page: a
+sticky header would stick under the native bar.
+
+### Backdrop
+
+The backdrop of Settings › Appearance (`features/settings/model/chat-backdrop.ts`) is the desktop
+window backdrop in the Ambient look: a quiet layer, not a wallpaper.
+
+- The built-in scenes come from `@openbot/brand/chat-backdrop-scenes`, the same painters as the
+  desktop. `ChatBackdropSceneView` draws them with Skia in 6 pt cells at about 15 frames each second.
+  A scene stops on a hidden screen (also under a sheet), in the background and with reduced motion.
+  A stop keeps the frame that shows, and the scene goes on from that time; a new screen goes on from
+  the last time too, so the scene never starts again.
+- `ChatBackdropLayer` draws the choice, then the base color of the scene over it by the Calm–Vivid
+  strength: most where the messages are in a chat. The base color replaces the chat background
+  color, as on the desktop, and Settings disables that color while a backdrop shows.
+- With a backdrop, Home shows the backdrop behind the big header and the pinned agents, and the
+  list is a card with a 28 pt rounded top and no shadow (`home-backdrop-card.tsx`). The backdrop is a
+  fixed layer under the clear list (`HomeBackdropBand`, down to the top of the card at rest), so the
+  scroll moves nothing in it. The title, the pinned agents and the card scroll together, with no
+  parallax: a layer that moves back by the scroll each frame jumps when React renders during the
+  scroll, such as when rows mount. Each row of the card is opaque. With no backdrop, Home keeps its
+  plain list. On Android the bar has no blur or solid surface over the backdrop at rest: it comes in with
+  the scroll while the big title fades out under the bar (`androidSurfaceWithTitle` of
+  `LargeTitleBar`), so the small title always reads over it. The mask of the blur follows the
+  scroll (`progress` of `AndroidHeaderBlur`), and the blur keeps its full strength: a lower strength
+  is grainy, a strength of 0 turns the blur off and flashes, and a fade of a parent snapped.
+- An agent page (`set_backdrop`) shows in a web view with no touches. A build without the web view
+  module does not offer it. The phone keeps the newest page of the open chat's agent, and deletes it
+  at sign-out and when its server goes.
+- Bubbles are solid by default: the see-through fill of a bubble with no color (the control fill at
+  60%) and of another member (their color at 22%) is mixed onto the chat background or the backdrop
+  base, so nothing shows through it and a chat with no backdrop looks as before. The card of a table
+  out of a bubble does the same (`useSolidChatFill` in `chat-bubble-fill.tsx`). The See-through
+  bubbles switch in the Backdrop section of Settings › Appearance brings back the translucent fill,
+  only while a backdrop shows; the Appearance preview shows it. Do not add glass to bubbles.
 
 ## Development workflow
 

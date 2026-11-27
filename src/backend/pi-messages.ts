@@ -1,7 +1,9 @@
 import { readFile } from "node:fs/promises";
 import { attachmentMimeTypeForName } from "@openbot/contracts/attachment-files";
+import { INPUT_LIMITS } from "@openbot/contracts/input-limits";
 import { isString } from "@openbot/contracts/runtime-values";
 import { Effect } from "effect";
+import { withoutTurnContext } from "./agent/developer-instructions";
 import { getArray, getString, isRecord, type ThreadItem } from "./protocol";
 import { providerCall, providerFailure } from "./provider-client-effects";
 
@@ -13,7 +15,13 @@ export function piText(content: unknown): string {
     .join("\n");
 }
 
-/** Converts the authoritative Pi message, never a cumulative streaming snapshot. */
+const PI_SHELL_TOOLS = new Set(["bash", "powershell"]);
+
+export function piShellCommand(tool: string | null, args: unknown): { command?: string } {
+  const command = tool !== null && PI_SHELL_TOOLS.has(tool) ? getString(args, "command") : null;
+  return command ? { command: command.slice(0, INPUT_LIMITS.messageText) } : {};
+}
+
 export function piMessageItems(message: unknown, id: string): ThreadItem[] {
   const role = getString(message, "role");
   if (role === "user")
@@ -21,7 +29,7 @@ export function piMessageItems(message: unknown, id: string): ThreadItem[] {
       {
         id,
         type: "userMessage",
-        content: [{ type: "text", text: piText(isRecord(message) ? message.content : null) }],
+        content: [{ type: "text", text: withoutTurnContext(piText(isRecord(message) ? message.content : null)) }],
       },
     ];
   if (role === "toolResult")
@@ -37,6 +45,9 @@ export function piMessageItems(message: unknown, id: string): ThreadItem[] {
   if (role !== "assistant") return [];
   const items: ThreadItem[] = [];
   const content = getArray(message, "content");
+  const step =
+    getString(message, "stopReason") === "toolUse" ||
+    content.some((block) => isRecord(block) && block.type === "toolCall");
   for (const [index, block] of content.entries()) {
     if (!isRecord(block)) continue;
     if (block.type === "text" && isString(block.text))
@@ -44,23 +55,26 @@ export function piMessageItems(message: unknown, id: string): ThreadItem[] {
         id: `${id}:text:${index}`,
         type: "agentMessage",
         text: block.text,
-        phase: getString(message, "stopReason") === "toolUse" ? "commentary" : "final_answer",
+        phase: step ? "commentary" : "final_answer",
       });
     if (block.type === "thinking" && isString(block.thinking))
       items.push({
         id: `${id}:thinking:${index}`,
         type: "reasoning",
         text: block.thinking,
-        summary: [{ type: "summary_text", text: block.thinking }],
+        summary: [block.thinking],
       });
-    if (block.type === "toolCall")
+    if (block.type === "toolCall") {
+      const tool = getString(block, "name");
       items.push({
         id: getString(block, "id") ?? `${id}:tool:${index}`,
         type: "dynamicToolCall",
-        tool: getString(block, "name"),
+        tool,
         arguments: block.arguments,
+        ...piShellCommand(tool, block.arguments),
         status: "inProgress",
       });
+    }
   }
   return items;
 }

@@ -6,10 +6,6 @@ import { createDigitRoll } from "../../digit-roll";
 import { useText } from "../../text";
 import { rendererDuration } from "../conversation/activity-timing";
 
-// `--panel-close-dur` is a calc() on the island itself, so it cannot be read off
-// the document root the way `rendererDuration` reads a token. Sum the two tokens
-// it is built from; keep this in step with `--panel-close-dur` in
-// account-update-island.css.
 function islandCloseDuration(): number {
   return rendererDuration("--openbot-duration-slow", 200) + rendererDuration("--openbot-duration-normal", 160);
 }
@@ -17,7 +13,8 @@ function islandCloseDuration(): number {
 interface AccountUpdateIslandProps {
   updateStatus: UpdateStatus;
   errorMessage?: string | null;
-  onUpdateAction: () => Promise<void>;
+  onUpdateAction: (button: HTMLButtonElement) => Promise<void>;
+  actionRef?: (button: HTMLButtonElement) => void;
 }
 
 interface UpdateProgressValueProps {
@@ -61,18 +58,18 @@ export function AccountUpdateIsland(props: AccountUpdateIslandProps) {
     return formatErrorMessage(message, t("account.update.failedRetry"));
   });
   const failed = createMemo(() => Boolean(props.errorMessage) || phase() === "error");
-  // The island is a single nowrap line that ellipsizes, so it can only carry a failure short enough
-  // to read at a glance. A failed check found no update, which leaves it nothing to offer beyond a
-  // sentence it would cut in half - that belongs in the Updates settings, where the text wraps. A failed
-  // download or install keeps the island: an update is in play and the action that retries it is here.
   const open = createMemo(
     () => isUpdateActivePhase(phase()) || (failed() && props.updateStatus.errorCode !== "check_failed"),
   );
   const downloading = createMemo(() => phase() === "downloading");
   const busy = createMemo(() => actionPending() || isUpdateBusyPhase(phase()));
-  // Host-managed tenants watch the status but never act on it.
   const managed = createMemo(() => props.updateStatus.managedByHost === true);
   const ready = createMemo(() => !failed() && (phase() === "ready" || phase() === "installing"));
+  const notInstalledMessage = createMemo(() =>
+    phase() === "ready" && !managed() && props.updateStatus.message?.trim()
+      ? formatErrorMessage(props.updateStatus.message, t("account.update.notInstalled"))
+      : undefined,
+  );
   const progress = createMemo(() => {
     const value = props.updateStatus.progress;
     return value === null ? null : Math.min(100, Math.max(0, Math.round(value)));
@@ -95,6 +92,8 @@ export function AccountUpdateIsland(props: AccountUpdateIslandProps) {
     if (downloading() && percent !== null) return t("account.update.downloadingLabel", { percent });
     if (phase() === "installing" || (actionPending() && ready())) return t("account.update.restartingLabel");
     if (failed()) return t("account.update.retryLabel", { reason: errorMessage() });
+    const notInstalled = notInstalledMessage();
+    if (notInstalled) return t("account.update.retryLabel", { reason: notInstalled });
     return ready() ? t("account.update.restartLabel") : t("account.update.downloadLabel");
   });
 
@@ -105,11 +104,6 @@ export function AccountUpdateIsland(props: AccountUpdateIslandProps) {
     },
   );
 
-  // Closed, the island is `opacity: 0` but still a composited layer carrying a
-  // 12px backdrop-filter and a spinner on an infinite `ui-spin`. That rotation
-  // invalidates the backdrop every frame, so an island nobody can see measured
-  // ~10% of a core, forever. Keep it out of the DOM instead, held only for as
-  // long as the slide-out needs it.
   const [present, setPresent] = createSignal(false);
   createEffect(
     () => open(),
@@ -129,11 +123,11 @@ export function AccountUpdateIsland(props: AccountUpdateIslandProps) {
     },
   );
 
-  async function runUpdateAction(): Promise<void> {
+  async function runUpdateAction(button: HTMLButtonElement): Promise<void> {
     if (!open() || busy() || managed()) return;
     setActionPending(true);
     try {
-      await props.onUpdateAction();
+      await props.onUpdateAction(button);
     } finally {
       setActionPending(false);
     }
@@ -157,8 +151,12 @@ export function AccountUpdateIsland(props: AccountUpdateIslandProps) {
           <strong data-text="available" aria-hidden={ready() || failed() ? "true" : undefined}>
             {t("account.update.available")}
           </strong>
-          <strong data-text="ready" aria-hidden={ready() && !failed() ? undefined : "true"}>
-            {t("account.update.ready")}
+          <strong
+            data-text="ready"
+            aria-hidden={ready() && !failed() ? undefined : "true"}
+            title={notInstalledMessage()}
+          >
+            {notInstalledMessage() ? t("account.update.notInstalled") : t("account.update.ready")}
           </strong>
           <strong data-text="error" aria-hidden={failed() ? undefined : "true"} title={errorMessage()}>
             {errorMessage()}
@@ -169,10 +167,13 @@ export function AccountUpdateIsland(props: AccountUpdateIslandProps) {
             type="button"
             size="xs"
             class="account-update-island__action"
+            ref={(element: HTMLButtonElement) => props.actionRef?.(element)}
             aria-label={accessibleActionLabel()}
             aria-busy={busy() ? "true" : undefined}
             disabled={!open() || busy() || managed()}
-            onClick={() => void runUpdateAction()}
+            onClick={(event: MouseEvent & { currentTarget: HTMLButtonElement }) =>
+              void runUpdateAction(event.currentTarget)
+            }
           >
             <span class="account-update-island__action-content">
               <span class="account-update-island__icon t-icon-swap" data-state={busy() ? "b" : "a"}>

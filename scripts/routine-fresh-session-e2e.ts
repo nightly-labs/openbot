@@ -1,16 +1,3 @@
-// Checks that each routine of an agent runs in its own side thread, and that each run starts its own
-// provider session, so that it does not send the whole chat context again. Runs the real agent
-// service on a temporary profile with a fake Codex app-server. The fake keeps the context of each
-// session: each request sends all of the session's earlier input again, as a model request does, and
-// reports that size as input tokens. The chat gets about 45,000 tokens of history, then a routine
-// runs twice. The check asserts that each run starts an ephemeral session and closes it, that its
-// request stays small, that both runs use one routine thread and their answers show there and not in
-// the chat, that the chat keeps its session, and that the chat turns read the answers. While the
-// second run is held, a chat message and a run of a second routine must finish: the lanes do not wait
-// for each other. The second routine opens a wait, which a routine thread can do as the chat can.
-// It also drives saved password and authenticator fills through the routine tool router, checks
-// the sign-in guidance, and checks that no secret reaches the provider.
-// `bun scripts/routine-fresh-session-e2e.ts`. Writes .openbot-build/routine-fresh-session-e2e/report.json.
 import assert from "node:assert/strict";
 import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { mkdtemp, rm, writeFile } from "node:fs/promises";
@@ -21,6 +8,8 @@ import {
   AGENT_PROVIDERS,
   type AgentEvent,
   type BrowserTab,
+  COMPUTER_USE_MCP_SERVER_ID,
+  COMPUTER_USE_MCP_SERVER_NAME,
   decodeUsageTokens,
   parseRoutineRunConversationEventItemType,
 } from "@openbot/contracts/ipc";
@@ -34,10 +23,8 @@ const userData = join(root, "user-data");
 const home = join(root, "home");
 const fakeCodex = join(root, "codex");
 const fakeLog = join(root, "codex.jsonl");
-/** While this file exists, the fake holds each turn of the first routine before its answer. */
 const fakeHold = join(root, "hold");
 
-// Before the service modules load: the Codex process and the stores read the home folder.
 process.env.HOME = home;
 process.env.CODEX_HOME = join(home, ".codex");
 process.env.OPENBOT_CODEX_PATH = fakeCodex;
@@ -49,23 +36,17 @@ const { runCauseEffect } = await import("../src/backend/effect-boundary");
 const { MailboxStore } = await import("../src/backend/mailbox-store");
 const { OpenBotDatabase } = await import("../src/backend/openbot-database");
 
-/** Tokens that each session holds before its first request: the instructions and the tools. */
 const BASE_TOKENS = 3_000;
-/** Each history message, in characters. Four of them make about 45,000 tokens. */
 const HISTORY_CHARACTERS = 45_000;
 const ROUTINE_INPUT_LIMIT = 10_000;
 const ROUTINE_MARK = "ROUTINE-CHECK";
 const SECOND_MARK = "ROUTINE-SECOND";
+const SUBAGENT_MARK = "SUBAGENT-RUN";
 const VAULT_ORIGIN = "https://routine.openbot.test";
 const VAULT_LOGIN = "routine-login";
 const PASSWORD = "fixture-routine-password";
 const CODE = "739182";
 
-/**
- * A Codex app-server with the methods that the service calls. It writes each `thread/start`,
- * `thread/resume`, `thread/unsubscribe` and `turn/start` to the log. A routine turn answers with a
- * numbered report; other turns answer "Done.".
- */
 const FAKE_CODEX = `#!/usr/bin/env node
 const { appendFileSync, existsSync } = require("node:fs");
 if (process.argv.includes("--version")) {
@@ -91,7 +72,6 @@ const callNext = (turn) => {
     namespace: "openbot", tool: call.tool, arguments: call.arguments,
   } });
 };
-/** threadId -> characters of all input so far, and the prompt and totals of the last request. */
 const context = new Map();
 process.stdout.on("error", (error) => {
   if (error.code === "EPIPE") process.exit(0);
@@ -112,7 +92,7 @@ const answer = (message) => {
     case "config/batchWrite": return write({ id: message.id, result: {} });
     case "thread/start": {
       const id = "thread-" + (++threads);
-      log({ method: "thread/start", threadId: id, ephemeral: params.ephemeral ?? null, persistSession: params.persistSession ?? null, instructions: params.developerInstructions });
+      log({ method: "thread/start", threadId: id, ephemeral: params.ephemeral ?? null, persistSession: params.persistSession ?? null, instructions: params.developerInstructions, mcpServers: Object.entries((params.config && params.config.mcp_servers) || {}).filter(([, server]) => server.enabled !== false).map(([name]) => name) });
       return write({ id: message.id, result: { thread: { id, turns: [] } } });
     }
     case "thread/resume":
@@ -121,6 +101,9 @@ const answer = (message) => {
     case "thread/unsubscribe":
       log({ method: "thread/unsubscribe", threadId: params.threadId });
       return write({ id: message.id, result: { status: "Unsubscribed" } });
+    case "thread/archive":
+      log({ method: "thread/archive", threadId: params.threadId });
+      return write({ id: message.id, result: {} });
     case "thread/turns/list":
     case "thread/items/list": return write({ id: message.id, result: { data: [], nextCursor: null } });
     case "thread/read": return write({ id: message.id, result: { thread: { id: params.threadId, turns: [] } } });
@@ -139,17 +122,23 @@ const answer = (message) => {
       const tokenUsage = { total: breakdown(state.input, state.cached, state.output), last: breakdown(prompt, cached, 100), modelContextWindow: 1000000 };
       write({ method: "thread/tokenUsage/updated", params: { threadId: params.threadId, turnId, tokenUsage } });
       const second = text.includes(${JSON.stringify(SECOND_MARK)});
+      const subagent = text.includes(${JSON.stringify(SUBAGENT_MARK)});
       const routine = !second && text.includes(${JSON.stringify(ROUTINE_MARK)});
       const reply = second ? "Second routine report: the docs are current." : routine ? "Routine report " + (++reports) + ": the build is green." : "Done.";
       const answerTurn = () => {
+        if (subagent) {
+          const spawn = { type: "collabAgentToolCall", id: "spawn-" + turnId, tool: "spawnAgent", status: "completed", senderThreadId: params.threadId, receiverThreadIds: ["child-" + turnId], prompt: "Check the logs", model: "gpt-6-luna", agentsStates: { ["child-" + turnId]: { status: "running", message: null } } };
+          write({ method: "item/completed", params: { threadId: params.threadId, turnId, item: spawn } });
+        }
         const item = { type: "agentMessage", id: "message-" + turnId, text: reply, phase: "final_answer" };
         write({ method: "item/completed", params: { threadId: params.threadId, turnId, item } });
         write({ method: "turn/completed", params: { threadId: params.threadId, turn: { id: turnId, status: "completed" } } });
       };
       const browserCall = (tool, args) => ({ tool: "tool_call", arguments: { name: "openbot_browser." + tool, arguments: args } });
-      const secret = (method) => browserCall("submit_secret", {
+      const secret = (method, withCode = false) => browserCall("submit_secret", {
         tabId: "routine-tab", loginId: ${JSON.stringify(VAULT_LOGIN)}, method, digits: 6,
-        targets: [{ kind: "css", selector: "#secret" }], submission: "click",
+        targets: [{ kind: "css", selector: "#secret" }, ...(withCode ? [{ kind: "css", selector: "#code" }] : [])],
+        submission: "click",
         submitTarget: { kind: "css", selector: "#submit" },
       });
       let held = false;
@@ -164,8 +153,8 @@ const answer = (message) => {
         browserCall("open", { url: ${JSON.stringify(VAULT_ORIGIN)} }),
         browserCall("list_logins", { tabId: "routine-tab" }),
         secret("password"), secret("authenticator"),
+        secret("password", true),
       ] : second ? [
-        // A routine thread keeps the tools of the agent's own chat, as a routine run in the chat had.
         { tool: "await_event", arguments: { note: "Report when the docs change." } },
       ] : [];
       callNext({ threadId: params.threadId, turnId, calls, finish });
@@ -211,6 +200,7 @@ interface LogEntry {
   prompt?: number;
   text?: string;
   instructions?: string;
+  mcpServers?: string[];
   tool?: string;
   result?: { success: boolean; contentItems: { type: string; text?: string }[] };
   error?: { message: string };
@@ -229,6 +219,8 @@ const report: {
   mainSession?: { before: string; after: string };
   threadStarts: Omit<LogEntry, "text">[];
   closedThreads: string[];
+  archivedThreads: string[];
+  subagentRunArchived?: boolean;
   turns: TurnReport[];
   routineAnswersInChat: string[];
   routineThreads: { routine: string; taskId: string; threadId: string; title: string; answers: string[] }[];
@@ -237,12 +229,14 @@ const report: {
   runMarkersInChat?: string[];
   waitInRoutineThread?: unknown[];
   digestInNextTurn?: { marker: boolean; answers: string[] };
+  chatRoutine?: { threads: number; answersInChat: number; runStatus: string };
   checks: { name: string; passed: boolean }[];
   passed: boolean;
   error?: string;
 } = {
   threadStarts: [],
   closedThreads: [],
+  archivedThreads: [],
   turns: [],
   routineAnswersInChat: [],
   routineThreads: [],
@@ -256,20 +250,33 @@ const fills: string[] = [];
 let takeoverRequests = 0;
 const browser: AgentBrowserHost = {
   listTabs: () => (tab ? [tab] : []),
+  toolCanUseTab: (params, tabId) =>
+    (tab ? [tab] : []).some(
+      (candidate) =>
+        candidate.id === tabId &&
+        candidate.ownerAgentId === params.ownerAgentId &&
+        candidate.ownerThreadId === params.threadId,
+    ),
   prepareSecret: (params) =>
     Effect.sync(() => {
       assert.equal(params.ownerAgentId, tab?.ownerAgentId);
       assert.equal(params.threadId, tab?.ownerThreadId);
-      const method = getString(getRecord(params, "arguments"), "method");
+      const args = getRecord(params, "arguments");
+      const method = getString(args, "method");
       assert.ok(method === "password" || method === "authenticator");
+      const targets = args?.targets;
+      const withCode = method === "password" && Array.isArray(targets) && targets.length > 1;
       return {
         request: { method, origin: VAULT_ORIGIN, digits: 6 },
         agentScriptedOrigin: false,
         vaultFillable: true,
-        submit: (value) =>
+        withCode,
+        submit: (value, vault, code) =>
           Effect.sync(() => {
             assert.equal(value, method === "password" ? PASSWORD : CODE);
-            fills.push(method);
+            assert.equal(vault, true);
+            assert.equal(code, withCode ? CODE : undefined);
+            fills.push(withCode ? "password+code" : method);
             return "submitted" as const;
           }),
         cancel: () => {},
@@ -300,9 +307,11 @@ const browser: AgentBrowserHost = {
   endControl: () => {},
   close: () => Effect.void,
   clearAgentSession: () => Effect.void,
+  shareTab: () => undefined,
+  unshareThread: () => undefined,
+  agentTab: () => null,
 };
 
-/** Waits for a state of the service, its database or the fake's log. */
 async function waitFor<T>(label: string, read: () => T | null | undefined | false, timeoutMs = 20_000): Promise<T> {
   const deadline = Date.now() + timeoutMs;
   for (;;) {
@@ -355,6 +364,19 @@ const agents = new AgentService({
     },
   },
   offProviders: AGENT_PROVIDERS.filter((provider) => provider !== "codex"),
+  computerUseMcpServer: () => ({
+    id: COMPUTER_USE_MCP_SERVER_ID,
+    name: COMPUTER_USE_MCP_SERVER_NAME,
+    transport: "stdio",
+    enabled: true,
+    command: fakeCodex,
+    args: [],
+    env: [],
+    envPassthrough: [],
+    workingDirectory: "",
+    url: "",
+    headers: [],
+  }),
 });
 agents.on("event", (event: AgentEvent) => {
   if (event.type === "browser-takeover-requested") takeoverRequests += 1;
@@ -366,7 +388,6 @@ const sqlite = () => {
 };
 const closeReader = () => connection?.close();
 
-/** The usage session and the input tokens that the records of one provider turn hold. */
 function usageOf(turnId: string): { sessionId: string; input: number } | null {
   const rows = sqlite()
     .prepare("SELECT session_id, tokens_json FROM agent_usage_records WHERE turn_id = ?")
@@ -411,7 +432,6 @@ async function send(agentId: string, text: string, label: string, timeoutMs?: nu
   await settled(deliveryId, label, timeoutMs);
 }
 
-/** The side thread of a routine, and the answers that its conversation shows. */
 function routineThread(agentId: string, routineId: string, mark: string) {
   const tasks = agents.listTasks(agentId).tasks.filter((task) => task.routineId === routineId);
   assert.equal(tasks.length, 1, `routine ${routineId}: ${tasks.length} threads`);
@@ -480,6 +500,7 @@ try {
     active: false,
     timezone: "UTC",
     schedule: { kind: "daily", time: "09:00" },
+    runIn: "thread",
   });
   const secondRoutine = agents.createRoutine({
     agentId: agent.id,
@@ -488,6 +509,7 @@ try {
     active: false,
     timezone: "UTC",
     schedule: { kind: "daily", time: "10:00" },
+    runIn: "thread",
   });
   const buildTurns = () =>
     fakeEntries().filter(
@@ -495,7 +517,6 @@ try {
     );
   const routineTurns: TurnReport[] = [];
   for (const run of [1, 2]) {
-    // The second run waits before its answer, until the chat and the second routine have finished.
     if (run === 2) await writeFile(fakeHold, "");
     const queued = await runCauseEffect(agents.testRoutine({ agentId: agent.id, routineId: routine.id }));
     assert.ok(queued.deliveryId, `routine run ${run}: no delivery`);
@@ -519,7 +540,7 @@ try {
     await settled(runDeliveryId, `routine run ${run}`);
     const entry = await waitFor(`routine run ${run} turn`, () => buildTurns().at(run - 1));
     await waitFor(`routine run ${run} session to close`, () =>
-      fakeEntries().some((item) => item.method === "thread/unsubscribe" && item.threadId === entry.threadId),
+      fakeEntries().some((item) => item.method === "thread/archive" && item.threadId === entry.threadId),
     );
     routineTurns.push(turnEntry(`routine run ${run}`, entry));
   }
@@ -534,7 +555,8 @@ try {
   report.closedThreads = entries
     .filter((entry) => entry.method === "thread/unsubscribe")
     .map((entry) => entry.threadId);
-  const routineStarts = report.threadStarts.filter((entry) => entry.ephemeral === true);
+  report.archivedThreads = entries.filter((entry) => entry.method === "thread/archive").map((entry) => entry.threadId);
+  const routineStarts = report.threadStarts.filter((entry) => entry.persistSession === false);
   const toolResults = entries.filter((entry) => entry.method === "tool-result");
   const results = toolResults.filter((entry) => entry.tool !== "await_event");
   const waitResults = toolResults.filter((entry) => entry.tool === "await_event");
@@ -548,11 +570,11 @@ try {
   );
   pass(
     "Routine Vault tool calls succeed",
-    results.length === 10 && results.every((entry) => entry.result?.success && !entry.error),
+    results.length === 12 && results.every((entry) => entry.result?.success && !entry.error),
   );
   pass(
-    "Each routine fills its saved password and authenticator code",
-    fills.join() === "password,authenticator,password,authenticator",
+    "Each routine fills its saved password and authenticator code, also together in one form",
+    fills.join() === "password,authenticator,password+code,password,authenticator,password+code",
   );
   const listed = results.filter((entry) => entry.tool === "openbot_browser.list_logins");
   pass(
@@ -572,10 +594,14 @@ try {
     "Secrets stay outside provider input and tool results",
     [PASSWORD, CODE].every((value) => !JSON.stringify(entries).includes(value)),
   );
+  const firstTurnText = (threadId: unknown) =>
+    entries.find((entry) => entry.method === "turn/start" && entry.threadId === threadId)?.text ?? "";
   const routineRule = "In a routine run, first check saved logins with openbot_browser.list_logins";
   pass(
     "Routine sessions receive the saved-login rule",
-    routineStarts.every((entry) => entry.instructions?.includes(routineRule)),
+    routineStarts.every(
+      (entry) => firstTurnText(entry.threadId).includes(routineRule) && !entry.instructions?.includes(routineRule),
+    ),
   );
   pass(
     "Discovered browser guidance reports only a sign-in that needs the user",
@@ -586,13 +612,21 @@ try {
   pass(
     "Routine guidance reports steps that need a person",
     routineStarts.every((entry) =>
-      entry.instructions?.includes("do not call request_takeover or submit_secret without loginId"),
+      firstTurnText(entry.threadId).includes("do not call request_takeover or submit_secret without loginId"),
     ),
   );
   pass("Each routine run starts one new session", routineStarts.length === 3);
   pass(
-    "Routine sessions are ephemeral and not saved",
-    routineStarts.every((entry) => entry.persistSession === false),
+    "Each routine run gets Computer Use",
+    routineStarts.every(
+      (entry) =>
+        entry.mcpServers?.includes(COMPUTER_USE_MCP_SERVER_NAME) &&
+        entry.instructions?.includes(`Use ${COMPUTER_USE_MCP_SERVER_NAME} for every GUI task`),
+    ),
+  );
+  pass(
+    "Codex saves each routine session, so that a subagent can fork it",
+    routineStarts.every((entry) => entry.ephemeral === false),
   );
   pass(
     "Each routine turn runs in its own session",
@@ -604,6 +638,10 @@ try {
   pass(
     "Each routine session closes after its run",
     routineTurns.every((turn) => report.closedThreads.includes(turn.threadId)),
+  );
+  pass(
+    "Each routine session leaves the Codex thread list after its run",
+    routineTurns.every((turn) => report.archivedThreads.includes(turn.threadId)),
   );
   pass(
     "The first routine request stays small",
@@ -632,7 +670,6 @@ try {
     .map((message) => message.text)
     .filter((text) => text.startsWith("Routine report") || text.startsWith("Second routine report"));
   pass("No routine answer shows in the chat", report.routineAnswersInChat.length === 0);
-  // A run in a routine thread still gets its status, its History row and its marker in the chat.
   const runStatuses = () =>
     [routine, secondRoutine].flatMap((item) =>
       agents.listRoutineRuns({ agentId: agent.id, routineId: item.id }).map((run) => run.status),
@@ -682,7 +719,60 @@ try {
   pass(
     "The chat did not resume or restart its session",
     !fakeEntries().some((entry) => entry.method === "thread/resume") &&
-      report.threadStarts.filter((entry) => entry.ephemeral !== true).length === 1,
+      report.threadStarts.filter((entry) => entry.persistSession !== false).length === 1,
+  );
+
+  const subagentRoutine = agents.createRoutine({
+    agentId: agent.id,
+    name: "Subagent check",
+    instruction: `${SUBAGENT_MARK}: start a subagent and report.`,
+    active: false,
+    timezone: "UTC",
+    schedule: { kind: "daily", time: "12:00" },
+    runIn: "thread",
+  });
+  const subagentRun = await runCauseEffect(agents.testRoutine({ agentId: agent.id, routineId: subagentRoutine.id }));
+  assert.ok(subagentRun.deliveryId, "subagent routine: no delivery");
+  await settled(subagentRun.deliveryId, "subagent routine run");
+  const subagentTurn = await waitFor("the subagent routine turn", () =>
+    fakeEntries().find((item) => item.method === "turn/start" && item.text?.includes(SUBAGENT_MARK)),
+  );
+  await waitFor("the subagent routine session to close", () =>
+    fakeEntries().some((item) => item.method === "thread/unsubscribe" && item.threadId === subagentTurn.threadId),
+  );
+
+  const chatRoutine = agents.createRoutine({
+    agentId: agent.id,
+    name: "Chat check",
+    instruction: "Check the chat and report.",
+    active: false,
+    timezone: "UTC",
+    schedule: { kind: "daily", time: "11:00" },
+  });
+  const chatRun = await runCauseEffect(agents.testRoutine({ agentId: agent.id, routineId: chatRoutine.id }));
+  assert.ok(chatRun.deliveryId, "chat routine: no delivery");
+  const chatRunDeliveryId = chatRun.deliveryId;
+  await settled(chatRunDeliveryId, "chat routine run");
+  const chatRunStatus = await waitFor("the chat routine run to end", () => {
+    const status = agents.listRoutineRuns({ agentId: agent.id, routineId: chatRoutine.id })[0]?.status;
+    return status && status !== "running" && status !== "queued" ? status : null;
+  });
+  const chatRunTurnId = mailbox.getDelivery(chatRunDeliveryId)?.delivery.turnId;
+  report.chatRoutine = {
+    threads: agents.listTasks(agent.id).tasks.filter((task) => task.routineId === chatRoutine.id).length,
+    answersInChat: (await runCauseEffect(agents.readConversation(agent.id))).messages.filter(
+      (message) =>
+        chatRunTurnId !== undefined && message.turnId === chatRunTurnId && message.itemType === "final_answer",
+    ).length,
+    runStatus: chatRunStatus,
+  };
+  report.subagentRunArchived = fakeEntries().some(
+    (item) => item.method === "thread/archive" && item.threadId === subagentTurn.threadId,
+  );
+  pass("A routine session whose subagent still works is not archived", !report.subagentRunArchived);
+  pass(
+    "A routine with no run place answers in the chat and gets no thread",
+    report.chatRoutine.threads === 0 && report.chatRoutine.answersInChat === 1 && chatRunStatus === "succeeded",
   );
   report.passed = true;
 } catch (error) {

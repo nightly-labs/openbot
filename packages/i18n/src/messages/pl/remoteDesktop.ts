@@ -73,4 +73,14 @@ export const messages = {
   "remoteDesktop.setup.seeDesktop": "Widzę swój pulpit",
   "remoteDesktop.setup.seeTestPanel": "Widzę panel testowy",
   "remoteDesktop.setup.finishTest": "Zakończ test",
+  "remoteDesktop.host.questionTitle": "{name} chce sterować tym komputerem",
+  "remoteDesktop.host.questionDetail":
+    "{name} zobaczy twój ekran i uzyska dostęp do myszy i klawiatury. Jeśli nie odpowiesz w ciągu 30 sekund, OpenBot odrzuci prośbę.",
+  "remoteDesktop.host.allow": "Zezwól",
+  "remoteDesktop.host.deny": "Odrzuć",
+  "remoteDesktop.host.startedTitle": "Rozpoczęto zdalne sterowanie",
+  "remoteDesktop.host.startedBody": "{name} steruje teraz tym komputerem.",
+  "remoteDesktop.host.trayTooltip": "OpenBot: zdalne sterowanie jest włączone",
+  "remoteDesktop.host.trayControlledBy": "{name} steruje tym komputerem",
+  "remoteDesktop.host.stopAll": "Zatrzymaj całe zdalne sterowanie",
 } as const satisfies PartialTranslation<typeof source>;

@@ -1,11 +1,13 @@
-import type { SpeechVoice } from "@openbot/contracts/ipc";
-import type { MobileTranslate } from "@openbot/i18n/mobile";
+import { type CodexLiveVoice, cloudSpeechModel, SPEECH_SPEEDS, type SpeechVoice } from "@openbot/contracts/ipc";
+import { shortVoiceServerModel, voiceServerHost } from "@openbot/contracts/voice-server";
+import type { MobileTextKey, MobileTranslate } from "@openbot/i18n/mobile";
+import { isRunningInExpoGo } from "expo";
 import { router } from "expo-router";
 import { Button, Typography } from "heroui-native";
 import Check from "lucide-react-native/icons/check";
 import { useEffect, useRef, useState } from "react";
-import { Alert } from "react-native";
-import { useCSSVariable } from "uniwind";
+import { Alert, View } from "react-native";
+import { useCSSVariable, useUniwind } from "uniwind";
 import { UsageSegments } from "@/features/agents/components/usage-segments";
 import { modelCaptureAvailable } from "@/features/chat/components/use-model-dictation";
 import {
@@ -14,20 +16,40 @@ import {
   SettingsRow,
   SettingsSection,
 } from "@/features/settings/components/settings-content";
+import { SettingsSwitch } from "@/features/settings/components/settings-controls";
 import { haptics } from "@/shared/lib/haptics";
 import { currentText, useText } from "@/shared/lib/text";
 import { DictationLanguageSection } from "../components/dictation-language-section";
+import { GptLiveServerRows } from "../components/gpt-live-servers";
+import { PauseSlider } from "../components/pause-slider";
 import { useVoicePreview } from "../components/use-voice-preview";
 import { elevenLabsVoiceParts } from "../model/elevenlabs";
 import { clearElevenLabsVoices, loadElevenLabsVoices, useElevenLabsVoices } from "../model/elevenlabs-voices";
+import { liveVoiceWebRtc } from "../model/live-voice-webrtc";
 import type { ModelDownload, ModelState } from "../model/model-download";
-import { parakeetModel, parakeetSupported, useParakeetModel } from "../model/parakeet-model";
+import {
+  checkRecognitionModels,
+  isLocalRecognition,
+  type LocalRecognition,
+  localModelOf,
+  localRecognitionInBinary,
+  localRecognitionSupported,
+  useParakeetModel,
+  useParakeetUnifiedModel,
+  useQwenModel,
+} from "../model/recognition-models";
+import { canChangeReplySpeed } from "../model/reply-voice";
 import { speechNative } from "../model/speech-native";
 import { supertonicModel, useSupertonicModel } from "../model/supertonic-model";
+import { useVoiceServer } from "../model/voice-server";
 import {
+  ELEVENLABS_SPEECH_MODEL_IDS,
+  type ElevenLabsSpeechModelId,
   type RecognitionEngine,
   removeElevenLabsKey,
   saveVoiceSettings,
+  TURN_PAUSE_LIMITS,
+  turnPauseMs,
   useVoiceSettings,
   type VoiceEngine,
 } from "../model/voice-settings";
@@ -39,7 +61,12 @@ export function supertonicVoiceLabel(voice: SpeechVoice, t: MobileTranslate): st
     : t("mobile.settings.voice.supertonic.male", { number });
 }
 
-/** A model that downloads or failed to: its progress or its failure. Null when it is ready or missing. */
+export function gptLiveVoiceLabel(voice: CodexLiveVoice | null, t: MobileTranslate): string {
+  return voice ? voice.charAt(0).toUpperCase() + voice.slice(1) : t("mobile.settings.voice.gptLive.automatic");
+}
+
+const layoutPreview = __DEV__ && isRunningInExpoGo();
+
 function downloadStatus(model: ModelState, t: MobileTranslate, percent: (value: number) => string): string | null {
   if (model.phase === "downloading")
     return t("mobile.settings.voice.supertonic.downloading", { percent: percent(model.progress) });
@@ -52,7 +79,6 @@ function downloadStatus(model: ModelState, t: MobileTranslate, percent: (value: 
   return null;
 }
 
-/** What Supertonic 3 can do now, for its row in the choice of voice. */
 function useSupertonicStatus(): string {
   const { t, format } = useText();
   const model = useSupertonicModel();
@@ -65,33 +91,87 @@ function useSupertonicStatus(): string {
   );
 }
 
-/** The check mark of the chosen row, in the accent colour, as in the other settings lists. */
-function useCheckMark() {
+export function ChoiceRow({
+  checked,
+  disabled,
+  supportingText,
+  label,
+  onPress,
+}: {
+  checked: boolean;
+  disabled?: boolean;
+  supportingText?: string;
+  label: string;
+  onPress: () => void;
+}) {
   const accent = String(useCSSVariable("--openbot-accent"));
-  return (checked: boolean) => (checked ? <Check size={18} color={accent} strokeWidth={2} /> : null);
+  return (
+    <SettingsRow
+      checked={checked}
+      disclosure={false}
+      disabled={disabled}
+      supportingText={supportingText}
+      trailing={checked ? <Check size={18} color={accent} strokeWidth={2} /> : null}
+      onPress={onPress}
+    >
+      <Typography.Paragraph>{label}</Typography.Paragraph>
+    </SettingsRow>
+  );
 }
 
-/**
- * The choice of what recognizes the user's speech, in a voice conversation and in dictation. The
- * checked row is the choice; Parakeet listens once its model is downloaded, and the phone's
- * recognizer listens until then.
- */
-function RecognitionSection({ onError }: { onError: (message: string) => void }) {
+const LOCAL_RECOGNITION_TEXT = {
+  parakeet: {
+    name: "mobile.settings.voice.recognition.parakeet",
+    ready: "mobile.settings.voice.recognition.parakeetReady",
+    footer: "mobile.settings.voice.recognition.parakeetFooter",
+  },
+  "parakeet-unified": {
+    name: "mobile.settings.voice.recognition.parakeetUnified",
+    ready: "mobile.settings.voice.recognition.parakeetUnifiedReady",
+    footer: "mobile.settings.voice.recognition.parakeetUnifiedFooter",
+  },
+  "qwen3-asr": {
+    name: "mobile.settings.voice.recognition.qwen",
+    ready: "mobile.settings.voice.recognition.qwenReady",
+    footer: "mobile.settings.voice.recognition.qwenFooter",
+  },
+} as const satisfies Record<LocalRecognition, Record<"name" | "ready" | "footer", MobileTextKey>>;
+
+function useLocalModelStatus(engine: LocalRecognition): string {
   const { t, format } = useText();
+  const models = {
+    parakeet: useParakeetModel(),
+    "parakeet-unified": useParakeetUnifiedModel(),
+    "qwen3-asr": useQwenModel(),
+  };
+  const model = models[engine];
+  if (!localRecognitionSupported(engine)) return t("mobile.settings.voice.recognition.parakeetUnsupported");
+  if (model.phase === "ready") return t(LOCAL_RECOGNITION_TEXT[engine].ready);
+  return (
+    downloadStatus(model, t, format.percent) ??
+    t("mobile.settings.voice.engine.supertonicMissing", { size: format.fileSize(localModelOf(engine).bytes) })
+  );
+}
+
+function RecognitionSection({ onError }: { onError: (message: string) => void }) {
+  const { t } = useText();
   const settings = useVoiceSettings();
-  const model = useParakeetModel();
-  const mark = useCheckMark();
-  const supported = parakeetSupported();
-  const parakeetStatus = !supported
-    ? t("mobile.settings.voice.recognition.parakeetUnsupported")
-    : model.phase === "ready"
-      ? t("mobile.settings.voice.recognition.parakeetReady")
-      : (downloadStatus(model, t, format.percent) ??
-        t("mobile.settings.voice.engine.supertonicMissing", { size: format.fileSize(parakeetModel.bytes) }));
+  const statuses = {
+    parakeet: useLocalModelStatus("parakeet"),
+    "parakeet-unified": useLocalModelStatus("parakeet-unified"),
+    "qwen3-asr": useLocalModelStatus("qwen3-asr"),
+  };
+  const localEngines = (["parakeet", "parakeet-unified", "qwen3-asr"] as const).filter(
+    (engine) => localRecognitionInBinary(engine) || layoutPreview,
+  );
+  const server = useVoiceServer((state) => state.server);
   const choose = (recognition: RecognitionEngine) => {
-    // ElevenLabs needs a key first; the key page makes it the recognizer when the key is saved.
     if (recognition === "elevenlabs" && !settings.hasElevenLabsKey) {
       router.push({ pathname: "/settings/elevenlabs-key", params: { use: "recognition" } });
+      return;
+    }
+    if (recognition === "voice-server" && !server?.routes.dictation) {
+      router.push("/settings/voice-server");
       return;
     }
     if (recognition === settings.recognition) return;
@@ -103,45 +183,74 @@ function RecognitionSection({ onError }: { onError: (message: string) => void })
       title={t("mobile.settings.voice.recognition.title")}
       footer={t("mobile.settings.voice.recognition.footer")}
     >
-      <SettingsRow
+      <ChoiceRow
         checked={settings.recognition === "system"}
-        disclosure={false}
         disabled={!settings.ready}
         supportingText={t("mobile.settings.voice.recognition.systemHint")}
-        trailing={mark(settings.recognition === "system")}
+        label={t("mobile.settings.voice.recognition.system")}
         onPress={() => choose("system")}
-      >
-        <Typography.Paragraph>{t("mobile.settings.voice.recognition.system")}</Typography.Paragraph>
-      </SettingsRow>
-      <SettingsRow
-        checked={settings.recognition === "parakeet"}
-        disclosure={false}
-        disabled={!settings.ready || !supported}
-        supportingText={parakeetStatus}
-        trailing={mark(settings.recognition === "parakeet")}
-        onPress={() => choose("parakeet")}
-      >
-        <Typography.Paragraph>{t("mobile.settings.voice.recognition.parakeet")}</Typography.Paragraph>
-      </SettingsRow>
-      <SettingsRow
+      />
+      {localEngines.map((engine) => (
+        <ChoiceRow
+          key={engine}
+          checked={settings.recognition === engine}
+          disabled={!settings.ready || (!localRecognitionSupported(engine) && !layoutPreview)}
+          supportingText={statuses[engine]}
+          label={t(LOCAL_RECOGNITION_TEXT[engine].name)}
+          onPress={() => choose(engine)}
+        />
+      ))}
+      <ChoiceRow
         checked={settings.recognition === "elevenlabs"}
-        disclosure={false}
         disabled={!settings.ready}
         supportingText={t(
           settings.hasElevenLabsKey
             ? "mobile.settings.voice.recognition.elevenLabsHint"
             : "mobile.settings.voice.engine.elevenLabsNoKey",
         )}
-        trailing={mark(settings.recognition === "elevenlabs")}
+        label={t("mobile.settings.voice.recognition.elevenLabs")}
         onPress={() => choose("elevenlabs")}
-      >
-        <Typography.Paragraph>{t("mobile.settings.voice.recognition.elevenLabs")}</Typography.Paragraph>
-      </SettingsRow>
+      />
+      <ChoiceRow
+        checked={settings.recognition === "voice-server"}
+        disabled={!settings.ready}
+        supportingText={
+          server?.routes.dictation
+            ? t("mobile.settings.voice.server.dictationReady", {
+                model: shortVoiceServerModel(server.routes.transcriptionModel),
+              })
+            : t("mobile.settings.voice.server.dictationOff")
+        }
+        label={t("mobile.settings.voice.server.choice")}
+        onPress={() => choose("voice-server")}
+      />
     </SettingsSection>
   );
 }
 
-/** The download, cancel and removal of one model, with its size and progress. */
+function VoiceServerSection({ preview }: { preview?: ReturnType<typeof useVoicePreview> }) {
+  const { t } = useText();
+  const server = useVoiceServer((state) => state.server);
+  const voice = server?.routes.speech ? server.routes.voice : null;
+  return (
+    <SettingsSection title={t("mobile.settings.voice.server.title")} footer={t("mobile.settings.voice.server.footer")}>
+      <SettingsRow
+        supportingText={server ? voiceServerHost(server.address) : t("mobile.settings.voice.server.notSetUp")}
+        onPress={() => router.push("/settings/voice-server")}
+      >
+        <Typography.Paragraph>{t("mobile.settings.voice.server.row")}</Typography.Paragraph>
+      </SettingsRow>
+      {preview && voice ? (
+        <ListenRow
+          enabled
+          playing={preview.playing === "settings"}
+          onPress={() => preview.toggle("settings", { engine: "voice-server", voice })}
+        />
+      ) : null}
+    </SettingsSection>
+  );
+}
+
 function ModelRow({
   model,
   label,
@@ -154,7 +263,6 @@ function ModelRow({
   label: string;
   removeTitle: string;
   removeBody: string;
-  /** Runs before the files go, such as to stop a sample that plays. */
   onRemove?: () => void;
   onError: (message: string) => void;
 }) {
@@ -203,16 +311,87 @@ function ModelRow({
   );
 }
 
-/** Parakeet's model, below the choice of recognizer while Parakeet is chosen. */
-function ParakeetSection({ onError }: { onError: (message: string) => void }) {
+function TurnPauseSection({ onError }: { onError: (message: string) => void }) {
+  const { t, format } = useText();
+  const ready = useVoiceSettings((state) => state.ready);
+  const saved = useVoiceSettings((state) => state.turnPauseMs);
+  const [dragged, setDragged] = useState<number | null>(null);
+  const shown = dragged ?? saved;
+  const lastStep = useRef(shown);
+  const seconds = (milliseconds: number) =>
+    t("mobile.settings.voice.pause.seconds", { seconds: format.number(milliseconds / 1_000) });
+  return (
+    <SettingsSection title={t("mobile.settings.voice.pause.title")} footer={t("mobile.settings.voice.pause.footer")}>
+      <View className="gap-3 px-4 py-3">
+        <View className="flex-row items-center justify-between">
+          <Typography.Paragraph>{t("mobile.settings.voice.pause.label")}</Typography.Paragraph>
+          <Typography.Paragraph className="text-grouped-secondary">{seconds(shown)}</Typography.Paragraph>
+        </View>
+        <PauseSlider
+          value={shown}
+          minimum={TURN_PAUSE_LIMITS.minimum}
+          maximum={TURN_PAUSE_LIMITS.maximum}
+          step={TURN_PAUSE_LIMITS.step}
+          disabled={!ready}
+          label={t("mobile.settings.voice.pause.label")}
+          onChange={(value) => {
+            const next = turnPauseMs(value);
+            if (next === lastStep.current) return;
+            lastStep.current = next;
+            void haptics.selection();
+            setDragged(next);
+          }}
+          onChangeEnd={(value) => {
+            const next = turnPauseMs(value);
+            lastStep.current = next;
+            setDragged(null);
+            if (next === saved) return;
+            void saveVoiceSettings({ turnPauseMs: next }).catch(() => onError(t("mobile.settings.saveFailed")));
+          }}
+        />
+      </View>
+    </SettingsSection>
+  );
+}
+
+function ReplySpeedSection({ onError }: { onError: (message: string) => void }) {
+  const { t, format } = useText();
+  const ready = useVoiceSettings((state) => state.ready);
+  const speed = useVoiceSettings((state) => state.speed);
+  const title = t("mobile.settings.voice.speed.title");
+  return (
+    <View className="gap-2">
+      <Typography type="body-xs" className="px-4 text-grouped-secondary">
+        {title}
+      </Typography>
+      <UsageSegments
+        options={SPEECH_SPEEDS.map((value) => ({
+          value: String(value),
+          label: t("mobile.settings.voice.speed.value", { speed: format.number(value) }),
+        }))}
+        value={String(speed)}
+        disabled={!ready}
+        accessibilityLabel={title}
+        onChange={(next) => {
+          const chosen = SPEECH_SPEEDS.find((value) => String(value) === next);
+          if (chosen === undefined) return;
+          void saveVoiceSettings({ speed: chosen }).catch(() => onError(t("mobile.settings.saveFailed")));
+        }}
+      />
+      <Typography.Paragraph type="body-xs" className="px-4 text-grouped-secondary">
+        {t("mobile.settings.voice.speed.footer")}
+      </Typography.Paragraph>
+    </View>
+  );
+}
+
+function LocalModelSection({ engine, onError }: { engine: LocalRecognition; onError: (message: string) => void }) {
   const { t } = useText();
   return (
-    <SettingsSection
-      title={t("mobile.settings.voice.recognition.parakeet")}
-      footer={t("mobile.settings.voice.recognition.parakeetFooter")}
-    >
+    <SettingsSection title={t(LOCAL_RECOGNITION_TEXT[engine].name)} footer={t(LOCAL_RECOGNITION_TEXT[engine].footer)}>
       <ModelRow
-        model={parakeetModel}
+        key={engine}
+        model={localModelOf(engine)}
         label={t("mobile.settings.voice.recognition.model")}
         removeTitle={t("mobile.settings.voice.recognition.removeTitle")}
         removeBody={t("mobile.settings.voice.recognition.removeBody")}
@@ -222,25 +401,23 @@ function ParakeetSection({ onError }: { onError: (message: string) => void }) {
   );
 }
 
-/**
- * The choice of the voice that reads replies. The checked row is the voice in use; the settings of
- * that voice follow below it.
- */
 function EngineSection({ onError }: { onError: (message: string) => void }) {
   const { t } = useText();
   const settings = useVoiceSettings();
   const supertonicStatus = useSupertonicStatus();
-  const checkMark = useCheckMark();
-  const mark = (engine: VoiceEngine) => checkMark(settings.engine === engine);
+  const server = useVoiceServer((state) => state.server);
   const elevenLabsStatus = !settings.hasElevenLabsKey
     ? t("mobile.settings.voice.engine.elevenLabsNoKey")
     : settings.elevenLabsVoice
       ? elevenLabsVoiceParts(settings.elevenLabsVoice.name).title
       : t("mobile.settings.voice.elevenLabs.chooseVoice");
   const choose = (engine: VoiceEngine) => {
-    // ElevenLabs needs a key first; the key page makes it the voice in use when the key is saved.
     if (engine === "elevenlabs" && !settings.hasElevenLabsKey) {
       router.push("/settings/elevenlabs-key");
+      return;
+    }
+    if (engine === "voice-server" && !server?.routes.speech) {
+      router.push("/settings/voice-server");
       return;
     }
     if (engine === settings.engine) return;
@@ -249,26 +426,34 @@ function EngineSection({ onError }: { onError: (message: string) => void }) {
   };
   return (
     <SettingsSection title={t("mobile.settings.voice.engine.title")} footer={t("mobile.settings.voice.engine.footer")}>
-      <SettingsRow
+      <ChoiceRow
         checked={settings.engine === "supertonic"}
-        disclosure={false}
         disabled={!settings.ready}
         supportingText={supertonicStatus}
-        trailing={mark("supertonic")}
+        label={t("mobile.settings.voice.engine.supertonic")}
         onPress={() => choose("supertonic")}
-      >
-        <Typography.Paragraph>{t("mobile.settings.voice.engine.supertonic")}</Typography.Paragraph>
-      </SettingsRow>
-      <SettingsRow
+      />
+      <ChoiceRow
         checked={settings.engine === "elevenlabs"}
-        disclosure={false}
         disabled={!settings.ready}
         supportingText={elevenLabsStatus}
-        trailing={mark("elevenlabs")}
+        label={t("mobile.settings.voice.engine.elevenLabs")}
         onPress={() => choose("elevenlabs")}
-      >
-        <Typography.Paragraph>{t("mobile.settings.voice.engine.elevenLabs")}</Typography.Paragraph>
-      </SettingsRow>
+      />
+      <ChoiceRow
+        checked={settings.engine === "voice-server"}
+        disabled={!settings.ready}
+        supportingText={
+          server?.routes.speech
+            ? t("mobile.settings.voice.server.speechReady", {
+                model: shortVoiceServerModel(server.routes.speechModel),
+                voice: server.routes.voice ?? "",
+              })
+            : t("mobile.settings.voice.server.speechOff")
+        }
+        label={t("mobile.settings.voice.server.choice")}
+        onPress={() => choose("voice-server")}
+      />
     </SettingsSection>
   );
 }
@@ -328,7 +513,6 @@ function ElevenLabsSection({
   onError,
 }: {
   preview: ReturnType<typeof useVoicePreview>;
-  /** ElevenLabs reads the replies, so its voice settings show; else only the key does. */
   readsReplies: boolean;
   onError: (message: string) => void;
 }) {
@@ -388,35 +572,106 @@ function ElevenLabsSection({
   );
 }
 
-/**
- * Settings > Voice, in two tabs. Listening: what recognizes the user's speech, the phone's
- * recognizer, Parakeet on the phone, or ElevenLabs Scribe. Speaking: the voice that reads replies,
- * Supertonic 3, the default, which runs on the phone as on desktop, or ElevenLabs. Each tab lists its
- * choices with a check mark, and the section below has the settings of the checked choice only.
- */
+const ELEVENLABS_MODEL_HINT = {
+  "elevenlabs-flash-v2.5": "mobile.settings.voice.elevenLabs.model.flash",
+  "elevenlabs-multilingual-v2": "mobile.settings.voice.elevenLabs.model.multilingual",
+  "elevenlabs-v3": "mobile.settings.voice.elevenLabs.model.v3",
+  "elevenlabs-v4-turbo": "mobile.settings.voice.elevenLabs.model.v4Turbo",
+  "elevenlabs-v4": "mobile.settings.voice.elevenLabs.model.v4",
+} as const satisfies Record<ElevenLabsSpeechModelId, MobileTextKey>;
+
+function ElevenLabsModelSection({ onChange, onError }: { onChange: () => void; onError: (message: string) => void }) {
+  const { t } = useText();
+  const ready = useVoiceSettings((state) => state.ready);
+  const chosen = useVoiceSettings((state) => state.elevenLabsModel);
+  const choose = (elevenLabsModel: ElevenLabsSpeechModelId) => {
+    if (elevenLabsModel === chosen) return;
+    void haptics.selection();
+    onChange();
+    void saveVoiceSettings({ elevenLabsModel }).catch(() => onError(t("mobile.settings.saveFailed")));
+  };
+  return (
+    <SettingsSection
+      title={t("mobile.settings.voice.elevenLabs.model.title")}
+      footer={t("mobile.settings.voice.elevenLabs.model.footer")}
+    >
+      {ELEVENLABS_SPEECH_MODEL_IDS.map((id) => (
+        <ChoiceRow
+          key={id}
+          checked={chosen === id}
+          disabled={!ready}
+          supportingText={t(ELEVENLABS_MODEL_HINT[id])}
+          label={cloudSpeechModel(id)?.name ?? id}
+          onPress={() => choose(id)}
+        />
+      ))}
+    </SettingsSection>
+  );
+}
+
+function GptLiveSection({ onError }: { onError: (message: string) => void }) {
+  const { t } = useText();
+  const { theme } = useUniwind();
+  const ready = useVoiceSettings((state) => state.ready);
+  const enabled = useVoiceSettings((state) => state.gptLive);
+  const voice = useVoiceSettings((state) => state.gptLiveVoice);
+  return (
+    <>
+      <SettingsSection footer={t("mobile.settings.voice.gptLive.footer")}>
+        <SettingsRow>
+          <SettingsSwitch
+            value={enabled}
+            disabled={!ready}
+            label={t("mobile.settings.voice.gptLive.title")}
+            dark={theme === "dark"}
+            onValueChange={(gptLive) =>
+              void saveVoiceSettings({ gptLive }).catch(() => onError(t("mobile.settings.saveFailed")))
+            }
+          />
+        </SettingsRow>
+      </SettingsSection>
+      {enabled ? (
+        <>
+          <SettingsSection>
+            <SettingsRow
+              supportingText={gptLiveVoiceLabel(voice, t)}
+              onPress={() => router.push({ pathname: "/settings/voice-choice", params: { engine: "gpt-live" } })}
+            >
+              <Typography.Paragraph>{t("mobile.settings.voice.voice")}</Typography.Paragraph>
+            </SettingsRow>
+          </SettingsSection>
+          <SettingsSection
+            title={t("mobile.settings.voice.gptLive.serversTitle")}
+            footer={t("mobile.settings.voice.gptLive.serversFooter")}
+          >
+            <GptLiveServerRows />
+          </SettingsSection>
+        </>
+      ) : null}
+    </>
+  );
+}
+
 export function VoiceSettingsScreen() {
   const { t } = useText();
   const preview = useVoicePreview();
   const engine = useVoiceSettings((state) => state.engine);
   const recognition = useVoiceSettings((state) => state.recognition);
   const hasKey = useVoiceSettings((state) => state.hasElevenLabsKey);
-  const canRecognize = modelCaptureAvailable();
-  // What hears the user, and what reads the replies: one tab each, so the page stays short.
-  const [tab, setTab] = useState<"listening" | "speaking">("listening");
+  const serverSpeaks = useVoiceServer((state) => state.server?.routes.speech === true);
+  const canRecognize = modelCaptureAvailable() || layoutPreview;
+  const [tab, setTab] = useState<"listening" | "speaking" | "gptLive">("listening");
   const [error, setError] = useState<string | null>(null);
   const showError = useRef((message: string) => {
     setError(message);
     void haptics.notification("error");
   }).current;
-  // The page needs to know whether the model is on the phone before Download can work.
   useEffect(() => {
-    if (parakeetModel.useModel.getState().phase === "unknown") parakeetModel.check();
+    checkRecognitionModels();
   }, []);
-  // The voices of the key load once, so the voice list opens with them.
   useEffect(() => {
     if (hasKey && useElevenLabsVoices.getState().phase === "idle") void loadElevenLabsVoices();
   }, [hasKey]);
-  // A sample of the voice before it does not go on under the settings of the other one.
   const stopPreview = useRef(preview.stop);
   stopPreview.current = preview.stop;
   const shownEngine = useRef(engine);
@@ -425,7 +680,7 @@ export function VoiceSettingsScreen() {
     shownEngine.current = engine;
     stopPreview.current();
   }, [engine]);
-  if (!speechNative)
+  if (!speechNative && !layoutPreview)
     return (
       <SettingsContent>
         <SettingsNote>{t("mobile.settings.voice.unavailable")}</SettingsNote>
@@ -435,18 +690,27 @@ export function VoiceSettingsScreen() {
     <>
       <EngineSection onError={showError} />
       {engine === "elevenlabs" && hasKey ? (
-        <ElevenLabsSection preview={preview} readsReplies onError={showError} />
+        <>
+          <ElevenLabsSection preview={preview} readsReplies onError={showError} />
+          <ElevenLabsModelSection onChange={preview.stop} onError={showError} />
+        </>
+      ) : engine === "voice-server" && serverSpeaks ? (
+        <VoiceServerSection preview={preview} />
       ) : (
         <SupertonicSection preview={preview} onError={showError} />
       )}
+      {engine === "voice-server" && serverSpeaks ? null : <VoiceServerSection />}
+      {canChangeReplySpeed || layoutPreview ? <ReplySpeedSection onError={showError} /> : null}
     </>
   );
-  // An app binary without the speech module's microphone has only the phone's recognizer.
+  const gptLive = liveVoiceWebRtc || layoutPreview ? <GptLiveSection onError={showError} /> : null;
   if (!canRecognize)
     return (
       <SettingsContent>
         {speaking}
         <DictationLanguageSection />
+        <TurnPauseSection onError={showError} />
+        {gptLive}
       </SettingsContent>
     );
   return (
@@ -455,6 +719,7 @@ export function VoiceSettingsScreen() {
         options={[
           { value: "listening", label: t("mobile.settings.voice.tab.listening") },
           { value: "speaking", label: t("mobile.settings.voice.tab.speaking") },
+          ...(gptLive ? [{ value: "gptLive" as const, label: t("mobile.settings.voice.tab.gptLive") }] : []),
         ]}
         value={tab}
         onChange={(next) => {
@@ -466,13 +731,19 @@ export function VoiceSettingsScreen() {
         <>
           <RecognitionSection onError={showError} />
           {recognition === "system" ? <DictationLanguageSection /> : null}
-          {recognition === "parakeet" && parakeetSupported() ? <ParakeetSection onError={showError} /> : null}
+          {isLocalRecognition(recognition) && (localRecognitionSupported(recognition) || layoutPreview) ? (
+            <LocalModelSection engine={recognition} onError={showError} />
+          ) : null}
           {recognition === "elevenlabs" && hasKey ? (
             <ElevenLabsSection preview={preview} readsReplies={false} onError={showError} />
           ) : null}
+          <VoiceServerSection />
+          <TurnPauseSection onError={showError} />
         </>
-      ) : (
+      ) : tab === "speaking" ? (
         speaking
+      ) : (
+        gptLive
       )}
       {error || preview.error ? (
         <Typography.Paragraph accessibilityRole="alert" type="body-xs" className="px-4 text-danger-text">

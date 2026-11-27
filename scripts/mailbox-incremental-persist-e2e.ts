@@ -1,10 +1,3 @@
-// Checks that a mailbox write that names only the changed rows gives the same rows as the full
-// replace (#2238). Runs the real mailbox store and SQLite on a temporary profile. A second database
-// receives the full replace of the same state after each write, and the script compares the rows of
-// the two after each step. No app, provider, account or network is started.
-//
-// Run: bun scripts/mailbox-incremental-persist-e2e.ts
-// Writes .openbot-build/mailbox-incremental-persist-e2e/report.json and exits non-zero on a failure.
 import assert from "node:assert/strict";
 import { mkdirSync, writeFileSync } from "node:fs";
 import { mkdtemp, rm } from "node:fs/promises";
@@ -23,12 +16,12 @@ const OTHER_AGENT = "agent-b";
 const CHANNEL = "channel-1";
 const SEEDED_MESSAGES = 2_000;
 const TIMED_UPDATES = 50;
+const KEYED_TEXT = "x".repeat(60);
 const PNG = Buffer.from(
   "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==",
   "base64",
 );
 
-/** The tables the mailbox projection owns, with the columns that order their rows. */
 const TABLES = [
   ["projection_mailbox_messages", "message_id"],
   ["projection_deliveries", "delivery_id"],
@@ -47,13 +40,19 @@ interface Report {
   steps: StepResult[];
   incrementalWrites: number;
   fullWrites: number;
+  idempotencyWritesSkipped: number;
   timing?: { seededMessages: number; updates: number; totalMs: number; perUpdateMs: number };
   passed: boolean;
 }
 
-const report: Report = { steps: [], incrementalWrites: 0, fullWrites: 0, passed: false };
+const report: Report = {
+  steps: [],
+  incrementalWrites: 0,
+  fullWrites: 0,
+  idempotencyWritesSkipped: 0,
+  passed: false,
+};
 
-/** Sends each mailbox write to the profile as the store asks, and the full replace of it to `reference`. */
 class MirroredDatabase extends OpenBotDatabase {
   readonly #reference: OpenBotDatabase;
 
@@ -68,9 +67,11 @@ class MirroredDatabase extends OpenBotDatabase {
     changes: MailboxProjectionChanges,
     eventType: string,
     fileDeletions: string[] = [],
+    writeIdempotency = true,
   ): boolean {
-    const wrote = super.applyMailboxChanges(commandId, state, changes, eventType, fileDeletions);
+    const wrote = super.applyMailboxChanges(commandId, state, changes, eventType, fileDeletions, writeIdempotency);
     report.incrementalWrites += 1;
+    if (!writeIdempotency) report.idempotencyWritesSkipped += 1;
     this.#reference.replaceMailboxState(commandId, structuredClone(state), eventType);
     return wrote;
   }
@@ -89,10 +90,6 @@ class MirroredDatabase extends OpenBotDatabase {
   }
 }
 
-/**
- * The rows of every mailbox table. The write sequence differs between the two databases, and a
- * generated attachment takes its time from the write that first stores it, so neither is compared.
- */
 function projectionRows(database: OpenBotDatabase): Record<string, unknown[]> {
   const rows: Record<string, unknown[]> = {};
   for (const [table, order] of TABLES) {
@@ -123,7 +120,11 @@ async function openProfile(root: string, name: string, reference?: OpenBotDataba
   return { database, mailbox };
 }
 
-async function enqueue(mailbox: MailboxStore, text: string, options: { draftIds?: string[]; channelId?: string } = {}) {
+async function enqueue(
+  mailbox: MailboxStore,
+  text: string,
+  options: { draftIds?: string[]; channelId?: string; idempotencyKey?: string } = {},
+) {
   return runCauseEffect(
     mailbox.enqueue({
       sender: { kind: "user" },
@@ -131,6 +132,7 @@ async function enqueue(mailbox: MailboxStore, text: string, options: { draftIds?
       text,
       ...(options.draftIds ? { draftIds: options.draftIds } : {}),
       ...(options.channelId ? { channelId: options.channelId } : {}),
+      ...(options.idempotencyKey ? { idempotencyKey: options.idempotencyKey } : {}),
     }),
   );
 }
@@ -193,7 +195,6 @@ async function parity(root: string): Promise<void> {
   await runCauseEffect(mailbox.setReaction(AGENT, first.messageId, { kind: "agent", agentId: OTHER_AGENT }, null));
   check("reaction removed", database, reference);
 
-  // A queued message with an attachment, edited: one attachment kept out, a new one added.
   const editedDraft = await draft(mailbox, "edited.txt");
   const edited = deliveryOf(await enqueue(mailbox, "edited", { draftIds: [editedDraft] }));
   mailbox.beginQueueEdit(AGENT, edited, "edit-1");
@@ -228,8 +229,6 @@ async function parity(root: string): Promise<void> {
   check("channel attachments committed", database, reference);
   await runCauseEffect(committed.revert);
   check("channel attachments reverted", database, reference);
-  // A rolled-back write leaves its keys, and then a command that was already applied runs again: its
-  // receipt is the newest, so it writes no row. It must keep the keys for the next write.
   assert.throws(() =>
     withDatabaseTransaction(database, () => {
       mailbox.cancelNow(AGENT, edited);
@@ -262,8 +261,6 @@ async function parity(root: string): Promise<void> {
   await runCauseEffect(mailbox.deleteStoredFile(generatedFile.attachment.id));
   check("stored files deleted", database, reference);
 
-  // A write inside a caller's transaction that rolls back, with no restore of memory. The next own
-  // write must still write the row that the rollback took away.
   const rolledBack = deliveryOf(await enqueue(mailbox, "rolled back"));
   assert.throws(() =>
     withDatabaseTransaction(database, () => {
@@ -275,8 +272,6 @@ async function parity(root: string): Promise<void> {
   check("own write after a rolled-back write", database, reference);
   await runCauseEffect(mailbox.markStarting(after));
 
-  // The same with a nested transaction whose restore runs before the owner's ROLLBACK, as the
-  // routine scheduler does. The restore reads rows that the rollback then undoes.
   const nested = deliveryOf(await enqueue(mailbox, "nested rollback"));
   assert.throws(() =>
     withDatabaseTransaction(database, () =>
@@ -293,13 +288,28 @@ async function parity(root: string): Promise<void> {
   await enqueue(mailbox, "after the nested rollback");
   check("own write after a nested rollback with a restore", database, reference);
 
+  const keyed = deliveryOf(await enqueue(mailbox, "keyed", { idempotencyKey: "routine:keyed:turn-k:1" }));
+  check("message with an idempotency key sent", database, reference);
+  await runCauseEffect(mailbox.markStarting(keyed));
+  check("keyed delivery started without a key change", database, reference);
+  assert.throws(() =>
+    withDatabaseTransaction(database, () => {
+      mailbox.forgetIdempotencyKey("routine:keyed:turn-k:1");
+      mailbox.cancelNow(AGENT, nested);
+      throw new Error("The caller's work failed after a key was forgotten.");
+    }),
+  );
+  await runCauseEffect(mailbox.markTerminal(keyed, "completed"));
+  check("own write after a rolled-back key change", database, reference);
+  mailbox.forgetIdempotencyKeys("routine:", new Date(Date.now() + 60_000));
+  await runCauseEffect(mailbox.setReaction(AGENT, first.messageId, { kind: "user" }, "👍"));
+  check("expired keys forgotten before an unrelated write", database, reference);
+
   await runCauseEffect(mailbox.deleteChannelData(CHANNEL));
   check("channel data deleted", database, reference);
   await draft(mailbox, "left on restart.txt");
   check("draft left for the restart", database, reference);
 
-  // A row in an older form: a delivery with no queue order, as an earlier build could store it. A
-  // restart reads the rows back, writes the current form, and clears the drafts that no edit holds.
   database.connection
     .prepare(
       "UPDATE projection_deliveries SET delivery_json = json_remove(delivery_json, '$.queueOrder') WHERE delivery_id = ?",
@@ -317,11 +327,12 @@ async function parity(root: string): Promise<void> {
   reference.close();
 }
 
-/** The time of one status update with a long history, for the pull request. */
 async function timing(root: string): Promise<NonNullable<Report["timing"]>> {
   const { database, mailbox } = await openProfile(root, "timing");
   for (let index = 0; index < SEEDED_MESSAGES; index += 1) {
-    const deliveryId = deliveryOf(await enqueue(mailbox, `message ${index}`));
+    const deliveryId = deliveryOf(
+      await enqueue(mailbox, `message ${index}`, { idempotencyKey: `routine:${index}:turn-${index}:${KEYED_TEXT}` }),
+    );
     await runCauseEffect(mailbox.markStarting(deliveryId));
     await runCauseEffect(mailbox.markTerminal(deliveryId, "completed"));
   }
@@ -344,7 +355,7 @@ const root = await mkdtemp(join(tmpdir(), "openbot-mailbox-persist-"));
 try {
   await parity(root);
   report.timing = await timing(root);
-  report.passed = report.steps.every((step) => step.matched);
+  report.passed = report.steps.every((step) => step.matched) && report.idempotencyWritesSkipped > 0;
 } finally {
   mkdirSync(OUT, { recursive: true });
   writeFileSync(join(OUT, "report.json"), `${JSON.stringify(report, null, 2)}\n`);

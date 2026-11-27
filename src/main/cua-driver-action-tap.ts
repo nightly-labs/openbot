@@ -1,141 +1,158 @@
-// What OpenBot puts between an agent's driver proxy and the driver daemon.
-//
-// The daemon answers one lease at a time and tells no lease about another, so OpenBot cannot ask it
-// which window an agent works in: `list_sessions` and `get_agent_cursor_state` report only the
-// lease that asks, and `history` is refused to anything but the local command line. Front-to-back
-// window order is no answer either, because the driver acts in the background by design and leaves
-// the order alone, and because the user's own clicks move it.
-//
-// OpenBot does own one thing: the address it hands the providers. This listens on an address of its
-// own, forwards every request byte to the daemon unchanged, and reads the few fields it needs out
-// of the request line - which application, which window, and which point the agent asked the
-// daemon to act on.
-//
-// It carries no policy. It refuses nothing and delays no request: a tap that could change an
-// action would be a second, quieter place where Computer Use is decided.
-//
-// It changes one thing on the way back. The answer to a tool call gets one more text item, a JSON
-// copy of its `structuredContent`, because some providers show the model only the text and the
-// driver's text is a summary with nothing in it to act on. `cua-driver-structured-text.ts` says
-// what the copy holds. Every other answer, and every other byte of a changed one, passes unchanged.
-//
-// It also times each tool call, from the request line to the end of its answer line, and logs the
-// tool name and the milliseconds. That is the driver's share of a slow Computer Use step; the rest
-// of the step is the model, which the tap cannot see.
-
 import { chmod } from "node:fs/promises";
 import { connect, createServer, type Server, type Socket } from "node:net";
 import { Transform, type TransformCallback } from "node:stream";
+import { StringDecoder } from "node:string_decoder";
 import { type DynamicRecord, isDynamicRecord } from "@openbot/contracts/runtime-values";
 import { createOpenBotLogger, type Logger } from "@openbot/logging";
 import { Effect, Result } from "effect";
 import { CuaDriverFailure, cuaIO } from "./cua-driver-effects";
-import { rewriteCallAnswer } from "./cua-driver-structured-text";
+import { parseAnswerLine, rewriteCallAnswer } from "./cua-driver-structured-text";
 
-/**
- * A line longer than this is not a request the tap understands, so it stops reading that line.
- *
- * The daemon's answers hold screenshots and accessibility trees and are megabytes long. Those
- * travel the other way and are never parsed, but a client is not trusted to stay small either: the
- * cap is what keeps a client that never sends a newline from growing the buffer without end.
- */
 const MAX_REQUEST_LINE_BYTES = 1_048_576;
 
-/**
- * An answer line longer than this is passed on unchanged rather than held whole to be read.
- *
- * A tool answer must be held to its end before a text item can be added to it, and a window state
- * with a screenshot is several megabytes. The cap keeps a daemon that never sends a newline from
- * growing the held answer without end; an answer past it reaches the agent as the daemon sent it.
- */
 const MAX_ANSWER_LINE_BYTES = 33_554_432;
 const NEWLINE = 0x0a;
 
-/**
- * A tool call that takes at least this long is logged at `info`, so the default log shows it.
- * Faster calls are logged at `debug` only, because a Computer Use turn makes many of them.
- */
 const SLOW_CALL_MS = 5_000;
+
+const MAX_SCREENSHOT_WINDOWS = 32;
 
 const defaultLogger = createOpenBotLogger("cua-driver-tap");
 
-/**
- * Where an agent last asked the daemon to act.
- *
- * The tool name and two numbers, and nothing else. A request also carries what the agent types,
- * which is the user's own work and belongs to nobody else - so it is read past, never kept and
- * never logged.
- */
 export interface ObservedAction {
-  /** The driver tool, kept so a log can say why the rim moved without naming a window. */
   tool: string;
-  /** The application the action is aimed at, or `null` when the request named none. */
   pid: number | null;
-  /** The exact window the action is aimed at, or `null` when the request named none. */
   windowId: number | null;
-  /** When the request passed through, from `Date.now()`. */
   at: number;
 }
 
-/**
- * Where an agent last aimed the pointer, on the desktop.
- *
- * This is what OpenBot draws its own agent cursor on. It is the point the agent asked for, not
- * where the pointer reached: the driver acts in the background and never moves the user's own
- * pointer there, so the request is the only account of it there is.
- */
 export interface ObservedPointer {
-  /** The driver tool that named the point, kept so a log can say why the cursor moved. */
   tool: string;
-  /** The desktop point, in the same units `list_windows` reports window bounds in. */
+  windowId: number | null;
+  screenshotWidth: number | null;
   x: number;
   y: number;
-  /** When the request passed through, from `Date.now()`. */
   at: number;
 }
 
-/** What one request line says: whether it is a tool call, and at most two answers about where the agent works. */
 interface ObservedRequest {
-  /**
-   * The tool a call names, or `null` when the line is no tool call. A call's answer gets the text
-   * copy of its structured result, and the tap logs how long that answer took.
-   */
   tool: string | null;
+  list: boolean;
   action: ObservedAction | null;
-  pointer: ObservedPointer | null;
+  pointer: ObservedPointer | "unplaced" | null;
 }
 
-const NOTHING: ObservedRequest = { tool: null, action: null, pointer: null };
+const NOTHING: ObservedRequest = { tool: null, list: false, action: null, pointer: null };
+const TOOL_LIST: ObservedRequest = { ...NOTHING, list: true };
 
-/**
- * The tools that aim the pointer at a point on the desktop.
- *
- * Every other tool with an `x` means something else by it: `set_window_frame` moves a window there
- * and leaves the pointer alone, so a cursor drawn on its arguments would walk away from the work.
- */
+const DRIVER_CURSOR_TOOLS = new Set([
+  "set_agent_cursor_enabled",
+  "set_agent_cursor_motion",
+  "set_agent_cursor_theme",
+  "get_agent_cursor_state",
+]);
+
+const FOREGROUND_HIDDEN_TOOLS = new Set([...DRIVER_CURSOR_TOOLS, "parallel_mouse_drag"]);
+
+const FOREGROUND = "foreground";
+
 const POINTER_TOOLS = new Set(["click", "move_cursor", "scroll"]);
 
-/**
- * What one request line of the daemon's own protocol says.
- *
- * The protocol is one JSON object per line. A tool call is
- * `{"method":"call","name":"click","args":{…}}`; the target sits in the arguments either directly
- * as `pid` and `window_id` or inside a `target` object, and the point sits beside it as `x` and
- * `y`. Anything else - a `list`, a `session_begin`, a call with neither - reports nothing rather
- * than a guess.
- */
-function readRequest(line: string, at: number): ObservedRequest {
+function readRequest(line: string, at: number, screenshotWidth: (windowId: number) => number | null): ObservedRequest {
   let parsed: unknown;
   try {
     parsed = JSON.parse(line);
   } catch {
     return NOTHING;
   }
+  if (isDynamicRecord(parsed) && parsed.method === "list") return TOOL_LIST;
   if (!isDynamicRecord(parsed) || parsed.method !== "call") return NOTHING;
   const tool = parsed.name;
   if (typeof tool !== "string") return NOTHING;
   const args: DynamicRecord = isDynamicRecord(parsed.args) ? parsed.args : {};
-  return { tool, action: readTarget(tool, args, at), pointer: readPointer(tool, args, at) };
+  if (tool === RUN_STEPS_TOOL) return { tool, list: false, ...readSteps(args, at, screenshotWidth) };
+  return {
+    tool,
+    list: false,
+    action: readTarget(tool, args, at),
+    pointer: readPointer(tool, args, at, screenshotWidth),
+  };
+}
+
+const RUN_STEPS_TOOL = "run_steps";
+const STEP_KEYS = new Set(["tool", "args", "wait_for", "expect", "timeout_ms"]);
+const WINDOW_KEYS = ["pid", "window_id", "app", "window"] as const;
+
+function readSteps(
+  args: DynamicRecord,
+  at: number,
+  screenshotWidth: (windowId: number) => number | null,
+): Pick<ObservedRequest, "action" | "pointer"> {
+  let context = windowOf(args);
+  let action: ObservedAction | null = null;
+  let pointer: ObservedPointer | "unplaced" | null = null;
+  for (const raw of Array.isArray(args.steps) ? args.steps : []) {
+    const step = readStep(raw);
+    if (!step) continue;
+    const named = windowOf(step.args);
+    if (named) context = named;
+    const stepArgs = named || !context ? step.args : { ...context, ...step.args };
+    action = readTarget(step.tool, stepArgs, at) ?? action;
+    pointer = readPointer(step.tool, stepArgs, at, screenshotWidth) ?? pointer;
+  }
+  return { action, pointer };
+}
+
+function readStep(raw: unknown): { tool: string; args: DynamicRecord } | null {
+  if (!isDynamicRecord(raw)) return null;
+  if (typeof raw.tool === "string") {
+    if (isDynamicRecord(raw.args)) return { tool: raw.tool, args: raw.args };
+    return { tool: raw.tool, args: Object.fromEntries(Object.entries(raw).filter(([key]) => !STEP_KEYS.has(key))) };
+  }
+  const named = Object.keys(raw).filter((key) => !STEP_KEYS.has(key));
+  const tool = named[0];
+  if (named.length !== 1 || tool === undefined) return null;
+  const args = raw[tool];
+  return isDynamicRecord(args) ? { tool, args } : null;
+}
+
+function windowOf(args: DynamicRecord): DynamicRecord | null {
+  const fields = WINDOW_KEYS.filter((key) => args[key] !== undefined && args[key] !== null);
+  return fields.length > 0 ? Object.fromEntries(fields.map((key) => [key, args[key]])) : null;
+}
+
+function deliveryModeTools(tools: readonly unknown[]): Set<string> {
+  const names = new Set<string>();
+  for (const tool of tools) {
+    if (!isDynamicRecord(tool) || typeof tool.name !== "string" || !isDynamicRecord(tool.input_schema)) continue;
+    const { properties } = tool.input_schema;
+    if (isDynamicRecord(properties) && properties.delivery_mode !== undefined) names.add(tool.name);
+  }
+  return names;
+}
+
+function inForeground(line: string, tools: ReadonlySet<string>): string {
+  if (!line.includes('"call"')) return line;
+  const parsed = parseAnswerLine(line);
+  if (parsed?.method !== "call" || typeof parsed.name !== "string") return line;
+  if (!tools.has(parsed.name)) return line;
+  const args: DynamicRecord = isDynamicRecord(parsed.args) ? parsed.args : {};
+  const steps =
+    parsed.name === RUN_STEPS_TOOL && Array.isArray(args.steps)
+      ? { steps: args.steps.map((step) => (isDynamicRecord(step) ? stepInForeground(step) : step)) }
+      : {};
+  return JSON.stringify({ ...parsed, args: { ...args, ...steps, delivery_mode: FOREGROUND } });
+}
+
+function stepInForeground(step: DynamicRecord): DynamicRecord {
+  return Object.fromEntries(
+    Object.entries(step).map(([key, value]) => {
+      if (key === "delivery_mode") return [key, FOREGROUND];
+      if (isDynamicRecord(value) && value.delivery_mode !== undefined)
+        return [key, { ...value, delivery_mode: FOREGROUND }];
+      return [key, value];
+    }),
+  );
 }
 
 function readTarget(tool: string, args: DynamicRecord, at: number): ObservedAction | null {
@@ -146,67 +163,124 @@ function readTarget(tool: string, args: DynamicRecord, at: number): ObservedActi
   return { tool, pid, windowId, at };
 }
 
-function readPointer(tool: string, args: DynamicRecord, at: number): ObservedPointer | null {
+function readPointer(
+  tool: string,
+  args: DynamicRecord,
+  at: number,
+  screenshotWidth: (windowId: number) => number | null,
+): ObservedPointer | "unplaced" | null {
   if (!POINTER_TOOLS.has(tool)) return null;
   const x = numberIn(args.x);
   const y = numberIn(args.y);
-  // A click on an element names the element and no point at all, which is the driver's own
-  // accessibility route. There is nowhere to draw a cursor then, so none is drawn.
   if (x === null || y === null) return null;
-  return { tool, x, y, at };
+  const windowId = pointerWindow(tool, args);
+  if (windowId === undefined) return "unplaced";
+  if (windowId === null) return { tool, windowId, screenshotWidth: null, x, y, at };
+  const width = screenshotWidth(windowId);
+  return width === null ? "unplaced" : { tool, windowId, screenshotWidth: width, x, y, at };
+}
+
+function pointerWindow(tool: string, args: DynamicRecord): number | null | undefined {
+  if (tool === "move_cursor") return null;
+  const target: DynamicRecord = isDynamicRecord(args.target) ? args.target : {};
+  if (args.scope === "desktop" || args.coordinate_frame === "desktop" || target.kind === "desktop") return null;
+  const windowId = numberIn(args.window_id) ?? numberIn(target.window_id);
+  if (windowId === null && (typeof args.app === "string" || typeof args.window === "string")) return undefined;
+  if (windowId === null && numberIn(args.pid) === null && numberIn(target.pid) === null) return null;
+  if (windowId === null || args.from_zoom === true) return undefined;
+  return windowId;
+}
+
+const SCREENSHOT_TOOLS = new Set(["get_window_state", RUN_STEPS_TOOL]);
+
+function screenshotOf(answer: DynamicRecord): { windowId: number; width: number } | null {
+  const result = answer.ok === true && isDynamicRecord(answer.result) ? answer.result : null;
+  const structured = result && isDynamicRecord(result.structuredContent) ? result.structuredContent : null;
+  const observation = structured && isDynamicRecord(structured.observation) ? structured.observation : null;
+  const state = observation && isDynamicRecord(observation.state) ? observation.state : structured;
+  const windowId = numberIn(state?.window_id);
+  const width = numberIn(state?.screenshot_width);
+  return windowId !== null && width !== null && width > 0 ? { windowId, width } : null;
 }
 
 function numberIn(value: unknown): number | null {
   return typeof value === "number" && Number.isFinite(value) ? value : null;
 }
 
+export type CompactScreenshot = (png: Buffer) => Buffer | null;
+
+const MIN_COMPACTED_BASE64_CHARS = 262_144;
+
+function withCompactImages(answer: DynamicRecord, compact: CompactScreenshot): DynamicRecord | null {
+  const result = answer.ok === true && isDynamicRecord(answer.result) ? answer.result : null;
+  if (!result || !Array.isArray(result.content)) return null;
+  let changed = false;
+  const content = result.content.map((item: unknown) => {
+    const jpeg = compactedImageData(item, compact);
+    if (jpeg === null || !isDynamicRecord(item)) return item;
+    changed = true;
+    return { ...item, data: jpeg, mimeType: "image/jpeg" };
+  });
+  return changed ? { ...answer, result: { ...result, content } } : null;
+}
+
+function compactedImageData(item: unknown, compact: CompactScreenshot): string | null {
+  if (!isDynamicRecord(item) || item.type !== "image" || item.mimeType !== "image/png") return null;
+  const { data } = item;
+  if (typeof data !== "string" || data.length < MIN_COMPACTED_BASE64_CHARS) return null;
+  return compact(Buffer.from(data, "base64"))?.toString("base64") ?? null;
+}
+
 export interface ActionTapAddresses {
-  /** The daemon's own address, which every forwarded byte goes to. */
   upstream: string;
-  /** The address the providers are handed, which this listens on. */
   tap: string;
 }
 
-/** A tool call the daemon has not answered yet: its tool, and when the request passed through. */
 interface PendingCall {
   tool: string;
   at: number;
 }
 
-/**
- * The daemon's answers, one line at a time, with the text copy added to each tool call's answer.
- *
- * The protocol carries no request id: the daemon answers in the order it was asked, so the answer
- * lines are matched to the request lines in order. `expect` is told about each request before the
- * daemon can answer it. A line that is not a tool call's answer is passed on as it arrives; a tool
- * call's answer is held to its newline, because a text item can only be added to a whole answer.
- * The stream's own back pressure holds the daemon while the agent reads slower than it writes.
- */
+type ExpectedAnswer = PendingCall | "list";
+
 class CallAnswerLines extends Transform {
-  /** One entry per request not yet answered: its tool call, or `null` when it is no call. */
-  readonly #expected: Array<PendingCall | null> = [];
-  /** How the current line is handled, or `null` before its first byte. */
+  readonly #expected: Array<ExpectedAnswer | null> = [];
   #line: "pass" | "hold" | null = null;
-  /** The request the current line answers, or `null` when it answers no tool call. */
-  #answering: PendingCall | null = null;
+  #answering: ExpectedAnswer | null = null;
   #held: Buffer[] = [];
   #heldBytes = 0;
   readonly #answered: (tool: string, ms: number) => void;
+  readonly #captured: (windowId: number, width: number) => void;
+  readonly #refused: () => void;
   readonly #now: () => number;
+  readonly #compact: CompactScreenshot | null;
+  readonly #listed: (line: Buffer) => Buffer;
 
-  constructor(answered: (tool: string, ms: number) => void, now: () => number) {
+  constructor(
+    answered: (tool: string, ms: number) => void,
+    captured: (windowId: number, width: number) => void,
+    refused: () => void,
+    now: () => number,
+    compact: CompactScreenshot | null,
+    listed: (line: Buffer) => Buffer,
+  ) {
     super();
     this.#answered = answered;
+    this.#captured = captured;
+    this.#refused = refused;
     this.#now = now;
+    this.#compact = compact;
+    this.#listed = listed;
   }
 
-  expect(request: PendingCall | null): void {
+  expect(request: ExpectedAnswer | null): void {
     this.#expected.push(request);
   }
 
-  /** The tool calls still waiting for their answer, oldest first. Each is returned only once. */
   takeUnanswered(): PendingCall[] {
-    const calls = [this.#answering, ...this.#expected].filter((call): call is PendingCall => call !== null);
+    const calls = [this.#answering, ...this.#expected].filter(
+      (call): call is PendingCall => call !== null && call !== "list",
+    );
     this.#answering = null;
     this.#expected.length = 0;
     return calls;
@@ -215,8 +289,6 @@ class CallAnswerLines extends Transform {
   override _transform(chunk: Buffer, _encoding: BufferEncoding, callback: TransformCallback): void {
     let start = 0;
     while (start < chunk.length) {
-      // An answer that arrives with no request to match reads as not a call. The copy also checks
-      // the structure of the answer, so a line out of step is at worst left unchanged.
       if (this.#line === null) {
         this.#answering = this.#expected.shift() ?? null;
         this.#line = this.#answering ? "hold" : "pass";
@@ -238,7 +310,7 @@ class CallAnswerLines extends Transform {
       if (newline >= 0) {
         if (this.#line === "hold") this.#release(true);
         const answering = this.#answering;
-        if (answering) this.#answered(answering.tool, this.#now() - answering.at);
+        if (answering && answering !== "list") this.#answered(answering.tool, this.#now() - answering.at);
         this.#answering = null;
         this.#line = null;
       }
@@ -247,7 +319,6 @@ class CallAnswerLines extends Transform {
   }
 
   override _flush(callback: TransformCallback): void {
-    // A last answer with no newline is not a whole line, so it goes on as the daemon sent it.
     this.#release(false);
     callback();
   }
@@ -257,61 +328,118 @@ class CallAnswerLines extends Transform {
     const line = Buffer.concat(this.#held, this.#heldBytes);
     this.#held = [];
     this.#heldBytes = 0;
-    this.push(whole ? withCopy(line) : line);
+    if (!whole) this.push(line);
+    else if (this.#answering === "list") this.push(this.#listed(line));
+    else {
+      const read = SCREENSHOT_TOOLS.has(this.#answering?.tool ?? "") ? this.#readScreenshot : undefined;
+      this.push(withCopy(line, read, this.#compact));
+      if (isAccessibilityRefusal(line)) this.#refused();
+    }
   }
+
+  readonly #readScreenshot = (answer: DynamicRecord): void => {
+    const screenshot = screenshotOf(answer);
+    if (screenshot) this.#captured(screenshot.windowId, screenshot.width);
+  };
 }
 
-/** One whole answer line, ending in its newline, with the copy added when there is one to add. */
-function withCopy(line: Buffer): Buffer {
-  // Most answers have no structured result, and this search costs far less than the parse.
-  if (!line.includes('"structuredContent"')) return line;
-  const rewritten = rewriteCallAnswer(line.toString("utf8", 0, line.length - 1));
-  return rewritten === null ? line : Buffer.from(`${rewritten}\n`, "utf8");
+function isAccessibilityRefusal(line: Buffer): boolean {
+  if (!line.includes("kAXErrorAPIDisabled") && !line.includes("AXError -25211")) return false;
+  return line.includes('"ok":false') || line.includes('"isError":true');
 }
 
-/** Keeps the last action an agent asked for, and forwards everything else unchanged. */
+function withListedTools(
+  line: Buffer,
+  hidden: ReadonlySet<string>,
+  read: ((tools: readonly unknown[]) => void) | null,
+): Buffer {
+  if (!read && !line.includes("agent_cursor")) return line;
+  const parsed = parseAnswerLine(line.toString("utf8", 0, line.length - 1));
+  const result = parsed?.ok === true ? parsed.result : null;
+  if (!parsed || !isDynamicRecord(result) || !Array.isArray(result.tools)) return line;
+  read?.(result.tools);
+  const tools = result.tools.filter(
+    (tool) => !(isDynamicRecord(tool) && typeof tool.name === "string" && hidden.has(tool.name)),
+  );
+  if (tools.length === result.tools.length) return line;
+  return Buffer.from(`${JSON.stringify({ ...parsed, result: { ...result, tools } })}\n`, "utf8");
+}
+
+function withCopy(
+  line: Buffer,
+  read: ((answer: DynamicRecord) => void) | undefined,
+  compact: CompactScreenshot | null,
+): Buffer {
+  const pngCompact = compact && line.includes('"image/png"') ? compact : null;
+  if (
+    !pngCompact &&
+    !line.includes('"structuredContent"') &&
+    !line.includes('"ok":false') &&
+    !line.includes('"isError":true')
+  )
+    return line;
+  const parsed = parseAnswerLine(line.toString("utf8", 0, line.length - 1));
+  if (!parsed) return line;
+  read?.(parsed);
+  const compacted = pngCompact ? withCompactImages(parsed, pngCompact) : null;
+  const rewritten = rewriteCallAnswer(compacted ?? parsed);
+  if (rewritten !== null) return Buffer.from(`${rewritten}\n`, "utf8");
+  return compacted ? Buffer.from(`${JSON.stringify(compacted)}\n`, "utf8") : line;
+}
+
 export class CuaDriverActionTap {
   #server: Server | null = null;
   #sockets = new Set<Socket>();
   #action: ObservedAction | null = null;
   #pointer: ObservedPointer | null = null;
+  #screenshotWidths = new Map<number, number>();
   #address: string | null = null;
   #now: () => number;
   #logger: Logger;
+  #onAccessibilityRefused: (() => void) | null = null;
+  #onToolCall: (() => void) | null = null;
+  readonly #compact: CompactScreenshot | null;
+  readonly #foregroundInput: boolean;
+  #deliveryModeTools: ReadonlySet<string> = new Set();
 
-  constructor(now: () => number = Date.now, logger: Logger = defaultLogger) {
+  constructor(
+    now: () => number = Date.now,
+    logger: Logger = defaultLogger,
+    compact: CompactScreenshot | null = null,
+    foregroundInput = false,
+  ) {
     this.#now = now;
     this.#logger = logger;
+    this.#compact = compact;
+    this.#foregroundInput = foregroundInput;
   }
 
-  /** The address to hand the providers, or `null` while nothing listens. */
+  onAccessibilityRefused(listener: () => void): void {
+    this.#onAccessibilityRefused = listener;
+  }
+
+  onToolCall(listener: () => void): void {
+    this.#onToolCall = listener;
+  }
+
   get address(): string | null {
     return this.#address;
   }
 
-  /**
-   * The last action, while it is recent enough to still say where the agent works.
-   *
-   * An old action is no answer: an agent that stopped an hour ago would otherwise hold the rim on
-   * an application the user has since closed and reopened somewhere else.
-   */
   lastAction(maxAgeMs: number): ObservedAction | null {
     const action = this.#action;
     if (!action) return null;
     return this.#now() - action.at <= maxAgeMs ? action : null;
   }
 
-  /**
-   * The last point the agent aimed at, while it is recent enough to still be where it works.
-   *
-   * Kept apart from the action above, because the two questions have different answers: a read
-   * names a window and no point, and `move_cursor` names a point and no window. One memory would
-   * let either answer take the other's place.
-   */
   lastPointer(maxAgeMs: number): ObservedPointer | null {
     const pointer = this.#pointer;
     if (!pointer) return null;
     return this.#now() - pointer.at <= maxAgeMs ? pointer : null;
+  }
+
+  #screenshotWidth(windowId: number): number | null {
+    return this.#screenshotWidths.get(windowId) ?? null;
   }
 
   listen = Effect.fn("CuaDriverActionTap.listen")(function* (
@@ -336,7 +464,6 @@ export class CuaDriverActionTap {
         });
       }),
     );
-    // Keep the listener safe after it is acquired and while it is closed after a bind failure.
     server.on("error", () => undefined);
     if (Result.isFailure(result)) {
       yield* this.close();
@@ -352,6 +479,7 @@ export class CuaDriverActionTap {
     this.#address = null;
     this.#action = null;
     this.#pointer = null;
+    this.#screenshotWidths.clear();
     for (const socket of this.#sockets) socket.destroy();
     this.#sockets.clear();
     if (!server) return;
@@ -364,9 +492,15 @@ export class CuaDriverActionTap {
     const daemon = connect(upstream);
     this.#sockets.add(client);
     this.#sockets.add(daemon);
-    const answers = new CallAnswerLines((tool, ms) => this.#logAnswered(tool, ms), this.#now);
+    const answers = new CallAnswerLines(
+      (tool, ms) => this.#logAnswered(tool, ms),
+      (windowId, width) => this.#keepScreenshotWidth(windowId, width),
+      () => this.#onAccessibilityRefused?.(),
+      this.#now,
+      this.#compact,
+      (line) => this.#listed(line),
+    );
     const end = () => {
-      // A call that hangs in the driver ends here, when the agent gives up and closes the connection.
       for (const call of answers.takeUnanswered()) this.#logUnanswered(call.tool, this.#now() - call.at);
       this.#sockets.delete(client);
       this.#sockets.delete(daemon);
@@ -376,45 +510,58 @@ export class CuaDriverActionTap {
     client.on("error", end);
     daemon.on("error", end);
     client.on("close", end);
-    // A daemon that closes cleanly can still have its last answer inside `answers`, held while the
-    // agent reads slowly. The pipe ends the client after that answer, and the client's own close
-    // then ends both; destroying the client here would cut the answer off.
     daemon.on("close", (hadError: boolean) => {
       if (hadError) end();
     });
-    // Piped, so the stream keeps the back pressure of a screenshot that the agent reads slower than
-    // the daemon writes it.
     daemon.pipe(answers).pipe(client);
     let pending = "";
     let skipping = false;
+    const decoder = new StringDecoder("utf8");
+    const foreground = this.#foregroundInput;
     client.on("data", (chunk: Buffer) => {
-      daemon.write(chunk);
-      pending += chunk.toString("utf8");
+      if (!foreground) daemon.write(chunk);
+      pending += decoder.write(chunk);
       let newline = pending.indexOf("\n");
       while (newline >= 0) {
         const line = pending.slice(0, newline);
         pending = pending.slice(newline + 1);
-        // Told before the daemon can answer, because this runs in the same turn as the write above.
+        if (foreground) daemon.write(`${skipping ? line : inForeground(line, this.#deliveryModeTools)}\n`);
         if (skipping) {
           answers.expect(null);
         } else {
           const at = this.#now();
-          const { tool, action, pointer } = readRequest(line, at);
-          answers.expect(tool === null ? null : { tool, at });
+          const { tool, list, action, pointer } = readRequest(line, at, (windowId) => this.#screenshotWidth(windowId));
+          answers.expect(list ? "list" : tool === null ? null : { tool, at });
+          if (tool !== null) this.#onToolCall?.();
           if (action) this.#action = action;
-          if (pointer) this.#pointer = pointer;
+          if (pointer) this.#pointer = pointer === "unplaced" ? null : pointer;
         }
         skipping = false;
         newline = pending.indexOf("\n");
       }
       if (pending.length > MAX_REQUEST_LINE_BYTES) {
+        if (foreground) daemon.write(pending);
         pending = "";
         skipping = true;
       }
     });
   }
 
-  /** The tool name and the time only: the arguments are the user's work and are never logged. */
+  #listed(line: Buffer): Buffer {
+    if (!this.#foregroundInput) return withListedTools(line, DRIVER_CURSOR_TOOLS, null);
+    return withListedTools(line, FOREGROUND_HIDDEN_TOOLS, (tools) => {
+      this.#deliveryModeTools = deliveryModeTools(tools);
+    });
+  }
+
+  #keepScreenshotWidth(windowId: number, width: number): void {
+    this.#screenshotWidths.delete(windowId);
+    this.#screenshotWidths.set(windowId, width);
+    const oldest = this.#screenshotWidths.keys().next();
+    if (this.#screenshotWidths.size > MAX_SCREENSHOT_WINDOWS && !oldest.done)
+      this.#screenshotWidths.delete(oldest.value);
+  }
+
   #logAnswered(tool: string, ms: number): void {
     const log = ms >= SLOW_CALL_MS ? this.#logger.info : this.#logger.debug;
     log("Computer Use driver answered", { tool, ms });

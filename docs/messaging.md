@@ -41,6 +41,8 @@ browser. A joined server shows no Slack page.
 
 - A mention in a channel starts, or continues, a conversation in that thread. A reply in that thread
   reaches the same agent without a mention.
+- When a message in a thread needs no answer, such as thanks, the agent can stay quiet. OpenBot then
+  removes its "Working on it…" post, and the ✅ reaction shows that it read the message.
 - A direct message always reaches OpenBot. OpenBot answers in a thread under it, so each direct
   message is its own conversation.
 - A new conversation goes to the Slack Orchestrator. It answers short requests itself, and gives other
@@ -56,6 +58,8 @@ browser. A joined server shows no Slack page.
 - The agent can read more of the channel or thread when a message refers to something earlier.
 - 👀 means the message arrived. "Working on it…" is replaced by the answer. ✅, ❌ or ⏹ shows the end.
   Every post comes from OpenBot and names no agent.
+- A new post that mentions a person as `<@user ID>` pings that person. A post never pings a channel,
+  `@here`, `@everyone` or a user group.
 - An approval appears in the thread with **Approve** and **Deny**. Only the person who wrote the
   message can answer it there. The OpenBot host can always answer it.
 - `stop` or `cancel` in the thread, or the **Stop** button, stops the request of the person who
@@ -113,7 +117,7 @@ again.
   An approval has **Approve** and **Deny** buttons, and a status post has **Stop**. Only the person
   who wrote the request can press them; another person gets a reply that only they see. A reply to
   an OpenBot post with only `stop` or `cancel` stops the request of the person who sends it.
-- A post never pings anyone, also when it names a person.
+- A new post that mentions a person pings that person. A post never pings a role or `@everyone`.
 - An answer longer than 2,000 characters is sent in more than one post. A file larger than 10 MB is
   not sent, and the conversation says which files were not sent.
 
@@ -131,6 +135,10 @@ this computer never has it.
 3. Pick the model of the Telegram Orchestrator, and select **Add agent**. One orchestrator answers
    every Telegram chat. It goes in the **Integrations** section of the sidebar.
 4. In the group, mention the bot (`@<bot> …`), or reply to one of its messages.
+
+A group that adds the bot in Telegram itself, without the link from OpenBot, is not linked. When a
+person mentions the bot there, or writes to it in a direct chat, the bot answers once a day that the
+chat is not linked and how to link it.
 
 A chat answers to one OpenBot server. Another account cannot link a chat that your server answers
 until you disconnect it. **Disconnect** makes the bot leave the chat and unlinks it. When it is the
@@ -150,6 +158,8 @@ agents.
   the last of them with `messaging_history`. With privacy mode on, Telegram does not send a plain
   mention to a bot that is not an admin of the group.
 - 👀 means the message arrived. "Working on it…" is replaced by the answer. 👌, 💔 or 🫡 shows the end.
+- An answer or a post that mentions a person as `@username` or `@<user ID>` pings that person. An
+  edit pings nobody, so an answer with a mention is a new message, and "Working on it…" is deleted.
 - An approval appears with **Approve** and **Deny**. Only the person who wrote the message can answer
   it there. When another person presses a button, the bot answers in the chat that only the requester
   can do it.
@@ -188,6 +198,8 @@ the WhatsApp Orchestrator is deleted with its conversations, as for Slack.
   a reply to a message of it continues it without a mention. Other messages of the group start nothing.
 - 👀 on your message means it arrived. "Working on it…" is replaced by the answer within 15 minutes;
   later, the answer is a new message. ✅ (done), ❌ (failed) or 🫡 (stopped) on your message shows the end.
+- An answer or a post that mentions a person as `@<user ID>` (the phone number) pings that person. An
+  edit pings nobody, so an answer with a mention is a new message, and "Working on it…" is deleted.
 - Personal WhatsApp has no buttons. An approval ends with "Reply 1 to approve or 2 to deny." Only the
   person who wrote the request can answer it. `stop` stops the request.
 - Short messages that one person sends within 1.5 seconds become one request.
@@ -267,9 +279,20 @@ whole list, with the ID of each fact. The prompt marks the facts as data, not in
 - OpenBot has no screen for these facts yet. Ask the agent in the workspace to forget a fact.
 
 `openbot.messaging_history` reads the newest messages of the conversation's own channel or thread:
-30 by default, 100 at most. It reads no other place. Slack can limit it to one read a minute; it
+30 by default, 100 at most. With `connection` and `place` from `openbot.messaging_list_places`, it
+reads that place in the user's own chat or in a routine, for example a routine that summarizes a
+chat each morning. It reads only a place that the list shows. A turn that answers an external chat,
+or a teammate's turn on a request from it, cannot read a different place: a person there is not the
+OpenBot user. Slack can limit it to one read a minute; it
 then fails at once, and the agent can try again. Discord gives the text only of messages that
-mention OpenBot, and of bot posts. Discord messages name their files. Telegram gives what this computer saw since it started.
+mention OpenBot, and of bot posts. Discord messages name their files. Telegram gives what this
+computer saw since it started. WhatsApp keeps the messages of the allowed chats for 90 days, also
+after a restart and also those that do not mention the number. It downloads their files when they
+arrive, and the agent gets the path of each copy. The copies of one number use at most 2 GB: the
+oldest go first, and their messages keep only the file names. A message that its author deletes for
+everyone goes, and a changed message keeps the new text. `query` keeps the messages whose text or author has
+each of its words, and `before` (an ISO time) reads earlier messages. WhatsApp searches all its saved
+messages; the other platforms search only the newest messages that they give.
 
 ## Posts that an agent sends
 
@@ -283,13 +306,17 @@ routine prompt, for example "post the summary to #bot-inflow on Discord".
   and post in, or the Telegram chat itself.
 - `openbot.messaging_post` posts markdown as OpenBot to `place`. `replyTo` puts the post in a
   thread: a Slack thread ts, a Discord message ID, a Telegram message ID, or `t<topic ID>` for a
-  Telegram forum topic. The text is redacted before it leaves this computer. A Discord post pings
-  nobody; a Telegram `@username` notifies that person. A Telegram connection posts only in its own
-  chat. The result has `messageId`, the ID of the first post, and for Discord a `url` to it.
+  Telegram forum topic. The text is redacted before it leaves this computer. A Slack or Discord
+  `<@user ID>` or a Telegram `@username` notifies that person. A Telegram connection posts only in
+  its own chat. The result has `messageId`, the ID of the first post, and for Discord a `url` to it.
 - A long text goes in more than one post. When a later part fails, the earlier parts stay posted.
 - A routine posts only when its run calls the tool. The scheduler does not post the run's answer.
 - A reply to the post reaches an agent only as usual: it must mention OpenBot, and it goes to the
-  Orchestrator.
+  Orchestrator. One exception, on Slack: when the post pings a person with `<@user ID>`, that
+  person's reply in the post's thread reaches the Slack Orchestrator without a mention. The
+  Orchestrator gets the post and the name of the agent that sent it. A person that a later answer in
+  that thread pings can reply without a mention too. The replies of other people always need a
+  mention.
 - There is no list of allowed channels and no approval. Anyone who can give the agents work can ask
   them to post in any place that OpenBot can see. A Slack private channel needs an `/invite`.
 - Discord listing needs a Signal that knows the `listChannels` call. An older Signal refuses it
@@ -338,8 +365,8 @@ while this computer has no Signal connection is lost, except for a hosted server
   and a protocol change of WhatsApp can stop the connection until OpenBot updates. Use a number only
   for OpenBot when you can.
 - WhatsApp removes a linked device after about 14 days without a connection. Link the number again.
-- WhatsApp gives a new linked device no history, so the agent sees only what this computer saw since
-  it started. A hosted server does not start for a WhatsApp message: WhatsApp keeps it until the
+- WhatsApp gives a new linked device no history, so the agent sees only what this computer saw after
+  the link, for 90 days. Disconnect deletes the saved messages and their files. A hosted server does not start for a WhatsApp message: WhatsApp keeps it until the
   server connects. A message older than one day gets no answer.
 - WhatsApp has one session per linked device. A second OpenBot profile that opens the same store
   stops with "locked"; link it as its own device.
@@ -365,7 +392,7 @@ core changes:
 | Slack | The Events API through Signal | `thread_ts`, or the message `ts` that starts a thread | Implemented. |
 | Discord | The Gateway in Signal (`@discordjs/ws`), which passes mentions to the host; calls go through Signal | The id of the first message of a reply chain | Implemented. No privileged intent. |
 | Telegram | The webhook of the one OpenBot bot through Signal, which holds the token | `message_thread_id`, the topic in a forum, `dm` in a direct chat | Implemented. No history API: the host keeps what the bot sees, in memory. |
-| WhatsApp | A linked device: this computer's own socket to WhatsApp (vendored Baileys, `packages/whatsapp`) | `dm` in a direct chat; in a group, the id of the message that mentioned the number | Implemented. No history: the host keeps what it saw, in memory. Sender rules in `whatsapp-senders.ts`. |
+| WhatsApp | A linked device: this computer's own socket to WhatsApp (vendored Baileys, `packages/whatsapp`) | `dm` in a direct chat; in a group, the id of the message that mentioned the number | Implemented. No history: the host saves what it saw for 90 days (`projection_messaging_history`). Sender rules in `whatsapp-senders.ts`. |
 
 Then add the platform to `MESSAGING_PLATFORMS`, a page in Marketplace → Apps, and its i18n
 keys. The database needs no migration: `platform` has no `CHECK`.

@@ -1,5 +1,3 @@
-/* Server Settings > Roles, and the role menu of a member row. */
-
 .server-roles-icon {
   color: var(--openbot-text-secondary);
 }
@@ -11,6 +9,10 @@
 
 .server-roles-level {
   min-width: 128px;
+}
+
+.server-roles-agent-level {
+  min-width: 176px;
 }
 
 .server-roles-name-row {
@@ -29,9 +31,23 @@
   white-space: nowrap;
 }
 
-/* A Lucide icon in a text button renders at 24px; there is no shared size rule for it. */
 :is(.server-roles-create, .server-roles-member-trigger) > svg {
   flex-shrink: 0;
   width: 14px;
   height: 14px;
+}
+
+.server-roles-level-source {
+  color: var(--openbot-text-secondary);
+}
+
+.server-roles-level-menu {
+  min-width: 176px;
+}
+
+.server-roles-level-menu .server-roles-open-everyone {
+  margin-top: var(--openbot-space-1);
+  border-top: 1px solid var(--openbot-border);
+  border-top-left-radius: 0;
+  border-top-right-radius: 0;
 }

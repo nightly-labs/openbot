@@ -4,9 +4,6 @@ import { DatabaseSync } from "node:sqlite";
 import { afterEach, describe, expect, it } from "vitest";
 import { migrateOpenBotDatabase } from "./openbot-database-schema";
 
-// Failure modes: a database that v0.1.12 to v0.2.1 made loses a row on its first upgrade to the migration
-// registry; the upgrade leaves a schema that a new install does not have; a foreign key or a page is broken.
-// The other tests start from a schema that this code makes. These start from the DDL that each release shipped.
 const appliedAt = "2026-10-17T12:00:00.000Z";
 
 const databases: DatabaseSync[] = [];
@@ -19,13 +16,10 @@ interface ReleasedSchema {
   readonly markers: readonly number[];
 }
 
-// A new install of a release wrote only its own version. An upgrade from an earlier release kept the
-// earlier marker as well.
 const RELEASED_SCHEMAS: readonly ReleasedSchema[] = [
   { tag: "v0.1.12", markers: [3] },
   { tag: "v0.1.15", markers: [4] },
   { tag: "v0.1.15", markers: [3, 4] },
-  // v0.1.18 to v0.2.0 kept version 4 and added the message page index.
   { tag: "v0.1.18", markers: [4] },
   { tag: "v0.1.18", markers: [3, 4] },
   { tag: "v0.2.1", markers: [6] },
@@ -50,8 +44,6 @@ function freshDatabase(): DatabaseSync {
 
 const snapshot = { messages: [{ id: "message-1" }, { id: "message-2" }] };
 
-// One or more rows in each table that these releases wrote. Thread `scout` has no read baseline, and the user
-// has no read of the direct thread, so the baseline step has rows to add.
 function seedSharedTables(db: DatabaseSync): void {
   db.exec(`
     INSERT INTO orchestration_events
@@ -149,7 +141,6 @@ function seedSharedTables(db: DatabaseSync): void {
   `);
 }
 
-// The tables that v0.2.1 added.
 function seedVersion6Tables(db: DatabaseSync): void {
   db.exec(`
     INSERT INTO projection_agent_memories (memory_id, agent_id, text, normalized_text, origin, source_turn_id,
@@ -197,7 +188,6 @@ function columnNames(db: DatabaseSync, table: string): string[] {
     .map((row) => String(row.name));
 }
 
-// The released columns of each table, in a stable order. A rebuild can change the rowid, so rows are sorted.
 function releasedRows(db: DatabaseSync, tables: Readonly<Record<string, readonly string[]>>) {
   return Object.fromEntries(
     Object.entries(tables).map(([table, columns]) => {
@@ -231,13 +221,12 @@ function schemaShape(db: DatabaseSync) {
 }
 
 function expectHealthy(db: DatabaseSync): void {
-  expect(db.prepare("SELECT MAX(version) AS version FROM schema_migrations").get()).toEqual({ version: 55 });
+  expect(db.prepare("SELECT MAX(version) AS version FROM schema_migrations").get()).toEqual({ version: 70 });
   expect(db.prepare("PRAGMA foreign_keys").get()).toEqual({ foreign_keys: 1 });
   expect(db.prepare("PRAGMA foreign_key_check").all()).toEqual([]);
   expect(db.prepare("PRAGMA integrity_check").get()).toEqual({ integrity_check: "ok" });
 }
 
-// The rows that the baseline step changes on purpose. Every other released row must stay the same.
 const CHANGED_TABLES = new Set([
   "orchestration_events",
   "orchestration_command_receipts",
@@ -268,7 +257,6 @@ describe("upgrade from a released schema before the migration registry", () => {
         .map((row) => row.version),
     ).toEqual(released.markers);
 
-    // Compaction keeps the latest snapshot of each thread and of the mailbox, and every other event.
     expect(db.prepare("SELECT sequence FROM orchestration_events ORDER BY sequence").all()).toEqual([
       { sequence: 2 },
       { sequence: 3 },
@@ -290,7 +278,6 @@ describe("upgrade from a released schema before the migration registry", () => {
       { activity_id: "activity-3" },
     ]);
 
-    // Migrations 9, 10, 11 and 14 stop the open sessions. The turn keeps its session.
     expect(
       db.prepare("SELECT id, provider, state, updated_at FROM projection_provider_sessions ORDER BY id").all(),
     ).toEqual([
@@ -302,7 +289,6 @@ describe("upgrade from a released schema before the migration registry", () => {
       { turn_id: "turn-2", provider_session_id: "session-2" },
     ]);
 
-    // A thread with no baseline gets its newest message; a direct thread member with no read gets one.
     expect(db.prepare("SELECT * FROM projection_thread_read_baselines ORDER BY thread_id").all()).toEqual([
       {
         thread_id: "openbot-thread-chief",
@@ -316,17 +302,14 @@ describe("upgrade from a released schema before the migration registry", () => {
       { thread_id: "direct-1", member_id: "user", last_read_sequence: 4, updated_at: appliedAt },
     ]);
 
-    // A released reaction is the user's.
     expect(db.prepare("SELECT actor_kind, actor_agent_id FROM projection_reactions").all()).toEqual([
       { actor_kind: "user", actor_agent_id: "" },
     ]);
-    // No id is generated, so migration 13 changes no path.
     expect(db.prepare("SELECT agent_json FROM projection_agents WHERE agent_id = 'chief'").get()).toEqual({
       agent_json: '{"id":"chief","name":"Chief","workspacePath":"/Users/user/OpenBot/Bots/chief"}',
     });
 
     if (released.tag !== "v0.2.1") return;
-    // Migration 32 indexes the released memories and selects them for the context.
     expect(
       db
         .prepare("SELECT rowid FROM agent_memory_search WHERE agent_memory_search MATCH 'Kraków'")

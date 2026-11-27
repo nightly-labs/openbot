@@ -1,5 +1,5 @@
+import { clamp } from "@/shared/lib/worklet-math";
 import {
-  clamp,
   clampFraction,
   clampZoom,
   MAX_ZOOM,
@@ -12,15 +12,6 @@ import {
   type Zoom,
 } from "./live-view-geometry";
 
-// The touches on a live view, as the mouse of the host's page. The rules are the ones the help
-// sheet gives the user:
-//
-// - One finger: a tap clicks where it lands, a drag holds the button, and a press and hold
-//   right-clicks. In trackpad mode the finger moves the pointer instead, a tap clicks at the
-//   pointer, and a tap followed by a press and hold drags.
-// - Two fingers: a drag scrolls, a tap right-clicks, and a pinch zooms the picture on the phone.
-//   With the picture zoomed, a two-finger drag pans it instead of scrolling the page.
-
 export type LiveViewMode = "direct" | "trackpad";
 export type LiveViewButton = "left" | "right";
 
@@ -30,20 +21,33 @@ export interface LiveViewTouch {
   y: number;
 }
 
-/** The screen that owns the gestures: what shows, and where the input goes. */
 export interface LiveViewGestureHost {
-  /** The stage, the page and the zoom as they show now. Null until a frame shows. */
   layout(): { stage: Size; frame: Size; zoom: Zoom } | null;
   mode(): LiveViewMode;
-  /** The pointer, as a fraction of the page. */
   pointer(): Point;
-  /** Moves the drawn pointer. In trackpad mode the screen also keeps it in view. */
   setPointer(fraction: Point): void;
   press(action: "move" | "down" | "up", at: Point, button: LiveViewButton, clickCount: number): void;
-  /** Scrolls the page at `at` by page pixels. */
   wheel(at: Point, deltaX: number, deltaY: number): void;
   setZoom(zoom: Zoom): void;
+  pinch(start: LiveViewPinch | null): void;
   feedback(kind: "secondary-click" | "drag-start"): void;
+}
+
+export interface LiveViewPinch {
+  ids: [number, number];
+  startZoom: Zoom;
+  startMid: Point;
+  startDistance: number;
+  stage: Size;
+  frame: Size;
+}
+
+export function pinchedZoom(pinch: LiveViewPinch, first: Point, second: Point): Zoom {
+  "worklet";
+  const mid = { x: (first.x + second.x) / 2, y: (first.y + second.y) / 2 };
+  const spread = Math.hypot(first.x - second.x, first.y - second.y);
+  const scale = clamp((pinch.startZoom.scale * spread) / Math.max(1, pinch.startDistance), 1, MAX_ZOOM);
+  return clampZoom(pinch.stage, pinch.frame, pinchZoom(pinch.startZoom, pinch.startMid, mid, scale));
 }
 
 export interface LiveViewScheduler {
@@ -51,21 +55,16 @@ export interface LiveViewScheduler {
   frame(callback: (time: number) => void): () => void;
 }
 
-/** A finger that moves less than this many points is a tap or a hold. */
 const TAP_SLOP = 10;
 const HOLD_MS = 500;
-/** In trackpad mode, a touch this soon after a tap starts a drag when it holds or moves. */
 const DOUBLE_TAP_MS = 300;
 const DRAG_HOLD_MS = 180;
-/** A second tap this close to the first, in points, is a double click. */
 const DOUBLE_TAP_SLOP = 32;
 const TWO_FINGER_TAP_MS = 250;
 const PINCH_SLOP = 16;
 const SCROLL_SLOP = 8;
-/** Trackpad pointer speed: the finger's distance at rest, up to twice that for a fast swipe. */
 const POINTER_ACCELERATION_START = 0.3;
 const POINTER_ACCELERATION_RANGE = 1.2;
-/** A scroll that ends faster than this, in page pixels per millisecond, keeps moving. */
 const FLING_MIN_SPEED = 0.25;
 const FLING_STOP_SPEED = 0.03;
 const FLING_SAMPLE_MS = 80;
@@ -79,7 +78,6 @@ interface OneFinger {
   last: Point;
   lastTime: number;
   phase: "pending" | "drag" | "pointer" | "pointer-drag" | "held";
-  /** Trackpad mode: the touch came right after a tap, so a hold or a move drags. */
   dragArmed: boolean;
   cancelHold: (() => void) | null;
 }
@@ -93,7 +91,7 @@ interface TwoFingers {
   startZoom: Zoom;
   lastMid: Point;
   phase: "pending" | "scroll" | "zoom";
-  /** Where the wheel events land, as a fraction of the page. */
+  pinching: boolean;
   scrollAt: Point;
   samples: { time: number; x: number; y: number }[];
 }
@@ -128,7 +126,6 @@ export function createLiveViewGestures(host: LiveViewGestureHost, scheduler: Liv
     host.press("up", at, button, clickCount);
   };
 
-  /** A click where the finger is, in direct mode. Nothing happens on the bars around the page. */
   const clickAt = (point: Point, button: LiveViewButton, clickCount: number) => {
     const at = fractionAt(point);
     if (!at || !onPage(at)) return false;
@@ -138,7 +135,6 @@ export function createLiveViewGestures(host: LiveViewGestureHost, scheduler: Liv
     return true;
   };
 
-  /** A right-click where the finger is in direct mode, or at the pointer in trackpad mode. */
   const secondaryClick = (point: Point | null) => {
     if (point) {
       if (!clickAt(point, "right", 1)) return;
@@ -153,7 +149,6 @@ export function createLiveViewGestures(host: LiveViewGestureHost, scheduler: Liv
     stopFling = null;
   };
 
-  /** The trackpad pointer moves by the finger's movement, a little faster for a fast swipe. */
   const movePointer = (from: Point, to: Point, elapsed: number) => {
     const layout = host.layout();
     if (!layout) return;
@@ -276,6 +271,7 @@ export function createLiveViewGestures(host: LiveViewGestureHost, scheduler: Liv
       startZoom: layout.zoom,
       lastMid: startMid,
       phase: "pending",
+      pinching: false,
       scrollAt: host.mode() === "trackpad" || !at ? host.pointer() : clampFraction(at),
       samples: [],
     };
@@ -293,7 +289,6 @@ export function createLiveViewGestures(host: LiveViewGestureHost, scheduler: Liv
       else if (distance(mid, fingers.startMid) > SCROLL_SLOP)
         fingers.phase = fingers.startZoom.scale > 1.01 ? "zoom" : "scroll";
       else return;
-      // The scroll starts here, so the distance under the slop does not jump the page.
       if (fingers.phase === "scroll") {
         fingers.lastMid = mid;
         return;
@@ -301,7 +296,6 @@ export function createLiveViewGestures(host: LiveViewGestureHost, scheduler: Liv
     }
     if (fingers.phase === "scroll") {
       const perPixel = pointsPerPixel(layout.stage, layout.frame, layout.zoom);
-      // The page follows the fingers, as a scroll view does: fingers up scroll the page down.
       const x = -(mid.x - fingers.lastMid.x) / perPixel;
       const y = -(mid.y - fingers.lastMid.y) / perPixel;
       fingers.lastMid = mid;
@@ -311,8 +305,23 @@ export function createLiveViewGestures(host: LiveViewGestureHost, scheduler: Liv
       host.wheel(fingers.scrollAt, x, y);
       return;
     }
-    const scale = clamp((fingers.startZoom.scale * spread) / Math.max(1, fingers.startDistance), 1, MAX_ZOOM);
-    host.setZoom(clampZoom(layout.stage, layout.frame, pinchZoom(fingers.startZoom, fingers.startMid, mid, scale)));
+    const pinch: LiveViewPinch = {
+      ids: fingers.ids,
+      startZoom: fingers.startZoom,
+      startMid: fingers.startMid,
+      startDistance: fingers.startDistance,
+      stage: layout.stage,
+      frame: layout.frame,
+    };
+    host.setZoom(pinchedZoom(pinch, first, second));
+    if (!fingers.pinching) {
+      fingers.pinching = true;
+      host.pinch(pinch);
+    }
+  };
+
+  const leaveTwo = () => {
+    if (state.kind === "two" && state.pinching) host.pinch(null);
   };
 
   const fling = (at: Point, samples: TwoFingers["samples"], time: number) => {
@@ -363,7 +372,6 @@ export function createLiveViewGestures(host: LiveViewGestureHost, scheduler: Liv
         if (entry) startOne(entry[0], entry[1], time);
         return;
       }
-      // Two fingers can land in one event.
       if (state.kind === "idle" && touches.size === 2) {
         const [first, second] = touches.keys();
         if (first !== undefined && second !== undefined) startTwo([first, second], time);
@@ -380,8 +388,10 @@ export function createLiveViewGestures(host: LiveViewGestureHost, scheduler: Liv
         if (other !== undefined) startTwo([current.id, other], time);
         return;
       }
-      // A third finger, or a second one during a drag, is not a gesture of its own.
-      if (current.kind === "two" && touches.size > 2) state = { kind: "lifting" };
+      if (current.kind === "two" && touches.size > 2) {
+        leaveTwo();
+        state = { kind: "lifting" };
+      }
     },
     move(all: readonly LiveViewTouch[], time: number) {
       for (const touch of all) if (touches.has(touch.id)) touches.set(touch.id, { x: touch.x, y: touch.y });
@@ -392,7 +402,6 @@ export function createLiveViewGestures(host: LiveViewGestureHost, scheduler: Liv
         moveTwo(state, time);
       }
     },
-    /** Returns how many fingers are still down. */
     up(changed: readonly LiveViewTouch[], time: number): number {
       for (const touch of changed) {
         if (touches.has(touch.id)) touches.set(touch.id, { x: touch.x, y: touch.y });
@@ -401,6 +410,7 @@ export function createLiveViewGestures(host: LiveViewGestureHost, scheduler: Liv
           state = { kind: "lifting" };
         } else if (state.kind === "two" && state.ids.includes(touch.id)) {
           endTwo(state, time);
+          leaveTwo();
           state = { kind: "lifting" };
         }
         touches.delete(touch.id);
@@ -408,13 +418,13 @@ export function createLiveViewGestures(host: LiveViewGestureHost, scheduler: Liv
       if (touches.size === 0) state = { kind: "idle" };
       return touches.size;
     },
-    /** The system took the touches, or the view ended. A held button is released. */
     cancel() {
       if (state.kind === "one") {
         state.cancelHold?.();
         if (state.phase === "drag" || state.phase === "pointer-drag") host.press("up", host.pointer(), "left", 1);
       }
       endFling();
+      leaveTwo();
       touches.clear();
       state = { kind: "idle" };
       lastTap = null;

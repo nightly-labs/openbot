@@ -1,4 +1,10 @@
-import type { AnalyticsProviderDay, AnalyticsTotals, HostAnalytics, HostAnalyticsInput } from "@openbot/contracts/ipc";
+import type {
+  AnalyticsProviderDay,
+  AnalyticsSkill,
+  AnalyticsTotals,
+  HostAnalytics,
+  HostAnalyticsInput,
+} from "@openbot/contracts/ipc";
 import {
   type AgentAnalytics,
   type AgentAnalyticsInput,
@@ -6,8 +12,6 @@ import {
   emptyAnalyticsTotals,
 } from "@openbot/contracts/ipc";
 
-// The weight separates the agents from each other: without it every mock agent draws the
-// same curve, and the per-agent table previews as identical rows with equal shares.
 export function mockAgentAnalytics(
   input: AgentAnalyticsInput,
   agent: Pick<ClientAgentSummary, "id" | "model" | "provider">,
@@ -87,9 +91,6 @@ export function mockHostAnalytics(
     return total;
   }
   const totals = sum(reports.map((report) => report.totals));
-  // Each mock report covers one provider, and two agents can share one, so the grid is the
-  // reports' daily rows folded together by [date, provider] - the same shape and order the
-  // read path produces.
   const providerDays = new Map<string, AnalyticsProviderDay>();
   for (const [index, report] of reports.entries()) {
     const provider = selected[index]?.provider ?? "";
@@ -144,5 +145,29 @@ export function mockHostAnalytics(
     providerDaily: [...providerDays.values()].sort(
       (a, b) => a.date.localeCompare(b.date) || a.provider.localeCompare(b.provider),
     ),
+    skills: mockSkills(
+      selected.length,
+      totals.processedTokens ? (totals.estimatedCostUsd ?? 0) / totals.processedTokens : 0,
+    ),
   };
+}
+
+const MOCK_SKILLS = [
+  ["release-notes", 14, 2_400],
+  ["code-review", 9, 3_900],
+  ["browser-research", 6, 5_200],
+  ["invoice-reconciliation", 3, 1_700],
+  ["incident-postmortem", 1, 2_800],
+] as const;
+
+function mockSkills(agents: number, costPerToken: number): AnalyticsSkill[] {
+  const rows = MOCK_SKILLS.map(([skill, loads, size], index) => {
+    const users = Math.max(0, agents - index);
+    const count = loads * users;
+    return { skill, loads: count, tokens: count * size, estimatedCostUsd: count * size * costPerToken, agents: users };
+  }).filter((row) => row.loads > 0);
+  const total = rows.reduce((sum, row) => sum + row.tokens, 0);
+  return rows
+    .map((row) => ({ ...row, share: total ? row.tokens / total : 0 }))
+    .sort((a, b) => b.tokens - a.tokens || b.loads - a.loads);
 }

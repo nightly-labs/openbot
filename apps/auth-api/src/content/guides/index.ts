@@ -1,10 +1,12 @@
-// Slug to guide body, on the same terms as the news bodies: eager, so the prose
-// is in the server's HTML rather than arriving after hydration.
-
 import type { ArticleBody } from "../body";
 import { AgenticAIDefinition } from "./agentic-ai-definition";
+import { AIAgentProductivity } from "./ai-agent-productivity";
+import { AIAgentWorkflow } from "./ai-agent-workflow";
+import { AIAgentWorkflows } from "./ai-agent-workflows";
 import { AIAgentsExamples } from "./ai-agents-examples";
 import { AIAgentsVsAgenticAI } from "./ai-agents-vs-agentic-ai";
+import { AITeammatesVsAIChatbots } from "./ai-teammates-vs-ai-chatbots";
+import { AIWorkspaceVsChat } from "./ai-workspace-vs-chat";
 import { ImportGrokBotAgents } from "./import-grok-bot-agents";
 import { ImportHermesAgents } from "./import-hermes-agents";
 import { InstallOpenBotVPS } from "./install-openbot-vps";
@@ -15,6 +17,11 @@ import { WhatAreAIAgents } from "./what-are-ai-agents";
 import { WtfIsOpenBot } from "./wtf-is-openbot";
 
 export const GUIDE_BODIES: Readonly<Record<string, ArticleBody>> = {
+  "ai-agent-workflows": AIAgentWorkflows,
+  "ai-agent-productivity": AIAgentProductivity,
+  "ai-agent-workflow": AIAgentWorkflow,
+  "ai-teammates-vs-ai-chatbots": AITeammatesVsAIChatbots,
+  "ai-workspace-vs-chat": AIWorkspaceVsChat,
   "install-openbot-vps": InstallOpenBotVPS,
   "import-hermes-agents": ImportHermesAgents,
   "import-grok-bot-agents": ImportGrokBotAgents,

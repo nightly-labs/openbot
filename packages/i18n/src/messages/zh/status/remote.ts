@@ -2,7 +2,6 @@ import type { PartialTranslation } from "../../../message";
 import type { messages as source } from "../../en/status/remote";
 
 export const messages = {
-  // Status lines of remote desktop setup and remote connection recovery.
   "status.remote.setupMacOnly": "权限设置仅在 macOS 上可用。",
   "status.remote.setupInstallHost": "请先安装远程桌面主机组件，然后重新检查。",
   "status.remote.setupUpdateRuntime": "请更新远程桌面运行时以检查 macOS 权限。",
@@ -41,4 +40,5 @@ export const messages = {
     other: "正在重连 {attempt}/{count}\n{detail}",
   },
   "status.remote.reconnecting": { one: "正在重连 {attempt}/{count}", other: "正在重连 {attempt}/{count}" },
+  "status.remote.messageCut": "[此消息有 {size} MB 未在此设备上显示。请在运行服务器的电脑上打开以阅读全文。]",
 } as const satisfies PartialTranslation<typeof source>;

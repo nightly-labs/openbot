@@ -1,3 +1,4 @@
+import { PUSH_NOTIFICATION_THREADS_ROUTES } from "@openbot/contracts/team-protocol/push-notification-threads-v1";
 import {
   ANDROID_PUSH_NOTIFICATIONS_ROUTES,
   type AndroidPushNotificationRegistration,
@@ -25,6 +26,7 @@ import {
   setNotificationPermission,
   usePushNotificationPreference,
 } from "@/features/settings/model/push-notifications";
+import { supportLog, supportLogValue } from "@/features/support/model/support-log";
 import type { MobileServer } from "@/features/workspace/model/workspace-types";
 import { isAndroid } from "@/shared/lib/platform";
 import { usePushEnvironment } from "@/shared/lib/push-environment";
@@ -33,58 +35,49 @@ import { pushNotificationsNative as native } from "./push-notifications-native";
 
 interface PushNotificationsInput {
   servers: readonly Pick<MobileServer, "id" | "name" | "state">[];
-  /**
-   * Whether `servers` came from the account service. Before that, and when it failed, the list is
-   * empty, and the key file keeps the keys of the last list.
-   */
   serversReady: boolean;
-  /** While the app is on screen, the hosts send nothing: the app shows the event itself. */
   foreground: boolean;
   post(serverId: string, path: string, body: TeamProtocolV2Json): Promise<unknown>;
   supportsPush(serverId: string): boolean;
+  supportsThreads(serverId: string): boolean;
 }
 
-/** A request that failed is sent again after this time, or at the next change or connection. */
 const RETRY_MS = 30_000;
-/** An iPhone registers through `push-notifications-v1`, an Android phone through `push-notifications-android-v1`. */
+
+let lastPushLine = "";
+function logPush(level: "info" | "warn", text: string): void {
+  if (text === lastPushLine) return;
+  lastPushLine = text;
+  supportLog.add(level, "app", `Notifications: ${text}`);
+}
+
+const serverLines = new Map<string, string>();
+function logServerPush(serverId: string, level: "info" | "warn", text: string): void {
+  if (serverLines.get(serverId) === text) return;
+  serverLines.set(serverId, text);
+  supportLog.add(level, "connection", `${serverId} notifications ${text}`);
+}
 const ROUTES = isAndroid ? ANDROID_PUSH_NOTIFICATIONS_ROUTES : PUSH_NOTIFICATIONS_ROUTES;
 
-/**
- * Gives each connected server that supports the notifications of this platform the push token of the
- * app, the events that the user chose, and whether the app is on screen. The server level is the
- * level that the user chose for all of their devices, or this phone's level when they chose none. With notifications off, an
- * iPhone still registers without a token when the Live Activity plays the sound, because the host
- * decides when it does. A host keeps the registration also when it restarts, so the phone tells each
- * host again after each connection, and removes it when the user turns both off for that host or
- * signs out.
- */
 export function usePushNotifications({
   servers,
   serversReady,
   foreground,
   post,
   supportsPush,
+  supportsThreads,
 }: PushNotificationsInput): void {
   const preference = usePushNotificationPreference();
-  // The level that the user chose for all of their devices replaces the level of this phone. The host
-  // applies it too, and the levels of the agents, so a change registers again only when it turns the
-  // server on or off here, or changes the level of the registration.
   const synced = useSyncedNotificationLevels((state) => state.servers);
   const liveActivities = useLiveActivitiesPreference();
   const activityHost = useLiveActivityHost();
-  // An iPhone registers only when it knows which Apple environment its token is for.
   const environment = usePushEnvironment();
   const [token, setToken] = useState<string | null>(null);
   const [secret, setSecret] = useState<Uint8Array | null>(null);
-  /** What the phone last told each host, so an unchanged state is not sent again. */
-  const registered = useRef(new Map<string, { key: string; removed: boolean }>());
+  const registered = useRef(new Map<string, { key: string; removed: boolean; threads: boolean | null }>());
   const postRef = useRef(post);
   postRef.current = post;
   const queues = useRef(new Map<string, Promise<void>>());
-  /**
-   * A removal cannot reach a host before the registration that it removes. Each server has its own
-   * queue, so a host that does not answer does not hold the others.
-   */
   const enqueue = useCallback((serverId: string, run: () => Promise<void>) => {
     queues.current.set(
       serverId,
@@ -113,20 +106,19 @@ export function usePushNotifications({
     if (native && foreground) void loadPushNotificationPreference().catch(() => undefined);
   }, [foreground]);
 
-  // The phone asks once. The answer can change in the phone settings while the app is away, so it is read again.
-  // Apple or Google can fail to give the token, as without network at the first launch. Without it no
-  // host gets the phone, so the read runs again while the app is on screen.
   useEffect(() => {
-    // A local name, so that the check above also holds in the function below.
     const push = native;
+    if (preference.ready && !preference.enabled) logPush("info", "off in the app settings");
     if (!push || !enabled || !foreground) return;
     let current = true;
     let again: ReturnType<typeof setTimeout> | null = null;
     const readToken = async () => {
       try {
         const device = await push.deviceToken();
+        logPush(device ? "info" : "warn", device ? "push token received" : "the phone gave no push token");
         if (current) setToken(device);
-      } catch {
+      } catch (error) {
+        logPush("warn", `push token not read: ${supportLogValue(error)}`);
         if (current) again = setTimeout(() => void readToken(), RETRY_MS);
       }
     };
@@ -134,6 +126,7 @@ export function usePushNotifications({
       const permission = await push.permission((answer) =>
         mobileAnalytics.track("notification_settings_action", { action: "permission_prompted", permission: answer }),
       );
+      logPush(permission === "denied" ? "warn" : "info", `permission ${permission}`);
       if (!current) return;
       setNotificationPermission(permission);
       if (permission === "granted") await readToken();
@@ -142,19 +135,16 @@ export function usePushNotifications({
       current = false;
       if (again) clearTimeout(again);
     };
-  }, [enabled, foreground]);
+  }, [enabled, foreground, preference.ready, preference.enabled]);
 
   useEffect(() => native?.onDeviceToken(setToken), []);
 
-  // The file is written again only when a server or its name changes. A list that did not load would
-  // remove the keys, and each notification would then show the app name only.
   useEffect(() => {
     if (!native || !secret || !serversReady) return;
     try {
       native.writeKeys(
         servers.map(({ id, name }) => {
           const keys = pushNotificationKeys(liveActivityHostKeys(secret, id).secret);
-          // `NotificationService.swift` and `SealedNotification.kt` read these field names.
           return {
             serverId: id,
             name,
@@ -163,23 +153,17 @@ export function usePushNotifications({
           };
         }),
       );
-    } catch {
-      // Without the file the extension shows the app name only.
-    }
+    } catch {}
   }, [secret, servers, serversReady]);
 
   useEffect(() => {
     if (!native || !preference.ready || !liveActivities.ready || !secret || !environment) return;
-    // Wait for iOS and the token, so a phone that has notifications does not remove them at launch.
     if (preference.enabled && preference.permission === null) return;
     const deliverable = preference.enabled && preference.permission === "granted";
     if (deliverable && !token) return;
-    // With notifications off, the Live Activity of an iPhone can still play the sound, which the host
-    // starts. Android has no Live Activity.
     const activitySound = !isAndroid && liveActivities.enabled && preference.playSound;
     const now = Date.now();
     for (const server of servers) {
-      // A host forgets nothing when the phone goes offline, but the phone tells it again on reconnect.
       if (server.state !== "online") {
         registered.current.delete(server.id);
         continue;
@@ -212,21 +196,37 @@ export function usePushNotifications({
           };
         }
       }
-      // A retry after a failed request sends the state again.
       const key = `${attempt}:${JSON.stringify(registration)}`;
-      if (registered.current.get(server.id)?.key === key) continue;
-      registered.current.set(server.id, { key, removed: registration === null });
+      const threads = registration && supportsThreads(server.id) ? preference.threadReplies : null;
+      const last = registered.current.get(server.id);
+      const sendRegistration = last?.key !== key;
+      const replies = threads !== null && last?.threads !== threads ? threads : null;
+      if (!sendRegistration && replies === null) continue;
+      registered.current.set(server.id, { key, removed: registration === null, threads });
       const serverId = server.id;
       enqueue(serverId, async () => {
         try {
-          await postRef.current(
-            serverId,
-            registration ? ROUTES.register : ROUTES.remove,
-            registration ? { ...registration } : {},
-          );
-        } catch {
-          if (registered.current.get(serverId)?.key !== key) return;
-          registered.current.delete(serverId);
+          if (sendRegistration) {
+            await postRef.current(
+              serverId,
+              registration ? ROUTES.register : ROUTES.remove,
+              registration ? { ...registration } : {},
+            );
+            logServerPush(
+              serverId,
+              "info",
+              registration
+                ? `registered, level ${registration.level}, ${registration.token ? "with" : "without"} a push token`
+                : "removed",
+            );
+          }
+          if (replies !== null) await postRef.current(serverId, PUSH_NOTIFICATION_THREADS_ROUTES.set, { replies });
+        } catch (error) {
+          logServerPush(serverId, "warn", `not registered: ${supportLogValue(error)}`);
+          const current = registered.current.get(serverId);
+          if (current?.key === key) registered.current.delete(serverId);
+          else if (current && replies !== null) current.threads = null;
+          else return;
           retry.current ??= setTimeout(() => {
             retry.current = null;
             setAttempt((count) => count + 1);
@@ -245,6 +245,7 @@ export function usePushNotifications({
     liveActivities,
     activityHost,
     supportsPush,
+    supportsThreads,
     enqueue,
     attempt,
   ]);
@@ -254,19 +255,13 @@ export function usePushNotifications({
     return () => {
       if (retry.current) clearTimeout(retry.current);
       retry.current = null;
-      // Sign-out removes the workspace. Its hosts must not notify about it, and the extension must not
-      // open a notification of it. The requests go at once: the server connections close after this
-      // cleanup. A host that does not get one learns it from the account service, which refuses the
-      // ended session.
       for (const [serverId, { removed }] of sent) {
         if (!removed) void postRef.current(serverId, ROUTES.remove, {}).catch(() => undefined);
       }
       sent.clear();
       try {
         native?.removeKeys();
-      } catch {
-        // The keys open nothing after sign-out: the phone secret changes.
-      }
+      } catch {}
     };
   }, []);
 }

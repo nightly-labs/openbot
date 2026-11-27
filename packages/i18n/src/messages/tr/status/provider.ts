@@ -10,5 +10,27 @@ export const messages = {
   "status.provider.retryUnreachable": "{provider} sunucusuna bağlanamıyor. Yeniden deneme {attempt}/{maxAttempts}.",
   "status.provider.retryServerError":
     "{provider} sunucusu meşgul veya bir hata verdi. Yeniden deneme {attempt}/{maxAttempts}.",
+  "status.provider.modelRetryUnreachable":
+    "{provider} model sağlayıcısına bağlanamıyor. Yeniden deniyor: deneme {attempt}.",
+  "status.provider.modelRetryServerError":
+    "Model sağlayıcısı meşgul veya bir hata verdi. {provider} yeniden deniyor: deneme {attempt}.",
+  "status.provider.modelRetryOutOfMemory":
+    "Model sunucusunun belleği bu sohbet için yetmedi. {provider} yeniden deniyor: deneme {attempt}. Yeni bir sohbet daha az bellek gerektirir.",
+  "status.provider.modelRetryRecovered": "Model sağlayıcısı yeniden yanıt veriyor.",
   "status.provider.retryRecovered": "{provider} sunucusundan yeniden yanıt alıyor.",
+  "status.provider.claudeFastModeNeedsUsageCredits":
+    "Claude standart hızda yanıt verdi. Claude aboneliğinde hızlı mod kullanım kredisi harcar. Bunu Claude hesabınızda açın.",
+  "status.provider.claudeFastModeNotOnPlan": "Claude standart hızda yanıt verdi. Claude planınız hızlı modu içermiyor.",
+  "status.provider.claudeFastModeNotFirstParty":
+    "Claude standart hızda yanıt verdi. Hızlı mod yalnızca bir Anthropic API anahtarı veya Claude aboneliğiyle çalışır; Bedrock, Vertex, Foundry veya bir ağ geçidiyle çalışmaz.",
+  "status.provider.claudeFastModeModelNotAllowed":
+    "Claude standart hızda yanıt verdi. Bu model hesabınızda hızlı modu kullanamaz.",
+  "status.provider.claudeFastModeTurnedOff":
+    "Claude standart hızda yanıt verdi. Hızlı mod, Claude Code ayarlarında veya kuruluşunuz tarafından kapatılmış.",
+  "status.provider.claudeFastModeUnavailable":
+    "Claude standart hızda yanıt verdi. Claude Code bu turda hızlı modu kullanamadı.",
+  "status.provider.claudeOwnApiKey":
+    "Claude Code bir Anthropic API anahtarı kullanacak şekilde ayarlı. Anthropic her isteği Claude planınızdan değil, anahtarın API kredisinden ücretlendirir. Planınızı kullanmak için anahtarı Claude Code ayarlarından veya ortam değişkenlerinden kaldırın, ardından OpenBot'u yeniden başlatın.",
+  "status.provider.accountRemovesAfterTurn":
+    "OpenBot, süren turlar bitince bu hesabı kaldırır. Ajanları sonra başka hesapları kullanır.",
 } as const satisfies PartialTranslation<typeof source>;

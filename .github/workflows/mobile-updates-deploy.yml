@@ -1,0 +1,83 @@
+name: Deploy mobile update server
+
+# The Worker of `apps/mobile-updates`, which gives the mobile app its over-the-air updates. It has
+# its own workflow and its own deploy token, so a problem here cannot stop a deploy of the account
+# Worker in CI. It deploys only when the Worker changes. See apps/mobile-updates/README.md.
+on:
+  push:
+    branches: [main]
+    paths:
+      - apps/mobile-updates/**
+      - .github/workflows/mobile-updates-deploy.yml
+  workflow_dispatch:
+
+permissions: {}
+
+concurrency:
+  group: mobile-updates-deploy
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    name: Deploy the update Worker
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    environment: cloudflare-production
+    permissions:
+      contents: read
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Require the deploy token
+        shell: bash
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_MOBILE_UPDATES_DEPLOY_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ vars.CLOUDFLARE_ACCOUNT_ID }}
+        run: |
+          if [[ -z "$CLOUDFLARE_API_TOKEN" || -z "$CLOUDFLARE_ACCOUNT_ID" ]]; then
+            echo "Set the cloudflare-production secret CLOUDFLARE_MOBILE_UPDATES_DEPLOY_TOKEN and the variable CLOUDFLARE_ACCOUNT_ID." >&2
+            exit 1
+          fi
+
+      - name: Set up Bun
+        uses: ./.github/actions/setup-bun
+        with:
+          install: ignore-scripts
+
+      - name: Typecheck the update server
+        run: bun run typecheck:updates
+
+      - name: Run the update server E2E test
+        run: bun run test:mobile-ota
+
+      - name: Deploy the update Worker
+        working-directory: apps/mobile-updates
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_MOBILE_UPDATES_DEPLOY_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ vars.CLOUDFLARE_ACCOUNT_ID }}
+        run: ../../node_modules/.bin/wrangler deploy --config wrangler.jsonc
+
+      # A binary with a runtime version that has no update must get the empty answer of protocol 1.
+      - name: Verify the deployment
+        shell: bash
+        run: |
+          headers="$(mktemp)"
+          for attempt in 1 2 3 4 5 6; do
+            status="$(curl --silent --show-error --max-time 20 --output /dev/null --dump-header "$headers" \
+              --write-out '%{http_code}' \
+              -H 'expo-platform: ios' -H 'expo-protocol-version: 1' \
+              -H 'expo-runtime-version: deployment-check' -H 'expo-channel-name: production' \
+              https://updates.openbot.run/manifest || true)"
+            if [[ "$status" == "204" ]] && grep -qi '^expo-protocol-version: 1' "$headers"; then
+              echo "The update server answers."
+              exit 0
+            fi
+            echo "Attempt $attempt: status $status."
+            sleep 10
+          done
+          echo "::error title=Verify the deployment::The update server did not give the empty answer of protocol 1."
+          exit 1

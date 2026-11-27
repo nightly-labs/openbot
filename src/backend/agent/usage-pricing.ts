@@ -1,9 +1,5 @@
 import type { UsageTokens } from "@openbot/contracts/ipc";
 
-// Standard API-equivalent rates per million tokens, verified 2026-10-21.
-// These are not subscription charges. No guessed alias or default-model prices.
-// Claude turns are priced by the Claude SDK's own cost report. These Claude rates apply only when
-// that report gives no cost for a turn, as on the first turn of a resumed process.
 const EFFECTIVE_DATE = "2026-10-21";
 const OPENAI = "https://developers.openai.com/api/docs/pricing";
 const CLAUDE = "https://platform.claude.com/docs/en/about-claude/pricing";
@@ -12,39 +8,23 @@ const GEMINI = "https://ai.google.dev/gemini-api/docs/pricing";
 interface Rates {
   input: number;
   cached: number;
-  /** The rate of a cache write. Without one, an update that writes the cache stays unpriced. */
   cacheWrite?: number;
   output: number;
 }
 interface Price {
   source: string;
-  /** The date these rates were read, when it is later than `EFFECTIVE_DATE`. */
   verified?: string;
   short: Rates;
-  /** A request whose prompt has at least `from` input tokens bills all its tokens at these rates. */
   long?: Rates & { from: number };
-  /** From this UTC date (`YYYY-MM-DD`), these rates replace `short`. */
   change?: { on: string; short: Rates };
 }
-// OpenAI: "Long context: >272K input tokens". Codex sets no cache lifetime, so a write is the
-// default 30-minute write. GPT-5.5 has no cache-write charge: a write bills as input.
 const OPENAI_LONG = 272_001;
-// xAI: "Long context ≥ 200k tokens". It lists no cache-write rate. ACP reports no prompt for each
-// request, so a Grok update at or over the threshold stays unpriced.
 const GROK_LONG = 200_000;
-// Anthropic, verified 2026-10-24: "Claude 4.6 and later models (except Claude Haiku 5.5) include the
-// full 1M token context window at standard pricing"; Haiku 5.5 pays more "for prompts over 100,000
-// tokens". Claude Code writes the 1-hour cache: its own costs match the 1-hour write rate, 2x input.
-// Server tools, such as web search, bill apart from tokens and are not in these estimates.
 const HAIKU_5_5_LONG = 100_001;
 const claude = (input: number, cached: number, output: number): Price => ({
   source: CLAUDE,
   short: { input, cached, cacheWrite: input * 2, output },
 });
-// Google, verified 2026-10-28: Antigravity "model inference is charged at standard Gemini list rates".
-// Gemini 4 Argon and Gemini 3.8 Flash list no long-context rates and no cache-write rate (Argon
-// caches only implicitly), and each list doubles on a set date. Antigravity also runs Claude models.
-// Its cache lifetime is unknown, so a Claude update through it that writes the cache stays unpriced.
 const ANTIGRAVITY_VERIFIED = "2026-10-28";
 const antigravityClaude = (input: number, cached: number, output: number): Price => ({
   source: CLAUDE,
@@ -56,6 +36,18 @@ const PRICES: Readonly<Record<string, Price>> = {
     source: OPENAI,
     short: { input: 10, cached: 1, cacheWrite: 12.5, output: 50 },
     long: { from: OPENAI_LONG, input: 20, cached: 2, cacheWrite: 25, output: 75 },
+  },
+  "codex:gpt-6.2-astra": {
+    source: OPENAI,
+    verified: "2026-11-17",
+    short: { input: 8, cached: 0.4, cacheWrite: 10, output: 40 },
+    long: { from: OPENAI_LONG, input: 16, cached: 0.8, cacheWrite: 20, output: 60 },
+  },
+  "codex:gpt-6.2-sol": {
+    source: OPENAI,
+    verified: "2026-11-17",
+    short: { input: 2, cached: 0.1, cacheWrite: 2.5, output: 10 },
+    long: { from: OPENAI_LONG, input: 4, cached: 0.2, cacheWrite: 5, output: 15 },
   },
   "codex:gpt-6.1-sol": {
     source: OPENAI,
@@ -129,6 +121,16 @@ const PRICES: Readonly<Record<string, Price>> = {
     short: { input: 2, cached: 0.1, output: 10 },
     change: { on: "2026-12-01", short: { input: 4, cached: 0.2, output: 20 } },
   },
+  "antigravity:gemini-4-hydrogen": {
+    source: GEMINI,
+    verified: "2026-11-18",
+    short: { input: 1.5, cached: 0.075, output: 7.5 },
+  },
+  "antigravity:gemini-4-neon": {
+    source: GEMINI,
+    verified: "2026-11-22",
+    short: { input: 3, cached: 0.15, output: 15 },
+  },
   "antigravity:gemini-3.8-flash": {
     source: GEMINI,
     verified: ANTIGRAVITY_VERIFIED,
@@ -140,23 +142,16 @@ const PRICES: Readonly<Record<string, Price>> = {
 };
 
 function priceOf(provider: string, model: string): Price | undefined {
-  // Claude Code names the 1M context window `[1m]`. It is priced at the model's standard rates.
-  return PRICES[`${provider}:${provider === "claude" ? model.replace(/\[1m\]$/, "") : model}`];
+  const price = PRICES[`${provider}:${provider === "claude" ? model.replace(/\[1m\]$/, "") : model}`];
+  if (price || provider !== "antigravity") return price;
+  const effort = /-(minimal|low|medium|high)$/.exec(model);
+  return effort ? PRICES[`${provider}:${model.slice(0, effort.index)}`] : undefined;
 }
 
-/** The standard input rate per million tokens, or null for a model with no known price. */
 export function inputPrice(provider: string, model: string): number | null {
   return priceOf(provider, model)?.short.input ?? null;
 }
 
-/**
- * Prices the tokens of one update. `lastRequestInputTokens` is the prompt of the last request in it,
- * when the provider reports one. An update under the long-context threshold cannot hold a request
- * over it. An update over it is one known request only when its input equals that last prompt;
- * otherwise it can mix short and long requests and stays unpriced. `smallestRequestInputTokens` is the
- * smallest prompt of all the update's requests, when the provider reports each request: at or over
- * the threshold, every request in the update is long. `occurredAt` (ISO) picks the rates of a dated change.
- */
 export function estimateUsageCost(
   provider: string,
   model: string,

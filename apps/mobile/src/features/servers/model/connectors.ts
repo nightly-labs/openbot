@@ -1,12 +1,16 @@
 import type { ConnectorMessagingPlatform, MessagingConnection } from "@openbot/contracts/ipc";
 import type { AppMobileMessages, MobileTextKey } from "@openbot/i18n/mobile";
 
-/**
- * The connectors of a joined server, in the order of desktop Server settings › Connectors. A host
- * without `bitwarden-connector-v1` connects Bitwarden only on its own computer, so a phone shows it
- * with no action.
- */
-export const MOBILE_CONNECTOR_IDS = ["slack", "discord", "telegram", "github", "onepassword", "bitwarden"] as const;
+export const MOBILE_CONNECTOR_IDS = [
+  "slack",
+  "discord",
+  "telegram",
+  "whatsapp",
+  "github",
+  "onepassword",
+  "bitwarden",
+  "protonpass",
+] as const;
 
 export type MobileConnectorId = (typeof MOBILE_CONNECTOR_IDS)[number];
 
@@ -14,23 +18,24 @@ export function isMobileConnectorId(value: string | undefined): value is MobileC
   return MOBILE_CONNECTOR_IDS.some((id) => id === value);
 }
 
-/** Slack and Discord install the OpenBot app in a workspace; Telegram links chats to one bot. */
 export type WorkspacePlatform = Exclude<ConnectorMessagingPlatform, "telegram">;
 
 export const CONNECTOR_TITLE_KEYS = {
   slack: "mobile.server.connectors.slack.title",
   discord: "mobile.server.connectors.discord.title",
   telegram: "mobile.server.connectors.telegram.title",
+  whatsapp: "mobile.server.connectors.whatsapp.title",
   github: "mobile.server.connectors.github.title",
   onepassword: "mobile.server.connectors.onePassword.title",
   bitwarden: "mobile.server.connectors.bitwarden.title",
+  protonpass: "mobile.server.connectors.protonPass.title",
 } as const satisfies Record<MobileConnectorId, MobileTextKey>;
 
-/** How a list shows a connector. `idle` is not set up; `unavailable` cannot be set up from a phone. */
-export type ConnectorStatus = "connected" | "attention" | "connecting" | "idle" | "unavailable" | "unknown";
+export type ConnectorStatus = "connected" | "paused" | "attention" | "connecting" | "idle" | "unavailable" | "unknown";
 
 export const CONNECTOR_STATUS_KEYS = {
   connected: "mobile.server.connectors.statusConnected",
+  paused: "mobile.server.connectors.statusPaused",
   attention: "mobile.server.connectors.statusAttention",
   connecting: "mobile.server.connectors.statusConnecting",
   idle: "mobile.server.connectors.statusNotSetUp",
@@ -38,8 +43,14 @@ export const CONNECTOR_STATUS_KEYS = {
   unknown: "mobile.server.connectors.statusUnknown",
 } as const satisfies Record<ConnectorStatus, MobileTextKey>;
 
-/** What a connection row can do. */
 export type ConnectionKind = "live" | "setup" | "paused" | "attention";
+
+export const CONNECTION_KIND_KEYS = {
+  live: "mobile.server.connectors.statusConnected",
+  paused: "mobile.server.connectors.statusPaused",
+  setup: "mobile.server.connectors.statusConnecting",
+  attention: "mobile.server.connectors.statusAttention",
+} as const satisfies Record<ConnectionKind, MobileTextKey>;
 
 export function connectionKind(connection: MessagingConnection): ConnectionKind {
   switch (connection.state) {
@@ -56,7 +67,6 @@ export function connectionKind(connection: MessagingConnection): ConnectionKind 
   }
 }
 
-/** The orchestrator agent of a Slack workspace or a Discord server, when it still exists. */
 export function workspaceOrchestrator<Agent extends { id: string }>(
   connection: MessagingConnection,
   agents: readonly Agent[],
@@ -64,7 +74,6 @@ export function workspaceOrchestrator<Agent extends { id: string }>(
   return agents.find((agent) => agent.id === connection.orchestratorAgentId) ?? null;
 }
 
-/** The one orchestrator agent of all Telegram chats, when it still exists. */
 export function telegramOrchestrator<Agent extends { id: string }>(
   connections: readonly MessagingConnection[],
   agents: readonly Agent[],
@@ -76,7 +85,6 @@ export function telegramOrchestrator<Agent extends { id: string }>(
   return null;
 }
 
-/** The connections that need the user: a stopped connection, or one that no agent answers. */
 export function attentionCount(
   platform: ConnectorMessagingPlatform,
   connections: readonly MessagingConnection[],
@@ -90,16 +98,51 @@ export function attentionCount(
   ).length;
 }
 
+function pausedOrConnected(connections: readonly MessagingConnection[]): ConnectorStatus {
+  return connections.every((connection) => connectionKind(connection) === "paused") ? "paused" : "connected";
+}
+
 export function messagingStatus(
   platform: ConnectorMessagingPlatform,
   connections: readonly MessagingConnection[],
   agents: readonly { id: string }[],
 ): ConnectorStatus {
   if (attentionCount(platform, connections, agents) > 0) return "attention";
-  return connections.length === 0 ? "idle" : "connected";
+  return connections.length === 0 ? "idle" : pausedOrConnected(connections);
 }
 
-/** Telegram gives a group, a supergroup and a channel a negative ID, and a direct chat a positive one. */
+export function whatsappAttentionCount(
+  connections: readonly MessagingConnection[],
+  agents: readonly { id: string }[],
+): number {
+  const orchestrator = telegramOrchestrator(connections, agents);
+  return connections.filter((connection) => connectionKind(connection) === "attention" || !orchestrator).length;
+}
+
+export function whatsappStatus(
+  connections: readonly MessagingConnection[],
+  agents: readonly { id: string }[],
+): ConnectorStatus {
+  if (whatsappAttentionCount(connections, agents) > 0) return "attention";
+  return connections.length === 0 ? "idle" : pausedOrConnected(connections);
+}
+
+export function whatsappPhoneNumber(digits: string): string {
+  return `+${digits}`;
+}
+
+export function whatsappNumberName(connection: MessagingConnection): string {
+  return connection.workspaceName || whatsappPhoneNumber(connection.workspaceId);
+}
+
+export function maskedWhatsAppNumber(digits: string): string {
+  return `+${digits.slice(0, 2)} ••• ${digits.slice(-3)}`;
+}
+
+export function groupedPairingCode(code: string): string {
+  return `${code.slice(0, 4)}-${code.slice(4)}`;
+}
+
 export function isTelegramGroup(connection: MessagingConnection): boolean {
   return connection.workspaceId.startsWith("-");
 }
@@ -111,11 +154,6 @@ const PAGE_HOSTS = {
   github: "github.com",
 } as const;
 
-/**
- * `address` when it is an https page of the platform, otherwise null. A joined server names the pages
- * that the phone opens, so the phone opens no other site. The React Native `URL` does not parse a
- * host strictly, so the host must follow `https://` with no user, port or other character before the path.
- */
 export function platformPage(platform: keyof typeof PAGE_HOSTS, address: string | null): string | null {
   if (address === null) return null;
   const origin = `https://${PAGE_HOSTS[platform]}`;
@@ -124,23 +162,17 @@ export function platformPage(platform: keyof typeof PAGE_HOSTS, address: string 
   return rest === "" || /^[/?#][^\s\\]*$/u.test(rest) ? address : null;
 }
 
-/**
- * The `openbot://` link where a Slack or Discord install returns, from the page at `/slack/connect` or
- * `/discord/connect`. The phone takes it in the browser session that opened the install.
- */
 export const MESSAGING_INSTALL_RETURN = {
   slack: "openbot://slack-workspace",
   discord: "openbot://discord-guild",
 } as const satisfies Record<WorkspacePlatform, string>;
 
-/** True for the return link of a Slack or Discord install, which only its browser session takes. */
 export function isMessagingInstallReturn(path: string): boolean {
   return Object.values(MESSAGING_INSTALL_RETURN).some(
     (prefix) => path === prefix || path.startsWith(`${prefix}?`) || path.startsWith(`${prefix}/`),
   );
 }
 
-/** The sealed grant of a return link, when it has the nonce of the install that the phone opened. */
 export function messagingInstallGrant(
   platform: WorkspacePlatform,
   url: string,
@@ -155,14 +187,9 @@ export function messagingInstallGrant(
   return params.get("nonce") === nonce && grant ? { nonce, grant } : null;
 }
 
-/** The text of one messaging platform. Slack and Discord share a page; Telegram has its own. */
 export const MESSAGING_TEXT = {
   slack: {
-    summary: "mobile.server.connectors.slack.summary",
     description: "mobile.server.connectors.slack.description",
-    connected: "mobile.server.connectors.slack.connected",
-    noAgent: "mobile.server.connectors.slack.noAgent",
-    many: "mobile.server.connectors.slack.many",
     attention: "mobile.server.connectors.slack.attention",
     connect: "mobile.server.connectors.slack.connect",
     connectFooter: "mobile.server.connectors.slack.connectFooter",
@@ -186,11 +213,7 @@ export const MESSAGING_TEXT = {
     installFailed: "mobile.server.connectors.slack.installFailed",
   },
   discord: {
-    summary: "mobile.server.connectors.discord.summary",
     description: "mobile.server.connectors.discord.description",
-    connected: "mobile.server.connectors.discord.connected",
-    noAgent: "mobile.server.connectors.discord.noAgent",
-    many: "mobile.server.connectors.discord.many",
     attention: "mobile.server.connectors.discord.attention",
     connect: "mobile.server.connectors.discord.connect",
     connectFooter: "mobile.server.connectors.discord.connectFooter",

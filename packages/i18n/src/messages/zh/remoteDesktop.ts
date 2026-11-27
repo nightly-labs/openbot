@@ -68,4 +68,14 @@ export const messages = {
   "remoteDesktop.setup.seeDesktop": "我能看到我的桌面",
   "remoteDesktop.setup.seeTestPanel": "我能看到测试面板",
   "remoteDesktop.setup.finishTest": "结束测试",
+  "remoteDesktop.host.questionTitle": "{name} 想要控制此电脑",
+  "remoteDesktop.host.questionDetail":
+    "{name} 将看到你的屏幕，并可以使用你的鼠标和键盘。如果你在 30 秒内没有回应，OpenBot 会拒绝该请求。",
+  "remoteDesktop.host.allow": "允许",
+  "remoteDesktop.host.deny": "拒绝",
+  "remoteDesktop.host.startedTitle": "远程控制已开始",
+  "remoteDesktop.host.startedBody": "{name} 正在控制此电脑。",
+  "remoteDesktop.host.trayTooltip": "OpenBot：远程控制已开启",
+  "remoteDesktop.host.trayControlledBy": "{name} 正在控制此电脑",
+  "remoteDesktop.host.stopAll": "停止所有远程控制",
 } as const satisfies PartialTranslation<typeof source>;

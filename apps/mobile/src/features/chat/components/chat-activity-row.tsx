@@ -8,11 +8,10 @@ import type { MobileAgent } from "@/features/workspace/model/workspace-types";
 import { haptics } from "@/shared/lib/haptics";
 import { useReducedMotion } from "@/shared/lib/motion";
 import { useText } from "@/shared/lib/text";
+import { MIRROR_IN_RTL } from "@/shared/lib/text-direction";
 import { ThinkingTextGradient } from "./thinking-text-gradient";
 
 const EASE_OUT = Easing.bezier(0.23, 1, 0.32, 1);
-// The fade carries the state change, so it survives reduced motion. The rise and the settle are
-// decoration and stop with the system setting.
 const FADE_IN = {
   duration: 260,
   easing: EASE_OUT,
@@ -33,7 +32,6 @@ const MOVE_OUT = {
   easing: EASE_OUT,
   reduceMotion: ReduceMotion.System,
 };
-// As on desktop. The label can be a whole commentary step, which must not make the row tall.
 const LABEL_LINES = 2;
 const PRESS_EASING = cubicBezier(0.23, 1, 0.32, 1);
 
@@ -62,11 +60,6 @@ function activityExiting() {
   };
 }
 
-/**
- * What the row shows for one agent. The list rebuilds it every render, and
- * {@link import("./use-activity-presence").useActivityPresence} keeps the last one while the next
- * signal for the same turn arrives, so `key` must identify the agent rather than the signal.
- */
 export interface ChatActivitySpec {
   key: string;
   label: string;
@@ -76,7 +69,6 @@ export interface ChatActivitySpec {
   online: boolean;
   animateAvatar: boolean;
   shimmer: boolean;
-  /** Opens every thought of the turn. Absent when the chat cannot show them. */
   onPress?: () => void;
 }
 
@@ -93,7 +85,6 @@ export function ChatActivityRow({
   const reducedMotion = useReducedMotion();
   const [pressed, setPressed] = useState(false);
   const { onPress } = spec;
-  // The same views with or without `onPress`, so the row does not enter again when its turn starts.
   return (
     <Animated.View entering={activityEntering} exiting={activityExiting}>
       <Pressable
@@ -141,7 +132,7 @@ export function ChatActivityRow({
               enabled={spec.shimmer}
             />
           </View>
-          {onPress ? <ChevronRight size={16} color={muted} /> : null}
+          {onPress ? <ChevronRight size={16} color={muted} style={MIRROR_IN_RTL} /> : null}
         </Animated.View>
       </Pressable>
     </Animated.View>

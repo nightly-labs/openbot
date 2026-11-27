@@ -71,8 +71,6 @@ export const messages = {
   "error.marketplace.templateTooLarge": "هذا الوكيل أكبر من أن يُنشر. اختصر تعليماته أو مهاراته أو مهامه الدورية.",
   "error.marketplace.linkInvalid": "رابط الوكيل غير صالح.",
   "error.marketplace.changedSinceOpened": "تغيّر هذا الوكيل بعد أن فتحته. افتح الرابط مرة أخرى لمراجعة الإصدار الجديد.",
-  "error.marketplace.skillNameConflict":
-    "لديك بالفعل مهارة محلية مختلفة باسم «{name}». أعد تسميتها أو أزلها، ثم أضف هذا الوكيل مرة أخرى.",
   "error.marketplace.avatarInvalid": "الصورة الرمزية للوكيل غير صالحة.",
   "error.marketplace.secretInName": "أزل السر أو عنوان البريد الإلكتروني من الاسم قبل النشر.",
   "error.marketplace.secretInTitle": "أزل السر أو عنوان البريد الإلكتروني من العنوان قبل النشر.",

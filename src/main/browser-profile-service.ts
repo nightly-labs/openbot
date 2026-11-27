@@ -1,56 +1,119 @@
-import { Effect, Schema, Semaphore } from "effect";
-// Named browser profiles, and the profile of each agent, as this computer holds them. The local
-// window uses this; the agent setting writes through `AgentService.updateAgent`, which closes the
-// agent's tabs when its profile changes. A profile name is user data: it is never logged.
-
 import {
   type AgentBrowserProfile,
   type AgentSummary,
   agentBrowserProfile,
   BROWSER_PROFILE_LIMIT,
+  BROWSER_PROXY_LIMIT,
   type BrowserProfileList,
   type BrowserProfileSummary,
+  type BrowserProxyComputer,
+  type BrowserProxyList,
+  type BrowserProxySummary,
   type BrowserTabProfile,
+  browserProxyAddressText,
   type ClearBrowserDataInput,
+  type DeleteBrowserProxyInput,
   nextBrowserProfileHue,
+  parseBrowserProxyAddress,
+  type SaveBrowserProxyInput,
+  type SetBrowserProfileProxyInput,
   type UpdateAgentBrowserProfileInput,
   type UpdateBrowserProfileInput,
 } from "@openbot/contracts/ipc";
 import { sourceText } from "@openbot/i18n/source";
+import { Effect, Schema, Semaphore } from "effect";
 import type { AgentService } from "../backend/agent-service";
 import type { BrowserHost } from "../backend/browser-host";
 import type { BrowserProfileRecord, BrowserProfileStore } from "../backend/browser-profiles/browser-profile-store";
+import type {
+  BrowserProxyAddressRecord,
+  BrowserProxyComputerRecord,
+  BrowserProxyConnection,
+  BrowserProxyRecord,
+  BrowserProxyStore,
+} from "../backend/browser-profiles/browser-proxy-store";
 import { agentBrowserSessionKey, type BrowserTabSession } from "../backend/browser-state";
 import { causeHelpers } from "../backend/effect-boundary";
 import { AgentNotFoundError } from "./agent-admin-settings";
+import type { SecretStorageCipher } from "./secret-storage-cipher";
 
 export interface BrowserProfileServiceDependencies {
   store: Pick<BrowserProfileStore, "list" | "get" | "create" | "rename" | "setHue" | "delete">;
+  proxies: Pick<
+    BrowserProxyStore,
+    | "list"
+    | "get"
+    | "password"
+    | "assignments"
+    | "proxyOfProfile"
+    | "create"
+    | "update"
+    | "delete"
+    | "assign"
+    | "ensureComputer"
+  >;
+  cipher: Pick<SecretStorageCipher, "canPersist" | "encrypt">;
   agents: Pick<AgentService, "listAgents" | "updateAgent">;
-  browser: Pick<BrowserHost, "tabIdsInSession" | "listTabSessions" | "close" | "clearTabSession">;
-  /** Runs after each change that succeeds, so every open profile list reads them again. */
+  browser: Pick<
+    BrowserHost,
+    | "tabIdsInSession"
+    | "listTabSessions"
+    | "close"
+    | "clearTabSession"
+    | "proxyFailure"
+    | "forgetProxyFailure"
+    | "releaseProfileProxy"
+  >;
+  memberName?: (memberId: string) => string | null;
+  computerOnline?: (memberId: string) => boolean;
   onChanged?: () => void;
 }
 
 export interface BrowserProfileService {
   list(): BrowserProfileList;
   create(name: string): Effect.Effect<BrowserProfileSummary, BrowserProfileFailure>;
-  /** Changes the name, the color, or both. Data and tabs stay. */
   update(input: UpdateBrowserProfileInput): Effect.Effect<BrowserProfileSummary, BrowserProfileFailure>;
-  /** Closes the tabs of the profile or the agent session, then deletes its cookies, storage and cache. */
   clear(input: ClearBrowserDataInput): Effect.Effect<void, BrowserProfileFailure>;
-  /** Moves the agents of the profile to the shared session, closes its tabs and deletes its data. */
   delete(profileId: string): Effect.Effect<void, BrowserProfileFailure>;
   readAgent(agentId: string): AgentBrowserProfile;
   updateAgent(input: UpdateAgentBrowserProfileInput): Effect.Effect<AgentBrowserProfile, BrowserProfileFailure>;
-  /** The profile of each open tab that is not in the shared session. */
   tabProfiles(): BrowserTabProfile[];
+  listProxies(memberId?: string): BrowserProxyList;
+  saveOwnComputer(memberId: string): Effect.Effect<BrowserProxyComputer, BrowserProfileFailure>;
+  saveProxy(input: SaveBrowserProxyInput): Effect.Effect<BrowserProxySummary, BrowserProfileFailure>;
+  deleteProxy(input: DeleteBrowserProxyInput): Effect.Effect<void, BrowserProfileFailure>;
+  setProfileProxy(input: SetBrowserProfileProxyInput): Effect.Effect<void, BrowserProfileFailure>;
+}
+
+export function browserProxyConnection(
+  proxies: Pick<BrowserProxyStore, "proxyOfProfile" | "get" | "password">,
+  cipher: Pick<SecretStorageCipher, "decrypt">,
+  profileId: string,
+): BrowserProxyConnection | null {
+  const proxyId = proxies.proxyOfProfile(profileId);
+  const proxy = proxyId === undefined ? undefined : proxies.get(proxyId);
+  if (proxy === undefined) return null;
+  if (proxy.kind === "computer") return { kind: "computer", proxyId: proxy.id, memberId: proxy.memberId };
+  const password = proxies.password(proxy.id);
+  return {
+    kind: "address",
+    proxyId: proxy.id,
+    scheme: proxy.scheme,
+    host: proxy.host,
+    port: proxy.port,
+    username: proxy.username,
+    password: password === null ? null : cipher.decrypt(Buffer.from(password)),
+  };
 }
 
 export function createBrowserProfileService({
   store,
+  proxies,
+  cipher,
   agents,
   browser,
+  memberName = () => null,
+  computerOnline = () => false,
   onChanged,
 }: BrowserProfileServiceDependencies): BrowserProfileService {
   function requireAgent(agentId: string): AgentSummary {
@@ -84,7 +147,6 @@ export function createBrowserProfileService({
       tabCount: browser.tabIdsInSession({ kind: "profile", profileId: profile.id }).length,
     };
   }
-  // One change at a time, so an agent cannot move into a profile while a delete moves its agents out.
   const changes = Semaphore.makeUnsafe(1);
   const serialized = <A>(change: Effect.Effect<A, BrowserProfileFailure>) =>
     changes
@@ -98,6 +160,152 @@ export function createBrowserProfileService({
   const closeAndClear = Effect.fn("BrowserProfiles.closeAndClear")(function* (tabSession: BrowserTabSession) {
     for (const tabId of browser.tabIdsInSession(tabSession)) yield* browser.close(tabId).pipe(toBrowserProfileFailure);
     yield* browser.clearTabSession(tabSession).pipe(toBrowserProfileFailure);
+  });
+
+  function requireProxy(proxyId: string): BrowserProxyRecord {
+    const proxy = proxies.get(proxyId);
+    if (!proxy) throw new BrowserProfileRejectedError(sourceText("error.backend.browserProxyNotFound"));
+    return proxy;
+  }
+  function profilesOf(proxyId: string, assignments: ReadonlyMap<string, string>): string[] {
+    return [...assignments].filter(([, id]) => id === proxyId).map(([profileId]) => profileId);
+  }
+  function proxySummary(
+    proxy: BrowserProxyAddressRecord,
+    assignments: ReadonlyMap<string, string> = proxies.assignments(),
+  ): BrowserProxySummary {
+    return {
+      id: proxy.id,
+      scheme: proxy.scheme,
+      host: proxy.host,
+      port: proxy.port,
+      username: proxy.username,
+      hasPassword: proxy.hasPassword,
+      profileIds: profilesOf(proxy.id, assignments),
+      failure: browser.proxyFailure(proxy.id),
+    };
+  }
+  function computerSummary(
+    proxy: BrowserProxyComputerRecord,
+    requester: string | undefined,
+    assignments: ReadonlyMap<string, string> = proxies.assignments(),
+  ): BrowserProxyComputer {
+    return {
+      id: proxy.id,
+      memberId: proxy.memberId,
+      name: memberName(proxy.memberId),
+      online: computerOnline(proxy.memberId),
+      mine: proxy.memberId === requester,
+      profileIds: profilesOf(proxy.id, assignments),
+      failure: browser.proxyFailure(proxy.id),
+    };
+  }
+  function requireAddress(proxyId: string): BrowserProxyAddressRecord {
+    const proxy = requireProxy(proxyId);
+    if (proxy.kind !== "address")
+      throw new BrowserProfileRejectedError(sourceText("error.backend.browserProxyNotFound"));
+    return proxy;
+  }
+  const closeProfileTabs = Effect.fn("BrowserProfiles.closeProfileTabs")(function* (profileIds: readonly string[]) {
+    for (const profileId of profileIds) {
+      for (const tabId of browser.tabIdsInSession({ kind: "profile", profileId }))
+        yield* browser.close(tabId).pipe(toBrowserProfileFailure);
+      yield* browser.releaseProfileProxy(profileId).pipe(toBrowserProfileFailure);
+    }
+  });
+
+  const saveProxy = Effect.fn("BrowserProfiles.saveProxy")(function* ({
+    proxyId,
+    previousAddress,
+    keepPassword,
+    address,
+  }: SaveBrowserProxyInput) {
+    const saved = yield* check(() => {
+      const parsed = parseBrowserProxyAddress(address);
+      if (parsed === null)
+        throw new BrowserProfileRejectedError(sourceText("error.backend.browserProxyAddressInvalid"));
+      const { scheme, host, port, username, password } = parsed;
+      const existing = proxyId === undefined ? undefined : requireAddress(proxyId);
+      if (existing !== undefined && browserProxyAddressText(existing) !== previousAddress)
+        throw new BrowserProfileRejectedError(sourceText("error.backend.browserProxyChanged"));
+      const all = proxies.list().filter((proxy) => proxy.kind === "address");
+      if (existing === undefined && all.length >= BROWSER_PROXY_LIMIT)
+        throw new BrowserProfileRejectedError(
+          sourceText("error.backend.browserProxyLimit", { limit: BROWSER_PROXY_LIMIT }),
+        );
+      const taken = all.some(
+        (proxy) =>
+          proxy.id !== proxyId &&
+          proxy.scheme === scheme &&
+          proxy.host === host &&
+          proxy.port === port &&
+          proxy.username === username,
+      );
+      if (taken) throw new BrowserProfileRejectedError(sourceText("error.backend.browserProxyTaken"));
+      if (password !== null && !cipher.canPersist())
+        throw new BrowserProfileRejectedError(sourceText("error.app.secretStorageUnavailable"));
+      const keptPassword =
+        existing !== undefined && keepPassword === true && username !== null ? proxies.password(existing.id) : null;
+      const row = {
+        scheme,
+        host,
+        port,
+        username,
+        password: password === null ? keptPassword : cipher.encrypt(password),
+      };
+      if (existing === undefined) return { id: proxies.create(row), changed: false };
+      proxies.update(existing.id, row);
+      return { id: existing.id, changed: true };
+    });
+    if (saved.changed) {
+      browser.forgetProxyFailure(saved.id);
+      const profileIds = yield* check(() =>
+        [...proxies.assignments()].filter(([, id]) => id === saved.id).map(([profileId]) => profileId),
+      );
+      yield* closeProfileTabs(profileIds);
+    }
+    return yield* check(() => proxySummary(requireAddress(saved.id)));
+  });
+
+  const saveOwnComputer = Effect.fn("BrowserProfiles.saveOwnComputer")(function* (memberId: string) {
+    return yield* check(() => {
+      const computers = proxies.list().filter((proxy) => proxy.kind === "computer");
+      if (!computers.some((proxy) => proxy.memberId === memberId) && computers.length >= BROWSER_PROXY_LIMIT)
+        throw new BrowserProfileRejectedError(
+          sourceText("error.backend.browserProxyLimit", { limit: BROWSER_PROXY_LIMIT }),
+        );
+      return computerSummary(proxies.ensureComputer(memberId), memberId);
+    });
+  });
+
+  const deleteProxy = Effect.fn("BrowserProfiles.deleteProxy")(function* ({
+    proxyId,
+    profileIds: seen,
+  }: DeleteBrowserProxyInput) {
+    const profileIds = yield* check(() => {
+      requireProxy(proxyId);
+      const users = profilesOf(proxyId, proxies.assignments());
+      if (users.length !== seen.length || users.some((profileId) => !seen.includes(profileId)))
+        throw new BrowserProfileRejectedError(sourceText("error.backend.browserProxyChanged"));
+      proxies.delete(proxyId);
+      return users;
+    });
+    browser.forgetProxyFailure(proxyId);
+    yield* closeProfileTabs(profileIds);
+  });
+
+  const setProfileProxy = Effect.fn("BrowserProfiles.setProfileProxy")(function* ({
+    profileId,
+    proxyId,
+  }: SetBrowserProfileProxyInput) {
+    const changed = yield* check(() => {
+      requireProfile(profileId);
+      if (proxyId !== null) requireProxy(proxyId);
+      if ((proxies.proxyOfProfile(profileId) ?? null) === proxyId) return false;
+      proxies.assign(profileId, proxyId);
+      return true;
+    });
+    if (changed) yield* closeProfileTabs([profileId]);
   });
 
   const create = Effect.fn("BrowserProfiles.create")(function* (name: string) {
@@ -138,7 +346,6 @@ export function createBrowserProfileService({
 
   const remove = Effect.fn("BrowserProfiles.delete")(function* (profileId: string) {
     yield* check(() => requireProfile(profileId));
-    // The agents move first, so none of them opens a new tab in the profile while it goes.
     for (const agent of agents.listAgents().filter((candidate) => candidate.browserProfileId === profileId))
       yield* agents.updateAgent({ agentId: agent.id, ownBrowserSession: false }).pipe(toBrowserProfileFailure);
     yield* closeAndClear({ kind: "profile", profileId });
@@ -187,10 +394,23 @@ export function createBrowserProfileService({
         return profile === undefined ? [] : [{ tabId, name: profile.name, hue: profile.hue }];
       });
     },
+    listProxies: (memberId) => {
+      const assignments = proxies.assignments();
+      const all = proxies.list();
+      return {
+        proxies: all.flatMap((proxy) => (proxy.kind === "address" ? [proxySummary(proxy, assignments)] : [])),
+        computers: all.flatMap((proxy) =>
+          proxy.kind === "computer" ? [computerSummary(proxy, memberId, assignments)] : [],
+        ),
+      };
+    },
+    saveOwnComputer: (memberId) => serialized(saveOwnComputer(memberId)),
+    saveProxy: (input) => serialized(saveProxy(input)),
+    deleteProxy: (input) => serialized(deleteProxy(input)),
+    setProfileProxy: (input) => serialized(setProfileProxy(input)),
   };
 }
 
-/** A change that the person who manages the profiles can correct: its message is catalog text for them. */
 export class BrowserProfileRejectedError extends Error {}
 
 class BrowserProfileFailure extends Schema.TaggedError<BrowserProfileFailure>()("BrowserProfileFailure", {

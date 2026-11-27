@@ -1,9 +1,3 @@
-/**
- * The presence feed of the workflow stories: a timer moves the other people on the canvas, as the
- * feed of a team server would. Each person moves from node to node on a slight curve, as a hand moves
- * a mouse, stops on a node for a moment and often selects it.
- */
-
 import type { WfnPoint } from "@openbot/ui/features/workflows/workflow-board";
 import {
   peersOf,
@@ -22,7 +16,6 @@ interface Target {
   height: number;
 }
 
-/** A repeatable random sequence, so each story opens with the same movement. */
 function random(seed: number) {
   let state = seed;
   return () => {
@@ -41,17 +34,13 @@ interface Walk {
   from: WfnPoint;
   bend: WfnPoint;
   to: WfnPoint;
-  /** The node that the person moves to, if any. */
   node: string | undefined;
-  /** The selection that the person makes when the move ends. */
   select: string | undefined;
   start: number;
   duration: number;
-  /** When the person moves again. */
   rest: number;
 }
 
-/** The nodes on the canvas, in world pixels, from their slots. */
 function canvasTargets(): Target[] {
   return [...document.querySelectorAll<HTMLElement>(".wfn-slot[data-slot]")].map((slot) => ({
     id: slot.dataset.slot ?? "",
@@ -62,7 +51,6 @@ function canvasTargets(): Target[] {
   }));
 }
 
-/** The people of the team fixtures, as the member `member-self` sees them, moved by a timer. */
 export function createStoryPresence(): WorkflowPresence {
   const self = "member-self";
   const members = STORY_PRESENCE.members;
@@ -83,7 +71,6 @@ export function createStoryPresence(): WorkflowPresence {
     }),
   );
 
-  /** Starts the next move. Without `from`, the person appears at the end of the move. */
   const plan = (walk: Walk, nodes: readonly Target[], now: number, from: WfnPoint | undefined) => {
     const others = nodes.filter((node) => node.id !== walk.node);
     const node = others[Math.floor(walk.next() * others.length)] ?? nodes[0];
@@ -115,7 +102,6 @@ export function createStoryPresence(): WorkflowPresence {
       for (const walk of walks) {
         const spot = draft[walk.id];
         if (!spot) {
-          // The people start at different times, so they do not move together.
           if (plan(walk, nodes, now - walk.next() * 1500, undefined))
             draft[walk.id] = { at: walk.to, selected: undefined };
           continue;
@@ -125,7 +111,7 @@ export function createStoryPresence(): WorkflowPresence {
         const u = 1 - t;
         const x = u * u * walk.from.x + 2 * u * t * walk.bend.x + t * t * walk.to.x;
         const y = u * u * walk.from.y + 2 * u * t * walk.bend.y + t * t * walk.to.y;
-        if (x !== spot.at.x || y !== spot.at.y) spot.at = { x, y };
+        if (x !== spot.at?.x || y !== spot.at?.y) spot.at = { x, y };
         const chosen = t === 1 ? walk.select : spot.selected;
         const selected = chosen && ids.has(chosen) ? chosen : undefined;
         if (selected !== spot.selected) spot.selected = selected;

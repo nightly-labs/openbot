@@ -1,8 +1,6 @@
-// Run: bun scripts/transfer-upload-cleanup-e2e.ts
-// Report: .openbot-build/transfer-upload-cleanup-e2e.json
-
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
+import { createHash } from "node:crypto";
 import { mkdir, mkdtemp, readdir, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
@@ -14,9 +12,7 @@ import {
   INSTANCE_TRANSFER_MANIFEST,
   INSTANCE_TRANSFER_VERSION,
 } from "../src/main/instance-transfer-manifest";
-import { type InstanceTransferOptions, InstanceTransferService } from "../src/main/instance-transfer-service";
-import { LocalSkillFailure } from "../src/main/local-skill-library";
-import { SkillMarketplaceFailure } from "../src/main/skill-marketplace-service";
+import { emptyInstanceTransferService as service } from "./instance-transfer-e2e-fixture";
 
 const run = Effect.runPromise;
 const exportInput = { agentIds: [], includeFiles: false, includeSettings: false };
@@ -30,7 +26,7 @@ const manifest = {
   signedIn: [],
 };
 const bytes = zipSync({ [INSTANCE_TRANSFER_MANIFEST]: strToU8(JSON.stringify(manifest)) });
-// Empty exports omit settings and cannot be imported. Check their wire manifest too.
+const sha256 = createHash("sha256").update(bytes).digest("hex");
 const decodeArchiveManifest = Schema.decodeUnknownSync(
   Schema.fromJsonString(
     Schema.Struct({
@@ -53,93 +49,6 @@ const decodeArchiveManifest = Schema.decodeUnknownSync(
   ),
 );
 
-function unexpected(operation: string): Error {
-  return new Error(`Unexpected boundary call: ${operation}`);
-}
-
-function service(uploadDirectory: string): InstanceTransferService {
-  // These checks transfer an empty instance. Other boundary calls must fail.
-  const agents: InstanceTransferOptions["agents"] = {
-    listAgents: () => [],
-    listRoutines: (_agentId) => {
-      throw unexpected("listRoutines");
-    },
-    listMemories: (_agentId) => {
-      throw unexpected("listMemories");
-    },
-    getMemorySelection: (_agentId) => {
-      throw unexpected("getMemorySelection");
-    },
-    setMemoryInclusion: (_input) => {
-      throw unexpected("setMemoryInclusion");
-    },
-    resolveAvatar: (_agentId) => {
-      throw unexpected("resolveAvatar");
-    },
-    listModels: () => {
-      throw unexpected("listModels");
-    },
-    createAgentProfile: (_input) => Effect.fail(unexpected("createAgentProfile")),
-    updateAgent: (_input) => Effect.fail(unexpected("updateAgent")),
-    createRoutine: (_input, _options) => {
-      throw unexpected("createRoutine");
-    },
-    createMemory: (_input) => {
-      throw unexpected("createMemory");
-    },
-    memoryLimit: () => {
-      throw unexpected("memoryLimit");
-    },
-    initializeMemorySelection: (_agentId) => {
-      throw unexpected("initializeMemorySelection");
-    },
-    setAvatar: (_agentId, _image) => Effect.fail(unexpected("setAvatar")),
-    deleteAgent: (_agentId) => Effect.fail(unexpected("deleteAgent")),
-  };
-  const library: ReturnType<InstanceTransferOptions["skills"]["library"]> = {
-    list: () => Effect.fail(new LocalSkillFailure({ cause: unexpected("library.list") })),
-    create: (_agentId, _folder) => Effect.fail(new LocalSkillFailure({ cause: unexpected("library.create") })),
-    revise: (_agentId, _id, _revision, _folder) =>
-      Effect.fail(new LocalSkillFailure({ cause: unexpected("library.revise") })),
-    withdraw: (_id, _revision) => Effect.fail(new LocalSkillFailure({ cause: unexpected("library.withdraw") })),
-  };
-  const skills: InstanceTransferOptions["skills"] = {
-    library: () => library,
-    installLocal: (_input) => Effect.fail(new SkillMarketplaceFailure({ cause: unexpected("installLocal") })),
-  };
-  const settings: InstanceTransferOptions["settings"] = {
-    mcpServers: () => {
-      throw unexpected("mcpServers");
-    },
-    saveMcpServer: (_config) => Effect.fail(unexpected("saveMcpServer")),
-    customProviders: () => {
-      throw unexpected("customProviders");
-    },
-    saveCustomProvider: (_input) => Effect.fail(unexpected("saveCustomProvider")),
-    customAgents: () => Effect.fail(unexpected("customAgents")),
-    providersOff: () => {
-      throw unexpected("providersOff");
-    },
-    sidebar: () => {
-      throw unexpected("sidebar");
-    },
-    mutateSidebar: (_action) => Effect.fail(unexpected("mutateSidebar")),
-    routineFlowLinks: (_agentId) => Effect.fail(unexpected("routineFlowLinks")),
-    connectRoutineFlow: (_input) => Effect.fail(unexpected("connectRoutineFlow")),
-    signedInProviders: () => [],
-  };
-  const options: InstanceTransferOptions = {
-    uploadDirectory,
-    sharedRoot: join(dirname(uploadDirectory), "shared"),
-    appVersion: "e2e",
-    agents,
-    skills,
-    settings,
-    timezone: () => "UTC",
-  };
-  return new InstanceTransferService(options);
-}
-
 async function names(directory: string): Promise<string[]> {
   return (await readdir(directory)).sort();
 }
@@ -160,8 +69,13 @@ async function verifyArchives(directory: string, expected: number): Promise<stri
 async function seed(directory: string): Promise<string[]> {
   const previous = service(directory);
   await run(previous.stageUpload(async () => bytes, "previous-owner"));
-  await run(previous.exportForMember(exportInput));
+  await run(previous.exportForMember(exportInput, "export-member"));
   await writeFile(join(directory, "interrupted.zip.part"), bytes);
+  const upload = await run(previous.chunks.beginUpload({ size: bytes.length, sha256 }, "parts-owner"));
+  await run(
+    previous.chunks.writePart({ uploadId: upload.uploadId, index: 0, sha256 }, async () => bytes, "parts-owner"),
+  );
+  await run(previous.chunks.beginExport(exportInput, "parts-owner"));
   return names(directory);
 }
 
@@ -173,7 +87,7 @@ async function restart(directory: string): Promise<string[]> {
   );
   assert.equal(child.status, 0, child.stderr);
   const orphans = Schema.decodeUnknownSync(Schema.fromJsonString(Schema.Array(Schema.String)))(child.stdout);
-  assert.equal(orphans.length, 3);
+  assert.equal(orphans.length, 5);
   return [...orphans];
 }
 
@@ -182,7 +96,7 @@ async function checkRestart(root: string, firstWriter: "upload" | "export"): Pro
   const orphans = await restart(directory);
   const current = service(directory);
   let exported: string | undefined;
-  if (firstWriter === "export") exported = await run(current.exportForMember(exportInput));
+  if (firstWriter === "export") exported = await run(current.exportForMember(exportInput, "export-member"));
   const [alice, bob] = await Promise.all([
     run(current.stageUpload(async () => bytes, "alice")),
     run(current.stageUpload(async () => bytes, "bob")),
@@ -190,7 +104,7 @@ async function checkRestart(root: string, firstWriter: "upload" | "export"): Pro
   for (const orphan of orphans) {
     await assert.rejects(readFile(join(directory, orphan)), { code: "ENOENT" }, `Old file remains: ${orphan}`);
   }
-  if (!exported) exported = await run(current.exportForMember(exportInput));
+  if (!exported) exported = await run(current.exportForMember(exportInput, "export-member"));
   await verifyArchives(directory, 3);
   const before = await names(directory);
   await run(current.discard(alice.token, "bob"));
@@ -212,7 +126,7 @@ async function checkConcurrent(root: string): Promise<void> {
   const current = service(directory);
   const [alice, exported, bob] = await Promise.all([
     run(current.stageUpload(async () => bytes, "alice")),
-    run(current.exportForMember(exportInput)),
+    run(current.exportForMember(exportInput, "export-member")),
     run(current.stageUpload(async () => bytes, "bob")),
   ]);
   await verifyArchives(directory, 3);
@@ -232,7 +146,7 @@ async function checkRetry(root: string): Promise<void> {
   const current = service(directory);
   const failed = await Promise.allSettled([
     run(current.stageUpload(async () => bytes, "alice")),
-    run(current.exportForMember(exportInput)),
+    run(current.exportForMember(exportInput, "export-member")),
   ]);
   assert.ok(failed.every((result) => result.status === "rejected"));
   await rm(blocker);
@@ -254,6 +168,71 @@ async function checkLocal(root: string): Promise<void> {
   await verifyArchives(join(root, "local", "instance-transfer-uploads"), 1);
   await run(current.apply({ token: uploaded.token, keys: [], includeSettings: false }, "alice"));
   assert.deepEqual(await readFile(path), Buffer.from(bytes));
+}
+
+async function checkChunks(root: string): Promise<void> {
+  const directory = join(root, "chunks", "instance-transfer-uploads");
+  const orphans = await restart(directory);
+  const current = service(directory);
+  const upload = await run(current.chunks.beginUpload({ size: bytes.length, sha256 }, "alice"));
+  for (const orphan of orphans) {
+    await assert.rejects(readFile(join(directory, orphan)), { code: "ENOENT" }, `Old file remains: ${orphan}`);
+  }
+  assert.deepEqual(await names(directory), [`${upload.uploadId}.part`]);
+  const part = { uploadId: upload.uploadId, index: 0, sha256 };
+  await assert.rejects(run(current.chunks.writePart(part, async () => bytes, "bob")));
+  await run(current.chunks.writePart(part, async () => bytes, "alice"));
+  await assert.rejects(run(current.chunks.finishUpload(upload.uploadId, "bob")));
+  const preview = await run(current.chunks.finishUpload(upload.uploadId, "alice"));
+  await verifyArchives(directory, 1);
+  await run(current.apply({ token: preview.token, keys: [], includeSettings: false }, "alice"));
+  assert.deepEqual(await names(directory), []);
+  const exported = await run(current.chunks.beginExport(exportInput, "alice"));
+  await verifyArchives(directory, 1);
+  await run(current.chunks.finishExport(exported.exportId, "bob"));
+  await verifyArchives(directory, 1);
+  await run(current.chunks.finishExport(exported.exportId, "alice"));
+  assert.deepEqual(await names(directory), []);
+}
+
+async function checkOverlappingUploads(root: string): Promise<void> {
+  const directory = join(root, "overlapping", "instance-transfer-uploads");
+  const current = service(directory);
+  const part = (uploadId: string) => ({ uploadId, index: 0, sha256 });
+  const first = await run(current.chunks.beginUpload({ size: bytes.length, sha256 }, "alice"));
+  const second = await run(current.chunks.beginUpload({ size: bytes.length, sha256 }, "alice"));
+  assert.equal(second.uploadId, first.uploadId);
+  await run(current.chunks.writePart(part(first.uploadId), async () => bytes, "alice"));
+  const [preview, joined] = await Promise.all([
+    run(current.chunks.finishUpload(first.uploadId, "alice")),
+    run(current.chunks.finishUpload(second.uploadId, "alice")),
+  ]);
+  assert.equal(joined.token, preview.token);
+  const late = await run(current.chunks.writePart(part(second.uploadId), async () => bytes, "alice"));
+  assert.equal(late.receivedBytes, bytes.length);
+  assert.equal((await run(current.chunks.finishUpload(second.uploadId, "alice"))).token, preview.token);
+  const third = await run(current.chunks.beginUpload({ size: bytes.length, sha256 }, "alice"));
+  assert.deepEqual([third.uploadId, third.received], [first.uploadId, [0]]);
+  await assert.rejects(run(current.chunks.writePart(part(first.uploadId), async () => bytes, "bob")));
+  await assert.rejects(run(current.chunks.finishUpload(first.uploadId, "bob")));
+  await verifyArchives(directory, 1);
+  await run(current.apply({ token: preview.token, keys: [], includeSettings: false }, "alice"));
+  assert.deepEqual(await names(directory), []);
+  const afterApply = await run(current.chunks.beginUpload({ size: bytes.length, sha256 }, "alice"));
+  assert.notEqual(afterApply.uploadId, first.uploadId);
+  assert.deepEqual(afterApply.received, []);
+  await assert.rejects(run(current.chunks.finishUpload(first.uploadId, "alice")));
+  await run(current.chunks.abortUpload(afterApply.uploadId, "alice"));
+  const wrong = createHash("sha256").update("another file").digest("hex");
+  const failed = await run(current.chunks.beginUpload({ size: bytes.length, sha256: wrong }, "carol"));
+  await run(current.chunks.writePart(part(failed.uploadId), async () => bytes, "carol"));
+  await assert.rejects(run(current.chunks.finishUpload(failed.uploadId, "carol")));
+  await assert.rejects(run(current.chunks.writePart(part(failed.uploadId), async () => bytes, "carol")));
+  const retried = await run(current.chunks.beginUpload({ size: bytes.length, sha256: wrong }, "carol"));
+  assert.notEqual(retried.uploadId, failed.uploadId);
+  assert.deepEqual(retried.received, []);
+  await run(current.chunks.abortUpload(retried.uploadId, "carol"));
+  assert.deepEqual(await names(directory), []);
 }
 
 interface Report {
@@ -278,6 +257,8 @@ if (process.argv[2] === "--seed") {
       ["concurrent-writers", () => checkConcurrent(root)],
       ["preparation-retry", () => checkRetry(root)],
       ["local-file-and-invalid-upload", () => checkLocal(root)],
+      ["parts-restart-and-owner", () => checkChunks(root)],
+      ["overlapping-uploads", () => checkOverlappingUploads(root)],
     ];
     for (const [name, check] of checks) {
       activeCheck = name;

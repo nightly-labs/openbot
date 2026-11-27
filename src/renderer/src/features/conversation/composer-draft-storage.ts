@@ -13,7 +13,6 @@ type Drafts = Record<string, ComposerDraft>;
 export interface StoredComposerDrafts {
   agents: Drafts;
   channels: Drafts;
-  /** The message box of each side thread, keyed by `threadDraftKey`. */
   threads: Drafts;
 }
 
@@ -24,18 +23,10 @@ interface ComposerDraftOwner {
   editingAgentId: () => string | null;
   editingServerId: () => string | null;
   editingDraftBackup: () => ComposerDraft | null;
-  /** Messages that left the composer but that the host has not confirmed, per chat, oldest first. */
+  threadQueueEdit: () => { draftKey: string; backup: ComposerDraft } | null;
   unsentTexts: () => Record<string, string[]>;
 }
 
-/**
- * Unsent composer text from the last session, so an update mid-message loses nothing.
- *
- * Only the text is kept. The main process deletes draft attachment files at startup, so a restored
- * attachment would point at nothing: its inline reference becomes its name. A reply target is not
- * kept either, because the message it names may not be loaded, and the user could not see or cancel
- * the reply.
- */
 export function readStoredComposerDrafts(): StoredComposerDrafts {
   try {
     return decodeStoredDrafts(JSON.parse(window.localStorage.getItem(COMPOSER_DRAFTS_STORAGE_KEY) ?? "null"));
@@ -54,12 +45,6 @@ function decodeStoredDrafts(value: unknown): StoredComposerDrafts {
     : { agents: {}, channels: {}, threads: {} };
 }
 
-/**
- * Writes the drafts shortly after each change, and at once when the window goes away.
- *
- * A queue edit stores its own draft (`QUEUE_EDIT_STORAGE_KEY`), so for that conversation this keeps
- * the draft the edit restores when it ends.
- */
 export function writeComposerDraftsOnChange(owner: ComposerDraftOwner): void {
   let timer: ReturnType<typeof setTimeout> | undefined;
   const write = () => {
@@ -71,8 +56,9 @@ export function writeComposerDraftsOnChange(owner: ComposerDraftOwner): void {
     if (editAgentId && editServerId)
       agents[composerDraftKey({ agentId: editAgentId, serverId: editServerId })] =
         owner.editingDraftBackup() ?? EMPTY_DRAFT;
-    // A failed or waiting message lives only in memory. After a restart its text is back in the
-    // composer, before what the user typed later, and nothing sends it again on its own.
+    const threads = { ...owner.threadDrafts() };
+    const threadEdit = owner.threadQueueEdit();
+    if (threadEdit) threads[threadEdit.draftKey] = threadEdit.backup;
     for (const [key, texts] of Object.entries(owner.unsentTexts())) {
       const draft = agents[key] ?? EMPTY_DRAFT;
       agents[key] = { ...draft, text: [...texts, draft.text].filter((text) => text.trim()).join("\n\n") };
@@ -83,12 +69,10 @@ export function writeComposerDraftsOnChange(owner: ComposerDraftOwner): void {
         JSON.stringify({
           agents: storableDrafts(agents),
           channels: storableDrafts(owner.channelDrafts()),
-          threads: storableThreadDrafts(owner.threadDrafts()),
+          threads: storableThreadDrafts(threads),
         }),
       );
-    } catch {
-      // Storage is full or unavailable. The drafts stay in memory for this session.
-    }
+    } catch {}
   };
   createEffect(
     () =>
@@ -98,11 +82,11 @@ export function writeComposerDraftsOnChange(owner: ComposerDraftOwner): void {
         owner.threadDrafts(),
         owner.editingAgentId(),
         owner.editingDraftBackup(),
+        owner.threadQueueEdit(),
         owner.unsentTexts(),
       ] as const,
     () => {
-      clearTimeout(timer);
-      timer = setTimeout(write, WRITE_DELAY_MS);
+      timer ??= setTimeout(write, WRITE_DELAY_MS);
     },
     { defer: true },
   );
@@ -125,7 +109,6 @@ function storableDrafts(drafts: Drafts): Record<string, { text: string }> {
   );
 }
 
-/** A side thread's draft is stored as its text only, as `storableDrafts` keeps it. */
 function storableThreadDrafts(drafts: Drafts): Record<string, string> {
   return Object.fromEntries(Object.entries(storableDrafts(drafts)).map(([key, draft]) => [key, draft.text]));
 }

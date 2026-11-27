@@ -1,3 +1,4 @@
+import { agentMentionRank } from "@openbot/contracts/agent-mention-rank";
 import type {
   ChannelSummary,
   ConversationFileSearchResult,
@@ -9,7 +10,6 @@ import type {
 import { markdownPreviewText } from "@openbot/contracts/markdown-preview-text";
 import type { MobileAgent } from "@/features/workspace/context/mobile-workspace-context";
 
-/** The filters of the desktop global search, in its order, and the settings pages of this app. */
 export const MOBILE_SEARCH_FILTERS = [
   "all",
   "agents",
@@ -22,7 +22,6 @@ export const MOBILE_SEARCH_FILTERS = [
 export type MobileSearchFilter = (typeof MOBILE_SEARCH_FILTERS)[number];
 type MobileSearchSectionKey = Exclude<MobileSearchFilter, "all">;
 
-/** A settings page of this app or of the active server. The phone has other pages than the desktop. */
 export type MobileSearchSettingId =
   | "profile"
   | "sessions"
@@ -33,6 +32,7 @@ export type MobileSearchSettingId =
   | "notifications"
   | "liveActivities"
   | "privacy"
+  | "conversations"
   | "hiddenChats"
   | "deletedChannels"
   | "support"
@@ -45,7 +45,6 @@ export type MobileSearchSettingId =
 export interface MobileSearchSetting {
   id: MobileSearchSettingId;
   title: string;
-  /** Where the page is: the app settings or the server name. */
   detail: string;
 }
 
@@ -71,54 +70,39 @@ export type MobileSearchResult =
         | { kind: "channel"; channel: ChannelSummary; name: string };
     };
 
-/** Who wrote a message. Another member of the server shows by name, as in the chat. */
 type MobileSearchMessageAuthor = "agent" | "you" | { member: string };
 
-/** A search that the host answers in pages. `idle` when it does not run for the filter and query. */
 export type MobileRemoteSearch<T> =
   | { status: "idle" }
   | {
       status: "loading" | "error" | "ready";
       items: T[];
       hasMore: boolean;
-      /** The pages read so far for this query. */
       pages?: number;
     };
 
 interface MobileSearchSection {
   key: MobileSearchSectionKey;
   results: MobileSearchResult[];
-  /** All shows the first rows of each kind. The filter of the kind shows the others. */
   more: boolean;
 }
 
 export interface MobileSearchView {
   state: "results" | "loading" | "error" | "empty" | "hint";
   sections: MobileSearchSection[];
-  /** A source still loads, so more rows can come. */
   loading: boolean;
-  /** A source failed. The rows of the other sources stay. */
   failed: boolean;
-  /** The filter shows a host search that has another page. */
   canLoadMore: boolean;
-  /**
-   * The host sorts every match before this device drops the agents it hides, so a page can hold no
-   * row to show while a later one does. The screen reads the next page of these sources.
-   */
   readOn: { messages: boolean; files: boolean };
 }
 
-// All shows a preview of each kind, as on desktop, but fewer rows for the phone screen.
 const ALL_SECTION_LIMIT = 3;
-// The pages the screen reads by itself while they hold only hidden agents' matches. After them, the
-// user asks for more: a hidden agent with many matches must not cause a long run of requests.
 const READ_ON_PAGE_LIMIT = 3;
 
 export function normalizeMobileSearchQuery(query: string): string {
   return query.trim().replace(/\s+/g, " ").toLocaleLowerCase();
 }
 
-/** The host searches that a filter and a query need. Files list the newest ones before the user types. */
 export function mobileSearchSources(filter: MobileSearchFilter, query: string) {
   const typed = normalizeMobileSearchQuery(query) !== "";
   return {
@@ -132,13 +116,11 @@ function matches(query: string, values: readonly (string | undefined)[]): boolea
   return !query || values.some((value) => value !== undefined && normalizeMobileSearchQuery(value).includes(query));
 }
 
-/** Thinking steps show in the activity row, not as a message, so the chat has no row to open at. */
 function searchableMessageText(message: ConversationMessage): string {
   if (message.author === "assistant" && message.itemType === "commentary") return "";
   return markdownPreviewText(message.text);
 }
 
-/** The reader, to tell their own messages from those of other members. */
 export interface MobileSearchReader {
   memberId: string | null;
   accountUserId: string | null;
@@ -147,7 +129,6 @@ export interface MobileSearchReader {
 function messageAuthor(message: ConversationMessage, reader: MobileSearchReader): MobileSearchMessageAuthor {
   if (message.author !== "user") return "agent";
   const sender = message.senderMember;
-  // As `projectChatMessages`: a server that is still connecting names no reader.
   const other =
     sender !== undefined &&
     reader.memberId !== null &&
@@ -181,11 +162,8 @@ export function mobileSearchView({
   query: string;
   filter: MobileSearchFilter;
   reader: MobileSearchReader;
-  /** The agents this device shows. Messages, files and routines of other agents stay out. */
   agents: MobileAgent[];
-  /** The open channels this device shows. */
   channels: ChannelSummary[];
-  /** The settings pages this device has. */
   settings: MobileSearchSetting[];
   routines: { status: "idle" | "loading" | "error" | "ready"; items: RoutineCalendarRoutine[] };
   messages: MobileRemoteSearch<ConversationSearchResult>;
@@ -197,7 +175,9 @@ export function mobileSearchView({
 
   const agentResults = agents
     .filter((agent) => matches(normalized, [agent.name, agent.title, agent.description, agent.preview]))
-    .map((agent): MobileSearchResult => ({ kind: "agent", id: `agent:${agent.id}`, agent }));
+    .map((agent) => ({ agent, rank: agentMentionRank(agent, normalized) ?? Number.MAX_VALUE }))
+    .sort((left, right) => left.rank - right.rank)
+    .map(({ agent }): MobileSearchResult => ({ kind: "agent", id: `agent:${agent.id}`, agent }));
   const channelResults = channels
     .filter((channel) => matches(normalized, [channel.name, channel.title]))
     .map((channel): MobileSearchResult => ({ kind: "channel", id: `channel:${channel.id}`, channel }));
@@ -284,7 +264,6 @@ export function mobileSearchView({
       sections = [full("settings", settingResults)];
       break;
     case "all":
-      // Before the user types, All lists the agents and the channels, as on desktop.
       sections = normalized
         ? [
             preview("agents", agentResults),
@@ -300,7 +279,6 @@ export function mobileSearchView({
       break;
   }
   sections = sections.filter((section) => section.results.length > 0);
-  // A host search that stopped reading by itself still offers its next page.
   const state =
     sections.length > 0 || canLoadMore
       ? "results"
@@ -326,11 +304,9 @@ export interface MobileSearchMatchPart {
   match: boolean;
 }
 
-/** Splits `text` into the runs that match the query and the runs between them, for highlighting. */
 export function mobileSearchMatchParts(text: string, query: string): MobileSearchMatchPart[] {
   const needle = normalizeMobileSearchQuery(query);
   const lowered = text.toLocaleLowerCase();
-  // Offsets in the lowered text are valid only while lowering keeps each character's length.
   if (!needle || lowered.length !== text.length) return [{ text, match: false }];
   const parts: MobileSearchMatchPart[] = [];
   let cursor = 0;
@@ -345,7 +321,6 @@ export function mobileSearchMatchParts(text: string, query: string): MobileSearc
   return parts;
 }
 
-/** Starts a long preview shortly before the first match, so two lines show the match. */
 export function mobileSearchSnippet(text: string, query: string, lead = 40): string {
   const needle = normalizeMobileSearchQuery(query);
   const lowered = text.toLocaleLowerCase();

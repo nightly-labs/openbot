@@ -25,12 +25,15 @@ const chiefMemories: AgentMemory[] = [
     "manual",
     "2026-10-29T08:10:00.000Z",
   ),
-  memory(
-    "x-workflow",
-    'X workflow: read mentions only through the "Mentions Monitor" deck. Go by time: skip everything before last_pass in replied.log (Warsaw time). Reply only to items addressed to the user; skip quote posts, giveaways and replies to other accounts.',
-    "automatic",
-    "2026-10-28T19:42:00.000Z",
-  ),
+  {
+    ...memory(
+      "x-workflow",
+      'X workflow: read mentions only through the "Mentions Monitor" deck. Go by time: skip everything before last_pass in replied.log (Warsaw time). Reply only to items addressed to the user; skip quote posts, giveaways and replies to other accounts.',
+      "automatic",
+      "2026-10-28T19:42:00.000Z",
+    ),
+    site: "x.com",
+  },
   memory(
     "updates",
     "The user prefers short progress updates with the result first.",
@@ -91,12 +94,10 @@ const meta = {
 export default meta;
 type Story = StoryObj<typeof meta>;
 
-/** The Memories page in the agent pane. A title opens the memory on its own page. */
 export const List: Story = {
   render: () => <AgentMemoriesStory memories={chiefMemories} width={380} />,
 };
 
-/** A wide pane keeps the page in a centered column. */
 export const WidePane: Story = {
   render: () => <AgentMemoriesStory memories={chiefMemories} width={1100} />,
 };
@@ -105,7 +106,6 @@ export const FullList: Story = {
   render: () => <AgentMemoriesStory memories={fullMemoryList} width={380} />,
 };
 
-/** At the cap, the limit note takes the place of the New memory row. */
 export const AtLimit: Story = {
   render: () => <AgentMemoriesStory memories={chiefMemories} width={380} limit={chiefMemories.length} />,
 };

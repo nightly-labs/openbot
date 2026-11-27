@@ -1,0 +1,5 @@
+.channel-context-actions .ui-item-description {
+  overflow: visible;
+  text-overflow: clip;
+  white-space: normal;
+}

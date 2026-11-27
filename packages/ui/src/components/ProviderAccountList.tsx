@@ -5,10 +5,27 @@ import {
   type ProviderAccountState,
 } from "@openbot/contracts/ipc";
 import type { AppTextKey } from "@openbot/i18n";
-import { Badge, buttonVariants, DropdownMenu, Ellipsis, Input, LogIn, Pencil, Trash2, X } from "@openbot/ui";
+import {
+  Badge,
+  buttonVariants,
+  DropdownMenu,
+  Ellipsis,
+  Input,
+  LogIn,
+  Pencil,
+  Smartphone,
+  Trash2,
+  X,
+} from "@openbot/ui";
 import { createSignal, For, Show } from "solid-js";
 import { useText } from "../text";
-import { type ProviderAccountActions, type ProviderPickerAccount, providerAccountName } from "./provider-accounts";
+import {
+  accountCodeSignInOffered,
+  isProviderKeyAccount,
+  type ProviderAccountActions,
+  type ProviderPickerAccount,
+  providerAccountName,
+} from "./provider-accounts";
 
 const ACCOUNT_STATE_TEXT = {
   connected: "provider.status.connected",
@@ -32,14 +49,9 @@ export interface ProviderAccountListProps {
   accounts: readonly ProviderPickerAccount[];
   actions: ProviderAccountActions;
   disabled?: boolean | undefined;
-  /** The dialog element the menus portal into, as the provider row's menu does. */
   menuMount?: HTMLElement | undefined;
 }
 
-/**
- * The accounts of one provider, under its row. The first is the provider's own sign-in: it can be
- * named, and it goes only with the provider.
- */
 export function ProviderAccountList(props: ProviderAccountListProps) {
   const { t, format, errorMessage } = useText();
   const [renaming, setRenaming] = createSignal<string | null>(null);
@@ -69,11 +81,14 @@ export function ProviderAccountList(props: ProviderAccountListProps) {
               ]
                 .filter(Boolean)
                 .join(" · ");
-            // A state that a newer host added shows as a failure.
             const state = (): ProviderAccountState =>
               Object.hasOwn(ACCOUNT_STATE_TEXT, account().state) ? account().state : "error";
-            const signInOffered = () => !own() && (state() === "signed-out" || state() === "error");
-            const connecting = () => !own() && state() === "connecting";
+            const signInOffered = () =>
+              !own() &&
+              !isProviderKeyAccount(props.provider, account().id) &&
+              (state() === "signed-out" || state() === "error");
+            const connecting = () =>
+              !own() && !isProviderKeyAccount(props.provider, account().id) && state() === "connecting";
             return (
               <li class="provider-picker-account">
                 <span class="provider-picker-account-copy">
@@ -125,6 +140,16 @@ export function ProviderAccountList(props: ProviderAccountListProps) {
                           {t("provider.account.signInAgain")}
                         </DropdownMenu.Item>
                       </Show>
+                      <Show when={signInOffered() && accountCodeSignInOffered(props.provider, props.actions)}>
+                        <DropdownMenu.Item
+                          onSelect={() =>
+                            run(name(), async () => props.actions.connectWithCode?.(props.provider, account().id))
+                          }
+                        >
+                          <Smartphone aria-hidden="true" />
+                          {t("provider.action.signInWithCode")}
+                        </DropdownMenu.Item>
+                      </Show>
                       <Show when={connecting()}>
                         <DropdownMenu.Item
                           onSelect={() => run(name(), () => props.actions.cancel(props.provider, account().id))}
@@ -160,21 +185,25 @@ export function ProviderAccountList(props: ProviderAccountListProps) {
   );
 }
 
-/** A name that turns into a field. Enter or leaving the field keeps the new name; Escape keeps the old one. */
 export function ProviderAccountRenameField(props: {
   value: string;
   placeholder: string;
   label: string;
-  /** The longest name the owner of the account keeps. A provider account keeps a short label. */
   maxLength?: number | undefined;
   onDone: (value: string | null) => void;
 }) {
-  // Enter and Escape remove the field, and the removal blurs it. Finish only once.
   let done = false;
   const finish = (value: string | null) => {
     if (done) return;
     done = true;
     props.onDone(value === null ? null : value.trim());
+  };
+  const returnFocusFromClosingMenu = (input: HTMLInputElement, next: EventTarget | null) => {
+    if (!(next instanceof Element) || !next.closest('[role="menuitem"]')) return false;
+    requestAnimationFrame(() => {
+      if (!done && input.isConnected) input.focus({ preventScroll: true });
+    });
+    return true;
   };
   return (
     <Input
@@ -192,7 +221,10 @@ export function ProviderAccountRenameField(props: {
           finish(null);
         }
       }}
-      onBlur={(event) => finish(event.currentTarget.value)}
+      onBlur={(event) => {
+        if (returnFocusFromClosingMenu(event.currentTarget, event.relatedTarget)) return;
+        finish(event.currentTarget.value);
+      }}
     />
   );
 }

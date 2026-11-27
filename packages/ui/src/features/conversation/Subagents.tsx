@@ -24,8 +24,10 @@ import {
   X,
 } from "@openbot/ui";
 import { useText } from "@openbot/ui/text";
+import { prefersReducedMotion } from "@openbot/ui/utils";
 import type { JSX } from "@solidjs/web";
 import { createEffect, createMemo, createSignal, createUniqueId, For, Match, Show, Switch } from "solid-js";
+import { ActivityShine } from "./ActivityShine";
 
 const STATE_LABEL = {
   running: "chat.subagents.state.running",
@@ -34,17 +36,20 @@ const STATE_LABEL = {
   stopped: "chat.subagents.state.stopped",
 } as const satisfies Record<ConversationSubagentStatus, AppTextKey>;
 
-/** The Claude type of a subagent with no special role. The meta line does not name it. */
 const GENERAL_AGENT_TYPE = "general-purpose";
 
-/** The time now, once a second while `running` is true. */
 function createClock(running: () => boolean) {
   const [now, setNow] = createSignal(Date.now());
   createEffect(running, (active) => {
     setNow(Date.now());
     if (!active) return;
-    const timer = window.setInterval(() => setNow(Date.now()), 1_000);
-    return () => window.clearInterval(timer);
+    const nextSecond = () => 1_000 - (Date.now() % 1_000);
+    const tick = () => {
+      setNow(Date.now());
+      timer = window.setTimeout(tick, nextSecond());
+    };
+    let timer = window.setTimeout(tick, nextSecond());
+    return () => window.clearTimeout(timer);
   });
   return now;
 }
@@ -58,7 +63,6 @@ function elapsedMs(subagent: ConversationSubagent, now: number): number {
   return timeOf(subagent.endedAt, now) - timeOf(subagent.startedAt, now);
 }
 
-/** "12s" or "1m 05s": the time of a subagent, or of a turn in its steps row. */
 export function useDuration() {
   const { t } = useText();
   return (ms: number) => {
@@ -102,7 +106,6 @@ function StepGlyph(props: { kind: ConversationSubagentStepKind; class: string })
   );
 }
 
-/** The state of one subagent, in the icons and colours of the chat action markers. */
 function SubagentStatus(props: { status: ConversationSubagentStatus }) {
   const { t } = useText();
   return (
@@ -123,10 +126,8 @@ function SubagentStatus(props: { status: ConversationSubagentStatus }) {
   );
 }
 
-/** What the subagent does now, with the icon of that kind of step, or how it ended. */
 function LiveLine(props: { subagent: ConversationSubagent }) {
   const { t } = useText();
-  /** The step that the line shows: the current step, or the answer of a subagent that ended. */
   const shown = () => {
     const last = props.subagent.steps.at(-1);
     if (props.subagent.status === "running") return last;
@@ -142,42 +143,57 @@ function LiveLine(props: { subagent: ConversationSubagent }) {
       <Show when={shown()}>{(step) => <StepGlyph kind={step().kind} class="subagents-live-glyph" />}</Show>
       <span class={["subagents-live-text", { "agent-activity-label": props.subagent.status === "running" }]}>
         {text()}
+        <Show when={props.subagent.status === "running"}>
+          <ActivityShine text={text()} />
+        </Show>
       </span>
     </span>
   );
 }
 
+function createGroupProgress(subagents: () => readonly ConversationSubagent[]) {
+  const duration = useDuration();
+  const total = () => subagents().length;
+  const running = () => subagents().filter((subagent) => subagent.status === "running").length;
+  const failed = () => subagents().filter((subagent) => subagent.status === "failed").length;
+  const finished = () => total() - running();
+  const now = createClock(() => running() > 0);
+  const elapsed = createMemo(() => {
+    const current = now();
+    const start = Math.min(...subagents().map((subagent) => timeOf(subagent.startedAt, current)));
+    const end = running() > 0 ? current : Math.max(...subagents().map((subagent) => timeOf(subagent.endedAt, current)));
+    return duration(end - start);
+  });
+  return { total, running, failed, finished, now, elapsed };
+}
+
+function RunningProgress(props: { finished: number; total: number }) {
+  const { t } = useText();
+  return (
+    <Badge class="subagents-progress">
+      <RadialProgress
+        class="subagents-ring"
+        aria-label={t("chat.subagents.progressLabel")}
+        value={(props.finished / Math.max(props.total, 1)) * 100}
+      />
+      {t("chat.subagents.progress", { finished: props.finished, total: props.total })}
+    </Badge>
+  );
+}
+
 export interface SubagentGroupProps {
   subagents: readonly ConversationSubagent[];
-  /** The subagent that the side panel shows now. */
   selectedId?: string | null | undefined;
-  /** Opens the subagent in the side panel, or closes the panel when it shows that subagent. */
   onOpen: (subagentId: string) => void;
 }
 
-/**
- * The subagents that an agent started in one turn. The header shows how far they are and opens or
- * closes the list; the list is open while a subagent works, unless the user chose. Each row shows
- * what its subagent does now. A click on a row opens its steps in the side panel.
- */
 export function SubagentGroup(props: SubagentGroupProps) {
   const { t } = useText();
   const duration = useDuration();
   const listId = createUniqueId();
-  const total = () => props.subagents.length;
-  const running = () => props.subagents.filter((subagent) => subagent.status === "running").length;
-  const failed = () => props.subagents.filter((subagent) => subagent.status === "failed").length;
-  const finished = () => total() - running();
-  const now = createClock(() => running() > 0);
+  const { total, running, failed, finished, now, elapsed: groupElapsed } = createGroupProgress(() => props.subagents);
   const [choice, setChoice] = createSignal<boolean>();
   const expanded = () => choice() ?? running() > 0;
-  const groupElapsed = createMemo(() => {
-    const current = now();
-    const start = Math.min(...props.subagents.map((subagent) => timeOf(subagent.startedAt, current)));
-    const end =
-      running() > 0 ? current : Math.max(...props.subagents.map((subagent) => timeOf(subagent.endedAt, current)));
-    return duration(end - start);
-  });
   const rowLabel = (subagent: ConversationSubagent) =>
     t("chat.subagents.open", {
       title: subagent.title,
@@ -209,14 +225,7 @@ export function SubagentGroup(props: SubagentGroupProps) {
             </Badge>
           }
         >
-          <Badge class="subagents-progress">
-            <RadialProgress
-              class="subagents-ring"
-              aria-label={t("chat.subagents.progressLabel")}
-              value={(finished() / Math.max(total(), 1)) * 100}
-            />
-            {t("chat.subagents.progress", { finished: finished(), total: total() })}
-          </Badge>
+          <RunningProgress finished={finished()} total={total()} />
         </Show>
         <span class="subagents-elapsed">{groupElapsed()}</span>
         <ChevronRight class="subagents-group-chevron" aria-hidden="true" />
@@ -254,21 +263,116 @@ export function SubagentGroup(props: SubagentGroupProps) {
   );
 }
 
-export interface SubagentPanelProps {
-  /** The subagent to show. A subagent that is not in the chat any more shows an empty pane. */
-  subagent: ConversationSubagent | undefined;
-  /** The agent that started the subagent. */
-  agentName: string;
-  onClosePanel: () => void;
+const DOCK_IN: KeyframeAnimationOptions = { duration: 340, easing: "cubic-bezier(0.2, 0.8, 0.2, 1)" };
+const DOCK_OUT: KeyframeAnimationOptions = { ...DOCK_IN, duration: 260 };
+
+function offset(from: DOMRect, to: DOMRect): string {
+  return `translate(${from.left - to.left}px, ${from.top - to.top}px)`;
 }
 
-/** The side panel pane of one subagent: its task, its state, and all of its steps. */
+export interface SubagentDockProps {
+  subagents: readonly ConversationSubagent[] | undefined;
+  cardHeader: () => DOMRect | undefined;
+  onReveal: () => void;
+}
+
+export function SubagentDock(props: SubagentDockProps) {
+  const { t } = useText();
+  const [shown, setShown] = createSignal<readonly ConversationSubagent[]>();
+  let bar: HTMLElement | undefined;
+  let leaving: Animation | undefined;
+  createEffect(
+    () => props.subagents,
+    (subagents) => {
+      if (subagents) {
+        leaving?.cancel();
+        leaving = undefined;
+        setShown(() => subagents);
+        return;
+      }
+      if (leaving) return;
+      const target = props.cardHeader();
+      if (!bar?.isConnected || !target || prefersReducedMotion()) {
+        setShown(undefined);
+        return;
+      }
+      const animation = bar.animate(
+        [
+          { transform: "none", opacity: 1 },
+          { transform: offset(target, bar.getBoundingClientRect()), opacity: 0 },
+        ],
+        DOCK_OUT,
+      );
+      leaving = animation;
+      const done = () => {
+        if (leaving !== animation) return;
+        leaving = undefined;
+        setShown(undefined);
+      };
+      animation.finished.then(done, done);
+    },
+  );
+  const morphIn = (element: HTMLElement) => {
+    bar = element;
+    requestAnimationFrame(() => {
+      const from = props.cardHeader();
+      if (!from || prefersReducedMotion() || !element.isConnected) return;
+      element.animate(
+        [
+          { transform: offset(from, element.getBoundingClientRect()), opacity: 0.2 },
+          { transform: "none", opacity: 1 },
+        ],
+        DOCK_IN,
+      );
+    });
+  };
+  return (
+    <div class="subagents-dock">
+      <Show when={shown()}>
+        {(subagents) => {
+          const progress = createGroupProgress(subagents);
+          const current = () => subagents().find((subagent) => subagent.status === "running");
+          return (
+            <Button
+              ref={morphIn}
+              type="button"
+              variant="ghost"
+              class="subagents-dock-bar no-drag"
+              onClick={() => props.onReveal()}
+            >
+              <span class="subagents-group-title">{t("chat.subagents.running", { count: progress.total() })}</span>
+              <RunningProgress finished={progress.finished()} total={progress.total()} />
+              <span class="subagents-dock-live">
+                <Show when={current()}>{(subagent) => <LiveLine subagent={subagent()} />}</Show>
+              </span>
+              <span class="subagents-elapsed">{progress.elapsed()}</span>
+              <ChevronRight class="subagents-dock-chevron" aria-hidden="true" />
+            </Button>
+          );
+        }}
+      </Show>
+    </div>
+  );
+}
+
+export interface SubagentPanelProps {
+  subagent: ConversationSubagent | undefined;
+  agentName: string;
+  onClosePanel: () => void;
+  resizer?: JSX.Element;
+}
+
 export function SubagentPanel(props: SubagentPanelProps) {
   const { t } = useText();
   const duration = useDuration();
   const now = createClock(() => props.subagent?.status === "running");
   return (
-    <aside class="browser-panel subagents-panel" aria-label={t("conversation.sidePanel.pane.subagent")}>
+    <aside
+      id="subagent-panel"
+      class="browser-panel subagents-panel"
+      aria-label={t("conversation.sidePanel.pane.subagent")}
+    >
+      {props.resizer}
       <header class="file-preview-header side-panel-pane-header">
         <h2 class="side-panel-pane-title">{t("conversation.sidePanel.pane.subagent")}</h2>
         <Button
@@ -316,12 +420,14 @@ export function SubagentPanel(props: SubagentPanelProps) {
                     return (
                       <li class="subagents-step" data-kind={step().kind}>
                         <StepGlyph kind={step().kind} class="subagents-step-glyph" />
-                        {/* A command reads left to right; other steps take their direction from their text. */}
                         <span
                           class={["subagents-step-text", { "agent-activity-label": live() }]}
                           dir={step().kind === "command" ? "ltr" : "auto"}
                         >
                           {step().text}
+                          <Show when={live()}>
+                            <ActivityShine text={step().text} />
+                          </Show>
                         </span>
                       </li>
                     );

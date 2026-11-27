@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { constants } from "node:fs";
-import { mkdir, mkdtemp, open, readFile, rm, writeFile } from "node:fs/promises";
-import { createServer } from "node:http";
+import { mkdir, mkdtemp, open, readFile, rm, utimes, writeFile } from "node:fs/promises";
+import { createServer, type ServerResponse } from "node:http";
 import { tmpdir } from "node:os";
 import { basename, join } from "node:path";
 import type { BrowserBounds } from "@openbot/contracts/ipc";
@@ -19,6 +19,7 @@ import {
 } from "electron";
 import { BrowserUploads } from "../src/backend/agent/browser-uploads";
 import { attachmentCall } from "../src/backend/attachment-effects";
+import { CONSENT_WORLD } from "../src/backend/browser-consent";
 import { BrowserHost } from "../src/backend/browser-host";
 import { runCauseEffect } from "../src/backend/effect-boundary";
 import { type DynamicToolResult, getString } from "../src/backend/protocol";
@@ -28,16 +29,12 @@ import { parseBrowserToolText } from "./browser-snapshot-text";
 
 let cachedPageVersion = 1;
 let slowDocumentVersion = 0;
-// `/slow-document?action` stays open until the smoke releases it, so the navigation that the timed
-// click starts is still pending when the click reaches its deadline.
 let actionNavigationRequests = 0;
 let releaseActionNavigation = (): void => {};
 const actionNavigationReleased = new Promise<void>((resolve) => {
   releaseActionNavigation = resolve;
 });
 let browserToolCall = 0;
-// The user agent each `/headers` hit carried, keyed by `?source=`. A subframe request that
-// bypasses the session identity shows up here under its own source with the raw build string.
 const recordedIdentityAgents: Record<string, string> = {};
 
 interface PersistenceSnapshot {
@@ -46,6 +43,8 @@ interface PersistenceSnapshot {
   localStorage: string | null;
   indexedDb: string | null;
 }
+
+const stalledResponses: ServerResponse[] = [];
 
 const server = createServer((request, response) => {
   const url = new URL(request.url ?? "/", "http://127.0.0.1");
@@ -160,14 +159,28 @@ const server = createServer((request, response) => {
     </script>`);
     return;
   }
+  if (url.pathname === "/hints-away") {
+    const host = request.headers.host ?? "127.0.0.1";
+    response.writeHead(302, { location: `http://${host.replace("127.0.0.1", "localhost")}/hints` });
+    response.end();
+    return;
+  }
+  if (url.pathname === "/hints") {
+    response.setHeader("content-type", "text/html; charset=utf-8");
+    response.setHeader("accept-ch", REQUESTED_HINTS.map(([header]) => header).join(", "));
+    const requestHeaders = JSON.stringify(request.headers).replaceAll("<", "\\u003c");
+    response.end(`<main></main><script>
+      navigator.userAgentData.getHighEntropyValues(${JSON.stringify(REQUESTED_HINTS.map(([, key]) => key))}).then((values) => {
+        document.querySelector("main").textContent = JSON.stringify({ requestHeaders: ${requestHeaders}, values });
+      });
+    </script>`);
+    return;
+  }
   if (url.pathname === "/abort") {
     response.destroy();
     return;
   }
   if (url.pathname === "/identity-frame") {
-    // The frame and the worker below are cross-origin to this host on purpose: same-origin
-    // subresources already inherit the session identity, while out-of-process frames and
-    // service workers can fall back to the raw build string instead.
     const host = request.headers.host ?? "127.0.0.1";
     const sibling = host.startsWith("127.0.0.1")
       ? host.replace("127.0.0.1", "localhost")
@@ -192,12 +205,49 @@ const server = createServer((request, response) => {
     return;
   }
   if (url.pathname === "/clipboard-frame") {
-    // An editor in a frame of another origin, which keeps the text of the last paste event.
     response.setHeader("content-type", "text/html; charset=utf-8");
     response.end(`<textarea style="position:fixed;inset:0;width:100%;height:100%"></textarea>
       <script>document.querySelector('textarea').addEventListener('paste', event => {
         window.__pasteEvent = event.clipboardData.getData('text/plain');
       });</script>`);
+    return;
+  }
+  if (url.pathname === "/cookie-banner") {
+    const acceptOnly = url.searchParams.has("accept-only");
+    const manual = url.searchParams.has("manual");
+    const shadow = url.searchParams.has("shadow");
+    const banner = shadow
+      ? `<div id="notice" style="position:fixed;bottom:0;left:0;right:0;padding:16px;background:#eee">
+        <banner-text></banner-text><banner-actions></banner-actions>
+      </div>`
+      : `<div id="notice" style="position:fixed;bottom:0;left:0;right:0;padding:16px;background:#eee">
+        <p>We use cookies to improve this site. Read more about how we use cookies.</p>
+        <button onclick="decide('accepted')">Accept all</button>
+        ${acceptOnly ? "" : `<button onclick="decide('rejected')">Reject all</button>`}
+      </div>`;
+    const components = `
+        customElements.define("banner-text", class extends HTMLElement {
+          connectedCallback() { this.attachShadow({ mode: "open" }).innerHTML = "<p>We use cookies to improve this site.</p>"; }
+        });
+        customElements.define("banner-actions", class extends HTMLElement {
+          connectedCallback() {
+            this.attachShadow({ mode: "open" }).innerHTML =
+              "<button onclick=\\"decide('accepted')\\">Accept all</button><button onclick=\\"decide('rejected')\\">Reject all</button>";
+          }
+        });`;
+    response.setHeader("content-type", "text/html; charset=utf-8");
+    response.end(`<!doctype html>
+      <title>Cookie banner</title>
+      <main><output>banner</output></main>
+      ${acceptOnly ? banner : ""}
+      <script>
+        function decide(value) {
+          document.querySelector("output").textContent = value;
+          document.getElementById("notice").remove();
+        }
+        ${shadow ? components : ""}
+        ${acceptOnly || manual ? "" : `setTimeout(() => document.body.insertAdjacentHTML("beforeend", ${JSON.stringify(banner)}), 300);`}
+      </script>`);
     return;
   }
   if (url.pathname === "/frame") {
@@ -239,12 +289,6 @@ const server = createServer((request, response) => {
     response.end(`<input type="file" aria-label="${label}" /><output>${label} ready</output>`);
     return;
   }
-  // Its own page rather than more markup on `/v2`: that page's height and width are asserted against
-  // a 220x560 panel, and a block form plus a default-sized iframe put a scrollbar in it.
-  // A canvas application: the grid is painted, so it has no element to focus, no value to set, and
-  // nothing for a semantic target to find. It reads keystrokes from the page the way a spreadsheet
-  // does -- characters build the pending cell, Tab commits it and moves a column right, Enter
-  // commits it and moves a row down.
   if (url.pathname === "/grid") {
     response.setHeader("content-type", "text/html; charset=utf-8");
     response.end(`<!doctype html><body style="margin:0">
@@ -300,13 +344,6 @@ const server = createServer((request, response) => {
       </script>`);
     return;
   }
-  // A frame that answers nothing, in its own process, so the parent stays responsive while the
-  // snapshot's walk of this frame never returns. The host has to be a site of its own rather than the
-  // `localhost` the other cross-origin fixtures use: same site means the same renderer, and wedging
-  // it would take the `/v2` page's own frame down with it for the rest of the run. It waits to be told
-  // to spin, because the one target the legacy `act` path accepts is a ref, and a ref only exists for
-  // an element some snapshot saw -- so the frame has to answer a snapshot first. Both messages go out
-  // before the loop is entered from a task, so the test waits on an announcement rather than a clock.
   if (url.pathname === "/spinning-frame") {
     response.setHeader("content-type", "text/html; charset=utf-8");
     response.end(`<!doctype html><body>
@@ -343,6 +380,11 @@ const server = createServer((request, response) => {
     response.end("console.error('external diagnostic marker');");
     return;
   }
+  if (url.pathname === "/stalled-document") {
+    response.writeHead(200, { "content-type": "text/html; charset=utf-8" });
+    response.write("<!doctype html>");
+    return;
+  }
   if (url.pathname === "/slow-document") {
     slowDocumentVersion += 1;
     const version = slowDocumentVersion;
@@ -355,14 +397,20 @@ const server = createServer((request, response) => {
     } else setTimeout(finish, 250);
     return;
   }
-  // The page starts a second main-frame navigation while the first load is still open, as a sign-in
-  // or consent redirect does. `loadURL` then rejects inside Electron's `did-start-navigation` event.
-  // The slow image keeps the first load open until the redirect starts.
   if (url.pathname === "/redirect-start") {
     response.setHeader("content-type", "text/html; charset=utf-8");
     response.end(
       `<!doctype html><script>setTimeout(() => location.replace('/redirect-end${url.search}'), 0)</script><img src="/redirect-image">`,
     );
+    return;
+  }
+  if (url.pathname === "/stalled-load") {
+    response.setHeader("content-type", "text/html; charset=utf-8");
+    response.end(`<!doctype html><main>Stalled page</main><img src="/stalled-image">`);
+    return;
+  }
+  if (url.pathname === "/stalled-image") {
+    stalledResponses.push(response);
     return;
   }
   if (url.pathname === "/redirect-image") {
@@ -397,7 +445,7 @@ const server = createServer((request, response) => {
       <span class="pseudo-option"><input type="radio" name="pay" aria-label="Pay by transfer" /></span>
       <span hidden data-hidden-wait>hidden wait sentinel</span>
       <button aria-label="SPA" onclick="setTimeout(() => { history.pushState({}, '', '/v2#done'); document.querySelector('output').textContent='SPA done'; }, 20)">SPA</button>
-      <button draggable="true" aria-label="Drag source">Drag source</button><button aria-label="Drop target" ondragover="event.preventDefault()" ondrop="event.preventDefault();document.querySelector('output').textContent='drag:' + event.isTrusted">Drop target</button>
+      <button draggable="true" aria-label="Drag source">Drag source</button><button aria-label="Drop target" ondragover="event.preventDefault();requestAnimationFrame(() => { this.dataset.dropFrame = 'yes'; })" ondrop="event.preventDefault();document.querySelector('output').textContent=this.dataset.dropFrame === 'yes' ? 'drag:' + event.isTrusted : 'drag:no-frame';delete this.dataset.dropFrame">Drop target</button>
       <input type="file" aria-label="Files" onchange="document.querySelector('output').textContent=this.files[0]?.name || ''" />
       <button aria-label="Attach files" onclick="const input = document.createElement('input'); input.type = 'file'; input.onchange = () => { document.querySelector('output').textContent = 'chooser:' + (input.files[0]?.name || ''); }; input.click()">Attach files</button>
       <button aria-label="No chooser">No chooser</button>
@@ -411,7 +459,6 @@ const server = createServer((request, response) => {
         root.innerHTML = '<button aria-label="Shadow action">Shadow action</button>';
         root.querySelector('button').onclick = event => { const trusted = event.isTrusted; fetch('/settle').then(() => { root.querySelector('button').textContent = 'Shadow settled:5:' + trusted; }); };
         document.addEventListener('keydown', event => { if (event.ctrlKey && event.key.toLowerCase() === 'k') document.querySelector('output').textContent = 'shortcut:' + event.isTrusted; });
-        // Like a React list sort: each change renders a new select, which drops the focus.
         const renderSort = index => {
           const select = document.createElement('select');
           select.setAttribute('aria-label', 'Sort');
@@ -428,7 +475,7 @@ const server = createServer((request, response) => {
 
   response.setHeader("content-type", "text/html; charset=utf-8");
   response.end(`<!doctype html>
-    <input aria-label="Task" oninput="this.dataset.trusted = String(event.isTrusted); document.querySelector('output').textContent = 'typed:' + this.value + '|input:' + event.isTrusted" />
+    <input aria-label="Task" onkeydown="window.smokeKeys = (window.smokeKeys ?? '') + event.key" oninput="this.dataset.trusted = String(event.isTrusted); document.querySelector('output').textContent = 'typed:' + this.value + '|input:' + event.isTrusted" />
     <button aria-label="Save" onclick="document.querySelector('output').textContent = document.querySelector('input').value + '|input:' + document.querySelector('input').dataset.trusted + '|click:' + event.isTrusted">Save</button>
     <a href="/child" target="_blank">Child</a>
     <a href="/download" download>Download</a>
@@ -443,6 +490,8 @@ const server = createServer((request, response) => {
     </script>`);
 });
 
+const HANG_LIMIT_MS = 10 * 60_000;
+
 const SCENARIOS = [
   "identity",
   "background",
@@ -456,6 +505,8 @@ const SCENARIOS = [
   "secret-handoff",
   "popups",
   "redirect-navigation",
+  "stalled-open",
+  "cookie-banner",
 ];
 
 void main().catch((error) => {
@@ -483,13 +534,10 @@ async function main(): Promise<void> {
   app.setName("OpenBot");
   app.setPath("userData", userDataPath);
   app.setPath("sessionData", userDataPath);
-  // A backstop for a phase that hangs, not a performance budget -- and it has to stay clear of the
-  // phases that wait on a product timeout on purpose, such as the bounded blocked-frame wait and the
-  // frozen-renderer environment race below.
   const hardTimeout = setTimeout(() => {
     process.stderr.write("BrowserHost smoke test timed out.\n");
     app.exit(1);
-  }, 120_000);
+  }, HANG_LIMIT_MS);
 
   try {
     if (persistencePhase) {
@@ -524,7 +572,6 @@ async function main(): Promise<void> {
     if (scenario) {
       try {
         if (scenario === "background") {
-          // The scenario runs before the browser panel is first shown.
         } else if (scenario === "focus") {
           await runFocusScenario(browser, origin, window);
         } else if (scenario === "identity") {
@@ -543,8 +590,12 @@ async function main(): Promise<void> {
           await runToolBoundaryScenario(browser, origin);
         } else if (scenario === "redirect-navigation") {
           await runRedirectNavigationScenario(browser, origin);
+        } else if (scenario === "stalled-open") {
+          await runStalledOpenScenario(browser, origin);
         } else if (scenario === "typing-focus") {
           await runTypingFocusScenario(browser, origin);
+        } else if (scenario === "cookie-banner") {
+          await runCookieBannerScenario(browser, origin);
         } else {
           const { tab, contents } = await openTabWithContents(browser, `${origin}/v2`, "smoke-thread", "smoke-bot");
           try {
@@ -635,6 +686,7 @@ async function main(): Promise<void> {
 
     await runDoubleClickScenario(browser, origin);
     await runRedirectNavigationScenario(browser, origin);
+    await runStalledOpenScenario(browser, origin);
     const v2Tab = await runCauseEffect(browser.open(`${origin}/v2`, "smoke-thread", "smoke-bot"));
     const v2Contents = webContents
       .getAllWebContents()
@@ -661,7 +713,6 @@ async function main(): Promise<void> {
     if (!v2SnapshotResult.contentItems.some((item) => item.type === "inputImage")) {
       throw new Error("Adaptive snapshot did not include an image for canvas/iframe content.");
     }
-    // A screenshot just before shows the same page, so the next adaptive snapshot sends no image.
     if (!(await callBrowserTool(browser, "screenshot", { tabId: v2Tab.id })).success) {
       throw new Error("V2 screenshot failed.");
     }
@@ -947,7 +998,6 @@ async function main(): Promise<void> {
     ) {
       throw new Error(`V2 iframe text input used the wrong CDP session: ${toolError(frameTyped)}`);
     }
-    // The model already has the result of its own action, so the text leaves out a plain success.
     const frameTypedActions = toolTextPayload(frameTyped)?.actions;
     if (
       !Array.isArray(frameTypedActions) ||
@@ -989,8 +1039,8 @@ async function main(): Promise<void> {
       tabId: v2Tab.id,
       target: { kind: "ref", ref: String(staleFrameTarget.ref), revision: staleFrameRevision },
     });
-    if (staleFrameClick.success || !toolError(staleFrameClick).includes("Stale browser reference")) {
-      throw new Error("V2 iframe navigation did not invalidate revision-bound references.");
+    if (staleFrameClick.success || !toolError(staleFrameClick).includes("Element reference is no longer available")) {
+      throw new Error("V2 iframe navigation did not invalidate the references of that frame.");
     }
     const semanticChangeSnapshot = await runCauseEffect(browser.snapshot(v2Tab.id));
     const semanticChangeTarget = semanticChangeSnapshot.elements.find((element) => element.name === "SPA");
@@ -1030,10 +1080,6 @@ async function main(): Promise<void> {
     await runControlActions(browser, v2Tab.id, v2Contents);
     await runKeyboardScenario(browser, origin, temporaryRoot);
     await runCanvasGridScenario(browser, origin);
-    // A snapshot walks every frame, and Electron's `sendCommand` has no timeout of its own, so a frame
-    // whose process is spinning never answers the walk. The timeout must return an error to the caller
-    // and cancel the command, or the promise the tab's queue was told to wait on stays pending and
-    // nothing on this tab ever runs again -- which is what the close below proves.
     const blockedTab = await runCauseEffect(browser.open(`${origin}/blocking-frame`, "smoke-thread", "smoke-bot"));
     const blockedContents = webContents
       .getAllWebContents()
@@ -1055,9 +1101,6 @@ async function main(): Promise<void> {
         "frame ready",
       "the blocking frame to report ready",
     );
-    // Wedge the frame: from here on it answers nothing, so the bounded wait
-    // below must give up on it and the close after that must not hang behind
-    // the cancelled command.
     await blockedContents.executeJavaScript(
       `(() => {
         document.querySelector('iframe').contentWindow.postMessage('spin', '*');
@@ -1071,9 +1114,6 @@ async function main(): Promise<void> {
         "frame spinning",
       "the blocking frame to start spinning",
     );
-    // One bounded wait proves a frame that answers nothing is given up on. The
-    // close after it proves the timeout cancelled the command instead of
-    // leaving the tab queue waiting on one it never cancelled.
     const blockedSnapshotWait = await callBrowserTool(browser, "wait_for", {
       tabId: blockedTab.id,
       url: "/blocking-frame",
@@ -1089,17 +1129,12 @@ async function main(): Promise<void> {
     if (blockedTabClosed !== "closed") {
       throw new Error("V2 snapshot timeout left the tab queue waiting on a CDP command it never cancelled.");
     }
-    // Environment commands reach the main renderer before the snapshot starts. Use a separate site
-    // so stopping that renderer does not stop the other fixture tabs.
     const frozenOrigin = `http://environment.localhost:${address.port}`;
     const frozenTab = await runCauseEffect(browser.open(`${frozenOrigin}/spinning-frame`, "smoke-thread", "smoke-bot"));
     const frozenContents = webContents
       .getAllWebContents()
       .find((contents) => !contents.isDestroyed() && contents.getURL().startsWith(frozenOrigin));
     if (!frozenContents) throw new Error("Environment timeout fixture web contents were not available.");
-    // Wait for this exact message. An unpackaged Electron also logs its security warning to the
-    // console after the page load, so the first message can arrive before the loop starts. The
-    // environment change then succeeds and only the snapshot after it meets the stopped renderer.
     const rendererStopped = new Promise<void>((resolve) => {
       const onConsoleMessage = (details: ElectronEvent<WebContentsConsoleMessageEventParams>): void => {
         if (details.message !== "environment renderer stopped") return;
@@ -1130,9 +1165,6 @@ async function main(): Promise<void> {
       new Promise<boolean>((resolve) => setTimeout(() => resolve(false), 5_000)),
     ]);
     if (!frozenClosed) throw new Error("V2 environment timeout left the tab queue blocked.");
-    // `submit: true` reached through a snapshot ref is the case that used to fail: typing changes a
-    // contenteditable's visible text, so re-resolving the same ref to press Enter fingerprinted the
-    // element against its pre-typing text and threw instead of submitting.
     const notesSnapshot = await runCauseEffect(browser.snapshot(v2Tab.id));
     const notesRef = notesSnapshot.elements.find((element) => element.name === "Notes")?.ref;
     if (!notesRef) throw new Error("V2 snapshot did not expose the contenteditable notes field.");
@@ -1316,7 +1348,6 @@ async function main(): Promise<void> {
     if (canvasValue !== "canvas:true") {
       throw new Error("V2 canvas coordinate click was not trusted.");
     }
-    // An input action returns a short status, so the refs of the snapshot before it still work.
     const canvasStatus = toolTextPayload(canvasClick);
     if (
       !canvasStatus ||
@@ -1393,9 +1424,6 @@ async function main(): Promise<void> {
     if (removedRefWait.success || !toolError(removedRefWait).includes("timed out")) {
       throw new Error("V2 ref wait matched an element after it was removed.");
     }
-    // Deadline enforcement stays covered by `--scenario=wait-deadlines`. It does
-    // not run in the default flow: its millisecond dispatch budgets fail on a
-    // loaded software-rendered runner for timing reasons, not product ones.
     await v2Contents.executeJavaScript(
       "globalThis.__openbotSlowNoise = setInterval(() => document.body.toggleAttribute('data-slow-noise'), 10); setTimeout(() => { clearInterval(globalThis.__openbotSlowNoise); delete globalThis.__openbotSlowNoise; }, 1200); true",
       true,
@@ -1441,7 +1469,6 @@ async function main(): Promise<void> {
       paths: [uploadPath],
     });
     if (!uploaded.success) throw new Error(`V2 upload failed: ${toolError(uploaded)}`);
-    // GitHub's comment box makes its file input only on click: the upload answers that file chooser.
     const chooserUpload = await callBrowserTool(browser, "upload_files", {
       tabId: v2Tab.id,
       target: { kind: "role", role: "button", name: "Attach files", exact: true },
@@ -1485,7 +1512,6 @@ async function main(): Promise<void> {
       preset: "fill",
     });
     const narrowFillSnapshot = toolTextPayload(narrowFillEnvironment);
-    // The snapshot reports usable page space, excluding reserved scrollbar gutters.
     const narrowFillViewport = await v2Contents.executeJavaScript(
       "({ width: innerWidth, height: innerHeight, contentWidth: document.documentElement.getBoundingClientRect().width, contentHeight: document.documentElement.clientHeight })",
       true,
@@ -1505,7 +1531,6 @@ async function main(): Promise<void> {
       );
     }
     await runCauseEffect(browser.setVisible({ visible: true, bounds: { x: 0, y: 0, width: 800, height: 600 } }));
-    // An earlier snapshot already delivered the page-load diagnostics; this one must carry a new entry.
     const errorsBeforeEnvironment =
       browser.listTabs().find((candidate) => candidate.id === v2Tab.id)?.diagnosticErrorCount ?? 0;
     await v2Contents.executeJavaScript("fetch('/diagnostic-error?access_token=diagnostic-secret'); true", true);
@@ -1638,9 +1663,6 @@ async function main(): Promise<void> {
     if (concurrentRecording.success || !toolError(concurrentRecording).includes("At most 1")) {
       throw new Error("V2 recorder did not enforce its concurrent recording limit.");
     }
-    // `recordingDurationMs: 500` stops this recording on its own. Wait for the stop the recorder
-    // reports rather than for a duration that outlives it: the recorder publishes the state change
-    // before it registers the artifact, and `recording_start` awaits that finalization either way.
     await waitFor(
       async () => browser.listTabs().find((candidate) => candidate.id === v2Tab.id)?.recording === false,
       "the recording duration limit to stop the recording",
@@ -1677,12 +1699,8 @@ async function main(): Promise<void> {
       `(() => { const button = document.createElement('button'); button.setAttribute('aria-label', 'Slow action navigation'); button.onclick = () => { location.href = ${JSON.stringify(`${origin}/slow-document?action`)}; }; document.body.append(button); return true; })()`,
       true,
     );
-    // The tab was just opened, so it may have no presented frame yet, and Chromium would drop the click.
     await waitForPresentedFrame(actionNavigationContents);
     try {
-      // The server holds the navigation open until the release below, so the click reaches its
-      // deadline while the navigation is pending. The limit only has to fit the dispatch: 100 ms
-      // did not always fit the highlight and the dispatch on a loaded runner.
       const timedActionNavigation = await callBrowserTool(browser, "click", {
         tabId: actionNavigationTab.id,
         snapshot: true,
@@ -1715,6 +1733,22 @@ async function main(): Promise<void> {
       releaseActionNavigation();
     }
     await runCauseEffect(browser.close(actionNavigationTab.id));
+    const { tab: stalledTab } = await openTabWithContents(browser, origin, "smoke-thread", "smoke-bot");
+    const stalledNavigation = await callBrowserTool(browser, "navigate", {
+      tabId: stalledTab.id,
+      url: `${origin}/stalled-document`,
+      timeoutMs: 500,
+    });
+    if (stalledNavigation.success) throw new Error("V2 stalled navigation did not time out.");
+    const stalledSnapshotStartedAt = Date.now();
+    const stalledSnapshot = await callBrowserTool(browser, "snapshot", { tabId: stalledTab.id });
+    const stalledSnapshotMs = Date.now() - stalledSnapshotStartedAt;
+    if (!stalledSnapshot.success || stalledSnapshotMs > 2_000) {
+      throw new Error(
+        `V2 snapshot of a document with no root element waited for an image: ${stalledSnapshotMs} ms, ${stalledSnapshot.success ? "success" : toolError(stalledSnapshot)}.`,
+      );
+    }
+    await runCauseEffect(browser.close(stalledTab.id));
     const { tab: waitTab, contents: waitContents } = await openTabWithContents(
       browser,
       origin,
@@ -1760,12 +1794,12 @@ async function main(): Promise<void> {
     }
     const queuedSnapshotStartedAt = Date.now();
     const queuedSnapshot = await callBrowserTool(browser, "snapshot", { tabId: waitTab.id });
-    if (
-      !queuedSnapshot.success ||
-      Date.now() - queuedSnapshotStartedAt > 1_000 ||
-      browser.listTabs().find((candidate) => candidate.id === waitTab.id)?.loading === true
-    ) {
-      throw new Error("V2 timed-out navigation did not stop before the tab queue resumed.");
+    const queuedSnapshotMs = Date.now() - queuedSnapshotStartedAt;
+    const queuedTabLoading = browser.listTabs().find((candidate) => candidate.id === waitTab.id)?.loading === true;
+    if (!queuedSnapshot.success || queuedSnapshotMs > 1_000 || queuedTabLoading) {
+      throw new Error(
+        `V2 timed-out navigation did not stop before the tab queue resumed: ${queuedSnapshotMs} ms, loading ${queuedTabLoading}, ${queuedSnapshot.success ? "success" : toolError(queuedSnapshot)}.`,
+      );
     }
     const beforeReloadText = String(toolTextPayload(queuedSnapshot)?.text);
     const reloadStartedAt = Date.now();
@@ -1779,7 +1813,6 @@ async function main(): Promise<void> {
       throw new Error(`V2 reload snapshot did not wait for the new document: ${toolError(reloaded)}`);
     }
     if (!waitContents.isAudioMuted()) unmutedTabs.push("tab after navigation and reload");
-    // A status action reads no snapshot. When it navigates, the refs of the old document still go.
     await waitContents.executeJavaScript(
       `document.body.append(Object.assign(document.createElement('a'), { href: ${JSON.stringify(`${origin}/?status-navigation`)}, textContent: 'Status navigation' })); true`,
       true,
@@ -1841,7 +1874,6 @@ async function main(): Promise<void> {
     ) {
       throw new Error("V2 snapshot did not bound its text or put viewport text first.");
     }
-    // A preview behind an agent operation gets the last frame at once instead of waiting for it.
     const firstPreview = await runCauseEffect(browser.capturePreview(boundedTab.id));
     let heldEvaluationSettled = false;
     const heldEvaluation = callBrowserTool(browser, "evaluate", {
@@ -1916,18 +1948,23 @@ async function main(): Promise<void> {
     process.stdout.write("BrowserHost: top-level cache revalidation passed.\n");
 
     await expectFailure(() => runCauseEffect(browser.open("file:///etc/passwd")));
-    const tabCountBeforeAbort = browser.listTabs().length;
-    await expectFailure(() => runCauseEffect(browser.open(`${origin}/abort`)));
-    if (browser.listTabs().length !== tabCountBeforeAbort) {
+    const tabIdsBeforeAbort = new Set(browser.listTabs().map((tab) => tab.id));
+    const agentAbort = await callBrowserTool(browser, "open", { url: `${origin}/abort` });
+    if (agentAbort.success || browser.listTabs().length !== tabIdsBeforeAbort.size) {
       throw new Error("A failed navigation leaked a browser tab.");
     }
+    await expectFailure(() => runCauseEffect(browser.open(`${origin}/abort`)));
+    const keptTabs = browser.listTabs().filter((tab) => !tabIdsBeforeAbort.has(tab.id));
+    if (keptTabs.length !== 1 || keptTabs[0]?.url !== `${origin}/abort`) {
+      throw new Error("A person's failed navigation did not keep its tab.");
+    }
+    await runCauseEffect(browser.close(keptTabs[0].id));
 
     const { tab: downloadPage, contents: downloadContents } = await openTabWithContents(
       browser,
       origin,
       "smoke-thread",
     );
-    // The tab was just opened, so it may have no presented frame yet, and Chromium would drop the click.
     await waitForPresentedFrame(downloadContents);
     const downloadSnapshot = await runCauseEffect(browser.snapshot(downloadPage.id));
     const download = downloadSnapshot.elements.find((element) => element.name === "Download");
@@ -1968,6 +2005,7 @@ async function main(): Promise<void> {
     await runToolBoundaryScenario(browser, origin);
     await runPopupScenario(browser, origin);
     await runSecretHandoffScenario(browser, origin);
+    await runCookieBannerScenario(browser, origin);
     if (!controlPhases.includes("open:acting") || !controlPhases.includes("open:waiting")) {
       throw new Error(`Browser control lifecycle was not reported: ${controlPhases.join(", ")}`);
     }
@@ -2146,12 +2184,14 @@ async function runTypingFocusScenario(browser: BrowserHost, origin: string): Pro
           "formatted input",
           "End redirected focus",
           "replaced focus target",
+          "redirected input append",
+          "redirected input mid-text",
         );
       for (const name of names) {
         const frameTransfer = name.endsWith("frame focus transfer");
         const siblingTransfer = name === "sibling frame focus transfer";
         const redirectFocus = name.includes("redirected focus") && name !== "End redirected focus";
-        const redirectInput = name === "redirected input" || name === "replaced target" || frameTransfer;
+        const redirectInput = name.startsWith("redirected input") || name === "replaced target" || frameTransfer;
         const replace = [
           "normal replace submit",
           "redirected focus replace",
@@ -2160,9 +2200,17 @@ async function runTypingFocusScenario(browser: BrowserHost, origin: string): Pro
           "formatted input",
         ].includes(name);
         const empty = name.startsWith("empty");
-        const submit = name !== "normal append" && name !== "empty replacement" && name !== "readonly";
+        const submit = ![
+          "normal append",
+          "empty replacement",
+          "readonly",
+          "redirected input append",
+          "redirected input mid-text",
+        ].includes(name);
+        const movedAfterText = name === "redirected input append";
+        const midText = name === "redirected input mid-text";
         const changedBeforeInput = redirectFocus || name === "End redirected focus" || name === "replaced focus target";
-        const expectedSuccess = !changedBeforeInput && !redirectInput;
+        const expectedSuccess = !changedBeforeInput && (!redirectInput || movedAfterText);
         await frame.executeJavaScript(
           `(() => {
             document.body.innerHTML = '<div id="typing-root"></div>';
@@ -2186,7 +2234,7 @@ async function runTypingFocusScenario(browser: BrowserHost, origin: string): Pro
               if (event.key === 'Enter') event.preventDefault();
             });
             ${redirectFocus ? "intended.onfocus = () => other.focus();" : ""}
-            ${name === "redirected input" ? "intended.addEventListener('input', () => other.focus());" : ""}
+            ${name.startsWith("redirected input") ? "intended.addEventListener('input', () => other.focus());" : ""}
             ${name === "replaced target" ? "intended.addEventListener('input', () => { const replacement = intended.cloneNode(true); intended.replaceWith(replacement); replacement.focus(); });" : ""}
             ${name === "replaced focus target" ? "intended.onfocus = () => { const replacement = intended.cloneNode(true); intended.replaceWith(replacement); replacement.focus(); };" : ""}
             ${
@@ -2246,7 +2294,7 @@ async function runTypingFocusScenario(browser: BrowserHost, origin: string): Pro
           target: target
             ? { kind: "ref", ref: target.ref, revision: snapshot.revision }
             : { kind: "role", role: "textbox", name: "Intended field", exact: true },
-          text: empty ? "" : "X",
+          text: empty ? "" : midText ? "XY" : "X",
           mode: replace ? "replace" : "append",
           submit,
         });
@@ -2282,10 +2330,18 @@ async function runTypingFocusScenario(browser: BrowserHost, origin: string): Pro
                 : replace
                   ? "X"
                   : "alphaX";
-        const expectedKeys = name === "End redirected focus" ? ["End"] : expectedSuccess && submit ? ["Enter"] : [];
+        const expectedKeys =
+          name === "End redirected focus"
+            ? ["End"]
+            : [...(changedBeforeInput || empty ? [] : ["X"]), ...(expectedSuccess && submit ? ["Enter"] : [])];
         const expectedInputs = changedBeforeInput || name === "readonly" ? 0 : 1;
-        // The error tells the agent whether the text is already in the field.
-        const expectedError = expectedSuccess ? "" : changedBeforeInput ? "Nothing was typed" : "Enter was not sent";
+        const expectedError = expectedSuccess
+          ? ""
+          : changedBeforeInput
+            ? "Nothing was typed"
+            : submit
+              ? "Enter was not sent"
+              : "Only the first part of the text is in the field";
         const safe =
           result.success === expectedSuccess &&
           (result.success || toolError(result).includes(expectedError)) &&
@@ -2320,7 +2376,6 @@ async function runTypingFocusScenario(browser: BrowserHost, origin: string): Pro
     );
     assert(
       cases.every((item) => item.safe),
-      // CI keeps no report file, so the message carries the failed cases.
       JSON.stringify(cases.filter((item) => !item.safe)),
     );
   } finally {
@@ -2329,9 +2384,6 @@ async function runTypingFocusScenario(browser: BrowserHost, origin: string): Pro
 }
 
 async function runFocusScenario(browser: BrowserHost, origin: string, window: BrowserWindow): Promise<void> {
-  // The page shares the app window. Chromium gives a page the focus when a new document commits,
-  // so each navigation must give it back to the app renderer that had it (#4405).
-  // A window without a document has no view to hold the focus.
   if (!window.webContents.getURL()) await window.webContents.loadURL("about:blank");
   window.focus();
   window.webContents.focus();
@@ -2350,7 +2402,6 @@ async function runFocusScenario(browser: BrowserHost, origin: string, window: Br
       args: { tabId: sameWindowTab.id, target: { kind: "role", role: "link", name: "Next page", exact: true } },
     },
     back: { tool: "navigate", args: { tabId: sameWindowTab.id, direction: "back" } },
-    // A refused connection commits an error page.
     errorPage: { tool: "navigate", args: { tabId: sameWindowTab.id, url: "http://127.0.0.1:1/" } },
   };
   const sameWindowFocus: Record<string, boolean> = {};
@@ -2360,10 +2411,8 @@ async function runFocusScenario(browser: BrowserHost, origin: string, window: Br
       throw new Error(`The same-window focus ${name} failed: ${toolError(result)}`);
     sameWindowFocus[name] = webContents.getFocusedWebContents() === window.webContents;
   }
-  // A person who enters an address moves to the page when its document commits, not only after the load.
   window.webContents.focus();
   await waitFor(async () => webContents.getFocusedWebContents() === window.webContents, "app window focus again");
-  // The address suggestions hide the page while the person types.
   await runCauseEffect(browser.setVisible({ visible: false, bounds: { x: 0, y: 0, width: 800, height: 600 } }));
   let addressFocusedTab = false;
   sameWindowContents.once("did-navigate", () => {
@@ -2371,7 +2420,6 @@ async function runFocusScenario(browser: BrowserHost, origin: string, window: Br
   });
   await runCauseEffect(browser.loadUrl(sameWindowTab.id, `${origin}/`));
   await runCauseEffect(browser.setVisible({ visible: true, bounds: { x: 0, y: 0, width: 800, height: 600 } }));
-  // An address that changes only the fragment has no commit. The next agent navigation still gives the focus back.
   await runCauseEffect(browser.loadUrl(sameWindowTab.id, `${origin}/#fragment`));
   window.webContents.focus();
   await waitFor(
@@ -2385,7 +2433,6 @@ async function runFocusScenario(browser: BrowserHost, origin: string, window: Br
   if (!afterFragment.success) throw new Error(`The navigation after a fragment failed: ${toolError(afterFragment)}`);
   sameWindowFocus.afterFragment = webContents.getFocusedWebContents() === window.webContents;
   await runCauseEffect(browser.close(sameWindowTab.id));
-  // A tab that a person opens with focus has it when its document commits.
   window.webContents.focus();
   await waitFor(async () => webContents.getFocusedWebContents() === window.webContents, "app window focus for open");
   let openedFocusedTab = false;
@@ -2445,8 +2492,6 @@ async function runFocusScenario(browser: BrowserHost, origin: string, window: Br
   if (!backgroundAction.success || webContents.getFocusedWebContents() !== focusSentinel.webContents) {
     throw new Error("A background browser action did not restore focus to the unrelated application renderer.");
   }
-  // An agent click opens a popup, and the popup closes itself after sign-in. The visible panel
-  // shows both changes; neither may take focus from the person typing.
   const opener = await runCauseEffect(browser.open(`${origin}/popup-parent`, "smoke-thread", "smoke-bot"));
   const popupClick = await callBrowserTool(browser, "click", {
     tabId: opener.id,
@@ -2461,7 +2506,6 @@ async function runFocusScenario(browser: BrowserHost, origin: string, window: Br
       webContents.getAllWebContents().some((item) => item.getURL().endsWith("/popup-login") && !item.isLoading()),
     "focus popup load",
   );
-  // The page closes during the navigation that the click starts, so the click can report an aborted load.
   await callBrowserTool(browser, "click", {
     tabId: popup.id,
     target: { kind: "role", role: "button", name: "Use test account", exact: true },
@@ -2486,12 +2530,6 @@ async function runFocusScenario(browser: BrowserHost, origin: string, window: Br
   focusSentinel.destroy();
 }
 
-/**
- * A page that redirects while it loads made `loadURL` reject inside Electron's `did-start-navigation`
- * event, and the tab then called `webContents.stop()` before that event returned. Chromium stops the
- * process when a navigation is cancelled while it starts. The process must survive and end on the
- * redirected page, and each navigation must succeed.
- */
 async function runRedirectNavigationScenario(browser: BrowserHost, origin: string): Promise<void> {
   const tab = await runCauseEffect(browser.open(origin, "smoke-thread", "smoke-bot"));
   const outcomes: { via: string; url: string; success: boolean; finalUrl?: string; error?: string }[] = [];
@@ -2543,20 +2581,37 @@ async function runRedirectNavigationScenario(browser: BrowserHost, origin: strin
   process.stdout.write(`BrowserHost: ${outcomes.length} redirecting navigations kept the process alive.\n`);
 }
 
+const STALLED_OPEN_LIMIT_SECONDS = 45;
+
+async function runStalledOpenScenario(browser: BrowserHost, origin: string): Promise<void> {
+  const url = `${origin}/stalled-load`;
+  const started = Date.now();
+  const result = await callBrowserTool(browser, "open", { url });
+  const seconds = Math.round((Date.now() - started) / 1000);
+  const tabs = browser.listTabs().filter((tab) => tab.url.startsWith(url));
+  for (const tab of tabs) await runCauseEffect(browser.close(tab.id));
+  for (const response of stalledResponses) response.destroy();
+  const outcome = {
+    url,
+    success: result.success,
+    seconds,
+    tabsAfter: tabs.length,
+    text: toolError(result).slice(0, 300),
+  };
+  await mkdir(".openbot-build", { recursive: true });
+  await writeFile(".openbot-build/browser-stalled-open-report.json", JSON.stringify(outcome, null, 2));
+  if (!outcome.success || !outcome.text.includes("Stalled page") || outcome.tabsAfter !== 1)
+    throw new Error(`A page with a stalled image did not open with its snapshot: ${JSON.stringify(outcome)}`);
+  if (seconds > STALLED_OPEN_LIMIT_SECONDS)
+    throw new Error(`An open of a stalled page did not end in time: ${JSON.stringify(outcome)}`);
+  process.stdout.write(`BrowserHost: open of a page that never finishes loading ended after ${seconds} s.\n`);
+}
+
 async function runBackgroundScenario(browser: BrowserHost, origin: string): Promise<void> {
   const tab = await runCauseEffect(browser.open(origin, "smoke-thread", "smoke-bot"));
   const other = await runCauseEffect(browser.open(`${origin}/child`, "other-thread", "other-agent"));
   const failures: string[] = [];
   try {
-    // Neither page has been displayed. A different agent now owns the active tab.
-    // Only keyboard input is asserted here, and neither a capture nor a click:
-    // a hidden view has no compositor surface under xvfb, so `capturePage`
-    // reports UnknownVizError and a mouse event is hit-tested by the browser
-    // process against surface data this view does not have. Typing takes
-    // neither path, because `DOM.focus` and `Input.insertText` are routed
-    // straight to the renderer, so it is the half of native input a background
-    // tab can prove. Captures and clicks on displayed tabs are proven in the
-    // main flow.
     try {
       const first = await runCauseEffect(browser.snapshot(tab.id));
       const input = first.elements.find((element) => element.name === "Task");
@@ -2564,8 +2619,20 @@ async function runBackgroundScenario(browser: BrowserHost, origin: string): Prom
       const typed = await runCauseEffect(
         browser.act(tab.id, first.revision, { type: "type", ref: input.ref, text: "background" }),
       );
-      if (!typed.text.includes("typed:background|input:true"))
-        throw new Error(`Background input was not native: ${typed.text}`);
+      if (!typed.text.includes("typed:background|input:true")) {
+        const pages = await Promise.all(
+          webContents
+            .getAllWebContents()
+            .filter((contents) => !contents.isDestroyed() && contents.getURL() === `${origin}/`)
+            .map((contents) =>
+              contents.executeJavaScript(
+                "JSON.stringify({ keys: window.smokeKeys ?? '', value: document.querySelector('input')?.value, active: document.activeElement?.ariaLabel ?? document.activeElement?.localName, focus: document.hasFocus(), visibility: document.visibilityState, size: [innerWidth, innerHeight] })",
+                true,
+              ),
+            ),
+        );
+        throw new Error(`Background input was not native: ${typed.text} ${pages.join(" ")}`);
+      }
     } catch (error) {
       failures.push(`input: ${String(error)}`);
     }
@@ -2577,8 +2644,6 @@ async function runBackgroundScenario(browser: BrowserHost, origin: string): Prom
 }
 
 async function runWaitDeadlines(browser: BrowserHost, tabId: string, v2Contents: WebContents): Promise<void> {
-  // A timeout returns before its CDP commands finish unwinding. A queued snapshot waits for
-  // that cleanup, so the next measurement covers its own deadline rather than the prior queue.
   await runCauseEffect(browser.snapshot(tabId));
   await v2Contents.executeJavaScript(
     "(() => { const container = Object.assign(document.createElement('div'), { innerHTML: Array.from({ length: 200 }, (_, index) => '<button aria-label=\"Bulk ' + index + '\">Bulk ' + index + '</button>').join('') }); container.dataset.bulkTargets = ''; document.body.appendChild(container); return true; })()",
@@ -2651,9 +2716,6 @@ async function runWaitDeadlines(browser: BrowserHost, tabId: string, v2Contents:
     "clearInterval(globalThis.__openbotNoise); delete globalThis.__openbotNoise; true",
     true,
   );
-  // A click that reached the page and then stopped its renderer. The timeout must say the input
-  // arrived, so the agent checks the page instead of repeating the click. A separate site keeps the
-  // stopped renderer away from the `/v2` tab.
   const address = server.address();
   if (!address || isString(address)) throw new Error("Local server address was not available.");
   const frozenClickOrigin = `http://frozen-click.localhost:${address.port}`;
@@ -2692,15 +2754,6 @@ async function runWaitDeadlines(browser: BrowserHost, tabId: string, v2Contents:
   if (!frozenClickClosed) throw new Error("V2 frozen click timeout left the tab queue blocked.");
 }
 
-/**
- * The live view a remote member watches: frames that keep coming, a rate that stays bounded, input
- * that reaches the page, and a stream that ends when the member stops watching.
- *
- * The first check is the one that a unit test cannot make. A page may hold only a few frames the
- * viewer has not acknowledged, so an acknowledgement that never arrives stops the stream after a
- * handful of frames and looks like a frozen page. Only a real page and a real debugger session show
- * that, and a released version already failed exactly this way.
- */
 async function runLiveViewScenario(browser: BrowserHost, tabId: string, contents: WebContents): Promise<void> {
   await contents.executeJavaScript(
     `(() => {
@@ -2714,7 +2767,6 @@ async function runLiveViewScenario(browser: BrowserHost, tabId: string, contents
     button.style.cssText = 'position:fixed;left:10px;top:150px;width:200px;height:60px;z-index:2147483647';
     button.addEventListener('click', event => { if (event.isTrusted) button.dataset.pressed = 'true'; });
     document.body.append(probe, button);
-    // A page that keeps drawing: the frames have to keep coming for as long as it does.
     const paint = () => {
       probe.style.opacity = String(0.4 + (Date.now() % 1000) / 2000);
       window.__liveViewProbe = requestAnimationFrame(paint);
@@ -2733,8 +2785,6 @@ async function runLiveViewScenario(browser: BrowserHost, tabId: string, contents
     }),
   );
   try {
-    // Chromium lets a page hold only a few unacknowledged frames, so passing this count proves the
-    // acknowledgements are landing rather than the stream having stopped after its first burst.
     const enough = 15;
     const deadline = Date.now() + 20_000;
     while (frames.length < enough && Date.now() < deadline) {
@@ -2748,15 +2798,12 @@ async function runLiveViewScenario(browser: BrowserHost, tabId: string, contents
     if (!first || !last) throw new Error("The live view sent no frames.");
     const elapsedSeconds = (last.at - first.at) / 1000;
     const rate = elapsedSeconds > 0 ? (frames.length - 1) / elapsedSeconds : Number.POSITIVE_INFINITY;
-    // The host paces the stream at about thirty frames a second. A page that draws faster than that
-    // must not raise what the link and the watching computer have to carry.
     if (rate > 45) throw new Error(`The live view sent ${rate.toFixed(1)} frames a second, above the paced rate.`);
     const sequences = frames.map((frame) => frame.sequence);
     if (sequences.some((value, index) => index > 0 && value <= (sequences[index - 1] ?? Number.NEGATIVE_INFINITY))) {
       throw new Error("Live view frames did not arrive in order.");
     }
 
-    // Input from the watching member reaches the page, at the page's own pixels.
     const centre = "document.getElementById('live-view-button').getBoundingClientRect()";
     const x = await contents.executeJavaScript(`(r => r.left + r.width / 2)(${centre})`, true);
     const y = await contents.executeJavaScript(`(r => r.top + r.height / 2)(${centre})`, true);
@@ -2787,8 +2834,8 @@ async function runLiveViewScenario(browser: BrowserHost, tabId: string, contents
     }
     if (!pressed) throw new Error("A live view click did not reach the page.");
     await runLiveViewClipboard(browser, tabId, contents);
+    await runLiveViewDigitTyping(browser, tabId, contents);
 
-    // An upload through a file chooser turns the Page domain on and off. The view must not stop.
     await contents.executeJavaScript(
       `(() => {
       const button = document.createElement('button');
@@ -2834,7 +2881,6 @@ async function runLiveViewScenario(browser: BrowserHost, tabId: string, contents
   } finally {
     await Effect.runPromise(stopView());
   }
-  // The page still draws. Nothing more may arrive once the member stops watching.
   const afterStop = frames.length;
   await new Promise((resolve) => setTimeout(resolve, 500));
   if (frames.length !== afterStop) {
@@ -2848,13 +2894,162 @@ async function runLiveViewScenario(browser: BrowserHost, tabId: string, contents
   })()`,
     true,
   );
+  await runLiveViewPageCopy(browser, tabId, contents);
 }
 
-/**
- * A member's paste, select-all, copy and cut in a live view. The text goes in as one insertion and
- * the selection comes back as text, and the host's own clipboard is neither read nor replaced. The
- * results go to `.openbot-build/browser-live-view-clipboard.json`.
- */
+async function runLiveViewPageCopy(browser: BrowserHost, tabId: string, contents: WebContents): Promise<void> {
+  const copies: string[] = [];
+  const stopView = await runCauseEffect(
+    browser.startView(tabId, () => {}, undefined, { onPageCopy: (text) => copies.push(text) }),
+  );
+  try {
+    const loaded = new Promise<void>((resolve) => contents.once("did-finish-load", () => resolve()));
+    contents.reload();
+    await loaded;
+    const armedDeadline = Date.now() + 5_000;
+    let armed = false;
+    while (!armed && Date.now() < armedDeadline) {
+      armed = await contents.executeJavaScript("window[Symbol.for('openbot.pageCopy')]?.waits?.length > 0", false);
+      if (!armed) await new Promise((resolve) => setTimeout(resolve, 50));
+    }
+    const idleDeadline = Date.now() + 12_000;
+    let idle = false;
+    while (!idle && Date.now() < idleDeadline) {
+      idle = !(await contents.executeJavaScript("navigator.userActivation.isActive", false));
+      if (!idle) await new Promise((resolve) => setTimeout(resolve, 200));
+    }
+    if (!idle) throw new Error("The page kept a user action, so a write with none cannot be checked.");
+    await contents
+      .executeJavaScript("navigator.clipboard.writeText('written without a click').catch(() => {})", false)
+      .catch(() => undefined);
+    await contents.executeJavaScript(
+      `(() => {
+      const make = (id, left, copy, top = 150) => {
+        const button = document.createElement('button');
+        button.id = id;
+        button.textContent = id;
+        button.style.cssText = 'position:fixed;width:200px;height:60px;z-index:2147483647;left:' + left + 'px;top:' + top + 'px';
+        button.addEventListener('click', copy);
+        document.body.append(button);
+      };
+      make('page-copy-api', 10, () => navigator.clipboard.writeText('copied by the page button'));
+      make('page-copy-command', 250, () => {
+        const once = (event) => { event.clipboardData.setData('text/plain', 'copied by the page command'); event.preventDefault(); };
+        document.addEventListener('copy', once, { once: true });
+        document.execCommand('copy');
+      });
+      const library = (text, setData) => () => {
+        const mark = document.createElement('span');
+        mark.textContent = text;
+        document.body.append(mark);
+        const range = document.createRange();
+        range.selectNodeContents(mark);
+        getSelection().removeAllRanges();
+        getSelection().addRange(range);
+        mark.addEventListener('copy', (event) => {
+          event.stopPropagation();
+          if (setData) { event.preventDefault(); event.clipboardData.clearData(); event.clipboardData.setData('text/plain', text); }
+        });
+        document.execCommand('copy');
+        getSelection().removeAllRanges();
+        mark.remove();
+      };
+      make('page-copy-library', 10, library('copied by a library selection', false), 230);
+      make('page-copy-library-data', 250, library('copied by a library format', true), 230);
+    })()`,
+      true,
+    );
+    const click = async (id: string, expected: string) => {
+      const box = `document.getElementById('${id}').getBoundingClientRect()`;
+      const x = await contents.executeJavaScript(`(r => r.left + r.width / 2)(${box})`, true);
+      const y = await contents.executeJavaScript(`(r => r.top + r.height / 2)(${box})`, true);
+      if (!isNumber(x) || !isNumber(y)) throw new Error("A page copy button did not report a position.");
+      for (const action of ["move", "down", "up"] as const) {
+        await runCauseEffect(
+          browser.dispatchViewInput(tabId, {
+            type: "pointer",
+            action,
+            x,
+            y,
+            button: "left",
+            clickCount: action === "move" ? 0 : 1,
+            deltaX: 0,
+            deltaY: 0,
+            modifiers: 0,
+          }),
+        );
+      }
+      const deadline = Date.now() + 5_000;
+      while (!copies.includes(expected) && Date.now() < deadline)
+        await new Promise((resolve) => setTimeout(resolve, 50));
+    };
+    await click("page-copy-api", "copied by the page button");
+    await click("page-copy-command", "copied by the page command");
+    await click("page-copy-library", "copied by a library selection");
+    await click("page-copy-library-data", "copied by a library format");
+    const report = { armed, copies };
+    const reportDirectory = join(process.cwd(), ".openbot-build");
+    await mkdir(reportDirectory, { recursive: true });
+    await writeFile(join(reportDirectory, "browser-live-view-page-copy.json"), `${JSON.stringify(report, null, 2)}\n`);
+    if (!armed) throw new Error("The live view did not arm the page that loaded for page copies.");
+    if (copies.includes("written without a click"))
+      throw new Error("A page copy with no user action reached the member.");
+    for (const expected of [
+      "copied by the page button",
+      "copied by the page command",
+      "copied by a library selection",
+      "copied by a library format",
+    ]) {
+      if (!copies.includes(expected))
+        throw new Error(`A page copy did not reach the member: ${JSON.stringify(copies)}`);
+    }
+  } finally {
+    await Effect.runPromise(stopView());
+  }
+}
+
+async function runLiveViewDigitTyping(browser: BrowserHost, tabId: string, contents: WebContents): Promise<void> {
+  const code = "482913";
+  for (const filter of ["keydown-keycode", "keypress-key"]) {
+    await contents.executeJavaScript(
+      `(() => {
+      document.getElementById('live-view-digits')?.remove();
+      const field = document.createElement('input');
+      field.id = 'live-view-digits';
+      field.inputMode = 'numeric';
+      field.style.cssText = 'position:fixed;left:10px;top:230px;width:300px;height:60px;z-index:2147483647';
+      if ('${filter}' === 'keydown-keycode') {
+        field.addEventListener('keydown', event => { if (event.keyCode < 48 || event.keyCode > 57) event.preventDefault(); });
+      } else {
+        field.addEventListener('keypress', event => { if (!/^[0-9]$/.test(event.key)) event.preventDefault(); });
+      }
+      document.body.append(field);
+      field.focus();
+    })()`,
+      true,
+    );
+    for (const digit of code) {
+      for (const action of ["down", "char", "up"] as const) {
+        await runCauseEffect(
+          browser.dispatchViewInput(tabId, {
+            type: "key",
+            action,
+            key: digit,
+            code: `Digit${digit}`,
+            text: action === "char" ? digit : "",
+            modifiers: 0,
+          }),
+        );
+      }
+    }
+    const typed = await contents.executeJavaScript("document.getElementById('live-view-digits').value", true);
+    if (typed !== code) {
+      throw new Error(`Live view digits in a field with a ${filter} digit filter left ${JSON.stringify(typed)}.`);
+    }
+  }
+  await contents.executeJavaScript("document.getElementById('live-view-digits').remove()", true);
+}
+
 async function runLiveViewClipboard(browser: BrowserHost, tabId: string, contents: WebContents): Promise<void> {
   const pasted = "pasted by the member\nsecond line";
   const field = (id: string, type: string) =>
@@ -2874,7 +3069,6 @@ async function runLiveViewClipboard(browser: BrowserHost, tabId: string, content
   const value = (id: string) => contents.executeJavaScript(`document.getElementById('${id}').value`, true);
 
   await field("live-view-text", "textarea");
-  // The member's Ctrl+V and Cmd+V still reach the page as keys, and must not paste the host's clipboard.
   for (const modifiers of [2, 4]) {
     for (const action of ["down", "up"] as const) {
       await runCauseEffect(
@@ -2895,7 +3089,6 @@ async function runLiveViewClipboard(browser: BrowserHost, tabId: string, content
   if (pasteEvent !== pasted) throw new Error("A live view paste fired no paste event with the text.");
   const afterPaste = await value("live-view-text");
   if (afterPaste !== pasted) throw new Error(`A live view paste left ${JSON.stringify(afterPaste)} in the field.`);
-  // Cmd+A from a Mac client selects all on any host, because the host names the command.
   await contents.executeJavaScript(
     "(field => field.setSelectionRange(field.value.length, field.value.length))(document.getElementById('live-view-text'))",
     true,
@@ -2909,7 +3102,6 @@ async function runLiveViewClipboard(browser: BrowserHost, tabId: string, content
   if (copied !== pasted) throw new Error(`A live view copy after select-all returned ${JSON.stringify(copied)}.`);
   const tooLarge = await runCauseEffect(browser.copyViewSelection(tabId, pasted.length - 1));
   if (tooLarge !== null) throw new Error("A live view copy sent a selection longer than its limit.");
-  // The second half of a cut deletes only the text the member has on their clipboard.
   await runCauseEffect(browser.dispatchViewInput(tabId, { type: "cut", text: "other text" }));
   const afterStaleCut = await value("live-view-text");
   if (afterStaleCut !== pasted) throw new Error("A live view cut deleted a selection that had changed.");
@@ -2917,7 +3109,6 @@ async function runLiveViewClipboard(browser: BrowserHost, tabId: string, content
   const afterCut = await value("live-view-text");
   if (afterCut !== "") throw new Error("A live view cut did not delete the selected text.");
 
-  // A field in a frame of the page's own origin gets the paste event and gives its selection.
   await contents.executeJavaScript(
     `new Promise(resolve => {
       document.getElementById('live-view-frame')?.remove();
@@ -2946,8 +3137,6 @@ async function runLiveViewClipboard(browser: BrowserHost, tabId: string, content
     throw new Error("A live view paste or copy missed a field in a frame of the same origin.");
   }
 
-  // A field in a frame of another origin, which runs in its own process: the page's world cannot
-  // reach it, so the host follows the focus through CDP. The member clicks into it, as a user does.
   await contents.executeJavaScript(
     `new Promise(resolve => {
       document.getElementById('live-view-frame')?.remove();
@@ -2962,7 +3151,6 @@ async function runLiveViewClipboard(browser: BrowserHost, tabId: string, content
   );
   const crossOriginFrame = contents.mainFrame.framesInSubtree.find((frame) => frame.url.endsWith("/clipboard-frame"));
   if (!crossOriginFrame) throw new Error("The cross-origin clipboard frame did not load.");
-  // A frame in another process takes clicks only once it draws, so the click repeats until it lands.
   const focusDeadline = Date.now() + 10_000;
   while (!(await crossOriginFrame.executeJavaScript("document.activeElement?.tagName === 'TEXTAREA'"))) {
     if (Date.now() > focusDeadline) {
@@ -3006,8 +3194,6 @@ async function runLiveViewClipboard(browser: BrowserHost, tabId: string, content
   await field("live-view-password", "password");
   const fromPassword = await runCauseEffect(browser.copyViewSelection(tabId, 100_000));
   if (fromPassword !== "") throw new Error("A live view copy read a password field.");
-  // Whoever sits at the host may copy something meanwhile, so the check is that the member's text
-  // never reached the host's clipboard, not that the clipboard stayed the same.
   const hostClipboardHasMemberText = (await clipboard.readText()).includes(pasted);
   if (hostClipboardHasMemberText) throw new Error("A live view copy or paste wrote the host clipboard.");
 
@@ -3043,17 +3229,6 @@ async function runLiveViewClipboard(browser: BrowserHost, tabId: string, content
   );
 }
 
-/**
- * Wait until the view actually delivers a mouse event to the page.
- *
- * A key event goes to the focused renderer, but a mouse event needs the view to be producing
- * compositor frames, and under a virtual display it can take seconds to get there - an animation
- * frame does not run at all until it does. Chromium drops every mouse event in the meantime and
- * reports nothing: no error, no pointer event, just a click that never happened. Every scenario
- * after this one clicks once and means it, so the waiting belongs here rather than in each of them.
- *
- * The probe is thrown away, so retrying it costs nothing and proves nothing about the product.
- */
 async function waitForMouseInput(browser: BrowserHost, tabId: string, contents: WebContents): Promise<void> {
   await contents.executeJavaScript(
     `(() => {
@@ -3085,11 +3260,6 @@ async function waitForMouseInput(browser: BrowserHost, tabId: string, contents: 
   if (!landed) throw new Error("The view never delivered a native mouse event to the page.");
 }
 
-/**
- * Wait until the view actually delivers a key event to the page. Under a virtual display the first
- * key events after a tab opens can be dropped with no error, so the first typing-focus cases lost
- * Enter and failed at random in CI. As with {@link waitForMouseInput}, the probe is thrown away.
- */
 async function waitForKeyInput(browser: BrowserHost, tabId: string, contents: WebContents): Promise<void> {
   await contents.executeJavaScript(
     `(() => {
@@ -3147,8 +3317,6 @@ async function runDoubleClickScenario(browser: BrowserHost, origin: string): Pro
   })()`,
       true,
     );
-    // The tab was just opened, so it may have no presented frame yet. Chromium would drop the first
-    // click and the double-click would arrive without the selection before it.
     await waitForPresentedFrame(doubleContents);
     const doubleClicked = await callBrowserTool(browser, "click", {
       tabId: doubleTab.id,
@@ -3171,6 +3339,7 @@ async function runDragAction(browser: BrowserHost, tabId: string, v2Contents: We
     tabId: tabId,
     source: { kind: "role", role: "button", name: "Drag source", exact: true },
     target: { kind: "role", role: "button", name: "Drop target", exact: true },
+    timeoutMs: 30_000,
   });
   if (!dragged.success) throw new Error(`V2 drag failed: ${toolError(dragged)}`);
   const dragValue = await v2Contents.executeJavaScript("document.querySelector('output').textContent", true);
@@ -3189,7 +3358,6 @@ async function runDragAction(browser: BrowserHost, tabId: string, v2Contents: We
   }
 }
 
-/** The pixel size of the PNG image in a tool result. */
 function imageSize(result: DynamicToolResult): { width: number; height: number } | null {
   const image = result.contentItems.find((item) => item.type === "inputImage");
   if (!result.success || !image || image.type !== "inputImage") return null;
@@ -3216,8 +3384,6 @@ async function runControlActions(browser: BrowserHost, tabId: string, v2Contents
   ) {
     throw new Error("V2 select did not use trusted native input.");
   }
-  // The second option with the same initial needs a second key, and the first key's change replaced
-  // the select that had the focus.
   const sorted = await callBrowserTool(browser, "select_option", {
     tabId: tabId,
     target: { kind: "role", role: "combobox", name: "Sort", exact: true },
@@ -3237,7 +3403,6 @@ async function runControlActions(browser: BrowserHost, tabId: string, v2Contents
       `V2 select did not follow a select that the page replaced: ${toolError(sorted)} ${JSON.stringify(sortValue)}`,
     );
   }
-  // A screenshot with a ref holds only that element, so it is smaller than the page.
   const sortRef = (await runCauseEffect(browser.snapshot(tabId))).elements.find(
     (element) => element.name === "Sort",
   )?.ref;
@@ -3256,9 +3421,6 @@ async function runControlActions(browser: BrowserHost, tabId: string, v2Contents
       `V2 element screenshot was not clipped: ${toolError(elementShot)} ${JSON.stringify({ pageSize, elementSize })}`,
     );
   }
-  // An option whose value is the empty string is how a page spells "no selection", and the value is
-  // the only way to address it -- its label is shared with Alpha's initial, so typeahead alone lands
-  // elsewhere. Rejecting the empty string as invalid put a real option out of reach.
   const clearedSelection = await callBrowserTool(browser, "select_option", {
     tabId: tabId,
     target: { kind: "role", role: "combobox", name: "Mode", exact: true },
@@ -3335,8 +3497,6 @@ async function runControlActions(browser: BrowserHost, tabId: string, v2Contents
   if (editableValue !== "editable text appended") {
     throw new Error("V2 contenteditable target did not receive text.");
   }
-  // A styled label's ::after covers its radio, as on Stripe Checkout. The label activates the radio,
-  // so the click goes through. The same layer on an element that is not a label still blocks it.
   const pseudoLabel = await callBrowserTool(browser, "click", {
     tabId: tabId,
     target: { kind: "role", role: "radio", name: "Pay by card", exact: true },
@@ -3357,10 +3517,6 @@ async function runControlActions(browser: BrowserHost, tabId: string, v2Contents
 }
 
 async function runKeyboardScenario(browser: BrowserHost, origin: string, temporaryRoot: string): Promise<void> {
-  // Chromium decides implicit form submission and text insertion from the *character* event, not
-  // the key event, so a named key dispatched without one reaches the page as a keydown nobody acts
-  // on: `submit: true` left a plain form unsubmitted and `press("Space")` typed nothing. Nothing is
-  // bound to this field, so only native submission can produce the form's output.
   const { tab: keysTab, contents: keysContents } = await openTabWithContents(
     browser,
     `${origin}/keys`,
@@ -3407,9 +3563,6 @@ async function runKeyboardScenario(browser: BrowserHost, origin: string, tempora
         `V2 submit did not reach native form submission: ${toolError(nativeSubmit)} (${nativeSubmitOutput})`,
       );
     }
-    // Shift is not a command modifier. `Shift+Enter` is how every composer on the web spells "line
-    // break, do not submit", so a shortcut whose character event is suppressed reaches the page as a
-    // keydown that inserts nothing while the tool reports success.
     const typedIntoBody = await callBrowserTool(browser, "type", {
       tabId: keysTab.id,
       target: { kind: "css", selector: 'textarea[aria-label="Body"]' },
@@ -3431,9 +3584,6 @@ async function runKeyboardScenario(browser: BrowserHost, origin: string, tempora
         `V2 Shift+Enter inserted no newline: ${toolError(shiftEnterPressed)} (${JSON.stringify(bodyAfterShiftEnter)})`,
       );
     }
-    // The character event carries the same modifier mask as the key events around it, or the page sees
-    // an unshifted Enter -- which is how a composer decides to send the message instead of breaking
-    // the line, whatever the textarea ends up containing.
     const shiftEnterKeypress = await keysContents.executeJavaScript(
       "document.querySelector('#keypress-log').textContent",
       true,
@@ -3441,9 +3591,6 @@ async function runKeyboardScenario(browser: BrowserHost, origin: string, tempora
     if (shiftEnterKeypress !== "keypress:Enter:true") {
       throw new Error(`V2 Shift+Enter reached the page unshifted: ${shiftEnterKeypress}`);
     }
-    // An input inside an iframe nested in a shadow root is reachable by target discovery, so its
-    // document has to be reachable by document enumeration too. If it is not, the next frame
-    // navigation reports the document as gone and frees the files the input is still holding.
     const nestedUploadPath = join(temporaryRoot, "nested-frame-upload.txt");
     await writeFile(nestedUploadPath, "nested frame upload fixture");
     let shadowFrameDocumentId = "";
@@ -3503,11 +3650,6 @@ function snapshotFocus(snapshot: DynamicRecord): { tag: string; name: string; ed
 }
 
 async function runCanvasGridScenario(browser: BrowserHost, origin: string): Promise<void> {
-  // A spreadsheet, a code editor and a map all paint their own surface, so `type` had no element to
-  // resolve, no `value` to write and no contenteditable to select: every attempt to enter data in
-  // one failed with "Typing requires an element target". Without a target the text has to arrive as
-  // the key events a person produces, which is also the only way the page's own keydown handlers
-  // see the tab and newline that move between columns and rows.
   const { tab: gridTab, contents: gridContents } = await openTabWithContents(
     browser,
     `${origin}/grid`,
@@ -3530,8 +3672,6 @@ async function runCanvasGridScenario(browser: BrowserHost, origin: string): Prom
     if (afterRow !== '{"A1":"12","B1":"Done"}') {
       throw new Error(`Canvas grid did not take the row: ${afterRow}`);
     }
-    // Enter returned to the first column of the next row, so the second call proves the page kept
-    // the focus the first one left it with, without any element to re-target.
     const committed = await callBrowserTool(browser, "type", {
       tabId: gridTab.id,
       text: "next",
@@ -3542,9 +3682,6 @@ async function runCanvasGridScenario(browser: BrowserHost, origin: string): Prom
     if (afterSubmit !== '{"A1":"12","B1":"Done","A2":"next"}') {
       throw new Error(`Canvas grid did not commit the submitted cell: ${afterSubmit}`);
     }
-    // Keystrokes with no target land wherever the page put the focus, and a caller that cannot see
-    // where that is finds out only when the data appears in the wrong place. The canvas leaves it on
-    // the document, which is what tells a caller the page interprets the keys itself.
     const canvasFocus = snapshotFocus(await expectSnapshot(browser, gridTab.id));
     if (canvasFocus?.tag !== "body" || canvasFocus.editable !== false) {
       throw new Error(`Canvas grid snapshot misreported the focus: ${JSON.stringify(canvasFocus)}`);
@@ -3560,8 +3697,6 @@ async function runCanvasGridScenario(browser: BrowserHost, origin: string): Prom
       throw new Error(`Grid field snapshot misreported the focus: ${JSON.stringify(fieldFocus)}`);
     }
 
-    // Replacing and appending are properties of a node's value. Reporting either one for keystrokes
-    // the page interprets itself would claim an edit that never happened.
     const modeWithoutTarget = await callBrowserTool(browser, "type", {
       tabId: gridTab.id,
       text: "ignored",
@@ -3575,11 +3710,6 @@ async function runCanvasGridScenario(browser: BrowserHost, origin: string): Prom
   }
 }
 
-/**
- * `upload_files` as an agent calls it: staged by `BrowserUploads` before `BrowserHost` sets the input.
- * Every failure must come back as a failed tool result. A rejected call becomes a JSON-RPC error,
- * which Codex hides from the agent and logs as a "Provider error".
- */
 async function runStagedUploadScenario(
   browser: BrowserHost,
   tabId: string,
@@ -3621,12 +3751,22 @@ async function runStagedUploadScenario(
     if (missing.success) throw new Error("V2 staged upload reported success for a missing file.");
     const staged = await upload({ kind: "css", selector: 'input[aria-label="Files"]' }, [uploadPath]);
     if (!staged.success) throw new Error(`V2 staged upload failed: ${toolError(staged)}`);
+    const settled = new Date(Date.now() - 60_000);
+    await utimes(uploadPath, settled, settled);
+    for (const attempt of ["first", "retry"]) {
+      await contents.executeJavaScript("document.querySelector('output').textContent = 'retry pending'", true);
+      const repeated = await upload({ kind: "css", selector: 'input[aria-label="Files"]' }, [uploadPath]);
+      if (!repeated.success) throw new Error(`V2 repeated staged upload failed: ${toolError(repeated)}`);
+      const repeatedOutput = await contents.executeJavaScript("document.querySelector('output').textContent", true);
+      if (repeatedOutput !== basename(uploadPath)) {
+        throw new Error(`V2 ${attempt} upload of an unchanged file did not reach the page: ${String(repeatedOutput)}`);
+      }
+    }
     await contents.executeJavaScript("document.querySelector('output').textContent = 'staged chooser pending'", true);
     const stagedChooser = await upload({ kind: "role", role: "button", name: "Attach files", exact: true }, [
       uploadPath,
     ]);
     if (!stagedChooser.success) throw new Error(`V2 staged file chooser upload failed: ${toolError(stagedChooser)}`);
-    // The staged copy keeps the file name, so the page names the file the agent chose.
     const stagedOutput = await contents.executeJavaScript("document.querySelector('output').textContent", true);
     if (stagedOutput !== `chooser:${basename(uploadPath)}`) {
       throw new Error(`V2 staged file chooser upload did not reach the page: ${String(stagedOutput)}`);
@@ -3655,7 +3795,6 @@ async function runEvaluationScenario(browser: BrowserHost, tabId: string, v2Cont
   if (thrownEvaluation.success || !toolError(thrownEvaluation).includes("evaluation-smoke-error")) {
     throw new Error("V2 page evaluation did not return a page exception.");
   }
-  // A snapshot leaves out a plain success, so the failed evaluation shows the history records evaluations.
   const evaluationSnapshot = await runCauseEffect(browser.snapshot(tabId));
   if (!evaluationSnapshot.actions.some((action) => action.action === "evaluate" && action.outcome === "error")) {
     throw new Error("V2 page evaluation was not recorded in browser action history.");
@@ -3684,10 +3823,6 @@ async function runEvaluationScenario(browser: BrowserHost, tabId: string, v2Cont
   if (oversizedEvaluation.success || !toolError(oversizedEvaluation).includes("exceeds 64 KB")) {
     throw new Error("V2 page evaluation accepted an oversized result.");
   }
-  // A promise the page never settles is the one evaluation CDP's own execution timeout does not
-  // bound, so the host has to cancel the pending command itself. If it does not, the tab's queue
-  // waits on that promise forever and every later operation -- including close and shutdown --
-  // blocks behind it, which is what the next call proves it does not.
   const neverSettlingEvaluation = await callBrowserTool(browser, "evaluate", {
     tabId: tabId,
     expression: "new Promise(() => {})",
@@ -3706,11 +3841,6 @@ async function runEvaluationScenario(browser: BrowserHost, tabId: string, v2Cont
   await runWedgedFrameEvaluation(browser, new URL(v2Contents.getURL()).origin);
 }
 
-/**
- * An evaluation waits for the page to become quiet in every frame. A frame that does not answer, such
- * as an ad frame whose timers do not run (#3139), must not hold the result until the deadline. The
- * frame host is a site of its own, so the spinning renderer is not the one of another fixture.
- */
 async function runWedgedFrameEvaluation(browser: BrowserHost, origin: string): Promise<void> {
   const { port } = new URL(origin);
   const { tab, contents } = await openTabWithContents(browser, `${origin}/blocking-frame`, "smoke-thread", "smoke-bot");
@@ -3854,8 +3984,6 @@ async function runPersistencePhase(root: string, origin: string, phase: string):
   await runCauseEffect(browser.setVisible({ visible: true, bounds: { x: 0, y: 0, width: 800, height: 600 } }));
   try {
     if (phase === "read-clear") {
-      // Read proves write persists across restart. Clear runs in the same
-      // boot. A later boot must verify that clear persists across restart.
       await checkOnePersistencePage(browser, origin, "read", true);
       await checkOnePersistencePage(browser, origin, "clear", false);
       await runCauseEffect(browser.flushPersistentStorage());
@@ -3887,8 +4015,6 @@ async function checkOnePersistencePage(
     const cookie = getString(snapshot, "cookie") ?? "";
     const localStorageValue = getString(snapshot, "localStorage");
     const indexedDbValue = getString(snapshot, "indexedDb");
-    // The npm macOS Electron binary does not have OpenBot's production signature or cookie-encryption fuse.
-    // Verify encrypted cookie persistence with the signed app; other platforms cover it in this process test.
     const requireCrossProcessCookie = phase !== "read" || process.platform !== "darwin";
     if (
       (expectedStored &&
@@ -3923,9 +4049,7 @@ async function waitForPersistenceSnapshot(browser: BrowserHost, tabId: string): 
           indexedDb: getString(parsed, "indexedDb"),
         };
       }
-    } catch {
-      // The page can still be initializing IndexedDB.
-    }
+    } catch {}
     await new Promise((resolve) => setTimeout(resolve, 50));
   }
   throw new Error(`Persistence page did not become ready: ${latest}`);
@@ -3966,7 +4090,6 @@ async function runPopupScenario(browser: BrowserHost, origin: string): Promise<v
         "(location.hostname === 'localhost' || document.cookie.includes('popup_session=shared')) && !!opener && typeof window.openbot === 'undefined' && typeof require === 'undefined'",
       );
       if (!shared) throw new Error("Popup lost session, opener, or isolation.");
-      // Named-window reuse must not register another view or lose the live relationship on reload.
       if (button !== "Cross-origin sign-in" && button !== "Iframe sign-in")
         await contents.executeJavaScript("window.open('/popup-login', 'auth'); void 0", true);
       if (popupContents.session !== contents.session) throw new Error("Popup session changed.");
@@ -3976,10 +4099,8 @@ async function runPopupScenario(browser: BrowserHost, origin: string): Promise<v
       await runCauseEffect(browser.setVisible({ visible: true, bounds: { x: 0, y: 0, width: 800, height: 600 } }));
       if (browser.listTabs().filter((tab) => tab.openerTabId === parent.id).length !== 1)
         throw new Error("Duplicate named popup.");
-      // Reloading a top-level opener preserves it; reloading removes an iframe opener.
       if (button !== "Iframe sign-in") await runCauseEffect(browser.reload(parent.id));
       if (!browser.listTabs().some((tab) => tab.id === popup.id)) throw new Error("Parent reload closed popup.");
-      // Background preview capture must not resize the opener and dispose its login callback.
       await contents.executeJavaScript(
         "window.callbackExpired = false; window.callbackViewport = { width: innerWidth, height: innerHeight, scale: devicePixelRatio }; void 0",
       );
@@ -3993,8 +4114,6 @@ async function runPopupScenario(browser: BrowserHost, origin: string): Promise<v
         async () => (await contents.executeJavaScript("document.querySelector('#result').textContent")) === "Signed in",
         "OAuth callback",
       );
-      // listTabs() hides the popup on its "close" event, but the host hands the active tab back to the
-      // opener only after "destroyed", so a slow runner can observe the gap.
       await waitFor(async () => browser.activeTabId === parent.id, `${button}: popup return to opener`);
     }
     const blocked = await callBrowserTool(browser, "click", {
@@ -4025,6 +4144,62 @@ async function runPopupScenario(browser: BrowserHost, origin: string): Promise<v
     await runCauseEffect(browser.close(post.id));
   } finally {
     await runCauseEffect(browser.close(parent.id));
+  }
+}
+
+async function runCookieBannerScenario(browser: BrowserHost, origin: string): Promise<void> {
+  const agent = await openTabWithContents(browser, `${origin}/cookie-banner`, "smoke-thread", "smoke-bot");
+  const shadow = await openTabWithContents(browser, `${origin}/cookie-banner?shadow`, "smoke-thread", "smoke-bot");
+  const acceptOnly = await openTabWithContents(
+    browser,
+    `${origin}/cookie-banner?accept-only`,
+    "smoke-thread",
+    "smoke-bot",
+  );
+  const takeover = await openTabWithContents(browser, `${origin}/cookie-banner?manual`, "smoke-thread", "smoke-bot");
+  const existingIds = new Set(webContents.getAllWebContents().map((contents) => contents.id));
+  const personTab = await runCauseEffect(browser.open(`${origin}/cookie-banner`));
+  const person = webContents
+    .getAllWebContents()
+    .find((candidate) => !existingIds.has(candidate.id) && !candidate.isDestroyed());
+  if (!person) throw new Error("Browser contents were not created for the person's tab.");
+  try {
+    const output = (contents: WebContents) =>
+      contents.executeJavaScript("document.querySelector('output')?.textContent ?? ''", true);
+    const consentScript = (contents: WebContents) =>
+      contents.executeJavaScriptInIsolatedWorld(CONSENT_WORLD, [{ code: "globalThis.__openbotConsent ?? null" }]);
+    await waitFor(async () => (await output(agent.contents)) === "rejected", "the agent tab to refuse cookies");
+    await waitFor(async () => (await output(shadow.contents)) === "rejected", "the shadow banner to be refused");
+    await waitFor(async () => (await consentScript(acceptOnly.contents)) !== null, "the script in the accept-only tab");
+    const acceptOnlyOutput = await output(acceptOnly.contents);
+    await waitFor(async () => (await consentScript(takeover.contents)) === true, "the script in the takeover tab");
+    await runCauseEffect(browser.beginTakeover(takeover.tab.id));
+    await waitFor(
+      async () => (await consentScript(takeover.contents)) === "stopped",
+      "the takeover to stop the script",
+    );
+    browser.endTakeover(takeover.tab.id);
+    await waitFor(async () => !person.isLoading() && person.getURL().endsWith("/cookie-banner"), "the person's tab");
+    const personScript = await consentScript(person);
+    const personOutput = await output(person);
+    const report = {
+      status:
+        acceptOnlyOutput === "banner" && personScript === null && personOutput === "banner" ? "passed" : "issues_found",
+      agentTab: "rejected",
+      shadowTab: "rejected",
+      acceptOnlyTab: acceptOnlyOutput,
+      takeoverTab: "stopped",
+      personTab: { output: personOutput, consentScript: personScript },
+    };
+    await mkdir(".openbot-build", { recursive: true });
+    await writeFile(".openbot-build/browser-cookie-banner.json", JSON.stringify(report, null, 2));
+    if (report.status !== "passed") throw new Error(`A cookie banner was changed: ${JSON.stringify(report)}`);
+  } finally {
+    await runCauseEffect(browser.close(agent.tab.id));
+    await runCauseEffect(browser.close(shadow.tab.id));
+    await runCauseEffect(browser.close(acceptOnly.tab.id));
+    await runCauseEffect(browser.close(takeover.tab.id));
+    await runCauseEffect(browser.close(personTab.id));
   }
 }
 
@@ -4093,12 +4268,74 @@ async function runIdentityScenario(browser: BrowserHost, origin: string): Promis
   const secondTab = await runCauseEffect(browser.open(`${origin}/headers?source=second-tab`, "smoke-thread"));
   const second = await checkBrowserIdentity(browser, secondTab.id);
   await runIdentityFrameProbe(browser, origin);
+  const requestedHints = await runRequestedHintsProbe(browser, origin);
   await mkdir(".openbot-build", { recursive: true });
   await writeFile(
     ".openbot-build/browser-identity.json",
-    JSON.stringify({ initial, reloaded, navigated, second, requests: recordedIdentityAgents }, null, 2),
+    JSON.stringify({ initial, reloaded, navigated, second, requestedHints, requests: recordedIdentityAgents }, null, 2),
   );
   process.stdout.write("BrowserHost: matching page, reload, navigation, and second-tab identity passed.\n");
+}
+
+const REQUESTED_HINTS = [
+  ["sec-ch-ua-full-version-list", "fullVersionList"],
+  ["sec-ch-ua-full-version", "uaFullVersion"],
+  ["sec-ch-ua-platform-version", "platformVersion"],
+  ["sec-ch-ua-arch", "architecture"],
+  ["sec-ch-ua-bitness", "bitness"],
+  ["sec-ch-ua-model", "model"],
+  ["sec-ch-ua-wow64", "wow64"],
+  ["sec-ch-ua-form-factors", "formFactors"],
+] as const;
+
+function hintHeaderValue(value: unknown): string {
+  if (typeof value === "boolean") return value ? "?1" : "?0";
+  if (Array.isArray(value))
+    return value
+      .map((item) =>
+        isDynamicRecord(item) ? `"${getString(item, "brand")}";v="${getString(item, "version")}"` : `"${String(item)}"`,
+      )
+      .join(", ");
+  return `"${String(value)}"`;
+}
+
+async function runRequestedHintsProbe(browser: BrowserHost, origin: string) {
+  const tab = await runCauseEffect(browser.open(`${origin}/hints`, "smoke-thread"));
+  const read = async () => {
+    const deadline = Date.now() + 10_000;
+    while (Date.now() < deadline) {
+      const text = (await runCauseEffect(browser.snapshot(tab.id))).text;
+      if (text.trim()) {
+        const payload = JSON.parse(text);
+        if (isDynamicRecord(payload) && isDynamicRecord(payload.requestHeaders) && isDynamicRecord(payload.values))
+          return { requestHeaders: payload.requestHeaders, values: payload.values };
+      }
+      await new Promise((resolve) => setTimeout(resolve, 100));
+    }
+    throw new Error("The requested-hints page did not report.");
+  };
+  const first = await read();
+  const early = REQUESTED_HINTS.filter(([header]) => first.requestHeaders[header] !== undefined);
+  if (early.length > 0) throw new Error(`Hints were sent before the site asked: ${JSON.stringify(early)}`);
+  await runCauseEffect(browser.reload(tab.id));
+  const second = await read();
+  const hints = REQUESTED_HINTS.filter(
+    ([header]) => process.platform !== "win32" || header !== "sec-ch-ua-platform-version",
+  );
+  const expected = Object.fromEntries(hints.map(([header, key]) => [header, hintHeaderValue(second.values[key])]));
+  const sent = Object.fromEntries(hints.map(([header]) => [header, second.requestHeaders[header]]));
+  if (JSON.stringify(sent) !== JSON.stringify(expected))
+    throw new Error(
+      `Requested hints differ from the page: sent ${JSON.stringify(sent)}, page ${JSON.stringify(expected)}`,
+    );
+  await runCauseEffect(browser.loadUrl(tab.id, `${origin}/hints-away`));
+  const away = await read();
+  const carried = REQUESTED_HINTS.filter(([header]) => away.requestHeaders[header] !== undefined);
+  if (!String(away.requestHeaders.host).startsWith("localhost") || carried.length > 0)
+    throw new Error(`A redirect carried hints to a different origin: ${JSON.stringify(carried)}`);
+  await runCauseEffect(browser.close(tab.id));
+  process.stdout.write("BrowserHost: requested client hints match the page.\n");
+  return sent;
 }
 
 async function checkBrowserIdentity(browser: BrowserHost, tabId: string): Promise<DynamicRecord> {
@@ -4125,7 +4362,6 @@ async function checkBrowserIdentity(browser: BrowserHost, tabId: string): Promis
       (brand) => getString(brand, "brand") === "Chromium" && getString(brand, "version") === chromiumMajorVersion,
     ) ||
     /Electron|OpenBot/u.test(clientHintBrands) ||
-    // Cloudflare rejects a header that differs from the brands the page reads, GREASE brand and order included.
     clientHintBrands !==
       navigatorBrands.map((brand) => `"${getString(brand, "brand")}";v="${getString(brand, "version")}"`).join(", ")
   ) {
@@ -4135,8 +4371,6 @@ async function checkBrowserIdentity(browser: BrowserHost, tabId: string): Promis
 }
 
 async function runIdentityFrameProbe(browser: BrowserHost, origin: string): Promise<void> {
-  // Every source must present the same identity the session carries: a subframe or worker that
-  // falls back to a different string reads as a second, unknown client next to the page.
   const frameTab = await runCauseEffect(browser.open(`${origin}/identity-frame`, "smoke-thread"));
   try {
     const deadline = Date.now() + 15_000;
@@ -4149,9 +4383,7 @@ async function runIdentityFrameProbe(browser: BrowserHost, origin: string): Prom
             Object.entries(parsed).map(([source, agent]) => [source, isString(agent) ? agent : ""]),
           );
         }
-      } catch {
-        // The frame or worker request may not have arrived yet.
-      }
+      } catch {}
       if (report.document && report.iframe && report.worker) break;
       await new Promise((resolve) => setTimeout(resolve, 100));
     }
@@ -4169,7 +4401,6 @@ async function runIdentityFrameProbe(browser: BrowserHost, origin: string): Prom
   }
 }
 
-/** Amazon product pages load a 1x1 ad frame whose timers do not run. Evaluation must still return (#3139). */
 async function runAmazonLiveProbe(browser: BrowserHost): Promise<void> {
   const { tab, contents } = await openTabWithContents(
     browser,
@@ -4322,8 +4553,6 @@ async function runXLiveProbe(browser: BrowserHost): Promise<void> {
 }
 
 async function runWhatsAppLiveProbe(browser: BrowserHost): Promise<void> {
-  // No credentials needed: the allowlist refusal renders before any login, while the real
-  // login page shows the phone-linking controls instead.
   const whatsappTab = await runCauseEffect(
     browser.open("https://web.whatsapp.com/", "whatsapp-live-smoke", "whatsapp-live-smoke", true),
   );
@@ -4353,8 +4582,6 @@ async function runWhatsAppLiveProbe(browser: BrowserHost): Promise<void> {
 }
 
 async function runCanvaLiveProbe(browser: BrowserHost): Promise<void> {
-  // No credentials needed: the presentations page renders the update-your-browser block for a
-  // refused user agent before any login, and the editor links go through the same gate.
   const canvaTab = await runCauseEffect(
     browser.open("https://www.canva.com/presentations/", "canva-live-smoke", "canva-live-smoke", true),
   );
@@ -4377,9 +4604,6 @@ async function runCanvaLiveProbe(browser: BrowserHost): Promise<void> {
 }
 
 async function runFramerLiveProbe(browser: BrowserHost, panelBounds: BrowserBounds): Promise<void> {
-  // An example.com address gets the same policy verdict as a real one and sends no mail to a
-  // person. The policy also refuses an exact 800x600 viewport, the headless default, so the probe
-  // uses another size for the duration and then restores the panel.
   await runCauseEffect(browser.setVisible({ visible: true, bounds: { x: 0, y: 0, width: 760, height: 560 } }));
   const framerTab = await runCauseEffect(
     browser.open("https://framer.com/login/", "framer-live-smoke", "framer-live-smoke", true),
@@ -4475,11 +4699,6 @@ interface FinishedDownload {
   path: string;
 }
 
-/**
- * Resolves when the next download that `contents` starts is done. Call it before the click: the
- * session emits `will-download` as the response arrives. The host's own listener runs first and
- * sets the save path, so the item reports the path the host chose.
- */
 function nextDownloadDone(contents: WebContents, step: string): Promise<FinishedDownload> {
   const { session } = contents;
   return new Promise((resolve, reject) => {
@@ -4491,7 +4710,6 @@ function nextDownloadDone(contents: WebContents, step: string): Promise<Finished
         resolve({ state, path: item.getSavePath() });
       });
     };
-    // The limit only turns a dropped click into a failure; a download that starts ends at once.
     const timer = setTimeout(() => {
       session.off("will-download", started);
       reject(new Error(`Timed out waiting for ${step}.`));
@@ -4516,9 +4734,7 @@ async function waitFor(check: () => Promise<boolean>, waitedFor: string): Promis
   while (Date.now() < deadline) {
     try {
       if (await check()) return;
-    } catch {
-      // The checked state may not exist yet.
-    }
+    } catch {}
     await new Promise((resolve) => setTimeout(resolve, 50));
   }
   throw new Error(`Timed out waiting for ${waitedFor}.`);

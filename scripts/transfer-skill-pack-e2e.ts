@@ -1,8 +1,3 @@
-// Run: bun scripts/transfer-skill-pack-e2e.ts
-// Report: .openbot-build/transfer-skill-pack-e2e.json
-// Installs a skill pack with more skills than an agent can have, exports the agent with the real
-// transfer service, and imports it through the real local skill library and pack installer.
-
 import assert from "node:assert/strict";
 import { createHash } from "node:crypto";
 import { mkdir, mkdtemp, readdir, readFile, rm, writeFile } from "node:fs/promises";
@@ -41,7 +36,6 @@ const report: Report = { status: "running" };
 
 const text = (value: string) => new TextEncoder().encode(value);
 const skillMarkdown = (name: string) => text(`---\nname: ${name}\ndescription: Test ${name}.\n---\nUse ${name}.\n`);
-// More skills than an agent can have, so the export cut the pack before the fix.
 const children = Array.from({ length: INPUT_LIMITS.agentSkills + 8 }, (_, index) => `kit-skill-${index + 1}`);
 const packFiles: Record<string, Uint8Array> = {
   "SKILL.md": skillMarkdown("kit"),
@@ -106,7 +100,6 @@ function agentSummary(id: string, name: string): AgentSummary {
   };
 }
 
-/** Each file in `.agents/skills`, with its text, by path. An install also copies it to `.claude/skills`. */
 async function skillTree(workspace: string): Promise<Record<string, string>> {
   const tree: Record<string, string> = {};
   const visit = async (directory: string): Promise<void> => {
@@ -156,13 +149,16 @@ try {
     library,
   );
   await run(skills.install({ agentId: source.id, skillId: detail.id }));
-  // A skill a user put in the folder without OpenBot travels as a skill of its own.
   await mkdir(join(source.workspacePath, ".agents/skills/notes"), { recursive: true });
   await writeFile(join(source.workspacePath, ".agents/skills/notes/SKILL.md"), skillMarkdown("notes"));
 
   const transferAgents: InstanceTransferOptions["agents"] = {
     listAgents: () => agents,
     listRoutines: () => [],
+    listRoutineRuns: () => [],
+    importRoutineRuns: () => [],
+    listChannelRoutineRuns: () => [],
+    importChannelRoutineRuns: () => [],
     listMemories: () => [],
     getMemorySelection: () => ({ selections: [] }),
     setMemoryInclusion: () => undefined,
@@ -191,10 +187,37 @@ try {
     initializeMemorySelection: () => undefined,
     setAvatar: () => Effect.die("The agent has no avatar."),
     deleteAgent: () => Effect.die("A successful import deletes no agent."),
+    setAgentHidden: () => Effect.die("The agent is not hidden."),
+    readTransferHistory: () => [],
+    resolveTransferFile: () => Effect.succeed(null),
+    importTransferHistory: () => Effect.die("The export has no chat history."),
+    channels: {
+      store: {
+        ids: () => [],
+        get: () => assert.fail("The instance has no channels."),
+        messages: () => [],
+        update: () => assert.fail("The instance has no channels."),
+        context: () => assert.fail("The instance has no channels."),
+      },
+      mailbox: {
+        stageGeneratedCopy: () => Effect.die("The instance has no channels."),
+        persistGeneratedAttachmentsWith: () => assert.fail("The instance has no channels."),
+        discardStagedGeneratedAttachments: () => Effect.void,
+      },
+      images: { resolve: () => null },
+      command: () => Effect.die("The instance has no channels."),
+      setImage: () => Effect.die("The instance has no channels."),
+    },
+    listChannelMemories: () => [],
+    listChannelRoutines: () => [],
+    createChannelMemory: () => assert.fail("The instance has no channels."),
+    createChannelRoutine: () => assert.fail("The instance has no channels."),
+    deleteChannel: () => Effect.die("The instance has no channels."),
   };
   const transfer = new InstanceTransferService({
     agents: transferAgents,
     skills: { library: () => library, installLocal: (input) => skills.installLocal(input) },
+    channelActor: () => ({ id: "local", name: "You" }),
     settings: {
       mcpServers: () => [],
       saveMcpServer: () => Effect.void,

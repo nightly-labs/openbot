@@ -7,14 +7,12 @@ import {
   type MachineMetric,
   type MachineMetrics,
   machineAlertLevel,
-  machineMetricRatio,
+  machineMetricPercent,
+  machineMetricTone,
   type TeamMemberSummary,
 } from "@openbot/contracts/ipc";
 import type { AppTextKey } from "@openbot/i18n";
 import {
-  Cpu,
-  HardDrive,
-  MemoryStick,
   Progress,
   Select,
   SelectContent,
@@ -25,24 +23,16 @@ import {
   TriangleAlert,
 } from "@openbot/ui";
 import { useText } from "@openbot/ui/text";
-import type { JSX } from "@solidjs/web";
 import { createMemo, createSignal, createUniqueId, For, Show } from "solid-js";
+import { MACHINE_METRIC_ICONS, MACHINE_METRIC_LABELS, useMachineMetricDetail } from "./machine-metric";
 
 export interface MachineResourcesProps {
-  /** Null until the first reading arrives. */
   metrics: MachineMetrics | null;
   error?: string | null;
-  /** Null while the settings load, or for a viewer who cannot change them. */
   alerts: MachineAlertSettings | null;
   members: readonly TeamMemberSummary[];
   onChangeAlerts: (settings: MachineAlertSettings) => Promise<void>;
 }
-
-const METRIC_LABELS = {
-  disk: "files.machine.disk",
-  memory: "files.machine.memory",
-  cpu: "files.machine.cpu",
-} as const satisfies Record<MachineMetric, AppTextKey>;
 
 const METRIC_ALERT_LABELS = {
   disk: "files.machine.diskAlert",
@@ -50,28 +40,16 @@ const METRIC_ALERT_LABELS = {
   cpu: "files.machine.cpuAlert",
 } as const satisfies Record<MachineMetric, AppTextKey>;
 
-const METRIC_ICONS: Record<MachineMetric, (props: { class: string }) => JSX.Element> = {
-  disk: (props) => <HardDrive class={props.class} aria-hidden="true" />,
-  memory: (props) => <MemoryStick class={props.class} aria-hidden="true" />,
-  cpu: (props) => <Cpu class={props.class} aria-hidden="true" />,
-};
-
 const LEVEL_FIELDS = {
   disk: "diskPercent",
   memory: "memoryPercent",
   cpu: "cpuPercent",
 } as const satisfies Record<MachineMetric, keyof MachineAlertSettings>;
 
-/**
- * The machine part of Server settings > Storage: disk, memory and CPU use of the computer that runs
- * the host, the level at which each one alerts, and the owner or admin who gets the alert.
- */
 export function MachineResources(props: MachineResourcesProps) {
   const { t, format } = useText();
+  const metricDetail = useMachineMetricDetail();
   const headingId = `machine-${createUniqueId()}`;
-  // A slider moves with the pointer, and its level saves when the user lets go. The record is replaced
-  // whole on each move, so the slider reads the new level at once. The sliders stay enabled while a
-  // level saves, so keyboard focus stays on the slider.
   const [draftLevels, setDraftLevels] = createSignal<Partial<Record<MachineMetric, number>>>({});
   const level = (metric: MachineMetric): number | null =>
     draftLevels()[metric] ?? (props.alerts ? machineAlertLevel(props.alerts, metric) : null);
@@ -88,23 +66,19 @@ export function MachineResources(props: MachineResourcesProps) {
   };
   const passed = () =>
     MACHINE_METRICS.filter((metric) => {
-      const ratio = props.metrics ? machineMetricRatio(props.metrics, metric) : null;
+      const percent = props.metrics ? machineMetricPercent(props.metrics, metric) : null;
       const limit = level(metric);
-      return ratio !== null && limit !== null && Math.floor(ratio * 100) >= limit;
+      return percent !== null && limit !== null && percent >= limit;
     });
 
   async function save(change: Partial<MachineAlertSettings>): Promise<void> {
     const saved = props.alerts;
     if (!saved) return;
-    // A member who left or is no longer an admin cannot get the alert, and the host refuses the
-    // settings while they name one. The owner gets it then, as the picker shows.
     const stored = saved.responsibleMemberId;
     const stale = stored !== null && props.members.length > 0 && !recipients().some((member) => member.id === stored);
-    // The caller shows the new settings at once, so a second change in a row builds on this one.
     await props.onChangeAlerts({ ...saved, ...(stale ? { responsibleMemberId: null } : {}), ...change });
   }
 
-  /** The slider shows its saved level again; another slider that the user still drags keeps its value. */
   const clearDraft = (metric: MachineMetric) =>
     setDraftLevels((levels) => {
       const { [metric]: _, ...rest } = levels;
@@ -136,26 +110,16 @@ export function MachineResources(props: MachineResourcesProps) {
           <ul class="machine-resources-metrics">
             <For each={MACHINE_METRICS}>
               {(metric) => {
-                const ratio = () => machineMetricRatio(metrics(), metric);
-                const percent = () => {
-                  const value = ratio();
-                  return value === null ? null : Math.floor(value * 100);
-                };
-                const tone = () => {
-                  const value = percent();
-                  const limit = level(metric);
-                  if (value === null || limit === null || value < limit) return "normal";
-                  return value >= Math.max(95, limit + 10) ? "danger" : "warning";
-                };
-                const Icon = METRIC_ICONS[metric];
+                const percent = () => machineMetricPercent(metrics(), metric);
+                const tone = () => machineMetricTone(percent(), level(metric));
+                const Icon = MACHINE_METRIC_ICONS[metric];
                 return (
                   <li class="machine-resources-metric" data-tone={tone()}>
                     <Icon class="machine-resources-icon" />
                     <span class="machine-resources-copy">
-                      <span class="machine-resources-title">{t(METRIC_LABELS[metric])}</span>
+                      <span class="machine-resources-title">{t(MACHINE_METRIC_LABELS[metric])}</span>
                       <span class="machine-resources-meta">{metricDetail(metrics(), metric)}</span>
                     </span>
-                    {/* 0% is a reading too, so the test is for null, not for a falsy value. */}
                     <Show
                       when={percent() !== null}
                       fallback={<span class="machine-resources-meta">{t("files.machine.unknown")}</span>}
@@ -165,7 +129,7 @@ export function MachineResources(props: MachineResourcesProps) {
                           <span class="machine-resources-bar">
                             <Progress
                               value={percent() ?? 0}
-                              aria-label={t(METRIC_LABELS[metric])}
+                              aria-label={t(MACHINE_METRIC_LABELS[metric])}
                               getValueLabel={() =>
                                 t("files.machine.used", { percent: format.percent((percent() ?? 0) / 100) })
                               }
@@ -267,29 +231,6 @@ export function MachineResources(props: MachineResourcesProps) {
     const params = { level: format.percent((level(metric) ?? 0) / 100) };
     if (metric === "disk") return t("files.machine.diskAbove", params);
     return metric === "memory" ? t("files.machine.memoryAbove", params) : t("files.machine.cpuAbove", params);
-  }
-
-  function metricDetail(metrics: MachineMetrics, metric: MachineMetric): string {
-    // A container limit can be part of a core, such as 1.5.
-    if (metric === "cpu") {
-      const cores = metrics.cpuMillicores / 1000;
-      return t("files.machine.cores", { count: cores, cores: format.number(cores, { maximumFractionDigits: 2 }) });
-    }
-    if (metric === "disk") {
-      const { diskUsedBytes: used, diskFreeBytes: free, diskTotalBytes: total } = metrics;
-      if (used === null || free === null || total === null) return t("files.machine.unknown");
-      return t("files.machine.diskDetail", {
-        used: format.fileSize(used),
-        total: format.fileSize(total),
-        free: format.fileSize(free),
-      });
-    }
-    const { memoryTotalBytes: total, memoryAvailableBytes: free } = metrics;
-    if (total === null || free === null) return t("files.machine.unknown");
-    return t("files.machine.memoryDetail", {
-      used: format.fileSize(Math.max(0, total - free)),
-      total: format.fileSize(total),
-    });
   }
 }
 

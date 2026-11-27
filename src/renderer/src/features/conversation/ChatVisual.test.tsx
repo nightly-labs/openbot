@@ -9,8 +9,6 @@ import { ChatVisual } from "@openbot/ui/features/conversation/ChatVisual";
 import { render, screen, waitFor } from "@solidjs/testing-library";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-// The browser client shows an agent's page from its HTML. The page runs scripts next to the app
-// origin, which keeps the host device keys, so the frame must give it an opaque origin.
 describe("ChatVisual from HTML", () => {
   it("shows the page as srcdoc in the sandbox, never from a URL", async () => {
     render(() => <ChatVisual html="<p>Chart</p>" title="Launch chart" onOpenLink={vi.fn()} />);
@@ -44,7 +42,6 @@ describe("ChatVisual from HTML", () => {
   });
 });
 
-// A page acts for the user only from its own frame, and only right after a click or a key in it.
 describe("ChatVisual page requests", () => {
   const message = (text: string) => ({
     jsonrpc: "2.0",
@@ -83,7 +80,6 @@ describe("ChatVisual page requests", () => {
     if (!page) throw new Error("The frame has no window.");
     const post = (data: unknown, source: Window = page) =>
       window.dispatchEvent(new MessageEvent("message", { source, data }));
-    /** The page asks for a message and the context, which both change the draft. */
     const ask = (source?: Window) => {
       post(message("Pick B"), source);
       post(context("Count 3"), source);
@@ -153,7 +149,6 @@ describe("ChatVisual page requests", () => {
     expect(parseChatVisualMessage(image("data:text/html,<script>alert(1)</script>"))).toBeNull();
     expect(parseChatVisualMessage(image("http://example.com/chart.png"))).toBeNull();
 
-    // A request with text out of range is refused, so the page's promise fails and does not wait.
     expect(parseChatVisualMessage(message("x".repeat(INPUT_LIMITS.messageText + 1)))).toEqual({
       type: "refused",
       id: 7,

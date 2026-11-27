@@ -1,14 +1,12 @@
 import { type AgentStep, AgentStepsDisclosure } from "@openbot/ui/features/conversation/AgentSteps";
+import { ChatMessageRow } from "@openbot/ui/features/conversation/ChatMessageRow";
+import { MessageActions, MessageMenuItems } from "@openbot/ui/features/conversation/MessageRendering";
 import { type TraceSpan, TraceWaterfall } from "@openbot/ui/features/conversation/TraceWaterfall";
 import { createMemo, createSignal, onSettled } from "solid-js";
+import { fn } from "storybook/test";
 import type { Meta, StoryObj } from "storybook-solidjs-vite";
+import { STORY_AGENTS } from "./fixtures";
 
-/*
- * The trace of an agent's turn: each model call, tool call, wait and handoff as a bar on one
- * timeline. The steps row of a finished turn opens it in a dialog. These stories use fixtures.
- */
-
-/** A span of the fixture turn, with its times in ms after the turn started. */
 interface FixtureSpan extends Omit<TraceSpan, "start" | "end"> {
   from: number;
   to: number;
@@ -35,6 +33,7 @@ const TURN: readonly FixtureSpan[] = [
     from: 0,
     to: 3_200,
     tokens: 1_840,
+    cachedInput: 12_400,
     costUsd: 0.011,
   },
   {
@@ -119,6 +118,8 @@ const TURN: readonly FixtureSpan[] = [
     name: "read",
     detail: "Subagents.tsx",
     kind: "tool",
+    failed: true,
+    error: "ENOENT: no such file or directory, open 'src/renderer/src/Subagents.tsx'",
     from: 14_100,
     to: 14_800,
   },
@@ -162,6 +163,7 @@ const TURN: readonly FixtureSpan[] = [
     detail: "docs.solidjs.com",
     kind: "tool",
     failed: true,
+    error: "GET https://docs.solidjs.com/reference/stores failed: 503 Service Unavailable",
     from: 26_900,
     to: 28_300,
   },
@@ -194,7 +196,6 @@ const TURN: readonly FixtureSpan[] = [
 
 const TURN_LENGTH = 38_600;
 
-/** The turn as it is `elapsed` ms after it started at `origin`: later spans are not there yet. */
 function spansAt(origin: number, elapsed: number): TraceSpan[] {
   return TURN.filter((span) => span.from <= elapsed).map(({ from, to, ...span }) => ({
     ...span,
@@ -207,7 +208,6 @@ const ORIGIN = Date.UTC(2026, 9, 24, 9, 30);
 const FINISHED = spansAt(ORIGIN, TURN_LENGTH);
 const FINISHED_NOW = ORIGIN + TURN_LENGTH;
 
-/** A clock for the story. It moves `now` each second, as the caller does in the app. */
 function createStoryClock() {
   const [now, setNow] = createSignal(Date.now());
   onSettled(() => {
@@ -225,7 +225,6 @@ const meta = {
 export default meta;
 type Story = StoryObj<typeof meta>;
 
-/** A finished turn with two subagents and one failed tool call. */
 export const Finished: Story = {
   render: () => (
     <div style={{ width: "1000px", height: "640px", display: "flex" }}>
@@ -234,7 +233,6 @@ export const Finished: Story = {
   ),
 };
 
-/** A running turn. The open spans grow to the "now" line, and the turn starts again at its end. */
 export const Live: Story = {
   render: () => {
     const now = createStoryClock();
@@ -249,7 +247,6 @@ export const Live: Story = {
   },
 };
 
-/** A search that matches nothing. */
 export const NoMatches: Story = {
   render: () => (
     <div style={{ width: "1000px", height: "520px", display: "flex" }}>
@@ -258,7 +255,6 @@ export const NoMatches: Story = {
   ),
 };
 
-/** A narrow trace. The step names get less room, and the timeline keeps the rest. */
 export const Narrow: Story = {
   render: () => (
     <div style={{ width: "420px", height: "640px", display: "flex" }}>
@@ -267,7 +263,6 @@ export const Narrow: Story = {
   ),
 };
 
-/** The steps of the fixture turn that the steps row lists: its own thoughts and tool calls. */
 const STEPS: AgentStep[] = TURN.filter((span) => span.parentId === "agent" && span.icon !== "agent").flatMap(
   (span): AgentStep[] => {
     if (span.icon === "thinking") return [{ id: span.id, kind: "thinking", text: span.name }];
@@ -276,10 +271,6 @@ const STEPS: AgentStep[] = TURN.filter((span) => span.parentId === "agent" && sp
   },
 );
 
-/**
- * The placement: the steps row of a finished turn opens the trace in a dialog. A click on one of the
- * turn's own steps closes it and shows that step in the list.
- */
 export const FromStepsRow: Story = {
   render: () => (
     <div style={{ width: "640px" }}>
@@ -288,6 +279,70 @@ export const FromStepsRow: Story = {
         defaultOpen={false}
         trace={{ spans: () => FINISHED, keyboard: "mac" }}
         facts={{ durationMs: TURN_LENGTH, failed: FINISHED.filter((span) => span.failed).length }}
+      />
+    </div>
+  ),
+};
+
+function ChannelAnswer(props: { id: string; agent: number; body: string; first: boolean }) {
+  const agent = STORY_AGENTS[props.agent];
+  const message = { id: props.id, author: "agent" as const, body: props.body, time: "09:31", kind: "text" as const };
+  return (
+    <div class="virtual-chat-list-static">
+      <div class="virtual-chat-row" data-grouped={props.first ? undefined : "sender"}>
+        <ChatMessageRow
+          message={message}
+          author={{ kind: "agent", name: agent?.name ?? "", agent }}
+          showAuthor={props.first}
+          actionsBeside
+          showTime={props.first}
+          agents={STORY_AGENTS}
+          actions={
+            <MessageActions
+              message={message}
+              authorName={agent?.name}
+              reactions={false}
+              pickerOpen={false}
+              expandedEmoji={false}
+              onTogglePicker={fn()}
+              onExpandEmoji={fn()}
+              onReact={fn()}
+              onReply={fn()}
+              menu={() => (
+                <MessageMenuItems message={message} reactions={false} onReact={fn()} onReply={fn()} onCopy={fn()} />
+              )}
+            />
+          }
+          steps={
+            <AgentStepsDisclosure
+              steps={STEPS}
+              defaultOpen={false}
+              list={false}
+              trace={{ spans: () => FINISHED, keyboard: "mac" }}
+              facts={{ durationMs: TURN_LENGTH, failed: FINISHED.filter((span) => span.failed).length }}
+            />
+          }
+          onSelectAgent={fn()}
+          onOpenLink={fn()}
+          onPreview={fn()}
+          onAttachmentAction={fn()}
+        />
+      </div>
+    </div>
+  );
+}
+
+export const FromChannelAnswer: Story = {
+  render: () => (
+    <div style={{ width: "720px" }}>
+      <ChannelAnswer id="a1" agent={1} first body="Yes. The ping run is at packet 112." />
+      <ChannelAnswer id="a2" agent={1} first={false} body="I stopped it. The process is gone." />
+      <ChannelAnswer id="a3" agent={0} first body="The ping run is cancelled. Nothing else is in progress." />
+      <ChannelAnswer
+        id="a4"
+        agent={0}
+        first={false}
+        body="I checked the other agents too. Research has no open runs, the browser session closed when the ping run stopped, and no file in the shared workspace is still being written."
       />
     </div>
   ),

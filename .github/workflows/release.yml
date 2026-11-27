@@ -46,6 +46,7 @@ jobs:
     outputs:
       release_version: ${{ steps.release.outputs.version }}
       release_tag: ${{ steps.release.outputs.tag }}
+      staging_percentage: ${{ steps.rollout.outputs.percentage }}
     steps:
       - name: Check out tagged source
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -82,14 +83,35 @@ jobs:
             exit 1
           fi
           bun scripts/check-release-notes.ts
+          # The start recovery reads which schema each release before this check can open.
+          bun scripts/released-schema-versions.ts
           # The `discord-announce` job of a tag push needs the role, so stop before the release.
           if [[ "$GITHUB_EVENT_NAME" == "push" && -z "$DISCORD_RELEASE_ROLE_ID" ]]; then
             echo "DISCORD_RELEASE_ROLE_ID is not set. See docs/RELEASING.md#discord-announcement." >&2
             exit 1
           fi
           bun scripts/discord-release-announcement.ts check "$package_version"
+          bun scripts/whats-new-translations.ts "$package_version"
           echo "version=$package_version" >> "$GITHUB_OUTPUT"
           echo "tag=v$package_version" >> "$GITHUB_OUTPUT"
+
+      # The share of installs that electron-updater offers the new release to at first. The
+      # `RELEASE_STAGING_PERCENTAGE` repository variable overrides the default; 100 releases to all.
+      # Checked here, so that a wrong value stops the run before the builds.
+      # docs/RELEASING.md#staged-rollout
+      - name: Read the rollout percentage
+        id: rollout
+        shell: bash
+        env:
+          RELEASE_STAGING_PERCENTAGE: ${{ vars.RELEASE_STAGING_PERCENTAGE }}
+        run: |
+          percentage="${RELEASE_STAGING_PERCENTAGE:-10}"
+          if [[ ! "$percentage" =~ ^(0|[1-9][0-9]?|100)$ ]]; then
+            echo "RELEASE_STAGING_PERCENTAGE must be a whole number from 0 to 100." >&2
+            exit 1
+          fi
+          echo "The release goes to $percentage% of installs at first."
+          echo "percentage=$percentage" >> "$GITHUB_OUTPUT"
 
       - name: Require deployed Universal Links support
         shell: bash
@@ -242,6 +264,31 @@ jobs:
         if: always()
         run: az account clear
 
+  repository-check:
+    name: Run repository check
+    needs: validate
+    if: github.event_name == 'push'
+    runs-on: macos-15
+    timeout-minutes: 45
+    permissions:
+      contents: read
+    env:
+      GITHUB_TOKEN: ${{ github.token }}
+    steps:
+      - name: Check out tagged source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Set up Bun
+        uses: ./.github/actions/setup-bun
+
+      - name: Run repository check
+        run: |
+          bun run check:desktop
+          bun run test:desktop -- --maxWorkers=2
+          NODE_OPTIONS=--max-old-space-size=4096 bun run check:api
+
   # Each architecture builds on a runner of its own kind. The install scripts run every provider
   # runtime they download, and the voice runtime and the remote desktop runtime are downloaded or
   # verified for the runner's architecture, so one runner cannot produce both. The ARM64 job keeps
@@ -310,16 +357,6 @@ jobs:
 
       - name: Install dependencies
         run: bun install --frozen-lockfile
-
-      # The code is the same for both architectures, so the check runs once.
-      - name: Run repository check
-        if: matrix.arch == 'arm64'
-        run: |
-          bun run check:desktop
-          bun run test:desktop -- --maxWorkers=2
-          # The account service check needs more than the default Node heap of this 7 GB runner (about 2 GB).
-          # Its build sets a larger heap itself, in `apps/auth-api/package.json`.
-          NODE_OPTIONS=--max-old-space-size=4096 bun run check:api
 
       - name: Install and verify native runtimes
         run: |
@@ -459,6 +496,13 @@ jobs:
             exit 1
           fi
 
+      # The signed ZIP of this build must start on the data of the previous public release, as an
+      # update does. A failure stops the publish job.
+      - name: Upgrade from the previous release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: bun scripts/release-upgrade-e2e.ts macos
+
       - name: Test native tenant setup
         if: matrix.arch == 'arm64'
         run: |
@@ -558,7 +602,7 @@ jobs:
     name: Build ${{ github.event_name == 'push' && 'signed' || 'unsigned' }} Windows x64 release
     needs: validate
     runs-on: windows-2025
-    timeout-minutes: 35
+    timeout-minutes: 45
     # This job reads no secrets. The environment limits a tag build to tags, and the Azure federated
     # credential trusts only this environment, so a dry run has no environment and stays unsigned.
     environment: ${{ github.event_name == 'push' && 'release' || '' }}
@@ -578,11 +622,6 @@ jobs:
 
       - name: Set up Bun
         uses: ./.github/actions/setup-bun
-
-      # The Linux job checks types with tsrs, as PR CI does. tsrs has no Windows binary, so a type check
-      # here would use `tsc` from another TypeScript version and could stop a release that CI passed.
-      - name: Run Windows checks
-        run: bun run lint
 
       # Without a token, the GitHub API rate limit for the runner's address can refuse the release
       # lookup with HTTP 403.
@@ -686,6 +725,13 @@ jobs:
           Select-String -Path dist/latest.yml -SimpleMatch ".exe"
           bun run verify:update-artifacts windows
 
+      # The installer must update an install of the previous public release and start on its data,
+      # as an update does. A failure stops the publish job.
+      - name: Upgrade from the previous release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: bun scripts/release-upgrade-e2e.ts windows
+
       - name: Generate checksums
         shell: pwsh
         run: |
@@ -741,7 +787,7 @@ jobs:
             runner: ubuntu-24.04-arm
             suffix: linux-arm64
     runs-on: ${{ matrix.runner }}
-    timeout-minutes: 35
+    timeout-minutes: 45
     # These jobs read no secrets. The environment limits a tag build to tags; a dry run has none.
     environment: ${{ github.event_name == 'push' && 'release' || '' }}
     permissions:
@@ -853,6 +899,20 @@ jobs:
           kill "$runtime" 2>/dev/null || true
           wait "$runtime" || true
 
+      # The AppImage must replace the previous public release and start on its data, as an update
+      # does. It runs from /opt/OpenBot, where the shipped AppArmor profile permits the sandbox, as on
+      # a user's computer. A failure stops the publish job.
+      - name: Upgrade from the previous release
+        run: |
+          set -euo pipefail
+          sudo install -m 0644 build/linux/openbot.apparmor /etc/apparmor.d/openbot
+          sudo apparmor_parser -r /etc/apparmor.d/openbot
+          sudo install -d -o "$(id -u)" -g "$(id -g)" /opt/OpenBot
+          xvfb-run -a bun scripts/release-upgrade-e2e.ts "$SUFFIX"
+        env:
+          GH_TOKEN: ${{ github.token }}
+          SUFFIX: ${{ matrix.suffix }}
+
       - name: Generate checksums
         run: |
           set -euo pipefail
@@ -937,8 +997,28 @@ jobs:
           SUFFIX: ${{ matrix.suffix }}
 
       - name: Build the image
+        shell: bash
         run: |
-          docker build --file docker/Dockerfile --platform "$PLATFORM" \
+          set -euo pipefail
+          # The Azure resolver of a hosted runner sometimes does not answer for the Ubuntu
+          # mirrors (v0.68.0: `apt-get update` could not resolve them for hours). When the
+          # runner cannot resolve a mirror, ask a public resolver and give the address to the build.
+          add_hosts=()
+          for host in archive.ubuntu.com security.ubuntu.com ports.ubuntu.com; do
+            if timeout 10 getent ahostsv4 "$host" >/dev/null; then continue; fi
+            address=
+            for resolver in 1.1.1.1 9.9.9.9 8.8.8.8; do
+              address=$(dig +time=3 +tries=2 +short A "$host" @"$resolver" | grep -Em1 '^[0-9.]+$' || true)
+              if [ -n "$address" ]; then break; fi
+            done
+            if [ -z "$address" ]; then
+              echo "::error::No resolver answers for $host."
+              exit 1
+            fi
+            echo "The runner cannot resolve $host. The build uses $address."
+            add_hosts+=(--add-host "$host:$address")
+          done
+          docker build "${add_hosts[@]}" --file docker/Dockerfile --platform "$PLATFORM" \
             --build-arg "VERSION=$RELEASE_VERSION" --build-arg "REVISION=$GITHUB_SHA" \
             --tag openbot:release image
         env:
@@ -985,7 +1065,7 @@ jobs:
 
   publish:
     name: Publish GitHub Release
-    needs: [validate, macos, windows, linux, docker]
+    needs: [validate, repository-check, macos, windows, linux, docker]
     if: github.event_name == 'push'
     runs-on: ubuntu-latest
     timeout-minutes: 10
@@ -1044,6 +1124,23 @@ jobs:
         with:
           name: release-linux-arm64
           path: release-assets/linux-arm64
+
+      # electron-updater offers the release only to this share of installs. `release-rollout.yml`
+      # changes it later. The manifests are not in a SHA256SUMS file or an attestation, so the edit
+      # changes no checksum; the script stops if any value other than the percentage changes.
+      - name: Set the rollout percentage
+        shell: bash
+        env:
+          RELEASE_VERSION: ${{ needs.validate.outputs.release_version }}
+          STAGING_PERCENTAGE: ${{ needs.validate.outputs.staging_percentage }}
+        run: |
+          bun scripts/update-rollout.ts \
+            --version "$RELEASE_VERSION" \
+            --percentage "$STAGING_PERCENTAGE" \
+            release-assets/latest-mac.yml \
+            release-assets/windows/latest.yml \
+            release-assets/linux/latest-linux.yml \
+            release-assets/linux-arm64/latest-linux-arm64.yml
 
       - name: Generate combined checksums
         shell: bash

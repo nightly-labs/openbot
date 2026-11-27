@@ -19,10 +19,7 @@ import { sourceText } from "@openbot/i18n/source";
 import { Effect } from "effect";
 import type { AgentRuntimeLock } from "../../scripts/agent-runtime-lock";
 import {
-  ANTIGRAVITY_MANIFEST,
-  antigravityHarnessName,
   CURSOR_MANIFEST,
-  parseAntigravityVersion,
   parseBunVersion,
   parseClaudeVersion,
   parseClineVersion,
@@ -34,99 +31,56 @@ import {
 } from "../backend/cli";
 import { sha256File } from "../backend/file-hash";
 import { nativeProviderRuntime } from "./native-provider-runtime";
-import {
-  assertSafeArchive,
-  extractArchive,
-  extractZipFiles,
-  extractZipTree,
-  rejectNonRegularFiles,
-} from "./provider-runtime-archive";
+import { assertSafeArchive, extractArchive, extractZipTree, rejectNonRegularFiles } from "./provider-runtime-archive";
 import { ProviderRuntimeFailure, runtimeIO, runtimeSync } from "./provider-runtime-effects";
 
 export type RuntimeTarget = "darwin-arm64" | "darwin-x64" | "linux-x64" | "linux-arm64" | "win32-x64";
 
-/** A hash of the download, in the algorithm its source publishes. */
 export interface ArchiveDigest {
   algorithm: "sha256" | "sha512";
   hex: string;
 }
 
-/**
- * Where a version came from, which decides what vouches for its bytes.
- *
- * `lock` is the version this build carries in `native-runtime.lock.json`: every file has a hash the
- * repository reviewed. `latest` is a release found upstream after the build: the download has the
- * hash its source publishes, and the installed files have the hashes recorded when they were
- * installed (see `INSTALL_RECORD`).
- */
 type RuntimeSource = "lock" | "latest";
 
 export interface RuntimeSpec {
   runtime: ManagedRuntimeId;
   version: string;
-  /** The version the package inside the download carries. Claude's is the SDK version, not the CLI's. */
   packageVersion: string;
   source: RuntimeSource;
   target: RuntimeTarget;
   url: string;
-  /** `null` only where the source publishes no hash: Grok's latest release is trusted on TLS alone. */
   archiveDigest: ArchiveDigest | null;
   downloadBytes: number;
   installedBytes: number;
   executableName: string;
 }
 
-/**
- * The file an install from an upstream release writes beside its files, naming each one's SHA-256.
- *
- * The lock cannot vouch for a version it has never seen, so what was verified at install time is
- * written down and checked on every start, as the lock's hashes are for a pinned version. It guards
- * against a damaged or replaced install, not against a writer who can change the record as well:
- * the store is the user's, and anything that can write to it can already run as the user.
- */
 export const INSTALL_RECORD = "openbot-install.json";
 
-/** Everything a staging step may use. `downloadSmallFile` is passed in so fetching stays private
- *  to the manager: a descriptor can ask for a checksummed LICENSE, and nothing else. */
 export interface ProviderStageContext {
   readonly spec: RuntimeSpec;
-  /** The verified archive or bare binary the manager downloaded. */
   readonly downloadedPath: string;
-  /** The directory the descriptor fills, renamed into place by the manager once it verifies. */
   readonly staging: string;
   readonly lock: AgentRuntimeLock;
-  /** `expectedSha256` is `null` for a file of an upstream release, which the lock has no hash for. */
   downloadSmallFile(url: string, expectedSha256: string | null): Effect.Effect<Uint8Array, ProviderRuntimeFailure>;
 }
 
-/**
- * How one pinned tool is downloaded, unpacked and checked: a provider CLI, or the JavaScript runtime
- * the MCP servers need.
- *
- * The manager used to answer these four questions with `if codex … else if claude … else grok`, so
- * a provider it had never heard of silently downloaded Grok's binary from x.ai into that provider's
- * directory. `Record<ManagedRuntimeId, …>` is the fix: a runtime with no descriptor is a `TS2741`
- * naming the id.
- */
 export interface ProviderRuntimeDescriptor {
   readonly runtime: ManagedRuntimeId;
-  /** Where the artifact for this target lives, and what it should weigh and hash. */
   spec(target: RuntimeTarget, lock: AgentRuntimeLock): RuntimeSpec;
-  /** Fill `staging` with the installed layout: `bin/<executable>`, licences and the manifest. */
   stage(context: ProviderStageContext): Effect.Effect<void, ProviderRuntimeFailure>;
-  /** Check a pinned install against the lock, beyond the shared executable and `--version` checks. */
   verify(root: string, spec: RuntimeSpec, lock: AgentRuntimeLock): Effect.Effect<void, ProviderRuntimeFailure>;
-  /** A file of the install whose text `parseVersion` reads, for a program with no `--version`. */
   readonly versionFile?: string;
+  readonly versionEnvironment?: Readonly<Record<string, string>>;
+  readonly legacyExecutableNames?: readonly string[];
   parseVersion(output: string): string;
 }
 
 const CODEX_ARCHIVE_ROOTS = ["bin", "codex-package.json", "codex-path", "codex-resources"];
 
-/** The one folder of a Cursor archive, which the install renames to `bin`. */
 const CURSOR_ARCHIVE_ROOT = "dist-package";
 
-/** Where Cursor publishes one build for one target. The build names the folder. */
 export function cursorPackageUrl(
   distribution: string,
   version: string,
@@ -135,15 +89,12 @@ export function cursorPackageUrl(
   return `${distribution}/${version}/${artifact.platformDirectory}/${artifact.architecture}/${artifact.asset}`;
 }
 
-/** Cline tags each CLI release `cli-v<version>`, apart from the tags of its editor extension. */
 function clineTag(version: string): string {
   return `cli-v${version}`;
 }
 
-/** The one folder of a Kimi archive, which the install renames to `bin`. */
 const KIMI_ARCHIVE_ROOT = "kimi";
 
-/** The Rust-style target name in each Kimi asset. */
 const KIMI_TARGETS: Record<RuntimeTarget, string> = {
   "darwin-arm64": "aarch64-apple-darwin",
   "darwin-x64": "x86_64-apple-darwin",
@@ -152,30 +103,18 @@ const KIMI_TARGETS: Record<RuntimeTarget, string> = {
   "win32-x64": "x86_64-pc-windows-msvc",
 };
 
-/** The PyInstaller folder build of one Kimi release for one target. The single-file build is slower to start. */
 export function kimiAssetName(version: string, target: RuntimeTarget): string {
   return `kimi-${version}-${KIMI_TARGETS[target]}-onedir.${target === "win32-x64" ? "zip" : "tar.gz"}`;
 }
 
-/** The lock's hash for a file of a pinned version; an upstream release's file has none to compare. */
 function pinnedHash(spec: RuntimeSpec, sha256: string): string | null {
   return spec.source === "lock" ? sha256 : null;
 }
 
-/**
- * The name Bun answers `npx`-shaped arguments under. Bun decides what it is from `argv[0]`, so the
- * same bytes under this second name run packages instead of scripts, and `bunx -y pkg` takes the
- * arguments a catalog entry already writes for `npx`.
- */
 export function bunxExecutableName(target: RuntimeTarget): "bunx" | "bunx.exe" {
   return target === "win32-x64" ? "bunx.exe" : "bunx";
 }
 
-/**
- * A hard link, because 80MB twice on disk buys nothing and a symlink would fail the staged-layout
- * guard that keeps an archive from writing outside the store. `copyFile` covers the filesystem that
- * refuses a link, so the runtime still installs there; it only costs the space.
- */
 const stageBunx = Effect.fn("ProviderRuntime.stageBunx")((binary: string, bunx: string) =>
   runtimeIO(() => link(binary, bunx)).pipe(
     Effect.catch(() =>
@@ -187,7 +126,6 @@ const stageBunx = Effect.fn("ProviderRuntime.stageBunx")((binary: string, bunx: 
   ),
 );
 
-/** The npm package that lists the platform packages of OpenCode 2. It carries no LICENSE. */
 export const OPENCODE_CLI_PACKAGE = "@opencode/cli";
 
 interface NpmPackageCheck {
@@ -197,11 +135,6 @@ interface NpmPackageCheck {
   mismatchError: string;
 }
 
-/**
- * Unpacks an npm platform tarball beside `staging`, checks that its `package.json` names the pinned
- * package and version, and gives `fill` the package root. The unpacked copy is removed after `fill`,
- * so only what `fill` copies into `staging` is installed.
- */
 const withNpmPackage = Effect.fn("ProviderRuntime.withNpmPackage")(function* (
   downloadedPath: string,
   staging: string,
@@ -232,7 +165,6 @@ const withNpmPackage = Effect.fn("ProviderRuntime.withNpmPackage")(function* (
   );
 });
 
-/** The `<runtime>-package.json` text that each install writes beside its files. */
 function layoutManifest(fields: Record<string, string>): string {
   return `${JSON.stringify({ layoutVersion: 1, ...fields })}\n`;
 }
@@ -241,6 +173,8 @@ const PROVIDER_RUNTIME_DESCRIPTORS: Record<ManagedRuntimeId, ProviderRuntimeDesc
   pi: nativeProviderRuntime("pi"),
   muse: nativeProviderRuntime("muse"),
   devin: nativeProviderRuntime("devin"),
+  copilot: nativeProviderRuntime("copilot"),
+  mistral: nativeProviderRuntime("mistral"),
   codex: {
     runtime: "codex",
     spec: (target, lock) => {
@@ -337,9 +271,11 @@ const PROVIDER_RUNTIME_DESCRIPTORS: Record<ManagedRuntimeId, ProviderRuntimeDesc
             yield* runtimeIO(() => mkdir(join(staging, "bin"), { recursive: true }));
             yield* Effect.all(
               [
-                runtimeIO(() =>
-                  copyFile(join(packageRoot, artifact.executable), join(staging, "bin", artifact.executable)),
-                ),
+                runtimeIO(async () => {
+                  const source = join(packageRoot, artifact.executable);
+                  const target = join(staging, "bin", artifact.executable);
+                  await rename(source, target).catch(() => copyFile(source, target));
+                }),
                 runtimeIO(() => copyFile(join(packageRoot, "LICENSE.md"), join(staging, "LICENSE.md"))),
                 runtimeIO(() =>
                   writeFile(
@@ -409,9 +345,6 @@ const PROVIDER_RUNTIME_DESCRIPTORS: Record<ManagedRuntimeId, ProviderRuntimeDesc
       downloadSmallFile,
     }: ProviderStageContext): Effect.fn.Return<void, ProviderRuntimeFailure> {
       const artifact = lock.opencode.artifacts[spec.target];
-      // No OpenCode 2 tarball carries the licence. The OpenCode 1 package that the lock names does,
-      // so an install needs no host other than npm. `verify` checks its hash against the lock. It is
-      // fetched first because it is small: a failed request stops before the binary is unpacked.
       const license = lock.opencode.licensePackage;
       const umbrella = yield* downloadSmallFile(
         `${lock.opencode.registry}/${license.name}/-/${license.name}-${license.version}.tgz`,
@@ -451,7 +384,6 @@ const PROVIDER_RUNTIME_DESCRIPTORS: Record<ManagedRuntimeId, ProviderRuntimeDesc
               yield* runtimeIO(() => chmod(join(staging, "bin", artifact.executable), 0o755));
           }),
       );
-      // A directory beside the staging one, so the sweep of abandoned staging removes it after a crash.
       const umbrellaRoot = `${staging}.umbrella`;
       const umbrellaPath = join(umbrellaRoot, `${license.name}.tgz`);
       yield* Effect.acquireUseRelease(
@@ -582,91 +514,7 @@ const PROVIDER_RUNTIME_DESCRIPTORS: Record<ManagedRuntimeId, ProviderRuntimeDesc
     }),
     parseVersion: parseGrokVersion,
   },
-  antigravity: {
-    runtime: "antigravity",
-    spec: (target, lock) => {
-      const artifact = lock.antigravity.artifacts[target];
-      return {
-        runtime: "antigravity",
-        target,
-        version: lock.antigravity.version,
-        packageVersion: lock.antigravity.version,
-        source: "lock",
-        url: `${lock.antigravity.distribution}/${artifact.platformDirectory}/${artifact.asset}`,
-        archiveDigest: { algorithm: "sha256", hex: artifact.assetSha256 },
-        downloadBytes: artifact.downloadBytes,
-        installedBytes: artifact.installedBytes,
-        executableName: artifact.executable,
-      };
-    },
-    // The server looks for the harness beside itself, so both go to `bin/`. The zip has no licence
-    // file; the manifest names the terms Google publishes instead.
-    stage: Effect.fn("ProviderRuntime.antigravity.stage")(function* ({
-      spec,
-      downloadedPath,
-      staging,
-      lock,
-    }: ProviderStageContext): Effect.fn.Return<void, ProviderRuntimeFailure> {
-      const bin = join(staging, "bin");
-      const harness = antigravityHarnessName(spec.target);
-      yield* runtimeIO(() => mkdir(bin, { recursive: true }));
-      yield* extractZipFiles(
-        downloadedPath,
-        bin,
-        [spec.executableName, harness],
-        sourceText("error.provider.antigravityArchivePath"),
-      );
-      yield* runtimeIO(() =>
-        writeFile(
-          join(staging, ANTIGRAVITY_MANIFEST),
-          layoutManifest({
-            version: spec.version,
-            target: spec.target,
-            executable: `bin/${spec.executableName}`,
-            harness: `bin/${harness}`,
-            licenseUrl: lock.antigravity.licenseUrl,
-          }),
-        ),
-      );
-      if (spec.target !== "win32-x64") {
-        yield* Effect.all(
-          [
-            runtimeIO(() => chmod(join(bin, spec.executableName), 0o755)),
-            runtimeIO(() => chmod(join(bin, harness), 0o755)),
-          ],
-          { concurrency: "unbounded" },
-        );
-      }
-    }),
-    verify: Effect.fn("ProviderRuntime.antigravity.verify")(function* (
-      root: string,
-      spec: RuntimeSpec,
-      lock: AgentRuntimeLock,
-    ): Effect.fn.Return<void, ProviderRuntimeFailure> {
-      const artifact = lock.antigravity.artifacts[spec.target];
-      const [executable, harness] = yield* Effect.all(
-        [
-          sha256File(join(root, "bin", artifact.executable)).pipe(
-            Effect.mapError(({ cause }) => new ProviderRuntimeFailure({ cause })),
-          ),
-          sha256File(join(root, "bin", artifact.harness)).pipe(
-            Effect.mapError(({ cause }) => new ProviderRuntimeFailure({ cause })),
-          ),
-        ],
-        { concurrency: "unbounded" },
-      );
-      if (executable !== artifact.executableSha256 || harness !== artifact.harnessSha256) {
-        return yield* new ProviderRuntimeFailure({
-          cause: new Error(sourceText("error.provider.antigravityChecksum")),
-        });
-      }
-    }),
-    // The server takes no `--version`: it starts and waits for ACP on stdin. OpenBot writes the
-    // manifest at install. `verify` hashes only the programs, so the version check compares the
-    // manifest with the version that OpenBot wrote, not with the programs.
-    versionFile: ANTIGRAVITY_MANIFEST,
-    parseVersion: parseAntigravityVersion,
-  },
+  antigravity: nativeProviderRuntime("antigravity"),
   cursor: {
     runtime: "cursor",
     spec: (target, lock) => {
@@ -684,9 +532,6 @@ const PROVIDER_RUNTIME_DESCRIPTORS: Record<ManagedRuntimeId, ProviderRuntimeDesc
         executableName: artifact.executable,
       };
     },
-    // The launcher starts the Node.js runtime and the script beside it, so the whole folder goes to
-    // `bin/`. The archive has no licence file; the manifest names the terms Cursor publishes instead.
-    // GNU tar on Linux reads no zip, so the Windows zip is read by OpenBot.
     stage: Effect.fn("ProviderRuntime.cursor.stage")(function* ({
       spec,
       downloadedPath,
@@ -728,8 +573,6 @@ const PROVIDER_RUNTIME_DESCRIPTORS: Record<ManagedRuntimeId, ProviderRuntimeDesc
         return yield* new ProviderRuntimeFailure({ cause: new Error(sourceText("error.provider.cursorChecksum")) });
       }
     }),
-    // The Windows launcher is a `.cmd` file, which `execFile` cannot start, so the version comes from
-    // the manifest that OpenBot wrote, as for Antigravity.
     versionFile: CURSOR_MANIFEST,
     parseVersion: parseCursorManifestVersion,
   },
@@ -769,13 +612,10 @@ const PROVIDER_RUNTIME_DESCRIPTORS: Record<ManagedRuntimeId, ProviderRuntimeDesc
         },
         (packageRoot) =>
           Effect.gen(function* () {
-            // The platform tarball carries no licence, so it comes from the tagged source like OpenCode's.
             const license = yield* downloadSmallFile(
               `${lock.cline.repository}/raw/${encodeURIComponent(clineTag(spec.version))}/LICENSE`,
               pinnedHash(spec, lock.cline.licenseSha256),
             );
-            // The CLI finds its plugin bootstrap and hub webview from the folder of its executable, so
-            // the whole package keeps its layout. Only the npm manifest stays out.
             const entries = (yield* runtimeIO(() => readdir(packageRoot))).filter((entry) => entry !== "package.json");
             yield* Effect.forEach(
               entries,
@@ -851,10 +691,6 @@ const PROVIDER_RUNTIME_DESCRIPTORS: Record<ManagedRuntimeId, ProviderRuntimeDesc
         executableName: artifact.executable,
       };
     },
-    // The launcher loads Python from `_internal` beside it, so the whole folder goes to `bin/`. The
-    // macOS Python framework keeps its links: copies of the files would break its code signature.
-    // GNU tar on Linux reads no zip, so the Windows zip is read by OpenBot. The licence comes from
-    // the tagged source, as Cline's does.
     stage: Effect.fn("ProviderRuntime.kimi.stage")(function* ({
       spec,
       downloadedPath,
@@ -901,7 +737,6 @@ const PROVIDER_RUNTIME_DESCRIPTORS: Record<ManagedRuntimeId, ProviderRuntimeDesc
         return yield* new ProviderRuntimeFailure({
           cause: new Error(sourceText("error.provider.kimiLicenseChecksum")),
         });
-      // A link added or changed after the install must still point inside its folder.
       yield* rejectNonRegularFiles(join(root, "bin"), { links: true });
     }),
     parseVersion: parseKimiVersion,
@@ -942,7 +777,6 @@ const PROVIDER_RUNTIME_DESCRIPTORS: Record<ManagedRuntimeId, ProviderRuntimeDesc
         },
         (packageRoot: string) =>
           Effect.gen(function* () {
-            // The platform tarball carries no licence, so it comes from the tagged source like Codex's.
             const license = yield* downloadSmallFile(
               `${lock.bun.repository}/raw/${encodeURIComponent(lock.bun.tag)}/LICENSE.md`,
               lock.bun.licenseSha256,
@@ -990,9 +824,6 @@ const PROVIDER_RUNTIME_DESCRIPTORS: Record<ManagedRuntimeId, ProviderRuntimeDesc
       ) {
         return yield* new ProviderRuntimeFailure({ cause: new Error(sourceText("error.provider.bunLicenseChecksum")) });
       }
-      // Only the size, because the second name is the same bytes: hashing 80MB twice on every start
-      // would buy nothing. A truncated or replaced file fails this, and a swapped whole binary is
-      // what the `bun` hash above already answers for.
       const [bun, bunx] = yield* Effect.all(
         [runtimeIO(() => stat(executable)), runtimeIO(() => stat(join(root, "bin", bunxExecutableName(spec.target))))],
         { concurrency: "unbounded" },
@@ -1004,7 +835,6 @@ const PROVIDER_RUNTIME_DESCRIPTORS: Record<ManagedRuntimeId, ProviderRuntimeDesc
   },
 };
 
-/** Codex tags each release `rust-v<version>`; the lock's `tag` is the same string for its version. */
 export function codexTag(version: string): string {
   return `rust-v${version}`;
 }

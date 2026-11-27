@@ -16,12 +16,12 @@ import { messages as mobileServer } from "./mobile/server";
 import { messages as mobileSettings } from "./mobile/settings";
 import { messages as mobileShare } from "./mobile/share";
 import { messages as mobileShared } from "./mobile/shared";
+import { messages as mobileWatch } from "./mobile/watch";
 import { messages as mobileWorkflow } from "./mobile/workflow";
 import { messages as mobileWorkspace } from "./mobile/workspace";
 import { shared } from "./shared";
 import { source } from "./source";
 
-/** The mobile catalog: shared keys, source text, and the mobile areas only. */
 export const plMobile = {
   ...shared,
   ...source,
@@ -43,4 +43,5 @@ export const plMobile = {
   ...mobileWorkflow,
   ...mobileShare,
   ...mobileShared,
+  ...mobileWatch,
 } as const satisfies PartialTranslation<AppMobileMessages>;

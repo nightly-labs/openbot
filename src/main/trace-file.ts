@@ -6,14 +6,8 @@ import { redactValue } from "@openbot/logging";
 import { Effect, Exit, Scope, Semaphore } from "effect";
 import { analyticsIO } from "./analytics-effects";
 
-/**
- * One timed operation. The name is a fixed string - an IPC channel, a turn origin, a crash origin, a
- * remote connection phase, the reason the app quits - and the outcome is a status word. A span holds no payload, message, path,
- * URL or identifier, so the file can go into a diagnostics export under the same promise as the rest of
- * it.
- */
 export interface TraceSpan {
-  kind: "ipc" | "turn" | "crash" | "connect" | "exit";
+  kind: "ipc" | "turn" | "crash" | "connect" | "exit" | "stall";
   name: string;
   durationMs: number;
   outcome: string;
@@ -24,24 +18,13 @@ export interface TraceFileOptions {
 }
 
 const FILE_NAME = "trace.ndjson";
-// Two files at most, the current one and `.1`. About 100 bytes a line gives some 40,000 spans.
 const MAX_FILE_BYTES = 2 * 1024 * 1024;
-// A burst of IPC calls becomes one append rather than one write for each call.
 const FLUSH_DELAY_MS = 1_000;
 const MAX_PENDING_LINES = 256;
-// Lines waiting for a write plus lines in writes that have not finished. When the disk stalls, new
-// spans are dropped at this limit rather than kept in memory.
 const MAX_BUFFERED_LINES = 4_096;
-// A provider can report any status string, which can hold a path or an error text.
 const TURN_STATUSES = new Set(["completed", "failed", "interrupted", "cancelled"]);
-// A turn whose completion never arrives must not keep its start time forever.
 const MAX_OPEN_TURNS = 256;
 
-/**
- * Owns the always-on local trace: IPC calls and provider turns as NDJSON lines in the user data
- * directory. It never sends anything. A write failure is dropped, because a trace must not become
- * the failure it would have recorded.
- */
 export class TraceFile {
   readonly #directory: string;
   readonly #path: string;
@@ -50,7 +33,6 @@ export class TraceFile {
   #timer: NodeJS.Timeout | null = null;
   #writes = Semaphore.makeUnsafe(1);
   #writingLines = 0;
-  /** The flushes that `record` starts. `close` waits for them. */
   readonly #scope = Scope.makeUnsafe();
 
   constructor(options: TraceFileOptions) {
@@ -90,7 +72,6 @@ export class TraceFile {
     const started = this.#openTurns.get(event.turnId);
     this.#openTurns.delete(event.turnId);
     if (!started) return;
-    // A completion often has no origin of its own; the start has it.
     this.record({
       kind: "turn",
       name: event.origin && event.origin !== "unknown" ? event.origin : started.origin,
@@ -99,7 +80,6 @@ export class TraceFile {
     });
   }
 
-  /** Writes the pending lines and waits for earlier writes. */
   readonly flush = Effect.fn("TraceFile.flush")(function* (this: TraceFile) {
     if (this.#timer) clearTimeout(this.#timer);
     this.#timer = null;
@@ -118,7 +98,6 @@ export class TraceFile {
       );
   }, Effect.uninterruptible);
 
-  /** Writes the pending lines and waits for every write that `record` started. */
   readonly close = Effect.fn("TraceFile.close")(function* (this: TraceFile) {
     yield* this.flush();
     yield* Scope.close(this.#scope, Exit.void);
@@ -130,7 +109,6 @@ export class TraceFile {
 
   readonly summarize = Effect.fn("TraceFile.summarize")(function* (this: TraceFile) {
     yield* this.flush();
-    // Hold the same permit for both files so rotation cannot split the read.
     const text = (yield* this.#writes.withPermit(
       Effect.forEach([`${this.#path}.1`, this.#path], readOptional, { concurrency: "unbounded" }),
     )).join("");
@@ -163,7 +141,6 @@ export class TraceFile {
   });
 }
 
-/** Appends NDJSON lines to a private file. A file at `maxBytes` first becomes `.1`, so two files at most. */
 export const appendRotatingLines = Effect.fn("TraceFile.appendRotatingLines")(function* (
   file: { directory: string; path: string; maxBytes: number },
   lines: readonly string[],
@@ -182,7 +159,6 @@ const readOptional = Effect.fn("TraceFile.readOptional")((path: string) =>
   analyticsIO(() => readFile(path, "utf8")).pipe(Effect.catch(() => Effect.succeed(""))),
 );
 
-// A crash can cut the last line short, so a line that does not parse is skipped.
 function parseLine(line: string): TraceSpan | null {
   if (!line) return null;
   let parsed = null;

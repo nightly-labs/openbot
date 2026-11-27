@@ -1,9 +1,3 @@
-/**
- * The undo history of the workflow canvas, and the conversion between a canvas snapshot and the saved
- * graph. A snapshot keeps the removed nodes mounted, so redo brings back what the user wrote in them;
- * the graph has only the nodes that are on the canvas.
- */
-
 import {
   type RoutineSchedule,
   WORKFLOW_BRANCHES,
@@ -16,18 +10,20 @@ import {
 import { createSignal } from "solid-js";
 import type { BoardSnapshot, WfnFields, WfnPoint, WfnSize } from "./workflow-board";
 import type { Stroke } from "./workflow-ink";
-import { defaultWorkflowModel, type WorkflowCatalogs, type WorkflowFeatures } from "./workflow-model";
+import {
+  defaultWorkflowModel,
+  offeredModelProviders,
+  type WorkflowCatalogs,
+  type WorkflowFeatures,
+} from "./workflow-model";
 import { isColor } from "./workflow-node-parts";
 
-/** A node on the canvas. Its place, size and fields are in their own stores. */
 export interface CanvasItem {
   id: string;
   kind: WorkflowNodeKind;
-  /** The schedule of a trigger node, as the graph has it. */
   schedule?: RoutineSchedule | undefined;
 }
 
-/** What undo restores: the nodes in stack order, where they are, their sizes, the board, and the drawing. */
 export interface CanvasSnapshot {
   nodes: readonly CanvasItem[];
   positions: Record<string, WfnPoint>;
@@ -41,7 +37,6 @@ const HISTORY_LIMIT = 100;
 const itemOf = (node: WorkflowNode): CanvasItem =>
   node.schedule ? { id: node.id, kind: node.kind, schedule: node.schedule } : { id: node.id, kind: node.kind };
 
-/** The canvas of a saved graph, with nothing selected. */
 export function snapshotFromGraph(graph: WorkflowGraph): CanvasSnapshot {
   return {
     nodes: graph.nodes.map(itemOf),
@@ -73,7 +68,6 @@ function sizeOf(size: WfnSize | undefined): WorkflowNodeSize | undefined {
   return Object.keys(kept).length > 0 ? kept : undefined;
 }
 
-/** The graph that a save writes: the nodes on the canvas in stack order, their connections and the drawing. */
 export function graphFromSnapshot(snapshot: CanvasSnapshot): WorkflowGraph {
   const removed = new Set(snapshot.board.removed);
   const locked = new Set(snapshot.board.locked);
@@ -110,7 +104,6 @@ export function graphFromSnapshot(snapshot: CanvasSnapshot): WorkflowGraph {
   return { nodes, edges, strokes };
 }
 
-/** JSON with the keys of each object in order, so two equal graphs give the same text. */
 export function stableJson(value: unknown): string {
   return JSON.stringify(value, (_key, part: unknown) =>
     part !== null && typeof part === "object" && !Array.isArray(part)
@@ -119,57 +112,84 @@ export function stableJson(value: unknown): string {
   );
 }
 
-/**
- * The undo and redo stacks. Each entry is the canvas before one change. A text in a field keeps its
- * own undo, so `beforeCommit` ends the typing step first.
- */
+export interface HistoryRename {
+  readonly workflowId: string;
+  readonly before: string;
+  readonly after: string;
+}
+
 export function createCanvasHistory(options: {
   capture: () => CanvasSnapshot;
   apply: (snapshot: CanvasSnapshot) => void;
   beforeCommit: () => void;
 }) {
-  let past: CanvasSnapshot[] = [];
-  let future: CanvasSnapshot[] = [];
-  /** While above 0, changes join the step that is open, so one action is one undo. */
+  type Entry = { snapshot: CanvasSnapshot; at: number; rename?: HistoryRename };
+  let past: Entry[] = [];
+  let future: Entry[] = [];
+  let rebases: ((snapshot: CanvasSnapshot) => CanvasSnapshot)[] = [];
+  let first = 0;
+  const entry = (snapshot: CanvasSnapshot, rename?: HistoryRename): Entry =>
+    rename ? { snapshot, at: first + rebases.length, rename } : { snapshot, at: first + rebases.length };
+  const take = (saved: Entry) =>
+    rebases.slice(saved.at - first).reduce((snapshot, change) => change(snapshot), saved.snapshot);
+  const prune = () => {
+    const oldest = Math.min(
+      first + rebases.length,
+      ...past.map((saved) => saved.at),
+      ...future.map((saved) => saved.at),
+    );
+    rebases = rebases.slice(oldest - first);
+    first = oldest;
+  };
   let joined = 0;
   const [steps, setSteps] = createSignal({ undo: 0, redo: 0 });
   const count = () => setSteps({ undo: past.length, redo: future.length });
-  /** Puts a snapshot on the undo stack, and clears redo. */
   const push = (snapshot: CanvasSnapshot) => {
-    past = [...past, snapshot].slice(-HISTORY_LIMIT);
+    past = [...past, entry(snapshot)].slice(-HISTORY_LIMIT);
     future = [];
+    prune();
     count();
   };
   return {
     steps,
-    /** Saves the canvas before a change. */
     commit: () => {
       options.beforeCommit();
       if (joined === 0) push(options.capture());
     },
     push,
-    undo: () => {
+    renamedWith: (rename: HistoryRename) => {
+      const last = past.at(-1);
+      if (last) past = [...past.slice(0, -1), { ...last, rename }];
+    },
+    undo: (): HistoryRename | undefined => {
       const saved = past.at(-1);
       if (!saved) return;
-      future = [...future, options.capture()];
+      future = [...future, entry(options.capture(), saved.rename)];
       past = past.slice(0, -1);
-      options.apply(saved);
+      options.apply(take(saved));
+      prune();
       count();
+      return saved.rename;
     },
-    redo: () => {
+    redo: (): HistoryRename | undefined => {
       const saved = future.at(-1);
       if (!saved) return;
-      past = [...past, options.capture()];
+      past = [...past, entry(options.capture(), saved.rename)];
       future = future.slice(0, -1);
-      options.apply(saved);
+      options.apply(take(saved));
+      prune();
       count();
+      return saved.rename;
     },
     clear: () => {
       past = [];
       future = [];
+      prune();
       count();
     },
-    /** Joins the next changes to the open step. The returned function ends the join. */
+    rebase: (change: (snapshot: CanvasSnapshot) => CanvasSnapshot) => {
+      if (past.length > 0 || future.length > 0) rebases = [...rebases, change];
+    },
     join: () => {
       joined += 1;
       let ended = false;
@@ -182,30 +202,34 @@ export function createCanvasHistory(options: {
   };
 }
 
-/**
- * The schedule of a new trigger node: each day at 09:00, as a new routine has. Each call gives a new
- * object, so a node that changes its schedule does not change the schedule of another node.
- */
 export const newTriggerSchedule = () => ({ kind: "daily", time: "09:00" }) satisfies RoutineSchedule;
 
-/** The local time zone, which a new schedule trigger runs in. */
-const localTimeZone = () => Intl.DateTimeFormat().resolvedOptions().timeZone;
+export const localTimeZone = () => Intl.DateTimeFormat().resolvedOptions().timeZone;
 
-/**
- * The fields that the host needs on a new node, with the first choice of each catalog. A node shows
- * these choices without them, but the host reads only the saved fields.
- */
+export function knownTimeZone(value: unknown): string | undefined {
+  if (typeof value !== "string" || value.length === 0) return undefined;
+  try {
+    new Intl.DateTimeFormat(undefined, { timeZone: value });
+    return value;
+  } catch {
+    return undefined;
+  }
+}
+
 export function hostDefaults(
   kind: WorkflowNodeKind,
   catalogs: WorkflowCatalogs,
   features: WorkflowFeatures,
+  initial?: WfnFields,
 ): WfnFields {
   switch (kind) {
     case "agent": {
-      const agent = catalogs.agents[0];
+      const offered = new Set(offeredModelProviders(catalogs));
+      const agent = catalogs.agents.find((choice) => offered.has(choice.provider)) ?? catalogs.agents[0];
       return agent ? { agentId: agent.id, model: agent.model, provider: agent.provider } : {};
     }
-    case "llm": {
+    case "llm":
+    case "condition": {
       const model = defaultWorkflowModel(catalogs);
       return model
         ? {
@@ -216,7 +240,9 @@ export function hostDefaults(
         : {};
     }
     case "image": {
-      const model = catalogs.imageModels[0];
+      const media = initial?.media === "video" ? "video" : "image";
+      const fits = catalogs.imageModels.filter((choice) => choice.kinds.includes(media));
+      const model = fits.find((choice) => choice.provider !== "openbot") ?? fits[0];
       return model ? { model: model.id } : {};
     }
     case "trigger": {

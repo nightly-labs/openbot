@@ -1,15 +1,33 @@
-// The ACP agent of `acp-turn-stall-e2e.ts`. Each prompt text names what the agent does:
-// - `hang` never answers and ignores `session/cancel`, as an OpenCode prompt that stays open (#2858).
-// - `tool` keeps one tool call open for `FAKE_TOOL_MS`, then answers.
-// - `stream` sends its answer in two chunks `FAKE_CHUNK_GAP_MS` apart, then answers.
-// Each other prompt answers at once. `FAKE_NO_LOAD=1` offers no `session/load`, as some custom agents.
 import { type AcpParams, type AcpPeer, type AcpRequest, logEntry, serveFakeAcpAgent } from "../acp-agent";
+
+interface HeldPrompt {
+  request: AcpRequest;
+  peer: AcpPeer;
+  onCancel: "answer" | "confirm" | "tool";
+}
 
 const MODELS = [{ modelId: "fake-alpha", name: "Fake Alpha" }];
 const toolMs = Number(process.env.FAKE_TOOL_MS ?? 0);
 const chunkGapMs = Number(process.env.FAKE_CHUNK_GAP_MS ?? 0);
+const quietMs = Number(process.env.FAKE_QUIET_MS ?? 0);
+const retryMs = Number(process.env.FAKE_RETRY_MS ?? 0);
+const rateRetryMs = Number(process.env.FAKE_RATE_RETRY_MS ?? 0);
 const loadSession = process.env.FAKE_NO_LOAD !== "1";
+const silentNew = process.env.FAKE_SILENT_NEW === "1";
+const sessionCapabilities = process.env.FAKE_RESUME === "1" ? { sessionCapabilities: { resume: {} } } : {};
+const resumed = new Set<string>();
+const held = new Map<string, HeldPrompt>();
 let count = 0;
+
+function retryNotice(
+  peer: AcpPeer,
+  sessionId: string,
+  attempt: number | null,
+  message = "Timed out waiting for response headers",
+): void {
+  const retry = attempt === null ? null : { attempt, error: { message } };
+  peer.update(sessionId, { sessionUpdate: "session_info_update", _meta: { "opencode/retry": retry } });
+}
 
 function setup(sessionId: string) {
   return {
@@ -31,10 +49,10 @@ function setup(sessionId: string) {
 function restore(request: AcpRequest, peer: AcpPeer): void {
   const sessionId = request.params.sessionId ?? "";
   logEntry({ event: request.method, sessionId });
+  if (request.method === "session/resume") resumed.add(sessionId);
   peer.reply(request, setup(sessionId));
 }
 
-/** The user's text, without the instructions that OpenBot puts first in a new or loaded session. */
 function promptText(params: AcpParams): string {
   const text = (params.prompt ?? []).map((block) => block.text ?? "").join("");
   return text.replace(/^[\s\S]*<\/openbot-developer-instructions>/u, "");
@@ -46,12 +64,13 @@ serveFakeAcpAgent(
       peer.reply(request, {
         protocolVersion: 1,
         agentInfo: { name: "stall", version: "1.0.0" },
-        agentCapabilities: { loadSession },
+        agentCapabilities: { loadSession, ...sessionCapabilities },
         authMethods: [],
       }),
     "session/new": (request, peer) => {
       count += 1;
       logEntry({ event: "session/new" });
+      if (silentNew && count > 1) return;
       peer.reply(request, setup(`s-${process.pid}-${count}`));
     },
     "session/load": restore,
@@ -63,6 +82,69 @@ serveFakeAcpAgent(
       const text = promptText(request.params).trim();
       logEntry({ event: "prompt", sessionId, text });
       if (text === "hang") return;
+      if (text === "answer-after-cancel" || text === "confirm-cancel" || text === "tool-after-cancel") {
+        const onCancel = text === "confirm-cancel" ? "confirm" : text === "tool-after-cancel" ? "tool" : "answer";
+        held.set(sessionId, { request, peer, onCancel });
+        return;
+      }
+      if (text === "hang-once" && !resumed.has(sessionId)) {
+        peer.update(sessionId, { sessionUpdate: "available_commands_update", availableCommands: [] });
+        return;
+      }
+      if (text === "retry-once") {
+        setTimeout(() => {
+          retryNotice(peer, sessionId, 2);
+          setTimeout(() => {
+            peer.say(sessionId, "ok");
+            peer.reply(request, { stopReason: "end_turn" });
+          }, retryMs);
+        }, retryMs);
+        return;
+      }
+      if (text === "retry-forever") {
+        for (let attempt = 2; attempt <= 7; attempt += 1)
+          setTimeout(
+            () => {
+              if (attempt > 2) retryNotice(peer, sessionId, null);
+              retryNotice(peer, sessionId, attempt);
+            },
+            retryMs * (attempt - 1),
+          );
+        return;
+      }
+      if (text === "retry-rate-limit") {
+        for (let attempt = 2; attempt <= 4; attempt += 1)
+          setTimeout(
+            () => {
+              if (attempt > 2) retryNotice(peer, sessionId, null);
+              retryNotice(peer, sessionId, attempt, "Rate limit exceeded");
+            },
+            rateRetryMs * (attempt - 1),
+          );
+        setTimeout(() => {
+          peer.say(sessionId, "ok");
+          peer.reply(request, { stopReason: "end_turn" });
+        }, rateRetryMs * 3.5);
+        return;
+      }
+      if (text === "quiet") {
+        peer.say(sessionId, "working");
+        setTimeout(() => {
+          peer.say(sessionId, ", done");
+          peer.reply(request, { stopReason: "end_turn" });
+        }, quietMs);
+        return;
+      }
+      if (text === "tool-hang") {
+        peer.update(sessionId, {
+          sessionUpdate: "tool_call",
+          toolCallId: "tool-hang-1",
+          title: "Read design file",
+          kind: "other",
+          status: "in_progress",
+        });
+        return;
+      }
       if (text === "tool") {
         peer.update(sessionId, {
           sessionUpdate: "tool_call",
@@ -92,7 +174,26 @@ serveFakeAcpAgent(
   },
   {
     onNotification: (method, params) => {
-      if (method === "session/cancel") logEntry({ event: "cancel", sessionId: params.sessionId ?? "" });
+      if (method !== "session/cancel") return;
+      const sessionId = params.sessionId ?? "";
+      logEntry({ event: "cancel", sessionId });
+      const prompt = held.get(sessionId);
+      if (!prompt) return;
+      held.delete(sessionId);
+      if (prompt.onCancel === "confirm") {
+        prompt.peer.reply(prompt.request, { stopReason: "cancelled" });
+        return;
+      }
+      if (prompt.onCancel === "tool")
+        prompt.peer.update(sessionId, {
+          sessionUpdate: "tool_call",
+          toolCallId: "tool-after-cancel-1",
+          title: "Run",
+          kind: "execute",
+          status: "failed",
+        });
+      else prompt.peer.say(sessionId, "late answer");
+      prompt.peer.reply(prompt.request, { stopReason: "end_turn" });
     },
   },
 );

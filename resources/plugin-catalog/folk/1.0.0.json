@@ -1,0 +1,36 @@
+{
+  "slug": "folk",
+  "name": "folk",
+  "tagline": "Relationship CRM",
+  "description": "folk lets agents search and update people, companies, notes, and deals in the signed-in folk workspace. Each user signs in to their own folk account through the browser.",
+  "category": "productivity",
+  "creatorName": "folk",
+  "iconUrl": "https://is1-ssl.mzstatic.com/image/thumb/Purple211/v4/69/d2/d1/69d2d138-46bf-eb1f-ff76-1cae782f8d10/AppIcon-0-0-1x_U007ephone-0-1-85-220.png/512x512bb.jpg",
+  "version": "1.0.0",
+  "prompts": [
+    {
+      "id": "prompt-find-contact",
+      "text": "Find the people at Acme in my folk workspace and when I last talked to them."
+    },
+    { "id": "prompt-add-note", "text": "Add a note to Jane Doe's folk profile about today's intro call." },
+    { "id": "prompt-stale-deals", "text": "Which deals have had no activity for more than 30 days?" }
+  ],
+  "apps": [
+    {
+      "id": "app-folk-mcp",
+      "name": "folk",
+      "description": "People, company, note, and deal access, over folk's MCP server with browser sign-in.",
+      "iconUrl": "https://is1-ssl.mzstatic.com/image/thumb/Purple211/v4/69/d2/d1/69d2d138-46bf-eb1f-ff76-1cae782f8d10/AppIcon-0-0-1x_U007ephone-0-1-85-220.png/512x512bb.jpg",
+      "server": {
+        "name": "folk",
+        "transport": "http",
+        "url": "https://mcp.folk.app/mcp",
+        "auth": [{ "id": "folk-oauth", "kind": "link", "label": "Sign in" }]
+      }
+    }
+  ],
+  "websiteUrl": "https://www.folk.app",
+  "privacyPolicyUrl": "https://www.folk.app/privacy-policy",
+  "termsUrl": "https://www.folk.app/terms-of-use",
+  "skills": []
+}

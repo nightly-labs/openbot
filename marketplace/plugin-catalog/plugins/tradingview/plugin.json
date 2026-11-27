@@ -1,0 +1,33 @@
+{
+  "slug": "tradingview",
+  "name": "TradingView",
+  "tagline": "Market data and analytics",
+  "description": "TradingView lets agents read market data and analytics for symbols, such as prices and technical indicators, with the signed-in TradingView account. It does not place trades.",
+  "category": "data-analytics",
+  "creatorName": "TradingView",
+  "iconUrl": "https://static.tradingview.com/static/images/favicon/apple-touch-icon-180x180.png",
+  "version": "1.0.0",
+  "prompts": [
+    { "id": "prompt-symbol-overview", "text": "Give me an overview of AAPL's price action over the last month." },
+    { "id": "prompt-indicators", "text": "What do the RSI and moving averages show for BTCUSD on the daily chart?" },
+    { "id": "prompt-compare", "text": "Compare the year-to-date performance of the S&P 500 and the Nasdaq 100." }
+  ],
+  "apps": [
+    {
+      "id": "app-tradingview-mcp",
+      "name": "TradingView",
+      "description": "Market data and technical analysis, over TradingView's MCP server with browser sign-in.",
+      "iconUrl": "https://static.tradingview.com/static/images/favicon/apple-touch-icon-180x180.png",
+      "server": {
+        "name": "tradingview",
+        "transport": "http",
+        "url": "https://mcp.tradingview.com/mcp",
+        "auth": [{ "id": "tradingview-oauth", "kind": "link", "label": "Sign in" }]
+      }
+    }
+  ],
+  "skills": [],
+  "websiteUrl": "https://www.tradingview.com",
+  "privacyPolicyUrl": "https://www.tradingview.com/privacy-policy/",
+  "termsUrl": "https://www.tradingview.com/policies/"
+}

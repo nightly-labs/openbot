@@ -4,47 +4,53 @@ import { copyFileSync, createReadStream, existsSync, readFileSync, writeFileSync
 import { mkdir, mkdtemp, readdir, readFile, rename, rm, stat, writeFile } from "node:fs/promises";
 import { join, resolve } from "node:path";
 import { createOpenBotLogger } from "@openbot/logging";
-import { PARAKEET_MODEL_FILES, VOICE_RUNTIME_ADDON } from "../src/main/voice-model-service";
+import {
+  PARAKEET_MODEL_FILES,
+  VOICE_RUNTIME_ADDON,
+  VOICE_SESSION_CONFIGS,
+  VOICE_SPEECH_DETECTOR,
+} from "../src/main/voice-model-service";
 import { elfSearchPaths, ORIGIN_SEARCH_PATH } from "./elf-search-paths";
 
 const logger = createOpenBotLogger("prepare-voice");
 
-const SHERPA_ONNX_VERSION = "1.13.8";
+const SHERPA_ONNX_VERSION = "2.0.3";
+const SPEECH_DETECTOR_FILE = {
+  url: `https://github.com/k2-fsa/sherpa-onnx/releases/download/asr-models/${VOICE_SPEECH_DETECTOR}`,
+  bytes: 2_313_101,
+  sha256: "6b99cbfd39246b6706f98ec13c7c50c6b299181f2474fa05cbc8046acc274396",
+};
 
 interface RuntimePackage {
   name: string;
-  /** The npm `dist.integrity` of the published tarball. */
   integrity: string;
-  /** The addon and the libraries it loads from its own directory. */
   files: readonly string[];
 }
 
-// Only these native files run. The JavaScript wrapper of `sherpa-onnx-node` is not used: the voice
-// host calls the N-API addon directly. The C++ API library is not loaded by the addon.
 const RUNTIME_PACKAGES: Readonly<Record<string, RuntimePackage>> = {
   "darwin-arm64": {
     name: "sherpa-onnx-darwin-arm64",
-    integrity: "sha512-FPNgJMgnWVl/KhRTIhG3KL3A4Om63Rn4YKXc9/uHY7SzLcvqLJLc/h7UBWJwduXvv7K18t5NpxHR6XgXn4sjWw==",
+    integrity: "sha512-PuPsSgMvzKYYBG+/CwEZbbtl4kmztravlpN8KmsQy2jWGJ3WjEJ1NkPzUNgEbrq/9s5xnyd20FFlWJXOIcAHoA==",
     files: [VOICE_RUNTIME_ADDON, "libsherpa-onnx-c-api.dylib", "libonnxruntime.dylib"],
   },
   "darwin-x64": {
     name: "sherpa-onnx-darwin-x64",
-    integrity: "sha512-7BLRpjM6w4f9W46/nmkmq8lEKUayhebvcpslCVQ+6QN2uReYlZEMDZlSpXMjme+hUFrPfRz8P3UNq8ep/4d19g==",
+    integrity: "sha512-ZFSsikOf0xrnvEl8Xj5Z8IpG0hqWGFDy3HwLFagwV1apftVgh/SVXbwQ+pIf0xFRBrAr+SaR3asvoCEc6DxOSg==",
     files: [VOICE_RUNTIME_ADDON, "libsherpa-onnx-c-api.dylib", "libonnxruntime.dylib"],
   },
   "win32-x64": {
     name: "sherpa-onnx-win-x64",
-    integrity: "sha512-oZF1c9VPOKtMwn83Bboc5XSWL+76BRoyB3eUuVnCknBKxwSULZU2Foia9VHWzU+n4I12rPsP6z6H9Rp1hD9o8g==",
+    integrity: "sha512-UDPUCNmuhWWC0oNMphHjgdRE0M8bVbUFXk9AyyJUuOtubmxhQBLz2sd2v6RWIAXSDh/7GwPbImLqAWI51ITTNQ==",
     files: [VOICE_RUNTIME_ADDON, "sherpa-onnx-c-api.dll", "onnxruntime.dll", "onnxruntime_providers_shared.dll"],
   },
   "linux-x64": {
     name: "sherpa-onnx-linux-x64",
-    integrity: "sha512-6plnhjagsSeTntCgnlag86hWbs/uZE9Crms1LgOb68/1nKsIQjMd+WG519m+aPwT6TrsBOiEMzrx41t8sL5L5g==",
+    integrity: "sha512-cORrflhfgu/vD22UAfU4DvwCjKC6cSmVGM2o2fXnM6O9meN8Mpu5enqb/afIi+Nwweo9eS6YmaQcvmT+L6ia2A==",
     files: [VOICE_RUNTIME_ADDON, "libsherpa-onnx-c-api.so", "libonnxruntime.so"],
   },
   "linux-arm64": {
     name: "sherpa-onnx-linux-arm64",
-    integrity: "sha512-Tlg7a70b/Wge3OF8IgTHF9jhSVCsLyKQKhwc4BsJ5A+dL/SrFtGBjzuHp4XeLhiiOT7afCxX5PdSn/D4c8Lnuw==",
+    integrity: "sha512-F4cciAFw4rrV39CR6o1yNLG1e/Gcd4Je2wGxi4Q+jl1NJh7VSvE3n4NCz4bQzBlvZWgU8ThhV9ggD6xC5iJWFQ==",
     files: [VOICE_RUNTIME_ADDON, "libsherpa-onnx-c-api.so", "libonnxruntime.so"],
   },
 };
@@ -52,7 +58,6 @@ const RUNTIME_PACKAGES: Readonly<Record<string, RuntimePackage>> = {
 const buildRoot = resolve(".openbot-build/voice");
 const runtimeRoot = join(buildRoot, "runtime");
 const modelRoot = join(buildRoot, "model");
-// Beside the runtime, not in it: electron-builder copies the whole runtime directory.
 const runtimeMarker = join(buildRoot, "runtime-package.txt");
 const runtimeOnly = process.argv.includes("--runtime-only");
 const target = `${process.platform}-${process.arch}`;
@@ -66,6 +71,8 @@ if (!runtimePackage) {
 
 requireCommand("tar", ["--version"]);
 await prepareRuntime(runtimePackage);
+await writeSessionConfigs();
+await prepareSpeechDetector();
 if (!runtimeOnly) await prepareModel();
 logger.info(`Prepared voice assets in ${buildRoot}`);
 
@@ -105,26 +112,42 @@ async function prepareRuntime(runtime: RuntimePackage): Promise<void> {
   }
 }
 
+async function writeSessionConfigs(): Promise<void> {
+  await Promise.all(
+    Object.entries(VOICE_SESSION_CONFIGS).map(([name, content]) => writeFile(join(runtimeRoot, name), content)),
+  );
+}
+
+async function prepareSpeechDetector(): Promise<void> {
+  await downloadVerified(join(runtimeRoot, VOICE_SPEECH_DETECTOR), {
+    name: VOICE_SPEECH_DETECTOR,
+    ...SPEECH_DETECTOR_FILE,
+  });
+}
+
 async function prepareModel(): Promise<void> {
   await mkdir(modelRoot, { recursive: true });
   await removeOtherModels();
-  for (const file of PARAKEET_MODEL_FILES) {
-    const path = join(modelRoot, file.name);
-    if (await isExpectedFile(path, file.bytes, file.sha256)) continue;
-    logger.info(`Downloading ${file.name}…`);
-    const response = await fetch(file.url);
-    if (!response.ok) throw new Error(`Unable to download ${file.name} (${response.status}).`);
-    const partialPath = `${path}.part`;
-    await writeFile(partialPath, Buffer.from(await response.arrayBuffer()));
-    if (!(await isExpectedFile(partialPath, file.bytes, file.sha256))) {
-      await rm(partialPath, { force: true });
-      throw new Error(`The downloaded ${file.name} failed its size or SHA-256 check.`);
-    }
-    await rename(partialPath, path);
-  }
+  for (const file of PARAKEET_MODEL_FILES) await downloadVerified(join(modelRoot, file.name), file);
 }
 
-/** Removes model files of an earlier pin, so a stale encoder cannot be packaged or loaded by mistake. */
+async function downloadVerified(
+  path: string,
+  file: { name: string; url: string; bytes: number; sha256: string },
+): Promise<void> {
+  if (await isExpectedFile(path, file.bytes, file.sha256)) return;
+  logger.info(`Downloading ${file.name}…`);
+  const response = await fetch(file.url);
+  if (!response.ok) throw new Error(`Unable to download ${file.name} (${response.status}).`);
+  const partialPath = `${path}.part`;
+  await writeFile(partialPath, Buffer.from(await response.arrayBuffer()));
+  if (!(await isExpectedFile(partialPath, file.bytes, file.sha256))) {
+    await rm(partialPath, { force: true });
+    throw new Error(`The downloaded ${file.name} failed its size or SHA-256 check.`);
+  }
+  await rename(partialPath, path);
+}
+
 async function removeOtherModels(): Promise<void> {
   const expected = new Set(PARAKEET_MODEL_FILES.map((file) => file.name));
   const entries = await readdir(modelRoot);
@@ -140,11 +163,6 @@ async function isExpectedFile(path: string, bytes: number, expectedSha256: strin
   return (await sha256(path)) === expectedSha256;
 }
 
-/**
- * The published Linux addon also searches its CI build directory, and the empty and relative entries
- * of its RUNPATH search the working directory. A library planted there would load into the voice host.
- * Shortens each search path to `$ORIGIN` in place, so the addon loads libraries only from its own directory.
- */
 function pinSearchPathToOrigin(path: string): void {
   const file = readFileSync(path);
   const paths = elfSearchPaths(file).filter(({ value }) => value !== ORIGIN_SEARCH_PATH);

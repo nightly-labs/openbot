@@ -1,10 +1,5 @@
-// One agent's memories: the standing notes it carries into every turn.
-//
-// `memoryId` is decoded by `pathIdentifier` on the first line of the parametric branch, before any
-// method is matched, so a malformed id is a 400 and not a 404. That ordering is the released
-// behaviour and the status-contract test pins it.
-
 import { INPUT_LIMITS } from "@openbot/contracts/input-limits";
+import type { AgentMemory } from "@openbot/contracts/ipc";
 import {
   AGENT_MEMORIES_CAPABILITY,
   AGENT_MEMORIES_PAGE_ROUTE,
@@ -23,6 +18,10 @@ export interface AgentMemoryRouteDependencies {
   agents: Pick<TeamApiAgents, "listMemories" | "createMemory" | "updateMemory" | "deleteMemory" | "clearMemories">;
 }
 
+function releasedMemory({ site: _site, ...memory }: AgentMemory): Omit<AgentMemory, "site"> {
+  return memory;
+}
+
 export async function routeAgentMemories(
   context: TeamApiRequestContext,
   { agentId, action }: AgentRouteTarget,
@@ -32,16 +31,18 @@ export async function routeAgentMemories(
 
   if (action === "memories") {
     if (method === "GET") {
-      return json(200, agents.listMemories(agentId));
+      return json(200, agents.listMemories(agentId).map(releasedMemory));
     }
     if (method === "POST") {
       const body = await readJson(request);
       return json(
         201,
-        agents.createMemory({
-          agentId,
-          text: stringField(body, "text", false, INPUT_LIMITS.agentMemoryText),
-        }),
+        releasedMemory(
+          agents.createMemory({
+            agentId,
+            text: stringField(body, "text", false, INPUT_LIMITS.agentMemoryText),
+          }),
+        ),
       );
     }
     if (method === "DELETE") {
@@ -56,11 +57,13 @@ export async function routeAgentMemories(
       const body = await readJson(request);
       return json(
         200,
-        agents.updateMemory({
-          agentId,
-          memoryId,
-          text: stringField(body, "text", false, INPUT_LIMITS.agentMemoryText),
-        }),
+        releasedMemory(
+          agents.updateMemory({
+            agentId,
+            memoryId,
+            text: stringField(body, "text", false, INPUT_LIMITS.agentMemoryText),
+          }),
+        ),
       );
     }
     if (method === "DELETE") {
@@ -72,7 +75,6 @@ export async function routeAgentMemories(
   return "unmatched";
 }
 
-/** A separate optional route keeps the released full-list response unchanged. */
 export async function routeAgentMemoryPage(
   context: TeamApiRequestContext,
   agents: Pick<TeamApiAgents, "listMemories" | "listAgents" | "getMemorySelection" | "setMemoryInclusion">,
@@ -122,7 +124,7 @@ export async function routeAgentMemoryPage(
     .listMemories(agentId)
     .filter((memory) => after === null || memory.id > after)
     .sort((left, right) => (left.id < right.id ? -1 : left.id > right.id ? 1 : 0));
-  const memories = remaining.slice(0, AGENT_MEMORIES_PAGE_SIZE);
+  const memories = remaining.slice(0, AGENT_MEMORIES_PAGE_SIZE).map(releasedMemory);
   return json(200, {
     memories,
     nextCursor: remaining.length > memories.length ? (memories.at(-1)?.id ?? null) : null,

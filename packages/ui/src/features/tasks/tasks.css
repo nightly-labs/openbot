@@ -1,4 +1,3 @@
-/* The Tasks page in TasksPage.tsx: one calm column, and the task panel beside it. */
 .tasks-page {
   display: flex;
   height: 100%;
@@ -7,7 +6,6 @@
   color: var(--openbot-text-primary);
 }
 
-/* One centered column. */
 .tasks-page-scroll {
   min-width: 0;
   flex: 1;
@@ -24,37 +22,7 @@
 }
 
 .tasks-page-header {
-  display: flex;
-  align-items: center;
-  gap: var(--openbot-space-2);
   padding: var(--openbot-space-6) var(--openbot-space-2) var(--openbot-space-3);
-}
-
-/* The arrow lines up with the content edge, not its hit area. */
-.tasks-page-header .ui-icon-button {
-  margin-inline-start: calc(-1 * var(--openbot-space-2));
-}
-
-/* Back and the agents panel toggle follow the reading direction. */
-.tasks-page-header svg:is([class~="lucide-arrow-left"], [class~="lucide-panel-left"]):dir(rtl) {
-  transform: scaleX(-1);
-}
-
-.tasks-page-header h2 {
-  min-width: 0;
-  flex: 1;
-  margin: 0;
-  font-size: var(--openbot-text-xl);
-  font-weight: var(--openbot-weight-semibold);
-}
-
-.tasks-page-agent-option > span {
-  flex: 1 1 auto;
-}
-
-.tasks-page-header h2 span {
-  color: var(--openbot-text-muted);
-  font-weight: var(--openbot-weight-regular);
 }
 
 .tasks-page-avatar.agent-avatar {
@@ -65,7 +33,6 @@
   flex: 0 0 auto;
 }
 
-/* The composer at the top of the list, and the line after a start. */
 .tasks-page-composer.composer-wrap {
   position: sticky;
   z-index: 3;
@@ -75,14 +42,21 @@
   padding: var(--openbot-space-1) 0 0;
 }
 
-.tasks-page-composer .composer-notice {
-  margin-bottom: var(--openbot-space-2);
-}
-
 .tasks-page-composer-agent {
   display: flex;
   min-width: 0;
   align-items: center;
+}
+
+.tasks-page-composer .composer[data-compact] {
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  padding-block: 7px;
+  padding-inline-start: var(--openbot-space-3);
+}
+
+.tasks-page-composer .composer[data-compact] .tasks-page-composer-agent {
+  grid-column: 1;
+  grid-row: 1;
 }
 
 .tasks-page-agent.ui-button {
@@ -95,7 +69,6 @@
   margin-inline-start: calc(-1 * var(--openbot-space-1));
 }
 
-/* As the header model switcher: the face of a newly chosen agent springs in, and the chevron turns. */
 .tasks-page-agent-face {
   display: flex;
   flex: 0 0 auto;
@@ -122,16 +95,6 @@
 
 .tasks-page-agent[aria-expanded="true"] .tasks-page-agent-chevron {
   transform: rotate(180deg);
-}
-
-.tasks-page-agent-check {
-  color: var(--openbot-text-primary);
-}
-
-/* A server can have more agents than the window has rows, so the menu fits the space left and scrolls. */
-.tasks-page-agent-menu {
-  max-height: min(520px, calc(100dvh - 16px), var(--kb-popper-content-available-height, 520px));
-  overflow-y: auto;
 }
 
 .tasks-page-took {
@@ -165,7 +128,6 @@
   white-space: nowrap;
 }
 
-/* The tasks by what they need, each section with its heading. */
 .tasks-page-section {
   display: flex;
   flex-direction: column;
@@ -264,15 +226,9 @@ li[data-arrived] > .tasks-page-row {
   animation: tasks-page-arrive 1600ms var(--openbot-ease-out);
 }
 
-/*
- * The task panel beside the list: it takes its own column, so the list gets narrower. The column opens
- * from no width and the panel keeps its width at the column's left edge, so it slides in from the
- * right while the list moves left. The close is faster than the open.
- */
 .tasks-page-side {
   position: relative;
-  flex: 0 0 420px;
-  overflow: hidden;
+  flex: 0 0 var(--tasks-page-side-width, 420px);
   transition:
     flex-basis var(--openbot-duration-overlay) var(--openbot-ease-out),
     opacity var(--openbot-duration-overlay) var(--openbot-ease-out);
@@ -292,12 +248,27 @@ li[data-arrived] > .tasks-page-row {
   transition-timing-function: cubic-bezier(0.5, 0, 0.75, 0);
 }
 
+html.panel-resizing .tasks-page-side {
+  transition: none;
+}
+
+.tasks-page-side[data-closing] > .panel-resizer {
+  visibility: hidden;
+}
+
+.tasks-page-side-clip {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  border-radius: inherit;
+}
+
 .tasks-page-side-content {
   position: absolute;
   inset-block: 0;
   inset-inline: 0 auto;
   display: flex;
-  width: 420px;
+  width: var(--tasks-page-side-width, 420px);
   --browser-panel-width: 100%;
 }
 
@@ -310,13 +281,6 @@ li[data-arrived] > .tasks-page-row {
   --task-list-glyph: 16px;
 }
 
-/* A question or a browser takeover waits: the chat answers it. */
-.tasks-panel-answer-footer {
-  display: flex;
-  justify-content: flex-end;
-}
-
-/* A change to a different task: the new task fades in at its place. */
 .tasks-page-side-content[data-entering] {
   animation: tasks-page-side-swap var(--openbot-duration-normal) var(--openbot-ease-out);
 }
@@ -328,10 +292,6 @@ li[data-arrived] > .tasks-page-row {
   }
 }
 
-/*
- * The page before the first task: the pitch, the composer and a faint list in the middle of the
- * column. The first start shows the real list, and the composer goes back to the top.
- */
 .tasks-page[data-empty] .tasks-page-column {
   min-height: 100%;
 }
@@ -363,8 +323,6 @@ li[data-arrived] > .tasks-page-row {
   color: var(--openbot-text-muted);
 }
 
-/* The one handwritten word of the title. It writes itself once. The app has no hand font, so it uses
- * the one of the system. Inline, not inline-block: a reader then hears "answer." with no space. */
 .tasks-page-empty-word {
   color: var(--openbot-accent-text);
   font-family: "Bradley Hand", "Noteworthy", "Segoe Print", cursive;
@@ -387,8 +345,6 @@ li[data-arrived] > .tasks-page-row {
   line-height: 1.5;
 }
 
-/* The faint list. Each section is one fixed block, so a row moves to the next section by its position
- * only. It fades towards every edge. */
 .tasks-page-empty-board {
   --tasks-page-empty-head: 1.75rem;
   --tasks-page-empty-block: calc(var(--tasks-page-empty-head) + var(--openbot-control-lg) + var(--openbot-space-4));
@@ -442,7 +398,6 @@ li[data-arrived] > .tasks-page-row {
   animation: tasks-page-empty-arrive 620ms var(--openbot-ease-out) both;
 }
 
-/* A row arrives in Waiting, as the row of a real start does. */
 @keyframes tasks-page-empty-arrive {
   from {
     opacity: 0;
@@ -452,7 +407,6 @@ li[data-arrived] > .tasks-page-row {
   }
 }
 
-/* An answered task leaves to make room for the next one. */
 .tasks-page-empty-row[data-age="3"] {
   opacity: 0;
   filter: blur(3px);
@@ -481,7 +435,6 @@ li[data-arrived] > .tasks-page-row {
     animation: none;
   }
 
-  /* Less motion: the title word shows whole, and the list keeps one task in each section. */
   .tasks-page-empty-word {
     clip-path: none;
     animation: none;

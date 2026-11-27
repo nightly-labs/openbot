@@ -34,6 +34,7 @@ const meta = {
     maxWidth: () => 640,
     onClose: fn(),
     onStartNewChat: fn(async () => {}),
+    onDeleteHistory: fn(async () => {}),
     onResize: fn(),
     onResizeEnd: fn(),
     onUpdateAgent: fn(async () => undefined),
@@ -53,7 +54,14 @@ type Story = StoryObj<typeof meta>;
 
 export const Default: Story = {};
 export const Working: Story = { args: { working: true } };
-/** The user's own level of the agent. The row opens the notification settings, the one place that changes it. */
+export const FastMode: Story = {
+  args: {
+    agent: { ...STORY_AGENT, provider: "codex", model: "gpt-6-luna", reasoningEffort: "high", fastMode: true },
+    runtimeSettings: { provider: "codex", model: "gpt-6-luna", reasoningEffort: "high" },
+    fastMode: true,
+    onFastModeChange: fn(),
+  },
+};
 export const NotificationLevel: Story = {
   args: { notificationLevel: { current: null, serverLevel: "needs-me", onOpen: fn() } },
 };
@@ -83,10 +91,6 @@ function storyFolderCalls(): AgentFolderCalls {
   };
 }
 
-/**
- * Two added folders; one was moved, so the row and the Folders page say that it is not found. Two
- * folders in them are excluded.
- */
 export const WorkspaceOnlyFolders: Story = {
   args: {
     agent: {
@@ -97,18 +101,14 @@ export const WorkspaceOnlyFolders: Story = {
     folders: storyFolderCalls(),
   },
 };
-/** Full reach, but the agent asks before it acts. */
 export const AskFirst: Story = { args: { agent: { ...STORY_AGENT, access: "full" }, autoApprove: false } };
-/** The agent steers messages sent while it works, whatever the app default says. */
 export const SteersWhileWorking: Story = { args: { agent: { ...STORY_AGENT, busyMessageMode: "steer" } } };
-/** Steer, from the app default, on a provider that cannot steer: the note says the messages queue. */
 export const SteerUnsupportedProvider: Story = {
   args: {
     defaultBusyMessageMode: "steer",
-    runtimeSettings: { provider: "opencode", model: STORY_AGENT.model, reasoningEffort: STORY_AGENT.reasoningEffort },
+    runtimeSettings: { provider: "cursor", model: STORY_AGENT.model, reasoningEffort: STORY_AGENT.reasoningEffort },
   },
 };
-/** An agent on a remote host: the setting belongs to that host, so the row is hidden. */
 export const RemoteAgent: Story = {
   args: {
     onUpdatePermissions: undefined,
@@ -118,10 +118,6 @@ export const RemoteAgent: Story = {
     browserProfiles: undefined,
   },
 };
-/**
- * Advanced, then Browser profile, then New profile: the name field opens in the list. Add makes the
- * profile and gives it to the agent. "Client A" is taken.
- */
 export const NewBrowserProfile: Story = {
   render: (args) => {
     const [profiles, setProfiles] = createStore<{ list: Pick<BrowserProfileSummary, "id" | "name" | "hue">[] }>({
@@ -151,24 +147,6 @@ export const NewBrowserProfile: Story = {
         />
       </main>
     );
-  },
-};
-/** An OpenCode model with no reasoning setting: OpenCode decides, and the row says so. */
-export const ReasoningSetByProvider: Story = {
-  args: {
-    runtimeSettings: { provider: "opencode", model: "opencode/big-pickle", reasoningEffort: "medium" },
-    modelOptions: [
-      ...STORY_MODELS,
-      {
-        provider: "opencode",
-        id: "opencode/big-pickle",
-        name: "Big Pickle",
-        description: "Free OpenCode model.",
-        defaultReasoningEffort: "medium",
-        supportedReasoningEfforts: ["medium"],
-        reasoningEffortConfigurable: false,
-      },
-    ],
   },
 };
 export const SaveFailure: Story = {

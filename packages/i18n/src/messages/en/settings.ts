@@ -1,11 +1,9 @@
 import { defineMessages } from "../../message";
 
 export const messages = defineMessages("settings", {
-  // The language setting itself.
   "settings.language.title": "Language",
   "settings.language.description": "OpenBot shows menus, buttons and messages in this language.",
   "settings.language.system": "System default",
-  // The logo color setting, General tab.
   "settings.appearance.title": "Appearance",
   "settings.appearance.theme.title": "Theme",
   "settings.appearance.theme.description": "Light or dark colors. System follows the setting of your device.",
@@ -17,6 +15,20 @@ export const messages = defineMessages("settings", {
     "Show the blurred desktop behind the window. Websites and menus then use the app theme.",
   "settings.interfaceSize.title": "Interface size",
   "settings.interfaceSize.description": "The size of text and controls in OpenBot.",
+  "settings.interfaceFont.title": "Interface font",
+  "settings.interfaceFont.description": "The font of menus, chats and settings.",
+  "settings.interfaceFont.default": "Default (Inter)",
+  "settings.interfaceFont.defaultSystem": "System font",
+  "settings.codeFont.title": "Code font",
+  "settings.codeFont.description": "The font of code, terminals and file paths.",
+  "settings.codeFont.default": "Default",
+  "settings.motion.title": "Motion",
+  "settings.backgroundBlur.title": "Background blur",
+  "settings.backgroundBlur.description": "Blur behind menus and dialogs. It starts off on a computer with no GPU.",
+  "settings.movingFaces.title": "Moving agent faces",
+  "settings.movingFaces.description": "Agent faces blink and move. They start still on a computer with no GPU.",
+  "settings.startupAnimation.title": "Startup animation",
+  "settings.startupAnimation.description": "Show the agent animation while OpenBot opens.",
   "settings.logoColor.title": "Logo color",
   "settings.logoColor.description": "Shown in the Dock, the taskbar and the Dynamic Island.",
   "settings.logoColor.buildNote": "This build keeps its own logo color. The choice applies to the release app.",
@@ -30,7 +42,51 @@ export const messages = defineMessages("settings", {
   "settings.logoColor.beige": "Beige",
   "settings.logoColor.gray": "Gray",
   "settings.logoColor.white": "White",
-  // The Settings window, General tab.
+  "settings.chatBackground.title": "Chat background",
+  "settings.chatBackground.description":
+    "Each theme keeps its own color. A color that makes text hard to read becomes darker or lighter.",
+  "settings.chatBackground.light": "Chat background in Light",
+  "settings.chatBackground.dark": "Chat background in Dark",
+  "settings.chatBackground.default": "Default",
+  "settings.chatBackdrop.title": "Backdrop",
+  "settings.chatBackdrop.description":
+    "A scene, picture, GIF or video behind the whole window on this device. Ask an agent to make a scene, then choose Use as backdrop on its reply.",
+  "settings.chatBackdrop.none": "None",
+  "settings.chatBackdrop.pond": "Koi pond",
+  "settings.chatBackdrop.jellyfish": "Jellyfish",
+  "settings.chatBackdrop.sunset": "Retro sunset",
+  "settings.chatBackdrop.snowfall": "Snowfall",
+  "settings.chatBackdrop.fireflies": "Fireflies",
+  "settings.chatBackdrop.coast": "Neon coast",
+  "settings.chatBackdrop.upload": "Upload…",
+  "settings.chatBackdrop.uploadRefused":
+    "Use a PNG, JPEG, GIF, WebP or AVIF image of 20 MB or less, or an MP4 or WebM video of 100 MB or less.",
+  "settings.chatBackdrop.saveFailed": "The backdrop was not saved.",
+  "settings.chatBackdrop.removeFailed": "The backdrop was not removed.",
+  "settings.chatColor.title": "Chat color",
+  "settings.chatColor.description": "Tints the bubbles of your messages. People on your servers see it too.",
+  "settings.chatColor.yours": "Your chat color",
+  "settings.chatColor.agentLabel": "Chat color of {name}",
+  "settings.chatColor.none": "None",
+  "settings.chatColor.noColor": "No color",
+  "settings.chatColor.area": "Saturation and brightness",
+  "settings.chatColor.areaValue": "Saturation {saturation}%, brightness {brightness}%",
+  "settings.chatColor.hue": "Hue",
+  "settings.chatColor.hueValue": "{degrees} degrees",
+  "settings.chatColor.eyeDropper": "Pick a color from the screen",
+  "settings.chatColor.hex": "Hex color",
+  "settings.chatColor.format": "Format {format}, switch to {next}",
+  "settings.chatColor.presets": "Presets",
+  "settings.chatColor.saturation": "Saturation",
+  "settings.chatColor.lightness": "Lightness",
+  "settings.chatColor.red": "Red",
+  "settings.chatColor.green": "Green",
+  "settings.chatColor.blue": "Blue",
+  "settings.bubbleStyle.title": "Your bubbles",
+  "settings.bubbleStyle.description": "In a chat with an agent, your bubbles take the agent's color. Only you see it.",
+  "settings.bubbleStyle.solid": "Solid",
+  "settings.bubbleStyle.tint": "Tint",
+  "settings.bubbleStyle.classic": "Classic",
   "settings.appBehavior.title": "App behavior",
   "settings.conversations.title": "Conversations",
   "settings.launchAtLogin.title": "Launch OpenBot at login",
@@ -47,9 +103,14 @@ export const messages = defineMessages("settings", {
     "Keep the computer awake on battery power too. The battery runs down faster.",
   "settings.restoreWorkspace.title": "Restore the last workspace on launch",
   "settings.restoreWorkspace.description": "Open the workspace and tasks from your previous session.",
+  "settings.quitGuard.title": "Hold ⌘Q to quit",
+  "settings.quitGuard.description": "Hold ⌘Q or press it twice to quit. With Never, one ⌘Q quits and stops the agents.",
+  "settings.quitGuard.working": "While agents work",
+  "settings.quitGuard.always": "Always",
+  "settings.quitGuard.never": "Never",
   "settings.externalLinks.title": "Open external links in",
-  "settings.externalLinks.description": "Links in chats, sign-in pages and billing pages open here.",
-  // The two link targets. The saved value stays in English; only the label is translated.
+  "settings.externalLinks.description":
+    "Links in chats, sign-in pages and billing pages open here. With OpenBot, only links in the main window's chats with agents on this computer open in OpenBot. Other links open in the default browser.",
   "settings.externalLinks.defaultBrowser": "Default browser",
   "settings.externalLinks.openbot": "OpenBot",
   "settings.externalLinks.defaultBrowserNamed": "Default browser ({name})",
@@ -60,19 +121,22 @@ export const messages = defineMessages("settings", {
   "settings.externalLinks.useCommand": "Use",
   "settings.externalLinks.fallback.title": "Could not open {name}",
   "settings.externalLinks.fallback.description": "The link opened in the default browser.",
-  // The message send shortcut. The saved mode stays in English; only the labels are translated.
   "settings.sendShortcut.title": "Send shortcut",
   "settings.sendShortcut.description": "Choose the keys that send a message on this device and browser.",
+  "settings.chatOrder.description":
+    "Choose how the sidebar sorts chats on this device. Manual and Recent activity turn off the Unread group.",
   "settings.sendShortcut.enter": "Enter to send",
   "settings.sendShortcut.modEnterMac": "⌘Enter to send",
   "settings.sendShortcut.modEnterWin": "Ctrl+Enter to send",
   "settings.showAgentSteps.title": "Show agent steps",
   "settings.showAgentSteps.description":
     "Open the thinking, tool steps and memory changes of each turn by default on this device and browser.",
+  "settings.compactMessageActions.title": "Compact message actions",
+  "settings.compactMessageActions.description":
+    "Show React, Reply and More beside a message, and the time between messages. When this is off, every action and the time show under each message.",
   "settings.busyMessage.title": "Steer agents while they work",
   "settings.busyMessage.description":
-    "New messages join the agent’s current work, not the queue. Works with ChatGPT and Claude.",
-  // The Agents tab: the defaults of the agents on this computer.
+    "New messages join the agent’s current work, not the queue. Agents that cannot do this keep new messages in the queue.",
   "settings.agentDefaults.title": "Defaults",
   "settings.agentDefaults.description": "Agents follow these defaults, unless you change them for an agent.",
   "settings.agentDefaults.value": "Default: {value}",
@@ -89,6 +153,32 @@ export const messages = defineMessages("settings", {
   "settings.agentDefaults.setAllLabel": "Set {setting} for all agents",
   "settings.agentDefaults.agentLabel": "{setting} for {agent}",
   "settings.agentDefaults.loadFailed": "The agents could not be read.",
+  "settings.commitCoAuthor.sectionTitle": "Git commits",
+  "settings.commitCoAuthor.title": "Credit OpenBot in commits",
+  "settings.commitCoAuthor.description":
+    "Agents add OpenBot as a co-author to the commits they make. You stay the author.",
+  "settings.planStart.title": "Start the work",
+  "settings.planStart.wait": "When I press Start",
+  "settings.planStart.after": "After {time}",
+  "settings.planStart.custom": "Custom…",
+  "settings.planStart.waitNote": "The plan waits until you press Start. You get a notification.",
+  "settings.planStart.afterNote": "The work starts after {time}, or when you press Start.",
+  "settings.planStart.customTitle": "Custom time",
+  "settings.planStart.customPrefix": "After",
+  "settings.planStart.amountLabel": "Time before the work starts",
+  "settings.planStart.unitLabel": "Unit",
+  "settings.planStart.seconds": "sec",
+  "settings.planStart.minutes": "min",
+  "settings.planStart.customHint": "At least 5 seconds.",
+  "settings.planStart.customInvalid": "Enter a whole number of at least 5 seconds.",
+  "settings.planStart.set": "Set",
+  "settings.automationLimit.sectionTitle": "Limit",
+  "settings.automationLimit.sectionDescription": "It applies to all agents on this computer.",
+  "settings.automationLimit.sectionDescriptionServer": "It applies to all agents on this server.",
+  "settings.automationLimit.title": "Requests an hour",
+  "settings.automationLimit.option": "{limit} an hour",
+  "settings.automationLimit.note":
+    "The most messages and routine runs that local scripts can send each agent in one hour.",
   "settings.backgroundProcesses.title": "Background processes",
   "settings.backgroundProcesses.description":
     "Programs that agents started and left running, such as dev servers. They keep running after the chat ends and after you quit OpenBot.",
@@ -146,7 +236,13 @@ export const messages = defineMessages("settings", {
   "settings.soundTheme.play": "Play {name}",
   "settings.notch.title": "Behavior",
   "settings.notch.show.title": "Show status in the MacBook notch",
+  "settings.notch.show.titleTopOfScreen": "Show status at the top of the screen",
   "settings.notch.show.description": "Show agent activity and items that need attention at the top of each display.",
+  "settings.notch.xwayland.title": "Restart needed",
+  "settings.notch.xwayland.description":
+    "On Wayland, OpenBot must use XWayland to show the Dynamic Island above other apps. Until then, the island does not show.",
+  "settings.notch.xwayland.unsupported": "On this Wayland desktop, the Dynamic Island cannot show above other apps.",
+  "settings.notch.xwayland.restart": "Restart",
   "settings.notch.idle.title": "Show idle island",
   "settings.notch.idle.description": "Show the OpenBot logo and greeting when no status is active.",
   "settings.notch.displays.title": "Show on additional displays",
@@ -163,14 +259,58 @@ export const messages = defineMessages("settings", {
   "settings.notch.size.height": "Height",
   "settings.notch.size.previewNotch": "Built-in display",
   "settings.notch.size.previewIsland": "External display",
+  "settings.agentDock.title": "Behavior",
+  "settings.agentDock.show.title": "Show the agent dock",
+  "settings.agentDock.show.description": "Show your agents at the screen edge, ready for a quick chat.",
+  "settings.agentDock.placement.title": "Position",
+  "settings.agentDock.placement.description":
+    "Above other apps keeps the dock on screen when OpenBot is in the background.",
+  "settings.agentDock.placement.screen": "Above other apps",
+  "settings.agentDock.placement.window": "In the OpenBot window",
+  "settings.agentDock.xwayland.title": "Restart needed",
+  "settings.agentDock.xwayland.description":
+    "On Wayland, OpenBot must use XWayland to show the dock above other apps. Until then, the dock shows in the OpenBot window.",
+  "settings.agentDock.xwayland.unsupported":
+    "On this Wayland desktop, the dock cannot show above other apps. It shows in the OpenBot window.",
+  "settings.agentDock.xwayland.restart": "Restart",
+  "settings.agentDock.noCompositor.title": "Shown in the OpenBot window",
+  "settings.agentDock.noCompositor.description":
+    "Your desktop cannot show see-through windows, so the dock shows in the OpenBot window. To show it above other apps, turn on desktop effects (a compositor) in your system settings, then restart OpenBot.",
+  "settings.agentDock.display.title": "Display",
+  "settings.agentDock.display.description":
+    "If that display is not connected, the dock goes to the display of the OpenBot window.",
+  "settings.agentDock.display.window": "With the OpenBot window",
+  "settings.agentDock.display.primary": "Main display",
+  "settings.agentDock.display.all": "All displays",
+  "settings.agentDock.display.unnamed": "Display {number}",
+  "settings.agentDock.display.disconnected": "Display not connected",
+  "settings.agentDock.edge.title": "Screen edge",
+  "settings.agentDock.edge.description": "Drag the dock up or down to move it along the edge.",
+  "settings.agentDock.edge.right": "Right",
+  "settings.agentDock.edge.left": "Left",
+  "settings.agentDock.size.title": "Dock size",
+  "settings.agentDock.size.description":
+    "Drag to change the size of the dock above the other apps. In the main window, the dock follows the interface size.",
+  "settings.agentDock.autoHide.title": "Hide when not in use",
+  "settings.agentDock.autoHide.description": "The dock slides into the edge. Move the pointer to the edge to show it.",
+  "settings.agentDock.edgeStrip.title": "Show a strip at the edge",
+  "settings.agentDock.edgeStrip.description":
+    "A thin strip stays where the dock hides. Move the pointer near it to show the dock. A color wash goes up the strip when an agent asks you something.",
+  "settings.agentDock.results.title": "Show finished work",
+  "settings.agentDock.results.description": "Results that agents finish show beside the dock for a short time.",
+  "settings.agentDock.activeSeats.title": "Show agents with new messages",
+  "settings.agentDock.activeSeats.description":
+    "An agent or channel that is not on the dock shows on it while it has a new message or waits for you.",
+  "settings.agentDock.agents.title": "Agents on the dock",
+  "settings.agentDock.agents.description": "The agents of {server}. Each server has its own dock.",
+  "settings.agentDock.agents.empty": "This server has no agents yet.",
   "settings.analytics.title": "Link analytics to my account",
   "settings.analytics.description":
     "On: usage and reliability metadata goes to OpenBot’s self-hosted analytics with your account ID and email, with the websites that you and your agents visit, tool use and a daily summary of your setup. Off: only basic usage, such as turns and token counts, goes with a random install ID. Chats, files and prompts are never sent.",
   "settings.analytics.webDescription":
     "On: usage and reliability metadata goes to OpenBot’s self-hosted analytics with your account ID and email. Off: the same metadata goes with a random install ID only. Chats, files and prompts are never sent. This setting applies to this browser.",
-  // The Settings window shell: its tab list, headers and save bar.
   "settings.tab.general.title": "General",
-  "settings.tab.general.description": "Control how OpenBot behaves on this computer.",
+  "settings.tab.general.description": "Choose how chats work and what OpenBot shares.",
   "settings.tab.agents.title": "Agents",
   "settings.tab.agents.description":
     "Choose what the agents on this computer can do when you do not set it for an agent.",
@@ -178,7 +318,7 @@ export const messages = defineMessages("settings", {
   "settings.tab.notifications.description": "Choose how OpenBot alerts you.",
   "settings.tab.voice.title": "Voice",
   "settings.tab.voice.description":
-    "Dictation in the message box. Local models run on this computer; ElevenLabs runs in the cloud.",
+    "Dictation in the message box. Local models run on this computer; ElevenLabs and Groq run in the cloud.",
   "settings.tab.computerUse.title": "Computer Use",
   "settings.tab.computerUse.description":
     "Let agents on this computer's OpenBot see and use its apps. Agents on another server use that server's computer.",
@@ -188,31 +328,38 @@ export const messages = defineMessages("settings", {
   "settings.tab.mobileConnect.description": "Sign in securely on your phone.",
   "settings.tab.dynamicIsland.title": "Dynamic Island",
   "settings.tab.dynamicIsland.description": "Choose when the island shows and how large it is.",
+  "settings.tab.agentDock.title": "Agent dock",
+  "settings.tab.agentDock.description": "Choose where the dock shows and which agents are on it.",
   "settings.tab.updates.title": "Updates",
   "settings.tab.updates.description": "Keep OpenBot current on this computer.",
   "settings.tab.billing.title": "Billing",
   "settings.tab.billing.description": "License, server plans, payment method and invoices.",
+  "settings.tab.referral.title": "Invite friends",
+  "settings.tab.referral.description": "Your invite link, your credit and the friends who joined.",
   "settings.tab.hostedServers.title": "Hosted servers",
   "settings.tab.hostedServers.description": "Create OpenBot servers that run when this computer is off.",
+  "settings.tab.appearance.description": "Choose the theme, colors, language and fonts.",
+  "settings.tab.appBehavior.description": "Choose how OpenBot starts and runs on this computer.",
+  "settings.appearance.colorsTitle": "Colors",
+  "settings.appearance.textTitle": "Language and text",
+  "settings.appBehavior.startTitle": "Start and quit",
+  "settings.appBehavior.backgroundTitle": "Background",
+  "settings.sections.group.account": "Account",
+  "settings.sections.group.thisComputer": "This computer",
   "settings.sections.label": "Settings sections",
   "settings.panel.resize": "Resize right panel",
-  // A failed read or save of the app preferences on the General, Notifications, Dynamic Island and Updates tabs.
   "settings.preferences.loadFailed": "Could not load your settings.",
   "settings.preferences.saveFailed": "Could not save this setting. Try again.",
-  // The agent picker on the skill and plugin install pages.
   "settings.agentSelect.placeholder": "Choose an agent",
   "settings.agentSelect.empty": "No local agents",
   "settings.agentSelect.label": "Install to",
-  // A device or an account session that the user disconnects.
   "settings.disconnect.action": "Disconnect",
   "settings.disconnect.pending": "Disconnecting…",
-  // The Mobile Connect tab.
   "settings.mobileConnect.phones.title": "Your phones",
   "settings.mobileConnect.phones.description": "Phones that use OpenBot with this account.",
   "settings.mobileConnect.phones.add": "Add phone",
   "settings.mobileConnect.phones.empty.title": "No phones yet",
   "settings.mobileConnect.phones.empty.description": "Chat with your agents and follow their work from your phone.",
-  // {time} is "Just now", "5m ago", "2h ago" or a date.
   "settings.mobileConnect.devices.lastActive": "Last active: {time}",
   "settings.mobileConnect.add.title": "Add a phone",
   "settings.mobileConnect.add.question": "Is OpenBot installed on the phone?",
@@ -223,7 +370,6 @@ export const messages = defineMessages("settings", {
   "settings.mobileConnect.add.install.heading": "Get the app",
   "settings.mobileConnect.add.install.note": "Point the phone camera at the code, install OpenBot, then continue.",
   "settings.mobileConnect.add.continue": "Continue to sign in",
-  // The tags under the QR codes. Each tag says what its code does.
   "settings.mobileConnect.qr.appStore": "Opens the App Store",
   "settings.mobileConnect.qr.playStore": "Opens Google Play",
   "settings.mobileConnect.qr.signIn": "Scan in the OpenBot app",
@@ -258,7 +404,6 @@ export const messages = defineMessages("settings", {
   "settings.mobileConnect.link.intro.description":
     "Use it on a phone that you sign in again and again, such as a test phone. Anyone with the link can sign in to your account, so use a one-time code when you can.",
   "settings.mobileConnect.link.private.title": "Keep this code private",
-  // {time} is a countdown such as 0:59.
   "settings.mobileConnect.link.private.description":
     "Anyone who scans it can sign in to your account until you revoke it. The code hides in {time}.",
   "settings.mobileConnect.link.replace": "Generate new link",
@@ -278,7 +423,6 @@ export const messages = defineMessages("settings", {
   "settings.mobileConnect.route.title": "How devices connect",
   "settings.mobileConnect.route.description":
     "For phones, other computers and team members that connect to this computer.",
-  // {route} is "Through OpenBot" or "Private network".
   "settings.mobileConnect.route.chipLabel": "How devices connect: {route}",
   "settings.mobileConnect.route.openbot.title": "Through OpenBot",
   "settings.mobileConnect.route.openbot.badge": "Recommended",
@@ -304,7 +448,6 @@ export const messages = defineMessages("settings", {
   "settings.mobileConnect.time.justNow": "Just now",
   "settings.mobileConnect.time.minutesAgo": "{minutes}m ago",
   "settings.mobileConnect.time.hoursAgo": "{hours}h ago",
-  // The Profile tab.
   "settings.profile.name.title": "Display name",
   "settings.profile.name.description": "Visible in shared workspaces.",
   "settings.profile.name.unsafe": "Remove line breaks and hidden or control characters.",
@@ -330,7 +473,6 @@ export const messages = defineMessages("settings", {
   "settings.profile.share.copyFailed": "Could not copy the image.",
   "settings.profile.share.createFailed": "Could not make the image.",
   "settings.profile.share.fileName": "openbot-activity.png",
-  // The text in the image to share.
   "settings.profile.share.caption": "My last six months with OpenBot",
   "settings.profile.activity.title": "Activity on this computer",
   "settings.profile.activity.activeDays": {
@@ -340,7 +482,6 @@ export const messages = defineMessages("settings", {
   "settings.profile.activity.empty": "No activity yet",
   "settings.profile.activity.loading": "Loading activity…",
   "settings.profile.activity.loadFailed": "Could not load your activity.",
-  // {tokens} is a short number, such as 1.2M.
   "settings.profile.activity.heatmapLabel": {
     one: "{tokens} tokens on {count} active day in the past year",
     other: "{tokens} tokens on {count} active days in the past year",
@@ -379,7 +520,6 @@ export const messages = defineMessages("settings", {
   "settings.profile.sessions.kind.hostedServer": "Hosted server",
   "settings.profile.sessions.hostedServerNote":
     "Disconnect signs the server out. Restart the server to sign it in again.",
-  // {kind} is Desktop or Mobile. {signedIn} and {lastActive} are a date and a time.
   "settings.profile.sessions.details": "{kind} · Signed in {signedIn} · Last active {lastActive}",
   "settings.profile.sessions.disconnectLabel": "Disconnect {name} session from {signedIn}",
   "settings.profile.sessions.loadFailed": "Could not load account sessions. Please try again.",
@@ -387,7 +527,6 @@ export const messages = defineMessages("settings", {
   "settings.profile.sessions.disconnectConfirm.title": "Disconnect this session?",
   "settings.profile.sessions.disconnectConfirm.description":
     "This device is signed out of your account. It must sign in again to connect.",
-  // The Updates tab. {target} is "OpenBot v1.2.3" or settings.updates.target.latest.
   "settings.updates.title": "OpenBot updates",
   "settings.updates.track.title": "Update track",
   "settings.updates.track.description": "Stable receives tested OpenBot releases.",
@@ -410,18 +549,17 @@ export const messages = defineMessages("settings", {
   "settings.updates.status.checking": "Checking the Stable track for updates…",
   "settings.updates.status.available": "{target} is available to download.",
   "settings.updates.status.downloading": "Downloading {target}…",
-  // {progress} is a percent, such as 42%.
   "settings.updates.status.downloadingProgress": "Downloading {target} · {progress}",
   "settings.updates.status.ready": "{target} is ready. Restart to apply.",
   "settings.updates.status.installing": "Restarting to apply {target}…",
   "settings.updates.status.upToDate": "OpenBot is up to date on the Stable track.",
+  "settings.updates.status.staged": "{target} is rolling out to some computers. Check for updates to get it now.",
   "settings.updates.status.checkFailed": "OpenBot could not check for updates. Try again.",
   "settings.updates.status.unsupported": "Updates are unavailable in this build.",
   "settings.updates.actionFailed": "Could not update OpenBot.",
   "settings.updates.autoInstall.title": "Install updates automatically",
   "settings.updates.autoInstall.description":
     "OpenBot restarts into a downloaded update when the agents are idle. Members of your servers are disconnected for a short time.",
-  // Restart OpenBot, or install a downloaded update, when no agent works.
   "settings.updates.idleRestart.title": "Restart OpenBot",
   "settings.updates.idleRestart.relaunchDescription":
     "OpenBot restarts when no agent works. New routine runs wait until then.",
@@ -432,7 +570,6 @@ export const messages = defineMessages("settings", {
   "settings.updates.allowRemote.title": "Allow updates from server members",
   "settings.updates.allowRemote.description":
     "All signed-in server members can request an update when this computer is idle. Owners and admins can also force a restart.",
-  // The Hosted sites tab.
   "settings.hostedSites.title": "Published sites",
   "settings.hostedSites.unavailable": "Site hosting is unavailable.",
   "settings.hostedSites.usage": { one: "{used} of {count} site", other: "{used} of {count} sites" },
@@ -451,7 +588,6 @@ export const messages = defineMessages("settings", {
   "settings.hostedSites.loadFailed": "Could not load hosted sites.",
   "settings.hostedSites.deleteFailed": "Could not delete the site.",
   "settings.hostedSites.reloadFailed": "Could not reload hosted sites.",
-  // The Hosted servers tab. {vcpu}, {memory} and {disk} are numbers, such as 2, 4 and 12.
   "settings.hostedServers.title": "Your servers",
   "settings.hostedServers.description": "Each server has its own agents, files and routines.",
   "settings.hostedServers.add": "Add server",
@@ -465,6 +601,7 @@ export const messages = defineMessages("settings", {
   "settings.hostedServers.state.planEnded": "Plan ended",
   "settings.hostedServers.state.creating": "Creating",
   "settings.hostedServers.state.starting": "Starting",
+  "settings.hostedServers.state.restoring": "Restoring data",
   "settings.hostedServers.state.running": "Running",
   "settings.hostedServers.state.stopping": "Stopping",
   "settings.hostedServers.state.stopped": "Stopped",
@@ -475,6 +612,8 @@ export const messages = defineMessages("settings", {
   "settings.hostedServers.paymentDescription": "The setup starts when Stripe confirms the payment.",
   "settings.hostedServers.planEndedDescription":
     "The plan ended, so the server stopped. Its data stays. Renew the plan to start it.",
+  "settings.hostedServers.planEndedKeptUntil":
+    "The plan ended, so the server stopped. Its data is kept until {date}. Renew the plan before then to start it.",
   "settings.hostedServers.pay": "Open payment page",
   "settings.hostedServers.payLabel": "Open payment page for {name}",
   "settings.hostedServers.renew": "Renew plan",
@@ -495,24 +634,17 @@ export const messages = defineMessages("settings", {
   "settings.hostedServers.createFailed": "Could not create the server.",
   "settings.hostedServers.wakeFailed": "Could not start the server.",
   "settings.hostedServers.deleteFailed": "Could not delete the server.",
-  // The plan picker. {count} is a number, such as 4. {price} is a formatted amount, such as "€50".
   "settings.hostedServers.plan.label": "Plan",
   "settings.hostedServers.plan.recommended": "Best value",
   "settings.hostedServers.plan.soldOut": "Sold out",
   "settings.hostedServers.plan.perMonth": "/ month",
   "settings.hostedServers.plan.disk": "{count} GB storage",
-  // Each plan is a Linux virtual machine. Agents run Linux commands and apps there, not macOS or Windows ones.
   "settings.hostedServers.plan.linux": "Linux machine",
-  // A server stops when no one uses it, and starts again for a message or a scheduled routine.
   "settings.hostedServers.plan.startsOnUse": "Starts when you use it",
-  // The most active members of the server, the owner included.
   "settings.hostedServers.plan.members": { one: "Up to {count} member", other: "Up to {count} members" },
-  // The most active hosted sites of the server. Agents publish static sites there.
   "settings.hostedServers.plan.sites": { one: "Up to {count} hosted site", other: "Up to {count} hosted sites" },
-  // Work at a company needs a commercial license. With a Starter server, the 1-user license costs less.
   "settings.hostedServers.plan.license.starter": "Commercial license: {price} / month",
   "settings.hostedServers.plan.license.team": "Work needs a Team license",
-  // The speed of a plan compared with Starter. {factor} is a number, such as 2.
   "settings.hostedServers.plan.speed.base": "Base speed",
   "settings.hostedServers.plan.speed.faster": "{factor}× faster",
   "settings.hostedServers.plan.starter.name": "Starter",
@@ -521,29 +653,37 @@ export const messages = defineMessages("settings", {
   "settings.hostedServers.plan.standard.summary": "For a small team with daily routines.",
   "settings.hostedServers.plan.pro.name": "Pro",
   "settings.hostedServers.plan.pro.summary": "For many agents and heavy browser work.",
-  // The Voice tab: dictation models and the dictation language.
-  "settings.voice.models.title": "Dictation model",
+  "settings.voice.dictation.section": "Dictation",
   "settings.voice.model.parakeet.description": "Fast. Finds the spoken language itself, in 25 European languages.",
+  "settings.voice.model.parakeetUnified.description":
+    "Fast. English only. Writes punctuation, with fewer errors than Parakeet TDT.",
   "settings.voice.model.bark.description": "Fast. English only. Writes mostly lowercase, with little punctuation.",
   "settings.voice.model.whisper.description": "Slower. About 100 languages, and you can set the spoken language.",
+  "settings.voice.model.cohere.description":
+    "Slower. 14 languages. You set the spoken language. Uses about 4 GB of memory.",
   "settings.voice.model.size": "Download size: {size}",
-  "settings.voice.model.downloading": "Downloading · {received} of {total}",
   "settings.voice.model.failed": "The download stopped. Check the connection and try again.",
   "settings.voice.model.progressLabel": "Downloading {name}",
   "settings.voice.model.use": "Use",
-  "settings.voice.model.inUse": "In use",
   "settings.voice.model.downloadLabel": "Download {name}",
-  "settings.voice.model.cancelLabel": "Stop the download of {name}",
   "settings.voice.model.retryLabel": "Download {name} again",
   "settings.voice.model.useLabel": "Use {name} for dictation",
   "settings.voice.model.removeLabel": "Remove {name} from this computer",
   "settings.voice.language.section": "Language",
-  "settings.voice.language.title": "Dictation language",
   "settings.voice.language.description": "The language that you speak. Automatic finds it from the recording.",
+  "settings.voice.language.modelLanguages":
+    "The language that you speak. This model knows only these languages and does not find the language itself.",
   "settings.voice.language.modelDetects":
-    "Parakeet finds the spoken language itself. To set a language, use Whisper or ElevenLabs.",
-  "settings.voice.language.englishOnly": "Bark recognizes English only. To set a language, use Whisper or ElevenLabs.",
+    "Parakeet finds the spoken language itself. To set a language, use Whisper, Cohere or ElevenLabs.",
+  "settings.voice.language.englishOnly":
+    "Bark recognizes English only. To set a language, use Whisper, Cohere or ElevenLabs.",
+  "settings.voice.language.parakeetUnifiedEnglishOnly":
+    "Parakeet Unified recognizes English only. To set a language, use Whisper, Cohere or ElevenLabs.",
   "settings.voice.language.automatic": "Automatic",
+  "settings.voice.pause.title": "Pause before sending",
+  "settings.voice.pause.description":
+    "In a voice conversation, OpenBot sends your words when you stop speaking for this long. Choose a longer pause if you speak slowly or stop to think. Codex live voice finds the end itself.",
+  "settings.voice.pause.seconds": "{seconds} s",
   "settings.voice.loadFailed": "Could not read the voice models.",
   "settings.voice.saveFailed": "Could not save the voice setting. Try again.",
   "settings.voice.downloadFailed": "Could not start the download. Try again.",
@@ -551,19 +691,46 @@ export const messages = defineMessages("settings", {
   "settings.voice.removeFailed": "Could not remove the model. Try again.",
   "settings.voice.model.elevenlabs.description":
     "Streams your voice to ElevenLabs. Text shows while you speak and stays fixed. Uses your own API key, and ElevenLabs bills each use.",
-  "settings.voice.model.keySaved": "API key saved",
-  "settings.voice.model.keyMissing": "Needs an ElevenLabs API key",
-  "settings.voice.apiKey.label": "ElevenLabs API key",
+  "settings.voice.model.groqTurbo.description":
+    "Sends each recording to Groq when you stop. Fast, and knows many languages. Uses your own API key, and Groq bills each use.",
+  "settings.voice.model.groqLarge.description":
+    "Sends each recording to Groq when you stop. More accurate than turbo, but slower. Uses your own API key, and Groq bills each use.",
   "settings.voice.apiKey.placeholder": "Paste the key",
   "settings.voice.apiKey.save": "Save key",
   "settings.voice.apiKey.remove": "Remove key",
   "settings.voice.apiKey.saveFailed": "Could not save the API key. Try again.",
   "settings.voice.apiKey.removeFailed": "Could not remove the API key. Try again.",
+  "settings.voice.model.title": "Model",
+  "settings.voice.model.group.local": "On this computer",
+  "settings.voice.model.downloadingShort": "Downloading…",
+  "settings.voice.model.ready": "{name} is ready",
+  "settings.voice.model.serverDictates": "Your voice server takes dictation now.",
+  "settings.voice.apiKey.providerLabel": "{provider} API key",
+  "settings.voice.apiKey.needed": "Paste a key to use {provider}",
+  "settings.voice.apiKey.removeLabel": "Remove the {provider} API key",
+  "settings.voice.speech.model.flash.description":
+    "Fast. Sends the reply text to ElevenLabs. Uses your own API key, and ElevenLabs bills each use.",
+  "settings.voice.speech.model.multilingual.description":
+    "More natural, and slower. Sends the reply text to ElevenLabs. Uses your own API key, and ElevenLabs bills each use.",
+  "settings.voice.speech.model.v3.description":
+    "Expressive, and slow. Sends the reply text to ElevenLabs. Uses your own API key, and ElevenLabs bills each use.",
+  "settings.voice.speech.model.v4Turbo.description":
+    "Fast, in more than 90 languages. Sends the reply text to ElevenLabs. Uses your own API key, and ElevenLabs bills each use.",
+  "settings.voice.speech.model.v4.description":
+    "The best quality, in more than 90 languages, and slow. Sends the reply text to ElevenLabs. Uses your own API key, and ElevenLabs bills each use.",
+  "settings.voice.speech.model.xai.description":
+    "Sends the reply text to xAI. Uses your own API key, and xAI bills each use.",
+  "settings.voice.speech.serverSpeaks": "Your voice server reads replies aloud now.",
   "settings.voice.speech.section": "Spoken replies",
   "settings.voice.speech.model.description": "Reads replies aloud on this computer, in 31 languages.",
   "settings.voice.speech.readReplies.title": "Read replies aloud",
   "settings.voice.speech.readReplies.description":
     "When you dictate a message, the reply is read aloud. Dictate again to stop it.",
+  "settings.voice.speech.codexLive.title": "Codex live voice",
+  "settings.voice.speech.codexLive.description":
+    "Voice conversations with any agent use OpenAI live voice with your Codex sign-in. Your voice, your requests and the agent's replies go to OpenAI.",
+  "settings.voice.speech.codexLive.serverDescription":
+    "Voice conversations with any agent use OpenAI live voice with the Codex sign-in of the server. Your voice, your requests and the agent's replies go to OpenAI.",
   "settings.voice.speech.speed.title": "Speed",
   "settings.voice.speech.voice.title": "Voice",
   "settings.voice.speech.voice.female": "Female voice {number}",
@@ -572,6 +739,45 @@ export const messages = defineMessages("settings", {
   "settings.voice.speech.voice.stop": "Stop",
   "settings.voice.speech.sample": "Hello. This is how your replies will sound.",
   "settings.voice.speech.listenFailed": "Could not play the sample.",
+  "settings.voice.live.section": "Live voice",
+  "settings.voice.talk.section": "Voice conversation",
+  "settings.voice.talkKey.title": "Push to talk key",
+  "settings.voice.talkKey.description": "Hold these keys to talk in a voice conversation.",
+  "settings.voice.talkKey.change": "Change the push to talk key",
+  "settings.voice.talkKey.recording": "Press the keys",
+  "settings.voice.talkKey.refused": "Add one more key",
+  "settings.voice.talkKey.reset": "Reset",
+  "settings.tab.keyboard.title": "Keyboard",
+  "settings.tab.keyboard.description": "Change the keyboard shortcuts on this device.",
+  "settings.shortcuts.section": "Shortcuts",
+  "settings.shortcuts.fixed.section": "Fixed shortcuts",
+  "settings.shortcuts.command.newThread": "New thread",
+  "settings.shortcuts.command.previousThread": "Previous thread",
+  "settings.shortcuts.command.nextThread": "Next thread",
+  "settings.shortcuts.command.newAgent": "New agent",
+  "settings.shortcuts.command.globalSearch": "Search everything",
+  "settings.shortcuts.command.searchChat": "Search in chat",
+  "settings.shortcuts.command.focusComposer": "Focus the message box",
+  "settings.shortcuts.command.back": "Go back",
+  "settings.shortcuts.command.forward": "Go forward",
+  "settings.shortcuts.command.toggleSidebar": "Show or hide the sidebar",
+  "settings.shortcuts.command.showShortcuts": "Show keyboard shortcuts",
+  "settings.shortcuts.command.openSettings": "Open settings",
+  "settings.shortcuts.command.stopAllAgents": "Stop all agents",
+  "settings.shortcuts.command.switchServer": "Switch server",
+  "settings.shortcuts.command.zoom": "Zoom",
+  "settings.shortcuts.refused.invalid": "Add a modifier key",
+  "settings.shortcuts.refused.reserved": "The system uses this shortcut",
+  "settings.shortcuts.refused.taken": "Used by {command}",
+  "settings.shortcuts.recording": "Press the keys",
+  "settings.shortcuts.change": "Change the shortcut for {command}",
+  "settings.shortcuts.reset": "Reset",
+  "settings.shortcuts.resetAll": "Reset all",
+  "settings.voice.live.signIn": "Sign in to Codex with your ChatGPT account to use live voice.",
+  "settings.voice.live.account": "Account",
+  "settings.voice.live.accountAutomatic": "Automatic",
+  "settings.voice.live.accountDescription":
+    "The ChatGPT account that live voice uses. Choose an account whose plan includes voice.",
   "settings.voice.server.section": "Voice server",
   "settings.voice.server.title": "OpenAI-compatible server",
   "settings.voice.server.notSetUp": "Not set up",
@@ -597,8 +803,6 @@ export const messages = defineMessages("settings", {
   "settings.voice.server.probeFailed": "Could not connect to the voice server.",
   "settings.voice.server.saveFailed": "Could not save the voice server.",
   "settings.voice.server.removeFailed": "Could not remove the voice server.",
-  // No value may end with the word "import": the CommonJS shim of electron-vite reads `import"` in the
-  // main bundle as an import statement and inserts its code inside the string.
   "settings.transfer.title": "Move this server to another computer",
   "settings.transfer.lede": "Your agents, their skills, routines, memories, and files go into one file.",
   "settings.transfer.flow.label": "How a transfer works",
@@ -609,8 +813,8 @@ export const messages = defineMessages("settings", {
   "settings.transfer.old.text": "Save its agents and server settings to a file.",
   "settings.transfer.new.title": "Import into this server",
   "settings.transfer.new.text": "Add the agents and server settings from a file.",
-  "settings.transfer.notMoved":
-    "API keys, sign-ins, connectors, app preferences, and chat history are not moved. Set them up again on the new server.",
+  "settings.transfer.notMovedSecrets":
+    "API keys, sign-ins, connectors, and app preferences are not moved. Set them up again on the new server.",
   "settings.transfer.back": "Back",
   "settings.transfer.loading": "Reading your agents…",
   "settings.transfer.summary.label": "What the file contains",
@@ -620,12 +824,28 @@ export const messages = defineMessages("settings", {
   "settings.transfer.count.noSettings": "No server settings",
   "settings.transfer.includeAgent": "Include {name}",
   "settings.transfer.export.title": "Export this server",
-  "settings.transfer.export.files": "Include workspace files",
-  "settings.transfer.export.filesDescription":
-    "Files your agents made, and the Shared folder. Turn off for a small file.",
-  "settings.transfer.export.settings": "Include server settings",
+  "settings.transfer.preset.label": "What goes into the file",
+  "settings.transfer.preset.templates": "Templates",
+  "settings.transfer.preset.everything": "Everything",
+  "settings.transfer.meter.files": "of {total} in workspace files",
+  "settings.transfer.part.agents": "Agents and their setup",
+  "settings.transfer.part.agentsDescription": "{contents}. Always in the file.",
+  "settings.transfer.part.settings": "Server settings",
+  "settings.transfer.part.chats": "Chat history",
+  "settings.transfer.part.chatsDescription":
+    "The chats and side threads with their files, and the run history of the routines. The agents continue these chats with their context.",
+  "settings.transfer.part.channels": "Channel messages",
+  "settings.transfer.part.channelsDescription":
+    "The messages of the channels that the exported agents are in, with their files and the run history of the channel routines.",
+  "settings.transfer.part.files": "Workspace files",
+  "settings.transfer.part.filesDescription": "Files your agents made, and the Shared folder.",
+  "settings.transfer.part.preferences": "Server preferences",
+  "settings.transfer.part.preferencesDescription":
+    "Name, logo, time zone, personality, agent defaults, model choices, memory and skill settings, and the notification levels and pins of each person.",
   "settings.transfer.export.settingsDescription":
-    "MCP servers, custom model providers, sidebar sections, and routine flows.",
+    "MCP servers, custom model providers, sidebar sections, routine flows, and shared skills.",
+  "settings.transfer.export.historyDescription":
+    "The chats, side threads, and channel messages, with the files of the chat messages. The file can be large.",
   "settings.transfer.export.chooseAgents": "Choose agents ({selected} of {total})",
   "settings.transfer.export.hideAgents": "Hide agents",
   "settings.transfer.export.agentsLabel": "Agents to export",
@@ -644,6 +864,13 @@ export const messages = defineMessages("settings", {
   "settings.transfer.import.lede": "Choose the file you exported from the other server. It ends in .zip.",
   "settings.transfer.import.choose": "Choose file…",
   "settings.transfer.import.reading": "Reading the file…",
+  "settings.transfer.upload.label": "Upload to the server",
+  "settings.transfer.upload.sending": "Sending the file…",
+  "settings.transfer.upload.sent": "{sent} of {total} sent",
+  "settings.transfer.upload.serverReading": "The server is reading the file…",
+  "settings.transfer.upload.etaSoon": "Less than a minute left",
+  "settings.transfer.upload.etaMinutes": "About {minutes} min left",
+  "settings.transfer.upload.etaHours": "About {hours} h {minutes} min left",
   "settings.transfer.import.openFailed": "The file could not be opened",
   "settings.transfer.import.contains": "This file contains",
   "settings.transfer.import.source": "OpenBot {version} · exported {date}",
@@ -652,8 +879,11 @@ export const messages = defineMessages("settings", {
   "settings.transfer.import.agentsLabel": "Agents in the file",
   "settings.transfer.import.nameExists": "Name already used",
   "settings.transfer.import.settings": "Import server settings",
-  "settings.transfer.import.settingsDescription":
-    "Adds the MCP servers, custom model providers, and sidebar sections that this server does not have.",
+  "settings.transfer.import.settingsAndPreferences":
+    "Adds the MCP servers, custom model providers, sidebar sections, and shared skills that this server does not have.",
+  "settings.transfer.import.preferences": "Import server preferences",
+  "settings.transfer.import.preferencesDescription":
+    "Replaces the name, logo, and preferences of this server, and the notification levels and pins of each person, with the ones in the file.",
   "settings.transfer.import.submit": { one: "Import {count} agent", other: "Import {count} agents" },
   "settings.transfer.import.submitSettings": "Import server settings",
   "settings.transfer.import.importing": "Importing…",
@@ -666,4 +896,30 @@ export const messages = defineMessages("settings", {
   "settings.transfer.result.signInButton": "Sign in to {provider}",
   "settings.transfer.result.notImported": "Not imported",
   "settings.transfer.result.warnings": "Check these",
+  "settings.transfer.copy.tileTitle": "Copy to another server",
+  "settings.transfer.copy.tileText": "Send agents to another of your servers.",
+  "settings.transfer.copy.title": "Copy agents to another server",
+  "settings.transfer.copy.from": "From",
+  "settings.transfer.copy.to": "To",
+  "settings.transfer.copy.chooseServer": "Choose a server",
+  "settings.transfer.copy.search": "Search agents",
+  "settings.transfer.copy.agentsOn": "Agents on {server}",
+  "settings.transfer.copy.all": { one: "All {count} agent", other: "All {count} agents" },
+  "settings.transfer.copy.noAgents": "This server has no agents.",
+  "settings.transfer.copy.new": "New",
+  "settings.transfer.copy.notCopied":
+    "Their channels, routine flows, workflows, and the Shared folder are copied too. API keys, sign-ins, connectors, and chat history are not copied. Set them up again on the other server.",
+  "settings.transfer.copy.submit": { one: "Copy {count} agent", other: "Copy {count} agents" },
+  "settings.transfer.copy.duplicatesTitle": "Copy duplicate agents?",
+  "settings.transfer.copy.duplicatesDescription":
+    "{server} already has agents with these names: {names}. The copy adds a second agent for each one. Each copy is a separate agent with its own chats, files, and memories.",
+  "settings.transfer.copy.duplicatesConfirm": "Copy duplicates",
+  "settings.transfer.copy.copying": "Copying…",
+  "settings.transfer.copy.done": {
+    one: "{count} agent copied to {server}.",
+    other: "{count} agents copied to {server}.",
+  },
+  "settings.transfer.copy.open": "Open {server}",
+  "settings.transfer.copy.loadFailed": "The agents could not be read",
+  "settings.transfer.copy.failed": "The copy did not finish",
 });

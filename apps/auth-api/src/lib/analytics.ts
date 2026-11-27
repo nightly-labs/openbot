@@ -10,6 +10,8 @@ import {
 import { isBoolean, isOneOf } from "@openbot/contracts/runtime-values";
 import { OpenPanel, OpenPanelBase, type OpenPanelOptions, type TrackProperties } from "@openpanel/web";
 import { BRAND_ROUTE } from "./brand-page";
+import { CHROME_EXTENSION } from "./browser-extension";
+import { CLA_ROUTE } from "./cla";
 import { COMMERCIAL_LICENSE_ROUTE } from "./commercial-license";
 import { CONTACT_TOPICS } from "./contact";
 import { CONTENT_COLLECTIONS } from "./content";
@@ -18,6 +20,7 @@ import { DOWNLOAD_PLATFORM_ORDER, type DownloadPlatform } from "./download-platf
 import { DPA_ROUTE } from "./dpa";
 import {
   OPENBOT_ALTERNATE_DOWNLOAD_LINKS,
+  OPENBOT_ANDROID_APK_LINK,
   OPENBOT_DOWNLOAD_LINKS,
   OPENBOT_DOWNLOAD_PAGE_LINKS,
   OPENBOT_LINKS,
@@ -26,32 +29,33 @@ import { MARKETPLACE_TAB_ROUTES } from "./marketplace-routes";
 import { MOBILE_APPS } from "./mobile-apps";
 import { PRICING_ROUTE } from "./pricing-page";
 import { PRIVACY_POLICY_ROUTE } from "./privacy-policy";
+import { localizedPagePath, TRANSLATED_SITE_LOCALES } from "./site-paths";
 import { TEAMS_ROUTE } from "./teams-page";
 import { TERMS_ROUTE } from "./terms";
 
 const OPENPANEL_API_URL = "https://analytics.openbot.run/api";
 const OPENPANEL_CLIENT_ID = "6c989975-87ef-4f0c-857e-ab449a65b5c2";
-/** Generation 10 adds `billing_return_viewed` and `contact_form_submitted`. */
 const ANALYTICS_SCHEMA_VERSION = 10;
 
 type LandingAcquisitionSource = FirstTouchAcquisitionSource;
 
-/** How far into an article the reader got. Reported once per depth per article view. */
 export type ArticleReadDepth = "start" | "half" | "end";
 
-/** An article the registries actually publish. Both fields are closed sets, never free text. */
 export interface ArticleReference {
   collection: CollectionId;
   slug: string;
 }
 
-/** The Stripe page that closed before the desktop return page opened. */
-export type BillingReturnKind = "plan" | "license" | "portal";
-export const BILLING_RETURN_KINDS = ["plan", "license", "portal"] as const satisfies readonly BillingReturnKind[];
+export type BillingReturnKind = "plan" | "license" | "portal" | "credits";
+export const BILLING_RETURN_KINDS = [
+  "plan",
+  "license",
+  "portal",
+  "credits",
+] as const satisfies readonly BillingReturnKind[];
 type BillingReturnOutcome = "completed" | "cancelled";
 
 type ContactTopicId = (typeof CONTACT_TOPICS)[number]["id"];
-/** `rate_limited` is the 429 answer; `failed` is each other failure, the network included. */
 type ContactFormResult = "succeeded" | "failed" | "rate_limited";
 const CONTACT_TOPIC_IDS = CONTACT_TOPICS.map((topic) => topic.id);
 
@@ -99,8 +103,7 @@ const LANDING_PLACEMENTS = [
   "content_related",
   "other",
 ] as const satisfies readonly LandingPlacement[];
-/** The platforms the landing page can send a visitor to a download or a phone app store for. */
-type LandingDownloadPlatform = "linux" | "macos" | "windows" | "ios" | "android";
+type LandingDownloadPlatform = "linux" | "macos" | "windows" | "ios" | "android" | "chrome";
 type LandingDestination =
   | "download_page"
   | "download_section"
@@ -110,6 +113,12 @@ type LandingDestination =
   | "teams"
   | "pricing"
   | "x"
+  | "threads"
+  | "linkedin"
+  | "reddit"
+  | "instagram"
+  | "tiktok"
+  | "facebook"
   | "discord"
   | "repository"
   | "releases"
@@ -125,10 +134,6 @@ type LandingDestination =
 type CollectionIndexRoute = ContentCollection["indexRoute"];
 type DownloadPagePath = (typeof OPENBOT_DOWNLOAD_PAGE_LINKS)[keyof typeof OPENBOT_DOWNLOAD_PAGE_LINKS];
 type MarketplaceTabPath = (typeof MARKETPLACE_TAB_ROUTES)[keyof typeof MARKETPLACE_TAB_ROUTES];
-/**
- * The screens a report may name. Article paths carry the slug so one article can be told from
- * another, and `safeScreenPath` keeps the set closed at runtime as well as in the type.
- */
 export type LandingScreenPath =
   | "/"
   | "/join"
@@ -141,6 +146,7 @@ export type LandingScreenPath =
   | typeof TERMS_ROUTE
   | typeof COMMERCIAL_LICENSE_ROUTE
   | typeof DPA_ROUTE
+  | typeof CLA_ROUTE
   | DownloadPagePath
   | MarketplaceTabPath
   | CollectionIndexRoute
@@ -157,6 +163,7 @@ const FIXED_SCREEN_PATHS = [
   TERMS_ROUTE,
   COMMERCIAL_LICENSE_ROUTE,
   DPA_ROUTE,
+  CLA_ROUTE,
   ...Object.values(OPENBOT_DOWNLOAD_PAGE_LINKS),
   ...Object.values(MARKETPLACE_TAB_ROUTES),
   "/news",
@@ -165,10 +172,6 @@ const FIXED_SCREEN_PATHS = [
   "/providers",
 ] as const satisfies readonly LandingScreenPath[];
 
-/**
- * Any path that is not a fixed screen or a published article reports the landing page instead. A
- * caller cannot widen what reaches analytics by passing a different string.
- */
 export function safeScreenPath(path: string): LandingScreenPath {
   if (isOneOf(FIXED_SCREEN_PATHS, path)) return path;
   const article = articleFromPath(path);
@@ -176,10 +179,6 @@ export function safeScreenPath(path: string): LandingScreenPath {
   return `/${article.collection}/${article.slug}`;
 }
 
-/**
- * Resolves a site path to the article it names, or null. The slug is looked up in the registry, so
- * a link to an article that does not exist reports nothing rather than a new string.
- */
 function articleFromPath(path: string): ArticleReference | null {
   const [pathname = ""] = path.split(/[?#]/u);
   for (const collection of CONTENT_COLLECTIONS) {
@@ -202,11 +201,6 @@ type OpenPanelClient = Pick<OpenPanel, "setGlobalProperties"> & {
 
 type ClientFactory = (options: OpenPanelOptions) => OpenPanelClient;
 
-/**
- * `OpenPanel.track` replaces `__path` with its own `lastPath`, which stays empty because screen
- * tracking is disabled here. The base method only merges the given properties, so both calls use it
- * and pass the reported path explicitly.
- */
 function createOpenPanelClient(options: OpenPanelOptions): OpenPanelClient {
   const client = new OpenPanel(options);
   return {
@@ -217,7 +211,6 @@ function createOpenPanelClient(options: OpenPanelOptions): OpenPanelClient {
   };
 }
 
-/** The download routes of each platform, reversed so a click can name the platform it asked for. */
 const DOWNLOAD_PLATFORMS_BY_HREF = new Map<string, LandingDownloadPlatform>([
   [OPENBOT_DOWNLOAD_LINKS.macos, "macos"],
   [OPENBOT_DOWNLOAD_LINKS.windows, "windows"],
@@ -226,6 +219,8 @@ const DOWNLOAD_PLATFORMS_BY_HREF = new Map<string, LandingDownloadPlatform>([
   [OPENBOT_ALTERNATE_DOWNLOAD_LINKS.linux, "linux"],
   [MOBILE_APPS.ios.href, "ios"],
   [MOBILE_APPS.android.href, "android"],
+  [OPENBOT_ANDROID_APK_LINK, "android"],
+  [CHROME_EXTENSION.href, "chrome"],
 ]);
 
 const LINK_DESTINATIONS = new Map<string, LandingDestination>([
@@ -236,11 +231,21 @@ const LINK_DESTINATIONS = new Map<string, LandingDestination>([
   [OPENBOT_LINKS.contact, "contact"],
   [TEAMS_ROUTE, "teams"],
   [PRICING_ROUTE, "pricing"],
+  ...TRANSLATED_SITE_LOCALES.flatMap((locale) => [
+    [localizedPagePath(locale, "/contact"), "contact"] as const,
+    [localizedPagePath(locale, "/teams"), "teams"] as const,
+    [localizedPagePath(locale, "/pricing"), "pricing"] as const,
+  ]),
   [OPENBOT_LINKS.x, "x"],
+  [OPENBOT_LINKS.threads, "threads"],
+  [OPENBOT_LINKS.linkedin, "linkedin"],
+  [OPENBOT_LINKS.reddit, "reddit"],
+  [OPENBOT_LINKS.instagram, "instagram"],
+  [OPENBOT_LINKS.tiktok, "tiktok"],
+  [OPENBOT_LINKS.facebook, "facebook"],
   [OPENBOT_LINKS.discord, "discord"],
   [OPENBOT_LINKS.repository, "repository"],
   [OPENBOT_LINKS.releases, "releases"],
-  // The same destination on this site: the release notes, reported under the name they had.
   [OPENBOT_LINKS.changelog, "releases"],
   [OPENBOT_LINKS.license, "license"],
   [OPENBOT_LINKS.privacy, "privacy"],
@@ -265,13 +270,6 @@ const EVENT_PROPERTY_ALLOWLIST = {
   contact_form_submitted: ["topic", "result"],
 } as const satisfies Record<LandingEventName, readonly string[]>;
 
-/**
- * The hero selector runs its platform detection before the page component starts analytics, so an
- * event can arrive first. A small queue keeps that first event instead of dropping it. The wait is
- * for the current page to start, not merely for a client to exist: a visitor who opens an article
- * and then navigates home still has a client, and it holds the article's path and attribution.
- * Nothing flushes until no page has started, so the bound is what stops the queue growing.
- */
 const PENDING_EVENT_LIMIT = 4;
 
 function shouldEnableLandingAnalytics(hostname: string, productionBuild: boolean): boolean {
@@ -293,11 +291,6 @@ class LandingAnalytics {
     this.#productionBuild = productionBuild;
   }
 
-  /**
-   * `screenPath` separates the marketing surfaces that share this listener, down to the individual
-   * article. It is passed as a string and narrowed by `safeScreenPath`, so a route that stops
-   * matching the registry degrades to the landing page instead of reporting a new path.
-   */
   start(document: Document, hostname: string, screenPath = "/"): () => void {
     if (isLikelyAutomation(document.defaultView?.navigator)) return () => undefined;
     if (!this.#ensureClient(hostname)) return () => undefined;
@@ -314,12 +307,10 @@ class LandingAnalytics {
     return this.#replaceClickListener(document, handleClick, screen);
   }
 
-  /** The platform the hero offers: once for what was detected, then for each manual change. */
   trackDownloadSelected(platform: LandingDownloadPlatform, detected: boolean): void {
     this.#track("landing_download_selected", { platform, detected });
   }
 
-  /** How far a reader got into an article. The caller reports each depth at most once. */
   trackArticleRead(article: ArticleReference, depth: ArticleReadDepth): void {
     this.#track("content_article_read", { ...article, depth });
   }
@@ -353,12 +344,6 @@ class LandingAnalytics {
     return this.#replaceClickListener(document, handleClick, "/join");
   }
 
-  /**
-   * The desktop page that Stripe opens after a Checkout or the Customer Portal. It reports one view
-   * with the result, and no `landing_viewed`, so it does not add to the landing page visits. It does not
-   * save a first visit: the visitor came from Stripe, not from a source. The reported path has no
-   * query, so the Checkout Session ID in the URL is not sent.
-   */
   startBillingReturn(
     document: Document,
     hostname: string,
@@ -375,11 +360,9 @@ class LandingAnalytics {
       outcome: options.cancelled ? "cancelled" : "completed",
       ...(options.kind ? { kind: options.kind } : {}),
     });
-    // The page has no tracked links. The listener only ends the page when the component unmounts.
     return this.#replaceClickListener(document, () => undefined, "/billing/return");
   }
 
-  /** The result of one send of the contact form. The form text and the email address are never sent. */
   trackContactFormSubmitted(topic: string, result: ContactFormResult): void {
     this.#track("contact_form_submitted", {
       ...(isOneOf(CONTACT_TOPIC_IDS, topic) ? { topic } : {}),
@@ -401,8 +384,6 @@ class LandingAnalytics {
       document.removeEventListener("click", listener);
       if (this.#clickCleanup.get(document) === cleanup) this.#clickCleanup.delete(document);
       if (replacement) return;
-      // The page this listener belonged to is gone. Its path must not be reused by an event that
-      // the next page's components send before that page calls `start`.
       this.#pageStarted = false;
       if (this.#lastScreenPath === screenPath) this.#lastScreenPath = null;
     };
@@ -438,7 +419,7 @@ class LandingAnalytics {
   #handleClick(event: MouseEvent): void {
     const target = event.target;
     const link = target instanceof Element ? target.closest<HTMLAnchorElement>("a[href]") : null;
-    if (!link) return;
+    if (!link || link.closest(".site-language-menu")) return;
     const placement = landingPlacement(link);
     const href = link.getAttribute("href") ?? "";
     const downloadPlatform = DOWNLOAD_PLATFORMS_BY_HREF.get(href);
@@ -451,8 +432,6 @@ class LandingAnalytics {
       this.#track("landing_link_clicked", { destination, placement });
       return;
     }
-    // Article links carry the slug in the path, so they cannot be matched by an exact href. Without
-    // this every card on an index page is dropped and the section looks like a dead end.
     const article = articleFromPath(href);
     if (article) this.#track("content_article_opened", { ...article, placement });
   }
@@ -463,9 +442,7 @@ class LandingAnalytics {
       const result = this.#client?.trackScreenView(this.#campaignPath);
       if (result instanceof Promise) void result.catch(() => undefined);
       this.#lastScreenPath = path;
-    } catch {
-      // Analytics must never change landing-page behavior.
-    }
+    } catch {}
   }
 
   #track<Name extends LandingEventName>(name: Name, properties: LandingAnalyticsEvents[Name]): void {
@@ -478,9 +455,7 @@ class LandingAnalytics {
         ),
       );
       this.#send(name, sanitized);
-    } catch {
-      // Analytics must never change landing-page behavior.
-    }
+    } catch {}
   }
 
   #send(name: LandingEventName, properties: TrackProperties): void {
@@ -510,11 +485,9 @@ function isSafeLandingProperty(name: LandingEventName, key: string, value: unkno
   if (key === "collection") return CONTENT_COLLECTIONS.some((collection) => collection.id === value);
   if (key === "slug") return typeof value === "string" && PUBLISHED_SLUGS.has(value);
   if (key === "depth") return isOneOf(["start", "half", "end"] as const, value);
-  // The invitation page offers only the desktop installers; the download events cover every platform
-  // the site links to, the phone apps included.
   if (key === "platform") {
     if (name === "join_page_action") return isOneOf(DOWNLOAD_PLATFORM_ORDER, value);
-    return isOneOf(["linux", "macos", "windows", "ios", "android"] as const, value);
+    return isOneOf(["linux", "macos", "windows", "ios", "android", "chrome"] as const, value);
   }
   if (key === "placement") return isOneOf(LANDING_PLACEMENTS, value);
   if (key === "destination") return [...LINK_DESTINATIONS.values()].some((destination) => destination === value);
@@ -534,10 +507,6 @@ const CAMPAIGN_PARAMETERS = [
   { parameter: "utm_term", field: "utmTerm" },
 ] as const satisfies readonly { parameter: string; field: (typeof FIRST_TOUCH_CAMPAIGN_FIELDS)[number] }[];
 
-/**
- * Campaign tags are marketer-authored labels. A value that is not a bounded lowercase label is
- * dropped instead of truncated, so no free text can escape through a campaign link.
- */
 function campaignTags(href: string): ((typeof CAMPAIGN_PARAMETERS)[number] & { value: string })[] {
   let search: URLSearchParams;
   try {
@@ -551,19 +520,11 @@ function campaignTags(href: string): ((typeof CAMPAIGN_PARAMETERS)[number] & { v
   });
 }
 
-/**
- * OpenPanel reads campaign attribution from the query of the reported path, so the allowlisted tags
- * must travel with the path. Every other parameter and the hash are dropped by construction.
- */
 function landingCampaignPath(screenPath: LandingScreenPath, href: string): string {
   const query = new URLSearchParams(campaignTags(href).map((tag) => [tag.parameter, tag.value])).toString();
   return query ? `${screenPath}?${query}` : screenPath;
 }
 
-/**
- * Saves the first visit of this browser, once, so a later sign-up on the web or a checkout can name
- * its source. The values are the ones this page already sends; nothing else is read.
- */
 function rememberLandingFirstTouch(
   document: Document,
   attribution: ReturnType<typeof landingAttribution>,
@@ -582,7 +543,6 @@ function rememberLandingFirstTouch(
   rememberFirstTouch(() => view.localStorage, touch, now);
 }
 
-// OpenPanel expects a URL. Keep only the domain, never credentials, ports or URL contents.
 function landingReferrer(referrer: string, hostname: string): string {
   try {
     const url = new URL(referrer);
@@ -594,7 +554,6 @@ function landingReferrer(referrer: string, hostname: string): string {
   }
 }
 
-// Regional search domains from https://www.google.com/supported_domains (2026-09-07).
 const GOOGLE_DOMAINS = `google.com google.ad google.ae google.com.af google.com.ag google.al google.am google.co.ao
 google.com.ar google.as google.at google.com.au google.az google.ba google.com.bd google.be
 google.bf google.bg google.com.bh google.bi google.bj google.com.bn google.com.bo google.com.br
@@ -646,9 +605,7 @@ function landingAttribution(document: Document, hostname: string) {
   let campaignSource = "";
   try {
     campaignSource = new URL(document.location.href).searchParams.get("utm_source")?.trim().toLowerCase() ?? "";
-  } catch {
-    // Missing campaign data leaves only the referring domain.
-  }
+  } catch {}
   const tagged = SOURCE_PLATFORMS.find((source) => source.tags.some((tag) => campaignSource === tag));
   const domain = referrer ? new URL(referrer).hostname : "";
   const referred = SOURCE_PLATFORMS.find((source) =>
@@ -666,10 +623,7 @@ function landingAttribution(document: Document, hostname: string) {
 
 function landingPlacement(link: HTMLAnchorElement): LandingPlacement {
   if (link.closest(".landing-header")) return "header";
-  // Checked before `.post-article`, which wraps it: a card in the related row is a different
-  // question from a link inside the article body.
   if (link.closest(".post-more")) return "content_related";
-  // Checked before `.landing-hero`: the /teams and /pricing heroes use the landing hero classes.
   if (link.closest(".teams-main")) return "teams_page";
   if (link.closest(".pricing-page main")) return "pricing_page";
   if (link.closest(".landing-hero")) return "hero";
@@ -677,8 +631,6 @@ function landingPlacement(link: HTMLAnchorElement): LandingPlacement {
   if (link.closest(".landing-teams")) return "teams_section";
   if (link.closest(".landing-footer")) return "footer";
   if (link.closest(".download-page")) return "download_page";
-  // Without these, every link inside an article body reports "other", which makes
-  // the article pages indistinguishable from each other in the report.
   if (link.closest(".post-index")) return "content_index";
   if (link.closest(".post-article")) return "content_article";
   return "other";

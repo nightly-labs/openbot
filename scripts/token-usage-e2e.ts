@@ -1,13 +1,3 @@
-// Measures the tokens of each turn that OpenBot starts, as the usage analytics record them. Runs the
-// real agent service on a temporary profile with the real Claude CLI and the user's Claude login, on
-// Claude Haiku. The agent does:
-//   1. a main chat of `--turns=<n>` short turns (20 when absent), one after the other,
-//   2. one routine run, in the ephemeral session of the routine,
-//   3. three Discord messages in one conversation.
-// Each turn records its uncached input, cache read, cache write and output tokens. The report shows if
-// a long chat sends its history again uncached, and what a routine and a Discord turn cost.
-// Costs about 25 Haiku turns. `bun run test:token-usage`; `--turns=<n>` sets the chat turns.
-// Writes .openbot-build/token-usage-e2e/report.json.
 import assert from "node:assert/strict";
 import { mkdirSync, writeFileSync } from "node:fs";
 import { mkdtemp, rm } from "node:fs/promises";
@@ -29,7 +19,6 @@ const turnsArgument = process.argv.find((argument) => argument.startsWith("--tur
 const CHAT_TURNS = turnsArgument ? Number(turnsArgument.slice("--turns=".length)) : 20;
 assert.ok(Number.isInteger(CHAT_TURNS) && CHAT_TURNS >= 2, "--turns must be a whole number of 2 or more");
 
-// The workspace home is temporary. `process.env.HOME` stays, so the Claude CLI uses the user's login.
 const root = await mkdtemp(join(tmpdir(), "openbot-token-usage-"));
 const userData = join(root, "user-data");
 const home = join(root, "home");
@@ -38,13 +27,11 @@ mkdirSync(home, { recursive: true });
 interface TurnReport {
   kind: "chat" | "routine" | "discord";
   index: number;
-  /** The characters of the message text, not of the whole turn input. */
   messageCharacters: number;
   uncachedInput: number | null;
   cachedInput: number | null;
   cacheCreation: number | null;
   output: number | null;
-  /** All the prompt tokens: uncached, cache read and cache write. */
   prompt: number | null;
 }
 
@@ -60,6 +47,7 @@ const report: {
 const unused = () => Effect.die(new Error("Not used by this check."));
 const browser: AgentBrowserHost = {
   listTabs: () => [],
+  toolCanUseTab: () => false,
   beginTakeover: unused,
   endTakeover: () => {},
   resolveUploadTarget: unused,
@@ -73,9 +61,11 @@ const browser: AgentBrowserHost = {
   endControl: () => {},
   close: () => Effect.void,
   clearAgentSession: () => Effect.void,
+  shareTab: () => undefined,
+  unshareThread: () => undefined,
+  agentTab: () => null,
 };
 
-/** Waits for a state of the service. */
 async function waitFor<T>(label: string, read: () => T | null | undefined | false, timeoutMs = 180_000): Promise<T> {
   const deadline = Date.now() + timeoutMs;
   for (;;) {
@@ -96,10 +86,8 @@ const agents = new AgentService({
   preferredProvider: "claude",
   offProviders: AGENT_PROVIDERS.filter((provider) => provider !== "claude"),
 });
-/** The start of the usage records that `readTurn` reads. The database opens in `initialize`. */
 let since = "";
 
-/** Waits for the delivery to end, then for the usage of its turn. */
 async function measure(
   agentId: string,
   deliveryId: string,
@@ -160,7 +148,6 @@ try {
   await runCauseEffect(agents.initialize());
   since = database.usage.collectionStartedAt();
 
-  // 1. The main chat.
   const agent = await runCauseEffect(
     agents.createAgent({
       name: "Token usage",
@@ -172,7 +159,6 @@ try {
       initialMessage: `Turn 1. ${PROMPT}`,
     }),
   );
-  // The first message is queued or already running: a real turn takes seconds.
   const first = await waitFor(
     "the first delivery",
     () => mailbox.queuedDeliveryIds(agent.id)[0] ?? mailbox.listRuntimeWork([agent.id], new Map())[0]?.id,
@@ -186,7 +172,6 @@ try {
     await measure(agent.id, deliveryId, "chat", index, text.length);
   }
 
-  // 2. One routine run.
   const instruction = `Routine run. ${PROMPT}`;
   const routine = agents.createRoutine(
     {
@@ -203,7 +188,6 @@ try {
   assert.ok(run.deliveryId, "the routine run has no delivery");
   await measure(agent.id, run.deliveryId, "routine", 1, instruction.length);
 
-  // 3. Three Discord messages in one conversation.
   const threads = agents.messaging;
   const connection = threads.store.ensureConnection("discord", "guild-1", "Test server");
   threads.store.updateConnection(connection.connectionId, { enabled: true });

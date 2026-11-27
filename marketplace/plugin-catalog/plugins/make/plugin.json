@@ -1,0 +1,33 @@
+{
+  "slug": "make",
+  "name": "Make",
+  "tagline": "Visual workflow automation",
+  "description": "Make lets agents list, read, and run the scenarios in the signed-in Make organization. Each user signs in to their own Make account through the browser.",
+  "category": "automation",
+  "creatorName": "Make",
+  "iconUrl": "https://is1-ssl.mzstatic.com/image/thumb/Purple211/v4/a6/10/3a/a6103aa2-67be-7823-c860-326e3df1ae14/AppIcon-0-0-1x_U007emarketing-0-6-0-sRGB-85-220.png/512x512bb.jpg",
+  "version": "1.0.0",
+  "prompts": [
+    { "id": "prompt-scenarios", "text": "List my active scenarios and which ones failed this week." },
+    { "id": "prompt-explain", "text": "Explain what my lead intake scenario does, step by step." },
+    { "id": "prompt-inputs", "text": "Which inputs does my weekly report scenario need?" }
+  ],
+  "apps": [
+    {
+      "id": "app-make-mcp",
+      "name": "Make",
+      "description": "Scenario search and runs, over Make's MCP server with browser sign-in.",
+      "iconUrl": "https://is1-ssl.mzstatic.com/image/thumb/Purple211/v4/a6/10/3a/a6103aa2-67be-7823-c860-326e3df1ae14/AppIcon-0-0-1x_U007emarketing-0-6-0-sRGB-85-220.png/512x512bb.jpg",
+      "server": {
+        "name": "make",
+        "transport": "http",
+        "url": "https://mcp.make.com/v2",
+        "auth": [{ "id": "make-oauth", "kind": "link", "label": "Sign in" }]
+      }
+    }
+  ],
+  "skills": [],
+  "websiteUrl": "https://www.make.com",
+  "privacyPolicyUrl": "https://www.make.com/privacy-notice",
+  "termsUrl": "https://www.make.com/terms-and-conditions"
+}

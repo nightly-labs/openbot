@@ -11,10 +11,19 @@ export const CauseCode = Schema.Literals([
   "billing",
   "network",
   "timeout",
+  "stalled",
   "storage",
   "not_found",
   "conflict",
   "provider_unavailable",
+  "context_too_long",
+  "model_not_found",
+  "invalid_request",
+  "content_blocked",
+  "turn_limit",
+  "empty_answer",
+  "provider_internal_error",
+  "provider_exited",
   "attachment_type_unsupported",
   "attachment_too_large",
   "attachment_upload_failed",
@@ -77,15 +86,11 @@ export const Report = Schema.Struct({
 export type Report = typeof Report.Type;
 export type ReportContext = Pick<Report, "surface" | "app_version" | "platform" | "event_schema_version">;
 
-/**
- * The current analytics generation of each surface. Product events and failure reports send the same value.
- * Change a value only together with ANALYTICS.md.
- */
 export const ANALYTICS_GENERATIONS = {
-  desktop_host: 11,
-  desktop: 12,
+  desktop_host: 22,
+  desktop: 14,
   web: 2,
-  mobile: 4,
+  mobile: 5,
 } as const satisfies Record<Report["surface"], number>;
 
 const FAILURE_CODES = new Set([
@@ -108,12 +113,10 @@ const FAILURE_CODES = new Set([
   ),
 ]);
 
-/** Drop all free text and unrecognized properties before writing or sending. */
 export function safeProperties(input: unknown): FailureProperties | null {
   const decoded = Schema.decodeUnknownOption(FailureProperties)(input);
   if (Option.isNone(decoded)) return null;
   const value = decoded.value;
-  // Only public model families can cross this boundary. Custom endpoints can put private names in model ids.
   const model =
     value.provider !== "acp" && value.model
       ? /^(?:(?:openai|anthropic|google|opencode|codex|claude)\/)?(?:gpt-\d+(?:\.\d+)*(?:-(?:mini|nano|pro|codex|max|sol|astra|luna|terra|chat|latest|preview))*|o[134](?:-(?:mini|pro|preview))*|claude-(?:opus|sonnet|haiku|fable)(?:-\d+)*(?:\[1m\])?|gemini-\d+(?:\.\d+)*(?:-(?:pro|flash|lite|preview))*|big-pickle|auto)$/u.test(
@@ -154,7 +157,6 @@ export function safeReport(input: unknown): Report | null {
     !Number.isFinite(Date.parse(value.timestamp)) ||
     !/^(?:\d+\.\d+\.\d+(?:[-+][a-zA-Z0-9.-]+)?|web|unknown)$/u.test(value.app_version) ||
     !isReportProfileId(value.profileId) ||
-    // A stored report from an older generation can still be sent: its properties pass the current filter.
     !Number.isInteger(value.event_schema_version) ||
     value.event_schema_version < 1 ||
     value.event_schema_version > ANALYTICS_GENERATIONS[value.surface]
@@ -176,7 +178,10 @@ export function safeReport(input: unknown): Report | null {
 const STRUCTURED_CAUSES: Readonly<Record<string, CauseCode>> = {
   invalid_upload_request: "invalid_upload_request",
   usageLimitExceeded: "usage_limit",
-  contextWindowExceeded: "unknown",
+  contextWindowExceeded: "context_too_long",
+  context_length_exceeded: "context_too_long",
+  invalid_request_error: "invalid_request",
+  model_not_found: "model_not_found",
   unauthorized: "authentication",
   authentication_error: "authentication",
   rate_limit_exceeded: "rate_limit",
@@ -192,10 +197,11 @@ const STRUCTURED_CAUSES: Readonly<Record<string, CauseCode>> = {
   ETIMEDOUT: "timeout",
   ENOSPC: "storage",
   EACCES: "permission",
+  ENOENT: "not_found",
+  EPIPE: "provider_exited",
   ABORT_ERR: "cancelled",
 };
 
-/** Inspect locally. The result is always a fixed code, never part of the input. */
 export function classifyFailure(error: unknown): CauseCode {
   const record = isDynamicRecord(error) ? error : undefined;
   for (const key of [record?.codexErrorInfo, record?.code]) {
@@ -214,27 +220,39 @@ export function classifyFailure(error: unknown): CauseCode {
   if (typeof message !== "string") return "unknown";
   if (/\binvalid upload request\b/iu.test(message)) return "invalid_upload_request";
   if (
-    /\b(?:401 unauthorized|invalid_api_key|not authenticated|authentication failed|authentication_error)\b/iu.test(
+    /\b(?:401 unauthorized|invalid[ _]api[ _]key|api key not valid|API_KEY_INVALID|not authenticated|UNAUTHENTICATED|authentication failed|authentication_error|token (?:has )?expired|sign in again|log in again)\b/iu.test(
       message,
     )
   )
     return "authentication";
-  if (/\b(?:rate[ _-]?limit(?:_error|_exceeded)?|too many requests)\b/iu.test(message)) return "rate_limit";
-  if (/\b(?:insufficient (?:funds|balance|quota)|payment required|credits? exhausted)\b/iu.test(message))
+  if (
+    /\b(?:rate[ _-]?limit(?:ed|ing|_error|_exceeded)?|too many requests|RESOURCE_EXHAUSTED|resource has been exhausted)\b/iu.test(
+      message,
+    )
+  )
+    return "rate_limit";
+  if (
+    /\b(?:insufficient[ _](?:funds|balance|quota|credits?)|payment required|payment (?:is )?past due|credits? (?:exhausted|depleted)|out of credits)\b/iu.test(
+      message,
+    )
+  )
     return "billing";
-  if (/\b(?:usage limit|hit your (?:weekly |session )?limit)\b/iu.test(message)) return "usage_limit";
+  if (
+    /\b(?:usage limit|hit your (?:weekly |session |\d+-hour )?limit|(?:hit|reached) your (?:weekly|session|\d+-hour) (?!(?:spend|rate|context|tokens?|requests?)\b)[\w-]+ limit|hit your (?:[\w']+ ){0,2}spend limit|quota (?:exceeded|reached|exhausted)|free[ _-]usage[ _-]exhausted|key limit exceeded|credits? balance (?:is )?too low)\b/iu.test(
+      message,
+    )
+  )
+    return "usage_limit";
   if (/\b(?:timed? out|ETIMEDOUT|gateway time-?out|deadline exceeded|DEADLINE_EXCEEDED)\b/iu.test(message))
     return "timeout";
   if (
-    /\b(?:fetch failed|failed to fetch|network request failed|connection error|socket hang up|stream disconnected|error sending request|ECONNRESET|ECONNREFUSED|ECONNABORTED|ENOTFOUND|EAI_AGAIN)\b/iu.test(
+    /\b(?:fetch failed|failed to fetch|network request failed|connection error|socket hang up|stream disconnected|error sending request|(?:unable to|failed to|could not|cannot) connect(?!\s+to\s+(?:the\s+)?MCP\b)|ECONNRESET|ECONNREFUSED|ECONNABORTED|ENOTFOUND|EAI_AGAIN)\b/iu.test(
       message,
     )
   )
     return "network";
   if (/\b(?:ENOSPC|SQLITE_FULL|disk full)\b/iu.test(message)) return "storage";
   if (/\b(?:EACCES|permission denied|403 forbidden)\b/iu.test(message)) return "permission";
-  // An outage: Claude's "API Error: 529 … overloaded_error", OpenAI's "server_error", Google's
-  // UNAVAILABLE status in capitals, or a 5xx status that the text names as a status.
   if (
     /\b(?:service unavailable|bad gateway|internal server error|overloaded(?:_error)?|server_error|api_error|server had an error|high demand|temporarily unavailable|upstream connect error)\b/iu.test(
       message,
@@ -243,14 +261,54 @@ export function classifyFailure(error: unknown): CauseCode {
     /\b(?:API Error|status(?: code)?|HTTP(?:\/[\d.]+)?)\W{0,4}5\d\d\b/iu.test(message)
   )
     return "provider_unavailable";
+  if (
+    /\b(?:context[ _-]?(?:length|window)[ _-]?exceeded|context[ _-]overflow|exceeds the context window|maximum context length|prompt is too long|too many (?:input )?tokens(?![^.]{0,40}\b(?:wait|per (?:minute|second|day)))|input token count\b.{0,80}\bexceeds)\b/iu.test(
+      message,
+    )
+  )
+    return "context_too_long";
+  if (/\b(?:content[ _-]?filter(?:ed)?|requires moderation|was flagged|safety (?:filter|block))\b/iu.test(message))
+    return "content_blocked";
+  if (
+    /\b(?:model[ _]not[ _]found|unknown model|no such model|not a valid model|no endpoints found|model\b(?![.:]\S)(?:[^.,;:\n]|[.:](?=\S)){0,60}\b(?:not found|does not exist|is not supported))\b/iu.test(
+      message,
+    ) ||
+    /\bmodels\/\S+ is not found\b|\bmodel\b(?:\s+\S+)?\s+(?:(?:was|is|has been) retired|is no longer (?:available|supported))\b/iu.test(
+      message,
+    )
+  )
+    return "model_not_found";
+  if (/\b(?:empty response|no visible content|reasoning_only)\b/iu.test(message)) return "empty_answer";
+  if (/\b(?:turn|request|operation) (?:was )?cancell?ed\b/iu.test(message)) return "cancelled";
+  const status = /\b(?:API Error|status(?: code)?|HTTP(?:\/[\d.]+)?)\W{0,4}([1-4]\d\d)\b/iu.exec(message)?.[1];
+  const statusCause = status === undefined ? null : httpStatusCause(Number(status));
+  if (statusCause) return statusCause;
+  if (/\b(?:invalid[ _]request(?:_error)?|bad request|INVALID_ARGUMENT)\b/iu.test(message)) return "invalid_request";
   return "unknown";
 }
 
-/**
- * Codex names a failed connection, a broken stream or a spent retry budget as an object, with the last
- * HTTP status when the provider answered. No status means that the provider did not answer. Any other
- * 4xx is a request that each model can refuse, so the message decides.
- */
+export function httpStatusCause(status: number): CauseCode | null {
+  if (status === 0) return "network";
+  if (status === 400 || status === 422) return "invalid_request";
+  if (status === 401) return "authentication";
+  if (status === 402) return "billing";
+  if (status === 403) return "permission";
+  if (status === 404) return "not_found";
+  if (status === 408 || status === 504) return "timeout";
+  if (status === 409) return "conflict";
+  if (status === 410) return "model_not_found";
+  if (status === 413) return "context_too_long";
+  if (status === 429) return "rate_limit";
+  return status >= 500 && status <= 599 ? "provider_unavailable" : null;
+}
+
+const REFUSAL_CAUSES: ReadonlySet<CauseCode> = new Set(["invalid_request", "permission", "not_found"]);
+
+export function structuredCause(structured: CauseCode | null, text: CauseCode): CauseCode {
+  if (!structured || (text !== "unknown" && REFUSAL_CAUSES.has(structured))) return text;
+  return structured;
+}
+
 function codexFailureCause(info: DynamicRecord): CauseCode | null {
   const failure = [
     "httpConnectionFailed",

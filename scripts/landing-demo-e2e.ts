@@ -1,17 +1,3 @@
-// End-to-end check of the app demo on the home page (the `/app-preview` iframe).
-//   bun scripts/landing-demo-e2e.ts [--origin=http://127.0.0.1:3100] [--browser-executable=<path>]
-// 1. Starts the site's development server on a free port, or uses `--origin`.
-// 2. Opens `/` in Chrome in the Europe/Warsaw time zone and checks, in the iframe:
-//    - desktop 1440 px: exactly the four agents, no foreign helper agent, no update card and no time
-//      zone toast; the visitor answers the channel question and the launch plan uses that answer;
-//      reactions, unread replies and a fuller context meter at the end; a click on each teammate
-//      plays its scene with its own model; a typed message gets the agent's scripted reply; the
-//      sidebar groups the chats in sections with no People section, and the launch channel opens with
-//      its history.
-//    - mobile 390 px: the four agents show side by side in the top row; the scene plays to the end
-//      with no visitor and uses the automatic answer.
-//    - reduced motion: the end state shows at once, with no question to answer.
-// Writes .openbot-build/landing-demo/report.json and the screenshots beside it.
 import assert from "node:assert/strict";
 import { type ChildProcess, spawn } from "node:child_process";
 import { mkdirSync, rmSync, writeFileSync } from "node:fs";
@@ -32,13 +18,12 @@ const TIME_ZONE = "Europe/Warsaw";
 const IFRAME = 'iframe[title="Interactive OpenBot application preview"]';
 const AGENTS = ["Atlas", "Scout", "Forge", "Pulse"] as const;
 const QUESTION = "Which channels should the launch use?";
-const AUTO_ANSWER = "Blog and changelog, X, Newsletter";
+const AUTO_ANSWER = "Blog and changelog";
 const SCENE_PROMPTS: Record<string, string> = {
   Scout: "Could anything steal our news on Friday?",
   Forge: "Show me the launch banner before it ships.",
   Pulse: "How did people react to the teaser?",
 };
-// The first line of each scene's answer shows while it streams; the last shows when it is complete.
 const SCENE_ANSWERS: Record<string, string> = {
   Scout: "Only one event is close, and it does not clash.",
   Forge: "Here is the banner from PR #418:",
@@ -52,7 +37,6 @@ const SCENE_ENDINGS: Record<string, string> = {
 };
 const TYPED_MESSAGE = "Watch the replies about pricing too.";
 const TYPED_REPLY = "Good call. I will watch the reactions to this and tell you if anything changes before Friday.";
-// A scene waits for the visitor's answer for about 3 s; the whole autoplay takes about 15 s.
 const SCENE_TIMEOUT_MS = 40_000;
 
 rmSync(OUT, { recursive: true, force: true });
@@ -69,7 +53,6 @@ const freePort = () =>
     });
   });
 
-/** Resolves once Vite prints the address it listens on, or rejects when the server exits first. */
 function waitForSite(child: ChildProcess, address: string): Promise<void> {
   return new Promise((done, fail) => {
     let output = "";
@@ -105,7 +88,9 @@ async function openDemo(
   await page.goto(`${origin}/`);
   await page.locator(".landing-app-preview").scrollIntoViewIfNeeded();
   await page.locator('.landing-app-preview[data-preview-state="shown"]').waitFor({ timeout: SCENE_TIMEOUT_MS });
-  return { page, app: page.frameLocator(IFRAME), errors };
+  const app = page.frameLocator(IFRAME);
+  assert.equal(await app.locator(".app-loading").count(), 0, "A loading screen covers the shown demo.");
+  return { page, app, errors };
 }
 
 const contextMeter = (app: FrameLocator) => app.locator('[aria-label^="Context "]').first();
@@ -123,7 +108,6 @@ const launchPlan = (app: FrameLocator) =>
     has: app.getByRole("heading", { name: "Friday's launch plan" }),
   });
 
-/** Checks what every view shows: the four agents, the channel, and none of the old noise or people. */
 async function checkRoster(app: FrameLocator): Promise<string[]> {
   const rows = chatList(app).getByRole("button");
   await rows.first().waitFor();
@@ -171,7 +155,6 @@ try {
     browserExecutable ? { executablePath: browserExecutable } : { channel: "chrome" },
   );
   try {
-    // Desktop: the visitor answers the question and clicks through the team.
     const desktop = await openDemo(browser, origin, { width: 1440, height: 900 }, "no-preference");
     const { app } = desktop;
     const roster = await checkRoster(app);
@@ -183,16 +166,15 @@ try {
     for (const channel of ["LinkedIn", "Product Hunt"]) {
       await choices.locator(`input[value="${channel}"]`).check();
     }
-    await app.getByRole("button", { name: "Submit answer" }).click();
+    await app.getByRole("button", { name: "Done", exact: true }).click();
     const sent = app.getByRole("region", { name: "Answers sent" });
-    await sent.getByText("LinkedIn, Product Hunt").waitFor();
+    for (const channel of ["LinkedIn", "Product Hunt"]) await sent.getByText(channel).waitFor();
 
     const plan = launchPlan(app);
     await plan.waitFor({ timeout: SCENE_TIMEOUT_MS });
     const reactions = plan.getByRole("group", { name: /^Reactions: / });
     await reactions.waitFor({ timeout: SCENE_TIMEOUT_MS });
     const reactionLabel = (await reactions.getAttribute("aria-label")) ?? "";
-    // The reactions come after the stream, so the table is complete.
     const channels = await plan.getByRole("row").allTextContents();
     assert.ok(
       channels.some((row) => row.startsWith("LinkedIn")),
@@ -215,8 +197,6 @@ try {
     assert.ok(models.Atlas?.includes("Claude Opus 5.5"), models.Atlas);
     await desktop.page.locator(".landing-app-preview").screenshot({ path: resolve(OUT, "desktop-autoplay-end.png") });
 
-    // A click on a teammate plays its scene, with the teammate's own model. The next click comes
-    // while the answer streams, so each scene also ends at once when the visitor leaves.
     for (const agent of AGENTS.slice(1)) {
       await agentRow(app, agent).click();
       await app.getByRole("heading", { name: agent, level: 1 }).waitFor();
@@ -232,7 +212,6 @@ try {
     }
     assert.equal(new Set(Object.values(models)).size, AGENTS.length, JSON.stringify(models));
 
-    // A typed message gets the agent's scripted reply, not the generic mock reply.
     await app.getByRole("button", { name: "Send message" }).waitFor();
     const composer = app.getByRole("textbox", { name: "Message Pulse" });
     await composer.fill(TYPED_MESSAGE);
@@ -242,7 +221,6 @@ try {
     assert.equal(await app.getByText(/Mock reply/u).count(), 0);
     await desktop.page.locator(".landing-app-preview").screenshot({ path: resolve(OUT, "desktop-typed-reply.png") });
 
-    // A scene that the visitor left while it streamed is complete, once, on return.
     const leftUnread: Record<string, string> = {};
     for (const agent of ["Scout", "Forge"]) {
       leftUnread[agent] = (await agentRow(app, agent).textContent())?.match(/\d+ new repl(y|ies)/u)?.[0] ?? "none";
@@ -255,14 +233,12 @@ try {
       assert.equal(await app.getByRole("button", { name: "Stop agent" }).count(), 0, agent);
     }
 
-    // The launch channel opens with its history.
     await chatList(app).getByRole("button", { name: CHANNEL_ROW }).click();
     await app.getByLabel("Conversation").getByText(CHANNEL_LAST_LINE).waitFor();
     await desktop.page.locator(".landing-app-preview").screenshot({ path: resolve(OUT, "desktop-channel.png") });
     assert.deepEqual(desktop.errors, []);
     await desktop.page.context().close();
 
-    // The visitor leaves Atlas mid-scene: the scene ends at once with the automatic answer.
     const early = await openDemo(browser, origin, { width: 1440, height: 900 }, "no-preference");
     await early.app.getByRole("button", { name: /^Friday's launch, split across the team\./u }).waitFor({
       timeout: SCENE_TIMEOUT_MS,
@@ -278,13 +254,12 @@ try {
       .getByRole("group", { name: /^Reactions: / })
       .waitFor();
     await early.app.getByRole("region", { name: "Answers sent" }).getByText(AUTO_ANSWER).waitFor();
-    assert.equal(await early.app.getByRole("button", { name: "Submit answer" }).count(), 0);
+    assert.equal(await early.app.getByRole("button", { name: "Done", exact: true }).count(), 0);
     assert.equal(await early.app.getByRole("button", { name: "Stop agent" }).count(), 0);
     await early.page.locator(".landing-app-preview").screenshot({ path: resolve(OUT, "desktop-left-mid-scene.png") });
     assert.deepEqual(early.errors, []);
     await early.page.context().close();
 
-    // Mobile: the agents show side by side, and nobody answers, so the scene uses the automatic answer.
     const mobile = await openDemo(browser, origin, { width: 390, height: 844 }, "no-preference");
     const mobileList = await mobile.app.getByRole("navigation", { name: "Chat list" }).boundingBox();
     assert.ok(mobileList, "The phone chat list has no box.");
@@ -298,7 +273,6 @@ try {
       );
       mobileAvatars.push({ agent, x: Math.round(box.x), y: Math.round(box.y) });
     }
-    // One row: the active row can sit a few pixels higher, but not a row lower.
     const avatarTops = mobileAvatars.map((avatar) => avatar.y);
     assert.ok(Math.max(...avatarTops) - Math.min(...avatarTops) < 8, JSON.stringify(mobileAvatars));
     await mobile.app
@@ -313,13 +287,12 @@ try {
     assert.deepEqual(mobile.errors, []);
     await mobile.page.context().close();
 
-    // Reduced motion: the end state shows at once and nothing waits for an answer.
     const still = await openDemo(browser, origin, { width: 1440, height: 900 }, "reduce");
     const stillRoster = await checkRoster(still.app);
     const stillPlan = launchPlan(still.app);
     await stillPlan.getByRole("group", { name: /^Reactions: / }).waitFor();
     await still.app.getByRole("region", { name: "Answers sent" }).getByText(AUTO_ANSWER).waitFor();
-    assert.equal(await still.app.getByRole("button", { name: "Submit answer" }).count(), 0);
+    assert.equal(await still.app.getByRole("button", { name: "Done", exact: true }).count(), 0);
     assert.equal(await still.app.getByRole("button", { name: "Stop agent" }).count(), 0);
     await still.page.locator(".landing-app-preview").screenshot({ path: resolve(OUT, "desktop-reduced-motion.png") });
     assert.deepEqual(still.errors, []);

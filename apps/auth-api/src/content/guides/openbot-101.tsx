@@ -3,16 +3,16 @@ import { ArticleImage } from "../../components/content/ArticleMedia";
 import { EXTERNAL_LINK_REL, OPENBOT_LINKS } from "../../lib/landing-links";
 import aChannel from "./media/openbot-101/a-channel.webp";
 import aRoutine from "./media/openbot-101/a-routine.webp";
-import aThread from "./media/openbot-101/a-thread.webp";
-import pickAModel from "./media/openbot-101/pick-a-model.webp";
+import agentCollaboration from "./media/openbot-101/agent-collaboration.png";
+import agentPermissions from "./media/openbot-101/agent-permissions.png";
+import providers from "./media/openbot-101/providers.png";
 
 export function OpenBot101() {
   return (
     <>
       <p>
-        I built OpenBot because I wanted teammates, not chats. A chat window forgets. A teammate keeps the folder it
-        works in, the history of what it did, and a name you can call it by. Tomorrow morning it is still those things,
-        on a different model, after a restart.
+        I built OpenBot because I wanted teammates that could keep their work between tasks. An agent keeps its
+        workspace, saved conversations and identity after a restart, and when you change its model or provider.
       </p>
       <p>
         This is the page I would send someone who has never opened the app. It covers what OpenBot is, what an agent
@@ -21,58 +21,56 @@ export function OpenBot101() {
 
       <h2>What OpenBot is</h2>
       <p>
-        OpenBot is a desktop workspace for AI teammates that live on your computer. It runs the coding command-line
-        tools you already use as processes on that machine:{" "}
+        OpenBot is a workspace for AI agents that run on your computer or a server you connect to. You can use providers
+        such as{" "}
         <a href={OPENBOT_LINKS.codex} target="_blank" rel={EXTERNAL_LINK_REL}>
-          the Codex App Server
+          ChatGPT through Codex
         </a>
         ,{" "}
         <a href={OPENBOT_LINKS.claude} target="_blank" rel={EXTERNAL_LINK_REL}>
           Claude Code
         </a>
-        , Grok CLI and OpenCode. Each agent gets a workspace, a thread and an identity around them.
+        , Gemini, Grok and OpenCode, or connect a supported API endpoint. OpenBot handles the provider tools behind the
+        scenes. Each agent gets its own workspace, saved conversations and identity.
       </p>
       <p>
-        Your work sits in a SQLite database called <code>openbot.db</code>, in the application's data folder. That file
-        is the source of truth. Workspaces, conversations, attachments, browser data and team data stay on the computer
-        that runs OpenBot.
+        OpenBot saves conversations and application records in a local database called <code>openbot.db</code>. The
+        files your agents create live in their workspace folders. The computer or server running OpenBot holds the main
+        copy of this work. If you connect the mobile app, your phone also keeps an encrypted copy of recently loaded
+        chats.
       </p>
       <p>
         <strong>Local-first is not the same as offline.</strong> Codex still talks to OpenAI, Claude to Anthropic, Grok
-        to xAI. Pages in the embedded browser use the network. A plugin can call its own service. What does not leave is
-        the record of the work.
+        to xAI. To answer you, the selected provider receives your messages and the context it needs, which can include
+        excerpts from earlier work. Pages in the embedded browser use the network, and plugins can send information to
+        the services they connect to.
       </p>
 
       <h2>Anatomy of an agent</h2>
-      <p>Four things belong to an agent. All four survive a restart and a change of model:</p>
+      <p>An agent has its own workspace, conversations, identity and a session with its selected provider:</p>
       <ul>
         <li>
-          <strong>A workspace.</strong> One directory of its own at <code>~/OpenBot/Agents/&lt;agent-id&gt;</code>. It
-          also gets <code>~/OpenBot/Shared</code>, which is where agents hand files to each other.
+          <strong>A workspace.</strong> A folder for its files, by default at{" "}
+          <code>~/OpenBot/Agents/&lt;agent-id&gt;</code>. Agents on the same computer or server can also exchange files
+          through <code>~/OpenBot/Shared</code>.
         </li>
         <li>
-          <strong>A thread.</strong> Everything you have asked the agent, and everything it did, in one durable record.
+          <strong>Saved conversations.</strong> A main chat and any separate task threads. You can return to earlier
+          messages and inspect the available activity.
         </li>
         <li>
           <strong>An identity.</strong> A name, an avatar, a short role and the instructions you wrote for it.
         </li>
         <li>
-          <strong>A private provider session.</strong> The resume state of the command-line tool behind it. That one
-          belongs to the provider, so it is kept apart from the thread on purpose.
+          <strong>A provider session.</strong> The session used by the selected provider. It is separate from your saved
+          OpenBot conversation and can be replaced when the provider or account changes.
         </li>
       </ul>
       <p>
-        That is why a model is just a setting. Move an agent from Codex to Claude and the workspace, the thread and the
-        name stay put. Only the thinking changes.
+        Move an agent from Codex to Claude and its files, saved conversations and name stay put. OpenBot gives the new
+        session relevant conversation history. The previous provider's internal state does not transfer with it, and the
+        full saved history is not automatically included in every request.
       </p>
-      <ArticleImage
-        src={aThread}
-        alt="An agent thread. Chief answers a launch question with a table of workstreams, owners and status, links the two working documents it read, and ends with a shell block."
-        width={2400}
-        height={1064}
-        mountOn="How to Use OpenBot: Set Up Your First AI Agent"
-        caption="A thread is the answer and the work behind it: mentions of other agents, the files that were read, and the command it wants run next."
-      />
 
       <h2>Install it, then connect a provider</h2>
       <p>
@@ -91,42 +89,48 @@ export function OpenBot101() {
       </p>
       <p>
         Then pick a provider. In onboarding, in Settings or in the model picker, select one and press{" "}
-        <strong>Download</strong>. OpenBot installs and pins its own managed copy of that command-line tool. If you
-        already installed the tool yourself and there is no managed copy, OpenBot uses yours.
+        <strong>Download</strong> if it needs a provider tool. OpenBot can download and manage that tool for you and
+        checks for updates automatically. It can also use a compatible installation already on the computer running the
+        agent. The provider settings show which version is running.
       </p>
       <p>
-        <strong>OpenBot uses the login the command-line tool already has.</strong> It does not copy your provider
-        credentials. If <code>codex</code> or <code>claude</code> works in your terminal, it works here.
+        Follow the provider's sign-in steps in OpenBot, or add an API key if that provider uses one. Some providers can
+        reuse a sign-in already present on the computer running the agent. You do not need an existing terminal setup to
+        use the providers that OpenBot can install for you.
       </p>
       <ArticleImage
-        src={pickAModel}
-        alt="The model picker open on the ChatGPT tab, showing the installed Codex CLI version, a list of GPT models, and a reasoning effort control."
-        width={1440}
-        height={1484}
+        src={providers}
+        alt="OpenBot Providers settings with ChatGPT selected as the default provider and the Connected list below."
+        width={1415}
+        height={1111}
         mountOn="How to Use OpenBot: Set Up Your First AI Agent"
-        caption="The picker names the command-line tool and its version, so you can see which binary an answer came from."
+        caption="Open Providers in Settings to see which providers are connected and choose the default for new agents."
       />
 
       <h2>Your first task</h2>
       <p>
-        Make the first one small, specific and checkable. “Improve my project” gets you an essay. “Read the failing test
-        in this file and tell me which claim it disproves” gets you something you can agree or disagree with.
+        Create an agent, give it a name and choose a connected provider and model. Use its instructions to describe the
+        work it should help with. Then give it a small task whose result you can check. For example, attach a document
+        and ask: “Read this document, list the three decisions I need to make, and save a summary in your workspace.”
       </p>
       <p>
         Then look at the activity under the answer, not only the answer. The thread shows the files the agent opened and
         the commands it ran. That is how you tell whether it did the work or described it.
       </p>
 
-      <h2>Full access, and what that means</h2>
+      <h2>Choose your agent's permissions</h2>
       <p>
-        OpenBot is a development preview. After you consent once at first launch, agents run with{" "}
-        <code>danger-full-access</code> and <code>approvalPolicy: never</code>. They can read and change files, run
-        commands, use the network and drive the embedded browser without asking again for each action.
+        Open <strong>Permissions</strong> in the agent's settings to choose <strong>Workspace only</strong>,{" "}
+        <strong>Ask first</strong> or <strong>Full access</strong>. Workspace only limits file changes to the agent's
+        workspace, the shared folder, temporary folders and any extra folders you have allowed. It does not block all
+        file reads or network access. The settings explain which restrictions the selected provider and operating system
+        support.
       </p>
       <p>
-        <strong>This is a product decision, not a security boundary.</strong> An agent starts in its own workspace, but
-        these provider modes are unrestricted on purpose. They can reach outside that workspace wherever the operating
-        system allows. Run agents and tasks you trust, and keep backups.
+        Ask first keeps approval requests for OpenBot tools and site publishing visible, along with requests from the
+        provider. Full access lets the agent act without routine approvals and change files your operating-system
+        account can reach. Questions, sign-in and some browser steps can still need your input. Computer Use and the
+        OpenBot browser are not limited to the workspace; Computer Use has its own switch.
       </p>
       <p>
         What the application sends, and what it never sends, is written down in{" "}
@@ -135,15 +139,30 @@ export function OpenBot101() {
         </a>
         .
       </p>
+      <ArticleImage
+        src={agentPermissions}
+        alt="Agent Permissions with the Access menu open, showing Workspace only, Ask first and Full access."
+        width={724}
+        height={1184}
+        mountOn="How to Use OpenBot: Set Up Your First AI Agent"
+        caption="The Access menu sets the permissions for this agent. Computer Use has its own switch below."
+      />
 
       <h2>Channels: more than one agent on one thing</h2>
       <p>
-        A channel is a shared thread that several agents read and write. One agent owns the task at a time, and it hands
-        the task on explicitly. You keep the controls: Stop, Resume, Reassign, Archive and Restore.
+        A channel brings several agents into one conversation. You can address one agent, ask several for their views,
+        or ask a coordinator to divide the work and combine the results. Each assigned task has an owner, and the
+        assignments and results appear in the conversation.
       </p>
       <p>
-        It works best when the agents are different from each other. One drafts, one verifies, one owns the release
-        date. Three copies of the same agent give you three copies of the same paragraph.
+        Give the agents distinct jobs: one drafts, one checks the sources, and one coordinates the work. Ask the
+        coordinator to assign each part and combine the results. A message that mentions another agent is not always an
+        assignment to start work.
+      </p>
+      <p>
+        You can stop a task, then choose <strong>Continue</strong>, <strong>Reassign</strong> or{" "}
+        <strong>Cancel task</strong> on its stopped-task card. <strong>Delete channel</strong> moves a channel to{" "}
+        <strong>Deleted channels</strong>, where you can preview it or choose <strong>Restore channel</strong>.
       </p>
       <ArticleImage
         src={aChannel}
@@ -151,17 +170,30 @@ export function OpenBot101() {
         width={2400}
         height={1090}
         mountOn="How to Use OpenBot: Set Up Your First AI Agent"
-        caption="One room, one task owner. The handover is a message, so you can read who took the work and why."
+        caption="One conversation shows who took each task and the results they returned."
+      />
+      <p>
+        Agents can also exchange updates outside a channel. In the Developer chat below, the agent receives an update
+        from Boss and reports what it changed and what still blocks publication.
+      </p>
+      <ArticleImage
+        src={agentCollaboration}
+        alt="Developer's chat showing a message from Boss, updates about a page built from shared files, and a report sent to Boss and Designer."
+        width={1587}
+        height={991}
+        mountOn="How to Use OpenBot: Set Up Your First AI Agent"
+        caption="The Developer chat shows messages between agents, links to shared files and the latest status."
       />
 
       <h2>Routines: the work that repeats</h2>
       <p>
-        A routine is one instruction plus the times to run it. The agent does the work in its own thread, so the result
-        lands where the context already is, and the run history sits beside it.
+        A routine repeats an instruction on a schedule. It can run in the agent's main chat or in a separate thread.
+        Each run starts a fresh provider session with selected recent conversation history. Its result and run history
+        remain available for you to check.
       </p>
       <p>
-        Size the instruction so that “nothing to report” is a normal answer. A routine that must always find something
-        will always invent something.
+        Make “nothing to report” an acceptable result when there is no new information. The computer or server running
+        OpenBot needs to be available when the routine runs.
       </p>
       <ArticleImage
         src={aRoutine}
@@ -174,13 +206,14 @@ export function OpenBot101() {
 
       <h2>Your team, on your own computer</h2>
       <p>
-        You can invite people to your OpenBot instead of copying it. Publishing never starts a second instance. The Team
-        API stays on loopback, and a hidden sandboxed page connects invited clients over WebRTC. Signal only carries the
-        connection setup.
+        You can invite people to connect to the same OpenBot computer or server. Sharing access does not start a second
+        instance. Chats and files travel through an encrypted connection to that computer, directly when possible or
+        through an encrypted relay. For this connection, Signal handles the setup.
       </p>
       <p>
-        Cloudflare holds accounts, avatars, host configuration, memberships, invitations and logical session records. It
-        does not carry chats, files or commands.
+        OpenBot's account service stores account details, avatars, host configuration, memberships, invitations and
+        logical session records. Its database does not store the chats, files or commands sent through the connection to
+        your OpenBot computer or server.
       </p>
 
       <h2>What is next</h2>
@@ -196,10 +229,7 @@ export function OpenBot101() {
         </a>{" "}
         holds every build.
       </p>
-      <p>
-        If something here is wrong, or a step does not match what you see, tell me. A preview is easier to correct than
-        a release.
-      </p>
+      <p>If a step does not match what you see, tell me which OpenBot version you are using and where you got stuck.</p>
     </>
   );
 }

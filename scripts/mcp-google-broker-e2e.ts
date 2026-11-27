@@ -1,11 +1,3 @@
-// Drives a Google sign-in with the OpenBot Google sign-in app, end to end except Google's token
-// endpoint and the user's consent. It starts the real Signal service (`remote/api`) with a throwaway
-// client secret and a fake Google token endpoint, then signs `McpOAuth` in to Google's real Calendar
-// MCP server: discovery and the authorization page are Google's own, the code is delivered by hand,
-// and the token exchange and the refresh go through the host broker (`src/main/google-token-broker.ts`)
-// and Signal. It also checks that a second account (`#account-…`) gets the OpenBot app, that a
-// sign-in app the user saved wins, and that a host with no ticket gets the account sentence. Needs the network and no Google account. Writes
-// .openbot-build/mcp-google-broker-e2e/report.json and exits non-zero when a check fails.
 import { type ChildProcess, spawn } from "node:child_process";
 import { createHash, generateKeyPairSync, randomBytes, randomUUID } from "node:crypto";
 import { mkdirSync, writeFileSync } from "node:fs";
@@ -71,7 +63,6 @@ function readBody(request: IncomingMessage): Promise<string> {
   });
 }
 
-// Google's token endpoint, as far as Signal needs it. Each access token is new, so a refresh shows.
 const googleCalls: Array<Record<string, string>> = [];
 function startGoogle(port: number): Promise<Server> {
   const server = createServer(async (request, response) => {
@@ -158,7 +149,6 @@ function oauthWith(
   });
 }
 
-/** Opens Google's page for a sign-in, and answers the page's query. */
 async function openPage(oauth: McpOAuth, opened: string[], url = SERVER_URL) {
   const attempt = oauth.signIn(url);
   if (!attempt) throw new Error(`No sign-in for ${url}.`);
@@ -181,7 +171,6 @@ const child = spawn("bun", [resolve(ROOT, "remote/api/src/index.ts")], {
     REMOTE_HEALTH_PORT: String(healthPort),
     REMOTE_TLS_DISABLED: "true",
     REMOTE_TICKET_PUBLIC_KEYS: JSON.stringify({ keys: [publicJwk] }),
-    // Signal does not call the account service for a token request.
     REMOTE_CONTROL_PLANE_URL: "http://127.0.0.1:9",
     REMOTE_SESSION_SECRET: randomBytes(32).toString("base64url"),
     REMOTE_AUTH_WEBHOOK_SECRET: randomBytes(32).toString("base64url"),
@@ -218,7 +207,6 @@ try {
       expect(query.redirect_uri === REDIRECT_URL, `redirect_uri: ${query.redirect_uri}`);
       expect(oauth.signInApp(SERVER_URL) === null, "The built-in app shows as a sign-in app of the user.");
       expect(records.get(SERVER_URL)?.tokens === undefined, "Tokens were written before the sign-in completed.");
-      // The user approved: the code comes back to the loopback address.
       expect(oauth.receiveAuthorizationCode(query.state ?? "", CODE), "No sign-in waited for the state.");
       await runCauseEffect(attempt.complete());
       return `client_id, scope, offline and S256 on ${page.origin}`;
@@ -346,7 +334,6 @@ try {
   await check("A Signal refusal gets the unavailable sentence", async () => {
     const pages: string[] = [];
     const calls = googleCalls.length;
-    // Signal does not know this client, and refuses it with its own error.
     const unknown = oauthWith(new Map(), withTicket, pages, "222222222222-unknown.apps.googleusercontent.com");
     try {
       const { attempt, page } = await openPage(unknown, pages);

@@ -1,6 +1,6 @@
 import { OPENBOT_CONTROL_PLANE_ORIGIN } from "@openbot/contracts/invite-links";
 import { parseMobileConnectUrl } from "@openbot/contracts/mobile-connect";
-import { Redirect, router, Stack, useLocalSearchParams } from "expo-router";
+import { router, Stack, useLocalSearchParams } from "expo-router";
 import { usePreventRemove } from "expo-router/react-navigation";
 import { openBrowserAsync } from "expo-web-browser";
 import { Button, Typography } from "heroui-native";
@@ -30,9 +30,7 @@ function IncomingLinkContent({ request }: { request?: string }) {
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [paired, setPaired] = useState(false);
-  usePreventRemove(busy, () => {
-    // Redemption saves a session. Keep this screen until that operation settles.
-  });
+  usePreventRemove(busy, () => {});
   useEffect(() => {
     if (!paired || busy) return;
     const pending = pendingSignInLinkId();
@@ -41,13 +39,10 @@ function IncomingLinkContent({ request }: { request?: string }) {
   const opened = useRef(false);
   const signedIn = Boolean(session);
   useEffect(() => {
-    if (link.kind !== "template" || !signedIn || opened.current) return;
+    if ((link.kind !== "template" && link.kind !== "invite") || !signedIn || opened.current) return;
     opened.current = true;
-    // Return to the running workspace, then open the sheet in its stack. A replace from this root
-    // screen would mount a second workspace, which opens a second connection to each host. With no
-    // workspace under this screen, `dismissTo` replaces this screen with one.
     router.dismissTo("/connected");
-    router.push({ pathname: "/install-agent", params: { request } });
+    router.push({ pathname: link.kind === "invite" ? "/add-server" : "/install-agent", params: { request } });
   }, [link.kind, signedIn, request]);
   const locked = useRef(false);
   const mounted = useRef(true);
@@ -61,7 +56,8 @@ function IncomingLinkContent({ request }: { request?: string }) {
   function close() {
     if (locked.current) return;
     forgetIncomingLink(request);
-    router.replace(session ? "/connected" : "/");
+    if (session) router.dismissTo("/connected");
+    else router.replace("/");
   }
 
   async function pair() {
@@ -90,7 +86,7 @@ function IncomingLinkContent({ request }: { request?: string }) {
   }
 
   if (link.kind === "invite") {
-    if (session) return <Redirect href={{ pathname: "/add-server", params: { request } }} />;
+    if (session) return null;
     return (
       <SignInScreen
         notice={{
@@ -119,7 +115,6 @@ function IncomingLinkContent({ request }: { request?: string }) {
     );
   }
 
-  // A link can name any account service. Show one that is not ours before the phone connects to it.
   const pairingService = link.kind === "pairing" && !session ? parseMobileConnectUrl(link.url)?.apiUrl : undefined;
   const accountService = pairingService && pairingService !== OPENBOT_CONTROL_PLANE_ORIGIN ? pairingService : null;
 

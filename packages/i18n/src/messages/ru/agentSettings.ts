@@ -62,6 +62,7 @@ export const messages = {
     other: "Можно добавить не больше {count} папки",
   },
   "agentSettings.folders.browse.places": "Перейти",
+  "agentSettings.folders.browse.path": "Путь к папке",
   "agentSettings.folders.browse.home": "Домашняя папка",
   "agentSettings.folders.browse.parent": "Вверх: {folder}",
   "agentSettings.folders.browse.failed": "Не удалось открыть эту папку.",
@@ -105,7 +106,7 @@ export const messages = {
   "agentSettings.backupModels.intro":
     "Если {model} достигнет лимита использования до того, как {name} начнёт писать, {name} спросит вас, какую модель использовать.",
   "agentSettings.backupModels.introAutomatic":
-    "Если {model} достигнет лимита использования или завершится с ошибкой провайдера до того, как {name} начнёт писать, {name} переключится на первую доступную модель по порядку.",
+    "Если {model} достигнет лимита использования, {name} переключится на первую доступную модель по порядку. {name} также переключится, если {model} завершится с ошибкой провайдера до того, как {name} начнёт писать.",
   "agentSettings.backupModels.ask": "Спрашивать перед переключением",
   "agentSettings.backupModels.order": "Порядок",
   "agentSettings.backupModels.listLabel": "Резервные модели по порядку",
@@ -117,6 +118,7 @@ export const messages = {
   "agentSettings.backupModels.limited": "Лимит использования исчерпан · пропущена",
   "agentSettings.backupModels.unavailable": "Сейчас недоступна · пропущена",
   "agentSettings.backupModels.withAccount": "{model} · {account}",
+  "agentSettings.backupModels.withProvider": "{model} · {provider}",
   "agentSettings.backupModels.note":
     "Если лимит использования остановит {name} после начала работы, {name} продолжит ту же работу на первой доступной модели из списка. Когда лимит закончится или через 10 минут после ошибки провайдера, {name} вернётся к {model}.",
   "agentSettings.groups.brain": "Мозг",
@@ -169,16 +171,10 @@ export const messages = {
 
   "agentSettings.runtime.model": "Модель агента",
   "agentSettings.runtime.modelUnavailable": "Модели станут доступны после подключения CLI агента.",
-  "agentSettings.runtime.reasoning": "Рассуждение",
-  "agentSettings.runtime.reasoningLabel": "Уровень рассуждения агента",
-  "agentSettings.runtime.selectReasoning": "Выберите уровень рассуждения",
-  "agentSettings.runtime.reasoningSetByProvider": "Как в {provider}",
   "agentSettings.runtime.access": "Доступ",
   "agentSettings.runtime.accessLabel": "Доступ агента",
   "agentSettings.runtime.busyMessage": "Во время работы",
   "agentSettings.runtime.busyMessageLabel": "Сообщения, пока агент работает",
-  "agentSettings.runtime.taskLimit": "Параллельные ветки",
-  "agentSettings.runtime.taskLimitLabel": "Ветки, которые работают одновременно",
   "agentSettings.runtime.workingDirectory": "Рабочая папка",
   "agentSettings.runtime.notAvailable": "Пока недоступно",
   "agentSettings.runtime.fullAccessNote":
@@ -198,8 +194,6 @@ export const messages = {
   "agentSettings.busyMessage.steer": "Направлять",
   "agentSettings.busyMessage.steerUnsupported":
     "{provider} не умеет направлять выполняемый ход. Сообщения, отправленные во время работы, ждут в очереди.",
-  "agentSettings.taskLimit.default": "По умолчанию ({count})",
-  "agentSettings.taskLimit.oneTurn": "{provider} выполняет один ход за раз. Ветки этого агента ждут друг друга.",
 
   "agentSettings.notificationLevel.title": "Уведомлять меня",
   "agentSettings.notificationLevel.server": "{level} (по умолчанию на сервере)",
@@ -207,13 +201,28 @@ export const messages = {
     "Этот выбор действует только для вас, на всех ваших устройствах. Если у сервера отключены уведомления или выбрано «Ничего», этот агент тоже молчит.",
 
   "agentSettings.newChat.title": "Новый чат",
-  "agentSettings.newChat.description": "Агент забудет этот чат. Настройки сохранятся.",
+  "agentSettings.newChat.description":
+    "Агент начнёт заново, но при необходимости найдёт сообщения этого чата. Настройки сохранятся.",
   "agentSettings.newChat.button": "Начать",
   "agentSettings.newChat.confirmTitle": "Начать новый чат с {name}?",
   "agentSettings.newChat.confirmDescription":
-    "Агент забудет этот чат. Сообщения останутся видны над разделителем. Инструкции, модель, инструменты, память, рабочее пространство и браузер не изменятся.",
+    "Агент начнёт заново, но при необходимости найдёт сообщения этого чата. Сообщения останутся видны над разделителем. Инструкции, модель, инструменты, память, рабочее пространство и браузер не изменятся.",
   "agentSettings.newChat.confirm": "Начать новый чат",
   "agentSettings.newChat.failed": "Не удалось начать новый чат.",
+  "agentSettings.newChat.busy": "Агент работает. Чтобы начать новый чат, дождитесь окончания или остановите агента.",
+  "agentSettings.deleteHistory.title": "Удалить историю",
+  "agentSettings.deleteHistory.description":
+    "Сообщения этого чата удаляются, и агент их забывает. Его настройки остаются.",
+  "agentSettings.deleteHistory.button": "Удалить",
+  "agentSettings.deleteHistory.confirmTitle": "Удалить историю чата с {name}?",
+  "agentSettings.deleteHistory.confirmDescription":
+    "Все сообщения и файлы этого чата будут удалены из OpenBot, и агент их забудет. Это нельзя отменить. Побочные ветки, инструкции, модель, инструменты, воспоминания, рабочая папка и браузер не изменятся.",
+  "agentSettings.deleteHistory.confirm": "Удалить историю",
+  "agentSettings.deleteHistory.failed": "Не удалось удалить историю.",
+  "agentSettings.deleteAgent.title": "Удалить агента",
+  "agentSettings.deleteAgent.description":
+    "Агент, его чат, память, регулярные задачи и рабочее пространство удаляются из OpenBot.",
+  "agentSettings.deleteAgent.button": "Удалить",
 
   "agentSettings.fullAccess.title": "Дать этому агенту полный доступ?",
   "agentSettings.fullAccess.askTitle": "Разрешить этому агенту работать за пределами рабочего пространства?",
@@ -225,6 +234,8 @@ export const messages = {
   "agentSettings.fullAccess.askConfirm": "Сначала спрашивать",
 
   "agentSettings.links.usage": "Использование",
+  "agentSettings.links.apps": "Приложения",
+  "agentSettings.links.appsScope": "Все агенты",
   "agentSettings.links.memories": "Память",
   "agentSettings.links.memoriesCount": {
     one: "Сохранено: {count}",
@@ -271,8 +282,10 @@ export const messages = {
   "agentSettings.agentNewChat.description":
     "Агент может начать новый чат, когда его чат становится длинным. Сначала он сохраняет заметки.",
   "agentSettings.quickAcknowledgement.title": "Показывать план перед долгими задачами",
-  "agentSettings.quickAcknowledgement.description":
-    "Перед долгой задачей агент показывает свой план. Он начинает через 10 с или когда вы нажимаете «Начать».",
+  "agentSettings.quickAcknowledgement.description": "Перед долгой задачей агент показывает свой план.",
+  "agentSettings.builtinMemory.title": "Память OpenBot",
+  "agentSettings.builtinMemory.description":
+    "Агент сохраняет и читает свою память. Выключите, чтобы использовать только приложение памяти, например Mem0. Сохранённая память остаётся.",
   "agentSettings.browserProfile.label": "Профиль браузера",
   "agentSettings.browserProfile.shared": "Общий",
   "agentSettings.browserProfile.agent": "Только этот агент",
@@ -282,6 +295,8 @@ export const messages = {
   "agentSettings.browserProfile.manageDescription":
     "Каждый профиль хранит свои входы в аккаунты и cookie. Изменение закрывает открытые вкладки агента.",
   "agentSettings.browserProfile.manage": "Настроить",
+  "agentSettings.browserProfile.movedNote":
+    "Входы на сайты остаются в старом профиле. Агенту нужно снова войти на эти сайты.",
   "agentSettings.runtime.workspaceEnforcedProcess":
     "Весь процесс {provider} работает в песочнице, поэтому запись за пределами рабочего пространства не удастся. Доступно только в macOS.",
 } as const satisfies PartialTranslation<typeof source>;

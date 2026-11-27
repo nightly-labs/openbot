@@ -10,37 +10,18 @@ import {
 } from "@norbert_bodziony/bloub";
 import type { AvatarMood } from "@openbot/brand/bloub-avatar-motion";
 
-/*
- * The felt plush of `@norbert_bodziony/bloub/plush` 0.6.3 (MIT), for the phone. That entry renders
- * with Solid and the DOM, and names its pictures with `import.meta.url`, so Metro cannot load it.
- * This file keeps the pure parts it needs, with the same numbers: the tint ramp, the eye pads cut
- * into felt pieces, the eyelids of a blink, and the felt decor of each state. The phone draws them
- * with Skia (`plush-draw.ts`). Check them against the package when its version changes.
- */
-
 const clamp01 = (value: number) => (value < 0 ? 0 : value > 1 ? 1 : value);
 const lerp = (from: number, to: number, t: number) => from + (to - from) * t;
 const easeOutQuint = (t: number) => 1 - (1 - t) ** 5;
 const easeOutCubic = (t: number) => 1 - (1 - t) ** 3;
 const TAU = Math.PI * 2;
 
-/** The states that keep the body. `thinking`, `asleep` and `failed` exist only for the plush. */
 export type PlushState = "idle" | "wink" | "wide" | "thinking" | "notify" | "asleep" | "failed";
 
-/** The bloub viewBox is 316 units wide, centred on the origin. The body radius is 100. */
 export const VIEW_BOX = 316;
 export const HALF_VIEW_BOX = VIEW_BOX / 2;
-/**
- * The plush body has the radius of the flat body, but its soft, dark fur edge makes it look smaller.
- * The desktop scales the drawing by this amount so that it looks the same size (`PLUSH_BODY_STYLE`),
- * and the fur and the felt decor reach past the avatar box. The phone does the same.
- */
 export const PLUSH_BODY_SCALE = 1.15;
 
-/**
- * How each mood shows on the plush, as the desktop `AgentAvatar` shows it. Only the eyes and the felt
- * decor move; the body is the identity of the agent and keeps its colour. `null` keeps the seed face.
- */
 const PLUSH_MOODS: Readonly<Record<AvatarMood, { state: PlushState; expression: ExpressionId | null }>> = {
   idle: { state: "idle", expression: null },
   working: { state: "thinking", expression: "attentif" },
@@ -55,18 +36,14 @@ export function plushMood(mood: AvatarMood) {
   return PLUSH_MOODS[mood];
 }
 
-/** The engine state under a plush state. The plush-only states keep the body at rest. */
 export const engineState = (state: PlushState): StateId =>
   state === "thinking" || state === "asleep" || state === "failed" ? "idle" : state;
 
-/** How long the arrival in a state takes: the morph of the engine state of the same name. */
 export const morphOf = (state: PlushState): number =>
   STATE_BY_ID.get(state === "asleep" ? "sleep" : state === "failed" ? "idle" : state)?.morph ?? 0.45;
 
 const REST_LOOK: Look = { yaw: 0, pitch: 0, mix: 0, spin: 0, wander: 0.4 };
-/** While thinking the eyes look up, towards the dots. */
 const THINK_LOOK: Look = { yaw: 18, pitch: 22, mix: 1, spin: 0, wander: 0.4 };
-/** Closed eyes do not search and do not blink. */
 const ASLEEP_LOOK: Look = { yaw: 0, pitch: 0, mix: 0, spin: 0, wander: 0.15, blink: 0 };
 
 export const lookOf = (state: PlushState): Look =>
@@ -84,13 +61,11 @@ function blendLook(from: Look, to: Look, t: number): Look {
   return look;
 }
 
-/** The "no" of `failed`: two shakes of the gaze, in degrees of yaw. */
 export const SHAKE = 0.8;
 const SHAKE_YAW = 12;
 const shake = (t: number) =>
   t <= 0 || t >= SHAKE ? 0 : SHAKE_YAW * Math.sin((2 * TAU * t) / SHAKE) * Math.sin((Math.PI * t) / SHAKE);
 
-/** The gaze `t` seconds after the plush enters `state`, from the gaze `from` that was on screen. */
 export function enterLook(from: Look, state: PlushState, t: number): Look {
   const look = blendLook(from, lookOf(state), easeOutQuint(clamp01(t / morphOf(state))));
   if (state === "failed") look.spin += shake(t);
@@ -103,32 +78,22 @@ function expression(id: ExpressionId): BotExpression {
   return face;
 }
 
-/** The face of a plush shape. The desktop gives `failed` this face as its base, not the seed face. */
 const NEUTRAL = expression("neutre");
 const SAD = expression("triste");
 const SLEEPY = expression("somnolent");
-/**
- * A face that is not in the catalogue. The package names these faces `plush-asleep` and
- * `neutre-failed`; the engine reads an id only to find the eye fit of a catalogue face, and gives an
- * id it does not know the fit of `neutre`. So `neutre` draws the same eyes, and keeps the type of a
- * catalogue id. The geometry key holds the state too, so these faces do not share a key with it.
- */
 function uncataloguedFace(face: Omit<BotExpression, "id">): BotExpression {
   return { ...face, id: NEUTRAL.id };
 }
 
 const ASLEEP_EYE = { w: 0.3, h: STATE_BY_ID.get("wink")?.pose(0).eyes[1].h ?? 0.089, open: 1, tilt: 0 };
-/** Both eyes closed, with the low gaze of `somnolent`. */
 const ASLEEP_FACE = uncataloguedFace({
   gaze: SLEEPY.gaze,
   split: SLEEPY.split,
   eyes: [{ ...ASLEEP_EYE }, { ...ASLEEP_EYE }],
 });
 
-/** The more open eye of a face, by the area of its capsule. */
 const openEye = ({ eyes: [left, right] }: BotExpression): 0 | 1 => (right.w * right.h > left.w * left.h ? 1 : 0);
 
-/** `failed`: the more open eye on both sides, flattened, with the tilt and gaze of `triste`. */
 const FAILED_FACE = (() => {
   const eye = NEUTRAL.eyes[openEye(NEUTRAL)];
   const ratio = eye.w / eye.h;
@@ -141,18 +106,12 @@ const FAILED_FACE = (() => {
   });
 })();
 
-/** The face a plush state shows: `asleep` and `failed` set their own, the others the given face. */
 export function plushFace(state: PlushState, resting: ExpressionId): BotExpression {
   if (state === "asleep") return ASLEEP_FACE;
   if (state === "failed") return FAILED_FACE;
   return expression(resting);
 }
 
-/**
- * The felt eye pad of a plush shape: the first pad of Fred, without its offset. It is baked as two
- * capsules, lying (`x`) and standing (`y`). `court` is the short side of the fitted capsule; the
- * round pad measures `kw` x `kh` of it.
- */
 const PAD = (() => {
   const eye = { w: 0.46, h: 0.5 };
   const [width, height] = [1.7586780224155572, 1.667393362265376];
@@ -162,9 +121,7 @@ const PAD = (() => {
   return { kw: (width - straightX) / short, kh: (height - straightY) / short };
 })();
 
-/** One piece of a pad on the screen, and the part of its picture it shows, from 0 to 1. */
 interface PlushPiece {
-  /** 0: the lying capsule, 1: the standing capsule. */
   src: 0 | 1;
   x: number;
   y: number;
@@ -176,13 +133,8 @@ interface PlushPiece {
   sh: number;
 }
 
-/** A straight part of a pad, in short sides: half of the straight part of the picture. */
 const BAR = 0.5;
 
-/**
- * The pad on a capsule of `w` x `h`: pieces of a felt capsule, never stretched. Each half shows its
- * round end and the straight part, in sections that mirror the picture, so the felt grain stays.
- */
 function padPieces(w: number, h: number): PlushPiece[] {
   const short = Math.min(w, h);
   const lying = w >= h;
@@ -243,16 +195,11 @@ function padExtent(pieces: readonly PlushPiece[]) {
 
 export type Matrix = readonly [number, number, number, number, number, number];
 
-/** The six numbers of a `matrix(a,b,c,d,e,f)` string. */
-function matrixOf(transform: string): Matrix {
+export function matrixOf(transform: string): Matrix {
   const [a = 1, b = 0, c = 0, d = 1, e = 0, f = 0] = (transform.match(/-?[\d.]+(?:e-?\d+)?/g) ?? []).map(Number);
   return [a, b, c, d, e, f];
 }
 
-/**
- * The engine closes an eye by squashing it on the screen, which turns a felt photo into a stick. The
- * pad goes under the matrix without that squash; this is the matrix that removes it.
- */
 function unsquash([a, b, c, d]: Matrix, open: number): Matrix | null {
   if (open >= 1) return null;
   const bOpen = b / open;
@@ -268,7 +215,6 @@ function unsquash([a, b, c, d]: Matrix, open: number): Matrix | null {
   ];
 }
 
-/** The capsule of an eye half closed at rest (`somnolent`): a shorter capsule, never a squashed one. */
 function restCapsule([a, b, c, d]: Matrix, open: number, rest: number, w: number, h: number) {
   if (rest >= 1) return { w, h };
   const bOpen = b / open;
@@ -279,24 +225,19 @@ function restCapsule([a, b, c, d]: Matrix, open: number, rest: number, w: number
   };
 }
 
-/** The squash of a closed eye in the engine (`blinkScale(0)`). */
 const BLINK_CLOSED = 0.06;
-/** The felt fringe outside the capsule, and the soft edge of the lids, in short sides. */
 const LID_FRINGE = 30 / 205;
 const LID_SOFT = 0.1;
 const LID_BANDS = 4;
 const LID_MARGIN = 8;
 
 interface PlushLid {
-  /** The eye centre, and the vertical squash about it, on the screen. */
   cx: number;
   cy: number;
   s: number;
-  /** Nested capsules in the pad frame, from the widest to the opening, painted one over the other. */
   bands: { w: number; h: number; r: number; alpha: number }[];
 }
 
-/** The lids of a blinking eye: the fur of the body closes over the pad. `null` when it does not blink. */
 function lidMask(
   [, , , , x, y]: Matrix,
   open: number,
@@ -319,21 +260,16 @@ function lidMask(
   return { cx: x, cy: y, s, bands };
 }
 
-/** The felt shapes of one eye on a frame, ready to draw. */
 export interface PlushEye {
   matrix: Matrix;
   alpha: number;
-  /** The matrix under `matrix` that removes the blink squash from the pad. */
   inner: Matrix | null;
   pieces: PlushPiece[];
-  /** The pad opacity. Closed eyes (`asleep`) fade the pad out and the closed line in. */
   pad: number;
   lid: PlushLid | null;
-  /** The closed eye line: the capsule width and the opacity. */
   closed: { w: number; opacity: number } | null;
 }
 
-/** The engine values of an eye that a transition blends. */
 export interface PlushEyeSample {
   matrix: Matrix;
   w: number;
@@ -347,7 +283,6 @@ export function eyeSample(eye: RenderedEye): PlushEyeSample {
   return { matrix: matrixOf(eye.matrix), w: eye.w, h: eye.h, open: eye.open, rest: eye.rest, alpha: eye.alpha };
 }
 
-/** The pieces, lids and closed line of an eye. `closedLevel` is the visibility of the sleep decor. */
 export function plushEye(eye: PlushEyeSample, closedLevel: number): PlushEye {
   const capsule = restCapsule(eye.matrix, eye.open, eye.rest, eye.w, eye.h);
   const pieces = padPieces(capsule.w, capsule.h);
@@ -365,18 +300,13 @@ export function plushEye(eye: PlushEyeSample, closedLevel: number): PlushEye {
   };
 }
 
-/** Fade in of the thinking dots: the emergence of the `thinking` state. */
 export const EMERGE = 0.3;
 
-/** A felt decor that fades in and out: the thinking dots, or the z's of sleep. */
 export interface DecorTrack {
-  /** The origin of the pulse. */
   phase: number;
-  /** The latest entry or exit, and the visibility it starts from. */
   at: number;
   from: number;
   on: boolean;
-  /** The exit duration: the morph of the next state. */
   exit: number;
 }
 
@@ -390,14 +320,12 @@ export function decorLevel(track: DecorTrack, t: number): number {
     : track.from * (1 - easeOutQuint(clamp01(since / track.exit)));
 }
 
-/** Entry in the decor (`on`) or exit to `next`, at `t`. */
 export function toggleDecor(track: DecorTrack, on: boolean, t: number, next: PlushState): DecorTrack {
   if (on === track.on) return track;
   const level = decorLevel(track, t);
   return { phase: on && level < 0.001 ? t : track.phase, at: t, from: level, on, exit: morphOf(next) };
 }
 
-/** A felt ball: its box in viewBox units. */
 export interface PlushBall {
   x: number;
   y: number;
@@ -405,17 +333,14 @@ export interface PlushBall {
   opacity: number;
 }
 
-/** The felt ball fills this part of its picture. */
 const BALL_FILL = 0.8;
 const THINK_X = 0.62;
 const THINK_Y = -1.3;
 const THINK_SCALE = 0.6;
-/** The thinking dots of the engine: their offsets, radius and pulse scale, in body radii. */
 const DOT_OFFSETS = [-0.557, -0.013, 0.532];
 const DOT_RADIUS = 0.165;
 const DOT_PULSE = 1.25;
 
-/** The three thinking dots at `t`, beside the head. Empty when they do not show. */
 export function thinkingDots(track: DecorTrack, t: number): PlushBall[] {
   const level = decorLevel(track, t);
   if (level < 0.001) return [];
@@ -426,12 +351,10 @@ export function thinkingDots(track: DecorTrack, t: number): PlushBall[] {
   });
 }
 
-/** The box of a felt ball of radius `r` at `x`, `y`, in units of `unit`. */
 export function ballBox(x: number, y: number, r: number, opacity: number, unit: number): PlushBall {
   return { x: (x - r / BALL_FILL) * unit, y: (y - r / BALL_FILL) * unit, size: ((2 * r) / BALL_FILL) * unit, opacity };
 }
 
-/** A "z" of sleep, as the path of its three strokes, in viewBox units. */
 export interface PlushZ {
   x: number;
   y: number;
@@ -445,10 +368,8 @@ const Z_COUNT = 3;
 const Z_FROM = { x: 0.55, y: -0.74 };
 const Z_TO = { x: 1.25, y: -1.38 };
 const Z_SIZE = [0.1, 0.2] as const;
-/** The stroke of a "z", in parts of its side. */
 const Z_STROKE = 0.24;
 
-/** The z's that rise beside a sleeping plush at `t`. Empty when they do not show. */
 export function sleepZs(track: DecorTrack, t: number): PlushZ[] {
   const level = decorLevel(track, t);
   if (level < 0.001) return [];
@@ -469,16 +390,11 @@ export function sleepZs(track: DecorTrack, t: number): PlushZ[] {
   return zs;
 }
 
-/**
- * The curve of the tint, fitted to the baked bodies: for each grey 0..255, the RGB colour 0..255. In
- * linear light: the colour times the distance in luminance to the median, then blended to white above.
- */
 const GREY = 0.55;
 const TINT = { gamma: 0.6, sheen: 0.08 };
 const toLinear = (value: number) => (value <= 0.04045 ? value / 12.92 : ((value + 0.055) / 1.055) ** 2.4);
 const toSrgb = (value: number) => (value <= 0.0031308 ? value * 12.92 : 1.055 * value ** (1 / 2.4) - 0.055);
 
-/** The tint ramp of `hex` as 256 RGBA pixels. */
 export function tintRamp(hex: string): Uint8Array {
   const value = Number.parseInt(hex.slice(1, 7), 16);
   const ink = [(value >> 16) & 255, (value >> 8) & 255, value & 255].map((channel) => toLinear(channel / 255));
@@ -496,10 +412,7 @@ export function tintRamp(hex: string): Uint8Array {
   return ramp;
 }
 
-/** The colour of the felt dot of `notify`. */
 export const NOTIFY_COLOR = "#2496e8";
-/** The closed eye line of `asleep`. */
 export const CLOSED_EYE_COLOR = "#1c1a1d";
-/** The closed eye line: its bend and its stroke, in parts of the capsule width. */
 export const CLOSED_EYE_BEND = 0.42;
 export const CLOSED_EYE_STROKE = 0.2;

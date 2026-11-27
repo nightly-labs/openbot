@@ -35,13 +35,6 @@ export function writePreferenceFile<A extends VersionedJsonFile>(
   );
 }
 
-/**
- * One small version 1 preference that main holds in memory after `load`.
- *
- * A file that is missing, unreadable as JSON or that `decode` rejects with `null` reads as the
- * default. Writes are chained for the reason `update-preference-store.ts` chains its own: an earlier
- * rename that lands last would persist the value the user just changed.
- */
 export class PreferenceStore<A extends object> {
   readonly #path: string;
   readonly #decode: (parsed: unknown) => A | null;
@@ -68,18 +61,26 @@ export class PreferenceStore<A extends object> {
     return { ...this.#value };
   }
 
-  readonly set = Effect.fn("PreferenceStore.set")(function* (this: PreferenceStore<A>, value: A) {
+  readonly update = Effect.fn("PreferenceStore.update")(function* (
+    this: PreferenceStore<A>,
+    change: (current: A) => A,
+  ) {
     yield* this.#writes.withPermit(
       Effect.uninterruptible(
-        writePreferenceFile(this.#path, { version: 1, ...value }).pipe(
-          Effect.tap(() =>
-            Effect.sync(() => {
-              this.#value = { ...value };
-            }),
-          ),
-        ),
+        Effect.suspend(() => {
+          const value = change(this.get());
+          return writePreferenceFile(this.#path, { version: 1, ...value }).pipe(
+            Effect.tap(() =>
+              Effect.sync(() => {
+                this.#value = { ...value };
+              }),
+            ),
+          );
+        }),
       ),
     );
     return this.get();
   });
+
+  readonly set = (value: A) => this.update(() => value);
 }

@@ -1,20 +1,8 @@
-// Checks that file links open from a channel (#2816), in this worktree's running dev app with a real
-// provider turn. Start the app with `bun run dev` (never `--shared`), then run
-// `bun scripts/channel-file-link-e2e.ts --allow-mutations`. It needs one visible agent whose
-// provider is signed in.
-//
-// It writes one file in the shared directory and one in the agent's workspace, makes a channel with
-// the agent, and sends a message with a link to each file. The person's message must show the shared
-// link and no workspace link, because a person's message in a channel names no workspace. The
-// agent repeats the workspace link, and each link must open its file in the preview panel. A quote of
-// the workspace file must name its absolute path and open the file again. Then the same links must
-// still open from the person's message in the agent's own chat. It deletes its channel and its two
-// files at the end.
-// Writes .openbot-build/channel-file-link-e2e/report.json and screenshots.
 import assert from "node:assert/strict";
 import { mkdirSync, rmSync, writeFileSync } from "node:fs";
 import { homedir } from "node:os";
 import { join, resolve } from "node:path";
+import { workspaceAccessEnforced } from "@openbot/contracts/ipc";
 import { translateFor } from "@openbot/i18n";
 import { ChannelClient, connectChannelE2e, WAIT_MS, waitFor, writeReport } from "./channel-e2e-support";
 
@@ -27,8 +15,8 @@ interface Report {
   shared?: { linkShown: boolean; opened: boolean; workspaceLinksInFile: number };
   workspace?: { linkInOwnMessage: number; linkInAgentReply: boolean; opened: boolean };
   quote?: { absolutePath: boolean; reopened: boolean };
+  outside?: { opened: boolean } | { skipped: "workspace access" };
   directChat?: { sharedOpened: boolean; workspaceOpened: boolean; workspaceLinksInSharedFile: number };
-  /** What the agent wrote, and the state of its task, when a step fails. */
   agentReplies?: string[] | undefined;
   taskStates?: string[] | undefined;
   pageErrors: string[];
@@ -47,7 +35,9 @@ const sharedName = `e2e-channel-shared-${id}.md`;
 const sharedText = `Shared spec ${id}`;
 const workspaceName = `e2e-channel-workspace-${id}.md`;
 const workspaceText = `Workspace spec ${id}`;
-// The dev profile uses the real ~/OpenBot folder, so the script removes only the files it wrote.
+const outsideName = `e2e-channel-outside-${id}.md`;
+const outsideText = `Outside spec ${id}`;
+const outsideFile = join(OUT, `outside-${id}`, outsideName);
 const sharedFile = join(homedir(), "OpenBot", "Shared", sharedName);
 let workspaceFile: string | null = null;
 mkdirSync(OUT, { recursive: true });
@@ -100,26 +90,21 @@ try {
     agent.id,
   );
 
-  // 1. The person's message links the shared file, and its workspace path stays text.
   await sharedLink().first().waitFor({ timeout: UI_WAIT_MS });
   const linkInOwnMessage = await workspaceLink().count();
   await sharedLink().first().click();
   await panel().getByText(sharedText).waitFor({ timeout: UI_WAIT_MS });
-  // The shared file names no agent, so in a channel its workspace path stays text.
   const workspaceLinksInSharedFile = await panelWorkspaceLink().count();
   report.shared = { linkShown: true, opened: true, workspaceLinksInFile: workspaceLinksInSharedFile };
   await shot("shared-preview");
 
-  // 2. The agent's reply links its workspace file, and the link opens it.
   await workspaceLink().first().waitFor({ timeout: WAIT_MS });
   await workspaceLink().first().click();
   await panel().getByText(workspaceText).waitFor({ timeout: UI_WAIT_MS });
   report.workspace = { linkInOwnMessage, linkInAgentReply: true, opened: true };
   await shot("workspace-preview");
 
-  // 3. A quote of the workspace file names its absolute path, and the quote opens the file again.
   await panel().getByText(workspaceText).selectText();
-  // The selection actions read the selection on a key or pointer release.
   await page.keyboard.press("Shift");
   await page.getByRole("button", { name: english("chat.selection.quote"), exact: true }).click();
   await conversation()
@@ -136,10 +121,11 @@ try {
     (quote) => quote !== undefined,
     UI_WAIT_MS,
   );
-  await panel()
-    .getByRole("button", { name: english("preview.panel.close"), exact: true })
+  await conversation()
+    .getByRole("button", { name: english("conversation.sidePanel.close"), exact: true })
+    .first()
     .click();
-  await panel().waitFor({ state: "detached", timeout: UI_WAIT_MS });
+  await panel().getByText(workspaceText).waitFor({ state: "hidden", timeout: UI_WAIT_MS });
   await conversation()
     .getByRole("button", { name: english("chat.reference.open.quote", { name: workspaceText }), exact: true })
     .click();
@@ -150,7 +136,31 @@ try {
   };
   await shot("quote-reopened");
 
-  // 4. In the agent's own chat, the person's message links both files, and both still open.
+  if (workspaceAccessEnforced(agent)) {
+    report.outside = { skipped: "workspace access" };
+  } else {
+    mkdirSync(join(OUT, `outside-${id}`), { recursive: true });
+    writeFileSync(outsideFile, `# ${outsideText}\n`);
+    await client.send(
+      channel.id,
+      [
+        `Read the file ${outsideFile} with one tool call. Then reply with exactly the next line and nothing else.`,
+        `[outside spec](${outsideName})`,
+      ].join("\n"),
+      agent.id,
+    );
+    const outsideLink = () =>
+      conversation().getByRole("button", {
+        name: english("chat.file.openWorkspace", { name: outsideName }),
+        exact: true,
+      });
+    await outsideLink().first().waitFor({ timeout: WAIT_MS });
+    await outsideLink().first().click();
+    await panel().getByText(outsideText).waitFor({ timeout: UI_WAIT_MS });
+    report.outside = { opened: true };
+    await shot("outside-preview");
+  }
+
   await page
     .getByRole("navigation", { name: english("sidebar.nav.label") })
     .getByRole("button", { name: new RegExp(`^${literal(agent.name)},`) })
@@ -189,6 +199,7 @@ try {
   await client.cleanup();
   rmSync(sharedFile, { force: true });
   if (workspaceFile) rmSync(workspaceFile, { force: true });
+  rmSync(join(OUT, `outside-${id}`), { recursive: true, force: true });
   writeReport("channel-file-link-e2e", report);
   await session.close();
 }

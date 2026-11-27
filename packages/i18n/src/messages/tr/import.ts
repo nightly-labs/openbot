@@ -32,6 +32,11 @@ export const messages = {
   "import.guide.reading": "Dışa aktarım okunuyor…",
   "import.guide.choose": "Dışa aktarım dosyasını seç",
   "import.guide.chooseNote": "Herhangi bir şey değişmeden önce ajanlarını görürsünüz.",
+  "import.guide.hermesLedeServer":
+    "Her Hermes profili bir ajana dönüşür. Sunucudaki profilleri okuyun ya da Hermes'teki dışa aktarma becerisinin onları tek bir .zip dosyasına paketlemesini sağlayın.",
+  "import.guide.hermesLedeExport":
+    "Her Hermes profili bir ajana dönüşür. Hermes'teki dışa aktarma becerisi onları tek bir .zip dosyasına paketler.",
+  "import.guide.setupServer": "Sunucuyu oku",
   "import.review.title": "{source} dışa aktarımı",
   "import.review.exported": "{date} tarihinde dışa aktarıldı",
   "import.review.fileSize": "Dosyalar: {size}",
@@ -64,4 +69,11 @@ export const messages = {
   "import.result.channel": "Kanal",
   "import.result.notImportedTitle": "İçe aktarılmadı",
   "import.result.warnings": "Bazı öğeler taşınmadı",
+  "import.source.ledeServer": "OpenBot bunları sunucuya kopyalar. Bir şey değişmeden önce her öğeyi görürsünüz.",
+  "import.source.hermesNoteServer":
+    "Sunucudaki Hermes klasörünü okuyun ya da Hermes'ten bir .zip dosyası dışa aktarın.",
+  "import.source.hermesNoteExport": "Hermes'ten bir .zip dosyası dışa aktarın.",
+  "import.hermes.notFoundServer": "Bu sunucuda Hermes profili yok",
+  "import.hermes.notFoundServerNote":
+    "OpenBot, sunucunun Hermes klasörünü okur. Hermes'i bu bilgisayardan içe aktarmak için Hermes'ten bir .zip dosyası dışa aktarın.",
 } as const satisfies PartialTranslation<typeof source>;

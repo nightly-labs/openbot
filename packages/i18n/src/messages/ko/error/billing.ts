@@ -5,8 +5,11 @@ export const messages = {
   "error.billing.lifecycleFailed": "서버 요금제를 변경할 수 없어요. 결제를 새로고침한 후 다시 시도해 주세요.",
   "error.billing.confirmMismatch": "삭제하려면 서버 이름을 입력해 주세요.",
   "error.billing.restartBusy": "지금은 서버를 다시 시작할 수 없어요. 잠시 후 다시 시도해 주세요.",
+  "error.billing.restartUnavailable": "이 서버는 여기에서 다시 시작할 수 없어요. 지원팀에 문의해 주세요.",
   "error.billing.planRequired": "이 서버의 요금제가 종료되었어요. 서버를 시작하려면 요금제를 갱신해 주세요.",
   "error.billing.planSoldOut": "이 요금제는 품절되었어요. 다른 요금제를 선택해 주세요.",
+  "error.billing.storageUnavailable": "이 저장 공간은 이 서버에서 사용할 수 없어요.",
+  "error.billing.storagePaymentFailed": "저장 공간 결제에 실패했어요. 결제 수단을 업데이트한 후 다시 시도해 주세요.",
   "error.billing.licenseExists": "이 계정에는 이미 라이선스가 있어요. 대신 사용자 수를 변경해 주세요.",
   "error.billing.licenseCurrency": "라이선스는 다른 요금제와 같은 통화를 사용해야 해요.",
   "error.billing.planCurrency": "새 요금제는 다른 요금제와 같은 통화를 사용해야 해요.",
@@ -14,11 +17,20 @@ export const messages = {
   "error.billing.licensePaymentFailed":
     "추가한 사용자의 결제에 실패했어요. 결제 수단을 업데이트한 후 다시 시도해 주세요.",
   "error.billing.licenseUnavailable": "지금은 라이선스를 사용할 수 없어요.",
+  "error.billing.mediaContentRefused":
+    "모델의 안전 검사에서 프롬프트 또는 이미지를 거부했습니다. 실제 인물, 유명 캐릭터, 브랜드, 폭력, 성인 콘텐츠는 자주 거부됩니다. 내용을 바꾼 뒤 다시 시도하세요. 크레딧은 사용되지 않았습니다.",
   "error.billing.licenseOneUser": "이 라이선스는 사용자 1명용이에요. 사용자를 추가하려면 Team으로 변경해 주세요.",
   "error.billing.licensePlanChange":
     "이 라이선스는 해당 요금제로 변경할 수 없어요. 라이선스를 취소한 후 새 요금제를 구매해 주세요.",
   "error.billing.noLicense": "이 계정에는 라이선스가 없어요.",
+  "error.billing.countryRequired": "결제 전에 청구 국가를 입력해 주세요. OpenBot을 업데이트한 다음 다시 시도해 주세요.",
+  "error.billing.detailsInvalid": "국가와 VAT ID를 확인해 주세요. VAT ID는 선택한 국가의 것이어야 해요.",
+  "error.billing.vatIdInvalid":
+    "EU VAT 시스템에서 이 VAT ID를 찾을 수 없어요. 번호를 확인하거나 VAT ID 없이 계속해 주세요.",
+  "error.billing.vatUnavailable": "지금은 결제할 수 없어요. 나중에 다시 시도해 주세요.",
   "error.billing.invalidRequest": "결제 요청이 올바르지 않아요.",
   "error.billing.invalidResponse": "결제 응답이 올바르지 않아요.",
   "error.billing.notStripePage": "결제 페이지가 Stripe 페이지가 아니에요.",
+  "error.billing.customServerOfferMissing": "이 서버에는 결제할 요금제가 없습니다.",
+  "error.billing.checkoutUnavailable": "지금은 결제를 시작할 수 없습니다. 1분 후에 다시 시도하세요.",
 } as const satisfies PartialTranslation<typeof source>;

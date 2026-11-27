@@ -4,10 +4,13 @@ import {
   MipmapMode,
   PaintStyle,
   type SkCanvas,
+  type SkHostRect,
   type SkImage,
   Skia,
   type SkPaint,
-  type SkRect,
+  type SkPathBuilder,
+  type SkPicture,
+  type SkPictureRecorder,
   StrokeCap,
   StrokeJoin,
 } from "@shopify/react-native-skia";
@@ -22,104 +25,173 @@ import {
 } from "./plush-felt";
 import type { PlushFrame } from "./plush-frames";
 
-/** The pictures of one plush: its tinted body and felt balls, and the shared eye pads. */
 export interface PlushArt {
   body: SkImage;
   padX: SkImage;
   padY: SkImage;
-  /** The felt ball in the agent colour: the thinking dots. */
   dot: SkImage;
-  /** The blue felt ball of `notify`. */
   notif: SkImage;
-  /** The agent colour: the z's of sleep. */
   ink: string;
 }
 
-function concat(canvas: SkCanvas, [a, b, c, d, e, f]: Matrix) {
-  "worklet";
-  canvas.concat(Skia.Matrix([a, c, e, b, d, f, 0, 0, 1]));
+interface PlushDrawKit {
+  plain: SkPaint;
+  alpha: SkPaint;
+  plus: SkPaint;
+  mask: SkPaint;
+  band: SkPaint;
+  line: SkPaint;
+  stroke: SkPaint;
+  strokeInk: string | null;
+  grey: SkPaint;
+  greySaturation: number | null;
+  source: SkHostRect;
+  target: SkHostRect;
+  bandRect: { rect: SkHostRect; rx: number; ry: number };
+  matrix: number[];
+  path: SkPathBuilder;
+  recorder: SkPictureRecorder;
+  bounds: SkHostRect;
 }
 
-function opacityPaint(opacity: number): SkPaint {
-  "worklet";
-  const paint = Skia.Paint();
-  paint.setAlphaf(opacity);
-  return paint;
+declare global {
+  var openbotPlushDrawKit: PlushDrawKit | undefined;
 }
 
-/**
- * Draws `source` of `image`, or all of it, into a rectangle. Do not give a worklet parameter a default
- * that reads a closure value: on the UI runtime the default runs before the closure is read.
- */
+function makeDrawKit(): PlushDrawKit {
+  "worklet";
+  const plus = Skia.Paint();
+  plus.setBlendMode(BlendMode.Plus);
+  const mask = Skia.Paint();
+  mask.setBlendMode(BlendMode.DstIn);
+  const band = Skia.Paint();
+  band.setAntiAlias(true);
+  band.setColor(Skia.Color("white"));
+  const line = Skia.Paint();
+  line.setAntiAlias(true);
+  line.setStyle(PaintStyle.Stroke);
+  line.setStrokeCap(StrokeCap.Round);
+  line.setColor(Skia.Color(CLOSED_EYE_COLOR));
+  const stroke = Skia.Paint();
+  stroke.setAntiAlias(true);
+  stroke.setStyle(PaintStyle.Stroke);
+  stroke.setStrokeCap(StrokeCap.Round);
+  stroke.setStrokeJoin(StrokeJoin.Round);
+  return {
+    plain: Skia.Paint(),
+    alpha: Skia.Paint(),
+    plus,
+    mask,
+    band,
+    line,
+    stroke,
+    strokeInk: null,
+    grey: Skia.Paint(),
+    greySaturation: null,
+    source: Skia.XYWHRect(0, 0, 0, 0),
+    target: Skia.XYWHRect(0, 0, 0, 0),
+    bandRect: { rect: Skia.XYWHRect(0, 0, 0, 0), rx: 0, ry: 0 },
+    matrix: [1, 0, 0, 0, 1, 0, 0, 0, 1],
+    path: Skia.PathBuilder.Make(),
+    recorder: Skia.PictureRecorder(),
+    bounds: Skia.XYWHRect(0, 0, 0, 0),
+  };
+}
+
+function drawKit(): PlushDrawKit {
+  "worklet";
+  let kit = globalThis.openbotPlushDrawKit;
+  if (!kit) {
+    kit = makeDrawKit();
+    globalThis.openbotPlushDrawKit = kit;
+  }
+  return kit;
+}
+
+function concat(canvas: SkCanvas, kit: PlushDrawKit, [a, b, c, d, e, f]: Matrix) {
+  "worklet";
+  const values = kit.matrix;
+  values[0] = a;
+  values[1] = c;
+  values[2] = e;
+  values[3] = b;
+  values[4] = d;
+  values[5] = f;
+  canvas.concat(values);
+}
+
+function alphaPaint(kit: PlushDrawKit, opacity: number): SkPaint {
+  "worklet";
+  kit.alpha.setAlphaf(opacity);
+  return kit.alpha;
+}
+
 function drawPicture(
   canvas: SkCanvas,
+  kit: PlushDrawKit,
   image: SkImage,
   x: number,
   y: number,
   width: number,
   height: number,
   paint: SkPaint,
-  source: SkRect | null,
+  sx: number,
+  sy: number,
+  sw: number,
+  sh: number,
 ) {
   "worklet";
-  canvas.drawImageRectOptions(
-    image,
-    source ?? Skia.XYWHRect(0, 0, image.width(), image.height()),
-    Skia.XYWHRect(x, y, width, height),
-    FilterMode.Linear,
-    MipmapMode.Linear,
-    paint,
-  );
+  const imageWidth = image.width();
+  const imageHeight = image.height();
+  kit.source.setXYWH(sx * imageWidth, sy * imageHeight, sw * imageWidth, sh * imageHeight);
+  kit.target.setXYWH(x, y, width, height);
+  canvas.drawImageRectOptions(image, kit.source, kit.target, FilterMode.Linear, MipmapMode.Linear, paint);
 }
 
-/**
- * One eye: the felt pad in pieces that add up (`plus`) in their own layer, under the lids of a
- * blink, and the closed line of sleep.
- */
-function drawEye(canvas: SkCanvas, eye: PlushEye, art: PlushArt) {
+function drawEye(canvas: SkCanvas, kit: PlushDrawKit, eye: PlushEye, art: PlushArt) {
   "worklet";
   const opacity = eye.alpha * eye.pad;
   if (opacity > 0.001) {
     if (eye.lid) canvas.saveLayer();
     canvas.save();
-    concat(canvas, eye.matrix);
-    if (eye.inner) concat(canvas, eye.inner);
-    canvas.saveLayer(opacityPaint(opacity));
-    const piecePaint = Skia.Paint();
-    if (eye.pieces.length > 1) piecePaint.setBlendMode(BlendMode.Plus);
+    concat(canvas, kit, eye.matrix);
+    if (eye.inner) concat(canvas, kit, eye.inner);
+    canvas.saveLayer(alphaPaint(kit, opacity));
+    const piecePaint = eye.pieces.length > 1 ? kit.plus : kit.plain;
     for (const piece of eye.pieces) {
       const image = piece.src === 0 ? art.padX : art.padY;
-      const width = image.width();
-      const height = image.height();
       drawPicture(
         canvas,
+        kit,
         image,
         piece.x,
         piece.y,
         piece.w,
         piece.h,
         piecePaint,
-        Skia.XYWHRect(piece.sx * width, piece.sy * height, piece.sw * width, piece.sh * height),
+        piece.sx,
+        piece.sy,
+        piece.sw,
+        piece.sh,
       );
     }
     canvas.restore();
     canvas.restore();
     if (eye.lid) {
       const lid = eye.lid;
-      const mask = Skia.Paint();
-      mask.setBlendMode(BlendMode.DstIn);
-      canvas.saveLayer(mask);
+      canvas.saveLayer(kit.mask);
       canvas.translate(lid.cx, lid.cy);
       canvas.scale(1, lid.s);
       canvas.translate(-lid.cx, -lid.cy);
-      concat(canvas, eye.matrix);
-      if (eye.inner) concat(canvas, eye.inner);
-      const band = Skia.Paint();
-      band.setAntiAlias(true);
-      band.setColor(Skia.Color("white"));
+      concat(canvas, kit, eye.matrix);
+      if (eye.inner) concat(canvas, kit, eye.inner);
+      const band = kit.bandRect;
       for (const { w, h, r, alpha } of lid.bands) {
-        band.setAlphaf(alpha);
-        canvas.drawRRect(Skia.RRectXY(Skia.XYWHRect(-w, -h, 2 * w, 2 * h), r, r), band);
+        kit.band.setAlphaf(alpha);
+        band.rect.setXYWH(-w, -h, 2 * w, 2 * h);
+        band.rx = r;
+        band.ry = r;
+        canvas.drawRRect(band, kit.band);
       }
       canvas.restore();
       canvas.restore();
@@ -127,17 +199,14 @@ function drawEye(canvas: SkCanvas, eye: PlushEye, art: PlushArt) {
   }
   if (eye.closed && eye.closed.opacity > 0.001) {
     const { w } = eye.closed;
-    const line = Skia.Paint();
-    line.setAntiAlias(true);
-    line.setStyle(PaintStyle.Stroke);
-    line.setStrokeCap(StrokeCap.Round);
+    const line = kit.line;
     line.setStrokeWidth(w * CLOSED_EYE_STROKE);
-    line.setColor(Skia.Color(CLOSED_EYE_COLOR));
     line.setAlphaf(eye.alpha * eye.closed.opacity);
     canvas.save();
-    concat(canvas, eye.matrix);
+    concat(canvas, kit, eye.matrix);
     canvas.drawPath(
-      Skia.PathBuilder.Make()
+      kit.path
+        .reset()
         .moveTo(-w / 2, 0)
         .quadTo(0, w * CLOSED_EYE_BEND, w / 2, 0)
         .build(),
@@ -147,8 +216,7 @@ function drawEye(canvas: SkCanvas, eye: PlushEye, art: PlushArt) {
   }
 }
 
-/** The colour matrix of SVG `saturate`. */
-function saturationMatrix(s: number): number[] {
+export function saturationMatrix(s: number): number[] {
   "worklet";
   return [
     0.213 + 0.787 * s,
@@ -174,45 +242,43 @@ function saturationMatrix(s: number): number[] {
   ];
 }
 
-/**
- * Draws a plush frame: the whole viewBox in a square of `size` pixels. It runs on the UI thread for a
- * moving avatar and on the JS thread for a still picture, so both show the same pixels. `saturation`
- * below 1 greys the plush, as a disconnected agent shows.
- */
 export function drawPlush(canvas: SkCanvas, frame: PlushFrame, art: PlushArt, size: number, saturation = 1) {
   "worklet";
+  const kit = drawKit();
   const scale = size / VIEW_BOX;
   canvas.save();
   canvas.translate(size / 2, size / 2);
   canvas.scale(scale, scale);
   const grey = saturation < 1;
   if (grey) {
-    const paint = Skia.Paint();
-    paint.setColorFilter(Skia.ColorFilter.MakeMatrix(saturationMatrix(saturation)));
-    canvas.saveLayer(paint);
+    if (kit.greySaturation !== saturation) {
+      kit.grey.setColorFilter(Skia.ColorFilter.MakeMatrix(saturationMatrix(saturation)));
+      kit.greySaturation = saturation;
+    }
+    canvas.saveLayer(kit.grey);
   }
   const faded = frame.bodyAlpha < 1;
-  if (faded) canvas.saveLayer(opacityPaint(frame.bodyAlpha));
-  drawPicture(canvas, art.body, -HALF_VIEW_BOX, -HALF_VIEW_BOX, VIEW_BOX, VIEW_BOX, Skia.Paint(), null);
-  for (const eye of frame.eyes) drawEye(canvas, eye, art);
+  if (faded) canvas.saveLayer(alphaPaint(kit, frame.bodyAlpha));
+  drawPicture(canvas, kit, art.body, -HALF_VIEW_BOX, -HALF_VIEW_BOX, VIEW_BOX, VIEW_BOX, kit.plain, 0, 0, 1, 1);
+  for (const eye of frame.eyes) drawEye(canvas, kit, eye, art);
   if (faded) canvas.restore();
   for (const dot of frame.dots)
-    drawPicture(canvas, art.dot, dot.x, dot.y, dot.size, dot.size, opacityPaint(dot.opacity), null);
+    drawPicture(canvas, kit, art.dot, dot.x, dot.y, dot.size, dot.size, alphaPaint(kit, dot.opacity), 0, 0, 1, 1);
   if (frame.notif) {
     const { x, y, size: ball } = frame.notif;
-    drawPicture(canvas, art.notif, x, y, ball, ball, Skia.Paint(), null);
+    drawPicture(canvas, kit, art.notif, x, y, ball, ball, kit.plain, 0, 0, 1, 1);
   }
   if (frame.zs.length > 0) {
-    const stroke = Skia.Paint();
-    stroke.setAntiAlias(true);
-    stroke.setStyle(PaintStyle.Stroke);
-    stroke.setStrokeCap(StrokeCap.Round);
-    stroke.setStrokeJoin(StrokeJoin.Round);
-    stroke.setColor(Skia.Color(art.ink));
+    const stroke = kit.stroke;
+    if (kit.strokeInk !== art.ink) {
+      stroke.setColor(Skia.Color(art.ink));
+      kit.strokeInk = art.ink;
+    }
     for (const z of frame.zs) {
       stroke.setStrokeWidth(z.width);
       stroke.setAlphaf(z.opacity);
-      const path = Skia.PathBuilder.Make()
+      const path = kit.path
+        .reset()
         .moveTo(z.x - z.half, z.y - z.half)
         .lineTo(z.x + z.half, z.y - z.half)
         .lineTo(z.x - z.half, z.y + z.half)
@@ -223,4 +289,18 @@ export function drawPlush(canvas: SkCanvas, frame: PlushFrame, art: PlushArt, si
   }
   if (grey) canvas.restore();
   canvas.restore();
+}
+
+export function recordPlush(
+  frame: PlushFrame | undefined,
+  art: PlushArt | null,
+  size: number,
+  saturation: number,
+): SkPicture {
+  "worklet";
+  const kit = drawKit();
+  kit.bounds.setXYWH(0, 0, size, size);
+  const canvas = kit.recorder.beginRecording(kit.bounds);
+  if (art && frame) drawPlush(canvas, frame, art, size, saturation);
+  return kit.recorder.finishRecordingAsPicture();
 }

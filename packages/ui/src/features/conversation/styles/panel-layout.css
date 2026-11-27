@@ -1,26 +1,26 @@
-.conversation-panel:has(.settings-panel) .conversation-header,
-.conversation-panel:has(.settings-panel) .conversation-scroll,
-.conversation-panel:has(.settings-panel) .composer-wrap {
+.conversation-panel[data-settings-panel]:where(:not(.browser-panel-active)) .conversation-header,
+.conversation-panel[data-settings-panel]:where(:not(.browser-panel-active)) .conversation-scroll,
+.conversation-panel[data-settings-panel]:where(:not(.browser-panel-active)) .composer-wrap {
   width: calc(100% - var(--settings-panel-width, 360px));
 }
 
-.conversation-panel:has(.settings-panel) .chat-search {
+.conversation-panel[data-settings-panel] .chat-search {
   inset-inline-end: calc(var(--settings-panel-width, 360px) + 16px);
   max-width: calc(100% - var(--settings-panel-width, 360px) - 32px);
 }
 
-.conversation-panel:has(#browser-side-panel) .chat-search,
-.conversation-panel:has(#file-preview-panel) .chat-search {
+.conversation-panel[data-browser-side-panel] .chat-search,
+.conversation-panel[data-file-preview-panel] .chat-search {
   inset-inline-end: calc(var(--browser-panel-width, 380px) + 16px);
   max-width: calc(100% - var(--browser-panel-width, 380px) - 32px);
 }
 
-.conversation-panel:has(#browser-side-panel) .conversation-header,
-.conversation-panel:has(#browser-side-panel) .conversation-scroll,
-.conversation-panel:has(#browser-side-panel) .composer-wrap,
-.conversation-panel:has(#file-preview-panel) .conversation-header,
-.conversation-panel:has(#file-preview-panel) .conversation-scroll,
-.conversation-panel:has(#file-preview-panel) .composer-wrap {
+.conversation-panel[data-browser-side-panel] .conversation-header,
+.conversation-panel[data-browser-side-panel] .conversation-scroll,
+.conversation-panel[data-browser-side-panel] .composer-wrap,
+.conversation-panel[data-file-preview-panel] .conversation-header,
+.conversation-panel[data-file-preview-panel] .conversation-scroll,
+.conversation-panel[data-file-preview-panel] .composer-wrap {
   width: 100%;
 }
 
@@ -31,6 +31,26 @@
   }
   to {
     opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes message-bubble-in {
+  from {
+    opacity: 0;
+    transform: translateY(8px) scale(0.97);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+@keyframes message-sent-in {
+  from {
+    transform: translateY(12px);
+  }
+  to {
     transform: translateY(0);
   }
 }
@@ -86,15 +106,20 @@
   .browser-panel,
   .remote-desktop-workspace,
   .message-entry,
+  .message-entry-animated,
   .chat-action-entry-animated,
+  .chat-action-target-entering,
   .agent-activity-entry,
   .agent-activity-content,
   .agent-activity-avatar,
+  .agent-activity-entry .agent-activity-avatar,
   .agent-row-thinking-dots i,
   .agent-row-agent-status-responded,
   .agent-row-agent-status-unread,
   .mention-picker,
   .mention-picker-list,
+  .mention-picker-highlight,
+  .mention-picker-option[data-entering],
   .settings-panel {
     animation: none;
     transition: none;

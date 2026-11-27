@@ -1,27 +1,7 @@
-// Applies the external contribution policy in CONTRIBUTING.md ("What you can send").
-//
-//   bun scripts/contribution-policy.ts pr <number>     checks one pull request
-//   bun scripts/contribution-policy.ts issue <number>  checks one new issue
-//   bun scripts/contribution-policy.ts sweep           checks every open pull request that has
-//                                                      `needs-approved-issue`, and closes the ones
-//                                                      that still fail after CLOSE_AFTER_DAYS
-//   --dry-run              writes nothing to GitHub; the decisions go to REPORT_PATH
-//   --assume-label <name>  adds a label to the pull request before the check (dry run only)
-//
-// Organization members, users with write access and the bots in TRUSTED_BOTS skip every rule.
-// A pull request from anyone else fails only when a maintainer adds `needs-approved-issue` and it
-// links no issue with the `approved` label. An issue from anyone else must come from an issue form
-// with all required answers; the form definitions are read from `.github/ISSUE_TEMPLATE`.
-//
-// No package imports: `contribution-policy.yml` runs this before `bun install`. Every GitHub read
-// uses `gh api --jq`, so the script handles only text.
-
 import { execFileSync } from "node:child_process";
 import { mkdirSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 
-// `openbotgit[bot]` is the OpenBot GitHub App. The account Worker gives its installation token only for
-// repositories where the signed-in user can push (`apps/auth-api/src/server/github-installation-tokens.ts`).
 const TRUSTED_BOTS = new Set(["infeld-ai[bot]", "dependabot[bot]", "openbotgit[bot]"]);
 const TRUSTED_ASSOCIATIONS = new Set(["OWNER", "MEMBER", "COLLABORATOR"]);
 const TRUSTED_PERMISSIONS = new Set(["admin", "maintain", "write"]);
@@ -82,7 +62,6 @@ function read(path: string, jq: string): string {
   return gh(["api", path, "--jq", jq]);
 }
 
-/** One column of a `@tsv` row or a regular expression match. A missing column is a script error. */
 function column(values: readonly string[], index: number): string {
   const value = values[index];
   if (value === undefined) fail(`Unexpected value from GitHub: ${values.join("\t")}`);
@@ -95,7 +74,6 @@ function readLines(path: string, jq: string): string[] {
     .filter((line) => line !== "");
 }
 
-/** Every change to GitHub goes through here, so `--dry-run` only records it. */
 function write(description: string, ghArgs: readonly string[], input?: string): void {
   writes.push(description);
   if (!dryRun) gh(ghArgs, input);
@@ -109,8 +87,6 @@ function parseNumber(value: string | undefined): number {
 
 function isTrusted(login: string, association: string): boolean {
   if (TRUSTED_BOTS.has(login) || TRUSTED_ASSOCIATIONS.has(association)) return true;
-  // `author_association` can miss a private organization member. The permission lookup does not,
-  // and it fails closed: an error treats the author as external.
   try {
     return TRUSTED_PERMISSIONS.has(read(`repos/${repository}/collaborators/${login}/permission`, ".permission"));
   } catch {
@@ -138,7 +114,6 @@ function comment(number: number, body: string): void {
   );
 }
 
-/** Keeps one policy comment per pull request and edits it in place. */
 function upsertStickyComment(number: number, body: string, createIfMissing: boolean): void {
   const text = `${COMMENT_MARKER}\n${body}`;
   const [existing] = readLines(
@@ -173,10 +148,6 @@ function setStatus(sha: string, state: "success" | "failure", description: strin
   ]);
 }
 
-/**
- * The issues that the pull request closes: `Closes #n` in its body, or a link set in the sidebar.
- * A plain `#n` mention does not count. A maintainer still checks that the closed issue matches.
- */
 function linkedIssues(number: number): number[] {
   const query =
     "query($owner:String!,$name:String!,$number:Int!){repository(owner:$owner,name:$name){pullRequest(number:$number){closingIssuesReferences(first:50){nodes{number}}}}}";
@@ -202,7 +173,6 @@ function linkedIssues(number: number): number[] {
 function approvedIssue(numbers: readonly number[]): number | undefined {
   return numbers.find((issue) => {
     try {
-      // A pull request number answers on the issues endpoint too; only a real issue counts.
       const row = read(
         `repos/${repository}/issues/${issue}`,
         '[(.pull_request != null), (.labels | map(.name) | join(","))] | @tsv',
@@ -294,7 +264,6 @@ function checkPullRequest(number: number): Decision {
 
   const issues = linkedIssues(number);
   const approved = approvedIssue(issues);
-  // The label stays: if the author removes the link later, the check fails again.
   if (approved !== undefined) {
     setStatus(pr.sha, "success", `Linked to approved issue #${approved}.`);
     upsertStickyComment(
@@ -314,10 +283,6 @@ function checkPullRequest(number: number): Decision {
   );
 }
 
-/**
- * The start of the current waiting time: when the label was added, or a later reopen by a
- * maintainer. A reopen by the author does not restart the wait.
- */
 function waitingSince(number: number): Date | undefined {
   const times = readLines(
     `repos/${repository}/issues/${number}/events?per_page=100`,
@@ -355,7 +320,6 @@ interface FormField {
   readonly type: string;
   readonly label: string;
   readonly required: boolean;
-  /** For checkboxes: the options that must be checked. */
   readonly requiredOptions: readonly string[];
 }
 
@@ -364,12 +328,6 @@ interface Form {
   readonly fields: readonly FormField[];
 }
 
-/**
- * Reads the fields of each issue form. The forms use one fixed layout (`- type:`, then
- * `attributes.label`, then `validations.required`, or `required` under each checkbox option), so a
- * line reader is enough and keeps this script free of a YAML dependency. A field without a label
- * is not shown as a heading.
- */
 function loadForms(): Form[] {
   return readdirSync(FORM_DIR)
     .filter((file) => file.endsWith(".yml") && file !== "config.yml")
@@ -403,7 +361,6 @@ function loadForms(): Form[] {
     });
 }
 
-/** Splits an issue form body into its `### Label` sections. */
 function formSections(body: string): Map<string, string> {
   const sections = new Map<string, string>();
   const parts = body.replace(/\r\n/g, "\n").split(/^### (.+)$/m);
@@ -422,7 +379,6 @@ function missingAnswers(form: Form, sections: ReadonlyMap<string, string>): stri
         const checked = new Set([...answer.matchAll(/^- \[[xX]\] (.+)$/gm)].map((match) => column(match, 1).trim()));
         return field.requiredOptions.some((option) => !checked.has(option));
       }
-      // "None" and "n/a" are valid answers. Only punctuation, such as "." or "-", counts as empty.
       return !/[\p{L}\p{N}].*[\p{L}\p{N}]/su.test(answer);
     })
     .map((field) => field.label);
@@ -455,7 +411,6 @@ function checkIssue(number: number): void {
     return;
   }
 
-  // Report against the form that the issue matches best: the one with the most headings present.
   const best = results
     .map((result) => ({ ...result, present: result.form.fields.filter((field) => sections.has(field.label)).length }))
     .sort((left, right) => right.present - left.present)[0];

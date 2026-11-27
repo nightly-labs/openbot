@@ -1,42 +1,27 @@
-/**
- * A local server: a second OpenBot server on this computer, which the desktop app starts as a
- * headless child process of itself (`local-servers/local-servers.ts`). It has its own user data
- * directory and its own agent root, so its database, agents, chats and files stay apart from the
- * app's own server. It shows no window and listens only on the loopback Team API.
- *
- * The parent passes the server name and the owner password in the environment. The password is
- * removed from the environment here, before any agent or provider process starts, so that no child
- * of this process can read it.
- *
- * While the desktop app is signed in, it registers this server for its account and writes the
- * server's machine token to the control pipe. This process then also meets the owner's devices on
- * Signal, and sends their notifications, with that token. It keeps the token in memory only.
- */
-
+import { randomUUID } from "node:crypto";
 import { Socket } from "node:net";
 import { isAbsolute } from "node:path";
 import type { Readable } from "node:stream";
-import { Effect, Schema, Semaphore } from "effect";
+import type { AgentSummary } from "@openbot/contracts/ipc";
+import { sourceText } from "@openbot/i18n/source";
+import { Deferred, Effect, Exit, Schema, Semaphore } from "effect";
+import { CentralAuthOperationError } from "./central-auth-effects";
+import { decodeRemoteMembers, type RemoteMemberRecord } from "./central-auth-records";
 import type { HostService } from "./host-service";
 import { RemoteWorkflowError } from "./remote-service-effects";
 import type { TeamStore } from "./team-store";
 
-/** The username of the one member of a local server. The desktop app logs in as it. */
 export const LOCAL_SERVER_OWNER_USERNAME = "owner";
-/** The prefix of the one stdout line that tells the parent where the Team API listens. */
 export const LOCAL_SERVER_READY_PREFIX = "OPENBOT_LOCAL_SERVER_READY ";
+export const LOCAL_SERVER_MEMBERS_REQUEST = "OPENBOT_LOCAL_SERVER_REQUEST members";
+export const LOCAL_SERVER_WORKING_PREFIX = "OPENBOT_LOCAL_SERVER_WORKING ";
+const LOCAL_SERVER_WORKING_DELAY_MS = 100;
+const LOCAL_SERVER_MEMBERS_TIMEOUT_MS = 30_000;
+const LOCAL_SERVER_MARKETPLACE_REQUEST_PREFIX = "OPENBOT_LOCAL_SERVER_REQUEST marketplace ";
+const LOCAL_SERVER_MARKETPLACE_TIMEOUT_MS = 60_000;
 
-/**
- * The pipe from the desktop app on Windows: there Electron replaces `process.stdin` with a stream that
- * only ends (#4868). On the other systems the pipe is standard input, which the processes that this
- * server starts do not inherit.
- */
 export const LOCAL_SERVER_CONTROL_FD = 3;
 
-/**
- * The pipe from the desktop app: its commands, and its end when the app stops. Null when the parent
- * gave no pipe, so that this process cannot know when the app stops.
- */
 export function openLocalServerControl(
   platform: NodeJS.Platform,
   onFailure: (cause: unknown) => void,
@@ -59,12 +44,9 @@ export const LOCAL_SERVER_ENVIRONMENT = {
 } as const;
 
 export interface LocalServerChildEnvironment {
-  /** The folder that holds the agents of this server, in place of `~/OpenBot`. */
   agentRoot: string;
-  /** The name of the server when it is made. A rename later goes through the Team API. */
   serverName: string;
   ownerSecret: string;
-  /** The provider CLI store of the desktop app. The servers of one computer share one copy of each CLI. */
   runtimeRoot: string | null;
 }
 
@@ -74,45 +56,198 @@ export interface LocalServerReady {
   apiUrl: string;
   fingerprint: string;
   publicKey: string;
-  /** The member that the account service records as the owner's membership when the parent registers this server. */
   ownerMemberId: string;
 }
 
-/**
- * A line that the parent writes to the control pipe. `publish` gives the machine token of this server's
- * registration; `unpublish` follows a sign-out of the desktop app. No other process sees the token.
- */
 const localServerCommandSchema = Schema.Union([
   Schema.Struct({ type: Schema.Literal("publish"), machineToken: Schema.String }),
   Schema.Struct({ type: Schema.Literal("unpublish") }),
+  Schema.Struct({ type: Schema.Literal("members"), members: Schema.Unknown }),
+  Schema.Struct({ type: Schema.Literal("members-unavailable") }),
+  Schema.Struct({
+    type: Schema.Literal("marketplace"),
+    id: Schema.String,
+    value: Schema.optional(Schema.Unknown),
+    bytes: Schema.optional(Schema.String),
+    error: Schema.optional(Schema.String),
+  }),
 ]);
 export type LocalServerCommand = typeof localServerCommandSchema.Type;
+type ParsedLocalServerCommand =
+  | Exclude<LocalServerCommand, { type: "members" }>
+  | { type: "members"; members: RemoteMemberRecord[] };
 const decodeLocalServerCommand = Schema.decodeUnknownSync(localServerCommandSchema);
 
 export function formatLocalServerCommand(command: LocalServerCommand): string {
   return `${JSON.stringify(command)}\n`;
 }
 
-/** Null for a line that is not a command, so a stray line does nothing. */
-function parseLocalServerCommand(line: string): LocalServerCommand | null {
+export function formatLocalServerMembersRequest(): string {
+  return `${LOCAL_SERVER_MEMBERS_REQUEST}\n`;
+}
+
+function parseLocalServerCommand(line: string): ParsedLocalServerCommand | null {
   try {
-    return decodeLocalServerCommand(JSON.parse(line));
+    const command = decodeLocalServerCommand(JSON.parse(line));
+    return command.type === "members" ? { type: "members", members: decodeRemoteMembers(command) } : command;
   } catch {
     return null;
   }
 }
 
-/** How this server meets the owner's devices once the parent registered it. */
+const localServerMarketplaceRequestSchema = Schema.Struct({
+  id: Schema.String,
+  method: Schema.Literals(["GET", "POST"]),
+  path: Schema.String,
+  download: Schema.Boolean,
+  body: Schema.optional(Schema.String),
+});
+export type LocalServerMarketplaceRequest = typeof localServerMarketplaceRequestSchema.Type;
+const decodeLocalServerMarketplaceRequest = Schema.decodeUnknownSync(localServerMarketplaceRequestSchema);
+
+export function parseLocalServerMarketplaceRequest(line: string): LocalServerMarketplaceRequest | null {
+  if (!line.startsWith(LOCAL_SERVER_MARKETPLACE_REQUEST_PREFIX)) return null;
+  try {
+    return decodeLocalServerMarketplaceRequest(JSON.parse(line.slice(LOCAL_SERVER_MARKETPLACE_REQUEST_PREFIX.length)));
+  } catch {
+    return null;
+  }
+}
+
+function membersUnavailable(): RemoteWorkflowError {
+  return new RemoteWorkflowError({ cause: new Error("The desktop app did not read the account directory.") });
+}
+
+export class LocalServerMembers {
+  readonly #request: () => void;
+  #pending: Deferred.Deferred<RemoteMemberRecord[], RemoteWorkflowError> | null = null;
+
+  constructor(request: () => void) {
+    this.#request = request;
+  }
+
+  readonly list = Effect.fn("LocalServerMembers.list")(function* (
+    this: LocalServerMembers,
+  ): Effect.fn.Return<RemoteMemberRecord[], RemoteWorkflowError> {
+    let pending = this.#pending;
+    if (!pending) {
+      pending = Deferred.makeUnsafe<RemoteMemberRecord[], RemoteWorkflowError>();
+      this.#pending = pending;
+      this.#request();
+    }
+    const current = pending;
+    return yield* Deferred.await(current).pipe(
+      Effect.timeoutOrElse({
+        duration: LOCAL_SERVER_MEMBERS_TIMEOUT_MS,
+        orElse: () => Effect.fail(membersUnavailable()),
+      }),
+      Effect.ensuring(
+        Effect.sync(() => {
+          if (this.#pending === current) this.#pending = null;
+        }),
+      ),
+    );
+  }).bind(this);
+
+  answer(members: RemoteMemberRecord[] | null): boolean {
+    const pending = this.#pending;
+    if (!pending) return false;
+    this.#pending = null;
+    Deferred.doneUnsafe(pending, members ? Exit.succeed(members) : Exit.fail(membersUnavailable()));
+    return true;
+  }
+}
+
+type LocalServerMarketplaceAnswer = Extract<LocalServerCommand, { type: "marketplace" }>;
+
+function requestFailed(): CentralAuthOperationError {
+  return new CentralAuthOperationError({ cause: new Error(sourceText("error.team.requestFailed")) });
+}
+
+export class LocalServerMarketplace {
+  readonly #write: (line: string) => void;
+  readonly #resolveApiUrl: (path: string) => string;
+  readonly #pending = new Map<string, Deferred.Deferred<LocalServerMarketplaceAnswer, CentralAuthOperationError>>();
+
+  constructor(write: (line: string) => void, resolveApiUrl: (path: string) => string) {
+    this.#write = write;
+    this.#resolveApiUrl = resolveApiUrl;
+  }
+
+  resolveApiUrl(path: string): string {
+    return this.#resolveApiUrl(path);
+  }
+
+  requestAuthorized<T>(
+    path: string,
+    init: RequestInit,
+    decoder: (value: unknown) => T,
+  ): Effect.Effect<T, CentralAuthOperationError> {
+    return this.#ask(path, init, false).pipe(
+      Effect.flatMap((answer) =>
+        Effect.try({ try: () => decoder(answer.value), catch: (cause) => new CentralAuthOperationError({ cause }) }),
+      ),
+    );
+  }
+
+  downloadAuthorized(path: string): Effect.Effect<Uint8Array, CentralAuthOperationError> {
+    return this.#ask(path, { method: "GET" }, true).pipe(
+      Effect.flatMap((answer) =>
+        answer.bytes === undefined
+          ? Effect.fail(requestFailed())
+          : Effect.succeed(new Uint8Array(Buffer.from(answer.bytes, "base64"))),
+      ),
+    );
+  }
+
+  answer(answer: LocalServerMarketplaceAnswer): boolean {
+    const pending = this.#pending.get(answer.id);
+    if (!pending) return false;
+    this.#pending.delete(answer.id);
+    Deferred.doneUnsafe(
+      pending,
+      answer.error === undefined
+        ? Exit.succeed(answer)
+        : Exit.fail(new CentralAuthOperationError({ cause: new Error(answer.error) })),
+    );
+    return true;
+  }
+
+  #ask(
+    path: string,
+    init: RequestInit,
+    download: boolean,
+  ): Effect.Effect<LocalServerMarketplaceAnswer, CentralAuthOperationError> {
+    return Effect.suspend(() => {
+      const method = init.method ?? "GET";
+      if (method !== "GET" && method !== "POST") return Effect.fail(requestFailed());
+      const id = randomUUID();
+      const pending = Deferred.makeUnsafe<LocalServerMarketplaceAnswer, CentralAuthOperationError>();
+      this.#pending.set(id, pending);
+      const request: LocalServerMarketplaceRequest = {
+        id,
+        method,
+        path,
+        download,
+        ...(typeof init.body === "string" ? { body: init.body } : {}),
+      };
+      this.#write(`${LOCAL_SERVER_MARKETPLACE_REQUEST_PREFIX}${JSON.stringify(request)}\n`);
+      return Deferred.await(pending).pipe(
+        Effect.timeoutOrElse({
+          duration: LOCAL_SERVER_MARKETPLACE_TIMEOUT_MS,
+          orElse: () => Effect.fail(requestFailed()),
+        }),
+        Effect.ensuring(Effect.sync(() => this.#pending.delete(id))),
+      );
+    });
+  }
+}
+
 interface LocalServerPublisher {
   publish(machineToken: string): Effect.Effect<void, RemoteWorkflowError>;
   unpublish(): Effect.Effect<void, RemoteWorkflowError>;
 }
 
-/**
- * Returns null unless the desktop app started this process as a local server. An explicit
- * `--user-data-dir` is required, so that a stray variable cannot make the normal app open its own
- * profile without a window.
- */
 export function takeLocalServerChildEnvironment(
   environment: NodeJS.ProcessEnv,
   userDataDirectory: string,
@@ -127,7 +262,29 @@ export function takeLocalServerChildEnvironment(
   return { agentRoot, serverName, ownerSecret, runtimeRoot: isAbsolute(runtimeRoot) ? runtimeRoot : null };
 }
 
-/** The ready line holds no secret: the parent knows the password, and the session is made later. */
+export function reportLocalServerWorkingAgents({
+  read,
+  subscribe,
+  write,
+}: {
+  read: () => AgentSummary[];
+  subscribe: (listener: () => void) => void;
+  write: (line: string) => void;
+}): void {
+  let last = "[]";
+  let timer: ReturnType<typeof setTimeout> | null = null;
+  subscribe(() => {
+    if (timer) return;
+    timer = setTimeout(() => {
+      timer = null;
+      const agents = JSON.stringify(read());
+      if (agents === last) return;
+      last = agents;
+      write(`${LOCAL_SERVER_WORKING_PREFIX}${agents}\n`);
+    }, LOCAL_SERVER_WORKING_DELAY_MS);
+  });
+}
+
 export function formatLocalServerReady(ready: LocalServerReady): string {
   return `${LOCAL_SERVER_READY_PREFIX}${JSON.stringify(ready)}\n`;
 }
@@ -135,19 +292,15 @@ export function formatLocalServerReady(ready: LocalServerReady): string {
 export interface StartLocalServerChildOptions {
   environment: LocalServerChildEnvironment;
   teamStore: Pick<TeamStore, "configured" | "configure" | "getIdentity" | "getOwnerMemberId">;
-  host: Pick<HostService, "startLoopbackOnly">;
+  host: Pick<HostService, "startLoopbackOnly" | "applyAccountDirectory">;
+  members: Pick<LocalServerMembers, "answer">;
+  marketplace: Pick<LocalServerMarketplace, "answer">;
   writeReady: (line: string) => void;
-  /** Calls `onLine` with each line of the control pipe. */
   readCommands: (onLine: (line: string) => void) => void;
   publisher: LocalServerPublisher;
-  /** A failed command leaves the server on loopback only. The message names no secret. */
   warn: (message: string, cause: unknown) => void;
 }
 
-/**
- * Makes the owner at the first start, then starts the Team API on loopback only. The store keeps a
- * host with no account owner bound at the next start, so the identity keys stay the same.
- */
 export const startLocalServerChild = Effect.fn("LocalServerChild.start")(function* ({
   environment,
   teamStore,
@@ -155,6 +308,8 @@ export const startLocalServerChild = Effect.fn("LocalServerChild.start")(functio
   writeReady,
   readCommands,
   publisher,
+  members,
+  marketplace,
   warn,
 }: StartLocalServerChildOptions) {
   if (!teamStore.configured)
@@ -162,16 +317,33 @@ export const startLocalServerChild = Effect.fn("LocalServerChild.start")(functio
   const status = yield* host.startLoopbackOnly();
   const identity = teamStore.getIdentity();
   const ownerMemberId = teamStore.getOwnerMemberId();
-  // The parent waits for the ready line. An error ends this process now, so the parent does not wait
-  // for its time limit.
   if (!identity || !status.apiUrl || !ownerMemberId)
     return yield* new RemoteWorkflowError({ cause: new Error("The local server has no identity or API address.") });
-  // Before the ready line: the parent can write a command as soon as it reads that line. One command
-  // runs at a time, in the order the parent wrote them.
   const commands = Semaphore.makeUnsafe(1);
   readCommands((line) => {
     const command = parseLocalServerCommand(line);
     if (!command) return;
+    if (command.type === "marketplace") {
+      marketplace.answer(command);
+      return;
+    }
+    if (command.type === "members-unavailable") {
+      members.answer(null);
+      return;
+    }
+    if (command.type === "members") {
+      if (members.answer(command.members)) return;
+      Effect.runFork(
+        host
+          .applyAccountDirectory(command.members)
+          .pipe(
+            Effect.catch((error) =>
+              Effect.sync(() => warn("The server on this computer did not apply the account directory.", error.cause)),
+            ),
+          ),
+      );
+      return;
+    }
     const run = command.type === "publish" ? publisher.publish(command.machineToken) : publisher.unpublish();
     Effect.runFork(
       commands.withPermit(

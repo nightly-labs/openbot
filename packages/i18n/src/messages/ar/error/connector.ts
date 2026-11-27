@@ -9,6 +9,8 @@ export const messages = {
   "error.connector.githubClientUnknown": "لا يعرف GitHub معرّف Client ID لهذا GitHub App.",
   "error.connector.githubUnexpected": "أرسل GitHub إجابة غير متوقعة: {detail}",
   "error.connector.githubUnreachable": "لا يمكن لـ OpenBot الوصول إلى GitHub: {detail}",
+  "error.connector.githubOffline":
+    "لا يمكن لـ OpenBot الوصول إلى GitHub. تحقق من اتصال الإنترنت وإعدادات DNS في الكمبيوتر أو الخادم الذي يشغّل OpenBot، ثم حاول مرة أخرى.",
   "error.connector.githubExpired": "انتهت صلاحية الاتصال بـ GitHub. اتصل بـ GitHub مرة أخرى.",
   "error.connector.githubFileUnreadable": "ملف اتصال GitHub غير قابل للقراءة.",
   "error.connector.githubFileTooLarge": "ملف اتصال GitHub كبير جدًا.",
@@ -21,25 +23,95 @@ export const messages = {
   "error.connector.linkNoCard": "لا يحتوي حساب Link على بطاقة. أضف بطاقة في Link.",
   "error.connector.linkFileUnreadable": "ملف اتصال Link غير قابل للقراءة.",
   "error.connector.linkFileTooLarge": "ملف اتصال Link كبير جدًا.",
+  "error.connector.nearSignIn": "سجّل الدخول إلى OpenBot لاستخدام محفظة العملات المشفرة.",
+  "error.connector.nearServiceUnavailable": "خدمة محفظة العملات المشفرة غير متاحة. حاول مرة أخرى لاحقًا.",
+  "error.connector.nearWalletNotFound": "هذه المحفظة لا تنتمي إلى حساب OpenBot هذا أو إلى هذا الخادم.",
+  "error.connector.nearWalletLimit": "محافظ جديدة كثيرة جدًا اليوم. حاول مرة أخرى غدًا.",
+  "error.connector.nearProviderBusy": "لا يستجيب NEAR Intents حاليًا. حاول مرة أخرى بعد بضع دقائق.",
+  "error.connector.nearNoWallet": "لم يتم إعداد أي محفظة عملات مشفرة. أعدّها في إعدادات الخادم > الخزنة > كريبتو.",
+  "error.connector.nearWalletExists": "تم إعداد محفظة عملات مشفرة بالفعل.",
+  "error.connector.nearFrozen":
+    "الدفعات من محفظة العملات المشفرة متوقفة مؤقتًا. استأنفها في إعدادات الخادم > الخزنة > كريبتو.",
+  "error.connector.nearAgentNotAllowed":
+    "لا يمكن لهذا الوكيل الدفع من محفظة العملات المشفرة. فعّل ذلك في إعدادات الخادم > الخزنة > كريبتو.",
+  "error.connector.nearGrantExpired":
+    "لا يملك OpenBot إذن دفع لمحفظة العملات المشفرة. جدّده في إعدادات الخادم > الخزنة > كريبتو.",
+  "error.connector.nearUnknownAsset": "لا يوجد في محفظة العملات المشفرة أصل {asset}.",
+  "error.connector.nearAmountInvalid": "{amount} ليس مبلغًا صالحًا من {asset}.",
+  "error.connector.nearRecipientInvalid": "{recipient} ليس حساب NEAR ولا chain:address.",
+  "error.connector.nearRefused": "رفضت NEAR Intents Agent API الطلب: {detail}",
+  "error.connector.nearUnexpected": "أرسلت NEAR Intents Agent API إجابة غير متوقعة: {detail}",
+  "error.connector.nearUnreachable": "لا يمكن لـ OpenBot الوصول إلى NEAR Intents Agent API: {detail}",
+  "error.connector.nearFileUnreadable": "ملف محفظة العملات المشفرة غير قابل للقراءة.",
+  "error.connector.nearFileTooLarge": "ملف محفظة العملات المشفرة كبير جدًا.",
+  "error.connector.nearSigningCanceled": "أُلغي التوقيع.",
+  "error.connector.nearSigningExpired": "لم يصل التوقيع في الوقت المحدد. حاول مرة أخرى.",
+  "error.connector.nearSigningInvalid": "التوقيع الوارد من المتصفح غير صالح.",
+  "error.connector.nearSigningBusy": "يوجد توقيع آخر ينتظر في المتصفح. أكمله أو ألغه أولًا.",
+  "error.connector.nearPolicyCooldown": "يمكنك تغيير قواعد المحفظة مرة أخرى في {time}.",
+  "error.connector.nearPolicyPending": "لم يكتمل تغيير السياسة. حاول مرة أخرى بعد بضع دقائق.",
+  "error.connector.nearDeclined": "رفض المالك الدفع.",
+  "error.connector.nearUncertain":
+    "لا يعرف OpenBot إن كان الدفع قد أُرسل. لا تدفع مرة أخرى. يمكن للمالك التحقق من سجل المحفظة.",
+  "error.connector.nearPaymentFailed": "فشل الدفع: {detail}",
+  "error.connector.nearPaymentUnknown": "لم يعد هذا الدفع ينتظر ردًا.",
+  "error.connector.nearRuleFull": "يمكن أن تحتوي قاعدة الدفع على {limit} مستلمين كحد أقصى.",
+  "error.connector.nearRulesFull": "يمكن أن تحتوي المحفظة على {limit} قواعد دفع كحد أقصى.",
   "error.connector.onePasswordCliMissing":
     "لا يمكن لـ OpenBot العثور على 1Password CLI. ثبّته وفعّل تكامله في تطبيق 1Password، أو استخدم رمز حساب خدمة.",
   "error.connector.onePasswordCliInstallFailed":
     "تعذّر على OpenBot تثبيت 1Password CLI. تحقق من الاتصال بالإنترنت، ثم حاول مرة أخرى.",
   "error.connector.onePasswordCliSignedOut":
     "لم يتم تسجيل الدخول إلى 1Password CLI. فعّل تكامله في تطبيق 1Password، ثم اتصل مرة أخرى.",
+  "error.connector.onePasswordAppUnreachable":
+    "لا يستطيع OpenBot الوصول إلى تطبيق 1Password. افتح 1Password وافتح قفله. في Settings > Developer، تأكد من تشغيل «Integrate with 1Password CLI». ثم حاول مرة أخرى.",
   "error.connector.onePasswordCliFailed": "فشل 1Password CLI: {detail}",
+  "error.connector.onePasswordCliForbidden":
+    "لا يسمح لك حساب 1Password بإنشاء الخزنة المشتركة أو حساب خدمة. اطلب هذا الإذن من مالك الحساب أو مسؤوله، أو اطلب منه رمز حساب خدمة وانقر «استخدام رمز».",
   "error.connector.onePasswordUnexpected": "أرسل 1Password إجابة غير متوقعة: {detail}",
   "error.connector.onePasswordTokenRejected": "لم يقبل 1Password رمز حساب الخدمة.",
+  "error.connector.onePasswordUnreachable":
+    "تعذّر على OpenBot الاتصال بـ 1Password. تحقق من الاتصال بالإنترنت، ثم حاول مرة أخرى.",
+  "error.connector.onePasswordRateLimited": "تلقّى 1Password طلبات كثيرة جدًا. انتظر بضع دقائق، ثم حاول مرة أخرى.",
   "error.connector.onePasswordNoVault": "لا يمكن لحساب الخدمة قراءة أي خزنة. امنحه الوصول إلى خزنة، ثم حاول مرة أخرى.",
+  "error.connector.onePasswordReadFailed":
+    "لا يستطيع OpenBot قراءة بيانات تسجيل الدخول في 1Password. اقطع اتصال 1Password، ثم اتصل به مرة أخرى.",
   "error.connector.onePasswordFileUnreadable": "ملف اتصال 1Password غير قابل للقراءة.",
   "error.connector.onePasswordFileTooLarge": "ملف اتصال 1Password كبير جدًا.",
   "error.connector.bitwardenFailed":
     "تعذّرت قراءة Bitwarden. ثبّت bw CLI، وسجّل الدخول، وافتح قفله، وأنشئ مجلدًا واحدًا باسم Shared with OpenBot. اتصل بمفتاح جلسة جديد.",
+  "error.connector.bitwardenCliMissing":
+    "لا يجد OpenBot واجهة سطر أوامر Bitwarden. ثبّت bw وتأكد أنه يعمل في طرفية جديدة، ثم اتصل مرة أخرى.",
+  "error.connector.bitwardenFolderMissing":
+    "يجب أن يحتوي Bitwarden على مجلد واحد فقط باسم Shared with OpenBot. أنشئه أو احذف المجلد الزائد، ثم اتصل مرة أخرى.",
   "error.connector.bitwardenHostInput":
     "أدخل عنوان خادم HTTPS، وclient_id وclient_secret لمفتاح API، وكلمة المرور الرئيسية.",
   "error.connector.bitwardenHostFailed":
     "تعذّر فتح Bitwarden على هذا الخادم. تحقق من عنوان الخادم ومفتاح API وكلمة المرور الرئيسية، وتأكد من وجود مجلد واحد باسم Shared with OpenBot. ثم اتصل مرة أخرى.",
+  "error.connector.bitwardenHostSignInFailed":
+    "تعذّر تسجيل الدخول إلى Bitwarden على هذا الخادم. تحقق من عنوان الخادم ومفتاح API، ثم اتصل مرة أخرى.",
+  "error.connector.bitwardenHostUnlockFailed":
+    "تعذّر فتح قفل Bitwarden على هذا الخادم. تحقق من كلمة المرور الرئيسية، ثم اتصل مرة أخرى.",
   "error.connector.bitwardenCliInstallFailed":
     "تعذّر تثبيت Bitwarden CLI على هذا الخادم. تحقق من اتصاله بالشبكة، ثم اتصل مرة أخرى.",
+  "error.connector.bitwardenCliCannotStart":
+    "لم يبدأ Bitwarden CLI على هذا الخادم. اتصل مرة أخرى. إذا لم يبدأ بعد ذلك، فاختر المساعدة > الإبلاغ عن مشكلة.",
   "error.connector.bitwardenFileUnreadable": "ملف اتصال Bitwarden غير قابل للقراءة.",
+  "error.connector.passwordManagerUnknown": "لا يعرف OpenBot مدير كلمات المرور هذا.",
+  "error.connector.passwordManagerMethod": "لا يمكن توصيل مدير كلمات المرور هذا بهذه الطريقة.",
+  "error.connector.passwordManagerNoSignIn": "لا توجد صفحة تسجيل دخول مفتوحة. اتصل مرة أخرى.",
+  "error.connector.protonPassFailed": "تعذّر توصيل Proton Pass. اتصل مرة أخرى.",
+  "error.connector.protonPassCliInstallFailed": "تعذّر تثبيت Proton Pass CLI. تحقق من اتصال الشبكة، ثم اتصل مرة أخرى.",
+  "error.connector.protonPassPlan":
+    "لا تسمح خطة Proton الخاصة بك باستخدام Proton Pass CLI. غيّر الخطة، ثم اتصل مرة أخرى.",
+  "error.connector.protonPassPlanMissing":
+    "لا تتضمن خطة Proton الخاصة بك Proton Pass CLI. تحتاج إلى خطة Proton تتضمن Pass Plus. غيّر الخطة، ثم اتصل مرة أخرى.",
+  "error.connector.protonPassExpired": "انتهى الوصول إلى Proton Pass. اتصل مرة أخرى.",
+  "error.connector.protonPassKeyInvalid": "أدخل مفتاح وصول Proton Pass يبدأ بـ pst_.",
+  "error.connector.protonPassExtraPassword": "كلمة المرور الإضافية غير صحيحة. أدخلها مرة أخرى.",
+  "error.connector.protonPassExtraPasswordNotAsked": "لم يطلب Proton Pass كلمة مرور إضافية.",
+  "error.connector.protonPassFileUnreadable": "ملف اتصال Proton Pass غير قابل للقراءة.",
+  "error.connector.protonPassSignInTimeout": "استغرق تسجيل الدخول إلى Proton وقتًا طويلاً. اتصل مرة أخرى.",
+  "error.connector.protonPassSetupFailed":
+    "تعذّر إنشاء الخزنة Shared with OpenBot أو مفتاح الوصول الخاص بها في Proton Pass. اتصل مرة أخرى.",
 } as const satisfies PartialTranslation<typeof source>;

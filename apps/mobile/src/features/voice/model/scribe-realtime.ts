@@ -1,18 +1,13 @@
 import { isDynamicRecord } from "@openbot/contracts/runtime-values";
+import { joinSegments } from "@/features/chat/model/voice-dictation";
 
 const SCRIBE_REALTIME_URL = "wss://api.elevenlabs.io/v1/speech-to-text/realtime";
-/** The microphone sends 16 kHz 16-bit mono PCM. */
 const SAMPLE_RATE = 16_000;
-/** How long ElevenLabs has to start the session. */
 const OPEN_TIMEOUT_MS = 15_000;
-/** After the finish, how long to wait for the last segment when ElevenLabs still shows one in progress. */
 const FINAL_SEGMENT_TIMEOUT_MS = 10_000;
-/** After the finish, how long to wait for late text when no segment is in progress. */
 const QUIET_FINISH_MS = 1_500;
-/** Audio that waits for the session to start: 10 s of chunks of 100 ms, then the oldest goes. */
 const MAXIMUM_WAITING_CHUNKS = 100;
 
-/** Why a session failed. It never holds the key, the token or the provider's text. */
 export type ScribeFailure = "network" | "invalid-key" | "quota" | "rate-limited" | "terms" | "failed";
 
 function failureOf(category: string): ScribeFailure {
@@ -25,25 +20,6 @@ function failureOf(category: string): ScribeFailure {
   return "failed";
 }
 
-const NO_SPACE_SCRIPT = /[\p{Script=Han}\p{Script=Hiragana}\p{Script=Katakana}\p{Script=Thai}]/u;
-
-/** Joins segments with a space, except between two characters of a script that writes none, as on desktop. */
-function joinSegments(segments: readonly string[]): string {
-  let text = "";
-  for (const segment of segments) {
-    const next = segment.trim();
-    if (!next) continue;
-    const joint = text && !(NO_SPACE_SCRIPT.test(text.at(-1) ?? "") && NO_SPACE_SCRIPT.test(next[0] ?? ""));
-    text = joint ? `${text} ${next}` : `${text}${next}`;
-  }
-  return text;
-}
-
-/**
- * One dictation with ElevenLabs Scribe v2 Realtime, as desktop streams it. ElevenLabs finds the
- * spoken language itself, and ends a segment at a silence, so the text before it stays fixed while
- * the user speaks on. The socket uses a single-use token, not the key.
- */
 export class ScribeRealtimeSession {
   readonly #socket: WebSocket;
   readonly #onText: (text: string) => void;
@@ -53,14 +29,12 @@ export class ScribeRealtimeSession {
   #partial = "";
   #waiting: string[] = [];
   #settleFinish: (() => void) | null = null;
-  /** `finish` came while the socket opened: the session finishes once it starts. */
   #finishOnStart = false;
   #timer: ReturnType<typeof setTimeout> | null = null;
 
   constructor(options: {
     token: string;
     onText: (text: string) => void;
-    /** The session ended before its finish, or during it. Called once, and never after `cancel`. */
     onFailure: (failure: ScribeFailure) => void;
   }) {
     this.#onText = options.onText;
@@ -74,7 +48,6 @@ export class ScribeRealtimeSession {
     this.#socket.onmessage = (event) => {
       if (typeof event.data === "string") this.#receive(event.data);
     };
-    // `onclose` follows an error. The error can hold the URL, which holds the token.
     this.#socket.onerror = () => undefined;
     this.#socket.onclose = () => {
       if (this.#phase === "finishing") this.#endFinish();
@@ -87,7 +60,6 @@ export class ScribeRealtimeSession {
     return joinSegments([...this.#committed, this.#partial]);
   }
 
-  /** Sends 100 ms of base64 PCM. Audio before the session starts waits for it. */
   append(pcm: string): void {
     if (this.#phase === "opening") {
       this.#waiting.push(pcm);
@@ -95,14 +67,12 @@ export class ScribeRealtimeSession {
     } else if (this.#phase === "streaming") this.#send(pcm, false);
   }
 
-  /** Ends the audio and waits for the last segment. A failure on the way reports through `onFailure`. */
   finish(): Promise<void> {
     if (this.#phase === "ended") return Promise.resolve();
     const done = new Promise<void>((resolve) => {
       this.#settleFinish = resolve;
     });
     if (this.#phase !== "opening") this.#beginFinish();
-    // The words said while the socket opens wait for the session: it sends them, then finishes.
     else if (this.#waiting.length > 0) this.#finishOnStart = true;
     else this.cancel();
     return done;
@@ -114,7 +84,6 @@ export class ScribeRealtimeSession {
     this.#armFinishTimer();
   }
 
-  /** Ends the session and drops its text. */
   cancel(): void {
     if (this.#phase === "ended") return;
     this.#phase = "ended";
@@ -168,7 +137,6 @@ export class ScribeRealtimeSession {
     }
     if (type === "warning" || type.startsWith("committed_transcript_") || type === "edited_transcript") return;
     if (this.#phase === "finishing" && (type === "commit_throttled" || type === "insufficient_audio_activity")) {
-      // Nothing was left to commit after the last segment.
       this.#endFinish();
       return;
     }
@@ -186,7 +154,6 @@ export class ScribeRealtimeSession {
 
   #endFinish(): void {
     if (this.#phase !== "finishing") return;
-    // The text so far stands for the segment that did not commit in time.
     if (this.#partial) {
       this.#committed.push(this.#partial);
       this.#partial = "";

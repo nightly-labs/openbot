@@ -1,0 +1,952 @@
+[
+  {
+    "version": "0.80.0",
+    "date": "2026-11-26",
+    "notices": [
+      "Katıldığınız her sunucuyu da bu sürüme güncelleyin. 0.79.0'dan sonra büyük sohbet geçmişi olan bir sunucu yeniden hızlı çalışır. Apple Watch uygulaması, canlı iş akışı işaretçileri, Dağıt ve aşağıdaki birçok düzeltme bir sunucuda yalnızca sunucu bu sürümdeyse çalışır."
+    ],
+    "groups": [
+      {
+        "type": "added",
+        "items": [
+          "Sunucunuz OpenBot Apple Watch uygulamasına doğrudan yanıt verir. OpenBot iPhone'da arka plandayken veya kapalıyken de saat çalışır. İstekler ve yanıtlar saat ile sunucu arasında uçtan uca şifrelenir.",
+          "Aynı iş akışını açan diğer her kişinin imlecini ve seçili adımını görürsünüz.",
+          "Ayarlar › Sağlayıcılar › Hesapları havuzla bölümünde yeni bir seçenek var: Dağıt. Ajanları en çok kullanım hakkı kalan hesaplara yerleştirir, böylece tüm hesaplar kullanılır. Önce doldur varsayılan olarak kalır.",
+          "Her NEAR cüzdan ödemesi sohbette durumu ve işlem bağlantısıyla bir kart gösterir. Cüzdanı kurarken veya harcamasını değiştirirken kendi günlük limitinizi yazabilirsiniz.",
+          "MAGI-2, OpenBot kredileriyle sesli 1080p video klipleri üretir. Video modeli adı verilmeyen bir ajan artık bunu kullanır."
+        ]
+      },
+      {
+        "type": "changed",
+        "items": [
+          "Kullanım sayfası maliyeti ve token sayısını sağlayıcı başına bir renkle yığılmış çubuklar olarak gösterir. Yeni bir rapor yüklenirken son raporu ekranda tutar.",
+          "Buy credits sayfası her kredi paketini kendi rengi, fiyatı ve tek kredinin fiyatıyla bir kart olarak gösterir.",
+          "Team lisansı artık en fazla 25 kullanıcı içerebilir. Önceden en fazla 10 idi."
+        ]
+      },
+      {
+        "type": "fixed",
+        "items": [
+          "0.79.0'a yükseltmeden sonra büyük sohbet geçmişi olan bir sunucu yeniden hızlı çalışır. Önceden eski sohbet olaylarının temizliği sunucuyu her dakika birkaç saniye durduruyordu.",
+          "Ajan yanıt yazarken mesaj kutusuna yazmak artık gecikmez.",
+          "Windows'ta Bilgisayar Kullanımı ajanları masaüstünü yeniden görür. 0.77.0'dan beri siyah bir görüntü alıyorlardı.",
+          "Çok sayıda resim içeren uzun bir sohbet çok daha az bellek kullanır.",
+          "Zamanlanmış rutinler, kısa bir veritabanı hatasından sonra kendiliğinden yeniden başlar. Önceden tek bir başarısız okuma tüm zamanlanmış rutinleri durduruyordu."
+        ]
+      }
+    ]
+  },
+  {
+    "version": "0.79.0",
+    "date": "2026-11-25",
+    "notices": [
+      "Katıldığınız her sunucuyu da bu sürüme güncelleyin. Kredili resim ve video araçları, konum istekleri ve aşağıdaki birçok düzeltme bir sunucuda yalnızca sunucu bu sürümdeyse çalışır."
+    ],
+    "groups": [
+      {
+        "type": "added",
+        "items": [
+          "Ajanlar OpenBot kredileriyle resim ve video oluşturabilir ve resimlerinizi düzenleyebilir. Onay kartı modeli, fiyatı ve istemi gösterir. İzin vermeden önce başka bir model seçebilirsiniz. Sol şeritteki \"Credits\" öğesi bakiyenizi gösterir. Bir sahip veya yönetici \"Ajanlar kredi kullanabilir\" seçeneğini açabilir veya kapatabilir.",
+          "Ajanlar, bir NEAR Intents cüzdanından sitelere kripto ile ödeme yapabilir. Cüzdanı Sunucu ayarları › Vault › Kripto bölümünde geçiş anahtarıyla bağlayın, sonra para yatırın. Her ödeme sohbette onayınızı bekler; ancak o site için \"Her zaman izin ver\" seçeneğini seçerseniz beklemez. Günlük bütçe ajanların harcayabileceği tutarı sınırlar. Cüzdan yalnızca bu bilgisayar içindir ve ödemelerde gerçek para kullanılır.",
+          "Her hesap 10 ücretsiz hoş geldin kredisi alır. Ayrıca Credits sayfasında Redeem code ile bir kredi kodunu kullanabilirsiniz.",
+          "Bir ajanın tarayıcı sekmesi konumunuzu isteyebilir. Sohbet önce size sorar; Engelle, Her zaman izin ver veya İzin ver seçersiniz. Önceden tarayıcı isteği her zaman engelliyordu.",
+          "Kenar çubuğunda sohbet listesinin üstünde sekmeler var: \"Tümü\", \"Okunmamış\" ve sizin seçtiğiniz klasörler. Her sekme, o sekmenin okunmamış sohbetlerini gösterir."
+        ]
+      },
+      {
+        "type": "changed",
+        "items": [
+          "Yeni bir iş akışı adımı artık çalışabilen bir modelle başlar. Metin adımı tercih ettiğiniz modeli veya bağlı bir sağlayıcının olağan modelini kullanır.",
+          "Yalnızca ücretsiz krediniz olduğunda, onay kartındaki model listesi ücretsiz kredilerle ödenen modelleri \"Ücretsiz kredi\" ile işaretler.",
+          "Yan panel, en fazla üç grubu üst üste bölebilir. Bir grubun yüksekliğini değiştirmek için iki grup arasındaki çizgiyi sürükleyin."
+        ]
+      },
+      {
+        "type": "fixed",
+        "items": [
+          "Uygulama daha az donar, çoğunlukla Windows'ta. Yavaş denetimlerin sonuçlarını kısa süre tutar ve yavaş işi arka planda yapar.",
+          "Bir Claude ajanı plan modunda bir planı bitirdiğinde, sohbet artık planı Onayla ve Stop planning ile gösterir. Önceden onay görünmüyor ve ajan yapmaya başlıyordu.",
+          "Başka bir ajanın veya bir rutinin iletisi artık meşgul bir Claude ajanının işini durdurmaz.",
+          "Bir ajanın tarayıcı sekmesindeki bir web sitesinin uyarısı, siz \"Tamam\"a tıklayana kadar OpenBot penceresini kaplamaz. Uyarı kendiliğinden kapanır ve ajan metnini alır.",
+          "Linux X11 masaüstünde, bir ajan başka bir uygulamada Bilgisayar Kullanımı'nı kullandıktan sonra OpenBot'ta yazmak artık durmaz. Yazma zaten durduysa bir kez çıkış yapıp yeniden giriş yapın."
+        ]
+      }
+    ]
+  },
+  {
+    "version": "0.78.0",
+    "date": "2026-11-24",
+    "notices": [
+      "Katıldığınız her sunucuyu da bu sürüme güncelleyin. Aşağıdaki düzeltmelerin çoğu bir sunucuda yalnızca sunucu bu sürümdeyse çalışır."
+    ],
+    "groups": [
+      {
+        "type": "added",
+        "items": [
+          "Kanallarda ses kullanın. Bir kanala sesle ileti dikte ettiğinizde uygulama bir ajanın yanıtını sesli okur. Kanalın ileti kutusundan sesli bir konuşma da başlatabilirsiniz.",
+          "Bir sunucuyu sunucu çubuğundan gizleyin. Sunucu diğer bilgisayarlarınızda da gizli olur. Yeniden göstermek için \"Gizli sunucular\" klasöründe seçin."
+        ]
+      },
+      {
+        "type": "changed",
+        "items": [
+          "Görevler sayfası artık Mesaj dizileri olarak adlandırılıyor; telefon uygulamasında ve sohbet yan panelinde olduğu gibi.",
+          "Akış halindeki yanıtlar ve aynı anda çalışan iş akışları daha az CPU kullanır; web istemcisi bir sunucuyu daha hızlı açar."
+        ]
+      },
+      {
+        "type": "fixed",
+        "items": [
+          "macOS'te Claude için Bağlan ve Hesap ekle artık OpenBot'tan Claude oturum açma sayfasını açar.",
+          "Katıldığınız bir sunucuyla bağlantı veri göndermeyi durdurduğunda uygulama artık kendiliğinden yeniden bağlanır.",
+          "Katıldığınız bir sunucuda uzun kanallar daha hızlı açılır ve güncellenir.",
+          "Bir iş akışının \"Bildirim\" çıktısı veya onay bekleyen bir adım artık telefona bildirim gönderir.",
+          "Bir Gemini sohbeti, Google bir araç sonucunu reddettikten sonra devam eder. Önceden sonraki her ileti başarısız oluyordu."
+        ]
+      }
+    ]
+  },
+  {
+    "version": "0.77.0",
+    "date": "2026-11-23",
+    "notices": [
+      "Katıldığınız her sunucuyu da bu sürüme güncelleyin. Sunucuda, OpenBot kredi modelleri, duraklatılmış ve dışa aktarılmış iş akışları, WhatsApp salt okunur sohbetleri, konum istekleri ve Signal sunucu seçimi yalnızca sunucu bu sürümdeyse çalışır.",
+      "Bu güncellemeden sonra OpenBot'un eski bir sürümü verilerinizi açamaz."
+    ],
+    "groups": [
+      {
+        "type": "added",
+        "items": [
+          "Kendiniz veya bir sunucu için OpenBot kredisi satın alın. Sayfa çubuğundaki \"Credits\" düğmesini veya Ayarlar → Faturalandırma bölümünü kullanın. Ücretli lisans ayrıca her ay ücretsiz kredi verir.",
+          "İş akışındaki resim ve video adımları, kredilerinizin karşıladığı OpenBot modellerini başka bir oturum açma olmadan kullanabilir. Bir adımda Adet ayarını yapın; aynı anda en fazla 4 sonuç alın.",
+          "İş akışı menüsünden bir iş akışını duraklatın. Ayrıca bir iş akışını dosyaya aktarabilir ve başka bir bilgisayarda veya sunucuda içe aktarabilirsiniz.",
+          "Önceki bir adımdan alan eklemek için bir iş akışı adımına {{ yazın. Zamanlama, GitHub, Discord, Telegram ve Slack tetikleyicileri artık alan da verir.",
+          "Bir istek buna ihtiyaç duyduğunda, örneğin \"yakınımdaki restoranlar\" gibi, ajan konumunuzu isteyebilir. Siz yanıt verene kadar hiçbir şey gönderilmez.",
+          "İzin verilen bir WhatsApp kişisini veya grubunu salt okunur yapın. Ajanlarınız sohbeti okuyabilir, OpenBot ise sohbete hiçbir zaman yazmaz."
+        ]
+      },
+      {
+        "type": "changed",
+        "items": [
+          "Bağlamı 200K veya daha fazla token olan boşta bir Claude veya Pi sohbeti, 1 saatlik istem önbelleği dolmadan önce kendini sıkıştırır. Bu, tüm bağlamı yeniden okumaktan daha az maliyetlidir. Bunu Sunucu ayarları → Sağlayıcılar bölümünden kapatın.",
+          "Bir sunucunun Signal sunucusunu Sunucu ayarları → Genel bölümünden seçin. \"Otomatik\" en yakın olanı tutar.",
+          "\"Tam erişim\" ile çalışan Gemini ajanları, bellek, tarayıcı ve kanallar gibi OpenBot araçlarını onay kartı olmadan kullanır."
+        ]
+      },
+      {
+        "type": "fixed",
+        "items": [
+          "Bir Claude ajanı çalışırken ona gönderdiğiniz ileti artık hemen ajana ulaşır; alt ajan veya uzun bir araç çalışırken de.",
+          "\"Önce sor\" olarak ayarlanmış bir ChatGPT (Codex) ajanı, artık bir komut çalıştırmadan veya bir dosyayı değiştirmeden önce size sorar.",
+          "Yanıt vermeyi bırakan barındırılan veya kendi kendine barındırılan bir sunucu artık 10 dakika sonra kendiliğinden yeniden başlar.",
+          "macOS'te ajan yuvası artık OpenBot'u ve tüm bilgisayarı yavaşlatmaz.",
+          "Uzun sohbetler yumuşak kayar. Önceden 100'den fazla iletisi olan bir sohbet, kaydırırken takılıyordu."
+        ]
+      }
+    ]
+  },
+  {
+    "version": "0.76.0",
+    "date": "2026-11-21",
+    "notices": [
+      "Katıldığınız her sunucuyu da bu sürüme güncelleyin. Sunucuda, aynı anda çalışan görevler, canlı ses hesabı, OpenBot bellek anahtarı, iş akışı klasörleri, türü tanımlı iş akışı yanıtları ve bir sağlayıcının 10'dan fazla hesabı yalnızca sunucu bu sürümdeyse çalışır.",
+      "Bu güncellemeden sonra OpenBot'un eski bir sürümü verilerinizi açamaz."
+    ],
+    "groups": [
+      {
+        "type": "added",
+        "items": [
+          "Bir ajan, birbirinden bağımsız işleri aynı anda çalışan görevlere ayırabilir. Her sonuç ana sohbete geri döner ve ajan sonuçları sizin için birleştirir.",
+          "Yan panelin yeni Mesaj dizileri sekmesinde bir ajanın açık tüm mesaj dizilerini görün. Sekme, sizi bekleyen mesaj dizilerinin sayısını gösterir.",
+          "Kısayollarınızı Ayarlar'ın yeni Klavye sekmesinde değiştirin. Yeni kısayollar yeni bir mesaj dizisi başlatır ve sonraki ile önceki mesaj dizisine geçer.",
+          "İş akışları sekmelerde açılır ve iş akışı adımları türü tanımlı yanıt verebilir. Bir yanıtı sonraki bir adımda kullanmak için {{name}} yazın.",
+          "Ayarlar > Görünüm bölümünden pencere arka planı olarak MP4 veya WebM videosu yükleyin.",
+          "Ayarlar > Ses bölümünden GPT canlı sesinin kullandığı ChatGPT hesabını seçin."
+        ]
+      },
+      {
+        "type": "changed",
+        "items": [
+          "Bir sağlayıcı 20 hesaba kadar tutar. Önceden sınır 10'du.",
+          "Dikte en fazla 10 dakika kaydeder. Önceden 2 dakikada duruyordu.",
+          "Yukarı kaydırdığınızda bir mesaj dizisi eski mesajları yükler. Bir düğmeye tıklamanız gerekmez."
+        ]
+      },
+      {
+        "type": "fixed",
+        "items": [
+          "Zamanlanmış bir rutin, bir çalıştırmanın bildirecek bir şeyi olmadığında artık sessizce kendini kapatmaz.",
+          "Uzun bir sohbet, bir yanıt akarken tüm mesajlarını doğru sırada tutar.",
+          "Bağlı bir WhatsApp numarası hâlâ \"Bağlandı\" yazarken mesaj almayı artık durdurmaz.",
+          "Windows'ta OpenCode ajanları komutları yeniden çalıştırır. Önceden sık sık \"opencode-pty request timed out\" hatasıyla başarısız oluyordu.",
+          "Sessize aldığınız bir ajan, bir kanalda yanıt verdiğinde artık size bildirim göndermez."
+        ]
+      }
+    ]
+  },
+  {
+    "version": "0.75.0",
+    "date": "2026-11-20",
+    "notices": [
+      "Katıldığınız her sunucuyu da bu sürüme güncelleyin. Sunucuda, iş akışı adım ayarları, Bu adımdan çalıştır, sahiplik devri, Tümünü güncelle düğmesi ve ajanlarla ilgili birçok düzeltme yalnızca sunucu bu sürümdeyse çalışır.",
+      "Bu güncellemeden sonra OpenBot'un eski bir sürümü verilerinizi açamaz."
+    ],
+    "groups": [
+      {
+        "type": "added",
+        "items": [
+          "Ajanla Bas konuş ile konuşun. Konuşurken konuşma düğmesini veya konuşma tuşunu basılı tutun. Bıraktığınızda OpenBot söylediklerinizi gönderir. Tuşu Ayarlar > Ses bölümünden değiştirin.",
+          "Bir iş akışını tek bir adımdan yeniden başlatın. Adım menüsünde Bu adımdan çalıştır seçin. Önceki adımlar yanıtlarını korur ve yeniden çalışmaz.",
+          "Bir iş akışı adımının sonucunu oluşturan ayarları ve girdileri görün. Adımda Ayarlar'ı seçin, sonra aynı şekilde yeniden çalıştırmak için Bu ayarları kullan'ı seçin.",
+          "Sunucunuzu başka bir OpenBot hesabına devredin. Sunucu ayarları > Üyeler bölümünde yeni sahibin e-postasını girin. Yeni sahip kabul ettiğinde sunucu el değiştirir.",
+          "Tüm sağlayıcıları aynı anda güncelleyin. Ayarlar > Sağlayıcılar, bir veya daha fazla sağlayıcının güncellemesi olduğunda Tümünü güncelle düğmesini gösterir."
+        ]
+      },
+      {
+        "type": "changed",
+        "items": [
+          "OpenBot, indirdiği sağlayıcı CLI'lerini yeni sürüm varsa her saat günceller. Güncelleme ajanlar boşta olana kadar bekler.",
+          "Bir ajanın her ileti dizisi, ana sohbetin veya o ajanın başka bir ileti dizisinin açtığı tarayıcı sekmelerini kullanabilir.",
+          "Rutinler sekmesi kenar çubuğundan kaldırıldı. Rutinler yine çalışır. Bunları ajan ayarlarında, Zamanlama sayfasında ve Sunucu ayarları > Rutinler bölümünde yönetin."
+        ]
+      },
+      {
+        "type": "fixed",
+        "items": [
+          "İndirilmiş bir güncelleme için yeniden başlatma artık ajanlar boşta olana kadar bekler; \"Yeniden başlatmayı iptal et\" seçeneği vardır. Önceden OpenBot hemen kapanır ve ajanın görevini durdururdu.",
+          "Bir ajan, yeniden başlatmadan ya da kullanım sınırından sonra artık \"Çalışıyor\" durumunda, iletileri beklerken kalmaz. Durdurulan tur Kesildi olarak gösterilir ve bekleyen iletiler başlar.",
+          "Çok sayıda ajanı ve bağlı cihazı olan meşgul bir sunucu artık bellek sorunu yaşamaz ve bir sonraki turu seçerken donmaz.",
+          "Bir duraklamadan sonra gönderdiğiniz ileti, Claude oturum açıkken artık \"Gönderilmedi\" ve \"Devam etmek için Claude sağlayıcısını bağlayın.\" durumunda kalmaz.",
+          "Kimsenin kullanmadığı ajan tarayıcı sekmeleri 2 dakika sonra işlemciyi kullanmayı bırakır."
+        ]
+      }
+    ]
+  },
+  {
+    "version": "0.74.0",
+    "date": "2026-11-19",
+    "notices": [
+      "Katıldığınız her sunucuyu da bu sürüme güncelleyin. Sunucuda, iş akışı tuvalindeki resimlerin küçük kopyaları, özel video uzunlukları ve bir isteği \"devam et\" demeden tamamlayan ajanlar yalnızca sunucu bu sürümdeyse çalışır.",
+      "Linux'ta güncellemeden sonra OpenBot hâlâ yavaşsa `~/.config/OpenBot/gpu-crash.json` dosyasını silin ve OpenBot'u yeniden başlatın.",
+      "Bir Mistral ajanı için Sağlayıcı ayarları altında Düşünme seçeneğini ayarladıysanız, Efor menüsünde düzeyi yeniden seçin ve eski Düşünme satırını sıfırlayın."
+    ],
+    "groups": [
+      {
+        "type": "added",
+        "items": [
+          "Ayarlar > Invite friends sekmesinde davet bağlantınızı paylaşın. Sekme kredinizi ve katılan arkadaşlarınızı gösterir. Bir arkadaşınız her ödemede %10 indirim alır, siz de arkadaşınızın ödediği her faturanın %10'unu kredi olarak alırsınız.",
+          "İş akışı tuvalindeki düğümleri bir grupta toplayın. Bunları seçin ve Grupla (⌘G) tuşuna basın. Bir grubu tek bir yığın kartına daraltın ve grubu çözmek için Grubu çöz (⇧⌘G) tuşuna basın.",
+          "İş akışı tuvalindeki bir video adımına, Sunra veya Higgsfield modelinin desteklediği herhangi bir uzunluğu verin. Uzunluk menüsünde Özel'i seçin ve kaydırıcıyı kullanın.",
+          "Bir ajanın ayarlarındaki Uygulamalar satırından Pazaryeri'ni açın. Bir uygulama bağlayın veya Özel ekle ile kendi MCP sunucunuzu ekleyin.",
+          "Yeni bir bilgisayarda oturum açtığınızda ve hesabınızda zaten sunucular varsa, bunlar ilk adımda gösterilir. Birini açarak ajanları ve sohbetleriyle devam edin."
+        ]
+      },
+      {
+        "type": "changed",
+        "items": [
+          "Ajanlar, isteğinizi sizden \"devam et\" demeden tamamlar. İsteğin bir kısmı bitmediğinde ajan o kısımla devam eder; en fazla 3 kez. Sizin seçiminizi veya onayınızı gerektiren bir soru yine ajanı durdurur.",
+          "Yan panel sekmeleri başlığını ve tek bir genişliğini korur. Sekmeler sığmadığında satır kayar ve satırın sonundaki bir menü diğer sekmeleri listeler. Orta tıklama bir sekmeyi kapatır.",
+          "Katıldığınız bir sunucuda, iş akışı tuvalindeki resimler çok daha hızlı gösterilir. Tuval her resmin küçük bir kopyasını alır ve tam resim görüntüleyicide açılır.",
+          "Bir ileti dizisi artık ajanın sohbetine benziyor. Aynı göndericinin iletileri tek bir blok olarak okunur ve bir yanıtın adımları yanında gösterilir."
+        ]
+      },
+      {
+        "type": "fixed",
+        "items": [
+          "Bir Claude veya ChatGPT ajanı, sağlayıcı yanıt vermeyi bıraktığında saatlerce \"Çalışıyor\" durumunda kalmaz. 15 dakika boyunca çıktı gelmezse (bir araç çalışırken 60 dakika), OpenBot turu sonlandırır ve sıradaki iletiler devam eder.",
+          "\"Kendi Claude Code kurulumumu kullan\" kapalıyken Claude ajanları artık genel Claude Code talimatlarınızı ve kurallarınızı yüklemez. Her tur daha hızlı çalışır ve daha az maliyet çıkarır. Bunları korumak için \"Kendi Claude Code kurulumumu kullan\" seçeneğini açın.",
+          "OpenBot bir sağlayıcı güncellemesini indirirken ajanlarınız çalışmaya devam eder. Bir dakika boyunca veri gelmeyen bir indirme durur ve tekrar denediğinizde kaldığı yerden devam eder.",
+          "Ajanlar artık takım arkadaşı ajanlarına doğrudan ileti gönderir. Önceden bir kart her devri onaylamanızı isterdi ve siz onaylayana kadar iş dururdu.",
+          "Otomatik yedek modelleri olan bir ajan, daha fazla durumda bir sonraki yedek modele geçer; örneğin hız sınırına takıldığında veya Gemini Google ile bağlantısını kaybettiğinde."
+        ]
+      }
+    ]
+  },
+  {
+    "version": "0.73.0",
+    "date": "2026-11-18",
+    "notices": [
+      "Bu sürümü kurduktan sonra bu bilgisayarda veya sunucuda OpenBot'un eski bir sürümüne dönemezsiniz. Bu sürüm veritabanını küçültür ve eski bir sürüm onu açamaz.",
+      "Katıldığınız her sunucuyu da bu sürüme güncelleyin. Sunucuda özel resim boyutları, Sunra ve Higgsfield modelleri ile fiyatları ve çok sayıda ajanın daha hızlı yüklenmesi yalnızca sunucuda bu sürüm varsa çalışır."
+    ],
+    "groups": [
+      {
+        "type": "added",
+        "items": [
+          "Her ajanın yan ileti dizilerini kenar çubuğunda görün. Bir ajan satırının sonundaki oku seçin ya da tüm ileti dizilerini görmek için imleci satırın üzerinde tutun.",
+          "Kenar çubuğunu arama alanının sonundaki filtre düğmesiyle süzün. Yalnızca ajanları veya kanalları, yalnızca okunmamış sohbetleri veya çalışan ajanları ya da yalnızca seçtiğiniz klasörlerdeki sohbetleri gösterin.",
+          "İş akışı tuvalindeki bir Görsel adımına piksel cinsinden özel bir boyut verin ya da 4:5 veya 5:4 en-boy oranını kullanın.",
+          "İş akışı tuvali Sunra ve Higgsfield'in tüm görsel ve video modellerini gösterir. Çalıştır düğmesi fiyatı kredi olarak gösterir.",
+          "Yavaş bir bilgisayarda OpenBot'u daha hızlı yapmak için Ayarlar → Görünüm → Hareket bölümünden Arka plan bulanıklığı ile Hareketli ajan yüzleri seçeneklerini kapatın."
+        ]
+      },
+      {
+        "type": "changed",
+        "items": [
+          "Birden fazla kişi aynı iş akışını aynı anda düzenleyebilir. Tuval, diğer kişilerin değişikliklerini kaydettikçe ekler.",
+          "OpenBot, birçok ajan çalışırken çok daha az CPU kullanır ve gecikme olmadan yazabilirsiniz.",
+          "Ajanlar, banka 3-D Secure kodu istediğinde ödemeyi tamamlar. Kod, ajanın okuyabildiği bir e-postada ya da SMS'te olduğunda ajan kodu yazar.",
+          "Sunucu ayarları → Aktarım → Başka bir sunucuya kopyala artık ajanların iş akışlarını ve rutin akışlarını da kopyalar."
+        ]
+      },
+      {
+        "type": "fixed",
+        "items": [
+          "OpenBot veritabanı çok daha az yer kaplar. Güncellemeden sonra OpenBot, eski sohbet iletilerinin kopyalarını küçük adımlarla kaldırır.",
+          "Windows'ta bir güncelleme ilerlemesini yeniden gösterir.",
+          "Katıldığınız, çok sayıda ajanı olan bir sunucu ve büyük bir kanal daha hızlı açılır.",
+          "Çok sayıda görsel içeren ya da uzun geçmişi olan Gemini sohbetleri artık durmaz ve yeni bir sohbet başladığında Gemini sizden yeniden oturum açmanızı istemez.",
+          "Masaüstü uygulaması, OpenBot v0.34.1 veya daha eski bir sürümdeki sunucuya yeniden bağlanır."
+        ]
+      }
+    ]
+  },
+  {
+    "version": "0.72.0",
+    "date": "2026-11-16",
+    "notices": [
+      "Katıldığınız her sunucuyu da bu sürüme güncelleyin. Bir sunucuda CRM, Kodla hesap ekle, bir ajanın ayarladığı arka plan, ajanların düzenlediği Kitaplık klasörleri ve çalışan bir Devin turuna giden iletiler yalnızca sunucuda bu sürüm varsa çalışır."
+    ],
+    "groups": [
+      {
+        "type": "added",
+        "items": [
+          "Tüm pencerenin arkasında canlandırılmış bir arka plan oynatın. Ayarlar → Pencere arka planı bölümünden Koi göleti ya da Ateş böcekleri gibi bir sahne seçin ya da bir ajandan sizin için bir tane yapmasını isteyin.",
+          "Potansiyel müşterileri, müşterileri ve ödemeleri yeni CRM sayfasında tutun. Bu özellik deneyseldir: bir sahip ya da yönetici bunu Sunucu ayarları → Deneysel bölümünden açar. Stripe'tan içe aktarabilir ve ajanlar, bir sahip ya da yöneticinin onayladığı değişiklikler önerir.",
+          "Ajan yuvası sohbetinde bir ajana yanıt verin. Bir komuta izin verin ya da reddedin, bir soruyu yanıtlayın ya da bir tarayıcı adımını ana pencere olmadan tamamlayın.",
+          "Kitaplığı klasör kutucukları, Favoriler, Son ve Geri al ile düzenleyin. Bir klasör oluşturmak için dosyaları Yeni klasör'e sürükleyin ya da bir ajandan klasörlerini düzenlemesini isteyin.",
+          "Kodla bir ChatGPT (Codex), Grok ya da Claude hesabı ekleyin. Hesap ekle'nin yanındaki menüyü açın ve Kodla hesap ekle'yi seçin.",
+          "Bir Devin ya da OpenCode ajanı çalışırken gönderdiğiniz ileti, çalışan tura girer. Bunun için Devin CLI 3000.12.57 ya da OpenCode 2.3.0 veya daha yeni bir sürüm gerekir."
+        ]
+      },
+      {
+        "type": "changed",
+        "items": [
+          "Ayarların yeni bir düzeni var. Bölümler etiketli gruplarda yer alır ve Sunucu ayarları'nda yeni Bellek ile Ajan varsayılanları bölümleri vardır. macOS'te OpenBot sistem yazı tipini kullanır.",
+          "Özel MCP sunucularını Pazaryeri → Uygulamalar bölümünden ekleyin ve düzenleyin. Sunucu ayarları'nda artık MCP bölümü yok.",
+          "Bir ajanla yaptığınız sohbette balonlarınız artık ajanın avatarının rengini alır. Bunu Ayarlar → Görünüm → Balonlarınız bölümünden değiştirin.",
+          "Sesli konuşma artık yan paneli açmaz. Sohbetin üstündeki küçük bir çubuk ses denetimlerini gösterir."
+        ]
+      },
+      {
+        "type": "fixed",
+        "items": [
+          "Kayıtlı oturumunu kaybeden ya da çok büyüyen bir sohbet artık bozuk kalmaz. Ajan, sohbet geçmişiyle yeni bir oturum başlatır ve mesajınızı yanıtlar.",
+          "Bir kullanım sınırı ya da bir sağlayıcı hatası bir turu durdurduğunda daha fazla ajan yedek modeline geçer; buna Grok, Hermes ve Claude ajanları da dahildir.",
+          "Ajanlar, bir çerçevedeki oturum açma formu gibi daha fazla yerde kayıtlı girişi kullanabilir.",
+          "Bir rutin, başarısız bir çalıştırmadan sonra açık kalır; sağlayıcı başlayamadığında vakti gelen bir çalıştırma daha sonra çalışır.",
+          "OpenBot daha az CPU ve pil kullanır: sohbetteki ve gizli tarayıcı sekmelerindeki videolar, siz görmediğinizde duraklatılır."
+        ]
+      }
+    ]
+  },
+  {
+    "version": "0.71.0",
+    "date": "2026-11-14",
+    "notices": [
+      "Katıldığınız her sunucuyu da bu sürüme güncelleyin. Bir sunucuda rutin çalıştırmaları için Durdur, ajanların metinsiz gönderdiği dosyalar ve eski yoldaki API anahtarları yalnızca sunucuda bu sürüm varsa çalışır."
+    ],
+    "groups": [
+      {
+        "type": "added",
+        "items": [
+          "Dokunmatik yüzeyde ya da dokunmatik ekranda parmaklarınızla çimdikleyerek işaretçinin altındaki alanı yakınlaştırın. Diyagramlar, tuvaller ve görsel görüntüleyici kendi yakınlaştırmasını korur.",
+          "Rutinler tuvalinden bir rutin çalıştırmasını durdurun: üst çubukta ya da rutin ayrıntılarında Durdur'u seçin. Çalıştırma İptal edildi olarak biter.",
+          "Ajanlar, WhatsApp, Telegram, Slack veya Discord sohbetine metin olmadan dosya ya da görsel gönderebilir.",
+          "Bir Starter barındırılan sunucuyu yeniden satın alın. 25 GB depolama alanı vardır.",
+          "Cline ajanlarıyla bir ClinePass aboneliği kullanın. Model menüsü ClinePass modellerini gösterir."
+        ]
+      },
+      {
+        "type": "changed",
+        "items": [
+          "Tuvalde bir notu, serbest metni, şekli ya da adımı metninden sürükleyin. Metne tıklamak metin imlecini tıkladığınız yere koyar.",
+          "Bir Antigravity ajanı çalışırken gönderdiğiniz mesaj, çalışan turun içine girer. Bunun için Antigravity CLI 1.5.0 veya daha yeni bir sürüm gerekir.",
+          "Görevinde iş bitince durmasını söyleyen bir rutin artık kendi kendini duraklatır. Rutinlerinizin listesinden yeniden açın.",
+          "Vault artık her ajanın diğer ajanların API anahtarı dosyalarını okuyabildiğini bildirir, çünkü tüm ajanlar aynı sistem kullanıcısı olarak çalışır."
+        ]
+      },
+      {
+        "type": "fixed",
+        "items": [
+          "Vault API anahtarlarını dosyalarından okuyan betikler, MCP sunucuları ve sağlayıcı ayarları 0.70.0 güncellemesinden sonra yeniden çalışır.",
+          "Claude Code varsayılan modelini değiştirdiğinde bir Claude ajanı profilindeki modeli korur.",
+          "Claude bir turu aylık harcama sınırında durdurduğunda, yedek modelleri olan bir ajan bir sonraki modelinde devam eder.",
+          "Ajanlar, YouTube videosu gibi altyazılı bir videonun tam dökümünü alır.",
+          "OpenBot daha az CPU kullanır: görmediğiniz tarayıcı sekmeleri yavaşlar ve bir ajanın etkinlik satırındaki hareketli ışık daha hafiftir."
+        ]
+      }
+    ]
+  },
+  {
+    "version": "0.70.0",
+    "date": "2026-11-13",
+    "notices": [
+      "Katıldığınız her sunucuyu da bu sürüme güncelleyin. Sunucuyu yeniden başlat, ajan varsayılanları, mesaj dizisi sınırları ve yeni İş akışları adımları ancak sunucu bu sürüme sahipse çalışır."
+    ],
+    "groups": [
+      {
+        "type": "added",
+        "items": [
+          "Kendi barındırdığınız bir sunucuyu uygulamadan yeniden başlatın: sahip veya yönetici olarak sunucu menüsünde Sunucuyu yeniden başlat'ı seçin.",
+          "Her giriş, kart, kişi ve API anahtarını hangi ajanların kullanabileceğini Sunucu ayarları → Vault bölümünden seçin. Bir ajan yalnızca kullanabildiği öğeleri görür ve doldurur.",
+          "İş akışlarında Görsel ve Video adımları var. GPT Image, Grok Imagine veya Sunra modelleriyle resim ve kısa videolar oluşturun, resimleri referans olarak bağlayın.",
+          "Sunra ve TryPost'u Pazaryeri'ndeki Uygulamalar bölümünden bağlayın. Ajanlar böylece Sunra kredilerinizle medya oluşturabilir, sosyal medya gönderilerinin taslağını hazırlayıp yayımlayabilir.",
+          "Sahipler ve yöneticiler, sunucu için ve her ajan için aynı anda kaç mesaj dizisinin aynı anda çalışacağını Sunucu ayarları → Genel bölümünden belirleyebilir.",
+          "Yeni mesajı olan ajanları yuvada gösterin: Ayarlar → Ajan yuvası bölümünden açın. Böyle bir ajana sağ tıklayıp Yuvaya ekle'yi seçin; ajan yuvada kalır.",
+          "Birden fazla Cursor hesabı ekleyin. Her ajan farklı bir hesap kullanabilir."
+        ]
+      },
+      {
+        "type": "changed",
+        "items": [
+          "Yalnızca bir ajan için kaydettiğiniz bir API anahtarı artık şifreli Vault'ta tutulur. Ajanların okuduğu anahtarların yeni bir yolu var; bu nedenle eski yolu kullanan bir betik yeni yolu kullanmalıdır.",
+          "Ajan ayarları, örneğin Ajanları çalışırken yönlendir, artık her sunucu için ve bu bilgisayar için Sunucu ayarları → Ajanlar bölümündedir.",
+          "Tam tarayıcı görünümünde mesaj kutusu yeniden sayfanın alt ortasında yer alır.",
+          "Sohbet üst bilgisi, ajanın adından sonra unvanını gösterir; örneğin “Brock · Mağaza müdürü”."
+        ]
+      },
+      {
+        "type": "fixed",
+        "items": [
+          "Sohbetleriniz uzun olduğunda OpenBot daha hızlı açılır.",
+          "Windows ve Linux'ta, ajanlar çalışırken OpenBot çıkmadan önce sorar. Pencereyi gizleyip ajanların işini bitirmesine izin vermek için Çalışsın'ı seçin.",
+          "Kurulum sırasında bir cihazın bağlantısı kesildiğinde cihazlar tekrar sunucuya bağlanır. Katılınan bir sunucudaki bir ajanın tarayıcısının canlı görünümü de yavaş bağlantıda açık kalır.",
+          "Bir ajandan web sayfasının ekran görüntüsünü istediğinizde, artık görüntüyü yanıtına ekler.",
+          "Bir OpenCode Go anahtarı kaydedildiğinde OpenCode ücretsiz modelleri yeniden yanıt verir."
+        ]
+      }
+    ]
+  },
+  {
+    "version": "0.69.0",
+    "date": "2026-11-12",
+    "notices": [
+      "Gizli ajanlar artık çalışmaya devam eder. OpenBot, bu sürümden önce gizlediğiniz ajanların rutinlerini kapattı; bu yüzden istediğiniz rutinleri açın."
+    ],
+    "groups": [
+      {
+        "type": "added",
+        "items": [
+          "Bir ajanın sohbetindeki bir mesajı sabitleyin: mesaja sağ tıklayıp Sabitle'yi seçin. Sohbet üst bilgisindeki sabitleme düğmesi, ajanın tüm sohbetlerindeki sabitlenmiş mesajları gösterir.",
+          "Kitaplık'ta klasörler ve üç görünüm var. Bir ajan, eklediği dosyaları da adını verdiğiniz bir klasöre kaydedebilir.",
+          "Görev öğret: + menüsünden Görev öğret'i seçin, sonra görevi ajanın tarayıcısında yapın. Ajan adımları bir beceri olarak kaydeder.",
+          "Ayarlar'da bir sağlayıcının hesaplarını havuzlayın. Ajanlar, kullanım sınırına yaklaşana kadar bir hesabı, sonra sıradaki hesabı kullanır.",
+          "GitHub'dan beceri ekleyin: herkese açık bir deponun bağlantısını Pazaryeri Becerileri aramasına yapıştırın.",
+          "Sunucu ayarları → Aktarım, bir sunucunun tam bir kopyasını dışa aktarabilir ve ajanları tek adımda başka bir sunucuya kopyalayabilir.",
+          "Kenar çubuğundaki menüsünden bir ajanı sessize alın. Sessize alınan ajan bildirim göndermez ve ses çalmaz."
+        ]
+      },
+      {
+        "type": "changed",
+        "items": [
+          "Bir ajan çalışırken ona gönderdiğiniz mesaj artık çalışan turu yönlendirir. Eskisi gibi kuyruğa almak için Ayarlar → Ajanlar bölümünde Ajanları çalışırken yönlendir seçeneğini kapatın.",
+          "Gizli ajan çalışmaya devam eder. Rutinlerini çalıştırır ve yanıtınızı beklediğinde Size ihtiyacı var bölümünde görünür.",
+          "Açık sunucu, sayfa çubuğunun altında bir logo olarak görünür. Yeni düğmesi kenar çubuğu arama alanının sonundadır.",
+          "OpenBot, Chromium 156 ile birlikte Electron 45.3.0 kullanır ve ajan tarayıcısında bot denetimi olan daha fazla site yüklenir."
+        ]
+      },
+      {
+        "type": "fixed",
+        "items": [
+          "OpenBot daha hızlı açılır, özellikle Windows'ta; yavaş bir bilgisayar açıldıktan sonra da kullanılabilir kalır.",
+          "Çok sayıda görev veya konu olduğunda OpenBot yeniden başlattıktan sonra da yanıt vermeye devam eder.",
+          "Linux ve Windows'ta ana pencereyi kapattığınızda OpenBot kapanışını tamamlar.",
+          "Bilgisayarın saati düzeltildikten sonra rutinler zamanında çalışır.",
+          "Bir sohbetten kopyaladığınız metnin başında ve sonunda artık boş satır yoktur."
+        ]
+      }
+    ]
+  },
+  {
+    "version": "0.68.0",
+    "date": "2026-11-11",
+    "notices": [],
+    "groups": [
+      {
+        "type": "added",
+        "items": [
+          "Kanal ayarlarında bir Tarayıcı ayarı var. Tarayıcıyı kanalda her üyenin, yalnızca bir üyenin veya hiçbir üyenin kullanıp kullanamayacağını seçin.",
+          "Kanalın yan panelinde Tarayıcı ve Dosyalar bölmeleri var. Bunlar kanal üyelerinin sekmelerini ve kanalda gönderilen dosyaları gösterir.",
+          "Dynamic Island'ı veya ajan yuvasını gizlemek için sağ tıklayın. Ayrıca bir ajanı yuvada yeni bir yere sürükleyebilir ve Ayarlar'da yuvanın boyutunu değiştirebilirsiniz.",
+          "Kenar çubuğundaki Okunmamış grubunu kapatabilirsiniz. Okunmamış başlığına sağ tıklayın veya Sohbetleri sırala'yı Elle olarak ayarlayın.",
+          "Yeni bir sürüm 3 kez üst üste başlatılamazsa bir kurtarma penceresi açılır. Yeniden deneyebilir, önceki sürümü indirebilir veya tanılamayı dışa aktarabilirsiniz."
+        ]
+      },
+      {
+        "type": "changed",
+        "items": [
+          "Yeni sürüm önce bilgisayarların yaklaşık onda birine, yaklaşık bir gün sonra da tüm bilgisayarlara gider. Hemen almak için Güncellemeleri denetle'yi seçin.",
+          "Ajanlar soruları seçeneklerle soru penceresinde sorar. Düğmeli kartlar yalnızca onaylar için kullanılır."
+        ]
+      },
+      {
+        "type": "fixed",
+        "items": [
+          "Okuduğunuz bir sohbet artık Okunmamış grubunda kalmaz. Bir rutinin konusu gibi okunmamış yan konular artık bir ajanı bu grupta tutmaz.",
+          "Windows'ta ajan yuvası ve Dynamic Island, birçok ajan çalışırken tüm uygulamalarda imleci yavaşlatmaz artık.",
+          "Lider, takım arkadaşları sonuç bildirdikten sonra yanıt vermeden turunu bitirdiğinde takım artık durmaz.",
+          "Uzun olan bir Claude sohbeti artık sohbet geçmişiyle yeni bir oturum başlatır. Önceden her ileti \"Prompt is too long\" hatasıyla başarısız oluyordu.",
+          "Bir Claude hesabı 5 saatlik sınırına ulaştığında ajan yedek modeline geçer veya sıfırlanmayı bekler.",
+          "Bir ajan, tarayıcı ekran görüntüsünü dosya olarak kaydedip yanıtına ekleyebilir."
+        ]
+      }
+    ]
+  },
+  {
+    "version": "0.67.1",
+    "date": "2026-11-10",
+    "notices": [],
+    "groups": [
+      {
+        "type": "fixed",
+        "items": [
+          "Gemini, Windows'ta yeniden kurulur ve güncellenir. 0.67.0'da bir bağlantı veya özel dosyayla ilgili bir hatayla duruyordu.",
+          "Meşgul bir takım arkadaşına mesaj gönderen bir ajan, mesajın arkadaşının devam eden görevine girip girmediğini artık bilir. Mesaj beklediğinde ajan nedenini size söyleyebilir.",
+          "Bilgisayar Kullanımı sırasında ajanlar artık imlecin kullanılamadığını söylemez. OpenBot, imleci ajanın tıkladığı, kaydırdığı veya hareket ettirdiği yere çizer."
+        ]
+      }
+    ]
+  },
+  {
+    "version": "0.67.0",
+    "date": "2026-11-10",
+    "notices": [
+      "Bu güncellemeden sonra Hızlı mod her Claude ajanında kapalıdır. Kullanıyorsanız model seçicide yeniden açın."
+    ],
+    "groups": [
+      {
+        "type": "added",
+        "items": [
+          "Kendi Linux bilgisayarınıza veya VPS'inize tek bir komutla sunucu ekleyin ya da bir ajandan sunucuyu oraya SSH üzerinden kurmasını isteyin.",
+          "Sunucu ayarları → Aktarım artık sohbet geçmişini, kanalları ve iş akışlarını yeni sunucuya taşıyabilir.",
+          "Linux'ta Dynamic Island ve ajan yuvası, Mac'te olduğu gibi diğer pencerelerin üstünde kalır.",
+          "Model seçicide bir Claude ajanı için Hızlı modu açın veya bir Codex ajanı için Ultra hızlı seçeneğini belirleyin.",
+          "Ajanlar bir site hakkında öğrendiklerini o sitenin belleği olarak saklar ve başarısız olan adımları tekrarlamaz.",
+          "Uygulamalar kataloğunda monday.com, Miro, Dropbox ve Zapier gibi 207 yeni uygulama var. Bunları tarayıcıda oturum açarak bağlarsınız."
+        ]
+      },
+      {
+        "type": "changed",
+        "items": [
+          "Okunmamış yanıtları olan sohbetler önce, Okunmamış grubunda gösterilir. Sırayı değiştirmek için sohbet listesinin menüsünde Sohbetleri sırala'yı seçin.",
+          "VPS gibi katılınan bir sunucuda masaüstü uygulaması ve tarayıcı uygulaması artık bu bilgisayarın özelliklerinin çoğuna sahip.",
+          "Ajanlar git commit'lerine OpenBot'u ortak yazar olarak ekler. Yazar siz kalırsınız. Bunu Ayarlarınız → Ajanlar bölümünde kapatın.",
+          "Ajanlar tarayıcı görevlerini daha az adımda ve yaklaşık %18 daha az token ile bitirir.",
+          "Gemini artık Antigravity CLI üzerinde çalışır. Google oturumunuz korunur."
+        ]
+      },
+      {
+        "type": "fixed",
+        "items": [
+          "Durdurduğunuz bir Claude ajanı artık yaklaşık 10 saniyede durur ve kuyruktaki mesajları başlar.",
+          "Windows'ta ajanlar, OpenBot penceresi simge durumundayken veya tepsideyken tarayıcıyı kullanabilir.",
+          "macOS'ta Yeniden başlat ve güncelle, OpenBot disk görüntüsünden çalışırken artık OpenBot'u kapatmaz. OpenBot'u Uygulamalar'a taşımanızı söyler.",
+          "Sesli bir konuşmada öksürük veya bir tuşa basma artık ajanın yanıtını durdurmaz."
+        ]
+      }
+    ]
+  },
+  {
+    "version": "0.66.0",
+    "date": "2026-11-09",
+    "notices": [],
+    "groups": [
+      {
+        "type": "added",
+        "items": [
+          "Ajanlar bir düzeltmeden veya işe yarayan bir yöntemden sonra yeni becerileri kendi kendine öğrenir. Sunucu ayarları → Genel bölümünde Otomatik, Önce sor veya Kapalı seçeneğini belirleyin.",
+          "Vault'taki girişler iki adımlı doğrulama kodunu saklayabilir ve ajanlar bu kodla oturum açabilir.",
+          "Windows'ta Dynamic Island ve ajan yuvası, Mac'te olduğu gibi ajanlarınızı gösterir. Ajan yuvası kanalları da tutabilir.",
+          "Ajanlar YouTube veya TikTok bağlantıları gibi herkese açık çevrimiçi videoları izleyebilir.",
+          "Kitaplık'ta birden çok dosya seçin ve hepsini bir kerede indirin veya silin.",
+          "Ajanlar sizin için OpenBot ekibine bir hata raporu veya özellik fikri gönderebilir."
+        ]
+      },
+      {
+        "type": "changed",
+        "items": [
+          "Kanal üyeleri kendi sohbetlerinde çalışırken yanıt verir; selamlama veya belirsiz bir mesaj kanal liderine gider.",
+          "Yeni bir ajan kısa bir karşılama ve seçebileceğiniz üç ilk görevle açılır.",
+          "Composio'yu tarayıcıda oturum açarak bağlayın. Artık URL ve API anahtarı yazmanız gerekmez.",
+          "Ayarlar'ın adı artık Ayarlarınız, Sunucu ayarları'nda da bir arama alanı var.",
+          "macOS uygulama simgesinin yeni bir cam görünümü var."
+        ]
+      },
+      {
+        "type": "fixed",
+        "items": [
+          "Bir ajanın kuyruğu, ajan kendi sorusunun yanıtını beklerken aynı mesajı artık tekrar tekrar başlatmaz.",
+          "Bir ChatGPT ajanı artık tekrar tekrar sıkıştırma yapmaz veya \"Bağlam sıkıştırılıyor\" durumunda sonsuza kadar kalmaz.",
+          "Cursor ve bazı diğer sağlayıcılardaki ajanlar, OpenBot yeniden başladıktan sonra OpenBot araçlarını korur.",
+          "Ajanlar, n8n gibi oturum açtığınız uzak bir MCP sunucusunu en yeni MCP sürümüyle kullanabilir."
+        ]
+      }
+    ]
+  },
+  {
+    "version": "0.65.0",
+    "date": "2026-11-08",
+    "notices": [],
+    "groups": [
+      {
+        "type": "added",
+        "items": [
+          "Pencere çubuğundaki Kitaplık sayfası, bir sunucunun sohbetlerindeki tüm resimleri ve dosyaları gösterir.",
+          "Bir sohbetin veya kanalın geçmişini ayarlarından silin. Kurulum, bellekler ve rutinler kalır.",
+          "Ayarlar → Ses bölümünde kendi API anahtarınızla yanıtları ElevenLabs veya xAI ile sesli okutun ve Groq ile dikte edin.",
+          "Mistral'ı sağlayıcı olarak ekleyin.",
+          "Bir ajanın oluşturduğu sayfayı sohbetin yanında bir yan panel sekmesi olarak açın.",
+          "Ayarlar → Genel bölümünde Açık tema için bir sohbet arka plan rengi, Koyu tema için başka bir renk seçin."
+        ]
+      },
+      {
+        "type": "changed",
+        "items": [
+          "Ajanlar Claude, Codex, Pi, OpenCode, Grok ve Hermes'te her istekte daha az token kullanır.",
+          "OpenBot tarayıcı sekmeleri, boştaki ajanlar ve uygulama pencereleri için daha az bellek kullanır.",
+          "Ajan tarayıcı sekmeleri kendiliğinden geçen bot kontrollerini bekler ve kısa görevleri daha az adımda bitirir.",
+          "Bildirimlerin görünümü yenilendi."
+        ]
+      },
+      {
+        "type": "fixed",
+        "items": [
+          "Ajanlar artık sohbet başladıktan sonra bir parola yöneticisine veya Vault'a kaydettiğiniz girişleri kullanır.",
+          "Signal yanıt vermediğinde sunucu Signal'e yeniden bağlanır, böylece cihazlar yeniden başlatmaya kadar \"Ana makine çevrim dışı.\" mesajını artık görmez.",
+          "Bir ajan çalışırken Dynamic Island ve ajan yuvası artık diğer uygulamaların takılmasına yol açmaz.",
+          "Anthropic API anahtarıyla çalışan Claude ajanları artık anahtarın promosyon API kredisini kullanır."
+        ]
+      }
+    ]
+  },
+  {
+    "version": "0.64.0",
+    "date": "2026-11-07",
+    "notices": [
+      "Claude ajanlarınız kendi CLAUDE.md dosyanızı, becerilerinizi veya kancalarınızı kullanıyorsa Ayarlar → Sağlayıcılar → Claude → Kendi Claude Code kurulumumu kullan seçeneğini açın."
+    ],
+    "groups": [
+      {
+        "type": "added",
+        "items": [
+          "macOS'ta ajanlarınızı ekranın kenarındaki yeni ajan yuvasına koyun. Ayarlar → Ajan yuvası bölümünden kapatabilirsiniz.",
+          "Ajanlar artık çalışırken kısa güncellemeler yazar. Eski tarz için Sunucu ayarları → Kişilik bölümünde Klasik'i seçin.",
+          "Bir kanalın ayarlarından yeni bir konuşma başlatın veya kanalın bağlamını sıkıştırın.",
+          "Katılınan bir sunucunun üyeleri kendi MCP sunucularını ekleyebilir ve Trello gibi uygulamaları bağlayabilir.",
+          "Bu bilgisayarı uzak masaüstüyle kimlerin kontrol edebileceğini Sunucu ayarları → Uzak masaüstü bölümünde seçin.",
+          "OpenBot'u İbranice kullanın ve Pazaryeri'nde GitLab, Omnisend ve ElevenLabs'i bağlayın."
+        ]
+      },
+      {
+        "type": "changed",
+        "items": [
+          "Sertifika veya VPN profili gibi her türden dosyayı sohbete ekleyin.",
+          "Web uygulaması 100 MB'a kadar dosyaları açar ve gönderir.",
+          "Bir mesajın üzerine geldiğinizde Tepki ver, Yanıtla ve Daha fazla işlem görünür. Tam satırı görmek için Ayarlar → Genel → Kompakt mesaj işlemleri seçeneğini kapatın.",
+          "Mac'te ⌘Q, basılı tutmanızı yalnızca bir ajan çalışırken ister."
+        ]
+      },
+      {
+        "type": "fixed",
+        "items": [
+          "Slack, Discord, Telegram ve WhatsApp gönderilerindeki bahsetmeler artık ilgili kişiye bildirim gönderir.",
+          "Bir sağlayıcının kotası dolduğunda ajan işe ilk hazır yedek modeliyle devam eder.",
+          "Her turdan sonra yeniden sıkıştırılan bir sohbet artık art arda 2 sıkıştırmadan sonra otomatik sıkıştırmayı durdurur.",
+          "Bir ajanın tarayıcı işlemi başka bir adrese geçen bir sayfayı beklediğinde OpenBot artık kapanmaz.",
+          "Proton Pass girişleri OpenBot yeniden başladıktan sonra da çalışır."
+        ]
+      }
+    ]
+  },
+  {
+    "version": "0.63.0",
+    "date": "2026-11-06",
+    "notices": [],
+    "groups": [
+      {
+        "type": "added",
+        "items": [
+          "Plan kartının uzun bir görevi ne zaman kendiliğinden başlatacağını Ayarlar → Ajanlar bölümünde seçin veya yalnızca Başlat'a bastığınızda başlamasını sağlayın.",
+          "Sağlayıcıya birden fazla hesap bağlıysa ajan oluştururken sağlayıcı hesabını seçin.",
+          "Yerel betiklerin her ajana bir saatte kaç istek gönderebileceğini Ayarlar → Ajanlar → Yerel betikler bölümünde değiştirin.",
+          "Kullanım sayfasında, ajanlarınızın her beceriyi ne sıklıkla yüklediğini ve maliyetini gösteren bir Beceri sekmesi var.",
+          "Görsel, video ve ses oluşturmak için Pazaryeri'nde Higgsfield'ı bağlayın."
+        ]
+      },
+      {
+        "type": "changed",
+        "items": [
+          "Sohbet rengi seçicide 11 yeni hazır renk var ve renkli bir balondaki kod, tablo ve kartlar balonun rengini alır.",
+          "API anahtarı formu gibi ajanın yanıt istediği kartlar, ajanın sorularıyla aynı görünür.",
+          "Bir kanalda ajandan yeni bir kanal oluşturmasını veya başka bir kanalı değiştirmesini isteyin, ajan bunu orada yapar."
+        ]
+      },
+      {
+        "type": "fixed",
+        "items": [
+          "Claude, OpenBot yeniden başladıktan veya güncellendikten sonra oturumu açık tutar ve Claude ajanları 5 saatlik kullanım penceresinin daha azını kullanır.",
+          "Uzun bir sohbette yüklediğiniz eski mesajlar yüklü kalır. Sohbet artık en son mesajlara geri atlamaz.",
+          "ChatGPT (Codex), Muse, Pi veya Antigravity sohbetindeki otomatik sıkıştırmalar art arda 2 başarısızlıktan sonra durur, böylece sohbet artık plan limitini tüketmez.",
+          "GPT sesi, ajan bir Codex modeli kullandığında da her ajanla çalışır.",
+          "Tarayıcı, Proton Pass'teki kayıtlı girişleri doldurur."
+        ]
+      }
+    ]
+  },
+  {
+    "version": "0.62.0",
+    "date": "2026-11-05",
+    "notices": [],
+    "groups": [
+      {
+        "type": "added",
+        "items": [
+          "Sunucu ayarları → Tarayıcı profilleri bölümünde bir tarayıcı profiline kendi proxy'sini verin veya katılınan bir sunucuda kendi bilgisayarınızı proxy olarak kullanın.",
+          "Pazaryeri'nde Proton Pass'i bağlayın. Tarayıcı, OpenBot ile paylaştığınız kasadaki girişleri doldurur.",
+          "Bir ajanın sohbetinde @ yazarak ajanın tarayıcı sekmelerinden veya yan konularından birini etiketleyin.",
+          "Ayarlar → Ses bölümünde iki yeni yerel dikte modeli var: Parakeet Unified EN ve Cohere Transcribe.",
+          "Ajanın yazdığı ve sizin okumadığınız bir mesaj dizisinde mavi bir nokta görünür.",
+          "Ajanlar WhatsApp, Slack, Discord ve Telegram sohbetlerine dosya gönderebilir ve GitHub depoları oluşturabilir.",
+          "Hermes Agent'ı Ayarlar → Sağlayıcılar bölümünden indirin ve bir sağlayıcıyı CLI'ıyla birlikte tek düğmeyle silin."
+        ]
+      },
+      {
+        "type": "changed",
+        "items": [
+          "Rutinler yeniden ajanın sohbetinde çalışır. Bir rutini kendi mesaj dizisinde tutmak için \"Ayrı bir dizide çalıştır\" seçeneğini açın.",
+          "Ajan soruları tek bir balonda, her seferinde bir soru olarak görünür.",
+          "Bir ajan API anahtarı istediğinde anahtar varsayılan olarak tüm ajanlar için Vault'a kaydedilir.",
+          "Simgelerin artık tek bir çizgi kalınlığı var ve üzerlerine geldiğinizde beyaza döner."
+        ]
+      },
+      {
+        "type": "fixed",
+        "items": [
+          "OpenBot açıkken ve görev yokken daha az enerji kullanır.",
+          "Uzun sohbetler takılmadan kayar ve daha hızlı açılır.",
+          "OpenBot açılışta artık \"OpenBot'a bağlanılıyor\" ekranında veya sunucu yükleme ekranında kalmaz.",
+          "Ajan için Bilgisayar Kullanımı açıksa rutin çalıştırmaları onu yeniden kullanabilir."
+        ]
+      }
+    ]
+  },
+  {
+    "version": "0.61.0",
+    "date": "2026-11-04",
+    "notices": [],
+    "groups": [
+      {
+        "type": "added",
+        "items": [
+          "Sohbetteki bir mesajı silin: mesaja sağ tıklayıp Sil'i seçin. Bu, ajan sohbetlerinde, yan görevlerde ve kanallarda çalışır.",
+          "Ajanlar iş akışları oluşturabilir, değiştirebilir ve çalıştırabilir; her adımı nasıl kurduklarını İş akışları sayfasında görürsünüz.",
+          "Codex canlı sesiyle bir Codex ajanıyla konuşun. Ayarlar → Ses bölümünden açın.",
+          "Devin ve GitHub Copilot, Daha fazla sağlayıcı altındaki yeni sağlayıcılardır.",
+          "Her ajan ve kendiniz için bir sohbet rengi seçin. Ajanların avatar renkleri de arttı.",
+          "Ajanlar sohbete yapıştırdığınız bir API anahtarını veya parolayı Vault'a kaydedebilir.",
+          "Webhook rutinleri Composio, Svix, Clerk ve Resend gibi kaynaklardan gelen Standard Webhooks isteklerini kabul eder.",
+          "Pazaryeri → Uygulamalar bölümünden Coinbase, Robinhood veya RevenueCat'i bağlayın."
+        ]
+      },
+      {
+        "type": "changed",
+        "items": [
+          "Bir ajanın her rutini kendi mesaj dizisinde çalışır, böylece rutinler ve sohbet artık birbirini beklemez.",
+          "Ajanlar durmadan önce görevin daha fazlasını bitirir ve gönderme, paylaşma, silme veya ödemeden önce bir onay kartıyla sorar.",
+          "Kenar çubuğu rozetleri keçe görünümünde ve sabitlenmiş bir kanal okunmamış sayısını gösterir."
+        ]
+      },
+      {
+        "type": "fixed",
+        "items": [
+          "Uzun geçmişi olan bir kanal yeniden hızlı açılır.",
+          "Linux'ta anahtarlık anahtarını tutmadığında OpenBot artık her yeniden başlatmadan sonra yeniden oturum açmanızı istemez.",
+          "Windows'ta kanal liderleri mesajları yeniden yönlendirir ve bu bilgisayarda sunucu oluşturabilirsiniz.",
+          "Eski bir OpenBot, daha yeni bir sürümün kaydettiği verileri açtığında en son sürümü yükler."
+        ]
+      }
+    ]
+  },
+  {
+    "version": "0.60.0",
+    "date": "2026-11-03",
+    "notices": [],
+    "groups": [
+      {
+        "type": "added",
+        "items": [
+          "Ajanlarınızla WhatsApp'tan konuşun. Pazaryeri → Uygulamalar → WhatsApp altında bir numara bağlayın. Ayrı bir numara daha güvenlidir, çünkü WhatsApp otomatik gördüğü numaraları engelleyebilir.",
+          "Biri Slack'te veya bir Telegram grubunda OpenBot'tan bahsettiğinde bir iş akışı başlatın ve sonucunu oraya geri gönderin.",
+          "OpenBot'u Arapça kullanın. Düzen sağdan sola doğru yansır.",
+          "Sunucu ayarları → Sağlayıcılar bölümünde modelleri kapatın. Model seçici önce en yeni modelleri gösterir, eski modeller ise katlanmış bir bölümdedir.",
+          "Sunucu ayarlarında üye, rol ve ajan erişimi değişikliklerini gösteren bir Denetim günlüğü var.",
+          "Şirket girişi: sunucu sahibi Üyeler → Şirket girişi bölümünde Microsoft Entra ID, Okta, Google Workspace veya başka bir OpenID Connect sağlayıcısını bağlayabilir. Şirket e-postası olan kişiler daha sonra davet olmadan katılır.",
+          "Kanal ayarlarında bir kanala resim veya simge verin.",
+          "Bir kanal kendi belleklerini tutabilir ve bir ajan doğrudan sohbetinizden bir kanala görev gönderebilir.",
+          "Yan konulardaki her mesajda Yanıtla var.",
+          "Katılınan bir sunucudaki indirmeler ve yüklemeler ilerlemelerini gösterir, başarısız bir yüklemede de Tekrar dene düğmesi vardır."
+        ]
+      },
+      {
+        "type": "changed",
+        "items": [
+          "Sohbet mesajları geniş bir pencerede daha fazla alan kullanır.",
+          "Sohbetten açtığınız her dosya yan panelde kendi sekmesini alır.",
+          "4.000 karakterden uzun bir metin yapıştırması pasted-text.txt eki olur, böylece mesaj metnin tamamını tutar.",
+          "OpenBot kişisel kullanım için ücretsizdir ve ilk açılış bunu belirtir."
+        ]
+      },
+      {
+        "type": "fixed",
+        "items": [
+          "Giriş kodları tüm bölgelerdeki kullanıcılara ulaşır.",
+          "Çökmeden sonra beyaz kalan pencere kendiliğinden yeniden yüklenir.",
+          "Claude sunucusuna ulaşamadığında sohbet yeniden denemeleri gösterir.",
+          "Yedek modelleri olan bir ajan, yazmaya başlamadan önce kredi bakiyesi veya kota bittiğinde sonraki modele geçer."
+        ]
+      }
+    ]
+  },
+  {
+    "version": "0.59.0",
+    "date": "2026-11-02",
+    "notices": [],
+    "groups": [
+      {
+        "type": "added",
+        "items": [
+          "Kimi yeni bir sağlayıcı. OpenBot, Kimi Code CLI'ı indirir ve Kimi Code hesabınızla oturum açarsınız.",
+          "Nous Research'ün Hermes Agent'ını kendi belleklerinizle, becerilerinizle ve oturum açma bilgilerinizle sağlayıcı olarak kullanın.",
+          "Mac'te OpenBot'un menü çubuğunda bir simgesi var. Pencereyi kapattıktan sonra Dock simgesi gizlenir ve görevler çalışmaya devam eder.",
+          "Biri Discord'da OpenBot'tan bahsettiğinde bir iş akışı başlatın ve sonucunu yanıt, gönderi veya tepki olarak geri gönderin.",
+          "Kenar çubuğu klasörleri üç düzeye kadar klasör içerebilir. Bir sohbeti veya klasörü bir klasöre sürükleyin.",
+          "Bir model sunduğunda Yok, Minimum ve Ultra akıl yürütme düzeylerini seçin.",
+          "Sabitlenmiş ajanlar ve kanallar bir sunucuya bağlanan her cihazda aynı kalır.",
+          "Sohbete SVG görselleri ekleyin. Ajan SVG metnini okur.",
+          "Birden fazla Notion hesabı bağlayın ve Uygulamalar'dan ClickUp'ı bağlayın.",
+          "Bir ajan sizden Vault'a bir giriş, kart veya adres eklemenizi isteyebilir. Gizli bilgiyi siz yazarsınız, ajan yalnızca adını alır."
+        ]
+      },
+      {
+        "type": "changed",
+        "items": [
+          "Mac'te çıkmak için ⌘Q'yu basılı tutun veya iki kez basın. Yanlışlıkla tek bir basış artık ajanlarınızı durdurmaz.",
+          "Planında hâlâ açık adımlar olduğunda ajan daha sık kendiliğinden devam eder.",
+          "Yapıştırılan görseller mesaj kutusunun üstünde küçük resim olarak, gönderilen görseller ise tam boyutta görünür.",
+          "Fotoğrafı olmayan ajanlar artık ne iş yaptığını gösteren yumuşak bir peluş bot olarak görünür."
+        ]
+      },
+      {
+        "type": "fixed",
+        "items": [
+          "Slack çalışma alanının bulunduğu bilgisayar kapalıyken de Slack bahsetmeleri ve doğrudan mesajlar yeniden OpenBot'a ulaşır.",
+          "Bilgisayar uykudan uyandıktan sonra telefonlar ve diğer cihazlar sunucularınıza hemen bağlanabilir.",
+          "Bir sohbetteki yükleme artık diğer sohbetlerde Gönder'i engellemez.",
+          "OpenBot'tan kopyaladığınız metin diğer uygulamalara uygulamanın renkleri olmadan yapıştırılır."
+        ]
+      }
+    ]
+  },
+  {
+    "version": "0.58.0",
+    "date": "2026-11-01",
+    "notices": [],
+    "groups": [
+      {
+        "type": "added",
+        "items": [
+          "GitHub'dan bir iş akışı başlatın: GitHub tetikleyicisi yeni sorunlarda, yorumlarda, çekme isteklerinde, incelemelerde, başarısız kontrollerde veya @openbotgit bahsetmesinde çalışır.",
+          "Bir iş akışından GitHub'ı değiştirin: OpenBot GitHub App olarak yorum yapın, etiket ekleyin, atayın, inceleyin, bir sorunu kapatın veya oluşturun.",
+          "Pazaryeri'nde QA Tester, PR Shepherd ve Chief of Staff gibi 17 yeni OpenBot ajanı ve bunlar için 15 yeni beceri var.",
+          "Kullanım, OpenCode Go aylık limitini üçüncü bir çubuk olarak gösterir."
+        ]
+      },
+      {
+        "type": "changed",
+        "items": [
+          "Katılınan bir sunucu çok daha hızlı açılır. Uygulama bağlanırken son ziyaretinizdeki ajanlar ve kenar çubuğu hemen görünür.",
+          "Web'de başka bir sunucuya geçiş 2-3 saniye değil, yaklaşık 1 saniye sürer.",
+          "Dynamic Island açıkken pencere yaklaşık 3 saniye daha erken açılır."
+        ]
+      },
+      {
+        "type": "fixed",
+        "items": [
+          "Kuyrukta 32'den fazla mesaj beklerken de kuyruktaki bir mesajı taşıyabilirsiniz.",
+          "10 dakika boyunca hiçbir şey göndermeyen bir Pi turu artık bir mesajla durur.",
+          "OpenCode veya Pi yüklü değilken de özel sağlayıcı model seçicide görünür.",
+          "Model seçicideki uzun model adları ikinci satıra geçer."
+        ]
+      }
+    ]
+  },
+  {
+    "version": "0.57.0",
+    "date": "2026-10-31",
+    "notices": [],
+    "groups": [
+      {
+        "type": "added",
+        "items": [
+          "Bir konuşmayı dallandırın: bir turun son ajan mesajına sağ tıklayıp Buradan dallandır'ı seçin. O mesaja kadarki konuşmayı içeren yeni bir mesaj dizisi açılır.",
+          "Ajan ayarlarında ajanın AGENTS.md dosyasını gösteren bir Talimatlar sayfası var. Ajan talimatlarını değiştirdiğinde sohbet bu değişikliği Geri al düğmesiyle gösterir.",
+          "Pazaryeri artık openbot.run'da. Her ajanın ve becerinin kendi sayfası var ve Bağlantıyı kopyala ile paylaşabilirsiniz.",
+          "Bir ajan, kendi tarayıcı işleminin açtığı bir web sitesi uyarısını veya onay penceresini yanıtlayabilir.",
+          "Durdurulmuş veya başarısız bir kanal görevinde Görevi iptal et düğmesi var."
+        ]
+      },
+      {
+        "type": "changed",
+        "items": [
+          "Bellekler ajanın ayarlar bölmesinde açılır; her bellek için kısa bir başlık ve bir arama alanı vardır.",
+          "Ajanlar her sağlayıcıda her istekte daha az token gönderir.",
+          "Her rutin, onu duraklatan veya sürdüren bir anahtarla kendi kartında görünür.",
+          "Ayarlar › Bildirimler her sunucu için bir kart gösterir; Tümü, Gerekince ve Hiçbiri tek bir denetimdedir."
+        ]
+      },
+      {
+        "type": "fixed",
+        "items": [
+          "Uygulama içi güncellemeler Intel Mac'ler gibi yavaş Mac'lere de yüklenir.",
+          "Boştaki bir ajan tarayıcı sekmesi çok daha az bellek kullanır.",
+          "OpenCode Go modelindeki bir ajan, Go kullanım limitinde yedek modeline geçer.",
+          "Ajan açık dosyayı değiştirdiğinde dosya önizleme paneli güncellenir."
+        ]
+      }
+    ]
+  },
+  {
+    "version": "0.56.0",
+    "date": "2026-10-30",
+    "notices": [],
+    "groups": [
+      {
+        "type": "added",
+        "items": [
+          "Ajanlar bir arama yazmak, Enter'a basmak ve sonuçları beklemek gibi birçok tarayıcı işlemini tek adımda yapar. Tarayıcı görevleri daha erken biter ve daha az token kullanır.",
+          "Bir ajan mesajını daha sonra yeniden okumak için mesaja sağ tıklayıp Okunmadı olarak işaretle'yi seçin.",
+          "Başka bir sunucunuz olduğunda Yerel sunucuyu menüsünden gizleyebilirsiniz. Ajanları, sohbetleri ve dosyaları bilgisayarınızda kalır.",
+          "Bir görev bittiğinde çalan sesi Ayarlar › Bildirimler bölümünde seçin."
+        ]
+      },
+      {
+        "type": "changed",
+        "items": [
+          "Yüklediğiniz CLI, OpenBot'un kopyasıyla aynı sürümde veya daha yeniyse sağlayıcı onu kullanır.",
+          "Analiz tercihiniz hesabınızla birlikte diğer cihazlarınıza taşınır. Analizi bu sürümden önce kapattıysanız, burada değiştirene kadar bu bilgisayarda kapalı kalır.",
+          "Talimatlar alanını uzatmak için tutamacını sürükleyin."
+        ]
+      },
+      {
+        "type": "fixed",
+        "items": [
+          "Cloudflare kontrolleri yerleşik tarayıcıda geçer.",
+          "Her sağlayıcı CLI'ı yaklaşık yarı yarıya daha az disk alanı kullanır: OpenBot tek bir sürüm tutar.",
+          "Kullanım limitindeki bir ajana gönderdiğiniz mesaj sağlayıcıyı hemen yeniden dener.",
+          "Kenar çubuğunda sürüklediğiniz sohbet, işaretçinin altındaki bölüme düşer."
+        ]
+      }
+    ]
+  }
+]

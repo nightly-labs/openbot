@@ -2,19 +2,22 @@ import { type AnalyticsTotals, analyticsTokens, type HostAnalytics } from "@open
 import type { AppTextKey } from "@openbot/i18n";
 import { Button, SlidingTabs } from "@openbot/ui";
 import { createMemo, createStore, For, onSettled, Show } from "solid-js";
+import { ScrollEdges } from "../../components/ScrollEdges";
 import { useText } from "../../text";
 import { UsageChart } from "./UsageChart";
 import { UsageProviderMark } from "./UsageProviderMark";
 import {
   type UsageAgentLabel,
+  type UsageBucket,
   type UsageMetric,
+  usageBucket,
   usageCompact,
   usageCost,
   usageExactCost,
   usageNumber,
   usageProviderName,
   usageProviders,
-  usageSeriesColor,
+  usageSeriesColors,
 } from "./usage-format";
 
 type UsageTotalField =
@@ -36,7 +39,11 @@ const TOTAL_ROWS = [
   { field: "assistantMessages", label: "usage.totals.assistantMessages" },
 ] as const satisfies ReadonlyArray<{ field: UsageTotalField; label: AppTextKey }>;
 
-// The fields that `Date.prototype.toLocaleString()` shows when it gets no options.
+const TREND_TITLES = {
+  cost: { day: "usage.dailyCost", week: "usage.weeklyCost", month: "usage.monthlyCost" },
+  tokens: { day: "usage.dailyTokens", week: "usage.weeklyTokens", month: "usage.monthlyTokens" },
+} as const satisfies Record<UsageMetric, Record<UsageBucket, AppTextKey>>;
+
 const UPDATED_AT_FORMAT: Intl.DateTimeFormatOptions = {
   year: "numeric",
   month: "numeric",
@@ -55,10 +62,6 @@ function Amount(props: { value: number | null; cost?: boolean }) {
     </>
   );
 }
-// The model and agent tables carry the same three value columns, so they share them and
-// the metric switch changes the same one column in both by construction. The headers name
-// the measure only: every cost cell carries its currency, and the note under the tables
-// already says a share is of the known amount.
 function BreakdownColumns(props: { label: string }) {
   const { t } = useText();
   return (
@@ -92,8 +95,6 @@ export function AgentUsageReport(props: {
   const text = useText();
   const { t, format } = text;
   onSettled(() => queueMicrotask(props.onReady));
-  // The host report answers "which teammate spent this" first, so the split by agent is
-  // the tab that opens.
   const [state, setState] = createStore({ breakdown: "agent" });
   const totals = () => props.result.totals;
   const cost = () => props.metric === "cost";
@@ -112,8 +113,13 @@ export function AgentUsageReport(props: {
       cost() ? (b.estimatedCostUsd ?? -1) - (a.estimatedCostUsd ?? -1) : analyticsTokens(b) - analyticsTokens(a),
     ),
   );
-  const partial = () =>
-    totals().missingUsageTurns > 0 || totals().unpricedRecords > 0 || totals().incompleteRecords > 0;
+  const seriesColor = createMemo(() =>
+    usageSeriesColors([
+      ...props.result.models.map((model) => model.provider),
+      ...props.result.providerDaily.map((cell) => cell.provider),
+    ]),
+  );
+  const bucket = createMemo(() => usageBucket(props.result.daily.length));
   const share = (amount: number | null) => {
     const total = cost() ? totals().estimatedCostUsd : analyticsTokens(totals());
     return amount === null || total === null
@@ -129,201 +135,247 @@ export function AgentUsageReport(props: {
   }
   return (
     <>
-      <Show when={!totals().turns && !totals().userMessages && !totals().processedTokens}>
-        <p class="agent-usage-notice" role="status">
-          {t("usage.empty")}
-        </p>
-      </Show>
-      <Show when={partial()}>
-        <p class="agent-usage-notice" role="status">
-          {t("usage.partial", {
-            turns: totals().missingUsageTurns,
-            unpriced: totals().unpricedRecords,
-            incomplete: totals().incompleteRecords,
-          })}
-        </p>
-      </Show>
-      <div class="agent-usage-overview">
-        <section class="agent-usage-summary" aria-label={t("usage.summary")}>
-          <div>
-            <p class="agent-usage-hero">
-              <Amount value={cost() ? totals().estimatedCostUsd : analyticsTokens(totals())} cost={cost()} />
-            </p>
-            <p class="agent-usage-secondary">
-              {t("usage.sessions", { count: totals().sessions, sessions: usageNumber(totals().sessions, text) })} ·{" "}
-              {cost() ? t("usage.costEstimate") : t("usage.knownTokens")}
-            </p>
-          </div>
-          <div class="agent-usage-providers">
-            <For each={providers()}>
-              {(provider) => (
-                <div class="agent-usage-provider">
-                  <div class="agent-usage-provider-heading">
-                    <span>
-                      {/* The chart needs a legend, and this list already names every
-                          series, so the dot is it - which is why the colour follows the
-                          provider rather than the row's place in a metric-sorted list. */}
-                      <span
-                        class="agent-usage-series-dot"
-                        style={{ background: usageSeriesColor(provider.provider) }}
-                        aria-hidden="true"
-                      />
-                      <UsageProviderMark provider={provider.provider} />
-                      {usageProviderName(provider.provider)}
-                    </span>
-                    <strong>
-                      <Amount value={cost() ? provider.cost : provider.tokens} cost={cost()} />
-                    </strong>
-                  </div>
-                  <p>
-                    {/* A provider with no known cost has no share of it, and its heading already says so. */}
-                    <Show when={!cost() || provider.cost !== null}>
+      <Show
+        when={totals().turns || totals().userMessages || totals().processedTokens}
+        fallback={
+          <p class="agent-usage-notice" role="status">
+            {t("usage.empty")}
+          </p>
+        }
+      >
+        <div class="agent-usage-overview">
+          <section class="agent-usage-summary" aria-label={t("usage.summary")}>
+            <div>
+              <p class="agent-usage-hero">
+                <Amount value={cost() ? totals().estimatedCostUsd : analyticsTokens(totals())} cost={cost()} />
+              </p>
+              <p class="agent-usage-secondary">
+                {t("usage.sessions", { count: totals().sessions, sessions: usageNumber(totals().sessions, text) })} ·{" "}
+                {cost() ? t("usage.costEstimate") : t("usage.knownTokens")}
+              </p>
+            </div>
+            <div class="agent-usage-providers">
+              <For each={providers()}>
+                {(provider) => (
+                  <div class="agent-usage-provider">
+                    <div class="agent-usage-provider-heading">
+                      <span>
+                        <span
+                          class="agent-usage-series-dot"
+                          style={{ background: seriesColor()(provider.provider) }}
+                          aria-hidden="true"
+                        />
+                        <UsageProviderMark provider={provider.provider} />
+                        {usageProviderName(provider.provider)}
+                      </span>
+                      <strong>
+                        <Amount value={cost() ? provider.cost : provider.tokens} cost={cost()} />
+                      </strong>
+                    </div>
+                    <p>
+                      <Show when={!cost() || provider.cost !== null}>
+                        {cost()
+                          ? t("usage.provider.shareOfCost", { share: share(provider.cost) })
+                          : t("usage.provider.shareOfTokens", { share: share(provider.tokens) })}{" "}
+                        ·{" "}
+                      </Show>
                       {cost()
-                        ? t("usage.provider.shareOfCost", { share: share(provider.cost) })
-                        : t("usage.provider.shareOfTokens", { share: share(provider.tokens) })}{" "}
-                      ·{" "}
-                    </Show>
-                    {cost()
-                      ? t("usage.tokensAmount", { tokens: usageCompact(provider.tokens, text) })
-                      : usageCost(provider.cost, text)}
-                  </p>
+                        ? t("usage.tokensAmount", { tokens: usageCompact(provider.tokens, text) })
+                        : usageCost(provider.cost, text)}
+                    </p>
+                  </div>
+                )}
+              </For>
+            </div>
+          </section>
+          <section class="agent-usage-trend" aria-label={t(TREND_TITLES[props.metric][bucket()])}>
+            <div class="agent-usage-section-header">
+              <h3>{t(TREND_TITLES[props.metric][bucket()])}</h3>
+              <Button variant="ghost" size="xs" onClick={showDailyData}>
+                {t("usage.viewDailyData")}
+              </Button>
+            </div>
+            <UsageChart
+              result={props.result}
+              metric={props.metric}
+              bucket={bucket()}
+              label={t(TREND_TITLES[props.metric][bucket()])}
+              seriesColor={seriesColor()}
+            />
+          </section>
+        </div>
+        <section aria-label={t("usage.totals.title")}>
+          <h3>{t("usage.totals.title")}</h3>
+          <dl class="agent-usage-totals">
+            <div>
+              <dt>{t("usage.totals.tokens")}</dt>
+              <dd>
+                <Amount value={analyticsTokens(totals())} />
+              </dd>
+            </div>
+            <For each={TOTAL_ROWS}>
+              {(item) => (
+                <div>
+                  <dt>{t(item.label)}</dt>
+                  <dd>
+                    <Amount value={totals()[item.field]} />
+                  </dd>
                 </div>
               )}
             </For>
-          </div>
+          </dl>
         </section>
-        <section class="agent-usage-trend" aria-label={t("usage.dailyTrend")}>
+        <SlidingTabs.Root
+          value={state.breakdown === "skill" && !props.result.skills ? "agent" : state.breakdown}
+          onChange={(value) =>
+            setState((draft) => {
+              draft.breakdown = value;
+            })
+          }
+        >
           <div class="agent-usage-section-header">
-            <h3>{cost() ? t("usage.dailyCost") : t("usage.dailyTokens")}</h3>
-            <Button variant="ghost" size="xs" onClick={showDailyData}>
-              {t("usage.viewDailyData")}
-            </Button>
+            <h3>{t("usage.breakdown.title")}</h3>
+            <SlidingTabs.List aria-label={t("usage.breakdown.label")}>
+              <SlidingTabs.Trigger value="model">{t("usage.breakdown.model")}</SlidingTabs.Trigger>
+              <SlidingTabs.Trigger value="agent">{t("usage.breakdown.agent")}</SlidingTabs.Trigger>
+              <SlidingTabs.Trigger value="day">{t("usage.breakdown.day")}</SlidingTabs.Trigger>
+              <Show when={props.result.skills}>
+                <SlidingTabs.Trigger value="skill">{t("usage.breakdown.skill")}</SlidingTabs.Trigger>
+              </Show>
+            </SlidingTabs.List>
           </div>
-          <UsageChart result={props.result} metric={props.metric} />
-        </section>
-      </div>
-      <section aria-label={t("usage.totals.title")}>
-        <h3>{t("usage.totals.title")}</h3>
-        <dl class="agent-usage-totals">
-          <div>
-            <dt>{t("usage.totals.tokens")}</dt>
-            <dd>
-              <Amount value={analyticsTokens(totals())} />
-            </dd>
-          </div>
-          <For each={TOTAL_ROWS}>
-            {(item) => (
-              <div>
-                <dt>{t(item.label)}</dt>
-                <dd>
-                  <Amount value={totals()[item.field]} />
-                </dd>
-              </div>
-            )}
-          </For>
-        </dl>
-      </section>
-      <SlidingTabs.Root
-        value={state.breakdown}
-        onChange={(value) =>
-          setState((draft) => {
-            draft.breakdown = value;
-          })
-        }
-      >
-        <div class="agent-usage-section-header">
-          <h3>{t("usage.breakdown.title")}</h3>
-          <SlidingTabs.List aria-label={t("usage.breakdown.label")}>
-            <SlidingTabs.Trigger value="model">{t("usage.breakdown.model")}</SlidingTabs.Trigger>
-            <SlidingTabs.Trigger value="agent">{t("usage.breakdown.agent")}</SlidingTabs.Trigger>
-            <SlidingTabs.Trigger value="day">{t("usage.breakdown.day")}</SlidingTabs.Trigger>
-          </SlidingTabs.List>
-        </div>
-        {/* Every panel is force-mounted, and the grid slot is what makes the hidden ones
-            share one cell instead of each reserving its own height below the visible table. */}
-        <SlidingTabs.ContentSlot>
-          <SlidingTabs.Content value="model">
-            <div class="agent-usage-table">
-              <table>
-                <caption class="sr-only">{t("usage.breakdown.byModel")}</caption>
-                <thead>
-                  <BreakdownColumns label={t("usage.breakdown.model")} />
-                </thead>
-                <tbody>
-                  <For each={models()}>
-                    {(model) => (
-                      <tr>
-                        <th scope="row">
-                          <span class="agent-usage-model-name">
-                            <UsageProviderMark provider={model.provider} />
-                            <span>
-                              {model.model || t("usage.unknownModel")}
-                              {/* The logo carries the provider for a reader who sees it, and the
-                                  row stays one line high; the name is still spoken. */}
-                              <span class="sr-only">{usageProviderName(model.provider)}</span>
+          <SlidingTabs.ContentSlot class="agent-usage-breakdown">
+            <SlidingTabs.Content value="model">
+              <ScrollEdges axis="x" viewClass="agent-usage-table" label={t("usage.breakdown.byModel")}>
+                <table>
+                  <caption class="sr-only">{t("usage.breakdown.byModel")}</caption>
+                  <thead>
+                    <BreakdownColumns label={t("usage.breakdown.model")} />
+                  </thead>
+                  <tbody>
+                    <For each={models()}>
+                      {(model) => (
+                        <tr>
+                          <th scope="row">
+                            <span class="agent-usage-model-name">
+                              <UsageProviderMark provider={model.provider} />
+                              <span>
+                                {model.model || t("usage.unknownModel")}
+                                <span class="sr-only">{usageProviderName(model.provider)}</span>
+                              </span>
                             </span>
-                          </span>
-                        </th>
-                        <BreakdownCells row={model} cost={cost()} share={share} />
-                      </tr>
-                    )}
-                  </For>
-                </tbody>
-              </table>
-            </div>
-          </SlidingTabs.Content>
-          <SlidingTabs.Content value="agent">
-            <div class="agent-usage-table">
-              <table>
-                <caption class="sr-only">{t("usage.breakdown.byAgent")}</caption>
-                <thead>
-                  <BreakdownColumns label={t("usage.breakdown.agent")} />
-                </thead>
-                <tbody>
-                  <For each={agents()}>
-                    {(agent) => (
-                      <tr>
-                        <th scope="row">
-                          <span class="agent-usage-model-name">
-                            <UsageProviderMark provider={props.agentLabel(agent.agentId).provider} />
-                            <span>{props.agentLabel(agent.agentId).name}</span>
-                          </span>
-                        </th>
-                        <BreakdownCells row={agent} cost={cost()} share={share} />
-                      </tr>
-                    )}
-                  </For>
-                </tbody>
-              </table>
-            </div>
-          </SlidingTabs.Content>
-          <SlidingTabs.Content value="day">
-            <div class="agent-usage-table">
-              <table ref={dailyTable} tabindex={-1}>
-                <caption class="sr-only">{t("usage.breakdown.byDay")}</caption>
-                <thead>
-                  <tr>
-                    <th scope="col">{t("usage.column.date")}</th>
-                    <th scope="col">{t("usage.column.costUsd")}</th>
-                    <th scope="col">{t("usage.column.tokens")}</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  <For each={[...props.result.daily].reverse()}>
-                    {(day) => (
-                      <tr>
-                        <th scope="row">{day.date}</th>
-                        <td>{usageExactCost(day.estimatedCostUsd, text)}</td>
-                        <td>{usageNumber(analyticsTokens(day), text)}</td>
-                      </tr>
-                    )}
-                  </For>
-                </tbody>
-              </table>
-            </div>
-          </SlidingTabs.Content>
-        </SlidingTabs.ContentSlot>
-      </SlidingTabs.Root>
+                          </th>
+                          <BreakdownCells row={model} cost={cost()} share={share} />
+                        </tr>
+                      )}
+                    </For>
+                  </tbody>
+                </table>
+              </ScrollEdges>
+            </SlidingTabs.Content>
+            <SlidingTabs.Content value="agent">
+              <ScrollEdges axis="x" viewClass="agent-usage-table" label={t("usage.breakdown.byAgent")}>
+                <table>
+                  <caption class="sr-only">{t("usage.breakdown.byAgent")}</caption>
+                  <thead>
+                    <BreakdownColumns label={t("usage.breakdown.agent")} />
+                  </thead>
+                  <tbody>
+                    <For each={agents()}>
+                      {(agent) => (
+                        <tr>
+                          <th scope="row">
+                            <span class="agent-usage-model-name">
+                              <UsageProviderMark provider={props.agentLabel(agent.agentId).provider} />
+                              <span>{props.agentLabel(agent.agentId).name}</span>
+                            </span>
+                          </th>
+                          <BreakdownCells row={agent} cost={cost()} share={share} />
+                        </tr>
+                      )}
+                    </For>
+                  </tbody>
+                </table>
+              </ScrollEdges>
+            </SlidingTabs.Content>
+            <SlidingTabs.Content value="day">
+              <ScrollEdges axis="x" viewClass="agent-usage-table" label={t("usage.breakdown.byDay")}>
+                <table ref={dailyTable} tabindex={-1}>
+                  <caption class="sr-only">{t("usage.breakdown.byDay")}</caption>
+                  <thead>
+                    <tr>
+                      <th scope="col">{t("usage.column.date")}</th>
+                      <th scope="col">{t("usage.column.costUsd")}</th>
+                      <th scope="col">{t("usage.column.tokens")}</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <For each={[...props.result.daily].reverse()}>
+                      {(day) => (
+                        <tr>
+                          <th scope="row">{day.date}</th>
+                          <td>{usageExactCost(day.estimatedCostUsd, text)}</td>
+                          <td>{usageNumber(analyticsTokens(day), text)}</td>
+                        </tr>
+                      )}
+                    </For>
+                  </tbody>
+                </table>
+              </ScrollEdges>
+            </SlidingTabs.Content>
+            <Show when={props.result.skills}>
+              {(skills) => (
+                <SlidingTabs.Content value="skill">
+                  <ScrollEdges axis="x" viewClass="agent-usage-table" label={t("usage.breakdown.bySkill")}>
+                    <table>
+                      <caption class="sr-only">{t("usage.breakdown.bySkill")}</caption>
+                      <thead>
+                        <tr>
+                          <th scope="col">{t("usage.breakdown.skill")}</th>
+                          <th scope="col">{t("usage.column.loads")}</th>
+                          <th scope="col">{t("usage.column.cost")}</th>
+                          <th scope="col">{t("usage.column.share")}</th>
+                          <th scope="col">{t("usage.column.tokens")}</th>
+                          <th scope="col">{t("usage.column.agents")}</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        <For
+                          each={skills()}
+                          fallback={
+                            <tr>
+                              <td colspan={6} class="agent-usage-table-empty">
+                                {t("usage.breakdown.skillEmpty")}
+                              </td>
+                            </tr>
+                          }
+                        >
+                          {(skill) => (
+                            <tr>
+                              <th scope="row">{skill.skill}</th>
+                              <td>{format.number(skill.loads)}</td>
+                              <td>
+                                <Amount value={skill.estimatedCostUsd} cost />
+                              </td>
+                              <td>
+                                {format.percent(skill.share, { minimumFractionDigits: 1, maximumFractionDigits: 1 })}
+                              </td>
+                              <td>
+                                <Amount value={skill.tokens} />
+                              </td>
+                              <td>{format.number(skill.agents)}</td>
+                            </tr>
+                          )}
+                        </For>
+                      </tbody>
+                    </table>
+                  </ScrollEdges>
+                </SlidingTabs.Content>
+              )}
+            </Show>
+          </SlidingTabs.ContentSlot>
+        </SlidingTabs.Root>
+      </Show>
       <footer class="agent-usage-footer">
         <p>
           {t("usage.footer", {

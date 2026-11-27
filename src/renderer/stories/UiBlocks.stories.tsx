@@ -7,11 +7,10 @@ import type {
   UiFormBlock as UiFormSpec,
   UiQuickRepliesBlock as UiQuickRepliesSpec,
 } from "@openbot/contracts/ui-blocks";
-import { uiBlockOutcomeText } from "@openbot/contracts/ui-blocks";
+import { UI_API_KEY_SCOPE_FIELD_ID, uiBlockOutcomeText } from "@openbot/contracts/ui-blocks";
 import { UiChoiceBlock } from "@openbot/ui/features/conversation/ui-blocks/UiChoiceBlock";
 import { UiConfirmBlock } from "@openbot/ui/features/conversation/ui-blocks/UiConfirmBlock";
 import { UiFormBlock } from "@openbot/ui/features/conversation/ui-blocks/UiFormBlock";
-import { UiQuickReplies } from "@openbot/ui/features/conversation/ui-blocks/UiQuickReplies";
 import type { JSX } from "@solidjs/web";
 import { createSignal } from "solid-js";
 import { fn } from "storybook/test";
@@ -53,7 +52,6 @@ const dangerSpec: UiConfirmSpec = {
   ],
 };
 
-/** The plan card of `acknowledge_request`. The host presses Start when nobody answers in 10 s. */
 const planSpec: UiConfirmSpec = {
   type: "confirm",
   title: "On it. This is my plan for the 502 on staging.",
@@ -130,9 +128,9 @@ interface LiveProps<Spec extends UiBlockSpec> {
   onRespond: (response: UiBlockResponse) => void;
   disabled?: boolean;
   busy?: boolean;
+  onSkip?: () => void;
 }
 
-/** Keeps the answer in the story, so a pending card freezes the way it does in the chat. */
 function live<Spec extends UiBlockSpec>(
   Block: (props: LiveProps<Spec>) => JSX.Element,
 ): (props: LiveProps<Spec>) => JSX.Element {
@@ -148,6 +146,7 @@ function live<Spec extends UiBlockSpec>(
           props.onRespond(response);
           setState(answered(props.spec, response));
         }}
+        onSkip={() => setState({ status: "closed" })}
       />
     );
   };
@@ -155,7 +154,7 @@ function live<Spec extends UiBlockSpec>(
 
 const LiveConfirm = live<UiConfirmSpec>(UiConfirmBlock);
 const LiveChoice = live<UiChoiceSpec>(UiChoiceBlock);
-const LiveQuick = live<UiQuickRepliesSpec>(UiQuickReplies);
+const LiveQuick = live<UiQuickRepliesSpec>(UiChoiceBlock);
 const LiveForm = live<UiFormSpec>(UiFormBlock);
 
 const meta = {
@@ -196,7 +195,6 @@ export const ConfirmExpired: Story = {
   render: (args) => <LiveConfirm spec={confirmSpec} state={{ status: "expired" }} onRespond={args.onRespond} />,
 };
 
-/** A draft taller than the preview box fades out at its end, and "Show all" under it opens the rest. */
 export const ConfirmLongPreview: Story = {
   render: (args) => (
     <LiveConfirm
@@ -209,7 +207,26 @@ export const ConfirmLongPreview: Story = {
   ),
 };
 
-/** Start counts down to the time the host answers. Cancel sits at the far end, and there is no Skip. */
+export const ConfirmManyActions: Story = {
+  render: (args) => (
+    <div style={{ "max-width": "540px" }}>
+      <LiveConfirm
+        spec={{
+          type: "confirm",
+          title: "Publish the release post?",
+          preview: "OpenBot 0.65 is out. Agents now ask questions in one prompt.",
+          actions: [
+            { id: "publish", label: "Publish on all channels", style: "primary" },
+            { id: "schedule", label: "Schedule for tomorrow" },
+            { id: "draft", label: "Save as a draft" },
+          ],
+        }}
+        onRespond={args.onRespond}
+      />
+    </div>
+  ),
+};
+
 export const PlanCountdown: Story = {
   render: (args) => (
     <LiveConfirm
@@ -220,7 +237,6 @@ export const PlanCountdown: Story = {
   ),
 };
 
-/** Nobody answered in time, so the host pressed Start. */
 export const PlanAutoAnswered: Story = {
   render: (args) => (
     <LiveConfirm
@@ -290,7 +306,6 @@ const vaultLoginSpec: UiFormSpec = {
   submit: "Save to Vault",
 };
 
-/** A form that asks for a secret. Once answered, its values show as rows and the secret shows as hidden. */
 export const SecretFormPending: Story = {
   render: (args) => <LiveForm spec={vaultLoginSpec} onRespond={args.onRespond} />,
 };
@@ -306,6 +321,27 @@ export const SecretFormAnswered: Story = {
       onRespond={args.onRespond}
     />
   ),
+};
+
+const apiKeySpec: UiFormSpec = {
+  type: "form",
+  title: "PrivateMail app password for the CRM sync",
+  fields: [
+    { id: "key", kind: "text", label: "PRIVATEMAIL_APP_PASSWORD", required: true, secret: true },
+    {
+      id: UI_API_KEY_SCOPE_FIELD_ID,
+      kind: "segmented",
+      label: "Save for",
+      options: ["All agents (Vault)", "Only this agent"],
+      required: true,
+      value: "All agents (Vault)",
+    },
+  ],
+  submit: "Save securely",
+};
+
+export const ApiKeyPending: Story = {
+  render: (args) => <LiveForm spec={apiKeySpec} onRespond={args.onRespond} />,
 };
 
 export const Narrow: Story = {

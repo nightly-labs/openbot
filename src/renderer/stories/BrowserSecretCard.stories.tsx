@@ -44,7 +44,6 @@ export const Password: Story = {
     vault: { server: null },
   },
 };
-/** An owner or admin of a joined server: the box starts unchecked. */
 export const PasswordJoinedServer: Story = {
   args: { ...Password.args, vault: { server: "Studio Mac mini" } },
 };
@@ -53,6 +52,16 @@ export const PasswordMember: Story = {
 };
 export const PasswordOlderHost: Story = {
   args: { ...Password.args, vault: { server: "Studio Mac mini", blocked: "version" } },
+};
+export const PasswordVaultSkipped: Story = {
+  args: {
+    ...Password.args,
+    request: {
+      ...request,
+      secret: { method: "password", origin: "https://accounts.example.com", digits: 6 },
+      vaultSkip: "agent-script",
+    },
+  },
 };
 export const EightDigits: Story = {
   args: { request: { ...request, secret: { method: "otp", origin: "https://accounts.example.com", digits: 8 } } },
@@ -65,7 +74,7 @@ export const Failed: Story = {
   },
 };
 const renderNarrow: NonNullable<Story["render"]> = (args) => (
-  <div style={{ width: "280px", "max-width": "100%" }}>
+  <div style={{ width: "340px", "max-width": "100%" }}>
     <BrowserSecretCard {...args} />
   </div>
 );
@@ -107,6 +116,10 @@ export const IslandPassword: Story = {
 
 export const IslandPasswordJoinedServer: Story = {
   args: { ...PasswordJoinedServer.args, variant: "island" },
+};
+
+export const IslandPasswordVaultSkipped: Story = {
+  args: { ...PasswordVaultSkipped.args, variant: "island" },
 };
 
 export const IslandEightDigits: Story = {

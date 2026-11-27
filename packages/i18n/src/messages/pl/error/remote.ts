@@ -7,6 +7,8 @@ export const messages = {
   "error.remote.desktopTestUnavailable": "Testowanie zdalnego pulpitu jest niedostępne.",
   "error.remote.controlUnavailable": "Zdalne sterowanie jest niedostępne.",
   "error.remote.controlSessionNotFound": "Nie znaleziono sesji zdalnego sterowania.",
+  "error.remote.controlNotAllowed": "Właściciel tego komputera nie pozwala twojej roli na sterowanie nim.",
+  "error.remote.controlDeclined": "Osoba przy tym komputerze nie zezwoliła na zdalne sterowanie.",
   "error.remote.testRuntimeUpdate": "Zaktualizuj środowisko zdalnego pulpitu macOS, aby uruchomić ten test.",
   "error.remote.testOtherSessions": "Zakończ inne sesje zdalnego pulpitu, zanim rozpoczniesz test.",
   "error.remote.testPermissions": "Przed rozpoczęciem testu sprawdź uprawnienia i sesję GUI na hoście.",
@@ -19,6 +21,18 @@ export const messages = {
   "error.remote.testActive": "Test zdalnego pulpitu jest aktywny. Spróbuj ponownie po jego zakończeniu.",
   "error.remote.screenRecordingDenied":
     "Host nie zezwolił OpenBot na nagrywanie ekranu. Przyznaj na hoście uprawnienie do nagrywania ekranu, a następnie spróbuj ponownie.",
+  "error.remote.windowsSessionDisconnected":
+    "Sesja Windows na hoście jest rozłączona, więc nie ma ekranu do udostępnienia. Zaloguj się do Windows na ekranie hosta, a następnie spróbuj ponownie.",
+  "error.remote.windowsCaptureDenied":
+    "Windows na hoście nie pozwala OpenBot nagrywać ekranu. Odblokuj Windows na ekranie hosta, zamknij wszystkie monity administratora, a następnie spróbuj ponownie. Jeśli problem nie ustąpi, uruchom ponownie host.",
+  "error.remote.macScreenLocked":
+    "Mac jest zablokowany, więc nie może udostępnić ekranu. Odblokuj Maca na jego ekranie, a następnie spróbuj ponownie.",
+  "error.remote.streamTooSlowLowerQuality":
+    "Połączenie z hostem jest zbyt wolne, aby pokazać obraz. Spróbuj ponownie: następne połączenie użyje niższej jakości.",
+  "error.remote.streamTooSlow":
+    "Połączenie z hostem jest zbyt wolne, aby pokazać obraz. Użyj szybszej sieci, a następnie spróbuj ponownie.",
+  "error.remote.noPictureSwitchEncoder":
+    "Host nie wysłał obrazu. Spróbuj ponownie: następne połączenie użyje ustawienia wideo, które działa na większej liczbie komputerów.",
   "error.remote.teamSessionExpired": "Sesja zespołu wygasła.",
   "error.remote.finishTestBeforeSwitch": "Zakończ test zdalnego pulpitu, zanim przełączysz ekran.",
   "error.remote.displayNotFound": "Nie znaleziono zdalnego ekranu.",
@@ -77,10 +91,18 @@ export const messages = {
   "error.remote.ownerOnlyRemove": "Tylko właściciel może usunąć ten serwer.",
   "error.remote.requestTimeout": "Przekroczono limit czasu zdalnego żądania.",
   "error.remote.requestFailed": "Zdalne żądanie nie powiodło się.",
-  "error.remote.pinnedKeyMissing": "Zdalny host nie ma przypiętego klucza urządzenia.",
-  "error.remote.hostDidNotConnect": "Host WebRTC nie połączył się.",
+  "error.remote.hostKeyMissing":
+    "OpenBot nie może zweryfikować tego serwera, ponieważ brakuje jego klucza bezpieczeństwa lub klucz się zmienił. Poproś właściciela serwera o sprawdzenie serwera.",
+  "error.remote.connectionNotStarted":
+    "OpenBot nie mógł nawiązać połączenia z tym serwerem. Jeśli problem się powtarza, zamknij OpenBot i otwórz go ponownie.",
+  "error.remote.connectionServiceUnreachable":
+    "Ten komputer nie może połączyć się z usługą połączeń OpenBot. Sprawdź jego połączenie z internetem. OpenBot połączy się ponownie automatycznie.",
+  "error.remote.serverAnswerTimeout": "Serwer nie odpowiedział na czas. OpenBot połączy się ponownie automatycznie.",
+  "error.remote.signInConnectionClosed":
+    "Połączenie z serwerem zostało zamknięte podczas logowania. Jeśli to się powtarza, sprawdź datę i godzinę na serwerze i na tym urządzeniu.",
   "error.remote.connectionCancelled": "Zdalne połączenie zostało anulowane.",
-  "error.remote.hostDisconnected": "Host WebRTC rozłączył się.",
+  "error.remote.hostDisconnected":
+    "Połączenie z serwerem zostało przerwane. Sprawdź, czy działanie się zakończyło, i spróbuj ponownie.",
   "error.remote.eventGap": "W sekwencji zdarzeń hosta jest luka.",
   "error.remote.malformedKnownEvent": "Host zwrócił uszkodzone znane zdarzenie.",
   "error.remote.fileTransportIsStopped": "Transport plików WebRTC jest zatrzymany.",
@@ -146,6 +168,7 @@ export const messages = {
   "error.remote.attachmentRejected": "Host odrzucił załącznik.",
   "error.remote.attachmentTooLarge": "Załączniki mogą mieć najwyżej 10 MB.",
   "error.remote.attachmentBusy": "Poczekaj, aż przesyłanie bieżącego załącznika się zakończy.",
+  "error.remote.attachmentChanged": "Plik się zmienił lub jest niedostępny. Wybierz go ponownie.",
   "error.remote.uploadTimeout": "Przekroczono limit czasu przesyłania załącznika.",
   "error.remote.hostSessionActive": "Host ma już aktywną zdalną sesję.",
   "error.remote.tooManyConnections": "Zbyt wiele aktywnych zdalnych połączeń.",
@@ -176,6 +199,8 @@ export const messages = {
   "error.remote.iceFailed":
     "Nie udało się nawiązać bezpośredniego połączenia z hostem. Może je blokować zapora, VPN lub serwer proxy.",
   "error.remote.iceDisconnected": "Bezpośrednie połączenie z hostem zostało utracone.",
+  "error.remote.webrtcBlocked":
+    "To urządzenie blokuje połączenie, którego potrzebuje OpenBot. Jeśli tryb blokady jest włączony, wyłącz go dla OpenBot w Ustawienia > Prywatność i ochrona > Tryb blokady.",
   "error.remote.directoryUnreachable": "OpenBot nie mógł połączyć się z usługą OpenBot. Sprawdź połączenie.",
   "error.remote.directoryTimeout": "Usługa OpenBot nie odpowiedziała na czas. Spróbuj ponownie.",
   "error.remote.inviteAlreadyUsed": "To zaproszenie zostało już użyte. Poproś o nowe zaproszenie.",
@@ -185,16 +210,26 @@ export const messages = {
   "error.remote.memberLimitReached": "Ten host osiągnął limit członków. Poproś właściciela o zwolnienie miejsca.",
   "error.remote.hostNotRegistered": "Ten host nie jest już zarejestrowany w usłudze OpenBot.",
   "error.remote.membershipEnded": "Nie jesteś już członkiem tego hosta. Poproś właściciela o nowe zaproszenie.",
+  "error.remote.membershipChanged":
+    "Ktoś inny zmienił tego członka w tym samym czasie. Wczytaj członków ponownie i spróbuj jeszcze raz.",
   "error.remote.accountSessionInactive": "Twoje logowanie nie jest już aktywne. Zaloguj się ponownie.",
   "error.remote.hostOtherAccount": "Ten host należy do innego konta.",
   "error.remote.remoteNotConfigured": "Zdalne połączenia nie są skonfigurowane w tej usłudze OpenBot.",
   "error.remote.hostRefused": "Host odrzucił żądanie ({status}).",
   "error.remote.formUnavailable": "Ten formularz nie jest już dostępny.",
   "error.remote.hostedServerRemoval": "Użyj sekcji Rozliczenia, aby usunąć hostowany serwer.",
+  "error.remote.hostRemoved": "Właściciel usunął ten serwer z konta.",
+  "error.remote.ownerTransferSelf": "Ten serwer już należy do Ciebie. Wpisz e-mail nowego właściciela.",
+  "error.remote.ownerTransferHosted": "Serwer hostowany przez OpenBot nie może zmienić właściciela.",
+  "error.remote.ownerTransferInvalid":
+    "To przekazanie własności nie jest już dostępne. Poproś właściciela, aby wysłał je ponownie.",
   "error.remote.channelsUnsupported": "Zaktualizuj ten serwer desktopowy, aby używać kanałów.",
   "error.remote.channelDeleteUnsupported": "Zaktualizuj ten serwer desktopowy, aby usuwać kanały.",
   "error.remote.historyRefreshFailed": "Wiadomość została wysłana, ale nie udało się odświeżyć historii czatu.",
   "error.remote.taskHistoryRefreshFailed": "Zadanie zostało zmienione, ale nie udało się odświeżyć historii czatu.",
+  "error.remote.serverNotLoaded": "Nie udało się wczytać serwera. Spróbuj ponownie.",
+  "error.remote.localServerNotStarted":
+    "Serwer na tym komputerze się nie uruchomił. Spróbuj ponownie. Jeśli nadal się nie uruchamia, uruchom ponownie OpenBot na tym komputerze.",
   "error.remote.localServerAccountRemovalFailed":
     "Serwer został usunięty na swoim komputerze, ale konto nadal go pokazuje. Usuń go ponownie, aby usunąć go z konta.",
 } as const satisfies PartialTranslation<typeof source>;

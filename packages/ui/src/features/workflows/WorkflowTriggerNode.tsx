@@ -1,5 +1,3 @@
-/** A trigger: the start of a workflow. */
-
 import type { AppTranslate } from "@openbot/i18n";
 import {
   type RoutineScheduleDraft,
@@ -21,10 +19,11 @@ import { createSignal, Show, untrack } from "solid-js";
 import { useText } from "../../text";
 import { RoutineSchedulePicker } from "../conversation/RoutineSchedulePicker";
 import { RoutineWebhookSecretField } from "../conversation/RoutineWebhookEndpoint";
+import { AnswerAction, AnswerProblems } from "./workflow-answer-parts";
 import { useBoard } from "./workflow-board";
 import { DISCORD_TRIGGER_DEFAULTS, DiscordIcon, DiscordTriggerRows } from "./workflow-discord-parts";
 import { GITHUB_TRIGGER_DEFAULTS, GitHubIcon, GitHubTriggerRows, useGitHubTriggerReady } from "./workflow-github-parts";
-import { newTriggerSchedule, stableJson } from "./workflow-history";
+import { knownTimeZone, localTimeZone, newTriggerSchedule, stableJson } from "./workflow-history";
 import { type Choice, NodeShell, NodeToolbar, oneOf, useField, useLocked, useStepRun } from "./workflow-node-parts";
 import { PlaceRow, SettingRow, SettingRows, SettingsFoot, StaticRow } from "./workflow-setting-rows";
 import { SLACK_TRIGGER_DEFAULTS, SlackIcon, SlackTriggerRows } from "./workflow-slack-parts";
@@ -66,7 +65,6 @@ const TRIGGER_TYPES: readonly TriggerType[] = [
   "slack",
 ];
 
-/** Trigger types that only an admin's host offers: they act as the host's GitHub App or messaging bot. */
 const HOST_TYPES: readonly TriggerType[] = ["github", "discord", "telegram", "slack"];
 
 const TRIGGER_DEFAULTS: Partial<Record<TriggerType, Record<string, string>>> = {
@@ -76,23 +74,12 @@ const TRIGGER_DEFAULTS: Partial<Record<TriggerType, Record<string, string>>> = {
   slack: SLACK_TRIGGER_DEFAULTS,
 };
 
-/**
- * The start of a workflow. The type is the first row of the card, and the settings of that type follow it:
- * a schedule shows its next run, a webhook shows the address to call, a message trigger shows its channel,
- * and a GitHub trigger shows its repository, its event and the events that GitHub sent. Each trigger has a
- * run button: on the canvas it runs the steps that this trigger leads to, and a manual trigger has no other
- * way to start. A GitHub trigger runs with the newest item that matches it.
- *
- * The host gives the webhook address and the next run time of a schedule. Without them, the trigger
- * does not show them. GitHub shows only when the host can run it.
- */
 export function TriggerNode(props: {
   id: string;
   trigger?: TriggerType;
   connectionId?: string;
   placeId?: string;
   webhookUrl?: string | undefined;
-  /** The next run of the schedule, as an ISO time. */
   nextRun?: string | undefined;
 }) {
   const board = useBoard();
@@ -103,27 +90,17 @@ export function TriggerNode(props: {
     untrack(() => props.trigger ?? "schedule"),
     oneOf(TRIGGER_TYPES),
   );
-  /**
-   * A new GitHub, Discord, Telegram or Slack trigger stores the fields that its rows show, so the host reads the
-   * same. Each keeps an `event`, so a change from one to another writes the defaults again.
-   */
   const chooseTrigger = (value: TriggerType) => {
     const defaults = TRIGGER_DEFAULTS[value];
     const fromOther = trigger() !== value && HOST_TYPES.includes(trigger());
     if (!defaults || (board.field(props.id, "event") !== undefined && !fromOther)) return setTrigger(value);
     board.setFields(props.id, { trigger: value, ...defaults });
   };
-  /** GitHub, Discord, Telegram and Slack need a host that can run them. Other types show unless the host lists the types it runs. */
   const offered = (type: TriggerType) => {
     const triggers = board.features()?.triggers;
     if (type === trigger()) return true;
     return HOST_TYPES.includes(type) ? triggers?.includes(type) === true : (triggers?.includes(type) ?? true);
   };
-  /**
-   * The draft that the user edits. A cron text with a space at the end saves without it, so the picker
-   * shows this draft while it gives the saved schedule. An undo gives another schedule, and its draft.
-   * A trigger saved without a schedule shows the schedule of a new one.
-   */
   const [edited, setEdited] = createSignal<RoutineScheduleDraft>();
   const schedule = () => {
     const saved = board.schedule(props.id) ?? newTriggerSchedule();
@@ -136,14 +113,12 @@ export function TriggerNode(props: {
     setEdited(draft);
     board.setSchedule(props.id, routineScheduleFromDraft(draft));
   };
-  /** The signing secret that the host gave once. It shows until the user dismisses it. */
   const [secret, setSecret] = createSignal<string | null>(null);
   const [creating, setCreating] = createSignal(false);
   const rotate = async () => {
     const make = board.rotateWebhookSecret;
     if (make) setSecret(await make(props.id));
   };
-  /** The first secret also makes the address, so a new webhook trigger has a button for both. */
   const create = () => {
     setCreating(true);
     rotate()
@@ -154,7 +129,6 @@ export function TriggerNode(props: {
   const run = useStepRun(untrack(() => props.id));
   const githubReady = useGitHubTriggerReady(() => props.id);
   const isGitHub = () => trigger() === "github";
-  /** A GitHub trigger has no input of its own, so a run from the card uses the newest event that matches. */
   const runLabel = () => {
     if (isGitHub()) return t("workflow.trigger.runLastEvent");
     return trigger() === "manual" ? t("workflow.trigger.runWorkflow") : t("workflow.trigger.runNow");
@@ -163,16 +137,19 @@ export function TriggerNode(props: {
     if (isGitHub()) return board.github()?.runLastEvent(props.id);
     return board.runFrom ? board.runFrom(props.id) : run.start();
   };
-  const nextRun = () =>
-    props.nextRun
-      ? format.date(new Date(props.nextRun), {
-          weekday: "short",
-          day: "numeric",
-          month: "short",
-          hour: "2-digit",
-          minute: "2-digit",
-        })
-      : undefined;
+  const nextRun = () => {
+    if (!props.nextRun) return undefined;
+    const timeZone = knownTimeZone(board.field(props.id, "timezone"));
+    const shown = timeZone && timeZone !== localTimeZone() ? timeZone : undefined;
+    return format.date(new Date(props.nextRun), {
+      weekday: "short",
+      day: "numeric",
+      month: "short",
+      hour: "2-digit",
+      minute: "2-digit",
+      ...(shown ? { timeZone: shown, timeZoneName: "short" } : {}),
+    });
+  };
   return (
     <NodeShell
       action={
@@ -194,7 +171,13 @@ export function TriggerNode(props: {
       kind="trigger"
       output="text"
       style={{ "--wfn-width": "320px" }}
-      toolbar={<NodeToolbar id={props.id} name={t("workflow.trigger.name")} locked={locked()} onLock={setLocked} />}
+      toolbar={
+        <NodeToolbar id={props.id} name={t("workflow.trigger.name")} locked={locked()} onLock={setLocked}>
+          <Show when={trigger() === "webhook"}>
+            <AnswerAction id={props.id} field="answer" locked={locked()} />
+          </Show>
+        </NodeToolbar>
+      }
     >
       <SettingRows
         head={
@@ -260,6 +243,9 @@ export function TriggerNode(props: {
               />
             </div>
           </Show>
+        </Show>
+        <Show when={trigger() === "webhook"}>
+          <AnswerProblems id={props.id} />
         </Show>
         <Show when={trigger() === "message"}>
           <PlaceRow

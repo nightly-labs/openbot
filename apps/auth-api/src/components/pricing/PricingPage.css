@@ -1,13 +1,8 @@
-/* The /pricing page around the shared order form (`@openbot/ui/features/billing/order-form.css`). Every rule is
-   scoped under `.pricing-page`. */
-
 .pricing-page .pricing-hero {
-  /* The accent colour as channels. The page sets it from the size of the order. */
   --pricing-accent: 236, 72, 153;
   padding-bottom: clamp(72px, 8vw, 120px);
 }
 
-/* The order form takes the colour of the order. */
 .pricing-page .order-form {
   --order-accent: rgb(var(--pricing-accent));
 }
@@ -16,7 +11,6 @@
   max-width: 520px;
 }
 
-/* A soft light of the accent colour behind the form, across the full page width. */
 .pricing-page .pricing-hero::before {
   position: absolute;
   z-index: -1;
@@ -41,10 +35,99 @@
   min-width: 240px;
 }
 
-/*
- * Enterprise: a band of light crosses the strip every 6 s, as on a rare card. The band lights the edge as it passes,
- * and Contact sales catches a glint when the band reaches it. A sheen hairline of the home page price runs along the top.
- */
+.pricing-page:is(:lang(ar), :lang(he)) :is(.pricing-enterprise h2, .order-form-badge, .order-form-half h2) {
+  letter-spacing: normal;
+  text-transform: none;
+}
+
+.pricing-page:is(:lang(ar), :lang(he)) .order-form-badge {
+  font-family: var(--openbot-font-sans);
+}
+
+.pricing-page .pricing-cta[data-disabled],
+.pricing-page .pricing-cta[data-disabled]:hover {
+  background: var(--openbot-surface-light);
+  cursor: not-allowed;
+  opacity: 0.45;
+}
+
+.pricing-page .pricing-consent-action {
+  display: flex;
+  max-width: 420px;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 12px;
+}
+
+.pricing-page .pricing-consent {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+}
+
+.pricing-page .pricing-consent-label {
+  color: var(--openbot-text-secondary);
+  font-size: 13px;
+  line-height: 1.45;
+  cursor: pointer;
+}
+
+.pricing-page .pricing-consent-label a {
+  color: var(--openbot-text-primary);
+  text-decoration: underline;
+  text-decoration-color: var(--openbot-border-focus);
+  text-underline-offset: 2px;
+}
+
+.pricing-page .pricing-consent-box {
+  position: relative;
+  display: inline-flex;
+  width: var(--openbot-icon-md);
+  height: var(--openbot-icon-md);
+  flex: 0 0 auto;
+  margin-top: 2px;
+}
+
+.pricing-page .pricing-consent-box .ui-checkbox-input {
+  position: absolute;
+  z-index: 1;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  margin: 0;
+  cursor: pointer;
+  opacity: 0;
+}
+
+.pricing-page .pricing-consent-box .ui-checkbox-visual {
+  display: inline-flex;
+  width: 100%;
+  height: 100%;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid var(--openbot-border-focus);
+  border-radius: var(--openbot-radius-xs);
+  background: var(--openbot-bg-control);
+  color: var(--openbot-transparent);
+}
+
+.pricing-page .pricing-consent-box .ui-checkbox-input:checked + .ui-checkbox-visual {
+  border-color: var(--openbot-surface-light);
+  background: var(--openbot-surface-light);
+  color: var(--openbot-text-on-light);
+}
+
+.pricing-page .pricing-consent-box .ui-checkbox-input:focus-visible + .ui-checkbox-visual {
+  outline: 2px solid var(--openbot-border-focus);
+  outline-offset: 2px;
+}
+
+.pricing-page .pricing-consent-box .ui-checkbox-visual svg {
+  width: var(--openbot-icon-xs);
+  height: var(--openbot-icon-xs);
+  stroke-width: 2.5;
+}
+
 @keyframes pricing-sweep {
   0% {
     background-position: 120% 0;
@@ -56,7 +139,6 @@
   }
 }
 
-/* The band reaches the button at about a third of the cycle on a wide screen. */
 @keyframes pricing-glint {
   0%,
   22% {
@@ -110,13 +192,11 @@
   overflow: hidden;
 }
 
-/* The personal strip is the first block of the hero, so it has the space under it, not above it. */
 .pricing-page .pricing-personal {
   margin-top: 0;
   margin-bottom: clamp(32px, 4vw, 48px);
 }
 
-/* The soft band across the face of the strip. */
 .pricing-page .pricing-enterprise::after {
   position: absolute;
   z-index: -1;
@@ -128,7 +208,6 @@
   animation: pricing-sweep 6s ease-in-out infinite;
 }
 
-/* The same band, cut to the 1px edge at full strength, so the border lights up where the band is. */
 .pricing-page .pricing-enterprise::before {
   position: absolute;
   inset: 0;
@@ -172,8 +251,13 @@
 }
 
 @media (max-width: 760px) {
-  .pricing-page .pricing-cta {
+  .pricing-page .pricing-cta,
+  .pricing-page .pricing-consent-action {
     width: 100%;
+  }
+
+  .pricing-page .pricing-consent-action {
+    max-width: none;
   }
 }
 

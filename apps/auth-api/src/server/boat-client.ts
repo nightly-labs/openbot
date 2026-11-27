@@ -4,11 +4,6 @@ import { hexToBytes, importHmacSha256Key } from "./crypto";
 
 const BOAT_API_URL = "https://boat.dev/api/v1";
 const REQUEST_TIMEOUT_MS = 15_000;
-/**
- * boat gives the sandbox `env` to its tool environment and to the create-time setup script, not to
- * systemd. The template's helper copies the two hosted variables to a file that the OpenBot service
- * waits for. See `scripts/hosting/openbot-hosted-env`.
- */
 const HOSTED_SERVER_SETUP_SCRIPT = "exec /opt/OpenBot/hosted/openbot-hosted-env\n";
 
 export type BoatSandboxType = "small" | "default" | "large";
@@ -28,9 +23,9 @@ const BoatSandboxState = Schema.Literals([
 ]);
 export type BoatSandboxState = typeof BoatSandboxState.Type;
 const BoatSandbox = Schema.Struct({ id: Schema.String, state: BoatSandboxState });
+const isFailingStop = Schema.is(Schema.Struct({ status: Schema.Literal("failing") }));
 const BoatCommandResult = Schema.Struct({ exitCode: Schema.NullOr(Schema.Number), stdout: Schema.String });
 
-/** Provider messages and raw causes can contain credentials and are not retained. */
 export class BoatApiError extends Schema.TaggedError<BoatApiError>()("BoatApiError", {
   status: Schema.Number,
   code: Schema.String,
@@ -96,11 +91,13 @@ const boatRequest = Effect.fn("BoatClient.request")(function* (
   return payload;
 });
 
-const parseSandbox = Effect.fn("BoatClient.decodeSandbox")((value: unknown) =>
-  Schema.decodeUnknownEffect(BoatSandbox)(
-    isDynamicRecord(value) && isDynamicRecord(value.sandbox) ? value.sandbox : value,
-  ).pipe(Effect.mapError(() => new BoatApiError(502, "invalid_response"))),
-);
+const parseSandbox = Effect.fn("BoatClient.decodeSandbox")((value: unknown) => {
+  const sandbox = isDynamicRecord(value) && isDynamicRecord(value.sandbox) ? value.sandbox : value;
+  return Schema.decodeUnknownEffect(BoatSandbox)(sandbox).pipe(
+    Effect.map((decoded) => ({ ...decoded, stopFailing: isDynamicRecord(sandbox) && isFailingStop(sandbox.stop) })),
+    Effect.mapError(() => new BoatApiError(502, "invalid_response")),
+  );
+});
 
 export class BoatClient {
   readonly #transport: Layer.Layer<BoatTransport>;
@@ -108,7 +105,6 @@ export class BoatClient {
   constructor(options: BoatClientOptions) {
     this.#transport = Layer.succeed(BoatTransport)({
       apiKey: options.apiKey,
-      // A wrapped global fetch preserves its workerd receiver.
       fetch: options.fetch ?? ((input, init) => fetch(input, init)),
       baseUrl: options.baseUrl ?? BOAT_API_URL,
     });
@@ -142,10 +138,6 @@ export class BoatClient {
       .pipe(Effect.provide(this.#transport));
   }
 
-  /**
-   * Restore the saved disk; boat refuses a smaller machine that cannot hold it. True when boat
-   * answers `running`: it kept the stopped machine in memory and continued it with no boot.
-   */
   resumeSandbox(sandboxId: string, ttlSeconds: number, type?: BoatSandboxType) {
     return boatRequest("POST", `/sandboxes/${encodeURIComponent(sandboxId)}/resume`, {
       body: type === undefined ? { ttlSeconds } : { ttlSeconds, type },
@@ -154,7 +146,6 @@ export class BoatClient {
       .pipe(Effect.provide(this.#transport));
   }
 
-  /** Runs a shell command as the sandbox user and gives its exit code and output. */
   runCommand(sandboxId: string, command: string, timeoutSeconds: number) {
     return boatRequest("POST", `/sandboxes/${encodeURIComponent(sandboxId)}/commands`, {
       body: { command, timeoutSeconds },
@@ -181,14 +172,12 @@ export class BoatClient {
       .pipe(Effect.provide(this.#transport));
   }
 
-  /** Boat saves the disk before stopping. A failed save must not force a stop. */
   stopSandbox(sandboxId: string) {
     return boatRequest("POST", `/sandboxes/${encodeURIComponent(sandboxId)}/stop`, { body: {} })
       .pipe(Effect.asVoid)
       .pipe(Effect.provide(this.#transport));
   }
 
-  /** A sandbox that is already gone counts as deleted. */
   deleteSandbox(sandboxId: string) {
     return boatRequest("DELETE", `/sandboxes/${encodeURIComponent(sandboxId)}`, {
       headers: { "X-Ascii-Confirm-Delete": sandboxId },
@@ -203,7 +192,6 @@ export class BoatClient {
 
 export const isBoatState = Schema.is(BoatSandboxState);
 
-/** Checks a boat webhook signature: hex HMAC-SHA256 of `delivery.timestamp.body`. */
 export const verifyBoatWebhookSignature = Effect.fn("verifyBoatWebhookSignature")(function* (input: {
   secret: string;
   deliveryId: string;

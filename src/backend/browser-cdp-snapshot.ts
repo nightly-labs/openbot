@@ -8,11 +8,14 @@ import {
   axValue,
   type CdpResult,
   exceptionDescription,
+  frameAutomationContextId,
   frameIds,
+  isFrameGone,
   isRecord,
   numberValue,
   recordValue,
   type SendCommand,
+  skipGoneFrame,
   stringValue,
   textMatches,
 } from "./browser-cdp-values";
@@ -20,21 +23,50 @@ import { browserFailure, browserSync } from "./browser-effects";
 
 const MAX_SNAPSHOT_ELEMENTS = 200;
 const MAX_SNAPSHOT_CANDIDATES = MAX_SNAPSHOT_ELEMENTS * 2;
-/** How much page text a text wait scans for its needle. */
 const MAX_SCANNED_TEXT = 100_000;
-/**
- * The page text a snapshot returns. The model pays for it on each page read; the text in the viewport
- * comes first, and a truncated snapshot says so.
- */
 const MAX_SNAPSHOT_TEXT = 20_000;
 export const MAX_SNAPSHOT_SCANNED_NODES = 10_000;
-/** The matches an ambiguous target collects, so that its error can name the candidates. */
 export const MAX_TARGET_CANDIDATES = 5;
 const MAX_CANDIDATE_TEXT = 120;
 const MAX_CANDIDATE_ITEM_TEXT = 200;
 const MAX_CANDIDATE_PEERS = 500;
 const MAX_SNAPSHOT_ELEMENT_VALUE = 2_000;
+const MAX_FRAME_DOCUMENTS = 12;
 const MAX_SERIALIZED_SNAPSHOT_BYTES = 128 * 1024;
+type HiddenSubtreeRule = "strict" | "drawn" | "drawn-usable";
+
+const SVG_RESOURCE_TAGS = [
+  "clipPath",
+  "defs",
+  "filter",
+  "linearGradient",
+  "marker",
+  "mask",
+  "pattern",
+  "radialGradient",
+  "symbol",
+];
+
+function skipHiddenSubtrees(rule: HiddenSubtreeRule): string {
+  const strict = rule === "strict";
+  return `{ acceptNode: node => {
+  if (node.nodeType !== 1) return NodeFilter.FILTER_ACCEPT;
+  if (scanned >= ${MAX_SNAPSHOT_SCANNED_NODES}) return NodeFilter.FILTER_ACCEPT;
+  let hidden = node.namespaceURI === 'http://www.w3.org/2000/svg' && ${JSON.stringify(SVG_RESOURCE_TAGS)}.includes(node.localName);
+  hidden ||= Element.prototype.hasAttribute.call(node, 'hidden') || (${rule !== "drawn"} && Element.prototype.hasAttribute.call(node, 'inert')) || (${strict} && String(node.getAttribute('aria-hidden')).toLowerCase() === 'true');
+  if (!hidden) {
+    const style = node.ownerDocument.defaultView?.getComputedStyle(node);
+    hidden = !style || style.display === 'none' || style.visibility === 'hidden' || style.visibility === 'collapse' || style.contentVisibility === 'hidden' || (${strict} && style.opacity === '0');
+  }
+  if (hidden) {
+    scanned++;
+    return NodeFilter.FILTER_REJECT;
+  }
+  return NodeFilter.FILTER_ACCEPT;
+} }`;
+}
+
+const SKIP_HIDDEN_SUBTREES = skipHiddenSubtrees("strict");
 
 const ACTIONABLE_ROLES = new Set([
   "button",
@@ -61,6 +93,8 @@ export interface TargetRecord {
   targetId?: string | undefined;
   element: BrowserElement;
   visibleText: string;
+  drawnOnly?: true;
+  ownFrame?: true;
 }
 
 export interface SnapshotTarget {
@@ -84,20 +118,48 @@ export const collectBoundedSnapshot = Effect.fn("Browser.collectBoundedSnapshot"
   includeText: boolean,
   deadline?: number,
 ) {
+  const strict = yield* collectSnapshotPass(send, captures, revision, includeText, false, deadline);
+  if (!includeText || strict.elements.length > 0 || strict.text) return { ...strict, fallback: false };
+  return { ...(yield* collectSnapshotPass(send, captures, revision, includeText, true, deadline)), fallback: true };
+});
+
+const collectSnapshotPass = Effect.fn("Browser.collectSnapshotPass")(function* (
+  send: SendCommand,
+  captures: SnapshotTarget[],
+  revision: number,
+  includeText: boolean,
+  drawnOnly: boolean,
+  deadline?: number,
+) {
   const targets = new Map<string, TargetRecord>();
   const elements: BrowserElement[] = [];
   const textParts: string[] = [];
   let textLength = 0;
   let hasVisualSurface = false;
   let hasFrame = captures.length > 1;
+  let hasRoot = true;
   let truncated = false;
+  const documents: Array<{ capture: SnapshotTarget; contextId?: number }> = [];
+  let frameBudget = MAX_FRAME_DOCUMENTS;
   for (const capture of captures) {
+    documents.push({ capture });
+    const frames = yield* frameDocumentContexts(send, capture.sessionId, frameBudget).pipe(
+      Effect.catch(() => Effect.succeed([])),
+    );
+    frameBudget -= frames.length;
+    documents.push(...frames.map((contextId) => ({ capture, contextId })));
+  }
+  for (const { capture, contextId } of documents) {
     yield* browserSync(() => assertBeforeDeadline(deadline));
     if (includeText) {
       const remainingText = Math.max(0, MAX_SNAPSHOT_TEXT - textLength);
-      const summary = yield* collectPageSummaryEffect(send, capture.sessionId, remainingText).pipe(
-        Effect.catch(() => Effect.succeed(null)),
-      );
+      const summary = yield* collectPageSummaryEffect(
+        send,
+        capture.sessionId,
+        remainingText,
+        drawnOnly,
+        contextId,
+      ).pipe(Effect.catch(() => Effect.succeed(null)));
       if (summary) {
         if (summary.text) {
           textParts.push(summary.text);
@@ -106,16 +168,17 @@ export const collectBoundedSnapshot = Effect.fn("Browser.collectBoundedSnapshot"
         truncated ||= summary.truncated;
         hasVisualSurface ||= summary.hasVisualSurface;
         hasFrame ||= summary.hasFrame;
+        if (!capture.sessionId && contextId === undefined) hasRoot = summary.hasRoot;
       }
     }
     const remainingElements = MAX_SNAPSHOT_ELEMENTS - elements.length;
     if (remainingElements <= 0) continue;
     const candidates =
-      capture.sessionId && deadline === undefined
-        ? yield* collectActionableNodesEffect(send, capture, remainingElements).pipe(
+      (capture.sessionId || contextId !== undefined) && deadline === undefined
+        ? yield* collectActionableNodesEffect(send, capture, remainingElements, drawnOnly, undefined, contextId).pipe(
             Effect.catch(() => Effect.succeed([])),
           )
-        : yield* collectActionableNodesEffect(send, capture, remainingElements, deadline);
+        : yield* collectActionableNodesEffect(send, capture, remainingElements, drawnOnly, deadline, contextId);
     for (const candidate of candidates) {
       const properties = Array.isArray(candidate.ax.properties) ? candidate.ax.properties.filter(isRecord) : [];
       const states = properties
@@ -130,7 +193,7 @@ export const collectBoundedSnapshot = Effect.fn("Browser.collectBoundedSnapshot"
       const element: BrowserElement = {
         ref,
         role: candidate.role,
-        name: axValue(candidate.ax.name).slice(0, 500),
+        name: candidate.name,
         description: axValue(candidate.ax.description).slice(0, 500),
         tag: (stringValue(candidate.node.localName) || stringValue(candidate.node.nodeName)).toLowerCase(),
         value: axValue(candidate.ax.value).slice(0, MAX_SNAPSHOT_ELEMENT_VALUE) || null,
@@ -145,6 +208,8 @@ export const collectBoundedSnapshot = Effect.fn("Browser.collectBoundedSnapshot"
         ...(capture.targetId === undefined ? {} : { targetId: capture.targetId }),
         element,
         visibleText: candidate.visibleText,
+        ...(drawnOnly ? { drawnOnly: true as const } : {}),
+        ...(contextId === undefined ? {} : { ownFrame: true as const }),
       });
       if (elements.length >= MAX_SNAPSHOT_ELEMENTS) break;
     }
@@ -157,15 +222,50 @@ export const collectBoundedSnapshot = Effect.fn("Browser.collectBoundedSnapshot"
     truncated: truncated || text.length > MAX_SNAPSHOT_TEXT || elements.length >= MAX_SNAPSHOT_ELEMENTS,
     hasVisualSurface,
     hasFrame,
+    hasRoot,
   };
+});
+
+const frameDocumentContexts = Effect.fn("Browser.frameDocumentContexts")(function* (
+  send: SendCommand,
+  sessionId: string | undefined,
+  limit: number,
+) {
+  if (limit <= 0) return [];
+  const tree = recordValue((yield* send("Page.getFrameTree", {}, sessionId)).frameTree);
+  const frames: string[] = [];
+  const pending = (Array.isArray(tree?.childFrames) ? tree.childFrames : []).map((child) => ({
+    child: recordValue(child),
+    parentOrigin: stringValue(recordValue(tree?.frame)?.securityOrigin),
+  }));
+  while (pending.length > 0 && frames.length < limit) {
+    const next = pending.shift();
+    const frame = recordValue(next?.child?.frame);
+    const id = stringValue(frame?.id);
+    const origin = stringValue(frame?.securityOrigin);
+    if (id && origin !== next?.parentOrigin) frames.push(id);
+    const children = next?.child?.childFrames;
+    if (Array.isArray(children))
+      pending.push(...children.map((child) => ({ child: recordValue(child), parentOrigin: origin })));
+  }
+  const contexts: number[] = [];
+  for (const frameId of frames) {
+    const contextId = yield* frameAutomationContextId(send, frameId, sessionId).pipe(
+      Effect.catch(() => Effect.succeed(undefined)),
+    );
+    if (contextId !== undefined) contexts.push(contextId);
+  }
+  return contexts;
 });
 
 const collectPageSummaryEffect = Effect.fn("Browser.collectPageSummary")(function* (
   send: SendCommand,
   sessionId: string | undefined,
   maxText: number,
+  drawnOnly: boolean,
+  frameContextId?: number,
 ) {
-  const contextId = yield* automationContextId(send, sessionId);
+  const contextId = frameContextId ?? (yield* automationContextId(send, sessionId));
   const result = yield* send(
     "Runtime.evaluate",
     {
@@ -174,8 +274,6 @@ const collectPageSummaryEffect = Effect.fn("Browser.collectPageSummary")(functio
         const maxText = ${maxText};
         const roots = [document];
         const seen = new Set();
-        // Text in the viewport comes first: a dialog is often the last child of the body, and the
-        // page behind it would otherwise fill the budget.
         const inView = { parts: [], chars: 0 };
         const outside = { parts: [], chars: 0 };
         let truncated = false;
@@ -183,18 +281,6 @@ const collectPageSummaryEffect = Effect.fn("Browser.collectPageSummary")(functio
         let hasVisualSurface = false;
         let hasFrame = false;
         const visibleRects = node => {
-          let element = node.parentElement;
-          while (element) {
-            if (element.hidden || element.inert || String(element.getAttribute('aria-hidden')).toLowerCase() === 'true') return null;
-            const style = getComputedStyle(element);
-            if (style.display === 'none' || style.visibility === 'hidden' || style.visibility === 'collapse' || style.contentVisibility === 'hidden' || style.opacity === '0') return null;
-            const parent = element.parentElement;
-            if (parent) element = parent;
-            else {
-              const root = element.getRootNode();
-              element = root?.nodeType === Node.DOCUMENT_FRAGMENT_NODE ? root.host : null;
-            }
-          }
           const range = node.ownerDocument.createRange();
           range.selectNodeContents(node);
           const rects = [...range.getClientRects()];
@@ -204,7 +290,7 @@ const collectPageSummaryEffect = Effect.fn("Browser.collectPageSummary")(functio
           const root = roots.shift();
           if (!root || seen.has(root)) continue;
           seen.add(root);
-          const walker = document.createTreeWalker(root, NodeFilter.SHOW_ELEMENT | NodeFilter.SHOW_TEXT);
+          const walker = document.createTreeWalker(root, NodeFilter.SHOW_ELEMENT | NodeFilter.SHOW_TEXT, ${skipHiddenSubtrees(drawnOnly ? "drawn" : "strict")});
           let node;
           while ((node = walker.nextNode()) && scanned < maxNodes) {
             scanned++;
@@ -246,7 +332,7 @@ const collectPageSummaryEffect = Effect.fn("Browser.collectPageSummary")(functio
         if (scanned >= maxNodes) truncated = true;
         const text = [...inView.parts, ...outside.parts].join(' ');
         if (text.length > maxText) truncated = true;
-        return { text: text.slice(0, maxText), truncated, hasVisualSurface, hasFrame };
+        return { text: text.slice(0, maxText), truncated, hasVisualSurface, hasFrame, hasRoot: document.documentElement !== null };
       })()`,
       contextId,
       returnByValue: true,
@@ -259,6 +345,7 @@ const collectPageSummaryEffect = Effect.fn("Browser.collectPageSummary")(functio
     truncated: value?.truncated === true,
     hasVisualSurface: value?.hasVisualSurface === true,
     hasFrame: value?.hasFrame === true,
+    hasRoot: value?.hasRoot !== false,
   };
 });
 
@@ -315,7 +402,10 @@ export const pageContainsText = Effect.fn("Browser.pageContainsText")(function* 
   for (const capture of captures) {
     yield* browserSync(() => assertBeforeDeadline(deadline));
     const scanBudgetMs = Math.max(1, deadline - Date.now());
-    const contextId = yield* automationContextId(send, capture.sessionId);
+    const contextId = yield* automationContextId(send, capture.sessionId).pipe(
+      skipGoneFrame(capture.sessionId, undefined),
+    );
+    if (contextId === undefined) continue;
     const result = yield* send(
       "Runtime.evaluate",
       {
@@ -328,18 +418,6 @@ export const pageContainsText = Effect.fn("Browser.pageContainsText")(function* 
           let chars = 0;
           let scanned = 0;
           const isVisibleText = node => {
-            let element = node.parentElement;
-            while (element) {
-              if (element.hidden || element.inert || String(element.getAttribute('aria-hidden')).toLowerCase() === 'true') return false;
-              const style = getComputedStyle(element);
-              if (style.display === 'none' || style.visibility === 'hidden' || style.visibility === 'collapse' || style.contentVisibility === 'hidden' || style.opacity === '0') return false;
-              const parent = element.parentElement;
-              if (parent) element = parent;
-              else {
-                const root = element.getRootNode();
-                element = root?.nodeType === Node.DOCUMENT_FRAGMENT_NODE ? root.host : null;
-              }
-            }
             const range = node.ownerDocument.createRange();
             range.selectNodeContents(node);
             return range.getClientRects().length > 0;
@@ -349,7 +427,7 @@ export const pageContainsText = Effect.fn("Browser.pageContainsText")(function* 
             const root = roots.shift();
             if (!root || seen.has(root)) continue;
             seen.add(root);
-            const walker = document.createTreeWalker(root, NodeFilter.SHOW_ELEMENT | NodeFilter.SHOW_TEXT);
+            const walker = document.createTreeWalker(root, NodeFilter.SHOW_ELEMENT | NodeFilter.SHOW_TEXT, ${SKIP_HIDDEN_SUBTREES});
             let node;
             while ((node = walker.nextNode()) && scanned < ${MAX_SNAPSHOT_SCANNED_NODES}) {
               if (performance.now() >= scanDeadline) return { matched: false, expired: true };
@@ -393,6 +471,7 @@ export const cssObjectMatch = Effect.fn("Browser.cssObjectMatch")(function* (
   send: SendCommand,
   selector: string,
   sessionId?: string,
+  limit = MAX_TARGET_CANDIDATES,
 ) {
   const contextId = yield* automationContextId(send, sessionId);
   const collection = yield* send(
@@ -405,32 +484,30 @@ export const cssObjectMatch = Effect.fn("Browser.cssObjectMatch")(function* (
         const matches = [];
         let scanned = 0;
         let truncated = false;
-        while (roots.length && matches.length < ${MAX_TARGET_CANDIDATES}) {
-          if (scanned >= ${MAX_SNAPSHOT_SCANNED_NODES}) {
-            truncated = true;
-            break;
-          }
+        while (roots.length && matches.length < ${limit}) {
           const root = roots.shift();
           if (!root || seen.has(root)) continue;
           seen.add(root);
+          for (const node of root.querySelectorAll(selector)) {
+            matches.push(node);
+            if (matches.length >= ${limit}) break;
+          }
+          if (truncated || matches.length >= ${limit}) continue;
           const walker = document.createTreeWalker(root, NodeFilter.SHOW_ELEMENT);
-          while (matches.length < ${MAX_TARGET_CANDIDATES}) {
-            const node = walker.nextNode();
-            if (!node) break;
+          let node;
+          while ((node = walker.nextNode())) {
             if (scanned >= ${MAX_SNAPSHOT_SCANNED_NODES}) {
               truncated = true;
               break;
             }
             scanned++;
-            if (node.matches(selector)) matches.push(node);
             if (node.localName === 'iframe' || node.localName === 'frame') {
               try { if (node.contentDocument) roots.push(node.contentDocument); } catch {}
             }
             if (node.shadowRoot) roots.push(node.shadowRoot);
           }
-          if (truncated) break;
         }
-        if (truncated && matches.length < 2) throw new Error('CSS selector uniqueness scan exceeded the safe node limit.');
+        if (truncated && matches.length === 0) throw new Error('CSS selector uniqueness scan exceeded the safe node limit.');
         return matches;
       })()`,
       contextId,
@@ -440,14 +517,14 @@ export const cssObjectMatch = Effect.fn("Browser.cssObjectMatch")(function* (
   );
   const exception = recordValue(collection.exceptionDetails);
   if (exception) return yield* browserFailure(new Error(exceptionDescription(exception)));
-  return yield* collectionElements(send, stringValue(recordValue(collection.result)?.objectId), sessionId);
+  return yield* collectionElements(send, stringValue(recordValue(collection.result)?.objectId), sessionId, limit);
 });
 
-/** The first elements of a page array, as objects that the caller releases. The array is released. */
 const collectionElements = Effect.fn("Browser.collectionElements")(function* (
   send: SendCommand,
   collectionId: string,
   sessionId: string | undefined,
+  limit = MAX_TARGET_CANDIDATES,
 ) {
   if (!collectionId) return [];
   return yield* Effect.gen(function* () {
@@ -457,7 +534,7 @@ const collectionElements = Effect.fn("Browser.collectionElements")(function* (
       .sort((left, right) => Number(left.name) - Number(right.name))
       .map((descriptor) => stringValue(recordValue(descriptor.value)?.objectId))
       .filter(Boolean)
-      .slice(0, MAX_TARGET_CANDIDATES);
+      .slice(0, limit);
   }).pipe(
     Effect.ensuring(
       Effect.gen(function* () {
@@ -473,14 +550,21 @@ export const semanticAxMatches = Effect.fn("Browser.semanticAxMatches")(function
   target: Extract<BrowserTarget, { kind: "role" | "text" }>,
   allowNonActionableRole: boolean,
   deadline?: number,
+  limit = MAX_TARGET_CANDIDATES,
 ) {
   yield* browserSync(() => assertBeforeDeadline(deadline));
   yield* send("Accessibility.enable", {}, capture.sessionId);
   const matches: SemanticMatch[] = [];
   const seen = new Set<number>();
   const frameTree = yield* send("Page.getFrameTree", {}, capture.sessionId);
-  for (const frameId of frameIds(frameTree)) {
-    const tree = yield* send("Accessibility.getFullAXTree", { frameId }, capture.sessionId);
+  const ids = frameIds(frameTree);
+  for (const frameId of ids) {
+    const tree = yield* send("Accessibility.getFullAXTree", { frameId }, capture.sessionId).pipe(
+      Effect.catchIf(
+        (failure) => frameId !== ids[0] && isFrameGone(failure),
+        () => Effect.succeed({ nodes: [] }),
+      ),
+    );
     yield* browserSync(() => assertBeforeDeadline(deadline));
     for (const node of Array.isArray(tree.nodes) ? tree.nodes.filter(isRecord) : []) {
       if (node.ignored === true) continue;
@@ -505,7 +589,7 @@ export const semanticAxMatches = Effect.fn("Browser.semanticAxMatches")(function
         role,
         name,
       });
-      if (matches.length >= MAX_TARGET_CANDIDATES) return matches;
+      if (matches.length >= limit) return matches;
     }
   }
   return matches;
@@ -516,6 +600,7 @@ export const visibleTextObjectMatches = Effect.fn("Browser.visibleTextObjectMatc
   capture: SnapshotTarget,
   target: Extract<BrowserTarget, { kind: "text" }>,
   deadline?: number,
+  limit = MAX_TARGET_CANDIDATES,
 ) {
   yield* browserSync(() => assertBeforeDeadline(deadline));
   const contextId = yield* automationContextId(send, capture.sessionId);
@@ -533,18 +618,6 @@ export const visibleTextObjectMatches = Effect.fn("Browser.visibleTextObjectMatc
         let truncated = false;
         const isCandidate = node => {
           if (node.nodeType !== 1) return false;
-          let element = node;
-          while (element) {
-            if (element.hidden || element.inert || String(element.getAttribute('aria-hidden')).toLowerCase() === 'true') return false;
-            const style = element.ownerDocument.defaultView?.getComputedStyle(element);
-            if (!style || style.display === 'none' || style.visibility === 'hidden' || style.visibility === 'collapse' || style.contentVisibility === 'hidden' || style.opacity === '0') return false;
-            const parent = element.parentElement;
-            if (parent) element = parent;
-            else {
-              const root = element.getRootNode();
-              element = root?.nodeType === Node.DOCUMENT_FRAGMENT_NODE ? root.host : null;
-            }
-          }
           const explicitRole = (node.getAttribute('role') || '').trim().split(/\\s+/)[0].toLowerCase();
           const tag = node.localName;
           const semantic = tag === 'button' || tag === 'summary' || (tag === 'a' && node.hasAttribute('href')) ||
@@ -552,7 +625,7 @@ export const visibleTextObjectMatches = Effect.fn("Browser.visibleTextObjectMatc
           if (!semantic && !roles.has(explicitRole)) return false;
           return node.getClientRects().length > 0;
         };
-        while (roots.length && matches.length < ${MAX_TARGET_CANDIDATES}) {
+        while (roots.length && matches.length < ${limit}) {
           if (scanned >= ${MAX_SNAPSHOT_SCANNED_NODES}) {
             truncated = true;
             break;
@@ -560,8 +633,8 @@ export const visibleTextObjectMatches = Effect.fn("Browser.visibleTextObjectMatc
           const root = roots.shift();
           if (!root || seenRoots.has(root)) continue;
           seenRoots.add(root);
-          const walker = document.createTreeWalker(root, NodeFilter.SHOW_ELEMENT);
-          while (matches.length < ${MAX_TARGET_CANDIDATES}) {
+          const walker = document.createTreeWalker(root, NodeFilter.SHOW_ELEMENT, ${SKIP_HIDDEN_SUBTREES});
+          while (matches.length < ${limit}) {
             const node = walker.nextNode();
             if (!node) break;
             if (scanned >= ${MAX_SNAPSHOT_SCANNED_NODES}) {
@@ -589,23 +662,20 @@ export const visibleTextObjectMatches = Effect.fn("Browser.visibleTextObjectMatc
   );
   const exception = recordValue(collection.exceptionDetails);
   if (exception) return yield* browserFailure(new Error(exceptionDescription(exception)));
-  return yield* collectionElements(send, stringValue(recordValue(collection.result)?.objectId), capture.sessionId);
+  return yield* collectionElements(
+    send,
+    stringValue(recordValue(collection.result)?.objectId),
+    capture.sessionId,
+    limit,
+  );
 });
 
-/** What tells the candidates of an ambiguous target apart. */
 export interface TargetCandidateText {
   tag: string;
-  /** The candidate's own visible text. */
   text: string;
-  /** The visible text of the largest element around the candidate that holds no other candidate, such as its card. */
   item: string;
 }
 
-/**
- * Reads the candidates of one frame together, because the item of a candidate is the part of the page
- * that no other candidate shares. The text is visible page text, which a snapshot also returns. The
- * result is in the order of `backendNodeIds`, with no entry for a node that could not be read.
- */
 export const describeTargetCandidates = Effect.fn("Browser.describeTargetCandidates")(function* (
   send: SendCommand,
   sessionId: string | undefined,
@@ -614,7 +684,6 @@ export const describeTargetCandidates = Effect.fn("Browser.describeTargetCandida
   const executionContextId = yield* automationContextId(send, sessionId);
   const objectIds: string[] = [];
   return yield* Effect.gen(function* () {
-    // A node that cannot be resolved, such as one removed after the match, has no text. The others keep theirs.
     for (const backendNodeId of backendNodeIds) {
       const resolved = yield* send("DOM.resolveNode", { backendNodeId, executionContextId }, sessionId).pipe(
         Effect.catch(() => Effect.succeed<CdpResult>({})),
@@ -630,16 +699,12 @@ export const describeTargetCandidates = Effect.fn("Browser.describeTargetCandida
         objectId: first,
         functionDeclaration: String.raw`function(...nodes) {
           const clean = (value) => String(value ?? '').replace(/\s+/g, ' ').trim();
-          // innerText gives all of textContent for a node that is not rendered, so a hidden node gets no text.
           const rendered = (element) =>
             element.checkVisibility ? element.checkVisibility() : element.getClientRects().length > 0;
           return nodes.map((node) => {
             if (!rendered(node)) return { tag: node.localName, text: '', item: '' };
             const text = clean(node.innerText);
             const own = clean(node.textContent);
-            // Another element with the same tag and text, such as the next card's button, which a
-            // capped candidate list can leave out. Its item is not this candidate's item. Each peer is
-            // compared once, and only when it has the same shape, so that large wrappers cost little.
             const twins = new Map();
             const isTwin = (peer) => {
               let known = twins.get(peer);
@@ -702,26 +767,29 @@ const collectActionableNodesEffect = Effect.fn("Browser.collectActionableNodes")
   send: SendCommand,
   capture: SnapshotTarget,
   limit: number,
+  drawnOnly: boolean,
   deadline?: number,
+  frameContextId?: number,
 ) {
   yield* browserSync(() => assertBeforeDeadline(deadline));
   yield* Effect.all([send("DOM.enable", {}, capture.sessionId), send("Accessibility.enable", {}, capture.sessionId)], {
     concurrency: "unbounded",
   });
   yield* browserSync(() => assertBeforeDeadline(deadline));
-  const contextId = yield* automationContextId(send, capture.sessionId);
+  const contextId = frameContextId ?? (yield* automationContextId(send, capture.sessionId));
   const results: Array<{
     backendNodeId: number;
     node: CdpResult;
     ax: CdpResult;
     role: string;
+    name: string;
     visibleText: string;
   }> = [];
   const batchSize = MAX_SNAPSHOT_ELEMENTS;
   const collection = yield* send(
     "Runtime.evaluate",
     {
-      expression: actionableNodesExpression(MAX_SNAPSHOT_CANDIDATES),
+      expression: actionableNodesExpression(MAX_SNAPSHOT_CANDIDATES, drawnOnly ? "drawn-usable" : "strict"),
       contextId,
       returnByValue: false,
     },
@@ -775,16 +843,11 @@ const collectActionableNodesEffect = Effect.fn("Browser.collectActionableNodes")
             const axNodes = Array.isArray(partialAxTree.nodes) ? partialAxTree.nodes.filter(isRecord) : [];
             const ax =
               axNodes.find((candidate) => numberValue(candidate.backendDOMNodeId) === backendNodeId) ?? axNodes[0];
-            if (!ax || ax.ignored === true) return null;
-            const role = axValue(ax.role).toLowerCase() || fallbackRole(node);
+            if (!drawnOnly && (!ax || ax.ignored === true)) return null;
+            const visibleText = stringValue(recordValue(visibleTextResult.result)?.value);
+            const { role, name } = controlIdentity(node, ax, visibleText);
             if (!ACTIONABLE_ROLES.has(role)) return null;
-            return {
-              backendNodeId,
-              node,
-              ax,
-              role,
-              visibleText: stringValue(recordValue(visibleTextResult.result)?.value),
-            };
+            return { backendNodeId, node, ax: ax ?? {}, role, name, visibleText };
           }),
         ),
         { concurrency: "unbounded" },
@@ -808,13 +871,11 @@ const collectActionableNodesEffect = Effect.fn("Browser.collectActionableNodes")
   return results;
 });
 
-function actionableNodesExpression(limit: number): string {
+function actionableNodesExpression(limit: number, rule: HiddenSubtreeRule): string {
   return `(() => {
     const roles = new Set(${JSON.stringify([...ACTIONABLE_ROLES])});
     const roots = [document];
     const seenRoots = new Set();
-    // Controls in the viewport come first: on a long page, the controls above the scroll position
-    // would otherwise fill the budget. Offscreen controls fill what is left.
     const inView = [];
     const outside = [];
     let scanned = 0;
@@ -826,24 +887,11 @@ function actionableNodesExpression(limit: number): string {
     };
     const isCandidate = node => {
       if (node.nodeType !== 1) return false;
-      // The walk can visit every scanned node, so the cheap tag and role check runs before the style walk.
       const explicitRole = (node.getAttribute('role') || '').trim().split(/\\s+/)[0].toLowerCase();
       const tag = node.localName;
       const semantic = tag === 'button' || tag === 'summary' || (tag === 'a' && node.hasAttribute('href')) ||
         tag === 'select' || tag === 'textarea' || (tag === 'input' && node.type !== 'hidden') || node.isContentEditable;
       if (!semantic && !roles.has(explicitRole)) return false;
-      let element = node;
-      while (element) {
-        if (element.hidden || element.inert || String(element.getAttribute('aria-hidden')).toLowerCase() === 'true') return false;
-        const style = element.ownerDocument.defaultView?.getComputedStyle(element);
-        if (!style || style.display === 'none' || style.visibility === 'hidden' || style.visibility === 'collapse' || style.contentVisibility === 'hidden' || style.opacity === '0') return false;
-        const parent = element.parentElement;
-        if (parent) element = parent;
-        else {
-          const root = element.getRootNode();
-          element = root?.nodeType === Node.DOCUMENT_FRAGMENT_NODE ? root.host : null;
-        }
-      }
       return node.getClientRects().length > 0;
     };
     const limit = ${Math.max(0, limit)};
@@ -851,7 +899,7 @@ function actionableNodesExpression(limit: number): string {
       const root = roots.shift();
       if (!root || seenRoots.has(root)) continue;
       seenRoots.add(root);
-      const walker = document.createTreeWalker(root, NodeFilter.SHOW_ELEMENT);
+      const walker = document.createTreeWalker(root, NodeFilter.SHOW_ELEMENT, ${skipHiddenSubtrees(rule)});
       let node;
       while ((node = walker.nextNode()) && scanned < ${MAX_SNAPSHOT_SCANNED_NODES} && inView.length < limit) {
         scanned++;
@@ -885,7 +933,6 @@ function redactedMetadataUrl(value: string | undefined): string {
 export function boundSerializedSnapshot(snapshot: BrowserSnapshot): void {
   let bytes = Buffer.byteLength(JSON.stringify(snapshot));
   while (bytes > MAX_SERIALIZED_SNAPSHOT_BYTES) {
-    // The text ends with what is outside the viewport; the elements are what the next action uses.
     if (snapshot.text.length > 0) {
       snapshot.truncated = true;
       const excess = bytes - MAX_SERIALIZED_SNAPSHOT_BYTES;
@@ -903,7 +950,8 @@ export function boundSerializedSnapshot(snapshot: BrowserSnapshot): void {
 export function fallbackRole(node: CdpResult): string {
   const tag = (stringValue(node.localName) || stringValue(node.nodeName)).toLowerCase();
   const attributes = nodeAttributes(node.attributes);
-  if (attributes.role) return attributes.role.toLowerCase();
+  const role = (attributes.role ?? "").trim().split(/\s+/u)[0]?.toLowerCase() ?? "";
+  if (role && role !== "none" && role !== "presentation") return role;
   if (tag === "button" || tag === "summary") return "button";
   if (tag === "a") return "link";
   if (tag === "select") return attributes.multiple === undefined ? "combobox" : "listbox";
@@ -913,7 +961,23 @@ export function fallbackRole(node: CdpResult): string {
   if (attributes.type === "radio") return "radio";
   if (attributes.type === "range") return "slider";
   if (attributes.type === "number") return "spinbutton";
+  if (["button", "submit", "reset", "image"].includes(attributes.type ?? "")) return "button";
   return "textbox";
+}
+
+export function controlIdentity(
+  node: CdpResult,
+  ax: CdpResult | undefined,
+  visibleText: string,
+): { role: string; name: string } {
+  if (ax && ax.ignored !== true) {
+    return { role: axValue(ax.role).toLowerCase() || fallbackRole(node), name: axValue(ax.name).slice(0, 500) };
+  }
+  const attributes = nodeAttributes(node.attributes);
+  const role = fallbackRole(node);
+  const value = stringValue(node.localName) === "input" && role === "button" ? attributes.value || attributes.alt : "";
+  const name = attributes["aria-label"] || visibleText || value || attributes.placeholder || attributes.title || "";
+  return { role, name: name.slice(0, 500) };
 }
 
 function nodeAttributes(value: unknown): Record<string, string> {
@@ -929,52 +993,62 @@ function nodeAttributes(value: unknown): Record<string, string> {
 
 const HIDDEN_SECURITY_CODE = "•••";
 
-/**
- * Hides the card values that `fill_card` typed from what an agent reads of the page: snapshots, tab
- * titles and URLs, and the text of a target or a wait. A page can copy a field anywhere, so every
- * string goes through it. The number stays hidden for the life of the tab. A security code is three
- * or four digits and also hides prices and dates, so it stays hidden only until the filled document
- * goes. Logs do not use it: the main process registers the number with the log redaction.
- */
 export class CardValueScrub {
   readonly #numbers = new Map<string, { pattern: RegExp; replacement: string }>();
-  #securityCodes = new Map<string, RegExp>();
+  #documentValues = new Map<string, RegExp>();
+  #documentSecretShown = false;
 
   add(number: string, securityCode: string): void {
     const digits = number.replace(/[^0-9]/gu, "");
     if (digits.length >= 12 && !this.#numbers.has(digits)) {
-      // Pages group the digits with spaces, dashes or dots.
       this.#numbers.set(digits, {
         pattern: new RegExp(`(?<![0-9])${[...digits].join("[\\s.\\-]*")}(?![0-9])`, "gu"),
         replacement: `•••• ${digits.slice(-4)}`,
       });
     }
-    if (/^[0-9]{3,4}$/u.test(securityCode) && !this.#securityCodes.has(securityCode))
-      this.#securityCodes.set(securityCode, new RegExp(`(?<![0-9])${securityCode}(?![0-9])`, "gu"));
+    if (/^[0-9]{3,4}$/u.test(securityCode) && !this.#documentValues.has(securityCode))
+      this.#documentValues.set(securityCode, new RegExp(`(?<![0-9])${securityCode}(?![0-9])`, "gu"));
   }
 
-  /** The filled document was replaced: its security code is no longer on the page. */
+  addDocumentSecret(secret: string, shown: boolean): void {
+    this.#documentSecretShown ||= shown;
+    const forms = [secret, encodeURIComponent(secret), new URLSearchParams({ v: secret }).toString().slice(2)];
+    for (const value of new Set(forms)) {
+      if (!value || this.#documentValues.has(value)) continue;
+      const escaped = value.replace(/[.*+?^${}()|[\]\\]/gu, "\\$&");
+      const pattern = /^[0-9]+$/u.test(value)
+        ? `(?<![0-9])${escaped}(?![0-9])`
+        : value.length < 4
+          ? `(?<![\\p{L}\\p{N}])${escaped}(?![\\p{L}\\p{N}])`
+          : escaped;
+      this.#documentValues.set(value, new RegExp(pattern, "gu"));
+    }
+  }
+
   endDocument(): void {
-    this.#securityCodes = new Map();
+    this.#documentValues = new Map();
+    this.#documentSecretShown = false;
+  }
+
+  get documentSecretShown(): boolean {
+    return this.#documentSecretShown;
   }
 
   get active(): boolean {
-    return this.#numbers.size > 0 || this.#securityCodes.size > 0;
+    return this.#numbers.size > 0 || this.#documentValues.size > 0;
   }
 
   text(value: string): string {
     let result = value;
     for (const { pattern, replacement } of this.#numbers.values()) result = result.replace(pattern, replacement);
-    for (const pattern of this.#securityCodes.values()) result = result.replace(pattern, HIDDEN_SECURITY_CODE);
+    for (const pattern of this.#documentValues.values()) result = result.replace(pattern, HIDDEN_SECURITY_CODE);
     return result;
   }
 
-  /** Whether `value` names a hidden value. A target or a wait with one would tell the agent the value. */
   reveals(value: string): boolean {
     return this.active && this.text(value) !== value;
   }
 
-  /** A copy of `snapshot` with each string scrubbed, within the serialized size limit. */
   snapshot(snapshot: BrowserSnapshot): BrowserSnapshot {
     if (!this.active) return snapshot;
     const scrubbed: BrowserSnapshot = JSON.parse(JSON.stringify(snapshot), (_key, value: unknown) =>

@@ -5,13 +5,14 @@ export const messages = {
   "notification.needsInput": "Girdinize ihtiyaç duyuyor.",
   "notification.needsApproval": "Onayınıza ihtiyaç duyuyor.",
   "notification.needsBrowserStep": "Tarayıcıda bir adımı tamamlamanız gerekiyor.",
+  "notification.waitsForSignIn": "{provider} oturumunun açılmasını bekliyor.",
   "notification.needsApprovalFor": "Onayınıza ihtiyaç duyuyor: {action}",
   "notification.finished": "Çalışmayı tamamladı.",
-  // A workflow step that waits for a person to approve or reject it.
   "notification.workflowApproval": "Bir adım onayınızı bekliyor.",
-  // A workflow output step that tells the user its result.
   "notification.workflowOutput": "Bir iş akışının yeni bir sonucu var.",
   "notification.failed": "Bir hatayla durdu.",
+  "notification.subagentFailed": "Bir alt ajan bir hatayla durdu.",
+  "notification.subagentFailedFor": "Bir alt ajan bir hatayla durdu: {task}",
   "notification.channelTitle": "{channel} kanalında {agent}",
   "notification.channelMessage": "Bir mesaj gönderdi.",
   "notification.usageLimit.title": "{provider} hesabı sınırına ulaştı",

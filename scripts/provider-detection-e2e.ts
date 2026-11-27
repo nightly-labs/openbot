@@ -1,18 +1,14 @@
-// Runs local detection and endpoint Edit end to end on the real main-process modules: the detection
-// settings file, the scan, the model probe, and the encrypted endpoint store, against fake
-// OpenAI-compatible servers on this computer. A fake cipher replaces the operating system's secret
-// storage, which exists only in Electron. It also scans a folder that holds a file named like a known
-// agent, and proves that the scan never starts it.
-// `bun scripts/provider-detection-e2e.ts`. Writes .openbot-build/provider-detection-e2e/report.json.
 import assert from "node:assert/strict";
-import { chmod, mkdir, mkdtemp, readFile, rm, stat, writeFile } from "node:fs/promises";
+import { chmod, mkdir, mkdtemp, readFile, rm, stat, utimes, writeFile } from "node:fs/promises";
 import { createServer, type IncomingMessage, type Server } from "node:http";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
+import { isDiscoverModelsResult } from "@openbot/contracts/ipc";
 import { Effect } from "effect";
 import { runCauseEffect } from "../src/backend/effect-boundary";
 import { type CustomProviderCipher, CustomProviderStore } from "../src/main/custom-provider-store";
 import { probeModels } from "../src/main/model-server-probe";
+import { ModelReleaseCatalog } from "../src/main/model-visibility";
 import { createProviderDetection } from "../src/main/provider-detection";
 import { ProviderDetectionSettingsStore } from "../src/main/provider-detection-settings-store";
 
@@ -32,8 +28,18 @@ interface FakeServer {
   close: () => Promise<void>;
 }
 
-/** An OpenAI-compatible server that lists `models`, or redirects every request to `redirectTo`. */
-async function fakeServer(models: string[], redirectTo?: string): Promise<FakeServer> {
+interface ListedModel {
+  id: string;
+  object?: string;
+  modalities?: { input?: string[] | string };
+  limit?: { context?: number; output?: number };
+  context_length?: number;
+  architecture?: { input_modalities: string[] };
+  top_provider?: { max_completion_tokens: number };
+  max_model_len?: number;
+}
+
+async function fakeServer(models: (string | ListedModel)[], redirectTo?: string): Promise<FakeServer> {
   const seen: Seen[] = [];
   const server: Server = createServer((request: IncomingMessage, response) => {
     seen.push({
@@ -46,7 +52,8 @@ async function fakeServer(models: string[], redirectTo?: string): Promise<FakeSe
       return;
     }
     response.writeHead(200, { "content-type": "application/json" });
-    response.end(JSON.stringify({ object: "list", data: models.map((id) => ({ id, object: "model" })) }));
+    const data = models.map((model) => (typeof model === "string" ? { id: model, object: "model" } : model));
+    response.end(JSON.stringify({ object: "list", data }));
   });
   await new Promise<void>((done) => server.listen(0, "127.0.0.1", done));
   const address = server.address();
@@ -67,6 +74,8 @@ interface Report {
     agentFound: string;
     agentStarted: boolean;
   };
+  catalogLimits?: unknown;
+  tornCatalog?: unknown;
   edit?: {
     keyKeptOnEdit: boolean;
     ciphertextUnchanged: boolean;
@@ -76,6 +85,7 @@ interface Report {
   };
   headers?: Record<string, boolean>;
   disabled?: { requestsSent: number; savedAcrossRestart: boolean };
+  catalog?: unknown[];
 }
 
 const cipher: CustomProviderCipher = {
@@ -93,7 +103,31 @@ try {
   const primary = await fakeServer(["llama-3.1-8b", "qwen2.5-coder"]);
   const other = await fakeServer(["other-model"]);
   const redirecting = await fakeServer([], primary.baseUrl);
-  servers.push(primary, other, redirecting);
+  const catalog = await fakeServer([
+    {
+      id: "gateway-vision",
+      modalities: { input: ["text", "image", "pdf"] },
+      limit: { context: 200_000, output: 32_000 },
+    },
+    {
+      id: "router-model",
+      context_length: 131_072,
+      architecture: { input_modalities: ["text", "file"] },
+      top_provider: { max_completion_tokens: 65_536 },
+    },
+    {
+      id: "router-full-cap",
+      context_length: 163_840,
+      modalities: {},
+      architecture: { input_modalities: ["text", "image"] },
+      top_provider: { max_completion_tokens: 163_840 },
+    },
+    { id: "vllm-model", object: "model", max_model_len: 32_768 },
+    { id: "text-only", modalities: { input: ["text"] } },
+    { id: "odd-model", context_length: 12, limit: { output: 4_096 }, modalities: { input: "image" } },
+    "bare-model",
+  ]);
+  servers.push(primary, other, redirecting, catalog);
 
   const settings = new ProviderDetectionSettingsStore(join(root, "openbot-provider-detection-v1.json"));
   await runCauseEffect(settings.load());
@@ -109,7 +143,6 @@ try {
   );
   detections.push(detection);
 
-  // 1. A listed address is found with its models, with no key; a redirect is not followed.
   const agentFolder = join(root, "tools");
   const marker = join(root, "started");
   await mkdir(agentFolder);
@@ -145,7 +178,6 @@ try {
     agentStarted: false,
   };
 
-  // 2. Add the found server with a key and a header.
   await runCauseEffect(
     endpoints.save({
       id: row.id,
@@ -160,7 +192,6 @@ try {
   assert.ok(!envelope.includes(KEY) && !envelope.includes(HEADER.value), "The file holds no plain key or header.");
   const cipherBefore = JSON.parse(envelope).providers[0].secret;
 
-  // 3. Edit with an empty key field: the models change, the stored key and header stay.
   await runCauseEffect(
     endpoints.update({
       id: row.id,
@@ -178,8 +209,6 @@ try {
   const cipherAfter = JSON.parse(await readFile(join(root, "custom-providers.json"), "utf8")).providers[0].secret;
   assert.deepEqual(cipherAfter, cipherBefore, "A kept key keeps its ciphertext.");
 
-  // 4. Load models for the saved endpoint with an empty key field: the server gets the stored key.
-  // With no header rows, the saved header is not sent: the user removed it in the form.
   await Effect.runPromise(
     detection.discoverModels({ baseUrl: row.baseUrl, apiKey: null, headers: [], savedProviderId: row.id }),
   );
@@ -187,7 +216,6 @@ try {
   assert.equal(loaded?.authorization, `Bearer ${KEY}`);
   assert.equal(loaded?.team, null, "A removed header row is not sent.");
 
-  // 5. The stored key never goes to another origin.
   await Effect.runPromise(
     detection.discoverModels({ baseUrl: other.baseUrl, apiKey: null, headers: [], savedProviderId: row.id }),
   );
@@ -197,7 +225,6 @@ try {
     runCauseEffect(endpoints.update({ id: row.id, name: "Local server", baseUrl: other.baseUrl, models: [] })),
     "A new address with a kept key is refused.",
   );
-  // 5b. Edit shows the saved header names. A null value keeps the saved value of that name.
   const savedHeaders = endpoints.list().find((summary) => summary.id === row.id)?.headerNames;
   assert.deepEqual(savedHeaders, [HEADER.name], "The list names the saved header.");
   const editBase = { id: row.id, name: "Local server", baseUrl: row.baseUrl, models: edited?.models ?? [] };
@@ -279,7 +306,83 @@ try {
     newAddressWithKeptKeyRefused: true,
   };
 
-  // 6. Detection off: nothing is probed.
+  const listed = await Effect.runPromise(
+    detection.discoverModels({ baseUrl: catalog.baseUrl, apiKey: null, headers: [] }),
+  );
+  report.catalog = listed.models;
+  assert.ok(isDiscoverModelsResult(listed), "The preload decoder accepts the list.");
+  assert.deepEqual(listed.models, [
+    { id: "gateway-vision", inputs: ["image", "pdf"], contextWindow: 200_000, maxOutput: 32_000 },
+    { id: "router-model", inputs: ["pdf"], contextWindow: 131_072, maxOutput: 65_536 },
+    { id: "router-full-cap", inputs: ["image"], contextWindow: 163_840 },
+    { id: "vllm-model", contextWindow: 32_768 },
+    { id: "text-only", inputs: [] },
+    { id: "odd-model" },
+    { id: "bare-model" },
+  ]);
+
+  const cache = join(root, "cache");
+  const copy = join(cache, "opencode", "models.json");
+  await mkdir(join(cache, "opencode"), { recursive: true });
+  await writeFile(
+    copy,
+    JSON.stringify({
+      google: { models: { "gemini-3.8-flash": { limit: { context: 1_048_576, output: 65_536 } } } },
+      "relay-a": { models: { "gemini-3.8-flash": { limit: { context: 200_000, output: 8_000 } } } },
+      "relay-b": { models: { "vendor/big.model": { limit: { context: 1_000_000, output: 64_000 } } } },
+      "relay-c": { models: { "big-model": { limit: { context: 1_000_000, output: 64_000 } } } },
+      "relay-d": { models: { "big-model": { limit: { context: 128_000, output: 8_000 } } } },
+      "relay-e": { models: { "full-cap": { limit: { context: 200_000, output: 200_000 } } } },
+    }),
+  );
+  const later = new Date(Date.now() + 24 * 60 * 60 * 1000);
+  await utimes(copy, later, later);
+  const namesOnly = await fakeServer([
+    "proxy/google/gemini-3.8-flash",
+    "Big.Model",
+    "full-cap",
+    "unknown-model",
+    { id: "local/big-model", context_length: 32_768 },
+  ]);
+  servers.push(namesOnly);
+  const withCatalog = await Effect.runPromise(
+    createProviderDetection({
+      settings,
+      customProviders: endpoints,
+      customAgents: { configs: () => [] },
+      probe: probeModels,
+      catalog: new ModelReleaseCatalog({ XDG_CACHE_HOME: cache }, root),
+    }),
+  );
+  detections.push(withCatalog);
+  const filled = await Effect.runPromise(
+    withCatalog.discoverModels({ baseUrl: namesOnly.baseUrl, apiKey: null, headers: [] }),
+  );
+  report.catalogLimits = filled.models;
+  assert.ok(isDiscoverModelsResult(filled), "The preload decoder accepts the filled list.");
+  assert.deepEqual(filled.models, [
+    { id: "proxy/google/gemini-3.8-flash", contextWindow: 1_048_576, maxOutput: 65_536 },
+    { id: "Big.Model", contextWindow: 1_000_000, maxOutput: 64_000 },
+    { id: "full-cap", contextWindow: 200_000 },
+    { id: "unknown-model" },
+    { id: "local/big-model", contextWindow: 32_768 },
+  ]);
+
+  await writeFile(copy, '{"google": {"models": {"gemini-3.8-fl');
+  const afterTear = new Date(later.getTime() + 60 * 1000);
+  await utimes(copy, afterTear, afterTear);
+  const torn = await Effect.runPromise(
+    withCatalog.discoverModels({ baseUrl: namesOnly.baseUrl, apiKey: null, headers: [] }),
+  );
+  report.tornCatalog = torn.models;
+  assert.deepEqual(torn.models, [
+    { id: "proxy/google/gemini-3.8-flash" },
+    { id: "Big.Model" },
+    { id: "full-cap" },
+    { id: "unknown-model" },
+    { id: "local/big-model", contextWindow: 32_768 },
+  ]);
+
   const before = primary.seen.length;
   await runCauseEffect(settings.set({ ...settings.get(), enabled: false }));
   assert.deepEqual(await Effect.runPromise(detection.scanModelServers()), []);

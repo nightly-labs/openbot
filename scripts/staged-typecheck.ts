@@ -1,18 +1,3 @@
-// Runs the `typecheck:*` scripts whose project can see a staged file, one at a time.
-//
-//   bun scripts/staged-typecheck.ts                       checks the paths in the index
-//   bun scripts/staged-typecheck.ts --dry-run [<path>...]  prints the selection and runs nothing;
-//                                                          paths replace the index
-//
-// The pre-commit hook calls this. `bun run typecheck` starts all projects at the same time; that
-// takes about 8 GB of memory, and several worktrees can commit at once. CI still checks every project.
-//
-// A project can see a file when one of these is true:
-// - its tsconfig `include` matches the file's folder;
-// - the file is in its workspace package, or in a workspace package that it depends on;
-// - one of its files imports the file through a relative path (`RELATIVE_IMPORTS`).
-// A root `tsconfig*.json`, `package.json` or `bun.lock` selects all projects.
-
 import { execFileSync } from "node:child_process";
 import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { join, posix, relative, resolve } from "node:path";
@@ -23,16 +8,11 @@ const ROOT = resolve(import.meta.dirname, "..");
 const TYPE_INPUT = /\.(ts|tsx|mts|cts|js|mjs|cjs)$|(^|\/)(tsconfig[^/]*\.json|package\.json)$/;
 const SELECTS_ALL = /^(tsconfig[^/]*\.json|package\.json|bun\.lock)$/;
 
-// Imports across project folders that no `include` or package dependency shows. Find them with a
-// search for `from "../` paths that leave a project folder.
 const RELATIVE_IMPORTS: Record<string, string[]> = {
-  // Tests in `scripts` import mobile models; `stripe-flows-e2e.ts` imports the account Worker.
-  "typecheck:node": ["apps/mobile/src", "apps/auth-api/src"],
-  // The account Worker routes hosted sites with the site router.
+  "typecheck:node": ["apps/mobile/src", "apps/auth-api/src", "apps/mobile-updates/src"],
+  "typecheck:updates": ["scripts/mobile-ota-lib.ts"],
   "typecheck:api": ["apps/site-router/src"],
-  // `Conversation.stories.tsx` reads pasted files with the preload helper.
   "typecheck:renderer": ["src/preload/clipboard-files.ts"],
-  // `.storybook/preview.tsx` imports the renderer i18n context.
   "typecheck:storybook": ["src/renderer/src"],
 };
 
@@ -46,7 +26,6 @@ interface PackageJson {
 
 interface Project {
   script: string;
-  /** Folders and files, relative to the repository root, that select the project. */
   roots: string[];
 }
 
@@ -70,7 +49,6 @@ function workspaceFolders(rootPackage: PackageJson): Map<string, string> {
   return folders;
 }
 
-/** The workspace folders that a package uses, directly or through another workspace package. */
 function dependencyFolders(packageFolder: string, workspaces: Map<string, string>): string[] {
   const found = new Set<string>();
   const visit = (folder: string) => {
@@ -86,7 +64,6 @@ function dependencyFolders(packageFolder: string, workspaces: Map<string, string
   return [...found];
 }
 
-/** The fixed part of each `include` pattern, such as `src/renderer` for `src/renderer/** /*.ts`. */
 function includeRoots(tsconfigPath: string): string[] {
   const config = readJson<{ extends?: string; include?: string[] }>(tsconfigPath);
   if (config.include === undefined) {
@@ -131,7 +108,6 @@ function projects(): Project[] {
 
 const contains = (root: string, path: string) => root === "." || path === root || path.startsWith(`${root}/`);
 
-/** Each selected script, with the first staged path that selected it. */
 function selectTypechecks(paths: string[]): Map<string, string> {
   const selected = new Map<string, string>();
   const all = projects();
@@ -143,14 +119,12 @@ function selectTypechecks(paths: string[]): Map<string, string> {
       if (SELECTS_ALL.test(path) || mobileCodegen || visible) selected.set(project.script, path);
     }
   }
-  // Keep the order of `package.json`.
   return new Map(
     all.filter(({ script }) => selected.has(script)).map(({ script }) => [script, selected.get(script) ?? ""]),
   );
 }
 
 function stagedPaths(): string[] {
-  // Without renames, a moved file lists its old path too: the files that imported it now fail.
   const output = execFileSync("git", ["diff", "--cached", "--name-only", "--no-renames", "-z"], {
     cwd: ROOT,
     encoding: "utf8",

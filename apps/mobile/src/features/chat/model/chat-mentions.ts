@@ -1,29 +1,28 @@
-import { chatTagReferences, serializeChatTagReference } from "@openbot/contracts/chat-tag-references";
+import {
+  type ChatTagReference,
+  chatTagReferences,
+  serializeChatTagReference,
+} from "@openbot/contracts/chat-tag-references";
 
 export function mentionDraft(source: string) {
   let cursor = 0;
   let text = "";
   const mentions = [];
   for (const reference of chatTagReferences(source)) {
-    if (
-      reference.kind !== "agent" &&
-      reference.kind !== "quote" &&
-      reference.kind !== "skill" &&
-      reference.kind !== "mcp"
-    )
-      continue;
     text += source.slice(cursor, reference.start);
     const start = text.length;
-    // A quote keeps its marker through an edit, as a mention does. The phone cannot jump to its source.
-    // A skill or an app reads as its name after @, as the desktop chip does; its marker goes to the host.
-    text += reference.kind === "quote" ? `“${reference.name}”` : `@${reference.name}`;
+    text += mentionText(reference);
     mentions.push({ start, end: text.length, reference, wire: source.slice(reference.start, reference.end) });
     cursor = reference.end;
   }
   return { text: text + source.slice(cursor), mentions };
 }
 
-// Preserve identities outside the edit. Editing a mention itself turns it into plain text.
+function mentionText(reference: ChatTagReference): string {
+  if (reference.kind === "quote") return `“${reference.name}”`;
+  return reference.kind === "tab" || reference.kind === "thread" ? reference.name : `@${reference.name}`;
+}
+
 export function editMentionDraft(source: string, next: string): string {
   const previous = mentionDraft(source);
   let start = 0;
@@ -55,12 +54,11 @@ export function mentionQuery(source: string, cursor: number) {
   return { start, end: cursor, query: query.toLocaleLowerCase() };
 }
 
-/** Writes an agent mention, or a skill or app reference as the desktop chip sends it, over the typed `@query`. */
 export function insertMention(
   source: string,
   range: { start: number; end: number },
   agent: { id: string; name: string },
-  kind: "agent" | "skill" | "mcp" = "agent",
+  kind: "agent" | "skill" | "mcp" | "tab" | "thread" = "agent",
 ) {
   const wireOffset = (position: number) => {
     let offset = position;
@@ -76,17 +74,14 @@ export function insertMention(
 
 interface MentionMatcher {
   expression: RegExp;
-  /** The place in the agent list of each lower-case name. */
   indexByName: ReadonlyMap<string, number>;
 }
 
-/** One matcher for each agent list: the text of every message token reads the same list. */
 const mentionMatchers = new WeakMap<readonly { name: string }[], MentionMatcher | null>();
 
 function mentionMatcher(agents: readonly { name: string }[]): MentionMatcher | null {
   const cached = mentionMatchers.get(agents);
   if (cached !== undefined) return cached;
-  // The longest name first, so a name that starts another name does not take its match.
   const ordered = agents
     .map((agent, index) => ({ name: agent.name, index }))
     .filter((agent) => agent.name.length > 0)
@@ -101,13 +96,11 @@ function mentionMatcher(agents: readonly { name: string }[]): MentionMatcher | n
   return matcher;
 }
 
-/** Display-only matching for prose from providers and older messages. Never changes stored text. */
 export function plainMentionParts<T extends { id: string; name: string }>(body: string, agents: readonly T[]) {
   const matcher = mentionMatcher(agents);
   const parts: Array<{ text: string; agent: T | undefined }> = [];
   if (!matcher) return [{ text: body, agent: undefined }];
   let cursor = 0;
-  // `matchAll` reads a copy of the expression, so the shared expression keeps no state.
   for (const match of body.matchAll(matcher.expression)) {
     if (match.index > 0 && /[\p{L}\p{N}_@]/u.test(body.charAt(match.index - 1))) continue;
     if (match.index > cursor) parts.push({ text: body.slice(cursor, match.index), agent: undefined });

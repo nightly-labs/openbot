@@ -1,9 +1,15 @@
 import {
   type BillingPortalRequest,
   type BillingState,
+  type BillingStorageRequest,
   parseBillingSessionUrl,
   parseBillingState,
 } from "@openbot/contracts/billing";
+import {
+  type BillingDetails,
+  type BillingDetailsRequest,
+  parseBillingDetails,
+} from "@openbot/contracts/billing-details";
 import { sourceText } from "@openbot/i18n/source";
 import { Effect, type Layer } from "effect";
 import {
@@ -14,11 +20,6 @@ import {
 
 export type BillingAuthClient = AccountRequestClient;
 
-/**
- * The Stripe plan of each server that the account pays for. The renderer never sends a URL: this
- * service gets the Customer Portal URL from the account server and opens it only when it is an https
- * Stripe page.
- */
 export class BillingDesktopService {
   readonly #platform: Layer.Layer<AccountServicePlatform>;
 
@@ -32,6 +33,18 @@ export class BillingDesktopService {
 
   openPortal(request: BillingPortalRequest): Effect.Effect<void, AccountServiceFailure> {
     return openBillingPortal(request).pipe(Effect.provide(this.#platform));
+  }
+
+  buyStorage(request: BillingStorageRequest): Effect.Effect<BillingState, AccountServiceFailure> {
+    return buyBillingStorage(request).pipe(Effect.provide(this.#platform));
+  }
+
+  getDetails(): Effect.Effect<BillingDetails, AccountServiceFailure> {
+    return readBillingDetails().pipe(Effect.provide(this.#platform));
+  }
+
+  setDetails(request: BillingDetailsRequest): Effect.Effect<BillingDetails, AccountServiceFailure> {
+    return saveBillingDetails(request).pipe(Effect.provide(this.#platform));
   }
 }
 
@@ -49,6 +62,38 @@ const openBillingPortal = Effect.fn("BillingDesktop.openPortal")(function* (requ
   );
   yield* platform.openPage(url);
 });
+
+const buyBillingStorage = Effect.fn("BillingDesktop.buyStorage")(function* (request: BillingStorageRequest) {
+  const platform = yield* AccountServicePlatform;
+  return yield* platform.request(
+    "/v1/me/billing/storage",
+    { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(request) },
+    decodeBillingState,
+  );
+});
+
+const BILLING_DETAILS_SAVE_TIMEOUT_MS = 30_000;
+
+const readBillingDetails = Effect.fn("BillingDesktop.getDetails")(function* () {
+  const platform = yield* AccountServicePlatform;
+  return yield* platform.request("/v1/me/billing/details", { method: "GET" }, decodeBillingDetails);
+});
+
+const saveBillingDetails = Effect.fn("BillingDesktop.setDetails")(function* (request: BillingDetailsRequest) {
+  const platform = yield* AccountServicePlatform;
+  return yield* platform.request(
+    "/v1/me/billing/details",
+    { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify(request) },
+    decodeBillingDetails,
+    BILLING_DETAILS_SAVE_TIMEOUT_MS,
+  );
+});
+
+function decodeBillingDetails(value: unknown): BillingDetails {
+  const details = parseBillingDetails(value);
+  if (!details) throw new Error(sourceText("error.billing.invalidResponse"));
+  return details;
+}
 
 function decodeBillingState(value: unknown): BillingState {
   const state = parseBillingState(value);

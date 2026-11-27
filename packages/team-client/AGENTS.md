@@ -7,7 +7,8 @@ macOS island and the iOS Live Activity both read, so the two show the same event
 It holds the routine schedule (`routine-schedule.ts`) and calendar (`routine-calendar.ts`) too: the
 host fires runs with them, and the desktop and phone calendars place runs with the same code.
 The usage chart series (`usage-series.ts`) is here for the same reason: the desktop and phone usage
-charts draw the same areas.
+charts draw the same areas. The profile stats (`profile-stats.ts`) are here because the desktop
+Profile tab and the phone Profile page show the same numbers.
 
 - Do not change the meaning of a shipped wire format. `webrtc-framing.ts` encodes the frames of
   Team protocol v2, and hosts and clients of older releases still use it. Put a new behaviour behind
@@ -15,6 +16,9 @@ charts draw the same areas.
   [contract rules](../contracts/AGENTS.md).
 - Keep the code independent of Electron, Node, and the DOM beyond WebRTC and `fetch`. Mobile runs it
   in React Native. Pass platform objects in as arguments, as `TeamClientFetch` does.
-- Do not re-export `@openbot/contracts/team-protocol` from `index.ts`. The comment there says why.
-  Each module has its own subpath in `package.json`.
+- Do not re-export `@openbot/contracts/team-protocol` from `index.ts`. That barrel adds every
+  frozen protocol codec and adapter to each consumer of the root export. On React Native and in a
+  browser, that is bundle weight for protocol versions that the client never uses. A consumer that
+  needs a protocol symbol imports it from its contracts subpath. Each module of this package has
+  its own subpath in `package.json`.
 - Do not log tokens, tickets, or message bodies.

@@ -36,7 +36,6 @@ export function placeSerializedCaret(editor: HTMLDivElement, position: number): 
   selection?.addRange(range);
 }
 
-/** Offsets in the serialized draft, including the complete identity of each inline token. */
 export function serializedEditorSelection(editor: HTMLDivElement): ComposerSelection {
   const selection = editor.ownerDocument.getSelection();
   const range = selection?.rangeCount ? selection.getRangeAt(0) : null;
@@ -74,27 +73,46 @@ function serializeNode(node: Node): string {
   const quoteMessageId = node.dataset.quoteMessageId;
   const quoteText = node.dataset.quoteText;
   if (quoteMessageId && quoteText) return serializeChatTagReference("quote", quoteText, quoteMessageId);
+  const tabId = node.dataset.tabId;
+  const tabName = node.dataset.tabName;
+  if (tabId && tabName) return serializeChatTagReference("tab", tabName, tabId);
+  const threadId = node.dataset.threadId;
+  const threadName = node.dataset.threadName;
+  if (threadId && threadName) return serializeChatTagReference("thread", threadName, threadId);
   if (node.tagName === "BR") return "\n";
   const content = Array.from(node.childNodes).map(serializeNode).join("");
   return node.tagName === "DIV" || node.tagName === "P" ? `${content}\n` : content;
 }
 
-/* Use native edits for typing, paste, and line breaks so they share the undo history.
- * insertText splits multiline text into blocks. Escaped insertHTML keeps literal newlines. */
+let editCommandRunning = false;
+
+export function isEditCommandRunning(): boolean {
+  return editCommandRunning;
+}
+
+function runEditCommand(command: string, value?: string): boolean {
+  const outerCommandRunning = editCommandRunning;
+  editCommandRunning = true;
+  try {
+    return document.execCommand(command, false, value);
+  } finally {
+    editCommandRunning = outerCommandRunning;
+  }
+}
+
 function insertTextThroughBrowser(editor: HTMLDivElement, text: string): boolean {
   if (typeof document.execCommand !== "function") return false;
   const selection = window.getSelection();
   const range = selection?.rangeCount ? selection.getRangeAt(0) : null;
   if (!range || !editor.contains(range.commonAncestorContainer)) return false;
-  if (!text) return document.execCommand("delete", false);
-  if (!text.includes("\n")) return document.execCommand("insertText", false, text);
+  if (!text) return runEditCommand("delete");
+  if (!text.includes("\n")) return runEditCommand("insertText", text);
   const escaped = document.createElement("div");
   escaped.textContent = text;
   const atEnd = editorTextOffset(editor, range.endContainer, range.endOffset) === editorText(editor).length;
   if (atEnd && editor.lastChild instanceof HTMLBRElement) range.setEndAfter(editor.lastChild);
-  // Include the final line box in the undoable edit, not in a later DOM mutation.
   const trailingLine = atEnd && text.endsWith("\n") ? "<br>" : "";
-  return document.execCommand("insertHTML", false, escaped.innerHTML + trailingLine);
+  return runEditCommand("insertHTML", escaped.innerHTML + trailingLine);
 }
 
 export function insertPlainText(editor: HTMLDivElement, text: string): void {
@@ -112,7 +130,6 @@ export function insertPlainText(editor: HTMLDivElement, text: string): void {
   }
   const caretOffset = editorTextOffset(editor, range.startContainer, range.startOffset) + text.length;
   if (!insertTextThroughBrowser(editor, text)) {
-    // jsdom has no editing commands. Keep the range path for that environment.
     if (!editor.textContent) editor.querySelector(":scope > br:last-child")?.remove();
     range.deleteContents();
     range.insertNode(document.createTextNode(text));
@@ -120,7 +137,6 @@ export function insertPlainText(editor: HTMLDivElement, text: string): void {
       editor.append(document.createElement("br"));
     }
   }
-  // Native deletion can put the caret before the previous newline. Restore the edit's endpoint.
   const caretRange = rangeFromTextOffsets(editor, caretOffset, caretOffset);
   if (!caretRange) return;
   selection?.removeAllRanges();
@@ -139,12 +155,8 @@ function replaceListRange(
   const target = rangeFromTextOffsets(editor, caret, end);
   if (!target) return false;
 
-  // Rewrite a cloned plain-text range, then let the browser record the insertion and all
-  // renumbering as one edit.
   const content = document.createElement("div");
   content.append(target.cloneContents());
-  // Chromium does not undo an insertHTML range containing non-editable chips reliably. Keep those
-  // nodes in place and use the token-safe multi-range fallback below instead.
   if (content.querySelector('[contenteditable="false"]')) return false;
   for (const replacement of replacements.toReversed()) {
     const marker = rangeFromTextOffsets(content, replacement.start - caret, replacement.end - caret);
@@ -156,11 +168,10 @@ function replaceListRange(
 
   selection.removeAllRanges();
   selection.addRange(target);
-  if (typeof document.execCommand === "function" && document.execCommand("insertHTML", false, content.innerHTML)) {
+  if (typeof document.execCommand === "function" && runEditCommand("insertHTML", content.innerHTML)) {
     return true;
   }
 
-  // jsdom has no editing commands. Preserve the same DOM shape for its unit-test path.
   target.deleteContents();
   const fragment = content.ownerDocument.createDocumentFragment();
   fragment.append(...content.childNodes);
@@ -168,11 +179,6 @@ function replaceListRange(
   return true;
 }
 
-/*
- * Continues or ends a Markdown list, as `markdownListLineBreak` describes. The edit works in the
- * editor's text offsets, where a chip counts as one position, and it changes only the current
- * line, so chips stay in place.
- */
 export function insertLineBreak(editor: HTMLDivElement): void {
   const selection = window.getSelection();
   const range = selection?.rangeCount ? selection.getRangeAt(0) : null;
@@ -272,7 +278,9 @@ export function mentionTokenAtCaretBoundary(
 function closestMentionToken(node: Node, editor: HTMLDivElement): HTMLElement | null {
   const element = node instanceof HTMLElement ? node : node.parentElement;
   const token =
-    element?.closest<HTMLElement>("[data-mention-id], [data-skill-id], [data-mcp-id], [data-quote-message-id]") ?? null;
+    element?.closest<HTMLElement>(
+      "[data-mention-id], [data-skill-id], [data-mcp-id], [data-quote-message-id], [data-tab-id], [data-thread-id]",
+    ) ?? null;
   return token && editor.contains(token) ? token : null;
 }
 
@@ -322,7 +330,6 @@ function previousNonemptySibling(node: Node | null): Node | null {
   return candidate;
 }
 
-// Each tag occupies one position. Renaming a tag must not move a selection after it.
 function editorSegments(root: Node): Node[] {
   return Array.from(root.childNodes).flatMap((node) => {
     if (node.nodeType === Node.TEXT_NODE) return [node];

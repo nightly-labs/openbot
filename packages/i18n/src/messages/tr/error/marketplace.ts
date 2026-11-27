@@ -2,7 +2,6 @@ import type { PartialTranslation } from "../../../message";
 import type { messages as source } from "../../en/error/marketplace";
 
 export const messages = {
-  // Agent marketplace and agent link errors.
   "error.marketplace.timezoneInvalid": "Yerel saat dilimi geçersiz.",
   "error.marketplace.installedAgentMissing": "Kurulu ajan artık mevcut değil.",
   "error.marketplace.differentListing": "Bu yerel ajan farklı bir pazaryeri ajanından kuruldu.",
@@ -40,15 +39,12 @@ export const messages = {
     one: '"{name}" rutini en fazla {count} karakterden oluşan bir ada ve bir talimata ihtiyaç duyar.',
     other: '"{name}" rutini en fazla {count} karakterden oluşan bir ada ve bir talimata ihtiyaç duyar.',
   },
-  // Fills `{name}` above when the routine has no name.
   "error.marketplace.templateRoutineNoName": "adsız",
   "error.marketplace.templateTooLarge":
     "Bu ajan yayımlanamayacak kadar büyük. Talimatlarını, becerilerini veya rutinlerini kısaltın.",
   "error.marketplace.linkInvalid": "Ajan bağlantısı geçersiz.",
   "error.marketplace.changedSinceOpened":
     "Bu ajan siz açtıktan sonra değişti. Yeni sürümü incelemek için bağlantıyı tekrar açın.",
-  "error.marketplace.skillNameConflict":
-    'Zaten "{name}" adında farklı bir yerel beceriniz var. Yeniden adlandırın veya kaldırın, ardından bu ajanı tekrar ekleyin.',
   "error.marketplace.avatarInvalid": "Ajan avatarı geçersiz.",
   "error.marketplace.secretInName": "Yayımlamadan önce addaki gizli anahtarı veya e-posta adresini kaldırın.",
   "error.marketplace.secretInTitle": "Yayımlamadan önce başlıktaki gizli anahtarı veya e-posta adresini kaldırın.",

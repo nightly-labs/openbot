@@ -1,14 +1,3 @@
-// Checks that a phone notification and a Live Activity show the lead of an agent message, not all of
-// it, and in words that a person reads (issue #3930): no code blocks, headings, mail headers, tool
-// names or redaction marks. The secrets stay hidden, and a command with a hidden secret cannot be
-// approved from the Live Activity. A run in a routine thread shows its answer from that thread, and
-// the notification opens that thread.
-//
-// It runs the real phone notification service and the real Live Activity push service, with a
-// synthetic conversation, runtime snapshot and read state, and a send that records the requests. It
-// opens each send with the keys of the phone, as the phone does. It sends nothing.
-// Run it with `bun run test:notification-summary`.
-// Writes .openbot-build/notification-summary-e2e/report.json.
 import assert from "node:assert/strict";
 import { randomBytes } from "node:crypto";
 import { EventEmitter } from "node:events";
@@ -139,7 +128,6 @@ function page(): ConversationPage {
   };
 }
 
-/** The routine thread. Its run's answer is not in the agent's chat page. */
 function routineThread(agentId: string, taskId: string): ConversationSnapshot {
   if (agentId !== AGENT || taskId !== ROUTINE_TASK) throw new Error("The routine thread is unknown.");
   return {
@@ -243,13 +231,11 @@ const phones = new PushNotificationService({
 const androidSecret = randomBytes(LIVE_ACTIVITY_SECRET_BYTES);
 const iphoneSecret = randomBytes(LIVE_ACTIVITY_SECRET_BYTES);
 
-/** The fields of an opened send that this check reads: a notification body, or Live Activity props. */
 interface OpenedSend {
   body: string | null;
   threadId: string | null;
   mode: string | null;
   detail: string | null;
-  /** Whether each Live Activity button is the prominent one, as Approve is. */
   prominentButtons: boolean[];
 }
 
@@ -270,7 +256,6 @@ function open(sealed: string, keys: { seal: Uint8Array; tag: Uint8Array }): Open
   };
 }
 
-/** Waits until `ready` gives a value, or fails at the deadline. */
 function waitFor<T>(what: string, ready: () => T | null): Promise<T> {
   return new Promise((resolveValue, reject) => {
     const deadline = setTimeout(() => {
@@ -289,7 +274,6 @@ function waitFor<T>(what: string, ready: () => T | null): Promise<T> {
   });
 }
 
-/** The props of the newest Live Activity update that `accept` takes. */
 function activityProps(from: number, accept: (props: OpenedSend) => boolean) {
   return waitFor("Live Activity update", () => {
     for (const push of activityPushes.slice(from).reverse()) {
@@ -311,7 +295,6 @@ async function step(name: string, run: () => Promise<unknown>): Promise<void> {
   }
 }
 
-/** A text that a person reads: no redaction marks, tool names, headers or code fences. */
 function assertReadable(text: string): void {
   assert.ok(!text.includes("[redacted"), "A redaction mark shows.");
   assert.ok(!/openbot\.\w+_\w+/u.test(text), "A tool name shows.");
@@ -366,8 +349,9 @@ try {
   await step("phone notification: a run in a routine thread shows its answer and opens the thread", async () => {
     const from = sent.length;
     events.emit("event", {
-      type: "routine-thread-turn-completed",
+      type: "thread-turn-completed",
       taskId: ROUTINE_TASK,
+      routine: true,
       turn: {
         type: "turn-completed",
         agentId: AGENT,

@@ -1,4 +1,5 @@
 import type {
+  AvatarColor,
   AvatarHue,
   DynamicIslandAction,
   DynamicIslandAgentIdentity,
@@ -11,11 +12,6 @@ import { signLiveActivityLink, verifyLiveActivityLink } from "./live-activity-se
 import { liveActivityMarkdown } from "./live-activity-text";
 import { hideRedactionMarks, messageSummary } from "./message-summary";
 
-/**
- * What the iOS Live Activity shows. The phone builds it while it runs, and its host builds the same
- * while iOS suspends the phone, so both read this module. ActivityKit keeps the content state under
- * 4 KB, so every text has a limit, and the widget runtime reads only these plain values.
- */
 export interface AgentLiveActivityProps {
   mode: Exclude<DynamicIslandPresentation["mode"], "idle">;
   label: string;
@@ -23,43 +19,19 @@ export interface AgentLiveActivityProps {
   tint: string;
   title: string;
   detail: string;
-  /** The short text in the compact island, beside the symbol. */
   compact: string;
-  /**
-   * The color of the compact text. One agent's work, reply or wait takes the agent color, and several
-   * agents are white, which the light Lock Screen shows dark. Other states keep their state color.
-   * The state line takes it too, except for a wait, whose line keeps the state color of `tint`.
-   */
   compactTint: string;
-  /** The line under the content, such as `+2 more requests`. Empty when there is none. */
   footer: string;
-  /** The most lines the detail can use. A command to approve shows in full. */
   detailLines: number;
-  /**
-   * Whether `detail` is inline Markdown, as a reply or a question is. A command or an error shows
-   * as written, so its `*` and `_` stay.
-   */
   detailMarkdown: boolean;
-  /** The agents that work now, for the `working` mode. Each `text` is inline Markdown. */
   rows: Array<{ name: string; text: string }>;
-  /** The file name of the agent picture in the App Group, or empty to show the symbol. */
   avatar: string;
-  /** Opens the chat the activity shows, or the chat list. It changes no host state. */
   tapUrl: string;
-  /** The Lock Screen and expanded island show these. Each opens the app, which then does its action. */
   buttons: Array<{ label: string; url: string; prominent: boolean }>;
-  /**
-   * The agents with unread replies when there is more than one. The activity shows their photos and
-   * a row for each, and each row opens that chat. Empty for one agent.
-   */
   agents: LiveActivityAgentRow[];
-  /** All agents with unread replies, also the ones `agents` leaves out. 0 for one agent. */
   agentCount: number;
-  /** Opens the chat list, for the agents the view has no room for. */
   listUrl: string;
-  /** The last list line, such as `+3 more`, when not all agents fit. Empty when all fit. */
   moreLabel: string;
-  /** Texts the widget shows. It cannot translate, so they come in the interface language. */
   appName: string;
   staleLabel: string;
   staleDetail: string;
@@ -72,7 +44,6 @@ export interface LiveActivityAgentRow {
   url: string;
 }
 
-/** What a button does after the app opens. */
 export type LiveActivityAction = Extract<
   DynamicIslandAction,
   { type: "open-agent" | "open-failure" | "answer-prompt" | "respond-approval" }
@@ -84,7 +55,6 @@ export interface LiveActivityButton {
   action: LiveActivityAction;
 }
 
-/** An agent with unread replies, with its count from the host read state. */
 export interface LiveActivityUnreadAgent extends DynamicIslandAgentIdentity {
   serverId: string;
   count: number;
@@ -98,58 +68,39 @@ export type AgentLiveActivitySymbol =
   | "macwindow"
   | "xmark.octagon.fill";
 
-/** The bloub face for a state, as the app avatars show it. */
 export type LiveActivityMood = "working" | "responded" | "failed" | "idle" | "waiting";
 
 export interface LiveActivityViewInput {
   t: MobileTranslate;
-  /** The bloub color of an agent, which the working state takes. */
-  agentColor(seed: string, hue: AvatarHue | null): string;
-  /** The file name of the agent picture for `mood`, or empty when there is none. */
+  agentColor(agent: DynamicIslandAgentIdentity): string;
   avatar(serverId: string, agent: DynamicIslandAgentIdentity, mood: LiveActivityMood): string;
-  /** The agents with unread replies, in any order. */
   unreadAgents: readonly LiveActivityUnreadAgent[];
-  /** Signs the button links. */
   actionKey: Uint8Array;
-  /**
-   * Hides the secrets in the agent text, because the Lock Screen and a paired watch show it. The
-   * caller supplies the shared log redaction: this package runs in React Native too.
-   */
+  threadId?: string | null;
   redact: (text: string) => string;
 }
 
-/**
- * ActivityKit fixes the URL of an activity when it starts, but the activity shows different chats
- * over its life. So the activity sets its tap link from the props, and each link says what it opens.
- */
 export const LIVE_ACTIVITY_URL = "openbot://live-activity";
-/** Opens the chat list. It starts no action, so it needs no signature. */
 export const LIVE_ACTIVITY_LIST_URL = `${LIVE_ACTIVITY_URL}?list=1`;
+const THREAD_PARAM = "thread";
 
 const TITLE_LIMIT = 80;
 const DETAIL_LIMIT = 180;
-/** The lead of a reply or a question that the detail shows: about its two lines. */
 const DETAIL_LEAD = 100;
 const ROW_NAME_LIMIT = 40;
 const ROW_TEXT_LIMIT = 100;
-/** The lead of a task in a one-line row. */
 const ROW_LEAD = 60;
 const WORKING_ROWS = 3;
 const BUTTON_LIMIT = 24;
-/** About four Lock Screen lines. A longer command is not approved from a view that cuts it. */
 const APPROVAL_COMMAND_LIMIT = 140;
 
 type LiveActivityExtras = Pick<AgentLiveActivityProps, "avatar" | "tapUrl" | "buttons" | "agents" | "agentCount">;
 type LiveActivityTexts = "listUrl" | "moreLabel" | "appName" | "staleLabel" | "staleDetail";
 type LiveActivityText = Pick<LiveActivityViewInput, "t" | "agentColor" | "redact">;
-/** A count for several agents. The island is always black, so white reads there. */
 const SEVERAL_AGENTS_TINT = "#FFFFFF";
-/** The list has 3 lines. When more agents have replies, 2 lines show agents and the last one opens the list. */
 const AGENT_LIST_LINES = 3;
-/** The rows fit the expanded island, and all photos stay small next to the 4 KB state limit. */
 export const UNREAD_AGENT_ROWS = 4;
 
-/** Returns `null` when nothing needs the user: the activity ends then, as the island goes quiet. */
 export function liveActivityView(
   presentation: DynamicIslandPresentation,
   input: LiveActivityViewInput,
@@ -160,16 +111,17 @@ export function liveActivityView(
     presentation.mode === "message" ? sortUnreadAgents(input.unreadAgents, presentation.message.agent.id) : [];
   const unread = allUnread.slice(0, UNREAD_AGENT_ROWS);
   const command = presentation.mode === "approval" ? (presentation.item.approval.command ?? undefined) : undefined;
+  const threadId = input.threadId ?? null;
   return liveActivityProps(
     presentation,
     {
       avatar: shown ? input.avatar(presentation.serverId, shown, liveActivityMood(presentation)) : "",
-      // Several chats have replies, so a tap opens the agent list and the user chooses one.
-      tapUrl: allUnread.length > 1 || !shown ? LIVE_ACTIVITY_LIST_URL : openUrl(presentation.serverId, shown.id),
+      tapUrl:
+        allUnread.length > 1 || !shown ? LIVE_ACTIVITY_LIST_URL : openUrl(presentation.serverId, shown.id, threadId),
       buttons: buttons.map((button) => ({
         label: button.label,
         prominent: button.prominent,
-        url: liveActivityActionUrl(button.action, input.actionKey, command),
+        url: liveActivityActionUrl(button.action, input.actionKey, command, threadId),
       })),
       agents: unread.map((agent) => ({
         name: agent.name,
@@ -217,7 +169,6 @@ function liveActivityContent(
   presentation: DynamicIslandPresentation,
   { t, agentColor, redact }: LiveActivityText,
 ): Omit<AgentLiveActivityProps, keyof LiveActivityExtras | LiveActivityTexts> | null {
-  // The agent's words show as their lead, as a notification shows them, with the secrets hidden.
   const agentText = (source: string, lead: number, max: number) =>
     liveActivityMarkdown(messageSummary(redact(source), lead), max);
   const plain = (source: string, max: number) => limit(hideRedactionMarks(redact(source)), max);
@@ -234,8 +185,7 @@ function liveActivityContent(
         mode: "working",
         label: t("mobile.liveActivity.badge.working"),
         symbol: "sparkles",
-        // Work is the normal state, not an alert. It takes the agent color, as the avatar shows it.
-        tint: first ? agentColor(first.agent.avatarSeed, first.agent.avatarHue) : "#8E8E93",
+        tint: first ? agentColor(first.agent) : "#8E8E93",
         title: first ? limit(first.agent.name, TITLE_LIMIT) : t("mobile.liveActivity.appName"),
         detail: first ? agentText(first.task, DETAIL_LEAD, DETAIL_LIMIT) : "",
         compact:
@@ -243,11 +193,7 @@ function liveActivityContent(
             ? String(presentation.working.length)
             : t("mobile.liveActivity.badge.working"),
         compactTint:
-          presentation.working.length > 1
-            ? SEVERAL_AGENTS_TINT
-            : first
-              ? agentColor(first.agent.avatarSeed, first.agent.avatarHue)
-              : "#8E8E93",
+          presentation.working.length > 1 ? SEVERAL_AGENTS_TINT : first ? agentColor(first.agent) : "#8E8E93",
         footer: "",
         detailLines: 2,
         detailMarkdown: true,
@@ -263,7 +209,7 @@ function liveActivityContent(
         title: limit(presentation.message.agent.name, TITLE_LIMIT),
         detail: agentText(presentation.message.text, DETAIL_LEAD, DETAIL_LIMIT),
         compact: String(presentation.unreadCount),
-        compactTint: agentColor(presentation.message.agent.avatarSeed, presentation.message.agent.avatarHue),
+        compactTint: agentColor(presentation.message.agent),
         footer: t("mobile.liveActivity.unread", { count: presentation.unreadCount }),
         detailLines: 2,
         detailMarkdown: true,
@@ -283,7 +229,7 @@ function liveActivityContent(
           DETAIL_LIMIT,
         ),
         compact: limit(presentation.item.agent.name, ROW_NAME_LIMIT),
-        compactTint: agentColor(presentation.item.agent.avatarSeed, presentation.item.agent.avatarHue),
+        compactTint: agentColor(presentation.item.agent),
         footer: remaining(presentation.remainingCount, t),
         detailLines: 2,
         detailMarkdown: true,
@@ -297,7 +243,6 @@ function liveActivityContent(
         symbol: "checkmark.shield.fill",
         tint: "#FF9F0A",
         title: plain(presentation.item.title, TITLE_LIMIT),
-        // The command shows as the host runs it, without its secrets. The reason is the agent's text.
         detail: command
           ? plain(command, APPROVAL_COMMAND_LIMIT)
           : agentText(
@@ -306,7 +251,7 @@ function liveActivityContent(
               DETAIL_LIMIT,
             ),
         compact: limit(presentation.item.agent.name, ROW_NAME_LIMIT),
-        compactTint: agentColor(presentation.item.agent.avatarSeed, presentation.item.agent.avatarHue),
+        compactTint: agentColor(presentation.item.agent),
         footer: remaining(presentation.remainingCount, t),
         detailLines: command ? 4 : 2,
         detailMarkdown: !command,
@@ -326,7 +271,7 @@ function liveActivityContent(
           DETAIL_LIMIT,
         ),
         compact: limit(presentation.item.agent.name, ROW_NAME_LIMIT),
-        compactTint: agentColor(presentation.item.agent.avatarSeed, presentation.item.agent.avatarHue),
+        compactTint: agentColor(presentation.item.agent),
         footer: "",
         detailLines: 2,
         detailMarkdown: true,
@@ -353,11 +298,6 @@ function liveActivityContent(
   }
 }
 
-/**
- * The desktop island answers questions and approvals in place. The activity offers the same
- * answers when it shows everything the answer depends on, and the Open button covers the rest. A
- * command with a hidden secret does not show all of itself, so only the app approves it.
- */
 export function liveActivityButtons(
   presentation: DynamicIslandPresentation,
   t: MobileTranslate,
@@ -391,7 +331,6 @@ export function liveActivityButtons(
     const { item } = presentation;
     const [question, ...others] = item.questions;
     const options = question?.options ?? [];
-    // Several questions need steps, and a secret needs the keyboard. The chat asks those.
     if (!question || others.length > 0 || question.isSecret || options.length === 0 || options.length > 3) return [];
     return options.map((option, index) => ({
       label: limit(option.label, BUTTON_LIMIT),
@@ -406,8 +345,6 @@ export function liveActivityButtons(
     }));
   }
   if (presentation.mode === "failed") {
-    // As on the desktop, opening the details clears the failure. It needs a button: the tap link has
-    // no signature, so a tap cannot change host state.
     const action: LiveActivityAction = {
       type: "open-failure",
       serverId,
@@ -419,20 +356,11 @@ export function liveActivityButtons(
   return [];
 }
 
-/**
- * ActivityKit takes 4 KB for each update. Long names in a script with wide characters can pass that,
- * so these are the props in the order to try: the lists go first, then the buttons and the detail.
- * The app still shows all of it when the user opens it.
- */
 export function liveActivityShorterProps(props: AgentLiveActivityProps): AgentLiveActivityProps[] {
   const withoutLists = { ...props, agents: [], agentCount: 0, moreLabel: "", rows: [] };
   return [props, withoutLists, { ...withoutLists, buttons: [], detail: "" }];
 }
 
-/**
- * The props that the phone gives ActivityKit itself. The content state also holds the name and
- * escapes the JSON, so the props stay well under the 4 KB limit.
- */
 export function fitLiveActivityProps(props: AgentLiveActivityProps): AgentLiveActivityProps {
   const candidates = liveActivityShorterProps(props);
   return (
@@ -444,7 +372,6 @@ export function fitLiveActivityProps(props: AgentLiveActivityProps): AgentLiveAc
 
 const LOCAL_PROPS_BYTES = 3_000;
 
-/** The island text in the phone language, for the coordinator that feeds `liveActivityView`. */
 export function liveActivityIslandText(
   t: MobileTranslate,
   errorMessage: DynamicIslandText["errorMessage"] = (_error, fallback) => fallback,
@@ -465,7 +392,6 @@ export function liveActivityIslandText(
   };
 }
 
-/** The bloub face for the state, as the app avatars show it. */
 export function liveActivityMood(presentation: DynamicIslandPresentation): LiveActivityMood {
   switch (presentation.mode) {
     case "working":
@@ -481,10 +407,8 @@ export function liveActivityMood(presentation: DynamicIslandPresentation): LiveA
   }
 }
 
-/** The faces the activity can show. The phone draws each of them before the host can ask for it. */
 export const LIVE_ACTIVITY_MOODS: readonly LiveActivityMood[] = ["working", "responded", "failed", "waiting"];
 
-/** The agent whose photo and chat the activity shows. */
 export function liveActivityAgent(presentation: DynamicIslandPresentation): DynamicIslandAgentIdentity | null {
   switch (presentation.mode) {
     case "idle":
@@ -498,57 +422,74 @@ export function liveActivityAgent(presentation: DynamicIslandPresentation): Dyna
   }
 }
 
-/** The file name of a drawn bloub. The phone writes it and the host names it, so both use this. */
-export function liveActivityBloubFile(seed: string, hue: AvatarHue | null, mood: LiveActivityMood): string {
-  return `avatar-${liveActivityFileName(["bloub", seed, String(hue ?? ""), mood])}.png`;
+export function liveActivityBloubName(
+  seed: string,
+  hue: AvatarHue | null,
+  mood: LiveActivityMood,
+  color: AvatarColor | null = null,
+): string {
+  return liveActivityFileName(["bloub", seed, String(hue ?? ""), mood, ...(color ? [color] : [])]);
 }
 
-/** A file name part that is different for each different list of parts. */
+export function liveActivityBloubFile(
+  seed: string,
+  hue: AvatarHue | null,
+  mood: LiveActivityMood,
+  color: AvatarColor | null = null,
+): string {
+  return `avatar-${liveActivityBloubName(seed, hue, mood, color)}.png`;
+}
+
 export function liveActivityFileName(parts: readonly string[]): string {
   return parts
     .map((part) => part.replace(/[^A-Za-z0-9]/gu, (character) => `_${character.codePointAt(0)?.toString(16)}_`))
     .join("-");
 }
 
-/** The link of a button. `command` is the command an Approve button runs, which the app shows again. */
-export function liveActivityActionUrl(action: LiveActivityAction, key: Uint8Array, command?: string): string {
+export function liveActivityActionUrl(
+  action: LiveActivityAction,
+  key: Uint8Array,
+  command?: string,
+  threadId: string | null = null,
+): string {
   const payload = JSON.stringify(command === undefined ? { action } : { action, command });
-  return `${LIVE_ACTIVITY_URL}?${new URLSearchParams({ action: payload, sig: signLiveActivityLink(payload, key) })}`;
+  const params = new URLSearchParams({ action: payload, sig: signLiveActivityLink(payload, key) });
+  if (threadId) params.set(THREAD_PARAM, threadId);
+  return `${LIVE_ACTIVITY_URL}?${params}`;
 }
 
 export type LiveActivityLink =
   | { type: "list" }
-  | { type: "open"; serverId: string; agentId: string }
-  | { type: "action"; action: LiveActivityAction; command: string | null };
+  | { type: "open"; serverId: string; agentId: string; threadId: string | null }
+  | { type: "action"; action: LiveActivityAction; command: string | null; threadId: string | null };
 
-/**
- * Reads a Live Activity link. Any app can open an `openbot://` link, so a link that changes host
- * state counts only with a valid signature. The key is the one of the host that the action goes to,
- * so one host cannot sign an action for another. Without a key, or with a wrong signature, the link
- * opens the list.
- */
 export function readLiveActivityLink(url: string, keyFor: (serverId: string) => Uint8Array | null): LiveActivityLink {
   const params = new URL(url).searchParams;
   const serverId = params.get("server");
   const agentId = params.get("agent");
-  if (serverId && agentId) return { type: "open", serverId, agentId };
+  const threadId = params.get(THREAD_PARAM) || null;
+  if (serverId && agentId) return { type: "open", serverId, agentId, threadId };
   const payload = params.get("action");
   const signature = params.get("sig");
   if (payload === null || signature === null) return { type: "list" };
-  const link = signedPayload(payload);
+  const link = signedPayload(payload, threadId);
   const key = link.type === "action" ? keyFor(link.action.serverId) : null;
   return key && verifyLiveActivityLink(payload, signature, key) ? link : { type: "list" };
 }
 
-/** The host or this app signed the link, so its action has the shape that one of them built. */
-function signedLink(value: unknown): LiveActivityLink {
+function signedLink(value: unknown, threadId: string | null): LiveActivityLink {
   if (!isDynamicRecord(value) || !isLiveActivityAction(value.action)) return { type: "list" };
-  return { type: "action", action: value.action, command: isString(value.command) ? value.command : null };
+  return {
+    type: "action",
+    action: value.action,
+    command: isString(value.command) ? value.command : null,
+    threadId,
+  };
 }
 
-function signedPayload(payload: string): LiveActivityLink {
+function signedPayload(payload: string, threadId: string | null): LiveActivityLink {
   try {
-    return signedLink(JSON.parse(payload));
+    return signedLink(JSON.parse(payload), threadId);
   } catch {
     return { type: "list" };
   }
@@ -564,11 +505,12 @@ function isLiveActivityAction(value: unknown): value is LiveActivityAction {
   );
 }
 
-function openUrl(serverId: string, agentId: string): string {
-  return `${LIVE_ACTIVITY_URL}?${new URLSearchParams({ server: serverId, agent: agentId })}`;
+function openUrl(serverId: string, agentId: string, threadId: string | null = null): string {
+  const params = new URLSearchParams({ server: serverId, agent: agentId });
+  if (threadId) params.set(THREAD_PARAM, threadId);
+  return `${LIVE_ACTIVITY_URL}?${params}`;
 }
 
-/** The agent the island shows first, then the most unread. */
 function sortUnreadAgents(agents: readonly LiveActivityUnreadAgent[], firstId: string): LiveActivityUnreadAgent[] {
   return [...agents].sort((a, b) => Number(b.id === firstId) - Number(a.id === firstId) || b.count - a.count);
 }

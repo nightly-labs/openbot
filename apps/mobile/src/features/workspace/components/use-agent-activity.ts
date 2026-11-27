@@ -1,9 +1,21 @@
-import { useCallback, useMemo, useSyncExternalStore } from "react";
-import { useMobileWorkspaceSelector } from "@/features/workspace/context/mobile-workspace-context";
-import type { MobileAgentActivities, MobileAgentWait } from "@/features/workspace/model/agent-activity";
+import { useQuery } from "@tanstack/react-query";
+import { useCallback, useMemo, useRef, useSyncExternalStore } from "react";
+import { useQueryScope } from "@/features/auth/context/mobile-session-context";
+import { useAgentThreadUnread } from "@/features/chat/components/use-agent-thread-reads";
+import {
+  useMobileWorkspaceReader,
+  useMobileWorkspaceSelector,
+} from "@/features/workspace/context/mobile-workspace-context";
+import type {
+  MobileAgentActivities,
+  MobileAgentActivity,
+  MobileAgentWait,
+} from "@/features/workspace/model/agent-activity";
+import { queryKeys } from "@/features/workspace/model/query-keys";
 import { showsOnline } from "@/features/workspace/model/server-status";
-import type { TurnStepLines } from "@/features/workspace/model/turn-step-lines";
-import { selectLiveState } from "./use-live-workspace";
+import { agentThreadWaitReason } from "@/features/workspace/model/thread-waits";
+import type { TurnStepLine, TurnStepLines } from "@/features/workspace/model/turn-step-lines";
+import { selectLiveState, useAgentUnread, useAgentUnreadCount } from "./use-live-workspace";
 
 export function useAgentActivity(agentId: string) {
   const liveState = useMobileWorkspaceSelector(selectLiveState);
@@ -16,36 +28,75 @@ export function useAgentActivity(agentId: string) {
   return useSyncExternalStore(liveState.subscribe, select);
 }
 
-/** What this agent waits on from the user, or undefined. Re-renders only when that changes. */
-export function useAgentWaitReason(agentId: string) {
-  const activity = useAgentActivity(agentId);
+function useAgentThreadWaitReason(agentId: string) {
+  const liveState = useMobileWorkspaceSelector(selectLiveState);
+  const online = useMobileWorkspaceSelector((workspace) => showsOnline(workspace.activeServer));
+  const serverId = useMobileWorkspaceSelector((workspace) => workspace.activeServer.id);
+  const select = useCallback(
+    () => (online ? agentThreadWaitReason(liveState.get().threadWaitsByServer[serverId] ?? [], agentId) : undefined),
+    [liveState, online, serverId, agentId],
+  );
+  return useSyncExternalStore(liveState.subscribe, select);
+}
+
+function useAgentThreadRunning(agentId: string) {
+  const queryScope = useQueryScope();
+  const workspace = useMobileWorkspaceReader();
+  const online = useMobileWorkspaceSelector((current) => showsOnline(current.activeServer));
+  const serverId = useMobileWorkspaceSelector((current) => current.activeServer.id);
+  const running = useQuery({
+    queryKey: queryKeys.agentTasks(queryScope, serverId, agentId),
+    enabled: false,
+    retry: false,
+    queryFn: () => workspace().loadAgentTasks(agentId, serverId),
+    select: (snapshot) => snapshot.tasks.some((task) => task.state === "running"),
+  }).data;
+  return online && running === true;
+}
+
+export function useAgentListActivity(agentId: string): MobileAgentActivity | undefined {
+  const own = useAgentActivity(agentId);
+  const threadWait = useAgentThreadWaitReason(agentId);
+  const threadRunning = useAgentThreadRunning(agentId);
+  return useMemo((): MobileAgentActivity | undefined => {
+    if (own?.phase === "waiting") return own;
+    if (threadWait) return { turnId: null, phase: "waiting", detail: null, reason: threadWait };
+    if (own) return own;
+    return threadRunning ? { turnId: null, phase: "working", detail: null } : undefined;
+  }, [own, threadWait, threadRunning]);
+}
+
+export function agentListWaitReason(activity: MobileAgentActivity | undefined) {
   return activity?.phase === "waiting" ? activity.reason : undefined;
 }
 
-/**
- * The agents of the active server that wait for the user. The selector returns a sorted key, so
- * activity that keeps the same agents waiting does not re-render the list.
- */
+export function useAgentListUnreadCount(agentId: string): number {
+  const own = useAgentUnread(agentId);
+  const ownCount = useAgentUnreadCount(agentId);
+  return own ? Math.max(1, ownCount) : 0;
+}
+
+export function useAgentListUnreadThreads(agentId: string): boolean {
+  const serverId = useMobileWorkspaceSelector((workspace) => workspace.activeServer.id);
+  return useAgentThreadUnread(serverId, agentId) > 0;
+}
+
 export function useWaitingAgentIds(): ReadonlySet<string> {
   const liveState = useMobileWorkspaceSelector(selectLiveState);
   const online = useMobileWorkspaceSelector((workspace) => showsOnline(workspace.activeServer));
   const serverId = useMobileWorkspaceSelector((workspace) => workspace.activeServer.id);
   const select = useCallback(() => {
     if (!online) return "";
-    const activities = liveState.get().activityByServer[serverId] ?? {};
-    return Object.keys(activities)
-      .filter((agentId) => activities[agentId]?.phase === "waiting")
-      .sort()
-      .join("\n");
+    const { activityByServer, threadWaitsByServer } = liveState.get();
+    const activities = activityByServer[serverId] ?? {};
+    const waiting = new Set(Object.keys(activities).filter((agentId) => activities[agentId]?.phase === "waiting"));
+    for (const wait of threadWaitsByServer[serverId] ?? []) if (wait.task) waiting.add(wait.agentId);
+    return [...waiting].sort().join("\n");
   }, [liveState, online, serverId]);
   const key = useSyncExternalStore(liveState.subscribe, select);
   return useMemo(() => new Set(key ? key.split("\n") : []), [key]);
 }
 
-/**
- * The wait of each agent of a server that waits for the user. The selector returns a key, so
- * activity that does not change a wait does not re-render the consumer.
- */
 export function useAgentWaits(serverId: string, online: boolean): Readonly<Record<string, MobileAgentWait>> {
   const liveState = useMobileWorkspaceSelector(selectLiveState);
   const waits = useCallback(
@@ -54,7 +105,6 @@ export function useAgentWaits(serverId: string, online: boolean): Readonly<Recor
   );
   const select = useCallback(() => JSON.stringify(waits()), [waits]);
   const key = useSyncExternalStore(liveState.subscribe, select);
-  // The key changes with every wait, so the waits are read again then.
   return useMemo(() => (key === "{}" ? {} : waits()), [key, waits]);
 }
 
@@ -70,9 +120,31 @@ function agentWaits(activities: MobileAgentActivities): Record<string, MobileAge
 
 const NO_TURN_LINES: TurnStepLines = {};
 
-/** The progress lines that this phone got for the newest turns on the server. */
 export function useTurnStepLines(serverId: string): TurnStepLines {
   const liveState = useMobileWorkspaceSelector(selectLiveState);
   const select = useCallback(() => liveState.get().turnLinesByServer[serverId] ?? NO_TURN_LINES, [liveState, serverId]);
+  return useSyncExternalStore(liveState.subscribe, select);
+}
+
+export function useTurnStepLinesOf(serverId: string, turnIds: readonly string[]): TurnStepLines {
+  const liveState = useMobileWorkspaceSelector(selectLiveState);
+  const kept = useRef<TurnStepLines>(NO_TURN_LINES);
+  const select = useCallback(() => {
+    const lines = liveState.get().turnLinesByServer[serverId] ?? NO_TURN_LINES;
+    const previous = kept.current;
+    const next: Record<string, readonly TurnStepLine[]> = {};
+    let count = 0;
+    let same = true;
+    for (const turnId of turnIds) {
+      const turn = lines[turnId];
+      if (!turn) continue;
+      next[turnId] = turn;
+      count += 1;
+      if (previous[turnId] !== turn) same = false;
+    }
+    if (same && count === Object.keys(previous).length) return previous;
+    kept.current = count === 0 ? NO_TURN_LINES : next;
+    return kept.current;
+  }, [liveState, serverId, turnIds]);
   return useSyncExternalStore(liveState.subscribe, select);
 }

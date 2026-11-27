@@ -1,9 +1,3 @@
-// The one list of published comparisons. Like news and guides, the sitemap, the
-// feed, the head tags and the build-time image generator read it. The page itself
-// is not prose: it is drawn from the data in src/content/compare.
-//
-// No JSX here, for the same reason `content-collection.ts` holds none.
-
 import { type ContentCollection, publishedFirst } from "./content-collection";
 import { NEWS_AUTHOR } from "./news";
 
@@ -15,6 +9,10 @@ export const COMPARE_COLLECTION: ContentCollection<"compare"> = {
   indexTitle: "Compare OpenBot with other AI agent apps",
   indexDescription:
     "How AI agent apps compare: OpenBot against other apps, coding agents against each other, and where agents run, which models they use and what they cost.",
+  indexSocialImage: {
+    path: "/social/compare.jpg",
+    alt: "Better together. OpenBot agents around a glass arch",
+  },
   feedTitle: "OpenBot comparisons",
   backLabel: "All comparisons",
   moreTitle: "More comparisons",
@@ -147,8 +145,6 @@ export const COMPARE_COLLECTION: ContentCollection<"compare"> = {
       author: NEWS_AUTHOR,
     },
     {
-      // Published first in /news, as openbot-vs-grokbot. That URL answers with a
-      // permanent redirect here (routes/news/openbot-vs-grokbot.ts).
       slug: "grok-bot",
       title: "OpenBot vs Grok Bot: A Local Grok Bot Alternative",
       description:

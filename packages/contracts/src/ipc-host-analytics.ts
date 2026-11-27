@@ -15,13 +15,49 @@ import { isDynamicRecord, isString } from "./runtime-values";
 export interface HostAnalyticsInput extends Omit<AgentAnalyticsInput, "agentId"> {
   agentId?: string | undefined;
 }
-// Only the host report carries the per-agent split and the daily-by-provider grid: on an
-// agent-scoped report the agent array would be one row restating the totals, and adding
-// either to AgentAnalytics would drag the agent codec and the mobile screen along.
 export interface HostAnalytics extends Omit<AgentAnalytics, "agentId"> {
   agentId?: string | undefined;
   agents: AnalyticsAgent[];
   providerDaily: AnalyticsProviderDay[];
+  skills?: AnalyticsSkill[] | undefined;
+}
+export interface AnalyticsSkill {
+  skill: string;
+  loads: number;
+  tokens: number;
+  estimatedCostUsd: number | null;
+  agents: number;
+  share: number;
+}
+const SKILL_NAME_LIMIT = 128;
+function decodeAnalyticsSkills(value: unknown): AnalyticsSkill[] {
+  if (!Array.isArray(value)) throw new Error("Invalid skill analytics rows.");
+  return value.map((row) => {
+    if (
+      !isDynamicRecord(row) ||
+      !isString(row.skill) ||
+      !row.skill ||
+      row.skill.length > SKILL_NAME_LIMIT ||
+      !count(row.loads) ||
+      !count(row.tokens) ||
+      !count(row.agents) ||
+      !(row.estimatedCostUsd === null || (typeof row.estimatedCostUsd === "number" && row.estimatedCostUsd >= 0)) ||
+      typeof row.share !== "number" ||
+      !(row.share >= 0 && row.share <= 1)
+    )
+      throw new Error("Invalid skill analytics row.");
+    return {
+      skill: row.skill,
+      loads: row.loads,
+      tokens: row.tokens,
+      estimatedCostUsd: row.estimatedCostUsd,
+      agents: row.agents,
+      share: row.share,
+    };
+  });
+}
+function count(value: unknown): value is number {
+  return typeof value === "number" && Number.isSafeInteger(value) && value >= 0;
 }
 export function parseHostAnalyticsInput(value: unknown): HostAnalyticsInput {
   const range = parseAnalyticsRange(value);
@@ -38,6 +74,7 @@ export function decodeHostAnalytics(value: unknown): HostAnalytics {
     ...parseHostAnalyticsInput(value),
     agents: decodeAnalyticsAgents(value.agents),
     providerDaily: decodeAnalyticsProviderDays(value.providerDaily),
+    ...(value.skills === undefined ? {} : { skills: decodeAnalyticsSkills(value.skills) }),
   };
 }
 export function decodeOptionalHostAnalytics(value: unknown): HostAnalytics | null {

@@ -50,6 +50,7 @@ export const messages = {
     other: "Je kunt maximaal {count} mappen toevoegen",
   },
   "agentSettings.folders.browse.places": "Ga naar",
+  "agentSettings.folders.browse.path": "Mappad",
   "agentSettings.folders.browse.home": "Thuismap",
   "agentSettings.folders.browse.parent": "Omhoog naar {folder}",
   "agentSettings.folders.browse.failed": "Kan deze map niet openen.",
@@ -84,7 +85,7 @@ export const messages = {
   "agentSettings.backupModels.intro":
     "Als {model} de gebruikslimiet bereikt voordat {name} begint te schrijven, vraagt {name} je welk model het moet gebruiken.",
   "agentSettings.backupModels.introAutomatic":
-    "Als {model} de gebruikslimiet bereikt of een fout van de aanbieder geeft voordat {name} begint te schrijven, schakelt {name} over op het eerste beschikbare model in de volgorde.",
+    "Als {model} de gebruikslimiet bereikt, schakelt {name} over op het eerste beschikbare model in de volgorde. {name} schakelt ook over als {model} een fout van de aanbieder geeft voordat {name} begint te schrijven.",
   "agentSettings.backupModels.ask": "Vragen voor overschakelen",
   "agentSettings.backupModels.order": "Volgorde",
   "agentSettings.backupModels.listLabel": "Reservemodellen, op volgorde",
@@ -96,6 +97,7 @@ export const messages = {
   "agentSettings.backupModels.limited": "Gebruikslimiet bereikt · overgeslagen",
   "agentSettings.backupModels.unavailable": "Nu niet beschikbaar · overgeslagen",
   "agentSettings.backupModels.withAccount": "{model} · {account}",
+  "agentSettings.backupModels.withProvider": "{model} · {provider}",
   "agentSettings.backupModels.note":
     "Als een gebruikslimiet {name} stopt nadat het werk is begonnen, gaat {name} met hetzelfde werk verder op het eerste beschikbare model in de volgorde. Het gaat terug naar {model} als de limiet afloopt, of 10 minuten na een fout van de aanbieder.",
   "agentSettings.groups.brain": "Brein",
@@ -145,16 +147,10 @@ export const messages = {
   "agentSettings.avatar.processFailed": "Kan de avatar van de agent niet verwerken.",
   "agentSettings.runtime.model": "Agentmodel",
   "agentSettings.runtime.modelUnavailable": "Modellen zijn beschikbaar nadat een agent-CLI verbinding maakt.",
-  "agentSettings.runtime.reasoning": "Redeneren",
-  "agentSettings.runtime.reasoningLabel": "Redeneerniveau van de agent",
-  "agentSettings.runtime.selectReasoning": "Kies redeneerniveau",
-  "agentSettings.runtime.reasoningSetByProvider": "Ingesteld door {provider}",
   "agentSettings.runtime.access": "Toegang",
   "agentSettings.runtime.accessLabel": "Toegang van agent",
   "agentSettings.runtime.busyMessage": "Tijdens werk",
   "agentSettings.runtime.busyMessageLabel": "Berichten terwijl de agent werkt",
-  "agentSettings.runtime.taskLimit": "Parallelle threads",
-  "agentSettings.runtime.taskLimitLabel": "Threads die tegelijk draaien",
   "agentSettings.runtime.workingDirectory": "Werkmap",
   "agentSettings.runtime.notAvailable": "Nog niet beschikbaar",
   "agentSettings.runtime.fullAccessNote":
@@ -173,21 +169,33 @@ export const messages = {
   "agentSettings.busyMessage.steer": "Bijsturen",
   "agentSettings.busyMessage.steerUnsupported":
     "{provider} kan een lopende beurt niet bijsturen. Berichten die je stuurt terwijl hij werkt, wachten in de wachtrij.",
-  "agentSettings.taskLimit.default": "Standaard ({count})",
-  "agentSettings.taskLimit.oneTurn":
-    "{provider} voert één beurt tegelijk uit. De threads van deze agent wachten op elkaar.",
   "agentSettings.notificationLevel.title": "Meld mij",
   "agentSettings.notificationLevel.server": "Serverstandaard ({level})",
   "agentSettings.notificationLevel.note":
     "Deze keuze geldt alleen voor jou, op al je apparaten. Is de server gedempt of op ‘Niets’ gezet, dan blijft ook deze agent stil.",
   "agentSettings.newChat.title": "Nieuwe chat",
-  "agentSettings.newChat.description": "De agent vergeet deze chat. De instellingen blijven.",
+  "agentSettings.newChat.description":
+    "De agent begint opnieuw en kan deze chat nog doorzoeken als dat nodig is. De instellingen blijven.",
   "agentSettings.newChat.button": "Starten",
   "agentSettings.newChat.confirmTitle": "Nieuwe chat met {name} starten?",
   "agentSettings.newChat.confirmDescription":
-    "De agent vergeet deze chat. De berichten blijven zichtbaar boven een scheidingslijn. De instructies, het model, de tools, het geheugen, de werkruimte en de browser veranderen niet.",
+    "De agent begint opnieuw en kan deze chat nog doorzoeken als dat nodig is. De berichten blijven zichtbaar boven een scheidingslijn. De instructies, het model, de tools, het geheugen, de werkruimte en de browser veranderen niet.",
   "agentSettings.newChat.confirm": "Nieuwe chat starten",
   "agentSettings.newChat.failed": "Kan geen nieuwe chat starten.",
+  "agentSettings.newChat.busy": "De agent is bezig. Wacht tot hij klaar is of stop hem om een nieuwe chat te starten.",
+  "agentSettings.deleteHistory.title": "Geschiedenis wissen",
+  "agentSettings.deleteHistory.description":
+    "De berichten van deze chat worden gewist en de agent vergeet ze. De instellingen blijven.",
+  "agentSettings.deleteHistory.button": "Wissen",
+  "agentSettings.deleteHistory.confirmTitle": "Chatgeschiedenis met {name} wissen?",
+  "agentSettings.deleteHistory.confirmDescription":
+    "Alle berichten en bestanden van deze chat worden uit OpenBot gewist en de agent vergeet ze. Dit kun je niet ongedaan maken. Zijthreads, instructies, model, tools, herinneringen, werkruimte en browser veranderen niet.",
+  "agentSettings.deleteHistory.confirm": "Geschiedenis wissen",
+  "agentSettings.deleteHistory.failed": "Kan de geschiedenis niet wissen.",
+  "agentSettings.deleteAgent.title": "Agent verwijderen",
+  "agentSettings.deleteAgent.description":
+    "De agent, de chat, herinneringen, routines en werkruimte verdwijnen uit OpenBot.",
+  "agentSettings.deleteAgent.button": "Verwijderen",
   "agentSettings.fullAccess.title": "Deze agent volledige toegang geven?",
   "agentSettings.fullAccess.askTitle": "Deze agent buiten zijn werkruimte laten werken?",
   "agentSettings.fullAccess.description":
@@ -197,6 +205,8 @@ export const messages = {
   "agentSettings.fullAccess.confirm": "Volledige toegang toestaan",
   "agentSettings.fullAccess.askConfirm": "Eerst vragen gebruiken",
   "agentSettings.links.usage": "Gebruik",
+  "agentSettings.links.apps": "Apps",
+  "agentSettings.links.appsScope": "Alle agents",
   "agentSettings.links.memories": "Herinneringen",
   "agentSettings.links.memoriesCount": { one: "{count} opgeslagen", other: "{count} opgeslagen" },
   "agentSettings.links.skills": "Vaardigheden",
@@ -222,8 +232,10 @@ export const messages = {
   "agentSettings.agentNewChat.description":
     "Laat de agent een nieuwe chat starten als de chat lang wordt. Hij slaat eerst notities op.",
   "agentSettings.quickAcknowledgement.title": "Plan tonen vóór lange taken",
-  "agentSettings.quickAcknowledgement.description":
-    "Vóór een lange taak toont de agent zijn plan. Hij begint na 10 s, of als je op Starten drukt.",
+  "agentSettings.quickAcknowledgement.description": "Vóór een lange taak toont de agent zijn plan.",
+  "agentSettings.builtinMemory.title": "OpenBot-geheugen",
+  "agentSettings.builtinMemory.description":
+    "De agent bewaart en leest zijn eigen herinneringen. Zet dit uit om alleen een geheugen-app zoals Mem0 te gebruiken. Bewaarde herinneringen blijven.",
   "agentSettings.browserProfile.label": "Browserprofiel",
   "agentSettings.browserProfile.shared": "Gedeeld",
   "agentSettings.browserProfile.agent": "Alleen deze agent",
@@ -233,6 +245,8 @@ export const messages = {
   "agentSettings.browserProfile.manageDescription":
     "Elk profiel bewaart eigen logins en cookies. Een wijziging sluit de open tabbladen van de agent.",
   "agentSettings.browserProfile.manage": "Beheren",
+  "agentSettings.browserProfile.movedNote":
+    "Logins bij sites blijven in het oude profiel. De agent moet opnieuw inloggen op deze sites.",
   "agentSettings.runtime.workspaceEnforcedProcess":
     "Het hele proces van {provider} draait in een sandbox, dus schrijven buiten mislukt. Alleen beschikbaar op macOS.",
 } as const satisfies PartialTranslation<typeof source>;

@@ -4,13 +4,24 @@ import { isAbsolute, join, relative, resolve, sep } from "node:path";
 import type { AgentSummary, MarketplaceSkillDetail } from "@openbot/contracts/ipc";
 import { isDynamicRecord, isString } from "@openbot/contracts/runtime-values";
 import { sourceText } from "@openbot/i18n/source";
-import { Effect, Schema, Semaphore } from "effect";
+import { createOpenBotLogger } from "@openbot/logging";
+import { Effect, Result, Schema, Semaphore } from "effect";
+import { zipSync } from "fflate";
 import { parse as parseYaml } from "yaml";
+import type { LocalSkillListing, UnreadableLocalSkill } from "../backend/agent/skill-tools";
 import { causeHelpers } from "../backend/effect-boundary";
 import { MANAGED_SKILL_SLUGS } from "./managed-skill-service";
-import { archiveDirectory, inspectArchive, normalizedFiles } from "./skill-package";
+import {
+  archiveDirectory,
+  inspectArchive,
+  normalizedFiles,
+  readSkillArchive,
+  SKILL_FRONTMATTER,
+  skillZippable,
+} from "./skill-package";
 
-/** Owns immutable local revisions. A revision exists only after its directory is published. */
+const logger = createOpenBotLogger("local-skill-library");
+
 export class LocalSkillLibrary {
   readonly #writes = Semaphore.makeUnsafe(1);
   constructor(
@@ -19,7 +30,11 @@ export class LocalSkillLibrary {
   ) {}
 
   list(): Effect.Effect<MarketplaceSkillDetail[], LocalSkillFailure> {
-    return Effect.gen({ self: this }, function* (): Effect.fn.Return<MarketplaceSkillDetail[], LocalSkillFailure> {
+    return this.listWithUnreadable().pipe(Effect.map(({ skills }) => skills));
+  }
+
+  listWithUnreadable(): Effect.Effect<LocalSkillListing, LocalSkillFailure> {
+    return Effect.gen({ self: this }, function* (): Effect.fn.Return<LocalSkillListing, LocalSkillFailure> {
       yield* localIO(() => mkdir(this.root, { recursive: true, mode: 0o700 }));
       const entries = yield* localIO(() => readdir(this.root, { withFileTypes: true }));
       const published = [];
@@ -28,11 +43,27 @@ export class LocalSkillLibrary {
         const revisions = yield* localIO(() => readdir(join(this.root, entry.name)));
         if (revisions.some((name) => /^[1-9]\d*$/u.test(name))) published.push(entry.name);
       }
-      const results = yield* Effect.forEach(published, (id) => this.get(id), { concurrency: "unbounded" });
-      // An older version took a skill with the name of an OpenBot skill. It can never install, so it stays hidden.
-      return results
-        .filter((skill) => !MANAGED_SKILL_SLUGS.has(skill.slug))
-        .sort((a, b) => a.name.localeCompare(b.name));
+      const results = yield* Effect.forEach(published, (id) => Effect.result(this.get(id)), {
+        concurrency: "unbounded",
+      });
+      const skills: MarketplaceSkillDetail[] = [];
+      const unreadable: UnreadableLocalSkill[] = [];
+      for (const [index, result] of results.entries()) {
+        if (Result.isSuccess(result)) {
+          skills.push(result.success);
+          continue;
+        }
+        const skillId = published[index] ?? "";
+        logger.warn(`OpenBot skipped local skill ${skillId}: its latest revision could not be read.`);
+        const cause = result.failure.cause;
+        unreadable.push({ skillId, error: cause instanceof Error ? cause.message : String(cause) });
+      }
+      return {
+        skills: skills
+          .filter((skill) => !MANAGED_SKILL_SLUGS.has(skill.slug))
+          .sort((a, b) => a.name.localeCompare(b.name)),
+        unreadable,
+      };
     });
   }
 
@@ -41,20 +72,37 @@ export class LocalSkillLibrary {
     return join(this.root, id);
   }
 
-  private revision(id: string, requested?: number): Effect.Effect<number, LocalSkillFailure> {
+  revision(id: string, requested?: number): Effect.Effect<number, LocalSkillFailure> {
     return Effect.gen({ self: this }, function* (): Effect.fn.Return<number, LocalSkillFailure> {
-      if (requested !== undefined) {
-        if (!Number.isSafeInteger(requested) || requested < 1)
-          return yield* new LocalSkillFailure({ cause: new Error("Invalid skill revision.") });
-        return requested;
-      }
-      const entries = yield* localIO(() => readdir(this.directory(id), { withFileTypes: true }));
-      const revisions = entries
-        .filter((entry) => entry.isDirectory() && /^[1-9]\d*$/u.test(entry.name))
-        .map((entry) => Number(entry.name));
+      if (requested !== undefined && (!Number.isSafeInteger(requested) || requested < 1))
+        return yield* new LocalSkillFailure({ cause: new Error("Invalid skill revision.") });
+      const revisions = yield* this.revisions(id);
       if (!revisions.length)
         return yield* new LocalSkillFailure({ cause: new Error(sourceText("error.skill.localNoRevisions")) });
-      return Math.max(...revisions);
+      const latest = Math.max(...revisions);
+      if (requested === undefined) return latest;
+      if (!revisions.includes(requested))
+        return yield* new LocalSkillFailure({
+          cause: new Error(
+            sourceText("error.skill.localRevisionNotFound", { revision: String(requested), latest: String(latest) }),
+          ),
+        });
+      return requested;
+    });
+  }
+
+  revisions(id: string): Effect.Effect<number[], LocalSkillFailure> {
+    return Effect.gen({ self: this }, function* (): Effect.fn.Return<number[], LocalSkillFailure> {
+      const listed = yield* Effect.result(localIO(() => readdir(this.directory(id), { withFileTypes: true })));
+      if (Result.isFailure(listed)) {
+        const error = listed.failure.cause;
+        if (isDynamicRecord(error) && error.code === "ENOENT")
+          return yield* new LocalSkillFailure({ cause: new Error(sourceText("error.skill.localNotFound")) });
+        return yield* listed.failure;
+      }
+      return listed.success
+        .filter((entry) => entry.isDirectory() && /^[1-9]\d*$/u.test(entry.name))
+        .map((entry) => Number(entry.name));
     });
   }
 
@@ -74,7 +122,7 @@ export class LocalSkillLibrary {
       const info = yield* localSync(() => inspectArchive(bytes));
       const files = yield* localSync(() => normalizedFiles(bytes));
       const text = new TextDecoder().decode(files["SKILL.md"]);
-      const match = text.match(/^---\s*\r?\n([\s\S]*?)\r?\n---(?:\r?\n|$)/u);
+      const match = text.match(SKILL_FRONTMATTER);
       const metadata = yield* localSync(() => parseYaml(match?.[1] ?? ""));
       const example =
         isDynamicRecord(metadata) && isString(metadata["example-prompt"]) ? metadata["example-prompt"].trim() : "";
@@ -104,19 +152,13 @@ export class LocalSkillLibrary {
   create(agentId: string, sourcePath: string): Effect.Effect<MarketplaceSkillDetail, LocalSkillFailure> {
     return this.serialize(
       Effect.gen({ self: this }, function* () {
-        const bytes = yield* this.sourceEffect(agentId, sourcePath);
-        const info = yield* localSync(() => inspectArchive(bytes));
-        if (MANAGED_SKILL_SLUGS.has(info.slug))
-          return yield* new LocalSkillFailure({
-            cause: new Error(sourceText("error.skill.managedSlug", { slug: info.slug })),
-          });
-        if ((yield* this.list()).some((skill) => skill.slug === info.slug))
-          return yield* new LocalSkillFailure({ cause: new Error(sourceText("error.skill.localNameTaken")) });
-        const id = `local-skill-${randomUUID()}`;
-        yield* this.publishEffect(id, 1, bytes);
-        return yield* this.get(id, 1);
+        return yield* this.publishNew(yield* this.sourceEffect(agentId, sourcePath));
       }),
     );
+  }
+
+  createFromBundle(bytes: Uint8Array): Effect.Effect<MarketplaceSkillDetail, LocalSkillFailure> {
+    return this.serialize(Effect.suspend(() => this.publishNew(bytes)));
   }
 
   revise(
@@ -127,21 +169,69 @@ export class LocalSkillLibrary {
   ): Effect.Effect<MarketplaceSkillDetail, LocalSkillFailure> {
     return this.serialize(
       Effect.gen({ self: this }, function* () {
-        const current = yield* this.get(id);
-        if (current.version !== expectedRevision)
-          return yield* new LocalSkillFailure({
-            cause: new Error("The skill changed. Read its latest revision before revising it."),
-          });
-        const bytes = yield* this.sourceEffect(agentId, sourcePath);
-        if ((yield* localSync(() => inspectArchive(bytes))).slug !== current.slug)
-          return yield* new LocalSkillFailure({ cause: new Error(sourceText("error.skill.localKeepName")) });
-        yield* this.publishEffect(id, expectedRevision + 1, bytes);
-        return yield* this.get(id, expectedRevision + 1);
+        const current = yield* this.currentAt(id, expectedRevision);
+        return yield* this.publishNext(current, yield* this.sourceEffect(agentId, sourcePath));
       }),
     );
   }
 
-  /** Removes a revision a failed import published. A skill left with no revision is removed too. */
+  reviseFromBundle(
+    id: string,
+    expectedRevision: number,
+    bytes: Uint8Array,
+  ): Effect.Effect<MarketplaceSkillDetail, LocalSkillFailure> {
+    return this.serialize(
+      Effect.gen({ self: this }, function* () {
+        return yield* this.publishNext(yield* this.currentAt(id, expectedRevision), bytes);
+      }),
+    );
+  }
+
+  private publishNew(bytes: Uint8Array): Effect.Effect<MarketplaceSkillDetail, LocalSkillFailure> {
+    return Effect.gen({ self: this }, function* () {
+      const info = yield* localSync(() => inspectArchive(bytes));
+      if (MANAGED_SKILL_SLUGS.has(info.slug))
+        return yield* new LocalSkillFailure({
+          cause: new Error(sourceText("error.skill.managedSlug", { slug: info.slug })),
+        });
+      const taken = (yield* this.list()).find((skill) => skill.slug === info.slug);
+      if (taken)
+        return yield* new LocalSkillFailure({
+          cause: new Error(
+            taken.name === info.name
+              ? sourceText("error.skill.localNameTaken")
+              : sourceText("error.skill.localNameClash", { name: taken.name, slug: info.slug }),
+          ),
+        });
+      const id = `local-skill-${randomUUID()}`;
+      yield* this.publishEffect(id, 1, bytes);
+      return yield* this.get(id, 1);
+    });
+  }
+
+  private currentAt(id: string, expectedRevision: number): Effect.Effect<MarketplaceSkillDetail, LocalSkillFailure> {
+    return Effect.gen({ self: this }, function* () {
+      const current = yield* this.get(id);
+      if (current.version !== expectedRevision)
+        return yield* new LocalSkillFailure({
+          cause: new Error("The skill changed. Read its latest revision before revising it."),
+        });
+      return current;
+    });
+  }
+
+  private publishNext(
+    current: MarketplaceSkillDetail,
+    bytes: Uint8Array,
+  ): Effect.Effect<MarketplaceSkillDetail, LocalSkillFailure> {
+    return Effect.gen({ self: this }, function* () {
+      if ((yield* localSync(() => inspectArchive(bytes))).slug !== current.slug)
+        return yield* new LocalSkillFailure({ cause: new Error(sourceText("error.skill.localKeepName")) });
+      yield* this.publishEffect(current.id, current.version + 1, bytes);
+      return yield* this.get(current.id, current.version + 1);
+    });
+  }
+
   withdraw(id: string, revision: number): Effect.Effect<void, LocalSkillFailure> {
     return this.serialize(
       Effect.gen({ self: this }, function* () {
@@ -175,9 +265,10 @@ export class LocalSkillLibrary {
         return yield* new LocalSkillFailure({ cause: new Error(sourceText("error.skill.localSourceNotFolder")) });
       if (!(yield* localIO(() => lstat(join(path, "SKILL.md")))).isFile())
         return yield* new LocalSkillFailure({ cause: new Error(sourceText("error.skill.localMissingSkillFile")) });
-      const bytes = yield* archiveDirectory(path).pipe(
+      const archived = yield* archiveDirectory(path).pipe(
         Effect.mapError(({ cause }) => new LocalSkillFailure({ cause })),
       );
+      const bytes = yield* localSync(() => withQuotedFrontmatter(archived));
       yield* localSync(() => inspectArchive(bytes));
       return bytes;
     });
@@ -209,10 +300,48 @@ export class LocalSkillLibrary {
   }
 }
 
+const TOP_LEVEL_VALUE = /^([A-Za-z][\w-]*):[ \t]+(\S.*)$/u;
+const NOT_PLAIN = /^["'|>[{&*!%@`#]/u;
+
+function parsesAsYaml(text: string): boolean {
+  try {
+    parseYaml(text);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+function withQuotedFrontmatter(bytes: Uint8Array): Uint8Array {
+  const { files, executable } = readSkillArchive(bytes);
+  const skillFile = files["SKILL.md"];
+  if (!skillFile) return bytes;
+  const quoted = quotedSkillMarkdown(skillFile);
+  return quoted ? zipSync(skillZippable({ ...files, "SKILL.md": quoted }, executable), { level: 6 }) : bytes;
+}
+
+export function quotedSkillMarkdown(skillFile: Uint8Array): Uint8Array | null {
+  const text = new TextDecoder("utf-8", { fatal: true }).decode(skillFile);
+  const match = SKILL_FRONTMATTER.exec(text);
+  const frontmatter = match?.[1];
+  if (!match || frontmatter === undefined || parsesAsYaml(frontmatter)) return null;
+  const quoted = frontmatter
+    .split("\n")
+    .map((line) => {
+      const value = TOP_LEVEL_VALUE.exec(line.trimEnd());
+      const key = value?.[1];
+      const plain = value?.[2];
+      if (key === undefined || plain === undefined || NOT_PLAIN.test(plain) || !/:(?:\s|$)/u.test(plain)) return line;
+      return `${key}: ${JSON.stringify(plain)}`;
+    })
+    .join("\n");
+  if (!parsesAsYaml(quoted)) return null;
+  const head = match[0].replace(frontmatter, () => quoted);
+  return new TextEncoder().encode(`${head}${text.slice(match[0].length)}`);
+}
+
 const rejectLinks = Effect.fn("LocalSkill.rejectLinks")(function* (root: string, path: string) {
   let current = root;
-  if ((yield* localIO(() => lstat(root))).isSymbolicLink())
-    return yield* new LocalSkillFailure({ cause: new Error(sourceText("error.skill.pathSymlink")) });
   for (const part of relative(root, path).split(sep).filter(Boolean)) {
     current = join(current, part);
     if ((yield* localIO(() => lstat(current))).isSymbolicLink())

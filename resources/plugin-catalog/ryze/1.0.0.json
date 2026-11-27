@@ -1,0 +1,36 @@
+{
+  "slug": "ryze",
+  "name": "Ryze AI",
+  "tagline": "Ad campaign analytics",
+  "description": "Ryze AI lets agents read and analyze Google Ads and Meta Ads campaign performance in the ad accounts that the signed-in user connects to Ryze AI.",
+  "category": "data-analytics",
+  "creatorName": "Ryze AI",
+  "iconUrl": "https://www.get-ryze.ai/favicon.ico",
+  "version": "1.0.0",
+  "prompts": [
+    {
+      "id": "prompt-cost-per-conversion",
+      "text": "Which Google Ads campaigns had the highest cost per conversion last week?"
+    },
+    { "id": "prompt-meta-roas", "text": "Compare Meta Ads spend and ROAS for the last 30 days." },
+    { "id": "prompt-low-performers", "text": "Which ad sets perform poorly enough that I should review them?" }
+  ],
+  "apps": [
+    {
+      "id": "app-ryze-mcp",
+      "name": "Ryze AI",
+      "description": "Google Ads and Meta Ads analytics, over Ryze AI's MCP server with browser sign-in.",
+      "iconUrl": "https://www.get-ryze.ai/favicon.ico",
+      "server": {
+        "name": "ryze",
+        "transport": "http",
+        "url": "https://connector.get-ryze.ai/mcp",
+        "auth": [{ "id": "ryze-oauth", "kind": "link", "label": "Sign in" }]
+      }
+    }
+  ],
+  "websiteUrl": "https://www.get-ryze.ai",
+  "privacyPolicyUrl": "https://www.get-ryze.ai/privacy",
+  "termsUrl": "https://www.get-ryze.ai/terms-of-use",
+  "skills": []
+}

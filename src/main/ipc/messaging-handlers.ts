@@ -1,7 +1,3 @@
-// The Slack workspaces, Discord guilds, Telegram chats and WhatsApp numbers where this computer's agents answer. Tokens
-// only travel towards the host; no result carries one. The `host*` endpoints do the same for a
-// joined server (`connectors-v1`, and `whatsapp-connector-v1` for WhatsApp).
-
 import {
   type AddMessagingOrchestratorResult,
   type ConnectorMessagingPlatform,
@@ -14,8 +10,17 @@ import {
   isDiscordAccess,
   isDiscordRoleList,
   isWhatsAppGroupList,
+  isWhatsAppReadOnlyList,
+  isWhatsAppStatusReactionsList,
+  isWhatsAppWorkingMessageList,
   messagingPage,
   type WhatsAppGroupList,
+  type WhatsAppReadOnlyList,
+  type WhatsAppStatusReactionsList,
+  type WhatsAppWorkingMessageList,
+  withWhatsAppReadOnly,
+  withWhatsAppStatusReactions,
+  withWhatsAppWorkingMessages,
 } from "@openbot/contracts/ipc";
 import { decodeRecord, nullableString } from "@openbot/contracts/ipc-decoding";
 import { CONNECTORS_CAPABILITY, CONNECTORS_ROUTES } from "@openbot/contracts/team-protocol/connectors-v1";
@@ -26,6 +31,18 @@ import {
   WHATSAPP_CONNECTOR_CAPABILITY,
   WHATSAPP_CONNECTOR_ROUTES,
 } from "@openbot/contracts/team-protocol/whatsapp-connector-v1";
+import {
+  WHATSAPP_READ_ONLY_CAPABILITY,
+  WHATSAPP_READ_ONLY_ROUTES,
+} from "@openbot/contracts/team-protocol/whatsapp-read-only-v1";
+import {
+  WHATSAPP_STATUS_REACTIONS_CAPABILITY,
+  WHATSAPP_STATUS_REACTIONS_ROUTES,
+} from "@openbot/contracts/team-protocol/whatsapp-status-reactions-v1";
+import {
+  WHATSAPP_WORKING_MESSAGE_CAPABILITY,
+  WHATSAPP_WORKING_MESSAGE_ROUTES,
+} from "@openbot/contracts/team-protocol/whatsapp-working-message-v1";
 import { sourceText } from "@openbot/i18n/source";
 import { Effect } from "effect";
 import { runCauseEffect } from "../../backend/effect-boundary";
@@ -50,6 +67,9 @@ import {
   parseSetDiscordAccessInput,
   parseSetMessagingEnabledInput,
   parseSetWhatsAppOwnNumberInput,
+  parseSetWhatsAppSenderReadOnlyInput,
+  parseSetWhatsAppStatusReactionsInput,
+  parseSetWhatsAppWorkingMessageInput,
   parseStartWhatsAppLinkInput,
   parseWhatsAppSenderInput,
 } from "./messaging-inputs";
@@ -85,6 +105,9 @@ interface MessagingIpcDependencies {
     | "removeWhatsAppSender"
     | "answerWhatsAppRequest"
     | "setWhatsAppOwnNumber"
+    | "setWhatsAppWorkingMessage"
+    | "setWhatsAppStatusReactions"
+    | "setWhatsAppSenderReadOnly"
   >;
   remoteServers: {
     supportsCapability(serverId: string, capability: TeamCurrentCapability): boolean;
@@ -96,11 +119,9 @@ interface MessagingIpcDependencies {
     ): Effect.Effect<T, RemoteWorkflowError>;
   };
   relayedInstalls: Pick<RelayedMessagingInstalls, "remember">;
-  /** Opens a joined server's connect page in this computer's browser. */
   openExternal: (url: string) => Promise<void>;
 }
 
-/** `url` is null when a reconnect needs no page. */
 const decodePage = (value: unknown): { url: string | null; nonce: string | null } => {
   const record = decodeRecord(value, "messaging page");
   return { url: nullableString(record, "url"), nonce: nullableString(record, "nonce") };
@@ -123,6 +144,18 @@ const decodeOrchestrator = (value: unknown): AddMessagingOrchestratorResult => {
   return value;
 };
 
+const decodeWhatsAppWorkingMessages = (value: unknown): WhatsAppWorkingMessageList => {
+  if (!isWhatsAppWorkingMessageList(value)) throw new Error("Invalid WhatsApp working message response.");
+  return value;
+};
+const decodeWhatsAppReadOnly = (value: unknown): WhatsAppReadOnlyList => {
+  if (!isWhatsAppReadOnlyList(value)) throw new Error("Invalid WhatsApp read-only response.");
+  return value;
+};
+const decodeWhatsAppStatusReactions = (value: unknown): WhatsAppStatusReactionsList => {
+  if (!isWhatsAppStatusReactionsList(value)) throw new Error("Invalid WhatsApp status reactions response.");
+  return value;
+};
 const decodeWhatsAppGroups = (value: unknown): WhatsAppGroupList => {
   if (!isWhatsAppGroupList(value)) throw new Error("Invalid WhatsApp groups response.");
   return value;
@@ -139,22 +172,16 @@ export function messagingIpcHandlers({
       throw new Error(sourceText("error.team.connectorsUnsupported"));
     return runCauseEffect(remoteServers.request(serverId, path, decoder, { method: "POST", body }));
   }
-  /** A `discord-access-v1` request to a joined server. An older host does not offer it. */
   function postAccess<T>(serverId: string, path: string, decoder: ResponseDecoder<T>, body: TeamProtocolV2Json) {
     if (!remoteServers.supportsCapability(serverId, DISCORD_ACCESS_CAPABILITY))
       throw new Error(sourceText("error.team.discordAccessUnsupported"));
     return runCauseEffect(remoteServers.request(serverId, path, decoder, { method: "POST", body }));
   }
-  /** A `whatsapp-connector-v1` request to a joined server. An older host does not offer it. */
   function postWhatsApp<T>(serverId: string, path: string, decoder: ResponseDecoder<T>, body: TeamProtocolV2Json = {}) {
     if (!remoteServers.supportsCapability(serverId, WHATSAPP_CONNECTOR_CAPABILITY))
       throw new Error(sourceText("error.team.connectorsUnsupported"));
     return runCauseEffect(remoteServers.request(serverId, path, decoder, { method: "POST", body }));
   }
-  /**
-   * Opens the page that a joined server named, when it is the platform's own page. A Slack or Discord
-   * install returns here, so main keeps its nonce to send the grant on to that server.
-   */
   async function open(
     serverId: string,
     platform: ConnectorMessagingPlatform,
@@ -261,6 +288,21 @@ export function messagingIpcHandlers({
       setWhatsAppOwnNumber: payloadHandler(parseSetWhatsAppOwnNumberInput, ({ workspaceId, ownNumber }) =>
         runCauseEffect(messaging.setWhatsAppOwnNumber(workspaceId, ownNumber)),
       ),
+      setWhatsAppWorkingMessage: payloadHandler(
+        parseSetWhatsAppWorkingMessageInput,
+        ({ workspaceId, workingMessage }) =>
+          runCauseEffect(messaging.setWhatsAppWorkingMessage(workspaceId, workingMessage)),
+      ),
+      setWhatsAppSenderReadOnly: payloadHandler(
+        parseSetWhatsAppSenderReadOnlyInput,
+        ({ workspaceId, senderId, readOnly }) =>
+          runCauseEffect(messaging.setWhatsAppSenderReadOnly(workspaceId, senderId, readOnly)),
+      ),
+      setWhatsAppStatusReactions: payloadHandler(
+        parseSetWhatsAppStatusReactionsInput,
+        ({ workspaceId, statusReactions }) =>
+          runCauseEffect(messaging.setWhatsAppStatusReactions(workspaceId, statusReactions)),
+      ),
       hostOverview: scopedHandler(parseHostMessagingPlatformInput, {
         local: ({ platform }) => overview(platform),
         remote: ({ platform }, serverId) =>
@@ -297,7 +339,6 @@ export function messagingIpcHandlers({
           await post(serverId, CONNECTORS_ROUTES.messagingDisconnect, decodeEmpty, { platform, workspaceId });
         },
       }),
-      // A Discord server that removed the bot installs it again, so the host can answer a page.
       hostReconnect: scopedHandler(parseHostMessagingWorkspaceInput, {
         local: ({ platform, workspaceId }) =>
           runCauseEffect(Effect.asVoid(messaging.reconnect(platform, workspaceId, true))),
@@ -315,7 +356,6 @@ export function messagingIpcHandlers({
           await post(serverId, CONNECTORS_ROUTES.messagingEnabled, decodeEmpty, { platform, workspaceId, enabled });
         },
       }),
-      // A joined server's orchestrator starts on the host's default provider and model.
       hostAddOrchestrator: scopedHandler(parseHostAddMessagingOrchestratorInput, {
         local: ({ platform, workspaceId }) =>
           runCauseEffect(
@@ -346,7 +386,24 @@ export function messagingIpcHandlers({
       }),
       hostGetWhatsAppOverview: scopedQueryHandler({
         local: () => messaging.whatsappOverview(),
-        remote: (serverId) => postWhatsApp(serverId, WHATSAPP_CONNECTOR_ROUTES.overview, decodeHostWhatsAppOverview),
+        remote: async (serverId) => {
+          const [overview, workingMessages, statusReactions, readOnly] = await Promise.all([
+            postWhatsApp(serverId, WHATSAPP_CONNECTOR_ROUTES.overview, decodeHostWhatsAppOverview),
+            remoteServers.supportsCapability(serverId, WHATSAPP_WORKING_MESSAGE_CAPABILITY)
+              ? postWhatsApp(serverId, WHATSAPP_WORKING_MESSAGE_ROUTES.list, decodeWhatsAppWorkingMessages)
+              : null,
+            remoteServers.supportsCapability(serverId, WHATSAPP_STATUS_REACTIONS_CAPABILITY)
+              ? postWhatsApp(serverId, WHATSAPP_STATUS_REACTIONS_ROUTES.list, decodeWhatsAppStatusReactions)
+              : null,
+            remoteServers.supportsCapability(serverId, WHATSAPP_READ_ONLY_CAPABILITY)
+              ? postWhatsApp(serverId, WHATSAPP_READ_ONLY_ROUTES.list, decodeWhatsAppReadOnly)
+              : null,
+          ]);
+          return withWhatsAppReadOnly(
+            withWhatsAppStatusReactions(withWhatsAppWorkingMessages(overview, workingMessages), statusReactions),
+            readOnly,
+          );
+        },
       }),
       hostStartWhatsAppLink: scopedHandler(parseStartWhatsAppLinkInput, {
         local: (input) => runCauseEffect(messaging.startWhatsAppLink(input)),
@@ -381,7 +438,6 @@ export function messagingIpcHandlers({
           await postWhatsApp(serverId, WHATSAPP_CONNECTOR_ROUTES.enabled, decodeEmpty, { workspaceId, enabled });
         },
       }),
-      // A joined server's orchestrator starts on the host's default provider and model.
       hostAddWhatsAppOrchestrator: scopedQueryHandler({
         local: () => runCauseEffect(messaging.addWhatsAppOrchestrator({})),
         remote: (serverId) => postWhatsApp(serverId, WHATSAPP_CONNECTOR_ROUTES.orchestrator, decodeOrchestrator),
@@ -421,6 +477,43 @@ export function messagingIpcHandlers({
         local: ({ workspaceId, ownNumber }) => runCauseEffect(messaging.setWhatsAppOwnNumber(workspaceId, ownNumber)),
         remote: async ({ workspaceId, ownNumber }, serverId) => {
           await postWhatsApp(serverId, WHATSAPP_CONNECTOR_ROUTES.ownNumber, decodeEmpty, { workspaceId, ownNumber });
+        },
+      }),
+      hostSetWhatsAppWorkingMessage: scopedHandler(parseSetWhatsAppWorkingMessageInput, {
+        local: ({ workspaceId, workingMessage }) =>
+          runCauseEffect(messaging.setWhatsAppWorkingMessage(workspaceId, workingMessage)),
+        remote: async ({ workspaceId, workingMessage }, serverId) => {
+          if (!remoteServers.supportsCapability(serverId, WHATSAPP_WORKING_MESSAGE_CAPABILITY))
+            throw new Error(sourceText("error.team.connectorsUnsupported"));
+          await postWhatsApp(serverId, WHATSAPP_WORKING_MESSAGE_ROUTES.update, decodeEmpty, {
+            workspaceId,
+            workingMessage,
+          });
+        },
+      }),
+      hostSetWhatsAppStatusReactions: scopedHandler(parseSetWhatsAppStatusReactionsInput, {
+        local: ({ workspaceId, statusReactions }) =>
+          runCauseEffect(messaging.setWhatsAppStatusReactions(workspaceId, statusReactions)),
+        remote: async ({ workspaceId, statusReactions }, serverId) => {
+          if (!remoteServers.supportsCapability(serverId, WHATSAPP_STATUS_REACTIONS_CAPABILITY))
+            throw new Error(sourceText("error.team.connectorsUnsupported"));
+          await postWhatsApp(serverId, WHATSAPP_STATUS_REACTIONS_ROUTES.update, decodeEmpty, {
+            workspaceId,
+            statusReactions,
+          });
+        },
+      }),
+      hostSetWhatsAppSenderReadOnly: scopedHandler(parseSetWhatsAppSenderReadOnlyInput, {
+        local: ({ workspaceId, senderId, readOnly }) =>
+          runCauseEffect(messaging.setWhatsAppSenderReadOnly(workspaceId, senderId, readOnly)),
+        remote: async ({ workspaceId, senderId, readOnly }, serverId) => {
+          if (!remoteServers.supportsCapability(serverId, WHATSAPP_READ_ONLY_CAPABILITY))
+            throw new Error(sourceText("error.team.connectorsUnsupported"));
+          await postWhatsApp(serverId, WHATSAPP_READ_ONLY_ROUTES.update, decodeEmpty, {
+            workspaceId,
+            senderId,
+            readOnly,
+          });
         },
       }),
     },

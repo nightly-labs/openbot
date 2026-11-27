@@ -1,17 +1,41 @@
-// The embedded browser and its picture-in-picture window.
-
-import { type BrowserDisplayState, type BrowserTab, LOCAL_SERVER_ID } from "@openbot/contracts/ipc";
+import {
+  type BrowserDisplayState,
+  type BrowserTab,
+  type BrowserTeachStep,
+  LOCAL_SERVER_ID,
+} from "@openbot/contracts/ipc";
 import { TEAM_API_ROUTES } from "@openbot/contracts/team-api-routes";
+import {
+  BROWSER_HTTP_SIGN_IN_CAPABILITY,
+  BROWSER_HTTP_SIGN_IN_ROUTES,
+  decodeBrowserHttpSignInSnapshot,
+} from "@openbot/contracts/team-protocol/browser-http-sign-in-v1";
 import {
   BROWSER_PAGE_STATE_CAPABILITY,
   BROWSER_PAGE_STATE_ROUTES,
   decodeBrowserPageStateSnapshot,
 } from "@openbot/contracts/team-protocol/browser-page-state-v1";
 import {
+  BROWSER_PERMISSIONS_CAPABILITY,
+  BROWSER_PERMISSIONS_ROUTES,
+  decodeBrowserPermissionAnswer,
+  decodeBrowserPermissionsSnapshot,
+} from "@openbot/contracts/team-protocol/browser-permissions-v1";
+import {
+  BROWSER_SIGN_IN_STORAGE_CAPABILITY,
+  BROWSER_SIGN_IN_STORAGE_ROUTES,
+  decodeBrowserSignInStorageResult,
+} from "@openbot/contracts/team-protocol/browser-sign-in-storage-v1";
+import {
   BROWSER_SIGN_IN_CAPABILITY,
   BROWSER_SIGN_IN_ROUTES,
   decodeBrowserSignInResult,
 } from "@openbot/contracts/team-protocol/browser-sign-in-v1";
+import {
+  BROWSER_TEACH_CAPABILITY,
+  BROWSER_TEACH_ROUTES,
+  decodeBrowserTeachSteps,
+} from "@openbot/contracts/team-protocol/browser-teach-v1";
 import {
   BROWSER_USER_CONTROL_CAPABILITY,
   BROWSER_USER_CONTROL_ROUTES,
@@ -24,12 +48,13 @@ import {
 } from "@openbot/contracts/team-protocol/browser-view-v1";
 import { TEAM_BROWSER_NAVIGATION_CAPABILITY } from "@openbot/contracts/team-protocol/current";
 import { sourceText } from "@openbot/i18n/source";
-import type { WebContents } from "electron";
+import type { IpcMainInvokeEvent, WebContents } from "electron";
 import type { BrowserHost } from "../../backend/browser-host";
 import { runCauseEffect } from "../../backend/effect-boundary";
 import type { BrowserPictureInPicture } from "../browser-picture-in-picture";
 import { isBrowserSignedInPage } from "../browser-sign-in-page";
 import type { BrowserViewClient } from "../browser-view-client";
+import type { DetachedBrowserWindow } from "../detached-browser-window";
 import type { LocalSignInWindows } from "../local-sign-in-window";
 import {
   decodeBrowserControlState,
@@ -38,26 +63,45 @@ import {
   decodeBrowserTab,
   decodeBrowserTabs,
 } from "../remote-device-decoding";
-import { decodeVoid } from "../remote-host-decoding";
+import { acceptEmpty, decodeVoid } from "../remote-host-decoding";
 import type { RemoteServerManager } from "../remote-server-manager";
 import {
   parseBrowserBounds,
   parseBrowserNavigate,
   parseBrowserOpen,
+  parseBrowserTeachStop,
+  parseBrowserWindowAction,
+  parseBrowserWindowModel,
+  parseHttpSignInAnswer,
   parseLocalSignIn,
   parseLocalSignInFinish,
   parseVisibility,
 } from "./browser-inputs";
-import { eventHandler, eventPayloadHandler, handler, type IpcGroupHandlers, payloadHandler } from "./define-ipc-group";
+import {
+  authorizedHandler,
+  eventHandler,
+  eventPayloadHandler,
+  handler,
+  type IpcGroupHandlers,
+  payloadHandler,
+} from "./define-ipc-group";
 import { routeToServer } from "./route-to-server";
 import { optionalPayload, stringPayload } from "./validation";
 
-/**
- * Only the members these endpoints reach. Each host is an Electron-bound class that cannot be
- * constructed outside a running app, so the narrow shapes are what a test can stand in for.
- */
 export interface BrowserIpcDependencies {
   browserPictureInPicture: Pick<BrowserPictureInPicture, "open" | "close" | "dock" | "hide">;
+  detachedBrowserWindow: Pick<
+    DetachedBrowserWindow,
+    | "open"
+    | "close"
+    | "focus"
+    | "dock"
+    | "publishModel"
+    | "model"
+    | "sendAction"
+    | "requireMainRenderer"
+    | "requireWindowRenderer"
+  >;
   browser: Pick<
     BrowserHost,
     | "open"
@@ -66,14 +110,18 @@ export interface BrowserIpcDependencies {
     | "navigate"
     | "reload"
     | "stop"
+    | "answerPermission"
     | "close"
     | "takeUserControl"
     | "releaseUserControl"
+    | "startTeach"
+    | "stopTeach"
     | "listTabs"
     | "getDisplayState"
     | "getControlState"
     | "capturePreview"
     | "setVisible"
+    | "answerHttpSignIn"
   >;
   remoteServers: Pick<RemoteServerManager, "activeServerId" | "supportsCapability" | "request">;
   browserView: Pick<BrowserViewClient, "start" | "stop" | "sendInput">;
@@ -82,22 +130,24 @@ export interface BrowserIpcDependencies {
 
 export function browserIpcHandlers({
   browserPictureInPicture,
+  detachedBrowserWindow,
   browser,
   remoteServers,
   browserView,
   localSignIn,
 }: BrowserIpcDependencies): Pick<IpcGroupHandlers, "browser" | "browserInput"> {
-  // A window that closes cannot stop its live view any more, so the view stops when the window goes.
+  const fromMainRenderer = (event: IpcMainInvokeEvent) => detachedBrowserWindow.requireMainRenderer(event.sender.id);
+  const fromBrowserWindow = (event: IpcMainInvokeEvent) => detachedBrowserWindow.requireWindowRenderer(event.sender.id);
   const liveViewOwners = new WeakSet<WebContents>();
   const watchLiveViewOwner = (owner: WebContents) => {
     if (liveViewOwners.has(owner)) return;
     liveViewOwners.add(owner);
     owner.once("destroyed", () => void runCauseEffect(browserView.stop(owner.id)).catch(() => undefined));
   };
-  // The frozen tab list has no field for a person's control or the history state, so a host that
-  // can tell answers on its own routes, and its list marks the tabs here.
-  const withUserControl = async (serverId: string, tabs: BrowserTab[]): Promise<BrowserTab[]> => {
-    if (!remoteServers.supportsCapability(serverId, BROWSER_USER_CONTROL_CAPABILITY)) return tabs;
+  type TabUpdate = (tab: BrowserTab) => BrowserTab;
+  const keepTab: TabUpdate = (tab) => tab;
+  const userControlUpdate = async (serverId: string): Promise<TabUpdate> => {
+    if (!remoteServers.supportsCapability(serverId, BROWSER_USER_CONTROL_CAPABILITY)) return keepTab;
     const { tabIds } = await runCauseEffect(
       remoteServers.request(serverId, BROWSER_USER_CONTROL_ROUTES.state, decodeBrowserUserControlSnapshot, {
         method: "POST",
@@ -105,10 +155,10 @@ export function browserIpcHandlers({
       }),
     );
     const held = new Set(tabIds);
-    return tabs.map((tab) => (held.has(tab.id) ? { ...tab, userControl: true } : tab));
+    return (tab) => (held.has(tab.id) ? { ...tab, userControl: true } : tab);
   };
-  const withPageState = async (serverId: string, tabs: BrowserTab[]): Promise<BrowserTab[]> => {
-    if (!remoteServers.supportsCapability(serverId, BROWSER_PAGE_STATE_CAPABILITY)) return tabs;
+  const pageStateUpdate = async (serverId: string): Promise<TabUpdate> => {
+    if (!remoteServers.supportsCapability(serverId, BROWSER_PAGE_STATE_CAPABILITY)) return keepTab;
     const snapshot = await runCauseEffect(
       remoteServers.request(serverId, BROWSER_PAGE_STATE_ROUTES.state, decodeBrowserPageStateSnapshot, {
         method: "POST",
@@ -116,19 +166,68 @@ export function browserIpcHandlers({
       }),
     );
     const states = new Map(snapshot.tabs.map((state) => [state.tabId, state]));
-    return tabs.map((tab) => {
+    return (tab) => {
       const state = states.get(tab.id);
       return state ? { ...tab, canGoBack: state.canGoBack, canGoForward: state.canGoForward } : tab;
-    });
+    };
   };
-  const withTabState = async (serverId: string, tabs: BrowserTab[]): Promise<BrowserTab[]> =>
-    withPageState(serverId, await withUserControl(serverId, tabs));
+  const permissionsUpdate = async (serverId: string): Promise<TabUpdate> => {
+    if (!remoteServers.supportsCapability(serverId, BROWSER_PERMISSIONS_CAPABILITY)) return keepTab;
+    const snapshot = await runCauseEffect(
+      remoteServers.request(serverId, BROWSER_PERMISSIONS_ROUTES.state, decodeBrowserPermissionsSnapshot, {
+        method: "POST",
+        body: {},
+      }),
+    );
+    const requests = new Map(snapshot.requests.map((request) => [request.tabId, request]));
+    return (tab) => {
+      const request = requests.get(tab.id);
+      return request
+        ? { ...tab, permissionRequest: { id: request.id, origin: request.origin, permission: request.permission } }
+        : tab;
+    };
+  };
+  const httpSignInUpdate = async (serverId: string): Promise<TabUpdate> => {
+    if (!remoteServers.supportsCapability(serverId, BROWSER_HTTP_SIGN_IN_CAPABILITY)) return keepTab;
+    const snapshot = await runCauseEffect(
+      remoteServers.request(serverId, BROWSER_HTTP_SIGN_IN_ROUTES.state, decodeBrowserHttpSignInSnapshot, {
+        method: "POST",
+        body: {},
+      }),
+    );
+    const prompts = new Map(snapshot.tabs.map((prompt) => [prompt.tabId, prompt]));
+    return (tab) => {
+      const prompt = prompts.get(tab.id);
+      return prompt
+        ? { ...tab, httpSignIn: { origin: prompt.origin, ...(prompt.refused ? { refused: true } : {}) } }
+        : tab;
+    };
+  };
+  const withTabState = async (serverId: string, tabs: BrowserTab[]): Promise<BrowserTab[]> => {
+    const updates = await Promise.all([
+      userControlUpdate(serverId),
+      pageStateUpdate(serverId),
+      permissionsUpdate(serverId),
+      httpSignInUpdate(serverId),
+    ]);
+    return tabs.map((tab) => updates.reduce((updated, update) => update(updated), tab));
+  };
   const userControlRequest = async (serverId: string, route: string, tabId: string): Promise<void> => {
     if (!remoteServers.supportsCapability(serverId, BROWSER_USER_CONTROL_CAPABILITY))
       throw new Error(sourceText("error.backend.browserUserControlUnsupported"));
     await runCauseEffect(
       remoteServers.request(serverId, route, decodeBrowserUserControlSnapshot, { method: "POST", body: { tabId } }),
     );
+  };
+  const teachRequest = async <Result>(
+    serverId: string,
+    route: string,
+    decode: (value: unknown) => Result,
+    body: { tabId: string; save?: boolean },
+  ): Promise<Result> => {
+    if (!remoteServers.supportsCapability(serverId, BROWSER_TEACH_CAPABILITY))
+      throw new Error(sourceText("error.backend.browserTeachUnsupported"));
+    return runCauseEffect(remoteServers.request(serverId, route, decode, { method: "POST", body }));
   };
   return {
     browser: {
@@ -174,8 +273,6 @@ export function browserIpcHandlers({
                 }),
               );
             }
-            // An older host has no route that moves an existing tab to an address. The renderer
-            // opens a new tab for it instead, so this stays the error that tells it to.
             if (!remoteServers.supportsCapability(serverId, TEAM_BROWSER_NAVIGATION_CAPABILITY)) {
               throw new Error(sourceText("error.backend.browserNavigateUnsupported"));
             }
@@ -227,7 +324,36 @@ export function browserIpcHandlers({
           },
         }),
       ),
-      // A sign-in on this computer for a tab of the active remote server. The local browser needs none.
+      answerPermission: payloadHandler(decodeBrowserPermissionAnswer, (answer) =>
+        routeToServer(remoteServers.activeServerId, {
+          local: () => runCauseEffect(browser.answerPermission(answer)),
+          remote: async (serverId) => {
+            if (!remoteServers.supportsCapability(serverId, BROWSER_PERMISSIONS_CAPABILITY))
+              throw new Error(sourceText("error.backend.browserPermissionsUnsupported"));
+            await runCauseEffect(
+              remoteServers.request(serverId, BROWSER_PERMISSIONS_ROUTES.answer, decodeBrowserPermissionsSnapshot, {
+                method: "POST",
+                body: answer,
+              }),
+            );
+          },
+        }),
+      ),
+      answerHttpSignIn: payloadHandler(parseHttpSignInAnswer, (answer) =>
+        routeToServer(remoteServers.activeServerId, {
+          local: () => runCauseEffect(browser.answerHttpSignIn(answer)),
+          remote: async (serverId) => {
+            if (!remoteServers.supportsCapability(serverId, BROWSER_HTTP_SIGN_IN_CAPABILITY))
+              throw new Error(sourceText("error.backend.browserHttpSignInUnsupported"));
+            await runCauseEffect(
+              remoteServers.request(serverId, BROWSER_HTTP_SIGN_IN_ROUTES.answer, decodeBrowserHttpSignInSnapshot, {
+                method: "POST",
+                body: answer,
+              }),
+            );
+          },
+        }),
+      ),
       openLocalSignIn: payloadHandler(parseLocalSignIn, ({ tabId, url }) =>
         routeToServer(remoteServers.activeServerId, {
           local: () => {
@@ -242,11 +368,6 @@ export function browserIpcHandlers({
           },
         }),
       ),
-      // A failed send keeps the sign-in, so Done can try again. No sign-in found also keeps it, so the
-      // person can finish it in the window. A checked send also keeps it while the server tab shows a
-      // sign-in step; the host answers after the tab loaded again, so the tab list shows the result.
-      // Some sites show their sign-in page again after the reload, so the tab first opens the page
-      // that the window shows after the sign-in.
       finishLocalSignIn: payloadHandler(parseLocalSignInFinish, async ({ send, check }) => {
         const target = localSignIn.target();
         if (!send || !target) {
@@ -254,14 +375,25 @@ export function browserIpcHandlers({
           return null;
         }
         const cookies = await runCauseEffect(localSignIn.collect());
-        if (cookies.length === 0) return { cookies: 0, signedIn: false };
-        const result = await runCauseEffect(
-          remoteServers.request(target.serverId, BROWSER_SIGN_IN_ROUTES.import, decodeBrowserSignInResult, {
-            method: "POST",
-            body: { tabId: target.tabId, cookies },
-          }),
-        );
-        if (result.cookies === 0) return { cookies: 0, signedIn: false };
+        const withStorage = remoteServers.supportsCapability(target.serverId, BROWSER_SIGN_IN_STORAGE_CAPABILITY);
+        const storage = withStorage ? await runCauseEffect(localSignIn.collectStorage()) : null;
+        if (cookies.length === 0 && !storage?.entries.length) return { cookies: 0, signedIn: false };
+        const set = withStorage
+          ? await runCauseEffect(
+              remoteServers.request(
+                target.serverId,
+                BROWSER_SIGN_IN_STORAGE_ROUTES.import,
+                decodeBrowserSignInStorageResult,
+                { method: "POST", body: { tabId: target.tabId, cookies, storage } },
+              ),
+            ).then((result) => result.cookies + result.storage)
+          : await runCauseEffect(
+              remoteServers.request(target.serverId, BROWSER_SIGN_IN_ROUTES.import, decodeBrowserSignInResult, {
+                method: "POST",
+                body: { tabId: target.tabId, cookies },
+              }),
+            ).then((result) => result.cookies);
+        if (set === 0) return { cookies: 0, signedIn: false };
         if (check) {
           const signedIn = async () => {
             const tabs = await runCauseEffect(
@@ -286,10 +418,10 @@ export function browserIpcHandlers({
             );
             done = await signedIn();
           }
-          if (!done) return { cookies: result.cookies, signedIn: false };
+          if (!done) return { cookies: set, signedIn: false };
         }
         await runCauseEffect(localSignIn.discard());
-        return { cookies: result.cookies, signedIn: true };
+        return { cookies: set, signedIn: true };
       }),
       takeControl: payloadHandler(stringPayload("tabId"), (tabId) =>
         routeToServer(remoteServers.activeServerId, {
@@ -301,6 +433,18 @@ export function browserIpcHandlers({
         routeToServer(remoteServers.activeServerId, {
           local: () => browser.releaseUserControl(tabId),
           remote: (serverId) => userControlRequest(serverId, BROWSER_USER_CONTROL_ROUTES.release, tabId),
+        }),
+      ),
+      startTeach: payloadHandler(stringPayload("tabId"), (tabId) =>
+        routeToServer(remoteServers.activeServerId, {
+          local: () => runCauseEffect(browser.startTeach(tabId, { kind: "local" })),
+          remote: (serverId) => teachRequest(serverId, BROWSER_TEACH_ROUTES.start, acceptEmpty, { tabId }),
+        }),
+      ),
+      stopTeach: payloadHandler(parseBrowserTeachStop, (input) =>
+        routeToServer<BrowserTeachStep[]>(remoteServers.activeServerId, {
+          local: () => browser.stopTeach(input.tabId, { kind: "local" }, input.save),
+          remote: (serverId) => teachRequest(serverId, BROWSER_TEACH_ROUTES.stop, decodeBrowserTeachSteps, input),
         }),
       ),
       listTabs: handler(() =>
@@ -317,8 +461,6 @@ export function browserIpcHandlers({
         routeToServer<BrowserDisplayState>(remoteServers.activeServerId, {
           local: () => browser.getDisplayState(),
           remote: async (serverId) => {
-            // Without the capability the host can only list tabs, and nothing on that list says
-            // which one is in front. The first tab is the guess this route exists to replace.
             if (!remoteServers.supportsCapability(serverId, TEAM_BROWSER_NAVIGATION_CAPABILITY)) {
               const tabs = await runCauseEffect(
                 remoteServers.request(serverId, TEAM_API_ROUTES.browser.tabs, decodeBrowserTabs),
@@ -351,24 +493,17 @@ export function browserIpcHandlers({
             ),
         }),
       ),
-      // Visibility is a local placement, not a remote operation, so a host's tab is left alone. The
-      // bounds are this window's CSS rectangle, and the host's browser is a native view on the
-      // host's own screen: forwarding them mounted a page over whoever is sitting at that computer,
-      // at coordinates that mean nothing there, and still showed the remote user nothing.
-      // `/v1/browser/visible` stays served for the clients that already send it.
       setVisible: payloadHandler(parseVisibility, async (parsed) => {
         if (remoteServers.activeServerId === LOCAL_SERVER_ID) await runCauseEffect(browser.setVisible(parsed));
       }),
-      // A local tab is a native view on this screen already; only a host's tab needs its pixels sent.
-      // The window that asks owns the view: the main window and Picture in Picture can both show one.
       startLiveView: eventPayloadHandler(stringPayload("tabId"), (event, tabId) => {
         watchLiveViewOwner(event.sender);
         return runCauseEffect(browserView.start(tabId, event.sender.id));
       }),
       stopLiveView: eventHandler((event) => runCauseEffect(browserView.stop(event.sender.id))),
-      // A host's tab is not a native view on this screen, so the window draws it from the live view.
-      openPictureInPicture: payloadHandler(optionalPayload(parseBrowserBounds), (bounds) =>
-        routeToServer(remoteServers.activeServerId, {
+      openPictureInPicture: payloadHandler(optionalPayload(parseBrowserBounds), (bounds) => {
+        detachedBrowserWindow.close();
+        return routeToServer(remoteServers.activeServerId, {
           local: () => runCauseEffect(browserPictureInPicture.open(bounds)),
           remote: (serverId) =>
             runCauseEffect(
@@ -379,16 +514,27 @@ export function browserIpcHandlers({
                   : undefined,
               ),
             ),
-        }),
-      ),
+        });
+      }),
       closePictureInPicture: handler(() => browserPictureInPicture.close()),
       dockPictureInPicture: handler(() => browserPictureInPicture.dock()),
       hidePictureInPicture: handler(() => browserPictureInPicture.hide()),
+      openWindow: payloadHandler(optionalPayload(parseBrowserBounds), (bounds) => {
+        browserPictureInPicture.close();
+        return runCauseEffect(detachedBrowserWindow.open(bounds));
+      }),
+      closeWindow: handler(() => detachedBrowserWindow.close()),
+      focusWindow: handler(() => detachedBrowserWindow.focus()),
+      dockWindow: eventHandler((event) => detachedBrowserWindow.dock(event.sender.id)),
+      publishWindowModel: authorizedHandler(fromMainRenderer, parseBrowserWindowModel, (_event, model) =>
+        detachedBrowserWindow.publishModel(model),
+      ),
+      getWindowModel: eventHandler((event) => detachedBrowserWindow.model(event.sender.id)),
+      sendWindowAction: authorizedHandler(fromBrowserWindow, parseBrowserWindowAction, (_event, action) =>
+        detachedBrowserWindow.sendAction(action),
+      ),
     },
     browserInput: {
-      // The protocol's own decoder is the boundary check: what the renderer sends is dispatched on a
-      // host that never sees this process, so it passes the same reading the host applies to any
-      // other member's input, and reaches the socket without a second one.
       sendLiveViewInput: payloadHandler(decodeBrowserViewInputValue, async (input) => browserView.sendInput(input)),
     },
   };

@@ -1,9 +1,4 @@
-/*
- * A channel page as the data of the conversation view: its rows, the agents that work, the work that
- * stopped, and the requests that wait for the reader. Each one is a function of the page, so the
- * desktop and the browser client build the same view from it.
- */
-
+import { coordinatorText } from "@openbot/contracts/coordinator-text";
 import {
   type AgentApproval,
   type BrowserTakeoverRequest,
@@ -12,23 +7,17 @@ import {
   type ChannelTask,
   type ChannelThread,
   type ConversationQuestionPrompt,
+  channelRoutineRequest,
   channelRoutingConversationEvent,
 } from "@openbot/contracts/ipc";
 import type { AgentMessage, AgentProfile } from "@openbot/ui/data";
 import type { ChannelWorker } from "@openbot/ui/features/channels/ChannelActivityIndicator";
 import { toAgentMessage, toAgentMessages } from "../../app-message-projection";
 
-/** A row with no text, no attachment and no question has nothing to draw. */
 export function channelMessageHasContent(entry: ChannelMessage): boolean {
   return Boolean(entry.message.text.trim() || entry.message.attachments?.length || entry.message.questionPrompt);
 }
 
-/**
- * One channel message as a row of the conversation view. A person's message is a `you` row with its
- * sender, so the view puts the reader's own on the right and names the other people. An agent's or
- * the coordinator's message names its author by `senderAgentId`. A routing receipt is an activity
- * row, like the "Messaged" marker of an agent chat: it has no bubble and does not count as new.
- */
 function channelConversationMessage(entry: ChannelMessage): AgentMessage {
   const member = entry.author.kind === "member";
   const row = toAgentMessage(entry.message, member ? undefined : entry.author.id);
@@ -38,41 +27,79 @@ function channelConversationMessage(entry: ChannelMessage): AgentMessage {
       ...row,
       id: entry.id,
       kind: "action-marker",
-      actionMarker: { ...routing, kind: "channel-routing", timestamp: entry.message.createdAt },
+      actionMarker: {
+        kind: "channel-routing",
+        action: routing.action,
+        agentIds: [routing.agentId],
+        timestamp: entry.message.createdAt,
+      },
     };
   if (member)
     return { ...row, id: entry.id, author: "you", senderMember: { id: entry.author.id, name: entry.author.name } };
   return { ...row, id: entry.id, author: "agent", senderAgentId: entry.author.id };
 }
 
-/** The thinking and the narration of a turn, which fold into the steps above its answer. */
 function foldedEntry(entry: ChannelMessage): boolean {
   return entry.message.author === "assistant" && entry.message.itemType === "commentary";
 }
 
-/**
- * The rows of a channel page. The thinking and narration of a member's turn fold into one thinking
- * row, as in an agent chat, and show as the steps above the member's answer. Before, each part showed
- * as a message, and a model that streams its whole reasoning (DeepSeek through OpenCode) showed a
- * very long one.
- */
-export function channelConversationRows(entries: readonly ChannelMessage[]): AgentMessage[] {
-  return toAgentMessages(
+function channelRoutineRow(row: AgentMessage, entry: ChannelMessage, tasks: readonly ChannelTask[]): AgentMessage {
+  const run = channelRoutineRequest(entry, tasks);
+  if (!run) return row;
+  return {
+    ...row,
+    kind: "action-marker",
+    actionMarker: { kind: "routine-run", sourceAgentId: null, ...run, timestamp: entry.message.createdAt },
+  };
+}
+
+function localizedCoordinatorEntry(entry: ChannelMessage, localize: (text: string) => string): ChannelMessage {
+  const text = coordinatorText(entry.author, entry.message.text, localize);
+  return text === entry.message.text ? entry : { ...entry, message: { ...entry.message, text } };
+}
+
+export function channelConversationRows(
+  sourceEntries: readonly ChannelMessage[],
+  tasks: readonly ChannelTask[],
+  localize: (text: string) => string,
+): AgentMessage[] {
+  const entries = sourceEntries.map((entry) => localizedCoordinatorEntry(entry, localize));
+  const rows = toAgentMessages(
     entries.map((entry) => ({ ...entry.message, id: entry.id })),
     undefined,
     (message, index) => {
       const entry = entries[index];
-      return entry ? channelConversationMessage(entry) : toAgentMessage(message);
+      return entry ? channelRoutineRow(channelConversationMessage(entry), entry, tasks) : toAgentMessage(message);
     },
+  );
+  const turnAuthors = new Map<string, string>();
+  for (const entry of entries)
+    if (entry.message.turnId && foldedEntry(entry) && entry.author.kind !== "member")
+      turnAuthors.set(entry.message.turnId, entry.author.id);
+  return joinRoutingRows(
+    rows.map((row) => {
+      const author = row.kind === "thinking" && row.turnId ? turnAuthors.get(row.turnId) : undefined;
+      return author ? { ...row, senderAgentId: author } : row;
+    }),
   );
 }
 
-/**
- * The turns whose steps show under the activity line: the newest thinking turn of each member whose
- * task runs. A stop or a resume keeps the task id, so a turn whose task this view saw stop goes into
- * `stopped` and does not show again when the task starts a new turn. The set keeps only the turns of
- * the page.
- */
+function joinRoutingRows(rows: AgentMessage[]): AgentMessage[] {
+  const joined: AgentMessage[] = [];
+  for (const row of rows) {
+    const marker = row.actionMarker?.kind === "channel-routing" ? row.actionMarker : undefined;
+    const previous = joined.at(-1);
+    const open = previous?.actionMarker?.kind === "channel-routing" ? previous.actionMarker : undefined;
+    if (!marker || !previous || !open || open.action !== marker.action) {
+      joined.push(row);
+      continue;
+    }
+    const agentIds = [...open.agentIds, ...marker.agentIds.filter((id) => !open.agentIds.includes(id))];
+    joined[joined.length - 1] = { ...previous, actionMarker: { ...open, agentIds, timestamp: marker.timestamp } };
+  }
+  return joined;
+}
+
 export function channelWorkingTurns(page: ChannelPage, stopped: Set<string>): string[] {
   const tasks = new Map(page.tasks.map((task) => [task.id, task] as const));
   const turns = new Set<string>();
@@ -89,15 +116,6 @@ export function channelWorkingTurns(page: ChannelPage, stopped: Set<string>): st
   return [...newest.values()];
 }
 
-/**
- * The row the unread divider stands on, or `null` when the reader has seen everything.
- *
- * The count comes from the channel list, and it leaves out what the reader wrote, activity rows,
- * plans, subagents and the folded thinking, so the walk back leaves them out too. The page has no
- * read pointer of its own: its `throughSequence` is the newest message of the channel, not the
- * newest the reader saw. The walk goes over the stored entries, because a thinking row stands where
- * the first item of its turn is.
- */
 export function firstUnreadChannelMessageId(
   entries: readonly ChannelMessage[],
   unreadCount: number,
@@ -118,22 +136,11 @@ export function firstUnreadChannelMessageId(
   return shown[0]?.id ?? null;
 }
 
-/**
- * Everyone the channel waits on: the owner of a running task, the author of a message of an active
- * task that is still arriving, and the lead while it chooses an owner. They read as one row under the transcript,
- * because a channel runs several agents at once and a row for each would push the messages away.
- *
- * The lead's routing turn moves no task out of `queued` and writes no message of its own. Without
- * it the transcript stands still while the coordinator thinks, which reads as a dropped request.
- * Only `queued` and `waiting`: routing that ends without an owner leaves the task `paused` with the
- * coordinator's reason above the composer, and that notice is the indicator from then on. A lead that
- * the user hid routes nothing until the restore, so it is not shown as working.
- */
 export function channelWorkers(
   page: ChannelPage,
   agents: readonly AgentProfile[],
   fallbackName: string,
-  hiddenAgentIds: ReadonlySet<string>,
+  pausedAgentIds: ReadonlySet<string>,
 ): ChannelWorker[] {
   const ids = new Set<string>();
   const active = new Set<string>();
@@ -141,9 +148,6 @@ export function channelWorkers(
     if (task.state === "running" && task.ownerAgentId) ids.add(task.ownerAgentId);
     if (task.state === "queued" || task.state === "running" || task.state === "waiting") active.add(task.id);
   }
-  // A refresh reads only the newest messages, so an older one keeps the copy the view loaded. A
-  // copy loaded while it streamed showed its author as working after the task ended (#4846). A
-  // follow-up queues the task while its turn still writes, so a queued task keeps its writer.
   for (const entry of page.messages)
     if (
       entry.message.status === "streaming" &&
@@ -154,7 +158,7 @@ export function channelWorkers(
   const lead = page.channel.leadAgentId;
   if (
     lead &&
-    !hiddenAgentIds.has(lead) &&
+    !pausedAgentIds.has(lead) &&
     page.tasks.some((task) => !task.ownerAgentId && (task.state === "queued" || task.state === "waiting"))
   )
     ids.add(lead);
@@ -165,15 +169,7 @@ export function channelWorkers(
   });
 }
 
-/**
- * The work that waits for the reader: one entry for each stopped run, not for each stopped task.
- *
- * A task the service stopped carries the reason, and an archived channel stops every task without
- * one, so the reason tells the two apart. A failed task belongs here too: its parent waits for it,
- * and only the reader starts it again. The assignment limit stops a whole tree at once, and `resume`
- * starts a task with everything under it, so the entry is the root.
- */
-export function stoppedChannelTasks(page: ChannelPage): ChannelTask[] {
+export function stoppedChannelTasks(page: ChannelPage): (ChannelTask & { runAgentIds: string[] })[] {
   if (page.channel.archived) return [];
   const roots = new Map<string, ChannelTask>();
   for (const task of page.tasks) {
@@ -181,15 +177,18 @@ export function stoppedChannelTasks(page: ChannelPage): ChannelTask[] {
     const known = roots.get(task.rootTaskId);
     if (!known || task.id === task.rootTaskId) roots.set(task.rootTaskId, task);
   }
-  return [...roots.values()];
+  return [...roots.values()].map((root) => ({
+    ...root,
+    runAgentIds: [
+      ...new Set(
+        page.tasks.flatMap((task) =>
+          task.rootTaskId === root.rootTaskId && task.ownerAgentId ? [task.ownerAgentId] : [],
+        ),
+      ),
+    ],
+  }));
 }
 
-/**
- * The runs that Stop ends: the top active task above each task that is queued, running or waiting.
- * `stop` pauses the whole run below the task it names, so one command for each run is enough. The
- * climb ends at a parent that is not active: a stop would pause a failed parent and clear its
- * reason, and a completed or cancelled task cannot stop.
- */
 export function activeChannelRuns(page: ChannelPage): string[] {
   if (page.channel.archived) return [];
   const byId = new Map(page.tasks.map((task) => [task.id, task]));
@@ -209,24 +208,43 @@ export function activeChannelRuns(page: ChannelPage): string[] {
   return [...runs];
 }
 
-/** The newest question of an agent that nobody answered yet. An archived channel takes no answer. */
 export function waitingChannelPrompt(
   page: ChannelPage,
+  threads: readonly ChannelThread[] | undefined,
+  waiting: readonly { agentId: string; threadId: string; requestId: string | number }[],
 ): { entry: ChannelMessage; prompt: ConversationQuestionPrompt } | null {
   if (page.channel.archived) return null;
   for (let index = page.messages.length - 1; index >= 0; index -= 1) {
     const entry = page.messages[index];
     const prompt = entry?.message.questionPrompt;
-    if (entry && prompt && entry.author.kind !== "member" && !prompt.resolution) return { entry, prompt };
+    if (
+      entry &&
+      prompt &&
+      entry.author.kind !== "member" &&
+      !prompt.resolution &&
+      waiting.some(
+        (request) =>
+          request.agentId === entry.author.id &&
+          String(request.requestId) === String(prompt.requestId) &&
+          channelOwnsRequest(page, threads, request),
+      )
+    )
+      return { entry, prompt };
   }
   return null;
 }
 
-/**
- * Whether a request of an agent belongs to this channel. A host with channel-attention-v1 names the
- * thread of each member. An older host does not, so a request of a member whose task runs here is
- * taken as the channel's, as the channel view took it before.
- */
+export function liveChannelPrompt<Request extends { agentId: string; threadId: string }>(
+  page: ChannelPage,
+  threads: readonly ChannelThread[] | undefined,
+  waiting: readonly Request[],
+): Request | undefined {
+  if (page.channel.archived || !threads) return undefined;
+  return waiting.findLast((request) =>
+    threads.some((thread) => thread.agentId === request.agentId && thread.threadId === request.threadId),
+  );
+}
+
 function channelOwnsRequest(
   page: ChannelPage,
   threads: readonly ChannelThread[] | undefined,
@@ -238,7 +256,6 @@ function channelOwnsRequest(
   return page.tasks.some((task) => task.ownerAgentId === request.agentId && task.state === "running");
 }
 
-/** The newest approval that this channel's work waits for. */
 export function channelApproval(
   page: ChannelPage,
   threads: readonly ChannelThread[] | undefined,
@@ -247,7 +264,6 @@ export function channelApproval(
   return approvals.findLast((approval) => channelOwnsRequest(page, threads, approval));
 }
 
-/** The newest browser takeover that this channel's work waits for. */
 export function channelBrowserTakeover(
   page: ChannelPage,
   threads: readonly ChannelThread[] | undefined,
@@ -256,12 +272,6 @@ export function channelBrowserTakeover(
   return takeovers.findLast((request) => channelOwnsRequest(page, threads, request));
 }
 
-/**
- * The id of the message a send stored. The command answers with the channel, not the message, so
- * the id is read from the page after it: the reader's first message after the sequence the page had
- * before the send. The same text picks it out when the reader sent two at once; a message with files
- * can have other text, so the first message after the sequence is the fallback.
- */
 export function sentChannelMessageId(
   page: ChannelPage,
   sequenceBefore: number,

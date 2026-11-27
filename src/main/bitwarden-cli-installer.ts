@@ -1,23 +1,17 @@
-// Installs the Bitwarden CLI into a folder that OpenBot owns, so a server with no `bw` on its PATH,
-// such as the Docker image, can connect Bitwarden or Vaultwarden.
-
 import { randomBytes } from "node:crypto";
-import { chmod, mkdir, rename, rm, stat } from "node:fs/promises";
+import { chmod, mkdir, rename, rm } from "node:fs/promises";
 import { join } from "node:path";
 import { sourceText } from "@openbot/i18n/source";
 import { Effect } from "effect";
 import { causeHelpers } from "../backend/effect-boundary";
 import { PasswordVaultError } from "../backend/password-vault";
+import { runBitwardenCli } from "./bitwarden-connector-service";
 import { downloadArchive } from "./onepassword-cli-installer";
 import { extractZipFiles } from "./provider-runtime-archive";
 import type { RuntimeTarget } from "./provider-runtime-descriptors";
 
 const { io: vaultCall } = causeHelpers(PasswordVaultError);
 
-/**
- * The release that the host installs. Each archive's SHA-256 is pinned here, taken from the GitHub
- * release of Bitwarden's own repository. A new release is a code change.
- */
 const BITWARDEN_CLI_VERSION = "2026.9.1";
 
 const ARCHIVES: Record<RuntimeTarget, { name: string; sha256: string }> = {
@@ -56,22 +50,33 @@ function managedCliPath(directory: string, target: RuntimeTarget): string {
   return join(directory, BITWARDEN_CLI_VERSION, executableName(target));
 }
 
-/**
- * The installed CLI, or a new install of the pinned release: downloaded, checked against its hash,
- * and unpacked into `<directory>/<version>`. A failed or stopped install leaves nothing in that folder.
- */
+const startsHere = Effect.fn("BitwardenCli.startsHere")(function* (
+  path: string,
+  dataDirectory: string,
+  signal: AbortSignal,
+): Effect.fn.Return<boolean> {
+  return yield* vaultCall((interrupted) =>
+    runBitwardenCli(
+      path,
+      ["--version"],
+      { BITWARDENCLI_APPDATA_DIR: dataDirectory },
+      AbortSignal.any([signal, interrupted]),
+    ),
+  ).pipe(
+    Effect.map((output) => output.trim() === BITWARDEN_CLI_VERSION),
+    Effect.orElseSucceed(() => false),
+  );
+});
+
 export const managedBitwardenCli = Effect.fn("BitwardenCli.managed")(function* (options: {
   directory: string;
+  dataDirectory: string;
   target: RuntimeTarget;
   signal: AbortSignal;
 }): Effect.fn.Return<string, PasswordVaultError> {
-  const { directory, target, signal } = options;
+  const { directory, dataDirectory, target, signal } = options;
   const path = managedCliPath(directory, target);
-  const installed = yield* vaultCall(() => stat(path)).pipe(
-    Effect.map((entry) => entry.isFile()),
-    Effect.orElseSucceed(() => false),
-  );
-  if (installed) return path;
+  if (yield* startsHere(path, dataDirectory, signal)) return path;
   const failed = sourceText("error.connector.bitwardenCliInstallFailed");
   const destination = join(directory, BITWARDEN_CLI_VERSION);
   const staging = join(directory, `.staging-${randomBytes(6).toString("hex")}`);
@@ -98,6 +103,10 @@ export const managedBitwardenCli = Effect.fn("BitwardenCli.managed")(function* (
       await rm(destination, { recursive: true, force: true });
       await rename(staging, destination);
     });
+    if (!(yield* startsHere(path, dataDirectory, signal)))
+      return yield* new PasswordVaultError({
+        cause: new Error(sourceText("error.connector.bitwardenCliCannotStart")),
+      });
     return path;
   }).pipe(
     Effect.ensuring(

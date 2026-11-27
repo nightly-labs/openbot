@@ -1,13 +1,3 @@
-// Checks the routine flow sweep of a profile with a frequent routine (#2283). Runs the real SQLite and
-// the real routine flow service on a temporary profile, with a week of runs of a 15-minute routine that
-// has no flow and of a routine with a flow. Checks that the sweep still gives each ended run its own
-// agent's step, sends only the handoffs that are not sent yet, and sends nothing on a second sweep.
-// Years of older runs sit outside the 7 days: no query of the sweep may read every row of a table for
-// them. Records the time of a sweep with nothing to do, which runs on each turn and queue change. No
-// app, provider, account or network is started.
-//
-// Run: bun scripts/routine-flow-sweep-e2e.ts
-// Writes .openbot-build/routine-flow-sweep-e2e/report.json and exits non-zero on a failure.
 import assert from "node:assert/strict";
 import { mkdirSync, writeFileSync } from "node:fs";
 import { mkdtemp, rm } from "node:fs/promises";
@@ -21,11 +11,10 @@ import { createRoutineFlows } from "../src/backend/routine-flows/routine-flows";
 
 const OUT = resolve(import.meta.dirname, "../.openbot-build/routine-flow-sweep-e2e");
 const QUARTER_HOUR_MS = 15 * 60 * 1000;
-/** A 15-minute routine runs 672 times in the 7 days a sweep looks back. */
-const SOLO_RUNS = 672;
-/** A routine with a flow, every hour: runs whose flow is done. */
+const SOLO_RUNS = 23_000;
+const SOLO_RUN_GAP_MS = 26_000;
+const FULL_SWEEP_AFTER_MS = 31 * 60 * 1000;
 const DONE_FLOW_RUNS = 160;
-/** The same routine before the 7 days: more than two years of hourly runs whose flow is done. */
 const OLD_FLOW_RUNS = 20_000;
 const TIMED_SWEEPS = 20;
 const INDEXES = ["routine_runs_status_updated", "routine_flow_steps_running", "routine_flow_steps_updated"];
@@ -35,8 +24,9 @@ interface Report {
   doneFlowRuns: number;
   oldFlowRuns: number;
   plans?: Record<string, string[]>;
+  answerPlan?: string[];
   checks: string[];
-  timing?: { sweeps: number; totalMs: number; perSweepMs: number };
+  timing?: { firstSweepMs: number; sweeps: number; totalMs: number; perSweepMs: number; fullSweepMs: number };
   passed: boolean;
 }
 
@@ -74,7 +64,7 @@ function seed(database: OpenBotDatabase): void {
   );
   db.exec("BEGIN");
   for (let index = 0; index < SOLO_RUNS; index += 1) {
-    const time = at(now - index * QUARTER_HOUR_MS - 30_000);
+    const time = at(now - index * SOLO_RUN_GAP_MS - 30_000);
     run.run(`solo-${index}`, "routine-solo", "solo", time, "Quarter-hour check", `solo-delivery-${index}`, time, time);
   }
   for (let index = 0; index < DONE_FLOW_RUNS; index += 1) {
@@ -90,18 +80,12 @@ function seed(database: OpenBotDatabase): void {
     step.run(`old-${index}-editor`, `old-${index}`, "editor", `old-editor-${index}`, time, time);
   }
   const recent = at(now - 60_000);
-  // The app stopped after the answer and before its handoff.
   run.run("pending", "routine-flow", "chief", recent, "Hourly brief", "pending-delivery", recent, recent);
   step.run("pending-chief", "pending", "chief", null, recent, recent);
-  // The answer is in, and no sweep saw it yet.
   run.run("fresh", "routine-flow", "chief", recent, "Hourly brief", "fresh-delivery", recent, recent);
   db.exec("COMMIT");
 }
 
-/**
- * The query plan of each statement that one sweep prepares. The sweep reads through the store, so the
- * statements come from the connection, not from a copy of their text here.
- */
 async function sweepPlans(database: OpenBotDatabase, sweep: () => Promise<void>): Promise<Record<string, string[]>> {
   const connection = database.connection;
   const prepare = connection.prepare.bind(connection);
@@ -128,8 +112,91 @@ async function sweepPlans(database: OpenBotDatabase, sweep: () => Promise<void>)
   );
 }
 
+function checkTurnAnswerRead(database: OpenBotDatabase): string[] {
+  const db = database.connection;
+  const at = (second: number) => new Date(Date.UTC(2026, 10, 1, 0, 0, second)).toISOString();
+  db.prepare(
+    `INSERT INTO projection_threads (thread_id, agent_id, title, active_turn_id, created_at, updated_at,
+       last_event_sequence) VALUES ('chief-chat', 'chief', 'Chat', NULL, ?, ?, 1)`,
+  ).run(at(0), at(0));
+  const turn = db.prepare(
+    `INSERT INTO projection_turns (turn_id, thread_id, provider_session_id, status, started_at, completed_at,
+       last_event_sequence) VALUES (?, 'chief-chat', NULL, 'completed', ?, ?, 1)`,
+  );
+  const message = db.prepare(
+    `INSERT INTO projection_thread_messages (thread_id, message_id, turn_id, author, status, item_type, created_at,
+       ordinal, message_json, last_event_sequence) VALUES ('chief-chat', ?, ?, ?, 'completed', NULL, ?, ?, ?, 1)`,
+  );
+  const add = (id: string, turnId: string, author: string, second: number, ordinal: number) =>
+    message.run(id, turnId, author, at(second), ordinal, JSON.stringify({ id, turnId, author, text: id }));
+  db.exec("BEGIN");
+  turn.run("chat-turn", at(1), at(1));
+  turn.run("routine-turn", at(10), at(12));
+  add("chat-question", "chat-turn", "user", 1, 0);
+  add("chat-answer", "chat-turn", "assistant", 2, 1);
+  add("routine-answer", "routine-turn", "assistant", 12, 4);
+  add("routine-instruction", "routine-turn", "user", 10, 2);
+  add("routine-progress", "routine-turn", "assistant", 11, 3);
+  db.exec("COMMIT");
+
+  const prepare = db.prepare.bind(db);
+  const statements: string[] = [];
+  db.prepare = (...args: Parameters<typeof prepare>) => {
+    statements.push(args[0]);
+    return prepare(...args);
+  };
+  let ids: string[];
+  try {
+    ids = database.readTurnAssistantMessages("chief", "routine-turn").map((read) => read.id);
+  } finally {
+    db.prepare = prepare;
+  }
+  assert.deepEqual(ids, ["routine-progress", "routine-answer"], "The read gives the turn's answers in chat order.");
+  assert.deepEqual(database.readTurnAssistantMessages("editor", "routine-turn"), [], "Another agent reads nothing.");
+  const [sql] = statements;
+  assert.ok(sql, "The answer read prepares a statement.");
+  const plan = prepare(`EXPLAIN QUERY PLAN ${sql}`)
+    .all("routine-turn", "chief")
+    .map((row) => String(row.detail));
+  const messages = plan.find((line) => line.includes(" message "));
+  assert.ok(
+    messages?.startsWith("SEARCH message USING INDEX thread_messages_turn (thread_id=? AND turn_id=?)"),
+    `The answer read finds the turn's messages by the turn index, not by reading the chat: ${plan.join("; ")}`,
+  );
+  return plan;
+}
+
 function count(database: OpenBotDatabase, sql: string): number {
   return Number(database.connection.prepare(sql).get()?.count);
+}
+
+function endRun(database: OpenBotDatabase, runId: string, routineId: string, agentId: string, endedAt: number): void {
+  const time = new Date(endedAt).toISOString();
+  database.connection
+    .prepare(
+      `INSERT INTO projection_routine_runs (run_id, routine_id, agent_id, trigger_id, run_kind, scheduled_for,
+         routine_name, instruction, delivery_id, status, error, created_at, updated_at, last_event_sequence)
+       VALUES (?, ?, ?, NULL, 'scheduled', ?, 'Late run', 'Collect the news.', ?, 'succeeded', NULL, ?, ?, 3)`,
+    )
+    .run(runId, routineId, agentId, time, `${runId}-delivery`, time, time);
+}
+
+function ageSettledSteps(database: OpenBotDatabase): void {
+  database.connection.exec(
+    `UPDATE routine_flow_steps SET created_at = run.updated_at, updated_at = run.updated_at
+     FROM projection_routine_runs AS run
+     WHERE run.run_id = routine_flow_steps.run_id AND routine_flow_steps.status <> 'running'`,
+  );
+}
+
+async function timed(work: () => Promise<void>): Promise<number> {
+  const started = performance.now();
+  await work();
+  return performance.now() - started;
+}
+
+function linkProbe(line: string): boolean {
+  return line === "SCAN routine_flow_links USING COVERING INDEX routine_flow_links_to";
 }
 
 const root = await mkdtemp(join(tmpdir(), "openbot-routine-flow-sweep-"));
@@ -144,13 +211,13 @@ try {
   assert.deepEqual(indexes, [...INDEXES].sort());
   report.checks.push(`indexes: ${indexes.join(", ")}`);
   seed(database);
+  let clock = Date.now();
 
   const handoffs: { runId: string; agentId: string }[] = [];
   const flows = await Effect.runPromise(
     createRoutineFlows({
       store: new RoutineFlowStore({ database }),
       routines: { list: () => [], get: () => null, listRuns: () => [] },
-      // Every run's own delivery answered; every handoff is still in the queue.
       delivery: (deliveryId) =>
         deliveryId.startsWith("handoff-")
           ? { status: "queued", turnId: null, error: null }
@@ -161,11 +228,14 @@ try {
         handoffs.push({ runId: input.run.id, agentId: input.agentId });
         return Effect.succeed(`handoff-${input.run.id}`);
       },
+      stopRoutineRun: () => Effect.void,
+      stopDelivery: () => Effect.void,
       changed: () => {},
+      now: () => new Date(clock),
     }),
   );
   try {
-    await Effect.runPromise(flows.sweep());
+    const firstSweepMs = await timed(() => Effect.runPromise(flows.sweep()));
     assert.equal(
       count(
         database,
@@ -175,6 +245,7 @@ try {
       "Each ended run of a routine without a flow gets its own agent's step: the canvas shows that answer.",
     );
     report.checks.push(`owner steps: ${SOLO_RUNS} runs of a routine without a flow`);
+    ageSettledSteps(database);
     assert.deepEqual(
       handoffs.sort((left, right) => left.runId.localeCompare(right.runId)),
       [
@@ -187,9 +258,11 @@ try {
 
     const plans = await sweepPlans(database, () => Effect.runPromise(flows.sweep()));
     report.plans = plans;
-    // The running steps index holds only running steps, so its scan reads no ended step.
     const scans = Object.entries(plans).filter(([, plan]) =>
-      plan.some((line) => line.startsWith("SCAN") && !line.includes("USING INDEX routine_flow_steps_running")),
+      plan.some(
+        (line) =>
+          line.startsWith("SCAN") && !line.includes("USING INDEX routine_flow_steps_running") && !linkProbe(line),
+      ),
     );
     assert.deepEqual(scans, [], "No query of a sweep reads every row of a table.");
     report.checks.push(`query plans: ${Object.keys(plans).length} sweep queries, each reads by an index`);
@@ -201,11 +274,36 @@ try {
     assert.equal(handoffs.length, 2, "A sweep with nothing to do sends nothing.");
     assert.equal(count(database, "SELECT COUNT(*) AS count FROM routine_flow_steps"), steps);
     report.checks.push(`later sweeps: no handoff and no step in ${TIMED_SWEEPS} sweeps`);
+
+    clock += 60_000;
+    endRun(database, "late", "routine-flow", "chief", clock - 1_000);
+    endRun(database, "late-solo", "routine-solo", "solo", clock - 1_000);
+    await Effect.runPromise(flows.sweep());
+    assert.equal(
+      count(
+        database,
+        "SELECT COUNT(*) AS count FROM routine_flow_steps WHERE (run_id, agent_id) IN (VALUES ('late', 'chief'), ('late-solo', 'solo'))",
+      ),
+      2,
+      "A later sweep records the owner step of each run that ended since the last sweep.",
+    );
+    assert.deepEqual(handoffs.at(-1), { runId: "late", agentId: "editor" }, "A later sweep hands on the new answer.");
+    assert.equal(handoffs.length, 3);
+    report.checks.push("later sweep: the owner steps and the handoff of runs that ended since the last sweep");
+
+    clock += FULL_SWEEP_AFTER_MS;
+    const fullSweepMs = await timed(() => Effect.runPromise(flows.sweep()));
+    assert.equal(handoffs.length, 3, "A full sweep after a quiet half hour sends nothing again.");
+    report.checks.push("full sweep after half an hour: nothing sent again");
     report.timing = {
+      firstSweepMs: Math.round(firstSweepMs),
       sweeps: TIMED_SWEEPS,
       totalMs: Math.round(totalMs),
       perSweepMs: Number((totalMs / TIMED_SWEEPS).toFixed(2)),
+      fullSweepMs: Math.round(fullSweepMs),
     };
+    report.answerPlan = checkTurnAnswerRead(database);
+    report.checks.push("answer read: the turn's answers in chat order, by the turn index");
     report.passed = true;
   } finally {
     await Effect.runPromise(flows.close());
@@ -217,7 +315,8 @@ try {
   await rm(root, { recursive: true, force: true });
 }
 process.stdout.write(
-  `${report.passed ? "PASS" : "FAIL"}: ${report.checks.length} checks, ${report.timing?.perSweepMs} ms per sweep. ` +
+  `${report.passed ? "PASS" : "FAIL"}: ${report.checks.length} checks, ${report.timing?.perSweepMs} ms per later sweep, ` +
+    `${report.timing?.fullSweepMs} ms per full sweep. ` +
     `Report: ${join(OUT, "report.json")}\n`,
 );
 if (!report.passed) process.exitCode = 1;

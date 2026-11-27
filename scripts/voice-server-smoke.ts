@@ -1,21 +1,3 @@
-// Sets up a voice server in Settings → Voice of a running dev app, and checks that dictation and
-// spoken replies go to it. The server is a fake OpenAI-compatible server on 127.0.0.1, which this
-// script starts: `GET /v1/models`, `GET /v1/audio/voices`, `POST /v1/audio/transcriptions` and
-// `POST /v1/audio/speech`, behind a Bearer key.
-//   1. Dialog: a wrong key shows its error under the key field; the right key shows both routes;
-//      Save shows the server, its models and its voice in the Voice tab.
-//   2. Tab: no local dictation model is "In use", the dictation language can be set, and the
-//      Supertonic voice row is hidden.
-//   3. Main: prepareModel is ready at once, transcribe sends the WAV and the model, and speak sends
-//      the model and voice and plays the WAV that comes back. Neither the settings nor a test
-//      result holds the key.
-//   4. Composer: dictation with a fake microphone puts the server's text in the message field.
-//   5. Reverse: "Use" on the local model turns server dictation off; Remove deletes the server.
-// The app must have no voice server when the script starts. Needs an English window and
-// `--allow-mutations`, because it changes the voice settings.
-//
-// Run: bun scripts/voice-server-smoke.ts --allow-mutations
-// It writes .openbot-build/voice-server-smoke/report.json and screenshots, and exits non-zero on a failure.
 import assert from "node:assert/strict";
 import { mkdirSync, writeFileSync } from "node:fs";
 import { resolve } from "node:path";
@@ -41,7 +23,6 @@ const VOICES = ["af_heart", "am_adam"];
 const TRANSCRIPT = "Voice server smoke transcript";
 const SPEECH_RATE = 24_000;
 const SPEECH_SAMPLES = 6_000;
-/** The name of each "Use" button of a local dictation model. */
 const useLabel = new RegExp(
   `^${t("settings.voice.model.useLabel", { name: "\u0000" })
     .split("\u0000")
@@ -60,7 +41,6 @@ interface ServerRequest {
   method: string;
   path: string;
   authorized: boolean;
-  /** For a transcription: the form fields and the size of the file. For speech: the JSON body. */
   body: unknown;
 }
 
@@ -78,7 +58,6 @@ assertMutationAllowed({
 });
 const logger = createOpenBotLogger("voice-server-smoke");
 
-/** A WAV file of 16-bit mono samples. */
 function wav(samples: Int16Array, sampleRate: number): Uint8Array<ArrayBuffer> {
   const buffer = Buffer.alloc(44 + samples.byteLength);
   buffer.write("RIFF", 0);
@@ -184,7 +163,6 @@ async function openVoiceTab(page: Page) {
 }
 
 async function closeSettings(page: Page) {
-  // A focused settings tab keeps Escape for itself, so Escape goes from the title.
   await settingsTitle(page).focus();
   await page.keyboard.press("Escape");
   await settingsTitle(page).waitFor({ state: "hidden" });
@@ -245,7 +223,6 @@ try {
   assert.equal(await page.evaluate(() => document.documentElement.lang), "en", "Set the app language to English.");
   assert.equal(await server(page), null, "Remove the voice server in Settings → Voice first.");
 
-  // 1. Dialog.
   await openVoiceTab(page);
   await setUpServer(page);
   saved = await waitFor(
@@ -275,18 +252,19 @@ try {
     summary,
   );
 
-  // 2. Tab.
-  const badges = await page.getByRole("tabpanel").getByText(t("settings.voice.model.inUse"), { exact: true }).count();
-  check("no local dictation model is in use", badges === 0, badges);
+  const notes = await page
+    .getByRole("tabpanel")
+    .getByText(t("settings.voice.model.serverDictates"), { exact: true })
+    .count();
+  check("the Model row says that the server takes dictation", notes === 1, notes);
   const language = page
-    .locator('[data-settings-row="settings.voice.language.title"]')
-    .getByRole("button", { name: t("settings.voice.language.title") });
+    .locator('[data-settings-row="settings.voice.language.section"]')
+    .getByRole("button", { name: t("settings.voice.language.section") });
   check("the dictation language can be set for the server", await language.isEnabled());
   const voiceRows = await page.locator('[data-settings-row="settings.voice.speech.voice.title"]').count();
   check("the Supertonic voice row is hidden", voiceRows === 0, voiceRows);
   await page.getByRole("tabpanel").screenshot({ path: resolve(OUT, "voice-tab.png") });
 
-  // 3. Main.
   const prepared = await page.evaluate(() => window.openbot.voice.prepareModel());
   check("the dictation model is ready at once", prepared.phase === "ready", prepared);
   const probe = await page.evaluate((target) => window.openbot.voice.probeServer(target), {
@@ -332,7 +310,6 @@ try {
     speechRequest,
   );
 
-  // 4. Composer.
   await closeSettings(page);
   const before = requests.length;
   await page.evaluate(() => {
@@ -351,7 +328,6 @@ try {
     await start.click();
     const stop = page.getByRole("button", { name: t("composer.voice.stop"), exact: true }).first();
     await stop.waitFor();
-    // The length of the recording is input, not a wait for state.
     await new Promise((resolve) => setTimeout(resolve, 1_500));
     await stop.click();
     const composer = page.getByRole("textbox").first();
@@ -370,22 +346,18 @@ try {
       sent.map((entry) => entry.body),
     );
     await page.screenshot({ path: resolve(OUT, "composer.png") });
-    // Leave the message field as it was.
     await composer.focus();
     await page.keyboard.press(process.platform === "darwin" ? "Meta+A" : "Control+A");
     await page.keyboard.press("Backspace");
   } else check("composer dictation", false, "Open a chat in the dev app first: no voice button is visible.");
 
-  // 5. Reverse.
   await openVoiceTab(page);
-  // Edit: the dialog tests the saved server again with the saved key, and dictation turns off.
   await serverSection(page)
     .getByRole("button", { name: t("common.edit"), exact: true })
     .click();
   const edit = page.getByRole("dialog", { name: t("settings.voice.server.dialog.editTitle") });
   const dictationSwitch = edit.getByRole("switch", { name: t("settings.voice.server.route.dictation"), exact: true });
   await dictationSwitch.and(page.locator(":enabled")).waitFor();
-  // The input is under the switch's control, so the keyboard turns it.
   await dictationSwitch.focus();
   await page.keyboard.press("Space");
   await waitFor(
@@ -411,10 +383,10 @@ try {
     summaryAfterEdit,
   );
 
-  // Use: needs a local model that is ready. A fresh dev profile has none, so the step is then skipped.
-  const use = page.locator('[data-settings-row="settings.voice.models.title"]').getByRole("button", { name: useLabel });
+  const use = page
+    .locator('[data-settings-row="settings.voice.dictation.section"]')
+    .getByRole("button", { name: useLabel });
   if (afterEdit && (await use.count()) > 0) {
-    // Server dictation on again, so that Use has something to turn off.
     await page.evaluate((current) => window.openbot.voice.setServer({ server: { ...current, apiKey: null } }), {
       address: afterEdit.address,
       routes: { ...afterEdit.routes, dictation: true },
@@ -442,7 +414,6 @@ try {
   await page.getByRole("tabpanel").screenshot({ path: resolve(OUT, "voice-tab-removed.png") });
   await closeSettings(page);
 } finally {
-  // Leave no server and no open dialog behind, also after a failure.
   const open = page.getByRole("dialog").getByRole("button", { name: t("common.close"), exact: true });
   if (await open.isVisible().catch(() => false)) await open.click().catch(() => undefined);
   if (saved !== null)

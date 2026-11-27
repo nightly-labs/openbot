@@ -17,23 +17,18 @@ import { type MenuAction, MenuView } from "@/shared/components/menu-view";
 import { SheetScrollEdgeEffect } from "@/shared/components/sheet-scroll-edge-effect";
 import { haptics } from "@/shared/lib/haptics";
 import { useText } from "@/shared/lib/text";
+import { MIRROR_IN_RTL } from "@/shared/lib/text-direction";
 import { useLiquidGlass } from "@/shared/lib/use-liquid-glass";
 
-/** The floating header: its buttons are 48 points high, 8 points under the safe area, as in the chat. */
 const HEADER_OFFSET = 8;
 const HEADER_HEIGHT = 48;
 const PADDING = 16;
 const GAP = 4;
 
-/**
- * Every image of one message, from the count under its stack. A tap opens the viewer on an image;
- * the menu saves all of them to Photos or shares all of them at once.
- */
 export function ImageGalleryScreen() {
   const { galleryId } = useLocalSearchParams<{ galleryId: string }>();
   const entry = imageGallery(galleryId);
 
-  // The galleries are kept in memory only, so a screen restored after a restart has nothing to show.
   useEffect(() => {
     if (!entry && router.canGoBack()) router.back();
   }, [entry]);
@@ -59,7 +54,6 @@ function GalleryContent({ entry }: { entry: ImageGalleryEntry }) {
     image: saved ? "checkmark" : "square.and.arrow.down",
     attributes: { disabled: files.busy || saved },
   };
-  // An SVG stays out of the photo library, so a gallery of SVG files only has Share.
   const actions: MenuAction[] = [
     ...(entry.images.some(savesToPhotos) ? [save] : []),
     {
@@ -108,7 +102,7 @@ function GalleryContent({ entry }: { entry: ImageGalleryEntry }) {
               router.back();
             }}
           >
-            <ArrowLeft color={String(foreground)} size={24} strokeWidth={2} />
+            <ArrowLeft color={String(foreground)} size={24} strokeWidth={2} style={MIRROR_IN_RTL} />
           </ChatGlassIconButton>
           <View className="min-w-0 flex-1 flex-row justify-center" pointerEvents="none">
             <GlassView

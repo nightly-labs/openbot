@@ -1,18 +1,18 @@
-import type { UiBlockSpec } from "@openbot/contracts/ui-blocks";
+import type { UiBlockResponse, UiBlockSpec } from "@openbot/contracts/ui-blocks";
 import type { JSX } from "@solidjs/web";
 import { Match, Switch } from "solid-js";
 import { UiChoiceBlock } from "./UiChoiceBlock";
 import { UiConfirmBlock } from "./UiConfirmBlock";
 import { UiFormBlock } from "./UiFormBlock";
-import { UiQuickReplies } from "./UiQuickReplies";
 import type { UiBlockProps } from "./ui-block-support";
 
-export interface UiBlockingBlockProps extends UiBlockProps<UiBlockSpec> {
-  /** Draws a confirm block's preview as safe Markdown. */
+export interface UiBlockingBlockProps extends Omit<UiBlockProps<UiBlockSpec>, "onRespond"> {
+  onRespond: (response: UiBlockResponse, preview?: string) => void;
   renderPreview?: ((markdown: string) => JSX.Element) | undefined;
+  canEditPreview?: boolean | undefined;
+  onPreviewDraftChange?: ((draft: string | undefined) => void) | undefined;
 }
 
-/** The card for any blocking block type: confirm, choice, quick replies or form. */
 export function UiBlockingBlock(props: UiBlockingBlockProps) {
   const shared = {
     get state() {
@@ -43,13 +43,18 @@ export function UiBlockingBlock(props: UiBlockingBlockProps) {
   return (
     <Switch>
       <Match when={props.spec.type === "confirm" && props.spec}>
-        {(spec) => <UiConfirmBlock {...shared} spec={spec()} renderPreview={props.renderPreview} />}
+        {(spec) => (
+          <UiConfirmBlock
+            {...shared}
+            spec={spec()}
+            renderPreview={props.renderPreview}
+            canEditPreview={props.canEditPreview}
+            onDraftChange={props.onPreviewDraftChange}
+          />
+        )}
       </Match>
-      <Match when={props.spec.type === "choice" && props.spec}>
+      <Match when={(props.spec.type === "choice" || props.spec.type === "quick_replies") && props.spec}>
         {(spec) => <UiChoiceBlock {...shared} spec={spec()} />}
-      </Match>
-      <Match when={props.spec.type === "quick_replies" && props.spec}>
-        {(spec) => <UiQuickReplies {...shared} spec={spec()} />}
       </Match>
       <Match when={props.spec.type === "form" && props.spec}>
         {(spec) => <UiFormBlock {...shared} spec={spec()} />}

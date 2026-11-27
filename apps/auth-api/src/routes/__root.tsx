@@ -3,34 +3,36 @@ import type { JSX } from "@solidjs/web";
 import { createRootRoute, type ErrorComponentProps, HeadContent, Outlet, Scripts } from "@tanstack/solid-router";
 import { createSignal, onSettled, Show } from "solid-js";
 import "@openbot/brand/logo.css";
+import { rememberPromotionCode } from "@openbot/contracts/promotion-code";
+import { rememberReferralCode } from "@openbot/contracts/referral";
 import { installPointerFocusGuard } from "@openbot/ui/pointer-focus";
 import "../styles.css";
 import { NotFoundPage } from "../components/landing/NotFoundPage";
 import { PageError } from "../components/landing/PageError";
+import { SiteTextProvider, useRouteSiteChrome } from "../components/landing/SiteText";
 import { type RootPageText, rootPageText } from "../components/transactional/page-text";
 import { loadPageText, type PageText } from "../lib/page-text";
 import { requestLocale } from "../lib/request-locale";
 import { servingSiteUrl } from "../lib/serving-site-url";
+import { loadSiteChrome } from "../lib/site-locale";
 import { OPENBOT_SECURITY_HEADERS, openBotRootHead } from "../lib/site-metadata";
+import type { SiteChrome } from "../lib/site-text";
 
 const NOT_FOUND_TITLE = "Page not found · OpenBot";
 
 export const Route = createRootRoute({
   beforeLoad: () => ({ siteUrl: servingSiteUrl(), locale: requestLocale() }),
-  // The error page text, in the language of the request. The server loads it once per document, and
-  // the browser reads it from the loader data.
-  loader: ({ context }) => loadPageText(context.locale, rootPageText),
+  loader: async ({ context }) => {
+    const [page, site] = await Promise.all([loadPageText(context.locale, rootPageText), loadSiteChrome("en")]);
+    return { ...page, site };
+  },
   shouldReload: false,
-  // The router marks the match that shows the global 404 with `_notFound`. That page has no route of
-  // its own, so the root head gives it its title. A child route's own title still wins. The 404 page
-  // is English only, so its title is English too.
   head: ({ matches }) => {
     const head = openBotRootHead(interLatinFont);
     if (!matches.some((match) => match._notFound)) return head;
     return { ...head, meta: head.meta.map((tag) => ("title" in tag ? { title: NOT_FOUND_TITLE } : tag)) };
   },
-  // The HTML holds catalog text in the language of `Accept-Language`, so a cache must keep it apart.
-  headers: () => ({ ...OPENBOT_SECURITY_HEADERS, Vary: "Accept-Language" }),
+  headers: () => ({ ...OPENBOT_SECURITY_HEADERS, Vary: "Accept-Language, Cookie" }),
   component: RootComponent,
   shellComponent: RootDocument,
   errorComponent: RootError,
@@ -38,25 +40,29 @@ export const Route = createRootRoute({
 });
 
 function RootComponent() {
-  // Runs only in the browser: the server render has no document.
   onSettled(() => installPointerFocusGuard());
+  onSettled(() => rememberPromotionCode(() => window.localStorage, window.location.href, Date.now()));
+  onSettled(() => rememberReferralCode(() => window.localStorage, window.location.href, Date.now()));
   return <Outlet />;
 }
 
-/**
- * The load error page. Its text comes from the root loader data. When the root loader itself did not
- * finish, the browser loads the English text, and the page shows when that text is ready.
- */
 function RootError(props: ErrorComponentProps) {
   console.error(props.error);
   const loaded = Route.useMatch({ select: (match) => match.loaderData });
-  const [fallback, setFallback] = createSignal<PageText<RootPageText>>();
+  const [fallback, setFallback] = createSignal<PageText<RootPageText> & { site: SiteChrome }>();
   onSettled(() => {
-    if (!loaded()) void loadPageText("en", rootPageText).then(setFallback);
+    if (loaded()) return;
+    void Promise.all([loadPageText("en", rootPageText), loadSiteChrome("en")]).then(([page, site]) =>
+      setFallback({ ...page, site }),
+    );
   });
   return (
     <Show when={loaded() ?? fallback()}>
-      {(page) => <PageError lang={page().lang} text={page().text.error} onRetry={() => window.location.reload()} />}
+      {(page) => (
+        <SiteTextProvider chrome={page().site}>
+          <PageError lang={page().lang} text={page().text.error} onRetry={() => window.location.reload()} />
+        </SiteTextProvider>
+      )}
     </Show>
   );
 }
@@ -64,16 +70,17 @@ function RootError(props: ErrorComponentProps) {
 const NO_SCRIPT_STYLE = "<style>[data-revealed=false],[data-revealed=false] *{opacity:1!important}</style>";
 
 function RootDocument(props: { children: JSX.Element }) {
+  const chrome = useRouteSiteChrome();
+  const lang = () => chrome()?.lang ?? "en";
+  const dir = () => chrome()?.dir ?? "ltr";
   return (
-    <html lang="en">
+    <html lang={lang()} dir={dir()}>
       <head>
         <HeadContent />
-        {/* Text waits at opacity 0 for a script to reveal it. Without scripts,
-            show it as it is, so the page can still be read. */}
         <noscript innerHTML={NO_SCRIPT_STYLE} />
       </head>
       <body>
-        {props.children}
+        <SiteTextProvider>{props.children}</SiteTextProvider>
         <Scripts />
       </body>
     </html>

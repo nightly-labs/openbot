@@ -7,6 +7,8 @@ export const messages = {
   "mcp.connect.notConnected": "Не подключено",
   "mcp.connect.close": "Закрыть подключение {name}",
   "mcp.connect.getKey": "Получить ключ",
+  "mcp.connect.useKey": "Использовать ключ API",
+  "mcp.connect.useSignIn": "Войти через аккаунт",
   "mcp.connect.keyDescription":
     "Вставьте учётные данные из аккаунта {name}. OpenBot подключится с ними и сохранит их на {host}.",
   "mcp.connect.thisComputer": "этом компьютере",
@@ -26,7 +28,10 @@ export const messages = {
   "mcp.signIn.waiting": "Ожидание браузера…",
   "mcp.signIn.continue": "Перейти к {name}",
   "mcp.signIn.pageDescription": "Эта страница открыта в браузере на {host}. Войдите здесь.",
-  "mcp.server.loadFailed": "Не удалось загрузить серверы MCP.",
+  "mcp.signIn.copyHint": "Если страница не загружается, скопируйте ссылку и откройте её в другом браузере.",
+  "mcp.signIn.copyLink": "Копировать ссылку",
+  "mcp.signIn.pasteHint":
+    "Если вы входите на другом устройстве, скопируйте адрес, который в конце покажет его браузер, и вставьте его сюда.",
   "mcp.test.connected": {
     one: "Подключено · {count} инструмент",
     few: "Подключено · {count} инструмента",
@@ -40,6 +45,7 @@ export const messages = {
   "mcp.status.signedIn": "Вход выполнен",
   "mcp.status.signingIn": "Выполняется вход…",
   "mcp.status.signInNeeded": "Нужен вход",
+  "mcp.status.signInAppNeeded": "Нужно приложение входа",
   "mcp.status.refused": "Отклонено",
   "mcp.status.checkUrl": "Проверьте URL",
   "mcp.status.noAnswer": "Нет ответа",
@@ -56,12 +62,6 @@ export const messages = {
   "mcp.panel.noAnswer": "Этот сервер не ответил.",
   "mcp.panel.connectTitle": "Подключить свой MCP",
   "mcp.panel.editTitle": "Изменить сервер MCP",
-  "mcp.panel.changesNotSaved": "Изменения не сохранены",
-  "mcp.panel.title": "Серверы MCP",
-  "mcp.panel.description":
-    "Серверы Model Context Protocol дают агентам этого сервера дополнительные инструменты. Агенты Claude и Codex получают только серверы из этого списка; агенты OpenCode и Grok также могут запускать серверы из собственных файлов конфигурации.",
-  "mcp.panel.connectCustom": "Подключить свой MCP",
-  "mcp.panel.empty": "Серверов MCP пока нет.",
   "mcp.panel.enable": "Включить {name}",
   "mcp.panel.detailsTitle": "Сведения",
   "mcp.panel.detailsDescription": "Назовите этот сервер и выберите, как OpenBot к нему подключается.",
@@ -103,17 +103,11 @@ export const messages = {
     "Один раз подключается с этими настройками и показывает доступные инструменты. Ничего не сохраняется.",
   "mcp.panel.testConnection": "Проверить подключение",
   "mcp.panel.notTested": "Ещё не проверялось.",
-  "mcp.panel.removeTitle": "Удалить {name}?",
-  "mcp.panel.removeDescription":
-    "Его инструменты перестанут предлагаться агентам этого сервера. Конфигурация не сохраняется.",
-  "mcp.panel.removeConfirm": "Удалить сервер MCP",
-  "mcp.panel.actionsFor": "Действия для {name}",
-  "mcp.panel.testUnavailable": "Этот сервер здесь проверить нельзя.",
   "mcp.panel.signIn": "Войти",
   "mcp.panel.signOut": "Выйти",
   "mcp.panel.cancelSignIn": "Отменить вход",
+  "mcp.panel.useAddress": "Использовать этот адрес",
   "mcp.panel.signInTo": "Войти в {name}",
-  "mcp.panel.cancelSignInTo": "Отменить вход в {name}",
   "mcp.panel.signInWaiting": {
     one: "Завершите вход в браузере. OpenBot ждёт не дольше {count} минуты.",
     few: "Завершите вход в браузере. OpenBot ждёт не дольше {count} минут.",
@@ -150,13 +144,12 @@ export const messages = {
   "mcp.panel.removeApp": "Удалить приложение",
   "mcp.panel.appSaved": "Приложение сохранено. Войдите, чтобы использовать его.",
   "mcp.panel.appRemoved": "Приложение удалено.",
-  "mcp.signIn.relayDescription":
-    "Убедитесь, что страница входа находится на {page}, затем откройте её в браузере. Когда вы закончите, OpenBot отправит вход на {host}.",
+  "mcp.signIn.relayDescription": "Войдите на {page} в браузере. Когда вы закончите, OpenBot отправит вход на {host}.",
   "mcp.signIn.relayOpenDescription":
-    "Откройте страницу входа {page} в своём браузере. Когда закончите, вставьте сюда показанный адрес. Затем OpenBot отправит вход на {host}.",
-  "mcp.signIn.relayDeviceDescription":
-    "Убедитесь, что страница входа находится на {page}, затем откройте её в браузере и завершите вход там. {host} сам обнаружит вход.",
+    "Войдите на {page} в браузере. Когда закончите, вставьте сюда показанный адрес. Затем OpenBot отправит вход на {host}.",
+  "mcp.signIn.relayDeviceDescription": "Войдите на {page} в браузере и завершите вход там. {host} сам обнаружит вход.",
   "mcp.signIn.relayOpen": "Открыть страницу входа",
+  "mcp.signIn.relayCopy": "Копировать ссылку",
   "mcp.signIn.relayPasteHint": "Если браузер не вернулся в OpenBot, скопируйте показанный адрес и вставьте его сюда.",
   "mcp.signIn.relayPasteRequired":
     "OpenBot не может сам получить вход из браузера. Когда закончите, скопируйте показанный адрес и вставьте его сюда.",

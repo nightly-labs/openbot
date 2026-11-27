@@ -1,12 +1,13 @@
 import { LOCAL_SERVER_ID } from "@openbot/contracts/ipc";
 import { onSettled } from "solid-js";
 import type { Meta, StoryObj } from "storybook-solidjs-vite";
-import { AGENT_ID, TABS_KEY, THREAD_OPTIONS } from "./agent-threads-fixtures";
+import type { MockOpenBotOptions } from "../src/preview/mock-openbot";
+import { AGENT_ID, TABS_KEY, THREAD_OPTIONS, THREAD_QUEUE_OPTIONS, UNREAD_OPTIONS } from "./agent-threads-fixtures";
 import { createAppDom, openChat, PrototypeApp } from "./prototype-support";
 import "./agent-threads-story.css";
 
-/** The real app on Chief, with the open tabs that this device stored. */
-function AgentThreadsApp(props: { open: string[]; active: string | null }) {
+function AgentThreadsApp(props: { open: string[]; active: string | null; options?: MockOpenBotOptions }) {
+  const options = props.options ?? THREAD_OPTIONS;
   localStorage.setItem(
     TABS_KEY,
     JSON.stringify({ [LOCAL_SERVER_ID]: { [AGENT_ID]: { open: props.open, active: props.active } } }),
@@ -23,7 +24,7 @@ function AgentThreadsApp(props: { open: string[]; active: string | null }) {
   });
   return (
     <div class="agent-threads-story" ref={app.attach}>
-      <PrototypeApp options={THREAD_OPTIONS} />
+      <PrototypeApp options={options} />
     </div>
   );
 }
@@ -36,34 +37,34 @@ const meta = {
 export default meta;
 type Story = StoryObj<typeof meta>;
 
-/** The agent's own chat, with four open side threads as tabs: done, working, failed and queued. */
 export const Tabs: Story = {
   render: () => <AgentThreadsApp open={["pricing", "competitors", "release", "links"]} active={null} />,
 };
 
-/** A side thread in the place of the chat, with its context meter. */
+export const UnreadThreads: Story = {
+  render: () => (
+    <AgentThreadsApp open={["pricing", "competitors", "release", "links"]} active={null} options={UNREAD_OPTIONS} />
+  ),
+};
+
 export const SideThread: Story = {
   render: () => <AgentThreadsApp open={["pricing", "competitors"]} active="pricing" />,
 };
 
-/** A thread that the agent started, held by the limit of parallel threads. */
+export const ThreadWithQueue: Story = {
+  render: () => <AgentThreadsApp open={["competitors"]} active="competitors" options={THREAD_QUEUE_OPTIONS} />,
+};
+
 export const QueuedThread: Story = {
   render: () => <AgentThreadsApp open={["links"]} active="links" />,
 };
 
-/**
- * A branch of "Pricing page copy". The line after the copied messages opens the source at the
- * answer that the branch came from. Open the thread menu: each branch shows under its source.
- * Hover the last answer of a turn for "Branch in new thread", or right-click it for "Branch from here".
- */
 export const Branch: Story = {
   render: () => <AgentThreadsApp open={["pricing", "pricing-short"]} active="pricing-short" />,
 };
 
-/** A branch whose source thread was deleted: the line has no link. */
 export const BranchOfDeletedThread: Story = {
   render: () => <AgentThreadsApp open={["pricing-orphan"]} active="pricing-orphan" />,
 };
 
-/** No side thread is open: the header shows only "New thread" and the menu. */
 export const NoTabs: Story = { render: () => <AgentThreadsApp open={[]} active={null} /> };

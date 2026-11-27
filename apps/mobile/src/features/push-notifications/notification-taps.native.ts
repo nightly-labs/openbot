@@ -1,42 +1,38 @@
 import { isString } from "@openbot/contracts/runtime-values";
+import type { PushNotificationKind } from "@openbot/team-client/push-notification-seal";
 import * as Notifications from "expo-notifications";
 import { useEffect, useRef } from "react";
-import { type NotificationTarget, SOUND_PREVIEW_KEY } from "./push-notifications-native.types";
+import { type NotificationTarget, SOUND_PREVIEW_KEY, type WorkflowTarget } from "./push-notifications-native.types";
 
-/**
- * expo-notifications 58 shows a notification that arrives in the foreground when no handler is set.
- * `null` keeps the earlier behavior until `useNotificationTaps` sets its handler: at launch and on the
- * sign-in screens, the app does not show it.
- */
 export function installNotificationHandler(): void {
   Notifications.setNotificationHandler(null);
 }
 
-/** The response that opened a chat last. A remount must not open it again. */
+const WORKFLOW_KIND: PushNotificationKind = "workflow";
+
 let handled: string | null = null;
 
-/**
- * Opens the chat of a notification that the user taps, also when the tap starts the app. The
- * Notification Service Extension on iOS, and `OpenBotMessagingService.kt` on Android, put the agent
- * into the notification data when they open the seal.
- * While the app is on screen, a notification of the chat that shows is not shown again.
- */
-export function useNotificationTaps(open: (target: NotificationTarget) => void, openChat: () => string | null): void {
+export function useNotificationTaps(
+  open: (target: NotificationTarget) => void,
+  onScreen: (target: NotificationTarget) => boolean,
+  openWorkflow: (target: WorkflowTarget) => void,
+): void {
   const response = Notifications.useLastNotificationResponse();
   const openRef = useRef(open);
   openRef.current = open;
-  const openChatRef = useRef(openChat);
-  openChatRef.current = openChat;
+  const openWorkflowRef = useRef(openWorkflow);
+  openWorkflowRef.current = openWorkflow;
+  const onScreenRef = useRef(onScreen);
+  onScreenRef.current = onScreen;
 
   useEffect(() => {
     Notifications.setNotificationHandler({
       handleNotification: async (notification) => {
-        // A sound preview from Settings only plays its sound.
         if (notification.request.content.data?.[SOUND_PREVIEW_KEY] === true) {
           return { shouldShowBanner: false, shouldShowList: false, shouldPlaySound: true, shouldSetBadge: false };
         }
-        const agentId = notificationTarget(notification)?.agentId ?? null;
-        const shown = agentId !== null && agentId === openChatRef.current();
+        const target = notificationTarget(notification);
+        const shown = target !== null && onScreenRef.current(target);
         return { shouldShowBanner: !shown, shouldShowList: !shown, shouldPlaySound: !shown, shouldSetBadge: false };
       },
     });
@@ -48,14 +44,27 @@ export function useNotificationTaps(open: (target: NotificationTarget) => void, 
     const identifier = response.notification.request.identifier;
     if (handled === identifier) return;
     handled = identifier;
+    const workflow = workflowTarget(response.notification);
+    if (workflow) {
+      openWorkflowRef.current(workflow);
+      return;
+    }
     const target = notificationTarget(response.notification);
     if (target) openRef.current(target);
   }, [response]);
 }
 
-function notificationTarget(notification: Notifications.Notification): NotificationTarget | null {
-  // A notification that the extension could not open has no data.
+function workflowTarget(notification: Notifications.Notification): WorkflowTarget | null {
   const data = notification.request.content.data;
+  const serverId = data?.serverId;
+  const workflowId = data?.agentId;
+  if (data?.kind !== WORKFLOW_KIND || !isString(serverId) || !serverId) return null;
+  return isString(workflowId) && workflowId ? { serverId, workflowId } : null;
+}
+
+function notificationTarget(notification: Notifications.Notification): NotificationTarget | null {
+  const data = notification.request.content.data;
+  if (data?.kind === WORKFLOW_KIND) return null;
   const agentId = data?.agentId;
   if (!isString(agentId) || !agentId) return null;
   const serverId = data?.serverId;

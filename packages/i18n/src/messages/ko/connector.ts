@@ -241,6 +241,7 @@ export const messages = {
   "connector.telegram.helpRelayUnavailableHost":
     "{host}의 OpenBot이 Telegram 메시지를 받을 수 없어요. {host}에서 로그인하고, 서버 설정에서 서버에 이름을 지정한 뒤 OpenBot을 열어 두세요.",
   "connector.telegram.helpError": "OpenBot이 이 채팅에 접근할 수 없어요. 다시 연결하거나 채팅 연결을 해제해 주세요.",
+  "connector.telegram.helpNotLinked": "이 채팅은 이 서버에 연결되어 있지 않습니다. 연결하려면 다시 연결을 선택하세요.",
   "connector.telegram.retryAt": "Telegram이 OpenBot에 기다리라고 요청했어요. {time}에 다시 시도해요.",
   "connector.telegram.pause": "일시 정지",
   "connector.telegram.resume": "재개",
@@ -308,11 +309,12 @@ export const messages = {
   "connector.whatsapp.linkNumber": "번호 연결",
   "connector.whatsapp.ownNumberNote": "“나에게 메시지 보내기” 채팅과 허용한 사람들이 OpenBot에 연락할 수 있어요.",
   "connector.whatsapp.dedicatedNote":
-    "허용한 사람들이 OpenBot에 연락할 수 있어요. 다른 사람은 나에게 알려 줄 코드를 받아요.",
+    "“나에게 메시지 보내기” 채팅과 허용한 사람들이 OpenBot에 연락할 수 있어요. 다른 사람은 나에게 알려 줄 코드를 받아요.",
   "connector.whatsapp.helpLoggedOut": "WhatsApp이 연결된 기기에서 이 컴퓨터를 삭제했어요. 번호를 다시 연결해 주세요.",
   "connector.whatsapp.helpLoggedOutHost": "WhatsApp이 연결된 기기에서 이 서버를 삭제했어요. 번호를 다시 연결해 주세요.",
   "connector.whatsapp.helpError":
     "OpenBot이 이 번호로 WhatsApp에 접근할 수 없어요. 다시 연결하거나 번호 연결을 해제해 주세요.",
+  "connector.whatsapp.helpKeysUnreadable": "OpenBot이 이 번호에 저장된 키를 읽을 수 없어요. 번호를 다시 연결해 주세요.",
   "connector.whatsapp.retryAt": "WhatsApp이 OpenBot에 기다리라고 요청했어요. {time}에 다시 시도해요.",
   "connector.whatsapp.pause": "일시 정지",
   "connector.whatsapp.resume": "재개",
@@ -327,7 +329,13 @@ export const messages = {
   "connector.whatsapp.rowAction": "{action}: {name}",
   "connector.whatsapp.ownNumber": "개인 번호",
   "connector.whatsapp.ownNumberDescription":
-    "“나에게 메시지 보내기” 채팅과 허용한 사람들만 메시지를 보낼 수 있어요. OpenBot 전용 번호라면 끄세요.",
+    "“나에게 메시지 보내기” 채팅과 허용한 사람들만 메시지를 보낼 수 있어요. 다른 사람에게는 답장하지 않아요. 끄면 OpenBot이 모르는 사람에게 코드를 답장해요.",
+  "connector.whatsapp.workingMessage": "“작업 중이에요…” 메시지",
+  "connector.whatsapp.workingMessageDescription":
+    "에이전트가 작업하는 동안 OpenBot이 보내고, 이후 답변으로 바꿔요. 이전 요청을 기다리는 요청에는 대기 메시지도 보내요. 개인 번호에서는 “나에게 메시지 보내기” 채팅에만 이 메시지를 보내요. 답변만 보내려면 끄세요.",
+  "connector.whatsapp.statusReactions": "상태 반응",
+  "connector.whatsapp.statusReactionsDescription":
+    "메시지가 도착하면 OpenBot이 👀로, 답변이 준비되면 ✅로 반응해요. 반응을 보내지 않으려면 끄세요.",
   "connector.whatsapp.orchestratorTitle": "WhatsApp 오케스트레이터",
   "connector.whatsapp.orchestratorDescription":
     "이 에이전트가 연결된 모든 번호에서 OpenBot에게 오는 메시지를 받아요. 짧은 요청은 직접 답하고, 나머지는 알맞은 에이전트에게 맡긴 뒤 WhatsApp에서 답해요.",
@@ -343,9 +351,11 @@ export const messages = {
   "connector.whatsapp.connectDescriptionHost": "번호를 선택한 다음 휴대폰의 WhatsApp에서 이 서버를 연결하세요.",
   "connector.whatsapp.kindLabel": "번호",
   "connector.whatsapp.kindPersonal": "내 개인 번호",
-  "connector.whatsapp.kindPersonalDescription": "OpenBot은 “나에게 메시지 보내기” 채팅과 허용한 사람들에게만 답해요.",
+  "connector.whatsapp.kindPersonalDescription":
+    "OpenBot은 “나에게 메시지 보내기” 채팅과 허용한 사람들에게만 답해요. 다른 사람에게는 답장하지 않아요.",
   "connector.whatsapp.kindDedicated": "OpenBot 전용 번호",
-  "connector.whatsapp.kindDedicatedDescription": "모르는 사람은 나에게 알려 줄 코드를 받아요. 여기에서 승인하세요.",
+  "connector.whatsapp.kindDedicatedDescription":
+    "OpenBot이 이 번호로 모르는 사람마다 나에게 알려 줄 코드를 답장해요. 여기에서 승인하세요.",
   "connector.whatsapp.methodLabel": "연결 방법",
   "connector.whatsapp.methodQr": "QR 코드",
   "connector.whatsapp.methodCode": "페어링 코드",
@@ -397,6 +407,9 @@ export const messages = {
   "connector.whatsapp.sendersLimit": "번호 하나에 연락처와 그룹을 최대 {count}개까지 허용할 수 있어요.",
   "connector.whatsapp.senderGroup": "그룹",
   "connector.whatsapp.removeSender": "제거",
+  "connector.whatsapp.senderAccess": "{name} 접근 권한",
+  "connector.whatsapp.senderReplies": "작업 요청 가능",
+  "connector.whatsapp.senderReadOnly": "읽기 전용",
   "connector.whatsapp.addContact": "연락처 추가",
   "connector.whatsapp.addGroup": "그룹 추가",
   "connector.whatsapp.contactTitle": "연락처 추가",
@@ -405,7 +418,8 @@ export const messages = {
   "connector.whatsapp.contactNameDescription": "선택 사항이에요. 비워 두면 목록에 전화번호가 표시돼요.",
   "connector.whatsapp.add": "추가",
   "connector.whatsapp.groupTitle": "그룹 추가",
-  "connector.whatsapp.groupDescription": "이 그룹의 사람들은 내 에이전트에게 작업을 맡길 수 있어요.",
+  "connector.whatsapp.groupDescription":
+    "이 그룹의 사람들은 이 번호를 멘션하거나 이 번호의 메시지에 답장하면 내 에이전트에게 작업을 맡길 수 있어요.",
   "connector.whatsapp.groupSearch": "그룹 검색",
   "connector.whatsapp.groupsLoading": "그룹을 읽는 중이에요…",
   "connector.whatsapp.groupsLoadFailed": "OpenBot이 그룹을 읽지 못했어요",
@@ -507,4 +521,71 @@ export const messages = {
   "connector.bitwarden.clientSecret": "API 키 client_secret",
   "connector.bitwarden.masterPassword": "마스터 비밀번호",
   "connector.bitwarden.connecting": "연결 중",
+  "connector.protonPass.title": "Proton Pass",
+  "connector.protonPass.description": "에이전트가 공유 Proton Pass 보관함의 로그인 정보로 사이트에 로그인합니다.",
+  "connector.protonPass.descriptionHost":
+    "{host}의 에이전트가 공유 Proton Pass 보관함의 로그인 정보로 사이트에 로그인합니다.",
+  "connector.protonPass.connect": "연결",
+  "connector.protonPass.moreWays": "다른 연결 방법",
+  "connector.protonPass.useKey": "액세스 키 사용",
+  "connector.protonPass.keyLabel": "액세스 키",
+  "connector.protonPass.keyPlaceholder": "pst_…",
+  "connector.protonPass.setupTitle": "설정",
+  "connector.protonPass.setupDescription":
+    "연결을 누르면 브라우저에서 Proton 로그인이 열립니다. 그다음 OpenBot이 공유 보관함을 만들고 읽기 전용 키만 보관합니다.",
+  "connector.protonPass.setupDescriptionHost":
+    "연결을 누르면 브라우저에서 Proton 로그인이 열립니다. 그다음 {host}이(가) 공유 보관함을 만들고 읽기 전용 키만 보관합니다.",
+  "connector.protonPass.vaultName": "Shared with OpenBot",
+  "connector.protonPass.vaultSetup": "연결하면 OpenBot이 이 보관함을 만듭니다. 공유할 로그인 정보를 여기로 옮기세요.",
+  "connector.protonPass.showSteps": "단계 보기",
+  "connector.protonPass.stepsLabel": "연결 단계",
+  "connector.protonPass.stepSignIn": "로그인",
+  "connector.protonPass.stepVault": "공유 보관함 만들기",
+  "connector.protonPass.stepDone": "완료",
+  "connector.protonPass.signInTitle": "Proton에 로그인",
+  "connector.protonPass.signInStarting": "OpenBot이 로그인을 시작합니다. 브라우저에서 Proton 페이지가 열립니다.",
+  "connector.protonPass.signInDescription":
+    "브라우저에서 로그인이 열려 있습니다. Proton이 비밀번호와 2단계 인증을 요청합니다.",
+  "connector.protonPass.signInDescriptionHost":
+    "브라우저에서 {host}의 로그인이 열려 있습니다. Proton이 비밀번호와 2단계 인증을 요청합니다.",
+  "connector.protonPass.extraPasswordDescription": "Proton Pass가 추가 비밀번호를 요청합니다.",
+  "connector.protonPass.extraPasswordWrong": "추가 비밀번호가 올바르지 않습니다. 다시 입력하세요.",
+  "connector.protonPass.extraPasswordLabel": "추가 비밀번호",
+  "connector.protonPass.continue": "계속",
+  "connector.protonPass.setupStepTitle": "공유 보관함 만드는 중",
+  "connector.protonPass.setupStepDescription":
+    "OpenBot이 보관함 “{vault}”와 읽기 전용 키를 만듭니다. 그다음 Proton 세션에서 로그아웃합니다.",
+  "connector.protonPass.doneTitle": "Proton Pass가 연결되었습니다",
+  "connector.protonPass.doneDescription":
+    "로그인 정보를 “{vault}”(으)로 옮기면 에이전트가 그 정보로 로그인할 수 있습니다.",
+  "connector.protonPass.failedTitle": "Proton Pass를 연결하지 못했습니다",
+  "connector.protonPass.copyLink": "링크 복사",
+  "connector.protonPass.linkCopied": "복사됨",
+  "connector.protonPass.openAgain": "다시 열기",
+  "connector.protonPass.done": "완료",
+  "connector.protonPass.close": "닫기",
+  "connector.protonPass.statusConnecting": "연결 중",
+  "connector.protonPass.statusConnected": "연결됨",
+  "connector.protonPass.statusExpired": "키 만료됨",
+  "connector.protonPass.expiredTitle": "Proton Pass 키가 만료되었습니다",
+  "connector.protonPass.expiredDescription": "다시 로그인할 때까지 에이전트가 공유 로그인 정보로 로그인할 수 없습니다.",
+  "connector.protonPass.reconnect": "다시 연결",
+  "connector.protonPass.planTitle": "Proton Pass에는 Pass Plus가 포함된 요금제가 필요합니다",
+  "connector.protonPass.planDescription":
+    "Proton Pass CLI에는 Pass Plus가 포함된 Proton 요금제가 필요합니다. Mail Plus 같은 다른 유료 요금제에는 포함되지 않습니다. 요금제를 변경한 다음 다시 연결하세요.",
+  "connector.protonPass.vaultTitle": "공유 보관함",
+  "connector.protonPass.vaultDescription":
+    "에이전트는 이 보관함의 로그인 정보로 로그인할 수 있습니다. 공유할 로그인 정보를 여기로 옮기세요.",
+  "connector.protonPass.loginCount": { other: "로그인 {count}개" },
+  "connector.protonPass.loginsLoading": "로그인 정보를 세는 중…",
+  "connector.protonPass.keyExpires": "읽기 전용. {date}에 만료됩니다.",
+  "connector.protonPass.keyExpired": "읽기 전용. {date}에 만료되었습니다.",
+  "connector.protonPass.keyNoExpiry": "읽기 전용. 만료되지 않습니다.",
+  "connector.protonPass.disconnectTitle": "Proton Pass 연결 해제",
+  "connector.protonPass.disconnectSummary":
+    "OpenBot이 이 컴퓨터의 액세스 키를 삭제합니다. 보관함과 그 안의 로그인 정보는 Proton 계정에 남습니다.",
+  "connector.protonPass.disconnectSummaryHost":
+    "OpenBot이 {host}의 액세스 키를 삭제합니다. 보관함과 그 안의 로그인 정보는 Proton 계정에 남습니다.",
+  "connector.protonPass.disconnect": "연결 해제",
+  "connector.protonPass.actionFailed": "OpenBot이 Proton Pass 연결을 변경하지 못했습니다.",
 } as const satisfies PartialTranslation<typeof source>;

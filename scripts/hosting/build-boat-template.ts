@@ -1,19 +1,3 @@
-/**
- * Builds the boat named snapshot that hosted servers are created from:
- *
- *   BOAT_TEMPLATE_API_KEY=... bun scripts/hosting/build-boat-template.ts --version=0.9.0 \
- *     --appimage-url=https://.../OpenBot-0.9.0-x86_64.AppImage --appimage-sha256=<hex> \
- *     --auth-api-url=https://<test worker origin>
- *
- * It creates a builder sandbox with no account env, runs provision.sh there, checks the install,
- * saves the builder as `openbot-server-<version>`, and deletes the builder. The builder never starts
- * OpenBot, so the template holds no host identity and no session. The key needs sandbox, files,
- * commands, and named snapshot access; the Worker's key must not have that access.
- *
- * The release job adds `--keep-releases=<n> --in-use=<names>`: before the build, it removes the
- * production snapshots of older releases except the newest n-1 and the names that pending creates use.
- */
-
 import { readFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
 import { setTimeout as delay } from "node:timers/promises";
@@ -26,9 +10,11 @@ const BOAT_API_URL = "https://boat.dev/api/v1";
 const TEMPLATE_FILES = [
   "provision.sh",
   "packages.txt",
+  "optional-packages.txt",
   "openbot-hosted-server",
   "openbot-hosted-env",
   "openbot-hosted-update",
+  "openbot-hosted-keyring",
   "openbot",
   "openbot-boat-pre-stop",
   "openbot-hosted.apparmor",
@@ -75,7 +61,6 @@ async function main(): Promise<void> {
   if (!apiKey) throw new Error("Set BOAT_TEMPLATE_API_KEY to a boat key with sandbox and snapshot access.");
   registerSecretValue(apiKey);
   const boat = boatRequester(apiKey);
-  // A release retry must not replace an artifact that new servers already use.
   const existing = await findNamedSnapshot(boat, options.name);
   if (existing) {
     await waitForNamedSnapshot(boat, options.name, existing);
@@ -87,7 +72,6 @@ async function main(): Promise<void> {
   if (!Array.isArray(listed.snapshots)) throw new Error("boat returned no named snapshot list.");
   const allowance = isDynamicRecord(listed.allowance) ? listed.allowance : null;
   const used = typeof allowance?.used === "number" ? allowance.used : listed.snapshots.length;
-  // Keep the agreed limit even when boat permits additional paid snapshots.
   if (Math.max(used, listed.snapshots.length) >= 10) {
     throw new Error("The 10-snapshot limit is reached. Remove unused snapshots, then retry the release.");
   }
@@ -123,7 +107,6 @@ async function main(): Promise<void> {
         `test "$(sed -n 's/^X-AppImage-Version=//p' /opt/OpenBot/app/*.desktop)" = ${shellQuote(options.version)}`,
         "systemctl is-enabled --quiet openbot.service",
         "! systemctl is-active --quiet openbot.service",
-        // With more than one unit, `is-enabled` passes when one of them is enabled.
         "systemctl is-enabled --quiet openbot-update.timer",
         "systemctl is-enabled --quiet openbot-update-apply.service",
         "systemctl is-enabled --quiet openbot-update-request.path",
@@ -192,7 +175,6 @@ async function waitForSandbox(boat: BoatRequester, sandboxId: string): Promise<v
   throw new Error("The builder sandbox did not become ready in 10 minutes.");
 }
 
-/** Runs a short command and fails on a non-zero exit. It retries while boat still starts the sandbox. */
 async function runCommand(boat: BoatRequester, sandboxId: string, command: string): Promise<void> {
   const body = await retryWhileStarting(() =>
     boat("POST", `/sandboxes/${encodeURIComponent(sandboxId)}/commands`, "Builder command", {
@@ -204,7 +186,6 @@ async function runCommand(boat: BoatRequester, sandboxId: string, command: strin
   }
 }
 
-/** Provisioning takes longer than a synchronous command may run, so it runs detached and is polled. */
 async function runDetached(boat: BoatRequester, sandboxId: string, command: string): Promise<void> {
   const started = await retryWhileStarting(() =>
     boat("POST", `/sandboxes/${encodeURIComponent(sandboxId)}/commands`, "Provisioning start", {
@@ -261,13 +242,6 @@ async function waitForNamedSnapshot(boat: BoatRequester, name: string, initial?:
   throw new Error("The named snapshot did not become ready in 30 minutes.");
 }
 
-/**
- * Removes the production snapshots of releases before this one. It keeps the newest `keepReleases - 1`
- * ready ones, so `keepReleases` remain with this release. The newest of them stays selected until this
- * release replaces it. Sandboxes made from a removed snapshot keep running, but a pending create sends
- * its first request again, so a name in `inUse` stays. A failed snapshot of an older release goes;
- * a save in progress or an unknown status stays.
- */
 async function removeOldReleases(boat: BoatRequester, options: TemplateOptions): Promise<void> {
   if (options.keepReleases === null) return;
   const current = parseRelease(options.version, ".");
@@ -357,13 +331,11 @@ function parseOptions(args: string[]): TemplateOptions {
   const keepArgument = args.find((argument) => argument.startsWith("--keep-releases="))?.slice(16);
   const keepReleases = keepArgument === undefined ? null : Number(keepArgument);
   if (keepReleases !== null) {
-    // With 1, the template that is selected now would go before this release replaces it.
     if (!Number.isInteger(keepReleases) || keepReleases < 2) throw new Error("--keep-releases must be 2 or more.");
     if (name !== `${PRODUCTION_PREFIX}${version.replaceAll(".", "-")}`) {
       throw new Error("--keep-releases needs the production snapshot name of --version.");
     }
   }
-  // Only compared with snapshot names, so a template value that boat refused cannot stop a release.
   const inUse = (args.find((argument) => argument.startsWith("--in-use="))?.slice(9) ?? "").split(",").filter(Boolean);
   return {
     name,

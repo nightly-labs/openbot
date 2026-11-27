@@ -18,12 +18,6 @@ function useThreadReadsEnabled(serverId: string): boolean {
   );
 }
 
-/**
- * The person's read mark of each open thread of one agent, by task id. The host keeps the marks for
- * the member, so a thread that the person read on desktop is read here too. Empty on a host without
- * `agent-thread-reads-v1`. The host sends no event when a mark moves: the marks load again when the
- * thread list changes and when a screen that shows them opens.
- */
 export function useAgentThreadReads(serverId: string, agentId: string): ReadonlyMap<string, AgentTaskReadState> {
   const queryScope = useQueryScope();
   const workspace = useMobileWorkspaceReader();
@@ -38,12 +32,6 @@ export function useAgentThreadReads(serverId: string, agentId: string): Readonly
   return useMemo(() => (reads ? new Map(reads.map((read) => [read.taskId, read])) : NO_READS), [reads]);
 }
 
-/**
- * Moves the person's read mark of a thread to `messageId` while the person sees the thread. The
- * member's other devices read the mark. `version` is the thread's last change: the host keeps the
- * mark where it is for a message that it has not saved yet, such as one that streams, so the mark
- * goes again when the turn ends. A failure keeps the old mark: the next change moves it.
- */
 export function useMarkThreadRead(
   serverId: string,
   agentId: string,
@@ -69,7 +57,6 @@ export function useMarkThreadRead(
           key,
           (stored) => stored?.map((read) => (read.taskId === state.taskId ? state : read)) ?? stored,
         );
-        // A read of the marks that started before this mark landed holds the old mark. Read again.
         void queryClient.invalidateQueries({ queryKey: key });
       })
       .catch(() => {
@@ -78,11 +65,6 @@ export function useMarkThreadRead(
   }, [enabled, taskId, messageId, version, agentId, serverId, queryScope, queryClient, workspace]);
 }
 
-/**
- * The person's read mark of each open thread in `tasks`, by task id. Null on a host without
- * `agent-thread-reads-v1`. It reads the marks of each agent that has an open thread. `ready` is
- * false while a read of the marks goes on, and `failed` is true when a read failed.
- */
 export function useServerThreadReads(
   serverId: string,
   tasks: readonly AgentTask[],
@@ -109,4 +91,63 @@ export function useServerThreadReads(
       failed: enabled && results.some((result) => result.isError),
     }),
   });
+}
+
+function threadReadsQuery(
+  queryScope: ReturnType<typeof useQueryScope>,
+  workspace: ReturnType<typeof useMobileWorkspaceReader>,
+  serverId: string,
+  agentId: string,
+  enabled: boolean,
+) {
+  return {
+    queryKey: queryKeys.agentThreadReads(queryScope, serverId, agentId),
+    enabled,
+    retry: false,
+    queryFn: () => workspace().loadAgentThreadReads(agentId, serverId),
+  };
+}
+
+export function useAgentThreadUnreadCounts(serverId: string, agentIds: readonly string[]): ReadonlyMap<string, number> {
+  const queryScope = useQueryScope();
+  const workspace = useMobileWorkspaceReader();
+  const enabled = useThreadReadsEnabled(serverId);
+  const key = useQueries({
+    queries: agentIds.map((agentId) => threadReadsQuery(queryScope, workspace, serverId, agentId, enabled)),
+    combine: (results) =>
+      JSON.stringify(
+        results.flatMap((result, index) => {
+          const count = (result.data ?? []).reduce((sum, read) => sum + read.unreadCount, 0);
+          return enabled && count > 0 ? [[agentIds[index], count]] : [];
+        }),
+      ),
+  });
+  return useMemo(() => new Map<string, number>(JSON.parse(key)), [key]);
+}
+
+export function useAgentThreadUnread(serverId: string, agentId: string): number {
+  const queryScope = useQueryScope();
+  const workspace = useMobileWorkspaceReader();
+  const enabled = useThreadReadsEnabled(serverId);
+  const unread = useQuery({
+    ...threadReadsQuery(queryScope, workspace, serverId, agentId, false),
+    select: (reads) => reads.reduce((sum, read) => sum + read.unreadCount, 0),
+  }).data;
+  return enabled ? (unread ?? 0) : 0;
+}
+
+export function useThreadOpeningUnread(
+  serverId: string,
+  agentId: string,
+  taskId: string | null,
+): { firstUnread: string | null | undefined; keptUnread: boolean } {
+  const queryScope = useQueryScope();
+  const workspace = useMobileWorkspaceReader();
+  const enabled = useThreadReadsEnabled(serverId) && taskId !== null;
+  const reads = useQuery({ ...threadReadsQuery(queryScope, workspace, serverId, agentId, enabled), staleTime: 0 });
+  const read = reads.data?.find((entry) => entry.taskId === taskId);
+  const keptUnread = !reads.data || (read?.unreadCount ?? 0) > 0;
+  if (!enabled || reads.isError) return { firstUnread: null, keptUnread: false };
+  if (reads.fetchStatus === "fetching") return { firstUnread: undefined, keptUnread };
+  return { firstUnread: read?.firstUnreadMessageId ?? null, keptUnread };
 }

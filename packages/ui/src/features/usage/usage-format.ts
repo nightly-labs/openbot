@@ -1,11 +1,11 @@
 import type { AnalyticsModel } from "@openbot/contracts/ipc";
-import { agentProviderCliName, analyticsTokens, isAgentProvider } from "@openbot/contracts/ipc";
+import { AGENT_PROVIDERS, agentProviderName, analyticsTokens, isAgentProvider } from "@openbot/contracts/ipc";
 import type { AppTextKey } from "@openbot/i18n";
+import type { UsageSeriesRow } from "@openbot/team-client/usage-series";
 import { currentText, type TextValue } from "../../text";
 
 type UsageText = Pick<TextValue, "t" | "format">;
 
-// The header filters keep these ids in memory only. The labels come from the maps below.
 export const usageMetrics = ["cost", "tokens"] as const;
 export type UsageMetric = (typeof usageMetrics)[number];
 export const usageMetricLabels = {
@@ -20,17 +20,12 @@ export const usagePeriodLabels = {
   "90d": "usage.period.days90",
   "1y": "usage.period.year",
 } as const satisfies Record<UsagePeriod, AppTextKey>;
-// A label is not a number of days once "1 year" is an option, and the host rejects a
-// range wider than 367 days, so a year is the 365 the calendar names rather than 366.
 export const usagePeriodDays: Record<UsagePeriod, number> = {
   "7d": 7,
   "30d": 30,
   "90d": 90,
   "1y": 365,
 };
-// A report row names an agent by id, and the provider is empty when the agent is not in
-// the list the panel read, because UsageProviderMark already draws nothing for a string
-// it does not recognize.
 export interface UsageAgentLabel {
   name: string;
   provider: string;
@@ -47,24 +42,24 @@ export function usageCost(value: number | null, text: UsageText = currentText())
   if (value !== null && value > 0 && value < 1e-12)
     return `<${text.format.currencyUsd(1e-12, { minimumFractionDigits: 2, maximumFractionDigits: 12 })}`;
   return value === null
-    ? text.t("usage.unavailable")
+    ? text.t("usage.noCostEstimate")
     : text.format.currencyUsd(value, {
         minimumFractionDigits: 2,
         maximumFractionDigits: value > 0 && value < 0.01 ? Math.min(12, -Math.floor(Math.log10(value)) + 1) : 2,
       });
 }
+export function usageAxisCost(value: number, text: UsageText = currentText()): string {
+  return Math.abs(value) >= 1000
+    ? text.format.currencyUsd(value, { notation: "compact", maximumFractionDigits: 1 })
+    : usageCost(value, text);
+}
 export function usageExactCost(value: number | null, text: UsageText = currentText()): string {
   return value === null
-    ? text.t("usage.unavailable")
+    ? text.t("usage.noCostEstimate")
     : text.t("usage.exactCost", { amount: text.format.number(value, { maximumFractionDigits: 12 }) });
 }
-/**
- * Usage rows name the tool rather than the account: a cost line is about what ran, not about who
- * paid. A provider this build does not know is shown as the raw id, because usage history outlives
- * the provider list.
- */
 export function usageProviderName(provider: string): string {
-  return isAgentProvider(provider) ? agentProviderCliName(provider) : provider;
+  return isAgentProvider(provider) ? agentProviderName(provider) : provider;
 }
 export function usageProviders(models: AnalyticsModel[]) {
   const providers = new Map<string, { provider: string; tokens: number; cost: number | null }>();
@@ -77,16 +72,66 @@ export function usageProviders(models: AnalyticsModel[]) {
   return [...providers.values()];
 }
 
-// A series wears its provider's colour, never the colour of its rank: the provider list
-// re-sorts when the metric changes, and a legend dot that repainted with it would say a
-// different area belongs to the row.
 const seriesColors: Readonly<Record<string, string>> = {
   codex: "var(--openbot-chart-series-codex)",
   claude: "var(--openbot-chart-series-claude)",
   grok: "var(--openbot-chart-series-grok)",
 };
+const extraSeriesColors = [
+  "var(--openbot-chart-series-extra-1)",
+  "var(--openbot-chart-series-extra-2)",
+  "var(--openbot-chart-series-extra-3)",
+  "var(--openbot-chart-series-extra-4)",
+] as const;
+const otherSeriesColor = "var(--openbot-chart-series-other)";
+
 export function usageSeriesColor(provider: string): string {
-  return seriesColors[provider] ?? "var(--openbot-chart-series-other)";
+  return seriesColors[provider] ?? otherSeriesColor;
+}
+function providerOrder(provider: string): number {
+  const index = AGENT_PROVIDERS.findIndex((candidate) => candidate === provider);
+  return index === -1 ? AGENT_PROVIDERS.length : index;
+}
+export function usageSeriesColors(providers: Iterable<string>): (provider: string) => string {
+  const extras = [...new Set(providers)]
+    .filter((provider) => !(provider in seriesColors))
+    .sort((a, b) => providerOrder(a) - providerOrder(b) || a.localeCompare(b));
+  const colors = new Map(extras.map((provider, index) => [provider, extraSeriesColors[index] ?? otherSeriesColor]));
+  return (provider) => seriesColors[provider] ?? colors.get(provider) ?? otherSeriesColor;
+}
+
+export type UsageBucket = "day" | "week" | "month";
+export function usageBucket(days: number): UsageBucket {
+  if (days <= 45) return "day";
+  return days <= 120 ? "week" : "month";
+}
+function bucketStart(date: string, bucket: UsageBucket): string {
+  if (bucket === "day") return date;
+  if (bucket === "month") return `${date.slice(0, 7)}-01`;
+  const day = new Date(`${date}T12:00:00Z`);
+  day.setUTCDate(day.getUTCDate() - ((day.getUTCDay() + 6) % 7));
+  return day.toISOString().slice(0, 10);
+}
+export function usageBucketRows(rows: UsageSeriesRow[], series: string[], bucket: UsageBucket): UsageSeriesRow[] {
+  if (bucket === "day") return rows;
+  const buckets = new Map<string, UsageSeriesRow>();
+  for (const row of rows) {
+    const date = bucketStart(row.date, bucket);
+    let target = buckets.get(date);
+    if (!target) {
+      target = { date };
+      for (const key of series) target[key] = null;
+      buckets.set(date, target);
+    }
+    for (const key of series) {
+      const value = row[key];
+      if (typeof value === "number") {
+        const current = target[key];
+        target[key] = (typeof current === "number" ? current : 0) + value;
+      }
+    }
+  }
+  return [...buckets.values()];
 }
 
 export { type UsageSeriesRow, usageSeries, usageTotalSeries } from "@openbot/team-client/usage-series";

@@ -2,13 +2,15 @@ import type { PartialTranslation } from "../../../message";
 import type { messages as source } from "../../en/error/update";
 
 export const messages = {
-  // Updater state the user reads.
   "error.update.unsupported": "설치된 데스크톱 빌드에서만 업데이트할 수 있어요.",
   "error.update.notReady": "설치할 업데이트가 아직 준비되지 않았어요.",
   "error.update.restartFailed": "OpenBot이 업데이트를 설치하기 위해 다시 시작하지 못했어요.",
   "error.update.downloadStalled": "업데이트 다운로드가 응답하지 않아요. 다시 시도해 주세요.",
   "error.update.installFailed": "업데이트를 설치할 수 없었어요. OpenBot을 종료한 후 다시 열고 다시 시도해 주세요.",
+  "error.update.notInstalled": "마지막 재시작에서 업데이트가 설치되지 않았어요. 다시 시작해서 다시 시도해 주세요.",
   "error.update.downloadFailed": "업데이트를 다운로드할 수 없었어요. 다시 시도해 주세요.",
+  "error.update.signatureNotConfirmed":
+    "OpenBot이 업데이트를 확인할 수 없었어요. 다시 시도해 주세요. 이 오류가 계속되면 openbot.run/download에서 OpenBot을 다운로드하세요.",
   "error.update.checkFailed": "업데이트를 확인할 수 없었어요. 다시 시도해 주세요.",
   "error.update.checkStalled": "업데이트 확인이 응답하지 않아요. 다시 시도해 주세요.",
   "error.update.checkOffline": "업데이트 서비스에 연결할 수 없어요. 인터넷 연결을 확인한 후 다시 시도해 주세요.",
@@ -23,7 +25,12 @@ export const messages = {
   "error.update.siblingSessionSameAccount":
     "이 사용자 계정에서 다른 OpenBot 프로세스가 아직 실행 중이에요. 종료한 후 업데이트를 다시 설치해 주세요.",
   "error.update.siblingCheckFailed": "다른 OpenBot 세션을 확인할 수 없었어요. 설치하기 전에 다시 시도해 주세요.",
-  // A joined server's admin reads these from the host.
+  "error.update.readOnlyLocation":
+    "이 위치에서는 OpenBot 업데이트를 설치할 수 없습니다. OpenBot을 종료하세요. Finder에서 OpenBot을 응용 프로그램 폴더로 드래그하세요(이미 그곳에 있다면 밖으로 꺼냈다가 다시 넣으세요). 그런 다음 OpenBot을 열고 업데이트를 다시 설치하세요.",
+  "error.update.appImageMissing":
+    "AppImage 파일이 이동되었거나 이름이 바뀌었거나 교체되어 OpenBot이 업데이트를 설치할 수 없습니다. OpenBot을 종료한 다음 AppImage 파일을 다시 여세요.",
+  "error.update.appImageReadOnly":
+    "OpenBot은 AppImage 파일이 있는 폴더에 업데이트를 설치할 수 없습니다. OpenBot을 종료하고 AppImage 파일을 홈 폴더 안의 폴더로 옮긴 다음, 파일을 열고 업데이트를 다시 설치하세요.",
   "error.update.remoteDisabled": "이 컴퓨터에서는 서버 관리자의 업데이트가 꺼져 있어요.",
   "error.update.restartStarted": "OpenBot이 업데이트를 설치하기 위해 이미 다시 시작하고 있어요.",
   "error.update.alreadyRestarting": "OpenBot이 이미 다시 시작하고 있어요.",

@@ -1,8 +1,3 @@
-// The Google token broker. A host sends the two token requests of a Google sign-in here: the code
-// exchange and the refresh. Signal adds the client secret of the OpenBot Google sign-in app, passes
-// the request to Google, and returns Google's status and body. It stores nothing, and it never logs
-// the request, the answer, the code or a token. See `@openbot/contracts/signal-protocol/google-oauth`.
-
 import {
   GOOGLE_OAUTH_REDIRECT_PATTERN,
   type GoogleOAuthBrokerErrorBody,
@@ -12,11 +7,8 @@ import {
 import { z } from "zod";
 import type { GoogleOAuthConfig } from "./config";
 
-// A request holds one code, one verifier or one refresh token: a few hundred bytes.
 export const GOOGLE_OAUTH_REQUEST_BYTES_LIMIT = 8 * 1024;
-// A token set is a few kilobytes. A larger answer is not one.
 const GOOGLE_OAUTH_ANSWER_BYTES_LIMIT = 64 * 1024;
-// The host waits 10 seconds for a token exchange. Signal stops a little before it.
 const GOOGLE_OAUTH_TIMEOUT_MS = 8_000;
 
 const valueSchema = z.string().min(1).max(2_048);
@@ -41,7 +33,6 @@ const requestSchema = z.discriminatedUnion("grant", [
   }),
 ]) satisfies z.ZodType<GoogleOAuthTokenRequest>;
 
-/** The request, or null when it does not match the contract. */
 export function decodeGoogleOAuthTokenRequest(body: Uint8Array): GoogleOAuthTokenRequest | null {
   try {
     const parsed = requestSchema.safeParse(JSON.parse(new TextDecoder().decode(body)));
@@ -56,7 +47,6 @@ export function googleOAuthError(status: number, code: GoogleOAuthBrokerErrorCod
   return Response.json(body, { status, headers: { "Cache-Control": "no-store" } });
 }
 
-/** Passes one token request to Google with the client secret, and returns Google's answer as it is. */
 export async function exchangeGoogleToken(
   config: GoogleOAuthConfig,
   request: GoogleOAuthTokenRequest,
@@ -90,19 +80,16 @@ export async function exchangeGoogleToken(
       headers: { "Content-Type": "application/json", "Cache-Control": "no-store" },
     });
   } catch (error) {
-    // Only the error name: a fetch error can quote the request.
     console.error("The Google token request failed.", error instanceof Error ? error.name : "Unknown error");
     return googleOAuthError(502, "upstream_failed");
   }
 }
 
-/** Google's answer, or null when it is larger than the limit. */
 async function readAnswer(answer: Response): Promise<Uint8Array<ArrayBuffer> | null> {
   const chunks: Uint8Array[] = [];
   let size = 0;
   for await (const chunk of answer.body ?? []) {
     size += chunk.byteLength;
-    // Leaving the loop cancels the rest of the body.
     if (size > GOOGLE_OAUTH_ANSWER_BYTES_LIMIT) return null;
     chunks.push(chunk);
   }

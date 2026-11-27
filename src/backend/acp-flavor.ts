@@ -1,34 +1,74 @@
 import { win32 } from "node:path";
-import type { LoadSessionResponse, NewSessionRequest, PromptResponse, RequestError } from "@agentclientprotocol/sdk";
+import {
+  type LoadSessionResponse,
+  type NewSessionRequest,
+  type PromptResponse,
+  RequestError,
+  type SessionUpdate,
+} from "@agentclientprotocol/sdk";
+import { agentProviderName } from "@openbot/contracts/agent-providers";
 import type { DynamicRecord } from "@openbot/contracts/runtime-values";
+import { sourceText } from "@openbot/i18n/source";
+import { type CauseCode, classifyFailure } from "@openbot/telemetry";
+import type { GeneratedMediaKind } from "./agent/image-generation";
+import { PLAN_APPROVE, PLAN_STOP, PLAN_UNANSWERED, planApprovalQuestion } from "./agent/plan-approval";
 import { enableCursorMcpServers } from "./cursor-mcp-disabled";
-import { isRecord } from "./protocol";
+import { grokMediaItem, grokMediaKind, grokMediaToolKind } from "./grok-media";
+import { grokMcpServerName } from "./mcp-provider-shapes";
+import { isRecord, type ThreadItem } from "./protocol";
 
-/** The custom endpoint that serves a model, as a turn's error names it. Never a credential itself. */
-export interface AcpCustomEndpoint {
-  readonly name: string;
-  /** Whether the endpoint has a saved API key or header. */
-  readonly hasCredentials: boolean;
+interface AcpRetryNotice {
+  readonly sessionId: string;
+  readonly attempt: number;
+  readonly maxAttempts: number;
+  readonly unreachable: boolean;
 }
 
-/**
- * What one ACP agent does differently from the protocol. `AcpAgentClient` reads each hook at the
- * place that the agent's behavior changes; an absent hook is the protocol's own behavior. Add a hook
- * only for an observed agent version, and name that version where the hook is set.
- */
+export type AcpRetryCause = "unreachable" | "outOfMemory" | "serverError";
+
+interface AcpRetryUpdate {
+  readonly attempt: number;
+  readonly cause: AcpRetryCause;
+}
+
+export interface AcpReplyEvent {
+  readonly sessionId: string;
+  readonly reply: string;
+  readonly failure: string | null;
+}
+
+export interface AcpCustomEndpoint {
+  readonly name: string;
+  readonly hasCredentials: boolean;
+  readonly stallMs?: number;
+  readonly contextWindow?: number;
+}
+
+export interface AcpMcpServerFailure {
+  readonly sessionId: string;
+  readonly name: string;
+  readonly reason: string;
+}
+
+interface AcpTaskTurns {
+  readonly startsTask: (toolCallId: string, input: unknown) => boolean;
+  readonly toolCallKey: (toolCallId: string) => string;
+}
+
 export interface AcpFlavor {
-  /** The `clientInfo` that `initialize` sends. Absent: `OPENBOT_ACP_CLIENT_INFO`. */
+  mediaTools?: {
+    kind(update: {
+      _meta?: unknown;
+      title?: string | null;
+      rawInput?: unknown;
+      rawOutput?: unknown;
+    }): GeneratedMediaKind | null;
+    item(kind: GeneratedMediaKind, call: ThreadItem, content: unknown): ThreadItem;
+    permitted(request: { _meta?: unknown; title?: string | null }): GeneratedMediaKind | null;
+  };
   clientInfo?: { name: string; title: string; version: string };
-  /**
-   * Whether an error names this missing session. `null` gives the decision to the protocol's
-   * `-32002` rule. Another error code or another session must never replace a provider session.
-   */
   sessionNotFound?(error: RequestError, sessionId: string): boolean | null;
-  /**
-   * The message of a failed turn, from the redacted failure text. `redact` masks more text, `log`
-   * writes a diagnostic that it redacts first, and `model` is the session's model. `endpoint` is the
-   * custom endpoint that serves that model, or null.
-   */
+  authRequiredSignsOut?: boolean;
   turnFailure?(
     error: unknown,
     detail: string,
@@ -36,204 +76,545 @@ export interface AcpFlavor {
     log: (text: string) => void,
     model: string | null,
     endpoint: AcpCustomEndpoint | null,
+    savedKey: boolean,
+    providerKeyStored: (provider: string) => boolean,
+    label: string,
+    refusalStatus: () => number | null,
+    savedKeyShadowed: () => boolean,
   ): string;
-  /** The message of a turn that ended with no answer text. Absent: such a turn succeeds. */
-  emptyAnswerFailure?(reasoned: boolean): string;
-  /**
-   * What to do when `session/load` or `session/resume` fails: wait once for a process that still
-   * starts, or list the sessions to find out whether this one exists. `null` reports the failure.
-   */
-  restoreFailure?(error: unknown, method: "load" | "resume"): "wait-for-start" | "list-sessions" | null;
-  /** A failed model refresh keeps the last list that the agent gave. */
+  failureCause?(error: unknown, answer: string): CauseCode | null;
+  failureReport?: RegExp;
+  emptyAnswerFailure?(
+    turn: { reasoned: boolean; answered: boolean; showedPlanOrCompaction: boolean },
+    label: string,
+  ): string | null;
+  emptyAnswerError?: RegExp;
+  textToolCallFailure?(answer: string): string | null;
+  restoreFailure?(
+    error: unknown,
+    method: "load" | "resume",
+  ): "wait-for-start" | "list-sessions" | "confirm-missing" | null;
+  stillStarting?(error: unknown): boolean;
+  lostTurns?: { refusal: RegExp; unsent: RegExp; discard(sessionId: string): readonly string[] };
+  refusesUntilRestart?(error: unknown): boolean;
+  lostServerUntilRestart?(error: unknown): boolean;
+  serverLost?(error: unknown): boolean;
+  sessionBusy?(error: unknown): boolean;
+  sessionStillActive?(error: unknown): boolean;
+  configConflict?(error: unknown): boolean;
+  staleSession?(error: unknown): boolean;
   keepModelsOnRefreshFailure?: true;
-  /**
-   * The model belongs to the agent's process, not to one session: a model set moves every session
-   * to it. A set of the model the process already runs on is not sent again.
-   */
+  noModelsAfterRetry?(): string;
   processWideModel?: true;
-  /**
-   * A `session/set_model` failure after which the session already runs on the new model. The agent
-   * changes the session first and then fails to save the model as its default.
-   */
+  setsConfigOnlyOnChange?: true;
   modelSetUnsaved?(error: RequestError): boolean;
-  /**
-   * The agent frees what a session holds only when its process ends, not at `session/close`. Model
-   * discovery then resumes one probe session for each process rather than opening another.
-   */
+  modelNotOffered?(error: RequestError): boolean;
+  modelConfigId?: string;
+  configSetUnsaved?(error: RequestError): boolean;
   closeKeepsSession?: true;
-  /**
-   * Each session gets a process of its own, and an idle session is closed by ending that process.
-   * For an agent with `closeKeepsSession`.
-   */
+  probeCloseDelayMs?: number;
+  sessionFiles?(argv: readonly string[], sessionId: string): readonly string[];
+  effortCategories?: readonly string[];
+  promptMediaBase64Bytes?: number;
   sessionProcesses?: true;
-  /** An agent that sends a failed prompt as answer text and ends the turn as a success. */
+  modelsLoadWithSession?: true;
+  sessionProcessesBefore?: string;
   sdkHarness?: {
-    /** The session whose prompt failed, from a stderr line. */
     failedSession(stderrLine: string): string | undefined;
-    /** The start of an answer that is the failure text, when no stderr line came. */
     answerIsFailure: RegExp;
-    /** The message of a turn that failed in this way, from the failure text. */
+    retryNotice?(text: string): number | null;
+    emptyOutputFailure?: RegExp;
+    textToolCall?: { starts: readonly string[]; whole: RegExp };
     turnFailure(text: string): string;
-    /** The message of an answer chunk that reports an exhausted quota, or `null`. */
+    fallbackCause?(text: string, reachedModel: boolean): CauseCode | null;
+    accountLink?(text: string, argv: readonly string[], sessionId: string): string | null;
+    accountVerification?: RegExp;
     quota(text: string): string | null;
-    /** The MCP server whose failed start ended the turn, from the failure text, or `null`. */
     mcpLoadFailure(text: string): { name: string; reason: string } | null;
+    refusedMcpTools?(text: string, argv: readonly string[], sessionId: string): string[];
+    loggedFailure?(text: string, argv: readonly string[], sessionId: string): string | null;
+    silentFailure?(argv: readonly string[], sessionId: string, since: number): string | null;
+    sessionLost?: RegExp;
   };
-  /** A stop finishes the turn locally, and the next prompt opens the session again first. */
   cancelLocallyThenResume?: true;
-  /** A turn that does not complete marks its open tool calls as stopped. */
+  steerByPromptSince?: string;
+  steerByPromptCapability?: string;
   interruptToolsOnStop?: true;
-  /** Answer text is shown at once, not only when `session/prompt` answers. */
   streamAnswerBeforePromptReturns?: true;
-  /**
-   * A model can stream its reasoning between the tokens of one answer, so a thought does not end
-   * the answer text. A tool call or the end of the turn still does.
-   */
   thoughtsInsideAnswer?: true;
-  /**
-   * `session/prompt` stays open with no update while background tasks run, so a silent turn is not
-   * stalled and OpenBot does not end it (`ACP_TURN_STALL_MS`).
-   */
+  resumesAnswerAfterThought?: { report: RegExp };
   promptOpenForBackgroundTasks?: true;
-  /**
-   * The agent answers a finished background task in a turn of its own and sends no session update
-   * for it. Only its `session/load` replays that turn. A tool call that leaves a task running ends
-   * with `rawOutput.metadata.status` "running" and the task's `sessionID`.
-   */
+  silentTurnLimitMs?: number;
   unsentBackgroundTurns?: true;
-  /** Each answer message has its own `messageId`, so text of a new ID is a new message, not more text. */
+  unsentTaskTurns?: AcpTaskTurns;
+  wakesAfterPromptEnds?: true;
+  restartNoticeOnReload?: true;
+  selfWakeTools?: RegExp;
   messagePerId?: true;
-  /**
-   * The agent keeps one MCP server of each name for a directory, and a session that opens there
-   * replaces the server that the others in it use. Their OpenBot servers then share one token.
-   */
+  resendsAnswer?: true;
+  childSessionUpdates?: true;
+  retryNotice?: (method: string, params: DynamicRecord) => AcpRetryNotice | null;
+  clientMeta?: DynamicRecord;
+  replyEvent?: (method: string, params: DynamicRecord) => AcpReplyEvent | null;
+  retryUpdate?: (update: SessionUpdate) => AcpRetryUpdate | null;
+  modelRetryUpdate?: (update: SessionUpdate) => boolean;
+  turnStallMs?: number;
+  openToolStallMs?: number;
+  subagentTools?: readonly string[];
   mcpServersPerDirectory?: true;
-  /**
-   * The agent connects to each MCP server of a session before it answers `session/new` or
-   * `session/load`, and leaves out a server that did not load with no error. A session that OpenBot's
-   * servers did not reach then fails, as the agent cannot use OpenBot's tools.
-   */
   mcpServersLoadWithSession?: true;
-  /** Turns OpenBot's servers back on where the agent's own settings for `cwd` turned them off. */
+  mcpConnectLimitMs?: number;
+  mcpListLimit?: { ms: number; since: string };
+  relayStdioMcpServers?: true | "unconfined";
+  mcpServerFailure?(method: string, params: DynamicRecord): AcpMcpServerFailure | null;
+  mcpServerName?(name: string): string;
+  ownMcpServerNames?(cwd: string, argv: readonly string[]): readonly string[];
+  mcpServerLimit?: number;
   enableMcpServers?(cwd: string, names: readonly string[]): void;
-  /** OpenBot compacts by replacing the session, for an agent that reports `usage_update` and has no compact request. */
+  mcpToolCallLimitMs?: number;
+  mcpToolsFixedAtStart?: true;
+  catalogAsMcpTools?: true;
   contextCompaction?: "handoff";
-  /** A whole answer chunk that is the agent's own transport error, not answer text. OpenBot drops it. */
+  compactsItself?: true;
+  reopenKeepsPrompts?: true;
   noiseChunk?: RegExp;
-  /**
-   * A whole answer chunk that tells that the agent's process lost its sign-in. OpenBot fails the
-   * turn and ends the process, so the next turn starts a process that reads the sign-in again.
-   */
   signInLostChunk?: RegExp;
-  /** The `_meta` of each `session/new`, `session/load` and `session/resume` request. */
+  signInUnusable?(error: RequestError): string | null;
+  planUsedUpChunk?: RegExp;
+  connectionLostChunk?: RegExp;
+  approvedEditSweep?: RegExp;
+  mcpCallInputNamesServer?: true;
+  bridgeToolsWithoutCard?: true;
   sessionMeta?: NewSessionRequest["_meta"];
-  /**
-   * OpenBot opens a saved session with `session/load`, also when the agent advertises
-   * `session/resume`, and this tells from a successful load reply that the session is missing.
-   */
+  workspaceAsAdditionalDirectory?: true;
   loadInsteadOfResume?: { missing(response: LoadSessionResponse): boolean };
-  /** The usage of this prompt alone, for an agent that sends it in the `_meta` of the prompt result, not in `usage`. */
   promptUsage?(response: PromptResponse): DynamicRecord | null;
+  promptRun?(response: PromptResponse): string | undefined;
+  userQuestions?: AcpUserRequest;
+  planApproval?: AcpUserRequest;
 }
 
-/** The protocol's own behavior: Cline. */
+interface AcpUserRequest {
+  method: string;
+  questions?(params: DynamicRecord): DynamicRecord[];
+  reply(
+    questions: readonly { id: string; question: string }[],
+    answers: Readonly<Record<string, readonly string[]>>,
+  ): DynamicRecord;
+}
+
 export const DEFAULT_ACP_FLAVOR: AcpFlavor = {};
 
-/**
- * Grok CLI 1.0.22 and 1.0.70 send no `usage` in the `session/prompt` result and no `usage_update`.
- * The result's `_meta.usage` holds the tokens and the cost of this prompt's model calls (#4827).
- */
-export const GROK_ACP_FLAVOR: AcpFlavor = {
-  promptUsage: (response) => (isRecord(response._meta) && isRecord(response._meta.usage) ? response._meta.usage : null),
+const COPILOT_PLAN_USED_UP =
+  /^\s*(?:Add a payment method to continue\.?|Error: You have exceeded your monthly quota\b[^\n]*)\s*$/u;
+const COPILOT_PLAN_USED_UP_TEXT = /\bAdd a payment method to continue\b|\bexceeded your monthly quota\b/u;
+
+export const CLINE_ACP_FLAVOR: AcpFlavor = {
+  subagentTools: ["spawn_agent"],
+  sessionNotFound: (error, sessionId) =>
+    error.code === -32603 ? isRecord(error.data) && error.data.details === `session not found: ${sessionId}` : null,
 };
 
-/**
- * Hermes Agent 0.21.5 answers a `session/resume` of a missing session with a new session, and the
- * reply does not give its id: each later prompt to the saved id then ends as "refusal". Its
- * `session/load` of a missing session answers null, which the SDK gives as an empty reply. A load of
- * a session that exists always gives its `modes`.
- */
+const COPILOT_SESSION_EVENT = "github.com/copilot/sessionEvent";
+
+export const COPILOT_ACP_FLAVOR: AcpFlavor = {
+  relayStdioMcpServers: true,
+  turnFailure: copilotTurnFailure,
+  planUsedUpChunk: COPILOT_PLAN_USED_UP,
+  failureCause: (error) => (COPILOT_PLAN_USED_UP_TEXT.test(errorText(error)) ? "usage_limit" : null),
+  compactsItself: true,
+  clientMeta: { "github.com/copilot": { events: ["session.error", "session.info"] } },
+  replyEvent: copilotReplyEvent,
+};
+
+function copilotReplyEvent(method: string, params: DynamicRecord): AcpReplyEvent | null {
+  const { sessionId, type, data, agentId } = params;
+  if (method.replace(/^_/u, "") !== COPILOT_SESSION_EVENT || agentId !== undefined) return null;
+  if (typeof sessionId !== "string" || !isRecord(data) || typeof data.message !== "string") return null;
+  if (type === "session.error") return { sessionId, reply: `Error: ${data.message}`, failure: data.message };
+  if (type === "session.info" && data.infoType === "model_retry")
+    return { sessionId, reply: `Info: ${data.message}`, failure: null };
+  return null;
+}
+
+function copilotTurnFailure(_error: unknown, detail: string): string {
+  if (COPILOT_PLAN_USED_UP_TEXT.test(detail))
+    return sourceText("error.provider.acpPlanUsedUp", { provider: agentProviderName("copilot") });
+  if (/\bmissing_finish_reason\b/u.test(detail)) return sourceText("error.provider.copilotAnswerIncomplete");
+  return /"thinking\.type\.enabled" is not supported for this model/u.test(detail)
+    ? sourceText("error.provider.copilotThinkingRejected")
+    : detail;
+}
+
+function errorText(error: unknown): string {
+  if (!(error instanceof Error)) return String(error);
+  const data = isRecord(error) && "data" in error ? JSON.stringify(error.data) : undefined;
+  return data ? `${error.message} ${data}` : error.message;
+}
+
+function noAnswerUnlessPlanOrCompaction(
+  { showedPlanOrCompaction }: { showedPlanOrCompaction: boolean },
+  label: string,
+): string | null {
+  return showedPlanOrCompaction ? null : sourceText("error.provider.acpNoAnswer", { provider: label });
+}
+
+function grokMcpServerFailure(method: string, params: DynamicRecord): AcpMcpServerFailure | null {
+  if (method !== "x.ai/mcp/server_status" || params.status !== "unavailable" || params.reason !== "handshake_failed")
+    return null;
+  if (typeof params.sessionId !== "string" || typeof params.name !== "string") return null;
+  const reason = typeof params.detail === "string" && params.detail.trim() ? params.detail.trim() : params.reason;
+  return { sessionId: params.sessionId, name: params.name, reason };
+}
+
+export const GROK_ACP_FLAVOR: AcpFlavor = {
+  mediaTools: { kind: grokMediaKind, item: grokMediaItem, permitted: grokMediaToolKind },
+  promptUsage: (response) => (isRecord(response._meta) && isRecord(response._meta.usage) ? response._meta.usage : null),
+  emptyAnswerError: /\bempty response from model\b/u,
+  emptyAnswerFailure: noAnswerUnlessPlanOrCompaction,
+  mcpServerFailure: grokMcpServerFailure,
+  mcpServerName: grokMcpServerName,
+  relayStdioMcpServers: "unconfined",
+  restoreFailure: (error) =>
+    error instanceof RequestError && error.code === -32603 && isRecord(error.data) && error.data.code === "FS_NOT_FOUND"
+      ? "confirm-missing"
+      : null,
+  userQuestions: {
+    method: "x.ai/ask_user_question",
+    reply: (questions, answers) => {
+      const given = questions.flatMap((question): [string, string | readonly string[]][] => {
+        const [first, ...more] = answers[question.id] ?? [];
+        if (first === undefined) return [];
+        return [[question.question, more.length > 0 ? [first, ...more] : first]];
+      });
+      return given.length > 0
+        ? { outcome: "accepted", answers: Object.fromEntries(given), annotations: {} }
+        : { outcome: "cancelled" };
+    },
+  },
+  planApproval: {
+    method: "x.ai/exit_plan_mode",
+    questions: (params) => [planApprovalQuestion(params.planContent)],
+    reply: (questions, answers) => grokPlanReply(answers[questions[0]?.id ?? ""]?.[0]?.trim()),
+  },
+  retryNotice: grokRetryNotice,
+  turnStallMs: 12 * 60_000,
+  openToolStallMs: 30 * 60_000,
+  turnFailure: grokTurnFailure,
+};
+
+function grokPlanReply(answer: string | undefined): DynamicRecord {
+  if (!answer) return { outcome: "abandoned", feedback: PLAN_UNANSWERED };
+  if (answer === PLAN_APPROVE) return { outcome: "approved" };
+  if (answer === PLAN_STOP) return { outcome: "abandoned" };
+  return { outcome: "request_changes", feedback: answer };
+}
+
+function grokTurnFailure(error: unknown, detail: string): string {
+  if (!(error instanceof RequestError)) return detail;
+  const cause = classifyFailure(detail);
+  if (cause === "network") return sourceText("error.provider.grokConnectionFailed");
+  if (cause === "provider_unavailable" || cause === "timeout") return sourceText("error.provider.grokServiceFailure");
+  return detail;
+}
+
+const GROK_RETRY_TYPES: ReadonlyMap<string, boolean> = new Map([
+  ["api", false],
+  ["idle_timeout", false],
+  ["http", true],
+]);
+
+function grokRetryNotice(method: string, params: DynamicRecord): AcpRetryNotice | null {
+  if (method.replace(/^_/u, "") !== "x.ai/session_notification") return null;
+  const { sessionId, update } = params;
+  if (!isRecord(update) || update.sessionUpdate !== "retry_state" || update.type !== "retrying") return null;
+  const unreachable = typeof update.error_type === "string" ? GROK_RETRY_TYPES.get(update.error_type) : undefined;
+  const { attempt, max_retries: maxAttempts } = update;
+  if (unreachable === undefined || typeof sessionId !== "string") return null;
+  if (typeof attempt !== "number" || typeof maxAttempts !== "number") return null;
+  return { sessionId, attempt, maxAttempts, unreachable };
+}
+
+const HERMES_LOST_TURNS: NonNullable<AcpFlavor["lostTurns"]> = {
+  refusal: /\bunknown_execution\b/u,
+  unsent: /\(nothing was submitted\)/u,
+  discard: (sessionId) => ["sessions", "discard", sessionId, "--yes"],
+};
+
+function hermesTurnFailure(error: unknown, detail: string): string {
+  if (isRecord(error) && isRecord(error.data) && error.data.details === "admitted_turn_failed")
+    return sourceText("error.provider.hermesTurnFailed");
+  if (hermesGatewayLost(error)) return sourceText("error.provider.hermesConnectionLost");
+  return hermesRefusal(error) ? sourceText("error.provider.hermesRefused") : detail;
+}
+
+function hermesGatewayLost(error: unknown): boolean {
+  return (
+    error instanceof RequestError &&
+    error.code === -32603 &&
+    isRecord(error.data) &&
+    typeof error.data.details === "string" &&
+    /^Gateway disconnected\b/u.test(error.data.details)
+  );
+}
+
+function hermesRefusal(error: unknown): boolean {
+  return (
+    error instanceof RequestError &&
+    error.code === -32603 &&
+    isRecord(error.data) &&
+    error.data.details === "invalid_params"
+  );
+}
+
+function kimiStaleSession(error: unknown): boolean {
+  return (
+    error instanceof RequestError &&
+    error.code === -32600 &&
+    isRecord(error.data) &&
+    error.data.code === "session.stale"
+  );
+}
+
+function hermesSessionBusy(error: unknown): boolean {
+  return (
+    error instanceof RequestError &&
+    error.code === -32603 &&
+    isRecord(error.data) &&
+    error.data.details === "session_busy"
+  );
+}
+
+function hermesRevisionConflict(error: unknown): boolean {
+  return (
+    error instanceof RequestError &&
+    error.code === -32603 &&
+    isRecord(error.data) &&
+    error.data.details === "revision_conflict"
+  );
+}
+
+const HERMES_FAILURE_REASONS: Readonly<Partial<Record<string, CauseCode>>> = {
+  auth: "authentication",
+  auth_permanent: "authentication",
+  billing: "billing",
+  rate_limit: "rate_limit",
+  upstream_rate_limit: "rate_limit",
+  overloaded: "provider_unavailable",
+  server_error: "provider_unavailable",
+  timeout: "timeout",
+};
+
+const HERMES_FAILURE_SUMMARY = /^\s*[^\n]+\n\nProvider said: ([^\n]+)/u;
+
+function hermesFailureCause(error: unknown, answer: string): CauseCode | null {
+  if (!isRecord(error) || !isRecord(error.data) || error.data.details !== "admitted_turn_failed") return null;
+  const { failure_reason: reason, message } = error.data;
+  const named = typeof reason === "string" ? HERMES_FAILURE_REASONS[reason] : undefined;
+  if (named) return named;
+  const said = HERMES_FAILURE_SUMMARY.exec(typeof message === "string" && message ? message : answer)?.[1];
+  const cause = said ? classifyFailure(said) : "unknown";
+  return cause === "unknown" ? null : cause;
+}
+
+function hermesSessionNotFound(error: RequestError): boolean | null {
+  return error.code === -32603 && isRecord(error.data) && error.data.details === "not_found" ? true : null;
+}
+
+const HERMES_MCP_SERVER_LIMIT = 16;
+
+const HERMES_SESSION_MCP_SINCE = "0.22.3";
+
 export const HERMES_ACP_FLAVOR: AcpFlavor = {
   loadInsteadOfResume: { missing: (response) => response.modes == null },
+  sessionNotFound: hermesSessionNotFound,
+  lostTurns: HERMES_LOST_TURNS,
+  refusesUntilRestart: hermesRefusal,
+  lostServerUntilRestart: hermesGatewayLost,
+  sessionBusy: hermesSessionBusy,
+  configConflict: hermesRevisionConflict,
+  mcpServerLimit: HERMES_MCP_SERVER_LIMIT,
+  sessionProcessesBefore: HERMES_SESSION_MCP_SINCE,
+  setsConfigOnlyOnChange: true,
+  resendsAnswer: true,
+  subagentTools: ["delegate_task"],
+  turnFailure: hermesTurnFailure,
+  failureCause: hermesFailureCause,
+  failureReport: HERMES_FAILURE_SUMMARY,
+  catalogAsMcpTools: true,
 };
 
-/**
- * Cursor puts the missing session in `data.message` and reports only "Invalid params" in `message`.
- * Other invalid parameters must not cause a provider session to be replaced.
- */
+const CURSOR_STREAM_FAILURE = /\bRetriableError: \[(?:canceled|aborted|unavailable|deadline_exceeded)\] /u;
+
+function cursorTurnFailure(error: unknown, detail: string): string {
+  return CURSOR_STREAM_FAILURE.test(errorText(error))
+    ? sourceText("error.provider.acpServerLost", { provider: agentProviderName("cursor") })
+    : detail;
+}
+
 export const CURSOR_ACP_FLAVOR: AcpFlavor = {
   sessionNotFound: (error, sessionId) =>
     error.code === -32602 ? isRecord(error.data) && error.data.message === `Session "${sessionId}" not found` : null,
-  // Cursor 2026.10.22-27dcf5f sends "\n\nError: RetriableError: WritableIterable is closed" as one
-  // chunk after a turn that succeeded, and then ends the turn (#3334). Only the full chunk matches.
   noiseChunk: /^\s*Error: (?:[\w$]+: )?WritableIterable is closed\s*$/u,
-  // Cursor 2026.10.22-27dcf5f keeps its access token in memory for the life of the process, and
-  // refreshes it there only with an API key. When its server refuses the token, each turn of each
-  // session sends only one of these chunks until the process ends. A new process reads the Keychain
-  // again (#4614).
   signInLostChunk:
     /^\n\n(?:Please sign in to continue|Error: \[unauthenticated\] Backend rejected authentication\.[^\n]*)$/u,
-  // Cursor 2026.10.22-27dcf5f asks its server for the model list on each model set, and reports a
-  // failed request as "Invalid model value" (#3800). One set per change, not one per turn.
+  signInUnusable: (error) =>
+    error.code === -32603 && isRecord(error.data) && error.data.message === "Failed to initialize session services"
+      ? sourceText("error.provider.cursorSignInUnusable")
+      : null,
+  noModelsAfterRetry: () => sourceText("error.provider.cursorNoModels"),
+  planUsedUpChunk: /^(?:\n\nUpgrade your plan to continue|\s*Add a payment method to continue\.?\s*)$/u,
+  connectionLostChunk: /^\s*Error: RetriableError: \[(?:canceled|aborted|unavailable|deadline_exceeded)\] [^\n]*\s*$/u,
+  turnFailure: cursorTurnFailure,
+  failureCause: (error) => (CURSOR_STREAM_FAILURE.test(errorText(error)) ? "network" : null),
   processWideModel: true,
-  // Cursor 2026.10.22-27dcf5f leaves out a disabled or blocked server, and the agent turn then
-  // finds no OpenBot tools (#3058).
   mcpServersLoadWithSession: true,
   enableMcpServers: enableCursorMcpServers,
 };
 
-/**
- * Kimi CLI 1.52.0 refuses `session/load` and `session/resume` for a session that it does not have
- * with "Invalid params" and `{ session_id: "Session not found" }`. Only that exact data counts: other
- * invalid parameters, such as an unknown model, must not cause a provider session to be replaced.
- */
+const KIMI_CODE_TOOL_CALL_TURN = /^\d+:/u;
+
+const KIMI_TASK_TURNS: AcpTaskTurns = {
+  startsTask: (toolCallId, input) =>
+    KIMI_CODE_TOOL_CALL_TURN.test(toolCallId) &&
+    isRecord(input) &&
+    (input.run_in_background === true || typeof input.task_id === "string"),
+  toolCallKey: (toolCallId) => toolCallId.replace(KIMI_CODE_TOOL_CALL_TURN, ""),
+};
+
 export const KIMI_ACP_FLAVOR: AcpFlavor = {
   sessionNotFound: (error) =>
     error.code === -32602 ? isRecord(error.data) && error.data.session_id === "Session not found" : null,
-  // Kimi CLI 1.52.0 moves the session to the new model, and then saves it as the default model in
-  // its config.toml. In a confined process that file is protected, and the save fails with -32603.
   modelSetUnsaved: (error) =>
     error.code === -32603 &&
     isRecord(error.data) &&
     typeof error.data.details === "string" &&
     error.data.details.includes("config.toml"),
+  subagentTools: ["Agent"],
+  authRequiredSignsOut: true,
+  emptyAnswerFailure: noAnswerUnlessPlanOrCompaction,
+  mcpToolsFixedAtStart: true,
+  turnStallMs: 12 * 60_000,
+  staleSession: kimiStaleSession,
+  unsentBackgroundTurns: true,
+  unsentTaskTurns: KIMI_TASK_TURNS,
+  messagePerId: true,
 };
 
-/**
- * Devin CLI 3000.11.234 refuses `session/load` of a session that it does not have with -32016 and
- * `{ "cognition.ai/errorKind": "session_not_found" }`. Only that kind counts.
- */
 export const DEVIN_ACP_FLAVOR: AcpFlavor = {
   sessionNotFound: (error) =>
     error.code === -32016 ? isRecord(error.data) && error.data["cognition.ai/errorKind"] === "session_not_found" : null,
+  steerByPromptCapability: "cognition.ai/midTurnPrompts",
+  emptyAnswerError: /\bThe model ended its turn without a response\b/u,
+  promptRun: (response) => {
+    const run = isRecord(response._meta) ? response._meta["cognition.ai/userMessageId"] : undefined;
+    return typeof run === "string" ? run : undefined;
+  },
 };
 
-/**
- * omp 18.8.4 wraps its exact missing-ID error in an internal error (#1690). Other internal failures,
- * including an error for another session, are not lifecycle signals.
- */
+export const MISTRAL_ACP_FLAVOR: AcpFlavor = {
+  sessionNotFound: (error, sessionId) =>
+    error.code === -32602 ? isRecord(error.data) && error.data.session_id === sessionId : null,
+  workspaceAsAdditionalDirectory: true,
+  configSetUnsaved: (error) => error.code === -32602 && error.message.includes("cannot write config file"),
+  effortCategories: ["thought_level", "thinking"],
+  probeCloseDelayMs: 5_000,
+  sessionProcesses: true,
+};
+
 function ompSessionNotFound(error: RequestError, sessionId: string): boolean | null {
   return error.code === -32603
     ? isRecord(error.data) && error.data.details === `Unsupported ACP session: ${sessionId}`
     : null;
 }
 
-/** Oh My Pi (`omp acp`). Its rules are here when they do not apply to every custom agent. */
-const OMP_ACP_FLAVOR: AcpFlavor = { sessionNotFound: ompSessionNotFound };
+function geminiCliSessionNotFound(error: RequestError, sessionId: string): true | null {
+  if (error.code === -32602 && error.message === `Session not found: ${sessionId}`) return true;
+  const details = error.code === -32603 && isRecord(error.data) ? error.data.details : undefined;
+  return typeof details === "string" && details.startsWith(`Invalid session identifier "${sessionId}"`) ? true : null;
+}
 
-/**
- * A custom agent without a flavor of its own. It keeps omp's rule: the rule needs the exact session
- * ID, and an agent can reuse omp's error text.
- */
-const CUSTOM_ACP_FLAVOR: AcpFlavor = { sessionNotFound: ompSessionNotFound };
+function customSessionNotFound(error: RequestError, sessionId: string): boolean | null {
+  return geminiCliSessionNotFound(error, sessionId) ?? ompSessionNotFound(error, sessionId);
+}
 
-const CUSTOM_AGENT_FLAVORS: Readonly<Partial<Record<string, AcpFlavor>>> = { omp: OMP_ACP_FLAVOR };
+function customSessionStillActive(error: unknown): boolean {
+  return (
+    error instanceof RequestError && error.code === -32602 && /\bsession is already active\b/iu.test(errorText(error))
+  );
+}
 
-/**
- * The flavor of a custom agent, from the exact name of its command: `omp`, `/usr/local/bin/omp`
- * and `C:\bin\omp.exe` are Oh My Pi, `omp-dev` is not. A name in the middle of another name never
- * selects a flavor, because a wrong flavor can replace a session.
- */
+function customEmptyAnswerFailure({ answered }: { answered: boolean }, label: string): string | null {
+  return answered ? null : sourceText("error.provider.acpNoAnswer", { provider: label });
+}
+
+function customRefusal(error: unknown, detail: string, label: string): string {
+  return error === "refusal" ? sourceText("error.provider.acpRefusedNoReason", { provider: label }) : detail;
+}
+
+const customTurnFailure: NonNullable<AcpFlavor["turnFailure"]> = (
+  error,
+  detail,
+  _redact,
+  _log,
+  _model,
+  _endpoint,
+  _savedKey,
+  _providerKeyStored,
+  label,
+) => customRefusal(error, detail, label);
+
+function customFailureCause(error: unknown): CauseCode | null {
+  return error === "refusal" ? "unknown" : null;
+}
+
+const OMP_ACP_FLAVOR: AcpFlavor = {
+  reopenKeepsPrompts: true,
+  sessionNotFound: ompSessionNotFound,
+  emptyAnswerFailure: customEmptyAnswerFailure,
+  turnFailure: customTurnFailure,
+  failureCause: customFailureCause,
+};
+
+const CUSTOM_ACP_FLAVOR: AcpFlavor = {
+  sessionNotFound: customSessionNotFound,
+  sessionStillActive: customSessionStillActive,
+  emptyAnswerFailure: customEmptyAnswerFailure,
+  turnFailure: customTurnFailure,
+  failureCause: customFailureCause,
+};
+
+const CUSTOM_AGENT_FLAVORS: Readonly<Partial<Record<string, AcpFlavor>>> = {
+  omp: OMP_ACP_FLAVOR,
+  hermes: {
+    ...CUSTOM_ACP_FLAVOR,
+    sessionNotFound: (error, sessionId) => hermesSessionNotFound(error) ?? ompSessionNotFound(error, sessionId),
+    lostTurns: HERMES_LOST_TURNS,
+    refusesUntilRestart: hermesRefusal,
+    lostServerUntilRestart: hermesGatewayLost,
+    sessionBusy: hermesSessionBusy,
+    configConflict: hermesRevisionConflict,
+    mcpServerLimit: HERMES_MCP_SERVER_LIMIT,
+    sessionProcessesBefore: HERMES_SESSION_MCP_SINCE,
+    setsConfigOnlyOnChange: true,
+    resendsAnswer: true,
+    turnFailure: (error, detail, _redact, _log, _model, _endpoint, _savedKey, _providerKeyStored, label) =>
+      customRefusal(error, hermesTurnFailure(error, detail), label),
+    failureCause: (error, answer) => customFailureCause(error) ?? hermesFailureCause(error, answer),
+    failureReport: HERMES_FAILURE_SUMMARY,
+    catalogAsMcpTools: true,
+  },
+  kimi: {
+    ...CUSTOM_ACP_FLAVOR,
+    mcpToolsFixedAtStart: true,
+    staleSession: kimiStaleSession,
+    unsentBackgroundTurns: true,
+    unsentTaskTurns: KIMI_TASK_TURNS,
+    messagePerId: true,
+  },
+  "kiro-cli": { ...CUSTOM_ACP_FLAVOR, mcpToolCallLimitMs: 120_000, modelConfigId: "model" },
+};
+
 export function customAgentFlavor(command: string): AcpFlavor {
   const name = win32
     .basename(command)
@@ -244,7 +625,6 @@ export function customAgentFlavor(command: string): AcpFlavor {
 
 const FAILURE_DETAIL_LIMIT = 200;
 
-/** The provider's text after a failure kind. The renderer shows its generic sentence for text over 400 characters. */
 export function shownFailureDetail(text: string): string {
   const characters = Array.from(text);
   return characters.length > FAILURE_DETAIL_LIMIT

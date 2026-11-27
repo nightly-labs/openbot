@@ -1,10 +1,3 @@
-// Runs `send_gmail_draft` end to end on the real modules against a local stand-in for the Gmail API:
-// `findGmailDraft` finds the draft in the second of two signed-in accounts, the real `AttentionRegistry`
-// shows the card that `gmailSendCardSpec` builds, and the owner, a member and an admin answer it. It
-// checks that only a privileged Send sends, that Cancel and a member send nothing, that a draft changed
-// after the card is not sent, that Gmail's refusal leaves the card open, and that no token reaches an
-// answer, an event or a stored message. No Google account is used.
-// `bun scripts/gmail-send-draft-e2e.ts`. Writes .openbot-build/gmail-send-draft-e2e/report.json.
 import assert from "node:assert/strict";
 import { mkdir, rm, writeFile } from "node:fs/promises";
 import { createServer, type IncomingMessage, type ServerResponse } from "node:http";
@@ -42,7 +35,6 @@ const ADMIN: PromptResponder = { sender: { id: "admin-1", name: "Ada" }, privile
 
 const b64 = (value: string) => Buffer.from(value, "utf8").toString("base64url");
 
-/** The drafts of the second account. `messageId` changes when the agent edits a draft. */
 const drafts = new Map<string, { messageId: string; payload: unknown; refuse?: boolean }>([
   [
     DRAFT,
@@ -114,7 +106,6 @@ async function readJson(request: IncomingMessage): Promise<{ id?: string }> {
   return JSON.parse(Buffer.concat(chunks).toString("utf8"));
 }
 
-/** The Gmail API as `gmail-drafts.ts` calls it. Only the second account has drafts. */
 const gmail = createServer((request, response) => {
   void (async () => {
     const url = new URL(request.url ?? "/", "http://127.0.0.1");
@@ -149,7 +140,6 @@ const address = gmail.address();
 assert.ok(address && typeof address === "object", "the Gmail stand-in has no port");
 const api: GmailApi = { apiUrl: `http://127.0.0.1:${address.port}/gmail/v1/users/me` };
 
-/** Records what OpenBot answers to the agent, as raw JSON. The process never starts. */
 class RecordingClient extends CodexAppServerClient {
   readonly answers = new Map<RequestId, string>();
 
@@ -164,7 +154,6 @@ class RecordingClient extends CodexAppServerClient {
     this.#waiting.get(id)?.();
   }
 
-  /** Resolves when OpenBot answers request `id`. */
   answered(id: RequestId): Promise<void> {
     if (this.answers.has(id)) return Promise.resolve();
     return new Promise((done) => this.#waiting.set(id, done));
@@ -197,9 +186,9 @@ const registry = new AttentionRegistry({
       snapshot.revision += 1;
     },
   },
-  browser: { listTabs: () => [], beginTakeover: () => Effect.void, endTakeover: () => {} },
+  browser: { listTabs: () => [], beginTakeover: () => Effect.void, endTakeover: () => {}, toolCanUseTab: () => false },
   hostedSites: { prepareApproval: () => Effect.succeed(null), resolveApproval: () => Effect.void },
-  routines: { markNeedsAttention: () => {}, markRunningForTurn: () => {} },
+  routines: { markNeedsAttention: () => {}, markRunningForTurn: () => {}, runsTurn: () => false },
   emit: (event) => events.push(event),
   emitError: () => {},
   emitRuntimeSnapshot: () => {},
@@ -207,7 +196,6 @@ const registry = new AttentionRegistry({
 
 let nextRequest = 1;
 
-/** Finds the draft and shows its card, as `OpenBotToolRouter.#sendGmailDraft` does. */
 async function showDraft(draftId: string): Promise<{ id: number; spec: UiBlockSpec; draft: GmailDraft }> {
   const args = sendGmailDraftToolSchema.parse({ draftId });
   const draft = await Effect.runPromise(findGmailDraft([FIRST, SECOND], args.draftId, api));
@@ -279,7 +267,6 @@ try {
     assert.equal(fields[sourceText("status.agent.gmailSend.subject")], "Launch notes");
     assert.equal(fields[sourceText("status.agent.gmailSend.attachments")], "plan.pdf");
     assert.ok(!(sourceText("status.agent.gmailSend.bcc") in fields), "an empty Bcc line is shown");
-    // The body holds three backticks, so its fence must be longer to keep it one code block.
     assert.ok(card.spec.preview?.startsWith("````text\nHi Alex,\n```\nthe plan is ready.\n````"), card.spec.preview);
     assert.ok(uiBlockActionIsPrivileged(card.spec, GMAIL_SEND_ACTION_ID), "Send is not privileged");
     return fields;

@@ -1,0 +1,36 @@
+{
+  "slug": "instantly",
+  "name": "Instantly",
+  "tagline": "Cold email campaigns",
+  "description": "Instantly lets agents read campaigns, leads, and analytics, and draft campaigns and lead lists in the signed-in workspace. Each user signs in to their own Instantly account through the browser.",
+  "category": "productivity",
+  "creatorName": "Instantly",
+  "iconUrl": "https://avatars.githubusercontent.com/u/218805310?s=256&v=4",
+  "version": "1.0.0",
+  "prompts": [
+    { "id": "prompt-campaign-stats", "text": "Compare the open and reply rates of my active campaigns." },
+    { "id": "prompt-leads", "text": "Which leads replied this week, and to which campaign?" },
+    {
+      "id": "prompt-draft-sequence",
+      "text": "Draft a three-step follow-up sequence for the new SaaS lead list, but do not launch it."
+    }
+  ],
+  "apps": [
+    {
+      "id": "app-instantly-mcp",
+      "name": "Instantly",
+      "description": "Campaigns, leads, and analytics, over Instantly's MCP server with browser sign-in.",
+      "iconUrl": "https://avatars.githubusercontent.com/u/218805310?s=256&v=4",
+      "server": {
+        "name": "instantly",
+        "transport": "http",
+        "url": "https://mcp.instantly.ai/mcp",
+        "auth": [{ "id": "instantly-oauth", "kind": "link", "label": "Sign in" }]
+      }
+    }
+  ],
+  "skills": [],
+  "websiteUrl": "https://instantly.ai",
+  "privacyPolicyUrl": "https://instantly.ai/privacy",
+  "termsUrl": "https://instantly.ai/terms"
+}

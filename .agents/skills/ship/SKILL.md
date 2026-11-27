@@ -44,7 +44,8 @@ before the push.
    `--no-verify`. When the hook fails, fix the cause and commit again.
 
 For a UI change, run the `smoke` skill and take before and after
-screenshots. Upload them with `gh pr create --attach` or
+screenshots. When the change is a flow or has motion, also run the
+`record-demo` skill. Upload them with `gh pr create --attach` or
 `gh pr edit --attach` (gh 2.101 or later; run `gh --version`). Do not
 commit them.
 

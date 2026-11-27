@@ -1,4 +1,5 @@
 import { CHANNEL_CHATS_CAPABILITY, type RoutineCalendarOwner } from "@openbot/contracts/ipc";
+import { ROUTINES_ONCE_CAPABILITY } from "@openbot/contracts/team-protocol/routines-once-v1";
 import { runTeamEffect } from "@openbot/team-client";
 import { buildRoutineCalendar, type RoutineCalendarSource } from "@openbot/team-client/routine-calendar";
 import { type TeamApiRequest, TeamRequestError, teamAgentRoutinesApi } from "@openbot/team-client/team-api-requests";
@@ -6,10 +7,6 @@ import { Effect } from "effect";
 import { changesSchedule, type ScheduleSource } from "../schedule/schedule-port";
 import type { WebWorkspace } from "./web-client-context";
 
-/**
- * The schedule on the web: the calendar of the connected host, from the routes that its routine
- * settings already use. A host from before channels has no channel routes; its agents still have routines.
- */
 export function webScheduleSource(
   workspace: Pick<WebWorkspace, "state" | "runtime" | "onHostEvent">,
   hostRequest: (serverId?: string) => TeamApiRequest,
@@ -18,7 +15,9 @@ export function webScheduleSource(
     Effect.tryPromise({ try: operation, catch: (cause) => new TeamRequestError({ cause }) });
 
   function source(serverId: string): RoutineCalendarSource<TeamRequestError> {
-    const agentRoutines = teamAgentRoutinesApi(hostRequest(serverId));
+    const agentRoutines = teamAgentRoutinesApi(hostRequest(serverId), undefined, () =>
+      workspace.state.capabilities.includes(ROUTINES_ONCE_CAPABILITY),
+    );
     const channels = workspace.state.capabilities.includes(CHANNEL_CHATS_CAPABILITY)
       ? workspace.runtime.channels
       : undefined;
@@ -59,7 +58,6 @@ export function webScheduleSource(
     onStale: (serverId, stale) =>
       workspace.onHostEvent((event) => {
         if (workspace.state.host?.hostId !== serverId) return;
-        // A snapshot comes after a reconnect: a run can end while the host is away.
         if (event.type === "runtime-snapshot" || changesSchedule(event)) stale();
       }),
   };

@@ -35,13 +35,8 @@ const FILTER_LABEL = {
   settings: "mobile.search.filter.settings",
 } as const satisfies Record<MobileSearchFilter, MobileTextKey>;
 
-// "Searching…" waits this long, so an answer that comes sooner never shows it.
 const SEARCHING_DELAY = 200;
 
-/**
- * Keeps the results of the previous host search while the next one loads, when the user is still
- * typing the same words on the same server. A new word starts with no results, not with old ones.
- */
 function continuesSearch(previous: readonly unknown[] | undefined, next: readonly unknown[]): boolean {
   if (!previous || previous.length !== next.length || previous.slice(0, -1).some((part, index) => part !== next[index]))
     return false;
@@ -50,7 +45,6 @@ function continuesSearch(previous: readonly unknown[] | undefined, next: readonl
   return now.startsWith(before) || before.startsWith(now);
 }
 
-/** The pages of the Settings sheet and of the server sheets and screens. They are not the desktop settings. */
 function useSearchSettings(channelsSupported: boolean): MobileSearchSetting[] {
   const { t } = useText();
   const serverName = useMobileWorkspace().activeServer.name;
@@ -71,6 +65,7 @@ function useSearchSettings(channelsSupported: boolean): MobileSearchSetting[] {
       );
     pages.push(
       { id: "privacy", title: t("mobile.settings.privacy.title"), detail: app },
+      { id: "conversations", title: t("mobile.settings.conversations.title"), detail: app },
       { id: "hiddenChats", title: t("mobile.settings.conversations.hiddenChats"), detail: app },
       ...(channelsSupported
         ? [{ id: "deletedChannels" as const, title: t("mobile.app.route.deletedChannels"), detail: serverName }]
@@ -79,18 +74,13 @@ function useSearchSettings(channelsSupported: boolean): MobileSearchSetting[] {
       { id: "about", title: t("mobile.settings.home.about"), detail: app },
       { id: "serverOptions", title: t("mobile.app.route.serverOptions"), detail: serverName },
       { id: "serverMembers", title: t("mobile.app.route.members"), detail: serverName },
-      { id: "serverRoutines", title: t("mobile.server.drawer.routines"), detail: serverName },
+      { id: "serverRoutines", title: t("mobile.app.route.schedule"), detail: serverName },
       { id: "serverUsage", title: t("mobile.server.drawer.usage"), detail: serverName },
     );
     return pages;
   }, [t, serverName, channelsSupported]);
 }
 
-/**
- * The results of the home search for `query`: agents and settings on this phone, and the messages,
- * files and routines that the host finds. With no query and no filter, `idle` shows instead.
- * The host searches run only while `active`.
- */
 export function MobileSearchResults({
   query,
   active,
@@ -100,7 +90,6 @@ export function MobileSearchResults({
   query: string;
   active: boolean;
   idle: ReactNode;
-  /** Runs before a result opens what it names. */
   onLeave: () => void;
 }) {
   const { t } = useText();
@@ -120,7 +109,6 @@ export function MobileSearchResults({
   const motion = useTransitionMode("searchTransitions");
   const filesSupported = canSearchFiles(serverId);
   const channelState = useChannels(serverId);
-  // As on desktop, a server without channels or without file search shows no filter for them.
   const filters = MOBILE_SEARCH_FILTERS.filter(
     (candidate) => (candidate !== "channels" || channelState.supported) && (candidate !== "files" || filesSupported),
   );
@@ -134,13 +122,11 @@ export function MobileSearchResults({
   const agentsById = useMemo(() => new Map(activeAgents.map((agent) => [agent.id, agent])), [activeAgents]);
   const settings = useSearchSettings(channelState.supported);
 
-  // Search the host after typing stops, as the desktop search does, not on each character.
   const [hostQuery, setHostQuery] = useState("");
   useEffect(() => {
     const timer = setTimeout(() => setHostQuery(normalizeMobileSearchQuery(query)), 150);
     return () => clearTimeout(timer);
   }, [query]);
-  // The host searches run for the query that typing stopped at. The typed query tells what will run.
   const sources = mobileSearchSources(filter, hostQuery);
   const wanted = mobileSearchSources(filter, query);
   const typing = normalizeMobileSearchQuery(query) !== hostQuery;
@@ -148,7 +134,6 @@ export function MobileSearchResults({
   const messages = useInfiniteQuery({
     queryKey: messageKey,
     queryFn: ({ pageParam }) => searchMessages(hostQuery, serverId, pageParam),
-    // An empty cursor asks for the newest matches.
     initialPageParam: "",
     getNextPageParam: (page) => page.nextCursor ?? undefined,
     placeholderData: (previous, previousQuery) =>
@@ -167,7 +152,6 @@ export function MobileSearchResults({
     enabled: active && filesSupported && sources.files,
     retry: false,
   });
-  // The phone already has the agents and channels it shows, so it asks the host only for their routines.
   const routineOwners = useMemo(
     () => [
       ...activeAgents.map((agent) => ({ kind: "agent" as const, agentId: agent.id })),
@@ -179,14 +163,11 @@ export function MobileSearchResults({
     .map((owner) => (owner.kind === "agent" ? `a:${owner.agentId}` : `c:${owner.channelId}`))
     .join(",");
   const routines = useQuery({
-    // The routine calendar key, so the events that change routines refresh this list too.
     queryKey: queryKeys.serverRoutineSearch(queryScope, serverId, routineOwnerKey),
     queryFn: async () => {
-      // A range that starts after now reads no run history, and an empty one places no runs.
       const at = new Date(Date.now() + 60_000).toISOString();
       return (await loadRoutineCalendar({ from: at, to: at }, serverId, routineOwners)).routines;
     },
-    // The list does not depend on the query, so it loads at once.
     enabled: active && wanted.routines,
     retry: false,
     staleTime: 60_000,
@@ -204,8 +185,6 @@ export function MobileSearchResults({
   const view = useMemo(
     () =>
       mobileSearchView({
-        // Local matches follow each character. The host searches wait for the typing to stop, and the
-        // results shown stay until the next ones come.
         query,
         filter,
         reader: { memberId: membershipId || null, accountUserId },
@@ -287,7 +266,6 @@ export function MobileSearchResults({
   const resultCount = view.sections.reduce((count, section) => count + section.results.length, 0);
   const item = swapItemMotion(motion);
   const showsIdle = filter === "all" && !normalizeMobileSearchQuery(query);
-  // Under the results: a host search that still loads, a failed one, or its next page.
   const footer =
     view.state !== "results"
       ? "none"
@@ -315,7 +293,6 @@ export function MobileSearchResults({
 
   return (
     <>
-      {/* A filter names itself above its results, with a way back to all of them. */}
       <BlurSwap swapKey={filter} mode={motion}>
         {filter === "all" ? null : (
           <SearchCaption
@@ -343,7 +320,6 @@ export function MobileSearchResults({
                   layout={item.layout}
                   className="pb-2"
                 >
-                  {/* The rows of a section that comes in come in with it. */}
                   <BlurEnter mode={motion}>
                     <LayoutAnimationConfig skipEntering>
                       {filter === "all" ? (
@@ -381,7 +357,6 @@ export function MobileSearchResults({
                 </Animated.View>
               );
             })}
-            {/* The footer moves with the sections above it. */}
             <Animated.View layout={item.layout}>
               <BlurSwap swapKey={footer} mode={motion} enterDelay={footer === "loading" ? SEARCHING_DELAY : 0}>
                 {footer === "loading" ? (
@@ -414,7 +389,6 @@ export function MobileSearchResults({
   );
 }
 
-/** The heading of a group of results, as the home list names its sections. */
 export function SearchCaption({
   label,
   action,
@@ -423,7 +397,6 @@ export function SearchCaption({
   action?: { label: string; accessibilityLabel?: string; onPress: () => void };
 }) {
   return (
-    // 24 pt above each heading, so the sections read as groups and do not run into each other.
     <View className="flex-row items-center justify-between gap-3 pt-6 pr-3 pb-1.5 pl-5">
       <Typography.Paragraph accessibilityRole="header" className="font-medium text-muted" style={typeScale.caption}>
         {label}

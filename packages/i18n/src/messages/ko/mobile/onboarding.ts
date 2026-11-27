@@ -18,7 +18,7 @@ export const messages = {
   "mobile.onboarding.server.invitationBody": "다른 사람이 공유한 서버에 참여해요.",
   "mobile.onboarding.server.computerTitle": "컴퓨터 연결",
   "mobile.onboarding.server.computerSteps":
-    "먼저 이 휴대폰에서 로그아웃하세요. 그런 다음 컴퓨터에서 OpenBot을 열고 설정 → Mobile Connect로 이동해 QR 코드 생성을 선택한 후 이 휴대폰으로 스캔하세요.",
+    "먼저 이 휴대폰에서 로그아웃하세요. 그런 다음 컴퓨터에서 OpenBot을 열고 설정 → 모바일 연결로 이동해 휴대폰 추가 → 예, 로그인을 선택한 후 이 휴대폰으로 코드를 스캔하세요.",
   "mobile.onboarding.server.signOut": "로그아웃",
   "mobile.onboarding.server.connecting": "{name}에 연결 중…",
   "mobile.onboarding.agent.title": "첫 에이전트를 골라보세요",
@@ -62,6 +62,7 @@ export const messages = {
   "mobile.onboarding.task.creating": "만드는 중…",
   "mobile.onboarding.task.withoutTask": "작업 없이 만들기",
   "mobile.onboarding.task.failed": "에이전트를 만들 수 없어요. 다시 시도해 주세요.",
+  "mobile.onboarding.task.sendFailed": "첫 작업을 보내지 못했어요. 채팅에서 보내 주세요.",
   "mobile.onboarding.idea.builder1": "간단한 할 일 목록 웹 앱을 만들어 줘.",
   "mobile.onboarding.idea.builder2": "Git 브랜치가 어떻게 동작하는지 예시와 함께 설명해 줘.",
   "mobile.onboarding.idea.builder3": "내 사진을 날짜별로 정리하는 스크립트를 작성해 줘.",

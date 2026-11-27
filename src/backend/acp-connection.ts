@@ -1,12 +1,14 @@
-import { type ChildProcessWithoutNullStreams, spawn } from "node:child_process";
+import { type ChildProcessWithoutNullStreams, execFile, spawn } from "node:child_process";
 import { basename } from "node:path";
 import { Readable, Writable } from "node:stream";
+import { promisify } from "node:util";
 import { type Client, ClientSideConnection, ndJsonStream } from "@agentclientprotocol/sdk";
+import { sourceText } from "@openbot/i18n/source";
 import { createOpenBotLogger } from "@openbot/logging";
 import { Deferred, Effect } from "effect";
 import { AgentProcessExitError, type DiagnosticOrigin } from "./agent-client";
 import { type AgentCliInfo, cliPathEnvironment, cliSpawnTarget } from "./cli";
-import { LineTooLongError, limitLineLength } from "./jsonl";
+import { LineTooLongError, limitLineLength, PROVIDER_LINE_LIMIT_BYTES } from "./jsonl";
 import type { SpawnTarget } from "./process-confinement";
 import {
   type ProviderClientOperationError,
@@ -20,41 +22,36 @@ import { createDiagnosticStream } from "./stderr-diagnostics";
 import { endProcessTree } from "./windows-process-tree";
 
 const EXIT_REPORT_WAIT_MS = 2_000;
-/**
- * The first line of a crash report. A crash handler such as the one in Google's Gemini server ends its
- * report with `RAW: Raising signal 6`, which does not say why: the reason is in the first line.
- */
 const CRASH_LINE = /^(?:F\d{4} \d\d:\d\d:\d\d|FATAL ERROR:|Fatal Python error:|\*\*\* SIG[A-Z]+ .*received)/u;
 const logger = createOpenBotLogger("acp-connection");
+const execFileAsync = promisify(execFile);
 interface ProcessEnd {
   ending: string;
   detail: string | null;
 }
 export interface AcpConnectionOptions {
-  /** The provider id, or a custom agent id. Only the resource monitor reads it. */
   provider: string;
   cli: AgentCliInfo;
   argv: readonly string[];
   env: Record<string, string>;
   extraEnv?: (() => Record<string, string>) | undefined;
   confine?: ((target: SpawnTarget) => SpawnTarget) | undefined;
-  /** A temporary folder of its own for each process, in this root (`provider-temp.ts`). */
+  causeLine?: ((message: string) => boolean) | undefined;
   privateTemp?: Omit<ProviderTempOptions, "provider"> | undefined;
   label(): string;
   redact(text: string): string;
+  peek?: ((message: unknown) => void) | undefined;
   diagnostic(message: string, origin: DiagnosticOrigin): void;
-  /** A stderr line that must not become the exit detail, such as a sign-in prompt with OAuth state. */
-  privateDiagnostic?: RegExp | undefined;
   exit(error: Error): void;
   client(): Client;
 }
 
-/** Owns the ACP child process, stream and exit diagnostics. It never owns agent sessions. */
 export class AcpConnection {
   #process: ChildProcessWithoutNullStreams | null = null;
   #connection: ClientSideConnection | null = null;
   #ended: Deferred.Deferred<ProcessEnd> | null = null;
   #stopping = false;
+  #lastOutputAt = 0;
   readonly #stoppedProcesses = new WeakSet<ChildProcessWithoutNullStreams>();
   constructor(private readonly options: AcpConnectionOptions) {}
   get running(): boolean {
@@ -62,6 +59,9 @@ export class AcpConnection {
   }
   get ended(): Deferred.Deferred<ProcessEnd> | null {
     return this.#ended;
+  }
+  get lastOutputAt(): number {
+    return this.#lastOutputAt;
   }
   get connection(): ClientSideConnection | null {
     return this.#connection;
@@ -91,9 +91,13 @@ export class AcpConnection {
       }),
     );
     this.#process = child;
+    this.#lastOutputAt = Date.now();
+    const wrote = () => {
+      this.#lastOutputAt = Date.now();
+    };
+    child.stdout.on("data", wrote);
+    child.stderr.on("data", wrote);
     registerProviderProcess(child, this.options.provider);
-    // A start that times out says nothing of the process. These lines show whether it ran, how long
-    // it took to write anything, and how it ended, such as a Windows server that unpacks itself (#2311).
     const startedAt = performance.now();
     const elapsedMs = () => Math.round(performance.now() - startedAt);
     const logFields = {
@@ -105,8 +109,6 @@ export class AcpConnection {
     child.stdout.once("data", () =>
       logger.info("An ACP agent process wrote its first output.", { ...logFields, durationMs: elapsedMs() }),
     );
-    // The SDK holds a line until its newline with no limit. At the limit the connection closes with
-    // the error, so each open request fails with it, and the process ends.
     const stdout = child.stdout.pipe(
       limitLineLength(() => {
         const error = new LineTooLongError(this.options.label());
@@ -115,30 +117,45 @@ export class AcpConnection {
         return error;
       }),
     );
-    const stream = ndJsonStream(
+    const lines = ndJsonStream(
       // biome-ignore lint/nursery/noUnsafeTypeAssertion: Node and DOM declare the same Web Stream ABI with incompatible generic variance.
       Writable.toWeb(child.stdin) as unknown as WritableStream<Uint8Array>,
       // biome-ignore lint/nursery/noUnsafeTypeAssertion: Node and DOM declare the same Web Stream ABI with incompatible generic variance.
       Readable.toWeb(stdout) as unknown as ReadableStream<Uint8Array>,
+      { maxMessageBytes: PROVIDER_LINE_LIMIT_BYTES },
     );
-    this.#connection = new ClientSideConnection(() => this.options.client(), stream);
-    // One record at a time, never one chunk at a time: a chunk can end inside a JSON record, and a
-    // record read in halves keeps the credential in its second half.
+    const peek = this.options.peek;
+    const stream = peek
+      ? {
+          writable: lines.writable,
+          readable: lines.readable.pipeThrough(
+            new TransformStream({
+              transform(message, controller) {
+                peek(message);
+                controller.enqueue(message);
+              },
+            }),
+          ),
+        }
+      : lines;
+    const connection = new ClientSideConnection(() => this.options.client(), stream);
+    this.#connection = connection;
+    connection.signal.addEventListener("abort", () => this.#connectionLost(connection.signal.reason, child), {
+      once: true,
+    });
     let lastDiagnostic: string | null = null;
     let crashDiagnostic: string | null = null;
+    let causeDiagnostic: string | null = null;
     const diagnostics = createDiagnosticStream({
       redact: (text) => this.options.redact(text),
       emit: (message) => {
-        if (!this.options.privateDiagnostic?.test(message)) {
-          lastDiagnostic = message;
-          if (crashDiagnostic === null && CRASH_LINE.test(message)) crashDiagnostic = message;
-        }
-        this.options.diagnostic(message, { duringStop: this.#stoppedProcesses.has(child) });
+        lastDiagnostic = message;
+        if (crashDiagnostic === null && CRASH_LINE.test(message)) crashDiagnostic = message;
+        if (causeDiagnostic === null && this.options.causeLine?.(message)) causeDiagnostic = message;
+        this.options.diagnostic(message, { duringStop: this.#stoppedProcesses.has(child), stderr: true });
       },
     });
     child.stderr.on("data", (chunk: Buffer) => diagnostics.push(chunk.toString("utf8")));
-    // Read at `close`, not `exit`: only then is stderr read to its end, and a CLI that fails at start
-    // writes the reason as its last line.
     const ended = Deferred.makeUnsafe<ProcessEnd>();
     this.#ended = ended;
     child.once("close", (code, signal) => {
@@ -148,7 +165,7 @@ export class AcpConnection {
         ended,
         Effect.succeed({
           ending: signal ? `signal ${signal}` : `exit code ${code ?? "unknown"}`,
-          detail: crashDiagnostic ?? lastDiagnostic,
+          detail: crashDiagnostic ?? causeDiagnostic ?? lastDiagnostic,
         }),
       );
     });
@@ -164,6 +181,33 @@ export class AcpConnection {
       this.#fail(new Error(`ACP process exited with ${suffix}.`), child);
     });
   }
+
+  readonly run = Effect.fn("AcpConnection.run")(function* (
+    this: AcpConnection,
+    argv: readonly string[],
+    timeoutMs: number,
+  ): Effect.fn.Return<void, ProviderClientOperationError> {
+    yield* Effect.tryPromise({
+      try: (signal) => {
+        const direct = cliSpawnTarget(this.options.cli.executable, argv);
+        const target = this.options.confine ? this.options.confine(direct) : direct;
+        return execFileAsync(target.command, target.args, {
+          signal,
+          timeout: timeoutMs,
+          maxBuffer: 64 * 1024,
+          env: {
+            ...process.env,
+            ...cliPathEnvironment(this.options.cli),
+            ...this.options.env,
+            ...this.options.extraEnv?.(),
+          },
+          windowsVerbatimArguments: target.windowsVerbatimArguments,
+          windowsHide: true,
+        });
+      },
+      catch: providerFailure,
+    });
+  });
 
   readonly stop = Effect.fn("AcpConnection.stop")(function* (
     this: AcpConnection,
@@ -184,10 +228,9 @@ export class AcpConnection {
     this: AcpConnection,
     error: unknown,
     ended: Deferred.Deferred<ProcessEnd> | null,
+    serverLost = false,
   ): Effect.fn.Return<unknown, ProviderClientOperationError> {
-    if (!ended || this.#stopping) return yield* providerSync(() => error);
-    const message = error instanceof Error ? error.message : "";
-    if (message !== "ACP connection closed" && message !== "ACP client is not running.")
+    if (!ended || this.#stopping || (!serverLost && !isClosedConnection(error)))
       return yield* providerSync(() => error);
     const ending = yield* Deferred.await(ended).pipe(
       Effect.timeoutOrElse({ duration: EXIT_REPORT_WAIT_MS, orElse: () => Effect.succeed(null) }),
@@ -205,6 +248,21 @@ export class AcpConnection {
     );
   });
 
+  explainClose(error: unknown): unknown {
+    if (!this.#ended || this.#stopping || !isClosedConnection(error)) return error;
+    return new AgentProcessExitError(
+      sourceText("error.provider.acpProcessStopped", { provider: this.options.label() }),
+      null,
+      { cause: error },
+    );
+  }
+
+  #connectionLost(reason: unknown, child: ChildProcessWithoutNullStreams): void {
+    if (this.#process !== child || child.exitCode !== null || this.#stopping || isClosedConnection(reason)) return;
+    this.#fail(reason instanceof Error ? reason : new Error(String(reason)), child);
+    Effect.runFork(endProcess(child));
+  }
+
   #fail(error: Error, child: ChildProcessWithoutNullStreams): void {
     if (this.#process !== child) return;
     this.#process = null;
@@ -212,8 +270,12 @@ export class AcpConnection {
   }
 }
 
-/** Ends the agent process. A `.cmd` agent runs under `cmd.exe`, so Windows stops the whole tree. */
+function isClosedConnection(error: unknown): boolean {
+  const message = error instanceof Error ? error.message : "";
+  return message === "ACP connection closed" || message === "ACP client is not running.";
+}
+
 const endProcess = Effect.fn("AcpAgentClient.endProcess")(function* (child: ChildProcessWithoutNullStreams) {
-  child.stdin.end();
+  if (process.platform !== "win32") child.stdin.end();
   yield* endProcessTree(child).pipe(Effect.mapError((failure) => providerFailure(failure.cause)));
 });

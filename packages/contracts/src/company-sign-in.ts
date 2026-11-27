@@ -1,11 +1,7 @@
-/**
- * Company sign-in values that the account service, the desktop app and the web app share.
- */
-
-/** The web app's query value for a company sign-in that did not finish: the error code. */
 export const WEB_APP_COMPANY_SIGN_IN_ERROR_PARAM = "companySignInError";
 
-/** The catalog key of the text for each company sign-in error code. */
+export const MOBILE_COMPANY_SIGN_IN_RETURN = "openbot://company-sign-in";
+
 const COMPANY_SIGN_IN_ERROR_KEYS = {
   cancelled: "error.auth.companySignInCancelled",
   timeout: "error.auth.companySignInTimeout",
@@ -29,7 +25,6 @@ const COMPANY_SIGN_IN_ERROR_MESSAGES = new Map<string, CompanySignInErrorKey>(
   Object.entries(COMPANY_SIGN_IN_ERROR_KEYS),
 );
 
-/** The catalog key for an error code. An unknown code gets the general text. */
 export function companySignInErrorKey(code: string): CompanySignInErrorKey {
   return COMPANY_SIGN_IN_ERROR_MESSAGES.get(code) ?? "error.auth.companySignInFailed";
 }

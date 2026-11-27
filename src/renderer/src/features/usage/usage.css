@@ -1,9 +1,3 @@
-/*
- * The workspace keeps its place in the app frame grid while Usage is open, so the wrapper draws no
- * box of its own. Its children are still grid items of the frame, but they are no longer its DOM
- * children, so `.app-frame > *` no longer reaches them: without this, a conversation panel grows to
- * its content height and pushes the composer under the window edge.
- */
 .app-frame-panes {
   display: contents;
 }
@@ -15,7 +9,6 @@
   pointer-events: none;
 }
 
-/* A selected tab in the chat sets itself visible, so every part of the chat hides, not only its root. */
 .app-frame.app-frame-page-open .app-frame-panes * {
   visibility: hidden;
 }
@@ -36,51 +29,18 @@
   background: var(--openbot-bg-canvas);
 }
 .agent-usage-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  flex-wrap: wrap;
-  gap: var(--openbot-space-3);
   padding: var(--openbot-space-4) var(--openbot-space-6);
   border-bottom: 1px solid var(--openbot-border);
 }
-.agent-usage-identity,
-.agent-usage-controls {
-  display: flex;
-  align-items: center;
-  gap: var(--openbot-space-3);
-  min-width: 0;
-}
-.agent-usage-identity {
-  flex-wrap: wrap;
-}
-/* What lines up with the header's inset is the arrow, not the 32px hit area around it, so
-   the button hangs its padding back into the header rather than pushing the glyph right. */
-.agent-usage-identity .ui-icon-button {
-  margin-inline-start: calc(-1 * var(--openbot-space-2));
-}
-/* The back arrow points to the start of the reading direction. */
-.agent-usage-identity > .ui-icon-button > svg:dir(rtl) {
-  transform: scaleX(-1);
-}
-.agent-usage-identity h2 {
-  display: flex;
-  gap: var(--openbot-space-3);
-  font-size: var(--openbot-text-lg);
-  color: var(--openbot-text-muted);
-}
-.agent-usage-identity h2 span:last-child {
-  color: var(--openbot-text-primary);
-  overflow-wrap: anywhere;
-}
 
-/* The three filters and the refresh button need more width than the header can always
-   give, so the row wraps from the right rather than clipping its last controls. */
 .agent-usage-controls {
-  margin-inline-start: auto;
+  display: flex;
+  min-width: 0;
   flex-wrap: wrap;
+  align-items: center;
   justify-content: flex-end;
   gap: var(--openbot-space-3);
+  margin-inline-start: auto;
 }
 .agent-usage-body {
   width: 100%;
@@ -91,6 +51,15 @@
   display: flex;
   flex-direction: column;
   gap: var(--openbot-space-8);
+}
+.agent-usage-report {
+  display: flex;
+  flex-direction: column;
+  gap: inherit;
+  transition: opacity var(--openbot-duration-fast) var(--openbot-ease-out);
+}
+.agent-usage-report[data-stale] {
+  opacity: 0.5;
 }
 .agent-usage h3 {
   font-size: var(--openbot-text-xl);
@@ -126,33 +95,6 @@
     gap: calc(var(--openbot-space-6) * 2);
   }
 }
-/* The drop order is the reading order reversed: message counts go before token
-   categories, and the processed total is the one entry that always stays. */
-@container (max-width: 1000px) {
-  .agent-usage-totals > div:nth-child(n + 7) {
-    display: none;
-  }
-}
-@container (max-width: 820px) {
-  .agent-usage-totals > div:nth-child(n + 6) {
-    display: none;
-  }
-}
-@container (max-width: 660px) {
-  .agent-usage-totals > div:nth-child(n + 5) {
-    display: none;
-  }
-}
-@container (max-width: 540px) {
-  .agent-usage-totals > div:nth-child(n + 4) {
-    display: none;
-  }
-}
-@container (max-width: 400px) {
-  .agent-usage-totals > div:nth-child(n + 3) {
-    display: none;
-  }
-}
 @container (max-width: 480px) {
   .agent-usage-hero {
     font-size: var(--openbot-text-display);
@@ -172,9 +114,6 @@
   }
 }
 
-/* The header holds one row of filters, so every dropdown and the refresh button share
-   a body colour and a 32px height rather than each wearing its own form-field or
-   toolbar look. */
 .agent-usage-controls .ui-select {
   width: auto;
   flex-shrink: 0;
@@ -197,19 +136,16 @@
   min-width: 0;
   overflow: hidden;
 }
-/* The pane makes no stacking context, so the dialog layer of the loading screen would paint over the
- * menus that open from the sidebar. The screen covers only the pane, so one layer is sufficient. */
+
 .server-connection-workspace > .app-loading {
   z-index: 1;
 }
-/* The panes were grid items of the frame and stretched to its height. In this column they grow to
- * fill it, so a short chat keeps its composer at the bottom. */
+
 .server-connection-content > * {
   min-height: 0;
   flex: 1;
 }
-/* The first load covers the whole window: the page rail, the server rail and the sidebar too. The frame
- * is a size container, so the screen is a child of the window and not of the frame. */
+
 .app-window > .app-loading {
   position: fixed;
 }

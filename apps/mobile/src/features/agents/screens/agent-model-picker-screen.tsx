@@ -1,0 +1,130 @@
+import { useQuery } from "@tanstack/react-query";
+import { router, Stack } from "expo-router";
+import { Typography } from "heroui-native";
+import Check from "lucide-react-native/icons/check";
+import { useEffect, useState } from "react";
+import type { NativeScrollEvent, NativeSyntheticEvent } from "react-native";
+import { useCSSVariable } from "uniwind";
+import { useAgentModelPicker, withAccountModels } from "@/features/agents/model/agent-model-picker";
+import { useQueryScope } from "@/features/auth/context/mobile-session-context";
+import {
+  SettingsContent,
+  SettingsNote,
+  SettingsRow,
+  SettingsSection,
+} from "@/features/settings/components/settings-content";
+import { useMobileWorkspaceActions } from "@/features/workspace/context/mobile-workspace-context";
+import { queryKeys } from "@/features/workspace/model/query-keys";
+import { SheetFormField } from "@/shared/components/sheet-form-field";
+import { haptics } from "@/shared/lib/haptics";
+import { isIOS } from "@/shared/lib/platform";
+import { useText } from "@/shared/lib/text";
+
+const PAGE_SIZE = 100;
+const END_DISTANCE = 600;
+
+export function AgentModelPickerScreen() {
+  const { t } = useText();
+  const accent = String(useCSSVariable("--openbot-accent"));
+  const workspace = useMobileWorkspaceActions();
+  const queryScope = useQueryScope();
+  const request = useAgentModelPicker((state) => state.request);
+  const [search, setSearch] = useState("");
+  const serverId = request?.serverId ?? "";
+  const models = useQuery({
+    queryKey: queryKeys.agentModels(queryScope, serverId),
+    queryFn: () => workspace.loadAgentModels(serverId),
+    enabled: request !== null,
+    retry: false,
+  });
+  const [limit, setLimit] = useState(PAGE_SIZE);
+  useEffect(() => {
+    if (!request && router.canGoBack()) router.back();
+  }, [request]);
+  const words = search.trim().toLocaleLowerCase().split(/\s+/u).filter(Boolean);
+  const options = withAccountModels(
+    models.data?.filter(
+      (option) => option.provider === request?.provider && (option.listing !== "kept" || option.id === request?.model),
+    ) ?? [],
+    request?.accountModels ?? [],
+  );
+  const matches = options.filter((option) => {
+    const text = `${option.name} ${option.id}`.toLocaleLowerCase();
+    return words.every((word) => text.includes(word));
+  });
+  const changeSearch = (text: string) => {
+    setSearch(text);
+    setLimit(PAGE_SIZE);
+  };
+  function onScroll({ nativeEvent }: NativeSyntheticEvent<NativeScrollEvent>) {
+    const end = nativeEvent.contentSize.height - nativeEvent.layoutMeasurement.height - nativeEvent.contentOffset.y;
+    if (end < END_DISTANCE && limit < matches.length) setLimit((current) => current + PAGE_SIZE);
+  }
+
+  return (
+    <SettingsContent onScroll={onScroll}>
+      <Stack.Screen options={{ title: t("mobile.agent.runtime.model") }} />
+      {isIOS ? (
+        <Stack.SearchBar
+          placeholder={t("mobile.agent.runtime.searchModels")}
+          autoCapitalize="none"
+          hideWhenScrolling={false}
+          hideNavigationBar={false}
+          onChangeText={(event) => changeSearch(event.nativeEvent.text)}
+          onCancelButtonPress={() => changeSearch("")}
+        />
+      ) : (
+        <SheetFormField
+          label={t("mobile.agent.runtime.searchModels")}
+          hideLabel
+          appearance="soft"
+          placeholder={t("mobile.agent.runtime.searchModels")}
+          autoCapitalize="none"
+          autoCorrect={false}
+          returnKeyType="search"
+          value={search}
+          onChangeText={changeSearch}
+        />
+      )}
+      {!request ? null : models.isError ? (
+        <SettingsSection>
+          <SettingsRow disclosure={false} onPress={() => void models.refetch()}>
+            <Typography.Paragraph>{t("mobile.agent.runtime.retryModels")}</Typography.Paragraph>
+          </SettingsRow>
+        </SettingsSection>
+      ) : models.isPending ? (
+        <SettingsNote>{t("mobile.agent.runtime.loadingModels")}</SettingsNote>
+      ) : options.length === 0 ? (
+        <SettingsNote>{t("mobile.agent.runtime.noModels")}</SettingsNote>
+      ) : matches.length === 0 ? (
+        <SettingsNote>
+          {request.provider === "openrouter"
+            ? t("mobile.agent.runtime.openrouterNoMatches")
+            : t("mobile.agent.runtime.noMatches")}
+        </SettingsNote>
+      ) : (
+        <SettingsSection>
+          {matches.slice(0, limit).map((option) => {
+            const on = option.id === request.model;
+            return (
+              <SettingsRow
+                key={option.id}
+                checked={on}
+                disclosure={false}
+                supportingText={option.name === option.id ? undefined : option.id}
+                trailing={on ? <Check size={18} color={accent} strokeWidth={2} /> : null}
+                onPress={() => {
+                  void haptics.selection();
+                  request.choose(option);
+                  router.back();
+                }}
+              >
+                <Typography.Paragraph numberOfLines={2}>{option.name}</Typography.Paragraph>
+              </SettingsRow>
+            );
+          })}
+        </SettingsSection>
+      )}
+    </SettingsContent>
+  );
+}

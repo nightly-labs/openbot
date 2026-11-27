@@ -1,0 +1,33 @@
+{
+  "slug": "picsart",
+  "name": "Picsart",
+  "tagline": "AI image, video and audio tools",
+  "description": "Picsart lets agents generate and edit images, videos, and audio with AI tools such as background removal and upscaling. Some tools use Picsart credits.",
+  "category": "design",
+  "creatorName": "Picsart",
+  "iconUrl": "https://avatars.githubusercontent.com/u/5361798?s=256&v=4",
+  "version": "1.0.0",
+  "prompts": [
+    { "id": "prompt-remove-bg", "text": "Remove the background from this product photo." },
+    { "id": "prompt-upscale", "text": "Upscale this image to twice its size." },
+    { "id": "prompt-generate", "text": "Generate a banner image for a coffee shop opening." }
+  ],
+  "apps": [
+    {
+      "id": "app-picsart-mcp",
+      "name": "Picsart",
+      "description": "Image, video, and audio generation and editing, over Picsart's MCP server with browser sign-in.",
+      "iconUrl": "https://avatars.githubusercontent.com/u/5361798?s=256&v=4",
+      "server": {
+        "name": "picsart",
+        "transport": "http",
+        "url": "https://api.picsart.com/gen-ai/mcp",
+        "auth": [{ "id": "picsart-oauth", "kind": "link", "label": "Sign in" }]
+      }
+    }
+  ],
+  "skills": [],
+  "websiteUrl": "https://picsart.com",
+  "privacyPolicyUrl": "https://picsart.com/privacy-policy/",
+  "termsUrl": "https://picsart.com/terms-of-use/"
+}

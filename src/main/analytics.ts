@@ -10,6 +10,7 @@ import {
   hostedSiteConversationEvent,
   isAgentModel,
   parseRoutineRunConversationEventItemType,
+  ROUTINE_RUN_SOURCES,
   type RoutineRunConversationEventStatus,
   type UsageTokens,
   WORKFLOW_RUN_SOURCES,
@@ -18,6 +19,7 @@ import { isBoolean, isDynamicRecord, isFunction, isNumber, isOneOf, isString } f
 import { normalizeEmailAddress } from "@openbot/contracts/validation";
 import {
   ANALYTICS_GENERATIONS,
+  type CauseCode,
   classifyFailure,
   operationForCode,
   type ReportQueue,
@@ -26,23 +28,31 @@ import {
 import { OpenPanelBase, type OpenPanelOptions } from "@openpanel/web";
 import { Effect, Exit, Scope } from "effect";
 import { parse as parseDomain } from "tldts";
+import type { CreditMediaReport } from "../backend/agent/credit-media-tools";
 import type { FailureSignal } from "../backend/agent/failure-signal";
 import type { ToolUsageSignal } from "../backend/agent/thread-items";
+import type { TurnTiming } from "../backend/agent/turn-lifecycle";
 import type { BrowserSiteVisit } from "../backend/browser-host";
 import type { TurnModelUsage } from "../backend/database/agent-usage";
 import type { WorkflowRunEnd } from "../backend/workflows/workflows";
 import { type AnalyticsOperationFailure, analyticsIO, analyticsSync } from "./analytics-effects";
 import { PROVIDER_AUTH_KINDS, type ProviderAuthKind } from "./analytics-provider-auth";
+import type { WebhookDeliveryReport } from "./host-events-service";
+import { isProfileFrame, isProfileStack } from "./main-loop-profile";
+import {
+  isSignalHomeName,
+  REMOTE_CONNECT_PHASES,
+  type RemoteConnectPhase,
+  type RemoteConnectSummary,
+} from "./remote-connect-trace";
+import type { MainLoopStallProfile } from "./resource-monitor";
 import { localDay, RESOURCE_ENUMS, RESOURCE_PROPERTY_NAMES, type ResourceProperties } from "./resource-summary";
+import { UNCLEAN_EXIT_ENUMS, type UncleanExitProperties } from "./run-marker";
+import { SERVICE_STEP_PROPERTY_NAMES, SERVICE_STEPS, START_KINDS, type StartupProperties } from "./startup-timing";
 
 const OPENPANEL_API_URL = "https://analytics.openbot.run/api";
 const OPENPANEL_CLIENT_ID = "6c989975-87ef-4f0c-857e-ab449a65b5c2";
-// Node fetch sends no Origin, and OpenPanel answers 401 to a client with no allowed origin or
-// secret. The SDK drops a 401 in silence. Send the renderer's origin, which the project allows.
 const OPENPANEL_ORIGIN = "openbot-app://app";
-// Provider CLI events are named `<provider>_diagnostic`, `_exited` and `_start_failed`. The list
-// comes from the registry so a new provider's events keep their own name instead of collapsing to
-// `unknown` the moment it ships.
 const PROVIDER_EVENT_PATTERN = new RegExp(`^(?:${AGENT_PROVIDERS.join("|")})_(?:diagnostic|exited|start_failed)$`, "u");
 
 const MAX_PENDING_EVENTS = 100;
@@ -50,11 +60,48 @@ const MAX_ACTIVE_TURNS = 1_000;
 const MAX_HOSTED_SITE_OPERATIONS = 10_000;
 const ACTIVE_TURN_TTL_MS = 24 * 60 * 60 * 1_000;
 const MAX_TOOL_ROWS_PER_TURN = 32;
-// One turn that reads a large cached context many times stays well below this.
 const MAX_TURN_TOKENS = 10_000_000_000;
-// Usage rows carry the time of the provider's turn start, which can precede the host event.
 const TURN_USAGE_MARGIN_MS = 60 * 60 * 1_000;
-// A turn uses its agent's model and sometimes a few more, such as a Claude subagent's model.
+const TURN_TIMING_PROPERTIES = [
+  ["queueWaitMs", "queue_wait_ms"],
+  ["startMs", "start_ms"],
+  ["providerStartMs", "provider_start_ms"],
+  ["firstOutputMs", "first_output_ms"],
+] as const satisfies readonly (readonly [keyof TurnTiming, string])[];
+const MAX_QUEUE_WAIT_MS = 7 * ACTIVE_TURN_TTL_MS;
+const MAX_STARTUP_MS = 24 * 60 * 60_000;
+const MAX_REMOTE_CONNECT_PHASE_MS = 60 * 60_000;
+const MAX_REMOTE_CONNECT_WAIT_MS = 24 * 60 * 60_000;
+const REMOTE_CONNECT_PHASE_PROPERTIES = [
+  ["session", "session_ms"],
+  ["ticket", "ticket_ms"],
+  ["bridge", "bridge_ms"],
+  ["signal-socket", "signal_socket_ms"],
+  ["signal", "signal_ms"],
+  ["channels", "channels_ms"],
+  ["auth", "auth_ms"],
+  ["compatibility", "compatibility_ms"],
+  ["first-request", "first_request_ms"],
+] as const satisfies readonly (readonly [RemoteConnectPhase, string])[];
+const REMOTE_CONNECT_ENUMS = {
+  outcome: ["connected", "failed"],
+  connection: ["first", "reconnect"],
+  session_kind: ["new", "stored", "reused"],
+  last_phase: ["start", ...REMOTE_CONNECT_PHASES],
+  first_request: ["ok", "error"],
+} as const;
+const STARTUP_PROPERTY_NAMES = [
+  "start_kind",
+  "host_kind",
+  "when_ready_ms",
+  "window_ready_ms",
+  "services_ready_ms",
+  "renderer_loaded_ms",
+  "workspace_ready_ms",
+  "slowest_service_step",
+  "slowest_service_step_ms",
+  ...SERVICE_STEP_PROPERTY_NAMES,
+] as const satisfies readonly (keyof StartupProperties)[];
 const MAX_TOKEN_ROWS_PER_TURN = 8;
 const TOKEN_PROPERTIES = [
   ["uncachedInput", "uncached_input_tokens"],
@@ -64,9 +111,7 @@ const TOKEN_PROPERTIES = [
 ] as const satisfies readonly (readonly [keyof UsageTokens, string])[];
 const MAX_SITE_TABS = 1_000;
 const MAX_ROUTINE_RUNS = 10_000;
-// A run holds at most this many nodes that run; a larger count is not sent.
 const MAX_WORKFLOW_RUN_STEPS = 1_000;
-/** A run can wait days for an approval, so its duration has a longer limit than a turn's. */
 const MAX_WORKFLOW_RUN_MS = 30 * 24 * 60 * 60 * 1_000;
 const WORKFLOW_RUN_STEP_COUNTS = [
   ["agent_step_count", ["agent"]],
@@ -78,6 +123,7 @@ const MAX_INVENTORY_ITEMS = 32;
 const ANALYTICS_SCHEMA_VERSION = ANALYTICS_GENERATIONS.desktop_host;
 const CURATED_AGENT_PREFIX = "openbot-curated-agent-";
 const LISTING_SLUG_PATTERN = /^[a-z0-9][a-z0-9-]{0,63}$/u;
+const APP_VERSION_PATTERN = /^\d{1,4}\.\d{1,4}\.\d{1,6}(?:-[0-9A-Za-z.]{1,24})?$/u;
 const TOOL_NAME_PATTERN = /^[A-Za-z0-9_.-]{1,64}$/u;
 const TOOL_KINDS = [
   "command",
@@ -90,11 +136,10 @@ const TOOL_KINDS = [
   "browser",
   "computer_use",
   "image_generation",
+  "video_generation",
   "subagent",
   "other",
 ] as const;
-// OpenBot's own tool servers. Every other server name is the user's, so only these and catalog
-// plugins keep their tool names.
 const BUILTIN_TOOL_SERVERS = new Map<string, (typeof TOOL_KINDS)[number]>([
   ["openbot", "openbot"],
   ["openbot_browser", "browser"],
@@ -111,13 +156,58 @@ const ROUTINE_TRIGGER_TYPES = [
   "advanced",
   "custom",
   "once",
+  "webhook",
 ] as const;
+const WEBHOOK_DELIVERY_RESULTS = [
+  "started",
+  "ignored",
+  "duplicate",
+  "gone",
+  "too_large",
+  "unavailable",
+  "signed_out",
+  "unknown_route",
+  "secret_unreadable",
+  "bad_signature",
+  "bad_body",
+  "failed",
+] as const;
+const WEBHOOK_IGNORED_REASONS = ["event-type", "filter", "inactive", "busy", "refused"] as const;
+const WEBHOOK_DELIVERY_STATUSES = [200, 202, 400, 401, 404, 413, 429, 503] as const;
+const MAX_WEBHOOK_BODY_BYTES = 2 * 1024 * 1024;
+const MAX_WEBHOOK_HANDLE_MS = 10 * 60 * 1_000;
+const MAX_WEBHOOK_AGE_MS = 10 * 60 * 1_000;
+const MAX_WEBHOOK_DELIVERY_EVENTS_PER_MINUTE = 60;
+const CREDIT_MEDIA_ENUMS = {
+  media_kind: ["image", "video"],
+  outcome: [
+    "generated",
+    "failed",
+    "not_saved",
+    "declined",
+    "skipped",
+    "muted",
+    "not_asked",
+    "short",
+    "invalid",
+    "input_failed",
+    "stopped",
+    "unavailable",
+  ],
+  model_source: ["agent", "default"],
+  hold_reason: ["balance", "agents_off"],
+  hold_answer: ["continued", "enabled", "skipped", "muted", "not_asked", "stopped"],
+  hold_via: ["local", "remote", "automatic"],
+  approval: ["accepted", "declined"],
+  approval_via: ["local", "remote", "automatic"],
+} as const;
+const CREDIT_MEDIA_MODEL_PATTERN = /^[a-z0-9][a-z0-9._:/-]{0,79}$/iu;
+const CREDIT_MEDIA_SPEC_PATTERN = /^[a-z0-9][a-z0-9:.x_-]{0,15}$/iu;
+const MAX_CREDIT_MEDIA_CREDITS = 1_000_000;
+const MAX_CREDIT_MEDIA_MS = 24 * 60 * 60 * 1_000;
+const WEBHOOK_DELIVERY_WINDOW_MS = 60 * 1_000;
 
 type AnalyticsIdentity = Pick<CentralAuthUser, "id" | "email">;
-/**
- * Who an event is about: the signed-in account (with its email) when the user shares analytics,
- * else the install ID (with no email).
- */
 type AnalyticsSubject = { id: string; email: string | null };
 type AnalyticsOperationKind = "clear" | "identify" | "track";
 type AnalyticsOperation = { kind: AnalyticsOperationKind; run: () => unknown };
@@ -132,13 +222,15 @@ type HostEventName =
   | "system_site_visited"
   | "system_routine_run"
   | "system_workflow_run"
+  | "system_credit_media"
+  | "system_webhook_delivery"
   | "system_inventory"
   | "system_resources"
+  | "system_startup"
+  | "system_unclean_exit"
+  | "system_main_loop_profile"
+  | "system_remote_connect"
   | "hosted_site_action";
-/**
- * Events that go only when the user links analytics to their account: the sites they visit, the
- * tools their agents use and their setup. Other events go also when it is off, with the install ID.
- */
 const LINKED_ONLY_EVENTS: ReadonlySet<HostEventName> = new Set([
   "system_site_visited",
   "system_tool_used",
@@ -156,51 +248,40 @@ function createOpenPanelClient(options: OpenPanelOptions): HostOpenPanelClient {
 export interface HostAnalyticsOptions {
   reports?: ReportQueue;
   enabled: boolean;
-  /** The OpenPanel API. Production when omitted; a dev capture server in `analytics-redaction-e2e`. */
   apiUrl?: string;
-  /** True when the user shares analytics with their account. Off: events go with `installId`. */
   trackingEnabled?: boolean;
-  /** The random install ID. Null: no saved ID, and events that have no account are not sent. */
   installId?: string | null;
   appVersion: string;
   platform: "darwin" | "win32" | "linux";
   resolveOwner: () => AnalyticsIdentity | null;
   resolveAgent: (agentId: string) => AgentSummary | null;
-  /** How the agent's provider is paid for, read when a turn completes. */
   resolveProviderAuth?: (agent: AgentSummary) => ProviderAuthKind;
-  /**
-   * The provider-reported token counts of a turn by provider and model, from the usage records that
-   * the Usage report reads. An empty list means the provider reported none.
-   */
   resolveTurnUsage?: (agentId: string, turnId: string, since: string) => readonly TurnModelUsage[];
-  /**
-   * The user's MCP servers that a provider reports under `name`: `null` when there is none, else the
-   * catalog plugin slug they all share, or `slug: null` for the user's own server.
-   */
+  resolveTurnTiming?: (turnId: string) => TurnTiming | null;
   resolveMcpServer?: (name: string) => { slug: string | null } | null;
   resolveRoutineRun?: (agentId: string, routineId: string, runId: string) => AnalyticsRoutineRun | null;
   resolveInventory?: () => Effect.Effect<AnalyticsInventory, AnalyticsOperationFailure>;
   inventoryDay?: AnalyticsInventoryDayStore;
   resources?: AnalyticsResourceSource;
+  uncleanExit?: UncleanExitProperties | null;
 }
 
-/** The resource summary of the last closed local day, which the resource monitor keeps. */
 export interface AnalyticsResourceSource {
-  /** `null` when no closed day waits to be sent. */
   previousDay(): { day: string; properties: ResourceProperties } | null;
-  /** Removes that day and saves the file. Analytics calls it before the send, or to drop the day. */
   clearPreviousDay(day: string): Effect.Effect<void, AnalyticsOperationFailure>;
 }
 
 interface AnalyticsRoutineRun {
   runKind: "scheduled" | "manual";
+  runSource: (typeof ROUTINE_RUN_SOURCES)[number] | null;
   triggerType: string;
 }
 
-/** Counts and closed-set names only: never a user-authored name, URL or command. */
 interface AnalyticsInventory {
   agentCount: number;
   enabledRoutineCount: number;
+  enabledWebhookRoutineCount: number;
+  webhookRouteCount: number;
   workflowCount: number;
   customMcpServerCount: number;
   plugins: string[];
@@ -212,7 +293,6 @@ interface AnalyticsInventory {
   computerUseEnabled: boolean;
 }
 
-/** The local day of the last inventory event. `malformed` counts as sent today. */
 export interface AnalyticsInventoryDayStore {
   read(): Effect.Effect<string | "missing" | "malformed", AnalyticsOperationFailure>;
   write(day: string): Effect.Effect<void, AnalyticsOperationFailure>;
@@ -220,14 +300,35 @@ export interface AnalyticsInventoryDayStore {
 
 const AGENT_PROPERTY_NAMES = ["provider", "model", "reasoning_effort", "agent_source", "agent_listing"] as const;
 
+type ProfileTopIndex = 1 | 2 | 3 | 4 | 5;
+type ProfileTopPropertyName = `top_${ProfileTopIndex}_${"frame" | "self_pct" | "stack"}`;
+const PROFILE_TOP_INDEXES = [1, 2, 3, 4, 5] as const satisfies readonly ProfileTopIndex[];
+const MAIN_LOOP_PROFILE_PROPERTY_NAMES = [
+  "stall_ms",
+  "phase",
+  "turn_active",
+  "host_kind",
+  "profiled_ms",
+  "busy_pct",
+  ...PROFILE_TOP_INDEXES.flatMap((index): ProfileTopPropertyName[] => [
+    `top_${index}_frame`,
+    `top_${index}_self_pct`,
+    `top_${index}_stack`,
+  ]),
+] as const;
+const MAX_PROFILE_MS = 60 * 60_000;
+
 const HOST_ALLOWLIST = {
   system_turn_started: [...AGENT_PROPERTY_NAMES, "origin"],
   system_turn_completed: [
     ...AGENT_PROPERTY_NAMES,
     "origin",
     "status",
+    "failure_code",
+    "cause_code",
     "provider_auth",
     "duration_ms",
+    ...TURN_TIMING_PROPERTIES.map(([, property]) => property),
     "token_usage",
     "uncached_input_tokens",
     "cached_input_tokens",
@@ -254,7 +355,6 @@ const HOST_ALLOWLIST = {
     "operation",
   ],
   system_tool_used: [...AGENT_PROPERTY_NAMES, "origin", "tool_kind", "plugin", "tool", "call_count", "failed_count"],
-  // `provider` and `model` name the model that used the tokens, which can differ from the agent's.
   system_token_usage: [
     "provider",
     "model",
@@ -269,7 +369,41 @@ const HOST_ALLOWLIST = {
     "total_tokens",
   ],
   system_site_visited: [...AGENT_PROPERTY_NAMES, "domain", "actor"],
-  system_routine_run: [...AGENT_PROPERTY_NAMES, "status", "run_kind", "trigger_type"],
+  system_routine_run: [...AGENT_PROPERTY_NAMES, "status", "run_kind", "run_source", "trigger_type"],
+  system_credit_media: [
+    ...AGENT_PROPERTY_NAMES,
+    "origin",
+    "media_kind",
+    "outcome",
+    "media_model",
+    "agent_media_model",
+    "model_source",
+    "model_changed",
+    "credits_cost",
+    "credits_charged",
+    "resolution",
+    "duration_seconds",
+    "audio",
+    "reference_count",
+    "hold_reason",
+    "hold_answer",
+    "hold_via",
+    "approval",
+    "approval_via",
+    "duration_ms",
+  ],
+  system_webhook_delivery: [
+    "owner_kind",
+    "format",
+    "result",
+    "ignored_reason",
+    "status_code",
+    "body_bytes",
+    "handle_ms",
+    "delivery_age_ms",
+    "test",
+    "skipped_count",
+  ],
   system_workflow_run: [
     "status",
     "source",
@@ -280,6 +414,8 @@ const HOST_ALLOWLIST = {
   system_inventory: [
     "agent_count",
     "enabled_routine_count",
+    "enabled_webhook_routine_count",
+    "webhook_route_count",
     "workflow_count",
     "custom_mcp_server_count",
     "plugins",
@@ -291,6 +427,39 @@ const HOST_ALLOWLIST = {
     "computer_use_enabled",
   ],
   system_resources: RESOURCE_PROPERTY_NAMES,
+  system_startup: STARTUP_PROPERTY_NAMES,
+  system_unclean_exit: [
+    "phase",
+    "previous_app_version",
+    "uptime_class",
+    "crash_dump_count",
+    "slept",
+    "ended_asleep",
+    "os_restarted",
+    "host_kind",
+  ],
+  system_main_loop_profile: MAIN_LOOP_PROFILE_PROPERTY_NAMES,
+  system_remote_connect: [
+    "outcome",
+    "connection",
+    "session_kind",
+    "last_phase",
+    "first_request",
+    "session_ms",
+    "ticket_ms",
+    "bridge_ms",
+    "signal_socket_ms",
+    "signal_ms",
+    "channels_ms",
+    "auth_ms",
+    "compatibility_ms",
+    "first_request_ms",
+    "total_ms",
+    "wait_ms",
+    "hosted_start_wait_ms",
+    "failed_attempts",
+    "signal_home",
+  ],
   hosted_site_action: ["action", "entry_point", "result", "failure_code"],
 } as const satisfies Record<HostEventName, readonly string[]>;
 
@@ -309,6 +478,7 @@ type ActiveTurn = {
   owner: AnalyticsSubject | null;
   ownerResolutionPending: boolean;
   tools: Map<string, ToolUseRow>;
+  failure?: { failureCode: string; causeCode: CauseCode };
 };
 
 export class HostAnalytics {
@@ -317,11 +487,13 @@ export class HostAnalytics {
   readonly #resolveAgent: HostAnalyticsOptions["resolveAgent"];
   readonly #resolveProviderAuth: HostAnalyticsOptions["resolveProviderAuth"];
   readonly #resolveTurnUsage: HostAnalyticsOptions["resolveTurnUsage"];
+  readonly #resolveTurnTiming: HostAnalyticsOptions["resolveTurnTiming"];
   readonly #resolveMcpServer: NonNullable<HostAnalyticsOptions["resolveMcpServer"]>;
   readonly #resolveRoutineRun: NonNullable<HostAnalyticsOptions["resolveRoutineRun"]>;
   readonly #resolveInventory: HostAnalyticsOptions["resolveInventory"];
   readonly #inventoryDayStore: HostAnalyticsOptions["inventoryDay"];
   readonly #resources: HostAnalyticsOptions["resources"];
+  #uncleanExit: UncleanExitProperties | null;
   readonly #client: HostOpenPanelClient | null;
   #identifiedOwner: AnalyticsIdentity | null = null;
   #trackingEnabled: boolean;
@@ -335,7 +507,9 @@ export class HostAnalytics {
   readonly #routineRunOwners = new Map<string, AnalyticsSubject | null>();
   readonly #routineRunReports = new Set<string>();
   readonly #workflowRunReports = new Set<string>();
-  /** A workflow run that began before this process is a replay after a restart, and is not sent. */
+  #webhookWindowStart = 0;
+  #webhookWindowCount = 0;
+  #webhookSkipped = 0;
   readonly #createdAt = Date.now();
   #closed = false;
   readonly #scope = Scope.makeUnsafe();
@@ -350,11 +524,13 @@ export class HostAnalytics {
     this.#resolveAgent = options.resolveAgent;
     this.#resolveProviderAuth = options.resolveProviderAuth;
     this.#resolveTurnUsage = options.resolveTurnUsage;
+    this.#resolveTurnTiming = options.resolveTurnTiming;
     this.#resolveMcpServer = options.resolveMcpServer ?? (() => null);
     this.#resolveRoutineRun = options.resolveRoutineRun ?? (() => null);
     this.#resolveInventory = options.resolveInventory;
     this.#inventoryDayStore = options.inventoryDay;
     this.#resources = options.resources;
+    this.#uncleanExit = options.uncleanExit ?? null;
     this.#trackingEnabled = options.trackingEnabled ?? true;
     this.#install = options.installId ? { id: options.installId, email: null } : null;
     if (!options.enabled) {
@@ -427,11 +603,15 @@ export class HostAnalytics {
             ...this.#agentProperties(event.agentId),
             origin,
             status: normalizedTurnStatus(event.status),
+            ...(event.status === "failed" && activeTurn?.failure
+              ? { failure_code: activeTurn.failure.failureCode, cause_code: activeTurn.failure.causeCode }
+              : {}),
             ...this.#providerAuth(event.agentId),
             ...(activeTurn === undefined
               ? {}
               : {
                   duration_ms: Math.max(0, Math.round(performance.now() - activeTurn.startedAt)),
+                  ...this.#turnTiming(event.turnId),
                   ...(usage ? tokenProperties(sumTokens(usage)) : {}),
                 }),
           },
@@ -514,23 +694,68 @@ export class HostAnalytics {
     }
   }
 
-  /** Reports go with the account when the user shares analytics, else with the install ID. */
   #configureReports(): void {
     if (!this.#reports) return;
     const subject = this.#trackingEnabled ? normalizeAnalyticsIdentity(this.#resolveOwner()) : this.#install;
     Effect.runFork(this.#reports.configure(this.#trackingEnabled || subject !== null, subject?.id ?? null));
   }
 
-  /** Only the local service emits this signal. Remote clients never send host reports. */
+  handleStartup(properties: StartupProperties): void {
+    if (this.#closed) return;
+    this.#track("system_startup", properties);
+  }
+
+  handleMainLoopProfile(profile: MainLoopStallProfile): void {
+    if (this.#closed) return;
+    const properties: HostProperties = {
+      stall_ms: Math.min(profile.stallMs, MAX_PROFILE_MS),
+      phase: profile.phase,
+      turn_active: profile.turnActive,
+      host_kind: profile.hostKind,
+      profiled_ms: Math.min(profile.profiledMs, MAX_PROFILE_MS),
+      busy_pct: profile.busyPct,
+    };
+    for (const index of PROFILE_TOP_INDEXES) {
+      const entry = profile.top[index - 1];
+      if (!entry) break;
+      properties[`top_${index}_frame`] = entry.frame;
+      properties[`top_${index}_self_pct`] = entry.selfPct;
+      properties[`top_${index}_stack`] = entry.stack;
+    }
+    this.#track("system_main_loop_profile", properties);
+  }
+
+  handleRemoteConnect(summary: RemoteConnectSummary): void {
+    if (this.#closed) return;
+    const properties: HostProperties = {
+      outcome: summary.outcome,
+      connection: summary.connection,
+      ...(summary.session ? { session_kind: summary.session } : {}),
+      last_phase: summary.lastPhase,
+      ...(summary.firstRequest ? { first_request: summary.firstRequest } : {}),
+      total_ms: summary.totalMs,
+      wait_ms: summary.waitMs,
+      ...(summary.hostedStartWaitMs === undefined ? {} : { hosted_start_wait_ms: summary.hostedStartWaitMs }),
+      failed_attempts: summary.failedAttempts,
+      ...(summary.signalHome === undefined ? {} : { signal_home: summary.signalHome }),
+    };
+    for (const [phase, property] of REMOTE_CONNECT_PHASE_PROPERTIES) {
+      const ms = summary.phases[phase];
+      if (ms !== undefined) properties[property] = ms;
+    }
+    this.#track("system_remote_connect", properties);
+  }
+
   handleFailure(failure: FailureSignal): void {
-    if (!this.#reports) return;
-    this.#configureReports();
     const candidates = [...this.#activeTurns.values()].filter((turn) => turn.agentId === failure.agentId);
     const turn = failure.turnId
       ? this.#activeTurns.get(failure.turnId)
       : candidates.length === 1
         ? candidates[0]
         : undefined;
+    if (turn && (failure.severity ?? "error") === "error") noteTurnFailure(turn, failure);
+    if (!this.#reports) return;
+    this.#configureReports();
     if (turn?.owner && turn.owner.id !== this.#currentSubject()?.id) return;
     const properties = turn?.properties ?? (failure.agentId ? this.#agentProperties(failure.agentId) : {});
     const provider =
@@ -550,7 +775,6 @@ export class HostAnalytics {
     if (safe) Effect.runFork((turn?.failureScope ?? this.#reports).record("system_operation_failed", safe));
   }
 
-  /** Counts one finished tool step. The turn's rows are sent when the turn completes. */
   handleToolUsage(usage: ToolUsageSignal): void {
     if (!this.#client || !this.#trackingEnabled) return;
     const turn = this.#activeTurns.get(usage.turnId);
@@ -565,10 +789,6 @@ export class HostAnalytics {
     if (!existing) turn.tools.set(key, target);
   }
 
-  /**
-   * Reports a workflow run's end: its outcome, how it began and how many nodes of each kind ran.
-   * A retry can end the same run again; each outcome of a run is sent once.
-   */
   handleWorkflowRun(end: WorkflowRunEnd): void {
     if (!this.#client) return;
     const startedAt = Date.parse(end.startedAt);
@@ -595,7 +815,73 @@ export class HostAnalytics {
     });
   }
 
-  /** Reports a tab that reached a new registrable domain. The hostname itself is never sent. */
+  handleCreditMedia(report: CreditMediaReport): void {
+    if (!this.#client) return;
+    const turn = this.#activeTurns.get(report.turnId);
+    this.#track(
+      "system_credit_media",
+      {
+        ...(turn?.properties ?? this.#agentProperties(report.agentId)),
+        origin: turn?.origin ?? "unknown",
+        media_kind: report.kind,
+        outcome: report.outcome,
+        ...optionalProperty("media_model", report.model),
+        ...optionalProperty("agent_media_model", report.agentModel),
+        ...optionalProperty("model_source", report.modelSource),
+        ...optionalProperty("credits_cost", report.cost),
+        ...optionalProperty("credits_charged", report.charged),
+        ...optionalProperty("resolution", report.resolution),
+        ...optionalProperty("duration_seconds", report.durationSeconds),
+        ...optionalProperty("audio", report.audio),
+        reference_count: report.references,
+        ...(report.hold
+          ? {
+              hold_reason: report.hold.reason,
+              ...optionalProperty("hold_answer", report.hold.answer),
+              ...optionalProperty("hold_via", report.hold.via),
+            }
+          : {}),
+        ...(report.approval
+          ? {
+              approval: report.approval.accepted ? "accepted" : "declined",
+              ...optionalProperty("approval_via", report.approval.via),
+              model_changed: report.approval.modelChanged,
+            }
+          : {}),
+        duration_ms: Math.max(0, Math.round(report.durationMs)),
+      },
+      turn?.owner,
+    );
+  }
+
+  handleWebhookDelivery(report: WebhookDeliveryReport): void {
+    if (!this.#client) return;
+    const now = Date.now();
+    if (now - this.#webhookWindowStart >= WEBHOOK_DELIVERY_WINDOW_MS) {
+      this.#webhookWindowStart = now;
+      this.#webhookWindowCount = 0;
+    }
+    if (this.#webhookWindowCount >= MAX_WEBHOOK_DELIVERY_EVENTS_PER_MINUTE) {
+      this.#webhookSkipped += 1;
+      return;
+    }
+    this.#webhookWindowCount += 1;
+    const skipped = this.#webhookSkipped;
+    this.#webhookSkipped = 0;
+    this.#track("system_webhook_delivery", {
+      ...(report.ownerKind ? { owner_kind: report.ownerKind } : {}),
+      format: report.format,
+      result: report.result,
+      ...(report.ignoredReason ? { ignored_reason: report.ignoredReason } : {}),
+      status_code: report.status,
+      body_bytes: report.bodyBytes,
+      handle_ms: Math.round(report.handleMs),
+      ...(report.ageMs === null ? {} : { delivery_age_ms: Math.round(report.ageMs) }),
+      test: report.test,
+      ...(skipped > 0 ? { skipped_count: skipped } : {}),
+    });
+  }
+
   handleSiteVisit(visit: BrowserSiteVisit): void {
     if (!this.#client || !this.#trackingEnabled) return;
     const domain = analyticsDomain(visit.hostname);
@@ -626,9 +912,9 @@ export class HostAnalytics {
     }
     this.#checkInventory();
     this.checkResources();
+    this.#checkUncleanExit();
   }
 
-  /** The account signed out. Later events go with the install ID only when the user does not share analytics. */
   clear(): void {
     this.#pending = [];
     this.#bufferOwnerlessEvents = false;
@@ -710,11 +996,6 @@ export class HostAnalytics {
     }
   }
 
-  /**
-   * Reports a routine run's outcome. Like hosted sites, only a run that this process saw running is
-   * reported, so a history replay after a restart sends nothing. The message text is the routine
-   * name and is never read.
-   */
   #handleRoutineRunConversation(agentId: string, messages: readonly ConversationMessage[]): void {
     const events = messages.flatMap((message) => {
       if (message.author !== "system" || message.source !== "system" || message.status !== "completed") return [];
@@ -742,7 +1023,13 @@ export class HostAnalytics {
         {
           ...this.#agentProperties(agentId),
           status: event.status,
-          ...(run ? { run_kind: run.runKind, trigger_type: run.triggerType } : {}),
+          ...(run
+            ? {
+                run_kind: run.runKind,
+                ...(run.runSource ? { run_source: run.runSource } : {}),
+                trigger_type: run.triggerType,
+              }
+            : {}),
         },
         owner,
         false,
@@ -763,8 +1050,6 @@ export class HostAnalytics {
   #toolUseRow(usage: ToolUsageSignal): ToolUseRow {
     const server = usage.server;
     if (usage.kind !== "mcp" || !server) return { kind: usage.kind, calls: 0, failed: 0 };
-    // A user's server can report under a built-in name, such as `openbot browser` shown as
-    // `openbot_browser`. It then stays custom, and a resolver that fails also gives custom.
     let configured: { slug: string | null } | null;
     try {
       configured = this.#resolveMcpServer(server);
@@ -777,10 +1062,6 @@ export class HostAnalytics {
     return { kind: builtinKind ?? "mcp", plugin, ...(tool ? { tool } : {}), calls: 0, failed: 0 };
   }
 
-  /**
-   * Sends the inventory at most once per local day. A user who shares analytics waits for sign-in,
-   * so the inventory goes with their account.
-   */
   #checkInventory(): void {
     const today = localDay(new Date());
     if (this.#closed || this.#inventoryDay === today || this.#inventoryCheck) return;
@@ -793,7 +1074,6 @@ export class HostAnalytics {
       Effect.gen({ self: this }, function* () {
         const stored = yield* store.read();
         if (stored === "malformed") {
-          // A damaged file counts as sent today. It is written again, so the next day sends.
           yield* store.write(today);
           this.#inventoryDay = today;
           return;
@@ -804,7 +1084,6 @@ export class HostAnalytics {
         }
         const inventory = yield* resolveInventory();
         if (this.#closed || !this.#trackingEnabled || !this.#currentSubject()) return;
-        // The day is stored before the send, so a failed write sends nothing and a crash cannot send twice.
         yield* store.write(today);
         this.#inventoryDay = today;
         const owner = this.#currentSubject();
@@ -814,6 +1093,8 @@ export class HostAnalytics {
           {
             agent_count: inventory.agentCount,
             enabled_routine_count: inventory.enabledRoutineCount,
+            enabled_webhook_routine_count: inventory.enabledWebhookRoutineCount,
+            webhook_route_count: inventory.webhookRouteCount,
             workflow_count: inventory.workflowCount,
             custom_mcp_server_count: inventory.customMcpServerCount,
             plugins: inventory.plugins,
@@ -839,22 +1120,15 @@ export class HostAnalytics {
     );
   }
 
-  /**
-   * Sends the resource summary of the last closed day, once. A user who shares analytics waits for
-   * sign-in, so the summary goes with their account.
-   */
   checkResources(): void {
     const source = this.#resources;
     if (this.#closed || this.#resourceCheck || !source || !this.#client) return;
     const due = source.previousDay();
     if (!due) return;
-    // A user who shares analytics waits for sign-in. Without an install ID, a day of a user who
-    // does not share analytics is cleared with no send, so it never goes later with the account.
     if (!this.#currentSubject() && this.#trackingEnabled) return;
     this.#resourceCheck = true;
     Effect.runFork(
       Effect.gen({ self: this }, function* () {
-        // Cleared before the send, so a failed write sends nothing and a crash cannot send twice.
         yield* source.clearPreviousDay(due.day);
         const owner = this.#currentSubject();
         if (this.#closed || !owner) return;
@@ -872,20 +1146,25 @@ export class HostAnalytics {
     );
   }
 
-  /**
-   * The subject of a new event: the account when the user shares analytics, else the install ID.
-   * Null while a user who shares analytics is signed out, so the install ID never shows next to an
-   * account, and when there is no install ID.
-   */
+  #checkUncleanExit(): void {
+    const properties = this.#uncleanExit;
+    if (this.#closed || !properties) return;
+    const owner = this.#client ? this.#currentSubject() : null;
+    if (!owner) {
+      if (!this.#client || !this.#trackingEnabled) this.#uncleanExit = null;
+      return;
+    }
+    this.#uncleanExit = null;
+    this.#trackForOwner("system_unclean_exit", { ...properties }, owner);
+  }
+
   #currentSubject(): AnalyticsSubject | null {
     if (!this.#trackingEnabled) return this.#install;
     return normalizeAnalyticsIdentity(this.#resolveOwner());
   }
 
   #trackForOwner(name: HostEventName, properties: HostProperties, owner: AnalyticsSubject, flushPending = true): void {
-    // An account taken before the user stopped sharing analytics is never sent after it.
     if (!this.#trackingEnabled && LINKED_ONLY_EVENTS.has(name)) return;
-    // An install ID taken before the user started sharing analytics is never sent after it.
     if (this.#trackingEnabled && owner.email === null) return;
     const subject = owner.email !== null && !this.#trackingEnabled ? this.#install : owner;
     if (!subject) return;
@@ -900,7 +1179,6 @@ export class HostAnalytics {
     }
   }
 
-  /** Events that waited for the account go with the account only. */
   #flushPendingForOwner(owner: AnalyticsSubject): void {
     this.#identify(owner);
     if (owner.email === null) return;
@@ -921,7 +1199,6 @@ export class HostAnalytics {
     this.#trackForOwner(name, sanitized, owner, ownerOverride === undefined);
   }
 
-  /** Puts the email on the account's profile. The install ID has no profile data. */
   #identify(owner: AnalyticsSubject): void {
     if (!this.#client) return;
     if (owner.email === null) {
@@ -971,7 +1248,6 @@ export class HostAnalytics {
     }
   }
 
-  /** The turn's usage rows, or `null` when they cannot be read and no token property is sent. */
   #turnUsage(agentId: string, turnId: string, startedAtTime: number): readonly TurnModelUsage[] | null {
     const resolve = this.#resolveTurnUsage;
     if (!resolve) return null;
@@ -980,6 +1256,21 @@ export class HostAnalytics {
     } catch {
       return null;
     }
+  }
+
+  #turnTiming(turnId: string): Record<string, number> {
+    let timing: TurnTiming | null = null;
+    try {
+      timing = this.#resolveTurnTiming?.(turnId) ?? null;
+    } catch {
+      return {};
+    }
+    const properties: Record<string, number> = {};
+    for (const [key, property] of TURN_TIMING_PROPERTIES) {
+      const value = timing?.[key];
+      if (isNumber(value) && Number.isFinite(value)) properties[property] = Math.max(0, Math.round(value));
+    }
+    return properties;
   }
 
   #pruneActiveTurns(now: number): void {
@@ -1032,7 +1323,6 @@ export class HostAnalytics {
     this.#operationQueue.active = false;
   });
 
-  /** Stop accepting events, then finish work already owned by this service. */
   readonly close = Effect.fn("HostAnalytics.close")(function* (this: HostAnalytics) {
     this.#closed = true;
     if (this.#reports) yield* this.#reports.close();
@@ -1040,7 +1330,6 @@ export class HostAnalytics {
   }, Effect.uninterruptible);
 }
 
-/** Runs a resolver whose failure must not reach the host, which has already done its work. */
 function safely<T>(resolve: () => T | null): T | null {
   try {
     return resolve();
@@ -1072,13 +1361,61 @@ function sanitizeHostEvent(name: HostEventName, properties: HostProperties): Hos
 }
 
 function sanitizeHostProperty(name: HostEventName, key: string, value: unknown): HostPropertyValue | undefined {
+  if (name === "system_startup") {
+    if (key === "start_kind") return isOneOf(START_KINDS, value) ? value : undefined;
+    if (key === "host_kind") return isOneOf(["desktop", "server"] as const, value) ? value : undefined;
+    if (key === "slowest_service_step") return isOneOf(SERVICE_STEPS, value) ? value : undefined;
+    return boundedCount(value, MAX_STARTUP_MS);
+  }
+  if (name === "system_remote_connect") {
+    if (
+      key === "outcome" ||
+      key === "connection" ||
+      key === "session_kind" ||
+      key === "last_phase" ||
+      key === "first_request"
+    ) {
+      const allowed: readonly string[] = REMOTE_CONNECT_ENUMS[key];
+      return isString(value) && allowed.includes(value) ? value : undefined;
+    }
+    if (key === "signal_home") return isSignalHomeName(value) ? value : undefined;
+    if (key === "failed_attempts") return boundedCount(value, 100_000);
+    if (key === "wait_ms" || key === "hosted_start_wait_ms") return boundedCount(value, MAX_REMOTE_CONNECT_WAIT_MS);
+    return boundedCount(value, MAX_REMOTE_CONNECT_PHASE_MS);
+  }
   if (name === "system_resources") {
-    if (key === "ram_class" || key === "cpu_class" || key === "arch" || key === "host_kind") {
+    if (
+      key === "ram_class" ||
+      key === "cpu_class" ||
+      key === "arch" ||
+      key === "host_kind" ||
+      key === "main_loop_delay_max_phase"
+    ) {
       const allowed: readonly string[] = RESOURCE_ENUMS[key];
       return isString(value) && allowed.includes(value) ? value : undefined;
     }
-    if (key === "provider_tree_supported") return isBoolean(value) ? value : undefined;
+    if (key === "provider_tree_supported" || key === "main_loop_delay_max_turn_active") {
+      return isBoolean(value) ? value : undefined;
+    }
     return boundedCount(value, 10_000_000);
+  }
+  if (name === "system_main_loop_profile") {
+    if (key === "phase") return isOneOf(RESOURCE_ENUMS.main_loop_delay_max_phase, value) ? value : undefined;
+    if (key === "host_kind") return isOneOf(RESOURCE_ENUMS.host_kind, value) ? value : undefined;
+    if (key === "turn_active") return isBoolean(value) ? value : undefined;
+    if (key === "stall_ms" || key === "profiled_ms") return boundedCount(value, MAX_PROFILE_MS);
+    if (key.endsWith("_frame")) return isProfileFrame(value) ? value : undefined;
+    if (key.endsWith("_stack")) return isProfileStack(value) ? value : undefined;
+    return isNumber(value) && value >= 0 && value <= 100 ? value : undefined;
+  }
+  if (name === "system_unclean_exit") {
+    if (key === "phase" || key === "uptime_class" || key === "host_kind") {
+      const allowed: readonly string[] = UNCLEAN_EXIT_ENUMS[key];
+      return isString(value) && allowed.includes(value) ? value : undefined;
+    }
+    if (key === "previous_app_version") return isString(value) && APP_VERSION_PATTERN.test(value) ? value : undefined;
+    if (key === "crash_dump_count") return boundedCount(value, 10);
+    return isBoolean(value) ? value : undefined;
   }
   if (key === "cause_code" || key === "severity" || key === "operation") {
     const safe = safeProperties({
@@ -1096,6 +1433,30 @@ function sanitizeHostProperty(name: HostEventName, key: string, value: unknown):
         ? hostedSiteFailureCode(value)
         : systemFailureCode(value)
       : "unknown";
+  }
+  if (name === "system_credit_media") {
+    if (
+      key === "media_kind" ||
+      key === "outcome" ||
+      key === "model_source" ||
+      key === "hold_reason" ||
+      key === "hold_answer" ||
+      key === "hold_via" ||
+      key === "approval" ||
+      key === "approval_via"
+    )
+      return isOneOf(CREDIT_MEDIA_ENUMS[key], value) ? value : undefined;
+    if (key === "media_model" || key === "agent_media_model")
+      return isString(value) && CREDIT_MEDIA_MODEL_PATTERN.test(value) ? value : undefined;
+    if (key === "resolution") return isString(value) && CREDIT_MEDIA_SPEC_PATTERN.test(value) ? value : undefined;
+    if (key === "model_changed" || key === "audio") return isBoolean(value) ? value : undefined;
+    if (key === "credits_cost" || key === "credits_charged")
+      return isNumber(value) && Number.isFinite(value) && value >= 0 && value <= MAX_CREDIT_MEDIA_CREDITS
+        ? value
+        : undefined;
+    if (key === "duration_seconds") return boundedCount(value, 3_600);
+    if (key === "reference_count") return boundedCount(value, 100);
+    if (key === "duration_ms") return boundedCount(value, MAX_CREDIT_MEDIA_MS);
   }
   if (name === "hosted_site_action") {
     if (key === "action") return isOneOf(["publish", "replace", "delete"] as const, value) ? value : undefined;
@@ -1115,7 +1476,21 @@ function sanitizeHostProperty(name: HostEventName, key: string, value: unknown):
       return isOneOf([...ROUTINE_TERMINAL_STATUSES, "needs-attention"] as const, value) ? value : undefined;
     }
     if (key === "run_kind") return isOneOf(["scheduled", "manual"] as const, value) ? value : undefined;
+    if (key === "run_source") return isOneOf(ROUTINE_RUN_SOURCES, value) ? value : undefined;
     if (key === "trigger_type") return isOneOf(ROUTINE_TRIGGER_TYPES, value) ? value : undefined;
+  }
+  if (name === "system_webhook_delivery") {
+    if (key === "owner_kind") return isOneOf(["agent", "channel", "workflow"] as const, value) ? value : undefined;
+    if (key === "format") return isOneOf(["openbot", "standard"] as const, value) ? value : undefined;
+    if (key === "result") return isOneOf(WEBHOOK_DELIVERY_RESULTS, value) ? value : undefined;
+    if (key === "ignored_reason") return isOneOf(WEBHOOK_IGNORED_REASONS, value) ? value : undefined;
+    if (key === "status_code") return isOneOf(WEBHOOK_DELIVERY_STATUSES, value) ? value : undefined;
+    if (key === "body_bytes") return boundedCount(value, MAX_WEBHOOK_BODY_BYTES);
+    if (key === "handle_ms") return boundedCount(value, MAX_WEBHOOK_HANDLE_MS);
+    if (key === "delivery_age_ms") return boundedCount(value, MAX_WEBHOOK_AGE_MS);
+    if (key === "skipped_count") return boundedCount(value, 1_000_000);
+    if (key === "test") return isBoolean(value) ? value : undefined;
+    return undefined;
   }
   if (name === "system_workflow_run") {
     if (key === "status") return isOneOf(["done", "failed", "stopped"] as const, value) ? value : undefined;
@@ -1169,20 +1544,18 @@ function sanitizeHostProperty(name: HostEventName, key: string, value: unknown):
   if (key === "duration_ms") {
     return isNumber(value) && Number.isFinite(value) && value >= 0 && value <= ACTIVE_TURN_TTL_MS ? value : undefined;
   }
+  if (name === "system_turn_completed") {
+    if (key === "queue_wait_ms") return boundedCount(value, MAX_QUEUE_WAIT_MS);
+    if (TURN_TIMING_PROPERTIES.some(([, property]) => property === key)) return boundedCount(value, ACTIVE_TURN_TTL_MS);
+  }
   if (key === "has_secret_prompt") return isBoolean(value) ? value : undefined;
   return undefined;
 }
 
-/**
- * The registrable domain (eTLD+1) of a page, or `undefined` for a host that must not be sent: an IP
- * address, a single-label or intranet name, or a name with no public ICANN suffix. Private suffixes
- * are ignored on purpose, so `user.github.io` reports as `github.io` and never names the user.
- */
 function analyticsDomain(hostname: string): string | undefined {
   const host = hostname.trim().toLowerCase().replace(/\.$/u, "");
   if (!host || host.length > 253) return undefined;
   const parsed = parseDomain(host, { allowPrivateDomains: false, extractHostname: false });
-  // `home.arpa` is on the ICANN list, but it names home networks (RFC 8375).
   if (parsed.isIp || !parsed.isIcann || !parsed.domain || isHomeNetwork(parsed.domain)) return undefined;
   return parsed.domain;
 }
@@ -1191,11 +1564,14 @@ function isHomeNetwork(domain: string): boolean {
   return domain === "home.arpa" || domain.endsWith(".home.arpa");
 }
 
+function optionalProperty(property: HostPropertyName, value: HostPropertyValue | null): HostProperties {
+  return value === null ? {} : { [property]: value };
+}
+
 function boundedCount(value: unknown, max: number): number | undefined {
   return isNumber(value) && Number.isInteger(value) && value >= 0 && value <= max ? value : undefined;
 }
 
-/** The counts of all models of a turn. A count is `null` when one model lacks it. */
 function sumTokens(rows: readonly TurnModelUsage[]): UsageTokens | null {
   if (rows.length === 0) return null;
   const sum: UsageTokens = { uncachedInput: 0, cachedInput: 0, cacheCreation: 0, output: 0 };
@@ -1213,10 +1589,6 @@ function tokenTotal(tokens: UsageTokens): number {
   return TOKEN_PROPERTIES.reduce((total, [key]) => total + (tokens[key] ?? 0), 0);
 }
 
-/**
- * Counts only: `token_usage` is `unknown` when the provider reported no usage, never a zero, and
- * `partial` when a count is missing. A missing count is left out rather than sent as 0.
- */
 function tokenProperties(tokens: UsageTokens | null): HostProperties {
   if (!tokens) return { token_usage: "unknown" };
   const properties: HostProperties = {};
@@ -1245,18 +1617,10 @@ function isRoutineRunFinished(status: RoutineRunConversationEventStatus): boolea
   return isOneOf(ROUTINE_TERMINAL_STATUSES, status);
 }
 
-/**
- * A model OpenCode serves is named `<provider>/<model>`, and when the user named that provider the
- * prefix is a string they typed - a company name, a hostname, a project. Nothing in the id separates
- * one of those from OpenCode's own `anthropic/...`, so every prefixed id is reported as `custom`.
- * That costs the model breakdown for OpenCode, which is the cheaper of the two mistakes.
- */
 function reportedModel(value: string): string {
-  // Hermes names a model of the user's own endpoint `custom:<endpoint name>:<model>`.
   if (value.startsWith("custom:")) return "custom";
   const separator = value.indexOf("/");
   if (separator < 0) return value;
-  // A key-only provider never puts its own id before a model id, so that prefix comes from OpenCode.
   const prefix = value.slice(0, separator);
   return isOneOf(AGENT_PROVIDERS, prefix) && !isKeyOnlyProvider(prefix) ? value : "custom";
 }
@@ -1267,6 +1631,11 @@ function hostedSiteFailureCode(value: string): string {
 
 function normalizedTurnStatus(value: string): string {
   return ["completed", "failed", "interrupted", "cancelled"].includes(value) ? value : "other";
+}
+
+function noteTurnFailure(turn: ActiveTurn, failure: FailureSignal): void {
+  if (failure.causeCode === "unknown" && turn.failure && turn.failure.causeCode !== "unknown") return;
+  turn.failure = { failureCode: systemFailureCode(failure.code), causeCode: failure.causeCode };
 }
 
 function systemFailureCode(value: string): string {
