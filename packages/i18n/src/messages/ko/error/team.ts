@@ -19,6 +19,9 @@ export const messages = {
   "error.team.activeInviteLimit": "호스트당 활성 초대는 최대 {limit}개까지 만들 수 있어요.",
   "error.team.inviteInvalid": "초대가 올바르지 않거나 만료되었어요.",
   "error.team.inviteEmailMismatch": "이 초대는 다른 이메일 주소로 보낸 초대예요.",
+  "error.team.inviteEmailRateLimited": {
+    other: "OpenBot이 지금은 이메일을 더 보낼 수 없어요. {count}분 기다린 후 초대를 다시 보내 주세요.",
+  },
   "error.team.memberDisabled": "이 팀 멤버는 비활성화되어 있어요.",
   "error.team.memberLimit": "호스트당 멤버는 최대 {limit}명까지 가능해요.",
   "error.team.accountNotMember": "이 OpenBot 계정은 팀 멤버가 아니에요.",

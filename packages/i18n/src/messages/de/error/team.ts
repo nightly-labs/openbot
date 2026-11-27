@@ -22,6 +22,11 @@ export const messages = {
   "error.team.activeInviteLimit": "Ein Host kann bis zu {limit} aktive Einladungen haben.",
   "error.team.inviteInvalid": "Die Einladung ist ungültig oder abgelaufen.",
   "error.team.inviteEmailMismatch": "Diese Einladung gehört zu einer anderen E-Mail-Adresse.",
+  "error.team.inviteEmailRateLimited": {
+    one: "OpenBot kann gerade keine weiteren E-Mails senden. Warte {count} Minute und sende die Einladung dann erneut.",
+    other:
+      "OpenBot kann gerade keine weiteren E-Mails senden. Warte {count} Minuten und sende die Einladung dann erneut.",
+  },
   "error.team.memberDisabled": "Dieses Teammitglied ist deaktiviert.",
   "error.team.memberLimit": "Ein Host kann bis zu {limit} Mitglieder haben.",
   "error.team.accountNotMember": "Dieses OpenBot-Konto ist kein Teammitglied.",

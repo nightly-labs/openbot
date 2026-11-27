@@ -19,6 +19,13 @@ export const messages = {
   "error.team.activeInviteLimit": "Host może mieć maksymalnie {limit} aktywnych zaproszeń.",
   "error.team.inviteInvalid": "Zaproszenie jest nieprawidłowe lub wygasło.",
   "error.team.inviteEmailMismatch": "To zaproszenie należy do innego adresu e-mail.",
+  "error.team.inviteEmailRateLimited": {
+    one: "OpenBot nie może teraz wysłać więcej e-maili. Poczekaj {count} minutę, a potem wyślij zaproszenie ponownie.",
+    few: "OpenBot nie może teraz wysłać więcej e-maili. Poczekaj {count} minuty, a potem wyślij zaproszenie ponownie.",
+    many: "OpenBot nie może teraz wysłać więcej e-maili. Poczekaj {count} minut, a potem wyślij zaproszenie ponownie.",
+    other:
+      "OpenBot nie może teraz wysłać więcej e-maili. Poczekaj {count} minuty, a potem wyślij zaproszenie ponownie.",
+  },
   "error.team.memberDisabled": "Ten członek zespołu jest wyłączony.",
   "error.team.memberLimit": "Host może mieć maksymalnie {limit} członków.",
   "error.team.accountNotMember": "To konto OpenBot nie jest członkiem zespołu.",

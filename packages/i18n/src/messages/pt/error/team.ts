@@ -21,6 +21,10 @@ export const messages = {
   "error.team.activeInviteLimit": "Um computador anfitrião pode ter até {limit} convites ativos.",
   "error.team.inviteInvalid": "O convite é inválido ou expirou.",
   "error.team.inviteEmailMismatch": "Este convite pertence a outro endereço de e-mail.",
+  "error.team.inviteEmailRateLimited": {
+    one: "O OpenBot não pode enviar mais e-mails agora. Aguarde {count} minuto e envie o convite novamente.",
+    other: "O OpenBot não pode enviar mais e-mails agora. Aguarde {count} minutos e envie o convite novamente.",
+  },
   "error.team.memberDisabled": "Este membro da equipe está desativado.",
   "error.team.memberLimit": "Um computador anfitrião pode ter até {limit} membros.",
   "error.team.accountNotMember": "Esta conta do OpenBot não é membro da equipe.",

@@ -20,6 +20,10 @@ export const messages = {
   "error.team.activeInviteLimit": "Een host kan maximaal {limit} actieve uitnodigingen hebben.",
   "error.team.inviteInvalid": "De uitnodiging is ongeldig of verlopen.",
   "error.team.inviteEmailMismatch": "Deze uitnodiging hoort bij een ander e-mailadres.",
+  "error.team.inviteEmailRateLimited": {
+    one: "OpenBot kan nu geen e-mail meer versturen. Wacht {count} minuut en verstuur de uitnodiging dan opnieuw.",
+    other: "OpenBot kan nu geen e-mail meer versturen. Wacht {count} minuten en verstuur de uitnodiging dan opnieuw.",
+  },
   "error.team.memberDisabled": "Dit teamlid is uitgeschakeld.",
   "error.team.memberLimit": "Een host kan maximaal {limit} leden hebben.",
   "error.team.accountNotMember": "Dit OpenBot-account is geen lid van het team.",

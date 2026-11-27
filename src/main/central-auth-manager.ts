@@ -61,6 +61,7 @@ import { WATCH_TICKET_AUDIENCE, type WatchTicketClaims } from "@openbot/contract
 import type { ServerAppearance } from "@openbot/contracts/team-protocol/host-appearance-v1";
 import { sourceText } from "@openbot/i18n/source";
 import { createOpenBotLogger, toLogValue } from "@openbot/logging";
+import { inviteEmailRateLimitedText } from "@openbot/team-client/remote-directory";
 import { referenceFrom, safeReference } from "@openbot/user-errors";
 import { Deferred, Duration, Effect, Exit, type Layer, Result, Schema, Semaphore } from "effect";
 import { createLocalJWKSet, type JWTPayload, jwtVerify } from "jose";
@@ -1626,7 +1627,7 @@ export class CentralAuthManager extends EventEmitter<CentralAuthEvents> {
           body: JSON.stringify(input),
         },
         decodeVoid,
-      );
+      ).pipe(Effect.mapError(inviteEmailFailure));
     },
     (operation) => this.#owned(operation),
   ).bind(this);
@@ -2918,6 +2919,20 @@ function companySignInIssue(failure: CentralAuthOperationError | CompanySignInBr
 function isDefinitiveEmailCodeRequestFailure(error: unknown): boolean {
   if (!(error instanceof AuthApiError)) return false;
   return DEFINITIVE_EMAIL_CODE_REQUEST_FAILURES.has(error.code);
+}
+
+function inviteEmailFailure(error: CentralAuthOperationError): CentralAuthOperationError {
+  const cause = error.cause;
+  if (!(cause instanceof AuthApiError) || cause.code !== "email_delivery_rate_limited") return error;
+  return new CentralAuthOperationError({
+    cause: new AuthApiError(
+      cause.status,
+      cause.code,
+      inviteEmailRateLimitedText(cause.retryAfterSeconds),
+      cause.retryAfterSeconds,
+      cause.reference,
+    ),
+  });
 }
 
 function parseRetryAfterSeconds(value: string | null): number | undefined {

@@ -19,6 +19,11 @@ export const messages = {
   "error.team.activeInviteLimit": "למארח יכולות להיות עד {limit} הזמנות פעילות.",
   "error.team.inviteInvalid": "ההזמנה אינה תקינה או שפג תוקפה.",
   "error.team.inviteEmailMismatch": "ההזמנה הזו שייכת לכתובת אימייל אחרת.",
+  "error.team.inviteEmailRateLimited": {
+    one: "OpenBot לא יכול לשלוח עוד אימיילים כרגע. יש להמתין דקה אחת ואז לשלוח את ההזמנה שוב.",
+    two: "OpenBot לא יכול לשלוח עוד אימיילים כרגע. יש להמתין שתי דקות ואז לשלוח את ההזמנה שוב.",
+    other: "OpenBot לא יכול לשלוח עוד אימיילים כרגע. יש להמתין {count} דקות ואז לשלוח את ההזמנה שוב.",
+  },
   "error.team.memberDisabled": "חבר הצוות הזה מושבת.",
   "error.team.memberLimit": "למארח יכולים להיות עד {limit} חברים.",
   "error.team.accountNotMember": "חשבון OpenBot הזה אינו חבר בצוות.",
