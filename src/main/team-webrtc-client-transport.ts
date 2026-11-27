@@ -2,6 +2,7 @@ import { generateKeyPairSync, randomBytes, sign, verify } from "node:crypto";
 import { EventEmitter } from "node:events";
 import type { AgentEvent, TeamRealtimeEvent } from "@openbot/contracts/ipc";
 import { isDynamicRecord, isNumber, isString } from "@openbot/contracts/runtime-values";
+import { addAttachmentDimensions } from "@openbot/contracts/team-protocol/attachment-dimensions-v1";
 import {
   decodeTeamProtocolSupportExpanded,
   teamCapabilitiesForProtocol,
@@ -654,6 +655,7 @@ export class TeamWebRtcClientTransport extends EventEmitter<TeamWebRtcClientTran
           addSkillSuggestionNames(body, envelope.body);
           addPromptQuestionDetails(body, envelope.body);
         }
+        addAttachmentDimensions(body, envelope.body);
         if (method === "GET" && path === "/v1/compatibility" && status === 200) {
           const support = yield* remoteDecode(() => decodeTeamProtocolSupportExpanded(body));
           this.#hostProtocols.set(hostId, Math.min(support.protocol.maximum, LOCAL_TEAM_PROTOCOL.maximum));
@@ -1527,6 +1529,7 @@ export class TeamWebRtcClientTransport extends EventEmitter<TeamWebRtcClientTran
           addSkillSuggestionNames(decoded.event, frame.payload);
           addPromptQuestionDetails(decoded.event, frame.payload);
         }
+        addAttachmentDimensions(decoded.event, frame.payload);
         this.emit("event", hostId, decoded.event);
       }
       this.#lastEventSequence.set(hostId, frame.sequence);

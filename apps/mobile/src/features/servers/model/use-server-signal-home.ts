@@ -3,7 +3,10 @@ import type { MobileTextKey } from "@openbot/i18n/mobile";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect } from "react";
 import { useQueryScope } from "@/features/auth/context/mobile-session-context";
-import { useMobileWorkspace, useMobileWorkspaceActions } from "@/features/workspace/context/mobile-workspace-context";
+import {
+  useMobileWorkspaceActions,
+  useMobileWorkspaceSelector,
+} from "@/features/workspace/context/mobile-workspace-context";
 import { rememberDrawerValues, useDrawerSnapshot } from "@/features/workspace/model/drawer-snapshot";
 import { queryKeys } from "@/features/workspace/model/query-keys";
 
@@ -36,13 +39,12 @@ export const SIGNAL_LATENCY_TEXT_CLASS: Readonly<Record<SignalLatencyTone, strin
 };
 
 export function useServerSignalHome(serverId: string) {
-  const { canManageServerSignalHome, servesServerSignalHome } = useMobileWorkspace();
+  const available = useMobileWorkspaceSelector((workspace) => workspace.canManageServerSignalHome(serverId));
+  const served = useMobileWorkspaceSelector((workspace) => workspace.servesServerSignalHome(serverId));
   const { loadServerSignalHome, setServerSignalHome } = useMobileWorkspaceActions();
   const queryScope = useQueryScope();
   const queryClient = useQueryClient();
   const queryKey = queryKeys.serverSignalHome(queryScope, serverId);
-  const available = canManageServerSignalHome(serverId);
-  const served = servesServerSignalHome(serverId);
   const cached = useDrawerSnapshot(serverId).signalHome;
   const query = useQuery({
     queryKey,
