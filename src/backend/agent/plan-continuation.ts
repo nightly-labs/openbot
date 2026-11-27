@@ -256,7 +256,15 @@ export class PlanContinuation {
       });
       return { kind: "check", continuations: count, earlierGaps };
     };
-    if (chained && previous.kind === "finishCheck" && input.usedTools === false && open.length === 0) return STOPPED;
+    if (
+      chained &&
+      previous.kind === "finishCheck" &&
+      input.usedTools === false &&
+      open.length === 0 &&
+      input.answer?.trim() &&
+      !stoppedBeforeNextStep(input.answer)
+    )
+      return STOPPED;
     if (count >= this.#limit) return chained && open.length > 0 ? STOPPED : checkAtLimit();
     let kind: ContinuationKind;
     if (open.length > 0 && mode !== "only") {

@@ -1396,6 +1396,46 @@ try {
     return { turns: turnsSince(mark).length };
   });
 
+  await check(
+    "a continuation with no tool step that names its next step, or with no answer, keeps its behavior",
+    async () => {
+      const writer = await createAgent("Writer");
+      const mark = loggedTurns().length;
+      const id = await send(
+        writer.id,
+        `Write the report. ${verdicts({ verdict: "continue", missing: "Write the report file." }, { verdict: "done" })} ${plan(
+          { steps: [], commands: ["ls notes"], answer: "I read the notes." },
+          { steps: [], answer: "Next, I'll write the report file." },
+          { steps: [], commands: ["write report.md"], answer: "The report file is written." },
+        )}`,
+      );
+      assert.equal(await settled(id), "completed");
+      assert.deepEqual(
+        turnsSince(mark).map((turn) => turn.note),
+        [false, true, true],
+        "A continuation that names its next step continues once more.",
+      );
+
+      const silent = await createAgent("Silent");
+      const quietMark = loggedTurns().length;
+      const empty = await send(
+        silent.id,
+        `Sort the notes. ${verdicts({ verdict: "continue", missing: "Sort the rest of the notes." })} ${plan(
+          { steps: [], commands: ["sort notes"], answer: "I sorted half of the notes." },
+          { steps: [], noAnswer: true },
+        )}`,
+      );
+      assert.equal(await settled(empty), "completed");
+      assert.deepEqual(
+        turnsSince(quietMark).map((turn) => turn.note),
+        [false, true],
+        "One continuation runs.",
+      );
+      assert.equal(stopLines(silent.id).length, 0, "An empty continuation shows no stop line.");
+      return { turns: turnsSince(mark).length };
+    },
+  );
+
   await check("a Stop or a new message during a slow finish check ends the check at once", async () => {
     const slow = (missing: string): Verdict => ({ verdict: "continue", missing, delayMs: 20_000 });
     const quick = 8_000;
