@@ -2371,9 +2371,7 @@ export class TurnLifecycle {
             })
           : null;
       const carriesWork = this.#carriesWork(agentId, turnId, running);
-      const waitsHere = !channelTurn && deliveries.every(({ channelId }) => channelId === undefined);
-      let continuing =
-        limited && carriesWork && deliveries.length > 0 && (waitsHere || this.#hooks.mayContinueOnBackup(agentId));
+      let continuing = limited && carriesWork && deliveries.length > 0;
       if (continuing) {
         for (const { delivery, channelId } of deliveries) {
           if (channelId && !(yield* this.#hooks.requeueChannelDelivery(delivery.id, true))) {

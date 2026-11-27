@@ -1318,6 +1318,85 @@ try {
     return { deliveryId, status, models: attempts.map((turn) => turn.model) };
   });
 
+  await check("without a backup, a channel task keeps its work and continues when the limit ends", async () => {
+    await restart();
+    const agent = await createCodex("Channel no fallback", { automatic: true, order: [] });
+    const since = events.length;
+    const before = turns().length;
+    const beforeCodex = readLog<CodexTurn>(codexLog).length;
+    const beforeWork = readLog<{ caseId: string; step: string }>(workLog).length;
+    const channelId = randomUUID();
+    const actor = { id: "local", name: "Alex" };
+    await runCauseEffect(
+      service.channels.command(
+        {
+          type: "save",
+          operationId: randomUUID(),
+          channelId,
+          draft: {
+            name: "Waits for limit",
+            title: "",
+            instructions: "Finish the assigned work.",
+            members: [{ agentId: agent.id }],
+            leadAgentId: agent.id,
+          },
+        },
+        actor,
+      ),
+    );
+    await runCauseEffect(
+      service.channels.command(
+        {
+          type: "send",
+          operationId: randomUUID(),
+          channelId,
+          text: "usage-partial case:channel-wait",
+          recipientAgentId: agent.id,
+          replyToMessageId: null,
+          attachmentDraftIds: [],
+        },
+        actor,
+      ),
+    );
+    const continuation = await waitFor("the stopped channel work to wait for the limit", () => {
+      const deliveryId = service.channels.store.assignments(channelId).at(-1)?.deliveryId;
+      if (!deliveryId) return null;
+      return (
+        service.getRuntimeSnapshot().usageLimits?.some((limit) => limit.agentId === agent.id) &&
+        mailbox.getDelivery(deliveryId)?.delivery.status === "queued" &&
+        mailbox.getDelivery(deliveryId)?.resumeAfterUsageLimit
+      );
+    });
+    assert.ok(continuation.workSteps.includes("checkpoint-result=channel-wait"), "The completed action is kept.");
+    assert.ok(
+      service.channels.store.tasks(channelId).every((task) => task.state === "queued"),
+      "The task waits and does not stop.",
+    );
+    assert.equal(readLog<CodexTurn>(codexLog).length, beforeCodex + 1, "The held work does not run again.");
+    await runCauseEffect(service.resetProviderUsage("codex", DEFAULT_PROVIDER_ACCOUNT_ID));
+    const task = await waitFor("the channel task to end", () =>
+      service.channels.store
+        .tasks(channelId)
+        .find((item) => ["completed", "failed", "paused", "cancelled"].includes(item.state)),
+    );
+    assert.equal(task.state, "completed", `The channel task completes: ${task.error}`);
+    assert.equal(service.channels.store.tasks(channelId).length, 1, "The channel keeps one task.");
+    const attempts = readLog<CodexTurn>(codexLog).slice(beforeCodex);
+    assert.equal(attempts.length, 2, "The same model continues the work once.");
+    assert.ok(attempts[1]?.input.includes("Continue the unfinished task"), "The model gets a continuation request.");
+    assert.deepEqual(
+      readLog<{ caseId: string; step: string }>(workLog).slice(beforeWork),
+      [
+        { caseId: "channel-wait", step: "checkpoint" },
+        { caseId: "channel-wait", step: "final" },
+      ],
+      "The completed action runs once; the continuation runs only the remaining action.",
+    );
+    assert.equal(turns().length, before, "No backup runs.");
+    assert.deepEqual(errorsFor(agent.id, since), [], "Channel work that waited for the limit shows no failure.");
+    return { taskId: task.id, state: task.state, models: attempts.map((turn) => turn.model) };
+  });
+
   await check("ask before switching continues partial work on the saved backup", async () => {
     await restart();
     const agent = await createCodex("Ask fallback", { automatic: false, order: automaticBackups.order });
