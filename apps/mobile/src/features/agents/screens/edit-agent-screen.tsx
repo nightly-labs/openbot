@@ -314,6 +314,7 @@ function AgentForm({
             : current,
         );
       }
+      if (!accountChanged && edits.model !== undefined) void queryClient.invalidateQueries({ queryKey: accountsKey });
       if (photoChanged) {
         await setAgentAvatar(agent.id, photo ?? null, agent.serverId);
         setPhoto(undefined);
