@@ -51,11 +51,15 @@ actor WidgetRefresh {
         if let ready { parts[serverId] = ready }
       }
     }
-    if !parts.isEmpty,
+    if !parts.isEmpty, Self.sessionKept(credentials),
       let merged = WatchMerge.merge(parts: parts, phone: nil, previous: previous, hasPicture: WatchAvatarFiles.has)
     {
       _ = ComplicationData.save(merged, previous: previous, chosen: WidgetSource.chosen)
     }
+  }
+
+  private static func sessionKept(_ credentials: WatchDirectCredentials) -> Bool {
+    WatchKeychain.credentials()?.watchSessionId == credentials.watchSessionId && WidgetSource.snapshot() != nil
   }
 
   private func register() async {
