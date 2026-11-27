@@ -278,6 +278,9 @@ export const messages = defineMessages("error.backend", {
     "The server refused the account that you signed in with. Check that this account can use the service. To use another account, sign out, then sign in again.",
   "error.backend.mcpSignInClientRefused":
     "The sign-in server did not accept OpenBot when it completed the sign-in. Sign in again: OpenBot registers with the server again.",
+  "error.backend.googleSignInNeedsAccount":
+    "Sign in to your OpenBot account first. OpenBot needs it to complete a Google sign-in.",
+  "error.backend.googleSignInUnavailable": "OpenBot could not complete the Google sign-in. Try again later.",
   "error.backend.mcpSignInAppRefused":
     "The sign-in server did not accept the sign-in app of this server. Check the client ID and the client secret of the sign-in app, then sign in again.",
   "error.backend.mcpCommandNotFound": "Command not found: {command}",
@@ -531,4 +534,8 @@ export const messages = defineMessages("error.backend", {
   "error.backend.taskRemoteUnsupported": "Tasks are only available for agents on this computer.",
   "error.backend.taskMessageFailed": "OpenBot could not send the message to the task. Try again later.",
   "error.backend.taskStartFailed": "OpenBot could not start the task. Do the work in this turn instead.",
+  "error.backend.uiBlockActionRunning": "OpenBot is still doing this. Wait until it is done.",
+  "error.backend.gmailDraftChanged":
+    "The draft changed after OpenBot showed it, so it was not sent. Ask the agent to show it again.",
+  "error.backend.gmailSendFailed": "Gmail did not send the draft: {reason}",
 });

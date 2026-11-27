@@ -27,6 +27,7 @@ import {
   type McpSignInOffer,
   type McpSignInOpener,
   mcpOAuthAccountKey,
+  normalizeResource,
 } from "../mcp-oauth-provider";
 import { McpOAuthProxy, type McpOAuthProxyTarget, mcpOAuthProxyAgentKey, mcpOAuthProxyRoute } from "../mcp-oauth-proxy";
 import {
@@ -223,6 +224,21 @@ export class McpGateway {
       .accessToken(config.url)
       .pipe(Effect.map((token) => (token ? { url: config.url, headers: config.headers, token } : null)));
   }
+
+  readonly accountTokens = Effect.fn("McpGateway.accountTokens")(function* (this: McpGateway, url: string) {
+    const oauth = this.#oauth;
+    const server = normalizeResource(url);
+    if (!oauth || !server) return [];
+    const rows = this.#servers
+      .listEnabled()
+      .filter((row) => this.#proxied(row) && normalizeResource(withoutMcpAccountFragment(row.url)) === server);
+    const tokens: { name: string; token: string }[] = [];
+    for (const row of rows) {
+      const token = yield* oauth.accessToken(row.url);
+      if (token) tokens.push({ name: row.name, token });
+    }
+    return tokens;
+  });
 
   record(configs: readonly McpServerConfig[]): McpServerConfig[] {
     return this.#handoff.record(configs);

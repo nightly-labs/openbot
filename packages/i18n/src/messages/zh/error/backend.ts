@@ -251,6 +251,8 @@ export const messages = {
     "服务器拒绝了你登录所用的账号。请确认该账号可以使用此服务。要使用其他账号，请先退出登录，再重新登录。",
   "error.backend.mcpSignInClientRefused":
     "完成登录时，登录服务器未接受 OpenBot。请重新登录，OpenBot 会重新向服务器注册。",
+  "error.backend.googleSignInNeedsAccount": "请先登录你的 OpenBot 账户。OpenBot 需要它来完成 Google 登录。",
+  "error.backend.googleSignInUnavailable": "OpenBot 无法完成 Google 登录。请稍后重试。",
   "error.backend.mcpSignInAppRefused":
     "登录服务器未接受该服务器的登录应用。请检查登录应用的客户端 ID 和客户端密钥，然后重新登录。",
   "error.backend.mcpCommandNotFound": "未找到命令：{command}",
@@ -457,4 +459,7 @@ export const messages = {
   "error.backend.taskRemoteUnsupported": "任务仅适用于本电脑上的助手。",
   "error.backend.taskMessageFailed": "OpenBot 无法将消息发送给该任务，请稍后重试。",
   "error.backend.taskStartFailed": "OpenBot 无法启动该任务，请改为在本轮对话中完成。",
+  "error.backend.uiBlockActionRunning": "OpenBot 仍在执行此操作。请等待完成。",
+  "error.backend.gmailDraftChanged": "OpenBot 显示草稿后草稿已更改，因此未发送。请让智能体再次显示。",
+  "error.backend.gmailSendFailed": "Gmail 未发送草稿：{reason}",
 } as const satisfies PartialTranslation<typeof source>;

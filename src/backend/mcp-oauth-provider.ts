@@ -37,6 +37,7 @@ import { Deferred, Effect, Exit, Fiber, Result, Scope } from "effect";
 import { getDomain } from "tldts";
 import { z } from "zod";
 import { runCauseEffect } from "./effect-boundary";
+import { GOOGLE_MCP_SCOPES, type GoogleSignIn, isGoogleSignInApp, withGoogleTokenBroker } from "./google-mcp-sign-in";
 import { readLimitedBody } from "./limited-body";
 import { McpOperationError, mcpCall, mcpFailure, mcpSync, toMcpOperationError } from "./mcp-effects";
 import {
@@ -148,6 +149,7 @@ export interface McpOAuthOptions {
   revocationTimeoutMs?: number;
   logger?: Pick<Logger, "warn">;
   lookup?: AddressLookup;
+  googleSignIn?: GoogleSignIn;
 }
 
 export const MCP_TOKEN_TIMEOUT_MS = 10_000;
@@ -217,7 +219,9 @@ export class McpOAuth implements McpOAuthAuthority {
   constructor(options: McpOAuthOptions) {
     const refusal = describeUnusableRedirectUrl(options.redirectUrl);
     if (refusal) throw new Error(refusal);
-    this.#options = options;
+    this.#options = options.googleSignIn
+      ? { ...options, storage: withGoogleSignInApp(options.storage, options.googleSignIn) }
+      : options;
   }
 
   readonly accessToken = Effect.fn("McpOAuth.accessToken")(function* (
@@ -305,8 +309,9 @@ export class McpOAuth implements McpOAuthAuthority {
   });
 
   #fetch(key: string, signal: AbortSignal): FetchLike {
-    const { lookup } = this.#options;
-    return secureOAuthFetch({ signal, resource: mcpOAuthServerUrl(key), ...(lookup ? { lookup } : {}) });
+    const { lookup, googleSignIn } = this.#options;
+    const fetch = secureOAuthFetch({ signal, resource: mcpOAuthServerUrl(key), ...(lookup ? { lookup } : {}) });
+    return googleSignIn ? withGoogleTokenBroker(fetch, googleSignIn, signal) : fetch;
   }
 
   readonly #awaitRefresh = Effect.fn("McpOAuth.awaitRefresh")((exchange: Fiber.Fiber<McpRefreshOutcome>) =>
@@ -647,6 +652,7 @@ export class McpOAuth implements McpOAuthAuthority {
   signInApp(url: string): McpOAuthAppSummary | null {
     const key = mcpOAuthAccountKey(url);
     const app = key ? this.#options.storage.read(key)?.app : undefined;
+    if (key && app && isGoogleSignInApp(mcpOAuthServerUrl(key), app)) return null;
     return app ? { clientId: app.clientId, secretSaved: app.clientSecret !== undefined, scope: app.scope ?? "" } : null;
   }
 
@@ -691,7 +697,7 @@ export class McpOAuth implements McpOAuthAuthority {
   ): Effect.fn.Return<boolean, McpOperationError> {
     const key = mcpOAuthAccountKey(url);
     const record = key ? this.#options.storage.read(key) : null;
-    if (!key || !record?.app) return false;
+    if (!key || !record?.app || isGoogleSignInApp(mcpOAuthServerUrl(key), record.app)) return false;
     this.#invalidate(key);
     yield* this.#options.storage.write(key, record.discovery ? { discovery: record.discovery } : {});
     return true;
@@ -1539,6 +1545,22 @@ function withOfflineAccess(authorizationUrl: URL, metadata: OAuthDiscoveryState[
   url.searchParams.set("scope", scope);
   if (!url.searchParams.has("prompt")) url.searchParams.set("prompt", "consent");
   return url;
+}
+
+function withGoogleSignInApp(storage: McpOAuthStorage, google: GoogleSignIn): McpOAuthStorage {
+  return {
+    read: (key) => {
+      const record = storage.read(key);
+      const server = mcpOAuthServerUrl(key);
+      const scope = Object.hasOwn(GOOGLE_MCP_SCOPES, server) ? GOOGLE_MCP_SCOPES[server] : undefined;
+      if (!scope || !google.available()) return record;
+      const app = record?.app;
+      if (app && !isGoogleSignInApp(server, app)) return record;
+      return { ...record, app: { ...app, clientId: google.clientId, scope } };
+    },
+    write: (key, record) => storage.write(key, record),
+    clear: (key) => storage.clear(key),
+  };
 }
 
 const registrationBodySchema = z.looseObject({

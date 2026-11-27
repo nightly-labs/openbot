@@ -297,6 +297,10 @@ export const messages = {
     "El servidor rechazó la cuenta con la que iniciaste sesión. Comprueba que esa cuenta puede usar el servicio. Para usar otra cuenta, cierra sesión y vuelve a iniciar sesión.",
   "error.backend.mcpSignInClientRefused":
     "El servidor de inicio de sesión no aceptó a OpenBot al completar el inicio de sesión. Inicia sesión de nuevo: OpenBot se registra otra vez en el servidor.",
+  "error.backend.googleSignInNeedsAccount":
+    "Primero inicia sesión en tu cuenta de OpenBot. OpenBot la necesita para completar un inicio de sesión con Google.",
+  "error.backend.googleSignInUnavailable":
+    "OpenBot no pudo completar el inicio de sesión con Google. Inténtalo de nuevo más tarde.",
   "error.backend.mcpSignInAppRefused":
     "El servidor de inicio de sesión no aceptó la app de inicio de sesión de este servidor. Revisa el ID de cliente y el secreto de cliente de la app de inicio de sesión y vuelve a iniciar sesión.",
   "error.backend.mcpCommandNotFound": "No se encontró el comando: {command}",
@@ -536,4 +540,8 @@ export const messages = {
   "error.backend.taskRemoteUnsupported": "Las tareas solo están disponibles para los agentes de este equipo.",
   "error.backend.taskMessageFailed": "OpenBot no pudo enviar el mensaje a la tarea. Inténtalo de nuevo más tarde.",
   "error.backend.taskStartFailed": "OpenBot no pudo iniciar la tarea. Haz el trabajo en este turno.",
+  "error.backend.uiBlockActionRunning": "OpenBot todavía está haciendo esto. Espera a que termine.",
+  "error.backend.gmailDraftChanged":
+    "El borrador cambió después de que OpenBot lo mostrara, así que no se envió. Pide al agente que lo muestre de nuevo.",
+  "error.backend.gmailSendFailed": "Gmail no envió el borrador: {reason}",
 } as const satisfies PartialTranslation<typeof source>;

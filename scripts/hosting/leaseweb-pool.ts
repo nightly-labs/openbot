@@ -14,6 +14,7 @@ import { HOSTED_PLAN_SIZE, HOSTED_SERVER_SIZE_NAMES } from "@openbot/contracts/h
 import { isOneOf } from "@openbot/contracts/runtime-values";
 import { createOpenBotLogger, toLogValue } from "@openbot/logging";
 import { z } from "zod";
+import { cloudflareAccessHeaders } from "../cloudflare-access-headers";
 import {
   ARCHIVE_REGION,
   abortUpload,
@@ -1481,7 +1482,11 @@ command -v age >/dev/null || DEBIAN_FRONTEND=noninteractive apt-get install -y -
     const authApi = this.#testDatabase ? AUTH_API_URL.test : AUTH_API_URL.production;
     const response = await fetch(`${authApi}/v2/admin/server-claims`, {
       method: "POST",
-      headers: { authorization: `Bearer ${this.#claimsToken}`, "content-type": "application/json" },
+      headers: {
+        ...cloudflareAccessHeaders(this.#environment),
+        authorization: `Bearer ${this.#claimsToken}`,
+        "content-type": "application/json",
+      },
       body: JSON.stringify({ email: owner }),
       signal: AbortSignal.timeout(30_000),
     });

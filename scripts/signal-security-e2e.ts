@@ -14,6 +14,7 @@ import {
   GITHUB_ROUTE_AUDIENCE,
   GITHUB_SIGNATURE_HEADER,
 } from "@openbot/contracts/signal-protocol/github-route";
+import { GOOGLE_OAUTH_TOKEN_PATH } from "@openbot/contracts/signal-protocol/google-oauth";
 import {
   createIngressQueueKeyPair,
   importIngressQueuePrivateKey,
@@ -77,6 +78,12 @@ const GITHUB_REPOSITORY = 77;
 const LINK_HOST_ID = "host-link-e2e";
 const LINK_CHAT = "-500";
 const LINK_CODE = randomBytes(32).toString("base64url");
+const GOOGLE_CLIENT_ID = "123456789012-e2etest.apps.googleusercontent.com";
+const GOOGLE_CLIENT_SECRET = `GOCSPX-${randomBytes(18).toString("base64url")}`;
+const GOOGLE_CODE = `4/0e2e-${randomBytes(12).toString("base64url")}`;
+const GOOGLE_REFRESH_TOKEN = `1//e2e-${randomBytes(12).toString("base64url")}`;
+const GOOGLE_ACCESS_TOKEN = `ya29.e2e-${randomBytes(12).toString("base64url")}`;
+const GOOGLE_VERIFIER = randomBytes(32).toString("base64url");
 const OFFLINE_LINKED_CHAT = "-700";
 const FAILED_LOOKUP_CHAT = "-701";
 const UNLINKED_CHAT = "-702";
@@ -298,6 +305,27 @@ function startControlPlane(port: number): Promise<Server> {
   return new Promise((resolveServer) => server.listen(port, "127.0.0.1", () => resolveServer(server)));
 }
 
+const googleCalls: Array<Record<string, string>> = [];
+function startGoogle(port: number): Promise<Server> {
+  const server = createServer(async (request, response) => {
+    const form = Object.fromEntries(new URLSearchParams(await readBody(request)));
+    googleCalls.push(form);
+    const answer = (status: number, value: unknown) => {
+      response.writeHead(status, { "Content-Type": "application/json" });
+      response.end(JSON.stringify(value));
+    };
+    if (request.method !== "POST" || request.url !== "/token") return answer(404, { error: "not_found" });
+    if (form.client_id !== GOOGLE_CLIENT_ID || form.client_secret !== GOOGLE_CLIENT_SECRET)
+      return answer(401, { error: "invalid_client" });
+    const tokens = { access_token: GOOGLE_ACCESS_TOKEN, expires_in: 3599, token_type: "Bearer", scope: "e2e" };
+    if (form.grant_type === "authorization_code" && form.code === GOOGLE_CODE && form.code_verifier === GOOGLE_VERIFIER)
+      return answer(200, { ...tokens, refresh_token: GOOGLE_REFRESH_TOKEN });
+    if (form.grant_type === "refresh_token" && form.refresh_token === GOOGLE_REFRESH_TOKEN) return answer(200, tokens);
+    return answer(400, { error: "invalid_grant", error_description: "Bad Request" });
+  });
+  return new Promise((resolveServer) => server.listen(port, "127.0.0.1", () => resolveServer(server)));
+}
+
 type MessageFields = { text: string; entities?: Array<{ type: string; offset: number; length: number }> };
 
 function startBotApi(port: number): Promise<Server> {
@@ -485,13 +513,15 @@ async function waitForReady(url: string, child: ChildProcess) {
   throw new Error("Signal did not become ready.");
 }
 
-const [signalPort, healthPort, controlPlanePort, botApiPort] = await Promise.all([
+const [signalPort, healthPort, controlPlanePort, botApiPort, googlePort] = await Promise.all([
+  freePort(),
   freePort(),
   freePort(),
   freePort(),
   freePort(),
 ]);
 const controlPlane = await startControlPlane(controlPlanePort);
+const google = await startGoogle(googlePort);
 const botApi = await startBotApi(botApiPort);
 const turnServer = await startTurnServer();
 const serviceOutput: string[] = [];
@@ -518,6 +548,8 @@ const child = spawn("bun", [resolve(ROOT, "remote/api/src/index.ts")], {
     GITHUB_WEBHOOK_SECRET,
     TELEGRAM_BOT_TOKENS: BOT_TOKEN,
     TELEGRAM_WEBHOOK_SECRET,
+    GOOGLE_OAUTH_CLIENTS: `${GOOGLE_CLIENT_ID}:${GOOGLE_CLIENT_SECRET}`,
+    GOOGLE_OAUTH_TOKEN_URL: `http://127.0.0.1:${googlePort}/token`,
     TELEGRAM_TEST_API_ORIGIN: `http://127.0.0.1:${botApiPort}`,
     REMOTE_MAX_CONNECTIONS_PER_IP: String(BURST_PEERS * 2),
     REMOTE_MAX_MESSAGES_PER_MINUTE: String(BURST_PEERS * 20),
@@ -1645,6 +1677,103 @@ try {
     return `${controlPlaneCalls.length} requests, all signed: ${[...new Set(controlPlaneCalls.map((call) => call.path))].join(", ")}`;
   });
 
+  const postGoogle = (body: unknown, ticket: string | null, contentType = "application/json") =>
+    fetch(`${base}${GOOGLE_OAUTH_TOKEN_PATH}`, {
+      method: "POST",
+      headers: { "Content-Type": contentType, ...(ticket ? { Authorization: `Bearer ${ticket}` } : {}) },
+      body: typeof body === "string" ? body : JSON.stringify(body),
+    });
+  const codeRequest = {
+    grant: "authorization_code",
+    clientId: GOOGLE_CLIENT_ID,
+    code: GOOGLE_CODE,
+    codeVerifier: GOOGLE_VERIFIER,
+    redirectUri: "http://127.0.0.1:28417/mcp-auth",
+  };
+  await check("A Google token request without a ticket is refused", async () => {
+    const calls = googleCalls.length;
+    const response = await postGoogle(codeRequest, null);
+    expect(response.status === 401, `status: ${response.status}`);
+    expect(googleCalls.length === calls, "Signal called Google.");
+    return "401, and Google got no request";
+  });
+  await check("A Google token request with a ticket of another key is refused", async () => {
+    const response = await postGoogle(codeRequest, await remoteTicket({}, foreignKey));
+    expect(response.status === 401, `status: ${response.status}`);
+    return "401";
+  });
+  await check("A Google token request for another client is refused", async () => {
+    const calls = googleCalls.length;
+    const response = await postGoogle(
+      { ...codeRequest, clientId: "999999999999-other.apps.googleusercontent.com" },
+      await remoteTicket(),
+    );
+    expect(response.status === 400, `status: ${response.status}`);
+    expect(googleCalls.length === calls, "Signal called Google.");
+    return "400, and Google got no request";
+  });
+  await check("A Google token request with a redirect that is not loopback is refused", async () => {
+    const response = await postGoogle(
+      { ...codeRequest, redirectUri: "https://attacker.example/mcp-auth" },
+      await remoteTicket(),
+    );
+    expect(response.status === 400, `status: ${response.status}`);
+    return "400";
+  });
+  await check("A Google token request with an extra key, or not JSON, is refused", async () => {
+    const extra = await postGoogle({ ...codeRequest, clientSecret: "x" }, await remoteTicket());
+    const form = await postGoogle(
+      new URLSearchParams({ grant: "refresh_token" }).toString(),
+      await remoteTicket(),
+      "application/x-www-form-urlencoded",
+    );
+    expect(extra.status === 400 && form.status === 400, `statuses: ${extra.status}, ${form.status}`);
+    return "400 and 400";
+  });
+  await check("Signal exchanges a Google code with the client secret", async () => {
+    const response = await postGoogle(codeRequest, await remoteTicket());
+    const body = await response.json();
+    const call = googleCalls.at(-1);
+    expect(response.status === 200, `status: ${response.status}`);
+    expect(response.headers.get("cache-control") === "no-store", "The answer can be cached.");
+    expect(body.access_token === GOOGLE_ACCESS_TOKEN && body.refresh_token === GOOGLE_REFRESH_TOKEN, "No token set.");
+    expect(
+      call?.client_secret === GOOGLE_CLIENT_SECRET && call.redirect_uri === codeRequest.redirectUri,
+      "Bad request to Google.",
+    );
+    return "200 with Google's token set; Google got the secret and the redirect";
+  });
+  await check("Signal refreshes a Google token, and passes Google's refusal on", async () => {
+    const refreshed = await postGoogle(
+      { grant: "refresh_token", clientId: GOOGLE_CLIENT_ID, refreshToken: GOOGLE_REFRESH_TOKEN },
+      await remoteTicket(),
+    );
+    const refused = await postGoogle(
+      { grant: "refresh_token", clientId: GOOGLE_CLIENT_ID, refreshToken: "1//e2e-revoked" },
+      await remoteTicket(),
+    );
+    const refusal = await refused.json();
+    expect(refreshed.status === 200, `refresh status: ${refreshed.status}`);
+    expect(refused.status === 400 && refusal.error === "invalid_grant", `refusal: ${refused.status}`);
+    return "200, then 400 invalid_grant as Google sent it";
+  });
+  await check("Google token requests of one host are rate limited", async () => {
+    const ticket = await remoteTicket({ hostId: "host-google-rate-e2e" });
+    const limit = (BURST_PEERS * 20) / 20;
+    const statuses: number[] = [];
+    while (statuses.length <= limit + 10 && !statuses.includes(429))
+      statuses.push((await postGoogle({ ...codeRequest, code: "x" }, ticket)).status);
+    expect(statuses.at(-1) === 429, `statuses: ${[...new Set(statuses)].join(", ")}`);
+    expect(statuses.length === limit + 1, `the first 429 came at request ${statuses.length}, not ${limit + 1}`);
+    return `requests 1 to ${limit} passed on, request ${statuses.length} got 429`;
+  });
+  await check("No log line holds the Google client secret, a code or a token", async () => {
+    const values = [GOOGLE_CLIENT_SECRET, GOOGLE_CODE, GOOGLE_REFRESH_TOKEN, GOOGLE_ACCESS_TOKEN, GOOGLE_VERIFIER];
+    const leaked = serviceOutput.filter((line) => values.some((value) => line.includes(value)));
+    expect(leaked.length === 0, `${leaked.length} log chunks hold a Google value.`);
+    return `${serviceOutput.length} log chunks checked`;
+  });
+
   await check("Signal marks each TURN relay by its probe", async () => {
     const expected = [...LIVE_RELAYS.map((host) => `{host="${host}"} 1`), `{host="${DOWN_RELAY}"} 0`].map(
       (sample) => `openbot_remote_turn_relay_available${sample}`,
@@ -1846,6 +1975,7 @@ try {
   entryChild?.kill("SIGTERM");
   entryDnsServer?.close();
   controlPlane.close();
+  google.close();
   botApi.close();
   turnServer.close();
 }

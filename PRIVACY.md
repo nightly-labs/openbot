@@ -1292,7 +1292,8 @@ the repositories that its GitHub triggers watch, and the requests to webhook rou
 see [Workflows](#workflows), [Slack connections](#slack-connections),
 [Discord connections](#discord-connections), [Telegram connections](#telegram-connections), and
 [Webhook routines](#webhook-routines). For Discord and Telegram, Signal also carries the host's
-answers to the platform.
+answers to the platform. For a Google MCP server, Signal carries only the host's token requests to
+Google and Google's answers; see [Other network connections](#other-network-connections).
 
 An owner or admin of a joined server can manage its host from their own computer, or from the
 browser client at `/app`. A provider API key, a custom endpoint key or header, the code that a
@@ -1385,7 +1386,18 @@ Network traffic can also occur when:
   so its sign-in page sends the browser to `https://openbot.run/oauth/mcp-callback` with the grant
   and the sign-in's random state. The account service keeps nothing and sends the browser on at once
   to `127.0.0.1` on the same computer. The grant cannot be used without a code that only OpenBot on
-  that computer holds;
+  that computer holds. For Google's MCP servers (Gmail,
+  Google Drive, Google Docs, Google Sheets, Google Slides and Google Calendar), OpenBot uses its own Google sign-in
+  app and does not register. The two token requests of that sign-in, the exchange of the grant and
+  the renewal of the token, go through OpenBot's Signal service (`signal.openbot.run`) with a ticket
+  of the computer, because only Signal holds the app's client secret. Signal passes the grant, the
+  PKCE verifier or the refresh token to Google, and returns Google's answer with the new tokens to the
+  computer. It does not store or log them. The tokens stay on the computer, and the emails, files and
+  events that an agent reads or changes go between the computer and Google directly, not through
+  Signal. When an agent asks to send a Gmail draft, the computer reads the draft from the Gmail API
+  (`gmail.googleapis.com`) with the token of that Gmail sign-in and shows its sender, recipients,
+  subject and body in the conversation. Only when the server owner or an admin presses Send does the
+  computer ask the Gmail API to send it. The token does not go to the agent or its provider;
 - an owner or admin pastes a GitHub link into the Marketplace Skills search. The computer that runs
   OpenBot, or the joined server, reads that public repository from `api.github.com` and
   `raw.githubusercontent.com` without a GitHub account, with `User-Agent: OpenBot`. It reads the

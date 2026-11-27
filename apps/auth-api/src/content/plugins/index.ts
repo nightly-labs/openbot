@@ -12,6 +12,12 @@ import { ELEVENLABS_PLUGIN_GUIDE } from "./elevenlabs";
 import { FIGMA_PLUGIN_GUIDE } from "./figma";
 import { FIRECRAWL_PLUGIN_GUIDE } from "./firecrawl";
 import { GITLAB_PLUGIN_GUIDE } from "./gitlab";
+import { GMAIL_PLUGIN_GUIDE } from "./gmail";
+import { GOOGLE_CALENDAR_PLUGIN_GUIDE } from "./google-calendar";
+import { GOOGLE_DOCS_PLUGIN_GUIDE } from "./google-docs";
+import { GOOGLE_DRIVE_PLUGIN_GUIDE } from "./google-drive";
+import { GOOGLE_SHEETS_PLUGIN_GUIDE } from "./google-sheets";
+import { GOOGLE_SLIDES_PLUGIN_GUIDE } from "./google-slides";
 import { HIGGSFIELD_PLUGIN_GUIDE } from "./higgsfield";
 import { HINDSIGHT_PLUGIN_GUIDE } from "./hindsight";
 import { HONCHO_PLUGIN_GUIDE } from "./honcho";
@@ -71,6 +77,12 @@ const PLUGIN_GUIDES: Readonly<Record<string, PluginGuide>> = {
   todoist: TODOIST_PLUGIN_GUIDE,
   ticktick: TICKTICK_PLUGIN_GUIDE,
   trello: TRELLO_PLUGIN_GUIDE,
+  gmail: GMAIL_PLUGIN_GUIDE,
+  "google-calendar": GOOGLE_CALENDAR_PLUGIN_GUIDE,
+  "google-drive": GOOGLE_DRIVE_PLUGIN_GUIDE,
+  "google-docs": GOOGLE_DOCS_PLUGIN_GUIDE,
+  "google-sheets": GOOGLE_SHEETS_PLUGIN_GUIDE,
+  "google-slides": GOOGLE_SLIDES_PLUGIN_GUIDE,
   clickup: CLICKUP_PLUGIN_GUIDE,
   coinbase: COINBASE_PLUGIN_GUIDE,
   robinhood: ROBINHOOD_PLUGIN_GUIDE,

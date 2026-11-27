@@ -295,6 +295,10 @@ export const messages = {
     "O servidor recusou a conta com que você entrou. Verifique se essa conta pode usar o serviço. Para usar outra conta, saia e entre de novo.",
   "error.backend.mcpSignInClientRefused":
     "O servidor de login não aceitou o OpenBot ao concluir o login. Entre de novo: o OpenBot se registra outra vez no servidor.",
+  "error.backend.googleSignInNeedsAccount":
+    "Primeiro, entre na sua conta OpenBot. O OpenBot precisa dela para concluir um login no Google.",
+  "error.backend.googleSignInUnavailable":
+    "O OpenBot não conseguiu concluir o login no Google. Tente de novo mais tarde.",
   "error.backend.mcpSignInAppRefused":
     "O servidor de login não aceitou o app de login deste servidor. Confira o ID do cliente e o segredo do cliente do app de login e entre de novo.",
   "error.backend.mcpCommandNotFound": "Comando não encontrado: {command}",
@@ -542,4 +546,8 @@ export const messages = {
   "error.backend.taskMessageFailed":
     "O OpenBot não conseguiu enviar a mensagem para a tarefa. Tente novamente mais tarde.",
   "error.backend.taskStartFailed": "O OpenBot não conseguiu iniciar a tarefa. Faça o trabalho neste turno.",
+  "error.backend.uiBlockActionRunning": "O OpenBot ainda está fazendo isso. Aguarde até terminar.",
+  "error.backend.gmailDraftChanged":
+    "O rascunho mudou depois que o OpenBot o mostrou, então não foi enviado. Peça ao agente para mostrá-lo de novo.",
+  "error.backend.gmailSendFailed": "O Gmail não enviou o rascunho: {reason}",
 } as const satisfies PartialTranslation<typeof source>;

@@ -311,6 +311,10 @@ export const messages = {
     "Der Server hat das Konto abgelehnt, mit dem du dich angemeldet hast. Prüfe, ob dieses Konto den Dienst nutzen darf. Für ein anderes Konto melde dich ab und dann wieder an.",
   "error.backend.mcpSignInClientRefused":
     "Der Anmeldeserver hat OpenBot beim Abschluss der Anmeldung nicht akzeptiert. Melde dich erneut an: OpenBot registriert sich erneut beim Server.",
+  "error.backend.googleSignInNeedsAccount":
+    "Melde dich zuerst bei deinem OpenBot-Konto an. OpenBot braucht es, um eine Google-Anmeldung abzuschließen.",
+  "error.backend.googleSignInUnavailable":
+    "OpenBot konnte die Google-Anmeldung nicht abschließen. Versuche es später erneut.",
   "error.backend.mcpSignInAppRefused":
     "Der Anmeldeserver hat die Anmelde-App dieses Servers nicht akzeptiert. Prüfe die Client-ID und das Client-Secret der Anmelde-App und melde dich dann erneut an.",
   "error.backend.mcpCommandNotFound": "Befehl nicht gefunden: {command}",
@@ -559,4 +563,8 @@ export const messages = {
     "OpenBot konnte die Nachricht nicht an die Aufgabe senden. Versuche es später erneut.",
   "error.backend.taskStartFailed":
     "OpenBot konnte die Aufgabe nicht starten. Erledige die Arbeit stattdessen in diesem Durchlauf.",
+  "error.backend.uiBlockActionRunning": "OpenBot führt das noch aus. Warte, bis es fertig ist.",
+  "error.backend.gmailDraftChanged":
+    "Der Entwurf hat sich geändert, nachdem OpenBot ihn gezeigt hat, und wurde nicht gesendet. Bitte den Agenten, ihn erneut zu zeigen.",
+  "error.backend.gmailSendFailed": "Gmail hat den Entwurf nicht gesendet: {reason}",
 } as const satisfies PartialTranslation<typeof source>;

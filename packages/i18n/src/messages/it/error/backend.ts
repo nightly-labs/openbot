@@ -296,6 +296,9 @@ export const messages = {
     "Il server ha rifiutato l'account con cui hai effettuato l'accesso. Verifica che questo account possa usare il servizio. Per usare un altro account, esci e poi accedi di nuovo.",
   "error.backend.mcpSignInClientRefused":
     "Il server di accesso non ha accettato OpenBot al completamento dell'accesso. Accedi di nuovo: OpenBot si registra di nuovo sul server.",
+  "error.backend.googleSignInNeedsAccount":
+    "Accedi prima al tuo account OpenBot. OpenBot ne ha bisogno per completare un accesso a Google.",
+  "error.backend.googleSignInUnavailable": "OpenBot non è riuscito a completare l'accesso a Google. Riprova più tardi.",
   "error.backend.mcpSignInAppRefused":
     "Il server di accesso non ha accettato l'app di accesso di questo server. Controlla l'ID client e il secret del client dell'app di accesso, poi accedi di nuovo.",
   "error.backend.mcpCommandNotFound": "Comando non trovato: {command}",
@@ -537,4 +540,8 @@ export const messages = {
   "error.backend.taskMessageFailed": "OpenBot non è riuscito a inviare il messaggio all’attività. Riprova più tardi.",
   "error.backend.taskStartFailed":
     "OpenBot non è riuscito ad avviare l'attività. Esegui invece il lavoro in questo turno.",
+  "error.backend.uiBlockActionRunning": "OpenBot lo sta ancora facendo. Attendi che finisca.",
+  "error.backend.gmailDraftChanged":
+    "La bozza è cambiata dopo che OpenBot l'ha mostrata, quindi non è stata inviata. Chiedi all'agente di mostrarla di nuovo.",
+  "error.backend.gmailSendFailed": "Gmail non ha inviato la bozza: {reason}",
 } as const satisfies PartialTranslation<typeof source>;

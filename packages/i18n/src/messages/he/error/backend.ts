@@ -264,6 +264,9 @@ export const messages = {
     "השרת דחה את החשבון שאיתו התחברת. יש לוודא שלחשבון הזה יש גישה לשירות. כדי להשתמש בחשבון אחר, יש להתנתק ואז להתחבר שוב.",
   "error.backend.mcpSignInClientRefused":
     "שרת ההתחברות לא קיבל את OpenBot כשהתחברות הושלמה. יש להתחבר שוב: OpenBot ירשום את עצמו שוב בשרת.",
+  "error.backend.googleSignInNeedsAccount":
+    "יש להתחבר קודם לחשבון OpenBot. OpenBot צריך אותו כדי להשלים התחברות עם Google.",
+  "error.backend.googleSignInUnavailable": "OpenBot לא הצליח להשלים את ההתחברות עם Google. יש לנסות שוב מאוחר יותר.",
   "error.backend.mcpSignInAppRefused":
     "שרת ההתחברות לא קיבל את אפליקציית ההתחברות של השרת הזה. יש לבדוק את ה-Client ID ואת ה-Client secret של אפליקציית ההתחברות, ואז להתחבר שוב.",
   "error.backend.mcpCommandNotFound": "הפקודה לא נמצאה: {command}",
@@ -487,4 +490,8 @@ export const messages = {
   "error.backend.taskRemoteUnsupported": "משימות זמינות רק לסוכנים שנמצאים במחשב הזה.",
   "error.backend.taskMessageFailed": "OpenBot לא הצליח לשלוח את ההודעה למשימה. יש לנסות שוב מאוחר יותר.",
   "error.backend.taskStartFailed": "OpenBot לא הצליח להתחיל את המשימה. יש לבצע את העבודה בתור הזה במקום.",
+  "error.backend.uiBlockActionRunning": "OpenBot עדיין מבצע את הפעולה. יש להמתין עד שתסתיים.",
+  "error.backend.gmailDraftChanged":
+    "הטיוטה השתנתה אחרי ש-OpenBot הציג אותה, ולכן היא לא נשלחה. יש לבקש מהסוכן להציג אותה שוב.",
+  "error.backend.gmailSendFailed": "Gmail לא שלח את הטיוטה: {reason}",
 } as const satisfies PartialTranslation<typeof source>;

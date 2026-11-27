@@ -302,6 +302,9 @@ export const messages = {
     "Le serveur a refusé le compte avec lequel vous vous êtes connecté. Vérifiez que ce compte peut utiliser le service. Pour utiliser un autre compte, déconnectez-vous, puis reconnectez-vous.",
   "error.backend.mcpSignInClientRefused":
     "Le serveur de connexion n’a pas accepté OpenBot à la fin de la connexion. Connectez-vous à nouveau : OpenBot s’enregistre de nouveau auprès du serveur.",
+  "error.backend.googleSignInNeedsAccount":
+    "Connectez-vous d’abord à votre compte OpenBot. OpenBot en a besoin pour terminer une connexion à Google.",
+  "error.backend.googleSignInUnavailable": "OpenBot n’a pas pu terminer la connexion à Google. Réessayez plus tard.",
   "error.backend.mcpSignInAppRefused":
     "Le serveur de connexion n’a pas accepté l’app de connexion de ce serveur. Vérifiez l’ID client et le secret client de l’app de connexion, puis reconnectez-vous.",
   "error.backend.mcpCommandNotFound": "Commande introuvable : {command}",
@@ -546,4 +549,8 @@ export const messages = {
   "error.backend.taskRemoteUnsupported": "Les tâches sont disponibles uniquement pour les agents de cet ordinateur.",
   "error.backend.taskMessageFailed": "OpenBot n’a pas pu envoyer le message à la tâche. Réessayez plus tard.",
   "error.backend.taskStartFailed": "OpenBot n’a pas pu lancer la tâche. Faites plutôt le travail dans ce tour.",
+  "error.backend.uiBlockActionRunning": "OpenBot est encore en train de le faire. Attends la fin.",
+  "error.backend.gmailDraftChanged":
+    "Le brouillon a changé après qu'OpenBot l'a affiché, il n'a donc pas été envoyé. Demande à l'agent de l'afficher à nouveau.",
+  "error.backend.gmailSendFailed": "Gmail n'a pas envoyé le brouillon : {reason}",
 } as const satisfies PartialTranslation<typeof source>;

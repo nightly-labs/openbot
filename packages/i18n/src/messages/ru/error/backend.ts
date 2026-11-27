@@ -290,6 +290,9 @@ export const messages = {
     "Сервер отклонил аккаунт, с которым вы вошли. Проверьте, что у этого аккаунта есть доступ к сервису. Чтобы использовать другой аккаунт, выйдите и войдите снова.",
   "error.backend.mcpSignInClientRefused":
     "Сервер входа не принял OpenBot при завершении входа. Войдите снова: OpenBot заново зарегистрируется на сервере.",
+  "error.backend.googleSignInNeedsAccount":
+    "Сначала войдите в учётную запись OpenBot. Она нужна OpenBot, чтобы завершить вход в Google.",
+  "error.backend.googleSignInUnavailable": "OpenBot не удалось завершить вход в Google. Повторите попытку позже.",
   "error.backend.mcpSignInAppRefused":
     "Сервер входа не принял приложение входа этого сервера. Проверьте ID клиента и секрет клиента приложения входа, затем войдите снова.",
   "error.backend.mcpCommandNotFound": "Команда не найдена: {command}",
@@ -523,4 +526,8 @@ export const messages = {
   "error.backend.taskRemoteUnsupported": "Задачи доступны только для агентов на этом компьютере.",
   "error.backend.taskMessageFailed": "OpenBot не удалось отправить сообщение задаче. Повторите попытку позже.",
   "error.backend.taskStartFailed": "OpenBot не удалось запустить задачу. Выполните работу в этом ходе.",
+  "error.backend.uiBlockActionRunning": "OpenBot ещё выполняет это действие. Дождитесь окончания.",
+  "error.backend.gmailDraftChanged":
+    "Черновик изменился после того, как OpenBot его показал, поэтому он не отправлен. Попросите агента показать его снова.",
+  "error.backend.gmailSendFailed": "Gmail не отправил черновик: {reason}",
 } as const satisfies PartialTranslation<typeof source>;

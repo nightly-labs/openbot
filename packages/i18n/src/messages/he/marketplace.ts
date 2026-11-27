@@ -532,6 +532,53 @@ export const messages = {
   "marketplace.plugin.trello.prompt.myCards": "אילו כרטיסי Trello הוקצו לי?",
   "marketplace.plugin.trello.prompt.board": "סכם מה בתהליך בלוח Trello שלי.",
   "marketplace.plugin.trello.prompt.newCards": "הוסף את פריטי הפעולה האלה ככרטיסים ללוח Trello שלי.",
+  "marketplace.plugin.gmail.tagline": "חיפוש אימייל, טיוטות ותוויות",
+  "marketplace.plugin.gmail.description":
+    "Gmail מאפשר לסוכנים לחפש ולקרוא שרשורי אימייל והודעות, לכתוב טיוטות, להוסיף ולהסיר תוויות, ליצור תוויות, להעביר אימייל לאשפה ולהחזיר ממנה, ולסמן אימייל כספאם. סוכן שולח אימייל רק באישור: הוא כותב טיוטה, OpenBot מציג את הנמענים, הנושא והגוף, והאימייל נשלח רק כשבעל השרת או מנהל לוחצים על שליחה. סוכנים לא יכולים למחוק אימייל לצמיתות. זהו שרת ה-MCP הרשמי של Gmail מבית Google, שנמצא ב-Developer Preview. כל משתמש מתחבר לחשבון Google שלו דרך הדפדפן ומאשר גישה בדף ההסכמה של Google. ל-OpenBot יש אפליקציית התחברות משלו ל-Google, כך שהמשתמש לא צריך להגדיר את Google Cloud. אימייל מאדם אחר יכול להכיל הוראות לסוכן, לכן יש לבדוק מה הסוכן עושה אחרי שהוא קורא אימייל לא מהימן.",
+  "marketplace.plugin.gmail.app":
+    "חיפוש אימייל, טיוטות, תוויות ואשפה, דרך שרת ה-MCP של Gmail מבית Google עם התחברות בדפדפן.",
+  "marketplace.plugin.gmail.prompt.unread": "סכם את האימיילים שלא קראתי מהיום.",
+  "marketplace.plugin.gmail.prompt.thread": "סמן את הניוזלטרים שלא נקראו מהשבוע בתווית Newsletters והעבר אותם לאשפה.",
+  "marketplace.plugin.gmail.prompt.draft": "כתוב טיוטת תשובה לאימייל האחרון מהמנהל שלי.",
+  "marketplace.plugin.googleDrive.tagline": "חיפוש, קריאה והוספה של קבצים",
+  "marketplace.plugin.googleDrive.description":
+    "Google Drive מאפשר לסוכנים לחפש קבצים, להציג קבצים אחרונים, לקרוא תוכן ופרטים של קבצים, לראות למי יש גישה לקובץ, וליצור ולהעתיק קבצים. סוכנים יכולים לקרוא את כל הקבצים שהמשתמש יכול לפתוח. הם יכולים ליצור קבצים ולהעתיק כל קובץ שהם יכולים לקרוא. לשרת Drive של Google אין כלי שמשנה, מעביר או מוחק קובץ. זהו שרת ה-MCP הרשמי של Drive מבית Google, שנמצא ב-Developer Preview. כל משתמש מתחבר לחשבון Google שלו דרך הדפדפן ומאשר גישה בדף ההסכמה של Google. ל-OpenBot יש אפליקציית התחברות משלו ל-Google, כך שהמשתמש לא צריך להגדיר את Google Cloud. קובץ מאדם אחר יכול להכיל הוראות לסוכן, לכן יש לבדוק מה הסוכן עושה אחרי שהוא קורא קובץ לא מהימן.",
+  "marketplace.plugin.googleDrive.app":
+    "חיפוש קבצים, קריאה ויצירת קבצים, דרך שרת ה-MCP של Drive מבית Google עם התחברות בדפדפן.",
+  "marketplace.plugin.googleDrive.prompt.find": "מצא את תוכנית השיווק ב-Google Drive שלי וסכם אותה.",
+  "marketplace.plugin.googleDrive.prompt.recent": "הצג את הקבצים שהשתמשתי בהם לאחרונה ב-Google Drive.",
+  "marketplace.plugin.googleDrive.prompt.access": "צור עותק של קובץ התקציב ב-Google Drive שלי לשנה הבאה.",
+  "marketplace.plugin.googleDocs.tagline": "קריאה ועריכה של מסמכים",
+  "marketplace.plugin.googleDocs.description":
+    "Google Docs מאפשר לסוכנים לקרוא מסמכים ולשנות את התוכן שלהם. סוכנים יכולים לקרוא את כל המסמכים שהמשתמש יכול לפתוח, ולערוך את המסמכים שהמשתמש יכול לערוך. זהו שרת ה-MCP הרשמי של Docs מבית Google, שנמצא ב-Developer Preview. כל משתמש מתחבר לחשבון Google שלו דרך הדפדפן ומאשר גישה בדף ההסכמה של Google. ל-OpenBot יש אפליקציית התחברות משלו ל-Google, כך שהמשתמש לא צריך להגדיר את Google Cloud. מסמך מאדם אחר יכול להכיל הוראות לסוכן, לכן יש לבדוק מה הסוכן עושה אחרי שהוא קורא מסמך לא מהימן.",
+  "marketplace.plugin.googleDocs.app": "קריאה ועריכה של מסמכים, דרך שרת ה-MCP של Docs מבית Google עם התחברות בדפדפן.",
+  "marketplace.plugin.googleDocs.prompt.summarize": "סכם את השאלות הפתוחות במסמך תוכנית ההשקה שלי.",
+  "marketplace.plugin.googleDocs.prompt.edit": "הוסף סיכום קצר בראש מסמך סיכומי הפגישה שלי.",
+  "marketplace.plugin.googleDocs.prompt.review": "מצא משפטים לא ברורים במסמך הצעת הפרויקט שלי.",
+  "marketplace.plugin.googleSheets.tagline": "קריאה ועדכון של גיליונות אלקטרוניים",
+  "marketplace.plugin.googleSheets.description":
+    "Google Sheets מאפשר לסוכנים לקרוא גיליונות אלקטרוניים וערכי תאים, לכתוב ערכים ונוסחאות, להוסיף שורות ועמודות, ולשנות גיליונות אלקטרוניים. סוכנים יכולים לקרוא את כל הגיליונות שהמשתמש יכול לפתוח, ולשנות את הגיליונות שהמשתמש יכול לערוך. זהו שרת ה-MCP הרשמי של Sheets מבית Google, שנמצא ב-Developer Preview. כל משתמש מתחבר לחשבון Google שלו דרך הדפדפן ומאשר גישה בדף ההסכמה של Google. ל-OpenBot יש אפליקציית התחברות משלו ל-Google, כך שהמשתמש לא צריך להגדיר את Google Cloud. גיליון אלקטרוני מאדם אחר יכול להכיל הוראות לסוכן, לכן יש לבדוק מה הסוכן עושה אחרי שהוא קורא גיליון לא מהימן.",
+  "marketplace.plugin.googleSheets.app":
+    "ערכים, נוסחאות ועדכונים בגיליונות אלקטרוניים, דרך שרת ה-MCP של Sheets מבית Google עם התחברות בדפדפן.",
+  "marketplace.plugin.googleSheets.prompt.summarize": "סכם את הסכומים בגיליון התקציב שלי.",
+  "marketplace.plugin.googleSheets.prompt.addRows": "הוסף את ההוצאות האלה כשורות חדשות לגיליון ההוצאות שלי.",
+  "marketplace.plugin.googleSheets.prompt.formula": "הוסף לגיליון המכירות שלי עמודה עם הסכום של כל שורה.",
+  "marketplace.plugin.googleSlides.tagline": "קריאה ועריכה של מצגות",
+  "marketplace.plugin.googleSlides.description":
+    "Google Slides מאפשר לסוכנים לקרוא מצגות, שקפים ותמונות ממוזערות של שקפים, ולשנות את התוכן של מצגת: להוסיף, לשנות ולמחוק שקפים, טקסט, צורות ותמונות. סוכנים יכולים לקרוא את כל המצגות שהמשתמש יכול לפתוח, ולערוך את המצגות שהמשתמש יכול לערוך. לשרת Slides של Google אין כלי שיוצר או מוחק מצגת. זהו שרת ה-MCP הרשמי של Slides מבית Google, שנמצא ב-Developer Preview. כל משתמש מתחבר לחשבון Google שלו דרך הדפדפן ומאשר גישה בדף ההסכמה של Google. ל-OpenBot יש אפליקציית התחברות משלו ל-Google, כך שהמשתמש לא צריך להגדיר את Google Cloud. מצגת מאדם אחר יכולה להכיל הוראות לסוכן, לכן יש לבדוק מה הסוכן עושה אחרי שהוא קורא מצגת לא מהימנה.",
+  "marketplace.plugin.googleSlides.app":
+    "קריאה ועריכה של מצגות, דרך שרת ה-MCP של Slides מבית Google עם התחברות בדפדפן.",
+  "marketplace.plugin.googleSlides.prompt.summary": "סכם את מצגת הסקירה הרבעונית שלי שקף אחר שקף.",
+  "marketplace.plugin.googleSlides.prompt.agenda": "הוסף שקף סדר יום אחרי שקף הכותרת במצגת ישיבת הצוות שלי.",
+  "marketplace.plugin.googleSlides.prompt.typos": "מצא ותקן את שגיאות הכתיב במצגת השקת המוצר שלי.",
+  "marketplace.plugin.googleCalendar.tagline": "אירועים, יומנים וזמן פנוי",
+  "marketplace.plugin.googleCalendar.description":
+    "Google Calendar מאפשר לסוכנים להציג יומנים, לקרוא ולחפש אירועים, למצוא זמנים שבהם אנשים פנויים, ליצור, לשנות ולמחוק אירועים, ולענות להזמנות. זהו שרת ה-MCP הרשמי של Calendar מבית Google, שנמצא ב-Developer Preview. כל משתמש מתחבר לחשבון Google שלו דרך הדפדפן ומאשר גישה בדף ההסכמה של Google. ל-OpenBot יש אפליקציית התחברות משלו ל-Google, כך שהמשתמש לא צריך להגדיר את Google Cloud. אירוע מאדם אחר יכול להכיל הוראות לסוכן, לכן יש לבדוק מה הסוכן עושה אחרי שהוא קורא אירוע לא מהימן.",
+  "marketplace.plugin.googleCalendar.app":
+    "יומנים, אירועים וזמן פנוי, דרך שרת ה-MCP של Calendar מבית Google עם התחברות בדפדפן.",
+  "marketplace.plugin.googleCalendar.prompt.today": "מה יש לי היום ב-Google Calendar?",
+  "marketplace.plugin.googleCalendar.prompt.week": "סכם את הפגישות שלי לשבוע הזה.",
+  "marketplace.plugin.googleCalendar.prompt.freeTime": "מצא שעה פנויה בשבוע הבא והוסף ליומן שלי פגישה עם Alex.",
   "marketplace.plugin.clickup.tagline": "משימות, מסמכים ועדכוני צוות",
   "marketplace.plugin.clickup.description":
     "ClickUp מאפשר לסוכנים לחפש משימות, מסמכים, הערות וצ'אט, ליצור ולעדכן משימות, רשימות ומסמכים, לפרסם הערות, לשלוח הודעות צ'אט ולעקוב אחר זמן. כל משתמש מתחבר לחשבון ClickUp שלו דרך הדפדפן. הסוכנים מקבלים את אותן הרשאות כמו המשתמש. הם יכולים להעביר משימות לפח ולמחוק הערות.",

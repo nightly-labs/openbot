@@ -323,6 +323,7 @@ const REFUSED_FORMAT = { status: 401 } as const;
 
 const MAXIMUM_RATE_WINDOWS = 100_000;
 const RATE_WINDOW_MILLISECONDS = 60_000;
+const GOOGLE_TOKEN_RATE_FACTOR = 1 / 20;
 const SIGNAL_HELLO_DEADLINE_MILLISECONDS = 30_000;
 const TURN_CREDENTIAL_REUSE_MILLISECONDS = 5 * 60_000;
 const MAXIMUM_SOCKETS_PER_HOST = 4;
@@ -780,6 +781,11 @@ export class SignalService {
     if (this.#acceptRateKey(key, now)) return null;
     const window = this.#rateWindows.get(key);
     return window ? Math.max(1, window.startedAt + RATE_WINDOW_MILLISECONDS - now) : RATE_WINDOW_MILLISECONDS;
+  }
+
+  acceptGoogleTokenRequest(claims: RemoteTicketClaims, now = Date.now()): "ok" | "unauthorized" | "rate_limited" {
+    if (claims.role !== "host" || this.#isRevoked(claims)) return "unauthorized";
+    return this.#acceptRateKey(`google-host:${claims.hostId}`, now, GOOGLE_TOKEN_RATE_FACTOR) ? "ok" : "rate_limited";
   }
 
   acceptWebhookRequest(key: string): boolean {

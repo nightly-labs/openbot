@@ -268,6 +268,9 @@ export const messages = {
     "رفض الخادم الحساب الذي سجّلت الدخول به. تحقّق من أن هذا الحساب يمكنه استخدام الخدمة. لاستخدام حساب آخر، سجّل الخروج ثم سجّل الدخول مرة أخرى.",
   "error.backend.mcpSignInClientRefused":
     "لم يقبل خادم تسجيل الدخول OpenBot عند إكمال تسجيل الدخول. سجّل الدخول مرة أخرى: سيسجّل OpenBot لدى الخادم مرة أخرى.",
+  "error.backend.googleSignInNeedsAccount":
+    "سجّل الدخول إلى حساب OpenBot أولًا. يحتاج OpenBot إليه لإكمال تسجيل الدخول إلى Google.",
+  "error.backend.googleSignInUnavailable": "تعذّر على OpenBot إكمال تسجيل الدخول إلى Google. حاول مرة أخرى لاحقًا.",
   "error.backend.mcpSignInAppRefused":
     "لم يقبل خادم تسجيل الدخول تطبيق تسجيل الدخول لهذا الخادم. تحقّق من Client ID وClient secret لتطبيق تسجيل الدخول، ثم سجّل الدخول مرة أخرى.",
   "error.backend.mcpCommandNotFound": "لم يتم العثور على الأمر: {command}",
@@ -498,4 +501,7 @@ export const messages = {
   "error.backend.taskRemoteUnsupported": "المهام متاحة فقط للوكلاء على هذا الحاسوب.",
   "error.backend.taskMessageFailed": "تعذّر على OpenBot إرسال الرسالة إلى المهمة. حاول مرة أخرى لاحقًا.",
   "error.backend.taskStartFailed": "تعذّر على OpenBot بدء المهمة. أنجز العمل في هذا الدور بدلًا من ذلك.",
+  "error.backend.uiBlockActionRunning": "لا يزال OpenBot ينفّذ هذا. انتظر حتى ينتهي.",
+  "error.backend.gmailDraftChanged": "تغيّرت المسودة بعد أن عرضها OpenBot، لذلك لم تُرسل. اطلب من الوكيل عرضها مرة أخرى.",
+  "error.backend.gmailSendFailed": "لم يرسل Gmail المسودة: {reason}",
 } as const satisfies PartialTranslation<typeof source>;

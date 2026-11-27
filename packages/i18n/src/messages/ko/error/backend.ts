@@ -277,6 +277,9 @@ export const messages = {
     "서버가 로그인한 계정을 거부했어요. 이 계정이 서비스를 사용할 수 있는지 확인하세요. 다른 계정을 사용하려면 로그아웃한 다음 다시 로그인하세요.",
   "error.backend.mcpSignInClientRefused":
     "로그인을 완료할 때 로그인 서버가 OpenBot을 받아들이지 않았어요. 다시 로그인하세요. OpenBot이 서버에 다시 등록해요.",
+  "error.backend.googleSignInNeedsAccount":
+    "먼저 OpenBot 계정에 로그인하세요. Google 로그인을 완료하려면 이 계정이 필요해요.",
+  "error.backend.googleSignInUnavailable": "OpenBot이 Google 로그인을 완료하지 못했어요. 나중에 다시 시도하세요.",
   "error.backend.mcpSignInAppRefused":
     "로그인 서버가 이 서버의 로그인 앱을 받아들이지 않았어요. 로그인 앱의 클라이언트 ID와 클라이언트 시크릿을 확인한 후 다시 로그인하세요.",
   "error.backend.mcpCommandNotFound": "명령을 찾을 수 없어요: {command}",
@@ -502,4 +505,8 @@ export const messages = {
   "error.backend.taskRemoteUnsupported": "작업은 이 컴퓨터의 에이전트에서만 사용할 수 있어요.",
   "error.backend.taskMessageFailed": "OpenBot이 작업에 메시지를 보낼 수 없었어요. 나중에 다시 시도하세요.",
   "error.backend.taskStartFailed": "OpenBot이 작업을 시작할 수 없었어요. 대신 이 턴에서 작업을 처리하세요.",
+  "error.backend.uiBlockActionRunning": "OpenBot이 아직 처리 중입니다. 끝날 때까지 기다리세요.",
+  "error.backend.gmailDraftChanged":
+    "OpenBot이 표시한 후 초안이 바뀌어 보내지 않았습니다. 에이전트에게 다시 표시해 달라고 요청하세요.",
+  "error.backend.gmailSendFailed": "Gmail이 초안을 보내지 않았습니다: {reason}",
 } as const satisfies PartialTranslation<typeof source>;

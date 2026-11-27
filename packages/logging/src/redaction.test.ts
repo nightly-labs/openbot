@@ -43,6 +43,8 @@ describe("redactText", () => {
       `rk_live_${run(24)}`,
       `rk_test_${run(24)}`,
       `whsec_${run(32)}`,
+      `ya29.${run(60)}`,
+      `1//0${run(40)}`,
       `whsec_${run(10)}+${run(10)}/${run(10)}=`,
     ]) {
       expect(redactText(`key ${key} leaked`)).toBe("key [redacted] leaked");

@@ -203,6 +203,8 @@ function openbotGuidance(namespace: string, tool: string): string {
     case "save_api_key":
     case "remove_api_key":
       return "When a command or service needs an API key, token, or password, such as for IMAP, call openbot.list_api_keys; when the key is missing, call openbot.request_api_key with the variable name that the program reads, such as OPENAI_API_KEY. Never tell the user to connect to the server, edit a file, or set a variable for it. Save a pasted key with openbot.save_api_key, named as the program reads it. Read the saved key from its file in the command, and quote the path, which can hold spaces: OPENAI_API_KEY=\"$(cat '<path>')\" npm run deploy. Never print or log the key, and never copy it into the workspace, a commit, a message, another tool argument, or your memory. Ask the user before you write it into a .env file. Remove a key with openbot.remove_api_key only when the user asks.";
+    case "send_gmail_draft":
+      return "Send every email with openbot.send_gmail_draft after Gmail create_draft. OpenBot always shows the card and sends only when the user presses Send, also with Full access; do not ask the user to confirm in text first.";
     case "interrupt_agent":
       return "openbot.list_agents reports each agent's status, queuedMessages, turnStartedAt, and lastActivityAt. openbot.interrupt_agent takes the agent id and a short reason. It stops only a turn that works on your message, cancels your requests still queued for that agent, and sends the agent a notice. Do not interrupt work only because it is slow.";
     case "list_agents":

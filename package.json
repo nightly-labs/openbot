@@ -313,6 +313,7 @@
     "test:claude-foreign-session": "bun scripts/claude-foreign-session-e2e.ts",
     "test:mcp-catalog": "bun scripts/mcp-catalog-smoke.ts",
     "test:mcp-oauth": "bun scripts/mcp-oauth-e2e.ts",
+    "test:mcp-google-broker": "bun scripts/mcp-google-broker-e2e.ts",
     "test:mcp-oauth-store": "bun scripts/mcp-oauth-store-e2e.ts",
     "test:mcp-sign-in-client-refused": "bun scripts/mcp-sign-in-client-refused-e2e.ts",
     "test:mcp-sign-in-client-metadata-document": "bun scripts/mcp-sign-in-client-metadata-document-e2e.ts",
@@ -326,6 +327,7 @@
     "test:ui-blocks": "bun scripts/ui-blocks-e2e.ts",
     "test:composer-attachments": "bun scripts/composer-attachments-e2e.ts",
     "test:agent-api-keys": "bun scripts/agent-api-keys-e2e.ts",
+    "test:gmail-send-draft": "bun scripts/gmail-send-draft-e2e.ts",
     "test:antigravity-start": "bun scripts/antigravity-start-e2e.ts",
     "test:pi-sign-in-watch": "bun scripts/pi-sign-in-watch-e2e.ts",
     "test:codex-sign-in-watch": "bun scripts/codex-sign-in-watch-e2e.ts",
@@ -709,5 +711,9 @@
     "electron-winstaller",
     "esbuild",
     "workerd"
-  ]
+  ],
+  "overrides": {
+    "shell-quote": "1.12.0",
+    "proxy-addr": "2.0.8"
+  }
 }

@@ -242,6 +242,13 @@ export const requestApiKeyToolSchema = z.strictObject({
 
 export const removeApiKeyToolSchema = z.strictObject({ name: apiKeyNameSchema });
 
+export const sendGmailDraftToolSchema = z.strictObject({
+  draftId: z
+    .string()
+    .regex(/^[A-Za-z0-9_-]{1,128}$/u)
+    .describe("The draft id from create_draft, such as r123456789."),
+});
+
 export const requestLocationToolSchema = z.strictObject({
   reason: uiTextSchema(UI_BLOCK_LIMITS.title).describe("Why you need it, in the user's language."),
 });
@@ -745,6 +752,15 @@ export const OPENBOT_TOOL_DEFINITIONS: readonly OpenBotToolDefinition[] = [
       "Call list_api_keys first: do not ask again for a saved key. A new answer replaces the saved key. Only the server owner or an admin can answer. Not in an external chat.",
     ].join(" "),
     shape: requestApiKeyToolSchema.shape,
+  },
+  {
+    name: "send_gmail_draft",
+    description: [
+      "Send a Gmail draft that Gmail create_draft wrote. OpenBot shows the user its sender, recipients, subject and body, and sends it only when the server owner or an admin presses Send.",
+      'Result: {"status":"sent","messageId","threadId"}, {"actionId":"cancel"} when not sent, or {"status":"expired"}.',
+      "A draft changed after the card is not sent. Needs Gmail signed in; not in external chats.",
+    ].join(" "),
+    shape: sendGmailDraftToolSchema.shape,
   },
   {
     name: "request_location",

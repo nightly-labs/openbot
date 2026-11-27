@@ -1,0 +1,33 @@
+{
+  "slug": "google-docs",
+  "name": "Google Docs",
+  "tagline": "Read and edit documents",
+  "description": "Google Docs lets agents read documents and change their content. Agents can read all the documents that the user can open, and edit the documents that the user can edit. This is Google's official Docs MCP server, which is in Developer Preview. Each user signs in to their own Google account through the browser and approves access on Google's consent page. OpenBot has its own Google sign-in app, so the user does not set up Google Cloud. A document from another person can contain instructions for the agent, so check what the agent does after it reads an untrusted document.",
+  "category": "documents",
+  "creatorName": "Google",
+  "iconUrl": "https://ssl.gstatic.com/images/branding/product/2x/docs_2020q4_48dp.png",
+  "version": "1.0.0",
+  "prompts": [
+    { "id": "prompt-summarize", "text": "Summarize the open questions in my launch plan document." },
+    { "id": "prompt-edit", "text": "Add a short summary at the top of my meeting notes document." },
+    { "id": "prompt-review", "text": "Find unclear sentences in my project proposal document." }
+  ],
+  "apps": [
+    {
+      "id": "app-google-docs-mcp",
+      "name": "Google Docs",
+      "description": "Document reading and editing, over Google's Docs MCP server with browser sign-in.",
+      "iconUrl": "https://ssl.gstatic.com/images/branding/product/2x/docs_2020q4_48dp.png",
+      "server": {
+        "name": "google-docs",
+        "transport": "http",
+        "url": "https://docsmcp.googleapis.com/mcp/v1",
+        "auth": [{ "id": "google-docs-oauth", "kind": "link", "label": "Sign in" }]
+      }
+    }
+  ],
+  "websiteUrl": "https://workspace.google.com/products/docs/",
+  "privacyPolicyUrl": "https://policies.google.com/privacy",
+  "termsUrl": "https://policies.google.com/terms",
+  "skills": []
+}

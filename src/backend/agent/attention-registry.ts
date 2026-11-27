@@ -118,7 +118,9 @@ import {
   browserTakeoverReleasedResult,
   browserTakeoverResult,
   browserTakeoverWaitingResult,
+  type ConfirmedActionOutput,
   commandText,
+  confirmedActionPromptResult,
   declinedMcpElicitationText,
   detachedPromptResult,
   dynamicPromptResult,
@@ -198,6 +200,7 @@ export interface SurfacedUiBlock {
   spec: UiBlockSpec;
   apiKey?: { name: string; vault?: boolean };
   vault?: { kind: UiVaultRequestKind };
+  confirmed?: { actionId: string; run: () => Effect.Effect<ConfirmedActionOutput, { readonly cause: unknown }> };
   location?: true;
 }
 
@@ -908,10 +911,12 @@ export class AttentionRegistry {
   ) {
     const saved = yield* this.#saveApiKeyAnswer(input, responder);
     const savedItem = yield* this.#saveVaultAnswer(input, responder);
+    const done = yield* this.#runConfirmedAction(input, responder);
     yield* attentionStep(() => {
       const pending = this.#prompts.get(input.requestId);
       if (saved && pending !== saved.pending) return;
       if (savedItem && pending !== savedItem.pending) return;
+      if (done && pending !== done.pending) return;
       if (!pending) throw new InactiveAttentionRequest(sourceText("error.backend.promptInactive"));
       const edit = pending.uiBlock
         ? uiConfirmPreviewEdit(pending.uiBlock.spec, input.answers)
@@ -926,27 +931,29 @@ export class AttentionRegistry {
       const preview = uiBlockResponse ? edit.preview : undefined;
       this.#routines.markRunningForTurn(getString(pending.params, "turnId"));
 
-      const result = pending.uiBlock?.apiKey
-        ? apiKeyPromptResult(pending.uiBlock.blockId, saved?.key ?? null)
-        : pending.uiBlock?.vault
-          ? vaultPromptResult(pending.uiBlock.blockId, savedItem?.item ?? null)
-          : pending.uiBlock?.location
-            ? locationPromptResult(pending.uiBlock.blockId, uiBlockResponse)
-            : pending.uiBlock
-              ? uiBlockPromptResult(
-                  uiBlockResponse
-                    ? { status: "answered", blockId: pending.uiBlock.blockId, response: uiBlockResponse, preview }
-                    : { status: "skipped", blockId: pending.uiBlock.blockId },
-                )
-              : pending.responseKind === "dynamic-tool"
-                ? dynamicPromptResult(pending.questions, answers)
-                : pending.responseKind === "mcp-elicitation"
-                  ? mcpElicitationResult(pending.params, answers)
-                  : {
-                      answers: Object.fromEntries(
-                        Object.entries(answers).map(([id, values]) => [id, { answers: values }]),
-                      ),
-                    };
+      const result = done
+        ? confirmedActionPromptResult(done.pending.uiBlock?.blockId ?? "", done.output)
+        : pending.uiBlock?.apiKey
+          ? apiKeyPromptResult(pending.uiBlock.blockId, saved?.key ?? null)
+          : pending.uiBlock?.vault
+            ? vaultPromptResult(pending.uiBlock.blockId, savedItem?.item ?? null)
+            : pending.uiBlock?.location
+              ? locationPromptResult(pending.uiBlock.blockId, uiBlockResponse)
+              : pending.uiBlock
+                ? uiBlockPromptResult(
+                    uiBlockResponse
+                      ? { status: "answered", blockId: pending.uiBlock.blockId, response: uiBlockResponse, preview }
+                      : { status: "skipped", blockId: pending.uiBlock.blockId },
+                  )
+                : pending.responseKind === "dynamic-tool"
+                  ? dynamicPromptResult(pending.questions, answers)
+                  : pending.responseKind === "mcp-elicitation"
+                    ? mcpElicitationResult(pending.params, answers)
+                    : {
+                        answers: Object.fromEntries(
+                          Object.entries(answers).map(([id, values]) => [id, { answers: values }]),
+                        ),
+                      };
       if (!pending.detached) pending.client.respond(pending.id, result);
       this.#prompts.delete(input.requestId);
       clearTimeout(pending.autoAnswer?.timer);
@@ -1091,6 +1098,37 @@ export class AttentionRegistry {
       ...(digits ? { last4: digits.slice(-4) } : {}),
     };
     return { pending: answer.pending, item, saved };
+  });
+
+  readonly #runConfirmedAction = Effect.fn("AttentionRegistry.runConfirmedAction")(function* (
+    this: AttentionRegistry,
+    input: RespondToPromptInput,
+    responder: PromptResponder | undefined,
+  ) {
+    const answer = yield* attentionStep(() => {
+      const pending = this.#prompts.get(input.requestId);
+      const confirmed = pending?.uiBlock?.confirmed;
+      if (!pending?.uiBlock || !confirmed) return null;
+      if (pending.saving) throw new Error(sourceText("error.backend.uiBlockActionRunning"));
+      const edit = uiConfirmPreviewEdit(pending.uiBlock.spec, input.answers);
+      if (!edit) return null;
+      const response = uiBlockAnswer(pending.uiBlock.spec, edit.answers, responder);
+      if (response?.actionId !== confirmed.actionId) return null;
+      if (responder && !responder.privileged)
+        throw new ForbiddenAttentionAnswer(sourceText("error.backend.uiBlockActionNotAllowed"));
+      pending.saving = true;
+      return { pending, run: confirmed.run };
+    });
+    if (!answer) return null;
+    const output = yield* answer.run().pipe(
+      toAttentionOperationFailed,
+      Effect.ensuring(
+        Effect.sync(() => {
+          answer.pending.saving = false;
+        }),
+      ),
+    );
+    return { pending: answer.pending, output };
   });
 
   readonly respondToMediaApproval = Effect.fn("AttentionRegistry.respondToMediaApproval")(function* (

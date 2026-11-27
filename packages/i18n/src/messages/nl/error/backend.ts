@@ -298,6 +298,10 @@ export const messages = {
     "De server heeft het account geweigerd waarmee je bent ingelogd. Controleer of dit account de dienst mag gebruiken. Log uit en log opnieuw in om een ander account te gebruiken.",
   "error.backend.mcpSignInClientRefused":
     "De inlogserver heeft OpenBot niet geaccepteerd bij het voltooien van de aanmelding. Meld je opnieuw aan: OpenBot registreert zich dan opnieuw bij de server.",
+  "error.backend.googleSignInNeedsAccount":
+    "Meld je eerst aan bij je OpenBot-account. OpenBot heeft het nodig om een Google-aanmelding te voltooien.",
+  "error.backend.googleSignInUnavailable":
+    "OpenBot kon de Google-aanmelding niet voltooien. Probeer het later opnieuw.",
   "error.backend.mcpSignInAppRefused":
     "De inlogserver heeft de inlog-app van deze server niet geaccepteerd. Controleer de client-ID en het clientgeheim van de inlog-app en log daarna opnieuw in.",
   "error.backend.mcpCommandNotFound": "Opdracht niet gevonden: {command}",
@@ -541,4 +545,8 @@ export const messages = {
   "error.backend.taskRemoteUnsupported": "Taken zijn alleen beschikbaar voor agents op deze computer.",
   "error.backend.taskMessageFailed": "OpenBot kon het bericht niet naar de taak sturen. Probeer het later opnieuw.",
   "error.backend.taskStartFailed": "OpenBot kon de taak niet starten. Doe het werk in plaats daarvan in deze beurt.",
+  "error.backend.uiBlockActionRunning": "OpenBot is hier nog mee bezig. Wacht tot het klaar is.",
+  "error.backend.gmailDraftChanged":
+    "Het concept is gewijzigd nadat OpenBot het liet zien, dus het is niet verzonden. Vraag de agent het opnieuw te tonen.",
+  "error.backend.gmailSendFailed": "Gmail heeft het concept niet verzonden: {reason}",
 } as const satisfies PartialTranslation<typeof source>;

@@ -288,6 +288,9 @@ export const messages = {
     "Serwer odrzucił konto, na które się zalogowano. Sprawdź, czy to konto może korzystać z usługi. Aby użyć innego konta, wyloguj się, a potem zaloguj ponownie.",
   "error.backend.mcpSignInClientRefused":
     "Serwer logowania nie zaakceptował OpenBot przy kończeniu logowania. Zaloguj się ponownie: OpenBot zarejestruje się ponownie na serwerze.",
+  "error.backend.googleSignInNeedsAccount":
+    "Najpierw zaloguj się do konta OpenBot. OpenBot potrzebuje go, aby dokończyć logowanie do Google.",
+  "error.backend.googleSignInUnavailable": "OpenBot nie mógł dokończyć logowania do Google. Spróbuj ponownie później.",
   "error.backend.mcpSignInAppRefused":
     "Serwer logowania nie zaakceptował aplikacji logowania tego serwera. Sprawdź identyfikator klienta i sekret klienta aplikacji logowania, a potem zaloguj się ponownie.",
   "error.backend.mcpCommandNotFound": "Nie znaleziono polecenia: {command}",
@@ -521,4 +524,8 @@ export const messages = {
   "error.backend.taskRemoteUnsupported": "Zadania są dostępne tylko dla agentów na tym komputerze.",
   "error.backend.taskMessageFailed": "OpenBot nie może wysłać wiadomości do zadania. Spróbuj ponownie później.",
   "error.backend.taskStartFailed": "OpenBot nie może rozpocząć zadania. Zamiast tego wykonaj pracę w tej turze.",
+  "error.backend.uiBlockActionRunning": "OpenBot jeszcze to wykonuje. Poczekaj, aż skończy.",
+  "error.backend.gmailDraftChanged":
+    "Wersja robocza zmieniła się po tym, jak OpenBot ją pokazał, więc nie została wysłana. Poproś agenta, aby pokazał ją ponownie.",
+  "error.backend.gmailSendFailed": "Gmail nie wysłał wersji roboczej: {reason}",
 } as const satisfies PartialTranslation<typeof source>;

@@ -266,6 +266,7 @@ import { GitHubConnectorStore } from "./github-connector-store";
 import { GitHubRelay, receiveGitHubDelivery } from "./github-relay";
 import { createGitHubRest, type WorkflowGitHubDirectory, workflowGitHubDirectory } from "./github-rest";
 import { githubSkillSource } from "./github-skill-source";
+import { googleSignIn } from "./google-token-broker";
 import { hermesRoot } from "./hermes-import-reader";
 import { HermesImportService } from "./hermes-import-service";
 import { HermesInstaller } from "./hermes-installer";
@@ -1849,12 +1850,20 @@ export async function createApplicationServices({
   if (mcpOAuthRedirect) {
     teardown.push(TEARDOWN_ORDER.mcpOAuthRedirect, "the MCP sign-in listener", () => mcpOAuthRedirect.close());
   }
+  const mcpGoogleSignIn = googleSignIn({
+    available: () => ingressHostId() !== null,
+    ticket: async (signal) => {
+      const hostId = ingressHostId();
+      return hostId ? Effect.runPromise(centralAuth.issueRemoteHostTicket(hostId), { signal }) : null;
+    },
+  });
   const mcpOAuth = new McpOAuth({
     storage: mcpOAuthStore,
     openExternal: openLink,
     redirectUrl: mcpOAuthRedirect?.redirectUrl ?? MCP_OAUTH_REDIRECT_URL,
     deepLinkRedirectUrl: mcpOAuthDeepLink,
     logger: createOpenBotLogger("mcp-oauth"),
+    ...(mcpGoogleSignIn ? { googleSignIn: mcpGoogleSignIn } : {}),
   });
   mcpOAuthAuthority = mcpOAuth;
   teardown.push(TEARDOWN_ORDER.mcpOAuth, "MCP token refresh", () => Effect.runPromise(mcpOAuth.close()));

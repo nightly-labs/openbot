@@ -100,7 +100,17 @@ import { OPENBOT_BROWSER_NAMESPACE } from "../browser-tools";
 import type { ChannelService } from "../channel-service";
 import type { CrmHandle } from "../crm/crm";
 import type { ProviderSession } from "../database/provider-sessions";
+import {
+  findGmailDraft,
+  GMAIL_SEND_ACTION_ID,
+  type GmailAccountToken,
+  type GmailApi,
+  GmailDraftFailed,
+  gmailSendCardSpec,
+  sendGmailDraft,
+} from "../gmail-drafts";
 import type { MailboxStore } from "../mailbox-store";
+import type { McpOperationError } from "../mcp-effects";
 import { agentMcpServers, codexDeferredMcpServers, openCodeMcpServers } from "../mcp-provider-shapes";
 import { type MessagingThreads, PLATFORM_NAMES } from "../messaging/messaging-threads";
 import { isMessagingOutboundCall } from "../messaging/messaging-tools";
@@ -117,6 +127,7 @@ import {
   requestLocationToolSchema,
   routineReportFailureToolSchema,
   saveApiKeyToolSchema,
+  sendGmailDraftToolSchema,
   sendToChannelToolSchema,
   serverInstallCommandToolSchema,
   setBackdropToolSchema,
@@ -534,6 +545,8 @@ export interface OpenBotToolRouterOptions {
   personCanAdminister?: ((personId: string) => boolean) | undefined;
   mcpServerOwners?: McpServerOwnerHooks | undefined;
   apiKeys?: AgentApiKeys | null | undefined;
+  gmailAccounts?: (() => Effect.Effect<GmailAccountToken[], McpOperationError>) | null | undefined;
+  gmailApi?: GmailApi | undefined;
   vaultItems?: VaultItems | null | undefined;
   codexSubagentParent?: ((childThreadId: string) => CodexSubagentParent | undefined) | undefined;
   clientBrowser?: ClientBrowser | null | undefined;
@@ -595,6 +608,8 @@ export class OpenBotToolRouter {
   readonly #personCanAdminister: (personId: string) => boolean;
   readonly #mcpServerOwners: McpServerOwnerHooks | null;
   readonly #apiKeys: AgentApiKeys | null;
+  readonly #gmailAccounts: (() => Effect.Effect<GmailAccountToken[], McpOperationError>) | null;
+  readonly #gmailApi: GmailApi;
   readonly #vaultItems: VaultItems | null;
   readonly #hooks: OpenBotToolRouterHooks;
   readonly #interruptTool: AgentInterruptTool;
@@ -664,6 +679,8 @@ export class OpenBotToolRouter {
     this.#personCanAdminister = options.personCanAdminister ?? (() => true);
     this.#mcpServerOwners = options.mcpServerOwners ?? null;
     this.#apiKeys = options.apiKeys ?? null;
+    this.#gmailAccounts = options.gmailAccounts ?? null;
+    this.#gmailApi = options.gmailApi ?? {};
     this.#vaultItems = options.vaultItems ?? null;
     this.#hooks = options.hooks;
     this.#interruptTool = new AgentInterruptTool({
@@ -1026,6 +1043,11 @@ export class OpenBotToolRouter {
               if (!toolRequest.signal?.aborted && client.running) client.respond(toolRequest.id, result);
               return;
             }
+            if (toolRequest.params.tool === "send_gmail_draft") {
+              const result = yield* this.#sendGmailDraft(client, toolRequest, toolRequest.params);
+              if (result && !toolRequest.signal?.aborted && client.running) client.respond(toolRequest.id, result);
+              return;
+            }
             if (toolRequest.params.tool === "request_location") {
               const result = this.#locationTool(client, toolRequest, toolRequest.params);
               if (result && !toolRequest.signal?.aborted && client.running) client.respond(toolRequest.id, result);
@@ -1285,6 +1307,52 @@ export class OpenBotToolRouter {
       blockId: randomUUID(),
       spec,
       apiKey: { name: parsed.data.name, vault },
+    });
+    return null;
+  });
+
+  readonly #sendGmailDraft = Effect.fn("OpenBotToolRouter.sendGmailDraft")(function* (
+    this: OpenBotToolRouter,
+    client: AgentClient,
+    request: AppServerRequest,
+    params: DynamicToolCallParams,
+  ) {
+    const agentId = this.#conversation.agentForThread(params.threadId);
+    if (!agentId) throw new Error("The calling OpenBot agent is unknown.");
+    const parsed = sendGmailDraftToolSchema.safeParse(params.arguments);
+    if (!parsed.success)
+      return openBotToolFailure(`${z.prettifyError(parsed.error)}\nCorrect the arguments and retry.`);
+    if (this.#messaging.store.linkForThread(this.#conversation.publicThreadId(agentId, params.threadId)))
+      return openBotToolFailure("send_gmail_draft does not work in an external chat. Ask the user in OpenBot.");
+    const accounts = this.#gmailAccounts
+      ? yield* this.#gmailAccounts().pipe(Effect.catch(() => Effect.succeed<GmailAccountToken[]>([])))
+      : [];
+    if (accounts.length === 0)
+      return openBotToolFailure(
+        "No Gmail account is signed in on this OpenBot server. Ask the user to install Gmail from Apps and sign in.",
+      );
+    const draft = yield* findGmailDraft(accounts, parsed.data.draftId, this.#gmailApi).pipe(
+      Effect.catch((failure) => Effect.succeed(failure)),
+    );
+    if (draft instanceof GmailDraftFailed) return openBotToolFailure(draft.message);
+    if (!draft)
+      return openBotToolFailure(
+        "No signed-in Gmail account has a draft with this id. Use the draft id that create_draft returned.",
+      );
+    const spec = gmailSendCardSpec(draft);
+    if (!spec) return openBotToolFailure("OpenBot could not show this draft.");
+    const api = this.#gmailApi;
+    this.#attention.surfaceUiBlock(client, request, {
+      blockId: randomUUID(),
+      spec,
+      confirmed: {
+        actionId: GMAIL_SEND_ACTION_ID,
+        run: () =>
+          sendGmailDraft(draft, api).pipe(
+            Effect.map((sent) => ({ status: "sent", messageId: sent.messageId, threadId: sent.threadId })),
+            Effect.mapError((failure) => ({ cause: new Error(failure.message) })),
+          ),
+      },
     });
     return null;
   });

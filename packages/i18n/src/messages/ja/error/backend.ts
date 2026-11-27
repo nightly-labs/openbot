@@ -300,6 +300,10 @@ export const messages = {
     "サーバーは、サインインに使ったアカウントを拒否しました。このアカウントがサービスを使えるか確認してください。別のアカウントを使うには、サインアウトしてからもう一度サインインしてください。",
   "error.backend.mcpSignInClientRefused":
     "サインインの完了時に、サインインサーバーが OpenBot を受け付けませんでした。もう一度サインインしてください。OpenBot はサーバーに再登録します。",
+  "error.backend.googleSignInNeedsAccount":
+    "先に OpenBot アカウントにサインインしてください。Google へのサインインを完了するために必要です。",
+  "error.backend.googleSignInUnavailable":
+    "OpenBot は Google へのサインインを完了できませんでした。後でもう一度お試しください。",
   "error.backend.mcpSignInAppRefused":
     "サインインサーバーがこのサーバーのサインインアプリを受け付けませんでした。サインインアプリのクライアント ID とクライアントシークレットを確認してから、もう一度サインインしてください。",
   "error.backend.mcpCommandNotFound": "コマンドが見つかりません: {command}",
@@ -537,4 +541,8 @@ export const messages = {
   "error.backend.taskRemoteUnsupported": "タスクは、このコンピューター上のエージェントでのみ利用できます。",
   "error.backend.taskMessageFailed": "OpenBot はタスクにメッセージを送信できませんでした。後でもう一度お試しください。",
   "error.backend.taskStartFailed": "OpenBot はタスクを開始できませんでした。代わりにこのターンで作業してください。",
+  "error.backend.uiBlockActionRunning": "OpenBot はまだ処理中です。完了するまでお待ちください。",
+  "error.backend.gmailDraftChanged":
+    "OpenBot が表示した後に下書きが変更されたため、送信されませんでした。もう一度表示するようエージェントに依頼してください。",
+  "error.backend.gmailSendFailed": "Gmail は下書きを送信しませんでした: {reason}",
 } as const satisfies PartialTranslation<typeof source>;

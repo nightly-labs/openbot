@@ -281,6 +281,9 @@ export const messages = {
     "Sunucu, oturum açtığınız hesabı reddetti. Bu hesabın hizmeti kullanabildiğini kontrol edin. Başka bir hesap kullanmak için oturumu kapatıp yeniden açın.",
   "error.backend.mcpSignInClientRefused":
     "Oturum açma sunucusu, oturum açma tamamlanırken OpenBot'u kabul etmedi. Yeniden oturum açın: OpenBot sunucuya yeniden kaydolur.",
+  "error.backend.googleSignInNeedsAccount":
+    "Önce OpenBot hesabınıza oturum açın. OpenBot, Google oturum açmayı tamamlamak için buna ihtiyaç duyar.",
+  "error.backend.googleSignInUnavailable": "OpenBot, Google oturum açmayı tamamlayamadı. Daha sonra yeniden deneyin.",
   "error.backend.mcpSignInAppRefused":
     "Oturum açma sunucusu bu sunucunun oturum açma uygulamasını kabul etmedi. Oturum açma uygulamasının istemci kimliğini ve istemci gizli anahtarını kontrol edip yeniden oturum açın.",
   "error.backend.mcpCommandNotFound": "Komut bulunamadı: {command}",
@@ -513,4 +516,8 @@ export const messages = {
   "error.backend.taskRemoteUnsupported": "Görevler yalnızca bu bilgisayardaki ajanlar için kullanılabilir.",
   "error.backend.taskMessageFailed": "OpenBot mesajı göreve gönderemedi. Daha sonra yeniden deneyin.",
   "error.backend.taskStartFailed": "OpenBot görevi başlatamadı. Bunun yerine işi bu turda yapın.",
+  "error.backend.uiBlockActionRunning": "OpenBot bunu hâlâ yapıyor. Bitmesini bekle.",
+  "error.backend.gmailDraftChanged":
+    "Taslak, OpenBot gösterdikten sonra değişti, bu yüzden gönderilmedi. Ajandan yeniden göstermesini iste.",
+  "error.backend.gmailSendFailed": "Gmail taslağı göndermedi: {reason}",
 } as const satisfies PartialTranslation<typeof source>;

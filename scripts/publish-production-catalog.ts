@@ -6,6 +6,7 @@ import { fileURLToPath } from "node:url";
 import { isDynamicRecord, isNumber, isString } from "@openbot/contracts/runtime-values";
 import { createOpenBotLogger, toLogValue } from "@openbot/logging";
 import { buildProductionCatalog } from "./build-production-catalog";
+import { cloudflareAccessHeaders } from "./cloudflare-access-headers";
 
 const logger = createOpenBotLogger("publish-production-catalog");
 
@@ -222,7 +223,7 @@ async function fetchLiveVersion(path: string): Promise<number | null> {
 
 async function verifyProductionAdmin(token: string): Promise<void> {
   const response = await fetch(new URL("/v1/skills/admin/submissions", productionApiUrl), {
-    headers: { authorization: `Bearer ${token}` },
+    headers: { ...cloudflareAccessHeaders(), authorization: `Bearer ${token}` },
   });
   if (!response.ok) {
     throw new Error(`Production admin verification failed with HTTP ${response.status}.`);

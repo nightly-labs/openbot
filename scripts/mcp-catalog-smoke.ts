@@ -11,6 +11,7 @@ import type { FetchLike, Transport } from "@modelcontextprotocol/sdk/shared/tran
 import { LATEST_PROTOCOL_VERSION } from "@modelcontextprotocol/sdk/types.js";
 import { createOpenBotLogger, toLogValue } from "@openbot/logging";
 import { runCauseEffect } from "../src/backend/effect-boundary";
+import { GOOGLE_MCP_SCOPES } from "../src/backend/google-mcp-sign-in";
 import { secureOAuthFetch } from "../src/backend/mcp-oauth-provider";
 import { hostAddresses, isPublicAddress, systemAddressLookup } from "../src/backend/network-address";
 import { defaultPluginCatalogPaths, loadPluginCatalog, type PluginApp } from "./build-plugin-catalog";
@@ -55,6 +56,7 @@ interface Skipped {
 function scope(app: PluginApp): { kind: Kind; url: string } | { reason: string } {
   const server = app.server;
   if (server.transport !== "http") return { reason: "stdio server" };
+  if (Object.hasOwn(GOOGLE_MCP_SCOPES, server.url)) return { reason: "OpenBot's own Google sign-in app" };
   const kinds = new Set((server.auth ?? []).map((flow) => flow.kind));
   if (kinds.has("link")) return { kind: "link", url: server.url };
   if (kinds.size === 0) return { kind: "open", url: server.url };

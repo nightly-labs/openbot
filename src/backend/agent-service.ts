@@ -362,6 +362,7 @@ import type { CrmHandle } from "./crm/crm";
 import type { ProviderSession } from "./database/provider-sessions";
 import { readUsageReportInWorker } from "./database/usage-report-reader";
 import { reportOriginalFailure } from "./effect-boundary";
+import { GMAIL_MCP_URL } from "./gmail-drafts";
 import type { HostMemory } from "./host-memory";
 import type { SignInRegion } from "./kimi-region";
 import type { LinkWallet } from "./link-wallet";
@@ -2213,6 +2214,7 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
         },
         (mcpServerId, agentId) => this.#mcpAgentAccess?.(mcpServerId, agentId) ?? true,
       ),
+      gmailAccounts: () => this.#mcp.accountTokens(GMAIL_MCP_URL),
       ...(options.marketplaceAppServer === undefined ? {} : { marketplaceAppServer: options.marketplaceAppServer }),
       githubConnected: () => Boolean(githubConnector?.mcpServer()),
       ...(options.passwordManagerConnected === undefined

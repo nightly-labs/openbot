@@ -571,6 +571,12 @@ export function apiKeyPromptResult(blockId: string, saved: SavedApiKey | null): 
   return { success: true, contentItems: [{ type: "inputText", text: JSON.stringify(value) }] };
 }
 
+export type ConfirmedActionOutput = Readonly<Record<string, string>>;
+
+export function confirmedActionPromptResult(blockId: string, output: ConfirmedActionOutput): DynamicToolResult {
+  return { success: true, contentItems: [{ type: "inputText", text: JSON.stringify({ ...output, blockId }) }] };
+}
+
 export function locationFormSpec(reason: string): UiBlockSpec | null {
   return normalizeUiBlockSpec({
     type: "form",
