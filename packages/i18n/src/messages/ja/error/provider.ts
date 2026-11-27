@@ -425,6 +425,8 @@ export const messages = {
     "Hermes を使うには、Nous Portal でサインインするか、ターミナルで `hermes setup` を実行してください。",
   "error.provider.hermesTurnFailed":
     "Hermes はこのターンを完了できませんでした。返信に理由が書かれている場合は、その指示に従ってください。書かれていない場合は、このエージェントの MCP サーバーが利用できない可能性があります。マーケットプレイス、アプリで確認してから、メッセージをもう一度送信してください。",
+  "error.provider.hermesProviderFailed":
+    "モデルプロバイダーがエラーを返したため、Hermes はこのターンを完了できませんでした。下のプロバイダーのメッセージに従うか、このエージェントに別のモデルを選んでから、メッセージをもう一度送信してください。\n{detail}",
   "error.provider.hermesRefused":
     "Hermes は開始前にこのメッセージを拒否しました。もう一度送信してください。Hermes がすべてのメッセージを拒否する場合は、このエージェントを実行しているコンピューターで OpenBot を再起動してください。",
   "error.provider.hermesConnectionLost":

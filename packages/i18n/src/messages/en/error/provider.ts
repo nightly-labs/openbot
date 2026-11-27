@@ -396,6 +396,8 @@ export const messages = defineMessages("error.provider", {
   "error.provider.hermesSignIn": "Sign in with Nous Portal, or run `hermes setup` in a terminal, to use Hermes.",
   "error.provider.hermesTurnFailed":
     "Hermes could not finish this turn. If its reply gives a reason, do what it says. If not, an MCP server of this agent can be unavailable: check it in Marketplace, Apps, then send your message again.",
+  "error.provider.hermesProviderFailed":
+    "Hermes could not finish this turn because its model provider returned an error. Do what the provider's message below says, or select a different model for this agent, then send your message again.\n{detail}",
   "error.provider.hermesRefused":
     "Hermes refused this message before it started. Send it again. If Hermes refuses each message, restart OpenBot on the computer that runs this agent.",
   "error.provider.hermesConnectionLost":

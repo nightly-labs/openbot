@@ -410,6 +410,8 @@ export const messages = {
     "Log in met Nous Portal of voer `hermes setup` uit in een terminal om Hermes te gebruiken.",
   "error.provider.hermesTurnFailed":
     "Hermes kon deze beurt niet afmaken. Als het antwoord een reden geeft, volg die dan. Zo niet, dan is een MCP-server van deze agent misschien niet beschikbaar: controleer hem in Marktplaats, Apps, en stuur je bericht opnieuw.",
+  "error.provider.hermesProviderFailed":
+    "Hermes kon deze beurt niet afmaken, omdat zijn modelaanbieder een fout gaf. Volg het bericht van de aanbieder hieronder, of kies een ander model voor deze agent, en stuur je bericht opnieuw.\n{detail}",
   "error.provider.hermesRefused":
     "Hermes heeft dit bericht geweigerd voordat het begon. Stuur het opnieuw. Als Hermes elk bericht weigert, start OpenBot dan opnieuw op de computer waarop deze agent draait.",
   "error.provider.hermesConnectionLost":

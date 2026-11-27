@@ -429,6 +429,8 @@ export const messages = {
     "Connectez-vous avec Nous Portal ou exécutez `hermes setup` dans un terminal pour utiliser Hermes.",
   "error.provider.hermesTurnFailed":
     "Hermes n’a pas pu terminer ce tour. Si sa réponse donne une raison, suivez-la. Sinon, un serveur MCP de cet agent est peut-être indisponible : vérifiez-le dans Marketplace, Apps, puis renvoyez votre message.",
+  "error.provider.hermesProviderFailed":
+    "Hermes n’a pas pu terminer ce tour, car son fournisseur de modèle a renvoyé une erreur. Suivez le message du fournisseur ci-dessous, ou choisissez un autre modèle pour cet agent, puis renvoyez votre message.\n{detail}",
   "error.provider.hermesRefused":
     "Hermes a refusé ce message avant de commencer. Renvoyez-le. Si Hermes refuse chaque message, redémarrez OpenBot sur l’ordinateur qui exécute cet agent.",
   "error.provider.hermesConnectionLost":
