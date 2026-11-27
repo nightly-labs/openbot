@@ -563,7 +563,7 @@
 .server-onboarding-close {
   position: absolute;
   top: 12px;
-  right: 12px;
+  right: calc(12px + var(--window-controls-end));
   -webkit-app-region: no-drag;
 }
 

@@ -43,7 +43,7 @@ body[data-browser-full-view] .app-frame {
   align-items: center;
   gap: var(--openbot-space-1);
   margin-inline: var(--browser-full-edge);
-  padding-inline: var(--openbot-space-1) 0;
+  padding-inline: var(--openbot-space-1) var(--window-controls-end, 0px);
   color: var(--openbot-text-secondary);
   font-size: var(--openbot-text-sm);
 }

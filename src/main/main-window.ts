@@ -64,8 +64,15 @@ import type { RemoteWorkflowError } from "./remote-service-effects";
 import { sendToRenderer } from "./renderer-ipc";
 import { isTrustedRendererUrl } from "./trusted-renderer";
 import type { UpdateService } from "./update-service";
-import { followAppearance, followWindowGlass, glassWindowOptions, windowBackgroundColor } from "./window-appearance";
-import { followWindowButtonSide, WINDOW_BUTTON_INSET } from "./window-buttons";
+import {
+  fitTitleBarOverlay,
+  followAppearance,
+  followTitleBarOverlay,
+  followWindowGlass,
+  glassWindowOptions,
+  windowBackgroundColor,
+} from "./window-appearance";
+import { followWindowButtonSide, WINDOW_BUTTON_INSET, windowButtonOptions } from "./window-buttons";
 
 const MAIN_WINDOW_DARK_BACKGROUND = "#0b0d0e";
 const logger = createOpenBotLogger("main-window");
@@ -284,6 +291,7 @@ export function createMainWindowController({
     if (!interfaceSize || window.isDestroyed()) return;
     const zoom = desktopLayoutZoomFactor(window.getContentBounds().width, interfaceSize.zoomFactor);
     if (window.webContents.getZoomFactor() !== zoom) window.webContents.setZoomFactor(zoom);
+    fitTitleBarOverlay(window);
   }
 
   function createWindow(): BrowserWindow {
@@ -306,9 +314,7 @@ export function createMainWindowController({
           ? getTranslate()("window.localClientTitle")
           : getTranslate()("window.localHostTitle"),
       icon: appIconPath,
-      ...(process.platform === "darwin"
-        ? { titleBarStyle: "hidden" as const, trafficLightPosition: WINDOW_BUTTON_INSET }
-        : {}),
+      ...windowButtonOptions("frame"),
       webPreferences: {
         preload: join(__dirname, "../preload/index.cjs"),
         contextIsolation: true,
@@ -321,6 +327,7 @@ export function createMainWindowController({
     });
     hideMenuBar(window);
     followWindowGlass(window, MAIN_WINDOW_DARK_BACKGROUND);
+    followTitleBarOverlay(window, "frame");
 
     window.once("ready-to-show", () => {
       performance.mark("openbot:window-ready");
@@ -441,9 +448,7 @@ export function createMainWindowController({
       ...glassWindowOptions(MAIN_WINDOW_DARK_BACKGROUND),
       title: getTranslate()("window.localHostTitle"),
       icon: appIconPath,
-      ...(process.platform === "darwin"
-        ? { titleBarStyle: "hidden" as const, trafficLightPosition: WINDOW_BUTTON_INSET }
-        : {}),
+      ...windowButtonOptions("canvas"),
       webPreferences: {
         preload: join(__dirname, "../preload/index.cjs"),
         contextIsolation: true,
@@ -455,6 +460,7 @@ export function createMainWindowController({
     });
     hideMenuBar(window);
     followWindowGlass(window, MAIN_WINDOW_DARK_BACKGROUND);
+    followTitleBarOverlay(window, "canvas");
     chatWindows.set(key, { target: { serverId: target.serverId, agentId: target.agentId }, window });
     window.once("ready-to-show", () => window.show());
     window.on("closed", () => {
@@ -471,6 +477,7 @@ export function createMainWindowController({
     window.webContents.on("did-navigate", () => {
       const interfaceSize = getServices()?.interfaceSize;
       if (interfaceSize) window.webContents.setZoomFactor(interfaceSize.zoomFactor);
+      fitTitleBarOverlay(window);
     });
     attachAppInput(window, getServices, getTranslate, { closesBrowserTabs: false, quitShortcut });
     allowPinchZoom(window.webContents);
@@ -562,8 +569,11 @@ export function createMainWindowController({
       [...chatWindows.values()].map((chat) => chat.window).filter((window) => !window.isDestroyed()),
     applyInterfaceSize: (zoomFactor: number) => {
       if (holder.current) applyMainWindowZoom(holder.current);
-      for (const chat of chatWindows.values())
-        if (!chat.window.isDestroyed()) chat.window.webContents.setZoomFactor(zoomFactor);
+      for (const chat of chatWindows.values()) {
+        if (chat.window.isDestroyed()) continue;
+        chat.window.webContents.setZoomFactor(zoomFactor);
+        fitTitleBarOverlay(chat.window);
+      }
     },
     chatWindowTarget: (window: BrowserWindow) =>
       [...chatWindows.values()].find((chat) => chat.window === window)?.target ?? null,

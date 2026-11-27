@@ -40,7 +40,7 @@
   overflow: hidden;
   border-bottom: 1px solid var(--openbot-border);
   padding-block: 0;
-  padding-inline: 0 8px;
+  padding-inline: 0 calc(8px + var(--window-controls-end, 0px));
   background: var(--openbot-bg-sidebar);
 }
 

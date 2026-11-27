@@ -40,6 +40,10 @@
     pointer-events: auto;
     -webkit-app-region: no-drag;
   }
+
+  .app-frame-edge[data-window-page-kind="titled"] > .window-page > .library-panel .library-path-head {
+    padding-inline-end: calc(var(--openbot-space-4) + var(--window-controls-end));
+  }
 }
 
 .library-panel-content[inert] {
