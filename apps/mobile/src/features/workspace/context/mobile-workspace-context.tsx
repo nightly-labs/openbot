@@ -1,8 +1,13 @@
 import {
+  type AgentPendingRuntime,
   type AvatarColor,
   canAdministerServer,
+  DEFAULT_PROVIDER_ACCOUNT_ID,
   type HostRemoteChatContent,
+  isAgentModel,
+  isAgentProvider,
   isQueuedMessageReceipt,
+  isReasoningEffort,
   MCP_SERVERS_CAPABILITY,
   type RespondToApprovalInput,
   type SidebarLayoutSnapshot,
@@ -2209,7 +2214,11 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
       setAgents((current) =>
         current.map((agent) =>
           agent.id === updated.id && agent.serverId === serverId
-            ? projectAgent(serverId, updated, hostColors.current[serverId]?.[updated.id] ?? null)
+            ? projectAgent(
+                serverId,
+                { ...updated, pendingRuntime: updated.pendingRuntime ?? agent.pendingRuntime },
+                hostColors.current[serverId]?.[updated.id] ?? null,
+              )
             : agent,
         ),
       );
@@ -2240,6 +2249,36 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
             agent.model === shown.model &&
             agent.reasoningEffort === shown.reasoningEffort
               ? { ...agent, ...kept }
+              : agent,
+          ),
+        );
+    };
+    const showQueuedRuntime = (serverId: string, change: Record<string, string>) => {
+      const target = (agent: MobileAgent) => agent.id === change.agentId && agent.serverId === serverId;
+      const previous = agentsRef.current.find(target);
+      const next = previous?.pendingRuntime ?? previous;
+      const provider = change.provider ?? next?.provider;
+      const model = change.model ?? next?.model;
+      const reasoningEffort = change.reasoningEffort ?? next?.reasoningEffort;
+      if (!previous || !isAgentProvider(provider) || !isAgentModel(model) || !isReasoningEffort(reasoningEffort))
+        return () => undefined;
+      const accountId =
+        change.providerAccountId ??
+        (provider === next?.provider ? previous.pendingRuntime?.providerAccountId : undefined);
+      const shown: AgentPendingRuntime = {
+        provider,
+        model,
+        reasoningEffort,
+        ...(accountId === undefined || accountId === DEFAULT_PROVIDER_ACCOUNT_ID
+          ? {}
+          : { providerAccountId: accountId }),
+      };
+      setAgents((current) => current.map((agent) => (target(agent) ? { ...agent, pendingRuntime: shown } : agent)));
+      return () =>
+        setAgents((current) =>
+          current.map((agent) =>
+            target(agent) && agent.pendingRuntime === shown
+              ? { ...agent, pendingRuntime: previous.pendingRuntime }
               : agent,
           ),
         );
@@ -2601,9 +2640,13 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
         if (!serverId || !agentsRef.current.some((agent) => agent.id === input.agentId && agent.serverId === serverId))
           throw new Error(currentText().t("mobile.workspace.error.agentUnavailableOnHost"));
         const { avatarColor, avatarHue, providerAccountId, ...other } = input;
+        const runtimeFieldChanged =
+          providerAccountId !== undefined ||
+          other.provider !== undefined ||
+          other.model !== undefined ||
+          other.reasoningEffort !== undefined;
         const runtimeChange =
-          providerAccountId !== undefined &&
-          hasCapability(serverCapabilities.current, serverId, AGENT_PENDING_RUNTIME_CAPABILITY)
+          runtimeFieldChanged && hasCapability(serverCapabilities.current, serverId, AGENT_PENDING_RUNTIME_CAPABILITY)
             ? pendingRuntimeUpdateBody({
                 agentId: input.agentId,
                 provider: input.provider,
@@ -2619,9 +2662,9 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
         const payload = updateAgentPayload(
           colorRoute && color !== null ? fields : { ...fields, ...(avatarHue === undefined ? {} : { avatarHue }) },
         );
-        let undoRuntime = showAgentRuntime(serverId, input);
+        let undoRuntime = runtimeChange ? () => undefined : showAgentRuntime(serverId, input);
         try {
-          if (Object.keys(payload).length > 1 || (!colorRoute && !runtimeChange)) {
+          if (Object.keys(payload).length > 1 || (!colorRoute && !runtimeChange && providerAccountId === undefined)) {
             const updated = await request(
               "PATCH",
               TEAM_API_ROUTES.agent.one(input.agentId),
@@ -2630,13 +2673,14 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
               serverId,
             );
             putAgent(serverId, updated);
-            if (!runtimeChange) undoRuntime = () => undefined;
+            undoRuntime = () => undefined;
           }
           if (colorRoute && color !== undefined && (color !== null || hostColors.current[serverId]?.[input.agentId]))
             applyHostColors(serverId, await writeHostAgentColor(teamApi(serverId), input.agentId, color));
-          if (runtimeChange)
+          if (runtimeChange) {
+            undoRuntime = showQueuedRuntime(serverId, runtimeChange);
             await request("POST", AGENT_PENDING_RUNTIME_ROUTES.update, ignoreResponse, runtimeChange, serverId);
-          else if (providerAccountId !== undefined)
+          } else if (providerAccountId !== undefined)
             await hostRequests.actions.setAgentProviderAccount(
               { agentId: input.agentId, accountId: providerAccountId },
               serverId,

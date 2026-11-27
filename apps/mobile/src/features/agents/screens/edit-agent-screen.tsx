@@ -164,7 +164,6 @@ function AgentForm({
     canManageBrowserProfiles,
     canManageAgentFolders,
     canSetAgentNotificationLevel,
-    setAgentProviderAccount,
   } = useMobileWorkspace();
   const queryClient = useQueryClient();
   const { settings: adminSettings } = useAgentAdminSettings(
@@ -196,12 +195,18 @@ function AgentForm({
   const [error, setError] = useState<string | null>(null);
   const { queryKey: accountsKey, accounts: hostAccounts } = useProviderAccounts(agent, available && page === "runtime");
   const [account, setAccount] = useState<string | undefined>();
-  const provider = edits.provider ?? agent.provider;
+  const queued = agent.pendingRuntime;
+  const savedProvider = queued?.provider ?? agent.provider;
+  const savedModel = queued?.model ?? agent.model;
+  const savedEffort = queued?.reasoningEffort ?? agent.reasoningEffort;
+  const provider = edits.provider ?? savedProvider;
   const providerAccounts = hostAccounts?.providers.find((entry) => entry.provider === provider)?.accounts ?? [];
   const savedAccount =
-    provider === agent.provider
-      ? (hostAccounts?.agents.find((entry) => entry.agentId === agent.id)?.accountId ?? DEFAULT_PROVIDER_ACCOUNT_ID)
-      : DEFAULT_PROVIDER_ACCOUNT_ID;
+    provider !== savedProvider
+      ? DEFAULT_PROVIDER_ACCOUNT_ID
+      : queued
+        ? (queued.providerAccountId ?? DEFAULT_PROVIDER_ACCOUNT_ID)
+        : (hostAccounts?.agents.find((entry) => entry.agentId === agent.id)?.accountId ?? DEFAULT_PROVIDER_ACCOUNT_ID);
   const accountChanged = account !== undefined && account !== savedAccount;
   const name = edits.name ?? agent.name;
   const title = edits.title ?? agent.title;
@@ -218,9 +223,9 @@ function AgentForm({
     avatarSeed !== agent.avatarSeed ||
     avatarHue !== agent.avatarHue ||
     avatarColor !== agent.avatarColor ||
-    (edits.provider !== undefined && edits.provider !== agent.provider) ||
-    (edits.model !== undefined && edits.model !== agent.model) ||
-    (edits.reasoningEffort !== undefined && edits.reasoningEffort !== agent.reasoningEffort) ||
+    (edits.provider !== undefined && edits.provider !== savedProvider) ||
+    (edits.model !== undefined && edits.model !== savedModel) ||
+    (edits.reasoningEffort !== undefined && edits.reasoningEffort !== savedEffort) ||
     accountChanged;
   const nameMissing = page === "info" && !name.trim();
   const [triedSave, setTriedSave] = useState(false);
@@ -274,12 +279,13 @@ function AgentForm({
     pending.current = true;
     setSaving(true);
     setError(null);
-    const accountId = account === undefined || account === DEFAULT_PROVIDER_ACCOUNT_ID ? null : account;
-    const accountWithRuntime =
-      accountChanged &&
-      (edits.provider !== undefined || edits.model !== undefined || edits.reasoningEffort !== undefined);
+    const chosenAccount = account ?? savedAccount;
+    const accountId = chosenAccount === DEFAULT_PROVIDER_ACCOUNT_ID ? null : chosenAccount;
+    const model = edits.model ?? savedModel;
+    const keepQueued =
+      queued !== undefined && (accountChanged || (edits.model !== undefined && queued.provider !== agent.provider));
     try {
-      if (Object.keys(edits).length > 0)
+      if (Object.keys(edits).length > 0 || accountChanged)
         await updateAgent(
           {
             agentId: agent.id,
@@ -289,17 +295,15 @@ function AgentForm({
             ...(edits.avatarSeed === undefined ? {} : { avatarSeed }),
             ...(edits.avatarHue === undefined ? {} : { avatarHue }),
             ...(edits.avatarColor === undefined ? {} : { avatarColor }),
-            ...(edits.provider === undefined ? {} : { provider: edits.provider }),
-            ...(edits.model === undefined ? {} : { model: edits.model }),
+            ...(provider !== undefined && (edits.provider !== undefined || keepQueued) ? { provider } : {}),
+            ...(model !== undefined && (edits.model !== undefined || keepQueued) ? { model } : {}),
             ...(edits.reasoningEffort === undefined ? {} : { reasoningEffort: edits.reasoningEffort }),
-            ...(accountWithRuntime ? { providerAccountId: accountId } : {}),
+            ...(accountChanged || (keepQueued && accountId !== null) ? { providerAccountId: accountId } : {}),
           },
           agent.serverId,
         );
       setEdits({});
-      if (accountChanged || (edits.provider !== undefined && edits.provider !== agent.provider)) {
-        if (accountChanged && !accountWithRuntime)
-          await setAgentProviderAccount({ agentId: agent.id, accountId }, agent.serverId);
+      if (accountChanged || (edits.provider !== undefined && edits.provider !== savedProvider)) {
         setAccount(undefined);
         queryClient.setQueryData<HostProviderAccounts | null>(accountsKey, (current) =>
           current
@@ -425,9 +429,9 @@ function AgentForm({
           available={available}
           saving={saving}
           provider={provider}
-          foreignProvider={edits.provider === undefined ? agent.foreignProvider : undefined}
-          model={edits.model ?? agent.model}
-          reasoningEffort={edits.reasoningEffort ?? agent.reasoningEffort}
+          foreignProvider={edits.provider === undefined && !queued ? agent.foreignProvider : undefined}
+          model={edits.model ?? savedModel}
+          reasoningEffort={edits.reasoningEffort ?? savedEffort}
           accounts={providerAccounts}
           accountId={account ?? savedAccount}
           workspaceOnly={adminSettings ? workspaceAccessEnforced(adminSettings) : false}
@@ -440,7 +444,7 @@ function AgentForm({
             setError(null);
           }}
           fastMode={
-            provider === agent.provider && (edits.model ?? agent.model) === agent.model
+            provider === agent.provider && (edits.model ?? savedModel) === agent.model
               ? { agent, server: host, available }
               : undefined
           }
@@ -519,7 +523,7 @@ function AgentForm({
           <SettingsSection title={t("mobile.agent.groups.brain")}>
             <SettingsRow
               leading={<RowIcon icon={Cpu} />}
-              supportingText={agent.model}
+              supportingText={savedModel}
               onPress={() =>
                 router.push({
                   pathname: "/agent-info/[agentId]/runtime",
