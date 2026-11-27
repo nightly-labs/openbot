@@ -142,6 +142,18 @@ export interface AcpFlavor {
   interruptToolsOnStop?: true;
   streamAnswerBeforePromptReturns?: true;
   thoughtsInsideAnswer?: true;
+  /**
+   * The name of the agent's own tool that asks the user with a form (`session/elicitation`). The text
+   * before its call is the answer that the user reads above the question card, not a step.
+   */
+  questionTool?: string;
+  /**
+   * The agent asks with OpenCode's forms: a choice field `<id>` can have a text field `<id>_custom`
+   * for a typed answer, and a form with each question skipped is an answer with no values, which the
+   * agent reads as unanswered. Without this, each field has its own page, and a form with no answer
+   * declines.
+   */
+  openCodeForms?: true;
   resumesAnswerAfterThought?: { report: RegExp };
   promptOpenForBackgroundTasks?: true;
   silentTurnLimitMs?: number;

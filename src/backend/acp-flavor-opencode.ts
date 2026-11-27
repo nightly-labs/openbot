@@ -304,6 +304,12 @@ export const OPENCODE_ACP_FLAVOR: AcpFlavor = {
   modelNotOffered: (error) => error.code === -32602 && isRecord(error.data) && typeof error.data.modelId === "string",
   streamAnswerBeforePromptReturns: true,
   thoughtsInsideAnswer: true,
+  // OpenCode's `question` tool asks with `session/elicitation`. Its `tool_call` has the tool name in
+  // `name` (2.x) and in the pending `title` (1.x and 2.x), and the kind `other`.
+  questionTool: "question",
+  // OpenCode 2.2.5 asks for the typed answer of a choice `qN` in `qN_custom`, and continues when the
+  // user skips each question.
+  openCodeForms: true,
   unsentBackgroundTurns: true,
   contextCompaction: "handoff",
   reopenKeepsPrompts: true,

@@ -7,7 +7,6 @@ import {
   type ContentBlock,
   type CreateElicitationRequest,
   type CreateElicitationResponse,
-  type ElicitationContentValue,
   type InitializeResponse,
   type LoadSessionRequest,
   type LoadSessionResponse,
@@ -60,7 +59,7 @@ import {
 import type { GeneratedMediaKind } from "./agent/image-generation";
 import type { ImageFitter } from "./agent/image-reader";
 import { acpPlanSteps, PLAN_UPDATED_METHOD } from "./agent/plan-updates";
-import { elicitationFieldQuestions, elicitationValue } from "./agent/prompts";
+import { acpFormQuestions, elicitationFormResult, openCodeFormQuestions, openCodeFormResult } from "./agent/prompts";
 import {
   isMcpSessionClosingDiagnostic,
   MCP_PROVIDER_FAILURE_TEXT,
@@ -3731,7 +3730,8 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
       turn.receivedOutput = true;
       if (update.sessionUpdate === "tool_call") {
         this.#completeThought(thread, turn);
-        this.#completeMessage(thread, turn, "commentary");
+        // The text before the agent's question is its reply, which shows above the question card.
+        this.#completeMessage(thread, turn, asksUser(this.#flavor, update) ? "final_answer" : "commentary");
       }
       const name = update.name ?? update.title ?? turn.toolNames.get(update.toolCallId) ?? "tool";
       turn.toolNames.set(update.toolCallId, name);
@@ -4833,13 +4833,9 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
     this: AcpAgentClient,
     params: CreateElicitationRequest,
   ): Effect.fn.Return<CreateElicitationResponse, ProviderClientOperationError> {
-    const properties = getRecord(getRecord(params, "requestedSchema"), "properties") ?? {};
-    const fields = elicitationFieldQuestions(params, "ACP");
-    const choices = new Set(fields.filter(({ options }) => options?.length).map(({ id }) => id));
-    const required = new Set(getArray(getRecord(params, "requestedSchema"), "required").filter(isString));
-    const questions = fields.filter(
-      ({ id }) => required.has(id) || !(id.endsWith("_custom") && choices.has(id.slice(0, -"_custom".length))),
-    );
+    // Only OpenCode's form folds a `_custom` field, and continues when the user skips each question.
+    const openCodeForm = this.#flavor.openCodeForms === true;
+    const questions = openCodeForm ? openCodeFormQuestions(params, "ACP") : acpFormQuestions(params);
     if (questions.length === 0) {
       questions.push({
         id: "response",
@@ -4850,16 +4846,16 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
       });
     }
     const result = yield* this.#requestUserInput("session/elicitation", { ...params, questions });
-    const answers = isRecord(result.answers) ? result.answers : null;
-    if (!answers) return { action: "decline" };
-    const content: Record<string, ElicitationContentValue> = {};
-    for (const [id, answerValue] of Object.entries(answers)) {
-      const answer = isRecord(answerValue) ? getArray(answerValue, "answers").filter(isString) : [];
-      if (answer.length === 0) continue;
-      content[id] = elicitationValue(isRecord(properties[id]) ? properties[id] : undefined, answer);
-    }
+    const answers = isRecord(result.answers)
+      ? Object.fromEntries(
+          Object.entries(result.answers).map(([id, answer]) => [
+            id,
+            isRecord(answer) ? getArray(answer, "answers").filter(isString) : [],
+          ]),
+        )
+      : null;
     return yield* providerCall(() =>
-      Object.keys(content).length > 0 ? { action: "accept", content } : { action: "decline" },
+      openCodeForm ? openCodeFormResult(params, answers) : elicitationFormResult(params, answers),
     );
   });
 
@@ -5014,6 +5010,20 @@ function printableInput(value: unknown): string | null {
 }
 
 type AcpToolCallUpdate = Extract<SessionUpdate, { sessionUpdate: "tool_call" | "tool_call_update" }>;
+
+/**
+ * Whether the call is the agent's own tool that asks the user with a form (`AcpFlavor.questionTool`).
+ * OpenCode's pending `tool_call` carries the tool name in `name` and the kind `other` (`pending_tool_call`
+ * in OpenCode's `packages/cli-rs/crates/acp/src/tools.rs`, v2.4.0). The fake `opencode acp` in
+ * `scripts/provider-fakes/agents/opencode-question.ts` sends the same shape.
+ */
+function asksUser(flavor: AcpFlavor, update: AcpToolCallUpdate): boolean {
+  return (
+    flavor.questionTool !== undefined &&
+    (update.name ?? update.title) === flavor.questionTool &&
+    (update.kind ?? "other") === "other"
+  );
+}
 
 function questionToolCallKey(sessionId: string, toolCallId: string): string {
   return JSON.stringify([sessionId, toolCallId]);
