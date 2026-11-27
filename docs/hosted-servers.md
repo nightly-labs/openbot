@@ -849,6 +849,25 @@ The unit (`openbot.service`):
   before main. The processes of the Electron binary do not change: Chromium sets the values of its
   renderers and GPU process, and its zygotes keep -500, because a new renderer starts from them.
 - `OOMPolicy=continue`: one killed agent process does not stop the unit.
+- `Delegate=yes` and `MemoryLow=15%`: the unit gets its own cgroup tree, and the kernel protects
+  15% of the memory from reclaim outside the unit. At the start, `openbot-hosted-server` moves every
+  process of the unit into the child cgroup `main` and makes an empty child cgroup `agents`. Then it
+  enables the `cpu`, `io` and `memory` controllers for the two children:
+
+  | Child | Setting |
+  | --- | --- |
+  | `main` | `cpu.weight` 100, `io.weight` 100, `memory.low` 15% of `MemoryMax` (at least 1 GiB) |
+  | `agents` | `cpu.weight` 20, `io.weight` 20, `memory.high` `MemoryMax` minus the `memory.low` of `main` (at least half of `MemoryMax`), `memory.swap.max` half of the swap |
+
+  The weights act only when the two children want more than the machine has. An idle server gives
+  a build all of the CPU. Above `memory.high`, the kernel takes memory back from the agents and
+  slows them; it does not stop them. Main, Xvfb, D-Bus, the keyring and the Electron processes
+  stay in `main`. So jobs of agents that fill the CPU, the disk or the swap slow down, and main
+  keeps answering. Without cgroup v2, without delegation, or in a unit with another name, the
+  launcher changes nothing, and the unit works as before. When a controller is missing, the log has
+  one line. `io.weight` acts only with an I/O scheduler that supports it (BFQ or `io.cost`).
+  `service_openbot` in the launcher compares the unit cgroup, without `/main` or `/.control`, so
+  the watchdog and `--stop` find main in its child cgroup.
 - `provision.sh` adds compressed swap (zram, half of the memory) when the kernel has the module.
   A Starter server then has 3.9 GB of memory and 3.9 GB of swap: the 2 GB file on disk and 1.9 GB of
   zram. zram keeps its pages compressed in the same memory, about 3 to 1 for program memory, so it
@@ -877,7 +896,10 @@ Agent processes (`AgentProcesses` in `src/main/server-memory.ts`):
   build whose parent the OOM killer stopped, leave main's tree: the kernel gives them to PID 1. The
   variable still finds them. Xvfb, D-Bus and the keyring start before main and do not have it.
 - Every 5 s, each marked process gets an `oom_score_adj` of at least 500, also after it leaves main's
-  tree, and each of its threads gets the nice value 10. Main and the Electron processes keep their
+  tree, and each of its threads gets the nice value 10. When main runs in the child cgroup `main`
+  of the unit, main also moves each new marked process into `agents`, one time. The programs that
+  the process starts after that are in `agents` from their start. `readCgroupRoot` gives the unit
+  cgroup, not `main`, so the memory guard and the machine metrics still read the limits of the unit. Main and the Electron processes keep their
   values. The Computer Use driver and remote desktop get the OOM value as children of main, but keep
   their nice value. So a full CPU slows the agents' builds and not main or the WebRTC host. Without
   this, a build with many workers took all the CPU and memory, main stopped answering, and the

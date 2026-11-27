@@ -1,4 +1,5 @@
-import { readdir, readFile, readlink, writeFile } from "node:fs/promises";
+import { constants } from "node:fs";
+import { access, readdir, readFile, readlink, writeFile } from "node:fs/promises";
 import { getPriority, setPriority } from "node:os";
 import { INPUT_LIMITS } from "@openbot/contracts/input-limits";
 import { Deferred, Effect, Schema } from "effect";
@@ -20,6 +21,9 @@ const AGENT_PROCESS_ENTRY = `\0${AGENT_PROCESS_VARIABLE}=1\0`;
 const AGENT_PROCESS_NICE = 10;
 const STOP_GRACE_MS = 5_000;
 const STOP_MIN_AGE_MS = 5_000;
+const SERVICE_CGROUP = "/openbot.service";
+const MAIN_CGROUP = "/main";
+const AGENT_CGROUP = "/agents";
 
 export interface ServerMemoryOptions {
   hostedPlan: boolean;
@@ -230,11 +234,28 @@ function parseMeminfo(text: string): MemorySample {
   return { total: kib("MemTotal"), available: kib("MemAvailable") };
 }
 
-export const readCgroupRoot = Effect.fn("ServerMemory.readCgroupRoot")(function* () {
+const readOwnCgroup = Effect.fn("ServerMemory.readOwnCgroup")(function* () {
   const cgroup = (yield* memoryIO(() => readFile("/proc/self/cgroup", "utf8")))
     .split("\n")
     .find((line) => line.startsWith("0::"));
-  return cgroup ? `/sys/fs/cgroup${cgroup.slice(3)}` : null;
+  return cgroup ? cgroup.slice(3) : null;
+});
+
+function splitServiceCgroup(path: string): string | null {
+  return path.endsWith(`${SERVICE_CGROUP}${MAIN_CGROUP}`) ? path.slice(0, -MAIN_CGROUP.length) : null;
+}
+
+export const readCgroupRoot = Effect.fn("ServerMemory.readCgroupRoot")(function* () {
+  const path = yield* readOwnCgroup();
+  return path === null ? null : `/sys/fs/cgroup${splitServiceCgroup(path) ?? path}`;
+});
+
+const readAgentCgroupProcs = Effect.fn("ServerMemory.readAgentCgroupProcs")(function* () {
+  const path = yield* readOwnCgroup();
+  const service = path === null ? null : splitServiceCgroup(path);
+  if (service === null) return null;
+  const procs = `/sys/fs/cgroup${service}${AGENT_CGROUP}/cgroup.procs`;
+  return (yield* optionalMemoryIO(() => access(procs, constants.W_OK))) === null ? null : procs;
 });
 
 const readUnitMemory = Effect.fn("ServerMemory.readUnit")(function* () {
@@ -269,15 +290,21 @@ interface Classification {
   marked: boolean;
   seenAt: number;
   parent: boolean;
+  grouped: boolean;
 }
 
 class AgentProcesses {
   readonly #known = new Map<number, Classification>();
+  #agentCgroupProcs: string | null | undefined;
   readonly #stopping = new Map<number, { start: string; at: number; killed: boolean }>();
 
   update = Effect.fn("ServerMemory.agentProcesses")(function* (this: AgentProcesses, neededBytes: number, now: number) {
     const electron = yield* optionalMemoryIO(() => readlink("/proc/self/exe"));
     if (electron === null) return [];
+    if (this.#agentCgroupProcs === undefined) {
+      this.#agentCgroupProcs = yield* readAgentCgroupProcs().pipe(Effect.catch(() => Effect.succeed(null)));
+    }
+    const agentCgroupProcs = this.#agentCgroupProcs;
     const entries = (yield* Effect.forEach(
       (yield* optionalMemoryIO(() => readdir("/proc"))) ?? [],
       (entry) => (/^\d+$/.test(entry) ? readProcessEntry(Number(entry)) : Effect.succeed(null)),
@@ -313,6 +340,7 @@ class AgentProcesses {
               marked: environment !== null && `\0${environment}`.includes(AGENT_PROCESS_ENTRY),
               seenAt: now,
               parent: false,
+              grouped: false,
             };
             this.#known.set(entry.pid, known);
           }
@@ -334,6 +362,10 @@ class AgentProcesses {
             yield* optionalMemoryIO(() => writeFile(path, String(CHILD_OOM_SCORE_ADJ)));
           }
           if (!known.marked) return;
+          if (agentCgroupProcs !== null && !known.grouped) {
+            known.grouped = true;
+            yield* optionalMemoryIO(() => writeFile(agentCgroupProcs, String(entry.pid)));
+          }
           for (const thread of (yield* optionalMemoryIO(() => readdir(`/proc/${entry.pid}/task`))) ?? []) {
             const tid = Number(thread);
             if ((optionalSync(() => getPriority(tid)) ?? AGENT_PROCESS_NICE) < AGENT_PROCESS_NICE) {

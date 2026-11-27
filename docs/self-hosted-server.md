@@ -189,7 +189,9 @@ one warning.
 
 Agent processes run at nice 10 with an OOM value of 500, also a job that an agent detaches. At the
 `critical` level, OpenBot stops leftover agent processes first. Node programs of agents see the CPU
-limit of the unit in `os.cpus()`. See [agent processes](hosted-servers.md#memory).
+limit of the unit in `os.cpus()`. With cgroup v2, agent processes also run in their own child cgroup
+of the unit, with a lower CPU and disk share and a memory limit below the one of the unit, so jobs
+of agents that fill the server do not stop OpenBot. See [agent processes](hosted-servers.md#memory).
 
 ## Display size
 
