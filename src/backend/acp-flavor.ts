@@ -445,10 +445,10 @@ function hermesProviderReason(error: { data: DynamicRecord }, answer: string): s
 
 function hermesFailureCause(error: unknown, answer: string): CauseCode | null {
   if (!hermesAdmittedTurnFailed(error)) return null;
-  const { failure_reason: reason, message } = error.data;
+  const reason = error.data.failure_reason;
   const named = typeof reason === "string" ? HERMES_FAILURE_REASONS[reason] : undefined;
   if (named) return named;
-  const said = HERMES_FAILURE_SUMMARY.exec(typeof message === "string" && message ? message : answer)?.[1];
+  const said = hermesProviderReason(error, answer);
   const cause = said ? classifyFailure(said) : "unknown";
   return cause === "unknown" ? null : cause;
 }
