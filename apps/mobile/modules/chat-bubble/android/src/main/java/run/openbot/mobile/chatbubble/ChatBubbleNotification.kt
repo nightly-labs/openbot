@@ -42,8 +42,9 @@ object ChatBubbleNotification {
       return false
     }
     if (json.optInt("version") != 1 || !json.optBoolean("enabled")) return false
+    // A file without the list allows every agent. An empty list allows none, because the app
+    // writes the agents that have a bubble and it has none before the agents load.
     val agents = json.optJSONArray("agents") ?: return true
-    if (agents.length() == 0) return true
     val key = "$serverId:$agentId"
     return (0 until agents.length()).any { agents.optString(it) == key }
   }
