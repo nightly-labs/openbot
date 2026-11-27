@@ -1,4 +1,5 @@
 import { UI_BLOCK_PREVIEW_EDIT_CAPABILITY } from "@openbot/contracts/team-protocol/ui-block-preview-edit-v1";
+import { withWholePromptText } from "@openbot/team-client/runtime-attention";
 import type { QuestionPromptComposerAnswer } from "@openbot/ui/components/QuestionPromptBubble";
 import { createMemo, Loading, Show } from "solid-js";
 import { deviceSendShortcut } from "../../send-shortcut-preference";
@@ -33,9 +34,11 @@ export function ConversationQuestionPrompt(props: {
   return (
     <Show when={keyedPrompt()} keyed>
       {(entry) => {
+        let shown = entry.prompt;
         const shownQuestions = () => {
           const latest = view.prompt;
-          return latest && promptKey(latest) === entry.key ? latest.questions : entry.prompt.questions;
+          if (latest && promptKey(latest) === entry.key) shown = withWholePromptText(shown, latest.questions);
+          return shown.questions;
         };
         const presentResolution = () =>
           view.onPromptResolutionPresented?.(entry.prompt.agentId, entry.prompt.turnId, entry.prompt.requestId);
