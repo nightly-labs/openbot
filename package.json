@@ -459,6 +459,7 @@
     "test:watch-sessions": "bun apps/auth-api/scripts/watch-sessions-e2e.ts",
     "test:watch-relay-host": "bun scripts/watch-relay-host-e2e.ts",
     "test:watch-crypto-interop": "bun scripts/watch-crypto-interop-e2e.ts",
+    "test:signal-revoked-session": "bun scripts/signal-revoked-session-e2e.ts",
     "test:conversation-ownership": "bun scripts/conversation-ownership-e2e.ts",
     "test:remote-protocol": "bun remote/scripts/protocol-e2e.ts",
     "test:ipc-input": "bun scripts/ipc-input-e2e.ts",
