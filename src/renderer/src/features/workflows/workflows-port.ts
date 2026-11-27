@@ -103,7 +103,7 @@ export function libraryPictures(usage: StorageUsage | null, clips: boolean): rea
 export function checkPicture(file: File, maxBytes: number, clips: boolean): string {
   const { t } = currentText();
   const mimeType = workflowAssetType(file, clips);
-  if (!mimeType) throw new Error(t("error.workflow.assetType"));
+  if (!mimeType) throw new Error(t(clips ? "error.workflow.assetType" : "error.workflow.pictureType"));
   if (file.size > maxBytes) throw new Error(t("error.attachment.fileTooLarge"));
   return mimeType;
 }

@@ -2236,7 +2236,8 @@ export function WorkflowCanvas(props: WorkflowCanvasProps) {
   const takesFile = (file: File) => !props.catalogs.upload || workflowAssetType(file, clipsOn()) !== null;
   const takenFiles = (files: readonly File[]) => {
     const taken = files.filter(takesFile);
-    if (taken.length < files.length) toast.error(t("error.workflow.assetType"));
+    if (taken.length < files.length)
+      toast.error(t(clipsOn() ? "error.workflow.assetType" : "error.workflow.pictureType"));
     return taken;
   };
   const uploadAll = (files: readonly File[]) =>
