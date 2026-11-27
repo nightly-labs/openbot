@@ -1034,13 +1034,14 @@ export class TurnLifecycle {
       });
       return false;
     }
-    const teammateResults = deliveries.every(({ delivery }) => answeredRequestId(delivery) !== null);
+    const teammateResults = deliveries.every(({ delivery }) => teammateReply(delivery));
     if (teammateResults && this.#awaitsTeammateInOwnLane(agentId, threadId, snapshot.threadId)) {
       logger.info("A turn for a teammate result ended with no answer while a teammate still works.", {
         agentId,
         turnId,
         provider: source.provider,
       });
+      dropEmptyAttempts(messages, turnId);
       return false;
     }
     if (!NO_ANSWER_CHECKED_PROVIDERS.has(source.provider)) return false;
@@ -1050,6 +1051,7 @@ export class TurnLifecycle {
         turnId,
         provider: source.provider,
       });
+      dropEmptyAttempts(messages, turnId);
       return false;
     }
     if (deliveries.every(replaysStartedResult)) {
@@ -1154,11 +1156,7 @@ export class TurnLifecycle {
     const narration = messages.find((message) => message.id === narrationId && message.turnId === turnId);
     if (narration?.itemType !== "commentary" || !narration.text.trim()) return false;
     narration.itemType = "final_answer";
-    for (let index = messages.length - 1; index >= 0; index -= 1) {
-      const message = messages[index];
-      const row = message?.itemType === "final_answer" ? { ...message, itemType: "agentMessage" } : message;
-      if (isEmptyAttemptText(row, turnId)) messages.splice(index, 1);
-    }
+    dropEmptyAttempts(messages, turnId);
     return true;
   }
 
@@ -2421,9 +2419,7 @@ export class TurnLifecycle {
           this.#conversation.channelForThread(snapshot.threadId) === null &&
           (tokenRefused ||
             (failover.context.causeCode === "empty_answer" &&
-              deliveries.every(
-                ({ delivery }) => delivery.sender.kind === "agent" && Boolean(delivery.replyToMessageId),
-              ))));
+              deliveries.every(({ delivery }) => teammateReply(delivery)))));
       const continuedWork = Effect.gen({ self: this }, function* () {
         const workSteps = running
           ? yield* readCapturedSteps(running.client, threadId, turnId).pipe(
@@ -3776,6 +3772,18 @@ function dropPlaceholderAnswers(snapshot: ConversationSnapshot, turnId: string):
     if (message.attachments?.length || message.imageGeneration || message.videoGeneration) continue;
     if (!message.text.trim() || /[\p{L}\p{N}]/u.test(message.text)) continue;
     snapshot.messages.splice(index, 1);
+  }
+}
+
+function teammateReply(delivery: QueueDelivery): boolean {
+  return delivery.sender.kind === "agent" && Boolean(delivery.replyToMessageId);
+}
+
+function dropEmptyAttempts(messages: ConversationMessage[], turnId: string): void {
+  for (let index = messages.length - 1; index >= 0; index -= 1) {
+    const message = messages[index];
+    const row = message?.itemType === "final_answer" ? { ...message, itemType: "agentMessage" } : message;
+    if (isEmptyAttemptText(row, turnId)) messages.splice(index, 1);
   }
 }
 
