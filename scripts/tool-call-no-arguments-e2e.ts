@@ -13,7 +13,7 @@ import { LocalMcpBridge, type LocalMcpSession } from "../src/backend/local-mcp-b
 import type { DynamicToolCallParams } from "../src/backend/protocol";
 
 const OUT = resolve(import.meta.dirname, "../.openbot-build/tool-call-no-arguments-e2e");
-const PROVIDERS: readonly AgentProviderId[] = ["acp", "opencode"];
+const PROVIDERS: readonly AgentProviderId[] = ["acp", "opencode", "kimi"];
 const NAME_ONLY_CALL = { name: "openbot.read_agent" };
 
 interface ProviderReport {
@@ -58,7 +58,7 @@ async function connect(session: LocalMcpSession): Promise<Client> {
 }
 
 function strictInputCheck(inputSchema: JsonSchema.JsonSchema, input: unknown): string {
-  const document = JsonSchema.fromSchemaDraft2020_12(inputSchema);
+  const document = JsonSchema.fromSchemaDraft07(inputSchema);
   const codec = Schema.make<Schema.Codec<unknown>>(SchemaRepresentation.fromJsonSchemaDocument(document).ast);
   const decoded = Schema.decodeUnknownResult(codec)(input, { errors: "all" });
   return Result.isSuccess(decoded) ? "accepted" : `refused: ${String(decoded.failure)}`;
