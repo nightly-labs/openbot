@@ -17,6 +17,7 @@ import {
   type ProviderCodeLoginStart,
   type ProviderHostSignInStatus,
   type ProviderRelaySignInStatus,
+  type ProviderUsageResetCredit,
   type ProviderUsageResetOutcome,
   type ProviderUsageResets,
 } from "./ipc-agent-status";
@@ -170,6 +171,30 @@ export function decodeHostProviderAccountUsage(value: unknown): AccountUsage {
   return value;
 }
 
+function decodeProviderUsageResetCredits(value: unknown): ProviderUsageResetCredit[] | undefined {
+  if (value === undefined) return undefined;
+  if (!Array.isArray(value)) throw new Error("Invalid provider usage resets.");
+  return value.map((item: unknown) => {
+    if (
+      !isDynamicRecord(item) ||
+      typeof item.id !== "string" ||
+      !item.id ||
+      !isNumber(item.grantedAt) ||
+      !Number.isFinite(item.grantedAt) ||
+      (item.expiresAt !== null && (!isNumber(item.expiresAt) || !Number.isFinite(item.expiresAt)))
+    ) {
+      throw new Error("Invalid provider usage resets.");
+    }
+    return {
+      id: item.id,
+      grantedAt: item.grantedAt,
+      expiresAt: item.expiresAt,
+      ...(typeof item.title === "string" || item.title === null ? { title: item.title } : {}),
+      ...(typeof item.description === "string" || item.description === null ? { description: item.description } : {}),
+    };
+  });
+}
+
 export function decodeProviderUsageResets(value: unknown): ProviderUsageResets[] {
   const invalid = () => new Error("Invalid provider usage resets.");
   if (!Array.isArray(value)) throw invalid();
@@ -182,8 +207,9 @@ export function decodeProviderUsageResets(value: unknown): ProviderUsageResets[]
       row.available < 0
     )
       throw invalid();
+    const credits = decodeProviderUsageResetCredits(row.credits);
     return isAgentProvider(row.provider)
-      ? [{ provider: row.provider, accountId: row.accountId, available: row.available }]
+      ? [{ provider: row.provider, accountId: row.accountId, available: row.available, ...(credits ? { credits } : {}) }]
       : [];
   });
 }

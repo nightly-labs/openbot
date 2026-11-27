@@ -245,6 +245,8 @@ export const messages = {
     other:
       "Isso usa 1 dos seus {count} créditos de redefinição de uso. Os limites de uso esgotados desta conta recomeçam agora. Você não pode desfazer isso.",
   },
+  "provider.account.resetUsageCreditDates": "Criado em {created} · Expira em {expires}",
+  "provider.account.resetUsageCreditNoExpiry": "Sem expiração",
   "provider.account.resetUsagePending": "Redefinindo…",
   "provider.account.resetUsageDone": "Os limites de uso de {name} recomeçam agora.",
   "provider.account.resetUsageNothing": "{name} não tem limite de uso esgotado. Nenhum crédito foi usado.",

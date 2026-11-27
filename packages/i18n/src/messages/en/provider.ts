@@ -256,6 +256,8 @@ export const messages = defineMessages("provider", {
     other:
       "This uses 1 of your {count} usage reset credits. The spent usage limits of this account start again now. You cannot undo this.",
   },
+  "provider.account.resetUsageCreditDates": "Created {created} · Expires {expires}",
+  "provider.account.resetUsageCreditNoExpiry": "No expiration",
   "provider.account.resetUsagePending": "Resetting…",
   "provider.account.resetUsageDone": "The usage limits of {name} start again now.",
   "provider.account.resetUsageNothing": "{name} has no spent usage limit. No credit was used.",

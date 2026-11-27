@@ -791,8 +791,33 @@ function AccountsSection(props: SectionProps) {
     ],
     readUsageResets,
   );
-  const resetsLeft = (accountId: string) =>
-    usageResets().find((reading) => reading.accountId === accountId)?.available ?? 0;
+  const resetReading = (accountId: string) =>
+    usageResets().find((reading) => reading.accountId === accountId);
+  const resetsLeft = (accountId: string) => resetReading(accountId)?.available ?? 0;
+  const resetCreditDateText = (seconds: number) =>
+    format.date(new Date(seconds * 1_000), {
+      month: "short",
+      day: "numeric",
+      year: "numeric",
+      hour: "numeric",
+      minute: "2-digit",
+    });
+  const resetDescription = (accountId: string) => {
+    const reading = resetReading(accountId);
+    const base = t("provider.account.resetUsageDescription", { count: reading?.available ?? 0 });
+    const credits = reading?.credits ?? [];
+    if (credits.length === 0) return base;
+    const lines = credits.map((credit) =>
+      t("provider.account.resetUsageCreditDates", {
+        created: resetCreditDateText(credit.grantedAt),
+        expires:
+          credit.expiresAt === null
+            ? t("provider.account.resetUsageCreditNoExpiry")
+            : resetCreditDateText(credit.expiresAt),
+      }),
+    );
+    return `${base}\n${lines.join("\n")}`;
+  };
   const resetUsage = async (target: ProviderPickerAccount) => {
     const name = providerAccountName(t, accounts(), target.id);
     setError(null);
@@ -1015,9 +1040,7 @@ function AccountsSection(props: SectionProps) {
         title={t("provider.account.resetUsageTitle", {
           name: resetting() ? providerAccountName(t, accounts(), resetting()?.id ?? "") : "",
         })}
-        description={t("provider.account.resetUsageDescription", {
-          count: resetsLeft(resetting()?.id ?? ""),
-        })}
+        description={resetting() ? resetDescription(resetting()?.id ?? "") : ""}
         confirmLabel={t("provider.account.resetUsage")}
         pendingLabel={t("provider.account.resetUsagePending")}
         initialFocus="cancel"
@@ -1195,6 +1218,18 @@ function AccountRow(
           <Badge variant="success-light">{t("provider.account.inUse")}</Badge>
         </Show>
         <Show when={usage()}>{(reading) => <UsageBadge reading={reading()} name={name()} />}</Show>
+        <Show when={state() === "connected" && !apiKey() && !keyAccount() && props.resetsLeft > 0}>
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            disabled={props.disabled}
+            onClick={() => props.onResetUsage()}
+          >
+            <Gauge aria-hidden="true" />
+            {t("provider.account.resetUsage")}
+          </Button>
+        </Show>
         <Show when={signInAgain()}>
           <Button
             type="button"
