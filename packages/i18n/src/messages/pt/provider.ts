@@ -185,9 +185,9 @@ export const messages = {
   "provider.claudeKey.label": "Chave de API da Anthropic",
   "provider.cursorKey.title": "Chave de API do Cursor",
   "provider.cursorKey.description":
-    "Cada conta do Cursor depois da primeira usa uma chave de API. Crie uma chave no painel do Cursor, em Integrations, e cole aqui. A chave é salva neste computador.",
+    "Cada conta do Cursor depois da primeira usa uma chave de API. Crie uma chave no painel do Cursor, em API Keys (cursor.com/dashboard/api), e cole aqui. A chave é salva neste computador.",
   "provider.cursorKey.descriptionHost":
-    "Cada conta do Cursor depois da primeira usa uma chave de API. Crie uma chave no painel do Cursor, em Integrations, e cole aqui. A chave é salva no computador anfitrião.",
+    "Cada conta do Cursor depois da primeira usa uma chave de API. Crie uma chave no painel do Cursor, em API Keys (cursor.com/dashboard/api), e cole aqui. A chave é salva no computador anfitrião.",
   "provider.cursorKey.label": "Chave de API do Cursor",
   "provider.inceptionKey.title": "Chave de API da Inception",
   "provider.inceptionKey.description":

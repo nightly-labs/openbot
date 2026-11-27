@@ -197,9 +197,9 @@ export const messages = {
   "provider.claudeKey.label": "Anthropic-API-Schlüssel",
   "provider.cursorKey.title": "Cursor-API-Schlüssel",
   "provider.cursorKey.description":
-    "Jedes Cursor-Konto nach dem ersten verwendet einen API-Schlüssel. Erstelle einen Schlüssel im Cursor-Dashboard unter Integrations und füge ihn hier ein. Der Schlüssel wird auf diesem Computer gespeichert.",
+    "Jedes Cursor-Konto nach dem ersten verwendet einen API-Schlüssel. Erstelle einen Schlüssel im Cursor-Dashboard unter API Keys (cursor.com/dashboard/api) und füge ihn hier ein. Der Schlüssel wird auf diesem Computer gespeichert.",
   "provider.cursorKey.descriptionHost":
-    "Jedes Cursor-Konto nach dem ersten verwendet einen API-Schlüssel. Erstelle einen Schlüssel im Cursor-Dashboard unter Integrations und füge ihn hier ein. Der Schlüssel wird auf dem Host gespeichert.",
+    "Jedes Cursor-Konto nach dem ersten verwendet einen API-Schlüssel. Erstelle einen Schlüssel im Cursor-Dashboard unter API Keys (cursor.com/dashboard/api) und füge ihn hier ein. Der Schlüssel wird auf dem Host gespeichert.",
   "provider.cursorKey.label": "Cursor-API-Schlüssel",
   "provider.inceptionKey.title": "Inception-API-Schlüssel",
   "provider.inceptionKey.description":

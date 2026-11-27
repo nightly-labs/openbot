@@ -196,9 +196,9 @@ export const messages = defineMessages("provider", {
   "provider.codexKey.label": "OpenAI API key",
   "provider.cursorKey.title": "Cursor API key",
   "provider.cursorKey.description":
-    "Each Cursor account after the first uses an API key. Make a key in the Cursor dashboard, under Integrations, and paste it here. The key is saved on this computer.",
+    "Each Cursor account after the first uses an API key. Make a key in the Cursor dashboard, under API Keys (cursor.com/dashboard/api), and paste it here. The key is saved on this computer.",
   "provider.cursorKey.descriptionHost":
-    "Each Cursor account after the first uses an API key. Make a key in the Cursor dashboard, under Integrations, and paste it here. The key is saved on the host.",
+    "Each Cursor account after the first uses an API key. Make a key in the Cursor dashboard, under API Keys (cursor.com/dashboard/api), and paste it here. The key is saved on the host.",
   "provider.cursorKey.label": "Cursor API key",
   "provider.inceptionKey.title": "Inception API key",
   "provider.inceptionKey.description":

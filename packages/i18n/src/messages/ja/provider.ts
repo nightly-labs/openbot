@@ -193,9 +193,9 @@ export const messages = {
   "provider.claudeKey.label": "Anthropic API キー",
   "provider.cursorKey.title": "Cursor API キー",
   "provider.cursorKey.description":
-    "2 つ目以降の Cursor アカウントは API キーを使います。Cursor ダッシュボードの Integrations でキーを作成し、ここに貼り付けてください。キーはこのコンピューターに保存されます。",
+    "2 つ目以降の Cursor アカウントは API キーを使います。Cursor ダッシュボードの API Keys (cursor.com/dashboard/api) でキーを作成し、ここに貼り付けてください。キーはこのコンピューターに保存されます。",
   "provider.cursorKey.descriptionHost":
-    "2 つ目以降の Cursor アカウントは API キーを使います。Cursor ダッシュボードの Integrations でキーを作成し、ここに貼り付けてください。キーはホストに保存されます。",
+    "2 つ目以降の Cursor アカウントは API キーを使います。Cursor ダッシュボードの API Keys (cursor.com/dashboard/api) でキーを作成し、ここに貼り付けてください。キーはホストに保存されます。",
   "provider.cursorKey.label": "Cursor API キー",
   "provider.inceptionKey.title": "Inception API キー",
   "provider.inceptionKey.description":

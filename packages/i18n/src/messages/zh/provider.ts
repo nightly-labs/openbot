@@ -184,9 +184,9 @@ export const messages = {
   "provider.geminiKey.label": "Gemini API 密钥",
   "provider.cursorKey.title": "Cursor API 密钥",
   "provider.cursorKey.description":
-    "第一个之后的每个 Cursor 账号都使用 API 密钥。在 Cursor 控制台的 Integrations 中创建密钥，然后粘贴到这里。密钥保存在这台电脑上。",
+    "第一个之后的每个 Cursor 账号都使用 API 密钥。在 Cursor 控制台的 API Keys (cursor.com/dashboard/api) 中创建密钥，然后粘贴到这里。密钥保存在这台电脑上。",
   "provider.cursorKey.descriptionHost":
-    "第一个之后的每个 Cursor 账号都使用 API 密钥。在 Cursor 控制台的 Integrations 中创建密钥，然后粘贴到这里。密钥保存在主机上。",
+    "第一个之后的每个 Cursor 账号都使用 API 密钥。在 Cursor 控制台的 API Keys (cursor.com/dashboard/api) 中创建密钥，然后粘贴到这里。密钥保存在主机上。",
   "provider.cursorKey.label": "Cursor API 密钥",
   "provider.inceptionKey.title": "Inception API 密钥",
   "provider.inceptionKey.description":

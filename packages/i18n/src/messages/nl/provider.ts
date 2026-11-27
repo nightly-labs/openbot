@@ -184,9 +184,9 @@ export const messages = {
   "provider.claudeKey.label": "Anthropic-API-sleutel",
   "provider.cursorKey.title": "Cursor-API-sleutel",
   "provider.cursorKey.description":
-    "Elk Cursor-account na het eerste gebruikt een API-sleutel. Maak een sleutel in het Cursor-dashboard, onder Integrations, en plak die hier. De sleutel wordt op deze computer opgeslagen.",
+    "Elk Cursor-account na het eerste gebruikt een API-sleutel. Maak een sleutel in het Cursor-dashboard, onder API Keys (cursor.com/dashboard/api), en plak die hier. De sleutel wordt op deze computer opgeslagen.",
   "provider.cursorKey.descriptionHost":
-    "Elk Cursor-account na het eerste gebruikt een API-sleutel. Maak een sleutel in het Cursor-dashboard, onder Integrations, en plak die hier. De sleutel wordt op de host opgeslagen.",
+    "Elk Cursor-account na het eerste gebruikt een API-sleutel. Maak een sleutel in het Cursor-dashboard, onder API Keys (cursor.com/dashboard/api), en plak die hier. De sleutel wordt op de host opgeslagen.",
   "provider.cursorKey.label": "Cursor-API-sleutel",
   "provider.inceptionKey.title": "Inception-API-sleutel",
   "provider.inceptionKey.description":

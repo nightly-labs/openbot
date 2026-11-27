@@ -212,9 +212,9 @@ export const messages = {
   "provider.codexKey.label": "مفتاح OpenAI API",
   "provider.cursorKey.title": "مفتاح Cursor API",
   "provider.cursorKey.description":
-    "كل حساب Cursor بعد الأول يستخدم مفتاح API. أنشئ مفتاحًا في لوحة تحكم Cursor ضمن Integrations، ثم الصقه هنا. يُحفظ المفتاح على هذا الحاسوب.",
+    "كل حساب Cursor بعد الأول يستخدم مفتاح API. أنشئ مفتاحًا في لوحة تحكم Cursor ضمن API Keys (cursor.com/dashboard/api)، ثم الصقه هنا. يُحفظ المفتاح على هذا الحاسوب.",
   "provider.cursorKey.descriptionHost":
-    "كل حساب Cursor بعد الأول يستخدم مفتاح API. أنشئ مفتاحًا في لوحة تحكم Cursor ضمن Integrations، ثم الصقه هنا. يُحفظ المفتاح على المضيف.",
+    "كل حساب Cursor بعد الأول يستخدم مفتاح API. أنشئ مفتاحًا في لوحة تحكم Cursor ضمن API Keys (cursor.com/dashboard/api)، ثم الصقه هنا. يُحفظ المفتاح على المضيف.",
   "provider.cursorKey.label": "مفتاح Cursor API",
   "provider.inceptionKey.title": "مفتاح Inception API",
   "provider.inceptionKey.description":

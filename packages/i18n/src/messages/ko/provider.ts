@@ -191,9 +191,9 @@ export const messages = {
   "provider.claudeKey.label": "Anthropic API 키",
   "provider.cursorKey.title": "Cursor API 키",
   "provider.cursorKey.description":
-    "두 번째부터의 Cursor 계정은 API 키를 사용해요. Cursor 대시보드의 Integrations에서 키를 만들어 여기에 붙여넣으세요. 키는 이 컴퓨터에 저장돼요.",
+    "두 번째부터의 Cursor 계정은 API 키를 사용해요. Cursor 대시보드의 API Keys (cursor.com/dashboard/api)에서 키를 만들어 여기에 붙여넣으세요. 키는 이 컴퓨터에 저장돼요.",
   "provider.cursorKey.descriptionHost":
-    "두 번째부터의 Cursor 계정은 API 키를 사용해요. Cursor 대시보드의 Integrations에서 키를 만들어 여기에 붙여넣으세요. 키는 호스트에 저장돼요.",
+    "두 번째부터의 Cursor 계정은 API 키를 사용해요. Cursor 대시보드의 API Keys (cursor.com/dashboard/api)에서 키를 만들어 여기에 붙여넣으세요. 키는 호스트에 저장돼요.",
   "provider.cursorKey.label": "Cursor API 키",
   "provider.inceptionKey.title": "Inception API 키",
   "provider.inceptionKey.description":

@@ -192,9 +192,9 @@ export const messages = {
   "provider.claudeKey.label": "Anthropic API anahtarı",
   "provider.cursorKey.title": "Cursor API anahtarı",
   "provider.cursorKey.description":
-    "İlkinden sonraki her Cursor hesabı bir API anahtarı kullanır. Cursor panelinde, Integrations bölümünde bir anahtar oluşturun ve buraya yapıştırın. Anahtar bu bilgisayara kaydedilir.",
+    "İlkinden sonraki her Cursor hesabı bir API anahtarı kullanır. Cursor panelinde, API Keys (cursor.com/dashboard/api) bölümünde bir anahtar oluşturun ve buraya yapıştırın. Anahtar bu bilgisayara kaydedilir.",
   "provider.cursorKey.descriptionHost":
-    "İlkinden sonraki her Cursor hesabı bir API anahtarı kullanır. Cursor panelinde, Integrations bölümünde bir anahtar oluşturun ve buraya yapıştırın. Anahtar ana makineye kaydedilir.",
+    "İlkinden sonraki her Cursor hesabı bir API anahtarı kullanır. Cursor panelinde, API Keys (cursor.com/dashboard/api) bölümünde bir anahtar oluşturun ve buraya yapıştırın. Anahtar ana makineye kaydedilir.",
   "provider.cursorKey.label": "Cursor API anahtarı",
   "provider.inceptionKey.title": "Inception API anahtarı",
   "provider.inceptionKey.description":
