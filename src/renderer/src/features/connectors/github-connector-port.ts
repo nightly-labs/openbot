@@ -11,25 +11,53 @@ export function githubConnectorPort(): GitHubConnectorPort {
 }
 
 const HOST_POLL_MS = 2_000;
+const HOST_POLL_FAILURE_LIMIT = 450;
 
 export function polledGitHubConnectorPort(actions: Omit<GitHubConnectorPort, "onChanged">): GitHubConnectorPort {
   const listeners = new Set<(status: GitHubConnectorStatus) => void>();
   let timer: ReturnType<typeof setTimeout> | null = null;
+  let pending = false;
+  let failures = 0;
+  let generation = 0;
   const stop = () => {
     if (timer !== null) clearTimeout(timer);
     timer = null;
   };
+  const schedule = () => {
+    if (!pending || timer !== null || listeners.size === 0 || failures >= HOST_POLL_FAILURE_LIMIT) return;
+    const read = generation;
+    timer = setTimeout(() => {
+      timer = null;
+      void actions.status().then(
+        (status) => {
+          if (read === generation) seen(status);
+        },
+        () => {
+          if (read !== generation) return;
+          failures += 1;
+          schedule();
+        },
+      );
+    }, HOST_POLL_MS);
+  };
   const seen = (status: GitHubConnectorStatus) => {
     for (const listener of listeners) listener(status);
-    if (status.state !== "pending") stop();
-    else if (timer === null && listeners.size > 0)
-      timer = setTimeout(() => {
-        timer = null;
-        void actions.status().then(seen, () => undefined);
-      }, HOST_POLL_MS);
+    pending = status.state === "pending";
+    failures = 0;
+    if (pending) schedule();
+    else stop();
     return status;
   };
-  const tracked = (action: () => Promise<GitHubConnectorStatus>) => async () => seen(await action());
+  const tracked = (action: () => Promise<GitHubConnectorStatus>) => async () => {
+    generation += 1;
+    stop();
+    try {
+      return seen(await action());
+    } catch (error) {
+      schedule();
+      throw error;
+    }
+  };
   return {
     ...actions,
     status: tracked(actions.status),
