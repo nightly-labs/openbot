@@ -74,7 +74,8 @@ export function recoveryAttempt(status: RemoteRecoveryStatus): number {
 }
 
 export function recoveryCountdown(status: RemoteRecoveryStatus): number | null {
-  return status.remainingSeconds > 0 ? status.remainingSeconds : null;
+  const waitingForRetry = status.phase === "waiting" || status.phase === "cooldown";
+  return waitingForRetry && status.remainingSeconds > 0 ? status.remainingSeconds : null;
 }
 
 export function serverKind(hostId: string, pairedHostId: string | undefined): MobileServer["kind"] {
