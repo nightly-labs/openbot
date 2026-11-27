@@ -325,7 +325,6 @@ interface MessageRowShared {
   animationActive: boolean;
   playbackActive: boolean;
   screenReaderEnabled: boolean;
-  textReveal: boolean;
   replySession: { progress: Map<string, number>; revealed: Set<string> };
   markRevealed: (id: string) => void;
   replyHaptics: ReturnType<typeof useReplyHaptics>;
@@ -1725,7 +1724,6 @@ export const ChatMessageList = memo(function ChatMessageList({
       animationActive,
       playbackActive: animationActive && textReveal && !screenReaderEnabled,
       screenReaderEnabled,
-      textReveal,
       replySession,
       markRevealed,
       replyHaptics,

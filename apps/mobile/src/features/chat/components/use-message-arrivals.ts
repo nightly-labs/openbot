@@ -1,9 +1,9 @@
 import { createContext, useContext, useEffect, useMemo, useRef, useState } from "react";
 import type { ChatMessage } from "@/features/chat/model/chat-messages";
 
-export const ENTRANCE_FRESH_MS = 3000;
+const ENTRANCE_FRESH_MS = 3000;
 
-export interface ArrivalSnapshot {
+interface ArrivalSnapshot {
   agentId: string;
   messages: readonly ChatMessage[];
   enabled: boolean;
@@ -12,16 +12,16 @@ export interface ArrivalSnapshot {
   entered: Set<string>;
 }
 
-export interface ArrivalEntrances {
+interface ArrivalEntrances {
   fresh: (id: string) => boolean;
   played: (id: string) => void;
 }
 
-export function firstArrivals(agentId: string, messages: readonly ChatMessage[], enabled: boolean): ArrivalSnapshot {
+function firstArrivals(agentId: string, messages: readonly ChatMessage[], enabled: boolean): ArrivalSnapshot {
   return { agentId, messages, enabled, arriving: new Set(), arrivedAt: new Map(), entered: new Set() };
 }
 
-export function nextArrivals(
+function nextArrivals(
   snapshot: ArrivalSnapshot,
   agentId: string,
   messages: readonly ChatMessage[],
@@ -73,7 +73,7 @@ export function nextArrivals(
   };
 }
 
-export function entranceFresh(snapshot: ArrivalSnapshot, id: string, now: number): boolean {
+function entranceFresh(snapshot: ArrivalSnapshot, id: string, now: number): boolean {
   if (!snapshot.arriving.has(id) || snapshot.entered.has(id)) return false;
   const at = snapshot.arrivedAt.get(id);
   return at !== undefined && now - at < ENTRANCE_FRESH_MS;
