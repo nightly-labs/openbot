@@ -111,6 +111,246 @@ textarea:focus-visible {
   font-size: 14px;
 }
 
+.ext-connect {
+  display: flex;
+  height: 100%;
+  flex-direction: column;
+  padding: 0 12px 0 8px;
+}
+
+.ext-connect-head {
+  display: flex;
+  min-height: 56px;
+  align-items: center;
+  gap: 12px;
+  padding: 16px 0 4px 12px;
+}
+
+.ext-connect-head-mark {
+  width: 48px;
+  height: 48px;
+  flex: none;
+}
+
+.ext-connect-text {
+  display: flex;
+  min-width: 0;
+  flex: 1;
+  flex-direction: column;
+}
+
+.ext-connect-title,
+.ext-connect-row-name,
+.ext-connect-account-name,
+.ext-connect-account-email {
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.ext-connect-title {
+  margin: 0;
+  color: var(--openbot-text-primary);
+  font-size: 26px;
+  font-weight: var(--openbot-weight-bold);
+  line-height: 32px;
+  letter-spacing: -0.52px;
+}
+
+.ext-connect-caption {
+  margin: 0;
+  color: var(--openbot-text-secondary);
+  font-size: 13px;
+  line-height: 18px;
+}
+
+.ext-connect-caption[data-failed] {
+  color: var(--openbot-danger);
+}
+
+.ext-connect-row .ext-connect-caption {
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.ext-connect-icon-button {
+  display: grid;
+  width: 36px;
+  height: 36px;
+  flex: none;
+  place-items: center;
+  border: 0;
+  border-radius: var(--openbot-radius-pill);
+  background: var(--ext-control);
+  color: var(--openbot-text-muted);
+  cursor: pointer;
+  transition: background-color 150ms ease-out;
+}
+
+.ext-connect-icon-button:hover {
+  background: var(--ext-control-active);
+}
+
+.ext-connect-rows {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  margin: 0;
+  padding: 8px 0 0;
+  overflow-y: auto;
+  list-style: none;
+}
+
+.ext-connect-row {
+  display: flex;
+  width: 100%;
+  height: 60px;
+  align-items: center;
+  gap: 12px;
+  margin: 2px 0;
+  border: 0;
+  padding: 0 12px;
+  border-radius: 16px;
+  background: transparent;
+  color: var(--openbot-text-primary);
+  cursor: pointer;
+  text-align: start;
+  transition: background-color 150ms ease-out;
+}
+
+.ext-connect-row:hover {
+  background: color-mix(in srgb, var(--ext-control) 60%, transparent);
+}
+
+.ext-connect-row:active {
+  opacity: 0.58;
+}
+
+.ext-connect-row[aria-current="true"] {
+  background: var(--ext-control);
+}
+
+.ext-connect-row-mark {
+  width: 40px;
+  height: 40px;
+  flex: none;
+}
+
+.ext-connect-row-name {
+  font-size: 16px;
+  font-weight: var(--openbot-weight-medium);
+  line-height: 21px;
+}
+
+.ext-connect-row[aria-current="true"] .ext-connect-row-name {
+  color: var(--openbot-text-secondary);
+}
+
+.ext-connect-account {
+  display: flex;
+  min-height: 56px;
+  align-items: center;
+  gap: 10px;
+  margin: 0 0 8px;
+  border-top: 1px solid var(--openbot-border);
+  padding: 16px 0 8px 12px;
+}
+
+.ext-connect-avatar {
+  display: grid;
+  width: 36px;
+  height: 36px;
+  flex: none;
+  place-items: center;
+  overflow: hidden;
+  border-radius: 50%;
+  background: var(--ext-control-active);
+  color: var(--openbot-text-secondary);
+  font-size: 12px;
+  font-weight: var(--openbot-weight-semibold);
+}
+
+.ext-connect-avatar img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.ext-connect-account-name {
+  color: var(--openbot-text-primary);
+  font-size: 14px;
+  font-weight: var(--openbot-weight-semibold);
+  line-height: 19px;
+}
+
+.ext-connect-account-email {
+  color: var(--openbot-text-secondary);
+  font-size: 12.5px;
+  line-height: 16px;
+}
+
+.ext-connect-pill {
+  display: flex;
+  height: 32px;
+  flex: none;
+  align-items: center;
+  gap: 6px;
+  border: 0;
+  padding: 0 12px;
+  border-radius: var(--openbot-radius-pill);
+  background: var(--ext-control);
+  color: var(--openbot-text-primary);
+  cursor: pointer;
+  font-size: 13px;
+  font-weight: var(--openbot-weight-medium);
+  transition: background-color 150ms ease-out;
+}
+
+.ext-connect-pill:hover:not(:disabled) {
+  background: var(--ext-control-active);
+}
+
+.ext-connect-pill:disabled {
+  opacity: 0.58;
+  cursor: default;
+}
+
+.ext-connect-empty {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 20px;
+  padding: 64px 24px;
+  text-align: center;
+}
+
+.ext-connect-empty-mark {
+  display: grid;
+  width: 64px;
+  height: 64px;
+  place-items: center;
+  border-radius: 24px;
+  background: var(--ext-control);
+  color: var(--openbot-text-muted);
+}
+
+.ext-connect-empty-text {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.ext-connect-empty-title {
+  margin: 0;
+  color: var(--openbot-text-primary);
+  font-size: 18px;
+  font-weight: var(--openbot-weight-semibold);
+  line-height: 24px;
+}
+
 .agent-avatar {
   display: grid;
   flex: 0 0 auto;

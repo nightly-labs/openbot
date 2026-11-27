@@ -3,7 +3,12 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import type { CustomProviderReasoningEffort } from "@openbot/contracts/ipc";
 import { Effect } from "effect";
-import { type CustomProviderConfig, customModelOutputLimit, isMistralApi } from "./opencode-config";
+import {
+  type CustomProviderConfig,
+  customModelOutputLimit,
+  customProviderSecretValues,
+  isMistralApi,
+} from "./opencode-config";
 import type { PiMcpExtension } from "./pi-mcp";
 import { providerCall } from "./provider-client-effects";
 
@@ -133,14 +138,7 @@ function payload(endpoint: CustomProviderConfig): EndpointPayload {
 }
 
 export function piCustomEndpointSecrets(endpoints: readonly CustomProviderConfig[]): string[] {
-  return endpoints
-    .filter((endpoint) => endpoint.models.length > 0)
-    .flatMap((endpoint) => {
-      const names = new Set([endpoint.id.toLowerCase(), endpoint.name.toLowerCase()]);
-      return [endpoint.apiKey ?? "", ...endpoint.headers.map((header) => header.value)].filter(
-        (value) => value.length > 0 && !names.has(value.toLowerCase()),
-      );
-    });
+  return customProviderSecretValues(endpoints.filter((endpoint) => endpoint.models.length > 0));
 }
 
 export const createPiCustomEndpointExtension = Effect.fn("PiCustomEndpoints.createExtension")(function* (

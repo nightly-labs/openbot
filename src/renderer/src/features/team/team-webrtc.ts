@@ -1,6 +1,7 @@
 import { isString } from "@openbot/contracts/runtime-values";
 import { decodeSignalServerMessage } from "@openbot/contracts/signal-protocol/decode";
 import {
+  SIGNAL_CLIENT_RECONNECT_GRACE_MS,
   SIGNAL_NO_READY_CLOSE_CODE,
   SIGNAL_PROTOCOL_VERSION,
   SIGNAL_TURN_REFRESH_INTERVAL_MS,
@@ -102,6 +103,9 @@ interface PeerState {
   restartIceOnReady: boolean;
   pathLost: boolean;
   signalChain: Promise<void>;
+  unconfirmedSessions: Map<string, number>;
+  reconfirmClockStartedAt: number | null;
+  reconfirmTimer: number | null;
   closed: boolean;
 }
 
@@ -111,6 +115,7 @@ const SIGNAL_READY_DEADLINE_MS = 30_000;
 const SIGNAL_PROBE_INTERVAL_MS = 4 * 60_000;
 const RELAYED_FRAME_DEADLINE_MS = 30_000;
 const SIGNAL_HOLD_SPREAD_MS = 5_000;
+export const CLIENT_RECONFIRM_MS = SIGNAL_CLIENT_RECONNECT_GRACE_MS + 60_000;
 
 const peers = new Map<string, PeerState>();
 let signalRetryAt = 0;
@@ -192,6 +197,9 @@ async function handleCommand(command: BridgeCommand): Promise<void> {
         restartIceOnReady: false,
         pathLost: false,
         signalChain: Promise.resolve(),
+        unconfirmedSessions: new Map(),
+        reconfirmClockStartedAt: null,
+        reconfirmTimer: null,
         closed: false,
       };
       peers.set(state.id, state);
@@ -341,6 +349,7 @@ function connectSignal(state: PeerState, prepared: WebSocket | null = null): voi
       ...(state.waitForHost ? { waitForHost: true } : {}),
     };
     socket.send(JSON.stringify(hello));
+    if (state.role === "host") markClientsUnconfirmed(state);
     awaitSignalReady(state, socket);
   };
   const open = prepared?.readyState === WebSocket.OPEN;
@@ -373,6 +382,7 @@ function connectSignal(state: PeerState, prepared: WebSocket | null = null): voi
     if (state.socket !== socket) return;
     state.socket = null;
     clearSignalLiveness(state);
+    if (state.role === "host") pauseClientReconfirm(state);
     if (state.role === "host" && !state.closed)
       post({ type: "signal-closed", peerId: state.id, code: String(event.code), terminal: event.code === 4000 });
     if (event.code === 4000) {
@@ -406,6 +416,10 @@ async function handleSignal(state: PeerState, message: SignalServerMessage): Pro
     state.reconnectAttempt = 0;
     state.resumeToken = message.resumeToken;
     post({ type: "host-waiting", peerId: state.id });
+    return;
+  }
+  if (message.type === "sessions-ended") {
+    if (state.role === "host" && !state.signalHost) endSessions(state, message.sessionIds);
     return;
   }
   if (message.type === "account-profile-changed") {
@@ -478,6 +492,7 @@ async function handleSignal(state: PeerState, message: SignalServerMessage): Pro
     else scheduleTurnRefresh(state);
     post({ type: "ice-servers", peerId: state.id, iceServers: usableIceServers(state) });
     post({ type: "signal-ready", peerId: state.id });
+    if (state.role === "host" && !state.signalHost) armClientReconfirm(state);
     if (shouldRestartIce) state.iceRestartPending = true;
     if (state.iceRestartPending) await retryPendingIceRestart(state);
     if (state.role === "client" && state.connectionId && !state.peerConnection) {
@@ -499,6 +514,7 @@ async function handleSignal(state: PeerState, message: SignalServerMessage): Pro
     return;
   }
   if (message.type === "peer-ready" && state.role === "host") {
+    state.unconfirmedSessions.delete(message.sessionId);
     let client = state.clients.get(message.sessionId);
     if (client && !message.resumed) {
       disconnect(client.id);
@@ -524,6 +540,9 @@ async function handleSignal(state: PeerState, message: SignalServerMessage): Pro
         disconnectedTimer: null,
         pathLost: false,
         signalChain: Promise.resolve(),
+        unconfirmedSessions: new Map(),
+        reconfirmClockStartedAt: null,
+        reconfirmTimer: null,
       };
       state.clients.set(message.sessionId, client);
       peers.set(client.id, client);
@@ -969,6 +988,62 @@ function replaceSignal(state: PeerState): void {
   connectSignal(state);
 }
 
+function markClientsUnconfirmed(host: PeerState): void {
+  pauseClientReconfirm(host);
+  for (const sessionId of host.clients.keys()) {
+    if (!host.unconfirmedSessions.has(sessionId)) host.unconfirmedSessions.set(sessionId, CLIENT_RECONFIRM_MS);
+  }
+}
+
+function armClientReconfirm(host: PeerState): void {
+  host.reconfirmClockStartedAt ??= Date.now();
+  scheduleClientReconfirm(host);
+}
+
+function pauseClientReconfirm(host: PeerState): void {
+  const startedAt = host.reconfirmClockStartedAt;
+  if (startedAt === null) return;
+  host.reconfirmClockStartedAt = null;
+  const onlineMs = Date.now() - startedAt;
+  for (const [sessionId, remainingMs] of host.unconfirmedSessions)
+    host.unconfirmedSessions.set(sessionId, Math.max(0, remainingMs - onlineMs));
+  scheduleClientReconfirm(host);
+}
+
+function scheduleClientReconfirm(host: PeerState): void {
+  if (host.reconfirmTimer !== null) clearTimeout(host.reconfirmTimer);
+  host.reconfirmTimer = null;
+  const startedAt = host.reconfirmClockStartedAt;
+  if (startedAt === null || host.unconfirmedSessions.size === 0) return;
+  const dueAt = startedAt + Math.min(...host.unconfirmedSessions.values());
+  host.reconfirmTimer = window.setTimeout(
+    () => {
+      host.reconfirmTimer = null;
+      endUnconfirmedSessions(host);
+    },
+    Math.max(0, dueAt - Date.now()),
+  );
+}
+
+function endUnconfirmedSessions(host: PeerState): void {
+  const startedAt = host.reconfirmClockStartedAt;
+  if (host.closed || startedAt === null) return;
+  const onlineMs = Date.now() - startedAt;
+  const expired = [...host.unconfirmedSessions]
+    .filter(([, remainingMs]) => remainingMs <= onlineMs)
+    .map(([sessionId]) => sessionId);
+  endSessions(host, expired);
+  scheduleClientReconfirm(host);
+}
+
+function endSessions(host: PeerState, sessionIds: readonly string[]): void {
+  for (const sessionId of sessionIds) {
+    host.unconfirmedSessions.delete(sessionId);
+    const client = host.clients.get(sessionId);
+    if (client) disconnect(client.id);
+  }
+}
+
 function scheduleSignalReconnect(state: PeerState): void {
   if (state.reconnectTimer !== null) return;
   const attempt = state.reconnectAttempt++;
@@ -991,6 +1066,7 @@ function awaitSignalReady(state: PeerState, socket: WebSocket): void {
     state.signalReadyTimer = null;
     if (state.closed || state.socket !== socket) return;
     state.socket = null;
+    pauseClientReconfirm(state);
     socket.close(1000, "No ready");
     post({ type: "signal-closed", peerId: state.id, code: SIGNAL_NO_READY_CLOSE_CODE, terminal: false });
     scheduleSignalReconnect(state);
@@ -1043,9 +1119,12 @@ function disconnect(peerId: string): void {
   for (const child of [...state.clients.values()]) disconnect(child.id);
   if (state.signalHost) {
     for (const [sessionId, child] of state.signalHost.clients) {
-      if (child === state) state.signalHost.clients.delete(sessionId);
+      if (child !== state) continue;
+      state.signalHost.clients.delete(sessionId);
+      state.signalHost.unconfirmedSessions.delete(sessionId);
     }
   }
+  if (state.reconfirmTimer !== null) clearTimeout(state.reconfirmTimer);
   if (state.reconnectTimer !== null) clearTimeout(state.reconnectTimer);
   if (state.turnRefreshTimer !== null) clearTimeout(state.turnRefreshTimer);
   clearSignalLiveness(state);

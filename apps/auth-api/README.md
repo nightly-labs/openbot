@@ -247,10 +247,14 @@ does. A reply goes to `EMAIL_LICENSE_REPLY_TO` (`licenses@openbot.run` in produc
 license sender when it is empty.
 
 When the `no_reply@openbot.run` mailbox reaches its sender limit (500 messages an hour), the email goes
-again from the overflow mailbox `EMAIL_SMTP_OVERFLOW_USERNAME` (`hello@openbot.run` in production),
-with that address as the sender. Its password is the `EMAIL_SMTP_OVERFLOW_PASSWORD` secret, in the
-same places as `EMAIL_SMTP_PASSWORD`; it is optional, and without it the overflow mailbox is off.
-When the overflow mailbox also reaches its limit, Cloudflare Email Service sends the email from
+again from the overflow mailbox `EMAIL_SMTP_OVERFLOW_2_USERNAME` (`signin@openbot.run` in production),
+with that address as the sender. Its password is the `EMAIL_SMTP_OVERFLOW_2_PASSWORD` secret, in the
+same places as `EMAIL_SMTP_PASSWORD`; it is optional, and without it this mailbox is off.
+When that mailbox also reaches its limit, the email goes from the overflow mailbox
+`EMAIL_SMTP_OVERFLOW_3_USERNAME` (`sign@openbot.run` in production), with the
+`EMAIL_SMTP_OVERFLOW_3_PASSWORD` secret, set in the same way. After that, the email goes from the overflow mailbox
+`EMAIL_SMTP_OVERFLOW_USERNAME` (`hello@openbot.run` in production), with the
+`EMAIL_SMTP_OVERFLOW_PASSWORD` secret, set in the same way. When all mailboxes reach their limit, Cloudflare Email Service sends the email from
 `EMAIL_FROM` (`EMAIL_FALLBACK`). Cloudflare also has a daily quota: past it, the binding refuses with
 `E_DAILY_LIMIT_EXCEEDED`.
 
@@ -298,6 +302,15 @@ variables. The SMTP connection uses TLS from the start and accepts only port 465
 GitHub Actions reads the remote-control secrets, `SKILLS_ADMIN_TOKEN`, `SITE_REPORT_HASH_SECRET`, and the optional
 `SITE_OPERATIONS_ADMIN_TOKEN` and `SERVER_CLAIMS_ADMIN_TOKEN` from the `cloudflare-production` Environment. It includes
 them in Wrangler's temporary runtime secrets file.
+
+Cloudflare Access also protects the admin routes (`/v1/skills/admin/`, `/v1/marketplace/agents/admin/`,
+`/v1/sites/admin/` and `/v2/admin/`). When the Worker variables `CF_ACCESS_TEAM_DOMAIN` (for example
+`<team>.cloudflareaccess.com`) and `CF_ACCESS_ADMIN_AUD` (the AUD tag of the Access application) are
+set, an admin request needs a valid `Cf-Access-Jwt-Assertion` as well as the admin token. With only
+one of them set, every admin request is refused. They are not secrets: set them in `wrangler.jsonc`
+`vars` only after the Access application exists. Development keeps them empty. People sign in to
+Access with MFA. Scripts send an Access service token when `CF_ACCESS_CLIENT_ID` and
+`CF_ACCESS_CLIENT_SECRET` are in the environment (`scripts/cloudflare-access-headers.ts`).
 
 `COMPANY_SIGN_IN_SECRET` (at least 32 random bytes) turns on company sign-in (OpenID Connect and
 SCIM). It encrypts each company's client secret in D1, so never change or lose it: with another

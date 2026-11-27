@@ -54,7 +54,7 @@ struct AgentStateStyle {
   let symbol: String
   let tint: Color
 
-  init(agent: WatchAgent, text: WatchText) {
+  init(agent: WatchAgent, text: WatchText, working: Color? = nil) {
     switch agent.wait {
     case .approval, .phone(.approval, _), .unknown:
       title = text(TextKey.stateApproval)
@@ -83,7 +83,7 @@ struct AgentStateStyle {
     if agent.wait != nil {
       tint = .orange
     } else {
-      tint = agent.state == .idle ? .secondary : .blue
+      tint = agent.state == .idle ? .secondary : working ?? Color.stateTint(hex: agent.color)
     }
   }
 }

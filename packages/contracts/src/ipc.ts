@@ -93,6 +93,7 @@ export * from "./ipc-provider-admin";
 export * from "./ipc-provider-detection";
 export * from "./ipc-provider-environment";
 export * from "./ipc-queue";
+export * from "./ipc-remote-chat-content";
 export * from "./ipc-remote-desktop-setup";
 export * from "./ipc-remote-sessions";
 export * from "./ipc-routine-flows";

@@ -15,6 +15,7 @@ export const messages = {
   "mobile.workspace.error.sectionsLoadFailed": "Kan mappen niet laden. Probeer opnieuw.",
   "mobile.workspace.error.transportNotReady": "De mobiele verbinding is nog niet klaar.",
   "mobile.workspace.error.sectionsUnsupported": "Deze host ondersteunt geen wijzigingen in mappen.",
+  "mobile.workspace.error.sidebarOffline": "Maak verbinding met deze server om de mappen te wijzigen.",
   "mobile.workspace.error.leaveOwnServer": "Je kunt alleen externe servers verlaten waar je lid van bent.",
   "mobile.workspace.error.removeOwnedServerOnly": "Alleen de eigenaar kan deze server verwijderen.",
   "mobile.workspace.error.agentNotOnHost": "Agent staat niet op deze host.",

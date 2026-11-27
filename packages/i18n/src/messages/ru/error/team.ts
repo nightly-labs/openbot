@@ -213,4 +213,7 @@ export const messages = {
   "error.team.mediaApprovalChoiceUnsupported":
     "Этот сервер не поддерживает выбор модели в одобрениях медиа. Обновите OpenBot на сервере.",
   "error.team.mediaApprovalChoiceInvalid": "Выбор в одобрении медиа недействителен.",
+  "error.team.remoteChatContentUnsupported":
+    "Это подключение не поддерживает настройку внешнего контента. Обновите OpenBot на сервере.",
+  "error.team.remoteChatContentRequired": "Настройка внешнего контента должна быть включена или выключена.",
 } as const satisfies PartialTranslation<typeof source>;

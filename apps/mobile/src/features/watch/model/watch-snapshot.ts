@@ -1,4 +1,4 @@
-import { avatarHeadColor } from "@openbot/brand/bloub-avatar";
+import { avatarHeadColor, serverPlushHex } from "@openbot/brand/bloub-avatar";
 import { coordinatorText } from "@openbot/contracts/coordinator-text";
 import type { ChannelSummary, ConversationMessage, SidebarLayoutSnapshot, SidebarPin } from "@openbot/contracts/ipc";
 import { markdownPreviewText } from "@openbot/contracts/markdown-preview-text";
@@ -63,6 +63,9 @@ const WATCH_TEXT_KEYS = [
   "mobile.watch.offline.detail",
   "mobile.watch.offline.unlock",
   "mobile.watch.list.pinned",
+  "mobile.watch.settings.title",
+  "mobile.watch.settings.theme",
+  "mobile.watch.settings.themeDetail",
   "mobile.watch.question.private",
   "mobile.agent.list.waiting.title",
   "mobile.agent.list.unreadGroup.title",
@@ -114,6 +117,7 @@ export interface WatchSnapshotInput {
   channels: (serverId: string) => readonly ChannelSummary[];
   online: (server: MobileServer) => boolean;
   watchKey: (serverId: string) => string | undefined;
+  serverPicture: (server: MobileServer) => string | undefined;
   account: string | undefined;
   text: MobileText;
   accent: string;
@@ -356,12 +360,16 @@ export function buildWatchSnapshot(input: WatchSnapshotInput): WatchSnapshot {
     text: watchTexts(text.t, waiting),
     servers: servers.map((server) => {
       const watchKey = input.watchKey(server.id);
+      const picture = input.serverPicture(server);
       const hiddenAgents = input.hidden(server.id).slice(0, WATCH_HIDDEN_LIMIT);
       const hiddenChannels = input.hiddenChannels(server.id).slice(0, WATCH_HIDDEN_LIMIT);
       return {
         id: server.id,
         name: server.name,
         online: input.online(server),
+        color: serverPlushHex(server.id, server.appearance?.color),
+        shape: server.appearance?.shape ?? "squircle",
+        ...(picture ? { picture } : {}),
         ...(watchKey ? { watchKey } : {}),
         ...(hiddenAgents.length > 0 ? { hiddenAgents } : {}),
         ...(hiddenChannels.length > 0 ? { hiddenChannels } : {}),

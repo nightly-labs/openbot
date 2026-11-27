@@ -89,6 +89,7 @@ import {
 } from "@/features/chat/model/chat-messages";
 import type { TurnStepsSummary } from "@/features/chat/model/turn-thinking";
 import { readableOn } from "@/features/onboarding/model/onboarding-colors";
+import { useRemoteChatContent } from "@/features/servers/model/use-remote-chat-content";
 import { useChatBackdrop } from "@/features/settings/model/chat-backdrop";
 import { useChatRowShown, useThinkingDisplayPreference } from "@/features/settings/model/chat-details";
 import {
@@ -119,7 +120,7 @@ import {
   messageChipFileNames,
   messageFileDirectory,
   messageFileTarget,
-  messageLinkFileTarget,
+  messageLinkFileTargets,
   messageTargetFileName,
 } from "../model/message-file-target";
 import { messageTime } from "../model/message-time";
@@ -340,6 +341,7 @@ interface MessageRowShared {
   agents: MobileAgent[];
   agentsById: ReadonlyMap<string, MobileAgent>;
   serverId: string;
+  remoteContent: boolean;
   canSend: boolean;
   muted: ViewStyle["backgroundColor"];
   themeMuted: string;
@@ -672,8 +674,14 @@ const MessageRow = memo(function MessageRow({
         return target ? () => void openFile(target.file, target.written, attachmentOf(target.file)) : null;
       },
       link: (href) => {
-        const target = messageLinkFileTarget(href, fileAgentId);
-        return target ? () => void openFile(target, null, attachmentOf(target)) : null;
+        const target = messageLinkFileTargets(href, fileAgentId);
+        if (!target) return null;
+        return () =>
+          void openFile(
+            target.file,
+            target.written,
+            (target.written && attachmentOf(target.written)) || attachmentOf(target.file),
+          );
       },
     };
   }, [fileBody, fileAgentId, fileAttachments, openFile]);
@@ -712,6 +720,7 @@ const MessageRow = memo(function MessageRow({
     animationEnabled: shared.animationActive && arriving,
     align: message.kind === "message" && message.author === "user" ? ("end" as const) : ("start" as const),
     literalWordStars: message.kind === "message" && message.author === "user",
+    remoteContent: shared.remoteContent,
   };
   const bubbleFor = useCallback(
     (children: ReactNode, key?: string) =>
@@ -1735,11 +1744,13 @@ export const ChatMessageList = memo(function ChatMessageList({
   const shownBranchPoints = onBranch ? branchPoints : NO_IDS;
   const listWidth = columnWidth - insets.left - insets.right - LIST_PADDING * 2;
   const messageFiles = useMessageFileOpener(target.serverId);
+  const remoteContent = useRemoteChatContent(target.serverId);
   const shared = useMemo<MessageRowShared>(
     () => ({
       agents,
       agentsById,
       serverId: target.serverId,
+      remoteContent,
       canSend,
       muted,
       themeMuted,
@@ -1781,6 +1792,7 @@ export const ChatMessageList = memo(function ChatMessageList({
       agentsById,
       target.kind,
       target.serverId,
+      remoteContent,
       canSend,
       muted,
       themeMuted,

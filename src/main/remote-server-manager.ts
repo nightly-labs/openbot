@@ -221,6 +221,7 @@ interface RemoteServerEvents {
   directTyping: [serverId: string, event: DirectTypingRealtimeEvent];
   machineAlert: [serverId: string, event: MachineAlertEvent];
   liveVoice: [serverId: string, event: LiveVoiceEvent];
+  remoteChatContent: [serverId: string, enabled: boolean];
   attachmentDownload: [progress: AttachmentDownloadProgress];
   attachmentImportProgress: [progress: AttachmentImportProgress];
 }
@@ -291,6 +292,7 @@ const REMOTE_DESKTOP_SESSION_HTTP_TIMEOUT_MS = 60_000;
 export const AGENT_IMPORT_UPLOAD_TIMEOUT_MS = TEAM_WEBRTC_REMOTE_REQUEST_TIMEOUT_MILLISECONDS;
 const INSTANCE_TRANSFER_PART_TIMEOUT_MS = 3 * 60_000;
 const HOST_RESTART_RETRY_MS = 30 * 60_000;
+const DROP_RECHECK_SPREAD_MS = 30_000;
 const REMOTE_PICTURES_DIRECTORY = "remote-pictures";
 export class RemoteServerManager extends EventEmitter<RemoteServerEvents> {
   readonly #scope = Scope.makeUnsafe();
@@ -347,6 +349,7 @@ export class RemoteServerManager extends EventEmitter<RemoteServerEvents> {
   readonly #connectTrace: RemoteConnectTrace | null;
   readonly #accountReady: Effect.Effect<unknown, RemoteWorkflowError>;
   #muteExpiryTimer: ReturnType<typeof setTimeout> | null = null;
+  #dropRecheckTimer: ReturnType<typeof setTimeout> | null = null;
 
   constructor(
     path: string,
@@ -463,6 +466,7 @@ export class RemoteServerManager extends EventEmitter<RemoteServerEvents> {
       onDirectTyping: (serverId, event) => this.emit("directTyping", serverId, event),
       onHostRestart: (serverId, event) => this.#applyHostRestart(serverId, event),
       onHostAppearance: (serverId, event) => this.#applyHostAppearance(serverId, event),
+      onRemoteChatContent: (serverId, enabled) => this.emit("remoteChatContent", serverId, enabled),
       onMachineAlert: (serverId, event) => this.emit("machineAlert", serverId, event),
       onLiveVoice: (serverId, event) => this.emit("liveVoice", serverId, event),
       onOffline: (serverId) => this.#presence.markOffline(serverId),
@@ -526,7 +530,7 @@ export class RemoteServerManager extends EventEmitter<RemoteServerEvents> {
       this.#emitChanged();
       const firstDrop = this.#events.transportDisconnected(serverId);
       this.#events.scheduleReconnect(serverId);
-      if (wasOnline && firstDrop) this.emit("directoryInvalidated");
+      if (wasOnline && firstDrop) this.#scheduleDropRecheck();
     });
     this.#webrtcTransport?.on("connectFailed", (serverId, failure) => {
       if (!this.#store.has(serverId) || this.#connections.hasIssue(serverId)) return;
@@ -975,6 +979,15 @@ export class RemoteServerManager extends EventEmitter<RemoteServerEvents> {
     },
     (operation) => this.#owned(operation),
   ).bind(this);
+
+  #scheduleDropRecheck(): void {
+    if (this.#dropRecheckTimer || this.#stopping) return;
+    this.#dropRecheckTimer = setTimeout(() => {
+      this.#dropRecheckTimer = null;
+      if (!this.#stopping) this.emit("directoryInvalidated");
+    }, Math.random() * DROP_RECHECK_SPREAD_MS);
+    this.#dropRecheckTimer.unref?.();
+  }
 
   #scheduleMuteExpiry(): void {
     if (this.#muteExpiryTimer) clearTimeout(this.#muteExpiryTimer);
@@ -2642,6 +2655,8 @@ export class RemoteServerManager extends EventEmitter<RemoteServerEvents> {
     this.#stopping = done;
     return yield* Effect.gen({ self: this }, function* () {
       for (const serverId of [...this.#hostedStartAt.keys()]) this.#clearHostedStart(serverId);
+      if (this.#dropRecheckTimer) clearTimeout(this.#dropRecheckTimer);
+      this.#dropRecheckTimer = null;
       this.#focusUse.dispose();
       this.#computerActivity?.dispose();
       yield* this.#events.stop();
@@ -2757,6 +2772,7 @@ export class RemoteServerManager extends EventEmitter<RemoteServerEvents> {
     else if (event.type === "team-direct-typing") this.emit("directTyping", serverId, event);
     else if (event.type === "host-restart") this.#applyHostRestart(serverId, event);
     else if (event.type === "host-appearance") this.#applyHostAppearance(serverId, event);
+    else if (event.type === "remote-chat-content") this.emit("remoteChatContent", serverId, event.enabled);
     else if (event.type === "machine-alert") this.emit("machineAlert", serverId, event);
     else if (event.type === "live-voice") this.emit("liveVoice", serverId, event);
     else if (event.type === "client-browser-command") return;

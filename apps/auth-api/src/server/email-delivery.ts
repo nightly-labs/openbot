@@ -38,6 +38,10 @@ export type EmailDeliveryBindings = Pick<
   | "EMAIL_SMTP_PASSWORD"
   | "EMAIL_SMTP_OVERFLOW_USERNAME"
   | "EMAIL_SMTP_OVERFLOW_PASSWORD"
+  | "EMAIL_SMTP_OVERFLOW_2_USERNAME"
+  | "EMAIL_SMTP_OVERFLOW_2_PASSWORD"
+  | "EMAIL_SMTP_OVERFLOW_3_USERNAME"
+  | "EMAIL_SMTP_OVERFLOW_3_PASSWORD"
   | "EMAIL_FROM"
   | "EMAIL_REPLY_TO"
   | "EMAIL_LICENSE_FROM"
@@ -48,9 +52,14 @@ export type EmailDeliveryBindings = Pick<
   | "EMAIL_DELIVERY_WEBHOOK_SECRET"
 >;
 
+interface OverflowMailbox {
+  mailbox: EmailMailbox;
+  smtp: SmtpEmailConfig;
+}
+
 interface EmailSenders {
   smtp: SmtpEmailConfig;
-  overflow: SmtpEmailConfig | null;
+  overflow: OverflowMailbox[];
   fallback: SendEmail | null;
   inbox: string;
 }
@@ -188,25 +197,27 @@ const sendThroughOverflow = Effect.fn("EmailDelivery.overflow")(function* (
   primaryFailure: SmtpFailure,
   startedAt: number,
 ): Effect.fn.Return<void, SmtpFailure | EmailDeliveryError> {
-  const remainingMs = EMAIL_CODE_DELIVERY_BUDGET_MS - (Date.now() - startedAt);
-  if (!senders.overflow || primaryFailure.message !== RATE_LIMITED_DELIVERY_ERROR || remainingMs < MIN_SEND_MS) {
-    return yield* primaryFailure;
-  }
-  const overflow = yield* Effect.result(
-    trackedSmtp(
-      analytics,
-      kind,
-      "overflow",
-      sendPrivateEmail(senders.overflow, message).pipe(
-        Effect.timeoutOrElse({
-          duration: remainingMs,
-          orElse: () => Effect.fail(new EmailDeliveryError({ message: "email_delivery_unknown" })),
-        }),
+  if (primaryFailure.message !== RATE_LIMITED_DELIVERY_ERROR) return yield* primaryFailure;
+  for (const overflow of senders.overflow) {
+    const remainingMs = EMAIL_CODE_DELIVERY_BUDGET_MS - (Date.now() - startedAt);
+    if (remainingMs < MIN_SEND_MS) break;
+    const sent = yield* Effect.result(
+      trackedSmtp(
+        analytics,
+        kind,
+        overflow.mailbox,
+        sendPrivateEmail(overflow.smtp, message).pipe(
+          Effect.timeoutOrElse({
+            duration: remainingMs,
+            orElse: () => Effect.fail(new EmailDeliveryError({ message: "email_delivery_unknown" })),
+          }),
+        ),
       ),
-    ),
-  );
-  if (Result.isSuccess(overflow)) return;
-  return yield* AMBIGUOUS_DELIVERY_ERRORS.has(overflow.failure.message) ? overflow.failure : primaryFailure;
+    );
+    if (Result.isSuccess(sent)) return;
+    if (AMBIGUOUS_DELIVERY_ERRORS.has(sent.failure.message)) return yield* sent.failure;
+  }
+  return yield* primaryFailure;
 });
 
 function canFallBack(message: string): boolean {
@@ -291,14 +302,41 @@ function readEmailSenders(bindings: EmailDeliveryBindings): EmailSenders | null 
   const smtp = readSmtpConfig(bindings);
   if (!smtp) return null;
   const inbox = bindings.EMAIL_REPLY_TO?.trim() || smtp.from;
-  return { smtp, overflow: readOverflowSmtpConfig(bindings, smtp), fallback: bindings.EMAIL_FALLBACK ?? null, inbox };
+  return { smtp, overflow: readOverflowMailboxes(bindings, smtp), fallback: bindings.EMAIL_FALLBACK ?? null, inbox };
 }
 
-function readOverflowSmtpConfig(bindings: EmailDeliveryBindings, primary: SmtpEmailConfig): SmtpEmailConfig | null {
-  const username = bindings.EMAIL_SMTP_OVERFLOW_USERNAME?.trim();
-  const password = bindings.EMAIL_SMTP_OVERFLOW_PASSWORD;
-  if (!username || !password) return null;
-  return { ...primary, username, password, from: username };
+function readOverflowMailboxes(bindings: EmailDeliveryBindings, primary: SmtpEmailConfig): OverflowMailbox[] {
+  return [
+    readOverflowMailbox(
+      "overflow_2",
+      bindings.EMAIL_SMTP_OVERFLOW_2_USERNAME,
+      bindings.EMAIL_SMTP_OVERFLOW_2_PASSWORD,
+      primary,
+    ),
+    readOverflowMailbox(
+      "overflow_3",
+      bindings.EMAIL_SMTP_OVERFLOW_3_USERNAME,
+      bindings.EMAIL_SMTP_OVERFLOW_3_PASSWORD,
+      primary,
+    ),
+    readOverflowMailbox(
+      "overflow",
+      bindings.EMAIL_SMTP_OVERFLOW_USERNAME,
+      bindings.EMAIL_SMTP_OVERFLOW_PASSWORD,
+      primary,
+    ),
+  ].flat();
+}
+
+function readOverflowMailbox(
+  mailbox: EmailMailbox,
+  rawUsername: string | undefined,
+  password: string | undefined,
+  primary: SmtpEmailConfig,
+): OverflowMailbox[] {
+  const username = rawUsername?.trim();
+  if (!username || !password) return [];
+  return [{ mailbox, smtp: { ...primary, username, password, from: username } }];
 }
 
 function withInboxReply(senders: EmailSenders, message: PreparedEmailMessage): PreparedEmailMessage {

@@ -85,6 +85,7 @@ import type {
   HostPersonality,
   HostProviderAccounts,
   HostReleaseStatus,
+  HostRemoteChatContent,
   HostSetMessagingEnabledInput,
   HostSignalHomeSettings,
   HostSkillLearning,
@@ -352,7 +353,10 @@ export interface MobileWorkspaceContextValue {
   respondToBrowserSecret: (serverId: string, input: RespondToBrowserSecretInput) => Promise<void>;
   sidebarByServer: Record<string, { layout: SidebarLayoutSnapshot | null; error: string | null }>;
   mutateSidebarLayout: (serverId: string, action: SidebarLayoutAction) => Promise<void>;
-  moveSidebarChat: (serverId: string, action: Extract<SidebarLayoutAction, { type: "move-agent" }>) => Promise<void>;
+  moveSidebarChat: (
+    serverId: string,
+    action: Extract<SidebarLayoutAction, { type: "move-agent" | "assign" }>,
+  ) => Promise<void>;
   loadQueue: (agentId: string, serverId: string) => Promise<QueueSnapshot>;
   canEditQueue: (serverId: string) => boolean;
   loadAgentUsageLimits: (serverId: string) => Promise<AgentUsageLimits>;
@@ -467,6 +471,10 @@ export interface MobileWorkspaceContextValue {
   canManageBrowsingMemory: (serverId: string) => boolean;
   loadBrowsingMemory: (serverId: string) => Promise<HostBrowsingMemory>;
   setBrowsingMemory: (enabled: boolean, serverId: string) => Promise<HostBrowsingMemory>;
+  canManageRemoteChatContent: (serverId: string) => boolean;
+  servesRemoteChatContent: (serverId: string) => boolean;
+  loadRemoteChatContent: (serverId: string) => Promise<HostRemoteChatContent>;
+  setRemoteChatContent: (enabled: boolean, serverId: string) => Promise<HostRemoteChatContent>;
   canManageServerPersonality: (serverId: string) => boolean;
   servesServerPersonality: (serverId: string) => boolean;
   loadServerPersonality: (serverId: string) => Promise<HostPersonality>;
@@ -915,6 +923,8 @@ type ServerCheckKey =
   | "canManageMemoryReview"
   | "canManageSkillLearning"
   | "canManageBrowsingMemory"
+  | "canManageRemoteChatContent"
+  | "servesRemoteChatContent"
   | "canManageServerPersonality"
   | "servesServerPersonality"
   | "canManageServerRoles"

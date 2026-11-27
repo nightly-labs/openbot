@@ -157,6 +157,7 @@ const STARTUP_RETRY_DELAYS_MS = [250, 500, 1_000, 2_000] as const;
 const UNAVAILABLE_RETRY_DELAYS_MS = [5_000, 10_000, 20_000, 30_000, 60_000] as const;
 const MAX_UNAVAILABLE_RETRY_AFTER_SECONDS = 60 * 60;
 const EMAIL_CODE_REQUEST_TIMEOUT_MS = 35_000;
+const HOST_CREDENTIAL_REVOKE_TIMEOUT_MS = 5_000;
 const RESEND_FALLBACK_DELAY_MS = 60_000;
 const DEFINITIVE_EMAIL_CODE_REQUEST_FAILURES = new Set([
   "email_delivery_failed",
@@ -2288,6 +2289,7 @@ export class CentralAuthManager extends EventEmitter<CentralAuthEvents> {
       this.#endCompanySignIn();
       this.#endCompanySignInTest();
       if (this.#sessionToken) {
+        yield* this.#revokeHostCredentials(this.#sessionToken);
         const attempt8 = yield* Effect.gen({ self: this }, function* () {
           yield* this.#authorizedRequestEffect("/v1/auth/logout", { method: "POST" }, decodeVoid);
         }).pipe(Effect.result);
@@ -2622,6 +2624,24 @@ export class CentralAuthManager extends EventEmitter<CentralAuthEvents> {
       yield* authCall(() => rm(this.#options.storagePath, { force: true }));
       this.#storedSessionToken = null;
     });
+  }
+
+  #revokeHostCredentials(sessionToken: string) {
+    return Effect.forEach(
+      [...this.#teamHostTokens],
+      ([hostId, machineToken]) =>
+        this.#requestEffect(
+          `/v2/remote/hosts/${encodeURIComponent(hostId)}/revoke-credential`,
+          {
+            method: "POST",
+            headers: { Authorization: `Bearer ${sessionToken}`, "Content-Type": "application/json" },
+            body: JSON.stringify({ machineToken }),
+          },
+          decodeVoid,
+          HOST_CREDENTIAL_REVOKE_TIMEOUT_MS,
+        ).pipe(Effect.ignore),
+      { concurrency: "unbounded", discard: true },
+    );
   }
 
   #forgetSession(): void {

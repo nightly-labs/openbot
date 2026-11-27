@@ -235,6 +235,7 @@ export function createChannelConversation(env: ChannelConversationEnvironment) {
 
   const source: ConversationChannelSource = {
     id: channelId,
+    loading: () => channels.state.selectedId === channelId && channels.state.loading,
     name: () => page()?.channel.name ?? summary()?.name ?? "",
     readOnly,
     ownMessage: ownRow,

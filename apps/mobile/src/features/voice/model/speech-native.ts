@@ -27,6 +27,7 @@ declare class SpeechModule extends NativeModule<SpeechEvents> {
   finishCapture?(): void;
   cancelCapture?(): void;
   allowHapticsWhileRecording?(): void;
+  keyboardLanguage?(): Promise<string | null>;
   setCallAudio?(active: boolean): void;
 }
 

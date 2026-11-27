@@ -1,14 +1,32 @@
+import { d1RequestReplicaTarget, d1RequestTarget } from "./d1-request-session";
+
 type D1FailureClass = "overloaded" | "constraint" | "network" | "other";
 
 type D1RetryOutcome = "none" | "succeeded" | "failed";
 
 type D1Operation = "first" | "all" | "raw" | "run" | "batch" | "exec";
 
-const OVERLOADED_RETRY_DELAY_MS = 1_000;
+const OVERLOADED_RETRY_MIN_DELAY_MS = 500;
+const OVERLOADED_RETRY_DELAY_SPREAD_MS = 1_000;
+const UNRECOVERED_OVERLOAD_WINDOW_MS = 10_000;
 const READ_ONLY_SQL = /^\s*(SELECT|WITH)\b/i;
 const WRITE_KEYWORD = /\b(INSERT|UPDATE|DELETE|REPLACE|UPSERT)\b/i;
 
+type DatabaseReads = "request" | "replica" | "primary";
+
 const observedDatabases = new WeakMap<D1Database, D1Database>();
+const replicaDatabases = new WeakMap<D1Database, D1Database>();
+const primaryDatabases = new WeakMap<D1Database, D1Database>();
+
+let unrecoveredOverloadAt = Number.NEGATIVE_INFINITY;
+
+export function d1OverloadedRecently(now: number): boolean {
+  return now - unrecoveredOverloadAt < UNRECOVERED_OVERLOAD_WINDOW_MS;
+}
+
+function rememberUnrecovered(failure: D1FailureClass): void {
+  if (failure === "overloaded") unrecoveredOverloadAt = Date.now();
+}
 
 function d1FailureClass(error: unknown): D1FailureClass {
   const message = error instanceof Error ? error.message : String(error);
@@ -37,15 +55,18 @@ async function observedCall<T>(operation: D1Operation, readOnly: boolean, call: 
     const failure = d1FailureClass(error);
     if (failure !== "overloaded" || !readOnly) {
       logD1Failure(operation, failure, "none");
+      rememberUnrecovered(failure);
       throw error;
     }
-    await wait(OVERLOADED_RETRY_DELAY_MS);
+    await wait(OVERLOADED_RETRY_MIN_DELAY_MS + Math.random() * OVERLOADED_RETRY_DELAY_SPREAD_MS);
     try {
       const result = await call();
       logD1Failure(operation, failure, "succeeded");
       return result;
     } catch (retryError) {
-      logD1Failure(operation, d1FailureClass(retryError), "failed");
+      const retryFailure = d1FailureClass(retryError);
+      logD1Failure(operation, retryFailure, "failed");
+      rememberUnrecovered(retryFailure);
       throw retryError;
     }
   }
@@ -90,17 +111,32 @@ class ObservedStatement implements D1PreparedStatement {
 }
 
 class ObservedDatabase implements D1Database {
-  constructor(readonly source: D1Database) {}
+  constructor(
+    readonly source: D1Database,
+    readonly reads: DatabaseReads,
+  ) {}
+
+  #target(): D1Database | D1DatabaseSession {
+    if (this.reads === "primary") return this.source;
+    if (this.reads === "replica") {
+      return d1RequestReplicaTarget(this.source) ?? this.source.withSession("first-unconstrained");
+    }
+    return d1RequestTarget(this.source) ?? this.source;
+  }
 
   prepare(query: string): D1PreparedStatement {
-    return new ObservedStatement(this.source.prepare(query), query);
+    return new ObservedStatement(this.#target().prepare(query), query);
   }
 
   batch<T = unknown>(statements: D1PreparedStatement[]): Promise<D1Result<T>[]> {
     const sources = statements.map((statement) =>
       statement instanceof ObservedStatement ? statement.source : statement,
     );
-    return observedCall("batch", false, () => this.source.batch<T>(sources));
+    const readOnly = statements.every(
+      (statement) => statement instanceof ObservedStatement && isReadOnly(statement.sql),
+    );
+    const target = this.#target();
+    return observedCall("batch", readOnly, () => target.batch<T>(sources));
   }
 
   exec(query: string): Promise<D1ExecResult> {
@@ -120,7 +156,24 @@ export function observedD1(database: D1Database): D1Database {
   if (database instanceof ObservedDatabase) return database;
   const known = observedDatabases.get(database);
   if (known) return known;
-  const observed = new ObservedDatabase(database);
+  const observed = new ObservedDatabase(database, "request");
   observedDatabases.set(database, observed);
   return observed;
+}
+
+function observedWith(database: D1Database, reads: DatabaseReads, known: WeakMap<D1Database, D1Database>): D1Database {
+  const source = database instanceof ObservedDatabase ? database.source : database;
+  const existing = known.get(source);
+  if (existing) return existing;
+  const observed = new ObservedDatabase(source, reads);
+  known.set(source, observed);
+  return observed;
+}
+
+export function replicaD1(database: D1Database): D1Database {
+  return observedWith(database, "replica", replicaDatabases);
+}
+
+export function primaryD1(database: D1Database): D1Database {
+  return observedWith(database, "primary", primaryDatabases);
 }

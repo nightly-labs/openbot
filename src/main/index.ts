@@ -9,6 +9,7 @@ import {
   DEFAULT_QUIT_GUARD,
   type HostStatus,
   IPC_ENDPOINTS,
+  LOCAL_SERVER_ID,
   type QuitGuard,
 } from "@openbot/contracts/ipc";
 import { createFormat, localeDirection, resolveLocale, translateFor, withHourCycle } from "@openbot/i18n";
@@ -757,6 +758,7 @@ function registerIpcHandlers({
   memoryReview,
   skillLearning,
   browsingMemory,
+  remoteChatContent,
   agentAccess,
   mcpAccess,
   serverAudit,
@@ -1047,6 +1049,7 @@ function registerIpcHandlers({
       memoryReview,
       skillLearning,
       browsingMemory,
+      remoteChatContent,
       machineAlerts,
       promptCacheTtl,
       claudeUserSetup,
@@ -1672,6 +1675,12 @@ if (!hasSingleInstanceLock) {
           sendToRenderer(window, IPC_ENDPOINTS.app.agentMemoryLimitPreference, preference);
         }
       });
+      const forwardRemoteChatContent = (serverId: string, enabled: boolean) => {
+        for (const window of BrowserWindow.getAllWindows()) {
+          sendToRenderer(window, IPC_ENDPOINTS.hostAdmin.remoteChatContent, { serverId, enabled });
+        }
+      };
+      built.remoteChatContent.onChange(({ enabled }) => forwardRemoteChatContent(LOCAL_SERVER_ID, enabled));
       host.on("changed", onHostChanged);
       host.on("presence", (snapshot) => forwardTeamPresence("local", snapshot));
       host.on("directMessage", (event) => forwardDirectMessage("local", event));
@@ -1694,6 +1703,7 @@ if (!hasSingleInstanceLock) {
       remoteServers.on("presence", forwardTeamPresence);
       remoteServers.on("directMessage", forwardDirectMessage);
       remoteServers.on("directTyping", forwardDirectTyping);
+      remoteServers.on("remoteChatContent", forwardRemoteChatContent);
       remoteServers.on("attachmentDownload", forwardAttachmentDownload);
       remoteServers.on("attachmentImportProgress", forwardAttachmentImportProgress);
       void Effect.runPromise(

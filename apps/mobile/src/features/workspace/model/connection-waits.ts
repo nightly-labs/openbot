@@ -12,6 +12,10 @@ export function isConnectionStop(error: Error | null): boolean {
   return error !== null && CONNECTION_STOPS.has(error.message);
 }
 
+export function stoppedBeforeSend(error: unknown): boolean {
+  return error instanceof Error && error.message === sourceText("error.remote.selectedServerOffline");
+}
+
 interface ConnectionWait {
   resolve: () => void;
   reject: (error: Error) => void;

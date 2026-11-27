@@ -52,6 +52,8 @@
     "EMAIL_SMTP_PORT": "465",
     "EMAIL_SMTP_USERNAME": "no_reply@openbot.run",
     "EMAIL_SMTP_OVERFLOW_USERNAME": "hello@openbot.run",
+    "EMAIL_SMTP_OVERFLOW_2_USERNAME": "signin@openbot.run",
+    "EMAIL_SMTP_OVERFLOW_3_USERNAME": "sign@openbot.run",
     "EMAIL_FROM": "no_reply@openbot.run",
     "EMAIL_REPLY_TO": "hello@openbot.run",
     "EMAIL_LICENSE_REPLY_TO": "licenses@openbot.run",
@@ -70,6 +72,8 @@
     "BILLING_COUNTRY_REQUIRED": "true",
     "GITHUB_APP_CLIENT_ID": "Iv23lik5pzHz70cb0RUL",
     "FEEDBACK_WITHDRAWN_REPOSITORY": "",
+    "CF_ACCESS_TEAM_DOMAIN": "",
+    "CF_ACCESS_ADMIN_AUD": "",
     "APNS_TEAM_ID": "8A47NKRZSJ",
     "APNS_TOPIC": "run.openbot.mobile"
   },
@@ -174,6 +178,8 @@
         "EMAIL_SMTP_PORT": "465",
         "EMAIL_SMTP_USERNAME": "no_reply@openbot.run",
         "EMAIL_SMTP_OVERFLOW_USERNAME": "hello@openbot.run",
+        "EMAIL_SMTP_OVERFLOW_2_USERNAME": "signin@openbot.run",
+        "EMAIL_SMTP_OVERFLOW_3_USERNAME": "sign@openbot.run",
         "EMAIL_FROM": "no_reply@openbot.run",
         "EMAIL_REPLY_TO": "hello@openbot.run",
         "EMAIL_LICENSE_REPLY_TO": "licenses@openbot.run",
@@ -185,7 +191,9 @@
         "REMOTE_SIGNAL_HOMES": "",
         "REMOTE_AUTH_WEBHOOK_URL": "http://127.0.0.1:8081/internal/auth-events",
         "REMOTE_AUTH_WEBHOOK_URLS": "",
-        "SIGNAL_ENTRY_ZONE_ID": ""
+        "SIGNAL_ENTRY_ZONE_ID": "",
+        "CF_ACCESS_TEAM_DOMAIN": "",
+        "CF_ACCESS_ADMIN_AUD": ""
       },
       "d1_databases": [
         {
@@ -276,6 +284,8 @@
         "EMAIL_SMTP_PORT": "465",
         "EMAIL_SMTP_USERNAME": "no_reply@openbot.run",
         "EMAIL_SMTP_OVERFLOW_USERNAME": "hello@openbot.run",
+        "EMAIL_SMTP_OVERFLOW_2_USERNAME": "signin@openbot.run",
+        "EMAIL_SMTP_OVERFLOW_3_USERNAME": "sign@openbot.run",
         "EMAIL_FROM": "no_reply@openbot.run",
         "EMAIL_REPLY_TO": "hello@openbot.run",
         "EMAIL_LICENSE_REPLY_TO": "licenses@openbot.run",
@@ -289,6 +299,8 @@
         "REMOTE_AUTH_WEBHOOK_URLS": "",
         "SIGNAL_ENTRY_ZONE_ID": "",
         "HOSTED_SERVERS_ENABLED": "true",
+        "CF_ACCESS_TEAM_DOMAIN": "",
+        "CF_ACCESS_ADMIN_AUD": "",
         "GITHUB_APP_CLIENT_ID": "Iv23lik5pzHz70cb0RUL",
         "APNS_TEAM_ID": "8A47NKRZSJ",
         "APNS_TOPIC": "run.openbot.mobile"

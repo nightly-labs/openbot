@@ -26,7 +26,14 @@ import {
   supportsWatchRelay,
   watchDirectCredentials,
 } from "./model/watch-pairing";
-import { syncWatchPictures, watchAvatar, watchFaces, watchPictureFile } from "./model/watch-pictures";
+import {
+  syncWatchPictures,
+  syncWatchServerPictures,
+  watchAvatar,
+  watchFaces,
+  watchPictureFile,
+  watchServerPicture,
+} from "./model/watch-pictures";
 import { buildWatchSnapshot, questionsToLoad } from "./model/watch-snapshot";
 import {
   knownWatchKey,
@@ -62,7 +69,7 @@ async function watchAvatarData(names: readonly string[]): Promise<Record<string,
     const file = watchPictureFile(name);
     if (!file) continue;
     const data = await file.base64();
-    if (size + data.length > AVATAR_REPLY_LIMIT) break;
+    if (size + data.length > AVATAR_REPLY_LIMIT) continue;
     avatars[name] = data;
     size += data.length;
   }
@@ -112,6 +119,7 @@ function WatchLinkSync({ servers, serversReady, agents, preferences, capabilitie
         },
         online: showsOnline,
         watchKey: knownWatchKey,
+        serverPicture: watchServerPicture,
         account: session ? accountScope(session.apiUrl, session.user.id) : undefined,
         text,
         accent,
@@ -127,6 +135,13 @@ function WatchLinkSync({ servers, serversReady, agents, preferences, capabilitie
   useEffect(() => {
     if (watchInstalled) syncWatchPictures(agents);
   }, [watchInstalled, agents]);
+
+  useEffect(() => {
+    if (!watchInstalled || !serversReady) return;
+    void syncWatchServerPictures(servers, session).then((written) => {
+      if (written) sendWatchSnapshot(buildRef.current());
+    });
+  }, [watchInstalled, serversReady, servers, session]);
 
   useEffect(() => {
     if (!watchInstalled || !serversReady) return;

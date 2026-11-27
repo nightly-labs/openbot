@@ -206,4 +206,6 @@ export const messages = {
   "error.team.providerUseInvalid": "该服务商没有开关。",
   "error.team.mediaApprovalChoiceUnsupported": "此服务器不支持在媒体审批中选择模型。请更新服务器上的 OpenBot。",
   "error.team.mediaApprovalChoiceInvalid": "媒体审批的选择无效。",
+  "error.team.remoteChatContentUnsupported": "此连接不支持远程内容设置。请更新服务器上的 OpenBot。",
+  "error.team.remoteChatContentRequired": "远程内容设置必须为开启或关闭。",
 } as const satisfies PartialTranslation<typeof source>;

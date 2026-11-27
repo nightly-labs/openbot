@@ -10,7 +10,7 @@ import {
 import { chatPreviewKind } from "@openbot/contracts/chat-preview";
 import { INPUT_LIMITS } from "@openbot/contracts/input-limits";
 import { markdownImageName } from "@openbot/contracts/markdown-preview-text";
-import { Button, Checkbox } from "@openbot/ui";
+import { Button, Checkbox, Image as ImageIcon } from "@openbot/ui";
 import { Dynamic } from "@solidjs/web";
 import { Marked, type Token, type Tokens, type TokensList } from "marked";
 import markedCjkFriendly from "marked-cjk-friendly";
@@ -273,6 +273,7 @@ export function MarkdownMessageText(props: MarkdownMessageTextProps) {
       onOpenQuote: props.onOpenQuote,
       onOpenTag: props.onOpenTag,
       linkFavicons: props.linkFavicons,
+      remoteContent: props.remoteContent,
       fileDirectory: fileDirectory(),
     }),
   );
@@ -312,6 +313,7 @@ export function MarkdownInlineText(
     onOpenQuote: props.onOpenQuote,
     onOpenTag: props.onOpenTag,
     linkFavicons: props.linkFavicons,
+    remoteContent: props.remoteContent,
     fileDirectory: messageFileDirectory(props.body),
   });
   return <MarkdownInline tokens={tokens()} content={contentProps()} />;
@@ -461,6 +463,7 @@ function MarkdownBlock(props: {
             kind={preview}
             streaming={props.streaming === true}
             onOpenLink={props.content.onOpenLink}
+            remoteContent={props.content.remoteContent}
           />
         );
       return <CodeBlock block={block} streaming={props.streaming === true} />;
@@ -734,7 +737,7 @@ function MarkdownInline(props: {
                 url={url}
                 title={token.title || linkTitle(token.text, url)}
                 isolate={linkTitle(token.text, token.href) === undefined}
-                favicon={props.content.linkFavicons !== false}
+                favicon={props.content.linkFavicons !== false && props.content.remoteContent === true}
                 onOpenLink={props.content.onOpenLink}
               >
                 {token.text === token.href ? (
@@ -773,7 +776,7 @@ function MarkdownInline(props: {
                 <MessageLink
                   url={url}
                   title={url}
-                  favicon={props.content.linkFavicons !== false}
+                  favicon={props.content.linkFavicons !== false && props.content.remoteContent === true}
                   onOpenLink={props.content.onOpenLink}
                 >
                   {token.text || t("chat.image.view")}
@@ -784,11 +787,12 @@ function MarkdownInline(props: {
               return <RichText body={token.text || token.raw} content={props.content} streamingTailAfter={after()} />;
             }
             return (
-              <MarkdownImage
+              <RemoteMarkdownImage
                 url={url}
                 alt={token.text}
                 title={token.title ?? undefined}
                 onOpenImage={props.content.onOpenImage}
+                remoteContent={props.content.remoteContent}
               />
             );
           }
@@ -868,6 +872,36 @@ function semanticChatTag(token: Token | undefined): string | null {
   if (!token || !tokenIs(token, "link")) return null;
   const target = /^(agent|skill|mcp|quote|tab|thread)(?:\+uri)?:([^\r\n]+)$/u.exec(token.href);
   return target?.[2] ? `@${token.raw}` : null;
+}
+
+function RemoteMarkdownImage(props: {
+  url: string;
+  alt: string;
+  title: string | undefined;
+  onOpenImage: ((image: HTMLImageElement) => void) | undefined;
+  remoteContent: boolean | undefined;
+}) {
+  const { t } = useText();
+  const [loaded, setLoaded] = createSignal(false);
+  return (
+    <Show
+      when={props.remoteContent !== true && !loaded()}
+      fallback={<MarkdownImage url={props.url} alt={props.alt} title={props.title} onOpenImage={props.onOpenImage} />}
+    >
+      <span class="message-remote-picture">
+        <ImageIcon class="message-remote-picture-icon" aria-hidden="true" />
+        <span class="message-remote-picture-text">
+          <strong class="message-remote-picture-name">{markdownImageName(props.alt, props.url)}</strong>
+          <span class="message-remote-picture-note">
+            {t("chat.remoteContent.pictureNotLoaded", { host: new URL(props.url).host })}
+          </span>
+        </span>
+        <Button variant="outline" size="sm" type="button" onClick={() => setLoaded(true)}>
+          {t("chat.remoteContent.loadPicture")}
+        </Button>
+      </span>
+    </Show>
+  );
 }
 
 function MarkdownImage(props: {

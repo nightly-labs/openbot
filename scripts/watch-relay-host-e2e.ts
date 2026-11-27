@@ -397,6 +397,7 @@ try {
         real.setAvatar(approver.id, { mimeType: "image/png", bytes: Buffer.from(PNG_BASE64, "base64") }),
       );
       await runCauseEffect(team.configure("Watch E2E Host", OWNER.username, OWNER.password));
+      await runCauseEffect(team.updateIdentity({ appearance: { shape: "hexagone", color: "#12b886" } }));
       const invite = await runCauseEffect(team.createInvite("member"));
       const watcher = await runCauseEffect(team.acceptInvite(invite.token, WATCHER.username, WATCHER.password));
       const hostId = team.getIdentity()?.serverId;
@@ -699,7 +700,9 @@ try {
       const { result, snapshot } = await send({ type: "refresh", language: "de-CH" });
       assert.equal(result.ok, true);
       const shown = ready(snapshot);
-      assert.deepEqual(shown.servers, [{ id: hostId, name: "Watch E2E Host", online: true, watchKey }]);
+      assert.deepEqual(shown.servers, [
+        { id: hostId, name: "Watch E2E Host", online: true, color: "#12b886", shape: "hexagone", watchKey },
+      ]);
       assert.equal(shown.language, "de");
       assert.equal(shown.text["mobile.chat.approval.allow"], "Erlauben", "The text is not localized.");
       const byId = new Map(shown.agents.map((agent) => [agent.id, agent]));

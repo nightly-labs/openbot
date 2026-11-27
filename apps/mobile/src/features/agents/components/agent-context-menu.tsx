@@ -1,5 +1,5 @@
 import { agentNotificationLevelMap } from "@openbot/contracts/ipc";
-import { Link, router } from "expo-router";
+import { type Href, Link, router } from "expo-router";
 import { type ReactNode, useEffect, useRef, useState } from "react";
 import { Alert, StyleSheet, View } from "react-native";
 import { useUniwind } from "uniwind";
@@ -178,18 +178,24 @@ function useAgentContextMenu(agent: MobileAgent) {
   );
 }
 
+export function agentChatHref(agent: MobileAgent): Href {
+  return { pathname: "/chat/[agentId]", params: { agentId: agent.id, serverId: agent.serverId } };
+}
+
 export function AgentContextMenuLink({
   agent,
+  href = agentChatHref(agent),
   preview,
   children,
 }: {
   agent: MobileAgent;
+  href?: Href;
   preview: ReactNode;
   children: ReactNode;
 }) {
   const agentContextMenu = useAgentContextMenu(agent);
   return (
-    <Link href={{ pathname: "/chat/[agentId]", params: { agentId: agent.id, serverId: agent.serverId } }} asChild>
+    <Link href={href} asChild>
       <Link.Trigger>{children}</Link.Trigger>
       {preview}
       {agentContextMenu}

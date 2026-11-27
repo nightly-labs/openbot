@@ -83,7 +83,7 @@ export const messages = {
     "Verranno chiuse anche le connessioni remote attive dell'account. Il dispositivo potrà accedere di nuovo.",
   "mobile.settings.sessions.disconnect": "Disconnetti",
   "mobile.settings.dictation.footer":
-    "La lingua che parli al riconoscimento del telefono, in una conversazione vocale e durante la dettatura. «Automatica» usa la prima lingua nelle impostazioni del telefono che supporta.",
+    "La lingua che parli al riconoscimento del telefono, in una conversazione vocale e durante la dettatura. «Automatica» usa la lingua della tastiera con cui scrivi, altrimenti la prima lingua nelle impostazioni del telefono che supporta.",
   "mobile.settings.dictation.automatic": "Automatica",
   "mobile.settings.appearance.title": "Aspetto",
   "mobile.settings.appearance.footer": "«Sistema» segue l'aspetto del dispositivo.",

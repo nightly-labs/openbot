@@ -231,6 +231,8 @@ export interface IngressAnswer {
 
 export type IngressState = "online" | "connecting" | "signed_out" | "no_host" | "unavailable";
 
+export type IngressFailure = "refused" | "certificate";
+
 export type IngressHandler = (
   workspaceId: string,
   delivery: IngressDelivery,
@@ -279,6 +281,7 @@ export class WhatsAppAnswerPartlySent extends Error {
 export interface MessagingIngress {
   acquire(platform: MessagingPlatform): () => void;
   state(): IngressState;
+  failure?(): IngressFailure | null;
   onState(listener: (state: IngressState) => void): () => void;
   handle(handler: IngressHandler | null): void;
   readonly telegram: TelegramGateway;

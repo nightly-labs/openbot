@@ -1,4 +1,5 @@
 import { isDynamicRecord, isString } from "./runtime-values";
+import type { ServerAppearanceShape } from "./team-protocol/host-appearance-v1";
 
 export const WATCH_PROTOCOL_VERSION = 1;
 
@@ -90,6 +91,9 @@ export interface WatchServer {
   id: string;
   name: string;
   online: boolean;
+  color?: string;
+  shape?: ServerAppearanceShape;
+  picture?: string;
   watchKey?: string;
   hiddenAgents?: string[];
   hiddenChannels?: string[];

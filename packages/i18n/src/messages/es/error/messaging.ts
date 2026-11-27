@@ -18,6 +18,8 @@ export const messages = {
     "OpenBot no puede acceder a Telegram en este equipo. Inicia sesión, ponle un nombre a este equipo e inténtalo de nuevo.",
   "error.messaging.telegramRelayUnreachable":
     "OpenBot no puede conectarse a su servicio desde este equipo. Comprueba la conexión a internet, la VPN, el proxy o el cortafuegos, y vuelve a intentarlo.",
+  "error.messaging.telegramRelayCertificate":
+    "OpenBot no puede crear una conexión segura con su servicio desde este ordenador. Puede deberse a un software de seguridad que analiza el tráfico HTTPS, o a una fecha y hora incorrectas en este ordenador. Revísalos e inténtalo de nuevo.",
   "error.messaging.telegramServiceUnavailable":
     "OpenBot no puede conectar Telegram ahora. Inténtalo de nuevo más tarde.",
   "error.messaging.whatsappNotConnected": "Este número de WhatsApp no está conectado.",

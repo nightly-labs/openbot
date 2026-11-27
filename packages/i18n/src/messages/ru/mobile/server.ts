@@ -638,6 +638,10 @@ export const messages = {
   "mobile.server.settings.browsingMemoryDescription":
     "Когда вы управляете браузером агента, агент узнаёт, как работают сайты, по страницам и кнопкам, которые вы используете. Введённый текст не сохраняется.",
   "mobile.server.settings.browsingMemoryLoadFailed": "Не удалось загрузить настройку браузинга.",
+  "mobile.server.settings.remoteChatContent": "Загружать внешний контент в чатах",
+  "mobile.server.settings.remoteChatContentDescription":
+    "Показывать в чатах изображения и значки сайтов с других веб-сайтов. Когда это выключено, они показаны как ссылки, а диаграммы и страницы загружаются только по нажатию. Это действует для всех на этом сервере.",
+  "mobile.server.settings.remoteChatContentLoadFailed": "Не удалось загрузить настройку внешнего контента.",
   "mobile.server.settings.learningSaveFailed": "Не удалось сохранить этот параметр. Повторите попытку.",
   "mobile.server.settings.learningUnsupported": "Обновите OpenBot на этом сервере, чтобы изменить здесь этот параметр.",
   "mobile.server.settings.responseStyleDescription":

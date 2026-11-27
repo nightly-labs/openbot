@@ -29,7 +29,7 @@ the read state and the sections load. These three reads run together. Cached con
 again after Online, the open conversation first; a chat that did not load then loads when it opens.
 Transport failures and reconnect attempts show Offline, and protocol failures show Connection error.
 The existing RTC connection updates and recovery controller are the source of truth; the indicator
-adds no polling or health requests. Foreground resume reuses a healthy connection without showing a
+adds no polling or health requests of its own. Foreground resume reuses a healthy connection without showing a
 reconnect. When the connection from before the background stays (`kept` on the `connect` result) and
 no read stopped at background entry, the first attempt only checks the path with the compatibility
 read and reads the open chats again; the event stream delivered every event, or an `event-reset`
@@ -47,10 +47,23 @@ first attempt connects. A move to another kind of network, such as Wi-Fi to mobi
 (`expo-network`, `apps/mobile/src/shared/lib/network-path.ts`), ends the connection, and the recovery
 makes a new one on the same session at once (`networkMoved`); the WebView's `online` event does not
 fire for such a move. In support logs, an ICE restart after a network move did not bring the path
-back within 6 s, and a new connection was up in 1.5–3 s. In other cases, a probe of the path waits up
+back within 6 s, and a new connection was up in 1.5–3 s. A new Wi-Fi address (`getIpAddressAsync`)
+is also a move. A change that involves a VPN, such as a VPN or Tailscale that turns on or off (iOS
+reports the type as unknown, Android as VPN), keeps the connection: the peer renews its Signal socket
+and restarts ICE, which gathers the candidates of the new interface and keeps the old path until a
+new one answers, and it checks the path with the compatibility read (`networkChanged`,
+`apps/mobile/src/shared/lib/network-change.ts`). A dead path then makes a new connection. Such a
+change waits 1 s, so that a short series of changes sends one restart; a move goes at once. In other cases, a probe of the path waits up
 to 6 s after the start of an ICE restart (`ICE_RESTART_PROBE_MS`) before it judges the path dead. The desktop host closes a connection
 at its 11th ICE restart, so the peer counts its restart offers and, after 10, makes a new connection
-on the same session instead of an 11th. A new connection to a known host opens its Signal socket while the ticket request runs,
+on the same session instead of an 11th. While the app is open and the connection is online, the peer
+reads the selected candidate pair every 5 s (`packages/team-client/src/remote-path-watch.ts`). After
+12 s with no received bytes and no ICE consent answers, it checks the path with the compatibility
+read, which replaces a dead connection. A connection on a TURN relay restarts ICE 60 s, 3 minutes
+and 9 minutes after it found the relay, to find a direct path; these restarts stop while 3 or fewer
+of the 10 restarts are left. A failed attempt is retried after 0.5, 1.2, 2.7 and 4.8 s, each with
+up to 20 % more, then the recovery waits 15 s before the next 5 attempts (`REMOTE_RETRY_DELAYS_MS`,
+`REMOTE_RETRY_COOLDOWN_MS`). A new connection to a known host opens its Signal socket while the ticket request runs,
 and, with ICE servers less than 30 minutes old, gathers candidates before `ready`; its first offer
 holds the candidates gathered so far. A server that was
 Online when the app left keeps its Online look during the first attempt after the return, for up to
@@ -278,11 +291,27 @@ never tokens or token hashes, and all operations are scoped to the authenticated
 Cloudflare issues short ES256 connection tickets and stores the logical session. Signal issues a
 10-minute resume token, so a short Signal update does not end an active WebRTC connection. Signal
 validates a trusted, non-expired resume token locally. After a Signal restart, the first use of a token
-checks the durable control plane once. An expired token also needs one durable check before Signal issues
+checks the durable control plane once. A connection ticket is checked the same way during the first
+3 minutes after a Signal start, and also later when it was issued before that start (with 60 s for
+clock skew), because Signal forgot the revocations from before its restart. Tickets issued after the
+start get no extra check. An expired token also needs one durable check before Signal issues
 a replacement. Later reconnects use the in-memory trust cache. This is not a heartbeat.
 Session endings and access changes use a durable D1 outbox. Cloudflare sends each revocation to Signal
 immediately and retries failed deliveries from a scheduled task. This keeps reconnect validation local
 without losing revocations when Signal is temporarily unavailable.
+A host does not need its Signal socket to keep a WebRTC connection, so Signal must tell it about a
+session that ended while the host socket was away. Signal keeps the ended session IDs of each host for
+24 hours and sends them in a `sessions-ended` frame each time a host socket authenticates, and at once
+to a host socket that is connected. The host closes the child peer of each listed session. Signal
+forgets these IDs when it restarts, so the host also fails closed: after each new host Signal socket,
+every child peer must be confirmed again by a `peer-ready` for its session, or the host closes it.
+Each child peer has 11 minutes for this (`CLIENT_RECONFIRM_MS` in `team-webrtc.ts`): the 10-minute
+client reconnect grace of Signal and 1 minute more. The time counts only while the host has a ready
+Signal socket, so a Signal outage does not close healthy peers. Signal confirms a client at once when
+the client socket is connected and Signal maps it to the resumed host socket. A client that is away
+from Signal is confirmed when it comes back. Host frames use their own Signal rate key
+(`host:<hostId>`, 10 times the per-user limit), so the traffic of an owner's client cannot close the
+host socket. Older hosts ignore `sessions-ended`.
 
 Protocol v1 remains frozen for compatibility fixtures, but its public HTTP, WebSocket, and Cloudflare
 Tunnel transport is retired. The old public endpoints return `host_update_required`.

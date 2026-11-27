@@ -109,6 +109,8 @@ export const messages = {
   "marketplace.app.partialTitle": "{name} nie jest kompletny",
   "marketplace.app.partialDescription":
     "Niektóre aplikacje lub umiejętności nie są zainstalowane. Ponowne połączenie je zainstaluje.",
+  "marketplace.app.pausedTitle": "{name} jest wyłączona",
+  "marketplace.app.pausedDescription": "Agenci nie dostają narzędzi {name}. Ponowne połączenie ją włączy.",
   "marketplace.app.notConnected": "Nie połączono",
   "marketplace.app.paused": "Wstrzymano",
   "marketplace.app.custom": "Serwer MCP",

@@ -221,6 +221,7 @@ export interface AgentThreadViewProps {
   onPreview: (attachment: AttachmentSummary) => void;
   onAttachmentAction: (attachment: AttachmentSummary, action: "open" | "reveal" | "download") => void;
   macWindowControls?: boolean | undefined;
+  remoteContent?: boolean | undefined;
   approval?: AgentApproval | undefined;
   onRespondApproval: (decision: "accept" | "decline") => Promise<boolean>;
   media?: MediaApprovalControls | undefined;
@@ -551,6 +552,7 @@ export function AgentThreadView(props: AgentThreadViewProps) {
             onOpenSharedFile={sharedFileOpener(current().exchange?.senderAgentId)}
             onOpenWorkspaceFile={workspaceFileOpener(current().exchange?.senderAgentId)}
             macWindowControls={props.macWindowControls}
+            remoteContent={props.remoteContent}
           />
         )}
       </Show>
@@ -949,6 +951,7 @@ export function AgentThreadView(props: AgentThreadViewProps) {
                           downloads={props.downloads}
                           onDownload={(attachment) => props.onAttachmentAction(attachment, "download")}
                           macWindowControls={props.macWindowControls}
+                          remoteContent={props.remoteContent}
                           referencedMessage={referenced(message())}
                           onOpenReference={() => {
                             const id = message().replyToMessageId;

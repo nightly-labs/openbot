@@ -21,6 +21,7 @@ import { identify, type SignInMethod, track } from "./analytics";
 import { BrowserAsks } from "./BrowserSharing";
 import { ChannelScreen } from "./ChannelScreen";
 import { ChatScreen } from "./ChatScreen";
+import { ConnectingScreen } from "./ConnectingScreen";
 import { type ClientBrowserLink, createClientBrowserLink } from "./client-browser-link";
 import {
   clearSession,
@@ -35,6 +36,7 @@ import { HomeScreen } from "./HomeScreen";
 import { createHostConnection, type HostConnection } from "./host-connection";
 import { NewAgentScreen } from "./NewAgentScreen";
 import { NewChannelScreen, NewFolderScreen } from "./NewChatItemScreens";
+import { NoServersScreen } from "./NoServersScreen";
 import { SettingsScreen } from "./SettingsScreen";
 import { SignInScreen } from "./SignInScreen";
 import { createWorkspace, type Workspace } from "./workspace";
@@ -50,12 +52,26 @@ import {
 } from "./x-messages";
 
 const EMAIL_START_KEY_LIFE_MS = 10 * 60_000;
+const SLOW_STEP_MS = 400;
+
+function createSlowStep() {
+  const [slow, setSlow] = createSignal(false);
+  let timer: number | undefined;
+  return {
+    slow,
+    start() {
+      if (slow() || timer !== undefined) return;
+      timer = window.setTimeout(() => setSlow(true), SLOW_STEP_MS);
+    },
+  };
+}
 
 export function App() {
   const [session, setSession] = createSignal<ExtensionSession | null>(null);
   const [login, setLogin] = createSignal<CentralAuthState>({ status: "loading" });
   let emailStart: { email: string; key: string; at: number } | null = null;
   let openTracked = false;
+  const sessionCheck = createSlowStep();
 
   function trackOpened(signedIn: boolean) {
     if (openTracked) return;
@@ -72,6 +88,7 @@ export function App() {
 
   async function checkSession() {
     setLogin({ status: "loading" });
+    sessionCheck.start();
     const saved = await readSession();
     if (!saved) {
       setLogin({ status: "signed_out" });
@@ -155,19 +172,21 @@ export function App() {
         when={session()}
         keyed
         fallback={
-          <div class="ext-login">
-            <SignInScreen
-              login={login()}
-              onRetry={checkSession}
-              onRequestEmailCode={requestCode}
-              onVerifyEmailCode={verify}
-              onReset={async () => {
-                emailStart = null;
-                setLogin({ status: "signed_out" });
-              }}
-              onSignedIn={(next) => signedIn(next, "web")}
-            />
-          </div>
+          <Show when={login().status !== "loading" || sessionCheck.slow()}>
+            <div class="ext-login">
+              <SignInScreen
+                login={login()}
+                onRetry={checkSession}
+                onRequestEmailCode={requestCode}
+                onVerifyEmailCode={verify}
+                onReset={async () => {
+                  emailStart = null;
+                  setLogin({ status: "signed_out" });
+                }}
+                onSignedIn={(next) => signedIn(next, "web")}
+              />
+            </div>
+          </Show>
         }
       >
         {(current) => (
@@ -212,6 +231,7 @@ function ServerView(props: { session: ExtensionSession; onSignOut: () => void; o
   let browserLink: ClientBrowserLink | null = null;
   const [presence, setPresence] = createSignal<ClientBrowserPresence>({ sharing: false, tabs: [] });
   const [canShare, setCanShare] = createSignal(false);
+  const connectStep = createSlowStep();
 
   const host = () => view.hosts.find((entry) => entry.hostId === view.hostId) ?? null;
 
@@ -231,6 +251,7 @@ function ServerView(props: { session: ExtensionSession; onSignOut: () => void; o
       draft.offline = false;
     });
     void saveServerId(hostId);
+    connectStep.start();
     try {
       const granted = await connection.connect(target);
       if (current !== attempt) return;
@@ -278,20 +299,28 @@ function ServerView(props: { session: ExtensionSession; onSignOut: () => void; o
         },
         sessionEnded: props.onSessionEnded,
       });
-      const hosts = await connection.listHosts();
-      setView((draft) => {
-        draft.hosts = hosts;
-        draft.status = hosts.length ? "connecting" : "empty";
-      });
-      if (!hosts.length) return;
-      const saved = await readServerId();
-      await open(hosts.some((entry) => entry.hostId === saved) && saved ? saved : (hosts[0]?.hostId ?? ""));
+      await listServers(connection);
     } catch (error) {
       setView((draft) => {
         draft.status = "failed";
         draft.message = error instanceof Error ? error.message : t("extension.connection.requestFailed");
       });
     }
+  }
+
+  async function listServers(current: HostConnection) {
+    const hosts = await current.listHosts();
+    setView((draft) => {
+      draft.hosts = hosts;
+      draft.status = hosts.length ? "connecting" : "empty";
+    });
+    if (!hosts.length) return;
+    const saved = await readServerId();
+    await open(hosts.some((entry) => entry.hostId === saved) && saved ? saved : (hosts[0]?.hostId ?? ""));
+  }
+
+  function listServersAgain() {
+    return connection ? listServers(connection) : start();
   }
 
   async function openChatFromX() {
@@ -385,7 +414,20 @@ function ServerView(props: { session: ExtensionSession; onSignOut: () => void; o
     <>
       <Switch>
         <Match when={view.status === "empty"}>
-          <p class="ext-state">{t("extension.connection.noServers")}</p>
+          <NoServersScreen user={props.session.user} onRetry={listServersAgain} onSignOut={() => props.onSignOut()} />
+        </Match>
+        <Match when={(view.status === "failed" || (view.status !== "ready" && connectStep.slow())) && host()}>
+          {(target) => (
+            <ConnectingScreen
+              hosts={view.hosts}
+              host={target()}
+              user={props.session.user}
+              failure={view.status === "failed" ? view.message : null}
+              onSelectHost={(hostId) => void open(hostId)}
+              onRetry={() => void open(target().hostId)}
+              onSignOut={() => props.onSignOut()}
+            />
+          )}
         </Match>
         <Match when={view.status === "failed"}>
           <div class="ext-state">
@@ -476,11 +518,6 @@ function ServerView(props: { session: ExtensionSession; onSignOut: () => void; o
               </section>
             </div>
           )}
-        </Match>
-        <Match when={true}>
-          <p class="ext-state" aria-live="polite">
-            {host() ? t("extension.connection.connecting", { server: host()?.name ?? "" }) : null}
-          </p>
         </Match>
       </Switch>
       <BrowserAsks />
