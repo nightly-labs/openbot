@@ -645,6 +645,7 @@ const MessageRow = memo(function MessageRow({
             enabled,
             active: shared.playbackActive,
             paused: shared.playbackPaused,
+            revealed,
             onWord: (word: string, index: number) => {
               markRevealed(message.id);
               replyHaptics.onWord(word, index);
@@ -664,6 +665,7 @@ const MessageRow = memo(function MessageRow({
       enabled,
       shared.playbackActive,
       shared.playbackPaused,
+      revealed,
       markRevealed,
       replyHaptics,
     ],

@@ -9,6 +9,7 @@ export interface ReplyPlayback {
   enabled: boolean;
   active: boolean;
   paused: boolean;
+  revealed: boolean;
   complete: boolean;
   onWord: (word: string, index: number) => void;
   onFlush: () => void;
@@ -16,7 +17,8 @@ export interface ReplyPlayback {
 }
 
 function resumable(playback: ReplyPlayback | undefined, total: number) {
-  const position = playback?.progress.get(playback.id) ?? 0;
+  if (!playback?.revealed) return false;
+  const position = playback.progress.get(playback.id) ?? 0;
   return position > 0 && position < total;
 }
 
