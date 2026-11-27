@@ -2956,6 +2956,7 @@ export class ProviderRuntime implements ProviderPort {
     this.#usageUnreported.delete(provider);
     this.#usageReadFailed.delete(provider);
     this.#lastUsage.set(provider, limit);
+    if (limit.primary && limit.secondary) this.#usageGate(provider).succeeded();
     this.#noteCredits(source, limit);
     const shown = (item: AgentProvider) =>
       !this.#usageUnreported.has(item) && (this.#clients.has(item) || this.#released.has(item));
