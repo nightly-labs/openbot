@@ -790,9 +790,12 @@ html.ui-textarea-resizing {
 
 .ui-search-select-input {
   width: 100%;
-  border-color: var(--ui-menu-edge);
   background: var(--ui-menu-item-hover);
   padding-inline-start: var(--openbot-space-8);
+}
+
+.ui-search-select-input:not(:focus-visible, [aria-invalid="true"]) {
+  border-color: var(--ui-menu-edge);
 }
 
 .ui-search-select-root {
