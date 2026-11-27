@@ -60,6 +60,7 @@ async function undoAction(slot: string, choice: ChatBackdropChoice): Promise<() 
 }
 
 function removeBackdrop(time: number): void {
+  if (readMark() >= time) return;
   writeMark(time);
   const previous = useChatBackdrop()();
   if (previous === null) return;
