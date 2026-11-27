@@ -48,6 +48,7 @@ import { AGENT_USAGE_LIMIT_CAPABILITY } from "./agent-usage-limit-v1";
 import { AGENT_WAITS_CAPABILITY } from "./agent-waits-v1";
 import { AGENT_WELCOME_CAPABILITY } from "./agent-welcome-v1";
 import { ANTIGRAVITY_CODE_SIGN_IN_CAPABILITY } from "./antigravity-code-sign-in-v1";
+import { TEAM_ATTACHMENT_DIMENSIONS_CAPABILITY } from "./attachment-dimensions-v1";
 import { ATTACHMENT_PREVIEW_CAPABILITY } from "./attachment-preview-v1";
 import { BACKGROUND_PROCESSES_CAPABILITY } from "./background-processes-v1";
 import { BITWARDEN_CONNECTOR_CAPABILITY } from "./bitwarden-connector-v1";
@@ -900,6 +901,7 @@ const TEAM_CAPABILITY_REGISTRY = [
   [SYNC_CAPABILITY, V10],
   [REMOTE_CHAT_CONTENT_CAPABILITY, V10],
   [PLUGIN_CATALOG_CAPABILITY, V10],
+  [TEAM_ATTACHMENT_DIMENSIONS_CAPABILITY, V10],
   [ROUTINE_RUN_CHANGES_CAPABILITY, V10],
 ] as const satisfies readonly (readonly [string, TeamCapabilityPlacement])[];
 

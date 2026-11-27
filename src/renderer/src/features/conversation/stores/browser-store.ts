@@ -615,6 +615,7 @@ export function createBrowserStore(deps: BrowserStoreDeps) {
     const index = tabsOwnedBy(agent).findIndex((tab) => tab.id === tabId);
     if (index < 0) return false;
     lastShownTabs.set(agent.id, { id: tabId, index });
+    deps.props.onActivateBrowserTab(tabId);
     return true;
   }
 

@@ -7,6 +7,47 @@ the [root changelog](../../CHANGELOG.md).
 
 ## [Unreleased]
 
+## [1.4.14.2] - 2026-11-27
+
+### Added
+
+- Server Settings > Providers has a new choice for pooled accounts, **Spread**. With Spread, the server puts agents on the accounts with the most usage left, so all accounts get used. **Fill first** stays the default. The server must be on the new OpenBot version for this choice.
+
+### Changed
+
+- You can tap Send while dictation records. The app stops the recording, waits for the full
+  transcript and sends the message one time. When speech recognition fails or does not finish,
+  the app does not send: the text stays in the message box. Before, Send was not available until
+  you stopped dictation (#8300).
+- Reconnect faster after the connection to a server drops. A failed attempt is tried again after
+  0.5, 1.2, 2.7 and 4.8 seconds, and the wait after 5 failed attempts is 15 seconds. Before, the
+  waits were 2, 4, 8 and 16 seconds, then 30 seconds.
+- Keep the connection when a VPN or Tailscale turns on or off. The app checks the connection and
+  looks for a new path, and it loads the workspace again only when the old path stopped. Before,
+  each change made a new connection and loaded the whole workspace again.
+- Move a connection that goes through the OpenBot relay to a direct path when one becomes
+  available, for example on the same Wi-Fi or through Tailscale. This makes replies arrive sooner.
+
+### Fixed
+
+- A chat link to a part of a file, such as `guide.md#install`, now opens the file. Before, the app showed "Could not open file".
+- With the sort "Recent activity" or "Unread first in folders", a chat that you drag onto a folder now moves into that folder, and the whole folder is highlighted while you drag. Before, the drop did nothing and the app did not say why.
+- A chat in the "Unread" or "Needs you" group now offers only the pinned area as a drop target. Before, a drop in the group did nothing, and a move into a folder did not show until you read the chat.
+- While the server is offline, a dragged chat now offers only the pinned area. When a folder change fails because the server is offline, the alert now says "Connect to this server to change its folders." Before, it said "This host does not support folder changes."
+- When an agent ends a routine run with "nothing to report" but still writes a message, such as a reminder, you can now read that message on the phone. Tap the routine row in the chat to open it, as on the desktop. Before, the phone showed only "Completed routine", so a reminder that the agent ended quietly by mistake was lost.
+- When a Telegram chat could not link from the phone, the phone always said to check the internet connection, VPN, proxy or firewall of the computer, also when the OpenBot service refused the connection or security software on the computer blocked it. The phone now shows the reason that the computer found. The computer or server must also be on the newest OpenBot version.
+- When an agent waits for you in a group chat, a tap on the agent under "Needs you" now opens that group chat at the question. Before, it opened the agent's own chat, which does not show the question.
+- When the phone cannot reach the OpenBot connection service, for example because of the mobile network or a VPN, the reconnect message now says so and asks you to check the internet connection and the VPN. Before, it said "The desktop did not connect.", also when the computer was online.
+- When the connection to the server stops for a short time, a workflow approval, retry or stop that you tap now waits up to 15 seconds for the connection and is then sent. Before, it failed at once with "The selected server is offline.", and the approval stayed pending. While the server is offline, these buttons are now disabled.
+- A message that shows "Not confirmed" now tells you to touch and hold it, so you can edit it or cancel it. Before, the text did not say how to continue, and the later messages of that chat waited for it with no clear way to release them.
+- Tap Sign in on the sign-in card of an MCP server in a chat, and the sign-in page now opens at once. Before, the app opened the server settings, and the Sign in button was at the bottom, below the visible part of the screen. The sign-in steps now show at the top of that page.
+- Find a connection that stopped silently within about 12 seconds and reconnect. Before, the app
+  could show the server as online while no new messages arrived, until a request timed out.
+- Reconnect at once after a move to another Wi-Fi network. Before, the app waited until a request
+  timed out.
+- Agent chats with no unread messages load 24 messages on the first page instead of 50, so switching chats over a remote connection is faster. A chat with unread messages still loads 50. When the server is on the new version, a channel with no unread messages also opens on 24 messages instead of 100, and a channel with unread messages opens on all the messages after your last read one, up to 100. Scrolling up continues to load older pages.
+- The app now connects again after you tap Refresh connection while a server is offline. Before, the connection could wait with no end until you closed the app or signed out and in again.
+
 ## [1.4.14.1] - 2026-11-26
 
 ### Changed

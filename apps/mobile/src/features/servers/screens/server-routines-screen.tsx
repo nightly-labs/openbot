@@ -23,7 +23,10 @@ import { useQueryScope } from "@/features/auth/context/mobile-session-context";
 import { useChannels } from "@/features/channels/components/use-channels";
 import { DAY_STRIP_LENGTH, DayStrip } from "@/features/servers/components/day-strip";
 import { SettingsNote, SettingsRow, SettingsSection } from "@/features/settings/components/settings-content";
-import { useMobileWorkspace } from "@/features/workspace/context/mobile-workspace-context";
+import {
+  useMobileWorkspaceActions,
+  useMobileWorkspaceSelector,
+} from "@/features/workspace/context/mobile-workspace-context";
 import { queryKeys } from "@/features/workspace/model/query-keys";
 import type { MobileAgent } from "@/features/workspace/model/workspace-types";
 import { LargeTitleScrollView } from "@/shared/components/large-title";
@@ -89,9 +92,10 @@ export function ServerRoutinesScreen() {
   const foreground = String(useCSSVariable("--openbot-text-primary"));
   const { serverId } = useLocalSearchParams<{ serverId: string }>();
   const queryScope = useQueryScope();
-  const { servers, agents, loadRoutineCalendar } = useMobileWorkspace();
+  const server = useMobileWorkspaceSelector((workspace) => workspace.servers.find((item) => item.id === serverId));
+  const agents = useMobileWorkspaceSelector((workspace) => workspace.agents);
+  const { loadRoutineCalendar } = useMobileWorkspaceActions();
   const { channels } = useChannels(serverId);
-  const server = servers.find((item) => item.id === serverId);
   const online = server?.state === "online";
   const timeZone = Intl.DateTimeFormat().resolvedOptions().timeZone;
   const [now, setNow] = useState(() => new Date());
