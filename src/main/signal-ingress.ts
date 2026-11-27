@@ -88,6 +88,7 @@ function linkedRouteIds(route: LinkedRouteTicket | null): ReadonlySet<string> | 
 
 const BACKOFF_START_MS = 2_000;
 const BACKOFF_LIMIT_MS = 5 * 60_000;
+const ONLINE_CLOSE_SPREAD_MS = 14_000;
 const PING_INTERVAL_MS = 30_000;
 const PONG_TIMEOUT_MS = 10_000;
 const READY_TIMEOUT_MS = 15_000;
@@ -632,6 +633,7 @@ export class SignalIngress implements MessagingIngress {
     socket.on("pong", () => pongs.set(socket, true));
     socket.on("close", (code) => {
       if (socket !== this.#socket) return;
+      const wasOnline = this.#state === "online";
       logger.info("The Signal ingress socket closed.", { code, opened });
       this.#socket = null;
       this.#directNext = proxyUrl !== null && !opened;
@@ -643,7 +645,7 @@ export class SignalIngress implements MessagingIngress {
       this.#clearReadyDeadline();
       this.#webhookReady = false;
       this.#loseGitHub();
-      if (!this.#unheld()) this.#wait("unavailable");
+      if (!this.#unheld()) this.#wait("unavailable", wasOnline ? ONLINE_CLOSE_SPREAD_MS : 0);
     });
     socket.on("error", (error: NodeJS.ErrnoException) => {
       const code = error.code ?? null;
@@ -871,10 +873,10 @@ export class SignalIngress implements MessagingIngress {
     );
   }
 
-  #wait(state: Exclude<IngressState, "online" | "connecting">): void {
+  #wait(state: Exclude<IngressState, "online" | "connecting">, spreadMs = 0): void {
     this.#setState(state);
     if (this.#unheld() || this.#retry) return;
-    const delay = this.#backoffMs * (0.5 + Math.random() / 2);
+    const delay = this.#backoffMs * (0.5 + Math.random() / 2) + Math.random() * spreadMs;
     this.#backoffMs = Math.min(this.#backoffMs * 2, BACKOFF_LIMIT_MS);
     this.#retry = setTimeout(() => {
       this.#retry = null;
