@@ -85,7 +85,7 @@ import {
 import { decodeBase64Url, hmacSha256, importHmacSha256Key, randomToken, sha256 } from "./crypto";
 import { CUSTOM_SERVER_OFFER_COLUMNS, type CustomServerOfferRow, customServerPayment } from "./custom-server-offers";
 import type { GitHubInstallationTokensError, GitHubRepositoryRoute } from "./github-installation-tokens";
-import { replicaD1 } from "./observed-d1";
+import { primaryD1, replicaD1 } from "./observed-d1";
 import { PERSISTENT_SESSION_EXPIRES_AT } from "./session-policy";
 import { CHECKOUT_LIFETIME_SECONDS } from "./stripe-client";
 import type { AuthUser, WorkerBindings } from "./types";
@@ -237,6 +237,23 @@ function remoteCall<A>(operation: () => Promise<A>): Effect.Effect<A, RemoteFail
     try: operation,
     catch: (error) => (error instanceof RemoteControlPlaneError ? error : new RemoteOperationError({})),
   });
+}
+
+type RemoteReads = "request" | "replica" | "primary";
+
+function readsFrom(database: D1Database, reads: RemoteReads): D1Database {
+  if (reads === "replica") return replicaD1(database);
+  if (reads === "primary") return primaryD1(database);
+  return database;
+}
+
+function machineTokenMatches(host: RemoteHostRow, providedHash: string): boolean {
+  const expected = host.machine_token_hash ?? "";
+  let difference = expected.length ^ providedHash.length;
+  for (let index = 0; index < providedHash.length; index += 1) {
+    difference |= expected.charCodeAt(index) ^ providedHash.charCodeAt(index);
+  }
+  return expected !== "" && difference === 0;
 }
 
 export interface SqlCondition {
@@ -3432,19 +3449,33 @@ export class RemoteControlPlane {
       hostId: string,
       machineToken: string,
     ): Effect.fn.Return<RemoteHostRow, RemoteFailure, RemoteDependencies> {
-      const host = yield* this.#host(hostId);
-      const expected = host?.machine_token_hash ?? "";
       const provided = yield* sha256(machineToken).pipe(
         Effect.mapError((error) => (error instanceof RemoteControlPlaneError ? error : new RemoteOperationError({}))),
       );
-      let difference = expected.length ^ provided.length;
-      for (let index = 0; index < provided.length; index += 1) {
-        difference |= expected.charCodeAt(index) ^ provided.charCodeAt(index);
-      }
-      if (!host || !expected || difference !== 0) {
+      const host = yield* this.#host(hostId);
+      if (!host || !machineTokenMatches(host, provided)) {
         return yield* new RemoteControlPlaneError(401, "host_unauthorized", "The host credential is invalid.");
       }
       return host;
+    },
+    (operation) => operation.pipe(Effect.provide(this.#layer)),
+  ).bind(this);
+
+  readonly assertHostCredential = Effect.fn("RemoteControlPlane.assertHostCredential")(
+    function* (
+      this: RemoteControlPlane,
+      hostId: string,
+      machineToken: string,
+    ): Effect.fn.Return<void, RemoteFailure, RemoteDependencies> {
+      const provided = yield* sha256(machineToken).pipe(
+        Effect.mapError((error) => (error instanceof RemoteControlPlaneError ? error : new RemoteOperationError({}))),
+      );
+      const replica = yield* this.#host(hostId, "replica");
+      if (replica && machineTokenMatches(replica, provided)) return;
+      const host = yield* this.#host(hostId, "primary");
+      if (!host || !machineTokenMatches(host, provided)) {
+        return yield* new RemoteControlPlaneError(401, "host_unauthorized", "The host credential is invalid.");
+      }
     },
     (operation) => operation.pipe(Effect.provide(this.#layer)),
   ).bind(this);
@@ -3666,10 +3697,11 @@ export class RemoteControlPlane {
   readonly #host = Effect.fn("RemoteControlPlane.host")(function* (
     this: RemoteControlPlane,
     hostId: string,
+    reads: RemoteReads = "request",
   ): Effect.fn.Return<RemoteHostRow | null, RemoteFailure, RemoteDependencies> {
     const dependencies = yield* RemoteDependencies;
     return yield* remoteCall(() =>
-      dependencies.database
+      readsFrom(dependencies.database, reads)
         .prepare(
           `SELECT host_id, owner_user_id, name, logo_key, auth_epoch, machine_token_hash, device_public_key, signal_home
          FROM remote_hosts WHERE host_id = ? LIMIT 1`,
