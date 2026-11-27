@@ -1203,22 +1203,46 @@ export function createConversationViewScope(props: ConversationProps) {
   };
   const composerHasText = () => Boolean(currentDraft().text.trim() || voiceLiveText().trim());
   const [draftHeldPromptKey, setDraftHeldPromptKey] = createSignal<string | null>(null);
-  let unsentPromptAnswer: { chat: string; key: string; text: string } | undefined;
-  const keepUnsentPromptAnswer = (text: string | undefined) => {
+  const unsentPromptAnswers = new Map<
+    string,
+    { chat: string; key: string; text: string; drafts: Record<string, string> | undefined }
+  >();
+  const unsentPromptAnswerKey = (chat: string, key: string) => JSON.stringify([chat, key]);
+  const keepUnsentPromptAnswer = (text: string | undefined, drafts?: Record<string, string>) => {
     const key = openPromptKey();
-    unsentPromptAnswer = text === undefined || key === null ? undefined : { chat: openChatKey(), key, text };
+    if (key === null) return;
+    const chat = openChatKey();
+    if (text === undefined) unsentPromptAnswers.delete(unsentPromptAnswerKey(chat, key));
+    else unsentPromptAnswers.set(unsentPromptAnswerKey(chat, key), { chat, key, text, drafts });
+  };
+  const unsentPromptDrafts = () => {
+    const key = openPromptKey();
+    return key === null ? undefined : unsentPromptAnswers.get(unsentPromptAnswerKey(openChatKey(), key))?.drafts;
+  };
+  const returnUnsentPromptAnswer = (target: ConversationTarget, threadDraftKey: string | undefined, text: string) => {
+    const appendTo =
+      (draftKey: string) =>
+      (current: Record<string, ComposerDraft>): Record<string, ComposerDraft> => ({
+        ...current,
+        [draftKey]: appendDraftText(current[draftKey] ?? EMPTY_DRAFT, text),
+      });
+    if (threadDraftKey === undefined) setDrafts(appendTo(composerDraftKey(target)));
+    else controller.setThreadDrafts(appendTo(threadDraftKey));
   };
   createEffect(
-    () => ({ chat: openChatKey(), key: openPromptKey(), target: currentConversationTarget(props) }),
-    ({ chat, key, target }) => {
-      const unsent = unsentPromptAnswer;
-      if (!unsent || unsent.chat !== chat || unsent.key === key || !target) return;
-      unsentPromptAnswer = undefined;
-      const draftKey = composerDraftKey(target);
-      setDrafts((current) => ({
-        ...current,
-        [draftKey]: appendDraftText(current[draftKey] ?? EMPTY_DRAFT, unsent.text),
-      }));
+    () => ({
+      chat: openChatKey(),
+      key: openPromptKey(),
+      target: currentConversationTarget(props),
+      threadDraftKey: threadComposer.openDraftKey(),
+    }),
+    ({ chat, key, target, threadDraftKey }) => {
+      if (!target) return;
+      for (const [entry, unsent] of unsentPromptAnswers) {
+        if (unsent.chat !== chat || unsent.key === key) continue;
+        unsentPromptAnswers.delete(entry);
+        returnUnsentPromptAnswer(target, threadDraftKey, unsent.text);
+      }
     },
   );
   let lastOpenPrompt: { chat: string; key: string | null } | undefined;
@@ -2974,6 +2998,7 @@ export function createConversationViewScope(props: ConversationProps) {
     setRequiredInteractionElement,
     registerPromptComposerAnswer,
     keepUnsentPromptAnswer,
+    unsentPromptDrafts,
     handleRoutineSettingsRequest,
     setShowComposerActions,
     settingsModel,

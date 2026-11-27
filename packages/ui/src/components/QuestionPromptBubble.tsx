@@ -27,6 +27,8 @@ export interface QuestionPromptBubbleProps {
   onResolutionPresented?: () => void;
   onOpenLink: (url: string) => void;
   registerComposerAnswer?: ((answer: QuestionPromptComposerAnswer) => () => void) | undefined;
+  drafts?: Record<string, string> | undefined;
+  onDraftsChange?: ((drafts: Record<string, string> | undefined) => void) | undefined;
 }
 
 const PICK_HOLD_MS = 180;
@@ -100,7 +102,7 @@ export function QuestionPromptBubble(props: QuestionPromptBubbleProps) {
   const [state, setState] = createStore<PromptState>({
     step: untrack(() => (props.resolution ? props.questions.length : 0)),
     picks: {},
-    drafts: {},
+    drafts: untrack(() => ({ ...props.drafts })),
     submitting: false,
     announced: "",
     sent: null,
@@ -201,12 +203,22 @@ export function QuestionPromptBubble(props: QuestionPromptBubbleProps) {
     props.onResolutionPresented?.();
   }
 
+  function reportDrafts(changed?: Record<string, string>): void {
+    const drafts = { ...state.drafts, ...changed };
+    const typed = props.questions.flatMap((question) => {
+      const text = drafts[question.id] ?? "";
+      return !question.isSecret && text.trim() ? [[question.id, text] as const] : [];
+    });
+    props.onDraftsChange?.(typed.length > 0 ? Object.fromEntries(typed) : undefined);
+  }
+
   async function submit(result: Record<string, string[]>): Promise<void> {
     if (busy()) return;
     window.clearTimeout(holdTimer);
     setState((draft) => {
       draft.submitting = true;
     });
+    props.onDraftsChange?.(undefined);
     let completed = false;
     try {
       completed = await props.onSubmit(result);
@@ -217,7 +229,10 @@ export function QuestionPromptBubble(props: QuestionPromptBubbleProps) {
       draft.submitting = false;
       if (completed) draft.sent = summaryResolution(props.questions, result);
     });
-    if (!completed) return;
+    if (!completed) {
+      reportDrafts();
+      return;
+    }
     resolutionPresentationPending = true;
     goTo(total());
     const duration = stage ? motionDuration(stage, "--page-slide-dur", 250) : 0;
@@ -260,6 +275,7 @@ export function QuestionPromptBubble(props: QuestionPromptBubbleProps) {
       draft.picks[question.id] = [label];
       draft.drafts[question.id] = "";
     });
+    reportDrafts({ [question.id]: "" });
     window.clearTimeout(holdTimer);
     holdTimer = window.setTimeout(() => goOn(page, [label]), PICK_HOLD_MS);
   }
@@ -270,6 +286,7 @@ export function QuestionPromptBubble(props: QuestionPromptBubbleProps) {
       draft.drafts[question.id] = value;
       if (!question.multiSelect && value.trim()) draft.picks[question.id] = [];
     });
+    reportDrafts({ [question.id]: value });
   }
 
   function skip(page: number): void {
@@ -279,6 +296,7 @@ export function QuestionPromptBubble(props: QuestionPromptBubbleProps) {
       draft.picks[question.id] = [];
       draft.drafts[question.id] = "";
     });
+    reportDrafts({ [question.id]: "" });
     goOn(page, []);
   }
 
