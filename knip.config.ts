@@ -50,6 +50,8 @@ const config: KnipConfig = {
     "ffmpeg",
     "gdbus",
     "import",
+    "systemd-run",
+    "unshare",
   ],
   workspaces: {
     ".": {
