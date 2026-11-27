@@ -1571,6 +1571,10 @@ async function refusesRedirectAddress(response: Response): Promise<boolean> {
 
 const registrationReplySchema = z.record(z.string(), z.unknown());
 
+function isDiscoveryRequest(input: string | URL): boolean {
+  return URL.canParse(String(input)) && new URL(String(input)).pathname.includes("/.well-known/");
+}
+
 async function withoutNullFields(response: Response): Promise<Response> {
   if (!response.ok) return response;
   const reply = registrationReplySchema.safeParse(
@@ -1670,7 +1674,10 @@ export function secureOAuthFetch(options: SecureOAuthFetchOptions = {}): FetchLi
       }
     : null;
   const mcpTraffic = options.mcpTraffic === true ? resource : null;
-  return (input, init) => runCauseEffect(secureOAuthRequest(input, init, options.signal, guard, mcpTraffic));
+  return async (input, init) => {
+    const response = await runCauseEffect(secureOAuthRequest(input, init, options.signal, guard, mcpTraffic));
+    return isDiscoveryRequest(input) ? withoutNullFields(response) : response;
+  };
 }
 
 export interface SecureOAuthFetchOptions {
