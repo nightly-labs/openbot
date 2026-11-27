@@ -739,7 +739,7 @@ html.ui-textarea-resizing {
 
 .ui-select-content {
   z-index: var(--openbot-layer-popover);
-  max-height: 320px;
+  max-height: min(320px, var(--kb-popper-content-available-height, 320px));
   min-width: 144px;
   overflow: hidden auto;
   border: 0;

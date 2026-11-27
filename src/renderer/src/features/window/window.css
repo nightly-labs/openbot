@@ -724,7 +724,7 @@
   }
 
   .app-frame-edge[data-window-page-kind="settings"] > .window-page > .settings-page > .settings-page-close {
-    margin-inline-end: var(--window-controls-end);
+    margin-inline-end: 0;
   }
 
   .app-frame-edge[data-window-page-kind="settings"] > .window-page > .settings-page > .settings-page-path-row {
@@ -745,6 +745,22 @@
 
     margin-inline: 0;
     padding-inline: calc(var(--openbot-space-2) + 1px) var(--openbot-space-3);
+  }
+
+  :root[data-openbot-window-controls-overlay]
+    .app-frame-edge[data-window-page-kind="settings"]
+    > .window-page
+    > .settings-page
+    > .settings-page-close {
+    display: none;
+  }
+
+  :root[data-openbot-window-controls-overlay]
+    .app-frame-edge[data-window-page-kind="settings"]
+    > .window-page
+    > .settings-page
+    > .settings-page-path-row {
+    --settings-page-close-room: var(--window-controls-end);
   }
 
   .app-frame-edge[data-window-page-kind="titled"] > .window-page {
