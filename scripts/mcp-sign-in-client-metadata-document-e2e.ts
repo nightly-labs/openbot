@@ -1,14 +1,21 @@
 import assert from "node:assert/strict";
-import { mkdir, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { createServer, type IncomingMessage, type Server, type ServerResponse } from "node:http";
-import { resolve } from "node:path";
+import { tmpdir } from "node:os";
+import { join, resolve } from "node:path";
 import type { McpServerConfig } from "@openbot/contracts/ipc";
 import { sourceText } from "@openbot/i18n/source";
+import { createOpenBotLogger } from "@openbot/logging";
 import { Effect } from "effect";
 import { z } from "zod";
+import { McpGateway } from "../src/backend/agent/mcp-gateway";
+import { handleMcpServerTool, mcpServersFromGateway, searchSignIns } from "../src/backend/agent/mcp-tools";
 import { runCauseEffect } from "../src/backend/effect-boundary";
 import { McpOAuth, type McpOAuthRecord, mcpOAuthRecordSchema } from "../src/backend/mcp-oauth-provider";
 import { testMcpServer } from "../src/backend/mcp-probe";
+import { McpServerStore } from "../src/backend/mcp-server-store";
+import { OpenBotDatabase } from "../src/backend/openbot-database";
+import { NO_PROVIDER_CREDENTIALS } from "../src/backend/provider-drivers";
 
 const out = resolve(import.meta.dirname, "../.openbot-build/mcp-sign-in-client-metadata-document-e2e");
 const CLIENT_METADATA_URL = "https://openbot.run/oauth/mcp-client.json";
@@ -44,7 +51,17 @@ interface Case {
   failures: string[];
 }
 
-const report: { passed: boolean; cases: (Case | PortChangeCase)[]; failures: string[] } = {
+interface TestConnectionCase {
+  name: string;
+  tests: { place: "here" | "host"; error: string | null }[];
+  agentTest: { status: unknown; error: unknown; signInCards: number };
+  search: { statuses: unknown[]; signInCards: number };
+  pagesOpened: number;
+  registrations: number;
+  failures: string[];
+}
+
+const report: { passed: boolean; cases: (Case | PortChangeCase | TestConnectionCase)[]; failures: string[] } = {
   passed: false,
   cases: [],
   failures: [],
@@ -296,6 +313,81 @@ async function runPortChange(): Promise<PortChangeCase> {
   }
 }
 
+async function runTestConnection(name: string, registration: boolean, signInApp: boolean): Promise<TestConnectionCase> {
+  const server = await fakeServer(registration, false, false);
+  const oauth = oauthOn(new Map<string, McpOAuthRecord>(), server);
+  const root = await mkdtemp(join(tmpdir(), "openbot-mcp-sign-in-app-test-"));
+  const database = new OpenBotDatabase(root);
+  let gateway: McpGateway | null = null;
+  try {
+    await runCauseEffect(database.initialize());
+    const store = new McpServerStore(database);
+    const config = store.save({ ...httpConfig(server.url), id: "" });
+    if (signInApp)
+      await runCauseEffect(oauth.saveSignInApp(server.url, { clientId: "e2e-app", clientSecret: null, scope: "" }));
+    gateway = new McpGateway({
+      servers: store,
+      credentials: { ...NO_PROVIDER_CREDENTIALS, mcpOAuth: oauth },
+      computerUseMcpServer: () => null,
+      logger: createOpenBotLogger("agent-service", () => undefined),
+      hooks: { emitError: () => undefined, refreshAllAgentRuntimes: () => Effect.void },
+    });
+    const tests: TestConnectionCase["tests"] = [];
+    for (const place of ["here", "host"] as const) {
+      const result = await runCauseEffect(gateway.test({ config }, { signInPlace: place }));
+      tests.push({ place, error: result.error });
+    }
+    const tools = mcpServersFromGateway(gateway);
+    const agentCards: string[] = [];
+    const response = await runCauseEffect(
+      handleMcpServerTool(tools, {
+        tool: "test_mcp_server",
+        agentId: "agent-a",
+        arguments: { name: config.name },
+        approve: () => Effect.succeed(true),
+        keysFromPerson: () => Effect.succeed(true),
+        requestSignIn: (row) => Effect.sync(() => void agentCards.push(row.id)),
+        added: () => Effect.void,
+        removed: () => Effect.void,
+      }),
+    );
+    const text = response.contentItems[0]?.type === "inputText" ? response.contentItems[0].text : "{}";
+    const agentResult = z.object({ status: z.unknown(), error: z.unknown().optional() }).parse(JSON.parse(text));
+    const searchCards: string[] = [];
+    const found = await runCauseEffect(
+      searchSignIns(tools, [config], (row) => Effect.sync(() => void searchCards.push(row.id))),
+    );
+    return {
+      name,
+      tests,
+      agentTest: { status: agentResult.status, error: agentResult.error, signInCards: agentCards.length },
+      search: { statuses: found.map((entry) => entry.status), signInCards: searchCards.length },
+      pagesOpened: server.pageClientIds.length,
+      registrations: server.registrations,
+      failures: [],
+    };
+  } finally {
+    if (gateway) await runCauseEffect(gateway.close());
+    await runCauseEffect(oauth.close());
+    database.close();
+    await rm(root, { recursive: true, force: true });
+    await server.close();
+  }
+}
+
+function checkTestConnection(entry: TestConnectionCase, expected: { here: string; host: string; status: string }) {
+  const [here, host] = entry.tests;
+  check(entry, here?.error === expected.here, `Test connection said: ${here?.error}`);
+  check(entry, host?.error === expected.host, `Test connection on the host said: ${host?.error}`);
+  check(entry, entry.agentTest.status === expected.status, `test_mcp_server said ${entry.agentTest.status}`);
+  check(entry, entry.search.statuses.join() === expected.status, `the tool search said ${entry.search.statuses}`);
+  const cards = expected.status === "needs_sign_in" ? 1 : 0;
+  check(entry, entry.agentTest.signInCards === cards, `test_mcp_server posted ${entry.agentTest.signInCards} cards`);
+  check(entry, entry.search.signInCards === cards, `the tool search posted ${entry.search.signInCards} cards`);
+  check(entry, entry.pagesOpened === 0, "a test opened a sign-in page");
+  check(entry, entry.registrations === 0, `a test registered ${entry.registrations} times`);
+}
+
 function check(entry: { failures: string[] }, condition: boolean, text: string): void {
   if (!condition) entry.failures.push(text);
 }
@@ -442,6 +534,32 @@ async function main(): Promise<void> {
     );
     check(noRegistration, !noRegistration.signedIn, "a token is stored with no client");
     report.cases.push(noRegistration);
+
+    const appNeeded = await runTestConnection("test-connection-no-registration", false, false);
+    checkTestConnection(appNeeded, {
+      here: sourceText("error.backend.mcpSignInAppNeeded"),
+      host: sourceText("error.backend.mcpSignInAppNeeded"),
+      status: "error",
+    });
+    check(
+      appNeeded,
+      appNeeded.agentTest.error === sourceText("error.backend.mcpSignInAppNeeded"),
+      `test_mcp_server gave the error ${String(appNeeded.agentTest.error)}`,
+    );
+    report.cases.push(appNeeded);
+
+    for (const [name, registration, signInApp] of [
+      ["test-connection-registration", true, false],
+      ["test-connection-saved-sign-in-app", false, true],
+    ] as const) {
+      const signIn = await runTestConnection(name, registration, signInApp);
+      checkTestConnection(signIn, {
+        here: sourceText("error.backend.mcpSignInRequired"),
+        host: sourceText("error.backend.mcpSignInOnHost"),
+        status: "needs_sign_in",
+      });
+      report.cases.push(signIn);
+    }
   } catch (error) {
     report.failures.push(error instanceof Error ? error.message : String(error));
   }
