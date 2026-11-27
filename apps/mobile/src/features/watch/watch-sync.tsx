@@ -62,7 +62,7 @@ async function watchAvatarData(names: readonly string[]): Promise<Record<string,
     const file = watchPictureFile(name);
     if (!file) continue;
     const data = await file.base64();
-    if (size + data.length > AVATAR_REPLY_LIMIT) break;
+    if (size + data.length > AVATAR_REPLY_LIMIT) continue;
     avatars[name] = data;
     size += data.length;
   }
