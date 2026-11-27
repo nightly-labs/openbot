@@ -114,7 +114,7 @@ export interface VoiceDictation {
   phase: DictationPhase;
   level: SharedValue<number>;
   start: (base: string) => boolean;
-  finish: () => Promise<void>;
+  finish: () => Promise<boolean>;
   cancel: () => void;
 }
 
@@ -131,7 +131,7 @@ function useSystemDictation({
   const phaseRef = useRef<DictationPhase>("idle");
   const level = useSharedValue(0);
   const session = useRef<DictationSession | null>(null);
-  const finished = useRef<(() => void)[]>([]);
+  const finished = useRef<((complete: boolean) => void)[]>([]);
   const stopTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const locales = useRef<Promise<SupportedLocales> | null>(null);
   useEffect(() => {
@@ -152,16 +152,20 @@ function useSystemDictation({
     setPhase(next);
   }, []);
 
-  const settle = useCallback(() => {
-    if (session.current) trackTurn(session.current, transcriptionOf(session.current.options));
-    if (owner === id) owner = null;
-    session.current = null;
-    if (stopTimer.current) clearTimeout(stopTimer.current);
-    stopTimer.current = null;
-    level.set(0);
-    update("idle");
-    for (const resolve of finished.current.splice(0)) resolve();
-  }, [id, level, update]);
+  const settle = useCallback(
+    (delivered = true) => {
+      const complete = delivered && !session.current?.ending;
+      if (session.current) trackTurn(session.current, transcriptionOf(session.current.options));
+      if (owner === id) owner = null;
+      session.current = null;
+      if (stopTimer.current) clearTimeout(stopTimer.current);
+      stopTimer.current = null;
+      level.set(0);
+      update("idle");
+      for (const resolve of finished.current.splice(0)) resolve(complete);
+    },
+    [id, level, update],
+  );
 
   useEffect(() => {
     if (!speechRecognition) return;
@@ -275,12 +279,12 @@ function useSystemDictation({
     [available, id, settle, update],
   );
 
-  const finish = useCallback((): Promise<void> => {
-    if (owner !== id || !speechRecognition) return Promise.resolve();
+  const finish = useCallback((): Promise<boolean> => {
+    if (owner !== id || !speechRecognition) return Promise.resolve(true);
     if (phaseRef.current === "starting") {
       speechRecognition.abort();
       settle();
-      return Promise.resolve();
+      return Promise.resolve(true);
     }
     const module = speechRecognition;
     return new Promise((resolve) => {
@@ -293,7 +297,7 @@ function useSystemDictation({
       stopTimer.current = setTimeout(() => {
         if (owner !== id) return;
         module.abort();
-        settle();
+        settle(false);
       }, STOP_TIMEOUT_MS);
     });
   }, [id, settle, update]);
@@ -316,7 +320,7 @@ function useSystemDictation({
 
   useEffect(
     () => () => {
-      for (const resolve of finished.current.splice(0)) resolve();
+      for (const resolve of finished.current.splice(0)) resolve(false);
       if (owner !== id) return;
       speechRecognition?.abort();
       owner = null;

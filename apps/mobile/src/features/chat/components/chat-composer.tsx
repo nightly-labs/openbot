@@ -664,6 +664,10 @@ export const ChatComposer = memo(function ChatComposer({
     setSendingDictation(true);
     try {
       const text = await current.finishDraft();
+      if (text === null) {
+        inputRef.current?.focus();
+        return;
+      }
       latestTextRef.current = text;
       if (sendBlocked.current || (!text.trim() && !hasFiles.current)) return;
       sendGate.edit();

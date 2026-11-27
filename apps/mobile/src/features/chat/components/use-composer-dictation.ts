@@ -16,7 +16,7 @@ export interface ComposerDictation {
   presence: SharedValue<number>;
   start: () => boolean;
   finish: () => void;
-  finishDraft: () => Promise<string>;
+  finishDraft: () => Promise<string | null>;
 }
 
 const EASE_OUT = Easing.bezier(0.23, 1, 0.32, 1);
@@ -76,8 +76,8 @@ export function useComposerDictation({
 
   const finishDraft = useCallback(async () => {
     if (activeRef.current) moveTo(false);
-    await stop();
-    return dictatedRef.current;
+    const complete = await stop();
+    return complete ? dictatedRef.current : null;
   }, [moveTo, stop]);
 
   const previousPhase = useRef(phase);
