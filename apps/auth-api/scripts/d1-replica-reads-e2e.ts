@@ -4,6 +4,7 @@ import { mkdir, writeFile } from "node:fs/promises";
 import { join, resolve } from "node:path";
 import { DatabaseSync } from "node:sqlite";
 import { Effect } from "effect";
+import { sessionReadsFor } from "../src/server/auth-service";
 import { D1AuthRepository } from "../src/server/d1-auth-repository";
 import { observedD1 } from "../src/server/observed-d1";
 import { sqliteD1 } from "./sqlite-d1";
@@ -93,34 +94,48 @@ async function main() {
     },
   );
 
-  const replicaRead = await Effect.runPromise(
-    repository.authenticateDesktopSession("old-token", AFTER_ACTIVITY_INTERVAL),
+  const reads = Object.fromEntries(
+    ["GET", "HEAD", "POST", "PUT", "PATCH", "DELETE"].map((method) => [
+      method,
+      sessionReadsFor(new Request("https://openbot.test/v1/me", { method })),
+    ]),
   );
   check(
-    "a session lookup reads the replica through the Effect runtime",
+    "only a GET or HEAD request picks the replica for its session lookup",
+    reads.GET === "replica" &&
+      reads.HEAD === "replica" &&
+      ["POST", "PUT", "PATCH", "DELETE"].every((method) => reads[method] === "primary"),
+    reads,
+  );
+
+  const primaryRead = await Effect.runPromise(repository.authenticate("old-token", NOW + 60_000));
+  const desktopRead = await Effect.runPromise(repository.authenticateDesktopSession("old-token", NOW + 120_000));
+  check(
+    "a session lookup that does not ask for the replica reads the primary",
+    primaryRead?.name === "New name" && desktopRead?.name === "New name" && counts.replica === 0,
+    { names: [primaryRead?.name ?? null, desktopRead?.name ?? null], counts: { ...counts } },
+  );
+
+  const replicaRead = await Effect.runPromise(repository.authenticate("old-token", AFTER_ACTIVITY_INTERVAL, "replica"));
+  check(
+    "a session lookup for a read request reads the replica through the Effect runtime",
     replicaRead?.name === "Old name" && counts.replica === 1,
     { name: replicaRead?.name ?? null, counts: { ...counts } },
   );
 
   const primaryBefore = counts.primary;
-  const newSession = await Effect.runPromise(repository.authenticate("new-token", AFTER_ACTIVITY_INTERVAL + 20_000));
+  const newSession = await Effect.runPromise(
+    repository.authenticate("new-token", AFTER_ACTIVITY_INTERVAL + 20_000, "replica"),
+  );
   check(
     "a session that the replica does not have yet is read from the primary, so a new sign-in is not refused",
     newSession?.id === "user" && counts.replica === 2 && counts.primary > primaryBefore,
     { user: newSession?.id ?? null, counts: { ...counts } },
   );
 
-  const replicaBeforeProfile = counts.replica;
-  const profile = await Effect.runPromise(
-    repository.authenticate("old-token", AFTER_ACTIVITY_INTERVAL + 30_000, "primary"),
+  const missing = await Effect.runPromise(
+    repository.authenticate("no-token", AFTER_ACTIVITY_INTERVAL + 40_000, "replica"),
   );
-  check(
-    "a profile read gets the new profile from the primary while the replica still has the old one",
-    profile?.name === "New name" && counts.replica === replicaBeforeProfile,
-    { name: profile?.name ?? null, counts: { ...counts } },
-  );
-
-  const missing = await Effect.runPromise(repository.authenticate("no-token", AFTER_ACTIVITY_INTERVAL + 40_000));
   check("an unknown session is still refused after the primary read", missing === null, { counts: { ...counts } });
 
   const touched = primary

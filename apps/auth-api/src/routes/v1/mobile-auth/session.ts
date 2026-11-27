@@ -11,7 +11,7 @@ export const Route = createFileRoute("/v1/mobile-auth/session")({
           Effect.gen(function* () {
             const token = bearerToken(request);
             if (!token) return apiError(401, "unauthorized", "Sign in is required.");
-            const user = yield* requestAuthService().readMobileProfile(token);
+            const user = yield* requestAuthService().authenticateMobileSession(token);
             return user ? json(user) : apiError(401, "unauthorized", "The mobile session is invalid.");
           }),
           authErrorResponse,
