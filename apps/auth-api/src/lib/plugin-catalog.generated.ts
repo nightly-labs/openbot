@@ -17,7 +17,7 @@ export interface PluginCatalogIndex {
 export const PLUGIN_CATALOG_INDEX: PluginCatalogIndex = {
   schemaVersion: 1,
   catalogVersion: "v1",
-  catalogSha256: "08afd754a53fa7c0d44f155b4b7ddb8e6d9677c80d44ce07664e3eabeddd51f4",
+  catalogSha256: "c57ed43386c9c9f7cbe2bb7d7247b0cab9e590acc44494b406c14b40bd7b3b2a",
   updatedAt: "2026-11-10T00:00:00.000Z",
   plugins: [
     {
