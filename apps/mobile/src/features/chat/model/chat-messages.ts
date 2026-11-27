@@ -42,8 +42,8 @@ import {
 } from "@openbot/contracts/ipc";
 import type { ConversationUiBlock } from "@openbot/contracts/ui-blocks";
 import type { MobileTextKey } from "@openbot/i18n/mobile";
-import { MOBILE_PLUGINS } from "@/features/marketplace/model/plugin-catalog.generated";
-import { isMobileConnectorId } from "@/features/servers/model/connectors";
+import { MOBILE_PLUGINS } from "../../marketplace/model/plugin-catalog.generated";
+import { isMobileConnectorId } from "../../servers/model/connectors";
 import { thinkingRowId } from "./turn-thinking";
 
 export type RoutineMarkerEvent = RoutineConversationEventAction | RoutineRunStatus;
@@ -104,14 +104,14 @@ export type ChatMessage =
       body: string;
       streaming: boolean;
       status?: ConversationMessage["status"];
-      replyToMessageId?: string | null;
-      attachments?: AttachmentSummary[];
+      replyToMessageId?: string | null | undefined;
+      attachments?: AttachmentSummary[] | undefined;
       visual?: { height?: number };
-      imageGeneration?: ImageGenerationInfo;
-      videoGeneration?: VideoGenerationInfo;
+      imageGeneration?: ImageGenerationInfo | undefined;
+      videoGeneration?: VideoGenerationInfo | undefined;
       failureReason?: string;
       createdAt?: string;
-      reactions?: readonly ConversationReaction[];
+      reactions?: readonly ConversationReaction[] | undefined;
       progress?: true;
     }
   | {
@@ -506,9 +506,11 @@ export function projectChatMessages(
   accountUserId: string | null = null,
   progressUpdates?: ProgressUpdates,
 ): ChatMessage[] {
-  const reader = memberId || null;
-  const readerAccount = accountUserId ? `local-user:${accountUserId}` : null;
-  const readerKey = `${reader ?? ""}\n${readerAccount ?? ""}`;
+  const member = memberId || null;
+  const account = accountUserId ? `local-user:${accountUserId}` : null;
+  const reader: Reader = { key: `${member ?? ""}\n${account ?? ""}`, member, account };
+  const streamed = streamedProjection(messages, reader, progressUpdates);
+  if (streamed) return streamed;
   const result: ChatMessage[] = [];
   const thinkingByTurn = new Map<string, Extract<ChatMessage, { kind: "thinking" }>>();
   const sorted = sortedConversationMessages(messages);
@@ -625,37 +627,174 @@ export function projectChatMessages(
       });
       if (update) result.push(projectedMarker(projectedUpdates, message, () => progressBubble(message.id, message)));
     } else {
-      const cached = projectedBubbles.get(message);
-      const replaced = replacedIds.has(message.id);
-      let bubble = cached?.readerKey === readerKey && cached.replaced === replaced ? cached.bubble : undefined;
-      if (!bubble) {
-        const sender = message.author === "user" ? message.senderMember : undefined;
-        const ownSender = sender !== undefined && (sender.id === reader || sender.id === readerAccount);
-        const otherMember = sender !== undefined && reader !== null && !ownSender;
-        bubble = projectPlan(message, replaced) ??
-          projectSubagents(message) ?? {
-            id: message.id,
-            kind: "message",
-            author: message.author === "user" ? "user" : "agent",
-            ...(otherMember ? { sender } : {}),
-            ...(ownSender ? { mine: true } : {}),
-            body: message.exchange ? "" : message.text,
-            streaming: message.status === "streaming",
-            status: message.status,
-            attachments: message.attachments,
-            ...visualReply(message),
-            imageGeneration: message.imageGeneration,
-            videoGeneration: message.videoGeneration,
-            replyToMessageId: message.replyToMessageId,
-            createdAt: message.createdAt,
-            reactions: messageReactions(message),
-          };
-        projectedBubbles.set(message, { readerKey, replaced, bubble });
-      }
-      result.push(bubble);
+      result.push(projectBubble(message, reader, replacedIds.has(message.id)));
     }
   }
-  return progressUpdates ? withStepsAfterUpdates(result, thinkingByTurn) : result;
+  const keptRows = keptThinkingRows(thinkingByTurn);
+  for (let index = 0; index < result.length; index += 1) {
+    const row = result[index];
+    const kept = row?.kind === "thinking" ? keptRows.get(row) : undefined;
+    if (kept) result[index] = kept;
+  }
+  const projected = progressUpdates ? withStepsAfterUpdates(result, thinkingByTurn) : result;
+  rememberProjection({ messages, readerKey: reader.key, progressUpdates, replacedIds, result: projected });
+  return projected;
+}
+
+interface Reader {
+  key: string;
+  member: string | null;
+  account: string | null;
+}
+
+function projectBubble(message: ConversationMessage, reader: Reader, replaced: boolean): ChatMessage {
+  const cached = projectedBubbles.get(message);
+  if (cached?.readerKey === reader.key && cached.replaced === replaced) return cached.bubble;
+  const sender = message.author === "user" ? message.senderMember : undefined;
+  const ownSender = sender !== undefined && (sender.id === reader.member || sender.id === reader.account);
+  const otherMember = sender !== undefined && reader.member !== null && !ownSender;
+  const bubble: ChatMessage = projectPlan(message, replaced) ??
+    projectSubagents(message) ?? {
+      id: message.id,
+      kind: "message",
+      author: message.author === "user" ? "user" : "agent",
+      ...(otherMember ? { sender } : {}),
+      ...(ownSender ? { mine: true } : {}),
+      body: message.exchange ? "" : message.text,
+      streaming: message.status === "streaming",
+      status: message.status,
+      attachments: message.attachments,
+      ...visualReply(message),
+      imageGeneration: message.imageGeneration,
+      videoGeneration: message.videoGeneration,
+      replyToMessageId: message.replyToMessageId,
+      createdAt: message.createdAt,
+      reactions: messageReactions(message),
+    };
+  projectedBubbles.set(message, { readerKey: reader.key, replaced, bubble });
+  return bubble;
+}
+
+type ThinkingRow = Extract<ChatMessage, { kind: "thinking" }>;
+
+const KNOWN_THINKING_LIMIT = 4000;
+const knownThinkingRows = new Map<string, ThinkingRow>();
+
+function sameThinking(before: ThinkingRow, after: ThinkingRow): boolean {
+  return (
+    before.turnId === after.turnId &&
+    before.steps.length === after.steps.length &&
+    before.steps.every((step, index) => {
+      const next = after.steps[index];
+      return (
+        next !== undefined &&
+        step.id === next.id &&
+        step.text === next.text &&
+        step.createdAt === next.createdAt &&
+        step.progress === next.progress
+      );
+    })
+  );
+}
+
+function keptThinkingRows(thinkingByTurn: Map<string, ThinkingRow>): ReadonlyMap<ThinkingRow, ThinkingRow> {
+  const replaced = new Map<ThinkingRow, ThinkingRow>();
+  for (const [key, thinking] of thinkingByTurn) {
+    const kept = knownThinkingRows.get(thinking.id);
+    if (kept && sameThinking(kept, thinking)) {
+      replaced.set(thinking, kept);
+      thinkingByTurn.set(key, kept);
+      continue;
+    }
+    if (knownThinkingRows.size >= KNOWN_THINKING_LIMIT) knownThinkingRows.clear();
+    knownThinkingRows.set(thinking.id, thinking);
+  }
+  return replaced;
+}
+
+interface ProjectionEntry {
+  messages: readonly ConversationMessage[];
+  readerKey: string;
+  progressUpdates: ProgressUpdates | undefined;
+  replacedIds: ReadonlySet<string>;
+  result: ChatMessage[];
+}
+
+const RECENT_PROJECTIONS = 4;
+const recentProjections: ProjectionEntry[] = [];
+
+function rememberProjection(entry: ProjectionEntry) {
+  const known = recentProjections.findIndex((item) => item.messages === entry.messages);
+  if (known >= 0) recentProjections.splice(known, 1);
+  recentProjections.unshift(entry);
+  recentProjections.length = Math.min(recentProjections.length, RECENT_PROJECTIONS);
+}
+
+export const NO_CHANGED_INDEX = -1;
+
+export function oneChangedIndex<T>(before: readonly T[], after: readonly T[]): number | null {
+  if (before.length !== after.length) return null;
+  let changed = NO_CHANGED_INDEX;
+  for (let index = 0; index < after.length; index += 1) {
+    if (before[index] === after[index]) continue;
+    if (changed !== NO_CHANGED_INDEX) return null;
+    changed = index;
+  }
+  return changed;
+}
+
+function standaloneBubble(message: ConversationMessage): boolean {
+  return (
+    message.author !== "system" &&
+    !message.routine &&
+    !message.exchange &&
+    !message.questionPrompt &&
+    message.itemType !== "commentary" &&
+    message.itemType !== ROUTINE_QUIET_ANSWER_ITEM_TYPE &&
+    message.delivery?.status !== "queued" &&
+    message.delivery?.status !== "cancelled" &&
+    Boolean(message.text.trim() || message.attachments?.length || message.imageGeneration || message.videoGeneration) &&
+    routineMarker(message) === null &&
+    !isContextResetMarker(message) &&
+    !isNoAnswerNotice(message) &&
+    !marketplaceSuggestionEvent(message) &&
+    !mcpSignInEvent(message)
+  );
+}
+
+function sameBubbleContext(before: ConversationMessage, after: ConversationMessage): boolean {
+  return (
+    sameSortFields(before, after) &&
+    before.senderAgentId === after.senderAgentId &&
+    isAgentAnswer(before) === isAgentAnswer(after) &&
+    standaloneBubble(before) &&
+    standaloneBubble(after)
+  );
+}
+
+function streamedProjection(
+  messages: readonly ConversationMessage[],
+  reader: Reader,
+  progressUpdates: ProgressUpdates | undefined,
+): ChatMessage[] | null {
+  for (const entry of recentProjections) {
+    if (entry.readerKey !== reader.key || entry.progressUpdates !== progressUpdates) continue;
+    const index = oneChangedIndex(entry.messages, messages);
+    if (index === null) continue;
+    if (index === NO_CHANGED_INDEX) return entry.result;
+    const before = entry.messages[index];
+    const after = messages[index];
+    if (!before || !after || !sameBubbleContext(before, after)) return null;
+    const replaced = entry.replacedIds.has(after.id);
+    const previous = projectBubble(before, reader, replaced);
+    const position = entry.result.indexOf(previous);
+    if (position < 0) return null;
+    const result = entry.result.slice();
+    result[position] = projectBubble(after, reader, replaced);
+    rememberProjection({ ...entry, messages, result });
+    return result;
+  }
+  return null;
 }
 
 function withStepsAfterUpdates(

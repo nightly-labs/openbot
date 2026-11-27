@@ -1,5 +1,5 @@
 import { type ChannelMessage, type ConversationMessage, isAgentAnswer } from "@openbot/contracts/ipc";
-import { isTurnThought, type TurnStepLine, type TurnStepLines } from "@/features/workspace/model/turn-step-lines";
+import { isTurnThought, type TurnStepLine, type TurnStepLines } from "../../workspace/model/turn-step-lines";
 import { messageTime } from "./message-time";
 
 export type TurnThinkingStep =
