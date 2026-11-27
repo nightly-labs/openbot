@@ -56,6 +56,7 @@ final class WatchSession: NSObject, ObservableObject {
   private let session: WCSession? = WCSession.isSupported() ? WCSession.default : nil
   private let defaults = UserDefaults(suiteName: watchAppGroup) ?? .standard
   private var refreshing = false
+  private var registeringWidgetPush = false
   private var feedbackTask: Task<Void, Never>?
   private var offlineTask: Task<Void, Never>?
   private var pictures: [String: UIImage] = [:]
@@ -282,7 +283,7 @@ final class WatchSession: NSObject, ObservableObject {
       refreshError = result.message ?? text(TextKey.error(result.error ?? .failed))
     }
     if result.ok { await loadMissingAvatars(phoneAllowed: phoneReady) }
-    if let credentials = usableCredentials { await WidgetPushRegistry.register(credentials: credentials, direct: direct) }
+    registerWidgetPush()
   }
 
   private func pairIfNeeded() async {
@@ -658,6 +659,15 @@ final class WatchSession: NSObject, ObservableObject {
     pictureTints = [:]
     avatarRevision += 1
     refreshComplication()
+  }
+
+  private func registerWidgetPush() {
+    guard !registeringWidgetPush, let credentials = usableCredentials else { return }
+    registeringWidgetPush = true
+    Task {
+      await WidgetPushRegistry.register(credentials: credentials, direct: direct)
+      registeringWidgetPush = false
+    }
   }
 
   private var chosenServerId: String {

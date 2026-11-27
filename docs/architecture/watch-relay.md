@@ -117,7 +117,7 @@ reloads a widget when it gets a widget push. A widget push has no data.
   is lowercase hex, 8 to 256 bytes (`WATCH_WIDGET_PUSH_TOKEN_PATTERN`); `environment` is
   `production` or `development` (a simulator build uses `development`). Only a success counts as a
   registration. A `400` from an older host, which refuses the command as invalid, also counts, so the
-  watch asks that host again only after the renewal time. The iPhone link answers `failed`.
+  watch asks that host again only after the renewal time. After another failure, such as an offline host or a timeout, the watch asks that host again after 60 seconds. The watch app registers in its own task, so a slow host does not stop its refresh. The iPhone link answers `failed`.
 - After a widget push, the widget fetches the new state over the direct link when its saved data is
   more than 5 seconds old, and saves it without a reload. The 5 seconds skip a fetch just after the
   watch app saved data and reloaded the widget itself.
