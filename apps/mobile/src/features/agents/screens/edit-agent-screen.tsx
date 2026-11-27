@@ -281,7 +281,7 @@ function AgentForm({
     setError(null);
     const accountId = account === undefined || account === DEFAULT_PROVIDER_ACCOUNT_ID ? null : account;
     const model = edits.model ?? savedModel;
-    const keepQueued = accountChanged && queued !== undefined;
+    const keepQueued = queued !== undefined && (accountChanged || edits.model !== undefined);
     try {
       if (Object.keys(edits).length > 0 || accountChanged)
         await updateAgent(
