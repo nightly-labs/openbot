@@ -76,7 +76,7 @@ export const PLUGIN_CATALOG_INDEX: PluginCatalogIndex = {
       slug: "gmail",
       version: "1.0.0",
       featured: false,
-      detailSha256: "355e2258c20f5ecafafa8235b7375c8b04cdb5b48e39f63195a81fc529a7a8bc",
+      detailSha256: "cd5029b07035b2cf6df5566904556680f78b581c2fd0e49e7f50c30d1f16a6db",
     },
     {
       slug: "google-calendar",
@@ -1973,7 +1973,7 @@ export const PLUGIN_CATALOG_DETAILS: Record<string, PluginCatalogDetail> = {
     name: "Gmail",
     tagline: "Email search, drafts and labels",
     description:
-      "Gmail lets agents search and read email threads and messages, write drafts, add and remove labels, create labels, move email to the trash and back, and mark email as spam. An agent sends email only with approval: it writes a draft, OpenBot shows the recipients, the subject and the body, and the email goes only when the server owner or an admin presses Send. An agent with full access sends without the card when the user asked it to, and the card stays in the chat. Agents cannot delete email permanently. This is Google's official Gmail MCP server, which is in Developer Preview. Each user signs in to their own Google account through the browser and approves access on Google's consent page. OpenBot has its own Google sign-in app, so the user does not set up Google Cloud. An email from another person can contain instructions for the agent, so check what the agent does after it reads untrusted email.",
+      "Gmail lets agents search and read email threads and messages, write drafts, add and remove labels, create labels, move email to the trash and back, and mark email as spam. An agent sends email only with approval: it writes a draft, OpenBot shows the recipients, the subject and the body, and the email goes only when the server owner or an admin presses Send. Agents cannot delete email permanently. This is Google's official Gmail MCP server, which is in Developer Preview. Each user signs in to their own Google account through the browser and approves access on Google's consent page. OpenBot has its own Google sign-in app, so the user does not set up Google Cloud. An email from another person can contain instructions for the agent, so check what the agent does after it reads untrusted email.",
     category: "productivity",
     creatorName: "Google",
     iconUrl: "https://ssl.gstatic.com/images/branding/product/2x/gmail_2020q4_48dp.png",

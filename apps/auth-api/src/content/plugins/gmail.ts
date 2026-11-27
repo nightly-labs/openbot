@@ -12,7 +12,7 @@ export const GMAIL_PLUGIN_GUIDE: PluginGuide = {
     },
     {
       title: "Write and send email",
-      text: "The agent writes a reply or a new email as a draft in your Drafts folder. To send it, the agent asks you in the conversation: OpenBot shows the recipients, the subject and the body, and sends the email only when you press Send. If you gave the agent full access and asked it to send without asking, it sends at once, and the card stays in the conversation. You can also change the draft and send it from Gmail.",
+      text: "The agent writes a reply or a new email as a draft in your Drafts folder. To send it, the agent asks you in the conversation: OpenBot shows the recipients, the subject and the body, and sends the email only when you press Send. You can also change the draft and send it from Gmail.",
     },
     {
       title: "Organize email",
@@ -33,7 +33,7 @@ export const GMAIL_PLUGIN_GUIDE: PluginGuide = {
     {
       question: "What can the agent see and change in Gmail?",
       answer:
-        "The agent can read all the email in your account (gmail.readonly) and write drafts (gmail.compose). It can also add and remove labels, create labels, move email to the trash and back, and mark email as spam (gmail.modify). OpenBot sends a draft only after you press Send on the card that shows it, or at once when you gave the agent full access and asked it to send without asking. The server has no tool that deletes email permanently, so the agent cannot do this. To remove the access, disconnect Gmail in OpenBot.",
+        "The agent can read all the email in your account (gmail.readonly) and write drafts (gmail.compose). It can also add and remove labels, create labels, move email to the trash and back, and mark email as spam (gmail.modify). OpenBot sends a draft only after you press Send on the card that shows it, also when the agent has full access. The server has no tool that deletes email permanently, so the agent cannot do this. To remove the access, disconnect Gmail in OpenBot.",
     },
     {
       question: "Is the Gmail MCP server finished?",
@@ -55,5 +55,5 @@ export const GMAIL_PLUGIN_GUIDE: PluginGuide = {
       url: "https://developers.google.com/workspace/gmail/api/reference/mcp/tools_list/label_message",
     },
   ],
-  checkedAt: "2026-10-29",
+  checkedAt: "2026-11-27",
 };
