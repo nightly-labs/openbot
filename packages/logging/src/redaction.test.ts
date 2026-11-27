@@ -41,6 +41,8 @@ describe("redactText", () => {
       `ASIA${"A1".repeat(8)}`,
       `rk_live_${run(24)}`,
       `whsec_${run(32)}`,
+      `ya29.${run(60)}`,
+      `1//0${run(40)}`,
     ]) {
       expect(redactText(`key ${key} leaked`)).toBe("key [redacted] leaked");
     }

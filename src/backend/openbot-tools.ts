@@ -288,12 +288,6 @@ export const sendGmailDraftToolSchema = z.strictObject({
     .string()
     .regex(/^[A-Za-z0-9_-]{1,128}$/u)
     .describe("The draft id from create_draft, such as r123456789."),
-  confirm: z
-    .boolean()
-    .optional()
-    .describe(
-      "false: send without the card. Pass it when a rule from the user in your memory or messages lets you send this email without asking. Default true.",
-    ),
 });
 
 export const sendToChannelToolSchema = z.strictObject({
@@ -702,7 +696,6 @@ export const OPENBOT_TOOL_DEFINITIONS: readonly OpenBotToolDefinition[] = [
       "Send a Gmail draft that Gmail create_draft wrote. OpenBot shows the user its sender, recipients, subject and body, and sends it only when the server owner or an admin presses Send.",
       'Result: {"status":"sent","messageId","threadId"}, {"actionId":"cancel"} when not sent, or {"status":"expired"}.',
       "A draft changed after the card is not sent. Needs Gmail signed in; not in external chats.",
-      "confirm false sends at once only if the user gave you full access and this is not a channel; else the card shows.",
     ].join(" "),
     shape: sendGmailDraftToolSchema.shape,
   },

@@ -712,32 +712,20 @@ export class OpenBotToolRouter {
     const spec = gmailSendCardSpec(draft);
     if (!spec) return openBotToolFailure("OpenBot could not show this draft.");
     const api = this.#gmailApi;
-    // The agent skips the press only when the user asked for that (`confirm: false`, such as from a
-    // memory) and gave this agent Full access, which the agent cannot turn on itself. A channel always
-    // asks, as it does for other tools. The host presses Send, and the card stays in the chat with
-    // what was sent.
-    const publicThreadId = this.#conversation.publicThreadId(agentId, params.threadId);
-    const automatic =
-      parsed.data.confirm === false &&
-      this.#approvalAutomation.autoApproves(agentId) &&
-      this.#channels.store.channelForThread(publicThreadId) === null;
-    this.#attention.surfaceUiBlock(
-      client,
-      request,
-      {
-        blockId: randomUUID(),
-        spec,
-        confirmed: {
-          actionId: GMAIL_SEND_ACTION_ID,
-          run: () =>
-            sendGmailDraft(draft, api).pipe(
-              Effect.map((sent) => ({ status: "sent", messageId: sent.messageId, threadId: sent.threadId })),
-              Effect.mapError((failure) => ({ cause: new Error(failure.message) })),
-            ),
-        },
+    // Always a press, also with Full access: an email, a file or a page that the agent read must not
+    // be able to send email (Google's Limited Use review and CASA count on this card).
+    this.#attention.surfaceUiBlock(client, request, {
+      blockId: randomUUID(),
+      spec,
+      confirmed: {
+        actionId: GMAIL_SEND_ACTION_ID,
+        run: () =>
+          sendGmailDraft(draft, api).pipe(
+            Effect.map((sent) => ({ status: "sent", messageId: sent.messageId, threadId: sent.threadId })),
+            Effect.mapError((failure) => ({ cause: new Error(failure.message) })),
+          ),
       },
-      automatic ? { actionId: GMAIL_SEND_ACTION_ID, afterMs: 0 } : undefined,
-    );
+    });
     return null;
   });
 

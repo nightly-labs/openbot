@@ -208,10 +208,7 @@ const registry = new AttentionRegistry({
 let nextRequest = 1;
 
 /** Finds the draft and shows its card, as `OpenBotToolRouter.#sendGmailDraft` does. */
-async function showDraft(
-  draftId: string,
-  automatic = false,
-): Promise<{ id: number; spec: UiBlockSpec; draft: GmailDraft }> {
+async function showDraft(draftId: string): Promise<{ id: number; spec: UiBlockSpec; draft: GmailDraft }> {
   const args = sendGmailDraftToolSchema.parse({ draftId });
   const draft = await Effect.runPromise(findGmailDraft([FIRST, SECOND], args.draftId, api));
   assert.ok(draft, `no account has ${draftId}`);
@@ -233,7 +230,6 @@ async function showDraft(
           ),
       },
     },
-    automatic ? { actionId: GMAIL_SEND_ACTION_ID, afterMs: 0 } : undefined,
   );
   return { id, spec, draft };
 }
@@ -328,16 +324,17 @@ try {
     return answer;
   });
 
-  await step("with the auto answer of Full access, the host presses Send and the card stays as sent", async () => {
-    const autoCard = await showDraft(AUTO_DRAFT, true);
-    // The host answers on a timer of 0 ms and then calls Gmail: wait for the agent's answer.
-    await client.answered(autoCard.id);
+  await step("an agent cannot skip the card: confirm is refused, and only a press sends", async () => {
+    const skip = sendGmailDraftToolSchema.safeParse({ draftId: AUTO_DRAFT, confirm: false });
+    assert.equal(skip.success, false, "the tool accepts a request to send without the card");
+    const card = await showDraft(AUTO_DRAFT);
+    assert.equal(sent.length, 1, "the draft was sent before a press");
+    assert.ok(!client.answers.has(card.id), "the agent got an answer before a press");
+    await press(card.id, card.spec, GMAIL_SEND_ACTION_ID);
     assert.deepEqual(sent.at(-1), { id: AUTO_DRAFT, token: SECOND.token });
-    const answer = agentAnswer(client.answers.get(autoCard.id));
+    const answer = agentAnswer(client.answers.get(card.id));
     assert.equal(answer.status, "sent");
-    const stored = JSON.stringify(snapshot.messages);
-    assert.ok(stored.includes('"done":true'), "the card does not say that the host answered");
-    assert.ok(stored.includes("Daily report."), "the card does not keep what was sent");
+    assert.ok(JSON.stringify(snapshot.messages).includes("Daily report."), "the card does not keep what was sent");
     return answer;
   });
 

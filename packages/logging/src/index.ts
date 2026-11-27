@@ -49,9 +49,10 @@ const CREDENTIAL_ASSIGNMENT = new RegExp(
 // part of a diagnostic that names what failed.
 // `npm_`, `hf_` and `gsk_` also start ordinary names such as `npm_config_user_agent`, so their
 // value must be one long alphanumeric run, as the vendors issue them. `ASIA` is a word, so only the
-// exact shape of an AWS key ID counts.
+// exact shape of an AWS key ID counts. Google OAuth access tokens start with `ya29.` and refresh tokens
+// with `1//0`; they rotate, so registering each one would grow the registered list without end.
 const KNOWN_SECRET_PREFIXES =
-  /(?<![A-Za-z0-9_-])(?:(?:sk-ant|sk-|sk_|xai-|ghp_|gho_|ghu_|ghr_|ghs_|github_pat_|AKIA|xox[abeoprs]-|xapp-|glpat-|rk_live_|whsec_)[A-Za-z0-9._-]{8,}|AIza[A-Za-z0-9_-]{30,}|(?:npm|hf|gsk)_[A-Za-z0-9]{30,}|ASIA[A-Z0-9]{16}(?![A-Za-z0-9]))/g;
+  /(?<![A-Za-z0-9_-])(?:(?:sk-ant|sk-|sk_|xai-|ghp_|gho_|ghu_|ghr_|ghs_|github_pat_|AKIA|xox[abeoprs]-|xapp-|glpat-|rk_live_|whsec_|ya29\.)[A-Za-z0-9._-]{8,}|1\/\/0[A-Za-z0-9_-]{20,}|AIza[A-Za-z0-9_-]{30,}|(?:npm|hf|gsk)_[A-Za-z0-9]{30,}|ASIA[A-Z0-9]{16}(?![A-Za-z0-9]))/g;
 // A JSON Web Token: a header and a payload that both start as a JSON object, then the signature.
 const JSON_WEB_TOKEN = /(?<![A-Za-z0-9_-])eyJ[A-Za-z0-9_-]{8,}\.eyJ[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]*/g;
 // A PEM private key, with its body. A key that the text cuts off before its END line is removed to
