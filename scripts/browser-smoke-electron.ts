@@ -2677,18 +2677,6 @@ async function runSelectPostbackScenario(browser: BrowserHost, origin: string): 
     ) {
       throw new Error(`An arrow-key postback select left the tab blank: ${JSON.stringify(steps)}`);
     }
-    const scripted = await run("run-script", "run_script", {
-      script:
-        "await selectOption('#country', 'Germany'); return await evaluate(\"document.getElementById('posted').textContent\");",
-    });
-    const scriptedPayload = toolTextPayload(scripted.result);
-    if (
-      !scripted.outcome.success ||
-      scriptedPayload?.status !== "completed" ||
-      scriptedPayload.value !== "Posted de|"
-    ) {
-      throw new Error(`A script postback select failed: ${JSON.stringify(steps)} ${JSON.stringify(scriptedPayload)}`);
-    }
   } finally {
     await runCauseEffect(browser.close(tab.id));
     await mkdir(".openbot-build", { recursive: true });

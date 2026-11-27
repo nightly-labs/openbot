@@ -413,6 +413,15 @@ const RUN_DIALOG_EVENT = "-run-dialog";
 const DIALOG_CLOSED_ERROR = "This dialog is closed. A person answered it, or the page closed it. Read the tab again.";
 const DIALOG_FOR_PERSON_ERROR = "Only a person can answer this dialog in the tab. Ask the user to answer it.";
 
+function passedSelectValues(plan: DynamicRecord, enabledIndices: number[], desiredIndex: number): number[] {
+  if (plan.multiple === true || !isNumber(plan.selectedIndex)) return [];
+  const startIndex = plan.selectedIndex;
+  const cycleIndices = Array.isArray(plan.typeaheadCycleIndices) ? plan.typeaheadCycleIndices.filter(isNumber) : [];
+  const passed =
+    cycleIndices.length > 0 ? cycleIndices : enabledIndices.slice(0, Math.max(0, enabledIndices.indexOf(desiredIndex)));
+  return passed.filter((index) => index !== desiredIndex && index !== startIndex);
+}
+
 export class BrowserCdpEngine {
   readonly #contents: WebContents;
   #viewButton: "left" | "middle" | "right" | null = null;
@@ -1608,6 +1617,7 @@ export class BrowserCdpEngine {
             values: Array.from(this.options, option => option.value),
             id: this.id,
             name: this.name,
+            topFrame: window.top === window,
             center: { x: box.left + box.width / 2, y: box.top + box.height / 2 },
           };
         }`,
@@ -1630,21 +1640,20 @@ export class BrowserCdpEngine {
         const frameDocumentGeneration = this.#frameDocumentGeneration;
         const pageNavigated = () => this.#documentGeneration !== documentGeneration;
         const optionValues = Array.isArray(plan.values) ? plan.values.filter(isString) : [];
+        const inTopFrame = plan.topFrame === true && resolved.sessionId === undefined;
         const reloadedSelect = {
           id: isString(plan.id) ? plan.id : "",
           name: isString(plan.name) ? plan.name : "",
           multiple: plan.multiple,
+          inTopFrame,
         };
+        const desiredValues = desiredIndices.map((index) => optionValues[index] ?? "");
+        const passedValues = passedSelectValues(plan, enabledIndices, firstDesiredIndex).map(
+          (index) => optionValues[index] ?? "",
+        );
         reload = {
-          started: () => this.#frameDocumentGeneration !== frameDocumentGeneration,
-          follow: () =>
-            this.#confirmReloadedSelectEffect(
-              send,
-              reloadedSelect,
-              desiredIndices.map((index) => optionValues[index] ?? ""),
-              resolved.sessionId,
-              deadline,
-            ),
+          started: () => (inTopFrame ? pageNavigated() : this.#frameDocumentGeneration !== frameDocumentGeneration),
+          follow: () => this.#confirmReloadedSelectEffect(send, reloadedSelect, desiredValues, passedValues, deadline),
         };
         yield* send("DOM.focus", { backendNodeId: resolved.backendNodeId }, resolved.sessionId);
         let selectNodeId = resolved.backendNodeId;
@@ -3823,16 +3832,16 @@ export class BrowserCdpEngine {
   readonly #confirmReloadedSelectEffect = Effect.fn("BrowserCdp.confirmReloadedSelect")(function* (
     this: BrowserCdpEngine,
     send: SendCommand,
-    select: { id: string; name: string; multiple: boolean },
+    select: { id: string; name: string; multiple: boolean; inTopFrame: boolean },
     desiredValues: string[],
-    sessionId: string | undefined,
+    passedValues: string[],
     deadline: number | undefined,
   ): Effect.fn.Return<void, BrowserOperationError> {
     const loadTimeout = Math.max(1, (deadline ?? Date.now() + ACTION_TIMEOUT_MS) - Date.now());
     yield* waitForLoading(this.#contents, loadTimeout).pipe(Effect.ignore);
     if (this.#contents.isDestroyed()) return;
     const selectedValues =
-      sessionId !== undefined || this.#contents.isLoading() || (select.id === "" && select.name === "")
+      !select.inTopFrame || this.#contents.isLoading() || (select.id === "" && select.name === "")
         ? null
         : yield* Effect.gen(function* () {
             const executionContextId = yield* automationContextId(send);
@@ -3849,16 +3858,20 @@ export class BrowserCdpEngine {
             const value = recordValue(found.result)?.value;
             return Array.isArray(value) ? value.filter(isString) : null;
           }).pipe(Effect.catch(() => Effect.succeed(null)));
-    if (selectedValues === null) {
-      this.#actionNote = SELECT_RELOAD_UNCONFIRMED;
-      return;
-    }
     if (
-      selectedValues.length !== desiredValues.length ||
-      selectedValues.some((value, position) => value !== desiredValues[position])
-    ) {
-      return yield* browserFailure(new Error(SELECT_RELOAD_OTHER_OPTION));
-    }
+      selectedValues !== null &&
+      selectedValues.length === desiredValues.length &&
+      selectedValues.every((value, position) => value === desiredValues[position])
+    )
+      return;
+    const postedOnTheWay =
+      selectedValues !== null &&
+      selectedValues.length > 0 &&
+      (select.multiple
+        ? selectedValues.every((value) => desiredValues.includes(value))
+        : selectedValues.every((value) => passedValues.includes(value)));
+    if (postedOnTheWay) return yield* browserFailure(new Error(SELECT_RELOAD_OTHER_OPTION));
+    this.#actionNote = SELECT_RELOAD_UNCONFIRMED;
   });
 
   get actionNote(): string | undefined {
