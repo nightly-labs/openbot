@@ -5,7 +5,7 @@ import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { Boom } from "@hapi/boom";
-import type { MessagingConnection, WhatsAppLinkState } from "@openbot/contracts/ipc";
+import { type MessagingConnection, NO_ANSWER_NOTICE_ITEM_TYPE, type WhatsAppLinkState } from "@openbot/contracts/ipc";
 import { isDynamicRecord } from "@openbot/contracts/runtime-values";
 import { sourceText } from "@openbot/i18n/source";
 import {
@@ -67,6 +67,7 @@ const LID_FRIEND = "48600100500";
 const LID_FRIEND_CHAT = "999123@lid";
 const LEAD = "48600100600";
 const OTHER_LEAD = "48600100700";
+const NO_COUNTRY_CODE = "600100800";
 const BRAZIL_TYPED = "5531988887777";
 const BRAZIL_ACCOUNT = "553188887777";
 const GROUP = "120363000000000001@g.us";
@@ -195,8 +196,10 @@ class FakeSocket implements WhatsAppSocket {
   async sendMessage(jid: string, content: AnyMessageContent, options?: MiscMessageGenerationOptions) {
     if (this.ended) throw new Error("socket closed");
     const id = options?.messageId ?? `SENT${this.#phone.sent.length}`;
-    if (this.#phone.dropNext === jid) {
+    const dropsText = "text" in content && content.text === this.#phone.dropText;
+    if (this.#phone.dropNext === jid || dropsText) {
       this.#phone.dropNext = null;
+      this.#phone.dropText = null;
       this.#phone.lost.push({ jid, content, id, quotedId: null });
       setTimeout(() => this.close(428), 0);
       return { key: { remoteJid: jid, id, fromMe: true }, message: {} } satisfies WAMessage;
@@ -246,9 +249,11 @@ class FakeSocket implements WhatsAppSocket {
   }
 
   async onWhatsApp(...phoneNumbers: string[]) {
+    this.#phone.lookups.push(...phoneNumbers);
+    if (this.#phone.lookupFails) throw new Error("usync failed");
     return phoneNumbers.map((number) => ({
       jid: `${number === BRAZIL_TYPED ? BRAZIL_ACCOUNT : number}@s.whatsapp.net`,
-      exists: true,
+      exists: !this.#phone.noAccount.has(number),
     }));
   }
 
@@ -261,7 +266,11 @@ class FakePhone {
   readonly sockets: FakeSocket[] = [];
   readonly sent: Sent[] = [];
   readonly refused = new Map<string, string>();
+  readonly noAccount = new Set<string>();
+  readonly lookups: string[] = [];
+  lookupFails = false;
   dropNext: string | null = null;
+  dropText: string | null = null;
   holdAcks = false;
   readonly lost: Sent[] = [];
   logouts = 0;
@@ -725,6 +734,60 @@ try {
       return { agent: "WhatsApp Orchestrator", teammate: "Sales" };
     });
 
+    await step("contact with no account: a post fails and is not sent, as WhatsApp answers (#13597)", async () => {
+      const sales = agents.listAgents().find((agent) => agent.name === "Sales");
+      assert.ok(sales, "No Sales agent.");
+      const jid = `${NO_COUNTRY_CODE}@s.whatsapp.net`;
+      try {
+        phone.noAccount.add(NO_COUNTRY_CODE);
+        phone.lookupFails = true;
+        await runCauseEffect(
+          messaging.addWhatsAppSender(OWNER, { id: NO_COUNTRY_CODE, kind: "contact", name: "Marta" }),
+        );
+        const unknownBefore = phone.lookups.filter((number) => number === NO_COUNTRY_CODE).length;
+        await postAs(agents, sales.id, jid, "Sent while WhatsApp does not answer.");
+        assert.equal(phone.textsTo(jid).length, 1, "A post did not go out while the account check had no answer.");
+        assert.equal(
+          phone.lookups.filter((number) => number === NO_COUNTRY_CODE).length - unknownBefore,
+          1,
+          "One post asked WhatsApp more than once about the same contact.",
+        );
+        phone.lookupFails = false;
+        const refused = await runCauseEffect(
+          agents.messaging.outboundTool(
+            sales.id,
+            { threadId: `thread-${sales.id}`, turnId: `turn-${sales.id}` },
+            "messaging_post",
+            { connection: connectionId(agents), place: jid, text: "Nobody gets this." },
+            () => Effect.succeed([]),
+          ),
+        );
+        const text = refused.contentItems[0]?.text ?? "";
+        assert.ok(text.includes("OpenBot sent nothing"), `The agent was not told that the post failed: ${text}`);
+        assert.ok(text.includes("country code"), "The agent was not told about the country code.");
+        assert.equal(phone.textsTo(jid).length, 1, "A post to a number with no account went out.");
+        await runCauseEffect(messaging.addWhatsAppSender(OWNER, { id: FRIEND, kind: "contact", name: "Ewa" }));
+        const friendJid = `${FRIEND}@s.whatsapp.net`;
+        const lookupsBefore = phone.lookups.filter((number) => number === FRIEND).length;
+        await postAs(agents, sales.id, friendJid, "First post.");
+        await postAs(agents, sales.id, friendJid, "Second post.");
+        assert.equal(phone.textsTo(friendJid).length, 2, "A post to a contact with an account did not go out.");
+        assert.equal(
+          phone.lookups.filter((number) => number === FRIEND).length - lookupsBefore,
+          1,
+          "OpenBot asked WhatsApp again about a contact it already checked on this connection.",
+        );
+        const contacts = messaging.whatsappOverview().accounts[0]?.allowedSenders.map((sender) => sender.id) ?? [];
+        assert.ok(contacts.includes(NO_COUNTRY_CODE), "OpenBot removed the saved contact.");
+        return { refused: true, lookupsPerContact: 1 };
+      } finally {
+        phone.lookupFails = false;
+        phone.noAccount.clear();
+        await runCauseEffect(messaging.removeWhatsAppSender(OWNER, NO_COUNTRY_CODE));
+        await runCauseEffect(messaging.removeWhatsAppSender(OWNER, FRIEND));
+      }
+    });
+
     await step("own chat: the owner's message reaches the orchestrator and gets 👀", async () => {
       const first = message({ chat: OWNER_JID, fromMe: true, text: "What is on my calendar?" });
       phone.current().receive([first]);
@@ -913,6 +976,94 @@ try {
         await until(() => received(agents, OWNER_JID, again.key.id ?? ""), `answer request again ${index}`);
       }
       return { posted };
+    });
+
+    await step("refused answer: the agent's chat says that WhatsApp did not deliver it (#14456)", async () => {
+      const link = agents.messaging.store.linkByKey(connectionId(agents), OWNER_JID, "dm");
+      assert.ok(link, "No conversation for the owner's chat.");
+      const notices = () =>
+        database
+          .readConversation(link.agentId, link.threadId)
+          .messages.filter((message) => message.itemType === NO_ANSWER_NOTICE_ITEM_TYPE);
+      const posts = (text: string) =>
+        phone.sent.filter(
+          (sent) =>
+            sent.jid === OWNER_JID && "text" in sent.content && sent.content.text === text && !("edit" in sent.content),
+        ).length;
+      const finishTurn = async (turnId: string, answer: string) => {
+        const request = mailbox.unresolvedMessagingDeliveries(link.linkId)[0];
+        assert.ok(request, "No request waits in the owner's chat.");
+        await runCauseEffect(mailbox.markStarting(request.delivery.id));
+        const scope = Effect.runSync(Scope.make());
+        const turn = { agentId: link.agentId, threadId: link.threadId, turnId };
+        agents.messaging.event({ type: "turn-started", ...turn }, scope);
+        const snapshot = database.readConversation(link.agentId, link.threadId);
+        snapshot.messages.push({
+          id: `${turnId}:answer`,
+          turnId,
+          author: "assistant",
+          text: answer,
+          createdAt: new Date().toISOString(),
+          status: "completed",
+        });
+        database.persistStreamingMessage({ snapshot, messageId: `${turnId}:answer`, eventType: "item.completed" });
+        await runCauseEffect(mailbox.markTerminal(request.delivery.id, "completed", null));
+        agents.messaging.event({ type: "turn-completed", ...turn, status: "completed" }, scope);
+      };
+      const refill = async (label: string) => {
+        for (let index = 1; mailbox.unresolvedMessagingDeliveries(link.linkId).length < 2; index += 1) {
+          const again = message({ chat: OWNER_JID, fromMe: true, text: `${label} ${index}` });
+          phone.current().receive([again]);
+          await until(() => received(agents, OWNER_JID, again.key.id ?? ""), `${label} ${index}`);
+        }
+      };
+
+      const answer = "Your report is ready.";
+      phone.refused.set(OWNER_JID, "463");
+      try {
+        await finishTurn("turn-refused-answer", answer);
+        await until(() => notices().length > 0, "the not-delivered line in the agent's chat");
+      } finally {
+        phone.refused.delete(OWNER_JID);
+      }
+      const [notice] = notices();
+      assert.equal(notices().length, 1, "The refused answer got more than one line.");
+      assert.equal(notice?.author, "system");
+      assert.equal(notice?.text, sourceText("status.messaging.whatsappNotDelivered"));
+      assert.ok(!notice?.text.includes("463"), "The line shows the WhatsApp error code.");
+      assert.equal(posts(answer), 1, "OpenBot posted a refused answer again.");
+      const messages = database.readConversation(link.agentId, link.threadId).messages;
+      assert.equal(messages.at(-1)?.id, notice?.id, "The line is not after the refused answer.");
+      assert.equal(connection(messaging)?.state, "connected", "A refused answer changed the connection state.");
+      await refill("refused request again");
+
+      const lateAnswer = "Your invoice is ready.";
+      const failureText = sourceText("status.messaging.failed");
+      const failuresBefore = posts(failureText);
+      await runCauseEffect(messaging.setWhatsAppWorkingMessage(OWNER, false));
+      phone.dropText = lateAnswer;
+      phone.refused.set(OWNER_JID, "463");
+      try {
+        await finishTurn("turn-refused-after-close", lateAnswer);
+        await until(
+          () => posts(failureText) > failuresBefore,
+          "the failure notice in place of the lost answer",
+          90_000,
+        );
+        await until(() => notices().length > 1, "the not-delivered line after a closed socket", 30_000);
+      } finally {
+        phone.dropText = null;
+        phone.refused.delete(OWNER_JID);
+        await runCauseEffect(messaging.setWhatsAppWorkingMessage(OWNER, true));
+      }
+      assert.equal(notices().length, 2, "A refusal after a closed socket did not add exactly one line.");
+      assert.equal(notices().at(-1)?.text, sourceText("status.messaging.whatsappNotDelivered"));
+      assert.ok(
+        phone.lost.some((sent) => "text" in sent.content && sent.content.text === lateAnswer),
+        "The socket did not drop the first send of the answer.",
+      );
+      await refill("refused after close again");
+      return { notice: notice?.text, posts: posts(answer), afterClose: notices().at(-1)?.text };
     });
 
     await step(
@@ -2105,6 +2256,50 @@ try {
           ],
         };
       } finally {
+        await runCauseEffect(session.stop());
+        store.close();
+      }
+    },
+  );
+
+  await step(
+    "a socket that never opens counts as a failed attempt, also a minute after the last open (#17021)",
+    async () => {
+      let clock = Date.now();
+      const store = WhatsAppAuthStore.open({ path: join(root, "offline.db"), key: newStoreKey(), now: () => clock });
+      store.creds.me = { id: `${OWNER}:8@s.whatsapp.net` };
+      store.saveCreds();
+      const session = new WhatsAppSession({
+        store,
+        createSocket: phone.create,
+        makeSignalRepository: () => {
+          throw new Error("Not used by the fake socket.");
+        },
+        fetchVersion: async () => null,
+        now: () => clock,
+      });
+      try {
+        session.start();
+        await until(() => session.state === "open", "the socket open");
+        clock += 61_000;
+        phone.offline = true;
+        const before = phone.sockets.length;
+        phone.current().close(428);
+        const createdAt: number[] = [];
+        for (let next = 1; next <= 3; next += 1) {
+          await until(() => phone.sockets.length >= before + next, `offline attempt ${next}`, 20_000);
+          createdAt.push(Date.now());
+        }
+        const gaps = createdAt.slice(1).map((at, index) => at - (createdAt[index] ?? at));
+        const firstDelayMax = backoffDelay(0, () => 1);
+        assert.ok(
+          gaps.every((gap) => gap > firstDelayMax),
+          `The backoff started again at each failed attempt: ${gaps.join(", ")} ms.`,
+        );
+        assert.notEqual(session.state, "open");
+        return { gapsMs: gaps, firstDelayMaxMs: firstDelayMax };
+      } finally {
+        phone.offline = false;
         await runCauseEffect(session.stop());
         store.close();
       }

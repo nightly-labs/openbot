@@ -12,6 +12,7 @@ import type {
   BrowserTakeoverRequest,
   BrowserVaultSkipReason,
   ConversationMessageSender,
+  ConversationNearPayment,
   CreditsHold,
   LocalBrowserSecretResponse,
   MediaApprovalChoice,
@@ -27,6 +28,8 @@ import {
   AGENT_WELCOME_ITEM_TYPE,
   BROWSER_TAKEOVER_REASONS,
   cardBrand,
+  NEAR_PAYMENT_ITEM_TYPE,
+  NEAR_WALLET_LIMITS,
 } from "@openbot/contracts/ipc";
 import { type DynamicRecord, isOneOf, isString } from "@openbot/contracts/runtime-values";
 import { normalizeTwoStepKey, twoStepKeySecret } from "@openbot/contracts/two-step-code";
@@ -65,6 +68,7 @@ import { repairBrowserToolInput } from "../browser-tool-input";
 import { type BrowserToolArguments, parseBrowserToolCall } from "../browser-tools";
 import { causeHelpers } from "../effect-boundary";
 import { LINK_CARD_ID_PREFIX, type LinkWallet } from "../link-wallet";
+import type { NearPaymentResult, NearWallet } from "../near-wallet";
 import {
   isWebProtocol,
   type PasswordVault,
@@ -101,6 +105,7 @@ import {
 } from "./hosted-site-coordinator";
 import type { HostedSiteMutationTool } from "./hosted-site-events";
 import { ForbiddenAttentionAnswer, InactiveAttentionRequest } from "./inactive-attention-request";
+import { nearPaymentText } from "./near-payment-message";
 import {
   API_KEY_FIELD_ID,
   API_KEY_SCOPE_AGENT,
@@ -162,6 +167,24 @@ interface PendingPrompt {
 
 function outlivesTurn(pending: PendingPrompt): boolean {
   return pending.detached !== undefined || pending.subagent === true;
+}
+
+function plainBlock(
+  block: SurfacedUiBlock,
+  auto: UiBlockAutoAnswer | undefined,
+  questions: AgentPromptQuestion[],
+): boolean {
+  return (
+    !block.vault &&
+    !block.apiKey &&
+    !block.location &&
+    auto === undefined &&
+    !questions.some((question) => question.isSecret)
+  );
+}
+
+function providerStopsCall(request: AppServerRequest): boolean {
+  return request.detachAfterMs !== undefined || request.answerBeforeMs !== undefined;
 }
 
 export type AgentPersonWait = "approval" | "answer" | "browser";
@@ -298,6 +321,9 @@ const VAULT_FIELDS: Record<BrowserToolArguments<"save_vault_item">["kind"], read
 
 const LINK_UNAVAILABLE =
   "Link is not connected. Ask the user to connect Link in Server settings > Vault > Cards, or use a saved card.";
+
+const NEAR_UNAVAILABLE =
+  "The NEAR Intents wallet is not ready. Ask the user to set it up or unfreeze it in Server settings > Vault > Crypto.";
 
 function httpsHost(address: string): string | null {
   try {
@@ -537,6 +563,7 @@ export interface AttentionRegistryOptions {
   passwordVault?: PasswordVault | null | undefined;
   vaultItems?: VaultItems | null | undefined;
   linkWallet?: LinkWallet | null | undefined;
+  nearWallet?: NearWallet | null | undefined;
   agentName?(agentId: string): string | undefined;
   noteVaultChange?(agentId: string, threadId: string, turnId: string, text: string): void;
   apiKeys?: AgentApiKeys | null | undefined;
@@ -584,6 +611,7 @@ export class AttentionRegistry {
   readonly #passwordVault: PasswordVault | null;
   readonly #vaultItems: VaultItems | null;
   readonly #linkWallet: LinkWallet | null;
+  readonly #nearWallet: NearWallet | null;
   readonly #agentName: (agentId: string) => string | undefined;
   readonly #noteVaultChange: (agentId: string, threadId: string, turnId: string, text: string) => void;
   readonly #apiKeys: AgentApiKeys | null;
@@ -613,6 +641,7 @@ export class AttentionRegistry {
     this.#passwordVault = options.passwordVault ?? null;
     this.#vaultItems = options.vaultItems ?? null;
     this.#linkWallet = options.linkWallet ?? null;
+    this.#nearWallet = options.nearWallet ?? null;
     this.#agentName = options.agentName ?? (() => undefined);
     this.#noteVaultChange = options.noteVaultChange ?? (() => undefined);
     this.#apiKeys = options.apiKeys ?? null;
@@ -910,7 +939,7 @@ export class AttentionRegistry {
                     : { status: "skipped", blockId: pending.uiBlock.blockId },
                 )
               : pending.responseKind === "dynamic-tool"
-                ? dynamicPromptResult(answers)
+                ? dynamicPromptResult(pending.questions, answers)
                 : pending.responseKind === "mcp-elicitation"
                   ? mcpElicitationResult(pending.params, answers)
                   : {
@@ -1793,6 +1822,93 @@ export class AttentionRegistry {
     } satisfies DynamicToolResult;
   }).bind(this);
 
+  readonly requestNearPayment = Effect.fn("AttentionRegistry.requestNearPayment")(function* (
+    this: AttentionRegistry,
+    client: AgentClient,
+    request: AppServerRequest,
+    params: DynamicToolCallParams,
+  ) {
+    const call = yield* attentionStep(() => parseBrowserToolCall("request_near_payment", params.arguments));
+    if (call.tool !== "request_near_payment")
+      return yield* new AttentionOperationFailed({ cause: new Error("Invalid NEAR payment request.") });
+    const wallet = this.#nearWallet;
+    const agentId = params.ownerAgentId;
+    if (!wallet?.ready() || !agentId) return browserTakeoverError(NEAR_UNAVAILABLE);
+    if (this.#messagingThread(params.threadId) || this.#messagingRequestTurn(agentId, params.turnId))
+      return browserTakeoverError(
+        "request_near_payment does not work for a request from a Slack, Discord or Telegram chat. Ask the user to start the payment in the OpenBot chat.",
+      );
+    const requestId = String(request.id);
+    const plan = yield* Effect.result(wallet.prepare({ agentId, threadId: params.threadId, requestId, ...call.args }));
+    if (Result.isFailure(plan))
+      return browserTakeoverError(`NEAR payment refused: ${plan.failure.message} Do not try again; tell the user.`);
+    const record = (state: ConversationNearPayment["state"], transactionHash: string | null, detail: string | null) =>
+      this.#recordNearPayment(agentId, params.threadId, params.turnId, requestId, {
+        domain: call.args.domain,
+        amount: plan.success.amount.slice(0, NEAR_WALLET_LIMITS.amount),
+        symbol: plan.success.symbol.slice(0, NEAR_WALLET_LIMITS.asset),
+        reason: call.args.reason.slice(0, NEAR_WALLET_LIMITS.reason),
+        state,
+        automatic: plan.success.kind === "auto",
+        transactionHash,
+        detail: detail === null ? null : detail.slice(0, NEAR_WALLET_LIMITS.paymentDetail),
+      });
+    if (plan.success.kind === "ask") {
+      const decision = yield* this.awaitToolApproval(
+        client,
+        request,
+        {
+          requestId: request.id,
+          agentId,
+          threadId: params.threadId,
+          turnId: params.turnId,
+          kind: "permissions",
+          command: null,
+          cwd: null,
+          reason: sourceText("status.agent.nearPayment", {
+            amount: plan.success.amount,
+            symbol: plan.success.symbol,
+            recipient: call.args.recipient,
+            domain: call.args.domain,
+            reason: call.args.reason,
+          }),
+          grantRoot: null,
+          permissions: null,
+        },
+        { ownerOnly: true },
+      ).pipe(Effect.onInterrupt(() => Effect.sync(() => wallet.drop(requestId))));
+      if (decision !== "accept") {
+        wallet.drop(requestId);
+        record("rejected", null, null);
+        return browserTakeoverError("The owner declined this NEAR payment. Do not ask again; tell the user.");
+      }
+    }
+    record("sending", null, null);
+    const paid = yield* Effect.result(wallet.pay(requestId)).pipe(
+      Effect.onInterrupt(() =>
+        Effect.sync(() => record("uncertain", null, sourceText("error.connector.nearUncertain"))),
+      ),
+    );
+    if (Result.isFailure(paid)) {
+      record("failed", null, paid.failure.message);
+      return browserTakeoverError(`NEAR payment failed: ${paid.failure.message}`);
+    }
+    const result = paid.success;
+    record(NEAR_PAYMENT_RESULT_STATE[result.status], result.transactionHash, result.detail);
+    const next =
+      result.status === "paid"
+        ? result.transactionHash
+          ? "Go back to the site and continue."
+          : "The payment is settled. Some payments have no public NEAR transaction hash; this is normal. Do not tell the user that the payment is not confirmed. Go back to the site and continue."
+        : result.status === "uncertain"
+          ? "Do not pay again. OpenBot finishes this payment; tell the user to check the wallet in Server settings > Vault > Crypto."
+          : "Do not try again; tell the user.";
+    return {
+      success: result.status === "paid",
+      contentItems: [{ type: "inputText", text: JSON.stringify({ ...result, next }) }],
+    } satisfies DynamicToolResult;
+  }).bind(this);
+
   readonly linkCardVault = Effect.fn("AttentionRegistry.linkCardVault")(function* (
     this: AttentionRegistry,
     client: AgentClient,
@@ -2168,7 +2284,8 @@ export class AttentionRegistry {
       ...(autoAnswerTimer ? { autoAnswer: autoAnswerTimer } : {}),
       ...(request.subagent ? { subagent: true as const } : {}),
     };
-    if (block.vault) this.#scheduleDetach(request, pending);
+    if (block.vault || (plainBlock(block, auto, questions) && providerStopsCall(request)))
+      this.#scheduleDetach(request, pending);
     this.#prompts.set(request.id, pending);
     this.#routines.markNeedsAttention(turnId);
     this.#emit({
@@ -2788,6 +2905,36 @@ export class AttentionRegistry {
     );
   }
 
+  #recordNearPayment(
+    agentId: string,
+    threadId: string,
+    turnId: string,
+    requestId: string,
+    payment: ConversationNearPayment,
+  ): void {
+    const snapshot = this.#conversation.ensureSnapshot(agentId, this.#conversation.publicThreadId(agentId, threadId));
+    const id = `near-payment:${turnId}:${requestId}`;
+    const text = nearPaymentText(payment);
+    const existing = snapshot.messages.find((message) => message.id === id);
+    if (existing) {
+      existing.nearPayment = payment;
+      existing.text = text;
+    } else {
+      snapshot.messages.push({
+        id,
+        turnId,
+        author: "system",
+        source: "system",
+        status: "completed",
+        createdAt: new Date().toISOString(),
+        itemType: NEAR_PAYMENT_ITEM_TYPE,
+        text,
+        nearPayment: payment,
+      });
+    }
+    this.#conversation.emitConversation(snapshot);
+  }
+
   #persistQuestionPrompt(
     agentId: string,
     publicThreadId: string,
@@ -2889,6 +3036,13 @@ export class AttentionRegistry {
     this.#conversation.emitConversation(snapshot);
   }
 }
+
+const NEAR_PAYMENT_RESULT_STATE = {
+  paid: "paid",
+  declined: "rejected",
+  failed: "failed",
+  uncertain: "uncertain",
+} as const satisfies Record<NearPaymentResult["status"], ConversationNearPayment["state"]>;
 
 function welcomeAnswerText(questions: AgentPromptQuestion[], resolution: AgentPromptResolution): string {
   const [question] = questions;

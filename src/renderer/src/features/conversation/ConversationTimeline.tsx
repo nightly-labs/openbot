@@ -45,6 +45,7 @@ import { MAIN_THREAD_ID } from "@openbot/ui/features/conversation/threads/thread
 import { UnreadMessagesBanner, UnreadMessagesDivider } from "@openbot/ui/features/conversation/UnreadMessages";
 import { VoicePlayer } from "@openbot/ui/features/conversation/VoicePlayer";
 import { teamMemberName } from "@openbot/ui/features/team/TeamPersonAvatar";
+import { NearPaymentRecordCard } from "@openbot/ui/features/vault/NearPaymentRecordCard";
 import { useText } from "@openbot/ui/text";
 import { createEffect, createMemo, createSignal, For, Loading, onSettled, Show, untrack } from "solid-js";
 import { useShowAgentSteps } from "../../agent-steps-preference";
@@ -69,10 +70,17 @@ import {
 import { cycleSpeechSpeed, speechSpeed } from "../speech/speech-speed";
 import { groupedMessageIds } from "./agent-message-timeline";
 import { ChatVisualReply, shownVisualReply } from "./ChatVisualReply";
+import { ConversationBrowserLocation } from "./ConversationBrowserLocation";
 import { ConversationBrowserTakeover } from "./ConversationBrowserTakeover";
 import { ConversationQuestionPrompt } from "./ConversationQuestionPrompt";
 import { chatSearchCanOpen, chatSearchOpensMessage } from "./chat-search";
-import { ApprovalCard, preloadConversationCards, QuestionPromptBubble, UiBlockPrompt } from "./conversation-cards";
+import {
+  ApprovalCard,
+  NearPaymentCard,
+  preloadConversationCards,
+  QuestionPromptBubble,
+  UiBlockPrompt,
+} from "./conversation-cards";
 import { useConversationController } from "./conversation-controller-context";
 import { conversationPort } from "./conversation-port";
 import { isIncomingAgentMessage } from "./conversation-read-state";
@@ -82,6 +90,7 @@ import { MarketplaceSuggestionChatCard, marketplaceSuggestionKnown } from "./Mar
 import { McpSignInChatCard } from "./McpSignInChatCard";
 import { useMessageBackdropAction, watchAgentBackdrops } from "./message-backdrop";
 import { createMessageImageFiles, decodedPath } from "./message-image-files";
+import { useNearPaymentApproval } from "./near-payment-approval";
 import { RoutineChatCard } from "./RoutineChatCard";
 import { createChatWebhookRoutines, RoutineWebhookChatCard } from "./RoutineWebhookChatCard";
 import { createRoutineRunFailures, type RoutineRunFailureSource } from "./routine-run-failures";
@@ -110,6 +119,7 @@ function rowDrawsTime(message: AgentMessage): boolean {
     message.kind !== "plan" &&
     message.kind !== "subagents" &&
     message.kind !== "memory-changes" &&
+    message.kind !== "near-payment" &&
     message.kind !== "thinking" &&
     chatVisualReply(message) === null
   );
@@ -137,6 +147,7 @@ export function ConversationTimeline() {
     agentActivitySpaceReserved,
     attachmentAction,
     attachmentDownloads,
+    imageCopies,
     channel,
     chatSearchMatches,
     chatSearchOpen,
@@ -352,6 +363,9 @@ export function ConversationTimeline() {
     () => props.isOwnSender,
   );
   const messageImageFiles = props.runtime ? undefined : createMessageImageFiles(runtime.agent);
+  const { payment: nearPayment, wallet: nearWallet } = useNearPaymentApproval(
+    () => props.server?.kind === "local" && !props.runtime,
+  );
   const withdrawFeedback = createMemo(() => {
     const agentId = props.agent?.id;
     const server = props.server;
@@ -389,6 +403,17 @@ export function ConversationTimeline() {
     if (props.messages.length !== held.rows || props.activeTurnId !== held.turnId) return undefined;
     return held.approval;
   });
+  const approvalCard = (approval: AgentApproval) => (
+    <ApprovalCard
+      approval={approval}
+      agentName={interactionAgentName()}
+      sending={heldFeedback() !== undefined}
+      onApprove={() => approve(approval)}
+      onReject={() => props.onRespondToApproval("decline")}
+      onAlwaysAllow={props.onAlwaysAllowApproval}
+      media={props.mediaApproval}
+    />
+  );
   async function approve(approval: AgentApproval) {
     if (feedbackApproval(approval)) {
       setSendingFeedback({ approval, rows: props.messages.length, turnId: props.activeTurnId });
@@ -685,6 +710,7 @@ export function ConversationTimeline() {
       next.kind === "plan" ||
       next.kind === "subagents" ||
       next.kind === "memory-changes" ||
+      next.kind === "near-payment" ||
       next.kind === "thinking" ||
       shownVisualReply(next, runtime.visualPage)
     )
@@ -1300,6 +1326,56 @@ export function ConversationTimeline() {
                     </div>
                   );
                 }
+                if (untrack(() => initialMessage.kind === "near-payment")) {
+                  const nearPayment = () => message()?.nearPayment ?? initialMessage.nearPayment;
+                  return (
+                    <div
+                      data-index={virtualRow.index}
+                      ref={messageVirtualizer.measureElement}
+                      class="virtual-chat-row"
+                      style={{
+                        transform: messageVirtualizer.isVirtualized()
+                          ? `translateY(${virtualRow.start - messageVirtualizer.scrollMargin()}px)`
+                          : "none",
+                      }}
+                    >
+                      <Show when={message()?.id === compactionBefore()}>
+                        <CompactionMarker />
+                      </Show>
+                      <Show when={dayMarker()}>
+                        {(label) => (
+                          <div class="time-marker">
+                            <span>{label()}</span>
+                          </div>
+                        )}
+                      </Show>
+                      <Show when={message()?.id === unreadBoundaryMessageId()}>
+                        <UnreadMessagesDivider
+                          animateIn={unreadDividerArrives}
+                          elementRef={(element) => {
+                            setUnreadMessagesDividerElement(element);
+                            scheduleUnreadDividerVisibilityUpdate();
+                          }}
+                        />
+                      </Show>
+                      <ChatRowBoundary>
+                        <article
+                          data-chat-search-message={message()?.id}
+                          class={{ "message-entry-animated": animateEntrance }}
+                        >
+                          <Show when={nearPayment()}>
+                            {(current) => (
+                              <NearPaymentRecordCard
+                                payment={current()}
+                                onOpenLink={(url) => void openExternalMessageUrl(url)}
+                              />
+                            )}
+                          </Show>
+                        </article>
+                      </ChatRowBoundary>
+                    </div>
+                  );
+                }
                 if (untrack(() => initialMessage.kind === "memory-changes" || initialMessage.kind === "thinking")) {
                   return (
                     <div
@@ -1547,6 +1623,7 @@ export function ConversationTimeline() {
                             onOpenTag={openTaggedReference}
                             onDownload={(attachment) => attachmentAction(attachment, "download")}
                             mediaSource={runtime.attachmentMedia}
+                            imageCopies={imageCopies()}
                             downloads={attachmentDownloads}
                             macWindowControls={props.platform === "darwin"}
                             loadImageFile={messageImageFiles && loadImageFile}
@@ -1696,15 +1773,17 @@ export function ConversationTimeline() {
             <Show keyed when={props.approval ?? heldFeedback()}>
               {(approval) => (
                 <Loading>
-                  <ApprovalCard
-                    approval={approval}
-                    agentName={interactionAgentName()}
-                    sending={heldFeedback() !== undefined}
-                    onApprove={() => approve(approval)}
-                    onReject={() => props.onRespondToApproval("decline")}
-                    onAlwaysAllow={props.onAlwaysAllowApproval}
-                    media={props.mediaApproval}
-                  />
+                  <Show when={nearPayment(approval)} fallback={approvalCard(approval)}>
+                    {(payment) => (
+                      <NearPaymentCard
+                        payment={payment()}
+                        status={nearWallet.state.status}
+                        actions={nearWallet.actions}
+                        onApprove={() => approve(approval)}
+                        onReject={() => props.onRespondToApproval("decline")}
+                      />
+                    )}
+                  </Show>
                 </Loading>
               )}
             </Show>
@@ -1723,6 +1802,7 @@ export function ConversationTimeline() {
             </Show>
             <Show when={!sideThreadOpen()}>
               <ConversationBrowserTakeover />
+              <ConversationBrowserLocation />
             </Show>
             <div
               class="agent-activity-slot"

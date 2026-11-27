@@ -204,7 +204,7 @@ const AGENT_PROVIDER_DESCRIPTOR_TABLE = {
     workspaceEnforcement: "confined-process",
     steer: "native",
     concurrentTurns: true,
-    reportsUsage: true,
+    reportsUsage: false,
     approvalsInFullAccess: true,
     foldersInFullAccess: true,
   },
@@ -605,6 +605,10 @@ export function isKeyOnlyProvider(provider: AgentProviderRef): provider is KeyOn
 
 export function pasteCodeSignInSupported(platform: string): boolean {
   return platform === "linux";
+}
+
+export function browserAddressPasteSupported(provider: AgentProviderId, platform: string): boolean {
+  return provider === "antigravity" && platform !== "win32";
 }
 
 export const CUSTOM_AGENT_ID_PATTERN = /^[a-z0-9][a-z0-9-]{0,39}$/;

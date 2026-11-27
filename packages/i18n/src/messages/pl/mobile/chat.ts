@@ -189,6 +189,7 @@ export const messages = {
   "mobile.chat.question.holdHint": "Przytrzymaj przycisk, aby potwierdzić.",
   "mobile.chat.question.preview": "Podgląd",
   "mobile.chat.question.showAllPreview": "Pokaż całość",
+  "mobile.chat.question.copyPreviewFailed": "Nie można skopiować wersji roboczej",
   "mobile.chat.question.sendChoice": "Wyślij",
   "mobile.chat.question.selectedCount": {
     one: "Wybrano: {count}",
@@ -534,11 +535,13 @@ export const messages = {
   "mobile.chat.upload.uploadingLabel": "Przesyłanie",
   "mobile.chat.outbox.sendsWhenOnline": "Zostanie wysłana, gdy serwer będzie online",
   "mobile.chat.outbox.waiting": "Oczekuje na wysłanie",
+  "mobile.chat.outbox.waitingForFailed": "Czeka na niewysłaną wiadomość",
   "mobile.chat.outbox.failed": "Nie wysłano",
   "mobile.chat.outbox.failedHold": "Nie wysłano. Przytrzymaj wiadomość, aby spróbować ponownie.",
   "mobile.chat.outbox.cancelSend": "Nie wysyłaj",
   "mobile.chat.outbox.menuHint": "Pokazuje opcje tej wiadomości.",
-  "mobile.chat.outbox.unconfirmed": "Niepotwierdzona. Sprawdź czat, zanim wyślesz ją ponownie.",
+  "mobile.chat.outbox.unconfirmed":
+    "Niepotwierdzona. Sprawdź czat, a potem przytrzymaj wiadomość, aby ją edytować lub anulować.",
   "mobile.chat.outbox.editFailed": "Nie udało się otworzyć wiadomości do edycji.",
   "mobile.chat.outbox.saveFailed":
     "Nie udało się zapisać oczekujących wiadomości na tym telefonie. Nie zamykaj aplikacji, dopóki nie zostaną wysłane.",
@@ -636,6 +639,8 @@ export const messages = {
   "mobile.chat.queue.repliesTitle": "Oczekiwanie na odpowiedzi",
   "mobile.chat.queue.providerRestart": "Oczekiwanie na ponowne uruchomienie {provider}",
   "mobile.chat.queue.signIn": "Oczekiwanie na zalogowanie do {provider}",
+  "mobile.chat.queue.usageLimit": "Osiągnięto limit użycia",
+  "mobile.chat.queue.usageLimitResets": "Osiągnięto limit użycia · Reset {time}",
   "mobile.chat.providerSignIn.title": "{provider} nie jest zalogowany",
   "mobile.chat.providerSignIn.action": "Zaloguj się",
   "mobile.chat.providerSignIn.open": "{label}. Otwórz ustawienia dostawcy",

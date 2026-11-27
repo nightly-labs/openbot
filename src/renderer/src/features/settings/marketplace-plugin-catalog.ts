@@ -3922,6 +3922,70 @@ const COINGECKO: MarketplacePluginDetail = {
   shareUrl: "https://openbot.run/plugins/coingecko",
 };
 
+const COINMARKETCAP: MarketplacePluginDetail = {
+  id: "plugin-coinmarketcap",
+  slug: "coinmarketcap",
+  name: "CoinMarketCap",
+  tagline: "Crypto market data and news",
+  description:
+    "CoinMarketCap lets agents read crypto prices, market data, technical indicators, on-chain metrics, market sentiment, and crypto news from CoinMarketCap. Each user signs in to their own CoinMarketCap account through the browser, or connects with an API key. A free account includes monthly credits. The tools only read data: they cannot trade or move funds.",
+  category: "data-analytics",
+  creatorName: "CoinMarketCap",
+  iconUrl: "https://coinmarketcap.com/apple-touch-icon.png",
+  version: "1.0.0",
+  prompts: [
+    {
+      id: "prompt-price",
+      text: "What are the current prices of Bitcoin and Ethereum, and how did they change in the last 7 days?",
+    },
+    {
+      id: "prompt-market",
+      text: "Give me a market overview: total market cap, Bitcoin dominance, and the Fear and Greed index.",
+    },
+    { id: "prompt-rsi", text: "Show the 14-day RSI and MACD for Solana, and tell me what they suggest." },
+  ],
+  apps: [
+    {
+      id: "app-coinmarketcap-mcp",
+      name: "CoinMarketCap",
+      description:
+        "Crypto prices, market data, indicators and news, over CoinMarketCap's MCP server with browser sign-in or an API key.",
+      iconUrl: "https://coinmarketcap.com/apple-touch-icon.png",
+      server: {
+        name: "coinmarketcap",
+        transport: "http",
+        url: "https://mcp.coinmarketcap.com/mcp",
+        auth: [
+          { id: "coinmarketcap-oauth", kind: "link", label: "Sign in" },
+          {
+            id: "coinmarketcap-key",
+            kind: "key",
+            label: "API key",
+            fields: [
+              {
+                id: "api-key",
+                label: "API key",
+                header: "X-CMC-MCP-API-KEY",
+                hint: "In CoinMarketCap, open API > Dashboard > API Keys and copy your key.",
+              },
+            ],
+            docsUrl: "https://coinmarketcap.com/api/dashboard/api-keys/",
+            docsLabel: "Get a key",
+          },
+        ],
+      },
+    },
+  ],
+  websiteUrl: "https://coinmarketcap.com",
+  privacyPolicyUrl: "https://coinmarketcap.com/privacy",
+  termsUrl: "https://coinmarketcap.com/terms",
+  skills: [],
+  installs: 0,
+  featured: false,
+  updatedAt: "2026-11-10T00:00:00.000Z",
+  shareUrl: "https://openbot.run/plugins/coinmarketcap",
+};
+
 const CONVEX: MarketplacePluginDetail = {
   id: "plugin-convex",
   slug: "convex",
@@ -10804,6 +10868,7 @@ export const MARKETPLACE_PLUGINS: MarketplacePluginDetail[] = [
   CLOUDINARY,
   CODA,
   COINGECKO,
+  COINMARKETCAP,
   CONVEX,
   CRAFT,
   CRUSTDATA,

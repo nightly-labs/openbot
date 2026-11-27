@@ -339,6 +339,10 @@ jobs:
       - name: Run the Team API routes E2E test
         run: bun run test:team-api-routes
 
+      - name: Run the Apple Watch relay host E2E test
+        if: ${{ !cancelled() }}
+        run: bun run test:watch-relay-host
+
       - name: Run the CRM Team API E2E test
         if: ${{ !cancelled() }}
         run: bun run test:crm-team-api
@@ -359,6 +363,7 @@ jobs:
           path: |
             .openbot-build/team-api-routes-e2e/
             .openbot-build/crm-team-api-e2e/
+            .openbot-build/watch-relay-host-e2e/
             .openbot-build/release-version-comparator-e2e.json
           if-no-files-found: ignore
 
@@ -736,10 +741,6 @@ jobs:
         if: ${{ !cancelled() }}
         run: bun run test:agent-update-agents
 
-      - name: Run the Gemini usage E2E test
-        if: ${{ !cancelled() }}
-        run: bun run test:antigravity-usage
-
       - name: Run the Gemini accounts E2E test
         if: ${{ !cancelled() }}
         run: bun run test:antigravity-accounts
@@ -1001,7 +1002,6 @@ jobs:
             .openbot-build/agent-mcp-tools-e2e/
             .openbot-build/mcp-server-unreadable-row-e2e/
             .openbot-build/agent-update-agents-e2e/
-            .openbot-build/antigravity-usage-e2e/
             .openbot-build/antigravity-accounts-e2e/
             .openbot-build/antigravity-usage-metering-e2e/
             .openbot-build/antigravity-quota-failover-e2e/
@@ -1621,6 +1621,8 @@ jobs:
         shell: bash
         env:
           EMAIL_SMTP_PASSWORD: ${{ secrets.EMAIL_SMTP_PASSWORD }}
+          EMAIL_SMTP_OVERFLOW_PASSWORD: ${{ secrets.EMAIL_SMTP_OVERFLOW_PASSWORD }}
+          EMAIL_SMTP_OVERFLOW_2_PASSWORD: ${{ secrets.EMAIL_SMTP_OVERFLOW_2_PASSWORD }}
           SKILLS_ADMIN_TOKEN: ${{ secrets.SKILLS_ADMIN_TOKEN }}
           SITE_OPERATIONS_ADMIN_TOKEN: ${{ secrets.SITE_OPERATIONS_ADMIN_TOKEN }}
           SERVER_CLAIMS_ADMIN_TOKEN: ${{ secrets.SERVER_CLAIMS_ADMIN_TOKEN }}
@@ -1687,6 +1689,9 @@ jobs:
               if (present.length === 0) continue;
               if (present.length !== names.length) throw new Error(`Set ${names.join(" and ")} together.`);
               for (const name of names) optional[name] = process.env[name].trim();
+            }
+            for (const name of ["EMAIL_SMTP_OVERFLOW_PASSWORD", "EMAIL_SMTP_OVERFLOW_2_PASSWORD"]) {
+              if (process.env[name]) optional[name] = process.env[name];
             }
             const githubAppKey = process.env.OPENBOT_GITHUB_APP_PRIVATE_KEY?.trim();
             if (githubAppKey) optional.GITHUB_APP_PRIVATE_KEY = githubAppKey;

@@ -335,7 +335,7 @@ a Claude subscription on a server, read [provider terms](provider-terms.md#claud
 
 The plan sets the number of active members, owner included: Starter 1, Standard 5 and Pro 10
 (`BILLING_PLANS`). A host with no plan, such as a self-hosted server, takes the users of its owner's
-license (`ownerLicenseForHost`): Starter 1, Team 2 to 10. Only a license that is `active`, `trialing`, or
+license (`ownerLicenseForHost`): Starter 1, Team 2 to 25. Only a license that is `active`, `trialing`, or
 `past_due` until the end of its period gives these seats. A host with no plan and no such license has 3
 (`DEFAULT_TEAM_MEMBER_LIMIT`). The Worker reads the limit in this order: a `server_member_limits` row,
 a hosted plan, the license, the default. A self-hosted host can keep a plan from before the license; it
@@ -708,6 +708,76 @@ no desktop session, the server starts two Xvfb displays and Openbox on the agent
   them through the slow mount for 25 s. boat keeps changes in `/srv` (not in `/var/lib`), and `/srv`
   is on the disk before the service starts.
 
+### Keyring guard
+
+The agents run as the service user, so an agent can stop the gnome-keyring daemon, replace it, change
+the keyring password or delete `login.keyring`. Chromium keeps the `safeStorage` key in memory, so
+OpenBot works until its next start. Then it cannot decrypt the account session, and the claim is
+used: the server stays signed out (server 3c3a7741 on 2026-11-25, after its Pi agent replaced the
+daemon). `openbot-hosted-keyring` (root) prevents this:
+
+- `openbot-hosted-keyring backup` runs from `openbot-hosted-update check` (each hour, from
+  `openbot-update.timer`). It saves a copy of `keyring-password` and `login.keyring` in
+  `/srv/openbot-keyring` (root, `0700`; files `0600`). The service user cannot read or change it.
+  `/srv` is root-owned, and boat keeps it.
+- `openbot-hosted-keyring start` runs as root in `ExecStartPre` of `openbot.service`, before
+  `openbot-hosted-server`. When the files are the same as the copy, it stops there. Otherwise it
+  checks the copy and the current files.
+- A check opens the keyring in a new D-Bus session as `nobody`, with `env -i`, for 20 s at most. It
+  passes when the password unlocks the keyring (`Locked` is false) and gnome-keyring does not make
+  `login_1.keyring`. It lists the items of the `safeStorage` schema
+  (`chrome_libsecret_os_crypt_password_v2`) with their `Created` and `Modified` values. It reads the
+  files as the service user. When a file is larger than 16 MiB, the guard changes nothing. The check runs as `nobody`, not
+  as the service user, so an agent cannot stop it or change its result. `dbus-daemon` needs a user
+  in the password database, so a free UID does not work. During a check, other processes that run
+  as `nobody` can read the copy of the files in `/run`.
+- When a check cannot complete, the guard logs `The keyring check did not complete (<code>)`. The
+  code is the step that failed: `10` unlock, `11` start, `12` and `13` `Locked`, `14` search, `15` to
+  `17` item properties, `124` and `137` the 20 s time-out, `missing` a missing command or user.
+- When the current files pass, and they keep each `safeStorage` item of the copy (or the copy does
+  not pass), the guard refreshes the copy. So a new password from `openbot-hosted-server`, and items
+  that other programs add, stay.
+- When the current files do not pass, or an item of the copy is missing or changed, `start` writes
+  the copy back as the service user, and moves the replaced files to `/srv/openbot-keyring/replaced`.
+  `backup` only logs this; the next start restores it.
+- When a check cannot complete (no `gnome-keyring-daemon`, a time-out), or neither the copy nor the
+  current files pass, the guard changes nothing. It never stops the start of OpenBot
+  (`ExecStartPre=-+`).
+- `start` waits 15 s at most for an hourly check that runs. Then it changes nothing, so the start
+  stays in the 90 s start time-out of `openbot.service`.
+- `move-from-boat.sh export` runs `start` after it stops OpenBot, so the archive has the restored
+  keyring, not a damaged one. When a keyring file is missing, `export` continues only when the copy
+  exists, and it archives only when the guard restored the file.
+
+A server gets the guard with its first update to a release that has it. The old `apply` installs the
+new units, so `openbot.service` has the new `ExecStartPre` at once. The old `HOSTED_FILES` does not
+name the guard, so the new `trigger` (the `ExecStartPre` before the guard) installs each missing file
+of `HOSTED_FILES`. The first copy comes from the first hourly check after the update.
+
+Limits:
+
+- An item that is not a `safeStorage` item (for example a provider CLI sign-in) and that changed after
+  the last copy is lost when the guard restores the copy. `replaced` keeps only the files of the last
+  restore.
+- When the start check cannot complete while the keyring is damaged, OpenBot can start with a new
+  `safeStorage` key. If the owner then claims the server again, the next start restores the old key,
+  and the server must be claimed one more time. After that, the key stays.
+- The guard does not protect against a keyring that an agent makes on purpose with the same
+  `safeStorage` item and a different key.
+- When you restore the data of another server on this machine, delete `/srv/openbot-keyring` first.
+  Otherwise the guard restores the keyring of the old server. `move-from-boat.sh` refuses `offer`,
+  `prepare`, `upgrade` and `import` when the folder exists, and `discard` deletes it.
+- A Docker container (`openbot-container`) has no guard.
+
+`bun scripts/hosting/hosted-keyring-guard-e2e.ts [--release 26.04] [--keep]` tests the guard in a
+privileged Docker container with systemd, the Electron of `package.json` and a small app that keeps an
+encrypted session with `safeStorage`. It installs `openbot.service` and an old `hosted` folder without
+the guard, so `trigger` must install it. Then it damages the keyring as the service user, restarts the
+service and checks that the session opens: the incident of 2026-11-25 (with a control run without the
+guard, in which the session does not open), a changed password, a removed password, a damaged
+keyring file and a `safeStorage` item deleted over D-Bus. It also checks that an item that another
+program adds stays. It writes `.openbot-build/hosted-keyring-guard-e2e/report.json` and the journal.
+
 OpenBot redeems the claim only when `safeStorage` works. After the first redeem the claim works
 for 10 more minutes, so a server whose response was lost can redeem it again; each redeem revokes the
 session of the one before. After that, a session that is only in memory would leave the server
@@ -732,8 +802,9 @@ background. Main rewrites `~/.config/OpenBot/openbot-run-marker-v1.json` every 6
 loop (`src/main/run-marker.ts`). The watchdog reads the file every 30 s. When the content does not
 change in 20 reads (10 minutes) after it changed once in this run, the watchdog logs "OpenBot did not
 update its heartbeat for 600 seconds" and sends `SIGKILL` to the process in
-`/run/openbot/openbot.pid`. `Restart=always` starts the service again 10 s later. The watchdog does
-nothing:
+`/run/openbot/openbot.pid`. `Restart=always` starts the service again 10 s later. The Docker
+entrypoint (`scripts/hosting/openbot-container`) starts the same watchdog; there the container exits
+and its restart policy starts it again. The watchdog does nothing:
 
 - before the first change of the file in this run;
 - until the start finishes: `openbot-start-attempts-v1.json` in the same folder has
@@ -2081,8 +2152,9 @@ Billing lists each paid server separately. Cancel renewal stops the next payment
 server stops when its plan ends and keeps its data. Keep server resumes renewal before
 the plan ends and removes any scheduled deletion.
 
-Delete server requires the server name. The owner can delete immediately with no refund
-for unused time, or schedule deletion for the paid-through date. The account Worker stores
+Delete server requires the server name and schedules deletion for the paid-through date.
+Billing has no option to delete a paid server immediately. The account Worker still accepts
+`timing: "now"` from released clients in the support window. The account Worker stores
 the date and subscription ID. The cron deletes on its next pass after that date only after
 Stripe confirms the subscription has ended and no newer or open plan exists. Failed
 provider deletion is retried through the existing deletion queue. Keep server and deletion

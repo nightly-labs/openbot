@@ -18,6 +18,8 @@ export const messages = {
     "OpenBot אינו יכול להגיע ל-Telegram מהמחשב הזה. יש להתחבר, לתת שם למחשב הזה ולנסות שוב.",
   "error.messaging.telegramRelayUnreachable":
     "OpenBot לא יכול להתחבר לשירות שלו מהמחשב הזה. יש לבדוק את החיבור לאינטרנט, את ה-VPN, את ה-proxy או את חומת האש, ולנסות שוב.",
+  "error.messaging.telegramRelayCertificate":
+    "OpenBot לא יכול ליצור חיבור מאובטח לשירות שלו מהמחשב הזה. תוכנת אבטחה שסורקת תעבורת HTTPS, או תאריך ושעה שגויים במחשב הזה, יכולים לגרום לכך. בדקו אותם ונסו שוב.",
   "error.messaging.telegramServiceUnavailable": "OpenBot אינו יכול לחבר את Telegram כרגע. אפשר לנסות שוב מאוחר יותר.",
   "error.messaging.whatsappNotConnected": "מספר ה-WhatsApp הזה אינו מחובר.",
   "error.messaging.whatsappUnsupported": "המחשב הזה אינו יכול להתחבר ל-WhatsApp.",

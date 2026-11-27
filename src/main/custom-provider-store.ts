@@ -20,11 +20,12 @@ import {
   sameCustomProviderOrigin,
 } from "@openbot/contracts/ipc";
 import { sourceText } from "@openbot/i18n/source";
+import { replaceSecretValueGroup } from "@openbot/logging";
 import { Effect, Schema, Semaphore } from "effect";
 import { z } from "zod";
 import { writeFileAtomically } from "../backend/atomic-json-file";
 import { causeHelpers } from "../backend/effect-boundary";
-import type { CustomProviderConfig } from "../backend/opencode-config";
+import { type CustomProviderConfig, customProviderSecretValues } from "../backend/opencode-config";
 
 export class CustomProviderFailure extends Schema.TaggedError<CustomProviderFailure>()("CustomProviderFailure", {
   cause: Schema.Defect(),
@@ -73,6 +74,13 @@ interface Entry {
   readonly secret: ProviderSecret | null;
 }
 
+function registerProviderSecrets(entries: readonly Entry[]): void {
+  const providers = entries.flatMap(({ stored, secret }) =>
+    secret ? [{ id: stored.id, name: stored.name, ...secret }] : [],
+  );
+  replaceSecretValueGroup("custom-providers", [{ values: customProviderSecretValues(providers) }]);
+}
+
 const READ_ONLY_MESSAGE = sourceText("error.provider.endpointsReadOnly");
 const NO_SECURE_STORAGE_MESSAGE = sourceText("error.provider.endpointNoSecureStorage");
 const DUPLICATE_MESSAGE = sourceText("error.provider.endpointDuplicate");
@@ -109,9 +117,11 @@ export class CustomProviderStore {
         return;
       }
       this.#readOnly = false;
-      this.#entries = yield* Effect.forEach(file.providers, (stored) =>
+      const entries = yield* Effect.forEach(file.providers, (stored) =>
         this.#openSecret(stored.secret).pipe(Effect.map((secret) => ({ stored, secret }))),
       );
+      registerProviderSecrets(entries);
+      this.#entries = entries;
     });
   }
 
@@ -243,6 +253,7 @@ export class CustomProviderStore {
         });
         if (entries) {
           yield* this.#persist(entries);
+          registerProviderSecrets(entries);
           this.#entries = entries;
         }
         return this.list();

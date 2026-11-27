@@ -44,11 +44,23 @@ export const messages = {
   "error.workflow.providerBusy": "제공자가 바빠요. 몇 분 기다린 다음 단계를 다시 실행해 주세요.",
   "error.workflow.providerOffline":
     "OpenBot이 제공자에 연결할 수 없었어요. 인터넷 연결을 확인한 다음 단계를 다시 실행해 주세요.",
+  "error.workflow.providerBilling":
+    "계정에 크레딧이 없거나 요금제에 이 모델이 없어요. 요금제를 확인하거나 다른 모델을 골라 주세요.",
+  "error.workflow.modelRefused": "제공자가 이 계정에 이 모델을 허용하지 않아요. 다른 모델을 골라 주세요.",
+  "error.workflow.modelRefusedReason":
+    '다른 모델을 골라 주세요. 제공자가 이 계정에 이 모델을 허용하지 않아요: "{reason}"',
+  "error.workflow.contentBlocked": "제공자가 입력을 막았어요. 입력이나 프롬프트를 바꾼 다음 단계를 다시 실행해 주세요.",
+  "error.workflow.inputTooLong": "입력이 이 모델에 너무 길어요. 줄이거나 다른 모델을 골라 주세요.",
+  "error.workflow.requestRefused": "제공자가 이 단계를 받아들이지 않았어요. 다른 모델을 골라 주세요.",
+  "error.workflow.requestRefusedReason": '다른 모델을 골라 주세요. 제공자가 이 단계를 받아들이지 않았어요: "{reason}"',
+  "error.workflow.providerRefused": '다른 모델을 고르거나 단계를 다시 실행해 주세요. 제공자의 답: "{reason}"',
   "error.workflow.modelBusy": "다른 모델 요청이 실행 중이에요. 잠시 후 단계를 다시 실행해 주세요.",
   "error.workflow.mediaFailed": "모델이 이미지나 동영상을 만들 수 없었어요. 단계를 다시 실행해 주세요.",
   "error.workflow.mediaNotMade": "모델이 이미지나 동영상을 만들지 않았어요. 모델의 답변: {answer}",
   "error.workflow.pictureMissing": "이미지가 서버에 더 이상 없어요. 다시 보내 주세요.",
   "error.workflow.pictureType": "PNG, JPEG 또는 WebP 이미지를 사용해 주세요.",
+  "error.workflow.assetType":
+    "PNG, JPEG 또는 WebP 이미지, MP4 또는 MOV 동영상, 또는 MP3, M4A, WAV, AAC, OGG, FLAC 오디오 파일을 사용해 주세요.",
   "error.workflow.mediaInputMissing": "이전 단계의 이미지를 사용할 수 없어요. 그 단계를 다시 실행해 주세요.",
   "error.workflow.mediaEmptyRequest": "설명을 작성하거나 앞 단계를 실행해 텍스트나 이미지가 들어오게 해 주세요.",
   "error.workflow.mediaInputNotImage": "이 단계는 동영상이 아닌 이미지만 받아요. 동영상에서 오는 연결을 지워 주세요.",

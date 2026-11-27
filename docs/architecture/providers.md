@@ -358,6 +358,11 @@ OpenBot unloads a session that has no turn, keeps its identity, and resumes it a
   default) with no activity. That unload ends the thread's unified exec processes and its MCP servers.
   An agent delete sends `thread/archive` after the unsubscribe: Codex ends the thread before it answers,
   so Windows can remove the workspace (#6266).
+- The Codex app server keeps the tool list of each MCP server in memory for 30 minutes. With a valid
+  list, a resumed thread does not wait for its MCP servers to start; without one, the first turn waits
+  up to `mcp_optional_startup_grace_ms` (10 s) for each slow server. So `ProviderRuntime` stops an
+  idle Codex app server 30 minutes after its last use, not after the 10 minutes of the other
+  provider CLIs (#16388). A Workspace only Codex process still stops after 10 minutes.
 - When the memory of a server is critical, `MemoryHold` releases every idle session of each kind at once.
 - A routine session is ephemeral and is not released.
 - Outside Windows, the Claude, Codex and Pi CLIs start as the leaders of their own process groups
@@ -685,6 +690,15 @@ and does not connect again while the settings stay the same (#10749). When the b
 its tools within that time after the session request, OpenBot gives the directory a new token and
 resumes the session once. The earlier tokens stay valid until the last session of the directory closes.
 
+On Windows, OpenCode picks PowerShell 7 first and accepts its Microsoft Store alias in `WindowsApps`.
+Its process service (`@opencode/pty` 0.6.0) starts that alias only some of the time: Windows refuses it
+with error 5 while another process of the Store package runs (anomalyco/opencode#64803). When `pwsh` on
+the `PATH` is only that alias and `SHELL` is not set, `opencode-windows-shell.ts` sets `SHELL` to
+Windows PowerShell in `System32`. A `shell` in the OpenCode config comes before `SHELL`, so the
+user's choice still wins. OpenCode has no variable of its own for the shell, so the commands and the
+stdio MCP servers of these agents also see this `SHELL`; GNU make on Windows reads it. Remove this
+when an OpenCode release ships anomalyco/opencode#64901.
+
 OpenCode adds its own system prompt, tools, skill listing and Code Mode catalog to each request of an
 agent. `opencode-agent-defaults.ts` denies the parts that an OpenBot agent does not use: the
 `question` tool (OpenBot has `ask_user`), the `opencode_list_mcp_resources` and
@@ -768,6 +782,25 @@ to Zen in OpenCode itself (`opencode auth login`). That sign-in buys the model, 
 each model that OpenCode lists. Checked in OpenCode 2.2.5 and 2.3.0: a key on `opencode-go` lists
 the Go models and no paid Zen model (#6185).
 
+The anonymous-key filter of OpenCode turns off only a model whose token price has an input cost
+above 0. A Zen image or video model has its price under `cost.image`, so OpenCode lists it as `input
+0`, keeps it, and offers its `generate_image` (2.2 and 2.3: `experimental_image_generate`) and
+`generate_video` tools to a free model. The OpenCode service refuses each request with "Invalid
+credential" or "Missing API key" (#15281, #6432). OpenCode Go has no image or video model, so the
+Go key does not help. When `hasOpenCodeMediaSignIn` finds no sign-in that can pay for these models,
+`openCodeAgentConfig` sends `experimental.image_generate` and `experimental.video_generate` as
+`false`, which removes both tools. OpenBot's own `generate_image` and `generate_video` (OpenBot
+credits) stay, and their guidance sends an agent to them when it has no media tool of its own. The check counts a non-empty environment variable whose name ends in
+`_API_KEY` (`OPENCODE_API_KEY` after `clearedInheritedOpenCodeKeyEnv`, or a provider key such as
+`OPENAI_API_KEY`: 291 of the 326 key variables in the OpenCode 2.4.2 catalog end so), and an
+`auth.json` entry or an active `credential` row for any provider except `opencode-go`. It also counts
+a custom endpoint with a key or headers (`hasCustomProviderCredentials`), and a user OpenCode config
+(the global config files or `OPENCODE_CONFIG`) that sets a provider `apiKey` or
+`experimental.image_generate`/`video_generate`, or that OpenBot cannot decode. A key for another
+provider keeps the tools, because that provider can have its own image models: a custom endpoint
+with the id `openai` and a key gets the OpenAI image models of the catalog in OpenCode 2.4.2. Checked with the real OpenCode 2.4.0 and 2.4.2 on a free
+model; 2.2.5 and 2.3.2 have the same switch. `test:opencode-expired-key` checks the config.
+
 OpenCode first lists the models of a cached or built-in catalog and fetches the new catalog in the
 background, about 3 s later. A first start of OpenCode 2.2.5 listed 80 of 88 models. The OpenCode
 driver thus sets `catalog.relistAfterStart`: the list is read again 5 s after each start, and agents
@@ -777,6 +810,16 @@ right after the computer wakes, also the second list lacks new models (#16212). 
 (`moveAgentsOffModelsUnlistedTwice`). The count is kept in memory, so the first start after an
 OpenBot restart never moves an agent. A model that is really gone moves at the next provider start,
 for example after the idle release.
+
+The same partial list is the session's model list right after a start. Before a turn, `applyConfig`
+fails a model that the session does not list (#11964), so a queued message failed with "does not
+offer" although OpenCode offered the model a moment later (#15963). OpenCode reloads its catalog when
+it gets a model that it does not list, and refuses a model that is still missing with -32602 and
+`data.modelId` (OpenCode 1.19 and 2). The OpenCode flavor sets `modelNotOffered` to match that
+error, so OpenBot sends the model and lets OpenCode decide. That refusal fails the turn with
+`ProviderModelNotOfferedError`, and so does a reply whose model list still does not have the model:
+OpenCode 1.15 sets any model with no check. Other ACP agents keep the check before the send, because Antigravity
+kept its own model and gave no error for a model that it did not list (#11797).
 
 The CLI reports no Go quota over ACP. `readOpenCodeGoUsage` (`src/backend/opencode-usage.ts`)
 sends `opencode.ai/zen/go/v1/usage` the key the CLI uses. A saved key is the only key: the CLI
@@ -1010,7 +1053,11 @@ advertise the capability; open OpenBot in the host's desktop session to connect 
 A host on any platform also advertises the `antigravity-code-sign-in-v1` marker (Team API v10). It
 adds nothing to the wire: it tells a client that the released providers-v8 `codeLoginStart` route
 signs Gemini in with `agy acp --login` (`ANTIGRAVITY_CODE_SIGN_IN` in `provider-drivers.ts`) and
-answers with the `paste` shape. The CLI prints the Google link; the user opens it on any device and
+answers with the `paste` shape. The CLI prints the Google link and also runs `open` or `xdg-open` with
+it, so each start would open a Google tab on the host (#16705). The code sign-in, also of an added
+account, therefore gets `SSH_CONNECTION` (`ANTIGRAVITY_LINK_ONLY_ENV`): then 1.5.4 prints the link
+only. The ACP `authenticate` sign-in does not get it, because the CLI then refuses a browser sign-in.
+The user opens the link on any device and
 pastes the code, or the URL of the page they land on, with the released `codeLoginSubmit`. This
 works on a server with no desktop and on a Windows host. A host before this marker refuses Gemini on
 that route, so the desktop with a joined server, the web client and mobile offer the code sign-in
@@ -1034,9 +1081,7 @@ app data folder. Its own log there (`log/`) contains the Google account email (`
 OpenBot does not read that folder into its log or a diagnostics export. In the 1.5.4 tests the CLI wrote
 nothing to stderr. So Gemini can hold more than one account: each account after the first gets
 `GEMINI_HOME` set to its own folder, which `antigravityArgv` passes as `--gemini-dir`, and
-`antigravityStatePaths` confines its process to that folder. A usage read needs an access token that
-has not expired, and only a running CLI refreshes it, so a usage read of an account with no agent
-process starts no process: the account shows its reading from the sign-in check. The sandbox cannot
+`antigravityStatePaths` confines its process to that folder. The sandbox cannot
 create folders in a new account's home, so OpenBot makes them.
 A plan can serve models that the first account's does not, so the account check also reads the account's own
 `model/list` (`ModelCatalog.read`) after it marks the account connected (#5217). The account row carries as
@@ -1054,43 +1099,22 @@ account, and a second account with the same email is refused as already added. A
 client's browser with `provider-account-relay-v2`. A host with only `provider-account-relay-v1`, which
 names Codex and Claude only, signs the account in through the live view.
 
-Antigravity 1.5 has no `/usage` command. The driver's `readRateLimits`
-(`src/backend/antigravity-usage.ts`) reads the access token from the account's token file and calls
-Google's Code Assist service as the CLI does: `loadCodeAssist` gives the account's project, and
-`retrieveUserQuotaSummary` gives each quota group with its buckets. Google refuses these calls (403)
-unless the User-Agent names Antigravity, and it sends the "Gemini Models" group only to the desktop app's
-version, not to the CLI's, so the User-Agent names the desktop version (#7215). It is the desktop app's own
-form, `antigravity/hub/<version> (aidev_client; os_type=<os>; arch=<arch>; cl=<build>)`: with
-`antigravity/<version> <os>/<arch>`, Pro plans got no "Gemini 4 Argon" group (#10934). 
-`loadCodeAssist` goes to `cloudcode-pa`. The summary comes only from `daily-cloudcode-pa`, the host
-that meters a Google account sign-in: the other host's room for the account can be wrong, and a wrong
-"spent" reading would hold Gemini turns. OpenBot does not refresh the token: it
-does not keep the CLI's client secret. An expired token, an API key sign-in, or a failed call gives no
-reading. Only a new CLI session refreshes the token, so an idle sign-in loses it after an hour. The
-driver sets `usageLeavesSession`: an account after the first and the own sign-in keep their last
-reading when a read gives none, so the account stays in the usage popover. A sign-out, a sign-in or a
-key change clears it (`#forgetUsage`). `OPENBOT_DEV_ANTIGRAVITY_CODE_ASSIST_URL` points the read at a loopback test server
-(`scripts/antigravity-usage-e2e.ts`); any other URL is ignored, because the token goes to it.
-Google can give a model a group of its own, such as Gemini 4
-Argon, so a read for a model takes the group whose "Models within this group" list names it (#3055),
-and a model that no group names has no reading. Google lists no models for the Argon group (its
-description is a plan note), so a group with no list takes its own name as its model while other groups
-list theirs (#9864). Google's JSON leaves a zero `remainingFraction` out: a bucket with a reset time and
-no fraction, no `remainingAmount` and no `disabled` is spent. The dock's read, with no model, takes the "Gemini
-Models" group. Each reading also carries every group by name and models (`AccountUsageLimit.groups`),
-so the usage popover shows one line per group and the composer notice uses the group of the agent's
-model (`usageGroupForModel`). The ring stays on the reading's own group. The Team API codecs do not
-send `groups`, so a remote client shows the one reading. The Claude and GPT models that Antigravity
-also runs share another limit, so `accountUsageCoversModel` keeps them out of the plan-limit hold.
+Antigravity 1.5 has no `/usage` command, and its ACP server reports no plan usage. The descriptor
+sets `reportsUsage: false`, and the driver has no `readRateLimits`, so Gemini shows no plan usage.
+OpenBot does not call Google's internal Code Assist API (`cloudcode-pa`, `daily-cloudcode-pa`,
+`v1internal`) for the quota or for an account verification link: Antigravity supports only ACP for
+other clients, and Google can flag an account that calls its internal API. The verification link comes
+only from the answer text or the CLI's own log (`antigravityAccountLink`). The token file is read only
+for the account's email (`readAntigravityEmail`). Add plan usage again only when Antigravity reports it
+over ACP.
 A saved Gemini API key comes before the Google sign-in, so the provider
 status sets `apiKeyInUse`, and the API key section of the Gemini provider page says that the key,
-not the plan, serves the turns. The dock shows no Gemini row then, because it has no reading.
+not the plan, serves the turns.
 A rate limit or quota refusal on the saved key says that the key reached it and that removing the
 key gives back the plan (`savedKeyLimitMessage`, `geminiSavedKeyLimitFailure`). A quota of 0 for the
 model, such as a free-tier key on Gemini 4 Argon (`limit: 0`), does not say to wait (#9517).
 
-A limit failure stays a turn error even though the descriptor sets `reportsUsage: true`, because
-many Gemini setups have no reading to explain it. `GEMINI_REQUEST_FAILURES` in
+A limit failure stays a turn error, because Gemini has no usage reading to explain it. `GEMINI_REQUEST_FAILURES` in
 `src/backend/acp-flavor-antigravity.ts` names a rate limit or quota, an unavailable model, and a
 service failure from Google's status text. Antigravity does not document these texts.
 
@@ -1805,6 +1829,38 @@ keep their frozen shapes.
 | Older app on the same computer | Does not delete or change an account file with more than 10 accounts: its store reads the `accounts` list without a limit, and opens the file read-only if a pool leaves out more than 10 accounts. But its preload decoder refuses an agent status with more than 10 accounts of one provider ("Invalid agent status response."), so that app cannot show agent status until it is updated again. |
 
 Run `bun run test:provider-many-accounts` to check the limits through the Team API and the account store.
+
+### How the account pool picks an account
+
+A provider with a pool (`pools[provider]` in `provider-accounts.json`) gives each agent turn an account
+from the pool. `ProviderAccountPool.strategy` selects how
+([`provider-account-pool.ts`](../../src/backend/agent/provider-account-pool.ts)):
+
+- **Fill first** (`fillFirst`, the default, not written to the file): `pickPoolAccount` keeps all
+  agents on the open account whose longest window resets first. The next account starts only when the
+  first one is near its limit (85% of a window of 24 hours or less, 95% of a longer window).
+- **Spread** (`spread`): `pickSpreadPoolAccount` gives each open account a share: the room left
+  (the smallest `100 - buffer - used` of its windows) divided by the agents on it, plus one. An
+  account with no usage reading gets the mean room of the read accounts, or 50 when no account has a
+  reading. A new agent goes to the account with the largest share. An agent with an account stays on
+  it until another account has a share 1.25 times larger, so agents do not move at each reading.
+
+When no account is open, both strategies use the least used account. `setPool` keeps the strategy
+when an update gives none, so a pool change from a client without the strategy keeps Spread. Turning
+the pool off deletes the entry and its strategy. An older app on the same computer ignores the
+`strategy` key and uses Fill first; its next pool write drops the key.
+
+A joined server reads and sets the strategy through the protocol 10 capability
+`provider-account-pool-strategy-v1`
+([`provider-account-pool-strategy-v1.ts`](../../packages/contracts/src/team-protocol/provider-account-pool-strategy-v1.ts)).
+The frozen `provider-account-pool-v1` rows keep their shape, and the client merges the strategy list
+into them (`withProviderAccountPoolStrategies`). An update when the pool is off does nothing. A client
+sends the strategy only after the v1 pool update, and only to a host with the capability; Settings
+hides the choice for a host without it.
+
+When an admin removes an account that a running turn uses, the account stays until the turn ends
+(`status.provider.accountRemovesAfterTurn`). Then OpenBot moves its agents to other accounts and
+removes it. A restart before the turn ends cancels the removal.
 
 ### Account code sign-in
 

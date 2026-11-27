@@ -1,3 +1,4 @@
+import { randomUUID } from "node:crypto";
 import { isAbsolute } from "node:path";
 import type {
   McpServerConfig,
@@ -12,7 +13,7 @@ import type {
   TestMcpServerInput,
 } from "@openbot/contracts/ipc";
 import { GITHUB_CONNECTOR_MCP_SERVER_ID, mcpConfigErrors, normalizeMcpConfig } from "@openbot/contracts/ipc";
-import { mcpAccountFragment, withoutMcpAccountFragment } from "@openbot/contracts/mcp-accounts";
+import { mcpAccountFragment, mcpAccountUrl, withoutMcpAccountFragment } from "@openbot/contracts/mcp-accounts";
 import { matchingSourceKeys, sourceText, sourceTextValues } from "@openbot/i18n/source";
 import { type Logger, redactSecrets, toLogValue } from "@openbot/logging";
 import { Effect, Exit, Result, Schema, Scope } from "effect";
@@ -121,6 +122,7 @@ export class McpGateway {
       settings: credentials.mcpOAuthProxySettings ?? null,
       target: (route) => this.#proxyTarget(route),
       refresh: (url, rejected) => (oauth ? oauth.refreshAccessToken(url, rejected) : Effect.succeed(null)),
+      scopeRefused: (url, rejected, scope) => (oauth ? oauth.recordScopeRefusal(url, rejected, scope) : Effect.void),
       signInEnded: (url) => !oauth?.signedIn(url),
       ...(credentials.appVersion
         ? {
@@ -233,11 +235,23 @@ export class McpGateway {
   readonly save = Effect.fn("McpGateway.save")(function* (this: McpGateway, input: SaveMcpServerInput) {
     const previous = this.#servers.list().find((config) => config.id === input.config.id);
     yield* Effect.try({
-      try: () => this.#servers.save(input.config),
+      try: () => this.#servers.save(this.accountConfig(input.config)),
       catch: (cause) => new McpGatewayFailed({ cause }),
     });
     return yield* this.changed(previous ? "now" : "after-background-work", [input.config.name, previous?.name]);
   }, Effect.uninterruptible);
+
+  accountConfig(config: McpServerConfig): McpServerConfig {
+    if (config.transport !== "http") return config;
+    const account = mcpOAuthAccountKey(config.url);
+    if (account === null) return config;
+    const signsInAs = (row: McpServerConfig) => row.transport === "http" && mcpOAuthAccountKey(row.url) === account;
+    const rows = this.#servers.list();
+    const saved = rows.find((row) => row.id === config.id);
+    if (saved && signsInAs(saved)) return config;
+    if (!rows.some((row) => row.id !== config.id && signsInAs(row))) return config;
+    return { ...config, url: mcpAccountUrl(config.url, randomUUID()) };
+  }
 
   readonly remove = Effect.fn("McpGateway.remove")(function* (this: McpGateway, input: RemoveMcpServerInput) {
     const removed = this.#servers.list().find((config) => config.id === input.mcpServerId);
@@ -322,7 +336,7 @@ export class McpGateway {
     yield* this.#refreshForTestedTools(config, outcome);
     const refused = outcome.error === null && (yield* this.signInOffer(config)) === "refused";
     const error = refused
-      ? sourceText("error.backend.mcpRegistrationUnavailable")
+      ? sourceText("error.backend.mcpSignInAppNeeded")
       : outcome.error === null && this.#awaitsSignIn(config)
         ? sourceText(
             options.signInPlace === "host" ? "error.backend.mcpSignInOnHost" : "error.backend.mcpSignInRequired",
@@ -397,7 +411,8 @@ export class McpGateway {
   ) {
     const github = config.id === GITHUB_CONNECTOR_MCP_SERVER_ID ? yield* this.#githubAuthorization() : null;
     const stored = this.#oauth;
-    return yield* callMcpServerTool(
+    const sent: { token: string | null } = { token: null };
+    const outcome = yield* callMcpServerTool(
       config,
       name,
       args,
@@ -405,9 +420,22 @@ export class McpGateway {
       config.id === GITHUB_CONNECTOR_MCP_SERVER_ID
         ? { accessToken: () => Effect.succeed(github) }
         : stored
-          ? { accessToken: (url) => stored.accessToken(url) }
+          ? {
+              accessToken: (url) =>
+                stored.accessToken(url).pipe(
+                  Effect.tap((token) =>
+                    Effect.sync(() => {
+                      sent.token = token;
+                    }),
+                  ),
+                ),
+            }
           : undefined,
     ).pipe(toMcpGatewayFailed);
+    const refusedScope = "refusedScope" in outcome ? outcome.refusedScope : undefined;
+    if (refusedScope === undefined || !stored || sent.token === null) return outcome;
+    yield* stored.recordScopeRefusal(config.url, sent.token, refusedScope).pipe(toMcpGatewayFailed);
+    return { error: sourceText("error.backend.mcpOAuthScopeNeeded") };
   });
 
   readonly signIn = Effect.fnUntraced(function* (
@@ -522,11 +550,14 @@ export class McpGateway {
     return this.#servers
       .list()
       .filter((config) => config.transport === "http")
-      .map((config) => ({
-        mcpServerId: config.id,
-        signedIn: oauth?.signedIn(config.url) ?? false,
-        needsSignIn: this.#awaitsSignIn(config),
-      }));
+      .map((config) => {
+        const needsSignIn = this.#awaitsSignIn(config);
+        return {
+          mcpServerId: config.id,
+          signedIn: !needsSignIn && (oauth?.signedIn(config.url) ?? false),
+          needsSignIn,
+        };
+      });
   }
 
   serviceSignIns(host: string): McpServiceSignIn[] {

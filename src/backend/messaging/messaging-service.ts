@@ -69,7 +69,9 @@ import {
   type InboundMessage,
   type IngressAnswer,
   type IngressDelivery,
+  type IngressFailure,
   type IngressState,
+  type MessageBody,
   type MessageTarget,
   type MessagingAdapter,
   type MessagingAdapterError,
@@ -943,7 +945,7 @@ export class MessagingService {
     return Effect.callback<void, MessagingOperationFailed>((resume) => {
       const settled = (state: IngressState) => {
         if (ingress.telegram.available()) resume(Effect.void);
-        else if (state === "online") resume(Effect.fail(telegramNotReady(state)));
+        else if (state === "online") resume(Effect.fail(telegramNotReady(state, null)));
         else return false;
         return true;
       };
@@ -957,7 +959,9 @@ export class MessagingService {
         duration: TELEGRAM_READY_TIMEOUT_MS,
         orElse: () =>
           Effect.suspend(() =>
-            ingress.telegram.available() ? Effect.void : Effect.fail(telegramNotReady(ingress.state())),
+            ingress.telegram.available()
+              ? Effect.void
+              : Effect.fail(telegramNotReady(ingress.state(), ingress.failure?.() ?? null)),
           ),
       }),
     );
@@ -1869,13 +1873,23 @@ export class MessagingService {
     const post = this.#posts.get(key);
     if (activity.type === "progress") {
       if (!live || !post?.messageId || !post.stopToken || post.final) return;
+      const messageId = post.messageId;
       const text = redactPostText(activity.text).replace(MENTION_MARKERS, "");
-      yield* live.adapter
-        .edit(target, post.messageId, {
-          text: text.length > PROGRESS_TEXT_LIMIT ? `${text.slice(0, PROGRESS_TEXT_LIMIT - 1)}…` : text,
-          buttons: [{ action: "stop" as const, label: sourceText("status.messaging.stop"), token: post.stopToken }],
-        })
-        .pipe(Effect.catch((failure) => Effect.sync(() => this.#warn(failure.cause))));
+      const shown = yield* this.#replaceStatus(live.adapter, target, messageId, {
+        text: text.length > PROGRESS_TEXT_LIMIT ? `${text.slice(0, PROGRESS_TEXT_LIMIT - 1)}…` : text,
+        buttons: [{ action: "stop" as const, label: sourceText("status.messaging.stop"), token: post.stopToken }],
+      }).pipe(
+        Effect.catch((failure) =>
+          Effect.sync(() => {
+            this.#warn(failure.cause);
+            return messageId;
+          }),
+        ),
+      );
+      if (shown !== messageId && this.#posts.get(key) === post) {
+        this.#posts.set(key, { ...post, messageId: shown });
+        yield* this.#status.save();
+      }
       return;
     }
     if (activity.type === "started") {
@@ -1906,10 +1920,7 @@ export class MessagingService {
       this.#posts.set(key, { connectionId: live.record.connectionId, target, messageId: existingMessageId, stopToken });
       this.#status.restored.delete(key);
       const messageId = existingMessageId
-        ? yield* live.adapter
-            .edit(target, existingMessageId, body)
-            .pipe(toMessagingOperationFailed)
-            .pipe(Effect.as(existingMessageId))
+        ? yield* this.#replaceStatus(live.adapter, target, existingMessageId, body).pipe(toMessagingOperationFailed)
         : yield* live.adapter.post(target, body).pipe(toMessagingOperationFailed);
       this.#posts.set(key, { connectionId: live.record.connectionId, target, messageId, stopToken });
       yield* this.#status.save();
@@ -1988,8 +1999,10 @@ export class MessagingService {
         Effect.gen({ self: this }, function* () {
           const cause = failure instanceof MessagingOperationFailed ? failure.cause : null;
           const partlySent = cause instanceof WhatsAppAnswerPartlySent;
-          if ((partlySent ? cause.cause : cause) instanceof WhatsAppRefusedError)
+          if ((partlySent ? cause.cause : cause) instanceof WhatsAppRefusedError) {
+            if (final.answer || final.replacesAnswer) this.#noteUndelivered(key, final.answer && partlySent);
             return yield* this.#forgetPost(key, post);
+          }
           const quiet = final.answer && this.#quietEnd(live.record.connectionId, post.target);
           if (quiet && partlySent) return yield* this.#forgetPost(key, post);
           const failures = (this.#finalFailures.get(key) ?? 0) + 1;
@@ -1998,7 +2011,12 @@ export class MessagingService {
           if (final.answer) {
             current = {
               ...post,
-              final: { answer: false, text: quiet ? "" : sourceText("status.messaging.failed"), reaction: null },
+              final: {
+                answer: false,
+                text: quiet ? "" : sourceText("status.messaging.failed"),
+                reaction: null,
+                replacesAnswer: true,
+              },
             };
             this.#posts.set(key, current);
             yield* this.#status.save();
@@ -2010,6 +2028,17 @@ export class MessagingService {
     );
     yield* this.#forgetPost(key, post);
   });
+
+  #noteUndelivered(key: string, partlySent: boolean): void {
+    try {
+      this.#threads.noteUndelivered(
+        key.slice(0, key.indexOf(":")),
+        sourceText(partlySent ? "status.messaging.whatsappPartlyDelivered" : "status.messaging.whatsappNotDelivered"),
+      );
+    } catch (error) {
+      this.#warn(error, "Could not mark a WhatsApp answer as not delivered.");
+    }
+  }
 
   readonly #forgetPost = Effect.fn("MessagingService.forgetPost")(function* (
     this: MessagingService,
@@ -2068,8 +2097,24 @@ export class MessagingService {
     placeholder: string | null,
     text: string,
   ) {
-    if (placeholder) yield* adapter.edit(target, placeholder, { text }).pipe(toMessagingOperationFailed);
+    if (placeholder)
+      yield* this.#replaceStatus(adapter, target, placeholder, { text }).pipe(toMessagingOperationFailed);
     else yield* adapter.post(target, { text }).pipe(toMessagingOperationFailed);
+  });
+
+  readonly #replaceStatus = Effect.fn("MessagingService.replaceStatus")(function* (
+    this: MessagingService,
+    adapter: MessagingAdapter,
+    target: MessageTarget,
+    messageId: string,
+    body: MessageBody,
+  ) {
+    const shown = yield* adapter.edit(target, messageId, body);
+    if (shown !== messageId && adapter.remove)
+      yield* adapter
+        .remove(target, messageId)
+        .pipe(Effect.catch((failure) => Effect.sync(() => this.#warn(failure.cause))));
+    return shown;
   });
 
   #dispatch<A>(operation: Effect.Effect<A, MessagingOperationFailed>): void {
@@ -2401,6 +2446,10 @@ const WHATSAPP_LOCAL_REFUSALS = new Map([
     "place_read_only",
     "OpenBot sent nothing: the user made this WhatsApp chat read only. OpenBot reads it but never posts in it. Do not post it again: give the result in the conversation that you answer.",
   ],
+  [
+    "no_account",
+    `OpenBot sent nothing: WhatsApp has no account for the number of this contact. Tell the user to open Marketplace, then Apps, then WhatsApp, and to check the number of this contact. ${sourceText("error.messaging.whatsappNumberNotFound")} When the number is not correct, the user must remove the contact and add it again.`,
+  ],
   ["not_connected", WHATSAPP_NOT_CONNECTED],
   ["not_linked", WHATSAPP_NOT_CONNECTED],
   [
@@ -2423,13 +2472,15 @@ const TELEGRAM_RELAY_REFUSALS = new Map([
   ],
 ]);
 
-function telegramNotReady(state: IngressState): MessagingOperationFailed {
+function telegramNotReady(state: IngressState, failure: IngressFailure | null): MessagingOperationFailed {
   const text =
-    state === "online"
-      ? sourceText("error.messaging.telegramServiceUnavailable")
-      : state === "signed_out" || state === "no_host"
-        ? sourceText("error.messaging.telegramRelayUnavailable")
-        : sourceText("error.messaging.telegramRelayUnreachable");
+    state === "signed_out" || state === "no_host"
+      ? sourceText("error.messaging.telegramRelayUnavailable")
+      : state === "online" || failure === "refused"
+        ? sourceText("error.messaging.telegramServiceUnavailable")
+        : failure === "certificate"
+          ? sourceText("error.messaging.telegramRelayCertificate")
+          : sourceText("error.messaging.telegramRelayUnreachable");
   return new MessagingOperationFailed({ cause: new Error(text) });
 }
 

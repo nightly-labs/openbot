@@ -23,6 +23,40 @@ export const messages = {
   "error.connector.linkNoCard": "لا يحتوي حساب Link على بطاقة. أضف بطاقة في Link.",
   "error.connector.linkFileUnreadable": "ملف اتصال Link غير قابل للقراءة.",
   "error.connector.linkFileTooLarge": "ملف اتصال Link كبير جدًا.",
+  "error.connector.nearSignIn": "سجّل الدخول إلى OpenBot لاستخدام محفظة العملات المشفرة.",
+  "error.connector.nearServiceUnavailable": "خدمة محفظة العملات المشفرة غير متاحة. حاول مرة أخرى لاحقًا.",
+  "error.connector.nearWalletNotFound": "هذه المحفظة لا تنتمي إلى حساب OpenBot هذا أو إلى هذا الخادم.",
+  "error.connector.nearWalletLimit": "محافظ جديدة كثيرة جدًا اليوم. حاول مرة أخرى غدًا.",
+  "error.connector.nearProviderBusy": "لا يستجيب NEAR Intents حاليًا. حاول مرة أخرى بعد بضع دقائق.",
+  "error.connector.nearNoWallet": "لم يتم إعداد أي محفظة عملات مشفرة. أعدّها في إعدادات الخادم > الخزنة > كريبتو.",
+  "error.connector.nearWalletExists": "تم إعداد محفظة عملات مشفرة بالفعل.",
+  "error.connector.nearFrozen":
+    "الدفعات من محفظة العملات المشفرة متوقفة مؤقتًا. استأنفها في إعدادات الخادم > الخزنة > كريبتو.",
+  "error.connector.nearAgentNotAllowed":
+    "لا يمكن لهذا الوكيل الدفع من محفظة العملات المشفرة. فعّل ذلك في إعدادات الخادم > الخزنة > كريبتو.",
+  "error.connector.nearGrantExpired":
+    "لا يملك OpenBot إذن دفع لمحفظة العملات المشفرة. جدّده في إعدادات الخادم > الخزنة > كريبتو.",
+  "error.connector.nearUnknownAsset": "لا يوجد في محفظة العملات المشفرة أصل {asset}.",
+  "error.connector.nearAmountInvalid": "{amount} ليس مبلغًا صالحًا من {asset}.",
+  "error.connector.nearRecipientInvalid": "{recipient} ليس حساب NEAR ولا chain:address.",
+  "error.connector.nearRefused": "رفضت NEAR Intents Agent API الطلب: {detail}",
+  "error.connector.nearUnexpected": "أرسلت NEAR Intents Agent API إجابة غير متوقعة: {detail}",
+  "error.connector.nearUnreachable": "لا يمكن لـ OpenBot الوصول إلى NEAR Intents Agent API: {detail}",
+  "error.connector.nearFileUnreadable": "ملف محفظة العملات المشفرة غير قابل للقراءة.",
+  "error.connector.nearFileTooLarge": "ملف محفظة العملات المشفرة كبير جدًا.",
+  "error.connector.nearSigningCanceled": "أُلغي التوقيع.",
+  "error.connector.nearSigningExpired": "لم يصل التوقيع في الوقت المحدد. حاول مرة أخرى.",
+  "error.connector.nearSigningInvalid": "التوقيع الوارد من المتصفح غير صالح.",
+  "error.connector.nearSigningBusy": "يوجد توقيع آخر ينتظر في المتصفح. أكمله أو ألغه أولًا.",
+  "error.connector.nearPolicyCooldown": "يمكنك تغيير قواعد المحفظة مرة أخرى في {time}.",
+  "error.connector.nearPolicyPending": "لم يكتمل تغيير السياسة. حاول مرة أخرى بعد بضع دقائق.",
+  "error.connector.nearDeclined": "رفض المالك الدفع.",
+  "error.connector.nearUncertain":
+    "لا يعرف OpenBot إن كان الدفع قد أُرسل. لا تدفع مرة أخرى. يمكن للمالك التحقق من سجل المحفظة.",
+  "error.connector.nearPaymentFailed": "فشل الدفع: {detail}",
+  "error.connector.nearPaymentUnknown": "لم يعد هذا الدفع ينتظر ردًا.",
+  "error.connector.nearRuleFull": "يمكن أن تحتوي قاعدة الدفع على {limit} مستلمين كحد أقصى.",
+  "error.connector.nearRulesFull": "يمكن أن تحتوي المحفظة على {limit} قواعد دفع كحد أقصى.",
   "error.connector.onePasswordCliMissing":
     "لا يمكن لـ OpenBot العثور على 1Password CLI. ثبّته وفعّل تكامله في تطبيق 1Password، أو استخدم رمز حساب خدمة.",
   "error.connector.onePasswordCliInstallFailed":
@@ -60,6 +94,8 @@ export const messages = {
     "تعذّر فتح قفل Bitwarden على هذا الخادم. تحقق من كلمة المرور الرئيسية، ثم اتصل مرة أخرى.",
   "error.connector.bitwardenCliInstallFailed":
     "تعذّر تثبيت Bitwarden CLI على هذا الخادم. تحقق من اتصاله بالشبكة، ثم اتصل مرة أخرى.",
+  "error.connector.bitwardenCliCannotStart":
+    "لم يبدأ Bitwarden CLI على هذا الخادم. اتصل مرة أخرى. إذا لم يبدأ بعد ذلك، فاختر المساعدة > الإبلاغ عن مشكلة.",
   "error.connector.bitwardenFileUnreadable": "ملف اتصال Bitwarden غير قابل للقراءة.",
   "error.connector.passwordManagerUnknown": "لا يعرف OpenBot مدير كلمات المرور هذا.",
   "error.connector.passwordManagerMethod": "لا يمكن توصيل مدير كلمات المرور هذا بهذه الطريقة.",

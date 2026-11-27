@@ -283,6 +283,7 @@ export class ConversationQueries {
                (? IS NOT NULL AND turn_id = ? AND status = 'streaming')
                OR json_type(message_json, '$.questionPrompt.resolution') = 'null'
                   AND json_type(message_json, '$.questionPrompt') = 'object'
+               OR json_extract(message_json, '$.nearPayment.state') = 'sending'
                OR json_extract(message_json, '$.itemType') = 'subagents'
                   AND EXISTS (
                     SELECT 1 FROM json_each(message_json, '$.subagents')

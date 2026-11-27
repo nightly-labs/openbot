@@ -1,6 +1,8 @@
+import type { NearOwnerAction } from "@openbot/contracts/ipc";
 import type { WebMessagingInstallPlatform } from "@openbot/contracts/web-messaging-install";
 import type { AppTranslate } from "@openbot/i18n";
 import { DOWNLOAD_PLATFORMS, type DownloadPlatform } from "../../lib/download-platforms";
+import type { NearSignFailure } from "../../lib/near-sign-actions";
 import type { FailureKind } from "./MessagingConnectPage";
 
 const PROVIDER_NAMES: Record<WebMessagingInstallPlatform, string> = { slack: "Slack", discord: "Discord" };
@@ -104,6 +106,47 @@ export function billingReturnText(t: AppTranslate) {
     cancelledBody: t("sitePage.billing.cancelledBody"),
   };
 }
+
+export function nearSignText(t: AppTranslate) {
+  return {
+    pageTitle: t("sitePage.nearSign.pageTitle"),
+    eyebrow: t("sitePage.nearSign.eyebrow"),
+    loading: t("sitePage.nearSign.loading"),
+    invalidTitle: t("sitePage.nearSign.invalidTitle"),
+    invalidBody: t("sitePage.nearSign.invalidBody"),
+    actions: {
+      register: t("sitePage.nearSign.action.register"),
+      create: t("sitePage.nearSign.action.create"),
+      grant: t("sitePage.nearSign.action.grant"),
+      budget: t("sitePage.nearSign.action.budget"),
+      freeze: t("sitePage.nearSign.action.freeze"),
+      unfreeze: t("sitePage.nearSign.action.unfreeze"),
+      "auto-pay": t("sitePage.nearSign.action.autoPay"),
+      "manual-pay": t("sitePage.nearSign.action.manualPay"),
+      "approve-payment": t("sitePage.nearSign.action.approvePayment"),
+      "check-backup": t("sitePage.nearSign.action.checkBackup"),
+    } satisfies Record<NearOwnerAction, string>,
+    createPasskey: t("sitePage.nearSign.createPasskey"),
+    usePasskey: t("sitePage.nearSign.usePasskey"),
+    tryAgain: t("sitePage.nearSign.tryAgain"),
+    workingPasskey: t("sitePage.nearSign.workingPasskey"),
+    registerDoneTitle: t("sitePage.nearSign.registerDoneTitle"),
+    doneTitle: t("sitePage.nearSign.doneTitle"),
+    doneBody: t("sitePage.nearSign.doneBody"),
+    openAgain: t("sitePage.nearSign.openAgain"),
+    passkeyName: t("sitePage.nearSign.passkeyName"),
+    failure: {
+      cancelled: t("sitePage.nearSign.failure.cancelled"),
+      noPasskey: t("sitePage.nearSign.failure.noPasskey"),
+      wrongSite: t("sitePage.nearSign.failure.wrongSite"),
+      keyType: t("sitePage.nearSign.failure.keyType"),
+      tooLarge: t("sitePage.nearSign.failure.tooLarge"),
+      failed: t("sitePage.nearSign.failure.failed"),
+    } satisfies Record<NearSignFailure, string>,
+  };
+}
+
+export type NearSignText = ReturnType<typeof nearSignText>;
 
 const EMAIL_MARKER = "";
 

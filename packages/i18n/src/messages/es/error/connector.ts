@@ -14,6 +14,42 @@ export const messages = {
   "error.connector.githubExpired": "La conexión con GitHub caducó. Conecta GitHub de nuevo.",
   "error.connector.githubFileUnreadable": "El archivo de conexión de GitHub no se puede leer.",
   "error.connector.githubFileTooLarge": "El archivo de conexión de GitHub es demasiado grande.",
+  "error.connector.nearSignIn": "Inicia sesión en OpenBot para usar la cartera cripto.",
+  "error.connector.nearServiceUnavailable":
+    "El servicio de la cartera cripto no está disponible. Inténtalo de nuevo más tarde.",
+  "error.connector.nearWalletNotFound": "Esta cartera no pertenece a esta cuenta ni a este servidor de OpenBot.",
+  "error.connector.nearWalletLimit": "Demasiadas carteras nuevas hoy. Inténtalo de nuevo mañana.",
+  "error.connector.nearProviderBusy": "NEAR Intents no responde en este momento. Inténtalo de nuevo en unos minutos.",
+  "error.connector.nearNoWallet":
+    "No hay ninguna cartera cripto configurada. Configúrala en Ajustes del servidor > Vault > Cripto.",
+  "error.connector.nearWalletExists": "Ya hay una cartera cripto configurada.",
+  "error.connector.nearFrozen":
+    "Los pagos desde la cartera cripto están en pausa. Reanúdalos en Ajustes del servidor > Vault > Cripto.",
+  "error.connector.nearAgentNotAllowed":
+    "Este agente no puede pagar desde la cartera cripto. Actívalo en Ajustes del servidor > Vault > Cripto.",
+  "error.connector.nearGrantExpired":
+    "OpenBot no tiene permiso de pago para la cartera cripto. Renuévalo en Ajustes del servidor > Vault > Cripto.",
+  "error.connector.nearUnknownAsset": "La cartera cripto no tiene el activo {asset}.",
+  "error.connector.nearAmountInvalid": "{amount} no es una cantidad válida de {asset}.",
+  "error.connector.nearRecipientInvalid": "{recipient} no es una cuenta de NEAR ni una dirección chain:address.",
+  "error.connector.nearRefused": "La NEAR Intents Agent API rechazó la solicitud: {detail}",
+  "error.connector.nearUnexpected": "La NEAR Intents Agent API envió una respuesta inesperada: {detail}",
+  "error.connector.nearUnreachable": "OpenBot no puede acceder a la NEAR Intents Agent API: {detail}",
+  "error.connector.nearFileUnreadable": "El archivo de la cartera cripto no se puede leer.",
+  "error.connector.nearFileTooLarge": "El archivo de la cartera cripto es demasiado grande.",
+  "error.connector.nearSigningCanceled": "Se canceló la firma.",
+  "error.connector.nearSigningExpired": "La firma no llegó a tiempo. Inténtalo de nuevo.",
+  "error.connector.nearSigningInvalid": "La firma del navegador no es válida.",
+  "error.connector.nearSigningBusy": "Hay otra firma pendiente en el navegador. Termínala o cancélala primero.",
+  "error.connector.nearPolicyCooldown": "Podrás volver a cambiar las reglas de la cartera a partir de {time}.",
+  "error.connector.nearPolicyPending": "El cambio de reglas no se completó. Inténtalo de nuevo en unos minutos.",
+  "error.connector.nearDeclined": "El propietario rechazó el pago.",
+  "error.connector.nearUncertain":
+    "OpenBot no sabe si el pago se envió. No vuelvas a pagar. El propietario puede consultar el historial de la cartera.",
+  "error.connector.nearPaymentFailed": "El pago falló: {detail}",
+  "error.connector.nearPaymentUnknown": "Este pago ya no espera una respuesta.",
+  "error.connector.nearRuleFull": "Una regla de pago puede tener como máximo {limit} destinatarios.",
+  "error.connector.nearRulesFull": "La cartera puede tener como máximo {limit} reglas de pago.",
   "error.connector.onePasswordCliMissing":
     "OpenBot no encuentra la CLI de 1Password. Instálala y activa su integración en la aplicación 1Password, o usa un token de cuenta de servicio.",
   "error.connector.onePasswordCliInstallFailed":
@@ -53,6 +89,8 @@ export const messages = {
     "No se pudo desbloquear Bitwarden en este servidor. Comprueba la contraseña maestra y conecta de nuevo.",
   "error.connector.bitwardenCliInstallFailed":
     "No se pudo instalar la CLI de Bitwarden en este servidor. Comprueba su conexión de red y conecta de nuevo.",
+  "error.connector.bitwardenCliCannotStart":
+    "La CLI de Bitwarden no se inició en este servidor. Conecta de nuevo. Si sigue sin iniciarse, elige Ayuda > Informar de un problema.",
   "error.connector.bitwardenFileUnreadable": "El archivo de conexión de Bitwarden no se puede leer.",
   "error.connector.passwordManagerUnknown": "OpenBot no conoce este gestor de contraseñas.",
   "error.connector.passwordManagerMethod": "Este gestor de contraseñas no se puede conectar de esta forma.",

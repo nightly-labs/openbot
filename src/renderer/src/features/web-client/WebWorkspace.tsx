@@ -54,6 +54,7 @@ import { AGENT_TASKS_CAPABILITY } from "@openbot/contracts/team-protocol/agent-t
 import { AGENT_THREAD_FILES_CAPABILITY } from "@openbot/contracts/team-protocol/agent-thread-files-v1";
 import { AGENT_USAGE_LIMIT_CAPABILITY } from "@openbot/contracts/team-protocol/agent-usage-limit-v1";
 import { AGENT_WAITS_CAPABILITY } from "@openbot/contracts/team-protocol/agent-waits-v1";
+import { ATTACHMENT_PREVIEW_CAPABILITY } from "@openbot/contracts/team-protocol/attachment-preview-v1";
 import { BROWSER_PROFILES_CAPABILITY } from "@openbot/contracts/team-protocol/browser-profiles-v1";
 import { BROWSER_PROXIES_CAPABILITY } from "@openbot/contracts/team-protocol/browser-proxies-v1";
 import { TEAM_BROWSER_VIEW_CAPABILITY } from "@openbot/contracts/team-protocol/browser-view-v1";
@@ -296,6 +297,7 @@ import {
 } from "../conversation/message-delete-access";
 import { webEventRoutinesApi } from "../conversation/routine-webhooks-api";
 import { trackUsageLimitShown, usageLimitAskFrom } from "../conversation/usage-limit-ask";
+import { CreditModelsProvider, createCreditModels, useCreditModels } from "../credits/credits-context";
 import { createCrmEnabled } from "../crm/crm-enabled";
 import type { FilesPort } from "../files/files-port";
 import { hostSetupProviderProps } from "../onboarding/host-setup-provider-props";
@@ -383,6 +385,7 @@ import {
   createWebCreditsCalls,
   createWebLicenseCalls,
   createWebReferralCalls,
+  readCreditCatalog,
   type WebAppStart,
 } from "./web-billing";
 import { webBitwardenConnectorPort } from "./web-bitwarden-connector";
@@ -482,10 +485,13 @@ type WebWorkspaceProps = {
 const WebAccountSettings = lazy(() => import("./WebAccountSettings"));
 
 export function WebWorkspace(props: WebWorkspaceProps) {
+  const creditModels = createCreditModels(() => readCreditCatalog(props.accountFetch));
   return (
     <PlatformProvider appInfo={WEB_APP_INFO}>
       <LayoutProvider>
-        <WebWorkspaceFrame {...props} />
+        <CreditModelsProvider models={creditModels}>
+          <WebWorkspaceFrame {...props} />
+        </CreditModelsProvider>
       </LayoutProvider>
     </PlatformProvider>
   );
@@ -1109,6 +1115,7 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
       workspace.state.capabilities.includes(capability) && canAdministerServer(workspace.state.host?.role),
     () => storageCalls,
     () => marketplaceCalls.skills,
+    () => (workspace.state.synced ? workspace.state.capabilities.includes(ATTACHMENT_PREVIEW_CAPABILITY) : undefined),
   );
   const [searchRoutineList, setSearchRoutineList] = createSignal<GlobalSearchRoutine[]>([]);
   const [searchRoutinesLoading, setSearchRoutinesLoading] = createSignal(false);
@@ -1376,6 +1383,7 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
     admin: () => canAdministerServer(workspace.state.host?.role),
     hostName: () => server()?.name,
     onHostEvent: workspace.onHostEvent,
+    setSpot: (input) => workspace.runtime.setWorkflowSpot(input),
     onReconnect(listener) {
       hostOnlineListeners.add(listener);
       return () => {
@@ -1511,6 +1519,7 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
   const license = createLicenseStore(() => licenseCalls, billingOpen, trackLicenseEvent);
   const referralCalls = createWebReferralCalls(props.accountFetch);
   const creditsCalls = createWebCreditsCalls(props.accountFetch);
+  const creditModels = useCreditModels();
   const credits = createCreditsStore(
     () => creditsCalls,
     () => billingOpen() || creditsOpen() !== null,
@@ -3045,6 +3054,7 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
               current={railPage()}
               pinned={layout.railPinned()}
               onPinChange={layout.setRailPinned}
+              creditModels={creditModels()}
               usageRows={usageRows()}
               onAgents={showAgentsPage}
               onTasks={
@@ -3230,6 +3240,7 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
                               initialServerId={request.serverId}
                               headerFrame="window"
                               billingDetails={billingCalls}
+                              models={creditModels()}
                               onClose={showAgents}
                             />
                           )}
@@ -3322,6 +3333,8 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
                                     workspace.stepLines(),
                                   )
                                 }
+                                members={workspace.state.presence?.members}
+                                selfMemberId={workspace.state.memberId}
                               />
                             </Loading>
                           )}
@@ -3470,6 +3483,8 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
                       }
                       chatOrder={layout.sidebarChatOrder()}
                       onChatOrderChange={layout.setSidebarChatOrder}
+                      tabIds={workspace.preferences.sidebarTabIds()}
+                      onTabIdsChange={workspace.preferences.setSidebarTabIds}
                       collapsedSectionIds={workspace.preferences.collapsedSidebarSectionIds()}
                       onMutateLayout={workspace.mutateSidebarLayout}
                       sectionDuplicateSupported={

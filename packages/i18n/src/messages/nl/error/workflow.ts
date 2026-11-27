@@ -49,11 +49,25 @@ export const messages = {
   "error.workflow.providerBusy": "De provider is bezet. Wacht een paar minuten en voer de stap dan opnieuw uit.",
   "error.workflow.providerOffline":
     "OpenBot kon de provider niet bereiken. Controleer de internetverbinding en voer de stap dan opnieuw uit.",
+  "error.workflow.providerBilling":
+    "Het account heeft geen tegoed, of het abonnement bevat dit model niet. Controleer het abonnement, of kies een ander model.",
+  "error.workflow.modelRefused": "De provider staat dit model niet toe voor dit account. Kies een ander model.",
+  "error.workflow.modelRefusedReason":
+    'Kies een ander model. De provider staat dit model niet toe voor dit account: "{reason}"',
+  "error.workflow.contentBlocked":
+    "De provider heeft de invoer geblokkeerd. Wijzig de invoer of de prompt en voer de stap dan opnieuw uit.",
+  "error.workflow.inputTooLong": "De invoer is te lang voor dit model. Maak hem korter, of kies een ander model.",
+  "error.workflow.requestRefused": "De provider heeft deze stap niet geaccepteerd. Kies een ander model.",
+  "error.workflow.requestRefusedReason":
+    'Kies een ander model. De provider heeft deze stap niet geaccepteerd: "{reason}"',
+  "error.workflow.providerRefused": 'Kies een ander model, of voer de stap opnieuw uit. De provider zei: "{reason}"',
   "error.workflow.modelBusy": "Er loopt een ander verzoek aan het model. Voer de stap zo opnieuw uit.",
   "error.workflow.mediaFailed": "Het model kon de afbeelding of video niet maken. Voer de stap opnieuw uit.",
   "error.workflow.mediaNotMade": "Het model heeft de afbeelding of video niet gemaakt. Het antwoordde: {answer}",
   "error.workflow.pictureMissing": "De afbeelding staat niet meer op de server. Stuur hem opnieuw.",
   "error.workflow.pictureType": "Gebruik een PNG-, JPEG- of WebP-afbeelding.",
+  "error.workflow.assetType":
+    "Gebruik een PNG-, JPEG- of WebP-afbeelding, een MP4- of MOV-video, of een MP3-, M4A-, WAV-, AAC-, OGG- of FLAC-audiobestand.",
   "error.workflow.mediaInputMissing":
     "Een afbeelding van een eerdere stap is niet beschikbaar. Voer die stap opnieuw uit.",
   "error.workflow.mediaEmptyRequest":

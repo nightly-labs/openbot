@@ -57,6 +57,11 @@ export const messages = {
     "OpenBot לא הצליח לטעון את הדף בחלון ההתחברות. בדקו את החיבור לאינטרנט, ואז פתחו שוב את חלון ההתחברות.",
   "error.backend.browserSignInReadFailed": "OpenBot לא הצליח לקרוא את ההתחברות מהחלון.",
   "error.backend.browserStopUnsupported": "המארח המרוחק הזה אינו יכול לעצור טעינת דף.",
+  "error.backend.browserLocationFailed": "לא ניתן להגדיר את המיקום עבור הדף.",
+  "error.backend.browserPermissionsUnsupported": "המארח המרוחק הזה לא יכול להשיב לבקשות מיקום.",
+  "error.backend.browserLocationRequired": "שלח את מיקום המכשיר כדי לאשר את הבקשה.",
+  "error.backend.browserHttpSignInInactive": "האתר הזה כבר לא מבקש התחברות. יש לטעון מחדש את הדף כדי לנסות שוב.",
+  "error.backend.browserHttpSignInUnsupported": "המארח המרוחק הזה אינו יכול לקבל התחברות לאתר.",
   "error.backend.sharedDataLocalOnly": "נתונים משותפים מנוהלים במחשב שמריץ את הסוכנים האלה.",
   "error.backend.browserUrlProtocol": "מותר להשתמש רק בכתובות דפדפן של HTTP(S).",
   "error.backend.sunshineNotReady": "Sunshine לא הפך למוכן.",
@@ -187,6 +192,7 @@ export const messages = {
   "error.backend.videoGenerationFailed": "יצירת הסרטון נכשלה.",
   "error.backend.videoGenerationNoVideo": "יצירת הסרטון לא החזירה סרטון.",
   "error.backend.videoGenerationInterrupted": "יצירת הסרטון הופסקה.",
+  "error.backend.grokVideoNoQuota": "חשבון ה-Grok הזה לא יכול ליצור סרטונים. אפשר ליצור את הסרטון באמצעות קרדיטים.",
   "error.backend.attachmentNotRegularFile": "אפשר לצרף רק קבצים רגילים: {name}",
   "error.backend.attachmentCopyFailed": "OpenBot לא הצליח להעתיק את {name}.",
   "error.backend.routineNameRequired": "נדרש שם לשגרה.",
@@ -267,6 +273,8 @@ export const messages = {
     "שרת ההתחברות עדיין אינו מקבל את OpenBot כאפליקציה. החשבון שלך אינו הסיבה. יש להשתמש בדרך חיבור אחרת, כמו שרת MCP מקומי.",
   "error.backend.mcpRegistrationUnavailable":
     "שרת ההתחברות אינו יכול לרשום את OpenBot כאפליקציה. החשבון שלך אינו הסיבה. כדי להתחבר, יש לשמור את השרת הזה בחנות, אפליקציות, ואחר כך להוסיף לו אפליקציית התחברות.",
+  "error.backend.mcpSignInAppNeeded":
+    "שרת ההתחברות אינו יכול לרשום את OpenBot כאפליקציה. החשבון שלך אינו הסיבה. כדי להתחבר, יש לפתוח את השרת הזה בחנות, אפליקציות, ללחוץ על בדיקת חיבור, ואחר כך להוסיף אפליקציית התחברות.",
   "error.backend.mcpSignInAbandonedGeneric": "ההתחברות ננטשה.",
   "error.backend.mcpSignInForgotten": "התחברות ה-MCP נשכחה בזמן שהיא רצה.",
   "error.backend.mcpSignInAbandoned": "התחברות ה-MCP ננטשה.",
@@ -324,6 +332,7 @@ export const messages = {
     "המחשב הזה חסם את החיבור אל השרת. יש לבדוק את חומת האש או את תוכנת האבטחה ולנסות שוב.",
   "error.backend.mcpServerIncompatible":
     "משהו ענה בכתובת הזו, אבל לא כשרת MCP דרך Streamable HTTP. יש לבדוק את ה-URL ולעדכן את האפליקציה שמריצה את השרת.",
+  "error.backend.mcpServerKeyNotAccepted": "השרת לא קיבל את מפתח ה-API. יש לבדוק את המפתח ולנסות שוב.",
   "error.backend.mcpRemoteBridge":
     "{reason} הפקודה הזו מריצה את הגשר mcp-remote. במקום זאת יש לבחור Streamable HTTP עם ה-URL {url}, ו-OpenBot יתחבר בשבילך.",
   "error.backend.oauthNotHttps": "נקודת הקצה של OAuth {origin} אינה https, ולכן פרטי הגישה לא נשלחו.",

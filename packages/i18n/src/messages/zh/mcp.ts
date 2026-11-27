@@ -35,6 +35,7 @@ export const messages = {
   "mcp.status.signedIn": "已登录",
   "mcp.status.signingIn": "正在登录…",
   "mcp.status.signInNeeded": "需要登录",
+  "mcp.status.signInAppNeeded": "需要登录应用",
   "mcp.status.refused": "被拒绝",
   "mcp.status.checkUrl": "请检查 URL",
   "mcp.status.noAnswer": "无响应",

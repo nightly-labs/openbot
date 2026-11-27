@@ -1,0 +1,116 @@
+import {
+  type NearOwnerAction,
+  type NearWalletDesktopApi,
+  type NearWalletStatus,
+  NO_NEAR_WALLET,
+} from "@openbot/contracts/ipc";
+
+const MOCK_SIGNATURE_MS = 2_000;
+
+const MOCK_ACCOUNT_ID = "7f3c2a9e41b8d6c05e12f4a3b7c9d8e1f0a2b4c6d8e0f1a3b5c7d9e1f2a4b6c8";
+
+const mockBackup = () => ({ state: "synced" as const, checkedAt: new Date().toISOString() });
+
+export function createMockNearWallet(): NearWalletDesktopApi {
+  let status: NearWalletStatus = structuredClone(NO_NEAR_WALLET);
+  let timer: ReturnType<typeof setTimeout> | null = null;
+  const listeners = new Set<(status: NearWalletStatus) => void>();
+  const set = (next: NearWalletStatus): NearWalletStatus => {
+    status = next;
+    for (const listener of listeners) listener(structuredClone(status));
+    return structuredClone(status);
+  };
+  const stopTimer = () => {
+    if (timer) clearTimeout(timer);
+    timer = null;
+  };
+  const sign = (action: NearOwnerAction, change: (current: NearWalletStatus) => NearWalletStatus) => {
+    stopTimer();
+    timer = setTimeout(() => {
+      timer = null;
+      set({ ...change(status), signing: null, error: null });
+    }, MOCK_SIGNATURE_MS);
+    return set({ ...status, signing: { action, requestId: null }, error: null });
+  };
+  const withAccount = (current: NearWalletStatus, change: Partial<NonNullable<NearWalletStatus["account"]>>) =>
+    current.account ? { ...current, account: { ...current.account, ...change } } : current;
+  return {
+    status: async () => structuredClone(status),
+    create: async (input) =>
+      sign("create", (current) => ({
+        ...current,
+        state: "ready",
+        ownerBackup: mockBackup(),
+        allAgents: true,
+        account: {
+          accountId: MOCK_ACCOUNT_ID,
+          ownerApproval: true,
+          dailyBudgetUsd: input.dailyBudgetUsd,
+          spentTodayUsd: "0",
+          policyChangeAvailableAt: null,
+          grantExpiresAt: new Date(Date.now() + 30 * 24 * 60 * 60_000).toISOString(),
+        },
+        balances: [{ assetId: "nep141:usdc.near", symbol: "USDC", amount: "0", usd: "0.00" }],
+        depositAssets: [
+          { assetId: "nep141:usdc.near", symbol: "USDC", blockchain: "near" },
+          { assetId: "nep141:wrap.near", symbol: "NEAR", blockchain: "near" },
+        ],
+      })),
+    setBudget: async ({ dailyBudgetUsd }) => sign("budget", (current) => withAccount(current, { dailyBudgetUsd })),
+    setAgents: async ({ allAgents, agentIds }) => set({ ...status, allAgents, agentIds }),
+    renewGrant: async () =>
+      sign("grant", (current) =>
+        withAccount(current, { grantExpiresAt: new Date(Date.now() + 30 * 24 * 60 * 60_000).toISOString() }),
+      ),
+    checkBackup: async () => sign("check-backup", (current) => ({ ...current, ownerBackup: mockBackup() })),
+    freeze: async () => sign("freeze", (current) => ({ ...current, state: "frozen" })),
+    unfreeze: async () => sign("unfreeze", (current) => ({ ...current, state: "ready" })),
+    deposit: async () => ({ address: MOCK_ACCOUNT_ID, memo: null, minAmount: null, expiresAt: null }),
+    saveRule: async (input) => {
+      const save = (current: NearWalletStatus): NearWalletStatus => ({
+        ...withAccount(current, { ownerApproval: false }),
+        rules: [...current.rules.filter((rule) => rule.domain !== input.domain), { ...input, spentTodayUsd: 0 }],
+      });
+      return status.account?.ownerApproval ? sign("auto-pay", save) : set(save(status));
+    },
+    removeRule: async ({ domain }) => {
+      const remove = (current: NearWalletStatus): NearWalletStatus => ({
+        ...current,
+        rules: current.rules.filter((rule) => rule.domain !== domain),
+      });
+      const removesLastRule = status.rules.length === 1 && status.rules[0]?.domain === domain;
+      return removesLastRule && status.account?.ownerApproval === false
+        ? sign("manual-pay", (current) => withAccount(remove(current), { ownerApproval: true }))
+        : set(remove(status));
+    },
+    allowPayment: async ({ requestId, dailyUsd }) => {
+      const payment = status.payments.find((candidate) => candidate.requestId === requestId);
+      if (!payment) return structuredClone(status);
+      const allow = (current: NearWalletStatus): NearWalletStatus => {
+        const rule = current.rules.find((candidate) => candidate.domain === payment.domain);
+        const recipients = [...new Set([...(rule?.recipients ?? []), payment.recipient])];
+        return {
+          ...withAccount(current, { ownerApproval: false }),
+          rules: [
+            ...current.rules.filter((candidate) => candidate.domain !== payment.domain),
+            { domain: payment.domain, recipients, dailyUsd, spentTodayUsd: rule?.spentTodayUsd ?? 0 },
+          ],
+        };
+      };
+      return status.account?.ownerApproval ? sign("auto-pay", allow) : set(allow(status));
+    },
+    openSigning: async () => {},
+    cancelSigning: async () => {
+      stopTimer();
+      return set({ ...status, signing: null });
+    },
+    disconnect: async () => {
+      stopTimer();
+      return set(structuredClone(NO_NEAR_WALLET));
+    },
+    onChanged: (listener) => {
+      listeners.add(listener);
+      return () => listeners.delete(listener);
+    },
+  };
+}

@@ -63,6 +63,13 @@ export const messages = {
     "OpenBot konnte die Seite im Anmeldefenster nicht laden. Prüfe die Internetverbindung und öffne das Anmeldefenster dann erneut.",
   "error.backend.browserSignInReadFailed": "OpenBot konnte die Anmeldung im Fenster nicht lesen.",
   "error.backend.browserStopUnsupported": "Dieser entfernte Host kann das Laden einer Seite nicht stoppen.",
+  "error.backend.browserLocationFailed": "Der Standort für die Seite konnte nicht festgelegt werden.",
+  "error.backend.browserPermissionsUnsupported": "Dieser entfernte Host kann Standortanfragen nicht beantworten.",
+  "error.backend.browserLocationRequired": "Sende den Gerätestandort, um die Anfrage zu erlauben.",
+  "error.backend.browserHttpSignInInactive":
+    "Diese Website fragt nicht mehr nach einer Anmeldung. Lade die Seite neu, um es noch einmal zu versuchen.",
+  "error.backend.browserHttpSignInUnsupported":
+    "Dieser entfernte Host kann keine Anmeldung bei einer Website übernehmen.",
   "error.backend.sharedDataLocalOnly":
     "Geteilte Daten werden auf dem Computer verwaltet, auf dem diese Agenten laufen.",
   "error.backend.browserUrlProtocol": "Im Browser sind nur HTTP(S)-URLs erlaubt.",
@@ -217,6 +224,8 @@ export const messages = {
   "error.backend.videoGenerationFailed": "Die Videoerstellung ist fehlgeschlagen.",
   "error.backend.videoGenerationNoVideo": "Die Videoerstellung hat kein Video zurückgegeben.",
   "error.backend.videoGenerationInterrupted": "Die Videoerstellung wurde unterbrochen.",
+  "error.backend.grokVideoNoQuota":
+    "Dein Grok-Konto kann keine Videos erstellen. Erstelle das Video stattdessen mit Credits.",
   "error.backend.attachmentNotRegularFile": "Nur reguläre Dateien können angehängt werden: {name}",
   "error.backend.attachmentCopyFailed": "OpenBot konnte {name} nicht kopieren.",
   "error.backend.routineNameRequired": "Ein Name für die Routine ist erforderlich.",
@@ -311,6 +320,8 @@ export const messages = {
     "Der Anmeldeserver akzeptiert OpenBot noch nicht als Anwendung. Dein Konto ist nicht die Ursache. Verwende eine andere Verbindungsmethode, etwa einen lokalen MCP-Server.",
   "error.backend.mcpRegistrationUnavailable":
     "Der Anmeldeserver kann OpenBot nicht als Anwendung registrieren. Dein Konto ist nicht die Ursache. Speichere zum Verbinden diesen Server unter Marketplace, Apps und füge ihm dann eine Anmelde-App hinzu.",
+  "error.backend.mcpSignInAppNeeded":
+    "Der Anmeldeserver kann OpenBot nicht als Anwendung registrieren. Dein Konto ist nicht die Ursache. Öffne zum Verbinden diesen Server unter Marketplace, Apps, klicke auf Verbindung testen und füge dann eine Anmelde-App hinzu.",
   "error.backend.mcpSignInAbandonedGeneric": "Die Anmeldung wurde abgebrochen.",
   "error.backend.mcpSignInForgotten": "Die MCP-Anmeldung wurde während ihrer Ausführung verworfen.",
   "error.backend.mcpSignInAbandoned": "Die MCP-Anmeldung wurde abgebrochen.",
@@ -375,6 +386,8 @@ export const messages = {
     "Dieser Computer hat die Verbindung zum Server blockiert. Prüfe deine Firewall oder Sicherheitssoftware und versuche es dann erneut.",
   "error.backend.mcpServerIncompatible":
     "Unter dieser Adresse hat etwas geantwortet, aber nicht als MCP-Server über Streamable HTTP. Prüfe die URL und aktualisiere die App, die den Server ausführt.",
+  "error.backend.mcpServerKeyNotAccepted":
+    "Der Server hat den API-Schlüssel nicht akzeptiert. Prüfe den Schlüssel und versuche es erneut.",
   "error.backend.mcpRemoteBridge":
     "{reason} Dieser Befehl startet die mcp-remote-Brücke. Wähle stattdessen Streamable HTTP mit der URL {url}, dann meldet OpenBot dich an.",
   "error.backend.oauthNotHttps":

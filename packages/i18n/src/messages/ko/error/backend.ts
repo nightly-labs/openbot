@@ -60,6 +60,12 @@ export const messages = {
     "OpenBot이 로그인 창에서 페이지를 불러올 수 없었어요. 인터넷 연결을 확인한 다음 로그인 창을 다시 열어 주세요.",
   "error.backend.browserSignInReadFailed": "OpenBot이 창에서 로그인 정보를 읽을 수 없었어요.",
   "error.backend.browserStopUnsupported": "이 원격 호스트는 페이지 로딩을 중지할 수 없어요.",
+  "error.backend.browserLocationFailed": "페이지의 위치를 설정할 수 없습니다.",
+  "error.backend.browserPermissionsUnsupported": "이 원격 호스트는 위치 요청에 응답할 수 없습니다.",
+  "error.backend.browserLocationRequired": "요청을 허용하려면 기기 위치를 보내세요.",
+  "error.backend.browserHttpSignInInactive":
+    "이 사이트는 더 이상 로그인을 요구하지 않아요. 다시 시도하려면 페이지를 새로고침하세요.",
+  "error.backend.browserHttpSignInUnsupported": "이 원격 호스트는 사이트 로그인을 받을 수 없어요.",
   "error.backend.sharedDataLocalOnly": "공유 데이터는 이 에이전트를 실행하는 컴퓨터에서 관리해요.",
   "error.backend.browserUrlProtocol": "브라우저 URL은 HTTP(S)만 사용할 수 있어요.",
   "error.backend.sunshineNotReady": "Sunshine이 준비되지 않았어요.",
@@ -195,6 +201,7 @@ export const messages = {
   "error.backend.videoGenerationFailed": "동영상을 생성하지 못했어요.",
   "error.backend.videoGenerationNoVideo": "동영상 생성 결과로 동영상이 오지 않았어요.",
   "error.backend.videoGenerationInterrupted": "동영상 생성이 중단됐어요.",
+  "error.backend.grokVideoNoQuota": "이 Grok 계정으로는 동영상을 만들 수 없어요. 대신 크레딧으로 동영상을 생성하세요.",
   "error.backend.attachmentNotRegularFile": "일반 파일만 첨부할 수 있어요: {name}",
   "error.backend.attachmentCopyFailed": "OpenBot이 {name}을(를) 복사할 수 없었어요.",
   "error.backend.routineNameRequired": "루틴 이름이 필요해요.",
@@ -279,6 +286,8 @@ export const messages = {
     "로그인 서버가 아직 OpenBot을 앱으로 허용하지 않아요. 계정 문제가 아니에요. 로컬 MCP 서버처럼 다른 방법으로 연결하세요.",
   "error.backend.mcpRegistrationUnavailable":
     "로그인 서버가 OpenBot을 앱으로 등록할 수 없어요. 계정 문제가 아니에요. 연결하려면 마켓플레이스, 앱에서 이 서버를 저장한 다음 로그인 앱을 추가하세요.",
+  "error.backend.mcpSignInAppNeeded":
+    "로그인 서버가 OpenBot을 앱으로 등록할 수 없어요. 계정 문제가 아니에요. 연결하려면 마켓플레이스, 앱에서 이 서버를 열고 연결 테스트를 클릭한 다음 로그인 앱을 추가하세요.",
   "error.backend.mcpSignInAbandonedGeneric": "로그인이 중단되었어요.",
   "error.backend.mcpSignInForgotten": "MCP 로그인이 진행 중에 삭제되었어요.",
   "error.backend.mcpSignInAbandoned": "MCP 로그인이 중단되었어요.",
@@ -339,6 +348,7 @@ export const messages = {
     "이 컴퓨터가 서버 연결을 차단했어요. 방화벽이나 보안 소프트웨어를 확인한 후 다시 시도해 주세요.",
   "error.backend.mcpServerIncompatible":
     "이 주소에서 응답은 있지만 Streamable HTTP 기반 MCP 서버가 아니에요. URL을 확인하고 서버를 실행하는 앱을 업데이트하세요.",
+  "error.backend.mcpServerKeyNotAccepted": "서버가 API 키를 받아들이지 않았어요. 키를 확인한 다음 다시 시도하세요.",
   "error.backend.mcpRemoteBridge":
     "{reason} 이 명령은 mcp-remote 브리지를 실행해요. 대신 Streamable HTTP를 선택하고 URL {url}을(를) 사용하면 OpenBot이 로그인해 줘요.",
   "error.backend.oauthNotHttps": "OAuth 엔드포인트 {origin}이(가) https가 아니어서 자격 증명을 보내지 않았어요.",

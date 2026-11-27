@@ -62,6 +62,12 @@ export const messages = {
     "OpenBot nie mógł wczytać strony w oknie logowania. Sprawdź połączenie z internetem, a potem otwórz okno logowania ponownie.",
   "error.backend.browserSignInReadFailed": "OpenBot nie mógł odczytać logowania z okna.",
   "error.backend.browserStopUnsupported": "Ten zdalny host nie może zatrzymać wczytywania strony.",
+  "error.backend.browserLocationFailed": "Nie można ustawić lokalizacji dla strony.",
+  "error.backend.browserPermissionsUnsupported": "Ten zdalny host nie może odpowiadać na prośby o lokalizację.",
+  "error.backend.browserLocationRequired": "Wyślij lokalizację urządzenia, aby zezwolić na prośbę.",
+  "error.backend.browserHttpSignInInactive":
+    "Ta strona nie prosi już o logowanie. Wczytaj stronę ponownie, aby spróbować jeszcze raz.",
+  "error.backend.browserHttpSignInUnsupported": "Ten zdalny host nie może przyjąć logowania do strony.",
   "error.backend.sharedDataLocalOnly": "Dane współdzielone są zarządzane na komputerze, na którym działają ci agenci.",
   "error.backend.browserUrlProtocol": "Dozwolone są tylko adresy URL HTTP(S).",
   "error.backend.sunshineNotReady": "Sunshine nie osiągnął gotowości.",
@@ -205,6 +211,7 @@ export const messages = {
   "error.backend.videoGenerationFailed": "Generowanie filmu nie powiodło się.",
   "error.backend.videoGenerationNoVideo": "Generowanie filmu nie zwróciło filmu.",
   "error.backend.videoGenerationInterrupted": "Generowanie filmu zostało przerwane.",
+  "error.backend.grokVideoNoQuota": "Twoje konto Grok nie może tworzyć filmów. Wygeneruj film za kredyty.",
   "error.backend.attachmentNotRegularFile": "Załączać można tylko zwykłe pliki: {name}",
   "error.backend.attachmentCopyFailed": "OpenBot nie mógł skopiować pliku {name}.",
   "error.backend.routineNameRequired": "Nazwa rutyny jest wymagana.",
@@ -290,6 +297,8 @@ export const messages = {
     "Serwer logowania nie akceptuje jeszcze OpenBot jako aplikacji. Przyczyną nie jest twoje konto. Połącz się w inny sposób, na przykład przez lokalny serwer MCP.",
   "error.backend.mcpRegistrationUnavailable":
     "Serwer logowania nie może zarejestrować OpenBot jako aplikacji. Przyczyną nie jest twoje konto. Aby się połączyć, zapisz ten serwer w Marketplace, Aplikacje, a potem dodaj do niego aplikację logowania.",
+  "error.backend.mcpSignInAppNeeded":
+    "Serwer logowania nie może zarejestrować OpenBot jako aplikacji. Przyczyną nie jest twoje konto. Aby się połączyć, otwórz ten serwer w Marketplace, Aplikacje, kliknij Testuj połączenie, a potem dodaj aplikację logowania.",
   "error.backend.mcpSignInAbandonedGeneric": "Logowanie zostało porzucone.",
   "error.backend.mcpSignInForgotten": "Logowanie MCP zostało zapomniane w trakcie działania.",
   "error.backend.mcpSignInAbandoned": "Logowanie MCP zostało porzucone.",
@@ -352,6 +361,7 @@ export const messages = {
     "Ten komputer zablokował połączenie z serwerem. Sprawdź zaporę lub oprogramowanie zabezpieczające i spróbuj ponownie.",
   "error.backend.mcpServerIncompatible":
     "Pod tym adresem coś odpowiedziało, ale nie jako serwer MCP przez Streamable HTTP. Sprawdź URL i zaktualizuj aplikację, która uruchamia serwer.",
+  "error.backend.mcpServerKeyNotAccepted": "Serwer nie przyjął klucza API. Sprawdź klucz i spróbuj ponownie.",
   "error.backend.mcpRemoteBridge":
     "{reason} To polecenie uruchamia most mcp-remote. Zamiast tego wybierz Streamable HTTP z URL {url}, a OpenBot cię zaloguje.",
   "error.backend.oauthNotHttps":

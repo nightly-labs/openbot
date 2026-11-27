@@ -15,6 +15,7 @@ export const messages = {
   "mobile.workspace.error.sectionsLoadFailed": "폴더를 불러올 수 없어요. 다시 시도해 주세요.",
   "mobile.workspace.error.transportNotReady": "모바일 전송이 준비되지 않았어요.",
   "mobile.workspace.error.sectionsUnsupported": "이 호스트는 폴더 변경을 지원하지 않아요.",
+  "mobile.workspace.error.sidebarOffline": "폴더를 변경하려면 이 서버에 연결하세요.",
   "mobile.workspace.error.leaveOwnServer": "참여한 원격 서버에서만 나갈 수 있어요.",
   "mobile.workspace.error.removeOwnedServerOnly": "소유자만 이 서버를 삭제할 수 있어요.",
   "mobile.workspace.error.agentNotOnHost": "이 호스트에 없는 에이전트예요.",

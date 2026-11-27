@@ -64,6 +64,12 @@ export const messages = {
     "OpenBot kon de pagina in het inlogvenster niet laden. Controleer de internetverbinding en open het inlogvenster daarna opnieuw.",
   "error.backend.browserSignInReadFailed": "OpenBot kon de inlog niet uit het venster lezen.",
   "error.backend.browserStopUnsupported": "Deze externe host kan het laden van een pagina niet stoppen.",
+  "error.backend.browserLocationFailed": "Kan de locatie voor de pagina niet instellen.",
+  "error.backend.browserPermissionsUnsupported": "Deze externe host kan geen locatieverzoeken beantwoorden.",
+  "error.backend.browserLocationRequired": "Stuur de locatie van het apparaat om het verzoek toe te staan.",
+  "error.backend.browserHttpSignInInactive":
+    "Deze site vraagt niet meer om in te loggen. Laad de pagina opnieuw om het nog eens te proberen.",
+  "error.backend.browserHttpSignInUnsupported": "Deze externe host kan geen login voor een site overnemen.",
   "error.backend.sharedDataLocalOnly": "Gedeelde gegevens worden beheerd op de computer waarop deze agents draaien.",
   "error.backend.browserUrlProtocol": "Alleen HTTP(S)-URL’s zijn toegestaan in de browser.",
   "error.backend.sunshineNotReady": "Sunshine is niet klaar geworden.",
@@ -210,6 +216,8 @@ export const messages = {
   "error.backend.videoGenerationFailed": "Het maken van de video is mislukt.",
   "error.backend.videoGenerationNoVideo": "Het maken van de video gaf geen video terug.",
   "error.backend.videoGenerationInterrupted": "Het maken van de video is onderbroken.",
+  "error.backend.grokVideoNoQuota":
+    "Je Grok-account kan geen video's maken. Maak de video in plaats daarvan met credits.",
   "error.backend.attachmentNotRegularFile": "Alleen gewone bestanden kunnen worden bijgevoegd: {name}",
   "error.backend.attachmentCopyFailed": "OpenBot kon {name} niet kopiëren.",
   "error.backend.routineNameRequired": "Een naam voor de routine is verplicht.",
@@ -299,6 +307,8 @@ export const messages = {
     "De inlogserver accepteert OpenBot nog niet als app. Dit ligt niet aan je account. Gebruik een andere manier om te verbinden, zoals een lokale MCP-server.",
   "error.backend.mcpRegistrationUnavailable":
     "De inlogserver kan OpenBot niet als app registreren. Dit ligt niet aan je account. Sla deze server op in Marktplaats, Apps, en voeg er daarna een inlog-app aan toe om te verbinden.",
+  "error.backend.mcpSignInAppNeeded":
+    "De inlogserver kan OpenBot niet als app registreren. Dit ligt niet aan je account. Open deze server in Marktplaats, Apps, klik op Verbinding testen en voeg daarna een inlog-app toe om te verbinden.",
   "error.backend.mcpSignInAbandonedGeneric": "Het inloggen is afgebroken.",
   "error.backend.mcpSignInForgotten": "De MCP-inlog is vergeten terwijl deze bezig was.",
   "error.backend.mcpSignInAbandoned": "Het inloggen bij MCP is afgebroken.",
@@ -361,6 +371,8 @@ export const messages = {
     "Deze computer heeft de verbinding met de server geblokkeerd. Controleer je firewall of beveiligingssoftware en probeer het opnieuw.",
   "error.backend.mcpServerIncompatible":
     "Er reageerde iets op dit adres, maar niet als MCP-server via Streamable HTTP. Controleer de URL en werk de app bij die de server draait.",
+  "error.backend.mcpServerKeyNotAccepted":
+    "De server heeft de API-sleutel niet geaccepteerd. Controleer de sleutel en probeer het opnieuw.",
   "error.backend.mcpRemoteBridge":
     "{reason} Deze opdracht draait de mcp-remote-brug. Kies in plaats daarvan Streamable HTTP met de URL {url}, dan logt OpenBot je in.",
   "error.backend.oauthNotHttps": "Het OAuth-endpoint {origin} is geen https, dus de inloggegevens zijn niet verstuurd.",

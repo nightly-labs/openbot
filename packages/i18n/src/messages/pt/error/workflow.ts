@@ -47,11 +47,24 @@ export const messages = {
   "error.workflow.providerBusy": "O provedor está ocupado. Aguarde alguns minutos e execute a etapa novamente.",
   "error.workflow.providerOffline":
     "O OpenBot não conseguiu acessar o provedor. Verifique a conexão com a internet e execute a etapa novamente.",
+  "error.workflow.providerBilling":
+    "A conta não tem crédito, ou o plano dela não inclui este modelo. Verifique o plano ou escolha outro modelo.",
+  "error.workflow.modelRefused": "O provedor não permite este modelo para esta conta. Escolha outro modelo.",
+  "error.workflow.modelRefusedReason":
+    'Escolha outro modelo. O provedor não permite este modelo para esta conta: "{reason}"',
+  "error.workflow.contentBlocked":
+    "O provedor bloqueou a entrada. Altere a entrada ou o prompt e execute a etapa novamente.",
+  "error.workflow.inputTooLong": "A entrada é longa demais para este modelo. Encurte-a ou escolha outro modelo.",
+  "error.workflow.requestRefused": "O provedor não aceitou esta etapa. Escolha outro modelo.",
+  "error.workflow.requestRefusedReason": 'Escolha outro modelo. O provedor não aceitou esta etapa: "{reason}"',
+  "error.workflow.providerRefused": 'Escolha outro modelo ou execute a etapa novamente. O provedor disse: "{reason}"',
   "error.workflow.modelBusy": "Outra solicitação ao modelo está em andamento. Execute a etapa novamente em breve.",
   "error.workflow.mediaFailed": "O modelo não conseguiu criar a imagem ou o vídeo. Execute a etapa novamente.",
   "error.workflow.mediaNotMade": "O modelo não criou a imagem ou o vídeo. Ele respondeu: {answer}",
   "error.workflow.pictureMissing": "A imagem não está mais no servidor. Envie-a novamente.",
   "error.workflow.pictureType": "Use uma imagem PNG, JPEG ou WebP.",
+  "error.workflow.assetType":
+    "Use uma imagem PNG, JPEG ou WebP, um vídeo MP4 ou MOV, ou um arquivo de áudio MP3, M4A, WAV, AAC, OGG ou FLAC.",
   "error.workflow.mediaInputMissing":
     "Uma imagem de uma etapa anterior não está disponível. Execute essa etapa novamente.",
   "error.workflow.mediaEmptyRequest":

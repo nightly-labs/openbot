@@ -138,7 +138,7 @@ function isCodexRefusedAudio(provider: AgentProvider, message: string): boolean 
 function isRejectedOpenCodeRequest(provider: AgentProvider, message: string): boolean {
   return (
     provider === "opencode" &&
-    /\bthe request contains invalid parameters\b|\bInternal error: Invalid request parameters\b|\bUpstream request failed: \[invalid_request\] the request is invalid\b/i.test(
+    /\bthe request contains invalid parameters\b|\bInternal error: Invalid request parameters\b|\bUpstream request failed: \[invalid_request\] the request is invalid\b|\bUpstream request failed: \[invalid_request_error\] messages\.\d+\.output_config\b/i.test(
       message,
     )
   );
@@ -165,7 +165,7 @@ function isUnreadableAntigravityHistory(provider: AgentProvider, message: string
 function isUnsignedAntigravityThinking(provider: AgentProvider, message: string): boolean {
   return (
     provider === "antigravity" &&
-    /\bmessages\.\d+\.content\.\d+(?:\.thinking\.signature: Field required|: Invalid `signature` in `thinking` block)/u.test(
+    /\bmessages\.\d+\.content\.\d+(?:\.thinking\.signature: Field required|: Invalid `signature` in `thinking` block|: [^\n]*\bthinking\b[^\n]*\bcannot be modified\b)/u.test(
       message,
     )
   );
@@ -187,7 +187,9 @@ function isFailedOpenCodeCompaction(provider: AgentProvider, message: string): b
 function isUnsendableOpenCodeMedia(provider: AgentProvider, message: string): boolean {
   return (
     provider === "opencode" &&
-    /\bMedia strings must be base64\b|\bLocal file references must be read with Media\.file\b/i.test(message)
+    /\bMedia strings must be base64\b|\bLocal file references must be read with Media\.file\b|\bImage could not be decoded\b/i.test(
+      message,
+    )
   );
 }
 
@@ -197,6 +199,10 @@ function isMuseMcpStartupFault(provider: AgentProvider, message: string): boolea
 
 function isMissingClaudeSession(provider: AgentProvider, message: string): boolean {
   return provider === "claude" && /\bNo conversation found with session ID\b/.test(message);
+}
+
+function isMissingOpenCodeSession(provider: AgentProvider, message: string): boolean {
+  return provider === "opencode" && /\bInvalid params: session not found: \S/.test(message);
 }
 
 function isClaudeContextOverflow(provider: AgentProvider, message: string): boolean {
@@ -219,6 +225,7 @@ export function refusedSessionFailure(
   provider: AgentProvider,
   message: string,
   contextWindow: number | null = null,
+  imageLimitRepeated = false,
 ): string | null {
   if (isForeignReasoningError(message))
     return sourceText("error.provider.foreignReasoning", { provider: providerLabel(provider) });
@@ -233,7 +240,9 @@ export function refusedSessionFailure(
   if (isImageTooLargeDiagnostic(message))
     return sourceText("error.provider.imageTooLarge", { provider: providerLabel(provider) });
   if (isImageCountDiagnostic(message))
-    return sourceText("error.provider.imageCountLimit", { provider: providerLabel(provider) });
+    return imageLimitRepeated
+      ? sourceText("error.provider.imageCountLimitRepeated")
+      : sourceText("error.provider.imageCountLimit", { provider: providerLabel(provider) });
   if (isImageUnreadableDiagnostic(message) || isUnsendableOpenCodeMedia(provider, message))
     return sourceText("error.provider.imageUnreadable", { provider: providerLabel(provider) });
   if (isRequestBodyLimitDiagnostic(message))
@@ -254,6 +263,7 @@ export function refusedSessionFailure(
   if (isFailedOpenCodeCompaction(provider, message)) return openCodeCompactionFailure(contextWindow);
   if (isMuseMcpStartupFault(provider, message)) return sourceText("error.provider.museMcpStartupFault");
   if (isMissingClaudeSession(provider, message)) return sourceText("error.provider.claudeSessionMissing");
+  if (isMissingOpenCodeSession(provider, message)) return sourceText("error.provider.opencodeSessionMissing");
   if (isClaudeContextOverflow(provider, message)) return sourceText("error.provider.claudeContextFull");
   if (isPiContextOverflow(provider, message))
     return sourceText("error.provider.requestTooLarge", { provider: providerLabel(provider) });
@@ -477,6 +487,8 @@ function browserProgressText(tool: string): string {
     case "fill_fields":
     case "press":
       return sourceText("status.agent.browserTyping");
+    case "request_near_payment":
+      return sourceText("status.agent.browserPaying");
     default:
       return sourceText("status.agent.browserActing");
   }

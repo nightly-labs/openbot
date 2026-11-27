@@ -64,6 +64,7 @@ export const messages = {
   "provider.aria.install": "安装 {name}",
   "provider.aria.signIn": "登录 {name}",
   "provider.aria.codeFallback": "用验证码登录 {name}",
+  "provider.aria.addressFallback": "粘贴 {name} 的登录地址",
   "provider.aria.moreActions": "{name} 的更多操作",
 
   "provider.aria.use": "在 OpenBot 中使用 {name}",
@@ -91,6 +92,7 @@ export const messages = {
   "provider.codeLogin.pasteExpiresIn": "等待你的操作，本次登录将在 {time} 后终止。",
   "provider.codeLogin.linkTitle": "在另一台设备上登录 {name}",
   "provider.codeLogin.pageTitle": "登录 {name}",
+  "provider.codeLogin.addressDescription": "请在浏览器中完成登录。登录完成后，此窗口会自动关闭。",
   "provider.codeLogin.pageDescription": "该页面已在 {host} 的浏览器中打开，请在这里登录。",
   "provider.codeLogin.relayStarting": "正在 {host} 上启动 {name} 登录…",
   "provider.codeLogin.pageOpening": "正在 {host} 上打开 {name} 登录页面…",
@@ -247,6 +249,11 @@ export const messages = {
   "provider.account.resetUsageFailed": "无法重置 {name} 的用量。",
   "provider.account.pool": "账号池",
   "provider.account.poolDescription": "助手先用一个账号，直到接近用量限额，再换到限额最先重置的账号。",
+  "provider.account.poolStrategy": "账号用法",
+  "provider.account.poolFillFirst": "先用满",
+  "provider.account.poolSpread": "分散",
+  "provider.account.poolSpreadDescription":
+    "助手分散到剩余用量最多的账号。只有当另一个账号的余量多很多时，助手才会换账号。",
   "provider.account.inUse": "使用中",
   "provider.account.notInPool": "不在池中",
   "provider.account.leaveOutOfPool": "移出账号池",

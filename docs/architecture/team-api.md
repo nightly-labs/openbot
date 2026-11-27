@@ -278,11 +278,27 @@ never tokens or token hashes, and all operations are scoped to the authenticated
 Cloudflare issues short ES256 connection tickets and stores the logical session. Signal issues a
 10-minute resume token, so a short Signal update does not end an active WebRTC connection. Signal
 validates a trusted, non-expired resume token locally. After a Signal restart, the first use of a token
-checks the durable control plane once. An expired token also needs one durable check before Signal issues
+checks the durable control plane once. A connection ticket is checked the same way during the first
+3 minutes after a Signal start, and also later when it was issued before that start (with 60 s for
+clock skew), because Signal forgot the revocations from before its restart. Tickets issued after the
+start get no extra check. An expired token also needs one durable check before Signal issues
 a replacement. Later reconnects use the in-memory trust cache. This is not a heartbeat.
 Session endings and access changes use a durable D1 outbox. Cloudflare sends each revocation to Signal
 immediately and retries failed deliveries from a scheduled task. This keeps reconnect validation local
 without losing revocations when Signal is temporarily unavailable.
+A host does not need its Signal socket to keep a WebRTC connection, so Signal must tell it about a
+session that ended while the host socket was away. Signal keeps the ended session IDs of each host for
+24 hours and sends them in a `sessions-ended` frame each time a host socket authenticates, and at once
+to a host socket that is connected. The host closes the child peer of each listed session. Signal
+forgets these IDs when it restarts, so the host also fails closed: after each new host Signal socket,
+every child peer must be confirmed again by a `peer-ready` for its session, or the host closes it.
+Each child peer has 11 minutes for this (`CLIENT_RECONFIRM_MS` in `team-webrtc.ts`): the 10-minute
+client reconnect grace of Signal and 1 minute more. The time counts only while the host has a ready
+Signal socket, so a Signal outage does not close healthy peers. Signal confirms a client at once when
+the client socket is connected and Signal maps it to the resumed host socket. A client that is away
+from Signal is confirmed when it comes back. Host frames use their own Signal rate key
+(`host:<hostId>`, 10 times the per-user limit), so the traffic of an owner's client cannot close the
+host socket. Older hosts ignore `sessions-ended`.
 
 Protocol v1 remains frozen for compatibility fixtures, but its public HTTP, WebSocket, and Cloudflare
 Tunnel transport is retired. The old public endpoints return `host_update_required`.
@@ -597,9 +613,9 @@ and spend no credits; `list_media_models` still works. When `askWhenBlocked` is 
 not hold: the tool tells the agent that it skipped the step. When
 one `generate_image` or `generate_video` call costs more credits than this limit, the user must approve
 it. When the agent names no model, the call uses the default model of its kind if that model takes the
-input pictures. With no default model set, it uses the preferred model
-(`CREDIT_MEDIA_PREFERRED_MODELS`: `gpt-image-2.6` for images, `seedance-2.5` for videos), and
-`list_media_models` gives these as `defaultModels`. Only owners and admins can use them (else 403); the host refuses a value outside the
+input pictures. With no default model set, it uses the first preferred model in the catalog that
+takes the input pictures (`CREDIT_MEDIA_PREFERRED_MODELS`: `gpt-image-2.6` for images; `magi-2`, then
+`seedance-2.5` for videos), and `list_media_models` gives the first available one as `defaultModels`. Only owners and admins can use them (else 403); the host refuses a value outside the
 range, not whole, or a model ID that is not valid with 400. A change applies to the next call.
 `src/main/team-api/route-media-approval-credits.ts` owns them. Without the capability a client hides
 the row for that host.

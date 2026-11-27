@@ -29,6 +29,7 @@ import { TaskAnswerCard, TaskPanel } from "@openbot/ui/features/tasks/TaskPanel"
 import { TASKS_SIDE_DEFAULT, TASKS_SIDE_MIN, TasksPage, type TasksVoice } from "@openbot/ui/features/tasks/TasksPage";
 import { currentText } from "@openbot/ui/text";
 import { appendVoiceTranscript } from "@openbot/ui/voice-recording";
+import type { JSX } from "@solidjs/web";
 import {
   createEffect,
   createMemo,
@@ -102,6 +103,7 @@ interface TasksViewProps {
   approvals: readonly AgentApproval[];
   onRespondApproval: (approval: AgentApproval, decision: "accept" | "decline") => Promise<boolean>;
   mediaApproval?: MediaApprovalControls | undefined;
+  approvalCard?: ((approval: AgentApproval) => JSX.Element | undefined) | undefined;
   onRead?: ((input: AgentTaskInput, messageId: string) => void) | undefined;
   waitsForAnswer?: ((task: AgentTask) => boolean) | undefined;
   onOpenInChat?: ((task: AgentTask) => void) | undefined;
@@ -829,6 +831,7 @@ export function TasksView(props: TasksViewProps) {
               downloads={props.downloads}
               approval={approval()}
               media={props.mediaApproval}
+              approvalCard={props.approvalCard}
               onRespondApproval={async (decision) => {
                 const current = approval();
                 return current ? props.onRespondApproval(current, decision) : false;

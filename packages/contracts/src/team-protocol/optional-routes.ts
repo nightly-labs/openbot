@@ -41,7 +41,9 @@ import { AGENT_USAGE_LIMIT_CODECS } from "./agent-usage-limit-v1";
 import { AGENT_WAITS_CODECS } from "./agent-waits-v1";
 import { BACKGROUND_PROCESSES_CODECS } from "./background-processes-v1";
 import { BITWARDEN_CONNECTOR_CODECS } from "./bitwarden-connector-v1";
+import { BROWSER_HTTP_SIGN_IN_CODECS } from "./browser-http-sign-in-v1";
 import { BROWSER_PAGE_STATE_CODECS } from "./browser-page-state-v1";
+import { BROWSER_PERMISSIONS_CODECS } from "./browser-permissions-v1";
 import { BROWSER_PROFILES_CODECS } from "./browser-profiles-v1";
 import { BROWSER_PROXIES_CODECS } from "./browser-proxies-v1";
 import { BROWSER_SECRET_VAULT_CODECS } from "./browser-secret-vault-v1";
@@ -51,6 +53,7 @@ import { BROWSER_TEACH_CODECS } from "./browser-teach-v1";
 import { BROWSER_USER_CONTROL_CODECS } from "./browser-user-control-v1";
 import { BROWSING_MEMORY_CODECS } from "./browsing-memory-v1";
 import { CACHE_EXPIRY_COMPACTION_CODECS } from "./cache-expiry-compaction-v1";
+import { CHANNEL_COMPACT_AVAILABILITY_CODECS } from "./channel-compact-availability-v1";
 import { CHANNEL_FOLDERS_CODECS } from "./channel-folders-v1";
 import { CHAT_COLORS_CODECS } from "./chat-colors-v1";
 import { CHAT_HISTORY_CODECS } from "./chat-history-v1";
@@ -116,6 +119,7 @@ import { PROMPT_CACHE_TTL_CODECS } from "./prompt-cache-ttl-v1";
 import { PROVIDER_ACCOUNT_CODE_CODECS } from "./provider-account-code-v1";
 import { PROVIDER_ACCOUNT_KEYS_CODECS } from "./provider-account-keys-v1";
 import { PROVIDER_ACCOUNT_MODELS_CODECS } from "./provider-account-models-v1";
+import { PROVIDER_ACCOUNT_POOL_STRATEGY_CODECS } from "./provider-account-pool-strategy-v1";
 import { PROVIDER_ACCOUNT_POOL_CODECS } from "./provider-account-pool-v1";
 import { PROVIDER_ACCOUNT_RELAY_CODECS } from "./provider-account-relay-v1";
 import { PROVIDER_ACCOUNT_RELAY_V2_CODECS } from "./provider-account-relay-v2";
@@ -167,6 +171,7 @@ import { VAULT_V2_CODECS } from "./vault-v2";
 import { VAULT_V3_CODECS } from "./vault-v3";
 import { VAULT_V4_CODECS } from "./vault-v4";
 import { VOICE_TRANSCRIPTION_CODECS } from "./voice-transcription-v1";
+import { WATCH_RELAY_CODECS } from "./watch-relay-v1";
 import { WEBHOOK_AGENT_SECRET_CODECS } from "./webhook-agent-secret-v1";
 import { WEBHOOK_SENDER_SECRET_CODECS } from "./webhook-sender-secret-v1";
 import { WEBHOOK_TESTS_CODECS } from "./webhook-tests-v1";
@@ -258,6 +263,7 @@ const CODECS: ReadonlyMap<string, OptionalRouteCodec> = new Map([
   ...CHANNEL_FOLDERS_CODECS,
   ...AGENT_FAST_MODE_CODECS,
   ...AGENT_SPEED_CODECS,
+  ...WATCH_RELAY_CODECS,
   ...CONTEXT_COMPACT_CODECS,
   ...AGENT_INSTRUCTIONS_CODECS,
   ...MCP_SIGN_IN_CODECS,
@@ -282,6 +288,7 @@ const CODECS: ReadonlyMap<string, OptionalRouteCodec> = new Map([
   ...PROVIDER_ENVIRONMENT_CODECS,
   ...PROVIDER_ACCOUNT_MODELS_CODECS,
   ...PROVIDER_ACCOUNT_POOL_CODECS,
+  ...PROVIDER_ACCOUNT_POOL_STRATEGY_CODECS,
   ...PROVIDER_ACCOUNT_KEYS_CODECS,
   ...PROVIDER_ACCOUNT_CODE_CODECS,
   ...GITHUB_SKILLS_CODECS,
@@ -332,6 +339,7 @@ const CODECS: ReadonlyMap<string, OptionalRouteCodec> = new Map([
   ...WHATSAPP_READ_ONLY_CODECS,
   ...MESSAGE_DELETE_CODECS,
   ...CHAT_HISTORY_CODECS,
+  ...CHANNEL_COMPACT_AVAILABILITY_CODECS,
   ...CONVERSATION_UNREAD_FROM_CODECS,
   ...PASSWORD_MANAGERS_CODECS,
   ...BROWSER_PROXIES_CODECS,
@@ -343,6 +351,8 @@ const CODECS: ReadonlyMap<string, OptionalRouteCodec> = new Map([
   ...BROWSER_USER_CONTROL_CODECS,
   ...BROWSER_TEACH_CODECS,
   ...BROWSER_PAGE_STATE_CODECS,
+  ...BROWSER_PERMISSIONS_CODECS,
+  ...BROWSER_HTTP_SIGN_IN_CODECS,
   ...BROWSER_SIGN_IN_CODECS,
   ...BROWSER_SIGN_IN_STORAGE_CODECS,
   ...AGENT_TASKS_CODECS,

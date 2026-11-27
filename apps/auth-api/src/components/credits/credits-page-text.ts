@@ -1,6 +1,7 @@
 import type { AppTranslate } from "@openbot/i18n";
 
 export const CREDITS_QUERY_SLOT = "{query}";
+export const CREDITS_AMOUNT_SLOT = "{credits}";
 
 export function creditsPageText(t: AppTranslate) {
   return {
@@ -14,12 +15,18 @@ export function creditsPageText(t: AppTranslate) {
     empty: t("sitePage.credits.empty", { query: CREDITS_QUERY_SLOT }),
     credits: t("sitePage.credits.credits"),
     perImage: t("sitePage.credits.perImage"),
-    perClip: t("sitePage.credits.perClip"),
-    video: { title: t("sitePage.credits.video.title"), unit: t("sitePage.credits.video.unit") },
-    image: { title: t("sitePage.credits.image.title"), unit: t("sitePage.credits.image.unit") },
-    avatar: { title: t("sitePage.credits.avatar.title"), unit: t("sitePage.credits.avatar.unit") },
-    edit: { title: t("sitePage.credits.edit.title"), unit: t("sitePage.credits.edit.unit") },
-    audio: { title: t("sitePage.credits.audio.title"), unit: t("sitePage.credits.audio.unit") },
+    perSecond: t("sitePage.credits.perSecond"),
+    perGeneration: t("sitePage.credits.perGeneration"),
+    model: t("sitePage.credits.model"),
+    oneSize: t("sitePage.credits.oneSize"),
+    notAvailable: t("sitePage.credits.notAvailable"),
+    withoutSound: t("sitePage.credits.withoutSound", { credits: CREDITS_AMOUNT_SLOT }),
+    soon: t("sitePage.credits.soon"),
+    video: t("sitePage.credits.video.title"),
+    image: t("sitePage.credits.image.title"),
+    avatar: t("sitePage.credits.avatar.title"),
+    edit: t("sitePage.credits.edit.title"),
+    audio: t("sitePage.credits.audio.title"),
   };
 }
 

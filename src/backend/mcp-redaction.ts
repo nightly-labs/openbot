@@ -1,5 +1,12 @@
 import type { McpServerConfig } from "@openbot/contracts/ipc";
-import { isSecretName, type LogValue, redactText, registerSecretValue, toSecretSafeValue } from "@openbot/logging";
+import {
+  isSecretName,
+  type LogValue,
+  redactPostText,
+  redactText,
+  registerSecretValue,
+  toSecretSafeValue,
+} from "@openbot/logging";
 import { mcpEnvironment } from "./mcp-provider-shapes";
 
 const MASK = "•••";
@@ -25,6 +32,10 @@ export function redactMcpRecord(record: unknown, values: Iterable<string>): LogV
     return Object.fromEntries(Object.entries(value).map(([key, entry]) => [maskValues(key, known), mask(entry)]));
   };
   return mask(toSecretSafeValue(record));
+}
+
+export function redactMcpModelText(text: string, values: Iterable<string>): string {
+  return maskValues(redactPostText(text), values);
 }
 
 const CONFIG_LITERALS = new Set(["true", "false", "null", "none"]);

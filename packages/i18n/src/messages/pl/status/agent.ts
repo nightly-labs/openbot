@@ -70,6 +70,26 @@ export const messages = {
   "status.agent.workflowDelete":
     "Usuń przepływ pracy {title} razem z jego uruchomieniami i wersjami. Jego otwarte kroki zostaną zatrzymane.",
   "status.agent.deleteAgents": "Usuń {agents} razem z ich czatami i plikami. Tej operacji nie można cofnąć.",
+  "status.agent.nearSignatureReceived": "OpenBot otrzymał podpis. Możesz zamknąć tę kartę.",
+  "status.agent.nearSignatureUnknown": "OpenBot nie czeka na ten podpis. Rozpocznij go ponownie w OpenBot.",
+  "status.agent.nearPayment":
+    "Zapłać {amount} {symbol} odbiorcy {recipient} z portfela kryptowalut, dla {domain}: {reason}",
+  "status.agent.nearPaymentSending": "Płacę {amount} dla {domain}: {reason}",
+  "status.agent.nearPaymentPaid": "Zapłacono {amount} dla {domain}: {reason}",
+  "status.agent.nearPaymentNotPaid": "Nie zapłacono: {amount} dla {domain}: {reason}",
+  "status.agent.nearPaymentUncertain": "Niepotwierdzone: {amount} dla {domain}: {reason}",
+  "status.agent.nearSummaryCreate":
+    "Wszyscy agenci mogą płacić do {amount} USD dziennie. Możesz to później zmienić w OpenBot.",
+  "status.agent.nearSummaryGrant":
+    "Pozwól tej aplikacji OpenBot płacić z portfela przez {days} dni, zgodnie z twoimi regułami.",
+  "status.agent.nearSummaryBudget": "Zmień budżet dzienny portfela na {amount} USD.",
+  "status.agent.nearSummaryAutoPay":
+    "Pozwól OpenBot płacić bez twojego podpisu, gdy pozwala na to reguła płatności. O inne płatności nadal zapytamy cię na czacie.",
+  "status.agent.nearSummaryManualPay":
+    "Nie ma już żadnej reguły płatności. OpenBot znów poprosi o twój podpis przy każdej płatności.",
+  "status.agent.nearSummaryPayment": "Zatwierdź płatność {amount} dla odbiorcy {recipient}.",
+  "status.agent.nearSummaryFreeze": "Agenci nie mogą płacić z tego portfela, dopóki nie wznowisz płatności.",
+  "status.agent.nearSummaryUnfreeze": "Agenci znów mogą płacić z tego portfela, zgodnie z twoimi regułami.",
   "status.agent.screenCaptureProgress": "Prośba o przechwycenie ekranu…",
   "status.agent.screenCaptureReviewing": "Sprawdzanie przechwyconego ekranu…",
   "status.agent.browserOpening": "Otwieranie strony internetowej…",
@@ -77,6 +97,7 @@ export const messages = {
   "status.agent.browserClicking": "Klikanie na stronie internetowej…",
   "status.agent.browserTyping": "Wpisywanie na stronie internetowej…",
   "status.agent.browserActing": "Korzystanie ze strony internetowej…",
+  "status.agent.browserPaying": "Wysyłanie płatności…",
   "status.agent.browserReviewing": "Sprawdzanie strony internetowej…",
   "status.agent.memoriesSearching": "Przeszukiwanie wspomnień…",
   "status.agent.chatsSearching": "Przeszukiwanie wcześniejszych czatów…",

@@ -72,6 +72,7 @@ import { TurnContext } from "./agent/turn-context";
 import { USAGE_LIMIT_METHOD } from "./agent/usage-limit-gate";
 import {
   type AgentProvider,
+  CLAUDE_CONTEXT_COMPACTION,
   MissingClaudeSessionError,
   ProviderModelLimitedError,
   ProviderTurnActiveError,
@@ -86,6 +87,7 @@ import {
   claudeHistoryFromMessages,
   claudeHistoryReader,
   claudeTaskTurnId,
+  claudeWakeTurnId,
   isClaudeNoResponsePlaceholder,
 } from "./claude-history";
 import { readClaudeStoredSignIn } from "./claude-stored-sign-in";
@@ -360,6 +362,7 @@ interface ThreadConfig {
   channelTools: boolean;
   workspaceOnly: boolean;
   excludedFolders: string[];
+  writeAreas: string[];
   excludedInstructionFiles: string[];
   agentId: string | null;
 }
@@ -676,7 +679,7 @@ function claudeSignInSettings(parsed: DynamicRecord): Settings {
 const CLAUDE_LISTED_MODELS = new Set<string>();
 
 export class ClaudeAgentClient extends EventEmitter<ClientEvents> {
-  readonly contextCompaction = "native";
+  readonly contextCompaction = CLAUDE_CONTEXT_COMPACTION;
   readonly compactsOnDemand = true;
   readonly #cacheTtls = new Map<string, number>();
   readonly turnContext = true;
@@ -782,6 +785,15 @@ export class ClaudeAgentClient extends EventEmitter<ClientEvents> {
     if (!launchProcess) return {};
     return {
       spawnClaudeCodeProcess: (options: SpawnOptions) => spawnClaudeThroughLauncher(options, stderr, launchProcess),
+    };
+  }
+
+  #probeProcessSpawner(): Pick<ClaudeSdkLaunch, "spawnClaudeCodeProcess"> {
+    const launchProcess = this.#launchProcess;
+    if (this.#sdkLaunch.spawnClaudeCodeProcess || !launchProcess) return {};
+    return {
+      spawnClaudeCodeProcess: (options: SpawnOptions) =>
+        spawnClaudeThroughLauncher(options, new ClaudeStderrTail(), launchProcess),
     };
   }
 
@@ -1236,6 +1248,7 @@ export class ClaudeAgentClient extends EventEmitter<ClientEvents> {
     const options: Options = {
       cwd: process.cwd(),
       ...this.#sdkLaunch,
+      ...this.#probeProcessSpawner(),
       settingSources: userSetup ? ["user", "project", "local"] : [],
       ...(settingsFile ? { settings: settingsFile } : {}),
       mcpServers: {},
@@ -1473,10 +1486,16 @@ export class ClaudeAgentClient extends EventEmitter<ClientEvents> {
     for (;;) {
       yield* this.#threads.opened(threadId);
       const current = this.#threads.get(threadId);
-      if (current && threadConfigKey(current.config, true) === threadConfigKey(config, true)) return;
+      if (current && threadConfigKey(current.config, true) === threadConfigKey(config, true)) {
+        current.config.writeAreas = config.writeAreas;
+        return;
+      }
       if (current) {
         if (current.activeTurn) return yield* providerFailure(new Error(sourceText("error.provider.claudeTurnActive")));
-        if (threadConfigKey(current.config, false) === threadConfigKey(config, false)) return;
+        if (threadConfigKey(current.config, false) === threadConfigKey(config, false)) {
+          current.config.writeAreas = config.writeAreas;
+          return;
+        }
         queryLogger.info("Restarting a Claude query.", {
           reason: "configuration-change",
           count: ++this.#queryRestarts,
@@ -1514,6 +1533,7 @@ export class ClaudeAgentClient extends EventEmitter<ClientEvents> {
               toolInput,
               config.cwd,
               config.additionalDirectories,
+              config.writeAreas,
             );
             if (outside)
               return yield* this.#requestWriteApprovalEffect(
@@ -1636,7 +1656,7 @@ export class ClaudeAgentClient extends EventEmitter<ClientEvents> {
         : {}),
     };
     const sandbox = config.workspaceOnly
-      ? claudeWorkspaceSandbox(config.additionalDirectories, config.excludedFolders)
+      ? yield* claudeWorkspaceSandbox(config.additionalDirectories, config.excludedFolders, config.writeAreas)
       : null;
     const settingsFile =
       Object.keys(signInSettings).length > 0
@@ -1704,7 +1724,12 @@ export class ClaudeAgentClient extends EventEmitter<ClientEvents> {
           ...(sandbox && !settingsFile ? { sandbox } : {}),
           ...(config.workspaceOnly
             ? {
-                hooks: claudeWorkspaceHooks(config.cwd, config.additionalDirectories, config.excludedFolders),
+                hooks: claudeWorkspaceHooks(
+                  config.cwd,
+                  config.additionalDirectories,
+                  config.excludedFolders,
+                  () => config.writeAreas,
+                ),
                 managedSettings: CLAUDE_WORKSPACE_MANAGED_SETTINGS,
               }
             : {}),
@@ -1805,6 +1830,8 @@ export class ClaudeAgentClient extends EventEmitter<ClientEvents> {
     const runtime = yield* providerSync(() => this.#requireThread(threadId));
     if (runtime.activeTurn) return yield* providerFailure(this.#turnActiveError(runtime.activeTurn));
     runtime.contextRequest += 1;
+    const writeAreas = readWriteAreas(params);
+    if (writeAreas) runtime.config.writeAreas = writeAreas;
 
     const requestedModel = getString(params, "model");
     const modelChanged = Boolean(requestedModel && requestedModel !== runtime.config.model);
@@ -2268,6 +2295,16 @@ export class ClaudeAgentClient extends EventEmitter<ClientEvents> {
       !message.resume_reason
     )
       runtime.nextTurnId = message.user_message_uuid;
+    else if (
+      !runtime.activeTurn &&
+      runtime.nextTurnId === null &&
+      message.parent_tool_use_id === null &&
+      !message.resume_reason &&
+      isString(message.session_id)
+    ) {
+      const apiMessageId = claudeReplyMessageId(message);
+      if (apiMessageId) runtime.nextTurnId = claudeWakeTurnId(message.session_id, apiMessageId);
+    }
     if (message.type === "stream_event" && message.parent_tool_use_id === null) {
       const event = message.event;
       const delta = isRecord(event) ? event.delta : null;
@@ -3604,6 +3641,7 @@ function readThreadConfig(params: unknown): ThreadConfig {
       isRecord(params) && Array.isArray(params.excludedFolders)
         ? params.excludedFolders.filter((value): value is string => isString(value))
         : [],
+    writeAreas: readWriteAreas(params) ?? [],
     excludedInstructionFiles:
       isRecord(params) && Array.isArray(params.excludedInstructionFiles)
         ? params.excludedInstructionFiles.filter((value): value is string => isString(value))
@@ -3612,7 +3650,13 @@ function readThreadConfig(params: unknown): ThreadConfig {
   };
 }
 
-function threadConfigKey(config: ThreadConfig, withModel: boolean): string {
+function readWriteAreas(params: unknown): string[] | null {
+  return isRecord(params) && Array.isArray(params.writeAreas)
+    ? params.writeAreas.filter((value): value is string => isString(value))
+    : null;
+}
+
+function threadConfigKey({ writeAreas: _, ...config }: ThreadConfig, withModel: boolean): string {
   const fields = {
     ...config,
     model: withModel ? (config.model ?? null) : null,
@@ -3772,6 +3816,14 @@ function takePrompt(runtime: ThreadRuntime, uuid: string): void {
     if (runtime.promptIds.size <= TAKEN_PROMPT_LIMIT) break;
     runtime.promptIds.delete(old);
   }
+}
+
+function claudeReplyMessageId(message: ClaudeStreamMessage): string | null {
+  if (message.type === "assistant")
+    return isClaudeNoResponsePlaceholder(message.message) ? null : getString(message.message, "id");
+  if (message.type === "stream_event" && isRecord(message.event) && message.event.type === "message_start")
+    return getString(message.event.message, "id");
+  return null;
 }
 
 function takenMessageIds(message: ClaudeStreamMessage): string[] {

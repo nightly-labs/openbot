@@ -47,11 +47,24 @@ export const messages = {
   "error.workflow.providerBusy": "El proveedor está ocupado. Espera unos minutos y ejecuta el paso de nuevo.",
   "error.workflow.providerOffline":
     "OpenBot no pudo conectar con el proveedor. Comprueba la conexión a internet y ejecuta el paso de nuevo.",
+  "error.workflow.providerBilling":
+    "La cuenta no tiene crédito, o su plan no incluye este modelo. Revisa el plan o elige otro modelo.",
+  "error.workflow.modelRefused": "El proveedor no permite este modelo para esta cuenta. Elige otro modelo.",
+  "error.workflow.modelRefusedReason":
+    'Elige otro modelo. El proveedor no permite este modelo para esta cuenta: "{reason}"',
+  "error.workflow.contentBlocked":
+    "El proveedor bloqueó la entrada. Cambia la entrada o el prompt y ejecuta el paso de nuevo.",
+  "error.workflow.inputTooLong": "La entrada es demasiado larga para este modelo. Acórtala o elige otro modelo.",
+  "error.workflow.requestRefused": "El proveedor no aceptó este paso. Elige otro modelo.",
+  "error.workflow.requestRefusedReason": 'Elige otro modelo. El proveedor no aceptó este paso: "{reason}"',
+  "error.workflow.providerRefused": 'Elige otro modelo o ejecuta el paso de nuevo. El proveedor dijo: "{reason}"',
   "error.workflow.modelBusy": "Hay otra solicitud al modelo en curso. Ejecuta el paso de nuevo en breve.",
   "error.workflow.mediaFailed": "El modelo no pudo crear la imagen o el vídeo. Ejecuta el paso de nuevo.",
   "error.workflow.mediaNotMade": "El modelo no creó la imagen ni el vídeo. Respondió: {answer}",
   "error.workflow.pictureMissing": "La imagen ya no está en el servidor. Envíala de nuevo.",
   "error.workflow.pictureType": "Usa una imagen PNG, JPEG o WebP.",
+  "error.workflow.assetType":
+    "Usa una imagen PNG, JPEG o WebP, un vídeo MP4 o MOV, o un archivo de audio MP3, M4A, WAV, AAC, OGG o FLAC.",
   "error.workflow.mediaInputMissing": "Una imagen de un paso anterior no está disponible. Ejecuta ese paso de nuevo.",
   "error.workflow.mediaEmptyRequest":
     "Escribe una descripción o ejecuta los pasos anteriores para que llegue un texto o una imagen.",

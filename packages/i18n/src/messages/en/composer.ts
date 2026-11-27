@@ -107,6 +107,9 @@ export const messages = defineMessages("composer", {
   "composer.voice.recording": "Voice recording",
   "composer.voice.limitSoon": "Recording stops in {seconds} seconds.",
   "composer.voice.limitReached": "Recording stopped at the 10-minute limit. What you said is in the message.",
+  "composer.voice.languageNotice":
+    "Dictation knows 25 European languages, such as English. Other languages need a larger model ({size}), and the text shows after you stop.",
+  "composer.voice.languageNotice.action": "I speak another language",
   "composer.send.saveQueued": "Save queued message",
   "composer.send.voice": "Send voice message",
   "composer.send.message": "Send message",

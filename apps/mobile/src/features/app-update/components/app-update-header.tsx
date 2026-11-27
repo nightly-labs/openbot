@@ -18,6 +18,9 @@ import { scheduleOnRN } from "react-native-worklets";
 import { showFailureAlert } from "@/features/analytics/failure-reports";
 import { AppUpdateNotes } from "@/features/app-update/components/app-update-notes";
 import { type AppUpdate, dismissAppUpdate, installAppUpdate } from "@/features/app-update/model/app-update";
+
+export type StoreAppUpdate = Extract<AppUpdate, { kind: "store" }>;
+
 import { BloubEyes, EYES_HEIGHT, EYES_WIDTH } from "@/shared/components/bloub-stage/bloub-eyes";
 import { BLOUB_MOVE, BLOUB_RADIUS, bloubGradient, useBloubColors } from "@/shared/components/bloub-stage/bloub-look";
 import type { BloubMood } from "@/shared/components/bloub-stage/bloub-stage-store";
@@ -41,7 +44,7 @@ const READ_GAZE_Y = 10;
 const GAZE = { duration: 240, easing: SPLASH_EASE_OUT };
 
 export interface AppUpdateHeader {
-  shown: AppUpdate | null;
+  shown: StoreAppUpdate | null;
   drop: SharedValue<number>;
   rest: number;
   moving: boolean;
@@ -50,10 +53,10 @@ export interface AppUpdateHeader {
   measure: (height: number) => void;
 }
 
-export function useAppUpdateHeader(update: AppUpdate | null): AppUpdateHeader {
+export function useAppUpdateHeader(update: StoreAppUpdate | null): AppUpdateHeader {
   const barTop = useBarTop();
   const reduced = useReducedMotion();
-  const [shown, setShown] = useState<AppUpdate | null>(update);
+  const [shown, setShown] = useState<StoreAppUpdate | null>(update);
   const [captionHeight, setCaptionHeight] = useState(0);
   const [moving, setMoving] = useState(false);
   const [expanded, setExpanded] = useState(false);
@@ -198,18 +201,12 @@ export function AppUpdateBlock({
 
   if (!shown) return null;
   const update = shown;
-  const ready = update.kind === "ready";
   const install = () => {
     void haptics.impact("light");
     setMood("happy");
     installAppUpdate(update, colors.dark ? colors.dimBody : colors.body).catch((error: unknown) => {
       const { t: text } = currentText();
-      showFailureAlert(
-        error,
-        "update",
-        text("mobile.app.update.failedTitle"),
-        text(ready ? "mobile.app.update.restartFailed" : "mobile.app.update.storeFailed"),
-      );
+      showFailureAlert(error, "update", text("mobile.app.update.failedTitle"), text("mobile.app.update.storeFailed"));
     });
   };
   const later = () => {
@@ -241,7 +238,7 @@ export function AppUpdateBlock({
       }
     >
       {underStatusBar && !hidden ? <StatusBar style="dark" /> : null}
-      {ready || rest === 0 ? null : (
+      {rest === 0 ? null : (
         <AppUpdateNotes
           open={open}
           expanded={expanded}
@@ -289,10 +286,10 @@ export function AppUpdateBlock({
             className="tracking-openbot-tight"
             style={{ color: colors.eye }}
           >
-            {ready ? t("mobile.app.update.readyTitle") : t("mobile.app.update.title", { version: update.version })}
+            {t("mobile.app.update.title", { version: update.version })}
           </Typography.Heading>
           <Typography.Paragraph type="body-sm" align="center" style={{ color: colors.eye, opacity: 0.62 }}>
-            {t(ready ? "mobile.app.update.readyBody" : "mobile.app.update.storeBody")}
+            {t("mobile.app.update.storeBody")}
           </Typography.Paragraph>
           <View className="mt-3.5 flex-row gap-2">
             <Button
@@ -318,23 +315,21 @@ export function AppUpdateBlock({
               </Button.Label>
             </Button>
           </View>
-          {ready ? null : (
-            <Pressable
-              accessibilityRole="button"
-              accessibilityState={{ expanded }}
-              hitSlop={8}
-              className="mt-2.5 flex-row items-center gap-1"
-              style={({ pressed }) => ({ opacity: pressed ? 0.35 : 0.55 })}
-              onPress={toggleNotes}
-            >
-              <Typography.Paragraph type="body-sm" className="font-medium" style={{ color: colors.eye }}>
-                {t(expanded ? "mobile.app.update.hideWhatsNew" : "mobile.app.update.whatsNew")}
-              </Typography.Paragraph>
-              <Animated.View style={chevronStyle}>
-                <ChevronDown size={16} color={colors.eye} strokeWidth={2.2} />
-              </Animated.View>
-            </Pressable>
-          )}
+          <Pressable
+            accessibilityRole="button"
+            accessibilityState={{ expanded }}
+            hitSlop={8}
+            className="mt-2.5 flex-row items-center gap-1"
+            style={({ pressed }) => ({ opacity: pressed ? 0.35 : 0.55 })}
+            onPress={toggleNotes}
+          >
+            <Typography.Paragraph type="body-sm" className="font-medium" style={{ color: colors.eye }}>
+              {t(expanded ? "mobile.app.update.hideWhatsNew" : "mobile.app.update.whatsNew")}
+            </Typography.Paragraph>
+            <Animated.View style={chevronStyle}>
+              <ChevronDown size={16} color={colors.eye} strokeWidth={2.2} />
+            </Animated.View>
+          </Pressable>
         </View>
       </Animated.View>
     </Animated.View>

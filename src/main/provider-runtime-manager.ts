@@ -378,8 +378,15 @@ export class ProviderRuntimeManager extends EventEmitter<ProviderRuntimeManagerE
   #cliInUse(runtime: ManagedRuntimeId): boolean {
     if (isManagedToolRuntime(runtime)) return true;
     if (this.#isProviderOn(runtime) && !this.#systemVersions.has(runtime)) return true;
-    return runtime === "pi" && KEY_ONLY_PROVIDERS.some((provider) => this.#isProviderOn(provider));
+    return runtime === "pi" && this.#keyProviderOn();
   }
+
+  #keyProviderOn(): boolean {
+    return KEY_ONLY_PROVIDERS.some((provider) => this.#isProviderOn(provider));
+  }
+
+  readonly #runsHere = (provider: ManagedProviderId): boolean =>
+    this.#isProviderOn(provider) || (provider === "pi" && this.#keyProviderOn());
 
   #removalRetentionMs(): number {
     return this.#lastCheckAt !== null && Date.now() - this.#lastCheckAt < this.#checkIntervalMs
@@ -831,7 +838,7 @@ export class ProviderRuntimeManager extends EventEmitter<ProviderRuntimeManagerE
       for (const version of versions) {
         const spec = version === pinned.version ? pinned : recordedSpec(pinned, version);
         const installRoot = join(targetRoot, version);
-        const failure = yield* verifyChangedRuntime(installRoot, spec, this.#lock, this.#isProviderOn).pipe(
+        const failure = yield* verifyChangedRuntime(installRoot, spec, this.#lock, this.#runsHere).pipe(
           Effect.as(null),
           Effect.catch((error) => Effect.succeed(error)),
         );
@@ -859,7 +866,7 @@ export class ProviderRuntimeManager extends EventEmitter<ProviderRuntimeManagerE
   #readStoreEffect(spec: RuntimeSpec): Effect.Effect<ProviderRuntimeStatus, ProviderRuntimeFailure> {
     return Effect.gen({ self: this }, function* (): Effect.fn.Return<ProviderRuntimeStatus, ProviderRuntimeFailure> {
       const installRoot = this.#installRoot(spec);
-      const verified = yield* verifyChangedRuntime(installRoot, spec, this.#lock, this.#isProviderOn).pipe(
+      const verified = yield* verifyChangedRuntime(installRoot, spec, this.#lock, this.#runsHere).pipe(
         Effect.as(true),
         Effect.catch(() => Effect.succeed(false)),
       );
@@ -1085,19 +1092,13 @@ export class ProviderRuntimeManager extends EventEmitter<ProviderRuntimeManagerE
                   staging,
                   spec,
                   this.#lock,
-                  this.#isProviderOn,
+                  this.#runsHere,
                   yield* runtimeFingerprint(staging),
                 );
                 const destination = this.#installRoot(spec);
                 yield* runtimeIO(() => mkdir(dirname(destination), { recursive: true }));
                 committed = yield* this.#commitEffect(staging, destination, spec);
-                yield* verifyChangedRuntime(
-                  destination,
-                  spec,
-                  this.#lock,
-                  this.#isProviderOn,
-                  committed ? staged : null,
-                );
+                yield* verifyChangedRuntime(destination, spec, this.#lock, this.#runsHere, committed ? staged : null);
                 return committed;
               }),
             );
@@ -1197,7 +1198,7 @@ export class ProviderRuntimeManager extends EventEmitter<ProviderRuntimeManagerE
   }
 
   #verifiesEffect(installRoot: string, spec: RuntimeSpec): Effect.Effect<boolean, ProviderRuntimeFailure> {
-    return verifyInstalledRuntime(installRoot, spec, this.#lock, this.#isProviderOn).pipe(
+    return verifyInstalledRuntime(installRoot, spec, this.#lock, this.#runsHere).pipe(
       Effect.as(true),
       Effect.catch(() => Effect.succeed(false)),
     );

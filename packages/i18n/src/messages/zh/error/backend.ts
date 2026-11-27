@@ -54,6 +54,11 @@ export const messages = {
   "error.backend.browserSignInLoadFailed": "OpenBot 无法在登录窗口中加载页面。请检查网络连接，然后再次打开登录窗口。",
   "error.backend.browserSignInReadFailed": "OpenBot 无法从窗口读取登录信息。",
   "error.backend.browserStopUnsupported": "该远程主机无法停止页面加载。",
+  "error.backend.browserLocationFailed": "无法为页面设置位置。",
+  "error.backend.browserPermissionsUnsupported": "此远程主机无法回应位置请求。",
+  "error.backend.browserLocationRequired": "发送设备位置以允许此请求。",
+  "error.backend.browserHttpSignInInactive": "此网站不再要求登录。请重新加载页面后重试。",
+  "error.backend.browserHttpSignInUnsupported": "该远程主机无法接收网站登录。",
   "error.backend.sharedDataLocalOnly": "共享数据在运行这些助手的电脑上管理。",
   "error.backend.browserUrlProtocol": "只允许使用 HTTP(S) 浏览器地址。",
   "error.backend.sunshineNotReady": "Sunshine 未能就绪。",
@@ -176,6 +181,7 @@ export const messages = {
   "error.backend.videoGenerationFailed": "视频生成失败。",
   "error.backend.videoGenerationNoVideo": "视频生成没有返回视频。",
   "error.backend.videoGenerationInterrupted": "视频生成已中断。",
+  "error.backend.grokVideoNoQuota": "你的 Grok 账号无法生成视频。请改用积分生成视频。",
   "error.backend.attachmentNotRegularFile": "只能附加普通文件：{name}",
   "error.backend.attachmentCopyFailed": "OpenBot 无法复制 {name}。",
   "error.backend.routineNameRequired": "需要填写自动化任务名称。",
@@ -254,6 +260,8 @@ export const messages = {
     "登录服务器尚未接受 OpenBot 作为应用，这与你的账号无关。请改用其他连接方式，例如本地 MCP 服务器。",
   "error.backend.mcpRegistrationUnavailable":
     "登录服务器无法将 OpenBot 注册为应用，这与你的账号无关。要连接，请在 市场、应用 中保存此服务器，然后为它添加登录应用。",
+  "error.backend.mcpSignInAppNeeded":
+    "登录服务器无法将 OpenBot 注册为应用，这与你的账号无关。要连接，请在 市场、应用 中打开此服务器，点击 测试连接，然后添加登录应用。",
   "error.backend.mcpSignInAbandonedGeneric": "登录已放弃。",
   "error.backend.mcpSignInForgotten": "MCP 登录在运行过程中被遗忘。",
   "error.backend.mcpSignInAbandoned": "MCP 登录已放弃。",
@@ -306,6 +314,7 @@ export const messages = {
   "error.backend.mcpServerBlocked": "该电脑阻止了与该服务器的连接。请检查防火墙或安全软件后重试。",
   "error.backend.mcpServerIncompatible":
     "该地址有响应，但不是通过 Streamable HTTP 提供服务的 MCP 服务器。请检查地址，并更新运行该服务器的应用。",
+  "error.backend.mcpServerKeyNotAccepted": "服务器没有接受该 API 密钥。请检查密钥，然后重试。",
   "error.backend.mcpRemoteBridge":
     "{reason} 该命令运行的是 mcp-remote 桥接。请改用 Streamable HTTP 并填写地址 {url}，由 OpenBot 帮你登录。",
   "error.backend.oauthNotHttps": "OAuth 端点 {origin} 不是 https，因此未发送凭据。",

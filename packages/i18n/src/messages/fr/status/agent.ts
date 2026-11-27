@@ -70,6 +70,27 @@ export const messages = {
     "Supprimer le workflow {title} avec ses exécutions et ses versions. Ses étapes en cours s'arrêtent.",
   "status.agent.deleteAgents":
     "Supprimer {agents} avec leurs discussions et leurs fichiers. Cette action est irréversible.",
+  "status.agent.nearSignatureReceived": "OpenBot a reçu la signature. Vous pouvez fermer cet onglet.",
+  "status.agent.nearSignatureUnknown": "OpenBot n’attend pas cette signature. Recommencez depuis OpenBot.",
+  "status.agent.nearPayment":
+    "Payer {amount} {symbol} à {recipient} depuis le portefeuille crypto, pour {domain} : {reason}",
+  "status.agent.nearPaymentSending": "Paiement de {amount} pour {domain} : {reason}",
+  "status.agent.nearPaymentPaid": "{amount} payé pour {domain} : {reason}",
+  "status.agent.nearPaymentNotPaid": "Non payé : {amount} pour {domain} : {reason}",
+  "status.agent.nearPaymentUncertain": "Non confirmé : {amount} pour {domain} : {reason}",
+  "status.agent.nearSummaryCreate":
+    "Tous les agents peuvent payer jusqu’à {amount} USD par jour. Vous pourrez le modifier plus tard dans OpenBot.",
+  "status.agent.nearSummaryGrant":
+    "Autoriser cette app OpenBot à payer depuis le portefeuille pendant {days} jours, selon vos règles.",
+  "status.agent.nearSummaryBudget": "Passer le budget quotidien du portefeuille à {amount} USD.",
+  "status.agent.nearSummaryAutoPay":
+    "Autoriser OpenBot à payer sans votre signature quand une règle de paiement le permet. Les autres paiements vous sont toujours demandés dans le chat.",
+  "status.agent.nearSummaryManualPay":
+    "Il ne reste aucune règle de paiement. OpenBot vous demandera de nouveau votre signature pour chaque paiement.",
+  "status.agent.nearSummaryPayment": "Approuver le paiement de {amount} à {recipient}.",
+  "status.agent.nearSummaryFreeze":
+    "Les agents ne peuvent pas payer depuis ce portefeuille tant que vous n’avez pas repris les paiements.",
+  "status.agent.nearSummaryUnfreeze": "Les agents peuvent de nouveau payer depuis ce portefeuille, selon vos règles.",
   "status.agent.screenCaptureProgress": "Demande de capture d’écran…",
   "status.agent.screenCaptureReviewing": "Analyse de la capture d’écran…",
   "status.agent.browserOpening": "Ouverture d’une page web…",
@@ -77,6 +98,7 @@ export const messages = {
   "status.agent.browserClicking": "Clic sur la page web…",
   "status.agent.browserTyping": "Saisie sur la page web…",
   "status.agent.browserActing": "Utilisation de la page web…",
+  "status.agent.browserPaying": "Envoi du paiement…",
   "status.agent.browserReviewing": "Analyse de la page web…",
   "status.agent.memoriesSearching": "Recherche dans ses souvenirs…",
   "status.agent.chatsSearching": "Recherche dans ses anciennes discussions…",

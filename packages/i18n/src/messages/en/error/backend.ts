@@ -58,6 +58,11 @@ export const messages = defineMessages("error.backend", {
     "OpenBot could not load the page in the sign-in window. Check the internet connection, then open the sign-in window again.",
   "error.backend.browserSignInReadFailed": "OpenBot could not read the sign-in from the window.",
   "error.backend.browserStopUnsupported": "This remote host cannot stop a page load.",
+  "error.backend.browserLocationFailed": "Could not set the location for the page.",
+  "error.backend.browserPermissionsUnsupported": "This remote host cannot answer location requests.",
+  "error.backend.browserLocationRequired": "Send the location of the device to allow the request.",
+  "error.backend.browserHttpSignInInactive": "This site no longer asks for a sign-in. Reload the page to try again.",
+  "error.backend.browserHttpSignInUnsupported": "This remote host cannot take a site sign-in.",
   "error.backend.sharedDataLocalOnly": "Shared data is managed on the computer that runs these agents.",
   "error.backend.browserUrlProtocol": "Only HTTP(S) browser URLs are allowed.",
   "error.backend.sunshineNotReady": "Sunshine did not become ready.",
@@ -197,6 +202,7 @@ export const messages = defineMessages("error.backend", {
   "error.backend.videoGenerationFailed": "Video generation failed.",
   "error.backend.videoGenerationNoVideo": "Video generation did not return a video.",
   "error.backend.videoGenerationInterrupted": "Video generation was interrupted.",
+  "error.backend.grokVideoNoQuota": "Your Grok account cannot make videos. Generate the video with credits instead.",
   "error.backend.attachmentNotRegularFile": "Only regular files can be attached: {name}",
   "error.backend.attachmentCopyFailed": "OpenBot could not copy {name}.",
   "error.backend.routineNameRequired": "A routine name is required.",
@@ -281,6 +287,8 @@ export const messages = defineMessages("error.backend", {
     "The sign-in server does not accept OpenBot as an app yet. Your account is not the cause. Use another way to connect, such as a local MCP server.",
   "error.backend.mcpRegistrationUnavailable":
     "The sign-in server cannot register OpenBot as an app. Your account is not the cause. To connect, save this server in Marketplace, Apps, then add a sign-in app to it.",
+  "error.backend.mcpSignInAppNeeded":
+    "The sign-in server cannot register OpenBot as an app. Your account is not the cause. To connect, open this server in Marketplace, Apps, click Test connection, then add a sign-in app.",
   "error.backend.mcpSignInAbandonedGeneric": "The sign-in was abandoned.",
   "error.backend.mcpSignInForgotten": "The MCP sign-in was forgotten while it was running.",
   "error.backend.mcpSignInAbandoned": "The MCP sign-in was abandoned.",
@@ -331,6 +339,8 @@ export const messages = defineMessages("error.backend", {
     "{provider} could not get the GitHub tools, because GitHub did not answer. Open GitHub in Marketplace, Apps, and connect it again if it asks you to. Then start a new chat to try again.",
   "error.backend.mcpAppReconnect":
     "{name} on ChatGPT asks you to sign in again. Reconnect {name} on ChatGPT, then ask the agent again.",
+  "error.backend.mcpAppAutoReview":
+    "This ChatGPT app does not run when the agent has Ask first or Full access. The app needs the automatic approval review of Codex, which OpenBot does not support yet. You can try Workspace only for Access in the agent settings, then ask the agent again.",
   "error.backend.mcpServerSignInPage":
     "The MCP server {name} asked you to sign in on a web page. OpenBot does not open this page for a server, so it declined. Open {name} in Marketplace, Apps, and sign in, then ask the agent again.",
   "error.backend.mcpServerRequestDeclined":
@@ -345,6 +355,8 @@ export const messages = defineMessages("error.backend", {
     "OpenBot could not renew the sign-in to this MCP server now. The sign-in is kept, and the next request tries again. If this error continues, the user can sign out of the server in OpenBot and sign in again.",
   "error.backend.mcpOAuthRequestRefused":
     "The MCP server refused this request, but the sign-in to it is still active. Possibly the account cannot use this tool, or the sign-in did not give all the necessary access. The user can examine the plan and the access of the account at the service, or sign in to the server again in OpenBot and allow all the access that it asks for.",
+  "error.backend.mcpOAuthScopeNeeded":
+    "The MCP server needs more access for this request than the sign-in gives. The sign-in is kept for the other tools. The user must sign in to the server again in OpenBot and allow the access that it asks for.",
   "error.backend.mcpServerUnreachable": "OpenBot could not reach the server. Check the URL and your network.",
   "error.backend.mcpLocalServerOff":
     "No server answers at {address} on this computer. Start the server, or turn it on in the app that runs it, then try again.",
@@ -352,6 +364,7 @@ export const messages = defineMessages("error.backend", {
     "This computer blocked the connection to the server. Check your firewall or security software, then try again.",
   "error.backend.mcpServerIncompatible":
     "Something answered at this address, but not as an MCP server over Streamable HTTP. Check the URL, and update the app that runs the server.",
+  "error.backend.mcpServerKeyNotAccepted": "The server did not accept the API key. Check the key, then try again.",
   "error.backend.mcpRemoteBridge":
     "{reason} This command runs the mcp-remote bridge. Choose Streamable HTTP with the URL {url} instead, and OpenBot signs you in.",
   "error.backend.oauthNotHttps": "The OAuth endpoint {origin} is not https, so the credentials were not sent.",

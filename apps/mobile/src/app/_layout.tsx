@@ -58,6 +58,7 @@ import { checkRecognitionModels } from "@/features/voice/model/recognition-model
 import { supertonicModel } from "@/features/voice/model/supertonic-model";
 import { loadVoiceServer } from "@/features/voice/model/voice-server";
 import { loadVoiceSettings } from "@/features/voice/model/voice-settings";
+import { installWatch, resetWatch } from "@/features/watch/watch-native";
 import { AppLoadingOverlayProvider, useAppLoadingOverlay } from "@/shared/components/app-loading-overlay";
 import { useBloubColors } from "@/shared/components/bloub-stage/bloub-look";
 import { BloubStage } from "@/shared/components/bloub-stage/bloub-stage";
@@ -80,6 +81,7 @@ installSupportLog();
 installQuickActions();
 installShortcuts();
 installCarPlay();
+installWatch();
 installAppLock();
 installNotificationHandler();
 backgroundRefreshNative?.install();
@@ -141,6 +143,7 @@ function RootNavigator() {
     resetShortcuts();
     resetNotificationAvatars();
     resetCarPlay();
+    resetWatch();
   }, [loading, session]);
 
   useLayoutEffect(() => {

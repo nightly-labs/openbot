@@ -326,7 +326,8 @@ const SETTING_LINKS: Record<SettingLinkId, SettingLinkEntry> = {
   "agent.busy-message": {
     title: "While working",
     place: `${AGENT} > Advanced`,
-    about: "What happens to a message that the user sends while the agent works: queue it or steer the work.",
+    about:
+      "What happens to a message from the user or another agent that arrives while the agent works: queue it or steer the work.",
     words: "queue steer interrupt busy",
   },
   "agent.browser-profile": {
@@ -518,6 +519,14 @@ const SERVER_PLACES: readonly ServerPlaceEntry[] = [
       "Only the owner or an admin of the server. Signs in one more account of a provider, for example a second Claude or ChatGPT subscription, or adds an API key. Each agent uses one account: choose it in the agent's settings. Pool accounts lets the agents of a provider share its accounts.",
     words: ["account accounts subscription pool", ...PROVIDER_WORDS].join(" "),
     answersProviderAccountQuestion: true,
+  },
+  {
+    title: "Parallel threads",
+    place: `For one agent, on the phone app: the agent's settings > Advanced > Behavior > Parallel threads. For all agents, on a computer: ${SERVER_SETTINGS} > Agent defaults > Parallel threads per agent and Threads at the same time. On the phone app: the server's Server settings > Agents.`,
+    about:
+      "Only the owner or an admin changes these rows; a member asks the owner. How many threads of an agent run at the same time; the others wait. An agent's Parallel threads on Default uses the server's Parallel threads per agent, which is 4 until it is changed. Parallel threads per agent applies to each agent with no limit of its own, and Threads at the same time limits all agent threads of the server; more threads use more memory. A provider that runs one turn at a time runs one thread at a time.",
+    words: "parallel concurrent concurrency simultaneous simultaneously threads task tasks",
+    foundWithoutServerWord: ["parallel", "concurrent", "concurrency", "simultaneous", "simultaneously"],
   },
 ];
 

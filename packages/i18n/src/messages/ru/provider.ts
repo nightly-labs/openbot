@@ -79,6 +79,7 @@ export const messages = {
   "provider.aria.install": "Установить: {name}",
   "provider.aria.signIn": "Войти в {name}",
   "provider.aria.codeFallback": "Войти в {name} по коду",
+  "provider.aria.addressFallback": "Вставить адрес входа для {name}",
   "provider.aria.moreActions": "Другие действия для {name}",
 
   "provider.aria.use": "Использовать {name} в OpenBot",
@@ -109,6 +110,7 @@ export const messages = {
   "provider.codeLogin.pasteExpiresIn": "Ждём вас. Вход прекратится через {time}.",
   "provider.codeLogin.linkTitle": "Вход в {name} на другом устройстве",
   "provider.codeLogin.pageTitle": "Вход в {name}",
+  "provider.codeLogin.addressDescription": "Завершите вход в браузере. Это окно закроется, когда вход будет выполнен.",
   "provider.codeLogin.pageDescription": "Эта страница открыта в браузере на {host}. Войдите здесь.",
   "provider.codeLogin.relayStarting": "Запуск входа в {name} на {host}…",
   "provider.codeLogin.pageOpening": "Открываем страницу входа {name} на {host}…",
@@ -280,6 +282,11 @@ export const messages = {
   "provider.account.pool": "Объединить аккаунты",
   "provider.account.poolDescription":
     "Агенты используют один аккаунт, пока он не приблизится к лимиту, а затем аккаунт, чей лимит сбросится раньше всех.",
+  "provider.account.poolStrategy": "Использование аккаунтов",
+  "provider.account.poolFillFirst": "Сначала заполнять",
+  "provider.account.poolSpread": "Распределять",
+  "provider.account.poolSpreadDescription":
+    "Агенты распределяются по аккаунтам, у которых осталось больше всего лимита. Агент меняет аккаунт, только когда у другого аккаунта намного больше запаса.",
   "provider.account.inUse": "Используется",
   "provider.account.notInPool": "Вне пула",
   "provider.account.leaveOutOfPool": "Исключить из пула",

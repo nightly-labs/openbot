@@ -1,10 +1,10 @@
 {
-  "version": "0.78.0",
+  "version": "0.80.0",
   "highlights": [
-    "Update your joined servers to this version too, so that channel voice, hidden servers, workflow phone notifications and the connection fixes work there.",
-    "Use voice in channels: dictate a message and hear the agent's answer, or start a voice conversation from the channel's message box.",
-    "Hide a server from the server rail. It stays hidden on your other computers, and the \"Hidden servers\" folder shows it again.",
-    "Streamed replies and parallel workflows use less CPU, and long channels on a joined server open faster.",
-    "A workflow \"Notification\" output or a step that waits for approval now sends a phone notification."
+    "Update your joined servers to this version too. It makes a server with a large chat history fast again after 0.79.0, and the new features below work there only then.",
+    "Use the OpenBot Apple Watch app when OpenBot on iPhone is closed. Your server answers the watch directly, end to end encrypted.",
+    "See the pointer and the selected step of each other person who has the same workflow open.",
+    "Spread agents over all your pooled provider accounts with the new Spread choice in Settings › Providers.",
+    "Type with no lag while an agent writes its reply, and use much less memory in long chats with many images."
   ]
 }

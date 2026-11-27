@@ -149,6 +149,7 @@ const teamBrowser: TeamApiBrowser = {
   navigate: unused,
   reload: unused,
   stop: unused,
+  answerPermission: unused,
   takeUserControl: unused,
   startTeach: unused,
   stopTeach: () => [],
@@ -164,7 +165,9 @@ const teamBrowser: TeamApiBrowser = {
   startView: unused,
   dispatchViewInput: unused,
   copyViewSelection: unused,
+  answerViewDialog: unused,
   importSignIn: unused,
+  answerHttpSignIn: unused,
 };
 
 const root = await mkdtemp(join(tmpdir(), "openbot-provider-many-accounts-"));
@@ -238,6 +241,8 @@ function providerAccounts(store: ProviderAccountStore): TeamApiProviderAccounts 
     },
     setPool: (provider, enabled, leftOut) =>
       store.setPool(provider === "acp" ? PROVIDER : provider, enabled ? { leftOut } : null).pipe(Effect.orDie),
+    poolStrategies: () => ({ strategies: [] }),
+    setPoolStrategy: unused,
     liveVoiceAccount: () => ({ accountId: null }),
     setLiveVoiceAccount: unused,
     usage: unused,

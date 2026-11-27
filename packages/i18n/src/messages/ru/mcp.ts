@@ -45,6 +45,7 @@ export const messages = {
   "mcp.status.signedIn": "Вход выполнен",
   "mcp.status.signingIn": "Выполняется вход…",
   "mcp.status.signInNeeded": "Нужен вход",
+  "mcp.status.signInAppNeeded": "Нужно приложение входа",
   "mcp.status.refused": "Отклонено",
   "mcp.status.checkUrl": "Проверьте URL",
   "mcp.status.noAnswer": "Нет ответа",

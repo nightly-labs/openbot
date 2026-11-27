@@ -82,6 +82,7 @@ export const messages = {
   "provider.aria.install": "تثبيت {name}",
   "provider.aria.signIn": "تسجيل الدخول إلى {name}",
   "provider.aria.codeFallback": "تسجيل الدخول إلى {name} برمز",
+  "provider.aria.addressFallback": "الصق عنوان تسجيل الدخول لـ {name}",
   "provider.aria.moreActions": "إجراءات إضافية لـ {name}",
   "provider.aria.use": "استخدام {name} في OpenBot",
   "provider.use.inUseOne": "يستخدم {agent} المزوّد {name}. غيّر نموذج هذا الوكيل، ثم أوقف {name}.",
@@ -112,6 +113,7 @@ export const messages = {
   "provider.codeLogin.pasteExpiresIn": "في انتظارك. يتوقف تسجيل الدخول هذا خلال {time}.",
   "provider.codeLogin.linkTitle": "تسجيل الدخول إلى {name} على جهاز آخر",
   "provider.codeLogin.pageTitle": "تسجيل الدخول إلى {name}",
+  "provider.codeLogin.addressDescription": "أكمل تسجيل الدخول في المتصفح. تُغلق هذه النافذة عند اكتمال تسجيل الدخول.",
   "provider.codeLogin.pageDescription": "هذه الصفحة مفتوحة في المتصفح على {host}. سجّل الدخول هنا.",
   "provider.codeLogin.relayStarting": "جارٍ بدء تسجيل الدخول إلى {name} على {host}…",
   "provider.codeLogin.pageOpening": "جارٍ فتح صفحة تسجيل الدخول إلى {name} على {host}…",
@@ -289,6 +291,11 @@ export const messages = {
   "provider.account.pool": "تجميع الحسابات",
   "provider.account.poolDescription":
     "يستخدم الوكلاء حسابًا واحدًا حتى يقترب من حد الاستخدام، ثم الحساب الذي يُعاد تعيين حده أولًا.",
+  "provider.account.poolStrategy": "طريقة الاستخدام",
+  "provider.account.poolFillFirst": "ملء الأول أولًا",
+  "provider.account.poolSpread": "توزيع",
+  "provider.account.poolSpreadDescription":
+    "يتوزع الوكلاء على الحسابات التي بقي فيها أكبر قدر من الاستخدام. لا يغيّر الوكيل حسابه إلا عندما يكون لدى حساب آخر مساحة أكبر بكثير.",
   "provider.account.inUse": "قيد الاستخدام",
   "provider.account.notInPool": "خارج المجموعة",
   "provider.account.leaveOutOfPool": "استبعاد من المجموعة",

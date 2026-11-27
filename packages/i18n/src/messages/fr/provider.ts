@@ -67,6 +67,7 @@ export const messages = {
   "provider.aria.install": "Installer {name}",
   "provider.aria.signIn": "Se connecter à {name}",
   "provider.aria.codeFallback": "Se connecter à {name} avec un code",
+  "provider.aria.addressFallback": "Coller l’adresse de connexion pour {name}",
   "provider.aria.moreActions": "Autres actions pour {name}",
 
   "provider.aria.use": "Utiliser {name} dans OpenBot",
@@ -94,6 +95,8 @@ export const messages = {
   "provider.codeLogin.pasteExpiresIn": "En attente. Cette connexion s’arrête dans {time}.",
   "provider.codeLogin.linkTitle": "Connectez-vous à {name} sur un autre appareil",
   "provider.codeLogin.pageTitle": "Se connecter à {name}",
+  "provider.codeLogin.addressDescription":
+    "Terminez la connexion dans votre navigateur. Cette fenêtre se ferme quand la connexion est terminée.",
   "provider.codeLogin.pageDescription": "Cette page est ouverte dans le navigateur de {host}. Connectez-vous ici.",
   "provider.codeLogin.relayStarting": "Démarrage de la connexion à {name} sur {host}…",
   "provider.codeLogin.pageOpening": "Ouverture de la page de connexion de {name} sur {host}…",
@@ -261,6 +264,11 @@ export const messages = {
   "provider.account.pool": "Regrouper les comptes",
   "provider.account.poolDescription":
     "Les agents utilisent un compte jusqu’à ce qu’il approche d’une limite d’usage, puis le compte dont la limite se réinitialise en premier.",
+  "provider.account.poolStrategy": "Utiliser les comptes",
+  "provider.account.poolFillFirst": "Remplir d’abord",
+  "provider.account.poolSpread": "Répartir",
+  "provider.account.poolSpreadDescription":
+    "Les agents se répartissent sur les comptes qui ont le plus d’usage restant. Un agent change de compte seulement quand un autre compte a beaucoup plus de marge.",
   "provider.account.inUse": "Utilisé",
   "provider.account.notInPool": "Hors du groupe",
   "provider.account.leaveOutOfPool": "Retirer du groupe",

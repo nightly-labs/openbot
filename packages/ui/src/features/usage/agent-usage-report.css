@@ -72,19 +72,19 @@
 }
 
 .agent-usage-totals {
-  display: flex;
-  flex-wrap: wrap;
-  gap: var(--openbot-space-4) calc(var(--openbot-space-6) * 2);
-  max-height: calc(var(--openbot-leading-sm) + var(--openbot-space-1) + var(--openbot-leading-xl));
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(11rem, 1fr));
+  gap: var(--openbot-space-6);
   margin-top: var(--openbot-space-4);
-  overflow: hidden;
+}
+.agent-usage-totals > div {
+  min-width: 0;
 }
 .agent-usage-totals dt {
   font-size: var(--openbot-text-sm);
   line-height: var(--openbot-leading-sm);
   color: var(--openbot-text-muted);
   margin-bottom: var(--openbot-space-1);
-  white-space: nowrap;
 }
 .agent-usage-totals dd {
   margin: 0;

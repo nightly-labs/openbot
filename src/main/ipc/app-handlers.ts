@@ -1,3 +1,4 @@
+import { CHROME_EXTENSION_URL } from "@openbot/contracts/browser-extension";
 import { bugReportFormUrl } from "@openbot/contracts/feedback";
 import { HOSTED_SERVER_CONTACT_URL } from "@openbot/contracts/hosted-servers";
 import { INPUT_LIMITS } from "@openbot/contracts/input-limits";
@@ -97,6 +98,7 @@ const EXTERNAL_DESTINATIONS: Record<ExternalDestination, string | ((translate: A
   "grok-bot-export": GROK_BOT_EXPORT_URL,
   "hosted-server-contact": HOSTED_SERVER_CONTACT_URL,
   download: DOWNLOAD_URL,
+  "chrome-extension": CHROME_EXTENSION_URL,
   "mac-screen-recording": MAC_PERMISSION_URLS["screen-recording"],
 };
 

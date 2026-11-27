@@ -38,6 +38,7 @@ const BROWSER_VAULT_TOOLS = new Set([
   "request_vault_item",
   "delete_vault_item",
   "request_link_payment",
+  "request_near_payment",
 ]);
 
 function browserGuidance(tool: string, options: ToolGuidanceOptions): string[] {
@@ -160,7 +161,7 @@ function openbotGuidance(namespace: string, tool: string): string {
     case "list_media_models":
     case "generate_image":
     case "generate_video":
-      return "openbot.list_media_models (with tool_call) gives the model ids, options and prices; use them when the user names a model, an option or a price. Each call makes one file and spends credits: make no variants that the user did not ask for. To edit a picture, give its local path in images. When the user declines or skips, or the balance is too low, tell the user and do not try another model.";
+      return "openbot.list_media_models (with tool_call) gives the model ids, options and prices; use them when the user names a model, an option or a price. Each call makes one file and spends credits: make no variants that the user did not ask for. To edit a picture, give its local path in images. When the user declines or skips, tell the user and do not try again. Use plain words, not field names.";
     case "set_backdrop":
       return "Check the page with openbot.html_preview first when you can. Give matching bubbles colors unless the user wants the page only.";
     case "react_to_user_message":

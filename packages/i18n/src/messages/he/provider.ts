@@ -65,6 +65,7 @@ export const messages = {
   "provider.aria.install": "התקנת {name}",
   "provider.aria.signIn": "התחברות ל-{name}",
   "provider.aria.codeFallback": "התחברות ל-{name} עם קוד",
+  "provider.aria.addressFallback": "הדבקת כתובת ההתחברות של {name}",
   "provider.aria.moreActions": "פעולות נוספות עבור {name}",
   "provider.aria.use": "שימוש ב-{name} ב-OpenBot",
   "provider.use.inUseOne": "{agent} משתמש ב-{name}. יש לשנות את המודל של הסוכן הזה ואז לכבות את {name}.",
@@ -92,6 +93,7 @@ export const messages = {
   "provider.codeLogin.pasteExpiresIn": "ממתין לך. ההתחברות הזאת תיעצר בעוד {time}.",
   "provider.codeLogin.linkTitle": "התחברות ל-{name} בהתקן אחר",
   "provider.codeLogin.pageTitle": "התחברות ל-{name}",
+  "provider.codeLogin.addressDescription": "סיימו את ההתחברות בדפדפן. החלון הזה ייסגר כשההתחברות תסתיים.",
   "provider.codeLogin.pageDescription": "הדף הזה פתוח בדפדפן ב-{host}. יש להתחבר כאן.",
   "provider.codeLogin.relayStarting": "מתחיל את ההתחברות ל-{name} ב-{host}…",
   "provider.codeLogin.pageOpening": "פותח את דף ההתחברות של {name} ב-{host}…",
@@ -261,6 +263,11 @@ export const messages = {
   "provider.account.pool": "איגום חשבונות",
   "provider.account.poolDescription":
     "הסוכנים משתמשים בחשבון אחד עד שהוא מתקרב למגבלת שימוש, ואז בחשבון שהמגבלה שלו מתאפסת ראשונה.",
+  "provider.account.poolStrategy": "שימוש בחשבונות",
+  "provider.account.poolFillFirst": "מילוי ראשון",
+  "provider.account.poolSpread": "פיזור",
+  "provider.account.poolSpreadDescription":
+    "הסוכנים מתפזרים בין החשבונות שנשאר בהם הכי הרבה שימוש. סוכן מחליף חשבון רק כשלחשבון אחר יש הרבה יותר מקום.",
   "provider.account.inUse": "בשימוש",
   "provider.account.notInPool": "מחוץ למאגר",
   "provider.account.leaveOutOfPool": "הוצאה מהמאגר",

@@ -12,6 +12,7 @@ import {
   type QuitGuard,
 } from "@openbot/contracts/ipc";
 import type { AppTextKey, AppTranslate, LayoutDirection } from "@openbot/i18n";
+import { sourceText } from "@openbot/i18n/source";
 import { createOpenBotLogger, toLogValue } from "@openbot/logging";
 import { Effect } from "effect";
 import {
@@ -70,6 +71,7 @@ const MAIN_WINDOW_DARK_BACKGROUND = "#0b0d0e";
 const logger = createOpenBotLogger("main-window");
 
 const FIRST_LOAD_ATTEMPTS = 3;
+const SANDBOXED_RENDERER_BLOCKED_EXIT_CODE = -2147483645;
 const RENDERER_RELOAD_MAX = 3;
 const RENDERER_RELOAD_WINDOW_MS = 60_000;
 const RESTARTED_RENDERER_QUERY = "restarted";
@@ -198,6 +200,7 @@ export function createMainWindowController({
     });
   let rendererReloadTimes: number[] = [];
   let firstLoadPending = false;
+  let firstLoadRendererExits: boolean[] = [];
   let firstRendererStopped = false;
   let rendererStoppedDialogOpen = false;
   let closeConfirmationOpen = false;
@@ -371,6 +374,7 @@ export function createMainWindowController({
     window.webContents.once("destroyed", onRendererGone);
     window.webContents.on("render-process-gone", (_event, details) => {
       logger.warn("The main window renderer stopped.", { reason: details.reason, exitCode: details.exitCode });
+      if (firstLoadPending) firstLoadRendererExits.push(isBlockedSandboxedRenderer(details));
       const now = Date.now();
       rendererReloadTimes = rendererReloadTimes.filter((time) => now - time < RENDERER_RELOAD_WINDOW_MS);
       if (isQuitting() || window.isDestroyed() || firstLoadPending || !RELOADABLE_RENDERER_EXITS.has(details.reason))
@@ -491,12 +495,21 @@ export function createMainWindowController({
   async function loadRenderer(window: BrowserWindow, options: { restarted?: boolean } = {}): Promise<void> {
     if (options.restarted) return loadRendererOnce(window, options);
     firstLoadPending = true;
+    firstLoadRendererExits = [];
     try {
       for (let attempt = 1; ; attempt += 1) {
         try {
           return await loadRendererOnce(window);
         } catch (error) {
-          if (attempt >= FIRST_LOAD_ATTEMPTS || window.isDestroyed() || !isFailedLoad(error)) throw error;
+          if (attempt >= FIRST_LOAD_ATTEMPTS || window.isDestroyed() || !isFailedLoad(error)) {
+            if (!isFailedLoad(error) || !firstLoadRendererExits.length || !firstLoadRendererExits.every(Boolean))
+              throw error;
+            logger.warn(
+              "The main window did not load, because its renderer was blocked at each start.",
+              toLogValue(error),
+            );
+            throw new Error(sourceText("error.app.windowBlockedBySecuritySoftware"), { cause: error });
+          }
           logger.warn(
             `The main window did not load (attempt ${attempt} of ${FIRST_LOAD_ATTEMPTS}). Loading it again.`,
             toLogValue(error),
@@ -694,6 +707,10 @@ function attachAppInput(
   });
 }
 
+function x11AboveAppsWindowType(): "splash" | "dock" {
+  return process.env.HYPRLAND_INSTANCE_SIGNATURE ? "splash" : "dock";
+}
+
 export function createDynamicIslandWindow(bounds: Rectangle, _display: Display): BrowserWindow {
   const x11 = process.platform === "linux";
   const window = new BrowserWindow({
@@ -712,7 +729,7 @@ export function createDynamicIslandWindow(bounds: Rectangle, _display: Display):
     enableLargerThanScreen: true,
     hasShadow: false,
     skipTaskbar: true,
-    type: process.platform === "darwin" ? "panel" : x11 ? "dock" : "toolbar",
+    type: process.platform === "darwin" ? "panel" : x11 ? x11AboveAppsWindowType() : "toolbar",
     backgroundColor: "#00000000",
     webPreferences: {
       preload: join(__dirname, "../preload/index.cjs"),
@@ -735,7 +752,6 @@ export function createDynamicIslandWindow(bounds: Rectangle, _display: Display):
 
 export function createAgentDockWindow(bounds: Rectangle): BrowserWindow {
   const x11 = process.platform === "linux";
-  const x11Type = process.env.HYPRLAND_INSTANCE_SIGNATURE ? "splash" : "dock";
   const window = new BrowserWindow({
     ...bounds,
     show: false,
@@ -751,7 +767,7 @@ export function createAgentDockWindow(bounds: Rectangle): BrowserWindow {
     fullscreenable: false,
     hasShadow: false,
     skipTaskbar: true,
-    type: process.platform === "darwin" ? "panel" : x11 ? x11Type : "toolbar",
+    type: process.platform === "darwin" ? "panel" : x11 ? x11AboveAppsWindowType() : "toolbar",
     backgroundColor: "#00000000",
     webPreferences: {
       preload: join(__dirname, "../preload/index.cjs"),
@@ -869,6 +885,14 @@ const REPLACED_LOAD_ERROR = -3;
 
 function isReplacedLoad(error: unknown): error is Error {
   return error instanceof Error && "errno" in error && error.errno === REPLACED_LOAD_ERROR;
+}
+
+function isBlockedSandboxedRenderer(details: RenderProcessGoneDetails): boolean {
+  return (
+    process.platform === "win32" &&
+    details.reason === "crashed" &&
+    details.exitCode === SANDBOXED_RENDERER_BLOCKED_EXIT_CODE
+  );
 }
 
 function isFailedLoad(error: unknown): boolean {

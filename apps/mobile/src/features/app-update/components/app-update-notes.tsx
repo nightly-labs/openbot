@@ -76,19 +76,47 @@ function ScrollRow({
 
 const ITEM_TEXT_INSET = 16;
 
-function NoteItem({ item, scroll, dot }: { item: string; scroll: RowScroll; dot: string }) {
+export interface NoteLineRow {
+  key: number;
+  baseY: SharedValue<number>;
+  className: string;
+  children: ReactNode;
+}
+
+export function NoteItem({
+  item,
+  dot,
+  textColor,
+  compact = false,
+  renderRow,
+}: {
+  item: string;
+  dot: string;
+  textColor?: string;
+  compact?: boolean;
+  renderRow: (row: NoteLineRow) => ReactNode;
+}) {
   const itemY = useSharedValue(0);
   const [lines, setLines] = useState<{ start: number; text: string }[] | null>(null);
-  const dotView = <View className="mt-[9px] size-1.5 rounded-full" style={{ backgroundColor: dot }} />;
+  const type = compact ? "body-sm" : "body";
+  const textClassName = textColor ? "flex-1" : "flex-1 text-text-secondary";
+  const textStyle = textColor ? { color: textColor } : undefined;
+  const dotView = (
+    <View
+      className={compact ? "mt-[8px] size-1.5 rounded-full" : "mt-[9px] size-1.5 rounded-full"}
+      style={{ backgroundColor: dot }}
+    />
+  );
   return (
     <View
       accessible
       accessibilityLabel={item}
-      className="mb-2.5"
+      className={compact ? "mb-1.5" : "mb-2.5"}
       onLayout={(event) => itemY.set(event.nativeEvent.layout.y)}
     >
       <View pointerEvents="none" style={{ position: "absolute", left: ITEM_TEXT_INSET, right: 0, opacity: 0 }}>
         <Typography.Paragraph
+          type={type}
           className="text-text-secondary"
           onTextLayout={(event) => {
             let start = 0;
@@ -108,26 +136,46 @@ function NoteItem({ item, scroll, dot }: { item: string; scroll: RowScroll; dot:
           {item}
         </Typography.Paragraph>
       </View>
-      {lines ? (
-        lines.map((line) => (
-          <ScrollRow key={line.start} scroll={scroll} baseY={itemY} className="flex-row gap-2.5">
-            {line.start === 0 ? dotView : <View className="size-1.5" />}
-            <Typography.Paragraph numberOfLines={1} ellipsizeMode="clip" className="flex-1 text-text-secondary">
-              {line.text}
-            </Typography.Paragraph>
-          </ScrollRow>
-        ))
-      ) : (
-        <ScrollRow scroll={scroll} baseY={itemY} className="flex-row gap-2.5">
-          {dotView}
-          <Typography.Paragraph className="flex-1 text-text-secondary">{item}</Typography.Paragraph>
-        </ScrollRow>
-      )}
+      {lines
+        ? lines.map((line) =>
+            renderRow({
+              key: line.start,
+              baseY: itemY,
+              className: "flex-row gap-2.5",
+              children: (
+                <>
+                  {line.start === 0 ? dotView : <View className="size-1.5" />}
+                  <Typography.Paragraph
+                    type={type}
+                    numberOfLines={1}
+                    ellipsizeMode="clip"
+                    className={textClassName}
+                    style={textStyle}
+                  >
+                    {line.text}
+                  </Typography.Paragraph>
+                </>
+              ),
+            }),
+          )
+        : renderRow({
+            key: -1,
+            baseY: itemY,
+            className: "flex-row gap-2.5",
+            children: (
+              <>
+                {dotView}
+                <Typography.Paragraph type={type} className={textClassName} style={textStyle}>
+                  {item}
+                </Typography.Paragraph>
+              </>
+            ),
+          })}
     </View>
   );
 }
 
-function groupTitle(t: MobileText["t"], group: MobileReleaseNoteGroup): string {
+export function groupTitle(t: MobileText["t"], group: MobileReleaseNoteGroup): string {
   switch (group.type) {
     case "notice":
       return t("mobile.app.update.group.notice");
@@ -177,7 +225,18 @@ function releaseRows(
             {groupTitle(t, group)}
           </Typography.Paragraph>
         </ScrollRow>,
-        ...group.items.map((item) => <NoteItem key={`${groupKey}-${item}`} item={item} scroll={scroll} dot={dot} />),
+        ...group.items.map((item) => (
+          <NoteItem
+            key={`${groupKey}-${item}`}
+            item={item}
+            dot={dot}
+            renderRow={(row) => (
+              <ScrollRow key={row.key} scroll={scroll} baseY={row.baseY} className={row.className}>
+                {row.children}
+              </ScrollRow>
+            )}
+          />
+        )),
       ];
     });
     return [heading, ...groups];

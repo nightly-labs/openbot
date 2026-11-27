@@ -56,6 +56,12 @@ import {
   PROVIDER_ACCOUNT_MODELS_ROUTES,
 } from "@openbot/contracts/team-protocol/provider-account-models-v1";
 import {
+  decodeProviderAccountPoolStrategies,
+  PROVIDER_ACCOUNT_POOL_STRATEGY_CAPABILITY,
+  PROVIDER_ACCOUNT_POOL_STRATEGY_ROUTES,
+  withProviderAccountPoolStrategies,
+} from "@openbot/contracts/team-protocol/provider-account-pool-strategy-v1";
+import {
   PROVIDER_ACCOUNT_POOL_CAPABILITY,
   PROVIDER_ACCOUNT_POOL_ROUTES,
 } from "@openbot/contracts/team-protocol/provider-account-pool-v1";
@@ -101,6 +107,7 @@ import { normalizePastedCode } from "../../backend/agent/cli-code-login";
 import { AgentLifecycleFailed, type AgentService } from "../../backend/agent-service";
 import { runCauseEffect } from "../../backend/effect-boundary";
 import type { CustomProviderChanges, PeerCustomProviderChanges } from "../custom-provider-changes";
+import type { LocalSignInPages } from "../local-sign-in-pages";
 import type { ProviderCredentialStore } from "../provider-credential-store";
 import type { ProviderRuntimeManager } from "../provider-runtime-manager";
 import {
@@ -170,6 +177,7 @@ interface ProviderAdminIpcDependencies {
   customProviders: PeerCustomProviderChanges & Pick<CustomProviderChanges, "update">;
   remoteServers: ProviderAdminRemoteServers;
   relay: Pick<SignInRelayClient, "run" | "page" | "open" | "paste">;
+  signInPages: Pick<LocalSignInPages, "paste">;
 }
 
 interface RelayedSignIn {
@@ -186,6 +194,7 @@ export function providerAdminIpcHandlers({
   customProviders,
   remoteServers,
   relay,
+  signInPages,
 }: ProviderAdminIpcDependencies): Pick<IpcGroupHandlers, "providerAdmin"> {
   function remote<T>(serverId: string, path: string, body: unknown, decoder: ResponseDecoder<T>): Promise<T> {
     if (!remoteServers.supportsCapability(serverId, PROVIDERS_ADMIN_CAPABILITY))
@@ -417,11 +426,26 @@ export function providerAdminIpcHandlers({
                   Effect.orElseSucceed(() => null),
                 )
             : Effect.succeed(null);
+          const strategies =
+            remoteServers.supportsCapability(serverId, PROVIDER_ACCOUNT_POOL_CAPABILITY) &&
+            remoteServers.supportsCapability(serverId, PROVIDER_ACCOUNT_POOL_STRATEGY_CAPABILITY)
+              ? remoteServers
+                  .request(serverId, PROVIDER_ACCOUNT_POOL_STRATEGY_ROUTES.list, decodeProviderAccountPoolStrategies, {
+                    method: "POST",
+                    body: {},
+                  })
+                  .pipe(Effect.orElseSucceed(() => null))
+              : Effect.succeed(null);
           return runCauseEffect(
-            Effect.all([list, models, pools, liveVoice], { concurrency: "unbounded" }).pipe(
-              Effect.map(([accounts, extra, pooled, voice]) => {
+            Effect.all([list, models, pools, liveVoice, strategies], { concurrency: "unbounded" }).pipe(
+              Effect.map(([accounts, extra, pooled, voice, strategyRows]) => {
                 const withModels = extra ? withHostProviderAccountModels(accounts, extra) : accounts;
-                const withPools = pooled ? { ...withModels, pools: pooled } : withModels;
+                const withPools = pooled
+                  ? {
+                      ...withModels,
+                      pools: strategyRows ? withProviderAccountPoolStrategies(pooled, strategyRows) : pooled,
+                    }
+                  : withModels;
                 return voice ? { ...withPools, liveVoiceAccount: voice.accountId } : withPools;
               }),
             ),
@@ -486,14 +510,28 @@ export function providerAdminIpcHandlers({
       removeAccount: accountsRequest(parseRemoveProviderAccountInput, PROVIDER_ACCOUNTS_ROUTES.remove, acceptEmpty),
       setAccountPool: scopedHandler(parseSetProviderAccountPoolInput, {
         local: () => Promise.reject(new Error(sourceText("error.team.providersUnsupported"))),
-        remote: (input, serverId) => {
+        remote: ({ strategy, ...input }, serverId) => {
           if (!remoteServers.supportsCapability(serverId, PROVIDER_ACCOUNT_POOL_CAPABILITY))
             throw new Error(sourceText("error.team.providersUnsupported"));
+          const update = remoteServers.request(serverId, PROVIDER_ACCOUNT_POOL_ROUTES.update, acceptEmpty, {
+            method: "POST",
+            body: input,
+          });
+          const withStrategy =
+            strategy &&
+            input.enabled &&
+            remoteServers.supportsCapability(serverId, PROVIDER_ACCOUNT_POOL_STRATEGY_CAPABILITY);
           return runCauseEffect(
-            remoteServers.request(serverId, PROVIDER_ACCOUNT_POOL_ROUTES.update, acceptEmpty, {
-              method: "POST",
-              body: input,
-            }),
+            withStrategy
+              ? update.pipe(
+                  Effect.andThen(
+                    remoteServers.request(serverId, PROVIDER_ACCOUNT_POOL_STRATEGY_ROUTES.update, acceptEmpty, {
+                      method: "POST",
+                      body: { provider: input.provider, strategy },
+                    }),
+                  ),
+                )
+              : update,
           );
         },
       }),
@@ -572,9 +610,10 @@ export function providerAdminIpcHandlers({
         return { page: running.result ? null : relay.page(key), result: running.result };
       }),
       openRelaySignIn: relaySignIn(parseProviderId, (provider, serverId) => relay.open(relayKey(serverId, provider))),
-      pasteRelaySignIn: relaySignIn(parsePasteRelaySignInInput, ({ provider, address }, serverId) =>
-        relay.paste(relayKey(serverId, provider), address),
-      ),
+      pasteRelaySignIn: scopedHandler(parsePasteRelaySignInInput, {
+        local: ({ provider, address }) => runCauseEffect(signInPages.paste(provider, address)),
+        remote: ({ provider, address }, serverId) => relay.paste(relayKey(serverId, provider), address),
+      }),
       cancelRelaySignIn: relaySignIn(parseProviderId, async (provider, serverId) => {
         await stopRelay(relayKey(serverId, provider));
         return runCauseEffect(readRemoteAgentStatus(remoteServers, serverId));

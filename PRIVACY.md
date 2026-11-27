@@ -160,6 +160,15 @@ history. The server does not store the location or the typed place in the SQLite
 keeps only that the location was shared or not. The agent's reply, which can name the place, is stored
 like any other message. The phone does not store the location, follow it in the background, or send it
 to the account service or analytics.
+A page in the OpenBot browser can ask for the location. The browser asks the person first, and a page
+gets nothing until the person selects **Allow**. On the computer that runs the browser, Allow lets the
+page read the location of that computer. On a joined server, Allow reads the location of the member's
+own device (latitude, longitude and accuracy) one time and sends it to the server, which gives it to
+that tab only. The page can then send it to its site, as in any browser. The answer holds while the
+tab stays on the same site. **Allow always** holds for that site in all agent tabs until OpenBot or the
+server restarts. On a joined server, it holds only in the tabs of the same agent, and the server keeps the
+location that the member sent in memory for that time and gives it to the site again in those tabs. OpenBot does not store the location or the answer in the SQLite database,
+and does not send it to the account service or analytics.
 Channel history keeps its existing membership and task checks. Messaging history stays within its
 current link. The full conversation stays in local SQLite storage. No history text is sent to the
 account service or analytics by these tools.
@@ -1049,6 +1058,12 @@ no review reads are deleted after 30 days. Turning the setting off deletes all r
   Disconnect deletes the file and asks Link to revoke the sign-in. A one-time Link card is not
   stored: OpenBot reads it from Link for each fill and types it into the page. The tokens and the
   card number are redacted from logs, exports and diagnostics.
+- The NEAR Intents wallet (Server settings › Vault › Crypto) is kept in
+  `~/Library/Application Support/OpenBot/openbot-near-wallet-v1.json`, encrypted by the operating
+  system's secret storage. It holds the payment grant token, the owner's passkey credential ID and
+  public key, the agents that can pay, the payment rules, today's spend, and the payments that wait
+  for an answer. The app window never receives the token. Disconnect deletes the
+  file. The token is redacted from logs, exports and diagnostics.
 - The ElevenLabs API key for dictation and spoken replies is kept in
   `~/Library/Application Support/OpenBot/voice-api-key.json`, encrypted by the operating system's
   secret storage. The app window never receives the key back. Remove key in **Settings → Voice**
@@ -1538,6 +1553,19 @@ Network traffic can also occur when:
   merchant name and address, and the agent's description of the purchase. Link asks the user to
   approve it, and OpenBot then reads the one-time card from `api.link.com`. Nothing else about the
   user's agents, conversations or files is sent to Link;
+- the user sets up the NEAR Intents wallet in Server settings › Vault › Crypto. OpenBot sends the
+  owner's passkey public key, the daily budget and the signed owner actions to the NEAR Intents
+  Agent API (`api.agentsonintents.com`). When an agent pays, OpenBot sends the recipient, the asset,
+  the amount, an idempotency key and the payment grant token. These calls go through the OpenBot
+  account service (`api.openbot.run/v1/near/*`), which adds the OpenBot partner key and passes them
+  through in transit only. It does not store or log them. It keeps only the wallet ID, the OpenBot
+  account or server that owns it, and the time it was made, so that only that owner can use the
+  wallet. The owner signs on the OpenBot page
+  `nearintents.openbot.run/near/sign` in the system browser; the request is in the address fragment, which the
+  browser does not send to the server, and the page sends the signature back to OpenBot only. The
+  agent's reason and the domain of a payment stay on this computer. The chat card and the Crypto tab
+  load the icon of the payment's domain from that domain (`/favicon.ico`), with no referrer. Nothing
+  else about the user's agents, conversations or files is sent to the Agent API;
 - an installed build checks GitHub Releases for updates;
 - OpenBot checks for new provider CLI releases when it starts, once an hour, and when you select
   `Check for updates`. It asks `api.github.com` for Codex, Kimi, GitHub Copilot, Mistral and Gemini, `registry.npmjs.org` for Claude,
@@ -2064,13 +2092,8 @@ do not revoke the sign-in at Google; remove Antigravity's access in your Google 
 apply: <https://antigravity.google/terms>.
 Gemini agents stay on this computer: OpenBot does not show them to team members.
 
-To show the remaining Gemini quota in Usage, OpenBot reads the access token from the server's token file
-and asks Google's Code Assist service (`cloudcode-pa.googleapis.com` and
-`daily-cloudcode-pa.googleapis.com`) for the account's project and quota, as the Antigravity app does.
-The requests carry that token and a User-Agent with the Antigravity desktop app's client name, version
-and build number, your operating system and processor type. They contain no conversation, file, or model data. With an API key
-sign-in, or an expired token, OpenBot sends nothing and shows no Gemini usage. OpenBot does not send that
-usage to its maintainer.
+OpenBot does not read the Gemini quota and does not call Google's internal Code Assist service. It
+reads the server's token file only for the email of the Google account. Usage shows no Gemini plan usage.
 
 ### Cursor
 
@@ -2351,6 +2374,39 @@ approves it.
 
 Settings > Notifications > Live Activities turns this off. The phone then removes its token from the
 host.
+
+## Apple Watch app
+
+The Apple Watch app gets your agents in two ways: from the iPhone app on the same Apple ID, through
+Apple's WatchConnectivity link between the two devices, and directly from your servers, so that it
+works when the iPhone app is in the background or closed.
+
+The watch shows the agents that the chat list of the iPhone app shows: their names, server names,
+picture colours and pictures, their state, the number of unread messages, the request or question
+that an agent waits on, and the start of the last reply. It also shows the channels of that list:
+their names, member agents, the number of unread messages, if an agent works in them, and the start
+of the last message with the name of its author. It does not get hidden chats, only their IDs, so
+that it does not show them when a server answers it directly. It does not get attachments,
+files or the phone's session. The watch keeps the last copy in the storage of the OpenBot watch app,
+for the watch face complication and the next time the app opens. It also keeps it when the app lock
+of the phone is on. A sign-out on the phone tells the watch to delete its copy, its pictures and its
+keys.
+
+For the direct link, the iPhone app gives the watch its own watch session from the OpenBot account
+service. It is linked to the phone's session: a sign-out on the phone, or a revoke of the phone in
+your connected devices, ends it. The watch makes its own signing key, which does not leave the
+watch, and keeps the session token and the public watch keys of your servers in its Keychain.
+
+To reach a server, the watch asks the account service for a ticket for that server, then sends the
+request to Signal over HTTPS. The request and the answer are encrypted end to end between the watch
+and the server. Signal reads only the ticket (your user ID, the server ID and the watch session ID),
+the time and the size, and passes the encrypted request to the server. It does not keep or log the
+request, the answer or the ticket. If a hosted server sleeps, a watch request wakes it.
+
+An answer on the watch, such as Allow, Deny, a choice or a dictated message to an agent or a channel, goes to the server on the
+direct link, or through the iPhone app, which sends it over its encrypted host connection, as a tap
+in the app does. Dictation on the watch uses the dictation of watchOS. Listen reads the reply with the
+speech voices of watchOS on the watch.
 
 ## iPhone notifications
 

@@ -19,6 +19,7 @@ import { usePlatform } from "../../platform";
 import { deviceQuoteShortcut, deviceSendShortcut } from "../../send-shortcut-preference";
 import { remoteAgentError } from "../agents/agent-error-text";
 import { useThreadVisualReplyCard } from "./ChatVisualReply";
+import { ConversationBrowserLocation } from "./ConversationBrowserLocation";
 import { ConversationBrowserTakeover } from "./ConversationBrowserTakeover";
 import { ConversationQuestionPrompt } from "./ConversationQuestionPrompt";
 import { chatSearchOpensMessage } from "./chat-search";
@@ -29,7 +30,9 @@ import type { ConversationThreads } from "./conversation-types";
 import { useThreadMarketplaceSuggestionCard } from "./MarketplaceSuggestionChatCard";
 import { useThreadMcpSignInCard } from "./McpSignInChatCard";
 import { useMessageBackdropAction } from "./message-backdrop";
+import { useThreadNearPaymentCard } from "./NearPaymentThreadCard";
 import { narrationRows, naturalThreadRows } from "./narration-rows";
+import { useNearPaymentApproval } from "./near-payment-approval";
 import { useThreadSettingLinkCard } from "./SettingLinkChatCard";
 import { withQuestionContext } from "./stores/scroll-store";
 import { createTurnSteps } from "./turn-steps";
@@ -43,6 +46,7 @@ export function ConversationThread() {
     previewAttachment,
     attachmentAction,
     attachmentDownloads,
+    imageCopies,
     openThreadFile,
     browserTakeoverResolution,
     installedSkills,
@@ -72,11 +76,13 @@ export function ConversationThread() {
     changeMarkerActions,
     shownSubagentId,
     toggleSubagentPanel,
+    browserTabs,
   } = useConversationViewScope();
   const backdropAction = useMessageBackdropAction(conversationRuntime(props));
   const threadBackgroundWorkSince = (taskId: string | undefined) =>
     taskId === undefined ? undefined : props.backgroundWorkSince?.(taskId);
   const { t, errorMessage } = useText();
+  const { card: nearPaymentCard } = useNearPaymentApproval(() => props.server?.kind === "local" && !props.runtime);
   const [picker, setPicker] = createSignal<HTMLInputElement>();
   const failureToast = (fallback: AppTextKey) => ({
     onError: (error: unknown) => {
@@ -86,7 +92,8 @@ export function ConversationThread() {
     },
   });
   const takeoverShown = () => props.browserTakeover !== undefined || browserTakeoverResolution() !== null;
-  const hasAttention = createMemo(() => takeoverShown() || props.prompt !== undefined);
+  const locationAsked = () => browserTabs().some((tab) => tab.permissionRequest !== undefined);
+  const hasAttention = createMemo(() => takeoverShown() || locationAsked() || props.prompt !== undefined);
   const messages = createProjection<AgentMessage[]>(
     () => {
       const conversation = props.threads?.conversation;
@@ -211,6 +218,7 @@ export function ConversationThread() {
   );
   const marketplaceCard = useThreadMarketplaceSuggestionCard();
   const settingLinkCard = useThreadSettingLinkCard();
+  const paymentRecordCard = useThreadNearPaymentCard();
   const visualReplyCard = useThreadVisualReplyCard(threadComposer.openDraftKey, requestThreadFocus);
   const attention = () => {
     if (!hasAttention()) return undefined;
@@ -222,6 +230,7 @@ export function ConversationThread() {
           }
         />
         <ConversationBrowserTakeover />
+        <ConversationBrowserLocation />
       </>
     );
   };
@@ -293,12 +302,20 @@ export function ConversationThread() {
             onPreview={(attachment) => void previewAttachment(attachment)}
             onAttachmentAction={attachmentAction}
             mediaSource={props.runtime?.attachmentMedia}
+            imageCopies={imageCopies()}
             downloads={attachmentDownloads}
             macWindowControls={props.platform === "darwin"}
             approval={current().threads.approval}
             media={props.mediaApproval}
             onRespondApproval={(decision) =>
               current().threads.onRespondApproval(decision, failureToast("prompt.approval.answerFailed"))
+            }
+            approvalCard={(approval) =>
+              nearPaymentCard(
+                approval,
+                () => current().threads.onRespondApproval("accept", failureToast("prompt.approval.answerFailed")),
+                () => current().threads.onRespondApproval("decline", failureToast("prompt.approval.answerFailed")),
+              )
             }
             context={contextUsageView(current().threads.contextState)}
             onCompactContext={current().threads.onCompactContext}
@@ -308,7 +325,8 @@ export function ConversationThread() {
               visualReplyCard(message, quote) ??
               mcpSignInCard(message) ??
               marketplaceCard(message) ??
-              settingLinkCard(message)
+              settingLinkCard(message) ??
+              paymentRecordCard(message)
             }
             olderMessages={current().threads.olderMessages}
             newerMessages={current().threads.newerMessages}

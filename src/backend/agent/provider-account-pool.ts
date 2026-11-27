@@ -37,6 +37,16 @@ function longestReset(candidate: PoolCandidate, nowSeconds: number): number | nu
 
 const SAME_RESET_SECONDS = 10 * 60;
 
+function leastUsed(candidates: readonly PoolCandidate[], current: string | null, nowSeconds: number): string {
+  const mostUsed = (candidate: PoolCandidate) =>
+    Math.max(0, ...windowsOf(candidate).map((window) => usedNow(window, nowSeconds)));
+  return candidates.reduce((best, candidate) =>
+    mostUsed(candidate) < mostUsed(best) || (mostUsed(candidate) === mostUsed(best) && candidate.accountId === current)
+      ? candidate
+      : best,
+  ).accountId;
+}
+
 export function pickPoolAccount(
   candidates: readonly PoolCandidate[],
   current: string | null,
@@ -45,17 +55,7 @@ export function pickPoolAccount(
 ): string | null {
   if (candidates.length === 0) return null;
   const open = candidates.filter((candidate) => usable(candidate, nowSeconds));
-  if (open.length === 0 && openOnly) return null;
-  if (open.length === 0) {
-    const mostLeft = (candidate: PoolCandidate) =>
-      Math.max(0, ...windowsOf(candidate).map((window) => usedNow(window, nowSeconds)));
-    return candidates.reduce((best, candidate) =>
-      mostLeft(candidate) < mostLeft(best) ||
-      (mostLeft(candidate) === mostLeft(best) && candidate.accountId === current)
-        ? candidate
-        : best,
-    ).accountId;
-  }
+  if (open.length === 0) return openOnly ? null : leastUsed(candidates, current, nowSeconds);
   const rank = (candidate: PoolCandidate) => longestReset(candidate, nowSeconds) ?? Number.POSITIVE_INFINITY;
   return open.reduce((best, candidate) => {
     const difference = rank(candidate) - rank(best);
@@ -63,4 +63,36 @@ export function pickPoolAccount(
       return candidate.accountId === current ? candidate : best;
     return difference < 0 ? candidate : best;
   }).accountId;
+}
+
+const UNREAD_ROOM_PERCENT = 50;
+const SPREAD_MOVE_GAIN = 1.25;
+
+function roomLeft(candidate: PoolCandidate, nowSeconds: number): number | null {
+  const windows = windowsOf(candidate);
+  if (windows.length === 0) return null;
+  return Math.min(...windows.map((window) => 100 - bufferPercent(window) - usedNow(window, nowSeconds)));
+}
+
+export function pickSpreadPoolAccount(
+  candidates: readonly PoolCandidate[],
+  current: string | null,
+  nowSeconds: number,
+  agentsOn: (accountId: string) => number,
+  openOnly = false,
+): string | null {
+  if (candidates.length === 0) return null;
+  const open = candidates.filter((candidate) => usable(candidate, nowSeconds));
+  if (open.length === 0) return openOnly ? null : leastUsed(candidates, current, nowSeconds);
+  const read = open.flatMap((candidate) => {
+    const room = roomLeft(candidate, nowSeconds);
+    return room === null ? [] : [room];
+  });
+  const unreadRoom = read.length > 0 ? read.reduce((sum, room) => sum + room, 0) / read.length : UNREAD_ROOM_PERCENT;
+  const share = (candidate: PoolCandidate) =>
+    (roomLeft(candidate, nowSeconds) ?? unreadRoom) / (agentsOn(candidate.accountId) + 1);
+  const best = open.reduce((leader, candidate) => (share(candidate) > share(leader) ? candidate : leader));
+  const stay = open.find((candidate) => candidate.accountId === current);
+  if (stay && share(best) <= share(stay) * SPREAD_MOVE_GAIN) return stay.accountId;
+  return best.accountId;
 }

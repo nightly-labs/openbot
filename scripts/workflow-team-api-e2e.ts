@@ -44,6 +44,14 @@ import { STORAGE_WORKFLOW_FILES_CAPABILITY } from "@openbot/contracts/team-proto
 import { TEAM_PROTOCOL_V7 } from "@openbot/contracts/team-protocol/v7";
 import { TEAM_PROTOCOL_V9 } from "@openbot/contracts/team-protocol/v9";
 import { TEAM_PROTOCOL_V10 } from "@openbot/contracts/team-protocol/v10";
+import {
+  WORKFLOW_PRESENCE_CAPABILITY,
+  WORKFLOW_PRESENCE_LIMITS,
+  WORKFLOW_SPOT_CONTROL,
+  type WorkflowSpotEvent,
+  type WorkflowSpotPoint,
+  workflowSpotEvent,
+} from "@openbot/contracts/team-protocol/workflow-presence-v1";
 import { WORKFLOWS_AGENT_FILES_CAPABILITY } from "@openbot/contracts/team-protocol/workflows-agent-files-v1";
 import { WORKFLOWS_ANSWERS_CAPABILITY } from "@openbot/contracts/team-protocol/workflows-answers-v1";
 import { WORKFLOWS_CHANNELS_CAPABILITY } from "@openbot/contracts/team-protocol/workflows-channels-v1";
@@ -74,6 +82,7 @@ import {
   WORKFLOWS_MEDIA_CATALOG_V2_CODECS,
   WORKFLOWS_MEDIA_CATALOG_V2_ROUTES,
 } from "@openbot/contracts/team-protocol/workflows-media-catalog-v2";
+import { WORKFLOWS_MEDIA_CLIPS_CAPABILITY } from "@openbot/contracts/team-protocol/workflows-media-clips-v1";
 import {
   WORKFLOWS_MEDIA_SERVICE_ACCOUNT_CAPABILITY,
   WORKFLOWS_MEDIA_SERVICE_ACCOUNT_CODECS,
@@ -363,6 +372,7 @@ const teamBrowser: TeamApiBrowser = {
   navigate: unused,
   reload: unused,
   stop: unused,
+  answerPermission: unused,
   takeUserControl: unused,
   startTeach: unused,
   stopTeach: () => [],
@@ -378,7 +388,9 @@ const teamBrowser: TeamApiBrowser = {
   startView: unused,
   dispatchViewInput: unused,
   copyViewSelection: unused,
+  answerViewDialog: unused,
   importSignIn: unused,
+  answerHttpSignIn: unused,
 };
 
 const root = await mkdtemp(join(tmpdir(), "openbot-workflow-team-api-"));
@@ -444,6 +456,7 @@ interface Host {
 let host: Host | null = null;
 const sockets: WebSocket[] = [];
 let failingAgent = "";
+const localSpotListeners = new Set<(event: WorkflowSpotEvent) => void>();
 
 async function startHost(): Promise<Host> {
   const database = new OpenBotDatabase(userData);
@@ -594,6 +607,10 @@ async function startHost(): Promise<Host> {
       diskUse: unused,
     },
     libraryFolders,
+    workflowSpotStaleMs: SPOT_STALE_MS,
+    onWorkflowSpot: (event) => {
+      for (const listener of [...localSpotListeners]) listener(event);
+    },
     workflows: {
       ...workflows,
       get: (workflowId) =>
@@ -792,7 +809,7 @@ async function setLevels(ownerToken: string, everyone: AgentAccessChange["everyo
   accessRevision += 1;
 }
 
-async function openEvents(token: string): Promise<WebSocket> {
+async function openEvents(token: string, extraCapabilities: readonly string[] = []): Promise<WebSocket> {
   const socket = new WebSocket(`ws://127.0.0.1:${current().port}${TEAM_API_ROUTES.events}`, [
     TEAM_PROTOCOL_V1_WEBSOCKET,
     `openbot-token.${token}`,
@@ -809,12 +826,60 @@ async function openEvents(token: string): Promise<WebSocket> {
     JSON.stringify({
       type: "agent-event-scope",
       includeConversations: false,
-      capabilities: ["agent-runtime-snapshots", WORKFLOWS_CAPABILITY],
+      capabilities: ["agent-runtime-snapshots", WORKFLOWS_CAPABILITY, ...extraCapabilities],
     }),
   );
   await snapshot;
   return socket;
 }
+
+const openPresence = (token: string) => openEvents(token, [WORKFLOW_PRESENCE_CAPABILITY]);
+
+const SPOT_STALE_MS = 5_000;
+
+function sendSpot(
+  socket: WebSocket,
+  workflowId: string | null,
+  at: WorkflowSpotPoint | null,
+  selected: string | null = null,
+): void {
+  socket.send(JSON.stringify({ type: WORKFLOW_SPOT_CONTROL, workflowId, at, selected }));
+}
+
+function nextSpot(socket: WebSocket, pick: (event: WorkflowSpotEvent) => boolean): Promise<WorkflowSpotEvent> {
+  return nextMessage(socket, (value) => {
+    const event = workflowSpotEvent(value);
+    return event && pick(event) ? event : null;
+  });
+}
+
+function recordSpots(socket: WebSocket): WorkflowSpotEvent[] {
+  const seen: WorkflowSpotEvent[] = [];
+  socket.addEventListener("message", (message) => {
+    const event = workflowSpotEvent(JSON.parse(String(message.data)));
+    if (event) seen.push(event);
+  });
+  return seen;
+}
+
+function nextLocalSpot(pick: (event: WorkflowSpotEvent) => boolean): Promise<WorkflowSpotEvent> {
+  return new Promise((resolveSpot) => {
+    const listener = (event: WorkflowSpotEvent) => {
+      if (!pick(event)) return;
+      localSpotListeners.delete(listener);
+      resolveSpot(event);
+    };
+    localSpotListeners.add(listener);
+  });
+}
+
+function closeCode(socket: WebSocket): Promise<number> {
+  return new Promise((resolveClose) =>
+    socket.addEventListener("close", (event) => resolveClose(event.code), { once: true }),
+  );
+}
+
+const spotAt = (event: WorkflowSpotEvent, x: number, y: number) => event.spot?.at?.x === x && event.spot.at.y === y;
 
 function nextMessage<T>(socket: WebSocket, pick: (value: unknown) => T | null): Promise<T> {
   return new Promise((resolveMessage, reject) => {
@@ -1888,6 +1953,191 @@ try {
     return await changed;
   });
 
+  await step("presence: the host advertises workflow-presence-v1 to a v10 client", async () => {
+    const advertised = async (protocol: number) =>
+      list(
+        record((await call("GET", TEAM_API_ROUTES.compatibility, { protocol })).body, "compatibility").capabilities,
+        "capabilities",
+      ).includes(WORKFLOW_PRESENCE_CAPABILITY);
+    assert.ok(await advertised(TEAM_PROTOCOL_V10));
+    assert.ok(!(await advertised(TEAM_PROTOCOL_V9)));
+    return { capability: WORKFLOW_PRESENCE_CAPABILITY };
+  });
+
+  const presence = await step(
+    "presence: the owner and the member see the cursor and selection of the other on one workflow",
+    async () => {
+      const owner = await openPresence(ownerToken);
+      const mate = await openPresence(member);
+      const ownerSeen = recordSpots(owner);
+      const mateSeen = recordSpots(mate);
+      const ownerSpot = nextSpot(mate, (event) => event.workflowId === ids.open && spotAt(event, 10, 20));
+      const mateSpot = nextSpot(owner, (event) => event.workflowId === ids.open && spotAt(event, 30, 40));
+      sendSpot(owner, ids.open, { x: 10, y: 20 }, "agent");
+      sendSpot(mate, ids.open, { x: 30, y: 40 });
+      const fromOwner = await ownerSpot;
+      const fromMate = await mateSpot;
+      assert.equal(fromOwner.spot?.selected, "agent");
+      assert.equal(fromMate.spot?.selected, null);
+      assert.notEqual(fromOwner.memberId, fromMate.memberId);
+      const moved = nextSpot(mate, (event) => spotAt(event, 11, 21));
+      sendSpot(owner, ids.open, { x: 11, y: 21 }, "prompt");
+      assert.equal((await moved).spot?.selected, "prompt");
+      assert.ok(!ownerSeen.some((event) => event.memberId === fromOwner.memberId), "The owner got their own spot.");
+      assert.ok(!mateSeen.some((event) => event.memberId === fromMate.memberId), "The member got their own spot.");
+      return { owner, mate, ownerId: fromOwner.memberId, memberId: fromMate.memberId };
+    },
+    ({ ownerId, memberId }) => ({ relayed: true, distinctMembers: ownerId !== memberId }),
+  );
+
+  await step("presence: a seat that joins gets the current spots as a snapshot", async () => {
+    const late = await openPresence(member);
+    const snapshot = nextSpot(late, (event) => event.memberId === presence.ownerId);
+    const announced = nextSpot(presence.owner, (event) => spotAt(event, 50, 60));
+    sendSpot(late, ids.open, { x: 50, y: 60 });
+    const seen = await snapshot;
+    assert.ok(spotAt(seen, 11, 21), JSON.stringify(seen));
+    assert.equal((await announced).memberId, presence.memberId);
+    const fallback = nextSpot(presence.owner, (event) => event.memberId === presence.memberId && spotAt(event, 30, 40));
+    late.close();
+    await fallback;
+    return { snapshot: seen.spot, afterClose: "the remaining seat of the member" };
+  });
+
+  await step("presence: the host sends the local user's spot and gets the spots of members", async () => {
+    const toMember = nextSpot(presence.mate, (event) => event.memberId === presence.ownerId && spotAt(event, 70, 80));
+    const toLocal = nextLocalSpot((event) => event.memberId === presence.memberId);
+    current().server.setLocalWorkflowSpot(presence.ownerId, {
+      workflowId: ids.open,
+      at: { x: 70, y: 80 },
+      selected: null,
+    });
+    const local = await toLocal;
+    assert.equal(local.workflowId, ids.open);
+    await toMember;
+    const back = nextSpot(presence.mate, (event) => event.memberId === presence.ownerId && spotAt(event, 11, 21));
+    current().server.setLocalWorkflowSpot(presence.ownerId, { workflowId: null, at: null, selected: null });
+    await back;
+    return { local: local.spot, afterLeave: "the remaining seat of the owner" };
+  });
+
+  await step("presence: a member's spot on a workflow they cannot see is not relayed", async () => {
+    const watcher = await openPresence(ownerToken);
+    const watcherSeen = recordSpots(watcher);
+    sendSpot(watcher, ids.closed, { x: 1, y: 1 });
+    const outsider = await openPresence(member);
+    const outsiderSeen = recordSpots(outsider);
+    sendSpot(outsider, ids.closed, { x: 2, y: 2 });
+    await ok(WORKFLOWS_ROUTES.get, member, { workflowId: ids.open });
+    const control = nextSpot(presence.owner, (event) => event.memberId === presence.memberId && spotAt(event, 3, 3));
+    sendSpot(presence.mate, ids.open, { x: 3, y: 3 });
+    await control;
+    assert.deepEqual(watcherSeen, [], "The owner got a spot on a workflow the member cannot see.");
+    assert.deepEqual(outsiderSeen, [], "The member got spots on a workflow they cannot see.");
+    assert.equal(outsider.readyState, WebSocket.OPEN);
+    watcher.close();
+    outsider.close();
+    return { relayedToOwner: watcherSeen.length, relayedToMember: outsiderSeen.length };
+  });
+
+  await step("presence: a client without workflow-presence-v1 and a malformed spot are refused", async () => {
+    const plain = await openEvents(member);
+    const plainClosed = closeCode(plain);
+    sendSpot(plain, ids.open, { x: 1, y: 1 });
+    const malformed = await openPresence(member);
+    const malformedClosed = closeCode(malformed);
+    malformed.send(
+      JSON.stringify({ type: WORKFLOW_SPOT_CONTROL, workflowId: ids.open, at: { x: "1", y: 1 }, selected: null }),
+    );
+    const codes = { withoutCapability: await plainClosed, malformed: await malformedClosed };
+    assert.deepEqual(codes, { withoutCapability: 1003, malformed: 1003 });
+    return codes;
+  });
+
+  await step(
+    "presence: a member who loses access to the workflow stops getting spots and gets them again",
+    async () => {
+      const ownerSees = nextSpot(
+        presence.owner,
+        (event) => event.memberId === presence.memberId && event.spot === null,
+      );
+      const mateSees = nextSpot(presence.mate, (event) => event.memberId === presence.ownerId && event.spot === null);
+      await setLevels(ownerToken, {
+        [open]: "none",
+        [closed]: "none",
+        [viewer]: "view",
+        [chatter]: "chat",
+        [later]: "none",
+      });
+      await ownerSees;
+      await mateSees;
+      await setLevels(ownerToken, { [closed]: "none", [viewer]: "view", [chatter]: "chat", [later]: "none" });
+      const back = nextSpot(presence.owner, (event) => event.memberId === presence.memberId && spotAt(event, 5, 5));
+      const snapshot = nextSpot(presence.mate, (event) => event.memberId === presence.ownerId && event.spot !== null);
+      sendSpot(presence.mate, ids.open, { x: 5, y: 5 });
+      await back;
+      await snapshot;
+      return { revoked: "spot null on both sides", restored: "relayed again" };
+    },
+  );
+
+  await step("presence: a member who leaves the workflow is removed for the others", async () => {
+    const left = nextSpot(presence.owner, (event) => event.memberId === presence.memberId && event.spot === null);
+    sendSpot(presence.mate, null, null);
+    await left;
+    const ownerLeft = nextSpot(presence.mate, (event) => event.memberId === presence.ownerId && event.spot === null);
+    const mateReturned = nextSpot(presence.owner, (event) => spotAt(event, 4, 4));
+    sendSpot(presence.mate, ids.open, { x: 4, y: 4 });
+    await mateReturned;
+    presence.owner.close();
+    await ownerLeft;
+    presence.mate.close();
+    return { onLeave: null, onClose: null };
+  });
+
+  await step("presence: a seat that sends again keeps its spot, and a silent seat is removed", async () => {
+    const owner = await openPresence(ownerToken);
+    const mate = await openPresence(member);
+    const ownerSeen = recordSpots(owner);
+    const ownerKeepsAlive = () => sendSpot(owner, ids.open, { x: 7, y: 7 });
+    ownerKeepsAlive();
+    const ownerAlive = setInterval(ownerKeepsAlive, SPOT_STALE_MS / 2);
+    const first = nextSpot(owner, (event) => event.memberId === presence.memberId && spotAt(event, 6, 6));
+    sendSpot(mate, ids.open, { x: 6, y: 6 });
+    await first;
+    const keptUntil = Date.now() + SPOT_STALE_MS * 1.5;
+    while (Date.now() < keptUntil) {
+      await new Promise((resolveWait) => setTimeout(resolveWait, SPOT_STALE_MS / 2));
+      sendSpot(mate, ids.open, { x: 6, y: 6 });
+    }
+    const mateEvents = () => ownerSeen.filter((event) => event.memberId === presence.memberId);
+    const keptEvents = mateEvents();
+    const mostBroadcasts = 1 + Math.floor((SPOT_STALE_MS * 1.5) / (WORKFLOW_PRESENCE_LIMITS.keepAliveMs / 2));
+    assert.ok(keptEvents.length >= 1 && keptEvents.length <= mostBroadcasts, JSON.stringify(keptEvents));
+    assert.ok(
+      keptEvents.every((event) => spotAt(event, 6, 6)),
+      JSON.stringify(keptEvents),
+    );
+    const silentFrom = Date.now();
+    await nextSpot(owner, (event) => event.memberId === presence.memberId && event.spot === null);
+    const removedAfterMs = Date.now() - silentFrom;
+    assert.ok(removedAfterMs >= SPOT_STALE_MS * 0.9, String(removedAfterMs));
+    assert.equal(mate.readyState, WebSocket.OPEN);
+    const back = nextSpot(owner, (event) => event.memberId === presence.memberId && spotAt(event, 6, 6));
+    sendSpot(mate, ids.open, { x: 6, y: 6 });
+    await back;
+    clearInterval(ownerAlive);
+    owner.close();
+    mate.close();
+    return {
+      keptForMs: SPOT_STALE_MS * 1.5,
+      broadcastsWhileKept: keptEvents.length,
+      mostBroadcasts,
+      removedAfterMs,
+      returnsOnNextSend: true,
+    };
+  });
+
   await step("size: a workflow too large for one frame answers 413 with its own sentence", async () => {
     const nodes: WorkflowNode[] = Array.from({ length: 100 }, (_, index) => ({
       id: `text-${index}`,
@@ -1923,7 +2173,7 @@ try {
   });
 
   await step(
-    "media: a member keeps an uploaded PNG as a picture of the host; a GIF, a used draft and an old client are refused",
+    "media: a member keeps an uploaded PNG and an MP4 clip on the host; a GIF, a used draft and an old client are refused",
     async () => {
       const capabilities = async (protocol: number) =>
         list(
@@ -1932,6 +2182,8 @@ try {
         );
       assert.ok((await capabilities(TEAM_PROTOCOL_V9)).includes(WORKFLOWS_MEDIA_CAPABILITY));
       assert.ok(!(await capabilities(TEAM_PROTOCOL_V7)).includes(WORKFLOWS_MEDIA_CAPABILITY));
+      assert.ok((await capabilities(TEAM_PROTOCOL_V10)).includes(WORKFLOWS_MEDIA_CLIPS_CAPABILITY));
+      assert.ok(!(await capabilities(TEAM_PROTOCOL_V9)).includes(WORKFLOWS_MEDIA_CLIPS_CAPABILITY));
       const codec = WORKFLOWS_MEDIA_CODECS.get(WORKFLOWS_MEDIA_ROUTES.keepPicture);
       assert.ok(codec, "No workflows-media-v1 codec for keep-picture.");
       const keep = async (draftId: string, capabilities = teamCapabilitiesForProtocol(TEAM_PROTOCOL_V9)) => {
@@ -1962,7 +2214,18 @@ try {
 
       const gif = await keep(gifDraft);
       assert.notEqual(gif.status, 200, JSON.stringify(gif.body));
-      assert.ok(JSON.stringify(gif.body).includes(sourceText("error.workflow.pictureType")), JSON.stringify(gif.body));
+      assert.ok(JSON.stringify(gif.body).includes(sourceText("error.workflow.assetType")), JSON.stringify(gif.body));
+
+      const clip = Uint8Array.from(Buffer.from("openbot workflow clip"));
+      const clipDraft = await sendDraft(member, "clip.mp4", "video/mp4", clip);
+      const keptClip = await keep(clipDraft);
+      assert.equal(keptClip.status, 200, JSON.stringify(keptClip.body));
+      const clipId = text(record(keptClip.body, "keep-clip").fileId, "fileId");
+      const clipFile = await fetch(`http://127.0.0.1:${current().port}${TEAM_API_ROUTES.attachment(clipId)}`, {
+        headers: v9Headers(member),
+      });
+      assert.equal(clipFile.status, 200, `The kept clip returned ${clipFile.status}.`);
+      assert.deepEqual(new Uint8Array(await clipFile.arrayBuffer()), clip, "The kept clip has other bytes.");
 
       const kept = await keep(pngDraft);
       assert.equal(kept.status, 200, JSON.stringify(kept.body));
@@ -1980,7 +2243,14 @@ try {
         JSON.stringify(used.body).includes(sourceText("error.workflow.pictureMissing")),
         JSON.stringify(used.body),
       );
-      return { old: old.status, gif: gif.status, kept: kept.status, file: file.status, used: used.status };
+      return {
+        old: old.status,
+        gif: gif.status,
+        clip: keptClip.status,
+        kept: kept.status,
+        file: file.status,
+        used: used.status,
+      };
     },
   );
 

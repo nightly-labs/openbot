@@ -30,7 +30,7 @@ const OPENCODE_RETRY_TYPES: ReadonlyMap<string, boolean> = new Map([
   ["provider.transport", true],
 ]);
 
-const TEXT_TOOL_CALL_TAG = String.raw`(?:[\w.-]+:|[|｜]DSML[|｜])?(?:function_calls?|tool_calls?|invoke)`;
+const TEXT_TOOL_CALL_TAG = String.raw`(?:[\w.-]+:|[|｜]DSML[|｜])?(?:function_calls?|tool_calls?|invoke|execute)`;
 const TEXT_TOOL_CALL_ENDING = new RegExp(
   String.raw`(?:^|\n)[ \t]*(?:<${TEXT_TOOL_CALL_TAG}\b[^>]*>[\s\S]*</${TEXT_TOOL_CALL_TAG}>|<｜tool▁calls▁begin｜>[\s\S]*<｜tool▁calls▁end｜>|\[Assistant tool call\]:[ \t]*[\w.-]+\([\s\S]*\))\s*$`,
   "u",
@@ -130,7 +130,7 @@ function isReasoningEffortRefusal(error: unknown): boolean {
   if (!(error instanceof RequestError) || error.code !== -32603) return false;
   return (
     /\breasoning[_ .]?effort\b/iu.test(error.message) &&
-    /\b(?:does not support|doesn't support|not supported|unsupported|unrecognized|unknown|unexpected|invalid|not allowed|not permitted)\b/iu.test(
+    /\b(?:does not support|doesn't support|not supported|unsupported|unrecognized|unknown|unexpected|invalid|not allowed|not permitted|must be|should be|expected)\b/iu.test(
       error.message,
     )
   );
@@ -301,6 +301,7 @@ export const OPENCODE_ACP_FLAVOR: AcpFlavor = {
     return isOpenCodeServiceFailure(error) ? "list-sessions" : null;
   },
   keepModelsOnRefreshFailure: true,
+  modelNotOffered: (error) => error.code === -32602 && isRecord(error.data) && typeof error.data.modelId === "string",
   streamAnswerBeforePromptReturns: true,
   thoughtsInsideAnswer: true,
   unsentBackgroundTurns: true,

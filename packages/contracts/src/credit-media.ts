@@ -1,11 +1,21 @@
-import { creditCharge, isCreditAmount } from "./credits";
+import {
+  CREDIT_CLIP_SECONDS,
+  CREDIT_ESTIMATE_SPECS,
+  CREDIT_MODEL_COSTS,
+  type CreditEstimate,
+  type CreditModelCost,
+  creditCharge,
+  creditEstimates,
+  creditModelMakerNamed,
+  isCreditAmount,
+} from "./credits";
 import { isBoolean, isDynamicRecord, isNumber, isOneOf, isString } from "./runtime-values";
 
 export const CREDIT_MEDIA_KINDS = ["image", "video"] as const;
 export type CreditMediaGenerationKind = (typeof CREDIT_MEDIA_KINDS)[number];
-export const CREDIT_MEDIA_PREFERRED_MODELS: Readonly<Record<CreditMediaGenerationKind, string>> = {
-  image: "gpt-image-2.6",
-  video: "seedance-2.5",
+export const CREDIT_MEDIA_PREFERRED_MODELS: Readonly<Record<CreditMediaGenerationKind, readonly string[]>> = {
+  image: ["gpt-image-2.6"],
+  video: ["magi-2", "seedance-2.5"],
 };
 export const CREDIT_MEDIA_PRICE_UNITS = ["item", "second"] as const;
 export type CreditMediaPriceUnit = (typeof CREDIT_MEDIA_PRICE_UNITS)[number];
@@ -13,6 +23,8 @@ export const CREDIT_MEDIA_JOB_STATUSES = ["queued", "processing", "completed", "
 export type CreditMediaJobStatus = (typeof CREDIT_MEDIA_JOB_STATUSES)[number];
 export const CREDIT_MEDIA_FAILURES = ["refused", "failed", "canceled", "expired"] as const;
 export type CreditMediaFailure = (typeof CREDIT_MEDIA_FAILURES)[number];
+export const CREDIT_MEDIA_FAILURE_REASONS = ["content_policy"] as const;
+export type CreditMediaFailureReason = (typeof CREDIT_MEDIA_FAILURE_REASONS)[number];
 export const CREDIT_MEDIA_INPUT_ROLES = ["first", "last", "reference"] as const;
 export type CreditMediaInputRole = (typeof CREDIT_MEDIA_INPUT_ROLES)[number];
 export const CREDIT_MEDIA_WALLETS = ["personal", "server"] as const;
@@ -109,6 +121,7 @@ export interface CreditMediaJob {
   pollAfterSeconds: number;
   outputs: readonly CreditMediaOutput[];
   failure: CreditMediaFailure | null;
+  reason: CreditMediaFailureReason | null;
 }
 
 export interface CreditMediaBalance {
@@ -153,6 +166,62 @@ export function creditMediaCost(model: CreditMediaModel, input: CreditMediaCostI
   const total = perUnit * units * Math.max(1, input.count);
   if (!Number.isFinite(total) || total <= 0) return null;
   return creditCharge(total);
+}
+
+export function creditMediaShownCredits(model: CreditMediaModel): number | null {
+  const price = creditMediaPrice(model, model.defaultResolution);
+  if (!price) return null;
+  const perUnit = model.audio && price.silentCredits !== null ? price.silentCredits : price.credits;
+  return price.unit === "second" ? creditCharge(perUnit * CREDIT_CLIP_SECONDS) : perUnit;
+}
+
+function liveModelCost(model: CreditMediaModel): CreditModelCost | null {
+  const maker = creditModelMakerNamed(model.maker);
+  const credits = creditMediaShownCredits(model);
+  if (maker === undefined || credits === null) return null;
+  const cost: CreditModelCost = {
+    modelId: model.id,
+    name: model.name,
+    maker,
+    kind: model.kind,
+    unit: model.kind === "video" ? "clip" : "image",
+    credits,
+  };
+  return model.variant === null ? cost : { ...cost, variant: model.variant };
+}
+
+export function creditModelCostsLive(models: readonly CreditMediaModel[]): CreditModelCost[] {
+  const live = new Map(models.map((model) => [model.id, model]));
+  const known = new Set(CREDIT_MODEL_COSTS.map((cost) => cost.modelId));
+  const listed = CREDIT_MODEL_COSTS.map((cost) => {
+    const model = live.get(cost.modelId);
+    const credits = model ? creditMediaShownCredits(model) : null;
+    if (!model || credits === null) return cost;
+    return model.variant === null ? { ...cost, credits } : { ...cost, credits, variant: model.variant };
+  });
+  const added = models.flatMap((model) => {
+    if (known.has(model.id)) return [];
+    const cost = liveModelCost(model);
+    return cost ? [cost] : [];
+  });
+  return [...listed, ...added];
+}
+
+export function creditEstimatesLive(models: readonly CreditMediaModel[]): CreditEstimate[] {
+  const live = new Map(models.map((model) => [model.id, model]));
+  return creditEstimates().flatMap((estimate) => {
+    const model = live.get(estimate.model.modelId);
+    if (!model) return [];
+    const spec = CREDIT_ESTIMATE_SPECS[estimate.model.modelId];
+    if (!spec || !model.resolutions.includes(spec.resolution)) return [estimate];
+    const charge = creditMediaCost(model, {
+      resolution: spec.resolution,
+      duration: model.kind === "video" ? CREDIT_CLIP_SECONDS : null,
+      count: 1,
+      audio: false,
+    });
+    return [charge === null ? estimate : { ...estimate, charge }];
+  });
 }
 
 export function creditMediaRequestProblem(
@@ -320,7 +389,17 @@ export function parseCreditMediaJob(value: unknown): CreditMediaJob | null {
     value.failure === null ? null : isOneOf(CREDIT_MEDIA_FAILURES, value.failure) ? value.failure : undefined;
   if (credits === null || pollAfterSeconds === null || failure === undefined) return null;
   const outputs = value.outputs.map(parseOutput).filter((output): output is CreditMediaOutput => output !== null);
-  return { jobId: value.jobId, model: value.model, status: value.status, credits, pollAfterSeconds, outputs, failure };
+  const reason = isOneOf(CREDIT_MEDIA_FAILURE_REASONS, value.reason) ? value.reason : null;
+  return {
+    jobId: value.jobId,
+    model: value.model,
+    status: value.status,
+    credits,
+    pollAfterSeconds,
+    outputs,
+    failure,
+    reason,
+  };
 }
 
 export function parseCreditMediaBalance(value: unknown): CreditMediaBalance | null {

@@ -81,6 +81,8 @@ export const messages = {
   "prompt.mediaApproval.setDefault": "تعيين كافتراضي",
   "prompt.mediaApproval.perImage": "لكل صورة",
   "prompt.mediaApproval.forSeconds": "لمدة {count} ث",
+  "prompt.mediaApproval.freeCredits": "أرصدة مجانية",
+  "prompt.mediaApproval.paidOnly": "أرصدة مدفوعة فقط",
   "prompt.mediaApproval.defaultFailed": "تعذّر حفظ النموذج الافتراضي. حاول مرة أخرى.",
   "prompt.creditsHold.needMore": "أحتاج إلى مزيد من الأرصدة",
   "prompt.creditsHold.cannotUse": "لا يمكنني استخدام الأرصدة",

@@ -414,6 +414,21 @@ const FIXTURES: Fixture[] = [
     replies: ["A plan."],
     steps: { plan: "done" },
   },
+  {
+    title: "Video and audio assets",
+    pr: "canvas media clips",
+    format: 4,
+    graph: graphOf(
+      [
+        TRIGGER,
+        node("clip", "asset", 0, { fileId: "file-clip", file: "launch.mp4", media: "video" }),
+        node("song", "asset", 0, { fileId: "file-song", file: "theme.mp3", media: "audio" }),
+        node("writer", "agent", 300, { agentId: AGENT_A, task: "Write about the clip." }),
+      ],
+      [edge("start", "writer"), edge("clip", "writer", { type: "file" }), edge("song", "writer", { type: "file" })],
+    ),
+    steps: { writer: "done" },
+  },
 ];
 
 let modelReplies: string[] = [];
@@ -664,6 +679,12 @@ try {
   const filesA: string[] = [];
   const filesB: string[] = [];
   const logo = new Uint8Array([137, 80, 78, 71, 1, 2, 3]);
+  const files = new Map([
+    ["file-logo", { name: "logo.png", type: "image/png" }],
+    ["file-clip", { name: "launch.mp4", type: "video/mp4" }],
+    ["file-song", { name: "theme.mp3", type: "audio/mpeg" }],
+  ]);
+  const fileOnB = (name: string) => `${[...files].find(([, file]) => file.name === name)?.[0] ?? "file-logo"}-b`;
   const encode = (title: string, graph: WorkflowGraph, agents: Map<string, { name: string }>) => {
     const source: WorkflowFileSource = {
       title,
@@ -675,10 +696,12 @@ try {
         ["channel-news", { name: "news" }],
         ["channel-news-b", { name: "news" }],
       ]),
-      assets: new Map([
-        ["file-logo", { name: "logo.png", type: "image/png", size: logo.byteLength }],
-        ["file-logo-b", { name: "logo.png", type: "image/png", size: logo.byteLength }],
-      ]),
+      assets: new Map(
+        [...files].flatMap(([id, file]) => [
+          [id, { ...file, size: logo.byteLength }],
+          [`${id}-b`, { ...file, size: logo.byteLength }],
+        ]),
+      ),
       hasSecret,
     };
     const exported = encodeWorkflowFile(source);
@@ -707,7 +730,9 @@ try {
           reference.kind === "agent" ? AGENT_B : "channel-news-b",
         ]),
       ),
-      assets: new Map(Object.keys(decoded.file.assets).map((key) => [key, { id: "file-logo-b", name: "logo.png" }])),
+      assets: new Map(
+        Object.entries(decoded.file.assets).map(([key, asset]) => [key, { id: fileOnB(asset.name), name: asset.name }]),
+      ),
     });
     const copy = await runCauseEffect(b.create({ ...imported, paused: true }));
     const copied = await runCauseEffect(b.get(copy.summary.id));

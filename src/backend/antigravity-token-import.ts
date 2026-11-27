@@ -1,6 +1,7 @@
 import { closeSync, existsSync, mkdirSync, openSync, readFileSync, writeFileSync } from "node:fs";
+import { readFile } from "node:fs/promises";
 import { join } from "node:path";
-import { Option, Schema } from "effect";
+import { Effect, Option, Schema } from "effect";
 
 const LEGACY_TOKEN_FILE = "acp_token.json";
 
@@ -73,3 +74,14 @@ function writeExclusive(path: string, text: string): void {
 function writeMarker(marker: string): void {
   writeFileSync(marker, "", { mode: 0o600 });
 }
+
+const TokenFileEmail = Schema.Struct({ id_token_email: Schema.optional(Schema.String) });
+
+const decodeTokenFileEmail = Schema.decodeUnknownOption(Schema.fromJsonString(TokenFileEmail));
+
+export const readAntigravityEmail = Effect.fn("AntigravityToken.readEmail")(function* (tokenFile: string) {
+  return yield* Effect.tryPromise(() => readFile(tokenFile, "utf8")).pipe(
+    Effect.map((text) => Option.getOrNull(decodeTokenFileEmail(text))?.id_token_email?.trim() || null),
+    Effect.orElseSucceed(() => null),
+  );
+});

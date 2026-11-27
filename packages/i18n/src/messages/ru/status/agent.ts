@@ -68,6 +68,26 @@ export const messages = {
   "status.agent.workflowDelete":
     "Удалить рабочий процесс {title} вместе с его запусками и версиями. Его открытые шаги остановятся.",
   "status.agent.deleteAgents": "Удалить {agents} вместе с их чатами и файлами. Это нельзя отменить.",
+  "status.agent.nearSignatureReceived": "OpenBot получил подпись. Эту вкладку можно закрыть.",
+  "status.agent.nearSignatureUnknown": "OpenBot не ждёт эту подпись. Начните её заново в OpenBot.",
+  "status.agent.nearPayment":
+    "Заплатить {amount} {symbol} получателю {recipient} из криптокошелька, для {domain}: {reason}",
+  "status.agent.nearPaymentSending": "Оплата {amount} для {domain}: {reason}",
+  "status.agent.nearPaymentPaid": "Оплачено {amount} для {domain}: {reason}",
+  "status.agent.nearPaymentNotPaid": "Не оплачено: {amount} для {domain}: {reason}",
+  "status.agent.nearPaymentUncertain": "Не подтверждено: {amount} для {domain}: {reason}",
+  "status.agent.nearSummaryCreate":
+    "Все агенты могут платить до {amount} USD в день. Это можно изменить позже в OpenBot.",
+  "status.agent.nearSummaryGrant":
+    "Разрешить этому приложению OpenBot платить из кошелька {days} дней в рамках ваших правил.",
+  "status.agent.nearSummaryBudget": "Изменить дневной бюджет кошелька на {amount} USD.",
+  "status.agent.nearSummaryAutoPay":
+    "Разрешить OpenBot платить без вашей подписи, когда это позволяет правило платежей. О других платежах вас по-прежнему спросят в чате.",
+  "status.agent.nearSummaryManualPay":
+    "Правил платежей больше нет. OpenBot снова будет запрашивать вашу подпись для каждого платежа.",
+  "status.agent.nearSummaryPayment": "Одобрить платёж {amount} получателю {recipient}.",
+  "status.agent.nearSummaryFreeze": "Агенты не смогут платить из этого кошелька, пока вы не возобновите платежи.",
+  "status.agent.nearSummaryUnfreeze": "Агенты снова смогут платить из этого кошелька в рамках ваших правил.",
   "status.agent.screenCaptureProgress": "Запрос снимка экрана…",
   "status.agent.screenCaptureReviewing": "Просмотр снимка экрана…",
   "status.agent.browserOpening": "Открытие веб-страницы…",
@@ -75,6 +95,7 @@ export const messages = {
   "status.agent.browserClicking": "Нажатие на веб-странице…",
   "status.agent.browserTyping": "Ввод на веб-странице…",
   "status.agent.browserActing": "Работа с веб-страницей…",
+  "status.agent.browserPaying": "Отправка платежа…",
   "status.agent.browserReviewing": "Просмотр веб-страницы…",
   "status.agent.memoriesSearching": "Поиск в памяти…",
   "status.agent.chatsSearching": "Поиск в прошлых чатах…",

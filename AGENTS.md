@@ -38,7 +38,9 @@ and state which default you set aside. Do not argue by citing this file.
 - **Redact secrets** on every log, export, and send path, including diagnostics and analytics.
   Exception: an agent's chat-app post (`redactPostText`) masks known key formats and a saved secret
   only as a whole token, not inside a word, an email address or a domain, and not labeled passwords
-  that are not saved. Decided by the developer on 2026-11-22.
+  that are not saved. Decided by the developer on 2026-11-22. The agent's instruction file, when
+  OpenBot sends it to the model, uses the same rule. Decided by the developer on 2026-11-26. The reply
+  and thinking text of a Pi agent in the chat also uses it. Decided by the developer on 2026-11-26.
 - **Keep PolyForm Noncommercial 1.0.0.** Do not add incompatible dependencies or relicense files.
 
 Read [CONTRIBUTING.md](CONTRIBUTING.md#security-sensitive-changes) when a change touches the trust
@@ -55,6 +57,15 @@ adding a module or moving ownership between workspaces.
   The phone also keeps the newest backdrop page that an agent set for its user with `set_backdrop`
   (`apps/mobile/src/features/settings/model/chat-backdrop.ts`); sign-out, session expiry and server
   removal delete it too.
+  The paired Apple Watch keeps a copy of the agents, their states and the requests they wait on, and
+  of the channels with the start of their last message (`apps/mobile/src/features/watch/`), also with
+  the app lock on. It gets them from the iPhone app or
+  directly from the host through Signal, end to end encrypted (`docs/architecture/watch-relay.md`).
+  It keeps a watch session token and the hosts' public watch keys in its Keychain. Sign-out deletes
+  all of it. Decided by the developer on 2026-11-25.
+  The watch also keeps the logo picture of each server (the plush or the uploaded logo, which the iPhone
+  draws into `watch-server-pictures` in the App Group), its color and its shape. Sign-out deletes them
+  with the other watch pictures. Decided by the developer on 2026-11-27.
   A desktop or browser client also keeps a copy of the agent and channel pictures that it loaded from a
   joined server (`src/main/remote-picture-cache.ts`,
   `src/renderer/src/features/web-client/web-agent-pictures.ts`), so the saved workspace shows the agent
@@ -67,7 +78,13 @@ adding a module or moving ownership between workspaces.
   service binding `MEDIA_GATEWAY`) to the media generation processor, and the result file comes back
   the same way. Both pass them through in transit only: they do not store or log them, and the
   account service keeps only the credit hold record. The processor adapters, routes, upstream model
-  IDs and keys are in the private gateway repository and its secrets, never in this repository.
+  IDs and keys are in the private repository
+  [`nightly-labs/openbot-media-gateway`](https://github.com/nightly-labs/openbot-media-gateway) and
+  its Worker secrets, never in this repository. To change a processor, a route, a welcome route or
+  the active upstream, work in that repository and deploy its Worker as its README says.
+  Exception: the crypto wallet sends its NEAR Intents Agent API calls through the account service
+  (`/v1/near/*`), which adds the partner key (`NEAR_INTENTS_PARTNER_KEY`, a secret). It passes them
+  through in transit only, and keeps only the wallet ID, its owner and its creation time in D1.
 - The user's SQLite database is the source of truth, not a remote cache.
 - Agents keep their workspace, thread, and identity across provider switches and restarts.
   Do not reset an agent to simplify state.
@@ -255,6 +272,20 @@ State which surfaces a change touches. Check all affected consumers and reverse 
   Load it with `bunx @dotenvx/dotenvx@2.38.2 run -f apps/auth-api/.env.dev -fk <root>/.env.keys --
   <command>`; `bun run dev` does not pass it on. Never print it. Ask before a benchmark or a run of many
   turns: the token budget is small.
+- For NEAR Intents wallet smoke checks, `apps/auth-api/.env.dev` holds `NEAR_INTENTS_PARTNER_KEY`
+  (an `agent-api` partner key for the production Agent API, `https://api.agentsonintents.com`; the
+  demo API refuses it) and `NEAR_TEST_WALLET_OWNER_KEY` (the P-256 key of the passkey that owns the
+  test wallets). Load them the same way as `INCEPTION_API_KEY`, and never print them. The partner key
+  holds no funds; each wallet holds its own. The test funds stay in the wallet "OpenBot mainnet test
+  wallet" (`NEAR_TEST_WALLET_ACCOUNT`). Send test payments to "OpenBot mainnet test recipient"
+  (`NEAR_TEST_RECIPIENT_ACCOUNT`); move them back after the test. Both wallets have the test key as
+  owner and need its vote for each payment. It is a shared test wallet: each person or agent with the
+  dev key controls its funds. Keep only a few dollars in it.
+  `bun run smoke:near-wallet-live` drives the real wallet service against production on the test
+  wallet: it signs a grant with the owner key, changes the budget, freezes and unfreezes the wallet,
+  and keeps its encrypted state in `.openbot-build/near-wallet-live/`. It moves no funds. Wait 5
+  minutes between two runs: the Agent API refuses a second rule change sooner. The Agent API has no
+  testnet: ask before any call that moves funds.
 - For development and manual tests, the team has one test Google account. `apps/auth-api/.env.dev`
   holds `DEV_TEST_GMAIL_ADDRESS` and `DEV_TEST_GMAIL_PASSWORD`. Use it to sign in to Gmail and to
   third-party services ("Sign in with Google") for development and smoke checks, never for a

@@ -22,6 +22,55 @@ export function customProvidersOn(source: CustomProviderSource, harness: CustomP
   return () => source().filter((provider) => (provider.harness ?? "opencode") === harness);
 }
 
+const PUBLIC_HEADER_NAMES = new Set([
+  "accept",
+  "accept-encoding",
+  "accept-language",
+  "anthropic-beta",
+  "anthropic-version",
+  "api-version",
+  "content-type",
+  "http-referer",
+  "origin",
+  "referer",
+  "user-agent",
+  "x-title",
+]);
+
+const SECRET_HEADER_NAME_PARTS = new Set([
+  "apikey",
+  "auth",
+  "authorization",
+  "cookie",
+  "credential",
+  "credentials",
+  "key",
+  "password",
+  "secret",
+  "session",
+  "signature",
+  "token",
+]);
+const PLAIN_WORD = /^[a-z]+(?:[-_.][a-z]+)*$/u;
+
+function isSecretHeader(header: { readonly name: string; readonly value: string }): boolean {
+  const name = header.name.trim().toLowerCase();
+  if (PUBLIC_HEADER_NAMES.has(name)) return false;
+  const secretName = name.split(/[-_]/u).some((part) => SECRET_HEADER_NAME_PARTS.has(part));
+  return secretName || !PLAIN_WORD.test(header.value);
+}
+
+export function customProviderSecretValues(
+  providers: readonly Pick<CustomProviderConfig, "id" | "name" | "apiKey" | "headers">[],
+): string[] {
+  return providers.flatMap((provider) => {
+    const names = new Set([provider.id.toLowerCase(), provider.name.toLowerCase()]);
+    return [provider.apiKey ?? "", ...provider.headers.filter(isSecretHeader).map((header) => header.value)].filter(
+      (value) => value.length > 0 && !names.has(value.toLowerCase()),
+    );
+  });
+}
+
 export const CUSTOM_ENDPOINT_SILENCE_MS = 30 * 60_000;
 
 interface OpenCodeProviderOptions {
@@ -75,6 +124,7 @@ interface OpenCodeConfig {
   readonly permission?: OpenCodePermissionLayer;
   readonly provider?: Readonly<Record<string, OpenCodeProviderEntry | OpenCodeKeyEntry>>;
   readonly providers?: Readonly<Record<string, OpenCodeNativeProviderEntry>>;
+  readonly experimental?: { readonly image_generate: false; readonly video_generate: false };
 }
 
 export type OpenCodeConfigBase = Omit<OpenCodeConfig, "agent" | "provider" | "providers">;
@@ -83,7 +133,7 @@ const OPENCODE_TITLE_OFF = { title: { disable: true } } as const;
 
 export const OPENCODE_PROFILE_CONFIG: OpenCodeConfigBase = { permission: { "*": "deny", bash: "ask", read: "ask" } };
 
-export const OPENCODE_AGENT_CONFIG: OpenCodeConfigBase = {
+const OPENCODE_AGENT_CONFIG: OpenCodeConfigBase = {
   permission: {
     "opencode_session_*": "deny",
     "opencode_worktree_*": "deny",
@@ -91,6 +141,12 @@ export const OPENCODE_AGENT_CONFIG: OpenCodeConfigBase = {
     automation_resume: "deny",
   },
 };
+
+const OPENCODE_MEDIA_TOOLS_OFF = { image_generate: false, video_generate: false } as const;
+
+export function openCodeAgentConfig(mediaSignIn: boolean): OpenCodeConfigBase {
+  return mediaSignIn ? OPENCODE_AGENT_CONFIG : { ...OPENCODE_AGENT_CONFIG, experimental: OPENCODE_MEDIA_TOOLS_OFF };
+}
 
 const OPENCODE_CONFIG_ENV = "OPENCODE_CONFIG_CONTENT";
 
@@ -168,6 +224,12 @@ function modelEntry(model: CustomProviderModel, withoutReasoning: boolean): Open
         }),
     ...(model.inputs === undefined ? {} : { modalities: { input: ["text", ...model.inputs], output: ["text"] } }),
   };
+}
+
+export function hasCustomProviderCredentials(providers: readonly CustomProviderConfig[]): boolean {
+  return providers.some(
+    (provider) => provider.models.length > 0 && (Boolean(provider.apiKey) || provider.headers.length > 0),
+  );
 }
 
 function customProviderEntries(

@@ -2,6 +2,7 @@ import type { DiscordDelivery } from "./discord-api";
 import type { GitHubDeliveryStatus } from "./github-route";
 import type { TelegramCallFailure, TelegramCallMethod, TelegramCallParams, TelegramCallResult } from "./telegram-route";
 import type { RemoteMemberRole } from "./ticket";
+import type { WatchRelayHostStatus } from "./watch-relay";
 import type { WebhookSignatureFormat } from "./webhook-route";
 
 export const SIGNAL_PROTOCOL_VERSION = 1;
@@ -17,6 +18,8 @@ export const SIGNAL_DEFAULT_RECONNECT_GRACE_MS = 30_000;
 export const SIGNAL_CLIENT_RECONNECT_GRACE_MS = 10 * 60_000;
 
 export const SIGNAL_NO_READY_CLOSE_CODE = "no-ready";
+
+export const SIGNAL_SESSIONS_ENDED_LIMIT = 256;
 
 export type SignalPeer = "host" | "client" | "ingress";
 
@@ -91,6 +94,7 @@ export type SignalClientMessage =
       telegramRoute?: string;
       queueKey?: string;
       webhookFormats?: string[];
+      watchRelay?: boolean;
     }
   | {
       type: "telegram-call";
@@ -121,6 +125,13 @@ export type SignalClientMessage =
       requestId: string;
       status: GitHubDeliveryStatus;
     }
+  | {
+      type: "watch-delivery-result";
+      version: SignalProtocolVersion;
+      requestId: string;
+      status: WatchRelayHostStatus;
+      sealed?: string;
+    }
   | SignalRelayMessage;
 
 export type SignalServerMessage =
@@ -136,6 +147,7 @@ export type SignalServerMessage =
       reconnectGraceMs?: number;
     }
   | { type: "host-waiting"; version: SignalProtocolVersion; resumeToken: string }
+  | { type: "sessions-ended"; version: SignalProtocolVersion; sessionIds: string[] }
   | {
       type: "peer-ready";
       version: SignalProtocolVersion;
@@ -184,6 +196,15 @@ export type SignalServerMessage =
     }
   | { type: "discord-delivery"; version: SignalProtocolVersion; guildId: string; delivery: DiscordDelivery }
   | { type: "queued-delivery"; version: SignalProtocolVersion; id: string; sealed: string }
+  | {
+      type: "watch-delivery";
+      version: SignalProtocolVersion;
+      requestId: string;
+      ticket: string;
+      ts: number;
+      proof: string;
+      sealed: string;
+    }
   | {
       type: "webhook-delivery";
       version: SignalProtocolVersion;

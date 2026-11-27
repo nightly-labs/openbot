@@ -114,7 +114,7 @@ export const messages = {
   "settings.quitGuard.never": "Asla",
   "settings.externalLinks.title": "Harici bağlantıları şurada aç",
   "settings.externalLinks.description":
-    "Sohbetlerdeki, oturum açma ve faturalandırma sayfalarındaki bağlantılar burada açılır.",
+    "Sohbetlerdeki, oturum açma ve faturalandırma sayfalarındaki bağlantılar burada açılır. OpenBot seçiliyken yalnızca ana pencerede bu bilgisayardaki ajanlarla yapılan sohbetlerin bağlantıları OpenBot'ta açılır. Diğer bağlantılar varsayılan tarayıcıda açılır.",
   "settings.externalLinks.defaultBrowser": "Varsayılan tarayıcı",
   "settings.externalLinks.openbot": "OpenBot",
   "settings.externalLinks.defaultBrowserNamed": "Varsayılan tarayıcı ({name})",
@@ -245,8 +245,7 @@ export const messages = {
   "settings.notch.xwayland.title": "Yeniden başlatma gerekli",
   "settings.notch.xwayland.description":
     "Wayland'de OpenBot, Dynamic Island'ı diğer uygulamaların üstünde göstermek için XWayland kullanmalıdır. O zamana kadar ada görünmez.",
-  "settings.notch.xwayland.unsupported":
-    "XWayland olmayan Wayland'de Dynamic Island diğer uygulamaların üstünde görünemez.",
+  "settings.notch.xwayland.unsupported": "Bu Wayland masaüstünde Dynamic Island diğer uygulamaların üstünde görünemez.",
   "settings.notch.xwayland.restart": "Yeniden başlat",
   "settings.notch.idle.title": "Boştaki adayı göster",
   "settings.notch.idle.description": "Hiçbir durum etkin olmadığında OpenBot logosunu ve selamlamasını gösterin.",
@@ -277,7 +276,7 @@ export const messages = {
   "settings.agentDock.xwayland.description":
     "Wayland'de OpenBot, dock'u diğer uygulamaların üstünde göstermek için XWayland kullanmalıdır. O zamana kadar dock OpenBot penceresinde görünür.",
   "settings.agentDock.xwayland.unsupported":
-    "XWayland olmayan Wayland'de dock diğer uygulamaların üstünde görünemez. OpenBot penceresinde görünür.",
+    "Bu Wayland masaüstünde dock diğer uygulamaların üstünde görünemez. OpenBot penceresinde görünür.",
   "settings.agentDock.xwayland.restart": "Yeniden başlat",
   "settings.agentDock.noCompositor.title": "OpenBot penceresinde",
   "settings.agentDock.noCompositor.description":

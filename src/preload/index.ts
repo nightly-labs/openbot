@@ -118,6 +118,7 @@ import {
   decodeWebhookTestResult,
 } from "@openbot/contracts/ipc-events";
 import { decodeAcceptedOwnerTransfer, decodeOwnerTransfer } from "@openbot/contracts/owner-transfer";
+import { decodeChannelCompactAvailability } from "@openbot/contracts/team-protocol/channel-compact-availability-v1";
 import { contextBridge, ipcRenderer, webUtils } from "electron";
 import {
   decodeAccountUsageFromMain,
@@ -186,6 +187,7 @@ import {
   decodeCentralAuthState,
   decodeChatWindowTargets,
   decodeCreditActivity,
+  decodeCreditMediaCatalog,
   decodeCreditRedeemResult,
   decodeCreditsState,
   decodeCustomAgentCheckResult,
@@ -216,6 +218,8 @@ import {
   decodeMobileConnectedDevices,
   decodeMobileConnectLink,
   decodeMobileConnectTicket,
+  decodeNearDepositAddress,
+  decodeNearWalletStatus,
   decodeNotificationOpenedEvent,
   decodeNotificationPreference,
   decodeNullablePath,
@@ -245,6 +249,7 @@ import {
   decodeVoiceServerProbe,
   decodeVoiceServerSettings,
   decodeVoiceSettings,
+  decodeVoiceSettingsState,
   decodeVoiceStream,
   decodeVoiceStreamTranscript,
   decodeVoiceTranscriptionResult,
@@ -647,6 +652,7 @@ const agentGroup = bridgeGroup(IPC_ENDPOINTS.agent, {
   clearChannelContext: decodeVoid,
   deleteChannelHistory: decodeVoid,
   compactChannelContext: decodeVoid,
+  channelCompactAvailability: decodeChannelCompactAvailability,
   getSidebarLayout: decodeSidebarLayout,
   mutateSidebarLayout: decodeSidebarLayout,
   getSidebarPins: decodeSidebarPinsFromMain,
@@ -952,6 +958,7 @@ const openbotApi: OpenBotDesktopApi = {
     mediaPrice: decodeWorkflowMediaPrice,
     folders: decodeWorkflowFoldersSnapshotFromMain,
     folderAction: decodeWorkflowFoldersSnapshotFromMain,
+    setSpot: decodeVoid,
   }),
   crm: bridgeGroup(IPC_ENDPOINTS.crm, {
     overview: decodeCrmOverview,
@@ -978,7 +985,7 @@ const openbotApi: OpenBotDesktopApi = {
     downloadModel: decodeVoiceModelStatus,
     cancelModelDownload: decodeVoiceModelStatus,
     removeModel: decodeVoiceModelStatus,
-    getSettings: decodeVoiceSettings,
+    getSettings: decodeVoiceSettingsState,
     setSettings: decodeVoiceSettings,
     prepareModel: decodeVoiceModelStatus,
     transcribe: decodeVoiceTranscriptionResult,
@@ -1088,6 +1095,24 @@ const openbotApi: OpenBotDesktopApi = {
     disconnect: decodeLinkAccountStatus,
     changed: decodeLinkAccountStatus,
   }),
+  nearWallet: bridgeGroup(IPC_ENDPOINTS.nearWallet, {
+    status: decodeNearWalletStatus,
+    create: decodeNearWalletStatus,
+    setBudget: decodeNearWalletStatus,
+    setAgents: decodeNearWalletStatus,
+    renewGrant: decodeNearWalletStatus,
+    freeze: decodeNearWalletStatus,
+    unfreeze: decodeNearWalletStatus,
+    deposit: decodeNearDepositAddress,
+    saveRule: decodeNearWalletStatus,
+    removeRule: decodeNearWalletStatus,
+    allowPayment: decodeNearWalletStatus,
+    openSigning: decodeVoid,
+    cancelSigning: decodeNearWalletStatus,
+    checkBackup: decodeNearWalletStatus,
+    disconnect: decodeNearWalletStatus,
+    changed: decodeNearWalletStatus,
+  }),
   passwordManagers: bridgeGroup(IPC_ENDPOINTS.passwordManagers, {
     list: decodePasswordManagerResponses,
     connect: decodePasswordManagerResponse,
@@ -1168,6 +1193,7 @@ const openbotApi: OpenBotDesktopApi = {
   credits: bridgeGroup(IPC_ENDPOINTS.credits, {
     getState: decodeCreditsState,
     getActivity: decodeCreditActivity,
+    getCatalog: decodeCreditMediaCatalog,
     openCheckout: decodeVoid,
     transfer: decodeCreditsState,
     redeem: decodeCreditRedeemResult,
@@ -1582,6 +1608,7 @@ const openbotApi: OpenBotDesktopApi = {
       navigate: decodeVoid,
       reload: decodeVoid,
       stop: decodeVoid,
+      answerPermission: decodeVoid,
       close: decodeVoid,
       takeControl: decodeVoid,
       releaseControl: decodeVoid,
@@ -1612,6 +1639,7 @@ const openbotApi: OpenBotDesktopApi = {
       windowEvent: decodeBrowserWindowEvent,
       openLocalSignIn: decodeBrowserLocalSignInEnd,
       finishLocalSignIn: decodeBrowserLocalSignInResult,
+      answerHttpSignIn: decodeVoid,
     }),
     sendLiveViewInput: (input) =>
       ipcRenderer.invoke(IPC_ENDPOINTS.browserInput.sendLiveViewInput.channel, input).then(decodeVoid),

@@ -1,5 +1,79 @@
 [
   {
+    "version": "0.80.0",
+    "date": "2026-11-26",
+    "notices": [
+      "Zaktualizuj także do tej wersji każdy dołączony serwer. Serwer z dużą historią czatów znów działa szybko po wersji 0.79.0. Aplikacja Apple Watch, wskaźniki przepływów pracy na żywo, opcja Rozkładaj i wiele poprawek poniżej działają na serwerze tylko wtedy, gdy serwer ma tę wersję."
+    ],
+    "groups": [
+      {
+        "type": "added",
+        "items": [
+          "Twój serwer odpowiada bezpośrednio aplikacji OpenBot Apple Watch. Zegarek działa, gdy OpenBot na iPhonie działa w tle albo jest zamknięty. Zapytania i odpowiedzi są szyfrowane od końca do końca między zegarkiem a serwerem.",
+          "Zobacz wskaźnik i wybrany krok każdej innej osoby, która ma otwarty ten sam przepływ pracy.",
+          "Ustawienia › Dostawcy › Łącz konta w pulę mają nową opcję: Rozkładaj. Przydziela agentów do kont z największą ilością pozostałego użycia, dzięki czemu wszystkie konta są wykorzystywane. Najpierw zapełniaj pozostaje domyślną opcją.",
+          "Każda płatność z portfela NEAR pokazuje w czacie kartę z jej stanem i linkiem do transakcji. Gdy konfigurujesz portfel albo zmieniasz wydatki, możesz wpisać własny dzienny limit.",
+          "MAGI-2 tworzy klipy wideo 1080p z dźwiękiem za kredyty OpenBot. Agent, który nie podaje modelu wideo, używa go teraz."
+        ]
+      },
+      {
+        "type": "changed",
+        "items": [
+          "Strona Użycie pokazuje koszt i tokeny jako słupki skumulowane, z jednym kolorem dla każdego dostawcy. Ostatni raport zostaje na ekranie, gdy ładuje się nowy.",
+          "Strona Buy credits pokazuje każdy pakiet kredytów jako kartę we własnym kolorze, z ceną i ceną jednego kredytu.",
+          "Licencja Team obejmuje teraz do 25 użytkowników. Wcześniej maksimum wynosiło 10."
+        ]
+      },
+      {
+        "type": "fixed",
+        "items": [
+          "Serwer z dużą historią czatów znów działa szybko po aktualizacji do wersji 0.79.0. Wcześniej czyszczenie starych zdarzeń czatu zatrzymywało serwer na wiele sekund co minutę.",
+          "Pisanie w polu wiadomości już nie zacina się, gdy agent pisze odpowiedź.",
+          "W Windows agenci z funkcją Sterowanie komputerem znów widzą pulpit. Od wersji 0.77.0 dostawali czarny obraz.",
+          "Długi czat z wieloma obrazami zużywa dużo mniej pamięci.",
+          "Zaplanowane rutyny uruchamiają się znów same po krótkim błędzie bazy danych. Wcześniej jeden nieudany odczyt zatrzymywał wszystkie zaplanowane rutyny."
+        ]
+      }
+    ]
+  },
+  {
+    "version": "0.79.0",
+    "date": "2026-11-25",
+    "notices": [
+      "Zaktualizuj także do tej wersji każdy dołączony serwer. Narzędzia do obrazów i wideo za kredyty, prośby o lokalizację oraz wiele poprawek poniżej działają na serwerze tylko wtedy, gdy serwer ma tę wersję."
+    ],
+    "groups": [
+      {
+        "type": "added",
+        "items": [
+          "Agenci mogą tworzyć obrazy i filmy za kredyty OpenBot oraz edytować twoje zdjęcia. Karta zatwierdzenia pokazuje model, cenę i prompt. Zanim zezwolisz, możesz wybrać inny model. Pozycja Credits w lewym pasku pokazuje twoje saldo. Właściciel lub administrator może włączyć albo wyłączyć opcję „Agenci mogą używać kredytów”.",
+          "Agenci mogą płacić na stronach kryptowalutami z portfela NEAR Intents. Połącz go w Ustawienia serwera › Sejf › Krypto za pomocą klucza dostępu, a potem dodaj środki. Każda płatność czeka na twoje zatwierdzenie w czacie, chyba że dla danej strony wybierzesz „Zawsze zezwalaj”. Budżet dzienny ogranicza wydatki agentów. Portfel działa tylko na tym komputerze, a płatności używają prawdziwych środków.",
+          "Każde konto dostaje 10 darmowych kredytów powitalnych. Na stronie Credits możesz też zrealizować kod kredytowy przyciskiem Redeem code.",
+          "Karta przeglądarki agenta może poprosić o twoją lokalizację. Czat najpierw cię pyta, a ty wybierasz Blokuj, Zawsze zezwalaj albo Zezwól. Wcześniej przeglądarka zawsze blokowała prośbę.",
+          "Pasek boczny ma karty nad listą czatów: Wszystkie, Nieprzeczytane oraz foldery, które wybierzesz. Każda karta pokazuje swoje nieprzeczytane czaty."
+        ]
+      },
+      {
+        "type": "changed",
+        "items": [
+          "Nowy krok przepływu pracy zaczyna się teraz od modelu, który może działać. Krok tekstowy używa twojego ulubionego modelu albo zwykłego modelu połączonego dostawcy.",
+          "Gdy masz tylko darmowe kredyty, lista modeli na karcie zatwierdzenia oznacza modele, za które płacą darmowe kredyty, znacznikiem „Darmowe kredyty”.",
+          "Panel boczny może podzielić się na do trzech grup, jedna nad drugą. Przeciągnij linię między dwiema grupami, aby zmienić ich wysokość."
+        ]
+      },
+      {
+        "type": "fixed",
+        "items": [
+          "Aplikacja zamarza rzadziej, głównie w Windows. Przez krótki czas zachowuje wyniki wolnych sprawdzeń i wykonuje wolną pracę w tle.",
+          "Gdy agent Claude kończy plan w trybie planowania, czat pokazuje teraz plan z przyciskami Zatwierdź i Stop planning. Wcześniej nie pojawiało się zatwierdzenie i agent zaczynał budować.",
+          "Wiadomość od innego agenta lub rutyny nie zatrzymuje już pracy zajętego agenta Claude.",
+          "Alert ze strony w karcie przeglądarki agenta nie zasłania już okna OpenBot, dopóki nie klikniesz OK. Alert zamyka się sam, a agent dostaje jego tekst.",
+          "Na pulpicie Linux X11 pisanie w OpenBot nie zatrzymuje się już po tym, jak agent użyje Sterowania komputerem w innej aplikacji. Jeśli pisanie już się zatrzymało, wyloguj się i zaloguj ponownie."
+        ]
+      }
+    ]
+  },
+  {
     "version": "0.78.0",
     "date": "2026-11-24",
     "notices": [

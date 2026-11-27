@@ -7,8 +7,10 @@ import {
   isKeyOnlyProvider,
   isProviderEnvironmentProvider,
   PROMPT_CACHE_TTLS,
+  PROVIDER_ACCOUNT_POOL_STRATEGIES,
   type PromptCacheTtl,
   type ProviderAccountPool,
+  type ProviderAccountPoolStrategy,
   type ProviderAccountStatus,
   type ProviderApiKeyStatus,
 } from "@openbot/contracts/ipc";
@@ -28,6 +30,7 @@ import Minimize2 from "lucide-react-native/icons/minimize-2";
 import Package from "lucide-react-native/icons/package";
 import RefreshCw from "lucide-react-native/icons/refresh-cw";
 import RotateCcw from "lucide-react-native/icons/rotate-ccw";
+import Scale from "lucide-react-native/icons/scale";
 import Smartphone from "lucide-react-native/icons/smartphone";
 import Star from "lucide-react-native/icons/star";
 import UserPlus from "lucide-react-native/icons/user-plus";
@@ -358,6 +361,15 @@ export function ServerProviderScreen() {
               ? (enabled) =>
                   void run("pool", async () => {
                     await setPool(provider, enabled, pool?.leftOut ?? []);
+                    await accounts.refresh();
+                  })
+              : null
+          }
+          onPoolStrategyChange={
+            setPool && admin.accounts?.poolStrategy
+              ? (strategy) =>
+                  void run("pool", async () => {
+                    await setPool(provider, true, pool?.leftOut ?? [], strategy);
                     await accounts.refresh();
                   })
               : null
@@ -702,6 +714,11 @@ function CompactWindowSection({
   );
 }
 
+const POOL_STRATEGY_KEYS = {
+  fillFirst: "mobile.server.providers.poolFillFirst",
+  spread: "mobile.server.providers.poolSpread",
+} as const;
+
 function ProviderAccountsSection({
   serverId,
   provider,
@@ -714,6 +731,7 @@ function ProviderAccountsSection({
   onAddWithCode,
   pool,
   onPoolChange,
+  onPoolStrategyChange,
 }: {
   serverId: string;
   provider: AgentProviderId;
@@ -726,6 +744,7 @@ function ProviderAccountsSection({
   onAddWithCode: () => void;
   pool: ProviderAccountPool | undefined;
   onPoolChange: ((enabled: boolean) => void) | null;
+  onPoolStrategyChange: ((strategy: ProviderAccountPoolStrategy) => void) | null;
 }) {
   const { t } = useText();
   const { theme } = useUniwind();
@@ -734,6 +753,7 @@ function ProviderAccountsSection({
     (account) => account.id !== CLAUDE_API_KEY_ACCOUNT_ID && !isProviderKeyAccount(provider, account.id),
   );
   const poolOffered = onPoolChange !== null && (planAccounts.length > 1 || Boolean(pool));
+  const poolStrategy = pool?.strategy ?? "fillFirst";
   return (
     <SettingsSection
       title={t("mobile.server.providers.accounts")}
@@ -758,6 +778,31 @@ function ProviderAccountsSection({
             dark={theme === "dark"}
             onValueChange={(enabled) => onPoolChange?.(enabled)}
           />
+        </SettingsRow>
+      ) : null}
+      {poolOffered && pool && onPoolStrategyChange ? (
+        <SettingsRow
+          disclosure={false}
+          leading={<RowIcon icon={Scale} />}
+          supportingText={poolStrategy === "spread" ? t("mobile.server.providers.poolSpreadHint") : undefined}
+          trailing={
+            <SettingsPicker<ProviderAccountPoolStrategy>
+              value={poolStrategy}
+              options={PROVIDER_ACCOUNT_POOL_STRATEGIES.map((strategy) => ({
+                value: strategy,
+                label: t(POOL_STRATEGY_KEYS[strategy]),
+              }))}
+              enabled={!busy}
+              dark={theme === "dark"}
+              label={t("mobile.server.providers.poolStrategy")}
+              onChange={(strategy) => {
+                if (strategy === poolStrategy) return;
+                onPoolStrategyChange(strategy);
+              }}
+            />
+          }
+        >
+          <Typography.Paragraph>{t("mobile.server.providers.poolStrategy")}</Typography.Paragraph>
         </SettingsRow>
       ) : null}
       {accounts.map((account, index) => {

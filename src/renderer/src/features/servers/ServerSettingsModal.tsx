@@ -48,6 +48,7 @@ import type { LicenseCalls } from "@openbot/ui/features/billing/license-store";
 import type { ProviderSettingsDetail } from "@openbot/ui/features/settings/ProviderSettingsPage";
 import {
   SaveBarDock,
+  type SettingsCrumb,
   SettingsDialogShell,
   SettingsNavGroupLabel,
   type SettingsPagePlacement,
@@ -299,7 +300,9 @@ export function ServerSettingsModal(props: ServerSettingsModalProps) {
   );
   const [providerDetail, setProviderDetail] = createSignal<ProviderSettingsDetail | null>(null);
   const [importDetail, setImportDetail] = createSignal<ServerImportDetail | null>(null);
+  const [vaultDetail, setVaultDetail] = createSignal<SettingsCrumb | null>(null);
   const crumbDetail = () => {
+    if (section() === "vault") return vaultDetail();
     if (section() === "import") return importDetail();
     if (section() === "roles") return roles.crumb();
     if (section() === "agents") return agents.crumb();
@@ -810,7 +813,7 @@ export function ServerSettingsModal(props: ServerSettingsModalProps) {
         <Show when={props.vault}>
           {(vault) => (
             <Tabs.Content value="vault" class="settings-modal-tab-panel server-settings-panel" data-tab="vault">
-              <ServerVaultPanel {...vault()} menuMount={modalElement()} />
+              <ServerVaultPanel {...vault()} menuMount={modalElement()} onDetailChange={setVaultDetail} />
             </Tabs.Content>
           )}
         </Show>

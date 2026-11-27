@@ -114,4 +114,8 @@ export const RedeemCode: Story = { render: () => <RedeemStory /> };
 
 export const BillingSection: Story = { render: () => <SectionStory calls={createMockCredits()} /> };
 
+export const BillingSectionFreeCredits: Story = {
+  render: () => <SectionStory calls={createMockCredits({ balance: 75, welcome: 10 })} />,
+};
+
 export const Explainer: Story = { render: () => <ExplainerStory /> };

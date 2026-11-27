@@ -49,6 +49,8 @@ import type {
   BitwardenConnectorStatus,
   BitwardenHostConnectInput,
   BranchAgentTaskInput,
+  BrowserHttpSignInInput,
+  BrowserPermissionAnswer,
   BrowserProfileList,
   BrowserProfileSummary,
   BrowserProxyList,
@@ -214,6 +216,7 @@ import type {
   SaveEventRoutineResult,
   WebhookSecret,
 } from "@openbot/contracts/ipc-events";
+import type { AgentUsageLimits } from "@openbot/contracts/team-protocol/agent-usage-limit-v1";
 import type { ServerAppearance } from "@openbot/contracts/team-protocol/host-appearance-v1";
 import type { LiveVoiceSessionResponse, LiveVoiceStartRequest } from "@openbot/contracts/team-protocol/live-voice-v1";
 import type { QueueEditRequest } from "@openbot/contracts/team-protocol/queue-edit-v1";
@@ -318,6 +321,8 @@ export interface MobileBrowserViewSupport {
   contextMenu: boolean;
   viewport: boolean;
   navigation: boolean;
+  permissions: boolean;
+  httpSignIn: boolean;
 }
 
 type MobileBrowserTabAction =
@@ -335,6 +340,8 @@ export interface MobileWorkspaceContextValue {
     listener: (event: BrowserViewBridgeEvent) => void,
   ) => RemoteBrowserViewSession | null;
   controlBrowserTab: (serverId: string, action: MobileBrowserTabAction) => Promise<MobileBrowserTab | null>;
+  answerBrowserPermission: (serverId: string, answer: BrowserPermissionAnswer) => Promise<void>;
+  answerBrowserHttpSignIn: (serverId: string, input: BrowserHttpSignInInput) => Promise<void>;
   respondToApproval: (serverId: string, input: RespondToApprovalInput) => Promise<void>;
   readsWholeApprovals: (serverId: string) => boolean;
   readWholeApproval: (serverId: string, approval: PendingApproval) => Promise<void>;
@@ -345,9 +352,14 @@ export interface MobileWorkspaceContextValue {
   respondToBrowserSecret: (serverId: string, input: RespondToBrowserSecretInput) => Promise<void>;
   sidebarByServer: Record<string, { layout: SidebarLayoutSnapshot | null; error: string | null }>;
   mutateSidebarLayout: (serverId: string, action: SidebarLayoutAction) => Promise<void>;
-  moveSidebarChat: (serverId: string, action: Extract<SidebarLayoutAction, { type: "move-agent" }>) => Promise<void>;
+  moveSidebarChat: (
+    serverId: string,
+    action: Extract<SidebarLayoutAction, { type: "move-agent" | "assign" }>,
+  ) => Promise<void>;
   loadQueue: (agentId: string, serverId: string) => Promise<QueueSnapshot>;
   canEditQueue: (serverId: string) => boolean;
+  loadAgentUsageLimits: (serverId: string) => Promise<AgentUsageLimits>;
+  canReadAgentUsageLimits: (serverId: string) => boolean;
   canReadModelSteering: (serverId: string) => boolean;
   canRetryMessage: (serverId: string) => boolean;
   canDeleteMessages: (serverId: string) => boolean;
@@ -854,6 +866,7 @@ interface McpSignInRelay {
 export type MobileWorkspaceCapabilityCheck =
   | "browserViewSupport"
   | "canEditQueue"
+  | "canReadAgentUsageLimits"
   | "canReadModelSteering"
   | "canRetryMessage"
   | "canDeleteMessages"

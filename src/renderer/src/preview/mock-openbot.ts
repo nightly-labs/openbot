@@ -260,6 +260,7 @@ import { createMockHostedServers } from "./mock-hosted-servers";
 import { createMockLicense } from "./mock-license";
 import { createMockLinkAccount } from "./mock-link-account";
 import { createMockMessaging } from "./mock-messaging";
+import { createMockNearWallet } from "./mock-near-wallet";
 import { createMockOnePasswordConnector } from "./mock-onepassword-connector";
 import { createMockPasswordManagers } from "./mock-password-managers";
 import { createMockProviderRuntimes, type MockProviderRuntimeOptions } from "./mock-provider-runtimes";
@@ -1638,15 +1639,16 @@ export function createMockOpenBot(options: MockOpenBotOptions = {}): MockOpenBot
         changeProviderAccounts(provider, (accounts) => accounts.filter((account) => account.id !== accountId)),
       );
     },
-    setProviderAccountPool: async ({ provider, enabled, leftOut }) => {
+    setProviderAccountPool: async ({ provider, enabled, leftOut, strategy }) => {
       agentStatus = {
         ...agentStatus,
         providers: agentStatus.providers?.map((row) => {
           if (row.id !== provider) return row;
-          const { accountPool: _old, ...rest } = row;
+          const { accountPool: old, ...rest } = row;
           if (!enabled) return rest;
           const inUse = row.accounts?.find((account) => !leftOut.includes(account.id))?.id ?? null;
-          return { ...rest, accountPool: { leftOut: [...leftOut], inUse } };
+          const kept = strategy ?? old?.strategy;
+          return { ...rest, accountPool: { leftOut: [...leftOut], inUse, ...(kept ? { strategy: kept } : {}) } };
         }),
       };
       return clone(agentStatus);
@@ -1756,6 +1758,7 @@ export function createMockOpenBot(options: MockOpenBotOptions = {}): MockOpenBot
     },
     githubConnector: createMockGitHubConnector(),
     linkAccount: createMockLinkAccount(),
+    nearWallet: createMockNearWallet(),
     onePasswordConnector: createMockOnePasswordConnector(),
     bitwardenConnector: createMockBitwardenConnector(),
     passwordManagers: createMockPasswordManagers(),

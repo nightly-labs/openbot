@@ -26,6 +26,8 @@ import { RoutineFlowError, type RoutineFlowRun, type RoutineFlowStore } from "./
 const logger = createOpenBotLogger("routine-flows");
 
 const SWEEP_WINDOW_MS = 7 * 24 * 60 * 60 * 1000;
+const FULL_SWEEP_INTERVAL_MS = 30 * 60 * 1000;
+const SWEEP_OVERLAP_MS = 10 * 60 * 1000;
 const UPCOMING_WINDOW_MS = 7 * 24 * 60 * 60 * 1000;
 const UPCOMING_LIMIT = 400;
 const RECENT_RUNS = 10;
@@ -94,6 +96,7 @@ class RoutineFlows extends Context.Service<RoutineFlows, RoutineFlowsShape>()("o
         const lock = yield* Semaphore.make(1);
         const { store } = dependencies;
         const now = () => (dependencies.now ?? (() => new Date()))();
+        let swept: SweepMark | null = null;
 
         const attempt = <A>(work: () => A) =>
           Effect.try({ try: work, catch: (cause) => new RoutineFlowFailed({ cause }) });
@@ -308,7 +311,9 @@ class RoutineFlows extends Context.Service<RoutineFlows, RoutineFlowsShape>()("o
         });
 
         const sweepOnce = Effect.fn("RoutineFlows.sweepOnce")(function* () {
-          const since = new Date(now().getTime() - SWEEP_WINDOW_MS).toISOString();
+          const at = now().getTime();
+          const window = sweepWindow(swept, at);
+          const since = new Date(window.since).toISOString();
           const changed = new Set<string>();
           const runIds = new Set<string>();
           for (const run of store.endedRunsWithoutOwnerStep(since)) {
@@ -338,6 +343,7 @@ class RoutineFlows extends Context.Service<RoutineFlows, RoutineFlowsShape>()("o
             for (const agentId of yield* advance(run)) changed.add(agentId);
             if (changed.size > 0) for (const agentId of agentsOfRoutine(run.routineId)) changed.add(agentId);
           }
+          swept = { at, fullAt: window.fullAt };
           if (changed.size > 0) dependencies.changed([...changed]);
         });
 
@@ -424,6 +430,17 @@ export const createRoutineFlows = Effect.fn("createRoutineFlows")(function* (dep
   const service = Context.get(context, RoutineFlows);
   return { ...service, close: () => runtime.disposeEffect } satisfies RoutineFlowsHandle;
 });
+
+interface SweepMark {
+  at: number;
+  fullAt: number;
+}
+
+function sweepWindow(swept: SweepMark | null, at: number): { since: number; fullAt: number } {
+  if (swept === null || at < swept.at || at - swept.fullAt >= FULL_SWEEP_INTERVAL_MS)
+    return { since: at - SWEEP_WINDOW_MS, fullAt: at };
+  return { since: swept.at - SWEEP_OVERLAP_MS, fullAt: swept.fullAt };
+}
 
 function handoffText(
   routineName: string,

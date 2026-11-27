@@ -17,6 +17,7 @@ import { Route as AppRouteImport } from './routes/app'
 import { Route as AppPreviewRouteImport } from './routes/app-preview'
 import { Route as BrandingRouteImport } from './routes/branding'
 import { Route as ChangelogRouteImport } from './routes/changelog'
+import { Route as ChromeExtensionRouteImport } from './routes/chrome-extension'
 import { Route as ClaRouteImport } from './routes/cla'
 import { Route as CommercialLicenseRouteImport } from './routes/commercial-license'
 import { Route as CommerciallicenseRouteImport } from './routes/commerciallicense'
@@ -67,6 +68,7 @@ import { Route as HealthLiveRouteImport } from './routes/health/live'
 import { Route as HealthReadyRouteImport } from './routes/health/ready'
 import { Route as MarketplaceIndexRouteImport } from './routes/marketplace/index'
 import { Route as MarketplaceAppsRouteImport } from './routes/marketplace/apps'
+import { Route as NearSignRouteImport } from './routes/near/sign'
 import { Route as NewsIndexRouteImport } from './routes/news/index'
 import { Route as NewsSlugRouteImport } from './routes/news/$slug'
 import { Route as NewsOpenbotVsGrokbotRouteImport } from './routes/news/openbot-vs-grokbot'
@@ -157,6 +159,7 @@ import { Route as V1MobileAuthSessionRouteImport } from './routes/v1/mobile-auth
 import { Route as V1MobileAuthTicketRouteImport } from './routes/v1/mobile-auth/ticket'
 import { Route as V1MobileChangelogRouteImport } from './routes/v1/mobile/changelog'
 import { Route as V1MobileFeaturesRouteImport } from './routes/v1/mobile/features'
+import { Route as V1NearSplatRouteImport } from './routes/v1/near/$'
 import { Route as V1SitesIndexRouteImport } from './routes/v1/sites/index'
 import { Route as V1SitesSiteIdRouteImport } from './routes/v1/sites/$siteId'
 import { Route as V1SitesReportsRouteImport } from './routes/v1/sites/reports'
@@ -173,6 +176,7 @@ import { Route as V2AdminServerClaimsRouteImport } from './routes/v2/admin/serve
 import { Route as V2DiscordAuthorizeRouteImport } from './routes/v2/discord/authorize'
 import { Route as V2DiscordCallbackRouteImport } from './routes/v2/discord/callback'
 import { Route as V2HostingPlansRouteImport } from './routes/v2/hosting/plans'
+import { Route as V2RemoteHostWakeRouteImport } from './routes/v2/remote/host-wake'
 import { Route as V2RemoteRouteWakeRouteImport } from './routes/v2/remote/route-wake'
 import { Route as V2ServerClaimsIndexRouteImport } from './routes/v2/server-claims/index'
 import { Route as V2ServerClaimsRedeemRouteImport } from './routes/v2/server-claims/redeem'
@@ -232,6 +236,7 @@ import { Route as V2RemoteSessionsIndexRouteImport } from './routes/v2/remote/se
 import { Route as V2RemoteSlackRouteValidateRouteImport } from './routes/v2/remote/slack-route/validate'
 import { Route as V2RemoteTelegramRouteLinkRouteImport } from './routes/v2/remote/telegram-route/link'
 import { Route as V2RemoteTelegramRouteValidateRouteImport } from './routes/v2/remote/telegram-route/validate'
+import { Route as V2RemoteWatchTicketRouteImport } from './routes/v2/remote/watch/ticket'
 import { Route as V2RemoteWebhookRouteValidateRouteImport } from './routes/v2/remote/webhook-route/validate'
 import { Route as V1MarketplaceAgentsAgentIdAvatarRouteImport } from './routes/v1/marketplace/agents/$agentId/avatar'
 import { Route as V1MarketplaceAgentsAgentIdCardRouteImport } from './routes/v1/marketplace/agents/$agentId/card'
@@ -282,6 +287,8 @@ import { Route as V2RemoteOwnerTransfersTransferIdAcceptRouteImport } from './ro
 import { Route as V2RemoteOwnerTransfersTransferIdDeclineRouteImport } from './routes/v2/remote/owner-transfers/$transferId/decline'
 import { Route as V2RemoteSessionsSessionIdEndRouteImport } from './routes/v2/remote/sessions/$sessionId/end'
 import { Route as V2RemoteSessionsSessionIdTicketRouteImport } from './routes/v2/remote/sessions/$sessionId/ticket'
+import { Route as V2RemoteWatchSessionsIndexRouteImport } from './routes/v2/remote/watch/sessions/index'
+import { Route as V2RemoteWatchSessionsWatchSessionIdRouteImport } from './routes/v2/remote/watch/sessions/$watchSessionId'
 import { Route as V1MarketplaceAgentsAdminCardsVersionIdRouteImport } from './routes/v1/marketplace/agents/admin/cards/$versionId'
 import { Route as V1MarketplaceAgentsAdminFeaturedAgentIdRouteImport } from './routes/v1/marketplace/agents/admin/featured/$agentId'
 import { Route as V1MarketplaceAgentsAdminSubmissionsVersionIdRouteImport } from './routes/v1/marketplace/agents/admin/submissions/$versionId'
@@ -328,6 +335,11 @@ const BrandingRoute = BrandingRouteImport.update({
 const ChangelogRoute = ChangelogRouteImport.update({
   id: '/changelog',
   path: '/changelog',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ChromeExtensionRoute = ChromeExtensionRouteImport.update({
+  id: '/chrome-extension',
+  path: '/chrome-extension',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ClaRoute = ClaRouteImport.update({
@@ -579,6 +591,11 @@ const MarketplaceIndexRoute = MarketplaceIndexRouteImport.update({
 const MarketplaceAppsRoute = MarketplaceAppsRouteImport.update({
   id: '/marketplace/apps',
   path: '/marketplace/apps',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const NearSignRoute = NearSignRouteImport.update({
+  id: '/near/sign',
+  path: '/near/sign',
   getParentRoute: () => rootRouteImport,
 } as any)
 const NewsIndexRoute = NewsIndexRouteImport.update({
@@ -1037,6 +1054,11 @@ const V1MobileFeaturesRoute = V1MobileFeaturesRouteImport.update({
   path: '/v1/mobile/features',
   getParentRoute: () => rootRouteImport,
 } as any)
+const V1NearSplatRoute = V1NearSplatRouteImport.update({
+  id: '/v1/near/$',
+  path: '/v1/near/$',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const V1SitesIndexRoute = V1SitesIndexRouteImport.update({
   id: '/v1/sites/',
   path: '/v1/sites/',
@@ -1115,6 +1137,11 @@ const V2DiscordCallbackRoute = V2DiscordCallbackRouteImport.update({
 const V2HostingPlansRoute = V2HostingPlansRouteImport.update({
   id: '/v2/hosting/plans',
   path: '/v2/hosting/plans',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const V2RemoteHostWakeRoute = V2RemoteHostWakeRouteImport.update({
+  id: '/v2/remote/host-wake',
+  path: '/v2/remote/host-wake',
   getParentRoute: () => rootRouteImport,
 } as any)
 const V2RemoteRouteWakeRoute = V2RemoteRouteWakeRouteImport.update({
@@ -1426,6 +1453,11 @@ const V2RemoteTelegramRouteValidateRoute =
     path: '/v2/remote/telegram-route/validate',
     getParentRoute: () => rootRouteImport,
   } as any)
+const V2RemoteWatchTicketRoute = V2RemoteWatchTicketRouteImport.update({
+  id: '/v2/remote/watch/ticket',
+  path: '/v2/remote/watch/ticket',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const V2RemoteWebhookRouteValidateRoute =
   V2RemoteWebhookRouteValidateRouteImport.update({
     id: '/v2/remote/webhook-route/validate',
@@ -1723,6 +1755,18 @@ const V2RemoteSessionsSessionIdTicketRoute =
     path: '/v2/remote/sessions/$sessionId/ticket',
     getParentRoute: () => rootRouteImport,
   } as any)
+const V2RemoteWatchSessionsIndexRoute =
+  V2RemoteWatchSessionsIndexRouteImport.update({
+    id: '/v2/remote/watch/sessions/',
+    path: '/v2/remote/watch/sessions/',
+    getParentRoute: () => rootRouteImport,
+  } as any)
+const V2RemoteWatchSessionsWatchSessionIdRoute =
+  V2RemoteWatchSessionsWatchSessionIdRouteImport.update({
+    id: '/v2/remote/watch/sessions/$watchSessionId',
+    path: '/v2/remote/watch/sessions/$watchSessionId',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 const V1MarketplaceAgentsAdminCardsVersionIdRoute =
   V1MarketplaceAgentsAdminCardsVersionIdRouteImport.update({
     id: '/v1/marketplace/agents/admin/cards/$versionId',
@@ -1796,6 +1840,7 @@ export interface FileRoutesByFullPath {
   '/app-preview': typeof AppPreviewRoute
   '/branding': typeof BrandingRoute
   '/changelog': typeof ChangelogRoute
+  '/chrome-extension': typeof ChromeExtensionRoute
   '/cla': typeof ClaRoute
   '/commercial-license': typeof CommercialLicenseRoute
   '/commerciallicense': typeof CommerciallicenseRoute
@@ -1840,6 +1885,7 @@ export interface FileRoutesByFullPath {
   '/health/live': typeof HealthLiveRoute
   '/health/ready': typeof HealthReadyRoute
   '/marketplace/apps': typeof MarketplaceAppsRoute
+  '/near/sign': typeof NearSignRoute
   '/news/$slug': typeof NewsSlugRoute
   '/news/openbot-vs-grokbot': typeof NewsOpenbotVsGrokbotRoute
   '/news/rss.xml': typeof NewsRssDotxmlRoute
@@ -1933,6 +1979,7 @@ export interface FileRoutesByFullPath {
   '/v1/mobile-auth/ticket': typeof V1MobileAuthTicketRoute
   '/v1/mobile/changelog': typeof V1MobileChangelogRoute
   '/v1/mobile/features': typeof V1MobileFeaturesRoute
+  '/v1/near/$': typeof V1NearSplatRoute
   '/v1/sites/$siteId': typeof V1SitesSiteIdRoute
   '/v1/sites/reports': typeof V1SitesReportsRoute
   '/v1/skills/$skillId': typeof V1SkillsSkillIdRouteWithChildren
@@ -1947,6 +1994,7 @@ export interface FileRoutesByFullPath {
   '/v2/discord/authorize': typeof V2DiscordAuthorizeRoute
   '/v2/discord/callback': typeof V2DiscordCallbackRoute
   '/v2/hosting/plans': typeof V2HostingPlansRoute
+  '/v2/remote/host-wake': typeof V2RemoteHostWakeRoute
   '/v2/remote/route-wake': typeof V2RemoteRouteWakeRoute
   '/v2/server-claims/redeem': typeof V2ServerClaimsRedeemRoute
   '/v2/slack/authorize': typeof V2SlackAuthorizeRoute
@@ -2000,6 +2048,7 @@ export interface FileRoutesByFullPath {
   '/v2/remote/slack-route/validate': typeof V2RemoteSlackRouteValidateRoute
   '/v2/remote/telegram-route/link': typeof V2RemoteTelegramRouteLinkRoute
   '/v2/remote/telegram-route/validate': typeof V2RemoteTelegramRouteValidateRoute
+  '/v2/remote/watch/ticket': typeof V2RemoteWatchTicketRoute
   '/v2/remote/webhook-route/validate': typeof V2RemoteWebhookRouteValidateRoute
   '/scim/v2/Users/': typeof ScimV2UsersIndexRoute
   '/v1/marketplace/agents/': typeof V1MarketplaceAgentsIndexRoute
@@ -2057,9 +2106,11 @@ export interface FileRoutesByFullPath {
   '/v2/remote/owner-transfers/$transferId/decline': typeof V2RemoteOwnerTransfersTransferIdDeclineRoute
   '/v2/remote/sessions/$sessionId/end': typeof V2RemoteSessionsSessionIdEndRoute
   '/v2/remote/sessions/$sessionId/ticket': typeof V2RemoteSessionsSessionIdTicketRoute
+  '/v2/remote/watch/sessions/$watchSessionId': typeof V2RemoteWatchSessionsWatchSessionIdRoute
   '/v1/media/jobs/$jobId/': typeof V1MediaJobsJobIdIndexRoute
   '/v2/hosting/servers/$serverId/': typeof V2HostingServersServerIdIndexRoute
   '/v2/remote/hosts/$hostId/': typeof V2RemoteHostsHostIdIndexRoute
+  '/v2/remote/watch/sessions/': typeof V2RemoteWatchSessionsIndexRoute
   '/v1/marketplace/agents/admin/cards/$versionId': typeof V1MarketplaceAgentsAdminCardsVersionIdRoute
   '/v1/marketplace/agents/admin/featured/$agentId': typeof V1MarketplaceAgentsAdminFeaturedAgentIdRoute
   '/v1/marketplace/agents/admin/submissions/$versionId': typeof V1MarketplaceAgentsAdminSubmissionsVersionIdRoute
@@ -2078,6 +2129,7 @@ export interface FileRoutesByTo {
   '/app-preview': typeof AppPreviewRoute
   '/branding': typeof BrandingRoute
   '/changelog': typeof ChangelogRoute
+  '/chrome-extension': typeof ChromeExtensionRoute
   '/cla': typeof ClaRoute
   '/commercial-license': typeof CommercialLicenseRoute
   '/commerciallicense': typeof CommerciallicenseRoute
@@ -2122,6 +2174,7 @@ export interface FileRoutesByTo {
   '/health/live': typeof HealthLiveRoute
   '/health/ready': typeof HealthReadyRoute
   '/marketplace/apps': typeof MarketplaceAppsRoute
+  '/near/sign': typeof NearSignRoute
   '/news/$slug': typeof NewsSlugRoute
   '/news/openbot-vs-grokbot': typeof NewsOpenbotVsGrokbotRoute
   '/news/rss.xml': typeof NewsRssDotxmlRoute
@@ -2215,6 +2268,7 @@ export interface FileRoutesByTo {
   '/v1/mobile-auth/ticket': typeof V1MobileAuthTicketRoute
   '/v1/mobile/changelog': typeof V1MobileChangelogRoute
   '/v1/mobile/features': typeof V1MobileFeaturesRoute
+  '/v1/near/$': typeof V1NearSplatRoute
   '/v1/sites/$siteId': typeof V1SitesSiteIdRoute
   '/v1/sites/reports': typeof V1SitesReportsRoute
   '/v1/skills/$skillId': typeof V1SkillsSkillIdRouteWithChildren
@@ -2229,6 +2283,7 @@ export interface FileRoutesByTo {
   '/v2/discord/authorize': typeof V2DiscordAuthorizeRoute
   '/v2/discord/callback': typeof V2DiscordCallbackRoute
   '/v2/hosting/plans': typeof V2HostingPlansRoute
+  '/v2/remote/host-wake': typeof V2RemoteHostWakeRoute
   '/v2/remote/route-wake': typeof V2RemoteRouteWakeRoute
   '/v2/server-claims/redeem': typeof V2ServerClaimsRedeemRoute
   '/v2/slack/authorize': typeof V2SlackAuthorizeRoute
@@ -2282,6 +2337,7 @@ export interface FileRoutesByTo {
   '/v2/remote/slack-route/validate': typeof V2RemoteSlackRouteValidateRoute
   '/v2/remote/telegram-route/link': typeof V2RemoteTelegramRouteLinkRoute
   '/v2/remote/telegram-route/validate': typeof V2RemoteTelegramRouteValidateRoute
+  '/v2/remote/watch/ticket': typeof V2RemoteWatchTicketRoute
   '/v2/remote/webhook-route/validate': typeof V2RemoteWebhookRouteValidateRoute
   '/scim/v2/Users': typeof ScimV2UsersIndexRoute
   '/v1/marketplace/agents': typeof V1MarketplaceAgentsIndexRoute
@@ -2339,9 +2395,11 @@ export interface FileRoutesByTo {
   '/v2/remote/owner-transfers/$transferId/decline': typeof V2RemoteOwnerTransfersTransferIdDeclineRoute
   '/v2/remote/sessions/$sessionId/end': typeof V2RemoteSessionsSessionIdEndRoute
   '/v2/remote/sessions/$sessionId/ticket': typeof V2RemoteSessionsSessionIdTicketRoute
+  '/v2/remote/watch/sessions/$watchSessionId': typeof V2RemoteWatchSessionsWatchSessionIdRoute
   '/v1/media/jobs/$jobId': typeof V1MediaJobsJobIdIndexRoute
   '/v2/hosting/servers/$serverId': typeof V2HostingServersServerIdIndexRoute
   '/v2/remote/hosts/$hostId': typeof V2RemoteHostsHostIdIndexRoute
+  '/v2/remote/watch/sessions': typeof V2RemoteWatchSessionsIndexRoute
   '/v1/marketplace/agents/admin/cards/$versionId': typeof V1MarketplaceAgentsAdminCardsVersionIdRoute
   '/v1/marketplace/agents/admin/featured/$agentId': typeof V1MarketplaceAgentsAdminFeaturedAgentIdRoute
   '/v1/marketplace/agents/admin/submissions/$versionId': typeof V1MarketplaceAgentsAdminSubmissionsVersionIdRoute
@@ -2364,6 +2422,7 @@ export interface FileRoutesById {
   '/app-preview': typeof AppPreviewRoute
   '/branding': typeof BrandingRoute
   '/changelog': typeof ChangelogRoute
+  '/chrome-extension': typeof ChromeExtensionRoute
   '/cla': typeof ClaRoute
   '/commercial-license': typeof CommercialLicenseRoute
   '/commerciallicense': typeof CommerciallicenseRoute
@@ -2408,6 +2467,7 @@ export interface FileRoutesById {
   '/health/live': typeof HealthLiveRoute
   '/health/ready': typeof HealthReadyRoute
   '/marketplace/apps': typeof MarketplaceAppsRoute
+  '/near/sign': typeof NearSignRoute
   '/news/$slug': typeof NewsSlugRoute
   '/news/openbot-vs-grokbot': typeof NewsOpenbotVsGrokbotRoute
   '/news/rss.xml': typeof NewsRssDotxmlRoute
@@ -2502,6 +2562,7 @@ export interface FileRoutesById {
   '/v1/mobile-auth/ticket': typeof V1MobileAuthTicketRoute
   '/v1/mobile/changelog': typeof V1MobileChangelogRoute
   '/v1/mobile/features': typeof V1MobileFeaturesRoute
+  '/v1/near/$': typeof V1NearSplatRoute
   '/v1/sites/$siteId': typeof V1SitesSiteIdRoute
   '/v1/sites/reports': typeof V1SitesReportsRoute
   '/v1/skills/$skillId': typeof V1SkillsSkillIdRouteWithChildren
@@ -2516,6 +2577,7 @@ export interface FileRoutesById {
   '/v2/discord/authorize': typeof V2DiscordAuthorizeRoute
   '/v2/discord/callback': typeof V2DiscordCallbackRoute
   '/v2/hosting/plans': typeof V2HostingPlansRoute
+  '/v2/remote/host-wake': typeof V2RemoteHostWakeRoute
   '/v2/remote/route-wake': typeof V2RemoteRouteWakeRoute
   '/v2/server-claims/redeem': typeof V2ServerClaimsRedeemRoute
   '/v2/slack/authorize': typeof V2SlackAuthorizeRoute
@@ -2569,6 +2631,7 @@ export interface FileRoutesById {
   '/v2/remote/slack-route/validate': typeof V2RemoteSlackRouteValidateRoute
   '/v2/remote/telegram-route/link': typeof V2RemoteTelegramRouteLinkRoute
   '/v2/remote/telegram-route/validate': typeof V2RemoteTelegramRouteValidateRoute
+  '/v2/remote/watch/ticket': typeof V2RemoteWatchTicketRoute
   '/v2/remote/webhook-route/validate': typeof V2RemoteWebhookRouteValidateRoute
   '/scim/v2/Users/': typeof ScimV2UsersIndexRoute
   '/v1/marketplace/agents/': typeof V1MarketplaceAgentsIndexRoute
@@ -2626,9 +2689,11 @@ export interface FileRoutesById {
   '/v2/remote/owner-transfers/$transferId/decline': typeof V2RemoteOwnerTransfersTransferIdDeclineRoute
   '/v2/remote/sessions/$sessionId/end': typeof V2RemoteSessionsSessionIdEndRoute
   '/v2/remote/sessions/$sessionId/ticket': typeof V2RemoteSessionsSessionIdTicketRoute
+  '/v2/remote/watch/sessions/$watchSessionId': typeof V2RemoteWatchSessionsWatchSessionIdRoute
   '/v1/media/jobs/$jobId/': typeof V1MediaJobsJobIdIndexRoute
   '/v2/hosting/servers/$serverId/': typeof V2HostingServersServerIdIndexRoute
   '/v2/remote/hosts/$hostId/': typeof V2RemoteHostsHostIdIndexRoute
+  '/v2/remote/watch/sessions/': typeof V2RemoteWatchSessionsIndexRoute
   '/v1/marketplace/agents/admin/cards/$versionId': typeof V1MarketplaceAgentsAdminCardsVersionIdRoute
   '/v1/marketplace/agents/admin/featured/$agentId': typeof V1MarketplaceAgentsAdminFeaturedAgentIdRoute
   '/v1/marketplace/agents/admin/submissions/$versionId': typeof V1MarketplaceAgentsAdminSubmissionsVersionIdRoute
@@ -2649,6 +2714,7 @@ export interface FileRouteTypes {
     | '/app-preview'
     | '/branding'
     | '/changelog'
+    | '/chrome-extension'
     | '/cla'
     | '/commercial-license'
     | '/commerciallicense'
@@ -2693,6 +2759,7 @@ export interface FileRouteTypes {
     | '/health/live'
     | '/health/ready'
     | '/marketplace/apps'
+    | '/near/sign'
     | '/news/$slug'
     | '/news/openbot-vs-grokbot'
     | '/news/rss.xml'
@@ -2786,6 +2853,7 @@ export interface FileRouteTypes {
     | '/v1/mobile-auth/ticket'
     | '/v1/mobile/changelog'
     | '/v1/mobile/features'
+    | '/v1/near/$'
     | '/v1/sites/$siteId'
     | '/v1/sites/reports'
     | '/v1/skills/$skillId'
@@ -2800,6 +2868,7 @@ export interface FileRouteTypes {
     | '/v2/discord/authorize'
     | '/v2/discord/callback'
     | '/v2/hosting/plans'
+    | '/v2/remote/host-wake'
     | '/v2/remote/route-wake'
     | '/v2/server-claims/redeem'
     | '/v2/slack/authorize'
@@ -2853,6 +2922,7 @@ export interface FileRouteTypes {
     | '/v2/remote/slack-route/validate'
     | '/v2/remote/telegram-route/link'
     | '/v2/remote/telegram-route/validate'
+    | '/v2/remote/watch/ticket'
     | '/v2/remote/webhook-route/validate'
     | '/scim/v2/Users/'
     | '/v1/marketplace/agents/'
@@ -2910,9 +2980,11 @@ export interface FileRouteTypes {
     | '/v2/remote/owner-transfers/$transferId/decline'
     | '/v2/remote/sessions/$sessionId/end'
     | '/v2/remote/sessions/$sessionId/ticket'
+    | '/v2/remote/watch/sessions/$watchSessionId'
     | '/v1/media/jobs/$jobId/'
     | '/v2/hosting/servers/$serverId/'
     | '/v2/remote/hosts/$hostId/'
+    | '/v2/remote/watch/sessions/'
     | '/v1/marketplace/agents/admin/cards/$versionId'
     | '/v1/marketplace/agents/admin/featured/$agentId'
     | '/v1/marketplace/agents/admin/submissions/$versionId'
@@ -2931,6 +3003,7 @@ export interface FileRouteTypes {
     | '/app-preview'
     | '/branding'
     | '/changelog'
+    | '/chrome-extension'
     | '/cla'
     | '/commercial-license'
     | '/commerciallicense'
@@ -2975,6 +3048,7 @@ export interface FileRouteTypes {
     | '/health/live'
     | '/health/ready'
     | '/marketplace/apps'
+    | '/near/sign'
     | '/news/$slug'
     | '/news/openbot-vs-grokbot'
     | '/news/rss.xml'
@@ -3068,6 +3142,7 @@ export interface FileRouteTypes {
     | '/v1/mobile-auth/ticket'
     | '/v1/mobile/changelog'
     | '/v1/mobile/features'
+    | '/v1/near/$'
     | '/v1/sites/$siteId'
     | '/v1/sites/reports'
     | '/v1/skills/$skillId'
@@ -3082,6 +3157,7 @@ export interface FileRouteTypes {
     | '/v2/discord/authorize'
     | '/v2/discord/callback'
     | '/v2/hosting/plans'
+    | '/v2/remote/host-wake'
     | '/v2/remote/route-wake'
     | '/v2/server-claims/redeem'
     | '/v2/slack/authorize'
@@ -3135,6 +3211,7 @@ export interface FileRouteTypes {
     | '/v2/remote/slack-route/validate'
     | '/v2/remote/telegram-route/link'
     | '/v2/remote/telegram-route/validate'
+    | '/v2/remote/watch/ticket'
     | '/v2/remote/webhook-route/validate'
     | '/scim/v2/Users'
     | '/v1/marketplace/agents'
@@ -3192,9 +3269,11 @@ export interface FileRouteTypes {
     | '/v2/remote/owner-transfers/$transferId/decline'
     | '/v2/remote/sessions/$sessionId/end'
     | '/v2/remote/sessions/$sessionId/ticket'
+    | '/v2/remote/watch/sessions/$watchSessionId'
     | '/v1/media/jobs/$jobId'
     | '/v2/hosting/servers/$serverId'
     | '/v2/remote/hosts/$hostId'
+    | '/v2/remote/watch/sessions'
     | '/v1/marketplace/agents/admin/cards/$versionId'
     | '/v1/marketplace/agents/admin/featured/$agentId'
     | '/v1/marketplace/agents/admin/submissions/$versionId'
@@ -3216,6 +3295,7 @@ export interface FileRouteTypes {
     | '/app-preview'
     | '/branding'
     | '/changelog'
+    | '/chrome-extension'
     | '/cla'
     | '/commercial-license'
     | '/commerciallicense'
@@ -3260,6 +3340,7 @@ export interface FileRouteTypes {
     | '/health/live'
     | '/health/ready'
     | '/marketplace/apps'
+    | '/near/sign'
     | '/news/$slug'
     | '/news/openbot-vs-grokbot'
     | '/news/rss.xml'
@@ -3354,6 +3435,7 @@ export interface FileRouteTypes {
     | '/v1/mobile-auth/ticket'
     | '/v1/mobile/changelog'
     | '/v1/mobile/features'
+    | '/v1/near/$'
     | '/v1/sites/$siteId'
     | '/v1/sites/reports'
     | '/v1/skills/$skillId'
@@ -3368,6 +3450,7 @@ export interface FileRouteTypes {
     | '/v2/discord/authorize'
     | '/v2/discord/callback'
     | '/v2/hosting/plans'
+    | '/v2/remote/host-wake'
     | '/v2/remote/route-wake'
     | '/v2/server-claims/redeem'
     | '/v2/slack/authorize'
@@ -3421,6 +3504,7 @@ export interface FileRouteTypes {
     | '/v2/remote/slack-route/validate'
     | '/v2/remote/telegram-route/link'
     | '/v2/remote/telegram-route/validate'
+    | '/v2/remote/watch/ticket'
     | '/v2/remote/webhook-route/validate'
     | '/scim/v2/Users/'
     | '/v1/marketplace/agents/'
@@ -3478,9 +3562,11 @@ export interface FileRouteTypes {
     | '/v2/remote/owner-transfers/$transferId/decline'
     | '/v2/remote/sessions/$sessionId/end'
     | '/v2/remote/sessions/$sessionId/ticket'
+    | '/v2/remote/watch/sessions/$watchSessionId'
     | '/v1/media/jobs/$jobId/'
     | '/v2/hosting/servers/$serverId/'
     | '/v2/remote/hosts/$hostId/'
+    | '/v2/remote/watch/sessions/'
     | '/v1/marketplace/agents/admin/cards/$versionId'
     | '/v1/marketplace/agents/admin/featured/$agentId'
     | '/v1/marketplace/agents/admin/submissions/$versionId'
@@ -3503,6 +3589,7 @@ export interface RootRouteChildren {
   AppPreviewRoute: typeof AppPreviewRoute
   BrandingRoute: typeof BrandingRoute
   ChangelogRoute: typeof ChangelogRoute
+  ChromeExtensionRoute: typeof ChromeExtensionRoute
   ClaRoute: typeof ClaRoute
   CommercialLicenseRoute: typeof CommercialLicenseRoute
   CommerciallicenseRoute: typeof CommerciallicenseRoute
@@ -3530,6 +3617,7 @@ export interface RootRouteChildren {
   HealthLiveRoute: typeof HealthLiveRoute
   HealthReadyRoute: typeof HealthReadyRoute
   MarketplaceAppsRoute: typeof MarketplaceAppsRoute
+  NearSignRoute: typeof NearSignRoute
   NewsSlugRoute: typeof NewsSlugRoute
   NewsOpenbotVsGrokbotRoute: typeof NewsOpenbotVsGrokbotRoute
   NewsRssDotxmlRoute: typeof NewsRssDotxmlRoute
@@ -3573,6 +3661,7 @@ export interface RootRouteChildren {
   V1MobileAuthTicketRoute: typeof V1MobileAuthTicketRoute
   V1MobileChangelogRoute: typeof V1MobileChangelogRoute
   V1MobileFeaturesRoute: typeof V1MobileFeaturesRoute
+  V1NearSplatRoute: typeof V1NearSplatRoute
   V1SitesSiteIdRoute: typeof V1SitesSiteIdRoute
   V1SitesReportsRoute: typeof V1SitesReportsRoute
   V1SkillsSkillIdRoute: typeof V1SkillsSkillIdRouteWithChildren
@@ -3587,6 +3676,7 @@ export interface RootRouteChildren {
   V2DiscordAuthorizeRoute: typeof V2DiscordAuthorizeRoute
   V2DiscordCallbackRoute: typeof V2DiscordCallbackRoute
   V2HostingPlansRoute: typeof V2HostingPlansRoute
+  V2RemoteHostWakeRoute: typeof V2RemoteHostWakeRoute
   V2RemoteRouteWakeRoute: typeof V2RemoteRouteWakeRoute
   V2ServerClaimsRedeemRoute: typeof V2ServerClaimsRedeemRoute
   V2SlackAuthorizeRoute: typeof V2SlackAuthorizeRoute
@@ -3622,6 +3712,7 @@ export interface RootRouteChildren {
   V2RemoteSlackRouteValidateRoute: typeof V2RemoteSlackRouteValidateRoute
   V2RemoteTelegramRouteLinkRoute: typeof V2RemoteTelegramRouteLinkRoute
   V2RemoteTelegramRouteValidateRoute: typeof V2RemoteTelegramRouteValidateRoute
+  V2RemoteWatchTicketRoute: typeof V2RemoteWatchTicketRoute
   V2RemoteWebhookRouteValidateRoute: typeof V2RemoteWebhookRouteValidateRoute
   ScimV2UsersIndexRoute: typeof ScimV2UsersIndexRoute
   V1MarketplaceAgentsIndexRoute: typeof V1MarketplaceAgentsIndexRoute
@@ -3670,9 +3761,11 @@ export interface RootRouteChildren {
   V2RemoteOwnerTransfersTransferIdDeclineRoute: typeof V2RemoteOwnerTransfersTransferIdDeclineRoute
   V2RemoteSessionsSessionIdEndRoute: typeof V2RemoteSessionsSessionIdEndRoute
   V2RemoteSessionsSessionIdTicketRoute: typeof V2RemoteSessionsSessionIdTicketRoute
+  V2RemoteWatchSessionsWatchSessionIdRoute: typeof V2RemoteWatchSessionsWatchSessionIdRoute
   V1MediaJobsJobIdIndexRoute: typeof V1MediaJobsJobIdIndexRoute
   V2HostingServersServerIdIndexRoute: typeof V2HostingServersServerIdIndexRoute
   V2RemoteHostsHostIdIndexRoute: typeof V2RemoteHostsHostIdIndexRoute
+  V2RemoteWatchSessionsIndexRoute: typeof V2RemoteWatchSessionsIndexRoute
   V1MarketplaceAgentsAdminCardsVersionIdRoute: typeof V1MarketplaceAgentsAdminCardsVersionIdRoute
   V1MarketplaceAgentsAdminFeaturedAgentIdRoute: typeof V1MarketplaceAgentsAdminFeaturedAgentIdRoute
   V1MarketplaceAgentsAdminVerifiedAgentIdRoute: typeof V1MarketplaceAgentsAdminVerifiedAgentIdRoute
@@ -3740,6 +3833,13 @@ declare module '@tanstack/solid-router' {
       path: '/changelog'
       fullPath: '/changelog'
       preLoaderRoute: typeof ChangelogRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/chrome-extension': {
+      id: '/chrome-extension'
+      path: '/chrome-extension'
+      fullPath: '/chrome-extension'
+      preLoaderRoute: typeof ChromeExtensionRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/cla': {
@@ -4090,6 +4190,13 @@ declare module '@tanstack/solid-router' {
       path: '/marketplace/apps'
       fullPath: '/marketplace/apps'
       preLoaderRoute: typeof MarketplaceAppsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/near/sign': {
+      id: '/near/sign'
+      path: '/near/sign'
+      fullPath: '/near/sign'
+      preLoaderRoute: typeof NearSignRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/news/': {
@@ -4722,6 +4829,13 @@ declare module '@tanstack/solid-router' {
       preLoaderRoute: typeof V1MobileFeaturesRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/v1/near/$': {
+      id: '/v1/near/$'
+      path: '/v1/near/$'
+      fullPath: '/v1/near/$'
+      preLoaderRoute: typeof V1NearSplatRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/v1/sites/': {
       id: '/v1/sites/'
       path: '/v1/sites'
@@ -4832,6 +4946,13 @@ declare module '@tanstack/solid-router' {
       path: '/v2/hosting/plans'
       fullPath: '/v2/hosting/plans'
       preLoaderRoute: typeof V2HostingPlansRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/v2/remote/host-wake': {
+      id: '/v2/remote/host-wake'
+      path: '/v2/remote/host-wake'
+      fullPath: '/v2/remote/host-wake'
+      preLoaderRoute: typeof V2RemoteHostWakeRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/v2/remote/route-wake': {
@@ -5247,6 +5368,13 @@ declare module '@tanstack/solid-router' {
       preLoaderRoute: typeof V2RemoteTelegramRouteValidateRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/v2/remote/watch/ticket': {
+      id: '/v2/remote/watch/ticket'
+      path: '/v2/remote/watch/ticket'
+      fullPath: '/v2/remote/watch/ticket'
+      preLoaderRoute: typeof V2RemoteWatchTicketRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/v2/remote/webhook-route/validate': {
       id: '/v2/remote/webhook-route/validate'
       path: '/v2/remote/webhook-route/validate'
@@ -5595,6 +5723,20 @@ declare module '@tanstack/solid-router' {
       path: '/v2/remote/sessions/$sessionId/ticket'
       fullPath: '/v2/remote/sessions/$sessionId/ticket'
       preLoaderRoute: typeof V2RemoteSessionsSessionIdTicketRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/v2/remote/watch/sessions/': {
+      id: '/v2/remote/watch/sessions/'
+      path: '/v2/remote/watch/sessions'
+      fullPath: '/v2/remote/watch/sessions/'
+      preLoaderRoute: typeof V2RemoteWatchSessionsIndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/v2/remote/watch/sessions/$watchSessionId': {
+      id: '/v2/remote/watch/sessions/$watchSessionId'
+      path: '/v2/remote/watch/sessions/$watchSessionId'
+      fullPath: '/v2/remote/watch/sessions/$watchSessionId'
+      preLoaderRoute: typeof V2RemoteWatchSessionsWatchSessionIdRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/v1/marketplace/agents/admin/cards/$versionId': {
@@ -6019,6 +6161,7 @@ const rootRouteChildren: RootRouteChildren = {
   AppPreviewRoute: AppPreviewRoute,
   BrandingRoute: BrandingRoute,
   ChangelogRoute: ChangelogRoute,
+  ChromeExtensionRoute: ChromeExtensionRoute,
   ClaRoute: ClaRoute,
   CommercialLicenseRoute: CommercialLicenseRoute,
   CommerciallicenseRoute: CommerciallicenseRoute,
@@ -6047,6 +6190,7 @@ const rootRouteChildren: RootRouteChildren = {
   HealthLiveRoute: HealthLiveRoute,
   HealthReadyRoute: HealthReadyRoute,
   MarketplaceAppsRoute: MarketplaceAppsRoute,
+  NearSignRoute: NearSignRoute,
   NewsSlugRoute: NewsSlugRoute,
   NewsOpenbotVsGrokbotRoute: NewsOpenbotVsGrokbotRoute,
   NewsRssDotxmlRoute: NewsRssDotxmlRoute,
@@ -6090,6 +6234,7 @@ const rootRouteChildren: RootRouteChildren = {
   V1MobileAuthTicketRoute: V1MobileAuthTicketRoute,
   V1MobileChangelogRoute: V1MobileChangelogRoute,
   V1MobileFeaturesRoute: V1MobileFeaturesRoute,
+  V1NearSplatRoute: V1NearSplatRoute,
   V1SitesSiteIdRoute: V1SitesSiteIdRoute,
   V1SitesReportsRoute: V1SitesReportsRoute,
   V1SkillsSkillIdRoute: V1SkillsSkillIdRouteWithChildren,
@@ -6104,6 +6249,7 @@ const rootRouteChildren: RootRouteChildren = {
   V2DiscordAuthorizeRoute: V2DiscordAuthorizeRoute,
   V2DiscordCallbackRoute: V2DiscordCallbackRoute,
   V2HostingPlansRoute: V2HostingPlansRoute,
+  V2RemoteHostWakeRoute: V2RemoteHostWakeRoute,
   V2RemoteRouteWakeRoute: V2RemoteRouteWakeRoute,
   V2ServerClaimsRedeemRoute: V2ServerClaimsRedeemRoute,
   V2SlackAuthorizeRoute: V2SlackAuthorizeRoute,
@@ -6139,6 +6285,7 @@ const rootRouteChildren: RootRouteChildren = {
   V2RemoteSlackRouteValidateRoute: V2RemoteSlackRouteValidateRoute,
   V2RemoteTelegramRouteLinkRoute: V2RemoteTelegramRouteLinkRoute,
   V2RemoteTelegramRouteValidateRoute: V2RemoteTelegramRouteValidateRoute,
+  V2RemoteWatchTicketRoute: V2RemoteWatchTicketRoute,
   V2RemoteWebhookRouteValidateRoute: V2RemoteWebhookRouteValidateRoute,
   ScimV2UsersIndexRoute: ScimV2UsersIndexRoute,
   V1MarketplaceAgentsIndexRoute: V1MarketplaceAgentsIndexRoute,
@@ -6195,9 +6342,12 @@ const rootRouteChildren: RootRouteChildren = {
     V2RemoteOwnerTransfersTransferIdDeclineRoute,
   V2RemoteSessionsSessionIdEndRoute: V2RemoteSessionsSessionIdEndRoute,
   V2RemoteSessionsSessionIdTicketRoute: V2RemoteSessionsSessionIdTicketRoute,
+  V2RemoteWatchSessionsWatchSessionIdRoute:
+    V2RemoteWatchSessionsWatchSessionIdRoute,
   V1MediaJobsJobIdIndexRoute: V1MediaJobsJobIdIndexRoute,
   V2HostingServersServerIdIndexRoute: V2HostingServersServerIdIndexRoute,
   V2RemoteHostsHostIdIndexRoute: V2RemoteHostsHostIdIndexRoute,
+  V2RemoteWatchSessionsIndexRoute: V2RemoteWatchSessionsIndexRoute,
   V1MarketplaceAgentsAdminCardsVersionIdRoute:
     V1MarketplaceAgentsAdminCardsVersionIdRoute,
   V1MarketplaceAgentsAdminFeaturedAgentIdRoute:

@@ -4,6 +4,7 @@ import { join, resolve } from "node:path";
 import { DatabaseSync } from "node:sqlite";
 import { CREDIT_MEDIA_REQUEST_PART } from "@openbot/contracts/credit-media";
 import { type DynamicRecord, isDynamicRecord } from "@openbot/contracts/runtime-values";
+import { sourceText } from "@openbot/i18n/source";
 import { Effect } from "effect";
 import { createAccountAnalytics } from "../src/server/account-analytics";
 import { BillingError, type BillingOperationError } from "../src/server/billing-errors";
@@ -129,6 +130,7 @@ interface FakeJob {
   upstream: string;
   status: string;
   outputs: number;
+  failure?: string;
 }
 
 interface FakeSubmit {
@@ -150,6 +152,7 @@ function fakeGateway() {
   const outputs: string[] = [];
   let active = "router";
   let submitStatus = 200;
+  let submitCode = "upstream_said_no";
   let modelsStatus = 200;
   let sequence = 0;
   let gate: { arrived: () => void; released: Promise<void> } | null = null;
@@ -207,7 +210,7 @@ function fakeGateway() {
         waiting.arrived();
         await waiting.released;
       }
-      if (submitStatus !== 200) return Response.json({ error: { code: "upstream_said_no" } }, { status: submitStatus });
+      if (submitStatus !== 200) return Response.json({ error: { code: submitCode } }, { status: submitStatus });
       const upstream = isDynamicRecord(request) && typeof request.upstream === "string" ? request.upstream : "";
       const model = isDynamicRecord(request) ? request.model : null;
       if (typeof model !== "string" || !routedFor(upstream, model, request.funding))
@@ -224,7 +227,13 @@ function fakeGateway() {
     const id = decodeURIComponent(job[2] ?? "");
     if (!job[3]) {
       polls.push(key);
-      return Response.json({ upstream: stored.upstream, id, status: stored.status, pollAfterSeconds: 4 });
+      return Response.json({
+        upstream: stored.upstream,
+        id,
+        status: stored.status,
+        pollAfterSeconds: 4,
+        ...(stored.failure === undefined ? {} : { failure: stored.failure }),
+      });
     }
     if (job[3] === "result")
       return Response.json({
@@ -259,6 +268,11 @@ function fakeGateway() {
     setStatus: (providerJobId: string, status: string) => {
       find(providerJobId)[1].status = status;
     },
+    fail: (providerJobId: string, failure: string) => {
+      const [, job] = find(providerJobId);
+      job.status = "failed";
+      job.failure = failure;
+    },
     complete: (providerJobId: string, count: number) => {
       const [, job] = find(providerJobId);
       job.status = "completed";
@@ -267,8 +281,9 @@ function fakeGateway() {
     forget: (providerJobId: string) => {
       jobs.delete(find(providerJobId)[0]);
     },
-    setSubmitStatus: (status: number) => {
+    setSubmitStatus: (status: number, code = "upstream_said_no") => {
       submitStatus = status;
+      submitCode = code;
     },
     setModelsStatus: (status: number) => {
       modelsStatus = status;
@@ -304,7 +319,7 @@ async function run<T>(effect: Effect.Effect<T, BillingError | BillingOperationEr
 
 async function failure(effect: Effect.Effect<unknown, BillingError | BillingOperationError>) {
   const error = await Effect.runPromise(Effect.flip(effect));
-  if (error instanceof BillingError) return { status: error.status, code: error.code };
+  if (error instanceof BillingError) return { status: error.status, code: error.code, message: error.message };
   return { status: 500, code: error._tag };
 }
 
@@ -522,7 +537,11 @@ async function gatewayFlow() {
   const failed = await run(service.job(owner, video.jobId));
   check(
     "a failed generation frees its hold and uses no credits",
-    failed.status === "failed" && failed.failure === "failed" && failed.credits === 0 && (await balance(owner)) === 297,
+    failed.status === "failed" &&
+      failed.failure === "failed" &&
+      failed.reason === null &&
+      failed.credits === 0 &&
+      (await balance(owner)) === 297,
     failed,
   );
 
@@ -537,6 +556,27 @@ async function gatewayFlow() {
   );
   upstream.setStatus(upstream.lastJobId(), "failed");
   await run(service.job(owner, silent.jobId));
+
+  const unsafe = await run(service.submit(owner, OWNER, submission("image-one")));
+  upstream.fail(upstream.lastJobId(), "content_policy");
+  const unsafeView = await run(service.job(owner, unsafe.jobId));
+  const unsafeHold = database
+    .prepare("SELECT status, outcome, failure_reason FROM credit_holds WHERE job_id = ?")
+    .get(unsafe.jobId);
+  const unsafeLater = await run(service.job(owner, unsafe.jobId));
+  check(
+    "a generation that the upstream refuses for content policy is refused, frees its hold and uses no credits",
+    unsafeView.status === "failed" &&
+      unsafeView.failure === "refused" &&
+      unsafeView.reason === "content_policy" &&
+      unsafeLater.reason === "content_policy" &&
+      unsafeHold?.failure_reason === "content_policy" &&
+      unsafeView.credits === 0 &&
+      unsafeHold?.status === "released" &&
+      unsafeHold.outcome === "refused" &&
+      (await balance(owner)) === 297,
+    { unsafeView, unsafeLater, unsafeHold },
+  );
 
   const refusedStatuses: [number, string, string][] = [
     [422, "media_request_refused", "refused"],
@@ -562,6 +602,23 @@ async function gatewayFlow() {
       { refused, view },
     );
   }
+
+  upstream.setSubmitStatus(400, "Content_Policy");
+  const unsafeSubmitRequest = submission("image-one");
+  const unsafeSubmit = await failure(service.submit(owner, OWNER, unsafeSubmitRequest));
+  upstream.setSubmitStatus(200);
+  const unsafeSubmitView = await run(service.submit(owner, OWNER, unsafeSubmitRequest));
+  check(
+    "a content policy refusal at submit says why, and the same job sent again keeps the reason",
+    unsafeSubmit.code === "media_request_refused" &&
+      unsafeSubmit.message === sourceText("error.billing.mediaContentRefused") &&
+      unsafeSubmitView.status === "failed" &&
+      unsafeSubmitView.failure === "refused" &&
+      unsafeSubmitView.reason === "content_policy" &&
+      unsafeSubmitView.credits === 0 &&
+      (await balance(owner)) === 297,
+    { unsafeSubmit, unsafeSubmitView },
+  );
 
   upstream.setSubmitStatus(500);
   const retryRequest = submission("image-one");
@@ -724,6 +781,19 @@ async function gatewayFlow() {
     { emptyStudioHold, before: studioBeforeEmpty, after: await balance(studio) },
   );
 
+  const unsafeStudioJob = await run(service.submit(studio, null, submission("image-one")));
+  upstream.fail(upstream.lastJobId(), "content_policy");
+  clock += CREDIT_HOLD_FIRST_CHECK_MS;
+  await run(service.sweep());
+  const unsafeStudioHold = database
+    .prepare("SELECT status, outcome FROM credit_holds WHERE job_id = ?")
+    .get(unsafeStudioJob.jobId);
+  check(
+    "the sweep also settles a content policy refusal as refused",
+    unsafeStudioHold?.status === "released" && unsafeStudioHold.outcome === "refused",
+    unsafeStudioHold,
+  );
+
   database.exec("UPDATE credit_media_prices SET credits = 2.5, updated_at = 2 WHERE model_id = 'image-one'");
   const repriced = await run(service.catalog());
   const repricedJob = await run(service.submit(owner, OWNER, submission("image-one", { count: 3 })));
@@ -783,6 +853,22 @@ async function gatewayFlow() {
         kind: "image",
         outcome: "failed",
       }).length === 1 &&
+      sent(OWNER, { action: "media_released", model_id: "video-one", outcome: "failed", reason: "unknown" }).length ===
+        2 &&
+      sent(OWNER, { action: "media_released", wallet: "personal", outcome: "refused", reason: "content_policy" })
+        .length === 2 &&
+      sent(OWNER, { action: "media_released", wallet: "server", outcome: "refused", reason: "content_policy" })
+        .length === 1 &&
+      sent(OWNER, { action: "media_released", wallet: "server", outcome: "failed", reason: "no_output" }).length ===
+        1 &&
+      sent(OWNER, { action: "media_released", outcome: "refused", reason: "upstream_said_no" }).length === 4 &&
+      sent(OWNER, { action: "media_released", outcome: "failed", reason: "not_found" }).length >= 1 &&
+      tracked.every(
+        (event) =>
+          !isDynamicRecord(event.properties) ||
+          event.properties.action === "media_released" ||
+          event.properties.reason === undefined,
+      ) &&
       tracked.every(
         (event) => event.name === "credit_action" && (event.profileId === OWNER || event.profileId === OUTSIDER),
       ),
@@ -824,7 +910,8 @@ async function gatewayFlow() {
     "the credit audit has one row for each hold and start, and a charge or release for each settled generation",
     audited({ event: "hold" }).length === holds &&
       audited({ event: "charged", result: "ok", code: "completed" }).length === ledgerSpends().length &&
-      audited({ event: "released", code: "refused" }).length === refusedStatuses.length &&
+      audited({ event: "released", code: "refused" }).length ===
+        refusedStatuses.length + [unsafe, unsafeSubmitRequest, unsafeStudioJob].length &&
       audited({ event: "charged", server_id: SERVER_ID, model_id: "video-one", credits: 35 }).length === 1 &&
       audited({ event: "released", result: "failed", code: "failed", model_id: "video-one", credits: 155 }).length ===
         1,
@@ -843,7 +930,7 @@ async function gatewayFlow() {
             row.actor_user_id === OWNER,
         ).length === 1,
     ) &&
-      audited({ event: "media_submit", code: "media_request_refused" }).length === 1 &&
+      audited({ event: "media_submit", code: "media_request_refused" }).length === 2 &&
       audited({ event: "media_submit", code: "media_busy" }).length === 2,
     trail,
   );
@@ -1181,6 +1268,100 @@ async function welcomeRouteFlow() {
       paidSubmit.upstream === "router" &&
       hold(paidJob.request.jobId)?.funding === "paid",
     paidSubmit,
+  );
+
+  database.exec(
+    "UPDATE credit_holds SET status = 'released', outcome = 'canceled', settled_at = 2 WHERE status = 'held'",
+  );
+  database.prepare("UPDATE credit_grants SET remaining_tenths = 100 WHERE grant_id = ?").run(`welcome:${OWNER}`);
+  const serverLedger = database
+    .prepare("SELECT SUM(amount_tenths) AS tenths FROM credit_ledger WHERE server_id = ?")
+    .get(SERVER_ID);
+  database
+    .prepare(
+      "INSERT INTO credit_ledger(entry_id, user_id, server_id, amount_tenths, kind, actor_user_id, reference, created_at) VALUES ('move:studio', NULL, ?, ?, 'transfer', ?, 'move', 2)",
+    )
+    .run(SERVER_ID, 10 - Number(serverLedger?.tenths ?? 0), OWNER);
+  const emptyServer = await run(service.balance(studio));
+  const ownerBefore = await run(service.balance(owner));
+  const viaJob = submission("image-one", { count: 2 });
+  const viaFirst = await run(service.submit(studio, null, viaJob));
+  const viaSubmit = gateway.submits.at(-1)?.request;
+  const viaRetry = await run(service.submit(studio, null, viaJob));
+  const viaHold = database
+    .prepare("SELECT user_id, server_id, actor_user_id, via_server_id, funding FROM credit_holds WHERE job_id = ?")
+    .get(viaJob.request.jobId);
+  const viaPoll = await run(service.job(studio, viaJob.request.jobId));
+  const viaOwnerPoll = await failure(service.job(owner, viaJob.request.jobId));
+  const viaProvider = database
+    .prepare("SELECT provider_job_id FROM credit_holds WHERE job_id = ?")
+    .get(viaJob.request.jobId);
+  gateway.complete(String(viaProvider?.provider_job_id ?? ""), 1);
+  const viaDone = await run(service.job(studio, viaJob.request.jobId));
+  const ownerAfter = await run(service.balance(owner));
+  const serverAfter = await run(service.balance(studio));
+  check(
+    "a server with too few credits makes a free model job on the free credits of its owner, polls it, and the owner sees the spend",
+    emptyServer.available === 11 &&
+      emptyServer.welcome === 10 &&
+      ownerBefore.welcome === 10 &&
+      viaSubmit?.funding === "welcome" &&
+      viaSubmit.upstream === "tasks" &&
+      viaFirst.jobId === viaRetry.jobId &&
+      gateway.submits.filter((entry) => entry.request.jobId === viaJob.request.jobId).length === 1 &&
+      JSON.stringify(viaHold) ===
+        JSON.stringify({
+          user_id: OWNER,
+          server_id: null,
+          actor_user_id: null,
+          via_server_id: SERVER_ID,
+          funding: "welcome",
+        }) &&
+      viaPoll.jobId === viaJob.request.jobId &&
+      viaOwnerPoll.code === "media_job_not_found" &&
+      viaDone.status === "completed" &&
+      ownerAfter.welcome === 7 &&
+      serverAfter.available === 8 &&
+      serverAfter.welcome === 7,
+    { emptyServer, ownerBefore, viaSubmit, viaHold, viaOwnerPoll, viaDone, ownerAfter, serverAfter },
+  );
+
+  const paidOnServer = await failure(service.submit(studio, null, submission("video-one", { duration: 5 })));
+  database.prepare("UPDATE credit_grants SET remaining_tenths = 30 WHERE grant_id = ?").run(`welcome:${OWNER}`);
+  const tooBig = await failure(service.submit(studio, null, submission("image-one", { count: 4 })));
+  check(
+    "the owner's free credits never pay for a model with no free use or a job they cannot cover",
+    paidOnServer.code === "credits_spend_not_enough" &&
+      tooBig.code === "credits_spend_not_enough" &&
+      (await run(service.balance(owner))).welcome === 3,
+    { paidOnServer, tooBig },
+  );
+
+  database.exec(`
+    INSERT INTO users(id, identity_key, email, created_at, updated_at)
+    VALUES ('member', 'email:member@example.test', 'member@example.test', 1, 1);
+    INSERT INTO remote_memberships(membership_id, host_id, user_id, role, status, created_at, updated_at)
+    VALUES ('m-member', '${SERVER_ID}', 'member', 'member', 'active', 1, 1);
+  `);
+  const outsiderJob = await failure(service.submit(studio, OUTSIDER, submission("image-one")));
+  const memberSubmission = submission("image-one");
+  await run(service.submit(studio, "member", memberSubmission));
+  const memberHold = database
+    .prepare("SELECT user_id, server_id, actor_user_id, via_server_id, funding FROM credit_holds WHERE job_id = ?")
+    .get(memberSubmission.request.jobId);
+  check(
+    "a job of a server member also uses the owner's free credits; a job of a user who is not a member does not",
+    outsiderJob.code === "credits_spend_member" &&
+      JSON.stringify(memberHold) ===
+        JSON.stringify({
+          user_id: OWNER,
+          server_id: null,
+          actor_user_id: "member",
+          via_server_id: SERVER_ID,
+          funding: "welcome",
+        }) &&
+      (await run(service.balance(owner))).welcome === 1.5,
+    { outsiderJob, memberHold },
   );
 }
 

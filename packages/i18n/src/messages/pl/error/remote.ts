@@ -97,6 +97,8 @@ export const messages = {
     "OpenBot nie mógł nawiązać połączenia z tym serwerem. Jeśli problem się powtarza, zamknij OpenBot i otwórz go ponownie.",
   "error.remote.connectionServiceUnreachable":
     "Ten komputer nie może połączyć się z usługą połączeń OpenBot. Sprawdź jego połączenie z internetem. OpenBot połączy się ponownie automatycznie.",
+  "error.remote.deviceConnectionServiceUnreachable":
+    "To urządzenie nie może połączyć się z usługą połączeń OpenBot. Sprawdź jego połączenie z internetem i VPN. OpenBot połączy się ponownie automatycznie.",
   "error.remote.serverAnswerTimeout": "Serwer nie odpowiedział na czas. OpenBot połączy się ponownie automatycznie.",
   "error.remote.signInConnectionClosed":
     "Połączenie z serwerem zostało zamknięte podczas logowania. Jeśli to się powtarza, sprawdź datę i godzinę na serwerze i na tym urządzeniu.",

@@ -61,6 +61,12 @@ export const messages = {
     "OpenBot не удалось загрузить страницу в окне входа. Проверьте подключение к интернету, затем снова откройте окно входа.",
   "error.backend.browserSignInReadFailed": "OpenBot не удалось прочитать вход из окна.",
   "error.backend.browserStopUnsupported": "Этот удалённый хост не может остановить загрузку страницы.",
+  "error.backend.browserLocationFailed": "Не удалось задать местоположение для страницы.",
+  "error.backend.browserPermissionsUnsupported": "Этот удаленный хост не может отвечать на запросы местоположения.",
+  "error.backend.browserLocationRequired": "Отправьте местоположение устройства, чтобы разрешить запрос.",
+  "error.backend.browserHttpSignInInactive":
+    "Этот сайт больше не запрашивает вход. Перезагрузите страницу, чтобы попробовать снова.",
+  "error.backend.browserHttpSignInUnsupported": "Этот удалённый хост не может принять вход на сайт.",
   "error.backend.sharedDataLocalOnly": "Общими данными управляют на компьютере, где работают эти агенты.",
   "error.backend.browserUrlProtocol": "Допускаются только URL браузера с HTTP(S).",
   "error.backend.sunshineNotReady": "Sunshine не стал готов.",
@@ -204,6 +210,7 @@ export const messages = {
   "error.backend.videoGenerationFailed": "Не удалось создать видео.",
   "error.backend.videoGenerationNoVideo": "Создание видео не вернуло видео.",
   "error.backend.videoGenerationInterrupted": "Создание видео прервано.",
+  "error.backend.grokVideoNoQuota": "Ваш аккаунт Grok не может создавать видео. Создайте видео за кредиты.",
   "error.backend.attachmentNotRegularFile": "Прикреплять можно только обычные файлы: {name}",
   "error.backend.attachmentCopyFailed": "OpenBot не смог скопировать {name}.",
   "error.backend.routineNameRequired": "Нужно название регулярной задачи.",
@@ -292,6 +299,8 @@ export const messages = {
     "Сервер входа пока не принимает OpenBot как приложение. Дело не в вашем аккаунте. Подключитесь другим способом, например через локальный сервер MCP.",
   "error.backend.mcpRegistrationUnavailable":
     "Сервер входа не может зарегистрировать OpenBot как приложение. Дело не в вашем аккаунте. Чтобы подключиться, сохраните этот сервер в разделе Каталог, Приложения, затем добавьте к нему приложение входа.",
+  "error.backend.mcpSignInAppNeeded":
+    "Сервер входа не может зарегистрировать OpenBot как приложение. Дело не в вашем аккаунте. Чтобы подключиться, откройте этот сервер в разделе Каталог, Приложения, нажмите Проверить подключение, затем добавьте приложение входа.",
   "error.backend.mcpSignInAbandonedGeneric": "Вход прерван.",
   "error.backend.mcpSignInForgotten": "Вход в MCP был забыт, пока выполнялся.",
   "error.backend.mcpSignInAbandoned": "Вход в MCP прерван.",
@@ -353,6 +362,7 @@ export const messages = {
     "Этот компьютер заблокировал подключение к серверу. Проверьте брандмауэр или защитное ПО и повторите попытку.",
   "error.backend.mcpServerIncompatible":
     "По этому адресу что-то ответило, но не как сервер MCP через Streamable HTTP. Проверьте URL и обновите приложение, которое запускает сервер.",
+  "error.backend.mcpServerKeyNotAccepted": "Сервер не принял ключ API. Проверьте ключ и попробуйте ещё раз.",
   "error.backend.mcpRemoteBridge":
     "{reason} Эта команда запускает мост mcp-remote. Выберите вместо него Streamable HTTP с URL {url}, и OpenBot выполнит вход.",
   "error.backend.oauthNotHttps": "Эндпоинт OAuth {origin} не использует https, поэтому учётные данные не отправлены.",

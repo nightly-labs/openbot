@@ -13,6 +13,7 @@ import {
   writeFileSync,
 } from "node:fs";
 import { request as httpRequest } from "node:http";
+import { connect } from "node:net";
 import { homedir, tmpdir } from "node:os";
 import { join, parse, resolve } from "node:path";
 import { isDeepStrictEqual } from "node:util";
@@ -180,6 +181,7 @@ import {
   AGENT_THREAD_REQUESTS_CAPABILITY,
   AGENT_THREAD_REQUESTS_ROUTES,
 } from "@openbot/contracts/team-protocol/agent-thread-requests-v1";
+import { AGENT_THREADS_CAPABILITY, AGENT_THREADS_ROUTES } from "@openbot/contracts/team-protocol/agent-threads-v1";
 import {
   AGENT_USAGE_LIMIT_CAPABILITY,
   AGENT_USAGE_LIMIT_ROUTES,
@@ -200,6 +202,14 @@ import {
   BITWARDEN_CONNECTOR_CAPABILITY,
   BITWARDEN_CONNECTOR_ROUTES,
 } from "@openbot/contracts/team-protocol/bitwarden-connector-v1";
+import {
+  BROWSER_HTTP_SIGN_IN_CAPABILITY,
+  BROWSER_HTTP_SIGN_IN_ROUTES,
+} from "@openbot/contracts/team-protocol/browser-http-sign-in-v1";
+import {
+  BROWSER_PERMISSIONS_CAPABILITY,
+  BROWSER_PERMISSIONS_ROUTES,
+} from "@openbot/contracts/team-protocol/browser-permissions-v1";
 import {
   BROWSER_PROFILES_CAPABILITY,
   BROWSER_PROFILES_ROUTES,
@@ -227,6 +237,11 @@ import {
   CACHE_EXPIRY_COMPACTION_CODECS,
   CACHE_EXPIRY_COMPACTION_ROUTES,
 } from "@openbot/contracts/team-protocol/cache-expiry-compaction-v1";
+import {
+  CHANNEL_COMPACT_AVAILABILITY_CAPABILITY,
+  CHANNEL_COMPACT_AVAILABILITY_ROUTE,
+  decodeChannelCompactAvailability,
+} from "@openbot/contracts/team-protocol/channel-compact-availability-v1";
 import {
   CHANNEL_FOLDERS_CAPABILITY,
   CHANNEL_FOLDERS_ROUTES,
@@ -391,6 +406,7 @@ import {
   MODEL_VISIBILITY_ROUTES,
 } from "@openbot/contracts/team-protocol/model-visibility-v1";
 import { OPENBOT_CREDITS_EVENTS_CAPABILITY } from "@openbot/contracts/team-protocol/openbot-credits-events-v1";
+import { optionalRouteCodec } from "@openbot/contracts/team-protocol/optional-routes";
 import {
   PASSWORD_MANAGERS_CAPABILITY,
   PASSWORD_MANAGERS_CODECS,
@@ -426,6 +442,11 @@ import {
   PROVIDER_ACCOUNT_MODELS_CAPABILITY,
   PROVIDER_ACCOUNT_MODELS_ROUTES,
 } from "@openbot/contracts/team-protocol/provider-account-models-v1";
+import {
+  decodeProviderAccountPoolStrategies,
+  PROVIDER_ACCOUNT_POOL_STRATEGY_CAPABILITY,
+  PROVIDER_ACCOUNT_POOL_STRATEGY_ROUTES,
+} from "@openbot/contracts/team-protocol/provider-account-pool-strategy-v1";
 import {
   PROVIDER_ACCOUNT_POOL_CAPABILITY,
   PROVIDER_ACCOUNT_POOL_ROUTES,
@@ -561,8 +582,10 @@ import { RoutineInputError } from "@openbot/team-client/routine-schedule";
 import { Effect } from "effect";
 import { strToU8, unzipSync, zipSync } from "fflate";
 import { runClientBrowserTool, withClientTabs } from "../src/backend/agent/client-browser-tools";
+import { compactsOnRequest } from "../src/backend/agent/context-compaction";
 import { ForbiddenAttentionAnswer, InactiveAttentionRequest } from "../src/backend/agent/inactive-attention-request";
 import { SteerUnsupportedError } from "../src/backend/agent/queue-controls";
+import { fixedContextCompaction } from "../src/backend/agent-client";
 import { AgentLifecycleFailed } from "../src/backend/agent-service";
 import { AgentThreadLimitError } from "../src/backend/agent-tasks/agent-tasks";
 import { AgentWaitError } from "../src/backend/agent-waits/agent-wait-store";
@@ -1419,7 +1442,11 @@ const fakeMediaOffer: MediaApprovalOffer = {
   choice: { model: "gpt-image-2", aspect: "1:1", resolution: null, duration: null, audio: false },
   defaultModel: null,
   canSetDefault: true,
-  models: [fakeMediaModel("gpt-image-2", "GPT Image 2", 12), fakeMediaModel("nano-banana-2", "Nano Banana 2", 8)],
+  models: [
+    fakeMediaModel("gpt-image-2", "GPT Image 2", 12),
+    { ...fakeMediaModel("nano-banana-2", "Nano Banana 2", 8), welcome: true },
+  ],
+  balance: { available: 10, welcome: 10 },
 };
 
 const fakeAgents: TeamApiAgents = {
@@ -1878,6 +1905,14 @@ const fakeAgents: TeamApiAgents = {
   },
   clearChannelContext: unused("clearChannelContext"),
   compactChannelContext: unused("compactChannelContext"),
+  channelCompactAvailable: (channelId) => {
+    record("channelCompactAvailable", channelId);
+    const members = new Set(channelService?.store.get(channelId).members.map((member) => member.agentId));
+    return agents.some((item) => {
+      const mode = fixedContextCompaction(item.provider);
+      return members.has(item.id) && (mode === undefined || compactsOnRequest(mode));
+    });
+  },
   deleteChannelHistory: unused("deleteChannelHistory"),
   compactAgentContext: (agentId) => Effect.sync(() => record("compactAgentContext", agentId)),
   compactTaskContext: (input) => {
@@ -2193,7 +2228,7 @@ const fakeAgentTasks: TeamApiAgentTasks = {
     throw new AgentThreadLimitError();
   },
   renameTask: unused("renameTask"),
-  deleteTask: unused("deleteTask"),
+  deleteTask: (input) => Effect.sync(() => record("deleteTask", input)),
   listTaskReads: unused("listTaskReads"),
   markTaskRead: unused("markTaskRead"),
   branchTask: unused("branchTask"),
@@ -2240,6 +2275,10 @@ const browser: TeamApiBrowser = {
   navigate: unused("navigate"),
   reload: unused("reload"),
   stop: unused("stop"),
+  answerPermission: (answer) => {
+    record("answerPermission", answer);
+    return Effect.void;
+  },
   takeUserControl: unused("takeUserControl"),
   releaseUserControl: unused("releaseUserControl"),
   startTeach: (tabId, holder) => {
@@ -2270,9 +2309,20 @@ const browser: TeamApiBrowser = {
   startView: unused("startView"),
   dispatchViewInput: unused("dispatchViewInput"),
   copyViewSelection: unused("copyViewSelection"),
+  answerViewDialog: unused("answerViewDialog"),
   importSignIn: (tabId, cookies, storage = null) => {
     record("importSignIn", tabId, cookies.length, storage?.origin ?? null, storage?.entries.length ?? 0);
     return Effect.succeed({ cookies: cookies.length, storage: storage?.entries.length ?? 0 });
+  },
+  answerHttpSignIn: (input) => {
+    if ("cancel" in input) record("answerHttpSignIn", input.tabId, "cancel");
+    else record("answerHttpSignIn", input.tabId, "answer", input.username.length, input.password.length);
+    browserTabs = browserTabs.map((tab) => {
+      if (tab.id !== input.tabId) return tab;
+      const { httpSignIn: _signIn, ...rest } = tab;
+      return rest;
+    });
+    return Effect.void;
   },
 };
 
@@ -3312,13 +3362,18 @@ try {
     providerAccounts: new ProviderAccountsHost({
       service: {
         getStatus: accountModelsStatus,
-        setProviderAccountPool: (provider, enabled, leftOut) =>
+        setProviderAccountPool: (provider, enabled, leftOut, strategy) =>
           Effect.sync(() => {
-            record("setProviderAccountPool", { provider, enabled, leftOut });
+            record("setProviderAccountPool", { provider, enabled, leftOut, ...(strategy ? { strategy } : {}) });
             const known = ["default", ULTRA_ACCOUNT, FREE_ACCOUNT];
             const out = leftOut.filter((id) => known.includes(id));
+            const kept = strategy ?? antigravityPool?.strategy;
             antigravityPool = enabled
-              ? { leftOut: out, inUse: known.find((id) => !out.includes(id)) ?? null }
+              ? {
+                  leftOut: out,
+                  inUse: known.find((id) => !out.includes(id)) ?? null,
+                  ...(kept && kept !== "fillFirst" ? { strategy: kept } : {}),
+                }
               : undefined;
             return accountModelsStatus();
           }),
@@ -3522,6 +3577,89 @@ try {
 
   function summary(reply: Reply): ReplySummary {
     return { status: reply.status, body: reply.body ?? reply.text.slice(0, 200) };
+  }
+
+  function rawUpgradeStatusLine(target: string): Promise<string> {
+    return new Promise((resolveLine, rejectLine) => {
+      const socket = connect(port, "127.0.0.1", () => {
+        socket.write(
+          [
+            `GET ${target} HTTP/1.1`,
+            `Host: 127.0.0.1:${port}`,
+            "Connection: Upgrade",
+            "Upgrade: websocket",
+            "Sec-WebSocket-Version: 13",
+            `Sec-WebSocket-Key: ${randomBytes(16).toString("base64")}`,
+            `Sec-WebSocket-Protocol: ${TEAM_PROTOCOL_V1_WEBSOCKET}`,
+            "",
+            "",
+          ].join("\r\n"),
+        );
+      });
+      const deadline = setTimeout(() => {
+        socket.destroy();
+        resolveLine("no answer");
+      }, 5_000);
+      let received = "";
+      socket.on("data", (chunk: Buffer) => {
+        received += chunk.toString("utf8");
+      });
+      socket.on("close", () => {
+        clearTimeout(deadline);
+        resolveLine(received.split("\r\n")[0] ?? "");
+      });
+      socket.on("error", (error) => {
+        clearTimeout(deadline);
+        rejectLine(error);
+      });
+    });
+  }
+
+  function rawPathGet(path: string): Promise<ReplySummary> {
+    return new Promise((resolveCall, rejectCall) => {
+      const request = httpRequest({ host: "127.0.0.1", port, method: "GET", path }, (response) => {
+        const chunks: Buffer[] = [];
+        response.on("data", (chunk: Buffer) => chunks.push(chunk));
+        response.on("end", () => {
+          const text = Buffer.concat(chunks).toString("utf8");
+          resolveCall({ status: response.statusCode ?? 0, body: text ? parseJson(text) : null });
+        });
+      });
+      request.setTimeout(5_000, () => request.destroy(new Error("The host did not answer.")));
+      request.on("error", rejectCall);
+      request.end();
+    });
+  }
+
+  {
+    const uncaught: string[] = [];
+    const recordUncaught = (error: Error) => uncaught.push(error.message);
+    process.on("uncaughtException", recordUncaught);
+    try {
+      const unparsable = await rawUpgradeStatusLine("//[");
+      const afterwards = await rawUpgradeStatusLine(TEAM_API_ROUTES.events);
+      check(
+        "an upgrade with a target that is not a URL gets 400 before the token check, and the next upgrade gets 401",
+        unparsable === "HTTP/1.1 400 Bad Request" &&
+          afterwards === "HTTP/1.1 401 Unauthorized" &&
+          uncaught.length === 0,
+        { unparsable, afterwards, uncaught },
+      );
+      const loggedBefore = logged.length;
+      const plain = await rawPathGet("//[");
+      const compatibility = await call("GET", TEAM_API_ROUTES.compatibility, { protocol: null });
+      check(
+        "a request with a target that is not a URL gets 400 with the request error, writes no error log line, and the host keeps answering",
+        plain.status === 400 &&
+          field(plain.body, "error") === sourceText("error.team.requestFailed") &&
+          logged.slice(loggedBefore).every((line) => !line.includes("Team API request failed")) &&
+          compatibility.status === 200 &&
+          uncaught.length === 0,
+        { plain, compatibility: compatibility.status, uncaught },
+      );
+    } finally {
+      process.off("uncaughtException", recordUncaught);
+    }
   }
 
   {
@@ -5183,6 +5321,109 @@ try {
       "an admin turns the pool off again",
       offAgain.status === 200 && isDeepStrictEqual(cleared.body, { pools: [] }),
       [summary(offAgain), summary(cleared)],
+    );
+  }
+
+  {
+    const route = PROVIDER_ACCOUNT_POOL_STRATEGY_ROUTES;
+    const pool = PROVIDER_ACCOUNT_POOL_ROUTES;
+    const v10 = {
+      capabilities: [PROVIDER_ACCOUNT_POOL_CAPABILITY, PROVIDER_ACCOUNT_POOL_STRATEGY_CAPABILITY],
+      protocol: TEAM_PROTOCOL_V10,
+    };
+    const v9 = { capabilities: [PROVIDER_ACCOUNT_POOL_CAPABILITY], protocol: TEAM_PROTOCOL_V9 };
+    const compatibility = await call("GET", TEAM_API_ROUTES.compatibility, { protocol: TEAM_PROTOCOL_V10 });
+    const older = await call("GET", TEAM_API_ROUTES.compatibility, { protocol: TEAM_PROTOCOL_V9 });
+    check(
+      "the host advertises provider-account-pool-strategy-v1 to a protocol 10 peer only",
+      list(field(compatibility.body, "capabilities")).includes(PROVIDER_ACCOUNT_POOL_STRATEGY_CAPABILITY) &&
+        older.status === 200 &&
+        !list(field(older.body, "capabilities")).includes(PROVIDER_ACCOUNT_POOL_STRATEGY_CAPABILITY),
+      [summary(compatibility), summary(older)],
+    );
+    const unsupported = await call("POST", route.list, { token: adaToken, json: {}, ...v9 });
+    check(
+      "the strategy route without the capability gets 400 providersUnsupported",
+      errorIs(unsupported, 400, sourceText("error.team.providersUnsupported")),
+      summary(unsupported),
+    );
+    const writes = callsOf("setProviderAccountPool").length;
+    const memberRead = await call("POST", route.list, { token: bobToken, json: {}, ...v10 });
+    const memberUpdate = await call("POST", route.update, {
+      token: bobToken,
+      json: { provider: "antigravity", strategy: "spread" },
+      ...v10,
+    });
+    const offUpdate = await call("POST", route.update, {
+      token: adaToken,
+      json: { provider: "antigravity", strategy: "spread" },
+      ...v10,
+    });
+    const offList = await call("POST", route.list, { token: adaToken, json: {}, ...v10 });
+    check(
+      "a member cannot read or change the strategy, and with the pool off an admin change writes nothing",
+      errorIs(memberRead, 403, sourceText("error.team.adminRequired")) &&
+        errorIs(memberUpdate, 403, sourceText("error.team.adminRequired")) &&
+        offUpdate.status === 200 &&
+        isDeepStrictEqual(offList.body, { strategies: [] }) &&
+        callsOf("setProviderAccountPool").length === writes,
+      [summary(memberRead), summary(memberUpdate), summary(offUpdate), summary(offList)],
+    );
+    const badStrategy = await call("POST", route.update, {
+      token: adaToken,
+      json: { provider: "antigravity", strategy: "roundRobin" },
+      ...v10,
+    });
+    check(
+      "a strategy that is not one gets 400, and the host writes nothing",
+      badStrategy.status === 400 && callsOf("setProviderAccountPool").length === writes,
+      summary(badStrategy),
+    );
+    await call("POST", pool.update, {
+      token: adaToken,
+      json: { provider: "antigravity", enabled: true, leftOut: [FREE_ACCOUNT] },
+      ...v10,
+    });
+    const fillFirst = await call("POST", route.list, { token: adaToken, json: {}, ...v10 });
+    const spread = await call("POST", route.update, {
+      token: adaToken,
+      json: { provider: "antigravity", strategy: "spread" },
+      ...v10,
+    });
+    const spreadList = await call("POST", route.list, { token: adaToken, json: {}, ...v10 });
+    const v1List = await call("POST", pool.list, { token: adaToken, json: {}, ...v9 });
+    check(
+      "an admin sets Spread, the host keeps the left-out account, and the v1 pool list keeps its shape",
+      isDeepStrictEqual(fillFirst.body, { strategies: [{ provider: "antigravity", strategy: "fillFirst" }] }) &&
+        spread.status === 200 &&
+        isDeepStrictEqual(callsOf("setProviderAccountPool").at(-1), [
+          { provider: "antigravity", enabled: true, leftOut: [FREE_ACCOUNT], strategy: "spread" },
+        ]) &&
+        isDeepStrictEqual(decodeProviderAccountPoolStrategies(spreadList.body), [
+          { provider: "antigravity", strategy: "spread" },
+        ]) &&
+        isDeepStrictEqual(v1List.body, {
+          pools: [{ provider: "antigravity", leftOut: [FREE_ACCOUNT], inUse: "default" }],
+        }),
+      [summary(fillFirst), summary(spread), summary(spreadList), summary(v1List)],
+    );
+    await call("POST", pool.update, {
+      token: adaToken,
+      json: { provider: "antigravity", enabled: true, leftOut: [] },
+      ...v9,
+    });
+    const keptList = await call("POST", route.list, { token: adaToken, json: {}, ...v10 });
+    await call("POST", pool.update, {
+      token: adaToken,
+      json: { provider: "antigravity", enabled: false, leftOut: [] },
+      ...v9,
+    });
+    const clearedList = await call("POST", route.list, { token: adaToken, json: {}, ...v10 });
+    check(
+      "a v1 pool change from an older client keeps Spread, and turning the pool off drops it",
+      isDeepStrictEqual(keptList.body, { strategies: [{ provider: "antigravity", strategy: "spread" }] }) &&
+        isDeepStrictEqual(clearedList.body, { strategies: [] }),
+      [summary(keptList), summary(clearedList)],
     );
   }
 
@@ -7609,6 +7850,108 @@ try {
   }
 
   {
+    const v10 = { capabilities: [BROWSER_HTTP_SIGN_IN_CAPABILITY], protocol: TEAM_PROTOCOL_V10 };
+    const compatibility = await call("GET", TEAM_API_ROUTES.compatibility, { protocol: TEAM_PROTOCOL_V10 });
+    const older = await call("GET", TEAM_API_ROUTES.compatibility, { protocol: TEAM_PROTOCOL_V9 });
+    check(
+      "the host advertises browser-http-sign-in to a protocol 10 peer only",
+      list(field(compatibility.body, "capabilities")).includes(BROWSER_HTTP_SIGN_IN_CAPABILITY) &&
+        !list(field(older.body, "capabilities")).includes(BROWSER_HTTP_SIGN_IN_CAPABILITY),
+      [summary(compatibility).status, list(field(older.body, "capabilities")).length],
+    );
+    const savedTabs = browserTabs;
+    const siteTab = (id: string, origin: string, refused: boolean) => ({
+      id,
+      title: "Files",
+      url: `${origin}/`,
+      loading: false,
+      ownerThreadId: null,
+      ownerAgentId: null,
+      httpSignIn: { origin, ...(refused ? { refused: true as const } : {}) },
+    });
+    browserTabs = [
+      siteTab("tab-site", "https://files.example.com", false),
+      siteTab("tab-private", "https://private.example.com", true),
+    ];
+    const answersBefore = callsOf("answerHttpSignIn").length;
+    const unsupported = await call("POST", BROWSER_HTTP_SIGN_IN_ROUTES.state, {
+      token: bobToken,
+      json: {},
+      protocol: TEAM_PROTOCOL_V10,
+    });
+    check(
+      "the site sign-in routes without the capability get 400 browserHttpSignInUnsupported",
+      errorIs(unsupported, 400, sourceText("error.backend.browserHttpSignInUnsupported")),
+      summary(unsupported),
+    );
+    const memberState = await call("POST", BROWSER_HTTP_SIGN_IN_ROUTES.state, { token: bobToken, json: {}, ...v10 });
+    const adminState = await call("POST", BROWSER_HTTP_SIGN_IN_ROUTES.state, { token: adaToken, json: {}, ...v10 });
+    check(
+      "a member sees the site sign-in prompts of the tabs they can see; an admin sees all of them",
+      memberState.status === 200 &&
+        isDeepStrictEqual(memberState.body, {
+          tabs: [{ tabId: "tab-site", origin: "https://files.example.com", refused: false }],
+        }) &&
+        isDeepStrictEqual(adminState.body, {
+          tabs: [
+            { tabId: "tab-site", origin: "https://files.example.com", refused: false },
+            { tabId: "tab-private", origin: "https://private.example.com", refused: true },
+          ],
+        }),
+      [summary(memberState), summary(adminState)],
+    );
+    const hidden = await call("POST", BROWSER_HTTP_SIGN_IN_ROUTES.answer, {
+      token: bobToken,
+      json: { tabId: "tab-private", username: "bob", password: "e2e-password" },
+      ...v10,
+    });
+    const extra = await call("POST", BROWSER_HTTP_SIGN_IN_ROUTES.answer, {
+      token: bobToken,
+      json: { tabId: "tab-site", username: "bob", password: "e2e-password", url: "https://other.example.com" },
+      ...v10,
+    });
+    const tooLong = await call("POST", BROWSER_HTTP_SIGN_IN_ROUTES.answer, {
+      token: bobToken,
+      json: { tabId: "tab-site", username: "bob", password: "x".repeat(4097) },
+      ...v10,
+    });
+    check(
+      "the host refuses a site sign-in for a hidden tab, with an unknown field, or with a too long password",
+      errorIs(hidden, 404, sourceText("error.backend.browserTabNotFound")) &&
+        extra.status === 400 &&
+        tooLong.status === 400 &&
+        callsOf("answerHttpSignIn").length === answersBefore,
+      [summary(hidden), summary(extra), summary(tooLong)],
+    );
+    const answered = await call("POST", BROWSER_HTTP_SIGN_IN_ROUTES.answer, {
+      token: bobToken,
+      json: { tabId: "tab-site", username: "bob", password: "e2e-password" },
+      ...v10,
+    });
+    check(
+      "a member answers a site sign-in; the host gets the answer, and the prompt is gone from the reply",
+      answered.status === 200 &&
+        isDeepStrictEqual(answered.body, { tabs: [] }) &&
+        isDeepStrictEqual(callsOf("answerHttpSignIn").slice(answersBefore), [["tab-site", "answer", 3, 12]]),
+      summary(answered),
+    );
+    browserTabs = [siteTab("tab-site", "https://files.example.com", true)];
+    const cancelled = await call("POST", BROWSER_HTTP_SIGN_IN_ROUTES.answer, {
+      token: bobToken,
+      json: { tabId: "tab-site", cancel: true },
+      ...v10,
+    });
+    check(
+      "a member closes a site sign-in prompt without an answer",
+      cancelled.status === 200 &&
+        isDeepStrictEqual(callsOf("answerHttpSignIn").at(-1), ["tab-site", "cancel"]) &&
+        isDeepStrictEqual(cancelled.body, { tabs: [] }),
+      summary(cancelled),
+    );
+    browserTabs = savedTabs;
+  }
+
+  {
     const capabilities = [BROWSER_TEACH_CAPABILITY];
     const compatibility = await call("GET", TEAM_API_ROUTES.compatibility, { protocol: TEAM_PROTOCOL_V9 });
     const older = await call("GET", TEAM_API_ROUTES.compatibility, { protocol: 8 });
@@ -7986,6 +8329,114 @@ try {
   }
 
   {
+    const v10 = { capabilities: [BROWSER_PERMISSIONS_CAPABILITY], protocol: TEAM_PROTOCOL_V10 };
+    const asking = (id: string) => ({
+      id,
+      title: id,
+      url: "https://maps.example/",
+      loading: false,
+      ownerThreadId: null,
+      ownerAgentId: "agent-oc",
+      permissionRequest: { id: `request-${id}`, origin: "https://maps.example", permission: "geolocation" as const },
+    });
+    browserTabs = [asking("tab-1"), asking("tab-private")];
+    const answersBefore = callsOf("answerPermission").length;
+    const location = { latitude: 52.2297, longitude: 21.0122, accuracyMeters: 35 };
+    const compatibility = await call("GET", TEAM_API_ROUTES.compatibility, { protocol: TEAM_PROTOCOL_V10 });
+    const older = await call("GET", TEAM_API_ROUTES.compatibility, { protocol: TEAM_PROTOCOL_V9 });
+    const unsupported = await call("POST", BROWSER_PERMISSIONS_ROUTES.state, {
+      token: bobToken,
+      json: {},
+      capabilities: [],
+      protocol: TEAM_PROTOCOL_V10,
+    });
+    const state = await call("POST", BROWSER_PERMISSIONS_ROUTES.state, { token: bobToken, json: {}, ...v10 });
+    check(
+      "the host advertises browser-permissions on protocol 10 only; a member reads the open location requests without the private tab, and a client without the capability gets 400",
+      list(field(compatibility.body, "capabilities")).includes(BROWSER_PERMISSIONS_CAPABILITY) &&
+        !list(field(older.body, "capabilities")).includes(BROWSER_PERMISSIONS_CAPABILITY) &&
+        errorIs(unsupported, 400, sourceText("error.backend.browserPermissionsUnsupported")) &&
+        state.status === 200 &&
+        isDeepStrictEqual(state.body, {
+          requests: [
+            { tabId: "tab-1", id: "request-tab-1", origin: "https://maps.example", permission: "geolocation" },
+          ],
+        }),
+      [summary(unsupported), summary(state)],
+    );
+    const allowWithoutLocation = await call("POST", BROWSER_PERMISSIONS_ROUTES.answer, {
+      token: bobToken,
+      json: { tabId: "tab-1", requestId: "request-tab-1", allow: true },
+      ...v10,
+    });
+    const blockWithLocation = await call("POST", BROWSER_PERMISSIONS_ROUTES.answer, {
+      token: bobToken,
+      json: { tabId: "tab-1", requestId: "request-tab-1", allow: false, location },
+      ...v10,
+    });
+    const farLocation = await call("POST", BROWSER_PERMISSIONS_ROUTES.answer, {
+      token: bobToken,
+      json: { tabId: "tab-1", requestId: "request-tab-1", allow: true, location: { ...location, latitude: 91 } },
+      ...v10,
+    });
+    const blockAlways = await call("POST", BROWSER_PERMISSIONS_ROUTES.answer, {
+      token: bobToken,
+      json: { tabId: "tab-1", requestId: "request-tab-1", allow: false, always: true },
+      ...v10,
+    });
+    const privateAnswer = await call("POST", BROWSER_PERMISSIONS_ROUTES.answer, {
+      token: bobToken,
+      json: { tabId: "tab-private", requestId: "request-tab-private", allow: false },
+      ...v10,
+    });
+    check(
+      "the host refuses an allow without a location, a block with a location, a location out of range, a block for always and an answer for a private tab",
+      errorIs(allowWithoutLocation, 400, sourceText("error.backend.browserLocationRequired")) &&
+        blockWithLocation.status === 400 &&
+        farLocation.status === 400 &&
+        blockAlways.status === 400 &&
+        errorIs(privateAnswer, 404, sourceText("error.backend.browserTabNotFound")) &&
+        callsOf("answerPermission").length === answersBefore,
+      [
+        summary(allowWithoutLocation),
+        summary(blockWithLocation),
+        summary(farLocation),
+        summary(blockAlways),
+        summary(privateAnswer),
+      ],
+    );
+    const allowed = await call("POST", BROWSER_PERMISSIONS_ROUTES.answer, {
+      token: bobToken,
+      json: { tabId: "tab-1", requestId: "request-tab-1", allow: true, location },
+      ...v10,
+    });
+    const blocked = await call("POST", BROWSER_PERMISSIONS_ROUTES.answer, {
+      token: bobToken,
+      json: { tabId: "tab-1", requestId: "request-tab-1", allow: false },
+      ...v10,
+    });
+    const allowedAlways = await call("POST", BROWSER_PERMISSIONS_ROUTES.answer, {
+      token: bobToken,
+      json: { tabId: "tab-1", requestId: "request-tab-1", allow: true, always: true, location },
+      ...v10,
+    });
+    browserTabs = [];
+    check(
+      "a member allows once or always with the location of the device, or blocks; the host gets the answer and sends back the open requests",
+      allowed.status === 200 &&
+        blocked.status === 200 &&
+        allowedAlways.status === 200 &&
+        list(field(allowed.body, "requests")).length === 1 &&
+        isDeepStrictEqual(callsOf("answerPermission").slice(answersBefore), [
+          [{ tabId: "tab-1", requestId: "request-tab-1", allow: true, location }],
+          [{ tabId: "tab-1", requestId: "request-tab-1", allow: false }],
+          [{ tabId: "tab-1", requestId: "request-tab-1", allow: true, always: true, location }],
+        ]),
+      [summary(allowed), summary(blocked), summary(allowedAlways), callsOf("answerPermission").slice(answersBefore)],
+    );
+  }
+
+  {
     const capabilities = [BROWSER_SIGN_IN_STORAGE_CAPABILITY];
     const compatibility = await call("GET", TEAM_API_ROUTES.compatibility, { protocol: TEAM_PROTOCOL_V9 });
     const older = await call("GET", TEAM_API_ROUTES.compatibility, { protocol: 8 });
@@ -8174,6 +8625,27 @@ try {
       "a refused key change gives the owner 409 with the reason, not a host fault",
       errorIs(refusedRotate, 409, sourceText("error.host.keyRotationRefused")),
       summary(refusedRotate),
+    );
+  }
+
+  {
+    const target = { agentId: "agent-ada", taskId: "task-1" };
+    const unsupported = await call("POST", AGENT_THREADS_ROUTES.delete, { token: bobToken, json: target });
+    check(
+      "the thread delete route without agent-threads-v1 gets 400 threadRemoteUnsupported, and deletes nothing",
+      errorIs(unsupported, 400, sourceText("error.backend.threadRemoteUnsupported")) &&
+        callsOf("deleteTask").length === 0,
+      summary(unsupported),
+    );
+    const deleted = await call("POST", AGENT_THREADS_ROUTES.delete, {
+      token: bobToken,
+      json: target,
+      capabilities: [AGENT_HIDDEN_CAPABILITY, AGENT_THREADS_CAPABILITY],
+    });
+    check(
+      "the thread delete route with agent-threads-v1 deletes the thread of the agent that the member names",
+      deleted.status === 200 && isDeepStrictEqual(callsOf("deleteTask"), [[target]]),
+      [summary(deleted), callsOf("deleteTask")],
     );
   }
 
@@ -10110,6 +10582,18 @@ try {
         isDeepStrictEqual(other.body, { media: null, hold: null }),
       [summary(memberRead), summary(adminRead), summary(other)],
     );
+    const wireOffer = decodeMediaApprovalReadResponse(
+      MEDIA_APPROVAL_CHOICE_CODECS.get(route.read)?.response(200, memberRead.body) ?? {},
+    ).media;
+    check(
+      "the media offer keeps the free-credit models and the payer's paid and free credits on the wire, so the picker can mark the paid-only models",
+      isDeepStrictEqual(wireOffer?.balance, { available: 10, welcome: 10 }) &&
+        isDeepStrictEqual(
+          wireOffer?.models.map((model) => model.welcome === true),
+          [false, true],
+        ),
+      [summary(memberRead), JSON.stringify(wireOffer?.balance ?? null)],
+    );
     const choice = { model: "nano-banana-2", aspect: "16:9", resolution: null, duration: null, audio: false };
     const allowed = await call("POST", route.respond, {
       token: bobToken,
@@ -10633,6 +11117,83 @@ try {
         field(alertRow, "unreadCount") === 1 &&
         logged.slice(alertLogStart).every((line) => !line.includes("Team API request failed")),
       [heldSequence, shownSequence, summary(readAfterDelete), summary(readPastHistory), field(alertRow, "unreadCount")],
+    );
+    pictures.store.update(
+      pictures.store.create("channel-mixed", {
+        name: "mixed",
+        title: "",
+        instructions: "",
+        members: [{ agentId: "agent-ada" }, { agentId: "agent-pi" }],
+        leadAgentId: null,
+      }),
+    );
+    const compactUse = {
+      base: at,
+      token: adaToken,
+      protocol: TEAM_PROTOCOL_V10,
+      capabilities: [CHANNEL_COMPACT_AVAILABILITY_CAPABILITY],
+    };
+    const compactAdvertised = await call("GET", TEAM_API_ROUTES.compatibility, {
+      base: at,
+      protocol: TEAM_PROTOCOL_V10,
+    });
+    const compactOlder = await call("GET", TEAM_API_ROUTES.compatibility, { base: at, protocol: TEAM_PROTOCOL_V9 });
+    const compactMainHost = await call("GET", TEAM_API_ROUTES.compatibility, { protocol: TEAM_PROTOCOL_V10 });
+    check(
+      "a host with channels advertises channel-compact-availability-v1 to protocol 10 only, and a host without channels does not",
+      list(field(compactAdvertised.body, "capabilities")).includes(CHANNEL_COMPACT_AVAILABILITY_CAPABILITY) &&
+        !list(field(compactOlder.body, "capabilities")).includes(CHANNEL_COMPACT_AVAILABILITY_CAPABILITY) &&
+        !list(field(compactMainHost.body, "capabilities")).includes(CHANNEL_COMPACT_AVAILABILITY_CAPABILITY),
+      [summary(compactAdvertised), summary(compactOlder), summary(compactMainHost)],
+    );
+    const claudeOnly = await call("POST", CHANNEL_COMPACT_AVAILABILITY_ROUTE, { ...compactUse, json: { channelId } });
+    const mixed = await call("POST", CHANNEL_COMPACT_AVAILABILITY_ROUTE, {
+      ...compactUse,
+      json: { channelId: "channel-mixed" },
+    });
+    const decodeAvailability = (reply: Reply) =>
+      decodeChannelCompactAvailability(
+        optionalRouteCodec(CHANNEL_COMPACT_AVAILABILITY_ROUTE)?.response(reply.status, reply.body),
+      );
+    check(
+      "a channel whose members are all Claude Code cannot compact on request, and a channel with a Pi member can",
+      claudeOnly.status === 200 &&
+        decodeAvailability(claudeOnly).available === false &&
+        mixed.status === 200 &&
+        decodeAvailability(mixed).available === true &&
+        isDeepStrictEqual(callsOf("channelCompactAvailable"), [[channelId], ["channel-mixed"]]),
+      [summary(claudeOnly), summary(mixed)],
+    );
+    const compactNoCapability = await call("POST", CHANNEL_COMPACT_AVAILABILITY_ROUTE, {
+      ...compactUse,
+      capabilities: [CHANNEL_CHATS_CAPABILITY],
+      protocol: TEAM_PROTOCOL_V9,
+      json: { channelId },
+    });
+    const compactMissing = await call("POST", CHANNEL_COMPACT_AVAILABILITY_ROUTE, {
+      ...compactUse,
+      json: { channelId: "channel-missing" },
+    });
+    const compactNoChannels = await call("POST", CHANNEL_COMPACT_AVAILABILITY_ROUTE, {
+      ...compactUse,
+      base,
+      json: { channelId },
+    });
+    accessLevels = { revision: 10, everyone: { "agent-ada": "none" }, roles: [] };
+    const compactHidden = await call("POST", CHANNEL_COMPACT_AVAILABILITY_ROUTE, {
+      ...compactUse,
+      token: bobToken,
+      json: { channelId },
+    });
+    accessLevels = { revision: 11, everyone: {}, roles: [] };
+    check(
+      "the availability route refuses a peer without the capability, an unknown channel, a host without channels and a member who does not see the channel",
+      errorIs(compactNoCapability, 400, sourceText("error.team.channelContextUnsupported")) &&
+        errorIs(compactMissing, 404, sourceText("error.backend.channelNotFound")) &&
+        errorIs(compactNoChannels, 400, sourceText("error.team.channelContextUnsupported")) &&
+        errorIs(compactHidden, 404, sourceText("error.backend.channelNotFound")) &&
+        callsOf("channelCompactAvailable").length === 2,
+      [summary(compactNoCapability), summary(compactMissing), summary(compactNoChannels), summary(compactHidden)],
     );
 
     const pageTask = (id: string, requestMessageId: string, state: ChannelTask["state"]): ChannelTask => ({

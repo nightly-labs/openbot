@@ -88,7 +88,9 @@ import {
   promptInstructionsFile,
 } from "./workspace-instructions";
 import {
+  agentWriteAreas,
   type CodexApprovalPolicy,
+  type CodexSandboxConfig,
   checkAgentFolders,
   codexApprovalPolicy,
   codexSandboxConfig,
@@ -142,6 +144,14 @@ const CODEX_BROWSER_PLUGINS_OFF = {
 } as const;
 
 const CODEX_MCP_STARTUP_GRACE_MS = 10_000;
+const CODEX_WAIT_FOR_MCP_STARTUP_MS = 0;
+
+function waitingForMcpStartup(params: DynamicRecord): DynamicRecord {
+  const config = params.config;
+  return isDynamicRecord(config)
+    ? { ...params, config: { ...config, mcp_optional_startup_grace_ms: CODEX_WAIT_FOR_MCP_STARTUP_MS } }
+    : params;
+}
 
 const CODEX_DIRECT_ONLY_NAMESPACES = [...visibleDynamicTools("codex").map((namespace) => namespace.name), "image_gen"];
 
@@ -562,7 +572,11 @@ export class ThreadLifecycle {
     });
     const { params } = yield* this.#startParams(owner, client, publicThreadId);
     const response = yield* client
-      .request("thread/start", { ...params, ephemeral: false, persistSession: false }, decodeThreadResponse)
+      .request(
+        "thread/start",
+        { ...waitingForMcpStartup(params), ephemeral: false, persistSession: false },
+        decodeThreadResponse,
+      )
       .pipe(toThreadOperationFailed);
     const externalThreadId = response.thread.id;
     this.#conversation.bindThread(externalThreadId, owner.id, publicThreadId);
@@ -846,7 +860,7 @@ export class ThreadLifecycle {
         CodexPromptSettings &
         typeof CODEX_BROWSER_PLUGINS_OFF &
         Partial<typeof CODEX_COMPUTER_USE_PLUGINS_OFF> &
-        ReturnType<typeof codexSandboxConfig>;
+        CodexSandboxConfig;
     },
     ThreadOperationFailed
   > {
@@ -872,7 +886,7 @@ export class ThreadLifecycle {
           ...CODEX_DIRECT_ONLY_NAMESPACES,
           ...codexDirectMcpNamespaces(servers),
         ],
-        ...codexSandboxConfig(agent, this.#store.sharedRoot),
+        ...(yield* codexSandboxConfig(agent, this.#store.sharedRoot, this.writeAreas())),
         ...Object.fromEntries(
           Object.entries(environment).map(([name, value]) => [`shell_environment_policy.set.${name}`, value]),
         ),
@@ -1043,14 +1057,30 @@ export class ThreadLifecycle {
     return agentMcpServers(this.#mcpServers(agent.id), agentComputerUseEnabled(agent));
   }
 
-  #workspaceOnlyParam(agent: AgentSummary, client: AgentClient): { workspaceOnly?: true; excludedFolders?: string[] } {
+  #workspaceOnlyParam(
+    agent: AgentSummary,
+    client: AgentClient,
+  ): { workspaceOnly?: true; excludedFolders?: string[]; writeAreas?: string[] } {
     if (
       agentProviderDescriptor(client.provider).workspaceEnforcement !== "tool-sandbox" ||
       !workspaceAccessEnforced(agent)
     )
       return {};
     const excluded = workspaceExcludedFolders(agent);
-    return { workspaceOnly: true, ...(excluded.length ? { excludedFolders: excluded } : {}) };
+    return {
+      workspaceOnly: true,
+      ...(excluded.length ? { excludedFolders: excluded } : {}),
+      writeAreas: this.writeAreas(),
+    };
+  }
+
+  writeAreasParam(agent: AgentSummary, client: AgentClient): { writeAreas?: string[] } {
+    const { writeAreas } = this.#workspaceOnlyParam(agent, client);
+    return writeAreas ? { writeAreas } : {};
+  }
+
+  writeAreas(): string[] {
+    return agentWriteAreas(this.#store.list(), this.#store.sharedRoot);
   }
 
   #computerUseParam(agent: AgentSummary, client: AgentClient): { computerUse?: false } {

@@ -291,6 +291,7 @@ function server(summary: DynamicRecord): ServerSummary {
     thisComputer,
     hidden,
     appearance,
+    username,
   } = summary;
   if (!isOneOf(SERVER_NOTIFICATION_LEVELS, notificationLevel)) throw new Error("Invalid notificationLevel.");
   if (!isOneOf(SERVER_KINDS, kind)) throw new Error("Invalid kind.");
@@ -315,6 +316,7 @@ function server(summary: DynamicRecord): ServerSummary {
   }
   if (thisComputer !== undefined && thisComputer !== true) throw new Error("Invalid thisComputer.");
   if (hidden !== undefined && !isBoolean(hidden)) throw new Error("Invalid hidden.");
+  if (username !== undefined && !isString(username)) throw new Error("Invalid username.");
   if (paymentRequired !== undefined && paymentRequired !== true) throw new Error("Invalid paymentRequired.");
   const plan = customPlan === undefined ? undefined : parseCustomServerPlan(customPlan);
   if (plan === null) throw new Error("Invalid customPlan.");
@@ -334,6 +336,7 @@ function server(summary: DynamicRecord): ServerSummary {
     logoUrl: nullableString(summary, "logoUrl"),
     ...(appearance === undefined ? {} : { appearance: serverAppearance(appearance) }),
     role: role === null ? null : teamRole(role),
+    ...(username === undefined ? {} : { username }),
     active: requiredBoolean(summary, "active"),
     ...(compatibility === undefined
       ? {}

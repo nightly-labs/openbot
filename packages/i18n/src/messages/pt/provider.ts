@@ -61,6 +61,7 @@ export const messages = {
   "provider.aria.install": "Instalar {name}",
   "provider.aria.signIn": "Entrar em {name}",
   "provider.aria.codeFallback": "Entrar em {name} com um código",
+  "provider.aria.addressFallback": "Colar o endereço de login de {name}",
   "provider.aria.moreActions": "Mais ações para {name}",
   "provider.aria.use": "Usar {name} no OpenBot",
   "provider.use.inUseOne": "{agent} usa {name}. Mude o modelo deste agente e depois desligue {name}.",
@@ -87,6 +88,7 @@ export const messages = {
   "provider.codeLogin.pasteExpiresIn": "Aguardando você. Esta tentativa de login termina em {time}.",
   "provider.codeLogin.linkTitle": "Entre em {name} em outro dispositivo",
   "provider.codeLogin.pageTitle": "Entrar em {name}",
+  "provider.codeLogin.addressDescription": "Conclua o login no navegador. Esta janela fecha quando o login termina.",
   "provider.codeLogin.pageDescription": "Esta página está aberta no navegador de {host}. Entre aqui.",
   "provider.codeLogin.relayStarting": "Iniciando o login de {name} em {host}…",
   "provider.codeLogin.pageOpening": "Abrindo a página de login de {name} em {host}…",
@@ -252,6 +254,11 @@ export const messages = {
   "provider.account.pool": "Agrupar contas",
   "provider.account.poolDescription":
     "Os agentes usam uma conta até ela chegar perto de um limite de uso e depois a conta cujo limite reinicia primeiro.",
+  "provider.account.poolStrategy": "Usar contas",
+  "provider.account.poolFillFirst": "Encher primeiro",
+  "provider.account.poolSpread": "Distribuir",
+  "provider.account.poolSpreadDescription":
+    "Os agentes se distribuem entre as contas com mais uso restante. Um agente só troca de conta quando outra conta tem muito mais margem.",
   "provider.account.inUse": "Em uso",
   "provider.account.notInPool": "Fora do grupo",
   "provider.account.leaveOutOfPool": "Tirar do grupo",

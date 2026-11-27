@@ -34,6 +34,16 @@ import { AGENT_TASK_LIMIT_CAPABILITY } from "@openbot/contracts/team-protocol/ag
 import { AGENT_UPDATE_CAPABILITY } from "@openbot/contracts/team-protocol/agent-update-v1";
 import { BACKGROUND_PROCESSES_CAPABILITY } from "@openbot/contracts/team-protocol/background-processes-v1";
 import { BITWARDEN_CONNECTOR_CAPABILITY } from "@openbot/contracts/team-protocol/bitwarden-connector-v1";
+import {
+  BROWSER_HTTP_SIGN_IN_CAPABILITY,
+  BROWSER_HTTP_SIGN_IN_ROUTES,
+  decodeBrowserHttpSignInSnapshot,
+} from "@openbot/contracts/team-protocol/browser-http-sign-in-v1";
+import {
+  BROWSER_PERMISSIONS_CAPABILITY,
+  BROWSER_PERMISSIONS_ROUTES,
+  decodeBrowserPermissionsSnapshot,
+} from "@openbot/contracts/team-protocol/browser-permissions-v1";
 import { BROWSER_PROFILES_CAPABILITY } from "@openbot/contracts/team-protocol/browser-profiles-v1";
 import { BROWSER_PROXIES_CAPABILITY } from "@openbot/contracts/team-protocol/browser-proxies-v1";
 import { BROWSING_MEMORY_CAPABILITY } from "@openbot/contracts/team-protocol/browsing-memory-v1";
@@ -169,7 +179,7 @@ import { showFailureAlert } from "@/features/analytics/failure-reports";
 import { mobileAnalytics } from "@/features/analytics/mobile-analytics";
 import { trackWorkspaceActions } from "@/features/analytics/workspace-actions";
 import { useMobileSession } from "@/features/auth/context/mobile-session-context";
-import { decodeMobileBrowserTabs } from "@/features/browser/model/browser-tabs";
+import { decodeMobileBrowserTabs, mobileHttpSignIns } from "@/features/browser/model/browser-tabs";
 import { useCarPlayConnected } from "@/features/carplay/carplay-native";
 import { deleteServerCarPlayData } from "@/features/carplay/carplay-reset";
 import { MobileChannelStore } from "@/features/channels/model/channel-store";
@@ -191,6 +201,8 @@ import { ShortcutsSync } from "@/features/shortcuts/shortcuts-sync";
 import { fetch } from "@/features/support/model/logged-fetch";
 import { supportLog } from "@/features/support/model/support-log";
 import { forgetPhoneFeedback, shownPhoneFeedback } from "@/features/support/model/support-log-capture";
+import { useWatchAwake } from "@/features/watch/model/watch-awake";
+import { WatchSync } from "@/features/watch/watch-sync";
 import { OwnerTransferPrompts } from "@/features/workspace/components/owner-transfer-prompts";
 import type { RemoteTeamTransportRef } from "@/features/workspace/components/remote-team-transport";
 import {
@@ -266,6 +278,7 @@ import { createDownloadQueue } from "@/features/workspace/model/request-lanes";
 import {
   hasCapability,
   requireCapability,
+  requireSidebarLayout,
   type ServerCapabilities,
   SIDEBAR_LAYOUT_CAPABILITY,
   supportsBrowserView,
@@ -442,6 +455,7 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
   const appForeground = useAppForeground();
   const carPlayConnected = useCarPlayConnected();
   const foreground = appForeground || carPlayConnected;
+  const watchAwake = useWatchAwake();
   const [servers, setServers] = useState<MobileServer[]>([]);
   const [serverDirectoryState, setServerDirectoryState] = useState<MobileServerDirectoryState>("loading");
   const [serverDirectoryError, setServerDirectoryError] = useState<string | null>(null);
@@ -456,7 +470,7 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
     loaded: () => allSettled(serverLoads.current),
     saved: () => allSettled(cacheWrites.current),
   });
-  const live = foreground || backgroundRefreshing;
+  const live = foreground || backgroundRefreshing || watchAwake;
   const firstConnectionTimers = useRef(new Map<string, ReturnType<typeof setTimeout>>());
   const [sidebarByServer, setSidebarByServer] = useState<
     Record<string, { layout: SidebarLayoutSnapshot | null; error: string | null }>
@@ -645,6 +659,7 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
         presenceSignatures.current.delete(serverId);
         for (const queryKey of [
           queryKeys.chatQueue(serverId),
+          queryKeys.agentUsageLimits(queryScope, serverId),
           queryKeys.serverMembers(queryScope, serverId),
           queryKeys.serverInvites(queryScope, serverId),
           queryKeys.agentAvatar(queryScope, serverId),
@@ -671,6 +686,8 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
       liveState.update("approvalRequests", (current) => withoutKeys(current, serverIds));
       liveState.update("browserRequests", (current) => withoutKeys(current, serverIds));
       liveState.update("browserTabs", (current) => withoutKeys(current, serverIds));
+      liveState.update("browserPermissions", (current) => withoutKeys(current, serverIds));
+      liveState.update("browserHttpSignIns", (current) => withoutKeys(current, serverIds));
       const kept = keptHosts.current;
       if (kept?.some((host) => serverIds.has(host.hostId)))
         keepHosts(kept.filter((host) => !serverIds.has(host.hostId)));
@@ -1338,6 +1355,26 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
             }));
           })
           .catch(() => undefined);
+        if (compatibility.capabilities.includes(BROWSER_HTTP_SIGN_IN_CAPABILITY))
+          void client
+            .request("POST", BROWSER_HTTP_SIGN_IN_ROUTES.state, decodeBrowserHttpSignInSnapshot, {})
+            .then((snapshot) => {
+              if (!context.isCurrent()) return;
+              liveState.update("browserHttpSignIns", (current) => ({
+                ...current,
+                [serverId]: mobileHttpSignIns(snapshot.tabs),
+              }));
+            })
+            .catch(() => undefined);
+      }
+      if (compatibility.capabilities.includes(BROWSER_PERMISSIONS_CAPABILITY)) {
+        void client
+          .request("POST", BROWSER_PERMISSIONS_ROUTES.state, decodeBrowserPermissionsSnapshot, {})
+          .then(({ requests }) => {
+            if (!context.isCurrent()) return;
+            liveState.update("browserPermissions", (current) => ({ ...current, [serverId]: requests }));
+          })
+          .catch(() => undefined);
       }
       const reads =
         early && sameCapabilities(early.capabilities, compatibility.capabilities)
@@ -1948,12 +1985,13 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
       openBrowserView: browser.openBrowserView,
       remoteDesktopConnection: (serverId) => connections.current.get(serverId)?.client ?? null,
       controlBrowserTab: browser.controlBrowserTab,
+      answerBrowserPermission: browser.answerBrowserPermission,
+      answerBrowserHttpSignIn: browser.answerBrowserHttpSignIn,
       mutateSidebarLayout: async (serverId, action) => {
-        requireCapability(
+        requireSidebarLayout(
           serverCapabilities.current,
           serverId,
-          SIDEBAR_LAYOUT_CAPABILITY,
-          "mobile.workspace.error.sectionsUnsupported",
+          serversRef.current.find((server) => server.id === serverId),
         );
         const layout = await request(
           "POST",
@@ -1967,11 +2005,10 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
         applySidebarLayout(serverId, layout);
       },
       moveSidebarChat: async (serverId, action) => {
-        requireCapability(
+        requireSidebarLayout(
           serverCapabilities.current,
           serverId,
-          SIDEBAR_LAYOUT_CAPABILITY,
-          "mobile.workspace.error.sectionsUnsupported",
+          serversRef.current.find((server) => server.id === serverId),
         );
         const previous = sidebarByServerRef.current[serverId]?.layout;
         const moved = previous ? moveSidebarChat(previous, action) : null;
@@ -1979,7 +2016,9 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
         try {
           const layout = await request(
             "POST",
-            TEAM_API_ROUTES.sidebarLayout.actions,
+            action.type === "assign" && hasCapability(serverCapabilities.current, serverId, SIDEBAR_FOLDERS_CAPABILITY)
+              ? SIDEBAR_FOLDERS_ROUTES.actions
+              : TEAM_API_ROUTES.sidebarLayout.actions,
             decodeSidebarLayout,
             action,
             serverId,
@@ -2849,6 +2888,14 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
             active={appForeground}
             onAccepted={refreshMemberships}
           />
+          <WatchSync
+            servers={orderedServers}
+            serversReady={serverDirectoryState === "ready"}
+            agents={directoryAgents}
+            preferences={visiblePreferences}
+            capabilities={serverCapabilities.current}
+            teamApi={teamApi}
+          />
           <NotificationAvatarSync
             servers={servers}
             serversReady={serverDirectoryState === "ready"}
@@ -2859,7 +2906,9 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
               key={server.id}
               hostId={server.id}
               publicKey={server.publicKey}
-              active={(foreground && (!othersHeld || server.id === activeServerId)) || backgroundRefreshing}
+              active={
+                (foreground && (!othersHeld || server.id === activeServerId)) || backgroundRefreshing || watchAwake
+              }
               background={!foreground}
               directory={directory}
               register={registerConnection}

@@ -187,6 +187,7 @@ export const messages = {
   "mobile.chat.question.holdHint": "Удерживайте кнопку, чтобы подтвердить.",
   "mobile.chat.question.preview": "Предпросмотр",
   "mobile.chat.question.showAllPreview": "Показать всё",
+  "mobile.chat.question.copyPreviewFailed": "Не удалось скопировать черновик",
   "mobile.chat.question.sendChoice": "Отправить",
   "mobile.chat.question.selectedCount": {
     one: "Выбран {count}",
@@ -532,11 +533,13 @@ export const messages = {
   "mobile.chat.upload.uploadingLabel": "Загрузка",
   "mobile.chat.outbox.sendsWhenOnline": "Отправится, когда сервер будет в сети",
   "mobile.chat.outbox.waiting": "Ожидает отправки",
+  "mobile.chat.outbox.waitingForFailed": "Ожидает неотправленное сообщение",
   "mobile.chat.outbox.failed": "Не отправлено",
   "mobile.chat.outbox.failedHold": "Не отправлено. Нажмите и удерживайте сообщение, чтобы повторить.",
   "mobile.chat.outbox.cancelSend": "Не отправлять",
   "mobile.chat.outbox.menuHint": "Показывает действия для этого сообщения.",
-  "mobile.chat.outbox.unconfirmed": "Не подтверждено. Проверьте чат, прежде чем отправлять сообщение снова.",
+  "mobile.chat.outbox.unconfirmed":
+    "Не подтверждено. Проверьте чат, затем нажмите и удерживайте сообщение, чтобы изменить или отменить его.",
   "mobile.chat.outbox.editFailed": "Не удалось открыть сообщение для изменения.",
   "mobile.chat.outbox.saveFailed":
     "Не удалось сохранить ожидающие сообщения на этом телефоне. Не закрывайте приложение, пока они не будут отправлены.",
@@ -633,6 +636,8 @@ export const messages = {
   "mobile.chat.queue.repliesTitle": "Ожидание ответов",
   "mobile.chat.queue.providerRestart": "Ожидание перезапуска {provider}",
   "mobile.chat.queue.signIn": "Ожидание входа в {provider}",
+  "mobile.chat.queue.usageLimit": "Лимит использования исчерпан",
+  "mobile.chat.queue.usageLimitResets": "Лимит использования исчерпан · Сброс: {time}",
   "mobile.chat.providerSignIn.title": "Вход в {provider} не выполнен",
   "mobile.chat.providerSignIn.action": "Войти",
   "mobile.chat.providerSignIn.open": "{label}. Открыть настройки провайдера",

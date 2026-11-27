@@ -79,6 +79,7 @@ export const messages = {
   "provider.aria.install": "Zainstaluj {name}",
   "provider.aria.signIn": "Zaloguj się do {name}",
   "provider.aria.codeFallback": "Zaloguj się do {name} kodem",
+  "provider.aria.addressFallback": "Wklej adres logowania do {name}",
   "provider.aria.moreActions": "Więcej działań: {name}",
 
   "provider.aria.use": "Używaj {name} w OpenBot",
@@ -109,6 +110,8 @@ export const messages = {
   "provider.codeLogin.pasteExpiresIn": "Czekamy na ciebie. To logowanie wygaśnie za {time}.",
   "provider.codeLogin.linkTitle": "Zaloguj się do {name} na innym urządzeniu",
   "provider.codeLogin.pageTitle": "Zaloguj się do {name}",
+  "provider.codeLogin.addressDescription":
+    "Dokończ logowanie w przeglądarce. To okno zamknie się, gdy logowanie się zakończy.",
   "provider.codeLogin.pageDescription": "Ta strona jest otwarta w przeglądarce na: {host}. Zaloguj się tutaj.",
   "provider.codeLogin.relayStarting": "Uruchamianie logowania do {name} na {host}…",
   "provider.codeLogin.pageOpening": "Otwieranie strony logowania {name} na {host}…",
@@ -281,6 +284,11 @@ export const messages = {
   "provider.account.pool": "Łącz konta w pulę",
   "provider.account.poolDescription":
     "Agenci używają jednego konta, aż zbliży się do limitu użycia, a potem konta, którego limit odnowi się najwcześniej.",
+  "provider.account.poolStrategy": "Używanie kont",
+  "provider.account.poolFillFirst": "Najpierw zapełniaj",
+  "provider.account.poolSpread": "Rozkładaj",
+  "provider.account.poolSpreadDescription":
+    "Agenci rozkładają się na konta z największym pozostałym użyciem. Agent zmienia konto tylko wtedy, gdy inne konto ma dużo więcej zapasu.",
   "provider.account.inUse": "W użyciu",
   "provider.account.notInPool": "Poza pulą",
   "provider.account.leaveOutOfPool": "Wyłącz z puli",

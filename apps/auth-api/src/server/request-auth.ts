@@ -49,6 +49,12 @@ import {
   MarketplaceRateLimitError,
 } from "./marketplace-request-policy";
 import { mediaGatewayFromBinding } from "./media-gateway";
+import {
+  type NearIntentsOwner,
+  NearIntentsRelay,
+  NearIntentsRelayError,
+  nearIntentsRelayErrorResponse,
+} from "./near-intents-relay";
 import { Referrals } from "./referrals";
 import {
   deliverPendingRemoteAuthEvents,
@@ -65,6 +71,7 @@ import {
   type TeamInviteEmailDelivery,
   type WorkerBindings,
 } from "./types";
+import { WatchSessionStoreError, WatchSessions } from "./watch-sessions";
 
 function accountAnalytics(bindings: WorkerBindings): AccountAnalytics {
   return createAccountAnalytics({
@@ -184,6 +191,41 @@ export const requestCreditMediaPayer = Effect.fn("CreditMedia.requestPayer")(fun
   const payer: CreditMediaPayer = { wallet: "personal", userId: user.id };
   return { payer, actorUserId: user.id };
 });
+
+export const requestNearIntentsOwner = Effect.fn("NearIntents.requestOwner")(function* (request: Request) {
+  const hostId = request.headers.get(CREDIT_MEDIA_HOST_HEADER);
+  const machineToken = request.headers.get(CREDIT_MEDIA_HOST_TOKEN_HEADER);
+  if (hostId || machineToken) {
+    if (!hostId || !machineToken || hostId.length > 200 || machineToken.length > 512)
+      return yield* new RemoteControlPlaneError(401, "host_unauthorized", "The host credential is invalid.");
+    yield* requestRemoteControlPlane().authenticateHost(hostId, machineToken);
+    const owner: NearIntentsOwner = { kind: "server", serverId: hostId };
+    return owner;
+  }
+  const user = yield* requestUser(request);
+  if (!user) return null;
+  const owner: NearIntentsOwner = { kind: "user", userId: user.id };
+  return owner;
+});
+
+export function requestNearIntentsRelay(): NearIntentsRelay {
+  const bindings = requireWorkerBindings(env);
+  return new NearIntentsRelay({
+    database: bindings.DB,
+    partnerKey: bindings.NEAR_INTENTS_PARTNER_KEY,
+    upstream: bindings.NEAR_INTENTS_AGENT_API_URL,
+  });
+}
+
+export function nearIntentsErrorResponse(error: unknown): Response {
+  if (error instanceof NearIntentsRelayError) return nearIntentsRelayErrorResponse(error);
+  if (error instanceof RemoteControlPlaneError)
+    return nearIntentsRelayErrorResponse(new NearIntentsRelayError(error.status, error.code, error.message));
+  console.error("near-intents: the relay failed");
+  return nearIntentsRelayErrorResponse(
+    new NearIntentsRelayError(503, "wallet_service_unavailable", "The crypto wallet service is not available."),
+  );
+}
 
 export function creditMediaErrorResponse(error: unknown): Response {
   if (error instanceof BillingError) {
@@ -492,6 +534,23 @@ export function requestOwnerTransferEmailDelivery(): OwnerTransferEmailDelivery 
 
 export function requestRemoteControlPlane(): RemoteControlPlane {
   return new RemoteControlPlane(requireWorkerBindings(env), { schedule });
+}
+
+export function requestWatchSessions(): WatchSessions {
+  const bindings = requireWorkerBindings(env);
+  const limiter = bindings.WATCH_TICKET_RATE_LIMITER;
+  return new WatchSessions({
+    database: bindings.DB,
+    now: () => Date.now(),
+    issueTicket: (input) => Effect.suspend(() => requestRemoteControlPlane().issueWatchTicket(input)),
+    allowTicket: limiter
+      ? (watchSessionId) =>
+          Effect.tryPromise({
+            try: () => limiter.limit({ key: `watch:${watchSessionId}` }),
+            catch: () => new WatchSessionStoreError({}),
+          }).pipe(Effect.map((result) => result.success))
+      : null,
+  });
 }
 
 export function requestHostedServerService(request?: Request): HostedServerService {

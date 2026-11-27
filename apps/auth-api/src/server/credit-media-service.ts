@@ -1,4 +1,5 @@
 import {
+  CREDIT_MEDIA_FAILURE_REASONS,
   CREDIT_MEDIA_INPUT_LIMIT_BYTES,
   CREDIT_MEDIA_INPUT_TYPES,
   CREDIT_MEDIA_INPUTS_LIMIT_BYTES,
@@ -7,6 +8,7 @@ import {
   type CreditMediaBalance,
   type CreditMediaCatalog,
   type CreditMediaFailure,
+  type CreditMediaFailureReason,
   type CreditMediaInputRole,
   type CreditMediaJob,
   type CreditMediaJobRequest,
@@ -37,9 +39,11 @@ import { CreditGrants, welcomeTenthsSql } from "./credit-grants";
 import {
   availableTenthsSql,
   type CreditHold,
+  type CreditHoldInput,
   type CreditHoldOutcome,
   type CreditJobCheck,
   type CreditJobChecker,
+  type CreditJobRelease,
   CreditSpending,
   type CreditSubmitTarget,
   type CreditWallet,
@@ -52,6 +56,7 @@ import {
   type MediaGatewayError,
   type MediaGatewayGeneration,
   type MediaGatewayInput,
+  type MediaGatewayJob,
   type MediaGatewayModel,
 } from "./media-gateway";
 
@@ -161,10 +166,16 @@ function walletOf(payer: CreditMediaPayer): CreditWallet {
   return payer.wallet === "personal" ? { userId: payer.userId } : { serverId: payer.serverId };
 }
 
+type HoldRequest = Omit<CreditHoldInput, "wallet" | "welcome" | "viaServerId">;
+
 function owns(payer: CreditMediaPayer, hold: CreditHold): boolean {
-  return payer.wallet === "personal"
-    ? hold.userId === payer.userId && hold.serverId === null
-    : hold.serverId === payer.serverId && hold.userId === null;
+  if (payer.wallet === "personal")
+    return hold.userId === payer.userId && hold.serverId === null && hold.viaServerId === null;
+  return hold.viaServerId === payer.serverId || (hold.serverId === payer.serverId && hold.userId === null);
+}
+
+function notEnoughCredits(error: Failure): error is BillingError {
+  return error instanceof BillingError && error.code === "credits_spend_not_enough";
 }
 
 function resumable(hold: CreditHold | null): boolean {
@@ -174,6 +185,20 @@ function resumable(hold: CreditHold | null): boolean {
 function failureOf(outcome: CreditHoldOutcome | null): CreditMediaFailure {
   if (outcome === "refused" || outcome === "canceled" || outcome === "expired") return outcome;
   return "failed";
+}
+
+const [CONTENT_POLICY_FAILURE] = CREDIT_MEDIA_FAILURE_REASONS;
+const NOT_FOUND_REASON = "not_found";
+const NO_OUTPUT_REASON = "no_output";
+
+function releasedResult(state: MediaGatewayJob): CreditJobRelease {
+  if (state.status === "canceled") return { outcome: "canceled" };
+  const reason = state.failure ?? "unknown";
+  return { outcome: reason === CONTENT_POLICY_FAILURE ? "refused" : "failed", reason };
+}
+
+function failureReasonOf(reason: string | null): CreditMediaFailureReason | null {
+  return isOneOf(CREDIT_MEDIA_FAILURE_REASONS, reason) ? reason : null;
 }
 
 function outputsOf(artifacts: readonly MediaGatewayArtifact[]): CreditMediaOutput[] {
@@ -371,6 +396,15 @@ export class CreditMediaService {
     );
   }
 
+  #serverOwner(serverId: string): Effect.Effect<string | null, Failure> {
+    return billingCall(() =>
+      this.#database
+        .prepare("SELECT owner_user_id FROM remote_hosts WHERE host_id = ?1")
+        .bind(serverId)
+        .first<{ owner_user_id: string }>(),
+    ).pipe(Effect.map((row) => row?.owner_user_id ?? null));
+  }
+
   #gatewayOrFail(): Effect.Effect<MediaGateway, BillingError> {
     return this.#gateway ? Effect.succeed(this.#gateway) : Effect.fail(unavailable());
   }
@@ -403,17 +437,22 @@ export class CreditMediaService {
     yield* this.#issueWelcome(payer);
     const column = payer.wallet === "personal" ? "user_id" : "server_id";
     const id = payer.wallet === "personal" ? payer.userId : payer.serverId;
+    const owner = payer.wallet === "server" ? yield* this.#serverOwner(payer.serverId) : null;
+    if (owner) yield* this.#issueWelcome({ wallet: "personal", userId: owner });
     const row = yield* billingCall(() =>
       this.#database
         .prepare(
           `SELECT ${availableTenthsSql(column, "?1")} AS available_tenths,
-                  ${welcomeTenthsSql(column, "?1")} AS welcome_tenths`,
+                  ${welcomeTenthsSql(column, "?1")} AS welcome_tenths,
+                  ${welcomeTenthsSql("user_id", "?2")} AS owner_welcome_tenths`,
         )
-        .bind(id)
-        .first<{ available_tenths: number; welcome_tenths: number }>(),
+        .bind(id, owner)
+        .first<{ available_tenths: number; welcome_tenths: number; owner_welcome_tenths: number }>(),
     );
-    const availableTenths = Math.max(0, row?.available_tenths ?? 0);
-    const welcomeTenths = Math.min(availableTenths, Math.max(0, row?.welcome_tenths ?? 0));
+    const ownTenths = Math.max(0, row?.available_tenths ?? 0);
+    const ownerWelcomeTenths = Math.max(0, row?.owner_welcome_tenths ?? 0);
+    const availableTenths = ownTenths + ownerWelcomeTenths;
+    const welcomeTenths = Math.min(ownTenths, Math.max(0, row?.welcome_tenths ?? 0)) + ownerWelcomeTenths;
     const balance: CreditMediaBalance = { wallet: payer.wallet, available: creditsFromTenths(availableTenths) };
     if (welcomeTenths > 0) balance.welcome = creditsFromTenths(welcomeTenths);
     return balance;
@@ -434,6 +473,7 @@ export class CreditMediaService {
       pollAfterSeconds: finished ? 0 : pollAfterSeconds,
       outputs,
       failure: hold.status === "released" ? failureOf(hold.outcome) : null,
+      reason: hold.status === "released" ? failureReasonOf(hold.failureReason) : null,
     };
   }
 
@@ -484,16 +524,12 @@ export class CreditMediaService {
     const credits = creditMediaCost(stored.model, request);
     if (credits === null) return yield* unavailable();
     quote.credits = credits;
-    const welcome = payer.wallet === "personal" ? stored.welcome : null;
-    if (welcome) yield* this.#issueWelcome(payer);
-    const hold = yield* this.#spending.hold({
-      jobId: request.jobId,
-      wallet: walletOf(payer),
-      actorUserId,
-      modelId: stored.model.id,
-      credits,
-      welcome: welcome !== null,
-    });
+    const hold = yield* this.#hold(
+      payer,
+      { jobId: request.jobId, actorUserId, modelId: stored.model.id, credits },
+      stored.welcome !== null,
+      earlier,
+    );
     if (hold.status === "released") return this.#releasedView(hold);
     if (hold.status === "charged" || hold.providerJobId) return yield* this.#job(payer, hold.jobId, trace);
     const target = yield* this.#spending.claimSubmit(
@@ -508,11 +544,17 @@ export class CreditMediaService {
       const error = submitted.failure;
       logUpstream("submit", error, trace);
       if (REFUSED_STATUSES.has(error.status)) {
-        yield* this.#settle(hold, { outcome: "refused" });
-        return yield* new BillingError(400, "media_request_refused", sourceText("error.billing.mediaRequestRefused"));
+        yield* this.#settle(hold, { outcome: "refused", reason: error.code });
+        return yield* new BillingError(
+          400,
+          "media_request_refused",
+          error.code === CONTENT_POLICY_FAILURE
+            ? sourceText("error.billing.mediaContentRefused")
+            : sourceText("error.billing.mediaRequestRefused"),
+        );
       }
       if (NOT_ACCEPTED_STATUSES.has(error.status)) {
-        yield* this.#settle(hold, { outcome: "refused" });
+        yield* this.#settle(hold, { outcome: "refused", reason: error.code });
         return yield* error.status === 429 ? busy() : unavailable();
       }
       yield* this.#spending.endSubmit(hold.jobId);
@@ -527,6 +569,43 @@ export class CreditMediaService {
     };
     const started = (yield* this.#spending.start(hold.jobId, job.id, details, job.upstream)) ?? hold;
     return this.#view(started, job.status, job.pollAfterSeconds, []);
+  }).bind(this);
+
+  readonly #hold = Effect.fn("CreditMedia.hold")(function* (
+    this: CreditMediaService,
+    payer: CreditMediaPayer,
+    request: HoldRequest,
+    welcome: boolean,
+    earlier: CreditHold | null,
+  ): Effect.fn.Return<CreditHold, Failure> {
+    if (payer.wallet === "personal") {
+      if (welcome) yield* this.#issueWelcome(payer);
+      return yield* this.#spending.hold({ ...request, wallet: walletOf(payer), welcome });
+    }
+    if (earlier?.viaServerId === payer.serverId && earlier.userId !== null)
+      return yield* this.#spending.hold({
+        ...request,
+        wallet: { userId: earlier.userId },
+        welcome: true,
+        viaServerId: payer.serverId,
+      });
+    const serverHold = this.#spending.hold({ ...request, wallet: walletOf(payer) });
+    if (!welcome || earlier) return yield* serverHold;
+    return yield* serverHold.pipe(
+      Effect.catchIf(notEnoughCredits, (error) => this.#ownerWelcomeHold(payer.serverId, request, error)),
+    );
+  }).bind(this);
+
+  readonly #ownerWelcomeHold = Effect.fn("CreditMedia.ownerWelcomeHold")(function* (
+    this: CreditMediaService,
+    serverId: string,
+    request: HoldRequest,
+    serverShort: BillingError,
+  ): Effect.fn.Return<CreditHold, Failure> {
+    const owner = yield* this.#serverOwner(serverId);
+    if (!owner) return yield* serverShort;
+    yield* this.#issueWelcome({ wallet: "personal", userId: owner });
+    return yield* this.#spending.hold({ ...request, wallet: { userId: owner }, welcome: true, viaServerId: serverId });
   }).bind(this);
 
   #ownedHold(payer: CreditMediaPayer, jobId: string): Effect.Effect<CreditHold | null, Failure> {
@@ -569,15 +648,17 @@ export class CreditMediaService {
     const checked = yield* Effect.result(gateway.status(upstream, hold.providerJobId));
     if (Result.isFailure(checked)) {
       logUpstream("status", checked.failure, trace);
-      if (checked.failure.status === 404) return this.#releasedView(yield* this.#settle(hold, { outcome: "failed" }));
+      if (checked.failure.status === 404)
+        return this.#releasedView(yield* this.#settle(hold, { outcome: "failed", reason: NOT_FOUND_REASON }));
       return yield* busy();
     }
     const state = checked.success;
     if (state.status === "failed" || state.status === "canceled")
-      return this.#releasedView(yield* this.#settle(hold, { outcome: state.status }));
+      return this.#releasedView(yield* this.#settle(hold, releasedResult(state)));
     if (state.status !== "completed") return this.#view(hold, state.status, state.pollAfterSeconds, []);
     const artifacts = yield* this.#artifacts(gateway, upstream, hold.providerJobId, trace);
-    if (artifacts.length === 0) return this.#releasedView(yield* this.#settle(hold, { outcome: "failed" }));
+    if (artifacts.length === 0)
+      return this.#releasedView(yield* this.#settle(hold, { outcome: "failed", reason: NO_OUTPUT_REASON }));
     const charged = yield* this.#settle(hold, { outcome: "completed" });
     return this.#view(charged, "completed", 0, outputsOf(artifacts));
   }).bind(this);
@@ -632,16 +713,18 @@ export class CreditMediaService {
               .pipe(
                 Effect.map(
                   (artifacts): CreditJobCheck =>
-                    artifacts.length > 0 ? { status: "completed" } : { status: "failed" },
+                    artifacts.length > 0 ? { status: "completed" } : { status: "failed", reason: NO_OUTPUT_REASON },
                 ),
               );
-          if (state.status === "failed" || state.status === "canceled")
-            return Effect.succeed<CreditJobCheck>({ status: state.status });
+          if (state.status === "failed" || state.status === "canceled") {
+            const { outcome, ...reason } = releasedResult(state);
+            return Effect.succeed<CreditJobCheck>({ status: outcome, ...reason });
+          }
           return Effect.succeed<CreditJobCheck>({ status: "running" });
         }),
         Effect.catchIf(
           (error) => error.status === 404,
-          () => Effect.succeed<CreditJobCheck>({ status: "failed" }),
+          () => Effect.succeed<CreditJobCheck>({ status: "failed", reason: NOT_FOUND_REASON }),
         ),
         Effect.tapError((error) =>
           Effect.sync(() => logUpstream("check", error, trace)).pipe(

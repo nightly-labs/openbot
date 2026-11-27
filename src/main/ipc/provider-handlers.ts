@@ -11,6 +11,7 @@ import {
   type ConnectProviderAccountInput,
   type ConnectProviderAccountKeyInput,
   isProviderAccountId,
+  isProviderAccountPoolStrategy,
   MAX_PROVIDER_ACCOUNTS,
   PROVIDER_ACCOUNT_LABEL_MAX_LENGTH,
   type RemoveProviderAccountInput,
@@ -28,6 +29,7 @@ import { Effect } from "effect";
 import { AgentLifecycleFailed, type AgentService } from "../../backend/agent-service";
 import { runCauseEffect } from "../../backend/effect-boundary";
 import type { SignInRegion } from "../../backend/kimi-region";
+import type { LocalSignInPages } from "../local-sign-in-pages";
 import type { ProviderCredentialStore } from "../provider-credential-store";
 import type { ProviderRuntimeManager } from "../provider-runtime-manager";
 import { parseProviderId } from "./app-inputs";
@@ -41,6 +43,7 @@ export interface ProviderIpcDependencies {
   providerRuntimes: ProviderRuntimeManager;
   credentials: ProviderCredentialStore;
   openLink: (url: string) => Promise<void>;
+  signInPages: Pick<LocalSignInPages, "opened" | "forget">;
 }
 
 export function providerIpcHandlers({
@@ -48,15 +51,18 @@ export function providerIpcHandlers({
   providerRuntimes,
   credentials,
   openLink,
+  signInPages,
 }: ProviderIpcDependencies): Pick<IpcGroupHandlers, "providers" | "providerRuntimes"> {
   async function connect(provider: AgentProviderId, region: SignInRegion) {
     await runCauseEffect(providerRuntimes.ensureKeyProviderCli(provider));
+    signInPages.forget(provider);
     return runCauseEffect(
       service.connectProvider(
         provider,
         async (value) => {
           const url = new URL(value);
           if (url.protocol !== "https:") throw new Error(sourceText("error.provider.httpsSignInLinkOnly"));
+          signInPages.opened(provider, url.toString());
           await openLink(url.toString());
         },
         region,
@@ -78,9 +84,10 @@ export function providerIpcHandlers({
         }
         return connect(provider, "mainland-cn");
       }),
-      cancelProviderSignIn: payloadHandler(parseProviderId, (provider) =>
-        runCauseEffect(service.cancelProviderSignIn(provider)),
-      ),
+      cancelProviderSignIn: payloadHandler(parseProviderId, (provider) => {
+        signInPages.forget(provider);
+        return runCauseEffect(service.cancelProviderSignIn(provider));
+      }),
       updateProviderCli: payloadHandler(parseManagedProviderId, async (provider) => {
         await runCauseEffect(providerRuntimes.downloadAndWait(provider));
         return service.getStatus();
@@ -150,8 +157,10 @@ export function providerIpcHandlers({
       removeProviderAccount: payloadHandler(parseRemoveProviderAccountInput, ({ provider, accountId }) =>
         runCauseEffect(service.removeProviderAccount(provider, accountId)),
       ),
-      setProviderAccountPool: payloadHandler(parseSetProviderAccountPoolInput, ({ provider, enabled, leftOut }) =>
-        runCauseEffect(service.setProviderAccountPool(provider, enabled, leftOut)),
+      setProviderAccountPool: payloadHandler(
+        parseSetProviderAccountPoolInput,
+        ({ provider, enabled, leftOut, strategy }) =>
+          runCauseEffect(service.setProviderAccountPool(provider, enabled, leftOut, strategy)),
       ),
       setLiveVoiceAccount: payloadHandler(parseSetLiveVoiceAccountInput, ({ accountId }) =>
         runCauseEffect(service.setLiveVoiceAccount(accountId)),
@@ -250,10 +259,16 @@ export function parseSetProviderAccountPoolInput(value: unknown): SetProviderAcc
     typeof value.enabled !== "boolean" ||
     !Array.isArray(value.leftOut) ||
     value.leftOut.length > MAX_PROVIDER_ACCOUNTS ||
-    !value.leftOut.every(isProviderAccountId)
+    !value.leftOut.every(isProviderAccountId) ||
+    (value.strategy !== undefined && !isProviderAccountPoolStrategy(value.strategy))
   )
     throw new Error("Invalid provider account pool.");
-  return { provider: parseProviderId(value.provider), enabled: value.enabled, leftOut: value.leftOut };
+  return {
+    provider: parseProviderId(value.provider),
+    enabled: value.enabled,
+    leftOut: value.leftOut,
+    ...(value.strategy === undefined ? {} : { strategy: value.strategy }),
+  };
 }
 
 export function parseSetLiveVoiceAccountInput(value: unknown): SetLiveVoiceAccountInput {

@@ -4,6 +4,7 @@ import {
   type CreditActivityEntry,
   type CreditsState,
   creditModelCharge,
+  creditsMovable,
   isCreditCode,
   normalizeCreditCode,
 } from "@openbot/contracts/credits";
@@ -92,6 +93,7 @@ export function createMockCredits(initial: Partial<CreditsState> = {}): CreditsD
   return {
     getState: async () => structuredClone(state),
     getActivity: async () => ({ entries: structuredClone(activity) }),
+    getCatalog: async () => ({ models: [] }),
     openCheckout: async (request) => {
       if (request.serverId === undefined) {
         state.balance += request.credits;
@@ -105,7 +107,7 @@ export function createMockCredits(initial: Partial<CreditsState> = {}): CreditsD
       const wallet = server(request.serverId);
       if (wallet?.role !== "owner") throw new Error(sourceText("error.billing.creditsServerOwner"));
       const toServer = request.direction === "to_server";
-      const available = toServer ? state.balance : wallet.balance;
+      const available = toServer ? creditsMovable(state) : wallet.balance;
       if (available < request.credits) throw new Error(sourceText("error.billing.creditsNotEnough"));
       const change = toServer ? request.credits : -request.credits;
       state.balance -= change;

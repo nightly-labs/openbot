@@ -44,6 +44,7 @@ import {
 } from "@openbot/contracts/ipc";
 import { decodeRecord, requiredString } from "@openbot/contracts/ipc-decoding";
 import { isValidSemver } from "@openbot/contracts/release-version";
+import { AGENT_TASKS_ROUTES } from "@openbot/contracts/team-protocol/agent-tasks-v1";
 import { CHANNEL_ROUTES } from "@openbot/contracts/team-protocol/channels-v1";
 import { localeDirection } from "@openbot/i18n";
 import { sourceText } from "@openbot/i18n/source";
@@ -311,7 +312,7 @@ import {
   aboveAppsWindowKind,
   ozonePlatformArguments,
   setAboveAppsXWayland,
-  usesX11Windows,
+  x11OverlaysShow,
 } from "./linux-wayland-output";
 import { localRoutineFeedDocument } from "./local-routine-calendar";
 import {
@@ -324,6 +325,7 @@ import {
 } from "./local-server-child";
 import { LOCAL_SERVERS_FILE } from "./local-servers/local-server-registry";
 import { LocalServers, sandboxArguments } from "./local-servers/local-servers";
+import { LocalSignInPages } from "./local-sign-in-pages";
 import { LocalSignInWindows } from "./local-sign-in-window";
 import { localSkillLearner } from "./local-skill-learner";
 import { LocalSkillLibrary } from "./local-skill-library";
@@ -383,6 +385,10 @@ import { MemoryReviewPreferenceStore } from "./memory-review-preference-store";
 import { MessagingCredentialStore } from "./messaging-credential-store";
 import { createModelReasoningSupport, MODEL_REASONING_RETRY_WAITS_MS } from "./model-reasoning-probe";
 import { ModelReleaseCatalog, ModelVisibility } from "./model-visibility";
+import { createNearIntentsGateway } from "./near-intents-gateway";
+import { NearWalletService } from "./near-wallet-service";
+import { NEAR_PASSKEY_WALLET_ORIGIN, NearOwnerSigning, nearPasskeyPageOrigin } from "./near-wallet-signing";
+import { NearWalletStore } from "./near-wallet-store";
 import { NotificationPreferenceStore } from "./notification-preference-store";
 import { OnePasswordConnectorService } from "./onepassword-connector-service";
 import { OnePasswordConnectorStore } from "./onepassword-connector-store";
@@ -411,7 +417,7 @@ import { PushNotificationStore } from "./push-notification-store";
 import { DESKTOP_USE_MS } from "./push-notifications";
 import { ReferralDesktopService } from "./referral-service";
 import { RelayedMessagingInstalls } from "./relayed-messaging-installs";
-import { decodeQueuedMessageReceipt } from "./remote-agent-decoding";
+import { decodeQueuedMessageReceipt, decodeRemoteAgentTask } from "./remote-agent-decoding";
 import { RemoteConnectTrace } from "./remote-connect-trace";
 import { createRemoteControlPolicyStore } from "./remote-control-policy-store";
 import { createRemoteControlQuestion } from "./remote-control-question";
@@ -511,6 +517,9 @@ import { spawnVoiceSpeechHost } from "./voice-speech-host-process";
 import { VoiceSpeechService } from "./voice-speech-service";
 import { spawnVoiceTranscriptionHost } from "./voice-transcription-host-process";
 import { VoiceTranscriptionService } from "./voice-transcription-service";
+import { WatchRelayCommands } from "./watch-relay-commands";
+import { createWatchRelayWantedStore, loadWatchRelayKey } from "./watch-relay-key";
+import { WatchRelayService } from "./watch-relay-service";
 import { WebhookRelay } from "./webhook-relay";
 import { WindowsTopmostKeeper } from "./windows-topmost-keeper";
 import { createWorkflowFileExporter, type WorkflowFileExporter } from "./workflow-file-export";
@@ -567,10 +576,13 @@ const CUSTOM_PROVIDERS_FILE = "openbot-custom-providers-v1.json";
 const PROVIDER_CREDENTIAL_FILE = "openbot-provider-credentials-v1.json";
 const MESSAGING_CREDENTIAL_FILE = "openbot-messaging-credentials-v1.json";
 const INGRESS_QUEUE_KEY_FILE = "openbot-ingress-queue-key-v1.json";
+const WATCH_RELAY_KEY_FILE = "openbot-watch-relay-key-v1.json";
+const WATCH_RELAY_WANTED_FILE = "openbot-watch-relay-v1.json";
 const MCP_OAUTH_FILE = "openbot-mcp-oauth-v1.json";
 const MCP_OAUTH_PROXY_FILE = "openbot-mcp-oauth-proxy-v1.json";
 const GITHUB_CONNECTOR_FILE = "openbot-github-connector-v1.json";
 const LINK_ACCOUNT_FILE = "openbot-link-account-v1.json";
+const NEAR_WALLET_FILE = "openbot-near-wallet-v1.json";
 const ONEPASSWORD_CONNECTOR_FILE = "openbot-onepassword-connector-v1.json";
 const BITWARDEN_CONNECTOR_FILE = "openbot-bitwarden-connector-v1.json";
 const PROTONPASS_CONNECTOR_FILE = "openbot-protonpass-connector-v1.json";
@@ -618,6 +630,7 @@ const TEARDOWN_ORDER = {
   routineResults: 84,
   messaging: 85,
   hostEvents: 85.5,
+  watchRelay: 85.75,
   signalIngress: 86,
   host: 90,
   clientBrowser: 98,
@@ -633,6 +646,7 @@ const TEARDOWN_ORDER = {
   passwordManagers: 106.75,
   githubConnector: 107,
   linkAccount: 107.5,
+  nearWallet: 107.6,
   automation: 108,
   storageUsage: 109,
   service: 110,
@@ -690,9 +704,11 @@ export interface ApplicationServices {
   teamWebRtcBridge: TeamWebRtcBridge;
   mcpOAuth: McpOAuth;
   signInRelayClient: SignInRelayClient;
+  localSignInPages: LocalSignInPages;
   relayedMessagingInstalls: RelayedMessagingInstalls;
   githubConnector: GitHubConnectorService;
   linkAccount: LinkAccountService;
+  nearWallet: NearWalletService;
   onePasswordConnector: OnePasswordConnectorService;
   bitwardenConnector: BitwardenConnectorService;
   passwordManagers: PasswordManagersService;
@@ -1147,6 +1163,29 @@ export async function createApplicationServices({
           return Effect.fail(new AgentDockFailed({ cause: new Error(sourceText("error.app.notReady")) }));
         }
         const { agents, host, remoteServers } = criticalActionTargets;
+        if (action.type === "start-thread") {
+          const input = { agentId: action.agentId, text: action.text, clientMessageId: action.clientMessageId };
+          const started =
+            action.serverId === LOCAL_SERVER_ID
+              ? agents.startTask(input, host.conversationSender()).pipe(toAgentDockFailed)
+              : remoteServers
+                  .request(action.serverId, AGENT_TASKS_ROUTES.start, decodeRemoteAgentTask, {
+                    method: "POST",
+                    body: input,
+                  })
+                  .pipe(toAgentDockFailed);
+          return started.pipe(
+            Effect.flatMap((task) =>
+              agentDock.performAction(0, {
+                type: "open-thread",
+                serverId: action.serverId,
+                agentId: action.agentId,
+                threadId: task.id,
+                started: true,
+              }),
+            ),
+          );
+        }
         if (action.seat.kind === "channel") {
           const command: ChannelCommand = {
             type: "send",
@@ -1162,6 +1201,24 @@ export async function createApplicationServices({
               ? agents.channels.command(command, host.channelActor()).pipe(Effect.asVoid)
               : remoteServers
                   .request(action.serverId, CHANNEL_ROUTES.command, decodeChannel, { method: "POST", body: command })
+                  .pipe(Effect.asVoid);
+          return sent.pipe(toAgentDockFailed);
+        }
+        if (action.taskId !== undefined) {
+          const input = {
+            agentId: action.seat.id,
+            taskId: action.taskId,
+            text: action.text,
+            clientMessageId: action.clientMessageId,
+          };
+          const sent =
+            action.serverId === LOCAL_SERVER_ID
+              ? agents.sendMessage(input, host.conversationSender()).pipe(Effect.asVoid)
+              : remoteServers
+                  .request(action.serverId, AGENT_TASKS_ROUTES.send, decodeQueuedMessageReceipt, {
+                    method: "POST",
+                    body: input,
+                  })
                   .pipe(Effect.asVoid);
           return sent.pipe(toAgentDockFailed);
         }
@@ -1818,15 +1875,39 @@ export async function createApplicationServices({
   });
   await Effect.runPromise(linkAccount.load());
   teardown.push(TEARDOWN_ORDER.linkAccount, "the Link account", () => Effect.runPromise(linkAccount.dispose()));
+  const nearHost: { serverId: () => string | null } = { serverId: () => null };
+  const nearWallet = new NearWalletService({
+    gateway: createNearIntentsGateway({
+      auth: centralAuth,
+      hostId: () => nearHost.serverId(),
+      serverWallet: Boolean(hostedServer || serverModeEnvironment || localServerChild),
+    }),
+    store: new NearWalletStore(join(app.getPath("userData"), NEAR_WALLET_FILE), secretCipher),
+    signing: new NearOwnerSigning({
+      pageOrigin: app.isPackaged
+        ? NEAR_PASSKEY_WALLET_ORIGIN
+        : nearPasskeyPageOrigin(process.env.OPENBOT_DEV_NEAR_SIGNING_ORIGIN || centralAuthApiUrl()),
+      openExternal: openLink,
+      loopback: !app.isPackaged,
+    }),
+    baseUrl: app.isPackaged ? undefined : process.env.OPENBOT_DEV_NEAR_AGENT_API_URL || undefined,
+  });
+  await Effect.runPromise(nearWallet.load());
+  centralAuth.on("changed", (state) => {
+    if (state.status === "signed_in") void Effect.runPromise(nearWallet.refresh());
+  });
+  teardown.push(TEARDOWN_ORDER.nearWallet, "the NEAR wallet", () => Effect.runPromise(nearWallet.dispose()));
   const bitwardenCliTarget = runtimeTarget(process.platform, process.arch);
+  const bitwardenDataDirectory = join(app.getPath("userData"), "provider-state", "bitwarden-host");
   const bitwardenConnector = new BitwardenConnectorService({
     host: {
       store: new BitwardenConnectorStore(join(app.getPath("userData"), BITWARDEN_CONNECTOR_FILE), secretCipher),
-      dataDirectory: join(app.getPath("userData"), "provider-state", "bitwarden-host"),
+      dataDirectory: bitwardenDataDirectory,
       installCli: bitwardenCliTarget
         ? (signal) =>
             managedBitwardenCli({
               directory: join(app.getPath("userData"), "provider-state", "bitwarden-cli"),
+              dataDirectory: bitwardenDataDirectory,
               target: bitwardenCliTarget,
               signal,
             })
@@ -1996,7 +2077,7 @@ export async function createApplicationServices({
     await Effect.runPromise(computerUseReads.close());
   });
   const agentsShareDisplay = !hasSeparateAgentDisplay(process.platform);
-  const drawsComputerUseHighlight = agentsShareDisplay && (process.platform !== "linux" || usesX11Windows());
+  const drawsComputerUseHighlight = agentsShareDisplay && (process.platform !== "linux" || x11OverlaysShow());
   const computerUsePermissionHelp = new ComputerUsePermissionHelpWindowController({
     createWindow: () =>
       createComputerUsePermissionHelpWindow(language.translate, () => localeDirection(language.locale)),
@@ -2093,6 +2174,7 @@ export async function createApplicationServices({
     store,
     mailbox,
     browser,
+    usageReportWorkerPath: join(__dirname, "usage-report-worker.js"),
     finishCheck: true,
     cacheExpiryCompaction: () => cacheExpiryCompaction.get().enabled,
     mediaApprovalCredits: () => mediaApprovalCredits.get(),
@@ -2238,15 +2320,14 @@ export async function createApplicationServices({
       mcpToolRuntimes: () => providerRuntimes.mcpToolRuntimes(),
       mcpOAuth,
       mcpOAuthProxySettings,
-      systemProxyFetch: (url, init) => net.fetch(url, { ...init, credentials: "omit", cache: "no-store" }),
       appVersion: app.getVersion(),
       providerStateDirectory: join(app.getPath("userData"), "provider-state"),
       ...(process.platform === "win32" ? { providerTempDirectory } : {}),
       ...(processLauncher ? { launchProcess: processLauncher.launch } : {}),
       serverEnvironment,
-      agentEnvironment: (inherited) => ({
+      agentEnvironment: (inherited, gitConfig) => ({
         ...agentDisplayEnvironment(process.platform),
-        ...githubConnector.agentEnvironment(inherited),
+        ...githubConnector.agentEnvironment(inherited, gitConfig),
       }),
     },
     computerUseMcpServer: () => cuaDriver.mcpServerForProviders(),
@@ -2262,6 +2343,7 @@ export async function createApplicationServices({
     ]),
     vaultItems: vault.items,
     linkWallet: linkAccount,
+    nearWallet,
     agentApiKeys,
     localSkillTools: () => localSkillTools(skills),
     browserProfiles: () => agentBrowserProfiles,
@@ -2737,6 +2819,7 @@ export async function createApplicationServices({
     join(app.getPath("userData"), LEGACY_TEAM_STORE_FILE),
   );
   await runCauseEffect(teamStore.initialize());
+  nearHost.serverId = () => teamStore.getIdentity()?.serverId ?? null;
   performance.mark("openbot:services.team");
   const machineAlertStore = new MachineAlertPreferenceStore(
     join(app.getPath("userData"), MACHINE_ALERTS_PREFERENCE_FILE),
@@ -3131,6 +3214,7 @@ export async function createApplicationServices({
     timezone: () => serverTimezone.effective(),
     settings: {
       mcpServers: () => service.listMcpServers(),
+      listedMcpServers: () => catalogPluginServers.filter((server) => server.transport === "http"),
       saveMcpServer: (config) => service.saveMcpServer({ config }),
       customProviders: () => customProviderChanges.list(),
       saveCustomProvider: (input) => customProviderChanges.save(input),
@@ -3164,6 +3248,11 @@ export async function createApplicationServices({
   });
   const mcpHostSignIns = new McpHostSignIns({ service, browser });
   const providerSignIns = new ProviderHostSignIns({ service, browser });
+  const localSignInPages = new LocalSignInPages(
+    (provider) =>
+      service.getStatus().providers?.some((row) => row.id === provider && row.connectionState === "connecting") ??
+      false,
+  );
   const providerAccountsHost = new ProviderAccountsHost({ service, browser });
   const signInRelayHost = new SignInRelayHost({
     mcp: mcpHostSignIns,
@@ -3253,7 +3342,22 @@ export async function createApplicationServices({
   service.on("event", (event) => {
     if (event.type === "turn-started") accountActivity.turnStarted();
   });
+  let watchCommands: WatchRelayCommands | null = null;
+  const watchRelay = new WatchRelayService({
+    hostId: () => teamStore.getIdentity()?.serverId ?? null,
+    key: loadWatchRelayKey(join(app.getPath("userData"), WATCH_RELAY_KEY_FILE), secretCipher),
+    wanted: createWatchRelayWantedStore(join(app.getPath("userData"), WATCH_RELAY_WANTED_FILE)),
+    ingress: signalIngress,
+    verifyTicket: (ticket) => centralAuth.verifyWatchTicket(ticket),
+    member: (membershipId, role) => {
+      const ownerId = role === "owner" ? teamStore.getOwnerMemberId() : null;
+      return teamStore.getMember(membershipId) ?? (ownerId ? teamStore.getMember(ownerId) : null);
+    },
+    commands: () => watchCommands,
+  });
+  teardown.push(TEARDOWN_ORDER.watchRelay, "the Apple Watch relay", () => Effect.runPromise(watchRelay.dispose()));
   const host = new HostService({
+    watchRelay,
     onMemberUse: (memberId) => accountActivity.memberUsed(memberId),
     appVersion: app.getVersion(),
     store: teamStore,
@@ -3607,6 +3711,9 @@ export async function createApplicationServices({
       }),
   });
   teardown.push(TEARDOWN_ORDER.host, "the local host", () => runCauseEffect(host.shutdown()));
+  watchCommands = new WatchRelayCommands(host.watchTeamApi());
+  signalIngress.handleWatch((delivery) => watchRelay.deliver(delivery));
+  Effect.runFork(watchRelay.start());
   const signedInState = centralAuth.getState();
   if (localServerChild) {
   } else if (signedInState.status === "signed_in") {
@@ -3971,7 +4078,7 @@ export async function createApplicationServices({
       write: (line) => process.stdout.write(line),
     });
   }
-  configureAttachmentProtocol({ mailbox, agents: service, remoteServers });
+  configureAttachmentProtocol({ mailbox, agents: service, remoteServers, attachmentPreviews });
   configureServerLogoProtocols({ teamStore, remoteServers });
   const browserView = new BrowserViewClient({
     servers: remoteServers,
@@ -4412,9 +4519,11 @@ export async function createApplicationServices({
     teamWebRtcBridge,
     mcpOAuth,
     signInRelayClient,
+    localSignInPages,
     relayedMessagingInstalls: new RelayedMessagingInstalls(remoteServers),
     githubConnector,
     linkAccount,
+    nearWallet,
     onePasswordConnector,
     bitwardenConnector,
     passwordManagers,

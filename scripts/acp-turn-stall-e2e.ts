@@ -4,13 +4,18 @@ import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { sourceText } from "@openbot/i18n/source";
 import { AcpAgentClient } from "../src/backend/acp-client";
-import { type AcpCustomEndpoint, type AcpFlavor, DEFAULT_ACP_FLAVOR } from "../src/backend/acp-flavor";
+import {
+  type AcpCustomEndpoint,
+  type AcpFlavor,
+  customAgentFlavor,
+  DEFAULT_ACP_FLAVOR,
+} from "../src/backend/acp-flavor";
 import { ANTIGRAVITY_ACP_FLAVOR } from "../src/backend/acp-flavor-antigravity";
 import { OPENCODE_ACP_FLAVOR } from "../src/backend/acp-flavor-opencode";
-import type { AgentClient } from "../src/backend/agent-client";
+import { type AgentClient, ProviderSessionBusyError } from "../src/backend/agent-client";
 import { runCauseEffect } from "../src/backend/effect-boundary";
 import type { AppServerNotification } from "../src/backend/protocol";
-import { installFakeAgent, readJsonl, runTurn, startThread, stopClients } from "./provider-fakes/host";
+import { installFakeAgent, readJsonl, runTurn, startThread, stopClients, type TurnResult } from "./provider-fakes/host";
 
 const OUT = resolve(import.meta.dirname, "../.openbot-build/acp-turn-stall-e2e");
 const STALL_MS = 1_500;
@@ -31,6 +36,9 @@ interface Report {
   passed: boolean;
   stall?: { status: string | null; error: string | null; elapsedMs: number; cancelSent: boolean };
   afterStall?: { status: string | null; sessionRestored: boolean };
+  answerAfterCancel?: { status: string | null; reply: string; error: string | null };
+  confirmedCancel?: { status: string | null; error: string | null; elapsedMs: number };
+  toolAfterCancel?: { status: string | null; error: string | null };
   retry?: { status: string | null; reply: string; elapsedMs: number };
   retryForever?: { status: string | null; error: string | null; elapsedMs: number };
   rateLimitRetry?: { status: string | null; reply: string; elapsedMs: number };
@@ -55,7 +63,19 @@ interface Report {
   quiet?: { status: string | null; reply: string; prompts: number };
   noLoad?: { stopStatus: string | null; next: string | null; sessionsOpened: number; loads: number };
   silentNew?: { error: string; elapsedMs: number };
+  heldSession?: ActiveSessionReport;
+  closedHeldSession?: ActiveSessionReport;
   failure?: string;
+}
+
+interface ActiveSessionReport {
+  stalledStatus: string | null;
+  busyWhileOpen?: boolean;
+  nextStatus: string | null;
+  nextReply: string;
+  refusedRestores: number;
+  closes: number;
+  sameSession: boolean;
 }
 
 const root = await mkdtemp(join(tmpdir(), "openbot-acp-turn-stall-e2e-"));
@@ -92,6 +112,46 @@ async function open(
   clients.push(client);
   client.start();
   return client;
+}
+
+async function openStrict(name: string, env: Readonly<Record<string, string>>): Promise<AgentClient> {
+  const executable = join(root, name, "bin", "strict-agent");
+  await installFakeAgent(executable, "strict-session", { FAKE_LOG: join(root, `${name}.jsonl`), ...env });
+  const client = new AcpAgentClient({ executable, version: "", source: "system" }, 20_000, {
+    provider: "acp",
+    flavor: customAgentFlavor("strict-agent"),
+    label: "Strict Agent",
+    allowNoModels: true,
+    argv: [],
+    env: {},
+    signInMessage: "Sign in to the fake agent.",
+    turnStallMs: STALL_MS,
+  });
+  clients.push(client);
+  client.start();
+  return client;
+}
+
+async function activeSessionReport(
+  log: string,
+  stalled: TurnResult,
+  next: TurnResult,
+  busyWhileOpen?: boolean,
+): Promise<ActiveSessionReport> {
+  const entries = await readJsonl<LogEntry>(log);
+  const prompts = entries.filter((entry) => entry.event === "prompt");
+  const session = prompts[0]?.sessionId;
+  return {
+    stalledStatus: stalled.status,
+    ...(busyWhileOpen === undefined ? {} : { busyWhileOpen }),
+    nextStatus: next.status,
+    nextReply: next.reply,
+    refusedRestores: entries.filter(
+      (entry) => (entry.event === "session/load" || entry.event === "session/resume") && entry.text === "refused",
+    ).length,
+    closes: entries.filter((entry) => entry.event === "session/close" && entry.sessionId === session).length,
+    sameSession: prompts.length >= 2 && prompts.every((entry) => entry.sessionId === session),
+  };
 }
 
 async function timed<T>(run: () => Promise<T>): Promise<{ value: T; elapsedMs: number }> {
@@ -143,6 +203,34 @@ try {
   report.afterStall = { status: afterStall.status, sessionRestored };
   assert.equal(afterStall.status, "completed", "A turn after a stall completes.");
   assert.equal(sessionRestored, true, "A turn after a stall opens the session again.");
+
+  const answered = await runTurn(client, thread, { text: "answer-after-cancel", timeoutMs: STALL_MS * 10 });
+  report.answerAfterCancel = { status: answered.status, reply: answered.reply, error: answered.error };
+  assert.equal(answered.status, "completed", "An answer that arrives after a stall cancel completes the turn.");
+  assert.equal(answered.reply, "late answer", "The answer that arrives after a stall cancel is kept.");
+
+  const confirmed = await timed(() => runTurn(client, thread, { text: "confirm-cancel", timeoutMs: STALL_MS * 10 }));
+  report.confirmedCancel = {
+    status: confirmed.value.status,
+    error: confirmed.value.error,
+    elapsedMs: confirmed.elapsedMs,
+  };
+  assert.equal(confirmed.value.status, "failed", "A stalled turn that the agent cancels still fails.");
+  assert.equal(
+    confirmed.value.error,
+    sourceText("error.agent.turnStalled", { provider: "OpenCode" }),
+    "A stalled turn that the agent cancels names the stall.",
+  );
+  assert.ok(confirmed.elapsedMs < STALL_MS * 2, "A confirmed cancel ends the stalled turn without the full wait.");
+
+  const toolOnly = await runTurn(client, thread, { text: "tool-after-cancel", timeoutMs: STALL_MS * 10 });
+  report.toolAfterCancel = { status: toolOnly.status, error: toolOnly.error };
+  assert.equal(toolOnly.status, "failed", "A tool update after a stall cancel is not an answer.");
+  assert.equal(
+    toolOnly.error,
+    sourceText("error.agent.turnStalled", { provider: "OpenCode" }),
+    "A stalled turn with only a tool update after the cancel names the stall.",
+  );
 
   const retrying = await open(
     "opencode",
@@ -484,6 +572,37 @@ try {
     "A session start that the agent never answers fails after the stall limit.",
   );
   assert.ok(silentStart.elapsedMs >= STALL_MS, "The session start waits for the stall limit first.");
+
+  const heldLog = join(root, "held-session.jsonl");
+  const held = await openStrict("held-session", { FAKE_HANG_MS: String(STALL_MS * 4) });
+  const heldThread = await startThread(held, { cwd: workspace });
+  const heldStall = await runTurn(held, heldThread, { text: "hang", timeoutMs: STALL_MS * 10 });
+  const heldBusy = await runTurn(held, heldThread, { timeoutMs: 10_000 }).then(
+    () => false,
+    (error: unknown) => error instanceof ProviderSessionBusyError,
+  );
+  await waitForEntry(heldLog, (entry) => entry.event === "prompt-ended", 15_000);
+  const heldNext = await runTurn(held, heldThread, { timeoutMs: 10_000 });
+  report.heldSession = await activeSessionReport(heldLog, heldStall, heldNext, heldBusy);
+  assert.equal(heldStall.status, "failed", "A silent turn of a strict agent fails at the stall limit.");
+  assert.equal(heldBusy, true, "While the stopped prompt still runs, the message waits as for a busy session.");
+  assert.equal(heldNext.status, "completed", "The next message uses the session that the agent still holds.");
+  assert.equal(heldNext.reply, "ok", "The agent answers in the held session.");
+  assert.equal(report.heldSession.sameSession, true, "No new session replaces the chat.");
+  assert.ok(report.heldSession.refusedRestores >= 2, "The agent refused to open the held session again.");
+
+  const closedLog = join(root, "closed-held-session.jsonl");
+  const closed = await openStrict("closed-held-session", { FAKE_CLOSE: "1", FAKE_RESUME: "1" });
+  const closedThread = await startThread(closed, { cwd: workspace });
+  const closedStall = await runTurn(closed, closedThread, { text: "hang", timeoutMs: STALL_MS * 10 });
+  const closedNext = await runTurn(closed, closedThread, { timeoutMs: 10_000 });
+  report.closedHeldSession = await activeSessionReport(closedLog, closedStall, closedNext);
+  assert.equal(closedStall.status, "failed", "A silent turn of a strict agent fails at the stall limit.");
+  assert.equal(closedNext.status, "completed", "The next message works after OpenBot closes the held session.");
+  assert.equal(closedNext.reply, "ok", "The agent answers after the session opens again.");
+  assert.equal(report.closedHeldSession.refusedRestores, 1, "The agent refused only the first resume.");
+  assert.equal(report.closedHeldSession.closes, 1, "OpenBot closes the refused session once.");
+  assert.equal(report.closedHeldSession.sameSession, true, "No new session replaces the chat.");
 
   report.passed = true;
 } catch (error) {

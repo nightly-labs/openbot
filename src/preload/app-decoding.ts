@@ -1,6 +1,7 @@
 import { isAgentTemplateId } from "@openbot/contracts/agent-template-links";
 import { type BillingState, parseBillingState } from "@openbot/contracts/billing";
 import { type BillingDetails, parseBillingDetails } from "@openbot/contracts/billing-details";
+import { type CreditMediaCatalog, parseCreditMediaCatalog } from "@openbot/contracts/credit-media";
 import {
   type CreditActivity,
   type CreditRedeemResult,
@@ -115,6 +116,8 @@ import {
   type MobileConnectedDevice,
   type MobileConnectLink,
   type MobileConnectTicket,
+  type NearDepositAddress,
+  type NearWalletStatus,
   type NotificationOpenedEvent,
   type NotificationPreference,
   type OnePasswordConnectorStatus,
@@ -122,6 +125,8 @@ import {
   parseGitHubConnectorRepositories,
   parseGitHubConnectorStatus,
   parseLinkAccountStatus,
+  parseNearDepositAddress,
+  parseNearWalletStatus,
   parseOnePasswordConnectorStatus,
   QUIT_GUARDS,
   type RemoteDesktopSetupStatus,
@@ -141,6 +146,7 @@ import {
   type VoiceServerProbe,
   type VoiceServerSettings,
   type VoiceSettings,
+  type VoiceSettingsState,
   type VoiceStream,
   type VoiceStreamTranscript,
   type VoiceTranscriptionResult,
@@ -607,6 +613,10 @@ export function decodeVoiceSettings(value: unknown): VoiceSettings {
   return { modelId, language };
 }
 
+export function decodeVoiceSettingsState(value: unknown): VoiceSettingsState {
+  return { ...decodeVoiceSettings(value), saved: requiredBoolean(decodeRecord(value, "voice settings"), "saved") };
+}
+
 export function decodeVoiceTranscriptionResult(value: unknown): VoiceTranscriptionResult {
   return { text: requiredString(decodeRecord(value, "voice transcription"), "text") };
 }
@@ -756,6 +766,18 @@ export function decodeLinkAccountStatus(value: unknown): LinkAccountStatus {
   return status;
 }
 
+export function decodeNearWalletStatus(value: unknown): NearWalletStatus {
+  const status = parseNearWalletStatus(value);
+  if (!status) throw new Error("Invalid NEAR wallet response.");
+  return status;
+}
+
+export function decodeNearDepositAddress(value: unknown): NearDepositAddress {
+  const address = parseNearDepositAddress(value);
+  if (!address) throw new Error("Invalid NEAR deposit address response.");
+  return address;
+}
+
 export function decodeOnePasswordConnectorStatus(value: unknown): OnePasswordConnectorStatus {
   const status = parseOnePasswordConnectorStatus(value);
   if (!status) throw new Error("Invalid 1Password connector response.");
@@ -796,6 +818,12 @@ export function decodeCreditActivity(value: unknown): CreditActivity {
   const activity = parseCreditActivity(value);
   if (!activity) throw new Error("Invalid credit activity response.");
   return activity;
+}
+
+export function decodeCreditMediaCatalog(value: unknown): CreditMediaCatalog {
+  const catalog = parseCreditMediaCatalog(value);
+  if (!catalog) throw new Error("Invalid credit media catalog response.");
+  return catalog;
 }
 
 export function decodeLicenseState(value: unknown): LicenseState {

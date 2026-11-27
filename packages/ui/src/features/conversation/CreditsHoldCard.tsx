@@ -26,15 +26,15 @@ export interface CreditsHoldControls {
 
 type Phase = "held" | "thanks" | "answering";
 
-function WithAmounts(props: { text: string; cost: string; balance: string }) {
+function WithAmounts(props: { text: string; cost: number; balance: number }) {
   const parts = () => props.text.split(new RegExp(`(${COST_MARK}|${BALANCE_MARK})`));
   return (
     <For each={parts()}>
       {(part) =>
         part === COST_MARK ? (
-          <CreditAmount value={props.cost} class="credits-hold-amount" />
+          <CreditAmount credits={props.cost} class="credits-hold-amount" />
         ) : part === BALANCE_MARK ? (
-          <CreditAmount value={props.balance} class="credits-hold-amount" />
+          <CreditAmount credits={props.balance} class="credits-hold-amount" />
         ) : (
           part
         )
@@ -44,7 +44,7 @@ function WithAmounts(props: { text: string; cost: string; balance: string }) {
 }
 
 function CostLine(props: { hold: CreditsHold }) {
-  const { t, format } = useText();
+  const { t } = useText();
   const marks = { cost: COST_MARK, balance: BALANCE_MARK };
   const text = () => {
     const { images, videos } = props.hold;
@@ -52,9 +52,7 @@ function CostLine(props: { hold: CreditsHold }) {
     if (videos > 0) return t("prompt.creditsHold.videosCost", { count: videos, ...marks });
     return t("prompt.creditsHold.imagesCost", { count: images, ...marks });
   };
-  return (
-    <WithAmounts text={text()} cost={format.number(props.hold.cost)} balance={format.number(props.hold.balance ?? 0)} />
-  );
+  return <WithAmounts text={text()} cost={props.hold.cost} balance={props.hold.balance ?? 0} />;
 }
 
 export function CreditsHoldCard(props: { approval: AgentApproval; hold: CreditsHold; controls: CreditsHoldControls }) {

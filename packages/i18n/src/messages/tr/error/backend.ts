@@ -61,6 +61,12 @@ export const messages = {
     "OpenBot oturum açma penceresinde sayfayı yükleyemedi. İnternet bağlantısını kontrol edin, ardından oturum açma penceresini yeniden açın.",
   "error.backend.browserSignInReadFailed": "OpenBot pencereden oturumu okuyamadı.",
   "error.backend.browserStopUnsupported": "Bu uzak ana makine sayfa yüklemesini durduramaz.",
+  "error.backend.browserLocationFailed": "Sayfanın konumu ayarlanamadı.",
+  "error.backend.browserPermissionsUnsupported": "Bu uzak ana bilgisayar konum isteklerini yanıtlayamaz.",
+  "error.backend.browserLocationRequired": "İsteğe izin vermek için cihazın konumunu gönderin.",
+  "error.backend.browserHttpSignInInactive":
+    "Bu site artık oturum açmanı istemiyor. Yeniden denemek için sayfayı yenile.",
+  "error.backend.browserHttpSignInUnsupported": "Bu uzak ana makine bir siteye oturum açma alamaz.",
   "error.backend.sharedDataLocalOnly": "Paylaşılan veriler bu ajanları çalıştıran bilgisayarda yönetilir.",
   "error.backend.browserUrlProtocol": "Yalnızca HTTP(S) tarayıcı URL'lerine izin verilir.",
   "error.backend.sunshineNotReady": "Sunshine hazır hale gelmedi.",
@@ -200,6 +206,7 @@ export const messages = {
   "error.backend.videoGenerationFailed": "Video oluşturulamadı.",
   "error.backend.videoGenerationNoVideo": "Video oluşturma bir video döndürmedi.",
   "error.backend.videoGenerationInterrupted": "Video oluşturma kesintiye uğradı.",
+  "error.backend.grokVideoNoQuota": "Grok hesabınız video oluşturamıyor. Bunun yerine videoyu kredilerle oluşturun.",
   "error.backend.attachmentNotRegularFile": "Yalnızca normal dosyalar eklenebilir: {name}",
   "error.backend.attachmentCopyFailed": "OpenBot {name} öğesini kopyalayamadı.",
   "error.backend.routineNameRequired": "Bir rutin adı gereklidir.",
@@ -283,6 +290,8 @@ export const messages = {
     "Oturum açma sunucusu OpenBot'u henüz bir uygulama olarak kabul etmiyor. Hesabınız bunun nedeni değildir. Yerel bir MCP sunucusu gibi bağlanmanın başka bir yolunu kullanın.",
   "error.backend.mcpRegistrationUnavailable":
     "Oturum açma sunucusu OpenBot'u uygulama olarak kaydedemiyor. Hesabınız bunun nedeni değildir. Bağlanmak için bu sunucuyu Pazaryeri, Uygulamalar bölümünde kaydedin, ardından ona bir oturum açma uygulaması ekleyin.",
+  "error.backend.mcpSignInAppNeeded":
+    "Oturum açma sunucusu OpenBot'u uygulama olarak kaydedemiyor. Hesabınız bunun nedeni değildir. Bağlanmak için bu sunucuyu Pazaryeri, Uygulamalar bölümünde açın, Bağlantıyı test et'e tıklayın, ardından bir oturum açma uygulaması ekleyin.",
   "error.backend.mcpSignInAbandonedGeneric": "Oturum açma yarıda bırakıldı.",
   "error.backend.mcpSignInForgotten": "MCP oturum açma işlemi çalışırken unutuldu.",
   "error.backend.mcpSignInAbandoned": "MCP oturum açma işlemi yarıda bırakıldı.",
@@ -345,6 +354,7 @@ export const messages = {
     "Bu bilgisayar sunucu bağlantısını engelledi. Güvenlik duvarınızı veya güvenlik yazılımınızı kontrol edin, ardından tekrar deneyin.",
   "error.backend.mcpServerIncompatible":
     "Bu adreste bir şey yanıt verdi, ancak Streamable HTTP üzerinden bir MCP sunucusu olarak değil. URL'yi kontrol edin ve sunucuyu çalıştıran uygulamayı güncelleyin.",
+  "error.backend.mcpServerKeyNotAccepted": "Sunucu API anahtarını kabul etmedi. Anahtarı kontrol edip yeniden deneyin.",
   "error.backend.mcpRemoteBridge":
     "{reason} Bu komut mcp-remote köprüsünü çalıştırır. Bunun yerine {url} URL'siyle Streamable HTTP'yi seçin; OpenBot oturumunuzu açar.",
   "error.backend.oauthNotHttps": "OAuth uç noktası {origin} https değil, bu nedenle kimlik bilgileri gönderilmedi.",

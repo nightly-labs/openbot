@@ -28,6 +28,7 @@ import { Effect, Result, Schema } from "effect";
 import { z } from "zod";
 import { causeHelpers } from "./effect-boundary";
 import {
+  type AuthorizationServerLookup,
   isLoopback,
   MCP_TOKEN_TIMEOUT_MS,
   type McpOAuthAuthority,
@@ -36,6 +37,7 @@ import {
   normalizeResource,
   secureOAuthFetch,
 } from "./mcp-oauth-provider";
+import { insufficientScopeChallenge } from "./mcp-oauth-proxy";
 import {
   clearMcpCommandCache,
   type McpShapeFailed,
@@ -129,7 +131,7 @@ export const callMcpServerTool = Effect.fnUntraced(function* (
   args: McpToolArguments,
   tools: McpToolRuntimes,
   oauth?: Pick<McpOAuthAuthority, "accessToken">,
-): Effect.fn.Return<{ result: McpToolCallResult } | { error: string }, McpShapeFailed> {
+): Effect.fn.Return<{ result: McpToolCallResult } | { error: string; refusedScope?: string | null }, McpShapeFailed> {
   const server = yield* usableMcpServer(
     config,
     tools,
@@ -142,12 +144,15 @@ export const callMcpServerTool = Effect.fnUntraced(function* (
   );
   if (server.error !== undefined) return { error: boundedError(server.error) };
   const timeoutMs = probeTimeoutMs(config);
+  const seen: { challenge: McpChallenge | null } = { challenge: null };
   const called = yield* Effect.result(
     Effect.acquireUseRelease(
       Effect.try({
         try: () => ({
           client: new Client({ name: "openbot", version: "1" }, { capabilities: {} }),
-          transport: createTransport(server, null, () => undefined),
+          transport: createTransport(server, null, (challenge) => {
+            seen.challenge = challenge;
+          }),
         }),
         catch: (cause) => new McpProbeFailure({ cause }),
       }),
@@ -168,7 +173,9 @@ export const callMcpServerTool = Effect.fnUntraced(function* (
   );
   if (Result.isSuccess(called)) return { result: called.success };
   const described = describeMcpError(called.failure.cause, config);
-  return { error: boundedError(redactMcpValues(described, probeSecrets(server, null))) };
+  const error = boundedError(redactMcpValues(described, probeSecrets(server, null)));
+  const scope = seen.challenge?.scope;
+  return scope === undefined ? { error } : { error, refusedScope: scope };
 });
 
 interface McpChallenge {
@@ -177,6 +184,7 @@ interface McpChallenge {
   resourceMetadata: boolean;
   keyOnly?: boolean;
   insufficientScope?: boolean;
+  scope?: string | null;
   url: string;
 }
 
@@ -239,7 +247,10 @@ const probeMcpServerEffect = Effect.fnUntraced(function* (
         keyOnly: (yield* advertisesOAuth(config.url, lookupMs, signInMetadata(config.url))) === false,
       };
     else if (unexplained.status === 403 && !server.authorization)
-      seen.challenge = { ...unexplained, bearer: yield* offersSignIn(config.url, lookupMs) };
+      seen.challenge = {
+        ...unexplained,
+        bearer: yield* offersSignIn(config.url, lookupMs, lookupAfterRefusal(unexplained)),
+      };
   }
   const remainingMs = timeoutMs - (Date.now() - startedAt);
   if (!signIn && config.transport === "http" && httpStatus(first.failure.cause) === 400 && remainingMs > 0) {
@@ -249,7 +260,7 @@ const probeMcpServerEffect = Effect.fnUntraced(function* (
   if (!signIn) return failure(first.failure.cause);
   if (first.failure.cause instanceof UnauthorizedError) return yield* afterSignIn(signIn);
   if (httpStatus(first.failure.cause) !== 403 || hasCredentialHeader(config)) return failure(first.failure.cause);
-  const begun = yield* Effect.result(signIn.begin());
+  const begun = yield* Effect.result(signIn.begin("this-server"));
   if (Result.isFailure(begun)) return failure(begun.failure.cause);
   return begun.success ? yield* afterSignIn(signIn) : failure(first.failure.cause);
 });
@@ -393,7 +404,7 @@ const countOverEffect = Effect.fnUntraced(function* (timeoutMs: number, open: ()
     Effect.try({ try: open, catch: (cause) => new McpProbeFailure({ cause }) }),
     ({ client, transport, connect }) =>
       Effect.gen(function* () {
-        yield* probeIo(connect);
+        yield* probeIo(connect).pipe(Effect.mapError((failure) => unreadableInitialize(failure, transport)));
         return yield* countToolsEffect(client);
       }).pipe(
         Effect.timeoutOrElse({
@@ -530,12 +541,13 @@ function challengeRecordingFetch(onChallenge: (challenge: McpChallenge) => void)
     if (response.status === 401 || response.status === 403) {
       const challenge = response.headers.get("www-authenticate") ?? "";
       const bearer = /(?:^|,)\s*bearer\b/iu.test(challenge);
-      const insufficientScope =
-        response.status === 403 && bearer && /\berror\s*=\s*"?insufficient_scope\b/iu.test(challenge);
+      const scope = response.status === 403 ? insufficientScopeChallenge(challenge) : undefined;
+      const insufficientScope = scope !== undefined;
       onChallenge({
         status: response.status,
         bearer: (response.status === 401 && bearer) || insufficientScope,
         insufficientScope,
+        ...(scope !== undefined ? { scope } : {}),
         resourceMetadata: /\bresource_metadata\s*=/iu.test(challenge),
         url: response.url || input.toString(),
       });
@@ -573,11 +585,15 @@ const advertisesOAuth = Effect.fnUntraced(function* (url: string, remainingMs: n
   return found.includes(null) ? null : false;
 });
 
-const offersSignIn = Effect.fnUntraced(function* (url: string, remainingMs: number) {
+function lookupAfterRefusal(challenge: McpChallenge | null): AuthorizationServerLookup {
+  return challenge?.insufficientScope ? "this-server-or-origin" : "this-server";
+}
+
+const offersSignIn = Effect.fnUntraced(function* (url: string, remainingMs: number, lookup: AuthorizationServerLookup) {
   if (remainingMs <= 0) return false;
   const controller = new AbortController();
   const fetchFn: FetchLike = (input, init) => fetch(input, { ...init, signal: controller.signal });
-  return yield* namesAuthorizationServer(normalizeResource(url) ?? url, fetchFn).pipe(
+  return yield* namesAuthorizationServer(normalizeResource(url) ?? url, fetchFn, lookup).pipe(
     Effect.map((issuer) => issuer !== null),
     Effect.timeoutOrElse({ duration: remainingMs, orElse: () => Effect.succeed(false) }),
     Effect.catch(() => Effect.succeed(false)),
@@ -599,6 +615,18 @@ class McpTimeout extends Error {
   constructor(readonly timeoutMs: number) {
     super(`Timed out after ${timeoutMs}ms.`);
   }
+}
+
+class McpInitializeUnreadable extends Error {
+  constructor() {
+    super("The server answered initialize with a result that is not an MCP initialize result.");
+  }
+}
+
+function unreadableInitialize(failure: McpProbeFailure, transport: Pick<Transport, "close">): McpProbeFailure {
+  return !(transport instanceof TailedStdioTransport) && failure.cause instanceof z.core.$ZodError
+    ? new McpProbeFailure({ cause: new McpInitializeUnreadable() })
+    : failure;
 }
 
 class McpServerExit extends Error {
@@ -643,6 +671,10 @@ function describeMcpErrorText(error: unknown, config: McpServerConfig): string {
   const status = httpStatus(error);
   if (status !== null) return httpStatusMessage(status);
   if (config.transport === "http" && isNetworkFailure(error)) return sourceText("error.backend.mcpServerUnreachable");
+  if (config.transport === "http" && error instanceof McpInitializeUnreadable)
+    return hasCredentialHeader(config)
+      ? sourceText("error.backend.mcpServerKeyNotAccepted")
+      : sourceText("error.backend.mcpServerIncompatible");
   const message = error instanceof Error ? error.message : String(error);
   if (message.includes("ENOENT")) return sourceText("error.backend.mcpCommandNotFound", { command: config.command });
   return redactMcpSecrets(message, config);
@@ -722,7 +754,7 @@ function isProtocolMismatch(error: Error, code: string | null): boolean {
 
 const REGISTRATION_REFUSED = sourceText("error.backend.mcpRegistrationRefused");
 
-const REGISTRATION_UNAVAILABLE = sourceText("error.backend.mcpRegistrationUnavailable");
+const REGISTRATION_UNAVAILABLE = sourceText("error.backend.mcpSignInAppNeeded");
 
 function isAccessRefusal(status: number | null): boolean {
   return status === 401 || status === 403;

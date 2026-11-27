@@ -24,6 +24,8 @@ async function main(): Promise<void> {
   }
   assertFcmServiceAccount();
   await putRequiredSecret("EMAIL_SMTP_PASSWORD");
+  await putOptionalSecret("EMAIL_SMTP_OVERFLOW_PASSWORD");
+  await putOptionalSecret("EMAIL_SMTP_OVERFLOW_2_PASSWORD");
   await putRequiredSecret("SKILLS_ADMIN_TOKEN");
   await putRequiredSecret("SITE_REPORT_HASH_SECRET");
   await putRequiredSecret("REMOTE_TICKET_PRIVATE_JWK");
@@ -54,6 +56,7 @@ async function main(): Promise<void> {
   }
   await putOptionalSecretSet("APNS_PRIVATE_KEY", "APNS_KEY_ID");
   await putOptionalSecret("FCM_SERVICE_ACCOUNT");
+  await putOptionalSecret("NEAR_INTENTS_PARTNER_KEY");
   await run(wranglerExecutable, ["d1", "migrations", "apply", "DB", "--remote", ...environmentArgs], {
     label: "Remote D1 migrations",
   });

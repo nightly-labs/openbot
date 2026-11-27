@@ -6,6 +6,7 @@ umask 077
 
 SOCKET=/run/openbot/control.sock
 UNIT=openbot.service
+PIN=""
 
 usage() {
   cat <<'EOF'
@@ -80,33 +81,140 @@ Install a new release with: sudo openbot update. Or try again with: sudo openbot
   not_answering
 }
 
+foreign_listener() {
+  fail "A program that is not OpenBot holds the control socket, so this command stops. Restart OpenBot with: sudo openbot restart"
+}
+
+start_time() {
+  local stat fields
+  { read -r stat <"/proc/$1/stat"; } 2>/dev/null || return 1
+  read -ra fields <<<"${stat##*) }"
+  started=${fields[19]}
+}
+
+parent_pid() {
+  local key number
+  parent=""
+  while read -r key number; do
+    if [ "$key" = PPid: ]; then parent=$number; fi
+  done 2>/dev/null <"/proc/$1/status" || return 1
+}
+
+still_holds() {
+  [ -n "$(find "/proc/$1/fd" -lname "socket:\[$2\]" 2>/dev/null)" ]
+}
+
+in_service_group() {
+  [ -n "$2" ] && awk -F: -v group="$2" '
+    ($1 == "0" && $2 == "" && $3 == group) || ($2 == "name=systemd" && $3 == group) { found = 1 }
+    END { exit !found }' "/proc/$1/cgroup" 2>/dev/null
+}
+
+check_listener() {
+  local app="$INSTALL/app/openbot" inode sock pids pid="" holder group other own="" started parent
+  inode=$(stat -c %i "$1") || return 1
+  sock=$(ss -xlHe src "$SOCKET" 2>/dev/null |
+    awk -v path="$SOCKET" -v inode="ino:$inode" '$5 == path && $9 == "<->" && $10 == inode { print $6 }')
+  [[ $sock =~ ^[0-9]+$ ]] || return 1
+  pids=$(find /proc/[0-9]*/fd -lname "socket:\[$sock\]" 2>/dev/null | cut -d/ -f3 | sort -u)
+  [ -n "$pids" ] || return 1
+  for holder in $pids; do
+    if ! start_time "$holder"; then
+      ! still_holds "$holder" "$sock" || return 1
+      continue
+    fi
+    if [ -z "$own" ] || [ "$started" -lt "$own" ]; then pid=$holder own=$started; fi
+  done
+  [ -n "$pid" ] || return 1
+  for holder in $pids; do
+    [ "$holder" != "$pid" ] || continue
+    if parent_pid "$holder" && [ "$parent" = "$pid" ] && [ "/proc/$holder/exe" -ef "$app" ]; then continue; fi
+    ! still_holds "$holder" "$sock" || return 2
+  done
+  group=$(systemctl show --property=ControlGroup --value "$UNIT" 2>/dev/null) || true
+  [ "/proc/$pid/exe" -ef "$app" ] && in_service_group "$pid" "$group" || return 2
+  for other in /proc/[0-9]*; do
+    other=${other#/proc/}
+    [ "$other" != "$pid" ] && [ "/proc/$other/exe" -ef "$app" ] || continue
+    in_service_group "$other" "$group" || continue
+    start_time "$other" || continue
+    [ "$started" -ge "$own" ] || return 2
+  done
+}
+
+remove_pin() {
+  [ -z "$PIN" ] || rm -rf "$PIN"
+  PIN=""
+}
+
 form_value() {
   printf '%s' "$1" | od -An -tx1 -v | tr -d ' \n' | sed 's/../%&/g'
 }
 
 control() {
-  local method=$1 path=$2 field body="" arguments=()
+  local method=$1 path=$2 field body="" arguments=() socket=$SOCKET checked=0
   shift 2
   for field in "$@"; do body+="${body:+&}${field%%=*}=$(form_value "${field#*=}")"; done
   if [ "$#" -gt 0 ]; then
     arguments=(--header 'content-type: application/x-www-form-urlencoded' --data-binary @-)
   fi
   wait_for_socket
-  response=$(printf '%s' "$body" | curl --silent --show-error --max-time 120 --unix-socket "$SOCKET" \
-    -X "$method" "${arguments[@]}" --write-out 'status=%{http_code}\n' "http://openbot$path") ||
+  if [ "$(id -u)" -eq 0 ] && ! in_container; then
+    command -v ss >/dev/null ||
+      fail "Install iproute2 first, so that this command can check the control socket: sudo apt-get install iproute2"
+    trap remove_pin EXIT
+    trap 'exit 130' INT TERM HUP
+    PIN=$(mktemp -d "${SOCKET%/*/*}/openbot-cli.XXXXXX") || not_answering
+    socket=$PIN/control.sock
+    ln "$SOCKET" "$socket" 2>/dev/null || checked=1
+    [ "$checked" -ne 0 ] || check_listener "$socket" || checked=$?
+    if [ "$checked" -ne 0 ]; then
+      remove_pin
+      if [ "$checked" -eq 2 ]; then foreign_listener; fi
+      not_answering
+    fi
+  fi
+  if ! response=$(printf '%s' "$body" | curl --silent --show-error --max-time 120 --unix-socket "$socket" \
+    -X "$method" "${arguments[@]}" --write-out 'status=%{http_code}\n' "http://openbot$path"); then
+    remove_pin
     not_answering
+  fi
+  remove_pin
 }
 
 value() {
   sed -n "s/^$1=//p" <<<"$response" | head -n 1
 }
 
+text_value() {
+  value "$1" | { iconv -f UTF-8 -t UTF-8 -c 2>/dev/null || true; } |
+    sed -e 's/[[:cntrl:]]/?/g' -e 's/\xc2[\x80-\x9f]/?/g'
+}
+
+number_value() {
+  local number
+  number=$(value "$1")
+  [[ $number =~ ^[0-9]{1,18}$ ]] || fail "OpenBot sent an invalid $2."
+  echo "$((10#$number))"
+}
+
+terminal_qr() {
+  local qr
+  qr=$(value qr | base64 -d 2>/dev/null) || return 1
+  [ -n "$qr" ] || return 1
+  iconv -f UTF-8 -t UTF-8 <<<"$qr" >/dev/null 2>&1 || return 1
+  if sed -E 's/\x1b\[(0|3[07]|4[07])m//g' <<<"$qr" | tr -d '\n' | grep -q -e '[[:cntrl:]]' -e $'\xc2[\x80-\x9f]'; then
+    return 1
+  fi
+  printf '%s\n' "$qr"
+}
+
 check_answer() {
   [ "$(value status)" = 200 ] && return 0
   local message
-  message=$(value message)
+  message=$(text_value message)
   if [ -z "$message" ]; then
-    case $(value error) in
+    case $(text_value error) in
       invalid_email) message="Enter a valid email address." ;;
       invalid_request) message="Enter the sign-in code or the claim." ;;
       invalid_name) message="Enter a server name." ;;
@@ -114,7 +222,7 @@ check_answer() {
       account_signed_out | account_code_sent) message="Sign in first with: openbot login" ;;
       account_error | account_loading) message="OpenBot could not check the account yet. Run: openbot status" ;;
       session_not_storable) message="This server cannot store the session securely. The claim was not used." ;;
-      *) message="OpenBot refused the request ($(value error))." ;;
+      *) message="OpenBot refused the request ($(text_value error))." ;;
     esac
   fi
   echo "$message" >&2
@@ -122,25 +230,26 @@ check_answer() {
 }
 
 show_status() {
-  local account server name message staged limit
-  account=$(value account)
-  server=$(value server)
-  name=$(value server_name)
-  message=$(value server_message)
-  echo "OpenBot $(value version)"
+  local account server name message staged limit available turns
+  account=$(text_value account)
+  server=$(text_value server)
+  name=$(text_value server_name)
+  message=$(text_value server_message)
+  echo "OpenBot $(text_value version)"
   case $account in
-    signed_in) echo "Account: $(value email)" ;;
+    signed_in) echo "Account: $(text_value email)" ;;
     signed_out) echo "Account: signed out. Sign in with: openbot login" ;;
     code_sent) echo "Account: waiting for a sign-in code. Run: openbot login" ;;
-    error) echo "Account: the account server does not answer. $(value account_message)" ;;
+    error) echo "Account: the account server does not answer. $(text_value account_message)" ;;
     *) echo "Account: $account" ;;
   esac
   if [ -n "$name" ]; then echo "Server: $name ($server)"; else echo "Server: $server"; fi
   case $server in error | unconfigured) if [ -n "$message" ]; then echo "  $message"; fi ;; esac
-  limit=$(value memory_limit)
-  if [ -n "$limit" ]; then
-    echo "Memory: $(($(value memory_available) / 1048576)) MiB free of $((limit / 1048576)) MiB ($(value memory_level))"
-    turns=$(value turn_limit)
+  if [ -n "$(value memory_limit)" ]; then
+    limit=$(number_value memory_limit "memory limit")
+    available=$(number_value memory_available "free memory value")
+    echo "Memory: $((available / 1048576)) MiB free of $((limit / 1048576)) MiB ($(text_value memory_level))"
+    turns=$(text_value turn_limit)
     if [ "$turns" = unlimited ]; then echo "Turns at the same time: no limit"; else echo "Turns at the same time: at most $turns"; fi
   fi
   staged=$(staged_version)
@@ -185,7 +294,7 @@ login_command() {
     [ -n "$claim" ] || fail "Give the claim on standard input."
     control POST /v1/login/claim "claim=$claim" ${name:+"name=$name"}
     check_answer || exit 1
-    email=$(value email)
+    email=$(text_value email)
   else
     [ -t 0 ] || fail "Run openbot login in a terminal."
     if [ -z "$email" ]; then read -rp "Email: " email; fi
@@ -200,7 +309,7 @@ login_command() {
       [ "$attempt" -lt 3 ] || exit 1
     done
   fi
-  echo "Signed in as $(value email). Publishing the server..."
+  echo "Signed in as $(text_value email). Publishing the server..."
   for ((second = 0; second < 90; second += 2)); do
     control GET /v1/status
     case $(value server) in online | error) break ;; esac
@@ -215,14 +324,15 @@ login_command() {
 }
 
 mobile_connect_command() {
-  local expires_at
+  local expires_at qr
   control POST /v1/mobile-connect
   check_answer || exit 1
   expires_at=$(value expires_at)
-  [[ $expires_at =~ ^[0-9]+$ ]] || fail "OpenBot sent an invalid Mobile Connect code."
-  value qr | base64 -d
+  [[ $expires_at =~ ^[0-9]{1,18}$ ]] || fail "OpenBot sent an invalid Mobile Connect code."
+  qr=$(terminal_qr) || fail "OpenBot sent an invalid Mobile Connect code."
+  printf '%s\n' "$qr"
   echo "In the OpenBot phone app, select Scan QR code and scan this code."
-  echo "It works for one sign-in and expires in $((expires_at / 1000 - $(date +%s))) seconds. Run the command again for a new code."
+  echo "It works for one sign-in and expires in $((10#$expires_at / 1000 - $(date +%s))) seconds. Run the command again for a new code."
 }
 
 logs_command() {
@@ -299,9 +409,9 @@ uninstall_command() {
   for entry in app hosted staged staged.ready .applying; do rm -rf "${INSTALL:?}/$entry"; done
   rmdir "$INSTALL" 2>/dev/null || true
   home=$(getent passwd "$user" | cut -d: -f6)
-  echo "Removed OpenBot. The data stays in ${home:-the home folder of $user} and /srv/openbot-hosted."
+  echo "Removed OpenBot. The data stays in ${home:-the home folder of $user}, /srv/openbot-hosted and /srv/openbot-keyring."
   echo "To install again with this data: the install command, with --user $user."
-  echo "To delete the data too: sudo userdel --remove $user && sudo rm -rf /srv/openbot-hosted"
+  echo "To delete the data too: sudo userdel --remove $user && sudo rm -rf /srv/openbot-hosted /srv/openbot-keyring"
 }
 
 command=${1:-}

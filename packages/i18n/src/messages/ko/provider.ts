@@ -64,6 +64,7 @@ export const messages = {
   "provider.aria.install": "{name} 설치",
   "provider.aria.signIn": "{name}에 로그인",
   "provider.aria.codeFallback": "코드로 {name}에 로그인",
+  "provider.aria.addressFallback": "{name} 로그인 주소 붙여넣기",
   "provider.aria.moreActions": "{name} 추가 작업",
 
   "provider.aria.use": "OpenBot에서 {name} 사용",
@@ -92,6 +93,7 @@ export const messages = {
   "provider.codeLogin.pasteExpiresIn": "기다리는 중이에요. 이 로그인은 {time} 후에 중단돼요.",
   "provider.codeLogin.linkTitle": "다른 기기에서 {name}에 로그인",
   "provider.codeLogin.pageTitle": "{name}에 로그인",
+  "provider.codeLogin.addressDescription": "브라우저에서 로그인을 완료하세요. 로그인이 끝나면 이 창이 닫힙니다.",
   "provider.codeLogin.pageDescription": "이 페이지는 {host}의 브라우저에서 열려 있어요. 여기서 로그인하세요.",
   "provider.codeLogin.relayStarting": "{host}에서 {name} 로그인을 시작하는 중…",
   "provider.codeLogin.pageOpening": "{host}에서 {name} 로그인 페이지를 여는 중…",
@@ -257,6 +259,11 @@ export const messages = {
   "provider.account.pool": "계정 풀 사용",
   "provider.account.poolDescription":
     "에이전트는 사용량 한도에 가까워질 때까지 한 계정을 쓰고, 그다음 한도가 가장 먼저 초기화되는 계정을 써요.",
+  "provider.account.poolStrategy": "계정 사용 방식",
+  "provider.account.poolFillFirst": "먼저 채우기",
+  "provider.account.poolSpread": "분산",
+  "provider.account.poolSpreadDescription":
+    "에이전트가 사용량이 가장 많이 남은 계정에 나뉘어요. 다른 계정에 여유가 훨씬 많을 때만 에이전트가 계정을 바꿔요.",
   "provider.account.inUse": "사용 중",
   "provider.account.notInPool": "풀 제외",
   "provider.account.leaveOutOfPool": "풀에서 제외",

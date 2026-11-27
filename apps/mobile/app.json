@@ -47,6 +47,7 @@
       "./plugins/with-workspace-bundle-inputs",
       "./plugins/with-update-channel",
       "./plugins/with-app-icons",
+      "./plugins/with-android-main-handler-first",
       "./plugins/with-android-view-preallocation-off",
       "./plugins/with-android-optional-features",
       "expo-router",
@@ -254,6 +255,7 @@
       ],
       "./plugins/with-shortcuts",
       "./plugins/with-carplay",
+      "./plugins/with-watch-targets",
       "./plugins/with-xcode-warning-fixes"
     ],
     "experiments": {

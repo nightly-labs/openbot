@@ -27,7 +27,9 @@ import type { SideThread } from "./conversation-types";
 import { useThreadMarketplaceSuggestionCard } from "./MarketplaceSuggestionChatCard";
 import { useThreadMcpSignInCard } from "./McpSignInChatCard";
 import { useMessageBackdropAction } from "./message-backdrop";
+import { useThreadNearPaymentCard } from "./NearPaymentThreadCard";
 import { naturalThreadRows } from "./narration-rows";
+import { useNearPaymentApproval } from "./near-payment-approval";
 import { useThreadSettingLinkCard } from "./SettingLinkChatCard";
 import { createTurnSteps } from "./turn-steps";
 import { createTurnStreamHold } from "./turn-stream-hold";
@@ -41,6 +43,7 @@ export function ConversationSideThread(props: { threadId: string; resizer: JSX.E
     previewAttachment,
     attachmentAction,
     attachmentDownloads,
+    imageCopies,
     openThreadFile,
     installedSkills,
     installedSkillsLoadFailed,
@@ -66,6 +69,7 @@ export function ConversationSideThread(props: { threadId: string; resizer: JSX.E
   const threadBackgroundWorkSince = (taskId: string | undefined) =>
     taskId === undefined ? undefined : view.backgroundWorkSince?.(taskId);
   const { t, errorMessage } = useText();
+  const { card: nearPaymentCard } = useNearPaymentApproval(() => view.server?.kind === "local" && !view.runtime);
   const failureToast = (fallback: AppTextKey) => ({
     onError: (error: unknown) => {
       actionToast.error(errorMessage(error, t(fallback)), {
@@ -176,6 +180,7 @@ export function ConversationSideThread(props: { threadId: string; resizer: JSX.E
   const mcpSignInCard = useThreadMcpSignInCard((body) => thread()?.onSend(body, [], null) ?? Promise.resolve(false));
   const marketplaceCard = useThreadMarketplaceSuggestionCard();
   const settingLinkCard = useThreadSettingLinkCard();
+  const paymentRecordCard = useThreadNearPaymentCard();
   const visualReplyCard = useThreadVisualReplyCard(draftKey, undefined, props.threadId);
   const branch = () => {
     if (!view.threads?.onBranch) return undefined;
@@ -269,6 +274,7 @@ export function ConversationSideThread(props: { threadId: string; resizer: JSX.E
             voice={threadVoice(draftKey())}
             focusRequest={focusRequest()}
             mediaSource={view.runtime?.attachmentMedia}
+            imageCopies={imageCopies()}
             downloads={attachmentDownloads}
             onSend={(text) => sendSide(current().thread, text)}
             onStop={() => current().thread.onStop()}
@@ -287,6 +293,13 @@ export function ConversationSideThread(props: { threadId: string; resizer: JSX.E
             onRespondApproval={(decision) =>
               current().thread.onRespondApproval(decision, failureToast("prompt.approval.answerFailed"))
             }
+            approvalCard={(approval) =>
+              nearPaymentCard(
+                approval,
+                () => current().thread.onRespondApproval("accept", failureToast("prompt.approval.answerFailed")),
+                () => current().thread.onRespondApproval("decline", failureToast("prompt.approval.answerFailed")),
+              )
+            }
             context={contextUsageView(current().thread.contextState)}
             onCompactContext={current().thread.onCompactContext}
             waitsForAnswer={waitsForAnswer()}
@@ -295,7 +308,8 @@ export function ConversationSideThread(props: { threadId: string; resizer: JSX.E
               visualReplyCard(message, quote) ??
               mcpSignInCard(message) ??
               marketplaceCard(message) ??
-              settingLinkCard(message)
+              settingLinkCard(message) ??
+              paymentRecordCard(message)
             }
             olderMessages={current().thread.olderMessages}
             newerMessages={current().thread.newerMessages}

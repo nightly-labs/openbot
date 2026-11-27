@@ -112,6 +112,7 @@ export const mcpOAuthRecordSchema = z.object({
     })
     .optional(),
   lostAt: z.number().optional(),
+  neededScope: z.string().optional(),
 });
 
 export type McpOAuthRecord = z.infer<typeof mcpOAuthRecordSchema>;
@@ -155,11 +156,13 @@ const TOKEN_REFRESH_MARGIN_MS = 60_000;
 
 const MCP_REVOCATION_TIMEOUT_MS = 5_000;
 
+const MAX_NEEDED_SCOPE_LENGTH = 1_024;
+
 export type McpSignInOffer = "none" | "offered" | "refused";
 
 export interface McpSignIn {
   readonly provider: OAuthClientProvider;
-  begin: () => Effect.Effect<boolean, McpOperationError>;
+  begin: (lookup?: AuthorizationServerLookup) => Effect.Effect<boolean, McpOperationError>;
   complete: () => Effect.Effect<void, McpOperationError>;
   abandon: () => void;
   secrets: () => string[];
@@ -182,6 +185,7 @@ export interface McpOAuthAuthority {
   accessToken: (url: string) => Effect.Effect<string | null, McpOperationError>;
   refreshAccessToken: (url: string, rejected: string) => Effect.Effect<string | null, McpOperationError>;
   endRefusedSignIn: (url: string, rejected: string) => Effect.Effect<boolean, McpOperationError>;
+  recordScopeRefusal: (url: string, rejected: string, scope: string | null) => Effect.Effect<void, McpOperationError>;
   signIn: (url: string, open?: McpSignInOpener, deepLinkRedirectUrl?: string) => McpSignIn | null;
   cancelSignIn: (url: string) => boolean;
   signInLink: (url: string) => string | null;
@@ -205,7 +209,7 @@ export class McpOAuth implements McpOAuthAuthority {
   readonly #openedElsewhere = new Set<string>();
   readonly #exchanges = new Map<string, Deferred.Deferred<boolean>>();
   readonly #attempts = new Map<string, Set<SignInAttempt>>();
-  readonly #unanswered = new Map<string, string>();
+  readonly #unanswered = new Map<string, { url: string; openedElsewhere: boolean }>();
   readonly #scope = Scope.makeUnsafe();
   readonly #refreshing = new Map<string, Fiber.Fiber<McpRefreshOutcome>>();
   readonly #generations = new Map<string, number>();
@@ -255,6 +259,20 @@ export class McpOAuth implements McpOAuthAuthority {
   ): Effect.fn.Return<boolean, McpOperationError> {
     const key = mcpOAuthAccountKey(url);
     return key !== null && (yield* this.#end(key, rejected)) === null;
+  }).bind(this);
+
+  readonly recordScopeRefusal = Effect.fn("McpOAuth.recordScopeRefusal")(function* (
+    this: McpOAuth,
+    url: string,
+    rejected: string,
+    scope: string | null,
+  ): Effect.fn.Return<void, McpOperationError> {
+    const key = mcpOAuthAccountKey(url);
+    const stored = key === null ? null : yield* mcpSync(() => this.#options.storage.read(key));
+    if (key === null || stored?.tokens?.access_token !== rejected) return;
+    const union = scopeUnion(stored.neededScope, scope);
+    const neededScope = union.length <= MAX_NEEDED_SCOPE_LENGTH ? union : (stored.neededScope ?? "");
+    if (neededScope !== stored.neededScope) yield* this.#options.storage.write(key, { ...stored, neededScope });
   }).bind(this);
 
   readonly #end = Effect.fn("McpOAuth.end")(function* (this: McpOAuth, key: string, rejected: string) {
@@ -317,8 +335,15 @@ export class McpOAuth implements McpOAuthAuthority {
     if (!key) return null;
     const attempts = this.#attempts.get(key) ?? new Set<SignInAttempt>();
     this.#attempts.set(key, attempts);
-    const unanswered = [...attempts].at(-1)?.unanswered() ?? this.#unanswered.get(key);
+    const openedElsewhere = open !== undefined;
+    const lastAttempt = [...attempts].at(-1);
+    const lastUnanswered = lastAttempt?.unanswered();
+    const previous =
+      lastAttempt && lastUnanswered
+        ? { url: lastUnanswered, openedElsewhere: lastAttempt.openedElsewhere }
+        : this.#unanswered.get(key);
     this.#unanswered.delete(key);
+    const unanswered = previous?.openedElsewhere === openedElsewhere ? previous.url : undefined;
     const state = randomUUID();
     const grant = Deferred.makeUnsafe<string, Error>();
     const signedInElsewhere = Deferred.makeUnsafe<void>();
@@ -349,7 +374,8 @@ export class McpOAuth implements McpOAuthAuthority {
     );
     const abandon = () => {
       const unansweredNow = provider.openedRedirectUrl ?? unanswered;
-      if (!abandoned && !settled && this.#waiting.has(state) && unansweredNow) this.#unanswered.set(key, unansweredNow);
+      if (!abandoned && !settled && this.#waiting.has(state) && unansweredNow)
+        this.#unanswered.set(key, { url: unansweredNow, openedElsewhere });
       abandoned = true;
       this.#waiting.delete(state);
       this.#openedElsewhere.delete(state);
@@ -372,19 +398,22 @@ export class McpOAuth implements McpOAuthAuthority {
         Deferred.doneUnsafe(signedInElsewhere, Effect.void);
       },
       unanswered: () => provider.openedRedirectUrl ?? unanswered,
+      openedElsewhere,
       openedUrl: () => provider.openedUrl,
     };
     attempts.add(attempt);
     return {
       provider,
-      begin: () =>
+      begin: (lookup) =>
         Effect.gen({ self: this }, function* () {
-          if (cancelled || abandoned || this.#options.storage.read(key)?.tokens) return false;
+          const stored = this.#options.storage.read(key);
+          if (cancelled || abandoned || (stored?.tokens && stored.neededScope === undefined)) return false;
           const controller = new AbortController();
           const fetchFn = provider.watchRegistration(this.#fetch(key, controller.signal));
+          const serverLookup = stored?.neededScope === undefined ? lookup : "this-server-or-origin";
           return yield* withTimeout(
             Effect.gen(function* () {
-              if (!(yield* namesAuthorizationServer(resource, fetchFn))) return false;
+              if (!(yield* namesAuthorizationServer(resource, fetchFn, serverLookup))) return false;
               return (yield* mcpCall(() => auth(provider, { serverUrl: resource, fetchFn }))) === "REDIRECT";
             }),
             this.#options.refreshTimeoutMs ?? MCP_TOKEN_TIMEOUT_MS,
@@ -520,7 +549,8 @@ export class McpOAuth implements McpOAuthAuthority {
   needsSignIn(url: string): boolean {
     const key = mcpOAuthAccountKey(url);
     const record = key === null ? undefined : this.#options.storage.read(key);
-    return (record?.lostAt !== undefined || record?.app !== undefined) && !record.tokens;
+    if (record?.tokens) return record.neededScope !== undefined;
+    return record?.lostAt !== undefined || record?.app !== undefined;
   }
 
   hasSignIn(url: string): boolean {
@@ -709,6 +739,9 @@ export class McpOAuth implements McpOAuthAuthority {
       state,
       storage: guarded,
       redirectUrl: this.#options.redirectUrl,
+      firstRedirectUrl: open
+        ? this.#options.redirectUrl
+        : (callbackRedirectUrl(this.#options.redirectUrl) ?? this.#options.redirectUrl),
       deepLinkRedirectUrl: open ? () => openedDeepLinkRedirectUrl : this.#options.deepLinkRedirectUrl,
       openExternal: open ?? this.#options.openExternal,
       isAbandoned,
@@ -725,6 +758,7 @@ interface SignInAttempt {
   cancel: () => void;
   settle: () => void;
   unanswered: () => string | undefined;
+  openedElsewhere: boolean;
   openedUrl: () => string | null;
 }
 
@@ -734,6 +768,7 @@ interface ClientProviderOptions {
   state: string | null;
   storage: McpOAuthStorage;
   redirectUrl: string;
+  firstRedirectUrl: string;
   deepLinkRedirectUrl?: (() => string | undefined) | undefined;
   openExternal: (url: string) => Promise<void>;
   isAbandoned: () => boolean;
@@ -761,8 +796,9 @@ class McpOAuthClientProvider implements OAuthClientProvider {
     this.#options = options;
     this.#localhostRedirectUrl = localhostRedirectUrl(options.redirectUrl);
     const { unansweredRedirectUrl: unanswered } = options;
+    const localhostNames = [this.#localhostRedirectUrl, localhostRedirectUrl(options.firstRedirectUrl)];
     this.#deepLinkRedirectUrl =
-      unanswered === this.#localhostRedirectUrl ? (options.deepLinkRedirectUrl?.() ?? null) : null;
+      unanswered && localhostNames.includes(unanswered) ? (options.deepLinkRedirectUrl?.() ?? null) : null;
     this.#retryRedirectUrl = this.#deepLinkRedirectUrl ?? this.#otherRedirectName(unanswered);
   }
 
@@ -774,10 +810,25 @@ class McpOAuthClientProvider implements OAuthClientProvider {
   #authorizedClient: OAuthClientInformationFull | undefined;
 
   #otherRedirectName(redirectUrl: string | null | undefined): string | null {
+    for (const address of new Set([this.#options.firstRedirectUrl, this.#options.redirectUrl])) {
+      const localhost = localhostRedirectUrl(address);
+      if (!localhost) continue;
+      if (redirectUrl === address) return localhost;
+      if (redirectUrl === localhost) return address;
+    }
+    return null;
+  }
+
+  #otherRedirectPath(redirectUrl: string | undefined): string | null {
+    const own = this.#options.redirectUrl;
     const localhost = this.#localhostRedirectUrl;
-    if (!localhost) return null;
-    if (redirectUrl === this.#options.redirectUrl) return localhost;
-    return redirectUrl === localhost ? this.#options.redirectUrl : null;
+    if (redirectUrl === own || redirectUrl === localhost) return callbackRedirectUrl(redirectUrl);
+    const first = this.#options.firstRedirectUrl;
+    if (first === own || !redirectUrl || (redirectUrl !== first && redirectUrl !== localhostRedirectUrl(first)))
+      return null;
+    const url = new URL(redirectUrl);
+    url.pathname = new URL(own).pathname;
+    return url.href;
   }
 
   get redirectUrl(): string {
@@ -809,7 +860,7 @@ class McpOAuthClientProvider implements OAuthClientProvider {
       client_name: MCP_CLIENT_NAME,
       client_uri: "https://openbot.run",
       logo_uri: "https://openbot.run/icon-512x512.png",
-      redirect_uris: [this.#retryRedirectUrl ?? this.#options.redirectUrl],
+      redirect_uris: [this.#retryRedirectUrl ?? this.#options.firstRedirectUrl],
       application_type: "native",
       grant_types: ["authorization_code", "refresh_token"],
       response_types: ["code"],
@@ -867,12 +918,26 @@ class McpOAuthClientProvider implements OAuthClientProvider {
     const retry = this.#retryRedirectUrl;
     if (retry && client.client_id !== MCP_CLIENT_METADATA_URL && !registersAddress(client.redirect_uris, retry))
       return this.#register();
+    const openedElsewhere = this.#options.firstRedirectUrl === this.#options.redirectUrl;
+    const neverSignedIn = !record.tokens && record.lostAt === undefined;
+    const checksFirstAddress = !retry && client.client_id !== MCP_CLIENT_METADATA_URL;
+    if (checksFirstAddress && (openedElsewhere || neverSignedIn) && !this.#registersFirstAddress(client))
+      return this.#register();
     const scopeAllowed =
       !client.scope ||
       !discovery?.resourceMetadata?.scopes_supported?.length ||
       !scopeWithOfflineAccess(client.scope, discovery.authorizationServerMetadata);
     if (registersAddress(client.redirect_uris, this.redirectUrl) && scopeAllowed) return client;
     return this.#register();
+  }
+
+  #registersFirstAddress(client: OAuthClientInformationFull): boolean {
+    const first = this.#options.firstRedirectUrl;
+    const localhost = localhostRedirectUrl(first);
+    return (
+      registersAddress(client.redirect_uris, first) ||
+      (localhost !== null && registersAddress(client.redirect_uris, localhost))
+    );
   }
 
   get openedRedirectUrl(): string | null {
@@ -941,18 +1006,18 @@ class McpOAuthClientProvider implements OAuthClientProvider {
         sent = retry;
         response = await fetch(input, retry);
       }
-      const callback =
+      const otherPath =
         response.status === 401 || response.status === 403
-          ? this.#withCallbackPath(request)
+          ? this.#withOtherPath(request)
           : (await replacesRedirectAddress(response, sent))
-            ? this.#withCallbackPath(sent)
+            ? this.#withOtherPath(sent)
             : null;
-      const retried = callback ? await fetch(input, callback) : null;
+      const retried = otherPath ? await fetch(input, otherPath) : null;
       if (retried?.ok) response = retried;
       this.#registrationStatus = response.status;
       const redirectRefused = (await registrationErrorCode(response)) === "invalid_redirect_uri";
       this.#redirectRefused = redirectRefused;
-      if (!this.#documentReplacesRefusal(response.status)) return response;
+      if (!this.#documentReplacesRefusal(response.status)) return withoutNullFields(response);
       this.#redirectRefused = false;
       await response.body?.cancel();
       return Response.json(
@@ -966,13 +1031,12 @@ class McpOAuthClientProvider implements OAuthClientProvider {
     };
   }
 
-  #withCallbackPath(init: RequestInit): RequestInit | null {
+  #withOtherPath(init: RequestInit): RequestInit | null {
     if (typeof init.body !== "string") return null;
     const body = registrationBodySchema.parse(JSON.parse(init.body));
     const sent = body.redirect_uris?.length === 1 ? body.redirect_uris[0] : undefined;
-    const own = sent === this.#options.redirectUrl || sent === this.#localhostRedirectUrl;
-    const callback = sent && own ? callbackRedirectUrl(sent) : null;
-    return callback ? { ...init, body: JSON.stringify({ ...body, redirect_uris: [callback] }) } : null;
+    const other = this.#otherRedirectPath(sent);
+    return other ? { ...init, body: JSON.stringify({ ...body, redirect_uris: [other] }) } : null;
   }
 
   #documentReplacesRefusal(status: number): boolean {
@@ -990,9 +1054,14 @@ class McpOAuthClientProvider implements OAuthClientProvider {
     const body = registrationBodySchema.parse(JSON.parse(init.body));
     const sent = body.redirect_uris?.length === 1 ? body.redirect_uris[0] : undefined;
     const deepLink = this.#deepLinkRedirectUrl;
-    const other = this.#otherRedirectName(sent);
-    const names = deepLink && sent === deepLink ? [this.#options.redirectUrl, localhost] : other ? [other] : [];
-    return names.map((name) => ({ ...init, body: JSON.stringify({ ...body, redirect_uris: [name] }) }));
+    const first = this.#options.firstRedirectUrl;
+    const firstNames = [first, localhostRedirectUrl(first)];
+    const ownNames = first === this.#options.redirectUrl ? [] : [this.#options.redirectUrl, localhost];
+    const names = deepLink && sent === deepLink ? [...firstNames, ...ownNames] : [this.#otherRedirectName(sent)];
+    if (sent && firstNames.includes(sent)) names.push(...ownNames);
+    return names
+      .filter((name) => name !== null)
+      .map((name) => ({ ...init, body: JSON.stringify({ ...body, redirect_uris: [name] }) }));
   }
 
   #withOfflineAccessRegistration(init: RequestInit): RequestInit {
@@ -1066,7 +1135,13 @@ class McpOAuthClientProvider implements OAuthClientProvider {
         const authorized = this.#authorizedClient;
         const replaced = authorized && this.#record().client?.client_id !== authorized.client_id;
         const client = this.#registeredClient ?? (replaced ? authorized : undefined);
-        yield* this.#save({ ...(client ? { client } : {}), tokens, obtainedAt: Date.now(), lostAt: undefined });
+        yield* this.#save({
+          ...(client ? { client } : {}),
+          tokens,
+          obtainedAt: Date.now(),
+          lostAt: undefined,
+          ...(this.#exchangingCode ? { neededScope: undefined } : {}),
+        });
         this.#registeredClient = undefined;
       }),
     );
@@ -1150,11 +1225,16 @@ class McpOAuthClientProvider implements OAuthClientProvider {
         if (!this.#options.state) return yield* mcpFailure(new Error(sourceText("error.backend.mcpSignInNoBrowser")));
         if (!isAuthorizationUrlSafe(authorizationUrl))
           return yield* mcpFailure(new Error(sourceText("error.backend.mcpSignInNotWebPage")));
-        const { app } = this.#record();
+        const { app, neededScope, tokens } = this.#record();
+        const serverPromptUrl = withServerPrompt(authorizationUrl);
         const url = withGoogleOfflineAccess(
-          app?.scope
-            ? withAppScope(authorizationUrl, app)
-            : withOfflineAccess(authorizationUrl, this.#discoveryState?.authorizationServerMetadata),
+          withNeededScope(
+            app?.scope
+              ? withAppScope(serverPromptUrl, app)
+              : withOfflineAccess(serverPromptUrl, this.#discoveryState?.authorizationServerMetadata),
+            neededScope,
+            tokens?.scope,
+          ),
         );
         const clientId = url.searchParams.get("client_id");
         this.#authorizedClient = app
@@ -1306,7 +1386,23 @@ function mcpOAuthServerUrl(key: string): string {
   return normalizeResource(key) ?? key;
 }
 
-export const namesAuthorizationServer = Effect.fnUntraced(function* (resource: string, fetchFn: FetchLike) {
+export type AuthorizationServerLookup = "this-server" | "this-server-or-origin";
+
+function namesThisServer(metadataResource: string, resource: string): boolean {
+  return (
+    URL.canParse(metadataResource) &&
+    checkResourceAllowed({
+      requestedResource: resourceUrlFromServerUrl(resource),
+      configuredResource: metadataResource,
+    })
+  );
+}
+
+export const namesAuthorizationServer = Effect.fnUntraced(function* (
+  resource: string,
+  fetchFn: FetchLike,
+  lookup: AuthorizationServerLookup = "this-server-or-origin",
+) {
   let metadataStatus: number | null = null;
   const metadataFetch: FetchLike = async (input, init) => {
     metadataStatus = null;
@@ -1323,6 +1419,10 @@ export const namesAuthorizationServer = Effect.fnUntraced(function* (resource: s
       return Effect.fail(new Error(sourceText("error.backend.mcpSignInMetadataUnreadable")));
     }),
   );
+  if (lookup === "this-server")
+    return metadata && namesThisServer(metadata.resource, resource)
+      ? (metadata.authorization_servers?.[0] ?? null)
+      : null;
   if (metadata) return metadata.authorization_servers?.[0] ?? null;
   const origin = String(new URL("/", resource));
   return yield* mcpCall(() => discoverAuthorizationServerMetadata(origin, { fetchFn })).pipe(
@@ -1403,12 +1503,32 @@ function describeUnusableRedirectUrl(redirectUrl: string): string | null {
   return null;
 }
 
+function withServerPrompt(authorizationUrl: URL): URL {
+  const [serverPrompt, ...addedPrompts] = authorizationUrl.searchParams.getAll("prompt");
+  if (serverPrompt === undefined || addedPrompts.length === 0) return authorizationUrl;
+  const url = new URL(authorizationUrl);
+  url.searchParams.set("prompt", serverPrompt);
+  return url;
+}
+
 function withAppScope(authorizationUrl: URL, app: McpOAuthApp | undefined): URL {
   if (!app?.scope) return authorizationUrl;
   const url = new URL(authorizationUrl);
   url.searchParams.set("scope", app.scope);
   if (app.scope.split(/\s+/).includes("offline_access") && !url.searchParams.has("prompt"))
     url.searchParams.set("prompt", "consent");
+  return url;
+}
+
+function scopeUnion(...scopes: ReadonlyArray<string | null | undefined>): string {
+  return [...new Set(scopes.flatMap((scope) => scope?.split(/\s+/).filter(Boolean) ?? []))].join(" ");
+}
+
+function withNeededScope(authorizationUrl: URL, needed: string | undefined, granted: string | undefined): URL {
+  const base = authorizationUrl.searchParams.get("scope") || granted;
+  if (!needed || !base) return authorizationUrl;
+  const url = new URL(authorizationUrl);
+  url.searchParams.set("scope", scopeUnion(base, needed));
   return url;
 }
 
@@ -1447,6 +1567,24 @@ async function replacesRedirectAddress(response: Response, sent: RequestInit): P
 async function refusesRedirectAddress(response: Response): Promise<boolean> {
   const error = await registrationErrorCode(response);
   return error === "invalid_redirect_uri" || error === "invalid_client_metadata";
+}
+
+const registrationReplySchema = z.record(z.string(), z.unknown());
+
+async function withoutNullFields(response: Response): Promise<Response> {
+  if (!response.ok) return response;
+  const reply = registrationReplySchema.safeParse(
+    await response
+      .clone()
+      .json()
+      .catch(() => null),
+  );
+  if (!reply.success) return response;
+  const fields = Object.entries(reply.data);
+  const kept = fields.filter(([, value]) => value !== null);
+  if (kept.length === fields.length) return response;
+  await response.body?.cancel();
+  return Response.json(Object.fromEntries(kept), { status: response.status });
 }
 
 async function registrationErrorCode(response: Response): Promise<string | null> {

@@ -1,4 +1,5 @@
 import { type DynamicRecord, isBoolean, isDynamicRecord, isNumber, isString } from "../runtime-values";
+import { type WorkflowSpotControl, workflowSpotControl } from "./workflow-presence-v1";
 
 export const TEAM_PROTOCOL_V2 = 2 as const;
 export const TEAM_PROTOCOL_V2_CHANNELS = {
@@ -56,7 +57,8 @@ export type TeamProtocolV2EventFrame =
       control:
         | { type: "runtime-snapshot-request" }
         | { type: "team-typing"; botId: string | null; typing: boolean }
-        | { type: "team-direct-typing"; recipientMemberId: string; typing: boolean };
+        | { type: "team-direct-typing"; recipientMemberId: string; typing: boolean }
+        | WorkflowSpotControl;
     };
 
 export type TeamProtocolV2FileControlFrame =
@@ -195,6 +197,8 @@ export function decodeTeamProtocolV2EventFrame(value: string | unknown): TeamPro
         },
       };
     }
+    const spot = workflowSpotControl(frame.control);
+    if (spot) return { version: 2, type: "event-control", control: spot };
   }
   throw invalid("event frame");
 }

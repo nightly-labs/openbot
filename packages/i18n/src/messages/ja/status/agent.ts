@@ -70,6 +70,27 @@ export const messages = {
   "status.agent.workflowDelete":
     "ワークフロー {title} を実行履歴とバージョンごと削除します。実行中のステップは停止します。",
   "status.agent.deleteAgents": "{agents} をチャットとファイルごと削除します。元に戻せません。",
+  "status.agent.nearSignatureReceived": "OpenBot が署名を受け取りました。このタブは閉じてかまいません。",
+  "status.agent.nearSignatureUnknown": "OpenBot はこの署名を待っていません。OpenBot でもう一度始めてください。",
+  "status.agent.nearPayment":
+    "{domain} のため、暗号資産ウォレットから {recipient} に {amount} {symbol} を支払います: {reason}",
+  "status.agent.nearPaymentSending": "{domain} に {amount} を支払い中: {reason}",
+  "status.agent.nearPaymentPaid": "{domain} に {amount} を支払いました: {reason}",
+  "status.agent.nearPaymentNotPaid": "未払い: {domain} への {amount}: {reason}",
+  "status.agent.nearPaymentUncertain": "未確認: {domain} への {amount}: {reason}",
+  "status.agent.nearSummaryCreate":
+    "すべてのエージェントが 1 日あたり最大 {amount} USD まで支払えます。あとで OpenBot で変更できます。",
+  "status.agent.nearSummaryGrant":
+    "この OpenBot アプリが、あなたのルールの範囲内で {days} 日間ウォレットから支払えるようにします。",
+  "status.agent.nearSummaryBudget": "ウォレットの 1 日の予算を {amount} USD に変更します。",
+  "status.agent.nearSummaryAutoPay":
+    "支払いルールで許可されている場合は、OpenBot があなたの署名なしで支払えるようにします。その他の支払いは引き続きチャットで確認します。",
+  "status.agent.nearSummaryManualPay":
+    "支払いルールがなくなりました。OpenBot は支払いごとに再びあなたの署名を求めます。",
+  "status.agent.nearSummaryPayment": "{recipient} への {amount} の支払いを承認します。",
+  "status.agent.nearSummaryFreeze": "支払いを再開するまで、エージェントはこのウォレットから支払えません。",
+  "status.agent.nearSummaryUnfreeze":
+    "エージェントは、あなたのルールの範囲内で再びこのウォレットから支払えるようになります。",
   "status.agent.screenCaptureProgress": "画面のキャプチャを要求しています…",
   "status.agent.screenCaptureReviewing": "画面のキャプチャを確認しています…",
   "status.agent.browserOpening": "Web ページを開いています…",
@@ -77,6 +98,7 @@ export const messages = {
   "status.agent.browserClicking": "Web ページをクリックしています…",
   "status.agent.browserTyping": "Web ページに入力しています…",
   "status.agent.browserActing": "Web ページを操作しています…",
+  "status.agent.browserPaying": "支払いを送信しています…",
   "status.agent.browserReviewing": "Web ページを確認しています…",
   "status.agent.memoriesSearching": "メモリーを検索しています…",
   "status.agent.chatsSearching": "過去のチャットを検索しています…",

@@ -80,7 +80,9 @@ Without `--apply` the script makes no change. `--local` (the default) and `--tes
 Each account gets 10 welcome credits once, with no end date. They pay only for the models that the
 media gateway gives a welcome route. The Worker reaches the media generation processor only through
 the private Worker `openbot-media-gateway` (service binding `MEDIA_GATEWAY`, production only). D1 keeps
-the models, prices, holds and ledger; the gateway keeps the adapters, routes and keys. Without the
+the models, prices, holds and ledger; the gateway keeps the adapters, routes and keys. Its source is
+in the private repository [`nightly-labs/openbot-media-gateway`](https://github.com/nightly-labs/openbot-media-gateway):
+change processors, routes and welcome routes there, then deploy that Worker. Without the
 binding, as in local development, every credits model is unavailable. `bun run test:credit-media`
 checks the service against a fake gateway.
 
@@ -243,6 +245,16 @@ License emails (the first payment, a failed renewal payment, and the end of a li
 make it an alias of the `EMAIL_SMTP_USERNAME` mailbox. An empty value uses `EMAIL_FROM`, as production
 does. A reply goes to `EMAIL_LICENSE_REPLY_TO` (`licenses@openbot.run` in production), or to the
 license sender when it is empty.
+
+When the `no_reply@openbot.run` mailbox reaches its sender limit (500 messages an hour), the email goes
+again from the overflow mailbox `EMAIL_SMTP_OVERFLOW_2_USERNAME` (`signin@openbot.run` in production),
+with that address as the sender. Its password is the `EMAIL_SMTP_OVERFLOW_2_PASSWORD` secret, in the
+same places as `EMAIL_SMTP_PASSWORD`; it is optional, and without it this mailbox is off.
+When that mailbox also reaches its limit, the email goes from the overflow mailbox
+`EMAIL_SMTP_OVERFLOW_USERNAME` (`hello@openbot.run` in production), with the
+`EMAIL_SMTP_OVERFLOW_PASSWORD` secret, set in the same way. When all mailboxes reach their limit, Cloudflare Email Service sends the email from
+`EMAIL_FROM` (`EMAIL_FALLBACK`). Cloudflare also has a daily quota: past it, the binding refuses with
+`E_DAILY_LIMIT_EXCEEDED`.
 
 `bun run env:set:smtp` encrypts the app password into `.env.production` only.
 
@@ -491,6 +503,15 @@ on Apple Watch only); a host cannot give the text.
 It has its own key in `LIVE_ACTIVITY_RATE_LIMITER`, and it sends nothing for a device session that
 has ended (`RemoteControlPlane.sessionOpen`), because the host does not learn about the end. The
 alert has "OpenBot" as its only text and `mutable-content`; the app opens the sealed bytes.
+
+`POST /v2/remote/watch/sessions` pairs an Apple Watch with the phone account session that sends it
+(`watch_sessions` in D1). The body is `{ publicKey }`, the raw P-256 key of the watch. The answer is
+`{ watchSessionId, token, expiresAt }`; D1 keeps only the hash of the token. The watch session ends
+after 30 days, or when its phone session ends. The same key again replaces the old session, and an
+account keeps at most 5. `DELETE /v2/remote/watch/sessions/:watchSessionId` revokes one.
+`POST /v2/remote/watch/ticket` takes the watch token and a signed `{ hostId, ts, proof }`, checks the
+membership on the host, and gives an ES256 ticket with `aud: "openbot-watch"` from the remote ticket
+key. `WATCH_TICKET_RATE_LIMITER` limits each watch session to 30 tickets a minute.
 
 The relay is off until `APNS_PRIVATE_KEY` (the `.p8` key text) and `APNS_KEY_ID` are set. Create
 the key in Apple Developer > Keys with the Apple Push Notifications service, then add both to the

@@ -45,11 +45,25 @@ export const messages = {
   "error.workflow.providerBusy": "Sağlayıcı meşgul. Birkaç dakika bekleyin, sonra adımı yeniden çalıştırın.",
   "error.workflow.providerOffline":
     "OpenBot sağlayıcıya ulaşamadı. İnternet bağlantısını kontrol edin, sonra adımı yeniden çalıştırın.",
+  "error.workflow.providerBilling":
+    "Hesapta kredi yok ya da plan bu modeli içermiyor. Planı kontrol edin ya da başka bir model seçin.",
+  "error.workflow.modelRefused": "Sağlayıcı bu hesap için bu modele izin vermiyor. Başka bir model seçin.",
+  "error.workflow.modelRefusedReason":
+    'Başka bir model seçin. Sağlayıcı bu hesap için bu modele izin vermiyor: "{reason}"',
+  "error.workflow.contentBlocked":
+    "Sağlayıcı girdiyi engelledi. Girdiyi ya da istemi değiştirin, sonra adımı yeniden çalıştırın.",
+  "error.workflow.inputTooLong": "Girdi bu model için çok uzun. Kısaltın ya da başka bir model seçin.",
+  "error.workflow.requestRefused": "Sağlayıcı bu adımı kabul etmedi. Başka bir model seçin.",
+  "error.workflow.requestRefusedReason": 'Başka bir model seçin. Sağlayıcı bu adımı kabul etmedi: "{reason}"',
+  "error.workflow.providerRefused":
+    'Başka bir model seçin ya da adımı yeniden çalıştırın. Sağlayıcının yanıtı: "{reason}"',
   "error.workflow.modelBusy": "Başka bir model isteği çalışıyor. Adımı birazdan yeniden çalıştırın.",
   "error.workflow.mediaFailed": "Model görseli veya videoyu oluşturamadı. Adımı yeniden çalıştırın.",
   "error.workflow.mediaNotMade": "Model görseli veya videoyu oluşturmadı. Modelin yanıtı: {answer}",
   "error.workflow.pictureMissing": "Görsel artık sunucuda değil. Yeniden gönderin.",
   "error.workflow.pictureType": "PNG, JPEG veya WebP görseli kullanın.",
+  "error.workflow.assetType":
+    "PNG, JPEG veya WebP görseli, MP4 veya MOV videosu ya da MP3, M4A, WAV, AAC, OGG veya FLAC ses dosyası kullanın.",
   "error.workflow.mediaInputMissing": "Önceki bir adımın görseli kullanılamıyor. O adımı yeniden çalıştırın.",
   "error.workflow.mediaEmptyRequest":
     "Bir açıklama yazın ya da bir metin veya görsel gelmesi için önceki adımları çalıştırın.",

@@ -48,11 +48,27 @@ export const messages = {
   "error.workflow.providerBusy": "Le fournisseur est occupé. Attendez quelques minutes, puis relancez l’étape.",
   "error.workflow.providerOffline":
     "OpenBot n’a pas pu joindre le fournisseur. Vérifiez la connexion internet, puis relancez l’étape.",
+  "error.workflow.providerBilling":
+    "Le compte n’a plus de crédit, ou son forfait n’inclut pas ce modèle. Vérifiez le forfait, ou choisissez un autre modèle.",
+  "error.workflow.modelRefused": "Le fournisseur ne permet pas ce modèle pour ce compte. Choisissez un autre modèle.",
+  "error.workflow.modelRefusedReason":
+    'Choisissez un autre modèle. Le fournisseur ne permet pas ce modèle pour ce compte : "{reason}"',
+  "error.workflow.contentBlocked":
+    "Le fournisseur a bloqué l’entrée. Modifiez l’entrée ou le prompt, puis relancez l’étape.",
+  "error.workflow.inputTooLong":
+    "L’entrée est trop longue pour ce modèle. Raccourcissez-la, ou choisissez un autre modèle.",
+  "error.workflow.requestRefused": "Le fournisseur n’a pas accepté cette étape. Choisissez un autre modèle.",
+  "error.workflow.requestRefusedReason":
+    'Choisissez un autre modèle. Le fournisseur n’a pas accepté cette étape : "{reason}"',
+  "error.workflow.providerRefused":
+    'Choisissez un autre modèle, ou relancez l’étape. Le fournisseur a dit : "{reason}"',
   "error.workflow.modelBusy": "Une autre requête au modèle est en cours. Relancez l’étape bientôt.",
   "error.workflow.mediaFailed": "Le modèle n’a pas pu créer l’image ou la vidéo. Relancez l’étape.",
   "error.workflow.mediaNotMade": "Le modèle n’a pas créé l’image ou la vidéo. Sa réponse : {answer}",
   "error.workflow.pictureMissing": "L’image n’est plus sur le serveur. Envoyez-la de nouveau.",
   "error.workflow.pictureType": "Utilisez une image PNG, JPEG ou WebP.",
+  "error.workflow.assetType":
+    "Utilisez une image PNG, JPEG ou WebP, une vidéo MP4 ou MOV, ou un fichier audio MP3, M4A, WAV, AAC, OGG ou FLAC.",
   "error.workflow.mediaInputMissing": "Une image d’une étape précédente n’est pas disponible. Relancez cette étape.",
   "error.workflow.mediaEmptyRequest":
     "Écrivez une description, ou exécutez les étapes précédentes pour qu’un texte ou une image arrive.",

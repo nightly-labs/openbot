@@ -467,6 +467,8 @@ export class CreditMediaWorkflows {
     const done = yield* this.#wait(started);
     if (existing === null || existing.status === "queued" || existing.status === "processing")
       this.#options.creditsChanged?.();
+    if (done.status === "failed" && done.reason === "content_policy")
+      return yield* mediaFail(sourceText("error.billing.mediaContentRefused"));
     if (done.status === "failed" && done.failure === "refused")
       return yield* mediaFail(sourceText("error.billing.mediaRequestRefused"));
     if (done.status !== "completed") return yield* mediaFailed();

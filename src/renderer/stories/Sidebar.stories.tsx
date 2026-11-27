@@ -3,9 +3,11 @@ import { Button } from "@openbot/ui";
 import type { AvatarMood } from "@openbot/ui/bloub-avatar";
 import type { ThreadItem } from "@openbot/ui/features/conversation/threads/thread-types";
 import { Sidebar } from "@openbot/ui/features/sidebar/Sidebar";
+import { SidebarChromeExtensionCard } from "@openbot/ui/features/sidebar/SidebarChromeExtensionCard";
 import { SidebarCommunityCard } from "@openbot/ui/features/sidebar/SidebarCommunityCard";
 import { SidebarMachineCard } from "@openbot/ui/features/sidebar/SidebarMachineCard";
 import { SidebarMobileAppCard } from "@openbot/ui/features/sidebar/SidebarMobileAppCard";
+import { SidebarPromoDeck } from "@openbot/ui/features/sidebar/SidebarPromoDeck";
 import { SidebarStorageCard } from "@openbot/ui/features/sidebar/SidebarStorageCard";
 import { normalizeSidebarPinnedItems, type SidebarPinnedItem } from "@openbot/ui/features/sidebar/sidebar-pins";
 import {
@@ -165,6 +167,7 @@ const args: Parameters<typeof Sidebar>[0] = {
   onOpenSearch: fn(),
   onOpenMarketplace: fn(),
   onChatOrderChange: fn(),
+  onTabIdsChange: fn(),
 };
 
 function InteractiveSidebar(props: Parameters<typeof Sidebar>[0]) {
@@ -174,6 +177,7 @@ function InteractiveSidebar(props: Parameters<typeof Sidebar>[0]) {
   const [collapsedSectionIds, setCollapsedSectionIds] = createSignal(untrack(() => props.collapsedSectionIds));
   const [hiddenAgents, setHiddenAgents] = createSignal(untrack(() => props.userHiddenAgents ?? []));
   const [chatOrder, setChatOrder] = createSignal(untrack(() => props.chatOrder));
+  const [tabIds, setTabIds] = createSignal(untrack(() => props.tabIds));
   const [activeAgentId, setActiveAgentId] = createSignal(untrack(() => props.activeAgentId));
   const [readAgentIds, setReadAgentIds] = createSignal<ReadonlySet<string>>(new Set());
   const [mutedAgentIds, setMutedAgentIds] = createSignal<ReadonlySet<string>>(new Set());
@@ -222,6 +226,11 @@ function InteractiveSidebar(props: Parameters<typeof Sidebar>[0]) {
       onChatOrderChange={(order) => {
         setChatOrder(order);
         props.onChatOrderChange?.(order);
+      }}
+      tabIds={tabIds()}
+      onTabIdsChange={(next) => {
+        setTabIds(next);
+        props.onTabIdsChange?.(next);
       }}
       collapsedSectionIds={collapsedSectionIds()}
       pinnedItems={pinnedItems()}
@@ -314,6 +323,33 @@ export const ChatHistory: Story = {
 
 export const MobileAppCard: Story = {
   args: { footer: <SidebarMobileAppCard agents={STORY_AGENTS} onInstall={fn()} onDismiss={fn()} /> },
+  decorators: [(Story) => <div style={{ width: "280px", height: "100vh" }}>{Story()}</div>],
+};
+
+export const ChromeExtensionCard: Story = {
+  args: { footer: <SidebarChromeExtensionCard agents={STORY_AGENTS} onAdd={fn()} onDismiss={fn()} /> },
+  decorators: [(Story) => <div style={{ width: "280px", height: "100vh" }}>{Story()}</div>],
+};
+
+export const PromoDeck: Story = {
+  args: {
+    footer: (
+      <SidebarPromoDeck
+        cards={[
+          {
+            id: "chrome-extension",
+            label: "Your agents, in Chrome",
+            content: () => <SidebarChromeExtensionCard agents={STORY_AGENTS} onAdd={fn()} onDismiss={fn()} />,
+          },
+          {
+            id: "mobile-app",
+            label: "Your agents, in your pocket",
+            content: () => <SidebarMobileAppCard agents={STORY_AGENTS} onInstall={fn()} onDismiss={fn()} />,
+          },
+        ]}
+      />
+    ),
+  },
   decorators: [(Story) => <div style={{ width: "280px", height: "100vh" }}>{Story()}</div>],
 };
 
@@ -645,6 +681,17 @@ export const FoldersClosed: Story = {
     pinnedItems: [],
     foldersSupported: true,
     collapsedSectionIds: [folderIds.acme, folderIds.internal],
+  },
+  decorators: [(Story) => <div style={{ width: "280px", height: "100vh" }}>{Story()}</div>],
+};
+
+export const FolderTabs: Story = {
+  args: {
+    agents: folderAgents,
+    layout: folderLayout,
+    pinnedItems: [],
+    foldersSupported: true,
+    tabIds: ["unread", `folder:${folderIds.clients}`, `folder:${folderIds.internal}`, `folder:${folderIds.archive}`],
   },
   decorators: [(Story) => <div style={{ width: "280px", height: "100vh" }}>{Story()}</div>],
 };

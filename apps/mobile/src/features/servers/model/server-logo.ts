@@ -2,6 +2,8 @@ import { isAvatarMimeType } from "@openbot/contracts/avatar-images";
 import { bytesToBase64 } from "@openbot/team-client/base64";
 import { fetch } from "@/features/support/model/logged-fetch";
 
+export const SERVER_AVATAR_CORNER_RATIO = 0.32;
+
 export async function loadServerLogo(
   session: { apiUrl: string; sessionToken: string },
   serverId: string,
