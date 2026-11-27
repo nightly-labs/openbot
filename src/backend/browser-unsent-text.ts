@@ -1,52 +1,79 @@
-import type { WebContents, WebFrameMain } from "electron";
+import type { WebContents } from "electron";
 
-const EDITS_KEY = `Symbol.for("openbot.userEdits")`;
+const USER_EDITS_WORLD = 1_020;
+
+const HELD_TEXT_FUNCTION = `(element) => {
+  const role = element.getAttribute("role") ?? "";
+  if (role === "searchbox" || role === "combobox" || element.closest("[role=search], search")) return false;
+  const text = element.isContentEditable
+    ? element.textContent
+    : element.localName === "textarea" || (element.localName === "input" && /^(?:text|email|url|tel|number)$/.test(element.type))
+      ? element.value
+      : "";
+  return typeof text === "string" && text.replace(/[\\s\\u200b\\ufeff]/g, "") !== "";
+}`;
 
 const WATCH_EDITS_SCRIPT = `(() => {
-  const key = ${EDITS_KEY};
-  if (globalThis[key]) return;
+  if (globalThis.openbotUserEdits) return;
   const edited = new Set();
-  Object.defineProperty(globalThis, key, { value: edited });
+  globalThis.openbotUserEdits = edited;
   addEventListener("input", (event) => {
     if (event.isTrusted) edited.add(event.composedPath()[0]);
   }, true);
+  addEventListener("keydown", (event) => {
+    const target = event.composedPath()[0];
+    if (event.isTrusted && event.key === "Enter" && target?.localName === "input") edited.delete(target);
+  }, true);
+  addEventListener("submit", (event) => {
+    for (const element of edited) if (event.target.contains(element)) edited.delete(element);
+  }, true);
 })()`;
 
-const HOLDS_UNSENT_TEXT_SCRIPT = `(() => {
-  const edited = globalThis[${EDITS_KEY}];
+const EDITED_TEXT_SCRIPT = `(() => {
+  const heldText = ${HELD_TEXT_FUNCTION};
+  const edited = globalThis.openbotUserEdits;
   if (!edited) return false;
-  const textField = /^(?:text|search|email|url|tel|number)$/;
   for (const element of edited) {
     if (!element.isConnected) {
       edited.delete(element);
       continue;
     }
-    const text = element.isContentEditable
-      ? element.textContent
-      : element.localName === "textarea" || (element.localName === "input" && textField.test(element.type))
-        ? element.value
-        : "";
-    if (typeof text === "string" && text.trim() !== "") return true;
+    if (heldText(element)) return true;
   }
   return false;
 })()`;
 
-export function watchUserEdits(frame: WebFrameMain | null | undefined): void {
-  if (!frame || frame.isDestroyed()) return;
-  void frame.executeJavaScript(WATCH_EDITS_SCRIPT).catch(() => undefined);
+const FRAME_TEXT_SCRIPT = `(() => {
+  const heldText = ${HELD_TEXT_FUNCTION};
+  for (const element of document.querySelectorAll("input, textarea")) {
+    if (element.value !== element.defaultValue && heldText(element)) return true;
+  }
+  return document.body !== null && (document.designMode === "on" || document.body.isContentEditable) && heldText(document.body);
+})()`;
+
+export function watchUserEdits(contents: WebContents): void {
+  if (contents.isDestroyed()) return;
+  void contents
+    .executeJavaScriptInIsolatedWorld(USER_EDITS_WORLD, [{ code: WATCH_EDITS_SCRIPT }])
+    .catch(() => undefined);
 }
 
 export async function pageHoldsUnsentText(contents: WebContents): Promise<boolean> {
   if (contents.isDestroyed() || contents.mainFrame.isDestroyed()) return false;
-  const frames = await Promise.all(
-    contents.mainFrame.framesInSubtree.map((frame) =>
-      frame.isDestroyed()
+  const mainFrame = contents.mainFrame;
+  const answers = await Promise.all([
+    contents.executeJavaScriptInIsolatedWorld(USER_EDITS_WORLD, [{ code: EDITED_TEXT_SCRIPT }]).then(
+      (held) => held === true,
+      () => false,
+    ),
+    ...mainFrame.framesInSubtree.map((frame) =>
+      frame === mainFrame || frame.isDestroyed()
         ? false
-        : frame.executeJavaScript(HOLDS_UNSENT_TEXT_SCRIPT).then(
+        : frame.executeJavaScript(FRAME_TEXT_SCRIPT).then(
             (held) => held === true,
             () => false,
           ),
     ),
-  );
-  return frames.includes(true);
+  ]);
+  return answers.includes(true);
 }

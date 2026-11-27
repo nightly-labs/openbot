@@ -752,6 +752,12 @@ async function main(): Promise<void> {
       ),
     );
     assert.equal(typedDraft.success, true, text(typedDraft));
+    const typedQuery = await runCauseEffect(
+      sleepy.handleDynamicTool(
+        params("type", { tabId: draft.tab.id, target: { kind: "css", selector: "#query" }, text: "group rules" }),
+      ),
+    );
+    assert.equal(typedQuery.success, true, text(typedQuery));
     const later: Electron.WebContents[] = [];
     for (const index of [1, 2, 3, 4, 5, 6]) later.push((await openSleepTab(`/form?later=${index}`)).contents);
     const [firstLater, secondLater] = later;
@@ -764,10 +770,17 @@ async function main(): Promise<void> {
       "Unsent post",
       "A tab with unsent text lost its text.",
     );
-    recordCases("tab-with-unsent-text-stays-loaded");
+    assert.equal(
+      await draft.contents.executeJavaScript(
+        "Object.getOwnPropertyNames(globalThis).some((name) => name.toLowerCase().includes('openbot'))",
+      ),
+      false,
+      "The page can see the edit watcher.",
+    );
+    recordCases("tab-with-unsent-text-stays-loaded", "page-cannot-see-the-edit-watcher");
     await draft.contents.executeJavaScript("document.querySelector('#draft').textContent = ''");
     await unloaded(draft.contents);
-    recordCases("tab-sleeps-after-its-text-is-cleared");
+    recordCases("tab-sleeps-after-its-text-is-cleared", "search-text-does-not-keep-a-tab-loaded");
 
     const report = {
       status: "passed",
@@ -815,6 +828,7 @@ function recordCases(...names: string[]): void {
 
 const PAGES: Record<string, string> = {
   "/draft": `<!doctype html><meta charset="utf-8"><title>Draft</title>
+    <form role="search"><input id="query" aria-label="Search"></form>
     <div id="draft" contenteditable="true" role="textbox" aria-label="Post"></div>`,
   "/skeleton": `<!doctype html><meta charset="utf-8"><title>Skeleton</title>
     <main><div class="skeleton" aria-busy="true" style="width:240px;height:40px;background:#ddd"></div></main>

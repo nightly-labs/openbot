@@ -63,7 +63,6 @@ import {
   WebContentsView,
   type WebContentsWillFrameNavigateEventParams,
   webContents,
-  webFrameMain,
 } from "electron";
 import { writeJsonFileAtomically } from "./atomic-json-file";
 import type { BrowserCardFillResult } from "./browser-card-fill";
@@ -810,10 +809,11 @@ export class BrowserHost {
       return;
     }
     Effect.runFork(
-      this.#holdsUnsentText(tab).pipe(
-        Effect.andThen(
+      this.#checkUnsentText(tab).pipe(
+        Effect.flatMap((answer) =>
           Effect.sync(() => {
-            if (this.#viewShown(tab.view) || this.#tabBusy(tab) || !this.#mayFreeze(tab)) return;
+            if (Option.isNone(answer) || this.#viewShown(tab.view) || this.#tabBusy(tab) || !this.#mayFreeze(tab))
+              return;
             this.#setFrozen(tab, true);
           }),
         ),
@@ -822,18 +822,25 @@ export class BrowserHost {
     );
   }
 
+  readonly #checkUnsentText = Effect.fn("BrowserHost.checkUnsentText")(function* (
+    this: BrowserHost,
+    tab: BrowserHostTab,
+  ) {
+    const contents = tab.contents;
+    const answer = yield* browserCall(() => pageHoldsUnsentText(contents)).pipe(
+      Effect.timeoutOption(UNSENT_TEXT_CHECK_MS),
+      Effect.catch(() => Effect.succeed(Option.some(false))),
+    );
+    if (Option.isSome(answer)) tab.unsentText = answer.value;
+    return answer;
+  });
+
   readonly #holdsUnsentText = Effect.fn("BrowserHost.holdsUnsentText")(function* (
     this: BrowserHost,
     tab: BrowserHostTab,
   ) {
-    if (tab.engine.frozen) return tab.unsentText === true;
-    const contents = tab.contents;
-    const held = yield* browserCall(() => pageHoldsUnsentText(contents)).pipe(
-      Effect.timeoutOption(UNSENT_TEXT_CHECK_MS),
-      Effect.catch(() => Effect.succeed(Option.none<boolean>())),
-    );
-    if (Option.isSome(held)) tab.unsentText = held.value;
-    return tab.unsentText === true;
+    if (tab.engine.frozen) return tab.unsentText !== false;
+    return Option.getOrElse(yield* this.#checkUnsentText(tab), () => true);
   });
 
   #unthrottle(tab: BrowserHostTab): void {
@@ -4154,11 +4161,8 @@ export class BrowserHost {
     });
     this.#bindUserBrowsing(tab);
     contents.on("did-start-loading", changed);
-    contents.on("did-frame-finish-load", (_event, _isMainFrame, processId, routingId) =>
-      watchUserEdits(webFrameMain.fromId(processId, routingId)),
-    );
     contents.on("dom-ready", () => {
-      watchUserEdits(contents.mainFrame);
+      watchUserEdits(contents);
       void contents.insertCSS(":where(html) { scrollbar-gutter: stable; }").catch(() => undefined);
       if (this.#agentRunsTab(tab)) refuseCookieBanners(contents);
     });
