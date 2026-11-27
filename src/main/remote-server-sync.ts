@@ -87,6 +87,7 @@ import {
 } from "./remote-agent-decoding";
 import { decodeConversationPageFromHost, decodeConversationReadStates } from "./remote-conversation-decoding";
 import { decodeRemoteBody } from "./remote-server-http";
+import { addRemotePreviewUrls } from "./remote-server-urls";
 
 const logger = createOpenBotLogger("remote-sync");
 
@@ -138,6 +139,17 @@ function single<Entity>(list: readonly Entity[]): Entity {
   const [entity, ...rest] = list;
   if (entity === undefined || rest.length > 0) throw new Error("Invalid sync row.");
   return entity;
+}
+
+/**
+ * A synced row carries the addresses of the host that sent it. Point pictures at the joined server so the
+ * client loads them through `openbot-remote-avatar`/`openbot-remote-attachment` instead of its own store.
+ */
+export function withRemotePictureUrls<Entity>(
+  spec: SyncCollectionSpec<Entity>,
+  serverId: string,
+): SyncCollectionSpec<Entity> {
+  return { ...spec, decode: (row) => addRemotePreviewUrls(spec.decode(row), serverId) };
 }
 
 function listSpec<Entity>(
@@ -456,12 +468,15 @@ export class RemoteServerSync {
   readonly #registrations: RemoteSyncRegistration[] = [];
 
   readonly channels = this.#list(
-    new RemoteSyncedList<ChannelSummary>(CHANNELS_SYNC_COLLECTION.name, CHANNEL_CHATS_CAPABILITY, () =>
-      listSpec(
-        CHANNELS_SYNC_COLLECTION,
-        (channel) => channel.id,
-        (row) =>
-          single(decodeAsHttp({ method: "GET", path: CHANNEL_ROUTES.list, body: [row] }, decodeChannelSummaries)),
+    new RemoteSyncedList<ChannelSummary>(CHANNELS_SYNC_COLLECTION.name, CHANNEL_CHATS_CAPABILITY, (serverId) =>
+      withRemotePictureUrls(
+        listSpec(
+          CHANNELS_SYNC_COLLECTION,
+          (channel) => channel.id,
+          (row) =>
+            single(decodeAsHttp({ method: "GET", path: CHANNEL_ROUTES.list, body: [row] }, decodeChannelSummaries)),
+        ),
+        serverId,
       ),
     ),
   );
@@ -470,14 +485,17 @@ export class RemoteServerSync {
     new RemoteSyncedList<ClientAgentSummary>(
       AGENTS_SYNC_COLLECTION.name,
       SYNC_CAPABILITY,
-      () =>
-        listSpec(
-          AGENTS_SYNC_COLLECTION,
-          (agent) => agent.id,
-          (row) =>
-            single(
-              decodeAsHttp({ method: "GET", path: TEAM_API_ROUTES.agents.all, body: [row] }, decodeAgentSummaries),
-            ),
+      (serverId) =>
+        withRemotePictureUrls(
+          listSpec(
+            AGENTS_SYNC_COLLECTION,
+            (agent) => agent.id,
+            (row) =>
+              single(
+                decodeAsHttp({ method: "GET", path: TEAM_API_ROUTES.agents.all, body: [row] }, decodeAgentSummaries),
+              ),
+          ),
+          serverId,
         ),
       new PrependedOrder(),
     ),
