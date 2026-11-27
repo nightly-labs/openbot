@@ -113,6 +113,7 @@ export function MarketplaceOverlay(props: {
     () => props.open,
     (open) => {
       if (!open) return;
+      setPluginCatalogSettled(false);
       void loadMarketplacePlugins((props.calls ?? desktopMarketplaceCalls()).pluginCatalog).then(() =>
         setPluginCatalogSettled(true),
       );

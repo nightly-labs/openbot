@@ -181,9 +181,11 @@ async function main(): Promise<void> {
       return { plugins: catalog.plugins.length, etag };
     });
 
-    await check("a request with the current ETag gets 304", async () => {
+    await check("a request with the current ETag, strong or weak, gets 304", async () => {
       const response = await fetch(`${base}${PLUGIN_CATALOG_PATH}`, { headers: { "If-None-Match": etag } });
       assert.equal(response.status, 304);
+      const weak = await fetch(`${base}${PLUGIN_CATALOG_PATH}`, { headers: { "If-None-Match": `"other", W/${etag}` } });
+      assert.equal(weak.status, 304);
     });
 
     await check("the shared mobile and web client reads the new apps", async () => {
@@ -213,6 +215,7 @@ async function main(): Promise<void> {
       assert.equal(catalogPluginSlug(stdioConfig(), host.servers(), tmpdir()), null);
       const catalog = await Effect.runPromise(host.load());
       assert.ok(catalog);
+      assert.ok(host.loaded());
       assert.equal(catalogPluginSlug(stdioConfig(), host.servers(), tmpdir()), STDIO_SLUG);
       assert.ok([...bundledSlugs].every((slug) => host.servers().some((entry) => entry.slug === slug)));
     });
@@ -223,6 +226,7 @@ async function main(): Promise<void> {
         resolveApiUrl: (path) => `http://127.0.0.1:9${path}`,
       });
       assert.equal(await Effect.runPromise(host.load()), null);
+      assert.equal(host.loaded(), false);
       assert.equal(host.servers().length, bundledServers.length);
     });
 

@@ -26,9 +26,13 @@ export function createPluginCatalogResponder(
     }),
   });
   return (request) => {
-    if (request.headers.get("If-None-Match") === etag) return new Response(null, { status: 304, headers });
+    if (matchesEtag(request.headers.get("If-None-Match"), etag)) return new Response(null, { status: 304, headers });
     return new Response(body, { headers: { ...headers, "Content-Type": "application/json; charset=utf-8" } });
   };
+}
+
+function matchesEtag(header: string | null, etag: string): boolean {
+  return (header ?? "").split(",").some((value) => value.trim().replace(/^W\//u, "") === etag);
 }
 
 export const pluginCatalogResponse = createPluginCatalogResponder(PLUGIN_CATALOG_INDEX, PLUGIN_CATALOG_DETAILS);

@@ -715,6 +715,7 @@ export interface TeamApiOptions {
   liveActivityPush?: LiveActivityPushService | undefined;
   pushNotifications?: PushNotificationService | undefined;
   watchRelay?: TeamApiWatchRelay | undefined;
+  pluginCatalogLoaded?: (() => boolean) | undefined;
   focusUse?: boolean | undefined;
   rateLimitCapacity?: number | undefined;
   workflowSpotStaleMs?: number | undefined;

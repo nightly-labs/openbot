@@ -37,6 +37,10 @@ export class PluginCatalogService {
     this.#servers = options.bundled;
   }
 
+  loaded(): boolean {
+    return this.#catalog !== null;
+  }
+
   servers(): readonly CatalogPluginServer[] {
     return this.#servers;
   }

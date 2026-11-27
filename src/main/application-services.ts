@@ -3368,6 +3368,7 @@ export async function createApplicationServices({
   teardown.push(TEARDOWN_ORDER.watchRelay, "the Apple Watch relay", () => Effect.runPromise(watchRelay.dispose()));
   const host = new HostService({
     watchRelay,
+    pluginCatalogLoaded: () => pluginCatalog.loaded(),
     onMemberUse: (memberId) => accountActivity.memberUsed(memberId),
     appVersion: app.getVersion(),
     store: teamStore,
