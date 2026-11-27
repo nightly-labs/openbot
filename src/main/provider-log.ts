@@ -38,6 +38,7 @@ const MAIN_LOG_PREFIXES = [
   "start-recovery",
   "update",
   "channel-routing",
+  "signal-ingress",
   "drain-scheduler",
   "linux-gpu",
 ] as const;
