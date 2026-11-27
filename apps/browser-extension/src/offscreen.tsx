@@ -52,8 +52,9 @@ interface Target {
 interface FailedTarget {
   token: string;
   saved: string | null;
-  retryAt: number;
+  at: number;
   delayMs: number;
+  refused: boolean;
   error: unknown;
 }
 
@@ -77,11 +78,14 @@ function sameAttempt(attempt: FailedTarget | null, token: string, saved: string 
 function failTarget(token: string, saved: string | null, error: unknown): FailedTarget {
   const previous = sameAttempt(failed, token, saved) ? failed : null;
   const delayMs = previous ? Math.min(previous.delayMs * 2, TARGET_RETRY_MAX_MS) : TARGET_RETRY_MS;
-  const retryAt = isRefusedSession(error) ? Number.POSITIVE_INFINITY : Date.now() + delayMs;
-  return { token, saved, retryAt, delayMs, error };
+  return { token, saved, at: Date.now(), delayMs, refused: isRefusedSession(error), error };
 }
 
-async function currentTarget(): Promise<Target | null> {
+function stillFailing(attempt: FailedTarget, maxWaitMs: number): boolean {
+  return attempt.refused || Date.now() < attempt.at + Math.min(attempt.delayMs, maxWaitMs);
+}
+
+async function currentTarget(maxWaitMs = TARGET_RETRY_MAX_MS): Promise<Target | null> {
   const session = await readSession();
   if (!session) {
     drop();
@@ -90,7 +94,7 @@ async function currentTarget(): Promise<Target | null> {
   }
   const saved = await readServerId();
   if (target && target.token === session.token && (!saved || saved === target.hostId)) return target;
-  if (sameAttempt(failed, session.token, saved) && Date.now() < failed.retryAt) throw failed.error;
+  if (sameAttempt(failed, session.token, saved) && stillFailing(failed, maxWaitMs)) throw failed.error;
   drop();
   let link: ClientBrowserLink | null = null;
   const connection = await createHostConnection(session, {
@@ -118,7 +122,7 @@ async function currentTarget(): Promise<Target | null> {
 
 async function status(): Promise<XStatusAnswer> {
   try {
-    const current = await currentTarget();
+    const current = await currentTarget(TARGET_RETRY_MS);
     if (!current) return { ready: false, reason: "signed-out" };
     return await xStatus({
       hostId: current.hostId,
@@ -134,7 +138,7 @@ async function status(): Promise<XStatusAnswer> {
 async function send(payload: XReplyPayload, clientMessageId: string): Promise<XSendResult> {
   const { t } = currentText();
   try {
-    const current = await currentTarget();
+    const current = await currentTarget(0);
     if (!current) return { ok: false, error: t("extension.x.signedOut"), reached: false };
     return await xSend(
       { hostId: current.hostId, request: current.connection.request, capabilities: current.capabilities },

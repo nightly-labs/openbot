@@ -21,6 +21,8 @@ interface Phase {
   tabChanges: number;
   lists: number;
   lastReason: string;
+  sendLists: number;
+  sendReached: boolean;
 }
 
 let answer: ListAnswer = "empty";
@@ -77,6 +79,30 @@ function askStatus(worker: Worker): Promise<string> {
   );
 }
 
+const SEND_PAYLOAD = {
+  message: "Reply to this post.",
+  pageUrl: "https://x.com/openbot/status/123456789012345678",
+  posts: [
+    {
+      authorName: "OpenBot",
+      handle: "@openbot",
+      time: "2026-11-27T00:00:00.000Z",
+      url: "https://x.com/openbot/status/123456789012345678",
+      text: "A post.",
+      article: "",
+      media: [],
+    },
+  ],
+  replyTo: 0,
+};
+
+function askSend(worker: Worker): Promise<boolean> {
+  const message = { kind: "openbot-x-offscreen", action: "send", payload: SEND_PAYLOAD, clientMessageId: "retry-e2e" };
+  return worker.evaluate<boolean>(
+    `chrome.runtime.sendMessage(${JSON.stringify(message)}).then((value) => value?.reached === true)`,
+  );
+}
+
 async function runPhase(worker: Worker, name: string, token: string, listAnswer: ListAnswer): Promise<Phase> {
   answer = listAnswer;
   await signIn(worker, token);
@@ -87,13 +113,17 @@ async function runPhase(worker: Worker, name: string, token: string, listAnswer:
   await tab.close();
   let lastReason = "";
   for (let index = 0; index < BURST; index += 1) lastReason = await askStatus(worker);
+  const beforeSend = lists;
+  const sendReached = await askSend(worker);
   const phase = {
     name,
     answer: listAnswer,
     statusMessages: BURST,
     tabChanges: BURST + 1,
-    lists: lists - before,
+    lists: beforeSend - before,
     lastReason,
+    sendLists: lists - beforeSend,
+    sendReached,
   };
   phases.push(phase);
   return phase;
@@ -115,6 +145,8 @@ try {
   const empty = await runPhase(worker, "no servers", "retry-e2e-token-1", "empty");
   assert.ok(empty.lists <= 1, `An account with no servers listed ${empty.lists} times, expected at most 1.`);
   assert.match(empty.lastReason, /^server-failed/u);
+  assert.equal(empty.sendLists, 1, "A send must look for the server again after a failure.");
+  assert.equal(empty.sendReached, false);
 
   const newToken = await runPhase(worker, "new session", "retry-e2e-token-2", "empty");
   assert.equal(newToken.lists, 1, "A new session must list the servers again once.");
@@ -122,6 +154,7 @@ try {
   const revoked = await runPhase(worker, "revoked session", "retry-e2e-token-3", "revoked");
   assert.equal(revoked.lists, 1, `A revoked session listed ${revoked.lists} times, expected 1.`);
   assert.match(revoked.lastReason, /^server-failed/u);
+  assert.equal(revoked.sendLists, 0, "A send with a refused session must wait for a new sign-in.");
   passed = true;
 } finally {
   const path = writeReport(NAME, { burst: BURST, phases, passed });
