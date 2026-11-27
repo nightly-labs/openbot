@@ -290,7 +290,7 @@ textarea:focus-visible {
   line-height: 16px;
 }
 
-.ext-connect-sign-out {
+.ext-connect-pill {
   display: flex;
   height: 32px;
   flex: none;
@@ -307,8 +307,48 @@ textarea:focus-visible {
   transition: background-color 150ms ease-out;
 }
 
-.ext-connect-sign-out:hover {
+.ext-connect-pill:hover {
   background: var(--ext-control-active);
+}
+
+.ext-connect-pill:disabled {
+  opacity: 0.58;
+  cursor: default;
+}
+
+.ext-connect-empty {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 20px;
+  padding: 64px 24px;
+  text-align: center;
+}
+
+.ext-connect-empty-mark {
+  display: grid;
+  width: 64px;
+  height: 64px;
+  place-items: center;
+  border-radius: 24px;
+  background: var(--ext-control);
+  color: var(--openbot-text-muted);
+}
+
+.ext-connect-empty-text {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.ext-connect-empty-title {
+  margin: 0;
+  color: var(--openbot-text-primary);
+  font-size: 18px;
+  font-weight: var(--openbot-weight-semibold);
+  line-height: 24px;
 }
 
 .agent-avatar {
