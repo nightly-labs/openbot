@@ -68,6 +68,7 @@ import { type ContextCompaction, compactsOnRequest } from "./context-compaction"
 import type { ConversationRuntime } from "./conversation-runtime";
 import { HANDOFF_START } from "./delivery-content";
 import type { DeltaBuffer } from "./delta-buffer";
+import { type OpenBotStop, openBotStopNote } from "./developer-instructions";
 import type { FailureContext, FailureSignal } from "./failure-signal";
 import {
   FINISH_CHECK_ABORT_POLL,
@@ -441,6 +442,8 @@ export class TurnLifecycle {
   readonly #quietEmptyAnswers = new Set<string>();
   readonly #quietEndTimers = new Map<string, NodeJS.Timeout>();
   readonly #quietStops = new Set<string>();
+  readonly #openBotStops = new Map<string, OpenBotStop>();
+  readonly #stopNotes = new Map<string, { agentId: string; note: string }>();
   readonly #quietRepeats = new Set<string>();
   readonly #reportedFailures = new Map<string, string>();
   readonly #endedTurns = new Set<string>();
@@ -510,6 +513,30 @@ export class TurnLifecycle {
       if (key.startsWith(`${agentId}\u0000`)) this.#imageLimitedChats.delete(key);
     for (const [childId, parent] of this.#codexChildren)
       if (parent.agentId === agentId) this.#codexChildren.delete(childId);
+    for (const [threadId, stop] of this.#stopNotes) if (stop.agentId === agentId) this.#stopNotes.delete(threadId);
+  }
+
+  markAgentStop(turnId: string): void {
+    this.#openBotStops.set(turnId, "agent");
+  }
+
+  stopNote(threadId: string): string | undefined {
+    return this.#stopNotes.get(threadId)?.note;
+  }
+
+  clearStopNote(threadId: string, sent: string | undefined): void {
+    if (sent !== undefined && this.#stopNotes.get(threadId)?.note === sent) this.#stopNotes.delete(threadId);
+  }
+
+  #keepStopNote(agentId: string, threadId: string, turnId: string, status: string): void {
+    const stop = this.#openBotStops.get(turnId);
+    this.#openBotStops.delete(turnId);
+    const stoppedByOpenBot =
+      stop !== undefined &&
+      (status !== "completed" || stop === "quiet") &&
+      !this.#hooks.turnStopped(agentId, this.#taskForThread(agentId, threadId), turnId);
+    if (stoppedByOpenBot) this.#stopNotes.set(threadId, { agentId, note: openBotStopNote(stop) });
+    else this.#stopNotes.delete(threadId);
   }
 
   deliveriesStarting(deliveryIds: readonly string[], start: DeliveryStart): void {
@@ -607,6 +634,8 @@ export class TurnLifecycle {
     for (const timer of this.#quietEndTimers.values()) clearTimeout(timer);
     this.#quietEndTimers.clear();
     this.#quietStops.clear();
+    this.#openBotStops.clear();
+    this.#stopNotes.clear();
     this.#quietRepeats.clear();
     this.#reportedFailures.clear();
     this.#endedTurns.clear();
@@ -904,6 +933,7 @@ export class TurnLifecycle {
         true,
         client,
       );
+      this.#openBotStops.set(turnId, "compaction");
       Effect.runFork(client.request("turn/interrupt", { threadId, turnId }, decodeRecordResponse).pipe(Effect.ignore));
     }, runMs);
     timer.unref?.();
@@ -927,6 +957,7 @@ export class TurnLifecycle {
       client,
       sourceText("error.agent.compactionLoopStopped", { provider: agentProviderName(client.provider) }),
     );
+    this.#openBotStops.set(turnId, "compaction");
     Effect.runFork(client.request("turn/interrupt", { threadId, turnId }, decodeRecordResponse).pipe(Effect.ignore));
   }
 
@@ -1753,6 +1784,8 @@ export class TurnLifecycle {
         if (notification.method === "error" && errorTurnId && this.#runningTurns.has(errorTurnId)) {
           this.#turnErrors.set(errorTurnId, shownMessage);
           this.#turnCauses.set(errorTurnId, causeCode);
+          if (causeCode === "stalled" || (isRecord(params) && params.stoppedBy === "openbot"))
+            this.#openBotStops.set(errorTurnId, causeCode === "turn_limit" ? "toolLoop" : "stalled");
           if (refusedSessionFailure(source.provider, message) !== null) return;
           const errorInfo = error?.codexErrorInfo;
           if (source.provider === "codex" && typeof errorInfo === "string" && CODEX_SAFETY_BLOCKS.has(errorInfo)) {
@@ -2011,6 +2044,7 @@ export class TurnLifecycle {
       context: { causeCode: CAPACITY_CAUSE, provider, model, turnId, severity: "error" },
       movesToBackup: true,
     });
+    this.#openBotStops.set(turnId, "capacity");
     Effect.runFork(
       running.client.request("turn/interrupt", { threadId, turnId }, decodeRecordResponse).pipe(
         Effect.catch((error) =>
@@ -2131,6 +2165,7 @@ export class TurnLifecycle {
         return;
       }
       this.#quietStops.add(turnId);
+      this.#openBotStops.set(turnId, "quiet");
       logger.info(
         repeated
           ? "A quiet turn called the no-update tool again; OpenBot ends it."
@@ -2236,6 +2271,7 @@ export class TurnLifecycle {
       this.#runningTurns.delete(turnId);
       this.#markEnded(turnId);
       this.#completingTurns.add(turnId);
+      this.#keepStopNote(agentId, threadId, turnId, status);
       const toolOutcomes = this.#traces.toolOutcomes(turnId);
       const trace = this.#traces.take(turnId, new Date().toISOString());
       const noUpdateSteps = this.#noUpdateSteps.get(turnId);

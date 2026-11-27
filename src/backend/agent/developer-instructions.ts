@@ -358,6 +358,29 @@ export const SESSION_RELOAD_NOTE = [
   "</openbot_session_reload>",
 ].join("\n");
 
+const OPENBOT_STOP_START = "<openbot_stop>";
+
+export type OpenBotStop = "stalled" | "toolLoop" | "compaction" | "capacity" | "quiet" | "agent";
+
+const OPENBOT_STOP_REASONS: Record<OpenBotStop, string> = {
+  stalled: "your provider sent nothing for a long time",
+  toolLoop: "the same tool call failed again and again",
+  compaction: "the compaction of your context did not end",
+  capacity: "your model was at capacity, so OpenBot moved the work to another model",
+  quiet: "you had called the no-update tool and sent nothing more",
+  agent: "the agent that sent you the request stopped that work",
+};
+
+export function openBotStopNote(stop: OpenBotStop): string {
+  return [
+    OPENBOT_STOP_START,
+    `OpenBot note, not a message from the user. OpenBot stopped your last turn because ${OPENBOT_STOP_REASONS[stop]}. The user did not stop it.`,
+    "A tool result that says the user interrupted, stopped or declined a call came from this stop, not from the user. Do not tell the user that they stopped or interrupted your work, and do not ask the user for permission to continue because of this stop.",
+    "An action that this stop ended possibly ran in part: check its result before you do it again. This note does not approve a risky action.",
+    "</openbot_stop>",
+  ].join("\n");
+}
+
 export function isTurnContextBlock(text: string): boolean {
   return [
     MEMORY_BLOCK_START,
@@ -369,12 +392,13 @@ export function isTurnContextBlock(text: string): boolean {
     STEER_NOTE_START,
     BACKGROUND_WAKE_START,
     SESSION_RELOAD_START,
+    OPENBOT_STOP_START,
   ].some((start) => text.startsWith(`${start}\n`));
 }
 
 export function withoutTurnContext(text: string): string {
   return text.replace(
-    /^(?:<(openbot_saved_memories|openbot_saved_memories_update|openbot_section_teammates|openbot_agent_instructions|openbot_saved_logins|openbot_turn_style|openbot_steer|openbot_background_wake|openbot_session_reload)>\n[\s\S]*?\n<\/\1>\n*)+/u,
+    /^(?:<(openbot_saved_memories|openbot_saved_memories_update|openbot_section_teammates|openbot_agent_instructions|openbot_saved_logins|openbot_turn_style|openbot_steer|openbot_background_wake|openbot_session_reload|openbot_stop)>\n[\s\S]*?\n<\/\1>\n*)+/u,
     "",
   );
 }
