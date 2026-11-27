@@ -398,6 +398,17 @@ export class AuthService {
     (operation) => operation.pipe(Effect.mapError(authFailure), Effect.provide(this.#layer)),
   ).bind(this);
 
+  readonly readProfile = Effect.fn("AuthService.readProfile")(
+    function* (
+      this: AuthService,
+      sessionToken: string,
+    ): Effect.fn.Return<AuthUser | null, AuthWorkflowFailure, AuthDependencies> {
+      const dependencies = yield* AuthDependencies;
+      return yield* dependencies.repository.authenticate(sessionToken, dependencies.now(), "primary");
+    },
+    (operation) => operation.pipe(Effect.mapError(authFailure), Effect.provide(this.#layer)),
+  ).bind(this);
+
   readonly authenticateDesktopSession = Effect.fn("AuthService.authenticateDesktopSession")(
     function* (
       this: AuthService,
@@ -814,6 +825,17 @@ export class AuthService {
     ): Effect.fn.Return<AuthUser | null, AuthWorkflowFailure, AuthDependencies> {
       const dependencies = yield* AuthDependencies;
       return yield* dependencies.repository.authenticateMobileSession(sessionToken, dependencies.now());
+    },
+    (operation) => operation.pipe(Effect.mapError(authFailure), Effect.provide(this.#layer)),
+  ).bind(this);
+
+  readonly readMobileProfile = Effect.fn("AuthService.readMobileProfile")(
+    function* (
+      this: AuthService,
+      sessionToken: string,
+    ): Effect.fn.Return<AuthUser | null, AuthWorkflowFailure, AuthDependencies> {
+      const dependencies = yield* AuthDependencies;
+      return yield* dependencies.repository.authenticateMobileSession(sessionToken, dependencies.now(), "primary");
     },
     (operation) => operation.pipe(Effect.mapError(authFailure), Effect.provide(this.#layer)),
   ).bind(this);

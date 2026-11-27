@@ -110,6 +110,16 @@ async function main() {
     { user: newSession?.id ?? null, counts: { ...counts } },
   );
 
+  const replicaBeforeProfile = counts.replica;
+  const profile = await Effect.runPromise(
+    repository.authenticate("old-token", AFTER_ACTIVITY_INTERVAL + 30_000, "primary"),
+  );
+  check(
+    "a profile read gets the new profile from the primary while the replica still has the old one",
+    profile?.name === "New name" && counts.replica === replicaBeforeProfile,
+    { name: profile?.name ?? null, counts: { ...counts } },
+  );
+
   const missing = await Effect.runPromise(repository.authenticate("no-token", AFTER_ACTIVITY_INTERVAL + 40_000));
   check("an unknown session is still refused after the primary read", missing === null, { counts: { ...counts } });
 

@@ -12,6 +12,7 @@ import type {
   MobileAuthDevice,
   MobileAuthDeviceIdentity,
   MobileAuthSessionResult,
+  SessionReads,
 } from "./types";
 
 interface UserRow {
@@ -67,9 +68,12 @@ const selectSessionRow = Effect.fn("D1AuthRepository.selectSessionRow")(function
   sql: string,
   tokenHash: string,
   now: number,
+  reads: SessionReads,
 ): Effect.fn.Return<T | null, AuthStoreError> {
-  const row = yield* storeCall(() => replicaD1(database).prepare(sql).bind(tokenHash, now).first<T>());
-  if (row) return row;
+  if (reads === "replica") {
+    const row = yield* storeCall(() => replicaD1(database).prepare(sql).bind(tokenHash, now).first<T>());
+    if (row) return row;
+  }
   return yield* storeCall(() => database.prepare(sql).bind(tokenHash, now).first<T>());
 });
 export class D1AuthRepository implements AuthRepository {
@@ -319,6 +323,7 @@ export class D1AuthRepository implements AuthRepository {
       this: D1AuthRepository,
       sessionToken: string,
       now: number,
+      reads: SessionReads = "replica",
     ): Effect.fn.Return<AuthUser | null, AuthStoreError, AuthDatabase> {
       const database = yield* AuthDatabase;
       const tokenHash = yield* sha256(sessionToken).pipe(
@@ -334,6 +339,7 @@ export class D1AuthRepository implements AuthRepository {
            AND auth_sessions.expires_at > ?`,
         tokenHash,
         now,
+        reads,
       );
       if (!row) return null;
       yield* this.#updateSessionActivityEffect(tokenHash, row.last_used_at, now);
@@ -366,6 +372,7 @@ export class D1AuthRepository implements AuthRepository {
            )`,
         tokenHash,
         now,
+        "replica",
       );
       if (!row) return null;
       yield* this.#updateSessionActivityEffect(tokenHash, row.last_used_at, now);
@@ -887,6 +894,7 @@ export class D1AuthRepository implements AuthRepository {
       this: D1AuthRepository,
       sessionToken: string,
       now: number,
+      reads: SessionReads = "replica",
     ): Effect.fn.Return<AuthUser | null, AuthStoreError, AuthDatabase> {
       const database = yield* AuthDatabase;
       const tokenHash = yield* sha256(sessionToken).pipe(
@@ -903,6 +911,7 @@ export class D1AuthRepository implements AuthRepository {
            AND auth_sessions.expires_at > ?`,
         tokenHash,
         now,
+        reads,
       );
       if (!row) return null;
       yield* this.#updateSessionActivityEffect(tokenHash, row.last_used_at, now);

@@ -11,7 +11,7 @@ export const Route = createFileRoute("/v1/me")({
           Effect.gen(function* () {
             const token = bearerToken(request);
             if (!token) return apiError(401, "unauthorized", "Sign in is required.");
-            const user = yield* requestAuthService().authenticate(token);
+            const user = yield* requestAuthService().readProfile(token);
             return user ? json(user) : apiError(401, "unauthorized", "The session is invalid.");
           }),
           authErrorResponse,

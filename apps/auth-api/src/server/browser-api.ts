@@ -55,6 +55,7 @@ export interface BrowserApiServices {
     | "startEmailSignIn"
     | "verifyEmailCode"
     | "authenticate"
+    | "readProfile"
     | "enforceTeamInviteRateLimit"
     | "updateAnalytics"
     | "updateChatColor"
@@ -311,7 +312,9 @@ const handleBrowserOperation = Effect.fn("BrowserApi.handleOperation")(function*
     return json({ accepted: true });
   }
   const token = browserSessionToken(request);
-  const user = token ? yield* services.auth.authenticate(token) : null;
+  const user = token
+    ? yield* path === "session" ? services.auth.readProfile(token) : services.auth.authenticate(token)
+    : null;
   if (path === "logout" && request.method === "POST") {
     if (token && user) yield* services.remote.endAccountSession(user.id, yield* sha256(token));
     const response = json({ signedOut: true });
