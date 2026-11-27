@@ -330,20 +330,35 @@ export function MessageLink(props: {
       }}
     >
       <span class="message-link-icon" aria-hidden="true">
-        <LinkIcon />
-        <Show when={props.favicon !== false}>
-          <img
-            src={faviconUrl(props.url)}
-            alt=""
-            loading="lazy"
-            decoding="async"
-            referrerpolicy="no-referrer"
-            onError={(event) => event.currentTarget.remove()}
-          />
+        <Show when={props.favicon !== false && faviconUrl(props.url)} fallback={<LinkIcon />} keyed>
+          {(url) => <MessageLinkFavicon url={url} />}
         </Show>
       </span>
       {props.children}
     </a>
+  );
+}
+
+function MessageLinkFavicon(props: { url: string }) {
+  const [status, setStatus] = createSignal<"loading" | "loaded" | "failed">("loading");
+  return (
+    <>
+      <Show when={status() !== "loaded"}>
+        <LinkIcon />
+      </Show>
+      <Show when={status() !== "failed"}>
+        <img
+          src={props.url}
+          alt=""
+          loading="lazy"
+          decoding="async"
+          referrerpolicy="no-referrer"
+          data-loaded={status() === "loaded" ? "true" : undefined}
+          onLoad={() => setStatus("loaded")}
+          onError={() => setStatus("failed")}
+        />
+      </Show>
+    </>
   );
 }
 
