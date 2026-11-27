@@ -176,36 +176,67 @@ export function createBrowserStore(deps: BrowserStoreDeps) {
     preview: null,
   });
   let browserTakeoverPreviewKey: string | null = null;
+  let browserTakeoverPreviewPage: string | null = null;
   let browserTakeoverPreviewGeneration = 0;
+  let browserTakeoverPreviewCapturing = false;
+  let browserTakeoverPreviewNext: { tabId: string; generation: number } | null = null;
+  function captureBrowserTakeoverPreview(tabId: string, generation: number) {
+    if (browserTakeoverPreviewCapturing) {
+      browserTakeoverPreviewNext = { tabId, generation };
+      return;
+    }
+    browserTakeoverPreviewCapturing = true;
+    void conversationRuntime(deps.props)
+      .browser.capturePreview(tabId)
+      .then(
+        (preview) => {
+          if (browserTakeoverPreviewGeneration === generation) setBrowserTakeoverPreview({ status: "ready", preview });
+        },
+        () => {
+          if (browserTakeoverPreviewGeneration !== generation) return;
+          setBrowserTakeoverPreview((current) => (current.preview ? current : { status: "failed", preview: null }));
+        },
+      )
+      .finally(() => {
+        browserTakeoverPreviewCapturing = false;
+        const next = browserTakeoverPreviewNext;
+        browserTakeoverPreviewNext = null;
+        if (next?.generation === browserTakeoverPreviewGeneration)
+          captureBrowserTakeoverPreview(next.tabId, next.generation);
+      });
+  }
   createEffect(
-    () => ({
-      request: deps.props.browserTakeover,
-      suspended: deps.props.browserVisibilitySuspended,
-    }),
-    ({ request, suspended }) => {
+    () => {
+      const tab = browserTakeoverTab();
+      return {
+        request: deps.props.browserTakeover,
+        suspended: deps.props.browserVisibilitySuspended,
+        page: tab && !tab.loading ? JSON.stringify([tab.url, tab.title]) : null,
+      };
+    },
+    ({ request, suspended, page }) => {
       if (!request || request.secret || suspended) {
         browserTakeoverPreviewKey = null;
+        browserTakeoverPreviewPage = null;
+        browserTakeoverPreviewNext = null;
         browserTakeoverPreviewGeneration += 1;
         setBrowserTakeoverPreview({ status: "idle", preview: null });
         return;
       }
 
       const requestKey = String(request.requestId);
-      if (browserTakeoverPreviewKey === requestKey) return;
+      if (browserTakeoverPreviewKey === requestKey) {
+        if (page === null || page === browserTakeoverPreviewPage) return;
+        browserTakeoverPreviewPage = page;
+        captureBrowserTakeoverPreview(request.tabId, browserTakeoverPreviewGeneration);
+        return;
+      }
 
       browserTakeoverPreviewKey = requestKey;
+      browserTakeoverPreviewPage = page;
       const generation = ++browserTakeoverPreviewGeneration;
       setBrowserTakeoverPreview({ status: "loading", preview: null });
-      void conversationRuntime(deps.props)
-        .browser.capturePreview(request.tabId)
-        .then((preview) => {
-          if (browserTakeoverPreviewGeneration !== generation) return;
-          setBrowserTakeoverPreview({ status: "ready", preview });
-        })
-        .catch(() => {
-          if (browserTakeoverPreviewGeneration !== generation) return;
-          setBrowserTakeoverPreview({ status: "failed", preview: null });
-        });
+      captureBrowserTakeoverPreview(request.tabId, generation);
     },
   );
   const latestMessageMarker = createMemo(() => {
