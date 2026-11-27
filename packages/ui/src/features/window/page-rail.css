@@ -213,6 +213,10 @@
   stroke: var(--openbot-danger);
 }
 
+.window-rail-usage-pace {
+  stroke: var(--openbot-text-primary);
+}
+
 .window-rail-usage-more .window-rail-usage-count {
   color: var(--openbot-text-secondary);
   font-size: var(--openbot-text-sm);

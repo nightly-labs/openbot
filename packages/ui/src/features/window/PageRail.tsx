@@ -1,6 +1,6 @@
 import { AppLogo, type AppLogoVariant, ProviderLogo } from "@openbot/brand";
 import type { CreditMediaModel } from "@openbot/contracts/credit-media";
-import { usageTone } from "@openbot/team-client/plan-limits";
+import { usagePaceRemainingPercent, usageTone } from "@openbot/team-client/plan-limits";
 import {
   Bot,
   BriefcaseBusiness,
@@ -29,7 +29,7 @@ import { AccountUsageDetails, AccountUsageWindowList } from "@openbot/ui/feature
 import { type AccountUsageProviderRow, accountUsageRowKey } from "@openbot/ui/features/account/account-usage-view";
 import { useText } from "@openbot/ui/text";
 import { Dynamic, type JSX } from "@solidjs/web";
-import { createMemo, createSignal, For, onSettled, Show } from "solid-js";
+import { createMemo, createSignal, For, onCleanup, onSettled, Show } from "solid-js";
 import { CreditIcon } from "../credits/CreditIcon";
 import { CreditsRailChip } from "../credits/CreditsRailChip";
 
@@ -158,7 +158,18 @@ function UsageCard(props: { rows: AccountUsageProviderRow[] }) {
   );
 }
 
-const RING = { size: 34, stroke: 2.25, spacing: 4.5 };
+const RING = { size: 34, stroke: 2.25, spacing: 4.5, paceTick: 3.75, paceClockMs: 30_000 };
+
+function paceTick(radius: number, pacePercent: number) {
+  const angle = (pacePercent / 100) * 2 * Math.PI;
+  const point = (distance: number) => ({
+    x: RING.size / 2 + distance * Math.cos(angle),
+    y: RING.size / 2 + distance * Math.sin(angle),
+  });
+  const inner = point(radius - RING.paceTick / 2);
+  const outer = point(radius + RING.paceTick / 2);
+  return { x1: inner.x, y1: inner.y, x2: outer.x, y2: outer.y };
+}
 
 function UsageRings(props: {
   row: AccountUsageProviderRow;
@@ -186,6 +197,9 @@ function UsageRings(props: {
   const windows = () => [...ringRow().ringWindows].reverse().slice(0, 2);
   const unavailable = () => props.row.readFailed && windows().length === 0;
   const outerRadius = (RING.size - RING.stroke) / 2;
+  const [now, setNow] = createSignal(Date.now());
+  const clock = window.setInterval(() => setNow(Date.now()), RING.paceClockMs);
+  onCleanup(() => window.clearInterval(clock));
   return (
     <RailButton
       label={label()}
@@ -216,6 +230,16 @@ function UsageRings(props: {
                   pathLength={100}
                   stroke-dasharray={`${window().remainingPercent} 100`}
                 />
+              </Show>
+              <Show when={usagePaceRemainingPercent(window().durationMins, window().resetsAt, now())}>
+                {(pace) => (
+                  <line
+                    class="window-rail-usage-pace"
+                    {...paceTick(outerRadius - index * RING.spacing, pace())}
+                    stroke-width={1.5}
+                    stroke-linecap="round"
+                  />
+                )}
               </Show>
             </g>
           )}
