@@ -1,7 +1,7 @@
 import { Effect, Result } from "effect";
 import { routeRequest as routeHostedSiteRequest } from "../../../site-router/src/index";
 import { passkeyWalletHostResponse } from "../lib/near-sign-csp";
-import { OPENBOT_SITE_URL } from "../lib/site-metadata";
+import { OPENBOT_SECURITY_HEADERS, OPENBOT_SITE_URL } from "../lib/site-metadata";
 import { sendAccountActivitySnapshots } from "./account-activity";
 import { createAccountAnalytics, createAccountEventDelivery } from "./account-analytics";
 import { type AuthRetentionResult, pruneExpiredAuthData } from "./auth-data-retention";
@@ -120,7 +120,9 @@ export function createWorkerHandler(
 
   return {
     async fetch(request: Request, workerBindings: WorkerFetchBindings, context?: WorkerExecutionContext) {
-      return withD1RequestSession(request, workerBindings.DB, () => handleFetch(request, workerBindings, context));
+      return withStrictTransportSecurity(
+        await withD1RequestSession(request, workerBindings.DB, () => handleFetch(request, workerBindings, context)),
+      );
     },
     async scheduled(
       controller: Pick<ScheduledController, "scheduledTime"> & Partial<Pick<ScheduledController, "cron">>,
@@ -187,6 +189,15 @@ export function createWorkerHandler(
       if (sites) console.info("Hosted site cleanup completed.", sites);
     },
   } satisfies ExportedHandler<WorkerBindings>;
+}
+
+const STRICT_TRANSPORT_SECURITY = "Strict-Transport-Security";
+
+function withStrictTransportSecurity(response: Response): Response {
+  if (response.status === 101 || response.headers.has(STRICT_TRANSPORT_SECURITY)) return response;
+  const copy = new Response(response.body, response);
+  copy.headers.set(STRICT_TRANSPORT_SECURITY, OPENBOT_SECURITY_HEADERS[STRICT_TRANSPORT_SECURITY]);
+  return copy;
 }
 
 async function runSignalEntryCheck(bindings: Partial<SignalEntryBindings>): Promise<void> {

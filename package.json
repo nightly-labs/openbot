@@ -710,5 +710,9 @@
     "electron-winstaller",
     "esbuild",
     "workerd"
-  ]
+  ],
+  "overrides": {
+    "shell-quote": "1.12.0",
+    "proxy-addr": "2.0.8"
+  }
 }
