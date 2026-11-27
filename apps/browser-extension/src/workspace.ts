@@ -662,6 +662,7 @@ export function createWorkspace(
     setState((draft) => {
       if (!draft.agents.some((entry) => entry.id === agent.id)) draft.agents.push(agent);
     });
+    pictures.load([agent]);
     const color = draft.avatarColor;
     if (color && has(AGENT_COLORS_CAPABILITY))
       await runTeamEffect(setAgentColor(request, { agentId: agent.id, color })).then(

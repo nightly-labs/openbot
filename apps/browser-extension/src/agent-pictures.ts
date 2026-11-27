@@ -42,6 +42,7 @@ function decodePicture(value: unknown): string {
 
 export function createAgentPictures(request: TeamApiRequest, show: (agentId: string, picture: AgentPicture) => void) {
   const started = new Set<string>();
+  const wanted = new Map<string, string | null>();
   const queue: PictureRead[] = [];
   let reads = 0;
   let disposed = false;
@@ -55,7 +56,7 @@ export function createAgentPictures(request: TeamApiRequest, show: (agentId: str
       void request("GET", path, decodePicture)
         .then(
           (url) => {
-            if (!disposed) show(next.agentId, { source: next.source, url });
+            if (!disposed && wanted.get(next.agentId) === next.source) show(next.agentId, { source: next.source, url });
           },
           () => started.delete(next.key),
         )
@@ -70,6 +71,7 @@ export function createAgentPictures(request: TeamApiRequest, show: (agentId: str
     load(agents: readonly ClientAgentSummary[]): void {
       for (const agent of agents) {
         const source = agent.avatarUrl;
+        wanted.set(agent.id, source);
         const version = source ? pictureVersion(source) : null;
         if (!source || !version) continue;
         const key = `${agent.id} ${source}`;

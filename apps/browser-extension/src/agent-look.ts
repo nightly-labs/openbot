@@ -24,7 +24,8 @@ export function avatarAgent(agent: ClientAgentSummary, look: AgentLook) {
 }
 
 export function lookProfile(agent: ClientAgentSummary, look: AgentLook) {
-  return toAgentProfile({ ...agent, avatarColor: look.colors[agent.id] ?? null, avatarUrl: shownPicture(agent, look) });
+  const avatarUrl = shownPicture(agent, look) ?? agent.avatarUrl;
+  return toAgentProfile({ ...agent, avatarColor: look.colors[agent.id] ?? null, avatarUrl });
 }
 
 export function bubbleColors(agent: ClientAgentSummary, color: AvatarColor | undefined) {
