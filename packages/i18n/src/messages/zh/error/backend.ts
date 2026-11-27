@@ -115,6 +115,7 @@ export const messages = {
   "error.backend.channelLeadRefused": "频道主责的模型拒绝了此请求。请选择一位成员，或为主责选择其他模型。",
   "error.backend.channelLeadNotPermitted": "频道主责的提供方拒绝了此账户的访问。请检查账户，或选择一位成员。",
   "error.backend.channelLeadBilling": "频道主责的账户没有余额，或其套餐不包含此模型。请检查套餐，或选择一位成员。",
+  "error.backend.channelLeadUsageLimit": "频道主责的模型已达到使用上限。请选择一位成员，或为主责选择其他模型。",
   "error.backend.channelLeadBlocked": "频道主责的提供方拦截了此请求。请修改请求，或选择一位成员。",
   "error.backend.channelLeadNoAnswer": "频道主责的模型没有给出回答。请重试，或选择一位成员。",
   "error.backend.channelLeadProviderError": "频道主责的提供方出现错误。请几分钟后重试，或选择一位成员。",

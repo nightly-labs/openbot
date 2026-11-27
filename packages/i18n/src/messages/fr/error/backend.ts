@@ -145,6 +145,8 @@ export const messages = {
     "Le fournisseur du responsable a refusé l'accès pour ce compte. Vérifiez le compte ou choisissez un membre.",
   "error.backend.channelLeadBilling":
     "Le compte du responsable n'a plus de crédit, ou son forfait n'inclut pas ce modèle. Vérifiez le forfait ou choisissez un membre.",
+  "error.backend.channelLeadUsageLimit":
+    "Le modèle du responsable a atteint sa limite d'utilisation. Choisissez un membre ou un autre modèle pour le responsable.",
   "error.backend.channelLeadBlocked":
     "Le fournisseur du responsable a bloqué cette demande. Modifiez la demande ou choisissez un membre.",
   "error.backend.channelLeadNoAnswer":

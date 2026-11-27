@@ -147,6 +147,8 @@ export const messages = {
     "Der Anbieter der Kanalleitung hat den Zugriff für dieses Konto verweigert. Prüfe das Konto, oder wähle ein Mitglied.",
   "error.backend.channelLeadBilling":
     "Das Konto der Kanalleitung hat kein Guthaben, oder sein Tarif enthält dieses Modell nicht. Prüfe den Tarif, oder wähle ein Mitglied.",
+  "error.backend.channelLeadUsageLimit":
+    "Das Modell der Kanalleitung hat sein Nutzungslimit erreicht. Wähle ein Mitglied, oder wähle ein anderes Modell für die Kanalleitung.",
   "error.backend.channelLeadBlocked":
     "Der Anbieter der Kanalleitung hat diese Anfrage blockiert. Ändere die Anfrage, oder wähle ein Mitglied.",
   "error.backend.channelLeadNoAnswer":

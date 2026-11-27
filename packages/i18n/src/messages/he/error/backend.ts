@@ -122,6 +122,8 @@ export const messages = {
     "הספק של מוביל הערוץ דחה את הגישה לחשבון הזה. יש לבדוק את החשבון, או לבחור חבר.",
   "error.backend.channelLeadBilling":
     "בחשבון של מוביל הערוץ אין קרדיט, או שהתוכנית שלו לא כוללת את המודל הזה. יש לבדוק את התוכנית, או לבחור חבר.",
+  "error.backend.channelLeadUsageLimit":
+    "המודל של מוביל הערוץ הגיע למגבלת השימוש. יש לבחור חבר, או לבחור מודל אחר למוביל.",
   "error.backend.channelLeadBlocked": "הספק של מוביל הערוץ חסם את הבקשה. יש לשנות את הבקשה, או לבחור חבר.",
   "error.backend.channelLeadNoAnswer": "המודל של מוביל הערוץ לא נתן תשובה. יש לנסות שוב, או לבחור חבר.",
   "error.backend.channelLeadProviderError":

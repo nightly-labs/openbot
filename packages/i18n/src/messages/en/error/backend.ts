@@ -131,6 +131,8 @@ export const messages = defineMessages("error.backend", {
     "The lead's provider refused access for this account. Check the account, or choose a member.",
   "error.backend.channelLeadBilling":
     "The lead's account has no credit, or its plan does not include this model. Check the plan, or choose a member.",
+  "error.backend.channelLeadUsageLimit":
+    "The lead's model reached its usage limit. Choose a member, or choose another model for the lead.",
   "error.backend.channelLeadBlocked":
     "The lead's provider blocked this request. Change the request, or choose a member.",
   "error.backend.channelLeadNoAnswer": "The lead's model gave no answer. Try again, or choose a member.",

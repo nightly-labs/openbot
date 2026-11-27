@@ -3959,6 +3959,7 @@ const CHANNEL_LEAD_FAILURE_KEYS = [
   ["invalid_request", "error.backend.channelLeadRefused"],
   ["permission", "error.backend.channelLeadNotPermitted"],
   ["billing", "error.backend.channelLeadBilling"],
+  ["usage_limit", "error.backend.channelLeadUsageLimit"],
   ["content_blocked", "error.backend.channelLeadBlocked"],
   ["context_too_long", "error.backend.channelRoutingTooLong"],
   ["timeout", "error.backend.channelLeadTimedOut"],

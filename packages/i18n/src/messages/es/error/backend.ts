@@ -144,6 +144,8 @@ export const messages = {
     "El proveedor del coordinador rechazó el acceso de esta cuenta. Revisa la cuenta o elige un miembro.",
   "error.backend.channelLeadBilling":
     "La cuenta del coordinador no tiene crédito, o su plan no incluye este modelo. Revisa el plan o elige un miembro.",
+  "error.backend.channelLeadUsageLimit":
+    "El modelo del coordinador alcanzó su límite de uso. Elige un miembro o elige otro modelo para el coordinador.",
   "error.backend.channelLeadBlocked":
     "El proveedor del coordinador bloqueó esta solicitud. Cambia la solicitud o elige un miembro.",
   "error.backend.channelLeadNoAnswer":

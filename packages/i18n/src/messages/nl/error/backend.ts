@@ -142,6 +142,8 @@ export const messages = {
     "De provider van de kanaalleider weigerde toegang voor dit account. Controleer het account, of kies een lid.",
   "error.backend.channelLeadBilling":
     "Het account van de kanaalleider heeft geen tegoed, of het abonnement bevat dit model niet. Controleer het abonnement, of kies een lid.",
+  "error.backend.channelLeadUsageLimit":
+    "Het model van de kanaalleider heeft zijn gebruikslimiet bereikt. Kies een lid, of kies een ander model voor de leider.",
   "error.backend.channelLeadBlocked":
     "De provider van de kanaalleider blokkeerde dit verzoek. Wijzig het verzoek, of kies een lid.",
   "error.backend.channelLeadNoAnswer":

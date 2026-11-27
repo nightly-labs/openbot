@@ -142,6 +142,8 @@ export const messages = {
     "Il provider del responsabile ha negato l'accesso a questo account. Controlla l'account o scegli un membro.",
   "error.backend.channelLeadBilling":
     "L'account del responsabile non ha credito, o il suo piano non include questo modello. Controlla il piano o scegli un membro.",
+  "error.backend.channelLeadUsageLimit":
+    "Il modello del responsabile ha raggiunto il limite di utilizzo. Scegli un membro o un altro modello per il responsabile.",
   "error.backend.channelLeadBlocked":
     "Il provider del responsabile ha bloccato questa richiesta. Modifica la richiesta o scegli un membro.",
   "error.backend.channelLeadNoAnswer":

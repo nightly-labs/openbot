@@ -143,6 +143,8 @@ export const messages = {
     "O provedor do líder recusou o acesso desta conta. Verifique a conta ou escolha um membro.",
   "error.backend.channelLeadBilling":
     "A conta do líder não tem crédito, ou o plano dela não inclui este modelo. Verifique o plano ou escolha um membro.",
+  "error.backend.channelLeadUsageLimit":
+    "O modelo do líder atingiu o limite de uso. Escolha um membro ou outro modelo para o líder.",
   "error.backend.channelLeadBlocked":
     "O provedor do líder bloqueou esta solicitação. Altere a solicitação ou escolha um membro.",
   "error.backend.channelLeadNoAnswer":

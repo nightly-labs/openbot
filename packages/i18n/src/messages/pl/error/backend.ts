@@ -140,6 +140,8 @@ export const messages = {
     "Dostawca lidera kanału odmówił dostępu temu kontu. Sprawdź konto lub wybierz członka.",
   "error.backend.channelLeadBilling":
     "Konto lidera kanału nie ma środków albo jego plan nie obejmuje tego modelu. Sprawdź plan lub wybierz członka.",
+  "error.backend.channelLeadUsageLimit":
+    "Model lidera kanału osiągnął limit użycia. Wybierz członka lub wybierz inny model dla lidera.",
   "error.backend.channelLeadBlocked": "Dostawca lidera kanału zablokował tę prośbę. Zmień prośbę lub wybierz członka.",
   "error.backend.channelLeadNoAnswer": "Model lidera kanału nie dał odpowiedzi. Spróbuj ponownie lub wybierz członka.",
   "error.backend.channelLeadProviderError":

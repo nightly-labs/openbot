@@ -236,6 +236,11 @@ async function route(name: string, text: string, leadId: string, memberId: strin
 const CASES = [
   { name: "billing", text: "ROUTE-FAIL cause:billing", shown: sourceText("error.backend.channelLeadBilling") },
   {
+    name: "usage limit",
+    text: "ROUTE-FAIL cause:usage_limit",
+    shown: sourceText("error.backend.channelLeadUsageLimit"),
+  },
+  {
     name: "provider internal error",
     text: "ROUTE-FAIL cause:provider_internal_error",
     shown: sourceText("error.backend.channelLeadProviderError"),
