@@ -38,6 +38,7 @@ const APP = "300000000000000001";
 const GUILD = "100000000000000001";
 const CHANNEL = "110000000000000001";
 const HIDDEN = "110000000000000002";
+const NOTES = "110000000000000003";
 
 interface Step {
   name: string;
@@ -51,7 +52,7 @@ const report: { steps: Step[]; passed: boolean; unverified: string[] } = {
   passed: false,
   unverified: [
     "Discord itself: a fake REST client answers, so Discord's own permission checks are not run.",
-    "A read of a Slack, Telegram or WhatsApp place: this check connects only Discord. Each platform uses the same check against the adapter's place list.",
+    "A read of a Slack, Telegram or WhatsApp place: this check connects only Discord. Each platform uses the same check against the adapter's place list, and the same page and message cut.",
     "An agent turn: the check calls the tool as the tool router does, and no provider runs.",
   ],
 };
@@ -95,8 +96,12 @@ const reads: string[] = [];
 const VIEW_CHANNEL = 1n << 10n;
 const VIEW_AND_SEND = (VIEW_CHANNEL | (1n << 11n)).toString();
 const DISCORD_EPOCH_MS = 1_420_070_400_000n;
-const snowflake = (agoMs: number, index: number) =>
-  (((BigInt(Date.now() - agoMs) - DISCORD_EPOCH_MS) << 22n) + BigInt(index)).toString();
+const snowflakeAt = (ms: number, index: number) =>
+  (((BigInt(ms) - DISCORD_EPOCH_MS) << 22n) + BigInt(index)).toString();
+const snowflake = (agoMs: number, index: number) => snowflakeAt(Date.now() - agoMs, index);
+const LONG_TEXT = `Start of the plan. ${"The team checks each step. ".repeat(800)}End of the plan.`;
+const GROUP_TEXT = (index: number) => `Part ${index}.${" Every line of this part counts.".repeat(480)}`;
+const GROUP_MS = Date.now() - 90_000;
 const message = (id: string, username: string, content: string) => ({
   id,
   content,
@@ -111,6 +116,13 @@ const MESSAGES: Record<string, unknown[]> = {
     message(snowflake(60_000, 2), "tom", "Who books the room?"),
   ],
   [HIDDEN]: [message(snowflake(60_000, 3), "eve", "Salaries for next year.")],
+  [NOTES]: [
+    message(snowflake(180_000, 4), "anna", "The notes start here."),
+    message(snowflake(150_000, 5), "tom", LONG_TEXT),
+    message(snowflakeAt(GROUP_MS, 6), "anna", GROUP_TEXT(1)),
+    message(snowflakeAt(GROUP_MS, 7), "anna", GROUP_TEXT(2)),
+    message(snowflakeAt(GROUP_MS, 8), "anna", GROUP_TEXT(3)),
+  ],
 };
 
 const rest = {
@@ -128,6 +140,7 @@ const rest = {
             name: "board",
             permission_overwrites: [{ id: GUILD, type: 0, allow: "0", deny: VIEW_CHANNEL.toString() }],
           },
+          { id: NOTES, type: 0, name: "notes" },
         ]);
       if (input.route === `/guilds/${GUILD}/threads/active`) return Effect.succeed({ threads: [] });
       const channel = /^\/channels\/([0-9]+)\/messages$/u.exec(input.route)?.[1];
@@ -161,6 +174,7 @@ signal.handle(
     channels: [
       { id: CHANNEL, type: 0, name: "general" },
       { id: HIDDEN, type: 0, name: "board" },
+      { id: NOTES, type: 0, name: "notes" },
     ],
   }),
 );
@@ -290,7 +304,10 @@ try {
     await step("the place list shows the channel that OpenBot can view, and not the hidden one", async () => {
       const listed = await call(threads, "messaging_list_places", { connection });
       assert.ok(listed.success, JSON.stringify(listed.result));
-      assert.deepEqual(listed.result.places, [{ id: CHANNEL, name: "#general", kind: "channel" }]);
+      assert.deepEqual(listed.result.places, [
+        { id: CHANNEL, name: "#general", kind: "channel" },
+        { id: NOTES, name: "#notes", kind: "channel" },
+      ]);
       return listed.result;
     });
 
@@ -321,6 +338,35 @@ try {
         ["tom"],
       );
       return { messages: messages.length };
+    });
+
+    await step("a page keeps messages sent in the same second together, and names the next before value", async () => {
+      const read = await call(threads, "messaging_history", { connection, place: NOTES });
+      assert.ok(read.success, JSON.stringify(read.result));
+      const messages = Array.isArray(read.result.messages) ? read.result.messages.map(record) : [];
+      assert.deepEqual(
+        messages.map((entry) => entry.text),
+        [GROUP_TEXT(1), GROUP_TEXT(2), GROUP_TEXT(3)],
+      );
+      const before = /call again with before "([^"]+)"/u.exec(String(read.result.note))?.[1];
+      assert.equal(before, messages[0]?.sentAt, "The note does not name the time of the oldest message shown.");
+      const older = await call(threads, "messaging_history", { connection, place: NOTES, before });
+      assert.ok(older.success, JSON.stringify(older.result));
+      const olderMessages = Array.isArray(older.result.messages) ? older.result.messages.map(record) : [];
+      assert.deepEqual(
+        olderMessages.map((entry) => entry.author),
+        ["anna", "tom"],
+      );
+      const long = String(olderMessages[1]?.text);
+      assert.ok(long.startsWith("Start of the plan."), "The start of the long message is missing.");
+      assert.ok(long.endsWith("End of the plan."), "The end of the long message is missing.");
+      const leftOut = Number(/\[(\d+) characters left out\./u.exec(long)?.[1]);
+      assert.equal(
+        long.length - `\n[${leftOut} characters left out. This tool cannot show them.]\n`.length + leftOut,
+        LONG_TEXT.length,
+      );
+      assert.doesNotMatch(String(older.result.note), /did not fit/u);
+      return { firstPage: messages.length, note: read.result.note, olderPage: olderMessages.length, leftOut };
     });
 
     await step("a place that the list does not show is refused, and Discord gets no read", async () => {
