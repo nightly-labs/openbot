@@ -158,6 +158,19 @@ async function main(): Promise<void> {
     assert(stopped.outcome.snapshot, "A failed script lost its final snapshot.");
     recordCases("script-stops-at-failed-step");
 
+    const postback = await open("/postback");
+    const posted = await runScript({
+      tabId: postback.tab.id,
+      script: `
+        await selectOption("#country", "Germany");
+        return await evaluate("document.querySelector('#posted').textContent");
+      `,
+    });
+    assert.equal(posted.result.success, true, posted.outcome.error);
+    assert.equal(posted.outcome.status, "completed", posted.outcome.error);
+    assert.equal(posted.outcome.value, "Posted de");
+    recordCases("script-select-follows-postback");
+
     const navigated = await runScript({
       tabId: form.tab.id,
       script: `
@@ -783,6 +796,16 @@ function recordCases(...names: string[]): void {
 }
 
 const PAGES: Record<string, string> = {
+  "/postback": `<!doctype html><meta charset="utf-8"><title>Postback</title>
+    <form action="/postback"><label>Country <select id="country" name="country" onchange="setTimeout(() => this.form.submit(), 0)">
+      <option value="">Pick a country</option><option value="ca">Canada</option><option value="de">Germany</option>
+    </select></label></form>
+    <p id="posted"></p>
+    <script>
+      const chosen = new URLSearchParams(location.search).get("country") ?? "";
+      document.querySelector("#country").value = chosen;
+      document.querySelector("#posted").textContent = "Posted " + chosen;
+    </script>`,
   "/skeleton": `<!doctype html><meta charset="utf-8"><title>Skeleton</title>
     <main><div class="skeleton" aria-busy="true" style="width:240px;height:40px;background:#ddd"></div></main>
     <script>

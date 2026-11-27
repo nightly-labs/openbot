@@ -101,6 +101,42 @@ const server = createServer((request, response) => {
     response.end(`<script>opener.parent.postMessage('signed-in', location.origin); window.close();</script>`);
     return;
   }
+  if (url.pathname === "/select-postback") {
+    let body = "";
+    request.on("data", (chunk) => {
+      body += chunk;
+    });
+    request.on("end", () => {
+      const posted = new URLSearchParams(body);
+      const country = posted.get("country") ?? "";
+      const tags = posted.getAll("tags");
+      const option = (value: string, label: string, chosen: boolean) =>
+        `<option value="${value}"${chosen ? " selected" : ""}>${label}</option>`;
+      const countries = [
+        ["", "Pick a country"],
+        ["ca", "Canada"],
+        ["cl", "Chile"],
+        ["de", "Germany"],
+        ["none", ""],
+      ];
+      const tagOptions = [
+        ["a", "Alpha"],
+        ["b", "Beta"],
+        ["c", "Gamma"],
+      ];
+      response.setHeader("content-type", "text/html; charset=utf-8");
+      response.end(`<form id="postback" method="POST" action="/select-postback">
+        <label>Country <select id="country" name="country" onchange="setTimeout(() => this.form.submit(), 0)">${countries
+          .map(([value = "", label = ""]) => option(value, label, value === country))
+          .join("")}</select></label>
+        <label>Tags <select id="tags" name="tags" multiple size="3" onchange="setTimeout(() => this.form.submit(), 0)">${tagOptions
+          .map(([value = "", label = ""]) => option(value, label, tags.includes(value)))
+          .join("")}</select></label>
+        <p id="posted">Posted ${request.method === "POST" ? `${country}|${tags.join(",")}` : "nothing"}</p>
+      </form>`);
+    });
+    return;
+  }
   if (url.pathname === "/popup-post") {
     let body = "";
     request.on("data", (chunk) => {
@@ -507,6 +543,7 @@ const SCENARIOS = [
   "redirect-navigation",
   "stalled-open",
   "cookie-banner",
+  "select-postback",
 ];
 
 void main().catch((error) => {
@@ -596,6 +633,8 @@ async function main(): Promise<void> {
           await runTypingFocusScenario(browser, origin);
         } else if (scenario === "cookie-banner") {
           await runCookieBannerScenario(browser, origin);
+        } else if (scenario === "select-postback") {
+          await runSelectPostbackScenario(browser, origin);
         } else {
           const { tab, contents } = await openTabWithContents(browser, `${origin}/v2`, "smoke-thread", "smoke-bot");
           try {
@@ -686,6 +725,7 @@ async function main(): Promise<void> {
 
     await runDoubleClickScenario(browser, origin);
     await runRedirectNavigationScenario(browser, origin);
+    await runSelectPostbackScenario(browser, origin);
     await runStalledOpenScenario(browser, origin);
     const v2Tab = await runCauseEffect(browser.open(`${origin}/v2`, "smoke-thread", "smoke-bot"));
     const v2Contents = webContents
@@ -2579,6 +2619,82 @@ async function runRedirectNavigationScenario(browser: BrowserHost, origin: strin
   const failed = outcomes.filter((outcome) => !outcome.success);
   if (failed.length > 0) throw new Error(`${failed.length} redirecting navigations failed: ${failed[0]?.error}`);
   process.stdout.write(`BrowserHost: ${outcomes.length} redirecting navigations kept the process alive.\n`);
+}
+
+async function runSelectPostbackScenario(browser: BrowserHost, origin: string): Promise<void> {
+  const { tab, contents } = await openTabWithContents(
+    browser,
+    `${origin}/select-postback`,
+    "smoke-thread",
+    "smoke-bot",
+  );
+  const otherOption =
+    "The page reloaded after the select changed, and the select now shows another option. Call select_option again on the new page.";
+  const country = { kind: "css", selector: "#country" };
+  const tags = { kind: "css", selector: "#tags" };
+  const steps: Array<{ step: string; success: boolean; error: string | null; posted: string }> = [];
+  const run = async (step: string, tool: string, argumentsValue: DynamicRecord) => {
+    const result = await callBrowserTool(browser, tool, { tabId: tab.id, ...argumentsValue });
+    const posted: string = await contents.executeJavaScript(
+      "document.getElementById('posted')?.textContent ?? ''",
+      true,
+    );
+    const outcome = { step, success: result.success, error: result.success ? null : toolError(result), posted };
+    steps.push(outcome);
+    return { result, outcome };
+  };
+  try {
+    const typeahead = await run("typeahead", "select_option", { target: country, values: ["cl"] });
+    const intermediate = typeahead.outcome.error === otherOption && typeahead.outcome.posted === "Posted ca|";
+    const final = intermediate
+      ? await run("typeahead-retry", "select_option", { target: country, values: ["cl"] })
+      : typeahead;
+    if (!final.outcome.success || final.outcome.posted !== "Posted cl|") {
+      throw new Error(`A postback select did not reach the option: ${JSON.stringify(steps)}`);
+    }
+    const direct = await run("typeahead-snapshot", "select_option", {
+      target: country,
+      values: ["Germany"],
+      snapshot: true,
+    });
+    const directSnapshot = toolTextPayload(direct.result);
+    if (
+      !direct.outcome.success ||
+      direct.outcome.posted !== "Posted de|" ||
+      !Array.isArray(directSnapshot?.elements) ||
+      directSnapshot.elements.length === 0
+    ) {
+      throw new Error(`A postback select left the tab without the new page: ${JSON.stringify(steps)}`);
+    }
+    const multiple = await run("multiple", "select_option", { target: tags, values: ["b"] });
+    if (!multiple.outcome.success || multiple.outcome.posted !== "Posted de|b") {
+      throw new Error(`A postback multi-select did not reach the option: ${JSON.stringify(steps)}`);
+    }
+    const unlabeled = await run("arrow-keys", "select_option", { target: country, values: ["none"] });
+    if (
+      !unlabeled.outcome.posted.startsWith("Posted ") ||
+      unlabeled.outcome.error?.includes("does not belong to the document")
+    ) {
+      throw new Error(`An arrow-key postback select left the tab blank: ${JSON.stringify(steps)}`);
+    }
+    const scripted = await run("run-script", "run_script", {
+      script:
+        "await selectOption('#country', 'Germany'); return await evaluate(\"document.getElementById('posted').textContent\");",
+    });
+    const scriptedPayload = toolTextPayload(scripted.result);
+    if (
+      !scripted.outcome.success ||
+      scriptedPayload?.status !== "completed" ||
+      scriptedPayload.value !== "Posted de|"
+    ) {
+      throw new Error(`A script postback select failed: ${JSON.stringify(steps)} ${JSON.stringify(scriptedPayload)}`);
+    }
+  } finally {
+    await runCauseEffect(browser.close(tab.id));
+    await mkdir(".openbot-build", { recursive: true });
+    await writeFile(".openbot-build/browser-select-postback-report.json", JSON.stringify(steps, null, 2));
+  }
+  process.stdout.write("BrowserHost: postback selects followed the reload.\n");
 }
 
 const STALLED_OPEN_LIMIT_SECONDS = 45;
