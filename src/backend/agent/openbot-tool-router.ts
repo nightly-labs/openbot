@@ -1075,6 +1075,7 @@ export class OpenBotToolRouter {
               tool === "send_message" ||
               tool === "messaging_post" ||
               tool === "web_search" ||
+              tool === "list_sites" ||
               tool === "create_server_install_command";
             const correctable = (cause: unknown) =>
               correctableTool ||

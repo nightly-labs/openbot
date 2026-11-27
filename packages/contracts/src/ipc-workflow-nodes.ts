@@ -10,6 +10,7 @@ import {
 import { WORKFLOW_SLACK_ACTIONS, WORKFLOW_SLACK_EMOJI, WORKFLOW_SLACK_EVENTS } from "./ipc-workflow-slack";
 import { WORKFLOW_TELEGRAM_ACTIONS, WORKFLOW_TELEGRAM_EMOJI, WORKFLOW_TELEGRAM_EVENTS } from "./ipc-workflow-telegram";
 import {
+  WORKFLOW_ASSET_CLIP_MEDIA,
   WORKFLOW_MEDIA_ASPECTS,
   WORKFLOW_MEDIA_CUSTOM_ASPECT,
   WORKFLOW_MEDIA_KINDS,
@@ -127,6 +128,7 @@ const WORKFLOW_NODE_REGISTRY: Readonly<Record<WorkflowNodeKind, WorkflowNodeSpec
   shape: TEXT_ONLY,
   asset: {
     fileId: { runtime: true, id: "file" },
+    media: { runtime: true, values: WORKFLOW_ASSET_CLIP_MEDIA },
   },
   image: {
     media: { runtime: true, values: WORKFLOW_MEDIA_KINDS },

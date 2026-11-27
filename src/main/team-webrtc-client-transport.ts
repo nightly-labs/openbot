@@ -133,11 +133,23 @@ type DataListener = (
 function developmentLink(listener: DataListener, halfRoundTripMs: number, downlinkKbps: number): DataListener {
   if (halfRoundTripMs <= 0 && downlinkKbps <= 0) return listener;
   let linkFreeAt = 0;
+  const queue: { dueAt: number; deliver: () => void }[] = [];
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  const drain = () => {
+    timer = undefined;
+    const now = performance.now();
+    try {
+      while (queue[0] && queue[0].dueAt <= now) queue.shift()?.deliver();
+    } finally {
+      if (queue[0]) timer = setTimeout(drain, Math.max(0, queue[0].dueAt - now));
+    }
+  };
   return (hostId, channel, data) => {
     const now = performance.now();
     const bytes = typeof data === "string" ? Buffer.byteLength(data) : data.byteLength;
     linkFreeAt = Math.max(now, linkFreeAt) + (downlinkKbps > 0 ? (bytes * 8) / downlinkKbps : 0);
-    setTimeout(() => listener(hostId, channel, data), linkFreeAt - now + halfRoundTripMs);
+    queue.push({ dueAt: linkFreeAt + halfRoundTripMs, deliver: () => listener(hostId, channel, data) });
+    if (!timer) timer = setTimeout(drain, linkFreeAt + halfRoundTripMs - now);
   };
 }
 

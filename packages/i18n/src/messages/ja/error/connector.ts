@@ -89,6 +89,8 @@ export const messages = {
     "このサーバーで Bitwarden のロックを解除できませんでした。マスターパスワードを確認してから、もう一度接続してください。",
   "error.connector.bitwardenCliInstallFailed":
     "このサーバーに Bitwarden CLI をインストールできませんでした。ネットワーク接続を確認してから、もう一度接続してください。",
+  "error.connector.bitwardenCliCannotStart":
+    "このサーバーで Bitwarden CLI が起動しませんでした。もう一度接続してください。それでも起動しない場合は、ヘルプ > 問題を報告 を選んでください。",
   "error.connector.bitwardenFileUnreadable": "Bitwarden の接続ファイルを読み取れません。",
   "error.connector.passwordManagerUnknown": "OpenBot はこのパスワードマネージャーに対応していません。",
   "error.connector.passwordManagerMethod": "このパスワードマネージャーはこの方法では接続できません。",

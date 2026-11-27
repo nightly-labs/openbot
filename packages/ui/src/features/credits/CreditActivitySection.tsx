@@ -1,4 +1,4 @@
-import type { CreditActivityEntry, CreditsState } from "@openbot/contracts/credits";
+import { type CreditActivityEntry, type CreditsState, creditModelMakerNamed } from "@openbot/contracts/credits";
 import {
   ArrowDown,
   ArrowUp,
@@ -24,7 +24,7 @@ import { createMemo, createSignal, For, Match, Show, Switch } from "solid-js";
 import { useText } from "../../text";
 import { CreditIcon } from "./CreditIcon";
 import type { CreditsStore } from "./credits-store";
-import { creditModelMakerNamed, MakerLogo } from "./MakerLogo";
+import { MakerLogo } from "./MakerLogo";
 
 type ActivityFilter = "all" | "used" | "added";
 

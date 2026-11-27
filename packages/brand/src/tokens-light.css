@@ -56,6 +56,10 @@
 
   --openbot-chart-series-codex: #8e4fc0;
   --openbot-chart-series-grok: #16849b;
+  --openbot-chart-series-extra-1: #c4336b;
+  --openbot-chart-series-extra-2: #148a61;
+  --openbot-chart-series-extra-3: #a86f00;
+  --openbot-chart-series-extra-4: #2f74c9;
   --openbot-chart-storage-workspaces: #2f74c9;
   --openbot-chart-storage-files: #c64d1d;
   --openbot-chart-storage-chats: #148a61;

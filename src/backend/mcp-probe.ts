@@ -404,7 +404,7 @@ const countOverEffect = Effect.fnUntraced(function* (timeoutMs: number, open: ()
     Effect.try({ try: open, catch: (cause) => new McpProbeFailure({ cause }) }),
     ({ client, transport, connect }) =>
       Effect.gen(function* () {
-        yield* probeIo(connect);
+        yield* probeIo(connect).pipe(Effect.mapError((failure) => unreadableInitialize(failure, transport)));
         return yield* countToolsEffect(client);
       }).pipe(
         Effect.timeoutOrElse({
@@ -617,6 +617,18 @@ class McpTimeout extends Error {
   }
 }
 
+class McpInitializeUnreadable extends Error {
+  constructor() {
+    super("The server answered initialize with a result that is not an MCP initialize result.");
+  }
+}
+
+function unreadableInitialize(failure: McpProbeFailure, transport: Pick<Transport, "close">): McpProbeFailure {
+  return !(transport instanceof TailedStdioTransport) && failure.cause instanceof z.core.$ZodError
+    ? new McpProbeFailure({ cause: new McpInitializeUnreadable() })
+    : failure;
+}
+
 class McpServerExit extends Error {
   constructor(
     readonly output: string,
@@ -659,6 +671,10 @@ function describeMcpErrorText(error: unknown, config: McpServerConfig): string {
   const status = httpStatus(error);
   if (status !== null) return httpStatusMessage(status);
   if (config.transport === "http" && isNetworkFailure(error)) return sourceText("error.backend.mcpServerUnreachable");
+  if (config.transport === "http" && error instanceof McpInitializeUnreadable)
+    return hasCredentialHeader(config)
+      ? sourceText("error.backend.mcpServerKeyNotAccepted")
+      : sourceText("error.backend.mcpServerIncompatible");
   const message = error instanceof Error ? error.message : String(error);
   if (message.includes("ENOENT")) return sourceText("error.backend.mcpCommandNotFound", { command: config.command });
   return redactMcpSecrets(message, config);

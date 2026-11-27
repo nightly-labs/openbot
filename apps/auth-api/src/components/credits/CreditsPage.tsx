@@ -5,9 +5,10 @@ import {
   CREDIT_MODEL_MAKERS,
   type CreditMediaKind,
   type CreditModelMaker,
+  creditModelMakerNamed,
 } from "@openbot/contracts/credits";
 import { CreditIcon } from "@openbot/ui/features/credits/CreditIcon";
-import { creditModelMakerNamed, MakerLogo } from "@openbot/ui/features/credits/MakerLogo";
+import { MakerLogo } from "@openbot/ui/features/credits/MakerLogo";
 import { Search } from "@openbot/ui/icons";
 import { createMemo, createSignal, For, onSettled, Show } from "solid-js";
 import { landingAnalytics } from "../../lib/analytics";

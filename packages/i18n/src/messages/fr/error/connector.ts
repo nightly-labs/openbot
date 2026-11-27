@@ -91,6 +91,8 @@ export const messages = {
     "Impossible de déverrouiller Bitwarden sur ce serveur. Vérifiez le mot de passe principal, puis connectez-vous à nouveau.",
   "error.connector.bitwardenCliInstallFailed":
     "Impossible d’installer la CLI Bitwarden sur ce serveur. Vérifiez sa connexion réseau, puis connectez-vous à nouveau.",
+  "error.connector.bitwardenCliCannotStart":
+    "La CLI Bitwarden n’a pas démarré sur ce serveur. Connectez-vous à nouveau. Si elle ne démarre toujours pas, choisissez Aide > Signaler un problème.",
   "error.connector.bitwardenFileUnreadable": "Le fichier de connexion Bitwarden est illisible.",
   "error.connector.passwordManagerUnknown": "OpenBot ne connaît pas ce gestionnaire de mots de passe.",
   "error.connector.passwordManagerMethod": "Ce gestionnaire de mots de passe ne peut pas se connecter de cette façon.",

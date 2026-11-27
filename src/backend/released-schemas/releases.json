@@ -912,6 +912,11 @@
         "migrations": [[0, 63], 68, 69],
         "objects": [[0, 112], "b0ac97aba24eb3f3", [113, 144], "a50ebfbcdfcbfa27", [145, 194]]
       }
+    },
+    {
+      "tag": "v0.80.0",
+      "newInstall": { "migrations": [[0, 62], 70], "objects": [[0, 194], "5ae73c998c857b07"] },
+      "upgraded": { "migrations": [[0, 65], 70], "objects": [[0, 194], "5ae73c998c857b07"] }
     }
   ],
   "statements": {
@@ -1007,6 +1012,7 @@
     "56473ecb26a8a62f": "CREATE TRIGGER agent_memory_delete AFTER DELETE ON projection_agent_memories BEGIN\n    INSERT INTO agent_memory_search(agent_memory_search, rowid, text) VALUES ('delete', old.rowid, old.text);\n  END",
     "582f40d7935374f3": "CREATE TABLE projection_channel_routine_runs (\n    run_id TEXT PRIMARY KEY,\n    routine_id TEXT NOT NULL REFERENCES projection_channel_routines(routine_id) ON DELETE CASCADE,\n    channel_id TEXT NOT NULL,\n    trigger_id TEXT,\n    run_kind TEXT NOT NULL CHECK(run_kind IN ('scheduled', 'manual')),\n    scheduled_for TEXT NOT NULL,\n    routine_name TEXT NOT NULL,\n    instruction TEXT NOT NULL,\n    request_message_id TEXT,\n    status TEXT NOT NULL CHECK(status IN (\n      'queued', 'running', 'needs-attention', 'succeeded', 'failed', 'cancelled'\n    )),\n    error TEXT,\n    created_at TEXT NOT NULL,\n    updated_at TEXT NOT NULL,\n    last_event_sequence INTEGER NOT NULL, missed_count INTEGER CHECK(missed_count IS NULL OR missed_count >= 1), missed_until TEXT, run_source TEXT CHECK(run_source IS NULL OR run_source IN ('test', 'script', 'webhook')),\n    UNIQUE(trigger_id, scheduled_for)\n  )",
     "58b58439a49610b5": "CREATE TABLE workflow_versions (\n    version_id TEXT PRIMARY KEY,\n    workflow_id TEXT NOT NULL REFERENCES workflows(workflow_id) ON DELETE CASCADE,\n    graph_revision INTEGER NOT NULL CHECK(graph_revision >= 0),\n    kind TEXT NOT NULL CHECK(kind IN ('auto', 'restore', 'run')),\n    graph_json TEXT NOT NULL CHECK(json_valid(graph_json)),\n    created_at TEXT NOT NULL\n  )",
+    "5ae73c998c857b07": "CREATE INDEX thread_activities_sequence\n    ON projection_thread_activities(thread_id, last_event_sequence)",
     "5b2e32b096e98a60": "CREATE TABLE projection_agent_threads (\n    thread_id TEXT PRIMARY KEY REFERENCES projection_threads(thread_id) ON DELETE CASCADE,\n    agent_id TEXT NOT NULL,\n    legacy_task_id TEXT UNIQUE,\n    origin TEXT NOT NULL CHECK(origin IN ('user', 'agent')),\n    title TEXT NOT NULL,\n    title_source TEXT NOT NULL CHECK(title_source IN ('auto', 'agent', 'user')),\n    outcome TEXT CHECK(outcome IS NULL OR outcome IN ('completed', 'failed', 'interrupted')),\n    error TEXT,\n    created_at TEXT NOT NULL,\n    updated_at TEXT NOT NULL,\n    archived_at TEXT,\n    last_event_sequence INTEGER NOT NULL\n  )",
     "5b6c47b72065b7a6": "CREATE INDEX workflow_github_actions_run ON workflow_github_actions(run_id)",
     "5b744e487b298827": "CREATE TABLE projection_agent_routines (\n    routine_id TEXT PRIMARY KEY,\n    agent_id TEXT NOT NULL,\n    name TEXT NOT NULL,\n    instruction TEXT NOT NULL,\n    active INTEGER NOT NULL CHECK(active IN (0, 1)),\n    timezone TEXT NOT NULL,\n    created_at TEXT NOT NULL,\n    updated_at TEXT NOT NULL,\n    last_event_sequence INTEGER NOT NULL\n  , limit_policy TEXT NOT NULL DEFAULT 'wait' CHECK(limit_policy IN ('wait', 'skip')), missed_policy TEXT NOT NULL DEFAULT 'skip' CHECK(missed_policy IN ('skip', 'run-once')))",

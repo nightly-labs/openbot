@@ -843,6 +843,19 @@
   white-space: nowrap;
 }
 
+.wfn-asset-drop {
+  display: contents;
+}
+
+.wfn-asset-audio {
+  width: 100%;
+  height: 36px;
+}
+
+.wfn-arriving {
+  pointer-events: none;
+}
+
 .wfn-asset-file {
   display: flex;
   gap: var(--openbot-space-3);

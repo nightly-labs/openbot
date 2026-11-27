@@ -18,10 +18,10 @@ import {
   type SaveWorkflowGraphInput,
   type SetWorkflowPausedInput,
   type StartWorkflowRunInput,
+  WORKFLOW_ASSET_TYPES,
   WORKFLOW_CHECK_FIELD,
   WORKFLOW_CREDIT_MODEL_PREFIX,
   WORKFLOW_GITHUB_EVENTS,
-  WORKFLOW_PICTURE_TYPES,
   type WorkflowCatalogSource,
   type WorkflowDetail,
   type WorkflowGitHubHistory,
@@ -2132,11 +2132,11 @@ class Workflows extends Context.Service<Workflows, WorkflowsShape>()("openbot/ba
         const keepPicture = Effect.fn("Workflows.keepPicture")(function* (draftId: string) {
           const keep = dependencies.keepPicture;
           if (!keep) return yield* refuse("refused", sourceText("error.workflow.nodeUnsupported"));
-          const kept = yield* keep(draftId, WORKFLOW_PICTURE_TYPES).pipe(
+          const kept = yield* keep(draftId, WORKFLOW_ASSET_TYPES).pipe(
             Effect.mapError(({ cause }) => new WorkflowFailed({ cause })),
           );
           if (kept === "missing") return yield* refuse("missing", sourceText("error.workflow.pictureMissing"));
-          if (kept === "type") return yield* refuse("refused", sourceText("error.workflow.pictureType"));
+          if (kept === "type") return yield* refuse("refused", sourceText("error.workflow.assetType"));
           return kept;
         });
 

@@ -13,6 +13,7 @@ export function creditsIpcHandlers({ credits }: { credits: CreditsDesktopService
     credits: {
       getState: handler(() => runCauseEffect(credits.getState())),
       getActivity: handler(() => runCauseEffect(credits.getActivity())),
+      getCatalog: handler(() => runCauseEffect(credits.getCatalog())),
       openCheckout: payloadHandler(validRequest(parseCreditCheckoutRequest), (request) =>
         runCauseEffect(credits.openCheckout(request)),
       ),

@@ -88,6 +88,8 @@ export const messages = {
     "Не удалось разблокировать Bitwarden на этом сервере. Проверьте мастер-пароль, затем подключитесь снова.",
   "error.connector.bitwardenCliInstallFailed":
     "Не удалось установить Bitwarden CLI на этом сервере. Проверьте его сетевое подключение и подключитесь снова.",
+  "error.connector.bitwardenCliCannotStart":
+    "Bitwarden CLI не запустился на этом сервере. Подключитесь снова. Если он всё ещё не запускается, выберите Справка > Сообщить о проблеме.",
   "error.connector.bitwardenFileUnreadable": "Файл подключения Bitwarden не читается.",
   "error.connector.passwordManagerUnknown": "OpenBot не знает этот менеджер паролей.",
   "error.connector.passwordManagerMethod": "Этот менеджер паролей нельзя подключить таким способом.",

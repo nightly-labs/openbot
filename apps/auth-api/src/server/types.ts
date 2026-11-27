@@ -26,6 +26,8 @@ export interface WorkerBindings {
   EMAIL_SMTP_PORT?: string;
   EMAIL_SMTP_USERNAME?: string;
   EMAIL_SMTP_PASSWORD?: string;
+  EMAIL_SMTP_OVERFLOW_USERNAME?: string;
+  EMAIL_SMTP_OVERFLOW_PASSWORD?: string;
   EMAIL_FROM?: string;
   EMAIL_REPLY_TO?: string;
   EMAIL_LICENSE_FROM?: string;

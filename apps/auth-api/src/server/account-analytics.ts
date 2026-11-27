@@ -38,7 +38,7 @@ import {
 import type { HostedPoolGroup } from "./hosted-pool-snapshot";
 
 const OPENPANEL_API_URL = "https://analytics.openbot.run/api";
-export const ACCOUNT_ANALYTICS_SCHEMA_VERSION = 20;
+export const ACCOUNT_ANALYTICS_SCHEMA_VERSION = 22;
 const SEND_TIMEOUT_MS = 5_000;
 const ACCOUNT_ID_PATTERN = /^[A-Za-z0-9_-]{1,128}$/u;
 const ACTIVITY_DAY_PATTERN = /^\d{4}-\d{2}-\d{2}$/u;
@@ -101,6 +101,8 @@ const EMAIL_KINDS = ["sign_in_code", "team_invite", "contact", "welcome", "licen
 export type EmailKind = (typeof EMAIL_KINDS)[number];
 const EMAIL_RESULTS = ["accepted", "rate_limited", "unknown", "failed"] as const;
 export type EmailResult = (typeof EMAIL_RESULTS)[number];
+const EMAIL_MAILBOXES = ["primary", "overflow"] as const;
+export type EmailMailbox = (typeof EMAIL_MAILBOXES)[number];
 
 const CREDIT_ACTIONS = [
   "checkout_started",
@@ -123,6 +125,7 @@ const MAX_ANALYTICS_CREDITS = 10_000_000;
 const MAX_ANALYTICS_MEDIA_SECONDS = 3_600;
 const MAX_ANALYTICS_MEDIA_COUNT = 16;
 const MEDIA_RESOLUTION_PATTERN = /^[A-Za-z0-9._:x-]{1,16}$/u;
+const MEDIA_RELEASE_REASON_PATTERN = /^[a-z0-9_.-]{1,64}$/u;
 
 export interface CreditActionEvent {
   name: "credit_action";
@@ -137,6 +140,7 @@ export interface CreditActionEvent {
   modelId?: string;
   kind?: CreditMediaGenerationKind | null;
   outcome?: CreditHoldAnalyticsOutcome | null;
+  reason?: string;
   resolution?: string | null;
   duration?: number | null;
   count?: number;
@@ -185,7 +189,8 @@ export type AccountAnalyticsEvent =
       durationMs?: number;
       machine?: (typeof HOSTED_MACHINES)[number];
     }
-  | { name: "email_sent" | "email_fallback_sent"; kind: EmailKind; result: EmailResult }
+  | { name: "email_sent"; kind: EmailKind; result: EmailResult; mailbox: EmailMailbox }
+  | { name: "email_fallback_sent"; kind: EmailKind; result: EmailResult }
   | { name: "hosted_pool_snapshot"; group: HostedPoolGroup }
   | { name: "account_activity_snapshot"; day: string; activeAccounts: number }
   | CreditActionEvent
@@ -350,7 +355,8 @@ function accountEventProperties(event: AccountAnalyticsEvent): AnalyticsProperti
   }
   if (event.name === "email_sent" || event.name === "email_fallback_sent") {
     if (!isOneOf(EMAIL_KINDS, event.kind) || !isOneOf(EMAIL_RESULTS, event.result)) return null;
-    return { ...properties, kind: event.kind, result: event.result };
+    const mailbox = event.name === "email_sent" && isOneOf(EMAIL_MAILBOXES, event.mailbox) ? event.mailbox : null;
+    return { ...properties, kind: event.kind, result: event.result, ...(mailbox ? { mailbox } : {}) };
   }
   if (event.name === "hosted_pool_snapshot") return hostedPoolProperties(properties, event.group);
   if (event.name === "account_activity_snapshot")
@@ -423,6 +429,12 @@ function creditActionProperties(properties: AnalyticsProperties, event: CreditAc
   if (isCreditMediaModelId(event.modelId)) result.model_id = event.modelId;
   if (isOneOf(CREDIT_MEDIA_KINDS, event.kind)) result.kind = event.kind;
   if (isOneOf(CREDIT_HOLD_OUTCOMES, event.outcome)) result.outcome = event.outcome;
+  if (
+    event.action === "media_released" &&
+    typeof event.reason === "string" &&
+    MEDIA_RELEASE_REASON_PATTERN.test(event.reason)
+  )
+    result.reason = event.reason;
   if (typeof event.resolution === "string" && MEDIA_RESOLUTION_PATTERN.test(event.resolution))
     result.resolution = event.resolution;
   if (isWholeInRange(event.duration, MAX_ANALYTICS_MEDIA_SECONDS)) result.duration_seconds = event.duration;

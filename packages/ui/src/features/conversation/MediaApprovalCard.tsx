@@ -4,6 +4,7 @@ import {
   creditMediaCost,
   creditMediaSpendable,
 } from "@openbot/contracts/credit-media";
+import { creditModelMakerNamed } from "@openbot/contracts/credits";
 import type {
   AgentApproval,
   MediaApprovalBalance,
@@ -36,7 +37,7 @@ import {
   VolumeX,
 } from "@openbot/ui";
 import { CreditAmount } from "@openbot/ui/features/credits/CreditIcon";
-import { creditModelMakerNamed, MakerLogo } from "@openbot/ui/features/credits/MakerLogo";
+import { MakerLogo } from "@openbot/ui/features/credits/MakerLogo";
 import { createPickerFades } from "@openbot/ui/features/workflows/WorkflowPicker";
 import { useText } from "@openbot/ui/text";
 import type { JSX } from "@solidjs/web";

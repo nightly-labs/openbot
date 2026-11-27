@@ -498,6 +498,15 @@ sent through `POST /v1/attachments` as a picture of the host with no owner agent
 answers `missing`. Each member who can use workflows can keep a picture, as each member can send a
 draft. A client without the capability does not offer image and asset steps.
 
+`workflows-media-clips-v1` tells a client that the host also keeps an MP4 or MOV video, or an MP3,
+M4A, WAV, AAC, OGG or FLAC audio file, through the same `keep-picture` route, and runs an asset node
+that names one. The asset node then has `media: "video"` or `media: "audio"` and gives a `file`
+edge, so an `image` step with a video model gets it as a video or audio input, and an agent or LLM
+step gets it as a file. A graph with such a node has workflow format 4, so an older client opens it
+read-only. A client offers clips only when the host has the capability and format 4; the phone
+app keeps pictures only, because its photo picker gives no audio files, and shows a clip asset by
+its name.
+
 `workflows-sunra-v1` lets the host run an `image` node with a Sunra model of `WORKFLOW_MEDIA_MODELS`
 (the ids that start with `sunra-`). The host calls the tools of Sunra's MCP server with the Sunra
 sign-in of an enabled Sunra row in its Apps (`src/backend/workflows/sunra-media.ts`), and the credits
@@ -1881,8 +1890,17 @@ creates them and the Customer Portal settings.
     Checkout and the license split subscription get the `default_tax_rates` of the Tax Rate with the
     metadata `openbot_vat=pl_standard` (`VAT_TAX_RATE`, made by `api:stripe:bootstrap`).
   - A VAT ID of another EU country gets reverse charge (`tax_exempt=reverse`, no Tax Rate) only after
-    the EU VIES REST service confirms it. An unknown ID returns 400 `vat_id_invalid`; no answer from
-    VIES returns 503 `vat_id_unverified`, and nothing changes. The optional setting
+    the EU VIES REST service confirms it. An unknown ID returns 400 `vat_id_invalid`. When VIES does
+    not answer after its tries, or blocks the VAT ID or the caller, the `PUT` still saves the country and the `eu_vat` tax ID, but not as confirmed: the
+    buyer pays Polish VAT, the reply and the next `GET` have no VAT ID, and the operator alert
+    (`HOSTED_POOL_ALERT_WEBHOOK_URL`) gets a "VAT check" line with the customer and the VAT ID. The
+    operator checks the ID and can set reverse charge, or the buyer saves the ID again. When Stripe's
+    own check later marks the saved `eu_vat` ID `verified`, the next Checkout also gets reverse charge. An ID that was
+    confirmed before for this customer (by VIES, or `verified` by Stripe) keeps reverse charge, also with
+    an alert. The Worker tries VIES up to 3 times in
+    20 seconds (9 seconds for each try), and checks again without `VIES_REQUESTER_VAT_ID` when VIES
+    refuses it. It stops at once when VIES blocks the VAT ID or the caller (`VAT_BLOCKED`,
+    `IP_BLOCKED`). Desktop and the web client wait 30 seconds for this `PUT`. The optional setting
     `VIES_REQUESTER_VAT_ID` (the seller's VAT ID) makes VIES return a consultation number, which the
     customer metadata `openbot_vies_request` keeps as proof.
   - A buyer outside the EU (also the UK, Norway and Switzerland) pays no VAT.

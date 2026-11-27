@@ -787,6 +787,15 @@ export class ClaudeAgentClient extends EventEmitter<ClientEvents> {
     };
   }
 
+  #probeProcessSpawner(): Pick<ClaudeSdkLaunch, "spawnClaudeCodeProcess"> {
+    const launchProcess = this.#launchProcess;
+    if (this.#sdkLaunch.spawnClaudeCodeProcess || !launchProcess) return {};
+    return {
+      spawnClaudeCodeProcess: (options: SpawnOptions) =>
+        spawnClaudeThroughLauncher(options, new ClaudeStderrTail(), launchProcess),
+    };
+  }
+
   start(): void {
     if (this.#running) return;
     if (this.#scope.state._tag === "Closed") this.#scope = Scope.makeUnsafe();
@@ -1238,6 +1247,7 @@ export class ClaudeAgentClient extends EventEmitter<ClientEvents> {
     const options: Options = {
       cwd: process.cwd(),
       ...this.#sdkLaunch,
+      ...this.#probeProcessSpawner(),
       settingSources: userSetup ? ["user", "project", "local"] : [],
       ...(settingsFile ? { settings: settingsFile } : {}),
       mcpServers: {},

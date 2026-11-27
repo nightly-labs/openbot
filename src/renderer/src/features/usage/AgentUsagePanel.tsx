@@ -84,7 +84,7 @@ export function AgentUsagePanel(props: AgentUsagePanelProps) {
     if (!background)
       setState((draft) => {
         draft.phase = "loading";
-        draft.result = null;
+        if (draft.serverId !== serverId) draft.result = null;
       });
     try {
       const [result, agents] = await Promise.all([
@@ -99,7 +99,7 @@ export function AgentUsagePanel(props: AgentUsagePanelProps) {
           draft.phase = result ? "ready" : "unsupported";
         });
     } catch (error) {
-      if (background && state.result) return;
+      if (background && state.result && state.phase !== "loading") return;
       if (request === generation && props.serverId === serverId && state.range.agentId === agentId)
         setState((draft) => {
           draft.result = null;
@@ -249,8 +249,8 @@ export function AgentUsagePanel(props: AgentUsagePanelProps) {
           </IconButton>
         </div>
       </PageHeader>
-      <div ref={reportBody} class="agent-usage-body">
-        <Show when={state.phase === "loading"}>
+      <div ref={reportBody} class="agent-usage-body" aria-busy={state.phase === "loading" ? "true" : "false"}>
+        <Show when={state.phase === "loading" && !state.result}>
           <div class="agent-usage-loading" role="status">
             <span>{t("usage.panel.loading")}</span>
             <div class="agent-usage-placeholder" />
@@ -272,25 +272,22 @@ export function AgentUsagePanel(props: AgentUsagePanelProps) {
             </Button>
           </div>
         </Show>
-        <Show
-          when={
-            state.serverId === props.serverId &&
-            state.result &&
-            state.result.agentId === state.range.agentId &&
-            state.result.startDate === state.range.startDate &&
-            state.result.endDate === state.range.endDate &&
-            state.result
-          }
-        >
+        <Show when={state.serverId === props.serverId && state.result}>
           {(result) => (
-            <AgentUsageReport
-              result={result()}
-              metric={state.metric}
-              agentLabel={agentLabel}
-              onReady={() => {
-                if (reportBody) reportBody.scrollTop = 0;
-              }}
-            />
+            <div
+              class="agent-usage-report"
+              data-stale={state.phase === "loading" ? "" : undefined}
+              inert={state.phase === "loading"}
+            >
+              <AgentUsageReport
+                result={result()}
+                metric={state.metric}
+                agentLabel={agentLabel}
+                onReady={() => {
+                  if (reportBody) reportBody.scrollTop = 0;
+                }}
+              />
+            </div>
           )}
         </Show>
       </div>

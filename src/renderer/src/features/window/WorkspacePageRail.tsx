@@ -11,6 +11,7 @@ import { appPort } from "../../app-port";
 import { useLayout } from "../../layout";
 import { WorkflowsPage } from "../../lazy-views";
 import { usePlatform } from "../../platform";
+import { useCreditModels } from "../credits/credits-context";
 import { useCustomAgents } from "../custom-agents/custom-agents-context";
 import { serverHasStorage } from "../files/storage-usage";
 import { createCreditAgentsRail } from "../servers/credit-agents-rail";
@@ -38,6 +39,7 @@ export function WorkspacePageRail(props: { hidden: boolean }) {
   const windowPage = useWindowPage();
   const { openAppSettings, setSkillsMarketplaceOpen, setPendingPluginSlug, setPendingPluginConnect } = useSettings();
   const usage = useUsage();
+  const creditModels = useCreditModels();
   const updates = useUpdates();
   const layout = useLayout();
   const whatsNew = useWhatsNew();
@@ -117,6 +119,7 @@ export function WorkspacePageRail(props: { hidden: boolean }) {
       usageRows={usageRows()}
       customAgentUsage={localAgentUsage()}
       mediaCredits={mediaCredits()}
+      creditModels={creditModels()}
       onMediaCredits={(provider) => {
         windowPage.leavePricing();
         setPendingPluginConnect(false);

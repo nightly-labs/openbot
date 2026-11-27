@@ -1,5 +1,42 @@
 [
   {
+    "version": "0.80.0",
+    "date": "2026-11-26",
+    "notices": [
+      "Mettez aussi à jour vers cette version chaque serveur que vous avez rejoint. Un serveur avec un long historique de discussion redevient rapide après 0.79.0. L’app Apple Watch, les pointeurs en direct des workflows, « Répartir » et plusieurs corrections ci-dessous ne fonctionnent sur un serveur que si celui-ci a cette version."
+    ],
+    "groups": [
+      {
+        "type": "added",
+        "items": [
+          "Votre serveur répond directement à l’app OpenBot pour Apple Watch. La montre fonctionne quand OpenBot sur iPhone est en arrière-plan ou fermé. Les demandes et les réponses sont chiffrées de bout en bout entre la montre et le serveur.",
+          "Voyez le pointeur et l’étape sélectionnée de chaque autre personne qui a ouvert le même workflow.",
+          "Réglages › Fournisseurs › Regrouper les comptes propose un nouveau choix, « Répartir ». Il place les agents sur les comptes qui ont le plus d’utilisation restante, pour que tous les comptes servent. « Remplir d’abord » reste la valeur par défaut.",
+          "Chaque paiement du portefeuille NEAR affiche une carte dans la discussion, avec son état et un lien vers la transaction. Quand vous configurez le portefeuille ou modifiez ses dépenses, vous pouvez saisir votre propre limite quotidienne.",
+          "MAGI-2 crée des clips vidéo en 1080p avec son, payés en crédits OpenBot. Un agent qui ne nomme aucun modèle vidéo l’utilise désormais."
+        ]
+      },
+      {
+        "type": "changed",
+        "items": [
+          "La page Utilisation affiche le coût et les tokens sous forme de barres empilées, avec une couleur par fournisseur. Elle garde le dernier rapport affiché pendant le chargement d’un nouveau.",
+          "La page Buy credits affiche chaque pack de crédits sous forme de carte à sa propre couleur, avec son prix et le prix d’un crédit.",
+          "Une licence Team peut maintenant compter jusqu’à 25 utilisateurs. Auparavant, le maximum était de 10."
+        ]
+      },
+      {
+        "type": "fixed",
+        "items": [
+          "Un serveur avec un long historique de discussion est de nouveau rapide après la mise à jour vers 0.79.0. Avant, un nettoyage des anciens événements de discussion arrêtait le serveur pendant plusieurs secondes chaque minute.",
+          "La saisie dans la zone de message ne ralentit plus pendant qu’un agent écrit sa réponse.",
+          "Sous Windows, les agents Computer Use voient à nouveau le bureau. Depuis 0.77.0, ils recevaient une image noire.",
+          "Une longue discussion avec beaucoup d’images utilise beaucoup moins de mémoire.",
+          "Les routines programmées redémarrent d’elles-mêmes après une courte erreur de base de données. Avant, une seule lecture échouée arrêtait toutes les routines programmées."
+        ]
+      }
+    ]
+  },
+  {
     "version": "0.79.0",
     "date": "2026-11-25",
     "notices": [

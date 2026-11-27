@@ -5,6 +5,7 @@ import {
   WORKFLOW_TRIGGER_TYPES,
   type WorkflowRunPage,
   type WorkflowVersion,
+  workflowAssetType,
 } from "@openbot/contracts/ipc";
 import { accountUsageProviderRows } from "@openbot/ui/features/account/account-usage-view";
 import { Sidebar } from "@openbot/ui/features/sidebar/Sidebar";
@@ -150,6 +151,7 @@ function storyWorkflowHost(workflows: readonly StoryWorkflow[]): WorkflowHost {
     agentLevels: async () => null,
     githubSupported: () => true,
     mediaSupported: () => true,
+    clipsSupported: () => true,
     mediaAccountSupported: () => true,
     mediaTransparentSupported: () => true,
     mediaSizeSupported: () => true,
@@ -169,11 +171,13 @@ function storyWorkflowHost(workflows: readonly StoryWorkflow[]): WorkflowHost {
     setSpot: () => undefined,
     onSpot: () => () => undefined,
     pictures: async () => [],
-    uploadPicture: async (file) => keptPicture(crypto.randomUUID(), file, URL.createObjectURL(file)),
+    uploadPicture: async (file) =>
+      keptPicture(crypto.randomUUID(), file, workflowAssetType(file, true) ?? file.type, URL.createObjectURL(file)),
     mediaUrl: () => null,
     mediaPreviewUrl: () => null,
     githubConnector: createMockGitHubConnector(),
     hostName: () => undefined,
+    remote: () => false,
     openUrl: async () => undefined,
   };
 }

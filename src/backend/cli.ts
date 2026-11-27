@@ -13,6 +13,7 @@ import { Deferred, Effect, Fiber, Option, Result, type Scope } from "effect";
 import { providerCheckTimeoutMs } from "./disk-restore";
 import type { SignInRegion } from "./kimi-region";
 import { type ProviderClientOperationError, providerCall, providerFailure } from "./provider-client-effects";
+import { PROVIDER_PROCESS_GROUP, readProcessGroupOutput } from "./provider-process-group";
 
 export { compareReleases, isVersion, olderVersion } from "@openbot/contracts/cli-version";
 
@@ -1463,13 +1464,20 @@ const readCliVersion = Effect.fn("Cli.readVersion")(function* (
               windowsVerbatimArguments: true,
             },
           )
-        : execFileAsync(candidate, [...args], {
-            signal,
-            timeout,
-            maxBuffer: 64 * 1024,
-            windowsHide: process.platform === "win32",
-            env: { ...process.env, ...providerEnv, ...cliPathEnvironment(launch) },
-          }),
+        : PROVIDER_PROCESS_GROUP
+          ? readProcessGroupOutput(candidate, args, {
+              signal,
+              timeout,
+              maxBuffer: 64 * 1024,
+              env: { ...process.env, ...providerEnv, ...cliPathEnvironment(launch) },
+            })
+          : execFileAsync(candidate, [...args], {
+              signal,
+              timeout,
+              maxBuffer: 64 * 1024,
+              windowsHide: true,
+              env: { ...process.env, ...providerEnv, ...cliPathEnvironment(launch) },
+            }),
     catch: providerFailure,
   }).pipe(
     Effect.mapError((failure) => {
