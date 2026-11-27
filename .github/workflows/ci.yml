@@ -360,6 +360,18 @@ jobs:
         if: ${{ !cancelled() }}
         run: bun run test:crm-team-api
 
+      - name: Run the sync collections E2E test
+        if: ${{ !cancelled() }}
+        run: bun run test:sync
+
+      - name: Run the sync message logs E2E test
+        if: ${{ !cancelled() }}
+        run: bun run test:sync-log
+
+      - name: Run the joined-server sync E2E test
+        if: ${{ !cancelled() }}
+        run: bun run test:remote-sync
+
       - name: Run the account activity reporter E2E test
         if: ${{ !cancelled() }}
         run: bun run test:account-activity-reporter
@@ -377,6 +389,8 @@ jobs:
             .openbot-build/team-api-routes-e2e/
             .openbot-build/crm-team-api-e2e/
             .openbot-build/watch-relay-host-e2e/
+            .openbot-build/sync/
+            .openbot-build/remote-server-sync-e2e/
             .openbot-build/release-version-comparator-e2e.json
           if-no-files-found: ignore
 

@@ -211,7 +211,7 @@ reload event. The other readers are synchronous, so their push arrives first.
 ### Message logs
 
 The message logs use the change sequence of the host database (migration
-`0070-sync-change-sequence`). The table `sync_message_changes` has one row for each message that
+`0071-sync-change-sequence`). The table `sync_message_changes` has one row for each message that
 changed: `scope` (`thread` or `channel`), `owner_id` (the thread or channel ID), `message_id`,
 `deleted`, and an `AUTOINCREMENT` `sequence`. Triggers on `projection_thread_messages` and
 `projection_channel_messages` replace that row on each insert, update and delete. An update that
@@ -383,6 +383,10 @@ advertises `sync-v1`. Hosts and clients without it keep the HTTP reads and the r
 Removing those paths needs the 60-day support window.
 
 ## Check
+
+CI runs `test:sync`, `test:sync-log` and `test:remote-sync` (the desktop with a joined server) in
+the Team API routes E2E job when desktop code changes. `test:web-sync` and `test:extension-sync`
+need a dev stack and run only by hand.
 
 `bun run test:sync` (`scripts/sync-e2e.ts`) starts a host and checks the subscribe diff, the push
 before each reload event, an update, a visibility change, the barrier, a reconnect with `have` and
