@@ -153,15 +153,49 @@ function stoppedBeforeNextStep(answer: string | undefined): boolean {
 const PROMISES_WORK =
   /(?:^|[^\p{L}'’])(?<!(?:^|[^\p{L}])(?:não|nao|nunca)\s+)(?:i['’]ll|i\s+will|let\s+me|i['’]m\s+going\s+to|i\s+am\s+going\s+to|(?:eu\s+)?vou|(?:eu\s+)?irei|deix[ae](?:-me|\s+eu))\s+(?!(?:not|never|know|wait|hold|pause|stop|be\s+here|aguardar|esperar|ficar\s+(?:aguardando|esperando|no\s+aguardo))(?!\p{L}))\p{L}/iu;
 
-export function promisesWork(answer: string | undefined): boolean {
+const UNDONE_WORK_ANSWER_MAX = 1200;
+const LIST_ITEM = /^\s*(?:[-*+•]|\d+[.)])\s+/u;
+const WORK_DONE_VERB =
+  "(?:applied|apply|changed|change|made|make|fixed|fix|run|ran|started|start|implemented|implement|edited|edit|updated|update|written|write|created|create|sent|send|done|do|executed|execute|touched|touch|finished|finish)";
+const ADMITS_WORK_NOT_DONE = new RegExp(
+  String.raw`(?:^|[^\p{L}'’])(?:i\s+(?:have|had|did)\s+not|i\s+(?:haven['’]t|hadn['’]t|didn['’]t))\s+(?:yet\s+|actually\s+|really\s+)?${WORK_DONE_VERB}(?!\p{L})|(?:^|[^\p{L}])(?:not|nothing)\s+(?:(?:has|have|was|were)\s+)?(?:been\s+)?(?:applied|changed|fixed|implemented|done|sent|started|edited|updated)\s+yet(?!\p{L})|(?:^|[^\p{L}])(?:ainda\s+)?(?:não|nao)\s+(?:fiz|apliquei|corrigi|executei|rodei|enviei|alterei|implementei|mudei|editei|atualizei|criei|terminei|comecei)(?!\p{L})|(?:^|[^\p{L}])ainda\s+(?:não|nao)\s+(?:foi|foram|está|esta|estão|estao)\s+(?:feit|aplicad|corrigid|enviad|alterad|implementad)`,
+  "iu",
+);
+
+function closingSentences(plain: string): string[] {
+  const lines = plain.split("\n");
+  const blank = (line: string | undefined) => (line ?? "").trim().length === 0;
+  let end = lines.length;
+  while (end > 0 && (LIST_ITEM.test(lines[end - 1] ?? "") || blank(lines[end - 1]))) end -= 1;
+  let start = end;
+  while (start > 0 && !blank(lines[start - 1])) start -= 1;
+  const items = lines
+    .slice(end)
+    .filter((line) => LIST_ITEM.test(line))
+    .map((line) => line.replace(LIST_ITEM, ""));
+  const intro = lines[end - 1];
+  const introduced =
+    intro !== undefined && items[0] !== undefined ? [`${intro.replace(/:\s*$/u, "")} ${items[0]}`] : [];
+  return [
+    ...lines
+      .slice(start, end)
+      .join("\n")
+      .split(/(?<=[.!…])\s+|\n+/u),
+    ...items,
+    ...introduced,
+  ].filter((sentence) => !blank(sentence));
+}
+
+export function leavesWorkUndone(answer: string | undefined): boolean {
   const text = answer?.trim() ?? "";
-  if (text.length === 0 || text.length > NEXT_STEP_ANSWER_MAX || waitsForUser(answer)) return false;
+  if (text.length === 0 || text.length > UNDONE_WORK_ANSWER_MAX || waitsForUser(answer)) return false;
   const plain = text
     .replace(/[*_`>#]/g, "")
     .trimEnd()
     .replace(NOTHING_FROM_USER, "");
-  const lastSentence = plain.split(/(?<=[.!…])\s+|\n+/u).at(-1) ?? "";
-  return PROMISES_WORK.test(lastSentence);
+  return closingSentences(plain).some(
+    (sentence) => PROMISES_WORK.test(sentence) || ADMITS_WORK_NOT_DONE.test(sentence),
+  );
 }
 
 interface ContinuationCount {
