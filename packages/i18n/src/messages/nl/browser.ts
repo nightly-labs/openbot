@@ -180,7 +180,7 @@ export const messages = {
   "browser.signIn.description":
     "Sommige sites weigeren inloggen vanaf een server. Log in op deze computer, en OpenBot stuurt de login voor {site} naar {server}. Alle agents en leden op {server} kunnen die daarna in de browser gebruiken.",
   "browser.signIn.windowOpen":
-    "Log in in het venster dat is geopend. OpenBot stuurt de login als die klaar is. Kies Klaar als het venster open blijft.",
+    "Log in in het venster dat is geopend en voltooi alle stappen, zoals een verificatiecode. Kies daarna Klaar.",
   "browser.signIn.windowClosed":
     "Het inlogvenster is gesloten. Kies Klaar om de login te sturen, of open het venster opnieuw.",
   "browser.signIn.reopen": "Inlogvenster openen",
@@ -188,8 +188,6 @@ export const messages = {
   "browser.signIn.sent": "Ingelogd bij {site} op {server}",
   "browser.signIn.notFound":
     "OpenBot heeft geen login voor {site} gevonden. Log in in het venster en kies daarna Klaar.",
-  "browser.signIn.stillSignedOut":
-    "{server} toont nog een inlogpagina voor {site}. Rond het inloggen af in het venster.",
   "browser.signIn.failed": "OpenBot kon de login niet versturen.",
   "browser.httpSignIn.title": "Inloggen bij {site}",
   "browser.httpSignIn.description": "Deze site vraagt om een eigen gebruikersnaam en wachtwoord.",

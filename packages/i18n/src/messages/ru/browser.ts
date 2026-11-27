@@ -179,14 +179,13 @@ export const messages = {
   "browser.signIn.description":
     "Некоторые сайты отклоняют вход с сервера. Войдите на этом компьютере, и OpenBot отправит вход в {site} на {server}. Все агенты и участники на {server} смогут использовать его в браузере.",
   "browser.signIn.windowOpen":
-    "Войдите в открывшемся окне. OpenBot отправит вход, когда он будет выполнен. Если окно останется открытым, выберите «Готово».",
+    "Войдите в открывшемся окне и пройдите все шаги, например код подтверждения. Затем выберите «Готово».",
   "browser.signIn.windowClosed":
     "Окно входа закрыто. Выберите «Готово», чтобы отправить вход, или откройте окно снова.",
   "browser.signIn.reopen": "Открыть окно входа",
   "browser.signIn.sending": "Отправка на {server}…",
   "browser.signIn.sent": "Выполнен вход в {site} на {server}",
   "browser.signIn.notFound": "OpenBot не нашёл вход в {site}. Войдите в окне, затем выберите «Готово».",
-  "browser.signIn.stillSignedOut": "{server} всё ещё показывает страницу входа в {site}. Завершите вход в окне.",
   "browser.signIn.failed": "OpenBot не удалось отправить вход.",
   "browser.httpSignIn.title": "Вход в {site}",
   "browser.httpSignIn.description": "Этот сайт запрашивает собственное имя пользователя и пароль.",

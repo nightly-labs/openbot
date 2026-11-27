@@ -116,8 +116,7 @@ export function parseLocalSignIn(value: unknown): BrowserLocalSignInInput {
 
 export function parseLocalSignInFinish(value: unknown): BrowserLocalSignInFinish {
   if (!isObject(value) || !isBoolean(value.send)) throw new Error("Invalid browser sign-in request.");
-  if (value.check !== undefined && !isBoolean(value.check)) throw new Error("Invalid browser sign-in request.");
-  return { send: value.send, check: value.check === true };
+  return { send: value.send };
 }
 
 export function parseHttpSignInAnswer(value: unknown): BrowserHttpSignInInput {

@@ -167,14 +167,12 @@ export const messages = {
   "browser.signIn.title": "登录 {site}",
   "browser.signIn.description":
     "有些网站拒绝来自服务器的登录。在这台电脑上登录后，OpenBot 会把 {site} 的登录状态发送到 {server}。之后 {server} 上的所有助手和成员都可以在浏览器中使用它。",
-  "browser.signIn.windowOpen":
-    "请在打开的窗口中登录。登录完成后，OpenBot 会发送登录状态。如果窗口一直未关闭，请选择“完成”。",
+  "browser.signIn.windowOpen": "请在打开的窗口中登录，并完成所有步骤，例如验证码。然后选择“完成”。",
   "browser.signIn.windowClosed": "登录窗口已关闭。选择“完成”发送登录状态，或重新打开窗口。",
   "browser.signIn.reopen": "打开登录窗口",
   "browser.signIn.sending": "正在发送到 {server}…",
   "browser.signIn.sent": "已在 {server} 上登录 {site}",
   "browser.signIn.notFound": "OpenBot 没有找到 {site} 的登录状态。请在窗口中登录，然后选择“完成”。",
-  "browser.signIn.stillSignedOut": "{server} 上的 {site} 仍显示登录页面。请在窗口中完成登录。",
   "browser.signIn.failed": "OpenBot 无法发送登录状态。",
   "browser.httpSignIn.title": "登录 {site}",
   "browser.httpSignIn.description": "此网站要求输入它自己的用户名和密码。",

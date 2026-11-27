@@ -27,7 +27,6 @@ import {
   normalizeBrowserUrl,
   preferredBrowserLanguageCodes,
 } from "../backend/browser-policy";
-import { isBrowserSignInAddress, isBrowserSignInSite } from "./browser-sign-in-page";
 
 const COOKIE_LIMIT = 150;
 const COOKIE_TEXT_LIMIT = 4096;
@@ -36,9 +35,8 @@ const COOKIE_PATH_LIMIT = 1024;
 const ADDRESS_BOUND_COOKIE = /^(?:__cf|cf_)/u;
 const WINDOW_WIDTH = 520;
 const WINDOW_HEIGHT = 760;
-const CHECK_DELAY_MS = 1_000;
+const STORAGE_READ_DELAY_MS = 1_000;
 const SCRIPT_WORLD = 1_018;
-const PASSWORD_FIELD_SCRIPT = `Array.from(document.querySelectorAll("input[type=password]")).some((field) => field.getClientRects().length > 0)`;
 const STORAGE_SCRIPT = `({ origin: location.origin, entries: Object.keys(localStorage).map((name) => ({ name, value: localStorage.getItem(name) ?? "" })) })`;
 const STORAGE_READ_TIMEOUT_MS = 2_000;
 const ERR_ABORTED = -3;
@@ -52,16 +50,12 @@ export interface LocalSignInTarget {
   tabId: string;
 }
 
-export type LocalSignInEnd = "closed" | "signed-in";
-
 interface PendingSignIn extends LocalSignInTarget {
   host: string;
   session: Session;
   window: BrowserWindow | null;
-  ended: Deferred.Deferred<LocalSignInEnd, LocalSignInFailed>;
-  signInSeen: boolean;
-  cookieAfterSignIn: boolean;
-  check: ReturnType<typeof setTimeout> | null;
+  ended: Deferred.Deferred<void, LocalSignInFailed>;
+  storageTimer: ReturnType<typeof setTimeout> | null;
   storage: BrowserSignInStorage | null;
   storageReads: number;
   storageRead: number;
@@ -120,15 +114,11 @@ export class LocalSignInWindows {
     return contents && !contents.isDestroyed() ? contents.getURL() : null;
   }
 
-  signInSeen(): boolean {
-    return this.#pending?.signInSeen === true;
-  }
-
   readonly open = Effect.fn("LocalSignInWindows.open")(function* (
     this: LocalSignInWindows,
     target: LocalSignInTarget,
     address: string,
-  ): Effect.fn.Return<LocalSignInEnd, LocalSignInFailed> {
+  ): Effect.fn.Return<void, LocalSignInFailed> {
     const url = yield* Effect.try({
       try: () => normalizeBrowserUrl(address),
       catch: (cause) => new LocalSignInFailed({ cause }),
@@ -136,7 +126,7 @@ export class LocalSignInWindows {
     const pending = this.#pending;
     if (pending && (pending.serverId !== target.serverId || pending.tabId !== target.tabId)) yield* this.discard();
     const current = this.#pending ?? this.#start(target, new URL(url).hostname);
-    if (Deferred.isDoneUnsafe(current.ended)) current.ended = Deferred.makeUnsafe<LocalSignInEnd, LocalSignInFailed>();
+    if (Deferred.isDoneUnsafe(current.ended)) current.ended = Deferred.makeUnsafe<void, LocalSignInFailed>();
     if (current.window && !current.window.isDestroyed()) {
       current.window.show();
       current.window.focus();
@@ -174,10 +164,10 @@ export class LocalSignInWindows {
     const pending = this.#pending;
     if (!pending) return;
     this.#pending = null;
-    if (pending.check) clearTimeout(pending.check);
+    if (pending.storageTimer) clearTimeout(pending.storageTimer);
     for (const window of BrowserWindow.getAllWindows())
       if (!window.isDestroyed() && window.webContents.session === pending.session) window.destroy();
-    yield* Deferred.done(pending.ended, Exit.succeed("closed"));
+    yield* Deferred.done(pending.ended, Exit.void);
     yield* Effect.tryPromise(() => pending.session.clearStorageData()).pipe(Effect.ignore);
   });
 
@@ -197,50 +187,22 @@ export class LocalSignInWindows {
       host,
       session,
       window: null,
-      ended: Deferred.makeUnsafe<LocalSignInEnd, LocalSignInFailed>(),
-      signInSeen: false,
-      cookieAfterSignIn: false,
-      check: null,
+      ended: Deferred.makeUnsafe<void, LocalSignInFailed>(),
+      storageTimer: null,
       storage: null,
       storageReads: 0,
       storageRead: 0,
     };
-    session.cookies.on("changed", (_event, cookie, _cause, removed) => {
-      if (removed || !cookie.httpOnly || !pending.signInSeen) return;
-      if (!browserSignInCookieFitsHost(cookie.domain ?? "", host)) return;
-      pending.cookieAfterSignIn = true;
-      this.#scheduleCheck(pending);
-    });
     this.#pending = pending;
     return pending;
   }
 
-  #scheduleCheck(pending: PendingSignIn): void {
-    if (pending.check) clearTimeout(pending.check);
-    pending.check = setTimeout(() => {
-      pending.check = null;
-      void this.#check(pending);
-    }, CHECK_DELAY_MS);
-  }
-
-  async #check(pending: PendingSignIn): Promise<void> {
-    const contents = pending.window?.webContents;
-    if (this.#pending !== pending || !contents || contents.isDestroyed()) return;
-    const url = contents.getURL();
-    if (!isBrowserSignInSite(url, pending.host)) return;
-    void this.#readStorage(pending);
-    const passwordField = await contents
-      .executeJavaScriptInIsolatedWorld(SCRIPT_WORLD, [{ code: PASSWORD_FIELD_SCRIPT }])
-      .then((result: unknown) => result === true)
-      .catch(() => false);
-    if (this.#pending !== pending || contents.isDestroyed() || contents.getURL() !== url) return;
-    if (passwordField || isBrowserSignInAddress(url)) {
-      pending.signInSeen = true;
-      return;
-    }
-    if (!pending.signInSeen || !pending.cookieAfterSignIn) return;
-    pending.cookieAfterSignIn = false;
-    Deferred.doneUnsafe(pending.ended, Exit.succeed("signed-in"));
+  #scheduleStorageRead(pending: PendingSignIn): void {
+    if (pending.storageTimer) clearTimeout(pending.storageTimer);
+    pending.storageTimer = setTimeout(() => {
+      pending.storageTimer = null;
+      if (this.#pending === pending) void this.#readStorage(pending);
+    }, STORAGE_READ_DELAY_MS);
   }
 
   async #readStorage(pending: PendingSignIn): Promise<BrowserSignInStorage | null> {
@@ -282,14 +244,14 @@ export class LocalSignInWindows {
     window.on("closed", () => {
       if (pending.window !== window) return;
       pending.window = null;
-      Deferred.doneUnsafe(pending.ended, Exit.succeed("closed"));
+      Deferred.doneUnsafe(pending.ended, Exit.void);
     });
     const contents = window.webContents;
-    contents.on("did-navigate", () => this.#scheduleCheck(pending));
+    contents.on("did-navigate", () => this.#scheduleStorageRead(pending));
     contents.on("did-navigate-in-page", (_event, _url, isMainFrame) => {
-      if (isMainFrame) this.#scheduleCheck(pending);
+      if (isMainFrame) this.#scheduleStorageRead(pending);
     });
-    contents.on("did-stop-loading", () => this.#scheduleCheck(pending));
+    contents.on("did-stop-loading", () => this.#scheduleStorageRead(pending));
     contents.on("did-fail-load", (_event, code, _description, _url, isMainFrame) => {
       if (isMainFrame && code !== ERR_ABORTED) this.#fail(pending, window);
     });

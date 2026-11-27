@@ -164,14 +164,13 @@ export const messages = {
   "browser.signIn.description":
     "일부 사이트는 서버에서의 로그인을 거부해요. 이 컴퓨터에서 로그인하면 OpenBot이 {site} 로그인 정보를 {server}(으)로 보내요. 그러면 {server}의 모든 에이전트와 멤버가 브라우저에서 이를 사용할 수 있어요.",
   "browser.signIn.windowOpen":
-    "열린 창에서 로그인해 주세요. 로그인이 완료되면 OpenBot이 로그인 정보를 보내요. 창이 계속 열려 있으면 완료를 선택해 주세요.",
+    "열린 창에서 로그인하고 인증 코드 같은 모든 단계를 마쳐 주세요. 그런 다음 완료를 선택해 주세요.",
   "browser.signIn.windowClosed":
     "로그인 창이 닫혔어요. 로그인 정보를 보내려면 완료를 선택하거나 창을 다시 열어 주세요.",
   "browser.signIn.reopen": "로그인 창 열기",
   "browser.signIn.sending": "{server}(으)로 보내는 중…",
   "browser.signIn.sent": "{server}에서 {site}에 로그인했어요",
   "browser.signIn.notFound": "OpenBot이 {site}의 로그인 정보를 찾지 못했어요. 창에서 로그인한 후 완료를 선택해 주세요.",
-  "browser.signIn.stillSignedOut": "{server}에서 {site}의 로그인 페이지가 계속 표시돼요. 창에서 로그인을 마쳐 주세요.",
   "browser.signIn.failed": "OpenBot이 로그인 정보를 보내지 못했어요.",
   "browser.httpSignIn.title": "{site}에 로그인",
   "browser.httpSignIn.description": "이 사이트는 자체 사용자 이름과 비밀번호를 요구해요.",

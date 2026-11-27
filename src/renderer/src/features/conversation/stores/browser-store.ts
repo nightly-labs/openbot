@@ -415,10 +415,7 @@ export function createBrowserStore(deps: BrowserStoreDeps) {
     conversationPort()
       .browser.openLocalSignIn({ tabId, url })
       .then(
-        ({ signedIn }) => {
-          if (!signedIn) updateLocalSignIn(tabId, { windowOpen: false });
-          else if (localSignIn()?.tabId === tabId) void finishLocalSignIn(true);
-        },
+        () => updateLocalSignIn(tabId, { windowOpen: false }),
         (error: unknown) =>
           updateLocalSignIn(tabId, {
             windowOpen: false,
@@ -442,24 +439,20 @@ export function createBrowserStore(deps: BrowserStoreDeps) {
     startLocalSignIn(tab.id);
   }
 
-  async function finishLocalSignIn(check = false) {
+  async function finishLocalSignIn() {
     const current = localSignIn();
     if (!current || current.pending) return;
     const { t, errorMessage } = currentText();
     const server = deps.props.server?.name ?? "";
     updateLocalSignIn(current.tabId, { pending: true, error: undefined });
     try {
-      const result = await conversationPort().browser.finishLocalSignIn({ send: true, check });
+      const result = await conversationPort().browser.finishLocalSignIn({ send: true });
       if (!result?.signedIn) {
         updateLocalSignIn(current.tabId, {
           pending: false,
-          windowOpen: result !== null && (check || current.windowOpen),
-          error:
-            result && result.cookies > 0
-              ? t("browser.signIn.stillSignedOut", { site: current.site, server })
-              : t("browser.signIn.notFound", { site: current.site }),
+          windowOpen: result !== null && current.windowOpen,
+          error: t("browser.signIn.notFound", { site: current.site }),
         });
-        if (result && check) waitForLocalSignIn(current.tabId, current.url);
         return;
       }
       setLocalSignIn(null);
@@ -898,7 +891,7 @@ export function createBrowserStore(deps: BrowserStoreDeps) {
       blockedTakeover: blockedTakeoverSignIn,
       needsDesktopForTakeover: takeoverNeedsDesktopSignIn,
       reopen: openLocalSignInWindow,
-      finish: () => finishLocalSignIn(),
+      finish: finishLocalSignIn,
       cancel: cancelLocalSignIn,
     },
     activeBrowserControl,

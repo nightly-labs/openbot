@@ -174,7 +174,7 @@ export const messages = {
   "browser.signIn.description":
     "Certains sites refusent une connexion depuis un serveur. Connectez-vous sur cet ordinateur, et OpenBot envoie la connexion à {site} vers {server}. Tous les agents et membres de {server} peuvent ensuite l’utiliser dans le navigateur.",
   "browser.signIn.windowOpen":
-    "Connectez-vous dans la fenêtre qui s’est ouverte. OpenBot envoie la connexion quand elle est terminée. Si la fenêtre reste ouverte, sélectionnez Terminé.",
+    "Connectez-vous dans la fenêtre qui s’est ouverte et terminez toutes les étapes, comme un code de vérification. Sélectionnez ensuite Terminé.",
   "browser.signIn.windowClosed":
     "La fenêtre de connexion est fermée. Sélectionnez Terminé pour envoyer la connexion, ou ouvrez à nouveau la fenêtre.",
   "browser.signIn.reopen": "Ouvrir la fenêtre de connexion",
@@ -182,8 +182,6 @@ export const messages = {
   "browser.signIn.sent": "Connecté à {site} sur {server}",
   "browser.signIn.notFound":
     "OpenBot n’a trouvé aucune connexion pour {site}. Connectez-vous dans la fenêtre, puis sélectionnez Terminé.",
-  "browser.signIn.stillSignedOut":
-    "{server} affiche toujours une page de connexion de {site}. Terminez la connexion dans la fenêtre.",
   "browser.signIn.failed": "OpenBot n’a pas pu envoyer la connexion.",
   "browser.httpSignIn.title": "Se connecter à {site}",
   "browser.httpSignIn.description": "Ce site demande son propre nom d’utilisateur et son mot de passe.",

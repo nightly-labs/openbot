@@ -173,7 +173,7 @@ export const messages = {
   "browser.signIn.description":
     "Algunos sitios rechazan un inicio de sesión desde un servidor. Inicia sesión en este ordenador y OpenBot enviará el inicio de sesión de {site} a {server}. Todos los agentes y miembros de {server} podrán usarlo en el navegador.",
   "browser.signIn.windowOpen":
-    "Inicia sesión en la ventana que se abrió. OpenBot envía el inicio de sesión cuando está completo. Si la ventana sigue abierta, selecciona Listo.",
+    "Inicia sesión en la ventana que se abrió y completa todos los pasos, como un código de verificación. Después, selecciona Listo.",
   "browser.signIn.windowClosed":
     "La ventana de inicio de sesión está cerrada. Selecciona Listo para enviar el inicio de sesión o abre la ventana de nuevo.",
   "browser.signIn.reopen": "Abrir la ventana de inicio de sesión",
@@ -181,8 +181,6 @@ export const messages = {
   "browser.signIn.sent": "Sesión iniciada en {site} en {server}",
   "browser.signIn.notFound":
     "OpenBot no encontró un inicio de sesión para {site}. Inicia sesión en la ventana y selecciona Listo.",
-  "browser.signIn.stillSignedOut":
-    "{server} todavía muestra una página de inicio de sesión de {site}. Termina el inicio de sesión en la ventana.",
   "browser.signIn.failed": "OpenBot no pudo enviar el inicio de sesión.",
   "browser.httpSignIn.title": "Iniciar sesión en {site}",
   "browser.httpSignIn.description": "Este sitio pide su propio nombre de usuario y contraseña.",

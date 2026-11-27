@@ -189,14 +189,12 @@ export const messages = {
   "browser.signIn.title": "تسجيل الدخول إلى {site}",
   "browser.signIn.description":
     "ترفض بعض المواقع تسجيل الدخول من خادم. سجّل الدخول على هذا الحاسوب، وسيرسل OpenBot تسجيل الدخول إلى {site} إلى {server}. يمكن بعدها لكل الوكلاء والأعضاء على {server} استخدامه في المتصفح.",
-  "browser.signIn.windowOpen":
-    "سجّل الدخول في النافذة التي فُتحت. يرسل OpenBot تسجيل الدخول عند اكتماله. إذا بقيت النافذة مفتوحة، فاختر «تم».",
+  "browser.signIn.windowOpen": "سجّل الدخول في النافذة التي فُتحت، وأكمل كل الخطوات، مثل رمز التحقق. ثم اختر «تم».",
   "browser.signIn.windowClosed": "نافذة تسجيل الدخول مغلقة. اختر «تم» لإرسال تسجيل الدخول، أو افتح النافذة مرة أخرى.",
   "browser.signIn.reopen": "فتح نافذة تسجيل الدخول",
   "browser.signIn.sending": "جارٍ الإرسال إلى {server}…",
   "browser.signIn.sent": "سُجّل الدخول إلى {site} على {server}",
   "browser.signIn.notFound": "لم يجد OpenBot تسجيل دخول إلى {site}. سجّل الدخول في النافذة، ثم اختر «تم».",
-  "browser.signIn.stillSignedOut": "لا يزال {server} يعرض صفحة تسجيل الدخول إلى {site}. أكمل تسجيل الدخول في النافذة.",
   "browser.signIn.failed": "تعذّر على OpenBot إرسال تسجيل الدخول.",
   "browser.httpSignIn.title": "تسجيل الدخول إلى {site}",
   "browser.httpSignIn.description": "يطلب هذا الموقع اسم المستخدم وكلمة المرور الخاصين به.",

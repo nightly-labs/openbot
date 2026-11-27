@@ -327,7 +327,6 @@ export interface BrowserLocalSignInEnd {
 
 export interface BrowserLocalSignInFinish {
   send: boolean;
-  check?: boolean | undefined;
 }
 
 export interface BrowserLocalSignInResult {

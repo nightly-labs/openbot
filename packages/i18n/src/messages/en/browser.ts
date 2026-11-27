@@ -177,14 +177,13 @@ export const messages = defineMessages("browser", {
   "browser.signIn.description":
     "Some sites refuse a sign-in from a server. Sign in on this computer, and OpenBot sends the sign-in for {site} to {server}. All agents and members on {server} can then use it in the browser.",
   "browser.signIn.windowOpen":
-    "Sign in in the window that opened. OpenBot sends the sign-in when it is complete. If the window stays open, select Done.",
+    "Sign in in the window that opened, and complete all steps, such as a verification code. Then select Done.",
   "browser.signIn.windowClosed":
     "The sign-in window is closed. Select Done to send the sign-in, or open the window again.",
   "browser.signIn.reopen": "Open the sign-in window",
   "browser.signIn.sending": "Sending to {server}…",
   "browser.signIn.sent": "Signed in to {site} on {server}",
   "browser.signIn.notFound": "OpenBot found no sign-in for {site}. Sign in in the window, then select Done.",
-  "browser.signIn.stillSignedOut": "{server} still shows a sign-in page for {site}. Finish the sign-in in the window.",
   "browser.signIn.failed": "OpenBot could not send the sign-in.",
   "browser.httpSignIn.title": "Sign in to {site}",
   "browser.httpSignIn.description": "This site asks for its own username and password.",

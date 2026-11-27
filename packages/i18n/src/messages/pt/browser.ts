@@ -171,14 +171,13 @@ export const messages = {
   "browser.signIn.description":
     "Alguns sites recusam um login a partir de um servidor. Entre neste computador, e o OpenBot envia o login de {site} para {server}. Todos os agentes e membros em {server} podem usá-lo no navegador.",
   "browser.signIn.windowOpen":
-    "Entre na janela que abriu. O OpenBot envia o login quando ele estiver completo. Se a janela continuar aberta, selecione Concluído.",
+    "Entre na janela que abriu e conclua todas as etapas, como um código de verificação. Depois, selecione Concluído.",
   "browser.signIn.windowClosed":
     "A janela de login está fechada. Selecione Concluído para enviar o login ou abra a janela novamente.",
   "browser.signIn.reopen": "Abrir a janela de login",
   "browser.signIn.sending": "Enviando para {server}…",
   "browser.signIn.sent": "Conectado a {site} em {server}",
   "browser.signIn.notFound": "O OpenBot não encontrou um login para {site}. Entre na janela e selecione Concluído.",
-  "browser.signIn.stillSignedOut": "{server} ainda mostra uma página de login de {site}. Termine o login na janela.",
   "browser.signIn.failed": "O OpenBot não conseguiu enviar o login.",
   "browser.httpSignIn.title": "Entrar em {site}",
   "browser.httpSignIn.description": "Este site pede o próprio nome de usuário e senha.",
