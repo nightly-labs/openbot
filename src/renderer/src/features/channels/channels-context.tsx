@@ -73,6 +73,7 @@ export function ChannelsProvider(props: ParentProps) {
         writeChannelSelection(accountKey(), selectionServerId, channelId);
       }
     },
+    remote: () => activeServer()?.kind === "remote",
     supported: () => activeServerSupportsCapability(CHANNEL_CHATS_CAPABILITY),
     deletionSupported: () => activeServer()?.kind !== "remote" || serverRoleCanAdminister(activeServer()),
     taskCancelSupported: () => activeServerSupportsCapability(CHANNEL_TASK_CANCEL_CAPABILITY),

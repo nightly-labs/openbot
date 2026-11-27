@@ -45,6 +45,7 @@ export interface ChannelsEnvironment {
   scopeKey: () => string;
   readSelection: (scope: string) => string | null;
   writeSelection: (channelId: string | null) => void;
+  remote: () => boolean;
   supported: () => boolean;
   deletionSupported: () => boolean;
   messageDeletionSupported: () => boolean;
@@ -103,6 +104,8 @@ export function createChannelsController(env: ChannelsEnvironment) {
   let visitRead: string | null = null;
   const keptPages = new Map<string, ChannelPage>();
   let replaceLoadedPage = false;
+  let prefetchEpoch = 0;
+  const prefetching = new Map<string, number>();
   const changeListeners = new Set<(channelId: string | null) => void>();
   function announce(channelId: string | null): void {
     for (const listener of changeListeners) listener(channelId);
@@ -435,6 +438,8 @@ export function createChannelsController(env: ChannelsEnvironment) {
         readThrough.clear();
         keptPages.clear();
         replaceLoadedPage = false;
+        prefetchEpoch += 1;
+        prefetching.clear();
         visitRead = null;
         failedCommand = null;
         pendingCommands = 0;
@@ -469,6 +474,70 @@ export function createChannelsController(env: ChannelsEnvironment) {
         }),
       );
       void refresh(saved);
+    },
+  );
+  createEffect(
+    () => ({
+      scope: env.scopeKey(),
+      remote: env.remote(),
+      supported: supported(),
+      listed: state.listed,
+      channelIds: state.channels
+        .filter((channel) => !channel.archived)
+        .map((channel) => channel.id)
+        .join("\0"),
+    }),
+    ({ scope, remote, supported, listed, channelIds }) => {
+      if (!remote || !supported || !listed || !channelIds || typeof window.requestIdleCallback !== "function") return;
+      const selected = untrack(() => state.selectedId);
+      const remaining = Math.max(0, KEPT_PAGES - keptPages.size - prefetching.size);
+      if (remaining === 0) return;
+      const candidates = channelIds
+        .split("\0")
+        .filter((id) => id !== selected && !keptPages.has(id) && !prefetching.has(id))
+        .slice(0, remaining);
+      if (candidates.length === 0) return;
+      let stopped = false;
+      let idle: number | undefined;
+      function next(): void {
+        const channelId = candidates.shift();
+        if (stopped || disposed || !channelId) return;
+        idle = window.requestIdleCallback(() => {
+          if (stopped || disposed || scope !== env.scopeKey()) return;
+          if (keptPages.size + prefetching.size >= KEPT_PAGES) return;
+          if (keptPages.has(channelId) || prefetching.has(channelId) || untrack(() => state.selectedId) === channelId) {
+            next();
+            return;
+          }
+          const epoch = prefetchEpoch;
+          prefetching.set(channelId, epoch);
+          void env
+            .port()
+            .agent.readChannel({ channelId })
+            .then((page) => {
+              if (
+                !disposed &&
+                epoch === prefetchEpoch &&
+                scope === env.scopeKey() &&
+                untrack(() => state.selectedId) !== channelId &&
+                !keptPages.has(channelId) &&
+                keptPages.size < KEPT_PAGES
+              ) {
+                keepPage(page);
+              }
+            })
+            .catch(() => undefined)
+            .finally(() => {
+              if (prefetching.get(channelId) === epoch) prefetching.delete(channelId);
+              next();
+            });
+        });
+      }
+      next();
+      return () => {
+        stopped = true;
+        if (idle !== undefined) window.cancelIdleCallback(idle);
+      };
     },
   );
   onSettled(() => {
@@ -613,7 +682,6 @@ export function createChannelsController(env: ChannelsEnvironment) {
       return refresh(undefined, channelId === state.selectedId);
     },
     resync: () => {
-      keptPages.clear();
       announce(null);
       return refresh();
     },
