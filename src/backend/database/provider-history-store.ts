@@ -13,7 +13,7 @@ import {
   requiredNumberColumn,
   requiredStringColumn,
 } from "./database-rows";
-import { withTransaction } from "./sqlite-transaction";
+import { tryWriteTransaction, withTransaction } from "./sqlite-transaction";
 
 export interface ProviderHistorySessionInput {
   sessionId: string;
@@ -410,30 +410,61 @@ export class ProviderHistoryStore {
   }
 
   compactImportedItems(afterRowId: number): ProviderHistoryCompactionBatch {
-    return this.#transaction((db) => {
-      if (!hasCompactionSchema(db)) return { lastRowId: null, rows: 0, bytes: 0 };
-      const select = db.prepare(
-        `SELECT s.rowid AS row_id, s.item_json FROM provider_history_staging s
-         CROSS JOIN provider_history_turns t ON t.session_id = s.session_id AND t.turn_id = s.turn_id
-         CROSS JOIN provider_history_imports i ON i.session_id = s.session_id
-         WHERE s.rowid > ? AND s.imported = 1 AND NOT ${compactedSql("s.item_json")}
-           AND t.complete = 1 AND t.imported = 1 AND i.provider IN ${COMPACTED_PROVIDERS_SQL}
-         ORDER BY s.rowid`,
-      );
-      const rows: DynamicRecord[] = [];
-      let lastRowId = afterRowId;
-      let bytes = 0;
-      for (const value of select.iterate(afterRowId)) {
-        const row = databaseRow(value);
-        if (!row) continue;
-        rows.push(row);
-        lastRowId = requiredNumberColumn(row, "row_id");
-        bytes += Buffer.byteLength(requiredStringColumn(row, "item_json"));
-        if (rows.length >= COMPACTION_BATCH_ROWS || bytes >= COMPACTION_BATCH_BYTES) break;
-      }
-      const saved = compactRows(db, rows);
-      return { lastRowId: rows.length === 0 ? null : lastRowId, rows: rows.length, bytes: saved };
-    });
+    const db = this.#core.connection;
+    if (!hasCompactionSchema(db)) return { lastRowId: null, rows: 0, bytes: 0 };
+
+    const window = databaseRow(
+      db
+        .prepare(
+          `SELECT max(rowid) AS last_row_id FROM (
+             SELECT rowid FROM provider_history_staging WHERE rowid > ? ORDER BY rowid LIMIT ?
+           )`,
+        )
+        .get(afterRowId, COMPACTION_BATCH_ROWS),
+    );
+    const windowEnd = window?.last_row_id;
+    if (typeof windowEnd !== "number") return { lastRowId: null, rows: 0, bytes: 0 };
+    const eligible = `FROM provider_history_staging s
+       CROSS JOIN provider_history_turns t ON t.session_id = s.session_id AND t.turn_id = s.turn_id
+       CROSS JOIN provider_history_imports i ON i.session_id = s.session_id
+       WHERE s.rowid > ? AND s.rowid <= ? AND s.imported = 1 AND NOT ${compactedSql("s.item_json")}
+         AND t.complete = 1 AND t.imported = 1 AND i.provider IN ${COMPACTED_PROVIDERS_SQL}
+       ORDER BY s.rowid`;
+    if (!db.prepare(`SELECT 1 ${eligible} LIMIT 1`).get(afterRowId, windowEnd)) {
+      return { lastRowId: windowEnd, rows: 0, bytes: 0 };
+    }
+
+    return (
+      tryWriteTransaction(db, () => {
+        const candidates = db.prepare(`SELECT s.rowid AS row_id, octet_length(s.item_json) AS size ${eligible}`);
+        const payload = db.prepare("SELECT rowid AS row_id, item_json FROM provider_history_staging WHERE rowid = ?");
+        const rows: DynamicRecord[] = [];
+        let lastRowId = windowEnd;
+        let bytes = 0;
+        let previousRowId = afterRowId;
+        for (const value of candidates.iterate(afterRowId, windowEnd)) {
+          const candidate = databaseRow(value);
+          if (!candidate) continue;
+          const rowId = requiredNumberColumn(candidate, "row_id");
+          const size = requiredNumberColumn(candidate, "size");
+          if (rows.length > 0 && bytes + size > COMPACTION_BATCH_BYTES) {
+            lastRowId = previousRowId;
+            break;
+          }
+          const row = databaseRow(payload.get(rowId));
+          if (!row) continue;
+          rows.push(row);
+          bytes += size;
+          previousRowId = rowId;
+          if (bytes >= COMPACTION_BATCH_BYTES) {
+            lastRowId = rowId;
+            break;
+          }
+        }
+        const saved = compactRows(db, rows);
+        return { lastRowId, rows: rows.length, bytes: saved };
+      }) ?? { lastRowId: afterRowId, rows: 0, bytes: 0 }
+    );
   }
 
   dropCompactedItems(sessionId: string, turnId: string): void {

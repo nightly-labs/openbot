@@ -2,10 +2,12 @@ import { writeFileSync } from "node:fs";
 import { mkdir, mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
+import { DatabaseSync } from "node:sqlite";
 import { type AgentProviderId, type QueueDelivery, ROUTINE_QUIET_ANSWER_ITEM_TYPE } from "@openbot/contracts/ipc";
 import { Duration, Effect } from "effect";
 import { AgentStore } from "../src/backend/agent-store";
 import { compactedItemJson } from "../src/backend/database/provider-history-store";
+import { withTransaction } from "../src/backend/database/sqlite-transaction";
 import { runCauseEffect } from "../src/backend/effect-boundary";
 import type { DeliveryContext } from "../src/backend/mailbox-store";
 import { OpenBotDatabase } from "../src/backend/openbot-database";
@@ -541,6 +543,7 @@ async function runProviderHistoryReimportCheck(outputPath: string): Promise<Repo
         importCompleted: database.providerHistoryImport("codex-session")?.state === "complete",
       },
     };
+    Object.assign(report.acceptance, await checkCompactionWindows(database));
     await mkdir(dirname(outputPath), { recursive: true });
     writeFileSync(outputPath, `${JSON.stringify(report, null, 2)}\n`, { mode: 0o600 });
     return report;
@@ -614,6 +617,66 @@ function splitTurn(
       items: [{ type: "agentMessage", id: `${turnId}-b`, text: part("B"), status: "completed" }],
     },
   ];
+}
+
+async function checkCompactionWindows(database: OpenBotDatabase) {
+  const db = database.connection;
+  const start = count(database, "SELECT MAX(rowid) AS count FROM provider_history_staging");
+  const insert = db.prepare(`INSERT INTO provider_history_staging
+    (rowid, session_id, turn_id, item_key, item_index, item_json, imported, updated_at)
+    VALUES (?, 'legacy-session', 'legacy-turn-1', ?, ?, ?, ?, ?)`);
+  const item = JSON.stringify({ type: "agentMessage", text: "window check" });
+  const largeItem = JSON.stringify({ type: "agentMessage", text: "x".repeat(4 * 1024 * 1024) });
+  withTransaction(db, () => {
+    for (let i = 1; i <= 256; i++) insert.run(start + i, `pending-${i}`, 100 + i, item, 0, SENTINEL_TIME);
+    insert.run(start + 999, "before-large", 399, item, 1, SENTINEL_TIME);
+    insert.run(start + 1000, "large-item", 400, largeItem, 1, SENTINEL_TIME);
+    insert.run(start + 1001, "next-item", 401, item, 1, SENTINEL_TIME);
+  });
+  const writer = new DatabaseSync(database.path);
+  try {
+    const timeout = db.prepare("PRAGMA busy_timeout").get()?.timeout;
+    const empty = withTransaction(writer, () => database.compactImportedProviderHistory(start));
+    const blocked = withTransaction(writer, () => database.compactImportedProviderHistory(start + 256));
+    const timeoutAfterContention = db.prepare("PRAGMA busy_timeout").get()?.timeout;
+    const beforeLarge = database.compactImportedProviderHistory(start + 256);
+    const large = database.compactImportedProviderHistory(start + 999);
+    const next = database.compactImportedProviderHistory(start + 1000);
+    const end = database.compactImportedProviderHistory(start + 1001);
+    insert.run(start + 1002, "retry-item", 402, item, 1, SENTINEL_TIME);
+    writer.exec("BEGIN IMMEDIATE");
+    let retries = 0;
+    const scheduled = await Effect.runPromise(
+      compactImportedProviderHistory(
+        {
+          compactImportedProviderHistory(afterRowId) {
+            const batch = database.compactImportedProviderHistory(afterRowId);
+            if (batch.lastRowId === afterRowId && ++retries === 1) setTimeout(() => writer.exec("COMMIT"), 0);
+            return batch;
+          },
+        },
+        Duration.zero,
+      ),
+    );
+    return {
+      scheduledRetryCompactsAfterRelease: retries === 1 && scheduled.rows === 1,
+      emptyWindowAdvancesWithAnotherWriter: empty.rows === 0 && empty.lastRowId === start + 256,
+      contendedWriterRetriesSameWindow: blocked.rows === 0 && blocked.lastRowId === start + 256,
+      writerRetainsTimeout:
+        timeout === timeoutAfterContention && timeout === db.prepare("PRAGMA busy_timeout").get()?.timeout,
+      oversizedItemGetsOwnBatch: beforeLarge.rows === 1 && beforeLarge.lastRowId === start + 999,
+      oversizedItemHashMatches:
+        db.prepare("SELECT item_json FROM provider_history_staging WHERE rowid = ?").get(start + 1000)?.item_json ===
+        compactedItemJson(largeItem),
+      oversizedItemEndsBatch: large.rows === 1 && large.lastRowId === start + 1000,
+      nextEligibleItemIsCompacted: next.rows === 1 && next.lastRowId === start + 1001,
+      scanEndsAfterLastWindow: end.rows === 0 && end.lastRowId === null,
+      pendingItemsKeepPayload:
+        count(database, "SELECT count(*) AS count FROM provider_history_staging WHERE item_json = ?", item) === 256,
+    };
+  } finally {
+    writer.close();
+  }
 }
 
 function count(database: OpenBotDatabase, sql: string, ...parameters: string[]): number {
