@@ -324,6 +324,8 @@ interface MessageRowShared {
   firstMessageStyle: ComponentProps<typeof Animated.View>["style"];
   animationActive: boolean;
   playbackActive: boolean;
+  playbackResumes: boolean;
+  playbackPaused: boolean;
   screenReaderEnabled: boolean;
   replySession: { progress: Map<string, number>; revealed: Set<string> };
   markRevealed: (id: string) => void;
@@ -611,6 +613,9 @@ const MessageRow = memo(function MessageRow({
             complete,
             progress: replySession.progress,
             enabled,
+            active: shared.playbackResumes,
+            paused: shared.playbackPaused,
+            revealed,
             onWord: (word: string, index: number) => {
               markRevealed(message.id);
               replyHaptics.onWord(word, index);
@@ -622,7 +627,18 @@ const MessageRow = memo(function MessageRow({
             onComplete: replyHaptics.onComplete,
           }
         : undefined,
-    [eligible, message.id, complete, replySession.progress, enabled, markRevealed, replyHaptics],
+    [
+      eligible,
+      message.id,
+      complete,
+      replySession.progress,
+      enabled,
+      shared.playbackResumes,
+      shared.playbackPaused,
+      revealed,
+      markRevealed,
+      replyHaptics,
+    ],
   );
   const speaker = message.kind === "message" && message.speaker ? agentsById.get(message.speaker.id) : undefined;
   const fileAgentId = message.kind !== "message" ? undefined : message.speaker ? speaker?.id : shared.fileAgentId;
@@ -686,7 +702,7 @@ const MessageRow = memo(function MessageRow({
     color: textColor,
     tone,
     playback,
-    animationEnabled: shared.animationActive && arriving,
+    animationEnabled: shared.animationActive && (arriving || revealed),
     align: message.kind === "message" && message.author === "user" ? ("end" as const) : ("start" as const),
     literalWordStars: message.kind === "message" && message.author === "user",
     remoteContent: shared.remoteContent,
@@ -1691,6 +1707,7 @@ export const ChatMessageList = memo(function ChatMessageList({
     });
   };
   const animationActive = animateMessages && motion.responseVisible;
+  const playbackShown = isFocused && appActive && motion.responseVisible;
   const canReply = Boolean(onReply);
   const canReact = Boolean(onReact);
   const canDelete = Boolean(onDeleteMessage);
@@ -1723,6 +1740,8 @@ export const ChatMessageList = memo(function ChatMessageList({
       firstMessageStyle: motion.firstMessageStyle,
       animationActive,
       playbackActive: animationActive && textReveal && !screenReaderEnabled,
+      playbackResumes: playbackShown && textReveal && !screenReaderEnabled,
+      playbackPaused: !playbackShown && textReveal && !screenReaderEnabled,
       screenReaderEnabled,
       replySession,
       markRevealed,
@@ -1764,6 +1783,7 @@ export const ChatMessageList = memo(function ChatMessageList({
       motion.firstMessageStyle,
       screenReaderEnabled,
       animationActive,
+      playbackShown,
       textReveal,
       replySession,
       markRevealed,

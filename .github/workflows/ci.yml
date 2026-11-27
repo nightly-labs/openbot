@@ -1380,6 +1380,18 @@ jobs:
           path: .openbot-build/mobile-share-sender-e2e/report.json
           if-no-files-found: ignore
 
+      - name: Run the mobile stream reconcile E2E test
+        if: ${{ !cancelled() }}
+        run: bun run test:mobile-stream-reconcile
+
+      - name: Upload the mobile stream reconcile E2E report
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: mobile-stream-reconcile-e2e
+          path: .openbot-build/mobile-stream-reconcile-e2e/report.json
+          if-no-files-found: ignore
+
   mobile-ota-e2e:
     # Runs the update server of the mobile app on a local bucket and the real publish commands, then
     # asks for updates as a phone does. It needs no device and no external service.
