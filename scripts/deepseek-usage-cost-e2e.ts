@@ -22,6 +22,10 @@ interface Case {
   model: string;
   occurredAt: string;
   period: "peak" | "off-peak" | null;
+  session?: string;
+  step?: number;
+  piTotal?: number;
+  piDelta?: number;
 }
 
 interface CaseReport extends Case {
@@ -73,10 +77,38 @@ const CASES: readonly Case[] = [
     occurredAt: "2026-11-26T19:01:00.000Z",
     period: null,
   },
+  {
+    name: "mixed session, priced turn",
+    model: "deepseek-flash",
+    occurredAt: "2026-11-26T20:00:00.000Z",
+    period: "off-peak",
+    session: "mixed",
+    step: 1,
+    piTotal: 0.03,
+  },
+  {
+    name: "mixed session, unpriced model gets only its own Pi cost",
+    model: "deepseek-next",
+    occurredAt: "2026-11-26T20:10:00.000Z",
+    period: null,
+    session: "mixed",
+    step: 2,
+    piTotal: 0.05,
+    piDelta: 0.02,
+  },
+  {
+    name: "mixed session, priced turn again",
+    model: "deepseek-flash",
+    occurredAt: "2026-11-26T20:20:00.000Z",
+    period: "off-peak",
+    session: "mixed",
+    step: 3,
+    piTotal: 0.08,
+  },
 ];
 
 function expectedCost(item: Case): number {
-  if (item.period === null) return PI_COST;
+  if (item.period === null) return item.piDelta ?? PI_COST;
   const peak = PEAK_RATES[item.model];
   assert.ok(peak, `${item.name}: no published rate`);
   const part = item.period === "peak" ? 1 : 0.5;
@@ -102,7 +134,12 @@ try {
   reader = records;
   for (const [index, item] of CASES.entries()) {
     const agent = { id: "agent-e2e", model: item.model };
-    const session = { id: `session-${index + 1}`, provider: "deepseek" as const, createdAt: new Date().toISOString() };
+    const session = {
+      id: item.session ?? `session-${index + 1}`,
+      provider: "deepseek" as const,
+      createdAt: new Date().toISOString(),
+    };
+    const step = item.step ?? 1;
     const turnId = `turn-${index + 1}`;
     collectProviderUsage(database.usage, agent, session, "turn/started", { turn: { id: turnId } });
     records
@@ -112,18 +149,18 @@ try {
       threadId: "thread-e2e",
       turnId,
       usage: {
-        inputTokens: SENT.input,
-        cachedReadTokens: SENT.cached,
+        inputTokens: SENT.input * step,
+        cachedReadTokens: SENT.cached * step,
         cachedWriteTokens: 0,
-        outputTokens: SENT.output,
+        outputTokens: SENT.output * step,
       },
-      cost: PI_COST,
+      cost: item.piTotal ?? PI_COST,
     });
     const row = records
       .prepare(
-        "SELECT estimated_cost_usd AS cost, rate_basis AS basis, occurred_at AS occurredAt FROM agent_usage_records WHERE session_id = ?",
+        "SELECT estimated_cost_usd AS cost, rate_basis AS basis, occurred_at AS occurredAt FROM agent_usage_records WHERE session_id = ? AND turn_id = ?",
       )
-      .get(session.id);
+      .get(session.id, turnId);
     assert.ok(row, `${item.name}: no usage record`);
     const cost = typeof row.cost === "number" ? row.cost : null;
     const basis = typeof row.basis === "string" ? row.basis : null;

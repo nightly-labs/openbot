@@ -6,7 +6,6 @@ import { createOpenBotLogger } from "@openbot/logging";
 import type { AgentUsage } from "../database/agent-usage";
 import type { ProviderSession } from "../database/provider-sessions";
 import { getRecord, getString } from "../protocol";
-import { inputPrice } from "./usage-pricing";
 
 const logger = createOpenBotLogger("usage-collection");
 const GROK_USD_TICKS = 10_000_000_000;
@@ -159,8 +158,7 @@ export function collectProviderUsage(
     });
     return;
   }
-  const ownPrice = session.provider === "deepseek" && inputPrice(session.provider, model) !== null;
-  const sessionCost = !ownPrice && (session.provider === "pi" || isKeyOnlyProvider(session.provider));
+  const sessionCost = session.provider === "pi" || isKeyOnlyProvider(session.provider);
   const reportedCost = sessionCost && isDynamicRecord(params) ? cost(params.cost) : null;
   usage.record({
     agentId: agent.id,
@@ -173,6 +171,7 @@ export function collectProviderUsage(
     tokens: acpTokens(value),
     reportedCost,
     zeroCostUnpriced: sessionCost,
+    listPriceFirst: session.provider === "deepseek",
   });
 }
 
