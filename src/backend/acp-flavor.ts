@@ -431,17 +431,24 @@ function hermesAdmittedTurnFailed(error: unknown): error is { data: DynamicRecor
   return isRecord(error) && isRecord(error.data) && error.data.details === "admitted_turn_failed";
 }
 
+const HERMES_PROVIDER_SAID = /(?:^|\n)Provider said: ([^\n]+)/gu;
+
+function lastProviderSaid(text: string): string | null {
+  const said = [...text.matchAll(HERMES_PROVIDER_SAID)].at(-1)?.[1]?.trim();
+  return said || null;
+}
+
 function hermesProviderReason(error: { data: DynamicRecord }, answer: string): string | null {
   const { message } = error.data;
-  return HERMES_FAILURE_SUMMARY.exec(typeof message === "string" && message ? message : answer)?.[1]?.trim() || null;
+  return (typeof message === "string" ? lastProviderSaid(message) : null) ?? lastProviderSaid(answer);
 }
 
 function hermesFailureCause(error: unknown, answer: string): CauseCode | null {
   if (!hermesAdmittedTurnFailed(error)) return null;
-  const reason = error.data.failure_reason;
+  const { failure_reason: reason, message } = error.data;
   const named = typeof reason === "string" ? HERMES_FAILURE_REASONS[reason] : undefined;
   if (named) return named;
-  const said = hermesProviderReason(error, answer);
+  const said = HERMES_FAILURE_SUMMARY.exec(typeof message === "string" && message ? message : answer)?.[1];
   const cause = said ? classifyFailure(said) : "unknown";
   return cause === "unknown" ? null : cause;
 }
