@@ -1213,7 +1213,7 @@ export function isWorkflowMediaCreditBalance(value: unknown): value is WorkflowM
   );
 }
 
-function isOpenBotCreditBalance(value: unknown): value is WorkflowMediaCreditBalance {
+export function isOpenBotCreditBalance(value: unknown): value is WorkflowMediaCreditBalance {
   return (
     isDynamicRecord(value) && isCreditAmount(value.available) && (value.quota === null || isCreditAmount(value.quota))
   );
