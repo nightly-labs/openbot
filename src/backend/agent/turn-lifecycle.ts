@@ -269,7 +269,11 @@ export interface TurnHooks {
   emitRuntimeSnapshot(): void;
   scheduleDrain(agentId: string): void;
   steerAgentMessage(recipientAgentId: string, deliveryId: string): Effect.Effect<void>;
-  dropRefusedSession(agentId: string, externalThreadId: string): Effect.Effect<void, TurnOperationFailed>;
+  dropRefusedSession(
+    agentId: string,
+    externalThreadId: string,
+    reason?: "image-count",
+  ): Effect.Effect<void, TurnOperationFailed>;
   listAgents(): AgentSummary[];
   redactMcp(text: string): string;
   checkFinish?(agentId: string, input: FinishCheckInput): Effect.Effect<FinishCheckResult | null>;
@@ -2335,8 +2339,11 @@ export class TurnLifecycle {
         snapshot.activeTurnId = null;
       const deliveries = this.#mailbox.findDeliveriesByTurn(agentId, turnId);
       const taskTurn = this.#conversation.isTaskThread(snapshot.threadId);
+      const imageCountRefused = reportedError !== undefined && isImageCountDiagnostic(reportedError);
+      this.#noteImageLimit(imageLimitChat, status, reportedError);
       const retry =
         refused &&
+        !imageCountRefused &&
         !running.produced &&
         deliveries.length > 0 &&
         (taskTurn || !this.#conversation.isExecutionThread(snapshot.threadId)) &&
@@ -2345,7 +2352,6 @@ export class TurnLifecycle {
         yield* this.#retryRefusedTurn(agentId, threadId, turnId, snapshot, deliveries);
         return;
       }
-      this.#noteImageLimit(imageLimitChat, status, reportedError);
       const channelTurn = !taskTurn && this.#conversation.isExecutionThread(snapshot.threadId);
       const laneTaskId = taskTurn ? this.#taskForThread(agentId, threadId) : null;
       const compactionContinuation =
@@ -2550,7 +2556,8 @@ export class TurnLifecycle {
       if (ownLane && outcome === "failed") this.#failedTurns.set(agentId, turnId);
       else if (ownLane) this.#failedTurns.delete(agentId);
       const failure = refusedFailure ?? safetyBlock ?? reportedError;
-      if (refused) yield* this.#hooks.dropRefusedSession(agentId, threadId);
+      if (refused)
+        yield* this.#hooks.dropRefusedSession(agentId, threadId, imageCountRefused ? "image-count" : undefined);
       if (refused || safetyBlock !== null) {
         const context =
           safetyBlock === null

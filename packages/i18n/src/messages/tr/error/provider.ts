@@ -453,7 +453,7 @@ export const messages = {
   "error.provider.imageTooLarge":
     "Görsel çok büyük olduğu için model bu sohbetteki bir görseli kabul etmedi. OpenBot, sohbet geçmişiyle yeni bir {provider} oturumu başlattı. Tekrar deneyin.",
   "error.provider.imageCountLimit":
-    "Sohbette çok fazla görsel olduğu için model bu sohbeti kabul etmedi. OpenBot, sohbet geçmişiyle yeni bir {provider} oturumu başlattı. Tekrar deneyin.",
+    "Sohbette çok fazla görsel olduğu için model bu sohbeti kabul etmedi. OpenBot bu görselleri sonraki {provider} oturumunun dışında bıraktı. Görev görselleri yeniden açarsa yeni oturum sınırı kaldırmaz. Yeni sohbet seçin ve ajandan her adımda daha az görsel açmasını isteyin veya daha fazla görsel kabul eden bir model seçin.",
   "error.provider.imageCountLimitRepeated":
     "Model bu sohbeti yine kabul etmedi: sohbette çok fazla görsel var. Bir görev bu modelin kabul ettiğinden fazla görsel açıyor, bu yüzden yeni bir oturum işe yaramaz. Yeni sohbet'i seçin ve ajandan her adımda daha az görsel açmasını isteyin ya da daha fazla görsel kabul eden bir model seçin.",
   "error.provider.imageUnreadable":

@@ -450,7 +450,7 @@ export const messages = {
   "error.provider.imageTooLarge":
     "Het model accepteerde een afbeelding in deze chat niet, omdat de afbeelding te groot is. OpenBot heeft een nieuwe {provider}-sessie gestart met de chatgeschiedenis. Probeer het opnieuw.",
   "error.provider.imageCountLimit":
-    "Het model accepteerde deze chat niet, omdat de chat te veel afbeeldingen bevat. OpenBot heeft een nieuwe {provider}-sessie gestart met de chatgeschiedenis. Probeer het opnieuw.",
+    "Het model accepteerde deze chat niet, omdat de chat te veel afbeeldingen bevat. OpenBot heeft die afbeeldingen uit de volgende {provider}-sessie gelaten. Een nieuwe sessie heft de limiet niet op als de taak de afbeeldingen opnieuw opent. Kies Nieuwe chat en vraag de agent om in elke stap minder afbeeldingen te openen, of kies een model dat meer afbeeldingen accepteert.",
   "error.provider.imageCountLimitRepeated":
     "Het model accepteerde deze chat opnieuw niet: de chat bevat te veel afbeeldingen. Een taak opent meer afbeeldingen dan dit model accepteert, dus een nieuwe sessie helpt niet. Kies Nieuwe chat en vraag de agent per stap minder afbeeldingen te openen, of kies een model voor meer afbeeldingen.",
   "error.provider.imageUnreadable":

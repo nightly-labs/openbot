@@ -124,6 +124,7 @@ export interface DeliveryPromptSources {
   externalChat?: boolean;
   taskReport?: TaskReportState | null;
   taskReportWaiting?: readonly string[];
+  omitImages?: boolean;
 }
 
 export interface SkippedRoutineRuns {
@@ -623,13 +624,23 @@ export function deliveryPromptInput(context: DeliveryContext, sources: DeliveryP
     text = `${continuation}${CURRENT_MESSAGE_SEPARATOR}${text}`;
   }
   if (delivery.sender.kind === "user" && sources.fromChrome) text = `${FROM_CHROME_NOTE}\n\n${text}`;
+  const omittedImages = sources.omitImages
+    ? managedAttachments.filter((attachment) => attachment.kind === "image")
+    : [];
+  if (omittedImages.length) {
+    const names = omittedImages.map((attachment) => attachment.name).join(", ");
+    text += `\n\nImage attachments were omitted because the model refused this chat for too many images: ${names}. Do not open them again in this step.`;
+  }
   return [
     { type: "text", text },
-    ...managedAttachments.map(
-      (attachment): DeliveryInputItem =>
-        attachment.kind === "image"
-          ? { type: "localImage", path: attachment.path }
-          : { type: "mention", name: attachment.name, path: attachment.path },
+    ...managedAttachments.flatMap((attachment): DeliveryInputItem[] =>
+      attachment.kind === "image" && sources.omitImages
+        ? []
+        : [
+            attachment.kind === "image"
+              ? { type: "localImage", path: attachment.path }
+              : { type: "mention", name: attachment.name, path: attachment.path },
+          ],
     ),
   ];
 }

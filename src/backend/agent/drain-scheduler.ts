@@ -946,7 +946,9 @@ export class DrainScheduler {
       }
 
       const agentNames = agentNamesById(this.#store.list());
-      const tags = this.#hooks.tagReferences(agent.id, this.#conversation.publicThreadId(agent.id, threadId));
+      const publicThreadId = this.#conversation.publicThreadId(agent.id, threadId);
+      const omitImages = this.#threads.hasImageCountDrop(publicThreadId);
+      const tags = this.#hooks.tagReferences(agent.id, publicThreadId);
       const requestIds = new Set(
         batch.flatMap(({ delivery: item }) =>
           item.sender.kind === "agent" && item.replyToMessageId ? [item.replyToMessageId] : [],
@@ -990,6 +992,7 @@ export class DrainScheduler {
               liveVoice: this.#hooks.liveVoiceRelayed(item.delivery.id),
               fromChrome: this.#hooks.fromChrome(item.delivery.id),
               externalChat: this.#messaging?.ownsDelivery(item.delivery.id) === true,
+              ...(omitImages ? { omitImages } : {}),
               ...(executionText === undefined ? {} : { executionText }),
             });
           }),
@@ -1116,8 +1119,10 @@ export class DrainScheduler {
       this.#hooks.turnRestarting(delivery.id);
       const firstStart = yield* Effect.result(startTurn(threadId));
       let response: Effect.Success<ReturnType<typeof startTurn>>;
-      if (Result.isSuccess(firstStart)) response = firstStart.success;
-      else {
+      if (Result.isSuccess(firstStart)) {
+        if (omitImages) this.#threads.consumeImageCountDrop(publicThreadId);
+        response = firstStart.success;
+      } else {
         if (!routineThreadId && isCodexCompactionRefusal(firstStart.failure.cause)) {
           for (const item of batch) yield* this.#mailbox.restoreQueued(item.delivery.id).pipe(toDeliveryStartFailed);
           this.#compaction.holdForRefusal(agent.id, threadId, client);
@@ -1132,6 +1137,7 @@ export class DrainScheduler {
         }
         threadId = yield* this.#threads.ensureThread(agent, client, execution?.threadId).pipe(toDeliveryStartFailed);
         response = yield* startTurn(threadId);
+        if (omitImages) this.#threads.consumeImageCountDrop(publicThreadId);
         if (threadId === unavailableThreadId) {
           this.#threads.logRecovery(agent.id, client.provider, "resumed");
         }
