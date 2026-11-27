@@ -347,7 +347,7 @@ export class MobileChannelStore {
     if (entry.state.pages.has(channelId) || entry.observed.has(channelId)) return false;
     const writes = entry.writes;
     const page = await this.request("POST", CHANNEL_ROUTES.read, decodeChannelPage, { channelId }, serverId);
-    if (!entry.valid || !this.active || writes !== entry.writes) return false;
+    if (!entry.valid || !this.active || writes !== entry.writes || entry.observed.has(channelId)) return false;
     if (!entry.state.channels.some((channel) => channel.id === channelId)) return false;
     const current = entry.state.pages.get(channelId);
     if (current && page.channel.revision < current.channel.revision) return false;

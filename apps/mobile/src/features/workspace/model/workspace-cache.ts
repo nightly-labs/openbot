@@ -32,7 +32,7 @@ interface CachedServer {
   warmed?: { conversations: string[]; channels: string[] } | null;
 }
 
-export interface WorkspaceCacheWarmIds {
+interface WorkspaceCacheWarmIds {
   conversations?: ReadonlySet<string>;
   channels?: ReadonlySet<string>;
 }
