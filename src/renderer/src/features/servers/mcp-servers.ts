@@ -80,12 +80,19 @@ export function mcpSignInAddress(sourceText: string): string | undefined {
 
 export function mcpUrlAtAddress(url: string, address: string | undefined): string | undefined {
   if (!address || !URL.canParse(url.trim()) || !URL.canParse(address)) return undefined;
-  const next = new URL(url.trim());
+  const saved = new URL(url.trim());
+  const next = new URL(saved.href);
   const target = new URL(address);
-  if (target.protocol !== "https:" || target.pathname !== next.pathname) return undefined;
+  if (target.protocol !== "https:" || withoutTrailingSlash(target.pathname) !== withoutTrailingSlash(next.pathname))
+    return undefined;
   next.protocol = target.protocol;
   next.host = target.host;
-  return next.href;
+  next.pathname = target.pathname;
+  return next.href === saved.href ? undefined : next.href;
+}
+
+function withoutTrailingSlash(pathname: string): string {
+  return pathname.endsWith("/") ? pathname.slice(0, -1) : pathname;
 }
 
 export function isMcpSignInCancelled(sourceText: string): boolean {
