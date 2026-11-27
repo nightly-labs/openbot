@@ -349,6 +349,8 @@ const OTHER_SERVERS_RETURN_DELAY_MS = 3_000;
 const STARTUP_SERVER_WAIT_MS = 4_000;
 const FIRST_CONNECTION_WAIT_MS = 5_000;
 const STREAM_FLUSH_MS = 100;
+const LATEST_PAGE_SIZE = 50;
+const READ_LATEST_PAGE_SIZE = 24;
 const EMPTY_SERVER: MobileServer = {
   id: "unavailable",
   name: "OpenBot",
@@ -1143,6 +1145,14 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
     },
     [request, conversationStore],
   );
+  const latestPageSize = useCallback(
+    (agentId: string) => {
+      const live = liveState.get();
+      const unread = live.unreadAgentIds.includes(agentId) || (live.unreadCounts[agentId] ?? 0) > 0;
+      return unread ? LATEST_PAGE_SIZE : READ_LATEST_PAGE_SIZE;
+    },
+    [liveState],
+  );
   const loadConversation = useCallback(
     async (agentId: string, serverId = activeServerIdRef.current, refresh = false, attach = false) => {
       const generation = loadGeneration.current;
@@ -1151,7 +1161,7 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
         () =>
           request(
             "GET",
-            `${TEAM_API_ROUTES.agent.conversationPage(agentId)}?limit=50`,
+            `${TEAM_API_ROUTES.agent.conversationPage(agentId)}?limit=${latestPageSize(agentId)}`,
             decodeConversationPage,
             undefined,
             serverId,
@@ -1163,7 +1173,7 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
       refreshOpenExchanges(agentId, serverId);
       return page;
     },
-    [request, conversationStore, refreshOpenExchanges],
+    [request, conversationStore, refreshOpenExchanges, latestPageSize],
   );
   const loadLatestMessages = useCallback(
     async (agentId: string, serverId?: string) => {
@@ -1236,7 +1246,7 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
               () =>
                 client.request(
                   "GET",
-                  `${TEAM_API_ROUTES.agent.conversationPage(agentId)}?limit=50`,
+                  `${TEAM_API_ROUTES.agent.conversationPage(agentId)}?limit=${latestPageSize(agentId)}`,
                   decodeConversationPage,
                 ),
               context.isCurrent,
@@ -1248,7 +1258,7 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
       })();
       trackUntilSettled(serverLoads.current, loads);
     },
-    [conversationStore, persistServer],
+    [conversationStore, persistServer, latestPageSize],
   );
 
   const loadServer = useCallback(

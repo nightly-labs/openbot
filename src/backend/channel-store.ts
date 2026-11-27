@@ -80,6 +80,14 @@ const UNREAD_COUNT_SQL = `SELECT COUNT(*) AS unread FROM projection_channel_mess
     AND COALESCE(json_extract(m.message_json, '$.message.itemType'), '') NOT LIKE ?
     AND COALESCE(json_extract(m.message_json, '$.message.itemType'), '') NOT LIKE ?`;
 
+const MESSAGES_AFTER_READ_SQL = `SELECT COUNT(*) AS messages FROM (
+  SELECT 1 FROM projection_channel_messages
+  WHERE channel_id = ?
+    AND sequence > COALESCE(
+      (SELECT through_sequence FROM projection_channel_reads WHERE channel_id = ? AND member_id = ?), 0)
+    AND ${SHOWN_MESSAGE_SQL}
+  LIMIT ?)`;
+
 function deletedChannelMessage(entry: ChannelMessage): ChannelMessage & { deleted: true } {
   return {
     id: entry.id,
@@ -259,6 +267,13 @@ export class ChannelStore {
       this.#countsDataVersion = dataVersion;
     }
     return true;
+  }
+
+  messagesAfterRead(channelId: string, memberId: string, limit: number): number {
+    const row = databaseRow(
+      cachedStatement(this.database.connection, MESSAGES_AFTER_READ_SQL).get(channelId, channelId, memberId, limit),
+    );
+    return Number(row?.messages ?? 0);
   }
 
   #unreadCount(channelId: string, memberId: string, excludedId: string, keep: boolean): number {
