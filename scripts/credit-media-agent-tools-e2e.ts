@@ -13,6 +13,7 @@ import type { CreditsHoldAnswer, CreditsHoldCall, CreditsHoldWallet } from "../s
 import {
   CREDIT_MEDIA_TOOL_DEFINITIONS,
   type CreditAsksPerson,
+  type CreditMediaAnswerBefore,
   type CreditMediaReport,
   type CreditMediaShown,
   CreditMediaToolInputFailed,
@@ -820,6 +821,74 @@ async function stoppedCall() {
   );
 }
 
+function answerBeforeCall(turnId: string, answerBefore: CreditMediaAnswerBefore, shown: CreditMediaShown[]) {
+  return tools.handle({
+    agentId: "agent-1",
+    turnId,
+    tool: "generate_video",
+    arguments: { prompt: "Slow waves", duration: 4 },
+    readInputs: (paths) => Effect.succeed(paths.map(() => PNG)),
+    approve: () => Effect.succeed({ accepted: true, choice: null, via: "local" as const }),
+    hold: () => Effect.succeed({ action: "skip" as const }),
+    requesters: ["member-1"],
+    show: (media) =>
+      Effect.sync(() => {
+        shown.push(media);
+        return savedPath(media);
+      }),
+    answerBefore,
+  });
+}
+
+async function answeredBeforeProviderLimit() {
+  const lateResults: string[] = [];
+  const fastShown: CreditMediaShown[] = [];
+  const fast = await Effect.runPromise(
+    answerBeforeCall("turn-3", { at: Date.now() + 60_000, late: (text) => lateResults.push(text) }, fastShown),
+  );
+  const fastText = fast.contentItems[0]?.type === "inputText" ? fast.contentItems[0].text : "";
+  check(
+    "a job that ends before the provider limit answers in the same call and sends no late result",
+    fast.success && toolData(fastText)?.status === "shown" && fastShown.length === 1 && lateResults.length === 0,
+    { text: fastText, late: lateResults },
+  );
+
+  const submitted = Deferred.makeUnsafe<string>();
+  const late = Deferred.makeUnsafe<string>();
+  const shown: CreditMediaShown[] = [];
+  const before = submits.length;
+  heldJob = submitted;
+  const early = await Effect.runPromise(
+    answerBeforeCall(
+      "turn-4",
+      { at: Date.now(), late: (text) => Deferred.doneUnsafe(late, Effect.succeed(text)) },
+      shown,
+    ),
+  );
+  const earlyText = early.contentItems[0]?.type === "inputText" ? early.contentItems[0].text : "";
+  const jobId = await Effect.runPromise(Deferred.await(submitted));
+  check(
+    "a slow job answers before the provider limit and tells the agent not to call again",
+    early.success &&
+      toolData(earlyText)?.status === "making" &&
+      earlyText.includes("Do not call") &&
+      shown.length === 0,
+    { text: earlyText },
+  );
+  runningJobs.set(jobId, true);
+  const lateText = await Effect.runPromise(Deferred.await(late));
+  const lateData = toolData(lateText);
+  check(
+    "the slow job shows in the chat once, and its late result gives the agent the saved file",
+    shown.length === 1 &&
+      shown[0]?.itemType === "video_generation" &&
+      lateData?.status === "shown" &&
+      lateData.file === savedPath(shown[0]) &&
+      submits.length === before + 1,
+    { lateText, shown: shown.map((item) => item.name), submits: submits.length - before },
+  );
+}
+
 async function freeFlow() {
   catalogModels = [...MODELS, ...FREE_MODELS];
   activeWorkflows = new CreditMediaWorkflows({ gateway, warn: () => undefined, creditsChanged: () => undefined });
@@ -933,6 +1002,7 @@ let passed = false;
 try {
   await flow();
   await stoppedCall();
+  await answeredBeforeProviderLimit();
   await freeFlow();
   passed = checks.every((item) => item.passed);
 } finally {

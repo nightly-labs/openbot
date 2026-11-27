@@ -3020,10 +3020,12 @@ export class OpenBotToolRouter {
     request: AppServerRequest,
     params: DynamicToolCallParams,
   ) {
+    const calledAt = Date.now();
     const agentId = this.#conversation.agentForThread(params.threadId);
     const tools = this.#creditMediaTools;
     if (!agentId || !tools) return openBotToolFailure(sourceText("error.billing.mediaSignInRequired"));
     const threadId = this.#conversation.publicThreadId(agentId, params.threadId);
+    const sendLate = request.answerBeforeMs === undefined ? null : this.#attention.lateNoteSender(agentId, threadId);
     const messageId = responseAttachmentMessageId(params.threadId, params.turnId, params.callId);
     if (
       params.tool !== LIST_MEDIA_MODELS_TOOL &&
@@ -3061,6 +3063,15 @@ export class OpenBotToolRouter {
         ),
       hold: (reason, hold) => this.#attention.awaitCreditsHold(client, request, approval(reason), hold),
       requesters: this.#turnRequesters(agentId, params.turnId),
+      ...(sendLate && request.answerBeforeMs !== undefined
+        ? {
+            answerBefore: {
+              at: calledAt + request.answerBeforeMs,
+              late: (result: string) =>
+                sendLate(sourceText("status.agent.creditMediaLate", { tool: params.tool, result })),
+            },
+          }
+        : {}),
       show: (media: CreditMediaShown) =>
         Effect.uninterruptible(
           this.#addGeneratedMessage({

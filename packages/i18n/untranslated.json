@@ -6683,6 +6683,7 @@
   "status.agent.apiKeyScope.agent": ["de", "es", "fr", "it", "ja", "ko", "pl", "pt", "ru", "tr"],
   "status.agent.apiKeyScope.label": ["de", "es", "fr", "it", "ja", "ko", "pl", "pt", "ru", "tr"],
   "status.agent.apiKeyScope.vault": ["de", "es", "fr", "it", "ja", "ko", "pl", "pt", "ru", "tr"],
+  "status.agent.creditMediaLate": ["ar", "de", "es", "fr", "he", "it", "ja", "ko", "nl", "pl", "pt", "ru", "tr", "zh"],
   "status.agent.elicitationMoreOptions": [
     "ar",
     "de",
