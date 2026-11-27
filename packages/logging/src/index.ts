@@ -73,17 +73,41 @@ export function registerSecretValue(value: string, options: { allowShort?: boole
 
 export function registerSecretValues(values: Iterable<string>, options: { allowShort?: boolean } = {}): void {
   const size = registeredSecrets.size;
+  addSecretForms(registeredSecrets, values, options);
+  if (registeredSecrets.size !== size) rebuildRegisteredSecretPattern();
+}
+
+export interface SecretValueSet {
+  values: Iterable<string>;
+  allowShort?: boolean;
+}
+
+const secretGroups = new Map<string, Set<string>>();
+
+export function replaceSecretValueGroup(group: string, sets: readonly SecretValueSet[]): void {
+  const forms = new Set<string>();
+  for (const set of sets) addSecretForms(forms, set.values, set);
+  if (forms.size > 0) secretGroups.set(group, forms);
+  else if (!secretGroups.delete(group)) return;
+  rebuildRegisteredSecretPattern();
+}
+
+function addSecretForms(forms: Set<string>, values: Iterable<string>, options: { allowShort?: boolean }): void {
   for (const value of values) {
     if (!value || (!options.allowShort && value.length < MIN_REGISTERED_SECRET_LENGTH)) continue;
     for (const form of [value, JSON.stringify(value).slice(1, -1), uriEncoded(value)]) {
-      if (form !== null) registeredSecrets.add(form);
+      if (form) forms.add(form);
     }
   }
-  if (registeredSecrets.size === size) return;
-  const alternatives = [...registeredSecrets]
+}
+
+function rebuildRegisteredSecretPattern(): void {
+  const secrets = new Set(registeredSecrets);
+  for (const forms of secretGroups.values()) for (const form of forms) secrets.add(form);
+  const alternatives = [...secrets]
     .sort((left, right) => right.length - left.length)
     .map((secret) => secret.replace(/[.*+?^${}()|[\]\\]/gu, "\\$&"));
-  registeredSecretPattern = new RegExp(alternatives.join("|"), "gu");
+  registeredSecretPattern = alternatives.length === 0 ? null : new RegExp(alternatives.join("|"), "gu");
 }
 
 function uriEncoded(value: string): string | null {

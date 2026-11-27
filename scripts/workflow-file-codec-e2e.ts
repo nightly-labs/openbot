@@ -64,6 +64,7 @@ const sourceGraph: WorkflowGraph = {
   nodes: [
     { ...node("trigger", "trigger", 0, { trigger: "schedule" }), schedule: { kind: "daily", time: "09:00" } },
     node("asset", "asset", 0, { file: "logo.png", fileId: "file-on-host-a" }),
+    node("clip", "asset", 0, { media: "audio" }),
     node("agent", "agent", 300, { agentId: "agent-on-host-a", task: "Write the daily note.", stepName: "Writer" }),
     node("model", "llm", 300, { prompt: "Sort {{local_date}}.", answer: "title: text" }),
     node("picture", "image", 300, {

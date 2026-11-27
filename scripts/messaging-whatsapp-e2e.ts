@@ -2262,6 +2262,50 @@ try {
     },
   );
 
+  await step(
+    "a socket that never opens counts as a failed attempt, also a minute after the last open (#17021)",
+    async () => {
+      let clock = Date.now();
+      const store = WhatsAppAuthStore.open({ path: join(root, "offline.db"), key: newStoreKey(), now: () => clock });
+      store.creds.me = { id: `${OWNER}:8@s.whatsapp.net` };
+      store.saveCreds();
+      const session = new WhatsAppSession({
+        store,
+        createSocket: phone.create,
+        makeSignalRepository: () => {
+          throw new Error("Not used by the fake socket.");
+        },
+        fetchVersion: async () => null,
+        now: () => clock,
+      });
+      try {
+        session.start();
+        await until(() => session.state === "open", "the socket open");
+        clock += 61_000;
+        phone.offline = true;
+        const before = phone.sockets.length;
+        phone.current().close(428);
+        const createdAt: number[] = [];
+        for (let next = 1; next <= 3; next += 1) {
+          await until(() => phone.sockets.length >= before + next, `offline attempt ${next}`, 20_000);
+          createdAt.push(Date.now());
+        }
+        const gaps = createdAt.slice(1).map((at, index) => at - (createdAt[index] ?? at));
+        const firstDelayMax = backoffDelay(0, () => 1);
+        assert.ok(
+          gaps.every((gap) => gap > firstDelayMax),
+          `The backoff started again at each failed attempt: ${gaps.join(", ")} ms.`,
+        );
+        assert.notEqual(session.state, "open");
+        return { gapsMs: gaps, firstDelayMaxMs: firstDelayMax };
+      } finally {
+        phone.offline = false;
+        await runCauseEffect(session.stop());
+        store.close();
+      }
+    },
+  );
+
   report.passed = true;
 } finally {
   mkdirSync(OUT, { recursive: true });

@@ -187,6 +187,7 @@ import {
   decodeCentralAuthState,
   decodeChatWindowTargets,
   decodeCreditActivity,
+  decodeCreditMediaCatalog,
   decodeCreditRedeemResult,
   decodeCreditsState,
   decodeCustomAgentCheckResult,
@@ -957,6 +958,7 @@ const openbotApi: OpenBotDesktopApi = {
     mediaPrice: decodeWorkflowMediaPrice,
     folders: decodeWorkflowFoldersSnapshotFromMain,
     folderAction: decodeWorkflowFoldersSnapshotFromMain,
+    setSpot: decodeVoid,
   }),
   crm: bridgeGroup(IPC_ENDPOINTS.crm, {
     overview: decodeCrmOverview,
@@ -1191,6 +1193,7 @@ const openbotApi: OpenBotDesktopApi = {
   credits: bridgeGroup(IPC_ENDPOINTS.credits, {
     getState: decodeCreditsState,
     getActivity: decodeCreditActivity,
+    getCatalog: decodeCreditMediaCatalog,
     openCheckout: decodeVoid,
     transfer: decodeCreditsState,
     redeem: decodeCreditRedeemResult,

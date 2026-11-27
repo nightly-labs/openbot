@@ -199,6 +199,8 @@ import { ShortcutsSync } from "@/features/shortcuts/shortcuts-sync";
 import { fetch } from "@/features/support/model/logged-fetch";
 import { supportLog } from "@/features/support/model/support-log";
 import { forgetPhoneFeedback, shownPhoneFeedback } from "@/features/support/model/support-log-capture";
+import { useWatchAwake } from "@/features/watch/model/watch-awake";
+import { WatchSync } from "@/features/watch/watch-sync";
 import { OwnerTransferPrompts } from "@/features/workspace/components/owner-transfer-prompts";
 import type { RemoteTeamTransportRef } from "@/features/workspace/components/remote-team-transport";
 import {
@@ -274,6 +276,7 @@ import { createDownloadQueue } from "@/features/workspace/model/request-lanes";
 import {
   hasCapability,
   requireCapability,
+  requireSidebarLayout,
   type ServerCapabilities,
   SIDEBAR_LAYOUT_CAPABILITY,
   supportsBrowserView,
@@ -448,6 +451,7 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
   const loadGeneration = useRef(0);
   const directoryGeneration = useRef(0);
   const foreground = useAppForeground();
+  const watchAwake = useWatchAwake();
   const [servers, setServers] = useState<MobileServer[]>([]);
   const [serverDirectoryState, setServerDirectoryState] = useState<MobileServerDirectoryState>("loading");
   const [serverDirectoryError, setServerDirectoryError] = useState<string | null>(null);
@@ -462,7 +466,7 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
     loaded: () => allSettled(serverLoads.current),
     saved: () => allSettled(cacheWrites.current),
   });
-  const live = foreground || backgroundRefreshing;
+  const live = foreground || backgroundRefreshing || watchAwake;
   const firstConnectionTimers = useRef(new Map<string, ReturnType<typeof setTimeout>>());
   const [sidebarByServer, setSidebarByServer] = useState<
     Record<string, { layout: SidebarLayoutSnapshot | null; error: string | null }>
@@ -650,6 +654,7 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
         presenceSignatures.current.delete(serverId);
         for (const queryKey of [
           queryKeys.chatQueue(serverId),
+          queryKeys.agentUsageLimits(queryScope, serverId),
           queryKeys.serverMembers(queryScope, serverId),
           queryKeys.serverInvites(queryScope, serverId),
           queryKeys.agentAvatar(queryScope, serverId),
@@ -1978,11 +1983,10 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
       answerBrowserPermission: browser.answerBrowserPermission,
       answerBrowserHttpSignIn: browser.answerBrowserHttpSignIn,
       mutateSidebarLayout: async (serverId, action) => {
-        requireCapability(
+        requireSidebarLayout(
           serverCapabilities.current,
           serverId,
-          SIDEBAR_LAYOUT_CAPABILITY,
-          "mobile.workspace.error.sectionsUnsupported",
+          serversRef.current.find((server) => server.id === serverId),
         );
         const layout = await request(
           "POST",
@@ -1996,11 +2000,10 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
         applySidebarLayout(serverId, layout);
       },
       moveSidebarChat: async (serverId, action) => {
-        requireCapability(
+        requireSidebarLayout(
           serverCapabilities.current,
           serverId,
-          SIDEBAR_LAYOUT_CAPABILITY,
-          "mobile.workspace.error.sectionsUnsupported",
+          serversRef.current.find((server) => server.id === serverId),
         );
         const previous = sidebarByServerRef.current[serverId]?.layout;
         const moved = previous ? moveSidebarChat(previous, action) : null;
@@ -2008,7 +2011,9 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
         try {
           const layout = await request(
             "POST",
-            TEAM_API_ROUTES.sidebarLayout.actions,
+            action.type === "assign" && hasCapability(serverCapabilities.current, serverId, SIDEBAR_FOLDERS_CAPABILITY)
+              ? SIDEBAR_FOLDERS_ROUTES.actions
+              : TEAM_API_ROUTES.sidebarLayout.actions,
             decodeSidebarLayout,
             action,
             serverId,
@@ -2878,6 +2883,14 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
             active={foreground}
             onAccepted={refreshMemberships}
           />
+          <WatchSync
+            servers={orderedServers}
+            serversReady={serverDirectoryState === "ready"}
+            agents={directoryAgents}
+            preferences={visiblePreferences}
+            capabilities={serverCapabilities.current}
+            teamApi={teamApi}
+          />
           <NotificationAvatarSync
             servers={servers}
             serversReady={serverDirectoryState === "ready"}
@@ -2888,7 +2901,9 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
               key={server.id}
               hostId={server.id}
               publicKey={server.publicKey}
-              active={(foreground && (!othersHeld || server.id === activeServerId)) || backgroundRefreshing}
+              active={
+                (foreground && (!othersHeld || server.id === activeServerId)) || backgroundRefreshing || watchAwake
+              }
               background={!foreground}
               directory={directory}
               register={registerConnection}

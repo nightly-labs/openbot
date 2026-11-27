@@ -162,10 +162,10 @@ export function AddServerDialog(props: AddServerDialogProps) {
   const [opened, setOpened] = createSignal(false);
   const [closing, setClosing] = createSignal(false);
   const [work, setWork] = createSignal(Boolean(order?.license && untrack(() => props.licenseOffer)));
-  const minPeople = () =>
-    Math.min(LICENSE_MAX_USERS, licenseOrderFor(Math.max(1, props.licenseOffer?.used ?? 1)).users);
+  const maxPeople = () => Math.min(LICENSE_MAX_USERS, Math.max(1, ...props.plans.map((plan) => plan.memberLimit)));
+  const minPeople = () => Math.min(maxPeople(), licenseOrderFor(Math.max(1, props.licenseOffer?.used ?? 1)).users);
   const [people, setPeople] = createSignal(
-    Math.min(LICENSE_MAX_USERS, Math.max(order?.license?.users ?? LICENSE_INCLUDED_USERS, untrack(minPeople))),
+    Math.min(untrack(maxPeople), Math.max(order?.license?.users ?? LICENSE_INCLUDED_USERS, untrack(minPeople))),
   );
   const planPeople = () => (props.licenseOffer ? (work() ? people() : 0) : undefined);
   const longestPrice = () =>
@@ -428,6 +428,7 @@ export function AddServerDialog(props: AddServerDialogProps) {
                         <HostedLicensePeople
                           value={people()}
                           min={minPeople()}
+                          max={maxPeople()}
                           used={props.licenseOffer?.used ?? 0}
                           disabled={!work() || creating() || props.serverLimit != null}
                           onChange={setPeople}

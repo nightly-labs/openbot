@@ -45,8 +45,6 @@ export const messages = {
     "Die automatische Verlängerung wird für diesen Server fortgesetzt. Seine Agenten, Unterhaltungen und Dateien bleiben erhalten.",
   "billing.lifecycle.dataStays": "Die Verlängerung ist aus. Deine Daten bleiben erhalten, wenn der Tarif endet.",
   "billing.lifecycle.deleteServer": "Server löschen…",
-  "billing.lifecycle.whenDelete": "Wann soll dieser Server gelöscht werden?",
-  "billing.lifecycle.atPeriodEnd": "Am Ende des Zeitraums · {date}",
   "billing.lifecycle.planEndsLabel": "Tarif endet",
   "billing.lifecycle.plansDescription":
     "Verwalte jeden Server einzeln. Beim Kündigen der Verlängerung bleiben seine Daten erhalten.",
@@ -55,15 +53,12 @@ export const messages = {
   "billing.lifecycle.renewalLabel": "Nächste Verlängerung",
   "billing.lifecycle.deletionLabel": "Löschdatum",
   "billing.lifecycle.billingLabel": "Abrechnung",
-  "billing.lifecycle.immediately": "Sofort",
   "billing.lifecycle.automatic": "Automatische Verlängerung wird fortgesetzt",
-  "billing.lifecycle.noRefund": "Keine Erstattung für ungenutzte Zeit",
   "billing.lifecycle.noRenewal": "Keine weiteren Verlängerungen",
   "billing.lifecycle.dateUtc": "{date} UTC",
   "billing.lifecycle.renews": "Die automatische Verlängerung ist an.",
   "billing.lifecycle.schedule": "Am Ende des Zeitraums löschen",
   "billing.lifecycle.keep": "Server behalten",
-  "billing.lifecycle.deleteNow": "Jetzt löschen",
   "billing.lifecycle.deletesOn": "Wird am {date} gelöscht",
   "billing.lifecycle.scheduledDescription": "Die Verlängerung ist aus. Dein Server und deine Daten werden gelöscht.",
   "billing.lifecycle.scheduleDescription":
@@ -72,12 +67,9 @@ export const messages = {
   "billing.lifecycle.keepDescription":
     "Dein Server und seine Daten bleiben erhalten. Die geplante Löschung wird gestoppt und die automatische Verlängerung fortgesetzt.",
   "billing.lifecycle.deleteTitle": "{name} löschen?",
-  "billing.lifecycle.deleteDescription":
-    "Lösche diesen Server, seine Agenten, Unterhaltungen und Dateien endgültig. Dein Abonnement endet jetzt. Das kann nicht rückgängig gemacht werden.",
   "billing.lifecycle.saving": "Wird gespeichert…",
   "billing.lifecycle.failed":
     "Die Änderung konnte nicht bestätigt werden. Aktualisiere die Abrechnung und versuche es erneut.",
-  "billing.lifecycle.deleted": "{name} wurde gelöscht. Das Abonnement ist beendet.",
   "billing.lifecycle.label": "Designvorschau · Nur simulierte Aktionen",
   "billing.lifecycle.reset": "Vorschau zurücksetzen",
   "billing.license.title": "Lizenz",

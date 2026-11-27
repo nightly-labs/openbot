@@ -21,7 +21,7 @@ import {
   type ResponseStyle,
   workspaceAccessEnforced,
 } from "@openbot/contracts/ipc";
-import { redactSecrets, redactText } from "@openbot/logging";
+import { redactPostText, redactSecrets, redactText } from "@openbot/logging";
 import { automationRunCommand } from "../automation-command";
 import type { HomeSkill } from "../home-skills";
 import { PASSWORD_MANAGER_BRAND_NAMES } from "../password-vault";
@@ -147,7 +147,7 @@ function instructionsFileLines(file: InstructionsFileText, lead: string): string
   return [
     lead,
     "<agent_instructions>",
-    redactText(file.text).replace(/<(\/?(?:openbot_)?agent_instructions)/giu, "&lt;$1"),
+    redactPostText(file.text).replace(/<(\/?(?:openbot_)?agent_instructions)/giu, "&lt;$1"),
     "</agent_instructions>",
     ...(file.truncated ? [`This is the start of the file only; read the rest in ${file.fileName}.`] : []),
   ];
@@ -430,7 +430,7 @@ export function developerInstructions(
             }`
           : // Grok CLI 1.0.77 gives MCP tools to the model only through its `search_tool` and
             agent.provider === "grok"
-            ? ' When an openbot or openbot_browser tool is not in your tool list, find it with search_tool and run it with use_tool under the name that search_tool gives, with two underscores for the dot, such as openbot__send_message or openbot__tool_call; never say that a tool is missing before you search. A tool that search_tool does not find has no such name: run it with use_tool openbot__tool_call and the dotted name in its input, such as {"name":"openbot_browser.request_takeover","arguments":{…}}, never as openbot_browser__request_takeover.'
+            ? ' When an openbot or openbot_browser tool is not in your tool list, find it with search_tool and run it with use_tool under the name that search_tool gives, with two underscores for the dot, such as openbot__send_message or openbot__tool_call; never say that a tool is missing before you search. A tool that search_tool does not find has no such name: run it with use_tool openbot__tool_call and the dotted name in its input, such as {"name":"openbot_browser.request_takeover","arguments":{…}}, never as openbot_browser__request_takeover. When image_to_video or reference_to_video fails with a zero limit, such as a rate limit of 0/0, do not call it again: tell the user that their Grok account cannot make videos, and offer to make the video with openbot.generate_video, which spends OpenBot credits. Call it only when the user agrees.'
             : // Pi lists openbot.tool_search as mcp__openbot_<hash>__tool_search. With deferred MCP servers,
               agent.provider === "pi" || isKeyOnlyProvider(agent.provider)
               ? " In your tool list, openbot.tool_search and openbot.tool_call are the tools named mcp__openbot_…__tool_search and mcp__openbot_…__tool_call. A tool named exactly tool_search, when you have one, loads only the tools of the servers in <mcp_servers>, never OpenBot or browser tools."

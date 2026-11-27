@@ -312,6 +312,8 @@ export const messages = {
     "Gemini 无法读取此聊天的已保存记录。OpenBot 已带着聊天记录开启新的 Gemini 会话。请重新发送你的消息。",
   "error.provider.acpTurnStuck":
     "{provider} 没有结束上一轮，因此没有接受这条消息。OpenBot 已带着聊天记录开启新的 {provider} 会话。请重新发送你的消息。",
+  "error.provider.antigravityLicenseRefused":
+    "Google 表示你的账户没有使用该模型的许可。请改用其他模型，然后重新发送消息。\n{detail}",
   "error.provider.antigravityLocationUnsupported":
     "Google 不允许在运行此助手的电脑所在的网络位置使用 Gemini。请在其他电脑上使用 Gemini，或为此助手选择其他服务商。\n{detail}",
   "error.provider.antigravityTurnStopped":
@@ -398,6 +400,8 @@ export const messages = {
     "图片太大，模型未接受此聊天中的一张图片。OpenBot 已使用聊天记录开始新的 {provider} 会话。请重试。",
   "error.provider.imageCountLimit":
     "此聊天中的图片太多，模型未接受此聊天。OpenBot 已使用聊天记录开始新的 {provider} 会话。请重试。",
+  "error.provider.imageCountLimitRepeated":
+    "此聊天中的图片太多，模型再次未接受此聊天。一个任务打开的图片超过此模型接受的数量，因此新会话也无法解决。请选择“新对话”，并让智能体在每一步打开更少的图片，或者选择一个可以接受更多图片的模型。",
   "error.provider.imageUnreadable":
     "模型无法读取此聊天中的一张图片。OpenBot 已使用聊天记录开始新的 {provider} 会话。请重试。如果你发送了图片，请换一张图片。",
   "error.provider.requestTooLarge":
@@ -412,6 +416,8 @@ export const messages = {
     "Muse 无法启动某个 MCP 服务器，并在本次会话中停用了 MCP。OpenBot 已带着聊天记录开启新的 Muse 会话，请重试。如果仍然报错，请关闭 Computer Use，或对该助手关闭启动失败的 MCP 服务器。",
   "error.provider.claudeSessionMissing":
     "Claude Code 找不到此聊天已保存的会话。OpenBot 已带着聊天记录开启新的 Claude Code 会话，请重试。",
+  "error.provider.opencodeSessionMissing":
+    "OpenCode 找不到此聊天已保存的会话。OpenBot 已带着聊天记录开启新的 OpenCode 会话，请重试。",
   "error.provider.grokSignIn": "请运行 `grok login`，或设置 XAI_API_KEY 以使用 Grok。",
   "error.provider.acpSignInNoStart": "服务商没有启动，所以无法开始登录。请重试，或重新启动 OpenBot。",
   "error.provider.acpSignInTimedOut": "登录超时。",

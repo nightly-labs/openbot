@@ -96,13 +96,19 @@ function supportedLocales(module: Recognizer): Promise<SupportedLocales> {
   return cachedLocales;
 }
 
+function keyboardLanguage(chosen: string): Promise<string | null> {
+  if (chosen !== AUTOMATIC_DICTATION_LANGUAGE) return Promise.resolve(null);
+  return speechNative?.keyboardLanguage?.().catch(() => null) ?? Promise.resolve(null);
+}
+
 async function recognitionOptions(module: Recognizer, supported: Promise<SupportedLocales>) {
   const chosen = useDictationLanguage.getState().value;
+  const [locales, keyboard] = await Promise.all([supported, keyboardLanguage(chosen)]);
+  const listedKeyboard = keyboard && locales.locales.length > 0 ? [keyboard] : [];
   const preferred =
     chosen !== AUTOMATIC_DICTATION_LANGUAGE
       ? [chosen]
-      : [...phoneLanguages(), Intl.DateTimeFormat().resolvedOptions().locale];
-  const locales = await supported;
+      : [...listedKeyboard, ...phoneLanguages(), Intl.DateTimeFormat().resolvedOptions().locale];
   const lang = pickRecognitionLocale(preferred, locales.locales);
   const requiresOnDeviceRecognition =
     isIOS || (module.supportsOnDeviceRecognition() && hasRecognitionLocale(lang, locales.installedLocales));

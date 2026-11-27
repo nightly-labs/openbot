@@ -4,11 +4,12 @@ import { onCleanup } from "solid-js";
 import { fn } from "storybook/test";
 import type { Meta, StoryObj } from "storybook-solidjs-vite";
 import { AgentUsagePanel } from "../src/features/usage/AgentUsagePanel";
+import { PlatformProvider } from "../src/platform";
 import { mockHostAnalytics } from "../src/preview/mock-agent-analytics";
 import { createMockOpenBot } from "./mock-openbot";
 
 function UsageStory(props: {
-  state: "ready" | "empty" | "partial" | "loading" | "error" | "unsupported" | "large" | "small" | "long";
+  state: "ready" | "empty" | "loading" | "error" | "unsupported" | "large" | "small" | "long";
   narrow?: boolean;
   agentId?: string;
   machine?: "normal" | "high";
@@ -46,8 +47,6 @@ function UsageStory(props: {
     }));
     if (props.state === "empty")
       return { ...data, totals: emptyAnalyticsTotals(), models: [], daily: [], agents: [], providerDaily: [] };
-    if (props.state === "partial")
-      return { ...data, totals: { ...data.totals, missingUsageTurns: 3, unpricedRecords: 2 } };
     return data;
   };
   onCleanup(() => {
@@ -59,22 +58,24 @@ function UsageStory(props: {
     return load && <UsageMachineMeter metrics={machineMetrics(load)} onOpenStorage={fn()} />;
   };
   return (
-    <main
-      style={{
-        width: props.narrow ? "390px" : "100%",
-        height: "900px",
-        overflow: "hidden",
-        background: "var(--openbot-bg-canvas)",
-      }}
-    >
-      <AgentUsagePanel
-        hostName="Local host"
-        serverId="local"
-        agentId={props.agentId}
-        onBack={fn()}
-        machine={machine()}
-      />
-    </main>
+    <PlatformProvider>
+      <main
+        style={{
+          width: props.narrow ? "390px" : "100%",
+          height: "900px",
+          overflow: "hidden",
+          background: "var(--openbot-bg-canvas)",
+        }}
+      >
+        <AgentUsagePanel
+          hostName="Local host"
+          serverId="local"
+          agentId={props.agentId}
+          onBack={fn()}
+          machine={machine()}
+        />
+      </main>
+    </PlatformProvider>
   );
 }
 const GB = 1024 ** 3;
@@ -101,7 +102,6 @@ export default meta;
 type Story = StoryObj<typeof meta>;
 export const Usage: Story = {};
 export const Empty: Story = { args: { state: "empty" } };
-export const Partial: Story = { args: { state: "partial" } };
 export const Loading: Story = { args: { state: "loading" } };
 export const ErrorState: Story = { args: { state: "error" } };
 export const Unsupported: Story = { args: { state: "unsupported" } };

@@ -75,12 +75,18 @@ export const messages = {
   "status.agent.nearSignatureReceived": "OpenBot heeft de handtekening ontvangen. Je kunt dit tabblad sluiten.",
   "status.agent.nearSignatureUnknown": "OpenBot wacht niet op deze handtekening. Start het opnieuw in OpenBot.",
   "status.agent.nearPayment": "Betaal {amount} {symbol} aan {recipient} uit de cryptowallet, voor {domain}: {reason}",
+  "status.agent.nearPaymentSending": "{amount} betalen voor {domain}: {reason}",
+  "status.agent.nearPaymentPaid": "{amount} betaald voor {domain}: {reason}",
+  "status.agent.nearPaymentNotPaid": "Niet betaald: {amount} voor {domain}: {reason}",
+  "status.agent.nearPaymentUncertain": "Niet bevestigd: {amount} voor {domain}: {reason}",
   "status.agent.nearSummaryCreate":
     "Alle agents kunnen tot {amount} USD per dag betalen. Je kunt dit later wijzigen in OpenBot.",
   "status.agent.nearSummaryGrant": "Laat deze OpenBot-app {days} dagen uit de wallet betalen, binnen je regels.",
   "status.agent.nearSummaryBudget": "Wijzig het dagbudget van de wallet naar {amount} USD.",
   "status.agent.nearSummaryAutoPay":
     "Laat OpenBot zonder je handtekening betalen als een betaalregel dat toestaat. Voor andere betalingen krijg je nog steeds een vraag in de chat.",
+  "status.agent.nearSummaryManualPay":
+    "Er is geen betaalregel meer. OpenBot vraagt weer voor elke betaling om je handtekening.",
   "status.agent.nearSummaryPayment": "Keur de betaling van {amount} aan {recipient} goed.",
   "status.agent.nearSummaryFreeze": "Agents kunnen niet uit deze wallet betalen tot je de betalingen hervat.",
   "status.agent.nearSummaryUnfreeze": "Agents kunnen weer uit deze wallet betalen, binnen je regels.",

@@ -153,6 +153,7 @@ import { MISTRAL_CODE_SIGN_IN_CAPABILITY } from "./mistral-code-sign-in-v1";
 import { MODEL_STEERING_CAPABILITY } from "./model-steering-v1";
 import { MODEL_VISIBILITY_KEPT_CAPABILITY } from "./model-visibility-kept-v1";
 import { MODEL_VISIBILITY_CAPABILITY } from "./model-visibility-v1";
+import { TEAM_NEAR_PAYMENT_CAPABILITY } from "./near-payment-v1";
 import { ONEPASSWORD_CONNECTOR_CAPABILITY } from "./onepassword-connector-v1";
 import { OPENBOT_CREDITS_EVENTS_CAPABILITY } from "./openbot-credits-events-v1";
 import { OWNER_TRANSFER_CAPABILITY } from "./owner-transfer-v1";
@@ -166,6 +167,7 @@ import { TEAM_PROMPT_MULTI_SELECT_CAPABILITY } from "./prompt-multi-select-v1";
 import { PROVIDER_ACCOUNT_CODE_CAPABILITY } from "./provider-account-code-v1";
 import { PROVIDER_ACCOUNT_KEYS_CAPABILITY } from "./provider-account-keys-v1";
 import { PROVIDER_ACCOUNT_MODELS_CAPABILITY } from "./provider-account-models-v1";
+import { PROVIDER_ACCOUNT_POOL_STRATEGY_CAPABILITY } from "./provider-account-pool-strategy-v1";
 import { PROVIDER_ACCOUNT_POOL_CAPABILITY } from "./provider-account-pool-v1";
 import { PROVIDER_ACCOUNT_RELAY_CAPABILITY } from "./provider-account-relay-v1";
 import { PROVIDER_ACCOUNT_RELAY_V2_CAPABILITY } from "./provider-account-relay-v2";
@@ -262,6 +264,7 @@ import { VAULT_V3_CAPABILITY } from "./vault-v3";
 import { VAULT_V4_CAPABILITY } from "./vault-v4";
 import { TEAM_VIDEO_GENERATION_CAPABILITY } from "./video-generation-v1";
 import { VOICE_TRANSCRIPTION_CAPABILITY } from "./voice-transcription-v1";
+import { WATCH_RELAY_TEAM_CAPABILITY } from "./watch-relay-v1";
 import { WEBHOOK_AGENT_SECRET_CAPABILITY } from "./webhook-agent-secret-v1";
 import { WEBHOOK_SENDER_SECRET_CAPABILITY } from "./webhook-sender-secret-v1";
 import { WEBHOOK_TESTS_CAPABILITY } from "./webhook-tests-v1";
@@ -270,6 +273,7 @@ import { WHATSAPP_READ_ONLY_CAPABILITY } from "./whatsapp-read-only-v1";
 import { WHATSAPP_STATUS_REACTIONS_CAPABILITY } from "./whatsapp-status-reactions-v1";
 import { WHATSAPP_WORKING_MESSAGE_CAPABILITY } from "./whatsapp-working-message-v1";
 import { WORKFLOW_FOLDERS_CAPABILITY } from "./workflow-folders-v1";
+import { WORKFLOW_PRESENCE_CAPABILITY } from "./workflow-presence-v1";
 import { WORKFLOWS_AGENT_FILES_CAPABILITY } from "./workflows-agent-files-v1";
 import { WORKFLOWS_ANSWERS_CAPABILITY } from "./workflows-answers-v1";
 import { WORKFLOWS_CHANNELS_CAPABILITY } from "./workflows-channels-v1";
@@ -281,6 +285,7 @@ import { WORKFLOWS_HIGGSFIELD_CAPABILITY } from "./workflows-higgsfield-v1";
 import { WORKFLOWS_MEDIA_ACCOUNT_CAPABILITY } from "./workflows-media-account-v1";
 import { WORKFLOWS_MEDIA_CATALOG_CAPABILITY } from "./workflows-media-catalog-v1";
 import { WORKFLOWS_MEDIA_CATALOG_V2_CAPABILITY } from "./workflows-media-catalog-v2";
+import { WORKFLOWS_MEDIA_CLIPS_CAPABILITY } from "./workflows-media-clips-v1";
 import { WORKFLOWS_MEDIA_SERVICE_ACCOUNT_CAPABILITY } from "./workflows-media-service-account-v1";
 import { WORKFLOWS_MEDIA_SIZE_CAPABILITY } from "./workflows-media-size-v1";
 import { WORKFLOWS_MEDIA_TRANSPARENT_CAPABILITY } from "./workflows-media-transparent-v1";
@@ -497,6 +502,7 @@ export {
   TEAM_HISTORY_EXTENT_CAPABILITY,
   TEAM_MEMORY_CHANGES_CAPABILITY,
   TEAM_MESSAGE_CLIENT_ID_CAPABILITY,
+  TEAM_NEAR_PAYMENT_CAPABILITY,
   TEAM_PROMPT_DETAIL_CAPABILITY,
   TEAM_PROMPT_MULTI_SELECT_CAPABILITY,
   TEAM_REASONING_EFFORTS_CAPABILITY,
@@ -518,6 +524,7 @@ export {
   VAULT_V2_CAPABILITY,
   VAULT_V3_CAPABILITY,
   VAULT_V4_CAPABILITY,
+  WATCH_RELAY_TEAM_CAPABILITY,
   WEBHOOK_AGENT_SECRET_CAPABILITY,
   WEBHOOK_SENDER_SECRET_CAPABILITY,
   WEBHOOK_TESTS_CAPABILITY,
@@ -525,6 +532,7 @@ export {
   WHATSAPP_STATUS_REACTIONS_CAPABILITY,
   WHATSAPP_WORKING_MESSAGE_CAPABILITY,
   WORKFLOW_FOLDERS_CAPABILITY,
+  WORKFLOW_PRESENCE_CAPABILITY,
   WORKFLOWS_AGENT_FILES_CAPABILITY,
   WORKFLOWS_ANSWERS_CAPABILITY,
   WORKFLOWS_CAPABILITY,
@@ -538,6 +546,7 @@ export {
   WORKFLOWS_MEDIA_CAPABILITY,
   WORKFLOWS_MEDIA_CATALOG_CAPABILITY,
   WORKFLOWS_MEDIA_CATALOG_V2_CAPABILITY,
+  WORKFLOWS_MEDIA_CLIPS_CAPABILITY,
   WORKFLOWS_MEDIA_SERVICE_ACCOUNT_CAPABILITY,
   WORKFLOWS_MEDIA_SIZE_CAPABILITY,
   WORKFLOWS_MEDIA_TRANSPARENT_CAPABILITY,
@@ -876,6 +885,11 @@ const TEAM_CAPABILITY_REGISTRY = [
   [TEAM_BROWSER_VIEW_DIALOG_CAPABILITY, V10],
   [BROWSER_HTTP_SIGN_IN_CAPABILITY, V10],
   [CHANNEL_COMPACT_AVAILABILITY_CAPABILITY, V10],
+  [WORKFLOW_PRESENCE_CAPABILITY, V10],
+  [TEAM_NEAR_PAYMENT_CAPABILITY, V10],
+  [PROVIDER_ACCOUNT_POOL_STRATEGY_CAPABILITY, V10],
+  [WATCH_RELAY_TEAM_CAPABILITY, V10],
+  [WORKFLOWS_MEDIA_CLIPS_CAPABILITY, V10],
 ] as const satisfies readonly (readonly [string, TeamCapabilityPlacement])[];
 
 export const TEAM_CURRENT_CAPABILITIES = TEAM_CAPABILITY_REGISTRY.map(([capability]) => capability);

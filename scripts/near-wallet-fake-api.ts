@@ -225,6 +225,14 @@ export interface FakeExecution {
   settlements: number;
 }
 
+export function fakeTransactionHash(correlationId: string): string {
+  const alphabet = "123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz";
+  return Array.from(
+    { length: 44 },
+    (_, index) => alphabet[(correlationId.charCodeAt(index % correlationId.length) + index) % alphabet.length],
+  ).join("");
+}
+
 export function policyOf(agent: FakeAgent) {
   return policySchema.parse(agent.policy);
 }
@@ -648,7 +656,11 @@ export class FakeAgentApi {
       dispatch_committed_at: execution.createdAt,
       grant: { id: execution.grantId, label: "OpenBot" },
       type: execution.type,
-      details: { action: execution.type, approval_id: execution.approvalId },
+      details: {
+        action: execution.type,
+        approval_id: execution.approvalId,
+        tx_hash: execution.status === "SUCCESS" ? fakeTransactionHash(execution.correlationId) : null,
+      },
     };
   }
 

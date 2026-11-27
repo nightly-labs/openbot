@@ -19,7 +19,7 @@ import { createEffect, createMemo, createSignal, onCleanup, type Store, type Sto
 import { createScopeGuard } from "../../../scope-lifetime";
 import { serverSupportsCapability } from "../../servers/server-capabilities";
 import { createAttachmentDownloads } from "../attachment-downloads";
-import { attachmentFilePreview, remoteAttachmentUrlWith } from "../attachment-preview";
+import { attachmentFilePreview, localAttachmentCopyUrl, remoteAttachmentUrlWith } from "../attachment-preview";
 import { BROWSER_PIP_STORAGE_KEY, BROWSER_WINDOW_STORAGE_KEY, storeBounds } from "../browser-bounds-storage";
 import { releaseFilePreviewPage } from "../conversation-port";
 import { conversationRuntime } from "../conversation-runtime";
@@ -499,7 +499,10 @@ export function createPanelsStore(deps: PanelsStoreDeps) {
     copyUrl: (image) => {
       const server = deps.props.server;
       const url = image.previewUrl;
-      if (!url || server?.kind !== "remote" || !serverSupportsCapability(server, ATTACHMENT_PREVIEW_CAPABILITY))
+      if (!url) return undefined;
+      const local = localAttachmentCopyUrl(url);
+      if (local) return local;
+      if (server?.kind !== "remote" || !serverSupportsCapability(server, ATTACHMENT_PREVIEW_CAPABILITY))
         return undefined;
       const copy = remoteAttachmentUrlWith(url, "preview");
       return copy === url ? undefined : copy;

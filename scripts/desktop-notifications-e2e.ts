@@ -213,6 +213,7 @@ const phone = new PushNotificationService({
     getRuntimeSnapshot: () => {
       throw new Error("Not used by this check.");
     },
+    listTaskReads: () => [],
     listConversationReads: () => {
       throw new Error("Not used by this check.");
     },

@@ -3,6 +3,25 @@ for arg in "$@"; do
   if [ "$arg" = "-derivedDataPath" ]; then exec /usr/bin/xcodebuild "$@"; fi
 done
 
+previous=""
+device_build=""
+signing_updates=""
+for arg in "$@"; do
+  if [ "$arg" = "-allowProvisioningUpdates" ]; then signing_updates=1; fi
+  if [ "$previous" = "-destination" ]; then
+    case "$arg" in
+      id=*)
+        udid="${arg#id=}"
+        if ! xcrun simctl list devices 2>/dev/null | grep -q "$udid"; then device_build=1; fi
+        ;;
+    esac
+  fi
+  previous="$arg"
+done
+if [ -n "$device_build" ] && [ -z "$signing_updates" ]; then
+  set -- "$@" -allowProvisioningUpdates -allowProvisioningDeviceRegistration
+fi
+
 for arg in "$@"; do
   if [ "$arg" = "-destination" ] && [ -n "$OPENBOT_XCODE_COMPILATION_CACHE" ]; then
     set -- "$@" \

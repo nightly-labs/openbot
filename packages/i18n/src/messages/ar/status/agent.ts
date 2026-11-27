@@ -73,12 +73,17 @@ export const messages = {
   "status.agent.nearSignatureUnknown": "لا ينتظر OpenBot هذا التوقيع. ابدأه من جديد في OpenBot.",
   "status.agent.nearPayment":
     "دفع {amount} {symbol} إلى {recipient} من محفظة العملات المشفرة، لصالح {domain}: {reason}",
+  "status.agent.nearPaymentSending": "جارٍ دفع {amount} لـ {domain}: {reason}",
+  "status.agent.nearPaymentPaid": "تم دفع {amount} لـ {domain}: {reason}",
+  "status.agent.nearPaymentNotPaid": "لم يُدفع: {amount} لـ {domain}: {reason}",
+  "status.agent.nearPaymentUncertain": "غير مؤكد: {amount} لـ {domain}: {reason}",
   "status.agent.nearSummaryCreate":
     "يمكن لكل الوكلاء دفع ما يصل إلى {amount} USD يوميًا. يمكنك تغيير ذلك لاحقًا في OpenBot.",
   "status.agent.nearSummaryGrant": "السماح لتطبيق OpenBot هذا بالدفع من المحفظة لمدة {days} يومًا، ضمن قواعدك.",
   "status.agent.nearSummaryBudget": "تغيير الميزانية اليومية للمحفظة إلى {amount} USD.",
   "status.agent.nearSummaryAutoPay":
     "السماح لـ OpenBot بالدفع دون توقيعك عندما تسمح بذلك قاعدة دفع. أما الدفعات الأخرى فتظل تسألك في الدردشة.",
+  "status.agent.nearSummaryManualPay": "لم تعد هناك قواعد دفع. سيطلب OpenBot توقيعك لكل دفعة مرة أخرى.",
   "status.agent.nearSummaryPayment": "الموافقة على دفع {amount} إلى {recipient}.",
   "status.agent.nearSummaryFreeze": "لا يمكن للوكلاء الدفع من هذه المحفظة حتى تستأنف الدفعات.",
   "status.agent.nearSummaryUnfreeze": "يمكن للوكلاء الدفع من هذه المحفظة مرة أخرى، ضمن قواعدك.",

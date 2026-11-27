@@ -206,6 +206,7 @@ export const messages = {
   "error.backend.videoGenerationFailed": "Video oluşturulamadı.",
   "error.backend.videoGenerationNoVideo": "Video oluşturma bir video döndürmedi.",
   "error.backend.videoGenerationInterrupted": "Video oluşturma kesintiye uğradı.",
+  "error.backend.grokVideoNoQuota": "Grok hesabınız video oluşturamıyor. Bunun yerine videoyu kredilerle oluşturun.",
   "error.backend.attachmentNotRegularFile": "Yalnızca normal dosyalar eklenebilir: {name}",
   "error.backend.attachmentCopyFailed": "OpenBot {name} öğesini kopyalayamadı.",
   "error.backend.routineNameRequired": "Bir rutin adı gereklidir.",
@@ -353,6 +354,7 @@ export const messages = {
     "Bu bilgisayar sunucu bağlantısını engelledi. Güvenlik duvarınızı veya güvenlik yazılımınızı kontrol edin, ardından tekrar deneyin.",
   "error.backend.mcpServerIncompatible":
     "Bu adreste bir şey yanıt verdi, ancak Streamable HTTP üzerinden bir MCP sunucusu olarak değil. URL'yi kontrol edin ve sunucuyu çalıştıran uygulamayı güncelleyin.",
+  "error.backend.mcpServerKeyNotAccepted": "Sunucu API anahtarını kabul etmedi. Anahtarı kontrol edip yeniden deneyin.",
   "error.backend.mcpRemoteBridge":
     "{reason} Bu komut mcp-remote köprüsünü çalıştırır. Bunun yerine {url} URL'siyle Streamable HTTP'yi seçin; OpenBot oturumunuzu açar.",
   "error.backend.oauthNotHttps": "OAuth uç noktası {origin} https değil, bu nedenle kimlik bilgileri gönderilmedi.",

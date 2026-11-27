@@ -72,6 +72,10 @@ export const messages = {
   "status.agent.nearSignatureUnknown": "OpenBot не ждёт эту подпись. Начните её заново в OpenBot.",
   "status.agent.nearPayment":
     "Заплатить {amount} {symbol} получателю {recipient} из криптокошелька, для {domain}: {reason}",
+  "status.agent.nearPaymentSending": "Оплата {amount} для {domain}: {reason}",
+  "status.agent.nearPaymentPaid": "Оплачено {amount} для {domain}: {reason}",
+  "status.agent.nearPaymentNotPaid": "Не оплачено: {amount} для {domain}: {reason}",
+  "status.agent.nearPaymentUncertain": "Не подтверждено: {amount} для {domain}: {reason}",
   "status.agent.nearSummaryCreate":
     "Все агенты могут платить до {amount} USD в день. Это можно изменить позже в OpenBot.",
   "status.agent.nearSummaryGrant":
@@ -79,6 +83,8 @@ export const messages = {
   "status.agent.nearSummaryBudget": "Изменить дневной бюджет кошелька на {amount} USD.",
   "status.agent.nearSummaryAutoPay":
     "Разрешить OpenBot платить без вашей подписи, когда это позволяет правило платежей. О других платежах вас по-прежнему спросят в чате.",
+  "status.agent.nearSummaryManualPay":
+    "Правил платежей больше нет. OpenBot снова будет запрашивать вашу подпись для каждого платежа.",
   "status.agent.nearSummaryPayment": "Одобрить платёж {amount} получателю {recipient}.",
   "status.agent.nearSummaryFreeze": "Агенты не смогут платить из этого кошелька, пока вы не возобновите платежи.",
   "status.agent.nearSummaryUnfreeze": "Агенты снова смогут платить из этого кошелька в рамках ваших правил.",

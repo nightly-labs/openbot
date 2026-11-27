@@ -19,6 +19,8 @@ export const messages = {
   "error.billing.licensePaymentFailed":
     "Il pagamento per gli utenti aggiunti non è riuscito. Aggiorna il metodo di pagamento e riprova.",
   "error.billing.licenseUnavailable": "Le licenze non sono disponibili ora.",
+  "error.billing.mediaContentRefused":
+    "Il controllo di sicurezza del modello ha rifiutato il prompt o le immagini. Spesso rifiuta persone reali, personaggi famosi, marchi, violenza e contenuti per adulti. Modificali e riprova. Non sono stati usati crediti.",
   "error.billing.licenseOneUser": "Questa licenza è per 1 utente. Passa a Team per aggiungere utenti.",
   "error.billing.licensePlanChange":
     "Questa licenza non può passare a quel piano. Annullala e acquista il nuovo piano.",
@@ -28,8 +30,6 @@ export const messages = {
   "error.billing.detailsInvalid": "Controlla il paese e la partita IVA. La partita IVA deve essere del paese scelto.",
   "error.billing.vatIdInvalid":
     "Il sistema IVA dell’UE non conosce questa partita IVA. Controlla il numero o continua senza partita IVA.",
-  "error.billing.vatIdUnverified":
-    "Il sistema IVA dell’UE non può verificare la partita IVA ora. Riprova più tardi o continua senza partita IVA.",
   "error.billing.vatUnavailable": "Il pagamento non è disponibile ora. Riprova più tardi.",
   "error.billing.invalidRequest": "La richiesta di fatturazione non è valida.",
   "error.billing.invalidResponse": "La risposta di fatturazione non è valida.",

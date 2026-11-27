@@ -267,6 +267,10 @@ export function landingPageText(t: AppTranslate) {
       ],
       download: t("sitePage.landing.pricing.download"),
       license: t("sitePage.landing.pricing.license"),
+      eggs: {
+        smallPrint: t("sitePage.landing.pricing.eggs.smallPrint"),
+        forever: t("sitePage.landing.pricing.eggs.forever"),
+      },
     },
     teams: {
       title: t("sitePage.landing.teams.title"),
@@ -293,6 +297,10 @@ export function landingPageText(t: AppTranslate) {
         linux: downloadFor("linux"),
       } satisfies Record<DownloadPlatform, string>,
       phone,
+      chrome: {
+        description: t("sitePage.landing.download.chromeDescription"),
+        action: t("sitePage.landing.download.chromeAction"),
+      },
       pages: t("sitePage.landing.download.pages"),
       apk: t("sitePage.landing.download.apk"),
       intelMac: t("sitePage.marketplace.downloadFor", { platform: "Intel Mac" }),

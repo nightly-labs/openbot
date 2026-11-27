@@ -1,5 +1,79 @@
 [
   {
+    "version": "0.80.0",
+    "date": "2026-11-26",
+    "notices": [
+      "Aggiorna anche ogni server a cui ti sei unito a questa versione. Dopo la 0.79.0, rende di nuovo veloce un server con una lunga cronologia di chat. L’app Apple Watch, i puntatori live dei flussi di lavoro, Distribuisci e molte delle correzioni qui sotto funzionano su un server solo se il server ha questa versione."
+    ],
+    "groups": [
+      {
+        "type": "added",
+        "items": [
+          "Il tuo server risponde direttamente all’app OpenBot per Apple Watch. L’orologio funziona anche quando OpenBot su iPhone è in background o chiuso. Le richieste e le risposte sono cifrate end-to-end tra l’orologio e il server.",
+          "Vedi il puntatore e il passaggio selezionato di ogni altra persona che ha aperto lo stesso flusso di lavoro.",
+          "In Impostazioni › Provider › Raggruppa account c’è una nuova scelta, Distribuisci. Distribuisce gli agenti sugli account con più utilizzo disponibile, così tutti gli account vengono usati. Riempi prima resta l’impostazione predefinita.",
+          "Ogni pagamento con il wallet NEAR mostra una scheda in chat, con il suo stato e un link alla transazione. Quando configuri il wallet o ne cambi le spese, puoi digitare il tuo limite giornaliero.",
+          "MAGI-2 crea clip video 1080p con audio con i crediti di OpenBot. Un agente che non indica un modello video ora usa questo."
+        ]
+      },
+      {
+        "type": "changed",
+        "items": [
+          "La pagina Utilizzo mostra costi e token come barre impilate, con un colore per ogni provider. Mantiene l’ultimo report sullo schermo mentre ne carica uno nuovo.",
+          "La pagina Buy credits mostra ogni pacchetto di crediti come una scheda con un colore suo, il prezzo e il prezzo di un credito.",
+          "Una licenza Team ora ha fino a 25 utenti. Prima il massimo era 10."
+        ]
+      },
+      {
+        "type": "fixed",
+        "items": [
+          "Un server con una lunga cronologia di chat è di nuovo veloce dopo l’aggiornamento alla 0.79.0. Prima, una pulizia dei vecchi eventi delle chat fermava il server per molti secondi ogni minuto.",
+          "Scrivere nella casella del messaggio non rallenta più mentre un agente scrive la risposta.",
+          "Su Windows gli agenti con Controllo del computer vedono di nuovo il desktop. Dalla 0.77.0 ricevevano un’immagine nera.",
+          "Una chat lunga con molte immagini usa molta meno memoria.",
+          "Le routine programmate ripartono da sole dopo un breve errore del database. Prima, una lettura non riuscita fermava tutte le routine programmate."
+        ]
+      }
+    ]
+  },
+  {
+    "version": "0.79.0",
+    "date": "2026-11-25",
+    "notices": [
+      "Aggiorna anche ogni server a cui ti sei unito a questa versione. Gli strumenti per immagini e video con crediti, le richieste di posizione e molte delle correzioni qui sotto funzionano su un server solo se il server ha questa versione."
+    ],
+    "groups": [
+      {
+        "type": "added",
+        "items": [
+          "Gli agenti possono creare immagini e video con i crediti di OpenBot e modificare le tue foto. La scheda di approvazione mostra il modello, il prezzo e il prompt. Puoi scegliere un altro modello prima di consentire. La voce Credits nella barra a sinistra mostra il tuo saldo. Un proprietario o un amministratore può attivare o disattivare «Gli agenti possono usare crediti».",
+          "Gli agenti possono pagare i siti in crypto da un wallet NEAR Intents. Collegalo in Impostazioni server › Vault › Crypto con una passkey, poi fai un deposito. Ogni pagamento attende la tua approvazione nella chat, a meno che tu non scelga «Consenti sempre» per quel sito. Un budget giornaliero limita quanto possono spendere gli agenti. Il wallet vale solo per questo computer e i pagamenti usano fondi reali.",
+          "Ogni account riceve 10 crediti gratuiti di benvenuto. Puoi anche riscattare un codice nella pagina Credits con Redeem code.",
+          "La scheda del browser di un agente può chiedere la tua posizione. La chat ti chiede prima, e tu scegli Blocca, Consenti sempre o Consenti. Prima il browser bloccava sempre la richiesta.",
+          "La barra laterale ha schede sopra l’elenco delle chat: Tutte, Non lette e le cartelle che scegli. Ogni scheda mostra le sue chat non lette."
+        ]
+      },
+      {
+        "type": "changed",
+        "items": [
+          "Un nuovo passaggio di un flusso di lavoro ora parte con un modello che può funzionare. Un passaggio di testo usa il tuo modello preferito, o il modello abituale di un provider collegato.",
+          "Se hai solo crediti gratuiti, l’elenco dei modelli di una scheda di approvazione contrassegna con «Crediti gratuiti» i modelli che pagano con i crediti gratuiti.",
+          "Il pannello laterale può dividersi in massimo tre gruppi, uno sopra l’altro. Trascina la linea tra due gruppi per cambiarne le altezze."
+        ]
+      },
+      {
+        "type": "fixed",
+        "items": [
+          "L’app si blocca meno spesso, soprattutto su Windows. Conserva per poco tempo i risultati dei controlli lenti e svolge il lavoro lento in background.",
+          "Quando un agente Claude finisce un piano in modalità piano, la chat ora mostra il piano con Approva e Stop planning. Prima non compariva nessuna approvazione e l’agente iniziava a costruire.",
+          "Un messaggio di un altro agente o di una routine non ferma più il lavoro di un agente Claude occupato.",
+          "Un avviso di un sito nella scheda del browser di un agente non copre più la finestra di OpenBot finché non clicchi OK. L’avviso si chiude da solo e l’agente riceve il suo testo.",
+          "Su un desktop Linux X11, digitare in OpenBot non si interrompe più dopo che un agente usa Controllo del computer in un’altra app. Se la digitazione si è già interrotta, esci e rientra una volta."
+        ]
+      }
+    ]
+  },
+  {
     "version": "0.78.0",
     "date": "2026-11-24",
     "notices": [

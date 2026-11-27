@@ -345,6 +345,8 @@ export const messages = defineMessages("error.provider", {
     "Gemini could not read the saved history of this chat. OpenBot started a new Gemini session with the chat history. Send your message again.",
   "error.provider.acpTurnStuck":
     "{provider} did not end its earlier turn, so it did not accept this message. OpenBot started a new {provider} session with the chat history. Send your message again.",
+  "error.provider.antigravityLicenseRefused":
+    "Google says that your account does not have a license to use this model. Choose another model, then send your message again.\n{detail}",
   "error.provider.antigravityLocationUnsupported":
     "Google does not let Gemini work from the network location of the computer that runs this agent. Use Gemini on another computer, or choose another provider for this agent.\n{detail}",
   "error.provider.antigravityTurnStopped":
@@ -435,6 +437,8 @@ export const messages = defineMessages("error.provider", {
     "The model did not accept an image in this chat because the image is too large. OpenBot started a new {provider} session with the chat history. Try again.",
   "error.provider.imageCountLimit":
     "The model did not accept this chat because the chat has too many images. OpenBot started a new {provider} session with the chat history. Try again.",
+  "error.provider.imageCountLimitRepeated":
+    "The model did not accept this chat again: it has too many images. One task opens more images than this model accepts, so a new session does not help. Select New chat and ask the agent to open fewer images in each step, or select a model that accepts more images.",
   "error.provider.imageUnreadable":
     "The model could not read an image in this chat. OpenBot started a new {provider} session with the chat history. Try again. If you sent an image, send a different one.",
   "error.provider.requestTooLarge":
@@ -449,6 +453,8 @@ export const messages = defineMessages("error.provider", {
     "Muse could not start an MCP server and blocked MCP in this session. OpenBot started a new Muse session with the chat history. Try again. If the error continues, turn off Computer Use or the failed MCP server for this agent.",
   "error.provider.claudeSessionMissing":
     "Claude Code could not find the saved session of this chat. OpenBot started a new Claude Code session with the chat history. Try again.",
+  "error.provider.opencodeSessionMissing":
+    "OpenCode could not find the saved session of this chat. OpenBot started a new OpenCode session with the chat history. Try again.",
   "error.provider.grokSignIn": "Run `grok login` or set XAI_API_KEY to use Grok.",
   "error.provider.acpSignInNoStart":
     "The provider did not start, so the sign-in could not begin. Try again, or restart OpenBot.",

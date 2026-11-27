@@ -7,16 +7,26 @@ import {
   STORAGE_CAPABILITY,
   type StorageUsage,
   type StoredFileRow,
+  WORKFLOW_ASSET_TYPES,
   WORKFLOW_PICTURE_TYPES,
+  type WorkflowFileMediaKind,
   type WorkflowFolderAction,
   type WorkflowFoldersSnapshot,
-  type WorkflowMediaKind,
+  workflowAssetClipMedia,
+  workflowAssetType,
 } from "@openbot/contracts/ipc";
 import { ATTACHMENT_PREVIEW_CAPABILITY } from "@openbot/contracts/team-protocol/attachment-preview-v1";
 import { WORKFLOW_FOLDERS_CAPABILITY } from "@openbot/contracts/team-protocol/workflow-folders-v1";
+import {
+  WORKFLOW_PRESENCE_CAPABILITY,
+  WORKFLOW_SPOT_EVENT,
+  type WorkflowSpotEvent,
+  type WorkflowSpotInput,
+} from "@openbot/contracts/team-protocol/workflow-presence-v1";
 import { WORKFLOWS_AGENT_FILES_CAPABILITY } from "@openbot/contracts/team-protocol/workflows-agent-files-v1";
 import { WORKFLOWS_ANSWERS_CAPABILITY } from "@openbot/contracts/team-protocol/workflows-answers-v1";
 import { WORKFLOWS_MEDIA_ACCOUNT_CAPABILITY } from "@openbot/contracts/team-protocol/workflows-media-account-v1";
+import { WORKFLOWS_MEDIA_CLIPS_CAPABILITY } from "@openbot/contracts/team-protocol/workflows-media-clips-v1";
 import { WORKFLOWS_MEDIA_SIZE_CAPABILITY } from "@openbot/contracts/team-protocol/workflows-media-size-v1";
 import { WORKFLOWS_MEDIA_TRANSPARENT_CAPABILITY } from "@openbot/contracts/team-protocol/workflows-media-transparent-v1";
 import { WORKFLOWS_PAUSE_CAPABILITY } from "@openbot/contracts/team-protocol/workflows-pause-v1";
@@ -56,6 +66,7 @@ export interface WorkflowHost {
   agentLevels(): Promise<AgentAccessLevels | null>;
   githubSupported(): boolean;
   mediaSupported(): boolean;
+  clipsSupported(): boolean;
   mediaAccountSupported(): boolean;
   mediaTransparentSupported(): boolean;
   mediaSizeSupported(): boolean;
@@ -68,36 +79,44 @@ export interface WorkflowHost {
   folders(): Promise<WorkflowFoldersSnapshot>;
   folderAction(action: WorkflowFolderAction): Promise<WorkflowFoldersSnapshot>;
   onFoldersChanged(changed: () => void): () => void;
+  presenceSupported(): boolean;
+  setSpot(input: WorkflowSpotInput): void;
+  onSpot(changed: (event: WorkflowSpotEvent) => void): () => void;
   pictures(): Promise<readonly StoredFileRow[]>;
   uploadPicture(file: File): Promise<StoredFileRow>;
   downloadMedia?(attachmentId: string): Promise<void>;
-  mediaUrl(attachmentId: string, kind: WorkflowMediaKind): string | null | undefined;
+  mediaUrl(attachmentId: string, kind: WorkflowFileMediaKind): string | null | undefined;
   mediaPreviewUrl(attachmentId: string): string | null | undefined;
   githubConnector: GitHubConnectorPort;
   hostName(): string | undefined;
+  remote(): boolean;
   openUrl(url: string): Promise<void>;
 }
 
-export function libraryPictures(usage: StorageUsage | null): readonly StoredFileRow[] {
+export function libraryPictures(usage: StorageUsage | null, clips: boolean): readonly StoredFileRow[] {
+  const types = clips ? WORKFLOW_ASSET_TYPES : WORKFLOW_PICTURE_TYPES;
   return (usage?.files ?? [])
-    .filter((file) => file.status === "available" && WORKFLOW_PICTURE_TYPES.has(file.mimeType))
+    .filter((file) => file.status === "available" && types.has(file.mimeType))
     .sort((left, right) => right.createdAt.localeCompare(left.createdAt));
 }
 
-export function checkPicture(file: File, maxBytes: number): void {
+export function checkPicture(file: File, maxBytes: number, clips: boolean): string {
   const { t } = currentText();
-  if (!WORKFLOW_PICTURE_TYPES.has(file.type)) throw new Error(t("error.workflow.pictureType"));
+  const mimeType = workflowAssetType(file, clips);
+  if (!mimeType) throw new Error(t(clips ? "error.workflow.assetType" : "error.workflow.pictureType"));
   if (file.size > maxBytes) throw new Error(t("error.attachment.fileTooLarge"));
+  return mimeType;
 }
 
-export function keptPicture(fileId: string, file: File, previewUrl: string | null): StoredFileRow {
+export function keptPicture(fileId: string, file: File, mimeType: string, previewUrl: string | null): StoredFileRow {
+  const clip = workflowAssetClipMedia(mimeType);
   return {
     id: fileId,
     name: file.name,
     size: file.size,
-    kind: "image",
-    mimeType: file.type,
-    previewKind: "image",
+    kind: clip ? "file" : "image",
+    mimeType,
+    previewKind: clip ? "none" : "image",
     previewUrl,
     source: "generated",
     agentId: null,
@@ -149,13 +168,16 @@ export function desktopWorkflowHost(serverId: string, server: () => ServerSummar
     mediaSupported() && (local() || serverSupportsCapability(server(), WORKFLOWS_MEDIA_SIZE_CAPABILITY));
   const agentFilesSupported = () => local() || serverSupportsCapability(server(), WORKFLOWS_AGENT_FILES_CAPABILITY);
   const foldersSupported = () => local() || serverSupportsCapability(server(), WORKFLOW_FOLDERS_CAPABILITY);
+  const presenceSupported = () => local() || serverSupportsCapability(server(), WORKFLOW_PRESENCE_CAPABILITY);
   const hostGitHub = hostGitHubConnectorPort(() => (githubSupported() ? serverId : undefined));
   const mediaUrl = (attachmentId: string) =>
     local()
       ? `openbot-attachment://file/${encodeURIComponent(attachmentId)}`
       : `openbot-remote-attachment://${encodeURIComponent(serverId)}/${encodeURIComponent(attachmentId)}`;
+  const clipsSupported = () =>
+    mediaSupported() && (local() || serverSupportsCapability(server(), WORKFLOWS_MEDIA_CLIPS_CAPABILITY));
   const mediaPreviewUrl = (attachmentId: string) =>
-    !local() && serverSupportsCapability(server(), ATTACHMENT_PREVIEW_CAPABILITY)
+    local() || serverSupportsCapability(server(), ATTACHMENT_PREVIEW_CAPABILITY)
       ? `${mediaUrl(attachmentId)}?preview=1`
       : mediaUrl(attachmentId);
   return {
@@ -192,6 +214,7 @@ export function desktopWorkflowHost(serverId: string, server: () => ServerSummar
       mediaPrice: (input) => api().mediaPrice(input, serverId),
       folders: () => api().folders(serverId),
       folderAction: (action) => api().folderAction(action, serverId),
+      setSpot: (input) => api().setSpot(input, serverId),
     },
     onChanged(changed) {
       const unsubscribe = window.openbot.agent.onScopedEvent((scoped) => {
@@ -213,6 +236,17 @@ export function desktopWorkflowHost(serverId: string, server: () => ServerSummar
     onFoldersChanged: (changed) =>
       window.openbot.agent.onScopedEvent((scoped) => {
         if (scoped.serverId === serverId && scoped.event.type === "workflow-folders-changed") changed();
+      }),
+    presenceSupported,
+    setSpot(input) {
+      if (presenceSupported())
+        void api()
+          .setSpot(input, serverId)
+          .catch(() => undefined);
+    },
+    onSpot: (changed) =>
+      window.openbot.agent.onScopedEvent((scoped) => {
+        if (scoped.serverId === serverId && scoped.event.type === WORKFLOW_SPOT_EVENT) changed(scoped.event);
       }),
     async places() {
       if (!placesSupported()) return [];
@@ -280,15 +314,12 @@ export function desktopWorkflowHost(serverId: string, server: () => ServerSummar
     },
     async pictures() {
       if (!mediaSupported() || !(local() || serverSupportsCapability(server(), STORAGE_CAPABILITY))) return [];
-      return libraryPictures(await window.openbot.storage.getUsage({ scope: "host" }, serverId));
+      return libraryPictures(await window.openbot.storage.getUsage({ scope: "host" }, serverId), clipsSupported());
     },
     async uploadPicture(file) {
-      checkPicture(file, ATTACHMENT_LIMITS.fileBytes);
+      const mimeType = checkPicture(file, ATTACHMENT_LIMITS.fileBytes, clipsSupported());
       const bytes = new Uint8Array(await file.arrayBuffer());
-      const [draft] = await window.openbot.agent.importAttachmentData(
-        [{ name: file.name, mimeType: file.type, bytes }],
-        serverId,
-      );
+      const [draft] = await window.openbot.agent.importAttachmentData([{ name: file.name, mimeType, bytes }], serverId);
       if (!draft) throw new Error(currentText().t("error.workflow.pictureMissing"));
       const fileId = await api()
         .keepPicture(draft.id, serverId)
@@ -296,12 +327,13 @@ export function desktopWorkflowHost(serverId: string, server: () => ServerSummar
           await window.openbot.agent.discardDraftAttachment(draft.id, serverId).catch(() => undefined);
           throw error;
         });
-      return keptPicture(fileId, file, mediaUrl(fileId));
+      return keptPicture(fileId, file, mimeType, mediaUrl(fileId));
     },
     downloadMedia: (attachmentId) =>
       window.openbot.agent.openAttachment({ attachmentId, action: "download" }, serverId),
     githubSupported,
     mediaSupported,
+    clipsSupported,
     mediaAccountSupported,
     mediaTransparentSupported,
     mediaSizeSupported,
@@ -316,6 +348,7 @@ export function desktopWorkflowHost(serverId: string, server: () => ServerSummar
       return local() ? githubConnectorPort() : hostGitHub;
     },
     hostName: () => (local() ? undefined : server()?.name),
+    remote: () => !local(),
     openUrl: (url) => window.openbot.openUrl(url),
   };
 }

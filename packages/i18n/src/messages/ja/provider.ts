@@ -261,6 +261,11 @@ export const messages = {
   "provider.account.pool": "アカウントをプール",
   "provider.account.poolDescription":
     "エージェントは使用量の上限に近づくまで 1 つのアカウントを使い、その後は上限が最初にリセットされるアカウントを使います。",
+  "provider.account.poolStrategy": "アカウントの使い方",
+  "provider.account.poolFillFirst": "順番に使い切る",
+  "provider.account.poolSpread": "分散",
+  "provider.account.poolSpreadDescription":
+    "エージェントは使用量が最も残っているアカウントに分散します。エージェントは、別のアカウントにずっと多くの余裕があるときだけアカウントを変えます。",
   "provider.account.inUse": "使用中",
   "provider.account.notInPool": "プール外",
   "provider.account.leaveOutOfPool": "プールから外す",

@@ -87,7 +87,7 @@ export const messages = {
     "Dies beendet auch die aktiven Remote-Verbindungen des Kontos. Das Gerät kann sich erneut anmelden.",
   "mobile.settings.sessions.disconnect": "Trennen",
   "mobile.settings.dictation.footer":
-    "Die Sprache, die du mit der Erkennung des Telefons sprichst, in einem Sprachgespräch und beim Diktieren. Automatisch verwendet die erste Sprache in den Telefoneinstellungen, die sie unterstützt.",
+    "Die Sprache, die du mit der Erkennung des Telefons sprichst, in einem Sprachgespräch und beim Diktieren. Automatisch verwendet die Sprache der Tastatur, mit der du schreibst, und sonst die erste Sprache in den Telefoneinstellungen, die sie unterstützt.",
   "mobile.settings.dictation.automatic": "Automatisch",
   "mobile.settings.appearance.title": "Darstellung",
   "mobile.settings.appearance.footer": "System folgt der Darstellung deines Geräts.",

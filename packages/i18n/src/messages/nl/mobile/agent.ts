@@ -384,7 +384,7 @@ export const messages = {
     "Als een gebruikslimiet {name} stopt nadat het werk is begonnen, gaat {name} met hetzelfde werk verder op het eerste beschikbare model in de volgorde. Het gaat terug naar {model} als de limiet afloopt, of 10 minuten na een fout van de aanbieder.",
   "mobile.agent.busyMessage.label": "Tijdens werk",
   "mobile.agent.busyMessage.footer":
-    "Wat een bericht doet als je het stuurt terwijl de agent werkt. Wachtrij bewaart het tot de beurt eindigt. Bijsturen geeft het tijdens de beurt aan de agent.",
+    "Wat een bericht van jou of een andere agent doet als het binnenkomt terwijl de agent werkt. Wachtrij bewaart het tot de beurt eindigt. Bijsturen geeft het tijdens de beurt aan de agent.",
   "mobile.agent.busyMessage.queue": "Wachtrij",
   "mobile.agent.busyMessage.steer": "Bijsturen",
   "mobile.agent.busyMessage.hostDefaultQueue": "Hoststandaard (Wachtrij)",

@@ -34,6 +34,7 @@ const voiceRuntimeFiles = [
   "onnxruntime.dll",
   "onnxruntime_providers_shared.dll",
   "no-arena.cfg",
+  "silero_vad_v5.onnx",
 ];
 const voiceHostPath = resolve(resourcesPath, "app.asar.unpacked/out/main/voice-transcription-host.js");
 const speechHostPath = resolve(resourcesPath, "app.asar.unpacked/out/main/voice-speech-host.js");

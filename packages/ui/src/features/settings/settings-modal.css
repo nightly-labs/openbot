@@ -439,6 +439,12 @@
   width: 220px;
 }
 
+.ui-select-item-label:has(> .settings-font-option) {
+  flex: 1;
+  content-visibility: auto;
+  contain-intrinsic-block-size: auto var(--openbot-leading-sm);
+}
+
 .ui-select-item.settings-modal-select-group-end {
   margin-bottom: var(--openbot-space-1);
   border-bottom: 1px solid var(--openbot-border);

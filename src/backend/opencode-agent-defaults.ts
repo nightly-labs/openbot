@@ -176,6 +176,43 @@ function readUserRules(env: NodeJS.ProcessEnv, home: string): UserRules | null {
   return rules;
 }
 
+const UserMediaSetup = Schema.Struct({
+  provider: Schema.optional(
+    Schema.Record(
+      Schema.String,
+      Schema.Struct({ options: Schema.optional(Schema.Struct({ apiKey: Schema.optional(Schema.String) })) }),
+    ),
+  ),
+  experimental: Schema.optional(
+    Schema.Struct({ image_generate: Schema.optional(Schema.Unknown), video_generate: Schema.optional(Schema.Unknown) }),
+  ),
+});
+
+const decodeUserMediaSetup = Schema.decodeUnknownOption(Schema.fromJsonString(UserMediaSetup));
+
+function configHasMediaSetup(text: string): boolean {
+  const config = decodeUserMediaSetup(stripJsonc(text));
+  if (Option.isNone(config)) return true;
+  const { provider, experimental } = config.value;
+  return (
+    experimental?.image_generate !== undefined ||
+    experimental?.video_generate !== undefined ||
+    Object.values(provider ?? {}).some((entry) => Boolean(entry.options?.apiKey?.trim()))
+  );
+}
+
+export function openCodeUserConfigHasMediaSetup(env: NodeJS.ProcessEnv, home = homedir()): boolean {
+  const userFile = env.OPENCODE_CONFIG?.trim();
+  const files = [
+    ...globalConfigFolders(env, home).flatMap((folder) => GLOBAL_CONFIG_FILES.map((name) => join(folder, name))),
+    ...(userFile ? [userFile] : []),
+  ];
+  return files.some((file) => {
+    const text = readTextOrNull(file);
+    return text !== null && configHasMediaSetup(text);
+  });
+}
+
 function readTextOrNull(file: string): string | null {
   try {
     return readFileSync(file, "utf8");

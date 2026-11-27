@@ -365,7 +365,7 @@ export const messages = {
     "{name} 开始工作后若因用量上限停止，会用顺序中第一个可用的模型继续同一项工作。额度重置后会回到 {model}；出现服务商错误时，则在 10 分钟后回到 {model}。",
   "mobile.agent.busyMessage.label": "工作期间",
   "mobile.agent.busyMessage.footer":
-    "当助手正在工作时你发消息会发生什么。“排队”会保留消息直到本轮对话结束；“引导”会在本轮对话中把消息交给助手。",
+    "当助手正在工作时，你或其他助手发来的消息会怎样处理。“排队”会保留消息直到本轮对话结束；“引导”会在本轮对话中把消息交给助手。",
   "mobile.agent.busyMessage.queue": "排队",
   "mobile.agent.busyMessage.steer": "引导",
   "mobile.agent.busyMessage.hostDefaultQueue": "主机默认（排队）",

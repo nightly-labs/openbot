@@ -17,6 +17,7 @@ interface EndpointPayload {
   readonly api: "openai-completions" | "mistral-conversations";
   readonly baseUrl: string;
   readonly apiKey: string | null;
+  readonly authHeader: boolean;
   readonly headers: Readonly<Record<string, string>>;
   readonly models: readonly PiModelPayload[];
   readonly compat?: PiCompat;
@@ -89,6 +90,7 @@ const SOURCE = `export default function (pi) {
       baseUrl: endpoint.baseUrl,
       api: endpoint.api,
       apiKey: endpoint.apiKey ? literal(endpoint.apiKey) : "openbot",
+      ...(endpoint.authHeader ? { authHeader: true } : {}),
       headers: Object.fromEntries(Object.entries(endpoint.headers).map(([name, value]) => [name, literal(value)])),
       models: endpoint.models.map((model) => ({
         type: "chat",
@@ -108,11 +110,13 @@ const SOURCE = `export default function (pi) {
 `;
 
 function payload(endpoint: CustomProviderConfig): EndpointPayload {
+  const piApi = piEndpoint(endpoint.baseUrl);
   return {
     id: endpoint.id,
     name: endpoint.name,
-    ...piEndpoint(endpoint.baseUrl),
+    ...piApi,
     apiKey: endpoint.apiKey,
+    authHeader: piApi.api === "openai-completions" && Boolean(endpoint.apiKey),
     headers: Object.fromEntries(endpoint.headers.map((header) => [header.name, header.value])),
     models: endpoint.models.map((model) => {
       const contextWindow = model.contextWindow ?? DEFAULT_CONTEXT_WINDOW;

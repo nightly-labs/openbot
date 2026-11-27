@@ -75,6 +75,7 @@ const GEMINI_NETWORK_FAILURE =
 
 const GEMINI_REQUEST_FAILURES = [
   ["error.provider.antigravityLocationUnsupported", /\bUser location is not supported\b/iu],
+  ["error.provider.antigravityLicenseRefused", /\b(?:do(?:es)? not|don't) have a valid license\b/iu],
   [
     "error.provider.antigravityModelAtCapacity",
     /\bMODEL_CAPACITY_EX(?:HAUSTED|CEEDED)\b|\b[Nn]o capacity available for model\b/u,
@@ -103,6 +104,7 @@ type GeminiRequestFailureKey = (typeof GEMINI_REQUEST_FAILURES)[number][0];
 
 const GEMINI_FAILURE_CAUSES: Partial<Record<GeminiRequestFailureKey, CauseCode>> = {
   "error.provider.antigravityQuotaReached": "usage_limit",
+  "error.provider.antigravityLicenseRefused": "billing",
   "error.provider.antigravityRateLimited": "rate_limit",
   "error.provider.antigravityModelUnavailable": "model_not_found",
   "error.provider.antigravityNetwork": "network",
@@ -176,14 +178,6 @@ function geminiRequestFailure(error: unknown, detail: string): string {
   if (GEMINI_UNREADABLE_HISTORY.test(reason)) return detail;
   const key = GEMINI_REQUEST_FAILURES.find(([, pattern]) => pattern.test(reason))?.[0];
   return key ? geminiRequestFailureText(key, reason) : detail;
-}
-
-function geminiUnexplainedFailureVerification(error: unknown, detail: string, message: string): string | null {
-  const unexplained =
-    error instanceof RequestError
-      ? message === detail
-      : message === sourceText("error.provider.antigravityTurnStopped");
-  return unexplained ? sourceText("error.provider.geminiVerificationRequired") : null;
 }
 
 export function antigravityGeminiHome(env: Readonly<Record<string, string | undefined>>): string {
@@ -336,6 +330,10 @@ function folderNames(folder: string): string[] {
   }
 }
 
+function hasNoItemType(items: unknown): boolean {
+  return items === undefined || items === true || (isRecord(items) && !Object.hasOwn(items, "type"));
+}
+
 function hasRefusedField(parameters: unknown, path: string, reason: string): boolean {
   const steps = Array.from(path.matchAll(GOOGLE_FIELD_STEP), ([, key = "", index]) => ({
     key: key.replace(/_([a-z])/gu, (_, letter: string) => letter.toUpperCase()),
@@ -354,8 +352,11 @@ function hasRefusedField(parameters: unknown, path: string, reason: string): boo
     else node = isRecord(value) && Object.hasOwn(value, index) ? value[index] : undefined;
   }
   if (missing) {
-    if (last.index !== undefined || !isRecord(node) || Object.hasOwn(node, last.key)) return false;
-    return last.key !== "items" || node.type === "array" || (Array.isArray(node.type) && node.type.includes("array"));
+    if (last.index !== undefined || !isRecord(node)) return false;
+    const value = Object.hasOwn(node, last.key) ? node[last.key] : undefined;
+    if (last.key !== "items") return value === undefined;
+    if (!hasNoItemType(value)) return false;
+    return node.type === "array" || (Array.isArray(node.type) && node.type.includes("array"));
   }
   if (type) {
     if (last.index !== undefined || !isRecord(node) || !Object.hasOwn(node, last.key)) return false;
@@ -424,7 +425,6 @@ export const ANTIGRAVITY_ACP_FLAVOR: AcpFlavor = {
   turnFailure: (error, detail) => geminiRequestFailure(error, detail),
   authRequiredSignsOut: true,
   failureCause: (error) => (error === "refusal" ? "usage_limit" : null),
-  unexplainedFailureVerification: geminiUnexplainedFailureVerification,
   sdkHarness: {
     failedSession: (stderrLine) => GEMINI_SDK_FAILURE.exec(stderrLine)?.[1],
     answerIsFailure: GEMINI_FAILURE_ANSWER,

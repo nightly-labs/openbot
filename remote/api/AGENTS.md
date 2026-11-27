@@ -30,6 +30,12 @@ and an answer only to a callback query delivered to it. A result has only the re
 `TelegramCallResult`. Files go through short signed tokens (`TelegramFileTokens`); an upload token
 works once.
 
+Signal also relays Apple Watch requests. `POST /v1/watch/request` reads only the watch ticket
+claims, the timestamp and the proof, and passes the request to the `ingress` socket of the ticket's
+host in transit (`watch-delivery`). The request and the reply are sealed between the watch and the
+host. Signal never opens them, never queues, keeps or logs them, and never logs a watch ticket or a
+proof. Keep the ticket, clock, proof and revoked epoch checks before a delivery.
+
 Signal also holds the OpenBot Discord bot. `src/discord-gateway.ts` holds the bot token and the
 Gateway connection; `src/discord-events.ts` turns a Gateway event into a delivery for the `ingress`
 socket of the guild's host; `src/discord-api.ts` makes the typed Discord calls of `POST

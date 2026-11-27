@@ -74,6 +74,10 @@ export const messages = {
   "status.agent.nearSignatureUnknown": "OpenBot nie czeka na ten podpis. Rozpocznij go ponownie w OpenBot.",
   "status.agent.nearPayment":
     "Zapłać {amount} {symbol} odbiorcy {recipient} z portfela kryptowalut, dla {domain}: {reason}",
+  "status.agent.nearPaymentSending": "Płacę {amount} dla {domain}: {reason}",
+  "status.agent.nearPaymentPaid": "Zapłacono {amount} dla {domain}: {reason}",
+  "status.agent.nearPaymentNotPaid": "Nie zapłacono: {amount} dla {domain}: {reason}",
+  "status.agent.nearPaymentUncertain": "Niepotwierdzone: {amount} dla {domain}: {reason}",
   "status.agent.nearSummaryCreate":
     "Wszyscy agenci mogą płacić do {amount} USD dziennie. Możesz to później zmienić w OpenBot.",
   "status.agent.nearSummaryGrant":
@@ -81,6 +85,8 @@ export const messages = {
   "status.agent.nearSummaryBudget": "Zmień budżet dzienny portfela na {amount} USD.",
   "status.agent.nearSummaryAutoPay":
     "Pozwól OpenBot płacić bez twojego podpisu, gdy pozwala na to reguła płatności. O inne płatności nadal zapytamy cię na czacie.",
+  "status.agent.nearSummaryManualPay":
+    "Nie ma już żadnej reguły płatności. OpenBot znów poprosi o twój podpis przy każdej płatności.",
   "status.agent.nearSummaryPayment": "Zatwierdź płatność {amount} dla odbiorcy {recipient}.",
   "status.agent.nearSummaryFreeze": "Agenci nie mogą płacić z tego portfela, dopóki nie wznowisz płatności.",
   "status.agent.nearSummaryUnfreeze": "Agenci znów mogą płacić z tego portfela, zgodnie z twoimi regułami.",

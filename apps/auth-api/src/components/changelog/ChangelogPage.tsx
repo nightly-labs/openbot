@@ -120,7 +120,8 @@ export function ChangelogPage(props: ChangelogPageProps) {
   );
 
   const showListStart = () => {
-    if (layout && layout.getBoundingClientRect().top < 0)
+    const pinnedHeaderHeight = Number.parseFloat(getComputedStyle(document.documentElement).scrollPaddingTop) || 0;
+    if (layout && layout.getBoundingClientRect().top < pinnedHeaderHeight)
       layout.scrollIntoView({ block: "start", behavior: "instant" });
   };
 

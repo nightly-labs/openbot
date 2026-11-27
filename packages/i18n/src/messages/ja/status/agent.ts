@@ -74,6 +74,10 @@ export const messages = {
   "status.agent.nearSignatureUnknown": "OpenBot はこの署名を待っていません。OpenBot でもう一度始めてください。",
   "status.agent.nearPayment":
     "{domain} のため、暗号資産ウォレットから {recipient} に {amount} {symbol} を支払います: {reason}",
+  "status.agent.nearPaymentSending": "{domain} に {amount} を支払い中: {reason}",
+  "status.agent.nearPaymentPaid": "{domain} に {amount} を支払いました: {reason}",
+  "status.agent.nearPaymentNotPaid": "未払い: {domain} への {amount}: {reason}",
+  "status.agent.nearPaymentUncertain": "未確認: {domain} への {amount}: {reason}",
   "status.agent.nearSummaryCreate":
     "すべてのエージェントが 1 日あたり最大 {amount} USD まで支払えます。あとで OpenBot で変更できます。",
   "status.agent.nearSummaryGrant":
@@ -81,6 +85,8 @@ export const messages = {
   "status.agent.nearSummaryBudget": "ウォレットの 1 日の予算を {amount} USD に変更します。",
   "status.agent.nearSummaryAutoPay":
     "支払いルールで許可されている場合は、OpenBot があなたの署名なしで支払えるようにします。その他の支払いは引き続きチャットで確認します。",
+  "status.agent.nearSummaryManualPay":
+    "支払いルールがなくなりました。OpenBot は支払いごとに再びあなたの署名を求めます。",
   "status.agent.nearSummaryPayment": "{recipient} への {amount} の支払いを承認します。",
   "status.agent.nearSummaryFreeze": "支払いを再開するまで、エージェントはこのウォレットから支払えません。",
   "status.agent.nearSummaryUnfreeze":

@@ -6,7 +6,7 @@
 
 .credits-toolbar {
   position: sticky;
-  top: 0;
+  top: calc(var(--site-header-offset) - var(--site-header-island-inset));
   z-index: 2;
   display: grid;
   grid-template-columns: fit-content(100%);

@@ -243,8 +243,7 @@ export const messages = {
   "settings.notch.xwayland.title": "다시 시작 필요",
   "settings.notch.xwayland.description":
     "Wayland에서는 다른 앱 위에 Dynamic Island를 표시하려면 OpenBot이 XWayland를 사용해야 합니다. 그 전까지 아일랜드는 표시되지 않습니다.",
-  "settings.notch.xwayland.unsupported":
-    "XWayland가 없는 Wayland에서는 Dynamic Island를 다른 앱 위에 표시할 수 없습니다.",
+  "settings.notch.xwayland.unsupported": "이 Wayland 데스크톱에서는 Dynamic Island를 다른 앱 위에 표시할 수 없습니다.",
   "settings.notch.xwayland.restart": "다시 시작",
   "settings.notch.idle.title": "대기 상태 아일랜드 표시",
   "settings.notch.idle.description": "활성 상태가 없을 때 OpenBot 로고와 인사말을 표시해요.",
@@ -274,7 +273,7 @@ export const messages = {
   "settings.agentDock.xwayland.description":
     "Wayland에서는 다른 앱 위에 독을 표시하려면 OpenBot이 XWayland를 사용해야 합니다. 그 전까지 독은 OpenBot 창 안에 표시됩니다.",
   "settings.agentDock.xwayland.unsupported":
-    "XWayland가 없는 Wayland에서는 독을 다른 앱 위에 표시할 수 없습니다. OpenBot 창 안에 표시됩니다.",
+    "이 Wayland 데스크톱에서는 독을 다른 앱 위에 표시할 수 없습니다. OpenBot 창 안에 표시됩니다.",
   "settings.agentDock.xwayland.restart": "다시 시작",
   "settings.agentDock.noCompositor.title": "OpenBot 창 안에 표시",
   "settings.agentDock.noCompositor.description":

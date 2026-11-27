@@ -69,7 +69,9 @@ import {
   type InboundMessage,
   type IngressAnswer,
   type IngressDelivery,
+  type IngressFailure,
   type IngressState,
+  type MessageBody,
   type MessageTarget,
   type MessagingAdapter,
   type MessagingAdapterError,
@@ -943,7 +945,7 @@ export class MessagingService {
     return Effect.callback<void, MessagingOperationFailed>((resume) => {
       const settled = (state: IngressState) => {
         if (ingress.telegram.available()) resume(Effect.void);
-        else if (state === "online") resume(Effect.fail(telegramNotReady(state)));
+        else if (state === "online") resume(Effect.fail(telegramNotReady(state, null)));
         else return false;
         return true;
       };
@@ -957,7 +959,9 @@ export class MessagingService {
         duration: TELEGRAM_READY_TIMEOUT_MS,
         orElse: () =>
           Effect.suspend(() =>
-            ingress.telegram.available() ? Effect.void : Effect.fail(telegramNotReady(ingress.state())),
+            ingress.telegram.available()
+              ? Effect.void
+              : Effect.fail(telegramNotReady(ingress.state(), ingress.failure?.() ?? null)),
           ),
       }),
     );
@@ -1869,13 +1873,23 @@ export class MessagingService {
     const post = this.#posts.get(key);
     if (activity.type === "progress") {
       if (!live || !post?.messageId || !post.stopToken || post.final) return;
+      const messageId = post.messageId;
       const text = redactPostText(activity.text).replace(MENTION_MARKERS, "");
-      yield* live.adapter
-        .edit(target, post.messageId, {
-          text: text.length > PROGRESS_TEXT_LIMIT ? `${text.slice(0, PROGRESS_TEXT_LIMIT - 1)}…` : text,
-          buttons: [{ action: "stop" as const, label: sourceText("status.messaging.stop"), token: post.stopToken }],
-        })
-        .pipe(Effect.catch((failure) => Effect.sync(() => this.#warn(failure.cause))));
+      const shown = yield* this.#replaceStatus(live.adapter, target, messageId, {
+        text: text.length > PROGRESS_TEXT_LIMIT ? `${text.slice(0, PROGRESS_TEXT_LIMIT - 1)}…` : text,
+        buttons: [{ action: "stop" as const, label: sourceText("status.messaging.stop"), token: post.stopToken }],
+      }).pipe(
+        Effect.catch((failure) =>
+          Effect.sync(() => {
+            this.#warn(failure.cause);
+            return messageId;
+          }),
+        ),
+      );
+      if (shown !== messageId && this.#posts.get(key) === post) {
+        this.#posts.set(key, { ...post, messageId: shown });
+        yield* this.#status.save();
+      }
       return;
     }
     if (activity.type === "started") {
@@ -1906,10 +1920,7 @@ export class MessagingService {
       this.#posts.set(key, { connectionId: live.record.connectionId, target, messageId: existingMessageId, stopToken });
       this.#status.restored.delete(key);
       const messageId = existingMessageId
-        ? yield* live.adapter
-            .edit(target, existingMessageId, body)
-            .pipe(toMessagingOperationFailed)
-            .pipe(Effect.as(existingMessageId))
+        ? yield* this.#replaceStatus(live.adapter, target, existingMessageId, body).pipe(toMessagingOperationFailed)
         : yield* live.adapter.post(target, body).pipe(toMessagingOperationFailed);
       this.#posts.set(key, { connectionId: live.record.connectionId, target, messageId, stopToken });
       yield* this.#status.save();
@@ -2086,8 +2097,24 @@ export class MessagingService {
     placeholder: string | null,
     text: string,
   ) {
-    if (placeholder) yield* adapter.edit(target, placeholder, { text }).pipe(toMessagingOperationFailed);
+    if (placeholder)
+      yield* this.#replaceStatus(adapter, target, placeholder, { text }).pipe(toMessagingOperationFailed);
     else yield* adapter.post(target, { text }).pipe(toMessagingOperationFailed);
+  });
+
+  readonly #replaceStatus = Effect.fn("MessagingService.replaceStatus")(function* (
+    this: MessagingService,
+    adapter: MessagingAdapter,
+    target: MessageTarget,
+    messageId: string,
+    body: MessageBody,
+  ) {
+    const shown = yield* adapter.edit(target, messageId, body);
+    if (shown !== messageId && adapter.remove)
+      yield* adapter
+        .remove(target, messageId)
+        .pipe(Effect.catch((failure) => Effect.sync(() => this.#warn(failure.cause))));
+    return shown;
   });
 
   #dispatch<A>(operation: Effect.Effect<A, MessagingOperationFailed>): void {
@@ -2445,13 +2472,15 @@ const TELEGRAM_RELAY_REFUSALS = new Map([
   ],
 ]);
 
-function telegramNotReady(state: IngressState): MessagingOperationFailed {
+function telegramNotReady(state: IngressState, failure: IngressFailure | null): MessagingOperationFailed {
   const text =
-    state === "online"
-      ? sourceText("error.messaging.telegramServiceUnavailable")
-      : state === "signed_out" || state === "no_host"
-        ? sourceText("error.messaging.telegramRelayUnavailable")
-        : sourceText("error.messaging.telegramRelayUnreachable");
+    state === "signed_out" || state === "no_host"
+      ? sourceText("error.messaging.telegramRelayUnavailable")
+      : state === "online" || failure === "refused"
+        ? sourceText("error.messaging.telegramServiceUnavailable")
+        : failure === "certificate"
+          ? sourceText("error.messaging.telegramRelayCertificate")
+          : sourceText("error.messaging.telegramRelayUnreachable");
   return new MessagingOperationFailed({ cause: new Error(text) });
 }
 

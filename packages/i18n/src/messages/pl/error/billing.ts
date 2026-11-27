@@ -20,6 +20,8 @@ export const messages = {
   "error.billing.licensePaymentFailed":
     "Płatność za dodanych użytkowników nie powiodła się. Zaktualizuj metodę płatności i spróbuj ponownie.",
   "error.billing.licenseUnavailable": "Licencje są teraz niedostępne.",
+  "error.billing.mediaContentRefused":
+    "Kontrola bezpieczeństwa modelu odrzuciła prompt lub obrazy. Często odrzuca prawdziwe osoby, znane postacie, marki, przemoc i treści dla dorosłych. Zmień je i spróbuj ponownie. Nie użyto żadnych kredytów.",
   "error.billing.licenseOneUser": "Ta licencja obejmuje 1 użytkownika. Zmień ją na Team, aby dodać użytkowników.",
   "error.billing.licensePlanChange": "Tej licencji nie można zmienić na ten plan. Anuluj ją i kup nowy plan.",
   "error.billing.noLicense": "To konto nie ma licencji.",
@@ -27,8 +29,6 @@ export const messages = {
     "Podaj kraj rozliczenia przed płatnością. Zaktualizuj OpenBot, aby to zrobić, i spróbuj ponownie.",
   "error.billing.detailsInvalid": "Sprawdź kraj i numer VAT. Numer VAT musi należeć do wybranego kraju.",
   "error.billing.vatIdInvalid": "System VAT UE nie zna tego numeru VAT. Sprawdź numer lub kontynuuj bez numeru VAT.",
-  "error.billing.vatIdUnverified":
-    "System VAT UE nie może teraz sprawdzić numeru VAT. Spróbuj później lub kontynuuj bez numeru VAT.",
   "error.billing.vatUnavailable": "Płatność jest teraz niedostępna. Spróbuj później.",
   "error.billing.invalidRequest": "Żądanie rozliczeniowe jest nieprawidłowe.",
   "error.billing.invalidResponse": "Odpowiedź rozliczeniowa jest nieprawidłowa.",

@@ -40,18 +40,6 @@ const MONO_LOGOS: Partial<Record<CreditModelMaker, string>> = {
   xai: xaiLogo,
 };
 
-const isCreditModelMaker = (value: string): value is CreditModelMaker => Object.hasOwn(CREDIT_MODEL_MAKERS, value);
-
-const MAKER_BY_NAME = new Map(
-  Object.keys(CREDIT_MODEL_MAKERS)
-    .filter(isCreditModelMaker)
-    .map((key) => [CREDIT_MODEL_MAKERS[key].toLowerCase(), key]),
-);
-
-export function creditModelMakerNamed(name: string): CreditModelMaker | undefined {
-  return MAKER_BY_NAME.get(name.trim().toLowerCase());
-}
-
 export function MakerLogo(props: {
   maker: CreditModelMaker;
   mono?: boolean | undefined;

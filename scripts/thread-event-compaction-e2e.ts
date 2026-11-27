@@ -21,6 +21,9 @@ interface CaseReport {
   compactedEvents: number;
   rewritten: number;
   minimumRewritten: number;
+  deleted: number;
+  minimumDeleted: number;
+  laterPassDeleted: number;
   bytesBefore: number;
   bytesAfter: number;
   replayMatches: boolean;
@@ -64,11 +67,13 @@ interface Context {
   write(changedMessages: ConversationMessage[], activeTurnId?: string | null): void;
   remove(messageIds: string[], activeTurnId?: string | null): void;
   compactBatch(): void;
+  compactAll(): void;
 }
 
 interface Case {
   name: string;
   minimumRewritten: number;
+  minimumDeleted?: number;
   oldEventsLater?: true;
   run(context: Context): void;
 }
@@ -242,13 +247,44 @@ const cases: Case[] = [
       update(thread(26), { activeTurnId: null });
     },
   },
+  {
+    name: "single-message updates that a later update replaces",
+    minimumRewritten: 1,
+    minimumDeleted: 47,
+    run: ({ write }) => {
+      const streaming = (id: string, minute: number, text: string, extra: Partial<ConversationMessage> = {}) =>
+        message(id, minute, { text, status: "streaming", ...extra });
+      write([streaming("x", 1, "x0"), streaming("y", 2, "y0")]);
+      for (let step = 1; step <= 25; step++) {
+        write([streaming("x", 1, `x${step}`, step === 25 ? { itemType: "agentMessage" } : {})]);
+        write([streaming("y", 2, `y${step}`, step === 10 ? { turnId: "turn-1" } : {})]);
+      }
+      write([streaming("x", 1, "x25", { itemType: "agentMessage" })]);
+      write([message("x", 1, { text: "x done" })]);
+      write([message("y", 2, { text: "y done" })]);
+      write([message("z", 3)]);
+    },
+  },
+  {
+    name: "a compacted thread with many new events is taken again",
+    minimumRewritten: 0,
+    minimumDeleted: 1000,
+    run: ({ write, compactAll }) => {
+      write([message("a", 1, { text: "a0" }), message("b", 2, { text: "b0" })]);
+      compactAll();
+      for (let step = 1; step <= 520; step++) {
+        write([message("a", 1, { text: `a${step}` })]);
+        write([message("b", 2, { text: `b${step}` })]);
+      }
+    },
+  },
 ];
 
 interface Side {
   database: OpenBotDatabase;
   agentId: string;
   threadId: string;
-  totals: { rewritten: number; bytesBefore: number; bytesAfter: number };
+  totals: { rewritten: number; deleted: number; bytesBefore: number; bytesAfter: number };
 }
 
 async function openSide(root: string): Promise<Side> {
@@ -268,13 +304,14 @@ async function openSide(root: string): Promise<Side> {
   });
   database.connection.prepare("DELETE FROM orchestration_events WHERE aggregate_id = ?").run(threadId);
   database.connection.prepare("DELETE FROM projection_thread_activities WHERE thread_id = ?").run(threadId);
-  return { database, agentId: agent.id, threadId, totals: { rewritten: 0, bytesBefore: 0, bytesAfter: 0 } };
+  return { database, agentId: agent.id, threadId, totals: { rewritten: 0, deleted: 0, bytesBefore: 0, bytesAfter: 0 } };
 }
 
 function compactBatch(side: Side): boolean {
   const batch = side.database.compactThreadEvents();
   if (batch.failedThread) throw new Error(`Compaction failed: ${batch.failedThread}`);
   side.totals.rewritten += batch.rewritten;
+  side.totals.deleted += batch.deleted;
   side.totals.bytesBefore += batch.bytesBefore;
   side.totals.bytesAfter += batch.bytesAfter;
   return !batch.done;
@@ -332,6 +369,9 @@ function context(side: Side, compacts: boolean): Context {
     },
     compactBatch: () => {
       if (compacts) compactBatch(side);
+    },
+    compactAll: () => {
+      if (compacts) while (compactBatch(side)) {}
     },
   };
 }
@@ -419,11 +459,20 @@ async function runCase(test: Case): Promise<CaseReport> {
     const expected = full.database.rebuildThreadProjection(full.threadId);
     const actual = compacted.database.rebuildThreadProjection(compacted.threadId);
     const replayMatches = isDeepStrictEqual(neutral(compacted, actual), neutral(full, expected));
-    const rowsMatch = isDeepStrictEqual(neutral(compacted, replayRows(compacted)), neutral(full, replayRows(full)));
+    const keptSequences = new Set(compactedEvents.map((event) => event.sequence));
+    const fullRows = () => {
+      const rows = replayRows(full);
+      return {
+        ...rows,
+        activities: rows.activities.filter((row) => keptSequences.has(Number(row.last_event_sequence))),
+      };
+    };
+    const rowsMatch = isDeepStrictEqual(neutral(compacted, replayRows(compacted)), neutral(full, fullRows()));
     const keyDifference = otherKeysKept(full, fullEvents, compacted, compactedEvents);
 
     compacted.database.connection.prepare("DELETE FROM thread_event_compaction").run();
     const first = compacted.totals.rewritten;
+    const deleted = compacted.totals.deleted;
     while (compactBatch(compacted)) {}
     const secondPassRewritten = compacted.totals.rewritten - first;
     compacted.database.connection.prepare("DELETE FROM thread_event_compaction").run();
@@ -431,6 +480,7 @@ async function runCase(test: Case): Promise<CaseReport> {
     while (compactBatch(compacted)) {}
     const thirdPassRewritten = compacted.totals.rewritten - second;
     const secondReplay = compacted.database.rebuildThreadProjection(compacted.threadId);
+    const laterPassDeleted = compacted.totals.deleted - deleted;
 
     const result: CaseReport = {
       name: test.name,
@@ -438,6 +488,9 @@ async function runCase(test: Case): Promise<CaseReport> {
       compactedEvents: compactedEvents.length,
       rewritten: first,
       minimumRewritten: test.minimumRewritten,
+      deleted,
+      minimumDeleted: test.minimumDeleted ?? 0,
+      laterPassDeleted,
       bytesBefore: compacted.totals.bytesBefore,
       bytesAfter: compacted.totals.bytesAfter,
       replayMatches: replayMatches && isDeepStrictEqual(neutral(compacted, secondReplay), neutral(full, expected)),
@@ -452,14 +505,17 @@ async function runCase(test: Case): Promise<CaseReport> {
       result.rowsMatch &&
       result.otherKeysKept &&
       result.rewritten >= test.minimumRewritten &&
+      result.deleted >= result.minimumDeleted &&
+      (test.minimumDeleted === undefined ? result.deleted === 0 : result.compactedEvents === result.events - deleted) &&
+      result.laterPassDeleted === 0 &&
       (test.oldEventsLater ? result.secondPassRewritten > 0 : result.secondPassRewritten === 0) &&
       result.thirdPassRewritten === 0 &&
-      result.bytesAfter < result.bytesBefore;
+      (result.rewritten === 0 || result.bytesAfter < result.bytesBefore);
     if (keyDifference) result.difference = keyDifference;
     else if (!replayMatches) result.difference = "the rebuilt chats differ";
     else if (!rowsMatch) {
       const left = neutral(compacted, replayRows(compacted));
-      const right = neutral(full, replayRows(full));
+      const right = neutral(full, fullRows());
       const tables: (keyof typeof right)[] = ["messages", "turns", "activities", "thread"];
       const table = tables.find((key) => !isDeepStrictEqual(left[key], right[key]));
       const index = table ? right[table].findIndex((row, at) => !isDeepStrictEqual(row, left[table][at])) : -1;
@@ -484,7 +540,7 @@ try {
   writeFileSync(join(OUT, "report.json"), `${JSON.stringify(report, null, 2)}\n`);
   for (const result of report.cases)
     process.stdout.write(
-      `${result.passed ? "ok  " : "FAIL"} ${result.name}: ${result.rewritten} of ${result.events} events rewritten (min ${result.minimumRewritten}), ${result.bytesBefore} -> ${result.bytesAfter} bytes, replay ${result.replayMatches ? "matches" : "differs"}, rows ${result.rowsMatch ? "match" : "differ"}, later passes ${result.secondPassRewritten}/${result.thirdPassRewritten}${result.difference ? `, ${result.difference}` : ""}\n`,
+      `${result.passed ? "ok  " : "FAIL"} ${result.name}: ${result.rewritten} of ${result.events} events rewritten (min ${result.minimumRewritten}), ${result.deleted} deleted (min ${result.minimumDeleted}, later ${result.laterPassDeleted}), ${result.bytesBefore} -> ${result.bytesAfter} bytes, replay ${result.replayMatches ? "matches" : "differs"}, rows ${result.rowsMatch ? "match" : "differ"}, later passes ${result.secondPassRewritten}/${result.thirdPassRewritten}${result.difference ? `, ${result.difference}` : ""}\n`,
     );
   if (report.error) process.stdout.write(`${report.error}\n`);
   process.stdout.write(`${report.passed ? "PASS" : "FAIL"} ${join(OUT, "report.json")}\n`);

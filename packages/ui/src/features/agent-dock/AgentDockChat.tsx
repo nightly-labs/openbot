@@ -99,10 +99,25 @@ export interface AgentDockChatVoice {
   onSend: () => void;
 }
 
-export function isDockMessage(message: AgentMessage): boolean {
+function isDockRow(message: AgentMessage): boolean {
   if (message.author !== "you" && message.author !== "agent") return false;
-  if (message.kind !== undefined && message.kind !== "text" && message.kind !== "error") return false;
+  return message.kind === undefined || message.kind === "text" || message.kind === "error";
+}
+
+function hasDockText(message: AgentMessage): boolean {
   return message.body.trim().length > 0;
+}
+
+function hasDockAttachments(message: AgentMessage): boolean {
+  return (message.attachments?.length ?? 0) > 0;
+}
+
+export function isDockAnswer(message: AgentMessage): boolean {
+  return isDockRow(message) && hasDockText(message);
+}
+
+export function isDockMessage(message: AgentMessage): boolean {
+  return isDockRow(message) && (hasDockText(message) || hasDockAttachments(message));
 }
 
 export function isDockVisualReply(message: AgentMessage): boolean {
@@ -111,6 +126,24 @@ export function isDockVisualReply(message: AgentMessage): boolean {
 
 function isOwn(message: AgentMessage): boolean {
   return message.author === "you" && !message.senderMember;
+}
+
+function AgentDockFileRow(props: { names: readonly string[]; onOpen: () => void }) {
+  const { t, format } = useText();
+  const label = () => format.list(props.names);
+  return (
+    <div class="agent-dock-visual">
+      <p class="agent-dock-text">{label()}</p>
+      <Button
+        variant="secondary"
+        size="sm"
+        aria-label={t("agent.dock.openFile", { name: label() })}
+        onClick={() => props.onOpen()}
+      >
+        {t("common.open")}
+      </Button>
+    </div>
+  );
 }
 
 export function pendingMessageDelivered(pending: AgentDockPendingMessage, messages: readonly AgentMessage[]): boolean {
@@ -463,16 +496,26 @@ export function AgentDockChat(props: {
                         <Show
                           when={isDockVisualReply(message)}
                           fallback={
-                            <div class="agent-dock-markdown message-markdown">
-                              <MarkdownMessageText
-                                body={message.body}
-                                agents={props.agents}
-                                attachments={message.attachments}
-                                onSelectAgent={(agentId) => props.onSelectAgent?.(agentId)}
-                                onOpenAttachment={() => props.onOpenInMain()}
-                                onOpenLink={(url) => props.onOpenLink?.(url)}
-                              />
-                            </div>
+                            <Show
+                              when={hasDockText(message)}
+                              fallback={
+                                <AgentDockFileRow
+                                  names={(message.attachments ?? []).map((attachment) => attachment.name)}
+                                  onOpen={() => props.onOpenInMain()}
+                                />
+                              }
+                            >
+                              <div class="agent-dock-markdown message-markdown">
+                                <MarkdownMessageText
+                                  body={message.body}
+                                  agents={props.agents}
+                                  attachments={message.attachments}
+                                  onSelectAgent={(agentId) => props.onSelectAgent?.(agentId)}
+                                  onOpenAttachment={() => props.onOpenInMain()}
+                                  onOpenLink={(url) => props.onOpenLink?.(url)}
+                                />
+                              </div>
+                            </Show>
                           }
                         >
                           <div class="agent-dock-visual">

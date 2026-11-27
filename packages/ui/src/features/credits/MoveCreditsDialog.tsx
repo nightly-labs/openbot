@@ -10,7 +10,13 @@ import type { JSX } from "@solidjs/web";
 import { createSignal, Show, untrack } from "solid-js";
 import { useText } from "../../text";
 import { CreditIcon } from "./CreditIcon";
-import { type CreditsCalls, type CreditsStore, createCreditsStore, creditsServer } from "./credits-store";
+import {
+  type CreditsCalls,
+  type CreditsStore,
+  createCreditsStore,
+  creditsServer,
+  movablePersonalCredits,
+} from "./credits-store";
 
 export interface MoveCreditsDialogProps {
   store: CreditsStore;
@@ -60,7 +66,7 @@ export function MoveCreditsDialog(props: MoveCreditsDialogProps): JSX.Element {
   const [value, setValue] = createSignal("");
   const [turns, setTurns] = createSignal(0);
   const toServer = () => direction() === "to_server";
-  const personal = () => props.store.state.credits?.balance ?? 0;
+  const personal = () => movablePersonalCredits(props.store.state.credits);
   const source = () => (toServer() ? personal() : props.server.balance);
   const decimal = () => format.number(1.5).replace(/\p{Nd}/gu, "") || ".";
   const localDigits = () => Array.from({ length: 10 }, (_, digit) => format.number(digit));

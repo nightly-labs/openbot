@@ -44,8 +44,6 @@ export const messages = {
     "Automatische verlenging wordt hervat voor deze server. De agents, gesprekken en bestanden blijven bewaard.",
   "billing.lifecycle.dataStays": "Verlenging staat uit. Je gegevens blijven bewaard als het abonnement eindigt.",
   "billing.lifecycle.deleteServer": "Server verwijderen…",
-  "billing.lifecycle.whenDelete": "Wanneer moet deze server worden verwijderd?",
-  "billing.lifecycle.atPeriodEnd": "Aan het einde van de periode · {date}",
   "billing.lifecycle.planEndsLabel": "Abonnement eindigt",
   "billing.lifecycle.plansDescription":
     "Beheer elke server apart. Als je de verlenging opzegt, blijven de gegevens bewaard.",
@@ -54,15 +52,12 @@ export const messages = {
   "billing.lifecycle.renewalLabel": "Volgende verlenging",
   "billing.lifecycle.deletionLabel": "Verwijderdatum",
   "billing.lifecycle.billingLabel": "Facturering",
-  "billing.lifecycle.immediately": "Direct",
   "billing.lifecycle.automatic": "Automatische verlenging wordt hervat",
-  "billing.lifecycle.noRefund": "Geen terugbetaling voor ongebruikte tijd",
   "billing.lifecycle.noRenewal": "Geen verdere verlengingen",
   "billing.lifecycle.dateUtc": "{date} UTC",
   "billing.lifecycle.renews": "Automatische verlenging staat aan.",
   "billing.lifecycle.schedule": "Verwijderen aan einde periode",
   "billing.lifecycle.keep": "Server behouden",
-  "billing.lifecycle.deleteNow": "Nu verwijderen",
   "billing.lifecycle.deletesOn": "Wordt verwijderd op {date}",
   "billing.lifecycle.scheduledDescription": "Verlenging staat uit. Je server en gegevens worden verwijderd.",
   "billing.lifecycle.scheduleDescription":
@@ -71,11 +66,8 @@ export const messages = {
   "billing.lifecycle.keepDescription":
     "Je server en de gegevens blijven bewaard. Het geplande verwijderen stopt en automatische verlenging wordt hervat.",
   "billing.lifecycle.deleteTitle": "{name} verwijderen?",
-  "billing.lifecycle.deleteDescription":
-    "Verwijder deze server en de agents, gesprekken en bestanden definitief. Je abonnement eindigt nu. Je kunt dit niet ongedaan maken.",
   "billing.lifecycle.saving": "Opslaan…",
   "billing.lifecycle.failed": "De wijziging kan niet worden bevestigd. Vernieuw Facturering en probeer het opnieuw.",
-  "billing.lifecycle.deleted": "{name} is verwijderd. Het abonnement is beëindigd.",
   "billing.lifecycle.label": "Ontwerpvoorbeeld · Alleen nepacties",
   "billing.lifecycle.reset": "Voorbeeld resetten",
   "billing.license.title": "Licentie",

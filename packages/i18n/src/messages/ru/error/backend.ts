@@ -210,6 +210,7 @@ export const messages = {
   "error.backend.videoGenerationFailed": "Не удалось создать видео.",
   "error.backend.videoGenerationNoVideo": "Создание видео не вернуло видео.",
   "error.backend.videoGenerationInterrupted": "Создание видео прервано.",
+  "error.backend.grokVideoNoQuota": "Ваш аккаунт Grok не может создавать видео. Создайте видео за кредиты.",
   "error.backend.attachmentNotRegularFile": "Прикреплять можно только обычные файлы: {name}",
   "error.backend.attachmentCopyFailed": "OpenBot не смог скопировать {name}.",
   "error.backend.routineNameRequired": "Нужно название регулярной задачи.",
@@ -361,6 +362,7 @@ export const messages = {
     "Этот компьютер заблокировал подключение к серверу. Проверьте брандмауэр или защитное ПО и повторите попытку.",
   "error.backend.mcpServerIncompatible":
     "По этому адресу что-то ответило, но не как сервер MCP через Streamable HTTP. Проверьте URL и обновите приложение, которое запускает сервер.",
+  "error.backend.mcpServerKeyNotAccepted": "Сервер не принял ключ API. Проверьте ключ и попробуйте ещё раз.",
   "error.backend.mcpRemoteBridge":
     "{reason} Эта команда запускает мост mcp-remote. Выберите вместо него Streamable HTTP с URL {url}, и OpenBot выполнит вход.",
   "error.backend.oauthNotHttps": "Эндпоинт OAuth {origin} не использует https, поэтому учётные данные не отправлены.",

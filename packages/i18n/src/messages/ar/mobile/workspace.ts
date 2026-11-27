@@ -15,6 +15,7 @@ export const messages = {
   "mobile.workspace.error.sectionsLoadFailed": "تعذّر تحميل المجلدات. حاول مرة أخرى.",
   "mobile.workspace.error.transportNotReady": "وسيلة النقل في الهاتف غير جاهزة.",
   "mobile.workspace.error.sectionsUnsupported": "لا يدعم هذا المضيف تغييرات المجلدات.",
+  "mobile.workspace.error.sidebarOffline": "اتصل بهذا الخادم لتغيير مجلداته.",
   "mobile.workspace.error.leaveOwnServer": "يمكن مغادرة الخوادم البعيدة المنضم إليها فقط.",
   "mobile.workspace.error.removeOwnedServerOnly": "يمكن للمالك فقط إزالة هذا الخادم.",
   "mobile.workspace.error.agentNotOnHost": "الوكيل غير موجود على هذا المضيف.",

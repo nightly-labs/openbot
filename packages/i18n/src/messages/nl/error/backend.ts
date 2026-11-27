@@ -216,6 +216,8 @@ export const messages = {
   "error.backend.videoGenerationFailed": "Het maken van de video is mislukt.",
   "error.backend.videoGenerationNoVideo": "Het maken van de video gaf geen video terug.",
   "error.backend.videoGenerationInterrupted": "Het maken van de video is onderbroken.",
+  "error.backend.grokVideoNoQuota":
+    "Je Grok-account kan geen video's maken. Maak de video in plaats daarvan met credits.",
   "error.backend.attachmentNotRegularFile": "Alleen gewone bestanden kunnen worden bijgevoegd: {name}",
   "error.backend.attachmentCopyFailed": "OpenBot kon {name} niet kopiëren.",
   "error.backend.routineNameRequired": "Een naam voor de routine is verplicht.",
@@ -369,6 +371,8 @@ export const messages = {
     "Deze computer heeft de verbinding met de server geblokkeerd. Controleer je firewall of beveiligingssoftware en probeer het opnieuw.",
   "error.backend.mcpServerIncompatible":
     "Er reageerde iets op dit adres, maar niet als MCP-server via Streamable HTTP. Controleer de URL en werk de app bij die de server draait.",
+  "error.backend.mcpServerKeyNotAccepted":
+    "De server heeft de API-sleutel niet geaccepteerd. Controleer de sleutel en probeer het opnieuw.",
   "error.backend.mcpRemoteBridge":
     "{reason} Deze opdracht draait de mcp-remote-brug. Kies in plaats daarvan Streamable HTTP met de URL {url}, dan logt OpenBot je in.",
   "error.backend.oauthNotHttps": "Het OAuth-endpoint {origin} is geen https, dus de inloggegevens zijn niet verstuurd.",

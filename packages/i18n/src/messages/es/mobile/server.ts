@@ -1211,6 +1211,11 @@ export const messages = {
   "mobile.server.providers.pool": "Agrupar cuentas",
   "mobile.server.providers.poolHint":
     "Los agentes usan una cuenta hasta que se acerca a un límite de uso y luego la cuenta cuyo límite se restablece antes.",
+  "mobile.server.providers.poolStrategy": "Usar cuentas",
+  "mobile.server.providers.poolFillFirst": "Llenar primero",
+  "mobile.server.providers.poolSpread": "Repartir",
+  "mobile.server.providers.poolSpreadHint":
+    "Los agentes se reparten entre las cuentas con más uso disponible. Un agente cambia de cuenta solo cuando otra cuenta tiene mucho más margen.",
   "mobile.server.providers.accountsPooledHint":
     "Los agentes comparten estas cuentas. Una cuenta nueva inicia sesión en su página en este teléfono.",
   "mobile.server.providers.accountsPooledOnComputer":

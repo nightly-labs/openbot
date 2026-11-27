@@ -272,7 +272,10 @@ async function main(): Promise<void> {
       host.endControl(THREAD_ID, TURN_ID);
       assert.equal((await box).aborted, false, "The turn end closed Electron's box.");
       failure(await answer(tabId, opened.id, true, "turn-2"), /Only a person can answer/);
-      failure(await call("snapshot", { tabId, image: "never" }, "turn-2"), /only a person can answer it/);
+      const personRefusal = await call("snapshot", { tabId, image: "never" }, "turn-2");
+      failure(personRefusal, /only a person can answer it/);
+      assert.match(text(personRefusal), /A confirm dialog .*"Delete the test item\?"/);
+      assert(!text(personRefusal).includes(opened.id), "The agent got the id of a person's dialog.");
       recordCases("turn-end-hands-off");
       (await box).answer(0);
       await waitUntil(async () => (await title(contents)) === "confirm:true");
@@ -309,14 +312,30 @@ async function main(): Promise<void> {
     }
 
     {
-      const { contents } = await open();
+      const { tabId, contents } = await open();
+      await runCauseEffect(host.activate(tabId));
+      await runCauseEffect(host.setVisible({ visible: true, bounds: { x: 0, y: 0, width: 800, height: 600 } }));
+      contents.focus();
+      const shownBefore = boxes.length;
       const box = nextBox();
-      await contents.executeJavaScript("document.getElementById('alert').focus()");
+      let personKeySeen = false;
+      const notePersonKey = (_event: Electron.Event, input: Electron.Input) => {
+        if (input.type === "keyDown") personKeySeen = true;
+      };
+      contents.on("before-input-event", notePersonKey);
+      phase("person-input-alert-key");
       contents.sendInputEvent({ type: "keyDown", keyCode: "Space" });
       contents.sendInputEvent({ type: "keyUp", keyCode: "Space" });
+      await waitUntil(async () => personKeySeen);
+      contents.off("before-input-event", notePersonKey);
+      phase("person-input-alert-open");
+      await contents.executeJavaScript("setTimeout(() => document.getElementById('alert').click())");
+      await waitUntil(async () => boxes.length > shownBefore);
+      phase("cases");
       assert.equal((await box).aborted, false, "A person's alert in an agent tab got OK with no person.");
       (await box).answer(0);
       await waitUntil(async () => (await title(contents)) === "alert:done");
+      await runCauseEffect(host.setVisible({ visible: false }));
       recordCases("person-input-alert-in-agent-tab-stays-native");
     }
 

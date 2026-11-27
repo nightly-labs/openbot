@@ -15,6 +15,7 @@ export const messages = {
   "mobile.workspace.error.sectionsLoadFailed": "Ordner konnten nicht geladen werden. Versuche es erneut.",
   "mobile.workspace.error.transportNotReady": "Die mobile Übertragung ist nicht bereit.",
   "mobile.workspace.error.sectionsUnsupported": "Dieser Host unterstützt keine Änderungen an Ordnern.",
+  "mobile.workspace.error.sidebarOffline": "Verbinde dich mit diesem Server, um seine Ordner zu ändern.",
   "mobile.workspace.error.leaveOwnServer": "Nur beigetretene Remote-Server können verlassen werden.",
   "mobile.workspace.error.removeOwnedServerOnly": "Nur der Eigentümer kann diesen Server entfernen.",
   "mobile.workspace.error.agentNotOnHost": "Der Agent ist nicht auf diesem Host.",

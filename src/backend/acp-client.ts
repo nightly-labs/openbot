@@ -291,6 +291,7 @@ interface AcpTurn {
   awaitingCommands: boolean;
   ownReply: "none" | "reported" | "open" | "ended";
   abandoned: boolean;
+  stallCancel: "waiting" | "answered" | null;
   reportedCost: number | null;
   unprompted: boolean;
   textMessageId: string | null;
@@ -504,7 +505,6 @@ export interface AcpProviderOptions {
   ): Effect.Effect<void, ProviderClientOperationError>;
   savedKeyRefusedMessage?: () => string | null;
   savedKeyLimitMessage?: (detail: string, error?: unknown) => string | null;
-  readVerificationLink?: () => Effect.Effect<string | null>;
   authBlockedMessage?: () => string | null;
   savedSignInCheck?: AcpSavedSignInCheck;
   readAccount?(
@@ -646,6 +646,7 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
       processWideModel: options.flavor.processWideModel === true,
       setsConfigOnlyOnChange: options.flavor.setsConfigOnlyOnChange === true,
       modelSetUnsaved: options.flavor.modelSetUnsaved,
+      modelNotOffered: options.flavor.modelNotOffered,
       modelConfigId: options.flavor.modelConfigId,
       configSetUnsaved: options.flavor.configSetUnsaved,
       configConflict: options.flavor.configConflict,
@@ -815,10 +816,6 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
 
   get #label(): string {
     return this.options.label ?? agentProviderName(this.provider);
-  }
-
-  #readVerificationLink(): Effect.Effect<string | null> {
-    return this.options.readVerificationLink?.() ?? Effect.succeed(null);
   }
 
   #redact(text: string): string {
@@ -1355,6 +1352,7 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
           turn.id !== getString(params, "expectedTurnId") ||
           turn.stopped ||
           turn.completing ||
+          turn.stallCancel !== null ||
           (!steer && (turn.unprompted || turn.waitingOnUser > 0));
         if (turnChanged()) return yield* providerFailure(new Error(sourceText("error.backend.steerTurnChanged")));
         if (!steer && !turn.answered)
@@ -2228,6 +2226,14 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
       }
       if (this.#flavor.sessionBusy?.(error)) return yield* providerFailure(new ProviderSessionBusyError(this.#label));
       recovery = this.#flavor.restoreFailure?.(error, method) ?? null;
+      if (!recovery && isUnloadableSession(error)) {
+        logger.warn("An ACP agent could not open a saved session. OpenBot starts a new one.", {
+          provider: this.provider,
+          method,
+          reason: this.#redact(failureText(error)),
+        });
+        return yield* providerFailure(new MissingAcpSessionError(`ACP session not found: ${request.sessionId}`, error));
+      }
       if (!recovery) return yield* providerFailure(error);
       failure = error;
     }
@@ -2702,6 +2708,7 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
       awaitingCommands: false,
       ownReply: "none",
       abandoned: false,
+      stallCancel: null,
       reportedCost: null,
       unprompted,
       textMessageId: null,
@@ -2778,6 +2785,12 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
       while (providerResult(yield* Effect.result(this.#leaveOutFailedMcpServer(thread, turn, response, params))))
         response = providerResult(yield* send());
       if (thread.activeTurn !== turn || turn.completing) return;
+      if (
+        turn.stallCancel !== null &&
+        !turn.stopped &&
+        (response.stopReason !== "end_turn" || turn.stallCancel === "waiting")
+      )
+        return;
       const cancelledUnstarted = () =>
         response.stopReason === "cancelled" && !turn.stopped && !turn.answered && turn.failureCause === null;
       if (cancelledUnstarted()) {
@@ -2940,6 +2953,7 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
       if (turn.signInLost)
         yield* this.#endAgentProcess(sourceText("error.provider.acpSignInLost", { provider: this.#label }));
     } catch (error) {
+      if (turn.stallCancel !== null && !turn.stopped) return;
       const transport = thread.transport;
       const serverLost = !turn.stopped && !transport && this.#flavor.serverLost?.(error) === true;
       const failure = turn.stopped
@@ -3688,6 +3702,7 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
       if ((update.content.text.trim() || released.trim()) && !held) {
         turn.receivedOutput = true;
         turn.interruptedAnswer = null;
+        if (turn.stallCancel) turn.stallCancel = "answered";
       }
       if (this.#flavor.streamAnswerBeforePromptReturns && text && !held) {
         if (!turn.text || released)
@@ -3962,8 +3977,11 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
         continue;
       }
       this.emit("diagnostic", `${this.#label} sent nothing for ${silentFor} ms; ending turn ${turn.id}.`);
-      turn.failureCause = "stalled";
+      turn.stallCancel = "waiting";
       yield* providerCall(() => this.#sessionConnection(thread).cancel({ sessionId: thread.id })).pipe(Effect.ignore);
+      if (turn.task) yield* Fiber.await(turn.task).pipe(Effect.timeoutOption(Math.min(ACP_STOP_GRACE_MS, limit)));
+      if (thread.activeTurn !== turn || turn.completing || turn.stopped) return;
+      turn.failureCause = "stalled";
       yield* this.#abandonTurn(
         thread,
         turn,
@@ -4434,11 +4452,8 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
       const detail = this.#redact(failureText(error));
       const verification =
         turn.accountVerification || this.#flavor.sdkHarness?.accountVerification?.test(detail) === true;
-      if (verification) {
-        turn.accountLink = (yield* this.#readVerificationLink()) ?? turn.accountLink;
-        turn.failureCause ??= "authentication";
-      }
-      const shown =
+      if (verification) turn.failureCause ??= "authentication";
+      const message =
         this.options.savedKeyLimitMessage?.(detail, error) ??
         this.#flavor.turnFailure?.(
           error,
@@ -4454,15 +4469,6 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
           () => this.options.savedKeyShadowed?.() ?? false,
         ) ??
         detail;
-      const verificationMessage = verification
-        ? null
-        : (this.#flavor.unexplainedFailureVerification?.(error, detail, shown) ?? null);
-      const verifiedLink = verificationMessage ? yield* this.#readVerificationLink() : null;
-      if (verifiedLink) {
-        turn.accountLink = verifiedLink;
-        turn.failureCause = "authentication";
-      }
-      const message = verifiedLink && verificationMessage ? verificationMessage : shown;
       const causeCode = turn.failureCause ?? acpFailureCause(error, this.#flavor, message, answer);
       this.emit("notification", {
         method: "error",
@@ -5225,6 +5231,13 @@ function isSessionNotFound(error: unknown, sessionId: string, flavor: AcpFlavor)
   if (error.code !== -32002) return false;
   const data = isRecord(error.data) ? error.data : undefined;
   return data?.sessionId === sessionId || data?.uri === sessionId || error.message.includes(sessionId);
+}
+
+const DAMAGED_SESSION_STORE =
+  /\bdatabase disk image is malformed\b|\bfile is not a database\b|\bdatabase (?:is )?corrupt/iu;
+
+function isUnloadableSession(error: unknown): boolean {
+  return error instanceof RequestError && error.code === -32603 && DAMAGED_SESSION_STORE.test(failureText(error));
 }
 
 function failureDetail(error: RequestError): string | null {

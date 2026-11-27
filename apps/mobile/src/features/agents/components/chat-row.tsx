@@ -9,21 +9,10 @@ export const PINNED_AVATAR_SIZE = 70;
 const TITLE_MIN_WIDTH = 64;
 const NAME_TITLE_GAP = 6;
 
-export function ChatRowHeading({
-  name,
-  title,
-  leading,
-  trailing,
-}: {
-  name: string;
-  title: string;
-  leading?: ReactNode;
-  trailing: ReactNode;
-}) {
+export function ChatRowHeading({ name, title, trailing }: { name: string; title: string; trailing: ReactNode }) {
   const textScale = useWindowDimensions().fontScale * useTextScale();
   return (
     <View className="flex-row items-center gap-2">
-      {leading}
       <View
         style={{
           flex: 1,

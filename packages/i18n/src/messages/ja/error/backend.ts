@@ -218,6 +218,8 @@ export const messages = {
   "error.backend.videoGenerationFailed": "動画の生成に失敗しました。",
   "error.backend.videoGenerationNoVideo": "動画の生成で動画が返されませんでした。",
   "error.backend.videoGenerationInterrupted": "動画の生成が中断されました。",
+  "error.backend.grokVideoNoQuota":
+    "この Grok アカウントでは動画を作成できません。代わりにクレジットで動画を生成してください。",
   "error.backend.attachmentNotRegularFile": "添付できるのは通常のファイルだけです: {name}",
   "error.backend.attachmentCopyFailed": "OpenBot は {name} をコピーできませんでした。",
   "error.backend.routineNameRequired": "ルーティン名が必要です。",
@@ -373,6 +375,8 @@ export const messages = {
     "このコンピューターがサーバーへの接続をブロックしました。ファイアウォールまたはセキュリティソフトを確認してから、もう一度お試しください。",
   "error.backend.mcpServerIncompatible":
     "このアドレスで応答がありましたが、Streamable HTTP の MCP サーバーではありません。URL を確認し、サーバーを実行するアプリを更新してください。",
+  "error.backend.mcpServerKeyNotAccepted":
+    "サーバーが API キーを受け付けませんでした。キーを確認してから、もう一度お試しください。",
   "error.backend.mcpRemoteBridge":
     "{reason} このコマンドは mcp-remote ブリッジを実行します。代わりに URL {url} で Streamable HTTP を選ぶと、OpenBot がサインインします。",
   "error.backend.oauthNotHttps": "OAuth エンドポイント {origin} は https ではないため、認証情報を送信しませんでした。",

@@ -94,6 +94,8 @@ export const messages = {
     "تعذّر فتح قفل Bitwarden على هذا الخادم. تحقق من كلمة المرور الرئيسية، ثم اتصل مرة أخرى.",
   "error.connector.bitwardenCliInstallFailed":
     "تعذّر تثبيت Bitwarden CLI على هذا الخادم. تحقق من اتصاله بالشبكة، ثم اتصل مرة أخرى.",
+  "error.connector.bitwardenCliCannotStart":
+    "لم يبدأ Bitwarden CLI على هذا الخادم. اتصل مرة أخرى. إذا لم يبدأ بعد ذلك، فاختر المساعدة > الإبلاغ عن مشكلة.",
   "error.connector.bitwardenFileUnreadable": "ملف اتصال Bitwarden غير قابل للقراءة.",
   "error.connector.passwordManagerUnknown": "لا يعرف OpenBot مدير كلمات المرور هذا.",
   "error.connector.passwordManagerMethod": "لا يمكن توصيل مدير كلمات المرور هذا بهذه الطريقة.",

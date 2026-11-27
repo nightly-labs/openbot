@@ -312,7 +312,7 @@ import {
   aboveAppsWindowKind,
   ozonePlatformArguments,
   setAboveAppsXWayland,
-  usesX11Windows,
+  x11OverlaysShow,
 } from "./linux-wayland-output";
 import { localRoutineFeedDocument } from "./local-routine-calendar";
 import {
@@ -517,6 +517,9 @@ import { spawnVoiceSpeechHost } from "./voice-speech-host-process";
 import { VoiceSpeechService } from "./voice-speech-service";
 import { spawnVoiceTranscriptionHost } from "./voice-transcription-host-process";
 import { VoiceTranscriptionService } from "./voice-transcription-service";
+import { WatchRelayCommands } from "./watch-relay-commands";
+import { createWatchRelayWantedStore, loadWatchRelayKey } from "./watch-relay-key";
+import { WatchRelayService } from "./watch-relay-service";
 import { WebhookRelay } from "./webhook-relay";
 import { WindowsTopmostKeeper } from "./windows-topmost-keeper";
 import { createWorkflowFileExporter, type WorkflowFileExporter } from "./workflow-file-export";
@@ -573,6 +576,8 @@ const CUSTOM_PROVIDERS_FILE = "openbot-custom-providers-v1.json";
 const PROVIDER_CREDENTIAL_FILE = "openbot-provider-credentials-v1.json";
 const MESSAGING_CREDENTIAL_FILE = "openbot-messaging-credentials-v1.json";
 const INGRESS_QUEUE_KEY_FILE = "openbot-ingress-queue-key-v1.json";
+const WATCH_RELAY_KEY_FILE = "openbot-watch-relay-key-v1.json";
+const WATCH_RELAY_WANTED_FILE = "openbot-watch-relay-v1.json";
 const MCP_OAUTH_FILE = "openbot-mcp-oauth-v1.json";
 const MCP_OAUTH_PROXY_FILE = "openbot-mcp-oauth-proxy-v1.json";
 const GITHUB_CONNECTOR_FILE = "openbot-github-connector-v1.json";
@@ -625,6 +630,7 @@ const TEARDOWN_ORDER = {
   routineResults: 84,
   messaging: 85,
   hostEvents: 85.5,
+  watchRelay: 85.75,
   signalIngress: 86,
   host: 90,
   clientBrowser: 98,
@@ -1892,14 +1898,16 @@ export async function createApplicationServices({
   });
   teardown.push(TEARDOWN_ORDER.nearWallet, "the NEAR wallet", () => Effect.runPromise(nearWallet.dispose()));
   const bitwardenCliTarget = runtimeTarget(process.platform, process.arch);
+  const bitwardenDataDirectory = join(app.getPath("userData"), "provider-state", "bitwarden-host");
   const bitwardenConnector = new BitwardenConnectorService({
     host: {
       store: new BitwardenConnectorStore(join(app.getPath("userData"), BITWARDEN_CONNECTOR_FILE), secretCipher),
-      dataDirectory: join(app.getPath("userData"), "provider-state", "bitwarden-host"),
+      dataDirectory: bitwardenDataDirectory,
       installCli: bitwardenCliTarget
         ? (signal) =>
             managedBitwardenCli({
               directory: join(app.getPath("userData"), "provider-state", "bitwarden-cli"),
+              dataDirectory: bitwardenDataDirectory,
               target: bitwardenCliTarget,
               signal,
             })
@@ -2069,7 +2077,7 @@ export async function createApplicationServices({
     await Effect.runPromise(computerUseReads.close());
   });
   const agentsShareDisplay = !hasSeparateAgentDisplay(process.platform);
-  const drawsComputerUseHighlight = agentsShareDisplay && (process.platform !== "linux" || usesX11Windows());
+  const drawsComputerUseHighlight = agentsShareDisplay && (process.platform !== "linux" || x11OverlaysShow());
   const computerUsePermissionHelp = new ComputerUsePermissionHelpWindowController({
     createWindow: () =>
       createComputerUsePermissionHelpWindow(language.translate, () => localeDirection(language.locale)),
@@ -2166,6 +2174,7 @@ export async function createApplicationServices({
     store,
     mailbox,
     browser,
+    usageReportWorkerPath: join(__dirname, "usage-report-worker.js"),
     finishCheck: true,
     cacheExpiryCompaction: () => cacheExpiryCompaction.get().enabled,
     mediaApprovalCredits: () => mediaApprovalCredits.get(),
@@ -2311,7 +2320,6 @@ export async function createApplicationServices({
       mcpToolRuntimes: () => providerRuntimes.mcpToolRuntimes(),
       mcpOAuth,
       mcpOAuthProxySettings,
-      systemProxyFetch: (url, init) => net.fetch(url, { ...init, credentials: "omit", cache: "no-store" }),
       appVersion: app.getVersion(),
       providerStateDirectory: join(app.getPath("userData"), "provider-state"),
       ...(process.platform === "win32" ? { providerTempDirectory } : {}),
@@ -3206,6 +3214,7 @@ export async function createApplicationServices({
     timezone: () => serverTimezone.effective(),
     settings: {
       mcpServers: () => service.listMcpServers(),
+      listedMcpServers: () => catalogPluginServers.filter((server) => server.transport === "http"),
       saveMcpServer: (config) => service.saveMcpServer({ config }),
       customProviders: () => customProviderChanges.list(),
       saveCustomProvider: (input) => customProviderChanges.save(input),
@@ -3333,7 +3342,22 @@ export async function createApplicationServices({
   service.on("event", (event) => {
     if (event.type === "turn-started") accountActivity.turnStarted();
   });
+  let watchCommands: WatchRelayCommands | null = null;
+  const watchRelay = new WatchRelayService({
+    hostId: () => teamStore.getIdentity()?.serverId ?? null,
+    key: loadWatchRelayKey(join(app.getPath("userData"), WATCH_RELAY_KEY_FILE), secretCipher),
+    wanted: createWatchRelayWantedStore(join(app.getPath("userData"), WATCH_RELAY_WANTED_FILE)),
+    ingress: signalIngress,
+    verifyTicket: (ticket) => centralAuth.verifyWatchTicket(ticket),
+    member: (membershipId, role) => {
+      const ownerId = role === "owner" ? teamStore.getOwnerMemberId() : null;
+      return teamStore.getMember(membershipId) ?? (ownerId ? teamStore.getMember(ownerId) : null);
+    },
+    commands: () => watchCommands,
+  });
+  teardown.push(TEARDOWN_ORDER.watchRelay, "the Apple Watch relay", () => Effect.runPromise(watchRelay.dispose()));
   const host = new HostService({
+    watchRelay,
     onMemberUse: (memberId) => accountActivity.memberUsed(memberId),
     appVersion: app.getVersion(),
     store: teamStore,
@@ -3687,6 +3711,9 @@ export async function createApplicationServices({
       }),
   });
   teardown.push(TEARDOWN_ORDER.host, "the local host", () => runCauseEffect(host.shutdown()));
+  watchCommands = new WatchRelayCommands(host.watchTeamApi());
+  signalIngress.handleWatch((delivery) => watchRelay.deliver(delivery));
+  Effect.runFork(watchRelay.start());
   const signedInState = centralAuth.getState();
   if (localServerChild) {
   } else if (signedInState.status === "signed_in") {
@@ -4051,7 +4078,7 @@ export async function createApplicationServices({
       write: (line) => process.stdout.write(line),
     });
   }
-  configureAttachmentProtocol({ mailbox, agents: service, remoteServers });
+  configureAttachmentProtocol({ mailbox, agents: service, remoteServers, attachmentPreviews });
   configureServerLogoProtocols({ teamStore, remoteServers });
   const browserView = new BrowserViewClient({
     servers: remoteServers,

@@ -46,6 +46,7 @@ import { MAIN_THREAD_ID } from "@openbot/ui/features/conversation/threads/thread
 import { UnreadMessagesBanner, UnreadMessagesDivider } from "@openbot/ui/features/conversation/UnreadMessages";
 import { VoicePlayer } from "@openbot/ui/features/conversation/VoicePlayer";
 import { teamMemberName } from "@openbot/ui/features/team/TeamPersonAvatar";
+import { NearPaymentRecordCard } from "@openbot/ui/features/vault/NearPaymentRecordCard";
 import { useText } from "@openbot/ui/text";
 import { createEffect, createMemo, createSignal, For, Loading, onSettled, Show, untrack } from "solid-js";
 import { useShowAgentSteps } from "../../agent-steps-preference";
@@ -119,6 +120,7 @@ function rowDrawsTime(message: AgentMessage): boolean {
     message.kind !== "plan" &&
     message.kind !== "subagents" &&
     message.kind !== "memory-changes" &&
+    message.kind !== "near-payment" &&
     message.kind !== "thinking" &&
     chatVisualReply(message) === null
   );
@@ -709,6 +711,7 @@ export function ConversationTimeline() {
       next.kind === "plan" ||
       next.kind === "subagents" ||
       next.kind === "memory-changes" ||
+      next.kind === "near-payment" ||
       next.kind === "thinking" ||
       shownVisualReply(next, runtime.visualPage)
     )
@@ -1302,6 +1305,56 @@ export function ConversationTimeline() {
                                 subagents={current()}
                                 selectedId={shownSubagentId()}
                                 onOpen={toggleSubagentPanel}
+                              />
+                            )}
+                          </Show>
+                        </article>
+                      </ChatRowBoundary>
+                    </div>
+                  );
+                }
+                if (untrack(() => initialMessage.kind === "near-payment")) {
+                  const nearPayment = () => message()?.nearPayment ?? initialMessage.nearPayment;
+                  return (
+                    <div
+                      data-index={virtualRow.index}
+                      ref={messageVirtualizer.measureElement}
+                      class="virtual-chat-row"
+                      style={{
+                        transform: messageVirtualizer.isVirtualized()
+                          ? `translateY(${virtualRow.start - messageVirtualizer.scrollMargin()}px)`
+                          : "none",
+                      }}
+                    >
+                      <Show when={message()?.id === compactionBefore()}>
+                        <CompactionMarker />
+                      </Show>
+                      <Show when={dayMarker()}>
+                        {(label) => (
+                          <div class="time-marker">
+                            <span>{label()}</span>
+                          </div>
+                        )}
+                      </Show>
+                      <Show when={message()?.id === unreadBoundaryMessageId()}>
+                        <UnreadMessagesDivider
+                          animateIn={unreadDividerArrives}
+                          elementRef={(element) => {
+                            setUnreadMessagesDividerElement(element);
+                            scheduleUnreadDividerVisibilityUpdate();
+                          }}
+                        />
+                      </Show>
+                      <ChatRowBoundary>
+                        <article
+                          data-chat-search-message={message()?.id}
+                          class={{ "message-entry-animated": animateEntrance }}
+                        >
+                          <Show when={nearPayment()}>
+                            {(current) => (
+                              <NearPaymentRecordCard
+                                payment={current()}
+                                onOpenLink={(url) => void openExternalMessageUrl(url)}
                               />
                             )}
                           </Show>

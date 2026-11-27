@@ -7,6 +7,7 @@ import {
   type CustomProviderSummary,
   isManagedRuntimeProvider,
   type ProviderAccountPool,
+  type ProviderAccountPoolStrategy,
   type ProviderRuntimeSnapshot,
   type ProviderRuntimeStatus,
   type ServerSummary,
@@ -174,10 +175,19 @@ function createPoolAccounts() {
     cancel: fn(async () => undefined),
     rename: fn(async () => undefined),
     remove: fn(async () => undefined),
-    setPool: fn(async (_provider: AgentProviderId, enabled: boolean, leftOut: readonly string[]) => {
-      const inUse = accounts.find((account) => !leftOut.includes(account.id))?.id ?? null;
-      setPool(enabled ? { leftOut: [...leftOut], inUse } : undefined);
-    }),
+    setPool: fn(
+      async (
+        _provider: AgentProviderId,
+        enabled: boolean,
+        leftOut: readonly string[],
+        strategy?: ProviderAccountPoolStrategy,
+      ) => {
+        const inUse = accounts.find((account) => !leftOut.includes(account.id))?.id ?? null;
+        const kept = strategy ?? pool()?.strategy;
+        setPool(enabled ? { leftOut: [...leftOut], inUse, ...(kept ? { strategy: kept } : {}) } : undefined);
+      },
+    ),
+    poolStrategy: true,
   };
   const agentStatus = (): AgentStatus => ({
     ...usageResetAgentStatus,

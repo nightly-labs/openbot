@@ -442,6 +442,26 @@ try {
     return { order: loaded.order.length, sections: loaded.sections.length };
   });
 
+  await step("store: a layout made again after a damaged file keeps a revision above what clients saw", async () => {
+    const path = join(root, "reset", "sidebar-layout.json");
+    mkdirSync(join(root, "reset"), { recursive: true });
+    writeFileSync(path, JSON.stringify({ version: 2, revision: 26, sections: "damaged" }));
+    const store = new SidebarLayoutStore(path);
+    await runCauseEffect(store.initialize());
+    const reset = store.getSnapshot();
+    assert.ok(reset.revision > 26, `The new layout went back to revision ${reset.revision}.`);
+    assert.deepEqual(reset.sections, [], "The new layout kept damaged sections.");
+    const restarted = new SidebarLayoutStore(path);
+    await runCauseEffect(restarted.initialize());
+    assert.ok(restarted.getSnapshot().revision >= reset.revision, "A restart lowered the revision.");
+    const changed = await runCauseEffect(restarted.mutate({ type: "create", name: "Work" }, new Set()));
+    assert.ok(changed.revision > reset.revision, "A change did not raise the revision.");
+    const reloaded = new SidebarLayoutStore(path);
+    await runCauseEffect(reloaded.initialize());
+    assert.equal(reloaded.getSnapshot().revision, changed.revision, "A saved layout changed its revision on load.");
+    return { reset: reset.revision, changed: changed.revision };
+  });
+
   host = await startHost();
 
   const setup = await step(

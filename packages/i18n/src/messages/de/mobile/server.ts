@@ -1227,6 +1227,11 @@ export const messages = {
   "mobile.server.providers.pool": "Konten bündeln",
   "mobile.server.providers.poolHint":
     "Agenten nutzen ein Konto, bis es fast ein Nutzungslimit erreicht, dann das Konto, dessen Limit zuerst zurückgesetzt wird.",
+  "mobile.server.providers.poolStrategy": "Konten nutzen",
+  "mobile.server.providers.poolFillFirst": "Erst auffüllen",
+  "mobile.server.providers.poolSpread": "Verteilen",
+  "mobile.server.providers.poolSpreadHint":
+    "Agenten verteilen sich auf die Konten mit der meisten verbleibenden Nutzung. Ein Agent wechselt das Konto nur, wenn ein anderes Konto deutlich mehr Spielraum hat.",
   "mobile.server.providers.accountsPooledHint":
     "Agenten teilen sich diese Konten. Ein neues Konto meldet sich auf seiner Seite auf diesem Telefon an.",
   "mobile.server.providers.accountsPooledOnComputer":

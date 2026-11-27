@@ -453,9 +453,10 @@ A store that a newer version replaced is `Skipped (Android)`, and `/changelog` s
 
 A fix with no native change can go to the phones of a store version with no store review, as an
 over-the-air update: `bun run mobile:ota:publish`. Its notes get a section with a fourth number, such
-as `1.5.0.1`, from `bun run mobile:release:ota`; the store version and `app.json` do not change. The
-steps, the limits and the rollback are in
-[the mobile README](../apps/mobile/README.md#over-the-air-updates).
+as `1.5.0.1`, from `bun run mobile:release:ota`; the store version and `app.json` do not change.
+Merge the notes before the publish, so that the update banner shows them. The steps, the limits and
+the rollback are in [the mobile README](../apps/mobile/README.md#over-the-air-updates). The
+`release-mobile-ota` skill does the full delivery with its checks.
 
 The same step sets that version for the store in `MOBILE_LATEST_VERSIONS` and in the `upTo` of each
 feature in `apps/auth-api/src/server/mobile-features-config.ts`. The merge deploys the account
@@ -684,7 +685,12 @@ stage the user waits on is bounded by a timeout and recorded in `logs/update/upd
 check, download, or restart reports an actionable error and can be retried in place.
 
 The voice runtime (the sherpa-onnx N-API addon and ONNX Runtime, from the pinned `sherpa-onnx-*`
-npm packages) is part of the macOS, Windows and Linux applications, in `voice/runtime`. Each Linux
+npm packages) is part of the macOS, Windows and Linux applications, in `voice/runtime`. The runtime
+also holds the pinned Silero VAD v5 speech detector (`silero_vad_v5.onnx`, 2.3 MB, MIT, notice in
+`NOTICE`), which `scripts/prepare-voice.ts` downloads and checks. Before a Whisper model (local or
+Groq) transcribes a recording, the transcription host runs the detector, and a recording with no
+speech gives an empty text and is not uploaded. When the file is missing, transcription works as
+before. Each Linux
 AppImage carries the runtime of its architecture. The Linux arm64 AppImage ships no remote desktop
 runtime. The NVIDIA Parakeet TDT 0.6B v3 int8 model is not part of an application or update
 artifact. OpenBot downloads its four pinned files on first voice use, checks the size and SHA-256 of
@@ -863,6 +869,42 @@ How the apps use it:
 - A failed check never blocks. A failed request (offline, timeout, error status) keeps the last
   confirmed state. An answer with no readable minimum removes the block.
 - An install that cannot update itself (a Linux package, Nix) shows only the download page.
+
+## Browser extension
+
+Each release tag also releases the Chrome extension. `.github/workflows/release-extension.yml` runs
+on the tag push, builds the zip from the tag, and `scripts/chrome-web-store-release.ts` uploads it to
+the Chrome Web Store and submits it with automatic publish. The store reviews the version, then
+publishes it to all users. Chrome updates each install within a few hours. The extension version is
+the release version.
+
+The workflow does not upload, and the job summary says why, when:
+
+- the package asks for a permission, a host or a match pattern that the public version does not
+  have. Chrome can disable the extension for each user until the user accepts the new warning.
+  Confirm the change, then run the workflow by hand on the tag with `publish` and
+  `allow_new_permissions`;
+- an earlier version is still in review. The next release uploads after the review. To replace the
+  version in review, run the workflow by hand on the tag with `publish` and `replace_pending`;
+- the store already has this version or a newer one, for example after a patch of an older release.
+
+It also stops on a development build, a source map, or a manifest version that is not the tag. A run
+by hand on a branch only builds and checks the zip. The `release-extension-safely` skill audits a
+range for the hazards that the script cannot see: stored state, host capability gates and account
+service routes. Use it on a pull request that changes the extension.
+
+### One-time Chrome Web Store setup
+
+1. In Google Cloud, enable the **Chrome Web Store API** in a project, create a service account with
+   no roles, and create a JSON key for it.
+2. In the Chrome Web Store Developer Dashboard of the "Nightly" publisher, add the service account
+   email in **Account**. A publisher has one service account. Copy the publisher ID from
+   **Publisher > Settings**.
+3. In `nightly-labs/openbot`, create the `chrome-web-store` environment. Limit its deployments to
+   `v*.*.*` tags. Add the secret `CHROME_WEB_STORE_SERVICE_ACCOUNT_KEY` (the JSON key) and the
+   variable `CHROME_WEB_STORE_PUBLISHER_ID`.
+4. In the dashboard, set the distribution and the rollout percentage. The API publishes with the
+   saved settings. After a change of visibility in the dashboard, publish once by hand.
 
 ## Release health after publishing
 

@@ -32,9 +32,20 @@ export function startAgentLog(logsDirectory: string): () => void {
   });
 }
 
+const MAIN_LOG_PREFIXES = [
+  "main",
+  "main-window",
+  "start-recovery",
+  "update",
+  "channel-routing",
+  "signal-ingress",
+  "drain-scheduler",
+  "linux-gpu",
+] as const;
+
 export function startMainLog(logsDirectory: string): void {
   const directory = join(logsDirectory, "main");
-  teeLogLines(["main", "update", "channel-routing", "drain-scheduler", "linux-gpu"], (line) => {
+  teeLogLines(MAIN_LOG_PREFIXES, (line) => {
     const write = Effect.runFork(appendRemoteDiagnosticLog(directory, "main", `${line}\n`));
     mainLogWrites.add(write);
     write.addObserver(() => mainLogWrites.delete(write));

@@ -11,4 +11,6 @@ export const messages = {
   "error.app.remoteIdentityUnavailable": "هوية المضيف البعيد غير متاحة.",
   "error.app.iceServersMissing": "لم يقدّم Remote Signal خوادم ICE بعد.",
   "error.app.finishLocalTest": "أكمل الاختبار المحلي قبل تبديل الشاشات.",
+  "error.app.windowBlockedBySecuritySoftware":
+    "من المحتمل أن برنامج الحماية على هذا الكمبيوتر أوقف نافذة OpenBot. في برنامج الحماية، مثل Kaspersky، أضف OpenBot.exe كتطبيق موثوق. ثم شغّل OpenBot مرة أخرى.",
 } as const satisfies PartialTranslation<typeof source>;

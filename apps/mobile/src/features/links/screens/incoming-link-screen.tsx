@@ -1,6 +1,6 @@
 import { OPENBOT_CONTROL_PLANE_ORIGIN } from "@openbot/contracts/invite-links";
 import { parseMobileConnectUrl } from "@openbot/contracts/mobile-connect";
-import { Redirect, router, Stack, useLocalSearchParams } from "expo-router";
+import { router, Stack, useLocalSearchParams } from "expo-router";
 import { usePreventRemove } from "expo-router/react-navigation";
 import { openBrowserAsync } from "expo-web-browser";
 import { Button, Typography } from "heroui-native";
@@ -39,10 +39,10 @@ function IncomingLinkContent({ request }: { request?: string }) {
   const opened = useRef(false);
   const signedIn = Boolean(session);
   useEffect(() => {
-    if (link.kind !== "template" || !signedIn || opened.current) return;
+    if ((link.kind !== "template" && link.kind !== "invite") || !signedIn || opened.current) return;
     opened.current = true;
     router.dismissTo("/connected");
-    router.push({ pathname: "/install-agent", params: { request } });
+    router.push({ pathname: link.kind === "invite" ? "/add-server" : "/install-agent", params: { request } });
   }, [link.kind, signedIn, request]);
   const locked = useRef(false);
   const mounted = useRef(true);
@@ -56,7 +56,8 @@ function IncomingLinkContent({ request }: { request?: string }) {
   function close() {
     if (locked.current) return;
     forgetIncomingLink(request);
-    router.replace(session ? "/connected" : "/");
+    if (session) router.dismissTo("/connected");
+    else router.replace("/");
   }
 
   async function pair() {
@@ -85,7 +86,7 @@ function IncomingLinkContent({ request }: { request?: string }) {
   }
 
   if (link.kind === "invite") {
-    if (session) return <Redirect href={{ pathname: "/add-server", params: { request } }} />;
+    if (session) return null;
     return (
       <SignInScreen
         notice={{

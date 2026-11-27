@@ -23,8 +23,9 @@ import {
   createBillingDetailsForm,
 } from "../billing/BillingDetailsFields";
 import { formatMinorMoney } from "../billing/money";
-import { CreditIcon } from "./CreditIcon";
+import { CreditEmblem } from "./CreditIcon";
 import { type CreditTarget, CreditTargetLogo } from "./CreditTargetSelect";
+import { creditColorStep } from "./credit-color";
 
 export interface CreditConsent {
   earlyStart: boolean;
@@ -83,6 +84,7 @@ export function PayCreditsDialog(props: PayCreditsDialogProps): JSX.Element {
             as="section"
             class="hosted-upsell-modal credit-confirm-modal"
             data-tier={creditTier(props.stop)}
+            style={{ "--credit-step": creditColorStep(props.stop.index) }}
           >
             <IconButton
               class="credit-confirm-close"
@@ -95,7 +97,7 @@ export function PayCreditsDialog(props: PayCreditsDialogProps): JSX.Element {
             </IconButton>
             <div class="credit-confirm-hero">
               <span class="credit-confirm-badge">
-                <CreditIcon class="credit-confirm-icon" />
+                <CreditEmblem class="credit-confirm-icon" />
               </span>
               <Dialog.Title as="h2" class="hosted-upsell-modal-title">
                 {t("billing.credits.buy")}

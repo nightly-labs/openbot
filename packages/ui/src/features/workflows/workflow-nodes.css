@@ -843,6 +843,19 @@
   white-space: nowrap;
 }
 
+.wfn-asset-drop {
+  display: contents;
+}
+
+.wfn-asset-audio {
+  width: 100%;
+  height: 36px;
+}
+
+.wfn-arriving {
+  pointer-events: none;
+}
+
 .wfn-asset-file {
   display: flex;
   gap: var(--openbot-space-3);
@@ -4050,6 +4063,23 @@ svg.wfn-shape-surface {
   font-weight: var(--openbot-weight-bold);
 }
 
+.wfn-peer-cursor:is([data-flip-x], [data-flip-y]) .wfn-peer-name {
+  position: absolute;
+  top: 17px;
+  left: 8px;
+  margin: 0;
+}
+
+.wfn-peer-cursor[data-flip-x] .wfn-peer-name {
+  right: 11px;
+  left: auto;
+}
+
+.wfn-peer-cursor[data-flip-y] .wfn-peer-name {
+  top: auto;
+  bottom: 22px;
+}
+
 .wfn-slot[data-peer] .wfn-node:not([data-selected]) .wfn-card {
   outline-color: var(--wfn-peer);
 }
@@ -4407,8 +4437,8 @@ svg.wfn-shape-surface {
   min-width: 0;
 }
 
-.wfn-composer-settings:not(:has(> .wfn-composer-length)) > :last-child:nth-child(odd),
-.wfn-composer-settings:has(> .wfn-composer-length) > :last-child:nth-child(even) {
+.wfn-composer-settings > :last-child:nth-child(odd):not(.wfn-composer-length, .wfn-composer-length ~ *),
+.wfn-composer-settings > :last-child:nth-child(even):is(.wfn-composer-length, .wfn-composer-length ~ *) {
   grid-column: 1 / -1;
 }
 

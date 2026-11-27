@@ -42,8 +42,7 @@ import { readMuseAccount } from "./agent/muse-login";
 import { claudeModelName, modelsAfterOpenCodeDiscoveryFailure, serviceTierFields } from "./agent/provider-models";
 import type { TurnContext } from "./agent/turn-context";
 import type { AgentClient } from "./agent-client";
-import { ANTIGRAVITY_TOKEN_FILE, importAntigravityToken } from "./antigravity-token-import";
-import { readAntigravityEmail, readAntigravityQuota, readAntigravityValidationLink } from "./antigravity-usage";
+import { ANTIGRAVITY_TOKEN_FILE, importAntigravityToken, readAntigravityEmail } from "./antigravity-token-import";
 import { CodexAppServerClient } from "./app-server-client";
 import { ClaudeAgentClient } from "./claude-client";
 import {
@@ -86,25 +85,28 @@ import type { McpOAuthAuthority } from "./mcp-oauth-provider";
 import type { McpOAuthProxySettingsStore } from "./mcp-oauth-proxy";
 import type { McpDropReporter, McpEndpointSource, McpServerSource, McpToolRuntimeSource } from "./mcp-provider-shapes";
 import { MuseAgentClient } from "./muse-client";
-import { openCodeAgentDefaultsEnv } from "./opencode-agent-defaults";
+import { openCodeAgentDefaultsEnv, openCodeUserConfigHasMediaSetup } from "./opencode-agent-defaults";
 import {
   CUSTOM_ENDPOINT_SILENCE_MS,
   type CustomProviderSource,
   clearedInheritedOpenCodeKeyEnv,
   customProvidersOn,
-  OPENCODE_AGENT_CONFIG,
+  hasCustomProviderCredentials,
   OPENCODE_GO_PROVIDER,
   OPENCODE_PROFILE_CONFIG,
+  openCodeAgentConfig,
   openCodeConfigEnv,
   openCodeModelName,
   openCodeSignInMessage,
 } from "./opencode-config";
 import {
+  hasOpenCodeMediaSignIn,
   hasOpenCodeProviderKey,
   readOpenCodeGoUsage,
   readOpenCodeRefusalStatus,
   readOpenCodeStoredKey,
 } from "./opencode-usage";
+import { openCodeWindowsShellEnv } from "./opencode-windows-shell";
 import { PiAgentClient } from "./pi-client";
 import {
   antigravityStatePaths,
@@ -173,7 +175,6 @@ export interface ProviderHomeAccountSupport {
   readonly codeSignIn?: { readonly flow: "device" | "paste" | "link"; readonly command: ProviderAccountCodeCommand };
   readonly signOut?: ProviderCliCommand;
   supports?(cli: AgentCliInfo): boolean;
-  readonly usageLeavesSession?: boolean;
   readonly readOwnEmail?: () => Effect.Effect<string | null>;
 }
 
@@ -343,16 +344,18 @@ const ANTIGRAVITY_SIGN_IN: AcpAuthenticateSignIn = {
   timeoutMs: CLI_LOGIN_TIMEOUT_MS,
 };
 
+const ANTIGRAVITY_LINK_ONLY_ENV = { ...ANTIGRAVITY_ENV, SSH_CONNECTION: "127.0.0.1 0 127.0.0.1 0" };
+
 const ANTIGRAVITY_CODE_SIGN_IN: ProviderSignInCommand = {
   argv: () => Effect.succeed([...antigravityArgv({ ...process.env, ...ANTIGRAVITY_ENV }), "--login"]),
-  env: () => ({ ...ANTIGRAVITY_ENV }),
+  env: () => ({ ...ANTIGRAVITY_LINK_ONLY_ENV }),
   timeoutMs: CLI_LOGIN_TIMEOUT_MS,
   pipedInput: true,
 };
 
 const ANTIGRAVITY_ACCOUNT_CODE_SIGN_IN: ProviderAccountCodeCommand = {
   argv: (env) => [...antigravityArgv(env), "--login"],
-  env: () => ({ ...ANTIGRAVITY_ENV }),
+  env: () => ({ ...ANTIGRAVITY_LINK_ONLY_ENV }),
   timeoutMs: CLI_LOGIN_TIMEOUT_MS,
   pipedInput: true,
 };
@@ -466,7 +469,6 @@ export interface ProviderClientContext {
   readonly claudeCompactWindow?: () => number | null;
   readonly codexTurnContext?: TurnContext;
   readonly providerEnvironment?: (provider: ProviderEnvironmentProvider) => Readonly<Record<string, string>>;
-  readonly systemProxyFetch?: (url: string, init: RequestInit) => Promise<Response>;
   readonly fitImage?: ImageFitter | null;
 }
 
@@ -880,17 +882,28 @@ export const BUILT_IN_PROVIDER_DRIVERS: readonly BuiltInProviderDriver[] = [
         ...(confinement ? { confine: (target) => confineSpawnTarget(target, confinement, openCodeStatePaths()) } : {}),
         extraEnv: () => {
           const agentEnvironment = context.agentEnvironment?.();
+          const keyEnv = clearedInheritedOpenCodeKeyEnv(context.apiKey("opencode"));
+          const processEnv = { ...process.env, ...agentEnvironment, ...keyEnv };
+          const mediaSignIn =
+            hasCustomProviderCredentials(openCodeEndpoints(context)()) ||
+            openCodeUserConfigHasMediaSetup(processEnv) ||
+            Effect.runSync(hasOpenCodeMediaSignIn(processEnv));
           return {
             ...agentEnvironment,
             ...opencodeEnv(cli),
+            ...openCodeWindowsShellEnv({ ...process.env, ...cliPathEnvironment(cli), ...agentEnvironment }),
             ...openCodeAgentDefaultsEnv(
               context.providerStateDirectory,
               { ...process.env, ...agentEnvironment },
               cli.version,
               confinement ? "confined" : "provider-asks",
             ),
-            ...openCodeConfigEnv(OPENCODE_AGENT_CONFIG, openCodeEndpoints(context), context.apiKey("opencode")),
-            ...clearedInheritedOpenCodeKeyEnv(context.apiKey("opencode")),
+            ...openCodeConfigEnv(
+              openCodeAgentConfig(mediaSignIn),
+              openCodeEndpoints(context),
+              context.apiKey("opencode"),
+            ),
+            ...keyEnv,
             ...(confinement ? OPENCODE_CONFINED_ENV : {}),
           };
         },
@@ -964,7 +977,6 @@ export const BUILT_IN_PROVIDER_DRIVERS: readonly BuiltInProviderDriver[] = [
       signIn: ANTIGRAVITY_SIGN_IN,
       codeSignIn: { flow: "paste", command: ANTIGRAVITY_ACCOUNT_CODE_SIGN_IN },
       supports: (cli) => antigravityTakesStateFolders(cli.version),
-      usageLeavesSession: true,
       readOwnEmail: () => readAntigravityEmail(join(antigravityAppDataDir(process.env), ANTIGRAVITY_TOKEN_FILE)),
     },
     signOut: {
@@ -999,21 +1011,6 @@ export const BUILT_IN_PROVIDER_DRIVERS: readonly BuiltInProviderDriver[] = [
           antigravityUsesSavedKey(context)
             ? Effect.succeed({ email: null })
             : readAntigravityEmail(antigravityTokenFile(context)).pipe(Effect.map((email) => ({ email }))),
-        readRateLimits: (_connection, model) =>
-          antigravityUsesSavedKey(context)
-            ? Effect.succeed({ rateLimits: null, rateLimitsByLimitId: null })
-            : readAntigravityQuota({
-                tokenFile: antigravityTokenFile(context),
-                model,
-                ...(context.systemProxyFetch ? { fetch: context.systemProxyFetch } : {}),
-              }),
-        readVerificationLink: () =>
-          antigravityUsesSavedKey(context)
-            ? Effect.succeed(null)
-            : readAntigravityValidationLink({
-                tokenFile: antigravityTokenFile(context),
-                fetch: context.systemProxyFetch,
-              }),
       }),
     createProfileClient: (cli, timeout, context) =>
       new AcpAgentClient(cli, timeout, {

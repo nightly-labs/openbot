@@ -97,6 +97,7 @@ export function mockWebRuntimeFor(mock: MockOpenBotControls, events: WebRuntimeE
     },
     stop: (agentId, turnId) => agent.interrupt({ agentId, turnId }),
     setTyping: () => {},
+    setWorkflowSpot: () => {},
     queue: (agentId) => agent.listQueue(agentId),
     activeQueues: async (agentIds) => (await agent.listActiveQueues(agentIds)) ?? { queues: [], omitted: agentIds },
     editQueue: (input) => agent.editQueuedMessage(input),

@@ -6,9 +6,9 @@ import {
   STORAGE_CAPABILITY,
   type TeamRealtimeEvent,
   WORKFLOW_MEDIA_CATALOG_MAX,
+  type WorkflowFileMediaKind,
   type WorkflowFileSaveResult,
   type WorkflowFolderAction,
-  type WorkflowMediaKind,
 } from "@openbot/contracts/ipc";
 import { AGENT_ACCESS_CAPABILITY } from "@openbot/contracts/team-protocol/agent-access-v1";
 import { ATTACHMENT_PREVIEW_CAPABILITY } from "@openbot/contracts/team-protocol/attachment-preview-v1";
@@ -18,6 +18,11 @@ import {
   WORKFLOW_FOLDERS_CAPABILITY,
   WORKFLOW_FOLDERS_ROUTES,
 } from "@openbot/contracts/team-protocol/workflow-folders-v1";
+import {
+  WORKFLOW_PRESENCE_CAPABILITY,
+  WORKFLOW_SPOT_EVENT,
+  type WorkflowSpotInput,
+} from "@openbot/contracts/team-protocol/workflow-presence-v1";
 import { WORKFLOWS_AGENT_FILES_CAPABILITY } from "@openbot/contracts/team-protocol/workflows-agent-files-v1";
 import { WORKFLOWS_ANSWERS_CAPABILITY } from "@openbot/contracts/team-protocol/workflows-answers-v1";
 import { WORKFLOWS_CHANNELS_CAPABILITY } from "@openbot/contracts/team-protocol/workflows-channels-v1";
@@ -47,6 +52,7 @@ import {
   WORKFLOWS_MEDIA_CATALOG_V2_CAPABILITY,
   WORKFLOWS_MEDIA_CATALOG_V2_ROUTES,
 } from "@openbot/contracts/team-protocol/workflows-media-catalog-v2";
+import { WORKFLOWS_MEDIA_CLIPS_CAPABILITY } from "@openbot/contracts/team-protocol/workflows-media-clips-v1";
 import {
   WORKFLOWS_MEDIA_SERVICE_ACCOUNT_CAPABILITY,
   WORKFLOWS_MEDIA_SERVICE_ACCOUNT_ROUTES,
@@ -133,6 +139,7 @@ export interface WebWorkflowHostOptions {
   hostName: () => string | undefined;
   onHostEvent: (listener: (event: AgentEvent | TeamRealtimeEvent) => void) => () => void;
   onReconnect: (listener: () => void) => () => void;
+  setSpot: (input: WorkflowSpotInput) => void;
   githubConnector: GitHubConnectorPort;
   attachmentMedia: AttachmentMediaSource | undefined;
   previewMedia: AttachmentMediaSource | undefined;
@@ -140,15 +147,20 @@ export interface WebWorkflowHostOptions {
   saveFile: (file: { name: string; blob: Blob }) => void;
 }
 
-function mediaSummary(id: string, kind: WorkflowMediaKind): AttachmentSummary {
-  const video = kind === "video";
+const MEDIA_SUMMARY_FILES: Record<WorkflowFileMediaKind, { name: string; mimeType: string }> = {
+  image: { name: "image.png", mimeType: "image/png" },
+  video: { name: "video.mp4", mimeType: "video/mp4" },
+  audio: { name: "audio.mp3", mimeType: "audio/mpeg" },
+};
+
+function mediaSummary(id: string, kind: WorkflowFileMediaKind): AttachmentSummary {
+  const image = kind === "image";
   return {
     id,
-    name: video ? "video.mp4" : "image.png",
-    mimeType: video ? "video/mp4" : "image/png",
+    ...MEDIA_SUMMARY_FILES[kind],
     size: 0,
-    kind: video ? "file" : "image",
-    previewKind: video ? "none" : "image",
+    kind: image ? "image" : "file",
+    previewKind: image ? "image" : "none",
     previewUrl: null,
   };
 }
@@ -159,13 +171,14 @@ export function webWorkflowHost(options: WebWorkflowHostOptions): WorkflowHost {
   const chatsSupported = () => placesSupported() && has(WORKFLOWS_CHATS_CAPABILITY);
   const channelsSupported = () => options.admin() && has(WORKFLOWS_CHANNELS_CAPABILITY);
   const githubSupported = () => has(WORKFLOWS_GITHUB_CAPABILITY);
+  const clipsSupported = () => has(WORKFLOWS_MEDIA_CAPABILITY) && has(WORKFLOWS_MEDIA_CLIPS_CAPABILITY);
   const tooOld = () => new Error(currentText().t("error.workflow.serverTooOld"));
   const [unloaded, setUnloaded] = createSignal<ReadonlySet<string>>(new Set());
   options.onReconnect(() => setUnloaded(new Set()));
   const loaded = (
     media: AttachmentMediaSource,
     attachmentId: string,
-    kind: WorkflowMediaKind,
+    kind: WorkflowFileMediaKind,
     size: "thumbnail" | "generated",
     key: string,
   ) => {
@@ -175,7 +188,7 @@ export function webWorkflowHost(options: WebWorkflowHostOptions): WorkflowHost {
     });
     return media.url(attachmentId);
   };
-  const mediaUrl = (attachmentId: string, kind: WorkflowMediaKind) => {
+  const mediaUrl = (attachmentId: string, kind: WorkflowFileMediaKind) => {
     const media = options.attachmentMedia;
     return media ? loaded(media, attachmentId, kind, "thumbnail", `file:${attachmentId}`) : undefined;
   };
@@ -198,6 +211,10 @@ export function webWorkflowHost(options: WebWorkflowHostOptions): WorkflowHost {
     return post(path, decodeWorkflowFoldersSnapshot, body);
   };
   const folders = () => postFolders(WORKFLOW_FOLDERS_ROUTES.read, {});
+  const presenceSupported = () => has(WORKFLOW_PRESENCE_CAPABILITY);
+  const setSpot = (input: WorkflowSpotInput) => {
+    if (presenceSupported()) options.setSpot(input);
+  };
   const exportFile = async (workflowId: string): Promise<WorkflowFileSaveResult> => {
     if (!has(WORKFLOWS_PORTABLE_CAPABILITY)) throw tooOld();
     const source = await post(WORKFLOWS_PORTABLE_ROUTES.export, decodeRemoteWorkflowFileExport, { workflowId });
@@ -342,6 +359,7 @@ export function webWorkflowHost(options: WebWorkflowHostOptions): WorkflowHost {
             : { credits: null },
       folders,
       folderAction,
+      setSpot: async (input) => setSpot(input),
     },
     onChanged(changed) {
       const events = options.onHostEvent((event) => {
@@ -360,6 +378,12 @@ export function webWorkflowHost(options: WebWorkflowHostOptions): WorkflowHost {
     onFoldersChanged: (changed) =>
       options.onHostEvent((event) => {
         if (event.type === "workflow-folders-changed") changed();
+      }),
+    presenceSupported,
+    setSpot,
+    onSpot: (changed) =>
+      options.onHostEvent((event) => {
+        if (event.type === WORKFLOW_SPOT_EVENT) changed(event);
       }),
     async places() {
       if (!placesSupported()) return [];
@@ -406,17 +430,17 @@ export function webWorkflowHost(options: WebWorkflowHostOptions): WorkflowHost {
     async pictures() {
       if (!has(WORKFLOWS_MEDIA_CAPABILITY) || !has(STORAGE_CAPABILITY)) return [];
       const usage = await run((request) => getStorageUsage(request, { scope: "host" }));
-      return libraryPictures(usage).map((file) => ({ ...file, previewUrl: null }));
+      return libraryPictures(usage, clipsSupported()).map((file) => ({ ...file, previewUrl: null }));
     },
     async uploadPicture(file) {
       if (!has(WORKFLOWS_MEDIA_CAPABILITY)) throw tooOld();
-      checkPicture(file, TEAM_PROTOCOL_V2_MAX_FILE_BYTES);
+      const mimeType = checkPicture(file, TEAM_PROTOCOL_V2_MAX_FILE_BYTES, clipsSupported());
       const bytes = new Uint8Array(await file.arrayBuffer());
       const request = options.request();
       const draft = await runTeamEffect(
         uploadAttachmentDraft(request, {
           name: file.name,
-          mimeType: file.type,
+          mimeType,
           base64: bytesToBase64(bytes),
           maxBytes: TEAM_PROTOCOL_V2_MAX_FILE_BYTES,
         }).pipe(Effect.mapError((error) => error.cause)),
@@ -429,10 +453,11 @@ export function webWorkflowHost(options: WebWorkflowHostOptions): WorkflowHost {
         ).catch(() => undefined);
         throw error;
       });
-      return keptPicture(fileId, file, null);
+      return keptPicture(fileId, file, mimeType, null);
     },
     githubSupported,
     mediaSupported: () => has(WORKFLOWS_MEDIA_CAPABILITY),
+    clipsSupported,
     mediaAccountSupported: () => has(WORKFLOWS_MEDIA_CAPABILITY) && has(WORKFLOWS_MEDIA_ACCOUNT_CAPABILITY),
     mediaTransparentSupported: () => has(WORKFLOWS_MEDIA_CAPABILITY) && has(WORKFLOWS_MEDIA_TRANSPARENT_CAPABILITY),
     mediaSizeSupported: () => has(WORKFLOWS_MEDIA_CAPABILITY) && has(WORKFLOWS_MEDIA_SIZE_CAPABILITY),
@@ -452,6 +477,7 @@ export function webWorkflowHost(options: WebWorkflowHostOptions): WorkflowHost {
     },
     githubConnector: options.githubConnector,
     hostName: options.hostName,
+    remote: () => true,
     openUrl: openWebLink,
   };
 }

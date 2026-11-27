@@ -11,4 +11,6 @@ export const messages = {
   "error.app.remoteIdentityUnavailable": "L’identité de l’hôte distant n’est pas disponible.",
   "error.app.iceServersMissing": "Remote Signal n’a pas encore fourni de serveurs ICE.",
   "error.app.finishLocalTest": "Terminez le test local avant de changer d’écran.",
+  "error.app.windowBlockedBySecuritySoftware":
+    "Un logiciel de sécurité de cet ordinateur a probablement arrêté la fenêtre d’OpenBot. Dans votre logiciel de sécurité, par exemple Kaspersky, ajoutez OpenBot.exe comme application de confiance. Puis redémarrez OpenBot.",
 } as const satisfies PartialTranslation<typeof source>;

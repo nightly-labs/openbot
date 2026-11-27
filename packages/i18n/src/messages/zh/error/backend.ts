@@ -181,6 +181,7 @@ export const messages = {
   "error.backend.videoGenerationFailed": "视频生成失败。",
   "error.backend.videoGenerationNoVideo": "视频生成没有返回视频。",
   "error.backend.videoGenerationInterrupted": "视频生成已中断。",
+  "error.backend.grokVideoNoQuota": "你的 Grok 账号无法生成视频。请改用积分生成视频。",
   "error.backend.attachmentNotRegularFile": "只能附加普通文件：{name}",
   "error.backend.attachmentCopyFailed": "OpenBot 无法复制 {name}。",
   "error.backend.routineNameRequired": "需要填写自动化任务名称。",
@@ -313,6 +314,7 @@ export const messages = {
   "error.backend.mcpServerBlocked": "该电脑阻止了与该服务器的连接。请检查防火墙或安全软件后重试。",
   "error.backend.mcpServerIncompatible":
     "该地址有响应，但不是通过 Streamable HTTP 提供服务的 MCP 服务器。请检查地址，并更新运行该服务器的应用。",
+  "error.backend.mcpServerKeyNotAccepted": "服务器没有接受该 API 密钥。请检查密钥，然后重试。",
   "error.backend.mcpRemoteBridge":
     "{reason} 该命令运行的是 mcp-remote 桥接。请改用 Streamable HTTP 并填写地址 {url}，由 OpenBot 帮你登录。",
   "error.backend.oauthNotHttps": "OAuth 端点 {origin} 不是 https，因此未发送凭据。",

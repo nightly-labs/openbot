@@ -67,6 +67,8 @@ export const messages = {
   "error.workflow.mediaNotMade": "モデルは画像または動画を作成しませんでした。モデルの回答: {answer}",
   "error.workflow.pictureMissing": "画像はサーバーにありません。もう一度送信してください。",
   "error.workflow.pictureType": "PNG、JPEG、WebP の画像を使用してください。",
+  "error.workflow.assetType":
+    "PNG、JPEG、WebP の画像、MP4、MOV の動画、または MP3、M4A、WAV、AAC、OGG、FLAC の音声ファイルを使用してください。",
   "error.workflow.mediaInputMissing": "前のステップの画像を利用できません。そのステップをもう一度実行してください。",
   "error.workflow.mediaEmptyRequest": "説明を書くか、前のステップを実行して、テキストか画像が届くようにしてください。",
   "error.workflow.mediaInputNotImage":

@@ -1297,6 +1297,11 @@ export const messages = {
   "mobile.server.providers.pool": "Объединить аккаунты",
   "mobile.server.providers.poolHint":
     "Агенты используют один аккаунт, пока он не приблизится к лимиту, а затем аккаунт, чей лимит сбросится раньше всех.",
+  "mobile.server.providers.poolStrategy": "Использование аккаунтов",
+  "mobile.server.providers.poolFillFirst": "Сначала заполнять",
+  "mobile.server.providers.poolSpread": "Распределять",
+  "mobile.server.providers.poolSpreadHint":
+    "Агенты распределяются по аккаунтам, у которых осталось больше всего лимита. Агент меняет аккаунт, только когда у другого аккаунта намного больше запаса.",
   "mobile.server.providers.accountsPooledHint":
     "Агенты используют эти аккаунты вместе. Новый аккаунт входит на своей странице на этом телефоне.",
   "mobile.server.providers.accountsPooledOnComputer":

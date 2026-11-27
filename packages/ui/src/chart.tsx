@@ -5,7 +5,7 @@ import { useText } from "./text";
 
 export type { TooltipContentProps } from "solid-recharts";
 
-export { Area, AreaChart, CartesianGrid, XAxis, YAxis } from "solid-recharts";
+export { Area, AreaChart, Bar, BarChart, BarStack, CartesianGrid, XAxis, YAxis } from "solid-recharts";
 
 export function ChartContainer(props: {
   children: ComponentProps<typeof ResponsiveContainer>["children"];
@@ -21,6 +21,7 @@ export const ChartTooltip = Tooltip;
 export function ChartTooltipContent(
   props: Partial<TooltipContentProps> & {
     formatValue: (value: number) => string;
+    formatLabel?: (label: string) => string;
     series?: ((key: string) => { name: string; mark?: JSX.Element }) | undefined;
     total?: boolean;
   },
@@ -34,7 +35,7 @@ export function ChartTooltipContent(
   return (
     <Show when={props.active && props.payload?.length}>
       <div class="ui-chart-tooltip" role="tooltip">
-        <strong>{String(props.label ?? "")}</strong>
+        <strong>{props.formatLabel ? props.formatLabel(String(props.label ?? "")) : String(props.label ?? "")}</strong>
         <For each={rows()}>
           {(row) => (
             <Show when={props.series} fallback={<div>{props.formatValue(row.value)}</div>}>

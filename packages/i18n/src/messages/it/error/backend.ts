@@ -214,6 +214,7 @@ export const messages = {
   "error.backend.videoGenerationFailed": "La generazione del video non è riuscita.",
   "error.backend.videoGenerationNoVideo": "La generazione del video non ha restituito alcun video.",
   "error.backend.videoGenerationInterrupted": "La generazione del video è stata interrotta.",
+  "error.backend.grokVideoNoQuota": "Il tuo account Grok non può creare video. Genera il video con i crediti.",
   "error.backend.attachmentNotRegularFile": "Si possono allegare solo file normali: {name}",
   "error.backend.attachmentCopyFailed": "OpenBot non è riuscito a copiare {name}.",
   "error.backend.routineNameRequired": "Il nome della routine è obbligatorio.",
@@ -368,6 +369,8 @@ export const messages = {
     "Questo computer ha bloccato la connessione al server. Controlla il firewall o il software di sicurezza, poi riprova.",
   "error.backend.mcpServerIncompatible":
     "A questo indirizzo qualcosa ha risposto, ma non come server MCP via Streamable HTTP. Controlla l'URL e aggiorna l'app che esegue il server.",
+  "error.backend.mcpServerKeyNotAccepted":
+    "Il server non ha accettato la chiave API. Controlla la chiave, poi riprova.",
   "error.backend.mcpRemoteBridge":
     "{reason} Questo comando esegue il bridge mcp-remote. Scegli invece Streamable HTTP con l'URL {url} e OpenBot ti fa accedere.",
   "error.backend.oauthNotHttps":

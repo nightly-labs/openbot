@@ -262,6 +262,7 @@ import { MESSAGE_PINS_CAPABILITY } from "@openbot/contracts/team-protocol/messag
 import { MISTRAL_CODE_SIGN_IN_CAPABILITY } from "@openbot/contracts/team-protocol/mistral-code-sign-in-v1";
 import { MODEL_STEERING_CAPABILITY } from "@openbot/contracts/team-protocol/model-steering-v1";
 import { MODEL_VISIBILITY_KEPT_CAPABILITY } from "@openbot/contracts/team-protocol/model-visibility-kept-v1";
+import { TEAM_NEAR_PAYMENT_CAPABILITY, withNearPayments } from "@openbot/contracts/team-protocol/near-payment-v1";
 import { type OptionalTeamEvent, optionalTeamEvent } from "@openbot/contracts/team-protocol/optional-events";
 import { OWNER_TRANSFER_CAPABILITY } from "@openbot/contracts/team-protocol/owner-transfer-v1";
 import {
@@ -271,6 +272,7 @@ import {
 import { PROVIDER_ACCOUNT_CODE_CAPABILITY } from "@openbot/contracts/team-protocol/provider-account-code-v1";
 import { PROVIDER_ACCOUNT_KEYS_CAPABILITY } from "@openbot/contracts/team-protocol/provider-account-keys-v1";
 import { PROVIDER_ACCOUNT_MODELS_CAPABILITY } from "@openbot/contracts/team-protocol/provider-account-models-v1";
+import { PROVIDER_ACCOUNT_POOL_STRATEGY_CAPABILITY } from "@openbot/contracts/team-protocol/provider-account-pool-strategy-v1";
 import { PROVIDER_ACCOUNT_POOL_CAPABILITY } from "@openbot/contracts/team-protocol/provider-account-pool-v1";
 import { PROVIDER_DETECTION_CAPABILITY } from "@openbot/contracts/team-protocol/provider-detection-v1";
 import { PROVIDER_ENVIRONMENT_CAPABILITY } from "@openbot/contracts/team-protocol/provider-environment-v1";
@@ -335,7 +337,14 @@ import { TEAM_OPEN_PROVIDERS_CAPABILITY } from "@openbot/contracts/team-protocol
 import { encodeTeamProtocolV8BaseCurrentEvent } from "@openbot/contracts/team-protocol/v8-base-adapter";
 import { TEAM_PROTOCOL_V10, type TeamProtocolSupportV10 } from "@openbot/contracts/team-protocol/v10";
 import { VOICE_TRANSCRIPTION_CAPABILITY } from "@openbot/contracts/team-protocol/voice-transcription-v1";
+import { WATCH_RELAY_TEAM_CAPABILITY } from "@openbot/contracts/team-protocol/watch-relay-v1";
 import { WHATSAPP_READ_ONLY_CAPABILITY } from "@openbot/contracts/team-protocol/whatsapp-read-only-v1";
+import {
+  WORKFLOW_PRESENCE_CAPABILITY,
+  type WorkflowSpotEvent,
+  type WorkflowSpotInput,
+  workflowSpotControl,
+} from "@openbot/contracts/team-protocol/workflow-presence-v1";
 import { WORKSPACE_ONLY_PROCESS_LIMIT_CAPABILITY } from "@openbot/contracts/team-protocol/workspace-only-process-limit-v1";
 import { isFixedSourceText, sourceText } from "@openbot/i18n/source";
 import { createOpenBotLogger, toLogValue } from "@openbot/logging";
@@ -495,6 +504,7 @@ import {
   routeProviderAccountKeys,
   routeProviderAccountModels,
   routeProviderAccountPool,
+  routeProviderAccountPoolStrategy,
   routeProviderAccounts,
 } from "./team-api/route-provider-accounts";
 import { routeProviderDefault } from "./team-api/route-provider-default";
@@ -529,6 +539,7 @@ import { routeUsageCredits } from "./team-api/route-usage-credits";
 import { routeVault } from "./team-api/route-vault";
 import { routeVaultImport } from "./team-api/route-vault-import";
 import { routeVoiceTranscription } from "./team-api/route-voice-transcription";
+import { routeWatchRelay } from "./team-api/route-watch-relay";
 import { routeWhatsAppConnector } from "./team-api/route-whatsapp-connector";
 import { routeWhatsAppReadOnly } from "./team-api/route-whatsapp-read-only";
 import { routeWhatsAppStatusReactions } from "./team-api/route-whatsapp-status-reactions";
@@ -536,8 +547,10 @@ import { routeWhatsAppWorkingMessage } from "./team-api/route-whatsapp-working-m
 import { routeWorkflowFolders } from "./team-api/route-workflow-folders";
 import { routeWorkflows } from "./team-api/route-workflows";
 import { routeWorkspaceDirectory } from "./team-api/route-workspace-directory";
-import { visibleWorkflowIds } from "./team-api/workflow-visibility";
+import { WorkflowPresenceRelay, type WorkflowPresenceSeat } from "./team-api/workflow-presence-relay";
+import { visibleWorkflowIds, workflowVisibleTo } from "./team-api/workflow-visibility";
 import { TeamStoreError } from "./team-store";
+import type { WatchRelayTeamApi } from "./watch-relay-commands";
 
 const EVENT_PAYLOAD_LIMIT = 256 * 1_024;
 const TYPING_TIMEOUT_MS = 5_000;
@@ -648,6 +661,7 @@ export class TeamApiServer {
   #stopNotificationLevelsListener: (() => void) | null = null;
   #stopSidebarPinsListener: (() => void) | null = null;
   #localTypingAgentId: string | null = null;
+  readonly #workflowPresence: WorkflowPresenceRelay<EventClientState | "local">;
   readonly #reportedUnrepresentableAgents = new Set<string>();
   readonly #representableAgents = new Map<string, Map<string, { json: string; representable: boolean }>>();
   #nextRateLimitSweepAt = 0;
@@ -656,10 +670,37 @@ export class TeamApiServer {
     this.#options = { ...options, sidebarLayout: options.sidebarLayout ?? unavailableSidebarLayout() };
     this.#rateLimitCapacity = options.rateLimitCapacity ?? RATE_LIMIT_CAPACITY;
     this.#now = options.now ?? Date.now;
+    this.#workflowPresence = new WorkflowPresenceRelay(
+      (key, workflowId) => this.#workflowVisibleTo(key, workflowId),
+      options.workflowSpotStaleMs,
+    );
   }
 
   get port(): number | null {
     return this.#port;
+  }
+
+  watchTeamApi(): WatchRelayTeamApi {
+    const { agents, store } = this.#options;
+    const hostHidden = () => this.#options.hiddenAgents?.listHiddenAgents().agents.map((agent) => agent.agentId) ?? [];
+    return {
+      port: () => this.#port,
+      appVersion: () => this.#options.appVersion ?? "0.0.0",
+      serverName: () => store.getIdentity()?.serverName ?? null,
+      agents,
+      layout: () => this.#options.sidebarLayout.getSnapshot(),
+      listChannels: (memberId) => this.#options.channels?.store.list(memberId) ?? [],
+      pins: (memberId, hidden) => this.#options.sidebarPins?.snapshot(memberId, hidden).items ?? [],
+      hiddenAgentIds: (member) =>
+        new Set([
+          ...this.hiddenAgentIds(TEAM_PROTOCOL_V10, new Set(TEAM_CURRENT_CAPABILITIES), member),
+          ...hostHidden(),
+        ]),
+      channelHiddenAgentIds: (member) =>
+        this.hiddenAgentIds(TEAM_PROTOCOL_V10, new Set(TEAM_CURRENT_CAPABILITIES), member),
+      openSession: (input) => store.openRemoteSession(input),
+      closeSession: (sessionId) => store.closeRemoteSession(sessionId),
+    };
   }
 
   start(): Effect.Effect<number, RemoteWorkflowError> {
@@ -793,6 +834,7 @@ export class TeamApiServer {
       client.close(1001, "Server stopped");
     }
     this.#eventClients.clear();
+    this.#workflowPresence.clear();
     this.#pendingLegacyConversationReads.clear();
     this.#localTypingAgentId = null;
     const { remoteScreen, browserView } = this.#options;
@@ -1069,6 +1111,26 @@ export class TeamApiServer {
     this.#publishDirectTyping(senderMemberId, recipientMemberId, typing);
   }
 
+  setLocalWorkflowSpot(memberId: string, input: WorkflowSpotInput): void {
+    const onWorkflowSpot = this.#options.onWorkflowSpot;
+    if (!this.#options.workflows || !onWorkflowSpot) return;
+    this.#workflowPresence.update("local", { memberId, deliver: onWorkflowSpot }, input);
+  }
+
+  async #workflowVisibleTo(key: EventClientState | "local", workflowId: string): Promise<boolean> {
+    const workflows = this.#options.workflows;
+    if (!workflows) return false;
+    if (key === "local") return true;
+    const member = this.#connectionMember(key);
+    const protocol = eventProtocol(key.capabilities);
+    const viewer = {
+      admin: canAdministerServer(member.role),
+      protocol,
+      hiddenAgentIds: this.hiddenAgentIds(protocol, key.capabilities, member),
+    };
+    return workflowVisibleTo(viewer, workflows, this.#options.agents, workflowId);
+  }
+
   async #handle(request: IncomingMessage, response: ServerResponse) {
     const method = request.method ?? "GET";
     this.#responseRoutes.set(response, {
@@ -1258,6 +1320,7 @@ export class TeamApiServer {
       if ((await routeProviderAccounts(context, this.#options.providerAccounts)) === "handled") return;
       if ((await routeProviderAccountModels(context, this.#options.providerAccounts)) === "handled") return;
       if ((await routeProviderAccountPool(context, this.#options.providerAccounts)) === "handled") return;
+      if ((await routeProviderAccountPoolStrategy(context, this.#options.providerAccounts)) === "handled") return;
       if ((await routeLiveVoiceAccount(context, this.#options.providerAccounts)) === "handled") return;
       if ((await routeProviderAccountKeys(context, this.#options.providerAccounts)) === "handled") return;
       if ((await routeProviderAccountCode(context, this.#options.providerAccounts)) === "handled") return;
@@ -1481,6 +1544,7 @@ export class TeamApiServer {
       )
         return;
       if ((await routePushNotifications(context, this.#options.pushNotifications)) === "handled") return;
+      if ((await routeWatchRelay(context, this.#options.watchRelay)) === "handled") return;
       if ((await routeComputerActivity(context, this.#options.pushNotifications)) === "handled") return;
       if (
         (await routeFocusUse(context, this.#options.focusUse ? (id) => this.#recordFocusUse(id) : undefined)) ===
@@ -1692,9 +1756,12 @@ export class TeamApiServer {
       const withLocation = capabilities.has(TEAM_UI_BLOCK_LOCATION_CAPABILITY)
         ? withUiBlockLocationRequests(withVault, visible)
         : withVault;
-      const withSkills = capabilities.has(SKILL_LEARNING_CAPABILITY)
-        ? withSkillSuggestionNames(withLocation, visible)
+      const withPayments = capabilities.has(TEAM_NEAR_PAYMENT_CAPABILITY)
+        ? withNearPayments(withLocation, visible)
         : withLocation;
+      const withSkills = capabilities.has(SKILL_LEARNING_CAPABILITY)
+        ? withSkillSuggestionNames(withPayments, visible)
+        : withPayments;
       return capabilities.has(TEAM_PROMPT_DETAIL_CAPABILITY)
         ? withPromptQuestionDetails(withSkills, visible)
         : withSkills;
@@ -1708,7 +1775,9 @@ export class TeamApiServer {
       if (event.type === "agents-changed") {
         this.#broadcastAgentColors();
         this.#broadcastChatColors();
+        this.#workflowPresence.recheck();
       }
+      if (event.type === "workflows-changed") this.#workflowPresence.recheck(event.workflowId);
       return;
     }
 
@@ -1993,7 +2062,7 @@ export class TeamApiServer {
           !connection.capabilities.has("hosted-site-event-markers") ||
           event.snapshot.messages.some((message) => !markerSupported(message.itemType, connection.capabilities)))
       ) {
-        const key = `${blockedKey}:${protocol}:${connection.capabilities.has("opencode")}:${connection.capabilities.has("routine-event-markers")}:${connection.capabilities.has("routine-run-event-markers")}:${connection.capabilities.has("hosted-site-event-markers")}:${connection.capabilities.has(SETTING_LINK_MARKERS_CAPABILITY)}:${connection.capabilities.has(ROUTINE_QUIET_ANSWERS_CAPABILITY)}:${connection.capabilities.has(TEAM_PROMPT_MULTI_SELECT_CAPABILITY)}:${connection.capabilities.has(TEAM_UI_BLOCK_AUTO_ANSWER_CAPABILITY)}:${connection.capabilities.has(TEAM_UI_BLOCK_VAULT_CAPABILITY)}:${connection.capabilities.has(TEAM_UI_BLOCK_LOCATION_CAPABILITY)}:${connection.capabilities.has(SKILL_LEARNING_CAPABILITY)}:${connection.capabilities.has(TEAM_PROMPT_DETAIL_CAPABILITY)}:${encodingOptions.preserveSemanticTags}`;
+        const key = `${blockedKey}:${protocol}:${connection.capabilities.has("opencode")}:${connection.capabilities.has("routine-event-markers")}:${connection.capabilities.has("routine-run-event-markers")}:${connection.capabilities.has("hosted-site-event-markers")}:${connection.capabilities.has(SETTING_LINK_MARKERS_CAPABILITY)}:${connection.capabilities.has(ROUTINE_QUIET_ANSWERS_CAPABILITY)}:${connection.capabilities.has(TEAM_PROMPT_MULTI_SELECT_CAPABILITY)}:${connection.capabilities.has(TEAM_UI_BLOCK_AUTO_ANSWER_CAPABILITY)}:${connection.capabilities.has(TEAM_UI_BLOCK_VAULT_CAPABILITY)}:${connection.capabilities.has(TEAM_UI_BLOCK_LOCATION_CAPABILITY)}:${connection.capabilities.has(TEAM_NEAR_PAYMENT_CAPABILITY)}:${connection.capabilities.has(SKILL_LEARNING_CAPABILITY)}:${connection.capabilities.has(TEAM_PROMPT_DETAIL_CAPABILITY)}:${encodingOptions.preserveSemanticTags}`;
         let filtered = filteredConversationPayloads.get(key);
         if (!filtered) {
           filtered = encodeEvent(
@@ -2203,6 +2272,12 @@ export class TeamApiServer {
       chatColorsSent: null,
     };
     this.#eventClients.set(client, connection);
+    const presenceSeat: WorkflowPresenceSeat = {
+      memberId,
+      deliver: (event: WorkflowSpotEvent) => {
+        if (client.readyState === webSockets.WebSocket.OPEN) client.send(JSON.stringify(event));
+      },
+    };
     client.on("error", () => {});
     if (connection.capabilities.has("agent-runtime-snapshots")) {
       this.#sendRuntimeSnapshot(client, connection, false);
@@ -2219,7 +2294,15 @@ export class TeamApiServer {
             ? Buffer.concat(data).toString("utf8")
             : Buffer.from(data).toString("utf8");
         if (text.length > EVENT_PAYLOAD_LIMIT) throw new Error("Event payload is too large.");
-        const event = decodeTeamProtocolV1CurrentClientEvent(JSON.parse(text));
+        const parsed = JSON.parse(text);
+        const spot = workflowSpotControl(parsed);
+        if (spot) {
+          if (!connection.capabilities.has(WORKFLOW_PRESENCE_CAPABILITY) || !this.#options.workflows)
+            throw new Error("Workflow presence is not enabled for this client.");
+          this.#workflowPresence.update(connection, presenceSeat, spot);
+          return;
+        }
+        const event = decodeTeamProtocolV1CurrentClientEvent(parsed);
         if (event.type === "runtime-snapshot-request" && connection.capabilities.has("agent-runtime-snapshots")) {
           this.#sendRuntimeSnapshot(client, connection, true);
           return;
@@ -2293,6 +2376,7 @@ export class TeamApiServer {
       const directTypingRecipientId = connection.directTypingRecipientId;
       connection.directTypingRecipientId = null;
       this.#eventClients.delete(client);
+      this.#workflowPresence.leave(connection);
       if (sessionId && ![...this.#eventClients.values()].some((other) => other.sessionId === sessionId)) {
         this.#options.liveActivityPush?.disconnected(sessionId);
         this.#options.pushNotifications?.disconnected(sessionId);
@@ -2580,9 +2664,12 @@ export class TeamApiServer {
     const withLocation = route.capabilities.has(TEAM_UI_BLOCK_LOCATION_CAPABILITY)
       ? withUiBlockLocationRequests(withVault, effortValue)
       : withVault;
-    const withSkills = route.capabilities.has(SKILL_LEARNING_CAPABILITY)
-      ? withSkillSuggestionNames(withLocation, effortValue)
+    const withPayments = route.capabilities.has(TEAM_NEAR_PAYMENT_CAPABILITY)
+      ? withNearPayments(withLocation, effortValue)
       : withLocation;
+    const withSkills = route.capabilities.has(SKILL_LEARNING_CAPABILITY)
+      ? withSkillSuggestionNames(withPayments, effortValue)
+      : withPayments;
     const body = route.capabilities.has(TEAM_PROMPT_DETAIL_CAPABILITY)
       ? withPromptQuestionDetails(withSkills, effortValue)
       : withSkills;
@@ -2726,6 +2813,7 @@ export class TeamApiServer {
     const revision = this.#options.agentAccess.get(serverId).revision;
     this.#broadcastAgentEventToClients({ type: "agent-access-changed", revision });
     this.#broadcastAgentEventToClients({ type: "agents-changed", agents: this.#options.agents.listAgents() });
+    this.#workflowPresence.recheck();
     for (const [client, connection] of this.#eventClients)
       if (connection.capabilities.has("agent-runtime-snapshots")) this.#sendRuntimeSnapshot(client, connection, false);
     this.#publishPresence();
@@ -2844,6 +2932,8 @@ export class TeamApiServer {
         if (capability === PROVIDER_ACCOUNTS_CAPABILITY) return this.#options.providerAccounts !== undefined;
         if (capability === PROVIDER_ACCOUNT_MODELS_CAPABILITY) return this.#options.providerAccounts !== undefined;
         if (capability === PROVIDER_ACCOUNT_POOL_CAPABILITY) return this.#options.providerAccounts !== undefined;
+        if (capability === PROVIDER_ACCOUNT_POOL_STRATEGY_CAPABILITY)
+          return this.#options.providerAccounts !== undefined;
         if (capability === LIVE_VOICE_ACCOUNT_CAPABILITY)
           return this.#options.providerAccounts !== undefined && this.#options.liveVoice !== undefined;
         if (capability === PROVIDER_ACCOUNT_KEYS_CAPABILITY) return this.#options.providerAccounts !== undefined;
@@ -2994,6 +3084,7 @@ export class TeamApiServer {
         if (capability === ROUTINE_FLOWS_CAPABILITY) return this.#options.routineFlows !== undefined;
         if (capability === ROUTINE_FLOW_STOP_CAPABILITY) return this.#options.routineFlows !== undefined;
         if (capability === WORKFLOWS_CAPABILITY) return this.#options.workflows !== undefined;
+        if (capability === WORKFLOW_PRESENCE_CAPABILITY) return this.#options.workflows !== undefined;
         if (capability === WORKFLOW_FOLDERS_CAPABILITY)
           return this.#options.workflows !== undefined && this.#options.workflowFolders !== undefined;
         if (capability === CRM_CAPABILITY) return this.#options.crm !== undefined;
@@ -3027,6 +3118,7 @@ export class TeamApiServer {
         if (capability === AGENT_NOTIFICATION_LEVELS_CAPABILITY)
           return this.#options.agentNotificationLevels !== undefined;
         if (capability === SIDEBAR_PINS_CAPABILITY) return this.#options.sidebarPins !== undefined;
+        if (capability === WATCH_RELAY_TEAM_CAPABILITY) return this.#options.watchRelay?.available() === true;
         return true;
       },
     );
@@ -3185,6 +3277,7 @@ const EVENT_ENCODING_CAPABILITIES = [
   TEAM_UI_BLOCK_AUTO_ANSWER_CAPABILITY,
   TEAM_UI_BLOCK_VAULT_CAPABILITY,
   TEAM_UI_BLOCK_LOCATION_CAPABILITY,
+  TEAM_NEAR_PAYMENT_CAPABILITY,
   SKILL_LEARNING_CAPABILITY,
   TEAM_PROMPT_DETAIL_CAPABILITY,
   QUEUE_HOLD_CAPABILITY,

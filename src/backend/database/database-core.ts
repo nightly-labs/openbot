@@ -62,6 +62,8 @@ export class DatabaseCore {
           db.exec("PRAGMA foreign_keys = ON");
           db.exec("PRAGMA busy_timeout = 5000");
           db.exec("PRAGMA synchronous = NORMAL");
+          db.exec("PRAGMA cache_size = -65536");
+          db.exec("PRAGMA wal_autocheckpoint = 2000");
           db.function(COLLAPSE_WHITESPACE_FUNCTION, { deterministic: true }, (value) =>
             typeof value === "string" ? value.replace(/\s+/gu, " ") : value,
           );
