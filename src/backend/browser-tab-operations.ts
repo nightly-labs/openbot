@@ -514,9 +514,11 @@ export const runTabAction = Effect.fn("BrowserTab.action")(
               action,
               ...(target ? { target: describeBrowserTarget(target) } : {}),
               outcome: "success",
-              ...(Date.now() >= deadline
-                ? { detail: "Action completed; page settling exceeded the requested timeout." }
-                : {}),
+              ...(pageKeepsLoading
+                ? { detail: "Action completed; the page arrived and still loads after the requested timeout." }
+                : Date.now() >= deadline
+                  ? { detail: "Action completed; page settling exceeded the requested timeout." }
+                  : {}),
             });
             actionRecorded = true;
             return yield* readResult(tab, keepQueueBlocked, timeoutMessage);
