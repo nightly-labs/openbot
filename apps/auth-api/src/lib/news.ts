@@ -26,6 +26,7 @@ export const NEWS_COLLECTION: ContentCollection<"news"> = {
   backLabel: "All news",
   moreTitle: "More from OpenBot",
   imageEyebrow: "OPENBOT · NEWS",
+  imageWordmark: true,
   articles: publishedFirst([
     {
       slug: "introducing-openbot",

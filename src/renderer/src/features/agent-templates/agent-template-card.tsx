@@ -12,7 +12,7 @@ import { loadImage, loadSvg, withAlpha } from "../../avatar-canvas";
  * or the photo the owner uploaded. The Worker only checks its size and stores it.
  *
  * Layout, on the app's dark canvas: a hero square on the left in the avatar's own colour with the
- * avatar in it, and on the right the OpenBot mark, the name, the role, the instructions, and the
+ * avatar in it, and on the right the "openbot." wordmark, the name, the role, the instructions, and the
  * "Add to OpenBot" pill the page carries.
  */
 
@@ -28,7 +28,7 @@ export async function renderAgentTemplateCard(preview: AgentTemplatePreview): Pr
   canvas.height = HEIGHT;
   const context = canvas.getContext("2d");
   if (!context) throw new Error("The share card cannot be drawn.");
-  await Promise.all([document.fonts.load(`700 64px ${FONT}`), document.fonts.load(`500 26px ${FONT}`)]);
+  await Promise.all([document.fonts.load(`800 64px ${FONT}`), document.fonts.load(`500 26px ${FONT}`)]);
 
   const colors = themeColors();
   context.fillStyle = colors.canvas;
@@ -124,20 +124,22 @@ async function drawColumn(
   const { x, width } = COLUMN;
   context.textBaseline = "alphabetic";
 
-  // The brand row: the mark and the wordmark.
-  await drawLogo(context, x, 92, 44, colors);
+  // The brand row: the "openbot." wordmark of the site's social cards.
   context.fillStyle = colors.primary;
-  context.font = `600 28px ${FONT}`;
-  context.fillText("OpenBot", x + 58, 124);
+  context.font = `700 34px ${FONT}`;
+  context.fillText("openbot.", x, 124);
 
-  // `y` is always the baseline of the last line drawn.
+  // `y` is always the baseline of the last line drawn. The name is set heavy and tight, like the
+  // headlines of the site's social cards.
   let y = 154;
-  context.font = `700 60px ${FONT}`;
+  context.font = `800 60px ${FONT}`;
+  context.letterSpacing = "-2px";
   context.fillStyle = colors.primary;
   for (const line of wrapLines(context, preview.name, width, 2)) {
     y += 68;
     context.fillText(line, x, y);
   }
+  context.letterSpacing = "0px";
   if (preview.title) {
     y += 58;
     context.font = `500 28px ${FONT}`;
