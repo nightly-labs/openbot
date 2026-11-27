@@ -877,13 +877,13 @@ async function answeredBeforeProviderLimit() {
   );
   runningJobs.set(jobId, true);
   const lateText = await Effect.runPromise(Deferred.await(late));
-  const lateData = toolData(lateText);
+  const file = shown[0] ? savedPath(shown[0]) : "";
   check(
-    "the slow job shows in the chat once, and its late result gives the agent the saved file",
+    "the slow job shows in the chat once, and its late result is plain text that gives the agent the saved file",
     shown.length === 1 &&
       shown[0]?.itemType === "video_generation" &&
-      lateData?.status === "shown" &&
-      lateData.file === savedPath(shown[0]) &&
+      lateText ===
+        `${sourceText("status.agent.creditVideoLateShown")} ${sourceText("status.agent.creditMediaLateFile", { file })}` &&
       submits.length === before + 1,
     { lateText, shown: shown.map((item) => item.name), submits: submits.length - before },
   );

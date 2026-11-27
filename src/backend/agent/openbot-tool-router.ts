@@ -3065,11 +3065,7 @@ export class OpenBotToolRouter {
       requesters: this.#turnRequesters(agentId, params.turnId),
       ...(sendLate && request.answerBeforeMs !== undefined
         ? {
-            answerBefore: {
-              at: calledAt + request.answerBeforeMs,
-              late: (result: string) =>
-                sendLate(sourceText("status.agent.creditMediaLate", { tool: params.tool, result })),
-            },
+            answerBefore: { at: calledAt + request.answerBeforeMs, late: sendLate },
           }
         : {}),
       show: (media: CreditMediaShown) =>

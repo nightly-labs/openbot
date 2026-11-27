@@ -41,7 +41,10 @@ export const messages = defineMessages("status.agent", {
   "status.agent.creditVideoApproval": "Generate a video with {model}. This uses {credits} credits.",
   "status.agent.creditMediaChannel":
     "The result shows in the channel {channel}, and each member of this server who reads the channel can see it.",
-  "status.agent.creditMediaLate": "The {tool} call that you started has finished. Its result: {result}",
+  "status.agent.creditVideoLateShown": "The video that you started is ready, and it shows in the chat.",
+  "status.agent.creditImageLateShown": "The image that you started is ready, and it shows in the chat.",
+  "status.agent.creditMediaLateFile": "Its file is {file}",
+  "status.agent.creditMediaLateFailed": "The video or image that you started was not made. {reason}",
   "status.agent.creditsHoldBalance": "This uses {credits} credits, and the balance is {balance} credits.",
   "status.agent.creditsHoldAgentsOff": "Agents on this server cannot use credits.",
   "status.agent.screenCapturePermissionNext": "macOS can then ask you to allow Screen Recording for OpenBot.",

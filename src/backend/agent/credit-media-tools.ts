@@ -132,7 +132,7 @@ export interface CreditMediaToolCall {
 
 export interface CreditMediaAnswerBefore {
   at: number;
-  late: (result: string) => void;
+  late: (text: string) => void;
 }
 
 export interface CreditAsksPerson {
@@ -231,8 +231,31 @@ const failure = (message: string) => openBotToolFailure(message);
 const STILL_MAKING_NOTE =
   "It is still being made. It shows in the chat when it is ready, and its result arrives as the user's next message. Do not call the tool again for it. End your turn unless other work does not need it.";
 
-function resultText(result: DynamicToolResult): string {
-  return result.contentItems.flatMap((item) => (item.type === "inputText" ? [item.text] : [])).join("\n");
+const lateResultSchema = z.object({ file: z.string().optional(), error: z.string().optional() });
+
+function lateResult(result: DynamicToolResult) {
+  const first = result.contentItems[0];
+  if (first?.type !== "inputText") return {};
+  try {
+    const parsed = lateResultSchema.safeParse(JSON.parse(first.text));
+    return parsed.success ? parsed.data : {};
+  } catch {
+    return {};
+  }
+}
+
+function lateText(kind: CreditMediaGenerationKind, result: DynamicToolResult): string {
+  const data = lateResult(result);
+  if (!result.success)
+    return sourceText("status.agent.creditMediaLateFailed", {
+      reason: data.error ?? sourceText("error.agent.creditMediaNotSaved"),
+    });
+  const shown = sourceText(
+    kind === "image" ? "status.agent.creditImageLateShown" : "status.agent.creditVideoLateShown",
+  );
+  return data.file !== undefined
+    ? `${shown} ${sourceText("status.agent.creditMediaLateFile", { file: data.file })}`
+    : shown;
 }
 
 interface Blocked {
@@ -733,7 +756,7 @@ export class CreditMediaTools {
     const early = yield* Fiber.join(delivery).pipe(Effect.timeoutOption(Math.max(0, answerBefore.at - Date.now())));
     if (Option.isSome(early)) return early.value;
     yield* Fiber.join(delivery).pipe(
-      Effect.flatMap((result) => Effect.sync(() => answerBefore.late(resultText(result)))),
+      Effect.flatMap((result) => Effect.sync(() => answerBefore.late(lateText(run.facts.kind, result)))),
       Effect.ignore,
       Effect.forkIn(this.#options.scope(), { startImmediately: true }),
     );
