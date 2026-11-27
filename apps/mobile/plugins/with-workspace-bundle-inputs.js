@@ -1,5 +1,5 @@
 const { existsSync, readFileSync, realpathSync } = require("node:fs");
-const { dirname, join, relative } = require("node:path");
+const { dirname, join, relative, sep } = require("node:path");
 const { withAppBuildGradle } = require("expo/config-plugins");
 
 // The React Native Gradle task that makes the release JS bundle only checks the sources under
@@ -45,7 +45,7 @@ module.exports = (config) =>
     if (config.modResults.contents.includes(MARKER)) return config;
     const { projectRoot, platformProjectRoot } = config.modRequest;
     const dirs = workspaceSources(projectRoot)
-      .map((dir) => `    "${relative(platformProjectRoot, dir)}",`)
+      .map((dir) => `    "${relative(platformProjectRoot, dir).split(sep).join("/")}",`)
       .join("\n");
     config.modResults.contents += `
 ${MARKER}
