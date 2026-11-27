@@ -313,6 +313,7 @@ let server: TeamApiServer | null = null;
 let agents: AgentService | null = null;
 let workflows: WorkflowsHandle | null = null;
 let crm: CrmHandle | null = null;
+let crmCustomerReads = 0;
 let port = 0;
 
 type Received = { type: string; sync: SyncServerMessage | null };
@@ -729,7 +730,13 @@ try {
       ...workflows,
       rotateWorkflowSecret: () => Effect.die(new Error("No webhook secret rotates in this check.")),
     },
-    crm,
+    crm: {
+      ...crm,
+      customers: (input) => {
+        crmCustomerReads += 1;
+        return crm?.customers(input) ?? Effect.die(new Error("The CRM is closed."));
+      },
+    },
   });
   port = await Effect.runPromise(server.start());
   const ownerToken = await login(OWNER);
@@ -1311,6 +1318,27 @@ try {
       await unavailable(member, CUSTOMERS);
       await Promise.all([owner.close(), member.close()]);
       return { customerId, eventAt };
+    },
+  );
+
+  await step(
+    "agents: a rename that keeps the agent set refreshes only the agent rows, not the CRM customers",
+    async () => {
+      const owner = await openSync(ownerToken, SYNC_CAPABILITIES);
+      const readsBefore = crmCustomerReads;
+      await subscribe(owner, CRM_CUSTOMERS_SYNC_COLLECTION.name);
+      await subscribe(owner, AGENTS);
+      const subscribeReads = crmCustomerReads - readsBefore;
+      assert.ok(subscribeReads > 0, "The subscribe did not read the CRM customers.");
+      const renameFrom = crmCustomerReads;
+      await ok("PATCH", TEAM_API_ROUTES.agent.one(visibleAgent.id), ownerToken, { name: "Visible again" });
+      const pushed = await owner.settled(AGENTS);
+      assert.equal(record(pushed.upserts.get(visibleAgent.id)?.value, "agent").name, "Visible again");
+      await owner.settled(CRM_CUSTOMERS_SYNC_COLLECTION.name);
+      const renameReads = crmCustomerReads - renameFrom;
+      assert.equal(renameReads, 0, "An agent rename read the CRM customers again.");
+      await owner.close();
+      return { subscribeReads, renameReads };
     },
   );
 

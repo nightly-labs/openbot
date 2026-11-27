@@ -685,6 +685,7 @@ export class TeamApiServer {
     (error) => (this.#options.logger ?? logger).warn("Team sync could not read a collection:", toLogValue(error)),
   );
   #syncAgentsLoaded = false;
+  #syncAgentShape: string | null = null;
   readonly #pendingLegacyConversationReads = new Map<string, PendingLegacyConversationRead>();
   #legacyConversationScope = Scope.makeUnsafe();
   #hostRestart: HostRestartEvent = { type: HOST_RESTART_EVENT, state: "none", version: null };
@@ -2941,7 +2942,7 @@ export class TeamApiServer {
   }
 
   #signalSync(event: AgentEvent): void {
-    const changes = syncChanges(event);
+    const changes = event.type === "agents-changed" ? this.#agentsSyncChanges(event.agents) : syncChanges(event);
     if (!changes.length) return;
     for (const change of changes) {
       if (change === "all") this.#sync.changedAll();
@@ -2964,6 +2965,13 @@ export class TeamApiServer {
         value,
       ),
     );
+  }
+
+  #agentsSyncChanges(agents: readonly Pick<AgentSummary, "id" | "threadId" | "hiddenAt">[]): readonly SyncChange[] {
+    const shape = agentSyncShape(agents);
+    const unchanged = shape === this.#syncAgentShape;
+    this.#syncAgentShape = shape;
+    return unchanged ? [{ name: AGENTS_SYNC_COLLECTION.name }] : ["all"];
   }
 
   #signalSyncLog(event: AgentEvent): void {
@@ -3477,9 +3485,13 @@ function agentRowSyncChange(agentId: string): SyncChange {
   return { name: AGENTS_SYNC_COLLECTION.name, keys: [agentId] };
 }
 
+function agentSyncShape(agents: readonly Pick<AgentSummary, "id" | "threadId" | "hiddenAt">[]): string {
+  const rows = agents.map((agent) => JSON.stringify([agent.id, agent.threadId, agent.hiddenAt ?? null]));
+  return JSON.stringify(rows.sort());
+}
+
 function syncChanges(event: AgentEvent): readonly SyncChange[] {
   switch (event.type) {
-    case "agents-changed":
     case "agent-access-changed":
     case "hidden-agents-changed":
       return ["all"];
