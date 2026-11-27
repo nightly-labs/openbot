@@ -5,7 +5,7 @@ import { join, resolve } from "node:path";
 import { DatabaseSync } from "node:sqlite";
 import { Effect } from "effect";
 import { D1AuthRepository } from "../src/server/d1-auth-repository";
-import { observedD1, withD1ReplicaReads } from "../src/server/observed-d1";
+import { observedD1 } from "../src/server/observed-d1";
 import { sqliteD1 } from "./sqlite-d1";
 
 const ROOT = resolve(import.meta.dirname, "../../..");
@@ -81,44 +81,42 @@ async function main() {
   const counts: ReplicaCounts = { replica: 0, primary: 0 };
   const repository = new D1AuthRepository(observedD1(laggingReplicaD1(primary, replica, counts)));
 
-  const outside = await Effect.runPromise(repository.authenticate("old-token", NOW));
+  const other = await observedD1(laggingReplicaD1(primary, replica, counts))
+    .prepare("SELECT name FROM users WHERE id = 'user'")
+    .first<{ name: string }>();
   check(
-    "a request with no replica scope reads the primary only",
-    outside?.name === "New name" && counts.replica === 0,
+    "a query outside the session lookup reads the primary only",
+    other?.name === "New name" && counts.replica === 0,
     {
-      name: outside?.name ?? null,
+      name: other?.name ?? null,
       counts: { ...counts },
     },
   );
 
-  const replicaRead = await withD1ReplicaReads(() =>
-    Effect.runPromise(repository.authenticateDesktopSession("old-token", AFTER_ACTIVITY_INTERVAL)),
+  const replicaRead = await Effect.runPromise(
+    repository.authenticateDesktopSession("old-token", AFTER_ACTIVITY_INTERVAL),
   );
   check(
-    "a request in the replica scope reads the replica through the Effect runtime",
+    "a session lookup reads the replica through the Effect runtime",
     replicaRead?.name === "Old name" && counts.replica === 1,
     { name: replicaRead?.name ?? null, counts: { ...counts } },
   );
 
   const primaryBefore = counts.primary;
-  const newSession = await withD1ReplicaReads(() =>
-    Effect.runPromise(repository.authenticate("new-token", AFTER_ACTIVITY_INTERVAL + 20_000)),
-  );
+  const newSession = await Effect.runPromise(repository.authenticate("new-token", AFTER_ACTIVITY_INTERVAL + 20_000));
   check(
     "a session that the replica does not have yet is read from the primary, so a new sign-in is not refused",
     newSession?.id === "user" && counts.replica === 2 && counts.primary > primaryBefore,
     { user: newSession?.id ?? null, counts: { ...counts } },
   );
 
-  const missing = await withD1ReplicaReads(() =>
-    Effect.runPromise(repository.authenticate("no-token", AFTER_ACTIVITY_INTERVAL + 40_000)),
-  );
+  const missing = await Effect.runPromise(repository.authenticate("no-token", AFTER_ACTIVITY_INTERVAL + 40_000));
   check("an unknown session is still refused after the primary read", missing === null, { counts: { ...counts } });
 
   const touched = primary
     .prepare("SELECT last_used_at FROM auth_sessions WHERE id = 'old-session'")
     .get()?.last_used_at;
-  check("the activity update in the replica scope writes to the primary", touched === AFTER_ACTIVITY_INTERVAL, {
+  check("the activity update after a replica read writes to the primary", touched === AFTER_ACTIVITY_INTERVAL, {
     touched,
   });
 
