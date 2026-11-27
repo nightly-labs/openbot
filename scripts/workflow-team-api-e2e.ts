@@ -82,6 +82,7 @@ import {
   WORKFLOWS_MEDIA_CATALOG_V2_CODECS,
   WORKFLOWS_MEDIA_CATALOG_V2_ROUTES,
 } from "@openbot/contracts/team-protocol/workflows-media-catalog-v2";
+import { WORKFLOWS_MEDIA_CLIPS_CAPABILITY } from "@openbot/contracts/team-protocol/workflows-media-clips-v1";
 import {
   WORKFLOWS_MEDIA_SERVICE_ACCOUNT_CAPABILITY,
   WORKFLOWS_MEDIA_SERVICE_ACCOUNT_CODECS,
@@ -2172,7 +2173,7 @@ try {
   });
 
   await step(
-    "media: a member keeps an uploaded PNG as a picture of the host; a GIF, a used draft and an old client are refused",
+    "media: a member keeps an uploaded PNG and an MP4 clip on the host; a GIF, a used draft and an old client are refused",
     async () => {
       const capabilities = async (protocol: number) =>
         list(
@@ -2181,6 +2182,8 @@ try {
         );
       assert.ok((await capabilities(TEAM_PROTOCOL_V9)).includes(WORKFLOWS_MEDIA_CAPABILITY));
       assert.ok(!(await capabilities(TEAM_PROTOCOL_V7)).includes(WORKFLOWS_MEDIA_CAPABILITY));
+      assert.ok((await capabilities(TEAM_PROTOCOL_V10)).includes(WORKFLOWS_MEDIA_CLIPS_CAPABILITY));
+      assert.ok(!(await capabilities(TEAM_PROTOCOL_V9)).includes(WORKFLOWS_MEDIA_CLIPS_CAPABILITY));
       const codec = WORKFLOWS_MEDIA_CODECS.get(WORKFLOWS_MEDIA_ROUTES.keepPicture);
       assert.ok(codec, "No workflows-media-v1 codec for keep-picture.");
       const keep = async (draftId: string, capabilities = teamCapabilitiesForProtocol(TEAM_PROTOCOL_V9)) => {
@@ -2211,7 +2214,18 @@ try {
 
       const gif = await keep(gifDraft);
       assert.notEqual(gif.status, 200, JSON.stringify(gif.body));
-      assert.ok(JSON.stringify(gif.body).includes(sourceText("error.workflow.pictureType")), JSON.stringify(gif.body));
+      assert.ok(JSON.stringify(gif.body).includes(sourceText("error.workflow.assetType")), JSON.stringify(gif.body));
+
+      const clip = Uint8Array.from(Buffer.from("openbot workflow clip"));
+      const clipDraft = await sendDraft(member, "clip.mp4", "video/mp4", clip);
+      const keptClip = await keep(clipDraft);
+      assert.equal(keptClip.status, 200, JSON.stringify(keptClip.body));
+      const clipId = text(record(keptClip.body, "keep-clip").fileId, "fileId");
+      const clipFile = await fetch(`http://127.0.0.1:${current().port}${TEAM_API_ROUTES.attachment(clipId)}`, {
+        headers: v9Headers(member),
+      });
+      assert.equal(clipFile.status, 200, `The kept clip returned ${clipFile.status}.`);
+      assert.deepEqual(new Uint8Array(await clipFile.arrayBuffer()), clip, "The kept clip has other bytes.");
 
       const kept = await keep(pngDraft);
       assert.equal(kept.status, 200, JSON.stringify(kept.body));
@@ -2229,7 +2243,14 @@ try {
         JSON.stringify(used.body).includes(sourceText("error.workflow.pictureMissing")),
         JSON.stringify(used.body),
       );
-      return { old: old.status, gif: gif.status, kept: kept.status, file: file.status, used: used.status };
+      return {
+        old: old.status,
+        gif: gif.status,
+        clip: keptClip.status,
+        kept: kept.status,
+        file: file.status,
+        used: used.status,
+      };
     },
   );
 

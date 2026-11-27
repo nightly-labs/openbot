@@ -498,6 +498,15 @@ sent through `POST /v1/attachments` as a picture of the host with no owner agent
 answers `missing`. Each member who can use workflows can keep a picture, as each member can send a
 draft. A client without the capability does not offer image and asset steps.
 
+`workflows-media-clips-v1` tells a client that the host also keeps an MP4 or MOV video, or an MP3,
+M4A, WAV, AAC, OGG or FLAC audio file, through the same `keep-picture` route, and runs an asset node
+that names one. The asset node then has `media: "video"` or `media: "audio"` and gives a `file`
+edge, so an `image` step with a video model gets it as a video or audio input, and an agent or LLM
+step gets it as a file. A graph with such a node has workflow format 4, so an older client opens it
+read-only. A client offers clips only when the host has the capability and format 4; the phone
+app keeps pictures only, because its photo picker gives no audio files, and shows a clip asset by
+its name.
+
 `workflows-sunra-v1` lets the host run an `image` node with a Sunra model of `WORKFLOW_MEDIA_MODELS`
 (the ids that start with `sunra-`). The host calls the tools of Sunra's MCP server with the Sunra
 sign-in of an enabled Sunra row in its Apps (`src/backend/workflows/sunra-media.ts`), and the credits

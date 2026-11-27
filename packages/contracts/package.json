@@ -250,6 +250,7 @@
     "./team-protocol/workflows-credit-media-v1": "./src/team-protocol/workflows-credit-media-v1.ts",
     "./team-protocol/workflows-media-catalog-v2": "./src/team-protocol/workflows-media-catalog-v2.ts",
     "./team-protocol/workflows-media-transparent-v1": "./src/team-protocol/workflows-media-transparent-v1.ts",
+    "./team-protocol/workflows-media-clips-v1": "./src/team-protocol/workflows-media-clips-v1.ts",
     "./team-protocol/workflows-media-size-v1": "./src/team-protocol/workflows-media-size-v1.ts",
     "./team-protocol/workflows-v1": "./src/team-protocol/workflows-v1.ts",
     "./team-protocol/workflow-folders-v1": "./src/team-protocol/workflow-folders-v1.ts",
