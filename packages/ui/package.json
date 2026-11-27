@@ -294,6 +294,7 @@
     "./features/settings/GitHubConnectorPanel": "./src/features/settings/GitHubConnectorPanel.tsx",
     "./features/settings/IntegrationLayout": "./src/features/settings/IntegrationLayout.tsx",
     "./features/settings/brand-marks": "./src/features/settings/brand-marks.tsx",
+    "./features/settings/claude-bedrock": "./src/features/settings/claude-bedrock.ts",
     "./features/settings/BitwardenConnectorPanel": "./src/features/settings/BitwardenConnectorPanel.tsx",
     "./features/settings/OnePasswordConnectorPanel": "./src/features/settings/OnePasswordConnectorPanel.tsx",
     "./features/settings/ProtonPassConnectorPanel": "./src/features/settings/ProtonPassConnectorPanel.tsx",

@@ -194,6 +194,17 @@ Claude CLI on macOS:
 curl -fsSL https://claude.ai/install.sh | bash
 ```
 
+To run Claude agents on Amazon Bedrock, open **Settings → Providers → Claude → Amazon Bedrock**,
+turn on **Use Amazon Bedrock**, and set the AWS region. Then select one sign-in method: a Bedrock
+API key (`AWS_BEARER_TOKEN_BEDROCK`), AWS access keys (`AWS_ACCESS_KEY_ID`,
+`AWS_SECRET_ACCESS_KEY` and an optional `AWS_SESSION_TOKEN`), or a profile name from
+`~/.aws/config` (`AWS_PROFILE`). You can also set a Bedrock model ID or inference profile for the
+Opus, Sonnet and Haiku families. OpenBot saves these values as Claude environment variables, sets
+`CLAUDE_CODE_USE_BEDROCK=1`, and keeps the keys and tokens encrypted on the computer that runs the
+agents. Claude restarts when its current turns end. Your AWS account pays for the usage, and the
+model must be enabled in your Bedrock region. See the
+[Claude Code Bedrock documentation](https://code.claude.com/docs/en/amazon-bedrock).
+
 Install Grok CLI following the [Grok Build documentation](https://docs.x.ai/build/overview), then
 authenticate with `grok login` or set `XAI_API_KEY` in the environment used to launch OpenBot.
 
