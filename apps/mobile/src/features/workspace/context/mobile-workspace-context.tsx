@@ -172,6 +172,7 @@ import {
 import { replaceEqualDeep, useQueryClient } from "@tanstack/react-query";
 import { Effect } from "effect";
 import * as Crypto from "expo-crypto";
+import * as Network from "expo-network";
 import { type PropsWithChildren, useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import { View } from "react-native";
 import { agentInitialMessage, type NewAgentInput } from "@/features/agents/model/agent-initial-message";
@@ -1047,16 +1048,23 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
       if (previous?.length === inputs.length && previous.every((input, index) => input === inputs[index])) return;
       persistedInputs.current.set(serverId, inputs);
       const write = workspaceCache
-        .write(serverId, {
-          agents,
-          hidden: hostHiddenRef.current[serverId] ?? null,
-          colors: colorList(hostColors.current[serverId]),
-          sidebar: sidebarByServerRef.current[serverId]?.layout ?? null,
-          conversations: agents.flatMap((agent) => conversationStore.cachedPage(agent.id) ?? []),
-          capabilities,
-          drawer: drawerSnapshot(serverId),
-          channels: channelStore.cachedChannels(serverId),
-        })
+        .write(
+          serverId,
+          {
+            agents,
+            hidden: hostHiddenRef.current[serverId] ?? null,
+            colors: colorList(hostColors.current[serverId]),
+            sidebar: sidebarByServerRef.current[serverId]?.layout ?? null,
+            conversations: agents.flatMap((agent) => conversationStore.cachedPage(agent.id) ?? []),
+            capabilities,
+            drawer: drawerSnapshot(serverId),
+            channels: channelStore.cachedChannels(serverId),
+          },
+          {
+            conversations: conversationStore.warmedAgentIds(),
+            channels: channelStore.warmedChannelIds(serverId),
+          },
+        )
         .catch(() => false)
         .then((written) => {
           if (!written && persistedInputs.current.get(serverId) === inputs) persistedInputs.current.delete(serverId);
@@ -1090,9 +1098,18 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
           if (cached.colors) applyHostColors(id, cached.colors);
           if (cached.sidebar) applySidebarLayout(id, cached.sidebar);
           replaceServerAgents(id, cached.agents);
-          for (const page of cached.conversations) conversationStore.restore(page);
+          const warmedConversations = new Set(cached.warmed?.conversations ?? []);
+          const warmedChannels = new Set(cached.warmed?.channels ?? []);
+          for (const page of cached.conversations)
+            conversationStore.restore(page, warmedConversations.has(page.agentId));
           if (cached.channels && cached.capabilities)
-            channelStore.restore(id, cached.capabilities, cached.channels.channels, cached.channels.pages);
+            channelStore.restore(
+              id,
+              cached.capabilities,
+              cached.channels.channels,
+              cached.channels.pages,
+              warmedChannels,
+            );
           const connection = connections.current.get(id);
           if (connection) connection.quietStart();
           else quietStarts.current.add(id);
@@ -1226,8 +1243,17 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
       agents: agentsRef,
     });
 
+  const foregroundRef = useRef(foreground);
+  foregroundRef.current = foreground;
+
   const loadOpenChats = useCallback(
-    (serverId: string, agentIds: string[], client: RemoteTeamTransportRef, context: ServerLoadContext) => {
+    (
+      serverId: string,
+      agentIds: string[],
+      client: RemoteTeamTransportRef,
+      context: ServerLoadContext,
+      warm = false,
+    ) => {
       const open = agentIds.filter((agentId) => conversationStore.isObserved(agentId));
       const loads = (async () => {
         for (const agentId of open) {
@@ -1248,10 +1274,52 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
             .catch(() => undefined);
         }
         if (context.isCurrent()) persistServer(serverId);
+        if (!warm || !context.isCurrent() || !foregroundRef.current || serverId !== activeServerIdRef.current) return;
+        const network = await Network.getNetworkStateAsync().catch(() => null);
+        if (network?.type !== Network.NetworkStateType.WIFI && network?.type !== Network.NetworkStateType.ETHERNET) {
+          return;
+        }
+        let warmed = false;
+        const channelState = await channelStore.whenListed(serverId, 5_000);
+        if (context.isCurrent() && foregroundRef.current && channelState.supported) {
+          const channelsToWarm = channelState.channels
+            .filter((channel) => !channel.archived && !channelState.pages.has(channel.id))
+            .sort((a, b) => (b.lastMessage?.at ?? "").localeCompare(a.lastMessage?.at ?? ""))
+            .slice(0, 6);
+          for (const channel of channelsToWarm) {
+            if (!context.isCurrent() || !foregroundRef.current || serverId !== activeServerIdRef.current) return;
+            const fetched = await channelStore.prefetch(serverId, channel.id).catch(() => false);
+            if (fetched) warmed = true;
+          }
+        }
+        const agentsToWarm = agentIds
+          .filter((agentId) => !conversationStore.get(agentId) && !conversationStore.isObserved(agentId))
+          .slice(0, 6);
+        for (const agentId of agentsToWarm) {
+          if (!context.isCurrent() || !foregroundRef.current || serverId !== activeServerIdRef.current) return;
+          if (conversationStore.get(agentId) || conversationStore.isObserved(agentId)) continue;
+          const page = await conversationStore
+            .loadLatest(
+              agentId,
+              () =>
+                client.request(
+                  "GET",
+                  `${TEAM_API_ROUTES.agent.conversationPage(agentId)}?limit=24`,
+                  decodeConversationPage,
+                ),
+              context.isCurrent,
+            )
+            .catch(() => undefined);
+          if (page) {
+            conversationStore.markWarmed(agentId);
+            warmed = true;
+          }
+        }
+        if (warmed && context.isCurrent()) persistServer(serverId);
       })();
       trackUntilSettled(serverLoads.current, loads);
     },
-    [conversationStore, persistServer],
+    [channelStore, conversationStore, persistServer],
   );
 
   const loadServer = useCallback(
@@ -1420,9 +1488,10 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
       if (!context.isCurrent()) return;
       loadOpenChats(
         serverId,
-        summaries.map((agent) => agent.id),
+        [...summaries].sort((a, b) => (b.updatedAt ?? "").localeCompare(a.updatedAt ?? "")).map((agent) => agent.id),
         client,
         context,
+        true,
       );
       context.stage = "connection";
     },
@@ -1462,8 +1531,6 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
       ),
     [session.apiUrl, session.sessionToken],
   );
-  const foregroundRef = useRef(foreground);
-  foregroundRef.current = foreground;
   const sendApproval = useCallback(
     async (serverId: string, input: RespondToApprovalInput, approval: PendingApproval) => {
       const phone =

@@ -92,6 +92,7 @@ export interface ChannelView extends ChannelFlags {
   page: ChannelPage | undefined;
 }
 const CHANGE_READ_INTERVAL_MS = 250;
+const EMPTY_WARMED_CHANNELS: ReadonlySet<string> = new Set();
 const EMPTY: ChannelState = {
   channels: [],
   pages: new Map(),
@@ -120,6 +121,7 @@ interface Entry {
   changeTimer: ReturnType<typeof setTimeout> | null;
   changeReadAt: number;
   changeMissed: boolean;
+  warmed: Set<string>;
 }
 
 export class ChannelHistoryRefreshError extends Error {}
@@ -161,6 +163,7 @@ export class MobileChannelStore {
         changeTimer: null,
         changeReadAt: 0,
         changeMissed: false,
+        warmed: new Set(),
       };
       this.entries.set(serverId, entry);
     }
@@ -228,10 +231,23 @@ export class MobileChannelStore {
       ...(supported ? {} : { listed: true, channels: [], pages: new Map() }),
     });
   }
-  restore(serverId: string, capabilities: readonly string[], channels: ChannelSummary[], pages: ChannelPage[]) {
+  restore(
+    serverId: string,
+    capabilities: readonly string[],
+    channels: ChannelSummary[],
+    pages: ChannelPage[],
+    warmedIds?: ReadonlySet<string>,
+  ) {
     const entry = this.entry(serverId);
     if (entry.state.listed || entry.state.channels.length || !capabilities.includes(CHANNEL_CHATS_CAPABILITY)) return;
     const ids = new Set(channels.map((channel) => channel.id));
+    if (warmedIds) {
+      for (const page of pages) {
+        if (ids.has(page.channel.id) && warmedIds.has(page.channel.id) && !entry.observed.has(page.channel.id)) {
+          entry.warmed.add(page.channel.id);
+        }
+      }
+    }
     this.publish(entry, {
       supported: true,
       canDelete: capabilities.includes(CHANNEL_DELETE_CAPABILITY),
@@ -271,6 +287,7 @@ export class MobileChannelStore {
   }
   observe(serverId: string, channelId: string) {
     const entry = this.entry(serverId);
+    entry.warmed.delete(channelId);
     entry.observed.set(channelId, (entry.observed.get(channelId) ?? 0) + 1);
     if (entry.observed.get(channelId) === 1) void this.refresh(serverId);
     return () => {
@@ -323,6 +340,27 @@ export class MobileChannelStore {
       if (!channelId || channelId === id) entry.readChannels.add(id);
     }
     return this.read(serverId, entry);
+  }
+  async prefetch(serverId: string, channelId: string): Promise<boolean> {
+    const entry = this.entry(serverId);
+    if (!this.active || !entry.state.supported) return false;
+    if (entry.state.pages.has(channelId) || entry.observed.has(channelId)) return false;
+    const writes = entry.writes;
+    const page = await this.request("POST", CHANNEL_ROUTES.read, decodeChannelPage, { channelId }, serverId);
+    if (!entry.valid || !this.active || writes !== entry.writes) return false;
+    if (!entry.state.channels.some((channel) => channel.id === channelId)) return false;
+    const current = entry.state.pages.get(channelId);
+    if (current && page.channel.revision < current.channel.revision) return false;
+    const merged = mergeLatestChannelPage(current, page);
+    if (merged === current) return false;
+    const nextPages = new Map(entry.state.pages);
+    nextPages.set(channelId, merged);
+    entry.warmed.add(channelId);
+    this.publish(entry, { pages: nextPages });
+    return true;
+  }
+  warmedChannelIds(serverId: string): ReadonlySet<string> {
+    return this.entries.get(serverId)?.warmed ?? EMPTY_WARMED_CHANNELS;
   }
   private read(serverId: string, entry: Entry): Promise<void> {
     if (entry.pending) {

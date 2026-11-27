@@ -30,6 +30,7 @@ export class MobileConversationStore {
   #latestReads = new Map<string, number>();
   #latestLoads = 0;
   #cached = new Set<string>();
+  #warmed = new Set<string>();
 
   constructor(private schedule: (flush: () => void) => () => void) {}
 
@@ -73,6 +74,7 @@ export class MobileConversationStore {
   }
 
   subscribe(agentId: string, listener: () => void) {
+    this.#warmed.delete(agentId);
     let listeners = this.#listeners.get(agentId);
     if (!listeners) {
       listeners = new Set();
@@ -97,6 +99,7 @@ export class MobileConversationStore {
     this.#missedLatest.delete(agentId);
     this.#latestReads.delete(agentId);
     this.#cached.delete(agentId);
+    this.#warmed.delete(agentId);
     this.#indices.delete(agentId);
     this.#deltas.delete(agentId);
     this.#loads.delete(agentId);
@@ -160,10 +163,19 @@ export class MobileConversationStore {
     };
   }
 
-  restore(page: ConversationPage) {
+  markWarmed(agentId: string) {
+    if (!this.isObserved(agentId) && this.get(agentId)) this.#warmed.add(agentId);
+  }
+
+  warmedAgentIds(): ReadonlySet<string> {
+    return this.#warmed;
+  }
+
+  restore(page: ConversationPage, warmed = false) {
     if (this.get(page.agentId)) return;
     this.applyPage(page);
     this.#cached.add(page.agentId);
+    if (warmed && !this.isObserved(page.agentId)) this.#warmed.add(page.agentId);
   }
 
   cachedPage(agentId: string): ConversationPage | undefined {
