@@ -35,7 +35,7 @@ export class CredentialFileTooLarge extends Error {
 
 export class SecretStorageClosedError extends Error {
   constructor() {
-    super(sourceText("error.app.secretStorageUnavailable"));
+    super(sourceText("error.app.macSecureStorageUnavailable"));
     this.name = "SecretStorageClosedError";
   }
 }

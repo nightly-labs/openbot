@@ -450,8 +450,8 @@ export class VaultService {
           return this.state();
         }
         const before = this.#status;
-        if (before !== "ready" && (yield* this.load()) === "unavailable") {
-          if (before !== "unavailable") this.#emit();
+        if (before !== "ready" && (yield* this.load()) !== "unreadable") {
+          if (this.#status !== before) this.#emit();
           return this.state();
         }
         yield* this.#store.clear();
