@@ -840,6 +840,7 @@ export class BrowserHost {
     tab: BrowserHostTab,
   ) {
     if (tab.engine.frozen) return tab.unsentText !== false;
+    if (tab.engine.dialog) return tab.unsentText === true;
     return Option.getOrElse(yield* this.#checkUnsentText(tab), () => true);
   });
 
