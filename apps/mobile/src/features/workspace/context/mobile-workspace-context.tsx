@@ -1034,7 +1034,11 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
       const agents = cachedSummaries.current.get(serverId);
       if (!workspaceCache || !agents || removedServers.current.has(serverId)) return;
       const capabilities = serverCapabilities.current.get(serverId) ?? keptCapabilities.current.get(serverId) ?? null;
+      const warmedAgentIds = conversationStore.warmedAgentIds();
+      const warmedConversations = new Set(agents.map((agent) => agent.id).filter((id) => warmedAgentIds.has(id)));
+      const warmedChannels = new Set(channelStore.warmedChannelIds(serverId));
       const inputs = [
+        [...warmedConversations, "", ...warmedChannels].join("\n"),
         agents,
         hostHiddenRef.current[serverId],
         hostColors.current[serverId],
@@ -1060,10 +1064,7 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
             drawer: drawerSnapshot(serverId),
             channels: channelStore.cachedChannels(serverId),
           },
-          {
-            conversations: conversationStore.warmedAgentIds(),
-            channels: channelStore.warmedChannelIds(serverId),
-          },
+          { conversations: warmedConversations, channels: warmedChannels },
         )
         .catch(() => false)
         .then((written) => {
