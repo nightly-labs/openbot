@@ -188,7 +188,7 @@ export interface AgentDockProps {
   onAdd: (seat: AgentDockSeatRef) => void;
   onRemove: (seat: AgentDockSeatRef) => void;
   onSend: (seat: AgentDockSeatRef, text: string) => Promise<AgentDockSendResult>;
-  onOpenInMain: (seat: AgentDockSeatRef) => void;
+  onOpenInMain: (seat: AgentDockSeatRef, draft?: string) => void;
   onOpenWindow?: ((agentId: string) => void) | undefined;
   onOpenThread?: ((seat: AgentDockSeatRef, id: string) => void) | undefined;
   onNewThread?: ((seat: AgentDockSeatRef) => void) | undefined;
@@ -824,6 +824,17 @@ export function AgentDock(props: AgentDockProps) {
     };
   }
 
+  function openInMain(id: string) {
+    const draft = state.drafts[id];
+    const text = draft?.trim() ? draft : undefined;
+    if (text !== undefined) {
+      setState((current) => {
+        current.drafts[id] = "";
+      });
+    }
+    props.onOpenInMain(refOfKey(id), text);
+  }
+
   function closeChat(returnFocus = true) {
     const id = state.open;
     if (!id) return;
@@ -1295,7 +1306,7 @@ export function AgentDock(props: AgentDockProps) {
                               <ContextMenu.Item
                                 onSelectAfterClose={() => {
                                   if (state.open === id) closeChat(false);
-                                  props.onOpenInMain(refOfKey(id));
+                                  openInMain(id);
                                 }}
                               >
                                 <Maximize2 aria-hidden="true" />
@@ -1513,13 +1524,13 @@ export function AgentDock(props: AgentDockProps) {
                     onAdd={() => props.onAdd(refOfKey(id))}
                     onOpenInMain={() => {
                       closeChat(false);
-                      props.onOpenInMain(refOfKey(id));
+                      openInMain(id);
                     }}
                     onOpenTakeover={(takeover) => {
                       closeChat(false);
                       const openTakeover = props.answers?.openTakeover;
                       if (openTakeover) openTakeover(takeover);
-                      else props.onOpenInMain(refOfKey(id));
+                      else openInMain(id);
                     }}
                     onOpenWindow={openWindowFor(id)}
                     onOpenThread={

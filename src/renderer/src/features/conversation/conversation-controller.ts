@@ -365,6 +365,11 @@ export function createStableConversationState(
       setComposerFocusRequest((value) => value + 1);
     },
     feedbackFixes,
+    appendAgentText(target: { serverId: string; agentId: string }, text: string) {
+      const key = composerDraftKey(target);
+      setDrafts((current) => ({ ...current, [key]: appendDraftText(current[key] ?? EMPTY_DRAFT, text) }));
+      setComposerFocusRequest((value) => value + 1);
+    },
     appendChannelText(target: { serverId: string; channelId: string }, text: string) {
       const key = composerDraftKey({ serverId: target.serverId, agentId: target.channelId });
       setChannelDrafts((current) => ({ ...current, [key]: appendDraftText(current[key] ?? EMPTY_DRAFT, text) }));

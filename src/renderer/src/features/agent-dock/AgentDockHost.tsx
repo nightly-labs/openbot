@@ -844,6 +844,7 @@ function WindowAgentDock(props: { serverId: string }) {
   const { selectAgent } = useNavigation();
   const channels = useChannels();
   const { openAppSettings } = useSettings();
+  const { appendAgentText, appendChannelText } = useConversationController();
   const dock = createServerDock(props.serverId, { readWhenHidden: false });
   const media = useDesktopMediaApproval();
   const voice = createAgentDockVoice(() => props.serverId);
@@ -874,9 +875,15 @@ function WindowAgentDock(props: { serverId: string }) {
       onSend={(seat, text) =>
         seat.kind === "channel" ? dock.sendToChannel(seat.id, text) : dock.sendToAgent(seat.id, text)
       }
-      onOpenInMain={(seat) =>
-        seat.kind === "channel" ? void channels.open(seat.id) : selectAgent(seat.id, dock.mainTabOf(seat.id))
-      }
+      onOpenInMain={(seat, draft) => {
+        if (seat.kind === "channel") {
+          void channels.open(seat.id);
+          if (draft) appendChannelText({ serverId: props.serverId, channelId: seat.id }, draft);
+          return;
+        }
+        selectAgent(seat.id, dock.mainTabOf(seat.id));
+        if (draft) appendAgentText({ serverId: props.serverId, agentId: seat.id }, draft);
+      }}
       onOpenWindow={(agentId) => void appPort().openChatWindow({ serverId: props.serverId, agentId })}
       onOpenThread={(seat, id) => {
         if (seat.kind === "agent") dock.showThread(seat.id, id);
@@ -900,6 +907,7 @@ function ScreenAgentDock(props: { serverId: string }) {
   const { selectAgent } = useNavigation();
   const channels = useChannels();
   const { openAppSettings } = useSettings();
+  const { appendAgentText, appendChannelText } = useConversationController();
   const preference = useAgentDockPreference();
   const dock = createServerDock(props.serverId, { readWhenHidden: true });
   const openTakeoverPage = useTakeoverPageOpener((agentId) => dock.mainTabOf(agentId));
@@ -996,12 +1004,14 @@ function ScreenAgentDock(props: { serverId: string }) {
           return;
         case "open-agent":
           selectAgent(action.agentId, dock.mainTabOf(action.agentId));
+          if (action.draft) appendAgentText({ serverId: action.serverId, agentId: action.agentId }, action.draft);
           return;
         case "open-browser-takeover":
           openTakeoverPage(action.agentId, action.tabId);
           return;
         case "open-channel":
           void channels.open(action.channelId);
+          if (action.draft) appendChannelText({ serverId: action.serverId, channelId: action.channelId }, action.draft);
           return;
         case "open-window":
           void appPort().openChatWindow({ serverId: action.serverId, agentId: action.agentId });

@@ -270,9 +270,9 @@ export type AgentDockAction =
   | { type: "open-thread"; serverId: string; agentId: string; threadId: string; started?: boolean }
   | { type: "new-thread"; serverId: string; agentId: string }
   | { type: "start-thread"; serverId: string; agentId: string; text: string; clientMessageId: string }
-  | { type: "open-agent"; serverId: string; agentId: string }
+  | { type: "open-agent"; serverId: string; agentId: string; draft?: string }
   | { type: "open-browser-takeover"; serverId: string; agentId: string; tabId: string }
-  | { type: "open-channel"; serverId: string; channelId: string }
+  | { type: "open-channel"; serverId: string; channelId: string; draft?: string }
   | { type: "open-window"; serverId: string; agentId: string }
   | {
       type: "respond-approval";
@@ -360,6 +360,10 @@ export function isAgentDockAction(value: unknown): value is AgentDockAction {
     case "move":
       return isSeatRef(value.seat) && (value.before === null || isSeatRef(value.before));
     case "open-agent":
+      return (
+        isIdentifier(value.agentId) &&
+        (value.draft === undefined || isBoundedString(value.draft, INPUT_LIMITS.messageText))
+      );
     case "open-window":
     case "new-thread":
       return isIdentifier(value.agentId);
@@ -379,7 +383,10 @@ export function isAgentDockAction(value: unknown): value is AgentDockAction {
     case "open-browser-takeover":
       return isIdentifier(value.agentId) && isIdentifier(value.tabId);
     case "open-channel":
-      return isIdentifier(value.channelId);
+      return (
+        isIdentifier(value.channelId) &&
+        (value.draft === undefined || isBoundedString(value.draft, INPUT_LIMITS.messageText))
+      );
     case "respond-approval":
       return (
         isIdentifier(value.agentId) &&
