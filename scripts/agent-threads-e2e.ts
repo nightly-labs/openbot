@@ -24,6 +24,7 @@ interface Report {
   archived?: { state: string; inArchivedList: boolean };
   restored?: { state: string; tabSelected: boolean };
   archivedElsewhere?: { tabHidden: boolean; threadViewClosed: boolean; tabBack: boolean };
+  reopenedAfterTabChange?: { tabBack: boolean };
   deleteWhileRunning?: { menuDisabled: boolean; refused: boolean; error: string };
   reload?: { tabKept: boolean; tabSelected: boolean };
   undo?: { toast: boolean; archivedDuringUndo: boolean; tabBack: boolean; state: string };
@@ -188,6 +189,26 @@ try {
   });
   await tab(title).waitFor({ timeout: UI_WAIT_MS });
   report.archivedElsewhere = { tabHidden: true, threadViewClosed: true, tabBack: true };
+
+  await page.evaluate(({ agent, task }) => window.openbot.agent.closeTask({ agentId: agent, taskId: task }), {
+    agent: agentId,
+    task: task.id,
+  });
+  await tab(title).waitFor({ state: "detached", timeout: UI_WAIT_MS });
+  await button(english("conversation.threads.new")).first().click();
+  const draftTab = tab(english("conversation.threads.new"));
+  await draftTab.waitFor({ timeout: UI_WAIT_MS });
+  await menuItem(
+    await openTabMenu(english("conversation.threads.new")),
+    english("conversation.threads.closeTab"),
+  ).click();
+  await draftTab.waitFor({ state: "detached", timeout: UI_WAIT_MS });
+  await page.evaluate(({ agent, task }) => window.openbot.agent.reopenTask({ agentId: agent, taskId: task }), {
+    agent: agentId,
+    task: task.id,
+  });
+  await tab(title).waitFor({ timeout: UI_WAIT_MS });
+  report.reopenedAfterTabChange = { tabBack: true };
 
   await tab(title).click();
   const composer = page.getByRole("textbox", {
