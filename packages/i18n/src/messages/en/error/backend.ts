@@ -127,6 +127,16 @@ export const messages = defineMessages("error.backend", {
     "The lead's model is not available. Choose another model for the lead, or choose a member.",
   "error.backend.channelLeadRefused":
     "The lead's model refused this request. Choose a member, or choose another model for the lead.",
+  "error.backend.channelLeadNotPermitted":
+    "The provider does not permit the lead's model for this account. Choose another model for the lead, or choose a member.",
+  "error.backend.channelLeadBilling":
+    "The lead's account has no credit, or its plan does not include this model. Check the plan, or choose a member.",
+  "error.backend.channelLeadBlocked":
+    "The lead's provider blocked this request. Change the request, or choose a member.",
+  "error.backend.channelLeadNoAnswer": "The lead's model gave no answer. Try again, or choose a member.",
+  "error.backend.channelLeadProviderError":
+    "The lead's provider had an error. Try again in a few minutes, or choose a member.",
+  "error.backend.channelLeadStopped": "The lead's model stopped before it answered. Try again, or choose a member.",
   "error.backend.channelRequestMemberRequired": "Choose a member for this request.",
   "error.backend.channelDeliveryNotCreated": "Channel delivery was not created.",
   "error.backend.channelAssignmentStopped": "This channel assignment has been stopped or replaced.",

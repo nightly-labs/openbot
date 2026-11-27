@@ -141,6 +141,18 @@ export const messages = {
     "Le modèle du responsable n'est pas disponible. Choisissez un autre modèle pour le responsable ou un membre.",
   "error.backend.channelLeadRefused":
     "Le modèle du responsable a refusé cette demande. Choisissez un membre ou un autre modèle pour le responsable.",
+  "error.backend.channelLeadNotPermitted":
+    "Le fournisseur n'autorise pas le modèle du responsable pour ce compte. Choisissez un autre modèle pour le responsable ou un membre.",
+  "error.backend.channelLeadBilling":
+    "Le compte du responsable n'a plus de crédit, ou son forfait n'inclut pas ce modèle. Vérifiez le forfait ou choisissez un membre.",
+  "error.backend.channelLeadBlocked":
+    "Le fournisseur du responsable a bloqué cette demande. Modifiez la demande ou choisissez un membre.",
+  "error.backend.channelLeadNoAnswer":
+    "Le modèle du responsable n'a donné aucune réponse. Réessayez ou choisissez un membre.",
+  "error.backend.channelLeadProviderError":
+    "Le fournisseur du responsable a rencontré une erreur. Réessayez dans quelques minutes ou choisissez un membre.",
+  "error.backend.channelLeadStopped":
+    "Le modèle du responsable s'est arrêté avant de répondre. Réessayez ou choisissez un membre.",
   "error.backend.channelRequestMemberRequired": "Choisissez un membre pour cette demande.",
   "error.backend.channelDeliveryNotCreated": "La distribution dans le canal n’a pas été créée.",
   "error.backend.channelAssignmentStopped": "Cette tâche de canal a été arrêtée ou remplacée.",

@@ -118,6 +118,15 @@ export const messages = {
   "error.backend.channelLeadSignIn": "פג תוקף ההתחברות לספק של מוביל הערוץ. יש להתחבר שוב, או לבחור חבר.",
   "error.backend.channelLeadModelGone": "המודל של מוביל הערוץ לא זמין. יש לבחור מודל אחר למוביל, או לבחור חבר.",
   "error.backend.channelLeadRefused": "המודל של מוביל הערוץ דחה את הבקשה. יש לבחור חבר, או מודל אחר למוביל.",
+  "error.backend.channelLeadNotPermitted":
+    "הספק לא מתיר את המודל של מוביל הערוץ בחשבון הזה. יש לבחור מודל אחר למוביל, או לבחור חבר.",
+  "error.backend.channelLeadBilling":
+    "בחשבון של מוביל הערוץ אין קרדיט, או שהתוכנית שלו לא כוללת את המודל הזה. יש לבדוק את התוכנית, או לבחור חבר.",
+  "error.backend.channelLeadBlocked": "הספק של מוביל הערוץ חסם את הבקשה. יש לשנות את הבקשה, או לבחור חבר.",
+  "error.backend.channelLeadNoAnswer": "המודל של מוביל הערוץ לא נתן תשובה. יש לנסות שוב, או לבחור חבר.",
+  "error.backend.channelLeadProviderError":
+    "אירעה שגיאה אצל הספק של מוביל הערוץ. יש לנסות שוב בעוד כמה דקות, או לבחור חבר.",
+  "error.backend.channelLeadStopped": "המודל של מוביל הערוץ נעצר לפני שענה. יש לנסות שוב, או לבחור חבר.",
   "error.backend.channelRequestMemberRequired": "יש לבחור חבר לבקשה הזו.",
   "error.backend.channelDeliveryNotCreated": "מסירת הערוץ לא נוצרה.",
   "error.backend.channelAssignmentStopped": "הקצאת הערוץ הזו נעצרה או הוחלפה.",

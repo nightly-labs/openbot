@@ -143,6 +143,18 @@ export const messages = {
     "Das Modell der Kanalleitung ist nicht verfügbar. Wähle ein anderes Modell für die Leitung, oder wähle ein Mitglied.",
   "error.backend.channelLeadRefused":
     "Das Modell der Kanalleitung hat diese Anfrage abgelehnt. Wähle ein Mitglied oder ein anderes Modell für die Leitung.",
+  "error.backend.channelLeadNotPermitted":
+    "Der Anbieter erlaubt das Modell der Kanalleitung für dieses Konto nicht. Wähle ein anderes Modell für die Leitung, oder wähle ein Mitglied.",
+  "error.backend.channelLeadBilling":
+    "Das Konto der Kanalleitung hat kein Guthaben, oder sein Tarif enthält dieses Modell nicht. Prüfe den Tarif, oder wähle ein Mitglied.",
+  "error.backend.channelLeadBlocked":
+    "Der Anbieter der Kanalleitung hat diese Anfrage blockiert. Ändere die Anfrage, oder wähle ein Mitglied.",
+  "error.backend.channelLeadNoAnswer":
+    "Das Modell der Kanalleitung hat keine Antwort gegeben. Versuche es erneut, oder wähle ein Mitglied.",
+  "error.backend.channelLeadProviderError":
+    "Beim Anbieter der Kanalleitung ist ein Fehler aufgetreten. Versuche es in ein paar Minuten erneut, oder wähle ein Mitglied.",
+  "error.backend.channelLeadStopped":
+    "Das Modell der Kanalleitung wurde vor seiner Antwort beendet. Versuche es erneut, oder wähle ein Mitglied.",
   "error.backend.channelRequestMemberRequired": "Wähle ein Mitglied für diese Anfrage.",
   "error.backend.channelDeliveryNotCreated": "Die Kanalzustellung wurde nicht erstellt.",
   "error.backend.channelAssignmentStopped": "Dieser Kanalauftrag wurde gestoppt oder ersetzt.",

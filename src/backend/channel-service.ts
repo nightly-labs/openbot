@@ -3957,6 +3957,14 @@ const CHANNEL_LEAD_FAILURE_KEYS = [
   ["authentication", "error.backend.channelLeadSignIn"],
   ["model_not_found", "error.backend.channelLeadModelGone"],
   ["invalid_request", "error.backend.channelLeadRefused"],
+  ["permission", "error.backend.channelLeadNotPermitted"],
+  ["billing", "error.backend.channelLeadBilling"],
+  ["content_blocked", "error.backend.channelLeadBlocked"],
+  ["context_too_long", "error.backend.channelRoutingTooLong"],
+  ["timeout", "error.backend.channelLeadTimedOut"],
+  ["empty_answer", "error.backend.channelLeadNoAnswer"],
+  ["provider_internal_error", "error.backend.channelLeadProviderError"],
+  ["provider_exited", "error.backend.channelLeadStopped"],
 ] as const satisfies readonly (readonly [CauseCode, keyof SourceMessages])[];
 const CHANNEL_LEAD_FAILURES = new Map<CauseCode, (typeof CHANNEL_LEAD_FAILURE_KEYS)[number][1]>(
   CHANNEL_LEAD_FAILURE_KEYS,
