@@ -3922,14 +3922,24 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
     next: AgentModelChoice | undefined,
   ): string | null | undefined {
     if (move !== null || input.leaveUsageLimit) return undefined;
-    if (initiatingAgentId === undefined)
-      return input.provider !== undefined || input.model !== undefined || input.providerAccountId !== undefined
-        ? null
-        : undefined;
+    if (initiatingAgentId === undefined) return this.#userAccountPin(input, next);
     if (input.providerAccountId === undefined) return undefined;
     if (!next || !this.#pooled(next)) return null;
     if (next.providerAccountId) return next.providerAccountId;
     return input.providerAccountId === DEFAULT_PROVIDER_ACCOUNT_ID ? DEFAULT_PROVIDER_ACCOUNT_ID : null;
+  }
+
+  #userAccountPin(input: AgentUpdate, next: AgentModelChoice | undefined): string | null | undefined {
+    if (input.provider === undefined && input.model === undefined && input.providerAccountId === undefined)
+      return undefined;
+    if (input.providerAccountId === null || !next || !this.#leftOutOfPool(next)) return null;
+    if (input.providerAccountId === undefined) return undefined;
+    return next.providerAccountId ?? DEFAULT_PROVIDER_ACCOUNT_ID;
+  }
+
+  #leftOutOfPool(choice: AgentModelChoice): boolean {
+    const account = choice.providerAccountId ?? DEFAULT_PROVIDER_ACCOUNT_ID;
+    return this.#providers.accountPool(choice.provider)?.leftOut.includes(account) === true;
   }
 
   #withAccountModel(input: AgentUpdate): AgentUpdate {

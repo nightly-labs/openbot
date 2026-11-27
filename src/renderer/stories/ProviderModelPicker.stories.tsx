@@ -1,4 +1,12 @@
+import {
+  type AgentModelId,
+  type AgentProviderId,
+  type AgentStatus,
+  DEFAULT_PROVIDER_ACCOUNT_ID,
+  type ProviderAccountStatus,
+} from "@openbot/contracts/ipc";
 import { ProviderModelPicker } from "@openbot/ui/components/ProviderModelPicker";
+import { createSignal } from "solid-js";
 import { fn } from "storybook/test";
 import type { Meta, StoryObj } from "storybook-solidjs-vite";
 import { STORY_AGENT_STATUS, STORY_MODELS } from "./fixtures";
@@ -332,4 +340,61 @@ export const CodexModelCatalogSource: Story = {
     modelOptions: [...codexOllamaModels, ...STORY_MODELS.filter((model) => model.provider !== "codex")],
     agentStatus: codexStatusWithSource({ kind: "catalog" }),
   },
+};
+
+const POOL_TEAM_ACCOUNT = "a0000000000000002";
+const POOL_RESERVED_ACCOUNT = "a0000000000000003";
+
+const poolAccounts: ProviderAccountStatus[] = [
+  { id: DEFAULT_PROVIDER_ACCOUNT_ID, label: null, email: "person@example.com", state: "connected", message: null },
+  { id: POOL_TEAM_ACCOUNT, label: null, email: "team@example.com", state: "connected", message: null },
+  { id: POOL_RESERVED_ACCOUNT, label: "Reserved", email: "reserved@example.com", state: "connected", message: null },
+];
+
+const poolStatus = (leftOut: string[]): AgentStatus => ({
+  ...STORY_AGENT_STATUS,
+  providers: STORY_AGENT_STATUS.providers?.map((provider) =>
+    provider.id === "claude"
+      ? { ...provider, accounts: poolAccounts, accountPool: { leftOut, inUse: POOL_TEAM_ACCOUNT } }
+      : provider,
+  ),
+});
+
+interface PoolChoice {
+  provider: AgentProviderId;
+  model: AgentModelId;
+  account: string | undefined;
+}
+
+function PoolPicker(props: { leftOut: string[] }) {
+  const [choice, setChoice] = createSignal<PoolChoice>({
+    provider: "claude",
+    model: "claude-opus-5-5",
+    account: undefined,
+  });
+  const nextAccount = (provider: AgentProviderId, accountId: string | null | undefined) => {
+    if (accountId === undefined) return provider === choice().provider ? choice().account : undefined;
+    return accountId === null || accountId === DEFAULT_PROVIDER_ACCOUNT_ID ? undefined : accountId;
+  };
+  return (
+    <ProviderModelPicker
+      {...args}
+      provider={choice().provider}
+      value={choice().model}
+      agentStatus={poolStatus(props.leftOut)}
+      accountChoice
+      providerAccountId={choice().account}
+      onChange={(model, provider, accountId) =>
+        setChoice({ provider, model, account: nextAccount(provider, accountId) })
+      }
+    />
+  );
+}
+
+export const PoolWithAccountLeftOut: Story = {
+  render: () => <PoolPicker leftOut={[POOL_RESERVED_ACCOUNT]} />,
+};
+
+export const PoolWithOwnSignInLeftOut: Story = {
+  render: () => <PoolPicker leftOut={[DEFAULT_PROVIDER_ACCOUNT_ID]} />,
 };
