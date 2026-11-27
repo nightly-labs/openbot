@@ -386,9 +386,11 @@ Removing those paths needs the 60-day support window.
 
 CI runs `test:sync`, `test:sync-log` and `test:remote-sync` (the desktop with a joined server) in
 the Team API routes E2E job when desktop code changes. `test:web-sync` and `test:extension-sync`
-need a dev stack and run only by hand. `test:team-webrtc-wire-parity` decodes each sync message as a
-WebRTC frame: the client messages in `event-control` frames, and the host messages in `event`
-frames.
+need a dev stack and run only by hand. `test:team-webrtc-wire-parity` decodes valid and invalid sync
+messages as WebRTC frames (client messages in `event-control` frames, host messages in `event`
+frames) and with the `sync-v1.ts` decoders, and fails when one is accepted or refused incorrectly.
+The `event` frame decoder accepts any JSON payload: only `decodeSyncServerMessage` refuses an
+invalid host message.
 
 `bun run test:sync` (`scripts/sync-e2e.ts`) starts a host and checks the subscribe diff, the push
 before each reload event, an update, a visibility change, the barrier, a reconnect with `have` and

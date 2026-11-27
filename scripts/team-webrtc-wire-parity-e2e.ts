@@ -396,10 +396,42 @@ function bodylessMismatches(results: Record<string, Outcome>): string[] {
   return mismatches;
 }
 
+function syncExpectations(): ReadonlyArray<readonly [string, "ok" | "null" | "error"]> {
+  const refused = (label: string) => label.startsWith("bad-");
+  return [
+    ...SYNC_CLIENT_MESSAGES.flatMap(([label]) => [
+      [
+        `framing.decodeTeamProtocolV2EventFrame sync-control ${label}`,
+        refused(label) || label === "unknown-type" ? "error" : "ok",
+      ] as const,
+      [
+        `sync-v1.decodeSyncClientMessage ${label}`,
+        refused(label) ? "error" : label === "unknown-type" ? "null" : "ok",
+      ] as const,
+    ]),
+    ...SYNC_SERVER_MESSAGES.flatMap(([label]) => [
+      [`framing.decodeTeamProtocolV2EventFrame sync-event ${label}`, "ok"] as const,
+      [`sync-v1.decodeSyncServerMessage ${label}`, refused(label) ? "error" : "ok"] as const,
+    ]),
+  ];
+}
+
+function syncMismatches(results: Record<string, Outcome>): string[] {
+  return syncExpectations()
+    .filter(([key, expected]) => {
+      const result = results[key];
+      if (!result) return true;
+      if ("error" in result) return expected !== "error";
+      return expected !== (result.ok === null ? "null" : "ok");
+    })
+    .map(([key]) => key);
+}
+
 mkdirSync(OUT, { recursive: true });
 const after = await runCorpus(join(ROOT, "packages/contracts/src"));
 writeFileSync(join(OUT, "after.json"), `${JSON.stringify(after, null, 2)}\n`);
 const bodyless = bodylessMismatches(after);
+const sync = syncMismatches(after);
 
 let before: { ref: string; commit: string; compared: number; mismatches: string[] } | null = null;
 if (beforeRef) {
@@ -432,9 +464,10 @@ const report = {
   cases: Object.keys(after).length,
   errors: Object.values(after).filter((value) => "error" in value).length,
   bodylessMismatches: bodyless,
+  syncMismatches: sync,
   before,
 };
 writeFileSync(join(OUT, "report.json"), `${JSON.stringify(report, null, 2)}\n`);
 const summary = { ...report, before: before && { ...before, mismatches: before.mismatches.slice(0, 20) } };
 process.stdout.write(`${JSON.stringify(summary, null, 2)}\n`);
-if (bodyless.length > 0 || (before && before.mismatches.length > 0)) process.exit(1);
+if (bodyless.length > 0 || sync.length > 0 || (before && before.mismatches.length > 0)) process.exit(1);
