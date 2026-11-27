@@ -22,6 +22,14 @@ const AGENTS = 60;
 const MESSAGES_PER_PAGE = 50;
 const MESSAGE_TEXT_LENGTH = 1_100;
 const CHANNELS = 6;
+const SIGNAL_HOME = {
+  preferred: null,
+  current: "a",
+  homes: [
+    { id: "a", latencyMs: 41 },
+    { id: "us", latencyMs: null },
+  ],
+};
 const MAX_CACHE_JSON = 3 * 1024 * 1024;
 const require = createRequire(import.meta.url);
 const logger = createOpenBotLogger("mobile-workspace-cache-e2e");
@@ -143,6 +151,7 @@ interface CachedPages {
 
 interface SplitRead {
   agents: { id: string }[];
+  drawer: { memberCount?: number; signalHome?: unknown } | null;
   channels: unknown[] | null;
   readPages(): Promise<CachedPages | null>;
 }
@@ -276,7 +285,7 @@ function workspaceValue() {
     sidebar: null,
     conversations,
     capabilities: ["chat-channels"],
-    drawer: null,
+    drawer: { memberCount: 3, signalHome: SIGNAL_HOME },
     channels: { channels, pages },
   };
 }
@@ -400,6 +409,18 @@ await check("the first new write replaces the released file with the split files
     pages: await fileSize(`${SERVER_ID}~pages.bin`),
   };
   return { files, sealedBytes: splitBytes };
+});
+
+await check("the drawer snapshot keeps the Signal server settings and drops a damaged copy", async () => {
+  const read = await currentCache.read(SERVER_ID);
+  assert.ok(read, "The workspace part was not read.");
+  assert.deepEqual(read.drawer, { memberCount: 3, signalHome: SIGNAL_HOME });
+  const damaged = { ...value, drawer: { memberCount: 3, signalHome: { ...SIGNAL_HOME, current: "Not An Id" } } };
+  assert.equal(await currentCache.write(SERVER_ID, damaged), true);
+  const reread = await currentCache.read(SERVER_ID);
+  assert.deepEqual(reread?.drawer, { memberCount: 3 });
+  assert.equal(await currentCache.write(SERVER_ID, value), true);
+  return read.drawer;
 });
 
 await check("new code makes the workspace part ready before it decodes the pages", async () => {

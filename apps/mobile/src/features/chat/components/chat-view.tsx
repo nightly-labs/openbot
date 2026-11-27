@@ -45,11 +45,7 @@ import {
   type PendingChatMessage,
   presentChatMessages,
 } from "@/features/chat/model/chat-messages";
-import {
-  answerlessTurnSummaries,
-  finishedTurnSummaries,
-  type TurnStepsSummary,
-} from "@/features/chat/model/turn-thinking";
+import { answerlessTurnSummaries, chatTurnSummaries, type TurnStepsSummary } from "@/features/chat/model/turn-thinking";
 import { useChatBackgroundColor } from "@/features/settings/model/chat-background";
 import { useChatRowShown, useThinkingDisplayPreference } from "@/features/settings/model/chat-details";
 import { liveVoiceWebRtc } from "@/features/voice/model/live-voice-webrtc";
@@ -201,9 +197,9 @@ const OPEN_TRANSITION_DEADLINE_MS = 700;
 
 const NO_TURN_IDS: readonly string[] = [];
 
-function finishedTurnIdsOf(messages: readonly ConversationMessage[], activeTurnId: string | null): string[] {
+function turnIdsOf(messages: readonly ConversationMessage[]): string[] {
   const ids = new Set<string>();
-  for (const message of messages) if (message.turnId && message.turnId !== activeTurnId) ids.add(message.turnId);
+  for (const message of messages) if (message.turnId) ids.add(message.turnId);
   return [...ids];
 }
 
@@ -436,21 +432,28 @@ export function ChatView({
   const queueCount = queueRows.length + (queuePending ? 1 : 0);
   usePublishedQueuedChat(queue?.chatId ?? `${target.serverId}:${target.id}`, queue ?? null, queuePending);
   const conversationMessages = conversation?.messages;
-  const conversationTurnId = conversation?.activeTurnId ?? null;
-  const lastFinishedTurnIds = useRef<readonly string[]>(NO_TURN_IDS);
-  const finishedTurnIds = useMemo(() => {
-    lastFinishedTurnIds.current =
+  const pageTurnId = conversation?.activeTurnId ?? null;
+  const liveTurnId = activity?.turnId ?? null;
+  const [runningTurnSeen, setRunningTurnSeen] = useState<string | null>(null);
+  useEffect(() => {
+    if (liveTurnId) setRunningTurnSeen(liveTurnId);
+  }, [liveTurnId]);
+  const turnEndedBeforePage = pageTurnId !== null && runningTurnSeen === pageTurnId && !activity && showsOnline(server);
+  const conversationTurnId = turnEndedBeforePage ? null : pageTurnId;
+  const lastTurnIds = useRef<readonly string[]>(NO_TURN_IDS);
+  const turnIds = useMemo(() => {
+    lastTurnIds.current =
       conversationMessages && target.kind === "agent"
-        ? keptTurnIds(finishedTurnIdsOf(conversationMessages, conversationTurnId), lastFinishedTurnIds.current)
+        ? keptTurnIds(turnIdsOf(conversationMessages), lastTurnIds.current)
         : NO_TURN_IDS;
-    return lastFinishedTurnIds.current;
-  }, [conversationMessages, conversationTurnId, target.kind]);
-  const turnLines = useTurnStepLinesOf(target.serverId, finishedTurnIds);
+    return lastTurnIds.current;
+  }, [conversationMessages, target.kind]);
+  const turnLines = useTurnStepLinesOf(target.serverId, turnIds);
   const lastTurnSummaries = useRef<ReadonlyMap<string, TurnStepsSummary> | undefined>(undefined);
   const agentTurnSummaries = useMemo(() => {
     lastTurnSummaries.current =
       conversationMessages && target.kind === "agent"
-        ? finishedTurnSummaries(conversationMessages, conversationTurnId, turnLines, lastTurnSummaries.current)
+        ? chatTurnSummaries(conversationMessages, conversationTurnId, turnLines, lastTurnSummaries.current)
         : undefined;
     return lastTurnSummaries.current;
   }, [conversationMessages, conversationTurnId, turnLines, target.kind]);
@@ -510,9 +513,10 @@ export function ChatView({
           : [
               {
                 message: outboxRow(outbox, message),
-                baseline: outboxSnapshot.storing.has(message.clientMessageId)
-                  ? (sendBaselines.current.get(message.clientMessageId) ?? null)
-                  : null,
+                baseline:
+                  message.messageId !== null || outboxSnapshot.storing.has(message.clientMessageId)
+                    ? (sendBaselines.current.get(message.clientMessageId) ?? null)
+                    : null,
                 serverId: message.messageId,
               },
             ],
@@ -529,8 +533,12 @@ export function ChatView({
     [projectedMessages, pendingMessages, messageAliases, queuedMessageIds],
   );
   useEffect(() => {
-    for (const id of sendBaselines.current.keys())
-      if (!outboxSnapshot.storing.has(id)) sendBaselines.current.delete(id);
+    const projectedIds = sendBaselines.current.size ? new Set(projectedMessages.map((message) => message.id)) : null;
+    for (const id of sendBaselines.current.keys()) {
+      const hostId = outboxMessages.find((message) => message.clientMessageId === id)?.messageId ?? null;
+      const awaitsHostCopy = hostId !== null && !projectedIds?.has(hostId);
+      if (!outboxSnapshot.storing.has(id) && !awaitsHostCopy) sendBaselines.current.delete(id);
+    }
     for (const id of routedSends.current) {
       const message = outboxMessages.find((item) => item.clientMessageId === id);
       if (message?.state === "sending" || message?.state === "sent") continue;

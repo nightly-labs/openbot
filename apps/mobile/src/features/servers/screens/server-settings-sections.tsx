@@ -355,7 +355,9 @@ export function ServerGeneralSection({ serverId }: { serverId: string }) {
   const signalHomeAccess = useServerRow(serverId, (checks) => checks.servesServerSignalHome(serverId));
   const signalHomes = signalHome.query.data;
   const signalHomeRow = signalHome.query.isError || (signalHomes?.homes.length ?? 0) > 1 ? signalHomeAccess : "hidden";
-  const signalHomeInUse = signalHomes?.homes.find((home) => home.id === signalHomes.current);
+  const signalHomeInUse = signalHome.served
+    ? signalHomes?.homes.find((home) => home.id === signalHomes.current)
+    : undefined;
   const updateShown = Boolean(update.access || update.query.data) || updateRow === "disabled";
   if (!updateShown && timezoneRow === "hidden" && agentsRow === "hidden" && signalHomeRow === "hidden") return null;
   const zone = timezone.query.data;
