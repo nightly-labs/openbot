@@ -116,6 +116,8 @@ export const messages = {
   "marketplace.app.attention": "דורש תשומת לב",
   "marketplace.app.partialTitle": "{name} אינו שלם",
   "marketplace.app.partialDescription": "חלק מהאפליקציות או המיומנויות שלו לא הותקנו. חיבור מחדש יתקין אותן.",
+  "marketplace.app.pausedTitle": "{name} כבוי",
+  "marketplace.app.pausedDescription": "הסוכנים לא מקבלים את הכלים של {name}. חיבור מחדש יפעיל אותו.",
   "marketplace.app.notConnected": "לא מחובר",
   "marketplace.app.paused": "מושהה",
   "marketplace.app.custom": "שרת MCP",
