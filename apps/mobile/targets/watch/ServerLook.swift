@@ -76,11 +76,20 @@ extension UIColor {
   }
 }
 
+private struct ThemedKey: EnvironmentKey {
+  static let defaultValue = true
+}
+
 private struct ServerPaletteKey: EnvironmentKey {
   static let defaultValue: ServerPalette? = nil
 }
 
 extension EnvironmentValues {
+  var themed: Bool {
+    get { self[ThemedKey.self] }
+    set { self[ThemedKey.self] = newValue }
+  }
+
   var serverPalette: ServerPalette? {
     get { self[ServerPaletteKey.self] }
     set { self[ServerPaletteKey.self] = newValue }

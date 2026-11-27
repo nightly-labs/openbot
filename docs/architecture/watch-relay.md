@@ -127,7 +127,9 @@ JSON body `WatchRelayHttpRequest { v: 1, ts, sealed, proof }`, at most `WATCH_RE
   uses the color for the home background, the server rows and the tones of the home text, dots and
   unread badges (`ServerPalette`). When the picture has a
   clear main color, the watch uses that color instead. The agent list shows the same background as the
-  home screen, moved by one page, so the logo continues across the two pages. When a host reply has no
+  home screen, moved by one page, so the logo continues across the two pages. The Settings page, left of the
+  home screen, has a switch for these colors (`openbot.watch.theme` in the watch's user defaults). When it
+  is off, the home screen and the list are black with no logo, and the Servers list does not change. When a host reply has no
   logo, the watch keeps the one from the phone; with neither, it uses `accent`.
 - Each `WatchAgent` in the phone's snapshot can carry `faces` (`waiting`, `working`): the names of the
   agent's picture with that face. The phone draws them; the host does not send faces, so the watch keeps

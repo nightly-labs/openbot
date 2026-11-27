@@ -35,6 +35,7 @@ final class WatchSession: NSObject, ObservableObject {
   static let pairFailureRetry: TimeInterval = 30
   static let urlScheme = "openbot-watch"
   static let serverKey = "openbot.watch.server"
+  static let themeKey = "openbot.watch.theme"
   static let shared = WatchSession()
 
   private static let snapshotKey = "openbot.watch.snapshot"

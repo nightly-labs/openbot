@@ -151,11 +151,12 @@ struct AgentRow: View {
   static let workingTint = Color(white: 0.8)
 
   @Environment(\.watchText) private var text
+  @Environment(\.themed) private var themed
   let agent: WatchAgent
   var divided = false
 
   var body: some View {
-    let style = AgentStateStyle(agent: agent, text: text, working: Self.workingTint)
+    let style = AgentStateStyle(agent: agent, text: text, working: themed ? Self.workingTint : .blue)
     NavigationLink(value: WatchRoute.agent(agent.key)) {
       HStack(spacing: 8) {
         AgentAvatar(agent: agent, size: 32)

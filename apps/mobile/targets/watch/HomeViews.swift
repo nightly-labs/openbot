@@ -1,6 +1,7 @@
 import SwiftUI
 
 enum HomePage: Hashable {
+  case settings
   case summary
   case list
 }
@@ -8,6 +9,7 @@ enum HomePage: Hashable {
 struct HomeView: View {
   @EnvironmentObject private var session: WatchSession
   @Environment(\.scenePhase) private var scenePhase
+  @Environment(\.themed) private var themed
   let snapshot: WatchReadySnapshot
   @Binding var path: [WatchRoute]
   @AppStorage(WatchSession.serverKey) private var chosenServerId = ""
@@ -15,22 +17,28 @@ struct HomeView: View {
 
   var body: some View {
     TabView(selection: $page) {
+      WatchSettingsView()
+        .tag(HomePage.settings)
       SummaryView(snapshot: shown, serverCount: snapshot.servers.count, path: $path)
         .background {
-          if let server { ServerBackdrop(server: server, tint: session.tint(server, accent: snapshot.accent)) }
+          if themed, let server { ServerBackdrop(server: server, tint: tint(server)) }
         }
         .tag(HomePage.summary)
       AgentListView(snapshot: shown) { path.append($0) }
         .background {
-          if let server { ServerBackdrop(server: server, tint: session.tint(server, accent: snapshot.accent), page: 1) }
+          if themed, let server { ServerBackdrop(server: server, tint: tint(server), page: 1) }
         }
         .tag(HomePage.list)
     }
     .tabViewStyle(.page(indexDisplayMode: .always))
-    .environment(\.serverPalette, server.flatMap { ServerPalette(tint: session.tint($0, accent: snapshot.accent)) })
+    .environment(\.serverPalette, themed ? server.flatMap { ServerPalette(tint: tint($0)) } : nil)
     .onChange(of: scenePhase) { previous, phase in
       if previous == .background, phase != .background, path.isEmpty { page = .summary }
     }
+  }
+
+  private func tint(_ server: WatchServer) -> Color {
+    session.tint(server, accent: snapshot.accent)
   }
 
   private var shown: WatchReadySnapshot {
@@ -247,5 +255,23 @@ struct ServerPickerView: View {
       .listRowBackground(ServerRowBackdrop(server: server, tint: tint))
     }
     .navigationTitle(text(TextKey.servers))
+  }
+}
+
+struct WatchSettingsView: View {
+  @Environment(\.watchText) private var text
+  @AppStorage(WatchSession.themeKey) private var themed = true
+
+  var body: some View {
+    List {
+      Section {
+        Toggle(text(TextKey.settingsTheme), isOn: $themed)
+      } header: {
+        Text(text(TextKey.settingsTitle))
+          .textCase(nil)
+      } footer: {
+        Text(text(TextKey.settingsThemeDetail))
+      }
+    }
   }
 }
