@@ -250,12 +250,25 @@ export const readCgroupRoot = Effect.fn("ServerMemory.readCgroupRoot")(function*
   return path === null ? null : `/sys/fs/cgroup${splitServiceCgroup(path) ?? path}`;
 });
 
-const readAgentCgroupProcs = Effect.fn("ServerMemory.readAgentCgroupProcs")(function* () {
+interface AgentCgroup {
+  procs: string;
+  mainMembership: string;
+}
+
+const readAgentCgroup = Effect.fn("ServerMemory.readAgentCgroup")(function* () {
   const path = yield* readOwnCgroup();
   const service = path === null ? null : splitServiceCgroup(path);
-  if (service === null) return null;
+  if (path === null || service === null) return null;
   const procs = `/sys/fs/cgroup${service}${AGENT_CGROUP}/cgroup.procs`;
-  return (yield* optionalMemoryIO(() => access(procs, constants.W_OK))) === null ? null : procs;
+  const writable = yield* optionalMemoryIO(() => access(procs, constants.W_OK).then(() => true));
+  if (writable !== true) return null;
+  return { procs, mainMembership: `0::${path}` } satisfies AgentCgroup;
+});
+
+const moveToAgentCgroup = Effect.fn("ServerMemory.moveToAgentCgroup")(function* (cgroup: AgentCgroup, pid: number) {
+  const membership = yield* optionalMemoryIO(() => readFile(`/proc/${pid}/cgroup`, "utf8"));
+  if (membership?.trim() !== cgroup.mainMembership) return;
+  yield* optionalMemoryIO(() => writeFile(cgroup.procs, String(pid)));
 });
 
 const readUnitMemory = Effect.fn("ServerMemory.readUnit")(function* () {
@@ -295,16 +308,16 @@ interface Classification {
 
 class AgentProcesses {
   readonly #known = new Map<number, Classification>();
-  #agentCgroupProcs: string | null | undefined;
+  #agentCgroup: AgentCgroup | null | undefined;
   readonly #stopping = new Map<number, { start: string; at: number; killed: boolean }>();
 
   update = Effect.fn("ServerMemory.agentProcesses")(function* (this: AgentProcesses, neededBytes: number, now: number) {
     const electron = yield* optionalMemoryIO(() => readlink("/proc/self/exe"));
     if (electron === null) return [];
-    if (this.#agentCgroupProcs === undefined) {
-      this.#agentCgroupProcs = yield* readAgentCgroupProcs().pipe(Effect.catch(() => Effect.succeed(null)));
+    if (this.#agentCgroup === undefined) {
+      this.#agentCgroup = yield* readAgentCgroup().pipe(Effect.catch(() => Effect.succeed(null)));
     }
-    const agentCgroupProcs = this.#agentCgroupProcs;
+    const agentCgroup = this.#agentCgroup;
     const entries = (yield* Effect.forEach(
       (yield* optionalMemoryIO(() => readdir("/proc"))) ?? [],
       (entry) => (/^\d+$/.test(entry) ? readProcessEntry(Number(entry)) : Effect.succeed(null)),
@@ -362,9 +375,9 @@ class AgentProcesses {
             yield* optionalMemoryIO(() => writeFile(path, String(CHILD_OOM_SCORE_ADJ)));
           }
           if (!known.marked) return;
-          if (agentCgroupProcs !== null && !known.grouped) {
+          if (agentCgroup !== null && !known.grouped) {
             known.grouped = true;
-            yield* optionalMemoryIO(() => writeFile(agentCgroupProcs, String(entry.pid)));
+            yield* moveToAgentCgroup(agentCgroup, entry.pid);
           }
           for (const thread of (yield* optionalMemoryIO(() => readdir(`/proc/${entry.pid}/task`))) ?? []) {
             const tid = Number(thread);

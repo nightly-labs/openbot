@@ -897,8 +897,10 @@ Agent processes (`AgentProcesses` in `src/main/server-memory.ts`):
   variable still finds them. Xvfb, D-Bus and the keyring start before main and do not have it.
 - Every 5 s, each marked process gets an `oom_score_adj` of at least 500, also after it leaves main's
   tree, and each of its threads gets the nice value 10. When main runs in the child cgroup `main`
-  of the unit, main also moves each new marked process into `agents`, one time. The programs that
-  the process starts after that are in `agents` from their start. `readCgroupRoot` gives the unit
+  of the unit, main also moves each new marked process that is still in `main` into `agents`, one
+  time. The programs that the process starts after that are in `agents` from their start.
+  `bun run test:server-agent-cgroup` checks the split and the move in a delegated user unit named
+  `openbot.service` (Linux, systemd user manager). `readCgroupRoot` gives the unit
   cgroup, not `main`, so the memory guard and the machine metrics still read the limits of the unit. Main and the Electron processes keep their
   values. The Computer Use driver and remote desktop get the OOM value as children of main, but keep
   their nice value. So a full CPU slows the agents' builds and not main or the WebRTC host. Without
