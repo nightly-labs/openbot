@@ -70,6 +70,13 @@ export type ChannelSettingsAgents = Pick<
   | "listChannelRoutineRuns"
 >;
 
+const DEFAULT_CHANNEL_PAGE_LIMIT = 100;
+const REMOTE_INITIAL_CHANNEL_PAGE_LIMIT = 24;
+
+function firstChannelPageLimit(messagesAfterRead: number): number {
+  return Math.min(DEFAULT_CHANNEL_PAGE_LIMIT, Math.max(REMOTE_INITIAL_CHANNEL_PAGE_LIMIT, messagesAfterRead + 1));
+}
+
 export async function routeChannels(
   context: TeamApiRequestContext,
   channels: ChannelService | undefined,
@@ -101,6 +108,7 @@ export async function routeChannels(
         capabilities,
         hiddenAgentIds,
         channelHiddenAgentIds,
+        memberId: member.id,
       }),
     );
   }
@@ -143,14 +151,19 @@ export function channelReadPage(
     capabilities: ReadonlySet<string>;
     hiddenAgentIds: ReadonlySet<string>;
     channelHiddenAgentIds: ReadonlySet<string>;
+    memberId?: string;
   },
 ) {
-  const { capabilities, hiddenAgentIds, channelHiddenAgentIds } = viewer;
+  const { capabilities, hiddenAgentIds, channelHiddenAgentIds, memberId } = viewer;
   const seenSubtasks = capabilities.has(CHANNEL_SEEN_SUBTASKS_CAPABILITY);
   const taskWaits = capabilities.has(CHANNEL_TASK_WAITS_CAPABILITY) && beforeSequence === undefined;
   const settingLinks = capabilities.has(SETTING_LINK_MARKERS_CAPABILITY);
   const pageTasksOnly = capabilities.has(CHANNEL_PAGE_TASKS_CAPABILITY);
-  const newest = channels.store.pageWithoutExtent(channelId, beforeSequence, 100);
+  const initialLimit =
+    beforeSequence === undefined && memberId !== undefined
+      ? firstChannelPageLimit(channels.store.messagesAfterRead(channelId, memberId, DEFAULT_CHANNEL_PAGE_LIMIT))
+      : DEFAULT_CHANNEL_PAGE_LIMIT;
+  const newest = channels.store.pageWithoutExtent(channelId, beforeSequence, initialLimit);
   const tasks =
     seenSubtasks && beforeSequence === undefined
       ? channels.store.withSeenDependencies(channelId, newest.tasks)
@@ -162,7 +175,7 @@ export function channelReadPage(
     const kept = waits.filter((wait) => value.tasks.some((task) => task.id === wait.taskId));
     return kept.length ? { ...value, waits: kept } : value;
   };
-  for (let limit = 100; ; limit = Math.floor(limit / 2)) {
+  for (let limit = initialLimit; ; limit = Math.floor(limit / 2)) {
     const messages = newest.messages.slice(-limit);
     const hasOlder = newest.olderCursor !== null || newest.messages.length > limit;
     const olderCursor = hasOlder ? (messages[0]?.sequence ?? null) : null;
