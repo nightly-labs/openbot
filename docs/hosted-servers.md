@@ -335,7 +335,7 @@ a Claude subscription on a server, read [provider terms](provider-terms.md#claud
 
 The plan sets the number of active members, owner included: Starter 1, Standard 5 and Pro 10
 (`BILLING_PLANS`). A host with no plan, such as a self-hosted server, takes the users of its owner's
-license (`ownerLicenseForHost`): Starter 1, Team 2 to 10. Only a license that is `active`, `trialing`, or
+license (`ownerLicenseForHost`): Starter 1, Team 2 to 25. Only a license that is `active`, `trialing`, or
 `past_due` until the end of its period gives these seats. A host with no plan and no such license has 3
 (`DEFAULT_TEAM_MEMBER_LIMIT`). The Worker reads the limit in this order: a `server_member_limits` row,
 a hosted plan, the license, the default. A self-hosted host can keep a plan from before the license; it
@@ -802,8 +802,9 @@ background. Main rewrites `~/.config/OpenBot/openbot-run-marker-v1.json` every 6
 loop (`src/main/run-marker.ts`). The watchdog reads the file every 30 s. When the content does not
 change in 20 reads (10 minutes) after it changed once in this run, the watchdog logs "OpenBot did not
 update its heartbeat for 600 seconds" and sends `SIGKILL` to the process in
-`/run/openbot/openbot.pid`. `Restart=always` starts the service again 10 s later. The watchdog does
-nothing:
+`/run/openbot/openbot.pid`. `Restart=always` starts the service again 10 s later. The Docker
+entrypoint (`scripts/hosting/openbot-container`) starts the same watchdog; there the container exits
+and its restart policy starts it again. The watchdog does nothing:
 
 - before the first change of the file in this run;
 - until the start finishes: `openbot-start-attempts-v1.json` in the same folder has

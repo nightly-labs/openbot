@@ -43,6 +43,7 @@
     "./hosted-sites": "./src/hosted-sites.ts",
     "./host-grant": "./src/host-grant.ts",
     "./host-key-handover": "./src/host-key-handover.ts",
+    "./browser-extension": "./src/browser-extension.ts",
     "./browser-extension-x": "./src/browser-extension-x.ts",
     "./input-limits": "./src/input-limits.ts",
     "./invite-links": "./src/invite-links.ts",
@@ -112,6 +113,7 @@
     "./team-protocol/provider-account-code-v1": "./src/team-protocol/provider-account-code-v1.ts",
     "./team-protocol/provider-account-keys-v1": "./src/team-protocol/provider-account-keys-v1.ts",
     "./team-protocol/provider-account-pool-v1": "./src/team-protocol/provider-account-pool-v1.ts",
+    "./team-protocol/provider-account-pool-strategy-v1": "./src/team-protocol/provider-account-pool-strategy-v1.ts",
     "./team-protocol/provider-many-accounts-v1": "./src/team-protocol/provider-many-accounts-v1.ts",
     "./team-protocol/provider-accounts-v1": "./src/team-protocol/provider-accounts-v1.ts",
     "./team-protocol/provider-sign-in-relay-v2": "./src/team-protocol/provider-sign-in-relay-v2.ts",
@@ -248,6 +250,7 @@
     "./team-protocol/workflows-credit-media-v1": "./src/team-protocol/workflows-credit-media-v1.ts",
     "./team-protocol/workflows-media-catalog-v2": "./src/team-protocol/workflows-media-catalog-v2.ts",
     "./team-protocol/workflows-media-transparent-v1": "./src/team-protocol/workflows-media-transparent-v1.ts",
+    "./team-protocol/workflows-media-clips-v1": "./src/team-protocol/workflows-media-clips-v1.ts",
     "./team-protocol/workflows-media-size-v1": "./src/team-protocol/workflows-media-size-v1.ts",
     "./team-protocol/workflows-v1": "./src/team-protocol/workflows-v1.ts",
     "./team-protocol/workflow-folders-v1": "./src/team-protocol/workflow-folders-v1.ts",
@@ -323,6 +326,7 @@
     "./team-protocol/host-signal-home-v1": "./src/team-protocol/host-signal-home-v1.ts",
     "./team-protocol/host-timezone-v1": "./src/team-protocol/host-timezone-v1.ts",
     "./team-protocol/ui-block-location-v1": "./src/team-protocol/ui-block-location-v1.ts",
+    "./team-protocol/near-payment-v1": "./src/team-protocol/near-payment-v1.ts",
     "./team-protocol/host-turn-limits-events-v1": "./src/team-protocol/host-turn-limits-events-v1.ts",
     "./team-protocol/host-turn-limits-v1": "./src/team-protocol/host-turn-limits-v1.ts",
     "./team-protocol/host-appearance-v1": "./src/team-protocol/host-appearance-v1.ts",
@@ -384,7 +388,10 @@
     "./team-protocol/capability-limits": "./src/team-protocol/capability-limits.ts",
     "./team-protocol/v9-webrtc-adapter": "./src/team-protocol/v9-webrtc-adapter.ts",
     "./team-protocol/v10": "./src/team-protocol/v10.ts",
-    "./team-protocol/v10-webrtc-adapter": "./src/team-protocol/v10-webrtc-adapter.ts"
+    "./team-protocol/v10-webrtc-adapter": "./src/team-protocol/v10-webrtc-adapter.ts",
+    "./watch-protocol": "./src/watch-protocol.ts",
+    "./signal-protocol/watch-relay": "./src/signal-protocol/watch-relay.ts",
+    "./team-protocol/watch-relay-v1": "./src/team-protocol/watch-relay-v1.ts"
   },
   "scripts": {
     "typecheck": "bun ../../scripts/type-checker.ts --noEmit -p tsconfig.json"

@@ -259,6 +259,11 @@ export const messages = {
   "provider.account.pool": "계정 풀 사용",
   "provider.account.poolDescription":
     "에이전트는 사용량 한도에 가까워질 때까지 한 계정을 쓰고, 그다음 한도가 가장 먼저 초기화되는 계정을 써요.",
+  "provider.account.poolStrategy": "계정 사용 방식",
+  "provider.account.poolFillFirst": "먼저 채우기",
+  "provider.account.poolSpread": "분산",
+  "provider.account.poolSpreadDescription":
+    "에이전트가 사용량이 가장 많이 남은 계정에 나뉘어요. 다른 계정에 여유가 훨씬 많을 때만 에이전트가 계정을 바꿔요.",
   "provider.account.inUse": "사용 중",
   "provider.account.notInPool": "풀 제외",
   "provider.account.leaveOutOfPool": "풀에서 제외",

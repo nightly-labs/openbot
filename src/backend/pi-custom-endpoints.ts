@@ -3,7 +3,12 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import type { CustomProviderReasoningEffort } from "@openbot/contracts/ipc";
 import { Effect } from "effect";
-import { type CustomProviderConfig, customModelOutputLimit, isMistralApi } from "./opencode-config";
+import {
+  type CustomProviderConfig,
+  customModelOutputLimit,
+  customProviderSecretValues,
+  isMistralApi,
+} from "./opencode-config";
 import type { PiMcpExtension } from "./pi-mcp";
 import { providerCall } from "./provider-client-effects";
 
@@ -17,6 +22,7 @@ interface EndpointPayload {
   readonly api: "openai-completions" | "mistral-conversations";
   readonly baseUrl: string;
   readonly apiKey: string | null;
+  readonly authHeader: boolean;
   readonly headers: Readonly<Record<string, string>>;
   readonly models: readonly PiModelPayload[];
   readonly compat?: PiCompat;
@@ -89,6 +95,7 @@ const SOURCE = `export default function (pi) {
       baseUrl: endpoint.baseUrl,
       api: endpoint.api,
       apiKey: endpoint.apiKey ? literal(endpoint.apiKey) : "openbot",
+      ...(endpoint.authHeader ? { authHeader: true } : {}),
       headers: Object.fromEntries(Object.entries(endpoint.headers).map(([name, value]) => [name, literal(value)])),
       models: endpoint.models.map((model) => ({
         type: "chat",
@@ -108,11 +115,13 @@ const SOURCE = `export default function (pi) {
 `;
 
 function payload(endpoint: CustomProviderConfig): EndpointPayload {
+  const piApi = piEndpoint(endpoint.baseUrl);
   return {
     id: endpoint.id,
     name: endpoint.name,
-    ...piEndpoint(endpoint.baseUrl),
+    ...piApi,
     apiKey: endpoint.apiKey,
+    authHeader: piApi.api === "openai-completions" && Boolean(endpoint.apiKey),
     headers: Object.fromEntries(endpoint.headers.map((header) => [header.name, header.value])),
     models: endpoint.models.map((model) => {
       const contextWindow = model.contextWindow ?? DEFAULT_CONTEXT_WINDOW;
@@ -129,14 +138,7 @@ function payload(endpoint: CustomProviderConfig): EndpointPayload {
 }
 
 export function piCustomEndpointSecrets(endpoints: readonly CustomProviderConfig[]): string[] {
-  return endpoints
-    .filter((endpoint) => endpoint.models.length > 0)
-    .flatMap((endpoint) => {
-      const names = new Set([endpoint.id.toLowerCase(), endpoint.name.toLowerCase()]);
-      return [endpoint.apiKey ?? "", ...endpoint.headers.map((header) => header.value)].filter(
-        (value) => value.length > 0 && !names.has(value.toLowerCase()),
-      );
-    });
+  return customProviderSecretValues(endpoints.filter((endpoint) => endpoint.models.length > 0));
 }
 
 export const createPiCustomEndpointExtension = Effect.fn("PiCustomEndpoints.createExtension")(function* (

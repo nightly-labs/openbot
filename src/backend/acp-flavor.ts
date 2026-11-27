@@ -83,7 +83,6 @@ export interface AcpFlavor {
     savedKeyShadowed: () => boolean,
   ): string;
   failureCause?(error: unknown, answer: string): CauseCode | null;
-  unexplainedFailureVerification?(error: unknown, detail: string, message: string): string | null;
   failureReport?: RegExp;
   emptyAnswerFailure?(
     turn: { reasoned: boolean; answered: boolean; showedPlanOrCompaction: boolean },
@@ -570,6 +569,7 @@ function customFailureCause(error: unknown): CauseCode | null {
 }
 
 const OMP_ACP_FLAVOR: AcpFlavor = {
+  reopenKeepsPrompts: true,
   sessionNotFound: ompSessionNotFound,
   emptyAnswerFailure: customEmptyAnswerFailure,
   turnFailure: customTurnFailure,

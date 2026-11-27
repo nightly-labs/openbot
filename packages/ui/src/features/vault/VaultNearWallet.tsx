@@ -51,7 +51,7 @@ import {
   usdNumber,
 } from "./near-wallet-parts";
 
-export { NearAddFundsDialog, NearSetupDialog } from "./near-wallet-dialogs";
+export { NearAddFundsDialog, NearBudgetDialog, NearSetupDialog } from "./near-wallet-dialogs";
 export type { NearWalletActions, NearWalletAgent } from "./near-wallet-parts";
 
 export interface VaultNearWalletProps {

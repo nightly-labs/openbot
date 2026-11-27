@@ -90,6 +90,8 @@ export const messages = {
     "Bitwarden konnte auf diesem Server nicht entsperrt werden. Prüfe das Master-Passwort und verbinde dann erneut.",
   "error.connector.bitwardenCliInstallFailed":
     "Die Bitwarden CLI konnte auf diesem Server nicht installiert werden. Prüfe seine Netzwerkverbindung und verbinde dann erneut.",
+  "error.connector.bitwardenCliCannotStart":
+    "Die Bitwarden CLI ist auf diesem Server nicht gestartet. Verbinde erneut. Wenn sie dann noch nicht startet, wähle Hilfe > Problem melden.",
   "error.connector.bitwardenFileUnreadable": "Die Bitwarden-Verbindungsdatei ist nicht lesbar.",
   "error.connector.passwordManagerUnknown": "OpenBot kennt diesen Passwortmanager nicht.",
   "error.connector.passwordManagerMethod": "Dieser Passwortmanager kann sich so nicht verbinden.",

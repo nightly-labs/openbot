@@ -4123,7 +4123,8 @@ export class BrowserHost {
       );
     });
     contents.on("console-message", (...eventArgs) => {
-      if (this.#takeoverTabIds.has(tab.id) || this.#userControlTabIds.has(tab.id) || tab.secret) return;
+      if (this.#takeoverTabIds.has(tab.id) || this.#userControlTabIds.has(tab.id) || tab.secret || tab.secretDocument)
+        return;
       const details = readConsoleMessage(eventArgs);
       if (!details) return;
       tab.diagnostics.add({
@@ -4677,7 +4678,7 @@ export class BrowserHost {
         `A ${dialog.type} dialog is open in this tab: ${JSON.stringify(dialog.message)}. Answer it first with handle_dialog, dialogId ${dialog.id}.`,
       );
     throw new Error(
-      "A dialog is open in this tab, and only a person can answer it. Ask the user to answer it, then try again.",
+      `A ${dialog.type} dialog is open in this tab, and only a person can answer it: ${JSON.stringify(dialog.message)}. Ask the user to answer it, then try again.`,
     );
   }
 

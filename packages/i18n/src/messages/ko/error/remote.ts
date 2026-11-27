@@ -95,6 +95,8 @@ export const messages = {
     "OpenBot이 이 서버와 연결을 시작하지 못했어요. 문제가 계속되면 OpenBot을 종료하고 다시 여세요.",
   "error.remote.connectionServiceUnreachable":
     "이 컴퓨터가 OpenBot 연결 서비스에 연결할 수 없어요. 인터넷 연결을 확인하세요. OpenBot이 자동으로 다시 연결해요.",
+  "error.remote.deviceConnectionServiceUnreachable":
+    "이 기기가 OpenBot 연결 서비스에 연결할 수 없어요. 인터넷 연결과 VPN을 확인하세요. OpenBot이 자동으로 다시 연결해요.",
   "error.remote.serverAnswerTimeout": "서버가 제때 응답하지 않았어요. OpenBot이 자동으로 다시 연결해요.",
   "error.remote.signInConnectionClosed":
     "로그인 중에 서버 연결이 끊겼어요. 계속 그러면 서버와 이 기기의 날짜와 시간이 맞는지 확인하세요.",

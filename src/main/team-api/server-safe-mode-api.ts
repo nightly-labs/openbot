@@ -88,7 +88,12 @@ export function handleServerSafeModeRequest(
   options: ServerSafeModeApiOptions,
 ): void {
   const method = request.method ?? "GET";
-  const path = new URL(request.url ?? "/", "http://127.0.0.1").pathname;
+  const url = URL.parse(request.url ?? "/", "http://127.0.0.1");
+  if (!url) {
+    send(response, 400, { error: sourceText("error.team.requestFailed") });
+    return;
+  }
+  const path = url.pathname;
   const appVersion = options.reason.appVersion;
   if (method === "GET" && path === TEAM_API_ROUTES.compatibility) {
     send(response, 200, serverSafeModeCompatibility(appVersion, requestProtocol(request)));

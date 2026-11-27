@@ -11,11 +11,16 @@ export interface NearPaymentRequest {
   reason: string;
 }
 
-export type NearPaymentPlan = { kind: "auto" } | { kind: "ask"; amount: string; symbol: string };
+export interface NearPaymentPlan {
+  kind: "auto" | "ask";
+  amount: string;
+  symbol: string;
+}
 
 export interface NearPaymentResult {
   status: "paid" | "declined" | "failed" | "uncertain";
   correlationId: string | null;
+  transactionHash: string | null;
   detail: string | null;
 }
 

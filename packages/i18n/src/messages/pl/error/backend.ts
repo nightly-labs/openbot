@@ -361,6 +361,7 @@ export const messages = {
     "Ten komputer zablokował połączenie z serwerem. Sprawdź zaporę lub oprogramowanie zabezpieczające i spróbuj ponownie.",
   "error.backend.mcpServerIncompatible":
     "Pod tym adresem coś odpowiedziało, ale nie jako serwer MCP przez Streamable HTTP. Sprawdź URL i zaktualizuj aplikację, która uruchamia serwer.",
+  "error.backend.mcpServerKeyNotAccepted": "Serwer nie przyjął klucza API. Sprawdź klucz i spróbuj ponownie.",
   "error.backend.mcpRemoteBridge":
     "{reason} To polecenie uruchamia most mcp-remote. Zamiast tego wybierz Streamable HTTP z URL {url}, a OpenBot cię zaloguje.",
   "error.backend.oauthNotHttps":

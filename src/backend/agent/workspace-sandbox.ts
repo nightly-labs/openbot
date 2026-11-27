@@ -1,8 +1,9 @@
-import { stat } from "node:fs/promises";
+import { lstat, readlink, realpath, stat } from "node:fs/promises";
 import { tmpdir } from "node:os";
-import { isAbsolute } from "node:path";
+import { dirname, isAbsolute, join, parse, resolve } from "node:path";
 import { type AgentSummary, workspaceAccessEnforced } from "@openbot/contracts/ipc";
 import { Effect } from "effect";
+import { isMissingFileError } from "../file-errors";
 import { isPathInside } from "../path-containment";
 
 type SandboxedAgent = Pick<AgentSummary, "id" | "access" | "additionalFolders" | "provider" | "workspacePath">;
@@ -92,23 +93,119 @@ export function workspaceTemporaryPaths(platform: NodeJS.Platform = process.plat
   return [...new Set(platform === "win32" ? [tmpdir()] : ["/tmp", tmpdir()])];
 }
 
-export function codexSandboxPolicy(agent: SandboxedAgent, sharedRoot: string): CodexSandboxPolicy {
+export function agentWriteAreas(
+  agents: readonly Pick<AgentSummary, "id" | "access" | "additionalFolders" | "workspacePath">[],
+  sharedRoot: string,
+): string[] {
+  return [
+    ...new Set([
+      sharedRoot,
+      ...workspaceTemporaryPaths(),
+      ...agents
+        .filter(workspaceAccessEnforced)
+        .flatMap((agent) => [agent.workspacePath, ...effectiveAgentFolders(agent)]),
+    ]),
+  ];
+}
+
+export const sandboxWritePaths = Effect.fn("sandboxWritePaths")(function* (
+  paths: readonly string[],
+  writeAreas: readonly string[],
+) {
+  const areas = yield* Effect.forEach([...new Set([...writeAreas, ...paths])], realOrResolved, {
+    concurrency: "unbounded",
+  });
+  const resolved = yield* Effect.forEach(paths, (path) => fixedRealPath(path, areas), { concurrency: "unbounded" });
+  return [
+    ...new Set(
+      paths.flatMap((path, index) => {
+        const real = resolved[index];
+        return real ? [path, real] : [path];
+      }),
+    ),
+  ];
+});
+
+const MAX_LINKS = 40;
+
+const fixedRealPath = Effect.fn("fixedRealPath")(function* (path: string, areas: readonly string[]) {
+  if (!isAbsolute(path)) return null;
+  let real = parse(path).root;
+  const pending = pathNames(path.slice(real.length));
+  let links = 0;
+  for (let name = pending.shift(); name !== undefined; name = pending.shift()) {
+    if (name === ".") continue;
+    if (name === "..") {
+      real = dirname(real);
+      continue;
+    }
+    const next = join(real, name);
+    const entry = yield* pathEntry(next);
+    if (entry.kind === "missing") return resolve(next, ...pending);
+    if (entry.kind === "unknown") return null;
+    if (entry.kind === "entry") {
+      real = next;
+      continue;
+    }
+    links += 1;
+    if (links > MAX_LINKS || areas.some((area) => isPathInside(area, real))) return null;
+    const targetRoot = isAbsolute(entry.target) ? parse(entry.target).root : "";
+    if (targetRoot) real = targetRoot;
+    pending.unshift(...pathNames(entry.target.slice(targetRoot.length)));
+  }
+  return real;
+});
+
+type PathEntry = { kind: "missing" | "unknown" | "entry" } | { kind: "link"; target: string };
+
+const pathEntry = Effect.fn("pathEntry")(function* (path: string) {
+  const info = yield* Effect.tryPromise(() => lstat(path)).pipe(
+    Effect.catch((error) => Effect.succeed(isMissingFileError(error.cause) ? ("missing" as const) : null)),
+  );
+  if (info === "missing") return { kind: "missing" } satisfies PathEntry;
+  if (info === null) return { kind: "unknown" } satisfies PathEntry;
+  if (!info.isSymbolicLink()) return { kind: "entry" } satisfies PathEntry;
+  const target = yield* Effect.tryPromise(() => readlink(path)).pipe(Effect.catch(() => Effect.succeed(null)));
+  return target === null ? ({ kind: "unknown" } satisfies PathEntry) : ({ kind: "link", target } satisfies PathEntry);
+});
+
+const realOrResolved = (path: string) =>
+  Effect.tryPromise(() => realpath(path)).pipe(Effect.catch(() => Effect.succeed(resolve(path))));
+
+function pathNames(path: string): string[] {
+  return path.split(process.platform === "win32" ? /[\\/]/ : "/").filter((name) => name !== "");
+}
+
+const sandboxWritableRoots = (agent: SandboxedAgent, sharedRoot: string, writeAreas: readonly string[]) =>
+  sandboxWritePaths(workspaceWritableRoots(agent, sharedRoot), writeAreas);
+
+export const codexSandboxPolicy = Effect.fn("codexSandboxPolicy")(function* (
+  agent: SandboxedAgent,
+  sharedRoot: string,
+  writeAreas: readonly string[],
+): Effect.fn.Return<CodexSandboxPolicy> {
   if (!workspaceAccessEnforced(agent)) return { type: "dangerFullAccess" };
   return {
     type: "workspaceWrite",
-    writableRoots: workspaceWritableRoots(agent, sharedRoot),
+    writableRoots: yield* sandboxWritableRoots(agent, sharedRoot, writeAreas),
     networkAccess: true,
     excludeTmpdirEnvVar: false,
     excludeSlashTmp: false,
   };
-}
+});
 
-export function codexSandboxConfig(
+export type CodexSandboxConfig = { sandbox_workspace_write?: { writable_roots: string[]; network_access: boolean } };
+
+export const codexSandboxConfig = Effect.fn("codexSandboxConfig")(function* (
   agent: SandboxedAgent,
   sharedRoot: string,
-): { sandbox_workspace_write?: { writable_roots: string[]; network_access: boolean } } {
+  writeAreas: readonly string[],
+): Effect.fn.Return<CodexSandboxConfig> {
   if (!workspaceAccessEnforced(agent)) return {};
   return {
-    sandbox_workspace_write: { writable_roots: workspaceWritableRoots(agent, sharedRoot), network_access: true },
+    sandbox_workspace_write: {
+      writable_roots: yield* sandboxWritableRoots(agent, sharedRoot, writeAreas),
+      network_access: true,
+    },
   };
-}
+});

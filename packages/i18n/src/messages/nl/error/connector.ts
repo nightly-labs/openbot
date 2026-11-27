@@ -89,6 +89,8 @@ export const messages = {
     "Kan Bitwarden niet ontgrendelen op deze server. Controleer het hoofdwachtwoord en verbind opnieuw.",
   "error.connector.bitwardenCliInstallFailed":
     "Kan de Bitwarden-CLI niet installeren op deze server. Controleer de netwerkverbinding en verbind opnieuw.",
+  "error.connector.bitwardenCliCannotStart":
+    "De Bitwarden-CLI is niet gestart op deze server. Verbind opnieuw. Start hij dan nog steeds niet, kies dan Help > Meld een probleem.",
   "error.connector.bitwardenFileUnreadable": "Het verbindingsbestand van Bitwarden is onleesbaar.",
   "error.connector.passwordManagerUnknown": "OpenBot kent deze wachtwoordbeheerder niet.",
   "error.connector.passwordManagerMethod": "Deze wachtwoordbeheerder kan niet op deze manier verbinden.",

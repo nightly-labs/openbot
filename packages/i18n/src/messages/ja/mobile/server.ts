@@ -1167,6 +1167,11 @@ export const messages = {
   "mobile.server.providers.pool": "アカウントをプール",
   "mobile.server.providers.poolHint":
     "エージェントは使用量の上限に近づくまで 1 つのアカウントを使い、その後は上限が最初にリセットされるアカウントを使います。",
+  "mobile.server.providers.poolStrategy": "アカウントの使い方",
+  "mobile.server.providers.poolFillFirst": "順番に使い切る",
+  "mobile.server.providers.poolSpread": "分散",
+  "mobile.server.providers.poolSpreadHint":
+    "エージェントは使用量が最も残っているアカウントに分散します。エージェントは、別のアカウントにずっと多くの余裕があるときだけアカウントを変えます。",
   "mobile.server.providers.accountsPooledHint":
     "エージェントはこれらのアカウントを共有します。新しいアカウントは、このスマートフォンでそのページからサインインします。",
   "mobile.server.providers.accountsPooledOnComputer":

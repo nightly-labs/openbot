@@ -2092,13 +2092,8 @@ do not revoke the sign-in at Google; remove Antigravity's access in your Google 
 apply: <https://antigravity.google/terms>.
 Gemini agents stay on this computer: OpenBot does not show them to team members.
 
-To show the remaining Gemini quota in Usage, OpenBot reads the access token from the server's token file
-and asks Google's Code Assist service (`cloudcode-pa.googleapis.com` and
-`daily-cloudcode-pa.googleapis.com`) for the account's project and quota, as the Antigravity app does.
-The requests carry that token and a User-Agent with the Antigravity desktop app's client name, version
-and build number, your operating system and processor type. They contain no conversation, file, or model data. With an API key
-sign-in, or an expired token, OpenBot sends nothing and shows no Gemini usage. OpenBot does not send that
-usage to its maintainer.
+OpenBot does not read the Gemini quota and does not call Google's internal Code Assist service. It
+reads the server's token file only for the email of the Google account. Usage shows no Gemini plan usage.
 
 ### Cursor
 
@@ -2379,6 +2374,39 @@ approves it.
 
 Settings > Notifications > Live Activities turns this off. The phone then removes its token from the
 host.
+
+## Apple Watch app
+
+The Apple Watch app gets your agents in two ways: from the iPhone app on the same Apple ID, through
+Apple's WatchConnectivity link between the two devices, and directly from your servers, so that it
+works when the iPhone app is in the background or closed.
+
+The watch shows the agents that the chat list of the iPhone app shows: their names, server names,
+picture colours and pictures, their state, the number of unread messages, the request or question
+that an agent waits on, and the start of the last reply. It also shows the channels of that list:
+their names, member agents, the number of unread messages, if an agent works in them, and the start
+of the last message with the name of its author. It does not get hidden chats, only their IDs, so
+that it does not show them when a server answers it directly. It does not get attachments,
+files or the phone's session. The watch keeps the last copy in the storage of the OpenBot watch app,
+for the watch face complication and the next time the app opens. It also keeps it when the app lock
+of the phone is on. A sign-out on the phone tells the watch to delete its copy, its pictures and its
+keys.
+
+For the direct link, the iPhone app gives the watch its own watch session from the OpenBot account
+service. It is linked to the phone's session: a sign-out on the phone, or a revoke of the phone in
+your connected devices, ends it. The watch makes its own signing key, which does not leave the
+watch, and keeps the session token and the public watch keys of your servers in its Keychain.
+
+To reach a server, the watch asks the account service for a ticket for that server, then sends the
+request to Signal over HTTPS. The request and the answer are encrypted end to end between the watch
+and the server. Signal reads only the ticket (your user ID, the server ID and the watch session ID),
+the time and the size, and passes the encrypted request to the server. It does not keep or log the
+request, the answer or the ticket. If a hosted server sleeps, a watch request wakes it.
+
+An answer on the watch, such as Allow, Deny, a choice or a dictated message to an agent or a channel, goes to the server on the
+direct link, or through the iPhone app, which sends it over its encrypted host connection, as a tap
+in the app does. Dictation on the watch uses the dictation of watchOS. Listen reads the reply with the
+speech voices of watchOS on the watch.
 
 ## iPhone notifications
 

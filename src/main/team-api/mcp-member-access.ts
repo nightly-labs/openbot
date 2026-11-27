@@ -6,7 +6,7 @@ import {
 } from "@openbot/contracts/ipc";
 import { MCP_MEMBER_ACCESS_CAPABILITY } from "@openbot/contracts/team-protocol/current";
 import { sourceText } from "@openbot/i18n/source";
-import { mcpOAuthAccountKey } from "../../backend/mcp-oauth-provider";
+import { mcpOAuthAccountKey, normalizeResource } from "../../backend/mcp-oauth-provider";
 import type { TeamApiMcpServerOwners } from "./dependencies";
 import { HttpError } from "./http-error";
 import { requireAdmin } from "./request-helpers";
@@ -42,10 +42,10 @@ export function seesMcpServer(access: McpMemberAccess, mcpServerId: string): boo
 
 export function seesMcpAddress(access: McpMemberAccess, servers: readonly McpServerConfig[], url: string): boolean {
   if (!access) return true;
-  const key = signInKey(url);
+  const address = serverAddress(url);
   return !servers.some(
     (server) =>
-      server.transport === "http" && signInKey(server.url) === key && memberLevel(access, server.id) === "none",
+      server.transport === "http" && serverAddress(server.url) === address && memberLevel(access, server.id) === "none",
   );
 }
 
@@ -101,6 +101,10 @@ export function mcpSignInSharedWithOthers(
 
 function signInKey(url: string): string {
   return mcpOAuthAccountKey(url) ?? url;
+}
+
+function serverAddress(url: string): string {
+  return normalizeResource(url) ?? url;
 }
 
 function notYours(): HttpError {

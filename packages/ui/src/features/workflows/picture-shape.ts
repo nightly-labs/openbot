@@ -34,6 +34,17 @@ async function blobShape(blob: Blob): Promise<PictureShape | undefined> {
   }
 }
 
+function dataUrlBlob(url: string): Blob {
+  const comma = url.indexOf(",");
+  const head = url.slice("data:".length, comma);
+  const type = head.split(";")[0] ?? "";
+  const body = url.slice(comma + 1);
+  const bytes = head.endsWith(";base64")
+    ? Uint8Array.from(atob(body), (char) => char.charCodeAt(0))
+    : new TextEncoder().encode(decodeURIComponent(body));
+  return new Blob([bytes], { type });
+}
+
 function cachedPictureShape(url: string): Promise<PictureShape | undefined> {
   const known = shapeCache.get(url);
   if (known) {
@@ -44,13 +55,15 @@ function cachedPictureShape(url: string): Promise<PictureShape | undefined> {
   const forget = () => {
     if (shapeCache.get(url) === pending) shapeCache.delete(url);
   };
-  const pending = fetch(url).then(async (response) => {
-    if (!response.ok) {
-      forget();
-      return undefined;
-    }
-    return blobShape(await response.blob());
-  });
+  const pending = url.startsWith("data:")
+    ? Promise.resolve(url).then((data) => blobShape(dataUrlBlob(data)))
+    : fetch(url).then(async (response) => {
+        if (!response.ok) {
+          forget();
+          return undefined;
+        }
+        return blobShape(await response.blob());
+      });
   pending.catch(forget);
   shapeCache.set(url, pending);
   if (shapeCache.size > CACHE_LIMIT) {

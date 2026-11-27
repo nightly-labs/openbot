@@ -1,3 +1,4 @@
+import { type CreditMediaCatalog, parseCreditMediaCatalog } from "@openbot/contracts/credit-media";
 import {
   type CreditActivity,
   type CreditCheckoutRequest,
@@ -33,6 +34,10 @@ export class CreditsDesktopService {
     return readCreditActivity().pipe(Effect.provide(this.#platform));
   }
 
+  getCatalog(): Effect.Effect<CreditMediaCatalog, AccountServiceFailure> {
+    return readCreditCatalog().pipe(Effect.provide(this.#platform));
+  }
+
   openCheckout(request: CreditCheckoutRequest): Effect.Effect<void, AccountServiceFailure> {
     return openCreditCheckout(request).pipe(Effect.provide(this.#platform));
   }
@@ -54,6 +59,11 @@ const readCreditsState = Effect.fn("CreditsDesktop.getState")(function* () {
 const readCreditActivity = Effect.fn("CreditsDesktop.getActivity")(function* () {
   const platform = yield* AccountServicePlatform;
   return yield* platform.request("/v1/me/credits/activity", { method: "GET" }, decodeCreditActivity);
+});
+
+const readCreditCatalog = Effect.fn("CreditsDesktop.getCatalog")(function* () {
+  const platform = yield* AccountServicePlatform;
+  return yield* platform.request("/v1/media/models", { method: "GET" }, decodeCreditCatalog);
 });
 
 const openCreditCheckout = Effect.fn("CreditsDesktop.openCheckout")(function* (request: CreditCheckoutRequest) {
@@ -92,6 +102,12 @@ function decodeCreditActivity(value: unknown): CreditActivity {
   const activity = parseCreditActivity(value);
   if (!activity) throw new Error(sourceText("error.billing.invalidResponse"));
   return activity;
+}
+
+function decodeCreditCatalog(value: unknown): CreditMediaCatalog {
+  const catalog = parseCreditMediaCatalog(value);
+  if (!catalog) throw new Error(sourceText("error.billing.invalidResponse"));
+  return catalog;
 }
 
 function decodeCheckoutUrl(value: unknown): string {

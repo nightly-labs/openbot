@@ -71,6 +71,10 @@ export const messages = {
   "status.agent.nearSignatureReceived": "OpenBot imzayı aldı. Bu sekmeyi kapatabilirsiniz.",
   "status.agent.nearSignatureUnknown": "OpenBot bu imzayı beklemiyor. OpenBot'ta yeniden başlatın.",
   "status.agent.nearPayment": "{domain} için kripto cüzdandan {recipient} alıcısına {amount} {symbol} öde: {reason}",
+  "status.agent.nearPaymentSending": "{domain} için {amount} ödeniyor: {reason}",
+  "status.agent.nearPaymentPaid": "{domain} için {amount} ödendi: {reason}",
+  "status.agent.nearPaymentNotPaid": "Ödenmedi: {domain} için {amount}: {reason}",
+  "status.agent.nearPaymentUncertain": "Onaylanmadı: {domain} için {amount}: {reason}",
   "status.agent.nearSummaryCreate":
     "Tüm ajanlar günde en fazla {amount} USD ödeyebilir. Bunu daha sonra OpenBot'ta değiştirebilirsiniz.",
   "status.agent.nearSummaryGrant":
@@ -78,6 +82,7 @@ export const messages = {
   "status.agent.nearSummaryBudget": "Cüzdanın günlük bütçesini {amount} USD olarak değiştir.",
   "status.agent.nearSummaryAutoPay":
     "Bir ödeme kuralı izin verdiğinde OpenBot'un imzanız olmadan ödeme yapmasına izin ver. Diğer ödemeler için yine sohbette size sorulur.",
+  "status.agent.nearSummaryManualPay": "Hiç ödeme kuralı kalmadı. OpenBot her ödeme için yeniden imzanızı ister.",
   "status.agent.nearSummaryPayment": "{recipient} alıcısına {amount} ödemesini onayla.",
   "status.agent.nearSummaryFreeze": "Siz ödemeleri sürdürene kadar ajanlar bu cüzdandan ödeme yapamaz.",
   "status.agent.nearSummaryUnfreeze": "Ajanlar kurallarınız dahilinde bu cüzdandan yeniden ödeme yapabilir.",

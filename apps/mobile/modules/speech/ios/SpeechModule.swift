@@ -628,8 +628,18 @@ public class SpeechModule: Module {
             self.recognitionQueue.async { self.recognizer = nil }
           }
         },
+        center.addObserver(forName: UIResponder.keyboardDidShowNotification, object: nil, queue: .main) { _ in
+          rememberKeyboardLanguage()
+        },
+        center.addObserver(forName: UITextInputMode.currentInputModeDidChangeNotification, object: nil, queue: .main) { _ in
+          rememberKeyboardLanguage()
+        },
       ]
     }
+
+    AsyncFunction("keyboardLanguage") { () -> String? in
+      rememberKeyboardLanguage() ?? UserDefaults.standard.string(forKey: keyboardLanguageKey)
+    }.runOnQueue(.main)
 
     /// Loads Parakeet from a downloaded model directory. A second call with the same directory keeps
     /// the loaded model.
@@ -800,6 +810,36 @@ public class SpeechModule: Module {
       capture.queue.sync { capture.cancel() }
       self.recognitionQueue.sync { self.recognizer = nil }
     }
+  }
+}
+
+private let keyboardLanguageKey = "run.openbot.speech.keyboard-language"
+
+@discardableResult
+private func rememberKeyboardLanguage() -> String? {
+  guard let language = FirstResponder.current()?.textInputMode?.primaryLanguage,
+        language != "emoji", language != "dictation" else { return nil }
+  UserDefaults.standard.set(language, forKey: keyboardLanguageKey)
+  return language
+}
+
+private final class FirstResponder: NSObject {
+  private static weak var found: UIResponder?
+
+  static func current() -> UIResponder? {
+    found = nil
+    UIApplication.shared.sendAction(#selector(UIResponder.openBotCaptureFirstResponder), to: nil, from: nil, for: nil)
+    return found
+  }
+
+  fileprivate static func capture(_ responder: UIResponder) {
+    found = responder
+  }
+}
+
+extension UIResponder {
+  @objc fileprivate func openBotCaptureFirstResponder() {
+    FirstResponder.capture(self)
   }
 }
 

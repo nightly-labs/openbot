@@ -1,4 +1,5 @@
 import { AppLogo, type AppLogoVariant, ProviderLogo } from "@openbot/brand";
+import type { CreditMediaModel } from "@openbot/contracts/credit-media";
 import { usageTone } from "@openbot/team-client/plan-limits";
 import {
   Bot,
@@ -339,6 +340,7 @@ function CreditsRailButton(props: {
   walletName: string | null | undefined;
   onMove: (() => void) | undefined;
   onOpenPrices: (() => void) | undefined;
+  creditModels: readonly CreditMediaModel[] | undefined;
   onOpen: () => void;
 }) {
   const { t } = useText();
@@ -357,6 +359,7 @@ function CreditsRailButton(props: {
           walletName={props.walletName}
           onMove={props.onMove}
           onOpenPrices={props.onOpenPrices}
+          creditModels={props.creditModels}
           onBuy={props.onOpen}
         />
       }
@@ -495,6 +498,7 @@ export interface PageRailProps {
   creditWalletName?: string | null | undefined;
   onCreditMove?: (() => void) | undefined;
   onCreditPrices?: (() => void) | undefined;
+  creditModels?: readonly CreditMediaModel[] | undefined;
   hiddenItems?: readonly PageRailHideableItem[] | undefined;
   onHiddenChange?: ((item: PageRailHideableItem, hidden: boolean) => void) | undefined;
   onSettings: (button: HTMLElement) => void;
@@ -819,6 +823,7 @@ export function PageRail(props: PageRailProps) {
                   walletName={props.creditWalletName}
                   onMove={props.onCreditMove}
                   onOpenPrices={props.onCreditPrices}
+                  creditModels={props.creditModels}
                   onOpen={() => onCredits()()}
                 />
               )}

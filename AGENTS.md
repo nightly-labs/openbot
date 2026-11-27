@@ -39,7 +39,8 @@ and state which default you set aside. Do not argue by citing this file.
   Exception: an agent's chat-app post (`redactPostText`) masks known key formats and a saved secret
   only as a whole token, not inside a word, an email address or a domain, and not labeled passwords
   that are not saved. Decided by the developer on 2026-11-22. The agent's instruction file, when
-  OpenBot sends it to the model, uses the same rule. Decided by the developer on 2026-11-26.
+  OpenBot sends it to the model, uses the same rule. Decided by the developer on 2026-11-26. The reply
+  and thinking text of a Pi agent in the chat also uses it. Decided by the developer on 2026-11-26.
 - **Keep PolyForm Noncommercial 1.0.0.** Do not add incompatible dependencies or relicense files.
 
 Read [CONTRIBUTING.md](CONTRIBUTING.md#security-sensitive-changes) when a change touches the trust
@@ -56,6 +57,15 @@ adding a module or moving ownership between workspaces.
   The phone also keeps the newest backdrop page that an agent set for its user with `set_backdrop`
   (`apps/mobile/src/features/settings/model/chat-backdrop.ts`); sign-out, session expiry and server
   removal delete it too.
+  The paired Apple Watch keeps a copy of the agents, their states and the requests they wait on, and
+  of the channels with the start of their last message (`apps/mobile/src/features/watch/`), also with
+  the app lock on. It gets them from the iPhone app or
+  directly from the host through Signal, end to end encrypted (`docs/architecture/watch-relay.md`).
+  It keeps a watch session token and the hosts' public watch keys in its Keychain. Sign-out deletes
+  all of it. Decided by the developer on 2026-11-25.
+  The watch also keeps the logo picture of each server (the plush or the uploaded logo, which the iPhone
+  draws into `watch-server-pictures` in the App Group), its color and its shape. Sign-out deletes them
+  with the other watch pictures. Decided by the developer on 2026-11-27.
   A desktop or browser client also keeps a copy of the agent and channel pictures that it loaded from a
   joined server (`src/main/remote-picture-cache.ts`,
   `src/renderer/src/features/web-client/web-agent-pictures.ts`), so the saved workspace shows the agent

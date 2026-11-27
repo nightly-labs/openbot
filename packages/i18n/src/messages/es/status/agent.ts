@@ -72,6 +72,10 @@ export const messages = {
   "status.agent.nearSignatureReceived": "OpenBot recibió la firma. Puedes cerrar esta pestaña.",
   "status.agent.nearSignatureUnknown": "OpenBot no está esperando esta firma. Vuelve a iniciarla en OpenBot.",
   "status.agent.nearPayment": "Pagar {amount} {symbol} a {recipient} desde la cartera cripto, para {domain}: {reason}",
+  "status.agent.nearPaymentSending": "Pagando {amount} para {domain}: {reason}",
+  "status.agent.nearPaymentPaid": "Pagado {amount} para {domain}: {reason}",
+  "status.agent.nearPaymentNotPaid": "No pagado: {amount} para {domain}: {reason}",
+  "status.agent.nearPaymentUncertain": "Sin confirmar: {amount} para {domain}: {reason}",
   "status.agent.nearSummaryCreate":
     "Todos los agentes pueden pagar hasta {amount} USD al día. Puedes cambiarlo más tarde en OpenBot.",
   "status.agent.nearSummaryGrant":
@@ -79,6 +83,8 @@ export const messages = {
   "status.agent.nearSummaryBudget": "Cambiar el presupuesto diario de la cartera a {amount} USD.",
   "status.agent.nearSummaryAutoPay":
     "Permitir que OpenBot pague sin tu firma cuando una regla de pago lo permita. Para los demás pagos, te seguirán preguntando en el chat.",
+  "status.agent.nearSummaryManualPay":
+    "Ya no queda ninguna regla de pago. OpenBot volverá a pedir tu firma para cada pago.",
   "status.agent.nearSummaryPayment": "Aprobar el pago de {amount} a {recipient}.",
   "status.agent.nearSummaryFreeze": "Los agentes no podrán pagar desde esta cartera hasta que reanudes los pagos.",
   "status.agent.nearSummaryUnfreeze": "Los agentes pueden volver a pagar desde esta cartera, dentro de tus reglas.",

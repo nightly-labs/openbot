@@ -1,5 +1,10 @@
 import { attachmentMimeTypeForName } from "@openbot/contracts/attachment-files";
-import { type StoredFileRow, WORKFLOW_PICTURE_TYPES, type WorkflowNode } from "@openbot/contracts/ipc";
+import {
+  type StoredFileRow,
+  WORKFLOW_ASSET_TYPES,
+  WORKFLOW_PICTURE_TYPES,
+  type WorkflowNode,
+} from "@openbot/contracts/ipc";
 import { TEAM_PROTOCOL_V2_MAX_FILE_BYTES } from "@openbot/contracts/team-protocol/v2";
 import { MOBILE_ATTACHMENT_BYTES, type RemoteFileUpload } from "@openbot/team-client/remote-peer";
 import { useQueryClient } from "@tanstack/react-query";
@@ -27,9 +32,9 @@ import { useText } from "@/shared/lib/text";
 const PAGE_SIZE = 12;
 const THUMBNAIL_SIZE = 40;
 
-function workflowPictures(files: readonly StoredFileRow[] | undefined): StoredFileRow[] {
+function workflowFiles(files: readonly StoredFileRow[] | undefined, types: ReadonlySet<string>): StoredFileRow[] {
   return (files ?? [])
-    .filter((file) => file.status === "available" && WORKFLOW_PICTURE_TYPES.has(file.mimeType))
+    .filter((file) => file.status === "available" && types.has(file.mimeType))
     .sort((left, right) => right.createdAt.localeCompare(left.createdAt));
 }
 
@@ -116,10 +121,11 @@ export function AssetFields({ node, draft }: { node: WorkflowNode; draft: Workfl
   const editable = draft.mode !== "read-only";
   const fileId = fieldText(node, "fileId");
   const fileName = fieldText(node, "file");
-  const choose = (id: string, name: string) => setFields(node.id, { fileId: id, file: name });
+  const choose = (id: string, name: string) => setFields(node.id, { fileId: id, file: name, media: undefined });
   const { uploading, error, upload } = usePictureUpload(draft.serverId, choose);
-  const pictures = useMemo(() => workflowPictures(query.data?.files), [query.data]);
-  const chosen = fileId ? pictures.find((file) => file.id === fileId) : undefined;
+  const pictures = useMemo(() => workflowFiles(query.data?.files, WORKFLOW_PICTURE_TYPES), [query.data]);
+  const assets = useMemo(() => workflowFiles(query.data?.files, WORKFLOW_ASSET_TYPES), [query.data]);
+  const chosen = fileId ? assets.find((file) => file.id === fileId) : undefined;
   const gone = Boolean(fileId) && !chosen && !uploading && query.isSuccess && !query.data.truncated;
   const shown = pictures.slice(0, limit);
   const listed = supported && available;
@@ -132,10 +138,10 @@ export function AssetFields({ node, draft }: { node: WorkflowNode; draft: Workfl
       >
         <SettingsRow
           leading={
-            chosen ? (
+            chosen && WORKFLOW_PICTURE_TYPES.has(chosen.mimeType) ? (
               <PictureThumbnail serverId={draft.serverId} file={chosen} />
             ) : (
-              <AttachmentThumbnail name={fileName} uri={null} size={THUMBNAIL_SIZE} />
+              <AttachmentThumbnail name={chosen?.name ?? fileName} uri={null} size={THUMBNAIL_SIZE} />
             )
           }
         >

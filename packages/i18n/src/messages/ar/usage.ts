@@ -13,11 +13,10 @@ export const messages = {
   "usage.exactCost": "{amount} USD",
   "usage.tokensAmount": "{tokens} رمز",
   "usage.chart.costDescription":
-    "التكلفة اليومية التقديرية بالدولار USD حسب المزوّد. القيم الدقيقة متاحة عبر «عرض البيانات اليومية».",
+    "التكلفة التقديرية بالدولار USD حسب المزوّد. القيم الدقيقة متاحة عبر «عرض البيانات اليومية».",
   "usage.chart.tokensDescription":
-    "الرموز اليومية دون قراءات ذاكرة التخزين المؤقت حسب المزوّد. القيم الدقيقة متاحة عبر «عرض البيانات اليومية».",
-  "usage.chart.costLabel": "التكلفة اليومية التقديرية بالدولار USD حسب المزوّد",
-  "usage.chart.tokensLabel": "الرموز اليومية دون قراءات ذاكرة التخزين المؤقت حسب المزوّد",
+    "الرموز دون قراءات ذاكرة التخزين المؤقت حسب المزوّد. القيم الدقيقة متاحة عبر «عرض البيانات اليومية».",
+  "usage.chart.weekOf": "أسبوع {date}",
   "usage.column.cost": "التكلفة",
   "usage.column.share": "الحصة",
   "usage.column.tokens": "الرموز",
@@ -26,8 +25,6 @@ export const messages = {
   "usage.column.loads": "مرات التحميل",
   "usage.column.agents": "الوكلاء",
   "usage.empty": "لا يوجد استخدام مسجّل في هذا النطاق.",
-  "usage.partial":
-    "بيانات جزئية · {turns} من الأدوار بلا استخدام مُبلَّغ عنه؛ {unpriced} من السجلات بلا تقدير للتكلفة؛ {incomplete} من السجلات ببيانات رموز غير مكتملة.",
   "usage.summary": "ملخص الاستخدام",
   "usage.sessions": {
     zero: "لا جلسات",
@@ -41,9 +38,12 @@ export const messages = {
   "usage.knownTokens": "الرموز المعروفة دون قراءات ذاكرة التخزين المؤقت",
   "usage.provider.shareOfCost": "{share} من التكلفة المعروفة",
   "usage.provider.shareOfTokens": "{share} من الرموز المعروفة",
-  "usage.dailyTrend": "الاتجاه اليومي",
   "usage.dailyCost": "التكلفة اليومية",
   "usage.dailyTokens": "الرموز اليومية",
+  "usage.weeklyCost": "التكلفة الأسبوعية",
+  "usage.weeklyTokens": "الرموز الأسبوعية",
+  "usage.monthlyCost": "التكلفة الشهرية",
+  "usage.monthlyTokens": "الرموز الشهرية",
   "usage.viewDailyData": "عرض البيانات اليومية",
   "usage.totals.title": "الإجماليات",
   "usage.totals.tokens": "الرموز دون قراءات ذاكرة التخزين المؤقت",

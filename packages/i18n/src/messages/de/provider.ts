@@ -268,6 +268,11 @@ export const messages = {
   "provider.account.pool": "Konten bündeln",
   "provider.account.poolDescription":
     "Agenten nutzen ein Konto, bis es fast ein Nutzungslimit erreicht, dann das Konto, dessen Limit zuerst zurückgesetzt wird.",
+  "provider.account.poolStrategy": "Konten nutzen",
+  "provider.account.poolFillFirst": "Erst auffüllen",
+  "provider.account.poolSpread": "Verteilen",
+  "provider.account.poolSpreadDescription":
+    "Agenten verteilen sich auf die Konten mit der meisten verbleibenden Nutzung. Ein Agent wechselt das Konto nur, wenn ein anderes Konto deutlich mehr Spielraum hat.",
   "provider.account.inUse": "Aktiv",
   "provider.account.notInPool": "Nicht im Pool",
   "provider.account.leaveOutOfPool": "Aus Pool nehmen",

@@ -1,4 +1,5 @@
 import {
+  type ConversationNearPayment,
   type NearDepositAddress,
   type NearOwnerAction,
   type NearPendingPayment,
@@ -8,8 +9,14 @@ import {
 } from "@openbot/contracts/ipc";
 import { sourceText } from "@openbot/i18n/source";
 import { NearPaymentCard } from "@openbot/ui/features/vault/NearPaymentCard";
-import { NearAddFundsDialog, NearSetupDialog, VaultNearWalletPage } from "@openbot/ui/features/vault/VaultNearWallet";
-import { onSettled } from "solid-js";
+import { NearPaymentRecordCard } from "@openbot/ui/features/vault/NearPaymentRecordCard";
+import {
+  NearAddFundsDialog,
+  NearBudgetDialog,
+  NearSetupDialog,
+  VaultNearWalletPage,
+} from "@openbot/ui/features/vault/VaultNearWallet";
+import { For, onSettled, Show } from "solid-js";
 import { fn } from "storybook/test";
 import type { Meta, StoryObj } from "storybook-solidjs-vite";
 import { createNearWalletStore } from "../src/features/vault/stores/near-wallet-store";
@@ -194,6 +201,15 @@ function AddFundsView(props: { status: NearWalletStatus }) {
   return <NearAddFundsDialog status={store.state.status} actions={store.actions} onClose={fn()} />;
 }
 
+function BudgetView(props: { status: NearWalletStatus }) {
+  const store = storyStore(props.status);
+  return (
+    <Show when={store.state.status.account}>
+      <NearBudgetDialog status={store.state.status} actions={store.actions} onClose={fn()} />
+    </Show>
+  );
+}
+
 function PaymentCard(props: { payment: NearPendingPayment; status: NearWalletStatus }) {
   const store = storyStore(props.status);
   return (
@@ -205,6 +221,46 @@ function PaymentCard(props: { payment: NearPendingPayment; status: NearWalletSta
         onApprove={fn(async () => true)}
         onReject={fn(async () => true)}
       />
+    </main>
+  );
+}
+
+const RECORD: ConversationNearPayment = {
+  domain: "api.firecrawl.dev",
+  amount: "12.00",
+  symbol: "USDC",
+  reason: "Crawl 2,000 pages of the product docs",
+  state: "paid",
+  automatic: false,
+  transactionHash: "8xK3mQ7vT2pLr9cWd4bYnE6hJ5sFgA1uZq3oXk7Vf2Qa",
+  detail: null,
+};
+
+const RECORDS: readonly ConversationNearPayment[] = [
+  { ...RECORD, state: "sending", transactionHash: null },
+  { ...RECORD, domain: "api.exa.ai", amount: "0.40", reason: "Search credits for the source check", automatic: true },
+  RECORD,
+  {
+    ...RECORD,
+    domain: "brightdata.com",
+    amount: "30.00",
+    reason: "Residential proxy plan",
+    state: "rejected",
+    transactionHash: null,
+  },
+  {
+    ...RECORD,
+    state: "failed",
+    transactionHash: null,
+    detail: sourceText("error.connector.nearServiceUnavailable"),
+  },
+  { ...RECORD, state: "uncertain", transactionHash: null, detail: sourceText("error.connector.nearUncertain") },
+];
+
+function PaymentRecordsGrid() {
+  return (
+    <main style={{ display: "grid", gap: "12px", width: "100%", "max-width": "720px" }}>
+      <For each={RECORDS}>{(record) => <NearPaymentRecordCard payment={record} onOpenLink={fn()} />}</For>
     </main>
   );
 }
@@ -242,6 +298,14 @@ export const GuidedSetupSigning: Story = {
 
 export const GuidedSetupStopped: Story = {
   render: () => <Setup stopAt="create" />,
+};
+
+export const ChangeSpending: Story = { render: () => <BudgetView status={READY} /> };
+
+export const ChangeSpendingCustom: Story = {
+  render: () => (
+    <BudgetView status={{ ...READY, account: READY.account && { ...READY.account, dailyBudgetUsd: "40" } }} />
+  ),
 };
 
 export const AddFunds: Story = { render: () => <AddFundsView status={READY} /> };
@@ -288,3 +352,5 @@ export const PaymentSigning: Story = {
     />
   ),
 };
+
+export const PaymentRecords: Story = { render: () => <PaymentRecordsGrid /> };

@@ -8,6 +8,7 @@ import {
   type WorkflowMediaModel,
   type WorkflowMediaServiceAccount,
   type WorkflowMediaUnavailableModel,
+  workflowAssetClipMedia,
   workflowCatalogMediaModel,
   workflowCatalogSource,
 } from "@openbot/contracts/ipc";
@@ -257,13 +258,16 @@ export function WorkflowsCanvas(props: {
           : {
               ...file,
               get previewUrl() {
-                return props.host.mediaUrl(file.id, "image") ?? null;
+                return props.host.mediaUrl(file.id, workflowAssetClipMedia(file.mimeType) ?? "image") ?? null;
               },
             },
       );
     },
     get upload() {
       return props.host.mediaSupported() ? workflows.uploadPicture : undefined;
+    },
+    get previewWhileUploading() {
+      return props.host.remote();
     },
     get download() {
       return props.host.mediaSupported() ? workflows.downloadMedia : undefined;
@@ -308,6 +312,7 @@ export function WorkflowsCanvas(props: {
       ...WORKFLOW_FEATURES_V1,
       kinds: media ? [...WORKFLOW_FEATURES_V1.kinds, "image", "asset"] : WORKFLOW_FEATURES_V1.kinds,
       uploads: media,
+      clips: props.host.clipsSupported(),
       triggers: [...WORKFLOW_FEATURES_V1.triggers, ...added],
       outputs: [...outputs, ...added],
       format: workflows.detail()?.hostFormat ?? WORKFLOW_FEATURES_V1.format,

@@ -3,6 +3,8 @@ import { workflowNodeHasUnknownValue } from "./ipc-workflow-nodes";
 import { WORKFLOW_TRIGGER_FIELDS_FORMAT } from "./ipc-workflow-trigger-fields";
 import {
   isWorkflowFormat,
+  WORKFLOW_ASSET_CLIP_MEDIA,
+  WORKFLOW_ASSET_CLIPS_FORMAT,
   WORKFLOW_BRANCHES,
   WORKFLOW_NODE_KINDS,
   WORKFLOW_PORT_TYPES,
@@ -14,7 +16,7 @@ import {
 } from "./ipc-workflows";
 import { type DynamicRecord, isDynamicRecord, isOneOf } from "./runtime-values";
 
-export const WORKFLOW_FORMAT = 3;
+export const WORKFLOW_FORMAT = 4;
 
 interface WorkflowFormatRule {
   readonly since: number;
@@ -43,12 +45,17 @@ function readsTriggerFields(graph: WorkflowGraph, node: WorkflowNode): boolean {
   return used.some((name) => builtIn.has(name) && !declared.has(name));
 }
 
+function isClipAsset(node: WorkflowNode): boolean {
+  return node.kind === "asset" && isOneOf(WORKFLOW_ASSET_CLIP_MEDIA, node.fields.media);
+}
+
 const WORKFLOW_FORMAT_RULES: readonly WorkflowFormatRule[] = [
   { since: 2, uses: (graph) => graph.nodes.some(outputUsesNames) },
   {
     since: WORKFLOW_TRIGGER_FIELDS_FORMAT,
     uses: (graph) => graph.nodes.some((node) => readsTriggerFields(graph, node)),
   },
+  { since: WORKFLOW_ASSET_CLIPS_FORMAT, uses: (graph) => graph.nodes.some(isClipAsset) },
 ];
 
 export function workflowGraphFormat(graph: WorkflowGraph): number {

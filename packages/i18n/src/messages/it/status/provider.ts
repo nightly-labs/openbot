@@ -33,4 +33,6 @@ export const messages = {
     "Claude ha risposto alla velocità standard. Claude Code non ha potuto usare la modalità veloce per questo turno.",
   "status.provider.claudeOwnApiKey":
     "Claude Code è impostato per usare una chiave API di Anthropic. Anthropic addebita ogni richiesta sul credito API della chiave, non sul tuo piano Claude. Per usare il tuo piano, rimuovi la chiave dalle impostazioni di Claude Code o dalle variabili d'ambiente, poi riavvia OpenBot.",
+  "status.provider.accountRemovesAfterTurn":
+    "OpenBot rimuove questo account quando finiscono i turni in corso. I suoi agenti usano poi altri account.",
 } as const satisfies PartialTranslation<typeof source>;

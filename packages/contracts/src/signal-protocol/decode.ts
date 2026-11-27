@@ -6,6 +6,7 @@ import {
   type IceServer,
   QUEUED_DELIVERY_SEALED_LIMIT,
   SIGNAL_PROTOCOL_VERSION,
+  SIGNAL_SESSIONS_ENDED_LIMIT,
   type SignalChannel,
   type SignalServerMessage,
   SLACK_DELIVERY_BODY_BYTES_LIMIT,
@@ -18,6 +19,7 @@ import {
   TELEGRAM_UPDATE_BYTES_LIMIT,
   type TelegramCallResult,
 } from "./telegram-route";
+import { decodeWatchRelayHttpRequest } from "./watch-relay";
 import {
   STANDARD_WEBHOOK_SIGNATURE_PATTERN,
   STANDARD_WEBHOOKS_FORMAT,
@@ -47,6 +49,8 @@ export function decodeSignalServerMessage(value: unknown): SignalServerMessage |
       };
     case "host-waiting":
       return { type: kind, version, resumeToken: identifier(value.resumeToken) };
+    case "sessions-ended":
+      return { type: kind, version, sessionIds: sessionIdList(value.sessionIds) };
     case "peer-ready":
       return {
         type: kind,
@@ -148,6 +152,20 @@ export function decodeSignalServerMessage(value: unknown): SignalServerMessage |
       if (sealed.length === 0 || sealed.length > QUEUED_DELIVERY_SEALED_LIMIT || !/^[A-Za-z0-9_-]+$/u.test(sealed))
         invalid();
       return { type: kind, version, id: identifier(value.id), sealed };
+    }
+    case "watch-delivery": {
+      const request = decodeWatchRelayHttpRequest({ v: 1, ts: value.ts, sealed: value.sealed, proof: value.proof });
+      const ticket = text(value.ticket);
+      if (!request || ticket.length === 0 || ticket.length > 8_192) invalid();
+      return {
+        type: kind,
+        version,
+        requestId: identifier(value.requestId),
+        ticket,
+        ts: request.ts,
+        proof: request.proof,
+        sealed: request.sealed,
+      };
     }
     case "telegram-delivery":
       if (value.linked !== undefined && value.linked !== true) invalid();
@@ -251,6 +269,11 @@ function matching(value: unknown, pattern: RegExp): string {
 
 function guildList(value: unknown): string[] {
   if (!Array.isArray(value) || value.length > DISCORD_ROUTE_GUILDS_LIMIT) invalid();
+  return value.map(identifier);
+}
+
+function sessionIdList(value: unknown): string[] {
+  if (!Array.isArray(value) || value.length > SIGNAL_SESSIONS_ENDED_LIMIT) invalid();
   return value.map(identifier);
 }
 

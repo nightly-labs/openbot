@@ -15,6 +15,7 @@ export const messages = {
   "mobile.workspace.error.sectionsLoadFailed": "Impossibile caricare le cartelle. Riprova.",
   "mobile.workspace.error.transportNotReady": "Il trasporto mobile non è pronto.",
   "mobile.workspace.error.sectionsUnsupported": "Questo host non supporta la modifica delle cartelle.",
+  "mobile.workspace.error.sidebarOffline": "Connettiti a questo server per cambiarne le cartelle.",
   "mobile.workspace.error.leaveOwnServer": "Puoi uscire solo dai server remoti a cui ti sei unito.",
   "mobile.workspace.error.removeOwnedServerOnly": "Solo il proprietario può rimuovere questo server.",
   "mobile.workspace.error.agentNotOnHost": "L'agente non è su questo host.",

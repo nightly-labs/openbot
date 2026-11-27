@@ -187,6 +187,7 @@ import {
   decodeCentralAuthState,
   decodeChatWindowTargets,
   decodeCreditActivity,
+  decodeCreditMediaCatalog,
   decodeCreditRedeemResult,
   decodeCreditsState,
   decodeCustomAgentCheckResult,
@@ -1192,6 +1193,7 @@ const openbotApi: OpenBotDesktopApi = {
   credits: bridgeGroup(IPC_ENDPOINTS.credits, {
     getState: decodeCreditsState,
     getActivity: decodeCreditActivity,
+    getCatalog: decodeCreditMediaCatalog,
     openCheckout: decodeVoid,
     transfer: decodeCreditsState,
     redeem: decodeCreditRedeemResult,

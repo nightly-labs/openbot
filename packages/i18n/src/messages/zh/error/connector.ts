@@ -75,6 +75,8 @@ export const messages = {
     "无法在该服务器上登录 Bitwarden。请检查服务器地址和 API 密钥，然后重新连接。",
   "error.connector.bitwardenHostUnlockFailed": "无法在该服务器上解锁 Bitwarden。请检查主密码，然后重新连接。",
   "error.connector.bitwardenCliInstallFailed": "无法在该服务器上安装 Bitwarden CLI。请检查它的网络连接，然后重新连接。",
+  "error.connector.bitwardenCliCannotStart":
+    "Bitwarden CLI 未能在该服务器上启动。请重新连接。如果仍然无法启动，请选择 帮助 > 反馈问题。",
   "error.connector.bitwardenFileUnreadable": "Bitwarden 连接文件无法读取。",
   "error.connector.passwordManagerUnknown": "OpenBot 不支持此密码管理器。",
   "error.connector.passwordManagerMethod": "此密码管理器不能以这种方式连接。",

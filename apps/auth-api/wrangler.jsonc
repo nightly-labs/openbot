@@ -51,6 +51,8 @@
     "EMAIL_SMTP_HOST": "mail.privateemail.com",
     "EMAIL_SMTP_PORT": "465",
     "EMAIL_SMTP_USERNAME": "no_reply@openbot.run",
+    "EMAIL_SMTP_OVERFLOW_USERNAME": "hello@openbot.run",
+    "EMAIL_SMTP_OVERFLOW_2_USERNAME": "signin@openbot.run",
     "EMAIL_FROM": "no_reply@openbot.run",
     "EMAIL_REPLY_TO": "hello@openbot.run",
     "EMAIL_LICENSE_REPLY_TO": "licenses@openbot.run",
@@ -148,6 +150,11 @@
       "name": "FEEDBACK_RATE_LIMITER",
       "namespace_id": "2026110801",
       "simple": { "limit": 3, "period": 60 }
+    },
+    {
+      "name": "WATCH_TICKET_RATE_LIMITER",
+      "namespace_id": "2026112501",
+      "simple": { "limit": 30, "period": 60 }
     }
   ],
   "env": {
@@ -167,6 +174,8 @@
         "EMAIL_SMTP_HOST": "mail.privateemail.com",
         "EMAIL_SMTP_PORT": "465",
         "EMAIL_SMTP_USERNAME": "no_reply@openbot.run",
+        "EMAIL_SMTP_OVERFLOW_USERNAME": "hello@openbot.run",
+        "EMAIL_SMTP_OVERFLOW_2_USERNAME": "signin@openbot.run",
         "EMAIL_FROM": "no_reply@openbot.run",
         "EMAIL_REPLY_TO": "hello@openbot.run",
         "EMAIL_LICENSE_REPLY_TO": "licenses@openbot.run",
@@ -237,6 +246,11 @@
           "name": "FEEDBACK_RATE_LIMITER",
           "namespace_id": "2026110802",
           "simple": { "limit": 3, "period": 60 }
+        },
+        {
+          "name": "WATCH_TICKET_RATE_LIMITER",
+          "namespace_id": "2026112502",
+          "simple": { "limit": 30, "period": 60 }
         }
       ]
     },
@@ -263,6 +277,8 @@
         "EMAIL_SMTP_HOST": "mail.privateemail.com",
         "EMAIL_SMTP_PORT": "465",
         "EMAIL_SMTP_USERNAME": "no_reply@openbot.run",
+        "EMAIL_SMTP_OVERFLOW_USERNAME": "hello@openbot.run",
+        "EMAIL_SMTP_OVERFLOW_2_USERNAME": "signin@openbot.run",
         "EMAIL_FROM": "no_reply@openbot.run",
         "EMAIL_REPLY_TO": "hello@openbot.run",
         "EMAIL_LICENSE_REPLY_TO": "licenses@openbot.run",
@@ -337,6 +353,11 @@
           "name": "FEEDBACK_RATE_LIMITER",
           "namespace_id": "2026110803",
           "simple": { "limit": 3, "period": 60 }
+        },
+        {
+          "name": "WATCH_TICKET_RATE_LIMITER",
+          "namespace_id": "2026112503",
+          "simple": { "limit": 30, "period": 60 }
         }
       ]
     }

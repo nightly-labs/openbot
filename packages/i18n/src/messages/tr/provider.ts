@@ -261,6 +261,11 @@ export const messages = {
   "provider.account.pool": "Hesapları havuzla",
   "provider.account.poolDescription":
     "Ajanlar bir hesabı kullanım sınırına yaklaşana kadar kullanır, sonra sınırı ilk sıfırlanan hesaba geçer.",
+  "provider.account.poolStrategy": "Hesap kullanımı",
+  "provider.account.poolFillFirst": "Önce doldur",
+  "provider.account.poolSpread": "Dağıt",
+  "provider.account.poolSpreadDescription":
+    "Ajanlar en çok kullanım hakkı kalan hesaplara dağılır. Bir ajan yalnızca başka bir hesapta çok daha fazla yer olduğunda hesap değiştirir.",
   "provider.account.inUse": "Kullanımda",
   "provider.account.notInPool": "Havuz dışı",
   "provider.account.leaveOutOfPool": "Havuzdan çıkar",

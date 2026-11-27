@@ -13,6 +13,7 @@ export type NearOwnerAction =
   | "freeze"
   | "unfreeze"
   | "auto-pay"
+  | "manual-pay"
   | "approve-payment"
   | "check-backup";
 export const NEAR_OWNER_ACTIONS = [
@@ -23,6 +24,7 @@ export const NEAR_OWNER_ACTIONS = [
   "freeze",
   "unfreeze",
   "auto-pay",
+  "manual-pay",
   "approve-payment",
   "check-backup",
 ] as const satisfies NearOwnerAction[];
@@ -50,6 +52,7 @@ export const NEAR_WALLET_LIMITS = {
   reason: 500,
   usd: 32,
   requestId: 128,
+  paymentDetail: 1000,
 } as const;
 
 export interface NearBalance {
@@ -77,6 +80,48 @@ export interface NearPendingPayment {
   amountUsd: number | null;
   reason: string;
   overLimit: boolean;
+}
+
+export const NEAR_PAYMENT_ITEM_TYPE = "near_payment";
+
+export type NearPaymentState = "sending" | "paid" | "rejected" | "failed" | "uncertain";
+export const NEAR_PAYMENT_STATES = [
+  "sending",
+  "paid",
+  "rejected",
+  "failed",
+  "uncertain",
+] as const satisfies NearPaymentState[];
+
+export interface ConversationNearPayment {
+  domain: string;
+  amount: string;
+  symbol: string;
+  reason: string;
+  state: NearPaymentState;
+  automatic: boolean;
+  transactionHash: string | null;
+  detail: string | null;
+}
+
+const NEAR_TRANSACTION_HASH = /^[1-9A-HJ-NP-Za-km-z]{32,64}$/;
+
+export function isNearTransactionHash(value: unknown): value is string {
+  return typeof value === "string" && NEAR_TRANSACTION_HASH.test(value);
+}
+
+export function isConversationNearPayment(value: unknown): value is ConversationNearPayment {
+  return (
+    isDynamicRecord(value) &&
+    isNearRuleDomain(value.domain) &&
+    isBoundedString(value.amount, NEAR_WALLET_LIMITS.amount) &&
+    isBoundedString(value.symbol, NEAR_WALLET_LIMITS.asset) &&
+    isBoundedString(value.reason, NEAR_WALLET_LIMITS.reason) &&
+    isOneOf(NEAR_PAYMENT_STATES, value.state) &&
+    isBoolean(value.automatic) &&
+    (value.transactionHash === null || isNearTransactionHash(value.transactionHash)) &&
+    isNullableBoundedString(value.detail, NEAR_WALLET_LIMITS.paymentDetail)
+  );
 }
 
 export interface NearWalletAccount {

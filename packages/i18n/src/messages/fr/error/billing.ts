@@ -20,6 +20,8 @@ export const messages = {
   "error.billing.licensePaymentFailed":
     "Le paiement des utilisateurs ajoutés a échoué. Mettez à jour le moyen de paiement et réessayez.",
   "error.billing.licenseUnavailable": "Les licences ne sont pas disponibles pour le moment.",
+  "error.billing.mediaContentRefused":
+    "Le contrôle de sécurité du modèle a refusé le prompt ou les images. Il refuse souvent les personnes réelles, les personnages célèbres, les marques, la violence et le contenu pour adultes. Modifie-les et réessaie. Aucun crédit n'a été utilisé.",
   "error.billing.licenseOneUser":
     "Cette licence est prévue pour 1 utilisateur. Passez à Team pour ajouter des utilisateurs.",
   "error.billing.licensePlanChange":
@@ -31,8 +33,6 @@ export const messages = {
     "Vérifiez le pays et le numéro de TVA. Le numéro de TVA doit être celui du pays choisi.",
   "error.billing.vatIdInvalid":
     "Le système de TVA de l’UE ne connaît pas ce numéro de TVA. Vérifiez le numéro ou continuez sans numéro de TVA.",
-  "error.billing.vatIdUnverified":
-    "Le système de TVA de l’UE ne peut pas vérifier le numéro de TVA pour l’instant. Réessayez plus tard ou continuez sans numéro de TVA.",
   "error.billing.vatUnavailable": "Le paiement n’est pas disponible pour l’instant. Réessayez plus tard.",
   "error.billing.invalidRequest": "La demande de facturation n’est pas valide.",
   "error.billing.invalidResponse": "La réponse de facturation n’est pas valide.",

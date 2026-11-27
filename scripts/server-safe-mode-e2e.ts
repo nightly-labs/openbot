@@ -277,6 +277,30 @@ function upgradeStatus(port: number, token: string): Promise<string> {
   });
 }
 
+function rawStatusLine(port: number, target: string): Promise<string> {
+  return new Promise((resolveLine, reject) => {
+    const socket = connect(port, "127.0.0.1", () => {
+      socket.write([`GET ${target} HTTP/1.1`, `Host: 127.0.0.1:${port}`, "Connection: close", "", ""].join("\r\n"));
+    });
+    const deadline = setTimeout(() => {
+      socket.destroy();
+      resolveLine("no answer");
+    }, 5_000);
+    let received = "";
+    socket.on("data", (chunk) => {
+      received += chunk.toString("utf8");
+    });
+    socket.on("close", () => {
+      clearTimeout(deadline);
+      resolveLine(received.split("\r\n")[0] ?? "");
+    });
+    socket.on("error", (error) => {
+      clearTimeout(deadline);
+      reject(error);
+    });
+  });
+}
+
 const HOSTING = resolve(import.meta.dirname, "hosting");
 const START = "systemctl start --no-block openbot.service";
 const STOP = "systemctl stop openbot.service";
@@ -463,6 +487,22 @@ try {
     assert.equal(malformed.status, 400);
     assert.equal(record(malformed.body, "400 body").code, "protocol_error");
     return { newer: newer.status, malformed: malformed.status };
+  });
+
+  await step("HTTP: a target that is not a URL gets 400, and the host keeps answering", async () => {
+    const uncaught: string[] = [];
+    const recordUncaught = (error: Error) => uncaught.push(error.message);
+    process.on("uncaughtException", recordUncaught);
+    try {
+      const unparsable = await rawStatusLine(port, "//[");
+      const afterwards = await http(port, { protocol: TEAM_PROTOCOL_V10, path: "/v1/compatibility" }, v10Headers());
+      assert.equal(unparsable, "HTTP/1.1 400 Bad Request");
+      assert.equal(afterwards.status, 200);
+      assert.deepEqual(uncaught, []);
+      return { unparsable, afterwards: afterwards.status };
+    } finally {
+      process.off("uncaughtException", recordUncaught);
+    }
   });
 
   await step("HTTP protocol 10: the host serves server-safe-mode-v1 and no other capability", async () => {

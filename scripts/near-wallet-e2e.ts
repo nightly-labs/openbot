@@ -19,6 +19,7 @@ import { NearOwnerSigning } from "../src/main/near-wallet-signing";
 import { NearWalletStore } from "../src/main/near-wallet-store";
 import {
   FakeAgentApi,
+  fakeTransactionHash,
   type Json,
   KeyedNearGateway,
   PAGE_ORIGIN,
@@ -402,8 +403,14 @@ async function main(): Promise<void> {
         assert.equal(update?.expected_revision, 1);
 
         const auto = await wallet.prepare(payment("pay-auto-1", { amount: "2" }));
-        assert.deepEqual(auto, { kind: "auto" });
-        assert.equal((await wallet.pay("pay-auto-1")).status, "paid");
+        assert.deepEqual(auto, { kind: "auto", amount: "2", symbol: "USDC" });
+        const paidAuto = await wallet.pay("pay-auto-1");
+        assert.equal(paidAuto.status, "paid");
+        assert.equal(
+          paidAuto.transactionHash,
+          paidAuto.correlationId ? fakeTransactionHash(paidAuto.correlationId) : null,
+          "a paid transfer gives its transaction hash",
+        );
         const after = wallet.status();
         details.set("rules", after.rules);
         assert.equal(after.rules[0]?.spentTodayUsd, 2);
@@ -436,7 +443,7 @@ async function main(): Promise<void> {
       assert.equal(wallet.status().rules[0]?.spentTodayUsd, 3, "the approved payment counts under the rule");
 
       const auto = await wallet.prepare(payment("pay-shop-2", { recipient: SHOP, amount: "1" }));
-      assert.deepEqual(auto, { kind: "auto" });
+      assert.deepEqual(auto, { kind: "auto", amount: "1", symbol: "USDC" });
       assert.equal((await wallet.pay("pay-shop-2")).status, "paid");
       const over = await wallet.prepare(payment("pay-shop-3", { recipient: SHOP, amount: "7" }));
       details.set("over", over);
@@ -449,7 +456,7 @@ async function main(): Promise<void> {
       const mark = api.requests.length;
       const balanceBefore = api.balanceRaw;
       const auto = await wallet.prepare(payment("pay-lost", { amount: "1" }));
-      assert.deepEqual(auto, { kind: "auto" });
+      assert.deepEqual(auto, { kind: "auto", amount: "1", symbol: "USDC" });
       api.dropNextExecution = true;
       const result = await wallet.pay("pay-lost");
       details.set("result", result);
@@ -495,8 +502,16 @@ async function main(): Promise<void> {
     await scenario("two auto payments at the same time stay inside the rule limit", async (details) => {
       const mark = api.requests.length;
       assert.equal(wallet.status().rules[0]?.spentTodayUsd, 5);
-      assert.deepEqual(await wallet.prepare(payment("pay-race-1", { amount: "3" })), { kind: "auto" });
-      assert.deepEqual(await wallet.prepare(payment("pay-race-2", { amount: "3" })), { kind: "auto" });
+      assert.deepEqual(await wallet.prepare(payment("pay-race-1", { amount: "3" })), {
+        kind: "auto",
+        amount: "3",
+        symbol: "USDC",
+      });
+      assert.deepEqual(await wallet.prepare(payment("pay-race-2", { amount: "3" })), {
+        kind: "auto",
+        amount: "3",
+        symbol: "USDC",
+      });
       const results = await Promise.all([wallet.pay("pay-race-1"), wallet.pay("pay-race-2")]);
       details.set("results", results);
       details.set(
@@ -516,7 +531,11 @@ async function main(): Promise<void> {
       "a proxy error with no error document is uncertain; after a new grant a restart does not send it again",
       async (details) => {
         const mark = api.requests.length;
-        assert.deepEqual(await wallet.prepare(payment("pay-proxy", { amount: "1" })), { kind: "auto" });
+        assert.deepEqual(await wallet.prepare(payment("pay-proxy", { amount: "1" })), {
+          kind: "auto",
+          amount: "1",
+          symbol: "USDC",
+        });
         api.proxyFailures = SEND_ATTEMPTS;
         const result = await wallet.pay("pay-proxy");
         details.set("result", result);
@@ -654,6 +673,64 @@ async function main(): Promise<void> {
       assert.equal(status.account?.dailyBudgetUsd, "20");
       assert.equal(policyOf(fakeAgent).budget.daily_usd, "20");
       assert.equal(policyOf(fakeAgent).owner_approval, false, "the change keeps auto-pay");
+    });
+
+    await scenario("removing the last rule turns the owner approval on again", async (details) => {
+      const fakeAgent = api.agents.get(wallet.store.read().wallet?.agentId ?? "");
+      assert.ok(fakeAgent);
+      const visits = page.visits.length;
+      const other = decoded(
+        parseNearRuleInput({ domain: "other.example.com", recipients: [SHOP], dailyUsd: 5 }),
+        "rule",
+      );
+      await Effect.runPromise(wallet.service.saveRule(other));
+      const kept = await Effect.runPromise(wallet.service.removeRule(other.domain));
+      details.set("afterOtherRule", { error: kept.error, rules: kept.rules.map((rule) => rule.domain) });
+      assert.equal(kept.error, null);
+      assert.deepEqual(
+        page.visits.slice(visits).map((visit) => visit.fragment.action),
+        [],
+        "a rule that is not the last one needs no signature",
+      );
+      assert.equal(policyOf(fakeAgent).owner_approval, false);
+
+      page.mode = { kind: "other-key" };
+      try {
+        const failed = await attempt(wallet.service.removeRule(DOMAIN));
+        const status = wallet.status();
+        details.set("failedOwnerStep", { refused: failed.error, error: status.error, rules: status.rules });
+        assert.ok(failed.error ?? status.error, "a refused signature shows a sentence");
+        assert.deepEqual(
+          status.rules.map((rule) => rule.domain),
+          [DOMAIN],
+          "the rule stays so that the owner can remove it again",
+        );
+        assert.equal(policyOf(fakeAgent).owner_approval, false);
+        assert.equal(wallet.store.read().wallet?.ownerApproval, false);
+      } finally {
+        page.mode = { kind: "honest" };
+      }
+
+      const retryVisits = page.visits.length;
+      const removed = await Effect.runPromise(wallet.service.removeRule(DOMAIN));
+      const actions = page.visits.slice(retryVisits).map((visit) => visit.fragment.action);
+      details.set("removed", {
+        error: removed.error,
+        rules: removed.rules,
+        ownerApproval: removed.account?.ownerApproval,
+      });
+      details.set("signedActions", actions);
+      assert.equal(removed.error, null);
+      assert.deepEqual(removed.rules, []);
+      assert.deepEqual(actions, ["manual-pay"]);
+      assert.equal(policyOf(fakeAgent).owner_approval, true);
+      assert.equal(wallet.store.read().wallet?.ownerApproval, true);
+      assert.equal(removed.account?.ownerApproval, true);
+
+      const ask = await wallet.prepare(payment("pay-no-rule", { amount: "1" }));
+      details.set("ask", ask);
+      assert.deepEqual(ask, { kind: "ask", amount: "1", symbol: "USDC" });
+      wallet.service.drop("pay-no-rule");
     });
 
     await scenario("secrets stay out of the store file, statuses, answers, logs and requests", async (details) => {

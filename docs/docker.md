@@ -391,6 +391,12 @@ and runs its safe mode: each member's app shows why the server does not start an
 runs. The safe mode opens no database. After one hour it exits, and the restart policy starts the
 container again. A newer image is the fix. See [hosted servers](hosted-servers.md#start-loop).
 
+The entrypoint also starts the [watchdog](hosted-servers.md#watchdog) of the hosted servers. When
+main stops updating its heartbeat file for 10 minutes, for example because its main thread is
+blocked, the watchdog stops OpenBot with `SIGKILL`. The container then exits, and the restart policy
+starts it again. A blocked main thread cannot answer `docker stop`, so without the watchdog the
+container stayed running and did not answer until someone restarted it.
+
 OpenBot does not update itself in a container. A new image replaces it. An instance of
 `docker/instances` can ask the host for that from the app, see
 [Updates from the app](#updates-from-the-app). Do not go back to an older tag: an older OpenBot cannot
@@ -506,6 +512,12 @@ architecture from the AppImage of that release, after it checks the AppImage aga
 checksums. `docker/Dockerfile` unpacks the AppImage to `/opt/OpenBot/app` and installs the packages
 of a self-hosted server from that release. The workflow starts and stops each image once, and pushes
 the images to GHCR only after the GitHub Release is published.
+
+The package step installs the current Ubuntu security updates, because the Ubuntu base image can be
+older than a fix: in November 2026 the newest `ubuntu:24.04` image still had libc6 2.39-0ubuntu8.9,
+and the glibc fixes of USN-9065-1 were only in the Ubuntu archive. Dependabot opens a pull request
+each week when a new `ubuntu:24.04` digest is available. It does not change the tag: the package
+lists are for Ubuntu 24.04.
 
 `tini` is process 1. It starts `resources/hosting/openbot-container` from the release, which checks
 that it can make a user namespace, starts D-Bus, two virtual displays and the keyring, and then

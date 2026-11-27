@@ -76,6 +76,10 @@ export const messages = {
   "status.agent.nearSignatureReceived": "OpenBot ha ricevuto la firma. Puoi chiudere questa scheda.",
   "status.agent.nearSignatureUnknown": "OpenBot non sta aspettando questa firma. Avviala di nuovo in OpenBot.",
   "status.agent.nearPayment": "Pagamento di {amount} {symbol} a {recipient} dal wallet crypto, per {domain}: {reason}",
+  "status.agent.nearPaymentSending": "Pagamento di {amount} per {domain}: {reason}",
+  "status.agent.nearPaymentPaid": "Pagato {amount} per {domain}: {reason}",
+  "status.agent.nearPaymentNotPaid": "Non pagato: {amount} per {domain}: {reason}",
+  "status.agent.nearPaymentUncertain": "Non confermato: {amount} per {domain}: {reason}",
   "status.agent.nearSummaryCreate":
     "Tutti gli agenti possono pagare fino a {amount} USD al giorno. Puoi cambiarlo in seguito in OpenBot.",
   "status.agent.nearSummaryGrant":
@@ -83,6 +87,8 @@ export const messages = {
   "status.agent.nearSummaryBudget": "Imposta il budget giornaliero del wallet a {amount} USD.",
   "status.agent.nearSummaryAutoPay":
     "Consenti a OpenBot di pagare senza la tua firma quando una regola di pagamento lo permette. Per gli altri pagamenti ti viene comunque chiesto in chat.",
+  "status.agent.nearSummaryManualPay":
+    "Non resta nessuna regola di pagamento. OpenBot chiederà di nuovo la tua firma per ogni pagamento.",
   "status.agent.nearSummaryPayment": "Approva il pagamento di {amount} a {recipient}.",
   "status.agent.nearSummaryFreeze": "Gli agenti non possono pagare da questo wallet finché non riprendi i pagamenti.",
   "status.agent.nearSummaryUnfreeze": "Gli agenti possono di nuovo pagare da questo wallet, entro le tue regole.",

@@ -84,11 +84,17 @@ export const messages = defineMessages("status.agent", {
   "status.agent.nearSignatureReceived": "OpenBot received the signature. You can close this tab.",
   "status.agent.nearSignatureUnknown": "OpenBot does not wait for this signature. Start it again in OpenBot.",
   "status.agent.nearPayment": "Pay {amount} {symbol} to {recipient} from the crypto wallet, for {domain}: {reason}",
+  "status.agent.nearPaymentSending": "Paying {amount} for {domain}: {reason}",
+  "status.agent.nearPaymentPaid": "Paid {amount} for {domain}: {reason}",
+  "status.agent.nearPaymentNotPaid": "Not paid: {amount} for {domain}: {reason}",
+  "status.agent.nearPaymentUncertain": "Not confirmed: {amount} for {domain}: {reason}",
   "status.agent.nearSummaryCreate": "All agents can pay up to {amount} USD a day. You can change it later in OpenBot.",
   "status.agent.nearSummaryGrant": "Let this OpenBot app pay from the wallet for {days} days, within your rules.",
   "status.agent.nearSummaryBudget": "Change the daily budget of the wallet to {amount} USD.",
   "status.agent.nearSummaryAutoPay":
     "Let OpenBot pay without your signature when a payment rule allows it. Other payments still ask you in the chat.",
+  "status.agent.nearSummaryManualPay":
+    "No payment rule is left. OpenBot asks for your signature for each payment again.",
   "status.agent.nearSummaryPayment": "Approve the payment of {amount} to {recipient}.",
   "status.agent.nearSummaryFreeze": "Agents cannot pay from this wallet until you resume payments.",
   "status.agent.nearSummaryUnfreeze": "Agents can pay from this wallet again, within your rules.",

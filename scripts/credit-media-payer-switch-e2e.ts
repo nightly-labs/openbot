@@ -96,6 +96,7 @@ function jobView(jobId: string, job: AccountJob): CreditMediaJob {
     pollAfterSeconds: 0,
     outputs: completed ? [{ index: 0, mimeType: "image/png", width: null, height: null, durationMs: null }] : [],
     failure: null,
+    reason: null,
   };
 }
 
