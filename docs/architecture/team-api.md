@@ -29,7 +29,7 @@ the read state and the sections load. These three reads run together. Cached con
 again after Online, the open conversation first; a chat that did not load then loads when it opens.
 Transport failures and reconnect attempts show Offline, and protocol failures show Connection error.
 The existing RTC connection updates and recovery controller are the source of truth; the indicator
-adds no polling or health requests. Foreground resume reuses a healthy connection without showing a
+adds no polling or health requests of its own. Foreground resume reuses a healthy connection without showing a
 reconnect. When the connection from before the background stays (`kept` on the `connect` result) and
 no read stopped at background entry, the first attempt only checks the path with the compatibility
 read and reads the open chats again; the event stream delivered every event, or an `event-reset`
@@ -47,10 +47,23 @@ first attempt connects. A move to another kind of network, such as Wi-Fi to mobi
 (`expo-network`, `apps/mobile/src/shared/lib/network-path.ts`), ends the connection, and the recovery
 makes a new one on the same session at once (`networkMoved`); the WebView's `online` event does not
 fire for such a move. In support logs, an ICE restart after a network move did not bring the path
-back within 6 s, and a new connection was up in 1.5–3 s. In other cases, a probe of the path waits up
+back within 6 s, and a new connection was up in 1.5–3 s. A new Wi-Fi address (`getIpAddressAsync`)
+is also a move. A change that involves a VPN, such as a VPN or Tailscale that turns on or off (iOS
+reports the type as unknown, Android as VPN), keeps the connection: the peer renews its Signal socket
+and restarts ICE, which gathers the candidates of the new interface and keeps the old path until a
+new one answers, and it checks the path with the compatibility read (`networkChanged`,
+`apps/mobile/src/shared/lib/network-change.ts`). A dead path then makes a new connection. Such a
+change waits 1 s, so that a short series of changes sends one restart; a move goes at once. In other cases, a probe of the path waits up
 to 6 s after the start of an ICE restart (`ICE_RESTART_PROBE_MS`) before it judges the path dead. The desktop host closes a connection
 at its 11th ICE restart, so the peer counts its restart offers and, after 10, makes a new connection
-on the same session instead of an 11th. A new connection to a known host opens its Signal socket while the ticket request runs,
+on the same session instead of an 11th. While the app is open and the connection is online, the peer
+reads the selected candidate pair every 5 s (`packages/team-client/src/remote-path-watch.ts`). After
+12 s with no received bytes and no ICE consent answers, it checks the path with the compatibility
+read, which replaces a dead connection. A connection on a TURN relay restarts ICE 60 s, 3 minutes
+and 9 minutes after it found the relay, to find a direct path; these restarts stop while 3 or fewer
+of the 10 restarts are left. A failed attempt is retried after 0.5, 1.2, 2.7 and 4.8 s, each with
+up to 20 % more, then the recovery waits 15 s before the next 5 attempts (`REMOTE_RETRY_DELAYS_MS`,
+`REMOTE_RETRY_COOLDOWN_MS`). A new connection to a known host opens its Signal socket while the ticket request runs,
 and, with ICE servers less than 30 minutes old, gathers candidates before `ready`; its first offer
 holds the candidates gathered so far. A server that was
 Online when the app left keeps its Online look during the first attempt after the return, for up to
