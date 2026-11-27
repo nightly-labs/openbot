@@ -1,6 +1,6 @@
 import { createHash } from "node:crypto";
 import { ARTICLE_GRADIENT_BRAND_HEXES } from "@openbot/brand/article-gradient";
-import { avatarHeadColor } from "@openbot/brand/bloub-avatar";
+import { avatarHeadColor, serverPlushHex } from "@openbot/brand/bloub-avatar";
 import { coordinatorText } from "@openbot/contracts/coordinator-text";
 import {
   type AgentApproval,
@@ -16,6 +16,7 @@ import {
   sidebarFolderPath,
 } from "@openbot/contracts/ipc";
 import { markdownPreviewText } from "@openbot/contracts/markdown-preview-text";
+import type { ServerAppearance } from "@openbot/contracts/team-protocol/host-appearance-v1";
 import {
   WATCH_AGENT_LIMIT,
   WATCH_APPROVAL_LIMIT,
@@ -73,6 +74,9 @@ const WATCH_TEXT_KEYS = [
   "mobile.watch.offline.detail",
   "mobile.watch.offline.unlock",
   "mobile.watch.list.pinned",
+  "mobile.watch.settings.title",
+  "mobile.watch.settings.theme",
+  "mobile.watch.settings.themeDetail",
   "mobile.watch.question.private",
   "mobile.agent.list.waiting.title",
   "mobile.agent.list.unreadGroup.title",
@@ -125,6 +129,7 @@ export function watchAvatarName(agentId: string, avatar: WatchAvatarFile): strin
 export interface HostWatchSnapshotInput {
   hostId: string;
   serverName: string;
+  appearance: ServerAppearance | null;
   watchKey: string;
   agents: readonly AgentSummary[];
   runtime: AgentRuntimeSnapshot;
@@ -438,7 +443,16 @@ export function buildHostWatchSnapshot(input: HostWatchSnapshotInput): WatchSnap
     accent: ARTICLE_GRADIENT_BRAND_HEXES["--openbot-accent"],
     language: text.locale,
     text: watchTexts(text.t, waiting),
-    servers: [{ id: input.hostId, name: input.serverName, online: true, watchKey: input.watchKey }],
+    servers: [
+      {
+        id: input.hostId,
+        name: input.serverName,
+        online: true,
+        color: serverPlushHex(input.hostId, input.appearance?.color),
+        shape: input.appearance?.shape ?? "squircle",
+        watchKey: input.watchKey,
+      },
+    ],
     agents: shown,
     channels: watchChannelsWithinLimit(placed.channels.map((item) => hostChannel(input, item))),
   };

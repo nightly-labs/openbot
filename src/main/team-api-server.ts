@@ -687,6 +687,7 @@ export class TeamApiServer {
       port: () => this.#port,
       appVersion: () => this.#options.appVersion ?? "0.0.0",
       serverName: () => store.getIdentity()?.serverName ?? null,
+      serverAppearance: () => store.getIdentity()?.appearance ?? null,
       agents,
       layout: () => this.#options.sidebarLayout.getSnapshot(),
       listChannels: (memberId) => this.#options.channels?.store.list(memberId) ?? [],

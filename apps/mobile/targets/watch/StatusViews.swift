@@ -156,11 +156,13 @@ struct AgentAvatar: View {
       .overlay(alignment: .bottomTrailing) {
         if stateIcon && agent.isBusy {
           let style = AgentStateStyle(agent: agent, text: text)
+          let waiting = agent.wait != nil || agent.state == .waiting
+          let fill = waiting ? Color.orange : Color.stateTint(hex: agent.color)
           Image(systemName: style.symbol)
             .font(.system(size: size * 0.2, weight: .bold))
-            .foregroundStyle(.white)
+            .foregroundStyle(!waiting && UIColor(fill).luminance > 0.6 ? Color.black : .white)
             .frame(width: size * 0.42, height: size * 0.42)
-            .background(agent.wait != nil || agent.state == .waiting ? Color.orange : Color.blue, in: Circle())
+            .background(fill, in: Circle())
             .overlay(Circle().stroke(.black, lineWidth: 2))
             .offset(x: 3, y: 3)
         }

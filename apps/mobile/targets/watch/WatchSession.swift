@@ -35,6 +35,7 @@ final class WatchSession: NSObject, ObservableObject {
   static let pairFailureRetry: TimeInterval = 30
   static let urlScheme = "openbot-watch"
   static let serverKey = "openbot.watch.server"
+  static let themeKey = "openbot.watch.theme"
   static let shared = WatchSession()
 
   private static let snapshotKey = "openbot.watch.snapshot"
@@ -58,6 +59,7 @@ final class WatchSession: NSObject, ObservableObject {
   private var feedbackTask: Task<Void, Never>?
   private var offlineTask: Task<Void, Never>?
   private var pictures: [String: UIImage] = [:]
+  private var pictureTints: [String: Color?] = [:]
   private let direct = WatchDirect()
   private var credentials: WatchDirectCredentials?
   private var nextPairAttempt = Date.distantPast
@@ -165,6 +167,7 @@ final class WatchSession: NSObject, ObservableObject {
     let ordered =
       ready.agents.compactMap(\.avatar)
       + ready.agents.flatMap { [$0.faces?.waiting, $0.faces?.working].compactMap { $0 } }
+      + ready.servers.compactMap(\.picture)
     var seen = Set<String>()
     return ordered.filter { Self.avatarURL($0) != nil && !Self.hasPicture($0) && seen.insert($0).inserted }
   }
@@ -172,6 +175,22 @@ final class WatchSession: NSObject, ObservableObject {
   var language: String {
     if case .ready(let ready) = snapshot { return ready.language }
     return Locale.current.identifier
+  }
+
+  func picture(_ server: WatchServer) -> UIImage? {
+    server.picture.flatMap(picture(named:))
+  }
+
+  func tint(_ server: WatchServer, accent: String) -> Color {
+    pictureTint(server) ?? server.tint(accent: accent)
+  }
+
+  private func pictureTint(_ server: WatchServer) -> Color? {
+    guard let name = server.picture, let image = picture(named: name) else { return nil }
+    if let known = pictureTints[name] { return known }
+    let found = image.dominantColor
+    pictureTints.updateValue(found, forKey: name)
+    return found
   }
 
   func picture(_ agent: WatchAgent) -> UIImage? {
@@ -577,15 +596,17 @@ final class WatchSession: NSObject, ObservableObject {
     case .locked:
       Self.removeAvatars(keeping: [])
       pictures = [:]
+      pictureTints = [:]
       ComplicationData.write(.locked)
     case .ready(let ready):
       if origin == .phone {
         forgetCredentials(ifAccountIsNot: ready.account)
         learnDirectServers(from: ready)
       }
-      let kept = Set(ready.agents.flatMap(\.pictureNames))
+      let kept = Set(ready.agents.flatMap(\.pictureNames) + ready.servers.compactMap(\.picture))
       Self.removeAvatars(keeping: kept)
       pictures = pictures.filter { name, _ in kept.contains(name) }
+      pictureTints = pictureTints.filter { name, _ in kept.contains(name) }
       ComplicationData.write(.ready(ready))
     }
     defaults.set(json, forKey: Self.snapshotKey)
@@ -612,6 +633,7 @@ final class WatchSession: NSObject, ObservableObject {
     UserDefaults.standard.removeObject(forKey: Self.serverKey)
     if let folder = Self.avatarFolder { try? FileManager.default.removeItem(at: folder) }
     pictures = [:]
+    pictureTints = [:]
     avatarRevision += 1
     ComplicationData.remove()
   }
@@ -627,6 +649,7 @@ final class WatchSession: NSObject, ObservableObject {
       return
     }
     pictures = [:]
+    pictureTints = [:]
     avatarRevision += 1
   }
 
