@@ -26,8 +26,6 @@ export interface ComputerUseHighlightTarget {
 
 const LIVE_SESSION_IDLE_SECONDS = 60;
 
-const AGENT_ACTION_SECONDS = 2;
-
 export const COMPUTER_USE_ACTION_MAX_AGE_MS = 60_000;
 
 export const COMPUTER_USE_CURSOR_MAX_AGE_MS = 15_000;
@@ -59,6 +57,7 @@ export interface TargetChoice {
   ownPid: number;
   ownCoveringWindowIds?: ReadonlySet<number>;
   previous: ComputerUseHighlightTarget | null;
+  pointer?: ObservedPointer | null;
   toDesktop?: (bounds: Rectangle) => Rectangle;
 }
 
@@ -77,19 +76,38 @@ export function chooseTarget({
   ownPid,
   ownCoveringWindowIds,
   previous,
+  pointer,
   toDesktop,
 }: TargetChoice): ComputerUseHighlightTarget | null {
   if (!session) return null;
   const visible = visibleWindows(windows, ownPid, ownCoveringWindowIds, toDesktop);
   const candidates = workableWindows(visible, ownPid);
-  const acted = actedWindow(candidates, action);
+  const named = desktopPointAction(windows, ownPid, ownCoveringWindowIds, pointer, action) ?? action;
+  const acted = actedWindow(candidates, named);
   if (acted) return asTarget(acted, visible);
-  if (action) return null;
+  if (named) return null;
   const held = previous ? candidates.find((window) => window.windowId === previous.windowId) : undefined;
-  if (held && session.idleSeconds > AGENT_ACTION_SECONDS) return asTarget(held, visible);
-  const front = frontWindow(candidates);
-  if (!front) return held ? asTarget(held, visible) : null;
-  return asTarget(front, visible);
+  return held ? asTarget(held, visible) : null;
+}
+
+function desktopPointAction(
+  windows: unknown,
+  ownPid: number,
+  ownCoveringWindowIds: ReadonlySet<number> | undefined,
+  pointer: ObservedPointer | null | undefined,
+  action: ObservedAction | null,
+): ObservedAction | null {
+  if (!pointer || pointer.windowId !== null || (action && action.at > pointer.at)) return null;
+  const under = frontWindow(
+    visibleWindows(windows, ownPid, ownCoveringWindowIds).filter((window) =>
+      contains(window.bounds, pointer.x, pointer.y),
+    ),
+  );
+  return under ? { tool: pointer.tool, pid: null, windowId: under.windowId, at: pointer.at } : null;
+}
+
+function contains(bounds: Rectangle, x: number, y: number): boolean {
+  return x >= bounds.x && y >= bounds.y && x < bounds.x + bounds.width && y < bounds.y + bounds.height;
 }
 
 function actedWindow(candidates: readonly DriverWindow[], action: ObservedAction | null): DriverWindow | null {
@@ -97,7 +115,8 @@ function actedWindow(candidates: readonly DriverWindow[], action: ObservedAction
   const exact = candidates.find((window) => window.windowId === action.windowId);
   if (exact) return exact;
   if (action.pid === null) return null;
-  return frontWindow(candidates.filter((window) => window.pid === action.pid));
+  const owned = candidates.filter((window) => window.pid === action.pid);
+  return owned.length === 1 ? (owned[0] ?? null) : null;
 }
 
 function asTarget(window: DriverWindow, visible: readonly DriverWindow[]): ComputerUseHighlightTarget {
