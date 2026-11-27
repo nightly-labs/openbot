@@ -1,4 +1,4 @@
-import type { TeamMemberSummary, TeamRole } from "@openbot/contracts/ipc";
+import type { ChannelSummary, TeamMemberSummary, TeamRole } from "@openbot/contracts/ipc";
 import type { WatchPushEnvironment } from "@openbot/contracts/watch-protocol";
 import { toLogValue } from "@openbot/logging";
 import { Effect, Exit, Schema, Scope } from "effect";
@@ -24,6 +24,7 @@ type WatchWidgetPushAgents = Pick<
 export interface WatchWidgetPushOptions {
   agents: WatchWidgetPushAgents;
   hiddenAgentIds(member: { id: string; role: TeamRole }): ReadonlySet<string>;
+  channels(member: { id: string; role: TeamRole }): readonly ChannelSummary[];
   member(memberId: string): TeamMemberSummary | null;
   send(push: WatchWidgetPush): Effect.Effect<"sent" | "gone", WatchWidgetPushFailure>;
   now?: () => number;
@@ -174,6 +175,15 @@ export class WatchWidgetPushService {
         reply: runtime.latestMessages.find((item) => item.agentId === agent.id)?.id ?? null,
         updatedAt: agent.updatedAt,
         unread: reads[agent.id]?.unreadCount ?? 0,
+      });
+    }
+    for (const channel of this.#options.channels({ id: member.id, role: member.role })) {
+      view.set(`channel:${channel.id}`, {
+        state: channel.activeTasks > 0 ? "working" : "idle",
+        waits: [],
+        reply: channel.lastMessage?.at ?? null,
+        updatedAt: channel.lastMessage?.at ?? null,
+        unread: channel.unreadCount,
       });
     }
     return view;

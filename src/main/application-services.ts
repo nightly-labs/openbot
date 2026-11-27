@@ -517,7 +517,7 @@ import { spawnVoiceSpeechHost } from "./voice-speech-host-process";
 import { VoiceSpeechService } from "./voice-speech-service";
 import { spawnVoiceTranscriptionHost } from "./voice-transcription-host-process";
 import { VoiceTranscriptionService } from "./voice-transcription-service";
-import { WatchRelayCommands } from "./watch-relay-commands";
+import { visibleWatchChannels, WatchRelayCommands } from "./watch-relay-commands";
 import { createWatchRelayWantedStore, loadWatchRelayKey } from "./watch-relay-key";
 import { WatchRelayService } from "./watch-relay-service";
 import { WatchWidgetPushFailure, WatchWidgetPushService } from "./watch-widget-push";
@@ -3717,6 +3717,7 @@ export async function createApplicationServices({
   const watchWidgetPush = new WatchWidgetPushService({
     agents: service,
     hiddenAgentIds: (member) => watchTeamApi.hiddenAgentIds(member),
+    channels: (member) => visibleWatchChannels(watchTeamApi, member),
     member: (memberId) => teamStore.getMember(memberId),
     send: (push) => {
       const hostId = teamStore.getIdentity()?.serverId;

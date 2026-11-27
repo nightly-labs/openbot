@@ -108,7 +108,7 @@ const { TeamApiServer } = await import("../src/main/team-api-server");
 const { TeamStore } = await import("../src/main/team-store");
 const { CentralAuthManager } = await import("../src/main/central-auth-manager");
 const { WatchRelayService } = await import("../src/main/watch-relay-service");
-const { WatchRelayCommands } = await import("../src/main/watch-relay-commands");
+const { visibleWatchChannels, WatchRelayCommands } = await import("../src/main/watch-relay-commands");
 const { createWatchRelayWantedStore, loadWatchRelayKey } = await import("../src/main/watch-relay-key");
 const { WatchWidgetPushFailure, WatchWidgetPushService } = await import("../src/main/watch-widget-push");
 
@@ -575,6 +575,7 @@ try {
       widgetPush = new WatchWidgetPushService({
         agents: real,
         hiddenAgentIds: (member) => watchTeamApi.hiddenAgentIds(member),
+        channels: (member) => visibleWatchChannels(watchTeamApi, member),
         member: (memberId) => team.getMember(memberId),
         send: (push) =>
           centralAuth
@@ -590,11 +591,12 @@ try {
         watcher: { id: watcher.member.id, token: watcher.sessionToken },
         agents: { approver: approver.id, longAsker: longAsker.id, asker: asker.id, worker: worker.id },
         channelId,
+        ownerId,
       };
     },
     (value) => ({ port: value.port, hostId: value.hostId }),
   );
-  const { port, hostId, signing, watcher, agents, channelId } = setup;
+  const { port, hostId, signing, watcher, agents, channelId, ownerId } = setup;
   const forwarded = encodeTeamCapabilitiesV10([...TEAM_CURRENT_CAPABILITIES]);
 
   async function wire(path: string, token?: string): Promise<{ status: number; body: unknown }> {
@@ -925,15 +927,43 @@ try {
     return widgetRequests[0]?.path;
   });
 
+  await step("A new channel message from another member sends one widget push", async () => {
+    assert.ok(channels && service);
+    widgetClockOffset += 61_000;
+    await runCauseEffect(
+      channels.command(
+        {
+          type: "send",
+          operationId: randomUUID(),
+          channelId,
+          text: "The release notes are ready.",
+          recipientAgentId: null,
+          replyToMessageId: null,
+          attachmentDraftIds: [],
+        },
+        { id: ownerId, name: "Owner" },
+      ),
+    );
+    service.emit("event", { type: "channels-changed", channelId, revision: 2 });
+    await untilTrue(() => widgetRequests.length > 1);
+    assert.equal(widgetRequests.length, 2, "The host did not send exactly one push for the channel message.");
+    assert.deepEqual(widgetRequests[1]?.body, {
+      machineToken: MACHINE_TOKEN,
+      token: WIDGET_TOKEN,
+      environment: "development",
+    });
+    return { requests: widgetRequests.length };
+  });
+
   await step("A 410 answer makes the host forget the widget token", async () => {
     assert.ok(widgetPush);
     const push = widgetPush;
     widgetAnswer = 410;
     widgetClockOffset += 11_000;
     startWait("approval-widget-2");
-    await untilTrue(() => widgetRequests.length > 1);
+    await untilTrue(() => widgetRequests.length > 2);
     await untilTrue(() => push.tokenCount(watcher.id) === 0);
-    assert.equal(widgetRequests.length, 2, "The host sent more than one push for each wait.");
+    assert.equal(widgetRequests.length, 3, "The host sent more than one push for each wait.");
     return { requests: widgetRequests.length, tokens: push.tokenCount(watcher.id) };
   });
 

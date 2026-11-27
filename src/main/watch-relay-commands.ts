@@ -110,6 +110,16 @@ export interface WatchCommandReply {
   snapshot: WatchSnapshot | null;
 }
 
+export function visibleWatchChannels(
+  api: Pick<WatchRelayTeamApi, "listChannels" | "channelHiddenAgentIds">,
+  member: Pick<WatchRelayMember, "id" | "role">,
+): ChannelSummary[] {
+  const hidden = canAdministerServer(member.role)
+    ? new Set<string>()
+    : api.channelHiddenAgentIds({ id: member.id, role: member.role });
+  return api.listChannels(member.id).filter((channel) => !channel.archived && seesChannel(channel.members, hidden));
+}
+
 const failure = (error: WatchErrorCode, message: string): WatchCommandReply => ({
   result: { ok: false, error, message },
   snapshot: null,
@@ -325,12 +335,7 @@ export class WatchRelayCommands {
   });
 
   #visibleChannels(member: WatchRelayMember): ChannelSummary[] {
-    const hidden = canAdministerServer(member.role)
-      ? new Set<string>()
-      : this.#api.channelHiddenAgentIds({ id: member.id, role: member.role });
-    return this.#api
-      .listChannels(member.id)
-      .filter((channel) => !channel.archived && seesChannel(channel.members, hidden));
+    return visibleWatchChannels(this.#api, member);
   }
 
   readonly #readBoundary = Effect.fn("WatchRelayCommands.readBoundary")(function* (
