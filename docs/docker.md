@@ -513,6 +513,12 @@ checksums. `docker/Dockerfile` unpacks the AppImage to `/opt/OpenBot/app` and in
 of a self-hosted server from that release. The workflow starts and stops each image once, and pushes
 the images to GHCR only after the GitHub Release is published.
 
+The package step installs the current Ubuntu security updates, because the Ubuntu base image can be
+older than a fix: in November 2026 the newest `ubuntu:24.04` image still had libc6 2.39-0ubuntu8.9,
+and the glibc fixes of USN-9065-1 were only in the Ubuntu archive. Dependabot opens a pull request
+each week when a new `ubuntu:24.04` digest is available. It does not change the tag: the package
+lists are for Ubuntu 24.04.
+
 `tini` is process 1. It starts `resources/hosting/openbot-container` from the release, which checks
 that it can make a user namespace, starts D-Bus, two virtual displays and the keyring, and then
 becomes OpenBot with `OPENBOT_SERVER=1`. OpenBot shows its windows on `:0`, at 1280x800. The agents

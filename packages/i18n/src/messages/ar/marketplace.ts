@@ -123,6 +123,8 @@ export const messages = {
   "marketplace.app.attention": "يحتاج إلى انتباه",
   "marketplace.app.partialTitle": "{name} غير مكتمل",
   "marketplace.app.partialDescription": "بعض تطبيقاته أو مهاراته غير مثبّتة. تثبّتها إعادة الربط.",
+  "marketplace.app.pausedTitle": "{name} متوقف",
+  "marketplace.app.pausedDescription": "لا يحصل الوكلاء على أدوات {name}. تشغّله إعادة الربط.",
   "marketplace.app.notConnected": "غير متصل",
   "marketplace.app.paused": "متوقف مؤقتًا",
   "marketplace.app.custom": "خادم MCP",

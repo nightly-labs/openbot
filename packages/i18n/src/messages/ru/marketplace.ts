@@ -114,6 +114,8 @@ export const messages = {
   "marketplace.app.attention": "Требует внимания",
   "marketplace.app.partialTitle": "{name}: установка не завершена",
   "marketplace.app.partialDescription": "Часть приложений или навыков не установлена. «Переподключить» установит их.",
+  "marketplace.app.pausedTitle": "{name} выключено",
+  "marketplace.app.pausedDescription": "Агенты не получают инструменты {name}. «Переподключить» включит его.",
   "marketplace.app.notConnected": "Не подключено",
   "marketplace.app.paused": "Приостановлено",
   "marketplace.app.custom": "Сервер MCP",

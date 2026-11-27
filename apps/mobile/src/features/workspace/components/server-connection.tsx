@@ -20,6 +20,7 @@ import { mobileAnalytics } from "@/features/analytics/mobile-analytics";
 import { phoneVpn } from "@/features/support/model/phone-network-capture";
 import { supportLog, supportLogValue } from "@/features/support/model/support-log";
 import { referencedError } from "@/features/workspace/model/referenced-error";
+import { type NetworkChange, strongerChange } from "@/shared/lib/network-change";
 import { subscribeNetworkMoves } from "@/shared/lib/network-path";
 import { RemoteTeamTransport, type RemoteTeamTransportRef } from "./remote-team-transport";
 
@@ -123,15 +124,15 @@ export const ServerConnection = memo(function ServerConnection({
     supportLog.add("info", "connection", `${hostId} network restored`);
     controller.current?.networkRestored();
   }, [hostId]);
-  const networkMoved = useRef(false);
+  const networkMoved = useRef<NetworkChange | null>(null);
   const clientRef = useRef(client);
   clientRef.current = client;
   useEffect(() => {
     if (!client) return;
-    return subscribeNetworkMoves(() => {
-      supportLog.add("info", "connection", `${hostId} network changed${activeRef.current ? "" : " while inactive"}`);
-      if (activeRef.current) client.networkChanged();
-      else networkMoved.current = true;
+    return subscribeNetworkMoves((change) => {
+      supportLog.add("info", "connection", `${hostId} network ${change}${activeRef.current ? "" : " while inactive"}`);
+      if (activeRef.current) client.networkChanged(change);
+      else networkMoved.current = strongerChange(networkMoved.current, change);
     });
   }, [client, hostId]);
   const handleDiagnostic = useCallback(
@@ -268,9 +269,10 @@ export const ServerConnection = memo(function ServerConnection({
       inactiveSince.current = null;
     }
     controller.current?.setActive(active);
-    if (active && networkMoved.current) {
-      networkMoved.current = false;
-      clientRef.current?.networkChanged();
+    const moved = networkMoved.current;
+    if (active && moved) {
+      networkMoved.current = null;
+      clientRef.current?.networkChanged(moved);
     }
     const phase = lastStatus.current?.status.phase;
     if (returned && (phase === "waiting" || phase === "cooldown")) controller.current?.refresh();

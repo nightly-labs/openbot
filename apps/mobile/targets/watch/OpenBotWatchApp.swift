@@ -47,6 +47,7 @@ enum ComposeTarget: Hashable {
 struct RootView: View {
   @EnvironmentObject private var session: WatchSession
   @Environment(\.scenePhase) private var scenePhase
+  @AppStorage(WatchSession.themeKey) private var themed = true
   @State private var path: [WatchRoute] = []
 
   var body: some View {
@@ -56,6 +57,7 @@ struct RootView: View {
           destination(route)
         }
     }
+    .environment(\.themed, themed)
     .overlay(alignment: .bottom) {
       if let feedback = session.feedback {
         FeedbackView(feedback: feedback)

@@ -88,6 +88,8 @@ export const messages = {
   "marketplace.app.attention": "需要关注",
   "marketplace.app.partialTitle": "{name} 未完成安装",
   "marketplace.app.partialDescription": "部分应用或技能尚未安装。重新连接即可安装。",
+  "marketplace.app.pausedTitle": "{name} 已关闭",
+  "marketplace.app.pausedDescription": "智能体无法使用 {name} 的工具。重新连接即可开启。",
   "marketplace.app.notConnected": "未连接",
   "marketplace.app.paused": "已暂停",
   "marketplace.app.custom": "MCP 服务器",

@@ -14,3 +14,64 @@ index 48a0fd7..8d62826 100644
        // React Native destroys modules on a background thread, but `ZeroContentOrigins` is UI-thread only.
        Handler(Looper.getMainLooper()).post { ZeroContentOrigins.clear() }
  
+diff --git a/build/community/menu/MenuView.ios.js b/build/community/menu/MenuView.ios.js
+index b276fe771fb2bbe18711722855937fbb16679a75..62c284fea83686c8d3843858a6f92297ffc0f711 100644
+--- a/build/community/menu/MenuView.ios.js
++++ b/build/community/menu/MenuView.ios.js
+@@ -7,7 +7,12 @@ import { Menu } from '../../swift-ui/Menu';
+ import { RNHostView } from '../../swift-ui/RNHostView';
+ import { Section } from '../../swift-ui/Section';
+ import { Toggle } from '../../swift-ui/Toggle';
+-import { disabled as disabledModifier, tint as tintModifier } from '../../swift-ui/modifiers';
++import { buttonStyle, disabled as disabledModifier, menuIndicator, menuStyle, tint as tintModifier } from '../../swift-ui/modifiers';
++const triggerModifiers = [
++    menuStyle('button'),
++    buttonStyle('plain'),
++    menuIndicator('hidden')
++];
+ function actionId(action) {
+     return action.id ?? action.title;
+ }
+@@ -121,6 +126,7 @@ let warnedShowNoop = false;
+             ]
+         }) : /*#__PURE__*/ _jsx(Menu, {
+             label: trigger,
++            modifiers: triggerModifiers,
+             children: body
+         })
+     });
+diff --git a/src/community/menu/MenuView.ios.tsx b/src/community/menu/MenuView.ios.tsx
+index 40f1d5813bdf4829b43cf09d38a56fb50b1192ce..218eb71f126fbe2c41aaa049402a111679e2ae65 100644
+--- a/src/community/menu/MenuView.ios.tsx
++++ b/src/community/menu/MenuView.ios.tsx
+@@ -7,10 +7,18 @@ import { Menu } from '../../swift-ui/Menu';
+ import { RNHostView } from '../../swift-ui/RNHostView';
+ import { Section } from '../../swift-ui/Section';
+ import { Toggle } from '../../swift-ui/Toggle';
+-import { disabled as disabledModifier, tint as tintModifier } from '../../swift-ui/modifiers';
++import {
++  buttonStyle,
++  disabled as disabledModifier,
++  menuIndicator,
++  menuStyle,
++  tint as tintModifier,
++} from '../../swift-ui/modifiers';
+ import type { ModifierConfig } from '../../types';
+ import type { MenuAction, MenuComponentProps, MenuComponentRef, NativeActionEvent } from './types';
+ 
++const triggerModifiers = [menuStyle('button'), buttonStyle('plain'), menuIndicator('hidden')];
++
+ function actionId(action: MenuAction): string {
+   return action.id ?? action.title;
+ }
+@@ -141,7 +149,9 @@ export function MenuView(props: MenuComponentProps & { ref?: React.Ref<MenuCompo
+           <ContextMenu.Items>{body}</ContextMenu.Items>
+         </ContextMenu>
+       ) : (
+-        <Menu label={trigger}>{body}</Menu>
++        <Menu label={trigger} modifiers={triggerModifiers}>
++          {body}
++        </Menu>
+       )}
+     </Host>
+   );

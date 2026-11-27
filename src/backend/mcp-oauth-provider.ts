@@ -1023,7 +1023,7 @@ class McpOAuthClientProvider implements OAuthClientProvider {
       this.#registrationStatus = response.status;
       const redirectRefused = (await registrationErrorCode(response)) === "invalid_redirect_uri";
       this.#redirectRefused = redirectRefused;
-      if (!this.#documentReplacesRefusal(response.status)) return response;
+      if (!this.#documentReplacesRefusal(response.status)) return withoutNullFields(response);
       this.#redirectRefused = false;
       await response.body?.cancel();
       return Response.json(
@@ -1589,6 +1589,24 @@ async function replacesRedirectAddress(response: Response, sent: RequestInit): P
 async function refusesRedirectAddress(response: Response): Promise<boolean> {
   const error = await registrationErrorCode(response);
   return error === "invalid_redirect_uri" || error === "invalid_client_metadata";
+}
+
+const registrationReplySchema = z.record(z.string(), z.unknown());
+
+async function withoutNullFields(response: Response): Promise<Response> {
+  if (!response.ok) return response;
+  const reply = registrationReplySchema.safeParse(
+    await response
+      .clone()
+      .json()
+      .catch(() => null),
+  );
+  if (!reply.success) return response;
+  const fields = Object.entries(reply.data);
+  const kept = fields.filter(([, value]) => value !== null);
+  if (kept.length === fields.length) return response;
+  await response.body?.cancel();
+  return Response.json(Object.fromEntries(kept), { status: response.status });
 }
 
 async function registrationErrorCode(response: Response): Promise<string | null> {

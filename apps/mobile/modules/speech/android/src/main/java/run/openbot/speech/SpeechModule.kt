@@ -11,6 +11,8 @@ import android.media.AudioTrack
 import android.media.PlaybackParams
 import android.net.Uri
 import android.os.Build
+import android.view.inputmethod.InputMethodManager
+import android.view.inputmethod.InputMethodSubtype
 import com.k2fsa.sherpa.onnx.GenerationConfig
 import com.k2fsa.sherpa.onnx.OfflineTts
 import com.k2fsa.sherpa.onnx.OfflineTtsConfig
@@ -24,6 +26,7 @@ import expo.modules.kotlin.typedarray.Uint8Array
 import java.io.File
 import java.nio.ByteBuffer
 import java.nio.ByteOrder
+import java.util.Locale
 import java.util.concurrent.Executors
 import java.util.concurrent.LinkedBlockingQueue
 import java.util.concurrent.atomic.AtomicInteger
@@ -45,6 +48,13 @@ private val CALL_HEADSETS = setOf(
   AudioDeviceInfo.TYPE_BLUETOOTH_SCO,
   AudioDeviceInfo.TYPE_BLE_HEADSET,
 )
+
+private fun keyboardLocale(subtype: InputMethodSubtype): Locale {
+  if (subtype.languageTag.isNotEmpty()) return Locale.forLanguageTag(subtype.languageTag)
+  @Suppress("DEPRECATION")
+  val legacy = subtype.locale
+  return Locale.forLanguageTag(legacy.split('_').take(2).joinToString("-"))
+}
 
 /** A path from a `file://` URI, as the app's file system API names its files, or a plain path. */
 private fun pathOf(location: String): String =
@@ -184,6 +194,13 @@ class SpeechModule : Module() {
     /** Closes the microphone and drops the speech that was not sent. */
     Function("cancelCapture") {
       captureExecutor.execute { capture.cancel() }
+    }
+
+    AsyncFunction("keyboardLanguage") {
+      val keyboard = appContext.reactContext?.getSystemService(InputMethodManager::class.java)
+      val subtype = keyboard?.currentInputMethodSubtype ?: return@AsyncFunction null
+      if (subtype.mode != "keyboard") return@AsyncFunction null
+      keyboardLocale(subtype).toLanguageTag().takeUnless { it == "und" }
     }
 
     /**

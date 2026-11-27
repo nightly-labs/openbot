@@ -82,6 +82,8 @@ export const messages = {
   "marketplace.app.attention": "확인 필요",
   "marketplace.app.partialTitle": "{name}이(가) 완료되지 않았어요",
   "marketplace.app.partialDescription": "일부 앱 또는 스킬이 설치되지 않았어요. 다시 연결하면 설치돼요.",
+  "marketplace.app.pausedTitle": "{name}이(가) 꺼져 있어요",
+  "marketplace.app.pausedDescription": "에이전트가 {name}의 도구를 받지 못해요. 다시 연결하면 켜져요.",
   "marketplace.app.notConnected": "연결 안 됨",
   "marketplace.app.paused": "일시 중지됨",
   "marketplace.app.custom": "MCP 서버",

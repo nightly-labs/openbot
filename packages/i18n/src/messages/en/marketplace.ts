@@ -105,6 +105,8 @@ export const messages = defineMessages("marketplace", {
   "marketplace.app.attention": "Needs attention",
   "marketplace.app.partialTitle": "{name} is not complete",
   "marketplace.app.partialDescription": "Some of its apps or skills are not installed. Reconnect installs them.",
+  "marketplace.app.pausedTitle": "{name} is turned off",
+  "marketplace.app.pausedDescription": "Agents do not get the tools of {name}. Reconnect turns it on.",
   "marketplace.app.notConnected": "Not connected",
   "marketplace.app.paused": "Paused",
   "marketplace.app.custom": "MCP server",

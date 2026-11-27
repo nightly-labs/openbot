@@ -10,7 +10,7 @@ import Svg, { Path } from "react-native-svg";
 import { useCSSVariable } from "uniwind";
 import { thumbnailColor } from "@/features/agents/components/bloub-avatar";
 import { useMobileSession, useQueryScope } from "@/features/auth/context/mobile-session-context";
-import { loadServerLogo } from "@/features/servers/model/server-logo";
+import { loadServerLogo, SERVER_AVATAR_CORNER_RATIO } from "@/features/servers/model/server-logo";
 import { useServerPlush } from "@/features/servers/model/server-plush";
 import { DISCONNECTED_APPEARANCE } from "@/features/workspace/components/use-connection-appearance";
 import { queryKeys } from "@/features/workspace/model/query-keys";
@@ -19,7 +19,6 @@ import type { MobileServer } from "@/features/workspace/model/workspace-types";
 import { END_X } from "@/shared/lib/text-direction";
 
 const INK = "rgba(0, 0, 0, 0.72)";
-export const SERVER_AVATAR_CORNER_RATIO = 0.32;
 const DOT = 12;
 const DOT_OVERHANG = 2;
 const DOT_GAP = 2.5;

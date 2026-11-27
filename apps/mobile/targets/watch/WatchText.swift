@@ -23,6 +23,9 @@ enum TextKey {
   static let stopDetail = "mobile.watch.stop.detail"
   static let newMessage = "mobile.watch.compose.newMessage"
   static let pinned = "mobile.watch.list.pinned"
+  static let settingsTitle = "mobile.watch.settings.title"
+  static let settingsTheme = "mobile.watch.settings.theme"
+  static let settingsThemeDetail = "mobile.watch.settings.themeDetail"
   static let needsYou = "mobile.agent.list.waiting.title"
   static let servers = "mobile.server.drawer.title"
   static let unread = "mobile.agent.list.unreadGroup.title"
@@ -96,5 +99,23 @@ extension Color {
       red: Double((value >> 16) & 0xFF) / 255,
       green: Double((value >> 8) & 0xFF) / 255,
       blue: Double(value & 0xFF) / 255)
+  }
+}
+
+extension Color {
+  static let stateMinBrightness: CGFloat = 0.95
+  static let stateMaxSaturation: CGFloat = 0.7
+
+  static func stateTint(hex: String) -> Color {
+    guard let base = Color(hex: hex) else { return .blue }
+    var hue: CGFloat = 0
+    var saturation: CGFloat = 0
+    var brightness: CGFloat = 0
+    var alpha: CGFloat = 0
+    guard UIColor(base).getHue(&hue, saturation: &saturation, brightness: &brightness, alpha: &alpha) else {
+      return base
+    }
+    return Color(
+      hue: hue, saturation: min(saturation, stateMaxSaturation), brightness: max(brightness, stateMinBrightness))
   }
 }

@@ -94,6 +94,8 @@ export const messages = {
     "تعذّر على OpenBot بدء الاتصال بهذا الخادم. إذا استمرت المشكلة، فأغلق OpenBot ثم افتحه مرة أخرى.",
   "error.remote.connectionServiceUnreachable":
     "لا يستطيع هذا الكمبيوتر الوصول إلى خدمة اتصال OpenBot. تحقّق من اتصاله بالإنترنت. يعيد OpenBot الاتصال تلقائيًا.",
+  "error.remote.deviceConnectionServiceUnreachable":
+    "لا يستطيع هذا الجهاز الوصول إلى خدمة اتصال OpenBot. تحقّق من اتصاله بالإنترنت ومن VPN. يعيد OpenBot الاتصال تلقائيًا.",
   "error.remote.serverAnswerTimeout": "لم يستجب الخادم في الوقت المحدد. يعيد OpenBot الاتصال تلقائيًا.",
   "error.remote.signInConnectionClosed":
     "أُغلق الاتصال بالخادم أثناء تسجيل الدخول. إذا تكرر ذلك، فتأكد من صحة التاريخ والوقت على الخادم وعلى هذا الجهاز.",

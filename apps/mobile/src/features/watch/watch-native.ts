@@ -9,6 +9,7 @@ import { type NativeModule, requireOptionalNativeModule } from "expo";
 import { useSyncExternalStore } from "react";
 import { endWatchWake, startWatchWake } from "./model/watch-awake";
 import { revokeWatchSession, type WatchAccountCredential } from "./model/watch-pairing";
+import { resetWatchServerPictures } from "./model/watch-pictures";
 
 interface WatchLinkState {
   supported: boolean;
@@ -151,6 +152,7 @@ function forgetWatchSessions() {
 
 export function resetWatch(): void {
   forgetWatchSessions();
+  resetWatchServerPictures();
   if (!native) return;
   handler = null;
   for (const entry of waiting.splice(0)) reply(entry.id, { ok: false, error: "failed", message: "" });

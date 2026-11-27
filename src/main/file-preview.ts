@@ -18,7 +18,7 @@ export function filePreviewFromBytes(name: string, bytes: Uint8Array, generation
   const mimeType = mimeTypeForName(name);
   const kind = filePreviewKindForFile(name, mimeType);
   if (kind === "none") return { name, size: bytes.byteLength, mimeType, previewKind: kind, bytes: null };
-  const pageUrl = filePreviewPages.add(mimeType, bytes, generation);
+  const pageUrl = filePreviewPages.add(mimeType, bytes, generation, undefined, name);
   return { name, size: bytes.byteLength, mimeType, previewKind: kind, bytes, ...(pageUrl ? { pageUrl } : {}) };
 }
 
@@ -36,7 +36,7 @@ export const localFilePreview = Effect.fn("FilePreview.local")(function* (
     bytes && isChatVisualMimeType(mimeType)
       ? yield* attachmentCall(() => realpath(dirname(path))).pipe(Effect.orElseSucceed(() => undefined))
       : undefined;
-  const pageUrl = bytes ? filePreviewPages.add(mimeType, bytes, generation, folder) : undefined;
+  const pageUrl = bytes ? filePreviewPages.add(mimeType, bytes, generation, folder, name) : undefined;
   return {
     name,
     size,

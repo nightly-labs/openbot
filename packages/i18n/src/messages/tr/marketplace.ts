@@ -102,6 +102,8 @@ export const messages = {
   "marketplace.app.attention": "Dikkat gerekiyor",
   "marketplace.app.partialTitle": "{name} tamamlanmadı",
   "marketplace.app.partialDescription": "Bazı uygulamaları veya becerileri yüklü değil. Yeniden bağlan bunları yükler.",
+  "marketplace.app.pausedTitle": "{name} kapalı",
+  "marketplace.app.pausedDescription": "Ajanlar {name} araçlarını almıyor. Yeniden bağlan onu açar.",
   "marketplace.app.notConnected": "Bağlı değil",
   "marketplace.app.paused": "Duraklatıldı",
   "marketplace.app.custom": "MCP sunucusu",

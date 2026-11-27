@@ -5,7 +5,8 @@ import Trash2 from "lucide-react-native/icons/trash";
 import { useState } from "react";
 import { Alert, View } from "react-native";
 import { ServerAppearancePicker } from "@/features/servers/components/server-appearance-picker";
-import { SERVER_AVATAR_CORNER_RATIO, ServerAvatar } from "@/features/servers/components/server-avatar";
+import { ServerAvatar } from "@/features/servers/components/server-avatar";
+import { SERVER_AVATAR_CORNER_RATIO } from "@/features/servers/model/server-logo";
 import { useLockedAction } from "@/features/servers/model/use-locked-action";
 import {
   SettingsContent,

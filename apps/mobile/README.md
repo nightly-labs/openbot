@@ -248,7 +248,8 @@ and a channel message uses the same id as its `operationId`, so a repeat after a
 the message once. A message that the host refused shows `Not sent`, and its menu adds Retry; it holds
 the later messages of its chat, which show `Waits for the message that was not sent`. A refused message writes its failure kind,
 its file count and its size to the support log, without the error text, which can name a file. A message that the host may have stored is not repeated when
-the host cannot drop a repeat, or 12 hours after its first attempt; it shows `Not confirmed`. This
+the host cannot drop a repeat, or 12 hours after its first attempt; it shows `Not confirmed` and tells
+the user to touch and hold it, where its menu has Edit and Don't send. This
 visual state is derived only in the mobile UI: it never changes the agent's synced avatar profile or
 sends appearance updates over RTC.
 

@@ -46,6 +46,7 @@ import {
   SIGNAL_CLIENT_RECONNECT_GRACE_MS,
   SIGNAL_DEFAULT_RECONNECT_GRACE_MS,
   SIGNAL_MESSAGE_BYTES_LIMIT,
+  SIGNAL_SESSIONS_ENDED_LIMIT,
   type SignalClientMessage,
   type SignalErrorCode,
   type SignalServerMessage,
@@ -327,8 +328,11 @@ const SIGNAL_HELLO_DEADLINE_MILLISECONDS = 30_000;
 const TURN_CREDENTIAL_REUSE_MILLISECONDS = 5 * 60_000;
 const MAXIMUM_SOCKETS_PER_HOST = 4;
 const INITIAL_TICKET_TTL_MILLISECONDS = 3 * 60_000;
+const TICKET_CLOCK_SKEW_SECONDS = 60;
 const MAXIMUM_EXPIRATION_TIMER_MILLISECONDS = 24 * 60 * 60_000;
 const INGRESS_RATE_FACTOR = 10;
+const HOST_RATE_FACTOR = 10;
+const ENDED_SESSION_MEMORY_SECONDS = 24 * 60 * 60;
 const SLACK_TEAM_RATE_FACTOR = 2;
 const WEBHOOK_WAKE_RATE_FACTOR = 1 / 10;
 const WEBHOOK_WAKE_TOTAL_RATE_FACTOR = 1;
@@ -382,8 +386,10 @@ export class SignalService {
   readonly #usedTicketIds = new Map<string, number>();
   readonly #revokedEpochs = new Map<string, number>();
   readonly #revokedSessions = new Map<string, number>();
+  readonly #endedHostSessions = new Map<string, Map<string, number>>();
   readonly #rateWindows = new Map<string, { startedAt: number; count: number }>();
   readonly #validateInitialTicketsUntil = Date.now() + INITIAL_TICKET_TTL_MILLISECONDS;
+  readonly #ticketsIssuedBeforeStartUntil = Math.floor(Date.now() / 1_000) + TICKET_CLOCK_SKEW_SECONDS;
   readonly #validateSlackRoutesUntil = Date.now() + SLACK_ROUTE_TTL_SECONDS * 1_000;
   readonly #validateTelegramRoutesUntil = Date.now() + TELEGRAM_ROUTE_TTL_SECONDS * 1_000;
   readonly #validateDiscordRoutesUntil = Date.now() + DISCORD_ROUTE_TTL_SECONDS * 1_000;
@@ -801,8 +807,10 @@ export class SignalService {
     if (!succeeded) this.#metrics.discordApiFailures += 1;
   }
 
-  revokeSession(sessionId: string): void {
-    this.#revokedSessions.set(sessionId, Math.floor(Date.now() / 1_000) + 24 * 60 * 60);
+  revokeSession(sessionId: string, hostId: string): void {
+    const expiresAt = Math.floor(Date.now() / 1_000) + ENDED_SESSION_MEMORY_SECONDS;
+    this.#revokedSessions.set(sessionId, expiresAt);
+    this.#rememberEndedHostSession(hostId, sessionId, expiresAt);
     this.#tokens.revokeSession?.(sessionId);
     for (const connection of [...this.#connections.values()]) {
       if (connection.sessionId === sessionId) this.#dropConnection(connection.id, connection.client.id);
@@ -813,6 +821,28 @@ export class SignalService {
         this.#fail(peer.socket, "session_revoked", "The remote session ended.", 1008);
       }
     }
+    for (const socketId of this.#hosts.get(hostId) ?? []) {
+      const host = this.#peers.get(socketId);
+      if (host) this.#send(host.socket, { type: "sessions-ended", version: 1, sessionIds: [sessionId] });
+    }
+  }
+
+  #rememberEndedHostSession(hostId: string, sessionId: string, expiresAt: number): void {
+    const sessions = this.#endedHostSessions.get(hostId) ?? new Map<string, number>();
+    sessions.delete(sessionId);
+    sessions.set(sessionId, expiresAt);
+    for (const oldest of sessions.keys()) {
+      if (sessions.size <= SIGNAL_SESSIONS_ENDED_LIMIT) break;
+      sessions.delete(oldest);
+    }
+    this.#endedHostSessions.set(hostId, sessions);
+  }
+
+  #sendEndedHostSessions(host: AuthenticatedPeer): void {
+    this.#pruneReplayCache();
+    const sessions = this.#endedHostSessions.get(host.claims.hostId);
+    if (!sessions || sessions.size === 0) return;
+    this.#send(host.socket, { type: "sessions-ended", version: 1, sessionIds: [...sessions.keys()] });
   }
 
   readonly deliverSlack = Effect.fn("Signal.deliverSlack")((appId: string, teamId: string, delivery: SlackDelivery) => {
@@ -1393,7 +1423,7 @@ export class SignalService {
         const authentication = yield* Effect.gen({ self: this }, function* () {
           const initial = yield* Effect.gen({ self: this }, function* () {
             const claims = yield* tokens.verifyTicket(message.token);
-            if (Date.now() < this.#validateInitialTicketsUntil && !(yield* tokens.validateClaims(claims))) {
+            if (this.#mustValidateTicket(claims) && !(yield* tokens.validateClaims(claims))) {
               return yield* new RemoteTokenError({ message: "The remote session is not active." });
             }
             return claims;
@@ -1641,6 +1671,7 @@ export class SignalService {
             resumeToken,
             iceServers: this.#tokens.iceServers(claims),
           });
+          this.#sendEndedHostSessions(peer);
           yield* this.#restoreWaitingClients(peer);
           return;
         }
@@ -1702,6 +1733,10 @@ export class SignalService {
         });
       }),
   );
+
+  #mustValidateTicket(claims: RemoteTicketClaims): boolean {
+    return Date.now() < this.#validateInitialTicketsUntil || claims.iat <= this.#ticketsIssuedBeforeStartUntil;
+  }
 
   #currentHost(hostId: string): AuthenticatedPeer | null {
     let current: AuthenticatedPeer | null = null;
@@ -1899,6 +1934,7 @@ export class SignalService {
   #acceptMessage(socket: SignalSocket, now = Date.now()): boolean {
     const peer = this.#peers.get(socket.id);
     if (peer?.peer === "ingress") return this.#acceptRateKey(`ingress:${socket.id}`, now, INGRESS_RATE_FACTOR);
+    if (peer?.peer === "host") return this.#acceptRateKey(`host:${peer.claims.hostId}`, now, HOST_RATE_FACTOR);
     if (!this.#acceptRateKey(`ip:${socket.ip || socket.id}`, now)) return false;
     return peer ? this.#acceptRateKey(`user:${peer.claims.userId}`, now) : true;
   }
@@ -1927,6 +1963,10 @@ export class SignalService {
     for (const [jti, expiresAt] of this.#usedTicketIds) if (expiresAt <= nowSeconds) this.#usedTicketIds.delete(jti);
     for (const [sessionId, expiresAt] of this.#revokedSessions) {
       if (expiresAt <= nowSeconds) this.#revokedSessions.delete(sessionId);
+    }
+    for (const [hostId, sessions] of this.#endedHostSessions) {
+      for (const [sessionId, expiresAt] of sessions) if (expiresAt <= nowSeconds) sessions.delete(sessionId);
+      if (sessions.size === 0) this.#endedHostSessions.delete(hostId);
     }
   }
 

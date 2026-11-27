@@ -83,7 +83,7 @@ export const messages = {
     "Bu aynı zamanda hesabın etkin uzak bağlantılarını da sonlandırır. Cihaz tekrar oturum açabilir.",
   "mobile.settings.sessions.disconnect": "Bağlantıyı kes",
   "mobile.settings.dictation.footer":
-    "Sesli konuşmada ve dikte ederken telefonun tanıyıcısına konuştuğun dil. Otomatik, telefon ayarlarındaki desteklenen ilk dili kullanır.",
+    "Sesli konuşmada ve dikte ederken telefonun tanıyıcısına konuştuğun dil. Otomatik, yazarken kullandığın klavyenin dilini, sonra telefon ayarlarındaki desteklenen ilk dili kullanır.",
   "mobile.settings.dictation.automatic": "Otomatik",
   "mobile.settings.appearance.title": "Görünüm",
   "mobile.settings.appearance.footer": "Sistem cihazınızın görünümünü takip eder.",

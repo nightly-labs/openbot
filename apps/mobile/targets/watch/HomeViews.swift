@@ -1,12 +1,15 @@
 import SwiftUI
 
 enum HomePage: Hashable {
+  case settings
   case summary
   case list
 }
 
 struct HomeView: View {
+  @EnvironmentObject private var session: WatchSession
   @Environment(\.scenePhase) private var scenePhase
+  @Environment(\.themed) private var themed
   let snapshot: WatchReadySnapshot
   @Binding var path: [WatchRoute]
   @AppStorage(WatchSession.serverKey) private var chosenServerId = ""
@@ -14,19 +17,36 @@ struct HomeView: View {
 
   var body: some View {
     TabView(selection: $page) {
+      WatchSettingsView()
+        .tag(HomePage.settings)
       SummaryView(snapshot: shown, serverCount: snapshot.servers.count, path: $path)
+        .background {
+          if themed, let server { ServerBackdrop(server: server, tint: tint(server)) }
+        }
         .tag(HomePage.summary)
       AgentListView(snapshot: shown) { path.append($0) }
+        .background {
+          if themed, let server { ServerBackdrop(server: server, tint: tint(server), page: 1) }
+        }
         .tag(HomePage.list)
     }
     .tabViewStyle(.page(indexDisplayMode: .always))
+    .environment(\.serverPalette, themed ? server.flatMap { ServerPalette(tint: tint($0)) } : nil)
     .onChange(of: scenePhase) { previous, phase in
       if previous == .background, phase != .background, path.isEmpty { page = .summary }
     }
   }
 
+  private func tint(_ server: WatchServer) -> Color {
+    session.tint(server, accent: snapshot.accent)
+  }
+
   private var shown: WatchReadySnapshot {
     snapshot.forServer(chosenServerId)
+  }
+
+  private var server: WatchServer? {
+    snapshot.chosenServer(chosenServerId)
   }
 }
 
@@ -73,6 +93,7 @@ struct AgentCounts {
 struct SummaryView: View {
   @EnvironmentObject private var session: WatchSession
   @Environment(\.watchText) private var text
+  @Environment(\.serverPalette) private var palette
   let snapshot: WatchReadySnapshot
   let serverCount: Int
   @Binding var path: [WatchRoute]
@@ -91,9 +112,9 @@ struct SummaryView: View {
               .foregroundStyle(.secondary)
           } else {
             let counts = AgentCounts(snapshot.agents, channels: snapshot.channels ?? [])
-            CountLine(count: counts.waiting, title: text(TextKey.needsYou), color: .orange)
-            CountLine(count: counts.unread, title: text(TextKey.unread), color: .blue)
-            CountLine(count: counts.working, title: text(TextKey.stateWorking), color: .green)
+            CountLine(count: counts.waiting, title: text(TextKey.needsYou), color: palette?.attention ?? .orange)
+            CountLine(count: counts.unread, title: text(TextKey.unread), color: palette?.unread ?? .blue)
+            CountLine(count: counts.working, title: text(TextKey.stateWorking), color: palette?.working ?? .green)
             AvatarStack(agents: stacked)
               .padding(.top, 4)
           }
@@ -107,6 +128,7 @@ struct SummaryView: View {
   @ViewBuilder
   private var title: some View {
     let name = snapshot.servers.first?.name ?? ""
+    let color = palette?.title ?? .primary
     if serverCount > 1 {
       Button {
         path.append(.servers)
@@ -114,11 +136,12 @@ struct SummaryView: View {
         HStack(spacing: 4) {
           Text(name)
             .font(.title3.weight(.semibold))
+            .foregroundStyle(color)
             .lineLimit(2)
             .multilineTextAlignment(.leading)
           Image(systemName: "chevron.up.chevron.down")
             .font(.footnote.weight(.semibold))
-            .foregroundStyle(.secondary)
+            .foregroundStyle(palette?.label ?? .secondary)
         }
       }
       .buttonStyle(.plain)
@@ -126,6 +149,7 @@ struct SummaryView: View {
     } else {
       Text(name)
         .font(.title3.weight(.semibold))
+        .foregroundStyle(color)
         .lineLimit(2)
     }
   }
@@ -139,6 +163,7 @@ struct SummaryView: View {
 }
 
 struct CountLine: View {
+  @Environment(\.serverPalette) private var palette
   let count: Int
   let title: String
   let color: Color
@@ -156,6 +181,7 @@ struct CountLine: View {
           .lineLimit(1)
       }
       .font(.footnote)
+      .foregroundStyle(palette?.label ?? .primary)
       .accessibilityElement(children: .combine)
     }
   }
@@ -163,18 +189,23 @@ struct CountLine: View {
 
 struct AvatarStack: View {
   static let shown = 5
+  static let side: CGFloat = 28
+  static let overlap: CGFloat = 12
+
+  @Environment(\.serverPalette) private var palette
   let agents: [WatchAgent]
 
   var body: some View {
-    HStack(spacing: -8) {
-      ForEach(agents.prefix(Self.shown)) { agent in
-        AgentAvatar(agent: agent, size: 28)
+    HStack(spacing: 4) {
+      HStack(spacing: -Self.overlap) {
+        ForEach(agents.prefix(Self.shown)) { agent in
+          AgentAvatar(agent: agent, size: Self.side)
+        }
       }
       if agents.count > Self.shown {
         Text(verbatim: "+\(agents.count - Self.shown)")
           .font(.caption2)
-          .foregroundStyle(.secondary)
-          .padding(.leading, 2)
+          .foregroundStyle(palette?.label ?? .secondary)
       }
     }
     .accessibilityHidden(true)
@@ -182,6 +213,7 @@ struct AvatarStack: View {
 }
 
 struct ServerPickerView: View {
+  @EnvironmentObject private var session: WatchSession
   @Environment(\.watchText) private var text
   let snapshot: WatchReadySnapshot
   @Binding var path: [WatchRoute]
@@ -190,15 +222,13 @@ struct ServerPickerView: View {
   var body: some View {
     let chosen = snapshot.chosenServer(chosenServerId)
     List(snapshot.servers, id: \.id) { server in
+      let tint = session.tint(server, accent: snapshot.accent)
       Button {
         chosenServerId = server.id
         if !path.isEmpty { path.removeLast() }
       } label: {
         HStack(spacing: 8) {
-          Circle()
-            .fill(server.online ? Color.green : Color.secondary)
-            .frame(width: 8, height: 8)
-            .accessibilityHidden(true)
+          ServerBadge(server: server, tint: tint)
           VStack(alignment: .leading, spacing: 1) {
             Text(server.name)
               .font(.headline)
@@ -222,7 +252,26 @@ struct ServerPickerView: View {
         }
       }
       .accessibilityAddTraits(server.id == chosen?.id ? .isSelected : [])
+      .listRowBackground(ServerRowBackdrop(server: server, tint: tint))
     }
     .navigationTitle(text(TextKey.servers))
+  }
+}
+
+struct WatchSettingsView: View {
+  @Environment(\.watchText) private var text
+  @AppStorage(WatchSession.themeKey) private var themed = true
+
+  var body: some View {
+    List {
+      Section {
+        Toggle(text(TextKey.settingsTheme), isOn: $themed)
+      } header: {
+        Text(text(TextKey.settingsTitle))
+          .textCase(nil)
+      } footer: {
+        Text(text(TextKey.settingsThemeDetail))
+      }
+    }
   }
 }
