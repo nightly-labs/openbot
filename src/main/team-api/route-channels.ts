@@ -69,6 +69,9 @@ export type ChannelSettingsAgents = Pick<
   | "listChannelRoutineRuns"
 >;
 
+const DEFAULT_CHANNEL_PAGE_LIMIT = 100;
+const REMOTE_INITIAL_CHANNEL_PAGE_LIMIT = 24;
+
 export async function routeChannels(
   context: TeamApiRequestContext,
   channels: ChannelService | undefined,
@@ -105,7 +108,9 @@ export async function routeChannels(
     const taskWaits = capabilities.has(CHANNEL_TASK_WAITS_CAPABILITY) && input.beforeSequence === undefined;
     const settingLinks = capabilities.has(SETTING_LINK_MARKERS_CAPABILITY);
     const pageTasksOnly = capabilities.has(CHANNEL_PAGE_TASKS_CAPABILITY);
-    const newest = channels.store.pageWithoutExtent(input.channelId, input.beforeSequence, 100);
+    const initialLimit =
+      input.beforeSequence === undefined ? REMOTE_INITIAL_CHANNEL_PAGE_LIMIT : DEFAULT_CHANNEL_PAGE_LIMIT;
+    const newest = channels.store.pageWithoutExtent(input.channelId, input.beforeSequence, initialLimit);
     const tasks =
       seenSubtasks && input.beforeSequence === undefined
         ? channels.store.withSeenDependencies(input.channelId, newest.tasks)
@@ -117,7 +122,7 @@ export async function routeChannels(
       const kept = waits.filter((wait) => value.tasks.some((task) => task.id === wait.taskId));
       return kept.length ? { ...value, waits: kept } : value;
     };
-    for (let limit = 100; ; limit = Math.floor(limit / 2)) {
+    for (let limit = initialLimit; ; limit = Math.floor(limit / 2)) {
       const messages = newest.messages.slice(-limit);
       const hasOlder = newest.olderCursor !== null || newest.messages.length > limit;
       const olderCursor = hasOlder ? (messages[0]?.sequence ?? null) : null;

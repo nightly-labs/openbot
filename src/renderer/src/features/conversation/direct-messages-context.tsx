@@ -140,7 +140,7 @@ const DirectMessages = createSimpleContext({
         const page = await conversationPort().servers.readDirectConversationPage({
           memberId,
           anchor: { type: "latest" },
-          limit: 50,
+          limit: activeServer()?.kind === "remote" ? 24 : 50,
         });
         if (!scopeIsCurrent() || request !== directConversationRequest) return;
         const snapshot = retainCached

@@ -1154,7 +1154,7 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
         () =>
           request(
             "GET",
-            `${TEAM_API_ROUTES.agent.conversationPage(agentId)}?limit=50`,
+            `${TEAM_API_ROUTES.agent.conversationPage(agentId)}?limit=24`,
             decodeConversationPage,
             undefined,
             serverId,
@@ -1239,7 +1239,7 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
               () =>
                 client.request(
                   "GET",
-                  `${TEAM_API_ROUTES.agent.conversationPage(agentId)}?limit=50`,
+                  `${TEAM_API_ROUTES.agent.conversationPage(agentId)}?limit=24`,
                   decodeConversationPage,
                 ),
               context.isCurrent,

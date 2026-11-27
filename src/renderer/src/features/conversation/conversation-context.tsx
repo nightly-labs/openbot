@@ -65,6 +65,7 @@ import { noteSocialFollowMessageSent } from "./social-follow-prompt";
 type ConversationDeltaEvent = Extract<AgentEvent, { type: "conversation-delta" }>;
 
 const LATEST_PAGE_SIZE = 50;
+const REMOTE_LATEST_PAGE_SIZE = 24;
 const INACTIVE_SNAPSHOT_TAIL = LATEST_PAGE_SIZE * 4;
 
 function trimToLatestPage(conversation: ConversationState): void {
@@ -257,7 +258,14 @@ const Conversation = createSimpleContext({
           conversation.loadError = null;
         });
         void conversationPort()
-          .agent.readConversationPage({ agentId, anchor: { type: "latest" }, limit: 50 }, serverId)
+          .agent.readConversationPage(
+            {
+              agentId,
+              anchor: { type: "latest" },
+              limit: server?.kind === "remote" ? REMOTE_LATEST_PAGE_SIZE : LATEST_PAGE_SIZE,
+            },
+            serverId,
+          )
           .then((page) => {
             if (!scopeIsCurrent() || conversationPageRequests.get(agentId) !== pageRequest) return;
             updateConversation(agentId, (conversation) => {
@@ -921,7 +929,7 @@ const Conversation = createSimpleContext({
       const page = await conversationPort().agent.readConversationPage({
         agentId,
         anchor: { type: "latest" },
-        limit: 50,
+        limit: activeServer()?.kind === "remote" ? REMOTE_LATEST_PAGE_SIZE : LATEST_PAGE_SIZE,
       });
       if (!scopeIsCurrent() || conversationPageRequests.get(agentId) !== request) return;
       applyConversationPage(page, "replace", "latest");

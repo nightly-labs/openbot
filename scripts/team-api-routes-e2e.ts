@@ -11243,6 +11243,27 @@ try {
         taskIds(windowTasks).join() === "task-open,task-shown",
       [taskIds(fullTasks), taskIds(windowTasks)],
     );
+
+    for (let index = 1; index <= 60; index += 1) postAlert(`page-cap-${index}`, alertMember);
+    const firstChannelPage = await call("POST", CHANNEL_ROUTES.read, { ...use, json: { channelId } });
+    const firstCursor = field(firstChannelPage.body, "olderCursor");
+    const olderChannelPage = await call("POST", CHANNEL_ROUTES.read, {
+      ...use,
+      json: { channelId, beforeSequence: firstCursor },
+    });
+    check(
+      "the first channel page caps at 24 messages with olderCursor, and older pages still return up to 100 messages",
+      firstChannelPage.status === 200 &&
+        list(field(firstChannelPage.body, "messages")).length === 24 &&
+        typeof firstCursor === "number" &&
+        olderChannelPage.status === 200 &&
+        list(field(olderChannelPage.body, "messages")).length > 24,
+      [
+        list(field(firstChannelPage.body, "messages")).length,
+        firstCursor,
+        list(field(olderChannelPage.body, "messages")).length,
+      ],
+    );
   }
 
   {
