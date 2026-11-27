@@ -426,7 +426,8 @@ export const messages = {
   "mobile.chat.outbox.failedHold": "Niet verstuurd. Houd het bericht ingedrukt om het opnieuw te proberen.",
   "mobile.chat.outbox.cancelSend": "Niet versturen",
   "mobile.chat.outbox.menuHint": "Toont de opties voor dit bericht.",
-  "mobile.chat.outbox.unconfirmed": "Niet bevestigd. Controleer de chat voordat je het opnieuw verstuurt.",
+  "mobile.chat.outbox.unconfirmed":
+    "Niet bevestigd. Controleer de chat en houd daarna het bericht ingedrukt om het te bewerken of te annuleren.",
   "mobile.chat.outbox.editFailed": "Kan het bericht niet openen om het te bewerken.",
   "mobile.chat.outbox.saveFailed":
     "Kan wachtende berichten niet op deze telefoon bewaren. Houd de app open totdat ze zijn verstuurd.",
