@@ -74,6 +74,8 @@ const GROUP = "120363000000000001@g.us";
 const OTHER_GROUP = "120363000000000002@g.us";
 const PAIRING_CODE: string = "ABCD1234";
 const lidDirectId = "IN-LID-DIRECT";
+const DAY_MS = 24 * 60 * 60_000;
+let clockOffset = 0;
 
 interface Step {
   name: string;
@@ -421,6 +423,7 @@ async function boot<T>(use: (services: Booted) => Promise<T>): Promise<T> {
       throw new Error("Not used by the fake socket.");
     },
     fetchVersion: async () => null,
+    now: () => Date.now() + clockOffset,
   });
   const messaging = new MessagingService({
     threads: agents.messaging,
@@ -1646,6 +1649,51 @@ try {
       },
     );
 
+    await step(
+      "LID mention: with no saved LID, a mention of the linked number's LID starts work (#15921)",
+      async () => {
+        const context = {
+          me: { number: OWNER, lid: null },
+          openedAt: Date.now(),
+          now: Date.now(),
+          rules: {
+            ownNumber: true,
+            contacts: new Map<string, string>(),
+            groups: new Set([GROUP]),
+            readOnly: new Set<string>(),
+          },
+          chats: new WhatsAppChatState(),
+          isOwnPost: () => false,
+          threadOf: () => null,
+          numberForLid: async (lid: string) =>
+            lid === `${OWNER_LID}@lid` ? OWNER : lid === LID_FRIEND_CHAT ? LID_FRIEND : null,
+        };
+        const ownMention = await whatsAppInbound(
+          message({
+            chat: GROUP,
+            participant: LID_FRIEND_CHAT,
+            text: `@${OWNER_LID} is the build green?`,
+            mentions: [`${OWNER_LID}@lid`],
+          }),
+          context,
+        );
+        assert.equal(ownMention?.type, "message", "A mention of the linked number's LID started no work.");
+        assert.ok(ownMention?.type === "message");
+        assert.equal(
+          ownMention.message.text,
+          "is the build green?",
+          "The mention of the linked number stayed in the text.",
+        );
+        assert.deepEqual(ownMention.message.mentionedUserIds, [], "The linked number counted as another person.");
+        const otherMention = await whatsAppInbound(
+          message({ chat: GROUP, participant: OWNER_JID, text: "@999123 lunch?", mentions: [LID_FRIEND_CHAT] }),
+          { ...context, me: { number: FRIEND, lid: null } },
+        );
+        assert.equal(otherMention, null, "A mention of another member started work.");
+        return { ownMention: ownMention.message.text, otherMention: null };
+      },
+    );
+
     await step("LID authors: a LID chat with a phone form, and a LID group member, map to their numbers", async () => {
       const input = parseWhatsAppSenderInput({
         workspaceId: OWNER,
@@ -1931,7 +1979,63 @@ try {
       assert.deepEqual(answer.content.mentions, [`${FRIEND}@s.whatsapp.net`], "The answer did not list the person.");
       return { mentions: answer.content.mentions };
     });
+
+    await step(
+      "group replies: a reply to an agent's post from yesterday starts work, a reply to the owner's message does not (#15921)",
+      async () => {
+        const handle = runtime.get(credentials.get(connectionId(agents))?.storeId ?? "");
+        assert.ok(handle, "No open store.");
+        const member = "48600100800";
+        const author = `${member}@s.whatsapp.net`;
+        await postAs(agents, "agent-whatsapp-e2e", GROUP, "The weekly report is ready.");
+        const post = phone.sent.findLast((sent) => sent.jid === GROUP && "text" in sent.content);
+        assert.ok(post, "The agent's post did not reach the group.");
+        const ownerMessage = message({ chat: GROUP, fromMe: true, text: "I will be late today" });
+        phone.current().receive([ownerMessage]);
+        clockOffset += DAY_MS + 60 * 60_000;
+        phone.current().keepAlive();
+        handle.store.prune();
+        assert.equal(handle.store.hasOutbound(post.id), false, "The post stayed in the outbound list.");
+        const reply = message({
+          chat: GROUP,
+          participant: author,
+          text: "Can you add the costs?",
+          quotedId: post.id,
+          quotedParticipant: OWNER_JID,
+        });
+        const ownerReply = message({
+          chat: GROUP,
+          participant: author,
+          text: "No problem",
+          quotedId: ownerMessage.key.id ?? "",
+          quotedParticipant: OWNER_JID,
+        });
+        phone.current().receive([ownerReply, reply]);
+        await until(() => received(agents, GROUP, reply.key.id ?? ""), "the reply to yesterday's post");
+        await until(
+          () =>
+            agents.messaging.history
+              .recent(connectionId(agents), GROUP, null, 500)
+              .some((entry) => entry.id === ownerReply.key.id),
+          "the saved reply to the owner's own message",
+        );
+        assert.equal(
+          received(agents, GROUP, ownerReply.key.id ?? ""),
+          false,
+          "A reply to the owner's own message started work.",
+        );
+        const link = agents.messaging.store.linkByKey(
+          connectionId(agents),
+          GROUP,
+          handle.store.getPost(post.id)?.threadKey ?? "",
+        );
+        assert.ok(link, "The reply to yesterday's post has no conversation for the post.");
+        await runCauseEffect(agents.messaging.stop(link.linkId, member));
+        return { replyToPost: "started", replyToOwner: "history only" };
+      },
+    );
   });
+  clockOffset = 0;
 
   const crash = await (async () => {
     const store = openConnectionStore();

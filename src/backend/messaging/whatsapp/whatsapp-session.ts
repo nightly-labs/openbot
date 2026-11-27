@@ -292,7 +292,11 @@ export class WhatsAppSession {
 
   isOwnPost(messageId: string): boolean {
     const at = this.#echoes.get(messageId);
-    return (at !== undefined && this.#now() - at < ECHO_TTL_MS) || this.#store.hasOutbound(messageId);
+    return (
+      (at !== undefined && this.#now() - at < ECHO_TTL_MS) ||
+      this.#store.hasOutbound(messageId) ||
+      this.#store.getPost(messageId)?.own === true
+    );
   }
 
   send(

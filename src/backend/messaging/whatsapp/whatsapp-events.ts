@@ -129,7 +129,8 @@ export async function whatsAppInbound(
   const contextInfo = contextOf(content);
   const quotedId = contextInfo?.stanzaId ?? null;
   const mentioned = (contextInfo?.mentionedJid ?? []).map((jid) => jidNormalizedUser(jid));
-  const namesMe = mentioned.some((jid) => isMe(jid, context.me));
+  const mentionsOfMe = await ownMentions(mentioned, context);
+  const namesMe = mentionsOfMe.size > 0;
   const repliesToPost = quotedId !== null && context.isOwnPost(quotedId);
   const repliesToMe =
     quotedId !== null &&
@@ -196,8 +197,8 @@ export async function whatsAppInbound(
     isDirect: !isGroup,
     requiresLink: isGroup && !namesMe && !repliesToPost,
     authorId,
-    text: withMentions(text, mentioned, context.me),
-    mentionedUserIds: mentioned.filter((jid) => !isMe(jid, context.me)).flatMap((jid) => userOf(jid) ?? []),
+    text: withMentions(text, mentioned, mentionsOfMe),
+    mentionedUserIds: mentioned.filter((jid) => !mentionsOfMe.has(jid)).flatMap((jid) => userOf(jid) ?? []),
     files,
     ...(replyTo ? { replyTo } : {}),
   };
@@ -407,14 +408,22 @@ function quoteOf(
   };
 }
 
-function withMentions(text: string, mentioned: string[], me: WhatsAppIdentity): string {
+function withMentions(text: string, mentioned: string[], mentionsOfMe: ReadonlySet<string>): string {
   let result = text;
   for (const jid of mentioned) {
     const user = userOf(jid);
     if (!user) continue;
-    result = result.replaceAll(`@${user}`, isMe(jid, me) ? "" : `@${user}`);
+    result = result.replaceAll(`@${user}`, mentionsOfMe.has(jid) ? "" : `@${user}`);
   }
   return result.replace(/\s{2,}/gu, " ").trim();
+}
+
+async function ownMentions(mentioned: readonly string[], context: WhatsAppInboundContext): Promise<Set<string>> {
+  const own = new Set<string>();
+  for (const jid of mentioned)
+    if (isMe(jid, context.me) || (isLidUser(jid) && (await context.numberForLid(jid)) === context.me.number))
+      own.add(jid);
+  return own;
 }
 
 function isMe(jid: string, me: WhatsAppIdentity): boolean {
