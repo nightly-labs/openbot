@@ -38,6 +38,11 @@ const scriptSchema = z.object({
 const server = createServer((request, response) => {
   const url = new URL(request.url ?? "/", "http://127.0.0.1");
   response.setHeader("Content-Type", "text/html; charset=utf-8");
+  if (url.pathname === "/stalled-image" || url.pathname === "/never-commit") return;
+  if (url.pathname === "/slow-instances") {
+    setTimeout(() => response.end("Instances: vm-1, vm-2"), 2_500);
+    return;
+  }
   if (url.pathname === "/list") response.end(listPage(Number(url.searchParams.get("page") ?? "1")));
   else if (url.pathname in PAGES) response.end(PAGES[url.pathname]);
   else response.end(formPage());
@@ -688,6 +693,32 @@ async function main(): Promise<void> {
     recordCases("crashed-tool-call-stops");
     await close(crashing.tab.id);
 
+    phase("slow-committed-page");
+    const slow = await open("/form");
+    const slowNavigate = await call("navigate", {
+      tabId: slow.tab.id,
+      url: `${origin}/slow-console`,
+      timeoutMs: 1_000,
+    });
+    assert.equal(slowNavigate.success, true, text(slowNavigate));
+    const slowPage = z
+      .object({ url: z.string(), loading: z.boolean() })
+      .parse(parseBrowserToolText(text(slowNavigate)));
+    assert.equal(slowPage.url, `${origin}/slow-console`);
+    assert.equal(slowPage.loading, true, "A committed page that still loads did not report loading.");
+    const listed = await call("wait_for", { tabId: slow.tab.id, text: "Instances: vm-1", timeoutMs: 10_000 });
+    assert.equal(listed.success, true, text(listed));
+    recordCases("navigate-keeps-committed-page-loading", "committed-page-finishes-its-requests");
+    const neverCommits = await call("navigate", {
+      tabId: slow.tab.id,
+      url: `${origin}/never-commit`,
+      timeoutMs: 1_000,
+    });
+    assert.equal(neverCommits.success, false, "A navigation that never committed did not fail.");
+    assert.equal(slow.contents.isLoading(), false, "A navigation that never committed kept loading.");
+    recordCases("navigate-stops-uncommitted-page");
+    await close(slow.tab.id);
+
     phase("tab-sleep");
     await runCauseEffect(host.destroy());
     const sleepy = new BrowserHost(window, join(fixtureRoot, "downloads"), join(fixtureRoot, "sleep-tabs.json"), {
@@ -789,6 +820,15 @@ const PAGES: Record<string, string> = {
       setTimeout(() => {
         document.querySelector("main").innerHTML = "<button type='button'>Loaded</button>";
       }, 1200);
+    </script>`,
+  "/slow-console": `<!doctype html><meta charset="utf-8"><title>Console</title>
+    <header>Console header</header><main id="list">Loading instances</main>
+    <img src="/stalled-image" alt="">
+    <script>
+      fetch("/slow-instances")
+        .then((response) => response.text())
+        .then((list) => (document.querySelector("#list").textContent = list))
+        .catch(() => (document.querySelector("#list").textContent = "Instances failed"));
     </script>`,
   "/stuck-skeleton": `<!doctype html><meta charset="utf-8"><title>Stuck</title>
     <div class="skeleton" style="width:240px;height:40px;background:#ddd"></div><button type="button">Stay</button>`,

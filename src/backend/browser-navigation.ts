@@ -18,16 +18,21 @@ export function isCommittedNavigationTimeout(failure: BrowserOperationError): bo
   return failure.cause instanceof NavigationTimeoutError && failure.cause.committed;
 }
 
+export type CommittedPageAtDeadline = "stop" | "keep";
+
 export function navigateAndWait(
   contents: WebContents,
   initiate: () => boolean | Promise<unknown>,
   timeoutMs: number | null = 10_000,
+  committedPage: CommittedPageAtDeadline = "stop",
 ): Effect.Effect<void, BrowserOperationError> {
-  return watchNavigation(contents, initiate, timeoutMs);
+  return watchNavigation(contents, initiate, timeoutMs, committedPage);
 }
 
 export function waitForLoading(contents: WebContents, timeoutMs: number): Effect.Effect<void, BrowserOperationError> {
-  return Effect.suspend(() => (contents.isLoading() ? watchNavigation(contents, undefined, timeoutMs) : Effect.void));
+  return Effect.suspend(() =>
+    contents.isLoading() ? watchNavigation(contents, undefined, timeoutMs, "stop") : Effect.void,
+  );
 }
 
 export const stopLoadingAndWait = Effect.fn("Browser.stopLoadingAndWait")((contents: WebContents) => {
@@ -65,7 +70,12 @@ export const stopLoadingAndWait = Effect.fn("Browser.stopLoadingAndWait")((conte
 });
 
 const watchNavigation = Effect.fn("Browser.watchNavigation")(
-  (contents: WebContents, initiate: (() => boolean | Promise<unknown>) | undefined, timeoutMs: number | null) => {
+  (
+    contents: WebContents,
+    initiate: (() => boolean | Promise<unknown>) | undefined,
+    timeoutMs: number | null,
+    committedPage: CommittedPageAtDeadline,
+  ) => {
     return Effect.callback<void, BrowserOperationError>((resume) => {
       let started = initiate === undefined;
       let inPlace = false;
@@ -142,6 +152,7 @@ const watchNavigation = Effect.fn("Browser.watchNavigation")(
       const startDeadline = (ms: number) => {
         timer = setTimeout(() => {
           timedOut = true;
+          if (committedPage === "keep" && committed && !documentPending) return complete();
           try {
             const navigationWasActive = started || contents.isLoading();
             contents.stop();
