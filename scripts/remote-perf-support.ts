@@ -135,6 +135,34 @@ export async function readSyncSink(page: Page): Promise<{ records: RemoteRequest
 
 export const delay = (ms: number) => new Promise<void>((done) => setTimeout(done, ms));
 
+export const MARK_PREFIX = "openbot:remote-";
+const QUIET_MS = 1_500;
+
+export function pageNow(page: Page): Promise<number> {
+  return page.evaluate(() => performance.timeOrigin + performance.now());
+}
+
+export async function waitMark(page: Page, name: string, after: number): Promise<void> {
+  await page.waitForFunction(
+    ({ mark, after }) =>
+      performance.getEntriesByName(mark).some((entry) => performance.timeOrigin + entry.startTime >= after),
+    { mark: `${MARK_PREFIX}${name}`, after },
+    { timeout: WAIT_MS, polling: 100 },
+  );
+}
+
+export async function settleNetwork(page: Page, from: number): Promise<RemoteRequestRecord[]> {
+  const deadline = Date.now() + WAIT_MS;
+  for (;;) {
+    const sink = await readSyncSink(page);
+    const mine = sink.records.filter((record) => record.startedAt >= from);
+    const lastEnd = Math.max(from, ...mine.map((record) => record.endedAt));
+    if (sink.open === 0 && (await pageNow(page)) - lastEnd >= QUIET_MS) return mine;
+    if (Date.now() > deadline) throw new Error("The network of the page did not become quiet.");
+    await delay(100);
+  }
+}
+
 export async function addNetworkLatency(context: BrowserContext, latencyMs: number): Promise<void> {
   const delayed = new Set(["document", "fetch", "xhr"]);
   await context.route("**/*", async (route) => {

@@ -49,18 +49,18 @@ export const COMPARE_COLLECTION: ContentCollection<"compare"> = {
       slug: "best-ai-agent-apps",
       title: "Best AI Agent Apps in 2026: 13 Apps Compared",
       description:
-        "13 AI agent apps compared: OpenBot, Claude Code, Codex, Cursor, Antigravity, Devin, Manus and more. Where they run, models, price and benchmark scores.",
+        "What an AI agent app is, and 13 AI agent apps compared: OpenBot, Claude Code, Codex, Cursor, Antigravity, Devin, Manus and more. Where they run, models, price and benchmark scores.",
       publishedAt: "2026-10-03",
-      updatedAt: "2026-10-24",
+      updatedAt: "2026-11-27",
       author: NEWS_AUTHOR,
     },
     {
       slug: "codex-vs-claude-code",
-      title: "Codex vs Claude Code: Which Coding Agent to Use",
+      title: "Codex vs Claude Code: Benchmarks, Cost and Plans",
       description:
-        "Codex vs Claude Code: benchmark scores, cost per task, plans, sandboxes and privacy, from official sources. Or run both as one team in OpenBot.",
+        "Codex vs Claude Code: benchmark scores, cost per task, ChatGPT and Claude plans, the Codex desktop app for Mac, sandboxes and privacy, from official sources. Or run both as one team in OpenBot.",
       publishedAt: "2026-10-03",
-      updatedAt: "2026-10-24",
+      updatedAt: "2026-11-27",
       author: NEWS_AUTHOR,
     },
     {
@@ -96,7 +96,7 @@ export const COMPARE_COLLECTION: ContentCollection<"compare"> = {
       description:
         "OpenBot is a free, local Devin alternative: run Codex, Claude Code, Gemini and Grok as a coding agent team on your computer, with plans you already have.",
       publishedAt: "2026-09-27",
-      updatedAt: "2026-10-24",
+      updatedAt: "2026-11-27",
       author: NEWS_AUTHOR,
     },
     {

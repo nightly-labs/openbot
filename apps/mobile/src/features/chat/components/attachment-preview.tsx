@@ -1,4 +1,5 @@
 import { attachmentFileExtension } from "@openbot/contracts/attachment-files";
+import { knownImageSize } from "@openbot/contracts/image-size";
 import type { AttachmentSummary } from "@openbot/contracts/ipc";
 import type { MobileTranslate } from "@openbot/i18n/mobile";
 import { MOBILE_ATTACHMENT_BYTES, type RemoteFileUpload } from "@openbot/team-client/remote-peer";
@@ -44,6 +45,10 @@ export function rememberImageDimensions(id: string, dimensions: ImageDimensions)
 
 export function knownImageDimensions(id: string): ImageDimensions | null {
   return dimensionCache.get(id);
+}
+
+function knownDimensions(attachment: AttachmentSummary): ImageDimensions | null {
+  return dimensionCache.get(attachment.id) ?? knownImageSize(attachment);
 }
 
 export function showsAsImage(attachment: Pick<AttachmentSummary, "kind" | "previewKind">): boolean {
@@ -117,7 +122,7 @@ function mediaTarget(serverId: string, attachment: AttachmentSummary): string | 
 
 function keptFile(serverId: string, attachment: AttachmentSummary): (RemoteFileUpload & { fileUri: string }) | null {
   const large = attachment.size > MOBILE_ATTACHMENT_BYTES;
-  if (!large && (!attachment.mimeType.startsWith("image/") || !dimensionCache.get(attachment.id))) return null;
+  if (!large && (!attachment.mimeType.startsWith("image/") || !knownDimensions(attachment))) return null;
   try {
     const file = mediaFile(serverId, attachment);
     if (!file.exists || file.size !== attachment.size) return null;
@@ -308,13 +313,14 @@ export function useAttachmentFile(
     if (waitingForTap) prioritizeAttachmentDownload(serverId, attachment.id);
   }, [waitingForTap, prioritizeAttachmentDownload, serverId, attachment.id]);
   const data = query.data;
+  const { id, width, height } = attachment;
   const dimensions = useMemo(() => {
-    const known = dimensionCache.get(attachment.id);
-    if (known || !data?.mimeType.startsWith("image/")) return known ?? null;
-    const read = imageDimensions(data.base64);
-    if (read) rememberImageDimensions(attachment.id, read);
+    const known = dimensionCache.get(id);
+    if (known || !data?.mimeType.startsWith("image/")) return known ?? knownImageSize({ width, height });
+    const read = imageDimensions(data.base64) ?? knownImageSize({ width, height });
+    if (read) rememberImageDimensions(id, read);
     return read;
-  }, [attachment.id, data]);
+  }, [id, width, height, data]);
   const localUri = local ?? query.data?.localUri;
   const uri =
     localUri ?? query.data?.fileUri ?? (query.data ? `data:${query.data.mimeType};base64,${query.data.base64}` : null);

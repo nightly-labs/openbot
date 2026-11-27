@@ -2177,6 +2177,12 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
   if (stopChannelPictures) onCleanup(stopChannelPictures);
   const stopChannelList = workspace.runtime.channels?.onListChanged?.(() => void channels.refresh(undefined, false));
   if (stopChannelList) onCleanup(stopChannelList);
+  createEffect(
+    () => channels.state.selectedId,
+    (channelId) => {
+      workspace.runtime.channels?.focusSync?.(channelId);
+    },
+  );
   onCleanup(
     workspace.onHostEvent((event) => {
       if (event.type !== "agent-notification-levels-changed") return;

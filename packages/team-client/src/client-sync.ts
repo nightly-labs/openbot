@@ -57,16 +57,10 @@ import {
   type SyncServerMessage,
 } from "@openbot/contracts/team-protocol/sync-v1";
 import { WORKFLOWS_CAPABILITY, WORKFLOWS_ROUTES } from "@openbot/contracts/team-protocol/workflows-v1";
-import type { RemoteTeamEvent } from "@openbot/team-client/remote-peer";
-import {
-  createSyncClient,
-  type SyncClient,
-  type SyncCollection,
-  type SyncLog,
-  type SyncLogEntry,
-} from "@openbot/team-client/sync-client";
-import { channelPageFromSync, conversationPageFromSync } from "@openbot/team-client/sync-pages";
-import { markRemoteSync } from "@openbot/team-client/sync-profile";
+import type { RemoteTeamEvent } from "./remote-peer";
+import { createSyncClient, type SyncClient, type SyncCollection, type SyncLog, type SyncLogEntry } from "./sync-client";
+import { channelPageFromSync, conversationPageFromSync } from "./sync-pages";
+import { markRemoteSync } from "./sync-profile";
 
 const PAIR_WINDOW_MS = 2_000;
 const CONVERSATION_PAGINATION_CAPABILITY = "conversation-pagination";
@@ -103,9 +97,9 @@ type PayloadEventType =
 
 type WriteScope = "workflows" | "crm" | "messages";
 
-export type WebSyncOrder = "agents" | "channels";
+export type ClientSyncOrder = "agents" | "channels";
 
-export interface WebSyncOptions {
+export interface ClientSyncOptions {
   capabilities: readonly string[];
   role: TeamRole | null;
   focusedAgentId: string | null;
@@ -116,14 +110,14 @@ export interface WebSyncOptions {
   readsChanged(): void;
 }
 
-export interface WebSync {
+export interface ClientSync {
   receive(message: SyncServerMessage): void;
   pause(): void;
   resubscribe(): void;
   focus(agentId: string | null): void;
   focusChannel(channelId: string | null): void;
   wrote(method: string, path: string): void;
-  noteOrder(kind: WebSyncOrder, ids: readonly string[]): void;
+  noteOrder(kind: ClientSyncOrder, ids: readonly string[]): void;
   hostEvent(event: RemoteTeamEvent): boolean;
   channels(): ChannelSummary[] | null;
   agents(): ClientAgentSummary[] | null;
@@ -262,7 +256,7 @@ function sameRows<Entity>(before: readonly SyncLogEntry<Entity>[], after: readon
   );
 }
 
-export function createWebSync(options: WebSyncOptions): WebSync | null {
+export function createClientSync(options: ClientSyncOptions): ClientSync | null {
   const has = (capability: string) => options.capabilities.includes(capability);
   if (!has(SYNC_CAPABILITY)) return null;
   const client: SyncClient = createSyncClient({ send: options.send });
@@ -270,7 +264,7 @@ export function createWebSync(options: WebSyncOptions): WebSync | null {
   const syncSignals = new RecentSyncSignals();
   const writes: Record<WriteScope, number> = { workflows: 0, crm: 0, messages: 0 };
   const readsAfter = new Map<string, number>();
-  const order: Record<WebSyncOrder, ReadonlyMap<string, number>> = { agents: new Map(), channels: new Map() };
+  const order: Record<ClientSyncOrder, ReadonlyMap<string, number>> = { agents: new Map(), channels: new Map() };
   let disposed = false;
 
   function emit(event: AgentEvent): void {
@@ -288,7 +282,7 @@ export function createWebSync(options: WebSyncOptions): WebSync | null {
     options.emit(event);
   }
 
-  function noteOrder(kind: WebSyncOrder, ids: readonly string[]): void {
+  function noteOrder(kind: ClientSyncOrder, ids: readonly string[]): void {
     order[kind] = new Map(ids.map((id, index) => [id, index] as const));
   }
 

@@ -128,13 +128,36 @@ export function finishedTurnSummaries(
   lines: TurnStepLines,
   previous?: ReadonlyMap<string, TurnStepsSummary>,
 ): ReadonlyMap<string, TurnStepsSummary> {
+  return turnSummaries(messages, activeTurnId, false, lines, previous);
+}
+
+export function chatTurnSummaries(
+  messages: readonly ConversationMessage[],
+  activeTurnId: string | null,
+  lines: TurnStepLines,
+  previous?: ReadonlyMap<string, TurnStepsSummary>,
+): ReadonlyMap<string, TurnStepsSummary> {
+  return turnSummaries(messages, activeTurnId, true, lines, previous);
+}
+
+function turnSummaries(
+  messages: readonly ConversationMessage[],
+  activeTurnId: string | null,
+  withLiveAnswer: boolean,
+  lines: TurnStepLines,
+  previous: ReadonlyMap<string, TurnStepsSummary> | undefined,
+): ReadonlyMap<string, TurnStepsSummary> {
   const turns = tallyTurns(messages, (message) =>
-    message.turnId === activeTurnId ? null : { rowId: message.id, message },
+    !withLiveAnswer && message.turnId === activeTurnId ? null : { rowId: message.id, message },
   );
   const summaries = new Map<string, TurnStepsSummary>();
   for (const [turnId, turn] of turns) {
     const steps = turn.thoughts + (lines[turnId]?.length ?? 0);
     if (steps === 0) continue;
+    if (turnId === activeTurnId) {
+      if (turn.answerId) summaries.set(turn.answerId, { turnId, steps, seconds: null });
+      continue;
+    }
     const rowId = turn.answerId ?? (turn.thoughts > 0 && !turn.silent ? thinkingRowId(turnId) : null);
     if (rowId) summaries.set(rowId, { turnId, steps, seconds: turnSeconds(turn) });
   }

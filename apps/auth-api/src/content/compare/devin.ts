@@ -14,7 +14,7 @@ export const DEVIN_COMPARISON: Comparison = {
     "You want native apps for iPhone and Android, or a free app.",
   ],
   rivalPlans:
-    "Devin chooses from models by Anthropic, OpenAI, Google, Cognition and open-source labs, and you pay Devin for use: Free with a light quota, Pro $20 a month, Max $200 a month. It does not take your own API keys.",
+    "Devin chooses from models by Anthropic, OpenAI, Google, Cognition and open-source labs, and you pay Devin for use: Free with a light quota, Pro $20 a month, Max $200 a month. It does not take your own API keys, but on Pro, Max and Teams a personal ChatGPT plan can pay for its GPT models.",
   chooseRival: [
     "You want agents in cloud virtual machines that keep working while your laptop is closed.",
     "You want to start work from Slack, Microsoft Teams, GitHub, Linear or Jira.",
@@ -26,7 +26,7 @@ export const DEVIN_COMPARISON: Comparison = {
       topic: "Models and plans",
       openbot: OPENBOT_TEXT.models,
       rival:
-        "Models from Anthropic, OpenAI, Google, Cognition and open-source labs, paid through your Devin plan. No own API keys. On paid plans, Devin Desktop can also run agents such as Codex CLI or Gemini CLI, billed by their provider.",
+        "Models from Anthropic, OpenAI, Google, Cognition and open-source labs, paid through your Devin plan. No own API keys, but a personal ChatGPT plan can pay for GPT models on Pro, Max and Teams. On paid plans, Devin Desktop can also run agents such as Codex CLI or Gemini CLI, billed by their provider.",
       better: "openbot",
     },
     {
@@ -134,7 +134,7 @@ export const DEVIN_COMPARISON: Comparison = {
       title: "Models and the plans you pay for",
       openbot: OPENBOT_TEXT.plansSection,
       rival:
-        "Devin supports the latest models from Anthropic, OpenAI, Google and Cognition, and open-source models such as DeepSeek, Kimi and GLM. You choose a model in Devin Desktop and the CLI, and a mode in Devin Cloud. Cognition's own SWE-2 model is post-trained from Kimi K3. Devin does not take your own API keys: you pay through your Devin plan, and extra use is billed at API prices. On Pro, Max and Teams, Devin Desktop can also run third-party agents such as Codex CLI, Claude Agent, OpenCode and Gemini CLI; their provider bills you directly.",
+        "Devin supports the latest models from Anthropic, OpenAI, Google and Cognition, and open-source models such as DeepSeek, Kimi and GLM. You choose a model in Devin Desktop and the CLI, and a mode in Devin Cloud. Cognition's own SWE-2 model is post-trained from Kimi K3. Devin does not take your own API keys: you pay through your Devin plan, and extra use is billed at API prices. On Pro, Max and Teams, you can sign in with a personal ChatGPT Go, Plus or Pro plan, and it pays for the GPT models; other models stay on your Devin quota. On Pro, Max and Teams, Devin Desktop can also run third-party agents such as Codex CLI, Claude Agent, OpenCode and Gemini CLI; their provider bills you directly.",
       better: "openbot",
     },
     {
@@ -182,7 +182,7 @@ export const DEVIN_COMPARISON: Comparison = {
     {
       question: "Can I use my own API key or plan with Devin?",
       answer:
-        "Not for Devin's own agent: Cognition says Devin does not support third-party API keys, and you pay through your Devin plan. On Pro, Max and Teams, Devin Desktop can run third-party agents such as Codex CLI or Gemini CLI, and those providers bill you directly.",
+        "Not an API key: Cognition says Devin does not support third-party API keys. A plan, yes: on Pro, Max and Teams, a personal ChatGPT Go, Plus or Pro plan can pay for GPT models, and other models use your Devin quota. Also on Pro, Max and Teams, Devin Desktop can run third-party agents such as Codex CLI or Gemini CLI, and those providers bill you directly.",
     },
     {
       question: "Is Devin Desktop the same as Windsurf?",

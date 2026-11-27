@@ -8748,6 +8748,10 @@ svg[data-icon="arrow-right"]:dir(rtl) {
   font-weight: 500;
 }
 
+.plugin-mcp-address {
+  overflow-wrap: anywhere;
+}
+
 @media (max-width: 640px) {
   .provider-adds-grid.plugin-uses {
     grid-template-columns: minmax(0, 1fr);

@@ -10,23 +10,23 @@ export const CODEX_VS_CLAUDE_CODE: MatchupComparison = {
     { name: "Claude Code", mark: "claude-code", provider: "claude" },
   ],
   answer:
-    "Pick Codex if you pay for ChatGPT and care what each task costs. Pick Claude Code if you pay for Claude and want the top benchmark score, and can wait for it. Both start at $20 a month, and both run on your computer or in the cloud.",
+    "Codex vs Claude Code: pick Claude Code for the higher score, 58 on the Artificial Analysis index with Fable 5.2, against 53 for Codex with GPT-6.2 Astra. Pick Codex for the lower cost: 53 for $3.20 a task, or 50 for $0.90 with its default GPT-6.2 Sol, against $7.51 for the cheapest Claude Code run that scores 58. Both cost $20 a month to start, with ChatGPT Plus or Claude Pro, and both run on your computer or in the cloud. Usually, the plan you already pay for decides it.",
   chooseA: [
     "You already pay for ChatGPT.",
-    "Cost per task matters: GPT-6.1 Sol scores 63 on the Artificial Analysis index for about $1 a task.",
+    "Cost per task matters: GPT-6.2 Sol, the default, scores 50 on the Artificial Analysis index for $0.90 a task.",
     "The sandbox should be on from the first run, with no network.",
     "You'd like to read the source. The command line is Apache-2.0.",
   ],
   chooseB: [
     "You already pay for Claude.",
-    "You want the best score on the index: 68, with Sonnet 5.5 at max effort.",
+    "You want the higher score on the index: 58, with Fable 5.2 or Opus 5.5.",
     "Your company buys Claude through Amazon Bedrock, Google Cloud or Microsoft Foundry.",
   ],
   rows: [
     {
       icon: "cpu",
       topic: "Models",
-      a: "OpenAI models: GPT-6 Astra, GPT-6.1 Sol, GPT-6 Sol and GPT-6 Luna.",
+      a: "OpenAI models: GPT-6.2 Astra, GPT-6.2 Sol, GPT-6 Astra, GPT-6.1 Sol, GPT-6.1 Terra and GPT-6 Luna.",
       b: "Claude models: Opus 5.5 is the default, with Sonnet, Haiku and Fable models.",
     },
     {
@@ -45,8 +45,8 @@ export const CODEX_VS_CLAUDE_CODE: MatchupComparison = {
     {
       icon: "tag",
       topic: "Plans and price",
-      a: "Plus $20 a month, Pro $100, $200 or $500, and Business from $20 a user. Free and Go get GPT-6 Luna in the desktop app, as it rolls out. An API key also works, with no cloud features.",
-      b: "Pro $20 a month, or $17 billed yearly. Max $100 or $200, and Team seats $25, or $20 billed yearly. The free plan does not include Claude Code. An API key also works.",
+      a: "Plus $20 a month, Pro $100, $200 or $500, and Business $20 a user billed yearly, or $25 monthly. Free and Go get GPT-6 Luna in the desktop app, as it rolls out. An API key also works, with no cloud features.",
+      b: "Pro $20 a month, or $17 billed yearly. Max $100, Ultra $200, and Team seats $25, or $20 billed yearly. The free plan does not include Claude Code. An API key also works.",
     },
     {
       icon: "users",
@@ -64,7 +64,7 @@ export const CODEX_VS_CLAUDE_CODE: MatchupComparison = {
       icon: "folder",
       topic: "Your data",
       a: "On Plus and Pro, OpenAI can use your chats to improve its models unless you turn training off. Business, Enterprise and the API: no training by default.",
-      b: "On Pro and Max, Anthropic trains on your chats only when you turn the setting on. Team, Enterprise and the API: no training by default.",
+      b: "On Pro, Max and Ultra, Anthropic trains on your chats only when you turn the setting on. Team, Enterprise and the API: no training by default.",
       better: "b",
     },
     {
@@ -82,34 +82,34 @@ export const CODEX_VS_CLAUDE_CODE: MatchupComparison = {
     },
   ],
   intro:
-    "Codex is OpenAI's coding agent. Claude Code is Anthropic's. They do the same job: read your code, edit files and run commands, on your computer or in their maker's cloud. Both read rules from your repo, use MCP servers, skills and hooks, and review pull requests on GitHub. The real difference is whose models you get, and which subscription you already have.",
+    "Codex is OpenAI's coding agent: a command line, IDE extensions, and Codex in the ChatGPT desktop app for Mac and Windows. Claude Code is Anthropic's, with a command line, IDE extensions and its own desktop app. They do the same job: read your code, edit files and run commands, on your computer or in their maker's cloud. Both read rules from your repo, use MCP servers, skills and hooks, and review pull requests on GitHub. The real differences are whose models you get, what each task costs, and which subscription you already have.",
   bothInOpenBot:
     "OpenBot runs both on your computer, each signed in with your own plan: Codex with ChatGPT, Claude Code with Claude. Give each one a job. They pass work to each other in a shared channel, and you can follow along from your phone. Move an agent from one to the other and it keeps its role, workspace and conversation. When one plan hits its limit, the agent can move to a backup model on the other.",
   benchmark: {
     takeaway:
-      "Claude Code with Sonnet 5.5 at max effort has the top score, 68. It's also the slowest and most expensive run here: $14.19 and 87 minutes a task. Codex with GPT-6.1 Sol at xhigh scores 63, the same as Sonnet 5.5 at xhigh, for $1.04 a task instead of $3.33, and in a bit more than half the time.",
+      "Claude Code scores higher: 58 with Fable 5.2 at xhigh or high, and with Opus 5.5 at max. Fable 5.2 at high is the cheapest of those runs, $7.51 and 31 minutes a task. Codex reaches 53 with GPT-6.2 Astra, for $3.20 and 17 minutes at xhigh. Its default, GPT-6.2 Sol at xhigh, scores 50 for $0.90 a task. Since November 2026, the index is on version 2.1, with new tests and a new cost method, so all scores are lower than in October.",
     rows: [
       {
         agent: "claude-code",
         name: "Claude Code",
-        model: "Sonnet 5.5 (max)",
-        score: 68,
-        costUsd: 14.19,
-        minutes: 87.4,
+        model: "Fable 5.2 (xhigh)",
+        score: 58,
+        costUsd: 15.47,
+        minutes: 53.3,
       },
-      { agent: "claude-code", name: "Claude Code", model: "Opus 5.5 (max)", score: 66, costUsd: 13.04, minutes: 64.5 },
-      { agent: "claude-code", name: "Claude Code", model: "Sonnet 5.5 (xhigh)", score: 63, costUsd: 3.33, minutes: 27 },
-      { agent: "codex", name: "Codex", model: "GPT-6.1 Sol (xhigh)", score: 63, costUsd: 1.04, minutes: 15.5 },
-      { agent: "codex", name: "Codex", model: "GPT-6 Astra (max)", score: 62, costUsd: 7.47, minutes: 29.4 },
-      { agent: "codex", name: "Codex", model: "GPT-6.1 Sol (medium)", score: 61, costUsd: 0.7, minutes: 10.9 },
+      { agent: "claude-code", name: "Claude Code", model: "Fable 5.2 (high)", score: 58, costUsd: 7.51, minutes: 31.3 },
+      { agent: "claude-code", name: "Claude Code", model: "Opus 5.5 (max)", score: 58, costUsd: 12.61, minutes: 65.3 },
+      { agent: "codex", name: "Codex", model: "GPT-6.2 Astra (max)", score: 53, costUsd: 5.12, minutes: 25.1 },
+      { agent: "codex", name: "Codex", model: "GPT-6.2 Astra (xhigh)", score: 53, costUsd: 3.2, minutes: 16.5 },
+      { agent: "codex", name: "Codex", model: "GPT-6.2 Sol (xhigh)", score: 50, costUsd: 0.9, minutes: 12.6 },
     ],
-    checkedAt: "2026-10-03",
+    checkedAt: "2026-11-27",
   },
   sections: [
     {
       title: "Models and the plans you pay for",
-      a: "Codex is built for OpenAI's models: GPT-6 Astra, GPT-6.1 Sol and GPT-6 Luna. OpenAI recommends GPT-6.1 Sol for hard coding work. Plus is $20 a month, Pro is $100, $200 or $500, and Business is $20 a seat billed yearly. Free and Go get GPT-6 Luna in the desktop app as it rolls out, but no cloud tasks. Limits reset every five hours, and weekly caps can apply. An API key works too, at API prices, but you lose cloud features like GitHub review.",
-      b: "Claude Code is built for Claude's models, with Opus 5.5 as the default on paid plans. Pro is $20 a month ($17 billed yearly), Max is $100 or $200, and Team seats are $25 ($20 yearly). The free Claude plan doesn't include Claude Code. Limits reset every five hours, and paid plans have a weekly cap that Claude and Claude Code share. It also works with an Anthropic API key, Amazon Bedrock, Google Cloud and Microsoft Foundry.",
+      a: "Codex is built for OpenAI's models: GPT-6.2 Astra, GPT-6.2 Sol, GPT-6.1 Sol and GPT-6 Luna. GPT-6.2 Sol is the everyday pick, and OpenAI recommends GPT-6.2 Astra for the hardest end-to-end work. Plus is $20 a month, Pro is $100, $200 or $500, and Business is $20 a seat billed yearly. Free and Go get GPT-6 Luna in the desktop app as it rolls out, but no cloud tasks. Limits reset every five hours, Pro has no five-hour limit for now, and weekly caps can apply. An API key works too, at API prices, but you lose cloud features like GitHub review.",
+      b: "Claude Code is built for Claude's models, with Opus 5.5 as the default on paid plans. Pro is $20 a month ($17 billed yearly), Max is $100, Ultra is $200, and Team seats are $25 ($20 yearly). The free Claude plan doesn't include Claude Code. Limits reset every five hours, and paid plans have a weekly cap that Claude and Claude Code share. It also works with an Anthropic API key, Amazon Bedrock, Google Cloud and Microsoft Foundry.",
     },
     {
       title: "Where the work happens",
@@ -125,7 +125,7 @@ export const CODEX_VS_CLAUDE_CODE: MatchupComparison = {
     {
       title: "Data and privacy",
       a: "On Plus and Pro, OpenAI can train on your chats unless you turn that off in ChatGPT's data controls, which cover Codex too. Business, Enterprise, Edu and the API aren't used for training by default. Enterprise and Edu also get retention and data-residency controls.",
-      b: "On Free, Pro and Max, Anthropic trains on your data only if you turn the setting on. With it on, data is kept for 5 years. With it off, 30 days. Team, Enterprise and the API aren't used for training unless you opt in, and Enterprise can get zero data retention. Opt-in beats opt-out, so Claude Code takes this one.",
+      b: "On Free, Pro, Max and Ultra, Anthropic trains on your data only if you turn the setting on. With it on, data is kept for 5 years. With it off, 30 days. Team, Enterprise and the API aren't used for training unless you opt in, and Enterprise can get zero data retention. Opt-in beats opt-out, so Claude Code takes this one.",
       better: "b",
     },
   ],
@@ -133,7 +133,7 @@ export const CODEX_VS_CLAUDE_CODE: MatchupComparison = {
     {
       question: "Which is better for coding, Codex or Claude Code?",
       answer:
-        "On the Artificial Analysis Coding Agent Index, Claude Code with Sonnet 5.5 at max effort scores highest, 68. Codex with GPT-6.1 Sol at xhigh scores 63 for $1.04 a task, against $14.19 for that Claude run. Past the numbers, the plan you already pay for usually decides it.",
+        "On the Artificial Analysis Coding Agent Index, Claude Code scores higher: 58 with Fable 5.2 or Opus 5.5, against 53 for Codex with GPT-6.2 Astra. Codex costs less: 53 for $3.20 a task, and 50 for $0.90 with GPT-6.2 Sol, against $7.51 to $15.47 for the Claude Code runs that score 58. Past the numbers, the plan you already pay for usually decides it.",
     },
     {
       question: "Can I use Codex and Claude Code together?",
@@ -143,7 +143,12 @@ export const CODEX_VS_CLAUDE_CODE: MatchupComparison = {
     {
       question: "How much do Codex and Claude Code cost?",
       answer:
-        "Both start at $20 a month: ChatGPT Plus for Codex, Claude Pro for Claude Code. Claude Pro drops to $17 a month if you pay yearly. Higher limits cost $100 or $200 a month on both, and ChatGPT Pro also has a $500 tier. ChatGPT Free and Go get GPT-6 Luna in the desktop app as it rolls out. The free Claude plan doesn't include Claude Code.",
+        "Both start at $20 a month: ChatGPT Plus for Codex, Claude Pro for Claude Code. Claude Pro drops to $17 a month if you pay yearly. For higher limits, Claude Max is $100 and Claude Ultra $200 a month, and ChatGPT Pro is $100, $200 or $500. Cost per task differs more: on the Artificial Analysis index, the default Codex run costs $0.90 a task, and the Claude Code runs that score 58 cost $7.51 to $15.47. ChatGPT Free and Go get GPT-6 Luna in the desktop app as it rolls out. The free Claude plan doesn't include Claude Code.",
+    },
+    {
+      question: "Is there a Codex desktop app for Mac?",
+      answer:
+        "Yes. Codex is in the ChatGPT desktop app for macOS and Windows, and a Linux app is in preview for Ubuntu, Debian, Fedora and Arch. The Codex command line also runs on macOS, Linux and Windows. Claude Code has its own desktop app for macOS and Windows, with Linux in beta.",
     },
     {
       question: "Is Codex open source? Is Claude Code?",
@@ -153,7 +158,7 @@ export const CODEX_VS_CLAUDE_CODE: MatchupComparison = {
     {
       question: "Do Codex and Claude Code train on my code?",
       answer:
-        "On personal plans, it comes down to one setting. ChatGPT Plus and Pro train on your chats unless you turn it off. Claude Pro and Max train only if you turn it on. On business plans and the API, neither trains on your data by default.",
+        "On personal plans, it comes down to one setting. ChatGPT Plus and Pro train on your chats unless you turn it off. Claude Pro, Max and Ultra train only if you turn it on. On business plans and the API, neither trains on your data by default.",
     },
     {
       question: "Can I use an API key instead of a plan?",
@@ -170,6 +175,9 @@ export const CODEX_VS_CLAUDE_CODE: MatchupComparison = {
     { label: "Codex subagents", url: `${CODEX_DOCS}/agent-configuration/subagents` },
     { label: "Codex Git worktrees", url: `${CODEX_DOCS}/environments/git-worktrees` },
     { label: "Codex remote", url: `${CODEX_DOCS}/remote` },
+    { label: "Codex on mobile", url: `${CODEX_DOCS}/mobile` },
+    { label: "Codex app", url: `${CODEX_DOCS}/app` },
+    { label: "Codex for Linux", url: `${CODEX_DOCS}/linux/linux-app` },
     { label: "Codex IDE extension", url: `${CODEX_DOCS}/codex/ide` },
     { label: "Codex open source", url: `${CODEX_DOCS}/open-source` },
     { label: "Codex authentication", url: `${CODEX_DOCS}/auth` },
@@ -197,5 +205,5 @@ export const CODEX_VS_CLAUDE_CODE: MatchupComparison = {
     { label: "Claude Code license", url: "https://github.com/anthropics/claude-code/blob/main/LICENSE.md" },
     ...BENCHMARK_SOURCES,
   ],
-  checkedAt: "2026-10-03",
+  checkedAt: "2026-11-27",
 };
