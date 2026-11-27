@@ -8,6 +8,7 @@ module.exports = () => ({
   frameworks: ["WatchConnectivity", "WidgetKit", "AVFoundation"],
   entitlements: {
     "com.apple.security.application-groups": ["group.run.openbot.mobile"],
+    "keychain-access-groups": ["$(AppIdentifierPrefix)run.openbot.mobile.watch"],
   },
   colors: {
     $accent: "#FFFFFF",

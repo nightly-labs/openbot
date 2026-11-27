@@ -139,6 +139,7 @@ struct WatchAgent: Codable, Hashable, Identifiable {
   var state: WatchAgentState
   var detail: String?
   var updated: String?
+  var updatedAt: Double?
   var turnId: String?
   var reply: String?
   var wait: WatchWait?
@@ -275,9 +276,11 @@ enum WatchCommand: Encodable, Hashable {
   case read(serverId: String, agentId: String)
   case sendChannel(serverId: String, channelId: String, text: String, messageId: String)
   case readChannel(serverId: String, channelId: String)
+  case widgetPush(token: String, environment: String)
 
   private enum CodingKeys: String, CodingKey {
     case type, serverId, agentId, channelId, requestId, answers, text, turnId, messageId, names, language, publicKey
+    case token, environment
   }
 
   func encode(to encoder: Encoder) throws {
@@ -337,6 +340,10 @@ enum WatchCommand: Encodable, Hashable {
       try container.encode("readChannel", forKey: .type)
       try container.encode(serverId, forKey: .serverId)
       try container.encode(channelId, forKey: .channelId)
+    case .widgetPush(let token, let environment):
+      try container.encode("widgetPush", forKey: .type)
+      try container.encode(token, forKey: .token)
+      try container.encode(environment, forKey: .environment)
     }
   }
 
@@ -349,7 +356,7 @@ enum WatchCommand: Encodable, Hashable {
 
   var serverId: String? {
     switch self {
-    case .refresh, .pair, .avatars: return nil
+    case .refresh, .pair, .avatars, .widgetPush: return nil
     case .approve(let serverId, _, _), .deny(let serverId, _, _), .answer(let serverId, _, _, _),
       .send(let serverId, _, _, _), .stop(let serverId, _, _), .open(let serverId, _), .read(let serverId, _),
       .sendChannel(let serverId, _, _, _), .readChannel(let serverId, _):
@@ -368,7 +375,7 @@ enum WatchCommand: Encodable, Hashable {
 
   var agentKey: AgentKey? {
     switch self {
-    case .refresh, .pair, .avatars, .sendChannel, .readChannel: return nil
+    case .refresh, .pair, .avatars, .sendChannel, .readChannel, .widgetPush: return nil
     case .approve(let serverId, let agentId, _), .deny(let serverId, let agentId, _),
       .answer(let serverId, let agentId, _, _), .send(let serverId, let agentId, _, _),
       .stop(let serverId, let agentId, _), .open(let serverId, let agentId), .read(let serverId, let agentId):

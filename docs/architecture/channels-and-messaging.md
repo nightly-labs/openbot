@@ -125,6 +125,9 @@ does not learn about these. It makes the APNs alert itself, with "OpenBot" as th
 `mutable-content`, the sound, and the sealed bytes. It stores and logs nothing. A `410` answer, from
 the Worker or Apple, removes the registration.
 
+The same APNs relay sends the empty watch widget pushes (`POST /v2/remote/hosts/:hostId/widget-push`);
+see [Widget push](watch-relay.md#widget-push).
+
 The Notification Service Extension of the app (`apps/mobile/plugins/with-notification-service.js`,
 `NotificationService.swift`) opens the seal with the keys that the app writes into the App Group
 file `push-notifications.json`, and shows the agent name and the text. It refuses content that names

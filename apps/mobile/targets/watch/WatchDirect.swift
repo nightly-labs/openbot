@@ -32,13 +32,18 @@ actor WatchDirect {
   }
 
   private let urlSession: URLSession
+  private let loadKey: @Sendable () -> WatchSigningKey?
   private var tickets: [String: Ticket] = [:]
   private var signingKey: WatchSigningKey?
 
-  init() {
+  init(
+    timeout: TimeInterval = WatchDirect.requestTimeout,
+    loadKey: @escaping @Sendable () -> WatchSigningKey? = { WatchKeychain.signingKey() }
+  ) {
+    self.loadKey = loadKey
     let configuration = URLSessionConfiguration.ephemeral
-    configuration.timeoutIntervalForRequest = Self.requestTimeout
-    configuration.timeoutIntervalForResource = Self.requestTimeout + 5
+    configuration.timeoutIntervalForRequest = timeout
+    configuration.timeoutIntervalForResource = timeout + 5
     configuration.waitsForConnectivity = false
     configuration.httpCookieStorage = nil
     configuration.urlCache = nil
@@ -66,7 +71,7 @@ actor WatchDirect {
   {
     guard let commandJSON = command.json() else { throw WatchDirectFailure.invalid }
     let ticket = try await ticket(for: server, credentials: credentials)
-    let key = key()
+    let key = try key()
     let id = Base64URL.random(byteCount: 16)
     let responseKey = Base64URL.random(byteCount: WatchCrypto.responseKeyBytes)
     let ts = Self.now()
@@ -90,9 +95,9 @@ actor WatchDirect {
     return result
   }
 
-  private func key() -> WatchSigningKey {
+  private func key() throws -> WatchSigningKey {
     if let signingKey { return signingKey }
-    let loaded = WatchKeychain.signingKey()
+    guard let loaded = loadKey() else { throw WatchDirectFailure.invalid }
     signingKey = loaded
     return loaded
   }
