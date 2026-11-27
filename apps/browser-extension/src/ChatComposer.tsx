@@ -86,7 +86,9 @@ export function ChatComposer(props: {
     setDraft("");
     setImageError(null);
     queueMicrotask(resize);
-    await props.onSend(text, attachments).catch(() => undefined);
+    await props.onSend(text, attachments).catch(() => {
+      for (const attachment of attachments) props.images.discard(attachment.id);
+    });
   }
 
   function sendButton() {
