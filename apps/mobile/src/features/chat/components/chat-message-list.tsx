@@ -73,7 +73,11 @@ import { ChatTurnStepsRow } from "@/features/chat/components/chat-turn-steps-row
 import { useActivityPresence } from "@/features/chat/components/use-activity-presence";
 import { CHAT_ROW_GAP, type ChatMotion } from "@/features/chat/components/use-chat-motion";
 import { useFoldScrollAnchor } from "@/features/chat/components/use-fold-scroll-anchor";
-import { useMessageArrivals } from "@/features/chat/components/use-message-arrivals";
+import {
+  ArrivalEntrancesContext,
+  useArrivalEntrance,
+  useMessageArrivals,
+} from "@/features/chat/components/use-message-arrivals";
 import type { QuestionPromptController } from "@/features/chat/components/use-question-prompt";
 import { approvalTitle } from "@/features/chat/model/approval-text";
 import {
@@ -108,7 +112,6 @@ import type { PendingApproval } from "@/features/workspace/model/pending-approva
 import { useColumnWidth } from "@/shared/components/adaptive-split";
 import { haptics } from "@/shared/lib/haptics";
 import { useMotionPreference, useReducedMotion } from "@/shared/lib/motion";
-import { isAndroid } from "@/shared/lib/platform";
 import { useText } from "@/shared/lib/text";
 import { END_X, lineDirectionStyle, MIRROR_IN_RTL } from "@/shared/lib/text-direction";
 import { type BubbleTone, bubbleTone } from "../model/bubble-tone";
@@ -187,7 +190,6 @@ const USER_MESSAGE_ENTRANCE = FadeInDown.duration(240)
 const PROGRESS_UPDATE_ENTRANCE = FadeIn.duration(220)
   .easing(Easing.bezier(0.23, 1, 0.32, 1))
   .reduceMotion(ReduceMotion.System);
-const REPLY_SIZE = { duration: 180, easing: Easing.bezier(0.23, 1, 0.32, 1), reduceMotion: ReduceMotion.System };
 const REPLY_APPEAR = { duration: 220, easing: Easing.bezier(0.23, 1, 0.32, 1), reduceMotion: ReduceMotion.Never };
 const BUBBLE_CORNER = { borderCurve: "circular", borderRadius: 22 } as const;
 
@@ -195,7 +197,6 @@ function ChatBubble({
   children,
   agent,
   collapsed = false,
-  animateSize,
   className,
   style,
   fill,
@@ -203,53 +204,21 @@ function ChatBubble({
   agent: boolean;
   fill: string | undefined;
   collapsed?: boolean;
-  animateSize: boolean;
   className: string;
   style: ComponentProps<typeof Animated.View>["style"];
 }>) {
-  const sized = agent && animateSize && !isAndroid;
-  const size = useSharedValue({ width: 0, height: 0, measured: false });
   const shown = useSharedValue(collapsed ? 0 : 1);
   useEffect(() => {
     shown.set(collapsed ? 0 : withTiming(1, REPLY_APPEAR));
   }, [collapsed, shown]);
-  const background = useAnimatedStyle(() => {
-    if (!sized) return { opacity: shown.get() };
-    const { width, height, measured } = size.get();
-    return {
-      opacity: shown.get(),
-      width: measured ? withTiming(width, REPLY_SIZE) : width,
-      height: measured ? withTiming(height, REPLY_SIZE) : height,
-    };
-  });
+  const background = useAnimatedStyle(() => ({ opacity: shown.get() }));
   return (
-    <Animated.View
-      className={className}
-      style={[style, BUBBLE_CORNER]}
-      onLayout={
-        sized
-          ? ({ nativeEvent }) => {
-              const previous = size.get();
-              size.set({
-                width: nativeEvent.layout.width,
-                height: nativeEvent.layout.height,
-                measured: previous.measured || previous.width > 0,
-              });
-            }
-          : undefined
-      }
-    >
+    <Animated.View className={className} style={[style, BUBBLE_CORNER]}>
       {agent ? (
         <Animated.View
-          key={sized ? "sized" : "filled"}
           pointerEvents="none"
-          className={fill ? "absolute left-0 top-0" : "absolute left-0 top-0 bg-control/60"}
-          style={[
-            BUBBLE_CORNER,
-            sized ? null : StyleSheet.absoluteFill,
-            fill ? { backgroundColor: fill } : null,
-            background,
-          ]}
+          className={fill ? undefined : "bg-control/60"}
+          style={[BUBBLE_CORNER, StyleSheet.absoluteFill, fill ? { backgroundColor: fill } : null, background]}
         />
       ) : null}
       {children}
@@ -356,7 +325,6 @@ interface MessageRowShared {
   animationActive: boolean;
   playbackActive: boolean;
   screenReaderEnabled: boolean;
-  textReveal: boolean;
   replySession: { progress: Map<string, number>; revealed: Set<string> };
   markRevealed: (id: string) => void;
   replyHaptics: ReturnType<typeof useReplyHaptics>;
@@ -567,6 +535,7 @@ const MessageRow = memo(function MessageRow({
   const { t } = useText();
   const [selectionHeight, setSelectionHeight] = useState(0);
   const waiting = awaitingFirstWord(message, shared, arriving, revealed);
+  const entrance = useArrivalEntrance(message.id, arriving);
   const bubble = message.kind === "message" && !outbox && !message.streaming && !waiting ? message : null;
   const selectable = Boolean(bubble?.body.trim()) && shared.canSelectText;
   const messageActions = useMessageActions(
@@ -730,7 +699,6 @@ const MessageRow = memo(function MessageRow({
           agent={message.author === "agent"}
           fill={plainBubbleFill}
           collapsed={waiting}
-          animateSize={shared.textReveal}
           className={
             message.author === "user"
               ? `max-w-full self-end px-4 py-3 ${userBubbleStyle || memberColor || plainBubbleFill ? "" : "bg-control/60"}`
@@ -755,16 +723,7 @@ const MessageRow = memo(function MessageRow({
           {children}
         </ChatBubble>
       ) : null,
-    [
-      message,
-      waiting,
-      shared.textReveal,
-      shared.listWidth,
-      userBubbleStyle,
-      memberColor,
-      plainBubbleFill,
-      solidBubbleSurface,
-    ],
+    [message, waiting, shared.listWidth, userBubbleStyle, memberColor, plainBubbleFill, solidBubbleSurface],
   );
   const sentTable = useCallback(
     (table: ReactNode, key: string) => (
@@ -819,7 +778,7 @@ const MessageRow = memo(function MessageRow({
       <Animated.View
         key={message.id}
         entering={
-          arriving && !isFirstUser
+          entrance && !isFirstUser
             ? message.author === "user"
               ? USER_MESSAGE_ENTRANCE
               : message.progress && shared.playbackActive
@@ -1523,7 +1482,7 @@ export const ChatMessageList = memo(function ChatMessageList({
     },
     [replySession],
   );
-  const arrivals = useMessageArrivals(replySession.key, messages, watchesArrivals);
+  const { arriving: arrivals, entrances } = useMessageArrivals(replySession.key, messages, watchesArrivals);
   const messageColorMode = useMessageColor((state) => state.mode);
   const customMessageColor = useMessageColor((state) => state.customColor);
   const messageColorStyle = useMessageColor((state) => state.style);
@@ -1765,7 +1724,6 @@ export const ChatMessageList = memo(function ChatMessageList({
       animationActive,
       playbackActive: animationActive && textReveal && !screenReaderEnabled,
       screenReaderEnabled,
-      textReveal,
       replySession,
       markRevealed,
       replyHaptics,
@@ -1996,6 +1954,7 @@ export const ChatMessageList = memo(function ChatMessageList({
   const openTaggedTab = useTaggedTabOpener(target.serverId);
   const activityRows = useActivityPresence(
     (activities?.length ? activities : [activity]).flatMap((entry) => activitySpec(entry) ?? []),
+    motion.sendSettling,
   );
 
   const startReached = useRef(() => {});
@@ -2192,17 +2151,19 @@ export const ChatMessageList = memo(function ChatMessageList({
             <HistoryShownContext value={historyState !== "ready" || motion.historyVisible}>
               <RoutineGroupsContext value={routineGroupsState}>
                 <KeptOpenContext value={replySession.keptOpen}>
-                  <RowContext value={rowContext}>
-                    <ChatSwipeGestureContext value={swipeGesture ?? null}>
-                      <ChatTimeRevealContext value={timeReveal}>
-                        <ChatTimesMountedContext value={timesMounted}>
-                          <ListHeaderContext value={listHeader}>
-                            <ListFooterContext value={listFooter}>{list}</ListFooterContext>
-                          </ListHeaderContext>
-                        </ChatTimesMountedContext>
-                      </ChatTimeRevealContext>
-                    </ChatSwipeGestureContext>
-                  </RowContext>
+                  <ArrivalEntrancesContext value={entrances}>
+                    <RowContext value={rowContext}>
+                      <ChatSwipeGestureContext value={swipeGesture ?? null}>
+                        <ChatTimeRevealContext value={timeReveal}>
+                          <ChatTimesMountedContext value={timesMounted}>
+                            <ListHeaderContext value={listHeader}>
+                              <ListFooterContext value={listFooter}>{list}</ListFooterContext>
+                            </ListHeaderContext>
+                          </ChatTimesMountedContext>
+                        </ChatTimeRevealContext>
+                      </ChatSwipeGestureContext>
+                    </RowContext>
+                  </ArrivalEntrancesContext>
                 </KeptOpenContext>
               </RoutineGroupsContext>
             </HistoryShownContext>
