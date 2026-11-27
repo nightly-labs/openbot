@@ -16786,6 +16786,35 @@ try {
         text(resultOverDrop) === "after the drop",
       [keptOverDrop, bobBack.events, summary(answeredOverDrop), resultOverDrop],
     );
+    const adaChrome = field(
+      (
+        await call("POST", TEAM_API_ROUTES.auth.login, {
+          json: { username: "ada", password: ADA_PASSWORD },
+        })
+      ).body,
+      "sessionToken",
+    );
+    assert.ok(typeof adaChrome === "string", "ada has no Chrome session.");
+    const adaChromeSocket = await openChromeSocket(adaChrome, [CLIENT_BROWSER_CAPABILITY]);
+    const adaShared = await call("POST", CLIENT_BROWSER_ROUTES.presence, {
+      token: adaChrome,
+      ...v10,
+      json: { sharing: true, tabs: [tab] },
+    });
+    await socketClosed(adaChromeSocket.socket);
+    await call("GET", TEAM_API_ROUTES.compatibility, { protocol: TEAM_PROTOCOL_V10 });
+    const adaKeptOverDrop = clientBrowser.tabs(adaId) !== null;
+    const adaLogout = await call("POST", TEAM_API_ROUTES.auth.logout, { token: adaChrome, json: {} });
+    const adaSharedAfterLogout = clientBrowser.tabs(adaId) !== null;
+    check(
+      "a sign-out while the event connection is away ends the shared tabs at once",
+      adaChromeSocket.ready &&
+        adaShared.status === 200 &&
+        adaKeptOverDrop &&
+        adaLogout.status === 204 &&
+        !adaSharedAfterLogout,
+      [summary(adaShared), adaKeptOverDrop, summary(adaLogout), adaSharedAfterLogout],
+    );
     bobBack.socket.close();
     adaSocket.socket.close();
     const closed = await new Promise<boolean>((resolveClosed) => {
