@@ -331,6 +331,15 @@ export const messages = {
   "crm.review.noMatch": "Żadna sugestia nie pasuje",
   "crm.review.reject": "Odrzuć",
   "crm.review.approve": "Zatwierdź",
+  "crm.review.approveAll": "Zatwierdź wszystkie",
+  "crm.review.approveAllTitle": {
+    one: "Zatwierdzić {count} sugestię?",
+    few: "Zatwierdzić {count} sugestie?",
+    many: "Zatwierdzić {count} sugestii?",
+    other: "Zatwierdzić {count} sugestii?",
+  },
+  "crm.review.approveAllBody":
+    "CRM stosuje je po kolei, od najstarszej. Zatrzymuje się na sugestii, której nie może zastosować, a pozostałe zostają na liście.",
   "crm.review.suggests": "{agent} sugeruje: {change}",
   "crm.access.button": {
     one: "{count} agent",

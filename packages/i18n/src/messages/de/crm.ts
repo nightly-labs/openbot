@@ -291,6 +291,10 @@ export const messages = {
   "crm.review.noMatch": "Keine passenden Vorschläge",
   "crm.review.reject": "Ablehnen",
   "crm.review.approve": "Genehmigen",
+  "crm.review.approveAll": "Alle genehmigen",
+  "crm.review.approveAllTitle": { one: "{count} Vorschlag genehmigen?", other: "{count} Vorschläge genehmigen?" },
+  "crm.review.approveAllBody":
+    "Das CRM übernimmt sie einzeln, die ältesten zuerst. Es hält bei einem Vorschlag an, den es nicht übernehmen kann, und die übrigen bleiben in der Liste.",
   "crm.review.suggests": "{agent} schlägt vor: {change}",
   "crm.access.button": { one: "{count} Agent", other: "{count} Agenten" },
   "crm.access.title": "Agenten, die das CRM lesen und Änderungen vorschlagen können",

@@ -291,6 +291,10 @@ export const messages = {
   "crm.review.noMatch": "Aucune suggestion ne correspond",
   "crm.review.reject": "Refuser",
   "crm.review.approve": "Approuver",
+  "crm.review.approveAll": "Tout approuver",
+  "crm.review.approveAllTitle": { one: "Approuver {count} suggestion ?", other: "Approuver {count} suggestions ?" },
+  "crm.review.approveAllBody":
+    "Le CRM les applique une par une, de la plus ancienne à la plus récente. Il s'arrête à une suggestion qu'il ne peut pas appliquer, et les autres restent dans la liste.",
   "crm.review.suggests": "{agent} suggère : {change}",
   "crm.access.button": { one: "{count} agent", other: "{count} agents" },
   "crm.access.title": "Agents qui peuvent lire le CRM et suggérer des modifications",

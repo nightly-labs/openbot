@@ -353,6 +353,17 @@ export const messages = {
   "crm.review.noMatch": "لا اقتراحات مطابقة",
   "crm.review.reject": "رفض",
   "crm.review.approve": "موافقة",
+  "crm.review.approveAll": "الموافقة على الكل",
+  "crm.review.approveAllTitle": {
+    zero: "الموافقة على {count} اقتراح؟",
+    one: "الموافقة على اقتراح واحد؟",
+    two: "الموافقة على اقتراحين؟",
+    few: "الموافقة على {count} اقتراحات؟",
+    many: "الموافقة على {count} اقتراحًا؟",
+    other: "الموافقة على {count} اقتراح؟",
+  },
+  "crm.review.approveAllBody":
+    "يطبّق CRM الاقتراحات واحدًا تلو الآخر، بدءًا من الأقدم. ويتوقف عند اقتراح لا يمكن تطبيقه، وتبقى البقية في القائمة.",
   "crm.review.suggests": "يقترح {agent}: {change}",
   "crm.access.button": {
     zero: "لا وكلاء",

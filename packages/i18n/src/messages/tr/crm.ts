@@ -292,6 +292,10 @@ export const messages = {
   "crm.review.noMatch": "Eşleşen öneri yok",
   "crm.review.reject": "Reddet",
   "crm.review.approve": "Onayla",
+  "crm.review.approveAll": "Tümünü onayla",
+  "crm.review.approveAllTitle": { one: "{count} öneri onaylansın mı?", other: "{count} öneri onaylansın mı?" },
+  "crm.review.approveAllBody":
+    "CRM bunları en eskisinden başlayarak tek tek uygular. Uygulayamadığı bir öneride durur ve diğerleri listede kalır.",
   "crm.review.suggests": "{agent} öneriyor: {change}",
   "crm.access.button": { one: "{count} ajan", other: "{count} ajan" },
   "crm.access.title": "CRM'i okuyup değişiklik önerebilen ajanlar",
