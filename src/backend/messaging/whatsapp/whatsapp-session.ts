@@ -24,7 +24,7 @@ import {
   type WAVersion,
 } from "@openbot/whatsapp/baileys";
 import { Effect } from "effect";
-import { MessagingAdapterError, WhatsAppRefusedError } from "../messaging-types";
+import { MessagingAdapterError, WhatsAppPostNeedsConfirmation, WhatsAppRefusedError } from "../messaging-types";
 import type { WhatsAppUpsertWindow } from "./whatsapp-events";
 
 const logger = createOpenBotLogger("whatsapp");
@@ -300,9 +300,12 @@ export class WhatsAppSession {
     content: AnyMessageContent,
     options?: MiscMessageGenerationOptions,
   ): Effect.Effect<WAMessage, MessagingAdapterError> {
-    return Effect.tryPromise({
-      try: () => this.#queue(jid, () => this.#sendNow(jid, content, options)),
-      catch: (cause) => new MessagingAdapterError({ cause }),
+    return Effect.gen({ self: this }, function* () {
+      const needsConfirmation = yield* WhatsAppPostNeedsConfirmation;
+      return yield* Effect.tryPromise({
+        try: () => this.#queue(jid, () => this.#sendNow(jid, content, needsConfirmation, options)),
+        catch: (cause) => new MessagingAdapterError({ cause }),
+      });
     });
   }
 
@@ -534,7 +537,12 @@ export class WhatsAppSession {
     return next;
   }
 
-  async #sendNow(jid: string, content: AnyMessageContent, options?: MiscMessageGenerationOptions): Promise<WAMessage> {
+  async #sendNow(
+    jid: string,
+    content: AnyMessageContent,
+    needsConfirmation: boolean,
+    options?: MiscMessageGenerationOptions,
+  ): Promise<WAMessage> {
     let messageId = options?.messageId;
     const deadline = this.#now() + SEND_DEADLINE_MS;
     for (let attempt = 1; ; attempt += 1) {
@@ -569,6 +577,7 @@ export class WhatsAppSession {
         if (typeof result === "object" && result.error)
           throw attempt > 1 ? new Error("not_confirmed") : new WhatsAppRefusedError(result.error);
         if (sent.message) this.#store.putOutbound(sent.key.id, sent.message);
+        if (result === "timeout" && needsConfirmation) throw new Error("not_confirmed");
         if (isPnUser(jid)) remember(this.#postChats, messageId, address);
         return sent;
       } finally {

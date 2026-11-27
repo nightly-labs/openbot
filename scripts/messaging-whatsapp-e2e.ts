@@ -1961,6 +1961,49 @@ try {
       },
     );
 
+    await step("unconfirmed post: messaging_post fails, and the history does not record it (#17557)", async () => {
+      const jid = `${FRIEND}@s.whatsapp.net`;
+      await runCauseEffect(messaging.addWhatsAppSender(OWNER, { id: FRIEND, kind: "contact", name: "Ewa" }));
+      try {
+        await postAs(agents, "agent-whatsapp-e2e", jid, "CONFIRMED-17557");
+        const socket = phone.current();
+        phone.holdAcks = true;
+        const unconfirmed = await runCauseEffect(
+          agents.messaging.outboundTool(
+            "agent-whatsapp-e2e",
+            { threadId: "thread-whatsapp-e2e", turnId: "turn-whatsapp-e2e" },
+            "messaging_post",
+            { connection: connectionId(agents), place: jid, text: "UNCONFIRMED-17557" },
+            () => Effect.succeed([]),
+          ),
+        );
+        phone.holdAcks = false;
+        const text = unconfirmed.contentItems[0]?.text ?? "";
+        assert.equal(unconfirmed.success, false, `An unconfirmed post counted as sent: ${text}`);
+        assert.ok(text.includes("WhatsApp did not confirm the message"), `The agent was not told: ${text}`);
+        assert.ok(text.includes("check the chat"), `The agent was not told to have the chat checked: ${text}`);
+        assert.ok(phone.textsTo(jid).includes("UNCONFIRMED-17557"), "The unconfirmed post never reached the server.");
+        await until(
+          () => socket.ended && connection(messaging)?.state === "connected",
+          "connected again after the unconfirmed post",
+          20_000,
+        );
+        const history = (await readHistory(agents, { place: jid })).messages.map((entry) => entry.text);
+        assert.ok(
+          history.some((entry) => entry.includes("CONFIRMED-17557")),
+          "The confirmed post is not in the history.",
+        );
+        assert.ok(
+          !history.some((entry) => entry.includes("UNCONFIRMED-17557")),
+          "The history records the unconfirmed post as sent.",
+        );
+        return { unconfirmed: "not_confirmed", history: history.length };
+      } finally {
+        phone.holdAcks = false;
+        await runCauseEffect(messaging.removeWhatsAppSender(OWNER, FRIEND));
+      }
+    });
+
     await step("restart: the number connects again from its store and keeps reading", async () => {
       await until(() => connection(messaging)?.state === "connected", "connected after restart");
       const handle = runtime.get(credentials.get(connectionId(agents))?.storeId ?? "");

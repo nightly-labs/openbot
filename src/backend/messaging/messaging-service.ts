@@ -83,6 +83,7 @@ import {
   type StatusReaction,
   TelegramCallError,
   WhatsAppAnswerPartlySent,
+  WhatsAppPostNeedsConfirmation,
   WhatsAppRefusedError,
 } from "./messaging-types";
 import { type SlackAppPort, SlackConnect, type SlackConnectFailed } from "./slack/slack-connect";
@@ -286,7 +287,9 @@ export class MessagingService {
       places: (connectionId) => this.#outboundPlaces(connectionId),
       history: (connectionId, placeId, limit, filter) => this.#outboundHistory(connectionId, placeId, limit, filter),
       post: (connectionId, target, markdown, files, embeds) =>
-        this.#outboundPost(connectionId, target, markdown, files, embeds),
+        this.#outboundPost(connectionId, target, markdown, files, embeds).pipe(
+          Effect.provideService(WhatsAppPostNeedsConfirmation, true),
+        ),
       discord: (connectionId, send) => this.#outboundDiscord(connectionId, send),
       telegram: (connectionId, send) => this.#outboundTelegram(connectionId, send),
       slack: (connectionId, send) => this.#outboundSlack(connectionId, send),
@@ -2454,7 +2457,7 @@ const WHATSAPP_LOCAL_REFUSALS = new Map([
   ["not_linked", WHATSAPP_NOT_CONNECTED],
   [
     "not_confirmed",
-    "The WhatsApp connection dropped before WhatsApp confirmed the message, also after OpenBot sent it again. It can be in the chat already. Do not post it again only because of this error: tell the user to check the chat.",
+    "WhatsApp did not confirm the message. It can be in the chat already, or it can be missing. Do not post it again only because of this error: tell the user to check the chat.",
   ],
 ]);
 

@@ -7,7 +7,7 @@ import type {
   TelegramCallResult,
 } from "@openbot/contracts/signal-protocol/telegram-route";
 import { isFixedSourceText, matchingSourceKeys, sourceText } from "@openbot/i18n/source";
-import { type Effect, Schema } from "effect";
+import { Context, type Effect, Schema } from "effect";
 import type { MessagingOperationFailed } from "./messaging-service";
 import type { MessagingAnswerFile } from "./messaging-threads";
 
@@ -261,6 +261,10 @@ export class TelegramCallError extends Error {
     this.code = `telegram_${errorCode}`;
   }
 }
+
+export const WhatsAppPostNeedsConfirmation = Context.Reference<boolean>("openbot/WhatsAppPostNeedsConfirmation", {
+  defaultValue: () => false,
+});
 
 export class WhatsAppRefusedError extends Error {
   readonly code: string;
