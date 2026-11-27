@@ -12,6 +12,7 @@ import { sessionReadsFor } from "../src/server/auth-service";
 import { D1AuthRepository } from "../src/server/d1-auth-repository";
 import { runApiEffect } from "../src/server/effect-runtime";
 import { observedD1 } from "../src/server/observed-d1";
+import type { SessionReads } from "../src/server/types";
 import { createWorkerHandler } from "../src/server/worker-handler";
 import { sqliteD1 } from "./sqlite-d1";
 
@@ -172,7 +173,8 @@ const accountApp = (request: Request): Promise<Response> =>
     Effect.gen(function* () {
       const url = new URL(request.url);
       const token = request.headers.get("Authorization")?.replace(/^Bearer /u, "") ?? "";
-      const user = yield* repository.authenticate(token, NOW, sessionReadsFor(request));
+      const reads: SessionReads = url.searchParams.has("primary-session") ? "primary" : sessionReadsFor(request);
+      const user = yield* repository.authenticate(token, NOW, reads);
       if (!user) return Response.json({ error: "unauthorized" }, { status: 401 });
       yield* Effect.yieldNow;
       if (request.method === "GET") {
@@ -314,6 +316,29 @@ async function main() {
     "a GET with an older bookmark still accepts a session that another device created while the replica lags",
     otherDevice.status === 200,
     { status: otherDevice.status, routes: routesOf("other-device-get") },
+  );
+
+  replicated.forRequest("transferred-sign-in");
+  await DB.prepare(
+    "INSERT INTO auth_sessions(id, user_id, token_hash, expires_at, created_at, last_used_at) VALUES (?, ?, ?, ?, ?, ?)",
+  )
+    .bind(
+      "transferred",
+      "user",
+      createHash("sha256").update("transferred-token").digest("base64url"),
+      NOW + DAY_MS,
+      NOW,
+      NOW,
+    )
+    .run();
+  const transferred = await send("transferred-get", "/v1/me?primary-session", {
+    headers: { Authorization: "Bearer transferred-token", [ACCOUNT_BOOKMARK_HEADER]: replicaReadyBookmark },
+  });
+  const transferredLookup = routesOf("transferred-get")[0];
+  check(
+    "a GET whose route checks the session on the primary ignores the bookmark for that check",
+    transferred.status === 200 && transferredLookup?.instance === "primary",
+    { status: transferred.status, routes: routesOf("transferred-get") },
   );
 
   const store = {

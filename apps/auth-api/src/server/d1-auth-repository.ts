@@ -75,7 +75,7 @@ const selectSessionRow = Effect.fn("D1AuthRepository.selectSessionRow")(function
     if (row) return row;
     return yield* storeCall(() => primaryD1(database).prepare(sql).bind(tokenHash, now).first<T>());
   }
-  return yield* storeCall(() => database.prepare(sql).bind(tokenHash, now).first<T>());
+  return yield* storeCall(() => primaryD1(database).prepare(sql).bind(tokenHash, now).first<T>());
 });
 export class D1AuthRepository implements AuthRepository {
   readonly #layer: Layer.Layer<AuthDatabase>;
