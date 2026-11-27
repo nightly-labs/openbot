@@ -222,6 +222,7 @@ export const RemoteTeamTransport = memo(
     const newPage = useCallback((reason: string) => {
       gatheringStalls.current = 0;
       supportLog.add("warn", "connection", `${latest.current.props.hostId} new page ${reason}`);
+      bridge.current = null;
       setBridgeKey((key) => key + 1);
     }, []);
 
