@@ -50,7 +50,7 @@ interface HostBindingRow {
   user_id: string;
 }
 
-const SESSION_ACTIVITY_UPDATE_INTERVAL_MS = 15 * 60_000;
+const SESSION_ACTIVITY_UPDATE_INTERVAL_MS = 60 * 60_000;
 
 class AuthDatabase extends Context.Service<AuthDatabase, D1Database>()("auth-api/D1AuthRepository/Database") {}
 export class AuthStoreError extends Schema.TaggedError<AuthStoreError>()("AuthStoreError", {

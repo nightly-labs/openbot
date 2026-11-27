@@ -38,18 +38,33 @@ export interface ServerEntitlementRow {
   hosted: number;
 }
 
+function serverEntitlementSourceSql(server: string): string {
+  return `FROM billing_subscriptions s
+       LEFT JOIN remote_hosts sh ON sh.host_id = s.server_id AND ${subscriptionPaysForOwnerSql("s", "sh.owner_user_id")}
+       LEFT JOIN hosted_servers hs ON hs.server_id = s.server_id AND hs.owner_user_id = s.user_id
+       WHERE s.server_id = ${server} AND s.status IN ${ENTITLED_STATUSES_SQL}
+         AND (sh.host_id IS NOT NULL OR hs.server_id IS NOT NULL)`;
+}
+
 export function serverEntitlementStatement(database: D1Database, serverId: string): D1PreparedStatement {
   return database
     .prepare(
       `SELECT s.plan, s.status, s.current_period_end, hs.legacy_member_limits, hs.server_id IS NOT NULL AS hosted
-         FROM billing_subscriptions s
-       LEFT JOIN remote_hosts h ON h.host_id = s.server_id AND ${subscriptionPaysForOwnerSql("s", "h.owner_user_id")}
-       LEFT JOIN hosted_servers hs ON hs.server_id = s.server_id AND hs.owner_user_id = s.user_id
-       WHERE s.server_id = ? AND s.status IN ${ENTITLED_STATUSES_SQL}
-         AND (h.host_id IS NOT NULL OR hs.server_id IS NOT NULL)
+         ${serverEntitlementSourceSql("?")}
        ORDER BY s.updated_at DESC`,
     )
     .bind(serverId);
+}
+
+export interface ServerEntitlementJsonRow extends ServerEntitlementRow {
+  updated_at: number;
+}
+
+export function serverEntitlementsJsonSql(server: string): string {
+  return `(SELECT json_group_array(json_object('plan', s.plan, 'status', s.status,
+      'current_period_end', s.current_period_end, 'legacy_member_limits', hs.legacy_member_limits,
+      'hosted', hs.server_id IS NOT NULL, 'updated_at', s.updated_at))
+    ${serverEntitlementSourceSql(server)})`;
 }
 
 export function serverEntitlementFromRows(
@@ -127,6 +142,16 @@ export function ownerLicenseStatement(database: D1Database, hostId: string): D1P
     .bind(hostId);
 }
 
+export interface OwnerLicenseJsonRow extends OwnerLicenseRow {
+  updated_at: number;
+}
+
+export function ownerLicensesJsonSql(owner: string): string {
+  return `(SELECT json_group_array(json_object('owner_id', l.user_id, 'users', l.users, 'status', l.status,
+      'current_period_end', l.current_period_end, 'updated_at', l.updated_at))
+    FROM licenses l WHERE l.user_id = ${owner} AND l.status IN ${OPEN_STATUSES_SQL})`;
+}
+
 export function ownerLicenseFromRows(rows: readonly OwnerLicenseRow[], now: number): OwnerLicense | null {
   const row = rows.find((license) => licenseEntitled(license, now)) ?? rows[0];
   if (!row) return null;
@@ -187,7 +212,15 @@ function memberLimit(plan: BillingPlanId, legacyMemberLimits: number | null): nu
   return legacyMemberLimits === 0 ? memberLimitForPlan(plan) : LEGACY_MEMBER_LIMITS[plan];
 }
 
-export const SERVER_MEMBER_LIMIT_SQL = `SELECT l.member_limit FROM server_member_limits l
-  LEFT JOIN remote_hosts h ON h.host_id = l.server_id AND h.owner_user_id = l.owner_user_id
-  LEFT JOIN hosted_servers hs ON hs.server_id = l.server_id AND hs.owner_user_id = l.owner_user_id
- WHERE l.server_id = ? AND (h.host_id IS NOT NULL OR hs.server_id IS NOT NULL)`;
+function serverMemberLimitSql(server: string): string {
+  return `SELECT l.member_limit FROM server_member_limits l
+  LEFT JOIN remote_hosts lh ON lh.host_id = l.server_id AND lh.owner_user_id = l.owner_user_id
+  LEFT JOIN hosted_servers lhs ON lhs.server_id = l.server_id AND lhs.owner_user_id = l.owner_user_id
+ WHERE l.server_id = ${server} AND (lh.host_id IS NOT NULL OR lhs.server_id IS NOT NULL)`;
+}
+
+export const SERVER_MEMBER_LIMIT_SQL = serverMemberLimitSql("?");
+
+export function serverMemberLimitValueSql(server: string): string {
+  return `(${serverMemberLimitSql(server)} LIMIT 1)`;
+}

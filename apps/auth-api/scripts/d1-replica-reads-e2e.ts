@@ -14,7 +14,7 @@ const OUT = join(ROOT, ".openbot-build", "d1-replica-reads-e2e");
 const MIGRATIONS = join(ROOT, "apps", "auth-api", "migrations");
 const NOW = Date.parse("2026-11-27T13:00:00Z");
 const DAY_MS = 24 * 60 * 60 * 1000;
-const AFTER_ACTIVITY_INTERVAL = NOW + 16 * 60_000;
+const AFTER_ACTIVITY_INTERVAL = NOW + 61 * 60_000;
 
 const checks: { name: string; passed: boolean; detail?: unknown }[] = [];
 function check(name: string, passed: boolean, detail?: unknown) {
@@ -115,6 +115,12 @@ async function main() {
     primaryRead?.name === "New name" && desktopRead?.name === "New name" && counts.replica === 0,
     { names: [primaryRead?.name ?? null, desktopRead?.name ?? null], counts: { ...counts } },
   );
+
+  await Effect.runPromise(repository.authenticate("old-token", NOW + 59 * 60_000));
+  const untouched = primary
+    .prepare("SELECT last_used_at FROM auth_sessions WHERE id = 'old-session'")
+    .get()?.last_used_at;
+  check("a session lookup within one hour of the last activity does not write", untouched === NOW, { untouched });
 
   const replicaRead = await Effect.runPromise(repository.authenticate("old-token", AFTER_ACTIVITY_INTERVAL, "replica"));
   check(
