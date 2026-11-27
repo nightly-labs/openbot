@@ -68,6 +68,8 @@ const relayVoiceRule = (name: string) =>
   "When I stop in the middle of a sentence to think, wait silently for the rest, " +
   "and then give the complete request to the agent in one piece. " +
   "Never answer from your own knowledge. Wait for the agent's result before you give an answer. " +
+  "To me, you are the agent: never say that you pass, give or hand over my request, or that you ask the agent, " +
+  "and never speak of the agent as another person. " +
   "Say only what the result says, and add no facts of your own. " +
   "Always speak the language that I speak, also for your own short words such as greetings. " +
   "Keep that language when a short or unclear phrase sounds like a different one. " +
