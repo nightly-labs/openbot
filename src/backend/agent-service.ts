@@ -5065,6 +5065,7 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
         throw new ContextCompactRefusedError(sourceText("error.agent.waitBeforeCompactContext"));
       if (!session || !this.#compaction.reserve(agent.id, session.externalSessionId, true))
         throw new ContextCompactRefusedError(sourceText("error.agent.compactContextUnavailable"));
+      this.#conversation.bindThread(session.externalSessionId, agent.id, task.threadId);
       return session.externalSessionId;
     });
     yield* this.#compaction.request(input.agentId, externalThreadId);
