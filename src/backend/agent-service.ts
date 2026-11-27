@@ -1595,13 +1595,16 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
               }),
               Effect.mapError((failure) => {
                 const failed: { causeCode: CauseCode; message: string } | null = providerError;
+                const ended =
+                  failure instanceof ProfileGenerationFailed && failure.cause instanceof Error ? failure.cause : null;
+                const exited = ended?.message === sourceText("error.agent.profileDisconnected");
                 const shown =
-                  background || selected !== lead || !failed ? null : channelLeadFailureText(failed.causeCode);
-                return shown &&
-                  failure instanceof ProfileGenerationFailed &&
-                  failure.cause instanceof Error &&
-                  failure.cause.message === sourceText("error.agent.profileFailed")
-                  ? new ProfileGenerationFailed({ cause: new Error(shown, { cause: failure.cause }) })
+                  background || selected !== lead
+                    ? null
+                    : ((failed ? channelLeadFailureText(failed.causeCode) : null) ??
+                      (exited ? channelLeadFailureText("provider_exited") : null));
+                return shown && ended && (exited || ended.message === sourceText("error.agent.profileFailed"))
+                  ? new ProfileGenerationFailed({ cause: new Error(shown, { cause: ended }) })
                   : failure;
               }),
             );

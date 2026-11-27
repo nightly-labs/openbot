@@ -132,6 +132,18 @@ export const messages = {
     "Kanal liderinin modeli kullanılamıyor. Lider için başka bir model seçin veya bir üye seçin.",
   "error.backend.channelLeadRefused":
     "Kanal liderinin modeli bu isteği reddetti. Bir üye veya lider için başka bir model seçin.",
+  "error.backend.channelLeadNotPermitted":
+    "Kanal liderinin sağlayıcısı bu hesabın erişimini reddetti. Hesabı kontrol edin veya bir üye seçin.",
+  "error.backend.channelLeadBilling":
+    "Kanal liderinin hesabında kredi yok ya da planı bu modeli içermiyor. Planı kontrol edin veya bir üye seçin.",
+  "error.backend.channelLeadUsageLimit":
+    "Kanal liderinin modeli kullanım sınırına ulaştı. Bir üye seçin veya lider için başka bir model seçin.",
+  "error.backend.channelLeadBlocked":
+    "Kanal liderinin sağlayıcısı bu isteği engelledi. İsteği değiştirin veya bir üye seçin.",
+  "error.backend.channelLeadNoAnswer": "Kanal liderinin modeli yanıt vermedi. Tekrar deneyin veya bir üye seçin.",
+  "error.backend.channelLeadProviderError":
+    "Kanal liderinin sağlayıcısında bir hata oluştu. Birkaç dakika sonra tekrar deneyin veya bir üye seçin.",
+  "error.backend.channelLeadStopped": "Kanal liderinin modeli yanıt vermeden durdu. Tekrar deneyin veya bir üye seçin.",
   "error.backend.channelRequestMemberRequired": "Bu istek için bir üye seçin.",
   "error.backend.channelDeliveryNotCreated": "Kanal teslimatı oluşturulamadı.",
   "error.backend.channelAssignmentStopped": "Bu kanal ataması durduruldu veya değiştirildi.",

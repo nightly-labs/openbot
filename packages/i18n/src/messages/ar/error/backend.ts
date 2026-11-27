@@ -123,6 +123,16 @@ export const messages = {
   "error.backend.channelLeadModelGone": "نموذج الوكيل الرئيسي غير متاح. اختر نموذجًا آخر للوكيل الرئيسي، أو اختر عضوًا.",
   "error.backend.channelLeadRefused":
     "رفض نموذج الوكيل الرئيسي هذا الطلب. اختر عضوًا، أو اختر نموذجًا آخر للوكيل الرئيسي.",
+  "error.backend.channelLeadNotPermitted": "رفض مزوّد الوكيل الرئيسي الوصول لهذا الحساب. تحقّق من الحساب، أو اختر عضوًا.",
+  "error.backend.channelLeadBilling":
+    "لا يوجد رصيد في حساب الوكيل الرئيسي، أو أن خطته لا تتضمن هذا النموذج. تحقّق من الخطة، أو اختر عضوًا.",
+  "error.backend.channelLeadUsageLimit":
+    "وصل نموذج الوكيل الرئيسي إلى حد الاستخدام. اختر عضوًا، أو اختر نموذجًا آخر للوكيل الرئيسي.",
+  "error.backend.channelLeadBlocked": "حظر مزوّد الوكيل الرئيسي هذا الطلب. غيّر الطلب، أو اختر عضوًا.",
+  "error.backend.channelLeadNoAnswer": "لم يُقدّم نموذج الوكيل الرئيسي أي إجابة. حاول مرة أخرى، أو اختر عضوًا.",
+  "error.backend.channelLeadProviderError":
+    "حدث خطأ لدى مزوّد الوكيل الرئيسي. حاول مرة أخرى بعد بضع دقائق، أو اختر عضوًا.",
+  "error.backend.channelLeadStopped": "توقّف نموذج الوكيل الرئيسي قبل أن يُجيب. حاول مرة أخرى، أو اختر عضوًا.",
   "error.backend.channelRequestMemberRequired": "اختر عضوًا لهذا الطلب.",
   "error.backend.channelDeliveryNotCreated": "لم يتم إنشاء تسليم القناة.",
   "error.backend.channelAssignmentStopped": "تم إيقاف تعيين القناة هذا أو استبداله.",
