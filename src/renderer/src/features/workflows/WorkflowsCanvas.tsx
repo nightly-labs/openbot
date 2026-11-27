@@ -8,6 +8,7 @@ import {
   type WorkflowMediaModel,
   type WorkflowMediaServiceAccount,
   type WorkflowMediaUnavailableModel,
+  workflowAssetClipMedia,
   workflowCatalogMediaModel,
   workflowCatalogSource,
 } from "@openbot/contracts/ipc";
@@ -257,7 +258,7 @@ export function WorkflowsCanvas(props: {
           : {
               ...file,
               get previewUrl() {
-                return props.host.mediaUrl(file.id, "image") ?? null;
+                return props.host.mediaUrl(file.id, workflowAssetClipMedia(file.mimeType) ?? "image") ?? null;
               },
             },
       );

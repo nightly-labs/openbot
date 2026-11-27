@@ -19,6 +19,7 @@ import {
   Popover,
   Search,
   SlidingTabs,
+  toast,
   Upload,
 } from "@openbot/ui";
 import { createSignal, createStore, For, onCleanup, Show, untrack } from "solid-js";
@@ -376,7 +377,7 @@ function AssetLibrary(props: { selected?: string | undefined; onPick: (file: Sto
 
 export function AssetNode(props: { id: string; file?: string }) {
   const board = useBoard();
-  const { t, format } = useText();
+  const { t, format, errorMessage } = useText();
   const [fileName] = useField(
     () => props.id,
     "file",
@@ -414,7 +415,7 @@ export function AssetNode(props: { id: string; file?: string }) {
     setOpen(false);
     board
       .upload(chosen)
-      .then(setFile, () => undefined)
+      .then(setFile, (error: unknown) => toast.error(errorMessage(error, t("composer.upload.failed"))))
       .finally(() => setSending(false));
   };
   const onDragOver = (event: DragEvent) => {
@@ -481,88 +482,95 @@ export function AssetNode(props: { id: string; file?: string }) {
           </NodeToolbar>
         }
       >
-        <Popover.Root open={open()} onOpenChange={setOpen} placement="right-start" gutter={56}>
-          <Popover.Trigger
-            class="wfn-asset-trigger"
-            disabled={locked()}
-            aria-busy={sending() ? "true" : undefined}
-            data-dropping={dropping() ? "" : undefined}
-            onDragOver={onDragOver}
-            onDragLeave={() => setDropping(false)}
-            onDrop={onDrop}
-            aria-label={file() ? t("workflow.asset.current", { name: file()?.name ?? "" }) : t("workflow.asset.choose")}
-          >
-            <Show
-              when={file()}
-              fallback={
-                <span class="wfn-asset-empty">
-                  <span class="wfn-asset-icon" aria-hidden="true">
-                    <File />
-                  </span>
-                  {t("workflow.asset.choose")}
-                </span>
+        <fieldset
+          class="wfn-asset-drop"
+          aria-label={t("workflow.asset.title")}
+          onDragOver={onDragOver}
+          onDragLeave={() => setDropping(false)}
+          onDrop={onDrop}
+        >
+          <Popover.Root open={open()} onOpenChange={setOpen} placement="right-start" gutter={56}>
+            <Popover.Trigger
+              class="wfn-asset-trigger"
+              disabled={locked()}
+              aria-busy={sending() ? "true" : undefined}
+              data-dropping={dropping() ? "" : undefined}
+              aria-label={
+                file() ? t("workflow.asset.current", { name: file()?.name ?? "" }) : t("workflow.asset.choose")
               }
             >
-              {(current) => (
-                <Show
-                  when={isImage() || clip() === "video"}
-                  fallback={
-                    <span class="wfn-asset-file">
-                      <AssetThumb file={current()} />
-                      <span class="wfn-asset-text">
-                        <span class="wfn-asset-name">{current().name}</span>
-                        <span class="wfn-asset-meta">{format.fileSize(current().size)}</span>
-                      </span>
+              <Show
+                when={file()}
+                fallback={
+                  <span class="wfn-asset-empty">
+                    <span class="wfn-asset-icon" aria-hidden="true">
+                      <File />
                     </span>
-                  }
-                >
-                  <Show when={isImage()}>
-                    <AssetThumb file={current()} card />
-                    <span class="wfn-chip wfn-asset-caption">{current().name}</span>
+                    {t("workflow.asset.choose")}
+                  </span>
+                }
+              >
+                {(current) => (
+                  <Show
+                    when={isImage() || clip() === "video"}
+                    fallback={
+                      <span class="wfn-asset-file">
+                        <AssetThumb file={current()} />
+                        <span class="wfn-asset-text">
+                          <span class="wfn-asset-name">{current().name}</span>
+                          <span class="wfn-asset-meta">{format.fileSize(current().size)}</span>
+                        </span>
+                      </span>
+                    }
+                  >
+                    <Show when={isImage()}>
+                      <AssetThumb file={current()} card />
+                      <span class="wfn-chip wfn-asset-caption">{current().name}</span>
+                    </Show>
                   </Show>
-                </Show>
-              )}
-            </Show>
-          </Popover.Trigger>
-          <Popover.Portal>
-            <Popover.Content class="ui-popover-menu-surface wfn-popover" data-wfn-portal="">
-              <div class="wfn-popover-head">
-                <Popover.Title class="wfn-popover-title">{t("workflow.asset.library")}</Popover.Title>
-                <Show when={uploads()}>
-                  <UploadButton busy={sending()} onChoose={send} />
-                </Show>
-              </div>
-              <AssetLibrary
-                selected={file()?.id}
-                onPick={(next) => {
-                  setFile(next);
-                  setOpen(false);
-                }}
-              />
-            </Popover.Content>
-          </Popover.Portal>
-        </Popover.Root>
-        <Show when={clipSource()}>
-          {(url) => (
-            <Show
-              when={clip() === "video"}
-              fallback={
-                <audio class="wfn-asset-audio" controls preload="metadata" src={url()} aria-label={fileName()}>
-                  <track kind="captions" />
-                </audio>
-              }
-            >
-              <VideoPlayer
-                src={url()}
-                label={fileName()}
-                fullControls
-                loading={videoReady() !== url()}
-                onMetadata={() => setVideoReady(url())}
-                onError={() => setVideoReady(url())}
-              />
-            </Show>
-          )}
-        </Show>
+                )}
+              </Show>
+            </Popover.Trigger>
+            <Popover.Portal>
+              <Popover.Content class="ui-popover-menu-surface wfn-popover" data-wfn-portal="">
+                <div class="wfn-popover-head">
+                  <Popover.Title class="wfn-popover-title">{t("workflow.asset.library")}</Popover.Title>
+                  <Show when={uploads()}>
+                    <UploadButton busy={sending()} onChoose={send} />
+                  </Show>
+                </div>
+                <AssetLibrary
+                  selected={file()?.id}
+                  onPick={(next) => {
+                    setFile(next);
+                    setOpen(false);
+                  }}
+                />
+              </Popover.Content>
+            </Popover.Portal>
+          </Popover.Root>
+          <Show when={clipSource()}>
+            {(url) => (
+              <Show
+                when={clip() === "video"}
+                fallback={
+                  <audio class="wfn-asset-audio" controls preload="metadata" src={url()} aria-label={fileName()}>
+                    <track kind="captions" />
+                  </audio>
+                }
+              >
+                <VideoPlayer
+                  src={url()}
+                  label={fileName()}
+                  fullControls
+                  loading={videoReady() !== url()}
+                  onMetadata={() => setVideoReady(url())}
+                  onError={() => setVideoReady(url())}
+                />
+              </Show>
+            )}
+          </Show>
+        </fieldset>
       </NodeShell>
       <Show when={viewer()}>
         {(opening) => (

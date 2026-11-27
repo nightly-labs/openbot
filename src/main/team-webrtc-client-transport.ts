@@ -138,8 +138,11 @@ function developmentLink(listener: DataListener, halfRoundTripMs: number, downli
   const drain = () => {
     timer = undefined;
     const now = performance.now();
-    while (queue[0] && queue[0].dueAt <= now) queue.shift()?.deliver();
-    if (queue[0]) timer = setTimeout(drain, queue[0].dueAt - now);
+    try {
+      while (queue[0] && queue[0].dueAt <= now) queue.shift()?.deliver();
+    } finally {
+      if (queue[0]) timer = setTimeout(drain, Math.max(0, queue[0].dueAt - now));
+    }
   };
   return (hostId, channel, data) => {
     const now = performance.now();

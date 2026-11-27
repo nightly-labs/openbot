@@ -9,6 +9,8 @@ import {
   type WorkflowGraph,
   workflowAnswerProblems,
   workflowAnswerSources,
+  workflowAssetClipMedia,
+  workflowAssetType,
   workflowInputAnswerFields,
 } from "@openbot/contracts/ipc";
 import { ATTACHMENT_PREVIEW_EDGE } from "@openbot/contracts/team-protocol/attachment-preview-v1";
@@ -864,17 +866,21 @@ export function createBoard(options: BoardOptions) {
   const localCopy = (file: File) => {
     const known = copies.get(file);
     if (known) return known;
-    const made = file.type.startsWith("video/")
-      ? Promise.resolve(clipCopy(file))
-      : options.catalogs().previewWhileUploading
-        ? pictureCopy(file)
-        : Promise.resolve(undefined);
+    if (isVideo(file)) {
+      const url = clipCopy(file);
+      const ready = Promise.resolve(url);
+      copies.set(file, ready);
+      readyCopies.set(file, url);
+      return ready;
+    }
+    const made = options.catalogs().previewWhileUploading ? pictureCopy(file) : Promise.resolve(undefined);
     copies.set(file, made);
     void made.then((url) => {
       if (url && copies.get(file) === made) readyCopies.set(file, url);
     });
     return made;
   };
+  const isVideo = (file: File) => workflowAssetClipMedia(workflowAssetType(file, true) ?? "") === "video";
   const clipCopy = (file: File) => {
     const url = URL.createObjectURL(file);
     clipCopies.add(url);
@@ -890,6 +896,12 @@ export function createBoard(options: BoardOptions) {
       URL.revokeObjectURL(url);
     });
   };
+  const keepCopy = (file: File, id: string, fallback: string | undefined) => {
+    const url = readyCopies.get(file) ?? fallback;
+    copies.delete(file);
+    readyCopies.delete(file);
+    if (url) setKeptCopies((kept) => new Map(kept).set(id, url));
+  };
   const upload = async (file: File): Promise<StoredFileRow> => {
     const host = options.catalogs().upload;
     if (host) {
@@ -898,12 +910,9 @@ export function createBoard(options: BoardOptions) {
         dropCopy(file);
         throw error;
       });
-      const url =
-        readyCopies.get(file) ??
-        (options.catalogs().previewWhileUploading || row.previewKind !== "image" ? undefined : row.previewUrl);
-      copies.delete(file);
-      readyCopies.delete(file);
-      if (url) setKeptCopies((kept) => new Map(kept).set(row.id, url));
+      const original =
+        options.catalogs().previewWhileUploading || row.previewKind !== "image" ? undefined : row.previewUrl;
+      keepCopy(file, row.id, original ?? undefined);
       return row;
     }
     const image = file.type.startsWith("image/");
@@ -923,6 +932,7 @@ export function createBoard(options: BoardOptions) {
       status: "available",
       deletable: false,
     };
+    keepCopy(file, row.id, undefined);
     setUploads((list) => [row, ...list]);
     return row;
   };

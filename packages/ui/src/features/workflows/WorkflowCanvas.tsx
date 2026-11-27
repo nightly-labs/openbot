@@ -69,6 +69,7 @@ import {
   createStore,
   createUniqueId,
   For,
+  flush,
   getOwner,
   onCleanup,
   onSettled,
@@ -570,6 +571,7 @@ const SENT_LIMIT = 200;
 
 interface Arriving {
   key: string;
+  workflow: string;
   at: WfnPoint;
   media: "image" | "video" | "audio" | "file";
   url: string | undefined;
@@ -1026,6 +1028,7 @@ export function WorkflowCanvas(props: WorkflowCanvasProps) {
     });
   const allows = (kind: WorkflowNodeKind) => props.features.kinds.includes(kind);
   const [arriving, setArriving] = createSignal<readonly Arriving[]>([]);
+  const arrivingHere = () => arriving().filter((item) => item.workflow === openId());
   const [ghost, setGhost] = createSignal<WfnPoint | null>(null);
   const placing = () => ui.tool === "note" || ui.tool === "shape";
   const [drawn, setDrawn] = createSignal<Box | null>(null);
@@ -2164,7 +2167,7 @@ export function WorkflowCanvas(props: WorkflowCanvasProps) {
   const blocksBut = (group?: string) =>
     untrack(() => [
       ...live().flatMap((node) => shownBox(node.id) ?? []),
-      ...arriving().map((item) => ({ ...item.at, ...NEW_NODE })),
+      ...arrivingHere().map((item) => ({ ...item.at, ...NEW_NODE })),
       ...nodeGroups().flatMap((entry) => (entry.id === group ? [] : (frameOf(entry) ?? []))),
     ]);
   const rowsBox = (at: WfnPoint, count: number): Box => {
@@ -2172,22 +2175,34 @@ export function WorkflowCanvas(props: WorkflowCanvasProps) {
     if (count < 2) return { ...at, ...size };
     return frameBox({ id: "", name: "", folded: false, members: [] }, { ...at, ...size });
   };
+  const packRows = (elements: readonly (HTMLElement | undefined)[], from: WfnPoint) => {
+    const places: (WfnPoint | undefined)[] = [];
+    let y = from.y;
+    for (let row = 0; row * PICTURE_ROW < elements.length; row++) {
+      let x = from.x;
+      let tallest = 0;
+      for (let index = row * PICTURE_ROW; index < Math.min(elements.length, (row + 1) * PICTURE_ROW); index++) {
+        const element = elements[index];
+        if (!element) continue;
+        places[index] = snapPoint({ x, y });
+        x += element.offsetWidth + GRID * 2;
+        tallest = Math.max(tallest, element.offsetHeight);
+      }
+      y += tallest + GRID * 2;
+    }
+    return places;
+  };
   const reflowRows = (ids: readonly string[], from: WfnPoint) =>
     afterLayout(() => {
+      const places = packRows(
+        ids.map((id) => (board.isRemoved(id) ? undefined : slot(id))),
+        from,
+      );
       const next: Record<string, WfnPoint> = {};
-      let y = from.y;
-      for (let row = 0; row * PICTURE_ROW < ids.length; row++) {
-        let x = from.x;
-        let tallest = 0;
-        for (const id of ids.slice(row * PICTURE_ROW, (row + 1) * PICTURE_ROW)) {
-          const element = slot(id);
-          if (!element || board.isRemoved(id)) continue;
-          next[id] = snapPoint({ x, y });
-          x += element.offsetWidth + GRID * 2;
-          tallest = Math.max(tallest, element.offsetHeight);
-        }
-        y += tallest + GRID * 2;
-      }
+      ids.forEach((id, index) => {
+        const at = places[index];
+        if (at) next[id] = at;
+      });
       setPositions((draft) => {
         for (const [id, at] of Object.entries(next)) draft[id] = at;
       });
@@ -2235,6 +2250,7 @@ export function WorkflowCanvas(props: WorkflowCanvasProps) {
     const media = type ? (workflowAssetClipMedia(type) ?? "image") : "file";
     return {
       key: crypto.randomUUID(),
+      workflow: openId(),
       at,
       media,
       url: undefined,
@@ -2255,13 +2271,26 @@ export function WorkflowCanvas(props: WorkflowCanvasProps) {
     const shown = files.map((file, index) => arrivingFor(file, places[index] ?? start));
     const keys = new Set(shown.map((item) => item.key));
     setArriving((list) => [...list, ...shown]);
+    flush();
+    const packed = packRows(
+      shown.map((item) => viewport?.querySelector<HTMLElement>(`[data-arriving="${item.key}"]`) ?? undefined),
+      start,
+    );
+    setArriving((list) =>
+      list.map((each) => {
+        const at = packed[shown.findIndex((item) => item.key === each.key)];
+        return at ? { ...each, at } : each;
+      }),
+    );
     files.forEach((file, index) => {
       const item = shown[index];
       if (item) showCopy(file, item);
     });
+    const workflow = openId();
     void uploadAll(files).then((stored) => {
       setArriving((list) => list.filter((item) => !keys.has(item.key)));
-      addFiles(stored, start);
+      flush();
+      if (openId() === workflow) addFiles(stored, start);
     });
   };
   const dropOnAsset = (id: string, chosen: readonly File[]) => {
@@ -3377,7 +3406,7 @@ export function WorkflowCanvas(props: WorkflowCanvasProps) {
     const pastePictures = (event: ClipboardEvent) => {
       const data = event.clipboardData;
       const active = document.activeElement;
-      const pictures = [...(data?.files ?? [])].filter((file) => workflowAssetType(file, clipsOn()) !== null);
+      const pictures = [...(data?.files ?? [])];
       if (pictures.length === 0 || !allows("asset") || !props.features.uploads) return;
       if (!inCanvas(root, active) && (!pointer || isEditable(active))) return;
       if (isEditable(active) && data?.types.includes("text/plain")) return;
@@ -3391,7 +3420,9 @@ export function WorkflowCanvas(props: WorkflowCanvasProps) {
       !editsBlocked() &&
       allows("asset") &&
       props.features.uploads === true &&
-      !(event.target instanceof Element && event.target.closest("[data-node-id], [data-wfn-portal], .wfn-hud"));
+      event.target instanceof Element &&
+      event.target.closest(".wfn-viewport, .wfn-empty") !== null &&
+      !event.target.closest("[data-node-id], [data-wfn-portal], .wfn-hud");
     const onDragOver = (event: DragEvent) => {
       if (!takesFiles(event) || !event.dataTransfer) return;
       event.preventDefault();
@@ -3517,8 +3548,9 @@ export function WorkflowCanvas(props: WorkflowCanvasProps) {
       } else delete area.dataset.space;
     };
     area.addEventListener("dblclick", onDoubleClick);
-    area.addEventListener("dragover", onDragOver);
-    area.addEventListener("drop", onDrop);
+    const surface = root ?? area;
+    surface.addEventListener("dragover", onDragOver);
+    surface.addEventListener("drop", onDrop);
     area.addEventListener("contextmenu", onNativeMenu, { capture: true });
     document.addEventListener("keydown", onShortcut);
     document.addEventListener("copy", onCopy);
@@ -3534,8 +3566,8 @@ export function WorkflowCanvas(props: WorkflowCanvasProps) {
       area.removeEventListener("pointermove", onHover);
       area.removeEventListener("pointerleave", onLeave);
       area.removeEventListener("dblclick", onDoubleClick);
-      area.removeEventListener("dragover", onDragOver);
-      area.removeEventListener("drop", onDrop);
+      surface.removeEventListener("dragover", onDragOver);
+      surface.removeEventListener("drop", onDrop);
       area.removeEventListener("contextmenu", onNativeMenu, { capture: true });
       document.removeEventListener("keydown", onShortcut);
       document.removeEventListener("copy", onCopy);
@@ -3686,10 +3718,11 @@ export function WorkflowCanvas(props: WorkflowCanvasProps) {
                   );
                 }}
               </For>
-              <For each={arriving()} keyed={(item) => item.key}>
+              <For each={arrivingHere()} keyed={(item) => item.key}>
                 {(item) => (
                   <div
                     class="wfn-slot wfn-arriving"
+                    data-arriving={item().key}
                     aria-hidden="true"
                     style={{ left: `${item().at.x}px`, top: `${item().at.y}px` }}
                   >

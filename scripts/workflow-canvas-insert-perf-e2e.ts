@@ -259,8 +259,12 @@ async function measureClient(clientName: string): Promise<ClientReport> {
       const wallStart = await dropPhotos(page);
       const times = await insertResult(page);
       if (recording) {
-        await page.waitForTimeout(300);
+        await page.evaluate(
+          () => new Promise<void>((resolve) => requestAnimationFrame(() => requestAnimationFrame(() => resolve()))),
+        );
         await recording.stop();
+        const painted = await cdp.send("Page.captureScreenshot", { format: "jpeg", quality: 80 });
+        recording.frames.push({ at: wallStart + times.allMs, data: painted.data });
         writeFilmstrip(clientName, recording.frames, wallStart, times.allMs);
       }
       result.push(times);
