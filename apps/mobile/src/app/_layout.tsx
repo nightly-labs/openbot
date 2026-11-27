@@ -222,28 +222,27 @@ export default function RootLayout() {
   }, [canvas]);
   useEffect(() => {
     void untilForeground().then(async () => {
+      const firstScreen = [
+        loadAppearance(),
+        loadTextSize(),
+        loadMessageColor(),
+        loadChatBackground(),
+        loadChatBackdrop(),
+        loadFullVisualPreference(),
+        loadRoutineCollapsePreference(),
+        loadChatDetailPreferences(),
+        loadChatOrderPreference(),
+        loadMotionPreferences(),
+      ];
       const appLanguage = loadAppLanguage().catch(() => undefined);
       void appLanguage.then(() => offerLayoutRestart(splashColor.current, () => undefined));
-      await Promise.allSettled([
-        loadAppearance(),
-        loadMotionPreferences(),
-        appLanguage,
-        loadChatOrderPreference(),
-        loadOnboardingProgress(),
-      ]);
+      await Promise.allSettled([...firstScreen, appLanguage, loadOnboardingProgress()]);
       void loadHapticsPreference().catch(() => undefined);
       void loadLargeFilePreference().catch(() => undefined);
       void loadPhotoQualityPreference().catch(() => undefined);
       void loadFullScreenCameraPreference().catch(() => undefined);
-      void loadMessageColor().catch(() => undefined);
-      void loadChatBackground().catch(() => undefined);
-      void loadChatBackdrop().catch(() => undefined);
-      void loadRoutineCollapsePreference().catch(() => undefined);
-      void loadChatDetailPreferences().catch(() => undefined);
-      void loadFullVisualPreference().catch(() => undefined);
       void loadChatSwipePreference().catch(() => undefined);
       void loadChatPullPreference().catch(() => undefined);
-      void loadTextSize().catch(() => undefined);
       void loadLiveActivitiesPreference().catch(() => undefined);
       void loadPushNotificationPreference().catch(() => undefined);
       void loadDictationLanguage().catch(() => undefined);
