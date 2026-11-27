@@ -517,7 +517,8 @@ export function createChannelsController(env: ChannelsEnvironment) {
                 channelEpoch === (channelPrefetchEpochs.get(channelId) ?? 0) &&
                 scope === env.scopeKey() &&
                 untrack(() => state.selectedId) !== channelId &&
-                !keptPages.has(channelId)
+                !keptPages.has(channelId) &&
+                keptPages.size < KEPT_PAGES
               ) {
                 keepPage(page);
               }
