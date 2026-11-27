@@ -12,6 +12,7 @@ import { makeGitWorkspace, removeRun } from "./claude-agent-harness";
 const OUT = resolve(import.meta.dirname, "../.openbot-build/claude-routine-mcp-reconnect-e2e");
 const MODEL = "claude-haiku-5-5";
 const FAIL_MS = 8_000;
+const TURN_DEADLINE_MS = 180_000;
 const MARKER = "REPORT-16316-OK";
 const PROMPT =
   "Call the tool get_daily_report of the MCP server named reports, then reply with its exact output. " +
@@ -150,7 +151,8 @@ async function runScenario(root: string, scenario: ScenarioReport["scenario"]): 
     await runCauseEffect(
       client.request("turn/start", { threadId, model: MODEL, input: [{ type: "text", text: PROMPT }] }, (v) => v),
     );
-    await done;
+    const ended = await Promise.race([done.then(() => true), Bun.sleep(TURN_DEADLINE_MS).then(() => false)]);
+    if (!ended) throw new Error(`The turn did not end in ${TURN_DEADLINE_MS} ms.`);
     report.toolCalled = server.log.some((line) => line.endsWith(" tools/call"));
   } catch (error) {
     report.error = error instanceof Error ? error.message : String(error);
@@ -171,6 +173,8 @@ const passed =
   routine.toolCalled &&
   routine.answer.includes(MARKER) &&
   routine.failedNotices.length === 0 &&
+  routine.serverLog.some((line) => line.endsWith(" 502")) &&
+  routine.serverLog.some((line) => line.endsWith(" initialize")) &&
   chat.error === null;
 const result = { model: MODEL, failForMs: FAIL_MS, passed, routine, chat };
 mkdirSync(OUT, { recursive: true });

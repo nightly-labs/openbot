@@ -892,7 +892,7 @@ export class ClaudeAgentClient extends EventEmitter<ClientEvents> {
     const query = runtime.query;
     yield* Effect.forkIn(
       providerCall(() => query.mcpServerStatus?.() ?? null).pipe(
-        Effect.timeout("2 seconds"),
+        Effect.timeout(CLAUDE_MCP_STATUS_TIMEOUT_MS),
         Effect.orElseSucceed(() => null),
         Effect.flatMap((rows) =>
           Effect.sync(() => {
@@ -1831,29 +1831,30 @@ export class ClaudeAgentClient extends EventEmitter<ClientEvents> {
     let nextReconnectAt = 0;
     let reconnected = false;
     while (this.#threads.get(runtime.id) === runtime) {
-      const rows = yield* providerCall(() => query.mcpServerStatus?.() ?? null).pipe(
-        Effect.timeout(CLAUDE_MCP_STATUS_TIMEOUT_MS),
+      const read = yield* providerCall(() => query.mcpServerStatus?.() ?? null).pipe(
+        Effect.timeoutOption(CLAUDE_MCP_STATUS_TIMEOUT_MS),
         Effect.orElseSucceed(() => null),
       );
-      const startup = claudeMcpStartup(rows, names);
-      if (!startup || (startup.pending === 0 && startup.failed.length === 0)) {
+      if (read === null || (Option.isSome(read) && !Array.isArray(read.value))) return;
+      const startup = Option.isSome(read) ? claudeMcpStartup(read.value, names) : null;
+      if (startup && startup.pending === 0 && startup.failed.length === 0) {
         if (reconnected) queryLogger.info("Claude connected its MCP servers again before an unattended run.");
         return;
       }
       if (Date.now() >= deadline) {
         queryLogger.warn("An unattended Claude run starts without some MCP servers.", {
-          failed: startup.failed.length,
-          pending: startup.pending,
+          failed: startup?.failed.length ?? null,
+          pending: startup?.pending ?? null,
         });
         return;
       }
-      if (startup.failed.length > 0 && Date.now() >= nextReconnectAt) {
+      if (startup && startup.failed.length > 0 && Date.now() >= nextReconnectAt) {
         reconnected = true;
         yield* Effect.forEach(
           startup.failed,
           (name) =>
             providerCall(() => query.reconnectMcpServer?.(name) ?? Promise.resolve()).pipe(
-              Effect.timeout(CLAUDE_MCP_RECONNECT_TIMEOUT_MS),
+              Effect.timeout(Math.max(0, Math.min(CLAUDE_MCP_RECONNECT_TIMEOUT_MS, deadline - Date.now()))),
               Effect.ignore,
             ),
           { concurrency: "unbounded", discard: true },
