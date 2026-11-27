@@ -638,9 +638,7 @@ public class SpeechModule: Module {
     }
 
     AsyncFunction("keyboardLanguage") { () -> String? in
-      if let open = rememberKeyboardLanguage() { return open }
-      guard let saved = UserDefaults.standard.string(forKey: keyboardLanguageKey) else { return nil }
-      return UITextInputMode.activeInputModes.contains { $0.primaryLanguage == saved } ? saved : nil
+      rememberKeyboardLanguage() ?? UserDefaults.standard.string(forKey: keyboardLanguageKey)
     }.runOnQueue(.main)
 
     /// Loads Parakeet from a downloaded model directory. A second call with the same directory keeps
