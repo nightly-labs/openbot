@@ -426,6 +426,7 @@ export const messages = {
   "chat.selection.showMore": "展开更多操作",
   "chat.selection.send": "发送编辑指令",
   "chat.row.label": "来自 {name} 的消息",
+  "chat.row.pinned": "已置顶",
   "chat.row.openChat": "打开 {name} 的对话",
   "chat.row.reactions": "回应：{emoji}",
   "chat.row.agentReaction": "{name} 用 {emoji} 做了回应",

@@ -178,6 +178,23 @@
   padding-inline: 0;
 }
 
+.message-pinned {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--openbot-space-1);
+  padding-inline: var(--openbot-space-1);
+  color: var(--openbot-text-muted);
+  font-size: var(--openbot-text-sm);
+  line-height: var(--openbot-leading-sm);
+  white-space: nowrap;
+}
+
+.message-pinned > svg {
+  width: 12px;
+  height: 12px;
+  flex: none;
+}
+
 .message-entry-user .message-action-row > .message-time {
   order: -1;
 }

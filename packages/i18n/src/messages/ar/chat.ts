@@ -587,6 +587,7 @@ export const messages = {
   "chat.selection.showMore": "إظهار مزيد من الإجراءات",
   "chat.selection.send": "إرسال تعليمات التعديل",
   "chat.row.label": "رسالة من {name}",
+  "chat.row.pinned": "مثبّتة",
   "chat.row.openChat": "فتح دردشة {name}",
   "chat.row.reactions": "التفاعلات: {emoji}",
   "chat.row.agentReaction": "تفاعل {name} بـ {emoji}",

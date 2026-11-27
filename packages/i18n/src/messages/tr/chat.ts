@@ -444,6 +444,7 @@ export const messages = {
   "chat.selection.showMore": "Daha fazla işlem göster",
   "chat.selection.send": "Düzenleme talimatı gönder",
   "chat.row.label": "{name} tarafından gönderilen mesaj",
+  "chat.row.pinned": "Sabitlendi",
   "chat.row.openChat": "{name} sohbetini aç",
   "chat.row.reactions": "Tepkiler: {emoji}",
   "chat.row.agentReaction": "{name}, {emoji} ile tepki verdi",

@@ -427,6 +427,7 @@ export const messages = defineMessages("chat", {
   "chat.selection.showMore": "Show more actions",
   "chat.selection.send": "Send edit instruction",
   "chat.row.label": "Message from {name}",
+  "chat.row.pinned": "Pinned",
   "chat.row.openChat": "Open {name}'s chat",
   "chat.row.reactions": "Reactions: {emoji}",
   "chat.row.agentReaction": "{name} reacted with {emoji}",

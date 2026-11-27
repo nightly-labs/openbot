@@ -531,6 +531,7 @@ export const messages = {
   "chat.selection.showMore": "Показать больше действий",
   "chat.selection.send": "Отправить указание по правке",
   "chat.row.label": "Сообщение. Автор: {name}",
+  "chat.row.pinned": "Закреплено",
   "chat.row.openChat": "Открыть чат: {name}",
   "chat.row.reactions": "Реакции: {emoji}",
   "chat.row.agentReaction": "{name} отреагировал: {emoji}",

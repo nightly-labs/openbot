@@ -8,6 +8,7 @@ import {
   MessageAvatar,
   MessageContent,
   MessageHeader,
+  Pin,
 } from "@openbot/ui";
 import type { JSX } from "@solidjs/web";
 import { children, createMemo, For, Show } from "solid-js";
@@ -46,6 +47,7 @@ export interface ChatMessageRowProps {
   referencedAuthorName?: string | undefined;
   onOpenReference?: (() => void) | undefined;
   referenceState?: "loading" | "unavailable" | undefined;
+  pinned?: boolean | undefined;
   reactions?: readonly ConversationReaction[] | undefined;
   reactionOverflowCount?: number | undefined;
   onRemoveReaction?: (() => void) | undefined;
@@ -259,6 +261,12 @@ export function ChatMessageRow(props: ChatMessageRowProps): JSX.Element {
         <time class="message-time" datetime={props.message.createdAt}>
           {props.message.time}
         </time>
+      </Show>
+      <Show when={props.pinned}>
+        <span class="message-pinned">
+          <Pin aria-hidden="true" />
+          {t("chat.row.pinned")}
+        </span>
       </Show>
       <Show when={steps.toArray().length > 0}>
         <div class="message-steps">{steps()}</div>

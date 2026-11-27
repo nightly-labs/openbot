@@ -437,6 +437,7 @@ export const messages = {
   "chat.selection.showMore": "Meer acties tonen",
   "chat.selection.send": "Bewerkingsinstructie versturen",
   "chat.row.label": "Bericht van {name}",
+  "chat.row.pinned": "Vastgemaakt",
   "chat.row.openChat": "Chat van {name} openen",
   "chat.row.reactions": "Reacties: {emoji}",
   "chat.row.agentReaction": "{name} reageerde met {emoji}",
