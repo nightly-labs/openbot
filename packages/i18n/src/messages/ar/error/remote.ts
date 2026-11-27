@@ -70,6 +70,8 @@ export const messages = {
   "error.remote.inviteAcceptedOtherHost": "قبلت خدمة الحسابات مضيفًا مختلفًا.",
   "error.remote.inviteIdentityChanged": "تغيّرت هوية مضيف الدعوة أثناء قبولها.",
   "error.remote.localServerRemove": "لا يمكن إزالة الخادم المحلي.",
+  "error.remote.localServerTrashFailed":
+    "لا يمكن لـ OpenBot نقل ملفات هذا الخادم إلى سلة المهملات. أغلق البرامج التي تستخدم هذه الملفات، أو أعد تشغيل الكمبيوتر، ثم حاول مرة أخرى.",
   "error.remote.desktopSetupHostUpdate": "حدّث OpenBot على المضيف للتحقق من إعداد سطح المكتب البعيد.",
   "error.remote.desktopTestHostUpdate": "حدّث OpenBot على المضيف لاختبار إعداد سطح المكتب البعيد.",
   "error.remote.viewerProxyUnavailable": "وكيل العارض البعيد المحلي غير متاح.",

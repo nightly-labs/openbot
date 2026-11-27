@@ -75,6 +75,8 @@ export const messages = {
   "error.remote.inviteAcceptedOtherHost": "O serviço de contas aceitou outro computador anfitrião.",
   "error.remote.inviteIdentityChanged": "A identidade do computador anfitrião mudou durante a aceitação do convite.",
   "error.remote.localServerRemove": "O servidor local não pode ser removido.",
+  "error.remote.localServerTrashFailed":
+    "O OpenBot não consegue mover os arquivos deste servidor para a lixeira. Feche os programas que usam esses arquivos ou reinicie o computador e tente novamente.",
   "error.remote.desktopSetupHostUpdate":
     "Atualize o OpenBot no computador anfitrião para verificar a configuração da área de trabalho remota.",
   "error.remote.desktopTestHostUpdate":

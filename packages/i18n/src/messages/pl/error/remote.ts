@@ -71,6 +71,8 @@ export const messages = {
   "error.remote.inviteAcceptedOtherHost": "Usługa kont zaakceptowała inny host.",
   "error.remote.inviteIdentityChanged": "Tożsamość hosta zaproszenia zmieniła się podczas akceptacji.",
   "error.remote.localServerRemove": "Nie można usunąć lokalnego serwera.",
+  "error.remote.localServerTrashFailed":
+    "OpenBot nie może przenieść plików tego serwera do kosza. Zamknij programy, które używają tych plików, lub uruchom ponownie komputer, a potem spróbuj ponownie.",
   "error.remote.desktopSetupHostUpdate": "Zaktualizuj OpenBot na hoście, aby sprawdzić konfigurację zdalnego pulpitu.",
   "error.remote.desktopTestHostUpdate":
     "Zaktualizuj OpenBot na hoście, aby przetestować konfigurację zdalnego pulpitu.",

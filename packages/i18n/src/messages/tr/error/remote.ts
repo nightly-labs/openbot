@@ -71,6 +71,8 @@ export const messages = {
   "error.remote.inviteAcceptedOtherHost": "Hesap hizmeti farklı bir ana makineyi kabul etti.",
   "error.remote.inviteIdentityChanged": "Davet ana makine kimliği kabul edilirken değişti.",
   "error.remote.localServerRemove": "Yerel sunucu kaldırılamaz.",
+  "error.remote.localServerTrashFailed":
+    "OpenBot bu sunucunun dosyalarını çöp kutusuna taşıyamıyor. Bu dosyaları kullanan programları kapatın veya bilgisayarı yeniden başlatın, sonra tekrar deneyin.",
   "error.remote.desktopSetupHostUpdate":
     "Uzak masaüstü kurulumunu kontrol etmek için ana makinedeki OpenBot'u güncelleyin.",
   "error.remote.desktopTestHostUpdate":

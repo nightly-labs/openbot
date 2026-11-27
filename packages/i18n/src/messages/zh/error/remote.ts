@@ -62,6 +62,8 @@ export const messages = {
   "error.remote.inviteAcceptedOtherHost": "账号服务接受了另一个主机。",
   "error.remote.inviteIdentityChanged": "接受邀请期间，邀请中的主机身份发生了变更。",
   "error.remote.localServerRemove": "本地服务器无法移除。",
+  "error.remote.localServerTrashFailed":
+    "OpenBot 无法将此服务器的文件移到回收站。请关闭使用这些文件的程序，或重启电脑，然后重试。",
   "error.remote.desktopSetupHostUpdate": "请更新主机上的 OpenBot 以检查远程桌面配置。",
   "error.remote.desktopTestHostUpdate": "请更新主机上的 OpenBot 以测试远程桌面配置。",
   "error.remote.viewerProxyUnavailable": "本地远程查看器代理不可用。",

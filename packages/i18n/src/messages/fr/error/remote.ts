@@ -74,6 +74,8 @@ export const messages = {
   "error.remote.inviteAcceptedOtherHost": "Le service de compte a accepté un autre hôte.",
   "error.remote.inviteIdentityChanged": "L’identité de l’hôte de l’invitation a changé pendant son acceptation.",
   "error.remote.localServerRemove": "Le serveur local ne peut pas être supprimé.",
+  "error.remote.localServerTrashFailed":
+    "OpenBot ne peut pas placer les fichiers de ce serveur dans la corbeille. Fermez les programmes qui utilisent ces fichiers ou redémarrez l’ordinateur, puis réessayez.",
   "error.remote.desktopSetupHostUpdate":
     "Mettez à jour OpenBot sur l’hôte pour vérifier la configuration du bureau à distance.",
   "error.remote.desktopTestHostUpdate":

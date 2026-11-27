@@ -71,6 +71,8 @@ export const messages = {
   "error.remote.inviteAcceptedOtherHost": "계정 서비스가 다른 호스트를 수락했어요.",
   "error.remote.inviteIdentityChanged": "초대를 수락하는 동안 초대 호스트 ID가 변경되었어요.",
   "error.remote.localServerRemove": "로컬 서버는 삭제할 수 없어요.",
+  "error.remote.localServerTrashFailed":
+    "OpenBot이 이 서버의 파일을 휴지통으로 옮길 수 없어요. 이 파일을 사용하는 프로그램을 닫거나 컴퓨터를 다시 시작한 다음 다시 시도하세요.",
   "error.remote.desktopSetupHostUpdate": "원격 데스크톱 설정을 확인하려면 호스트의 OpenBot을 업데이트해 주세요.",
   "error.remote.desktopTestHostUpdate": "원격 데스크톱 설정을 테스트하려면 호스트의 OpenBot을 업데이트해 주세요.",
   "error.remote.viewerProxyUnavailable": "로컬 원격 뷰어 프록시를 사용할 수 없어요.",

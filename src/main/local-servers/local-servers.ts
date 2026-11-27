@@ -7,8 +7,9 @@ import { Readable, Writable } from "node:stream";
 import { type AgentSummary, isAgentSummary, LOCAL_SERVER_LIMIT, type ServerSummary } from "@openbot/contracts/ipc";
 import { sourceText } from "@openbot/i18n/source";
 import { registerSecretValue } from "@openbot/logging";
-import { Deferred, Duration, Effect, Exit, Schema, Scope, Semaphore } from "effect";
+import { Deferred, Duration, Effect, Exit, Fiber, Option, Schedule, Schema, Scope, Semaphore } from "effect";
 import { causeHelpers } from "../../backend/effect-boundary";
+import { stopWindowsProcessTree } from "../../backend/windows-process-tree";
 import type { RemoteMemberRecord } from "../central-auth-records";
 import {
   formatLocalServerCommand,
@@ -37,7 +38,9 @@ export class LocalServerFailure extends Schema.TaggedError<LocalServerFailure>()
 const { io: localIO, sync: localSync, rewrap: toLocalServerFailure } = causeHelpers(LocalServerFailure);
 
 const READY_TIMEOUT = Duration.seconds(90);
-const STOP_GRACE_MS = 6_000;
+const STOP_GRACE = Duration.seconds(6);
+const TRASH_RETRIES = 20;
+const TRASH_RETRY_DELAY = Duration.millis(500);
 const RESTART_DELAY = Duration.seconds(5);
 const RESTART_WINDOW_MS = 10 * 60_000;
 const RESTART_LIMIT = 3;
@@ -643,6 +646,8 @@ export class LocalServers {
     const secret = yield* localSync(() => this.#options.cipher.decrypt(Buffer.from(entry.encryptedSecret, "base64")));
     registerSecretValue(secret);
     const paths = this.#paths(entry);
+    if ((this.#registry.find(entry.id) ?? entry).serverId !== null && !(yield* pathExists(paths.userData)))
+      return yield* startFailure();
     yield* localIO(() => mkdir(paths.userData, { recursive: true, mode: 0o700 }));
     yield* localIO(() => mkdir(paths.agentRoot, { recursive: true }));
     const providerHomes = yield* ownProviderHomes(paths.userData);
@@ -851,10 +856,7 @@ export class LocalServers {
     removeFromAccount = true,
   ) {
     yield* this.#stopChild(entry);
-    const paths = this.#paths(entry);
-    for (const path of [paths.userData, paths.agentRoot]) {
-      if (yield* pathExists(path)) yield* localIO(() => this.#options.trash(path));
-    }
+    yield* this.#trashFolders(entry);
     const serverId = this.#registry.find(entry.id)?.serverId ?? null;
     yield* this.#registry.remove(entry.id, serverId).pipe(toLocalServerFailure);
     this.#exits.delete(entry.id);
@@ -864,21 +866,58 @@ export class LocalServers {
     if (removeFromAccount && this.#options.account.accountId() !== null)
       this.#background(this.#accountSteps.withPermit(this.#removeDeletedHosts()));
   });
-}
 
-function terminate(child: ChildProcess, platform: NodeJS.Platform): Effect.Effect<void> {
-  return Effect.callback<void>((resume) => {
-    if (child.exitCode !== null || child.signalCode !== null) {
-      resume(Effect.void);
-      return;
-    }
-    const timer = setTimeout(() => child.kill("SIGKILL"), STOP_GRACE_MS);
-    child.once("exit", () => {
-      clearTimeout(timer);
-      resume(Effect.void);
-    });
-    const control = controlPipe(child, platform);
-    control?.end(() => control.destroy());
-    if (platform !== "win32") child.kill("SIGTERM");
+  readonly #trashFolders = Effect.fn("LocalServers.trashFolders")(function* (
+    this: LocalServers,
+    entry: StoredLocalServer,
+  ) {
+    const paths = this.#paths(entry);
+    yield* Effect.forEach(
+      [paths.userData, paths.agentRoot],
+      (path) =>
+        pathExists(path).pipe(
+          Effect.flatMap((exists) => (exists ? localIO(() => this.#options.trash(path)) : Effect.void)),
+        ),
+      { discard: true },
+    ).pipe(
+      Effect.retry({
+        times: this.#options.platform === "win32" ? TRASH_RETRIES : 0,
+        schedule: Schedule.spaced(TRASH_RETRY_DELAY),
+      }),
+      Effect.tapError(({ cause }) =>
+        Effect.sync(() =>
+          this.#options.log.warn("The folders of a deleted server on this computer did not move to the trash.", cause),
+        ),
+      ),
+      Effect.mapError(
+        () => new LocalServerFailure({ cause: new Error(sourceText("error.remote.localServerTrashFailed")) }),
+      ),
+    );
   });
 }
+
+function waitForExit(child: ChildProcess): Effect.Effect<void> {
+  return Effect.callback<void>((resume) => {
+    const onExit = () => resume(Effect.void);
+    child.once("exit", onExit);
+    return Effect.sync(() => child.off("exit", onExit));
+  });
+}
+
+function killAfterGrace(child: ChildProcess, platform: NodeJS.Platform): Effect.Effect<void> {
+  const kill = Effect.sync(() => {
+    if (child.exitCode === null && child.signalCode === null) child.kill("SIGKILL");
+  });
+  return platform === "win32" ? stopWindowsProcessTree(child).pipe(Effect.ignore, Effect.andThen(kill)) : kill;
+}
+
+const terminate = Effect.fn("LocalServers.terminate")(function* (child: ChildProcess, platform: NodeJS.Platform) {
+  if (child.exitCode !== null || child.signalCode !== null) return;
+  const exited = yield* Effect.forkChild(waitForExit(child), { startImmediately: true });
+  const control = controlPipe(child, platform);
+  control?.end(() => control.destroy());
+  if (platform !== "win32") child.kill("SIGTERM");
+  const stopped = yield* Fiber.await(exited).pipe(Effect.timeoutOption(STOP_GRACE));
+  if (Option.isNone(stopped)) yield* killAfterGrace(child, platform);
+  yield* Fiber.join(exited);
+});

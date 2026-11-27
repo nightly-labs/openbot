@@ -70,6 +70,8 @@ export const messages = {
   "error.remote.inviteAcceptedOtherHost": "שירות החשבונות אישר מארח אחר.",
   "error.remote.inviteIdentityChanged": "זהות מארח ההזמנה השתנתה בזמן אישור ההזמנה.",
   "error.remote.localServerRemove": "אי אפשר להסיר את השרת המקומי.",
+  "error.remote.localServerTrashFailed":
+    "OpenBot לא יכול להעביר את הקבצים של השרת הזה לפח. סגור את התוכניות שמשתמשות בקבצים האלה, או הפעל מחדש את המחשב, ואז נסה שוב.",
   "error.remote.desktopSetupHostUpdate": "יש לעדכן את OpenBot במארח כדי לבדוק את הגדרת שולחן העבודה המרוחק.",
   "error.remote.desktopTestHostUpdate": "יש לעדכן את OpenBot במארח כדי לבדוק את הגדרת שולחן העבודה המרוחק.",
   "error.remote.viewerProxyUnavailable": "שרת הביניים המקומי של מציג שולחן העבודה המרוחק אינו זמין.",
