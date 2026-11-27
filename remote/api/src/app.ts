@@ -217,7 +217,7 @@ export function createRemoteApiApp(
         signal.revokeTelegramRoute(event.botId, event.chatId, event.through);
       else if (event.type === "discord-route-revoked") signal.revokeDiscordRoute(event.guildId, event.through);
       else if (event.type === "webhook-route-revoked") signal.revokeWebhookRoute(event.routeId, event.through);
-      else signal.revokeSession(event.sessionId);
+      else signal.revokeSession(event.sessionId, event.hostId);
       return new Response(null, { status: 204 });
     })
     .post(
