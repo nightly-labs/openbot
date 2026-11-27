@@ -1464,6 +1464,14 @@ try {
         verdict: { verdict: "continue", missing: "Do more." },
       },
       { answer: "I did not find any problem in the audit.", verdict: { verdict: "continue", missing: "Do more." } },
+      {
+        answer: "Next I will:\n* fix the build path\n* add the release check",
+        verdict: { verdict: "continue", missing: "Add the release check." },
+      },
+      {
+        answer: "Let me explain how this works. The parser reads tokens and builds a tree.",
+        verdict: { verdict: "continue", missing: "Do more." },
+      },
     ] satisfies { answer: string; verdict: Verdict }[];
     const results = [];
     for (const item of cases) {
@@ -1498,6 +1506,8 @@ try {
         [2, 2],
         [2, 2],
         [1, 0],
+        [1, 0],
+        [2, 2],
         [1, 0],
       ],
       "A promise or an admission of undone work continues on a continue verdict, ends on done, and a closing, a refusal or a report gets no check.",

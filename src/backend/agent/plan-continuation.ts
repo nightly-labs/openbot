@@ -158,11 +158,21 @@ const LIST_ITEM = /^\s*(?:[-*+•]|\d+[.)])\s+/u;
 const WORK_DONE_VERB =
   "(?:applied|apply|changed|change|made|make|fixed|fix|run|ran|started|start|implemented|implement|edited|edit|updated|update|written|write|created|create|sent|send|done|do|executed|execute|touched|touch|finished|finish)";
 const ADMITS_WORK_NOT_DONE = new RegExp(
-  String.raw`(?:^|[^\p{L}'’])(?:i\s+(?:have|had|did)\s+not|i\s+(?:haven['’]t|hadn['’]t|didn['’]t))\s+(?:yet\s+|actually\s+|really\s+)?${WORK_DONE_VERB}(?!\p{L})|(?:^|[^\p{L}])(?:not|nothing)\s+(?:(?:has|have|was|were)\s+)?(?:been\s+)?(?:applied|changed|fixed|implemented|done|sent|started|edited|updated)\s+yet(?!\p{L})|(?:^|[^\p{L}])(?:ainda\s+)?(?:não|nao)\s+(?:fiz|apliquei|corrigi|executei|rodei|enviei|alterei|implementei|mudei|editei|atualizei|criei|terminei|comecei)(?!\p{L})|(?:^|[^\p{L}])ainda\s+(?:não|nao)\s+(?:foi|foram|está|esta|estão|estao)\s+(?:feit|aplicad|corrigid|enviad|alterad|implementad)`,
+  String.raw`(?:^|[^\p{L}'’])(?:i\s+(?:have|had|did)\s+not|i\s+(?:haven['’]?t|hadn['’]?t|didn['’]?t))\s+(?:yet\s+|actually\s+|really\s+)?${WORK_DONE_VERB}(?!\p{L})|(?:^|[^\p{L}])(?:not|nothing)\s+(?:(?:has|have|was|were)\s+)?(?:been\s+)?(?:applied|changed|fixed|implemented|done|sent|started|edited|updated)\s+yet(?!\p{L})|(?:^|[^\p{L}])(?:ainda\s+)?(?:não|nao)\s+(?:fiz|apliquei|corrigi|executei|rodei|enviei|alterei|implementei|mudei|editei|atualizei|criei|terminei|comecei)(?!\p{L})|(?:^|[^\p{L}])ainda\s+(?:não|nao)\s+(?:foi|foram|está|esta|estão|estao)\s+(?:feit|aplicad|corrigid|enviad|alterad|implementad)`,
   "iu",
 );
 
-function closingSentences(plain: string): string[] {
+const TALKS_ABOUT_WORK =
+  /(?:i['’]ll|i\s+will|let\s+me|i['’]m\s+going\s+to|i\s+am\s+going\s+to)\s+(?:now\s+|first\s+|quickly\s+)?(?:explain|walk\s+you|summari[sz]e|recap|clarify|break\s+(?:it\s+|this\s+)?down|describe|outline|show\s+you|answer|be\s+(?:honest|brief|clear|direct))(?!\p{L})/iu;
+const STILL_OPEN = /(?:^|[^\p{L}])(?:yet|ainda)(?!\p{L})/iu;
+
+interface ClosingParts {
+  earlier: string[];
+  closing: string[];
+  asksBeforeList: boolean;
+}
+
+function closingParts(plain: string): ClosingParts {
   const lines = plain.split("\n");
   const blank = (line: string | undefined) => (line ?? "").trim().length === 0;
   let end = lines.length;
@@ -176,25 +186,35 @@ function closingSentences(plain: string): string[] {
   const intro = lines[end - 1];
   const introduced =
     intro !== undefined && items[0] !== undefined ? [`${intro.replace(/:\s*$/u, "")} ${items[0]}`] : [];
-  return [
-    ...lines
-      .slice(start, end)
-      .join("\n")
-      .split(/(?<=[.!…])\s+|\n+/u),
-    ...items,
-    ...introduced,
-  ].filter((sentence) => !blank(sentence));
+  const sentences = lines
+    .slice(start, end)
+    .join("\n")
+    .split(/(?<=[.!…])\s+|\n+/u)
+    .filter((sentence) => !blank(sentence));
+  return {
+    earlier: sentences.slice(0, -1),
+    closing: [...sentences.slice(-1), ...items, ...introduced],
+    asksBeforeList: items.length > 0 && /[?？]/u.test(intro ?? ""),
+  };
 }
 
 export function leavesWorkUndone(answer: string | undefined): boolean {
   const text = answer?.trim() ?? "";
   if (text.length === 0 || text.length > UNDONE_WORK_ANSWER_MAX || waitsForUser(answer)) return false;
   const plain = text
+    .replace(/^(\s*)\*\s+/gmu, "$1- ")
     .replace(/[*_`>#]/g, "")
     .trimEnd()
     .replace(NOTHING_FROM_USER, "");
-  return closingSentences(plain).some(
-    (sentence) => PROMISES_WORK.test(sentence) || ADMITS_WORK_NOT_DONE.test(sentence),
+  const { earlier, closing, asksBeforeList } = closingParts(plain);
+  if (asksBeforeList) return false;
+  return (
+    closing.some((sentence) => PROMISES_WORK.test(sentence) || ADMITS_WORK_NOT_DONE.test(sentence)) ||
+    earlier.some(
+      (sentence) =>
+        (PROMISES_WORK.test(sentence) && !TALKS_ABOUT_WORK.test(sentence)) ||
+        (ADMITS_WORK_NOT_DONE.test(sentence) && STILL_OPEN.test(sentence)),
+    )
   );
 }
 
