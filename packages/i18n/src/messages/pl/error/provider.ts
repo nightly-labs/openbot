@@ -376,6 +376,8 @@ export const messages = {
     "Cursor nie mógł połączyć się ze swoim serwerem przy użyciu Twojego logowania. Sprawdź połączenie z internetem, a potem zaloguj się ponownie do Cursor.",
   "error.provider.cursorNoModels":
     "Cursor nie wysłał listy modeli. Wybierz „Połącz”, aby ponownie zalogować się do Cursor. Jeśli ten komunikat nie znika, sprawdź, czy Twój plan Cursor obejmuje modele.",
+  "error.provider.geminiNoModels":
+    "Gemini nie wysłał listy modeli. Wybierz „Połącz”, aby ponownie zalogować się przez Google. Jeśli ten komunikat nie znika, sprawdź, czy Twoje konto Google może korzystać z Gemini.",
   "error.provider.clineArchivePath": "Archiwum Cline ma nieoczekiwaną ścieżkę.",
   "error.provider.clinePackageMismatch": "Pakiet Cline nie pasuje do katalogu środowisk uruchomieniowych.",
   "error.provider.clineChecksum": "Niezgodna suma kontrolna środowiska uruchomieniowego Cline.",

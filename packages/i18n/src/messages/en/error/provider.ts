@@ -370,6 +370,8 @@ export const messages = defineMessages("error.provider", {
     "Cursor could not connect to its server with your sign-in. Check your internet connection, then sign in to Cursor again.",
   "error.provider.cursorNoModels":
     "Cursor did not send its list of models. Select Connect to sign in to Cursor again. If this message stays, check that your Cursor plan includes models.",
+  "error.provider.geminiNoModels":
+    "Gemini did not send its list of models. Select Connect to sign in with Google again. If this message stays, check that your Google account can use Gemini.",
   "error.provider.clineArchivePath": "The Cline archive has an unexpected path.",
   "error.provider.clinePackageMismatch": "The Cline package does not match the runtime catalog.",
   "error.provider.clineChecksum": "Cline runtime checksum mismatch.",
