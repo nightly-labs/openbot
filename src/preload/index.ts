@@ -165,7 +165,7 @@ import {
   decodeAgentDockOffset,
   decodeAgentDockPresentation,
 } from "./agent-dock-decoding";
-import { decodeScopedAgentEvent } from "./agent-event-decoding";
+import { decodeAgentSyncChangedEvent, decodeScopedAgentEvent } from "./agent-event-decoding";
 import {
   decodeAccountSessions,
   decodeAgentDefaults,
@@ -725,6 +725,7 @@ const agentGroup = bridgeGroup(IPC_ENDPOINTS.agent, {
   respondToBrowserSecret: decodeVoid,
   respondToBrowserTakeover: decodeVoid,
   scopedEvent: decodeScopedAgentEvent,
+  syncChanged: decodeAgentSyncChangedEvent,
 });
 
 const agentFoldersGroup = bridgeGroup(IPC_ENDPOINTS.agentFolders, {

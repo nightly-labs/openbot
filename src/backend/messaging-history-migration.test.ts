@@ -14,6 +14,7 @@ const HISTORY_TABLES = {
   projection_messaging_history: [],
   ...CRM_TABLES_AFTER_MIGRATION,
   ...THREAD_EVENT_COMPACTION_TABLES_AFTER_MIGRATION,
+  sync_message_changes: [],
 };
 
 function databaseAt(version: number): DatabaseSync {

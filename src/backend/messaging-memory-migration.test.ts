@@ -112,6 +112,7 @@ describe("messaging memory migration", () => {
         ...CRM_TABLES_AFTER_MIGRATION,
         ...THREAD_EVENT_COMPACTION_TABLES_AFTER_MIGRATION,
         projection_pinned_thread_messages: [],
+        sync_message_changes: [],
       });
       expect(db.prepare("SELECT MAX(version) AS version FROM schema_migrations").get()).toEqual({ version: 70 });
       expect(db.prepare("PRAGMA foreign_keys").get()).toEqual({ foreign_keys: 1 });
@@ -164,6 +165,7 @@ describe("messaging memory migration", () => {
       ...CRM_TABLES_AFTER_MIGRATION,
       ...THREAD_EVENT_COMPACTION_TABLES_AFTER_MIGRATION,
       projection_pinned_thread_messages: [],
+      sync_message_changes: [],
     });
   });
 

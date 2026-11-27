@@ -37,6 +37,7 @@ const EMPTY_WORKFLOW_TABLES = {
   ...CRM_TABLES_AFTER_MIGRATION,
   ...THREAD_EVENT_COMPACTION_TABLES_AFTER_MIGRATION,
   projection_pinned_thread_messages: [],
+  sync_message_changes: [],
 };
 
 function databaseAt(version: number): DatabaseSync {
@@ -280,6 +281,7 @@ const EMPTY_V54_TABLES = {
   ...CRM_TABLES_AFTER_MIGRATION,
   ...THREAD_EVENT_COMPACTION_TABLES_AFTER_MIGRATION,
   projection_pinned_thread_messages: [],
+  sync_message_changes: [],
 };
 const EMPTY_LATER_TABLES = { projection_messaging_allowed_senders: [], ...EMPTY_V54_TABLES };
 

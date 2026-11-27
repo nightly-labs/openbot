@@ -15,6 +15,7 @@ const SOURCES = Array.from({ length: 52 }, (_, index) => index + 8);
 const LATER_TABLES = {
   projection_messaging_history: [],
   projection_pinned_thread_messages: [],
+  sync_message_changes: [],
   ...CRM_TABLES_AFTER_MIGRATION,
   ...THREAD_EVENT_COMPACTION_TABLES_AFTER_MIGRATION,
 };

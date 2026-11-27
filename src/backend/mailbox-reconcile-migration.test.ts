@@ -115,6 +115,7 @@ function withoutRepeats(rows: Rows): Rows {
     ...CRM_TABLES_AFTER_MIGRATION,
     ...THREAD_EVENT_COMPACTION_TABLES_AFTER_MIGRATION,
     projection_pinned_thread_messages: [],
+    sync_message_changes: [],
   };
 }
 

@@ -28,6 +28,7 @@ import type { PromptAnswerOptions } from "./features/conversation/conversation-t
 import type { TurnStepLines } from "./features/conversation/turn-step-lines";
 import { useDynamicIsland } from "./features/dynamic-island/dynamic-island-context";
 import { useServers } from "./features/servers/servers-context";
+import { cancelQueueEdit, type QueueEdit, queueWithEdit, reorderQueueEdit, steerQueueEdit } from "./queue-optimistic";
 import { queuedDeliveriesInOrder } from "./queue-reconciliation";
 import { isQuietSteerRefusal } from "./quiet-steer-refusal";
 import { createScopeGuard } from "./scope-lifetime";
@@ -446,15 +447,61 @@ const Turns = createSimpleContext({
       }
     }
 
+    interface ShownQueueEdit {
+      agentId: string;
+      edit: QueueEdit;
+      request: number;
+    }
+
+    function showQueueEdit(agentId: string, edit: QueueEdit | null): ShownQueueEdit | null {
+      if (edit === null) return null;
+      const request = (queueSnapshotRequests.get(agentId) ?? 0) + 1;
+      queueSnapshotRequests.set(agentId, request);
+      setQueues((current) => {
+        const snapshot = current[agentId];
+        return snapshot ? { ...current, [agentId]: queueWithEdit(snapshot, edit, "apply") } : current;
+      });
+      return { agentId, edit, request };
+    }
+
+    function queueEditUntouched(shown: ShownQueueEdit): boolean {
+      return queueSnapshotRequests.get(shown.agentId) === shown.request;
+    }
+
+    function rollBackQueueEdit(shown: ShownQueueEdit | null): void {
+      if (shown === null || !scopeIsCurrent()) return;
+      if (!queueEditUntouched(shown)) {
+        loadQueue(shown.agentId);
+        return;
+      }
+      setQueues((current) => {
+        const snapshot = current[shown.agentId];
+        if (!snapshot) return current;
+        const next = queueWithEdit(snapshot, shown.edit, "roll-back");
+        return next === snapshot ? current : { ...current, [shown.agentId]: next };
+      });
+    }
+
+    function showCancelEdit(agentIds: readonly string[], deliveryId: string): ShownQueueEdit | null {
+      for (const agentId of agentIds) {
+        const shown = showQueueEdit(agentId, cancelQueueEdit(queues()[agentId], deliveryId));
+        if (shown !== null) return shown;
+      }
+      return null;
+    }
+
     function cancelQueuedMessage(deliveryId: string, recipientAgentId?: string) {
       const agent = activeAgent();
       if (!agent) return;
       const serverId = activeServerId();
       const analytics = desktopAnalytics.scope();
+      const queueAgentId = recipientAgentId ?? agent.id;
+      const shown = showCancelEdit([queueAgentId, agent.id], deliveryId);
       void turnsPort()
-        .agent.cancelQueuedMessage({ agentId: recipientAgentId ?? agent.id, deliveryId })
+        .agent.cancelQueuedMessage({ agentId: queueAgentId, deliveryId })
         .then(() => analytics.track("queue_action", { action: "cancel", result: "succeeded" }))
         .catch((error) => {
+          rollBackQueueEdit(shown);
           analytics.track("queue_action", { action: "cancel", result: "failed", failure_code: "cancel_failed" });
           appendUiError(agent.id, error, currentText().t("app.errorStatus.cancel"), serverId);
         });
@@ -476,11 +523,13 @@ const Turns = createSimpleContext({
       if (!agent || !turnId) return;
       const serverId = activeServerId();
       const analytics = desktopAnalytics.scope();
+      const shown = showQueueEdit(agent.id, steerQueueEdit(queues()[agent.id], deliveryId, turnId));
       void turnsPort()
         .agent.steerQueuedMessage({ agentId: agent.id, deliveryId, expectedTurnId: turnId })
         .then(() => analytics.track("queue_action", { action: "steer", result: "succeeded" }))
         .catch((error) => {
           analytics.track("queue_action", { action: "steer", result: "failed", failure_code: "steer_failed" });
+          rollBackQueueEdit(shown);
           if (activeTurns()[agent.id] !== turnId) return;
           const delivery = queues()[agent.id]?.deliveries.find((item) => item.id === deliveryId);
           if (delivery && delivery.status !== "queued") return;
@@ -504,18 +553,21 @@ const Turns = createSimpleContext({
         analytics.track("queue_action", { action: "send_now", result: "failed", failure_code: "send_now_failed" });
         appendUiError(agent.id, error, status, serverId);
       };
+      const moveToHead = (deliveryIds: string[]) => {
+        const shown = showQueueEdit(agent.id, reorderQueueEdit(queues()[agent.id], deliveryIds));
+        return port.reorderQueue({ agentId: agent.id, deliveryIds }).then(
+          () => true,
+          (error: unknown) => {
+            rollBackQueueEdit(shown);
+            failed(error, currentText().t("app.errorStatus.reorder"));
+            return false;
+          },
+        );
+      };
       const reorder =
         ids[0] === deliveryId
           ? Promise.resolve(true)
-          : port
-              .reorderQueue({ agentId: agent.id, deliveryIds: [deliveryId, ...ids.filter((id) => id !== deliveryId)] })
-              .then(
-                () => true,
-                (error: unknown) => {
-                  failed(error, currentText().t("app.errorStatus.reorder"));
-                  return false;
-                },
-              );
+          : moveToHead([deliveryId, ...ids.filter((id) => id !== deliveryId)]);
       void reorder.then((moved) => {
         if (!moved || activeTurns()[agent.id] !== turnId) return;
         return port
@@ -559,10 +611,12 @@ const Turns = createSimpleContext({
       if (!agent) return;
       const serverId = activeServerId();
       const analytics = desktopAnalytics.scope();
+      const shown = showQueueEdit(agent.id, reorderQueueEdit(queues()[agent.id], deliveryIds));
       void turnsPort()
         .agent.reorderQueue({ agentId: agent.id, deliveryIds })
         .then(() => analytics.track("queue_action", { action: "reorder", result: "succeeded" }))
         .catch((error) => {
+          rollBackQueueEdit(shown);
           analytics.track("queue_action", { action: "reorder", result: "failed", failure_code: "reorder_failed" });
           appendUiError(agent.id, error, currentText().t("app.errorStatus.reorder"), serverId);
         });

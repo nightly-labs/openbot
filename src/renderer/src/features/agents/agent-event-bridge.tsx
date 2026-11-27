@@ -6,6 +6,16 @@ import {
   type ConversationMessage,
   LOCAL_SERVER_ID,
 } from "@openbot/contracts/ipc";
+import {
+  AGENTS_SYNC_COLLECTION,
+  CONVERSATION_READS_SYNC_COLLECTION,
+  HIDDEN_AGENTS_SYNC_COLLECTION,
+  NOTIFICATION_LEVELS_SYNC_COLLECTION,
+  ROUTINES_SYNC_COLLECTION,
+  SIDEBAR_LAYOUT_SYNC_COLLECTION,
+  SIDEBAR_PINS_SYNC_COLLECTION,
+} from "@openbot/contracts/team-protocol/sync-collections";
+import { parseSyncName } from "@openbot/contracts/team-protocol/sync-v1";
 import { cleanAgentMessageText } from "@openbot/team-client/agent-message-text";
 import { agentNotificationLevel } from "@openbot/team-client/agent-notifications";
 import { reconcileQueuesWithRuntimeWork } from "@openbot/team-client/dynamic-island-coordinator";
@@ -624,6 +634,35 @@ export function AgentEventBridge() {
     applyRuntimeMessages(snapshot.latestMessages);
   }
 
+  function applySynced<Value>(serverId: string, read: Promise<Value>, apply: (value: Value) => void): void {
+    void read
+      .then((value) => {
+        if (serverId === activeServerId()) flush(() => apply(value));
+      })
+      .catch(() => undefined);
+  }
+
+  function reloadSyncedCollection(serverId: string, name: string): void {
+    const agent = agentsPort().agent;
+    const synced = parseSyncName(name);
+    if (synced?.base === ROUTINES_SYNC_COLLECTION.name && synced.param !== null)
+      refreshRoutineIds(synced.param, serverId);
+    else if (name === AGENTS_SYNC_COLLECTION.name) applySynced(serverId, agent.listAgents(serverId), applyStoredAgents);
+    else if (name === CONVERSATION_READS_SYNC_COLLECTION.name) {
+      const request = ++readRefresh;
+      applySynced(serverId, agent.listConversationReads(serverId), (reads) => {
+        if (request === readRefresh) applyConversationReads(reads);
+      });
+    } else if (name === SIDEBAR_LAYOUT_SYNC_COLLECTION.name)
+      applySynced(serverId, agent.getSidebarLayout(serverId), setSidebarLayout);
+    else if (name === SIDEBAR_PINS_SYNC_COLLECTION.name)
+      applySynced(serverId, agent.getSidebarPins(serverId), (pins) => receiveServerPins(serverId, pins));
+    else if (name === HIDDEN_AGENTS_SYNC_COLLECTION.name)
+      applySynced(serverId, agent.listHiddenAgents(serverId), (hidden) => applyUserHiddenAgents(hidden.agents));
+    else if (name === NOTIFICATION_LEVELS_SYNC_COLLECTION.name)
+      applySynced(serverId, agent.listAgentNotificationLevels(serverId), applyOwnAgentLevels);
+  }
+
   onSettled(() => {
     if (soundLevel(null) === "all" && !platform.chatWindow) prepareCompletionSound();
     const unsubscribe = agentsPort().agent.onEvent((event) => {
@@ -638,6 +677,9 @@ export function AgentEventBridge() {
       if (platform.chatWindow) return;
       playAgentEventSound(event);
     });
+    const stopSync = agentsPort().agent.onSyncChanged((change) => {
+      if (change.serverId === activeServerId()) reloadSyncedCollection(change.serverId, change.name);
+    });
     void agentsPort()
       .agent.getRuntimeSnapshot()
       .then((snapshot) => {
@@ -648,6 +690,7 @@ export function AgentEventBridge() {
       readRefresh += 1;
       promptListScope += 1;
       unsubscribe();
+      stopSync();
       completedTurnByAgent.clear();
     };
   });

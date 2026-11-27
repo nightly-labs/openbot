@@ -40,6 +40,11 @@ import { optionalTeamEvent, optionalTeamEventToCurrent } from "@openbot/contract
 import { addPromptQuestionDetails } from "@openbot/contracts/team-protocol/prompt-detail-v1";
 import { teamSideRouteCodec } from "@openbot/contracts/team-protocol/side-routes";
 import { addSkillSuggestionNames } from "@openbot/contracts/team-protocol/skill-learning-v1";
+import {
+  decodeSyncServerMessage,
+  type SyncClientMessage,
+  type SyncServerMessage,
+} from "@openbot/contracts/team-protocol/sync-v1";
 import { addUiBlockAutoAnswers } from "@openbot/contracts/team-protocol/ui-block-auto-answer-v1";
 import { addUiBlockLocationRequests } from "@openbot/contracts/team-protocol/ui-block-location-v1";
 import { addUiBlockVaultRequests } from "@openbot/contracts/team-protocol/ui-block-vault-v1";
@@ -331,6 +336,7 @@ export interface RemoteTeamPeerActions {
   onDiagnostic?: (diagnostic: RemoteTeamDiagnostic) => Promise<void>;
   onNetworkRestored?: () => Promise<void>;
   onTeamEvent: (hostId: string, event: RemoteTeamEvent) => Promise<void>;
+  onSyncEvent?: (hostId: string, event: SyncServerMessage) => Promise<void>;
   digestUploadFile?: (ref: string) => Promise<string>;
   readUploadFile?: (part: { ref: string; offset: number; length: number }) => Promise<string>;
   writeDownloadFile?: (part: { ref: string; base64: string; append: boolean }) => Promise<void>;
@@ -456,6 +462,7 @@ class RemotePeerIO extends Context.Service<
     ): Effect.Effect<RemoteTeamBootstrapPayload, RemotePeerError>;
     connectionUpdate(update: RemoteTeamConnectionUpdate): Effect.Effect<void, RemotePeerError>;
     teamEvent(hostId: string, event: RemoteTeamEvent): Effect.Effect<void, RemotePeerError>;
+    syncEvent(hostId: string, event: SyncServerMessage): Effect.Effect<void, RemotePeerError>;
   }
 >()("@openbot/team-client/RemotePeerIO") {
   static layer(actions: ActionsRef) {
@@ -470,6 +477,9 @@ class RemotePeerIO extends Context.Service<
         ),
         teamEvent: Effect.fn("RemotePeerIO.teamEvent")((hostId: string, event: RemoteTeamEvent) =>
           peerCall(() => actions.current.onTeamEvent(hostId, event)),
+        ),
+        syncEvent: Effect.fn("RemotePeerIO.syncEvent")((hostId: string, event: SyncServerMessage) =>
+          peerCall(() => actions.current.onSyncEvent?.(hostId, event) ?? Promise.resolve()),
         ),
       }),
     );
@@ -601,6 +611,11 @@ export function createRemoteTeamPeer(
       const state = peer;
       if (!state || !isPeerOnline(state)) return;
       void runPeerEffect(sendEventControl(state, { type: WORKFLOW_SPOT_CONTROL, ...input })).catch(() => undefined);
+    },
+    async sendSync(message: SyncClientMessage) {
+      const state = peer;
+      if (!state || !isPeerOnline(state)) throw new Error(sourceText("error.remote.hostConnectionOffline"));
+      await runPeerEffect(sendSyncControl(state, message));
     },
     execute: (command: RemoteTeamCommand) => runPeerEffect(executeCommand(command, actions)),
     setWaitForHost(value: boolean) {
@@ -1747,6 +1762,13 @@ export function createRemoteTeamPeer(
         diagnose(state, "event-gap", `expected ${state.lastEventSequence + 1}, got ${frame.sequence}`);
         return yield* new RemotePeerError({ message: sourceText("error.remote.eventStreamGap") });
       }
+      const sync = yield* peerDecode(() => decodeSyncServerMessage(frame.payload));
+      if (sync) {
+        state.lastEventSequence = frame.sequence;
+        yield* RemotePeerIO.use((io) => io.syncEvent(state.hostId, sync));
+        scheduleEventAck(state);
+        return;
+      }
       const channel = yield* peerDecode(() => optionalTeamEvent(frame.payload, { agentTaskUiBlocks: true }));
       const decoded = channel
         ? { status: "known" as const, event: optionalTeamEventToCurrent(channel) }
@@ -2153,6 +2175,16 @@ export function createRemoteTeamPeer(
             control: control.type === WORKFLOW_SPOT_CONTROL ? control : toWireTeamProtocolV1ClientEvent(control),
           }),
         ),
+      );
+    })();
+  }
+
+  function sendSyncControl(state: PeerState, control: SyncClientMessage) {
+    return Effect.fn("RemotePeer.sendSyncControl")(function* () {
+      yield* sendPayload(
+        state,
+        "events",
+        yield* peerDecode(() => encodeTeamProtocolV2Frame({ version: 2, type: "event-control", control })),
       );
     })();
   }

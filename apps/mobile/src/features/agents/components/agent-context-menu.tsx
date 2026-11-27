@@ -8,6 +8,7 @@ import { useChatSectionMenu } from "@/features/agents/components/use-chat-sectio
 import { showFailureAlert } from "@/features/analytics/failure-reports";
 import {
   setSyncedNotificationLevels,
+  showAgentNotificationLevel,
   useSyncedNotificationLevels,
 } from "@/features/settings/model/notification-levels";
 import { useAgentUnread } from "@/features/workspace/components/use-live-workspace";
@@ -84,10 +85,13 @@ function useAgentMenuActions(agent: MobileAgent) {
   };
   const handleMute = () => {
     void haptics.selection();
+    const level = isMuted ? null : "nothing";
+    const undo = showAgentNotificationLevel(agent.serverId, agent.id, level);
     workspace()
-      .setAgentNotificationLevel({ agentId: agent.id, level: isMuted ? null : "nothing" }, agent.serverId)
+      .setAgentNotificationLevel({ agentId: agent.id, level }, agent.serverId)
       .then((snapshot) => setSyncedNotificationLevels(agent.serverId, snapshot))
       .catch((error: unknown) => {
+        undo();
         void haptics.notification("error");
         const text = currentText();
         showFailureAlert(

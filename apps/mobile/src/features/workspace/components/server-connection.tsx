@@ -20,6 +20,7 @@ import { mobileAnalytics } from "@/features/analytics/mobile-analytics";
 import { phoneVpn } from "@/features/support/model/phone-network-capture";
 import { supportLog, supportLogValue } from "@/features/support/model/support-log";
 import { referencedError } from "@/features/workspace/model/referenced-error";
+import type { MobileServerSync } from "@/features/workspace/sync/server-sync";
 import { type NetworkChange, strongerChange } from "@/shared/lib/network-change";
 import { subscribeNetworkMoves } from "@/shared/lib/network-path";
 import { RemoteTeamTransport, type RemoteTeamTransportRef } from "./remote-team-transport";
@@ -54,6 +55,7 @@ interface Props {
   active: boolean;
   background: boolean;
   directory: RemoteTeamDirectoryClient;
+  sync: MobileServerSync;
   register(hostId: string, handle: ServerConnectionHandle | null): void;
   load(hostId: string, publicKey: string, client: RemoteTeamTransportRef, context: ServerLoadContext): Promise<void>;
   onStatus(
@@ -73,6 +75,7 @@ export const ServerConnection = memo(function ServerConnection({
   active,
   background,
   directory,
+  sync,
   register,
   load,
   onStatus,
@@ -143,6 +146,7 @@ export const ServerConnection = memo(function ServerConnection({
   const handleConnectionUpdate = useCallback(
     (update: RemoteTeamConnectionUpdate) => {
       if (update.hostId !== hostId) return;
+      sync.connection(hostId, update);
       supportLog.add(
         update.state === "offline" ? "warn" : "info",
         "connection",
@@ -162,8 +166,16 @@ export const ServerConnection = memo(function ServerConnection({
       }
       if (update.resync) controller.current?.refresh();
     },
-    [hostId, analytics],
+    [hostId, analytics, sync],
   );
+  const handleSyncEvent = useCallback(
+    (id: string, value: unknown) => {
+      if (id === hostId) sync.receive(hostId, value);
+    },
+    [sync, hostId],
+  );
+  const handleNewPage = useCallback(() => sync.transportReset(hostId), [sync, hostId]);
+  useEffect(() => sync.setActive(hostId, active), [sync, hostId, active]);
 
   useEffect(() => {
     if (!client) return;
@@ -300,6 +312,8 @@ export const ServerConnection = memo(function ServerConnection({
       onTeamEvent={onTeamEvent}
       onConnectionUpdate={handleConnectionUpdate}
       onDiagnostic={handleDiagnostic}
+      onSyncEvent={handleSyncEvent}
+      onNewPage={handleNewPage}
     />
   );
 });

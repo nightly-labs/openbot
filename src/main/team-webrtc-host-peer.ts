@@ -60,6 +60,7 @@ import {
   withSkillSuggestionNames,
 } from "@openbot/contracts/team-protocol/skill-learning-v1";
 import { STORAGE_WORKFLOW_FILES_CAPABILITY } from "@openbot/contracts/team-protocol/storage-workflow-files-v1";
+import { decodeSyncServerMessage, isSyncClientMessage } from "@openbot/contracts/team-protocol/sync-v1";
 import {
   addUiBlockAutoAnswers,
   TEAM_UI_BLOCK_AUTO_ANSWER_CAPABILITY,
@@ -153,6 +154,7 @@ const requireModule = createRequire(import.meta.url);
 const webSockets: typeof Ws = requireModule(join(dirname(requireModule.resolve("ws/package.json")), "index.js"));
 const logger = createOpenBotLogger("team-webrtc-host-peer");
 const MAXIMUM_BUFFERED_EVENTS = 2_000;
+const MAXIMUM_PENDING_SYNC_CONTROLS = 256;
 const MAXIMUM_BUFFERED_EVENT_CHARACTERS = 32 * 1024 * 1024;
 const MAXIMUM_KEPT_RESPONSES = 1_000;
 const MAXIMUM_KEPT_RESPONSE_CHARACTERS = 4 * 1024 * 1024;
@@ -224,6 +226,7 @@ export class TeamWebRtcHostPeer {
   #nextEventSequence = 1;
   #eventsSentThrough = 0;
   #eventResetPending = false;
+  #pendingSyncControls: string[] = [];
   #eventSender: string | null = null;
   readonly #desktopSockets = new Map<string, Ws.WebSocket>();
   #sessionExpirationTimer: ReturnType<typeof setTimeout> | null = null;
@@ -377,6 +380,7 @@ export class TeamWebRtcHostPeer {
     this.#nextEventSequence = 1;
     this.#eventsSentThrough = 0;
     this.#eventResetPending = false;
+    this.#pendingSyncControls = [];
     const expiresAt = connection.sessionExpiresAt * 1_000;
     if (expiresAt <= Date.now()) return;
     const session = yield* remoteDecode(() => this.#store.openRemoteSession({ ...connection, expiresAt }));
@@ -913,15 +917,21 @@ export class TeamWebRtcHostPeer {
     socket.once("open", () => {
       this.#eventsReconnectAttempts = 0;
       this.#sendAgentEventScope();
+      const pending = this.#pendingSyncControls;
+      this.#pendingSyncControls = [];
+      for (const control of pending) socket.send(control);
     });
     socket.on("message", (data, binary) => {
       if (binary || !this.#peerId) return;
       let frame: string;
       try {
         const event = JSON.parse(data.toString());
-        const channel = optionalTeamEvent(event, {
-          agentTaskUiBlocks: this.#peerCapabilities.has(AGENT_TASK_UI_BLOCKS_CAPABILITY),
-        });
+        const sync = decodeSyncServerMessage(event);
+        const channel =
+          sync ??
+          optionalTeamEvent(event, {
+            agentTaskUiBlocks: this.#peerCapabilities.has(AGENT_TASK_UI_BLOCKS_CAPABILITY),
+          });
         frame = encodeTeamProtocolV2Frame(
           channel
             ? decodeTeamProtocolV2EventFrame({
@@ -992,6 +1002,8 @@ export class TeamWebRtcHostPeer {
     socket.once("close", () => {
       if (this.#eventsSocket !== socket) return;
       this.#eventsSocket = null;
+      this.#pendingSyncControls = [];
+      this.#eventResetPending = true;
       this.#scheduleLocalEventsReconnect();
     });
   }
@@ -1025,13 +1037,18 @@ export class TeamWebRtcHostPeer {
     const frame = yield* remoteDecode(() => decodeTeamProtocolV2EventFrame(data));
     if (!this.#eventsSocket && this.#localSessionToken) this.#connectLocalEvents(this.#localSessionToken);
     if (frame.type === "event-control") {
-      if (this.#eventsSocket?.readyState === webSockets.WebSocket.OPEN) {
-        this.#eventsSocket.send(
-          frame.control.type === WORKFLOW_SPOT_CONTROL
-            ? JSON.stringify(frame.control)
-            : encodeTeamProtocolV1ClientEvent(frame.control),
-        );
+      const control = frame.control;
+      const socket = this.#eventsSocket?.readyState === webSockets.WebSocket.OPEN ? this.#eventsSocket : null;
+      if (isSyncClientMessage(control)) {
+        if (socket) socket.send(JSON.stringify(control));
+        else if (this.#pendingSyncControls.length < MAXIMUM_PENDING_SYNC_CONTROLS)
+          this.#pendingSyncControls.push(JSON.stringify(control));
+        else return yield* new RemoteWorkflowError({ cause: new Error("Too many sync controls are waiting.") });
+        return;
       }
+      socket?.send(
+        control.type === WORKFLOW_SPOT_CONTROL ? JSON.stringify(control) : encodeTeamProtocolV1ClientEvent(control),
+      );
       return;
     }
     if (frame.type !== "event-ack")

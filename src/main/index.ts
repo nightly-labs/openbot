@@ -550,6 +550,7 @@ const {
   forwardRemoteDesktopSessions,
   forwardServers,
   forwardTeamPresence,
+  forwardSyncChanged,
   forwardDirectMessage,
   forwardDirectTyping,
   forwardAttachmentDownload,
@@ -1692,6 +1693,7 @@ if (!hasSingleInstanceLock) {
       });
       remoteServers.on("receivedRuntimeSnapshot", withdrawSettledNotifications);
       remoteServers.on("presence", forwardTeamPresence);
+      remoteServers.on("syncChanged", forwardSyncChanged);
       remoteServers.on("directMessage", forwardDirectMessage);
       remoteServers.on("directTyping", forwardDirectTyping);
       remoteServers.on("attachmentDownload", forwardAttachmentDownload);

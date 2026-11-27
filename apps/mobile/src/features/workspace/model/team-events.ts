@@ -76,7 +76,6 @@ export function syncEventQueries(
   if (
     event.type === "routines-changed" ||
     event.type === "channel-routines-changed" ||
-    event.type === "agents-changed" ||
     (event.type === "turn-completed" && event.origin === "routine")
   ) {
     void queryClient.invalidateQueries({ queryKey: queryKeys.serverRoutines(scope, serverId) });
@@ -153,12 +152,16 @@ export function syncEventQueries(
     void queryClient.invalidateQueries({ queryKey: queryKeys.workflowList(scope, serverId) });
     void queryClient.invalidateQueries({ queryKey: queryKeys.workflow(scope, serverId, event.workflowId) });
   }
-  if (event.type === "agents-changed") {
-    void queryClient.invalidateQueries({ queryKey: queryKeys.serverWorkflows(scope, serverId) });
-    void queryClient.invalidateQueries({ queryKey: queryKeys.serverRoles(scope, serverId) });
-    void queryClient.invalidateQueries({
-      queryKey: queryKeys.agentInfo(scope, serverId),
-      predicate: (query) => AGENT_SETTINGS_PARTS.includes(String(query.queryKey.at(-1))),
-    });
-  }
+  if (event.type === "agents-changed") invalidateAgentsChangedQueries(queryClient, scope, serverId);
+}
+
+export function invalidateAgentsChangedQueries(queryClient: QueryClient, scope: QueryScope, serverId: string): void {
+  void queryClient.invalidateQueries({ queryKey: queryKeys.serverRoutines(scope, serverId) });
+  void queryClient.invalidateQueries({ queryKey: queryKeys.routineWebhooks(serverId) });
+  void queryClient.invalidateQueries({ queryKey: queryKeys.serverWorkflows(scope, serverId) });
+  void queryClient.invalidateQueries({ queryKey: queryKeys.serverRoles(scope, serverId) });
+  void queryClient.invalidateQueries({
+    queryKey: queryKeys.agentInfo(scope, serverId),
+    predicate: (query) => AGENT_SETTINGS_PARTS.includes(String(query.queryKey.at(-1))),
+  });
 }

@@ -153,6 +153,7 @@ describe("CRM migration", () => {
         ...before,
         ...CRM_TABLES_AFTER_MIGRATION,
         ...THREAD_EVENT_COMPACTION_TABLES_AFTER_MIGRATION,
+        sync_message_changes: [],
       });
       expectHealthy(db);
     },
@@ -175,6 +176,7 @@ describe("CRM migration", () => {
       ...before,
       ...CRM_TABLES_AFTER_MIGRATION,
       ...THREAD_EVENT_COMPACTION_TABLES_AFTER_MIGRATION,
+      sync_message_changes: [],
     });
     expectHealthy(db);
   });

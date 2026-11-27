@@ -9,6 +9,7 @@ import {
   type WorkflowFileMediaKind,
   type WorkflowFileSaveResult,
   type WorkflowFolderAction,
+  type WorkflowSummary,
 } from "@openbot/contracts/ipc";
 import { AGENT_ACCESS_CAPABILITY } from "@openbot/contracts/team-protocol/agent-access-v1";
 import { ATTACHMENT_PREVIEW_CAPABILITY } from "@openbot/contracts/team-protocol/attachment-preview-v1";
@@ -145,6 +146,7 @@ export interface WebWorkflowHostOptions {
   previewMedia: AttachmentMediaSource | undefined;
   download: (attachmentId: string) => Promise<{ base64: string }>;
   saveFile: (file: { name: string; blob: Blob }) => void;
+  syncedList?: () => Promise<WorkflowSummary[] | null>;
 }
 
 const MEDIA_SUMMARY_FILES: Record<WorkflowFileMediaKind, { name: string; mimeType: string }> = {
@@ -283,7 +285,7 @@ export function webWorkflowHost(options: WebWorkflowHostOptions): WorkflowHost {
 
   return {
     workflows: {
-      list: () => post(WORKFLOWS_ROUTES.list, decodeRemoteWorkflowList, {}),
+      list: async () => (await options.syncedList?.()) ?? post(WORKFLOWS_ROUTES.list, decodeRemoteWorkflowList, {}),
       get: (workflowId) => post(WORKFLOWS_ROUTES.get, decodeRemoteWorkflowDetail, { workflowId }),
       create: ({ paused, ...input }) =>
         post(WORKFLOWS_ROUTES.create, decodeRemoteWorkflowDetail, {

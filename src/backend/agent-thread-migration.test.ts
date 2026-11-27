@@ -121,6 +121,7 @@ function withoutTasks(rows: Record<string, unknown[]>): Record<string, unknown[]
     projection_messaging_pings: _pings,
     projection_pinned_thread_messages: _pins,
     projection_messaging_history: _history,
+    sync_message_changes: _syncChanges,
     ...kept
   } = rows;
   return Object.fromEntries(Object.entries(kept).filter(([table]) => !table.startsWith("crm_")));

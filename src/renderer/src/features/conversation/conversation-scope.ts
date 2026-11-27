@@ -1384,8 +1384,16 @@ export function createConversationViewScope(props: ConversationProps) {
     setComposerError: setScopedComposerError,
     setComposerFocusRequest,
   });
-  const { replyToMessage, addPageText, setPageContext, reactToMessage, copyMessage, messageText, removeAttachment } =
-    messageActions;
+  const {
+    replyToMessage,
+    addPageText,
+    setPageContext,
+    reactToMessage,
+    withPendingReaction,
+    copyMessage,
+    messageText,
+    removeAttachment,
+  } = messageActions;
   const settings = createSettingsStore({
     props,
     runtimeSettingsAttempts: resources.runtimeSettingsAttempts,
@@ -2911,6 +2919,7 @@ export function createConversationViewScope(props: ConversationProps) {
     queueOpen,
     renderedQueueDeliveries,
     reactToMessage,
+    withPendingReaction,
     navigateBrowserTab,
     reloadBrowserTab,
     stopBrowserTab,

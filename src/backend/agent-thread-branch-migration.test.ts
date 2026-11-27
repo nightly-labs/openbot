@@ -66,6 +66,7 @@ function withBranchLink(
     ...CRM_TABLES_AFTER_MIGRATION,
     ...THREAD_EVENT_COMPACTION_TABLES_AFTER_MIGRATION,
     projection_pinned_thread_messages: [],
+    sync_message_changes: [],
     projection_agent_threads: (before.projection_agent_threads ?? []).map((row) => ({
       ...row,
       branch_source_thread_id: null,

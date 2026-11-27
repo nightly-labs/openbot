@@ -252,6 +252,7 @@ import {
 import { decodeConversationReadState } from "../remote-conversation-decoding";
 import { acceptEmpty, decodeVoid, type ResponseDecoder } from "../remote-host-decoding";
 import type { RemoteServerManager } from "../remote-server-manager";
+import { syncedOrRequest } from "../remote-server-sync";
 import { OWNER_PIN_KEY, type SidebarPinStore } from "../sidebar-pin-store";
 import type { SkillMarketplaceService } from "../skill-marketplace-service";
 import {
@@ -619,6 +620,8 @@ export function agentIpcHandlers({
         local: () => service.listHiddenAgents(),
         remote: (serverId) => {
           if (!remoteServers.supportsCapability(serverId, AGENT_HIDDEN_CAPABILITY)) return { agents: [] };
+          const synced = remoteServers.sync.hiddenAgents.value(serverId);
+          if (synced) return synced;
           return runCauseEffect(
             remoteServers.request(serverId, AGENT_HIDDEN_ROUTES.read, decodeHiddenAgentsFromHost, {
               method: "POST",
@@ -654,7 +657,9 @@ export function agentIpcHandlers({
           runCauseEffect(
             Effect.all(
               [
-                remoteServers.request(serverId, TEAM_API_ROUTES.agents.all, decodeAgentSummaries),
+                syncedOrRequest(remoteServers.sync.agents.values(serverId), () =>
+                  remoteServers.request(serverId, TEAM_API_ROUTES.agents.all, decodeAgentSummaries),
+                ),
                 remoteServers.readAgentColors(serverId).pipe(Effect.catch(() => Effect.void)),
                 remoteServers.readChatColors(serverId).pipe(Effect.catch(() => Effect.void)),
               ],
@@ -677,13 +682,23 @@ export function agentIpcHandlers({
       listChannels: scopedQueryHandler({
         local: () => service.channels.store.list(host.channelActor().id, true),
         remote: (serverId) =>
+          remoteServers.sync.channels.values(serverId) ??
           runCauseEffect(remoteServers.request(serverId, CHANNEL_ROUTES.list, decodeChannelSummaries)),
       }),
       readChannel: scopedHandler(parseChannelRead, {
         local: (input) => service.channels.page(input.channelId, input.beforeSequence),
         remote: (input, serverId) =>
           runCauseEffect(
-            remoteServers.request(serverId, CHANNEL_ROUTES.read, decodeChannelPage, { method: "POST", body: input }),
+            syncedOrRequest(
+              input.beforeSequence === undefined
+                ? remoteServers.sync.channelPages.latest(serverId, input.channelId)
+                : null,
+              () =>
+                remoteServers.request(serverId, CHANNEL_ROUTES.read, decodeChannelPage, {
+                  method: "POST",
+                  body: input,
+                }),
+            ),
           ),
       }),
       channelCommand: scopedHandler(parseChannelCommand, {
@@ -769,11 +784,12 @@ export function agentIpcHandlers({
       getSidebarLayout: scopedQueryHandler({
         local: () => sidebarLayout.getSnapshot(),
         remote: (serverId) =>
-          remoteServers.supportsCapability(serverId, SIDEBAR_FOLDERS_CAPABILITY)
+          remoteServers.sync.sidebarLayout.value(serverId) ??
+          (remoteServers.supportsCapability(serverId, SIDEBAR_FOLDERS_CAPABILITY)
             ? remoteFolderLayout(serverId, {})
             : runCauseEffect(
                 remoteServers.request(serverId, TEAM_API_ROUTES.sidebarLayout.state, decodeSidebarLayoutSnapshot),
-              ),
+              )),
       }),
       mutateSidebarLayout: scopedHandler(parseSidebarFolderAction, {
         local: (action) => runCauseEffect(sidebarLayout.mutate(action, service.sidebarChatIds())),
@@ -795,6 +811,8 @@ export function agentIpcHandlers({
         remote: (serverId) => {
           if (!remoteServers.supportsCapability(serverId, SIDEBAR_PINS_CAPABILITY))
             throw new Error(sourceText("error.team.sidebarPinsUnsupported"));
+          const synced = remoteServers.sync.sidebarPins.value(serverId);
+          if (synced) return synced;
           return runCauseEffect(
             remoteServers.request(serverId, SIDEBAR_PINS_ROUTES.read, decodeSidebarPinsFromHost, {
               method: "POST",
@@ -1074,7 +1092,12 @@ export function agentIpcHandlers({
         local: (parsed) => runCauseEffect(host.readAgentConversationPage(parsed.agentId, parsed.anchor, parsed.limit)),
         remote: (parsed, serverId) =>
           runCauseEffect(
-            remoteServers.readAgentConversationPage(parsed.agentId, parsed.anchor, parsed.limit, serverId),
+            syncedOrRequest(
+              parsed.anchor === undefined || parsed.anchor.type === "latest"
+                ? remoteServers.sync.latestConversationPage(serverId, parsed.agentId, parsed.limit)
+                : null,
+              () => remoteServers.readAgentConversationPage(parsed.agentId, parsed.anchor, parsed.limit, serverId),
+            ),
           ),
       }),
       openMessageLink: scopedHandler(parseOpenMessageLink, {
@@ -1239,6 +1262,7 @@ export function agentIpcHandlers({
       listQueue: scopedHandler(parseAgentId, {
         local: (agentId) => service.listQueue(agentId),
         remote: (agentId, serverId) =>
+          remoteServers.sync.queues.value(serverId, agentId) ??
           runCauseEffect(remoteServers.request(serverId, TEAM_API_ROUTES.agent.queue(agentId), decodeQueueSnapshot)),
       }),
       listActiveQueues: scopedHandler(parseAgentIdList, {
