@@ -40,6 +40,7 @@ import {
 import {
   decodeSyncServerMessage,
   SYNC_CAPABILITY,
+  SYNC_LIMITS,
   type SyncLogRow,
   type SyncServerMessage,
   syncName,
@@ -540,6 +541,7 @@ try {
   const hiddenAgent = await createAgent("Hidden");
   const spareAgent = await createAgent("Spare");
   const bulkAgent = await createAgent("Bulk");
+  const queueAgent = await createAgent("Queue");
   const service = new AgentService({ store: agentStore, mailbox, browser: agentBrowser, sidebarLayout: sidebar });
   agents = service;
   const createInvite: TeamApiOptions["createInvite"] = (input) =>
@@ -1080,6 +1082,66 @@ try {
       references: Object.keys(older.references),
       olderCount: older.pageInfo.olderCount ?? 0,
     };
+  });
+
+  await step("since: a queue change sends the queued rows again with their new positions", async () => {
+    const queueLog = syncName(AGENT_MESSAGES_SYNC_LOG.name, queueAgent.id);
+    const deliveryIds: string[] = [];
+    for (const body of ["First queued.", "Second queued."]) {
+      const receipt = await runCauseEffect(
+        mailbox.enqueue({ sender: { kind: "user" }, recipientAgentIds: [queueAgent.id], text: body }),
+      );
+      const delivery = receipt.deliveries.find((candidate) => candidate.recipientAgentId === queueAgent.id);
+      assert.ok(delivery, "The queue has no delivery.");
+      deliveryIds.push(delivery.id);
+    }
+    const [first, second] = deliveryIds;
+    assert.ok(first && second);
+    writeAgentMessages(
+      queueAgent.id,
+      deliveryIds.map((id, index) => ({
+        ...message(id, "user", 40 + index, `Queued ${index + 1}.`),
+        delivery: { id, status: "queued" as const, position: null },
+      })),
+    );
+    const position = (view: LogView, key: string) => {
+      const row = view.rows.get(key);
+      return row ? (AGENT_MESSAGES_SYNC_LOG.decode(row.value).delivery?.position ?? null) : undefined;
+    };
+    const socket = await openSync(memberToken);
+    const view = new LogView();
+    view.apply(await subscribeLog(socket, queueLog, 100));
+    const subscribed = [position(view, first), position(view, second)];
+    assert.deepEqual(subscribed, [1, 2], "The subscribe window has no queue positions.");
+    sameAsHttp(AGENT_MESSAGES_SYNC_LOG, view.ordered(), (await agentPage(memberToken, queueAgent.id, 100)).messages);
+    await runCauseEffect(mailbox.markStarting(first));
+    service.emit("event", { type: "queue-changed", snapshot: mailbox.listQueue(queueAgent.id) });
+    const seen = await follow(socket, queueLog, view, () => position(view, second) === 1);
+    const http = (await agentPage(memberToken, queueAgent.id, 100)).messages
+      .map((item) => record(item, "message"))
+      .find((item) => item.id === second);
+    assert.equal(record(http?.delivery, "delivery").position, 1, "HTTP gives another position.");
+    return { subscribed, changed: changedKeys(seen).rows, after: position(view, second) };
+  });
+
+  await step("since: a long non-ASCII message arrives cut to fit one row", async () => {
+    const queueLog = syncName(AGENT_MESSAGES_SYNC_LOG.name, queueAgent.id);
+    const socket = await openSync(memberToken);
+    const view = new LogView();
+    view.apply(await subscribeLog(socket, queueLog, 100));
+    const longText = `Start ${"界".repeat(800_000)} end`;
+    writeAgentMessages(queueAgent.id, [message("long", "assistant", 50, longText)]);
+    await follow(socket, queueLog, view, () => view.rows.has("long"));
+    const row = view.rows.get("long");
+    assert.ok(row, "The long message did not arrive.");
+    const bytes = Buffer.byteLength(JSON.stringify(row.value));
+    const text = entityText(AGENT_MESSAGES_SYNC_LOG, row);
+    assert.ok(bytes <= SYNC_LIMITS.rowBytes, `The row has ${bytes} bytes.`);
+    assert.ok(
+      text.startsWith("Start ") && text.endsWith(" end") && text.length < longText.length,
+      "The text is not cut.",
+    );
+    return { sourceBytes: Buffer.byteLength(longText), rowBytes: bytes };
   });
 
   report.passed = true;

@@ -36,7 +36,7 @@ import {
 import { runCauseEffect } from "../../backend/effect-boundary";
 import type { OpenBotDatabase } from "../../backend/openbot-database";
 import type { TeamApiAgents } from "./dependencies";
-import { markerExclusionsForCapabilities } from "./request-helpers";
+import { markerExclusionsForCapabilities, messageTextCut } from "./request-helpers";
 import { channelReadPage, channelVisible, peerChannel, shownChannelMessage } from "./route-channels";
 import { type TeamSyncViewer, teamSyncViewerKey } from "./sync-collections";
 import type { SyncEntries, SyncHostCollection, SyncHostLog, SyncLogDiff, SyncLogPage, SyncLogWindow } from "./sync-hub";
@@ -44,7 +44,7 @@ import type { SyncEntries, SyncHostCollection, SyncHostLog, SyncLogDiff, SyncLog
 type TeamSyncChannels = Pick<ChannelService, "store" | "taskWaits">;
 
 export interface TeamSyncLogSources {
-  agents(): Pick<TeamApiAgents, "listAgents" | "readConversationPageFor">;
+  agents(): Pick<TeamApiAgents, "listAgents" | "listQueue" | "readConversationPageFor">;
   channels(): TeamSyncChannels | undefined;
   database(): Pick<OpenBotDatabase, "connection"> | undefined;
   response(viewer: TeamSyncViewer, method: string, path: string, value: TeamSyncLogBody): unknown;
@@ -69,6 +69,8 @@ const ORDER_NUMBER_BIAS = 2 ** 52;
 const ORDER_NUMBER_WIDTH = 11;
 const ORDER_TIME_WIDTH = 24;
 const ORDER_GROUP_WIDTH = 40;
+const QUEUE_MARK_WIDTH = 8;
+const ROW_BODY_BUDGET = Math.floor(SYNC_LIMITS.rowBytes * 0.75);
 const THREAD_ORDER_COLUMNS = "group_start, group_first, group_id, turn_rank, created_at, ordinal";
 
 export type TeamSyncLogBody = ConversationPage | ChannelPage;
@@ -182,7 +184,10 @@ function agentMessagesLog(sources: TeamSyncLogSources): SyncHostLog<TeamSyncView
       const page = await readPage(viewer, agentId, { type: "latest" }, limit);
       return {
         ...pageRows(viewer, database.connection, page),
-        cursor: changeCursor(through, cursorTag(viewer, "thread", page.threadId)),
+        cursor: queueCursor(
+          changeCursor(through, cursorTag(viewer, "thread", page.threadId)),
+          queueMark(queuedPositions(sources, agentId)),
+        ),
       };
     },
     async older(viewer, agentId, before, limit): Promise<SyncLogPage | null> {
@@ -197,8 +202,11 @@ function agentMessagesLog(sources: TeamSyncLogSources): SyncHostLog<TeamSyncView
       const skeleton = await readPage(viewer, agentId, { type: "latest" }, 1);
       const tag = cursorTag(viewer, "thread", skeleton.threadId);
       const threadId = skeleton.threadId ?? "";
-      const range = changeRange(database.connection, "thread", threadId, cursor, tag);
+      const sent = cursorQueueMark(cursor);
+      const range = changeRange(database.connection, "thread", threadId, sent.cursor, tag);
       if (range === "reset") return "reset";
+      const positions = queuedPositions(sources, agentId);
+      const mark = queueMark(positions);
       const filter = conversationMarkerSqlFilter(markerExclusionsForCapabilities(viewer.capabilities));
       const changes = databaseRows(
         database.connection
@@ -212,12 +220,22 @@ function agentMessagesLog(sources: TeamSyncLogSources): SyncHostLog<TeamSyncView
           )
           .all(threadId, range.after, range.through),
       );
+      const changedIds = new Set(changes.map((change) => requiredStringColumn(change, "changed_id")));
+      const requeued =
+        sent.mark === mark
+          ? []
+          : queuedRows(
+              database.connection,
+              threadId,
+              [...positions.keys()].filter((id) => !changedIds.has(id)),
+              filter,
+            );
       const messages: ConversationMessage[] = [];
       const orders = new Map<string, ThreadRowOrder>();
-      for (const change of changes) {
+      for (const change of [...changes, ...requeued]) {
         const json = optionalStringColumn(change, "message_json");
         if (json === null) continue;
-        const message = decodeConversationMessageJson(json);
+        const message = withQueuePosition(decodeConversationMessageJson(json), positions);
         messages.push(message);
         orders.set(message.id, threadRowOrder(change));
       }
@@ -239,10 +257,56 @@ function agentMessagesLog(sources: TeamSyncLogSources): SyncHostLog<TeamSyncView
           changes.map((change) => requiredStringColumn(change, "changed_id")),
           rows,
         ),
-        cursor: changeCursor(range.through, tag),
+        cursor: queueCursor(changeCursor(range.through, tag), mark),
       };
     },
   };
+}
+
+function queuedPositions(sources: TeamSyncLogSources, agentId: string): ReadonlyMap<string, number> {
+  const positions = new Map<string, number>();
+  for (const delivery of sources.agents().listQueue(agentId).deliveries)
+    if (delivery.status === "queued" && delivery.position !== null) positions.set(delivery.id, delivery.position);
+  return positions;
+}
+
+function queueMark(positions: ReadonlyMap<string, number>): string {
+  return createHash("sha256")
+    .update([...positions].map(([id, position]) => `${id}:${position}`).join("\n"))
+    .digest("hex")
+    .slice(0, QUEUE_MARK_WIDTH);
+}
+
+function queueCursor(cursor: string, mark: string): string {
+  return `${cursor}.${mark}`;
+}
+
+function cursorQueueMark(cursor: string): { cursor: string; mark: string | null } {
+  const match = new RegExp(`^(.+)\\.([0-9a-f]{${QUEUE_MARK_WIDTH}})$`, "u").exec(cursor);
+  return match?.[1] && match[2] ? { cursor: match[1], mark: match[2] } : { cursor, mark: null };
+}
+
+function withQueuePosition(message: ConversationMessage, positions: ReadonlyMap<string, number>): ConversationMessage {
+  const delivery = message.delivery;
+  const position = delivery?.status === "queued" ? positions.get(delivery.id) : undefined;
+  return delivery && position !== undefined ? { ...message, delivery: { ...delivery, position } } : message;
+}
+
+function queuedRows(
+  connection: DatabaseSync,
+  threadId: string,
+  messageIds: readonly string[],
+  filter: string,
+): DynamicRecord[] {
+  if (messageIds.length === 0) return [];
+  return databaseRows(
+    connection
+      .prepare(
+        `SELECT message_id AS changed_id, message_json, ${THREAD_ORDER_COLUMNS} FROM projection_thread_messages
+         WHERE thread_id = ? AND message_id IN (${messageIds.map(() => "?").join(", ")}) ${filter}`,
+      )
+      .all(threadId, ...messageIds),
+  );
 }
 
 function channelMessagesLog(sources: TeamSyncLogSources): SyncHostLog<TeamSyncViewer> {
@@ -380,13 +444,22 @@ function agentRows(
   page: ConversationPage,
   orders: ReadonlyMap<string, ThreadRowOrder>,
 ): { rows: SyncLogRow[]; references: SyncLogReference[] } {
-  const body = sources.response(viewer, "GET", TEAM_API_ROUTES.agent.conversationPage(page.agentId), page);
+  const body = sources.response(viewer, "GET", TEAM_API_ROUTES.agent.conversationPage(page.agentId), {
+    ...page,
+    messages: page.messages.map(fittedMessage),
+    references: Object.fromEntries(Object.entries(page.references).map(([id, item]) => [id, fittedMessage(item)])),
+  });
   const rows = encodedRows(AGENT_MESSAGES_SYNC_LOG, body, (message) => {
     const order = orders.get(message.id);
     if (!order) throw new Error("Team sync log message has no order.");
     return order.order;
   });
   return { rows, references: encodedReferences(AGENT_MESSAGES_SYNC_LOG, body) };
+}
+
+function fittedMessage(message: ConversationMessage): ConversationMessage {
+  const bytes = Buffer.byteLength(JSON.stringify(message));
+  return bytes <= ROW_BODY_BUDGET ? message : messageTextCut([message], bytes - ROW_BODY_BUDGET)(message);
 }
 
 function encodedReferences<Entity>(spec: SyncLogSpec<Entity>, body: unknown): SyncLogReference[] {
@@ -399,7 +472,10 @@ function encodedReferences<Entity>(spec: SyncLogSpec<Entity>, body: unknown): Sy
 }
 
 function channelRows(sources: TeamSyncLogSources, viewer: TeamSyncViewer, page: ChannelPage): SyncLogRow[] {
-  const body = sources.response(viewer, "POST", CHANNEL_ROUTES.read, page);
+  const body = sources.response(viewer, "POST", CHANNEL_ROUTES.read, {
+    ...page,
+    messages: page.messages.map((item) => ({ ...item, message: fittedMessage(item.message) })),
+  });
   return encodedRows(CHANNEL_MESSAGES_SYNC_LOG, body, (message) => orderNumber(message.sequence));
 }
 

@@ -81,7 +81,7 @@ interface ClientState<Viewer> {
 
 interface ReadRow {
   readonly version: string;
-  readonly json: string;
+  readonly bytes: number;
   readonly value: unknown;
 }
 
@@ -267,20 +267,22 @@ export class SyncHub<Viewer, Client> {
   #subscribe(state: ClientState<Viewer>, message: Extract<SyncClientMessage, { type: "sync-subscribe" }>): void {
     const name = message.collection;
     state.collections.delete(name);
+    const target = parseSyncName(name);
+    const collection = target && this.#collections.get(target.base);
+    if (!target || !collection || Boolean(collection.scoped) !== (target.param !== null)) {
+      state.pendingHave.delete(name);
+      if (!message.more) state.queue.run(() => state.port.send({ type: "sync-unavailable", collection: name }));
+      return;
+    }
     const have = state.pendingHave.get(name) ?? new Map<string, string>();
     for (const [key, version] of message.have) have.set(key, version);
-    if (have.size > SYNC_LIMITS.haveEntries) throw new Error("Sync state is too large.");
+    if (pendingEntries(state.pendingHave, name) + have.size > SYNC_LIMITS.haveEntries)
+      throw new Error("Sync state is too large.");
     if (message.more) {
       state.pendingHave.set(name, have);
       return;
     }
     state.pendingHave.delete(name);
-    const target = parseSyncName(name);
-    const collection = target && this.#collections.get(target.base);
-    if (!target || !collection || Boolean(collection.scoped) !== (target.param !== null)) {
-      state.queue.run(() => state.port.send({ type: "sync-unavailable", collection: name }));
-      return;
-    }
     const subscription: CollectionSubscription = { name, target, versions: null };
     state.collections.set(name, subscription);
     state.queue.run(() =>
@@ -291,7 +293,7 @@ export class SyncHub<Viewer, Client> {
           const upserts: { upsert: SyncUpsert; bytes: number }[] = [];
           for (const [key, row] of view) {
             if (have.get(key) !== row.version)
-              upserts.push({ upsert: { key, version: row.version, value: row.value }, bytes: row.json.length });
+              upserts.push({ upsert: { key, version: row.version, value: row.value }, bytes: row.bytes });
           }
           const deletes = [...have.keys()].filter((key) => !view.has(key));
           subscription.versions = versionsOf(view);
@@ -327,7 +329,7 @@ export class SyncHub<Viewer, Client> {
             }
             if (versions.get(key) === row.version) continue;
             versions.set(key, row.version);
-            upserts.push({ upsert: { key, version: row.version, value: row.value }, bytes: row.json.length });
+            upserts.push({ upsert: { key, version: row.version, value: row.value }, bytes: row.bytes });
           }
           if (versions.size > SYNC_LIMITS.haveEntries) throw new Error("Sync collection is too large.");
           if (upserts.length || deletes.length)
@@ -341,7 +343,7 @@ export class SyncHub<Viewer, Client> {
         const upserts: { upsert: SyncUpsert; bytes: number }[] = [];
         for (const [key, row] of view) {
           if (versions.get(key) !== row.version)
-            upserts.push({ upsert: { key, version: row.version, value: row.value }, bytes: row.json.length });
+            upserts.push({ upsert: { key, version: row.version, value: row.value }, bytes: row.bytes });
         }
         const deletes = [...versions.keys()].filter((key) => !view.has(key));
         subscription.versions = versionsOf(view);
@@ -544,6 +546,12 @@ function dirtyKeys(
   return new Set([...(exact ?? []), ...(base ?? [])]);
 }
 
+function pendingEntries(pending: ReadonlyMap<string, ReadonlyMap<string, string>>, except: string): number {
+  let entries = 0;
+  for (const [name, have] of pending) if (name !== except) entries += have.size;
+  return entries;
+}
+
 function versionsOf(view: ReadView): Map<string, string> {
   return new Map([...view].map(([key, row]) => [key, row.version]));
 }
@@ -553,8 +561,9 @@ function readRows(entries: Iterable<readonly [string, unknown]>, full: boolean):
   for (const [key, value] of entries) {
     if (!isSyncKey(key) || view.has(key)) throw new Error("Invalid sync key.");
     const json = JSON.stringify(value);
-    if (json.length > SYNC_LIMITS.rowBytes) throw new Error("Sync entity is too large.");
-    view.set(key, { version: syncVersion(json), json, value });
+    const bytes = Buffer.byteLength(json);
+    if (bytes > SYNC_LIMITS.rowBytes) throw new Error("Sync entity is too large.");
+    view.set(key, { version: syncVersion(json), bytes, value });
   }
   if (full && view.size > SYNC_LIMITS.haveEntries) throw new Error("Sync collection is too large.");
   return view;
@@ -613,7 +622,7 @@ function collectionChunks(
 type LogItem = { row: SyncLogRow; bytes: number } | { reference: SyncLogReference; bytes: number } | { delete: string };
 
 function logValueBytes(key: string, value: unknown): number {
-  const bytes = JSON.stringify(value).length;
+  const bytes = Buffer.byteLength(JSON.stringify(value));
   if (!isSyncKey(key) || bytes > SYNC_LIMITS.rowBytes) throw new Error("Invalid sync log row.");
   return bytes;
 }
