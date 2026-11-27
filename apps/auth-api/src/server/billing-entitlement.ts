@@ -30,34 +30,33 @@ export function subscriptionPaysForOwnerSql(subscription: string, owner: string)
       AND paid_transfer.status = 'accepted'))`;
 }
 
-export const getServerEntitlement = Effect.fn("Billing.getServerEntitlement")(function* (
-  database: D1Database,
-  serverId: string,
-  now = Date.now(),
-): Effect.fn.Return<BillingEntitlement | null, BillingEntitlementError> {
-  const rows = yield* Effect.tryPromise({
-    try: () =>
-      database
-        .prepare(
-          `SELECT s.plan, s.status, s.current_period_end, hs.legacy_member_limits, hs.server_id IS NOT NULL AS hosted
+export interface ServerEntitlementRow {
+  plan: string;
+  status: BillingSubscriptionStatus;
+  current_period_end: number | null;
+  legacy_member_limits: number | null;
+  hosted: number;
+}
+
+export function serverEntitlementStatement(database: D1Database, serverId: string): D1PreparedStatement {
+  return database
+    .prepare(
+      `SELECT s.plan, s.status, s.current_period_end, hs.legacy_member_limits, hs.server_id IS NOT NULL AS hosted
          FROM billing_subscriptions s
        LEFT JOIN remote_hosts h ON h.host_id = s.server_id AND ${subscriptionPaysForOwnerSql("s", "h.owner_user_id")}
        LEFT JOIN hosted_servers hs ON hs.server_id = s.server_id AND hs.owner_user_id = s.user_id
        WHERE s.server_id = ? AND s.status IN ${ENTITLED_STATUSES_SQL}
          AND (h.host_id IS NOT NULL OR hs.server_id IS NOT NULL)
        ORDER BY s.updated_at DESC`,
-        )
-        .bind(serverId)
-        .all<{
-          plan: string;
-          status: BillingSubscriptionStatus;
-          current_period_end: number | null;
-          legacy_member_limits: number | null;
-          hosted: number;
-        }>(),
-    catch: () => new BillingEntitlementError({}),
-  });
-  for (const row of rows.results) {
+    )
+    .bind(serverId);
+}
+
+export function serverEntitlementFromRows(
+  rows: readonly ServerEntitlementRow[],
+  now: number,
+): BillingEntitlement | null {
+  for (const row of rows) {
     const plan = BILLING_PLANS.find((candidate) => candidate.id === row.plan);
     if (!plan) continue;
     if (!entitled(row, now)) continue;
@@ -71,6 +70,18 @@ export const getServerEntitlement = Effect.fn("Billing.getServerEntitlement")(fu
     };
   }
   return null;
+}
+
+export const getServerEntitlement = Effect.fn("Billing.getServerEntitlement")(function* (
+  database: D1Database,
+  serverId: string,
+  now = Date.now(),
+): Effect.fn.Return<BillingEntitlement | null, BillingEntitlementError> {
+  const rows = yield* Effect.tryPromise({
+    try: () => serverEntitlementStatement(database, serverId).all<ServerEntitlementRow>(),
+    catch: () => new BillingEntitlementError({}),
+  });
+  return serverEntitlementFromRows(rows.results, now);
 });
 
 export const accountHasServerPlan = Effect.fn("Billing.accountHasServerPlan")(function* (
@@ -99,26 +110,39 @@ export interface OwnerLicense {
   entitled: boolean;
 }
 
+export interface OwnerLicenseRow {
+  owner_id: string;
+  users: number;
+  status: string;
+  current_period_end: number | null;
+}
+
+export function ownerLicenseStatement(database: D1Database, hostId: string): D1PreparedStatement {
+  return database
+    .prepare(
+      `SELECT l.user_id AS owner_id, l.users, l.status, l.current_period_end FROM remote_hosts h
+             JOIN licenses l ON l.user_id = h.owner_user_id AND l.status IN ${OPEN_STATUSES_SQL}
+            WHERE h.host_id = ? ORDER BY l.updated_at DESC`,
+    )
+    .bind(hostId);
+}
+
+export function ownerLicenseFromRows(rows: readonly OwnerLicenseRow[], now: number): OwnerLicense | null {
+  const row = rows.find((license) => licenseEntitled(license, now)) ?? rows[0];
+  if (!row) return null;
+  return { ownerId: row.owner_id, users: row.users, entitled: licenseEntitled(row, now) };
+}
+
 export const ownerLicenseForHost = Effect.fn("Billing.ownerLicenseForHost")(function* (
   database: D1Database,
   hostId: string,
   now = Date.now(),
 ): Effect.fn.Return<OwnerLicense | null, BillingEntitlementError> {
   const rows = yield* Effect.tryPromise({
-    try: () =>
-      database
-        .prepare(
-          `SELECT l.user_id AS owner_id, l.users, l.status, l.current_period_end FROM remote_hosts h
-             JOIN licenses l ON l.user_id = h.owner_user_id AND l.status IN ${OPEN_STATUSES_SQL}
-            WHERE h.host_id = ? ORDER BY l.updated_at DESC`,
-        )
-        .bind(hostId)
-        .all<{ owner_id: string; users: number; status: string; current_period_end: number | null }>(),
+    try: () => ownerLicenseStatement(database, hostId).all<OwnerLicenseRow>(),
     catch: () => new BillingEntitlementError({}),
   });
-  const row = rows.results.find((license) => licenseEntitled(license, now)) ?? rows.results[0];
-  if (!row) return null;
-  return { ownerId: row.owner_id, users: row.users, entitled: licenseEntitled(row, now) };
+  return ownerLicenseFromRows(rows.results, now);
 });
 
 export const accountLicense = Effect.fn("Billing.accountLicense")(function* (

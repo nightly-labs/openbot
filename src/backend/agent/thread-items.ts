@@ -187,7 +187,9 @@ function isFailedOpenCodeCompaction(provider: AgentProvider, message: string): b
 function isUnsendableOpenCodeMedia(provider: AgentProvider, message: string): boolean {
   return (
     provider === "opencode" &&
-    /\bMedia strings must be base64\b|\bLocal file references must be read with Media\.file\b/i.test(message)
+    /\bMedia strings must be base64\b|\bLocal file references must be read with Media\.file\b|\bImage could not be decoded\b/i.test(
+      message,
+    )
   );
 }
 

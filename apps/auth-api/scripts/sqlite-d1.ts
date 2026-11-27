@@ -53,26 +53,28 @@ export function sqliteD1(database: DatabaseSync): D1Database {
   const unused = () => {
     throw new Error("Unused");
   };
-  return {
-    prepare: (query: string) => statement(query),
-    batch: async <T>(statements: D1PreparedStatement[]) => {
-      database.exec("BEGIN");
-      try {
-        const results: D1Result<T>[] = [];
-        for (const prepared of statements) {
-          const entry = queries.get(prepared);
-          if (!entry) throw new Error("A batch statement is not from this database.");
-          results.push(allNow<T>(entry.query, entry.values));
-        }
-        database.exec("COMMIT");
-        return results;
-      } catch (error) {
-        database.exec("ROLLBACK");
-        throw error;
+  const batch = async <T>(statements: D1PreparedStatement[]) => {
+    database.exec("BEGIN");
+    try {
+      const results: D1Result<T>[] = [];
+      for (const prepared of statements) {
+        const entry = queries.get(prepared);
+        if (!entry) throw new Error("A batch statement is not from this database.");
+        results.push(allNow<T>(entry.query, entry.values));
       }
-    },
+      database.exec("COMMIT");
+      return results;
+    } catch (error) {
+      database.exec("ROLLBACK");
+      throw error;
+    }
+  };
+  const prepare = (query: string) => statement(query);
+  return {
+    prepare,
+    batch,
     exec: unused,
-    withSession: unused,
+    withSession: () => ({ prepare, batch, getBookmark: () => null }),
     dump: unused,
   };
 }

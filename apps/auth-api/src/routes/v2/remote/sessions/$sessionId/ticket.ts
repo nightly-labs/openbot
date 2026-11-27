@@ -17,7 +17,7 @@ export const Route = createFileRoute("/v2/remote/sessions/$sessionId/ticket")({
       POST: ({ request, params }) =>
         runApiResponse(
           Effect.gen(function* () {
-            const user = yield* requestUser(request);
+            const user = yield* requestUser(request, "replica");
             if (!user) return apiError(401, "unauthorized", "Sign in is required.");
             const body = yield* readJsonObject(request);
             if (!isString(body.clientPublicKey)) {

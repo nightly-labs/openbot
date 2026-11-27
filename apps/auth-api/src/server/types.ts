@@ -30,6 +30,8 @@ export interface WorkerBindings {
   EMAIL_SMTP_OVERFLOW_PASSWORD?: string;
   EMAIL_SMTP_OVERFLOW_2_USERNAME?: string;
   EMAIL_SMTP_OVERFLOW_2_PASSWORD?: string;
+  EMAIL_SMTP_OVERFLOW_3_USERNAME?: string;
+  EMAIL_SMTP_OVERFLOW_3_PASSWORD?: string;
   EMAIL_FROM?: string;
   EMAIL_REPLY_TO?: string;
   EMAIL_LICENSE_FROM?: string;
@@ -243,6 +245,8 @@ export interface EmailChallengeRecord {
   deliveryState: EmailChallengeDeliveryState;
 }
 
+export type SessionReads = "replica" | "primary";
+
 export interface AuthRepository {
   listAccountSessions(
     userId: string,
@@ -278,7 +282,7 @@ export interface AuthRepository {
     windowStart: number,
     limit: number,
   ): Effect.Effect<{ allowed: boolean; count: number; windowStart: number }, AuthStoreError>;
-  authenticate(sessionToken: string, now: number): Effect.Effect<AuthUser | null, AuthStoreError>;
+  authenticate(sessionToken: string, now: number, reads?: SessionReads): Effect.Effect<AuthUser | null, AuthStoreError>;
   authenticateDesktopSession(sessionToken: string, now: number): Effect.Effect<AuthUser | null, AuthStoreError>;
   revokeSession(sessionToken: string, now: number): Effect.Effect<void, AuthStoreError>;
   revokeMobileSession(sessionToken: string, now: number): Effect.Effect<boolean, AuthStoreError>;

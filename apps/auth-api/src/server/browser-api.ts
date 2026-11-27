@@ -23,7 +23,13 @@ import { type DynamicRecord, isBoolean, isNumber, isString } from "@openbot/cont
 import { sourceText } from "@openbot/i18n/source";
 import { Cause, Effect } from "effect";
 import { type AccountAttribution, requestFirstTouch } from "./account-attribution";
-import { type AuthService, AuthServiceError, readAnalyticsAnswer, readChatColor } from "./auth-service";
+import {
+  type AuthService,
+  AuthServiceError,
+  readAnalyticsAnswer,
+  readChatColor,
+  sessionReadsFor,
+} from "./auth-service";
 import { AvatarUploadError, readAvatarUpload, removeAccountAvatar, storeAccountAvatar } from "./avatar-storage";
 import { BILLING_UNAVAILABLE_STATE, BillingError, type BillingService } from "./billing-service";
 import { withSuggestedCountry } from "./billing-tax";
@@ -311,7 +317,9 @@ const handleBrowserOperation = Effect.fn("BrowserApi.handleOperation")(function*
     return json({ accepted: true });
   }
   const token = browserSessionToken(request);
-  const user = token ? yield* services.auth.authenticate(token) : null;
+  const user = token
+    ? yield* services.auth.authenticate(token, path === "session" ? "primary" : sessionReadsFor(request))
+    : null;
   if (path === "logout" && request.method === "POST") {
     if (token && user) yield* services.remote.endAccountSession(user.id, yield* sha256(token));
     const response = json({ signedOut: true });
