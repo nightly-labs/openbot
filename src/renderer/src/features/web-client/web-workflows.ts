@@ -36,6 +36,10 @@ import {
   WORKFLOWS_CREDIT_MEDIA_ROUTES,
 } from "@openbot/contracts/team-protocol/workflows-credit-media-v1";
 import {
+  WORKFLOWS_GITHUB_RELAY_CAPABILITY,
+  WORKFLOWS_GITHUB_RELAY_ROUTES,
+} from "@openbot/contracts/team-protocol/workflows-github-relay-v1";
+import {
   WORKFLOWS_GITHUB_CAPABILITY,
   WORKFLOWS_GITHUB_ROUTES,
 } from "@openbot/contracts/team-protocol/workflows-github-v1";
@@ -104,6 +108,7 @@ import {
   decodeRemoteWorkflowGitHubCatalog,
   decodeRemoteWorkflowGitHubHistory,
   decodeRemoteWorkflowGitHubOptions,
+  decodeRemoteWorkflowGitHubRelay,
   decodeRemoteWorkflowList,
   decodeRemoteWorkflowMediaCatalog,
   decodeRemoteWorkflowMediaCredits,
@@ -120,6 +125,7 @@ import {
   decodeRemoteWorkflowSummary,
   decodeRemoteWorkflowVersionGraph,
   decodeRemoteWorkflowVersions,
+  withGitHubRelay,
   workflowMediaCreditsOf,
   workflowMediaProvidersOf,
 } from "@openbot/team-client/workflow-decoding";
@@ -307,7 +313,13 @@ export function webWorkflowHost(options: WebWorkflowHostOptions): WorkflowHost {
         return post(WORKFLOWS_STEP_SETTINGS_ROUTES.read, decodeRemoteWorkflowStepSettings, { stepId });
       },
       rotateWebhookSecret: (input) => post(WORKFLOWS_ROUTES.rotateWebhookSecret, decodeRemoteWorkflowSecret, input),
-      githubCatalog: () => postGitHub(WORKFLOWS_GITHUB_ROUTES.catalog, decodeRemoteWorkflowGitHubCatalog, {}),
+      githubCatalog: () =>
+        withGitHubRelay(
+          postGitHub(WORKFLOWS_GITHUB_ROUTES.catalog, decodeRemoteWorkflowGitHubCatalog, {}),
+          has(WORKFLOWS_GITHUB_RELAY_CAPABILITY)
+            ? postGitHub(WORKFLOWS_GITHUB_RELAY_ROUTES.status, decodeRemoteWorkflowGitHubRelay, {})
+            : null,
+        ),
       githubOptions: (input) => postGitHub(WORKFLOWS_GITHUB_ROUTES.options, decodeRemoteWorkflowGitHubOptions, input),
       githubHistory: (workflowId) =>
         postGitHub(WORKFLOWS_GITHUB_ROUTES.history, decodeRemoteWorkflowGitHubHistory, { workflowId }),

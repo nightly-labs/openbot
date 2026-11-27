@@ -430,6 +430,8 @@ export const messages = {
   "workflow.github.alert.missing": "OpenBot не видит {repository} на GitHub.",
   "workflow.github.alert.readOnly": "OpenBot не может изменять задачи и пул-реквесты в {repository}.",
   "workflow.github.alert.eventsOff": "GitHub пока не присылает события из {repository}.",
+  "workflow.github.alert.relayWaiting": "События из {repository} сейчас не доходят до OpenBot. OpenBot пробует снова.",
+  "workflow.github.alert.relayUnrouted": "OpenBot пока не получает события из {repository}. OpenBot пробует снова.",
   "workflow.github.alert.noEvent": "Триггер не является событием GitHub. Выберите репозиторий и берите номер из входа.",
   "workflow.github.alert.pullRequestOnly":
     "«{action}» работает только с пул-реквестами. Триггер запускается на задачах.",

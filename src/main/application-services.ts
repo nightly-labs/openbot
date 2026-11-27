@@ -2482,7 +2482,11 @@ export async function createApplicationServices({
     tokens: (repository) => githubConnector.repositoryTokens(repository),
     download: (url, maxBytes) => downloadDiscordAttachment(url, maxBytes),
   });
-  const workflowGitHub = workflowGitHubDirectory(() => githubConnector.workflowCatalog(), githubRest);
+  const workflowGitHub = workflowGitHubDirectory(
+    () => githubConnector.workflowCatalog(),
+    githubRest,
+    (visible) => githubRelay.status(visible),
+  );
   const workflowNotices = new EventEmitter<{ notice: [WorkflowNotice] }>();
   const workflowRuntime = await Effect.runPromise(
     createWorkflows({

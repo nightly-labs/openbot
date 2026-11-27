@@ -321,6 +321,8 @@ export const messages = {
   "mobile.workflow.github.alert.missing": "OpenBot לא רואה את {repository} ב-GitHub.",
   "mobile.workflow.github.alert.readOnly": "OpenBot לא יכול לשנות בעיות ו-pull requests ב-{repository}.",
   "mobile.workflow.github.alert.eventsOff": "GitHub עדיין לא שולח אירועים מ-{repository}.",
+  "mobile.workflow.github.alert.relayWaiting": "האירועים מ-{repository} לא מגיעים ל-OpenBot כרגע. OpenBot מנסה שוב.",
+  "mobile.workflow.github.alert.relayUnrouted": "OpenBot עדיין לא מקבל אירועים מ-{repository}. OpenBot מנסה שוב.",
   "mobile.workflow.github.alert.noEvent": "הטריגר אינו אירוע GitHub. יש לבחור מאגר ולקחת את המספר מהקלט.",
   "mobile.workflow.github.alert.pullRequestOnly": "{action} עובד רק על pull requests. הטריגר מתחיל בבעיות.",
   "mobile.workflow.github.runLastEvent": "הרצה עם האירוע האחרון",

@@ -128,9 +128,35 @@ export interface WorkflowGitHubRepository {
   events: boolean;
 }
 
+export interface WorkflowGitHubRelay {
+  ready: boolean;
+  watched: string[];
+  routed: string[];
+}
+
+export type WorkflowGitHubRelayProblem = "waiting" | "unrouted";
+
 export interface WorkflowGitHubCatalog {
   connected: boolean;
   repositories: WorkflowGitHubRepository[];
+  relay?: WorkflowGitHubRelay;
+}
+
+export function workflowGitHubRelayProblem(
+  relay: WorkflowGitHubRelay | undefined,
+  repository: string,
+): WorkflowGitHubRelayProblem | undefined {
+  const name = repository.toLowerCase();
+  const named = (names: readonly string[]) => names.some((entry) => entry.toLowerCase() === name);
+  if (!relay || !named(relay.watched)) return undefined;
+  if (!relay.ready) return "waiting";
+  return named(relay.routed) ? undefined : "unrouted";
+}
+
+export function workflowGitHubRelayPending(catalog: WorkflowGitHubCatalog): boolean {
+  return catalog.repositories.some(
+    (entry) => entry.events && workflowGitHubRelayProblem(catalog.relay, entry.fullName) !== undefined,
+  );
 }
 
 export interface WorkflowGitHubLabel {
@@ -210,8 +236,14 @@ export function isWorkflowGitHubCatalog(value: unknown): value is WorkflowGitHub
         isBoolean(repository.private) &&
         isBoolean(repository.canWrite) &&
         isBoolean(repository.events),
-    )
+    ) &&
+    (value.relay === undefined || isWorkflowGitHubRelay(value.relay))
   );
+}
+
+export function isWorkflowGitHubRelay(value: unknown): value is WorkflowGitHubRelay {
+  const names = (list: unknown) => Array.isArray(list) && list.every(isGitHubRepositoryName);
+  return isDynamicRecord(value) && isBoolean(value.ready) && names(value.watched) && names(value.routed);
 }
 
 export function isWorkflowGitHubRepositoryOptions(value: unknown): value is WorkflowGitHubRepositoryOptions {

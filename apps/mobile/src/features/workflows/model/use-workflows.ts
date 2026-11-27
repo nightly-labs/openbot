@@ -1,4 +1,4 @@
-import type { WorkflowRunDetail } from "@openbot/contracts/ipc";
+import { type WorkflowRunDetail, workflowGitHubRelayPending } from "@openbot/contracts/ipc";
 import { useInfiniteQuery, useQuery } from "@tanstack/react-query";
 import { useEffect } from "react";
 import { useQueryScope } from "@/features/auth/context/mobile-session-context";
@@ -7,6 +7,8 @@ import {
   useMobileWorkspaceSelector,
 } from "@/features/workspace/context/mobile-workspace-context";
 import { queryKeys } from "@/features/workspace/model/query-keys";
+
+const GITHUB_RELAY_REREAD_MS = 30_000;
 
 function useWorkflowsAvailable(serverId: string) {
   const online = useMobileWorkspaceSelector((current) =>
@@ -151,6 +153,8 @@ export function useWorkflowGitHubCatalog(serverId: string, enabled: boolean) {
     queryKey: queryKeys.workflowGitHubCatalog(queryScope, serverId),
     enabled: enabled && ready && supported,
     retry: false,
+    refetchInterval: (query) =>
+      query.state.data && workflowGitHubRelayPending(query.state.data) ? GITHUB_RELAY_REREAD_MS : false,
     queryFn: () => loadWorkflowGitHubCatalog(serverId),
   });
 }

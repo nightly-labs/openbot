@@ -11,10 +11,12 @@ import {
   type WorkflowGitHubEvent,
   type WorkflowGitHubFilter,
   type WorkflowGitHubItem,
+  type WorkflowGitHubRelayProblem,
   type WorkflowGitHubSkipReason,
   type WorkflowGraph,
   type WorkflowNode,
   workflowGitHubEventItemKind,
+  workflowGitHubRelayProblem,
   workflowGitHubTriggerRepositories,
   workflowListField,
 } from "@openbot/contracts/ipc";
@@ -191,7 +193,7 @@ export function githubOutput(node: WorkflowNode, graph: WorkflowGraph): GitHubOu
   };
 }
 
-export type GitHubAccessProblem = "missing" | "readOnly" | "eventsOff";
+export type GitHubAccessProblem = "missing" | "readOnly" | "eventsOff" | WorkflowGitHubRelayProblem;
 
 export function githubAccessProblem(
   catalog: WorkflowGitHubCatalog | undefined,
@@ -204,13 +206,15 @@ export function githubAccessProblem(
   if (!entry) return "missing";
   if (need.write && !entry.canWrite) return "readOnly";
   if (need.events && !entry.events) return "eventsOff";
-  return null;
+  return (need.events && workflowGitHubRelayProblem(catalog.relay, repository)) || null;
 }
 
 export const GITHUB_ACCESS_LABEL = {
   missing: "mobile.workflow.github.alert.missing",
   readOnly: "mobile.workflow.github.alert.readOnly",
   eventsOff: "mobile.workflow.github.alert.eventsOff",
+  waiting: "mobile.workflow.github.alert.relayWaiting",
+  unrouted: "mobile.workflow.github.alert.relayUnrouted",
 } as const satisfies Record<GitHubAccessProblem, string>;
 
 export function githubItemUrl(item: WorkflowGitHubItem): string {

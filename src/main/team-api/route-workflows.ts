@@ -19,6 +19,10 @@ import {
   WORKFLOWS_CREDIT_MEDIA_ROUTES,
 } from "@openbot/contracts/team-protocol/workflows-credit-media-v1";
 import {
+  WORKFLOWS_GITHUB_RELAY_CAPABILITY,
+  WORKFLOWS_GITHUB_RELAY_ROUTES,
+} from "@openbot/contracts/team-protocol/workflows-github-relay-v1";
+import {
   WORKFLOWS_GITHUB_CAPABILITY,
   WORKFLOWS_GITHUB_ROUTES,
 } from "@openbot/contracts/team-protocol/workflows-github-v1";
@@ -90,6 +94,7 @@ import { runWorkflowEffect as run, workflowMissing, workflowVisibility } from ".
 
 const WORKFLOW_PATHS = new Set<string>(Object.values(WORKFLOWS_ROUTES));
 const WORKFLOW_GITHUB_PATHS = new Set<string>(Object.values(WORKFLOWS_GITHUB_ROUTES));
+const WORKFLOW_GITHUB_RELAY_PATHS = new Set<string>(Object.values(WORKFLOWS_GITHUB_RELAY_ROUTES));
 const WORKFLOW_MEDIA_PATHS = new Set<string>(Object.values(WORKFLOWS_MEDIA_ROUTES));
 const WORKFLOW_SUNRA_PATHS = new Set<string>(Object.values(WORKFLOWS_SUNRA_ROUTES));
 const WORKFLOW_HIGGSFIELD_PATHS = new Set<string>(Object.values(WORKFLOWS_HIGGSFIELD_ROUTES));
@@ -185,7 +190,8 @@ export async function routeWorkflows(
 ): Promise<RouteOutcome> {
   const { method, url, capabilities, member, request, json } = context;
   const path = url.pathname;
-  const githubPath = WORKFLOW_GITHUB_PATHS.has(path);
+  const relayPath = WORKFLOW_GITHUB_RELAY_PATHS.has(path);
+  const githubPath = relayPath || WORKFLOW_GITHUB_PATHS.has(path);
   const mediaPath = WORKFLOW_MEDIA_PATHS.has(path);
   const sunraPath = WORKFLOW_SUNRA_PATHS.has(path);
   const higgsfieldPath = WORKFLOW_HIGGSFIELD_PATHS.has(path);
@@ -220,6 +226,8 @@ export async function routeWorkflows(
     throw new HttpError(400, sourceText("error.workflow.serverTooOld"));
   const github = workflows.github;
   if (githubPath && (!github || !capabilities.has(WORKFLOWS_GITHUB_CAPABILITY)))
+    throw new HttpError(400, sourceText("error.workflow.serverTooOld"));
+  if (relayPath && !capabilities.has(WORKFLOWS_GITHUB_RELAY_CAPABILITY))
     throw new HttpError(400, sourceText("error.workflow.serverTooOld"));
   if (mediaPath && !capabilities.has(WORKFLOWS_MEDIA_CAPABILITY))
     throw new HttpError(400, sourceText("error.workflow.serverTooOld"));
@@ -458,6 +466,9 @@ export async function routeWorkflows(
     case WORKFLOWS_GITHUB_ROUTES.catalog:
       requireAdmin(member);
       return json(200, fitted(await run(github.catalog())));
+    case WORKFLOWS_GITHUB_RELAY_ROUTES.status:
+      requireAdmin(member);
+      return json(200, fitted(github.relayStatus()));
     case WORKFLOWS_GITHUB_ROUTES.options: {
       requireAdmin(member);
       const input = parse(parseWorkflowGitHubRepository, body);

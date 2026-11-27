@@ -10,8 +10,10 @@ import {
   type WorkflowGitHubEvent,
   type WorkflowGitHubFilter,
   type WorkflowGitHubItem,
+  type WorkflowGitHubRelayProblem,
   type WorkflowGitHubSkipReason,
   workflowGitHubEventItemKind,
+  workflowGitHubRelayProblem,
   workflowGitHubTriggerRepositories,
   workflowGitHubTriggerRepositoryFields,
 } from "@openbot/contracts/ipc";
@@ -194,7 +196,9 @@ function OpenGitHubButton(props: { github: WorkflowGitHubCanvas; label: string }
   );
 }
 
-type AccessProblem = "missing" | "readOnly" | "eventsOff";
+type GitHubSideProblem = "missing" | "readOnly" | "eventsOff";
+type AccessProblem = GitHubSideProblem | WorkflowGitHubRelayProblem;
+const GITHUB_SIDE_PROBLEMS: readonly AccessProblem[] = ["missing", "readOnly", "eventsOff"];
 
 function accessProblem(
   github: WorkflowGitHubCanvas | undefined,
@@ -207,13 +211,15 @@ function accessProblem(
   if (!entry) return "missing";
   if (need.write && !entry.canWrite) return "readOnly";
   if (need.events && !entry.events) return "eventsOff";
-  return undefined;
+  return need.events ? workflowGitHubRelayProblem(catalog.relay, repository) : undefined;
 }
 
 const ACCESS_ALERT = {
   missing: "workflow.github.alert.missing",
   readOnly: "workflow.github.alert.readOnly",
   eventsOff: "workflow.github.alert.eventsOff",
+  waiting: "workflow.github.alert.relayWaiting",
+  unrouted: "workflow.github.alert.relayUnrouted",
 } as const satisfies Record<AccessProblem, string>;
 
 function AccessAlerts(props: {
@@ -237,7 +243,9 @@ function AccessAlerts(props: {
       <For each={problems()}>
         {(entry) => <Warning>{t(ACCESS_ALERT[entry.problem], { repository: entry.repository })}</Warning>}
       </For>
-      <OpenGitHubButton github={props.github} label={buttonLabel()} />
+      <Show when={problems().some((entry) => GITHUB_SIDE_PROBLEMS.includes(entry.problem))}>
+        <OpenGitHubButton github={props.github} label={buttonLabel()} />
+      </Show>
     </Show>
   );
 }

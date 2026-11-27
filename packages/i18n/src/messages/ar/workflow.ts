@@ -444,6 +444,8 @@ export const messages = {
   "workflow.github.alert.missing": "لا يمكن لـ OpenBot رؤية {repository} على GitHub.",
   "workflow.github.alert.readOnly": "لا يمكن لـ OpenBot تغيير المشكلات وطلبات السحب في {repository}.",
   "workflow.github.alert.eventsOff": "لا يرسل GitHub أحداثًا من {repository} بعد.",
+  "workflow.github.alert.relayWaiting": "لا تصل أحداث {repository} إلى OpenBot الآن. يحاول OpenBot مرة أخرى.",
+  "workflow.github.alert.relayUnrouted": "لا يتلقى OpenBot أحداث {repository} بعد. يحاول OpenBot مرة أخرى.",
   "workflow.github.alert.noEvent": "المشغّل ليس حدثًا من GitHub. اختر مستودعًا، وخذ الرقم من المدخل.",
   "workflow.github.alert.pullRequestOnly": "يعمل {action} على طلبات السحب فقط. يبدأ المشغّل عند المشكلات.",
   "workflow.github.history.name": "الأحداث",

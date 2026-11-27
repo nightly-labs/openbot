@@ -331,6 +331,10 @@ export const messages = {
   "mobile.workflow.github.alert.missing": "OpenBot kann {repository} auf GitHub nicht sehen.",
   "mobile.workflow.github.alert.readOnly": "OpenBot kann Issues und Pull Requests in {repository} nicht ändern.",
   "mobile.workflow.github.alert.eventsOff": "GitHub sendet noch keine Ereignisse aus {repository}.",
+  "mobile.workflow.github.alert.relayWaiting":
+    "Ereignisse aus {repository} erreichen OpenBot gerade nicht. OpenBot versucht es erneut.",
+  "mobile.workflow.github.alert.relayUnrouted":
+    "OpenBot erhält noch keine Ereignisse aus {repository}. OpenBot versucht es erneut.",
   "mobile.workflow.github.alert.noEvent":
     "Der Auslöser ist kein GitHub-Ereignis. Wähle ein Repository und nimm die Nummer aus der Eingabe.",
   "mobile.workflow.github.alert.pullRequestOnly":

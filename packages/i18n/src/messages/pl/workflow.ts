@@ -429,6 +429,10 @@ export const messages = {
   "workflow.github.alert.missing": "OpenBot nie widzi {repository} w GitHub.",
   "workflow.github.alert.readOnly": "OpenBot nie może zmieniać zgłoszeń ani pull requestów w {repository}.",
   "workflow.github.alert.eventsOff": "GitHub nie wysyła jeszcze zdarzeń z {repository}.",
+  "workflow.github.alert.relayWaiting":
+    "Zdarzenia z {repository} nie docierają teraz do OpenBot. OpenBot próbuje ponownie.",
+  "workflow.github.alert.relayUnrouted":
+    "OpenBot nie otrzymuje jeszcze zdarzeń z {repository}. OpenBot próbuje ponownie.",
   "workflow.github.alert.noEvent": "Wyzwalacz nie jest zdarzeniem GitHub. Wybierz repozytorium i weź numer z wejścia.",
   "workflow.github.alert.pullRequestOnly":
     "„{action}” działa tylko dla pull requestów. Wyzwalacz uruchamia się dla zgłoszeń.",

@@ -353,6 +353,8 @@ export const messages = {
   "mobile.workflow.github.alert.missing": "لا يستطيع OpenBot رؤية {repository} على GitHub.",
   "mobile.workflow.github.alert.readOnly": "لا يستطيع OpenBot تغيير المشكلات وطلبات السحب في {repository}.",
   "mobile.workflow.github.alert.eventsOff": "لا يرسل GitHub أحداثًا من {repository} بعد.",
+  "mobile.workflow.github.alert.relayWaiting": "لا تصل أحداث {repository} إلى OpenBot الآن. يحاول OpenBot مرة أخرى.",
+  "mobile.workflow.github.alert.relayUnrouted": "لا يتلقى OpenBot أحداث {repository} بعد. يحاول OpenBot مرة أخرى.",
   "mobile.workflow.github.alert.noEvent": "المشغّل ليس حدث GitHub. اختر مستودعًا، وخذ الرقم من المدخلات.",
   "mobile.workflow.github.alert.pullRequestOnly": "يعمل {action} على طلبات السحب فقط. يبدأ المشغّل على المشكلات.",
   "mobile.workflow.github.runLastEvent": "التشغيل بآخر حدث",

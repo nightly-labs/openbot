@@ -280,6 +280,7 @@ import { WORKFLOWS_CHANNELS_CAPABILITY } from "./workflows-channels-v1";
 import { WORKFLOWS_CHATS_CAPABILITY } from "./workflows-chats-v1";
 import { WORKFLOWS_CREDIT_MEDIA_UNAVAILABLE_CAPABILITY } from "./workflows-credit-media-unavailable-v1";
 import { WORKFLOWS_CREDIT_MEDIA_CAPABILITY } from "./workflows-credit-media-v1";
+import { WORKFLOWS_GITHUB_RELAY_CAPABILITY } from "./workflows-github-relay-v1";
 import { WORKFLOWS_GITHUB_CAPABILITY } from "./workflows-github-v1";
 import { WORKFLOWS_HIGGSFIELD_CAPABILITY } from "./workflows-higgsfield-v1";
 import { WORKFLOWS_MEDIA_ACCOUNT_CAPABILITY } from "./workflows-media-account-v1";
@@ -887,6 +888,7 @@ const TEAM_CAPABILITY_REGISTRY = [
   [TEAM_NEAR_PAYMENT_CAPABILITY, V10],
   [PROVIDER_ACCOUNT_POOL_STRATEGY_CAPABILITY, V10],
   [WATCH_RELAY_TEAM_CAPABILITY, V10],
+  [WORKFLOWS_GITHUB_RELAY_CAPABILITY, V10],
 ] as const satisfies readonly (readonly [string, TeamCapabilityPlacement])[];
 
 export const TEAM_CURRENT_CAPABILITIES = TEAM_CAPABILITY_REGISTRY.map(([capability]) => capability);

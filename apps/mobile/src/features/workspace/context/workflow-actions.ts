@@ -1,6 +1,10 @@
 import type { WorkflowGraph, WorkflowNodeSize } from "@openbot/contracts/ipc";
 import type { TeamProtocolV2Json } from "@openbot/contracts/team-protocol/v2";
 import {
+  WORKFLOWS_GITHUB_RELAY_CAPABILITY,
+  WORKFLOWS_GITHUB_RELAY_ROUTES,
+} from "@openbot/contracts/team-protocol/workflows-github-relay-v1";
+import {
   WORKFLOWS_GITHUB_CAPABILITY,
   WORKFLOWS_GITHUB_ROUTES,
 } from "@openbot/contracts/team-protocol/workflows-github-v1";
@@ -18,6 +22,7 @@ import {
   decodeRemoteWorkflowGitHubCatalog,
   decodeRemoteWorkflowGitHubHistory,
   decodeRemoteWorkflowGitHubOptions,
+  decodeRemoteWorkflowGitHubRelay,
   decodeRemoteWorkflowList,
   decodeRemoteWorkflowPicture,
   decodeRemoteWorkflowRunDetail,
@@ -28,6 +33,7 @@ import {
   decodeRemoteWorkflowSummary,
   decodeRemoteWorkflowVersionGraph,
   decodeRemoteWorkflowVersions,
+  withGitHubRelay,
 } from "@openbot/team-client/workflow-decoding";
 import * as Crypto from "expo-crypto";
 import type { WorkspaceRequest } from "@/features/workspace/context/host-request-actions";
@@ -36,7 +42,11 @@ import {
   loadWorkflowMediaModels,
   loadWorkflowMediaPrice,
 } from "@/features/workspace/context/workflow-media-models";
-import { requireCapability, type ServerCapabilities } from "@/features/workspace/model/server-capabilities";
+import {
+  hasCapability,
+  requireCapability,
+  type ServerCapabilities,
+} from "@/features/workspace/model/server-capabilities";
 import { ignoreResponse } from "@/features/workspace/model/workspace-records";
 import type { MobileWorkspaceContextValue } from "@/features/workspace/model/workspace-types";
 
@@ -166,7 +176,12 @@ export function createWorkflowActions({
     loadWorkflowMediaPrice: (input, serverId) => loadWorkflowMediaPrice({ request, capabilities, serverId, input }),
     loadWorkflowCreditBalance: (serverId) => loadWorkflowCreditBalance({ request, capabilities, serverId }),
     loadWorkflowGitHubCatalog: (serverId) =>
-      sendGitHub(serverId, WORKFLOWS_GITHUB_ROUTES.catalog, decodeRemoteWorkflowGitHubCatalog, {}),
+      withGitHubRelay(
+        sendGitHub(serverId, WORKFLOWS_GITHUB_ROUTES.catalog, decodeRemoteWorkflowGitHubCatalog, {}),
+        hasCapability(capabilities, serverId, WORKFLOWS_GITHUB_RELAY_CAPABILITY)
+          ? sendGitHub(serverId, WORKFLOWS_GITHUB_RELAY_ROUTES.status, decodeRemoteWorkflowGitHubRelay, {})
+          : null,
+      ),
     loadWorkflowGitHubOptions: (repository, serverId) =>
       sendGitHub(serverId, WORKFLOWS_GITHUB_ROUTES.options, decodeRemoteWorkflowGitHubOptions, { repository }),
     loadWorkflowGitHubHistory: (workflowId, serverId) =>

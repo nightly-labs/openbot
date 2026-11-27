@@ -398,6 +398,9 @@ export const messages = {
   "workflow.github.alert.missing": "OpenBot no puede ver {repository} en GitHub.",
   "workflow.github.alert.readOnly": "OpenBot no puede cambiar incidencias ni pull requests en {repository}.",
   "workflow.github.alert.eventsOff": "GitHub aún no envía eventos de {repository}.",
+  "workflow.github.alert.relayWaiting":
+    "Los eventos de {repository} no llegan a OpenBot ahora. OpenBot lo intenta de nuevo.",
+  "workflow.github.alert.relayUnrouted": "OpenBot aún no recibe eventos de {repository}. OpenBot lo intenta de nuevo.",
   "workflow.github.alert.noEvent":
     "El activador no es un evento de GitHub. Elige un repositorio y toma el número de la entrada.",
   "workflow.github.alert.pullRequestOnly":

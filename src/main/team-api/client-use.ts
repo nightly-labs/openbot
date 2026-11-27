@@ -119,6 +119,7 @@ import { WHATSAPP_WORKING_MESSAGE_ROUTES } from "@openbot/contracts/team-protoco
 import { WORKFLOW_FOLDERS_ROUTES } from "@openbot/contracts/team-protocol/workflow-folders-v1";
 import { WORKFLOWS_CREDIT_MEDIA_UNAVAILABLE_ROUTES } from "@openbot/contracts/team-protocol/workflows-credit-media-unavailable-v1";
 import { WORKFLOWS_CREDIT_MEDIA_ROUTES } from "@openbot/contracts/team-protocol/workflows-credit-media-v1";
+import { WORKFLOWS_GITHUB_RELAY_ROUTES } from "@openbot/contracts/team-protocol/workflows-github-relay-v1";
 import { WORKFLOWS_GITHUB_ROUTES } from "@openbot/contracts/team-protocol/workflows-github-v1";
 import { WORKFLOWS_HIGGSFIELD_ROUTES } from "@openbot/contracts/team-protocol/workflows-higgsfield-v1";
 import { WORKFLOWS_MEDIA_CATALOG_ROUTES } from "@openbot/contracts/team-protocol/workflows-media-catalog-v1";
@@ -290,6 +291,7 @@ const PASSIVE_ROUTES: ReadonlySet<string> = new Set([
   WORKFLOWS_GITHUB_ROUTES.catalog,
   WORKFLOWS_GITHUB_ROUTES.history,
   WORKFLOWS_GITHUB_ROUTES.options,
+  WORKFLOWS_GITHUB_RELAY_ROUTES.status,
   WORKFLOWS_CREDIT_MEDIA_ROUTES.catalog,
   WORKFLOWS_CREDIT_MEDIA_UNAVAILABLE_ROUTES.list,
   WORKFLOWS_CREDIT_MEDIA_ROUTES.credits,

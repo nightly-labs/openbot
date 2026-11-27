@@ -324,6 +324,10 @@ export const messages = {
   "mobile.workflow.github.alert.missing": "OpenBot は GitHub 上の {repository} を参照できません。",
   "mobile.workflow.github.alert.readOnly": "OpenBot は {repository} の Issue とプルリクエストを変更できません。",
   "mobile.workflow.github.alert.eventsOff": "GitHub はまだ {repository} のイベントを送信していません。",
+  "mobile.workflow.github.alert.relayWaiting":
+    "{repository} のイベントが今 OpenBot に届きません。OpenBot が再試行します。",
+  "mobile.workflow.github.alert.relayUnrouted":
+    "OpenBot はまだ {repository} のイベントを受け取っていません。OpenBot が再試行します。",
   "mobile.workflow.github.alert.noEvent":
     "トリガーが GitHub イベントではありません。リポジトリを選択し、番号は入力から取得してください。",
   "mobile.workflow.github.alert.pullRequestOnly":

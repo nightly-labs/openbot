@@ -345,6 +345,7 @@ import {
   type WorkflowSpotInput,
   workflowSpotControl,
 } from "@openbot/contracts/team-protocol/workflow-presence-v1";
+import { WORKFLOWS_GITHUB_RELAY_CAPABILITY } from "@openbot/contracts/team-protocol/workflows-github-relay-v1";
 import { WORKSPACE_ONLY_PROCESS_LIMIT_CAPABILITY } from "@openbot/contracts/team-protocol/workspace-only-process-limit-v1";
 import { isFixedSourceText, sourceText } from "@openbot/i18n/source";
 import { createOpenBotLogger, toLogValue } from "@openbot/logging";
@@ -3088,7 +3089,8 @@ export class TeamApiServer {
         if (capability === WORKFLOW_FOLDERS_CAPABILITY)
           return this.#options.workflows !== undefined && this.#options.workflowFolders !== undefined;
         if (capability === CRM_CAPABILITY) return this.#options.crm !== undefined;
-        if (capability === WORKFLOWS_GITHUB_CAPABILITY) return this.#options.workflows?.github !== undefined;
+        if (capability === WORKFLOWS_GITHUB_CAPABILITY || capability === WORKFLOWS_GITHUB_RELAY_CAPABILITY)
+          return this.#options.workflows?.github !== undefined;
         if (capability === WORKFLOWS_MEDIA_CAPABILITY) return this.#options.workflows !== undefined;
         if (capability === WORKFLOWS_SUNRA_CAPABILITY) return this.#options.workflows !== undefined;
         if (capability === WORKFLOWS_HIGGSFIELD_CAPABILITY) return this.#options.workflows !== undefined;
