@@ -1503,8 +1503,8 @@ export function createConversationViewScope(props: ConversationProps) {
         return;
       }
       const glide = left * (1 - Math.exp(-elapsed / CHAT_GLIDE_TIME_CONSTANT_MS));
-      element.scrollTop = current + glide;
-      if (glide > 0 && element.scrollTop === current) {
+      element.scrollTop = current + Math.max(glide, Math.min(left, 1));
+      if (element.scrollTop === current) {
         followConversationBottom(element);
         chatGlideFrame = undefined;
         return;
