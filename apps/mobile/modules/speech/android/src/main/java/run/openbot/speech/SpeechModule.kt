@@ -187,14 +187,9 @@ class SpeechModule : Module() {
       captureExecutor.execute { capture.cancel() }
     }
 
-    /**
-     * The language of the keyboard that is set now, such as `pt-BR`, or null when the keyboard names
-     * none. The phone recognizer listens in one language, and the keyboard tells which one the user
-     * writes in when the phone settings are in another. Some keyboards set only the older locale.
-     */
-    Function("keyboardLanguage") {
+    AsyncFunction("keyboardLanguage") {
       val keyboard = appContext.reactContext?.getSystemService(InputMethodManager::class.java)
-      val subtype = keyboard?.currentInputMethodSubtype ?: return@Function null
+      val subtype = keyboard?.currentInputMethodSubtype ?: return@AsyncFunction null
       @Suppress("DEPRECATION")
       subtype.languageTag.ifEmpty { subtype.locale.replace('_', '-') }.ifEmpty { null }
     }

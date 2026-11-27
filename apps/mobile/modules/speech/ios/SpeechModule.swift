@@ -628,7 +628,6 @@ public class SpeechModule: Module {
             self.recognitionQueue.async { self.recognizer = nil }
           }
         },
-        // The keyboard opens, or the user switches it with the globe key.
         center.addObserver(forName: UIResponder.keyboardDidShowNotification, object: nil, queue: .main) { _ in
           rememberKeyboardLanguage()
         },
@@ -638,12 +637,10 @@ public class SpeechModule: Module {
       ]
     }
 
-    /// The language of the keyboard that the user typed with last, such as `pt-BR`, or null before
-    /// the keyboard opened. The phone recognizer listens in one language, and the keyboard tells
-    /// which one the user writes in when the phone settings are in another.
-    Function("keyboardLanguage") { () -> String? in
-      UserDefaults.standard.string(forKey: keyboardLanguageKey)
-    }
+    AsyncFunction("keyboardLanguage") { () -> String? in
+      rememberKeyboardLanguage()
+      return UserDefaults.standard.string(forKey: keyboardLanguageKey)
+    }.runOnQueue(.main)
 
     /// Loads Parakeet from a downloaded model directory. A second call with the same directory keeps
     /// the loaded model.
@@ -819,16 +816,12 @@ public class SpeechModule: Module {
 
 private let keyboardLanguageKey = "run.openbot.speech.keyboard-language"
 
-/// Saves the language of the keyboard that is open. Emoji and dictation are input modes without a
-/// written language. The key outlives a restart, so a voice conversation that starts before the
-/// keyboard opens still has the language.
 private func rememberKeyboardLanguage() {
   guard let language = FirstResponder.current()?.textInputMode?.primaryLanguage,
         language != "emoji", language != "dictation" else { return }
   UserDefaults.standard.set(language, forKey: keyboardLanguageKey)
 }
 
-/// UIKit has no getter for the first responder: an action sent to nil goes to it.
 private final class FirstResponder: NSObject {
   private static weak var found: UIResponder?
 
