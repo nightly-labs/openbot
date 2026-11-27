@@ -1,5 +1,42 @@
 [
   {
+    "version": "0.81.0",
+    "date": "2026-11-27",
+    "notices": [
+      "Aktualisiere auch jeden verbundenen Server auf diese Version. Die Einstellung für externe Inhalte, die schnelleren Chats und Kanäle, Canvas-Videos und viele der Korrekturen unten funktionieren auf einem Server nur, wenn der Server diese Version hat."
+    ],
+    "groups": [
+      {
+        "type": "added",
+        "items": [
+          "Lege Videos und Audiodateien auf einem Canvas ab. Ziehe sie hinein, füge sie ein oder lade sie hoch, wie bei Bildern. Ein Datei-Schritt spielt den Clip ab und kann ihn an einen Agenten oder an einen Videoschritt senden.",
+          "Eine neue Servereinstellung, „Externe Inhalte in Chats laden“, findest du unter Servereinstellungen › Allgemein › Datenschutz. Solange sie aus ist, was der Standard ist, laden Chats nichts von anderen Websites, bis du klickst.",
+          "Füge Bilder in den Chat der Chrome-Erweiterung ein: in Agenten-Chats, in Threads und in Kanälen."
+        ]
+      },
+      {
+        "type": "changed",
+        "items": [
+          "Auf einem verbundenen Server halten die Desktop-App und der Webclient Agenten, Kanäle, Routinen, Workflows und die neuesten Nachrichten von selbst aktuell. Der Server sendet nur, was sich geändert hat.",
+          "Auf einem verbundenen Server erscheinen Reaktionen, Lesemarken, Routinenschalter, Kanalbefehle und Änderungen an wartenden Nachrichten sofort. Chats und Kanäle öffnen sich früher.",
+          "Ein Server mit vielen Agenten oder einer langen Nachrichtenhistorie braucht viel weniger CPU. Bei 70.000 Nachrichten sind das Senden einer Nachricht und das Öffnen einer Unterhaltung 5- bis 30-mal schneller.",
+          "Die meisten OpenBot-Credit-Preise für Bilder und Videos sind um bis zu 80 % niedriger.",
+          "Menüs, Auswahllisten, Tooltips und die Karten für Nutzung und Credits haben jetzt Milchglas. Wenn du Unschärfe-Effekte ausschaltest, sind sie einfarbig."
+        ]
+      },
+      {
+        "type": "fixed",
+        "items": [
+          "Ein MCP-Server, den du unter der Adresse eines anderen MCP-Servers hinzufügst, meldet sich jetzt bei seinem eigenen Konto an. Vorher nutzten beide Server eine Anmeldung.",
+          "Wenn die Kanalleitung eine Nachricht nicht weiterleiten kann, sagt der Kanal jetzt, warum, und was als Nächstes zu tun ist.",
+          "Bilder in einem Chat auf einem verbundenen Server haben ihre richtige Größe, bevor sie laden, damit der Chat nicht springt.",
+          "Unter Windows hält die App nicht mehr etwa alle 5 Minuten für einige Sekunden an, während sie die Plan-Nutzung von Claude liest.",
+          "Wenn die Sicherheitsprüfung des Modells ein Bild oder Video für OpenBot-Credits ablehnt, sagen der Workflow und der Agent jetzt, warum. Es werden keine Credits verbraucht."
+        ]
+      }
+    ]
+  },
+  {
     "version": "0.80.0",
     "date": "2026-11-26",
     "notices": [
