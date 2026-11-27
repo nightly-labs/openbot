@@ -213,4 +213,5 @@ export const messages = {
   "error.team.mediaApprovalChoiceInvalid": "미디어 승인 선택이 올바르지 않습니다.",
   "error.team.remoteChatContentUnsupported":
     "이 연결은 원격 콘텐츠 설정을 지원하지 않습니다. 서버의 OpenBot을 업데이트하세요.",
+  "error.team.remoteChatContentRequired": "원격 콘텐츠 설정은 켜짐 또는 꺼짐이어야 합니다.",
 } as const satisfies PartialTranslation<typeof source>;

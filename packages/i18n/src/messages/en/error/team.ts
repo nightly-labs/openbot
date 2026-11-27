@@ -224,4 +224,5 @@ export const messages = defineMessages("error.team", {
   "error.team.mediaApprovalChoiceInvalid": "The media approval choice is not valid.",
   "error.team.remoteChatContentUnsupported":
     "The remote content setting is not supported by this connection. Update OpenBot on the server.",
+  "error.team.remoteChatContentRequired": "The remote content setting must be on or off.",
 });

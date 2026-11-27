@@ -73,7 +73,11 @@ export function CustomBackdrop(props: { source: CustomBackdropSource; title: str
               sandbox={staticPage() ? CHAT_VISUAL_STATIC_SANDBOX : CHAT_VISUAL_FRAME_SANDBOX}
               referrerpolicy="no-referrer"
               tabindex={-1}
-              src={staticPage() ? chatVisualStaticFrameUrl(src()) : chatVisualFrameUrl(src(), theme())}
+              src={
+                staticPage()
+                  ? chatVisualStaticFrameUrl(src(), documentColorScheme())
+                  : chatVisualFrameUrl(src(), theme())
+              }
             />
           )}
         </Match>

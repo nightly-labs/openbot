@@ -212,4 +212,5 @@ export const messages = {
   "error.team.mediaApprovalChoiceInvalid": "Medya onayı seçimi geçerli değil.",
   "error.team.remoteChatContentUnsupported":
     "Bu bağlantı uzak içerik ayarını desteklemiyor. Sunucudaki OpenBot'u güncelleyin.",
+  "error.team.remoteChatContentRequired": "Uzak içerik ayarı açık veya kapalı olmalıdır.",
 } as const satisfies PartialTranslation<typeof source>;

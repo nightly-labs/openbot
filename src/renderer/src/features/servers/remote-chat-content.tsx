@@ -13,6 +13,8 @@ export interface RemoteChatContent {
   set(enabled: boolean, serverId: string): Promise<boolean>;
 }
 
+const RETRY_AFTER_FAILURE_MS = 15_000;
+
 const BLOCKED: RemoteChatContent = {
   enabled: () => false,
   load: async () => false,
@@ -28,6 +30,8 @@ export function useRemoteChatContent(): RemoteChatContent {
 export function createRemoteChatContent(calls: RemoteChatContentCalls): RemoteChatContent & { dispose(): void } {
   const [values, setValues] = createSignal<ReadonlyMap<string, boolean>>(new Map());
   const pending = new Map<string, Promise<boolean>>();
+  const failedAt = new Map<string, number>();
+  const [retryTick, setRetryTick] = createSignal(0);
   const remember = (serverId: string, enabled: boolean) => {
     setValues((current) => {
       if (current.get(serverId) === enabled) return current;
@@ -43,21 +47,32 @@ export function createRemoteChatContent(calls: RemoteChatContentCalls): RemoteCh
     const request = calls
       .getRemoteChatContent(serverId)
       .then(
-        ({ enabled }) => remember(serverId, enabled),
-        () => remember(serverId, false),
+        ({ enabled }) => {
+          failedAt.delete(serverId);
+          return remember(serverId, enabled);
+        },
+        () => {
+          failedAt.set(serverId, Date.now());
+          setTimeout(() => setRetryTick((tick) => tick + 1), RETRY_AFTER_FAILURE_MS);
+          return false;
+        },
       )
       .finally(() => pending.delete(serverId));
     pending.set(serverId, request);
     return request;
   };
   const dispose = calls.onRemoteChatContent(({ serverId, enabled }) => {
+    failedAt.delete(serverId);
     remember(serverId, enabled);
   });
   return {
     enabled: (serverId) => {
       if (!serverId) return false;
+      retryTick();
       const known = values().get(serverId);
-      if (known === undefined && !pending.has(serverId)) queueMicrotask(() => void load(serverId));
+      const failed = failedAt.get(serverId);
+      const retry = failed === undefined || Date.now() - failed >= RETRY_AFTER_FAILURE_MS;
+      if (known === undefined && !pending.has(serverId) && retry) queueMicrotask(() => void load(serverId));
       return known === true;
     },
     load,

@@ -13,7 +13,7 @@ import {
   attachmentCorsHeaders,
   attachmentDocumentHeaders,
   chatVisualResponse,
-  isStaticChatVisualRequest,
+  staticChatVisualOptions,
 } from "./chat-visual-protocol";
 import { inlineContentDisposition } from "./content-disposition";
 import { buildContentSecurityPolicy, readSelfHostedSignalOrigin } from "./content-security-policy";
@@ -157,7 +157,7 @@ export function configureAttachmentProtocol({
       if (!attachment || !isChatVisualMimeType(attachment.mimeType)) return new Response("Not found", { status: 404 });
       if ((await stat(attachment.path)).size > CHAT_VISUAL_PAGE_LIMIT)
         return new Response("Not found", { status: 404 });
-      return chatVisualResponse(await readFile(attachment.path), {}, isStaticChatVisualRequest(url));
+      return chatVisualResponse(await readFile(attachment.path), {}, staticChatVisualOptions(url));
     } catch {
       return new Response("Not found", { status: 404 });
     }
@@ -170,7 +170,7 @@ export function configureAttachmentProtocol({
       if (!serverId || !attachmentId) return new Response("Not found", { status: 404 });
       const attachment = await runCauseEffect(remoteServers.downloadAttachment(attachmentId, serverId));
       if (!isChatVisualMimeType(attachment.mimeType)) return new Response("Not found", { status: 404 });
-      return chatVisualResponse(attachment.bytes, {}, isStaticChatVisualRequest(url));
+      return chatVisualResponse(attachment.bytes, {}, staticChatVisualOptions(url));
     } catch (error) {
       logger.warn("A remote visual reply could not be shown.", { cause: toLogValue(error) });
       return new Response("Not found", { status: 404 });

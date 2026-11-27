@@ -119,7 +119,9 @@ function VisualFrame(props: ChatVisualProps) {
   const url = () => {
     const current = theme();
     if (!current || props.html !== undefined || props.src === undefined) return undefined;
-    return staticPage() ? chatVisualStaticFrameUrl(props.src) : chatVisualFrameUrl(props.src, current);
+    return staticPage()
+      ? chatVisualStaticFrameUrl(props.src, documentColorScheme())
+      : chatVisualFrameUrl(props.src, current);
   };
   const pageDocument = () => {
     const current = theme();

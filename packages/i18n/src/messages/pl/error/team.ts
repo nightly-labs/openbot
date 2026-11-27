@@ -213,4 +213,5 @@ export const messages = {
   "error.team.mediaApprovalChoiceInvalid": "Wybór w zatwierdzeniu multimediów jest nieprawidłowy.",
   "error.team.remoteChatContentUnsupported":
     "To połączenie nie obsługuje ustawienia treści zdalnych. Zaktualizuj OpenBot na serwerze.",
+  "error.team.remoteChatContentRequired": "Ustawienie treści zdalnych musi być włączone lub wyłączone.",
 } as const satisfies PartialTranslation<typeof source>;

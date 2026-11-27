@@ -1,9 +1,13 @@
 import {
   CHAT_VISUAL_FRAME_SANDBOX,
+  CHAT_VISUAL_NO_DNS_PREFETCH,
   CHAT_VISUAL_PAGE_LIMIT,
+  CHAT_VISUAL_STATIC_APPEARANCE_PARAMETER,
   CHAT_VISUAL_STATIC_PARAMETER,
   type ChatVisualDocumentOptions,
+  chatVisualAppTheme,
   chatVisualDocument,
+  withoutResourceHints,
 } from "@openbot/contracts/chat-visual";
 import { isTrustedRendererUrl } from "./trusted-renderer";
 
@@ -23,18 +27,29 @@ const STATIC_PAGE_POLICY = [
   "form-action 'none'",
 ].join("; ");
 
-export function isStaticChatVisualRequest(url: URL): boolean {
-  return url.searchParams.get(CHAT_VISUAL_STATIC_PARAMETER) === "1";
+export function staticChatVisualOptions(url: URL): ChatVisualDocumentOptions | null {
+  if (url.searchParams.get(CHAT_VISUAL_STATIC_PARAMETER) !== "1") return null;
+  const appearance = url.searchParams.get(CHAT_VISUAL_STATIC_APPEARANCE_PARAMETER);
+  return appearance === "light" || appearance === "dark" ? { theme: chatVisualAppTheme(appearance), appearance } : {};
 }
 
 export function chatVisualResponse(
   bytes: Uint8Array,
   options: ChatVisualDocumentOptions = {},
-  staticPage = false,
+  staticOptions: ChatVisualDocumentOptions | null = null,
 ): Response {
   if (bytes.byteLength > CHAT_VISUAL_PAGE_LIMIT) return new Response("Not found", { status: 404 });
+  const staticPage = staticOptions !== null;
   const html = new TextDecoder().decode(bytes);
-  return new Response(chatVisualDocument(html, staticPage ? { ...options, bootstrap: false } : options), {
+  const document = staticPage
+    ? chatVisualDocument(withoutResourceHints(html), {
+        ...options,
+        ...staticOptions,
+        head: `${CHAT_VISUAL_NO_DNS_PREFETCH}${options.head ?? ""}`,
+        bootstrap: false,
+      })
+    : chatVisualDocument(html, options);
+  return new Response(document, {
     headers: {
       "Content-Type": "text/html; charset=utf-8",
       "Content-Security-Policy": staticPage ? STATIC_PAGE_POLICY : `sandbox ${CHAT_VISUAL_FRAME_SANDBOX}`,

@@ -723,6 +723,7 @@ export function ConversationPanels(panelProps: { onOpenUsage?: ((trigger: HTMLBu
           resizer={paneResizer(split, "side-question-panel")}
           onOpenLink={(url) => void openExternalMessageUrl(url)}
           macWindowControls={props.platform === "darwin"}
+          remoteContent={remoteChatContent.enabled(props.server?.id ?? LOCAL_SERVER_ID)}
         />
       )}
     </Show>

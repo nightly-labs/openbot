@@ -235,4 +235,5 @@ export const messages = {
   "error.team.mediaApprovalChoiceInvalid": "La scelta dell'approvazione multimediale non è valida.",
   "error.team.remoteChatContentUnsupported":
     "Questa connessione non supporta l'impostazione dei contenuti remoti. Aggiorna OpenBot sul server.",
+  "error.team.remoteChatContentRequired": "L'impostazione dei contenuti remoti deve essere attiva o disattiva.",
 } as const satisfies PartialTranslation<typeof source>;

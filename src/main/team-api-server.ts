@@ -2317,6 +2317,7 @@ export class TeamApiServer {
             const colorsWereSent = connection.capabilities.has(AGENT_COLORS_CAPABILITY);
             const chatColorsWereSent = connection.capabilities.has(CHAT_COLORS_CAPABILITY);
             const appearanceWasSent = connection.capabilities.has(HOST_APPEARANCE_CAPABILITY);
+            const remoteChatContentWasSent = connection.capabilities.has(REMOTE_CHAT_CONTENT_CAPABILITY);
             connection.capabilities = new Set(event.capabilities.filter(isTeamCurrentCapability));
             if (connection.capabilities.has("agent-runtime-snapshots") && !snapshotsWereEnabled) {
               this.#sendRuntimeSnapshot(client, connection, false);
@@ -2336,7 +2337,7 @@ export class TeamApiServer {
               this.#sendChatColors(client, connection, this.#chatColors(), true);
             if (!machineAlertsWereSent) this.#sendPendingMachineAlerts(client, connection);
             if (!appearanceWasSent) this.#sendHostAppearance(client, connection);
-            this.#sendRemoteChatContent(client, connection);
+            if (!remoteChatContentWasSent) this.#sendRemoteChatContent(client, connection);
           }
           connection.includeConversationEvents = event.includeConversations;
           return;

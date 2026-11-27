@@ -26,6 +26,6 @@ export async function routeRemoteChatContent(
   const body = await readJson(request);
   if (url.pathname === REMOTE_CHAT_CONTENT_ROUTES.settings) return json(200, hostRemoteChatContent(setting.get()));
   requireAdmin(member);
-  if (typeof body.enabled !== "boolean") throw new HttpError(400, "Remote chat content setting is required.");
+  if (typeof body.enabled !== "boolean") throw new HttpError(400, sourceText("error.team.remoteChatContentRequired"));
   return json(200, hostRemoteChatContent(await runCauseEffect(setting.set({ enabled: body.enabled }))));
 }

@@ -213,4 +213,5 @@ export const messages = {
     "هذا الخادم لا يدعم اختيار النموذج في موافقات الوسائط. حدّث OpenBot على الخادم.",
   "error.team.mediaApprovalChoiceInvalid": "اختيار موافقة الوسائط غير صالح.",
   "error.team.remoteChatContentUnsupported": "هذا الاتصال لا يدعم إعداد المحتوى البعيد. حدّث OpenBot على الخادم.",
+  "error.team.remoteChatContentRequired": "يجب أن يكون إعداد المحتوى البعيد مفعّلًا أو متوقفًا.",
 } as const satisfies PartialTranslation<typeof source>;

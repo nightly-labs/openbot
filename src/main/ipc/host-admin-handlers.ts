@@ -797,7 +797,7 @@ function parseSkillLearningText(value: unknown): string {
 }
 
 function parseRemoteChatContentEnabled(value: unknown): boolean {
-  if (typeof value !== "boolean") throw new Error("Remote chat content setting is required.");
+  if (typeof value !== "boolean") throw new Error(sourceText("error.team.remoteChatContentRequired"));
   return value;
 }
 
