@@ -112,10 +112,15 @@ The watch widgets update late while the watch app is closed. On watchOS 26 and l
 reloads a widget when it gets a widget push. A widget push has no data.
 
 - The watch sends `widgetPush { token, environment }` on the direct link to each host: at app launch,
-  when the token changes, and when the last registration on that host is more than 1 hour old. The
-  token is lowercase hex, 64 to 200 characters; `environment` is `production` or `development`. An
-  older host refuses the command as invalid, and the watch ignores that. The iPhone link answers
-  `failed`.
+  when the token changes, and when the last registration on that host is more than 15 minutes old.
+  A host that restarts forgets its tokens, so this renewal limits the time with no pushes. The token
+  is lowercase hex, 8 to 256 bytes (`WATCH_WIDGET_PUSH_TOKEN_PATTERN`); `environment` is
+  `production` or `development` (a simulator build uses `development`). Only a success counts as a
+  registration. A `400` from an older host, which refuses the command as invalid, also counts, so the
+  watch asks that host again only after the renewal time. The iPhone link answers `failed`.
+- After a widget push, the widget fetches the new state over the direct link when its saved data is
+  more than 5 seconds old, and saves it without a reload. The 5 seconds skip a fetch just after the
+  watch app saved data and reloaded the widget itself.
 - `WatchWidgetPushService` (`src/main/watch-widget-push.ts`) keeps the tokens in memory only, for
   each member, at most 5 for each member. It forgets a token 12 hours after the last registration,
   when the account service answers `410`, when the member is removed or disabled (checked before each

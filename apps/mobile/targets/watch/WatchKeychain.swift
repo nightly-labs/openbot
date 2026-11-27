@@ -79,18 +79,43 @@ enum WatchKeychain {
   }
 
   private static func write(_ account: String, _ data: Data) {
-    SecItemDelete(query(account) as CFDictionary)
+    let value = [kSecValueData as String: data]
+    if let group {
+      var shared = query(account)
+      shared[kSecAttrAccessGroup as String] = group
+      if SecItemUpdate(shared as CFDictionary, value as CFDictionary) == errSecSuccess
+        || SecItemAdd(newItem(account, data, group: group) as CFDictionary, nil) == errSecSuccess
+      {
+        removeCopies(account, outside: group)
+        return
+      }
+    }
+    if SecItemUpdate(query(account) as CFDictionary, value as CFDictionary) != errSecSuccess {
+      SecItemAdd(newItem(account, data, group: nil) as CFDictionary, nil)
+    }
+  }
+
+  private static func newItem(_ account: String, _ data: Data, group: String?) -> [String: Any] {
     var item = query(account)
     item[kSecValueData as String] = data
     item[kSecAttrAccessible as String] = kSecAttrAccessibleAfterFirstUnlockThisDeviceOnly
-    guard let group else {
-      SecItemAdd(item as CFDictionary, nil)
-      return
-    }
-    var shared = item
-    shared[kSecAttrAccessGroup as String] = group
-    if SecItemAdd(shared as CFDictionary, nil) != errSecSuccess {
-      SecItemAdd(item as CFDictionary, nil)
+    if let group { item[kSecAttrAccessGroup as String] = group }
+    return item
+  }
+
+  private static func removeCopies(_ account: String, outside group: String) {
+    var request = query(account)
+    request[kSecReturnAttributes as String] = true
+    request[kSecMatchLimit as String] = kSecMatchLimitAll
+    var items: CFTypeRef?
+    guard SecItemCopyMatching(request as CFDictionary, &items) == errSecSuccess,
+      let found = items as? [[String: Any]]
+    else { return }
+    for item in found {
+      guard let other = item[kSecAttrAccessGroup as String] as? String, other != group else { continue }
+      var copy = query(account)
+      copy[kSecAttrAccessGroup as String] = other
+      SecItemDelete(copy as CFDictionary)
     }
   }
 

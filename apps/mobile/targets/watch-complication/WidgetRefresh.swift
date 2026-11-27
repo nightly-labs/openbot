@@ -3,7 +3,7 @@ import Foundation
 actor WidgetRefresh {
   static let shared = WidgetRefresh()
 
-  private static let freshness: TimeInterval = 30
+  private static let freshness: TimeInterval = 5
   private static let timeout: TimeInterval = 8
 
   private let direct = WatchDirect(timeout: WidgetRefresh.timeout, loadKey: { WatchKeychain.existingSigningKey() })
@@ -15,7 +15,10 @@ actor WidgetRefresh {
       await running.value
       return
     }
-    let task = Task { await fetch() }
+    let task = Task {
+      await fetch()
+      await register()
+    }
     running = task
     await task.value
     running = nil
@@ -53,6 +56,12 @@ actor WidgetRefresh {
     {
       _ = ComplicationData.save(merged, previous: previous, chosen: WidgetSource.chosen)
     }
+  }
+
+  private func register() async {
+    guard let credentials = WatchKeychain.credentials(),
+      credentials.expiresAt / 1000 > Date().timeIntervalSince1970
+    else { return }
     await WidgetPushRegistry.register(credentials: credentials, direct: direct)
   }
 }

@@ -1,7 +1,7 @@
 import Foundation
 
 enum WidgetPushRegistry {
-  static let renewal: TimeInterval = 60 * 60
+  static let renewal: TimeInterval = 15 * 60
 
   private static let tokenKey = "openbot.watch.widget.push.token"
   private static let environmentKey = "openbot.watch.widget.push.environment"
@@ -36,13 +36,8 @@ enum WidgetPushRegistry {
     guard !due.isEmpty else { return }
     var updated = answered
     for server in due {
-      do {
-        _ = try await direct.run(
-          .widgetPush(token: token, environment: environment), server: server, credentials: credentials)
-      } catch WatchDirectFailure.status(let status) where (400..<500).contains(status) {
-      } catch {
-        continue
-      }
+      guard await accepted(server, token: token, environment: environment, credentials: credentials, direct: direct)
+      else { continue }
       updated[server.serverId] = Answer(token: token, at: now)
     }
     let known = Set(credentials.servers.map(\.serverId))
@@ -55,6 +50,21 @@ enum WidgetPushRegistry {
     guard defaults?.string(forKey: environmentKey) != environment else { return }
     defaults?.set(environment, forKey: environmentKey)
     forget()
+  }
+
+  private static func accepted(
+    _ server: WatchDirectServer, token: String, environment: String, credentials: WatchDirectCredentials,
+    direct: WatchDirect
+  ) async -> Bool {
+    do {
+      let result = try await direct.run(
+        .widgetPush(token: token, environment: environment), server: server, credentials: credentials)
+      return result.ok
+    } catch WatchDirectFailure.status(let status) {
+      return status == 400
+    } catch {
+      return false
+    }
   }
 
   static func forget() {
