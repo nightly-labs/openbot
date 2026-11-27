@@ -436,7 +436,7 @@ export const messages = {
   "mobile.chat.outbox.failedHold": "未发送。长按该消息即可重试。",
   "mobile.chat.outbox.cancelSend": "不发送",
   "mobile.chat.outbox.menuHint": "显示该消息的选项。",
-  "mobile.chat.outbox.unconfirmed": "尚未确认，请先查看对话再重新发送。",
+  "mobile.chat.outbox.unconfirmed": "尚未确认。请先查看对话，然后长按该消息进行编辑或取消。",
   "mobile.chat.outbox.editFailed": "无法打开该消息进行编辑。",
   "mobile.chat.outbox.saveFailed": "无法在这台手机上保存待发消息。请保持应用打开，直到它们发送完成。",
   "mobile.chat.failure.title": "未得到回答",
