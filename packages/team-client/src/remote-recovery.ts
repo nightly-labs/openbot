@@ -26,9 +26,9 @@ export const REMOTE_RETRY_LIMIT = REMOTE_RETRY_DELAYS_MS.length + 1;
 export const REMOTE_RETRY_COOLDOWN_MS = 15_000;
 const REMOTE_RETRY_JITTER = 0.2;
 
-export function remoteRetryDelay(attempt: number, random: () => number = Math.random): number {
+function remoteRetryDelay(attempt: number): number {
   const delay = REMOTE_RETRY_DELAYS_MS[Math.max(0, attempt - 1)] ?? REMOTE_RETRY_COOLDOWN_MS;
-  return Math.round(delay * (1 + REMOTE_RETRY_JITTER * random()));
+  return Math.round(delay * (1 + REMOTE_RETRY_JITTER * Math.random()));
 }
 
 export interface RemoteRecoveryStatus {

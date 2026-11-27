@@ -1,14 +1,8 @@
+import { mock } from "bun:test";
 import { mkdir, writeFile } from "node:fs/promises";
 import { join, resolve } from "node:path";
 import { createOpenBotLogger } from "@openbot/logging";
-import { type NetworkChange, networkChange, strongerChange } from "../apps/mobile/src/shared/lib/network-change";
-import {
-  createPathWatch,
-  PATH_SILENCE_MS,
-  PATH_WATCH_INTERVAL_MS,
-  type PathReading,
-  RELAY_UPGRADE_DELAYS_MS,
-} from "../packages/team-client/src/remote-path-watch";
+import type { NetworkChange } from "../apps/mobile/src/shared/lib/network-change";
 import {
   createRemoteConnectionRecovery,
   REMOTE_RETRY_COOLDOWN_MS,
@@ -22,6 +16,10 @@ const OUT = join(ROOT, ".openbot-build", "mobile-reconnect-e2e");
 const JITTER = 0.2;
 const TIMER_SLACK_MS = 250;
 const FAST_RECOVERY_GOAL_MS = 12_500;
+const CHANGE_SETTLE_MS = 1_000;
+const MOVE_LIMIT_MS = 200;
+const NETWORK_EVENT_LIMIT_MS = 3_000;
+const NETWORK_QUIET_MS = 1_500;
 
 const checks: { name: string; passed: boolean; detail?: unknown }[] = [];
 function check(name: string, passed: boolean, detail?: unknown) {
@@ -79,93 +77,156 @@ async function cooldownAfterLimit() {
   return { status, attempts, reachedAfterMs };
 }
 
-function networkScenarios() {
-  const wifi = (address: string | null) => ({ type: "WIFI", address });
-  const cellular = { type: "CELLULAR", address: null };
-  const scenarios: {
-    name: string;
-    steps: { type: string; address: string | null }[];
-    expected: NetworkChange | null;
-  }[] = [
-    { name: "Wi-Fi to mobile data", steps: [wifi("192.168.1.20"), cellular], expected: "moved" },
-    { name: "mobile data to Wi-Fi", steps: [cellular, wifi("192.168.1.20")], expected: "moved" },
+interface NativeNetworkState {
+  type: string;
+  isConnected: boolean;
+}
+
+const readWaiters: { count: number; resolve: () => void }[] = [];
+const networkListeners = new Set<(state: NativeNetworkState) => void>();
+const appStateListeners = new Set<(state: string) => void>();
+const native: { state: NativeNetworkState; address: string; reads: number } = {
+  state: { type: "WIFI", isConnected: true },
+  address: "0.0.0.0",
+  reads: 0,
+};
+
+mock.module("expo-network", () => ({
+  NetworkStateType: {
+    NONE: "NONE",
+    UNKNOWN: "UNKNOWN",
+    CELLULAR: "CELLULAR",
+    WIFI: "WIFI",
+    ETHERNET: "ETHERNET",
+    VPN: "VPN",
+    OTHER: "OTHER",
+  },
+  addNetworkStateListener: (listener: (state: NativeNetworkState) => void) => {
+    networkListeners.add(listener);
+    return { remove: () => networkListeners.delete(listener) };
+  },
+  getNetworkStateAsync: async () => ({ ...native.state }),
+  getIpAddressAsync: async () => {
+    native.reads += 1;
+    const address = native.address;
+    for (const waiter of readWaiters.filter((item) => native.reads >= item.count)) {
+      readWaiters.splice(readWaiters.indexOf(waiter), 1);
+      setImmediate(waiter.resolve);
+    }
+    return address;
+  },
+}));
+mock.module("react-native", () => ({
+  AppState: {
+    addEventListener: (_event: string, listener: (state: string) => void) => {
+      appStateListeners.add(listener);
+      return { remove: () => appStateListeners.delete(listener) };
+    },
+  },
+}));
+type SubscribeNetworkMoves = (listener: (change: NetworkChange) => void) => () => void;
+
+function isNetworkPathModule(value: unknown): value is { subscribeNetworkMoves: SubscribeNetworkMoves } {
+  return (
+    typeof value === "object" &&
+    value !== null &&
+    "subscribeNetworkMoves" in value &&
+    typeof value.subscribeNetworkMoves === "function"
+  );
+}
+
+const NETWORK_PATH_MODULE = join(ROOT, "apps", "mobile", "src", "shared", "lib", "network-path.ts");
+const networkPath = await import(NETWORK_PATH_MODULE);
+if (!isNetworkPathModule(networkPath)) throw new Error("network-path.ts does not export subscribeNetworkMoves.");
+const { subscribeNetworkMoves } = networkPath;
+
+function addressRead(): Promise<void> {
+  const count = native.reads + 1;
+  return new Promise((resolve) => readWaiters.push({ count, resolve }));
+}
+
+function within<T>(promise: Promise<T>, limitMs: number): Promise<T | null> {
+  return Promise.race([promise, new Promise<null>((resolve) => setTimeout(() => resolve(null), limitMs))]);
+}
+
+interface NetworkStep {
+  type: string;
+  address: string;
+  connected?: boolean;
+  via?: "listener" | "return";
+}
+
+interface NetworkScenario {
+  name: string;
+  steps: [NetworkStep, ...NetworkStep[]];
+  expected: NetworkChange | null;
+}
+
+async function applyStep(step: NetworkStep) {
+  native.state = { type: step.type, isConnected: step.connected ?? true };
+  native.address = step.address;
+  const read = step.connected === false ? Promise.resolve() : addressRead();
+  if (step.via === "return") for (const listener of appStateListeners) listener("active");
+  else for (const listener of networkListeners) listener({ ...native.state });
+  await read;
+}
+
+async function runNetworkScenario(scenario: NetworkScenario) {
+  const [first, ...rest] = scenario.steps;
+  native.state = { type: first.type, isConnected: true };
+  native.address = first.address;
+  const events: { change: NetworkChange; afterLastStepMs: number }[] = [];
+  const firstEvent = settled<void>();
+  let lastStepAt = performance.now();
+  const initialRead = addressRead();
+  const unsubscribe = subscribeNetworkMoves((change) => {
+    events.push({ change, afterLastStepMs: Math.round(performance.now() - lastStepAt) });
+    firstEvent.resolve();
+  });
+  await initialRead;
+  for (const step of rest) {
+    lastStepAt = performance.now();
+    await applyStep(step);
+  }
+  await within(firstEvent.promise, NETWORK_EVENT_LIMIT_MS);
+  await within(new Promise<never>(() => {}), NETWORK_QUIET_MS);
+  unsubscribe();
+  return { name: scenario.name, expected: scenario.expected, events };
+}
+
+async function networkScenarios() {
+  const wifi = (address: string): NetworkStep => ({ type: "WIFI", address });
+  const home = wifi("192.168.1.20");
+  const scenarios: NetworkScenario[] = [
+    { name: "Wi-Fi to mobile data", steps: [home, { type: "CELLULAR", address: "0.0.0.0" }], expected: "moved" },
+    { name: "iOS VPN turns on", steps: [home, { type: "UNKNOWN", address: "192.168.1.20" }], expected: "changed" },
+    { name: "Android VPN turns off", steps: [{ type: "VPN", address: "100.101.4.9" }, home], expected: "changed" },
+    { name: "another Wi-Fi network", steps: [home, wifi("10.0.0.31")], expected: "moved" },
+    { name: "signal strength only", steps: [home, home], expected: null },
     {
-      name: "iOS VPN turns on",
-      steps: [wifi("192.168.1.20"), { type: "UNKNOWN", address: "192.168.1.20" }],
+      name: "no address while roaming, then another Wi-Fi",
+      steps: [home, wifi("0.0.0.0"), wifi("10.0.0.31")],
+      expected: "moved",
+    },
+    {
+      name: "VPN flaps three times in one second",
+      steps: [home, { type: "UNKNOWN", address: "192.168.1.20" }, home, { type: "UNKNOWN", address: "192.168.1.20" }],
       expected: "changed",
     },
     {
-      name: "Android VPN turns off",
-      steps: [{ type: "VPN", address: "100.101.4.9" }, wifi("192.168.1.20")],
-      expected: "changed",
-    },
-    { name: "another Wi-Fi network", steps: [wifi("192.168.1.20"), wifi("10.0.0.31")], expected: "moved" },
-    {
-      name: "VPN address changes",
-      steps: [
-        { type: "VPN", address: "100.101.4.9" },
-        { type: "VPN", address: "100.88.1.2" },
-      ],
-      expected: "changed",
-    },
-    { name: "signal strength only", steps: [wifi("192.168.1.20"), wifi("192.168.1.20")], expected: null },
-    { name: "cellular with no address", steps: [cellular, cellular], expected: null },
-    {
-      name: "VPN on, then Wi-Fi to mobile data in the same second",
-      steps: [wifi("192.168.1.20"), { type: "UNKNOWN", address: "192.168.1.20" }, cellular],
-      expected: "changed",
+      name: "Wi-Fi drops and comes back",
+      steps: [home, { type: "NONE", address: "0.0.0.0", connected: false }, home],
+      expected: null,
     },
     {
-      name: "VPN on, then another Wi-Fi network",
-      steps: [wifi("192.168.1.20"), { type: "UNKNOWN", address: "192.168.1.20" }, wifi("10.0.0.31")],
-      expected: "changed",
-    },
-    {
-      name: "Wi-Fi to mobile data, then VPN on",
-      steps: [wifi("192.168.1.20"), cellular, { type: "UNKNOWN", address: null }],
+      name: "mobile data seen at the return to the app",
+      steps: [home, { type: "CELLULAR", address: "0.0.0.0", via: "return" }],
       expected: "moved",
     },
   ];
-  return scenarios.map((scenario) => {
-    let change: NetworkChange | null = null;
-    for (let index = 1; index < scenario.steps.length; index += 1) {
-      const previous = scenario.steps[index - 1];
-      const next = scenario.steps[index];
-      if (previous && next) change = strongerChange(change, networkChange(previous, next));
-    }
-    return { name: scenario.name, expected: scenario.expected, actual: change };
-  });
-}
-
-function pathTimeline(readings: (now: number) => PathReading | null, untilMs: number) {
-  const watch = createPathWatch();
-  const silentAt: number[] = [];
-  const upgradeAt: number[] = [];
-  const routeChangedAt: number[] = [];
-  for (let now = PATH_WATCH_INTERVAL_MS; now <= untilMs; now += PATH_WATCH_INTERVAL_MS) {
-    const step = watch.observe(readings(now), now);
-    if (step.silent) silentAt.push(now);
-    if (step.routeChanged) routeChangedAt.push(now);
-    if (step.upgradeDue) {
-      upgradeAt.push(now);
-      watch.upgradeStarted(now);
-    }
-  }
-  return { silentAt, upgradeAt, routeChangedAt };
-}
-
-function pathScenarios() {
-  const direct = (received: number): PathReading => ({ pairId: "direct", received, relayed: false });
-  const busy = pathTimeline((now) => direct(now), 120_000);
-  const deadAt = 30_000;
-  const dead = pathTimeline((now) => direct(Math.min(now, deadAt)), 60_000);
-  const relayed = pathTimeline((now) => ({ pairId: "relay", received: now, relayed: true }), 900_000);
-  const upgraded = pathTimeline(
-    (now) => (now < 70_000 ? { pairId: "relay", received: now, relayed: true } : direct(now)),
-    900_000,
-  );
-  const lost = pathTimeline((now) => (now < 20_000 ? direct(now) : null), 60_000);
-  return { busy, dead, deadAt, relayed, upgraded, lost };
+  const results = [];
+  for (const scenario of scenarios) results.push(await runNetworkScenario(scenario));
+  return results;
 }
 
 async function run() {
@@ -204,46 +265,25 @@ async function run() {
     { remainingSeconds: cooldown.status.remainingSeconds, reachedAfterMs: Math.round(cooldown.reachedAfterMs) },
   );
 
-  const network = networkScenarios();
-  for (const scenario of network)
-    check(`network: ${scenario.name} is ${scenario.expected ?? "no change"}`, scenario.actual === scenario.expected, {
-      actual: scenario.actual,
-    });
-
-  const path = pathScenarios();
-  check("path: a busy direct path is never silent", path.busy.silentAt.length === 0, path.busy);
-  check("path: a busy direct path never upgrades", path.busy.upgradeAt.length === 0, path.busy);
-  const firstSilent = path.dead.silentAt[0];
-  check(
-    `path: a dead path is silent ${PATH_SILENCE_MS} ms after its last bytes`,
-    firstSilent !== undefined &&
-      firstSilent - path.deadAt >= PATH_SILENCE_MS &&
-      firstSilent - path.deadAt < PATH_SILENCE_MS + PATH_WATCH_INTERVAL_MS,
-    path.dead,
-  );
-  const silentGaps = path.dead.silentAt.slice(1).map((at, index) => at - (path.dead.silentAt[index] ?? 0));
-  check(
-    "path: a dead path is not checked more often than the silence time",
-    silentGaps.every((gap) => gap >= PATH_SILENCE_MS),
-    { silentGaps },
-  );
-  const expectedUpgrades: number[] = [];
-  let since = PATH_WATCH_INTERVAL_MS;
-  for (const delay of RELAY_UPGRADE_DELAYS_MS) {
-    since = Math.ceil((since + delay) / PATH_WATCH_INTERVAL_MS) * PATH_WATCH_INTERVAL_MS;
-    expectedUpgrades.push(since);
+  const network = await networkScenarios();
+  for (const scenario of network) {
+    const changes = scenario.events.map((event) => event.change);
+    const expected = scenario.expected === null ? [] : [scenario.expected];
+    check(
+      `network: ${scenario.name} sends ${scenario.expected ?? "nothing"}`,
+      JSON.stringify(changes) === JSON.stringify(expected),
+      scenario.events,
+    );
+    const delay = scenario.events[0]?.afterLastStepMs;
+    if (scenario.expected === "moved")
+      check(`network: ${scenario.name} goes at once`, delay !== undefined && delay < MOVE_LIMIT_MS, { delay });
+    if (scenario.expected === "changed")
+      check(
+        `network: ${scenario.name} waits about 1 s`,
+        delay !== undefined && delay >= CHANGE_SETTLE_MS - 50 && delay < CHANGE_SETTLE_MS + MOVE_LIMIT_MS,
+        { delay },
+      );
   }
-  check(
-    `path: a relayed path tries ${RELAY_UPGRADE_DELAYS_MS.length} upgrades, then stops`,
-    JSON.stringify(path.relayed.upgradeAt) === JSON.stringify(expectedUpgrades),
-    { actual: path.relayed.upgradeAt, expected: expectedUpgrades },
-  );
-  check(
-    "path: an upgraded path reports the new route and tries no more upgrades",
-    path.upgraded.upgradeAt.length === 1 && path.upgraded.routeChangedAt.length === 1,
-    path.upgraded,
-  );
-  check("path: a lost pair is not reported as silent", path.lost.silentAt.length === 0, path.lost);
 
   const passed = checks.every((item) => item.passed);
   const report = {
@@ -256,7 +296,6 @@ async function run() {
       onlineAfterMs: Math.round(recovery.onlineAfterMs),
     },
     network,
-    path,
     checks,
   };
   const reportPath = join(OUT, "report.json");

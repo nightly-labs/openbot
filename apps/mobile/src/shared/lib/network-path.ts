@@ -30,7 +30,7 @@ function record(state: Network.NetworkState): void {
   void point(state).then((next) => {
     if (current !== reading || !next || listeners.size === 0) return;
     const change = previous ? networkChange(previous, next) : null;
-    previous = next;
+    previous = next.address === null && previous?.type === next.type ? { ...next, address: previous.address } : next;
     if (!change) return;
     pending = strongerChange(pending, change);
     if (pending === "moved") emit();
