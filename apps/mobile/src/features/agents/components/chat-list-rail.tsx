@@ -18,6 +18,7 @@ import {
 import type { MobileAgent } from "@/features/workspace/context/mobile-workspace-context";
 import { agentActivityMood } from "@/features/workspace/model/agent-activity";
 import type { MobileSidebarItem } from "@/features/workspace/model/sidebar-layout";
+import { CornerSafeArea } from "@/shared/components/corner-safe-area";
 import { useBarTop } from "@/shared/lib/native-bar";
 import { useText } from "@/shared/lib/text";
 
@@ -157,9 +158,13 @@ export function ChatListRail({
   );
   return (
     <View className="flex-1 bg-background" style={{ paddingLeft: insets.left }}>
-      <View className="items-center justify-center" style={{ marginTop: barTop, height: headerHeight }}>
-        {header}
-      </View>
+      <CornerSafeArea cornerAdaptation="vertical" style={{ flex: 0, marginTop: barTop }}>
+        {(headerInsets) => (
+          <View className="items-center justify-center" style={{ marginTop: headerInsets.top, height: headerHeight }}>
+            {header}
+          </View>
+        )}
+      </CornerSafeArea>
       <FlatList
         className="flex-1"
         data={entries}

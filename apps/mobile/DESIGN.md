@@ -175,6 +175,10 @@ for each device or pose: a folded iPhone Duo is a compact window, and an open on
   scroll view with `contentInsetAdjustmentBehavior="always"` (a margin on the scroll view), because
   iOS would also inset its content by them.
 - Native headers, toolbars and sheets place themselves, rail included. Do not move them by hand.
+- The safe area does not include the window controls of iPadOS windowed mode. A bar that a column
+  draws itself goes in `CornerSafeArea` (`src/shared/components/corner-safe-area.tsx`), which
+  measures the corner-adapted insets at the bar: `horizontal` moves a wide bar to the right of
+  the controls, and `vertical` moves the narrow rail button below them.
 - While iOS shows the vertical bar (`useVerticalBarShown`), it moves native bar buttons (Back, icon
   buttons, menus) into it; custom views (`Stack.Toolbar.View`) stay at the top. A JS header cannot
   move, so `ChatHeader` then shows the native bar with its Back, browser and actions as toolbar items
