@@ -18,6 +18,7 @@ import { sourceText } from "@openbot/i18n/source";
 import { isSecretName, registerSecretValues } from "@openbot/logging";
 import { Effect } from "effect";
 import { z } from "zod";
+import type { AgentClient } from "../agent-client";
 import type { McpSignInOffer } from "../mcp-oauth-provider";
 import type { McpProbeOutcome, McpToolArguments, McpToolCallResult } from "../mcp-probe";
 import { providerMcpServerName } from "../mcp-provider-shapes";
@@ -133,6 +134,12 @@ export interface AgentMcpServers {
     name: string,
     args: McpToolArguments,
   ): Effect.Effect<{ result: McpToolCallResult } | { error: string }, ToolOperationFailed>;
+}
+
+export function mcpToolCallFallback(client: AgentClient, model: string | undefined): boolean {
+  return (
+    client.provider === "antigravity" || (model !== undefined && client.toolCallRunsHiddenMcpTools?.(model) === true)
+  );
 }
 
 export function mcpFallbackRunsServer(config: McpServerConfig, agent: { access?: AgentAccess | undefined }): boolean {

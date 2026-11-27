@@ -131,6 +131,7 @@ export interface DeveloperInstructionOptions {
   httpMcpServers?: boolean;
   mcpApps?: boolean;
   deferredMcpServers?: readonly string[];
+  mcpToolsByToolCall?: boolean;
   catalogAsMcpTools?: boolean;
   toolCatalog?: string;
   instructionsFileName?: AgentInstructionFileName;
@@ -477,7 +478,7 @@ export function developerInstructions(
           agent.provider === "opencode"
             ? `Your MCP servers: ${options.deferredMcpServers.join(", ")}. Their tools are only in execute, and openbot.tool_search does not find them. When a tool of one is not listed there, find it with search(...) inside execute and call the path that it returns.`
             : // Antigravity 1.5 leaves the tools over its schema budget out of the tool list and of
-              agent.provider === "antigravity"
+              options.mcpToolsByToolCall
               ? `Your MCP servers: ${options.deferredMcpServers.join(", ")}. Some of their tools can be missing from your tool list and from <mcp_servers>. Each tool has its schema in <appDataDir>/mcp/<server>/<tool>.json. Run a missing tool with openbot.tool_call: {"name":"<server>.<tool>","arguments":{...}}.`
               : `Your MCP servers: ${options.deferredMcpServers.join(", ")}. When a tool of one is not in your tool list, find it with tool_search. When you have exec instead, read ALL_TOOLS in an exec cell, where MCP tool names start with mcp__, and call the tool on tools.`,
         ]

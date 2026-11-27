@@ -318,6 +318,9 @@ export class CustomAcpAgentsClient extends EventEmitter<ClientEvents> implements
   readonly catalogAsMcpTools = (model: string): boolean =>
     this.#flavorOf(customAgentIdOfModel(model))?.catalogAsMcpTools === true;
 
+  readonly toolCallRunsHiddenMcpTools = (model: string): boolean =>
+    this.#flavorOf(customAgentIdOfModel(model))?.toolCallRunsHiddenMcpTools === true;
+
   #flavorOf(agentId: string | null): AcpFlavor | undefined {
     const config = agentId ? this.#source().find((candidate) => candidate.id === agentId) : undefined;
     return config ? customAgentFlavor(config.command) : undefined;
