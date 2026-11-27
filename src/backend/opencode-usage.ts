@@ -4,6 +4,7 @@ import { join, resolve } from "node:path";
 import { DatabaseSync } from "node:sqlite";
 import type { DynamicRecord } from "@openbot/contracts/runtime-values";
 import { Effect, Option, Schema } from "effect";
+import { OPENCODE_GO_PROVIDER } from "./opencode-config";
 import { openCodeDataDirectory } from "./process-confinement";
 import {
   type AccountRateLimitsReadResult,
@@ -142,44 +143,42 @@ const readStoredCredentialProviders = Effect.fn("OpenCode.readStoredCredentialPr
 });
 
 export interface OpenCodeMediaProviders {
-  readonly providers: ReadonlySet<string>;
-  readonly keyVariables: ReadonlySet<string>;
+  readonly paysForMedia: (provider: string) => boolean;
+  readonly paysForMediaKey: (variable: string) => boolean;
 }
 
-const OPENCODE_ZEN_PROVIDER = "opencode";
 const OPENCODE_CATALOG_KEYS = ["models-dev:v3:catalog", "models-dev:v2:catalog"] as const;
-const MEDIA_MODEL_TYPES: ReadonlySet<string> = new Set(["image", "video"]);
 
-const ZEN_MEDIA_PROVIDERS: OpenCodeMediaProviders = {
-  providers: new Set([OPENCODE_ZEN_PROVIDER]),
-  keyVariables: new Set(["OPENCODE_API_KEY"]),
+const MEDIA_PROVIDERS_WITHOUT_CATALOG: OpenCodeMediaProviders = {
+  paysForMedia: (provider) => provider !== OPENCODE_GO_PROVIDER,
+  paysForMediaKey: () => true,
 };
 
 const CatalogMeta = Schema.fromJsonString(Schema.Struct({ digest: Schema.String }));
-const CatalogProviders = Schema.Record(
-  Schema.String,
+const CatalogBody = Schema.Record(Schema.String, Schema.Unknown);
+const Catalog = Schema.fromJsonString(
+  Schema.Struct({ digest: Schema.String, body: Schema.Union([CatalogBody, Schema.fromJsonString(CatalogBody)]) }),
+);
+const decodeCatalogProvider = Schema.decodeUnknownOption(
   Schema.Struct({
     env: Schema.optionalKey(Schema.Array(Schema.String)),
-    models: Schema.Record(Schema.String, Schema.Struct({ type: Schema.optionalKey(Schema.String) })),
+    models: Schema.optionalKey(Schema.Record(Schema.String, Schema.Unknown)),
   }),
 );
-const Catalog = Schema.fromJsonString(
-  Schema.Struct({ body: Schema.Union([CatalogProviders, Schema.fromJsonString(CatalogProviders)]) }),
-);
+const isMediaModel = Schema.is(Schema.Struct({ type: Schema.Literals(["image", "video"]) }));
 
 let catalogCache: { readonly source: string; readonly media: OpenCodeMediaProviders } | null = null;
 
-function mediaProvidersOf(catalog: typeof CatalogProviders.Type): OpenCodeMediaProviders {
-  const media = Object.entries(catalog).filter(([, provider]) =>
-    Object.values(provider.models).some((model) => model.type !== undefined && MEDIA_MODEL_TYPES.has(model.type)),
-  );
-  return {
-    providers: new Set([...ZEN_MEDIA_PROVIDERS.providers, ...media.map(([id]) => id)]),
-    keyVariables: new Set([
-      ...ZEN_MEDIA_PROVIDERS.keyVariables,
-      ...media.flatMap(([, provider]) => provider.env ?? []).map((name) => name.toUpperCase()),
-    ]),
-  };
+function mediaProvidersOf(body: typeof CatalogBody.Type): OpenCodeMediaProviders {
+  const providers = new Set(["opencode"]);
+  const keys = new Set(["OPENCODE_API_KEY"]);
+  for (const [id, entry] of Object.entries(body)) {
+    const provider = decodeCatalogProvider(entry);
+    if (Option.isNone(provider) || !Object.values(provider.value.models ?? {}).some(isMediaModel)) continue;
+    providers.add(id);
+    for (const name of provider.value.env ?? []) keys.add(name.toUpperCase());
+  }
+  return { paysForMedia: (provider) => providers.has(provider), paysForMediaKey: (variable) => keys.has(variable) };
 }
 
 function readCatalogMediaProviders(database: DatabaseSync, databasePath: string): OpenCodeMediaProviders {
@@ -190,26 +189,26 @@ function readCatalogMediaProviders(database: DatabaseSync, databasePath: string)
     const source = `${databasePath}\n${key}\n${meta.value.digest}`;
     if (catalogCache?.source === source) return catalogCache.media;
     const catalog = Schema.decodeUnknownOption(Catalog)(select.get(key)?.value);
-    if (Option.isNone(catalog)) continue;
-    catalogCache = { source, media: mediaProvidersOf(catalog.value.body) };
-    return catalogCache.media;
+    const media = Option.isSome(catalog) ? mediaProvidersOf(catalog.value.body) : MEDIA_PROVIDERS_WITHOUT_CATALOG;
+    if (Option.isNone(catalog) || catalog.value.digest === meta.value.digest) catalogCache = { source, media };
+    return media;
   }
-  return ZEN_MEDIA_PROVIDERS;
+  return MEDIA_PROVIDERS_WITHOUT_CATALOG;
 }
 
 export const readOpenCodeMediaProviders = Effect.fn("OpenCode.readMediaProviders")(function* (env: NodeJS.ProcessEnv) {
   const databasePath = openCodeDatabasePath(env);
-  if (!databasePath || !existsSync(databasePath)) return ZEN_MEDIA_PROVIDERS;
+  if (!databasePath || !existsSync(databasePath)) return MEDIA_PROVIDERS_WITHOUT_CATALOG;
   return yield* Effect.try({
     try: () => readOpenCodeDatabase(databasePath, (database) => readCatalogMediaProviders(database, databasePath)),
     catch: (cause) => new OpenCodeUsageFailed({ cause }),
-  }).pipe(Effect.orElseSucceed(() => ZEN_MEDIA_PROVIDERS));
+  }).pipe(Effect.orElseSucceed(() => MEDIA_PROVIDERS_WITHOUT_CATALOG));
 });
 
-function hasMediaKeyVariable(env: NodeJS.ProcessEnv, keyVariables: ReadonlySet<string>): boolean {
+function hasMediaKeyVariable(env: NodeJS.ProcessEnv, media: OpenCodeMediaProviders): boolean {
   return Object.entries(env).some(([name, value]) => {
     const variable = name.toUpperCase();
-    return variable.endsWith("_API_KEY") && keyVariables.has(variable) && Boolean(value?.trim());
+    return variable.endsWith("_API_KEY") && media.paysForMediaKey(variable) && Boolean(value?.trim());
   });
 }
 
@@ -217,9 +216,9 @@ export const hasOpenCodeMediaSignIn = Effect.fn("OpenCode.hasMediaSignIn")(funct
   env: NodeJS.ProcessEnv,
   media: OpenCodeMediaProviders,
 ) {
-  if (hasMediaKeyVariable(env, media.keyVariables)) return true;
-  if ((yield* readAuthFileProviders(env)).some((provider) => media.providers.has(provider))) return true;
-  return (yield* readStoredCredentialProviders(env)).some((provider) => media.providers.has(provider));
+  if (hasMediaKeyVariable(env, media)) return true;
+  if ((yield* readAuthFileProviders(env)).some(media.paysForMedia)) return true;
+  return (yield* readStoredCredentialProviders(env)).some(media.paysForMedia);
 });
 
 const RefusedTurn = Schema.Struct({

@@ -43,6 +43,7 @@ interface Report {
     textProviderEnvKey: (boolean | null)[];
     customProviderKey: (boolean | null)[];
     textCustomProviderKey: (boolean | null)[];
+    envKeyWithoutCatalog: (boolean | null)[];
     userConfigKey: (boolean | null)[];
     otherProviderKey: (boolean | null)[];
   };
@@ -74,8 +75,8 @@ function seedOpenCodeCatalog() {
     deepseek: { env: ["DEEPSEEK_API_KEY"], models: models("chat") },
   };
   const catalog = new DatabaseSync(join(openCodeData, "opencode.db"));
-  catalog.exec("CREATE TABLE kv (key TEXT PRIMARY KEY, value TEXT NOT NULL)");
-  const insert = catalog.prepare("INSERT INTO kv (key, value) VALUES (?, ?)");
+  catalog.exec("CREATE TABLE IF NOT EXISTS kv (key TEXT PRIMARY KEY, value TEXT NOT NULL)");
+  const insert = catalog.prepare("INSERT OR REPLACE INTO kv (key, value) VALUES (?, ?)");
   insert.run("models-dev:v3:catalog", JSON.stringify({ updatedAt: 1, digest: "d1", body: JSON.stringify(body) }));
   insert.run("models-dev:v3:catalog:meta", JSON.stringify({ updatedAt: 1, digest: "d1" }));
   catalog.close();
@@ -201,6 +202,20 @@ try {
     [false, false],
     "A custom provider with a key but no catalog image models does not keep the tools (#17402).",
   );
+
+  const withoutCatalog = new DatabaseSync(join(openCodeData, "opencode.db"));
+  withoutCatalog.exec("DELETE FROM kv");
+  withoutCatalog.close();
+  process.env.OPENAI_API_KEY = "other-provider";
+  const envKeyWithoutCatalog = await mediaToolsOfNewProcess().finally(() => {
+    delete process.env.OPENAI_API_KEY;
+  });
+  assert.deepEqual(
+    envKeyWithoutCatalog,
+    [null, null],
+    "Before OpenCode stores its catalog, a provider key keeps the image and video tools as before.",
+  );
+  seedOpenCodeCatalog();
 
   const userConfig = join(root, "config", "opencode", "opencode.json");
   await mkdir(join(root, "config", "opencode"), { recursive: true });
@@ -340,6 +355,7 @@ try {
     textProviderEnvKey,
     customProviderKey,
     textCustomProviderKey,
+    envKeyWithoutCatalog,
     userConfigKey,
     otherProviderKey,
   };

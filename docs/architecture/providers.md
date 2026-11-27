@@ -796,8 +796,12 @@ A key keeps the tools only when its provider can pay for image or video models.
 `readOpenCodeMediaProviders` reads OpenCode's own catalog from `opencode.db` (kv
 `models-dev:v3:catalog` in 2.4, `models-dev:v2:catalog` in 2.2 and 2.3; the v3 `body` is a JSON
 string) and keeps the providers that have a model of type `image` or `video`, with their `env` key
-names. The result is cached until the catalog `digest` changes. A Zen key (`opencode`,
-`OPENCODE_API_KEY`) always counts, also when the catalog is missing. The check then counts a
+names. A provider entry or a model entry that does not decode is skipped. The result is cached
+until the catalog `digest` changes, and only when the catalog row has the same `digest` as its
+`:meta` row. A Zen key (`opencode`, `OPENCODE_API_KEY`) always counts. Before OpenCode stores a
+catalog (its first start, or `OPENCODE_DB=:memory:`), or when the catalog cannot be read, the check
+keeps the earlier rule: any `*_API_KEY` variable, and any key except an `opencode-go` key, keep the
+tools, so a working provider key does not lose them. With a catalog, the check counts a
 non-empty `*_API_KEY` variable that the catalog lists for such a provider, an `auth.json` entry or an
 active `credential` row for such a provider, a custom endpoint with a key or headers whose id is
 such a provider (`hasCustomProviderMediaKey`: the id `openai` gets the OpenAI image models of the
@@ -807,7 +811,7 @@ cannot decode. A key for a provider with no image or video model, such as a cust
 text model or a DeepSeek or Anthropic key, does not keep the tools: OpenCode would offer only the
 Zen image model, and the image job would fail with "Invalid credential" (#17402). Checked with the
 real OpenCode 2.4.2 and the catalogs of 2.4.2 and 2.2.5. `test:opencode-expired-key` checks the
-config with a seeded catalog.
+config with a seeded catalog and with no catalog.
 
 OpenCode first lists the models of a cached or built-in catalog and fetches the new catalog in the
 background, about 3 s later. A first start of OpenCode 2.2.5 listed 80 of 88 models. The OpenCode

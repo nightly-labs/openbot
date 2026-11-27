@@ -886,10 +886,9 @@ export const BUILT_IN_PROVIDER_DRIVERS: readonly BuiltInProviderDriver[] = [
           const keyEnv = clearedInheritedOpenCodeKeyEnv(context.apiKey("opencode"));
           const processEnv = { ...process.env, ...agentEnvironment, ...keyEnv };
           const media = Effect.runSync(readOpenCodeMediaProviders(processEnv));
-          const paysForMedia = (provider: string) => media.providers.has(provider);
           const mediaSignIn =
-            hasCustomProviderMediaKey(openCodeEndpoints(context)(), paysForMedia) ||
-            openCodeUserConfigHasMediaSetup(processEnv, paysForMedia) ||
+            hasCustomProviderMediaKey(openCodeEndpoints(context)(), media.paysForMedia) ||
+            openCodeUserConfigHasMediaSetup(processEnv, media.paysForMedia) ||
             Effect.runSync(hasOpenCodeMediaSignIn(processEnv, media));
           return {
             ...agentEnvironment,
