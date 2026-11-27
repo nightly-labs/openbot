@@ -107,7 +107,6 @@ export const startStdioMcpRelay = Effect.fn("StdioMcpRelay.start")(function* (la
       children.delete(child);
       if (entry.keptUntil) clearTimeout(entry.keptUntil);
       if (starting === entry) starting = null;
-      if (!closing) reportFailedStart(launch, output);
       const index = running.indexOf(entry);
       if (index >= 0) running.splice(index, 1);
     };
@@ -273,6 +272,7 @@ export const startStdioMcpRelay = Effect.fn("StdioMcpRelay.start")(function* (la
     close: () =>
       providerCall(async () => {
         closing = true;
+        for (const entry of running) entry.output.startSettled = true;
         const closed = new Promise<void>((resolve) => server.close(() => resolve()));
         server.closeAllConnections();
         await Promise.all([...transports].map((transport) => transport.close().catch(() => undefined)));
@@ -314,6 +314,7 @@ function startServer(launch: StdioMcpLaunch, output: ServerOutput): ChildProcess
   endProcessGroupOnExit(child);
   const buffer = new ReadBuffer();
   const end = () => {
+    reportFailedStart(launch, output);
     for (const answer of [...output.own.values()]) answer(null);
     const { transport, pending } = output;
     const ids = [...pending];
