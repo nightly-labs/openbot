@@ -1,7 +1,14 @@
 import type { AttachmentSummary } from "@openbot/contracts/ipc";
 import type { AppFormat, MobileTranslate } from "@openbot/i18n/mobile";
 import { chatDayLabels } from "./chat-day-markers";
-import { type ChatMarkerGroup, type ChatMessage, groupExchangeMarkers, groupRoutineRunMarkers } from "./chat-messages";
+import {
+  type ChatMarkerGroup,
+  type ChatMessage,
+  groupExchangeMarkers,
+  groupRoutineRunMarkers,
+  NO_CHANGED_INDEX,
+  oneChangedIndex,
+} from "./chat-messages";
 import { startOfDay } from "./message-time";
 
 export type ChatListRow = ChatMessage | ChatMarkerGroup;
@@ -88,19 +95,6 @@ function sameSettings(before: ChatListViewInput, after: ChatListViewInput): bool
   );
 }
 
-const SAME_ROWS = -1;
-
-function oneChangedRow(before: readonly ChatMessage[], after: readonly ChatMessage[]): number | null {
-  if (before.length !== after.length) return null;
-  let changed = SAME_ROWS;
-  for (let index = 0; index < after.length; index += 1) {
-    if (before[index] === after[index]) continue;
-    if (changed !== SAME_ROWS) return null;
-    changed = index;
-  }
-  return changed;
-}
-
 function rowCreatedAt(row: ChatMessage): string | undefined {
   return "createdAt" in row ? row.createdAt : undefined;
 }
@@ -110,9 +104,9 @@ function rowAttachments(row: ChatMessage): readonly AttachmentSummary[] | undefi
 }
 
 function streamedView(entry: ViewEntry, input: ChatListViewInput, now: Date): ChatListView | null {
-  const index = oneChangedRow(entry.input.messages, input.messages);
+  const index = oneChangedIndex(entry.input.messages, input.messages);
   if (index === null) return null;
-  if (index === SAME_ROWS) return entry.view;
+  if (index === NO_CHANGED_INDEX) return entry.view;
   const before = entry.input.messages[index];
   const after = input.messages[index];
   if (!before || !after || before.id !== after.id || before.kind !== after.kind || !UNGROUPED_KINDS.has(after.kind))

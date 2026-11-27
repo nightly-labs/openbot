@@ -706,17 +706,14 @@ function rememberProjection(entry: ProjectionEntry) {
   recentProjections.length = Math.min(recentProjections.length, RECENT_PROJECTIONS);
 }
 
-const SAME_MESSAGES = -1;
+export const NO_CHANGED_INDEX = -1;
 
-function oneChangedMessage(
-  before: readonly ConversationMessage[],
-  after: readonly ConversationMessage[],
-): number | null {
+export function oneChangedIndex<T>(before: readonly T[], after: readonly T[]): number | null {
   if (before.length !== after.length) return null;
-  let changed = SAME_MESSAGES;
+  let changed = NO_CHANGED_INDEX;
   for (let index = 0; index < after.length; index += 1) {
     if (before[index] === after[index]) continue;
-    if (changed !== SAME_MESSAGES) return null;
+    if (changed !== NO_CHANGED_INDEX) return null;
     changed = index;
   }
   return changed;
@@ -758,9 +755,9 @@ function streamedProjection(
 ): ChatMessage[] | null {
   for (const entry of recentProjections) {
     if (entry.readerKey !== reader.key || entry.progressUpdates !== progressUpdates) continue;
-    const index = oneChangedMessage(entry.messages, messages);
+    const index = oneChangedIndex(entry.messages, messages);
     if (index === null) continue;
-    if (index === SAME_MESSAGES) return entry.result;
+    if (index === NO_CHANGED_INDEX) return entry.result;
     const before = entry.messages[index];
     const after = messages[index];
     if (!before || !after || !sameBubbleContext(before, after)) return null;
