@@ -36,6 +36,7 @@ const FAILURE_OPERATIONS: Record<MobileEventName, Operation> = {
   account_sign_in_completed: "auth",
   notification_settings_action: "settings",
   live_activity_action: "settings",
+  chat_bubble_settings_action: "settings",
   analytics_preference_changed: "settings",
   voice_conversation_action: "voice",
   voice_turn: "voice",

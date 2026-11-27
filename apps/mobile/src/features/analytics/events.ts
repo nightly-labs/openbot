@@ -92,6 +92,10 @@ export const MOBILE_EVENTS = {
     enabled: isBoolean,
   },
   live_activity_action: { action: ["started", "ended"] },
+  chat_bubble_settings_action: {
+    action: ["enabled", "disabled", "agent_toggled", "agent_default", "open_settings"],
+    enabled: isBoolean,
+  },
   voice_conversation_action: { ...outcome, ...voice, action: ["start", "end"], turn_count: count },
   voice_turn: { ...outcome, ...voice, audio_duration_seconds: seconds },
   agent_template_action: { ...outcome, action: ["installed"], entry_point: ["deep_link"] },

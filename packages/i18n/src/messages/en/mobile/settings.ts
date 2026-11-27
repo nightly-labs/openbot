@@ -272,6 +272,17 @@ export const messages = defineMessages("mobile.settings", {
     "Shows agent work, messages, questions, and approvals on the Lock Screen and in the Dynamic Island while OpenBot runs.",
   "mobile.settings.liveActivities.toggle": "Show agent activity",
   "mobile.settings.liveActivities.retry": "Retry saving Live Activities setting",
+  "mobile.settings.chatBubble.title": "Chat bubbles",
+  "mobile.settings.chatBubble.toggle": "Show chat bubbles",
+  "mobile.settings.chatBubble.footer":
+    "A bubble stays on the screen over other apps and shows a dot when an agent has a new message. Tap the bubble to read the chat in a small window. This is off by default. Android must also allow bubbles for OpenBot.",
+  "mobile.settings.chatBubble.openSettings": "Open Android settings",
+  "mobile.settings.chatBubble.agentToggle": "Show a bubble for this agent",
+  "mobile.settings.chatBubble.useDefault": "Use the default setting",
+  "mobile.settings.chatBubble.channel": "Chat bubbles",
+  "mobile.settings.chatBubble.noSession": "Sign in to OpenBot to read this chat.",
+  "mobile.settings.chatBubble.noAgent": "This agent is not available now.",
+  "mobile.settings.chatBubble.close": "Close",
   "mobile.settings.notifications.title": "Notifications",
   "mobile.settings.notifications.toggle": "Allow notifications",
   "mobile.settings.notifications.footer":
