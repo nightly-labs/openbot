@@ -1027,7 +1027,7 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
               Effect.sync(() => {
                 this.#drain.scheduleDrains(this.#store.list().map((agent) => agent.id));
                 for (const agentId of this.#mailbox.agentsWithEditHolds()) this.#queue.wakeAfterEditHold(agentId);
-                this.#emitRuntimeSnapshot();
+                if (!this.#stopping) this.#emitRuntimeSnapshot();
               }),
             ),
             toProviderOperationFailed,
@@ -1250,7 +1250,8 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
       rotateSession: (agentId, client, threadId) => this.#threads.rotateProviderSession(agentId, client, threadId),
       loadSession: (agentId, client, threadId) => this.#threads.loadSessionForCompaction(agentId, client, threadId),
       rotatesSession: (agentId, threadId) => this.#threads.rotatesSession(agentId, threadId),
-      compactionMode: (agent) => this.#compactionMode(agent),
+      runningCompactionMode: (agent) =>
+        this.#providers.agentClientRunning(agent) ? this.#compactionMode(agent) : undefined,
       isStopping: () => this.#stopping,
       compacted: (threadId) => {
         this.channels.contextCompacted(threadId);

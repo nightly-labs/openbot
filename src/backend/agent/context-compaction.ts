@@ -88,7 +88,7 @@ export interface ContextCompactionOptions {
   ): Effect.Effect<string | null, ThreadOperationFailed>;
   loadSession(agentId: string, client: AgentClient, threadId: string): Effect.Effect<boolean, ThreadOperationFailed>;
   rotatesSession(agentId: string, threadId: string): boolean;
-  compactionMode?(agent: AgentSummary): AgentClient["contextCompaction"];
+  runningCompactionMode?(agent: AgentSummary): AgentClient["contextCompaction"];
   isStopping(): boolean;
   changed?(): void;
   compacted?(threadId: string): void;
@@ -170,7 +170,7 @@ export class ContextCompaction {
     this.#rotateSession = options.rotateSession;
     this.#loadSession = options.loadSession;
     this.#rotatesSession = options.rotatesSession;
-    this.#compactionMode = options.compactionMode ?? (() => undefined);
+    this.#compactionMode = options.runningCompactionMode ?? (() => undefined);
     this.#isStopping = options.isStopping;
     this.#cacheExpiry = new CacheExpiryCompaction({
       usedTokens: (threadId) => this.#display.get(threadId)?.usage?.usedTokens ?? null,
