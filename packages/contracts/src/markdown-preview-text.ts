@@ -127,6 +127,11 @@ export function markdownInlinePlainText(body: string): string {
   return inlineText(new markdown.Lexer(markdown.defaults).inlineTokens(body)).replace(/\s+/gu, " ").trim();
 }
 
+export function thoughtTitle(text: string): string {
+  const line = text.split("\n").find((candidate) => candidate.trim()) ?? "";
+  return markdownInlinePlainText(line.replace(/^\s*#{1,6}\s+/u, ""));
+}
+
 function listLines(token: Tokens.List, depth: number): string[] {
   const start = typeof token.start === "number" ? token.start : 1;
   return token.items.flatMap((item, index) => {

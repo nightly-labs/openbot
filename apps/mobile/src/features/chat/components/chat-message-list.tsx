@@ -4,7 +4,7 @@ import { avatarHeadColor } from "@openbot/brand/bloub-avatar";
 import { expandAttachmentReferences } from "@openbot/contracts/attachment-references";
 import { expandChatTagReferences } from "@openbot/contracts/chat-tag-references";
 import type { AttachmentSummary, BrowserTakeoverRequest } from "@openbot/contracts/ipc";
-import { markdownInlinePlainText, markdownPlainText } from "@openbot/contracts/markdown-preview-text";
+import { markdownInlinePlainText, markdownPlainText, thoughtTitle } from "@openbot/contracts/markdown-preview-text";
 import { useIsFocused } from "expo-router";
 import { Button, Spinner, Typography } from "heroui-native";
 import CircleX from "lucide-react-native/icons/circle-x";
@@ -1926,7 +1926,7 @@ export const ChatMessageList = memo(function ChatMessageList({
     );
     const latestStep =
       showThinking && !replying && latestThinking?.kind === "thinking" ? latestThinking.steps.at(-1) : undefined;
-    const thinkingDetail = latestStep && !latestStep.progress ? latestStep.text.replace(/\s+/gu, " ").trim() : null;
+    const thinkingDetail = latestStep && !latestStep.progress ? thoughtTitle(latestStep.text) : null;
     const activityLabel =
       sending && !activity
         ? t("common.sending")

@@ -1,4 +1,5 @@
 import { analyticsTokens, type ConversationTurnTrace } from "@openbot/contracts/ipc";
+import { thoughtTitle } from "@openbot/contracts/markdown-preview-text";
 import type { AgentMessage } from "@openbot/ui/data";
 import type { AgentStep, AgentStepsFacts } from "@openbot/ui/features/conversation/AgentSteps";
 import { silentAgentAnswer } from "@openbot/ui/features/conversation/new-message-tally";
@@ -28,12 +29,8 @@ function stepText(step: AgentStep): string {
   return step.kind === "memory" ? step.change.text : step.text;
 }
 
-function thoughtTitle(text: string): string {
-  const line = text.trim().split("\n", 1)[0] ?? "";
-  return line
-    .replace(/^#+\s*/, "")
-    .replaceAll("**", "")
-    .slice(0, 120);
+function spanTitle(text: string): string {
+  return thoughtTitle(text).slice(0, 120);
 }
 
 export interface TraceLabels {
@@ -75,7 +72,7 @@ function storedSpans(
     previousEnd = Math.max(previousEnd, end);
     const failed = step.failed === true;
     if (step.kind === "reasoning") {
-      const title = thoughtTitle(thoughts.get(step.id) ?? "");
+      const title = spanTitle(thoughts.get(step.id) ?? "");
       spans.push({
         id: step.id,
         parentId: "turn",
@@ -129,7 +126,7 @@ function guessedSpans(timed: readonly TimedStep[], lastEnd: number, labels: Trac
       spans.push({
         id: step.id,
         parentId: "turn",
-        name: thoughtTitle(step.text),
+        name: spanTitle(step.text),
         kind: "model",
         icon: "thinking",
         start: at,

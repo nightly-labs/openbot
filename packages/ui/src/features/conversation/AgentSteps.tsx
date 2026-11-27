@@ -1,5 +1,6 @@
 import type { ConversationMemoryChange } from "@openbot/contracts/ipc";
 import { countConversationMemoryChanges } from "@openbot/contracts/ipc";
+import { markdownPreviewText } from "@openbot/contracts/markdown-preview-text";
 import type { JSX } from "@solidjs/web";
 import { createEffect, createMemo, createSignal, createUniqueId, For, onSettled, Show } from "solid-js";
 import { Badge } from "../../badge";
@@ -109,10 +110,11 @@ function stepBody(step: AgentStep, newest: boolean, text: TextValue): JSX.Elemen
     );
   }
   if (step.kind === "thinking") {
+    const thought = markdownPreviewText(step.text);
     return (
       <span class={["agent-step-text", { "agent-activity-label": newest }]} dir="auto">
-        {step.text}
-        {newest && <ActivityShine text={step.text} />}
+        {thought}
+        {newest && <ActivityShine text={thought} />}
       </span>
     );
   }
