@@ -3,6 +3,7 @@ import { mkdir, readFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
 import { playableMediaKind } from "@openbot/contracts/attachment-files";
 import { rewriteAttachmentReferences } from "@openbot/contracts/attachment-references";
+import type { ImageSize } from "@openbot/contracts/image-size";
 import { INPUT_LIMITS } from "@openbot/contracts/input-limits";
 import type {
   AgentRuntimeWorkItem,
@@ -3796,6 +3797,34 @@ export class MailboxStore {
     const staged = this.#stagedGeneratedAttachments.get(attachmentId);
     if (staged) return staged.path;
     return this.#fileRecords().find((record) => record.id === attachmentId && !record.deletedAt)?.path ?? null;
+  }
+
+  knownAttachmentSizes(attachmentIds: ReadonlySet<string>): Map<string, ImageSize> {
+    const sizes = new Map<string, ImageSize>();
+    for (const id of attachmentIds) {
+      const size = this.#files.imageSizes.get(id);
+      if (size) sizes.set(id, size);
+    }
+    return sizes;
+  }
+
+  attachmentPaths(attachmentIds: ReadonlySet<string>): Map<string, string> {
+    const paths = new Map<string, string>();
+    for (const id of attachmentIds) {
+      const staged = this.#stagedGeneratedAttachments.get(id);
+      if (staged) paths.set(id, staged.path);
+    }
+    const take = (record: StoredAttachment) => {
+      if (!record.deletedAt && attachmentIds.has(record.id) && !paths.has(record.id)) paths.set(record.id, record.path);
+    };
+    for (const draft of this.#state.drafts) take(draft);
+    for (const message of this.#state.messages) {
+      if (paths.size === attachmentIds.size) return paths;
+      for (const record of message.attachments) take(record);
+      if (message.voiceRecording) take(message.voiceRecording);
+    }
+    for (const record of this.#state.generatedAttachments) take(record);
+    return paths;
   }
 
   storeGeneratedAttachment = Effect.fn("MailboxStore.storeGeneratedAttachment")(function* (

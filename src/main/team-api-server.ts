@@ -64,6 +64,11 @@ import { AGENT_THREAD_REPLIES_CAPABILITY } from "@openbot/contracts/team-protoco
 import { AGENT_THREAD_REQUESTS_CAPABILITY } from "@openbot/contracts/team-protocol/agent-thread-requests-v1";
 import { AGENT_THREADS_CAPABILITY } from "@openbot/contracts/team-protocol/agent-threads-v1";
 import { ANTIGRAVITY_CODE_SIGN_IN_CAPABILITY } from "@openbot/contracts/team-protocol/antigravity-code-sign-in-v1";
+import {
+  type AttachmentSizeLookup,
+  TEAM_ATTACHMENT_DIMENSIONS_CAPABILITY,
+  withAttachmentDimensions,
+} from "@openbot/contracts/team-protocol/attachment-dimensions-v1";
 import { BACKGROUND_PROCESSES_CAPABILITY } from "@openbot/contracts/team-protocol/background-processes-v1";
 import { BROWSER_EGRESS_CAPABILITY } from "@openbot/contracts/team-protocol/browser-egress-v1";
 import { BROWSER_HTTP_SIGN_IN_CAPABILITY } from "@openbot/contracts/team-protocol/browser-http-sign-in-v1";
@@ -392,6 +397,7 @@ import { listenLoopback } from "./listen-loopback";
 import { mcpAccessLevel } from "./mcp-access-store";
 import { RemoteScreenError } from "./remote-screen-gateway";
 import { RemoteWorkflowError, remoteCall, toRemoteWorkflowError } from "./remote-service-effects";
+import { createAttachmentSizeCache } from "./team-api/attachment-sizes";
 import { isClientUse } from "./team-api/client-use";
 import type { TeamApiMcpServerOwners, TeamApiOptions, TeamApiSidebarLayout } from "./team-api/dependencies";
 import { HttpError } from "./team-api/http-error";
@@ -733,9 +739,14 @@ export class TeamApiServer {
   readonly #reportedUnrepresentableAgents = new Set<string>();
   readonly #representableAgents = new Map<string, Map<string, { json: string; representable: boolean }>>();
   #nextRateLimitSweepAt = 0;
+  readonly #attachmentSizes: AttachmentSizeLookup;
 
   constructor(options: TeamApiOptions) {
     this.#options = { ...options, sidebarLayout: options.sidebarLayout ?? unavailableSidebarLayout() };
+    this.#attachmentSizes = createAttachmentSizeCache({
+      known: (attachmentIds) => options.mailbox.knownAttachmentSizes?.(attachmentIds) ?? new Map(),
+      paths: (attachmentIds) => options.mailbox.attachmentPaths?.(attachmentIds) ?? new Map(),
+    });
     this.#rateLimitCapacity = options.rateLimitCapacity ?? RATE_LIMIT_CAPACITY;
     this.#now = options.now ?? Date.now;
     options.admin?.remoteChatContent?.onChange(() => this.refreshRemoteChatContent());
@@ -1862,9 +1873,12 @@ export class TeamApiServer {
       const withSkills = capabilities.has(SKILL_LEARNING_CAPABILITY)
         ? withSkillSuggestionNames(withPayments, visible)
         : withPayments;
-      return capabilities.has(TEAM_PROMPT_DETAIL_CAPABILITY)
+      const withDetails = capabilities.has(TEAM_PROMPT_DETAIL_CAPABILITY)
         ? withPromptQuestionDetails(withSkills, visible)
         : withSkills;
+      return capabilities.has(TEAM_ATTACHMENT_DIMENSIONS_CAPABILITY)
+        ? withAttachmentDimensions(withDetails, visible, this.#attachmentSizes)
+        : withDetails;
     }
     return encodeTeamProtocolV1CurrentEvent(visible, options);
   }
@@ -2134,6 +2148,8 @@ export class TeamApiServer {
                   }
                 : optional,
         );
+        if (connection.capabilities.has(TEAM_ATTACHMENT_DIMENSIONS_CAPABILITY))
+          outgoing = withAttachmentDimensions(outgoing, optional, this.#attachmentSizes);
         outgoingBytes = Buffer.byteLength(outgoing);
       } else if (event.type === "conversation" && supportsRuntimeSnapshots) {
         const conversationInvalidation = encodeEvent(
@@ -2164,7 +2180,7 @@ export class TeamApiServer {
           !connection.capabilities.has("hosted-site-event-markers") ||
           event.snapshot.messages.some((message) => !markerSupported(message.itemType, connection.capabilities)))
       ) {
-        const key = `${blockedKey}:${protocol}:${connection.capabilities.has("opencode")}:${connection.capabilities.has("routine-event-markers")}:${connection.capabilities.has("routine-run-event-markers")}:${connection.capabilities.has("hosted-site-event-markers")}:${connection.capabilities.has(SETTING_LINK_MARKERS_CAPABILITY)}:${connection.capabilities.has(ROUTINE_QUIET_ANSWERS_CAPABILITY)}:${connection.capabilities.has(TEAM_PROMPT_MULTI_SELECT_CAPABILITY)}:${connection.capabilities.has(TEAM_UI_BLOCK_AUTO_ANSWER_CAPABILITY)}:${connection.capabilities.has(TEAM_UI_BLOCK_VAULT_CAPABILITY)}:${connection.capabilities.has(TEAM_UI_BLOCK_LOCATION_CAPABILITY)}:${connection.capabilities.has(TEAM_NEAR_PAYMENT_CAPABILITY)}:${connection.capabilities.has(SKILL_LEARNING_CAPABILITY)}:${connection.capabilities.has(TEAM_PROMPT_DETAIL_CAPABILITY)}:${encodingOptions.preserveSemanticTags}`;
+        const key = `${blockedKey}:${protocol}:${connection.capabilities.has("opencode")}:${connection.capabilities.has("routine-event-markers")}:${connection.capabilities.has("routine-run-event-markers")}:${connection.capabilities.has("hosted-site-event-markers")}:${connection.capabilities.has(SETTING_LINK_MARKERS_CAPABILITY)}:${connection.capabilities.has(ROUTINE_QUIET_ANSWERS_CAPABILITY)}:${connection.capabilities.has(TEAM_PROMPT_MULTI_SELECT_CAPABILITY)}:${connection.capabilities.has(TEAM_UI_BLOCK_AUTO_ANSWER_CAPABILITY)}:${connection.capabilities.has(TEAM_UI_BLOCK_VAULT_CAPABILITY)}:${connection.capabilities.has(TEAM_UI_BLOCK_LOCATION_CAPABILITY)}:${connection.capabilities.has(TEAM_NEAR_PAYMENT_CAPABILITY)}:${connection.capabilities.has(SKILL_LEARNING_CAPABILITY)}:${connection.capabilities.has(TEAM_PROMPT_DETAIL_CAPABILITY)}:${connection.capabilities.has(TEAM_ATTACHMENT_DIMENSIONS_CAPABILITY)}:${encodingOptions.preserveSemanticTags}`;
         let filtered = filteredConversationPayloads.get(key);
         if (!filtered) {
           filtered = encodeEvent(
@@ -2804,9 +2820,12 @@ export class TeamApiServer {
     const withSkills = route.capabilities.has(SKILL_LEARNING_CAPABILITY)
       ? withSkillSuggestionNames(withPayments, effortValue)
       : withPayments;
-    return route.capabilities.has(TEAM_PROMPT_DETAIL_CAPABILITY)
+    const withDetails = route.capabilities.has(TEAM_PROMPT_DETAIL_CAPABILITY)
       ? withPromptQuestionDetails(withSkills, effortValue)
       : withSkills;
+    return route.capabilities.has(TEAM_ATTACHMENT_DIMENSIONS_CAPABILITY)
+      ? withAttachmentDimensions(withDetails, effortValue, this.#attachmentSizes)
+      : withDetails;
   }
 
   #unrepresentableAgentIds(
@@ -3571,6 +3590,7 @@ const EVENT_ENCODING_CAPABILITIES = [
   QUEUE_HOLD_CAPABILITY,
   QUEUE_HOLD_SIGN_IN_CAPABILITY,
   AGENT_ERROR_LINK_CAPABILITY,
+  TEAM_ATTACHMENT_DIMENSIONS_CAPABILITY,
 ];
 
 function eventEncodingKey(capabilities: ReadonlySet<string>, options: { preserveSemanticTags?: boolean }): string {

@@ -1,3 +1,4 @@
+import { knownImageSize } from "@openbot/contracts/image-size";
 import type { AttachmentSummary } from "@openbot/contracts/ipc";
 import { ATTACHMENT_PREVIEW_EDGE } from "@openbot/contracts/team-protocol/attachment-preview-v1";
 import { Button, ChevronLeft, ChevronRight, Dialog, Spinner, toast, X } from "@openbot/ui";
@@ -82,9 +83,11 @@ function rememberCopyRatio(attachmentId: string, ratio: number): void {
   if (!oldest.done) copyRatios.delete(oldest.value);
 }
 
-function rememberedGalleryRatio(attachmentId: string): number {
-  const size = rememberedMediaSize(attachmentId);
-  return size ? galleryRatio(size.width, size.height) : (copyRatios.get(attachmentId) ?? 1);
+function rememberedGalleryRatio(attachment: AttachmentSummary): number {
+  const size = rememberedMediaSize(attachment.id);
+  if (size) return galleryRatio(size.width, size.height);
+  const sent = knownImageSize(attachment);
+  return copyRatios.get(attachment.id) ?? (sent ? galleryRatio(sent.width, sent.height) : 1);
 }
 
 export function ImageGallery(props: {
@@ -101,7 +104,7 @@ export function ImageGallery(props: {
   let gallery: HTMLUListElement | undefined;
   const layout = createMemo(() =>
     justifiedGalleryLayout(
-      props.images.map((image, index) => ratios[index] ?? rememberedGalleryRatio(image.id)),
+      props.images.map((image, index) => ratios[index] ?? rememberedGalleryRatio(image)),
       {
         width: width(),
         rowHeight: GALLERY_ROW_HEIGHT,

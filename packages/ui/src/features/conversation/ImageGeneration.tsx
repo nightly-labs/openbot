@@ -1,3 +1,4 @@
+import { knownImageSize } from "@openbot/contracts/image-size";
 import {
   type AttachmentSummary,
   type ImageGenerationAspectRatio,
@@ -42,8 +43,13 @@ export function ImageGeneration(props: ImageGenerationProps) {
   const [copyFailed, setCopyFailed] = createSignal(false);
   const [imageSize, setImageSize] = createSignal(
     untrack(() => {
-      const id = props.attachment?.id;
-      return id ? (rememberedMediaSize(id) ?? rememberedMediaSize(copySizeKey(id))) : null;
+      const attachment = props.attachment;
+      if (!attachment) return null;
+      return (
+        rememberedMediaSize(attachment.id) ??
+        rememberedMediaSize(copySizeKey(attachment.id)) ??
+        knownImageSize(attachment)
+      );
     }),
   );
   const copyIsSharp = () => {
