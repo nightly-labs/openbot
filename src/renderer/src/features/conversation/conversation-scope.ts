@@ -1194,8 +1194,11 @@ export function createConversationViewScope(props: ConversationProps) {
     return () => setPromptComposerAnswer((current) => (current === answer ? undefined : current));
   };
   const [unsavedKey, setUnsavedKey] = createSignal<() => Promise<boolean>>();
-  const keepUnsavedKey = (save: (() => Promise<boolean>) | undefined) => setUnsavedKey(() => save);
   const [heldKeySend, setHeldKeySend] = createSignal<() => void>();
+  const keepUnsavedKey = (save: (() => Promise<boolean>) | undefined) => {
+    setUnsavedKey(() => save);
+    if (!save) setHeldKeySend(undefined);
+  };
   const unsavedKeyDialogOpen = () => heldKeySend() !== undefined && unsavedKey() !== undefined;
   const holdForUnsavedKey = (resend: () => void) => {
     if (!unsavedKey()) return false;

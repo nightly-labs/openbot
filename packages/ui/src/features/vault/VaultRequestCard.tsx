@@ -7,7 +7,7 @@ import {
 } from "@openbot/contracts/ui-blocks";
 import type { AppTextKey } from "@openbot/i18n";
 import { Button, CreditCard, Field, KeyRound, NativeSelect, UserRound } from "@openbot/ui";
-import { createSignal, createUniqueId, For, Match, onCleanup, Show, Switch, untrack } from "solid-js";
+import { createEffect, createSignal, createUniqueId, For, Match, onCleanup, Show, Switch, untrack } from "solid-js";
 import { useText } from "../../text";
 import { UiBlockCard } from "../conversation/ui-blocks/UiBlockCard";
 import {
@@ -151,21 +151,21 @@ export function VaultRequestCard(props: VaultRequestCardProps) {
   const pending = () => props.status === "pending";
   const keyForm = () => props.kind === "apiKey" && pending();
 
-  function changeApiKey(key: string): void {
-    setApiKey(key);
-    props.onUnsavedKeyChange?.(keyForm() && props.onSave && key.trim() !== "" ? saveApiKey : undefined);
-  }
+  createEffect(
+    () => keyForm() && Boolean(props.onSave) && apiKey().trim() !== "",
+    (unsaved) => props.onUnsavedKeyChange?.(unsaved ? saveApiKey : undefined),
+  );
 
   async function saveApiKey(): Promise<boolean> {
     const save = props.onSave;
-    if (!save || props.busy || apiKey().trim() === "") return false;
+    if (!save || !keyForm() || props.busy || apiKey().trim() === "") return false;
     setSaveFailure(undefined);
     try {
       await save(
         { kind: "apiKey", id: null, name: props.prefill.name ?? "", notes: "", key: apiKey() },
         props.scope ? scopeChoice() : undefined,
       );
-      changeApiKey("");
+      setApiKey("");
       return true;
     } catch (cause) {
       setSaveFailure(errorMessage(cause, t("vault.failed")));
@@ -262,7 +262,7 @@ export function VaultRequestCard(props: VaultRequestCardProps) {
           scope={props.scope}
           apiKey={apiKey()}
           scopeChoice={scopeChoice()}
-          onKeyChange={changeApiKey}
+          onKeyChange={setApiKey}
           onScopeChange={setScopeChoice}
           onSubmit={() => void saveApiKey()}
         />

@@ -821,6 +821,7 @@ export function createComposerActions(deps: ComposerActionsDeps) {
       return false;
     if (
       !keyChoiceMade &&
+      !voice &&
       targetShown(target) &&
       deps.holdForUnsavedKey(() => void submitMessage(undefined, undefined, undefined, undefined, steer, true))
     )
