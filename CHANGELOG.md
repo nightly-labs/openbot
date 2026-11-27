@@ -26,16 +26,21 @@ All notable changes to OpenBot will be documented here. The project follows
 - Gemini Omni 1.2 videos now use paid credits only. Free welcome credits do not pay for them.
 - A server with a long message history uses less CPU for each agent message. Sending a message, starting and finishing a turn, reading the queues and opening a conversation no longer read all the saved messages of all agents. With 70,000 messages, these steps are 5 to 30 times faster. A server must be on this version to get the gain.
 - A server now sends its logo color and shape to the Apple Watch app, so the watch can show the server logo and color when it connects to the server directly.
-- The account service can answer the sign-in checks from a nearby copy of its database, and it reads the server list with fewer database calls. This helps it stay fast when many people use OpenBot at the same time.
 - When a joined server disconnects, the desktop app checks your server list again after a short random wait, not at once. When many apps lose their connection at the same time, the checks do not all come at the same second.
 - The web app checks your account at most once a minute when you go back to its tab.
-- Reconnect the web client faster after the connection to a joined server drops. A failed attempt
+- After the connection to a joined server drops, the web client reconnects sooner. A failed attempt
   is tried again after 0.5, 1.2, 2.7 and 4.8 seconds, and the wait after 5 failed attempts is 15
   seconds. Before, the waits were 2, 4, 8 and 16 seconds, then 30 seconds.
-- Move a web client connection that goes through the OpenBot relay to a direct path when one
-  becomes available. This makes replies arrive sooner.
-- The account service reads your server list with one database query, and it records the last use of a sign-in at most once an hour. This makes the account service lighter, so it stays fast when many people use OpenBot.
-- The account service reads more data from database copies near you, and your apps still see their own changes immediately. This makes the account service faster and lighter.
+- A web client connection that goes through the OpenBot relay now moves to a direct path when one
+  becomes available, so replies arrive sooner.
+- The account service does less database work. It reads more data from database copies near you, reads your server list with one query, records the last use of a sign-in at most once an hour, and charges a finished credit job with fewer database calls. It stays fast when many people use OpenBot, and your apps still see their own changes at once.
+- The browser extension waits before it looks for your server again after a failed connection: 30 s,
+  then two times longer each time, up to 5 minutes. When the account has no server, it does not ask
+  again on each tab change. On X, it checks again each 30 s, and a reply that you send tries again at
+  once. When your session ended, it waits until you sign in again.
+- A computer or the web app that cannot connect to a joined server waits longer between the groups of
+  attempts: 15 s, then two times longer each time, up to 5 minutes. A refresh, a network change or a
+  return to the app tries again at once.
 - Links in chats no longer show the icon of their web site until an owner or admin turns on "Load remote content in chats".
 - The desktop app now checks for server ownership requests less often when you focus its window. A new request still shows at once. This removes load from the account database.
 - The Apps tab of the Marketplace now loads the app list from openbot.run. A new app shows on the desktop app and the web client without an update. A new app that runs a local command shows only when the server is also on the new OpenBot version.
@@ -71,8 +76,9 @@ All notable changes to OpenBot will be documented here. The project follows
 - When the EU VAT system cannot check your VAT ID, you can now continue to payment. You pay Polish VAT. To get reverse charge on the next invoices, save the VAT ID again when the EU VAT system works.
 - On macOS and Linux, a provider check that did not finish in time, or that was still running when you quit OpenBot, stopped only the provider's start script. Programs that the script started, such as a version manager, continued to run and could make the computer slow. OpenBot now stops all of them.
 - Two messages that an agent got in the same millisecond keep their order after OpenBot restarts.
-- Send the sign-in code when many people sign in at the same time. Before, the code did not arrive
-  after the email service reached its hourly and daily limits.
+- The sign-in code now arrives when many people sign in at the same time. Before, the code did not
+  arrive after the email service reached its hourly and daily limits. Two more mailboxes now send the
+  code when the others reach their hourly limit.
 - When the model's safety check refuses an OpenBot credits image or video, the workflow and the agent now say why: the model often refuses real people, famous characters, brands, violence and adult content. Change the prompt or the pictures and try again. No credits are used. An older server shows the general "refused" text.
 - A WhatsApp number that cannot reach WhatsApp now shows "Needs attention" with Reconnect in Marketplace after about 4 minutes. Before, when its last good connection was more than a minute before, it showed "Connected" with no Reconnect, while each agent post waited 5 minutes and then failed with "not connected". OpenBot also waits longer between the attempts again, and does not try every 2 seconds. On a joined server, the server must also be on this version.
 - The turn trace of a Pi agent shows the real run time of each tool step. Before, each tool step showed 0 seconds, also when a shell command ran for minutes.
@@ -84,12 +90,10 @@ All notable changes to OpenBot will be documented here. The project follows
 - When you drop or paste pictures, videos, audio files or steps on a new canvas before you choose a template, the canvas starts blank and the template choice closes. Before, the template choice stayed on top of the new items.
 - When you drop or paste a file that a canvas cannot use, a message tells you which file types it can use. Before, the canvas ignored the file.
 - A reply in a thread, such as the own chat of a routine, that comes while the OpenBot app is open on your phone now sends a phone notification when you leave the app, if you did not open that thread. Before, the reply showed only in that thread, and no notification came. A reply in a thread that you opened still sends no notification. On a joined server, the server must also be on this version.
-- Show the correct reason when a Telegram chat cannot link because the computer cannot connect to the
-  OpenBot service. Before, each cause showed the same "check the internet, VPN, proxy, or firewall"
+- When a Telegram chat cannot link because the computer cannot connect to the OpenBot service, the
+  message now gives the correct reason. Before, each cause showed the same "check the internet, VPN, proxy, or firewall"
   text, also when the service refused the connection or security software blocked it. The main log
   now also records why the connection failed.
-- Send more sign-in codes in a busy hour. A third mailbox sends the code when the other two reach
-  their hourly limit.
 - In the desktop app, when you open a PDF from a file link in a chat and save it with the download
   button of the PDF viewer, the save dialog now shows the name of the file. Before, it showed a
   random ID such as `b6ce5234-….pdf`. This also applies to files from a joined server that you open
@@ -103,32 +107,25 @@ All notable changes to OpenBot will be documented here. The project follows
 - When Devin says that your daily or weekly usage quota has been exhausted, an agent with automatic backup models now moves to its next backup model. Before, each message failed with the Devin quota error until you changed the main model by hand. On a joined server, the server must also be on this version.
 - While the Chrome extension connects to a server, it shows the server it connects to, all the servers of your account, and the account you signed in with. You can select another server, try again, or sign out. Before, the extension showed only "Connecting to" and the server name, and you could not leave that screen.
 - When you open the Chrome extension, it no longer shows the sign-in screen for a moment before your chats.
-- Find a web client connection to a joined server that stopped silently within about 12 seconds,
-  and reconnect. Before, the server could show as online while no new messages arrived, until a
+- Within about 12 seconds, the web client now finds a connection to a joined server that stopped
+  silently, and reconnects. Before, the server could show as online while no new messages arrived, until a
   request timed out.
 - Marketplace: an app such as Readwise that is turned off now shows "Paused" and says that agents do
   not get its tools. Reconnect turns it on again. Before, Marketplace showed the app as Connected,
   and Reconnect kept it off.
-- Send more sign-in codes in a busy hour. A fourth mailbox sends the code when the other three reach
-  their hourly limit.
-- Channels keep their cached messages visible when you reopen them after background activity, and refresh in parallel with the channel list instead of waiting an extra round trip.
 - Channels show a loading message while the first page loads. Recent messages appear immediately
   when you switch back from an agent chat and the page is still in memory.
 - When your account has no servers, the Chrome extension now shows the account you signed in with, a Try again button and a Sign out button. Before, it showed only a line of text, and you could not sign out or load the servers again.
 - In a channel with no agents, the stopped tasks stay on the message box again. The "Add agents" note
   shows above them and does not cover them.
-- Stop reloading an active remote chat's queue, routines, and waits when provider status updates without changing phase.
+- On a joined server, an open agent chat no longer loads its queue, routines and waits again each time the provider status changes but the turn stays in the same step.
 - Joined-server chats and channels with no unread messages load 24 messages on the first page, so switching chats is faster. A channel with unread messages opens on all the messages after your last read one, up to 100, so the "New" line stays on the first page. An agent chat with unread messages loads 50 messages, as before. Scrolling up continues to load full older pages. The channel change needs the server on this version too.
-- Remote agent chats warm their latest 24 messages in the background during idle time so switching to an unvisited chat shows messages immediately.
-- The account service charges a finished credit job with less database work, so it stays fast as
-  more people use credits.
+- On a joined server, the app loads the latest 24 messages of agent chats in the background when it is idle. A chat that you did not open yet shows its messages at once.
 - Usage shows the estimated cost of Gemini 4 Carbon turns on Antigravity, also for turns from before
   this version. Before, they showed "No cost estimate" and "Unavailable", and the total cost left
   them out. On a joined server, the server must also be on this version.
 - On a joined server, the desktop app and the web client now load the latest page of up to six open channels in the background when the app is idle. When you open such a channel for the first time, its messages show at once, and newer messages come in when the server answers. Before, each first open showed a loading state until the server answered.
 - On a joined server, channels that you opened recently now keep their saved page when the server sends a status update, for example after an agent turn. Before, the next open of each channel showed a loading state again. When the channel changed in the meantime, the page from the server replaces the saved page.
-- The account service reads the pending server owner transfers from a database copy, so the main
-  database has more room as more people use OpenBot.
 - On a touch screen, a chat that you tap in the "Unread" group of the sidebar now stays in its place while you use the list. Before, the row moved to its folder at once, under your finger. It now moves when you touch outside the list or leave the window, as it does for a mouse.
 - In the full browser view and in the separate browser window, a click on a tab that another agent opened now shows that tab. Before, the view could stay on the page that was active before the click.
 - On a joined server and in the web client, a picture in a chat now has its correct size before it
