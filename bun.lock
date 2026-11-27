@@ -157,7 +157,7 @@
     },
     "apps/mobile": {
       "name": "@openbot/mobile",
-      "version": "1.4.14",
+      "version": "1.4.15",
       "dependencies": {
         "@bacons/apple-targets": "5.0.0",
         "@config-plugins/react-native-webrtc": "15.0.2",
