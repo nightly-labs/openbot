@@ -302,9 +302,13 @@ durable check before Signal issues a replacement. Later reconnects use the in-me
 This is not a heartbeat. Signal collects these checks for 25 ms and sends up to 100 of them in one
 signed `/v2/remote/resume/validate-batch` request, which reads D1 with one host query and one
 session query, so a restart that reconnects every host costs about one request per 100 hosts, not
-one per host. An account service without the batch route answers 404; Signal then uses the single
-`/v2/remote/resume/validate` route, at most 64 at a time, and tries the batch route again after
-10 minutes.
+one per host. Signal sends at most 128 batch requests at a time, and closes a socket with 1013 when
+its check has no answer after 15 s. One batch request takes 0.2 to 3.3 s in production
+(2026-11-28), also with 128 requests at a time, so a home with 18,000 sockets is checked in about
+2 rounds. With 8 at a time, a home with 4,100 sockets needed about 6 rounds, and 186 checks passed
+the old 7 s limit. An account service without the batch route answers 404; Signal then uses the
+single `/v2/remote/resume/validate` route, at most 64 at a time, and tries the batch route again
+after 10 minutes.
 Session endings and access changes use a durable D1 outbox. Cloudflare sends each revocation to Signal
 immediately and retries failed deliveries from a scheduled task. This keeps reconnect validation local
 without losing revocations when Signal is temporarily unavailable.
