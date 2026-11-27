@@ -5,6 +5,7 @@ import {
 } from "@openbot/contracts/team-protocol/client-browser-v1";
 import { sourceText } from "@openbot/i18n";
 import type { RemoteTeamHost } from "@openbot/team-client/remote-directory";
+import { REMOTE_RETRY_COOLDOWN_MS, REMOTE_RETRY_DELAYS_MS } from "@openbot/team-client/remote-recovery";
 import { useText } from "@openbot/ui/text";
 import { createSignal, createStore, Match, onSettled, Show, Switch } from "solid-js";
 import { AgentSettingsScreen } from "./AgentSettingsScreen";
@@ -33,7 +34,7 @@ import {
   takeChatToOpen,
 } from "./extension-storage";
 import { HomeScreen } from "./HomeScreen";
-import { createHostConnection, type HostConnection } from "./host-connection";
+import { canRetryConnection, createHostConnection, type HostConnection } from "./host-connection";
 import { NewAgentScreen } from "./NewAgentScreen";
 import { NewChannelScreen, NewFolderScreen } from "./NewChatItemScreens";
 import { NoServersScreen } from "./NoServersScreen";
@@ -228,6 +229,9 @@ function ServerView(props: { session: ExtensionSession; onSignOut: () => void; o
   let connection: HostConnection | null = null;
   let capabilities: readonly string[] = [];
   let attempt = 0;
+  let reconnecting = false;
+  let reconnectTries = 0;
+  let reconnectTimer: ReturnType<typeof setTimeout> | undefined;
   let browserLink: ClientBrowserLink | null = null;
   const [presence, setPresence] = createSignal<ClientBrowserPresence>({ sharing: false, tabs: [] });
   const [canShare, setCanShare] = createSignal(false);
@@ -235,8 +239,15 @@ function ServerView(props: { session: ExtensionSession; onSignOut: () => void; o
 
   const host = () => view.hosts.find((entry) => entry.hostId === view.hostId) ?? null;
 
+  function stopReconnect() {
+    clearTimeout(reconnectTimer);
+    reconnectTimer = undefined;
+    reconnectTries = 0;
+  }
+
   async function open(hostId: string) {
     const current = ++attempt;
+    stopReconnect();
     const target = view.hosts.find((entry) => entry.hostId === hostId);
     if (!target || !connection) return;
     workspace()?.dispose();
@@ -262,7 +273,10 @@ function ServerView(props: { session: ExtensionSession; onSignOut: () => void; o
         capabilities: granted,
         onPresence: setPresence,
       });
-      const next = createWorkspace(connection.request, granted, connection.download, connection.transcribe);
+      const next = createWorkspace(connection.request, granted, connection.download, connection.transcribe, {
+        role: target.role,
+        send: connection.sendSync,
+      });
       setWorkspace(() => next);
       setView((draft) => {
         draft.status = "ready";
@@ -281,6 +295,49 @@ function ServerView(props: { session: ExtensionSession; onSignOut: () => void; o
     }
   }
 
+  function reconnectLater(hostId: string) {
+    const delay = REMOTE_RETRY_DELAYS_MS[reconnectTries] ?? REMOTE_RETRY_COOLDOWN_MS;
+    reconnectTries += 1;
+    clearTimeout(reconnectTimer);
+    reconnectTimer = setTimeout(() => {
+      reconnectTimer = undefined;
+      void reconnect(hostId);
+    }, delay);
+  }
+
+  async function reconnect(hostId: string) {
+    const target = view.hosts.find((entry) => entry.hostId === hostId);
+    if (!target || !connection || reconnecting || reconnectTimer) return;
+    reconnecting = true;
+    const current = attempt;
+    try {
+      const granted = await connection.connect(target);
+      if (current !== attempt) return;
+      reconnectTries = 0;
+      if (granted.length !== capabilities.length || granted.some((entry) => !capabilities.includes(entry))) {
+        await open(hostId);
+        return;
+      }
+      const opened = workspace();
+      if (!opened || opened.syncAvailable()) return;
+      await opened.load();
+      await opened.reloadChannel();
+    } catch (error) {
+      if (current !== attempt) return;
+      if (canRetryConnection(error)) {
+        reconnectLater(hostId);
+        return;
+      }
+      setView((draft) => {
+        draft.status = "failed";
+        draft.message =
+          error instanceof Error ? error.message : t("extension.connection.offline", { server: target.name });
+      });
+    } finally {
+      reconnecting = false;
+    }
+  }
+
   async function start() {
     try {
       connection = await createHostConnection(props.session, {
@@ -288,12 +345,16 @@ function ServerView(props: { session: ExtensionSession; onSignOut: () => void; o
           browserLink?.handleEvent(event);
           workspace()?.handleEvent(event);
         },
+        sync: (message) => workspace()?.receiveSync(message),
         state: (update) => {
           if (update.hostId !== view.hostId) return;
+          workspace()?.connection(update);
           setView((draft) => {
             draft.offline = update.state === "offline";
           });
+          if (update.state === "offline" && !update.code && view.status === "ready") void reconnect(update.hostId);
           if (update.state !== "online") return;
+          stopReconnect();
           void workspace()?.reloadChat();
           browserLink?.refresh();
         },
@@ -331,7 +392,12 @@ function ServerView(props: { session: ExtensionSession; onSignOut: () => void; o
 
   function xTarget(): XTarget | null {
     if (view.status !== "ready" || !connection || !view.hostId) return null;
-    return { hostId: view.hostId, request: connection.request, capabilities };
+    return {
+      hostId: view.hostId,
+      request: workspace()?.request ?? connection.request,
+      capabilities,
+      syncedAgents: () => workspace()?.syncedAgents() ?? null,
+    };
   }
 
   onSettled(() => {
@@ -380,6 +446,7 @@ function ServerView(props: { session: ExtensionSession; onSignOut: () => void; o
       closed = true;
       port?.disconnect();
       window.removeEventListener("pagehide", leave);
+      stopReconnect();
       browserLink?.dispose();
       workspace()?.dispose();
       void connection?.dispose();

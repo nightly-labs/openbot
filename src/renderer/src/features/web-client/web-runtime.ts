@@ -257,6 +257,7 @@ import { WORKSPACE_ONLY_PROCESS_LIMIT_CAPABILITY } from "@openbot/contracts/team
 import { runTeamEffect } from "@openbot/team-client";
 import { bytesToBase64 } from "@openbot/team-client/base64";
 import { createRemoteBrowserView, type RemoteBrowserView } from "@openbot/team-client/browser-view";
+import { type ClientSync, type ClientSyncOrder, createClientSync } from "@openbot/team-client/client-sync";
 import { verifyEd25519Base64Url } from "@openbot/team-client/ed25519";
 import {
   RemoteDirectoryError,
@@ -329,7 +330,6 @@ import {
   type WebHostTabMessage,
 } from "./web-host-lock";
 import { closeWebChatNotifications } from "./web-notifications";
-import { createWebSync, type WebSync, type WebSyncOrder } from "./web-sync";
 
 export interface WebAdminRuntime {
   request: TeamApiRequest;
@@ -391,6 +391,7 @@ export interface WebWorkspaceRuntime {
     setChannelImage(input: SetChannelImageInput): Promise<Channel>;
     onPictures?(listener: () => void): () => void;
     onListChanged?(listener: () => void): () => void;
+    focusSync?(channelId: string | null): void;
   };
   currentMemberId?: () => Promise<string>;
   respondToTakeover(input: RespondToBrowserTakeoverInput): Promise<void>;
@@ -643,7 +644,7 @@ export function createWebWorkspaceRuntime(
   };
   const downloadProgress = new Map<string, RemoteDownloadWatch["onProgress"]>();
   let waitingHostId: string | null = null;
-  let sync: { hostId: string; state: WebSync; paused: boolean } | null = null;
+  let sync: { hostId: string; state: ClientSync; paused: boolean } | null = null;
   let syncFocus: string | null = null;
   let syncChannelFocus: string | null = null;
   const channelListListeners = new Set<() => void>();
@@ -655,7 +656,7 @@ export function createWebWorkspaceRuntime(
   function startSync(host: RemoteTeamHost, owner: typeof peer, hostCapabilities: readonly string[]): void {
     stopSync();
     const hostId = host.hostId;
-    const state = createWebSync({
+    const state = createClientSync({
       capabilities: hostCapabilities,
       role: host.role,
       focusedAgentId: syncFocus,
@@ -671,7 +672,7 @@ export function createWebWorkspaceRuntime(
     });
     sync = state ? { hostId, state, paused: false } : null;
   }
-  function syncedRead<T>(read: (state: WebSync) => T | null): T | null {
+  function syncedRead<T>(read: (state: ClientSync) => T | null): T | null {
     return sync && sync.hostId === lockedHostId ? read(sync.state) : null;
   }
   const openedActions: RemoteTeamPeerActions = {
@@ -853,7 +854,7 @@ export function createWebWorkspaceRuntime(
     );
     return agents;
   }
-  function noteSyncOrder(kind: WebSyncOrder, ids: readonly string[]): void {
+  function noteSyncOrder(kind: ClientSyncOrder, ids: readonly string[]): void {
     if (sync && sync.hostId === lockedHostId) sync.state.noteOrder(kind, ids);
   }
   function noteSyncWrite(method: string, path: string, hostId: string | null): void {
@@ -1045,11 +1046,8 @@ export function createWebWorkspaceRuntime(
     return list;
   }
   async function syncedChannelPage(input: ChannelReadInput): Promise<ChannelPage | null> {
-    if (input.beforeSequence !== undefined) return null;
-    syncChannelFocus = input.channelId;
-    if (!sync || sync.hostId !== lockedHostId) return null;
-    sync.state.focusChannel(input.channelId);
-    return sync.state.channelPage(input.channelId);
+    if (input.beforeSequence !== undefined || syncChannelFocus !== input.channelId) return null;
+    return syncedRead((state) => state.channelPage(input.channelId));
   }
   const channelPictures = new Map<string, ChannelPicture>();
   const pictureListeners = new Set<() => void>();
@@ -1403,6 +1401,10 @@ export function createWebWorkspaceRuntime(
         return () => {
           channelListListeners.delete(listener);
         };
+      },
+      focusSync(channelId) {
+        syncChannelFocus = channelId;
+        sync?.state.focusChannel(channelId);
       },
       onPictures(listener) {
         pictureListeners.add(listener);

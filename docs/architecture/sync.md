@@ -293,11 +293,18 @@ Limits:
 | Web client | `src/renderer/src/features/web-client/web-runtime.ts` | The runtime reads a handle when it is `synced`, and uses HTTP for each other status. |
 | Desktop with a joined server | `src/main/remote-server-sync.ts`, one per server, next to `RemoteServerManager` | The `remote` branch of each IPC read returns the synced copy. The event `agent:sync-changed {serverId, name}` tells the renderer to read again. |
 | Mobile | `apps/mobile/src/features/workspace/sync/`, one per server in `MobileWorkspaceProvider` | The stores read a handle when it is `synced`. The encrypted workspace cache shows the old copy until the handle is `synced`. |
+| Browser extension | `apps/browser-extension/src/workspace.ts`, one per open server | The side panel reads a handle when it is `synced`, and uses HTTP for each other status. The X agent lookup uses the synced agents. |
 
-The web client always delivers a reload signal that a synced handle makes. It drops a released
-host reload event only when the same signal came from sync in the last 2 seconds. A host event can
-come before the sync change, and then the read returns the old copy, so the later sync signal must
-not be dropped.
+The web client and the browser extension share `createClientSync`
+(`packages/team-client/src/client-sync.ts`). It opens the collections and logs, turns each change
+into the released agent event, and counts the writes that the next read must wait for. It keeps one
+agent scope and one channel scope. The web client moves the channel scope only when the user
+selects a channel. A prefetch of another channel page does not move it.
+
+The web client and the browser extension always deliver a reload signal that a synced handle
+makes. They drop a released host reload event only when the same signal came from sync in the last
+2 seconds. A host event can come before the sync change, and then the read returns the old copy, so
+the later sync signal must not be dropped.
 
 ### Desktop with a joined server
 

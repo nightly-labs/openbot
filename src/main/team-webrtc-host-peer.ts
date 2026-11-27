@@ -913,7 +913,12 @@ export class TeamWebRtcHostPeer {
 
   #connectLocalEvents(token: string): void {
     if (!this.#localApiPort) return;
-    this.#eventsSocket?.close();
+    if (this.#eventsReconnectTimer) clearTimeout(this.#eventsReconnectTimer);
+    this.#eventsReconnectTimer = null;
+    if (this.#eventsSocket) {
+      this.#eventsSocket.close();
+      this.#eventResetPending = true;
+    }
     const socket = new webSockets.WebSocket(`ws://127.0.0.1:${this.#localApiPort}${TEAM_API_ROUTES.events}`, [
       "openbot-team-v1",
       `openbot-token.${token}`,
