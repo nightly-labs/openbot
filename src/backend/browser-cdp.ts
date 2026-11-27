@@ -1638,9 +1638,12 @@ export class BrowserCdpEngine {
         onDispatch?.();
         const documentGeneration = this.#documentGeneration;
         const frameDocumentGeneration = this.#frameDocumentGeneration;
-        const pageNavigated = () => this.#documentGeneration !== documentGeneration;
         const optionValues = Array.isArray(plan.values) ? plan.values.filter(isString) : [];
         const inTopFrame = plan.topFrame === true && resolved.sessionId === undefined;
+        const documentChanged = () =>
+          inTopFrame
+            ? this.#documentGeneration !== documentGeneration
+            : this.#frameDocumentGeneration !== frameDocumentGeneration;
         const reloadedSelect = {
           id: isString(plan.id) ? plan.id : "",
           name: isString(plan.name) ? plan.name : "",
@@ -1652,7 +1655,7 @@ export class BrowserCdpEngine {
           (index) => optionValues[index] ?? "",
         );
         reload = {
-          started: () => (inTopFrame ? pageNavigated() : this.#frameDocumentGeneration !== frameDocumentGeneration),
+          started: documentChanged,
           follow: () => this.#confirmReloadedSelectEffect(send, reloadedSelect, desiredValues, passedValues, deadline),
         };
         yield* send("DOM.focus", { backendNodeId: resolved.backendNodeId }, resolved.sessionId);
@@ -1708,7 +1711,7 @@ export class BrowserCdpEngine {
               if (
                 recordValue(state)?.selectedIndex === firstDesiredIndex ||
                 presses === cycleIndices.length ||
-                pageNavigated()
+                documentChanged()
               )
                 break;
               yield* browserSync(() => assertBeforeDeadline(deadline));
@@ -1717,14 +1720,14 @@ export class BrowserCdpEngine {
             }
           } else if (firstDesiredIndex !== selectedIndex) {
             yield* dispatchShortcut(send, "Home", resolved.sessionId);
-            for (let index = 0; index < targetRank && !pageNavigated(); index++) {
+            for (let index = 0; index < targetRank && !documentChanged(); index++) {
               yield* dispatchShortcut(send, "ArrowDown", resolved.sessionId);
             }
           }
         } else {
           const additiveModifiers = process.platform === "darwin" ? ["Meta"] : ["Control"];
           for (const [index, desiredIndex] of desiredIndices.entries()) {
-            if (pageNavigated()) break;
+            if (documentChanged()) break;
             const optionNodeId = yield* this.#optionBackendNodeIdEffect(
               send,
               resolved.backendNodeId,
