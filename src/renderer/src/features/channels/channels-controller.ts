@@ -496,6 +496,7 @@ export function createChannelsController(env: ChannelsEnvironment) {
         if (stopped || disposed || !channelId) return;
         idle = window.requestIdleCallback(() => {
           if (stopped || disposed || scope !== env.scopeKey()) return;
+          if (keptPages.size + prefetching.size >= KEPT_PAGES) return;
           if (keptPages.has(channelId) || prefetching.has(channelId) || untrack(() => state.selectedId) === channelId) {
             next();
             return;
