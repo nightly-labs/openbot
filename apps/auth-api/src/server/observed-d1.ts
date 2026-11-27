@@ -4,11 +4,23 @@ type D1RetryOutcome = "none" | "succeeded" | "failed";
 
 type D1Operation = "first" | "all" | "raw" | "run" | "batch" | "exec";
 
-const OVERLOADED_RETRY_DELAY_MS = 1_000;
+const OVERLOADED_RETRY_MIN_DELAY_MS = 500;
+const OVERLOADED_RETRY_DELAY_SPREAD_MS = 1_000;
+const UNRECOVERED_OVERLOAD_WINDOW_MS = 10_000;
 const READ_ONLY_SQL = /^\s*(SELECT|WITH)\b/i;
 const WRITE_KEYWORD = /\b(INSERT|UPDATE|DELETE|REPLACE|UPSERT)\b/i;
 
 const observedDatabases = new WeakMap<D1Database, D1Database>();
+
+let unrecoveredOverloadAt = Number.NEGATIVE_INFINITY;
+
+export function d1OverloadedRecently(now: number): boolean {
+  return now - unrecoveredOverloadAt < UNRECOVERED_OVERLOAD_WINDOW_MS;
+}
+
+function rememberUnrecovered(failure: D1FailureClass): void {
+  if (failure === "overloaded") unrecoveredOverloadAt = Date.now();
+}
 
 function d1FailureClass(error: unknown): D1FailureClass {
   const message = error instanceof Error ? error.message : String(error);
@@ -37,15 +49,18 @@ async function observedCall<T>(operation: D1Operation, readOnly: boolean, call: 
     const failure = d1FailureClass(error);
     if (failure !== "overloaded" || !readOnly) {
       logD1Failure(operation, failure, "none");
+      rememberUnrecovered(failure);
       throw error;
     }
-    await wait(OVERLOADED_RETRY_DELAY_MS);
+    await wait(OVERLOADED_RETRY_MIN_DELAY_MS + Math.random() * OVERLOADED_RETRY_DELAY_SPREAD_MS);
     try {
       const result = await call();
       logD1Failure(operation, failure, "succeeded");
       return result;
     } catch (retryError) {
-      logD1Failure(operation, d1FailureClass(retryError), "failed");
+      const retryFailure = d1FailureClass(retryError);
+      logD1Failure(operation, retryFailure, "failed");
+      rememberUnrecovered(retryFailure);
       throw retryError;
     }
   }
