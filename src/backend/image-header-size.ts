@@ -3,6 +3,7 @@ import { IMAGE_SIZE_HEADER_BYTES, type ImageSize, imageSizeFromBytes } from "@op
 import { Effect } from "effect";
 
 const SIZE_MEMORY_LIMIT = 4_096;
+export const IMAGE_HEADER_READ_CONCURRENCY = 4;
 
 export const readImageHeaderSize = (path: string) =>
   Effect.tryPromise(async () => {
@@ -14,7 +15,7 @@ export const readImageHeaderSize = (path: string) =>
     } finally {
       await file.close();
     }
-  }).pipe(Effect.orElseSucceed(() => null));
+  });
 
 export class ImageSizeMemory {
   readonly #sizes = new Map<string, ImageSize>();
@@ -40,8 +41,9 @@ export class ImageSizeMemory {
       (attachment) =>
         readImageHeaderSize(attachment.path).pipe(
           Effect.tap((size) => Effect.sync(() => size && this.remember(attachment.id, size))),
+          Effect.ignore,
         ),
-      { concurrency: "unbounded", discard: true },
+      { concurrency: IMAGE_HEADER_READ_CONCURRENCY, discard: true },
     );
   }).bind(this);
 }

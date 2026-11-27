@@ -1,7 +1,7 @@
 import type { ImageSize } from "@openbot/contracts/image-size";
 import type { AttachmentSizeLookup } from "@openbot/contracts/team-protocol/attachment-dimensions-v1";
-import { Effect } from "effect";
-import { readImageHeaderSize } from "../../backend/image-header-size";
+import { Effect, Semaphore } from "effect";
+import { IMAGE_HEADER_READ_CONCURRENCY, readImageHeaderSize } from "../../backend/image-header-size";
 
 const CACHE_LIMIT = 4_096;
 const MISS_RETRY_MS = 30_000;
@@ -28,6 +28,7 @@ function lookup<T>(
 export function createAttachmentSizeCache(sources: AttachmentSizeSources, now = Date.now): AttachmentSizeLookup {
   const sizes = new Map<string, CachedSize>();
   const reading = new Set<string>();
+  const readPermits = Semaphore.makeUnsafe(IMAGE_HEADER_READ_CONCURRENCY);
   const remember = (attachmentId: string, entry: CachedSize) => {
     sizes.delete(attachmentId);
     sizes.set(attachmentId, entry);
@@ -39,7 +40,11 @@ export function createAttachmentSizeCache(sources: AttachmentSizeSources, now = 
     reading.add(attachmentId);
     void Effect.runPromise(
       readImageHeaderSize(path).pipe(
-        Effect.tap((size) => Effect.sync(() => remember(attachmentId, { size, retryAt: null }))),
+        Semaphore.withPermit(readPermits),
+        Effect.match({
+          onFailure: () => remember(attachmentId, { size: null, retryAt: now() + MISS_RETRY_MS }),
+          onSuccess: (size) => remember(attachmentId, { size, retryAt: null }),
+        }),
         Effect.ensuring(Effect.sync(() => reading.delete(attachmentId))),
       ),
     );
