@@ -1,11 +1,12 @@
-import { execFile } from "node:child_process";
+import type { ChildProcess } from "node:child_process";
 import { appendFile, mkdir, rename, stat } from "node:fs/promises";
-import { join, win32 } from "node:path";
+import { join } from "node:path";
 import type { Readable } from "node:stream";
 import { StringDecoder } from "node:string_decoder";
 import { redactText } from "@openbot/logging";
 import { Deferred, Effect } from "effect";
 import { perfCount } from "../backend/perf-probe-hooks";
+import { stopWindowsProcessTree } from "../backend/windows-process-tree";
 import { desktopCall, desktopFailure, type RemoteDesktopOperationError } from "./remote-desktop-effects";
 
 const MAX_LOG_BYTES = 1024 * 1024;
@@ -86,21 +87,13 @@ const writeDiagnosticEffect = Effect.fn("RemoteDesktop.writeDiagnostic")(functio
   yield* desktopCall(() => appendFile(path, clean, { encoding: "utf8", mode: 0o600 }));
 });
 
-interface ManagedChildProcess {
-  pid?: number | undefined;
-  exitCode: number | null;
-  signalCode: NodeJS.Signals | null;
-  killed: boolean;
-  kill(signal?: NodeJS.Signals): boolean;
-  once(event: string, listener: (...args: unknown[]) => unknown): unknown;
-  removeListener?(event: string, listener: (...args: unknown[]) => unknown): unknown;
-}
-
 export const stopRemoteProcess = Effect.fn("RemoteDesktop.stopProcess")(function* (
-  child: ManagedChildProcess,
+  child: ChildProcess,
   graceMs = 2_000,
 ) {
   if (child.exitCode !== null || child.signalCode !== null || child.killed) return;
+  if (process.platform === "win32")
+    return yield* stopWindowsProcessTree(child).pipe(Effect.mapError(({ cause }) => desktopFailure(cause)));
   yield* Effect.callback<void, RemoteDesktopOperationError>((resume) => {
     let complete = false;
     const finish = () => {
@@ -120,7 +113,7 @@ export const stopRemoteProcess = Effect.fn("RemoteDesktop.stopProcess")(function
     }, graceMs);
     child.once("exit", finish);
     try {
-      endProcess(child);
+      child.kill("SIGTERM");
     } catch (cause) {
       complete = true;
       resume(Effect.fail(desktopFailure(cause)));
@@ -132,18 +125,3 @@ export const stopRemoteProcess = Effect.fn("RemoteDesktop.stopProcess")(function
     });
   });
 });
-
-function endProcess(child: ManagedChildProcess): void {
-  if (process.platform !== "win32" || child.pid === undefined) {
-    child.kill("SIGTERM");
-    return;
-  }
-  execFile(
-    win32.join(process.env.SystemRoot ?? "C:\\Windows", "System32", "taskkill.exe"),
-    ["/pid", String(child.pid), "/T", "/F"],
-    { windowsHide: true },
-    () => {
-      if (child.exitCode === null && child.signalCode === null) child.kill("SIGTERM");
-    },
-  );
-}
