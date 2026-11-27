@@ -25,8 +25,6 @@ const TITLE_MAX_LINES_WITH_LOCKUP = 2;
 /** `--openbot-logo-production` and `--openbot-logo-eye`. */
 const LOGO_BACKGROUND = "#d6adf2";
 const LOGO_EYE = "#040007";
-/** The black logo with light eyes from the brand rules, for the felt patch. */
-const DARK_LOGO = { background: "#040007", eye: "#fefdff" } as const;
 const LIGHT_LOGO = { background: LOGO_BACKGROUND, eye: LOGO_EYE } as const;
 
 /** The felt under a centred card is darkened to this average luma, so white marks on the patch stay readable. */
@@ -299,8 +297,8 @@ function drawCenteredLockup(context: CanvasRenderingContext2D, job: ContentImage
   const logoTop = y + (plateHeight - logoSize) / 2;
   context.save();
   setMarkShadow(context, unit);
-  drawMark(context, lockup.left?.mark ?? "openbot", x + plateWidth * 0.25 - logoSize / 2, logoTop, logoSize, DARK_LOGO);
-  drawMark(context, lockup.rivalMark, x + plateWidth * 0.75 - logoSize / 2, logoTop, logoSize, DARK_LOGO);
+  drawMark(context, lockup.left?.mark ?? "openbot", x + plateWidth * 0.25 - logoSize / 2, logoTop, logoSize);
+  drawMark(context, lockup.rivalMark, x + plateWidth * 0.75 - logoSize / 2, logoTop, logoSize);
   context.restore();
 
   // The hairline, broken around "vs".
@@ -353,7 +351,7 @@ function drawCenteredMarkRow(
   context.save();
   setMarkShadow(context, unit);
   marks.forEach((mark, index) => {
-    drawMark(context, mark, x + padX + index * (size + gap), y + padY, size, DARK_LOGO);
+    drawMark(context, mark, x + padX + index * (size + gap), y + padY, size);
   });
   context.restore();
 }
@@ -382,8 +380,8 @@ function drawMarkRow(
 }
 
 /**
- * A patch of the same felt sewn onto the card: a lighter piece cut from another
- * part of the background, a stitch just inside its edge and a short shadow.
+ * A patch of black felt sewn onto the card: a stitch just inside its edge, a
+ * cut edge lit from above and a short shadow.
  */
 function drawFeltPatch(
   context: CanvasRenderingContext2D,
@@ -412,11 +410,12 @@ function drawFeltPatch(
   context.save();
   roundedRect(context, x, y, width, height, radius);
   context.clip();
-  // Another part of the felt, turned half a turn, so its fibres do not line up.
-  context.translate(x + width / 2, y + height / 2);
+  // Black felt: the card's own felt without its colour, turned half a turn about
+  // the middle of the card so its fibres do not line up and it covers any plate.
+  context.translate(job.width / 2, job.height / 2);
   context.rotate(Math.PI);
-  context.filter = "brightness(1.14) saturate(1.05)";
-  context.drawImage(under, -job.width / 2 + 90 * unit, -job.height / 2 + 40 * unit);
+  context.filter = "grayscale(1) contrast(1.8) brightness(0.26)";
+  context.drawImage(under, -job.width / 2, -job.height / 2);
   context.restore();
 
   // The cut edge: lit at the top, in shade at the bottom.
