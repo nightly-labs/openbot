@@ -165,13 +165,14 @@ function listedInputs(modalities: unknown): AgentModelInput[] | undefined {
   return AGENT_MODEL_INPUTS.filter((input) => listed.includes(input));
 }
 
+const MODEL_EFFORT_VARIANT = /\/(?:none|minimal|low|medium|high|xhigh|max|ultra)$/;
+
 function catalogInputs(modelId: string, releases: Releases): AgentModelInput[] | undefined {
   const comma = modelId.indexOf(",");
   const key = (comma > 0 ? modelId.slice(0, comma) : modelId).replace(":", "/").toLowerCase();
-  const variant = key.lastIndexOf("/");
-  return (
-    releases.inputs.get(key) ?? (variant > key.indexOf("/") ? releases.inputs.get(key.slice(0, variant)) : undefined)
-  );
+  const exact = releases.inputs.get(key);
+  if (exact || !MODEL_EFFORT_VARIANT.test(key)) return exact;
+  return releases.inputs.get(key.replace(MODEL_EFFORT_VARIANT, ""));
 }
 
 function listedLimits(limit: unknown): ModelLimits | undefined {

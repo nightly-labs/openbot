@@ -209,7 +209,7 @@ export async function routeAgents(
     const listed = await runCauseEffect(visibleModels.picker(models));
     return json(
       200,
-      listed.map(({ listing: _listing, ...model }) => model),
+      listed.map(({ listing: _listing, inputs: _inputs, ...model }) => model),
     );
   }
   if (method === "POST" && url.pathname === AGENT_MODEL_INPUTS_ROUTES.list) {
