@@ -575,11 +575,9 @@ function memoryInstructions(
   enabled: boolean,
   options: Pick<DeveloperInstructionOptions, "memoryReview" | "skillRevision">,
 ): string[] {
-  const skills = `Keep reusable procedures in skills, with generic steps and no personal data; confirm before you uninstall a shared skill.${
-    options.skillRevision
-      ? " When the user corrects how you follow one of your local skills (id local-skill-…), or you fix a failed step of one, revise it in the same turn with openbot.revise_skill: change only that step, keep it generic, and tell the user in one sentence. Not for a one-time preference; to undo, publish the revision before."
-      : ""
-  }`;
+  const skills = options.skillRevision
+    ? "Keep reusable procedures in skills, with generic steps and no personal data; confirm before you uninstall a shared skill. When the user corrects how you follow one of your local skills (id local-skill-…), or you fix a failed step of one, revise it in the same turn with openbot.revise_skill: change only that step, keep it generic, and tell the user in one sentence. Not for a one-time preference; to undo, publish the revision before."
+    : "Save skills only if the user asks or agrees; generic steps, no private data; confirm before you uninstall a shared skill.";
   if (!enabled)
     return [
       "The user turned OpenBot memory off for you: you have no OpenBot saved memories, and openbot.search_memories, openbot.remember and openbot.forget_memory do not work. When an MCP app with memory tools is connected, such as Mem0, search it when a past preference, decision, or fact could help and before you ask the user to repeat one, and save durable preferences and facts there. When no memory app is connected and the user asks you to remember something, say that memory is off and that the user can turn on OpenBot memory in your settings or connect a memory app.",

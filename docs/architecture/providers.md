@@ -318,9 +318,12 @@ When skill learning is Automatic, an agent can also fix one of its local skills 
 a question first. This follows the skill patch of Hermes Agent: the developer instructions
 (`skillRevision`) tell the agent to revise a `local-skill-` skill when the user corrects how it
 follows that skill, or when a step fails and it finds the fix, and to change only that step. Not for
-a one-time preference. Ask first and Off leave the line out, so the agent changes a skill only when
-the user asks. The line is not in `tools/agent-context/budget.json`, because that fixture has no
-setting.
+a one-time preference. Ask first and Off leave the line out, and they also replace the general skill
+line ("Keep reusable procedures in skills") with one that tells the agent to save a skill only when
+the user asks or agrees to a skill question. So in these modes the agent does not save a skill that
+nobody asked for. The `create_skill` and `revise_skill` tools stay, so a request from the user still
+works. The line is not in `tools/agent-context/budget.json`, because that fixture has no setting; the
+fixture measures the Ask first and Off line, which has the same length as the general line of Automatic.
 
 `revise_skill` publishes the next revision and installs it for the calling agent when that agent has
 the skill (`installedRevision` is not null), so the chat shows one "Revised skill" line. Other agents
