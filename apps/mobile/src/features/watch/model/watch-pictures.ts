@@ -164,3 +164,14 @@ export async function syncWatchServerPictures(
   const written = await Promise.all(servers.map((server) => writeServerPicture(folder, server, session)));
   return written.some(Boolean);
 }
+
+export function resetWatchServerPictures(): void {
+  wantedServerPictures = new Set();
+  failedServerPictures.clear();
+  try {
+    const folder = appGroupDirectory(WATCH_SERVER_PICTURE_FOLDER);
+    if (folder?.exists) folder.delete();
+  } catch (error) {
+    supportLog.add("warn", "app", `Watch server pictures not removed: ${supportLogValue(error)}`);
+  }
+}
