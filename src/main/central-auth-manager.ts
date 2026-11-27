@@ -67,7 +67,7 @@ import { createLocalJWKSet, type JWTPayload, jwtVerify } from "jose";
 import { z } from "zod";
 import { runCauseEffect } from "../backend/effect-boundary";
 import { isMissingFileError } from "../backend/file-errors";
-import { UNTRUSTED_CERTIFICATE_CODES } from "../backend/tls-certificate-errors";
+import { CERTIFICATE_NAME_MISMATCH_CODES, UNTRUSTED_CERTIFICATE_CODES } from "../backend/tls-certificate-errors";
 import { authCall, authDecode, CentralAuthOperationError, CentralAuthTransport } from "./central-auth-effects";
 import {
   decodeAcceptedRemoteInvite,
@@ -2825,7 +2825,11 @@ function isFilterPage(response: Response): boolean {
 
 function isInterceptedTlsError(error: unknown): boolean {
   const cause = error instanceof Error ? error.cause : undefined;
-  return isDynamicRecord(cause) && isString(cause.code) && UNTRUSTED_CERTIFICATE_CODES.has(cause.code);
+  return (
+    isDynamicRecord(cause) &&
+    isString(cause.code) &&
+    (UNTRUSTED_CERTIFICATE_CODES.has(cause.code) || CERTIFICATE_NAME_MISMATCH_CODES.has(cause.code))
+  );
 }
 
 function centralAuthIssue(error: unknown, fallbackCode: string, fallbackMessage: string): CentralAuthIssue {
