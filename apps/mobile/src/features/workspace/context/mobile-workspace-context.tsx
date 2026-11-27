@@ -315,7 +315,7 @@ import { runTeamRequest } from "@/features/workspace/model/team-request";
 import { hostAwaitsQuestion, reduceThreadWaits } from "@/features/workspace/model/thread-waits";
 import { trustedHostKeys } from "@/features/workspace/model/trusted-host-keys";
 import { appendTurnStepLine, latestThoughtId } from "@/features/workspace/model/turn-step-lines";
-import { createWorkspaceCache } from "@/features/workspace/model/workspace-cache";
+import { type CachedPages, createWorkspaceCache } from "@/features/workspace/model/workspace-cache";
 import {
   decodeAgent,
   decodeAgentSummaries,
@@ -570,6 +570,7 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
   }, [session.apiUrl, session.user.id]);
   const cachedSummaries = useRef(new Map<string, RemoteAgent[]>());
   const restoredServers = useRef(new Set<string>());
+  const pageRestores = useRef(new Map<string, { persistLater: boolean }>());
   const persistedInputs = useRef(new Map<string, readonly unknown[]>());
   const quietStarts = useRef(new Set<string>());
   const keptCapabilities = useRef(new Map<string, readonly string[]>());
@@ -1132,6 +1133,11 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
     (serverId: string) => {
       const agents = cachedSummaries.current.get(serverId);
       if (!workspaceCache || !agents || removedServers.current.has(serverId)) return;
+      const pendingPages = pageRestores.current.get(serverId);
+      if (pendingPages) {
+        pendingPages.persistLater = true;
+        return;
+      }
       const capabilities = serverCapabilities.current.get(serverId) ?? keptCapabilities.current.get(serverId) ?? null;
       const inputs = [
         agents,
@@ -1172,6 +1178,7 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
       .map(({ id }) => id)
       .filter((id) => !restoredServers.current.has(id))
       .sort((a, b) => Number(b === activeId) - Number(a === activeId));
+    const restored: { id: string; readPages: () => Promise<CachedPages | null> }[] = [];
     let previousRead: Promise<unknown> = Promise.resolve();
     for (const id of pending) {
       restoredServers.current.add(id);
@@ -1189,16 +1196,29 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
             );
           if (cached.colors) applyHostColors(id, cached.colors);
           if (cached.sidebar) applySidebarLayout(id, cached.sidebar);
+          pageRestores.current.set(id, { persistLater: false });
+          restored.push({ id, readPages: cached.readPages });
           replaceServerAgents(id, cached.agents);
-          for (const page of cached.conversations) conversationStore.restore(page);
           if (cached.channels && cached.capabilities)
-            channelStore.restore(id, cached.capabilities, cached.channels.channels, cached.channels.pages);
+            channelStore.restore(id, cached.capabilities, cached.channels, []);
           const connection = connections.current.get(id);
           if (connection) connection.quietStart();
           else quietStarts.current.add(id);
         })
         .catch(() => undefined);
     }
+    void previousRead.then(async () => {
+      for (const { id, readPages } of restored) {
+        const pages = await readPages().catch(() => null);
+        const restore = pageRestores.current.get(id);
+        pageRestores.current.delete(id);
+        if (pages && !removedServers.current.has(id)) {
+          for (const page of pages.conversations) conversationStore.restore(page);
+          channelStore.restorePages(id, pages.channelPages);
+        }
+        if (restore?.persistLater) persistServer(id);
+      }
+    });
   }, [
     servers,
     workspaceCache,
@@ -1208,6 +1228,7 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
     replaceServerAgents,
     conversationStore,
     channelStore,
+    persistServer,
   ]);
 
   const openExchangeReads = useRef(new Map<string, { again: boolean }>());
