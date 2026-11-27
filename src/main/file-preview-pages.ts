@@ -6,7 +6,7 @@ import { ATTACHMENT_LIMITS } from "@openbot/contracts/input-limits";
 import { isFilePreviewPageUrl } from "@openbot/contracts/ipc";
 import { runCauseEffect } from "../backend/effect-boundary";
 import { isPathInside } from "../backend/path-containment";
-import { attachmentDocumentHeaders, chatVisualResponse } from "./chat-visual-protocol";
+import { attachmentDocumentHeaders, chatVisualResponse, isStaticChatVisualRequest } from "./chat-visual-protocol";
 import { fileResponse } from "./file-response";
 
 const FILE_PREVIEW_PAGE_CAPACITY = 8;
@@ -84,7 +84,7 @@ export class FilePreviewPages {
   }
 
   #page(url: URL): FilePreviewPage | undefined {
-    if (url.username || url.password || url.search) return undefined;
+    if (url.username || url.password || (url.search && !isStaticChatVisualRequest(url))) return undefined;
     const address = `${url.protocol}//${url.host}${url.pathname}`;
     if (!isFilePreviewPageUrl(address)) return undefined;
     return this.#pages.get(address);
@@ -103,7 +103,7 @@ export class FilePreviewPages {
         page.folder && !/<base\b[^>]*\bhref\s*=/iu.test(new TextDecoder().decode(page.bytes))
           ? `<base href="${url.protocol}//${url.host}${url.pathname}/">`
           : undefined;
-      return chatVisualResponse(page.bytes, base ? { head: base } : {});
+      return chatVisualResponse(page.bytes, base ? { head: base } : {}, isStaticChatVisualRequest(url));
     }
     const asset = request.method === "GET" ? await this.#asset(url) : undefined;
     return asset ?? new Response("Not found", { status: 404 });

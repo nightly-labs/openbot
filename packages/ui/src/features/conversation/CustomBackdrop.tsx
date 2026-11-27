@@ -1,8 +1,11 @@
 import {
   CHAT_VISUAL_FRAME_SANDBOX,
+  CHAT_VISUAL_STATIC_SANDBOX,
   chatVisualAppTheme,
   chatVisualDocument,
   chatVisualFrameUrl,
+  chatVisualStaticDocument,
+  chatVisualStaticFrameUrl,
 } from "@openbot/contracts/chat-visual";
 import { Match, onSettled, Switch } from "solid-js";
 import { documentColorScheme } from "../../document-color-scheme";
@@ -50,8 +53,9 @@ function BackdropVideo(props: { url: string }) {
   );
 }
 
-export function CustomBackdrop(props: { source: CustomBackdropSource; title: string }) {
+export function CustomBackdrop(props: { source: CustomBackdropSource; title: string; remoteContent?: boolean }) {
   const theme = () => chatVisualAppTheme(documentColorScheme());
+  const staticPage = () => props.remoteContent !== true;
   return (
     <div class="chat-backdrop chat-backdrop-custom" aria-hidden="true">
       <Switch>
@@ -66,10 +70,10 @@ export function CustomBackdrop(props: { source: CustomBackdropSource; title: str
             <iframe
               class="chat-backdrop-media"
               title={props.title}
-              sandbox={CHAT_VISUAL_FRAME_SANDBOX}
+              sandbox={staticPage() ? CHAT_VISUAL_STATIC_SANDBOX : CHAT_VISUAL_FRAME_SANDBOX}
               referrerpolicy="no-referrer"
               tabindex={-1}
-              src={chatVisualFrameUrl(src(), theme())}
+              src={staticPage() ? chatVisualStaticFrameUrl(src()) : chatVisualFrameUrl(src(), theme())}
             />
           )}
         </Match>
@@ -78,10 +82,13 @@ export function CustomBackdrop(props: { source: CustomBackdropSource; title: str
             <iframe
               class="chat-backdrop-media"
               title={props.title}
-              sandbox={CHAT_VISUAL_FRAME_SANDBOX}
+              sandbox={staticPage() ? CHAT_VISUAL_STATIC_SANDBOX : CHAT_VISUAL_FRAME_SANDBOX}
               referrerpolicy="no-referrer"
               tabindex={-1}
-              srcdoc={chatVisualDocument(html(), { theme: theme(), appearance: documentColorScheme() })}
+              srcdoc={(staticPage() ? chatVisualStaticDocument : chatVisualDocument)(html(), {
+                theme: theme(),
+                appearance: documentColorScheme(),
+              })}
             />
           )}
         </Match>

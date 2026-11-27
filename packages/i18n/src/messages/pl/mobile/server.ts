@@ -638,6 +638,10 @@ export const messages = {
   "mobile.server.settings.browsingMemoryDescription":
     "Gdy sterujesz przeglądarką agenta, agent uczy się działania stron z używanych przez Ciebie stron i przycisków. Wpisany tekst nie jest zapisywany.",
   "mobile.server.settings.browsingMemoryLoadFailed": "Nie udało się wczytać ustawienia przeglądania.",
+  "mobile.server.settings.remoteChatContent": "Wczytuj treści zewnętrzne w czatach",
+  "mobile.server.settings.remoteChatContentDescription":
+    "Pokazuj obrazy i ikony stron z innych witryn w czatach. Gdy to jest wyłączone, są widoczne jako linki, a diagramy i strony wczytują się dopiero po dotknięciu. Dotyczy to wszystkich na tym serwerze.",
+  "mobile.server.settings.remoteChatContentLoadFailed": "Nie udało się wczytać ustawienia treści zewnętrznych.",
   "mobile.server.settings.learningSaveFailed": "Nie udało się zapisać tego ustawienia. Spróbuj ponownie.",
   "mobile.server.settings.learningUnsupported": "Zaktualizuj OpenBot na tym serwerze, aby zmienić tu to ustawienie.",
   "mobile.server.settings.responseStyleDescription":

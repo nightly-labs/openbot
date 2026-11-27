@@ -224,4 +224,6 @@ export const messages = {
   "error.team.mediaApprovalChoiceUnsupported":
     "Deze server ondersteunt geen modelkeuze bij mediagoedkeuringen. Werk OpenBot op de server bij.",
   "error.team.mediaApprovalChoiceInvalid": "De keuze voor de mediagoedkeuring is ongeldig.",
+  "error.team.remoteChatContentUnsupported":
+    "Deze verbinding ondersteunt de instelling voor externe inhoud niet. Werk OpenBot op de server bij.",
 } as const satisfies PartialTranslation<typeof source>;

@@ -5,6 +5,7 @@ export interface HtmlPageProps {
   source: string;
   title: string;
   mode: "screen" | "chat";
+  scripts?: boolean;
   onHeight?: (height: number) => void;
   insets?: { top: number; bottom: number };
 }

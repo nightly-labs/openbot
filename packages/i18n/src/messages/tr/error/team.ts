@@ -210,4 +210,6 @@ export const messages = {
   "error.team.mediaApprovalChoiceUnsupported":
     "Bu sunucu medya onaylarında model seçimini desteklemiyor. Sunucudaki OpenBot'u güncelleyin.",
   "error.team.mediaApprovalChoiceInvalid": "Medya onayı seçimi geçerli değil.",
+  "error.team.remoteChatContentUnsupported":
+    "Bu bağlantı uzak içerik ayarını desteklemiyor. Sunucudaki OpenBot'u güncelleyin.",
 } as const satisfies PartialTranslation<typeof source>;

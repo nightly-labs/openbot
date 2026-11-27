@@ -211,4 +211,6 @@ export const messages = {
   "error.team.mediaApprovalChoiceUnsupported":
     "このサーバーはメディア承認でのモデル選択に対応していません。サーバーの OpenBot を更新してください。",
   "error.team.mediaApprovalChoiceInvalid": "メディア承認の選択が無効です。",
+  "error.team.remoteChatContentUnsupported":
+    "この接続はリモートコンテンツの設定に対応していません。サーバーの OpenBot を更新してください。",
 } as const satisfies PartialTranslation<typeof source>;

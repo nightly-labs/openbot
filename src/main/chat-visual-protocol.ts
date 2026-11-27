@@ -1,6 +1,7 @@
 import {
   CHAT_VISUAL_FRAME_SANDBOX,
   CHAT_VISUAL_PAGE_LIMIT,
+  CHAT_VISUAL_STATIC_PARAMETER,
   type ChatVisualDocumentOptions,
   chatVisualDocument,
 } from "@openbot/contracts/chat-visual";
@@ -12,12 +13,31 @@ function baseMimeType(mimeType: string): string {
   return (mimeType.split(";", 1)[0] ?? "").trim().toLowerCase();
 }
 
-export function chatVisualResponse(bytes: Uint8Array, options: ChatVisualDocumentOptions = {}): Response {
+const STATIC_PAGE_POLICY = [
+  "sandbox",
+  "default-src 'none'",
+  "style-src 'unsafe-inline' openbot-visual:",
+  "img-src data: blob: openbot-visual:",
+  "font-src data: openbot-visual:",
+  "media-src data: blob: openbot-visual:",
+  "form-action 'none'",
+].join("; ");
+
+export function isStaticChatVisualRequest(url: URL): boolean {
+  return url.searchParams.get(CHAT_VISUAL_STATIC_PARAMETER) === "1";
+}
+
+export function chatVisualResponse(
+  bytes: Uint8Array,
+  options: ChatVisualDocumentOptions = {},
+  staticPage = false,
+): Response {
   if (bytes.byteLength > CHAT_VISUAL_PAGE_LIMIT) return new Response("Not found", { status: 404 });
-  return new Response(chatVisualDocument(new TextDecoder().decode(bytes), options), {
+  const html = new TextDecoder().decode(bytes);
+  return new Response(chatVisualDocument(html, staticPage ? { ...options, bootstrap: false } : options), {
     headers: {
       "Content-Type": "text/html; charset=utf-8",
-      "Content-Security-Policy": `sandbox ${CHAT_VISUAL_FRAME_SANDBOX}`,
+      "Content-Security-Policy": staticPage ? STATIC_PAGE_POLICY : `sandbox ${CHAT_VISUAL_FRAME_SANDBOX}`,
       "Cache-Control": "no-store",
       "X-Content-Type-Options": "nosniff",
     },

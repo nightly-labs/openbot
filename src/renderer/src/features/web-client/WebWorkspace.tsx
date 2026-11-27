@@ -131,6 +131,7 @@ import {
   getHostPromptCacheTtl,
   getHostProviderEnvironment,
   getHostReleaseStatus,
+  getHostRemoteChatContent,
   getHostSkillLearning,
   getHostTimezone,
   getHostUpdateStatus,
@@ -149,6 +150,7 @@ import {
   setHostPersonality,
   setHostPromptCacheTtl,
   setHostProviderEnvironment,
+  setHostRemoteChatContent,
   setHostSkillLearning,
   setHostTimezone,
   setHostUpdateSettings,
@@ -310,6 +312,7 @@ import { createHostedUpsellOffline, HostedServerUpsell } from "../servers/hosted
 import { mcpSignInRecord } from "../servers/mcp-servers";
 import { type HostMediaApprovalCreditsCalls, saveMediaApprovalCredits } from "../servers/media-approval-credits-store";
 import { OwnerTransferPrompt } from "../servers/OwnerTransferPrompt";
+import { createRemoteChatContent, RemoteChatContentProvider } from "../servers/remote-chat-content";
 import { saveRemoteFrameChannels } from "../servers/remote-workspace-frame";
 import type { HostAgentDefaultsCalls } from "../servers/ServerAgentsSection";
 import type { HostServerAuditCalls } from "../servers/ServerAuditSection";
@@ -1847,6 +1850,19 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
     setSkillLearning: async (mode, serverId) =>
       runTeamEffect(setHostSkillLearning(hostRequest(serverId), mode).pipe(Effect.mapError((error) => error.cause))),
   };
+  const remoteChatContent = createRemoteChatContent({
+    getRemoteChatContent: async (serverId) =>
+      runTeamEffect(getHostRemoteChatContent(hostRequest(serverId)).pipe(Effect.mapError((error) => error.cause))),
+    setRemoteChatContent: async (enabled, serverId) =>
+      runTeamEffect(
+        setHostRemoteChatContent(hostRequest(serverId), enabled).pipe(Effect.mapError((error) => error.cause)),
+      ),
+    onRemoteChatContent: (listener) =>
+      workspace.onHostEvent((event) => {
+        if (event.type === "remote-chat-content") listener({ serverId: event.serverId, enabled: event.enabled });
+      }),
+  });
+  onCleanup(remoteChatContent.dispose);
   const hostBrowsingMemoryCalls: HostBrowsingMemoryCalls = {
     getBrowsingMemory: async (serverId) =>
       runTeamEffect(getHostBrowsingMemory(hostRequest(serverId)).pipe(Effect.mapError((error) => error.cause))),
@@ -3019,7 +3035,7 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
       />
     );
   };
-  return (
+  const workspaceView = () => (
     <ConversationControllerProvider controller={controller}>
       <ChannelsControllerProvider controller={channels}>
         <Show
@@ -3037,7 +3053,7 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
             </div>
           }
         >
-          <WindowBackdrop pages="srcdoc" />
+          <WindowBackdrop pages="srcdoc" remoteContent={remoteChatContent.enabled(server()?.id)} />
           <div
             class="app-window web-app-window"
             data-loading-waited-long={loadingCover() && loadingWaitedLong() ? "" : undefined}
@@ -4294,4 +4310,5 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
       </ChannelsControllerProvider>
     </ConversationControllerProvider>
   );
+  return <RemoteChatContentProvider value={remoteChatContent}>{workspaceView()}</RemoteChatContentProvider>;
 }

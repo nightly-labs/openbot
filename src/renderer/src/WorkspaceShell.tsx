@@ -1,4 +1,4 @@
-import type { CentralAuthUser } from "@openbot/contracts/ipc";
+import { type CentralAuthUser, LOCAL_SERVER_ID } from "@openbot/contracts/ipc";
 import { AGENT_TASKS_CAPABILITY } from "@openbot/contracts/team-protocol/agent-tasks-v1";
 import { CRM_CAPABILITY } from "@openbot/contracts/team-protocol/crm-v1";
 import {
@@ -29,6 +29,7 @@ import { WorkspaceServerOnboarding } from "./features/onboarding/WorkspaceServer
 import { useRemoteDesktop } from "./features/remote-desktop/remote-desktop-context";
 import { createRoutineTimezonePrompt, desktopRoutineZoneTargets } from "./features/schedule/routine-timezone-prompt";
 import { createHostedUpsellOffline } from "./features/servers/hosted-server-upsell-controller";
+import { useRemoteChatContent } from "./features/servers/remote-chat-content";
 import { createRemoteSyncMarks } from "./features/servers/remote-sync-marks";
 import { renewServerPlan } from "./features/servers/server-actions";
 import { serverCanAdminister } from "./features/servers/server-capabilities";
@@ -83,6 +84,7 @@ export function WorkspaceShell(props: {
     refreshHostedServersAvailable,
     planDeletesAt,
   } = useServers();
+  const remoteChatContent = useRemoteChatContent();
   const { remoteDesktopWorkspaceVisible } = useRemoteDesktop();
   const agentDockPlacement = useAgentDockPlacement();
   const windowAgentDock = () => agentDockPlacement() === "window" && activeServer() !== undefined;
@@ -352,7 +354,7 @@ export function WorkspaceShell(props: {
 
   return (
     <ConnectorsProvider>
-      <WindowBackdrop />
+      <WindowBackdrop remoteContent={remoteChatContent.enabled(activeServer()?.id ?? LOCAL_SERVER_ID)} />
       <div class="app-window">
         <WorkspacePageRail hidden={chatWindow || remoteDesktopWorkspaceVisible()} />
         <WorkspaceFrame

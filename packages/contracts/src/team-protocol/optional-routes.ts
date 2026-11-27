@@ -141,6 +141,7 @@ import { PROVIDERS_V8_CODECS } from "./providers-v8";
 import { PUSH_NOTIFICATION_THREADS_CODECS } from "./push-notification-threads-v1";
 import { ANDROID_PUSH_NOTIFICATIONS_CODECS } from "./push-notifications-android-v1";
 import { PUSH_NOTIFICATIONS_CODECS } from "./push-notifications-v1";
+import { REMOTE_CHAT_CONTENT_CODECS } from "./remote-chat-content-v1";
 import { ROUTINE_FLOW_STOP_CODECS } from "./routine-flow-stop-v1";
 import { ROUTINE_FLOWS_CODECS } from "./routine-flows-v1";
 import { ROUTINE_PAUSE_REASONS_CODECS } from "./routine-pause-reasons-v1";
@@ -228,6 +229,7 @@ const CODECS: ReadonlyMap<string, OptionalRouteCodec> = new Map([
   ...MEMORY_REVIEW_CODECS,
   ...SKILL_LEARNING_CODECS,
   ...BROWSING_MEMORY_CODECS,
+  ...REMOTE_CHAT_CONTENT_CODECS,
   ...PROMPT_CACHE_TTL_CODECS,
   ...MODEL_STEERING_CODECS,
   ...PROVIDER_MODEL_SOURCE_CODECS,

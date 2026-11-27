@@ -1,5 +1,6 @@
 import {
   CHAT_VISUAL_FRAME_SANDBOX,
+  CHAT_VISUAL_STATIC_SANDBOX,
   type ChatVisualKey,
   type ChatVisualRect,
   type ChatVisualReplyResult,
@@ -9,13 +10,15 @@ import {
   chatVisualFrameHeight,
   chatVisualFrameUrl,
   chatVisualReplyMessage,
+  chatVisualStaticDocument,
+  chatVisualStaticFrameUrl,
   chatVisualThemeMessage,
   parseChatVisualMessage,
 } from "@openbot/contracts/chat-visual";
 import type { AttachmentSummary } from "@openbot/contracts/ipc";
 import { Button, Maximize2, PanelRight, Wallpaper } from "@openbot/ui";
 import { Portal } from "@solidjs/web";
-import { createEffect, createSignal, onSettled, Show, untrack } from "solid-js";
+import { createEffect, createMemo, createSignal, onSettled, Show, untrack } from "solid-js";
 import { documentColorScheme } from "../../document-color-scheme";
 import { useText } from "../../text";
 import { CloseIcon } from "./ConversationIcons";
@@ -79,6 +82,7 @@ interface ChatVisualProps {
   onUseAsBackdrop?: (() => void) | undefined;
   quoteShortcut?: QuoteShortcutModifier | undefined;
   macWindowControls?: boolean | undefined;
+  remoteContent?: boolean | undefined;
 }
 
 export function ChatVisual(props: ChatVisualProps) {
@@ -107,20 +111,40 @@ function VisualFrame(props: ChatVisualProps) {
   const [fullscreen, setFullscreen] = createSignal(false);
   const [image, setImage] = createSignal<ImageLightboxOpening | null>(null);
   const [selection, setSelection] = createSignal<{ text: string; rect: ChatVisualRect } | null>(null);
+  const [running, setRunning] = createSignal(false);
   let frame: HTMLIFrameElement | undefined;
   let box: HTMLDivElement | undefined;
   let expandButton: HTMLButtonElement | undefined;
+  const staticPage = createMemo(() => props.remoteContent !== true && !running());
   const url = () => {
     const current = theme();
-    return current && props.html === undefined && props.src !== undefined
-      ? chatVisualFrameUrl(props.src, current)
-      : undefined;
+    if (!current || props.html !== undefined || props.src === undefined) return undefined;
+    return staticPage() ? chatVisualStaticFrameUrl(props.src) : chatVisualFrameUrl(props.src, current);
   };
   const pageDocument = () => {
     const current = theme();
-    return current && props.html !== undefined ? chatVisualDocument(props.html, { theme: current }) : undefined;
+    if (!current || props.html === undefined) return undefined;
+    return staticPage()
+      ? chatVisualStaticDocument(props.html, { theme: current })
+      : chatVisualDocument(props.html, { theme: current });
   };
   const filled = () => props.fill === true || fullscreen();
+  const pageFrame = (isStatic: boolean) => (
+    <iframe
+      ref={(element) => (frame = element)}
+      class={{ "chat-visual-frame": true, "chat-visual-frame-fill": filled() }}
+      title={props.title}
+      sandbox={isStatic ? CHAT_VISUAL_STATIC_SANDBOX : CHAT_VISUAL_FRAME_SANDBOX}
+      referrerpolicy="no-referrer"
+      loading={props.fill ? undefined : "lazy"}
+      src={url()}
+      srcdoc={pageDocument()}
+      style={filled() ? undefined : `height: ${chatVisualFrameHeight(reported(), props.height)}px`}
+      onLoad={() => {
+        if (frame && untrack(theme)) frame.contentWindow?.postMessage(chatVisualThemeMessage(visualTheme(frame)), "*");
+      }}
+    />
+  );
 
   const userActed = () => document.activeElement === frame && navigator.userActivation.isActive;
   const shown = () => box?.matches(":popover-open") === true;
@@ -290,21 +314,19 @@ function VisualFrame(props: ChatVisualProps) {
             </Button>
           </header>
         </Show>
-        <iframe
-          ref={(element) => (frame = element)}
-          class={{ "chat-visual-frame": true, "chat-visual-frame-fill": filled() }}
-          title={props.title}
-          sandbox={CHAT_VISUAL_FRAME_SANDBOX}
-          referrerpolicy="no-referrer"
-          loading={props.fill ? undefined : "lazy"}
-          src={url()}
-          srcdoc={pageDocument()}
-          style={filled() ? undefined : `height: ${chatVisualFrameHeight(reported(), props.height)}px`}
-          onLoad={() => {
-            if (frame && untrack(theme))
-              frame.contentWindow?.postMessage(chatVisualThemeMessage(visualTheme(frame)), "*");
-          }}
-        />
+        <div class="chat-visual-stage" data-fill={filled() ? "" : undefined}>
+          <Show when={staticPage()} fallback={pageFrame(false)}>
+            {pageFrame(true)}
+          </Show>
+          <Show when={staticPage()}>
+            <div class="chat-visual-static-bar">
+              <span>{t("chat.remoteContent.pageStatic")}</span>
+              <Button variant="outline" size="sm" type="button" onClick={() => setRunning(true)}>
+                {t("chat.remoteContent.runPage")}
+              </Button>
+            </div>
+          </Show>
+        </div>
       </section>
       <Show when={!props.fill}>
         <div class="chat-visual-actions">

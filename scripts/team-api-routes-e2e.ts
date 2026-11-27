@@ -477,6 +477,11 @@ import { PROVIDERS_V8_CAPABILITY, PROVIDERS_V8_ROUTES } from "@openbot/contracts
 import { QueueEditRejectedError, TEAM_QUEUE_EDIT_CAPABILITY } from "@openbot/contracts/team-protocol/queue-edit-v1";
 import { QUEUE_HOLD_CAPABILITY, QUEUE_HOLD_SIGN_IN_CAPABILITY } from "@openbot/contracts/team-protocol/queue-hold-v1";
 import {
+  REMOTE_CHAT_CONTENT_CAPABILITY,
+  REMOTE_CHAT_CONTENT_EVENT,
+  REMOTE_CHAT_CONTENT_ROUTES,
+} from "@openbot/contracts/team-protocol/remote-chat-content-v1";
+import {
   ROUTINE_PAUSE_REASONS_CAPABILITY,
   ROUTINE_PAUSE_REASONS_ROUTES,
 } from "@openbot/contracts/team-protocol/routine-pause-reasons-v1";
@@ -660,6 +665,7 @@ import {
   providerEnvironmentControl,
   providerEnvironmentSecret,
 } from "../src/main/provider-environment-store";
+import { RemoteChatContentPreferenceStore } from "../src/main/remote-chat-content-preference-store";
 import { downloadTransferInParts, uploadTransferInParts } from "../src/main/remote-instance-transfer-chunks";
 import { RemoteRequestError } from "../src/main/remote-server-errors";
 import { RemoteWorkflowError } from "../src/main/remote-service-effects";
@@ -2755,6 +2761,8 @@ const skillLearningFile = join(root, "skill-learning.json");
 const skillLearning = new SkillLearningPreferenceStore(skillLearningFile);
 const browsingMemoryFile = join(root, "browsing-memory.json");
 const browsingMemory = new BrowsingMemoryPreferenceStore(browsingMemoryFile);
+const remoteChatContentFile = join(root, "remote-chat-content.json");
+const remoteChatContent = new RemoteChatContentPreferenceStore(remoteChatContentFile);
 const agentLevelsFile = join(root, "agent-notification-levels.json");
 const agentLevels = new AgentNotificationLevelStore(agentLevelsFile);
 const sidebarPinsFile = join(root, "sidebar-pins.json");
@@ -3025,6 +3033,7 @@ try {
       memoryReview,
       skillLearning,
       browsingMemory,
+      remoteChatContent,
       hostKey: {
         rotate: () =>
           refuseHostKeyRotation
@@ -8369,6 +8378,128 @@ try {
       "an admin turns learning from browsing off again",
       off.status === 200 && isDeepStrictEqual(off.body, { enabled: false }) && !browsingMemory.get().enabled,
       summary(off),
+    );
+  }
+
+  {
+    const capabilities = [REMOTE_CHAT_CONTENT_CAPABILITY];
+    const compatibility = await call("GET", TEAM_API_ROUTES.compatibility, { protocol: TEAM_PROTOCOL_V10 });
+    const older = await call("GET", TEAM_API_ROUTES.compatibility, { protocol: TEAM_PROTOCOL_V9 });
+    check(
+      "the host advertises remote-chat-content-v1 on protocol 10 and not on protocol 9",
+      list(field(compatibility.body, "capabilities")).includes(REMOTE_CHAT_CONTENT_CAPABILITY) &&
+        !list(field(older.body, "capabilities")).includes(REMOTE_CHAT_CONTENT_CAPABILITY),
+      [summary(compatibility), summary(older)],
+    );
+    const memberRead = await call("POST", REMOTE_CHAT_CONTENT_ROUTES.settings, {
+      token: bobToken,
+      json: {},
+      capabilities,
+    });
+    const unsupported = await call("POST", REMOTE_CHAT_CONTENT_ROUTES.settings, { token: bobToken, json: {} });
+    check(
+      "a member reads the default: remote content in chats is off; without the capability the route gets 400",
+      memberRead.status === 200 &&
+        isDeepStrictEqual(memberRead.body, { enabled: false }) &&
+        errorIs(unsupported, 400, sourceText("error.team.remoteChatContentUnsupported")),
+      [summary(memberRead), summary(unsupported)],
+    );
+
+    const socket = new WebSocket(`ws://127.0.0.1:${port}${TEAM_API_ROUTES.events}`, [
+      TEAM_PROTOCOL_V1_WEBSOCKET,
+      `openbot-token.${bobToken}`,
+    ]);
+    const seen: boolean[] = [];
+    const waiters = new Set<() => void>();
+    socket.addEventListener("message", (message) => {
+      const value = JSON.parse(String(message.data));
+      if (!isDynamicRecord(value) || value.type !== REMOTE_CHAT_CONTENT_EVENT || value.serverId !== serverId) return;
+      if (typeof value.enabled === "boolean") seen.push(value.enabled);
+      for (const wake of waiters) wake();
+    });
+    await new Promise<void>((resolveOpen, reject) => {
+      socket.addEventListener("open", () => resolveOpen(), { once: true });
+      socket.addEventListener("error", () => reject(new Error("The event socket did not open.")), { once: true });
+    });
+    const until = (count: number) =>
+      new Promise<boolean>((resolveReady) => {
+        if (seen.length >= count) return resolveReady(true);
+        const timer = setTimeout(() => {
+          waiters.delete(wake);
+          resolveReady(false);
+        }, 5_000);
+        const wake = () => {
+          if (seen.length < count) return;
+          clearTimeout(timer);
+          waiters.delete(wake);
+          resolveReady(true);
+        };
+        waiters.add(wake);
+      });
+    socket.send(JSON.stringify({ type: "agent-event-scope", includeConversations: false, capabilities }));
+    const atConnect = await until(1);
+    check(
+      "a member's event socket that declares remote-chat-content-v1 gets the setting at once",
+      atConnect && isDeepStrictEqual(seen, [false]),
+      seen,
+    );
+
+    const memberSet = await call("POST", REMOTE_CHAT_CONTENT_ROUTES.update, {
+      token: bobToken,
+      json: { enabled: true },
+      capabilities,
+    });
+    const invalid = await call("POST", REMOTE_CHAT_CONTENT_ROUTES.update, {
+      token: adaToken,
+      json: { enabled: "yes" },
+      capabilities,
+    });
+    check(
+      "a member cannot turn remote content on, a bad value gets 400, and nothing is saved",
+      errorIs(memberSet, 403, sourceText("error.team.adminRequired")) &&
+        invalid.status === 400 &&
+        !remoteChatContent.get().enabled &&
+        !existsSync(remoteChatContentFile),
+      [summary(memberSet), summary(invalid)],
+    );
+    const on = await call("POST", REMOTE_CHAT_CONTENT_ROUTES.update, {
+      token: adaToken,
+      json: { enabled: true },
+      capabilities,
+    });
+    const pushed = await until(2);
+    const reloaded = new RemoteChatContentPreferenceStore(remoteChatContentFile);
+    await runCauseEffect(reloaded.load());
+    const memberAfter = await call("POST", REMOTE_CHAT_CONTENT_ROUTES.settings, {
+      token: bobToken,
+      json: {},
+      capabilities,
+    });
+    check(
+      "an admin turns remote content on: the host saves it, a restart reads it, and the member sees it at once",
+      on.status === 200 &&
+        isDeepStrictEqual(on.body, { enabled: true }) &&
+        reloaded.get().enabled &&
+        pushed &&
+        isDeepStrictEqual(seen, [false, true]) &&
+        isDeepStrictEqual(memberAfter.body, { enabled: true }),
+      [summary(on), seen, summary(memberAfter)],
+    );
+    const off = await call("POST", REMOTE_CHAT_CONTENT_ROUTES.update, {
+      token: adaToken,
+      json: { enabled: false },
+      capabilities,
+    });
+    const pushedOff = await until(3);
+    socket.close();
+    check(
+      "an admin turns remote content off again, and the member's socket gets it",
+      off.status === 200 &&
+        isDeepStrictEqual(off.body, { enabled: false }) &&
+        !remoteChatContent.get().enabled &&
+        pushedOff &&
+        isDeepStrictEqual(seen, [false, true, false]),
+      [summary(off), seen],
     );
   }
 

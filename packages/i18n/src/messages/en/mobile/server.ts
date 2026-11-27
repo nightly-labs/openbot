@@ -665,6 +665,10 @@ export const messages = defineMessages("mobile.server", {
   "mobile.server.settings.browsingMemoryDescription":
     "When you control an agent's browser, the agent learns how sites work from the pages and buttons you use. Typed text is not kept.",
   "mobile.server.settings.browsingMemoryLoadFailed": "Could not load the browsing setting.",
+  "mobile.server.settings.remoteChatContent": "Load remote content in chats",
+  "mobile.server.settings.remoteChatContentDescription":
+    "Show pictures and site icons from other websites in chats. When this is off, they show as links, and diagrams and pages load only when you tap. This applies to everyone on this server.",
+  "mobile.server.settings.remoteChatContentLoadFailed": "Could not load the remote content setting.",
   "mobile.server.settings.learningSaveFailed": "Could not save this setting. Try again.",
   "mobile.server.settings.learningUnsupported": "Update OpenBot on this server to change this setting here.",
   "mobile.server.settings.responseStyleDescription":

@@ -189,6 +189,7 @@ import { PROVIDER_ACCOUNT_POOL_CAPABILITY } from "@openbot/contracts/team-protoc
 import { PROVIDER_ACCOUNTS_CAPABILITY } from "@openbot/contracts/team-protocol/provider-accounts-v1";
 import { PROVIDERS_ADMIN_CAPABILITY } from "@openbot/contracts/team-protocol/providers-v1";
 import { TEAM_QUEUE_EDIT_CAPABILITY } from "@openbot/contracts/team-protocol/queue-edit-v1";
+import { REMOTE_CHAT_CONTENT_CAPABILITY } from "@openbot/contracts/team-protocol/remote-chat-content-v1";
 import { ROUTINE_RECOVERY_CAPABILITY } from "@openbot/contracts/team-protocol/routine-recovery-v1";
 import { ROUTINE_RESULTS_CAPABILITY } from "@openbot/contracts/team-protocol/routine-results-v1";
 import { ROUTINES_ONCE_CAPABILITY } from "@openbot/contracts/team-protocol/routines-once-v1";
@@ -275,6 +276,7 @@ import {
   getHostMemoryReview,
   getHostPersonality,
   getHostReleaseStatus,
+  getHostRemoteChatContent,
   getHostSignalHome,
   getHostSkillLearning,
   getHostTimezone,
@@ -343,6 +345,7 @@ import {
   setHostMediaApprovalCredits,
   setHostMemoryReview,
   setHostPersonality,
+  setHostRemoteChatContent,
   setHostSignalHome,
   setHostSkillLearning,
   setHostTimezone,
@@ -572,6 +575,8 @@ type HostRequestActions = Pick<
   | "setSkillLearning"
   | "loadBrowsingMemory"
   | "setBrowsingMemory"
+  | "loadRemoteChatContent"
+  | "setRemoteChatContent"
   | "loadServerPersonality"
   | "setServerPersonality"
   | "loadServerRoles"
@@ -886,6 +891,8 @@ export function createHostRequestActions({
     capabilityApi(serverId, SKILL_LEARNING_CAPABILITY, "mobile.server.settings.learningUnsupported");
   const browsingMemoryAdmin = (serverId: string) =>
     capabilityApi(serverId, BROWSING_MEMORY_CAPABILITY, "mobile.server.settings.learningUnsupported");
+  const remoteChatContentApi = (serverId: string) =>
+    capabilityApi(serverId, REMOTE_CHAT_CONTENT_CAPABILITY, "mobile.server.settings.learningUnsupported");
   const personalityApi = (serverId: string) =>
     capabilityApi(serverId, HOST_PERSONALITY_CAPABILITY, "mobile.server.settings.personalityUnsupported");
   const rolesAdmin = (serverId: string) =>
@@ -974,6 +981,9 @@ export function createHostRequestActions({
     loadBrowsingMemory: async (serverId) => runTeamRequest(getHostBrowsingMemory(browsingMemoryAdmin(serverId))),
     setBrowsingMemory: async (enabled, serverId) =>
       runTeamRequest(setHostBrowsingMemory(browsingMemoryAdmin(serverId), enabled)),
+    loadRemoteChatContent: async (serverId) => runTeamRequest(getHostRemoteChatContent(remoteChatContentApi(serverId))),
+    setRemoteChatContent: async (enabled, serverId) =>
+      runTeamRequest(setHostRemoteChatContent(remoteChatContentApi(serverId), enabled)),
     loadServerPersonality: async (serverId) =>
       has(serverId, HOST_PERSONALITY_CAPABILITY)
         ? runTeamRequest(getHostPersonality(personalityApi(serverId)))

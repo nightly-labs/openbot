@@ -1,3 +1,4 @@
+import { CHAT_HTML_PREVIEW_POLICY } from "./chat-preview";
 import { INPUT_LIMITS } from "./input-limits";
 import { type AvatarColor, isAvatarColor } from "./ipc-agent-identity";
 import { isBoundedString, isIdentifier } from "./ipc-bounded-values";
@@ -522,4 +523,17 @@ export function chatVisualDocument(html: string, options: ChatVisualDocumentOpti
     }
   }
   return `<!doctype html><html><head>${head}</head><body>${html}</body></html>`;
+}
+
+export const CHAT_VISUAL_STATIC_SANDBOX = "";
+
+export const CHAT_VISUAL_STATIC_PARAMETER = "static";
+
+export function chatVisualStaticFrameUrl(src: string): string {
+  const base = src.split("#", 1)[0] ?? src;
+  return `${base}${base.includes("?") ? "&" : "?"}${CHAT_VISUAL_STATIC_PARAMETER}=1`;
+}
+
+export function chatVisualStaticDocument(html: string, options: ChatVisualDocumentOptions = {}): string {
+  return `<!doctype html><meta http-equiv="Content-Security-Policy" content="${CHAT_HTML_PREVIEW_POLICY}">${chatVisualDocument(html, { ...options, bootstrap: false })}`;
 }

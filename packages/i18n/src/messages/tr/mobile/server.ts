@@ -581,6 +581,10 @@ export const messages = {
   "mobile.server.settings.browsingMemoryDescription":
     "Bir ajanın tarayıcısını kontrol ettiğinizde, ajan kullandığınız sayfalardan ve düğmelerden sitelerin nasıl çalıştığını öğrenir. Yazdığınız metin saklanmaz.",
   "mobile.server.settings.browsingMemoryLoadFailed": "Gezinme ayarı yüklenemedi.",
+  "mobile.server.settings.remoteChatContent": "Sohbetlerde dış içeriği yükle",
+  "mobile.server.settings.remoteChatContentDescription":
+    "Sohbetlerde diğer web sitelerinden resimleri ve site simgelerini gösterir. Kapalıyken bunlar bağlantı olarak görünür; diyagramlar ve sayfalar yalnızca dokunduğunuzda yüklenir. Bu, bu sunucudaki herkes için geçerlidir.",
+  "mobile.server.settings.remoteChatContentLoadFailed": "Dış içerik ayarı yüklenemedi.",
   "mobile.server.settings.learningSaveFailed": "Bu ayar kaydedilemedi. Tekrar deneyin.",
   "mobile.server.settings.learningUnsupported": "Bu ayarı burada değiştirmek için bu sunucudaki OpenBot'u güncelleyin.",
   "mobile.server.settings.responseStyleDescription":

@@ -95,6 +95,7 @@ import type { ProviderEnvironmentControl } from "../provider-environment-store";
 import type { ProviderHostSignIns } from "../provider-host-sign-ins";
 import type { ProviderRuntimeManager } from "../provider-runtime-manager";
 import type { PushNotificationService } from "../push-notifications";
+import type { RemoteChatContentPreferenceStore } from "../remote-chat-content-preference-store";
 import type { RemoteScreenGateway } from "../remote-screen-gateway";
 import type { RemoteWorkflowError } from "../remote-service-effects";
 import type { RequestedUpdate } from "../requested-update";
@@ -488,6 +489,7 @@ export interface TeamApiAdmin {
   memoryReview?: MemoryReviewPreferenceStore;
   skillLearning?: SkillLearningPreferenceStore;
   browsingMemory?: BrowsingMemoryPreferenceStore;
+  remoteChatContent?: RemoteChatContentPreferenceStore;
   promptCacheTtl?: Pick<PromptCacheTtlPreferenceStore, "get" | "set">;
   claudeUserSetup?: ClaudeUserSetupControl;
   cacheExpiryCompaction?: CacheExpiryCompactionControl;

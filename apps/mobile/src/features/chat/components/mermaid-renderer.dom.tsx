@@ -8,6 +8,7 @@ import type { MermaidJob, MermaidResult } from "../model/mermaid-diagrams";
 interface MermaidRendererProps {
   jobs: readonly MermaidJob[];
   onResult: (result: MermaidResult) => Promise<void>;
+  strict: boolean;
   dom?: import("expo/dom").DOMProps;
 }
 
@@ -16,14 +17,25 @@ const RASTER_MAX_SCALE = 3;
 const RASTER_MAX_PIXELS = 4_000_000;
 
 const NO_JOBS: readonly MermaidJob[] = [];
+const STRICT_POLICY = "img-src data: blob:; font-src data:; media-src 'none'; object-src 'none'; frame-src 'none'";
 
-export default function MermaidRenderer({ jobs = NO_JOBS, onResult }: MermaidRendererProps) {
+function applyStrictPolicy(): void {
+  if (document.getElementById("openbot-mermaid-policy")) return;
+  const policy = document.createElement("meta");
+  policy.id = "openbot-mermaid-policy";
+  policy.httpEquiv = "Content-Security-Policy";
+  policy.content = STRICT_POLICY;
+  document.head.prepend(policy);
+}
+
+export default function MermaidRenderer({ jobs = NO_JOBS, onResult, strict = true }: MermaidRendererProps) {
   const started = useRef(new Set<string>());
   const queue = useRef<Promise<void>>(Promise.resolve());
   const report = useRef(onResult);
   report.current = onResult;
 
   useEffect(() => {
+    if (strict) applyStrictPolicy();
     for (const job of jobs) {
       if (started.current.has(job.id)) continue;
       started.current.add(job.id);
@@ -33,7 +45,7 @@ export default function MermaidRenderer({ jobs = NO_JOBS, onResult }: MermaidRen
     }
     const current = new Set(jobs.map((job) => job.id));
     for (const id of started.current) if (!current.has(id)) started.current.delete(id);
-  }, [jobs]);
+  }, [jobs, strict]);
 
   return null;
 }

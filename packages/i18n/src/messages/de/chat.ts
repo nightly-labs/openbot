@@ -554,4 +554,13 @@ export const messages = {
   "chat.feedbackWithdrawn.badge": "Entfernt",
   "chat.feedbackWithdrawn.body":
     "Dein Bericht ist nicht mehr auf GitHub. Um einen korrigierten Bericht zu senden, bitte den Agenten darum.",
+  "chat.remoteContent.pictureNotLoaded":
+    "Bild von {host}. Es wurde nicht geladen, weil externe Inhalte auf diesem Server aus sind.",
+  "chat.remoteContent.loadPicture": "Bild laden",
+  "chat.remoteContent.diagramNotDrawn":
+    "Dieses Diagramm kann ein Bild von einer anderen Website laden. Es wurde nicht gezeichnet, weil externe Inhalte auf diesem Server aus sind.",
+  "chat.remoteContent.loadDiagram": "Diagramm laden",
+  "chat.remoteContent.pageStatic":
+    "Ohne Skripte und externe Inhalte angezeigt, weil externe Inhalte auf diesem Server aus sind.",
+  "chat.remoteContent.runPage": "Seite starten",
 } as const satisfies PartialTranslation<typeof source>;

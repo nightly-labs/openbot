@@ -228,4 +228,6 @@ export const messages = {
   "error.team.mediaApprovalChoiceUnsupported":
     "Dieser Server unterstützt keine Modellwahl bei Medienfreigaben. Aktualisiere OpenBot auf dem Server.",
   "error.team.mediaApprovalChoiceInvalid": "Die Auswahl für die Medienfreigabe ist ungültig.",
+  "error.team.remoteChatContentUnsupported":
+    "Diese Verbindung unterstützt die Einstellung für externe Inhalte nicht. Aktualisiere OpenBot auf dem Server.",
 } as const satisfies PartialTranslation<typeof source>;

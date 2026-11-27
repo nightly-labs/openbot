@@ -676,6 +676,10 @@ export const messages = {
   "mobile.server.settings.browsingMemoryDescription":
     "כשאתה שולט בדפדפן של סוכן, הסוכן לומד איך אתרים עובדים מהדפים והכפתורים שאתה משתמש בהם. טקסט שהקלדת לא נשמר.",
   "mobile.server.settings.browsingMemoryLoadFailed": "לא ניתן לטעון את הגדרת הגלישה.",
+  "mobile.server.settings.remoteChatContent": "טעינת תוכן חיצוני בצ'אטים",
+  "mobile.server.settings.remoteChatContentDescription":
+    "הצגת תמונות וסמלי אתרים מאתרים אחרים בצ'אטים. כשהאפשרות כבויה, הם מוצגים כקישורים, ותרשימים ודפים נטענים רק בהקשה. ההגדרה חלה על כולם בשרת הזה.",
+  "mobile.server.settings.remoteChatContentLoadFailed": "לא ניתן לטעון את הגדרת התוכן החיצוני.",
   "mobile.server.settings.learningSaveFailed": "לא ניתן לשמור את ההגדרה הזו. אפשר לנסות שוב.",
   "mobile.server.settings.learningUnsupported": "יש לעדכן את OpenBot בשרת הזה כדי לשנות כאן את ההגדרה הזו.",
   "mobile.server.settings.responseStyleDescription":

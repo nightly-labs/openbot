@@ -209,4 +209,5 @@ export const messages = {
   "error.team.providerUseInvalid": "לספק הזה אין מתג הפעלה וכיבוי.",
   "error.team.mediaApprovalChoiceUnsupported": "השרת הזה לא תומך בבחירת מודל באישורי מדיה. יש לעדכן את OpenBot בשרת.",
   "error.team.mediaApprovalChoiceInvalid": "הבחירה באישור המדיה אינה תקינה.",
+  "error.team.remoteChatContentUnsupported": "החיבור הזה לא תומך בהגדרת התוכן המרוחק. עדכן את OpenBot בשרת.",
 } as const satisfies PartialTranslation<typeof source>;

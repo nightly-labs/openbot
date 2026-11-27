@@ -96,6 +96,7 @@ import {
   decodeHostProviderAccounts,
   decodeHostProviderAccountUsage,
   decodeHostReleaseStatus,
+  decodeHostRemoteChatContent,
   decodeHostSignalHomeSettings,
   decodeHostSkillLearning,
   decodeHostTimezoneSettings,
@@ -148,6 +149,7 @@ import {
   type HostPersonality,
   type HostProviderAccounts,
   type HostReleaseStatus,
+  type HostRemoteChatContent,
   type HostSetDiscordAccessInput,
   type HostSetMessagingEnabledInput,
   type HostSignalHomeSettings,
@@ -402,6 +404,7 @@ import { PROVIDERS_SIGN_IN_V3_ROUTES } from "@openbot/contracts/team-protocol/pr
 import type { PROVIDERS_V4_ROUTES } from "@openbot/contracts/team-protocol/providers-v4";
 import type { PROVIDERS_V5_ROUTES } from "@openbot/contracts/team-protocol/providers-v5";
 import { PROVIDERS_V8_ROUTES } from "@openbot/contracts/team-protocol/providers-v8";
+import { REMOTE_CHAT_CONTENT_ROUTES } from "@openbot/contracts/team-protocol/remote-chat-content-v1";
 import { ROUTINE_RECOVERY_ROUTES } from "@openbot/contracts/team-protocol/routine-recovery-v1";
 import { ROUTINE_RESULTS_ROUTES } from "@openbot/contracts/team-protocol/routine-results-v1";
 import {
@@ -1023,6 +1026,19 @@ export function setHostBrowsingMemory(
   enabled: boolean,
 ): Effect.Effect<HostBrowsingMemory, TeamAdminRequestError> {
   return adminCall(() => request("POST", BROWSING_MEMORY_ROUTES.update, decodeHostBrowsingMemory, { enabled }));
+}
+
+export function getHostRemoteChatContent(
+  request: TeamApiRequest,
+): Effect.Effect<HostRemoteChatContent, TeamAdminRequestError> {
+  return adminCall(() => request("POST", REMOTE_CHAT_CONTENT_ROUTES.settings, decodeHostRemoteChatContent, {}));
+}
+
+export function setHostRemoteChatContent(
+  request: TeamApiRequest,
+  enabled: boolean,
+): Effect.Effect<HostRemoteChatContent, TeamAdminRequestError> {
+  return adminCall(() => request("POST", REMOTE_CHAT_CONTENT_ROUTES.update, decodeHostRemoteChatContent, { enabled }));
 }
 
 export function getHostAgentAccess(request: TeamApiRequest): Effect.Effect<AgentAccessSnapshot, TeamAdminRequestError> {

@@ -598,6 +598,11 @@ export const messages = {
   "mobile.server.settings.browsingMemoryDescription":
     "Wenn du den Browser eines Agenten steuerst, lernt der Agent aus den Seiten und Schaltflächen, die du nutzt, wie Websites funktionieren. Eingegebener Text wird nicht gespeichert.",
   "mobile.server.settings.browsingMemoryLoadFailed": "Die Browsing-Einstellung konnte nicht geladen werden.",
+  "mobile.server.settings.remoteChatContent": "Externe Inhalte in Chats laden",
+  "mobile.server.settings.remoteChatContentDescription":
+    "Bilder und Website-Symbole von anderen Websites in Chats anzeigen. Wenn dies aus ist, erscheinen sie als Links, und Diagramme und Seiten laden erst nach einem Tippen. Dies gilt für alle auf diesem Server.",
+  "mobile.server.settings.remoteChatContentLoadFailed":
+    "Die Einstellung für externe Inhalte konnte nicht geladen werden.",
   "mobile.server.settings.learningSaveFailed": "Die Einstellung konnte nicht gespeichert werden. Versuche es erneut.",
   "mobile.server.settings.learningUnsupported":
     "Aktualisiere OpenBot auf diesem Server, um diese Einstellung hier zu ändern.",

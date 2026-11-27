@@ -211,4 +211,6 @@ export const messages = {
   "error.team.mediaApprovalChoiceUnsupported":
     "이 서버는 미디어 승인에서 모델 선택을 지원하지 않습니다. 서버의 OpenBot을 업데이트하세요.",
   "error.team.mediaApprovalChoiceInvalid": "미디어 승인 선택이 올바르지 않습니다.",
+  "error.team.remoteChatContentUnsupported":
+    "이 연결은 원격 콘텐츠 설정을 지원하지 않습니다. 서버의 OpenBot을 업데이트하세요.",
 } as const satisfies PartialTranslation<typeof source>;

@@ -211,4 +211,6 @@ export const messages = {
   "error.team.mediaApprovalChoiceUnsupported":
     "Ten serwer nie obsługuje wyboru modelu w zatwierdzeniach multimediów. Zaktualizuj OpenBot na serwerze.",
   "error.team.mediaApprovalChoiceInvalid": "Wybór w zatwierdzeniu multimediów jest nieprawidłowy.",
+  "error.team.remoteChatContentUnsupported":
+    "To połączenie nie obsługuje ustawienia treści zdalnych. Zaktualizuj OpenBot na serwerze.",
 } as const satisfies PartialTranslation<typeof source>;

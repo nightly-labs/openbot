@@ -575,6 +575,10 @@ export const messages = {
   "mobile.server.settings.browsingMemoryDescription":
     "Quando controlli il browser di un agente, l'agente impara come funzionano i siti dalle pagine e dai pulsanti che usi. Il testo digitato non viene conservato.",
   "mobile.server.settings.browsingMemoryLoadFailed": "Impossibile caricare l'impostazione di navigazione.",
+  "mobile.server.settings.remoteChatContent": "Carica contenuti esterni nelle chat",
+  "mobile.server.settings.remoteChatContentDescription":
+    "Mostra immagini e icone di altri siti web nelle chat. Se è disattivato, appaiono come link, e diagrammi e pagine si caricano solo quando li tocchi. Vale per tutti su questo server.",
+  "mobile.server.settings.remoteChatContentLoadFailed": "Impossibile caricare l'impostazione dei contenuti esterni.",
   "mobile.server.settings.learningSaveFailed": "Impossibile salvare questa impostazione. Riprova.",
   "mobile.server.settings.learningUnsupported":
     "Aggiorna OpenBot su questo server per cambiare qui questa impostazione.",

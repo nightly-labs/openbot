@@ -195,6 +195,7 @@ import { TEAM_QUEUE_EDIT_CAPABILITY } from "./queue-edit-v1";
 import { QUEUE_HOLD_CAPABILITY, QUEUE_HOLD_SIGN_IN_CAPABILITY } from "./queue-hold-v1";
 import { QUIET_TURN_CAPABILITY } from "./quiet-turn-v1";
 import { TEAM_REASONING_EFFORTS_CAPABILITY } from "./reasoning-efforts-v1";
+import { REMOTE_CHAT_CONTENT_CAPABILITY } from "./remote-chat-content-v1";
 import { ROUTINE_FLOW_STOP_CAPABILITY } from "./routine-flow-stop-v1";
 import { ROUTINE_FLOWS_CAPABILITY } from "./routine-flows-v1";
 import { ROUTINE_PAUSE_REASONS_CAPABILITY } from "./routine-pause-reasons-v1";
@@ -882,6 +883,7 @@ const TEAM_CAPABILITY_REGISTRY = [
   [CHANNEL_COMPACT_AVAILABILITY_CAPABILITY, V10],
   [WORKFLOW_PRESENCE_CAPABILITY, V10],
   [TEAM_NEAR_PAYMENT_CAPABILITY, V10],
+  [REMOTE_CHAT_CONTENT_CAPABILITY, V10],
 ] as const satisfies readonly (readonly [string, TeamCapabilityPlacement])[];
 
 export const TEAM_CURRENT_CAPABILITIES = TEAM_CAPABILITY_REGISTRY.map(([capability]) => capability);

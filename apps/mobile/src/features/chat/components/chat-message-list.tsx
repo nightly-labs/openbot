@@ -88,6 +88,7 @@ import {
 } from "@/features/chat/model/chat-messages";
 import type { TurnStepsSummary } from "@/features/chat/model/turn-thinking";
 import { readableOn } from "@/features/onboarding/model/onboarding-colors";
+import { useRemoteChatContent } from "@/features/servers/model/use-remote-chat-content";
 import { useChatBackdrop } from "@/features/settings/model/chat-backdrop";
 import { useChatRowShown, useThinkingDisplayPreference } from "@/features/settings/model/chat-details";
 import {
@@ -339,6 +340,7 @@ interface MessageRowShared {
   agents: MobileAgent[];
   agentsById: ReadonlyMap<string, MobileAgent>;
   serverId: string;
+  remoteContent: boolean;
   canSend: boolean;
   muted: ViewStyle["backgroundColor"];
   themeMuted: string;
@@ -711,6 +713,7 @@ const MessageRow = memo(function MessageRow({
     animationEnabled: shared.animationActive && arriving,
     align: message.kind === "message" && message.author === "user" ? ("end" as const) : ("start" as const),
     literalWordStars: message.kind === "message" && message.author === "user",
+    remoteContent: shared.remoteContent,
   };
   const bubbleFor = useCallback(
     (children: ReactNode, key?: string) =>
@@ -1734,11 +1737,13 @@ export const ChatMessageList = memo(function ChatMessageList({
   const shownBranchPoints = onBranch ? branchPoints : NO_IDS;
   const listWidth = columnWidth - insets.left - insets.right - LIST_PADDING * 2;
   const messageFiles = useMessageFileOpener(target.serverId);
+  const remoteContent = useRemoteChatContent(target.serverId);
   const shared = useMemo<MessageRowShared>(
     () => ({
       agents,
       agentsById,
       serverId: target.serverId,
+      remoteContent,
       canSend,
       muted,
       themeMuted,
@@ -1780,6 +1785,7 @@ export const ChatMessageList = memo(function ChatMessageList({
       agentsById,
       target.kind,
       target.serverId,
+      remoteContent,
       canSend,
       muted,
       themeMuted,
