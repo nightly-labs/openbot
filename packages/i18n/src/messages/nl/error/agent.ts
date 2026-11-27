@@ -169,6 +169,12 @@ export const messages = {
   "error.agent.webSearchSignIn": "Zoeken op het web vereist een Codex-aanmelding met een ChatGPT-account.",
   "error.agent.webSearchBusy": "Er lopen te veel zoekopdrachten en zijvragen. Probeer het zo opnieuw.",
   "error.agent.webSearchFailed": "De webzoekopdracht is niet voltooid. Probeer het opnieuw.",
+  "error.agent.webSearchAccount":
+    "Dit {provider}-account kan zoeken op het web niet gebruiken. Controleer het abonnement, of meld je met een ander account aan bij {provider}.",
+  "error.agent.webSearchProviderBusy": "{provider} is bezet. Wacht een paar minuten en zoek dan opnieuw.",
+  "error.agent.webSearchOffline":
+    "OpenBot kon voor de webzoekopdracht geen verbinding maken met {provider}. Controleer de internetverbinding en zoek dan opnieuw.",
+  "error.agent.webSearchUnavailable": "{provider} kon de webzoekopdracht niet uitvoeren.",
   "error.agent.busyMessageModeLocalOnly":
     "Wat berichten doen terwijl de agent werkt, kun je alleen instellen op de computer waarop de agent draait.",
   "error.agent.backupModelsLocalOnly": "Reservemodellen kun je alleen instellen op de computer waarop de agent draait.",

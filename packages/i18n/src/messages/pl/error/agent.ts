@@ -157,6 +157,12 @@ export const messages = {
   "error.agent.webSearchSignIn": "Wyszukiwanie w sieci wymaga zalogowania się do Codex kontem ChatGPT.",
   "error.agent.webSearchBusy": "Działa zbyt wiele wyszukiwań i pytań pobocznych. Spróbuj ponownie za chwilę.",
   "error.agent.webSearchFailed": "Wyszukiwanie w sieci nie zostało ukończone. Spróbuj ponownie.",
+  "error.agent.webSearchAccount":
+    "To konto {provider} nie może korzystać z wyszukiwania w sieci. Sprawdź jego plan albo zaloguj się do {provider} innym kontem.",
+  "error.agent.webSearchProviderBusy": "{provider} jest zajęty. Poczekaj kilka minut, a potem wyszukaj ponownie.",
+  "error.agent.webSearchOffline":
+    "OpenBot nie mógł połączyć się z {provider}, aby wyszukać w sieci. Sprawdź połączenie z internetem, a potem wyszukaj ponownie.",
+  "error.agent.webSearchUnavailable": "{provider} nie mógł wykonać wyszukiwania w sieci.",
   "error.agent.busyMessageModeLocalOnly":
     "Zachowanie wiadomości podczas pracy agenta można ustawić tylko na komputerze, na którym działa agent.",
   "error.agent.backupModelsLocalOnly": "Modele zapasowe można ustawić tylko na komputerze, na którym działa agent.",

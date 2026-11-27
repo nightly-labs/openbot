@@ -168,6 +168,12 @@ export const messages = {
   "error.agent.webSearchSignIn": "Web 検索には ChatGPT アカウントでの Codex へのサインインが必要です。",
   "error.agent.webSearchBusy": "実行中の検索とサイド質問が多すぎます。少し待ってからもう一度お試しください。",
   "error.agent.webSearchFailed": "Web 検索が完了しませんでした。もう一度お試しください。",
+  "error.agent.webSearchAccount":
+    "この {provider} アカウントでは Web 検索を使えません。プランを確認するか、別のアカウントで {provider} にサインインしてください。",
+  "error.agent.webSearchProviderBusy": "{provider} が混み合っています。数分待ってから、もう一度検索してください。",
+  "error.agent.webSearchOffline":
+    "Web 検索のために OpenBot が {provider} に接続できませんでした。インターネット接続を確認してから、もう一度検索してください。",
+  "error.agent.webSearchUnavailable": "{provider} が Web 検索を実行できませんでした。",
   "error.agent.busyMessageModeLocalOnly":
     "エージェントの作業中のメッセージの扱いは、エージェントを実行しているコンピューターでのみ設定できます。",
   "error.agent.backupModelsLocalOnly":

@@ -46,9 +46,13 @@ export function workflowMediaAnswerError(answer: string): string {
   return sourceText("error.workflow.mediaNotMade", { answer: text });
 }
 
-function workflowProviderError(failure: Error | null, provider: AgentProvider, timedOut: string): string | null {
+export function providerFailureCause(failure: Error | null): CauseCode {
   const providerCause = failure?.cause instanceof Error ? classifyFailure(failure.cause) : "unknown";
-  switch (providerCause === "unknown" ? classifyFailure(failure) : providerCause) {
+  return providerCause === "unknown" ? classifyFailure(failure) : providerCause;
+}
+
+function workflowProviderError(failure: Error | null, provider: AgentProvider, timedOut: string): string | null {
+  switch (providerFailureCause(failure)) {
     case "authentication":
       return sourceText("error.provider.signInExpired", { provider: providerLabel(provider) });
     case "model_not_found":

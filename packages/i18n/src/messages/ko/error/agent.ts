@@ -152,6 +152,12 @@ export const messages = {
   "error.agent.webSearchSignIn": "웹 검색을 사용하려면 ChatGPT 계정으로 Codex에 로그인해야 합니다.",
   "error.agent.webSearchBusy": "실행 중인 검색과 사이드 질문이 너무 많습니다. 잠시 후 다시 시도하세요.",
   "error.agent.webSearchFailed": "웹 검색이 완료되지 않았습니다. 다시 시도하세요.",
+  "error.agent.webSearchAccount":
+    "이 {provider} 계정은 웹 검색을 사용할 수 없습니다. 요금제를 확인하거나 다른 계정으로 {provider}에 로그인하세요.",
+  "error.agent.webSearchProviderBusy": "{provider}이(가) 사용 중입니다. 몇 분 기다린 후 다시 검색하세요.",
+  "error.agent.webSearchOffline":
+    "OpenBot이 웹 검색을 위해 {provider}에 연결하지 못했습니다. 인터넷 연결을 확인한 후 다시 검색하세요.",
+  "error.agent.webSearchUnavailable": "{provider}이(가) 웹 검색을 하지 못했습니다.",
   "error.agent.busyMessageModeLocalOnly":
     "에이전트가 작업 중일 때 메시지를 처리하는 방식은 에이전트를 실행하는 컴퓨터에서만 설정할 수 있어요.",
   "error.agent.backupModelsLocalOnly": "백업 모델은 에이전트를 실행하는 컴퓨터에서만 설정할 수 있어요.",

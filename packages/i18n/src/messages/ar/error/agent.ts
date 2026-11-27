@@ -142,6 +142,12 @@ export const messages = {
   "error.agent.webSearchSignIn": "يحتاج البحث في الويب إلى تسجيل الدخول إلى Codex بحساب ChatGPT.",
   "error.agent.webSearchBusy": "تعمل عمليات بحث وأسئلة جانبية كثيرة جدًا. حاول مرة أخرى بعد قليل.",
   "error.agent.webSearchFailed": "لم يكتمل البحث في الويب. حاول مرة أخرى.",
+  "error.agent.webSearchAccount":
+    "لا يمكن لحساب {provider} هذا استخدام البحث في الويب. تحقق من خطته، أو سجّل الدخول إلى {provider} بحساب آخر.",
+  "error.agent.webSearchProviderBusy": "{provider} مشغول. انتظر بضع دقائق، ثم ابحث مرة أخرى.",
+  "error.agent.webSearchOffline":
+    "تعذّر على OpenBot الاتصال بـ {provider} للبحث في الويب. تحقق من الاتصال بالإنترنت، ثم ابحث مرة أخرى.",
+  "error.agent.webSearchUnavailable": "تعذّر على {provider} إجراء البحث في الويب.",
   "error.agent.busyMessageModeLocalOnly":
     "لا يمكن تحديد ما تفعله الرسائل أثناء عمل الوكيل إلا على الحاسوب الذي يشغّل الوكيل.",
   "error.agent.backupModelsLocalOnly": "لا يمكن تعيين النماذج الاحتياطية إلا على الحاسوب الذي يشغّل الوكيل.",

@@ -152,6 +152,12 @@ export const messages = {
   "error.agent.webSearchSignIn": "Web araması için bir ChatGPT hesabıyla Codex'te oturum açmanız gerekir.",
   "error.agent.webSearchBusy": "Çalışan çok fazla arama ve yan soru var. Biraz sonra yeniden deneyin.",
   "error.agent.webSearchFailed": "Web araması tamamlanmadı. Yeniden deneyin.",
+  "error.agent.webSearchAccount":
+    "Bu {provider} hesabı web aramasını kullanamıyor. Planını kontrol edin veya {provider} hesabına başka bir hesapla giriş yapın.",
+  "error.agent.webSearchProviderBusy": "{provider} meşgul. Birkaç dakika bekleyin, sonra yeniden arayın.",
+  "error.agent.webSearchOffline":
+    "OpenBot web araması için {provider} hizmetine bağlanamadı. İnternet bağlantısını kontrol edin, sonra yeniden arayın.",
+  "error.agent.webSearchUnavailable": "{provider} web aramasını yapamadı.",
   "error.agent.busyMessageModeLocalOnly":
     "Ajan çalışırken mesajların ne yapacağı yalnızca ajanı çalıştıran bilgisayarda ayarlanabilir.",
   "error.agent.backupModelsLocalOnly": "Yedek modeller yalnızca ajanı çalıştıran bilgisayarda ayarlanabilir.",

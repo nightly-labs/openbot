@@ -134,6 +134,10 @@ export const messages = {
   "error.agent.webSearchSignIn": "网页搜索需要使用 ChatGPT 账号登录 Codex。",
   "error.agent.webSearchBusy": "正在运行的搜索和旁支问题过多。请稍后重试。",
   "error.agent.webSearchFailed": "网页搜索未完成。请重试。",
+  "error.agent.webSearchAccount": "此 {provider} 账户无法使用网页搜索。请检查其套餐，或使用其他账户登录 {provider}。",
+  "error.agent.webSearchProviderBusy": "{provider} 正忙。请等待几分钟，然后再次搜索。",
+  "error.agent.webSearchOffline": "OpenBot 无法连接到 {provider} 进行网页搜索。请检查网络连接，然后再次搜索。",
+  "error.agent.webSearchUnavailable": "{provider} 无法完成网页搜索。",
   "error.agent.busyMessageModeLocalOnly": "忙碌时消息的处理方式只能在运行该助手的电脑上设置。",
   "error.agent.backupModelsLocalOnly": "备用模型只能在运行该助手的电脑上设置。",
   "error.agent.backupModelsAtLimit":

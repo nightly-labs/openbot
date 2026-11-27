@@ -156,6 +156,12 @@ export const messages = {
   "error.agent.webSearchSignIn": "Для веб-поиска нужен вход в Codex с аккаунтом ChatGPT.",
   "error.agent.webSearchBusy": "Выполняется слишком много поисков и побочных вопросов. Повторите попытку чуть позже.",
   "error.agent.webSearchFailed": "Веб-поиск не завершился. Повторите попытку.",
+  "error.agent.webSearchAccount":
+    "Этот аккаунт {provider} не может использовать веб-поиск. Проверьте его тариф или войдите в {provider} с другим аккаунтом.",
+  "error.agent.webSearchProviderBusy": "{provider} занят. Подождите несколько минут, затем повторите поиск.",
+  "error.agent.webSearchOffline":
+    "OpenBot не удалось подключиться к {provider} для веб-поиска. Проверьте подключение к интернету, затем повторите поиск.",
+  "error.agent.webSearchUnavailable": "{provider} не удалось выполнить веб-поиск.",
   "error.agent.busyMessageModeLocalOnly":
     "Поведение сообщений, пока агент работает, можно задать только на компьютере, где он работает.",
   "error.agent.backupModelsLocalOnly": "Резервные модели можно задать только на компьютере, где работает агент.",

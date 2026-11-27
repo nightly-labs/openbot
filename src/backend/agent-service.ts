@@ -328,6 +328,7 @@ import { sideSessionUsageObserver, workflowUsageObserver } from "./agent/usage-c
 import { toUsageReadFailed, UsageLimitGate, type UsageLimitKey } from "./agent/usage-limit-gate";
 import type { VideoReaderHost } from "./agent/video-reader";
 import { WarmGenerations } from "./agent/warm-generations";
+import { webSearchError } from "./agent/web-search-error";
 import { removeWebhookSecretKey, type WebhookRoutineWriter } from "./agent/webhook-routine-tool";
 import {
   workflowGenerationError,
@@ -6503,7 +6504,7 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
           failed(
             failure instanceof GenerationUsageLimitError
               ? sourceText("error.provider.usageLimitReached")
-              : sourceText("error.agent.webSearchFailed"),
+              : webSearchError(failure.cause),
           ),
         ),
       );
