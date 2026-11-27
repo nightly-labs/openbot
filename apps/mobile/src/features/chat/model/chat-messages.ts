@@ -104,14 +104,14 @@ export type ChatMessage =
       body: string;
       streaming: boolean;
       status?: ConversationMessage["status"];
-      replyToMessageId?: string | null;
-      attachments?: AttachmentSummary[];
+      replyToMessageId?: string | null | undefined;
+      attachments?: AttachmentSummary[] | undefined;
       visual?: { height?: number };
-      imageGeneration?: ImageGenerationInfo;
-      videoGeneration?: VideoGenerationInfo;
+      imageGeneration?: ImageGenerationInfo | undefined;
+      videoGeneration?: VideoGenerationInfo | undefined;
       failureReason?: string;
       createdAt?: string;
-      reactions?: readonly ConversationReaction[];
+      reactions?: readonly ConversationReaction[] | undefined;
       progress?: true;
     }
   | {

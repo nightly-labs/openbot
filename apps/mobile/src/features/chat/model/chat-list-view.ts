@@ -43,7 +43,7 @@ function listRows(input: ChatListViewInput): ChatListRow[] {
   return groupRoutineRunMarkers(groupExchangeMarkers(messages.filter((message) => listed(input, message))), {
     unreadMessageIds,
     focusMessageId: focusUnread ? null : focusMessageId,
-    branchRowId,
+    branchRowId: branchRowId ?? null,
   });
 }
 
