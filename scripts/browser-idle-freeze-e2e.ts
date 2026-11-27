@@ -9,7 +9,7 @@ import { withoutElectronRuntimeFlags } from "./electron-spawn-env";
 
 class FixtureProcessTimeout extends Error {}
 
-const FREEZE_CASES = 11;
+const FREEZE_CASES = 17;
 
 const projectRoot = dirname(dirname(fileURLToPath(import.meta.url)));
 const buildRoot = await mkdtemp(join(tmpdir(), "openbot-idle-freeze-"));

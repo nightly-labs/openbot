@@ -848,7 +848,6 @@ export class BrowserHost {
       !tab.closing &&
       !tab.contents.isDestroyed() &&
       !tab.popup &&
-      !tab.hasSharedBrowsingContext &&
       ![...this.#tabs.values()].some((child) => child.openerTabId === tab.id) &&
       !tab.engine.hasUploadDocuments()
     );
