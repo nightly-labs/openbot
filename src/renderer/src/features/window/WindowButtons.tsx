@@ -11,7 +11,7 @@ const WINDOW_BUTTONS_HEIGHT = 38;
 
 const [frame, setFrame] = createSignal<WindowFrameState | null>(null);
 
-export const windowButtonsShown = () => frame()?.buttons === true;
+const windowButtonsShown = () => frame()?.buttons === true;
 
 export const windowButtonsToastOffset = (edge: number) =>
   windowButtonsShown() ? { top: edge + WINDOW_BUTTONS_HEIGHT } : {};
