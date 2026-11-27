@@ -25,6 +25,11 @@ const ticketKeys = {
     keys: [{ ...(await crypto.subtle.exportKey("jwk", ticketKeyPair.publicKey)), kid: "ticket-1" }],
   }),
   REMOTE_TICKET_KEY_ID: "ticket-1",
+  SLACK_ROUTE_PRIVATE_JWK: JSON.stringify({
+    ...(await crypto.subtle.exportKey("jwk", ticketKeyPair.privateKey)),
+    kid: "ticket-1",
+  }),
+  SLACK_ROUTE_KEY_ID: "ticket-1",
 };
 
 async function migratedDatabase() {
@@ -36,6 +41,11 @@ async function migratedDatabase() {
       "INSERT INTO users(id, identity_key, email, created_at, updated_at) VALUES ('owner', 'email:owner', ?, 1, 1)",
     )
     .run("owner@example.test");
+  database
+    .prepare(
+      "INSERT INTO users(id, identity_key, email, created_at, updated_at) VALUES ('next-owner', 'email:next', ?, 1, 1)",
+    )
+    .run("next@example.test");
   return database;
 }
 
@@ -53,11 +63,15 @@ function storeHost(database: DatabaseSync, hostId: string, token: string | null)
     .run(hostId, token === null ? null : tokenHash(token));
 }
 
+const tableReads: string[] = [];
+
 function countingD1(database: DatabaseSync, reads: string[], label: string): D1Database {
   const source = sqliteD1(database);
   return {
     prepare: (query: string) => {
       if (query.includes("FROM remote_hosts")) reads.push(label);
+      const table = /FROM (\w+)/.exec(query)?.[1];
+      if (table) tableReads.push(`${label}:${table}`);
       return source.prepare(query);
     },
     batch: (statements) => source.batch(statements),
@@ -146,6 +160,39 @@ async function scenario() {
   check("authenticateHost still reads only the primary", Exit.isSuccess(authenticated) && reads.join() === "primary", {
     reads: [...reads],
   });
+
+  tableReads.length = 0;
+  const slack = await Effect.runPromiseExit(full.issueSlackRoute("synced", "token-synced"));
+  check(
+    "a Slack route ticket checks the credential on the replica and reads its routes on the primary",
+    Exit.isSuccess(slack) && tableReads.join() === "replica:remote_hosts,primary:slack_workspace_routes",
+    { tableReads: [...tableReads] },
+  );
+
+  tableReads.length = 0;
+  const refusedSlack = await Effect.runPromiseExit(full.issueSlackRoute("synced", "token-wrong"));
+  check(
+    "a Slack route ticket with a wrong token is refused and reads no routes",
+    Exit.isFailure(refusedSlack) && tableReads.join() === "replica:remote_hosts,primary:remote_hosts",
+    { tableReads: [...tableReads] },
+  );
+
+  primary.prepare("UPDATE remote_hosts SET owner_user_id = 'next-owner' WHERE host_id = 'synced'").run();
+  const insertRoute = primary.prepare(
+    "INSERT INTO webhook_routes(route_id, host_id, account_id, connected_at, revoked_at) VALUES (?, 'synced', ?, ?, ?)",
+  );
+  insertRoute.run("route-old-owner", "owner", 3, null);
+  insertRoute.run("route-new-owner", "next-owner", 2, null);
+  insertRoute.run("route-revoked", "next-owner", 1, 1);
+  tableReads.length = 0;
+  const webhook = await Effect.runPromiseExit(full.issueWebhookRoute("synced", "token-synced"));
+  check(
+    "a webhook route ticket uses the owner on the primary after an owner transfer",
+    Exit.isSuccess(webhook) &&
+      webhook.value.routes.join() === "route-new-owner" &&
+      tableReads.join() === "replica:remote_hosts,primary:webhook_routes",
+    { routes: Exit.isSuccess(webhook) ? webhook.value.routes : null, tableReads: [...tableReads] },
+  );
 }
 
 try {

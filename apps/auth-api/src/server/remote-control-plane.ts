@@ -2813,7 +2813,7 @@ export class RemoteControlPlane {
       if (!signer) {
         return yield* new RemoteControlPlaneError(503, "slack_not_configured", "Slack routing is not configured.");
       }
-      yield* this.authenticateHost(hostId, machineToken);
+      yield* this.assertHostCredential(hostId, machineToken);
       const rows = yield* remoteCall(() =>
         dependencies.database
           .prepare(
@@ -2948,7 +2948,7 @@ export class RemoteControlPlane {
       machineToken: string,
     ): Effect.fn.Return<{ homes: RemoteSignalHome[] }, RemoteFailure, RemoteDependencies> {
       const dependencies = yield* RemoteDependencies;
-      yield* this.authenticateHost(hostId, machineToken);
+      yield* this.assertHostCredential(hostId, machineToken);
       const signal = dependencies.signal;
       if (!signal) return yield* remoteSignalNotConfigured();
       return { homes: [...signal.homes].map(([id, url]) => ({ id, url })) };
@@ -2963,15 +2963,16 @@ export class RemoteControlPlane {
       machineToken: string,
     ): Effect.fn.Return<{ ticket: string; routes: string[] }, RemoteFailure, RemoteDependencies> {
       const dependencies = yield* RemoteDependencies;
-      const host = yield* this.authenticateHost(hostId, machineToken);
+      yield* this.assertHostCredential(hostId, machineToken);
       const rows = yield* remoteCall(() =>
         dependencies.database
           .prepare(
             `SELECT route_id, connected_at FROM webhook_routes
-             WHERE host_id = ? AND account_id = ? AND revoked_at IS NULL
+             WHERE host_id = ? AND revoked_at IS NULL
+               AND account_id = (SELECT owner_user_id FROM remote_hosts WHERE host_id = ?)
              ORDER BY connected_at DESC LIMIT ?`,
           )
-          .bind(hostId, host.owner_user_id, WEBHOOK_ROUTES_LIMIT)
+          .bind(hostId, hostId, WEBHOOK_ROUTES_LIMIT)
           .all<{ route_id: string; connected_at: number }>(),
       );
       const routes = rows.results.map((row) => ({ id: row.route_id, linkedAt: row.connected_at }));
@@ -2995,7 +2996,7 @@ export class RemoteControlPlane {
       RemoteDependencies
     > {
       const dependencies = yield* RemoteDependencies;
-      yield* this.authenticateHost(hostId, machineToken);
+      yield* this.assertHostCredential(hostId, machineToken);
       const routes = yield* repositories;
       return {
         ticket: yield* dependencies.signer.issueGitHubRoute({ hostId, repositories: routes, now: dependencies.now() }),
@@ -3101,7 +3102,7 @@ export class RemoteControlPlane {
       if (!signer) {
         return yield* new RemoteControlPlaneError(503, "discord_not_configured", "Discord routing is not configured.");
       }
-      yield* this.authenticateHost(hostId, machineToken);
+      yield* this.assertHostCredential(hostId, machineToken);
       const rows = yield* remoteCall(() =>
         dependencies.database
           .prepare(
@@ -3355,7 +3356,7 @@ export class RemoteControlPlane {
       const dependencies = yield* RemoteDependencies;
       const signer = dependencies.routeSigner;
       if (!signer || !dependencies.telegram) return yield* telegramNotConfigured();
-      yield* this.authenticateHost(hostId, machineToken);
+      yield* this.assertHostCredential(hostId, machineToken);
       const rows = yield* remoteCall(() =>
         dependencies.database
           .prepare(
