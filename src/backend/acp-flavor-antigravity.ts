@@ -13,7 +13,8 @@ import {
 } from "./agent/provider-diagnostics";
 import { getRecord, getString, isRecord } from "./protocol";
 
-const GEMINI_QUOTA_CHUNK = /^\s*(?:\u26A0 )?Usage Limit Reached\n\n([\s\S]*)$/u;
+const GEMINI_QUOTA_CHUNK =
+  /^\s*(?:\u26A0 )?(?:(?:Claude and GPT models )?Usage Limit Reached\n\n|Third-party quota reached[. ]\s*)([\s\S]*)$/u;
 const GEMINI_SDK_FAILURE = /\bAntigravity SDK error processing prompt for session (\S+)/u;
 const GEMINI_EXECUTION_ERROR_ANSWER = /^\s*Agent execution error: /u;
 const GEMINI_CONNECTION_LOST_ANSWER = /^\s*Agent connection was lost and could not be re-established: /u;
