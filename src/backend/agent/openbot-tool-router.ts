@@ -3639,9 +3639,7 @@ export class OpenBotToolRouter {
         providerAccountId: accountFor(requestedProvider),
       });
       const poolModel =
-        providerAccountId === undefined && model !== undefined
-          ? this.#hooks.poolModel?.(requestedProvider, model)
-          : undefined;
+        !providerAccountId && model !== undefined ? this.#hooks.poolModel?.(requestedProvider, model) : undefined;
       const runtime = requestedRuntime(
         target,
         runtimeRequest,

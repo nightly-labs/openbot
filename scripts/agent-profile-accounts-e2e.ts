@@ -679,6 +679,13 @@ try {
   });
   const agentChoice = choiceOf(pooled.id);
   await runCauseEffect(agents.updateAgent({ agentId: pooled.id, model: MODEL, providerAccountId: null }));
+  const nullChose = await callTool("give a model of one pool account to the pool", coordinator.id, "update_profile", {
+    agentId: pooled.id,
+    model: ACCOUNT_MODEL,
+    providerAccountId: null,
+  });
+  const nullChoice = choiceOf(pooled.id);
+  await runCauseEffect(agents.updateAgent({ agentId: pooled.id, model: MODEL, providerAccountId: null }));
   await runCauseEffect(agents.updateAgent({ agentId: pooled.id, model: ACCOUNT_MODEL }));
   const personChoice = choiceOf(pooled.id);
   const createdAgent = await runCauseEffect(
@@ -709,6 +716,14 @@ try {
     "With Pool accounts on, a new agent with a model of one account starts on that account",
     createdChoice.model === ACCOUNT_MODEL && createdChoice.account === second.id && createdChoice.pin === null,
     JSON.stringify(createdChoice),
+  );
+  pass(
+    "With Pool accounts on, an agent that selects a model of one account with a null account moves to that account",
+    nullChose.success &&
+      nullChoice.model === ACCOUNT_MODEL &&
+      nullChoice.account === second.id &&
+      nullChoice.pin === null,
+    nullChose.text,
   );
   pass(
     "With Pool accounts on, a person who selects a model of one account moves the agent to that account in the pool",
