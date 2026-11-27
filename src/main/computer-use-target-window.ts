@@ -83,7 +83,7 @@ export function chooseTarget({
   const visible = visibleWindows(windows, ownPid, ownCoveringWindowIds, toDesktop);
   const candidates = workableWindows(visible, ownPid);
   const named = desktopPointAction(windows, ownPid, ownCoveringWindowIds, pointer, action) ?? action;
-  const acted = actedWindow(candidates, named);
+  const acted = actedWindow(candidates, named, previous);
   if (acted) return asTarget(acted, visible);
   if (named) return null;
   const held = previous ? candidates.find((window) => window.windowId === previous.windowId) : undefined;
@@ -103,20 +103,25 @@ function desktopPointAction(
       contains(window.bounds, pointer.x, pointer.y),
     ),
   );
-  return under ? { tool: pointer.tool, pid: null, windowId: under.windowId, at: pointer.at } : null;
+  return { tool: pointer.tool, pid: under?.pid ?? null, windowId: under?.windowId ?? null, at: pointer.at };
 }
 
 function contains(bounds: Rectangle, x: number, y: number): boolean {
   return x >= bounds.x && y >= bounds.y && x < bounds.x + bounds.width && y < bounds.y + bounds.height;
 }
 
-function actedWindow(candidates: readonly DriverWindow[], action: ObservedAction | null): DriverWindow | null {
+function actedWindow(
+  candidates: readonly DriverWindow[],
+  action: ObservedAction | null,
+  previous: ComputerUseHighlightTarget | null,
+): DriverWindow | null {
   if (!action) return null;
   const exact = candidates.find((window) => window.windowId === action.windowId);
   if (exact) return exact;
   if (action.pid === null) return null;
   const owned = candidates.filter((window) => window.pid === action.pid);
-  return owned.length === 1 ? (owned[0] ?? null) : null;
+  if (owned.length === 1) return owned[0] ?? null;
+  return owned.find((window) => window.windowId === previous?.windowId) ?? null;
 }
 
 function asTarget(window: DriverWindow, visible: readonly DriverWindow[]): ComputerUseHighlightTarget {
