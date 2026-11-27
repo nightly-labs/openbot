@@ -7,6 +7,7 @@ import type { UpdateService } from "./update-service";
 
 interface IdleRestartUpdater {
   getStatus(): UpdateStatus;
+  installHandedOff(): boolean;
   installUpdate: UpdateService["installUpdate"];
   setIdleRestart(restart: IdleRestartStatus | null): void;
 }
@@ -141,7 +142,7 @@ export class IdleRestart {
       const message = error instanceof Error ? error.message : String(error);
       this.#log(`The restart when idle failed: ${message}`);
       this.#restarting = false;
-      if (this.#updater.getStatus().errorCode === "install_failed") this.#handedOff = true;
+      if (this.#updater.installHandedOff()) this.#handedOff = true;
       this.#end({ ...status, waitingFor: [], error: message });
     }
   });

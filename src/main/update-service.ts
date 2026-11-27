@@ -102,6 +102,7 @@ interface UpdateServiceOptions {
   enabled: boolean;
   autoDownload: boolean;
   beforeInstall: () => Promise<void>;
+  stageInstall?: (() => Effect.Effect<void, UpdateOperationFailure>) | undefined;
   checkSiblingInstances?: (() => Effect.Effect<readonly OpenBotSiblingInstance[], SiblingScanFailed>) | undefined;
   currentUid?: number | undefined;
   platform?: NodeJS.Platform;
@@ -173,6 +174,7 @@ export class UpdateService extends EventEmitter<UpdateServiceEvents> {
       | "logDirectory"
       | "notInstalledVersion"
       | "shipItDirectory"
+      | "stageInstall"
       | "updaterCacheDirectory"
     > & {
       phaseTimeoutsMs: Record<UpdateBusyPhase, number>;
@@ -307,6 +309,10 @@ export class UpdateService extends EventEmitter<UpdateServiceEvents> {
     if (!this.#phaseTimer) this.#armPhaseTimer();
     if (!this.#checksScheduled || !this.#options.enabled || this.#checkTimer) return;
     this.#scheduleCheck(this.#options.initialCheckDelayMs);
+  }
+
+  installHandedOff(): boolean {
+    return this.#teardownCommitted;
   }
 
   getStatus(): UpdateStatus {
@@ -602,6 +608,8 @@ export class UpdateService extends EventEmitter<UpdateServiceEvents> {
       this.#setStatus({ phase: "installing", progress: 100, message: null, errorCode: null });
       const installed = yield* Effect.result(
         Effect.gen({ self: this }, function* () {
+          if (this.#options.stageInstall) yield* this.#options.stageInstall();
+          if (this.#installGeneration !== generation) return;
           this.#teardownCommitted = true;
           yield* updateIO(() => this.#options.beforeInstall());
           if (this.#installGeneration !== generation) return;
