@@ -181,13 +181,11 @@ function agentMessagesLog(sources: TeamSyncLogSources): SyncHostLog<TeamSyncView
       const database = sources.database();
       if (!database || !readableAgent(sources, viewer, agentId)) return null;
       const through = lastChange(database.connection);
+      const mark = queueMark(queuedPositions(sources, agentId));
       const page = await readPage(viewer, agentId, { type: "latest" }, limit);
       return {
         ...pageRows(viewer, database.connection, page),
-        cursor: queueCursor(
-          changeCursor(through, cursorTag(viewer, "thread", page.threadId)),
-          queueMark(queuedPositions(sources, agentId)),
-        ),
+        cursor: queueCursor(changeCursor(through, cursorTag(viewer, "thread", page.threadId)), mark),
       };
     },
     async older(viewer, agentId, before, limit): Promise<SyncLogPage | null> {
