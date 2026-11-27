@@ -26,6 +26,7 @@ async function main(): Promise<void> {
   await putRequiredSecret("EMAIL_SMTP_PASSWORD");
   await putOptionalSecret("EMAIL_SMTP_OVERFLOW_PASSWORD");
   await putOptionalSecret("EMAIL_SMTP_OVERFLOW_2_PASSWORD");
+  await putOptionalSecret("EMAIL_SMTP_OVERFLOW_3_PASSWORD");
   await putRequiredSecret("SKILLS_ADMIN_TOKEN");
   await putRequiredSecret("SITE_REPORT_HASH_SECRET");
   await putRequiredSecret("REMOTE_TICKET_PRIVATE_JWK");

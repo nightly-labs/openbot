@@ -251,6 +251,8 @@ again from the overflow mailbox `EMAIL_SMTP_OVERFLOW_2_USERNAME` (`signin@openbo
 with that address as the sender. Its password is the `EMAIL_SMTP_OVERFLOW_2_PASSWORD` secret, in the
 same places as `EMAIL_SMTP_PASSWORD`; it is optional, and without it this mailbox is off.
 When that mailbox also reaches its limit, the email goes from the overflow mailbox
+`EMAIL_SMTP_OVERFLOW_3_USERNAME` (`sign@openbot.run` in production), with the
+`EMAIL_SMTP_OVERFLOW_3_PASSWORD` secret, set in the same way. After that, the email goes from the overflow mailbox
 `EMAIL_SMTP_OVERFLOW_USERNAME` (`hello@openbot.run` in production), with the
 `EMAIL_SMTP_OVERFLOW_PASSWORD` secret, set in the same way. When all mailboxes reach their limit, Cloudflare Email Service sends the email from
 `EMAIL_FROM` (`EMAIL_FALLBACK`). Cloudflare also has a daily quota: past it, the binding refuses with

@@ -1,5 +1,7 @@
 # syntax=docker/dockerfile:1
-ARG BASE=ubuntu:24.04@sha256:a853f94d226358a79c740cfc7bce0c289748f3fe3488d921d038ccd752c61b60
+ARG BASE=pinned-base
+
+FROM ubuntu:24.04@sha256:562111b88caa79c71391c0c4d3c2114a7d5c35915c20561fd893cb1e07929e6b AS pinned-base
 
 FROM ${BASE} AS release
 COPY OpenBot.AppImage /tmp/OpenBot.AppImage
@@ -13,6 +15,7 @@ FROM ${BASE}
 ARG DEBIAN_FRONTEND=noninteractive
 COPY --from=release /tmp/squashfs-root/resources/hosting/packages.txt /tmp/squashfs-root/resources/hosting/optional-packages.txt /tmp/
 RUN apt-get update \
+  && apt-get upgrade --yes \
   && sed -e '/^#/d' -e '/^$/d' -e '/^apparmor$/d' /tmp/packages.txt /tmp/optional-packages.txt \
     | xargs apt-get install --yes --no-install-recommends \
       fonts-noto-cjk git less openssh-client procps ripgrep tini unzip xz-utils \

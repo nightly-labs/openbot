@@ -89,7 +89,7 @@ export function ChatOutboxStatus({ status }: { status: OutboxRowStatus }) {
       )}
       <Typography.Paragraph
         type="body-xs"
-        numberOfLines={2}
+        numberOfLines={3}
         className={failed ? "shrink text-danger-text" : "shrink text-muted"}
       >
         {text}

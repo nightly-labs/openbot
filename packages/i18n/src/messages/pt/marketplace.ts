@@ -83,6 +83,8 @@ export const messages = {
   "marketplace.app.partialTitle": "{name} não está completo",
   "marketplace.app.partialDescription":
     "Alguns apps ou habilidades não estão instalados. Reconectar instala esses itens.",
+  "marketplace.app.pausedTitle": "{name} está desativado",
+  "marketplace.app.pausedDescription": "Os agentes não recebem as ferramentas de {name}. Reconectar ativa o app.",
   "marketplace.app.notConnected": "Não conectado",
   "marketplace.app.paused": "Pausado",
   "marketplace.app.custom": "Servidor MCP",

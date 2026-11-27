@@ -68,6 +68,7 @@ export interface MarketplaceAppConnection {
   accounts: readonly MarketplaceAppAccount[];
   multipleAccounts: boolean;
   keySaved?: boolean;
+  paused?: boolean;
 }
 
 export type MarketplaceApp =

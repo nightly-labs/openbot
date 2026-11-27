@@ -84,6 +84,8 @@ export const messages = {
   "marketplace.app.partialTitle": "{name} is niet compleet",
   "marketplace.app.partialDescription":
     "Sommige apps of vaardigheden ervan zijn niet geïnstalleerd. “Opnieuw koppelen” installeert ze.",
+  "marketplace.app.pausedTitle": "{name} staat uit",
+  "marketplace.app.pausedDescription": "Agents krijgen de tools van {name} niet. “Opnieuw koppelen” zet het aan.",
   "marketplace.app.notConnected": "Niet gekoppeld",
   "marketplace.app.paused": "Gepauzeerd",
   "marketplace.app.custom": "MCP-server",

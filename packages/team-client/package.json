@@ -9,6 +9,7 @@
     "./feedback-approval": "./src/feedback-approval.ts",
     "./host-key-handover": "./src/host-key-handover.ts",
     "./remote-directory": "./src/remote-directory.ts",
+    "./account-bookmark": "./src/account-bookmark.ts",
     "./ice-diagnostics": "./src/ice-diagnostics.ts",
     "./remote-peer": "./src/remote-peer.ts",
     "./remote-recovery": "./src/remote-recovery.ts",
