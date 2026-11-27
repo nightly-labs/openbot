@@ -6,6 +6,7 @@ import Ellipsis from "lucide-react-native/icons/ellipsis";
 import { useState } from "react";
 import { Alert, Pressable, View } from "react-native";
 import { showFailureAlert } from "@/features/analytics/failure-reports";
+import { useChatNavigation } from "@/features/chat/context/chat-navigation-context";
 import type { MobileAgent } from "@/features/workspace/context/mobile-workspace-context";
 import { haptics } from "@/shared/lib/haptics";
 import { currentText, useText } from "@/shared/lib/text";
@@ -42,6 +43,7 @@ export function reportTeamResult(work: Promise<void>, failedTitle: MobileTextKey
 
 export function useMessageActions(input: MessageActionsInput | null) {
   const { t } = useText();
+  const navigation = useChatNavigation();
   const reactions = input?.reactions;
   const [pending, setPending] = useState<{
     emoji: string | null;
@@ -84,23 +86,26 @@ export function useMessageActions(input: MessageActionsInput | null) {
   const togglePin = onTogglePin ? () => reportTeamResult(onTogglePin(), "mobile.chat.pins.failed") : undefined;
   const open = input
     ? () =>
-        openMessageActions({
-          messageId: input.messageId,
-          copyText: input.copyText,
-          createdAt: input.createdAt,
-          ownReaction: own,
-          readAloudId: input.readAloudId,
-          onReact: react,
-          onReply: input.onReply,
-          onBranch: input.onBranch,
-          onSelectText: input.onSelectText,
-          onMarkUnread: input.onMarkUnread,
-          pinned: input.pinned ?? false,
-          onTogglePin: togglePin,
-          sendToChannel: input.sendToChannel,
-          onDelete: confirmDelete,
-          files: input.files,
-        })
+        openMessageActions(
+          {
+            messageId: input.messageId,
+            copyText: input.copyText,
+            createdAt: input.createdAt,
+            ownReaction: own,
+            readAloudId: input.readAloudId,
+            onReact: react,
+            onReply: input.onReply,
+            onBranch: input.onBranch,
+            onSelectText: input.onSelectText,
+            onMarkUnread: input.onMarkUnread,
+            pinned: input.pinned ?? false,
+            onTogglePin: togglePin,
+            sendToChannel: input.sendToChannel,
+            onDelete: confirmDelete,
+            files: input.files,
+          },
+          navigation,
+        )
     : undefined;
   return { shown, react, open };
 }

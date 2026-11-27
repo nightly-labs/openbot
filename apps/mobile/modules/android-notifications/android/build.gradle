@@ -35,4 +35,6 @@ dependencies {
   implementation expoNotificationsDependency()
   // The version that `expo-notifications` uses.
   implementation 'com.google.firebase:firebase-messaging:25.0.1'
+  // The bubble of an agent: its shortcut, its channel and its notification id.
+  implementation project(':chat-bubble')
 }

@@ -1,6 +1,6 @@
 import { rankAgentMentions } from "@openbot/contracts/agent-mention-rank";
 import { GlassView } from "expo-glass-effect";
-import { router, useIsFocused } from "expo-router";
+import { useIsFocused } from "expo-router";
 import type { NativeStackNavigationProp } from "expo-router/native-stack";
 import { type ParamListBase, useNavigation } from "expo-router/react-navigation";
 import { Button, Spinner, Typography } from "heroui-native";
@@ -48,6 +48,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { scheduleOnRN } from "react-native-worklets";
 import { useCSSVariable } from "uniwind";
 import { BloubAvatar } from "@/features/agents/components/bloub-avatar";
+import { useChatNavigation } from "@/features/chat/context/chat-navigation-context";
 import type { ChatBubbleMessage } from "@/features/chat/model/chat-messages";
 import type { MobileAgent } from "@/features/workspace/model/workspace-types";
 import { useColumnWidth } from "@/shared/components/adaptive-split";
@@ -220,6 +221,7 @@ export const ChatComposer = memo(function ChatComposer({
   contextMeter,
 }: ChatComposerProps) {
   const { t, format, sourceText } = useText();
+  const chatNavigation = useChatNavigation();
   const still = useSharedValue(0);
   const menuMotion = menuProgress ?? still;
   const morph = voice?.presence ?? still;
@@ -679,8 +681,8 @@ export const ChatComposer = memo(function ChatComposer({
     editAfterDictation.current = false;
     void haptics.selection();
     inputRef.current?.blur();
-    router.push("/settings/voice");
-  }, []);
+    chatNavigation.push("/settings/voice");
+  }, [chatNavigation]);
   const voiceSettingsLabel = t("mobile.chat.composer.voiceSettings");
 
   const controlLabel = {

@@ -8,6 +8,9 @@ export function androidChannelId(sound: NotificationSound | null): string {
   return `openbot.sound.${sound}.v2`;
 }
 
+/** The channel of a chat bubble. `ChatBubbleNotification.kt` uses the same id. */
+export const CHAT_BUBBLE_CHANNEL_ID = "openbot.bubble";
+
 const SOUND_FILES: Readonly<Record<Exclude<NotificationSound, "default">, string>> = {
   openbot: "openbot_task.wav",
   warm: "openbot_warm.wav",
@@ -39,6 +42,12 @@ export async function createAndroidChannels(): Promise<void> {
   }
   await Notifications.setNotificationChannelAsync(androidChannelId(null), {
     name: t("mobile.settings.notifications.channelSilent"),
+    importance: Notifications.AndroidImportance.HIGH,
+    sound: null,
+    enableVibrate: false,
+  });
+  await Notifications.setNotificationChannelAsync(CHAT_BUBBLE_CHANNEL_ID, {
+    name: t("mobile.settings.chatBubble.channel"),
     importance: Notifications.AndroidImportance.HIGH,
     sound: null,
     enableVibrate: false,

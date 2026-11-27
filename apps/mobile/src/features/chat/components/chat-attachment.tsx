@@ -9,7 +9,6 @@ import type { AttachmentSummary } from "@openbot/contracts/ipc";
 import { requireOptionalNativeModule } from "expo";
 import { File } from "expo-file-system";
 import { Image } from "expo-image";
-import { router } from "expo-router";
 import { Button, Skeleton, Typography } from "heroui-native";
 import { useThemeColor } from "heroui-native/hooks";
 import ChevronRight from "lucide-react-native/icons/chevron-right";
@@ -19,6 +18,7 @@ import ImageOff from "lucide-react-native/icons/image-off";
 import { useEffect, useState } from "react";
 import { Pressable, useWindowDimensions, View } from "react-native";
 import Animated from "react-native-reanimated";
+import { useChatNavigation } from "@/features/chat/context/chat-navigation-context";
 import { useFullVisualPreference } from "@/features/settings/model/visual-preview";
 import { haptics } from "@/shared/lib/haptics";
 import { useText } from "@/shared/lib/text";
@@ -89,6 +89,7 @@ export function ChatAttachmentView(props: ChatAttachmentProps) {
 function ChatVisualAttachment(props: ChatAttachmentProps) {
   const { attachment, serverId } = props;
   const { t } = useText();
+  const navigation = useChatNavigation();
   const { width } = useWindowDimensions();
   const settled = useListSettled();
   const historyShown = useHistoryShown();
@@ -149,7 +150,7 @@ function ChatVisualAttachment(props: ChatAttachmentProps) {
           void haptics.impact("soft");
           const local = { uri: page.uri, name: attachment.name, mimeType: attachment.mimeType };
           const previewId = storeCodePreview({ kind: "html", source: page.source, language: "html", file: local });
-          router.push({ pathname: "/code-preview/[previewId]", params: { previewId } });
+          navigation.push({ pathname: "/code-preview/[previewId]", params: { previewId } });
         }}
       >
         <View pointerEvents="none" style={FILL}>

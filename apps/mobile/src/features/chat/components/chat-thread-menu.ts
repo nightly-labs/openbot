@@ -1,9 +1,9 @@
 import { avatarHeadColor } from "@openbot/brand/bloub-avatar";
 import type { AvatarColor, AvatarHue } from "@openbot/contracts/ipc";
-import { router } from "expo-router";
 import { useMemo } from "react";
 import { useAgentThreadReads } from "@/features/chat/components/use-agent-thread-reads";
 import { useOpenAgentTasks } from "@/features/chat/components/use-open-agent-tasks";
+import { useChatNavigation } from "@/features/chat/context/chat-navigation-context";
 import { useMobileWorkspaceSelector } from "@/features/workspace/context/mobile-workspace-context";
 import type { MenuAction } from "@/shared/components/menu-view";
 import { haptics } from "@/shared/lib/haptics";
@@ -42,6 +42,7 @@ export function useChatThreadMenu(
   activeId: string,
 ): ChatThreadMenu | undefined {
   const { t } = useText();
+  const navigation = useChatNavigation();
   const supported = useMobileWorkspaceSelector((current) => current.canUseTasks(agent.serverId));
   const tasks = useOpenAgentTasks(agent.serverId, agent.id);
   const reads = useAgentThreadReads(agent.serverId, agent.id);
@@ -51,8 +52,12 @@ export function useChatThreadMenu(
     const inThread = activeId !== MAIN_THREAD_ID;
     const unread = (taskId: string) => taskId !== activeId && (reads.get(taskId)?.unreadCount ?? 0) > 0;
     const openThread = (taskId: string) => {
-      if (inThread) router.setParams<"/task/[taskId]">({ taskId });
-      else router.push({ pathname: "/task/[taskId]", params: { serverId: agent.serverId, agentId: agent.id, taskId } });
+      if (inThread) navigation.setParams<"/task/[taskId]">({ taskId });
+      else
+        navigation.push({
+          pathname: "/task/[taskId]",
+          params: { serverId: agent.serverId, agentId: agent.id, taskId },
+        });
     };
     const actions: MenuAction[] = [
       {
@@ -96,12 +101,15 @@ export function useChatThreadMenu(
       void haptics.selection();
       if (id === MAIN_THREAD_ID) {
         if (inThread)
-          router.dismissTo({ pathname: "/chat/[agentId]", params: { agentId: agent.id, serverId: agent.serverId } });
+          navigation.dismissTo({
+            pathname: "/chat/[agentId]",
+            params: { agentId: agent.id, serverId: agent.serverId },
+          });
       } else if (id === DRAFT_THREAD_ID) openThread(DRAFT_THREAD_ID);
       else if (id === "all")
-        router.push({ pathname: "/server-tasks", params: { serverId: agent.serverId, agentId: agent.id } });
+        navigation.push({ pathname: "/server-tasks", params: { serverId: agent.serverId, agentId: agent.id } });
       else if (id === "info")
-        router.push({ pathname: "/agent-info/[agentId]", params: { agentId: agent.id, serverId: agent.serverId } });
+        navigation.push({ pathname: "/agent-info/[agentId]", params: { agentId: agent.id, serverId: agent.serverId } });
       else if (id.startsWith(THREAD_PREFIX)) {
         const taskId = id.slice(THREAD_PREFIX.length);
         if (taskId !== activeId) openThread(taskId);
@@ -109,5 +117,5 @@ export function useChatThreadMenu(
     };
     const attention = tasks.filter((task) => task.id !== activeId && unread(task.id)).length;
     return { actions, onPressAction, attention, color: agentColor, inThread, threadCount: tasks.length };
-  }, [supported, tasks, reads, agentColor, activeId, agent.id, agent.serverId, t]);
+  }, [navigation, supported, tasks, reads, agentColor, activeId, agent.id, agent.serverId, t]);
 }

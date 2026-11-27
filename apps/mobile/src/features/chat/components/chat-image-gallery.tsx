@@ -1,6 +1,5 @@
 import type { AttachmentSummary } from "@openbot/contracts/ipc";
 import { Image } from "expo-image";
-import { router } from "expo-router";
 import { Skeleton, Typography } from "heroui-native";
 import { useThemeColor } from "heroui-native/hooks";
 import ImageOff from "lucide-react-native/icons/image-off";
@@ -18,6 +17,7 @@ import Animated, {
   withTiming,
 } from "react-native-reanimated";
 import { scheduleOnRN, scheduleOnUI } from "react-native-worklets";
+import { useChatNavigation } from "@/features/chat/context/chat-navigation-context";
 import { haptics } from "@/shared/lib/haptics";
 import { useReducedMotion } from "@/shared/lib/motion";
 import { longPressDelay } from "@/shared/lib/platform";
@@ -69,6 +69,7 @@ export function ChatImageGallery({
   alignment: "left" | "right";
 }) {
   const { t } = useText();
+  const navigation = useChatNavigation();
   const muted = useThemeColor("muted");
   const reduced = useReducedMotion();
   const { width } = useWindowDimensions();
@@ -231,7 +232,7 @@ export function ChatImageGallery({
         onPress={() => {
           void haptics.selection();
           const galleryId = storeImageGallery({ serverId, images: attachments });
-          router.push({ pathname: "/image-gallery/[galleryId]", params: { galleryId } });
+          navigation.push({ pathname: "/image-gallery/[galleryId]", params: { galleryId } });
         }}
       >
         <Images size={14} color={String(muted)} />

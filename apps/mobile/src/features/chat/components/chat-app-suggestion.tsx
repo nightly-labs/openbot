@@ -1,5 +1,4 @@
 import { canAdministerServer } from "@openbot/contracts/ipc";
-import { router } from "expo-router";
 import { Button, Typography } from "heroui-native";
 import { useThemeColor } from "heroui-native/hooks";
 import Check from "lucide-react-native/icons/check";
@@ -7,6 +6,7 @@ import { type ReactNode, useMemo } from "react";
 import { View } from "react-native";
 import { useMobileSession } from "@/features/auth/context/mobile-session-context";
 import { useChatCardSurface } from "@/features/chat/components/chat-bubble-fill";
+import { useChatNavigation } from "@/features/chat/context/chat-navigation-context";
 import { dismissAppSuggestion, useAppSuggestionDismissals } from "@/features/chat/model/app-suggestion-dismissals";
 import { ListingIcon } from "@/features/marketplace/components/marketplace-parts";
 import { appListings, CONNECTOR_TAGLINES, customListing } from "@/features/marketplace/model/marketplace-listings";
@@ -55,6 +55,7 @@ function blockedState(access: { online: boolean; administers: boolean }): Sugges
 }
 
 function PluginSuggestion({ serverId, messageId, slug }: { serverId: string; messageId: string; slug: string }) {
+  const navigation = useChatNavigation();
   const { session } = useMobileSession();
   const canRelay = useMobileWorkspaceSelector((workspace) => workspace.canRelayMcpSignIn(serverId));
   const macUnavailable = useMobileWorkspaceSelector((workspace) => workspace.macAppsUnavailable(serverId));
@@ -91,9 +92,9 @@ function PluginSuggestion({ serverId, messageId, slug }: { serverId: string; mes
       state={state}
       onConnect={() => {
         if (method?.kind === "key" || method?.kind === "link")
-          router.push({ pathname: "/marketplace-listing/connect", params: { serverId, slug } });
+          navigation.push({ pathname: "/marketplace-listing/connect", params: { serverId, slug } });
         else
-          router.push({
+          navigation.push({
             pathname: "/marketplace-listing",
             params: { serverId, kind: "app", id: slug, name: listing.name },
           });
@@ -112,6 +113,7 @@ export function ChatMcpSignIn({
   mcpServerId: string;
 }) {
   const { t } = useText();
+  const navigation = useChatNavigation();
   const { canManage, list } = useMcpServerList(serverId);
   const signIns = useMcpSignIns(serverId, canManage);
   const canRelay = useMobileWorkspaceSelector((workspace) => workspace.canRelayMcpSignIn(serverId));
@@ -131,7 +133,7 @@ export function ChatMcpSignIn({
       actionAccessibilityLabel={t("mobile.chat.mcpSignIn.signInNamed", { name: config.name })}
       doneLabel={t("mobile.chat.mcpSignIn.signedIn")}
       onConnect={() =>
-        router.push({
+        navigation.push({
           pathname: "/server-settings/mcp-server",
           params: { serverId, mcpServerId: config.id, signIn: "1" },
         })
@@ -150,6 +152,7 @@ function ConnectorSuggestion({
   connector: MobileConnectorId;
 }) {
   const { t } = useText();
+  const navigation = useChatNavigation();
   const canManage = useMobileWorkspaceSelector((workspace) => workspace.canManageConnectors(serverId));
   const access = useServerAccess(serverId);
   const rows = useConnectorRowState(serverId);
@@ -178,7 +181,7 @@ function ConnectorSuggestion({
       tagline={tagline}
       icon={<ConnectorLogo id={connector} size={ICON_SIZE} />}
       state={state}
-      onConnect={() => router.push({ pathname: "/server-settings/connector", params: { serverId, id: connector } })}
+      onConnect={() => navigation.push({ pathname: "/server-settings/connector", params: { serverId, id: connector } })}
     />
   );
 }

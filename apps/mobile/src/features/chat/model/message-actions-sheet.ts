@@ -1,6 +1,6 @@
 import type { AttachmentSummary } from "@openbot/contracts/ipc";
-import { router } from "expo-router";
 import { useSyncExternalStore } from "react";
+import type { ChatNavigation } from "../context/chat-navigation-context";
 
 export interface MessageActionsRequest {
   messageId: string;
@@ -38,10 +38,10 @@ function subscribe(listener: () => void) {
   return () => listeners.delete(listener);
 }
 
-export function openMessageActions(request: MessageActionsRequest) {
+export function openMessageActions(request: MessageActionsRequest, navigation: ChatNavigation) {
   current = request;
   for (const listener of listeners) listener();
-  router.push("/message-actions");
+  navigation.push("/message-actions");
 }
 
 export function messageActionsOpen(): boolean {

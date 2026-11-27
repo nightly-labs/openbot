@@ -1,8 +1,8 @@
 import type { ChannelSummary } from "@openbot/contracts/ipc";
-import { router } from "expo-router";
 import { Spinner, Typography } from "heroui-native";
 import { Pressable, View } from "react-native";
 import { useCSSVariable } from "uniwind";
+import { useChatNavigation } from "@/features/chat/context/chat-navigation-context";
 import type { MobileAgentActivity } from "@/features/workspace/model/agent-activity";
 import { haptics } from "@/shared/lib/haptics";
 import { useText } from "@/shared/lib/text";
@@ -20,6 +20,7 @@ export function ChatChannelWorkRow({
   serverId: string;
 }) {
   const { t } = useText();
+  const navigation = useChatNavigation();
   const accent = useCSSVariable("--openbot-accent-text");
   const label = t(
     activity.phase === "waiting" ? "mobile.chat.channelWork.waiting" : "mobile.chat.channelWork.working",
@@ -36,7 +37,7 @@ export function ChatChannelWorkRow({
         style={({ pressed }) => ({ borderCurve: "continuous", opacity: pressed ? 0.6 : 1 })}
         onPress={() => {
           void haptics.selection();
-          router.push(waitingChannelHref(channel.id, serverId, agentId, activity));
+          navigation.push(waitingChannelHref(channel.id, serverId, agentId, activity));
         }}
       >
         {activity.phase === "waiting" ? null : <Spinner size="sm" color={String(accent)} />}

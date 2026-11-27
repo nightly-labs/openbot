@@ -15,6 +15,8 @@ import { MermaidRendererHost } from "@/features/chat/components/mermaid-renderer
 import { OutboxProvider } from "@/features/chat/context/outbox-context";
 import { QueuedMessagesProvider } from "@/features/chat/context/queued-messages-context";
 import { requestComposerText } from "@/features/chat/model/composer-requests";
+import { useChatBubblePendingRoute } from "@/features/chat-bubble/use-chat-bubble-pending-route";
+import { useChatBubbleSync } from "@/features/chat-bubble/use-chat-bubble-sync";
 import { setLiveActivityNavigator } from "@/features/live-activity/model/live-activity-link";
 import { HomeOnboardingProvider, useHomeOnboarding } from "@/features/onboarding/context/home-onboarding-context";
 import type { NotificationTarget, WorkflowTarget } from "@/features/push-notifications/push-notifications-native.types";
@@ -306,6 +308,8 @@ function AuthenticatedStack() {
     [closeDrawer],
   );
   useNotificationTaps(openTarget, onScreen, openWorkflow);
+  useChatBubbleSync();
+  useChatBubblePendingRoute();
 
   return (
     <Stack

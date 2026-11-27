@@ -1,6 +1,6 @@
-import { router } from "expo-router";
 import { createContext, useContext, useMemo } from "react";
 import { useBrowserFeature } from "@/features/browser/components/use-browser-feature";
+import { useChatNavigation } from "@/features/chat/context/chat-navigation-context";
 import { selectLiveState } from "@/features/workspace/components/use-live-workspace";
 import { useMobileWorkspaceSelector } from "@/features/workspace/context/mobile-workspace-context";
 import { haptics } from "@/shared/lib/haptics";
@@ -14,6 +14,7 @@ export function useOpenTaggedTab(): OpenTaggedTab | undefined {
 }
 
 export function useTaggedTabOpener(serverId: string): OpenTaggedTab | undefined {
+  const navigation = useChatNavigation();
   const browserAllowed = useBrowserFeature();
   const browserView = useMobileWorkspaceSelector((current) => current.browserViewSupport(serverId).view);
   const liveState = useMobileWorkspaceSelector(selectLiveState);
@@ -26,7 +27,7 @@ export function useTaggedTabOpener(serverId: string): OpenTaggedTab | undefined 
         return;
       }
       void haptics.selection();
-      router.push({ pathname: "/browser/[agentId]", params: { agentId: tab.ownerAgentId, serverId, tabId } });
+      navigation.push({ pathname: "/browser/[agentId]", params: { agentId: tab.ownerAgentId, serverId, tabId } });
     };
-  }, [browserAllowed, browserView, liveState, serverId]);
+  }, [navigation, browserAllowed, browserView, liveState, serverId]);
 }
