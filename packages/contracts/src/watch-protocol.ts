@@ -10,6 +10,7 @@ export const WATCH_AGENT_LIMIT = 40;
 export const WATCH_CHANNEL_LIMIT = 20;
 export const WATCH_CHANNEL_MEMBERS = 4;
 export const WATCH_HIDDEN_LIMIT = 200;
+export const WATCH_WIDGET_PUSH_TOKEN_PATTERN = /^(?:[0-9a-f]{2}){8,256}$/u;
 
 export type WatchAgentState = "waiting" | "working" | "idle";
 
@@ -167,7 +168,10 @@ export type WatchCommand =
   | { type: "stop"; serverId: string; agentId: string; turnId: string }
   | { type: "open" | "read"; serverId: string; agentId: string }
   | { type: "sendChannel"; serverId: string; channelId: string; text: string; messageId?: string }
-  | { type: "readChannel"; serverId: string; channelId: string };
+  | { type: "readChannel"; serverId: string; channelId: string }
+  | { type: "widgetPush"; token: string; environment: WatchPushEnvironment };
+
+export type WatchPushEnvironment = "production" | "development";
 
 export type WatchErrorCode = "inactive" | "offline" | "locked" | "failed" | "timeout" | "asleep";
 
@@ -203,6 +207,7 @@ export function decodeWatchCommand(text: string): WatchCommand | null {
       : null;
   }
   if (type === "avatars") return decodeAvatarRequest(value.names);
+  if (type === "widgetPush") return decodeWidgetPush(value.token, value.environment);
   if (type === "sendChannel" || type === "readChannel") {
     const { channelId, text, messageId } = value;
     return decodeChannelCommand(type, { serverId, channelId, text, messageId });
@@ -253,6 +258,12 @@ function decodeChannelCommand(
   return isString(messageId) && MESSAGE_ID.test(messageId)
     ? { type, serverId, channelId, text, messageId: messageId.toLowerCase() }
     : null;
+}
+
+function decodeWidgetPush(token: unknown, environment: unknown): WatchCommand | null {
+  if (!isString(token) || !WATCH_WIDGET_PUSH_TOKEN_PATTERN.test(token)) return null;
+  if (environment !== "production" && environment !== "development") return null;
+  return { type: "widgetPush", token, environment };
 }
 
 function decodeAvatarRequest(names: unknown): WatchCommand | null {

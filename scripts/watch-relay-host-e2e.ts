@@ -64,6 +64,8 @@ const AUTH_URL = "https://auth.watch-e2e.invalid";
 const OWNER = { username: "owner-user", password: "owner-password-123" };
 const WATCHER = { username: "watcher", password: "watcher-password-123" };
 const EPOCH = 3;
+const MACHINE_TOKEN = "watch-e2e-machine-token-0123456789abcdef";
+const WIDGET_TOKEN = "ab".repeat(32);
 const PNG_BASE64 = "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==";
 
 plugin({
@@ -108,6 +110,7 @@ const { CentralAuthManager } = await import("../src/main/central-auth-manager");
 const { WatchRelayService } = await import("../src/main/watch-relay-service");
 const { WatchRelayCommands } = await import("../src/main/watch-relay-commands");
 const { createWatchRelayWantedStore, loadWatchRelayKey } = await import("../src/main/watch-relay-key");
+const { WatchWidgetPushFailure, WatchWidgetPushService } = await import("../src/main/watch-widget-push");
 
 interface Step {
   name: string;
@@ -122,6 +125,7 @@ const report: { passed: boolean; unverified: string[]; steps: Step[] } = {
     "The Signal ingress socket. The check calls the host's watch-delivery handler directly; Signal is not started.",
     "The account service. The check signs watch tickets with its own ES256 key and serves that key set to CentralAuth.",
     "Provider turns. The agent service is real, but approvals, questions, sends and stops go to recorded stand-ins.",
+    "Apple delivery of widget pushes. The check records the host's widget-push requests to a fake account service.",
   ],
   steps: [],
 };
@@ -217,6 +221,10 @@ let service: AgentService | undefined;
 let server: InstanceType<typeof TeamApiServer> | undefined;
 let relay: InstanceType<typeof WatchRelayService> | undefined;
 let commands: InstanceType<typeof WatchRelayCommands> | null = null;
+let widgetPush: InstanceType<typeof WatchWidgetPushService> | undefined;
+let widgetClockOffset = 0;
+let widgetAnswer = 204;
+const widgetRequests: { path: string; body: unknown }[] = [];
 let channels: ChannelService | null = null;
 const CHANNEL_NAME = "Launch room";
 
@@ -516,12 +524,19 @@ try {
         storagePath: join(root, "session.bin"),
         encrypt: (value) => Buffer.from(value),
         decrypt: (value) => value.toString(),
-        fetch: async (input) => {
+        fetch: async (input, init) => {
           const url = new URL(input instanceof Request ? input.url : input);
           if (url.pathname === "/.well-known/jwks.json") return Response.json({ keys: [jwk] });
+          if (url.pathname.endsWith("/widget-push") && init?.method === "POST") {
+            widgetRequests.push({ path: url.pathname, body: JSON.parse(String(init.body)) });
+            return widgetAnswer === 204
+              ? new Response(null, { status: 204 })
+              : Response.json({ error: "widget_push_gone" }, { status: widgetAnswer });
+          }
           return new Response("{}", { status: 404 });
         },
       });
+      centralAuth.useHostCredential(hostId, MACHINE_TOKEN);
 
       relay = new WatchRelayService({
         hostId: () => team.getIdentity()?.serverId ?? null,
@@ -556,7 +571,18 @@ try {
       });
       const port = await Effect.runPromise(server.start());
       await Effect.runPromise(relay.start());
-      commands = new WatchRelayCommands(server.watchTeamApi());
+      const watchTeamApi = server.watchTeamApi();
+      widgetPush = new WatchWidgetPushService({
+        agents: real,
+        hiddenAgentIds: (member) => watchTeamApi.hiddenAgentIds(member),
+        member: (memberId) => team.getMember(memberId),
+        send: (push) =>
+          centralAuth
+            .sendWatchWidgetPush(hostId, push)
+            .pipe(Effect.mapError((cause) => new WatchWidgetPushFailure({ cause }))),
+        now: () => Date.now() + widgetClockOffset,
+      });
+      commands = new WatchRelayCommands(watchTeamApi, { widgetPush });
       return {
         port,
         hostId,
@@ -855,6 +881,62 @@ try {
     return recorded.interrupts[0];
   });
 
+  const untilTrue = async (check: () => boolean) => {
+    while (!check()) await new Promise((resolve) => setTimeout(resolve, 20));
+  };
+
+  await step("The watch registers a widget push token for the member", async () => {
+    assert.ok(widgetPush);
+    const { result, snapshot } = await send({ type: "widgetPush", token: WIDGET_TOKEN, environment: "development" });
+    assert.deepEqual(result, { ok: true });
+    assert.equal(snapshot, null);
+    assert.equal(widgetPush.tokenCount(watcher.id), 1);
+    assert.equal(widgetRequests.length, 0, "The registration itself sent a push.");
+    return { tokens: widgetPush.tokenCount(watcher.id) };
+  });
+
+  const startWait = (requestId: string) => {
+    assert.ok(service);
+    const shown = pendingApprovals.findIndex((item) => item.agentId === agents.worker);
+    if (shown >= 0) pendingApprovals.splice(shown, 1);
+    pendingApprovals.push({
+      requestId,
+      agentId: agents.worker,
+      threadId: `thread-${agents.worker}`,
+      turnId: `turn-${requestId}`,
+      kind: "command",
+      command: "/bin/zsh -lc 'ls'",
+      cwd: null,
+      reason: null,
+      grantRoot: null,
+      permissions: null,
+    });
+    service.emit("event", { type: "memories-changed", agentId: agents.worker });
+  };
+
+  await step("An agent that starts to wait sends one widget push with the token", async () => {
+    startWait("approval-widget-1");
+    await untilTrue(() => widgetRequests.length > 0);
+    assert.equal(widgetRequests.length, 1);
+    assert.deepEqual(widgetRequests[0], {
+      path: `/v2/remote/hosts/${encodeURIComponent(hostId)}/widget-push`,
+      body: { machineToken: MACHINE_TOKEN, token: WIDGET_TOKEN, environment: "development" },
+    });
+    return widgetRequests[0]?.path;
+  });
+
+  await step("A 410 answer makes the host forget the widget token", async () => {
+    assert.ok(widgetPush);
+    const push = widgetPush;
+    widgetAnswer = 410;
+    widgetClockOffset += 11_000;
+    startWait("approval-widget-2");
+    await untilTrue(() => widgetRequests.length > 1);
+    await untilTrue(() => push.tokenCount(watcher.id) === 0);
+    assert.equal(widgetRequests.length, 2, "The host sent more than one push for each wait.");
+    return { requests: widgetRequests.length, tokens: push.tokenCount(watcher.id) };
+  });
+
   await step("Avatars return the named agent picture", async () => {
     const name = firstSnapshot.agents.find((agent) => agent.id === agents.approver)?.avatar;
     assert.ok(name);
@@ -918,6 +1000,7 @@ try {
   report.passed = report.steps.every((entry) => entry.passed);
 } finally {
   if (relay) await Effect.runPromise(relay.dispose()).catch(() => undefined);
+  if (widgetPush) await Effect.runPromise(widgetPush.dispose()).catch(() => undefined);
   if (server) await Effect.runPromise(server.stop()).catch(() => undefined);
   if (service) await runCauseEffect(service.stop()).catch(() => undefined);
   database.close();

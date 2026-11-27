@@ -23,7 +23,7 @@ struct ComplicationAgent: Codable, Equatable {
     kind = Self.kind(agent).rawValue
     status = AgentStateStyle(agent: agent, text: text).title
     line = Self.line(agent).map { String($0.prefix(Self.lineLimit)) }
-    picture = [agent.face, agent.avatar].compactMap { $0 }.first(where: WatchSession.hasPicture)
+    picture = [agent.face, agent.avatar].compactMap { $0 }.first(where: WatchAvatarFiles.has)
   }
 
   private static func kind(_ agent: WatchAgent) -> WatchAgentState {
@@ -74,20 +74,25 @@ struct ComplicationData: Codable, Equatable {
   static let locked = ComplicationData(state: "locked", count: 0, text: "", name: nil, color: nil)
 
   @MainActor
-  static func update(_ all: WatchReadySnapshot, previous: WatchReadySnapshot? = nil) {
-    let chosen = UserDefaults.standard.string(forKey: WatchSession.serverKey) ?? ""
+  static func update(_ all: WatchReadySnapshot, previous: WatchReadySnapshot?, chosen: String) {
+    let change = save(all, previous: previous, chosen: chosen)
+    if change.data { WidgetReload.schedule(newServers: change.servers) }
+  }
+
+  static func save(_ all: WatchReadySnapshot, previous: WatchReadySnapshot?, chosen: String) -> ComplicationChange {
     let main = ready(all, previous: previous, server: chosen, kept: stored()?.agent)
-    guard all.servers.count > 1 else {
-      write(main, store: nil)
-      return
+    var store: ComplicationStore?
+    if all.servers.count > 1 {
+      let kept = ComplicationStore.stored()?.data ?? [:]
+      var data: [String: ComplicationData] = [:]
+      for server in all.servers {
+        data[server.id] = ready(all, previous: previous, server: server.id, kept: kept[server.id]?.agent)
+      }
+      let servers = all.servers.map { ComplicationServer(id: $0.id, name: $0.name) }
+      store = ComplicationStore(servers: servers, data: data)
     }
-    let kept = ComplicationStore.stored()?.data ?? [:]
-    var data: [String: ComplicationData] = [:]
-    for server in all.servers {
-      data[server.id] = ready(all, previous: previous, server: server.id, kept: kept[server.id]?.agent)
-    }
-    let servers = all.servers.map { ComplicationServer(id: $0.id, name: $0.name) }
-    write(main, store: ComplicationStore(servers: servers, data: data))
+    WidgetSource.save(all, chosen: chosen)
+    return persist(main, store: store)
   }
 
   private static func ready(
@@ -131,12 +136,14 @@ struct ComplicationData: Codable, Equatable {
     let waiting = agents.filter { $0.wait != nil || $0.state == .waiting }
     if let kept, waiting.contains(where: { $0.key == kept.key }) { return kept }
     if let first = waiting.first { return first }
+    let unread = agents.filter { ($0.unread ?? 0) > 0 }
+    if let newest = newest(unread) { return newest }
+    if let kept, unread.contains(where: { $0.key == kept.key }) { return kept }
+    if let first = unread.first { return first }
     if let newest = newest(agents) { return newest }
     if let changed = agents.first(where: { hasNews($0, since: previous) }) { return changed }
     if let kept { return kept }
-    return agents.first { $0.state == .working }
-      ?? agents.first { ($0.unread ?? 0) > 0 }
-      ?? agents.first
+    return agents.first { $0.state == .working } ?? agents.first
   }
 
   private static func newest(_ agents: [WatchAgent]) -> WatchAgent? {
@@ -153,18 +160,24 @@ struct ComplicationData: Codable, Equatable {
     return agent.reply != old.reply || agent.updated != old.updated || (agent.unread ?? 0) > (old.unread ?? 0)
   }
 
-  private static func stored() -> ComplicationData? {
+  static func stored() -> ComplicationData? {
     guard let stored = UserDefaults(suiteName: watchAppGroup)?.data(forKey: storageKey) else { return nil }
     return try? JSONDecoder().decode(ComplicationData.self, from: stored)
   }
 
   @MainActor
-  static func write(_ data: ComplicationData, store: ComplicationStore? = nil) {
-    guard let defaults = UserDefaults(suiteName: watchAppGroup) else { return }
+  static func write(_ data: ComplicationData) {
+    WidgetSource.remove()
+    let change = persist(data, store: nil)
+    if change.data { WidgetReload.schedule(newServers: change.servers) }
+  }
+
+  private static func persist(_ data: ComplicationData, store: ComplicationStore?) -> ComplicationChange {
+    guard let defaults = UserDefaults(suiteName: watchAppGroup) else { return ComplicationChange() }
     let previousStore = ComplicationStore.stored()
     let dataChanged = stored() != data
     let storeChanged = previousStore != store
-    guard dataChanged || storeChanged else { return }
+    guard dataChanged || storeChanged else { return ComplicationChange() }
     if dataChanged, let encoded = try? JSONEncoder().encode(data) {
       defaults.set(encoded, forKey: storageKey)
     }
@@ -175,7 +188,7 @@ struct ComplicationData: Codable, Equatable {
         defaults.removeObject(forKey: ComplicationStore.storageKey)
       }
     }
-    WidgetReload.schedule(newServers: previousStore?.servers ?? [] != store?.servers ?? [])
+    return ComplicationChange(data: true, servers: previousStore?.servers ?? [] != store?.servers ?? [])
   }
 
   @MainActor
@@ -183,6 +196,7 @@ struct ComplicationData: Codable, Equatable {
     let defaults = UserDefaults(suiteName: watchAppGroup)
     defaults?.removeObject(forKey: storageKey)
     defaults?.removeObject(forKey: ComplicationStore.storageKey)
+    WidgetSource.remove()
     WidgetReload.schedule(newServers: true)
     WidgetReload.flush()
   }
@@ -215,6 +229,49 @@ enum WidgetReload {
     if newServers { WidgetCenter.shared.invalidateConfigurationRecommendations() }
     newServers = false
     WidgetCenter.shared.reloadAllTimelines()
+  }
+}
+
+struct ComplicationChange {
+  var data = false
+  var servers = false
+}
+
+enum WidgetSource {
+  private static let snapshotKey = "openbot.watch.widget.snapshot"
+  private static let chosenKey = "openbot.watch.widget.server"
+  private static let freshKey = "openbot.watch.widget.fresh"
+
+  static func save(_ snapshot: WatchReadySnapshot, chosen: String) {
+    guard let defaults = UserDefaults(suiteName: watchAppGroup),
+      let encoded = try? JSONEncoder().encode(snapshot)
+    else { return }
+    if defaults.data(forKey: snapshotKey) != encoded { defaults.set(encoded, forKey: snapshotKey) }
+    if defaults.string(forKey: chosenKey) != chosen { defaults.set(chosen, forKey: chosenKey) }
+    defaults.set(Date().timeIntervalSince1970, forKey: freshKey)
+  }
+
+  static func snapshot() -> WatchReadySnapshot? {
+    guard let data = UserDefaults(suiteName: watchAppGroup)?.data(forKey: snapshotKey) else { return nil }
+    return try? JSONDecoder().decode(WatchReadySnapshot.self, from: data)
+  }
+
+  static var chosen: String {
+    UserDefaults(suiteName: watchAppGroup)?.string(forKey: chosenKey) ?? ""
+  }
+
+  static var age: TimeInterval {
+    guard let fresh = UserDefaults(suiteName: watchAppGroup)?.object(forKey: freshKey) as? Double else {
+      return .infinity
+    }
+    return Date().timeIntervalSince1970 - fresh
+  }
+
+  static func remove() {
+    let defaults = UserDefaults(suiteName: watchAppGroup)
+    defaults?.removeObject(forKey: snapshotKey)
+    defaults?.removeObject(forKey: chosenKey)
+    defaults?.removeObject(forKey: freshKey)
   }
 }
 

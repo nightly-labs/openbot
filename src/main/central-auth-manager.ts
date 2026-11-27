@@ -92,6 +92,7 @@ import {
 } from "./central-auth-records";
 import { awaitCompanySignIn, type CompanySignInBrowser, CompanySignInBrowserError } from "./company-sign-in-browser";
 import type { NotificationRelayRequest } from "./push-notifications";
+import type { WatchWidgetPush } from "./watch-widget-push";
 
 interface CentralAuthEvents {
   changed: [state: CentralAuthState];
@@ -1043,6 +1044,33 @@ export class CentralAuthManager extends EventEmitter<CentralAuthEvents> {
             if (error instanceof AuthApiError && error.status === 410) return "gone";
             return yield* new CentralAuthOperationError({ cause: error });
           }),
+        ),
+      );
+    },
+    (operation) => this.#owned(operation),
+  ).bind(this);
+
+  readonly sendWatchWidgetPush = Effect.fn("CentralAuth.sendWatchWidgetPush")(
+    function* (
+      this: CentralAuthManager,
+      hostId: string,
+      push: WatchWidgetPush,
+    ): Effect.fn.Return<"sent" | "gone", CentralAuthOperationError, CentralAuthTransport> {
+      const machineToken = yield* this.#hostMachineToken(hostId);
+      return yield* this.#requestEffect(
+        `/v2/remote/hosts/${encodeURIComponent(hostId)}/widget-push`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ machineToken, token: push.token, environment: push.environment }),
+        },
+        () => undefined,
+      ).pipe(
+        Effect.as("sent" as const),
+        Effect.catch(({ cause: error }) =>
+          error instanceof AuthApiError && error.status === 410
+            ? Effect.succeed("gone" as const)
+            : Effect.fail(new CentralAuthOperationError({ cause: error })),
         ),
       );
     },

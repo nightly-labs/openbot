@@ -2,25 +2,6 @@ import AppIntents
 import SwiftUI
 import WidgetKit
 
-private let appGroup = "group.run.openbot.mobile"
-
-struct ComplicationServer: Codable, Equatable {
-  var id: String
-  var name: String
-}
-
-struct ComplicationStore: Codable, Equatable {
-  var servers: [ComplicationServer]
-  var data: [String: ComplicationData]
-
-  static let storageKey = "openbot.watch.complication.servers"
-
-  static func load() -> ComplicationStore? {
-    guard let stored = UserDefaults(suiteName: appGroup)?.data(forKey: storageKey) else { return nil }
-    return try? JSONDecoder().decode(ComplicationStore.self, from: stored)
-  }
-}
-
 struct ServerEntity: AppEntity {
   static let typeDisplayRepresentation = TypeDisplayRepresentation(name: "OpenBot")
   static let defaultQuery = ServerQuery()
@@ -48,7 +29,7 @@ struct ServerQuery: EntityQuery {
   }
 
   private func suggested() -> [ServerEntity] {
-    (ComplicationStore.load()?.servers ?? []).map(ServerEntity.init)
+    (ComplicationStore.stored()?.servers ?? []).map(ServerEntity.init)
   }
 }
 
@@ -67,7 +48,7 @@ struct ServerIntent: WidgetConfigurationIntent {
 
 extension ComplicationData {
   static func load(server: String?) -> ComplicationData {
-    guard let server, let data = ComplicationStore.load()?.data[server] else { return load() }
+    guard let server, let data = ComplicationStore.stored()?.data[server] else { return load() }
     return data
   }
 }
@@ -83,13 +64,14 @@ struct ComplicationProvider: AppIntentTimelineProvider {
   }
 
   func timeline(for configuration: ServerIntent, in context: Context) async -> Timeline<ComplicationEntry> {
+    await WidgetRefresh.shared.run()
     let entry = ComplicationEntry(date: Date(), data: ComplicationData.load(server: configuration.server?.id))
     return Timeline(entries: [entry], policy: .never)
   }
 
   func recommendations() -> [AppIntentRecommendation<ServerIntent>] {
     let chosen = AppIntentRecommendation(intent: ServerIntent(), description: Text(verbatim: "OpenBot"))
-    let servers = ComplicationStore.load()?.servers ?? []
+    let servers = ComplicationStore.stored()?.servers ?? []
     guard servers.count > 1 else { return [chosen] }
     return [chosen]
       + servers.map { server in

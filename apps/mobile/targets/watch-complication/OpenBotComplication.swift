@@ -3,30 +3,16 @@ import SwiftUI
 import UIKit
 import WidgetKit
 
-private let appGroup = "group.run.openbot.mobile"
-
-struct ComplicationAgent: Codable, Equatable {
-  var serverId: String
-  var id: String
-  var name: String
-  var color: String
-  var kind: String
-  var status: String
-  var line: String?
-  var picture: String?
-
-  var isWaiting: Bool { kind == "waiting" }
-  var isWorking: Bool { kind == "working" }
+extension ComplicationAgent {
+  var isWaiting: Bool { kind == WatchAgentState.waiting.rawValue }
+  var isWorking: Bool { kind == WatchAgentState.working.rawValue }
 
   var url: URL? { ComplicationData.agentURL(serverId: serverId, agentId: id) }
 
   func image(side: CGFloat) -> UIImage? {
-    guard let picture, !picture.isEmpty, !picture.contains("/"), !picture.hasPrefix("."),
-      let folder = FileManager.default.containerURL(forSecurityApplicationGroupIdentifier: appGroup)
+    guard let picture, let url = WatchAvatarFiles.url(picture),
+      let source = CGImageSourceCreateWithURL(url as CFURL, nil)
     else { return nil }
-    let url = folder.appendingPathComponent("watch-avatars", isDirectory: true)
-      .appendingPathComponent(picture, isDirectory: false)
-    guard let source = CGImageSourceCreateWithURL(url as CFURL, nil) else { return nil }
     let options: [CFString: Any] = [
       kCGImageSourceCreateThumbnailFromImageAlways: true,
       kCGImageSourceCreateThumbnailWithTransform: true,
@@ -37,25 +23,7 @@ struct ComplicationAgent: Codable, Equatable {
   }
 }
 
-struct ComplicationData: Codable, Equatable {
-  var state: String
-  var count: Int
-  var text: String
-  var name: String?
-  var color: String?
-  var serverId: String?
-  var agentId: String?
-  var working: Int?
-  var agent: ComplicationAgent?
-  var unread: Int?
-  var moreWaiting: Int?
-  var moreUnread: Int?
-  var moreLabel: String?
-  var server: String?
-
-  static let storageKey = "openbot.watch.complication"
-  static let none = ComplicationData(state: "none", count: 0, text: "", name: nil, color: nil)
-
+extension ComplicationData {
   var isReady: Bool { state == "ready" }
   var isLocked: Bool { state == "locked" }
   var workingCount: Int { working ?? 0 }
@@ -80,10 +48,7 @@ struct ComplicationData: Codable, Equatable {
   }
 
   static func load() -> ComplicationData {
-    guard let stored = UserDefaults(suiteName: appGroup)?.data(forKey: storageKey),
-      let data = try? JSONDecoder().decode(ComplicationData.self, from: stored)
-    else { return .none }
-    return data
+    stored() ?? .none
   }
 }
 
@@ -107,6 +72,13 @@ struct OpenBotComplicationBundle: WidgetBundle {
 
 struct OpenBotComplication: Widget {
   var body: some WidgetConfiguration {
+    if #available(watchOS 26.0, *) {
+      return configuration.pushHandler(OpenBotWidgetPushHandler.self)
+    }
+    return configuration
+  }
+
+  private var configuration: some WidgetConfiguration {
     AppIntentConfiguration(
       kind: "OpenBotComplication", intent: ServerIntent.self, provider: ComplicationProvider()
     ) { entry in
@@ -114,5 +86,12 @@ struct OpenBotComplication: Widget {
     }
     .configurationDisplayName(Text(verbatim: "OpenBot"))
     .supportedFamilies([.accessoryCircular, .accessoryCorner, .accessoryRectangular])
+  }
+}
+
+@available(watchOS 26.0, *)
+struct OpenBotWidgetPushHandler: WidgetPushHandler {
+  func pushTokenDidChange(_ pushInfo: WidgetPushInfo, widgets: [WidgetInfo]) {
+    WidgetPushRegistry.save(token: pushInfo.token)
   }
 }

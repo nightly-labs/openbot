@@ -27,6 +27,7 @@ import { Effect, Option, Result, Schema } from "effect";
 import type { TeamApiAgents } from "./team-api/dependencies";
 import { seesChannel } from "./team-api/route-channels";
 import { buildHostWatchSnapshot, type WatchText, watchAvatarName, watchTextFor } from "./watch-relay-snapshot";
+import type { WatchWidgetPushService } from "./watch-widget-push";
 
 const AVATAR_REPLY_LIMIT = 48_000;
 const SESSION_LIFETIME_MS = 60_000;
@@ -35,7 +36,7 @@ const READ_PAGE_LIMIT = 50;
 const FULL_REPLY_PAGE_LIMIT = 20;
 const FULL_REPLY_CACHE_LIMIT = 64;
 
-const READ_OPTIONS = {
+export const WATCH_READ_OPTIONS = {
   excludeRoutineEvents: false,
   excludeRoutineRunEvents: false,
   excludeHostedSiteEvents: false,
@@ -114,14 +115,21 @@ const failure = (error: WatchErrorCode, message: string): WatchCommandReply => (
   snapshot: null,
 });
 
+export interface WatchRelayCommandsOptions {
+  widgetPush?: Pick<WatchWidgetPushService, "register">;
+  now?: () => number;
+}
+
 export class WatchRelayCommands {
   readonly #api: WatchRelayTeamApi;
+  readonly #widgetPush: Pick<WatchWidgetPushService, "register"> | null;
   readonly #now: () => number;
   readonly #fullReplies = new Map<string, string>();
 
-  constructor(api: WatchRelayTeamApi, now: () => number = Date.now) {
+  constructor(api: WatchRelayTeamApi, options: WatchRelayCommandsOptions = {}) {
     this.#api = api;
-    this.#now = now;
+    this.#widgetPush = options.widgetPush ?? null;
+    this.#now = options.now ?? Date.now;
   }
 
   snapshot(member: WatchRelayMember, context: WatchRelayContext, text: WatchText): WatchSnapshot {
@@ -150,7 +158,9 @@ export class WatchRelayCommands {
       prompts: agents.pendingPrompts().filter((item) => visible(item.agentId)),
       wholeApproval: (requestId) => agents.pendingApproval(requestId),
       reads: Object.fromEntries(
-        Object.entries(agents.listConversationReads(member.id, READ_OPTIONS)).filter(([agentId]) => visible(agentId)),
+        Object.entries(agents.listConversationReads(member.id, WATCH_READ_OPTIONS)).filter(([agentId]) =>
+          visible(agentId),
+        ),
       ),
       pins: this.#api.pins(member.id, hidden),
       layout: this.#api.layout(),
@@ -169,6 +179,11 @@ export class WatchRelayCommands {
   ): Effect.fn.Return<WatchCommandReply> {
     const text = watchTextFor(context.language);
     const { t } = text;
+    if (command.type === "widgetPush") {
+      if (!this.#widgetPush) return failure("failed", "");
+      this.#widgetPush.register(member, { token: command.token, environment: command.environment });
+      return { result: { ok: true }, snapshot: null };
+    }
     if (command.type !== "avatars") yield* this.#loadFullReplies(member);
     const done = (): WatchCommandReply => ({ result: { ok: true }, snapshot: this.snapshot(member, context, text) });
     if (command.type === "refresh") return done();

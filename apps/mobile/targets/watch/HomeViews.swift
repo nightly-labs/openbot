@@ -50,52 +50,6 @@ struct HomeView: View {
   }
 }
 
-extension WatchReadySnapshot {
-  func chosenServer(_ id: String) -> WatchServer? {
-    servers.first { $0.id == id } ?? servers.first
-  }
-
-  var isEmpty: Bool {
-    agents.isEmpty && (channels ?? []).isEmpty
-  }
-
-  func forServer(_ id: String) -> WatchReadySnapshot {
-    guard servers.count > 1, let server = chosenServer(id) else { return self }
-    var copy = self
-    copy.servers = [server]
-    copy.agents = agents.filter { $0.serverId == server.id }
-    copy.channels = channels?.filter { $0.serverId == server.id }
-    return copy
-  }
-}
-
-struct AgentCounts {
-  let waiting: Int
-  let unread: Int
-  let working: Int
-
-  init(_ agents: [WatchAgent], channels: [WatchChannel] = []) {
-    waiting = agents.filter { $0.state == .waiting }.count
-    unread = agents.filter { ($0.unread ?? 0) > 0 }.count + channels.filter { ($0.unread ?? 0) > 0 }.count
-    working = agents.filter { $0.state == .working }.count + channels.filter(\.isWorking).count
-  }
-
-  init(waiting: Int, unread: Int, working: Int = 0) {
-    self.waiting = waiting
-    self.unread = unread
-    self.working = working
-  }
-
-  func line(_ text: WatchText) -> String? {
-    let parts = [
-      waiting > 0 ? "\(waiting) \(text(TextKey.needsYou))" : nil,
-      unread > 0 ? "\(unread) \(text(TextKey.unread))" : nil,
-      working > 0 ? "\(working) \(text(TextKey.stateWorking))" : nil,
-    ].compactMap { $0 }
-    return parts.isEmpty ? nil : parts.joined(separator: " · ")
-  }
-}
-
 struct SummaryView: View {
   @EnvironmentObject private var session: WatchSession
   @Environment(\.watchText) private var text

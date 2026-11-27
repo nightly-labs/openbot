@@ -504,6 +504,13 @@ It has its own key in `LIVE_ACTIVITY_RATE_LIMITER`, and it sends nothing for a d
 has ended (`RemoteControlPlane.sessionOpen`), because the host does not learn about the end. The
 alert has "OpenBot" as its only text and `mutable-content`; the app opens the sealed bytes.
 
+`POST /v2/remote/hosts/:hostId/widget-push` takes `{ machineToken, token, environment }` and sends an
+empty Apple Watch widget push: `{"aps":{"content-changed":true}}`, with `apns-push-type: widgets` and
+the topic of `watchWidgetPushTopic` (`<APNS_TOPIC>.watchkitapp.push-type.widgets`). watchOS then reloads
+the widget, and the widget gets its data from the host over the watch direct link. It has its own key
+in `LIVE_ACTIVITY_RATE_LIMITER` and stores and logs nothing. See
+[Widget push](../../docs/architecture/watch-relay.md#widget-push).
+
 `POST /v2/remote/watch/sessions` pairs an Apple Watch with the phone account session that sends it
 (`watch_sessions` in D1). The body is `{ publicKey }`, the raw P-256 key of the watch. The answer is
 `{ watchSessionId, token, expiresAt }`; D1 keeps only the hash of the token. The watch session ends

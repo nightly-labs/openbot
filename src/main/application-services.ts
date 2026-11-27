@@ -520,6 +520,7 @@ import { VoiceTranscriptionService } from "./voice-transcription-service";
 import { WatchRelayCommands } from "./watch-relay-commands";
 import { createWatchRelayWantedStore, loadWatchRelayKey } from "./watch-relay-key";
 import { WatchRelayService } from "./watch-relay-service";
+import { WatchWidgetPushFailure, WatchWidgetPushService } from "./watch-widget-push";
 import { WebhookRelay } from "./webhook-relay";
 import { WindowsTopmostKeeper } from "./windows-topmost-keeper";
 import { createWorkflowFileExporter, type WorkflowFileExporter } from "./workflow-file-export";
@@ -630,6 +631,7 @@ const TEARDOWN_ORDER = {
   routineResults: 84,
   messaging: 85,
   hostEvents: 85.5,
+  watchWidgetPush: 85.7,
   watchRelay: 85.75,
   signalIngress: 86,
   host: 90,
@@ -3711,7 +3713,27 @@ export async function createApplicationServices({
       }),
   });
   teardown.push(TEARDOWN_ORDER.host, "the local host", () => runCauseEffect(host.shutdown()));
-  watchCommands = new WatchRelayCommands(host.watchTeamApi());
+  const watchTeamApi = host.watchTeamApi();
+  const watchWidgetPush = new WatchWidgetPushService({
+    agents: service,
+    hiddenAgentIds: (member) => watchTeamApi.hiddenAgentIds(member),
+    member: (memberId) => teamStore.getMember(memberId),
+    send: (push) => {
+      const hostId = teamStore.getIdentity()?.serverId;
+      if (!hostId)
+        return Effect.fail(
+          new WatchWidgetPushFailure({ cause: new Error(sourceText("error.auth.hostCredentialUnavailable")) }),
+        );
+      return centralAuth
+        .sendWatchWidgetPush(hostId, push)
+        .pipe(Effect.mapError((error) => new WatchWidgetPushFailure({ cause: error })));
+    },
+    logger,
+  });
+  teardown.push(TEARDOWN_ORDER.watchWidgetPush, "the Apple Watch widget pushes", () =>
+    Effect.runPromise(watchWidgetPush.dispose()),
+  );
+  watchCommands = new WatchRelayCommands(watchTeamApi, { widgetPush: watchWidgetPush });
   signalIngress.handleWatch((delivery) => watchRelay.deliver(delivery));
   Effect.runFork(watchRelay.start());
   const signedInState = centralAuth.getState();

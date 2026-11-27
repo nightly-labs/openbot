@@ -428,6 +428,7 @@ export function requestApnsRelay(): {
   sender: ApnsRelaySender;
   allow(hostId: string): Effect.Effect<boolean, AuthOperationError>;
   allowNotification(hostId: string): Effect.Effect<boolean, AuthOperationError>;
+  allowWidgetPush(hostId: string): Effect.Effect<boolean, AuthOperationError>;
 } | null {
   const bindings = requireWorkerBindings(env);
   const { APNS_PRIVATE_KEY, APNS_KEY_ID, APNS_TEAM_ID, APNS_TOPIC, APNS_ORIGIN, LIVE_ACTIVITY_RATE_LIMITER } = bindings;
@@ -444,6 +445,7 @@ export function requestApnsRelay(): {
     }),
     allow: (hostId) => limit(`host:${hostId}`),
     allowNotification: (hostId) => limit(`notification:host:${hostId}`),
+    allowWidgetPush: (hostId) => limit(`widget:host:${hostId}`),
   };
 }
 

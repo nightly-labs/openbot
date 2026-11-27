@@ -106,6 +106,36 @@ JSON body `WatchRelayHttpRequest { v: 1, ts, sealed, proof }`, at most `WATCH_RE
 - `avatars` returns the agent pictures that the host's snapshot names. `open` is not supported on
   the direct link (the watch uses the phone for it).
 
+## Widget push
+
+The watch widgets update late while the watch app is closed. On watchOS 26 and later, WidgetKit
+reloads a widget when it gets a widget push. A widget push has no data.
+
+- The watch sends `widgetPush { token, environment }` on the direct link to each host: at app launch,
+  when the token changes, and when the last registration on that host is more than 1 hour old. The
+  token is lowercase hex, 64 to 200 characters; `environment` is `production` or `development`. An
+  older host refuses the command as invalid, and the watch ignores that. The iPhone link answers
+  `failed`.
+- `WatchWidgetPushService` (`src/main/watch-widget-push.ts`) keeps the tokens in memory only, for
+  each member, at most 5 for each member. It forgets a token 12 hours after the last registration,
+  when the account service answers `410`, when the member is removed or disabled (checked before each
+  push and at each expiry), and when the host stops.
+- Triggers: on agent events, at most once each 2 seconds, the host reads for each member with a token
+  the agents that the member can see: state, wait request IDs, newest reply ID, `updatedAt`, and the
+  unread count. It pushes when the agent list, a state, a wait, a reply or `updatedAt` changes, or an
+  unread count goes up.
+- Limits for each token: an agent that starts to wait is sent at once when the last push was 10
+  seconds or more before, else at the end of those 10 seconds. Any other change goes out at most once
+  each 60 seconds, as one trailing push. Apple budgets widget pushes.
+- The host sends `POST /v2/remote/hosts/:hostId/widget-push` with `{ machineToken, token,
+  environment }`. The Worker checks the credential and the per-host APNs rate limit (key
+  `widget:host:<hostId>`), and posts `{"aps":{"content-changed":true}}` to APNs with
+  `apns-push-type: widgets`, `apns-topic: <watch app bundle ID>.push-type.widgets` (`watchWidgetPushTopic`
+  in `apps/auth-api/src/server/live-activity-relay.ts`; the watch app is `<APNS_TOPIC>.watchkitapp`),
+  `apns-priority: 5` and a 1-hour expiration. It stores and logs nothing. Answers: `204` sent, `410`
+  token gone, `400` refused by Apple or invalid, `429` rate limited, `503` not available.
+- On the push, watchOS reloads the widget, and the widget gets the new state over the direct link.
+
 ## Phone
 
 - The watch sends `pair { publicKey }` on the iPhone link when it has no credentials, or when its
