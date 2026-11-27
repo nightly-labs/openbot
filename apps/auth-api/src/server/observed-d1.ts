@@ -57,9 +57,10 @@ function retryFor(readOnly: boolean): D1Retry {
 }
 
 function retriesAfter(error: unknown, failure: D1FailureClass, retry: D1Retry): boolean {
-  if (failure !== "overloaded") return false;
+  const message = errorMessage(error);
+  if (failure !== "overloaded" || ACCOUNT_LOAD_THROTTLE.test(message)) return false;
   if (retry === "read") return true;
-  return retry === "write" && QUEUED_REQUEST_REJECTION.test(errorMessage(error));
+  return retry === "write" && QUEUED_REQUEST_REJECTION.test(message);
 }
 
 function wait(milliseconds: number): Promise<void> {

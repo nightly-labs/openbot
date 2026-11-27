@@ -15,6 +15,8 @@ const OUT = join(ROOT, ".openbot-build", "d1-overload-writes-e2e");
 const MIGRATIONS = join(ROOT, "apps", "auth-api", "migrations");
 const SOURCE_IP = "203.0.113.7";
 const READ_ONLY_SQL = /^\s*(SELECT|WITH)\b/i;
+const OVERLOAD_MARK_CLEAR_LIMIT_MS = 15_000;
+const OVERLOAD_MARK_POLL_MS = 200;
 
 const QUEUED_FOR_TOO_LONG = "D1_ERROR: D1 DB is overloaded. Requests queued for too long.";
 const TOO_MANY_QUEUED = "D1_ERROR: D1 DB is overloaded. Too many requests queued.";
@@ -121,6 +123,14 @@ async function outcome<A>(effect: Effect.Effect<A, unknown>) {
   };
 }
 
+async function overloadMarkCleared(): Promise<void> {
+  const deadline = Date.now() + OVERLOAD_MARK_CLEAR_LIMIT_MS;
+  while (d1OverloadedRecently(Date.now())) {
+    if (Date.now() > deadline) throw new Error("The overload mark did not clear.");
+    await new Promise((resolve) => setTimeout(resolve, OVERLOAD_MARK_POLL_MS));
+  }
+}
+
 function isTagged(value: unknown): value is { _tag: string } {
   return typeof value === "object" && value !== null && "_tag" in value && typeof value._tag === "string";
 }
@@ -206,14 +216,19 @@ async function main() {
     !d1OverloadedRecently(Date.now()),
   );
 
+  const overloadedBeforeThrottledRead = d1OverloadedRecently(Date.now());
   const throttledRead = fake.refuseNext("read", ACCOUNT_THROTTLE, 1);
   const throttledReadResult = await outcome(service.listMobileAuthDevices(token, host.hostId));
   check(
-    "a read refused by the account load throttle gets its retry",
-    throttledReadResult.ok && throttledRead.attempts === 2,
+    "a read refused by the account load throttle is not sent again, and the answer gets Retry-After",
+    !throttledReadResult.ok &&
+      throttledRead.attempts === 1 &&
+      !overloadedBeforeThrottledRead &&
+      d1OverloadedRecently(Date.now()),
     { result: throttledReadResult.ok ? "ok" : throttledReadResult.error, attempts: throttledRead.attempts },
   );
 
+  await overloadMarkCleared();
   const overloadedBeforeThrottle = d1OverloadedRecently(Date.now());
   for (const [name, message] of [
     ["the account load throttle", ACCOUNT_THROTTLE],
@@ -234,6 +249,8 @@ async function main() {
     }
   }
 
+  await overloadMarkCleared();
+  const overloadedBeforeTwice = d1OverloadedRecently(Date.now());
   const twice = fake.refuseNext("write", QUEUED_FOR_TOO_LONG, 2);
   const twiceResult = await outcome(service.issueMobileAuthTicket(token, SOURCE_IP, host));
   check(
@@ -241,6 +258,7 @@ async function main() {
     !twiceResult.ok &&
       twiceResult.error === "AuthOperationError" &&
       twice.attempts === 2 &&
+      !overloadedBeforeTwice &&
       d1OverloadedRecently(Date.now()),
     { result: twiceResult.ok ? "ok" : twiceResult.error, attempts: twice.attempts },
   );
