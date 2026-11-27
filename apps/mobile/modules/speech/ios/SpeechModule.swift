@@ -638,7 +638,7 @@ public class SpeechModule: Module {
     }
 
     AsyncFunction("keyboardLanguage") { () -> String? in
-      rememberKeyboardLanguage()
+      if let open = rememberKeyboardLanguage() { return open }
       guard let saved = UserDefaults.standard.string(forKey: keyboardLanguageKey) else { return nil }
       return UITextInputMode.activeInputModes.contains { $0.primaryLanguage == saved } ? saved : nil
     }.runOnQueue(.main)
@@ -817,10 +817,12 @@ public class SpeechModule: Module {
 
 private let keyboardLanguageKey = "run.openbot.speech.keyboard-language"
 
-private func rememberKeyboardLanguage() {
+@discardableResult
+private func rememberKeyboardLanguage() -> String? {
   guard let language = FirstResponder.current()?.textInputMode?.primaryLanguage,
-        language != "emoji", language != "dictation" else { return }
+        language != "emoji", language != "dictation" else { return nil }
   UserDefaults.standard.set(language, forKey: keyboardLanguageKey)
+  return language
 }
 
 private final class FirstResponder: NSObject {
