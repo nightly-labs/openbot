@@ -150,6 +150,7 @@ import {
   type VoiceStream,
   type VoiceStreamTranscript,
   type VoiceTranscriptionResult,
+  type WindowFrameState,
   type WorkflowNotificationOpenedEvent,
 } from "@openbot/contracts/ipc";
 import {
@@ -336,6 +337,12 @@ export function decodeChatWindowTargets(value: unknown): ChatWindowTarget[] {
     if (!isString(target.serverId) || !isString(target.agentId)) throw new Error("Invalid chat window.");
     return { serverId: target.serverId, agentId: target.agentId };
   });
+}
+
+export function decodeWindowFrameState(value: unknown): WindowFrameState {
+  const state = decodeRecord(value, "window frame state");
+  if (!isBoolean(state.buttons) || !isBoolean(state.maximized)) throw new Error("Invalid window frame state.");
+  return { buttons: state.buttons, maximized: state.maximized };
 }
 
 export function decodeCentralAuthState(value: unknown): CentralAuthState {

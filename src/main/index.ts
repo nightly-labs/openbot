@@ -129,6 +129,7 @@ import { teamIpcHandlers } from "./ipc/team-handlers";
 import { updateIpcHandlers } from "./ipc/update-handlers";
 import { vaultIpcHandlers } from "./ipc/vault-handlers";
 import { voiceIpcHandlers } from "./ipc/voice-handlers";
+import { windowFrameIpcHandlers } from "./ipc/window-frame-handlers";
 import { workflowIpcHandlers } from "./ipc/workflow-handlers";
 import { KeepAwake } from "./keep-awake";
 import { stopAppImageCrashpadHandlerAtExit } from "./linux-appimage-crashpad";
@@ -194,7 +195,7 @@ import { setIpcCallObserver } from "./trusted-ipc";
 import { macShipItDirectory, shipItInstallInProgress } from "./update-install-guard";
 import { UPDATE_INSTALL_TIMEOUT_MS } from "./update-service";
 import { setInitialWindowGlass, setWindowAppearance } from "./window-appearance";
-import { placeWindowButtons } from "./window-buttons";
+import { DRAWS_OWN_WINDOW_BUTTONS, placeWindowButtons, windowFrameState } from "./window-buttons";
 import { clearEarlierWindowsNotifications } from "./windows-notification-history";
 import { restartOutsideWindowsPackage } from "./windows-package-restart";
 
@@ -888,6 +889,14 @@ function registerIpcHandlers({
       setXWayland: (enabled) => setAboveAppsXWayland(app.getPath("userData"), "agent-dock", enabled),
     }),
     ...browserDockIpcHandlers({ browserDock }),
+    ...windowFrameIpcHandlers({
+      drawsOwnButtons: DRAWS_OWN_WINDOW_BUTTONS,
+      appWindowOf: (sender) =>
+        [windowHolder.current, ...windows.getChatWindows()].find(
+          (window) => window !== null && !window.isDestroyed() && window.webContents === sender,
+        ) ?? null,
+      state: windowFrameState,
+    }),
     ...computerUseIpcHandlers({
       cuaDriver,
       openExternal: (url) => shell.openExternal(url),

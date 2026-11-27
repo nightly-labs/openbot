@@ -202,6 +202,7 @@ import type {
   UpdateRestartMode,
   UpdateStatus,
   VerifyEmailCodeInput,
+  WindowFrameState,
 } from "./ipc-app-auth";
 import type { AppBehaviorPreference, AppBehaviorPreferenceChange } from "./ipc-app-behavior";
 import type {
@@ -978,6 +979,13 @@ export const IPC_ENDPOINTS = {
     listDisplays: request<undefined, AgentDockDisplayInfo[]>()("agent-dock:list-displays"),
     drag: request<AgentDockDragPhase, void>()("agent-dock:drag"),
     moved: event<AgentDockOffset>()("agent-dock:moved"),
+  },
+  windowFrame: {
+    getState: request<undefined, WindowFrameState>()("window-frame:get-state"),
+    state: event<WindowFrameState>()("window-frame:state"),
+    minimize: request<undefined, void>()("window-frame:minimize"),
+    toggleMaximize: request<undefined, void>()("window-frame:toggle-maximize"),
+    close: request<undefined, void>()("window-frame:close"),
   },
   computerUse: {
     getState: request<undefined, ComputerUseState>()("computer-use:get-state"),
@@ -2129,6 +2137,7 @@ export const IPC_GROUP_PATHS = {
   dynamicIsland: "dynamicIsland",
   browserDock: "browserDock",
   agentDock: "agentDock",
+  windowFrame: "windowFrame",
   computerUse: "computerUse",
   macAutomation: "macAutomation",
   backgroundProcesses: "backgroundProcesses",

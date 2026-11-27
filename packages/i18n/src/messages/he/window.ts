@@ -8,4 +8,7 @@ export const messages = {
   "window.rendererStoppedTitle": "OpenBot הפסיק לעבוד",
   "window.rendererStoppedBody": "החלון נעצר כמה פעמים. הצ׳אטים שלך שמורים, והסוכנים שלך ממשיכים לעבוד.",
   "window.rendererStoppedReload": "טעינה מחדש",
+  "window.minimize": "מזער",
+  "window.maximize": "הגדל",
+  "window.restore": "שחזר",
 } as const satisfies PartialTranslation<typeof source>;

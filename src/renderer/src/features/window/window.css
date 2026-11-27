@@ -19,11 +19,14 @@
 }
 
 :root {
-  --window-controls-end: calc(100vw - env(titlebar-area-x, 0px) - env(titlebar-area-width, 100vw));
+  --window-controls-end: 0px;
 }
 
-:root[dir="rtl"] {
-  --window-controls-end: env(titlebar-area-x, 0px);
+:root[data-openbot-window-buttons] {
+  --window-button-width: 46px;
+  --window-buttons-height: 38px;
+  --window-controls-end: calc(3 * var(--window-button-width));
+  --openbot-popper-top-inset: var(--window-buttons-height);
 }
 
 .app-window {
@@ -747,7 +750,7 @@
     padding-inline: calc(var(--openbot-space-2) + 1px) var(--openbot-space-3);
   }
 
-  :root[data-openbot-window-controls-overlay]
+  :root[data-openbot-window-buttons]
     .app-frame-edge[data-window-page-kind="settings"]
     > .window-page
     > .settings-page
@@ -755,7 +758,7 @@
     display: none;
   }
 
-  :root[data-openbot-window-controls-overlay]
+  :root[data-openbot-window-buttons]
     .app-frame-edge[data-window-page-kind="settings"]
     > .window-page
     > .settings-page
@@ -1306,5 +1309,40 @@
     :is(.conversation-panel > .conversation-header, .side-panel-docked > .side-panel-header)
     > .tab-shape {
     transition: none;
+  }
+}
+
+.window-buttons {
+  position: fixed;
+  z-index: calc(var(--openbot-layer-dialog-host) + 1);
+  top: 0;
+  inset-inline-end: 0;
+  display: flex;
+  height: var(--window-buttons-height);
+  -webkit-app-region: no-drag;
+}
+
+.window-buttons > .window-button {
+  width: var(--window-button-width);
+  height: 100%;
+  padding: 0;
+  border-radius: 0;
+  color: var(--openbot-text-secondary);
+}
+
+.window-buttons > .window-button > svg {
+  width: var(--openbot-icon-md);
+  height: var(--openbot-icon-md);
+  stroke-width: var(--openbot-icon-stroke-lg);
+}
+
+.window-buttons[data-inactive] > .window-button {
+  color: var(--openbot-text-dim);
+}
+
+@media (hover: hover) {
+  .window-buttons > .window-button-close:hover {
+    background: var(--openbot-danger);
+    color: var(--openbot-text-on-accent);
   }
 }

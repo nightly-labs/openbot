@@ -1,6 +1,7 @@
 import { createSignal, untrack } from "solid-js";
 
-const TOAST_EDGE_OFFSET = 24;
+export const TOAST_EDGE_OFFSET = 24;
+export const NARROW_TOAST_EDGE_OFFSET = 16;
 
 const [heldPages, setHeldPages] = createSignal(0);
 const [pageInsets, setPageInsets] = createSignal<ReadonlyMap<symbol, number>>(new Map());

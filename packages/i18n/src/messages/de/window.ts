@@ -9,4 +9,7 @@ export const messages = {
   "window.rendererStoppedBody":
     "Das Fenster wurde mehrmals beendet. Deine Chats sind gespeichert, und deine Agenten arbeiten weiter.",
   "window.rendererStoppedReload": "Neu laden",
+  "window.minimize": "Minimieren",
+  "window.maximize": "Maximieren",
+  "window.restore": "Verkleinern",
 } as const satisfies PartialTranslation<typeof source>;

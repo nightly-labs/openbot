@@ -8,4 +8,7 @@ export const messages = {
   "window.rendererStoppedTitle": "OpenBot 已停止工作",
   "window.rendererStoppedBody": "窗口多次停止运行。你的聊天已保存，智能体仍在继续工作。",
   "window.rendererStoppedReload": "重新加载",
+  "window.minimize": "最小化",
+  "window.maximize": "最大化",
+  "window.restore": "还原",
 } as const satisfies PartialTranslation<typeof source>;

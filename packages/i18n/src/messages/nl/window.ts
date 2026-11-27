@@ -9,4 +9,7 @@ export const messages = {
   "window.rendererStoppedBody":
     "Het venster is meerdere keren gestopt. Je chats zijn opgeslagen en je agents blijven werken.",
   "window.rendererStoppedReload": "Herladen",
+  "window.minimize": "Minimaliseren",
+  "window.maximize": "Maximaliseren",
+  "window.restore": "Vorige grootte",
 } as const satisfies PartialTranslation<typeof source>;

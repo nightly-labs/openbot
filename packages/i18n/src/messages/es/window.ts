@@ -9,4 +9,7 @@ export const messages = {
   "window.rendererStoppedBody":
     "La ventana se detuvo varias veces. Tus chats están guardados y tus agentes siguen trabajando.",
   "window.rendererStoppedReload": "Recargar",
+  "window.minimize": "Minimizar",
+  "window.maximize": "Maximizar",
+  "window.restore": "Restaurar",
 } as const satisfies PartialTranslation<typeof source>;

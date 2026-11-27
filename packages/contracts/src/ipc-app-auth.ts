@@ -391,6 +391,11 @@ export interface ChatWindowTarget {
   agentId: string;
 }
 
+export interface WindowFrameState {
+  buttons: boolean;
+  maximized: boolean;
+}
+
 export interface SentMessageStats {
   firstSentAt: string | null;
   sentCount: number;

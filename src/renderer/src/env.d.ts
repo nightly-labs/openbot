@@ -12,14 +12,6 @@ declare global {
     openbot: OpenBotDesktopApi;
   }
 
-  interface WindowControlsOverlay extends EventTarget {
-    readonly visible: boolean;
-  }
-
-  interface Navigator {
-    readonly windowControlsOverlay?: WindowControlsOverlay;
-  }
-
   interface ExtensionSignInMessage {
     kind: string;
     state: string;

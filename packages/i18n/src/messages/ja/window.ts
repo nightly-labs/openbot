@@ -9,4 +9,7 @@ export const messages = {
   "window.rendererStoppedBody":
     "ウィンドウが何度か停止しました。チャットは保存されており、エージェントは動作を続けています。",
   "window.rendererStoppedReload": "再読み込み",
+  "window.minimize": "最小化",
+  "window.maximize": "最大化",
+  "window.restore": "元に戻す",
 } as const satisfies PartialTranslation<typeof source>;

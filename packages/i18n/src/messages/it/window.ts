@@ -9,4 +9,7 @@ export const messages = {
   "window.rendererStoppedBody":
     "La finestra si è fermata più volte. Le tue chat sono salvate e i tuoi agenti continuano a lavorare.",
   "window.rendererStoppedReload": "Ricarica",
+  "window.minimize": "Riduci a icona",
+  "window.maximize": "Ingrandisci",
+  "window.restore": "Ripristina",
 } as const satisfies PartialTranslation<typeof source>;
