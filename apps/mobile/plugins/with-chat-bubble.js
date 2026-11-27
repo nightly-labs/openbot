@@ -5,7 +5,8 @@ const ACTIVITY = "run.openbot.mobile.chatbubble.ChatBubbleActivity";
 /**
  * The activity of a chat bubble. Android shows a bubble only for an activity that is embedded and
  * resizeable, and it needs `documentLaunchMode` to open one bubble per agent on Android 10 and
- * lower. The activity is not exported: only the bubble notification of this app opens it.
+ * lower. The activity is not exported: only the bubble notification of this app opens it. It does
+ * not show over the lock screen, because it has no app lock, so a locked phone shows no chat.
  *
  * @param {import('expo/config-plugins').AndroidManifest} manifest
  */
@@ -24,7 +25,6 @@ function addBubbleActivity(manifest) {
         "android:allowEmbedded": "true",
         "android:resizeableActivity": "true",
         "android:documentLaunchMode": "always",
-        "android:showWhenLocked": "true",
         "android:configChanges":
           "keyboard|keyboardHidden|orientation|screenSize|screenLayout|uiMode|smallestScreenSize|assetsPaths",
         "android:windowSoftInputMode": "adjustResize",
