@@ -1,7 +1,10 @@
 import type { HostReleaseStatus, HostUpdateStatus } from "@openbot/contracts/ipc";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useQueryScope } from "@/features/auth/context/mobile-session-context";
-import { useMobileWorkspace, useMobileWorkspaceActions } from "@/features/workspace/context/mobile-workspace-context";
+import {
+  useMobileWorkspaceActions,
+  useMobileWorkspaceSelector,
+} from "@/features/workspace/context/mobile-workspace-context";
 import { queryKeys } from "@/features/workspace/model/query-keys";
 
 export interface ServerUpdateSnapshot {
@@ -13,13 +16,12 @@ const POLL_MS = 1000;
 const IDLE_POLL_MS = 15_000;
 
 export function useServerUpdate(serverId: string, { poll }: { poll: boolean }) {
-  const { serverUpdateAccess, canReadServerRelease } = useMobileWorkspace();
+  const access = useMobileWorkspaceSelector((workspace) => workspace.serverUpdateAccess(serverId));
+  const readsRelease = useMobileWorkspaceSelector((workspace) => workspace.canReadServerRelease(serverId));
   const { loadServerUpdate, loadServerRelease } = useMobileWorkspaceActions();
   const queryScope = useQueryScope();
   const queryClient = useQueryClient();
   const queryKey = queryKeys.serverUpdate(queryScope, serverId);
-  const access = serverUpdateAccess(serverId);
-  const readsRelease = canReadServerRelease(serverId);
   const query = useQuery({
     queryKey,
     enabled: access !== null,

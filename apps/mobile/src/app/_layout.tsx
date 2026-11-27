@@ -1,4 +1,5 @@
 import "../../global.css";
+import "@/shared/lib/native-splash";
 
 import { QueryClientProvider } from "@tanstack/react-query";
 import { usePathname, useSegments } from "expo-router";

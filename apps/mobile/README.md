@@ -426,6 +426,31 @@ bun run mobile:typecheck
 bun run mobile:doctor
 ```
 
+### Screen open times
+
+`scripts/mobile-screen-open-e2e.ts` measures how fast screens open. It opens chat, agent info,
+Settings, Server Settings and the Hidden chats sheet N times from the agent list, and writes the
+p50 and p90 times to `.openbot-build/mobile-screen-open/<label>.json`. It drives the app through the
+Metro inspector, so it needs no taps and no deep link prompts.
+
+The app records the times with the Expo Router performance marks
+(`unstable_enablePerformanceIntegration`), in `src/features/screen-metrics/screen-open-probe.ts`.
+The probe runs only in a development bundle, or in a bundle that Metro builds with
+`EXPO_PUBLIC_OPENBOT_SCREEN_METRICS=1`. It sends no data: the script reads the times over the
+inspector. `focusMs` is the time from the push to the `expo-router:page-focused` mark, after the
+screen content commits. `paintMs` adds two animation frames.
+
+1. Start Metro and open a development build on a simulator. For times near a release build, start
+   Metro with `EXPO_PUBLIC_OPENBOT_SCREEN_METRICS=1` and `--no-dev --minify`.
+2. Sign in and open the agent list.
+3. Run `bun scripts/mobile-screen-open-e2e.ts --runs=20 --label=before`. Options: `--metro-port`,
+   `--screens=chat,settings`, `--device`, `--agent-id`, `--agent-server-id` and `--server-id`.
+4. After a change, run it again with `--label=after --baseline=.openbot-build/mobile-screen-open/before.json`.
+   The report then has the p50 and p90 differences.
+
+The first run of each screen is in `cold`. `warm` has the other runs. Compare runs on the same
+simulator, with the same data and the same bundle mode.
+
 ## EAS
 
 The project is linked to EAS and has development, preview, and production build profiles in `eas.json`. EAS gives the
