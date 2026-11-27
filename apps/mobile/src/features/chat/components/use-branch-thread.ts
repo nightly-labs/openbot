@@ -1,10 +1,10 @@
 import type { ConversationMessage } from "@openbot/contracts/ipc";
 import { useQueryClient } from "@tanstack/react-query";
 import * as Crypto from "expo-crypto";
-import { router } from "expo-router";
 import { useCallback, useMemo, useRef } from "react";
 import { showFailureAlert } from "@/features/analytics/failure-reports";
 import { useQueryScope } from "@/features/auth/context/mobile-session-context";
+import { useChatNavigation } from "@/features/chat/context/chat-navigation-context";
 import { useAgentViewOnly } from "@/features/servers/model/use-server-roles";
 import {
   useMobileWorkspaceReader,
@@ -35,6 +35,7 @@ export function useBranchThread({
   activeTurnId: string | null;
 }) {
   const queryScope = useQueryScope();
+  const navigation = useChatNavigation();
   const queryClient = useQueryClient();
   const workspace = useMobileWorkspaceReader();
   const viewOnly = useAgentViewOnly(serverId, agentId);
@@ -66,8 +67,8 @@ export function useBranchThread({
         addStartedTask(queryClient, queryScope, serverId, task);
         void haptics.notification("success");
         if (sourceTaskId === null)
-          router.push({ pathname: "/task/[taskId]", params: { serverId, agentId, taskId: task.id } });
-        else router.setParams<"/task/[taskId]">({ taskId: task.id });
+          navigation.push({ pathname: "/task/[taskId]", params: { serverId, agentId, taskId: task.id } });
+        else navigation.setParams<"/task/[taskId]">({ taskId: task.id });
       } catch (cause) {
         void haptics.notification("error");
         const text = currentText();
@@ -77,7 +78,7 @@ export function useBranchThread({
         pending.current = false;
       }
     },
-    [workspace, agentId, sourceTaskId, serverId, queryClient, queryScope],
+    [workspace, navigation, agentId, sourceTaskId, serverId, queryClient, queryScope],
   );
 
   return { branchPoints, branch: enabled ? branch : undefined };

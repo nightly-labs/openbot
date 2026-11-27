@@ -1,6 +1,7 @@
 import { attachmentMimeTypeForName } from "@openbot/contracts/attachment-files";
 import type { AttachmentSummary } from "@openbot/contracts/ipc";
 import { createContext, useCallback, useContext, useRef, useState } from "react";
+import { useChatNavigation } from "@/features/chat/context/chat-navigation-context";
 import { useMobileWorkspaceActions } from "@/features/workspace/context/mobile-workspace-context";
 import { haptics } from "@/shared/lib/haptics";
 import { useText } from "@/shared/lib/text";
@@ -74,6 +75,7 @@ async function localAttachment(
 }
 
 export function useMessageFileOpener(serverId: string) {
+  const navigation = useChatNavigation();
   const { downloadMessageFile, downloadAttachment } = useMobileWorkspaceActions();
   const { t, format, sourceText } = useText();
   const [image, setImage] = useState<LocalFile | null>(null);
@@ -90,7 +92,7 @@ export function useMessageFileOpener(serverId: string) {
           : await localMessageFile(serverId, target, written, downloadMessageFile);
         const kind = attachmentPreviewKind(file);
         if (file.mimeType.startsWith("image/")) setImage(file);
-        else if (kind) await openFilePreview(kind, file);
+        else if (kind) await openFilePreview(navigation, kind, file);
         else await shareLocalAttachment(file);
       } catch (error) {
         showFileFailure(error, t("mobile.chat.markdown.openFileFailed"), { t, sourceText });
@@ -98,7 +100,7 @@ export function useMessageFileOpener(serverId: string) {
         opening.current = false;
       }
     },
-    [downloadMessageFile, downloadAttachment, serverId, sourceText, t],
+    [navigation, downloadMessageFile, downloadAttachment, serverId, sourceText, t],
   );
 
   const sheet = (

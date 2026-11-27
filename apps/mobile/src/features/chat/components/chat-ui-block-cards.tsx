@@ -17,7 +17,6 @@ import {
   uiConfirmAnswersWithPreview,
   uiConfirmPreviewEditable,
 } from "@openbot/contracts/ui-blocks";
-import { router } from "expo-router";
 import { Button, Typography } from "heroui-native";
 import { useThemeColor } from "heroui-native/hooks";
 import Check from "lucide-react-native/icons/check";
@@ -29,6 +28,7 @@ import { useChatCardSurface } from "@/features/chat/components/chat-bubble-fill"
 import { ChatMarkdown } from "@/features/chat/components/chat-markdown";
 import { copyToClipboard } from "@/features/chat/components/use-copy-message";
 import type { QuestionPromptController } from "@/features/chat/components/use-question-prompt";
+import { useChatNavigation } from "@/features/chat/context/chat-navigation-context";
 import { storeCodePreview } from "@/features/chat/model/code-preview-store";
 import { promptAnswerLabel } from "@/features/chat/model/question-prompt";
 import { SettingsPicker } from "@/features/settings/components/settings-controls";
@@ -132,6 +132,7 @@ const knownCutOff = new Map<string, boolean>();
 
 function ConfirmPreview({ markdown, title }: { markdown: string; title: string }) {
   const { t } = useText();
+  const navigation = useChatNavigation();
   const [cutOff, setCutOff] = useState(() => knownCutOff.get(markdown) ?? false);
   return (
     <View className="gap-1">
@@ -162,7 +163,7 @@ function ConfirmPreview({ markdown, title }: { markdown: string; title: string }
             className="px-0"
             onPress={() => {
               const previewId = storeCodePreview({ kind: "markdown", source: markdown, title });
-              router.push({ pathname: "/code-preview/[previewId]", params: { previewId } });
+              navigation.push({ pathname: "/code-preview/[previewId]", params: { previewId } });
             }}
           >
             <Button.Label>{t("mobile.chat.question.showAllPreview")}</Button.Label>

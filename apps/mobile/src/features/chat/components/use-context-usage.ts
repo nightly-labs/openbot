@@ -1,6 +1,6 @@
 import type { AgentContextState } from "@openbot/contracts/ipc";
-import { router } from "expo-router";
 import { useCallback, useMemo, useSyncExternalStore } from "react";
+import { useChatNavigation } from "@/features/chat/context/chat-navigation-context";
 import {
   type ContextUsageView,
   contextMeterLevel,
@@ -37,16 +37,17 @@ export function useContextUsage(chat: ContextChat): ContextUsageView | undefined
 
 export function useComposerContextMeter(chat: ContextChat): ComposerContextMeter | undefined {
   const { t, format } = useText();
+  const navigation = useChatNavigation();
   const usage = useContextUsage(chat);
   const { serverId, agentId } = chat;
   const taskId = chat.task?.taskId;
   const threadId = chat.task?.threadId;
   const onPress = useCallback(() => {
-    router.push({
+    navigation.push({
       pathname: "/context-usage/[agentId]",
       params: { agentId, serverId, ...(taskId && threadId ? { taskId, threadId } : {}) },
     });
-  }, [agentId, serverId, taskId, threadId]);
+  }, [navigation, agentId, serverId, taskId, threadId]);
   return useMemo(() => {
     if (!usage) return undefined;
     const share = usedShare(usage);

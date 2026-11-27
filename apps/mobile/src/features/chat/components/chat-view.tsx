@@ -6,7 +6,7 @@ import { serializeSelectionInstruction } from "@openbot/contracts/selection-inst
 import { type CauseCode, classifyFailure, type FailureProperties } from "@openbot/telemetry";
 import { useQueryClient } from "@tanstack/react-query";
 import { isLiquidGlassAvailable } from "expo-glass-effect";
-import { router, useIsFocused } from "expo-router";
+import { useIsFocused } from "expo-router";
 import type { NativeStackNavigationProp } from "expo-router/native-stack";
 import { type ParamListBase, useNavigation } from "expo-router/react-navigation";
 import { Typography } from "heroui-native";
@@ -37,6 +37,7 @@ import { useChatAttachments } from "@/features/chat/components/use-chat-attachme
 import { useChatMotion } from "@/features/chat/components/use-chat-motion";
 import type { QuestionPromptController } from "@/features/chat/components/use-question-prompt";
 import { VoiceAgentAvatar } from "@/features/chat/components/voice-call-bar";
+import { useChatNavigation } from "@/features/chat/context/chat-navigation-context";
 import { useOutbox } from "@/features/chat/context/outbox-context";
 import { usePublishedQueuedChat } from "@/features/chat/context/queued-messages-context";
 import {
@@ -377,6 +378,7 @@ export function ChatView({
     reportMobileNotification({ code: sendError.cause }, "turn", "banner", sendError.context);
   }, [isFocused, sendError, target.id]);
   const [sendRetryVersion, setSendRetryVersion] = useState(0);
+  const navigation = useChatNavigation();
   const queryClient = useQueryClient();
   const [skillPickerVersion, setSkillPickerVersion] = useState(0);
   const [suggestionsOpen, setSuggestionsOpen] = useState(false);
@@ -463,26 +465,27 @@ export function ChatView({
   const thinkingAgentId = target.kind === "agent" ? target.id : null;
   const openTurn = useCallback(
     (turnId: string) => {
-      if (thinkingAgentId) router.push({ pathname: "/turn-thinking", params: { agentId: thinkingAgentId, turnId } });
+      if (thinkingAgentId)
+        navigation.push({ pathname: "/turn-thinking", params: { agentId: thinkingAgentId, turnId } });
     },
-    [thinkingAgentId],
+    [navigation, thinkingAgentId],
   );
   const openMemoryChanges = useCallback(
     (messageId: string) => {
       if (thinkingAgentId)
-        router.push({ pathname: "/memory-changes", params: { agentId: thinkingAgentId, messageId } });
+        navigation.push({ pathname: "/memory-changes", params: { agentId: thinkingAgentId, messageId } });
     },
-    [thinkingAgentId],
+    [navigation, thinkingAgentId],
   );
   const openSubagents = useCallback(
     (messageId: string) => {
       if (thinkingAgentId)
-        router.push({
+        navigation.push({
           pathname: "/subagent",
           params: { agentId: thinkingAgentId, serverId: target.serverId, messageId },
         });
     },
-    [thinkingAgentId, target.serverId],
+    [navigation, thinkingAgentId, target.serverId],
   );
   const queuedMessageIds = useMemo(
     () =>
@@ -727,7 +730,7 @@ export function ChatView({
       error: liveError,
       caption: liveCaption,
     };
-    const openSettings = () => router.push("/settings/voice");
+    const openSettings = () => navigation.push("/settings/voice");
     if (!liveAvailable && !liveOpen)
       return { ...liveVoice(source, voiceName, t), available: true, start: openSettings };
     return {
@@ -752,6 +755,7 @@ export function ChatView({
     voiceName,
     usesGptLive,
     liveVoiceMissing,
+    navigation,
     t,
   ]);
   const voiceAgentId = voiceAgent?.id;
@@ -1311,7 +1315,7 @@ export function ChatView({
                           openBrowser={
                             browserAllowed && browserViewAvailable
                               ? () =>
-                                  router.push({
+                                  navigation.push({
                                     pathname: "/browser/[agentId]",
                                     params: {
                                       agentId: request.agentId,

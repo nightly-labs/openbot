@@ -1,6 +1,6 @@
 import { itemTypeCountsAsUnread } from "@openbot/contracts/conversation-read";
 import type { RespondToPromptInput } from "@openbot/contracts/ipc";
-import { router, useIsFocused } from "expo-router";
+import { useIsFocused } from "expo-router";
 import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import { useAgentSteers } from "@/features/agents/model/use-agent-steers";
 import { showFailureAlert } from "@/features/analytics/failure-reports";
@@ -8,6 +8,7 @@ import { useMobileSession } from "@/features/auth/context/mobile-session-context
 import { useBrowserFeature } from "@/features/browser/components/use-browser-feature";
 import { ChatChannelWorkRow } from "@/features/channels/components/chat-channel-work-row";
 import { useChannelList } from "@/features/channels/components/use-channels";
+import { useChatNavigation } from "@/features/chat/context/chat-navigation-context";
 import { appendComposerDraft } from "@/features/chat/model/composer-drafts";
 import { promptAskedByThisPerson } from "@/features/chat/model/location-request";
 import { useAgentViewOnly } from "@/features/servers/model/use-server-roles";
@@ -66,6 +67,7 @@ export function MobileChatView({
   onLeave: () => void;
 }) {
   const { t } = useText();
+  const navigation = useChatNavigation();
   const workspace = useMobileWorkspaceReader();
   const agents = useMobileWorkspaceSelector((current) => current.agents, sameAgentsApartFromMessage);
   const conversationStore = useMobileWorkspaceSelector((current) => current.conversationStore);
@@ -416,10 +418,10 @@ export function MobileChatView({
       onSend: (channelId: string, text: string) => {
         requestComposerText({ serverId, channelId, text });
         requestComposerFocus({ serverId, channelId });
-        router.push({ pathname: "/channel/[channelId]", params: { channelId, serverId } });
+        navigation.push({ pathname: "/channel/[channelId]", params: { channelId, serverId } });
       },
     };
-  }, [channelKey, agent.serverId]);
+  }, [navigation, channelKey, agent.serverId]);
   const branching = useBranchThread({
     serverId: agent.serverId,
     agentId: agent.id,
@@ -448,15 +450,16 @@ export function MobileChatView({
     const params = { agentId: agent.id, serverId: agent.serverId };
     if (swipeAction === "off") return null;
     if (swipeAction === "question" && sideQuestionShown)
-      return () => router.push({ pathname: "/side-question/[agentId]", params });
+      return () => navigation.push({ pathname: "/side-question/[agentId]", params });
     if (swipeAction === "threads" || swipeAction === "question")
-      return threadsShown ? () => router.push({ pathname: "/server-tasks", params }) : null;
-    return browserShown ? () => router.push({ pathname: "/browser/[agentId]", params }) : null;
-  }, [swipeAction, sideQuestionShown, threadsShown, browserShown, agent.id, agent.serverId]);
+      return threadsShown ? () => navigation.push({ pathname: "/server-tasks", params }) : null;
+    return browserShown ? () => navigation.push({ pathname: "/browser/[agentId]", params }) : null;
+  }, [navigation, swipeAction, sideQuestionShown, threadsShown, browserShown, agent.id, agent.serverId]);
   const pullOn = useChatPullPreference((state) => state.enabled);
   const openInfo = useCallback(
-    () => router.push({ pathname: "/agent-info/[agentId]", params: { agentId: agent.id, serverId: agent.serverId } }),
-    [agent.id, agent.serverId],
+    () =>
+      navigation.push({ pathname: "/agent-info/[agentId]", params: { agentId: agent.id, serverId: agent.serverId } }),
+    [navigation, agent.id, agent.serverId],
   );
   const workActivity = workChannel ? liveActivity : undefined;
   const signInProvider = useProviderSignInNeeded(agent.serverId, agent.provider) ? agent.provider : undefined;

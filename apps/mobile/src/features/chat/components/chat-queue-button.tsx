@@ -1,7 +1,6 @@
 import { providerDisplayName } from "@openbot/contracts/agent-providers";
 import type { QueueDelivery } from "@openbot/contracts/ipc";
 import { GlassView } from "expo-glass-effect";
-import { router } from "expo-router";
 import { Typography } from "heroui-native";
 import { useThemeColor } from "heroui-native/hooks";
 import ChevronUp from "lucide-react-native/icons/chevron-up";
@@ -15,6 +14,7 @@ import { Alert, Pressable, View, type ViewStyle } from "react-native";
 import Animated, { cubicBezier } from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useCSSVariable } from "uniwind";
+import { type ChatNavigation, useChatNavigation } from "@/features/chat/context/chat-navigation-context";
 import { PLAN_LIMIT_RESET_FORMAT, planLimitResetDate } from "@/features/servers/model/plan-limits";
 import { haptics } from "@/shared/lib/haptics";
 import { useReducedMotion } from "@/shared/lib/motion";
@@ -40,9 +40,9 @@ interface ChatQueueButtonProps {
   fallbackBackground: ViewStyle["backgroundColor"];
 }
 
-function openSheet(chatId: string) {
+function openSheet(navigation: ChatNavigation, chatId: string) {
   void haptics.selection();
-  router.push({ pathname: "/queued-messages", params: { chat: chatId } });
+  navigation.push({ pathname: "/queued-messages", params: { chat: chatId } });
 }
 
 export const ChatQueueButton = memo(function ChatQueueButton({
@@ -54,6 +54,7 @@ export const ChatQueueButton = memo(function ChatQueueButton({
   fallbackBackground,
 }: ChatQueueButtonProps) {
   const { t } = useText();
+  const navigation = useChatNavigation();
   const muted = useThemeColor("muted");
   const waiting = queue.waiting.length > 0;
   const next = rows[0] ?? null;
@@ -84,7 +85,7 @@ export const ChatQueueButton = memo(function ChatQueueButton({
         fallbackBackground={fallbackBackground}
         height={44}
         liquidGlassAvailable={liquidGlassAvailable}
-        onPress={() => openSheet(queue.chatId)}
+        onPress={() => openSheet(navigation, queue.chatId)}
       >
         <Clock color={String(muted)} size={16} strokeWidth={2} />
         <Typography.Paragraph type="body-sm" weight="semibold">
@@ -115,6 +116,7 @@ function ChatQueueCard({
   liquidGlassAvailable,
   fallbackBackground,
 }: ChatQueueCardProps) {
+  const navigation = useChatNavigation();
   const text = useText();
   const { t } = text;
   const insets = useSafeAreaInsets();
@@ -176,7 +178,7 @@ function ChatQueueCard({
             accessibilityLabel={t("mobile.chat.queue.nextLabel", { text: preview })}
             className="min-w-0 flex-1 flex-row items-center gap-2 self-stretch pl-4"
             style={({ pressed }) => ({ opacity: pressed ? 0.55 : 1 })}
-            onPress={() => openSheet(queue.chatId)}
+            onPress={() => openSheet(navigation, queue.chatId)}
           >
             <Clock color={muted} size={16} strokeWidth={2} />
             <Typography.Paragraph
@@ -212,7 +214,10 @@ function ChatQueueCard({
             onPress={() => {
               if (!next) return;
               void haptics.selection();
-              router.push({ pathname: "/queued-messages/edit", params: { chat: queue.chatId, deliveryId: next.id } });
+              navigation.push({
+                pathname: "/queued-messages/edit",
+                params: { chat: queue.chatId, deliveryId: next.id },
+              });
             }}
           >
             <Pencil color={foreground} size={18} strokeWidth={2} />
@@ -227,7 +232,7 @@ function ChatQueueCard({
                 void queue.runAsThread(next).then((task) => {
                   void haptics.notification(task ? "success" : "error");
                   if (task)
-                    router.push({
+                    navigation.push({
                       pathname: "/task/[taskId]",
                       params: { taskId: task.id, agentId: task.agentId, serverId: queue.serverId },
                     });
@@ -264,7 +269,7 @@ function ChatQueueCard({
             }
             className="flex-1 flex-row items-center justify-center gap-1.5 border-separator border-t"
             style={({ pressed }) => ({ opacity: pressed ? 0.55 : 1 })}
-            onPress={() => openSheet(queue.chatId)}
+            onPress={() => openSheet(navigation, queue.chatId)}
           >
             <Typography.Paragraph type="body-xs" weight="semibold" className="text-muted">
               {shownMoreLabel}

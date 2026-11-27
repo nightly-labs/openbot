@@ -1,7 +1,7 @@
 import "../../../../global.css";
 
 import { QueryClientProvider } from "@tanstack/react-query";
-import { DarkTheme, DefaultTheme, ThemeProvider } from "expo-router";
+import { DarkTheme, DefaultTheme, router, ThemeProvider } from "expo-router";
 import { RoutingQueueProvider } from "expo-router/build/global-state/routingQueueContext";
 import { NavigationStateContext } from "expo-router/build/react-navigation/core/NavigationStateContext";
 import { createNativeStackNavigator } from "expo-router/native-stack";
@@ -17,6 +17,7 @@ import { appLockBlocks, installAppLock, useAppLock } from "@/features/app-lock/m
 import { MobileSessionProvider, useMobileSession } from "@/features/auth/context/mobile-session-context";
 import { AudioWaveformHost } from "@/features/chat/components/audio-waveform-host";
 import { MermaidRendererHost } from "@/features/chat/components/mermaid-renderer-host";
+import { type ChatNavigation, ChatNavigationProvider } from "@/features/chat/context/chat-navigation-context";
 import { OutboxProvider } from "@/features/chat/context/outbox-context";
 import { QueuedMessagesProvider } from "@/features/chat/context/queued-messages-context";
 import { MobileWorkspaceProvider } from "@/features/workspace/context/mobile-workspace-context";
@@ -26,9 +27,35 @@ import { queryClient } from "@/shared/lib/query-client";
 import { useText } from "@/shared/lib/text";
 import { chatBubbleNative } from "../chat-bubble-native";
 import { ChatBubbleErrorBoundary } from "../components/chat-bubble-error-boundary";
+import {
+  type ChatBubbleRouteArgs,
+  type ChatBubbleRouteMethod,
+  setChatBubblePendingRoute,
+} from "../model/chat-bubble-pending-route";
 import { ChatBubbleHeader, ChatBubbleScreen } from "./chat-bubble-screen";
 
 installAppLock();
+
+function openInApp(method: ChatBubbleRouteMethod, args: ChatBubbleRouteArgs): void {
+  setChatBubblePendingRoute({ method, args });
+  chatBubbleNative?.openApp();
+}
+
+const bubbleNavigation: ChatNavigation = {
+  back: () => undefined,
+  canGoBack: () => router.canGoBack(),
+  push: (...args) => openInApp("push", args),
+  navigate: (...args) => openInApp("navigate", args),
+  replace: (...args) => openInApp("replace", args),
+  dismiss: () => undefined,
+  dismissTo: () => undefined,
+  dismissAll: () => undefined,
+  canDismiss: () => router.canDismiss(),
+  setParams: () => undefined,
+  reload: () => undefined,
+  prefetch: (...args) => router.prefetch(...args),
+  setTransitionMode: (...args) => router.setTransitionMode(...args),
+};
 
 const UniwindGestureHandlerRootView = withUniwind(GestureHandlerRootView);
 const Stack = createNativeStackNavigator();
@@ -84,20 +111,22 @@ function BubbleContent() {
     );
   }
   return (
-    <ChatBubbleErrorBoundary
-      title={t("mobile.settings.chatBubble.title")}
-      message={t("mobile.settings.chatBubble.error")}
-    >
-      <MobileWorkspaceProvider>
-        <OutboxProvider>
-          <QueuedMessagesProvider>
-            <ChatBubbleScreen />
-            <MermaidRendererHost />
-            <AudioWaveformHost />
-          </QueuedMessagesProvider>
-        </OutboxProvider>
-      </MobileWorkspaceProvider>
-    </ChatBubbleErrorBoundary>
+    <ChatNavigationProvider value={bubbleNavigation}>
+      <ChatBubbleErrorBoundary
+        title={t("mobile.settings.chatBubble.title")}
+        message={t("mobile.settings.chatBubble.error")}
+      >
+        <MobileWorkspaceProvider>
+          <OutboxProvider>
+            <QueuedMessagesProvider>
+              <ChatBubbleScreen />
+              <MermaidRendererHost />
+              <AudioWaveformHost />
+            </QueuedMessagesProvider>
+          </OutboxProvider>
+        </MobileWorkspaceProvider>
+      </ChatBubbleErrorBoundary>
+    </ChatNavigationProvider>
   );
 }
 

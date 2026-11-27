@@ -1,8 +1,8 @@
 import { activateKeepAwakeAsync, deactivateKeepAwake } from "expo-keep-awake";
-import { router } from "expo-router";
 import { useCallback, useEffect, useId, useMemo, useRef, useState } from "react";
 import { BackHandler, Keyboard } from "react-native";
 import { Easing, ReduceMotion, type SharedValue, useSharedValue, withTiming } from "react-native-reanimated";
+import { useChatNavigation } from "@/features/chat/context/chat-navigation-context";
 import { speechNative } from "@/features/voice/model/speech-native";
 import type { DictationPhase } from "../model/voice-dictation";
 import { useVoiceDictation } from "./use-voice-dictation";
@@ -98,6 +98,7 @@ export function useComposerDictation({
 }
 
 export function useComposerDictationWithSettings(dictation: ComposerDictation): ComposerDictation {
+  const navigation = useChatNavigation();
   return useMemo(
     () =>
       !speechNative && !dictation.available
@@ -106,11 +107,11 @@ export function useComposerDictationWithSettings(dictation: ComposerDictation): 
             available: true,
             start: () => {
               Keyboard.dismiss();
-              router.push("/settings/voice");
+              navigation.push("/settings/voice");
               return false;
             },
           }
         : dictation,
-    [dictation],
+    [navigation, dictation],
   );
 }

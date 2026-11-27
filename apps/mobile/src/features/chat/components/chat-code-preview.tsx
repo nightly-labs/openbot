@@ -1,6 +1,5 @@
 import type { ChatPreviewKind } from "@openbot/contracts/chat-preview";
 import { Image } from "expo-image";
-import { router } from "expo-router";
 import { Skeleton, Typography } from "heroui-native";
 import { useThemeColor } from "heroui-native/hooks";
 import ChevronRight from "lucide-react-native/icons/chevron-right";
@@ -10,6 +9,7 @@ import { memo, useState } from "react";
 import { Pressable, useWindowDimensions, View } from "react-native";
 import Animated, { cubicBezier } from "react-native-reanimated";
 import { useUniwind } from "uniwind";
+import { useChatNavigation } from "@/features/chat/context/chat-navigation-context";
 import type { BubbleTone } from "@/features/chat/model/bubble-tone";
 import { type CodePreviewEntry, storeCodePreview } from "@/features/chat/model/code-preview-store";
 import { useMermaidDiagram } from "@/features/chat/model/mermaid-diagrams";
@@ -45,6 +45,7 @@ export const ChatCodePreview = memo(function ChatCodePreview({
   tone?: BubbleTone;
 }) {
   const { t } = useText();
+  const navigation = useChatNavigation();
   const reducedMotion = useReducedMotion();
   const settled = useListSettled();
   const historyShown = useHistoryShown();
@@ -75,7 +76,7 @@ export const ChatCodePreview = memo(function ChatCodePreview({
       onPress={() => {
         void haptics.impact("soft");
         const previewId = storeCodePreview({ kind, source: text, language, ...(file ? { file } : {}) });
-        router.push({ pathname: "/code-preview/[previewId]", params: { previewId } });
+        navigation.push({ pathname: "/code-preview/[previewId]", params: { previewId } });
       }}
     >
       <Animated.View

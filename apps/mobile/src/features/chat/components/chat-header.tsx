@@ -1,5 +1,5 @@
 import { GlassView } from "expo-glass-effect";
-import { router, Stack } from "expo-router";
+import { Stack } from "expo-router";
 import { Typography } from "heroui-native";
 import { useThemeColor } from "heroui-native/hooks";
 import ArrowLeft from "lucide-react-native/icons/arrow-left";
@@ -16,6 +16,7 @@ import { ChatGlassIconButton } from "@/features/chat/components/chat-glass-icon-
 import type { ChatThreadMenu } from "@/features/chat/components/chat-thread-menu";
 import { useMessagePinsEnabled } from "@/features/chat/components/use-message-pins";
 import { useSplitDetailRoot } from "@/features/chat/components/use-split-detail-root";
+import { useChatNavigation } from "@/features/chat/context/chat-navigation-context";
 import { useMobileWorkspaceSelector } from "@/features/workspace/context/mobile-workspace-context";
 import { showsOnline } from "@/features/workspace/model/server-status";
 import { useColumnWidth, useSplitLayout } from "@/shared/components/adaptive-split";
@@ -67,6 +68,7 @@ export const ChatHeader = memo(function ChatHeader({
   deleteAction,
 }: ChatHeaderProps) {
   const { t } = useText();
+  const navigation = useChatNavigation();
   const { theme } = useUniwind();
   const width = useColumnWidth();
   const insets = useSafeAreaInsets();
@@ -167,7 +169,7 @@ export const ChatHeader = memo(function ChatHeader({
   const openBrowser = () => {
     if (!browserAgent) return;
     void haptics.impact("soft");
-    router.push({
+    navigation.push({
       pathname: "/browser/[agentId]",
       params: {
         agentId: browserAgent.agentId,
@@ -179,18 +181,21 @@ export const ChatHeader = memo(function ChatHeader({
   };
   const openChannelActions = () => {
     void haptics.impact("soft");
-    router.push({
+    navigation.push({
       pathname: "/channel-actions/[channelId]",
       params: { channelId: target.id, serverId: target.serverId },
     });
   };
   const openSideQuestion = () => {
     void haptics.impact("soft");
-    router.push({ pathname: "/side-question/[agentId]", params: { agentId: target.id, serverId: target.serverId } });
+    navigation.push({
+      pathname: "/side-question/[agentId]",
+      params: { agentId: target.id, serverId: target.serverId },
+    });
   };
   const openPins = () => {
     void haptics.impact("soft");
-    router.push({ pathname: "/pinned-messages", params: { agentId: target.id, serverId: target.serverId } });
+    navigation.push({ pathname: "/pinned-messages", params: { agentId: target.id, serverId: target.serverId } });
   };
   const goBack = () => {
     void haptics.impact("soft");
@@ -311,12 +316,12 @@ export const ChatHeader = memo(function ChatHeader({
           onPress={() => {
             void haptics.impact("soft");
             if (target.kind === "channel")
-              router.push({
+              navigation.push({
                 pathname: "/channel-info/[channelId]",
                 params: { channelId: target.id, serverId: target.serverId },
               });
             else
-              router.push({
+              navigation.push({
                 pathname: "/agent-info/[agentId]",
                 params: { agentId: target.id, serverId: target.serverId },
               });

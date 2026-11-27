@@ -1,7 +1,6 @@
 import type { ConversationQuestionPrompt } from "@openbot/contracts/ipc";
 import type { ConversationUiBlock, UiBlockVaultRequest, UiVaultRequestKind } from "@openbot/contracts/ui-blocks";
 import type { MobileTextKey } from "@openbot/i18n/mobile";
-import { router } from "expo-router";
 import { Button, Typography } from "heroui-native";
 import { useThemeColor } from "heroui-native/hooks";
 import Check from "lucide-react-native/icons/check";
@@ -12,6 +11,7 @@ import { useEffect, useRef } from "react";
 import { View } from "react-native";
 import { useChatCardSurface } from "@/features/chat/components/chat-bubble-fill";
 import type { QuestionPromptController } from "@/features/chat/components/use-question-prompt";
+import { useChatNavigation } from "@/features/chat/context/chat-navigation-context";
 import { setVaultRequestHandoff, vaultRequestAnswers, vaultRequestPrefill } from "@/features/chat/model/vault-request";
 import { haptics } from "@/shared/lib/haptics";
 import { useText } from "@/shared/lib/text";
@@ -42,6 +42,7 @@ export function ChatVaultRequest({
   onActivate?: (() => void) | undefined;
 }) {
   const { t } = useText();
+  const navigation = useChatNavigation();
   const card = useChatCardSurface();
   const muted = useThemeColor("muted");
   const resolution =
@@ -112,7 +113,7 @@ export function ChatVaultRequest({
             isDisabled={controller.disabled}
             onPress={() => {
               void haptics.selection();
-              router.push({ pathname: "/vault-request", params: { requestId: handoffId } });
+              navigation.push({ pathname: "/vault-request", params: { requestId: handoffId } });
             }}
           >
             <Button.Label className="font-sans font-semibold">{t(ADD_LABEL[request.kind])}</Button.Label>
