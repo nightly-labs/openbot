@@ -367,8 +367,8 @@ OpenBot unloads a session that has no turn, keeps its identity, and resumes it a
   `config/mcpServer/reload` does not clear it. So when a test finds a new tool set on a server, or a
   sign-in on a server succeeds, OpenBot restarts each Codex process of the Codex agents that use the
   server (#17472). The shared app server restarts when it is idle, as for a changed start setting;
-  a running turn finishes first. An idle Workspace only or account process stops, and the next turn
-  starts a new one. `scripts/codex-mcp-new-tools-e2e.ts` checks it.
+  a running turn finishes first. A Workspace only or account process stops when its agent is idle,
+  and the next turn starts a new one. `scripts/codex-mcp-new-tools-e2e.ts` checks it.
 - When the memory of a server is critical, `MemoryHold` releases every idle session of each kind at once.
 - A routine session is ephemeral and is not released.
 - Outside Windows, the Claude, Codex and Pi CLIs start as the leaders of their own process groups

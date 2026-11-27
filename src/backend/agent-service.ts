@@ -2902,17 +2902,14 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
 
   #restartCodexForNewMcpTools(mcpServerIds: readonly string[]): Effect.Effect<void> {
     const enabled = this.#mcp.enabled();
-    const agentIds = new Set(
-      this.#store
-        .list()
-        .filter(
-          (agent) =>
-            providerForAgent(agent) === "codex" &&
-            this.#mcpServersFor(enabled, agent.id).some((config) => mcpServerIds.includes(config.id)),
-        )
-        .map((agent) => agent.id),
-    );
-    return agentIds.size === 0 ? Effect.void : this.#providers.restartForNewMcpTools("codex", agentIds);
+    const agents = this.#store
+      .list()
+      .filter(
+        (agent) =>
+          providerForAgent(agent) === "codex" &&
+          this.#mcpServersFor(enabled, agent.id).some((config) => mcpServerIds.includes(config.id)),
+      );
+    return agents.length === 0 ? Effect.void : this.#providers.restartForNewMcpTools("codex", agents);
   }
 
   #mcpServersFor(configs: readonly McpServerConfig[], agentId: string | null | undefined): McpServerConfig[] {
