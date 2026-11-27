@@ -352,13 +352,16 @@ try {
   report.passed = true;
 } catch (error) {
   report.failure = error instanceof Error ? error.message : String(error);
-  report.diagnostics = await panel
-    ?.evaluate(() => ({
-      peers: (window.__syncPerfPeers ?? []).map((peer) => peer.connectionState),
-      channels: (window.__extensionSyncChannels ?? []).map((channel) => `${channel.label}:${channel.readyState}`),
-      frames: (window.__extensionSyncFrames ?? []).map((frame) => `${frame.channel} ${frame.direction} ${frame.type}`),
-    }))
-    .catch(() => null);
+  report.diagnostics =
+    (await panel
+      ?.evaluate(() => ({
+        peers: (window.__syncPerfPeers ?? []).map((peer) => peer.connectionState),
+        channels: (window.__extensionSyncChannels ?? []).map((channel) => `${channel.label}:${channel.readyState}`),
+        frames: (window.__extensionSyncFrames ?? []).map(
+          (frame) => `${frame.channel} ${frame.direction} ${frame.type}`,
+        ),
+      }))
+      .catch(() => null)) ?? null;
   await panel?.screenshot({ path: resolve(OUT, "failure.png") }).catch(() => undefined);
   throw error;
 } finally {
