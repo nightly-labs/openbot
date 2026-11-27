@@ -216,6 +216,7 @@ export class PlanContinuation {
     answer: string | undefined;
     finishCheck?: FinishCheckMode;
     nextStep?: boolean;
+    usedTools?: boolean;
   }): ({ kind: ContinuationKind } & ContinuationCount) | typeof STOPPED | FinishCheckPending | null {
     const key = laneKey(input.agentId, input.taskId);
     const previous = this.#chains.get(key);
@@ -255,6 +256,7 @@ export class PlanContinuation {
       });
       return { kind: "check", continuations: count, earlierGaps };
     };
+    if (chained && previous.kind === "finishCheck" && input.usedTools === false && open.length === 0) return STOPPED;
     if (count >= this.#limit) return chained && open.length > 0 ? STOPPED : checkAtLimit();
     let kind: ContinuationKind;
     if (open.length > 0 && mode !== "only") {

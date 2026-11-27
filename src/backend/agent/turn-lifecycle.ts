@@ -2652,6 +2652,7 @@ export class TurnLifecycle {
               answer: latestAssistant?.text,
               finishCheck,
               nextStep: !awaitsEarlierRequest,
+              usedTools: toolSteps.length > 0,
             });
       const gap =
         proposed?.kind === "check" && latestAssistant

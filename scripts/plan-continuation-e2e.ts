@@ -1344,6 +1344,58 @@ try {
     return { turns: turns.length };
   });
 
+  await check("a continuation with no tool step after a teammate's partial result ends quietly", async () => {
+    const lead = await createAgent("Coordinator");
+    const reviser = await createAgent("Reviser");
+    const mark = loggedTurns().length;
+    const checks = loggedChecks().length;
+    const since = current.events.length;
+    const gap: Verdict = { verdict: "continue", missing: "Give the user the revised file." };
+    const pending = [
+      "Reviser is still preparing the revised file. I'll share it when it is ready.",
+      "Still pending: Reviser is preparing the revised file. I'll share it when it is ready.",
+      "Still pending: the revised file is not ready yet. I'll share it when it is ready.",
+    ];
+    const leadTurns = plan(...pending.map((answer) => ({ steps: [], answer })));
+    const partial = plan({
+      steps: [],
+      answer: `Status: partial. The revised file is not ready yet. ${verdicts(gap, gap, gap, gap)} ${leadTurns}`,
+    });
+    const id = await send(
+      lead.id,
+      `Revise the file. ${plan({
+        steps: [],
+        answer: "I asked Reviser for the revised file.",
+        calls: [{ tool: "send_message", arguments: { recipientAgentIds: [reviser.id], text: partial } }],
+      })}`,
+    );
+    assert.equal(await settled(id), "completed");
+    const leadThread = turnsSince(mark).find((turn) => turn.text.includes("Revise the file."))?.threadId;
+    await waitFor(
+      "the continuation of the lead's answer to the partial result",
+      () =>
+        turnsSince(mark).filter((turn) => turn.threadId === leadThread && turn.note).length === 1 &&
+        [lead.id, reviser.id].every((agentId) =>
+          current.service.listQueue(agentId).deliveries.every((delivery) => ended(delivery.status)),
+        ),
+    );
+    assert.deepEqual(
+      turnsSince(mark)
+        .filter((turn) => turn.threadId === leadThread)
+        .map((turn) => turn.note),
+      [false, false, true],
+      "One continuation runs, and a continuation with no tool step does not continue again.",
+    );
+    assert.equal(loggedChecks().length - checks, 1, "No check runs after the continuation with no tool step.");
+    const shows = (text: string | undefined) => chatMessages(lead.id).some((message) => message.text === text);
+    assert.ok(shows(pending[1]), "The continuation's answer shows.");
+    assert.ok(!shows(pending[2]), "No third pending message shows.");
+    assert.equal(stopLines(lead.id).length, 0, "No stop line shows.");
+    assert.equal(continuationLines(lead.id).length, 0, "No continuation line shows.");
+    assert.equal(errorsFor(lead.id, since).length, 0, "No error shows.");
+    return { turns: turnsSince(mark).length };
+  });
+
   await check("a Stop or a new message during a slow finish check ends the check at once", async () => {
     const slow = (missing: string): Verdict => ({ verdict: "continue", missing, delayMs: 20_000 });
     const quick = 8_000;
