@@ -222,8 +222,13 @@ export function desktopWorkflowHost(serverId: string, server: () => ServerSummar
         if (scoped.event.type === "workflows-changed") changed(scoped.event.workflowId, scoped.event.agentId);
         else if (scoped.event.type === "agent-access-changed") changed(null);
       });
+      // A server that came back online reads its capabilities again. Until that ends, main has none
+      // and refuses the read as from an older host (#11098). Main sends an event when the read ends.
       const reconnect = window.openbot.servers.onEvent((servers) => {
-        if (servers.some((server) => server.id === serverId && server.state === "online")) changed(null);
+        if (
+          servers.some((server) => server.id === serverId && server.state === "online" && !server.capabilitiesPending)
+        )
+          changed(null);
       });
       return () => {
         unsubscribe();
