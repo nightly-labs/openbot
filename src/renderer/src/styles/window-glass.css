@@ -115,6 +115,10 @@
   --crm-sheet-bg: var(--window-solid-canvas);
 }
 
+:root[data-openbot-window-glass] .app-window .sidebar:not(.sidebar-compact) .sidebar-folder > header {
+  --openbot-bg-sidebar: var(--window-solid-sidebar);
+}
+
 :root[data-openbot-window-glass] .app-window :is(.agent-row-agent-status, .ui-bubble-reactions) {
   --openbot-bg-surface: var(--window-solid-surface);
 }
