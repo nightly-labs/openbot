@@ -5,11 +5,17 @@ const OPENAI = "https://developers.openai.com/api/docs/pricing";
 const CLAUDE = "https://platform.claude.com/docs/en/about-claude/pricing";
 const GROK = "https://docs.x.ai/developers/pricing";
 const GEMINI = "https://ai.google.dev/gemini-api/docs/pricing";
+const DEEPSEEK = "https://api-docs.deepseek.com/quick_start/pricing";
 interface Rates {
   input: number;
   cached: number;
   cacheWrite?: number;
   output: number;
+}
+interface PeakHours {
+  utcWeekdays: readonly number[];
+  utcHours: readonly (readonly [from: number, to: number])[];
+  offPeakShare: number;
 }
 interface Price {
   source: string;
@@ -17,6 +23,7 @@ interface Price {
   short: Rates;
   long?: Rates & { from: number };
   change?: { on: string; short: Rates };
+  peak?: PeakHours;
 }
 const OPENAI_LONG = 272_001;
 const GROK_LONG = 200_000;
@@ -31,6 +38,21 @@ const antigravityClaude = (input: number, cached: number, output: number): Price
   verified: ANTIGRAVITY_VERIFIED,
   short: { input, cached, output },
 });
+const DEEPSEEK_PEAK: PeakHours = {
+  utcWeekdays: [1, 2, 3, 4, 5],
+  utcHours: [
+    [1, 4],
+    [6, 10],
+  ],
+  offPeakShare: 0.5,
+};
+const deepseek = (input: number, cached: number, output: number): Price => ({
+  source: DEEPSEEK,
+  verified: "2026-11-27",
+  short: { input, cached, cacheWrite: 0, output },
+  peak: DEEPSEEK_PEAK,
+});
+const DEEPSEEK_FLASH = deepseek(0.3, 0.006, 1.2);
 const PRICES: Readonly<Record<string, Price>> = {
   "codex:gpt-6-astra": {
     source: OPENAI,
@@ -139,6 +161,10 @@ const PRICES: Readonly<Record<string, Price>> = {
   },
   "antigravity:claude-opus-5-5": antigravityClaude(4, 0.2, 20),
   "antigravity:claude-sonnet-5-5": antigravityClaude(2, 0.1, 10),
+  "deepseek:deepseek-flash": DEEPSEEK_FLASH,
+  "deepseek:deepseek-v4-flash": DEEPSEEK_FLASH,
+  "deepseek:deepseek-v4-flash-vision-exp": DEEPSEEK_FLASH,
+  "deepseek:deepseek-v4-pro": deepseek(1.32, 0.044, 3.96),
 };
 
 function priceOf(provider: string, model: string): Price | undefined {
@@ -146,6 +172,24 @@ function priceOf(provider: string, model: string): Price | undefined {
   if (price || provider !== "antigravity") return price;
   const effort = /-(minimal|low|medium|high)$/.exec(model);
   return effort ? PRICES[`${provider}:${model.slice(0, effort.index)}`] : undefined;
+}
+
+function pricingPeriod(peak: PeakHours, occurredAt: string): "peak" | "off-peak" {
+  const at = new Date(occurredAt);
+  if (Number.isNaN(at.getTime())) return "peak";
+  const hour = at.getUTCHours();
+  return peak.utcWeekdays.includes(at.getUTCDay()) && peak.utcHours.some(([from, to]) => hour >= from && hour < to)
+    ? "peak"
+    : "off-peak";
+}
+
+function share(rates: Rates, part: number): Rates {
+  return {
+    input: rates.input * part,
+    cached: rates.cached * part,
+    ...(rates.cacheWrite === undefined ? {} : { cacheWrite: rates.cacheWrite * part }),
+    output: rates.output * part,
+  };
 }
 
 export function inputPrice(provider: string, model: string): number | null {
@@ -179,7 +223,9 @@ export function estimateUsageCost(
         ? "long"
         : null;
   const changed = price.change && occurredAt >= price.change.on ? price.change : null;
-  const rates = context === "short" ? (changed?.short ?? price.short) : context === "long" ? long : null;
+  const listed = context === "short" ? (changed?.short ?? price.short) : context === "long" ? long : null;
+  const period = price.peak ? pricingPeriod(price.peak, occurredAt) : null;
+  const rates = listed && price.peak && period === "off-peak" ? share(listed, price.peak.offPeakShare) : listed;
   if (!rates || (tokens.cacheCreation !== 0 && rates.cacheWrite === undefined)) return { cost: null, basis: null };
   return {
     cost:
@@ -192,6 +238,7 @@ export function estimateUsageCost(
       effectiveDate: changed?.on ?? price.verified ?? EFFECTIVE_DATE,
       model,
       context,
+      ...(period === null ? {} : { period }),
       input: rates.input,
       cached: rates.cached,
       ...(rates.cacheWrite === undefined ? {} : { cacheWrite: rates.cacheWrite }),
