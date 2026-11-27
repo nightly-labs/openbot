@@ -1,4 +1,5 @@
 import {
+  decodeWorkflowSummary,
   isWorkflowDetail,
   isWorkflowFields,
   isWorkflowFileHostExport,
@@ -105,7 +106,7 @@ function mapped<T>(map: (value: unknown) => unknown, decode: (value: unknown) =>
   return (value: unknown): T => decode(map(value));
 }
 
-export const decodeRemoteWorkflowSummary = mapped(summary, guardedDecoder(isWorkflowSummary, "remote workflow"));
+export const decodeRemoteWorkflowSummary = decodeWorkflowSummary;
 export const decodeRemoteWorkflowDetail = mapped(detail, guardedDecoder(isWorkflowDetail, "remote workflow"));
 export const decodeRemoteWorkflowFileExport = guardedDecoder(isWorkflowFileHostExport, "remote workflow file");
 export function decodeRemoteWorkflowVersionGraph(value: unknown) {

@@ -2,6 +2,7 @@
 
 import { isDynamicRecord, isString } from "@openbot/contracts/runtime-values";
 import { TEAM_WEB_CLIENT_PROTOCOL } from "@openbot/contracts/team-protocol/current";
+import { decodeSyncClientMessage, type SyncClientMessage } from "@openbot/contracts/team-protocol/sync-v1";
 import { sourceText } from "@openbot/i18n/source";
 import {
   createRemoteTeamPeer,
@@ -28,6 +29,7 @@ export type RemoteTeamBridgeHandle = {
   setActive: (active: BridgeJson) => void;
   networkChanged: (value: BridgeJson) => void;
   cancelUpload: (value: BridgeJson) => void;
+  sendSync: (message: BridgeJson) => void;
 };
 
 interface RemoteTeamBridgeProps extends Omit<RemoteTeamPeerActions, "onTeamEvent"> {
@@ -114,6 +116,7 @@ export default function RemoteTeamBridge({
     onDownloadProgress: afterTeamEvents(callbacks.onDownloadProgress),
     onAccountProfileChanged: afterTeamEvents(callbacks.onAccountProfileChanged),
     onAccountServersChanged: afterTeamEvents(callbacks.onAccountServersChanged),
+    onSyncEvent: afterTeamEvents(callbacks.onSyncEvent),
     onHostStreamData: (data) => {
       browserView.current?.receive(data);
       remoteDesktop.current?.receive(data);
@@ -194,6 +197,15 @@ export default function RemoteTeamBridge({
   const cancelUpload = useRef(() => {
     void peer.cancelUpload().catch(() => undefined);
   }).current;
+  const sendSync = useRef((value: unknown) => {
+    let message: SyncClientMessage | null;
+    try {
+      message = decodeSyncClientMessage(value);
+    } catch {
+      message = null;
+    }
+    if (message) void peer.sendSync(message).catch(() => undefined);
+  }).current;
 
   useDOMImperativeHandle<RemoteTeamBridgeHandle>(
     ref ?? null,
@@ -204,8 +216,9 @@ export default function RemoteTeamBridge({
       setActive,
       networkChanged,
       cancelUpload,
+      sendSync,
     }),
-    [views, desktopStreams, teamCommands, setActive, networkChanged, cancelUpload],
+    [views, desktopStreams, teamCommands, setActive, networkChanged, cancelUpload, sendSync],
   );
 
   const readySent = useRef(false);

@@ -9,9 +9,10 @@ import {
   limitedQuoteText,
   serializeChatTagReference,
 } from "@openbot/contracts/chat-tag-references";
-import type { InstalledSkill, MessageReaction } from "@openbot/contracts/ipc";
+import type { ConversationReaction, InstalledSkill, MessageReaction } from "@openbot/contracts/ipc";
 import type { AgentMessage } from "@openbot/ui/data";
 import { currentText } from "@openbot/ui/text";
+import { createEffect, createStore } from "solid-js";
 import { desktopAnalytics } from "../../../analytics";
 import { writeClipboardText } from "../../../clipboard";
 import { copiedFileRead, copyMessageWithAttachments } from "../composer-clipboard";
@@ -53,7 +54,81 @@ export function draftWithPageContext(draft: string, messageId: string, text: str
   return shown ? `${draft.slice(0, shown.start)}${quote}${draft.slice(end)}` : `${quote} ${draft}`;
 }
 
+interface PendingReaction {
+  emoji: MessageReaction | null;
+  baseline: string;
+  requests: number;
+  latest: number;
+}
+
+function reactionState(message: AgentMessage | undefined): string {
+  return JSON.stringify([message?.reaction ?? null, message?.reactions ?? [], message?.reactionSummary?.emojis ?? []]);
+}
+
+function withUserReaction(message: AgentMessage, emoji: MessageReaction | null): AgentMessage {
+  const shown: ConversationReaction[] = message.reactions?.length
+    ? message.reactions
+    : message.reaction
+      ? [{ emoji: message.reaction, actor: { kind: "user" } }]
+      : [];
+  const ownIndex = shown.findIndex((reaction) => reaction.actor.kind === "user");
+  const others = shown.filter((reaction) => reaction.actor.kind !== "user");
+  if (!emoji) return { ...message, reaction: null, reactions: others };
+  const at = ownIndex < 0 ? others.length : ownIndex;
+  return {
+    ...message,
+    reaction: emoji,
+    reactions: [...others.slice(0, at), { emoji, actor: { kind: "user" } }, ...others.slice(at)],
+  };
+}
+
 export function createMessageActions(deps: MessageActionsDeps) {
+  const [pendingReactions, setPendingReactions] = createStore<Record<string, PendingReaction>>({});
+  let reactionRequests = 0;
+  const serverMessage = (messageId: string) => deps.props.messages.find((message) => message.id === messageId);
+
+  function withPendingReaction(message: AgentMessage): AgentMessage {
+    const pending = pendingReactions[message.id];
+    if (!pending || (pending.requests === 0 && reactionState(message) !== pending.baseline)) return message;
+    return withUserReaction(message, pending.emoji);
+  }
+
+  createEffect(
+    () =>
+      Object.entries(pendingReactions)
+        .filter(([id, entry]) => entry.requests === 0 && reactionState(serverMessage(id)) !== entry.baseline)
+        .map(([id]) => id),
+    (confirmed) => {
+      if (confirmed.length === 0) return;
+      setPendingReactions((pending) => {
+        for (const id of confirmed) delete pending[id];
+      });
+    },
+  );
+
+  function holdReaction(messageId: string, emoji: MessageReaction | null, baseline: string) {
+    reactionRequests += 1;
+    const request = reactionRequests;
+    setPendingReactions((pending) => {
+      pending[messageId] = { emoji, baseline, requests: (pending[messageId]?.requests ?? 0) + 1, latest: request };
+    });
+    return request;
+  }
+
+  function settleReaction(messageId: string, request: number, failed: boolean): void {
+    const server = serverMessage(messageId);
+    setPendingReactions((pending) => {
+      const entry = pending[messageId];
+      if (!entry) return;
+      if (!server || (failed && entry.latest === request)) {
+        delete pending[messageId];
+        return;
+      }
+      entry.requests -= 1;
+      if (entry.requests === 0) entry.baseline = reactionState(server);
+    });
+  }
+
   function replyToMessage(message: AgentMessage) {
     deps.updateCurrentDraft({ replyToMessageId: message.id });
     deps.setOpenReactionMessageId(null);
@@ -77,14 +152,17 @@ export function createMessageActions(deps: MessageActionsDeps) {
     const analytics = desktopAnalytics.scope();
     deps.setOpenReactionMessageId(null);
     deps.setExpandedEmojiMessageId(null);
+    const request = holdReaction(message.id, emoji, reactionState(serverMessage(message.id) ?? message));
     try {
       await conversationRuntime(deps.props).agent.setMessageReaction({
         agentId,
         messageId: message.id,
         emoji,
       });
+      settleReaction(message.id, request, false);
       analytics.track("reaction_action", { action: emoji ? "add" : "remove", result: "succeeded" });
     } catch (error) {
+      settleReaction(message.id, request, true);
       analytics.track("reaction_action", {
         action: emoji ? "add" : "remove",
         result: "failed",
@@ -162,6 +240,7 @@ export function createMessageActions(deps: MessageActionsDeps) {
     addPageText,
     setPageContext,
     reactToMessage,
+    withPendingReaction,
     copyMessage,
     messageText,
     removeAttachment,

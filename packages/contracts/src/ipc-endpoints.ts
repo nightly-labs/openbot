@@ -63,7 +63,7 @@ import type {
   SetAgentDockInteractiveInput,
   SetAgentDockXWaylandInput,
 } from "./ipc-agent-dock";
-import type { AgentIpcRequest, ScopedAgentEvent } from "./ipc-agent-events";
+import type { AgentIpcRequest, AgentSyncChangedEvent, ScopedAgentEvent } from "./ipc-agent-events";
 import type {
   AddAgentFolderInput,
   AgentExclusionChange,
@@ -1691,6 +1691,7 @@ export const IPC_ENDPOINTS = {
     respondToBrowserSecret: scopedRequest<LocalBrowserSecretResponse, void>()("agent:respond-to-browser-secret"),
     respondToBrowserTakeover: scopedRequest<RespondToBrowserTakeoverInput, void>()("agent:respond-to-browser-takeover"),
     scopedEvent: event<ScopedAgentEvent>()("agent:event"),
+    syncChanged: event<AgentSyncChangedEvent>()("agent:sync-changed"),
   },
   agentMemories: {
     getMemorySelection: scopedRequest<string, AgentMemorySelectionState | null>()("agent:get-memory-selection"),

@@ -137,9 +137,15 @@ export function AgentInformation({
       void memorySelection.refetch();
     },
   };
+  const showsRoutines = available && (section === "routines" || section === "routine");
+  const { syncCollections } = workspace;
+  useEffect(
+    () => (showsRoutines ? syncCollections.routines.retain(agent.serverId, agent.id) : undefined),
+    [showsRoutines, syncCollections, agent.serverId, agent.id],
+  );
   const routines = useQuery({
     ...options,
-    enabled: available && (section === "routines" || section === "routine"),
+    enabled: showsRoutines,
     queryKey: queryKeys.agentRecord(queryScope, agent.serverId, agent.id, "routines"),
     queryFn: () => workspace.loadAgentRoutines(agent.id, agent.serverId),
   });

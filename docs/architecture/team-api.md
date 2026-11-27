@@ -10,6 +10,8 @@ OpenBot Mobile uses the same ticket, authentication transcript, framing, RPC cod
 In Expo Go, an Expo DOM component owns the browser `RTCPeerConnection` inside a hidden WebView and
 passes only serializable, validated commands and events to the native React UI; no native WebRTC
 module or development build is required.
+The `events` channel also carries keyed collection sync, the optional `sync-v1` capability. See
+[Sync engine](sync.md).
 The host's network route preference (`openbot-remote-network-route-v1.json`) applies to every
 remote connection to the computer. With `private`, the host gives WebRTC no ICE servers, and the
 hidden page removes each local, remote, and SDP candidate that is not a `host` candidate on a private

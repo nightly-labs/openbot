@@ -51,11 +51,16 @@ import { mergeConversationPage, missingReplyOriginals, windowedSnapshotMessages 
 import { conversationPort } from "./conversation-port";
 import {
   decideAgentAutoRead,
+  heldUnreadState,
+  isIncomingAgentMessage,
   latestIncomingConversationMessage,
   latestVisibleAgentMessageId,
+  markedReadState,
+  markedUnreadState,
   preserveKnownAgentUnread,
   readStateForMessages,
   retainedAutoReadState,
+  sameReadState,
 } from "./conversation-read-state";
 import type { ConversationMessagePins, SendMessageResult } from "./conversation-types";
 import { useDirectMessages } from "./direct-messages-context";
@@ -1216,13 +1221,53 @@ const Conversation = createSimpleContext({
       }
     }
 
+    function holdReadState(agentId: string, serverId: string, optimistic: ConversationReadState): () => void {
+      if (!scopeIsCurrent() || serverId !== activeServerId()) return () => undefined;
+      let restore: ConversationReadState | undefined;
+      updateConversation(agentId, (conversation) => {
+        restore = conversation.read ? { ...conversation.read } : undefined;
+        conversation.read = optimistic;
+      });
+      return () => {
+        if (!scopeIsCurrent() || serverId !== activeServerId()) return;
+        updateConversation(agentId, (conversation) => {
+          if (sameReadState(conversation.read, optimistic)) conversation.read = restore;
+        });
+      };
+    }
+
+    function loadedLatestMessages(agentId: string): AgentMessage[] | undefined {
+      flushConversationDeltas();
+      const conversation = conversations[agentId];
+      if (!conversation || conversation.loading || conversation.windowMode === "around") return undefined;
+      const messages = conversation.messages.filter(
+        (message) =>
+          !message.streaming &&
+          !message.id.startsWith("thinking:") &&
+          !message.id.startsWith("ui-") &&
+          !message.id.startsWith("pending:"),
+      );
+      return messages.length > 0 ? messages : undefined;
+    }
+
     async function markAgentMessagesUnread(
       agentId: string,
       fromMessageId: string,
       serverId = activeServerId(),
     ): Promise<void> {
+      await markUnreadFromMessage(agentId, fromMessageId, serverId);
+    }
+
+    async function markUnreadFromMessage(agentId: string, fromMessageId: string, serverId: string): Promise<boolean> {
+      flushConversationDeltas();
       const requestKey = agentConversationKey(serverId, agentId);
       heldUnreadAgentChats.add(requestKey);
+      const conversation = conversations[agentId];
+      const rollback = holdReadState(
+        agentId,
+        serverId,
+        markedUnreadState(conversation?.messages ?? [], fromMessageId, isIncomingAgentMessage, conversation?.read),
+      );
       const operation: Promise<void> = (conversationReadOperations.get(requestKey) ?? Promise.resolve())
         .catch(() => undefined)
         .then(async () => {
@@ -1233,9 +1278,12 @@ const Conversation = createSimpleContext({
       conversationReadOperations.set(requestKey, operation);
       try {
         await operation;
+        return true;
       } catch (error) {
         heldUnreadAgentChats.delete(requestKey);
+        rollback();
         appendUiError(agentId, error, currentText().t("chat.errorStatus.readState"), serverId);
+        return false;
       } finally {
         if (conversationReadOperations.get(requestKey) === operation) conversationReadOperations.delete(requestKey);
       }
@@ -1283,12 +1331,27 @@ const Conversation = createSimpleContext({
       const reportFailure = (error: unknown) =>
         appendUiError(agentId, error, currentText().t("chat.errorStatus.readState"), serverId);
       const readOwnChat = async () => {
-        const page = await conversationPort().agent.readConversationPage(
-          { agentId, anchor: { type: "latest" }, limit: 1 },
+        const loadedMessageId = serverId === activeServerId() ? loadedLatestMessages(agentId)?.at(-1)?.id : undefined;
+        const rollback = holdReadState(
+          agentId,
           serverId,
+          markedReadState(loadedMessageId ?? conversations[agentId]?.read?.throughMessageId ?? null),
         );
-        const latestMessageId = page.messages.at(-1)?.id;
-        if (latestMessageId) await markAgentMessagesRead(agentId, latestMessageId, serverId);
+        try {
+          const latestMessageId =
+            loadedMessageId ??
+            (
+              await conversationPort().agent.readConversationPage(
+                { agentId, anchor: { type: "latest" }, limit: 1 },
+                serverId,
+              )
+            ).messages.at(-1)?.id;
+          if (latestMessageId) await markAgentMessagesRead(agentId, latestMessageId, serverId);
+          else rollback();
+        } catch (error) {
+          rollback();
+          throw error;
+        }
       };
       await Promise.all([
         (unreadReplies()[agentId] ?? 0) > 0 ? readOwnChat().catch(reportFailure) : undefined,
@@ -1304,14 +1367,22 @@ const Conversation = createSimpleContext({
     }
 
     async function markAgentChatUnread(agentId: string, serverId = activeServerId()): Promise<void> {
+      const loaded = serverId === activeServerId() ? loadedLatestMessages(agentId) : undefined;
+      const loadedReply = loaded?.findLast(isIncomingAgentMessage);
+      if (loadedReply) {
+        await markUnreadFromMessage(agentId, loadedReply.id, serverId);
+        return;
+      }
+      const rollback = holdReadState(agentId, serverId, heldUnreadState(conversations[agentId]?.read));
       try {
         const page = await conversationPort().agent.readConversationPage(
           { agentId, anchor: { type: "latest" }, limit: LATEST_PAGE_SIZE },
           serverId,
         );
         const latestReply = latestIncomingConversationMessage(page.messages);
-        if (latestReply) await markAgentMessagesUnread(agentId, latestReply.id, serverId);
+        if (!latestReply || !(await markUnreadFromMessage(agentId, latestReply.id, serverId))) rollback();
       } catch (error) {
+        rollback();
         appendUiError(agentId, error, currentText().t("chat.errorStatus.readState"), serverId);
       }
     }

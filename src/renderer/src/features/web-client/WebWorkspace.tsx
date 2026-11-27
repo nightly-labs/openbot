@@ -1399,6 +1399,7 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
     previewMedia: workflowPreviews,
     download: (attachmentId) => workspace.runtime.download(attachmentId),
     saveFile: createWebFileSaver(),
+    syncedList: async () => (await workspace.runtime.syncedWorkflows?.()) ?? null,
   });
   const mediaCredits = createWorkflowMediaCredits(
     () => (page() === "workflows" && workspace.state.status === "online" ? (server()?.id ?? null) : null),
@@ -1427,7 +1428,11 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
   }
   const crmAllowed = () =>
     canAdministerServer(workspace.state.host?.role) && workspace.state.capabilities.includes(CRM_CAPABILITY);
-  const crmHost = webCrmHost({ request: () => hostRequest(), onHostEvent: workspace.onHostEvent });
+  const crmHost = webCrmHost({
+    request: () => hostRequest(),
+    onHostEvent: workspace.onHostEvent,
+    syncedCustomers: async () => (await workspace.runtime.syncedCrmCustomers?.()) ?? null,
+  });
   const crmServerId = createMemo(() => (crmAllowed() ? server()?.id : undefined));
   const crmSwitch = createCrmEnabled(createMemo(() => (crmServerId() === undefined ? undefined : { ...crmHost })));
   const crmEnabled = crmSwitch.enabled;
@@ -2170,6 +2175,8 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
   );
   const stopChannelPictures = workspace.runtime.channels?.onPictures?.(() => void channels.refresh(undefined, false));
   if (stopChannelPictures) onCleanup(stopChannelPictures);
+  const stopChannelList = workspace.runtime.channels?.onListChanged?.(() => void channels.refresh(undefined, false));
+  if (stopChannelList) onCleanup(stopChannelList);
   onCleanup(
     workspace.onHostEvent((event) => {
       if (event.type !== "agent-notification-levels-changed") return;

@@ -56,6 +56,7 @@ import {
 } from "../remote-agent-decoding";
 import { decodeVoid } from "../remote-host-decoding";
 import type { RemoteServerManager } from "../remote-server-manager";
+import { syncedOrRequest } from "../remote-server-sync";
 import type { RemoteWorkflowError } from "../remote-service-effects";
 import {
   parseAgentId,
@@ -89,7 +90,9 @@ export function routineIpcHandlers({
             remoteServers,
             serverId,
             Effect.gen(function* () {
-              const routines = remoteServers.request(serverId, TEAM_API_ROUTES.agent.routines(agentId), decodeRoutines);
+              const routines = syncedOrRequest(remoteServers.sync.routines.values(serverId, agentId), () =>
+                remoteServers.request(serverId, TEAM_API_ROUTES.agent.routines(agentId), decodeRoutines),
+              );
               const runPlaces = remoteServers.supportsCapability(serverId, ROUTINE_RUN_PLACE_CAPABILITY);
               const pauseReasons = remoteServers.supportsCapability(serverId, ROUTINE_PAUSE_REASONS_CAPABILITY);
               if (!runPlaces && !pauseReasons) return yield* routines;

@@ -89,6 +89,7 @@ export interface RendererForwarderDependencies {
     | "cachedNotificationLevels"
     | "knownNotificationLevels"
     | "supportsCapability"
+    | "sync"
   > | null;
   ownAgentNotificationLevels: () => ReadonlyMap<string, ServerNotificationLevel>;
   showMainWindow: (window: BrowserWindow) => void;
@@ -223,7 +224,10 @@ export function createRendererForwarders({
     const remoteManager = getRemoteServerManager();
     const server = remoteManager?.list().find((candidate) => candidate.id === serverId);
     if (!remoteManager || !server?.compatibility?.capabilities.includes(TEAM_CHANNEL_ATTENTION_CAPABILITY)) return null;
-    return runCauseEffect(remoteManager.request(serverId, CHANNEL_ROUTES.list, decodeChannelSummaries));
+    return (
+      remoteManager.sync.channels.values(serverId) ??
+      runCauseEffect(remoteManager.request(serverId, CHANNEL_ROUTES.list, decodeChannelSummaries))
+    );
   }
 
   async function notifyChannelReplies(serverId: string, next: ChannelSummary[]): Promise<void> {
@@ -632,6 +636,10 @@ export function createRendererForwarders({
     for (const target of appWindows()) sendToRenderer(target, IPC_ENDPOINTS.servers.event, summaries);
   }
 
+  function forwardSyncChanged(serverId: string, name: string): void {
+    for (const target of appWindows()) sendToRenderer(target, IPC_ENDPOINTS.agent.syncChanged, { serverId, name });
+  }
+
   function forwardTeamPresence(
     serverId: string,
     snapshot: import("@openbot/contracts/ipc").TeamPresenceSnapshot,
@@ -706,6 +714,7 @@ export function createRendererForwarders({
     forwardRemoteDesktopSessions,
     forwardServers,
     forwardTeamPresence,
+    forwardSyncChanged,
     forwardDirectMessage,
     forwardDirectTyping,
     forwardAttachmentDownload,

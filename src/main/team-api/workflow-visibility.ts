@@ -1,4 +1,10 @@
-import { type AgentAccessLevel, canAdministerServer, graphAgentIds, type WorkflowGraph } from "@openbot/contracts/ipc";
+import {
+  type AgentAccessLevel,
+  canAdministerServer,
+  graphAgentIds,
+  type WorkflowGraph,
+  type WorkflowSummary,
+} from "@openbot/contracts/ipc";
 import { sourceText } from "@openbot/i18n/source";
 import { RoutineInputError } from "@openbot/team-client/routine-schedule";
 import type { Effect } from "effect";
@@ -87,14 +93,20 @@ export async function visibleWorkflowIds(
   hiddenAgentIds: ReadonlySet<string>,
 ): Promise<ReadonlySet<string>> {
   if (!workflows) return new Set();
-  const { listed, visibleGraph } = workflowVisibility(context, workflows, agents, hiddenAgentIds);
-  const known = listed();
+  const viewer = { admin: canAdministerServer(context.member.role), protocol: context.protocol, hiddenAgentIds };
+  return new Set((await visibleWorkflowSummaries(viewer, workflows, agents)).map((summary) => summary.id));
+}
+
+export async function visibleWorkflowSummaries(
+  viewer: WorkflowViewer,
+  workflows: Pick<TeamApiWorkflows, "listWithGraphs">,
+  agents: Pick<TeamApiAgents, "listAgents">,
+): Promise<WorkflowSummary[]> {
+  const known = new Set(agents.listAgents().map((agent) => agent.id));
   const all = await runWorkflowEffect(workflows.listWithGraphs());
-  return new Set(
-    all
-      .filter(({ graph, needsNewerApp }) => !needsNewerApp && visibleGraph(graph, known))
-      .map(({ summary }) => summary.id),
-  );
+  return all
+    .filter(({ graph, needsNewerApp }) => !needsNewerApp && workflowGraphVisible(viewer, graph, known))
+    .map(({ summary }) => summary);
 }
 
 export async function workflowVisibleTo(

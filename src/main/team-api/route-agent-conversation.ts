@@ -1,6 +1,7 @@
 import { INPUT_LIMITS } from "@openbot/contracts/input-limits";
 import { isMessageReaction } from "@openbot/contracts/ipc";
 import { isString } from "@openbot/contracts/runtime-values";
+import { CONVERSATION_READS_SYNC_COLLECTION } from "@openbot/contracts/team-protocol/sync-collections";
 import { TEAM_PROTOCOL_V3 } from "@openbot/contracts/team-protocol/v3";
 import { sourceText } from "@openbot/i18n/source";
 import { runCauseEffect } from "../../backend/effect-boundary";
@@ -77,22 +78,23 @@ export async function routeAgentConversation(
     }
     await readJson(request);
     requireListedAgent(agents, agentId);
-    return json(200, await runCauseEffect(agents.markConversationUnread(agentId, member.id)));
+    const state = await runCauseEffect(agents.markConversationUnread(agentId, member.id));
+    context.syncChanged?.(CONVERSATION_READS_SYNC_COLLECTION.name, [agentId]);
+    return json(200, state);
   }
   if (method === "POST" && action === "conversation/read") {
     const body = await readJson(request);
     requireListedAgent(agents, agentId);
-    return json(
-      200,
-      await runCauseEffect(
-        agents.markConversationRead(
-          agentId,
-          member.id,
-          nullableString(body, "throughMessageId"),
-          markerExclusionsForCapabilities(capabilities),
-        ),
+    const state = await runCauseEffect(
+      agents.markConversationRead(
+        agentId,
+        member.id,
+        nullableString(body, "throughMessageId"),
+        markerExclusionsForCapabilities(capabilities),
       ),
     );
+    context.syncChanged?.(CONVERSATION_READS_SYNC_COLLECTION.name, [agentId]);
+    return json(200, state);
   }
   if (method === "POST" && action === "messages") {
     const body = await readJson(request);
