@@ -537,4 +537,13 @@ export const messages = {
   "chat.feedbackWithdrawn.badge": "Supprimé",
   "chat.feedbackWithdrawn.body":
     "Votre rapport n’est plus sur GitHub. Pour envoyer un rapport corrigé, demandez-le à l’agent.",
+  "chat.remoteContent.pictureNotLoaded":
+    "Image de {host}. Elle n'a pas été chargée, car le contenu distant est désactivé sur ce serveur.",
+  "chat.remoteContent.loadPicture": "Charger l'image",
+  "chat.remoteContent.diagramNotDrawn":
+    "Ce diagramme peut charger une image d'un autre site. Il n'a pas été dessiné, car le contenu distant est désactivé sur ce serveur.",
+  "chat.remoteContent.loadDiagram": "Charger le diagramme",
+  "chat.remoteContent.pageStatic":
+    "Affichée sans scripts ni contenu distant, car le contenu distant est désactivé sur ce serveur.",
+  "chat.remoteContent.runPage": "Lancer la page",
 } as const satisfies PartialTranslation<typeof source>;

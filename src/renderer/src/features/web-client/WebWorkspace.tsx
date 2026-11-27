@@ -90,6 +90,7 @@ import { MESSAGE_DELETE_CAPABILITY } from "@openbot/contracts/team-protocol/mess
 import { MESSAGE_PINS_CAPABILITY } from "@openbot/contracts/team-protocol/message-pins-v1";
 import { OWNER_TRANSFER_CAPABILITY } from "@openbot/contracts/team-protocol/owner-transfer-v1";
 import { PROVIDER_ACCOUNTS_CAPABILITY } from "@openbot/contracts/team-protocol/provider-accounts-v1";
+import { REMOTE_CHAT_CONTENT_CAPABILITY } from "@openbot/contracts/team-protocol/remote-chat-content-v1";
 import { ROUTINE_RECOVERY_CAPABILITY } from "@openbot/contracts/team-protocol/routine-recovery-v1";
 import { ROUTINE_RUN_PLACE_CAPABILITY } from "@openbot/contracts/team-protocol/routine-run-place-v1";
 import { ROUTINES_ONCE_CAPABILITY } from "@openbot/contracts/team-protocol/routines-once-v1";
@@ -131,6 +132,7 @@ import {
   getHostPromptCacheTtl,
   getHostProviderEnvironment,
   getHostReleaseStatus,
+  getHostRemoteChatContent,
   getHostSkillLearning,
   getHostTimezone,
   getHostUpdateStatus,
@@ -149,6 +151,7 @@ import {
   setHostPersonality,
   setHostPromptCacheTtl,
   setHostProviderEnvironment,
+  setHostRemoteChatContent,
   setHostSkillLearning,
   setHostTimezone,
   setHostUpdateSettings,
@@ -311,6 +314,7 @@ import { createHostedUpsellOffline, HostedServerUpsell } from "../servers/hosted
 import { mcpSignInRecord } from "../servers/mcp-servers";
 import { type HostMediaApprovalCreditsCalls, saveMediaApprovalCredits } from "../servers/media-approval-credits-store";
 import { OwnerTransferPrompt } from "../servers/OwnerTransferPrompt";
+import { createRemoteChatContent, RemoteChatContentProvider } from "../servers/remote-chat-content";
 import { saveRemoteFrameChannels } from "../servers/remote-workspace-frame";
 import type { HostAgentDefaultsCalls } from "../servers/ServerAgentsSection";
 import type { HostServerAuditCalls } from "../servers/ServerAuditSection";
@@ -1858,6 +1862,30 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
     setSkillLearning: async (mode, serverId) =>
       runTeamEffect(setHostSkillLearning(hostRequest(serverId), mode).pipe(Effect.mapError((error) => error.cause))),
   };
+  const remoteChatContent = createRemoteChatContent({
+    getRemoteChatContent: async (serverId) => {
+      if (workspace.state.capabilities.length === 0) throw new Error("The host is not connected yet.");
+      if (!workspace.state.capabilities.includes(REMOTE_CHAT_CONTENT_CAPABILITY)) return { enabled: false };
+      return runTeamEffect(
+        getHostRemoteChatContent(hostRequest(serverId)).pipe(Effect.mapError((error) => error.cause)),
+      );
+    },
+    setRemoteChatContent: async (enabled, serverId) =>
+      runTeamEffect(
+        setHostRemoteChatContent(hostRequest(serverId), enabled).pipe(Effect.mapError((error) => error.cause)),
+      ),
+    onRemoteChatContent: (listener) =>
+      workspace.onHostEvent((event) => {
+        if (event.type === "remote-chat-content") listener({ serverId: event.serverId, enabled: event.enabled });
+      }),
+  });
+  onCleanup(remoteChatContent.dispose);
+  createEffect(
+    () => (workspace.state.capabilities.length > 0 ? server()?.id : undefined),
+    (serverId) => {
+      if (serverId) void remoteChatContent.load(serverId);
+    },
+  );
   const hostBrowsingMemoryCalls: HostBrowsingMemoryCalls = {
     getBrowsingMemory: async (serverId) =>
       runTeamEffect(getHostBrowsingMemory(hostRequest(serverId)).pipe(Effect.mapError((error) => error.cause))),
@@ -3032,7 +3060,7 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
       />
     );
   };
-  return (
+  const workspaceView = () => (
     <ConversationControllerProvider controller={controller}>
       <ChannelsControllerProvider controller={channels}>
         <Show
@@ -3050,7 +3078,7 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
             </div>
           }
         >
-          <WindowBackdrop pages="srcdoc" />
+          <WindowBackdrop pages="srcdoc" remoteContent={remoteChatContent.enabled(server()?.id)} />
           <div
             class="app-window web-app-window"
             data-loading-waited-long={loadingCover() && loadingWaitedLong() ? "" : undefined}
@@ -4309,4 +4337,5 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
       </ChannelsControllerProvider>
     </ConversationControllerProvider>
   );
+  return <RemoteChatContentProvider value={remoteChatContent}>{workspaceView()}</RemoteChatContentProvider>;
 }

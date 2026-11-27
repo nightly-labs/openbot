@@ -44,6 +44,7 @@ import { moveBrowserTab, orderedBrowserTabs } from "../browser/browser-tab-sessi
 import type { AgentFilesOptions } from "../files/AgentFilesSettings";
 import type { ChatFilesSource } from "../files/ChatFilesPanel";
 import { canManageStorage, serverHasChannelStorage, serverHasStorage } from "../files/storage-usage";
+import { useRemoteChatContent } from "../servers/remote-chat-content";
 import { serverCanAdminister, serverCanManageMcp, serverSupportsCapability } from "../servers/server-capabilities";
 import { codexLiveAccess } from "../speech/codex-live-access";
 import { speechPort } from "../speech/speech-port";
@@ -269,6 +270,7 @@ export function ConversationPanels(panelProps: { onOpenUsage?: ((trigger: HTMLBu
     channel,
     replyJump,
   } = useConversationViewScope();
+  const remoteChatContent = useRemoteChatContent();
   const { t, errorMessage } = useText();
   const sidePanelToggle = useSidePanelToggle();
   const chatAgentKey = () => {
@@ -721,6 +723,7 @@ export function ConversationPanels(panelProps: { onOpenUsage?: ((trigger: HTMLBu
           resizer={paneResizer(split, "side-question-panel")}
           onOpenLink={(url) => void openExternalMessageUrl(url)}
           macWindowControls={props.platform === "darwin"}
+          remoteContent={remoteChatContent.enabled(props.server?.id ?? LOCAL_SERVER_ID)}
         />
       )}
     </Show>
@@ -1022,6 +1025,7 @@ export function ConversationPanels(panelProps: { onOpenUsage?: ((trigger: HTMLBu
               <FilePreviewPanel
                 allowExternalOpen={!props.runtime}
                 macWindowControls={props.platform === "darwin"}
+                remoteContent={remoteChatContent.enabled(props.server?.id ?? LOCAL_SERVER_ID)}
                 preview={file().preview}
                 directory={file().directory ?? null}
                 agents={props.agents}

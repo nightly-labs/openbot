@@ -256,6 +256,11 @@ export function createChannelsController(env: ChannelsEnvironment) {
     const id = ++refreshId;
     const account = env.scopeKey();
     const selected = selectedOverride === undefined ? state.selectedId : selectedOverride;
+    if (selected && withPage && state.page?.channel.id !== selected)
+      setState((state) => {
+        state.loading = true;
+        if (!failedCommand) Object.assign(state, { error: null, errorReference: null });
+      });
     try {
       const known = selected !== null && state.listed && state.channels.some((channel) => channel.id === selected);
       const listing = withList || !known ? env.port().agent.listChannels() : null;
@@ -339,6 +344,7 @@ export function createChannelsController(env: ChannelsEnvironment) {
     flush(() =>
       setState((state) => {
         Object.assign(state, { selectedId: channelId, page: kept, editing: null, loading: kept === null });
+        if (!failedCommand) Object.assign(state, { error: null, errorReference: null });
       }),
     );
     await refresh(channelId);
@@ -499,8 +505,10 @@ export function createChannelsController(env: ChannelsEnvironment) {
               listed: false,
               selectedId: selected,
               page: null,
+              loading: selected !== null,
               pending: false,
               error: null,
+              errorReference: null,
               editing: null,
             });
           }),
@@ -681,8 +689,9 @@ export function createChannelsController(env: ChannelsEnvironment) {
     loadOlder,
     close: () => {
       env.writeSelection(null);
+      if (state.page?.channel.id === state.selectedId) keepPage(state.page);
       setState((state) => {
-        Object.assign(state, { selectedId: null, page: null, editing: null });
+        Object.assign(state, { selectedId: null, page: null, editing: null, loading: false });
       });
     },
     edit: () =>

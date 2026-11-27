@@ -6,6 +6,7 @@ import { App } from "./App";
 import { startActionSounds } from "./action-sounds";
 import { syncAppearance } from "./appearance-choice";
 import "./dev-worktree";
+import { createRemoteChatContent, RemoteChatContentProvider } from "./features/servers/remote-chat-content";
 import { WindowBackdropBubbles } from "./features/window/backdrop-bubbles";
 import { readChatWindowTarget } from "./features/window/chat-window";
 import { syncLogoColor } from "./logo-color";
@@ -31,9 +32,11 @@ startRendererTiming();
 
 render(
   () => (
-    <WindowBackdropBubbles>
-      <App chatWindow={readChatWindowTarget(window.location.search)} />
-    </WindowBackdropBubbles>
+    <RemoteChatContentProvider value={createRemoteChatContent(window.openbot.hostAdmin)}>
+      <WindowBackdropBubbles>
+        <App chatWindow={readChatWindowTarget(window.location.search)} />
+      </WindowBackdropBubbles>
+    </RemoteChatContentProvider>
   ),
   root,
 );

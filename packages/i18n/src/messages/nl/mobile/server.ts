@@ -578,6 +578,10 @@ export const messages = {
   "mobile.server.settings.browsingMemoryDescription":
     "Als je de browser van een agent bedient, leert de agent hoe sites werken van de pagina's en knoppen die je gebruikt. Getypte tekst wordt niet bewaard.",
   "mobile.server.settings.browsingMemoryLoadFailed": "Kan de browse-instelling niet laden.",
+  "mobile.server.settings.remoteChatContent": "Externe inhoud laden in chats",
+  "mobile.server.settings.remoteChatContentDescription":
+    "Toon afbeeldingen en site-iconen van andere websites in chats. Als dit uit staat, verschijnen ze als links, en diagrammen en pagina's laden pas als je tikt. Dit geldt voor iedereen op deze server.",
+  "mobile.server.settings.remoteChatContentLoadFailed": "Kan de instelling voor externe inhoud niet laden.",
   "mobile.server.settings.learningSaveFailed": "Kan deze instelling niet opslaan. Probeer het opnieuw.",
   "mobile.server.settings.learningUnsupported": "Werk OpenBot bij op deze server om deze instelling hier te wijzigen.",
   "mobile.server.settings.responseStyleDescription":

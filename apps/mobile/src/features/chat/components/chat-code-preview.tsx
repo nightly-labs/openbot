@@ -12,13 +12,14 @@ import Animated, { cubicBezier } from "react-native-reanimated";
 import { useUniwind } from "uniwind";
 import type { BubbleTone } from "@/features/chat/model/bubble-tone";
 import { type CodePreviewEntry, storeCodePreview } from "@/features/chat/model/code-preview-store";
-import { useMermaidDiagram } from "@/features/chat/model/mermaid-diagrams";
+import { loadMermaidDiagram, useMermaidDiagram, useMermaidHeld } from "@/features/chat/model/mermaid-diagrams";
 import { expoGoDomOptions } from "@/shared/lib/expo-go-dom";
 import { haptics } from "@/shared/lib/haptics";
 import { useReducedMotion } from "@/shared/lib/motion";
 import { useText } from "@/shared/lib/text";
 import { CODE_LAYOUT_STYLE, CODE_TEXT_STYLE, MIRROR_IN_RTL } from "@/shared/lib/text-direction";
 import HtmlPreview from "./html-preview.dom";
+import { RemoteContentHold } from "./remote-content-hold";
 import { useHistoryShown } from "./use-history-shown";
 import { useListSettled } from "./use-list-settled";
 
@@ -36,6 +37,7 @@ export const ChatCodePreview = memo(function ChatCodePreview({
   streaming = false,
   file,
   tone,
+  remoteContent = false,
 }: {
   kind: ChatPreviewKind;
   text: string;
@@ -43,6 +45,7 @@ export const ChatCodePreview = memo(function ChatCodePreview({
   streaming?: boolean;
   file?: CodePreviewEntry["file"];
   tone?: BubbleTone;
+  remoteContent?: boolean;
 }) {
   const { t } = useText();
   const reducedMotion = useReducedMotion();
@@ -59,6 +62,7 @@ export const ChatCodePreview = memo(function ChatCodePreview({
   const title = kind === "html" ? t("mobile.chat.preview.htmlTitle") : t("mobile.chat.preview.mermaidTitle");
   const lineCount = text.split("\n").length;
   const Icon = kind === "html" ? CodeXml : Workflow;
+  const held = useMermaidHeld(text, remoteContent) && kind === "mermaid" && !streaming;
   return (
     <Pressable
       accessibilityRole="button"
@@ -74,7 +78,7 @@ export const ChatCodePreview = memo(function ChatCodePreview({
       }}
       onPress={() => {
         void haptics.impact("soft");
-        const previewId = storeCodePreview({ kind, source: text, language, ...(file ? { file } : {}) });
+        const previewId = storeCodePreview({ kind, source: text, language, remoteContent, ...(file ? { file } : {}) });
         router.push({ pathname: "/code-preview/[previewId]", params: { previewId } });
       }}
     >
@@ -116,8 +120,16 @@ export const ChatCodePreview = memo(function ChatCodePreview({
           </View>
           <ChevronRight size={18} color={String(muted)} style={MIRROR_IN_RTL} />
         </View>
+        {held ? (
+          <RemoteContentHold
+            message={t("mobile.chat.preview.diagramRemoteContent")}
+            action={t("mobile.chat.preview.loadDiagram")}
+            color={tone?.muted}
+            onPress={() => loadMermaidDiagram(text)}
+          />
+        ) : null}
         <View accessibilityElementsHidden importantForAccessibility="no-hide-descendants">
-          {streaming ? (
+          {held ? null : streaming ? (
             <CodeExcerpt text={text} color={tone?.muted} />
           ) : width <= 0 ? (
             <View style={{ aspectRatio: PREVIEW_ASPECT }} />
@@ -126,7 +138,14 @@ export const ChatCodePreview = memo(function ChatCodePreview({
           ) : kind === "html" ? (
             <HtmlCardPreview text={text} title={title} height={previewHeight} />
           ) : (
-            <DiagramCardPreview text={text} title={title} width={width} height={previewHeight} draw={historyShown} />
+            <DiagramCardPreview
+              text={text}
+              title={title}
+              width={width}
+              height={previewHeight}
+              draw={historyShown}
+              remoteContent={remoteContent}
+            />
           )}
         </View>
       </Animated.View>
@@ -187,17 +206,19 @@ function DiagramCardPreview({
   width,
   height,
   draw,
+  remoteContent,
 }: {
   text: string;
   title: string;
   width: number;
   height: number;
   draw: boolean;
+  remoteContent: boolean;
 }) {
   const { t } = useText();
   const { theme } = useUniwind();
-  const diagram = useMermaidDiagram(text, theme === "dark", draw);
-  if (diagram?.status === "failed") return <CodeExcerpt text={text} />;
+  const diagram = useMermaidDiagram(text, theme === "dark", remoteContent, draw);
+  if (diagram?.status === "failed" || diagram?.status === "held") return <CodeExcerpt text={text} />;
   if (!diagram || diagram.status === "drawing")
     return (
       <Skeleton

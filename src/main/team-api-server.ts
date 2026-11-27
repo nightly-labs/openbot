@@ -285,6 +285,11 @@ import {
   TEAM_REASONING_EFFORTS_CAPABILITY,
   withLegacyReasoningEfforts,
 } from "@openbot/contracts/team-protocol/reasoning-efforts-v1";
+import {
+  REMOTE_CHAT_CONTENT_CAPABILITY,
+  REMOTE_CHAT_CONTENT_EVENT,
+  type RemoteChatContentEvent,
+} from "@openbot/contracts/team-protocol/remote-chat-content-v1";
 import { ROUTINE_QUIET_ANSWERS_CAPABILITY } from "@openbot/contracts/team-protocol/routine-quiet-answers-v1";
 import { ROUTINE_RESULTS_WHATSAPP_CAPABILITY } from "@openbot/contracts/team-protocol/routine-results-whatsapp-v1";
 import { ROUTINE_RUN_COMMAND_CAPABILITY } from "@openbot/contracts/team-protocol/routine-run-command-v1";
@@ -535,6 +540,7 @@ import { routeProviderUsageReset } from "./team-api/route-provider-usage-reset";
 import { routeProviderUse } from "./team-api/route-provider-use";
 import { routeProviders } from "./team-api/route-providers";
 import { routePushNotifications } from "./team-api/route-push-notifications";
+import { routeRemoteChatContent } from "./team-api/route-remote-chat-content";
 import { routeRemoteScreen } from "./team-api/route-remote-screen";
 import { routeRoutineFlows } from "./team-api/route-routine-flows";
 import { routeRoutinePauseReasons } from "./team-api/route-routine-pause-reasons";
@@ -730,6 +736,7 @@ export class TeamApiServer {
     this.#options = { ...options, sidebarLayout: options.sidebarLayout ?? unavailableSidebarLayout() };
     this.#rateLimitCapacity = options.rateLimitCapacity ?? RATE_LIMIT_CAPACITY;
     this.#now = options.now ?? Date.now;
+    options.admin?.remoteChatContent?.onChange(() => this.refreshRemoteChatContent());
     this.#workflowPresence = new WorkflowPresenceRelay(
       (key, workflowId) => this.#workflowVisibleTo(key, workflowId),
       options.workflowSpotStaleMs,
@@ -1019,6 +1026,23 @@ export class TeamApiServer {
   announceHostRestart(state: HostRestartState, version: string | null): void {
     this.#hostRestart = { type: HOST_RESTART_EVENT, state, version };
     for (const [client, connection] of this.#eventClients) this.#sendHostRestart(client, connection);
+  }
+
+  refreshRemoteChatContent(): void {
+    for (const [client, connection] of this.#eventClients) this.#sendRemoteChatContent(client, connection);
+  }
+
+  #sendRemoteChatContent(client: Ws.WebSocket, connection: EventClientState): void {
+    const setting = this.#options.admin?.remoteChatContent;
+    if (!setting || !connection.capabilities.has(REMOTE_CHAT_CONTENT_CAPABILITY)) return;
+    const identity = this.#options.store.getIdentity();
+    if (!identity || client.readyState !== webSockets.WebSocket.OPEN) return;
+    const event: RemoteChatContentEvent = {
+      type: REMOTE_CHAT_CONTENT_EVENT,
+      serverId: identity.serverId,
+      enabled: setting.get().enabled,
+    };
+    client.send(JSON.stringify(event));
   }
 
   refreshAppearance(): void {
@@ -1518,6 +1542,7 @@ export class TeamApiServer {
       if ((await routeMemoryReview(context, this.#options.admin)) === "handled") return;
       if ((await routeSkillLearning(context, this.#options.admin)) === "handled") return;
       if ((await routeBrowsingMemory(context, this.#options.admin)) === "handled") return;
+      if ((await routeRemoteChatContent(context, this.#options.admin)) === "handled") return;
       if ((await routePromptCacheTtl(context, this.#options.admin)) === "handled") return;
       if ((await routeClaudeUserSetup(context, this.#options.admin)) === "handled") return;
       if ((await routeClaudeCompactWindow(context, this.#options.admin)) === "handled") return;
@@ -2409,6 +2434,7 @@ export class TeamApiServer {
             const colorsWereSent = connection.capabilities.has(AGENT_COLORS_CAPABILITY);
             const chatColorsWereSent = connection.capabilities.has(CHAT_COLORS_CAPABILITY);
             const appearanceWasSent = connection.capabilities.has(HOST_APPEARANCE_CAPABILITY);
+            const remoteChatContentWasSent = connection.capabilities.has(REMOTE_CHAT_CONTENT_CAPABILITY);
             connection.capabilities = new Set(event.capabilities.filter(isTeamCurrentCapability));
             if (connection.capabilities.has("agent-runtime-snapshots") && !snapshotsWereEnabled) {
               this.#sendRuntimeSnapshot(client, connection, false);
@@ -2428,6 +2454,7 @@ export class TeamApiServer {
               this.#sendChatColors(client, connection, this.#chatColors(), true);
             if (!machineAlertsWereSent) this.#sendPendingMachineAlerts(client, connection);
             if (!appearanceWasSent) this.#sendHostAppearance(client, connection);
+            if (!remoteChatContentWasSent) this.#sendRemoteChatContent(client, connection);
           }
           connection.includeConversationEvents = event.includeConversations;
           return;
@@ -3200,6 +3227,7 @@ export class TeamApiServer {
         if (capability === MEMORY_REVIEW_CAPABILITY) return this.#options.admin?.memoryReview !== undefined;
         if (capability === SKILL_LEARNING_CAPABILITY) return this.#options.admin?.skillLearning !== undefined;
         if (capability === BROWSING_MEMORY_CAPABILITY) return this.#options.admin?.browsingMemory !== undefined;
+        if (capability === REMOTE_CHAT_CONTENT_CAPABILITY) return this.#options.admin?.remoteChatContent !== undefined;
         if (capability === PROMPT_CACHE_TTL_CAPABILITY || capability === PROMPT_CACHE_TTL_PI_CAPABILITY)
           return this.#options.admin?.promptCacheTtl !== undefined;
         if (capability === CLAUDE_USER_SETUP_CAPABILITY) return this.#options.admin?.claudeUserSetup !== undefined;

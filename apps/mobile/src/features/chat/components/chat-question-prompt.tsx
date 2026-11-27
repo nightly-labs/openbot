@@ -26,6 +26,7 @@ import type { QuestionPromptController } from "@/features/chat/components/use-qu
 import { isLocationRequest } from "@/features/chat/model/location-request";
 import { promptAnswerLabel } from "@/features/chat/model/question-prompt";
 import { vaultRequestOf } from "@/features/chat/model/vault-request";
+import { useRemoteChatContent } from "@/features/servers/model/use-remote-chat-content";
 import { useMobileWorkspaceSelector } from "@/features/workspace/context/mobile-workspace-context";
 import { haptics } from "@/shared/lib/haptics";
 import { useText } from "@/shared/lib/text";
@@ -50,6 +51,7 @@ export function ChatQuestionPrompt({
   const card = useChatCardSurface();
   const muted = useThemeColor("muted");
   const canEditPreview = useMobileWorkspaceSelector((workspace) => workspace.canEditUiBlockPreview(serverId));
+  const remoteContent = useRemoteChatContent(serverId);
   const vaultRequest = vaultRequestOf(uiBlock);
   if (vaultRequest && uiBlock)
     return (
@@ -86,7 +88,11 @@ export function ChatQuestionPrompt({
         {confirm ? (
           <ConfirmBody spec={confirm} compact selectValue={answeredSelect(prompt, null, t)} />
         ) : (
-          <QuestionText question={formTitle ?? prompt.questions[0]?.question ?? ""} variant="body" />
+          <QuestionText
+            question={formTitle ?? prompt.questions[0]?.question ?? ""}
+            variant="body"
+            remoteContent={remoteContent}
+          />
         )}
         <Button variant="ghost" onPress={onActivate}>
           <Button.Label>{t("mobile.chat.question.answerForm")}</Button.Label>
@@ -118,13 +124,13 @@ export function ChatQuestionPrompt({
                 : t("mobile.chat.question.formExpired")}
           </Typography>
         </View>
-        {formTitle ? <QuestionText question={formTitle} variant="body" /> : null}
+        {formTitle ? <QuestionText question={formTitle} variant="body" remoteContent={remoteContent} /> : null}
         {confirm ? (
           <ConfirmBody spec={confirm} closed selectValue={answeredSelect(prompt, resolution, t)} />
         ) : (
           prompt.questions.map((item) => (
             <View key={item.id} className="gap-1">
-              <QuestionText question={item.question} variant="secondary" />
+              <QuestionText question={item.question} variant="secondary" remoteContent={remoteContent} />
               {resolution.status === "answered" ? (
                 <Typography>
                   {item.id === UI_CHOICE_QUESTION_ID
@@ -152,7 +158,8 @@ export function ChatQuestionPrompt({
         canEditPreview={canEditPreview}
       />
     );
-  if (choice) return <ChatChoicePrompt spec={choice} controller={controller} canSend={canSend} />;
+  if (choice)
+    return <ChatChoicePrompt spec={choice} controller={controller} canSend={canSend} remoteContent={remoteContent} />;
   const { question, index, disabled, setIndex, answer, submit, replyInChat, setReplyInChat, picked, togglePick } =
     controller;
 
@@ -162,9 +169,13 @@ export function ChatQuestionPrompt({
   return (
     <View className="w-full gap-2.5" accessibilityLabel={t("mobile.chat.question.form")}>
       <View className={`max-w-[92%] self-start gap-1 rounded-[20px] ${card.fillClass} px-4 py-3`} style={card.style}>
-        {pageTitle ? <QuestionText question={pageTitle} variant="title" /> : null}
-        <QuestionText question={question.question} variant={pageTitle ? "body" : "title"} />
-        {question.detail ? <QuestionDetail detail={question.detail} /> : null}
+        {pageTitle ? <QuestionText question={pageTitle} variant="title" remoteContent={remoteContent} /> : null}
+        <QuestionText
+          question={question.question}
+          variant={pageTitle ? "body" : "title"}
+          remoteContent={remoteContent}
+        />
+        {question.detail ? <QuestionDetail detail={question.detail} remoteContent={remoteContent} /> : null}
         {described.length ? (
           <View className="gap-2 pt-1">
             {described.map((option) => (

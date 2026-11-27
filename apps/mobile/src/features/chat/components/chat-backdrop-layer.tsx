@@ -6,6 +6,7 @@ import { StyleSheet, View } from "react-native";
 import Svg, { Defs, LinearGradient, Rect, Stop } from "react-native-svg";
 import { useUniwind } from "uniwind";
 import { HtmlPage } from "@/features/chat/components/html-page";
+import { useRemoteChatContent } from "@/features/servers/model/use-remote-chat-content";
 import {
   agentBackdropFile,
   backdropPhotoFile,
@@ -60,6 +61,7 @@ export function ChatBackdropLayer({ variant, active }: { variant: "chat" | "head
   const strength = useChatBackdrop((state) => state.strength);
   const photo = useChatBackdrop((state) => state.photo);
   const agentName = useChatBackdrop((state) => state.agentPage?.name ?? "");
+  const pageScripts = useRemoteChatContent(useChatBackdrop((state) => state.agentPage?.serverId));
   const foreground = useAppForeground();
   const reducedMotion = useReducedMotion();
   const page = useAgentPage(choice === "agent");
@@ -79,7 +81,7 @@ export function ChatBackdropLayer({ variant, active }: { variant: "chat" | "head
     >
       {isChatBackdropScene(choice) ? <ChatBackdropSceneView scene={choice} dark={dark} animate={animate} /> : null}
       {choice === "agent" && page !== null && HtmlPage && active ? (
-        <HtmlPage source={page} title={agentName} mode="chat" />
+        <HtmlPage source={page} title={agentName} mode="chat" scripts={pageScripts} />
       ) : null}
       {choice === "photo" && photo ? (
         <Image

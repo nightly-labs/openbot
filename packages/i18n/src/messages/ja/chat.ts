@@ -520,4 +520,13 @@ export const messages = {
   "chat.feedbackWithdrawn.badge": "削除済み",
   "chat.feedbackWithdrawn.body":
     "レポートはもう GitHub にありません。修正したレポートを送信するには、エージェントに依頼してください。",
+  "chat.remoteContent.pictureNotLoaded":
+    "{host} の画像です。このサーバーではリモートコンテンツがオフのため、読み込んでいません。",
+  "chat.remoteContent.loadPicture": "画像を読み込む",
+  "chat.remoteContent.diagramNotDrawn":
+    "この図は別のサイトから画像を読み込む可能性があります。このサーバーではリモートコンテンツがオフのため、描画していません。",
+  "chat.remoteContent.loadDiagram": "図を読み込む",
+  "chat.remoteContent.pageStatic":
+    "このサーバーではリモートコンテンツがオフのため、スクリプトとリモートコンテンツなしで表示しています。",
+  "chat.remoteContent.runPage": "ページを実行",
 } as const satisfies PartialTranslation<typeof source>;

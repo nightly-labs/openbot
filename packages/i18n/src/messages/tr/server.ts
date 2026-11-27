@@ -780,4 +780,8 @@ export const messages = {
   "server.ownerTransfer.accepted": "Artık {server} sunucusunun sahibisiniz",
   "server.ownerTransfer.acceptFailed": "Devir kabul edilemedi.",
   "server.ownerTransfer.declineFailed": "Devir reddedilemedi.",
+  "server.settings.privacyTitle": "Gizlilik",
+  "server.settings.remoteChatContent": "Sohbetlerde uzak içeriği yükle",
+  "server.settings.remoteChatContentDescription":
+    "Sohbetlerde başka sitelerden içerik yükleyen görselleri, site simgelerini, diyagramları ve sayfaları göster. Kapalıyken bu içerik yalnızca bir tıklamadan sonra yüklenir, böylece diğer siteler bir sohbetin ne zaman açıldığını öğrenmez. Bu, bu sunucudaki herkes için geçerlidir.",
 } as const satisfies PartialTranslation<typeof source>;

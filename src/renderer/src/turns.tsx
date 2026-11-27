@@ -45,6 +45,8 @@ const Turns = createSimpleContext({
     const { dynamicIslandCoordinator } = useDynamicIsland();
     const { activeAgent, activeAgentId, agentList, agentListSettled, agentStatus, appendUiError } = useAgents();
     const scopeIsCurrent = createScopeGuard();
+    const agentPhase = createMemo(() => agentStatus().phase);
+    const connectionSequence = createMemo(() => activeServer()?.connectionSequence);
 
     const scopeServerId = untrack(activeServerId);
     const seed = dynamicIslandCoordinator.serverState(scopeServerId);
@@ -146,13 +148,6 @@ const Turns = createSimpleContext({
         .catch(() => undefined);
     }
 
-    createEffect(
-      () => ({ agentId: activeAgentId(), agentPhase: agentStatus().phase, serverId: activeServerId() }),
-      ({ agentId, serverId }) => {
-        if (agentId) refreshRoutineIds(agentId, serverId);
-      },
-    );
-
     function loadQueue(agentId: string): void {
       const queueRequest = (queueSnapshotRequests.get(agentId) ?? 0) + 1;
       queueSnapshotRequests.set(agentId, queueRequest);
@@ -164,13 +159,6 @@ const Turns = createSimpleContext({
         })
         .catch(() => undefined);
     }
-
-    createEffect(
-      () => ({ agentId: activeAgentId(), agentPhase: agentStatus().phase, serverId: activeServerId() }),
-      ({ agentId }) => {
-        if (agentId) loadQueue(agentId);
-      },
-    );
 
     function loadWaits(agentId: string): void {
       const request = (waitSnapshotRequests.get(agentId) ?? 0) + 1;
@@ -184,16 +172,18 @@ const Turns = createSimpleContext({
         .catch(() => undefined);
     }
 
-    const connectionSequence = createMemo(() => activeServer()?.connectionSequence);
     createEffect(
       () => ({
         agentId: activeAgentId(),
-        agentPhase: agentStatus().phase,
+        agentPhase: agentPhase(),
         serverId: activeServerId(),
         connectionSequence: connectionSequence(),
       }),
-      ({ agentId }) => {
-        if (agentId) loadWaits(agentId);
+      ({ agentId, serverId }) => {
+        if (!agentId) return;
+        refreshRoutineIds(agentId, serverId);
+        loadQueue(agentId);
+        loadWaits(agentId);
       },
     );
 
@@ -245,7 +235,7 @@ const Turns = createSimpleContext({
               .map((agent) => agent.id)
               .join("\0")
           : "",
-        agentPhase: agentStatus().phase,
+        agentPhase: agentPhase(),
         serverId: activeServerId(),
       }),
       (next, previous) => {
