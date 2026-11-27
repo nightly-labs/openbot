@@ -783,7 +783,7 @@ function pageKeyValues(cursor: ConversationPageCursor): [string, number, string,
   ];
 }
 
-function conversationMarkerSqlFilter(exclusions: ConversationMarkerExclusions): string {
+export function conversationMarkerSqlFilter(exclusions: ConversationMarkerExclusions): string {
   return [
     `AND COALESCE(item_type, '') NOT IN ('${AGENT_WELCOME_ITEM_TYPE}', '${CHANNEL_RESUME_ITEM_TYPE}')`,
     exclusions.excludeRoutineEvents

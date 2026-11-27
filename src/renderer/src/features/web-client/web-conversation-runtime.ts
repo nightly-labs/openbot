@@ -20,7 +20,10 @@ import {
   FEEDBACK_WITHDRAW_ROUTES,
 } from "@openbot/contracts/team-protocol/feedback-withdraw-v1";
 import { LIVE_VOICE_CAPABILITY } from "@openbot/contracts/team-protocol/live-voice-v1";
-import { ROUTINE_PAUSE_REASONS_CAPABILITY } from "@openbot/contracts/team-protocol/routine-pause-reasons-v1";
+import {
+  ROUTINE_PAUSE_REASONS_CAPABILITY,
+  ROUTINE_PAUSE_REASONS_ROUTES,
+} from "@openbot/contracts/team-protocol/routine-pause-reasons-v1";
 import { ROUTINE_RESULTS_CAPABILITY } from "@openbot/contracts/team-protocol/routine-results-v1";
 import { ROUTINE_RUN_CHANGES_CAPABILITY } from "@openbot/contracts/team-protocol/routine-run-changes-v1";
 import {
@@ -28,7 +31,8 @@ import {
   ROUTINE_RUN_COMMAND_CAPABILITY,
   ROUTINE_RUN_COMMAND_ROUTES,
 } from "@openbot/contracts/team-protocol/routine-run-command-v1";
-import { ROUTINES_ONCE_CAPABILITY } from "@openbot/contracts/team-protocol/routines-once-v1";
+import { ROUTINE_RUN_PLACE_ROUTES } from "@openbot/contracts/team-protocol/routine-run-place-v1";
+import { ROUTINES_ONCE_CAPABILITY, ROUTINES_ONCE_ROUTES } from "@openbot/contracts/team-protocol/routines-once-v1";
 import {
   decodeSideQuestionResponse,
   SIDE_QUESTION_ROUTES,
@@ -76,6 +80,35 @@ import { openWebMessageLink, webMessageLinks } from "./web-message-link-relay";
 import type { WebWorkspaceRuntime } from "./web-runtime";
 
 type HostEvents = (listener: (event: AgentEvent | TeamRealtimeEvent) => void) => () => void;
+
+const SHARED_ROUTINE_READS: ReadonlySet<string> = new Set([
+  ROUTINE_RUN_PLACE_ROUTES.list,
+  ROUTINE_PAUSE_REASONS_ROUTES.list,
+  ROUTINES_ONCE_ROUTES.list,
+]);
+
+function sharedRoutineReads(request: () => TeamApiRequest, onHostEvent?: HostEvents): () => TeamApiRequest {
+  const running = new WeakMap<TeamApiRequest, Map<string, Promise<unknown>>>();
+  let generation = 0;
+  onHostEvent?.((event) => {
+    if (event.type === "routines-changed") generation += 1;
+  });
+  const shared: TeamApiRequest = (method, path, decode, body, upload) => {
+    const target = request();
+    if (method !== "POST" || upload !== undefined || !SHARED_ROUTINE_READS.has(path))
+      return target(method, path, decode, body, upload);
+    const reads = running.get(target) ?? new Map<string, Promise<unknown>>();
+    running.set(target, reads);
+    const key = `${generation} ${path} ${JSON.stringify(body ?? null)}`;
+    let read = reads.get(key);
+    if (!read) {
+      read = target(method, path, (value) => value, body).finally(() => reads.delete(key));
+      reads.set(key, read);
+    }
+    return read.then(decode);
+  };
+  return () => shared;
+}
 
 function webHostAdmin(
   request: () => TeamApiRequest,
@@ -181,6 +214,7 @@ export function createWebConversationRuntime(
   skillCatalog?: () => SkillCatalogCalls,
   imageCopiesSupported?: () => boolean | undefined,
 ): ConversationRuntime {
+  const routineRequest = adminRequest ? sharedRoutineReads(adminRequest, onHostEvent) : undefined;
   const routinesOnceEnabled = () => hasCapability?.(ROUTINES_ONCE_CAPABILITY) === true;
   const routinePauseReasonsEnabled = () => hasCapability?.(ROUTINE_PAUSE_REASONS_CAPABILITY) === true;
   const routineRunChangesEnabled = () => hasCapability?.(ROUTINE_RUN_CHANGES_CAPABILITY) === true;
@@ -533,10 +567,10 @@ export function createWebConversationRuntime(
       if (files.length > 0) await importPick(files);
     },
     cancelImportFiles,
-    routines: adminRequest
+    routines: routineRequest
       ? {
           ...teamAgentRoutinesApi(
-            (...args) => adminRequest()(...args),
+            (...args) => routineRequest()(...args),
             () => routineRunPlaceEnabled?.() === true,
             routinesOnceEnabled,
             routinePauseReasonsEnabled,
@@ -548,9 +582,9 @@ export function createWebConversationRuntime(
             }) ?? (() => {}),
         }
       : undefined,
-    admin: adminRequest
+    admin: routineRequest
       ? webHostAdmin(
-          adminRequest,
+          routineRequest,
           onHostEvent,
           eventsEnabled,
           sessionSettingsEnabled,

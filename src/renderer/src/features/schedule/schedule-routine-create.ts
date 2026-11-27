@@ -26,6 +26,10 @@ function desktopAgentRoutinesApi(serverId: string): AgentRoutinesApi {
     deleteRoutine: (input) => agent.deleteRoutine(input, serverId),
     testRoutine: (input) => agent.testRoutine(input, serverId),
     onEvent: agent.onEvent,
+    onSyncChanged: (listener) =>
+      agent.onSyncChanged((change) => {
+        if (change.serverId === serverId) listener(change);
+      }),
   };
 }
 

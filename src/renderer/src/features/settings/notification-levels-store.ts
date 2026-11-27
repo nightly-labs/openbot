@@ -6,6 +6,10 @@ import {
   type ServerSummary,
 } from "@openbot/contracts/ipc";
 import { AGENT_NOTIFICATION_LEVELS_CAPABILITY } from "@openbot/contracts/team-protocol/agent-notification-levels-v1";
+import {
+  AGENTS_SYNC_COLLECTION,
+  NOTIFICATION_LEVELS_SYNC_COLLECTION,
+} from "@openbot/contracts/team-protocol/sync-collections";
 import type {
   NotificationMatrixAgents,
   NotificationMatrixServer,
@@ -46,13 +50,23 @@ export function createNotificationLevelsStore(options: {
     }),
   );
 
-  async function load(server: ServerSummary): Promise<void> {
+  onSettled(() =>
+    settingsPort().agent.onSyncChanged((change) => {
+      if (change.name !== AGENTS_SYNC_COLLECTION.name && change.name !== NOTIFICATION_LEVELS_SYNC_COLLECTION.name)
+        return;
+      const server = options.servers().find((candidate) => candidate.id === change.serverId);
+      if (server && entries[server.id]?.status === "ready") void load(server, false);
+    }),
+  );
+
+  async function load(server: ServerSummary, showLoading = true): Promise<void> {
     const serverId = server.id;
     const generation = (generations.get(serverId) ?? 0) + 1;
     generations.set(serverId, generation);
-    setEntries((draft) => {
-      draft[serverId] = { status: "loading", agents: draft[serverId]?.agents ?? [], levels: null };
-    });
+    if (showLoading)
+      setEntries((draft) => {
+        draft[serverId] = { status: "loading", agents: draft[serverId]?.agents ?? [], levels: null };
+      });
     const port = settingsPort().agent;
     try {
       const [agents, levels] = await Promise.all([
@@ -64,7 +78,7 @@ export function createNotificationLevelsStore(options: {
         draft[serverId] = { status: "ready", agents, levels };
       });
     } catch {
-      if (generations.get(serverId) !== generation) return;
+      if (generations.get(serverId) !== generation || !showLoading) return;
       setEntries((draft) => {
         draft[serverId] = { status: "failed", agents: [], levels: null };
       });

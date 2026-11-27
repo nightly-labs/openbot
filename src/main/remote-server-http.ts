@@ -5,7 +5,7 @@ import {
   addPromptQuestionDetails,
   TEAM_PROMPT_DETAIL_CAPABILITY,
 } from "@openbot/contracts/team-protocol/prompt-detail-v1";
-import { teamSideRouteCodec } from "@openbot/contracts/team-protocol/side-routes";
+import { type TeamSideRouteOptions, teamSideRouteCodec } from "@openbot/contracts/team-protocol/side-routes";
 import { addSkillSuggestionNames, SKILL_LEARNING_CAPABILITY } from "@openbot/contracts/team-protocol/skill-learning-v1";
 import { TEAM_APP_VERSION_HEADER, TEAM_PROTOCOL_VERSION_HEADER } from "@openbot/contracts/team-protocol/v1";
 import { decodeTeamProtocolV1CurrentHttpResponse } from "@openbot/contracts/team-protocol/v1-adapter";
@@ -105,30 +105,12 @@ export const requestJson = Effect.fn("RemoteHttp.requestJson")(function* <T>(
   }
   if (value !== undefined) {
     const input = value;
-    const decodedValue = yield* Effect.try({
+    value = yield* Effect.try({
       try: () =>
-        sideRoute
-          ? sideRoute.response(path, response.status, input, {
-              historyExtent: true,
-              channelAttention: true,
-              agentTaskUiBlocks: true,
-              channelIsolation: true,
-              channelPicture: true,
-              channelBrowser: true,
-              channelSeenSubtasks: true,
-              channelTaskWaits: true,
-              mcpManyServers: true,
-              providerManyAccounts: true,
-              routineResultsWhatsApp: true,
-              storageWorkflowFiles: true,
-            })
-          : codec.decodeResponse(method, path, response.status, input),
+        decodeRemoteBody(method, path, response.status, input, options.protocol, options.capabilities, (body) => body),
       catch: (cause) =>
         new RemoteProtocolError("protocol_error", sourceText("error.remote.unsafeData"), null, { cause }),
     });
-    if (options.capabilities?.includes(SKILL_LEARNING_CAPABILITY)) addSkillSuggestionNames(decodedValue, input);
-    if (options.capabilities?.includes(TEAM_PROMPT_DETAIL_CAPABILITY)) addPromptQuestionDetails(decodedValue, input);
-    value = decodedValue;
   }
   if (!response.ok) {
     const message =
@@ -143,6 +125,39 @@ export const requestJson = Effect.fn("RemoteHttp.requestJson")(function* <T>(
     catch: (cause) => new RemoteProtocolError("protocol_error", sourceText("error.remote.unsafeData"), null, { cause }),
   });
 }, Effect.scoped);
+
+const SIDE_ROUTE_RESPONSE_OPTIONS: TeamSideRouteOptions = {
+  historyExtent: true,
+  channelAttention: true,
+  agentTaskUiBlocks: true,
+  channelIsolation: true,
+  channelPicture: true,
+  channelBrowser: true,
+  channelSeenSubtasks: true,
+  channelTaskWaits: true,
+  mcpManyServers: true,
+  providerManyAccounts: true,
+  routineResultsWhatsApp: true,
+  storageWorkflowFiles: true,
+};
+
+export function decodeRemoteBody<T>(
+  method: string,
+  path: string,
+  status: number,
+  input: unknown,
+  protocol: number | undefined,
+  capabilities: readonly TeamCurrentCapability[] | undefined,
+  decoder: ResponseDecoder<T>,
+): T {
+  const sideRoute = teamSideRouteCodec(path);
+  const decoded = sideRoute
+    ? sideRoute.response(path, status, input, SIDE_ROUTE_RESPONSE_OPTIONS)
+    : teamHttpCodec(protocol).decodeResponse(method, path, status, input);
+  if (capabilities?.includes(SKILL_LEARNING_CAPABILITY)) addSkillSuggestionNames(decoded, input);
+  if (capabilities?.includes(TEAM_PROMPT_DETAIL_CAPABILITY)) addPromptQuestionDetails(decoded, input);
+  return decoder(decoded);
+}
 
 function isJsonContentType(contentType: string | null | undefined): boolean {
   const mimeType = contentType?.split(";", 1)[0]?.trim().toLowerCase();

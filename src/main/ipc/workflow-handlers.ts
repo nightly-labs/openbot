@@ -104,6 +104,7 @@ import type { WorkflowGitHubDirectory } from "../github-rest";
 import type { HostEventsService } from "../host-events-service";
 import { acceptEmpty, decodeWorkflowFoldersSnapshotFromHost, type ResponseDecoder } from "../remote-host-decoding";
 import type { RemoteRequestInit } from "../remote-server-client";
+import type { RemoteServerSync } from "../remote-server-sync";
 import type { RemoteWorkflowError } from "../remote-service-effects";
 import type { WorkflowFileExporter } from "../workflow-file-export";
 import type { WorkflowFoldersService } from "../workflow-folders-service";
@@ -159,6 +160,7 @@ interface WorkflowRemoteServers {
   ): Effect.Effect<T, RemoteWorkflowError>;
   downloadAttachment(attachmentId: string, serverId: string): Effect.Effect<{ bytes: Uint8Array }, RemoteWorkflowError>;
   setWorkflowSpot(serverId: string, input: WorkflowSpotInput): Effect.Effect<void>;
+  readonly sync: Pick<RemoteServerSync, "workflows">;
 }
 
 interface WorkflowSpotHost {
@@ -235,7 +237,14 @@ export function workflowIpcHandlers({
     workflows: {
       list: scopedQueryHandler({
         local: () => runCauseEffect(workflows.list()),
-        remote: (serverId) => remote(serverId, WORKFLOWS_ROUTES.list, decodeRemoteWorkflowList, {}),
+        remote: (serverId) => {
+          if (!remoteServers.supportsCapability(serverId, WORKFLOWS_CAPABILITY))
+            throw new Error(sourceText("error.workflow.serverTooOld"));
+          return (
+            remoteServers.sync.workflows.values(serverId) ??
+            remote(serverId, WORKFLOWS_ROUTES.list, decodeRemoteWorkflowList, {})
+          );
+        },
       }),
       get: scopedHandler(parseWorkflowId, {
         local: (id) => runCauseEffect(workflows.get(id)),

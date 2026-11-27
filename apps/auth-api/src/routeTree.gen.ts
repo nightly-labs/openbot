@@ -285,6 +285,7 @@ import { Route as V2RemoteHostsHostIdTelegramRouteRouteImport } from './routes/v
 import { Route as V2RemoteHostsHostIdTicketRouteImport } from './routes/v2/remote/hosts/$hostId/ticket'
 import { Route as V2RemoteHostsHostIdWebhookRouteRouteImport } from './routes/v2/remote/hosts/$hostId/webhook-route'
 import { Route as V2RemoteHostsHostIdWebhookRoutesRouteImport } from './routes/v2/remote/hosts/$hostId/webhook-routes'
+import { Route as V2RemoteHostsHostIdWidgetPushRouteImport } from './routes/v2/remote/hosts/$hostId/widget-push'
 import { Route as V2RemoteOwnerTransfersTransferIdAcceptRouteImport } from './routes/v2/remote/owner-transfers/$transferId/accept'
 import { Route as V2RemoteOwnerTransfersTransferIdDeclineRouteImport } from './routes/v2/remote/owner-transfers/$transferId/decline'
 import { Route as V2RemoteSessionsSessionIdEndRouteImport } from './routes/v2/remote/sessions/$sessionId/end'
@@ -1744,6 +1745,12 @@ const V2RemoteHostsHostIdWebhookRoutesRoute =
     path: '/v2/remote/hosts/$hostId/webhook-routes',
     getParentRoute: () => rootRouteImport,
   } as any)
+const V2RemoteHostsHostIdWidgetPushRoute =
+  V2RemoteHostsHostIdWidgetPushRouteImport.update({
+    id: '/v2/remote/hosts/$hostId/widget-push',
+    path: '/v2/remote/hosts/$hostId/widget-push',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 const V2RemoteOwnerTransfersTransferIdAcceptRoute =
   V2RemoteOwnerTransfersTransferIdAcceptRouteImport.update({
     id: '/v2/remote/owner-transfers/$transferId/accept',
@@ -2117,6 +2124,7 @@ export interface FileRoutesByFullPath {
   '/v2/remote/hosts/$hostId/ticket': typeof V2RemoteHostsHostIdTicketRoute
   '/v2/remote/hosts/$hostId/webhook-route': typeof V2RemoteHostsHostIdWebhookRouteRoute
   '/v2/remote/hosts/$hostId/webhook-routes': typeof V2RemoteHostsHostIdWebhookRoutesRoute
+  '/v2/remote/hosts/$hostId/widget-push': typeof V2RemoteHostsHostIdWidgetPushRoute
   '/v2/remote/owner-transfers/$transferId/accept': typeof V2RemoteOwnerTransfersTransferIdAcceptRoute
   '/v2/remote/owner-transfers/$transferId/decline': typeof V2RemoteOwnerTransfersTransferIdDeclineRoute
   '/v2/remote/sessions/$sessionId/end': typeof V2RemoteSessionsSessionIdEndRoute
@@ -2408,6 +2416,7 @@ export interface FileRoutesByTo {
   '/v2/remote/hosts/$hostId/ticket': typeof V2RemoteHostsHostIdTicketRoute
   '/v2/remote/hosts/$hostId/webhook-route': typeof V2RemoteHostsHostIdWebhookRouteRoute
   '/v2/remote/hosts/$hostId/webhook-routes': typeof V2RemoteHostsHostIdWebhookRoutesRoute
+  '/v2/remote/hosts/$hostId/widget-push': typeof V2RemoteHostsHostIdWidgetPushRoute
   '/v2/remote/owner-transfers/$transferId/accept': typeof V2RemoteOwnerTransfersTransferIdAcceptRoute
   '/v2/remote/owner-transfers/$transferId/decline': typeof V2RemoteOwnerTransfersTransferIdDeclineRoute
   '/v2/remote/sessions/$sessionId/end': typeof V2RemoteSessionsSessionIdEndRoute
@@ -2704,6 +2713,7 @@ export interface FileRoutesById {
   '/v2/remote/hosts/$hostId/ticket': typeof V2RemoteHostsHostIdTicketRoute
   '/v2/remote/hosts/$hostId/webhook-route': typeof V2RemoteHostsHostIdWebhookRouteRoute
   '/v2/remote/hosts/$hostId/webhook-routes': typeof V2RemoteHostsHostIdWebhookRoutesRoute
+  '/v2/remote/hosts/$hostId/widget-push': typeof V2RemoteHostsHostIdWidgetPushRoute
   '/v2/remote/owner-transfers/$transferId/accept': typeof V2RemoteOwnerTransfersTransferIdAcceptRoute
   '/v2/remote/owner-transfers/$transferId/decline': typeof V2RemoteOwnerTransfersTransferIdDeclineRoute
   '/v2/remote/sessions/$sessionId/end': typeof V2RemoteSessionsSessionIdEndRoute
@@ -2997,6 +3007,7 @@ export interface FileRouteTypes {
     | '/v2/remote/hosts/$hostId/ticket'
     | '/v2/remote/hosts/$hostId/webhook-route'
     | '/v2/remote/hosts/$hostId/webhook-routes'
+    | '/v2/remote/hosts/$hostId/widget-push'
     | '/v2/remote/owner-transfers/$transferId/accept'
     | '/v2/remote/owner-transfers/$transferId/decline'
     | '/v2/remote/sessions/$sessionId/end'
@@ -3288,6 +3299,7 @@ export interface FileRouteTypes {
     | '/v2/remote/hosts/$hostId/ticket'
     | '/v2/remote/hosts/$hostId/webhook-route'
     | '/v2/remote/hosts/$hostId/webhook-routes'
+    | '/v2/remote/hosts/$hostId/widget-push'
     | '/v2/remote/owner-transfers/$transferId/accept'
     | '/v2/remote/owner-transfers/$transferId/decline'
     | '/v2/remote/sessions/$sessionId/end'
@@ -3583,6 +3595,7 @@ export interface FileRouteTypes {
     | '/v2/remote/hosts/$hostId/ticket'
     | '/v2/remote/hosts/$hostId/webhook-route'
     | '/v2/remote/hosts/$hostId/webhook-routes'
+    | '/v2/remote/hosts/$hostId/widget-push'
     | '/v2/remote/owner-transfers/$transferId/accept'
     | '/v2/remote/owner-transfers/$transferId/decline'
     | '/v2/remote/sessions/$sessionId/end'
@@ -3784,6 +3797,7 @@ export interface RootRouteChildren {
   V2RemoteHostsHostIdTicketRoute: typeof V2RemoteHostsHostIdTicketRoute
   V2RemoteHostsHostIdWebhookRouteRoute: typeof V2RemoteHostsHostIdWebhookRouteRoute
   V2RemoteHostsHostIdWebhookRoutesRoute: typeof V2RemoteHostsHostIdWebhookRoutesRoute
+  V2RemoteHostsHostIdWidgetPushRoute: typeof V2RemoteHostsHostIdWidgetPushRoute
   V2RemoteOwnerTransfersTransferIdAcceptRoute: typeof V2RemoteOwnerTransfersTransferIdAcceptRoute
   V2RemoteOwnerTransfersTransferIdDeclineRoute: typeof V2RemoteOwnerTransfersTransferIdDeclineRoute
   V2RemoteSessionsSessionIdEndRoute: typeof V2RemoteSessionsSessionIdEndRoute
@@ -5738,6 +5752,13 @@ declare module '@tanstack/solid-router' {
       preLoaderRoute: typeof V2RemoteHostsHostIdWebhookRoutesRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/v2/remote/hosts/$hostId/widget-push': {
+      id: '/v2/remote/hosts/$hostId/widget-push'
+      path: '/v2/remote/hosts/$hostId/widget-push'
+      fullPath: '/v2/remote/hosts/$hostId/widget-push'
+      preLoaderRoute: typeof V2RemoteHostsHostIdWidgetPushRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/v2/remote/owner-transfers/$transferId/accept': {
       id: '/v2/remote/owner-transfers/$transferId/accept'
       path: '/v2/remote/owner-transfers/$transferId/accept'
@@ -6380,6 +6401,7 @@ const rootRouteChildren: RootRouteChildren = {
   V2RemoteHostsHostIdTicketRoute: V2RemoteHostsHostIdTicketRoute,
   V2RemoteHostsHostIdWebhookRouteRoute: V2RemoteHostsHostIdWebhookRouteRoute,
   V2RemoteHostsHostIdWebhookRoutesRoute: V2RemoteHostsHostIdWebhookRoutesRoute,
+  V2RemoteHostsHostIdWidgetPushRoute: V2RemoteHostsHostIdWidgetPushRoute,
   V2RemoteOwnerTransfersTransferIdAcceptRoute:
     V2RemoteOwnerTransfersTransferIdAcceptRoute,
   V2RemoteOwnerTransfersTransferIdDeclineRoute:

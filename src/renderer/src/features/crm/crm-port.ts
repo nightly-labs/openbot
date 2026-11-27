@@ -11,7 +11,10 @@ import type {
   CrmSourceConnectInput,
   CrmSourceInput,
 } from "@openbot/contracts/ipc";
+import { CRM_CUSTOMERS_SYNC_COLLECTION } from "@openbot/contracts/team-protocol/sync-collections";
 import { appPort } from "../../app-port";
+
+export type CrmChangeCause = "change" | "resync";
 
 export interface CrmHost {
   overview(): Promise<CrmOverview>;
@@ -25,7 +28,7 @@ export interface CrmHost {
   settings(): Promise<CrmSettings>;
   setSettings(input: CrmSettings): Promise<CrmSettings>;
   openUrl(url: string): void;
-  onChanged(listener: () => void): () => void;
+  onChanged(listener: (cause: CrmChangeCause) => void): () => void;
 }
 
 export function desktopCrmHost(serverId: string): CrmHost {
@@ -44,16 +47,20 @@ export function desktopCrmHost(serverId: string): CrmHost {
     openUrl: (url) => void appPort().openUrl(url),
     onChanged(listener) {
       const events = window.openbot.agent.onScopedEvent((scoped) => {
-        if (scoped.serverId === serverId && scoped.event.type === "crm-changed") listener();
+        if (scoped.serverId === serverId && scoped.event.type === "crm-changed") listener("change");
+      });
+      const synced = window.openbot.agent.onSyncChanged((change) => {
+        if (change.serverId === serverId && change.name === CRM_CUSTOMERS_SYNC_COLLECTION.name) listener("change");
       });
       let online: boolean | undefined;
       const reconnect = window.openbot.servers.onEvent((servers) => {
         const now = servers.some((server) => server.id === serverId && server.state === "online");
-        if (now && online === false) listener();
+        if (now && online === false) listener("resync");
         online = now;
       });
       return () => {
         events();
+        synced();
         reconnect();
       };
     },

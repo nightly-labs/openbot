@@ -207,6 +207,7 @@ export function ConversationTimeline() {
     sendCardMessage,
     saveSkillSuggestion,
     reactToMessage,
+    withPendingReaction,
     renderedAgentActivity,
     activeStepActivity,
     activeTurnOutputShown,
@@ -907,7 +908,8 @@ export function ConversationTimeline() {
                 const index = createMemo(() => timelineIndexById().get(virtualRow.key));
                 const message = createMemo(() => {
                   const current = index();
-                  return current === undefined ? undefined : timelineMessages()[current];
+                  const row = current === undefined ? undefined : timelineMessages()[current];
+                  return row ? withPendingReaction(row) : undefined;
                 });
                 const previousMessage = () => {
                   const current = index();

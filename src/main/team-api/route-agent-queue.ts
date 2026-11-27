@@ -42,17 +42,21 @@ export interface AgentQueueRouteDependencies {
   >;
 }
 
+export function queueResponse(
+  protocol: number,
+  capabilities: ReadonlySet<string>,
+  snapshot: QueueSnapshot,
+): QueueSnapshot {
+  return protocol >= 7 && capabilities.has(TEAM_QUEUE_WINDOW_CAPABILITY) ? queueWindow(snapshot) : snapshot;
+}
+
 export async function routeAgentQueue(
   context: TeamApiRequestContext,
   { agentId, action }: AgentRouteTarget,
   { agents }: AgentQueueRouteDependencies,
 ): Promise<RouteOutcome> {
   const { method, request, member, json, empty } = context;
-  const snapshot = (value: QueueSnapshot) =>
-    json(
-      200,
-      context.protocol >= 7 && context.capabilities.has(TEAM_QUEUE_WINDOW_CAPABILITY) ? queueWindow(value) : value,
-    );
+  const snapshot = (value: QueueSnapshot) => json(200, queueResponse(context.protocol, context.capabilities, value));
 
   if (method === "POST" && action === "queue/edit") {
     if (context.protocol < 3 || !context.capabilities.has(TEAM_QUEUE_EDIT_CAPABILITY))

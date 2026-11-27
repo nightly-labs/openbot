@@ -18,6 +18,7 @@ export interface TeamApiRequestContext {
   readonly agentLevel: (agentId: string) => AgentAccessLevel;
   readonly json: (status: number, value: object | null) => RouteOutcome;
   readonly empty: (status: number) => RouteOutcome;
+  readonly syncChanged?: (name: string, keys: readonly string[]) => void;
 }
 
 export interface AgentRouteTarget {
