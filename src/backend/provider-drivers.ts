@@ -534,6 +534,7 @@ interface ProviderModelCatalog {
   readonly partialListAtStart?: true;
   readonly relistAfterStart?: true;
   readonly relistWhileRunning?: true;
+  readonly declaredEfforts?: true;
   modelName?(id: string): string | null;
   modelFields?(
     model: ModelListResponse["data"][number],
@@ -737,7 +738,13 @@ export const BUILT_IN_PROVIDER_DRIVERS: readonly BuiltInProviderDriver[] = [
       signOut: { argv: ["logout"], env: () => ({}), timeoutMs: 30_000 },
     },
     signInFiles: () => [join(codexHomeDirectory(), "auth.json")],
-    catalog: { paged: true, modelFields: serviceTierFields, source: readCodexModelSource, relistWhileRunning: true },
+    catalog: {
+      paged: true,
+      modelFields: serviceTierFields,
+      source: readCodexModelSource,
+      relistWhileRunning: true,
+      declaredEfforts: true,
+    },
     resolveCli: resolveCodexCli,
     createClient: (cli, requestTimeoutMs, context) => {
       const { SSL_CERT_FILE: _openBotRoots, ...serverEnvironment } = context.serverEnvironment ?? {};

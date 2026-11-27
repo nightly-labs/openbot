@@ -394,6 +394,7 @@
     "test:codex-subagent-steps": "bun scripts/codex-subagent-steps-e2e.ts",
     "test:subagent-status": "bun scripts/subagent-status-e2e.ts",
     "test:codex-idle-thread-release": "bun scripts/codex-idle-thread-release-e2e.ts",
+    "test:codex-ollama-thinking": "bun scripts/codex-ollama-thinking-e2e.ts",
     "test:codex-missing-rollout": "bun scripts/codex-missing-rollout-e2e.ts",
     "test:codex-usage-metering": "bun scripts/codex-usage-metering-e2e.ts",
     "test:codex-capacity-retry": "bun scripts/codex-capacity-retry-e2e.ts",

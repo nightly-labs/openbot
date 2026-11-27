@@ -5,7 +5,7 @@ import { agentProviderName } from "@openbot/contracts/ipc";
 import { type DynamicRecord, isNumber, isString } from "@openbot/contracts/runtime-values";
 import { sourceText } from "@openbot/i18n/source";
 import { createOpenBotLogger } from "@openbot/logging";
-import { Effect, Fiber, Result, Schema } from "effect";
+import { Deferred, Effect, Fiber, Result, Schema } from "effect";
 import { isTurnContextBlock } from "./agent/developer-instructions";
 import { LOG_TIMESTAMP_PREFIX } from "./agent/provider-diagnostics";
 import { TurnContext } from "./agent/turn-context";
@@ -17,12 +17,17 @@ import {
   RequestTimeoutError,
 } from "./agent-client";
 import { cliSpawnTarget } from "./cli";
+import { providerCheckTimeoutMs } from "./disk-restore";
 import { JsonLineDecoder, LineTooLongError } from "./jsonl";
 import {
   type AppServerNotification,
   type AppServerRequest,
+  type DeclaredReasoningEfforts,
+  declaredReasoningEfforts,
+  decodeModelListResponse,
   decodeRecordResponse,
   isRecord,
+  type ModelListResponse,
   type RequestId,
   type ResponseDecoder,
   type RpcError,
@@ -88,6 +93,9 @@ const THREAD_WORK_METHODS: ReadonlySet<string> = new Set([
   "turn/steer",
 ]);
 
+const EFFORT_METHODS: ReadonlySet<string> = new Set(["thread/start", "thread/resume", "turn/start"]);
+type DeclaredCatalog = ReadonlyMap<string, DeclaredReasoningEfforts>;
+
 function notificationTurnKey(params: unknown): string | null {
   if (!isRecord(params) || !isString(params.threadId)) return null;
   const turnId = isString(params.turnId) ? params.turnId : isRecord(params.turn) ? params.turn.id : null;
@@ -136,6 +144,8 @@ export class CodexAppServerClient extends EventEmitter<ClientEvents> {
   #nextId = 1;
   #stopping = false;
   #probing = false;
+  #catalog: DeclaredCatalog | null = null;
+  #catalogRead: Deferred.Deferred<ModelListResponse, ProviderClientOperationError> | null = null;
 
   readonly #extraEnv: Readonly<Record<string, string>> | undefined;
   readonly #configOverrides: readonly string[];
@@ -168,6 +178,8 @@ export class CodexAppServerClient extends EventEmitter<ClientEvents> {
     this.#linuxSandboxFailure = null;
     this.#decoder = new JsonLineDecoder();
     this.#serverRequestIds.clear();
+    this.#catalog = null;
+    this.#catalogRead = null;
     const target = cliSpawnTarget(this.#executable, [
       "app-server",
       ...this.#configOverrides.flatMap((override) => ["-c", override]),
@@ -409,20 +421,62 @@ export class CodexAppServerClient extends EventEmitter<ClientEvents> {
     params: unknown,
     decoder: ResponseDecoder<T>,
     timeoutMs = this.#requestTimeoutMs,
+  ): Effect.fn.Return<T, ProviderClientOperationError> {
+    const child = this.#process;
+    const counted = THREAD_WORK_METHODS.has(method);
+    if (counted) this.#threadWork += 1;
+    return yield* Effect.gen({ self: this }, function* () {
+      const threadId =
+        (method === "turn/start" || method === "turn/steer") && isRecord(params) && isString(params.threadId)
+          ? params.threadId
+          : null;
+      const abandoned = () => threadId !== null && this.#abandonedThreads().has(threadId);
+      const busy = () => new ProviderClientOperationError({ cause: new ProviderSessionBusyError("Codex") });
+      if (abandoned()) return yield* busy();
+      let sent = params;
+      if (EFFORT_METHODS.has(method) && carriesEffort(params)) {
+        if (!this.#catalog) {
+          const result = yield* Effect.result(
+            this.readModelCatalog(Math.min(timeoutMs, providerCheckTimeoutMs(5_000))),
+          );
+          if (this.#process !== child || this.#stopping) {
+            if (Result.isFailure(result)) return yield* result.failure;
+            return yield* new ProviderClientOperationError({
+              cause: new ProviderStoppedError("Codex", "Codex App Server stopped while listing models."),
+            });
+          }
+          if (abandoned()) return yield* busy();
+        }
+        sent = withDeclaredEffort(params, this.#catalog);
+      }
+      return yield* this.#sendRequest(method, sent, decoder, child);
+    }).pipe(
+      Effect.timeoutOrElse({
+        duration: timeoutMs,
+        orElse: () =>
+          Effect.sync(() => this.#checkAnswering(child, timeoutMs)).pipe(
+            Effect.andThen(
+              Effect.fail(new ProviderClientOperationError({ cause: new RequestTimeoutError("Codex", method) })),
+            ),
+          ),
+      }),
+      Effect.ensuring(
+        Effect.sync(() => {
+          if (counted) this.#threadWork -= 1;
+        }),
+      ),
+    );
+  });
+
+  #sendRequest<T>(
+    method: string,
+    params: unknown,
+    decoder: ResponseDecoder<T>,
+    child: ChildProcessWithoutNullStreams | null,
   ) {
     const id = this.#nextId++;
-    const child = this.#process;
     let answered = false;
-    if ((method === "turn/start" || method === "turn/steer") && isRecord(params) && isString(params.threadId)) {
-      if (this.#abandonedThreads().has(params.threadId))
-        return yield* Effect.fail(new ProviderClientOperationError({ cause: new ProviderSessionBusyError("Codex") }));
-    }
-    let counted = false;
-    return yield* Effect.callback<T, ProviderClientOperationError>((resume) => {
-      if (THREAD_WORK_METHODS.has(method)) {
-        this.#threadWork += 1;
-        counted = true;
-      }
+    return Effect.callback<T, ProviderClientOperationError>((resume) => {
       this.#pending.set(id, {
         resolve: (value) => {
           answered = true;
@@ -449,24 +503,68 @@ export class CodexAppServerClient extends EventEmitter<ClientEvents> {
       }
       return Effect.sync(() => this.#pending.delete(id));
     }).pipe(
-      Effect.timeoutOrElse({
-        duration: timeoutMs,
-        orElse: () =>
-          Effect.sync(() => this.#checkAnswering(child, timeoutMs)).pipe(
-            Effect.andThen(
-              Effect.fail(new ProviderClientOperationError({ cause: new RequestTimeoutError("Codex", method) })),
-            ),
-          ),
-      }),
       Effect.ensuring(
         Effect.sync(() => {
           this.#pending.delete(id);
-          if (counted) this.#threadWork -= 1;
           if (method === "turn/start" && !answered && isRecord(params) && isString(params.threadId))
             this.#turnContext.resend(params.threadId);
         }),
       ),
     );
+  }
+
+  readonly readModelCatalog = Effect.fn("CodexAppServer.readModelCatalog")(function* (
+    this: CodexAppServerClient,
+    timeoutMs: number,
+  ): Effect.fn.Return<ModelListResponse, ProviderClientOperationError> {
+    if (this.#catalogRead) return yield* Deferred.await(this.#catalogRead);
+    const pending = Deferred.makeUnsafe<ModelListResponse, ProviderClientOperationError>();
+    this.#catalogRead = pending;
+    return yield* this.#readModelPages(timeoutMs).pipe(
+      Effect.onExit((exit) => {
+        if (this.#catalogRead === pending) this.#catalogRead = null;
+        return Deferred.done(pending, exit);
+      }),
+    );
+  }).bind(this);
+
+  readonly #readModelPages = Effect.fn("CodexAppServer.readModelPages")(function* (
+    this: CodexAppServerClient,
+    timeoutMs: number,
+  ): Effect.fn.Return<ModelListResponse, ProviderClientOperationError> {
+    const child = this.#process;
+    const cursors = new Set<string>();
+    const byModel = new Map<string, ModelListResponse["data"][number]>();
+    let cursor: string | undefined;
+    do {
+      const page = yield* this.request(
+        "model/list",
+        { limit: 100, includeHidden: true, ...(cursor ? { cursor } : {}) },
+        decodeModelListResponse,
+        timeoutMs,
+      );
+      if (this.#process !== child || this.#stopping)
+        return yield* new ProviderClientOperationError({
+          cause: new ProviderStoppedError("Codex", "Codex App Server stopped while listing models."),
+        });
+      for (const option of page.data) {
+        const id = option.model?.trim();
+        if (id) byModel.set(id, option);
+      }
+      cursor = page.nextCursor;
+      if (cursor && cursors.has(cursor))
+        return yield* new ProviderClientOperationError({
+          cause: new Error("Model discovery repeated a pagination cursor."),
+        });
+      if (cursor) cursors.add(cursor);
+    } while (cursor);
+    const catalog = new Map<string, DeclaredReasoningEfforts>();
+    for (const [id, option] of byModel) {
+      const declared = declaredReasoningEfforts(option);
+      if (declared) catalog.set(id, declared);
+    }
+    this.#catalog = catalog;
+    return { data: [...byModel.values()] } satisfies ModelListResponse;
   });
 
   notify(method: string, params: unknown = {}): void {
@@ -944,6 +1042,25 @@ interface HistoryTurnPage {
 interface HistoryItemPage {
   data: Array<{ turnId: string; item: ThreadItem }>;
   nextCursor: string | null;
+}
+
+function carriesEffort(params: unknown): params is DynamicRecord {
+  if (!isRecord(params) || !isString(params.model)) return false;
+  return isString(params.effort) || (isRecord(params.config) && isString(params.config.model_reasoning_effort));
+}
+
+function withDeclaredEffort(params: DynamicRecord, catalog: DeclaredCatalog | null): DynamicRecord {
+  const declared = isString(params.model) ? catalog?.get(params.model) : undefined;
+  if (!declared) return params;
+  const unlisted = (effort: unknown) => isString(effort) && !declared.efforts.some((level) => level === effort);
+  const effort = unlisted(params.effort);
+  const config = isRecord(params.config) && unlisted(params.config.model_reasoning_effort) ? params.config : null;
+  if (!effort && !config) return params;
+  return {
+    ...params,
+    ...(effort ? { effort: declared.fallback } : {}),
+    ...(config ? { config: { ...config, model_reasoning_effort: declared.fallback } } : {}),
+  };
 }
 
 function codexEnvironment(extraEnv: Readonly<Record<string, string>> | undefined): NodeJS.ProcessEnv {

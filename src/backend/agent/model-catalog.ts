@@ -4,7 +4,7 @@ import { createOpenBotLogger, registerPublicValues } from "@openbot/logging";
 import { Effect, Result } from "effect";
 import type { AgentClient, AgentProvider } from "./../agent-client";
 import { providerCheckTimeoutMs } from "../disk-restore";
-import { decodeModelListResponse, type ModelListResponse } from "./../protocol";
+import { declaredReasoningEfforts, decodeModelListResponse, type ModelListResponse } from "./../protocol";
 import { providerFailure } from "../provider-client-effects";
 import { BUILT_IN_PROVIDER_DRIVERS, type BuiltInProviderDriver } from "./../provider-drivers";
 import {
@@ -104,12 +104,14 @@ export class ModelCatalog {
     const cursors = new Set<string>();
     let cursor: string | undefined;
     do {
-      const response = yield* client.request(
-        "model/list",
-        { limit: 100, includeHidden: true, ...(cursor ? { cursor } : {}) },
-        decodeModelListResponse,
-        providerCheckTimeoutMs(timeoutMs ?? (catalog.slowList ? this.#options.requestTimeoutMs : 5_000)),
-      );
+      const timeout = providerCheckTimeoutMs(timeoutMs ?? (catalog.slowList ? this.#options.requestTimeoutMs : 5_000));
+      const response = yield* client.readModelCatalog?.(timeout) ??
+        client.request(
+          "model/list",
+          { limit: 100, includeHidden: true, ...(cursor ? { cursor } : {}) },
+          decodeModelListResponse,
+          timeout,
+        );
       for (const item of response.data) {
         const id = item.model?.trim();
         if (!id) continue;
@@ -133,6 +135,11 @@ export class ModelCatalog {
       const efforts = (server?.supportedReasoningEfforts ?? [])
         .map((item) => item.reasoningEffort)
         .filter(isReasoningEffort);
+      const declared = catalog.declaredEfforts ? declaredReasoningEfforts(server) : null;
+      const fixedEffort = declared !== null && server.emptyReasoningEffortList === true;
+      const defaultEffort = isReasoningEffort(server.defaultReasoningEffort)
+        ? server.defaultReasoningEffort
+        : (fallback?.defaultReasoningEffort ?? "medium");
       const name = modelDisplayName(
         catalog.modelName?.(server.model) || server.displayName?.trim() || fallback?.name || server.model,
       );
@@ -141,11 +148,10 @@ export class ModelCatalog {
         id: server.model,
         name,
         description: fallback?.description ?? `${providerLabel(client.provider)} model discovered from the local CLI.`,
-        defaultReasoningEffort: isReasoningEffort(server?.defaultReasoningEffort)
-          ? server.defaultReasoningEffort
-          : (fallback?.defaultReasoningEffort ?? "medium"),
-        supportedReasoningEfforts: efforts.length ? efforts : (fallback?.supportedReasoningEfforts ?? ["medium"]),
-        ...(server.reasoningEffortConfigurable === false ? { reasoningEffortConfigurable: false } : {}),
+        defaultReasoningEffort: declared?.fallback ?? defaultEffort,
+        supportedReasoningEfforts:
+          declared?.efforts ?? (efforts.length ? efforts : (fallback?.supportedReasoningEfforts ?? ["medium"])),
+        ...(fixedEffort || server.reasoningEffortConfigurable === false ? { reasoningEffortConfigurable: false } : {}),
         ...(isOlderListing(server, serverModels) ? { listing: "older" as const } : {}),
         ...catalog.modelFields?.(server),
       });

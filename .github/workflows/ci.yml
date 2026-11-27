@@ -613,6 +613,10 @@ jobs:
         if: ${{ !cancelled() }}
         run: bun run test:codex-idle-thread-release
 
+      - name: Run the Codex thinking level E2E test
+        if: ${{ !cancelled() }}
+        run: bun run test:codex-ollama-thinking
+
       - name: Run the Codex usage metering E2E test
         if: ${{ !cancelled() }}
         run: bun run test:codex-usage-metering
@@ -1009,6 +1013,7 @@ jobs:
             .openbot-build/codex-midturn-compaction-e2e/
             .openbot-build/codex-missing-rollout-e2e/
             .openbot-build/codex-idle-thread-release-e2e/
+            .openbot-build/codex-ollama-thinking-e2e/
             .openbot-build/codex-usage-metering-e2e/
             .openbot-build/codex-usage-reset-e2e/
             .openbot-build/codex-capacity-retry-e2e/
