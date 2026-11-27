@@ -444,6 +444,8 @@ export const messages = {
     "La clé API Anthropic n'a pas de crédit API. Un forfait Claude ne paie pas les requêtes faites avec une clé API. Ajoutez du crédit dans l'Anthropic Console, ou connectez-vous à Claude dans les réglages et sélectionnez le compte Claude dans le menu des modèles de l'agent.",
   "error.provider.claudeAccountNoCredit":
     "Le solde de crédits de votre compte Claude est trop bas. Certaines requêtes, comme le mode rapide, utilisent des crédits d’utilisation même si votre forfait Claude n’est pas épuisé. Ajoutez des crédits dans votre compte Claude, ou choisissez un autre modèle dans le menu des modèles de l’agent.",
+  "error.provider.claudeExternalApiKeyRefused":
+    "Claude Code utilise une clé API Anthropic qui n'est pas valide. OpenBot n'a pas défini cette clé : elle vient des paramètres de Claude Code ou des variables d'environnement, et Claude Code l'utilise à la place de votre forfait Claude. Pour utiliser votre forfait, retirez la clé des paramètres de Claude Code ou des variables d'environnement, puis redémarrez OpenBot.",
   "error.provider.claudeCustomEndpointBilling":
     "Claude Code envoie les requêtes à {host}, pas à Anthropic : les réglages de Claude Code ou les variables d’environnement définissent cette adresse d’API. {host} a refusé la requête à cause du solde du compte, pas à cause de votre forfait Claude. Ajoutez des fonds à votre compte {host}, ou choisissez un autre modèle dans le menu des modèles de l’agent.\n{detail}",
   "error.provider.claudeServiceBlocked":

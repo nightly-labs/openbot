@@ -374,6 +374,8 @@ export const messages = {
     "该 Anthropic API 密钥没有 API 额度。Claude 套餐不支付使用 API 密钥的请求。请在 Anthropic Console 中充值，或在设置中登录 Claude，并在智能体的模型菜单中选择 Claude 账号。",
   "error.provider.claudeAccountNoCredit":
     "你的 Claude 账户额度余额不足。部分请求（例如快速模式）即使在 Claude 套餐仍有用量时也会使用用量额度。请在你的 Claude 账户中添加用量额度，或在智能体的模型菜单中选择其他模型。",
+  "error.provider.claudeExternalApiKeyRefused":
+    "Claude Code 正在使用一个无效的 Anthropic API 密钥。该密钥不是 OpenBot 设置的，而是来自 Claude Code 设置或环境变量，Claude Code 会用它代替你的 Claude 套餐。要使用你的套餐，请从 Claude Code 设置或环境变量中移除该密钥，然后重启 OpenBot。",
   "error.provider.claudeCustomEndpointBilling":
     "Claude Code 将请求发送到 {host}，而不是 Anthropic：Claude Code 设置或环境变量中指定了这个 API 地址。{host} 因账户余额拒绝了请求，不是你的 Claude 套餐的问题。请为你的 {host} 账户充值，或在智能体的模型菜单中选择其他模型。\n{detail}",
   "error.provider.claudeServiceBlocked":

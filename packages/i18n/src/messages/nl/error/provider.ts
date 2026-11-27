@@ -425,6 +425,8 @@ export const messages = {
     "De Anthropic-API-sleutel heeft geen API-tegoed. Een Claude-abonnement betaalt geen verzoeken met een API-sleutel. Voeg tegoed toe in de Anthropic Console, of log bij Instellingen in bij Claude en kies het Claude-account in het modelmenu van de agent.",
   "error.provider.claudeAccountNoCredit":
     "Het tegoed van je Claude-account is te laag. Sommige verzoeken, zoals de snelle modus, gebruiken gebruikstegoed, ook als je Claude-abonnement nog gebruik over heeft. Voeg gebruikstegoed toe in je Claude-account, of kies een ander model in het modelmenu van de agent.",
+  "error.provider.claudeExternalApiKeyRefused":
+    "Claude Code gebruikt een Anthropic API-sleutel die niet geldig is. OpenBot heeft deze sleutel niet ingesteld: hij komt uit de Claude Code-instellingen of de omgevingsvariabelen, en Claude Code gebruikt hem in plaats van je Claude-abonnement. Verwijder de sleutel uit de Claude Code-instellingen of de omgevingsvariabelen om je abonnement te gebruiken, en start OpenBot daarna opnieuw.",
   "error.provider.claudeCustomEndpointBilling":
     "Claude Code stuurt verzoeken naar {host}, niet naar Anthropic: de Claude Code-instellingen of de omgevingsvariabelen geven dit API-adres op. {host} weigerde het verzoek vanwege het tegoed van het account, niet vanwege je Claude-abonnement. Voeg tegoed toe aan je {host}-account, of kies een ander model in het modelmenu van de agent.\n{detail}",
   "error.provider.claudeServiceBlocked":

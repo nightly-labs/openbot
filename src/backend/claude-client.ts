@@ -2884,7 +2884,12 @@ export class ClaudeAgentClient extends EventEmitter<ClientEvents> {
               host: runtime.customApiHost,
               detail: String(error),
             })
-          : claudeTurnError(error, apiKey, !apiKey && runtime.firstPartyApi && this.#onClaudeAccount());
+          : claudeTurnError(
+              error,
+              apiKey,
+              !apiKey && runtime.firstPartyApi && this.#onClaudeAccount(),
+              Boolean(this.#environment(this.#onApiKey).ANTHROPIC_API_KEY),
+            );
       const crashed = message === String(error) && claudeProcessExited(error) && classifyFailure(message) === "unknown";
       this.emit("notification", {
         method: "error",
@@ -3344,6 +3349,7 @@ const CLAUDE_API_CREDIT_EMPTY = /\bcredit balance (?:is )?too low\b/iu;
 const CLAUDE_PAYMENT_REQUIRED = /\bAPI Error: 402\b/u;
 
 const CLAUDE_NOT_LOGGED_IN = /\bnot logged in\b\s*·\s*please run \/login\b/iu;
+const CLAUDE_EXTERNAL_KEY_REFUSED = /\binvalid api key\b\s*·\s*fix external api key\b/iu;
 
 const CLAUDE_CLOUDFLARE_BLOCK =
   /\b403\b[\s\S]*(?:attention required!? \| cloudflare|sorry, you have been blocked|cf-browser-verification|__cf_chl|cdn-cgi\/challenge-platform)/iu;
@@ -3369,8 +3375,10 @@ function claudeFastModeWarning(reason: string): string | null {
   }
 }
 
-function claudeTurnError(error: unknown, apiKey: boolean, claudeAccount: boolean): string {
+function claudeTurnError(error: unknown, apiKey: boolean, claudeAccount: boolean, openBotKey: boolean): string {
   const text = String(error);
+  if (!openBotKey && CLAUDE_EXTERNAL_KEY_REFUSED.test(text))
+    return sourceText("error.provider.claudeExternalApiKeyRefused");
   if (apiKey && CLAUDE_API_CREDIT_EMPTY.test(text)) return sourceText("error.provider.claudeApiKeyNoCredit");
   if (claudeAccount && CLAUDE_API_CREDIT_EMPTY.test(text)) return sourceText("error.provider.claudeAccountNoCredit");
   if (CLAUDE_CLOUDFLARE_BLOCK.test(text)) return sourceText("error.provider.claudeServiceBlocked");
