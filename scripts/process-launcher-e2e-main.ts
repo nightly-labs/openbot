@@ -97,15 +97,22 @@ async function startTree(launcher: ProcessLauncher): Promise<{ child: LaunchedPr
 async function measureTreeStops(hostPath: string) {
   if (process.platform !== "win32") return null;
   const launcher = new ProcessLauncher(() => forkProcessLauncherHost(hostPath));
-  const killed = await startTree(launcher);
-  const killedDone = settle(killed.child);
-  killed.child.kill("SIGTERM");
-  const killExit = (await killedDone).exit;
-  const killEndsGrandchild = await grandchildStopped(killed.grandchild);
-  const disposed = await startTree(launcher);
-  await Effect.runPromise(launcher.dispose());
-  const disposeEndsGrandchild = await grandchildStopped(disposed.grandchild);
-  return { killExit, killEndsGrandchild, disposeEndsGrandchild };
+  const grandchildren: number[] = [];
+  try {
+    const killed = await startTree(launcher);
+    grandchildren.push(killed.grandchild);
+    const killedDone = settle(killed.child);
+    killed.child.kill("SIGTERM");
+    const killExit = (await killedDone).exit;
+    const killEndsGrandchild = await grandchildStopped(killed.grandchild);
+    const disposed = await startTree(launcher);
+    grandchildren.push(disposed.grandchild);
+    await Effect.runPromise(launcher.dispose());
+    const disposeEndsGrandchild = await grandchildStopped(disposed.grandchild);
+    return { killExit, killEndsGrandchild, disposeEndsGrandchild };
+  } finally {
+    for (const pid of grandchildren.filter(running)) process.kill(pid);
+  }
 }
 
 function percentile(samples: number[], q: number): number {

@@ -61,7 +61,7 @@ function start(request: Extract<ProcessLauncherRequest, { kind: "spawn" }>, send
 
 function stop(id: number, signal: NodeJS.Signals): void {
   const child = children.get(id);
-  if (!child) return;
+  if (!child || child.exitCode !== null || child.signalCode !== null) return;
   if (process.platform !== "win32" || child.pid === undefined) {
     child.kill(signal);
     return;
