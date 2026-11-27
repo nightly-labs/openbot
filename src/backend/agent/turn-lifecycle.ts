@@ -1203,7 +1203,7 @@ export class TurnLifecycle {
       const line = `Background subagent "${subagent.title}" ${subagent.status}${report ? `: ${report}` : "."}`;
       reports.set(earlier, [...(reports.get(earlier) ?? []), this.#hooks.redactMcp(line)]);
     }
-    for (const origin of running.continues) {
+    for (const origin of new Set(running.continues)) {
       const lines = (running.taskReports.get(origin) ?? []).map((line) => this.#hooks.redactMcp(line));
       reports.set(origin, [...(reports.get(origin) ?? []), ...lines]);
     }

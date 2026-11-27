@@ -114,22 +114,25 @@ const turn = (message) => {
   const acts = drops || input.includes("act-then-fail");
   fs.appendFileSync(${JSON.stringify(turnLog)}, JSON.stringify({ model, failed: fails, input, pid: process.pid, config: process.env.CLAUDE_CONFIG_DIR }) + "\\n");
   if (input.includes("usage-command") && model === ${JSON.stringify(PRIMARY)} && process.env.CLAUDE_CONFIG_DIR === ${JSON.stringify(defaultClaudeConfig)}) {
-    const callId = "toolu_" + randomUUID().replaceAll("-", "");
-    const taskId = "bash-" + callId;
-    const task = { task_id: taskId, task_type: "local_bash", description: "npm run build" };
+    const commands = ["build", "lint"].map((name) => {
+      const callId = "toolu_" + randomUUID().replaceAll("-", "");
+      return { name, callId, task: { task_id: "bash-" + callId, task_type: "local_bash", description: "npm run " + name } };
+    });
     write({ type: "assistant", message: { id: "msg_" + randomUUID(), type: "message", role: "assistant", model,
-      content: [{ type: "tool_use", id: callId, name: "Bash", input: { command: "npm run build", run_in_background: true } }],
+      content: commands.map(({ name, callId }) => ({ type: "tool_use", id: callId, name: "Bash", input: { command: "npm run " + name, run_in_background: true } })),
       stop_reason: null, usage: { input_tokens: 1, output_tokens: 1 } }, parent_tool_use_id: null, session_id: sessionId, uuid: randomUUID() });
-    write({ type: "system", subtype: "task_started", tool_use_id: callId, ...task, session_id: sessionId, uuid: randomUUID() });
-    write({ type: "system", subtype: "background_tasks_changed", tasks: [task], session_id: sessionId, uuid: randomUUID() });
-    write({ type: "user", message: { role: "user", content: [{ type: "tool_result", tool_use_id: callId, content: "Command running in background with ID: " + taskId }] },
+    for (const { callId, task } of commands)
+      write({ type: "system", subtype: "task_started", tool_use_id: callId, ...task, session_id: sessionId, uuid: randomUUID() });
+    write({ type: "system", subtype: "background_tasks_changed", tasks: commands.map(({ task }) => task), session_id: sessionId, uuid: randomUUID() });
+    write({ type: "user", message: { role: "user", content: commands.map(({ callId, task }) => ({ type: "tool_result", tool_use_id: callId, content: "Command running in background with ID: " + task.task_id })) },
       parent_tool_use_id: null, session_id: sessionId, uuid: randomUUID() });
-    assistant("The build runs in the background.");
-    result({ is_error: false, result: "The build runs in the background." });
+    assistant("The build and the lint run in the background.");
+    result({ is_error: false, result: "The build and the lint run in the background." });
     setTimeout(() => {
       write({ type: "system", subtype: "background_tasks_changed", tasks: [], session_id: sessionId, uuid: randomUUID() });
-      write({ type: "system", subtype: "task_notification", task_id: taskId, tool_use_id: callId, status: "completed",
-        summary: 'Background command "npm run build" completed (exit code 0)', output_file: "/tmp/build-output.txt", session_id: sessionId, uuid: randomUUID() });
+      for (const { name, callId, task } of commands)
+        write({ type: "system", subtype: "task_notification", task_id: task.task_id, tool_use_id: callId, status: "completed",
+          summary: 'Background command "npm run ' + name + '" completed (exit code 0)', output_file: "/tmp/" + name + "-output.txt", session_id: sessionId, uuid: randomUUID() });
       fs.appendFileSync(${JSON.stringify(turnLog)}, JSON.stringify({ model, failed: true, input: "command result", pid: process.pid, config: process.env.CLAUDE_CONFIG_DIR }) + "\\n");
       assistant("The build passed. Now I deploy the result.");
       const limit = "You've hit your limit. Try again later.";
@@ -1896,13 +1899,11 @@ try {
             .slice(before)
             .find((turn) => turn.input.includes("Continue the unfinished task")),
         );
-        assert.ok(
-          continued.input.includes(
-            'Background task completed: Background command \\"npm run build\\" completed (exit code 0)',
-          ),
-          "The backup gets the command result.",
-        );
-        assert.ok(continued.input.includes("/tmp/build-output.txt"), "The backup gets the output file.");
+        for (const name of ["build", "lint"]) {
+          const line = `Background task completed: Background command \\"npm run ${name}\\" completed (exit code 0)`;
+          assert.equal(continued.input.split(line).length - 1, 1, `The backup gets the ${name} result once.`);
+          assert.ok(continued.input.includes(`/tmp/${name}-output.txt`), `The backup gets the ${name} output file.`);
+        }
         assert.ok(continued.input.includes("usage-command"), "The backup gets the original request.");
         await waitFor(
           "the continuation to end",
