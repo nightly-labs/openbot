@@ -23,6 +23,7 @@
     "./cli-version": "./src/cli-version.ts",
     "./credits": "./src/credits.ts",
     "./credit-media": "./src/credit-media.ts",
+    "./account-bookmark": "./src/account-bookmark.ts",
     "./license": "./src/license.ts",
     "./discord-app": "./src/discord-app.ts",
     "./discord-guild-grant": "./src/discord-guild-grant.ts",
