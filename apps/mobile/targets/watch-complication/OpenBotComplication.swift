@@ -51,6 +51,7 @@ struct ComplicationData: Codable, Equatable {
   var moreWaiting: Int?
   var moreUnread: Int?
   var moreLabel: String?
+  var server: String?
 
   static let storageKey = "openbot.watch.complication"
   static let none = ComplicationData(state: "none", count: 0, text: "", name: nil, color: nil)
@@ -97,21 +98,6 @@ struct ComplicationEntry: TimelineEntry {
   }
 }
 
-struct ComplicationProvider: TimelineProvider {
-  func placeholder(in context: Context) -> ComplicationEntry {
-    ComplicationEntry(date: Date(), data: .none)
-  }
-
-  func getSnapshot(in context: Context, completion: @escaping (ComplicationEntry) -> Void) {
-    completion(ComplicationEntry(date: Date(), data: context.isPreview ? .none : ComplicationData.load()))
-  }
-
-  func getTimeline(in context: Context, completion: @escaping (Timeline<ComplicationEntry>) -> Void) {
-    let entry = ComplicationEntry(date: Date(), data: ComplicationData.load())
-    completion(Timeline(entries: [entry], policy: .never))
-  }
-}
-
 @main
 struct OpenBotComplicationBundle: WidgetBundle {
   var body: some Widget {
@@ -121,7 +107,9 @@ struct OpenBotComplicationBundle: WidgetBundle {
 
 struct OpenBotComplication: Widget {
   var body: some WidgetConfiguration {
-    StaticConfiguration(kind: "OpenBotComplication", provider: ComplicationProvider()) { entry in
+    AppIntentConfiguration(
+      kind: "OpenBotComplication", intent: ServerIntent.self, provider: ComplicationProvider()
+    ) { entry in
       ComplicationView(data: entry.data)
     }
     .configurationDisplayName(Text(verbatim: "OpenBot"))

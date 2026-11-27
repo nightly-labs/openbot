@@ -222,6 +222,7 @@ final class WatchSession: NSObject, ObservableObject {
       try? await Task.sleep(nanoseconds: 200_000_000)
     }
     await Task.yield()
+    WidgetReload.flush()
   }
 
   func runWhileActive() async {
@@ -249,7 +250,10 @@ final class WatchSession: NSObject, ObservableObject {
   }
 
   func backgroundRefresh() async {
-    defer { scheduleBackgroundRefresh() }
+    defer {
+      WidgetReload.flush()
+      scheduleBackgroundRefresh()
+    }
     guard usableCredentials != nil, snapshot != nil else { return }
     await refresh(phoneAllowed: false)
   }
@@ -607,7 +611,7 @@ final class WatchSession: NSObject, ObservableObject {
       Self.removeAvatars(keeping: kept)
       pictures = pictures.filter { name, _ in kept.contains(name) }
       pictureTints = pictureTints.filter { name, _ in kept.contains(name) }
-      ComplicationData.write(.ready(ready, previous: readySnapshot))
+      ComplicationData.update(ready, previous: readySnapshot)
     }
     defaults.set(json, forKey: Self.snapshotKey)
     snapshot = next
@@ -655,7 +659,7 @@ final class WatchSession: NSObject, ObservableObject {
   }
 
   func refreshComplication() {
-    if let readySnapshot { ComplicationData.write(.ready(readySnapshot)) }
+    if let readySnapshot { ComplicationData.update(readySnapshot) }
   }
 
   nonisolated static var avatarFolder: URL? {

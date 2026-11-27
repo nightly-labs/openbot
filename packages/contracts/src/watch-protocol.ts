@@ -82,6 +82,7 @@ export interface WatchAgent {
   state: WatchAgentState;
   detail: string | null;
   updated: string | null;
+  updatedAt?: number;
   turnId: string | null;
   reply: string | null;
   wait: WatchWait | null;
@@ -273,6 +274,11 @@ function decodeAnswers(value: unknown): Record<string, string[]> | null {
     answers[questionId] = texts;
   }
   return answers;
+}
+
+export function watchTimestamp(value: string | null | undefined): Pick<WatchAgent, "updatedAt"> {
+  const updatedAt = value ? Date.parse(value) : Number.NaN;
+  return Number.isFinite(updatedAt) ? { updatedAt } : {};
 }
 
 export function watchText(value: string | null | undefined, limit = WATCH_TEXT_LIMIT): string | null {

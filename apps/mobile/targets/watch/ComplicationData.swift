@@ -67,15 +67,34 @@ struct ComplicationData: Codable, Equatable {
   var moreWaiting: Int?
   var moreUnread: Int?
   var moreLabel: String?
+  var server: String?
 
   static let storageKey = "openbot.watch.complication"
   static let none = ComplicationData(state: "none", count: 0, text: "", name: nil, color: nil)
   static let locked = ComplicationData(state: "locked", count: 0, text: "", name: nil, color: nil)
 
-  static func ready(_ all: WatchReadySnapshot, previous: WatchReadySnapshot? = nil) -> ComplicationData {
+  @MainActor
+  static func update(_ all: WatchReadySnapshot, previous: WatchReadySnapshot? = nil) {
     let chosen = UserDefaults.standard.string(forKey: WatchSession.serverKey) ?? ""
-    let snapshot = all.forServer(chosen)
-    let previous = previous?.forServer(chosen)
+    let main = ready(all, previous: previous, server: chosen, kept: stored()?.agent)
+    guard all.servers.count > 1 else {
+      write(main, store: nil)
+      return
+    }
+    let kept = ComplicationStore.stored()?.data ?? [:]
+    var data: [String: ComplicationData] = [:]
+    for server in all.servers {
+      data[server.id] = ready(all, previous: previous, server: server.id, kept: kept[server.id]?.agent)
+    }
+    let servers = all.servers.map { ComplicationServer(id: $0.id, name: $0.name) }
+    write(main, store: ComplicationStore(servers: servers, data: data))
+  }
+
+  private static func ready(
+    _ all: WatchReadySnapshot, previous: WatchReadySnapshot?, server: String, kept: ComplicationAgent?
+  ) -> ComplicationData {
+    let snapshot = all.forServer(server)
+    let previous = previous?.forServer(server)
     let waiting = snapshot.agents.filter { $0.state == .waiting }
     let allWaiting = all.agents.filter { $0.state == .waiting }.count
     let counts = AgentCounts(snapshot.agents, channels: snapshot.channels ?? [])
@@ -93,7 +112,7 @@ struct ComplicationData: Codable, Equatable {
     } else {
       label = text(TextKey.complicationClear)
     }
-    let shown = featured(snapshot.agents, previous: previous?.agents, shown: stored()?.agent)
+    let shown = featured(snapshot.agents, previous: previous?.agents, shown: kept)
     let others = AgentCounts(
       snapshot.agents.filter { $0.key != shown?.key }, channels: snapshot.channels ?? [])
     return ComplicationData(
@@ -101,7 +120,8 @@ struct ComplicationData: Codable, Equatable {
       color: waiting.first?.color, serverId: waiting.first?.serverId, agentId: waiting.first?.id,
       working: counts.working, agent: shown.map { ComplicationAgent($0, text: text) },
       unread: counts.unread, moreWaiting: others.waiting, moreUnread: others.unread,
-      moreLabel: AgentCounts(waiting: others.waiting, unread: others.unread).line(text))
+      moreLabel: AgentCounts(waiting: others.waiting, unread: others.unread).line(text),
+      server: all.servers.count > 1 ? snapshot.servers.first?.name : nil)
   }
 
   private static func featured(
@@ -111,11 +131,21 @@ struct ComplicationData: Codable, Equatable {
     let waiting = agents.filter { $0.wait != nil || $0.state == .waiting }
     if let kept, waiting.contains(where: { $0.key == kept.key }) { return kept }
     if let first = waiting.first { return first }
+    if let newest = newest(agents) { return newest }
     if let changed = agents.first(where: { hasNews($0, since: previous) }) { return changed }
     if let kept { return kept }
     return agents.first { $0.state == .working }
       ?? agents.first { ($0.unread ?? 0) > 0 }
       ?? agents.first
+  }
+
+  private static func newest(_ agents: [WatchAgent]) -> WatchAgent? {
+    var newest: WatchAgent?
+    for agent in agents {
+      guard let time = agent.updatedAt else { continue }
+      if time > newest?.updatedAt ?? -.infinity { newest = agent }
+    }
+    return newest
   }
 
   private static func hasNews(_ agent: WatchAgent, since previous: [WatchAgent]?) -> Bool {
@@ -128,18 +158,79 @@ struct ComplicationData: Codable, Equatable {
     return try? JSONDecoder().decode(ComplicationData.self, from: stored)
   }
 
-  static func write(_ data: ComplicationData) {
+  @MainActor
+  static func write(_ data: ComplicationData, store: ComplicationStore? = nil) {
     guard let defaults = UserDefaults(suiteName: watchAppGroup) else { return }
-    if stored() == data {
-      return
+    let previousStore = ComplicationStore.stored()
+    let dataChanged = stored() != data
+    let storeChanged = previousStore != store
+    guard dataChanged || storeChanged else { return }
+    if dataChanged, let encoded = try? JSONEncoder().encode(data) {
+      defaults.set(encoded, forKey: storageKey)
     }
-    guard let encoded = try? JSONEncoder().encode(data) else { return }
-    defaults.set(encoded, forKey: storageKey)
-    WidgetCenter.shared.reloadAllTimelines()
+    if storeChanged {
+      if let store, let encoded = try? JSONEncoder().encode(store) {
+        defaults.set(encoded, forKey: ComplicationStore.storageKey)
+      } else {
+        defaults.removeObject(forKey: ComplicationStore.storageKey)
+      }
+    }
+    WidgetReload.schedule(newServers: previousStore?.servers ?? [] != store?.servers ?? [])
   }
 
+  @MainActor
   static func remove() {
-    UserDefaults(suiteName: watchAppGroup)?.removeObject(forKey: storageKey)
+    let defaults = UserDefaults(suiteName: watchAppGroup)
+    defaults?.removeObject(forKey: storageKey)
+    defaults?.removeObject(forKey: ComplicationStore.storageKey)
+    WidgetReload.schedule(newServers: true)
+    WidgetReload.flush()
+  }
+}
+
+@MainActor
+enum WidgetReload {
+  private static let delay: Duration = .seconds(1)
+  private static var pending: Task<Void, Never>?
+  private static var newServers = false
+
+  static func schedule(newServers changed: Bool) {
+    newServers = newServers || changed
+    pending?.cancel()
+    pending = Task {
+      try? await Task.sleep(for: delay)
+      guard !Task.isCancelled else { return }
+      run()
+    }
+  }
+
+  static func flush() {
+    guard pending != nil else { return }
+    run()
+  }
+
+  private static func run() {
+    pending?.cancel()
+    pending = nil
+    if newServers { WidgetCenter.shared.invalidateConfigurationRecommendations() }
+    newServers = false
     WidgetCenter.shared.reloadAllTimelines()
+  }
+}
+
+struct ComplicationServer: Codable, Equatable {
+  var id: String
+  var name: String
+}
+
+struct ComplicationStore: Codable, Equatable {
+  var servers: [ComplicationServer]
+  var data: [String: ComplicationData]
+
+  static let storageKey = "openbot.watch.complication.servers"
+
+  static func stored() -> ComplicationStore? {
+    guard let stored = UserDefaults(suiteName: watchAppGroup)?.data(forKey: storageKey) else { return nil }
+    return try? JSONDecoder().decode(ComplicationStore.self, from: stored)
   }
 }

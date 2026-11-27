@@ -16,7 +16,9 @@ struct ComplicationView: View {
     case .accessoryRectangular:
       Group {
         if data.isReady, let agent = data.agent {
-          AgentCard(agent: agent, moreWaiting: data.moreWaiting ?? 0, moreUnread: data.moreUnread ?? 0)
+          AgentCard(
+            agent: agent, server: data.server, moreWaiting: data.moreWaiting ?? 0,
+            moreUnread: data.moreUnread ?? 0)
             .accessibilityElement(children: .combine)
             .accessibilityHint(data.moreLabel.map { Text($0) } ?? Text(verbatim: ""))
         } else {
@@ -60,6 +62,7 @@ struct AgentCard: View {
   @Environment(\.showsWidgetContainerBackground) private var showsBackground
   @Environment(\.widgetContentMargins) private var margins
   let agent: ComplicationAgent
+  let server: String?
   let moreWaiting: Int
   let moreUnread: Int
 
@@ -81,10 +84,17 @@ struct AgentCard: View {
             MorePill(count: moreUnread, color: .blue)
           }
         }
-        Text(agent.status)
-          .font(.footnote.weight(.semibold))
-          .foregroundStyle(statusColor)
-          .lineLimit(1)
+        HStack(spacing: 0) {
+          Text(agent.status)
+            .foregroundStyle(statusColor)
+            .layoutPriority(1)
+          if let server {
+            Text(verbatim: " · \(server)")
+              .foregroundStyle(.secondary)
+          }
+        }
+        .font(.footnote.weight(.semibold))
+        .lineLimit(1)
         if let line = agent.line {
           Text(line)
             .font(.footnote)

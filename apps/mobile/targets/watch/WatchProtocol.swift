@@ -139,6 +139,7 @@ struct WatchAgent: Codable, Hashable, Identifiable {
   var state: WatchAgentState
   var detail: String?
   var updated: String?
+  var updatedAt: Double?
   var turnId: String?
   var reply: String?
   var wait: WatchWait?
