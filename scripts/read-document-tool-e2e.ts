@@ -344,7 +344,7 @@ try {
   );
 
   const dense = join(files, "dense.pdf");
-  const denseLines = (page: number) => [...Array.from({ length: 49 }, () => "x".repeat(60)), `End of page ${page} `];
+  const denseLines = (page: number) => [...Array.from({ length: 49 }, () => "x".repeat(60)), `End of page ${page}`];
   await writeFile(dense, pdfFile(Array.from({ length: 25 }, (_, index) => denseLines(index + 1).join("\n"))));
   const full = await readFromChat("read dense pages", reader.id, dense, { path: "ATTACHED" });
   const pageField = (name: string) => Number(full.output.match(new RegExp(`"${name}":(\\d+)`))?.[1]);
@@ -355,7 +355,7 @@ try {
       fullPages.lastPage < 25 &&
       fullPages.nextPage === fullPages.lastPage + 1 &&
       full.output.includes(`End of page ${fullPages.lastPage}`) &&
-      !full.output.includes(`End of page ${fullPages.nextPage} `),
+      !full.output.includes(`--- page ${fullPages.nextPage} ---`),
     full.output.slice(0, 200),
   );
 
