@@ -2,7 +2,7 @@ import { Typography } from "heroui-native";
 import { useThemeColor } from "heroui-native/hooks";
 import Pin from "lucide-react-native/icons/pin";
 import PinOff from "lucide-react-native/icons/pin-off";
-import type { PropsWithChildren } from "react";
+import { type PropsWithChildren, useEffect } from "react";
 import { Pressable, View } from "react-native";
 import { GestureDetector } from "react-native-gesture-handler";
 import ReanimatedSwipeable from "react-native-gesture-handler/ReanimatedSwipeable";
@@ -94,6 +94,7 @@ export function AgentPinSwipeRow({
   pinBlocked,
   onPin,
   drag,
+  dormant = false,
   children,
 }: PropsWithChildren<{
   agentName: string;
@@ -101,27 +102,33 @@ export function AgentPinSwipeRow({
   pinBlocked: boolean;
   onPin: (withHaptic: boolean) => void;
   drag?: ReturnType<typeof useChatDrag>;
+  dormant?: boolean;
 }>) {
   const [background] = useThemeColor(["background"]);
   const { openingGesture } = useAppDrawer();
   const swipe = useAgentPinSwipe(openingGesture, onPin, pinBlocked, drag?.gesture);
   const { t } = useText();
-  const renderPin = (_progress: SharedValue<number>, translation: SharedValue<number>) => (
-    <PinAction
-      revealed={swipe.revealed}
-      agentName={agentName}
-      pinned={pinned}
-      pinBlocked={pinBlocked}
-      translation={translation}
-      onPress={() => swipe.pin()}
-    />
-  );
+  const { revealed, close } = swipe;
+  useEffect(() => {
+    if (dormant && revealed) close();
+  }, [dormant, revealed, close]);
+  const renderPin = (_progress: SharedValue<number>, translation: SharedValue<number>) =>
+    dormant ? null : (
+      <PinAction
+        revealed={swipe.revealed}
+        agentName={agentName}
+        pinned={pinned}
+        pinBlocked={pinBlocked}
+        translation={translation}
+        onPress={() => swipe.pin()}
+      />
+    );
 
   return (
     <GestureDetector gesture={swipe.detectorGesture}>
       <ReanimatedSwipeable
         ref={swipe.swipeable}
-        enabled={!swipe.pinPending}
+        enabled={!dormant && !swipe.pinPending}
         containerStyle={{ backgroundColor: background, overflow: "hidden" }}
         childrenContainerStyle={{ backgroundColor: background }}
         friction={1}
