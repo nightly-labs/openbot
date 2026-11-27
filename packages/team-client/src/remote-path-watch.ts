@@ -1,6 +1,6 @@
 export const PATH_WATCH_INTERVAL_MS = 5_000;
-export const PATH_SILENCE_MS = 12_000;
-export const RELAY_UPGRADE_DELAYS_MS = [60_000, 180_000, 540_000] as const;
+const PATH_SILENCE_MS = 12_000;
+const RELAY_UPGRADE_DELAYS_MS = [60_000, 180_000, 540_000] as const;
 
 export interface PathReading {
   pairId: string;
