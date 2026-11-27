@@ -321,10 +321,6 @@ export interface BrowserLocalSignInInput {
   url: string;
 }
 
-export interface BrowserLocalSignInEnd {
-  signedIn: boolean;
-}
-
 export interface BrowserLocalSignInFinish {
   send: boolean;
 }

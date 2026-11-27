@@ -381,7 +381,7 @@ export function browserIpcHandlers({
           remote: (serverId) => {
             if (!remoteServers.supportsCapability(serverId, BROWSER_SIGN_IN_CAPABILITY))
               throw new Error(sourceText("error.backend.browserSignInUnsupported"));
-            return runCauseEffect(localSignIn.open({ serverId, tabId }, url)).then(() => ({ signedIn: false }));
+            return runCauseEffect(localSignIn.open({ serverId, tabId }, url));
           },
         }),
       ),

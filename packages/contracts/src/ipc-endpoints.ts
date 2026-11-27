@@ -234,7 +234,6 @@ import type {
   BrowserDisplayState,
   BrowserHttpSignInInput,
   BrowserLiveViewEvent,
-  BrowserLocalSignInEnd,
   BrowserLocalSignInFinish,
   BrowserLocalSignInInput,
   BrowserLocalSignInResult,
@@ -1871,7 +1870,7 @@ export const IPC_ENDPOINTS = {
     sendWindowAction: request<BrowserWindowAction, void>()("browser:window-action"),
     windowModel: event<BrowserWindowModel>()("browser:window-model-event"),
     windowEvent: event<BrowserWindowEvent>()("browser:window-event"),
-    openLocalSignIn: request<BrowserLocalSignInInput, BrowserLocalSignInEnd>()("browser:local-sign-in-open"),
+    openLocalSignIn: request<BrowserLocalSignInInput, void>()("browser:local-sign-in-open"),
     finishLocalSignIn: request<BrowserLocalSignInFinish, BrowserLocalSignInResult | null>()(
       "browser:local-sign-in-finish",
     ),
