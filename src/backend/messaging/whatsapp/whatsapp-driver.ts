@@ -583,7 +583,7 @@ export function whatsAppDriver(options: WhatsAppDriverOptions): MessagingDriver 
       return new WhatsAppTransport({
         runtime,
         handle,
-        identity: () => whatsAppIdentity(handle) ?? me,
+        identity: () => ({ ...me, lid: whatsAppIdentity(handle)?.lid ?? me.lid }),
         workspaceId: identity.workspaceId,
       });
     },
