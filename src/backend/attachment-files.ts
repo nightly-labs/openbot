@@ -33,6 +33,7 @@ import { isWithin } from "./workspace-paths";
 const MAX_ATTACHMENTS = INPUT_LIMITS.attachments;
 const MAX_FILE_BYTES = ATTACHMENT_LIMITS.fileBytes;
 const MAX_TOTAL_BYTES = ATTACHMENT_LIMITS.totalBytes;
+const SVG_PREVIEW_MAX_BYTES = 10 * 1024 * 1024;
 const TRANSFER_MANIFEST_FILE = ".openbot-transfer.json";
 const HELD_TRANSFER_WAITS_MS: readonly number[] = [10, 50, 100, 250, 500, 1000, 1000];
 
@@ -621,7 +622,7 @@ function attachmentRecord(
     id,
     name,
     size,
-    ...attachmentMetadata(name, mimeType),
+    ...attachmentMetadata(name, mimeType, size),
     previewUrl: attachmentPreviewUrl(id),
     path,
     sha256: digest,
@@ -695,6 +696,7 @@ function uniqueName(name: string, used: Set<string>): string {
 function attachmentMetadata(
   name: string,
   explicitMimeType?: string,
+  size = 0,
 ): { kind: AttachmentKind; mimeType: string; previewKind: AttachmentPreviewKind } {
   const inferred = attachmentMimeTypeForName(name);
   const mimeType =
@@ -713,7 +715,11 @@ function attachmentMetadata(
         ? "text"
         : "none";
   const svg = mimeType.split(";", 1)[0]?.trim().toLowerCase() === "image/svg+xml";
-  return { kind: previewKind === "image" && !svg ? "image" : "file", mimeType, previewKind };
+  return {
+    kind: previewKind === "image" && !svg ? "image" : "file",
+    mimeType,
+    previewKind: svg && size > SVG_PREVIEW_MAX_BYTES ? "none" : previewKind,
+  };
 }
 
 const HEIF_BRANDS = new Set(["heic", "heix", "heim", "heis", "hevc", "hevx", "mif1", "mif2", "msf1"]);
@@ -761,7 +767,7 @@ function attachmentPreviewUrl(id: string): string {
 }
 
 export function toAttachmentSummary(attachment: StoredAttachment): AttachmentSummary {
-  const metadata = attachmentMetadata(attachment.name, attachment.mimeType);
+  const metadata = attachmentMetadata(attachment.name, attachment.mimeType, attachment.size);
   return {
     id: attachment.id,
     name: attachment.name,
