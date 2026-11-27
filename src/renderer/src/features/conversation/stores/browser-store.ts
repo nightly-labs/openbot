@@ -178,16 +178,17 @@ export function createBrowserStore(deps: BrowserStoreDeps) {
   let browserTakeoverPreviewKey: string | null = null;
   let browserTakeoverPreviewPage: string | null = null;
   let browserTakeoverPreviewGeneration = 0;
-  let browserTakeoverPreviewCapturing = false;
-  let browserTakeoverPreviewNext: { tabId: string; generation: number } | null = null;
+  let browserTakeoverPreviewCapture: { generation: number; again: boolean } | null = null;
   function captureBrowserTakeoverPreview(tabId: string, generation: number) {
-    if (browserTakeoverPreviewCapturing) {
-      browserTakeoverPreviewNext = { tabId, generation };
+    const running = browserTakeoverPreviewCapture;
+    if (running?.generation === generation) {
+      running.again = true;
       return;
     }
-    browserTakeoverPreviewCapturing = true;
-    void conversationRuntime(deps.props)
-      .browser.capturePreview(tabId)
+    const capture = { generation, again: false };
+    browserTakeoverPreviewCapture = capture;
+    void Promise.resolve()
+      .then(() => conversationRuntime(deps.props).browser.capturePreview(tabId))
       .then(
         (preview) => {
           if (browserTakeoverPreviewGeneration === generation) setBrowserTakeoverPreview({ status: "ready", preview });
@@ -198,11 +199,10 @@ export function createBrowserStore(deps: BrowserStoreDeps) {
         },
       )
       .finally(() => {
-        browserTakeoverPreviewCapturing = false;
-        const next = browserTakeoverPreviewNext;
-        browserTakeoverPreviewNext = null;
-        if (next?.generation === browserTakeoverPreviewGeneration)
-          captureBrowserTakeoverPreview(next.tabId, next.generation);
+        if (browserTakeoverPreviewCapture !== capture) return;
+        browserTakeoverPreviewCapture = null;
+        if (capture.again && browserTakeoverPreviewGeneration === generation)
+          captureBrowserTakeoverPreview(tabId, generation);
       });
   }
   createEffect(
@@ -218,7 +218,7 @@ export function createBrowserStore(deps: BrowserStoreDeps) {
       if (!request || request.secret || suspended) {
         browserTakeoverPreviewKey = null;
         browserTakeoverPreviewPage = null;
-        browserTakeoverPreviewNext = null;
+        browserTakeoverPreviewCapture = null;
         browserTakeoverPreviewGeneration += 1;
         setBrowserTakeoverPreview({ status: "idle", preview: null });
         return;
