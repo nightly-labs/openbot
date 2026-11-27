@@ -18,7 +18,13 @@ import {
 import { sourceText } from "@openbot/i18n/source";
 import { Effect } from "effect";
 import { cliSpawnTarget } from "./cli";
-import { boundedError, MCP_TOOL_CALL_TIMEOUT_MS, type McpToolArguments, type McpToolCallResult } from "./mcp-probe";
+import {
+  boundedError,
+  MCP_STDIO_PROBE_TIMEOUT_MS,
+  MCP_TOOL_CALL_TIMEOUT_MS,
+  type McpToolArguments,
+  type McpToolCallResult,
+} from "./mcp-probe";
 import { type ProviderClientOperationError, providerCall, providerFailure } from "./provider-client-effects";
 import { endProcessGroupOnExit, PROVIDER_PROCESS_GROUP } from "./provider-process-group";
 
@@ -61,6 +67,7 @@ interface RunningServer {
   child: ChildProcess;
   initialized: boolean;
   output: ServerOutput;
+  keptUntil: ReturnType<typeof setTimeout> | null;
 }
 
 const STOP_GRACE_MS = 2_000;
@@ -86,10 +93,14 @@ export const startStdioMcpRelay = Effect.fn("StdioMcpRelay.start")(function* (la
   const launchServer = (transport: StreamableHTTPServerTransport) => {
     const output: ServerOutput = { transport, pending: new Set(), own: new Map(), handshake: null };
     const child = startServer(launch, output);
-    const entry: RunningServer = { child, initialized: false, output };
+    const entry: RunningServer = { child, initialized: false, output, keptUntil: null };
     const forget = () => {
       children.delete(child);
-      if (starting === entry) starting = null;
+      if (entry.keptUntil) clearTimeout(entry.keptUntil);
+      if (starting === entry) {
+        starting = null;
+        if (!closing) launch.onStartAbandoned?.();
+      }
       const index = running.indexOf(entry);
       if (index >= 0) running.splice(index, 1);
     };
@@ -105,6 +116,7 @@ export const startStdioMcpRelay = Effect.fn("StdioMcpRelay.start")(function* (la
     const handshake = entry?.output.handshake;
     if (!entry || !handshake || handshake.client !== handshakeClient(request)) return null;
     starting = null;
+    if (entry.keptUntil) clearTimeout(entry.keptUntil);
     if (handshake.answer && isJSONRPCErrorResponse(handshake.answer)) {
       void stopServer(entry.child);
       return null;
@@ -121,7 +133,15 @@ export const startStdioMcpRelay = Effect.fn("StdioMcpRelay.start")(function* (la
     entry.output.transport = null;
     entry.output.pending.clear();
     starting = entry;
+    entry.keptUntil = setTimeout(() => giveUpUnansweredStart(entry), MCP_STDIO_PROBE_TIMEOUT_MS);
     return true;
+  };
+
+  const giveUpUnansweredStart = (entry: RunningServer) => {
+    if (closing || starting !== entry || entry.output.handshake?.answer) return;
+    starting = null;
+    launch.onStartAbandoned?.();
+    void stopServer(entry.child);
   };
 
   const open = () => {
@@ -156,7 +176,10 @@ export const startStdioMcpRelay = Effect.fn("StdioMcpRelay.start")(function* (la
       transports.delete(transport);
       if (transport.sessionId) sessions.delete(transport.sessionId);
       if (!live || live.output.transport !== transport) return;
-      if (abandoned.has(transport) && keepStarting(live)) return;
+      if (abandoned.has(transport)) {
+        if (keepStarting(live)) return;
+        launch.onStartAbandoned?.();
+      }
       void stopServer(live.child);
     };
     return transport;
@@ -178,7 +201,6 @@ export const startStdioMcpRelay = Effect.fn("StdioMcpRelay.start")(function* (la
     if (!existing)
       response.once("close", () => {
         if (response.writableFinished || closing) return;
-        launch.onStartAbandoned?.();
         abandoned.add(transport);
         void transport.close().catch(() => undefined);
       });
@@ -314,6 +336,7 @@ function startServer(launch: StdioMcpLaunch, output: ServerOutput): ChildProcess
         const handshake = output.handshake;
         if (handshake && !handshake.answer && message.id === handshake.request) {
           handshake.answer = message;
+          if (!output.transport && isJSONRPCErrorResponse(message)) launch.onStartAbandoned?.();
           output.pending.delete(handshake.reply);
           void output.transport?.send({ ...message, id: handshake.reply }).catch(() => undefined);
           continue;

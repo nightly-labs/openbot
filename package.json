@@ -319,6 +319,7 @@
     "test:mcp-sign-in-two-pages": "bun scripts/mcp-sign-in-two-pages-e2e.ts",
     "test:mcp-server-unreadable-row": "bun scripts/mcp-server-unreadable-row-e2e.ts",
     "test:mcp-tool-consent": "bun scripts/mcp-tool-consent-e2e.ts",
+    "test:mcp-stdio-relay-slow-start": "tsx scripts/mcp-stdio-relay-slow-start-e2e.ts",
     "test:agent-mcp-tools": "bun scripts/agent-mcp-tools-e2e.ts",
     "test:agent-update-agents": "bun scripts/agent-update-agents-e2e.ts",
     "test:ui-blocks": "bun scripts/ui-blocks-e2e.ts",
