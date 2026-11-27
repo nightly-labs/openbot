@@ -1,11 +1,11 @@
 import { Deferred, type Duration, Effect, Result, type Scope, Semaphore } from "effect";
 import type { RemoteTicketClaims } from "./protocol";
 
-export const RESUME_BATCH_LIMIT = 100;
+const RESUME_BATCH_LIMIT = 100;
 
-export type ResumeBatchAnswer = { readonly valid: readonly boolean[] } | "unsupported";
+type ResumeBatchAnswer = { readonly valid: readonly boolean[] } | "unsupported";
 
-export interface ResumeBatchOptions<E> {
+interface ResumeBatchOptions<E> {
   readonly scope: Scope.Scope;
   readonly wait: Duration.Input;
   readonly concurrency: number;
