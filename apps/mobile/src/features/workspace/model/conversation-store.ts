@@ -388,12 +388,12 @@ export class MobileConversationStore {
     const pending = this.#deltas;
     this.#deltas = new Map();
     for (const [agentId, deltas] of pending) {
+      this.#journals.get(agentId)?.deltas.push(...deltas);
       const current = this.get(agentId);
       const indices = this.#indices.get(agentId);
       if (!current || !indices) continue;
       const streamed = streamDeltas(current, indices, deltas);
       if (!streamed) continue;
-      this.#journals.get(agentId)?.deltas.push(...streamed.applied);
       this.#publish(agentId, streamed.entry, streamed.added);
     }
   }
@@ -407,7 +407,6 @@ function streamDeltas(current: MobileConversation, indices: Map<string, number>,
   let revision = current.revision;
   let threadId = current.threadId;
   let activeTurnId = current.activeTurnId;
-  const applied: Delta[] = [];
   const updates = new Map<string, { event: Delta; parts: string[] }>();
   for (const event of deltas) {
     if (event.revision <= revision || (threadId !== null && event.threadId !== threadId)) continue;
@@ -417,7 +416,6 @@ function streamDeltas(current: MobileConversation, indices: Map<string, number>,
     else updates.set(event.messageId, { event, parts: [event.delta] });
     revision = event.revision;
     activeTurnId = event.turnId;
-    applied.push(event);
   }
   if (!updates.size) return undefined;
   const messages = [...current.messages];
@@ -443,5 +441,5 @@ function streamDeltas(current: MobileConversation, indices: Map<string, number>,
       messages[index] = { ...message, text: message.text + text, status: "streaming" };
     }
   }
-  return { entry: { ...current, messages, revision, activeTurnId, threadId }, added, applied };
+  return { entry: { ...current, messages, revision, activeTurnId, threadId }, added };
 }

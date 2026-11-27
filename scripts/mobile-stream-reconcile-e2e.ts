@@ -12,6 +12,7 @@ const ROOT = resolve(import.meta.dirname, "..");
 const OUT = join(ROOT, ".openbot-build", "mobile-stream-reconcile-e2e");
 const AGENT = "agent-1";
 const THREAD = "thread-1";
+const NEW_THREAD = "thread-2";
 const TURN = "turn-1";
 const REPLY = "reply-1";
 const CREATED_AT = "2026-11-27T10:00:00.000Z";
@@ -72,10 +73,10 @@ function toolMessage(): ConversationMessage {
   };
 }
 
-function page(revision: number, messages: ConversationMessage[]): ConversationPage {
+function page(revision: number, messages: ConversationMessage[], threadId = THREAD): ConversationPage {
   return {
     agentId: AGENT,
-    threadId: THREAD,
+    threadId,
     activeTurnId: TURN,
     revision,
     messages,
@@ -84,11 +85,11 @@ function page(revision: number, messages: ConversationMessage[]): ConversationPa
   };
 }
 
-function delta(revision: number, text: string): Delta {
+function delta(revision: number, text: string, threadId = THREAD): Delta {
   return {
     type: "conversation-delta",
     agentId: AGENT,
-    threadId: THREAD,
+    threadId,
     turnId: TURN,
     messageId: REPLY,
     delta: text,
@@ -223,6 +224,39 @@ async function newerPageDropsOldDeltas() {
   return { text, revision: store.get(AGENT)?.revision };
 }
 
+async function threadSwitchDuringLoad() {
+  const frames = createFrames();
+  const store = new MobileConversationStore(frames.schedule);
+  store.applyPage(page(10, [userMessage]));
+  const unsubscribe = store.subscribe(AGENT, () => {});
+  const fetched = deferred<ConversationPage>();
+  const load = store.loadLatest(
+    AGENT,
+    () => fetched.promise,
+    () => true,
+    true,
+  );
+  await Promise.resolve();
+  const streamed = words(11, 15);
+  for (const word of streamed) {
+    store.enqueue(delta(word.revision, word.text, NEW_THREAD));
+    frames.run();
+  }
+  fetched.resolve(page(10, [userMessage], NEW_THREAD));
+  await load;
+  const entry = store.get(AGENT);
+  const text = replyText(store);
+  const expected = streamed.map((word) => word.text).join("");
+  unsubscribe();
+  check("thread switch: the page of the new thread keeps the deltas of that thread", text === expected, {
+    text,
+    expected,
+    threadId: entry?.threadId,
+  });
+  check("thread switch: the revision is the newest delta", entry?.revision === 15, { revision: entry?.revision });
+  return { text, threadId: entry?.threadId, revision: entry?.revision };
+}
+
 function readStateInvalidation() {
   const frames = createFrames();
   const store = new MobileConversationStore(frames.schedule);
@@ -326,6 +360,7 @@ async function run() {
   await mkdir(OUT, { recursive: true });
   const stream = await streamWithInvalidation();
   const newerPage = await newerPageDropsOldDeltas();
+  const threadSwitch = await threadSwitchDuringLoad();
   const readState = readStateInvalidation();
   const reveal = await revealBurst();
   const catchUpRows = catchUp();
@@ -334,6 +369,7 @@ async function run() {
     status: passed ? "passed" : "failed",
     stream,
     newerPage,
+    threadSwitch,
     readState,
     reveal,
     catchUp: catchUpRows,

@@ -11,7 +11,7 @@ const STREAM_REVEAL_WINDOW = 48;
 
 function streamRevealStep(waiting: number, limit: number) {
   const count = Math.min(MOST_ACTIVE, Math.ceil(waiting / CATCH_UP_SHARE));
-  return { count, room: Math.min(MOST_ACTIVE, Math.max(limit, count * FADE_OVERLAP)) };
+  return { count, room: count > 1 ? Math.min(MOST_ACTIVE, Math.max(limit, count * FADE_OVERLAP)) : limit };
 }
 
 export function createStreamRevealPool(limit = 4) {

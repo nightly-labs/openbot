@@ -24,7 +24,8 @@ function resumable(playback: ReplyPlayback | undefined, total: number) {
 
 export function useReplyPlayback(plan: ReturnType<typeof createReplyReveal>, playback?: ReplyPlayback) {
   const unfinished = resumable(playback, plan.words.length);
-  const enabled = Boolean(playback?.enabled || (playback?.active && unfinished));
+  const [resumed, setResumed] = useState(false);
+  const enabled = Boolean(playback?.enabled || (playback?.active && (unfinished || resumed)));
   const held = !enabled && Boolean(playback?.paused) && unfinished;
   const [visible, setVisible] = useState(() =>
     playback && (enabled || held) ? (playback.progress.get(playback.id) ?? 0) : plan.words.length,
@@ -35,6 +36,10 @@ export function useReplyPlayback(plan: ReturnType<typeof createReplyReveal>, pla
     callbacks.current = playback;
     currentPlan.current = plan;
   }, [playback, plan]);
+  const active = Boolean(playback?.active);
+  useEffect(() => {
+    if (active && unfinished) setResumed(true);
+  }, [active, unfinished]);
   const id = playback?.id;
   const progress = playback?.progress;
   useEffect(() => {
@@ -70,12 +75,14 @@ export function useReplyPlayback(plan: ReturnType<typeof createReplyReveal>, pla
       if (catchUp) {
         show(Math.min(words.length, position + catchUp));
         if (position < words.length) timer = setTimeout(tick, REPLY_CATCH_UP_STEP_MS);
+        else setResumed(false);
         return;
       }
       const word = words[position];
       if (word === undefined) {
         if (callbacks.current?.complete) {
           if (played) callbacks.current.onComplete();
+          setResumed(false);
           return;
         }
         timer = setTimeout(tick, 32);
