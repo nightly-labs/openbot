@@ -614,7 +614,6 @@ export function createChannelsController(env: ChannelsEnvironment) {
     },
     resync: () => {
       keptPages.clear();
-      replaceLoadedPage = false;
       announce(null);
       return refresh();
     },
