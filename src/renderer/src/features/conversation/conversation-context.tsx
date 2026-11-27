@@ -136,6 +136,7 @@ const Conversation = createSimpleContext({
       setUiErrors,
     } = useAgents();
     const {
+      activeTurns,
       completedTurnByAgent,
       pendingPrompts,
       setPendingPrompts,
@@ -248,17 +249,18 @@ const Conversation = createSimpleContext({
         }
         const { agentId } = next;
         if (!agentId) return;
-        const prefetched = prefetchedConversationPages.get(agentId);
-        if (prefetched) {
-          prefetchedConversationPages.delete(agentId);
-          if (!conversations[agentId]?.loaded) applyConversationPage(prefetched, "replace", "latest");
-        }
         const serverId = untrack(activeServerId);
         const trackingKey = agentConversationKey(serverId, agentId);
         const pageRequest = (conversationPageRequests.get(agentId) ?? 0) + 1;
         conversationPageRequests.set(agentId, pageRequest);
         const server = untrack(activeServer);
         if (server?.kind === "remote" && server.state !== "online") return;
+        const prefetched = prefetchedConversationPages.get(agentId);
+        if (prefetched) {
+          prefetchedConversationPages.delete(agentId);
+          if (untrack(() => prefetchedPageIsCurrent(prefetched)))
+            applyConversationPage(prefetched, "replace", "latest");
+        }
         updateConversation(agentId, (conversation) => {
           conversation.loading = true;
           conversation.loadError = null;
@@ -309,6 +311,22 @@ const Conversation = createSimpleContext({
       },
     );
 
+    function prefetchedPageIsCurrent(page: ConversationPage): boolean {
+      const conversation = conversations[page.agentId];
+      if (conversation?.loaded) return false;
+      const pageMessageIds = new Set(page.messages.map((message) => message.id));
+      if (conversation?.messages.some((message) => !pageMessageIds.has(message.id))) return false;
+      const pageTurnId = completedTurnByAgent.get(page.agentId) === page.activeTurnId ? null : page.activeTurnId;
+      if ((activeTurns()[page.agentId] ?? null) !== pageTurnId) return false;
+      const read = conversation?.read;
+      return (
+        !read ||
+        !page.readState ||
+        (read.unreadCount === page.readState.unreadCount &&
+          read.firstUnreadMessageId === page.readState.firstUnreadMessageId)
+      );
+    }
+
     const prefetchKey = createMemo(() => {
       const server = activeServer();
       const agentId = activeAgentId();
@@ -326,14 +344,16 @@ const Conversation = createSimpleContext({
       const [, serverId, agentId, ids = ""] = key.split("\n");
       if (!serverId || !agentId || !ids) return;
 
+      const listedIds = ids.split("\0");
+      const listed = new Set(listedIds);
       for (const cachedId of prefetchedConversationPages.keys()) {
-        if (untrack(() => conversations[cachedId]?.loaded)) prefetchedConversationPages.delete(cachedId);
+        if (!listed.has(cachedId) || untrack(() => conversations[cachedId]?.loaded))
+          prefetchedConversationPages.delete(cachedId);
       }
       const freeSlots = Math.max(0, 20 - prefetchedConversationPages.size);
       if (freeSlots === 0) return;
 
-      const candidates = ids
-        .split("\0")
+      const candidates = listedIds
         .filter(
           (id) => id !== agentId && !prefetchedConversationPages.has(id) && !untrack(() => conversations[id]?.loaded),
         )
