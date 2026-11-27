@@ -810,6 +810,9 @@ right after the computer wakes, also the second list lacks new models (#16212). 
 (`moveAgentsOffModelsUnlistedTwice`). The count is kept in memory, so the first start after an
 OpenBot restart never moves an agent. A model that is really gone moves at the next provider start,
 for example after the idle release.
+Antigravity also sets `catalog.partialListAtStart`: after a restart or the idle release, its first
+lists can lack models that it lists a few seconds later, and an agent on Gemini 4 Neon moved to Gemini
+4 Hydrogen (#17413). `scripts/antigravity-partial-model-list-e2e.ts` checks it with a fake `agy`.
 
 The same partial list is the session's model list right after a start. Before a turn, `applyConfig`
 fails a model that the session does not list (#11964), so a queued message failed with "does not

@@ -993,7 +993,7 @@ export const BUILT_IN_PROVIDER_DRIVERS: readonly BuiltInProviderDriver[] = [
       timeoutMs: 30_000,
       acpLogout: true,
     },
-    catalog: { slowList: true, ownOrder: true, relistWhileRunning: true },
+    catalog: { slowList: true, ownOrder: true, partialListAtStart: true, relistWhileRunning: true },
     resolveCli: resolveAntigravityCli,
     createClient: (cli, timeout, context, confinement) =>
       new AcpAgentClient(cli, timeout, {
