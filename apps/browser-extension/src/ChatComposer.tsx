@@ -1,11 +1,20 @@
+import type { AttachmentSummary } from "@openbot/contracts/ipc";
 import { ArrowUp } from "@openbot/ui";
+import { ComposerAttachmentRow } from "@openbot/ui/features/conversation/ComposerAttachmentRow";
 import { ComposerErrorBanner } from "@openbot/ui/features/conversation/ComposerErrorBanner";
 import { ComposerStackCard } from "@openbot/ui/features/conversation/ComposerStackCard";
 import { useText } from "@openbot/ui/text";
 import { appendVoiceTranscript } from "@openbot/ui/voice-recording";
-import { createSignal, onSettled, Show } from "solid-js";
+import { createEffect, createSignal, onSettled, Show } from "solid-js";
 import { DictationMic, DictationStrip } from "./DictationStrip";
 import { createDictation } from "./dictation";
+import { clipboardImages, createPastedImages } from "./pasted-images";
+
+export interface ComposerImages {
+  accepts: boolean;
+  upload: (file: File) => Promise<AttachmentSummary>;
+  discard: (attachmentId: string) => void;
+}
 
 export function ChatComposer(props: {
   placeholder: string;
@@ -14,11 +23,19 @@ export function ChatComposer(props: {
   onDismissError: () => void;
   sending: boolean;
   transcribe: ((wav: Uint8Array) => Promise<string>) | null;
-  onSend: (text: string) => Promise<void>;
+  images: ComposerImages;
+  onSend: (text: string, attachments: AttachmentSummary[]) => Promise<void>;
   onFocusReady?: (focus: () => void) => void;
 }) {
   const { t } = useText();
   const [draft, setDraft] = createSignal("");
+  const [imageError, setImageError] = createSignal<string | null>(null);
+  const images = createPastedImages({
+    upload: (file) => props.images.upload(file),
+    discard: (attachmentId) => props.images.discard(attachmentId),
+    onError: (error) =>
+      setImageError(error instanceof Error && error.message ? error.message : t("composer.upload.failed")),
+  });
   let field: HTMLTextAreaElement | undefined;
   const dictation = props.transcribe
     ? createDictation({
@@ -34,7 +51,15 @@ export function ChatComposer(props: {
     : null;
   const dictating = () => (dictation?.phase() ?? "idle") !== "idle";
   const recording = () => dictation?.phase() === "recording";
-  const canSend = () => draft().trim().length > 0 && !props.sending && !dictating();
+  const canSend = () =>
+    (draft().trim().length > 0 || images.ready().length > 0) && !props.sending && !dictating() && !images.busy();
+
+  createEffect(
+    () => `${props.conversationKey}:${props.images.accepts ? "images" : "text"}`,
+    (_target, previous) => {
+      if (previous !== undefined) images.clear();
+    },
+  );
 
   onSettled(() => {
     props.onFocusReady?.(() => field?.focus());
@@ -42,7 +67,10 @@ export function ChatComposer(props: {
       if (event.key === "Escape" && dictation?.phase() === "recording") dictation.cancel();
     };
     document.addEventListener("keydown", drop);
-    return () => document.removeEventListener("keydown", drop);
+    return () => {
+      document.removeEventListener("keydown", drop);
+      images.clear();
+    };
   });
 
   function resize() {
@@ -54,9 +82,11 @@ export function ChatComposer(props: {
     event?.preventDefault();
     if (!canSend()) return;
     const text = draft().trim();
+    const attachments = images.take();
     setDraft("");
+    setImageError(null);
     queueMicrotask(resize);
-    await props.onSend(text).catch(() => undefined);
+    await props.onSend(text, attachments).catch(() => undefined);
   }
 
   function sendButton() {
@@ -90,6 +120,17 @@ export function ChatComposer(props: {
             />
           )}
         </ComposerStackCard>
+        <ComposerStackCard when={imageError()}>
+          {(message) => (
+            <ComposerErrorBanner
+              message={message()}
+              onDismiss={() => {
+                setImageError(null);
+                field?.focus();
+              }}
+            />
+          )}
+        </ComposerStackCard>
         <ComposerStackCard when={dictation?.error()}>
           {(message) => (
             <ComposerErrorBanner
@@ -103,6 +144,14 @@ export function ChatComposer(props: {
         </ComposerStackCard>
       </div>
       <form class="ext-field" onSubmit={(event) => void submit(event)}>
+        <ComposerAttachmentRow
+          attachments={images.ready()}
+          pending={images.pending()}
+          onRemove={(attachment) => {
+            images.remove(attachment);
+            field?.focus();
+          }}
+        />
         <div class="ch-field">
           <Show when={dictation && recording() ? dictation : undefined}>
             {(voice) => <DictationStrip level={() => voice().levels().at(-1) ?? 0} seconds={voice().seconds()} />}
@@ -121,6 +170,14 @@ export function ChatComposer(props: {
               setDraft(event.currentTarget.value);
               resize();
             }}
+            onPaste={(event) => {
+              if (!props.images.accepts || dictation?.phase() === "transcribing") return;
+              const files = clipboardImages(event.clipboardData);
+              if (files.length === 0) return;
+              event.preventDefault();
+              setImageError(null);
+              images.add(files);
+            }}
             onKeyDown={(event) => {
               if (event.key === "Enter" && !event.shiftKey && !event.isComposing) {
                 event.preventDefault();
@@ -132,7 +189,7 @@ export function ChatComposer(props: {
             {(voice) => (
               <DictationMic
                 active={voice().phase() === "recording"}
-                disabled={voice().phase() === "starting" || voice().phase() === "transcribing"}
+                disabled={voice().phase() === "starting" || voice().phase() === "transcribing" || images.busy()}
                 label={
                   voice().phase() === "recording"
                     ? t("extension.chat.dictation.stop")

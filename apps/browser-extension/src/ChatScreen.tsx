@@ -277,7 +277,12 @@ function ChatView(props: ChatScreenProps & { chat: OpenChat; agent: ClientAgentS
         onDismissError={() => props.workspace.clearChatError()}
         sending={props.chat.sending}
         transcribe={props.workspace.transcribe}
-        onSend={(text) => props.workspace.send(text)}
+        images={{
+          accepts: props.workspace.chatTakesImages(props.chat),
+          upload: props.workspace.uploadImage,
+          discard: props.workspace.discardImage,
+        }}
+        onSend={(text, attachments) => props.workspace.send(text, attachments)}
         onFocusReady={(focus) => {
           focusField = focus;
         }}
