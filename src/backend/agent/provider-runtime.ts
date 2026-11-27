@@ -2832,6 +2832,28 @@ export class ProviderRuntime implements ProviderPort {
     return yield* this.#restartWhenIdle(provider, false);
   }).bind(this);
 
+  restartForNewMcpTools(provider: AgentProvider, agentIds: ReadonlySet<string>): Effect.Effect<void> {
+    return this.#restartForNewMcpTools(provider, agentIds).pipe(
+      Effect.ignore,
+      Effect.forkIn(this.#scope),
+      Effect.asVoid,
+    );
+  }
+
+  readonly #restartForNewMcpTools = Effect.fn("ProviderRuntime.restartForNewMcpTools")(function* (
+    this: ProviderRuntime,
+    provider: AgentProvider,
+    agentIds: ReadonlySet<string>,
+  ) {
+    const usesSharedProcess = [...agentIds].some((agentId) => !this.runsOnOwnProcess(agentId));
+    for (const [agentId, confined] of [...this.#confined]) {
+      if (!agentIds.has(agentId) || confined.client.provider !== provider) continue;
+      if (confined.client.canReleaseProcess?.() === false || this.#hooks.isAgentBusy(agentId)) continue;
+      yield* this.#stopConfined(agentId, confined);
+    }
+    if (usesSharedProcess && this.#clients.has(provider)) yield* this.#restartWhenIdle(provider, false);
+  });
+
   readonly chooseInstalledCli = Effect.fn("ProviderRuntime.chooseInstalledCli")(function* (
     this: ProviderRuntime,
     provider: AgentProvider,

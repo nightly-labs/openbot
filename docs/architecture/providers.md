@@ -363,6 +363,12 @@ OpenBot unloads a session that has no turn, keeps its identity, and resumes it a
   up to `mcp_optional_startup_grace_ms` (10 s) for each slow server. So `ProviderRuntime` stops an
   idle Codex app server 30 minutes after its last use, not after the 10 minutes of the other
   provider CLIs (#16388). A Workspace only Codex process still stops after 10 minutes.
+- That list is keyed by the server config only, and a new thread uses it without a new `tools/list`.
+  `config/mcpServer/reload` does not clear it. So when a test finds a new tool set on a server, or a
+  sign-in on a server succeeds, OpenBot restarts each Codex process of the Codex agents that use the
+  server (#17472). The shared app server restarts when it is idle, as for a changed start setting;
+  a running turn finishes first. An idle Workspace only or account process stops, and the next turn
+  starts a new one. `scripts/codex-mcp-new-tools-e2e.ts` checks it.
 - When the memory of a server is critical, `MemoryHold` releases every idle session of each kind at once.
 - A routine session is ephemeral and is not released.
 - Outside Windows, the Claude, Codex and Pi CLIs start as the leaders of their own process groups

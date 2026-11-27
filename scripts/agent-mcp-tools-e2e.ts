@@ -219,6 +219,7 @@ try {
         Effect.sync(() => {
           refreshes += 1;
         }),
+      mcpToolsChanged: () => Effect.void,
     },
   });
   const tools = mcpServersFromGateway(gateway);
@@ -532,7 +533,11 @@ try {
       mcpAuthorization: () => Effect.succeed(null),
     },
     logger: createOpenBotLogger("agent-service", () => undefined),
-    hooks: { emitError: () => undefined, refreshAllAgentRuntimes: () => Effect.void },
+    hooks: {
+      emitError: () => undefined,
+      refreshAllAgentRuntimes: () => Effect.void,
+      mcpToolsChanged: () => Effect.void,
+    },
   });
   const githubTools = mcpServersFromGateway(githubGateway);
   assert.ok(githubGateway.enabled().some((config) => config.name === "github"));
