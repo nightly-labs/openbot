@@ -20,6 +20,7 @@ import { typeScale } from "@/shared/lib/type-scale";
 import { ListingIcon } from "../components/marketplace-parts";
 import { appListings } from "../model/marketplace-listings";
 import { pluginConnectMethod } from "../model/plugin-connect";
+import { useMobilePlugins } from "../model/use-mobile-plugins";
 import { usePluginConnect } from "../model/use-plugin-connect";
 
 export function MarketplaceAppConnectScreen() {
@@ -28,7 +29,8 @@ export function MarketplaceAppConnectScreen() {
   const actionForeground = String(useCSSVariable("--openbot-action-foreground"));
   const { serverId, slug } = useLocalSearchParams<{ serverId: string; slug: string }>();
   const { session } = useMobileSession();
-  const listing = session?.apiUrl ? appListings(session.apiUrl).find((item) => item.id === slug) : undefined;
+  const plugins = useMobilePlugins(serverId);
+  const listing = session?.apiUrl ? appListings(session.apiUrl, plugins).find((item) => item.id === slug) : undefined;
   const plugin = listing?.kind === "app" && listing.source === "plugin" ? listing.plugin : null;
   const app = plugin?.apps[0] ?? null;
   const canRelay = useMobileWorkspaceSelector((workspace) => workspace.canRelayMcpSignIn(serverId));

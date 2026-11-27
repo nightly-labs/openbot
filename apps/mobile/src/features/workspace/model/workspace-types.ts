@@ -600,6 +600,7 @@ export interface MobileWorkspaceContextValue {
   testMcpServer: (config: McpServerConfig, serverId: string) => Promise<McpTestResult>;
   canRelayMcpSignIn: (serverId: string) => boolean;
   macAppsUnavailable: (serverId: string) => boolean;
+  hostLoadsPluginCatalog: (serverId: string) => boolean;
   canEditUiBlockPreview: (serverId: string) => boolean;
   mcpSignInRelay: (serverId: string) => McpSignInRelay;
   listMcpSignIns: (serverId: string) => Promise<McpSignInState[]>;
@@ -952,6 +953,7 @@ type ServerCheckKey =
   | "canManageMcpServers"
   | "canRelayMcpSignIn"
   | "macAppsUnavailable"
+  | "hostLoadsPluginCatalog"
   | "canEditUiBlockPreview"
   | "canManageMcpAccess"
   | "canAddMarketplaceAgents"

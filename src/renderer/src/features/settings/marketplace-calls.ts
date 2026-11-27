@@ -5,11 +5,13 @@ import type {
   McpSignInRelayPage,
   SetMcpAccessInput,
 } from "@openbot/contracts/ipc";
+import type { PluginCatalog } from "@openbot/contracts/plugin-catalog";
 import { appPort } from "../../app-port";
 import { type AgentSkillCalls, agentSkillCalls, type SkillsPort, skillsPort } from "../../skills-port";
 
 export interface MarketplaceCalls {
   skills: Pick<SkillsPort["skills"], "get" | "getBySlug" | "list">;
+  pluginCatalog: () => Promise<PluginCatalog | null>;
   agents: Pick<SkillsPort["marketplaceAgents"], "get" | "getListing" | "list">;
   agentSkills: (hostServerId?: string) => AgentSkillCalls;
   mcp: Pick<
@@ -53,6 +55,7 @@ export function desktopMarketplaceCalls(): MarketplaceCalls {
   const port = skillsPort();
   return {
     skills: port.skills,
+    pluginCatalog: () => port.skills.pluginCatalog(),
     agents: port.marketplaceAgents,
     agentSkills: agentSkillCalls,
     mcp: port.agent,

@@ -87,6 +87,7 @@ import { OWNER_TRANSFER_CAPABILITY } from "@openbot/contracts/team-protocol/owne
 import { PASSWORD_MANAGERS_CAPABILITY } from "@openbot/contracts/team-protocol/password-managers-v1";
 import { PENDING_APPROVAL_CAPABILITY } from "@openbot/contracts/team-protocol/pending-approval-v1";
 import { PHONE_FEEDBACK_CAPABILITY } from "@openbot/contracts/team-protocol/phone-feedback-v1";
+import { PLUGIN_CATALOG_CAPABILITY } from "@openbot/contracts/team-protocol/plugin-catalog-v1";
 import { PROVIDER_ACCOUNTS_CAPABILITY } from "@openbot/contracts/team-protocol/provider-accounts-v1";
 import { PROVIDERS_ADMIN_CAPABILITY } from "@openbot/contracts/team-protocol/providers-v1";
 import { PUSH_NOTIFICATION_THREADS_CAPABILITY } from "@openbot/contracts/team-protocol/push-notification-threads-v1";
@@ -356,6 +357,8 @@ const OTHER_SERVERS_RETURN_DELAY_MS = 3_000;
 const STARTUP_SERVER_WAIT_MS = 4_000;
 const FIRST_CONNECTION_WAIT_MS = 5_000;
 const STREAM_FLUSH_MS = 100;
+const LATEST_PAGE_SIZE = 50;
+const READ_LATEST_PAGE_SIZE = 24;
 const EMPTY_SERVER: MobileServer = {
   id: "unavailable",
   name: "OpenBot",
@@ -1151,6 +1154,14 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
     },
     [request, conversationStore],
   );
+  const latestPageSize = useCallback(
+    (agentId: string) => {
+      const live = liveState.get();
+      const unread = live.unreadAgentIds.includes(agentId) || (live.unreadCounts[agentId] ?? 0) > 0;
+      return unread ? LATEST_PAGE_SIZE : READ_LATEST_PAGE_SIZE;
+    },
+    [liveState],
+  );
   const loadConversation = useCallback(
     async (agentId: string, serverId = activeServerIdRef.current, refresh = false, attach = false) => {
       const generation = loadGeneration.current;
@@ -1159,7 +1170,7 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
         () =>
           request(
             "GET",
-            `${TEAM_API_ROUTES.agent.conversationPage(agentId)}?limit=50`,
+            `${TEAM_API_ROUTES.agent.conversationPage(agentId)}?limit=${latestPageSize(agentId)}`,
             decodeConversationPage,
             undefined,
             serverId,
@@ -1171,7 +1182,7 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
       refreshOpenExchanges(agentId, serverId);
       return page;
     },
-    [request, conversationStore, refreshOpenExchanges],
+    [request, conversationStore, refreshOpenExchanges, latestPageSize],
   );
   const loadLatestMessages = useCallback(
     async (agentId: string, serverId?: string) => {
@@ -1244,7 +1255,7 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
               () =>
                 client.request(
                   "GET",
-                  `${TEAM_API_ROUTES.agent.conversationPage(agentId)}?limit=50`,
+                  `${TEAM_API_ROUTES.agent.conversationPage(agentId)}?limit=${latestPageSize(agentId)}`,
                   decodeConversationPage,
                 ),
               context.isCurrent,
@@ -1256,7 +1267,7 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
       })();
       trackUntilSettled(serverLoads.current, loads);
     },
-    [conversationStore, persistServer],
+    [conversationStore, persistServer, latestPageSize],
   );
 
   const loadServer = useCallback(
@@ -2777,6 +2788,7 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
         canRelayMcpSignIn: (serverId) =>
           managesMcp(serverId) && hasCapability(capabilities, serverId, SIGN_IN_RELAY_CAPABILITY),
         macAppsUnavailable: (serverId) => hasCapability(capabilities, serverId, MAC_APPS_LIMIT_CAPABILITY),
+        hostLoadsPluginCatalog: (serverId) => hasCapability(capabilities, serverId, PLUGIN_CATALOG_CAPABILITY),
         canEditUiBlockPreview: (serverId) => hasCapability(capabilities, serverId, UI_BLOCK_PREVIEW_EDIT_CAPABILITY),
         canManageMcpAccess: (serverId) => administers(serverId, MCP_ACCESS_CAPABILITY),
         canAddMarketplaceAgents: (serverId) => administers(serverId, AGENT_INSTALL_CAPABILITY),

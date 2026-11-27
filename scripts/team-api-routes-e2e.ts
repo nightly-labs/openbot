@@ -285,6 +285,7 @@ import {
   CHANNEL_PAGE_TASKS_CAPABILITY,
   decodeTeamProtocolSupportExpanded,
   TEAM_CURRENT_CAPABILITIES,
+  TEAM_HISTORY_EXTENT_CAPABILITY,
   TEAM_USAGE_GROUPS_CAPABILITY,
   TEAM_USAGE_READ_FAILED_CAPABILITY,
   teamCapabilitiesForProtocol,
@@ -11382,6 +11383,55 @@ try {
         taskIds(fullTasks).join() === "task-history,task-open,task-shown" &&
         taskIds(windowTasks).join() === "task-open,task-shown",
       [taskIds(fullTasks), taskIds(windowTasks)],
+    );
+
+    for (let index = 1; index <= 60; index += 1) postAlert(`page-cap-${index}`, alertMember);
+    const pageReadAll = await markRead(pictures.store.page(channelId).throughSequence, "page-cap-read-all");
+    const extentUse = { ...use, capabilities: [...pictured, TEAM_HISTORY_EXTENT_CAPABILITY] };
+    const firstChannelPage = await call("POST", CHANNEL_ROUTES.read, { ...extentUse, json: { channelId } });
+    const firstCursor = field(firstChannelPage.body, "olderCursor");
+    const olderChannelPage = await call("POST", CHANNEL_ROUTES.read, {
+      ...extentUse,
+      json: { channelId, beforeSequence: firstCursor },
+    });
+    check(
+      "a read channel opens on 24 messages with olderCursor and olderCount, and older pages still return up to 100 messages",
+      pageReadAll.status === 200 &&
+        firstChannelPage.status === 200 &&
+        list(field(firstChannelPage.body, "messages")).length === 24 &&
+        typeof firstCursor === "number" &&
+        Number(field(firstChannelPage.body, "olderCount")) >= 36 &&
+        olderChannelPage.status === 200 &&
+        list(field(olderChannelPage.body, "messages")).length > 24,
+      [
+        summary(pageReadAll),
+        list(field(firstChannelPage.body, "messages")).length,
+        firstCursor,
+        field(firstChannelPage.body, "olderCount"),
+        list(field(olderChannelPage.body, "messages")).length,
+      ],
+    );
+    const pageMessageIds = (reply: Reply) => list(field(reply.body, "messages")).map((item) => field(item, "id"));
+    for (let index = 1; index <= 30; index += 1) postAlert(`page-unread-${index}`, alertMember);
+    const unreadChannelPage = await call("POST", CHANNEL_ROUTES.read, { ...extentUse, json: { channelId } });
+    for (let index = 31; index <= 120; index += 1) postAlert(`page-unread-${index}`, alertMember);
+    const cappedChannelPage = await call("POST", CHANNEL_ROUTES.read, { ...extentUse, json: { channelId } });
+    check(
+      "a channel with unread messages opens on the messages after the last read one and one read message, up to 100 messages",
+      unreadChannelPage.status === 200 &&
+        pageMessageIds(unreadChannelPage).length === 31 &&
+        pageMessageIds(unreadChannelPage)[0] === "page-cap-60" &&
+        pageMessageIds(unreadChannelPage)[1] === "page-unread-1" &&
+        cappedChannelPage.status === 200 &&
+        pageMessageIds(cappedChannelPage).length === 100 &&
+        pageMessageIds(cappedChannelPage)[0] === "page-unread-21" &&
+        typeof field(cappedChannelPage.body, "olderCursor") === "number",
+      [
+        pageMessageIds(unreadChannelPage).slice(0, 2),
+        pageMessageIds(unreadChannelPage).length,
+        pageMessageIds(cappedChannelPage)[0],
+        pageMessageIds(cappedChannelPage).length,
+      ],
     );
   }
 

@@ -163,6 +163,7 @@ export function serverSupportsCapability(
       capability === "workflow-folders-v1" ||
       capability === "workflow-presence-v1" ||
       capability === "vault-import-v1" ||
+      capability === "plugin-catalog-v1" ||
       capability === "agent-waits-v1" ||
       capability === "agent-queue-task-v1" ||
       capability === "background-processes-v1" ||

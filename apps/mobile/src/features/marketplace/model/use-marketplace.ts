@@ -24,8 +24,9 @@ import {
   matchesQuery,
   skillListing,
 } from "./marketplace-listings";
-import { MOBILE_PLUGINS } from "./plugin-catalog.generated";
+import type { MobilePlugin } from "./plugin-catalog.generated";
 import { claimedByPlugin, pluginInstalled } from "./plugin-connect";
+import { useMobilePlugins } from "./use-mobile-plugins";
 
 const CATALOG_FRESH_MS = 5 * 60_000;
 const SEARCH_DEBOUNCE_MS = 220;
@@ -39,7 +40,7 @@ function useDebounced(value: string, delay: number): string {
   return debounced;
 }
 
-function useServerApps(serverId: string) {
+function useServerApps(serverId: string, plugins: readonly MobilePlugin[]) {
   const { t } = useText();
   const rows = useConnectorRows(serverId);
   const { list: mcpServers } = useMcpServerList(serverId);
@@ -49,10 +50,10 @@ function useServerApps(serverId: string) {
         (row) => connectorListing(row, t(CONNECTOR_TITLE_KEYS[row.id]), t(CONNECTOR_TAGLINES[row.id])) ?? [],
       ),
       ...(mcpServers.data ?? [])
-        .filter((server) => !MOBILE_PLUGINS.some((plugin) => claimedByPlugin(server, plugin)))
+        .filter((server) => !plugins.some((plugin) => claimedByPlugin(server, plugin)))
         .map(customListing),
     ],
-    [rows, mcpServers.data, t],
+    [rows, mcpServers.data, plugins, t],
   );
   return { apps, mcpServers };
 }
@@ -67,7 +68,8 @@ export function useMarketplaceCatalog({
   filter: MarketplaceFilter;
 }) {
   const { session } = useMobileSession();
-  const { apps: serverApps, mcpServers } = useServerApps(serverId);
+  const plugins = useMobilePlugins(serverId);
+  const { apps: serverApps, mcpServers } = useServerApps(serverId, plugins);
   const apiUrl = session?.apiUrl ?? null;
   const search = useDebounced(query.trim(), SEARCH_DEBOUNCE_MS);
   const category = filter.category;
@@ -101,10 +103,10 @@ export function useMarketplaceCatalog({
     if (!apiUrl) return [];
     return [
       ...(agents.data?.pages ?? []).flatMap((page) => page.agents.map((agent) => agentListing(apiUrl, agent))),
-      ...[...serverApps, ...appListings(apiUrl)].filter((app) => matchesQuery(app, search)),
+      ...[...serverApps, ...appListings(apiUrl, plugins)].filter((app) => matchesQuery(app, search)),
       ...(skills.data?.pages ?? []).flatMap((page) => page.skills.map((skill) => skillListing(apiUrl, skill))),
     ];
-  }, [apiUrl, agents.data, skills.data, search, serverApps]);
+  }, [apiUrl, agents.data, skills.data, search, serverApps, plugins]);
   const pending =
     (agents.isPending && agents.fetchStatus !== "idle") || (skills.isPending && skills.fetchStatus !== "idle");
   const { fetchNextPage: moreAgents } = agents;
