@@ -95,7 +95,9 @@ interface PromptState {
 }
 
 export function QuestionPromptBubble(props: QuestionPromptBubbleProps) {
-  const { t } = useText();
+  const { t, sourceText } = useText();
+  const optionText = (question: AgentPromptQuestion, text: string) =>
+    question.id === MCP_ELICITATION_DECISION_QUESTION_ID ? sourceText(text) : text;
   const total = () => props.questions.length;
   const [state, setState] = createStore<PromptState>({
     step: untrack(() => (props.resolution ? props.questions.length : 0)),
@@ -384,9 +386,9 @@ export function QuestionPromptBubble(props: QuestionPromptBubbleProps) {
                   {optionLetter(optionIndex())}
                 </Kbd>
                 <span class="question-prompt-option-text">
-                  <span class="question-prompt-option-label">{option.label}</span>
+                  <span class="question-prompt-option-label">{optionText(question(), option.label)}</span>
                   <Show when={option.description}>
-                    <span class="question-prompt-option-description">{option.description}</span>
+                    <span class="question-prompt-option-description">{optionText(question(), option.description)}</span>
                   </Show>
                 </span>
               </Questionnaire.Choice>
@@ -427,7 +429,10 @@ export function QuestionPromptBubble(props: QuestionPromptBubbleProps) {
     const custom = optionLetter(question.options?.length ?? 0);
     if (question.isSecret || !response.answers) return [{ letter: custom, text: t("prompt.question.privateAnswer") }];
     if (response.answers.length === 0) return null;
-    return response.answers.map((answer) => ({ letter: answerLetter(question, answer), text: answer }));
+    return response.answers.map((answer) => ({
+      letter: answerLetter(question, answer),
+      text: optionText(question, answer),
+    }));
   }
 
   const statusTitle = () => {
@@ -447,7 +452,7 @@ export function QuestionPromptBubble(props: QuestionPromptBubbleProps) {
                 <Kbd class="question-prompt-letter" aria-hidden="true">
                   {optionLetter(optionIndex())}
                 </Kbd>
-                {option.label}
+                {optionText(optionsProps.question, option.label)}
               </li>
             )}
           </For>

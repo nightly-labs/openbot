@@ -2,6 +2,12 @@ import type { PartialTranslation } from "../../../message";
 import type { messages as source } from "../../en/status/agent";
 
 export const messages = {
+  "status.agent.mcpConsentAllowOnce": "允许一次",
+  "status.agent.mcpConsentAllowOnceDetail": "允许 {name} 的这次请求。",
+  "status.agent.mcpConsentAllowAlways": "始终允许",
+  "status.agent.mcpConsentAllowAlwaysDetail": "为以后的 {name} 请求记住此访问权限。",
+  "status.agent.mcpConsentDecline": "不允许",
+  "status.agent.mcpConsentDeclineDetail": "继续阻止访问。",
   "status.agent.claudeWriteOutside": "写入 {path}，位置在助手工作区、共享文件夹和临时文件夹之外。",
   "status.agent.contextCleared": "上下文已清空，将从这里开始新对话。",
   "status.agent.instructionsChanged": "更新了它的指令",

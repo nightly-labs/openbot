@@ -2,6 +2,12 @@ import type { PartialTranslation } from "../../../message";
 import type { messages as source } from "../../en/status/agent";
 
 export const messages = {
+  "status.agent.mcpConsentAllowOnce": "今回のみ許可",
+  "status.agent.mcpConsentAllowOnceDetail": "{name} のこのリクエストを許可します。",
+  "status.agent.mcpConsentAllowAlways": "常に許可",
+  "status.agent.mcpConsentAllowAlwaysDetail": "今後の {name} のリクエストでもこのアクセスを記憶します。",
+  "status.agent.mcpConsentDecline": "許可しない",
+  "status.agent.mcpConsentDeclineDetail": "アクセスはブロックされたままです。",
   "status.agent.claudeWriteOutside":
     "{path} に書き込みます。これはエージェントのワークスペース、共有フォルダー、一時フォルダーの外です。",
   "status.agent.contextCleared": "コンテキストを消去しました。ここから新しいチャットが始まります。",

@@ -2,6 +2,12 @@ import type { PartialTranslation } from "../../../message";
 import type { messages as source } from "../../en/status/agent";
 
 export const messages = {
+  "status.agent.mcpConsentAllowOnce": "Bir kez izin ver",
+  "status.agent.mcpConsentAllowOnceDetail": "{name} için bu isteğe izin ver.",
+  "status.agent.mcpConsentAllowAlways": "Her zaman izin ver",
+  "status.agent.mcpConsentAllowAlwaysDetail": "Gelecekteki {name} istekleri için bu erişimi hatırla.",
+  "status.agent.mcpConsentDecline": "İzin verme",
+  "status.agent.mcpConsentDeclineDetail": "Erişim engelli kalır.",
   "status.agent.claudeWriteOutside":
     "Ajanın çalışma alanı, paylaşılan klasör ve geçici klasörler dışındaki {path} konumuna yaz.",
   "status.agent.contextCleared": "Bağlam temizlendi. Yeni bir sohbet burada başlıyor.",
