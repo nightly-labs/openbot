@@ -21,6 +21,7 @@ import { Deferred, Effect, Schema, Semaphore } from "effect";
 import type { BrowserWindow, Display, Rectangle, Screen } from "electron";
 import { causeHelpers } from "../backend/effect-boundary";
 import { forceActivateX11Window } from "./linux-x11-activation";
+import { keepPanelStationary } from "./mac-panel-activation";
 import { letPointerThrough, type PointerForwardingGate } from "./pointer-forwarding-gate";
 import { sendToRenderer } from "./renderer-ipc";
 import type { WindowsTopmostKeeper } from "./windows-topmost-keeper";
@@ -424,6 +425,7 @@ export class AgentDockWindowController {
           window.setWindowButtonVisibility(false);
           window.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true, skipTransformProcessType: true });
           window.setHiddenInMissionControl(true);
+          keepPanelStationary(window);
         }
         if (this.#options.windowKind === "x11") {
           window.setShape([]);
