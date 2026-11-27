@@ -41,6 +41,7 @@ const RELEASED_SOURCE_KEYS = new Set([
   "error.backend.channelRequestMemberRequired",
   "error.backend.recipientHidden",
   "error.provider.customEndpointKeyRefused",
+  "error.provider.endpointSecretUnreadable",
   "error.connector.protonPassPlan",
 ]);
 
