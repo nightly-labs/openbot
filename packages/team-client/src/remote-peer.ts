@@ -2284,7 +2284,13 @@ export function createRemoteTeamPeer(
         : !CHANNELS.every((kind) => state.channels[kind]?.readyState === "open")
           ? "channels"
           : "auth";
-    return referenced(sourceText("error.remote.desktopDidNotConnect"), referenceFrom("timeout", "connect", stage));
+    const signalNeverOpened = stage === "signal" && state.socket?.readyState === WebSocket.CONNECTING;
+    return referenced(
+      sourceText(
+        signalNeverOpened ? "error.remote.deviceConnectionServiceUnreachable" : "error.remote.desktopDidNotConnect",
+      ),
+      referenceFrom("timeout", "connect", stage),
+    );
   }
 
   function connectionOffline(
