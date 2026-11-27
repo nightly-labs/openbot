@@ -65,6 +65,7 @@ import { noteSocialFollowMessageSent } from "./social-follow-prompt";
 type ConversationDeltaEvent = Extract<AgentEvent, { type: "conversation-delta" }>;
 
 const LATEST_PAGE_SIZE = 50;
+const REMOTE_LATEST_PAGE_SIZE = 24;
 const INACTIVE_SNAPSHOT_TAIL = LATEST_PAGE_SIZE * 4;
 
 function trimToLatestPage(conversation: ConversationState): void {
@@ -174,6 +175,11 @@ const Conversation = createSimpleContext({
       });
     }
 
+    function latestPageSize(agentId: string, remote: boolean) {
+      if (!remote || (conversations[agentId]?.read?.unreadCount ?? 0) > 0) return LATEST_PAGE_SIZE;
+      return REMOTE_LATEST_PAGE_SIZE;
+    }
+
     const unreadReplies = createMemo(() =>
       Object.fromEntries(
         Object.entries(conversations).map(([id, conversation]) => [id, conversation.read?.unreadCount ?? 0]),
@@ -257,7 +263,14 @@ const Conversation = createSimpleContext({
           conversation.loadError = null;
         });
         void conversationPort()
-          .agent.readConversationPage({ agentId, anchor: { type: "latest" }, limit: 50 }, serverId)
+          .agent.readConversationPage(
+            {
+              agentId,
+              anchor: { type: "latest" },
+              limit: untrack(() => latestPageSize(agentId, server?.kind === "remote")),
+            },
+            serverId,
+          )
           .then((page) => {
             if (!scopeIsCurrent() || conversationPageRequests.get(agentId) !== pageRequest) return;
             updateConversation(agentId, (conversation) => {
@@ -921,7 +934,7 @@ const Conversation = createSimpleContext({
       const page = await conversationPort().agent.readConversationPage({
         agentId,
         anchor: { type: "latest" },
-        limit: 50,
+        limit: latestPageSize(agentId, activeServer()?.kind === "remote"),
       });
       if (!scopeIsCurrent() || conversationPageRequests.get(agentId) !== request) return;
       applyConversationPage(page, "replace", "latest");
