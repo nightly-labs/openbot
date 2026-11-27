@@ -14,7 +14,6 @@ import {
 } from "react-native-reanimated";
 import { scheduleOnRN } from "react-native-worklets";
 import { useReducedMotion } from "@/shared/lib/motion";
-import { isAndroid } from "@/shared/lib/platform";
 import { chatContentIsVisible } from "../model/chat-layout";
 
 export const CHAT_ROW_GAP = 10;
@@ -25,8 +24,8 @@ const FOCUS_PLACE_TOLERANCE = 1;
 function afterLayout(): Promise<void> {
   return new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(() => resolve())));
 }
-const ANDROID_PLACE_FRAMES = 2;
-const ANDROID_PLACE_TIMEOUT_MS = 250;
+const OPEN_PLACE_FRAMES = 2;
+const OPEN_PLACE_TIMEOUT_MS = 350;
 const OPENING_FOLLOW_MS = 600;
 
 type AnchorReadyInfo = Parameters<NonNullable<AnchoredEndSpaceConfig["onReady"]>>[0];
@@ -148,6 +147,13 @@ export function useChatMotion(
     setHistoryVisible(true);
   }, [revealed]);
   const onListReady = useCallback((withRows: boolean) => setPlacedWithRows(withRows), []);
+  useEffect(() => {
+    if (!hasRows) {
+      if (placedWithRows !== null) setPlacedWithRows(null);
+      return;
+    }
+    if (placedWithRows === false) setPlacedWithRows(null);
+  }, [hasRows, placedWithRows]);
 
   useLayoutEffect(() => {
     if (holdOpening) heldOpening.current = true;
@@ -158,7 +164,7 @@ export function useChatMotion(
     else reveal();
   }, [listPlaced, ready, holdOpening, reveal]);
   useEffect(() => {
-    if (!isAndroid || shown.current || !hasRows || placedWithRows === true || !ready || holdOpening) return;
+    if (shown.current || !hasRows || placedWithRows === true || !ready || holdOpening) return;
     const started = Date.now();
     let measuredFrames = 0;
     let frame = requestAnimationFrame(function place() {
@@ -166,7 +172,7 @@ export function useChatMotion(
       const state = list?.getState();
       const last = state ? state.data.length - 1 : -1;
       if (state && last >= 0 && state.sizeAtIndex(last) > 0) measuredFrames += 1;
-      if (list && (measuredFrames > ANDROID_PLACE_FRAMES || Date.now() - started >= ANDROID_PLACE_TIMEOUT_MS)) {
+      if (list && (measuredFrames > OPEN_PLACE_FRAMES || Date.now() - started >= OPEN_PLACE_TIMEOUT_MS)) {
         void list.scrollToEnd({ animated: false }).then(() => setPlacedWithRows(true));
         return;
       }
