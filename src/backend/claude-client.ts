@@ -3288,14 +3288,17 @@ export function claudeOpenBotTools(
         CLAUDE_TERMINAL_CHANNEL_TOOLS.includes(`mcp__openbot__${definition.name}`),
       )
     : [];
-  const claudeTool = (definition: (typeof channel)[number], extras?: { alwaysLoad: true }) =>
-    tool(
+  const claudeTool = (definition: (typeof channel)[number], extras?: { alwaysLoad: true }) => {
+    const shape = advertisedZodShape(z.strictObject(definition.shape));
+    const registered = tool(
       definition.name,
       definition.description,
-      advertisedZodShape(z.strictObject(definition.shape)),
+      shape,
       (args) => call(definition.name, args),
       extras,
     );
+    return definition.name === "tool_call" ? { ...registered, inputSchema: z.looseObject(shape) } : registered;
+  };
   return [
     ...visibleToolDefinitions("claude")
       .filter((definition) => definition.name !== "ask_user")
