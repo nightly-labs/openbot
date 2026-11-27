@@ -56,6 +56,7 @@ const RUN_PAGE = 20;
 const CACHED_WORKFLOWS = 20;
 const SAVE_DELAY_MS = 400;
 const REFRESH_DELAY_MS = 50;
+const UPDATING_DELAY_MS = 400;
 
 const NO_OPTIONS: WorkflowGitHubRepositoryOptions = { labels: [], people: [] };
 
@@ -214,6 +215,7 @@ export function createWorkflowsController(
   const [folders, setFolders] = createSignal<WorkflowFoldersSnapshot>();
   const [build, setBuild] = createSignal<WorkflowBuild>();
   const [opening, setOpening] = createSignal<string>();
+  const [updating, setUpdating] = createSignal(false);
   const [failed, setFailed] = createSignal(false);
   const playBuild = (workflowId: string, agentId: string, before: WorkflowGraph | null) =>
     setBuild((last) => ({ key: (last?.key ?? 0) + 1, workflowId, agentId, before }));
@@ -236,6 +238,7 @@ export function createWorkflowsController(
   let edits = 0;
   let writing = 0;
   let previewRequest = 0;
+  let opens = 0;
 
   let writes: Promise<void> = Promise.resolve();
   const queued = <T>(task: () => Promise<T>): Promise<T> => {
@@ -359,7 +362,8 @@ export function createWorkflowsController(
   };
 
   let library: readonly WorkflowSummary[] | undefined;
-  const read = async (workflowId: string, agentId?: string, listed?: readonly WorkflowSummary[]) => {
+  const read = async (workflowId: string, agentId?: string, listed?: readonly WorkflowSummary[], ticket?: number) => {
+    const superseded = () => workflowId !== current || (ticket !== undefined && ticket !== opens);
     const seen = edits;
     const details = workflowId === current ? readDetail(workflowId) : undefined;
     details?.catch(() => undefined);
@@ -373,9 +377,9 @@ export function createWorkflowsController(
       if (entry) entry.library = list;
       else cache.set(hostKey, { library: list, workflows: new Map() });
     }
-    if (workflowId !== current || !list.some((summary) => summary.id === workflowId)) return;
+    if (superseded() || !list.some((summary) => summary.id === workflowId)) return;
     const [next, page, versions, github] = await (details ?? readDetail(workflowId));
-    if (disposed || workflowId !== current) return;
+    if (disposed || superseded()) return;
     const open = stored();
     const shown = open?.detail.summary.id === workflowId ? open.detail : undefined;
     const known = shown && bases.get(workflowId);
@@ -415,22 +419,39 @@ export function createWorkflowsController(
       readGitHubHistory(workflowId),
     ]);
 
-  const readOpening = async (workflowId: string, listed?: readonly WorkflowSummary[]) => {
+  const readOpening = async (workflowId: string, ticket: number, listed?: readonly WorkflowSummary[]) => {
     const shownId = stored()?.detail.summary.id;
-    setOpening(shownId !== undefined && shownId !== workflowId ? workflowId : undefined);
+    const savedCopyShown = shownId === workflowId;
+    setOpening(shownId !== undefined && !savedCopyShown ? workflowId : undefined);
+    setUpdating(false);
+    const slow = savedCopyShown
+      ? setTimeout(() => {
+          if (ticket === opens && !disposed) setUpdating(true);
+        }, UPDATING_DELAY_MS)
+      : undefined;
     try {
-      return await read(workflowId, undefined, listed);
+      return await read(workflowId, undefined, listed, ticket);
     } finally {
-      if (opening() === workflowId) setOpening(undefined);
+      clearTimeout(slow);
+      if (ticket === opens) {
+        setOpening(undefined);
+        setUpdating(false);
+      }
     }
   };
 
   const load = async (workflowId: string, listed?: readonly WorkflowSummary[]) => {
+    if (disposed) return;
+    const ticket = ++opens;
     current = workflowId;
     limit = RUN_PAGE;
     const known = cached(workflowId);
-    if (known && !disposed) show(known);
-    await readOpening(workflowId, listed);
+    if (known) show(known);
+    await readOpening(workflowId, ticket, listed);
+  };
+
+  const loadAfterWrites = (task: () => Promise<unknown>) => {
+    writes.then(task).catch(report);
   };
 
   const save = async (
@@ -489,7 +510,7 @@ export function createWorkflowsController(
   const open = (workflowId: string) => {
     flush();
     closePreview();
-    write(() => load(workflowId));
+    loadAfterWrites(() => load(workflowId));
   };
 
   const keepTabs = (next: readonly string[]) => {
@@ -779,7 +800,8 @@ export function createWorkflowsController(
     readGitHubCatalog();
     readFolders();
   });
-  void queued(async () => {
+  const openFirst = async () => {
+    const ticket = ++opens;
     const asked = untrack(() => requested?.workflowId());
     const remembered = hostKey === undefined ? undefined : readLastWorkflow(hostKey);
     const known = asked ?? (current === "" ? remembered : current);
@@ -789,20 +811,27 @@ export function createWorkflowsController(
       limit = RUN_PAGE;
       const shown = cached(known);
       if (shown && stored()?.detail.summary.id !== known) show(shown);
-      if (await readOpening(known)) return;
-      if (disposed) return;
+      if (await readOpening(known, ticket)) return;
     }
+    if (disposed || ticket !== opens) return;
     const list = library ?? (await host.workflows.list());
+    if (disposed || ticket !== opens) return;
     const wanted = untrack(() => requested?.workflowId());
     if (wanted !== undefined) requested?.taken();
     const found = list.find((summary) => summary.id === wanted) ?? list[0];
     if (found) {
-      if (!disposed) await load(found.id, list);
+      await load(found.id, list);
       return;
     }
-    const created = await host.workflows.create({ title: t("workflow.canvas.untitled") });
-    if (!disposed) await load(created.summary.id);
-  }).catch(() => setFailed(true));
+    const created = await writes.then(() => host.workflows.create({ title: t("workflow.canvas.untitled") }));
+    if (ticket === opens) await load(created.summary.id);
+  };
+  void Promise.resolve()
+    .then(openFirst)
+    .catch((error: unknown) => {
+      report(error);
+      setFailed(true);
+    });
   createEffect(
     () => requested?.workflowId(),
     (workflowId) => {
@@ -811,9 +840,10 @@ export function createWorkflowsController(
       if (workflowId === current) return;
       flush();
       closePreview();
-      write(async () => {
+      loadAfterWrites(async () => {
+        const before = opens;
         const list = await host.workflows.list();
-        if (!disposed && list.some((summary) => summary.id === workflowId)) await load(workflowId, list);
+        if (opens === before && list.some((summary) => summary.id === workflowId)) await load(workflowId, list);
       });
     },
   );
@@ -913,6 +943,9 @@ export function createWorkflowsController(
     get opening() {
       return opening() !== undefined;
     },
+    get updating() {
+      return updating();
+    },
     onGraphChange: (graph) => {
       edits += 1;
       pending = { workflowId: current, graph };
@@ -982,11 +1015,11 @@ export function createWorkflowsController(
     },
     onCreate: (input) => {
       flush();
-      return queued(async () => {
-        const created = await tracked("create", () => host.workflows.create(input));
-        await load(created.summary.id).catch(report);
-      }).then(
-        () => true,
+      return queued(() => tracked("create", () => host.workflows.create(input))).then(
+        async (created) => {
+          await load(created.summary.id).catch(report);
+          return true;
+        },
         () => false,
       );
     },

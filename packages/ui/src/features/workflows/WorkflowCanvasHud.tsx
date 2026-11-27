@@ -123,6 +123,7 @@ export function WorkflowCanvasHeader(props: {
   onStop: () => void;
   paused: boolean;
   onResume?: (() => void) | undefined;
+  updating: boolean;
   people?: JSX.Element;
 }) {
   const { t, format } = useText();
@@ -200,6 +201,12 @@ export function WorkflowCanvasHeader(props: {
                 </Hint>
               )}
             </Show>
+          </div>
+        </Show>
+        <Show when={props.updating}>
+          <div class="wfn-hud" role="status">
+            <LoaderCircle class="wfn-hud-spin" aria-hidden="true" />
+            <span class="wfn-hud-label">{t("workflow.canvas.updating")}</span>
           </div>
         </Show>
         <div class="sr-only" role="status">

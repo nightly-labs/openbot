@@ -561,6 +561,7 @@ export const messages = {
   "workflow.canvas.label": "لوحة سير العمل: {name}",
   "workflow.canvas.untitled": "سير عمل بلا عنوان",
   "workflow.canvas.opening": "جارٍ فتح سير العمل…",
+  "workflow.canvas.updating": "جارٍ التحديث…",
   "workflow.canvas.copyOf": "نسخة من {name}",
   "workflow.canvas.step": "خطوة",
   "workflow.canvas.kind.note": "ملاحظة لاصقة",

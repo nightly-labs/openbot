@@ -505,6 +505,7 @@ export const messages = {
   "workflow.canvas.label": "워크플로 캔버스: {name}",
   "workflow.canvas.untitled": "제목 없는 워크플로",
   "workflow.canvas.opening": "워크플로 여는 중…",
+  "workflow.canvas.updating": "업데이트 중…",
   "workflow.canvas.copyOf": "{name} 사본",
   "workflow.canvas.step": "단계",
   "workflow.canvas.kind.note": "스티커 메모",

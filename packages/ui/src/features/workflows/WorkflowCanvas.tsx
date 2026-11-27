@@ -251,6 +251,7 @@ export interface WorkflowCanvasProps {
   versionPreview?: { versionId: string; graph: WorkflowGraph } | undefined;
   library: readonly WorkflowSummary[];
   opening?: boolean | undefined;
+  updating?: boolean | undefined;
   readOnly?: boolean | undefined;
   presence?: WorkflowPresence | undefined;
   onSpot?: ((spot: WorkflowOwnSpot) => void) | undefined;
@@ -1656,7 +1657,7 @@ export function WorkflowCanvas(props: WorkflowCanvasProps) {
     glidePlaces(goals);
   };
 
-  const canRun = () => !props.readOnly && live().some((node) => isWorkflowStepKind(node.kind));
+  const canRun = () => !props.readOnly && !props.opening && live().some((node) => isWorkflowStepKind(node.kind));
   const pastRuns = (): readonly HudRun[] =>
     props.runs.runs.flatMap(({ run }) =>
       run.endedAt === null
@@ -4192,6 +4193,7 @@ export function WorkflowCanvas(props: WorkflowCanvasProps) {
           onRun={() => props.onRun({})}
           onStop={stopRun}
           paused={paused()}
+          updating={props.updating === true && !previewing()}
           onResume={resumeAction()}
           people={
             <Show when={peers().length > 0}>
