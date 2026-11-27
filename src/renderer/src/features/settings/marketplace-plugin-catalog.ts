@@ -9,6 +9,18 @@
 import type { McpServerConfig } from "@openbot/contracts/ipc";
 import type { MarketplacePluginApp, MarketplacePluginDetail } from "@openbot/ui/features/settings/marketplace-plugins";
 
+/**
+ * The configuration an app installs as. The catalog states the name and how the server is reached -
+ * an address, or a command, its words and its fixed settings; the rest of the record and `enabled`
+ * are made here rather than stored as catalog data that could disagree with `normalizeMcpConfig`.
+ *
+ * A credential is never among them. What a server asks for is declared in `server.auth`, and the
+ * value is typed by the user in the connect dialog, which hands back the configuration that
+ * connected.
+ *
+ * The id is empty, which is what the store reads as "new". An id it does not hold is an edit of a
+ * row that is gone, and the save is refused.
+ */
 export function createPluginAppConfig(app: MarketplacePluginApp): McpServerConfig {
   return {
     id: "",
@@ -10122,6 +10134,46 @@ const UPWORK: MarketplacePluginDetail = {
   shareUrl: "https://openbot.run/plugins/upwork",
 };
 
+const VET_OFFICE: MarketplacePluginDetail = {
+  id: "plugin-vet-office",
+  slug: "vet-office",
+  name: "Vet Office",
+  tagline: "Clinic schedules, patient records and appointment totals",
+  description:
+    "Read the schedule, patient records and appointment totals for a veterinary clinic in Vet Office. Choose a clinic if your account has access to more than one. Each request uses your current clinic permissions and the modules in your subscription. Access is read-only.",
+  category: "productivity",
+  creatorName: "Vet Office",
+  iconUrl: "https://www.google.com/s2/favicons?domain=www.vetoffice.com.br&sz=48",
+  version: "1.0.0",
+  prompts: [
+    { id: "prompt-list-clinics", text: "Which Vet Office clinics can I access?" },
+    { id: "prompt-clinic-schedule", text: "Show me today's appointments for the clinic I selected." },
+    { id: "prompt-weekly-totals", text: "How many appointments and distinct patients did this clinic have last week?" },
+  ],
+  apps: [
+    {
+      id: "app-vet-office-mcp",
+      name: "Vet Office",
+      description: "Read schedules, patient records and totals for the selected clinic.",
+      iconUrl: "https://www.google.com/s2/favicons?domain=www.vetoffice.com.br&sz=48",
+      server: {
+        name: "vet-office",
+        transport: "http",
+        url: "https://www.vetoffice.com.br/api/mcp",
+        auth: [{ id: "vet-office-oauth", kind: "link", label: "Sign in" }],
+      },
+    },
+  ],
+  websiteUrl: "https://www.vetoffice.com.br",
+  privacyPolicyUrl: "https://www.vetoffice.com.br/privacidade",
+  termsUrl: "https://www.vetoffice.com.br/termos-de-uso",
+  skills: [],
+  installs: 0,
+  featured: false,
+  updatedAt: "2026-11-10T00:00:00.000Z",
+  shareUrl: "https://openbot.run/plugins/vet-office",
+};
+
 const VIDEOGEN: MarketplacePluginDetail = {
   id: "plugin-videogen",
   slug: "videogen",
@@ -11018,6 +11070,7 @@ export const MARKETPLACE_PLUGINS: MarketplacePluginDetail[] = [
   TYPEFULLY,
   UBERSUGGEST,
   UPWORK,
+  VET_OFFICE,
   VIDEOGEN,
   VIDIQ,
   WEBFLOW,
