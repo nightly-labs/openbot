@@ -109,6 +109,63 @@ const RESPONSE_VALUES: ReadonlyArray<readonly [string, unknown]> = [
   ["viewer", { url: "https://viewer.invalid/", token: "viewer-token" }],
 ];
 
+const SYNC_VERSION = "AAAAAAAAAAAAAAAA";
+const SYNC_CLIENT_MESSAGES: ReadonlyArray<readonly [string, unknown]> = [
+  ["subscribe", { type: "sync-subscribe", collection: "agents.v1", have: [["agent-1", SYNC_VERSION]], more: false }],
+  ["subscribe-no-more", { type: "sync-subscribe", collection: "agents.v1", have: [] }],
+  ["subscribe-param", { type: "sync-subscribe", collection: "messages.v1:agent-1", have: [], more: true }],
+  ["unsubscribe", { type: "sync-unsubscribe", collection: "agents.v1" }],
+  ["barrier", { type: "sync-barrier", id: "barrier-1" }],
+  ["log-subscribe", { type: "sync-log-subscribe", log: "messages.v1:agent-1", after: "12.abc", limit: 50 }],
+  ["log-subscribe-start", { type: "sync-log-subscribe", log: "messages.v1:agent-1", limit: 50 }],
+  ["log-older", { type: "sync-log-older", log: "messages.v1:agent-1", id: "page-1", before: "12.abc", limit: 50 }],
+  ["bad-collection", { type: "sync-subscribe", collection: "Agents V1", have: [], more: false }],
+  ["bad-have", { type: "sync-subscribe", collection: "agents.v1", have: [["agent-1"]], more: false }],
+  ["bad-barrier-id", { type: "sync-barrier", id: "a b" }],
+  ["bad-limit", { type: "sync-log-subscribe", log: "messages.v1:agent-1", after: null, limit: 0 }],
+  ["unknown-type", { type: "sync-replace", collection: "agents.v1" }],
+];
+const SYNC_SERVER_MESSAGES: ReadonlyArray<readonly [string, unknown]> = [
+  [
+    "changes",
+    {
+      type: "sync-changes",
+      collection: "agents.v1",
+      upserts: [{ key: "agent-1", version: SYNC_VERSION, value: { name: "Agent" } }],
+      deletes: ["agent-2"],
+      synced: true,
+    },
+  ],
+  ["barrier", { type: "sync-barrier", id: "barrier-1" }],
+  ["unavailable", { type: "sync-unavailable", collection: "agents.v1" }],
+  [
+    "log-changes",
+    {
+      type: "sync-log-changes",
+      log: "messages.v1:agent-1",
+      rows: [{ key: "msg-1", order: "0000000001", value: { text: "hello" } }],
+      deletes: [],
+      cursor: "12.abc",
+      reset: false,
+      olderCursor: null,
+      synced: true,
+      references: [{ key: "att-1", value: { name: "a.txt" } }],
+    },
+  ],
+  [
+    "log-page",
+    {
+      type: "sync-log-page",
+      log: "messages.v1:agent-1",
+      id: "page-1",
+      rows: [],
+      olderCursor: null,
+      done: true,
+    },
+  ],
+  ["bad-changes", { type: "sync-changes", collection: "agents.v1", upserts: [{ key: "agent-1" }], deletes: [] }],
+];
+
 const FRAMES: ReadonlyArray<readonly [string, unknown]> = [
   ["request", { version: 2, type: "request", requestId: "r-1", operation: "http.request", payload: { method: "GET" } }],
   ["response", { version: 2, type: "response", requestId: "r-1", result: { status: 200, body: {} } }],
@@ -159,6 +216,12 @@ const FRAMES: ReadonlyArray<readonly [string, unknown]> = [
   ["file-cancel", { version: 2, type: "file-cancel", transferId: "t-1", reason: "cancelled" }],
   ["wrong-version", { version: 3, type: "request", requestId: "r-1", operation: "x", payload: null }],
   ["no-request-id", { version: 2, type: "request", operation: "http.request", payload: null }],
+  ...SYNC_CLIENT_MESSAGES.map(
+    ([label, control]) => [`sync-control ${label}`, { version: 2, type: "event-control", control }] as const,
+  ),
+  ...SYNC_SERVER_MESSAGES.map(
+    ([label, payload]) => [`sync-event ${label}`, { version: 2, type: "event", sequence: 5, payload }] as const,
+  ),
 ];
 
 function outcome(run: () => unknown): Outcome {
@@ -294,6 +357,12 @@ async function runCorpus(source: string): Promise<Record<string, Outcome>> {
     a: [1, "b", null, { c: true }],
   });
   results["framing.decodeTeamProtocolV2Json NaN"] = call(framing, "decodeTeamProtocolV2Json", Number.NaN);
+  if (!existsSync(join(source, "team-protocol", "sync-v1.ts"))) return results;
+  const sync = await loadModule(source, "sync-v1");
+  for (const [label, message] of SYNC_CLIENT_MESSAGES)
+    results[`sync-v1.decodeSyncClientMessage ${label}`] = call(sync, "decodeSyncClientMessage", message);
+  for (const [label, message] of SYNC_SERVER_MESSAGES)
+    results[`sync-v1.decodeSyncServerMessage ${label}`] = call(sync, "decodeSyncServerMessage", message);
   return results;
 }
 
@@ -327,10 +396,42 @@ function bodylessMismatches(results: Record<string, Outcome>): string[] {
   return mismatches;
 }
 
+function syncExpectations(): ReadonlyArray<readonly [string, "ok" | "null" | "error"]> {
+  const refused = (label: string) => label.startsWith("bad-");
+  return [
+    ...SYNC_CLIENT_MESSAGES.flatMap(([label]) => [
+      [
+        `framing.decodeTeamProtocolV2EventFrame sync-control ${label}`,
+        refused(label) || label === "unknown-type" ? "error" : "ok",
+      ] as const,
+      [
+        `sync-v1.decodeSyncClientMessage ${label}`,
+        refused(label) ? "error" : label === "unknown-type" ? "null" : "ok",
+      ] as const,
+    ]),
+    ...SYNC_SERVER_MESSAGES.flatMap(([label]) => [
+      [`framing.decodeTeamProtocolV2EventFrame sync-event ${label}`, "ok"] as const,
+      [`sync-v1.decodeSyncServerMessage ${label}`, refused(label) ? "error" : "ok"] as const,
+    ]),
+  ];
+}
+
+function syncMismatches(results: Record<string, Outcome>): string[] {
+  return syncExpectations()
+    .filter(([key, expected]) => {
+      const result = results[key];
+      if (!result) return true;
+      if ("error" in result) return expected !== "error";
+      return expected !== (result.ok === null ? "null" : "ok");
+    })
+    .map(([key]) => key);
+}
+
 mkdirSync(OUT, { recursive: true });
 const after = await runCorpus(join(ROOT, "packages/contracts/src"));
 writeFileSync(join(OUT, "after.json"), `${JSON.stringify(after, null, 2)}\n`);
 const bodyless = bodylessMismatches(after);
+const sync = syncMismatches(after);
 
 let before: { ref: string; commit: string; compared: number; mismatches: string[] } | null = null;
 if (beforeRef) {
@@ -363,9 +464,10 @@ const report = {
   cases: Object.keys(after).length,
   errors: Object.values(after).filter((value) => "error" in value).length,
   bodylessMismatches: bodyless,
+  syncMismatches: sync,
   before,
 };
 writeFileSync(join(OUT, "report.json"), `${JSON.stringify(report, null, 2)}\n`);
 const summary = { ...report, before: before && { ...before, mismatches: before.mismatches.slice(0, 20) } };
 process.stdout.write(`${JSON.stringify(summary, null, 2)}\n`);
-if (bodyless.length > 0 || (before && before.mismatches.length > 0)) process.exit(1);
+if (bodyless.length > 0 || sync.length > 0 || (before && before.mismatches.length > 0)) process.exit(1);
