@@ -270,7 +270,8 @@ function ServerView(props: { session: ExtensionSession; onSignOut: () => void; o
         state: (update) => {
           if (update.hostId !== view.hostId) return;
           setView((draft) => {
-            draft.offline = update.state === "offline";
+            if (update.state === "offline" || update.hostOffline) draft.offline = true;
+            else if (update.state === "online") draft.offline = false;
           });
           if (update.state !== "online") return;
           void workspace()?.reloadChat();
@@ -476,6 +477,14 @@ function ServerView(props: { session: ExtensionSession; onSignOut: () => void; o
               </section>
             </div>
           )}
+        </Match>
+        <Match when={view.status === "connecting" && view.offline}>
+          <div class="ext-state" aria-live="polite">
+            <p>{t("extension.connection.offline", { server: host()?.name ?? "" })}</p>
+            <button type="button" class="ext-text-button" onClick={() => props.onSignOut()}>
+              {t("extension.home.signOut")}
+            </button>
+          </div>
         </Match>
         <Match when={true}>
           <p class="ext-state" aria-live="polite">
