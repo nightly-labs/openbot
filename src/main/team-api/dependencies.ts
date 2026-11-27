@@ -633,7 +633,7 @@ export interface TeamApiVoiceTranscription {
 
 export type TeamApiClientBrowser = Pick<
   ClientBrowserHub,
-  "setPresence" | "resolve" | "sessionEnded" | "subscribe" | "shares"
+  "setPresence" | "resolve" | "sessionEnded" | "connectionLost" | "connectionBack" | "subscribe" | "shares"
 >;
 
 export interface TeamApiWatchRelay {
