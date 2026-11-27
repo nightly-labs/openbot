@@ -189,7 +189,8 @@ function ChannelView(props: {
         onDismissError={() => props.workspace.clearChannelError()}
         sending={props.open.sending}
         transcribe={props.workspace.transcribe}
-        onSend={(text) => props.workspace.sendToChannel(text)}
+        images={{ accepts: true, upload: props.workspace.uploadImage, discard: props.workspace.discardImage }}
+        onSend={(text, attachments) => props.workspace.sendToChannel(text, attachments)}
       />
     </div>
   );

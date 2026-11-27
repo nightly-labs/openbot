@@ -1,5 +1,5 @@
 import { isKnownAgentProvider } from "@openbot/contracts/agent-providers";
-import type { AgentRuntimeSnapshot } from "@openbot/contracts/ipc";
+import type { AgentRuntimeSnapshot, AttachmentSummary } from "@openbot/contracts/ipc";
 import {
   type AgentStatus,
   type AgentTask,
@@ -36,6 +36,7 @@ import {
 } from "@openbot/contracts/team-protocol/agent-colors-v1";
 import { AGENT_CREATE_OPERATION_CAPABILITY } from "@openbot/contracts/team-protocol/agent-create-operation-v1";
 import { AGENT_TASKS_CAPABILITY } from "@openbot/contracts/team-protocol/agent-tasks-v1";
+import { AGENT_THREAD_FILES_CAPABILITY } from "@openbot/contracts/team-protocol/agent-thread-files-v1";
 import { AGENT_THREAD_READS_CAPABILITY } from "@openbot/contracts/team-protocol/agent-thread-reads-v1";
 import { AGENT_WELCOME_CAPABILITY, TEAM_AGENT_CREATE_MODEL_CAPABILITY } from "@openbot/contracts/team-protocol/current";
 import {
@@ -47,18 +48,26 @@ import type { SyncClientMessage, SyncServerMessage } from "@openbot/contracts/te
 import type { TeamProtocolV2Json } from "@openbot/contracts/team-protocol/v2";
 import { VOICE_TRANSCRIPTION_CAPABILITY } from "@openbot/contracts/team-protocol/voice-transcription-v1";
 import { runTeamEffect } from "@openbot/team-client";
+import { bytesToBase64 } from "@openbot/team-client/base64";
 import { createClientSync } from "@openbot/team-client/client-sync";
-import type { RemoteTeamConnectionUpdate, RemoteTeamEvent } from "@openbot/team-client/remote-peer";
+import {
+  MOBILE_ATTACHMENT_BYTES,
+  type RemoteTeamConnectionUpdate,
+  type RemoteTeamEvent,
+} from "@openbot/team-client/remote-peer";
 import { retryOperationIds } from "@openbot/team-client/retry-operation-id";
 import { readSidebarPins, setAgentColor } from "@openbot/team-client/team-admin-requests";
 import {
+  discardAttachmentDraft,
   listAgentTasks,
   markAgentThreadRead,
   readAgentTask,
   sendAgentTaskMessage,
   startAgentTask,
   type TeamApiRequest,
+  TeamRequestError,
   teamChannelsApi,
+  uploadAttachmentDraft,
 } from "@openbot/team-client/team-api-requests";
 import { createAgentInitialMessage } from "@openbot/ui/features/agents/agent-initial-message";
 import type { FirstAgentDraft } from "@openbot/ui/features/agents/FirstAgentSetup";
@@ -139,6 +148,11 @@ export function isChatMessage(message: ConversationMessage): boolean {
   if (message.author === "user") return message.text.trim().length > 0 || files;
   if (message.author !== "assistant" && message.author !== "agent") return false;
   return SHOWN_ITEM_TYPES.has(message.itemType) && (message.text.length > 0 || files);
+}
+
+function withoutHostPreview(message: ConversationMessage): ConversationMessage {
+  if (!message.attachments) return message;
+  return { ...message, attachments: message.attachments.map((attachment) => ({ ...attachment, previewUrl: null })) };
 }
 
 export interface WorkspaceSyncLink {
@@ -291,7 +305,10 @@ export function createWorkspace(
       const read = page.throughSequence > open.throughSequence;
       setState((draft) => {
         if (!draft.channel) return;
-        draft.channel.messages = page.messages;
+        draft.channel.messages = page.messages.map((entry) => ({
+          ...entry,
+          message: withoutHostPreview(entry.message),
+        }));
         draft.channel.throughSequence = page.throughSequence;
         draft.channel.tasks = page.tasks;
         draft.channel.status = "ready";
@@ -341,7 +358,7 @@ export function createWorkspace(
     });
   }
 
-  async function sendToChannel(text: string): Promise<void> {
+  async function sendToChannel(text: string, attachments: readonly AttachmentSummary[] = []): Promise<void> {
     const open = state.channel;
     if (!channelsApi || !open || open.sending) return;
     const { channelId } = open;
@@ -371,6 +388,7 @@ export function createWorkspace(
           text,
           createdAt: new Date().toISOString(),
           status: "completed",
+          ...(attachments.length ? { attachments: [...attachments] } : {}),
         },
       });
     });
@@ -382,7 +400,7 @@ export function createWorkspace(
         text,
         recipientAgentId: recipient?.id ?? null,
         replyToMessageId: null,
-        attachmentDraftIds: [],
+        attachmentDraftIds: attachments.map((attachment) => attachment.id),
       });
       void track("message_send", { target: "channel", result: "succeeded" });
       await reloadChannel();
@@ -470,7 +488,7 @@ export function createWorkspace(
     setState((draft) => {
       const chat = draft.chat;
       if (!chat) return;
-      chat.messages = snapshot.messages;
+      chat.messages = snapshot.messages.map(withoutHostPreview);
       chat.threadId = snapshot.threadId;
       chat.revision = snapshot.revision;
       chat.activeTurnId = snapshot.activeTurnId;
@@ -588,13 +606,14 @@ export function createWorkspace(
     });
   }
 
-  async function send(text: string): Promise<void> {
+  async function send(text: string, attachments: readonly AttachmentSummary[] = []): Promise<void> {
     const chat = state.chat;
     if (!chat || chat.sending) return;
     const generation = chatGeneration;
     const clientMessageId = crypto.randomUUID();
     const { agentId, taskId, draftThread } = chat;
     const target = draftThread ? "new_thread" : taskId !== null ? "thread" : "chat";
+    const attachmentDraftIds = attachments.map((attachment) => attachment.id);
     setState((draft) => {
       if (!draft.chat) return;
       draft.chat.sending = true;
@@ -606,11 +625,14 @@ export function createWorkspace(
         text,
         createdAt: new Date().toISOString(),
         status: "completed",
+        ...(attachments.length ? { attachments: [...attachments] } : {}),
       });
     });
     try {
       if (draftThread) {
-        const task = await runTeamEffect(startAgentTask(request, { agentId, text, clientMessageId }));
+        const task = await runTeamEffect(
+          startAgentTask(request, { agentId, text, attachmentDraftIds, clientMessageId }),
+        );
         if (generation !== chatGeneration) return;
         setState((draft) => {
           if (!draft.chat) return;
@@ -620,11 +642,13 @@ export function createWorkspace(
         });
         flush();
       } else if (taskId !== null) {
-        await runTeamEffect(sendAgentTaskMessage(request, { agentId, taskId, text, clientMessageId }));
+        await runTeamEffect(
+          sendAgentTaskMessage(request, { agentId, taskId, text, attachmentDraftIds, clientMessageId }),
+        );
       } else {
         const receipt = await raw("POST", TEAM_API_ROUTES.agent.messages(agentId), {
           text,
-          attachmentDraftIds: [],
+          attachmentDraftIds,
           replyToMessageId: null,
           timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
           clientMessageId,
@@ -648,6 +672,27 @@ export function createWorkspace(
           if (draft.chat) draft.chat.sending = false;
         });
     }
+  }
+
+  async function uploadImage(file: File): Promise<AttachmentSummary> {
+    const bytes = new Uint8Array(await file.arrayBuffer());
+    const upload = {
+      name: file.name,
+      mimeType: file.type,
+      base64: bytesToBase64(bytes),
+      maxBytes: MOBILE_ATTACHMENT_BYTES,
+    };
+    return runTeamEffect(uploadAttachmentDraft(request, upload)).catch((error: unknown) => {
+      throw error instanceof TeamRequestError ? error.cause : error;
+    });
+  }
+
+  function discardImage(attachmentId: string): void {
+    void runTeamEffect(discardAttachmentDraft(request, attachmentId)).catch(() => undefined);
+  }
+
+  function chatTakesImages(chat: OpenChat): boolean {
+    return (chat.taskId === null && !chat.draftThread) || has(AGENT_THREAD_FILES_CAPABILITY);
   }
 
   async function agentCatalog(): Promise<{ models: ClientAgentModelOption[]; status: AgentStatus } | null> {
@@ -892,6 +937,9 @@ export function createWorkspace(
     answerPrompt,
     threadsAvailable: () => has(AGENT_TASKS_CAPABILITY),
     transcribe: has(VOICE_TRANSCRIPTION_CAPABILITY) ? transcribe : null,
+    uploadImage,
+    discardImage,
+    chatTakesImages,
     media,
     dispose: () => {
       media.dispose();
