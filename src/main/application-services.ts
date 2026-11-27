@@ -419,6 +419,7 @@ import { DESKTOP_USE_MS } from "./push-notifications";
 import { ReferralDesktopService } from "./referral-service";
 import { RelayedMessagingInstalls } from "./relayed-messaging-installs";
 import { decodeQueuedMessageReceipt, decodeRemoteAgentTask } from "./remote-agent-decoding";
+import { RemoteChatContentPreferenceStore } from "./remote-chat-content-preference-store";
 import { RemoteConnectTrace } from "./remote-connect-trace";
 import { createRemoteControlPolicyStore } from "./remote-control-policy-store";
 import { createRemoteControlQuestion } from "./remote-control-question";
@@ -548,6 +549,7 @@ const AGENT_MEMORY_LIMIT_PREFERENCE_FILE = "openbot-agent-memory-limit-v1.json";
 const MEMORY_REVIEW_PREFERENCE_FILE = "openbot-memory-review-v1.json";
 const SKILL_LEARNING_PREFERENCE_FILE = "openbot-skill-learning-v1.json";
 const BROWSING_MEMORY_PREFERENCE_FILE = "openbot-browsing-memory-v1.json";
+const REMOTE_CHAT_CONTENT_PREFERENCE_FILE = "openbot-remote-chat-content-v1.json";
 const USER_BROWSING_FILE = "openbot-browsing-steps-v1.json";
 const AGENT_NOTIFICATION_LEVELS_FILE = "openbot-agent-notification-levels-v1.json";
 const SIDEBAR_PINS_FILE = "openbot-sidebar-pins-v1.json";
@@ -754,6 +756,7 @@ export interface ApplicationServices {
   memoryReview: MemoryReviewPreferenceStore;
   skillLearning: SkillLearningPreferenceStore;
   browsingMemory: BrowsingMemoryPreferenceStore;
+  remoteChatContent: RemoteChatContentPreferenceStore;
   agentNotificationLevels: AgentNotificationLevelStore;
   sidebarPins: SidebarPinStore;
   agentAccess: AgentAccessStore;
@@ -1426,6 +1429,10 @@ export async function createApplicationServices({
     join(app.getPath("userData"), BROWSING_MEMORY_PREFERENCE_FILE),
   );
   await runCauseEffect(browsingMemory.load());
+  const remoteChatContent = new RemoteChatContentPreferenceStore(
+    join(app.getPath("userData"), REMOTE_CHAT_CONTENT_PREFERENCE_FILE),
+  );
+  await runCauseEffect(remoteChatContent.load());
   const userBrowsing = new UserBrowsingLog(join(app.getPath("userData"), USER_BROWSING_FILE));
   await Effect.runPromise(userBrowsing.load());
   browsingMemory.onChange(({ enabled }) => {
@@ -3518,6 +3525,7 @@ export async function createApplicationServices({
       memoryReview,
       skillLearning,
       browsingMemory,
+      remoteChatContent,
       promptCacheTtl,
       claudeUserSetup: claudeUserSetupSetting,
       cacheExpiryCompaction: cacheExpiryCompactionSetting,
@@ -4574,6 +4582,7 @@ export async function createApplicationServices({
     memoryReview,
     skillLearning,
     browsingMemory,
+    remoteChatContent,
     agentNotificationLevels,
     sidebarPins,
     agentAccess,

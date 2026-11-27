@@ -25,6 +25,7 @@ const CONFIG = {
 };
 const OVERFLOW = { username: "overflow@example.com", password: "overflow-password" };
 const OVERFLOW_2 = { username: "overflow-2@example.com", password: "overflow-2-password" };
+const OVERFLOW_3 = { username: "overflow-3@example.com", password: "overflow-3-password" };
 
 type Behavior = "normal" | "silent" | "stall_after_data" | "sender_limit" | "auth_refused";
 type Route = "direct" | "relay" | "relay_unreachable" | "relay_crashed";
@@ -217,7 +218,7 @@ async function runFallbackCase(
   outcome: "accept" | "daily_limit",
   code = "ABCD-EFGH",
   replyTo?: string,
-  overflowMailboxes: 0 | 1 | 2 = 0,
+  overflowMailboxes: 0 | 1 | 2 | 3 = 0,
 ): Promise<FallbackCaseReport & { sent: EmailMessageBuilder[] }> {
   const relay = await startRelay(behaviors);
   const handler = createEmailRelayHandler(relay.connector);
@@ -236,6 +237,9 @@ async function runFallbackCase(
         : {}),
       ...(overflowMailboxes >= 2
         ? { EMAIL_SMTP_OVERFLOW_2_USERNAME: OVERFLOW_2.username, EMAIL_SMTP_OVERFLOW_2_PASSWORD: OVERFLOW_2.password }
+        : {}),
+      ...(overflowMailboxes >= 3
+        ? { EMAIL_SMTP_OVERFLOW_3_USERNAME: OVERFLOW_3.username, EMAIL_SMTP_OVERFLOW_3_PASSWORD: OVERFLOW_3.password }
         : {}),
       EMAIL_RELAY: {
         fetch: (input, init) => handler.fetch(new Request(input, init)),
@@ -509,6 +513,46 @@ try {
   assert.deepEqual(allMailboxesLimited.events, [
     "email_sent:rate_limited:primary",
     "email_sent:rate_limited:overflow_2",
+    "email_sent:rate_limited:overflow",
+    "email_fallback_sent:accepted",
+  ]);
+
+  const signAfterSigninLimit = await runFallbackCase(
+    "sign_after_signin_limit",
+    ["sender_limit", "sender_limit", "normal"],
+    "daily_limit",
+    "ABCD-EFGH",
+    undefined,
+    3,
+  );
+  report.cases.push(signAfterSigninLimit);
+  assert.equal(signAfterSigninLimit.result, "sent");
+  assert.deepEqual(signAfterSigninLimit.mailFrom, [
+    `<${CONFIG.from}>`,
+    `<${OVERFLOW_2.username}>`,
+    `<${OVERFLOW_3.username}>`,
+  ]);
+  assert.deepEqual(signAfterSigninLimit.events, [
+    "email_sent:rate_limited:primary",
+    "email_sent:rate_limited:overflow_2",
+    "email_sent:accepted:overflow_3",
+  ]);
+
+  const allFourMailboxesLimited = await runFallbackCase(
+    "fallback_after_four_mailboxes_limited",
+    ["sender_limit", "sender_limit", "sender_limit", "sender_limit"],
+    "accept",
+    "ABCD-EFGH",
+    undefined,
+    3,
+  );
+  report.cases.push(allFourMailboxesLimited);
+  assert.equal(allFourMailboxesLimited.result, "sent");
+  assert.equal(allFourMailboxesLimited.fallbackSends, 1);
+  assert.deepEqual(allFourMailboxesLimited.events, [
+    "email_sent:rate_limited:primary",
+    "email_sent:rate_limited:overflow_2",
+    "email_sent:rate_limited:overflow_3",
     "email_sent:rate_limited:overflow",
     "email_fallback_sent:accepted",
   ]);

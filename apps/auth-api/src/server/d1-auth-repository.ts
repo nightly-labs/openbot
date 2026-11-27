@@ -2,7 +2,7 @@ import { type AvatarColor, isAvatarColor } from "@openbot/contracts/ipc";
 import type { AccountSession, MobileConnectHostBinding } from "@openbot/contracts/mobile-connect";
 import { Context, Effect, Layer, Schema } from "effect";
 import { sha256 } from "./crypto";
-import { replicaD1 } from "./observed-d1";
+import { primaryD1, replicaD1 } from "./observed-d1";
 import type {
   AuthRepository,
   AuthUser,
@@ -50,7 +50,7 @@ interface HostBindingRow {
   user_id: string;
 }
 
-const SESSION_ACTIVITY_UPDATE_INTERVAL_MS = 15 * 60_000;
+const SESSION_ACTIVITY_UPDATE_INTERVAL_MS = 60 * 60_000;
 
 class AuthDatabase extends Context.Service<AuthDatabase, D1Database>()("auth-api/D1AuthRepository/Database") {}
 export class AuthStoreError extends Schema.TaggedError<AuthStoreError>()("AuthStoreError", {
@@ -73,8 +73,9 @@ const selectSessionRow = Effect.fn("D1AuthRepository.selectSessionRow")(function
   if (reads === "replica") {
     const row = yield* storeCall(() => replicaD1(database).prepare(sql).bind(tokenHash, now).first<T>());
     if (row) return row;
+    return yield* storeCall(() => primaryD1(database).prepare(sql).bind(tokenHash, now).first<T>());
   }
-  return yield* storeCall(() => database.prepare(sql).bind(tokenHash, now).first<T>());
+  return yield* storeCall(() => primaryD1(database).prepare(sql).bind(tokenHash, now).first<T>());
 });
 export class D1AuthRepository implements AuthRepository {
   readonly #layer: Layer.Layer<AuthDatabase>;

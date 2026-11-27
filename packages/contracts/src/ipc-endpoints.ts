@@ -537,6 +537,7 @@ import type {
   SteerQueuedMessageInput,
   UpdateQueuedMessageInput,
 } from "./ipc-queue";
+import type { HostRemoteChatContent, RemoteChatContentChange } from "./ipc-remote-chat-content";
 import type {
   RemoteDesktopSetupAction,
   RemoteDesktopSetupStatus,
@@ -1282,6 +1283,11 @@ export const IPC_ENDPOINTS = {
     setSkillLearning: scopedRequest<string, HostSkillLearning, "required">()("host-admin:set-skill-learning"),
     getBrowsingMemory: scopedQuery<HostBrowsingMemory, "required">()("host-admin:get-browsing-memory"),
     setBrowsingMemory: scopedRequest<boolean, HostBrowsingMemory, "required">()("host-admin:set-browsing-memory"),
+    getRemoteChatContent: scopedQuery<HostRemoteChatContent, "required">()("host-admin:get-remote-chat-content"),
+    setRemoteChatContent: scopedRequest<boolean, HostRemoteChatContent, "required">()(
+      "host-admin:set-remote-chat-content",
+    ),
+    remoteChatContent: event<RemoteChatContentChange>()("host-admin:remote-chat-content"),
     getMachineAlerts: scopedQuery<MachineAlertSettings, "required">()("host-admin:get-machine-alerts"),
     setMachineAlerts: scopedRequest<MachineAlertSettings, MachineAlertSettings, "required">()(
       "host-admin:set-machine-alerts",

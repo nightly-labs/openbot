@@ -90,6 +90,8 @@ export const messages = {
   "marketplace.app.partialTitle": "{name} は完了していません",
   "marketplace.app.partialDescription":
     "一部のアプリまたはスキルがインストールされていません。再接続するとインストールされます。",
+  "marketplace.app.pausedTitle": "{name} はオフです",
+  "marketplace.app.pausedDescription": "エージェントは {name} のツールを使えません。再接続するとオンになります。",
   "marketplace.app.notConnected": "未接続",
   "marketplace.app.paused": "一時停止中",
   "marketplace.app.custom": "MCP サーバー",

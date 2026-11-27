@@ -791,4 +791,8 @@ export const messages = {
   "server.ownerTransfer.accepted": "你现在是 {server} 的所有者",
   "server.ownerTransfer.acceptFailed": "无法接受所有权转移。",
   "server.ownerTransfer.declineFailed": "无法拒绝所有权转移。",
+  "server.settings.privacyTitle": "隐私",
+  "server.settings.remoteChatContent": "在聊天中加载远程内容",
+  "server.settings.remoteChatContentDescription":
+    "在聊天中显示会从其他网站加载内容的图片、网站图标、图表和页面。关闭时，这些内容只有在点击后才会加载，因此其他网站不会知道聊天何时被打开。此设置适用于此服务器上的所有人。",
 } as const satisfies PartialTranslation<typeof source>;

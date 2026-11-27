@@ -1,0 +1,24 @@
+
+[[PackageOverrides]]
+name = "@xmldom/xmldom"
+version = "0.7.13"
+ecosystem = "npm"
+vulnerability.ignore = true
+effectiveUntil = 2027-03-01
+reason = "Mobile build tooling only (@bacons/xcode, expo prebuild); parses repository files; no fixed 0.7.x release."
+
+[[PackageOverrides]]
+name = "uuid"
+version = "8.3.2"
+ecosystem = "npm"
+vulnerability.ignore = true
+effectiveUntil = 2027-03-01
+reason = "Mobile build tooling only (@bacons/xcode); the advisory needs a caller-supplied buffer, which this tooling does not pass; no fixed 8.x release."
+
+[[PackageOverrides]]
+name = "image-size"
+version = "1.2.1"
+ecosystem = "npm"
+vulnerability.ignore = true
+effectiveUntil = 2027-03-01
+reason = "Mobile bundler only (metro); reads repository assets at build time; fix is only in the 2.x major that metro does not allow."

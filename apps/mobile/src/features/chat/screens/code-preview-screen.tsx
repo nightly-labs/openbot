@@ -20,7 +20,11 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useUniwind } from "uniwind";
 import { shareLocalAttachment } from "@/features/chat/components/attachment-preview";
 import { ScrollingCodeBlock } from "@/features/chat/components/chat-code-block";
-import { ChatGlassIconButton, ChatGlassLabel } from "@/features/chat/components/chat-glass-icon-button";
+import {
+  ChatGlassButton,
+  ChatGlassIconButton,
+  ChatGlassLabel,
+} from "@/features/chat/components/chat-glass-icon-button";
 import { ChatMarkdown } from "@/features/chat/components/chat-markdown";
 import { CodeDocument } from "@/features/chat/components/code-document";
 import DiagramCanvas from "@/features/chat/components/diagram-canvas.dom";
@@ -28,10 +32,11 @@ import { SpreadsheetFilePreview } from "@/features/chat/components/file-document
 import { HtmlPage } from "@/features/chat/components/html-page";
 import HtmlPreview from "@/features/chat/components/html-preview.dom";
 import { PdfPreview } from "@/features/chat/components/pdf-preview";
+import { RemoteContentHold } from "@/features/chat/components/remote-content-hold";
 import { copyToClipboard } from "@/features/chat/components/use-copy-message";
 import { type CodePreviewEntry, codePreview } from "@/features/chat/model/code-preview-store";
 import { type MarkdownPreviewPart, markdownPreviewSeries } from "@/features/chat/model/markdown-preview-parts";
-import { useMermaidDiagram } from "@/features/chat/model/mermaid-diagrams";
+import { loadMermaidDiagram, useMermaidDiagram } from "@/features/chat/model/mermaid-diagrams";
 import { webLink } from "@/features/chat/model/message-file-target";
 import { textPreviewParts } from "@/features/chat/model/text-preview-parts";
 import { type MenuAction, MenuView } from "@/shared/components/menu-view";
@@ -79,6 +84,9 @@ function PreviewContent({ entry }: { entry: CodePreviewEntry }) {
   const [codeOpened, setCodeOpened] = useState(view === "code");
   if (view === "code" && !codeOpened) setCodeOpened(true);
   const [wrap, setWrap] = useState(false);
+  const remoteContent = entry.remoteContent === true;
+  const [pageRun, setPageRun] = useState(remoteContent);
+  const runnablePage = entry.kind === "html" && Boolean(entry.file) && HtmlPage !== null;
   const headerBottom = insets.top + HEADER_OFFSET + HEADER_HEIGHT + HEADER_OFFSET;
   const title =
     entry.file?.name ??
@@ -173,6 +181,7 @@ function PreviewContent({ entry }: { entry: CodePreviewEntry }) {
             source={entry.source}
             title={title}
             mode="screen"
+            scripts={pageRun}
             insets={{ top: headerBottom, bottom: insets.bottom }}
           />
         ) : entry.kind === "html" ? (
@@ -190,12 +199,17 @@ function PreviewContent({ entry }: { entry: CodePreviewEntry }) {
             dom={{ ...expoGoDomOptions, style: { flex: 1 }, containerStyle: { flex: 1 }, scrollEnabled: false }}
           />
         ) : entry.kind === "markdown" ? (
-          <MarkdownPreview source={entry.source} insets={{ top: headerBottom, bottom: insets.bottom }} />
+          <MarkdownPreview
+            source={entry.source}
+            remoteContent={remoteContent}
+            insets={{ top: headerBottom, bottom: insets.bottom }}
+          />
         ) : entry.kind === "mermaid" ? (
           <DiagramPreview
             source={entry.source}
             title={title}
             dark={theme === "dark"}
+            remoteContent={remoteContent}
             insets={{ top: headerBottom, bottom: insets.bottom }}
             background={String(background)}
           />
@@ -215,6 +229,28 @@ function PreviewContent({ entry }: { entry: CodePreviewEntry }) {
           />
         </SwitchLayer>
       )}
+      {view === "preview" && runnablePage && !pageRun ? (
+        <View
+          className="absolute inset-x-0 z-20 flex-row items-center justify-center"
+          pointerEvents="box-none"
+          style={{ bottom: insets.bottom + PART_BAR_OFFSET }}
+        >
+          <ChatGlassButton
+            accessibilityLabel={t("mobile.chat.preview.runPage")}
+            className="h-12 flex-row items-center justify-center px-5"
+            fallbackBackground={fieldBackground}
+            liquidGlassAvailable={liquidGlass}
+            onPress={() => {
+              void haptics.impact("soft");
+              setPageRun(true);
+            }}
+          >
+            <Typography.Paragraph type="body-sm" weight="semibold">
+              {t("mobile.chat.preview.runPage")}
+            </Typography.Paragraph>
+          </ChatGlassButton>
+        </View>
+      ) : null}
       {view === "code" && partCount > 1 ? (
         <View
           className="absolute inset-x-0 z-20 flex-row items-center justify-center gap-2"
@@ -344,7 +380,15 @@ function GlassCapsule({
 
 const PART_GAP = 10;
 
-function MarkdownPreview({ source, insets }: { source: string; insets: { top: number; bottom: number } }) {
+function MarkdownPreview({
+  source,
+  remoteContent,
+  insets,
+}: {
+  source: string;
+  remoteContent: boolean;
+  insets: { top: number; bottom: number };
+}) {
   const sides = useSafeAreaInsets();
   const text = useMemo(() => source.replace(/\r\n?/gu, "\n"), [source]);
   const [series, setSeries] = useState(() => markdownPreviewSeries(text));
@@ -376,7 +420,7 @@ function MarkdownPreview({ source, insets }: { source: string; insets: { top: nu
           {item.kind === "code" ? (
             <ScrollingCodeBlock text={item.text} pieces={item.pieces} language={item.language} />
           ) : (
-            <ChatMarkdown body={item.source} color={undefined} finished selectable />
+            <ChatMarkdown body={item.source} color={undefined} finished selectable remoteContent={remoteContent} />
           )}
         </View>
       )}
@@ -389,17 +433,29 @@ function DiagramPreview({
   source,
   title,
   dark,
+  remoteContent,
   insets,
   background,
 }: {
   source: string;
   title: string;
   dark: boolean;
+  remoteContent: boolean;
   insets: { top: number; bottom: number };
   background: string;
 }) {
   const { t } = useText();
-  const diagram = useMermaidDiagram(source, dark);
+  const diagram = useMermaidDiagram(source, dark, remoteContent);
+  if (diagram?.status === "held")
+    return (
+      <View className="flex-1 items-center justify-center px-6">
+        <RemoteContentHold
+          message={t("mobile.chat.preview.diagramRemoteContent")}
+          action={t("mobile.chat.preview.loadDiagram")}
+          onPress={() => loadMermaidDiagram(source)}
+        />
+      </View>
+    );
   if (diagram?.status !== "ready")
     return (
       <View className="flex-1 items-center justify-center px-6">

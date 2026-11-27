@@ -1,8 +1,13 @@
 import {
   CHAT_VISUAL_FRAME_SANDBOX,
+  CHAT_VISUAL_NO_DNS_PREFETCH,
   CHAT_VISUAL_PAGE_LIMIT,
+  CHAT_VISUAL_STATIC_APPEARANCE_PARAMETER,
+  CHAT_VISUAL_STATIC_PARAMETER,
   type ChatVisualDocumentOptions,
+  chatVisualAppTheme,
   chatVisualDocument,
+  withoutResourceHints,
 } from "@openbot/contracts/chat-visual";
 import { isTrustedRendererUrl } from "./trusted-renderer";
 
@@ -12,12 +17,42 @@ function baseMimeType(mimeType: string): string {
   return (mimeType.split(";", 1)[0] ?? "").trim().toLowerCase();
 }
 
-export function chatVisualResponse(bytes: Uint8Array, options: ChatVisualDocumentOptions = {}): Response {
+const STATIC_PAGE_POLICY = [
+  "sandbox",
+  "default-src 'none'",
+  "style-src 'unsafe-inline' openbot-visual:",
+  "img-src data: blob: openbot-visual:",
+  "font-src data: openbot-visual:",
+  "media-src data: blob: openbot-visual:",
+  "form-action 'none'",
+].join("; ");
+
+export function staticChatVisualOptions(url: URL): ChatVisualDocumentOptions | null {
+  if (url.searchParams.get(CHAT_VISUAL_STATIC_PARAMETER) !== "1") return null;
+  const appearance = url.searchParams.get(CHAT_VISUAL_STATIC_APPEARANCE_PARAMETER);
+  return appearance === "light" || appearance === "dark" ? { theme: chatVisualAppTheme(appearance), appearance } : {};
+}
+
+export function chatVisualResponse(
+  bytes: Uint8Array,
+  options: ChatVisualDocumentOptions = {},
+  staticOptions: ChatVisualDocumentOptions | null = null,
+): Response {
   if (bytes.byteLength > CHAT_VISUAL_PAGE_LIMIT) return new Response("Not found", { status: 404 });
-  return new Response(chatVisualDocument(new TextDecoder().decode(bytes), options), {
+  const staticPage = staticOptions !== null;
+  const html = new TextDecoder().decode(bytes);
+  const document = staticPage
+    ? chatVisualDocument(withoutResourceHints(html), {
+        ...options,
+        ...staticOptions,
+        head: `${CHAT_VISUAL_NO_DNS_PREFETCH}${options.head ?? ""}`,
+        bootstrap: false,
+      })
+    : chatVisualDocument(html, options);
+  return new Response(document, {
     headers: {
       "Content-Type": "text/html; charset=utf-8",
-      "Content-Security-Policy": `sandbox ${CHAT_VISUAL_FRAME_SANDBOX}`,
+      "Content-Security-Policy": staticPage ? STATIC_PAGE_POLICY : `sandbox ${CHAT_VISUAL_FRAME_SANDBOX}`,
       "Cache-Control": "no-store",
       "X-Content-Type-Options": "nosniff",
     },

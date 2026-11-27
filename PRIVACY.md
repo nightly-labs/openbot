@@ -1372,6 +1372,15 @@ Network traffic can also occur when:
   site can see that the visit came from OpenBot. It adds nothing else. It does not change a link that already has a `utm_source`,
   a link to a local or private address, or a link with sign-in or signature values such as `state`,
   `code`, `token` or `X-Amz-Signature`;
+- a chat shows content from another web site. While "Load remote content in chats" is off (the
+  default, set by the server owner or an admin for everyone on the server), the app makes no such
+  request until a user clicks: a picture shows "Load picture", a diagram that names a picture shows
+  "Load diagram", a link shows no site icon, an agent page or an HTML file preview shows without
+  scripts and remote content until the user clicks "Run page", and a backdrop page shows without
+  scripts and remote content. When the setting
+  is on, the device that shows the chat loads these pictures, the site icon of each link
+  (`/favicon.ico` on the link's site), diagram pictures, and the content that pages load, from the
+  addresses in the message, as a browser does;
 - a locally installed Codex plugin connects to its service;
 - an MCP server the user enabled is reached at its own address, and, when that server asks for a
   sign-in, OpenBot connects to the server's authorization service to register itself, to exchange

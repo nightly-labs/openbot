@@ -72,14 +72,15 @@ import {
   type BillingEntitlement,
   getServerEntitlement,
   type OwnerLicense,
-  type OwnerLicenseRow,
+  type OwnerLicenseJsonRow,
   ownerLicenseForHost,
   ownerLicenseFromRows,
-  ownerLicenseStatement,
+  ownerLicensesJsonSql,
   SERVER_MEMBER_LIMIT_SQL,
-  type ServerEntitlementRow,
+  type ServerEntitlementJsonRow,
   serverEntitlementFromRows,
-  serverEntitlementStatement,
+  serverEntitlementsJsonSql,
+  serverMemberLimitValueSql,
 } from "./billing-entitlement";
 import { decodeBase64Url, hmacSha256, importHmacSha256Key, randomToken, sha256 } from "./crypto";
 import { CUSTOM_SERVER_OFFER_COLUMNS, type CustomServerOfferRow, customServerPayment } from "./custom-server-offers";
@@ -172,8 +173,6 @@ interface MemberSeat {
   readonly memberBinds: readonly (string | number)[] | null;
   readonly licenseBinds: readonly (string | number)[] | null;
 }
-
-type HostListBatchRow = RemoteHostKeyHandoverRow | OwnerLicenseRow | ServerMemberLimitRow | ServerEntitlementRow;
 
 interface ServerMemberLimitRow {
   member_limit: number;
@@ -275,6 +274,23 @@ function keyHandoversStatement(database: D1Database, condition: SqlCondition): D
          ORDER BY host_id, issued_at`,
     )
     .bind(...condition.binds, HOST_KEY_HANDOVER_LIMIT);
+}
+
+function keyHandoversJsonSql(host: string): string {
+  return `(SELECT json_group_array(json_object('host_id', k.host_id, 'issued_at', k.issued_at,
+      'previous_public_key', k.previous_public_key, 'public_key', k.public_key,
+      'previous_signature', k.previous_signature, 'signature', k.signature))
+    FROM (SELECT host_id, issued_at, previous_public_key, public_key, previous_signature, signature
+            FROM remote_host_key_handovers WHERE host_id = ${host}
+           ORDER BY issued_at DESC LIMIT ${HOST_KEY_HANDOVER_LIMIT}) k)`;
+}
+
+function jsonRows<T>(value: string): T[] {
+  return JSON.parse(value);
+}
+
+function newestFirst<T extends { updated_at: number }>(rows: T[]): T[] {
+  return rows.sort((left, right) => right.updated_at - left.updated_at);
 }
 
 function keyHandoversFromRows(rows: readonly RemoteHostKeyHandoverRow[]): Map<string, HostKeyHandover[]> {
@@ -879,6 +895,31 @@ export class RemoteControlPlane {
     (operation) => operation.pipe(Effect.provide(this.#layer)),
   ).bind(this);
 
+  readonly revokeHostCredential = Effect.fn("RemoteControlPlane.revokeHostCredential")(
+    function* (this: RemoteControlPlane, user: AuthUser, input: { hostId: string; machineToken: string }) {
+      const dependencies = yield* RemoteDependencies;
+      const hostId = yield* remoteValidate(() => requiredIdentifier(input.hostId, "host ID"));
+      const host = yield* this.authenticateHost(hostId, input.machineToken);
+      if (host.owner_user_id !== user.id) {
+        return yield* new RemoteControlPlaneError(403, "host_owner_mismatch", "This host belongs to another account.");
+      }
+      const now = dependencies.now();
+      yield* remoteCall(() =>
+        dependencies.database.batch([
+          dependencies.database
+            .prepare(
+              `UPDATE remote_hosts SET machine_token_hash = NULL, auth_epoch = auth_epoch + 1, updated_at = ?
+               WHERE host_id = ? AND owner_user_id = ? AND machine_token_hash = ?`,
+            )
+            .bind(now, hostId, user.id, host.machine_token_hash),
+          this.#authEpochEventStatement(hostId, now, user.id, { sql: "machine_token_hash IS NULL", binds: [] }),
+        ]),
+      );
+      yield* this.#flushAuthEvents();
+    },
+    (operation) => operation.pipe(Effect.provide(this.#layer)),
+  ).bind(this);
+
   readonly handOverHostKey = Effect.fn("RemoteControlPlane.handOverHostKey")(
     function* (
       this: RemoteControlPlane,
@@ -988,6 +1029,10 @@ export class RemoteControlPlane {
              AND s.desired_state NOT IN ('deleted', 'stopped')) AS operator_host,
            (SELECT s.storage_tier FROM hosted_servers s WHERE s.server_id = h.host_id
              AND s.desired_state NOT IN ('deleted', 'stopped')) AS hosted_storage_tier,
+           ${keyHandoversJsonSql("h.host_id")} AS key_handovers,
+           ${ownerLicensesJsonSql("h.owner_user_id")} AS owner_licenses,
+           ${serverMemberLimitValueSql("h.host_id")} AS custom_member_limit,
+           ${serverEntitlementsJsonSql("h.host_id")} AS server_entitlements,
            ${CUSTOM_SERVER_OFFER_COLUMNS}
          FROM remote_memberships m
          JOIN remote_hosts h ON h.host_id = m.host_id
@@ -1011,40 +1056,21 @@ export class RemoteControlPlane {
               hosted_plan: string | null;
               operator_host: string | null;
               hosted_storage_tier: number | null;
+              key_handovers: string;
+              owner_licenses: string;
+              custom_member_limit: number | null;
+              server_entitlements: string;
             } & CustomServerOfferRow
           >(),
       );
-      const rows = result.results ?? [];
-      if (rows.length === 0) return [];
-      const database = dependencies.database;
       const now = dependencies.now();
-      const [handoverResult, ...hostResults] = yield* remoteCall(() =>
-        database.batch<HostListBatchRow>([
-          keyHandoversStatement(database, {
-            sql: "host_id IN (SELECT host_id FROM remote_memberships WHERE user_id = ? AND status = 'active')",
-            binds: [userId],
-          }),
-          ...rows.flatMap((row) => [
-            ownerLicenseStatement(database, row.host_id),
-            database.prepare(SERVER_MEMBER_LIMIT_SQL).bind(row.host_id),
-            serverEntitlementStatement(database, row.host_id),
-          ]),
-        ]),
-      );
-      const keyHandovers = keyHandoversFromRows(
-        (handoverResult?.results ?? []).filter((entry) => "issued_at" in entry),
-      );
-      return rows.map((row, index) => {
-        const hostRows = (offset: number) => hostResults[index * 3 + offset]?.results ?? [];
-        const license = ownerLicenseFromRows(
-          hostRows(0).filter((entry) => "owner_id" in entry),
-          now,
-        );
-        const custom = hostRows(1).find((entry) => "member_limit" in entry) ?? null;
+      return (result.results ?? []).map((row) => {
+        const license = ownerLicenseFromRows(newestFirst(jsonRows<OwnerLicenseJsonRow>(row.owner_licenses)), now);
         const plan = serverEntitlementFromRows(
-          hostRows(2).filter((entry) => "plan" in entry),
+          newestFirst(jsonRows<ServerEntitlementJsonRow>(row.server_entitlements)),
           now,
         );
+        const custom = row.custom_member_limit === null ? null : { member_limit: row.custom_member_limit };
         const { limit, licenseRaises } = memberLimitFrom(custom, plan, license);
         return {
           hostId: row.host_id,
@@ -1052,7 +1078,12 @@ export class RemoteControlPlane {
           logoKey: row.logo_key,
           appearance: storedAppearance(row.appearance_shape, row.appearance_color),
           devicePublicKey: row.device_public_key,
-          keyHandovers: keyHandovers.get(row.host_id) ?? [],
+          keyHandovers:
+            keyHandoversFromRows(
+              jsonRows<RemoteHostKeyHandoverRow>(row.key_handovers).sort(
+                (left, right) => left.issued_at - right.issued_at,
+              ),
+            ).get(row.host_id) ?? [],
           authEpoch: row.auth_epoch,
           membershipId: row.membership_id,
           role: row.role,
