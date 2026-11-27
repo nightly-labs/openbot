@@ -1,4 +1,0 @@
-### Changed
-
-- The Apple Watch app now shows the logo and the color of each server: the same plush or uploaded logo as on the iPhone. The home screen has a background in the main color of the logo, with a large server logo that continues on the agent list page, and the server name, the counts, their dots and the unread badges show in tones of that color. Each row in Servers has the logo and the color of its server. When the watch gets data directly from a server, the server must also be on the newest OpenBot version to send its color. To turn the server colors off, swipe right from the home screen to the new Settings page. The Servers list keeps its logos and colors.
-- On the Apple Watch, "Working" on an agent or channel page and the working icon on a pinned agent now show in the color of that agent or channel, not in blue. The Server colors switch does not change them.
