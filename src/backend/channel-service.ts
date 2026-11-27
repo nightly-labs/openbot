@@ -2120,12 +2120,9 @@ export class ChannelService {
     return this.store.ids().flatMap((channelId) => {
       if (archived.has(channelId) || this.#deletedChannels.has(channelId)) return [];
       const assigned = new Set(
-        this.store
-          .assignments(channelId)
-          .filter(activeAssignment)
-          .map((assignment) => assignment.taskId),
+        this.store.assignmentsInStates(channelId, ACTIVE_ASSIGNMENT_STATES).map((assignment) => assignment.taskId),
       );
-      const tasks = this.store.tasks(channelId).filter((task) => task.state === "queued" && !assigned.has(task.id));
+      const tasks = this.store.tasksInStates(channelId, ["queued"]).filter((task) => !assigned.has(task.id));
       const leads = this.store.get(channelId).leadAgentId === agentId;
       const task = tasks.find((item) => item.ownerAgentId === agentId || (!item.ownerAgentId && leads));
       return task ? [task] : [];
@@ -2651,10 +2648,7 @@ export class ChannelService {
   private capture(snapshot: ConversationSnapshot, turnId?: string): boolean {
     const channelId = snapshot.threadId ? this.store.channelForThread(snapshot.threadId) : null;
     if (!channelId) return false;
-    const assignments =
-      turnId === undefined
-        ? this.store.assignments(channelId)
-        : this.store.agentAssignments(channelId, snapshot.agentId);
+    const assignments = this.store.agentAssignments(channelId, snapshot.agentId);
     const author = this.hooks.agents().find((agent) => agent.id === snapshot.agentId);
     const name = author?.name ?? "Former member";
     const taskReads = new Map<string, ChannelTask | null>();
@@ -2662,12 +2656,9 @@ export class ChannelService {
       if (!taskReads.has(id)) taskReads.set(id, this.store.task(channelId, id));
       return taskReads.get(id) ?? undefined;
     };
-    const history =
-      turnId === undefined
-        ? new Map(this.store.messages(channelId).map((message) => [message.id, message] as const))
-        : new Map<string, ChannelMessage | null>();
+    const history = new Map<string, ChannelMessage | null>();
     const existing = (id: string): ChannelMessage | undefined => {
-      if (turnId !== undefined && !history.has(id)) history.set(id, this.store.message(channelId, id));
+      if (!history.has(id)) history.set(id, this.store.message(channelId, id));
       return history.get(id) ?? undefined;
     };
     const messages: ChannelMessage[] = [];
@@ -2692,8 +2683,7 @@ export class ChannelService {
       const late =
         lateId === undefined
           ? undefined
-          : (assignments.find((item) => item.id === lateId) ??
-            (turnId === undefined ? undefined : (this.store.assignment(channelId, lateId) ?? undefined)));
+          : (assignments.find((item) => item.id === lateId) ?? this.store.assignment(channelId, lateId) ?? undefined);
       const owner = assignments.find((item) => item.turnId === message.turnId) ?? late;
       if (!owner && message.turnId !== undefined && this.#providerTurns.has(message.turnId)) continue;
       const note = channelNote(message, author?.provider, this.hooks.channelNote);
