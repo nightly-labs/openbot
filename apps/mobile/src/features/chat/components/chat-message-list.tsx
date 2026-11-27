@@ -118,7 +118,7 @@ import {
   messageChipFileNames,
   messageFileDirectory,
   messageFileTarget,
-  messageLinkFileTarget,
+  messageLinkFileTargets,
   messageTargetFileName,
 } from "../model/message-file-target";
 import { messageTime } from "../model/message-time";
@@ -671,8 +671,14 @@ const MessageRow = memo(function MessageRow({
         return target ? () => void openFile(target.file, target.written, attachmentOf(target.file)) : null;
       },
       link: (href) => {
-        const target = messageLinkFileTarget(href, fileAgentId);
-        return target ? () => void openFile(target, null, attachmentOf(target)) : null;
+        const target = messageLinkFileTargets(href, fileAgentId);
+        if (!target) return null;
+        return () =>
+          void openFile(
+            target.file,
+            target.written,
+            (target.written && attachmentOf(target.written)) || attachmentOf(target.file),
+          );
       },
     };
   }, [fileBody, fileAgentId, fileAttachments, openFile]);
