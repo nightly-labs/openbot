@@ -93,10 +93,11 @@ const searchShape = {
   limit: z.number().int().min(1).max(10).optional(),
 };
 const describeShape = { names: z.array(qualifiedName).min(1).max(10).optional(), name: qualifiedName.optional() };
+const callArguments = z.object({}).catchall(z.unknown());
 const callShape = {
   name: qualifiedName.optional(),
   tool: z.string().optional(),
-  arguments: z.object({}).catchall(z.unknown()),
+  arguments: callArguments.optional(),
 };
 const searchSchema = z
   .strictObject(searchShape)
@@ -104,12 +105,14 @@ const searchSchema = z
 const describeSchema = z
   .strictObject(describeShape)
   .refine((input) => input.names !== undefined || input.name !== undefined);
-const callSchema = z.strictObject(callShape).refine((input) => input.name !== undefined || input.tool !== undefined);
+const callSchema = z
+  .strictObject({ ...callShape, arguments: callArguments })
+  .refine((input) => input.name !== undefined || input.tool !== undefined);
 
 const KIMI_ARGUMENT_VALUE = { anyOf: ["string", "number", "boolean", "object", "array"].map((type) => ({ type })) };
 const kimiCallShape = {
   ...callShape,
-  arguments: callShape.arguments.meta({ additionalProperties: KIMI_ARGUMENT_VALUE }),
+  arguments: callArguments.meta({ additionalProperties: KIMI_ARGUMENT_VALUE }).optional(),
 };
 
 const TOOL_SEARCH_DESCRIPTION =
@@ -489,7 +492,7 @@ export function deferredNullValueError(resolved: DynamicToolCallParams, provider
 
 export function deferredCall(
   params: DynamicToolCallParams,
-): { name: string; arguments: z.infer<typeof callShape.arguments> } | null {
+): { name: string; arguments: z.infer<typeof callArguments> } | null {
   const parsed = parseCall(params);
   const name = parsed.success ? (parsed.data.name ?? parsed.data.tool)?.trim() : undefined;
   return parsed.success && name ? { name, arguments: parsed.data.arguments } : null;
