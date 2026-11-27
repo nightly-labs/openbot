@@ -71,6 +71,7 @@ All notable changes to OpenBot will be documented here. The project follows
 
 ### Fixed
 
+- A Claude agent that calls an OpenBot tool with the tool name in a wrong field now gets an error that tells it to use only name and arguments. Before, the wrong field was removed silently, the agent was told that the call had no name, and it often sent the same failed call many times.
 - Bitwarden and Vaultwarden now connect on a server that had a Bitwarden CLI that cannot run there, for example a copy made for a different processor. Before, OpenBot used that copy again on each connect, and the connect always failed with a message that told you to check your server address, API key and master password. Now OpenBot installs the correct CLI again. If the new CLI also cannot start, the message says so. On a joined server, the server must also be on this version.
 - An OMP (oh-my-pi) agent no longer gets a new full copy of the OpenBot instructions each time its chat opens again after 5 idle minutes. OMP keeps the earlier copy in the session, so the extra copies only filled the context and used more tokens. Changed instructions, a compaction and a failed turn still send the instructions again. On a joined server, the server must also be on this version.
 - When the EU VAT system cannot check your VAT ID, you can now continue to payment. You pay Polish VAT. To get reverse charge on the next invoices, save the VAT ID again when the EU VAT system works.
