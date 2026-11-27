@@ -55,6 +55,7 @@ interface DictationSession {
   listeningAt: number | null;
   stoppingAt: number | null;
   ending: "cancelled" | "permission_denied" | "operation_failed" | null;
+  cutShort: boolean;
 }
 
 function transcriptionOf(options: StartOptions | null): "cloud" | "local" | undefined {
@@ -120,7 +121,7 @@ export interface VoiceDictation {
   phase: DictationPhase;
   level: SharedValue<number>;
   start: (base: string) => boolean;
-  finish: () => Promise<void>;
+  finish: () => Promise<boolean>;
   cancel: () => void;
 }
 
@@ -137,7 +138,7 @@ function useSystemDictation({
   const phaseRef = useRef<DictationPhase>("idle");
   const level = useSharedValue(0);
   const session = useRef<DictationSession | null>(null);
-  const finished = useRef<(() => void)[]>([]);
+  const finished = useRef<((complete: boolean) => void)[]>([]);
   const stopTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const locales = useRef<Promise<SupportedLocales> | null>(null);
   useEffect(() => {
@@ -158,16 +159,20 @@ function useSystemDictation({
     setPhase(next);
   }, []);
 
-  const settle = useCallback(() => {
-    if (session.current) trackTurn(session.current, transcriptionOf(session.current.options));
-    if (owner === id) owner = null;
-    session.current = null;
-    if (stopTimer.current) clearTimeout(stopTimer.current);
-    stopTimer.current = null;
-    level.set(0);
-    update("idle");
-    for (const resolve of finished.current.splice(0)) resolve();
-  }, [id, level, update]);
+  const settle = useCallback(
+    (delivered = true) => {
+      const complete = delivered && !session.current?.ending && !session.current?.cutShort;
+      if (session.current) trackTurn(session.current, transcriptionOf(session.current.options));
+      if (owner === id) owner = null;
+      session.current = null;
+      if (stopTimer.current) clearTimeout(stopTimer.current);
+      stopTimer.current = null;
+      level.set(0);
+      update("idle");
+      for (const resolve of finished.current.splice(0)) resolve(complete);
+    },
+    [id, level, update],
+  );
 
   useEffect(() => {
     if (!speechRecognition) return;
@@ -202,6 +207,8 @@ function useSystemDictation({
           return;
         }
         if (phaseRef.current === "stopping" && (!current.heard || event.error === "client")) return;
+        if (phaseRef.current === "stopping" && (event.error === "aborted" || event.error === "interrupted"))
+          current.cutShort = true;
         const notice = dictationNotice(event.error);
         if (notice) current.ending = event.error === "not-allowed" ? "permission_denied" : "operation_failed";
         if (notice) showNotice(notice, { reference: referenceFrom("speech", event.error) });
@@ -242,6 +249,7 @@ function useSystemDictation({
         listeningAt: null,
         stoppingAt: null,
         ending: null,
+        cutShort: false,
       };
       session.current = current;
       update("starting");
@@ -281,12 +289,12 @@ function useSystemDictation({
     [available, id, settle, update],
   );
 
-  const finish = useCallback((): Promise<void> => {
-    if (owner !== id || !speechRecognition) return Promise.resolve();
+  const finish = useCallback((): Promise<boolean> => {
+    if (owner !== id || !speechRecognition) return Promise.resolve(true);
     if (phaseRef.current === "starting") {
       speechRecognition.abort();
       settle();
-      return Promise.resolve();
+      return Promise.resolve(false);
     }
     const module = speechRecognition;
     return new Promise((resolve) => {
@@ -299,7 +307,7 @@ function useSystemDictation({
       stopTimer.current = setTimeout(() => {
         if (owner !== id) return;
         module.abort();
-        settle();
+        settle(false);
       }, STOP_TIMEOUT_MS);
     });
   }, [id, settle, update]);
@@ -322,7 +330,7 @@ function useSystemDictation({
 
   useEffect(
     () => () => {
-      for (const resolve of finished.current.splice(0)) resolve();
+      for (const resolve of finished.current.splice(0)) resolve(false);
       if (owner !== id) return;
       speechRecognition?.abort();
       owner = null;
