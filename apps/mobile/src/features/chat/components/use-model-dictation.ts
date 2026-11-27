@@ -84,6 +84,7 @@ interface CaptureSession {
   listeningAt: number | null;
   stoppingAt: number | null;
   ending: "cancelled" | "permission_denied" | "operation_failed" | null;
+  cutShort: boolean;
 }
 
 function showVoiceServerNotice(error: VoiceServerError): void {
@@ -190,7 +191,7 @@ export function useModelDictation({
 
   const settle = useCallback(
     (delivered = true) => {
-      const complete = delivered && !session.current?.ending;
+      const complete = delivered && !session.current?.ending && !session.current?.cutShort;
       if (session.current)
         trackTurn(
           session.current,
@@ -265,6 +266,7 @@ export function useModelDictation({
           });
           return;
         }
+        if (error) current.cutShort = true;
         if (current.scribe) void current.scribe.finish().then(() => session.current === current && settle());
         else if (current.recording) {
           const pcm = joinRecording(current.recording);
@@ -320,6 +322,7 @@ export function useModelDictation({
         listeningAt: null,
         stoppingAt: null,
         ending: null,
+        cutShort: false,
       };
       session.current = current;
       update("starting");
@@ -404,7 +407,7 @@ export function useModelDictation({
     if (phaseRef.current === "starting") {
       cancelNative(current);
       settle();
-      return Promise.resolve(true);
+      return Promise.resolve(false);
     }
     return new Promise((resolve) => {
       finished.current.push(resolve);
@@ -444,6 +447,7 @@ export function useModelDictation({
 
   useEffect(
     () => () => {
+      for (const resolve of finished.current.splice(0)) resolve(false);
       if (owner !== id) return;
       if (session.current) cancelNative(session.current);
       owner = null;

@@ -55,6 +55,7 @@ interface DictationSession {
   listeningAt: number | null;
   stoppingAt: number | null;
   ending: "cancelled" | "permission_denied" | "operation_failed" | null;
+  cutShort: boolean;
 }
 
 function transcriptionOf(options: StartOptions | null): "cloud" | "local" | undefined {
@@ -154,7 +155,7 @@ function useSystemDictation({
 
   const settle = useCallback(
     (delivered = true) => {
-      const complete = delivered && !session.current?.ending;
+      const complete = delivered && !session.current?.ending && !session.current?.cutShort;
       if (session.current) trackTurn(session.current, transcriptionOf(session.current.options));
       if (owner === id) owner = null;
       session.current = null;
@@ -200,6 +201,8 @@ function useSystemDictation({
           return;
         }
         if (phaseRef.current === "stopping" && (!current.heard || event.error === "client")) return;
+        if (phaseRef.current === "stopping" && (event.error === "aborted" || event.error === "interrupted"))
+          current.cutShort = true;
         const notice = dictationNotice(event.error);
         if (notice) current.ending = event.error === "not-allowed" ? "permission_denied" : "operation_failed";
         if (notice) showNotice(notice, { reference: referenceFrom("speech", event.error) });
@@ -240,6 +243,7 @@ function useSystemDictation({
         listeningAt: null,
         stoppingAt: null,
         ending: null,
+        cutShort: false,
       };
       session.current = current;
       update("starting");
@@ -284,7 +288,7 @@ function useSystemDictation({
     if (phaseRef.current === "starting") {
       speechRecognition.abort();
       settle();
-      return Promise.resolve(true);
+      return Promise.resolve(false);
     }
     const module = speechRecognition;
     return new Promise((resolve) => {

@@ -582,7 +582,7 @@ export const ChatComposer = memo(function ChatComposer({
   const [sendingDictation, setSendingDictation] = useState(false);
   const sendingDictationRef = useRef(false);
   const busy = preparing || sendingDictation;
-  const attachmentsBlocked = disabled || preparing;
+  const attachmentsBlocked = disabled || preparing || sendingDictation;
   const leadingBlocked = attachmentsBlocked;
   const [warningColor, dangerColor] = useCSSVariable(["--openbot-warning", "--openbot-danger"]);
   const contextAlert =
@@ -664,12 +664,11 @@ export const ChatComposer = memo(function ChatComposer({
     setSendingDictation(true);
     try {
       const text = await current.finishDraft();
-      if (text === null) {
+      if (text !== null) latestTextRef.current = text;
+      if (text === null || sendBlocked.current || (!text.trim() && !hasFiles.current)) {
         inputRef.current?.focus();
         return;
       }
-      latestTextRef.current = text;
-      if (sendBlocked.current || (!text.trim() && !hasFiles.current)) return;
       sendGate.edit();
       sendAndCloseField(text);
     } finally {
