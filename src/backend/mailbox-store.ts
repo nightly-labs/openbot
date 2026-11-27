@@ -3,6 +3,7 @@ import { mkdir, readFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
 import { playableMediaKind } from "@openbot/contracts/attachment-files";
 import { rewriteAttachmentReferences } from "@openbot/contracts/attachment-references";
+import type { ImageSize } from "@openbot/contracts/image-size";
 import { INPUT_LIMITS } from "@openbot/contracts/input-limits";
 import type {
   AgentRuntimeWorkItem,
@@ -3796,6 +3797,15 @@ export class MailboxStore {
     const staged = this.#stagedGeneratedAttachments.get(attachmentId);
     if (staged) return staged.path;
     return this.#fileRecords().find((record) => record.id === attachmentId && !record.deletedAt)?.path ?? null;
+  }
+
+  knownAttachmentSizes(attachmentIds: ReadonlySet<string>): Map<string, ImageSize> {
+    const sizes = new Map<string, ImageSize>();
+    for (const id of attachmentIds) {
+      const size = this.#files.imageSizes.get(id);
+      if (size) sizes.set(id, size);
+    }
+    return sizes;
   }
 
   attachmentPaths(attachmentIds: ReadonlySet<string>): Map<string, string> {

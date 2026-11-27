@@ -743,9 +743,10 @@ export class TeamApiServer {
 
   constructor(options: TeamApiOptions) {
     this.#options = { ...options, sidebarLayout: options.sidebarLayout ?? unavailableSidebarLayout() };
-    this.#attachmentSizes = createAttachmentSizeCache(
-      (attachmentIds) => options.mailbox.attachmentPaths?.(attachmentIds) ?? new Map(),
-    );
+    this.#attachmentSizes = createAttachmentSizeCache({
+      known: (attachmentIds) => options.mailbox.knownAttachmentSizes?.(attachmentIds) ?? new Map(),
+      paths: (attachmentIds) => options.mailbox.attachmentPaths?.(attachmentIds) ?? new Map(),
+    });
     this.#rateLimitCapacity = options.rateLimitCapacity ?? RATE_LIMIT_CAPACITY;
     this.#now = options.now ?? Date.now;
     options.admin?.remoteChatContent?.onChange(() => this.refreshRemoteChatContent());

@@ -5,7 +5,11 @@ import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { isDynamicRecord } from "@openbot/contracts/runtime-values";
 import { TEAM_API_ROUTES } from "@openbot/contracts/team-api-routes";
-import { TEAM_APP_VERSION_HEADER, TEAM_PROTOCOL_VERSION_HEADER } from "@openbot/contracts/team-protocol";
+import {
+  TEAM_APP_VERSION_HEADER,
+  TEAM_PROTOCOL_V1_WEBSOCKET,
+  TEAM_PROTOCOL_VERSION_HEADER,
+} from "@openbot/contracts/team-protocol";
 import {
   addAttachmentDimensions,
   TEAM_ATTACHMENT_DIMENSIONS_CAPABILITY,
@@ -361,30 +365,70 @@ function checkSizes(attachments: WireAttachment[], withSizes: boolean): SeenSize
   return seen;
 }
 
+const LIVE_PICTURE = {
+  name: "live.png",
+  mimeType: "image/png",
+  bytes: pngHeader(320, 900),
+  expected: { width: 320, height: 900 },
+} as const;
+
+let agentId = "";
+
+async function sendPictures(files: ReadonlyArray<{ name: string; mimeType: string; bytes: Uint8Array }>) {
+  const { mailbox } = current();
+  const drafts = await runCauseEffect(
+    mailbox.prepareImportedAttachments(
+      [],
+      files.map((file) => ({ name: file.name, mimeType: file.mimeType, bytes: file.bytes })),
+    ),
+  );
+  assert.equal(drafts.length, files.length, "The files were not prepared.");
+  await runCauseEffect(
+    mailbox.enqueue({
+      sender: { kind: "user" },
+      recipientAgentIds: [agentId],
+      text: "pictures",
+      draftIds: drafts.map((draft) => draft.id),
+    }),
+  );
+}
+
+function findAttachment(value: unknown, name: string, depth = 0): WireAttachment | null {
+  if (depth > 12) return null;
+  if (Array.isArray(value)) {
+    for (const item of value) {
+      const found = findAttachment(item, name, depth + 1);
+      if (found) return found;
+    }
+    return null;
+  }
+  if (!isDynamicRecord(value)) return null;
+  if (value.name === name && typeof value.id === "string" && value.kind === "image")
+    return {
+      id: value.id,
+      name,
+      kind: "image",
+      ...(typeof value.width === "number" ? { width: value.width } : {}),
+      ...(typeof value.height === "number" ? { height: value.height } : {}),
+    };
+  for (const child of Object.values(value)) {
+    const found = findAttachment(child, name, depth + 1);
+    if (found) return found;
+  }
+  return null;
+}
+
 try {
   host = await startHost();
   const token = await login();
 
-  const agentId = await step("setup: an agent with a queued message that has two images and a text file", async () => {
-    const { agents, mailbox } = current();
+  await step("setup: an agent with a queued message that has two images and a text file", async () => {
+    const { agents } = current();
     const agent = await runCauseEffect(
       agents.createAgentProfile({ name: "Pictures", description: "Pictures", avatarSeed: "pictures", avatarHue: null }),
     );
-    const drafts = await runCauseEffect(
-      mailbox.prepareImportedAttachments(
-        [],
-        FILES.map((file) => ({ name: file.name, mimeType: file.mimeType, bytes: file.bytes })),
-      ),
-    );
-    assert.equal(drafts.length, FILES.length, "The files were not prepared.");
-    await runCauseEffect(
-      mailbox.enqueue({
-        sender: { kind: "user" },
-        recipientAgentIds: [agent.id],
-        text: "pictures",
-        draftIds: drafts.map((draft) => draft.id),
-      }),
-    );
+    agentId = agent.id;
+    await sendPictures(FILES);
     return agent.id;
   });
 
@@ -414,16 +458,57 @@ try {
   }
 
   await step("a current client gets the pixel size of each image and none for the text file", async () => {
-    const seen: Array<{ route: string; reads: number; sizes: SeenSize[] }> = [];
-    for (const route of routes) {
-      const { response, attempts } = await readUntilSized(route, token);
+    const seen: Array<{ route: string; sizes: SeenSize[] }> = [];
+    for (const route of routes)
       seen.push({
         route: route.label,
-        reads: attempts,
-        sizes: checkSizes(routeAttachments(route, response.body), true),
+        sizes: checkSizes(routeAttachments(route, (await read(route, { token })).body), true),
       });
-    }
     return seen;
+  });
+
+  await step("the first live event for a new picture has its size", async () => {
+    const socket = new WebSocket(`ws://127.0.0.1:${current().port}${TEAM_API_ROUTES.events}`, [
+      TEAM_PROTOCOL_V1_WEBSOCKET,
+      `openbot-token.${token}`,
+    ]);
+    try {
+      await new Promise<void>((resolveOpen, reject) => {
+        socket.addEventListener("open", () => resolveOpen(), { once: true });
+        socket.addEventListener("error", () => reject(new Error("The event socket did not open.")), { once: true });
+      });
+      socket.send(
+        JSON.stringify({
+          type: "agent-event-scope",
+          includeConversations: true,
+          capabilities: CURRENT.filter((capability) => capability !== "agent-runtime-snapshots"),
+        }),
+      );
+      const firstEvent = new Promise<{ type: string; picture: WireAttachment }>((resolveEvent, reject) => {
+        socket.addEventListener("message", (message) => {
+          const value = JSON.parse(String(message.data));
+          const picture = findAttachment(value, LIVE_PICTURE.name);
+          if (picture && isDynamicRecord(value)) resolveEvent({ type: String(value.type), picture });
+        });
+        socket.addEventListener("close", () => reject(new Error("The event socket closed.")), { once: true });
+      });
+      const [draft] = await runCauseEffect(
+        current().mailbox.prepareImportedAttachments(
+          [],
+          [{ name: LIVE_PICTURE.name, mimeType: LIVE_PICTURE.mimeType, bytes: LIVE_PICTURE.bytes }],
+        ),
+      );
+      assert.ok(draft, "The live picture was not prepared.");
+      await runCauseEffect(
+        current().agents.sendMessage({ agentId, text: "live picture", attachmentDraftIds: [draft.id] }),
+      );
+      const { type, picture } = await firstEvent;
+      assert.equal(picture.width, LIVE_PICTURE.expected.width, `The ${type} event has the wrong width.`);
+      assert.equal(picture.height, LIVE_PICTURE.expected.height, `The ${type} event has the wrong height.`);
+      return { event: type, width: picture.width, height: picture.height };
+    } finally {
+      socket.close();
+    }
   });
 
   await step("the desktop decoder for a joined server over HTTPS keeps the sizes", async () => {
