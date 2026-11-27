@@ -309,6 +309,8 @@ export const messages = {
   "error.backend.mcpOAuthRenewalFailed":
     "OpenBot 暂时无法续期此 MCP 服务器的登录。登录信息已保留，下一次请求会重试。如果此错误持续出现，用户可以在 OpenBot 中退出该服务器的登录，然后重新登录。",
   "error.backend.mcpServerUnreachable": "OpenBot 无法连接该服务器。请检查地址与网络。",
+  "error.backend.mcpServerCertificateUntrusted":
+    "OpenBot 不信任该服务器的安全证书。请确认运行 OpenBot 的电脑信任此证书。如果你是在 OpenBot 启动后才信任它的，请在那台电脑上退出 OpenBot，然后重新打开。",
   "error.backend.mcpLocalServerOff":
     "该电脑上 {address} 没有服务器在响应。请启动服务器，或在运行它的应用中开启它，然后重试。",
   "error.backend.mcpServerBlocked": "该电脑阻止了与该服务器的连接。请检查防火墙或安全软件后重试。",

@@ -67,6 +67,7 @@ import { createLocalJWKSet, type JWTPayload, jwtVerify } from "jose";
 import { z } from "zod";
 import { runCauseEffect } from "../backend/effect-boundary";
 import { isMissingFileError } from "../backend/file-errors";
+import { UNTRUSTED_CERTIFICATE_CODES } from "../backend/tls-certificate-errors";
 import { authCall, authDecode, CentralAuthOperationError, CentralAuthTransport } from "./central-auth-effects";
 import {
   decodeAcceptedRemoteInvite,
@@ -2793,18 +2794,6 @@ class AuthApiError extends Schema.TaggedError<AuthApiError>()("AuthApiError", {
 
 class NetworkBlockedError extends Error {}
 
-const INTERCEPTED_TLS_CODES = new Set([
-  "SELF_SIGNED_CERT_IN_CHAIN",
-  "DEPTH_ZERO_SELF_SIGNED_CERT",
-  "UNABLE_TO_GET_ISSUER_CERT",
-  "UNABLE_TO_GET_ISSUER_CERT_LOCALLY",
-  "UNABLE_TO_VERIFY_LEAF_SIGNATURE",
-  "CERT_UNTRUSTED",
-  "ERR_TLS_CERT_ALTNAME_INVALID",
-  "ERR_CERT_AUTHORITY_INVALID",
-  "ERR_CERT_COMMON_NAME_INVALID",
-]);
-
 function detectBlockingNetwork(fetcher: AuthFetcher, apiUrl: string): AuthFetcher {
   const blocked = () =>
     new NetworkBlockedError(sourceText("error.auth.networkBlocked", { host: new URL(apiUrl).host }));
@@ -2836,7 +2825,7 @@ function isFilterPage(response: Response): boolean {
 
 function isInterceptedTlsError(error: unknown): boolean {
   const cause = error instanceof Error ? error.cause : undefined;
-  return isDynamicRecord(cause) && isString(cause.code) && INTERCEPTED_TLS_CODES.has(cause.code);
+  return isDynamicRecord(cause) && isString(cause.code) && UNTRUSTED_CERTIFICATE_CODES.has(cause.code);
 }
 
 function centralAuthIssue(error: unknown, fallbackCode: string, fallbackMessage: string): CentralAuthIssue {

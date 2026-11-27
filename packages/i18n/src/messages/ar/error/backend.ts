@@ -333,6 +333,8 @@ export const messages = {
   "error.backend.mcpOAuthRenewalFailed":
     "تعذّر على OpenBot تجديد تسجيل الدخول إلى خادم MCP هذا الآن. يبقى تسجيل الدخول محفوظًا، وسيحاول الطلب التالي مرة أخرى. إذا استمر هذا الخطأ، يمكن للمستخدم تسجيل الخروج من الخادم في OpenBot ثم تسجيل الدخول مرة أخرى.",
   "error.backend.mcpServerUnreachable": "تعذّر على OpenBot الوصول إلى الخادم. تحقق من URL ومن شبكتك.",
+  "error.backend.mcpServerCertificateUntrusted":
+    "لا يثق OpenBot بشهادة الأمان لهذا الخادم. تأكد من أن الكمبيوتر الذي يشغّل OpenBot يثق بها. إذا وثقت بها بعد بدء OpenBot، فأغلق OpenBot على ذلك الكمبيوتر ثم افتحه مرة أخرى.",
   "error.backend.mcpLocalServerOff":
     "لا يُجيب أي خادم على {address} في هذا الحاسوب. شغّل الخادم، أو فعّله في التطبيق الذي يشغّله، ثم حاول مرة أخرى.",
   "error.backend.mcpServerBlocked":

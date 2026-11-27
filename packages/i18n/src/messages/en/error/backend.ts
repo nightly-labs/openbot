@@ -358,6 +358,8 @@ export const messages = defineMessages("error.backend", {
   "error.backend.mcpOAuthScopeNeeded":
     "The MCP server needs more access for this request than the sign-in gives. The sign-in is kept for the other tools. The user must sign in to the server again in OpenBot and allow the access that it asks for.",
   "error.backend.mcpServerUnreachable": "OpenBot could not reach the server. Check the URL and your network.",
+  "error.backend.mcpServerCertificateUntrusted":
+    "OpenBot does not trust the security certificate of this server. Make sure that the computer that runs OpenBot trusts it. If you trusted it after OpenBot started, quit OpenBot on that computer and open it again.",
   "error.backend.mcpLocalServerOff":
     "No server answers at {address} on this computer. Start the server, or turn it on in the app that runs it, then try again.",
   "error.backend.mcpServerBlocked":
