@@ -1,4 +1,5 @@
 import { isDynamicRecord, isNumber, isString } from "@openbot/contracts/runtime-values";
+import { cloudflareAccessHeaders } from "./cloudflare-access-headers";
 import { listingsWithoutCards, outDirectoryArgument, refreshCardAfterReview, runCardCommand } from "./marketplace-card";
 
 const [command, targetId, ...rest] = process.argv.slice(2);
@@ -7,7 +8,7 @@ const token = process.env.SKILLS_ADMIN_TOKEN;
 
 if (!token) throw new Error("SKILLS_ADMIN_TOKEN is required.");
 
-const headers = { Authorization: `Bearer ${token}`, "Content-Type": "application/json" };
+const headers = { ...cloudflareAccessHeaders(), Authorization: `Bearer ${token}`, "Content-Type": "application/json" };
 const api = { apiUrl, token };
 
 if (command === "list") {

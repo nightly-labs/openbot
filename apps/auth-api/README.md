@@ -303,6 +303,15 @@ GitHub Actions reads the remote-control secrets, `SKILLS_ADMIN_TOKEN`, `SITE_REP
 `SITE_OPERATIONS_ADMIN_TOKEN` and `SERVER_CLAIMS_ADMIN_TOKEN` from the `cloudflare-production` Environment. It includes
 them in Wrangler's temporary runtime secrets file.
 
+Cloudflare Access also protects the admin routes (`/v1/skills/admin/`, `/v1/marketplace/agents/admin/`,
+`/v1/sites/admin/` and `/v2/admin/`). When the Worker variables `CF_ACCESS_TEAM_DOMAIN` (for example
+`<team>.cloudflareaccess.com`) and `CF_ACCESS_ADMIN_AUD` (the AUD tag of the Access application) are
+set, an admin request needs a valid `Cf-Access-Jwt-Assertion` as well as the admin token. With only
+one of them set, every admin request is refused. They are not secrets: set them in `wrangler.jsonc`
+`vars` only after the Access application exists. Development keeps them empty. People sign in to
+Access with MFA. Scripts send an Access service token when `CF_ACCESS_CLIENT_ID` and
+`CF_ACCESS_CLIENT_SECRET` are in the environment (`scripts/cloudflare-access-headers.ts`).
+
 `COMPANY_SIGN_IN_SECRET` (at least 32 random bytes) turns on company sign-in (OpenID Connect and
 SCIM). It encrypts each company's client secret in D1, so never change or lose it: with another
 value, each company must enter its client secret again. Without it, company sign-in answers 503 and
