@@ -167,6 +167,29 @@ try {
     desktop.move(handle.x, handle.y);
     await settle(app);
     desktop.button(true);
+    await until(
+      async () =>
+        app.eval(
+          "dock",
+          "document.querySelector('.agent-dock')?.hasAttribute('data-dragging') === true",
+          decodeBoolean,
+        ),
+      "the dock drag to start",
+    );
+    let previousRegionCount = (await app.stats()).regions.length;
+    let stableWindows = 0;
+    await until(async () => {
+      await app.eval(
+        "dock",
+        "new Promise(resolve => { let left = 8; const sample = () => --left === 0 ? resolve(true) : requestAnimationFrame(sample); requestAnimationFrame(sample); })",
+        decodeBoolean,
+      );
+      const nextRegionCount = (await app.stats()).regions.length;
+      stableWindows = nextRegionCount === previousRegionCount ? stableWindows + 1 : 0;
+      previousRegionCount = nextRegionCount;
+      return stableWindows >= 3 ? nextRegionCount : undefined;
+    }, "the held stationary drag input region to remain stable for three animation-frame windows");
+    steps.push({ step: "held stationary drag sends no repeated input regions" });
     for (let step = 1; step <= 10; step += 1) {
       desktop.move(handle.x, handle.y + direction * step * 15);
       await sleep(30);

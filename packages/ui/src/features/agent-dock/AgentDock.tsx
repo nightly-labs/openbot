@@ -688,9 +688,12 @@ export function AgentDock(props: AgentDockProps) {
         lastTime = now;
       }
       if (!still) {
-        const pull = Math.max(-MAX_STRETCH, Math.min(MAX_STRETCH, speed * STRETCH_PER_SPEED));
-        stretch.to(pull, undefined, Math.abs(pull) < 1 ? WOBBLY : STRETCH_FOLLOW);
-        motion.kick();
+        const rawPull = Math.max(-MAX_STRETCH, Math.min(MAX_STRETCH, speed * STRETCH_PER_SPEED));
+        const pull = Math.abs(rawPull) < 0.005 ? 0 : rawPull;
+        if (stretch.target !== pull) {
+          stretch.to(pull, undefined, Math.abs(pull) < 1 ? WOBBLY : STRETCH_FOLLOW);
+          motion.kick();
+        }
       }
       frame = requestAnimationFrame(step);
     };
