@@ -35,6 +35,7 @@ import { sourceText } from "@openbot/i18n/source";
 import { spentUsageWindow } from "@openbot/team-client/plan-limits";
 import { Button, CopyButton, Input, toast } from "@openbot/ui";
 import { findModelOption } from "@openbot/ui/components/provider-accounts";
+import { splitServiceName } from "@openbot/ui/components/provider-model-options";
 import { AwaitingReplies } from "@openbot/ui/features/conversation/AwaitingReplies";
 import { ComposerAddMenu } from "@openbot/ui/features/conversation/ComposerAddMenu";
 import { ComposerAttachmentRow } from "@openbot/ui/features/conversation/ComposerAttachmentRow";
@@ -672,12 +673,17 @@ export function ConversationComposer() {
               <Show
                 when={shown().target}
                 fallback={
-                  <ComposerNotice body={t("composer.imageModel.bodyNoTarget", { model: shown().model.name })} />
+                  <ComposerNotice
+                    body={t("composer.imageModel.bodyNoTarget", { model: opencodeModelName(shown().model) })}
+                  />
                 }
               >
                 {(target) => (
                   <ComposerNotice
-                    body={t("composer.imageModel.body", { model: shown().model.name, target: target().name })}
+                    body={t("composer.imageModel.body", {
+                      model: opencodeModelName(shown().model),
+                      target: opencodeModelName(target()),
+                    })}
                     action={
                       <Button
                         variant="outline"
@@ -687,7 +693,7 @@ export function ConversationComposer() {
                         loadingLabel={t("composer.imageModel.pending")}
                         onClick={() => void switchToImageModel(target())}
                       >
-                        {t("composer.imageModel.action", { target: target().name })}
+                        {t("composer.imageModel.action", { target: opencodeModelName(target()) })}
                       </Button>
                     }
                   />
@@ -1027,6 +1033,10 @@ function whisperModelBytes(): number {
     VOICE_MODELS.flatMap((model) => (model.kind === "local" && model.id === "whisper-turbo" ? [model.bytes] : []))[0] ??
     0
   );
+}
+
+function opencodeModelName(option: ClientAgentModelOption): string {
+  return splitServiceName("opencode", option.name).name;
 }
 
 function freeOpencodeImageModel(options: readonly ClientAgentModelOption[]): ClientAgentModelOption | undefined {
