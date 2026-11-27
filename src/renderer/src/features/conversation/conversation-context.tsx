@@ -175,6 +175,11 @@ const Conversation = createSimpleContext({
       });
     }
 
+    function latestPageSize(agentId: string, remote: boolean) {
+      if (!remote || (conversations[agentId]?.read?.unreadCount ?? 0) > 0) return LATEST_PAGE_SIZE;
+      return REMOTE_LATEST_PAGE_SIZE;
+    }
+
     const unreadReplies = createMemo(() =>
       Object.fromEntries(
         Object.entries(conversations).map(([id, conversation]) => [id, conversation.read?.unreadCount ?? 0]),
@@ -262,7 +267,7 @@ const Conversation = createSimpleContext({
             {
               agentId,
               anchor: { type: "latest" },
-              limit: server?.kind === "remote" ? REMOTE_LATEST_PAGE_SIZE : LATEST_PAGE_SIZE,
+              limit: untrack(() => latestPageSize(agentId, server?.kind === "remote")),
             },
             serverId,
           )
@@ -929,7 +934,7 @@ const Conversation = createSimpleContext({
       const page = await conversationPort().agent.readConversationPage({
         agentId,
         anchor: { type: "latest" },
-        limit: activeServer()?.kind === "remote" ? REMOTE_LATEST_PAGE_SIZE : LATEST_PAGE_SIZE,
+        limit: latestPageSize(agentId, activeServer()?.kind === "remote"),
       });
       if (!scopeIsCurrent() || conversationPageRequests.get(agentId) !== request) return;
       applyConversationPage(page, "replace", "latest");

@@ -64,7 +64,7 @@ interface TaskCounts {
 const CHANNEL_THREADS_SQL =
   "SELECT channel_id, agent_id, thread_id FROM projection_channel_contexts ORDER BY channel_id, agent_id";
 
-const UNREAD_COUNT_SQL = `SELECT COUNT(*) AS unread FROM projection_channel_messages AS m
+const UNREAD_MESSAGES_SQL = `FROM projection_channel_messages AS m
   WHERE m.channel_id = ?
     AND m.sequence > COALESCE(
       (SELECT r.through_sequence FROM projection_channel_reads AS r
@@ -80,6 +80,25 @@ const UNREAD_COUNT_SQL = `SELECT COUNT(*) AS unread FROM projection_channel_mess
     AND COALESCE(json_extract(m.message_json, '$.message.itemType'), '') NOT LIKE ?
     AND COALESCE(json_extract(m.message_json, '$.message.itemType'), '') NOT LIKE ?
     AND COALESCE(json_extract(m.message_json, '$.message.itemType'), '') NOT LIKE ?`;
+
+const UNREAD_COUNT_SQL = `SELECT COUNT(*) AS unread ${UNREAD_MESSAGES_SQL}`;
+
+const MESSAGES_FROM_FIRST_UNREAD_SQL = `SELECT COUNT(*) AS messages FROM projection_channel_messages
+  WHERE channel_id = ? AND ${SHOWN_MESSAGE_SQL}
+    AND sequence >= (SELECT MIN(m.sequence) ${UNREAD_MESSAGES_SQL})`;
+
+function unreadMessagesParameters(channelId: string, memberId: string, excludedId: string): string[] {
+  return [
+    channelId,
+    channelId,
+    memberId,
+    memberId,
+    excludedId,
+    `${CHANNEL_ROUTING_EVENT_ITEM_TYPE_PREFIX}%`,
+    `${MCP_SIGN_IN_ITEM_TYPE_PREFIX}%`,
+    `${SETTING_LINK_ITEM_TYPE_PREFIX}%`,
+  ];
+}
 
 function deletedChannelMessage(entry: ChannelMessage): ChannelMessage & { deleted: true } {
   return {
@@ -274,20 +293,23 @@ export class ChannelStore {
     return true;
   }
 
+  messagesFromFirstUnread(channelId: string, memberId: string): number {
+    const row = databaseRow(
+      cachedStatement(this.database.connection, MESSAGES_FROM_FIRST_UNREAD_SQL).get(
+        channelId,
+        ...unreadMessagesParameters(channelId, memberId, memberId),
+      ),
+    );
+    return Number(row?.messages ?? 0);
+  }
+
   #unreadCount(channelId: string, memberId: string, excludedId: string, keep: boolean): number {
     const key = `${memberId}\n${excludedId}`;
     const kept = keep ? this.#unreadCounts.get(channelId)?.get(key) : undefined;
     if (kept !== undefined) return kept;
     const row = databaseRow(
       cachedStatement(this.database.connection, UNREAD_COUNT_SQL).get(
-        channelId,
-        channelId,
-        memberId,
-        memberId,
-        excludedId,
-        `${CHANNEL_ROUTING_EVENT_ITEM_TYPE_PREFIX}%`,
-        `${MCP_SIGN_IN_ITEM_TYPE_PREFIX}%`,
-        `${SETTING_LINK_ITEM_TYPE_PREFIX}%`,
+        ...unreadMessagesParameters(channelId, memberId, excludedId),
       ),
     );
     const count = Number(row?.unread ?? 0);

@@ -72,6 +72,10 @@ export type ChannelSettingsAgents = Pick<
 const DEFAULT_CHANNEL_PAGE_LIMIT = 100;
 const REMOTE_INITIAL_CHANNEL_PAGE_LIMIT = 24;
 
+function firstChannelPageLimit(messagesFromFirstUnread: number): number {
+  return Math.min(DEFAULT_CHANNEL_PAGE_LIMIT, Math.max(REMOTE_INITIAL_CHANNEL_PAGE_LIMIT, messagesFromFirstUnread + 1));
+}
+
 export async function routeChannels(
   context: TeamApiRequestContext,
   channels: ChannelService | undefined,
@@ -109,7 +113,9 @@ export async function routeChannels(
     const settingLinks = capabilities.has(SETTING_LINK_MARKERS_CAPABILITY);
     const pageTasksOnly = capabilities.has(CHANNEL_PAGE_TASKS_CAPABILITY);
     const initialLimit =
-      input.beforeSequence === undefined ? REMOTE_INITIAL_CHANNEL_PAGE_LIMIT : DEFAULT_CHANNEL_PAGE_LIMIT;
+      input.beforeSequence === undefined
+        ? firstChannelPageLimit(channels.store.messagesFromFirstUnread(input.channelId, member.id))
+        : DEFAULT_CHANNEL_PAGE_LIMIT;
     const newest = channels.store.pageWithoutExtent(input.channelId, input.beforeSequence, initialLimit);
     const tasks =
       seenSubtasks && input.beforeSequence === undefined

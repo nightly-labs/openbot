@@ -18,6 +18,9 @@ import { useWindowPage } from "../window/window-page-context";
 import { conversationPort } from "./conversation-port";
 import { preserveKnownDirectUnread } from "./conversation-read-state";
 
+const LATEST_DIRECT_PAGE_SIZE = 50;
+const REMOTE_LATEST_DIRECT_PAGE_SIZE = 24;
+
 function recoveredDirectConversation(
   page: DirectConversationPage,
   cached: DirectConversationSnapshot | undefined,
@@ -131,6 +134,13 @@ const DirectMessages = createSimpleContext({
       await loadDirectConversation(memberId, true);
     }
 
+    function latestDirectPageSize(memberId: string) {
+      const unread = directThreads().find((thread) => thread.otherMemberId === memberId)?.unreadCount ?? 0;
+      return activeServer()?.kind === "remote" && unread === 0
+        ? REMOTE_LATEST_DIRECT_PAGE_SIZE
+        : LATEST_DIRECT_PAGE_SIZE;
+    }
+
     async function loadDirectConversation(memberId: string, retainCached: boolean): Promise<void> {
       const hasCached = retainCached && Boolean(directConversations()[memberId]);
       setDirectConversationLoading(!hasCached);
@@ -140,7 +150,7 @@ const DirectMessages = createSimpleContext({
         const page = await conversationPort().servers.readDirectConversationPage({
           memberId,
           anchor: { type: "latest" },
-          limit: activeServer()?.kind === "remote" ? 24 : 50,
+          limit: latestDirectPageSize(memberId),
         });
         if (!scopeIsCurrent() || request !== directConversationRequest) return;
         const snapshot = retainCached
