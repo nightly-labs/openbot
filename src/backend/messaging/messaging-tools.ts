@@ -292,9 +292,17 @@ function historyMessage(message: ContextEntry, maxCharacters: number): HistoryMe
 
 function historyText(text: string, maxCharacters: number): string {
   if (text.length <= maxCharacters) return text;
-  const head = Math.floor(maxCharacters * HISTORY_HEAD_SHARE);
-  const tail = maxCharacters - head;
-  return `${text.slice(0, head)}\n[${text.length - head - tail} characters left out. This tool cannot show them.]\n${text.slice(-tail)}`;
+  const headEnd = Math.floor(maxCharacters * HISTORY_HEAD_SHARE);
+  const tailStart = text.length - (maxCharacters - headEnd);
+  const head = splitsPair(text, headEnd) ? headEnd - 1 : headEnd;
+  const tail = splitsPair(text, tailStart) ? tailStart + 1 : tailStart;
+  return `${text.slice(0, head)}\n[${tail - head} characters left out. This tool cannot show them.]\n${text.slice(tail)}`;
+}
+
+function splitsPair(text: string, index: number): boolean {
+  const before = text.charCodeAt(index - 1);
+  const after = text.charCodeAt(index);
+  return before >= 0xd800 && before <= 0xdbff && after >= 0xdc00 && after <= 0xdfff;
 }
 
 function historySize(messages: readonly HistoryMessage[]): number {
