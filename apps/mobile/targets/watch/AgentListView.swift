@@ -148,12 +148,14 @@ private func folderTitle(_ entry: ListEntry, manyServers: Bool) -> String {
 struct AgentRow: View {
   static let dividerInset: CGFloat = 40
 
+  static let workingTint = Color(white: 0.8)
+
   @Environment(\.watchText) private var text
   let agent: WatchAgent
   var divided = false
 
   var body: some View {
-    let style = AgentStateStyle(agent: agent, text: text)
+    let style = AgentStateStyle(agent: agent, text: text, working: Self.workingTint)
     NavigationLink(value: WatchRoute.agent(agent.key)) {
       HStack(spacing: 8) {
         AgentAvatar(agent: agent, size: 32)
@@ -168,12 +170,7 @@ struct AgentRow: View {
         }
         Spacer(minLength: 0)
         if let unread = agent.unread, unread > 0 {
-          Text(verbatim: unread > 99 ? "99+" : String(unread))
-            .font(.caption2.weight(.bold))
-            .foregroundStyle(.white)
-            .padding(.horizontal, 6)
-            .padding(.vertical, 2)
-            .background(Color.blue, in: Capsule())
+          UnreadBadge(count: unread)
         }
       }
       .padding(.vertical, 2)
@@ -220,12 +217,7 @@ struct PinnedGrid: View {
         picture()
           .overlay(alignment: .topTrailing) {
             if unread > 0 {
-              Text(verbatim: unread > 99 ? "99+" : String(unread))
-                .font(.system(size: 10, weight: .bold))
-                .foregroundStyle(.white)
-                .padding(.horizontal, 4)
-                .frame(minWidth: 16, minHeight: 16)
-                .background(Color.blue, in: Capsule())
+              UnreadBadge(count: unread, compact: true)
                 .offset(x: 5, y: -3)
             }
           }

@@ -114,7 +114,7 @@ struct ChannelRow: View {
             Label(text(TextKey.stateWorking), systemImage: "ellipsis")
               .font(.caption2)
               .lineLimit(1)
-              .foregroundStyle(.blue)
+              .foregroundStyle(AgentRow.workingTint)
           } else if let line = channel.activityLine {
             Label(line, systemImage: "number")
               .font(.caption2)
@@ -124,12 +124,7 @@ struct ChannelRow: View {
         }
         Spacer(minLength: 0)
         if let unread = channel.unread, unread > 0 {
-          Text(verbatim: unread > 99 ? "99+" : String(unread))
-            .font(.caption2.weight(.bold))
-            .foregroundStyle(.white)
-            .padding(.horizontal, 6)
-            .padding(.vertical, 2)
-            .background(Color.blue, in: Capsule())
+          UnreadBadge(count: unread)
         }
       }
       .padding(.vertical, 2)
@@ -157,7 +152,7 @@ struct ChannelStateCapsule: View {
 
   var body: some View {
     if channel.isWorking {
-      capsule(text(TextKey.stateWorking), symbol: "ellipsis", tint: .blue)
+      capsule(text(TextKey.stateWorking), symbol: "ellipsis", tint: Color.stateTint(hex: channel.color))
     } else if let updated = channel.updated, !updated.isEmpty {
       capsule(updated, symbol: "number", tint: .secondary)
     }

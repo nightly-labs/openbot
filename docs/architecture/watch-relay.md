@@ -87,7 +87,7 @@ JSON body `WatchRelayHttpRequest { v: 1, ts, sealed, proof }`, at most `WATCH_RE
   are only for ticket, proof, size and format errors.
 - `refresh` returns a `WatchSnapshot` for this host only, in the same shape and order rules as the
   phone builds (`apps/mobile/src/features/watch/model/watch-snapshot.ts`), localized for
-  `refresh.language`. `servers` has one entry, this host, with `watchKey`.
+  `refresh.language`. `servers` has one entry, this host, with `watchKey`, `color` and `shape`.
 - Agents come in the stored sidebar order: pinned agents first, then each folder in layout order, each agent
   with `folder` (the folder path, such as `Parent / Child`). The order does not change with unread state
   or recent activity. The watch shows Pinned, Unread and Needs you sections, then one section per folder.
@@ -117,6 +117,18 @@ JSON body `WatchRelayHttpRequest { v: 1, ts, sealed, proof }`, at most `WATCH_RE
   the agents and channels that the user hid on this phone (`hiddenAgents`, `hiddenChannels`, at most
   `WATCH_HIDDEN_LIMIT` each). These lists live only on the phone, so the watch removes those chats from
   the host's reply when it merges.
+- Each `WatchServer` carries the server logo: `color` (the appearance color, or the automatic color of
+  `serverPlushHex`) and `shape` (a `ServerAppearanceShape`, `squircle` by default). Both are optional.
+  The phone also sends `picture`: the name of a PNG of the server logo as the phone shows it (the
+  plush, or the uploaded logo in a rounded square), at most 192 px and 40 000 base64 characters. The
+  phone keeps these files in `watch-server-pictures` in the App Group, and the watch loads them with
+  `avatars` from the phone only; a host does not send `picture`. The watch shows the picture on the
+  home background and in the server rows, and the flat `shape` in `color` while it has no picture. It
+  uses the color for the home background, the server rows and the tones of the home text, dots and
+  unread badges (`ServerPalette`). When the picture has a
+  clear main color, the watch uses that color instead. The agent list shows the same background as the
+  home screen, moved by one page, so the logo continues across the two pages. When a host reply has no
+  logo, the watch keeps the one from the phone; with neither, it uses `accent`.
 - Each `WatchAgent` in the phone's snapshot can carry `faces` (`waiting`, `working`): the names of the
   agent's picture with that face. The phone draws them; the host does not send faces, so the watch keeps
   the faces that the phone sent.

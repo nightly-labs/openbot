@@ -22,7 +22,7 @@ function remember<T>(cache: Map<string, T>, key: string, value: T): T {
 const pictureKey = (shape: ServerAppearanceShape, hex: string, pixels: number, saturation: number) =>
   `${shape}|${hex}|${pixels}|${saturation}`;
 
-function loadServerPlush(shape: ServerAppearanceShape, hex: string, pixels: number, saturation: number) {
+export function loadServerPlush(shape: ServerAppearanceShape, hex: string, pixels: number, saturation: number) {
   const key = pictureKey(shape, hex, pixels, saturation);
   const cached = pictures.get(key);
   if (cached) return remember(pictures, key, cached);

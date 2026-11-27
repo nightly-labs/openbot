@@ -160,6 +160,9 @@ struct WatchServer: Codable, Hashable {
   var id: String
   var name: String
   var online: Bool
+  var color: String?
+  var shape: String?
+  var picture: String?
   var watchKey: String?
   var hiddenAgents: [String]?
   var hiddenChannels: [String]?
