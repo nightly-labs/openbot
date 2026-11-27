@@ -500,6 +500,7 @@
     "test:turn-input": "bun scripts/turn-input-e2e.ts",
     "test:analytics-redaction": "bun scripts/analytics-redaction-e2e.ts",
     "test:remote-connect-analytics": "bun scripts/remote-connect-analytics-e2e.ts",
+    "test:mobile-reconnect": "bun scripts/mobile-reconnect-e2e.ts",
     "test:central-auth-startup": "bun scripts/central-auth-startup-stall-e2e.ts",
     "test:exit-records": "bun scripts/exit-records-e2e.ts",
     "test:exit-watchdog": "bun scripts/exit-watchdog-e2e.ts",
