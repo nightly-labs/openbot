@@ -138,6 +138,10 @@ import {
   AGENT_INSTRUCTIONS_CAPABILITY,
   AGENT_INSTRUCTIONS_ROUTES,
 } from "@openbot/contracts/team-protocol/agent-instructions-v1";
+import {
+  AGENT_MODEL_INPUTS_CAPABILITY,
+  AGENT_MODEL_INPUTS_ROUTES,
+} from "@openbot/contracts/team-protocol/agent-model-inputs-v1";
 import { AGENT_NEW_CHAT_CAPABILITY, AGENT_NEW_CHAT_ROUTES } from "@openbot/contracts/team-protocol/agent-new-chat-v1";
 import {
   AGENT_NOTIFICATION_LEVELS_CAPABILITY,
@@ -939,7 +943,32 @@ const FAST_MODE_MODELS: AgentModelOption[] = [
     defaultReasoningEffort: "medium",
     supportedReasoningEfforts: ["medium"],
   },
+  {
+    provider: "opencode",
+    id: "opencode/glm-5.3-flash-free",
+    name: "GLM 5.3 Flash Free",
+    description: "",
+    defaultReasoningEffort: "medium",
+    supportedReasoningEfforts: ["medium"],
+  },
+  {
+    provider: "opencode",
+    id: "opencode/seaglass-alpha-free",
+    name: "Seaglass Alpha Free",
+    description: "",
+    defaultReasoningEffort: "medium",
+    supportedReasoningEfforts: ["medium"],
+  },
 ];
+
+const OPENCODE_CATALOG = {
+  opencode: {
+    models: {
+      "glm-5.3-flash-free": { modalities: { input: ["text", "image", "video"], output: ["text"] } },
+      "seaglass-alpha-free": { modalities: { input: ["text"], output: ["text"] } },
+    },
+  },
+};
 
 const SPENT_WEEK = { usedPercent: 100, windowDurationMins: 10_080, resetsAt: 1_900_000_000 };
 
@@ -955,6 +984,8 @@ const FAKE_SECRET = ["sk", "ant", "e2e", "fake0000000000000000"].join("-");
 
 const files = join(root, "files");
 mkdirSync(files, { recursive: true });
+mkdirSync(join(root, "cache", "opencode"), { recursive: true });
+writeFileSync(join(root, "cache", "opencode", "models.json"), JSON.stringify(OPENCODE_CATALOG));
 const attachmentPath = join(files, "report one.txt");
 const attachmentBytes = "attachment bytes for the download check\n";
 writeFileSync(attachmentPath, attachmentBytes);
@@ -6795,6 +6826,35 @@ try {
         list(released.body).some((model) => field(model, "id") === "steering-agent/default") &&
         list(released.body).every((model) => field(model, "steersTurns") === undefined),
       summary(released),
+    );
+    const inputsV10 = { capabilities: [AGENT_MODEL_INPUTS_CAPABILITY], protocol: TEAM_PROTOCOL_V10 };
+    const inputsCompatibility = await call("GET", TEAM_API_ROUTES.compatibility, { protocol: TEAM_PROTOCOL_V10 });
+    const inputsOlder = await call("GET", TEAM_API_ROUTES.compatibility, { protocol: TEAM_PROTOCOL_V9 });
+    const inputs = await call("POST", AGENT_MODEL_INPUTS_ROUTES.list, { token: bobToken, json: {}, ...inputsV10 });
+    const withoutInputs = await call("POST", AGENT_MODEL_INPUTS_ROUTES.list, {
+      token: bobToken,
+      json: {},
+      protocol: TEAM_PROTOCOL_V10,
+    });
+    check(
+      "the host advertises agent-model-inputs-v1 to a protocol 10 peer only, and a client without it gets 400",
+      list(field(inputsCompatibility.body, "capabilities")).includes(AGENT_MODEL_INPUTS_CAPABILITY) &&
+        inputsOlder.status === 200 &&
+        !list(field(inputsOlder.body, "capabilities")).includes(AGENT_MODEL_INPUTS_CAPABILITY) &&
+        errorIs(withoutInputs, 400, sourceText("error.team.modelVisibilityUnsupported")),
+      [summary(inputsCompatibility), summary(inputsOlder), summary(withoutInputs)],
+    );
+    check(
+      "a member reads the image input of each OpenCode model that the OpenCode catalog lists, and the released model list keeps its fields",
+      inputs.status === 200 &&
+        isDeepStrictEqual(inputs.body, {
+          models: [
+            { provider: "opencode", id: "opencode/glm-5.3-flash-free", inputs: ["image"] },
+            { provider: "opencode", id: "opencode/seaglass-alpha-free", inputs: [] },
+          ],
+        }) &&
+        list(released.body).every((model) => field(model, "inputs") === undefined),
+      [summary(inputs), summary(released)],
     );
     check(
       "a member reads only the custom agent models that steer",

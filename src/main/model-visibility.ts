@@ -2,6 +2,7 @@ import { readFile, stat } from "node:fs/promises";
 import { homedir } from "node:os";
 import { join } from "node:path";
 import type {
+  AgentModelInput,
   AgentModelListing,
   AgentModelListingEntry,
   AgentModelOption,
@@ -12,6 +13,7 @@ import type {
   ProviderModelVisibilityChange,
 } from "@openbot/contracts/ipc";
 import {
+  AGENT_MODEL_INPUTS,
   DEFAULT_CUSTOM_PROVIDER_HARNESS,
   isCustomProviderContextWindow,
   isCustomProviderMaxOutput,
@@ -47,6 +49,7 @@ interface ReleaseLookup {
   releaseByName(name: string): ModelRelease | undefined;
   knowsService(service: string): boolean;
   limits(modelId: string): ModelLimits | undefined;
+  inputs(modelId: string): AgentModelInput[] | undefined;
 }
 
 interface Releases {
@@ -55,6 +58,7 @@ interface Releases {
   services: Set<string>;
   limits: Map<string, ModelLimits>;
   nameLimits: Map<string, ModelLimits[]>;
+  inputs: Map<string, AgentModelInput[]>;
 }
 
 export class ModelReleaseCatalog {
@@ -93,7 +97,14 @@ export class ModelReleaseCatalog {
 }
 
 function noReleases(): Releases {
-  return { models: new Map(), names: new Map(), services: new Set(), limits: new Map(), nameLimits: new Map() };
+  return {
+    models: new Map(),
+    names: new Map(),
+    services: new Set(),
+    limits: new Map(),
+    nameLimits: new Map(),
+    inputs: new Map(),
+  };
 }
 
 function modelName(id: string): string {
@@ -111,6 +122,8 @@ function parseReleases(value: unknown): Releases {
     releases.services.add(service);
     for (const [model, details] of Object.entries(entry.models)) {
       if (!isDynamicRecord(details)) continue;
+      const inputs = listedInputs(details.modalities);
+      if (inputs) releases.inputs.set(`${service}/${model}`.toLowerCase(), inputs);
       const limits = listedLimits(details.limit);
       if (limits) {
         releases.limits.set(`${service}/${model}`.toLowerCase(), limits);
@@ -146,6 +159,22 @@ function writesText(modalities: unknown): boolean {
   return modalities.output.includes("text");
 }
 
+function listedInputs(modalities: unknown): AgentModelInput[] | undefined {
+  if (!isDynamicRecord(modalities) || !Array.isArray(modalities.input)) return undefined;
+  const listed = modalities.input;
+  return AGENT_MODEL_INPUTS.filter((input) => listed.includes(input));
+}
+
+const MODEL_EFFORT_VARIANT = /\/(?:none|minimal|low|medium|high|xhigh|max|ultra)$/;
+
+function catalogInputs(modelId: string, releases: Releases): AgentModelInput[] | undefined {
+  const comma = modelId.indexOf(",");
+  const key = (comma > 0 ? modelId.slice(0, comma) : modelId).replace(":", "/").toLowerCase();
+  const exact = releases.inputs.get(key);
+  if (exact || !MODEL_EFFORT_VARIANT.test(key)) return exact;
+  return releases.inputs.get(key.replace(MODEL_EFFORT_VARIANT, ""));
+}
+
 function listedLimits(limit: unknown): ModelLimits | undefined {
   if (!isDynamicRecord(limit) || !isCustomProviderContextWindow(limit.context)) return undefined;
   const contextWindow = limit.context;
@@ -179,6 +208,7 @@ function catalogLimits(modelId: string, releases: Releases): ModelLimits | undef
 function releaseLookup(releases: Releases): ReleaseLookup {
   return {
     limits: (modelId) => catalogLimits(modelId, releases),
+    inputs: (modelId) => catalogInputs(modelId, releases),
     release: (key) => releases.models.get(key),
     releaseByName: (name) => releases.names.get(name),
     knowsService: (service) => releases.services.has(service),
@@ -417,7 +447,7 @@ export class ModelVisibility {
     this.#options.modelsChanged();
   });
 
-  picker<Model extends { provider: string; id: string; listing?: AgentModelListing }>(
+  picker<Model extends { provider: string; id: string; listing?: AgentModelListing; inputs?: AgentModelInput[] }>(
     models: readonly Model[],
   ): Effect.Effect<Model[]> {
     return this.#picker(models);
@@ -491,7 +521,7 @@ export class ModelVisibility {
   });
 
   readonly #picker = Effect.fn("ModelVisibility.picker")(function* <
-    Model extends { provider: string; id: string; listing?: AgentModelListing },
+    Model extends { provider: string; id: string; listing?: AgentModelListing; inputs?: AgentModelInput[] },
   >(this: ModelVisibility, models: readonly Model[]) {
     const providers = new Map<string, Model[]>();
     for (const model of models) {
@@ -506,7 +536,8 @@ export class ModelVisibility {
       pickers.set(provider, this.#providerPicker(provider, listed, lookup, saved));
     const inUse = modelsInUse(this.#options.listAgents());
     const now = yield* Clock.currentTimeMillis;
-    return models.flatMap((model): Model[] => {
+    return models.flatMap((listed): Model[] => {
+      const model = withCatalogInputs(listed, lookup);
       const picker = pickers.get(model.provider);
       if (!picker) return [model];
       const used = inUse.has(modelKey(model.provider, model.id));
@@ -537,6 +568,15 @@ export class ModelVisibility {
     }
     return { byDefault, hidden: this.#hidden.get(provider) ?? new Set(), released };
   }
+}
+
+function withCatalogInputs<Model extends { provider: string; id: string; inputs?: AgentModelInput[] }>(
+  model: Model,
+  lookup: ReleaseLookup,
+): Model {
+  if (model.provider !== "opencode" || model.inputs) return model;
+  const inputs = lookup.inputs(model.id);
+  return inputs ? { ...model, inputs } : model;
 }
 
 function decodeHidden(parsed: unknown): Map<string, ReadonlySet<string>> | null {

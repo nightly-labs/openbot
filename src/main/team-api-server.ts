@@ -45,6 +45,7 @@ import { AGENT_FAST_MODE_CAPABILITY } from "@openbot/contracts/team-protocol/age
 import { AGENT_FOLDERS_CAPABILITY } from "@openbot/contracts/team-protocol/agent-folders-v1";
 import { AGENT_HIDDEN_CAPABILITY } from "@openbot/contracts/team-protocol/agent-hidden-v1";
 import { AGENT_INSTRUCTIONS_CAPABILITY } from "@openbot/contracts/team-protocol/agent-instructions-v1";
+import { AGENT_MODEL_INPUTS_CAPABILITY } from "@openbot/contracts/team-protocol/agent-model-inputs-v1";
 import { AGENT_NEW_CHAT_CAPABILITY } from "@openbot/contracts/team-protocol/agent-new-chat-v1";
 import { AGENT_NOTIFICATION_LEVELS_CAPABILITY } from "@openbot/contracts/team-protocol/agent-notification-levels-v1";
 import { AGENT_PENDING_RUNTIME_CAPABILITY } from "@openbot/contracts/team-protocol/agent-pending-runtime-v1";
@@ -2996,6 +2997,7 @@ export class TeamApiServer {
         if (capability === AGENT_FAST_MODE_CAPABILITY) return this.#options.admin?.agentHost !== undefined;
         if (capability === AGENT_SPEED_CAPABILITY) return this.#options.admin?.agentHost !== undefined;
         if (capability === MODEL_STEERING_CAPABILITY) return this.#options.admin?.agentHost !== undefined;
+        if (capability === AGENT_MODEL_INPUTS_CAPABILITY) return this.#options.admin?.modelVisibility !== undefined;
         if (capability === WORKSPACE_ONLY_PROCESS_LIMIT_CAPABILITY) return !canConfineProcesses();
         if (capability === MAC_APPS_LIMIT_CAPABILITY) return process.platform !== "darwin";
         if (

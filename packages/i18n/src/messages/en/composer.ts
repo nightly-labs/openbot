@@ -32,6 +32,12 @@ export const messages = defineMessages("composer", {
   "composer.imageInput.label": "Turn on images for {model}",
   "composer.imageInput.pending": "Turning on…",
   "composer.imageInput.action": "Turn on images",
+  "composer.imageModel.body":
+    "{model} gets only text, so it does not see the images that you attach. {target} can read images.",
+  "composer.imageModel.bodyNoTarget":
+    "{model} gets only text, so it does not see the images that you attach. Select a model that can read images.",
+  "composer.imageModel.pending": "Switching…",
+  "composer.imageModel.action": "Use {target}",
   "composer.usageLimit.credits": "You used all of your {provider} plan limit. Your agents now use your credits.",
   "composer.usageLimit.creditsResets":
     "You used all of your {provider} plan limit. Your agents use your credits until it resets {reset}.",

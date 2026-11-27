@@ -9,6 +9,7 @@ import {
   type ClientAgentSummary,
   DEFAULT_PROVIDER_ACCOUNT_ID,
   decodeAgentFastModels,
+  decodeAgentModelInputs,
   decodeAgentModelListings,
   decodeAgentProfileDraft,
   decodeAgentSteeringModels,
@@ -45,6 +46,7 @@ import {
   type SidebarLayoutSnapshot,
   withFastServiceTiers,
   withKeptModels,
+  withModelInputs,
   withModelListings,
   withSteeringModels,
   withUsageCredits,
@@ -68,6 +70,10 @@ import {
   AGENT_FAST_MODE_ROUTES,
 } from "@openbot/contracts/team-protocol/agent-fast-mode-v1";
 import { AGENT_HIDDEN_CAPABILITY, AGENT_HIDDEN_ROUTES } from "@openbot/contracts/team-protocol/agent-hidden-v1";
+import {
+  AGENT_MODEL_INPUTS_CAPABILITY,
+  AGENT_MODEL_INPUTS_ROUTES,
+} from "@openbot/contracts/team-protocol/agent-model-inputs-v1";
 import {
   AGENT_PENDING_RUNTIME_CAPABILITY,
   AGENT_PENDING_RUNTIME_ROUTES,
@@ -561,14 +567,25 @@ export function agentIpcHandlers({
                     })
                     .pipe(Effect.orElseSucceed(() => []))
                 : Effect.succeed([]);
-              const [options, fastModels, listed, steered, keptModels] = yield* Effect.all(
-                [models, fast, listings, steering, kept],
+              const inputs = remoteServers.supportsCapability(serverId, AGENT_MODEL_INPUTS_CAPABILITY)
+                ? remoteServers
+                    .request(serverId, AGENT_MODEL_INPUTS_ROUTES.list, decodeAgentModelInputs, {
+                      method: "POST",
+                      body: {},
+                    })
+                    .pipe(Effect.orElseSucceed(() => []))
+                : Effect.succeed([]);
+              const [options, fastModels, listed, steered, keptModels, modelInputs] = yield* Effect.all(
+                [models, fast, listings, steering, kept, inputs],
                 { concurrency: "unbounded" },
               );
               return withWorkspaceOnlyLimit(
-                withSteeringModels(
-                  withKeptModels(withModelListings(withFastServiceTiers(options, fastModels), listed), keptModels),
-                  steered,
+                withModelInputs(
+                  withSteeringModels(
+                    withKeptModels(withModelListings(withFastServiceTiers(options, fastModels), listed), keptModels),
+                    steered,
+                  ),
+                  modelInputs,
                 ),
                 remoteServers.supportsCapability(serverId, WORKSPACE_ONLY_PROCESS_LIMIT_CAPABILITY),
               );

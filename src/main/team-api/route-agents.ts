@@ -14,6 +14,10 @@ import {
   WORKFLOWS_USAGE_ID,
 } from "@openbot/contracts/ipc";
 import { TEAM_API_ROUTES } from "@openbot/contracts/team-api-routes";
+import {
+  AGENT_MODEL_INPUTS_CAPABILITY,
+  AGENT_MODEL_INPUTS_ROUTES,
+} from "@openbot/contracts/team-protocol/agent-model-inputs-v1";
 import { AGENT_WELCOME_CAPABILITY } from "@openbot/contracts/team-protocol/agent-welcome-v1";
 import {
   BROWSER_SECRET_VAULT_CAPABILITY,
@@ -205,8 +209,17 @@ export async function routeAgents(
     const listed = await runCauseEffect(visibleModels.picker(models));
     return json(
       200,
-      listed.map(({ listing: _listing, ...model }) => model),
+      listed.map(({ listing: _listing, inputs: _inputs, ...model }) => model),
     );
+  }
+  if (method === "POST" && url.pathname === AGENT_MODEL_INPUTS_ROUTES.list) {
+    if (!visibleModels || !capabilities.has(AGENT_MODEL_INPUTS_CAPABILITY))
+      throw new HttpError(400, sourceText("error.team.modelVisibilityUnsupported"));
+    await readJson(request);
+    const listed = await runCauseEffect(visibleModels.picker(await agents.listModels()));
+    return json(200, {
+      models: listed.flatMap(({ provider, id, inputs }) => (inputs ? [{ provider, id, inputs }] : [])),
+    });
   }
   if (method === "GET" && url.pathname === TEAM_API_ROUTES.agents.all) {
     return json(200, agents.listAgents());

@@ -99,6 +99,9 @@ export function isAvatarHue(value: unknown): value is AvatarHue {
 export const AGENT_MODEL_LISTINGS = ["new", "older", "kept"] as const;
 export type AgentModelListing = (typeof AGENT_MODEL_LISTINGS)[number];
 
+export const AGENT_MODEL_INPUTS = ["image", "pdf"] as const;
+export type AgentModelInput = (typeof AGENT_MODEL_INPUTS)[number];
+
 export interface AgentModelOption {
   provider: AgentProviderId;
   id: AgentModelId;
@@ -112,6 +115,7 @@ export interface AgentModelOption {
   listing?: AgentModelListing;
   steersTurns?: boolean;
   workspaceOnlyUnavailable?: boolean;
+  inputs?: AgentModelInput[];
 }
 
 export function isAgentModelOption(value: unknown): value is AgentModelOption {
@@ -137,6 +141,8 @@ function hasAgentModelOptionFields(value: DynamicRecord): boolean {
     (value.ultrafastServiceTier === undefined ||
       isBoundedString(value.ultrafastServiceTier, INPUT_LIMITS.serviceTier)) &&
     (value.listing === undefined || isOneOf(AGENT_MODEL_LISTINGS, value.listing)) &&
-    (value.steersTurns === undefined || isBoolean(value.steersTurns))
+    (value.steersTurns === undefined || isBoolean(value.steersTurns)) &&
+    (value.inputs === undefined ||
+      (Array.isArray(value.inputs) && value.inputs.every((input) => isOneOf(AGENT_MODEL_INPUTS, input))))
   );
 }

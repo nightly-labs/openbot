@@ -35,6 +35,12 @@ export const messages = {
   "composer.imageInput.label": "{model} için görselleri aç",
   "composer.imageInput.pending": "Açılıyor…",
   "composer.imageInput.action": "Görselleri aç",
+  "composer.imageModel.body":
+    "{model} yalnızca metin alır, bu yüzden eklediğiniz görselleri görmez. {target} görselleri okuyabilir.",
+  "composer.imageModel.bodyNoTarget":
+    "{model} yalnızca metin alır, bu yüzden eklediğiniz görselleri görmez. Görselleri okuyabilen bir model seçin.",
+  "composer.imageModel.pending": "Değiştiriliyor…",
+  "composer.imageModel.action": "{target} kullan",
   "composer.usageLimit.credits":
     "{provider} plan sınırınızın tamamını kullandınız. Ajanlarınız artık kredilerinizi kullanıyor.",
   "composer.usageLimit.creditsResets":

@@ -15,6 +15,7 @@ import {
   AGENT_MEMORY_SELECTION_PAGE_ROUTE,
 } from "@openbot/contracts/team-protocol/agent-memories-v1";
 import { AGENT_MEMORY_LIMIT_ROUTES } from "@openbot/contracts/team-protocol/agent-memory-limit-v1";
+import { AGENT_MODEL_INPUTS_ROUTES } from "@openbot/contracts/team-protocol/agent-model-inputs-v1";
 import { AGENT_NEW_CHAT_ROUTES } from "@openbot/contracts/team-protocol/agent-new-chat-v1";
 import { AGENT_NOTIFICATION_LEVELS_ROUTES } from "@openbot/contracts/team-protocol/agent-notification-levels-v1";
 import { AGENT_PLAN_CARD_ROUTES } from "@openbot/contracts/team-protocol/agent-plan-card-v1";
@@ -166,6 +167,7 @@ const PASSIVE_ROUTES: ReadonlySet<string> = new Set([
   MODEL_VISIBILITY_ROUTES.listing,
   MODEL_VISIBILITY_KEPT_ROUTES.list,
   MODEL_STEERING_ROUTES.list,
+  AGENT_MODEL_INPUTS_ROUTES.list,
   PROVIDER_MODEL_SOURCE_ROUTES.list,
   PROVIDER_ACCOUNT_MODELS_ROUTES.list,
   PROVIDER_ACCOUNT_POOL_ROUTES.list,

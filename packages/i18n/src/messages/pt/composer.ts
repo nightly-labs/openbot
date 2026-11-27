@@ -35,6 +35,12 @@ export const messages = {
   "composer.imageInput.label": "Ativar imagens para {model}",
   "composer.imageInput.pending": "Ativando…",
   "composer.imageInput.action": "Ativar imagens",
+  "composer.imageModel.body":
+    "{model} recebe só texto, então não vê as imagens que você anexa. {target} consegue ler imagens.",
+  "composer.imageModel.bodyNoTarget":
+    "{model} recebe só texto, então não vê as imagens que você anexa. Escolha um modelo que consiga ler imagens.",
+  "composer.imageModel.pending": "Trocando…",
+  "composer.imageModel.action": "Usar {target}",
   "composer.usageLimit.credits": "Você usou todo o limite do plano {provider}. Seus agentes agora usam seus créditos.",
   "composer.usageLimit.creditsResets":
     "Você usou todo o limite do plano {provider}. Seus agentes usam seus créditos até a renovação em {reset}.",
