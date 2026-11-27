@@ -31,7 +31,7 @@ export interface ChatListRowsInput<Item extends ChatListItem> {
   unreadCounts: Readonly<Record<string, number>>;
 }
 
-export function chatListRowKey(item: ChatListItem): string {
+function chatListRowKey(item: ChatListItem): string {
   return `${item.kind}:${item.id}`;
 }
 

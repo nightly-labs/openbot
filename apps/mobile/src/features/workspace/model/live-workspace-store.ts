@@ -77,11 +77,7 @@ function changedServerAgents<Value>(
   for (const serverId of servers) changedIn(before[serverId], after[serverId], into);
 }
 
-export function changedLiveAgentIds(
-  key: LiveAgentKey,
-  before: LiveWorkspaceState,
-  after: LiveWorkspaceState,
-): Set<string> {
+function changedLiveAgentIds(key: LiveAgentKey, before: LiveWorkspaceState, after: LiveWorkspaceState): Set<string> {
   const changed = new Set<string>();
   if (key === "activityByServer")
     changedServerAgents(before.activityByServer, after.activityByServer, changedRecordKeys, changed);

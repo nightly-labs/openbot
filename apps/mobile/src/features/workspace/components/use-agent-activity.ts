@@ -91,7 +91,7 @@ export function useAgentListUnreadThreads(agentId: string): boolean {
 
 const NO_AGENT_IDS: ReadonlySet<string> = new Set();
 
-export function waitingAgentIds(
+function waitingAgentIds(
   activities: MobileAgentActivities | undefined,
   waits: readonly MobileThreadWait[] | undefined,
   previous: ReadonlySet<string>,

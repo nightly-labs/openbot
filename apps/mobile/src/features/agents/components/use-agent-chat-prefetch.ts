@@ -5,7 +5,7 @@ import {
 } from "@/features/workspace/context/mobile-workspace-context";
 import { showsOnline } from "@/features/workspace/model/server-status";
 
-export function prefetchAgentChat(
+function prefetchAgentChat(
   workspace: Pick<MobileWorkspaceContextValue, "conversationStore" | "loadConversation" | "servers">,
   agentId: string,
   serverId: string,
