@@ -441,43 +441,57 @@ try {
     "email_fallback_sent:failed",
   ]);
 
-  const secondOverflowSent = await runFallbackCase(
-    "second_overflow_after_two_limits",
+  const helloAfterSigninLimit = await runFallbackCase(
+    "overflow_after_signin_limit",
     ["sender_limit", "sender_limit", "normal"],
     "daily_limit",
     "ABCD-EFGH",
     undefined,
     2,
   );
-  report.cases.push(secondOverflowSent);
-  assert.equal(secondOverflowSent.result, "sent");
-  assert.equal(secondOverflowSent.messages, 1);
-  assert.equal(secondOverflowSent.fallbackSends, 0);
-  assert.deepEqual(secondOverflowSent.mailFrom, [
+  report.cases.push(helloAfterSigninLimit);
+  assert.equal(helloAfterSigninLimit.result, "sent");
+  assert.equal(helloAfterSigninLimit.messages, 1);
+  assert.equal(helloAfterSigninLimit.fallbackSends, 0);
+  assert.deepEqual(helloAfterSigninLimit.mailFrom, [
     `<${CONFIG.from}>`,
-    `<${OVERFLOW.username}>`,
     `<${OVERFLOW_2.username}>`,
+    `<${OVERFLOW.username}>`,
   ]);
-  assert.deepEqual(secondOverflowSent.events, [
+  assert.deepEqual(helloAfterSigninLimit.events, [
     "email_sent:rate_limited:primary",
-    "email_sent:rate_limited:overflow",
-    "email_sent:accepted:overflow_2",
+    "email_sent:rate_limited:overflow_2",
+    "email_sent:accepted:overflow",
   ]);
 
-  const secondOverflowAfterRefusal = await runFallbackCase(
-    "second_overflow_after_overflow_auth_refused",
+  const signinBeforeHello = await runFallbackCase(
+    "signin_before_hello",
+    ["sender_limit", "normal"],
+    "daily_limit",
+    "ABCD-EFGH",
+    undefined,
+    2,
+  );
+  report.cases.push(signinBeforeHello);
+  assert.equal(signinBeforeHello.result, "sent");
+  assert.equal(signinBeforeHello.connections, 2);
+  assert.deepEqual(signinBeforeHello.mailFrom, [`<${CONFIG.from}>`, `<${OVERFLOW_2.username}>`]);
+  assert.deepEqual(signinBeforeHello.events, ["email_sent:rate_limited:primary", "email_sent:accepted:overflow_2"]);
+
+  const helloAfterSigninRefusal = await runFallbackCase(
+    "overflow_after_signin_auth_refused",
     ["sender_limit", "auth_refused", "normal"],
     "daily_limit",
     "ABCD-EFGH",
     undefined,
     2,
   );
-  report.cases.push(secondOverflowAfterRefusal);
-  assert.equal(secondOverflowAfterRefusal.result, "sent");
-  assert.deepEqual(secondOverflowAfterRefusal.events, [
+  report.cases.push(helloAfterSigninRefusal);
+  assert.equal(helloAfterSigninRefusal.result, "sent");
+  assert.deepEqual(helloAfterSigninRefusal.events, [
     "email_sent:rate_limited:primary",
-    "email_sent:failed:overflow",
-    "email_sent:accepted:overflow_2",
+    "email_sent:failed:overflow_2",
+    "email_sent:accepted:overflow",
   ]);
 
   const allMailboxesLimited = await runFallbackCase(
@@ -494,8 +508,8 @@ try {
   assert.equal(allMailboxesLimited.fallbackSends, 1);
   assert.deepEqual(allMailboxesLimited.events, [
     "email_sent:rate_limited:primary",
-    "email_sent:rate_limited:overflow",
     "email_sent:rate_limited:overflow_2",
+    "email_sent:rate_limited:overflow",
     "email_fallback_sent:accepted",
   ]);
 
