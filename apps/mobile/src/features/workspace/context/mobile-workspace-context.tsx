@@ -2214,7 +2214,11 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
       setAgents((current) =>
         current.map((agent) =>
           agent.id === updated.id && agent.serverId === serverId
-            ? projectAgent(serverId, updated, hostColors.current[serverId]?.[updated.id] ?? null)
+            ? projectAgent(
+                serverId,
+                { ...updated, pendingRuntime: updated.pendingRuntime ?? agent.pendingRuntime },
+                hostColors.current[serverId]?.[updated.id] ?? null,
+              )
             : agent,
         ),
       );
@@ -2660,7 +2664,7 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
         );
         let undoRuntime = runtimeChange ? () => undefined : showAgentRuntime(serverId, input);
         try {
-          if (Object.keys(payload).length > 1 || (!colorRoute && !runtimeChange)) {
+          if (Object.keys(payload).length > 1 || (!colorRoute && !runtimeChange && providerAccountId === undefined)) {
             const updated = await request(
               "PATCH",
               TEAM_API_ROUTES.agent.one(input.agentId),

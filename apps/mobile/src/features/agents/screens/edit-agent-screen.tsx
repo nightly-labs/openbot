@@ -164,7 +164,6 @@ function AgentForm({
     canManageBrowserProfiles,
     canManageAgentFolders,
     canSetAgentNotificationLevel,
-    setAgentProviderAccount,
   } = useMobileWorkspace();
   const queryClient = useQueryClient();
   const { settings: adminSettings } = useAgentAdminSettings(
@@ -281,11 +280,10 @@ function AgentForm({
     setSaving(true);
     setError(null);
     const accountId = account === undefined || account === DEFAULT_PROVIDER_ACCOUNT_ID ? null : account;
-    const accountWithRuntime =
-      accountChanged &&
-      (edits.provider !== undefined || edits.model !== undefined || edits.reasoningEffort !== undefined);
+    const model = edits.model ?? savedModel;
+    const keepQueued = accountChanged && queued !== undefined;
     try {
-      if (Object.keys(edits).length > 0)
+      if (Object.keys(edits).length > 0 || accountChanged)
         await updateAgent(
           {
             agentId: agent.id,
@@ -295,17 +293,15 @@ function AgentForm({
             ...(edits.avatarSeed === undefined ? {} : { avatarSeed }),
             ...(edits.avatarHue === undefined ? {} : { avatarHue }),
             ...(edits.avatarColor === undefined ? {} : { avatarColor }),
-            ...(edits.provider === undefined ? {} : { provider: edits.provider }),
-            ...(edits.model === undefined ? {} : { model: edits.model }),
+            ...(provider !== undefined && (edits.provider !== undefined || keepQueued) ? { provider } : {}),
+            ...(model !== undefined && (edits.model !== undefined || keepQueued) ? { model } : {}),
             ...(edits.reasoningEffort === undefined ? {} : { reasoningEffort: edits.reasoningEffort }),
-            ...(accountWithRuntime ? { providerAccountId: accountId } : {}),
+            ...(accountChanged ? { providerAccountId: accountId } : {}),
           },
           agent.serverId,
         );
       setEdits({});
       if (accountChanged || (edits.provider !== undefined && edits.provider !== savedProvider)) {
-        if (accountChanged && !accountWithRuntime)
-          await setAgentProviderAccount({ agentId: agent.id, accountId }, agent.serverId);
         setAccount(undefined);
         queryClient.setQueryData<HostProviderAccounts | null>(accountsKey, (current) =>
           current
