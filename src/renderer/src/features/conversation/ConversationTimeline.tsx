@@ -856,6 +856,11 @@ export function ConversationTimeline() {
         >
           <ReplyReturnButton onBack={() => void replyJump.returnToReply()} onStay={replyJump.stayHere} />
         </Show>
+        <Show when={!props.loaded && channel?.loading?.()}>
+          <div class="conversation-history-status" role="status">
+            {t("conversation.direct.loading")}
+          </div>
+        </Show>
         <Show when={props.loaded}>
           <Show when={props.loadingOlder || props.olderError}>
             <div class="conversation-history-status" role={props.olderError ? "alert" : "status"}>
