@@ -353,7 +353,10 @@ const BASE_STYLE = [
 
 const BOOTSTRAP = `(()=>{
 const parentWindow=window.parent,root=document.documentElement,marker="#${CHAT_VISUAL_THEME_FRAGMENT}";
-const apply=(theme)=>{if(!theme||typeof theme!=="object")return;for(const [name,value] of Object.entries(theme)){if(name.startsWith("--")&&typeof value==="string")root.style.setProperty(name,value);}};
+const baseSheet=document.getElementById("openbot-visual-base")?.sheet;
+let themeRule;
+const themeDeclarations=()=>{if(!themeRule&&baseSheet){try{themeRule=baseSheet.cssRules[baseSheet.insertRule(":root{}",baseSheet.cssRules.length)];}catch{}}return themeRule&&themeRule.style;};
+const apply=(theme)=>{if(!theme||typeof theme!=="object")return;const declarations=themeDeclarations();if(!declarations)return;for(const [name,value] of Object.entries(theme)){if(name.startsWith("--")&&typeof value==="string")declarations.setProperty(name,value);}};
 if(location.hash.startsWith(marker)){
 try{apply(JSON.parse(decodeURIComponent(location.hash.slice(marker.length))));}catch{}
 try{history.replaceState(null,"",location.href.split("#")[0]);}catch{}
