@@ -15,6 +15,7 @@ export const messages = {
   "mobile.workspace.error.sectionsLoadFailed": "Не удалось загрузить папки. Повторите попытку.",
   "mobile.workspace.error.transportNotReady": "Мобильный транспорт не готов.",
   "mobile.workspace.error.sectionsUnsupported": "Этот хост не поддерживает изменение папок.",
+  "mobile.workspace.error.sidebarOffline": "Подключитесь к серверу, чтобы изменить его папки.",
   "mobile.workspace.error.leaveOwnServer": "Выйти можно только из удалённых серверов, к которым вы присоединились.",
   "mobile.workspace.error.removeOwnedServerOnly": "Удалить этот сервер может только владелец.",
   "mobile.workspace.error.agentNotOnHost": "Агента нет на этом хосте.",

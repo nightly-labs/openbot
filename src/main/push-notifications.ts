@@ -1,6 +1,7 @@
 import {
   type AgentEvent,
   type AgentSummary,
+  type AgentTaskReadState,
   type AgentTurnCompletedEvent,
   type ConversationMessage,
   latestTurnAnswer,
@@ -66,7 +67,7 @@ type PushNotificationAgents = Pick<
   TeamApiAgents,
   "on" | "off" | "listAgents" | "readConversationPageFor" | "getRuntimeSnapshot" | "listConversationReads"
 > &
-  Pick<AgentService, "readTask">;
+  Pick<AgentService, "readTask" | "listTaskReads">;
 
 interface WorkflowPushNotice {
   type: "workflow-notice";
@@ -590,14 +591,22 @@ export class PushNotificationService {
     registration.held = [];
     if (!held.length) return;
     const snapshot = this.#options.agents.getRuntimeSnapshot();
-    const reads = this.#options.agents.listConversationReads(
-      memberId,
-      markerExclusionsForCapabilities(registration.capabilities),
-    );
+    const exclusions = markerExclusionsForCapabilities(registration.capabilities);
+    const reads = this.#options.agents.listConversationReads(memberId, exclusions);
+    const threadReads = new Map<string, readonly AgentTaskReadState[]>();
+    const threadUnread = (agentId: string, taskId: string): boolean | null => {
+      let agentReads = threadReads.get(agentId);
+      if (!agentReads) {
+        agentReads = this.#options.agents.listTaskReads(agentId, memberId, exclusions);
+        threadReads.set(agentId, agentReads);
+      }
+      const read = agentReads.find((candidate) => candidate.taskId === taskId);
+      return read ? read.unreadCount > 0 : null;
+    };
     const agents = this.#options.agents.listAgents();
     const sawScreen = registration.connected;
     for (const { event } of held) {
-      const unseen = heldEventUnseen(event, snapshot, reads, agents);
+      const unseen = heldEventUnseen(event, snapshot, reads, agents, threadUnread);
       if (unseen === false || (unseen === null && sawScreen)) continue;
       yield* this.#deliver(event, registration);
     }
@@ -652,8 +661,12 @@ function heldEventUnseen(
   snapshot: ReturnType<PushNotificationAgents["getRuntimeSnapshot"]>,
   reads: ReturnType<PushNotificationAgents["listConversationReads"]>,
   agents: readonly AgentSummary[],
+  threadUnread: (agentId: string, taskId: string) => boolean | null,
 ): boolean | null {
-  if (event.type === "error" || event.type === "thread-turn-completed") return null;
+  if (event.type === "error") return null;
+  if (event.type === "thread-turn-completed") {
+    return event.turn.status === "completed" ? threadUnread(event.turn.agentId, event.taskId) : null;
+  }
   if (event.type === "provider-sign-in-wait") return true;
   if (event.type !== "turn-completed") return true;
   if (event.status !== "completed") {

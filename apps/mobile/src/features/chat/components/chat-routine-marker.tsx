@@ -29,6 +29,7 @@ import {
   ExpandChevron,
   useActivityColors,
 } from "./chat-activity-line";
+import { ChatMarkdown } from "./chat-markdown";
 import { Spinner } from "./chat-subagents";
 
 const ROUTINE_MARKER_ICONS: Record<RoutineMarkerEvent, LucideIcon> = {
@@ -82,13 +83,35 @@ function MarkerIcon({ event, colors }: { event: RoutineMarkerEvent; colors: Acti
 export function RoutineMarkerRow({ message }: { message: RoutineMarker }) {
   const { t } = useText();
   const colors = useActivityColors();
-  return (
+  const [open, setOpen] = useState(false);
+  const answers = message.quietAnswers ?? [];
+  const line = (
     <ChatActivityLine
       icon={<MarkerIcon event={message.event} colors={colors} />}
       label={t(message.label)}
       name={message.routineName}
       accessibilityLabel={`${t(message.label)}, ${message.routineName}`}
+      {...(answers.length > 0
+        ? {
+            accessibilityState: { expanded: open },
+            onPress: () => setOpen(!open),
+            trailing: <ExpandChevron open={open} />,
+          }
+        : {})}
     />
+  );
+  if (answers.length === 0) return line;
+  return (
+    <View>
+      {line}
+      {open ? (
+        <View className="gap-2 ps-5 pe-1 pt-1">
+          {answers.map((answer) => (
+            <ChatMarkdown key={answer.id} body={answer.body} color={colors.name} compact finished />
+          ))}
+        </View>
+      ) : null}
+    </View>
   );
 }
 

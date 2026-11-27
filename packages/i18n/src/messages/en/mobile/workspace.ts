@@ -14,6 +14,7 @@ export const messages = defineMessages("mobile.workspace", {
   "mobile.workspace.error.sectionsLoadFailed": "Could not load folders. Try again.",
   "mobile.workspace.error.transportNotReady": "The mobile transport is not ready.",
   "mobile.workspace.error.sectionsUnsupported": "This host does not support folder changes.",
+  "mobile.workspace.error.sidebarOffline": "Connect to this server to change its folders.",
   "mobile.workspace.error.leaveOwnServer": "Only joined remote servers can be left.",
   "mobile.workspace.error.removeOwnedServerOnly": "Only the owner can remove this server.",
   "mobile.workspace.error.agentNotOnHost": "Agent is not on this host.",
