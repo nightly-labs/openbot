@@ -272,6 +272,7 @@ export class LocalServers {
   readonly #running = new Map<string, RunningChild>();
   readonly #exits = new Map<string, number[]>();
   readonly #restartPending = new Set<string>();
+  readonly #deleting = new Set<string>();
   readonly #starts = new Map<string, Deferred.Deferred<ServerSummary, LocalServerFailure>>();
   readonly #working = new Map<string, AgentSummary[]>();
   readonly #ready = new Map<string, LocalServerReady>();
@@ -392,7 +393,7 @@ export class LocalServers {
     ).pipe(
       Effect.andThen(this.#start(entry, from === "device")),
       Effect.tapError(() =>
-        this.#forget(entry).pipe(
+        this.#forget(entry, true).pipe(
           Effect.catch(({ cause }) =>
             Effect.sync(() => this.#options.log.warn("A server that did not start could not be removed.", cause)),
           ),
@@ -642,7 +643,7 @@ export class LocalServers {
     entry: StoredLocalServer,
     awaitRegistration = false,
   ): Effect.fn.Return<ServerSummary, LocalServerFailure> {
-    if (this.#stopped) return yield* startFailure();
+    if (this.#stopped || this.#deleting.has(entry.id)) return yield* startFailure();
     const secret = yield* localSync(() => this.#options.cipher.decrypt(Buffer.from(entry.encryptedSecret, "base64")));
     registerSecretValue(secret);
     const paths = this.#paths(entry);
@@ -766,7 +767,7 @@ export class LocalServers {
   }
 
   #scheduleRestart(entry: StoredLocalServer): void {
-    if (this.#stopped || this.#restartPending.has(entry.id)) return;
+    if (this.#stopped || this.#deleting.has(entry.id) || this.#restartPending.has(entry.id)) return;
     const now = Date.now();
     const exits = (this.#exits.get(entry.id) ?? []).filter((time) => now - time < RESTART_WINDOW_MS);
     exits.push(now);
@@ -850,22 +851,25 @@ export class LocalServers {
       yield* this.#options.remoteServers.detachLocalServer(serverId, false).pipe(Effect.catch(() => Effect.void));
   });
 
-  readonly #forget = Effect.fn("LocalServers.forget")(function* (
-    this: LocalServers,
-    entry: StoredLocalServer,
-    removeFromAccount = true,
-  ) {
-    yield* this.#stopChild(entry);
-    yield* this.#trashFolders(entry);
-    const serverId = this.#registry.find(entry.id)?.serverId ?? null;
-    yield* this.#registry.remove(entry.id, serverId).pipe(toLocalServerFailure);
-    this.#exits.delete(entry.id);
-    this.#ready.delete(entry.id);
-    if (serverId) yield* this.#options.remoteServers.detachLocalServer(serverId, true).pipe(toLocalServerFailure);
-    this.#announce();
-    if (removeFromAccount && this.#options.account.accountId() !== null)
-      this.#background(this.#accountSteps.withPermit(this.#removeDeletedHosts()));
-  });
+  readonly #forget = Effect.fn("LocalServers.forget")(
+    function* (this: LocalServers, entry: StoredLocalServer, removeFromAccount: boolean) {
+      yield* this.#stopChild(entry);
+      yield* this.#trashFolders(entry);
+      const serverId = this.#registry.find(entry.id)?.serverId ?? null;
+      yield* this.#registry.remove(entry.id, serverId).pipe(toLocalServerFailure);
+      this.#exits.delete(entry.id);
+      this.#ready.delete(entry.id);
+      if (serverId) yield* this.#options.remoteServers.detachLocalServer(serverId, true).pipe(toLocalServerFailure);
+      this.#announce();
+      if (removeFromAccount && this.#options.account.accountId() !== null)
+        this.#background(this.#accountSteps.withPermit(this.#removeDeletedHosts()));
+    },
+    (operation, entry) =>
+      Effect.sync(() => this.#deleting.add(entry.id)).pipe(
+        Effect.andThen(operation),
+        Effect.ensuring(Effect.sync(() => this.#deleting.delete(entry.id))),
+      ),
+  );
 
   readonly #trashFolders = Effect.fn("LocalServers.trashFolders")(function* (
     this: LocalServers,
