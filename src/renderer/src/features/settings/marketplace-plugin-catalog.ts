@@ -1970,6 +1970,47 @@ const TRYPOST: MarketplacePluginDetail = {
   shareUrl: "https://openbot.run/plugins/trypost",
 };
 
+const EKSIS: MarketplacePluginDetail = {
+  id: "plugin-eksis",
+  slug: "eksis",
+  name: "eksis",
+  tagline: "Social media scheduling",
+  description:
+    "eksis lets agents list the social media channels of a workspace, and draft, schedule, approve and publish posts on Instagram, Facebook, TikTok, YouTube, Threads, LinkedIn, X, Bluesky, Pinterest, DEV, Telegram and Discord. Agents can also manage the queue, media and ideas, reply to comments and direct messages, and read analytics. Sign in to your eksis account through the browser and choose a workspace. Agents can publish a post immediately, so review each post before you approve it.",
+  category: "automation",
+  creatorName: "eksis",
+  iconUrl: "https://media.eksis.io/brand/eksis-logo-white-512.png",
+  version: "1.0.0",
+  prompts: [
+    { id: "prompt-channels", text: "Which social media channels are connected to eksis?" },
+    { id: "prompt-draft", text: "Draft a LinkedIn post about our new release, but do not schedule it." },
+    { id: "prompt-comments", text: "Which comments on my posts from this week still need a reply?" },
+  ],
+  apps: [
+    {
+      id: "app-eksis-mcp",
+      name: "eksis",
+      description:
+        "Channels, posts, queue, media, comments, direct messages and analytics, over the eksis MCP server with browser sign-in.",
+      iconUrl: "https://media.eksis.io/brand/eksis-logo-white-512.png",
+      server: {
+        name: "eksis",
+        transport: "http",
+        url: "https://api.eksis.io/mcp",
+        auth: [{ id: "eksis-oauth", kind: "link", label: "Sign in" }],
+      },
+    },
+  ],
+  websiteUrl: "https://eksis.io",
+  privacyPolicyUrl: "https://eksis.io/privacy",
+  termsUrl: "https://eksis.io/terms",
+  skills: [],
+  installs: 0,
+  featured: false,
+  updatedAt: "2026-11-10T00:00:00.000Z",
+  shareUrl: "https://openbot.run/plugins/eksis",
+};
+
 const COMPOSIO: MarketplacePluginDetail = {
   id: "plugin-composio",
   slug: "composio",
@@ -10820,6 +10861,7 @@ export const MARKETPLACE_PLUGINS: MarketplacePluginDetail[] = [
   OMNISEND,
   POSTIZ,
   TRYPOST,
+  EKSIS,
   COMPOSIO,
   CLICKUP,
   COINBASE,
