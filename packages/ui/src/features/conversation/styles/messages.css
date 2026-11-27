@@ -195,6 +195,11 @@
   flex: none;
 }
 
+.message-entry-with-author > .ui-message-content > .message-pinned {
+  grid-column: 2;
+  grid-row: 3;
+}
+
 .message-entry-user .message-action-row > .message-time {
   order: -1;
 }

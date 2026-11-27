@@ -254,6 +254,14 @@ export function ChatMessageRow(props: ChatMessageRowProps): JSX.Element {
     </Bubble>
   );
   const beside = () => props.actionsBeside === true && !member();
+  const pinnedMark = (): JSX.Element => (
+    <Show when={props.pinned}>
+      <span class="message-pinned">
+        <Pin aria-hidden="true" />
+        {t("chat.row.pinned")}
+      </span>
+    </Show>
+  );
   const actionRow = (): JSX.Element => (
     <div class="message-action-row">
       {props.actions}
@@ -262,12 +270,7 @@ export function ChatMessageRow(props: ChatMessageRowProps): JSX.Element {
           {props.message.time}
         </time>
       </Show>
-      <Show when={props.pinned}>
-        <span class="message-pinned">
-          <Pin aria-hidden="true" />
-          {t("chat.row.pinned")}
-        </span>
-      </Show>
+      {pinnedMark()}
       <Show when={steps.toArray().length > 0}>
         <div class="message-steps">{steps()}</div>
       </Show>
@@ -329,6 +332,7 @@ export function ChatMessageRow(props: ChatMessageRowProps): JSX.Element {
           <Show when={props.actionRow !== false && beside()}>{actionRow()}</Show>
         </div>
         <Show when={props.actionRow !== false && !beside()}>{actionRow()}</Show>
+        <Show when={props.actionRow === false}>{pinnedMark()}</Show>
       </MessageContent>
     </>
   );
