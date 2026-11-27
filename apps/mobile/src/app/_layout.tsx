@@ -21,6 +21,8 @@ import { UpdateRequiredOverlay } from "@/features/app-update/components/update-r
 import { DevelopmentConnectLinkHandler } from "@/features/auth/components/development-connect-link-handler";
 import { MobileSessionProvider, useMobileSession } from "@/features/auth/context/mobile-session-context";
 import { backgroundRefreshNative } from "@/features/background-refresh/background-refresh-native";
+import { resetChatBubbleConfig } from "@/features/chat-bubble/model/chat-bubble-config";
+import { loadChatBubblePreference } from "@/features/chat-bubble/model/chat-bubble-preference-storage";
 import { loadOnboardingProgress } from "@/features/onboarding/model/onboarding-progress";
 import { resetNotificationAvatars } from "@/features/push-notifications/notification-avatars";
 import { installNotificationHandler } from "@/features/push-notifications/use-notification-taps";
@@ -139,6 +141,7 @@ function RootNavigator() {
     resetShortcutDirectory();
     resetShortcuts();
     resetNotificationAvatars();
+    resetChatBubbleConfig();
     resetWatch();
   }, [loading, session]);
 
@@ -239,6 +242,7 @@ export default function RootLayout() {
       void loadTextSize().catch(() => undefined);
       void loadLiveActivitiesPreference().catch(() => undefined);
       void loadPushNotificationPreference().catch(() => undefined);
+      void loadChatBubblePreference().catch(() => undefined);
       void loadMotionPreferences().catch(() => undefined);
       void loadDictationLanguage().catch(() => undefined);
       void loadVoiceSettings().catch(() => undefined);
