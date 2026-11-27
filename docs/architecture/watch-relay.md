@@ -44,6 +44,11 @@ Decided by the developer on 2026-11-25:
   `ts` must be within `WATCH_RELAY_CLOCK_SKEW_MS`. The user must have an active membership on the
   host. Reply `{ ticket, expiresAt, signalUrl }`. The ticket is an ES256 JWT with
   `aud: "openbot-watch"` and the claims of `WatchTicketClaims`, TTL `WATCH_TICKET_TTL_SECONDS`.
+  `signalUrl` is always the Signal entry (`REMOTE_SIGNAL_URL`), and the ticket has no `signal` claim,
+  also when the host has a Signal home. The host keeps its ingress socket on the entry (its ingress
+  ticket asks for `signalHome: false`), and Signal finds the socket only on the machine that holds
+  it. A ticket for the host's home made each watch request of a host on another home fail with
+  `host_offline`.
 - The watch session ends with its phone session: a sign-out on the phone, or a revoke of the phone in
   the connected devices, revokes it too.
 

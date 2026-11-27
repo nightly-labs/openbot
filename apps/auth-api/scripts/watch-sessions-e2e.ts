@@ -19,6 +19,8 @@ const ROOT = resolve(import.meta.dirname, "../../..");
 const OUT = join(ROOT, ".openbot-build", "watch-sessions-e2e");
 const MIGRATIONS = join(ROOT, "apps", "auth-api", "migrations");
 const SIGNAL_URL = "wss://signal.example.test";
+const SIGNAL_HOME_ID = "b";
+const SIGNAL_HOME_URL = "wss://signal-b.example.test";
 const OWNER = "user-owner";
 const OTHER = "user-other";
 const HOST_ID = "host-1";
@@ -79,7 +81,7 @@ async function proof(key: WatchKey, watchSessionId: string, hostId: string, ts: 
   return encodeBase64Url(new Uint8Array(signature));
 }
 
-async function setup(parentLifetimeMs = PARENT_LIFETIME_MS) {
+async function setup(parentLifetimeMs = PARENT_LIFETIME_MS, signalHomes?: string) {
   const database = new DatabaseSync(":memory:");
   database.exec("PRAGMA foreign_keys = ON");
   for (const name of (await readdir(MIGRATIONS)).sort()) database.exec(await readFile(join(MIGRATIONS, name), "utf8"));
@@ -113,6 +115,7 @@ async function setup(parentLifetimeMs = PARENT_LIFETIME_MS) {
       REMOTE_TICKET_PUBLIC_JWKS: JSON.stringify({ keys: [ticketPublicJwk] }),
       REMOTE_TICKET_KEY_ID: "ticket-1",
       REMOTE_SIGNAL_URL: SIGNAL_URL,
+      ...(signalHomes ? { REMOTE_SIGNAL_HOMES: signalHomes } : {}),
     },
     { now: () => clock.now, schedule: () => undefined },
   );
@@ -350,8 +353,42 @@ async function pairingRulesKeepFiveWatches() {
   check("revoking the same watch session again succeeds", again.code === null, again.code);
 }
 
+async function aHostOnASignalHomeGetsEntryTickets() {
+  const { database, clock, plane, pair, ticket } = await setup(
+    PARENT_LIFETIME_MS,
+    `${SIGNAL_HOME_ID}=${SIGNAL_HOME_URL}`,
+  );
+  database.prepare("UPDATE remote_hosts SET signal_home = ? WHERE host_id = ?").run(SIGNAL_HOME_ID, HOST_ID);
+  const key = await watchKey();
+  const session = (await pair(key)).value;
+  check("the phone pairs a watch for a host on a Signal home", session !== null);
+  if (!session) return;
+  const issued = await ticket(session.token, key, session.watchSessionId);
+  check("the watch gets a ticket for a host on a Signal home", issued.code === null, issued.code);
+  if (!issued.value) return;
+  check(
+    "the ticket of a host on a Signal home names the entry URL, where the host ingress socket is",
+    issued.value.signalUrl === SIGNAL_URL,
+    issued.value.signalUrl,
+  );
+  const verified = await jwtVerify(issued.value.ticket, createLocalJWKSet(plane.publicJwks()), {
+    audience: WATCH_TICKET_AUDIENCE,
+    algorithms: ["ES256"],
+    currentDate: new Date(clock.now),
+  }).then(
+    (value) => value,
+    () => null,
+  );
+  check(
+    "the ticket of a host on a Signal home has no Signal home claim",
+    verified !== null && !("signal" in verified.payload),
+    Object.keys(verified?.payload ?? {}),
+  );
+}
+
 const scenarios = [
   aPairedWatchGetsATicket,
+  aHostOnASignalHomeGetsEntryTickets,
   refusedTicketsGiveNoTicket,
   theParentSessionEndsTheWatch,
   aShortPhoneSessionLimitsTheWatch,
