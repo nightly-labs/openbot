@@ -107,7 +107,7 @@ globalThis.fetch = Object.assign(
 );
 
 const { RemoteServerManager } = await import("../src/main/remote-server-manager");
-const { REMOTE_SYNC_CONVERSATION_ROWS } = await import("../src/main/remote-server-sync");
+const { REMOTE_SYNC_CONVERSATION_ROWS, syncedOrRequest } = await import("../src/main/remote-server-sync");
 const { RemoteWorkflowError } = await import("../src/main/remote-service-effects");
 const { TeamApiServer } = await import("../src/main/team-api-server");
 const { TeamStore } = await import("../src/main/team-store");
@@ -173,8 +173,8 @@ function syncControlType(frame: TeamProtocolV2EventFrame | null): string | null 
   return frame?.type === "event-control" && isSyncClientMessage(frame.control) ? frame.control.type : null;
 }
 
-function syncEventType(frame: TeamProtocolV2EventFrame | null): string | null {
-  return frame?.type === "event" ? (decodeSyncServerMessage(frame.payload)?.type ?? null) : null;
+function syncEvent(frame: TeamProtocolV2EventFrame | null): SyncServerMessage | null {
+  return frame?.type === "event" ? decodeSyncServerMessage(frame.payload) : null;
 }
 
 interface TicketClaims {
@@ -237,7 +237,7 @@ class LoopbackLink {
   readonly client = new ClientLoopbackBridge(this);
   peerId: string | null = null;
   down = false;
-  dropNextSyncEvent = false;
+  dropSyncEvent: ((message: SyncServerMessage) => boolean) | null = null;
   #heldDial: string | null = null;
 
   constructor(
@@ -248,13 +248,13 @@ class LoopbackLink {
   fromHost(peerId: string, channel: Channel, data: string | ArrayBuffer) {
     if (this.down || peerId !== this.peerId) return linkClosed();
     const frame = channel === "events" ? eventFrame(data) : null;
-    const type = syncEventType(frame);
-    if (type && this.dropNextSyncEvent) {
-      this.dropNextSyncEvent = false;
+    const message = syncEvent(frame);
+    if (message && this.dropSyncEvent?.(message)) {
+      this.dropSyncEvent = null;
       this.counts.droppedSyncEvents += 1;
       return linkClosed();
     }
-    if (type) this.counts.syncEvents[type] = (this.counts.syncEvents[type] ?? 0) + 1;
+    if (message) this.counts.syncEvents[message.type] = (this.counts.syncEvents[message.type] ?? 0) + 1;
     if (frame?.type === "event-reset") this.counts.eventResets += 1;
     return Effect.sync(() => queueMicrotask(() => this.client.emit("data", this.hostId, channel, data)));
   }
@@ -268,13 +268,14 @@ class LoopbackLink {
   }
 
   hostDisconnect(peerId: string): void {
-    if (peerId === this.peerId) this.cut();
+    if (peerId !== this.peerId) return;
+    this.#drop();
   }
 
   clientConnect(hostId: string, token: string): void {
     if (hostId !== this.hostId) return;
     if (this.down) this.#heldDial = token;
-    else queueMicrotask(() => void this.#dial(token));
+    else queueMicrotask(() => this.#startDial(token));
   }
 
   clientDisconnect(hostId: string): void {
@@ -283,6 +284,12 @@ class LoopbackLink {
     const peerId = this.peerId;
     this.peerId = null;
     if (peerId) this.#endPeer(peerId);
+  }
+
+  #startDial(token: string): void {
+    this.#dial(token).catch((error: unknown) =>
+      this.client.emit("error", this.hostId, "loopback_dial_failed", String(error), true),
+    );
   }
 
   async #dial(token: string): Promise<void> {
@@ -323,6 +330,10 @@ class LoopbackLink {
 
   cut(): void {
     this.down = true;
+    this.#drop();
+  }
+
+  #drop(): void {
     const peerId = this.peerId;
     this.peerId = null;
     if (peerId) this.#endPeer(peerId);
@@ -333,7 +344,7 @@ class LoopbackLink {
     this.down = false;
     const held = this.#heldDial;
     this.#heldDial = null;
-    if (held) void this.#dial(held);
+    if (held) this.#startDial(held);
   }
 
   async close(): Promise<void> {
@@ -354,19 +365,26 @@ function recordSync(manager: Manager): SyncServerMessage[] {
   return received;
 }
 
+const openWaits = new Set<() => void>();
+
 function until<T>(manager: Manager, read: () => T | null | undefined): Promise<T> {
   return new Promise((resolveValue) => {
-    const check = () => {
-      const value = read();
-      if (value === null || value === undefined) return;
+    const stop = () => {
       manager.off("changed", check);
       manager.off("syncChanged", check);
       clearInterval(poll);
+      openWaits.delete(stop);
+    };
+    const check = () => {
+      const value = read();
+      if (value === null || value === undefined) return;
+      stop();
       resolveValue(value);
     };
     manager.on("changed", check);
     manager.on("syncChanged", check);
     const poll = setInterval(check, 25);
+    openWaits.add(stop);
     check();
   });
 }
@@ -475,14 +493,14 @@ try {
       const identity = team.getIdentity();
       assert.ok(ownerId && identity, "The host has no owner or identity.");
       const actor = { id: ownerId, name: "Owner" };
-      const createChannel = async (name: string) =>
+      const createChannel = async (name: string, channelId: string = randomUUID()) =>
         (
           await runCauseEffect(
             service.channels.command(
               {
                 type: "save",
                 operationId: randomUUID(),
-                channelId: randomUUID(),
+                channelId,
                 draft: { name, title: "", instructions: "", members: [{ agentId: agent.id }], leadAgentId: agent.id },
               },
               actor,
@@ -608,7 +626,18 @@ try {
       dials: loopback.counts.dials,
     }),
   );
-  const { manager: client, loopback, received, resets, serverId, hostPort, first, createChannel, agentId } = setup;
+  const {
+    manager: client,
+    loopback,
+    transport,
+    received,
+    resets,
+    serverId,
+    hostPort,
+    first,
+    createChannel,
+    agentId,
+  } = setup;
   const listCalls = () => httpCallCount(hostPort, "GET", CHANNEL_ROUTES.list);
   const hostList = () => runCauseEffect(client.request(serverId, CHANNEL_ROUTES.list, decodeChannelSummaries));
 
@@ -618,10 +647,14 @@ try {
     assert.ok((loopback.counts.syncControls["sync-subscribe"] ?? 0) > 0, "No sync-subscribe went as event-control.");
     assert.ok((loopback.counts.syncEvents["sync-changes"] ?? 0) > 0, "No sync-changes came as an event frame.");
     const before = listCalls();
-    const read = client.sync.channels.values(serverId);
+    const read = await runCauseEffect(
+      syncedOrRequest(client.sync.channels.values(serverId), () =>
+        client.request(serverId, CHANNEL_ROUTES.list, decodeChannelSummaries),
+      ),
+    );
     assert.equal(listCalls(), before, "A read after the first sync made an HTTP list call.");
     const host = await hostList();
-    assert.deepEqual(ids(read ?? []), ids(host), "The synced copy differs from the host list over WebRTC rpc.");
+    assert.deepEqual(ids(read), ids(host), "The synced copy differs from the host list over WebRTC rpc.");
     return {
       channels: synced.length,
       syncControls: { ...loopback.counts.syncControls },
@@ -675,8 +708,16 @@ try {
     const resetsBefore = resets();
     const framesBefore = loopback.counts.eventResets;
     received.length = 0;
-    loopback.dropNextSyncEvent = true;
-    const lost = await createChannel("Lost room");
+    let receivedAtReset: number | null = null;
+    transport.once("eventReset", () => {
+      receivedAtReset = received.length;
+    });
+    const lost = randomUUID();
+    loopback.dropSyncEvent = (message) =>
+      message.type === "sync-changes" &&
+      message.collection === CHANNELS &&
+      message.upserts.some((upsert) => upsert.key === lost);
+    await createChannel("Lost room", lost);
     await until(client, () => (loopback.counts.droppedSyncEvents > 0 ? true : null));
     const after = await createChannel("After reset room");
     const synced = await until(client, () => {
@@ -687,7 +728,11 @@ try {
     });
     assert.ok(loopback.counts.eventResets > framesBefore, "The host did not send event-reset.");
     assert.ok(resets() > resetsBefore, "The client transport did not report event-reset.");
-    assert.ok(channelUpserts(received).keys.includes(lost), "No sync message after the reset holds the lost channel.");
+    assert.ok(receivedAtReset !== null, "The client got no event-reset.");
+    assert.ok(
+      channelUpserts(received.slice(receivedAtReset)).keys.includes(lost),
+      "No sync message after the reset holds the lost channel.",
+    );
     assert.deepEqual(ids(synced), ids(await hostList()), "The synced copy differs from the host list after the reset.");
     return {
       channels: synced.length,
@@ -796,6 +841,7 @@ try {
 
   report.passed = true;
 } finally {
+  for (const stop of [...openWaits]) stop();
   globalThis.fetch = realFetch;
   if (manager) await runCauseEffect(manager.stop()).catch(() => undefined);
   if (link) await link.close();
