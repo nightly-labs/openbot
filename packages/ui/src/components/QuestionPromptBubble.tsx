@@ -30,8 +30,26 @@ export interface QuestionPromptBubbleProps {
 }
 
 const PICK_HOLD_MS = 180;
+const CHOICE_ARROW_STEPS: Partial<Record<string, number>> = {
+  ArrowLeft: -1,
+  ArrowUp: -1,
+  ArrowRight: 1,
+  ArrowDown: 1,
+};
 
 const queuedStageFits: Array<() => (() => void) | undefined> = [];
+
+function moveChoiceFocus(input: HTMLInputElement, step: number): boolean {
+  const group = input.closest('[role="radiogroup"]');
+  if (!group) return false;
+  const choices = Array.from(
+    group.querySelectorAll<HTMLInputElement>('input[type="radio"]:enabled, input.question-prompt-custom-input:enabled'),
+  );
+  const current = choices.indexOf(input);
+  if (current < 0 || choices.length < 2) return false;
+  choices[(current + step + choices.length) % choices.length]?.focus();
+  return true;
+}
 
 function queueStageFit(measure: () => (() => void) | undefined): void {
   if (queuedStageFits.length === 0) {
@@ -178,9 +196,13 @@ export function QuestionPromptBubble(props: QuestionPromptBubbleProps) {
     if (keepFocus) {
       queueMicrotask(() => {
         const page = stage?.children[next];
+        const selectedInput =
+          question && !question.multiSelect && state.drafts[question.id]?.trim()
+            ? ".question-prompt-custom-input"
+            : "input:checked";
         const target =
-          next < total() && toOption
-            ? (page?.querySelector<HTMLElement>("input:checked") ?? page?.querySelector<HTMLElement>("input"))
+          question && toOption
+            ? (page?.querySelector<HTMLElement>(selectedInput) ?? page?.querySelector<HTMLElement>("input"))
             : null;
         (target ?? stage)?.focus({ preventScroll: true });
       });
@@ -308,10 +330,24 @@ export function QuestionPromptBubble(props: QuestionPromptBubbleProps) {
     if (target instanceof HTMLTextAreaElement) return;
     if (target instanceof HTMLInputElement && target.type !== "radio" && target.type !== "checkbox") return;
     if (target instanceof Element && target.closest("a, button")) return;
+    const radio = target instanceof HTMLInputElement && target.type === "radio" ? target : null;
+    const step = CHOICE_ARROW_STEPS[event.key];
+    if (radio && step !== undefined) {
+      event.preventDefault();
+      moveChoiceFocus(radio, step);
+      return;
+    }
+
     const options = question.options ?? [];
     if (event.key === "Enter") {
       event.preventDefault();
-      if (answerOf(question).length > 0) goOn(page);
+      if (event.repeat) return;
+      const focusedOption = radio ? options.find((option) => option.label === radio.value) : undefined;
+      if (focusedOption) {
+        choose(question, page, focusedOption.label);
+      } else if (answerOf(question).length > 0) {
+        goOn(page);
+      }
       return;
     }
     if (event.key.length !== 1) return;
@@ -319,7 +355,7 @@ export function QuestionPromptBubble(props: QuestionPromptBubbleProps) {
     const option = options[optionIndex];
     if (option) {
       event.preventDefault();
-      choose(question, page, option.label);
+      if (!event.repeat) choose(question, page, option.label);
     } else if (optionIndex === options.length) {
       event.preventDefault();
       event.currentTarget instanceof HTMLElement &&
@@ -329,12 +365,20 @@ export function QuestionPromptBubble(props: QuestionPromptBubbleProps) {
 
   function handleCustomKey(event: KeyboardEvent, question: AgentPromptQuestion, page: number): void {
     if (event.isComposing || event.keyCode === 229) return;
+    if (event.key === "ArrowUp" || event.key === "ArrowDown") {
+      if (event.metaKey || event.ctrlKey || event.altKey || event.shiftKey) return;
+      const target = event.target;
+      if (target instanceof HTMLInputElement && moveChoiceFocus(target, event.key === "ArrowUp" ? -1 : 1)) {
+        event.preventDefault();
+      }
+      return;
+    }
     const sendShortcut = props.sendShortcut ?? "enter";
     if (sendShortcut === "enter") {
       if (event.key !== "Enter") return;
     } else if (!isSendShortcutKey(event, sendShortcut)) return;
     event.preventDefault();
-    if (answerOf(question).length > 0) goOn(page);
+    if (!event.repeat && answerOf(question).length > 0) goOn(page);
   }
 
   function isPicked(question: AgentPromptQuestion, label: string): boolean {
