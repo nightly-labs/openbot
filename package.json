@@ -468,6 +468,7 @@
     "test:conversation-ownership": "bun scripts/conversation-ownership-e2e.ts",
     "test:remote-protocol": "bun remote/scripts/protocol-e2e.ts",
     "test:remote-sync": "bun scripts/remote-server-sync-e2e.ts",
+    "test:remote-sync-webrtc": "bun scripts/remote-server-sync-webrtc-e2e.ts",
     "test:ipc-input": "bun scripts/ipc-input-e2e.ts",
     "test:automation-cli": "bun scripts/automation-cli-e2e.ts",
     "test:team-api-routes": "bun --preload ./scripts/team-api-routes-e2e-electron.mjs scripts/team-api-routes-e2e.ts",

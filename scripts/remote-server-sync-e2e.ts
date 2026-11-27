@@ -192,7 +192,7 @@ interface Step {
 const report: { passed: boolean; unverified: string[]; steps: Step[] } = {
   passed: false,
   unverified: [
-    "The WebRTC path (sync frames as event-control, event-reset resubscribe). It needs a Signal server and a WebRTC session; this check uses the WebSocket event stream.",
+    "The WebRTC path. test:remote-sync-webrtc checks the sync frames as event-control and event, and the event-reset resubscribe; this check uses the WebSocket event stream.",
     "The bound IPC handlers (agent:channels:list, agent list, pins, routines, workflows, queue, latest conversation page and latest channel page reads). The check runs the same expressions (synced copy, else HTTP) on the same manager; the handlers need the full app dependency graph.",
     "The renderer refresh on agent:sync-changed. No renderer runs; the check records the event that main sends to the window.",
     "The renderer reload of the released events. Main forwards them unchanged; the check counts HTTP list calls in main only.",
