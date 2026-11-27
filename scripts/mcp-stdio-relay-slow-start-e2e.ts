@@ -103,7 +103,12 @@ async function scenario(mode: Mode, name: string) {
     accept: "application/json, text/event-stream",
   };
   const post = (body: unknown, extra: Record<string, string> = {}, signal?: AbortSignal) =>
-    fetch(relay.url, { method: "POST", headers: { ...headers, ...extra }, body: JSON.stringify(body), signal });
+    fetch(relay.url, {
+      method: "POST",
+      headers: { ...headers, ...extra },
+      body: JSON.stringify(body),
+      ...(signal ? { signal } : {}),
+    });
   const gaveUp = new AbortController();
   const first = post(initialize(1), {}, gaveUp.signal)
     .then((response) => response.text())
