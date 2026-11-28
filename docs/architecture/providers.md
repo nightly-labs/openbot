@@ -108,9 +108,12 @@ Codex adds its own base prompt, tools, and skill listing to each Codex request.
 also when the user's `config.toml` turns them on: their `list_available_plugins_to_install` and
 `request_plugin_install` offer Codex plugins and ChatGPT apps that OpenBot cannot install, and the agent
 then tells the user about a prompt that never shows (#8515). It also turns off the skills about the Codex
-app (`CODEX_UNFIT_SKILLS`). The thread value of `skills.config` replaces the whole list, so the user's own
-entries go first and OpenBot adds only the skills that no entry names. On Codex 0.166 and GPT-6
-Luna these settings remove about 1,050 input tokens from each request: `request_plugin_install` about 430
+app (`CODEX_UNFIT_SKILLS`). This includes `visualize:visualize` of the `visualize` plugin: its chart
+reference (`visualize{"path":…}`) shows only in the Codex apps, so an OpenBot agent shows a chart in
+the ways that OpenBot draws, such as `html_render` (#17594). The thread value of `skills.config`
+replaces the whole list, so the user's own entries go first and OpenBot adds only the skills that no
+entry names. On Codex 0.166 and GPT-6 Luna these settings remove about 1,050 input tokens from each
+request: `request_plugin_install` about 430
 and the five skills about 620. Skill descriptions (about 2,950 tokens) and image generation (about 600)
 stay, as agent capabilities. `bun run bench:codex-prompt-settings` runs real turns and writes
 `.openbot-build/codex-prompt-settings-bench/report.json`. `bun run smoke:codex-agent` runs one thread
