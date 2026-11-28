@@ -54,13 +54,11 @@ each call, in a light query with no JSON subqueries.
   `fill(generation, now, entries)`. The object refuses the fill when the generation changed after the
   read, so a slow reader cannot put back an old copy. Fills use only primary reads.
 - A session copy is used only when its `session_host_id` and `host_id` are the host of the object.
-- The sign-in check: a copy with `auth_live = 1` is live when the session has no sign-in hash, when
-  the caller's own sign-in hash is the session hash, or when the copy is less than 60 s old. Else one
-  replica query on `auth_sessions` checks it. A revoked sign-in is refused within 60 s.
+- The sign-in check: a copy with `auth_live = 1` is live when the session has no sign-in hash, or
+  when the copy is less than 60 s old. Else one replica query on `auth_sessions` checks it. A revoked sign-in is refused within 60 s.
 - A listing copy is old when a `current_period_end` in it is in (`checked_at`, now]. So a `past_due`
   license or plan loses its entitlement on time.
-- To find the host of a session, each isolate keeps a map of up to 10,000 session IDs that it
-  started. A miss costs one replica query on `remote_sessions`.
+- Each session claim names its host, so a read needs no lookup to find the object.
 
 Change paths that invalidate:
 
@@ -78,8 +76,8 @@ Change paths that invalidate:
 When `invalidate()` fails or takes more than 1 s, the Worker writes a marker row to
 `remote_auth_events` (`pending_targets = '["host-state:"]'`, payload `{hostId}`) and schedules a retry
 after 1 s. The 1 min cron (`SIGNAL_ENTRY_CRON`) calls `retryPendingHostStateInvalidations`, which
-retries each marker row and deletes it after a successful invalidation. The 5 min cron
-(`deliverPendingRemoteAuthEvents`) retries them too. So a failed invalidation is applied within about
+retries each marker row and deletes it after a successful invalidation. The auth-event delivery
+(`deliverPendingRemoteAuthEvents`) skips the marker rows. So a failed invalidation is applied within about
 60 s, and the recheck can be 10 min. In mode `off`, or with no binding, the retry makes no query.
 
 ## Consistency
@@ -137,11 +135,11 @@ protocol. The E2E compares the answers of mode `read` with mode `off`.
 | --- | ---: | ---: |
 | 100 session tickets on the production route, 10 sessions on one host, 30 min (object not read) | 100 replica | 100 replica |
 | Host list of a member of 5 hosts, 10 calls in 5 min | 10, 590 | 11, 218 |
-| validate-batch of 27 claims (7 host, 20 session), 10 calls in 5 min | 20, 1,410 | 6 (+10 replica), 411 |
+| validate-batch of 27 claims (7 host, 20 session), 10 calls in 5 min | 20, 1,410 | 2 (+8 replica), 381 |
 | Host authentication, 20 requests on one host (slice 1) | 20 | 1 |
 
-The host list makes 1 more query on a fill, but each query reads 63% fewer rows. The 10 replica queries in
-validate-batch find the host of sessions that the isolate did not start.
+The host list makes 1 more query on a fill, but each query reads 63% fewer rows. The 8 replica queries in
+validate-batch check the sign-in of session copies older than 60 s.
 
 ## D1 primary queries a minute (estimate)
 
