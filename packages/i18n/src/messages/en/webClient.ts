@@ -56,6 +56,8 @@ export const messages = defineMessages("webClient", {
     "The result is not confirmed. Close this form and check the server before trying again.",
   "webClient.error.usageOffline": "Connect to your server to view usage.",
   "webClient.error.desktopOnly": "This action is available in the desktop app.",
+  "webClient.voice.notSetUp":
+    "Speech recognition is not set up on this server. Its owner or an admin can choose a model in Server settings → Agents → Speech recognition.",
   "webClient.settings.preferences.title": "Preferences",
   "webClient.settings.preferences.description": "Choose the language and sounds of OpenBot in this browser.",
   "webClient.error.checkConversation": "Check the conversation before sending again.",

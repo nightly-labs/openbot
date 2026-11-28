@@ -50,6 +50,8 @@ export const messages = {
   "webClient.agent.unconfirmed": "النتيجة غير مؤكدة. أغلق هذا النموذج وتحقق من الخادم قبل المحاولة مرة أخرى.",
   "webClient.error.usageOffline": "اتصل بخادمك لعرض الاستخدام.",
   "webClient.error.desktopOnly": "هذا الإجراء متاح في تطبيق سطح المكتب.",
+  "webClient.voice.notSetUp":
+    "التعرّف على الكلام غير مُعدّ على هذا الخادم. يمكن لمالكه أو لمسؤول اختيار نموذج في إعدادات الخادم ← الوكلاء ← التعرّف على الكلام.",
   "webClient.settings.preferences.title": "التفضيلات",
   "webClient.settings.preferences.description": "اختر لغة OpenBot وأصواته في هذا المتصفح.",
   "webClient.error.checkConversation": "تحقق من المحادثة قبل الإرسال مرة أخرى.",
