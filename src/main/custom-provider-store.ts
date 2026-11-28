@@ -86,7 +86,6 @@ const NO_SECURE_STORAGE_MESSAGE = sourceText("error.provider.endpointNoSecureSto
 const DUPLICATE_MESSAGE = sourceText("error.provider.endpointDuplicate");
 const NOT_SAVED_MESSAGE = sourceText("error.provider.endpointNotSaved");
 const KEY_FOR_NEW_ADDRESS_MESSAGE = sourceText("error.provider.endpointKeyForNewAddress");
-const SECRET_UNREADABLE_MESSAGE = sourceText("error.provider.endpointSecretUnreadable");
 
 export class CustomProviderStore {
   readonly #path: string;
@@ -222,9 +221,6 @@ export class CustomProviderStore {
     const keepKey = input.apiKey === undefined;
     const keepHeaders = input.headers === undefined || keepsSavedHeaders(input.headers, saved);
     const unreadable = Boolean(current.stored.secret) && !current.secret;
-    if (keepKey !== keepHeaders && unreadable) {
-      throw new Error(SECRET_UNREADABLE_MESSAGE);
-    }
     const headers = keepHeaders ? saved : mergeHeaders(input.headers ?? [], saved);
     const keptSecret =
       (keepKey && Boolean(current.secret?.apiKey)) ||

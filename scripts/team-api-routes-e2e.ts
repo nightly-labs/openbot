@@ -11898,6 +11898,66 @@ try {
         ]),
       [harnesses, store.list()],
     );
+
+    const movedPath = join(root, "moved-custom-providers.json");
+    const sealedElsewhere = Buffer.from("sealed on another computer").toString("base64");
+    const movedEndpoint = {
+      id: "nvidia",
+      name: "NVIDIA",
+      baseUrl: "https://integrate.api.nvidia.com/v1",
+      models: [{ id: "nemotron", name: "Nemotron" }],
+    };
+    const moveIn = async () => {
+      writeFileSync(
+        movedPath,
+        `${JSON.stringify({ version: 1, providers: [{ ...movedEndpoint, secret: sealedElsewhere }] })}\n`,
+      );
+      const movedStore = new CustomProviderStore({
+        path: movedPath,
+        cipher: { ...fakeCipher, canPersist: () => true },
+      });
+      await Effect.runPromise(movedStore.load());
+      const movedChanges = createCustomProviderChanges({
+        service: {
+          saveCustomProvider: (_id, _harness, persist) => persist(),
+          updateCustomProvider: (_id, _harness, _removed, persist) => persist(),
+          removeCustomProvider: (_id, persist) => persist(),
+          reloadCustomProviderConfig: () => Effect.succeed("not-running"),
+          startHarnessForMovedAgents: () => Effect.void,
+        },
+        customProviders: movedStore,
+        providerRuntimes: { startCustomProviderHarness: () => Effect.void },
+      });
+      return { movedStore, movedChanges };
+    };
+    const savedSecret = () => JSON.parse(readFileSync(movedPath, "utf8")).providers[0]?.secret;
+    const firstMove = await moveIn();
+    const unreadableSummary = firstMove.movedStore.list()[0];
+    await Effect.runPromise(firstMove.movedChanges.peerUpdate({ ...movedEndpoint, name: "NVIDIA NIM", headers: [] }));
+    const keptSealed = savedSecret();
+    await Effect.runPromise(firstMove.movedChanges.peerUpdate({ ...movedEndpoint, apiKey: "nvapi-new", headers: [] }));
+    const keyOnly = firstMove.movedStore.configs()[0];
+    const keyOnlySummary = firstMove.movedStore.list()[0];
+    const keyOnlySecret = savedSecret();
+    const movedAgain = await moveIn();
+    await Effect.runPromise(
+      movedAgain.movedChanges.peerUpdate({ ...movedEndpoint, headers: [{ name: "X-Tenant", value: "acme" }] }),
+    );
+    const headersOnly = movedAgain.movedStore.configs()[0];
+    check(
+      "an endpoint whose saved key this computer cannot read keeps it on other edits, and takes a new key or new headers",
+      unreadableSummary?.hasApiKey === false &&
+        isDeepStrictEqual(unreadableSummary?.headerNames, []) &&
+        keptSealed === sealedElsewhere &&
+        keyOnly?.apiKey === "nvapi-new" &&
+        isDeepStrictEqual(keyOnly?.headers, []) &&
+        keyOnlySummary?.hasApiKey === true &&
+        typeof keyOnlySecret === "string" &&
+        keyOnlySecret !== sealedElsewhere &&
+        headersOnly?.apiKey === null &&
+        isDeepStrictEqual(headersOnly?.headers, [{ name: "X-Tenant", value: "acme" }]),
+      [unreadableSummary, keptSealed, keyOnly, keyOnlySummary, headersOnly],
+    );
   }
 
   {
