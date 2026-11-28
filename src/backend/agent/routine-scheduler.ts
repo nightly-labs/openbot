@@ -114,7 +114,7 @@ const DELIVERY_TIMEZONE_LIMIT = 10_000;
 const SKIPPED_WHILE_CLOSED = "Skipped: OpenBot was closed at the scheduled time.";
 const WEBHOOK_REQUEST_REFUSALS: Record<Exclude<WebhookRoutineRequester, "person">, string> = {
   member:
-    "A server member who is not an owner or admin sent this request. Only an owner or admin can create, change or delete a webhook routine. Do not retry: tell the user to ask an owner or admin of the server.",
+    "A server member who is not an owner or admin sent this request. Only an owner or admin can create, change or delete a webhook routine. Do not retry: tell the user to ask an owner or admin of the server to send the request in your main chat.",
   agent_thread:
     "You started this thread, so a message in it cannot create, change or delete a webhook routine. Do not retry here: tell the user to send the request in your main chat.",
   outside_chat:
