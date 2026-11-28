@@ -48,6 +48,7 @@ export const messages = {
   "onboarding.provider.inceptionKey": "نماذج Mercury مع مفتاح API من Inception",
   "onboarding.provider.deepseekKey": "نماذج DeepSeek مع مفتاح API من DeepSeek",
   "onboarding.provider.openrouterKey": "نماذج كثيرة مع مفتاح API من OpenRouter",
+  "onboarding.provider.trustedrouterKey": "نماذج كثيرة مع مفتاح API من TrustedRouter",
   "onboarding.provider.tryFree": "جرّبه مجانًا",
   "onboarding.provider.noSignIn": "لا حاجة إلى تسجيل الدخول",
   "onboarding.provider.more": "مزيد من المزوّدين",

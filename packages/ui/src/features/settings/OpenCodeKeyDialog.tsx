@@ -75,6 +75,13 @@ const KEY_TEXT = {
     descriptionHost: "provider.openrouterKey.descriptionHost",
     label: "provider.openrouterKey.label",
   },
+  trustedrouter: {
+    name: "TrustedRouter",
+    title: "provider.trustedrouterKey.title",
+    description: "provider.trustedrouterKey.description",
+    descriptionHost: "provider.trustedrouterKey.descriptionHost",
+    label: "provider.trustedrouterKey.label",
+  },
 } as const satisfies Record<string, KeyDialogText>;
 
 export interface KeyDialogText {

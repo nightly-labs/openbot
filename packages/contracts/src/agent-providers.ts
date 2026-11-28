@@ -23,6 +23,7 @@ export const AGENT_PROVIDERS = [
   "devin",
   "copilot",
   "mistral",
+  "trustedrouter",
 ] as const;
 export type AgentProviderId = (typeof AGENT_PROVIDERS)[number];
 
@@ -463,6 +464,29 @@ const AGENT_PROVIDER_DESCRIPTOR_TABLE = {
     approvalsInFullAccess: true,
     foldersInFullAccess: false,
   },
+  trustedrouter: {
+    id: "trustedrouter",
+    displayName: "TrustedRouter",
+    cliName: "Pi CLI",
+    onboardingDescription: "Many models with a TrustedRouter API key",
+    signInMessage: "Add a TrustedRouter API key to continue.",
+    installGuideLink: null,
+    defaultModel: "trustedrouter/auto",
+    legacyModelPrefix: null,
+    authKind: "trustedrouter",
+    pickerOrder: 17,
+    localCodeSignIn: null,
+    signInPageEnd: "callback",
+    skillFolders: [".agents/skills"],
+    homeSkills: "native",
+    workspaceInstructionFiles: ["AGENTS.md", "CLAUDE.md"],
+    workspaceEnforcement: "confined-process",
+    steer: "native",
+    concurrentTurns: true,
+    reportsUsage: false,
+    approvalsInFullAccess: true,
+    foldersInFullAccess: false,
+  },
   hermes: {
     id: "hermes",
     displayName: "Hermes",
@@ -588,6 +612,7 @@ export const LOCAL_ONLY_PROVIDERS = [
   "inception",
   "deepseek",
   "openrouter",
+  "trustedrouter",
   "hermes",
   "acp",
 ] as const satisfies readonly AgentProviderId[];
@@ -596,7 +621,12 @@ export function isLocalOnlyProvider(provider: AgentProviderId): boolean {
   return isOneOf(LOCAL_ONLY_PROVIDERS, provider);
 }
 
-export const KEY_ONLY_PROVIDERS = ["inception", "deepseek", "openrouter"] as const satisfies readonly AgentProviderId[];
+export const KEY_ONLY_PROVIDERS = [
+  "inception",
+  "deepseek",
+  "openrouter",
+  "trustedrouter",
+] as const satisfies readonly AgentProviderId[];
 export type KeyOnlyProviderId = (typeof KEY_ONLY_PROVIDERS)[number];
 
 export function isKeyOnlyProvider(provider: AgentProviderRef): provider is KeyOnlyProviderId {

@@ -105,6 +105,7 @@ const PI_CATALOG_KEY_VARIABLES: Record<KeyOnlyProviderId, string | null> = {
   inception: null,
   deepseek: "DEEPSEEK_API_KEY",
   openrouter: "OPENROUTER_API_KEY",
+  trustedrouter: null,
 };
 
 const PI_THINKING_LEVELS = ["off", "minimal", "low", "medium", "high", "xhigh", "max"] as const;

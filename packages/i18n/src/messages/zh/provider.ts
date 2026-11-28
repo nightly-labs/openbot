@@ -201,11 +201,17 @@ export const messages = {
     "在主机上保存 DeepSeek API 密钥，即可使用 DeepSeek 模型。OpenBot 会在它下载的 Pi CLI 中运行这些模型。",
   "provider.deepseekKey.label": "DeepSeek API 密钥",
   "provider.openrouterKey.title": "OpenRouter API 密钥",
+  "provider.trustedrouterKey.title": "TrustedRouter API 密钥",
   "provider.openrouterKey.description":
     "在这台电脑上保存 OpenRouter API 密钥，即可使用 OpenRouter 提供的模型。OpenBot 会在它下载的 Pi CLI 中运行这些模型。",
   "provider.openrouterKey.descriptionHost":
     "在主机上保存 OpenRouter API 密钥，即可使用 OpenRouter 提供的模型。OpenBot 会在它下载的 Pi CLI 中运行这些模型。",
+  "provider.trustedrouterKey.description":
+    "在这台电脑上保存 TrustedRouter API 密钥，即可使用 TrustedRouter 提供的模型。OpenBot 会在它下载的 Pi CLI 中运行这些模型。",
+  "provider.trustedrouterKey.descriptionHost":
+    "在主机上保存 TrustedRouter API 密钥，即可使用 TrustedRouter 提供的模型。OpenBot 会在它下载的 Pi CLI 中运行这些模型。",
   "provider.openrouterKey.label": "OpenRouter API 密钥",
+  "provider.trustedrouterKey.label": "TrustedRouter API 密钥",
 
   "provider.openCodeKey.title": "登录 OpenCode Go",
   "provider.openCodeKey.description": "免费模型无需账号，填写密钥可解锁付费的 Go 模型。",
