@@ -4639,14 +4639,18 @@ export function deliverPendingRemoteAuthEvents(
         fetch: fetcher,
         now,
       }),
-      retryHostStateInvalidations({
-        database: bindings.DB,
-        hostState: hostStateStore(bindings.HOST_STATE, bindings.HOST_STATE_MODE),
-        now,
-      }),
+      retryPendingHostStateInvalidations(bindings, now),
     ],
     { concurrency: "unbounded", discard: true },
   );
+}
+
+export function retryPendingHostStateInvalidations(bindings: RemoteAuthEventBindings, now: number) {
+  return retryHostStateInvalidations({
+    database: bindings.DB,
+    hostState: hostStateStore(bindings.HOST_STATE, bindings.HOST_STATE_MODE),
+    now,
+  });
 }
 
 function hostStateRetryStatement(database: D1Database, hostId: string, now: number): D1PreparedStatement {

@@ -489,12 +489,12 @@ try {
   const retryStale = await ticket("read", retrySession);
   const retryQueued = await call("read", { op: "state", hostId: "h-retry" });
   clock.now += MINUTE;
-  const retried = await call("read", { op: "host-state-retry" });
+  const retried = await call("read", { op: "minute-cron" });
   const retryApplied = await call("read", { op: "state", hostId: "h-retry" });
   const retryTicket = await ticket("read", retrySession);
   const retryOpen = await call("read", { op: "session-open", hostId: "h-retry", sessionId: retrySession.sessionId });
   check(
-    "flag read: a failed invalidation after a session end is queued, retried within 60 s, and applied",
+    "flag read: a failed invalidation after a session end is queued, retried by the 1 min cron, and applied",
     retryFilled.ok &&
       retryQueued.pending === 1 &&
       retried.ok &&

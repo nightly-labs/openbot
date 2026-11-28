@@ -6,6 +6,7 @@ import {
   deliverPendingRemoteAuthEvents,
   RemoteControlPlane,
   type RemoteResumeClaims,
+  retryPendingHostStateInvalidations,
 } from "../src/server/remote-control-plane";
 import type { AuthUser } from "../src/server/types";
 
@@ -51,6 +52,7 @@ export type ProbeRequest =
   | { op: "revoke-host"; hostId: string; token: string; user: AuthUser }
   | { op: "state"; hostId: string }
   | { op: "host-state-retry" }
+  | { op: "minute-cron" }
   | { op: "session-start"; userId: string; hostId: string; authSessionHash: string }
   | { op: "session-ticket"; userId: string; sessionId: string; signedInTokenHash: string }
   | { op: "end-session"; userId: string; sessionId: string }
@@ -289,6 +291,15 @@ async function run(
         .run();
       const result = await outcome(plane.licenseChanged(request.ownerUserId));
       return result.ok ? { ok: true } : result;
+    }
+    case "minute-cron": {
+      const result = await outcome(
+        retryPendingHostStateInvalidations(
+          { DB: database, HOST_STATE: env.HOST_STATE, HOST_STATE_MODE: options.mode },
+          options.clock,
+        ),
+      );
+      return result.ok ? { ok: true, pending: await pendingRetries(env) } : result;
     }
     case "host-state-retry": {
       const result = await outcome(

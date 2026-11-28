@@ -28,6 +28,7 @@ import {
   type RemoteAuthEventBindings,
   RemoteControlPlane,
   type RemoteFailure,
+  retryPendingHostStateInvalidations,
 } from "./remote-control-plane";
 import { SalesAnalyticsDelivery } from "./sales-analytics-delivery";
 import { checkSignalEntry, SIGNAL_ENTRY_CRON, type SignalEntryBindings } from "./signal-entry-failover";
@@ -131,7 +132,10 @@ export function createWorkerHandler(
     ) {
       const bindings = { ...workerBindings, DB: observedD1(workerBindings.DB) };
       if (controller.cron === SIGNAL_ENTRY_CRON) {
-        await runSignalEntryCheck(bindings);
+        await Promise.all([
+          runSignalEntryCheck(bindings),
+          runApiEffect(Effect.exit(retryPendingHostStateInvalidations(bindings, controller.scheduledTime))),
+        ]);
         return;
       }
       const now = controller.scheduledTime;
