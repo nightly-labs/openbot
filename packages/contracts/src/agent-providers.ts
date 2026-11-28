@@ -195,7 +195,7 @@ const AGENT_PROVIDER_DESCRIPTOR_TABLE = {
     legacyModelPrefix: null,
     authKind: "antigravity",
     pickerOrder: 4,
-    localCodeSignIn: null,
+    localCodeSignIn: "paste",
     windowsCodeSignIn: "paste",
     signInPageEnd: "callback",
     skillFolders: [".gemini/skills", ".agents/skills"],

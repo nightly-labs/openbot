@@ -95,7 +95,8 @@ export function accountCodeSignInOffered(provider: string, actions: ProviderAcco
   return (
     codeSignIn === "device" ||
     (codeSignIn === "paste" && actions.pasteCodeSignIn === true) ||
-    (descriptor.windowsCodeSignIn === "paste" && actions.windowsCodeSignIn === true)
+    (descriptor.windowsCodeSignIn === "paste" && actions.windowsCodeSignIn === true) ||
+    (descriptor.localCodeSignIn === "paste" && actions.local === true && actions.pasteCodeSignIn === true)
   );
 }
 

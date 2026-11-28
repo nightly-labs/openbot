@@ -18,6 +18,7 @@ export type ProviderConnectPlace =
 export interface ProviderConnectRoute {
   connect: ProviderSignInMethod | null;
   alternative: ProviderSignInMethod | null;
+  addressWhileSigningIn?: boolean;
 }
 
 const NO_ROUTE: ProviderConnectRoute = { connect: null, alternative: null };
@@ -28,10 +29,10 @@ export function providerConnectRoute(
 ): ProviderConnectRoute {
   if (!place) return NO_ROUTE;
   if (place.kind === "computer") {
-    const address = place.platform !== undefined && browserAddressPasteSupported(provider, place.platform);
     return {
       connect: "browser",
-      alternative: localCodeSignInProviders(place.platform).includes(provider) ? "code" : address ? "address" : null,
+      alternative: localCodeSignInProviders(place.platform).includes(provider) ? "code" : null,
+      addressWhileSigningIn: place.platform !== undefined && browserAddressPasteSupported(provider, place.platform),
     };
   }
   const code = serverCodeRouteProviders(place.server).includes(provider);
