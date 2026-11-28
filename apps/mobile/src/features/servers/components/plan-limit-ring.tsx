@@ -10,7 +10,7 @@ import { planLimitWindowKey } from "@/features/servers/model/plan-limits";
 
 const STROKE_RATIO = 2.25 / 34;
 const SPACING_RATIO = 4.5 / 34;
-const LOGO_RATIO = 12 / 34;
+export const LOGO_RATIO = 12 / 34;
 
 export const PLAN_LIMIT_TONE_TEXT = {
   neutral: "",
