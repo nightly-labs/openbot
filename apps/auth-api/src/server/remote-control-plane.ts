@@ -84,6 +84,7 @@ import {
 } from "./billing-entitlement";
 import { decodeBase64Url, hmacSha256, importHmacSha256Key, randomToken, sha256 } from "./crypto";
 import { CUSTOM_SERVER_OFFER_COLUMNS, type CustomServerOfferRow, customServerPayment } from "./custom-server-offers";
+import { updateSessionActivity } from "./d1-auth-repository";
 import type { GitHubInstallationTokensError, GitHubRepositoryRoute } from "./github-installation-tokens";
 import { primaryD1, replicaD1 } from "./observed-d1";
 import { PERSISTENT_SESSION_EXPIRES_AT } from "./session-policy";
@@ -416,6 +417,46 @@ const RESUME_SESSION_ACTIVE = `(s.auth_session_hash IS NULL OR EXISTS(
             SELECT 1 FROM auth_sessions a WHERE a.token_hash = s.auth_session_hash
               AND a.user_id = s.user_id AND a.revoked_at IS NULL AND a.expires_at > ?
           ))`;
+
+const SIGNED_IN_SESSION_SQL = `SELECT a.user_id AS account_user_id, a.last_used_at AS account_last_used_at,
+         t.session_id, t.expires_at, t.ended_at, t.membership_id, t.host_id, t.user_id, t.role, t.status,
+         t.auth_epoch, t.signal_home
+       FROM auth_sessions a
+       JOIN users u ON u.id = a.user_id
+       LEFT JOIN (
+         SELECT s.session_id, s.user_id AS session_user_id, s.auth_session_hash, s.expires_at, s.ended_at,
+           m.membership_id, m.host_id, m.user_id, m.role, m.status, h.auth_epoch, h.signal_home
+         FROM remote_sessions s
+         JOIN remote_memberships m ON m.membership_id = s.membership_id
+         JOIN remote_hosts h ON h.host_id = s.host_id
+         WHERE s.session_id = ?
+       ) t ON t.session_user_id = a.user_id
+         AND (? = 0 OR t.auth_session_hash = a.token_hash)
+         AND (t.auth_session_hash IS NULL OR EXISTS(
+           SELECT 1 FROM auth_sessions b WHERE b.token_hash = t.auth_session_hash
+             AND b.user_id = t.session_user_id AND b.revoked_at IS NULL AND b.expires_at > ?
+         ))
+       WHERE a.token_hash = ? AND a.revoked_at IS NULL AND a.expires_at > ?
+       LIMIT 1`;
+
+type SignedInSessionRow = { account_user_id: string; account_last_used_at: number } & (
+  | RemoteSessionRow
+  | { [Column in keyof RemoteSessionRow]: null }
+);
+
+export interface SignedInSession {
+  userId: string;
+  session: RemoteSessionRow | null;
+}
+
+function signedInSession(row: SignedInSessionRow): SignedInSession {
+  const { account_user_id: userId, account_last_used_at: _, ...session } = row;
+  return { userId, session: session.session_id === null ? null : session };
+}
+
+function remoteSessionActive(session: RemoteSessionRow | null, now: number): session is RemoteSessionRow {
+  return session !== null && !session.ended_at && session.expires_at > now && session.status === "active";
+}
 
 interface RemoteInviteRow {
   invite_id: string;
@@ -2592,28 +2633,82 @@ export class RemoteControlPlane {
           .bind(sessionId, userId, authSessionHash ?? null, authSessionHash ?? null, now)
           .first<RemoteSessionRow>(),
       );
-      if (!session || session.ended_at || session.expires_at <= now || session.status !== "active") {
-        return yield* new RemoteControlPlaneError(403, "session_inactive", "The remote session is not active.");
-      }
-      const signal = dependencies.signal;
-      if (!signal) return yield* remoteSignalNotConfigured();
-      const home = configuredSignalHome(signal, session.signal_home);
-      const issued = yield* dependencies.signer.issue({
-        sessionId,
-        hostId: session.host_id,
-        userId,
-        membershipId: session.membership_id,
-        role: session.role,
-        authEpoch: session.auth_epoch,
-        sessionExpiresAt: session.expires_at,
-        clientPublicKey: boundClientPublicKey,
-        ...(home ? { signal: home.id } : {}),
-        now,
-      });
-      return { ...issued, signalUrl: home?.url ?? signal.entryUrl };
+      return yield* this.#signSessionTicket(userId, session, boundClientPublicKey, now);
     },
     (operation) => operation.pipe(Effect.provide(this.#layer)),
   ).bind(this);
+
+  readonly findSignedInSession = Effect.fn("RemoteControlPlane.findSignedInSession")(
+    function* (
+      this: RemoteControlPlane,
+      input: { authSessionHash: string; sessionId: string; boundToAuthSession: boolean },
+    ): Effect.fn.Return<SignedInSession | null, RemoteFailure, RemoteDependencies> {
+      const dependencies = yield* RemoteDependencies;
+      const now = dependencies.now();
+      const read = (database: D1Database) =>
+        remoteCall(() =>
+          database
+            .prepare(SIGNED_IN_SESSION_SQL)
+            .bind(input.sessionId, input.boundToAuthSession ? 1 : 0, now, input.authSessionHash, now)
+            .first<SignedInSessionRow>(),
+        );
+      const replicaRow = yield* read(replicaD1(dependencies.database));
+      const row =
+        replicaRow && remoteSessionActive(signedInSession(replicaRow).session, now)
+          ? replicaRow
+          : yield* read(primaryD1(dependencies.database));
+      if (!row) return null;
+      yield* updateSessionActivity(dependencies.database, input.authSessionHash, row.account_last_used_at, now).pipe(
+        Effect.mapError(() => new RemoteOperationError({})),
+      );
+      return signedInSession(row);
+    },
+    (operation) => operation.pipe(Effect.provide(this.#layer)),
+  ).bind(this);
+
+  readonly issueSignedInSessionTicket = Effect.fn("RemoteControlPlane.issueSignedInSessionTicket")(
+    function* (this: RemoteControlPlane, signedIn: SignedInSession, clientPublicKey: string) {
+      const dependencies = yield* RemoteDependencies;
+      const boundClientPublicKey = yield* remoteValidate(() =>
+        requiredText(clientPublicKey, 8_192, "client public key"),
+      );
+      return yield* this.#signSessionTicket(
+        signedIn.userId,
+        signedIn.session,
+        boundClientPublicKey,
+        dependencies.now(),
+      );
+    },
+    (operation) => operation.pipe(Effect.provide(this.#layer)),
+  ).bind(this);
+
+  readonly #signSessionTicket = Effect.fn("RemoteControlPlane.signSessionTicket")(function* (
+    userId: string,
+    session: RemoteSessionRow | null,
+    clientPublicKey: string,
+    now: number,
+  ) {
+    const dependencies = yield* RemoteDependencies;
+    if (!remoteSessionActive(session, now)) {
+      return yield* new RemoteControlPlaneError(403, "session_inactive", "The remote session is not active.");
+    }
+    const signal = dependencies.signal;
+    if (!signal) return yield* remoteSignalNotConfigured();
+    const home = configuredSignalHome(signal, session.signal_home);
+    const issued = yield* dependencies.signer.issue({
+      sessionId: session.session_id,
+      hostId: session.host_id,
+      userId,
+      membershipId: session.membership_id,
+      role: session.role,
+      authEpoch: session.auth_epoch,
+      sessionExpiresAt: session.expires_at,
+      clientPublicKey,
+      ...(home ? { signal: home.id } : {}),
+      now,
+    });
+    return { ...issued, signalUrl: home?.url ?? signal.entryUrl };
+  });
 
   readonly issueWatchTicket = Effect.fn("RemoteControlPlane.issueWatchTicket")(
     function* (

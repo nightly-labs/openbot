@@ -1,3 +1,4 @@
+import { ACCOUNT_BOOKMARK_HEADER, isAccountBookmark } from "@openbot/contracts/account-bookmark";
 import type { FirstTouch } from "@openbot/contracts/first-touch";
 import { type AvatarColor, isAvatarColor } from "@openbot/contracts/ipc";
 import type { MobileConnectHostBinding } from "@openbot/contracts/mobile-connect";
@@ -114,6 +115,12 @@ export function readChatColor(body: DynamicRecord): AvatarColor | null | undefin
 
 export function sessionReadsFor(request: Request): SessionReads {
   return request.method === "GET" || request.method === "HEAD" ? "replica" : "primary";
+}
+
+export function ownAccountReadsFor(request: Request): SessionReads {
+  return sessionReadsFor(request) === "replica" && isAccountBookmark(request.headers.get(ACCOUNT_BOOKMARK_HEADER))
+    ? "replica"
+    : "primary";
 }
 
 export class AuthService {

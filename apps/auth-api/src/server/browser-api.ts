@@ -26,6 +26,7 @@ import { type AccountAttribution, requestFirstTouch } from "./account-attributio
 import {
   type AuthService,
   AuthServiceError,
+  ownAccountReadsFor,
   readAnalyticsAnswer,
   readChatColor,
   sessionReadsFor,
@@ -76,7 +77,8 @@ export interface BrowserApiServices {
     | "removeOwnedHost"
     | "setHostHidden"
     | "startSession"
-    | "issueSessionTicket"
+    | "findSignedInSession"
+    | "issueSignedInSessionTicket"
     | "endSession"
     | "endAccountSession"
     | "previewInvite"
@@ -317,8 +319,26 @@ const handleBrowserOperation = Effect.fn("BrowserApi.handleOperation")(function*
     return json({ accepted: true });
   }
   const token = browserSessionToken(request);
+  const [, encodedTicketSessionId] = /^v2\/remote\/sessions\/([^/]+)\/ticket$/u.exec(path) ?? [];
+  if (encodedTicketSessionId !== undefined && request.method === "POST") {
+    const signedIn = token
+      ? yield* services.remote.findSignedInSession({
+          authSessionHash: yield* sha256(token),
+          sessionId: decodeURIComponent(encodedTicketSessionId),
+          boundToAuthSession: true,
+        })
+      : null;
+    if (!signedIn) return failure(401, "sign_in_required", "Sign in is required.");
+    const body = yield* readJsonObject(request);
+    return json(
+      yield* services.remote.issueSignedInSessionTicket(signedIn, yield* requiredString(body, "clientPublicKey")),
+    );
+  }
   const user = token
-    ? yield* services.auth.authenticate(token, path === "session" ? "primary" : sessionReadsFor(request))
+    ? yield* services.auth.authenticate(
+        token,
+        path === "session" ? ownAccountReadsFor(request) : sessionReadsFor(request),
+      )
     : null;
   if (path === "logout" && request.method === "POST") {
     if (token && user) yield* services.remote.endAccountSession(user.id, yield* sha256(token));
@@ -394,21 +414,10 @@ const handleBrowserOperation = Effect.fn("BrowserApi.handleOperation")(function*
       yield* services.remote.startSession(user.id, yield* requiredString(body, "hostId"), yield* sha256(token)),
       201,
     );
-  const [, encodedSessionId, sessionAction] = /^v2\/remote\/sessions\/([^/]+)\/(ticket|end)$/u.exec(path) ?? [];
-  if (encodedSessionId !== undefined) {
-    const sessionId = decodeURIComponent(encodedSessionId);
-    if (sessionAction === "end") {
-      yield* services.remote.endSession(user.id, sessionId, yield* sha256(token));
-      return json({ ended: true });
-    }
-    return json(
-      yield* services.remote.issueSessionTicket(
-        user.id,
-        sessionId,
-        yield* requiredString(body, "clientPublicKey"),
-        yield* sha256(token),
-      ),
-    );
+  const [, encodedEndedSessionId] = /^v2\/remote\/sessions\/([^/]+)\/end$/u.exec(path) ?? [];
+  if (encodedEndedSessionId !== undefined) {
+    yield* services.remote.endSession(user.id, decodeURIComponent(encodedEndedSessionId), yield* sha256(token));
+    return json({ ended: true });
   }
   if (path === "v2/remote/invites/preview")
     return json(yield* services.remote.previewInvite(yield* requiredString(body, "token")));
