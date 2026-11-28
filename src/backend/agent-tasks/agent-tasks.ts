@@ -137,7 +137,6 @@ export class AgentTasks implements TaskLanes {
   readonly #progress = new Map<string, string>();
   readonly #stoppedTurns = new Map<string, string>();
   readonly #userStops = new Map<string, string>();
-  readonly #shownResults = new Set<string>();
   readonly #progressPublish = new Map<string, NodeJS.Timeout>();
   readonly #turnEndWaiters = new Map<string, Set<Deferred.Deferred<void>>>();
   readonly #pendingReports = new Map<string, number>();
@@ -298,7 +297,7 @@ export class AgentTasks implements TaskLanes {
       outcome,
       closed: task.closedAt !== null,
       stillRunning,
-      resultsShown: this.#shownResults.has(task.taskId),
+      resultsShown: this.#resultsInChat(task),
     };
   }
 
@@ -423,7 +422,6 @@ export class AgentTasks implements TaskLanes {
     this.#progress.delete(task.taskId);
     this.#stoppedTurns.delete(task.taskId);
     this.#userStops.delete(task.taskId);
-    this.#shownResults.delete(task.taskId);
     this.#turnEndWaiters.delete(task.taskId);
     this.#store.delete(task.taskId);
     this.changed(task.agentId);
@@ -533,7 +531,6 @@ export class AgentTasks implements TaskLanes {
       this.#progress.delete(taskId);
       this.#stoppedTurns.delete(taskId);
       this.#userStops.delete(taskId);
-      this.#shownResults.delete(taskId);
     }
     this.#store.deleteForAgent(agentId);
   }
@@ -893,7 +890,6 @@ export class AgentTasks implements TaskLanes {
     event: AgentTurnCompletedEvent,
   ): Effect.fn.Return<void> {
     const task = this.#store.task(ended.taskId) ?? ended;
-    this.#shownResults.delete(task.taskId);
     if (event.status === "completed")
       yield* this.#showTaskResults(task, event.turnId).pipe(
         Effect.catchCause((cause) =>
@@ -941,9 +937,7 @@ export class AgentTasks implements TaskLanes {
       const copiedFiles = new Set<string>();
       for (const result of runResults(this.#conversation.ensureSnapshot(task.agentId, task.threadId).messages)) {
         const visual = chatVisualReply(result);
-        const id = visual
-          ? visualReplyMessageId(threadId, task.threadId, result.id)
-          : responseAttachmentMessageId(threadId, task.threadId, result.id);
+        const id = resultCopyId(threadId, task.threadId, result);
         if (shown.has(id)) continue;
         const copies: AttachmentSummary[] = [];
         for (const attachment of visual ? [visual.attachment] : (result.attachments ?? [])) {
@@ -990,9 +984,17 @@ export class AgentTasks implements TaskLanes {
         throw error;
       }
       this.#conversation.publishConversation(chat);
-      this.#shownResults.add(task.taskId);
     }).pipe(Effect.onError(() => this.#mailbox.discardStagedGeneratedAttachments(staged).pipe(Effect.ignore)));
   });
+
+  #resultsInChat(task: AgentThreadRecord): boolean {
+    const threadId = this.#hooks.agent(task.agentId)?.threadId;
+    if (!threadId) return false;
+    const chat = new Set(this.#conversation.ensureSnapshot(task.agentId, threadId).messages.map(({ id }) => id));
+    return runResults(this.#conversation.ensureSnapshot(task.agentId, task.threadId).messages).some((result) =>
+      chat.has(resultCopyId(threadId, task.threadId, result)),
+    );
+  }
 
   #unfinishedTasks(agentId: string): number {
     return this.#store
@@ -1069,6 +1071,12 @@ export class AgentTasks implements TaskLanes {
       throughMessageId,
     };
   }
+}
+
+function resultCopyId(chatThreadId: string, taskThreadId: string, result: ConversationMessage): string {
+  return chatVisualReply(result)
+    ? visualReplyMessageId(chatThreadId, taskThreadId, result.id)
+    : responseAttachmentMessageId(chatThreadId, taskThreadId, result.id);
 }
 
 function runResults(messages: readonly ConversationMessage[]): ConversationMessage[] {
