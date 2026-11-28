@@ -462,6 +462,7 @@ export const messages = {
   "chat.send.unconfirmed": "Non confirmé. Vérifiez la discussion avant de l’envoyer à nouveau.",
   "chat.send.edit": "Modifier",
   "chat.send.dismiss": "Ignorer",
+  "chat.send.waitingForFailed": "En attente du message non envoyé",
   "chat.history.olderFailed": "Les messages plus anciens n’ont pas pu être chargés.",
   "chat.messageUnavailable": "Ce message n’est plus disponible.",
   "chat.activity.workingIn": "Travaille dans {channel}",

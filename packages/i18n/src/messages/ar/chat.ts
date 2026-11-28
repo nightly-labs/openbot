@@ -612,6 +612,7 @@ export const messages = {
   "chat.send.unconfirmed": "لم يتم التأكيد. تحقق من الدردشة قبل أن ترسلها مرة أخرى.",
   "chat.send.edit": "تعديل",
   "chat.send.dismiss": "إخفاء",
+  "chat.send.waitingForFailed": "في انتظار الرسالة التي لم تُرسل",
   "chat.history.olderFailed": "تعذّر تحميل الرسائل الأقدم.",
   "chat.messageUnavailable": "لم تعد هذه الرسالة متاحة.",
   "chat.activity.workingIn": "يعمل في {channel}",

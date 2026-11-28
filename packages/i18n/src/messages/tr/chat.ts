@@ -469,6 +469,7 @@ export const messages = {
   "chat.send.unconfirmed": "Onaylanmadı. Yeniden göndermeden önce sohbeti kontrol edin.",
   "chat.send.edit": "Düzenle",
   "chat.send.dismiss": "Kapat",
+  "chat.send.waitingForFailed": "Gönderilemeyen mesajı bekliyor",
   "chat.history.olderFailed": "Daha eski mesajlar yüklenemedi.",
   "chat.messageUnavailable": "Bu mesaj artık kullanılamıyor.",
   "chat.activity.workingIn": "{channel} içinde çalışıyor",

@@ -556,6 +556,7 @@ export const messages = {
   "chat.send.unconfirmed": "Не подтверждено. Проверьте чат, прежде чем отправлять ещё раз.",
   "chat.send.edit": "Изменить",
   "chat.send.dismiss": "Скрыть",
+  "chat.send.waitingForFailed": "Ожидает неотправленное сообщение",
   "chat.history.olderFailed": "Не удалось загрузить прежние сообщения.",
   "chat.messageUnavailable": "Это сообщение больше недоступно.",
   "chat.activity.workingIn": "Работает в канале {channel}",

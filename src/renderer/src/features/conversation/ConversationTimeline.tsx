@@ -199,6 +199,7 @@ export function ConversationTimeline() {
     openQuote,
     openTaggedReference,
     pendingSendFor,
+    pendingSendsHeldByFailed,
     presentedQueueDeliveries,
     providerUpdateRequired,
     previewAttachment,
@@ -1659,6 +1660,7 @@ export function ConversationTimeline() {
                                   <PendingSendStatus
                                     state={pendingState()}
                                     updateRequired={Boolean(providerUpdateRequired())}
+                                    heldByFailed={pendingSendsHeldByFailed()}
                                     error={pendingSend()?.error ?? null}
                                     errorReference={pendingSend()?.errorReference ?? null}
                                     retrySafe={pendingRetrySafe()}

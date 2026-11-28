@@ -451,6 +451,7 @@ export const messages = {
   "chat.send.unconfirmed": "未确认成功。请先检查对话，再决定是否重发。",
   "chat.send.edit": "编辑",
   "chat.send.dismiss": "关闭",
+  "chat.send.waitingForFailed": "正在等待未发送的消息",
   "chat.history.olderFailed": "更早的消息加载失败。",
   "chat.messageUnavailable": "这条消息已不可用。",
   "chat.activity.workingIn": "正在 {channel} 中工作",

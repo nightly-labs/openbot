@@ -27,3 +27,5 @@ export const FailedWithDraft: Story = { args: { canEdit: false } };
 export const Unconfirmed: Story = { args: { retrySafe: false, error: null } };
 
 export const UpdateRequired: Story = { args: { updateRequired: true } };
+
+export const WaitingForFailed: Story = { args: { state: "waiting", error: null, heldByFailed: true } };

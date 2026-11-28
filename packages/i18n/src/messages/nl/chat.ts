@@ -462,6 +462,7 @@ export const messages = {
   "chat.send.unconfirmed": "Niet bevestigd. Controleer de chat voordat je het opnieuw verstuurt.",
   "chat.send.edit": "Bewerken",
   "chat.send.dismiss": "Sluiten",
+  "chat.send.waitingForFailed": "Wacht op het niet-verstuurde bericht",
   "chat.history.olderFailed": "Oudere berichten kunnen niet worden geladen.",
   "chat.messageUnavailable": "Dit bericht is niet meer beschikbaar.",
   "chat.activity.workingIn": "Bezig in {channel}",
