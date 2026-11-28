@@ -11,8 +11,9 @@ import type { ContextEntry, HistoryFilter } from "./messaging-types";
 
 const HISTORY_DEFAULT = 30;
 const HISTORY_LIMIT = 100;
-const HISTORY_MESSAGE_CHARACTERS = 2_000;
-const HISTORY_CHARACTERS = 24_000;
+const HISTORY_MESSAGE_CHARACTERS = 16_000;
+const HISTORY_HEAD_SHARE = 0.75;
+const HISTORY_CHARACTERS = 48_000;
 const HISTORY_QUERY_CHARACTERS = 200;
 const POST_CHARACTERS = 8_000;
 
@@ -247,26 +248,74 @@ interface HistoryMessage {
   files?: { name: string; path?: string }[];
 }
 
-export function boundedHistory(messages: readonly ContextEntry[]): HistoryMessage[] {
+export interface BoundedHistory {
+  messages: HistoryMessage[];
+  olderBefore: string | null;
+}
+
+export function boundedHistory(messages: readonly ContextEntry[]): BoundedHistory {
   const kept: HistoryMessage[] = [];
   let characters = 0;
-  for (const message of [...messages].reverse()) {
-    const text =
-      message.text.length > HISTORY_MESSAGE_CHARACTERS
-        ? `${message.text.slice(0, HISTORY_MESSAGE_CHARACTERS)}…`
-        : message.text;
-    const files = (message.files ?? []).map((file) => ({ name: file.name, ...(file.path ? { path: file.path } : {}) }));
-    characters += message.id.length + text.length + message.authorName.length + JSON.stringify(files).length;
-    if (characters > HISTORY_CHARACTERS) break;
-    kept.unshift({
-      id: message.id,
-      author: message.authorName,
-      sentAt: message.sentAt,
-      text,
-      ...(files.length ? { files } : {}),
-    });
+  for (const group of sameTimeGroups(messages)) {
+    let shown = group.map((message) => historyMessage(message, HISTORY_MESSAGE_CHARACTERS));
+    if (characters + historySize(shown) > HISTORY_CHARACTERS) {
+      if (kept.length) return { messages: kept, olderBefore: kept[0]?.sentAt ?? null };
+      const shared = Math.min(HISTORY_MESSAGE_CHARACTERS, Math.floor(HISTORY_CHARACTERS / group.length));
+      shown = group.map((message) => historyMessage(message, shared));
+    }
+    kept.unshift(...shown);
+    characters += historySize(shown);
   }
-  return kept;
+  return { messages: kept, olderBefore: null };
+}
+
+function sameTimeGroups(messages: readonly ContextEntry[]): ContextEntry[][] {
+  const groups: ContextEntry[][] = [];
+  const newestFirst = [...messages].reverse().sort((left, right) => Date.parse(right.sentAt) - Date.parse(left.sentAt));
+  for (const message of newestFirst) {
+    const group = groups.at(-1);
+    if (group?.[0]?.sentAt === message.sentAt) group.unshift(message);
+    else groups.push([message]);
+  }
+  return groups;
+}
+
+function historyMessage(message: ContextEntry, maxCharacters: number): HistoryMessage {
+  const files = (message.files ?? []).map((file) => ({ name: file.name, ...(file.path ? { path: file.path } : {}) }));
+  return {
+    id: message.id,
+    author: message.authorName,
+    sentAt: message.sentAt,
+    text: historyText(message.text, maxCharacters),
+    ...(files.length ? { files } : {}),
+  };
+}
+
+function historyText(text: string, maxCharacters: number): string {
+  if (text.length <= maxCharacters) return text;
+  const headEnd = Math.floor(maxCharacters * HISTORY_HEAD_SHARE);
+  const tailStart = text.length - (maxCharacters - headEnd);
+  const head = splitsPair(text, headEnd) ? headEnd - 1 : headEnd;
+  const tail = splitsPair(text, tailStart) ? tailStart + 1 : tailStart;
+  return `${text.slice(0, head)}\n[${tail - head} characters left out. This tool cannot show them.]\n${text.slice(tail)}`;
+}
+
+function splitsPair(text: string, index: number): boolean {
+  const before = text.charCodeAt(index - 1);
+  const after = text.charCodeAt(index);
+  return before >= 0xd800 && before <= 0xdbff && after >= 0xdc00 && after <= 0xdfff;
+}
+
+function historySize(messages: readonly HistoryMessage[]): number {
+  return messages.reduce(
+    (total, message) =>
+      total +
+      message.id.length +
+      message.text.length +
+      message.author.length +
+      JSON.stringify(message.files ?? []).length,
+    0,
+  );
 }
 
 function invalid(error: z.ZodError, unknownKeys = "the tool works only on this conversation."): { error: string } {
