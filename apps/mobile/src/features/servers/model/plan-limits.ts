@@ -122,15 +122,9 @@ export function usePlanLimits(serverId: string) {
 
 function planLimitsNotReported(accounts: PlanLimits["accounts"], rows: readonly PlanLimitRow[]): AgentProviderId[] {
   return (accounts ?? []).flatMap(({ provider, accounts: list }) =>
-    provider !== "opencode" &&
     !agentProviderDescriptor(provider).reportsUsage &&
     !rows.some((row) => row.provider === provider) &&
-    list.some(
-      (account) =>
-        account.state === "connected" &&
-        account.id !== CLAUDE_API_KEY_ACCOUNT_ID &&
-        !isProviderKeyAccount(provider, account.id),
-    )
+    list.some((account) => account.state === "connected" && !isProviderKeyAccount(provider, account.id))
       ? [provider]
       : [],
   );
