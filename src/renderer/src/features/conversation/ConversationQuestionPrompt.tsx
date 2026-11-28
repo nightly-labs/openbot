@@ -1,3 +1,4 @@
+import type { AgentPromptQuestion } from "@openbot/contracts/ipc";
 import { UI_BLOCK_PREVIEW_EDIT_CAPABILITY } from "@openbot/contracts/team-protocol/ui-block-preview-edit-v1";
 import type { QuestionPromptComposerAnswer } from "@openbot/ui/components/QuestionPromptBubble";
 import { createMemo, Loading, Show } from "solid-js";
@@ -7,12 +8,33 @@ import { QuestionPromptBubble, UiBlockPrompt } from "./conversation-cards";
 import { useConversationViewScope } from "./conversation-scope";
 import type { ConversationProps, PromptAnswerOptions } from "./conversation-types";
 
+function quoted(text: string): string {
+  return text
+    .split("\n")
+    .map((line) => `> ${line}`)
+    .join("\n");
+}
+
+function unsentAnswerText(questions: AgentPromptQuestion[], drafts: Record<string, string>): string {
+  const typed = questions.flatMap((question) => {
+    const text = drafts[question.id]?.trim();
+    return text ? [{ question: question.question, text }] : [];
+  });
+  if (questions.length === 1) return typed[0]?.text ?? "";
+  return typed.map(({ question, text }) => `${quoted(question)}\n\n${text}`).join("\n\n");
+}
+
 export function ConversationQuestionPrompt(props: {
   elementRef?: (element: HTMLElement | undefined) => void;
   onAnswer?: (answers: Record<string, string[]>, options?: PromptAnswerOptions) => Promise<boolean>;
   registerComposerAnswer?: ((answer: QuestionPromptComposerAnswer) => () => void) | undefined;
 }) {
-  const { props: view, openExternalMessageUrl, keepUnsentPromptAnswer } = useConversationViewScope();
+  const {
+    props: view,
+    openExternalMessageUrl,
+    keepUnsentPromptAnswer,
+    unsentPromptDrafts,
+  } = useConversationViewScope();
   let cachedPrompt: { key: string; prompt: NonNullable<ConversationProps["prompt"]> } | null = null;
   const keyedPrompt = createMemo(() => {
     const prompt = view.prompt;
@@ -33,6 +55,10 @@ export function ConversationQuestionPrompt(props: {
       {(entry) => {
         const presentResolution = () =>
           view.onPromptResolutionPresented?.(entry.prompt.agentId, entry.prompt.turnId, entry.prompt.requestId);
+        const keepUnsentDrafts = (drafts: Record<string, string> | undefined) => {
+          if (keyedPrompt() !== entry) return;
+          keepUnsentPromptAnswer(drafts && unsentAnswerText(entry.prompt.questions, drafts), drafts);
+        };
         return (
           <Loading>
             <Show
@@ -42,6 +68,8 @@ export function ConversationQuestionPrompt(props: {
                   questions={entry.prompt.questions}
                   elementRef={(element) => props.elementRef?.(element)}
                   registerComposerAnswer={props.registerComposerAnswer}
+                  drafts={unsentPromptDrafts()}
+                  onDraftsChange={keepUnsentDrafts}
                   sendShortcut={deviceSendShortcut(view.platform)}
                   onSubmit={answer}
                   onResolutionPresented={presentResolution}
