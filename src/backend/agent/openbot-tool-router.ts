@@ -3641,11 +3641,13 @@ export class OpenBotToolRouter {
       );
       requireRunnableChange(target, runtime, this.#hooks.providerStatuses());
       const ownProvider = runtime.provider ?? target.provider;
-      const after: AgentModelChoice = {
-        provider: ownProvider,
-        model: runtime.model ?? target.model,
-        providerAccountId: accountFor(ownProvider),
-      };
+      const queued =
+        runtime.provider === undefined && runtime.model === undefined && providerAccountId === undefined
+          ? target.pendingRuntime
+          : undefined;
+      const after: AgentModelChoice = queued
+        ? { provider: queued.provider, model: queued.model, providerAccountId: queued.providerAccountId }
+        : { provider: ownProvider, model: runtime.model ?? target.model, providerAccountId: accountFor(ownProvider) };
       const current: AgentModelChoice = {
         provider: target.provider,
         model: target.model,
