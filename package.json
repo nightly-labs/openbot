@@ -515,6 +515,7 @@
     "test:mobile-reconnect": "bun scripts/mobile-reconnect-e2e.ts",
     "test:mobile-stream-reconcile": "bun scripts/mobile-stream-reconcile-e2e.ts",
     "test:mobile-agent-list": "bun scripts/mobile-agent-list-e2e.ts",
+    "test:account-access-token": "bun scripts/account-access-token-e2e.ts",
     "test:central-auth-startup": "bun scripts/central-auth-startup-stall-e2e.ts",
     "test:exit-records": "bun scripts/exit-records-e2e.ts",
     "test:exit-watchdog": "bun scripts/exit-watchdog-e2e.ts",

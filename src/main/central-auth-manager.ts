@@ -61,6 +61,7 @@ import { WATCH_TICKET_AUDIENCE, type WatchTicketClaims } from "@openbot/contract
 import type { ServerAppearance } from "@openbot/contracts/team-protocol/host-appearance-v1";
 import { sourceText } from "@openbot/i18n/source";
 import { createOpenBotLogger, toLogValue } from "@openbot/logging";
+import { AccountAccessTokens, isAccountAccessTokenExpired } from "@openbot/team-client/account-access-token";
 import { referenceFrom, safeReference } from "@openbot/user-errors";
 import { Deferred, Duration, Effect, Exit, type Layer, Result, Schema, Semaphore } from "effect";
 import { createLocalJWKSet, type JWTPayload, jwtVerify } from "jose";
@@ -221,6 +222,7 @@ export class CentralAuthManager extends EventEmitter<CentralAuthEvents> {
   #sessionUser: { token: string; user: CentralAuthUser } | null = null;
   #storedUserJson: string | null = null;
   readonly #teamHostTokens = new Map<string, string>();
+  readonly #accessTokens = new AccountAccessTokens();
   #mobileConnectLink: StoredMobileConnectLink | null = null;
   #sessionWrites = Semaphore.makeUnsafe(1);
   #sessionAccountId: string | null = null;
@@ -374,11 +376,13 @@ export class CentralAuthManager extends EventEmitter<CentralAuthEvents> {
         return yield* new CentralAuthOperationError({
           cause: new AuthApiError(401, "unauthorized", sourceText("error.auth.signInRequired")),
         });
-      const response = yield* CentralAuthTransport.use((transport) =>
-        transport.fetch(new URL(path, this.#options.apiUrl), {
-          headers: { Authorization: `Bearer ${this.#sessionToken}` },
-          signal: AbortSignal.timeout(timeoutMs),
-        }),
+      const response = yield* this.#sendWithAccountToken(this.#sessionToken, path, "GET", (bearer) =>
+        CentralAuthTransport.use((transport) =>
+          transport.fetch(new URL(path, this.#options.apiUrl), {
+            headers: { Authorization: `Bearer ${bearer}` },
+            signal: AbortSignal.timeout(timeoutMs),
+          }),
+        ),
       );
       if (!response.ok)
         return yield* new CentralAuthOperationError({
@@ -1589,11 +1593,13 @@ export class CentralAuthManager extends EventEmitter<CentralAuthEvents> {
         });
       const url = new URL(`/v2/remote/hosts/${encodeURIComponent(hostId)}/logo`, this.#options.apiUrl);
       url.searchParams.set("v", version);
-      const response = yield* CentralAuthTransport.use((transport) =>
-        transport.fetch(url, {
-          headers: { Authorization: `Bearer ${this.#sessionToken}` },
-          signal: AbortSignal.timeout(30_000),
-        }),
+      const response = yield* this.#sendWithAccountToken(this.#sessionToken, url.pathname, "GET", (bearer) =>
+        CentralAuthTransport.use((transport) =>
+          transport.fetch(url, {
+            headers: { Authorization: `Bearer ${bearer}` },
+            signal: AbortSignal.timeout(30_000),
+          }),
+        ),
       );
       if (!response.ok)
         return yield* new CentralAuthOperationError({
@@ -2280,6 +2286,7 @@ export class CentralAuthManager extends EventEmitter<CentralAuthEvents> {
         this.#mobileConnectLink = previousMobileConnectLink;
         return yield* new CentralAuthOperationError({ cause: stored.failure.cause });
       }
+      if (previousToken && previousToken !== session.sessionToken) this.#accessTokens.forget(previousToken);
       const user = this.#resolveUserAvatar(session.user);
       this.#setState({ status: "signed_in", user });
       return user;
@@ -2304,6 +2311,7 @@ export class CentralAuthManager extends EventEmitter<CentralAuthEvents> {
       this.#mobileConnectLink = previousMobileConnectLink;
       return yield* new CentralAuthOperationError({ cause: stored.failure.cause });
     }
+    if (previousToken && previousToken !== session.sessionToken) this.#accessTokens.forget(previousToken);
     const user = this.#resolveUserAvatar(session.user);
     this.#setState({ status: "signed_in", user });
     return user;
@@ -2547,9 +2555,31 @@ export class CentralAuthManager extends EventEmitter<CentralAuthEvents> {
         cause: new AuthApiError(401, "unauthorized", sourceText("error.auth.signInRequired")),
       });
     const sessionToken = this.#sessionToken;
-    const headers = new Headers(init.headers);
-    headers.set("Authorization", `Bearer ${sessionToken}`);
-    return yield* this.#requestEffect(path, { ...init, headers }, decoder, timeoutMs).pipe(
+    const attempt = (bearer: string) => {
+      const headers = new Headers(init.headers);
+      headers.set("Authorization", `Bearer ${bearer}`);
+      return this.#requestEffect(path, { ...init, headers }, decoder, timeoutMs);
+    };
+    const retryOnAccessRefusal = (
+      bearer: string,
+      next: (expired: boolean) => Effect.Effect<string>,
+    ): Effect.Effect<T, CentralAuthOperationError, CentralAuthTransport> =>
+      attempt(bearer).pipe(
+        Effect.catchIf(
+          ({ cause }) => bearer !== sessionToken && cause instanceof AuthApiError && cause.status === 401,
+          ({ cause }) => {
+            this.#accessTokens.expire({ apiUrl: this.#options.apiUrl, sessionToken }, bearer);
+            const expired = cause instanceof AuthApiError && isAccountAccessTokenExpired(cause.status, cause.code);
+            return next(expired).pipe(
+              Effect.flatMap((retryBearer) => retryOnAccessRefusal(retryBearer, () => Effect.succeed(sessionToken))),
+            );
+          },
+        ),
+      );
+    const bearer = yield* this.#accountBearer(sessionToken, path, init.method);
+    return yield* retryOnAccessRefusal(bearer, (expired) =>
+      expired ? this.#accountBearer(sessionToken, path, init.method) : Effect.succeed(sessionToken),
+    ).pipe(
       Effect.tapError(({ cause }) =>
         cause instanceof AuthApiError && cause.status === 401 && path !== "/v1/auth/logout"
           ? this.#endRevokedSession(sessionToken, path === "/v1/me")
@@ -2557,6 +2587,29 @@ export class CentralAuthManager extends EventEmitter<CentralAuthEvents> {
       ),
     );
   });
+
+  #accountRequest(sessionToken: string, path: string, method: string | undefined) {
+    return {
+      apiUrl: this.#options.apiUrl,
+      sessionToken,
+      path,
+      method,
+      fetch: (input: string, init: RequestInit) => this.#options.fetch(input, init),
+    };
+  }
+
+  #accountBearer(sessionToken: string, path: string, method: string | undefined) {
+    return this.#accessTokens.bearer(this.#accountRequest(sessionToken, path, method));
+  }
+
+  #sendWithAccountToken<E, R>(
+    sessionToken: string,
+    path: string,
+    method: string,
+    perform: (bearer: string) => Effect.Effect<Response, E, R>,
+  ) {
+    return this.#accessTokens.send(this.#accountRequest(sessionToken, path, method), perform);
+  }
 
   #endRevokedSession(sessionToken: string, confirmed: boolean) {
     return Effect.gen({ self: this }, function* () {
@@ -2673,6 +2726,7 @@ export class CentralAuthManager extends EventEmitter<CentralAuthEvents> {
   }
 
   #forgetSession(): void {
+    if (this.#sessionToken) this.#accessTokens.forget(this.#sessionToken);
     this.#sessionToken = null;
     this.#sessionUser = null;
     this.#sessionAccountId = null;

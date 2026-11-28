@@ -16,7 +16,10 @@ export function accountBookmarkHeaders(url: string | URL): Record<string, string
   return bookmark === undefined ? {} : { [ACCOUNT_BOOKMARK_HEADER]: bookmark };
 }
 
-export function rememberAccountBookmark(url: string | URL, response: Pick<Response, "status" | "headers">): void {
+export function rememberAccountBookmark(
+  url: string | URL,
+  response: { readonly status: number; readonly headers: { get(name: string): string | null } },
+): void {
   const origin = accountOrigin(url);
   if (origin === null) return;
   if (response.status >= 500) {
