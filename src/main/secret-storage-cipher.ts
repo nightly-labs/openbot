@@ -42,7 +42,8 @@ function isExistingFile(error: unknown): boolean {
 export function createSecretStorage(options: { keyPath: string; platform?: NodeJS.Platform }): SecretStorage {
   const platform = options.platform ?? process.platform;
   const linux = platform === "linux";
-  const keyFileFallback = linux || platform === "darwin";
+  const windows = platform === "win32";
+  const keyFileFallback = linux || windows || platform === "darwin";
   let madeKeyFile = false;
 
   function readKey(): Buffer | null {
@@ -81,18 +82,20 @@ export function createSecretStorage(options: { keyPath: string; platform?: NodeJ
     } finally {
       rmSync(temporaryPath, { force: true });
     }
-    const folderHandle = openSync(folder, "r");
-    try {
-      fsyncSync(folderHandle);
-    } finally {
-      closeSync(folderHandle);
+    if (!windows) {
+      const folderHandle = openSync(folder, "r");
+      try {
+        fsyncSync(folderHandle);
+      } finally {
+        closeSync(folderHandle);
+      }
     }
     const created = readKey();
     if (!created) throw new Error("The secret storage key file was not made.");
     madeKeyFile = true;
     logger.warn("The system keyring did not keep the secrets. OpenBot keeps new secrets in its own key file.", {
       reason,
-      backend: safeStorage.getSelectedStorageBackend(),
+      backend: linux ? safeStorage.getSelectedStorageBackend() : platform,
     });
     return created;
   }

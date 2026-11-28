@@ -28,10 +28,10 @@ process.stderr.on("error", () => undefined);
 app.setPath("userData", argument("user-data"));
 configureLinuxPasswordStore();
 const keyPath = join(app.getPath("userData"), SECRET_STORAGE_KEY_FILE);
-const platformArgument = process.argv.find((item) => item.startsWith("--platform="));
+const platformArgument = process.argv.find((item) => item.startsWith("--platform="))?.slice("--platform=".length);
 const storage = createSecretStorage({
   keyPath,
-  ...(platformArgument === "--platform=darwin" ? { platform: "darwin" as const } : {}),
+  ...(platformArgument === "darwin" || platformArgument === "win32" ? { platform: platformArgument } : {}),
 });
 const cipher = storage.cipher(() => "No secret storage.");
 const canPersistBeforeReady = cipher.canPersist();
