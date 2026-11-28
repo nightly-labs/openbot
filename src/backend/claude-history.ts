@@ -135,6 +135,28 @@ export function claudeHistoryReader(options: ClaudeHistoryOptions = {}): ReadPro
     });
 }
 
+export function claudeTranscriptParent(
+  threadId: string,
+  cwd: string | undefined,
+  uuid: string,
+  options: ClaudeHistoryOptions = {},
+) {
+  return Effect.tryPromise({
+    try: async (signal) => {
+      const transcript = await findTranscript(threadId, cwd, options.configDirectory, options.projectDirectoryName);
+      if (!transcript) return null;
+      const { size } = await stat(transcript);
+      for await (const record of readTranscriptLines(transcript, signal, 0, size)) {
+        if (!record.complete || !record.line.includes(uuid)) continue;
+        const parsed = parseRecord(record.line.trim());
+        if (parsed?.uuid === uuid) return stringOrNull(parsed.parentUuid);
+      }
+      return null;
+    },
+    catch: providerFailure,
+  });
+}
+
 export const CLAUDE_NO_RESPONSE_TEXT = "No response requested.";
 
 export function isClaudeNoResponsePlaceholder(message: unknown): boolean {

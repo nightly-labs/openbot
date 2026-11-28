@@ -444,6 +444,10 @@ export const messages = {
     "{provider}, güvenlik kuralları nedeniyle bu mesajı engelledi: {reason} Ajan artık bu mesajı görmüyor, bu yüzden mesaj sonraki mesajlarınızı durdurmaz. İsteğinizi farklı kelimelerle yeniden gönderin.",
   "error.provider.codexSafetyBlockedKept":
     "{provider}, güvenlik kuralları nedeniyle bu mesajı engelledi: {reason} {provider} sonraki mesajlarınızı da engellerse yeni bir sohbet başlatın.",
+  "error.provider.claudeSafetyBlocked":
+    "{provider}, güvenlik kuralları nedeniyle bu mesajı engelledi. Ajan artık bu mesajı görmüyor, bu yüzden mesaj sonraki mesajlarınızı durdurmaz. İsteğinizi farklı kelimelerle yeniden gönderin.",
+  "error.provider.claudeSafetyBlockedKept":
+    "{provider}, güvenlik kuralları nedeniyle bu mesajı engelledi. {provider} sonraki mesajlarınızı da engellerse yeni bir sohbet başlatın.",
   "error.provider.codexAudioRefused":
     "Bu model ses dinleyemez, bu yüzden bu sohbetteki sesi kabul etmedi. OpenBot, sohbet geçmişiyle yeni bir Codex oturumu başlattı. Devam etmek için isteğinizi yeniden gönderin ve ajandan ses olmadan çalışmasını isteyin. Sesi kontrol etmek için ajanın model menüsünde ses dinleyebilen bir model seçin.",
   "error.provider.codexAccountSettingsUnreadable":

@@ -427,6 +427,10 @@ export const messages = defineMessages("error.provider", {
     "{provider} blocked this message because of its safety rules: {reason} The agent does not see this message now, so it does not stop your next messages. Send your request again with different words.",
   "error.provider.codexSafetyBlockedKept":
     "{provider} blocked this message because of its safety rules: {reason} If {provider} also blocks your next messages, start a new chat.",
+  "error.provider.claudeSafetyBlocked":
+    "{provider} blocked this message because of its safety rules. The agent does not see this message now, so it does not stop your next messages. Send your request again with different words.",
+  "error.provider.claudeSafetyBlockedKept":
+    "{provider} blocked this message because of its safety rules. If {provider} also blocks your next messages, start a new chat.",
   "error.provider.codexAudioRefused":
     "This model cannot listen to audio, so it did not accept the sound in this chat. OpenBot started a new Codex session with the chat history. To continue, send your request again and ask the agent to work without the sound. To check sound, select a model that can listen to audio in the agent's model menu.",
   "error.provider.codexAccountSettingsUnreadable":

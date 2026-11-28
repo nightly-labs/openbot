@@ -390,6 +390,10 @@ export const messages = {
     "{provider} 因其安全规则拦截了此消息：{reason} 智能体现在看不到此消息，因此它不会阻止你后续的消息。请换一种说法重新发送你的请求。",
   "error.provider.codexSafetyBlockedKept":
     "{provider} 因其安全规则拦截了此消息：{reason} 如果 {provider} 也拦截你后续的消息，请开始新对话。",
+  "error.provider.claudeSafetyBlocked":
+    "{provider} 因其安全规则拦截了此消息。智能体现在看不到此消息，因此它不会阻止你后续的消息。请换一种说法重新发送你的请求。",
+  "error.provider.claudeSafetyBlockedKept":
+    "{provider} 因其安全规则拦截了此消息。如果 {provider} 也拦截你后续的消息，请开始新对话。",
   "error.provider.codexAudioRefused":
     "此模型无法收听音频，因此未接受此聊天中的声音。OpenBot 已使用聊天记录开始新的 Codex 会话。要继续，请重新发送你的请求，并让智能体在不使用声音的情况下工作。要检查声音，请在智能体的模型菜单中选择一个可以收听音频的模型。",
   "error.provider.codexAccountSettingsUnreadable":

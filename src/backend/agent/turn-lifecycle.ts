@@ -186,8 +186,12 @@ function carriesHandoff(item: DynamicRecord): boolean {
   );
 }
 
-function safetyBlockText(reason: string, dropped: boolean): string {
-  const provider = agentProviderName("codex");
+function safetyBlockText(providerId: AgentProviderId, reason: string, dropped: boolean): string {
+  const provider = agentProviderName(providerId);
+  if (providerId === "claude")
+    return dropped
+      ? sourceText("error.provider.claudeSafetyBlocked", { provider })
+      : sourceText("error.provider.claudeSafetyBlockedKept", { provider });
   return dropped
     ? sourceText("error.provider.codexSafetyBlocked", { provider, reason })
     : sourceText("error.provider.codexSafetyBlockedKept", { provider, reason });
@@ -429,7 +433,7 @@ export class TurnLifecycle {
   readonly #compactionDeadlines = new Map<string, NodeJS.Timeout>();
   readonly #failoverRetries = new Map<string, Set<string>>();
   readonly #refusedRetries = new Set<string>();
-  readonly #safetyBlockedTurns = new Set<string>();
+  readonly #safetyBlockedTurns = new Map<string, AgentProviderId>();
   readonly #sessionFailures = new Map<string, number>();
   readonly #imageLimitedChats = new Map<string, string | null>();
   readonly #noUpdateTurns = new Set<string>();
@@ -1758,8 +1762,11 @@ export class TurnLifecycle {
           this.#turnCauses.set(errorTurnId, causeCode);
           if (refusedSessionFailure(source.provider, message) !== null) return;
           const errorInfo = error?.codexErrorInfo;
-          if (source.provider === "codex" && typeof errorInfo === "string" && CODEX_SAFETY_BLOCKS.has(errorInfo)) {
-            this.#safetyBlockedTurns.add(errorTurnId);
+          if (
+            (source.provider === "codex" && typeof errorInfo === "string" && CODEX_SAFETY_BLOCKS.has(errorInfo)) ||
+            (source.provider === "claude" && isRecord(params) && params.contentBlocked === true)
+          ) {
+            this.#safetyBlockedTurns.set(errorTurnId, source.provider);
             return;
           }
         }
@@ -2281,8 +2288,11 @@ export class TurnLifecycle {
             )
           : null;
       const refused = running !== undefined && refusedFailure !== null;
-      const safetyBlock = this.#safetyBlockedTurns.delete(turnId)
+      const blockedProvider = this.#safetyBlockedTurns.get(turnId);
+      this.#safetyBlockedTurns.delete(turnId);
+      const safetyBlock = blockedProvider
         ? yield* this.#dropSafetyBlockedTurn(
+            blockedProvider,
             running?.acted === false && !running.carriedHistory ? running.client : null,
             threadId,
             turnId,
@@ -2558,7 +2568,7 @@ export class TurnLifecycle {
         const context =
           safetyBlock === null
             ? undefined
-            : { causeCode: "content_blocked" as const, provider: "codex" as const, model, turnId };
+            : { causeCode: "content_blocked" as const, provider: blockedProvider, model, turnId };
         if (laneTaskId !== null && failure !== undefined) {
           this.#hooks.emitFailure?.({ code: "agent_error", agentId, causeCode: classifyFailure(failure), ...context });
           this.#hooks.taskFailed(laneTaskId, failure);
@@ -3058,6 +3068,7 @@ export class TurnLifecycle {
 
   readonly #dropSafetyBlockedTurn = Effect.fn("TurnLifecycle.dropSafetyBlockedTurn")(function* (
     this: TurnLifecycle,
+    provider: AgentProviderId,
     client: AgentClient | null,
     threadId: string,
     turnId: string,
@@ -3075,23 +3086,30 @@ export class TurnLifecycle {
         .pipe(
           Effect.as(true),
           Effect.catch((error) => {
-            logger.warn("Codex kept a turn that its safety check blocked.", {
+            logger.warn("A provider kept a turn that its safety check blocked.", {
               provider: client.provider,
-              error: this.#hooks.redactMcp(error.message),
+              error: this.#hooks.redactMcp(String(error.cause ?? error.message)),
             });
             return Effect.succeed(false);
           }),
         ));
-    return safetyBlockText(reason, dropped);
+    return safetyBlockText(provider, reason, dropped);
   });
 
   #showKeptSafetyBlock(agentId: string, turnId: string): void {
-    if (!this.#safetyBlockedTurns.delete(turnId)) return;
-    this.#hooks.emitError("agent_error", safetyBlockText(this.#turnErrors.get(turnId) ?? "", false), agentId, {
-      causeCode: "content_blocked",
-      provider: "codex",
-      turnId,
-    });
+    const provider = this.#safetyBlockedTurns.get(turnId);
+    if (!provider) return;
+    this.#safetyBlockedTurns.delete(turnId);
+    this.#hooks.emitError(
+      "agent_error",
+      safetyBlockText(provider, this.#turnErrors.get(turnId) ?? "", false),
+      agentId,
+      {
+        causeCode: "content_blocked",
+        provider,
+        turnId,
+      },
+    );
   }
 
   readonly #retryRefusedTurn = Effect.fn("TurnLifecycle.retryRefusedTurn")(function* (

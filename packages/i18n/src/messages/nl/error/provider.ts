@@ -441,6 +441,10 @@ export const messages = {
     "{provider} heeft dit bericht geblokkeerd vanwege zijn veiligheidsregels: {reason} De agent ziet dit bericht nu niet meer, dus het houdt je volgende berichten niet tegen. Stuur je verzoek opnieuw met andere woorden.",
   "error.provider.codexSafetyBlockedKept":
     "{provider} heeft dit bericht geblokkeerd vanwege zijn veiligheidsregels: {reason} Als {provider} ook je volgende berichten blokkeert, start dan een nieuwe chat.",
+  "error.provider.claudeSafetyBlocked":
+    "{provider} heeft dit bericht geblokkeerd vanwege zijn veiligheidsregels. De agent ziet dit bericht nu niet meer, dus het houdt je volgende berichten niet tegen. Stuur je verzoek opnieuw met andere woorden.",
+  "error.provider.claudeSafetyBlockedKept":
+    "{provider} heeft dit bericht geblokkeerd vanwege zijn veiligheidsregels. Als {provider} ook je volgende berichten blokkeert, start dan een nieuwe chat.",
   "error.provider.codexAudioRefused":
     "Dit model kan geen audio beluisteren, dus het accepteerde het geluid in deze chat niet. OpenBot heeft een nieuwe Codex-sessie gestart met de chatgeschiedenis. Stuur je verzoek opnieuw en vraag de agent om zonder het geluid te werken om verder te gaan. Kies in het modelmenu van de agent een model dat audio kan beluisteren om geluid te controleren.",
   "error.provider.codexAccountSettingsUnreadable":
