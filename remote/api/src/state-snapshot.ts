@@ -3,7 +3,7 @@ import { mkdir, readFile, rename, rm, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { Effect, Schema } from "effect";
 
-export const SNAPSHOT_MAXIMUM_AGE_MILLISECONDS = 10 * 60_000;
+const SNAPSHOT_MAXIMUM_AGE_MILLISECONDS = 10 * 60_000;
 const SNAPSHOT_FUTURE_SKEW_MILLISECONDS = 30_000;
 const SNAPSHOT_SIGNATURE_CONTEXT = "openbot-signal-state-v1.";
 const SNAPSHOT_FILE = "signal-state.json";

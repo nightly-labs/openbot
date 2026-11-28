@@ -218,8 +218,8 @@ export interface SignalServiceOptions {
 
 class NotEntryError extends Schema.TaggedError<NotEntryError>()("NotEntryError", {}) {}
 const NOT_ENTRY_REASON = "This Signal is not the entry.";
-export const HANDOFF_CLOSE_CODE = 1012;
-export const HANDOFF_CLOSE_REASON = "This Signal is restarting.";
+const HANDOFF_CLOSE_CODE = 1012;
+const HANDOFF_CLOSE_REASON = "This Signal is restarting.";
 
 export interface SignalCutoffs {
   ticket: number;

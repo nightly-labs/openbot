@@ -30,7 +30,7 @@ import type { SignalService, SignalSibling, SignalSocketCounts, SignalTokens } f
 import type { TrustedResumeTokenEntry } from "./state-snapshot";
 import { type RemoteTokenService, RemoteTokenUnavailableError } from "./tokens";
 
-export const HANDOFF_TOKEN_HEADER = "OpenBot-Handoff-Token";
+const HANDOFF_TOKEN_HEADER = "OpenBot-Handoff-Token";
 const FORWARDED_HEADER = "OpenBot-Handoff-Forwarded";
 const ADDRESS_HEADER = "OpenBot-Handoff-Address";
 const TARGET_HEADER = "OpenBot-Handoff-Target";
