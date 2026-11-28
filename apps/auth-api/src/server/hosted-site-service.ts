@@ -380,7 +380,7 @@ export class HostedSiteService {
           .prepare(
             `UPDATE site_deployments
          SET in_flight_uploads = CASE WHEN last_upload_claim_at <= ? THEN 1 ELSE in_flight_uploads + 1 END,
-             last_upload_claim_at = ?,
+             last_upload_claim_at = MAX(COALESCE(last_upload_claim_at, 0), ?),
              upload_claims = upload_claims + 1,
              upload_bytes_claimed = upload_bytes_claimed + ?
          WHERE id = ? AND user_id = ? AND status = 'uploading' AND upload_expires_at > ?
@@ -482,14 +482,13 @@ export class HostedSiteService {
       }).pipe(
         Effect.ensuring(
           Effect.gen({ self: this }, function* () {
-            if (claimExpired()) return;
             yield* siteCall(() =>
               database
                 .prepare(
                   `UPDATE site_deployments SET in_flight_uploads = MAX(0, in_flight_uploads - 1)
-           WHERE id = ? AND user_id = ?`,
+           WHERE id = ? AND user_id = ? AND last_upload_claim_at < ?`,
                 )
-                .bind(deployment.id, userId)
+                .bind(deployment.id, userId, claimTime + HOSTED_SITE_LIMITS.uploadClaimLeaseMs)
                 .run(),
             );
           }).pipe(Effect.orDie),
