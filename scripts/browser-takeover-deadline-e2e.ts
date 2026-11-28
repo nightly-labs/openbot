@@ -1069,6 +1069,11 @@ try {
       while (cards() === 0 && !unnamedAnswered) await new Promise((done) => setImmediate(done));
       const card = vaultRegistry.runtimeAttention().pendingBrowserTakeovers[0];
       assert(card?.secret, "no password card for a sign-in without loginId");
+      assert.equal(
+        card.vaultSkip,
+        "agent-script",
+        "the password card does not say that an agent script blocked the saved login",
+      );
       await runCauseEffect(
         vaultRegistry.respondToBrowserSecret({
           requestId: card.requestId,

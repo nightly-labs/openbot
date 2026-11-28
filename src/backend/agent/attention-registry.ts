@@ -623,6 +623,7 @@ export class AttentionRegistry {
   readonly #approvals = new Map<RequestId, PendingApproval>();
   readonly #takeovers = new Map<RequestId, PendingBrowserTakeover>();
   readonly #heldTakeoverResults = new Map<string, HeldTakeoverResult>();
+  readonly #scriptSkippedLogins = new Map<string, string>();
 
   constructor(options: AttentionRegistryOptions) {
     this.#conversation = options.conversation;
@@ -1632,7 +1633,7 @@ export class AttentionRegistry {
               ),
             );
             this.#resolveBrowserTakeover(requestId, pending, "cancel");
-          } else if (pending.request.vaultSkip === "agent-script") {
+          } else if (pending.request.vaultSkip === "agent-script" && getString(args, "loginId")) {
             pending.resolve(
               browserTakeoverError(
                 `${pending.vaultSkipped} When OpenBot still does not fill the saved login, call submit_secret without loginId so that the user types the password, or use request_takeover.`,
@@ -2712,6 +2713,9 @@ export class AttentionRegistry {
     for (const [key, held] of this.#heldTakeoverResults) {
       if (!tabs.some((tab) => tab.id === held.tabId)) this.#heldTakeoverResults.delete(key);
     }
+    for (const tabId of this.#scriptSkippedLogins.keys()) {
+      if (!tabs.some((tab) => tab.id === tabId)) this.#scriptSkippedLogins.delete(tabId);
+    }
   }
 
   #respondToMalformedApproval(client: AgentClient, request: AppServerRequest): void {
@@ -2747,12 +2751,17 @@ export class AttentionRegistry {
     const args = Result.isSuccess(parsed) && parsed.success.tool === "submit_secret" ? parsed.success.args : undefined;
     const loginId = args?.loginId;
     const namedCard = (card: BrowserVaultSkipReason) => (loginId ? { loginId, card } : {});
-    if (pending.secret?.agentScriptedOrigin !== false)
+    const { tabId } = pending.request;
+    if (pending.secret?.agentScriptedOrigin !== false) {
+      if (loginId) this.#scriptSkippedLogins.set(tabId, request.origin);
+      const savedLoginSkipped = this.#scriptSkippedLogins.get(tabId) === request.origin;
       return skip(
         "agent-scripted-origin",
         "a script that you ran with evaluate can still run in this page or in another open page of this site. First close or navigate each other tab of this site, also a popup or opener tab where you did not run evaluate. A tab of another agent or a channel can also block the fill, and list_tabs does not show it: when no other tab of this site is in list_tabs, ask the user to close the other tabs of this site. Then reload this page with navigate direction=reload, not with evaluate or by opening its address again, and call submit_secret again.",
-        namedCard("agent-script"),
+        savedLoginSkipped ? { ...(loginId ? { loginId } : {}), card: "agent-script" } : {},
       );
+    }
+    this.#scriptSkippedLogins.delete(tabId);
     const withCode = pending.secret.withCode;
     const codeFields =
       'A code field has autocomplete="one-time-code", or is a text, tel, or number input with a word such as otp, totp, authentication code, or verification code in its id, name, aria-label, placeholder, title, or label, or a field named "code" or "passcode" in a form whose visible text names an authenticator app and no email or SMS. Its name and label have no backup, recovery, mail, phone, SMS, name, label, promo, coupon, voucher, discount, gift, invite, referral, zip, postal, country, card, CVC, CVV, or CSC word.';
