@@ -22,6 +22,7 @@ export const claudeWorkspaceSandbox = Effect.fn("ClaudeWorkspace.sandbox")(funct
     failIfUnavailable: true,
     autoAllowBashIfSandboxed: true,
     allowUnsandboxedCommands: false,
+    enableWeakerNetworkIsolation: true,
     filesystem: { allowWrite, ...(excluded.length ? { denyWrite: [...excluded] } : {}) },
   };
 });
