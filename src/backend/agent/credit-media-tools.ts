@@ -1,4 +1,4 @@
-import { randomUUID } from "node:crypto";
+import { createHash, randomUUID } from "node:crypto";
 import { attachmentMimeTypeForName } from "@openbot/contracts/attachment-files";
 import {
   CREDIT_MEDIA_PROMPT_LIMIT,
@@ -46,6 +46,8 @@ export const CREDIT_MEDIA_TOOL_NAMES: ReadonlySet<string> = new Set([
 ]);
 
 export const DEFAULT_MEDIA_APPROVAL_CREDITS = 50;
+
+const UNFINISHED_JOB_MS = 60 * 60_000;
 
 const localPath = z.string().trim().min(1).max(INPUT_LIMITS.path);
 const modelId = z.string().trim().min(1).max(80);
@@ -494,6 +496,26 @@ interface InputRole {
   path: string;
 }
 
+interface UnfinishedJob {
+  jobId: string;
+  planned: PlannedJob;
+  roles: readonly InputRole[];
+  digest: string;
+  at: number;
+}
+
+type Delivery = Pick<UnfinishedJob, "jobId" | "planned" | "roles"> & { files: readonly Uint8Array[] };
+
+function requestKey(call: CreditMediaToolCall): string {
+  return JSON.stringify([call.agentId, call.tool, call.arguments ?? null]);
+}
+
+function inputsDigest(files: readonly Uint8Array[]): string {
+  const hash = createHash("sha256");
+  for (const file of files) hash.update(`${file.byteLength}:`).update(file);
+  return hash.digest("hex");
+}
+
 function startRun(call: CreditMediaToolCall, kind: CreditMediaGenerationKind): CreditMediaRun {
   return {
     facts: {
@@ -548,6 +570,7 @@ function inputRoles(inputs: Inputs): InputRole[] {
 
 export class CreditMediaTools {
   readonly #options: CreditMediaToolsOptions;
+  readonly #unfinished = new Map<string, UnfinishedJob>();
 
   constructor(options: CreditMediaToolsOptions) {
     this.#options = options;
@@ -642,6 +665,8 @@ export class CreditMediaTools {
     const roles = inputRoles(inputs);
     run.facts.references = roles.length;
     run.facts.modelSource = args.model === undefined ? "default" : "agent";
+    const resumed = yield* this.#resume(media, call, run);
+    if (resumed) return resumed;
     const models = yield* media.models();
     const defaultModels = this.#options.defaultModels(kind);
     const asked = plannedJob(models, kind, args, inputs, defaultModels);
@@ -700,6 +725,29 @@ export class CreditMediaTools {
         planned = chosen;
       }
     }
+    return yield* this.#delivered(media, call, run, { jobId: randomUUID(), planned, roles, files });
+  });
+
+  #resume = Effect.fn("CreditMediaTools.resume")(function* (
+    this: CreditMediaTools,
+    media: CreditMediaWorkflows,
+    call: CreditMediaToolCall,
+    run: CreditMediaRun,
+  ) {
+    const key = requestKey(call);
+    const earlier = this.#unfinished.get(key);
+    if (!earlier) return null;
+    this.#unfinished.delete(key);
+    if (Date.now() - earlier.at > UNFINISHED_JOB_MS || !(yield* media.unfinished(earlier.jobId))) return null;
+    const read = yield* Effect.result(call.readInputs(earlier.roles.map(({ path }) => path)));
+    if (read._tag === "Failure" || inputsDigest(read.success) !== earlier.digest) return null;
+    run.facts.agentModel = earlier.planned.model.id;
+    notePlan(run, earlier.planned);
+    return yield* this.#delivered(media, call, run, { ...earlier, files: read.success });
+  });
+
+  #delivered(media: CreditMediaWorkflows, call: CreditMediaToolCall, run: CreditMediaRun, delivery: Delivery) {
+    const { roles, files } = delivery;
     const readInput: CreditMediaInputRead = (attachmentId) => {
       const index = Number(attachmentId);
       const role = roles[index];
@@ -708,29 +756,37 @@ export class CreditMediaTools {
         role && bytes ? { mimeType: attachmentMimeTypeForName(role.path), bytes: Effect.succeed(bytes) } : null,
       );
     };
-    const delivery = yield* Effect.suspend(() => {
+    return Effect.suspend(() => {
       run.delivering = true;
-      return this.#deliver(media, call, run, planned, readInput, roles);
+      return this.#deliver(media, call, run, delivery, readInput);
     }).pipe(
       Effect.onExit((exit) => this.#report(run, exitOutcome(exit, run.facts.outcome))),
       Effect.forkIn(this.#options.scope(), { startImmediately: true }),
+      Effect.flatMap(Fiber.join),
     );
-    return yield* Fiber.join(delivery);
-  });
+  }
+
+  #remember(call: CreditMediaToolCall, job: Delivery) {
+    const now = Date.now();
+    for (const [key, earlier] of this.#unfinished)
+      if (now - earlier.at > UNFINISHED_JOB_MS) this.#unfinished.delete(key);
+    const { files, ...kept } = job;
+    this.#unfinished.set(requestKey(call), { ...kept, digest: inputsDigest(files), at: now });
+  }
 
   #deliver = Effect.fn("CreditMediaTools.deliver")(function* (
     this: CreditMediaTools,
     media: CreditMediaWorkflows,
     call: CreditMediaToolCall,
     run: CreditMediaRun,
-    planned: PlannedJob,
+    delivery: Delivery,
     readInput: CreditMediaInputRead,
-    roles: readonly InputRole[],
   ) {
+    const { jobId, planned, roles } = delivery;
     const kind = run.facts.kind;
     const made = yield* Effect.result(
       media.make(readInput, {
-        jobId: randomUUID(),
+        jobId,
         model: planned.model,
         job: planned.job,
         images: roles.map(({ role }, index) => ({ role, attachmentId: String(index) })),
@@ -738,6 +794,7 @@ export class CreditMediaTools {
     );
     if (made._tag === "Failure") {
       run.facts.outcome = "failed";
+      this.#remember(call, delivery);
       return failure(made.failure.message);
     }
     const { bytes, mimeType, credits } = made.success;

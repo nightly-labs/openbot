@@ -335,7 +335,7 @@
     "test:antigravity-session-files": "bun scripts/antigravity-session-files-e2e.ts",
     "test:acp-sign-in-errors": "bun scripts/acp-sign-in-errors-e2e.ts",
     "test:workflow-model-steps": "bun scripts/workflow-model-steps-e2e.ts",
-    "test:credit-media-agent-tools": "bun scripts/credit-media-agent-tools-e2e.ts",
+    "test:credit-media-agent-tools": "bun scripts/credit-media-agent-tools-e2e.ts && bun scripts/credit-media-hold-recovery-e2e.ts && bun apps/auth-api/scripts/credit-media-holds-e2e.ts",
     "test:credit-media-analytics": "bun scripts/credit-media-analytics-e2e.ts",
     "test:credit-media-workflow": "bun scripts/credit-media-workflow-e2e.ts",
     "test:workflow-paid-media": "bun scripts/workflow-paid-media-e2e.ts",
