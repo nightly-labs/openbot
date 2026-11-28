@@ -35,14 +35,14 @@
     "class-variance-authority": "catalog:",
     "fflate": "catalog:",
     "jose": "catalog:",
-    "solid-js": "2.0.3",
+    "solid-js": "2.0.4",
     "yaml": "catalog:",
     "zod": "catalog:",
     "@openbot/ui": "workspace:*",
     "effect": "catalog:"
   },
   "devDependencies": {
-    "@cloudflare/vite-plugin": "1.65.0",
+    "@cloudflare/vite-plugin": "1.70.1",
     "@cloudflare/workers-types": "catalog:",
     "@solidjs/vite-plugin": "catalog:",
     "@tailwindcss/vite": "catalog:",
