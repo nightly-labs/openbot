@@ -950,6 +950,11 @@ export class ProviderRuntime implements ProviderPort {
     for (const { client } of this.#confined.values()) if (client.releaseIdleThreads) yield* client.releaseIdleThreads();
   }).bind(this);
 
+  restartRelayedMcpServer(config: McpServerConfig): void {
+    for (const client of this.#clients.values()) client.restartRelayedMcpServer?.(config);
+    for (const { client } of this.#confined.values()) client.restartRelayedMcpServer?.(config);
+  }
+
   readonly releaseQuietBackgroundThreads = Effect.fn("ProviderRuntime.releaseQuietBackgroundThreads")(function* (
     this: ProviderRuntime,
   ) {

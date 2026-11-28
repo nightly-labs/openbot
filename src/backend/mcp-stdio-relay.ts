@@ -28,6 +28,7 @@ export interface StdioMcpLaunch {
   env: Record<string, string>;
   cwd: string;
   onStartAbandoned?: () => void;
+  onServerLost?: () => void;
 }
 
 export type RelayedMcpToolOutcome = { result: McpToolCallResult } | { error: string };
@@ -75,12 +76,18 @@ export const startStdioMcpRelay = Effect.fn("StdioMcpRelay.start")(function* (la
   const children = new Set<ChildProcess>();
   const running: RunningServer[] = [];
   const abandoned = new WeakSet<StreamableHTTPServerTransport>();
+  const stopped = new WeakSet<ChildProcess>();
   let starting: RunningServer | null = null;
   let closing = false;
 
   const authorized = (request: IncomingMessage) => {
     const header = Buffer.from(request.headers.authorization ?? "");
     return header.length === expected.length && timingSafeEqual(header, expected);
+  };
+
+  const stop = (child: ChildProcess) => {
+    stopped.add(child);
+    return stopServer(child);
   };
 
   const launchServer = (transport: StreamableHTTPServerTransport) => {
@@ -93,10 +100,14 @@ export const startStdioMcpRelay = Effect.fn("StdioMcpRelay.start")(function* (la
       const index = running.indexOf(entry);
       if (index >= 0) running.splice(index, 1);
     };
+    const lost = () => {
+      forget();
+      if (!closing && !stopped.has(child) && entry.output.transport) launch.onServerLost?.();
+    };
     children.add(child);
     running.push(entry);
-    child.once("exit", forget);
-    child.once("error", forget);
+    child.once("exit", lost);
+    child.once("error", lost);
     return entry;
   };
 
@@ -106,7 +117,7 @@ export const startStdioMcpRelay = Effect.fn("StdioMcpRelay.start")(function* (la
     if (!entry || !handshake || handshake.client !== handshakeClient(request)) return null;
     starting = null;
     if (handshake.answer && isJSONRPCErrorResponse(handshake.answer)) {
-      void stopServer(entry.child);
+      void stop(entry.child);
       return null;
     }
     entry.output.transport = transport;
@@ -157,7 +168,7 @@ export const startStdioMcpRelay = Effect.fn("StdioMcpRelay.start")(function* (la
       if (transport.sessionId) sessions.delete(transport.sessionId);
       if (!live || live.output.transport !== transport) return;
       if (abandoned.has(transport) && keepStarting(live)) return;
-      void stopServer(live.child);
+      void stop(live.child);
     };
     return transport;
   };

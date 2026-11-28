@@ -305,6 +305,8 @@ interface AcpTurn {
 type AcpSessionRestore = Omit<LoadSessionRequest, "sessionId">;
 
 interface SharedStdioRelay {
+  cwd: string;
+  name: string;
   launch: string;
   relay: Deferred.Deferred<StdioMcpRelay, ProviderClientOperationError>;
   replaced: Deferred.Deferred<StdioMcpRelay, ProviderClientOperationError>[];
@@ -1023,6 +1025,11 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
 
   relaysMcpServer(externalThreadId: string, config: McpServerConfig): boolean {
     return this.#relayFor(externalThreadId, config) !== undefined;
+  }
+
+  restartRelayedMcpServer(config: McpServerConfig): void {
+    for (const entry of this.#sharedRelays.values())
+      if (entry.name === this.sessionMcpServerName(config, entry.cwd)) entry.launch = "";
   }
 
   #relayFor(externalThreadId: string, config: McpServerConfig): StdioMcpRelay | undefined {
@@ -2158,7 +2165,14 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
         const key = this.#flavor.mcpServersPerDirectory ? JSON.stringify([cwd, server.name]) : null;
         const launch = JSON.stringify([server.command, server.args, server.env, server.cwd]);
         const shared = key === null ? undefined : this.#sharedRelays.get(key);
-        const entry: SharedStdioRelay = shared ?? { launch, relay: Deferred.makeUnsafe(), replaced: [], users: 0 };
+        const entry: SharedStdioRelay = shared ?? {
+          cwd,
+          name: server.name,
+          launch,
+          relay: Deferred.makeUnsafe(),
+          replaced: [],
+          users: 0,
+        };
         entry.users += 1;
         used.push({ key, entry });
         if (key !== null && !shared) this.#sharedRelays.set(key, entry);
@@ -2181,6 +2195,9 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
                   server.name,
                   sourceText("error.backend.mcpServerStartAbandoned", { provider: this.#label }),
                 ),
+              onServerLost: () => {
+                if (entry.relay === relay) entry.launch = "";
+              },
             }),
           ).pipe(
             Effect.flatMap((started) => {
