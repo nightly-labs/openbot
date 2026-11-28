@@ -113,6 +113,8 @@ export const messages = {
   "error.remote.fileTransportIsStopped": "Het WebRTC-bestandstransport is gestopt.",
   "error.remote.fileTooLarge": "Het bestand is groter dan 100 MB.",
   "error.remote.fileSetTooLarge": "De actieve set bestanden is groter dan 250 MB.",
+  "error.remote.fileSetBusy":
+    "Er worden te veel grote bestanden tegelijk overgezet. Wacht tot ze klaar zijn en probeer het dan opnieuw.",
   "error.remote.fileTransferTimeout": "De WebRTC-bestandsoverdracht duurde te lang.",
   "error.remote.fileTransferFailed": "De WebRTC-bestandsoverdracht is mislukt.",
   "error.remote.fileResumeFailed": "De WebRTC-bestandsoverdracht kon niet op tijd worden hervat.",

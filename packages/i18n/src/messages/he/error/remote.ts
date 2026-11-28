@@ -106,6 +106,7 @@ export const messages = {
   "error.remote.fileTransportIsStopped": "שכבת העברת הקבצים של WebRTC נעצרה.",
   "error.remote.fileTooLarge": "הקובץ גדול מ-100 MB.",
   "error.remote.fileSetTooLarge": "קבוצת הקבצים הפעילה גדולה מ-250 MB.",
+  "error.remote.fileSetBusy": "יותר מדי קבצים גדולים מועברים בו-זמנית. יש להמתין לסיום ההעברה ולנסות שוב.",
   "error.remote.fileTransferTimeout": "העברת הקובץ ב-WebRTC חרגה ממגבלת הזמן.",
   "error.remote.fileTransferFailed": "העברת הקובץ ב-WebRTC נכשלה.",
   "error.remote.fileResumeFailed": "לא ניתן היה להמשיך את העברת הקובץ ב-WebRTC לפני תום הזמן.",

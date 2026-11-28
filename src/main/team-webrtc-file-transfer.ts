@@ -26,6 +26,19 @@ const FILE_CHUNK_BYTES = 60 * 1024;
 const ACK_INTERVAL_BYTES = 1024 * 1024;
 const TRANSFER_RESUME_MILLISECONDS = 10 * 60_000;
 const STOPPED_WATCH_MILLISECONDS = 60_000;
+const SPOOL_BYTES = TEAM_PROTOCOL_V2_MAX_FILE_SET_BYTES + TEAM_PROTOCOL_V2_MAX_FILE_BYTES;
+
+interface SpoolReservation {
+  peerId: string;
+  size: number;
+  reserved: number;
+}
+
+function spoolReservation(expectedSize: number | undefined): number {
+  if (expectedSize === undefined || !Number.isSafeInteger(expectedSize) || expectedSize < 0)
+    return TEAM_PROTOCOL_V2_MAX_FILE_BYTES;
+  return Math.min(expectedSize, TEAM_PROTOCOL_V2_MAX_FILE_BYTES);
+}
 
 type BridgeEvents = TeamWebRtcBridge extends EventEmitter<infer Events> ? Events : never;
 type FileOpenFrame = Extract<TeamProtocolV2FileControlFrame, { type: "file-open" }>;
@@ -94,7 +107,8 @@ export class TeamWebRtcFileTransfer {
   readonly #acceptPeer: (peerId: string) => boolean;
   readonly #incoming = new Map<string, IncomingTransfer>();
   readonly #outgoing = new Map<string, OutgoingTransfer>();
-  readonly #writing = new Set<{ peerId: string; size: number }>();
+  readonly #writing = new Set<SpoolReservation>();
+  readonly #spoolWaiting = new Set<SpoolReservation>();
   readonly #completed = new Map<string, ReceivedWebRtcFile>();
   readonly #waitingOpens = new Map<string, { peerId: string; frame: FileOpenFrame }>();
   readonly #watches = new Set<IncomingWatch>();
@@ -134,7 +148,13 @@ export class TeamWebRtcFileTransfer {
   }
 
   hasActiveTransfers(): boolean {
-    return this.#incoming.size > 0 || this.#outgoing.size > 0 || this.#writing.size > 0 || this.#waitingOpens.size > 0;
+    return (
+      this.#incoming.size > 0 ||
+      this.#outgoing.size > 0 ||
+      this.#writing.size > 0 ||
+      this.#spoolWaiting.size > 0 ||
+      this.#waitingOpens.size > 0
+    );
   }
 
   readonly send = Effect.fn("TeamFileTransfer.send")(function* (
@@ -166,7 +186,12 @@ export class TeamWebRtcFileTransfer {
   readonly sendStream = Effect.fn("TeamFileTransfer.sendStream")(function* (
     this: TeamWebRtcFileTransfer,
     peerId: string,
-    input: { name: string; mimeType: string; body: AsyncIterable<Uint8Array> | Iterable<Uint8Array> },
+    input: {
+      name: string;
+      mimeType: string;
+      body: AsyncIterable<Uint8Array> | Iterable<Uint8Array>;
+      expectedSize?: number | undefined;
+    },
   ): Effect.fn.Return<{ transferId: string; size: number }, RemoteWorkflowError> {
     return yield* this.#owned(
       Effect.gen({ self: this }, function* () {
@@ -174,17 +199,23 @@ export class TeamWebRtcFileTransfer {
           return yield* new RemoteWorkflowError({
             cause: new Error(sourceText("error.remote.fileTransportIsStopped")),
           });
+        const { expectedSize } = input;
+        if (expectedSize !== undefined) yield* remoteDecode(() => this.#checkOutgoing(expectedSize));
         yield* remoteCall(() => mkdir(this.#directory, { recursive: true, mode: 0o700 }));
         const path = join(this.#directory, `${randomUUID()}.outgoing`);
         let file: FileHandle | null = null;
-        const pending = { peerId, size: 0 };
+        const deadline = Date.now() + this.#resumeMilliseconds;
+        const pending: SpoolReservation = { peerId, size: 0, reserved: spoolReservation(input.expectedSize) };
         return yield* Effect.acquireUseRelease(
           Effect.sync(() => {
-            this.#writing.add(pending);
+            this.#spoolWaiting.add(pending);
             recordRestartActivity();
           }),
           () =>
             Effect.gen({ self: this }, function* () {
+              yield* this.#waitUntilEffect(() => this.#reserveSpool(pending), deadline).pipe(
+                Effect.mapError((error) => this.#noRoomError(error)),
+              );
               const hash = createHash("sha256");
               const check = (size: number) => this.#checkSpool(pending, size);
               yield* remoteCall(() =>
@@ -206,23 +237,29 @@ export class TeamWebRtcFileTransfer {
               const source = yield* remoteCall(() => open(path, "r"));
               file = source;
               yield* remoteDecode(() => this.#checkOutgoing(size));
-              const transferId = yield* this.#sendOutgoingEffect(peerId, {
-                name: input.name,
-                mimeType: input.mimeType,
-                size,
-                sha256: hash.digest("hex"),
-                read: async (offset, length) => {
-                  const bytes = new Uint8Array(length);
-                  const { bytesRead } = await source.read(bytes, 0, length, offset);
-                  if (bytesRead !== length) throw new Error("The outgoing WebRTC file is incomplete.");
-                  return bytes;
+              const transferId = yield* this.#sendOutgoingEffect(
+                peerId,
+                {
+                  name: input.name,
+                  mimeType: input.mimeType,
+                  size,
+                  sha256: hash.digest("hex"),
+                  read: async (offset, length) => {
+                    const bytes = new Uint8Array(length);
+                    const { bytesRead } = await source.read(bytes, 0, length, offset);
+                    if (bytesRead !== length) throw new Error("The outgoing WebRTC file is incomplete.");
+                    return bytes;
+                  },
                 },
-              });
+                deadline,
+              );
               return { transferId, size };
             }),
           () =>
             Effect.gen({ self: this }, function* () {
+              this.#spoolWaiting.delete(pending);
               this.#writing.delete(pending);
+              this.#notifyStateChange();
               yield* remoteCall(() => (file ? file.close() : Promise.resolve())).pipe(Effect.catch(() => Effect.void));
               yield* remoteCall(() => rm(path, { force: true }));
             }),
@@ -237,13 +274,29 @@ export class TeamWebRtcFileTransfer {
       throw new TeamFileTooLargeError(sourceText("error.remote.fileTooLarge"));
   }
 
-  #checkSpool(own: { peerId: string; size: number }, size: number): void {
+  #heldSpoolBytes(peerId: string, except: SpoolReservation): number {
+    return [...this.#writing]
+      .filter((item) => item !== except && item.peerId === peerId)
+      .reduce((sum, item) => sum + Math.max(item.size, item.reserved), 0);
+  }
+
+  #reserveSpool(pending: SpoolReservation): boolean {
+    if (this.#heldSpoolBytes(pending.peerId, pending) + pending.reserved > SPOOL_BYTES) return false;
+    this.#spoolWaiting.delete(pending);
+    this.#writing.add(pending);
+    return true;
+  }
+
+  #checkSpool(own: SpoolReservation, size: number): void {
     this.#checkOutgoing(size);
-    const heldBytes = [...this.#writing]
-      .filter((item) => item !== own && item.peerId === own.peerId)
-      .reduce((sum, item) => sum + item.size, size);
-    if (heldBytes > TEAM_PROTOCOL_V2_MAX_FILE_SET_BYTES + TEAM_PROTOCOL_V2_MAX_FILE_BYTES)
-      throw new Error(sourceText("error.remote.fileSetTooLarge"));
+    if (this.#heldSpoolBytes(own.peerId, own) + size > SPOOL_BYTES)
+      throw new Error(sourceText("error.remote.fileSetBusy"));
+  }
+
+  #noRoomError(error: RemoteWorkflowError): RemoteWorkflowError {
+    return this.#stopped
+      ? error
+      : new RemoteWorkflowError({ cause: new Error(sourceText("error.remote.fileSetBusy")) });
   }
 
   #reserveOutgoing(transfer: OutgoingTransfer): boolean {
@@ -260,6 +313,7 @@ export class TeamWebRtcFileTransfer {
     this: TeamWebRtcFileTransfer,
     peerId: string,
     input: Pick<OutgoingTransfer, "name" | "mimeType" | "size" | "sha256" | "read" | "onProgress">,
+    deadline?: number,
   ): Effect.fn.Return<string, RemoteWorkflowError> {
     const transferId = randomUUID();
     const transfer: OutgoingTransfer = {
@@ -277,13 +331,10 @@ export class TeamWebRtcFileTransfer {
       onProgress: input.onProgress,
     };
     return yield* Effect.gen({ self: this }, function* () {
-      yield* this.#waitUntilEffect(() => this.#reserveOutgoing(transfer), Date.now() + this.#resumeMilliseconds).pipe(
-        Effect.mapError((error) =>
-          this.#stopped
-            ? error
-            : new RemoteWorkflowError({ cause: new Error(sourceText("error.remote.fileSetTooLarge")) }),
-        ),
-      );
+      yield* this.#waitUntilEffect(
+        () => this.#reserveOutgoing(transfer),
+        deadline ?? Date.now() + this.#resumeMilliseconds,
+      ).pipe(Effect.mapError((error) => this.#noRoomError(error)));
       recordRestartActivity();
       yield* this.#sendWithResumeEffect(transfer);
       return transferId;

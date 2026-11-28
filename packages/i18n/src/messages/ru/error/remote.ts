@@ -110,6 +110,8 @@ export const messages = {
   "error.remote.fileTransportIsStopped": "Файловый транспорт WebRTC остановлен.",
   "error.remote.fileTooLarge": "Файл больше 100 МБ.",
   "error.remote.fileSetTooLarge": "Активный набор файлов больше 250 МБ.",
+  "error.remote.fileSetBusy":
+    "Одновременно передаётся слишком много больших файлов. Дождитесь их завершения и повторите попытку.",
   "error.remote.fileTransferTimeout": "Время передачи файла по WebRTC истекло.",
   "error.remote.fileTransferFailed": "Передача файла по WebRTC не удалась.",
   "error.remote.fileResumeFailed": "Не удалось возобновить передачу файла по WebRTC до истечения срока.",

@@ -107,6 +107,8 @@ export const messages = {
   "error.remote.fileTransportIsStopped": "WebRTC 파일 전송이 중지되었어요.",
   "error.remote.fileTooLarge": "파일이 100MB보다 커요.",
   "error.remote.fileSetTooLarge": "활성 파일 세트가 250MB보다 커요.",
+  "error.remote.fileSetBusy":
+    "큰 파일을 한꺼번에 너무 많이 전송하고 있어요. 전송이 끝날 때까지 기다린 후 다시 시도해 주세요.",
   "error.remote.fileTransferTimeout": "WebRTC 파일 전송 시간이 초과되었어요.",
   "error.remote.fileTransferFailed": "WebRTC 파일 전송에 실패했어요.",
   "error.remote.fileResumeFailed": "WebRTC 파일 전송을 제한 시간 안에 재개할 수 없었어요.",
