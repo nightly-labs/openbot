@@ -964,6 +964,7 @@ export class ClaudeAgentClient extends EventEmitter<ClientEvents> {
     turn.prompt = { requestedId: null, message, retries: 0 };
     turn.messageIds.add(turnId);
     runtime.input.push(message);
+    yield* this.#forgetTurnDrop(threadId);
   });
 
   readonly releaseThread = Effect.fn("ClaudeAgentClient.releaseThread")(function* (
@@ -1560,7 +1561,7 @@ export class ClaudeAgentClient extends EventEmitter<ClientEvents> {
       Effect.catch((error) => {
         queryLogger.warn("Claude kept a refused message in its session.", {
           threadId,
-          error: redactText(String("cause" in error ? error.cause : error)),
+          error: redactText(String(error.cause ?? error)),
         });
         return Effect.succeed(false);
       }),
@@ -1584,6 +1585,8 @@ export class ClaudeAgentClient extends EventEmitter<ClientEvents> {
     const refused = runtime.refusedTurn;
     if (refused?.turnId !== turnId || runtime.activeTurn || !runtime.config.persistSession)
       return yield* providerFailure(new Error("Claude has no refused message to drop."));
+    if (runtime.backgroundTasks > 0 || runtime.awaitsResultTurn)
+      return yield* providerFailure(new Error("Claude keeps the refused message while background work runs."));
     yield* this.#threads.releaseNow(runtime);
     if (runtime.consume) yield* Fiber.await(runtime.consume);
     const anchor = yield* claudeTranscriptParent(
