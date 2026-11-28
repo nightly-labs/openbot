@@ -54,6 +54,8 @@ interface Account {
   credits: number;
   holds: Map<string, Hold>;
   processorSubmits: number;
+  posts: number;
+  queuedUntil: number;
   doneAt: number;
   failSaves: number;
   failPolls: number;
@@ -66,6 +68,8 @@ function account(credits: number): Account {
     credits,
     holds: new Map(),
     processorSubmits: 0,
+    posts: 0,
+    queuedUntil: 0,
     doneAt: Number.POSITIVE_INFINITY,
     failSaves: 0,
     failPolls: 0,
@@ -113,7 +117,7 @@ function gateway(state: Account): CreditMediaGateway {
           new CreditMediaGatewayFailed({ message: "Not found.", status: 404, code: "media_job_not_found" }),
         );
       if (hold.status === "released") return Effect.succeed(view(jobId, hold, "failed"));
-      if (!hold.providerJobId) return Effect.succeed(view(jobId, hold, "queued"));
+      if (!hold.providerJobId || state.now < state.queuedUntil) return Effect.succeed(view(jobId, hold, "queued"));
       if (state.now < state.doneAt) return Effect.succeed(view(jobId, hold, "processing"));
       hold.status = "charged";
       return Effect.succeed(view(jobId, hold, "completed"));
@@ -124,6 +128,7 @@ function gateway(state: Account): CreditMediaGateway {
     balance: () => Effect.sync(() => ({ wallet: "personal" as const, available: available(state) })),
     submit: (request) =>
       Effect.suspend(() => {
+        state.posts += 1;
         let hold = state.holds.get(request.jobId);
         if (!hold) {
           if (available(state) < PRICE)
@@ -229,6 +234,16 @@ async function clientChecks() {
     },
   );
 
+  const queued = account(155);
+  queued.queuedUntil = queued.now + 8 * MINUTE;
+  queued.doneAt = queued.now + 9 * MINUTE;
+  const queuedExit = await drive(queued, makeVideo(workflowsOf(queued)));
+  check(
+    "a job that waits in the processor queue is not sent again",
+    Exit.isSuccess(queuedExit) && queued.posts === 1 && queued.processorSubmits === 1,
+    { posts: queued.posts, submits: queued.processorSubmits },
+  );
+
   const down = account(155);
   down.pollsDown = true;
   const downExit = await drive(down, makeVideo(workflowsOf(down)));
@@ -282,14 +297,18 @@ async function toolChecks() {
     const first = await callTool(VIDEO_ARGS, () => {
       if ([...state.holds.values()].some((hold) => hold.providerJobId)) state.pollsDown = true;
     });
+    const stillDown = await callTool(VIDEO_ARGS);
+    const holdsWhileDown = state.holds.size;
     state.pollsDown = false;
     const afterFailure = available(state);
     state.doneAt = state.now;
     const retried = await callTool(Object.fromEntries(Object.entries(VIDEO_ARGS).reverse()));
     const afterRetry = { holds: holdStates(state), shown: [...shown], available: available(state) };
     check(
-      "when the account service stays down, the agent call fails, and the same call again (in any key order) gets the first video with one charge, also when the hold leaves too few credits for a new job",
+      "when the account service stays down, the agent call fails; a repeat while it is still down keeps the first job; the same call later (in any key order) gets the first video with one charge, also when the hold leaves too few credits for a new job",
       failing(first) &&
+        failing(stillDown) &&
+        holdsWhileDown === 1 &&
         afterFailure < PRICE &&
         succeeded(retried) &&
         afterRetry.shown.length === 1 &&

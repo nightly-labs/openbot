@@ -738,8 +738,14 @@ export class CreditMediaTools {
   ) {
     const earlier = this.#unfinished.get(key);
     if (!earlier || !this.#options.agentsAllowed()) return null;
+    const live =
+      Date.now() - earlier.at <= UNFINISHED_JOB_MS ? yield* Effect.result(media.unfinished(earlier.jobId)) : null;
+    if (live?._tag === "Failure") {
+      run.facts.outcome = "failed";
+      return failure(live.failure.message);
+    }
     this.#unfinished.delete(key);
-    if (Date.now() - earlier.at > UNFINISHED_JOB_MS || !(yield* media.unfinished(earlier.jobId))) return null;
+    if (!live?.success) return null;
     const read = yield* Effect.result(call.readInputs(earlier.roles.map(({ path }) => path)));
     if (read._tag === "Failure" || inputsDigest(read.success) !== earlier.digest) return null;
     run.facts.agentModel = earlier.planned.model.id;

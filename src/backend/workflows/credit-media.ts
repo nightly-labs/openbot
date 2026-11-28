@@ -241,6 +241,7 @@ export class CreditMediaWorkflows {
   readonly #options: CreditMediaWorkflowsOptions;
   readonly #lock = Semaphore.makeUnsafe(1);
   #listed: Listed | null = null;
+  readonly #unsent = new Set<string>();
 
   constructor(options: CreditMediaWorkflowsOptions) {
     this.#options = options;
@@ -446,7 +447,10 @@ export class CreditMediaWorkflows {
       return yield* mediaFail(sourceText("error.workflow.creditMediaPromptRequired"));
     const uploads = yield* this.#uploads(read, model, images);
     const gateway = this.#options.gateway;
-    return yield* this.#again(gateway.submit(job, uploads), patient).pipe(
+    const submit = gateway
+      .submit(job, uploads)
+      .pipe(Effect.tapError(() => Effect.sync(() => patient && this.#unsent.add(job.jobId))));
+    return yield* this.#again(submit, patient).pipe(
       Effect.catchIf(
         (failure) => failure.code === CREDIT_JOB_CONFLICT,
         () => this.#again(gateway.job(job.jobId), patient),
@@ -478,10 +482,12 @@ export class CreditMediaWorkflows {
     while (job.status === "queued" || job.status === "processing") {
       const seconds = Math.min(POLL_MAX_SECONDS, Math.max(POLL_MIN_SECONDS, job.pollAfterSeconds));
       yield* Effect.sleep(Duration.seconds(seconds));
-      if (patient && job.status === "queued" && this.#now() - submittedAt >= RESUBMIT_AFTER_MS) {
+      const unsent = patient && job.status === "queued" && this.#unsent.has(started.jobId);
+      if (unsent && this.#now() - submittedAt >= RESUBMIT_AFTER_MS) {
         submittedAt = this.#now();
         job = yield* start(started.jobId);
       } else job = yield* this.#again(gateway.job(started.jobId), patient).pipe(Effect.mapError(failedOf));
+      if (job.status !== "queued") this.#unsent.delete(started.jobId);
     }
     return job;
   });
@@ -517,7 +523,7 @@ export class CreditMediaWorkflows {
     this: CreditMediaWorkflows,
     jobId: string,
   ) {
-    const found = yield* this.#existing(jobId, true).pipe(Effect.orElseSucceed(() => null));
+    const found = yield* this.#existing(jobId, true);
     return found !== null && found.status !== "failed" && found.status !== "canceled";
   }).bind(this);
 
