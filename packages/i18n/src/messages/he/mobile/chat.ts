@@ -687,6 +687,8 @@ export const messages = {
   "mobile.chat.context.label": "ההקשר מלא ב-{percent}",
   "mobile.chat.context.labelEstimated": "ההקשר מלא בכ-{percent}",
   "mobile.chat.context.labelCompacting": "מכווץ את ההקשר",
+  "mobile.chat.context.labelUnknown": "גודל ההקשר עדיין לא ידוע",
+  "mobile.chat.context.unknown": "גודל ההקשר יוצג אחרי התשובה הבאה.",
   "mobile.chat.context.title": "הקשר",
   "mobile.chat.context.percent": "מלא ב-{percent}",
   "mobile.chat.context.tokens": "{used} מתוך {total} טוקנים",

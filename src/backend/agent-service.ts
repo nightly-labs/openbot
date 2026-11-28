@@ -336,7 +336,7 @@ import {
 } from "./agent/workflow-generation-error";
 import { confinedWritesAllowed, effectiveAgentFolders } from "./agent/workspace-sandbox";
 import type { AgentApiKeys } from "./agent-api-keys";
-import { type AgentProvider, fixedContextCompaction } from "./agent-client";
+import { type AgentClient, type AgentProvider, fixedContextCompaction } from "./agent-client";
 import type { AgentTables } from "./agent-data/agent-tables";
 import {
   AgentHistoryTransfer,
@@ -1027,6 +1027,7 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
               Effect.sync(() => {
                 this.#drain.scheduleDrains(this.#store.list().map((agent) => agent.id));
                 for (const agentId of this.#mailbox.agentsWithEditHolds()) this.#queue.wakeAfterEditHold(agentId);
+                if (!this.#stopping) this.#emitRuntimeSnapshot();
               }),
             ),
             toProviderOperationFailed,
@@ -1249,6 +1250,8 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
       rotateSession: (agentId, client, threadId) => this.#threads.rotateProviderSession(agentId, client, threadId),
       loadSession: (agentId, client, threadId) => this.#threads.loadSessionForCompaction(agentId, client, threadId),
       rotatesSession: (agentId, threadId) => this.#threads.rotatesSession(agentId, threadId),
+      runningCompactionMode: (agent) =>
+        this.#providers.agentClientRunning(agent) ? this.#compactionMode(agent) : undefined,
       isStopping: () => this.#stopping,
       compacted: (threadId) => {
         this.channels.contextCompacted(threadId);
@@ -5066,6 +5069,7 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
         throw new ContextCompactRefusedError(sourceText("error.agent.waitBeforeCompactContext"));
       if (!session || !this.#compaction.reserve(agent.id, session.externalSessionId, true))
         throw new ContextCompactRefusedError(sourceText("error.agent.compactContextUnavailable"));
+      this.#conversation.bindThread(session.externalSessionId, agent.id, task.threadId);
       return session.externalSessionId;
     });
     yield* this.#compaction.request(input.agentId, externalThreadId);
@@ -5278,8 +5282,12 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
   }
 
   #mayCompactOnRequest(agent: AgentSummary): boolean {
-    const mode = this.#providers.lastCompactionMode(agent) ?? fixedContextCompaction(agent.provider);
+    const mode = this.#compactionMode(agent);
     return mode === undefined || compactsOnRequest(mode);
+  }
+
+  #compactionMode(agent: AgentSummary): AgentClient["contextCompaction"] {
+    return this.#providers.lastCompactionMode(agent) ?? fixedContextCompaction(agent.provider);
   }
 
   #startRequestedNewChat(agentId: string, queuedRuns: readonly string[] = []): Effect.Effect<void> {

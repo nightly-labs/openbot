@@ -73,6 +73,22 @@ export function ContextUsageScreen() {
         <SettingsNote>{t("mobile.chat.context.unavailable")}</SettingsNote>
       </SettingsContent>
     );
+  const compactSection =
+    agent && canCompactHere && !viewOnly && canCompact(usage) ? (
+      <AgentCompactSection agent={agent} available taskId={taskId} compacting={usage.compacting} />
+    ) : null;
+  const newChatSection =
+    agent && !taskId && canStartNewChat && !viewOnly ? (
+      <AgentNewChatSection agent={agent} available={!usage.compacting} />
+    ) : null;
+  if (usage.sizeUnknown)
+    return (
+      <SettingsContent>
+        <SettingsNote>{t("mobile.chat.context.unknown")}</SettingsNote>
+        {compactSection}
+        {newChatSection}
+      </SettingsContent>
+    );
   const share = usedShare(usage);
   const level = contextMeterLevel(usage);
   const percentColor = level === "warning" ? warning : level === "danger" ? danger : undefined;
@@ -149,12 +165,8 @@ export function ContextUsageScreen() {
           ))}
         </SettingsSection>
       ) : null}
-      {agent && canCompactHere && !viewOnly && canCompact(usage) ? (
-        <AgentCompactSection agent={agent} available taskId={taskId} compacting={usage.compacting} />
-      ) : null}
-      {agent && !taskId && canStartNewChat && !viewOnly ? (
-        <AgentNewChatSection agent={agent} available={!usage.compacting} />
-      ) : null}
+      {compactSection}
+      {newChatSection}
     </SettingsContent>
   );
 }

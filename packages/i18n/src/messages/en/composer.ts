@@ -153,6 +153,8 @@ export const messages = defineMessages("composer", {
   "composer.context.label": "Context {percent} full",
   "composer.context.labelEstimated": "Context about {percent} full",
   "composer.context.labelCompacting": "Compacting context",
+  "composer.context.labelUnknown": "Context size not known yet",
+  "composer.context.unknown": "The context size shows after the next reply.",
   "composer.context.title": "Context",
   "composer.context.percent": "{percent} full",
   "composer.context.tokens": "{used} of {total} tokens",

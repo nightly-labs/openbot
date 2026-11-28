@@ -7,21 +7,36 @@ export interface ContextUsageView {
   autoCompactAt: number | null;
   nativeManaged: boolean;
   estimated: boolean;
+  sizeUnknown: boolean;
   compacting: boolean;
   lastCompaction: { beforeTokens: number; afterTokens: number } | null;
   categories: readonly { category: AgentContextCategory; tokens: number }[];
 }
 
 export function contextUsageView(state: AgentContextState | undefined): ContextUsageView | undefined {
-  const usage = state?.usage;
-  if (!usage) return undefined;
-  const compaction = state.compaction;
+  if (!state) return undefined;
+  const { usage, compaction } = state;
+  if (!usage)
+    return compaction === null || compaction.status === "running"
+      ? {
+          usedTokens: 0,
+          windowTokens: 0,
+          autoCompactAt: null,
+          nativeManaged: false,
+          estimated: false,
+          sizeUnknown: true,
+          compacting: compaction !== null,
+          lastCompaction: null,
+          categories: [],
+        }
+      : undefined;
   return {
     usedTokens: usage.usedTokens,
     windowTokens: usage.windowTokens,
     autoCompactAt: usage.autoCompactAt,
     nativeManaged: usage.nativeManaged,
     estimated: usage.estimated ?? false,
+    sizeUnknown: false,
     compacting: compaction?.status === "running",
     lastCompaction:
       compaction?.status === "completed" &&
@@ -47,7 +62,7 @@ export function contextMeterLevel(usage: ContextUsageView): ContextMeterLevel {
 }
 
 export function canCompact(usage: ContextUsageView): boolean {
-  return usage.autoCompactAt !== null;
+  return usage.sizeUnknown || usage.autoCompactAt !== null;
 }
 
 export const CONTEXT_CATEGORY_LABEL = {

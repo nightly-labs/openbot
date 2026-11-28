@@ -145,6 +145,8 @@ export const messages = {
   "composer.context.label": "上下文已用 {percent}",
   "composer.context.labelEstimated": "上下文约已用 {percent}",
   "composer.context.labelCompacting": "正在压缩上下文",
+  "composer.context.labelUnknown": "上下文大小暂未知",
+  "composer.context.unknown": "下一次回复后显示上下文大小。",
   "composer.context.title": "上下文",
   "composer.context.percent": "已用 {percent}",
   "composer.context.tokens": "{used} / {total} 个 token",

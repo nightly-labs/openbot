@@ -677,6 +677,8 @@ export const messages = {
   "mobile.chat.context.label": "Bağlam {percent} dolu",
   "mobile.chat.context.labelEstimated": "Bağlam yaklaşık {percent} dolu",
   "mobile.chat.context.labelCompacting": "Bağlam sıkıştırılıyor",
+  "mobile.chat.context.labelUnknown": "Bağlam boyutu henüz bilinmiyor",
+  "mobile.chat.context.unknown": "Bağlam boyutu bir sonraki yanıttan sonra görünür.",
   "mobile.chat.context.title": "Bağlam",
   "mobile.chat.context.percent": "{percent} dolu",
   "mobile.chat.context.tokens": "{used} / {total} token",

@@ -650,6 +650,8 @@ export const messages = {
   "mobile.chat.context.label": "上下文已用 {percent}",
   "mobile.chat.context.labelEstimated": "上下文约已用 {percent}",
   "mobile.chat.context.labelCompacting": "正在压缩上下文",
+  "mobile.chat.context.labelUnknown": "上下文大小暂未知",
+  "mobile.chat.context.unknown": "下一次回复后显示上下文大小。",
   "mobile.chat.context.title": "上下文",
   "mobile.chat.context.percent": "已用 {percent}",
   "mobile.chat.context.tokens": "{used} / {total} 个 token",

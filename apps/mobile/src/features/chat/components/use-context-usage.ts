@@ -55,9 +55,12 @@ export function useComposerContextMeter(chat: ContextChat): ComposerContextMeter
       share,
       level: contextMeterLevel(usage),
       compacting: usage.compacting,
+      sizeUnknown: usage.sizeUnknown,
       label: usage.compacting
         ? t("mobile.chat.context.labelCompacting")
-        : t(usage.estimated ? "mobile.chat.context.labelEstimated" : "mobile.chat.context.label", { percent }),
+        : usage.sizeUnknown
+          ? t("mobile.chat.context.labelUnknown")
+          : t(usage.estimated ? "mobile.chat.context.labelEstimated" : "mobile.chat.context.label", { percent }),
       onPress,
     };
   }, [usage, t, format, onPress]);

@@ -671,6 +671,8 @@ export const messages = {
   "mobile.chat.context.label": "コンテキスト使用率 {percent}",
   "mobile.chat.context.labelEstimated": "コンテキスト使用率 約 {percent}",
   "mobile.chat.context.labelCompacting": "コンテキストを圧縮しています",
+  "mobile.chat.context.labelUnknown": "コンテキストのサイズはまだ不明です",
+  "mobile.chat.context.unknown": "コンテキストのサイズは次の返信の後に表示されます。",
   "mobile.chat.context.title": "コンテキスト",
   "mobile.chat.context.percent": "{percent} 使用中",
   "mobile.chat.context.tokens": "{used} / {total} トークン",

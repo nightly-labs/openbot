@@ -155,6 +155,8 @@ export const messages = {
   "composer.context.label": "コンテキスト使用率 {percent}",
   "composer.context.labelEstimated": "コンテキスト使用率 約 {percent}",
   "composer.context.labelCompacting": "コンテキストを圧縮しています",
+  "composer.context.labelUnknown": "コンテキストのサイズはまだ不明です",
+  "composer.context.unknown": "コンテキストのサイズは次の返信の後に表示されます。",
   "composer.context.title": "コンテキスト",
   "composer.context.percent": "{percent} 使用中",
   "composer.context.tokens": "{used} / {total} トークン",
