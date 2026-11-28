@@ -3,11 +3,12 @@ import { REMOTE_AUTH_EVENT_DELIVERED, REMOTE_AUTH_EVENT_RETENTION_MS } from "./r
 
 const RATE_LIMIT_WINDOW_MS = 15 * 60_000;
 const CREDIT_CODE_LIMIT_WINDOW_MS = 60 * 60_000;
+const RATE_LIMIT_PRUNE_CHUNK = 1_000;
+const RATE_LIMIT_PRUNE_CHUNKS_PER_RUN = 10;
 
 export interface AuthRetentionResult {
   challenges: number;
   sessions: number;
-  rateLimits: number;
   creditCodeLimits: number;
   teamTickets: number;
   remoteSessions: number;
@@ -36,11 +37,6 @@ function authRetentionOperations(now: number): AuthRetentionOperation[] {
       name: "sessions",
       sql: "DELETE FROM auth_sessions WHERE expires_at <= ? OR revoked_at IS NOT NULL",
       cutoff: now,
-    },
-    {
-      name: "rateLimits",
-      sql: "DELETE FROM auth_rate_limits WHERE window_start <= ?",
-      cutoff: now - RATE_LIMIT_WINDOW_MS,
     },
     {
       name: "creditCodeLimits",
@@ -128,7 +124,6 @@ const prune = Effect.fn("AuthRetention.prune")(function* (now: number) {
   const deleted: AuthRetentionResult = {
     challenges: 0,
     sessions: 0,
-    rateLimits: 0,
     creditCodeLimits: 0,
     teamTickets: 0,
     remoteSessions: 0,
@@ -147,4 +142,31 @@ const prune = Effect.fn("AuthRetention.prune")(function* (now: number) {
 
 export function pruneExpiredAuthData(database: D1Database, now: number) {
   return prune(now).pipe(Effect.provide(Layer.succeed(AuthRetentionDatabase)(database)));
+}
+
+const pruneRateLimits = Effect.fn("AuthRetention.pruneRateLimits")(function* (now: number) {
+  const database = yield* AuthRetentionDatabase;
+  let deleted = 0;
+  for (let chunk = 0; chunk < RATE_LIMIT_PRUNE_CHUNKS_PER_RUN; chunk += 1) {
+    const result = yield* Effect.tryPromise({
+      try: () =>
+        database
+          .prepare(
+            `DELETE FROM auth_rate_limits WHERE rowid IN (
+               SELECT rowid FROM auth_rate_limits WHERE window_start <= ? LIMIT ?
+             )`,
+          )
+          .bind(now - RATE_LIMIT_WINDOW_MS, RATE_LIMIT_PRUNE_CHUNK)
+          .run(),
+      catch: () => new AuthRetentionError({ message: "Rate limit retention failed." }),
+    });
+    const changes = result.meta.changes ?? 0;
+    deleted += changes;
+    if (changes < RATE_LIMIT_PRUNE_CHUNK) break;
+  }
+  return deleted;
+});
+
+export function pruneExpiredRateLimits(database: D1Database, now: number) {
+  return pruneRateLimits(now).pipe(Effect.provide(Layer.succeed(AuthRetentionDatabase)(database)));
 }
