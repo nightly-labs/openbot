@@ -10,6 +10,7 @@ export function keepNewMessagesLast(
   now = Date.now(),
 ): void {
   if (messages.length === 0) return;
+  keepMovedDeliveryTimes(db, threadId, messages);
   const hostTime = new Date(now).toISOString();
   const newestSaved = newestSavedTime(db, threadId);
   if (newestSaved === null || newestSaved <= hostTime) return;
@@ -35,6 +36,26 @@ export function keepNewMessagesLast(
   for (const message of moving) {
     latest += 1;
     message.createdAt = new Date(latest).toISOString();
+  }
+}
+
+function keepMovedDeliveryTimes(db: DatabaseSync, threadId: string, messages: readonly ConversationMessage[]): void {
+  const deliveries = messages.filter((message) => message.delivery && !message.steered);
+  if (deliveries.length === 0) return;
+  const rows = databaseRows(
+    cachedStatement(
+      db,
+      `SELECT message_id, created_at FROM projection_thread_messages
+       WHERE thread_id = ? AND message_id IN (SELECT value FROM json_each(?))
+         AND json_extract(message_json, '$.steered') IS NOT 1`,
+    ).all(threadId, JSON.stringify(deliveries.map((message) => message.id))),
+  );
+  const savedTimes = new Map(
+    rows.map((row) => [requiredStringColumn(row, "message_id"), requiredStringColumn(row, "created_at")]),
+  );
+  for (const message of deliveries) {
+    const savedTime = savedTimes.get(message.id);
+    if (savedTime !== undefined && message.createdAt < savedTime) message.createdAt = savedTime;
   }
 }
 

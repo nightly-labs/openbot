@@ -6,18 +6,24 @@ import { join, resolve } from "node:path";
 import type { AgentEvent, ConversationMessage, ConversationSnapshot } from "@openbot/contracts/ipc";
 import { ConversationRuntime } from "../src/backend/agent/conversation-runtime";
 import { AgentStore } from "../src/backend/agent-store";
+import { refreshThreadOrder } from "../src/backend/database/thread-message-order";
 import { runCauseEffect } from "../src/backend/effect-boundary";
 import { OpenBotDatabase } from "../src/backend/openbot-database";
 
 const OUT = resolve(import.meta.dirname, "../.openbot-build/new-messages-after-clock-correction-e2e");
 const FAST_CLOCK_MS = 3 * 60 * 60 * 1000;
 const FUTURE_TURNS = 60;
+const CLOCK_CATCH_UP = "-4 hours";
+const CLOCK_CATCH_UP_MS = 4 * 60 * 60 * 1000;
+const QUEUED_BEFORE_STEER_MS = 60_000;
 
 type CaseName =
   | "clock-corrected"
   | "reply-listed-first"
   | "mailbox-copy-keeps-moved-time"
+  | "clock-caught-up"
   | "normal-clock"
+  | "steer-requeued"
   | "older-history";
 
 interface CaseReport {
@@ -70,13 +76,17 @@ async function runCase(name: CaseName, result: CaseReport): Promise<void> {
       threadId,
       activeTurnId: null,
       revision: 0,
-      messages: name === "normal-clock" ? [pastPrompt] : [pastPrompt, ...futureTurns(now)],
+      messages: name === "normal-clock" || name === "steer-requeued" ? [pastPrompt] : [pastPrompt, ...futureTurns(now)],
     };
     conversation.emitConversation(seeded, "e2e.seeded", {});
 
     const held = conversation.ensureSnapshot(agent.id, threadId);
     const sentAt = Date.now();
-    const prompt = message("new-prompt", "new-turn", "user", sentAt);
+    const delivered = (createdAt: number): ConversationMessage => ({
+      ...message("new-prompt", "new-turn", "user", createdAt),
+      delivery: { id: "new-prompt", status: "completed", position: null },
+    });
+    const prompt = delivered(sentAt);
     const reply = message("new-reply", "new-turn", "assistant", sentAt + 1);
     const history = message("older-history", "history-turn", "user", now - 2 * 60 * 60 * 1000);
     const added =
@@ -86,11 +96,32 @@ async function runCase(name: CaseName, result: CaseReport): Promise<void> {
 
     if (name === "mailbox-copy-keeps-moved-time") {
       const index = held.messages.findIndex((candidate) => candidate.id === prompt.id);
-      held.messages[index] = {
-        ...message(prompt.id, prompt.turnId ?? "", "user", sentAt),
-        delivery: { id: prompt.id, status: "completed", position: null },
-      };
+      held.messages[index] = delivered(sentAt);
       conversation.emitConversation(held);
+    }
+
+    if (name === "steer-requeued") {
+      const promptIndex = () => held.messages.findIndex((candidate) => candidate.id === prompt.id);
+      held.messages[promptIndex()] = { ...delivered(sentAt), steered: true };
+      conversation.emitConversation(held);
+      held.messages[promptIndex()] = delivered(sentAt - QUEUED_BEFORE_STEER_MS);
+      conversation.emitConversation(held);
+    }
+
+    if (name === "clock-caught-up") {
+      database.connection
+        .prepare(
+          "UPDATE projection_thread_messages SET created_at = strftime('%Y-%m-%dT%H:%M:%fZ', created_at, ?) WHERE thread_id = ?",
+        )
+        .run(CLOCK_CATCH_UP, threadId);
+      refreshThreadOrder(database.connection, threadId);
+      database.persistConversationChanges({
+        agentId: agent.id,
+        threadId,
+        activeTurnId: null,
+        changedMessages: [delivered(sentAt - CLOCK_CATCH_UP_MS)],
+        eventType: "conversation.mailbox-reconciled",
+      });
     }
 
     const page = database.readConversationPage(agent.id, threadId, { type: "latest" }, 40);
@@ -112,6 +143,12 @@ async function runCase(name: CaseName, result: CaseReport): Promise<void> {
     if (name === "older-history") {
       assert.equal(stored.get(history.id), history.createdAt, "older history keeps its own time");
       assert.ok(!result.latestPageTail.includes(history.id), "older history is not moved to the end");
+    } else if (name === "steer-requeued") {
+      assert.equal(
+        stored.get(prompt.id),
+        new Date(sentAt - QUEUED_BEFORE_STEER_MS).toISOString(),
+        "a requeued steer goes back to its own time",
+      );
     } else if (name === "normal-clock") {
       assert.equal(stored.get(prompt.id), prompt.createdAt, "a normal clock keeps the prompt time");
       assert.equal(stored.get(reply.id), reply.createdAt, "a normal clock keeps the reply time");
@@ -122,11 +159,12 @@ async function runCase(name: CaseName, result: CaseReport): Promise<void> {
       assert.ok((stored.get(reply.id) ?? "") > (stored.get(prompt.id) ?? ""), "the reply stays after its prompt");
       assert.deepEqual(result.latestPageTail.slice(-2), [prompt.id, reply.id], "the latest page ends with them");
       assert.deepEqual(result.publishedTail.slice(-2), [prompt.id, reply.id], "the live chat ends with them");
-      assert.equal(
-        held.messages.find((candidate) => candidate.id === prompt.id)?.createdAt,
-        stored.get(prompt.id),
-        "the live chat and the database have the same time",
-      );
+      if (name !== "clock-caught-up")
+        assert.equal(
+          held.messages.find((candidate) => candidate.id === prompt.id)?.createdAt,
+          stored.get(prompt.id),
+          "the live chat and the database have the same time",
+        );
     }
     result.passed = true;
   } finally {
@@ -140,7 +178,9 @@ const names: CaseName[] = [
   "clock-corrected",
   "reply-listed-first",
   "mailbox-copy-keeps-moved-time",
+  "clock-caught-up",
   "normal-clock",
+  "steer-requeued",
   "older-history",
 ];
 for (const name of names) {
