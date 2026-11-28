@@ -182,6 +182,7 @@ import {
   visualReplyFileName,
   visualReplyMessageId,
 } from "./delivery-content";
+import { READ_DOCUMENT_MAX_FILE_BYTES, readDocumentToolSchema, readPdfText } from "./document-reader";
 import type { DrainScheduler } from "./drain-scheduler";
 import type { FeedbackWithdrawal } from "./feedback-withdrawal";
 import { HistoryTools, historyCursorThread, isHistoryBrowse, MAIN_CHAT_TASK_ID } from "./history-tools";
@@ -1070,6 +1071,7 @@ export class OpenBotToolRouter {
               tool === "list_channels" ||
               tool === "attach_files_to_response" ||
               tool === "read_image" ||
+              tool === "read_document" ||
               tool === "list_library_folders" ||
               tool === "organize_library" ||
               tool === "send_message" ||
@@ -1094,7 +1096,7 @@ export class OpenBotToolRouter {
             );
             if (tool === "attach_files_to_response" || tool === "html_render" || tool === "set_backdrop")
               yield* Effect.uninterruptible(response);
-            else if (tool === "web_search" || tool === "read_video") {
+            else if (tool === "web_search" || tool === "read_video" || tool === "read_document") {
               if (toolRequest.signal?.aborted) return;
               yield* response.pipe(Effect.raceFirst(requestAborted(toolRequest.signal)));
             } else yield* response;
@@ -2119,6 +2121,10 @@ export class OpenBotToolRouter {
       return yield* this.#readImage(senderAgentId, params);
     }
 
+    if (params.tool === "read_document") {
+      return yield* this.#readDocument(senderAgentId, params);
+    }
+
     if (params.tool === "list_sites") {
       return openBotToolResult(yield* this.#hostedSites.listSites());
     }
@@ -2919,6 +2925,44 @@ export class OpenBotToolRouter {
         { type: "inputImage", imageUrl: dataUrl },
       ],
     } satisfies DynamicToolResult;
+  });
+
+  readonly #readDocument = Effect.fn("OpenBotToolRouter.readDocument")(function* (
+    this: OpenBotToolRouter,
+    senderAgentId: string,
+    params: DynamicToolCallParams,
+  ) {
+    const parsed = readDocumentToolSchema.safeParse(params.arguments, { reportInput: true });
+    if (!parsed.success) return openBotToolFailure(profileToolErrorMessage(parsed.error));
+    const bytes = yield* Effect.acquireUseRelease(
+      this.#attachments.openSources(senderAgentId, [parsed.data.path], { allowAnyReadablePath: true }),
+      ([source]) =>
+        attachmentCall(async () => {
+          if (!source) throw new Error("The PDF file was not found.");
+          const { size } = await source.handle.stat();
+          if (size === 0) throw new Error("The PDF file is empty. Ask the user to attach the PDF again.");
+          if (size > READ_DOCUMENT_MAX_FILE_BYTES)
+            throw new Error(`The PDF file is larger than ${READ_DOCUMENT_MAX_FILE_BYTES / 1024 / 1024} MB.`);
+          const bytes = Buffer.alloc(size);
+          const { bytesRead } = await source.handle.read(bytes, 0, size, 0);
+          return new Uint8Array(bytes.buffer, bytes.byteOffset, bytesRead);
+        }),
+      (sources) => Effect.promise(() => Promise.allSettled(sources.map((source) => source.handle.close()))),
+    );
+    return yield* readPdfText(bytes, parsed.data.firstPage ?? 1).pipe(
+      Effect.map(
+        ({ text, note, ...pages }): DynamicToolResult => ({
+          success: true,
+          contentItems: [
+            { type: "inputText", text: JSON.stringify({ ...pages, note }) },
+            { type: "inputText", text: this.#hooks.redactMcpForAgent(text) },
+          ],
+        }),
+      ),
+      Effect.catchTag("DocumentReadFailed", (failure) =>
+        Effect.succeed(openBotToolFailure(this.#hooks.redactMcp(failure.reason))),
+      ),
+    );
   });
 
   readonly #readVideo = Effect.fn("OpenBotToolRouter.readVideo")(function* (
