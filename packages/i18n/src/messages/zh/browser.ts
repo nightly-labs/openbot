@@ -107,7 +107,7 @@ export const messages = {
   "browser.secret.failed": "无法完成该请求，请检查连接后重试。",
   "browser.secret.ended": "此登录请求已结束。请让助手再试一次。",
   "browser.secret.vaultSkip.agentScript":
-    "由于助手在此页面上运行了脚本，OpenBot 没有使用你保存的登录信息。如需使用，请让助手重新加载页面后再试一次。",
+    "由于助手在此网站上运行了脚本，OpenBot 没有使用你保存的登录信息。如需使用，请关闭此网站的其他标签页，然后让助手重新加载页面后再试一次。",
   "browser.secret.vaultSkip.fieldKind": "由于助手在页面上选择了错误的字段，OpenBot 没有使用你保存的登录信息。",
   "browser.secret.vaultSkip.loginChoice":
     "由于助手没有选择此网站已保存的任何一个登录信息，OpenBot 没有使用已保存的登录信息。请告诉助手要使用哪个账户。",

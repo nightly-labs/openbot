@@ -101,7 +101,7 @@ export const messages = {
   "browser.secret.failed": "Não foi possível concluir a solicitação. Verifique a conexão e tente novamente.",
   "browser.secret.ended": "Esta solicitação de login terminou. Peça ao agente que tente de novo.",
   "browser.secret.vaultSkip.agentScript":
-    "O OpenBot não usou seu login salvo porque o agente executou um script nesta página. Para usá-lo, peça ao agente que recarregue a página e tente de novo.",
+    "O OpenBot não usou seu login salvo porque um agente executou um script neste site. Para usá-lo, feche as outras abas deste site e depois peça ao agente que recarregue a página e tente de novo.",
   "browser.secret.vaultSkip.fieldKind":
     "O OpenBot não usou seu login salvo porque o agente escolheu o campo errado na página.",
   "browser.secret.vaultSkip.loginChoice":

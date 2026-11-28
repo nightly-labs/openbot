@@ -108,7 +108,7 @@ export const messages = {
   "browser.secret.failed": "Het verzoek kan niet worden voltooid. Controleer de verbinding en probeer het opnieuw.",
   "browser.secret.ended": "Dit aanmeldverzoek is beëindigd. Vraag de agent het nog eens te proberen.",
   "browser.secret.vaultSkip.agentScript":
-    "OpenBot heeft je opgeslagen login niet gebruikt, omdat de agent een script op deze pagina heeft uitgevoerd. Vraag de agent de pagina opnieuw te laden en het nog eens te proberen.",
+    "OpenBot heeft je opgeslagen login niet gebruikt, omdat een agent een script op deze site heeft uitgevoerd. Sluit de andere tabbladen van deze site en vraag de agent daarna de pagina opnieuw te laden en het nog eens te proberen.",
   "browser.secret.vaultSkip.fieldKind":
     "OpenBot heeft je opgeslagen login niet gebruikt, omdat de agent het verkeerde veld op de pagina heeft gekozen.",
   "browser.secret.vaultSkip.loginChoice":

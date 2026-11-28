@@ -269,6 +269,7 @@ const browser: AgentBrowserHost = {
       return {
         request: { method, origin: VAULT_ORIGIN, digits: 6 },
         agentScriptedOrigin: false,
+        agentScriptTabs: [],
         vaultFillable: true,
         withCode,
         submit: (value, vault, code) =>

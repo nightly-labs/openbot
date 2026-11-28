@@ -9,7 +9,7 @@ import { AttentionRegistry } from "../src/backend/agent/attention-registry";
 import { vaultRequestFormSpec } from "../src/backend/agent/prompts";
 import { CodexAppServerClient } from "../src/backend/app-server-client";
 import { browserFailure } from "../src/backend/browser-effects";
-import type { PreparedBrowserSecret } from "../src/backend/browser-host";
+import type { AgentScriptTab, PreparedBrowserSecret } from "../src/backend/browser-host";
 import { runCauseEffect } from "../src/backend/effect-boundary";
 import type { RequestId } from "../src/backend/protocol";
 import { VaultService } from "../src/main/vault-service";
@@ -81,6 +81,7 @@ function preparedSecret(): PreparedBrowserSecret {
   return {
     request: { method: "password", origin: "https://example.test", digits: 6 },
     agentScriptedOrigin: false,
+    agentScriptTabs: [],
     vaultFillable: false,
     withCode: false,
     submit: (secret) =>
@@ -963,7 +964,9 @@ try {
       const vaultFills: string[] = [];
       const vaultEvents: AgentEvent[] = [];
       const attention: string[] = [];
+      let scriptTabs: AgentScriptTab[] = [];
       const vaultRegistry = new AttentionRegistry({
+        agentName: (agentId) => (agentId === "agent-2" ? "Research" : undefined),
         conversation: {
           agentForThread: (threadId) => (threadId === THREAD ? AGENT : undefined),
           publicThreadId: (_agentId, threadId) => threadId,
@@ -985,6 +988,7 @@ try {
             Effect.sync(() => ({
               ...preparedSecret(),
               agentScriptedOrigin: true,
+              agentScriptTabs: scriptTabs,
               vaultFillable: true,
               submit: (secret: string) =>
                 Effect.sync(() => {
@@ -1061,6 +1065,26 @@ try {
         "the secure input lock of the tab was not released",
       );
       assert(!attention.some((entry) => entry.startsWith("needs:")), "the routine was marked as waiting for the user");
+      assert.doesNotMatch(skipped.next ?? "", /another open tab/u, "a skip with no other marked tab blamed a tab");
+      scriptTabs = [
+        { tabId: null, ownerAgentId: "agent-2" },
+        { tabId: null, ownerAgentId: null },
+        { tabId: "tab-7", ownerAgentId: AGENT },
+      ];
+      const blocked = answerOf(await signIn("openbot:a"));
+      scriptTabs = [];
+      const blockedNext = blocked.next ?? "";
+      assert.equal(blocked.success, false, "the saved login blocked by another tab was reported as a success");
+      assert.match(blockedNext, /a tab of the agent "Research"/u, "the agent was not told which agent holds the tab");
+      assert.match(blockedNext, /a tab that the user opened/u, "the agent was not told about the user's tab");
+      assert.match(blockedNext, /Close tab tab-7 with close_tab/u, "the agent was not told which of its tabs to close");
+      assert.match(
+        blockedNext,
+        /Browser panel[\s\S]*Then reload this page with navigate direction=reload/u,
+        "the agent was not told to reload this page after the other tabs close",
+      );
+      assert.equal(cards(), 0, "a password card opened for a skip that the agent can fix");
+      assert.deepEqual(vaultFills, [], "a saved password was filled while another tab's agent script can run");
       const unnamed = signIn();
       let unnamedAnswered = false;
       void unnamed.finally(() => {
@@ -1079,7 +1103,7 @@ try {
       );
       assert.equal(answerOf(await unnamed).status, "completed");
       assert.deepEqual(vaultFills, [SECRET], "the card did not fill what the user typed");
-      return { skipped, cards: cards() };
+      return { skipped, blocked, cards: cards() };
     },
   );
 

@@ -103,7 +103,7 @@ export const messages = {
   "browser.secret.failed": "Nie udało się wykonać żądania. Sprawdź połączenie i spróbuj ponownie.",
   "browser.secret.ended": "To żądanie logowania zostało zakończone. Poproś agenta o ponowną próbę.",
   "browser.secret.vaultSkip.agentScript":
-    "OpenBot nie użył Twoich zapisanych danych logowania, ponieważ agent uruchomił skrypt na tej stronie. Aby ich użyć, poproś agenta o ponowne załadowanie strony i ponowną próbę.",
+    "OpenBot nie użył Twoich zapisanych danych logowania, ponieważ agent uruchomił skrypt w tej witrynie. Aby ich użyć, zamknij inne karty tej witryny, a potem poproś agenta o ponowne załadowanie strony i ponowną próbę.",
   "browser.secret.vaultSkip.fieldKind":
     "OpenBot nie użył Twoich zapisanych danych logowania, ponieważ agent wybrał niewłaściwe pole na stronie.",
   "browser.secret.vaultSkip.loginChoice":

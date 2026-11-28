@@ -98,7 +98,7 @@ export const messages = {
   "browser.secret.failed": "요청을 완료할 수 없어요. 연결을 확인한 후 다시 시도해 주세요.",
   "browser.secret.ended": "이 로그인 요청은 종료되었어요. 에이전트에게 다시 시도해 달라고 요청해 주세요.",
   "browser.secret.vaultSkip.agentScript":
-    "에이전트가 이 페이지에서 스크립트를 실행해서 OpenBot이 저장된 로그인 정보를 사용하지 않았어요. 사용하려면 에이전트에게 페이지를 새로고침하고 다시 시도해 달라고 요청하세요.",
+    "에이전트가 이 사이트에서 스크립트를 실행해서 OpenBot이 저장된 로그인 정보를 사용하지 않았어요. 사용하려면 이 사이트의 다른 탭을 닫은 다음, 에이전트에게 페이지를 새로고침하고 다시 시도해 달라고 요청하세요.",
   "browser.secret.vaultSkip.fieldKind":
     "에이전트가 페이지에서 잘못된 입력란을 선택해서 OpenBot이 저장된 로그인 정보를 사용하지 않았어요.",
   "browser.secret.vaultSkip.loginChoice":

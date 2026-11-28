@@ -102,7 +102,7 @@ export const messages = {
   "browser.secret.failed": "Impossible de terminer la demande. Vérifiez la connexion et réessayez.",
   "browser.secret.ended": "Cette demande de connexion est terminée. Demandez à l’agent de réessayer.",
   "browser.secret.vaultSkip.agentScript":
-    "OpenBot n’a pas utilisé votre identifiant enregistré, car l’agent a exécuté un script sur cette page. Pour l’utiliser, demandez à l’agent de recharger la page et de réessayer.",
+    "OpenBot n’a pas utilisé votre identifiant enregistré, car un agent a exécuté un script sur ce site. Pour l’utiliser, fermez les autres onglets de ce site, puis demandez à l’agent de recharger la page et de réessayer.",
   "browser.secret.vaultSkip.fieldKind":
     "OpenBot n’a pas utilisé votre identifiant enregistré, car l’agent a choisi le mauvais champ sur la page.",
   "browser.secret.vaultSkip.loginChoice":
