@@ -49,19 +49,28 @@ const readMinimumMacosVersion = Effect.fn("RemoteDesktop.readMinimumMacosVersion
   return commands ? minimumMacosVersion(commands) : null;
 });
 
-export const readSunshineMinimumMacosVersion = Effect.fn("RemoteDesktop.readSunshineMinimumMacosVersion")(function* (
-  sunshine: string,
-) {
-  const frameworks = join(dirname(dirname(sunshine)), "Frameworks");
-  const libraries = yield* desktopCall(() => readdir(frameworks)).pipe(Effect.orElseSucceed((): string[] => []));
-  const versions = yield* Effect.forEach(
-    [sunshine, ...libraries.filter((name) => name.endsWith(".dylib")).map((name) => join(frameworks, name))],
-    readMinimumMacosVersion,
+const listLibraries = (directory: string) =>
+  desktopCall(() => readdir(directory)).pipe(
+    Effect.map((names) => names.filter((name) => name.endsWith(".dylib")).map((name) => join(directory, name))),
+    Effect.orElseSucceed((): string[] => []),
   );
-  return versions.reduce<string | null>(
+
+export const readRuntimeMinimumMacosVersion = Effect.fn("RemoteDesktop.readRuntimeMinimumMacosVersion")(function* (
+  paths: RemoteDesktopRuntimePaths,
+) {
+  const libraries = yield* Effect.forEach(
+    [join(dirname(dirname(paths.sunshine)), "Frameworks"), join(dirname(paths.moonlightWebServer), "lib")],
+    listLibraries,
+  );
+  const versions = yield* Effect.forEach(
+    [paths.sunshine, paths.moonlightWebServer, paths.moonlightStreamer, ...libraries.flat()],
+    (file) => readMinimumMacosVersion(file).pipe(Effect.orElseSucceed(() => undefined)),
+  );
+  const minimum = versions.reduce<string | null>(
     (highest, version) => (version && (!highest || isMacosOlderThan(highest, version)) ? version : highest),
     null,
   );
+  return { minimum, complete: versions.every((version) => version !== undefined) };
 });
 
 function versionParts(version: string): number[] {

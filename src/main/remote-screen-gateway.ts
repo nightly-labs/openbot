@@ -29,7 +29,7 @@ import {
   displayMacosVersion,
   isMacosOlderThan,
   type RemoteDesktopRuntimePaths,
-  readSunshineMinimumMacosVersion,
+  readRuntimeMinimumMacosVersion,
 } from "./remote-desktop-runtime-artifact";
 import { remoteDesktopStreamWatchScript } from "./remote-desktop-stream-watch";
 import { RemoteWorkflowError, remoteCall } from "./remote-service-effects";
@@ -1154,10 +1154,8 @@ export class RemoteScreenGateway {
     const { platform, systemVersion, runtimePaths } = this.#options;
     if (platform !== "darwin" || !systemVersion || !runtimePaths) return null;
     if (this.#macosUpdate !== undefined) return this.#macosUpdate;
-    const minimum = yield* readSunshineMinimumMacosVersion(runtimePaths.sunshine).pipe(
-      Effect.orElseSucceed(() => null),
-    );
-    this.#macosUpdate =
+    const { minimum, complete } = yield* readRuntimeMinimumMacosVersion(runtimePaths);
+    const update =
       minimum && isMacosOlderThan(systemVersion, minimum)
         ? new RemoteScreenError(
             503,
@@ -1165,7 +1163,8 @@ export class RemoteScreenGateway {
             sourceText("error.remote.macosUpdateRequired", { version: displayMacosVersion(minimum) }),
           )
         : null;
-    return this.#macosUpdate;
+    if (complete) this.#macosUpdate = update;
+    return update;
   });
 
   #runtimeStartRefusal(error: unknown): RemoteScreenError {
