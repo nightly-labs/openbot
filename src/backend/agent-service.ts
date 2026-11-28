@@ -1188,6 +1188,7 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
         },
         servesModel: (modelId) => this.#endpoints.serves(modelId, "opencode"),
         codexTurnContext: new TurnContext(),
+        waitsForPerson: (threadId, turnId) => this.#attention.hasAttentionForTurn(threadId, turnId),
         mcpServers: (agentId) => this.#mcp.record(this.#mcpServersFor(credentials.mcpServers(), agentId)),
         reportMcpDrops: (provider, drops) => this.#mcp.reportDrops(provider, drops),
         mcpEndpoint: (config, agentId) => this.#mcp.endpoint(config, agentId).pipe(toMcpOperationError),

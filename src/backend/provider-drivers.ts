@@ -467,6 +467,7 @@ export interface ProviderClientContext {
   readonly promptCacheTtl?: () => PromptCacheTtl;
   readonly claudeUserSetup?: () => boolean;
   readonly launchProcess?: ProcessLaunch;
+  readonly waitsForPerson?: (threadId: string, turnId: string) => boolean;
   readonly claudeCompactWindow?: () => number | null;
   readonly codexTurnContext?: TurnContext;
   readonly providerEnvironment?: (provider: ProviderEnvironmentProvider) => Readonly<Record<string, string>>;
@@ -792,6 +793,7 @@ export const BUILT_IN_PROVIDER_DRIVERS: readonly BuiltInProviderDriver[] = [
         claudeFallbackApiKey(context),
         context.claudeUserSetup,
         context.launchProcess,
+        context.waitsForPerson,
       ),
     authState: (account) => ({ kind: "claude", email: account?.email ?? null }),
     validateAccount: () => undefined,

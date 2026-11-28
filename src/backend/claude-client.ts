@@ -702,6 +702,7 @@ export class ClaudeAgentClient extends EventEmitter<ClientEvents> {
   readonly #fallbackApiKey: (() => string | null) | undefined;
   readonly #userSetup: () => boolean;
   readonly #launchProcess: ProcessLaunch | undefined;
+  readonly #waitsForPerson: (threadId: string, turnId: string) => boolean;
   #onApiKey = false;
   #cliApiKey = false;
   #accountRead = false;
@@ -741,6 +742,7 @@ export class ClaudeAgentClient extends EventEmitter<ClientEvents> {
     fallbackApiKey?: () => string | null,
     userSetup: () => boolean = () => false,
     launchProcess?: ProcessLaunch,
+    waitsForPerson: (threadId: string, turnId: string) => boolean = () => false,
   ) {
     super();
     this.#cli = cli;
@@ -757,6 +759,7 @@ export class ClaudeAgentClient extends EventEmitter<ClientEvents> {
     this.#fallbackApiKey = fallbackApiKey;
     this.#userSetup = userSetup;
     this.#launchProcess = launchProcess;
+    this.#waitsForPerson = waitsForPerson;
     const historyEnvironment = agentEnvironment?.();
     const resolvedHistoryIndexDirectory = historyIndexDirectory ?? stateDirectory;
     const historyOptions: ClaudeHistoryOptions = {
@@ -1035,16 +1038,22 @@ export class ClaudeAgentClient extends EventEmitter<ClientEvents> {
       if (!turn) continue;
       const asleep = Date.now() - before - CLAUDE_STALL_CHECK_MS;
       if (asleep > CLAUDE_STALL_CHECK_MS) turn.lastActivityAt = Math.min(Date.now(), turn.lastActivityAt + asleep);
+      if (turn.personRequests > 0 || this.#waitsForPerson(runtime.id, turn.id)) {
+        turn.lastActivityAt = Date.now();
+        continue;
+      }
       const silentFor = Date.now() - turn.lastActivityAt;
       const limit = turn.toolCalls.size > 0 || runtime.compacting ? CLAUDE_TOOL_STALL_MS : CLAUDE_TURN_STALL_MS;
-      if (turn.hostRequests > 0 || turn.stopRequested || silentFor < limit || this.#threads.get(runtime.id) !== runtime)
-        continue;
+      if (turn.stopRequested || silentFor < limit || this.#threads.get(runtime.id) !== runtime) continue;
       queryLogger.warn("Closed a Claude query that sent nothing past the stall limit.", {
         threadId: runtime.id,
         silentForMinutes: Math.floor(silentFor / 60_000),
         openToolCalls: turn.toolCalls.size,
+        openHostRequests: turn.hostRequests,
       });
       turn.stalled = true;
+      for (const hostToolCall of turn.hostToolCalls) hostToolCall.abort();
+      turn.hostToolCalls.clear();
       yield* (runtime.config.persistSession ? this.#threads.releaseNow(runtime) : this.#threads.close(runtime)).pipe(
         Effect.ignore,
       );
@@ -2147,7 +2156,7 @@ export class ClaudeAgentClient extends EventEmitter<ClientEvents> {
     message: ClaudeStreamMessage,
   ) {
     runtime.lastOutputAt = Date.now();
-    if (runtime.activeTurn) runtime.activeTurn.lastActivityAt = runtime.lastOutputAt;
+    if (runtime.activeTurn && !isToolHeartbeat(message)) runtime.activeTurn.lastActivityAt = runtime.lastOutputAt;
     runtime.answered = true;
     if (!message.parent_tool_use_id) for (const uuid of takenMessageIds(message)) runtime.unreadSteers.delete(uuid);
     if (message.type === "command_lifecycle") {
@@ -3250,6 +3259,10 @@ type ClaudeSdkLaunch = Pick<Options, "pathToClaudeCodeExecutable" | "spawnClaude
 const BROWSER_PERSON_TOOLS: ReadonlySet<string> = new Set(
   ["request_takeover", "submit_secret"].map((tool) => `mcp__${OPENBOT_BROWSER_NAMESPACE}__${tool}`),
 );
+
+function isToolHeartbeat(message: ClaudeStreamMessage): boolean {
+  return message.type === "tool_progress" && "heartbeat" in message && message.heartbeat === true;
+}
 
 function waitsForBrowserPerson(namespace: string, name: string, args: unknown): boolean {
   return BROWSER_PERSON_TOOLS.has(claudeBridgedToolName(`mcp__${namespace}__${name}`, args));
