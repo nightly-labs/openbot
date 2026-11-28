@@ -17,9 +17,3 @@ export async function loadImage(blob: Blob): Promise<HTMLImageElement> {
   await image.decode();
   return image;
 }
-
-export function withAlpha(hex: string, alpha: number): string {
-  const value = hex.replace("#", "");
-  const [r, g, b] = [0, 2, 4].map((offset) => Number.parseInt(value.slice(offset, offset + 2), 16));
-  return `rgba(${r}, ${g}, ${b}, ${alpha})`;
-}
