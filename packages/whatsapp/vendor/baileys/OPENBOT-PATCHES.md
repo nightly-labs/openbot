@@ -35,6 +35,7 @@ both and plug in OpenBot's clean-room Signal module (`../../src/signal`, see `..
 | `src/Socket/socket.ts` | Handles `companion_reg_refresh`, which WhatsApp sends after the phone scans the code since July 2026: before a link, a new adv secret and the same code drawn again. Each code reads the adv secret when it is drawn. Upstream issue #2737, open PR #2765. Without it, the phone shows "Couldn't link device". |
 | `src/Socket/messages-recv.ts` | `sendMessageAck` reads `creds.me?.id`, so a node before the link (such as `companion_reg_refresh`) gets its ack. Upstream issue #2738, PR #2749. |
 | `src/Socket/messages-recv.ts` | The socket emits `openbot:node` (node, `true`) when the handler of a message, call, receipt or notification node starts, and (node, `false`) when it ends, online or offline. OpenBot reconnects a socket whose node waits too long: a stalled handler holds the ack, and WhatsApp then stops delivering messages while keep-alives still pass. Upstream issue #2491 (open). |
+| `src/Socket/socket.ts` | The `creds.update` handler announces the push name only when the update carries a new one, with `type` `unavailable` (or `available` when `markOnlineOnConnect` is on). Upstream sends a presence with no type, which means available, on each update without `me` (key uploads, account sync), so the linked device shows online and the phone stops showing notifications. Upstream PR #2789 (closed by the stale bot, not merged). |
 
 ## Updating from upstream
 

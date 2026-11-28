@@ -81,7 +81,9 @@ export const makeSocket = (config: SocketConfig) => {
 		defaultQueryTimeoutMs,
 		transactionOpts,
 		qrTimeout,
-		makeSignalRepository
+		makeSignalRepository,
+		// OPENBOT PATCH: read for the presence type on a push name change (see creds.update below).
+		markOnlineOnConnect
 	} = config
 
 	const publicWAMBuffer = new BinaryInfo()
@@ -1076,12 +1078,14 @@ export const makeSocket = (config: SocketConfig) => {
 	// update credentials when required
 	ev.on('creds.update', update => {
 		const name = update.me?.name
-		// if name has just been received
-		if (creds.me?.name !== name) {
+		// OPENBOT PATCH: only an update that carries a new push name announces it, with an explicit type. Most
+		// updates carry no `me`, and upstream then sent a typeless presence, which means available: it marked the
+		// linked device online and the phone stopped showing notifications (upstream PR #2789, closed unmerged).
+		if (name && creds.me?.name !== name) {
 			logger.debug({ name }, 'updated pushName')
 			sendNode({
 				tag: 'presence',
-				attrs: { name: name! }
+				attrs: { name, type: markOnlineOnConnect ? 'available' : 'unavailable' }
 			}).catch(err => {
 				logger.warn({ trace: err.stack }, 'error in sending presence update on name change')
 			})
