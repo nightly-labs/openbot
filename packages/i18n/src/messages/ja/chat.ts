@@ -421,6 +421,7 @@ export const messages = {
   "chat.selection.showMore": "その他の操作を表示",
   "chat.selection.send": "編集の指示を送信",
   "chat.row.label": "{name} からのメッセージ",
+  "chat.row.pinned": "ピン留め済み",
   "chat.row.openChat": "{name} のチャットを開く",
   "chat.row.reactions": "リアクション: {emoji}",
   "chat.row.agentReaction": "{name} が {emoji} でリアクションしました",

@@ -1601,6 +1601,7 @@ export function ConversationTimeline() {
                             showTime={!continuesRun()}
                             actionRow={!turnStep()}
                             actionTime={rowActionTime()}
+                            pinned={pinAction(message() ?? initialMessage)?.pinned}
                             steps={stepsInRow() ? stepsDisclosure() : undefined}
                             actionsBeside={actionsBeside()}
                             animate={animateEntrance}

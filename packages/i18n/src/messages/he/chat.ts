@@ -443,6 +443,7 @@ export const messages = {
   "chat.selection.showMore": "הצגת עוד פעולות",
   "chat.selection.send": "שליחת הוראת עריכה",
   "chat.row.label": "הודעה מאת {name}",
+  "chat.row.pinned": "מוצמדת",
   "chat.row.openChat": "פתיחת הצ'אט של {name}",
   "chat.row.reactions": "תגובות: {emoji}",
   "chat.row.agentReaction": "{name} הגיב עם {emoji}",

@@ -427,6 +427,7 @@ export const messages = {
   "chat.selection.showMore": "작업 더 보기",
   "chat.selection.send": "수정 지시 보내기",
   "chat.row.label": "{name}의 메시지",
+  "chat.row.pinned": "고정됨",
   "chat.row.openChat": "{name}의 채팅 열기",
   "chat.row.reactions": "반응: {emoji}",
   "chat.row.agentReaction": "{name}이(가) {emoji}(으)로 반응했어요",

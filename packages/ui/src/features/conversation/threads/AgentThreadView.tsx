@@ -958,6 +958,7 @@ export function AgentThreadView(props: AgentThreadViewProps) {
                             if (id) showMessage(id);
                           }}
                           actions={messageActions(message())}
+                          pinned={pinAction(message())?.pinned}
                           steps={stepsInRow() ? stepsDisclosure() : undefined}
                           actionTime={props.compactMessageActions === false}
                           actionsBeside={stepsInRow() || author(message()).kind === "you"}

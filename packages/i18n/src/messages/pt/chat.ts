@@ -434,6 +434,7 @@ export const messages = {
   "chat.selection.showMore": "Mostrar mais ações",
   "chat.selection.send": "Enviar instrução de edição",
   "chat.row.label": "Mensagem de {name}",
+  "chat.row.pinned": "Fixada",
   "chat.row.openChat": "Abrir chat de {name}",
   "chat.row.reactions": "Reações: {emoji}",
   "chat.row.agentReaction": "{name} reagiu com {emoji}",

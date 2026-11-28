@@ -443,6 +443,7 @@ export const messages = {
   "chat.selection.showMore": "Mostra altre azioni",
   "chat.selection.send": "Invia l'istruzione di modifica",
   "chat.row.label": "Messaggio di {name}",
+  "chat.row.pinned": "Fissato",
   "chat.row.openChat": "Apri la chat di {name}",
   "chat.row.reactions": "Reazioni: {emoji}",
   "chat.row.agentReaction": "{name} ha reagito con {emoji}",
