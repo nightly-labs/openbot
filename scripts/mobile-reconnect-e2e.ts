@@ -234,6 +234,30 @@ async function networkScenarios() {
     { name: "Wi-Fi to mobile data", steps: [home, { type: "CELLULAR", address: "0.0.0.0" }], expected: "moved" },
     { name: "iOS VPN turns on", steps: [home, { type: "UNKNOWN", address: "192.168.1.20" }], expected: "changed" },
     { name: "Android VPN turns off", steps: [{ type: "VPN", address: "100.101.4.9" }, home], expected: "changed" },
+    {
+      name: "iOS VPN on, Wi-Fi to mobile data",
+      steps: [
+        { type: "UNKNOWN", address: "192.168.1.20" },
+        { type: "UNKNOWN", address: "0.0.0.0" },
+      ],
+      expected: "changed",
+    },
+    {
+      name: "iOS VPN on, mobile data to Wi-Fi",
+      steps: [
+        { type: "UNKNOWN", address: "0.0.0.0" },
+        { type: "UNKNOWN", address: "192.168.1.20" },
+      ],
+      expected: "changed",
+    },
+    {
+      name: "Android VPN on, same tunnel address",
+      steps: [
+        { type: "VPN", address: "100.101.4.9" },
+        { type: "VPN", address: "100.101.4.9" },
+      ],
+      expected: null,
+    },
     { name: "another Wi-Fi network", steps: [home, wifi("10.0.0.31")], expected: "moved" },
     { name: "signal strength only", steps: [home, home], expected: null },
     {
