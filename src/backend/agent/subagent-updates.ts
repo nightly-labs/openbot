@@ -325,6 +325,44 @@ export function foldCodexSubagentItem(
   return changed ? subagents : null;
 }
 
+export function foldCodexSubagentActivity(
+  current: readonly ConversationSubagent[],
+  item: DynamicRecord,
+  now: string,
+): ConversationSubagent[] | null {
+  if (!isString(item.agentThreadId)) return null;
+  const id = item.agentThreadId;
+  const subagents = current.map((subagent) => ({ ...subagent, steps: [...subagent.steps] }));
+  const subagent = subagents.find((candidate) => candidate.id === id);
+  if (item.kind === "started" || item.kind === "interacted") {
+    if (subagent) return null;
+    subagents.push({
+      id,
+      title: codexAgentName(item.agentPath) ?? id,
+      agentType: isString(item.model) ? item.model : null,
+      prompt: null,
+      status: "running",
+      startedAt: now,
+      endedAt: null,
+      steps: [],
+      error: null,
+    });
+    return subagents;
+  }
+  const status = item.kind === "completed" ? "completed" : item.kind === "interrupted" ? "stopped" : null;
+  return subagent && status && endSubagent(subagent, status, now) ? subagents : null;
+}
+
+function codexAgentName(agentPath: unknown): string | null {
+  if (!isString(agentPath)) return null;
+  return (
+    agentPath
+      .split("/")
+      .map((part) => part.trim())
+      .findLast(Boolean) ?? null
+  );
+}
+
 function codexSubagentStatus(status: unknown): Exclude<ConversationSubagentStatus, "running"> | null {
   if (status === "completed") return "completed";
   if (status === "errored" || status === "failed") return "failed";
