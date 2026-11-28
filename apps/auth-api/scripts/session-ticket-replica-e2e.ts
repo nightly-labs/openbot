@@ -17,6 +17,8 @@ const HOUR_MS = 60 * 60 * 1000;
 const DAY_MS = 24 * HOUR_MS;
 const TOKEN = "browser-session-token-0001";
 const OTHER_TOKEN = "browser-session-token-0002";
+let accountToken = TOKEN;
+let accountCount = 0;
 const SESSION = "remote-session-1";
 const CLIENT_KEY = "client-public-key-0001";
 const WRITE_SQL = /^\s*(INSERT|UPDATE|DELETE|REPLACE)\b/iu;
@@ -221,7 +223,7 @@ interface Outcome {
   user: string | null;
   name: string | null;
   bookmark: string | null;
-  queries: { primaryReads: number; replicaReads: number; primaryWrites: number; tables: string[] };
+  queries: { primaryReads: number; replicaReads: number; primaryWrites: number; changeReads: number; tables: string[] };
 }
 
 const Claims = Schema.Struct({
@@ -259,6 +261,7 @@ async function send(path: string, init: RequestInit): Promise<Outcome> {
   const response = await app.fetch(new Request(new URL(path, API), init), env);
   const body = Schema.decodeUnknownSync(Schema.fromJsonString(Body))(await response.text());
   const user = body.user ?? { id: body.id ?? null, name: body.name ?? null };
+  const accountQueries = world.queries.filter((query) => !query.sql.includes("auth_session_change"));
   return {
     status: response.status,
     code: body.error?.code ?? null,
@@ -267,9 +270,10 @@ async function send(path: string, init: RequestInit): Promise<Outcome> {
     name: user.name,
     bookmark: response.headers.get(ACCOUNT_BOOKMARK_HEADER),
     queries: {
-      primaryReads: world.queries.filter((query) => query.instance === "primary" && !query.write).length,
-      replicaReads: world.queries.filter((query) => query.instance === "replica").length,
+      primaryReads: accountQueries.filter((query) => query.instance === "primary" && !query.write).length,
+      replicaReads: accountQueries.filter((query) => query.instance === "replica").length,
       primaryWrites: world.queries.filter((query) => query.write).length,
+      changeReads: world.queries.length - accountQueries.length,
       tables: world.queries.map((query) => `${query.instance}${query.write ? ":write" : ""}: ${query.sql}`),
     },
   };
@@ -294,7 +298,9 @@ function ticketRequest(client: Client, token: string | null, body: unknown = { c
 
 function sessionRequest(client: "me" | "browser", bookmark: string | null) {
   const headers: Record<string, string> = {
-    ...(client === "me" ? { Authorization: `Bearer ${TOKEN}` } : { Cookie: `__Host-openbot-web=${TOKEN}` }),
+    ...(client === "me"
+      ? { Authorization: `Bearer ${accountToken}` }
+      : { Cookie: `__Host-openbot-web=${accountToken}` }),
     ...(bookmark ? { [ACCOUNT_BOOKMARK_HEADER]: bookmark } : {}),
   };
   return send(client === "me" ? "/v1/me" : "/api/browser/session", { headers });
@@ -314,7 +320,7 @@ function seededWorld(seed: Seed = {}): World {
     "INSERT INTO users(id, identity_key, email, created_at, updated_at) VALUES ('owner', 'email:owner', 'owner@example.test', 1, 1)",
   );
   for (const [id, token] of [
-    ["auth-1", TOKEN],
+    ["auth-1", accountToken],
     ["auth-2", OTHER_TOKEN],
   ] as const) {
     next.both(
@@ -501,11 +507,17 @@ async function ticketCases() {
   }
 }
 
+function freshAccountWorld(): World {
+  accountCount += 1;
+  accountToken = `browser-session-token-account-${accountCount}`;
+  return seededWorld();
+}
+
 async function sessionCases() {
   for (const client of ["me", "browser"] as const) {
     const label = client === "me" ? "GET /v1/me" : "GET /api/browser/session";
 
-    world = seededWorld();
+    world = freshAccountWorld();
     const plain = await sessionRequest(client, null);
     results[`${label}: no bookmark`] = plain;
     check(
@@ -517,7 +529,7 @@ async function sessionCases() {
       plain,
     );
 
-    world = seededWorld();
+    world = freshAccountWorld();
     const caughtUp = await sessionRequest(client, bookmarkAt(world.primaryVersion));
     results[`${label}: bookmark the replica has`] = caughtUp;
     check(
@@ -526,7 +538,7 @@ async function sessionCases() {
       caughtUp,
     );
 
-    world = seededWorld();
+    world = freshAccountWorld();
     world.primaryOnly("UPDATE users SET name = 'New name' WHERE id = 'user'");
     const ownWrite = await sessionRequest(client, bookmarkAt(world.primaryVersion));
     results[`${label}: bookmark of a profile write`] = ownWrite;
@@ -536,7 +548,7 @@ async function sessionCases() {
       ownWrite,
     );
 
-    world = seededWorld();
+    world = freshAccountWorld();
     world.replicaOnly("DELETE FROM auth_sessions WHERE id = 'auth-1'");
     world.primaryVersion += 1;
     const signedIn = await sessionRequest(client, bookmarkAt(world.primaryVersion));
@@ -547,19 +559,19 @@ async function sessionCases() {
       signedIn,
     );
 
-    world = seededWorld();
+    world = freshAccountWorld();
     world.both(REVOKE_AUTH);
     const revoked = await sessionRequest(client, bookmarkAt(world.primaryVersion));
     results[`${label}: revoked account session`] = revoked;
     check(`${label} refuses a revoked account session`, revoked.status === 401, revoked);
 
-    world = seededWorld();
+    world = freshAccountWorld();
     world.both(EXPIRE_AUTH);
     const expired = await sessionRequest(client, bookmarkAt(world.primaryVersion));
     results[`${label}: expired account session`] = expired;
     check(`${label} refuses an expired account session`, expired.status === 401, expired);
 
-    world = seededWorld();
+    world = freshAccountWorld();
     const before = bookmarkAt(world.primaryVersion);
     world.primaryOnly(REVOKE_AUTH);
     const lag = await sessionRequest(client, before);
@@ -569,7 +581,7 @@ async function sessionCases() {
       lag.status === 200,
       lag,
     );
-    world = seededWorld();
+    world = freshAccountWorld();
     world.primaryOnly(REVOKE_AUTH);
     const lagNoBookmark = await sessionRequest(client, null);
     results[`${label}: stale replica, no bookmark`] = lagNoBookmark;
