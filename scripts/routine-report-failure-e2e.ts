@@ -46,6 +46,14 @@ const PROVIDER_ERROR = "The fake provider stopped.";
 const NO_ANSWER_ERROR = "The fake provider sent no answer.";
 const NOTICE_TEXT = "Before the check: I run one harmless command and report the result to my teammate.";
 const LINK_REASON = "The mirror is down.";
+const PLAN_ANSWER = [
+  "Status: done",
+  "Result: The plan:",
+  "1. Move the build cache to the shared folder.",
+  "2. Run the docs build two times and compare the output.",
+  "3. Keep the old cache until both runs pass.",
+  "Evidence: none",
+].join("\n");
 
 interface FakeCall {
   tool: "routine_report_failure" | "routine_no_update" | "list_routines" | "send_message" | "update_routine";
@@ -169,7 +177,7 @@ const answer = (message) => {
         write({ method: "item/started", params: { threadId: params.threadId, turnId, item: call } });
         write({ method: "item/completed", params: { threadId: params.threadId, turnId, item: { ...call, status: "completed", success: true, contentItems: [] } } });
       }
-      const reply = next ? "Relay report <<CALLS" + next[1] + "CALLS>>" : textOnly ? "The result went to the teammate." : turnCalls.length ? ${JSON.stringify(FAILED_ANSWER)} : "All good.";
+      const reply = task.includes("PLAN-ANSWER") ? ${JSON.stringify(PLAN_ANSWER)} : next ? "Relay report <<CALLS" + next[1] + "CALLS>>" : textOnly ? "The result went to the teammate." : turnCalls.length ? ${JSON.stringify(FAILED_ANSWER)} : "All good.";
       return callNext({ threadId: params.threadId, turnId, calls: turnCalls, reply, providerFail: task.includes("PROVIDER-FAIL"), silentFail: task.includes("SILENT-FAIL"), emptyAnswer: task.includes("EMPTY-ANSWER"), quietHang: task.includes("QUIET-HANG"), quietLoop: task.includes("QUIET-LOOP"), noFinal: task.includes("NO-FINAL"), loops: 0 });
     }
     case "turn/interrupt": {
@@ -528,7 +536,7 @@ try {
   pass(
     "A teammate's request ends quiet after its result went back to the teammate",
     earlyResult?.success === false &&
-      earlyResult.contentItems.some((item) => item.text.includes("send_message first")) &&
+      earlyResult.contentItems.some((item) => item.text.includes("Give it as your final written answer")) &&
       replyResult?.success === true &&
       lateResult?.success === true &&
       lateResult.contentItems.some((item) => item.text.includes('"quiet"')) &&
@@ -615,6 +623,31 @@ try {
       !mailbox.hasOwnReplyFrom(unansweredDelivery.id) &&
       mailbox.hasSentResultFor(unansweredDelivery.id),
     { unanswered, sentResults, unansweredDelivery },
+  );
+
+  pass(
+    "A teammate request asks for the whole result in the final message, not a send_message reply",
+    unanswered.turn.text?.includes("OpenBot sends your final message to") === true &&
+      unanswered.turn.text.includes("send a concise result") === false,
+    unanswered.turn.text,
+  );
+  const planRequest = await requestTurnOf("Write the cache plan. TEAMMATE-REQUEST-NOREPLY PLAN-ANSWER");
+  const planMessageId = /Message ID: (\S+)/.exec(planRequest.turn.text ?? "")?.[1];
+  const planResults = await waitFor("the plan for the teammate", () => {
+    const results = agents
+      .listQueue(relay.id)
+      .deliveries.filter(
+        (delivery) =>
+          delivery.sender.kind === "agent" &&
+          delivery.sender.agentId === checker.id &&
+          delivery.replyToMessageId === planMessageId,
+      );
+    return results.length > 0 && results;
+  });
+  pass(
+    "The teammate who asked gets the whole plan of the final message",
+    planResults.length === 1 && planResults[0]?.text.includes(PLAN_ANSWER) === true,
+    planResults,
   );
 
   const healthRun = await settledRun(

@@ -119,6 +119,7 @@ export interface DeliveryPromptSources {
   liveVoice?: LiveVoiceRelayed | null;
   fromChrome?: boolean;
   steerFramedAsUser?: boolean;
+  steered?: boolean;
   steersQuietTurn?: boolean;
   followsUpOwnAnswer?: boolean;
   externalChat?: boolean;
@@ -220,6 +221,10 @@ const ROUTINE_LANGUAGE_LINE =
   "Write each line for the user, also the first one, in the language that the routine task names, else the language that your instructions name, else the language of the user's chat messages, else the language of the routine task. Do not use the language of this OpenBot note.";
 const RESULT_FORMAT =
   "Reply in three lines: Status: done | partial | blocked, Result: <concrete outcome>, Evidence: <file, test, command, or none>.";
+const FULL_RESULT_FORMAT =
+  "Write it in this form: Status: done | partial | blocked, Result: <the concrete outcome, with all of what the request asks for, such as a plan or a text>, Evidence: <file, test, command, or none>.";
+const FULL_TEXT_TO_USER =
+  "When it holds a plan, a draft or another text that the user asked for, give that text in full.";
 const NO_ANSWER_REASON = ": the request to them ended before they answered. Do not wait for them.";
 const STILL_WORKING_FROM = "No answer yet from ";
 const EXTERNAL_CHAT_ANSWER = `This turn runs in an external chat, such as WhatsApp, Slack or Telegram. OpenBot posts your written answer there, and the people in it read it. Put the result only in openbot.send_message. When only a person in that chat can give what you need, ask them for it in your written answer, in plain words. Otherwise answer only ${QUIET_ANSWER}: nothing is posted.`;
@@ -319,7 +324,7 @@ function userFramedTeammateText(
     return [
       `${teammate} answered your message through OpenBot:`,
       displayText,
-      "Give the result to the user naturally, starting with the teammate's name. Send the teammate no acknowledgement; when the status is partial or blocked, finish or follow up the open part yourself.",
+      `Give the result to the user naturally, starting with the teammate's name. ${FULL_TEXT_TO_USER} Send the teammate no acknowledgement; when the status is partial or blocked, finish or follow up the open part yourself.`,
       USER_LANGUAGE_LINE,
     ].join("\n");
   if (delivery.expectsReply === false)
@@ -478,11 +483,12 @@ export function deliveryPromptInput(context: DeliveryContext, sources: DeliveryP
     const senderName = agentNames.get(senderAgentId) ?? senderAgentId;
     const routine = answersRequest ? sources.answeredRoutine : null;
     const externalChatResult = sources.externalChat ? EXTERNAL_CHAT_RESULT : null;
+    const relaysAnswer = !sources.steered && !sources.externalChat && context.channelId === undefined;
     const replyProtocol = answersRequest
       ? [
           routine
-            ? `This replies to a message you sent in a run of your routine "${routine.routineName}". That run has ended, so its task is below. Continue that task from this result now: do its next steps, such as a request to the next teammate, before you end this turn. ${externalChatResult ?? "Then give the result to the user naturally, starting with the teammate's name."}`
-            : `This replies to a message you sent. ${externalChatResult ?? "Give the result to the user naturally, starting with the teammate's name."}`,
+            ? `This replies to a message you sent in a run of your routine "${routine.routineName}". That run has ended, so its task is below. Continue that task from this result now: do its next steps, such as a request to the next teammate, before you end this turn. ${externalChatResult ?? `Then give the result to the user naturally, starting with the teammate's name. ${FULL_TEXT_TO_USER}`}`
+            : `This replies to a message you sent. ${externalChatResult ?? `Give the result to the user naturally, starting with the teammate's name. ${FULL_TEXT_TO_USER}`}`,
           "For partial or blocked work, you still own the request: finish the rest yourself, with a follow-up, or with a better teammate; do not repeat a failed call unchanged. Give the user the blocker and its Unblock action only when the user must act. When OpenBot has a plugin for the service and it is not in your tools, call openbot.suggest_marketplace_app and end your answer with the next field of its result.",
           `Reply to the teammate only for another requested action or new information that unblocks its work, with replyToMessageId "${delivery.messageId}", never with the same request or an acknowledgement.`,
           USER_LANGUAGE_LINE,
@@ -497,13 +503,17 @@ export function deliveryPromptInput(context: DeliveryContext, sources: DeliveryP
             USER_LANGUAGE_LINE,
           ]
         : [
-            `Finish the whole request, then send a concise result to ${senderName} with openbot.send_message: recipientAgentIds ["${senderAgentId}"], replyToMessageId "${delivery.messageId}", expectsReply false.`,
+            relaysAnswer
+              ? `Finish the whole request. When your turn ends, OpenBot sends your final message to ${senderName} as your reply, so write it for them and put the whole result in that one message. Do not send it with openbot.send_message.`
+              : `Finish the whole request, then send a concise result to ${senderName} with openbot.send_message: recipientAgentIds ["${senderAgentId}"], replyToMessageId "${delivery.messageId}", expectsReply false.`,
             "When something fails, find the cause and try other ways first. Status: blocked only when the sender or the user must act.",
-            `${RESULT_FORMAT} When blocked, add Unblock: <the one action that unblocks the task>; when OpenBot has a plugin for the service and it is not in your tools, call openbot.suggest_marketplace_app, and that action is the next field of its result.`,
+            `${relaysAnswer ? FULL_RESULT_FORMAT : RESULT_FORMAT} When blocked, add Unblock: <the one action that unblocks the task>; when OpenBot has a plugin for the service and it is not in your tools, call openbot.suggest_marketplace_app, and that action is the next field of its result.`,
             "Never acknowledge without a Status line.",
             sources.externalChat
               ? EXTERNAL_CHAT_ANSWER
-              : "The user does not see your written answer to this request. When only the user can give what you need, call openbot.ask_user (Claude: AskUserQuestion) and wait; never ask the user in a written answer.",
+              : relaysAnswer
+                ? `Your written answer goes to ${senderName}. When only the user can give what you need, call openbot.ask_user (Claude: AskUserQuestion) and wait; never ask the user in a written answer.`
+                : "The user does not see your written answer to this request. When only the user can give what you need, call openbot.ask_user (Claude: AskUserQuestion) and wait; never ask the user in a written answer.",
           ];
     text = [
       `${TEAMMATE_HEADER} ${senderName} (${senderAgentId}).`,

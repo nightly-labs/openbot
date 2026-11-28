@@ -104,7 +104,15 @@ question card keeps the turn shown (#11012). The tool still accepts a
 request: before the reply it answers that the agent must send the result first, but only when the
 missing reply is all that keeps the turn from a quiet end. When the agent sends no reply, OpenBot
 sends the turn's answer to the teammate as its result when the turn ends (`#relayAgentResult`). The
-teammate then has the answer, so the turn ends quiet too (#8021). The turn completion makes this
+teammate then has the answer, so the turn ends quiet too (#8021). So the request prompt asks for the
+whole result in the agent's final message and no `send_message` reply (`relaysAnswer` in
+`deliveryPromptInput`), and says that the written answer goes to the teammate, not that the user does
+not see it: `settleQuietRoutineTurn` keeps a written answer of a relayed turn (`answeredRequestTurn`
+needs a turn with no answer), so the agent's chat shows the result. Before, it asked for a concise
+reply of three lines: the agent wrote a plan in its answer, which the quiet end folded, and sent only a summary, so the plan never reached the user
+(#17173). A steered request, a channel request and an external chat turn still ask for a
+`send_message` reply, because the turn end does not relay their answer. The answer prompt tells the
+teammate to give a plan or another text that the user asked for in full. The turn completion makes this
 decision with the same check as the relay (`#sendsResult`), and reads the answer before the quiet end
 changes it to a quiet answer. The history import runs after the relay. It counts the agent's own reply
 from the turn that ran the request (`MailboxStore.hasOwnReplyFrom`) or the stored idempotency key of

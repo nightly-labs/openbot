@@ -2296,7 +2296,7 @@ export class OpenBotToolRouter {
         );
       if (outcome === "unanswered")
         return openBotToolFailure(
-          "Send your result to the teammate who asked with openbot.send_message first, then call this tool again.",
+          "The teammate who asked still waits for your result. Give it as your final written answer instead of calling this tool: OpenBot sends that answer to them. When the request told you to send the result with openbot.send_message, send it that way first, then call this tool again.",
         );
       if (
         outcome === "quiet" &&
