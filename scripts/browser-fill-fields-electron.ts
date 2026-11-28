@@ -701,7 +701,7 @@ async function interruptionCases(
         const result = await send(method, args, sessionId);
         if (mode === "close") phase("during-input-close-input-acknowledged");
         Deferred.doneUnsafe(dispatched, Effect.void);
-        if (mode === "takeover") lifecycle = Effect.runFork(host.beginTakeover(form.tab.id));
+        if (mode === "takeover") lifecycle = Effect.runFork(host.beginTakeover(form.tab.id).pipe(Effect.asVoid));
         if (mode === "close") {
           lifecycle = Effect.runFork(host.close(form.tab.id));
           phase("during-input-close-lifecycle-started");

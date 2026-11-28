@@ -35,6 +35,7 @@ const actionNavigationReleased = new Promise<void>((resolve) => {
   releaseActionNavigation = resolve;
 });
 let browserToolCall = 0;
+let stuckTakeoverLoads = 0;
 const recordedIdentityAgents: Record<string, string> = {};
 
 interface PersistenceSnapshot {
@@ -48,6 +49,21 @@ const stalledResponses: ServerResponse[] = [];
 
 const server = createServer((request, response) => {
   const url = new URL(request.url ?? "/", "http://127.0.0.1");
+  if (url.pathname === "/takeover-stuck") {
+    stuckTakeoverLoads += 1;
+    response.setHeader("content-type", "text/html; charset=utf-8");
+    response.end(
+      `<input aria-label="Code" id="code"><script>window.loadNumber = ${stuckTakeoverLoads};${
+        stuckTakeoverLoads === 1 ? "setTimeout(() => { for (;;) {} }, 300);" : ""
+      }</script>`,
+    );
+    return;
+  }
+  if (url.pathname === "/takeover-healthy") {
+    response.setHeader("content-type", "text/html; charset=utf-8");
+    response.end(`<input aria-label="Code" id="code">`);
+    return;
+  }
   if (url.pathname === "/focus-navigation") {
     response.setHeader("content-type", "text/html; charset=utf-8");
     response.end(`<input aria-label="Search" autofocus><a href="/focus-navigation?next">Next page</a>`);
@@ -507,6 +523,7 @@ const SCENARIOS = [
   "redirect-navigation",
   "stalled-open",
   "cookie-banner",
+  "takeover-stuck-page",
 ];
 
 void main().catch((error) => {
@@ -594,6 +611,8 @@ async function main(): Promise<void> {
           await runStalledOpenScenario(browser, origin);
         } else if (scenario === "typing-focus") {
           await runTypingFocusScenario(browser, origin);
+        } else if (scenario === "takeover-stuck-page") {
+          await runStuckPageTakeoverScenario(browser, origin);
         } else if (scenario === "cookie-banner") {
           await runCookieBannerScenario(browser, origin);
         } else {
@@ -624,6 +643,7 @@ async function main(): Promise<void> {
       return;
     }
     await runTypingFocusScenario(browser, origin);
+    await runStuckPageTakeoverScenario(browser, origin);
     const documentChangedTabs: string[] = [];
     const retainedDocumentChanges: Array<{ tabId: string; documentIds: ReadonlySet<string> }> = [];
     browser.onDocumentChanged((tabId, documentIds) => {
@@ -2118,6 +2138,50 @@ async function main(): Promise<void> {
     if (server.listening) server.close();
     if (!configuredRoot) await rm(temporaryRoot, { recursive: true, force: true });
     app.quit();
+  }
+}
+
+async function runStuckPageTakeoverScenario(browser: BrowserHost, origin: string): Promise<void> {
+  const typeIntoTakeover = async (contents: WebContents): Promise<string> => {
+    contents.focus();
+    await contents.executeJavaScript("document.querySelector('#code').focus()", true);
+    for (const keyCode of ["4", "2"]) contents.sendInputEvent({ type: "char", keyCode });
+    return await contents.executeJavaScript("document.querySelector('#code').value", true);
+  };
+  const stuck = await openTabWithContents(browser, `${origin}/takeover-stuck`, "smoke-thread", "smoke-bot");
+  const healthy = await openTabWithContents(browser, `${origin}/takeover-healthy`, "smoke-thread", "smoke-bot");
+  try {
+    await waitFor(async () => stuckTakeoverLoads === 1 && !stuck.contents.isLoading(), "stuck page load");
+    await new Promise((resolve) => setTimeout(resolve, 500));
+    await runCauseEffect(browser.activate(stuck.tab.id));
+    const stuckReloaded = await runCauseEffect(browser.beginTakeover(stuck.tab.id));
+    const stuckLoad = await stuck.contents.executeJavaScript("window.loadNumber", true);
+    const stuckTyped = await typeIntoTakeover(stuck.contents);
+    browser.endTakeover(stuck.tab.id);
+    await healthy.contents.executeJavaScript("window.keptState = 'kept'", true);
+    await runCauseEffect(browser.activate(healthy.tab.id));
+    const healthyReloaded = await runCauseEffect(browser.beginTakeover(healthy.tab.id));
+    const healthyState = await healthy.contents.executeJavaScript("window.keptState", true);
+    const healthyTyped = await typeIntoTakeover(healthy.contents);
+    browser.endTakeover(healthy.tab.id);
+    const report = { stuckReloaded, stuckLoad, stuckTyped, healthyReloaded, healthyState, healthyTyped };
+    await mkdir(join(process.cwd(), ".openbot-build"), { recursive: true });
+    await writeFile(
+      join(process.cwd(), ".openbot-build", "browser-takeover-stuck-page.json"),
+      `${JSON.stringify(report, null, 2)}\n`,
+    );
+    assert.deepEqual(report, {
+      stuckReloaded: true,
+      stuckLoad: 2,
+      stuckTyped: "42",
+      healthyReloaded: false,
+      healthyState: "kept",
+      healthyTyped: "42",
+    });
+    process.stdout.write("BrowserHost: takeover of a stuck page reloads it before the user gets control.\n");
+  } finally {
+    await runCauseEffect(browser.close(stuck.tab.id));
+    await runCauseEffect(browser.close(healthy.tab.id));
   }
 }
 
