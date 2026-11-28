@@ -17,6 +17,8 @@ export const messages = {
   "error.remote.sessionCapacity": "De host heeft al vier actieve sessies.",
   "error.remote.linuxNeedsX11":
     "Extern bureaublad op Linux heeft een X11-sessie nodig. Wayland wordt niet ondersteund.",
+  "error.remote.macosUpdateRequired":
+    "Extern bureaublad heeft macOS {version} of nieuwer nodig op de host. Werk macOS op de host bij en probeer het opnieuw.",
   "error.remote.runtimeMissing":
     "De runtime van Sunshine en Moonlight Web ontbreekt of wordt niet ondersteund op deze host. Installeer de volledige release van OpenBot op een Mac, een Windows x64-host of een Linux x64-host en start OpenBot opnieuw.",
   "error.remote.testActive": "Er loopt een test van extern bureaublad. Probeer het opnieuw als die klaar is.",

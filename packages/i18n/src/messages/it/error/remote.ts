@@ -16,6 +16,8 @@ export const messages = {
   "error.remote.testPanelFailed": "L'host non è riuscito ad aprire il pannello di test.",
   "error.remote.sessionCapacity": "L'host ha già quattro sessioni attive.",
   "error.remote.linuxNeedsX11": "Il desktop remoto su Linux richiede una sessione X11. Wayland non è supportato.",
+  "error.remote.macosUpdateRequired":
+    "Il desktop remoto richiede macOS {version} o successivo sull’host. Aggiorna macOS sull’host, poi riprova.",
   "error.remote.runtimeMissing":
     "Il runtime di Sunshine e Moonlight Web manca o non è supportato su questo host. Installa la versione completa di OpenBot su un Mac, un host Windows x64 o un host Linux x64, poi riavvia OpenBot.",
   "error.remote.testActive": "Un test del desktop remoto è in corso. Riprova quando finisce.",

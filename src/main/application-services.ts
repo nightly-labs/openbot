@@ -3675,6 +3675,7 @@ export async function createApplicationServices({
     platform: process.platform === "darwin" || process.platform === "win32" ? process.platform : "linux",
     unattended: false,
     remoteDesktopRuntimePaths: remoteDesktopRuntime,
+    systemVersion: process.getSystemVersion(),
     remoteControlPolicy,
     ...(hostedServer || serverModeEnvironment || localServerChild
       ? {}
