@@ -57,7 +57,7 @@ interface AuthServiceOptions {
   attribution?: AccountAttribution;
   referrals?: Referrals;
   usesCompanySignIn?: (email: string) => Effect.Effect<boolean, AuthOperationError>;
-  accessTokenSecret?: string;
+  accessTokenSecret?: string | undefined;
 }
 
 export interface StoreReviewSignIn {
