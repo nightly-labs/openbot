@@ -24,6 +24,8 @@ export interface ContentCollection<Id extends CollectionId = CollectionId> {
   backLabel: string;
   moreTitle: string;
   imageEyebrow: string;
+  imageBackgrounds?: true;
+  imageLayout?: "centered";
   articles: readonly CollectionArticle[];
 }
 
