@@ -53,7 +53,7 @@ function seeded(): DatabaseSync {
 function migrated(): DatabaseSync {
   const database = seeded();
   database.exec("BEGIN");
-  database.exec(migration("0080_auth_session_changes.sql"));
+  database.exec(migration("0083_auth_session_changes.sql"));
   database.exec("COMMIT");
   return database;
 }
@@ -64,7 +64,7 @@ describe("auth session changes migration", () => {
     const before = snapshot(database);
 
     database.exec("BEGIN");
-    database.exec(migration("0080_auth_session_changes.sql"));
+    database.exec(migration("0083_auth_session_changes.sql"));
     database.exec("COMMIT");
 
     expect(snapshot(database)).toEqual(before);
