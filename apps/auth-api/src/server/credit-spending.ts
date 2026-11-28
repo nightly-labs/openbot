@@ -471,7 +471,8 @@ export class CreditSpending {
       this.#database
         .prepare(
           `UPDATE credit_holds SET status = 'released', outcome = 'abandoned', settled_at = ?1
-            WHERE status = 'held' AND provider_job_id IS NULL AND submitted_at IS NULL AND created_at <= ?2
+            WHERE status = 'held' AND provider_job_id IS NULL AND COALESCE(submitted_at, created_at) <= ?2
+              AND (submit_lease_until IS NULL OR submit_lease_until <= ?1)
            ${TRACKED_HOLD_SQL}`,
         )
         .bind(now, now - CREDIT_HOLD_START_GRACE_MS)

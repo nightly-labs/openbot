@@ -41,6 +41,10 @@ const SIGN_IN_CHECKS = 30;
 const NAME_MAX = 160;
 const AUDIO_OPTION = "audio";
 const CREDIT_JOB_CONFLICT = "credits_job_conflict";
+const RETRY_CODES: ReadonlySet<string> = new Set(["media_busy", "media_result_unavailable"]);
+const RETRY_STATUSES: ReadonlySet<number> = new Set([0, 500, 502, 504]);
+const RETRY_LIMIT_MS = 10 * 60_000;
+const RESUBMIT_AFTER_MS = 200_000;
 
 export class CreditMediaGatewayFailed extends Schema.TaggedError<CreditMediaGatewayFailed>()(
   "CreditMediaGatewayFailed",
@@ -212,6 +216,9 @@ function creditUploadPicks(
 
 const failedOf = (failure: CreditMediaGatewayFailed) => mediaFail(failure.message);
 
+const transient = (failure: CreditMediaGatewayFailed) =>
+  RETRY_STATUSES.has(failure.status) || RETRY_CODES.has(failure.code);
+
 function workflowAttachmentRead(resolveAttachment: McpMediaDependencies["resolveAttachment"]): CreditMediaInputRead {
   return (attachmentId) =>
     resolveAttachment(attachmentId).pipe(
@@ -234,6 +241,7 @@ export class CreditMediaWorkflows {
   readonly #options: CreditMediaWorkflowsOptions;
   readonly #lock = Semaphore.makeUnsafe(1);
   #listed: Listed | null = null;
+  readonly #unsent = new Set<string>();
 
   constructor(options: CreditMediaWorkflowsOptions) {
     this.#options = options;
@@ -390,8 +398,23 @@ export class CreditMediaWorkflows {
     return this.available();
   });
 
-  #existing(jobId: string) {
-    return this.#options.gateway.job(jobId).pipe(
+  #again<A>(
+    attempt: Effect.Effect<A, CreditMediaGatewayFailed>,
+    patient: boolean,
+  ): Effect.Effect<A, CreditMediaGatewayFailed> {
+    if (!patient) return attempt;
+    const until = this.#now() + RETRY_LIMIT_MS;
+    const next: Effect.Effect<A, CreditMediaGatewayFailed> = attempt.pipe(
+      Effect.catchIf(
+        (failure) => transient(failure) && this.#now() < until,
+        () => Effect.sleep(Duration.seconds(POLL_MAX_SECONDS)).pipe(Effect.andThen(Effect.suspend(() => next))),
+      ),
+    );
+    return next;
+  }
+
+  #existing(jobId: string, patient = false) {
+    return this.#again(this.#options.gateway.job(jobId), patient).pipe(
       Effect.map((job): CreditMediaJob | null => job),
       Effect.catchIf(
         (failure) => failure.status === 404,
@@ -418,15 +441,19 @@ export class CreditMediaWorkflows {
     model: CreditMediaModel,
     job: CreditMediaJobRequest,
     images: readonly { role: MediaPictureRole; attachmentId: string }[],
+    patient = false,
   ) {
     if (model.promptRequired && job.prompt.trim() === "")
       return yield* mediaFail(sourceText("error.workflow.creditMediaPromptRequired"));
     const uploads = yield* this.#uploads(read, model, images);
     const gateway = this.#options.gateway;
-    return yield* gateway.submit(job, uploads).pipe(
+    const submit = gateway
+      .submit(job, uploads)
+      .pipe(Effect.tapError(() => Effect.sync(() => patient && this.#unsent.add(job.jobId))));
+    return yield* this.#again(submit, patient).pipe(
       Effect.catchIf(
         (failure) => failure.code === CREDIT_JOB_CONFLICT,
-        () => gateway.job(job.jobId),
+        () => this.#again(gateway.job(job.jobId), patient),
       ),
       Effect.mapError(failedOf),
     );
@@ -443,13 +470,24 @@ export class CreditMediaWorkflows {
     return yield* this.#submitJob(read, model, creditJobRequest(model, request, request.jobId), request.images);
   });
 
-  #wait = Effect.fn("CreditMediaWorkflows.wait")(function* (this: CreditMediaWorkflows, started: CreditMediaJob) {
+  #wait = Effect.fn("CreditMediaWorkflows.wait")(function* (
+    this: CreditMediaWorkflows,
+    started: CreditMediaJob,
+    start: (jobId: string) => Effect.Effect<CreditMediaJob, McpMediaFailed>,
+    patient: boolean,
+  ) {
     const gateway = this.#options.gateway;
     let job = started;
+    let submittedAt = this.#now();
     while (job.status === "queued" || job.status === "processing") {
       const seconds = Math.min(POLL_MAX_SECONDS, Math.max(POLL_MIN_SECONDS, job.pollAfterSeconds));
       yield* Effect.sleep(Duration.seconds(seconds));
-      job = yield* gateway.job(started.jobId).pipe(Effect.mapError(failedOf));
+      const unsent = patient && job.status === "queued" && this.#unsent.has(started.jobId);
+      if (unsent && this.#now() - submittedAt >= RESUBMIT_AFTER_MS) {
+        submittedAt = this.#now();
+        job = yield* start(started.jobId);
+      } else job = yield* this.#again(gateway.job(started.jobId), patient).pipe(Effect.mapError(failedOf));
+      if (job.status !== "queued") this.#unsent.delete(started.jobId);
     }
     return job;
   });
@@ -459,12 +497,13 @@ export class CreditMediaWorkflows {
     start: (jobId: string) => Effect.Effect<CreditMediaJob, McpMediaFailed>,
     jobId: string,
     earlierJobIds: readonly string[],
+    patient = false,
   ) {
     if (!(yield* this.#signedIn())) return yield* mediaFail(sourceText("error.billing.mediaSignInRequired"));
-    const existing = (yield* this.#existing(jobId)) ?? (yield* this.#earlier(earlierJobIds));
+    const existing = (yield* this.#existing(jobId, patient)) ?? (yield* this.#earlier(earlierJobIds));
     const started =
       existing === null ? yield* start(jobId) : existing.status === "queued" ? yield* start(existing.jobId) : existing;
-    const done = yield* this.#wait(started);
+    const done = yield* this.#wait(started, start, patient);
     if (existing === null || existing.status === "queued" || existing.status === "processing")
       this.#options.creditsChanged?.();
     if (done.status === "failed" && done.reason === "content_policy")
@@ -474,9 +513,19 @@ export class CreditMediaWorkflows {
     if (done.status !== "completed") return yield* mediaFailed();
     const output = done.outputs[0];
     if (!output) return yield* mediaFailed();
-    const bytes = yield* this.#options.gateway.output(done.jobId, output.index).pipe(Effect.mapError(failedOf));
+    const bytes = yield* this.#again(this.#options.gateway.output(done.jobId, output.index), patient).pipe(
+      Effect.mapError(failedOf),
+    );
     return { bytes, mimeType: output.mimeType, credits: done.credits } satisfies CreditMediaMade;
   });
+
+  readonly unfinished = Effect.fn("CreditMediaWorkflows.unfinished")(function* (
+    this: CreditMediaWorkflows,
+    jobId: string,
+  ) {
+    const found = yield* this.#existing(jobId, true);
+    return found !== null && found.status !== "failed" && found.status !== "canceled";
+  }).bind(this);
 
   readonly models = Effect.fn("CreditMediaWorkflows.models")(function* (this: CreditMediaWorkflows) {
     const models = yield* this.#models();
@@ -489,9 +538,10 @@ export class CreditMediaWorkflows {
     request: CreditMediaAgentRequest,
   ) {
     return yield* this.#produce(
-      (jobId) => this.#submitJob(read, request.model, { ...request.job, jobId }, request.images),
+      (jobId) => this.#submitJob(read, request.model, { ...request.job, jobId }, request.images, true),
       request.jobId,
       [],
+      true,
     );
   }).bind(this);
 
