@@ -1,0 +1,3 @@
+### Fixed
+
+- When you add a ChatGPT account and select a ChatGPT workspace that ChatGPT does not accept for Codex, OpenBot now tells you to sign in again and select your personal account or a different workspace. When this happens at start, ChatGPT shows "Not connected" with this text and a Connect button, and Connect now opens the ChatGPT sign-in so that you can select a different account. Before, OpenBot showed only "selected workspace missing from routing discovery", and Connect stopped with "OpenBot could not connect ChatGPT. Try again.". On a joined server, the server must also be on this version.

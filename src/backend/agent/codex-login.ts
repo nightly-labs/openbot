@@ -3,6 +3,7 @@ import { sourceText } from "@openbot/i18n/source";
 import { classifyUserError } from "@openbot/user-errors";
 import { Deferred, Effect, Result, Schema } from "effect";
 import type { AgentClient } from "./../agent-client";
+import { AppServerError } from "./../app-server-client";
 import { type CodexCliInfo, resolveCodexCli, resolveInstalledFirst } from "./../cli";
 import { causeHelpers } from "../effect-boundary";
 import {
@@ -20,6 +21,18 @@ import { recordRestartActivity } from "../restart-activity";
 
 const CODEX_LOGIN_TIMEOUT_MS = 10 * 60_000;
 const UNVERIFIED_MESSAGE = "OpenBot could not verify the ChatGPT connection. Try again.";
+const CODEX_WORKSPACE_MISSING = "selected workspace missing from routing discovery";
+
+function isCodexWorkspaceMissing(cause: unknown): boolean {
+  return cause instanceof AppServerError && cause.message === CODEX_WORKSPACE_MISSING;
+}
+
+export function codexWorkspaceMissing(cause: unknown): ProviderSignInError | null {
+  if (!isCodexWorkspaceMissing(cause)) return null;
+  return new ProviderSignInError({
+    message: sourceText("error.provider.codexWorkspaceMissing", { provider: "ChatGPT" }),
+  });
+}
 
 interface PendingCodexLogin {
   client: AgentClient;
@@ -197,7 +210,7 @@ export class CodexLoginFlow {
         .pipe(toCodexLoginFailed);
       if (this.#pending === pending) this.#pending = null;
       end(pending, true);
-    }).pipe(Effect.catch(() => this.#fail(pending, UNVERIFIED_MESSAGE)));
+    }).pipe(Effect.catch((failure) => this.#fail(pending, codexWorkspaceMissing(failure.cause) ?? UNVERIFIED_MESSAGE)));
   }, Effect.uninterruptible).bind(this);
 
   readonly failUnverified = Effect.fn("CodexLogin.failUnverified")(function* (this: CodexLoginFlow) {
@@ -285,7 +298,7 @@ export class CodexLoginFlow {
                 .pipe(
                   toCodexLoginFailed,
                   Effect.catchIf(
-                    (failure) => classifyUserError(failure.cause) === "auth",
+                    (failure) => classifyUserError(failure.cause) === "auth" || isCodexWorkspaceMissing(failure.cause),
                     () => Effect.succeed({ account: null }),
                   ),
                 );

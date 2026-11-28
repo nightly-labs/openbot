@@ -106,7 +106,7 @@ import { normalizeAccountUsage, usageWindowHasReset, usageWindowResetSince } fro
 import { captureBrowser, signInPageByOpenBot } from "./browser-capture";
 import { CliCodeLoginFailed, type CliCodePrompt, PROMPT_TIMEOUT_MS, startCliCodeLogin } from "./cli-code-login";
 import { CliLoginFailed, CliLoginFlow, type CliLoginProcess, toCliLoginFailed } from "./cli-login-flow";
-import { CodexLoginFlow, toCodexLoginFailed } from "./codex-login";
+import { CodexLoginFlow, codexWorkspaceMissing, toCodexLoginFailed } from "./codex-login";
 import { readCodexRoutesToOpenai } from "./codex-model-source";
 import type { ConversationRuntime } from "./conversation-runtime";
 import type { FailureContext } from "./failure-signal";
@@ -213,6 +213,11 @@ const CODEX_SERVICE_UNREACHABLE = new Set([
 
 function isCodexServiceUnreachable(error: unknown): boolean {
   return error instanceof AppServerError && CODEX_SERVICE_UNREACHABLE.has(error.message);
+}
+
+function signInForMissingCodexWorkspace(failure: ProviderOperationFailed): ProviderOperationFailed {
+  const signIn = codexWorkspaceMissing(failure.cause);
+  return signIn ? new ProviderOperationFailed({ cause: signIn }) : failure;
 }
 const PROVIDER_RESTART_POLL_MS = 1_000;
 const PROVIDER_BACKGROUND_WORK_WAIT_MS = 4 * 60 * 60_000;
@@ -3272,7 +3277,7 @@ export class ProviderRuntime implements ProviderPort {
             logger.info("A provider answered initialize.", { provider, durationMs: durationMs() });
             const response = yield* client
               .request("account/read", { refreshToken: false }, accountReadDecoder(provider))
-              .pipe(toProviderOperationFailed);
+              .pipe(toProviderOperationFailed, Effect.mapError(signInForMissingCodexWorkspace));
             const account = response.account;
             if (!account)
               return yield* new ProviderOperationFailed({
@@ -3749,7 +3754,7 @@ export class ProviderRuntime implements ProviderPort {
                 provider === "codex" ? CODEX_START_ACCOUNT_READ_TIMEOUT_MS : START_ACCOUNT_READ_TIMEOUT_MS,
               ),
             )
-            .pipe(toProviderOperationFailed);
+            .pipe(toProviderOperationFailed, Effect.mapError(signInForMissingCodexWorkspace));
           if (!account.account) {
             const message = this.#signInRequiredMessage(provider);
             this.#startFailures.delete(provider);

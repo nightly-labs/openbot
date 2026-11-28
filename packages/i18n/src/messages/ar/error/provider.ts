@@ -266,6 +266,8 @@ export const messages = {
   "error.provider.opencodeNetwork":
     "تعذّر على OpenCode الاتصال بمزوّد النموذج. تحقق من اتصال الشبكة للحاسوب الذي يشغّل OpenBot، ثم أعد المحاولة.\n{detail}",
   "error.provider.codexStateBusy": "لا يزال ChatGPT يجهّز سجله المحلي بعد تشغيل سابق. انتظر بضع دقائق، ثم أعد المحاولة.",
+  "error.provider.codexWorkspaceMissing":
+    "لم يقبل {provider} مساحة العمل التي اخترتها. سجّل الدخول مرة أخرى واختر حسابك الشخصي أو مساحة عمل أخرى.",
   "error.provider.codexThreadInUse":
     "تطبيق Codex آخر يفتح هذه الدردشة، مثل تطبيق Codex لسطح المكتب أو Codex CLI أو إضافة IDE. يمكن لتطبيق واحد فقط في كل مرة أن يكتب في دردشة Codex. أغلق الدردشة في ذلك التطبيق، ثم أرسل رسالتك مرة أخرى.",
   "error.provider.realtimeLimitZero":

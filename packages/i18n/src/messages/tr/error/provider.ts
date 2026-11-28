@@ -288,6 +288,8 @@ export const messages = {
     "OpenCode model sağlayıcısına bağlanamadı. OpenBot'u çalıştıran bilgisayarın ağ bağlantısını kontrol edin, ardından tekrar deneyin.\n{detail}",
   "error.provider.codexStateBusy":
     "ChatGPT önceki bir başlatmadan sonra yerel geçmişini hâlâ hazırlıyor. Birkaç dakika bekleyin, sonra yeniden deneyin.",
+  "error.provider.codexWorkspaceMissing":
+    "{provider} seçtiğiniz çalışma alanını kabul etmedi. Yeniden oturum açın ve kişisel hesabınızı ya da başka bir çalışma alanını seçin.",
   "error.provider.codexThreadInUse":
     "Bu sohbet başka bir Codex uygulamasında açık; örneğin Codex masaüstü uygulaması, Codex CLI veya bir IDE uzantısı. Bir Codex sohbetine aynı anda yalnızca bir uygulama yazabilir. Sohbeti o uygulamada kapatın, sonra mesajınızı yeniden gönderin.",
   "error.provider.realtimeLimitZero":

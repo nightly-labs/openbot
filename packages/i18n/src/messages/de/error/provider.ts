@@ -298,6 +298,8 @@ export const messages = {
     "OpenCode konnte keine Verbindung zum Modellanbieter herstellen. Prüfe die Netzwerkverbindung des Computers, auf dem OpenBot läuft, und versuche es erneut.\n{detail}",
   "error.provider.codexStateBusy":
     "ChatGPT bereitet nach einem früheren Start noch seinen lokalen Verlauf vor. Warte ein paar Minuten und versuche es dann erneut.",
+  "error.provider.codexWorkspaceMissing":
+    "{provider} hat den ausgewählten Workspace nicht angenommen. Melde dich erneut an und wähle dein persönliches Konto oder einen anderen Workspace.",
   "error.provider.codexThreadInUse":
     "Eine andere Codex-App hat diesen Chat geöffnet, zum Beispiel die Codex-Desktop-App, die Codex CLI oder eine IDE-Erweiterung. Nur eine App kann gleichzeitig in einen Codex-Chat schreiben. Schließe den Chat in dieser App und sende deine Nachricht dann erneut.",
   "error.provider.realtimeLimitZero":
