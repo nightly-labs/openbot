@@ -35,7 +35,7 @@ export interface AttachmentDownloads {
   retry(attachment: AttachmentSummary): void;
 }
 
-const REMOTE_PREVIEW_URL = /^openbot-remote-attachment:/;
+export const REMOTE_PREVIEW_URL = /^openbot-remote-attachment:/;
 
 export function AttachmentCards(props: {
   attachments: AttachmentSummary[];

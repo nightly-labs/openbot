@@ -86,7 +86,7 @@ export class RemoteAttachmentCache {
     const entry = this.#entries.get(key);
     if (entry) {
       this.#delete(key, entry);
-      this.#entries.set(key, entry);
+      this.#entries.set(key, { ...entry, storedAt: this.#now() });
       this.#bytes += entry.attachment.bytes.byteLength;
       return entry.attachment;
     }
