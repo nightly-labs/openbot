@@ -147,11 +147,20 @@ function usageRow(
   const cursorSpent = ownWindows.filter(
     (_, index) => cursorTotal && reported[index] !== cursorTotal && (reported[index]?.usedPercent ?? 0) >= 100,
   );
-  const ringWindows = cursorTotal
+  const ownRingWindows = cursorTotal
     ? cursorSpent.length
       ? cursorSpent
       : ownWindows.filter((_, index) => reported[index] === cursorTotal)
     : ownWindows.filter((_, index) => reported[index] !== limit?.tertiary);
+  const ringWindows = groups
+    .map((group) =>
+      reportedUsageWindows(group).map((window) => windowRow(window, usageWindowLabel(window.windowDurationMins, text))),
+    )
+    .reduce(
+      (ring, groupRing) =>
+        groupRing.length > 0 && lowestRemainingPercent(groupRing) < lowestRemainingPercent(ring) ? groupRing : ring,
+      ownRingWindows,
+    );
   const binding = ringWindows.reduce<AccountUsageWindowRow | null>(
     (lowest, window) => (lowest === null || window.remainingPercent < lowest.remainingPercent ? window : lowest),
     null,
@@ -171,6 +180,10 @@ function usageRow(
     sharedQuotaWith: limit?.sharedQuotaWith ?? null,
     readFailed: limit?.readFailed === true && windows.length === 0,
   };
+}
+
+function lowestRemainingPercent(windows: readonly AccountUsageWindowRow[]): number {
+  return Math.min(...windows.map((window) => window.remainingPercent));
 }
 
 export function usageWindowLabel(durationMins: number | null, text: UsageText = currentText()): string {
