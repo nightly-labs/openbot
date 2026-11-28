@@ -99,6 +99,8 @@ export const messages = {
     "助手压缩上下文时连接中断，因此任务已停止。请检查网络连接，并确认 {provider} 设置中“变量”下的 {variable} 是模型服务的 API 地址（通常以 /v1 结尾）。然后发送一条消息。",
   "error.agent.compactionLoopStopped":
     "{provider} 反复压缩上下文，但每次压缩后仍然太满，无法继续，因此 OpenBot 停止了这一轮。请关闭此智能体不需要的 MCP 服务器或电脑操控，然后发送一条消息。如果你或智能体更改过 {provider} 的压缩时机，请撤销该更改。",
+  "error.agent.compactionRepeatStopped":
+    "由于某个文件或工具结果放不进模型的上下文窗口，{provider} 在一个回合中不得不反复缩短此聊天。OpenBot 已停止此回合。请让智能体读取文件中较小的一部分，或选择上下文窗口更大的模型。",
   "error.agent.selectedGone": "所选的助手已不存在。",
   "error.agent.profileEndpointsChanged": "生成期间自定义端点发生了变更，请重试。",
   "error.agent.profileInvalid": "服务商返回了无效的资料，请试着修改提示词。",

@@ -128,6 +128,8 @@ export const messages = {
     "De verbinding viel weg terwijl de agent zijn context comprimeerde, dus de taak is gestopt. Controleer je internetverbinding. Controleer ook of {variable} onder Variabelen in de instellingen van {provider} het API-adres van je modeldienst is (vaak eindigend op /v1). Stuur daarna een bericht.",
   "error.agent.compactionLoopStopped":
     "{provider} heeft de context steeds opnieuw gecomprimeerd, en elke keer bleef die te vol om door te gaan. Daarom heeft OpenBot deze beurt gestopt. Zet de MCP-servers of het computergebruik uit die deze agent niet nodig heeft, en stuur dan een bericht. Als jij of de agent hebt gewijzigd wanneer {provider} comprimeert, maak die wijziging dan ongedaan.",
+  "error.agent.compactionRepeatStopped":
+    "{provider} moest deze chat in één beurt steeds opnieuw inkorten, omdat een bestand of een toolresultaat niet in het contextvenster van het model past. OpenBot heeft deze beurt gestopt. Vraag de agent een kleiner deel van het bestand te lezen, of kies een model met een groter contextvenster.",
   "error.agent.selectedGone": "De gekozen agent bestaat niet meer.",
   "error.agent.profileEndpointsChanged":
     "De aangepaste endpoints zijn gewijzigd tijdens het maken. Probeer het opnieuw.",

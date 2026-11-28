@@ -959,7 +959,7 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
     });
   }
 
-  #compacted(thread: AcpThread): void {
+  #compacted(thread: AcpThread, compactionId?: string): void {
     if (thread.activeTurn) {
       markAnswered(thread.activeTurn);
       thread.activeTurn.showedPlanOrCompaction = true;
@@ -968,7 +968,7 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
     this.#turnContext.resend(thread.id);
     this.emit("notification", {
       method: "openbot/context-compaction",
-      params: { threadId: thread.id, status: "completed" },
+      params: { threadId: thread.id, status: "completed", ...(compactionId ? { compactionId } : {}) },
     });
   }
 
@@ -3472,6 +3472,11 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
     }
     if (update.sessionUpdate === "compaction_update") {
       if (update.status === "completed") this.#compacted(thread);
+      return;
+    }
+    const compactionId = this.#flavor.finishedCompaction?.(update);
+    if (compactionId) {
+      this.#compacted(thread, compactionId);
       return;
     }
     const turn = thread.activeTurn ?? this.#catchOwnReply(thread, update);

@@ -124,6 +124,8 @@ export const messages = {
     "La conexión se detuvo mientras el agente compactaba su contexto, así que la tarea se detuvo. Comprueba tu conexión a internet y que {variable}, en Variables de los ajustes de {provider}, sea la dirección API de tu servicio de modelos (suele terminar en /v1). Luego envía un mensaje.",
   "error.agent.compactionLoopStopped":
     "{provider} compactó el contexto una y otra vez, y cada vez quedó demasiado lleno para continuar, así que OpenBot detuvo este turno. Desactiva los servidores MCP o el uso del ordenador que este agente no necesita y luego envía un mensaje. Si tú o el agente cambiasteis cuándo compacta {provider}, deshaz ese cambio.",
+  "error.agent.compactionRepeatStopped":
+    "{provider} tuvo que acortar este chat una y otra vez en un mismo turno, porque un archivo o el resultado de una herramienta no cabe en la ventana de contexto del modelo. OpenBot detuvo este turno. Pide al agente que lea una parte más pequeña del archivo o elige un modelo con una ventana de contexto más grande.",
   "error.agent.selectedGone": "El agente seleccionado ya no existe.",
   "error.agent.profileEndpointsChanged":
     "Los endpoints personalizados cambiaron durante la generación. Inténtalo de nuevo.",

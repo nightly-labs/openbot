@@ -125,6 +125,8 @@ export const messages = {
     "La connessione si è interrotta mentre l'agente compattava il contesto, quindi l’attività si è fermata. Controlla la connessione a internet e che {variable}, in Variabili nelle impostazioni di {provider}, sia l’indirizzo API del servizio di modelli (spesso finisce in /v1). Poi invia un messaggio.",
   "error.agent.compactionLoopStopped":
     "{provider} ha compattato il contesto più e più volte, e ogni volta è rimasto troppo pieno per continuare, quindi OpenBot ha fermato questo turno. Disattiva i server MCP o l'uso del computer che questo agente non usa, poi invia un messaggio. Se tu o l'agente avete cambiato quando {provider} compatta, annulla la modifica.",
+  "error.agent.compactionRepeatStopped":
+    "{provider} ha dovuto accorciare questa chat più e più volte in un solo turno, perché un file o il risultato di uno strumento non entra nella finestra di contesto del modello. OpenBot ha fermato questo turno. Chiedi all'agente di leggere una parte più piccola del file, oppure scegli un modello con una finestra di contesto più grande.",
   "error.agent.selectedGone": "L'agente selezionato non esiste più.",
   "error.agent.profileEndpointsChanged": "Gli endpoint personalizzati sono cambiati durante la generazione. Riprova.",
   "error.agent.profileInvalid": "Il provider ha restituito un profilo non valido. Prova a rivedere il prompt.",
