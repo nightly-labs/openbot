@@ -1,6 +1,6 @@
 import { execFile } from "node:child_process";
 import { createHash } from "node:crypto";
-import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { promisify } from "node:util";
@@ -12,7 +12,6 @@ import { getPlatformProxy } from "wrangler";
 
 const run = promisify(execFile);
 const ROOT = resolve(import.meta.dirname, "../../..");
-const SCRIPT = resolve(import.meta.filename);
 const OUT_DIR = join(ROOT, ".openbot-build", "d1-replica-reads-all-e2e");
 const WRANGLER = join(ROOT, "node_modules", ".bin", process.platform === "win32" ? "wrangler.cmd" : "wrangler");
 const API = "https://account.openbot.test";
@@ -42,11 +41,6 @@ const PRODUCTION_REQUESTS_2026_11_27: Record<string, number> = {
   "member list": 1_078,
   "host registration": 828,
 };
-
-function argument(name: string): string | null {
-  const prefix = `--${name}=`;
-  return process.argv.find((value) => value.startsWith(prefix))?.slice(prefix.length) ?? null;
-}
 
 type Instance = "primary" | "replica";
 type Constraint = "none" | "first-primary" | "first-unconstrained" | "bookmark";
@@ -83,91 +77,15 @@ interface RunReport {
   checks: { name: string; passed: boolean; detail?: unknown }[];
 }
 
-if (argument("before") !== null) await compare(argument("before") ?? "");
-else await measure();
-
-async function compare(before: string) {
-  const sha = (await run("git", ["rev-parse", "--verify", `${before}^{commit}`], { cwd: ROOT })).stdout.trim();
-  const tree = join(OUT_DIR, "before", sha);
-  await rm(tree, { recursive: true, force: true });
-  await mkdir(tree, { recursive: true });
-  const archive = join(tree, "source.tar");
-  await run(
-    "git",
-    [
-      "archive",
-      "--format=tar",
-      "-o",
-      archive,
-      sha,
-      "apps/auth-api/src",
-      "apps/auth-api/migrations",
-      "apps/auth-api/tsconfig.json",
-      "apps/site-router",
-      "CHANGELOG.md",
-      "package.json",
-      "apps/mobile/CHANGELOG.md",
-    ],
-    { cwd: ROOT },
-  );
-  await run("tar", ["-xf", archive, "-C", tree]);
-  const beforeReport = join(tree, "report.json");
-  const afterReport = join(OUT_DIR, "after-report.json");
-  const child = async (source: string, out: string) => {
-    const result = await run(process.execPath, [SCRIPT, `--source=${source}`, `--out=${out}`], {
-      cwd: ROOT,
-      maxBuffer: 64 * 1024 * 1024,
-    }).catch((error: { stdout?: string; stderr?: string }) => error);
-    process.stdout.write(result.stdout ?? "");
-    process.stderr.write(result.stderr ?? "");
-    const parsed: RunReport = JSON.parse(await readFile(out, "utf8"));
-    return parsed;
-  };
-  const baseline = await child(join(tree, "apps", "auth-api"), beforeReport);
-  const current = await child(join(ROOT, "apps", "auth-api"), afterReport);
-  const types = Object.keys(current.types);
-  const table = types.map((type) => {
-    const was = baseline.types[type];
-    const now = current.types[type];
-    return {
-      type,
-      before: was
-        ? { primary: was.primaryStatements, replica: was.replicaStatements, primaryTimeShare: was.primaryTimeShare }
-        : null,
-      after: now
-        ? { primary: now.primaryStatements, replica: now.replicaStatements, primaryTimeShare: now.primaryTimeShare }
-        : null,
-    };
-  });
-  const report = {
-    passed: current.passed,
-    before: { commit: sha, weighted: baseline.weighted, passed: baseline.passed },
-    after: { weighted: current.weighted, passed: current.passed },
-    requestsPerType: current.requestsPerType,
-    table,
-  };
-  const path = join(OUT_DIR, "comparison.json");
-  await writeFile(path, `${JSON.stringify(report, null, 2)}\n`);
-  console.log("");
-  console.log(`type | before primary/replica (primary time) | after primary/replica (primary time)`);
-  for (const row of table)
-    console.log(
-      `${row.type} | ${row.before ? `${row.before.primary}/${row.before.replica} (${percent(row.before.primaryTimeShare)})` : "-"} | ${row.after ? `${row.after.primary}/${row.after.replica} (${percent(row.after.primaryTimeShare)})` : "-"}`,
-    );
-  console.log(
-    `weighted by the 2026-11-27 route mix: primary time ${percent(baseline.weighted.primaryTimeShare)} -> ${percent(current.weighted.primaryTimeShare)}, primary statements ${percent(baseline.weighted.primaryStatementShare)} -> ${percent(current.weighted.primaryStatementShare)}`,
-  );
-  console.log(`Report: ${path}`);
-  if (!report.passed) process.exitCode = 1;
-}
+await measure();
 
 function percent(value: number): string {
   return `${(value * 100).toFixed(1)}%`;
 }
 
 async function measure() {
-  const SOURCE = resolve(argument("source") ?? join(ROOT, "apps", "auth-api"));
-  const REPORT = resolve(argument("out") ?? join(OUT_DIR, "report.json"));
+  const SOURCE = join(ROOT, "apps", "auth-api");
+  const REPORT = join(OUT_DIR, "report.json");
   const MIGRATIONS = join(SOURCE, "migrations");
   const checks: RunReport["checks"] = [];
   const check = (name: string, passed: boolean, detail?: unknown) => {
@@ -514,6 +432,15 @@ async function measure() {
   const loaded = new Map<string, LoadedRoute>();
   for (const [, , file] of ROUTES) loaded.set(file, await import(join(SOURCE, "src", "routes", file)));
   const { createWorkerHandler } = await import(join(SOURCE, "src", "server", "worker-handler.ts"));
+  const { requestUser } = await import(join(SOURCE, "src", "server", "request-auth.ts"));
+  const { Effect } = await import("effect");
+  const upstream = { calls: 0 };
+  const upstreamRefusal = async (request: Request) => {
+    const user = await Effect.runPromise(requestUser(request));
+    if (!user) return new Response(null, { status: 401 });
+    upstream.calls += 1;
+    return Response.json({ error: { code: "upstream_refused" } }, { status: 403 });
+  };
 
   const app = createWorkerHandler((request: Request) => {
     const url = new URL(request.url);
@@ -525,6 +452,7 @@ async function measure() {
       const params = Object.fromEntries(names.map((name, index) => [name, decodeURIComponent(match[index + 1] ?? "")]));
       return handler({ request, params });
     }
+    if (request.method === "GET" && url.pathname === "/e2e/upstream-refusal") return upstreamRefusal(request);
     return new Response("not found", { status: 404 });
   });
 
@@ -981,6 +909,20 @@ async function measure() {
     status: missingStatus.status,
     body: missingStatus.body,
   });
+  check(
+    "a GET whose replica read finds no row runs again on the primary before it answers 404",
+    missingStatus.statements.some((statement) => statement.constraint === "first-primary"),
+    { statements: missingStatus.statements.map(describe) },
+  );
+  const callsBefore = upstream.calls;
+  const refused = await send("/e2e/upstream-refusal", { token: OWNER_TOKEN });
+  check(
+    "a 403 from an upstream service, after replica reads that found their rows, calls the upstream only once",
+    refused.status === 403 &&
+      upstream.calls - callsBefore === 1 &&
+      refused.statements.every((statement) => statement.constraint !== "first-primary"),
+    { status: refused.status, calls: upstream.calls - callsBefore, statements: refused.statements.map(describe) },
+  );
 
   await catchUp();
   const newHost = await send("/v2/remote/hosts/register", {
