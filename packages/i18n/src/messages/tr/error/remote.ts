@@ -110,6 +110,8 @@ export const messages = {
   "error.remote.fileTransportIsStopped": "WebRTC dosya iletimi durduruldu.",
   "error.remote.fileTooLarge": "Dosya 100 MB'tan daha büyük.",
   "error.remote.fileSetTooLarge": "Etkin dosya kümesi 250 MB'tan daha büyük.",
+  "error.remote.fileSetBusy":
+    "Aynı anda çok fazla büyük dosya aktarılıyor. Bitmelerini bekleyin, ardından tekrar deneyin.",
   "error.remote.fileTransferTimeout": "WebRTC dosya aktarımı zaman aşımına uğradı.",
   "error.remote.fileTransferFailed": "WebRTC dosya aktarımı başarısız oldu.",
   "error.remote.fileResumeFailed": "WebRTC dosya aktarımı son tarihinden önce sürdürülemedi.",

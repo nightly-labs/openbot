@@ -854,6 +854,7 @@ export class TeamWebRtcHostPeer {
               name,
               mimeType: contentType || "application/octet-stream",
               body: response.body ?? [],
+              expectedSize: declaredContentLength(response.headers.get("content-length")),
             });
             return {
               status: response.status,
@@ -1280,6 +1281,10 @@ interface HttpRequestPayload {
   contentType?: string;
   capabilities?: string[];
   absent?: string[];
+}
+
+function declaredContentLength(header: string | null): number | undefined {
+  return header !== null && /^\d+$/.test(header) ? Number(header) : undefined;
 }
 
 function webRtcPeerProtocol(capabilities: ReadonlySet<string>): number | null {

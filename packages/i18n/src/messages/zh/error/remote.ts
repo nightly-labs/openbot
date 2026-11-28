@@ -97,6 +97,7 @@ export const messages = {
   "error.remote.fileTransportIsStopped": "WebRTC 文件传输已停止。",
   "error.remote.fileTooLarge": "文件大于 100 MB。",
   "error.remote.fileSetTooLarge": "当前文件集合大于 250 MB。",
+  "error.remote.fileSetBusy": "同时传输的大文件过多。请等待传输完成后重试。",
   "error.remote.fileTransferTimeout": "WebRTC 文件传输超时。",
   "error.remote.fileTransferFailed": "WebRTC 文件传输失败。",
   "error.remote.fileResumeFailed": "WebRTC 文件传输未能在截止时间前恢复。",

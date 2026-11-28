@@ -107,6 +107,8 @@ export const messages = defineMessages("error.remote", {
   "error.remote.fileTransportIsStopped": "The WebRTC file transport is stopped.",
   "error.remote.fileTooLarge": "The file is larger than 100 MB.",
   "error.remote.fileSetTooLarge": "The active file set is larger than 250 MB.",
+  "error.remote.fileSetBusy":
+    "Too many large files are moving at the same time. Wait until they finish, then try again.",
   "error.remote.fileTransferTimeout": "The WebRTC file transfer timed out.",
   "error.remote.fileTransferFailed": "The WebRTC file transfer failed.",
   "error.remote.fileResumeFailed": "The WebRTC file transfer could not resume before its deadline.",
