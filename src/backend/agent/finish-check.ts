@@ -47,6 +47,15 @@ const clip = (text: string, limit: number) =>
 
 const clipEnd = (text: string, limit: number) => (text.length <= limit ? text : `…${text.slice(1 - limit)}`);
 
+const MIDDLE_LEFT_OUT = "\n[… the middle of this answer is left out …]\n";
+
+function answerPart(text: string, limit: number): string {
+  if (text.length <= limit) return text;
+  const room = limit - MIDDLE_LEFT_OUT.length;
+  const end = Math.floor((room * 2) / 5);
+  return `${text.slice(0, room - end)}${MIDDLE_LEFT_OUT}${text.slice(-end)}`;
+}
+
 const oneLine = (text: string) => text.replace(/\s+/g, " ").trim();
 
 function resultPart(result: string): string {
@@ -67,7 +76,7 @@ function earlierTurnLines(answers: readonly string[], gaps: readonly string[]): 
             .slice(-EARLIER_ANSWERS)
             .flatMap((answer, index) => [
               `--- answer ${index + 1} ---`,
-              clip(answer.trim(), EARLIER_ANSWER_CHARACTERS),
+              answerPart(answer.trim(), EARLIER_ANSWER_CHARACTERS),
             ]),
           "</earlier-answers>",
         ]
@@ -99,6 +108,8 @@ export function finishCheckPrompt(input: FinishCheckInput): string {
   const shownTools = tools.slice(-STEP_LINES);
   const plan = input.plan?.steps.map((step) => `- [${step.status}] ${oneLine(step.text)}`) ?? [];
   const earlier = earlierTurnLines(input.earlierAnswers ?? [], input.earlierGaps ?? []);
+  const answer = answerPart(input.answer.trim(), ANSWER_CHARACTERS);
+  const partShown = answer.includes(MIDDLE_LEFT_OUT) || earlier.some((line) => line.includes(MIDDLE_LEFT_OUT));
   return [
     `${FINISH_CHECK_MARKER}. You check whether an AI agent finished the user's request. You do not do the work, and you do not talk to the user. Answer with one JSON object only.`,
     "",
@@ -131,8 +142,14 @@ export function finishCheckPrompt(input: FinishCheckInput): string {
     "",
     "The agent's last answer to the user:",
     "<answer>",
-    clip(input.answer.trim(), ANSWER_CHARACTERS),
+    answer,
     "</answer>",
+    ...(partShown
+      ? [
+          "",
+          "A long answer shows only its start and its end. The middle part that is left out is not missing work, and the answer is not cut off: judge the answer from its start and its end.",
+        ]
+      : []),
     "",
     `The request continued automatically ${input.continuations} times before this turn.`,
     ...(input.awaitsTeammate

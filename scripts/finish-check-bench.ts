@@ -61,7 +61,74 @@ function input(
   return { request: [request], context: [], steps, plan: null, answer, continuations: 0, ...extra };
 }
 
+const REVIEWED_AGENTS = [
+  ["Mila", "writes blog drafts"],
+  ["Atlas", "answers customer email"],
+  ["Juno", "does web research"],
+  ["Rex", "runs the weekly sales report"],
+  ["Nova", "fixes code in the app repository"],
+  ["Sage", "plans social posts"],
+  ["Orion", "keeps the calendar"],
+  ["Pixel", "summarizes meetings"],
+  ["Echo", "translates documents"],
+  ["Vega", "checks invoices"],
+  ["Lumen", "designs images"],
+  ["Iris", "tracks news"],
+] as const;
+const REVIEW_REQUEST = "Review the permissions of all my agents. Tell me which ones have more access than they need.";
+function agentReview(index: number): string {
+  const [name, job] = REVIEWED_AGENTS[index] ?? ["Agent", "works"];
+  const full = index % 3 === 0;
+  return [
+    `### ${index + 1}. ${name} (${job})`,
+    `- Access: ${full ? "full computer access" : "workspace only"}. Permissions: ${full ? "full" : index % 3 === 1 ? "ask for approval" : "read only"}. Computer Use: ${index % 2 === 0 ? "on" : "off"}. MCP servers: ${index % 2 === 0 ? "GitHub" : "none"}.`,
+    `- Finding: ${full ? `more access than it needs to ${job}. Use workspace access and "ask for approval".` : "correct for its job."}`,
+    "- Routines, skills and notifications match its job and need no change. The browser profile is the default one and holds no saved sign-ins that the job does not need.",
+  ].join("\n");
+}
+const reviewSteps = (count: number) => [
+  tool("openbot.list_agents"),
+  ...REVIEWED_AGENTS.slice(0, count).map(([name]) => tool(`openbot.read_agent ${name}`)),
+];
+const COMPLETE_REVIEW = [
+  `I reviewed the permissions of all ${REVIEWED_AGENTS.length} agents.`,
+  ...REVIEWED_AGENTS.map((_, index) => agentReview(index)),
+  "## Summary",
+  "- More access than needed: Mila, Rex, Orion and Vega.",
+  "- All other agents have the access that their job needs.",
+  "- I changed no setting.",
+].join("\n\n");
+const HALF_REVIEW = [
+  `I started the review of all ${REVIEWED_AGENTS.length} agents. These are the first 6:`,
+  ...REVIEWED_AGENTS.slice(0, 6).map((_, index) =>
+    [agentReview(index), "- Its last runs used only the tools that its job needs."].join("\n"),
+  ),
+  "Next, I will review the other 6 agents: Orion, Pixel, Echo, Vega, Lumen and Iris.",
+].join("\n\n");
+
 const CASES: Case[] = [
+  {
+    name: "long-complete-review",
+    label: "stop",
+    verdict: "done",
+    input: input(REVIEW_REQUEST, reviewSteps(REVIEWED_AGENTS.length), COMPLETE_REVIEW),
+  },
+  {
+    name: "short-follow-up-to-long-review",
+    label: "stop",
+    verdict: "done",
+    input: input(REVIEW_REQUEST, [], "All agents are reviewed in my answer above. Nothing is left from your request.", {
+      continuations: 1,
+      earlierAnswers: [COMPLETE_REVIEW],
+      earlierGaps: ["Review the permissions of the remaining agents and report them."],
+    }),
+  },
+  {
+    name: "long-review-stops-at-half",
+    label: "continue",
+    verdict: "continue",
+    input: input(REVIEW_REQUEST, reviewSteps(6), HALF_REVIEW),
+  },
   {
     name: "partial-items",
     label: "continue",
@@ -324,6 +391,11 @@ const runCount = Math.max(
   1,
   Number(process.argv.find((argument) => argument.startsWith("--runs="))?.split("=")[1] ?? 1) || 1,
 );
+const caseNames = process.argv
+  .find((argument) => argument.startsWith("--cases="))
+  ?.split("=")[1]
+  ?.split(",");
+const selectedCases = caseNames ? CASES.filter((testCase) => caseNames.includes(testCase.name)) : CASES;
 
 interface Run {
   provider: Provider;
@@ -473,7 +545,7 @@ for (const provider of providers) {
       call = codexCall(cli, model);
     }
     for (let index = 0; index < runCount; index += 1)
-      for (const testCase of CASES) {
+      for (const testCase of selectedCases) {
         try {
           const run = await measure(provider, model, testCase, call);
           runs.push(run);
@@ -524,7 +596,14 @@ const summary = providers.map((provider) => {
   };
 });
 mkdirSync(OUT, { recursive: true });
-const report = { date: new Date().toISOString(), runsPerCase: runCount, cases: CASES.length, summary, runs, failures };
+const report = {
+  date: new Date().toISOString(),
+  runsPerCase: runCount,
+  cases: selectedCases.length,
+  summary,
+  runs,
+  failures,
+};
 writeFileSync(resolve(OUT, "report.json"), `${JSON.stringify(report, null, 2)}\n`);
 process.stdout.write(`${JSON.stringify({ summary, failures }, null, 2)}\nReport: ${resolve(OUT, "report.json")}\n`);
 if (failures.length) process.exit(1);
