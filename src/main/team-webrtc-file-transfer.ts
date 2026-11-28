@@ -199,6 +199,8 @@ export class TeamWebRtcFileTransfer {
           return yield* new RemoteWorkflowError({
             cause: new Error(sourceText("error.remote.fileTransportIsStopped")),
           });
+        const { expectedSize } = input;
+        if (expectedSize !== undefined) yield* remoteDecode(() => this.#checkOutgoing(expectedSize));
         yield* remoteCall(() => mkdir(this.#directory, { recursive: true, mode: 0o700 }));
         const path = join(this.#directory, `${randomUUID()}.outgoing`);
         let file: FileHandle | null = null;
