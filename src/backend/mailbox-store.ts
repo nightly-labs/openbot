@@ -2661,7 +2661,7 @@ export class MailboxStore {
     if (!delivery) return false;
     const messages = this.#messagesById();
     const reply = messages.get(delivery.messageId);
-    if (!reply || !isAnswer(reply)) return false;
+    if (!reply || !isTeammateReply(reply)) return false;
     const deliveries = this.#deliveriesFor(delivery.recipientAgentId);
     const position = deliveries.indexOf(delivery);
     if (position <= 0) return false;
@@ -4638,7 +4638,13 @@ function isChatMessageFromPerson(message: StoredMessage): boolean {
 function isAnswer(
   message: StoredMessage,
 ): message is StoredMessage & { sender: { kind: "agent"; agentId: string }; replyToMessageId: string } {
-  return message.sender.kind === "agent" && message.replyToMessageId !== null && message.expectsReply === false;
+  return isTeammateReply(message) && message.expectsReply === false;
+}
+
+function isTeammateReply(
+  message: StoredMessage,
+): message is StoredMessage & { sender: { kind: "agent"; agentId: string }; replyToMessageId: string } {
+  return message.sender.kind === "agent" && message.replyToMessageId !== null;
 }
 
 function answersSameRequest(
