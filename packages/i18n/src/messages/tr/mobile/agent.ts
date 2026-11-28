@@ -643,6 +643,7 @@ export const messages = {
   "mobile.agent.home.sort.title": "Sohbetleri sırala",
   "mobile.agent.home.sort.manual": "Elle",
   "mobile.agent.home.sort.recent": "Son etkinlik",
+  "mobile.agent.home.sort.name": "Ad",
   "mobile.agent.home.sort.unreadGroup": "Okunmamışlar bir grupta",
   "mobile.agent.home.sort.unreadFirst": "Klasörlerde önce okunmamışlar",
   "mobile.agent.route.appearance": "Görünüm",

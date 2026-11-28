@@ -129,7 +129,7 @@ export const messages = {
   "settings.sendShortcut.title": "Sneltoets voor verzenden",
   "settings.sendShortcut.description": "Kies de toetsen die een bericht verzenden op dit apparaat en in deze browser.",
   "settings.chatOrder.description":
-    "Kies hoe de zijbalk chats op dit apparaat sorteert. Handmatig en Recente activiteit zetten de groep Ongelezen uit.",
+    "Kies hoe de zijbalk chats op dit apparaat sorteert. Handmatig, Recente activiteit en Naam zetten de groep Ongelezen uit.",
   "settings.sendShortcut.enter": "Enter verstuurt",
   "settings.sendShortcut.modEnterMac": "⌘Enter verstuurt",
   "settings.sendShortcut.modEnterWin": "Ctrl+Enter verstuurt",

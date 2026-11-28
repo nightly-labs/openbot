@@ -130,7 +130,7 @@ export const messages = {
   "settings.sendShortcut.title": "Atalho de envio",
   "settings.sendShortcut.description": "Escolha as teclas que enviam uma mensagem neste dispositivo e navegador.",
   "settings.chatOrder.description":
-    "Escolha como a barra lateral ordena as conversas neste dispositivo. Manual e Atividade recente desativam o grupo Não lidas.",
+    "Escolha como a barra lateral ordena as conversas neste dispositivo. Manual, Atividade recente e Nome desativam o grupo Não lidas.",
   "settings.sendShortcut.enter": "Enter para enviar",
   "settings.sendShortcut.modEnterMac": "⌘Enter para enviar",
   "settings.sendShortcut.modEnterWin": "Ctrl+Enter para enviar",

@@ -176,7 +176,7 @@ export function createSidebarDataStore(deps: {
   const chatMovesWhenUnread = (chatId: string) => !(props.mutedAgentIds?.has(chatId) ?? false);
   let heldUnreadKey = "";
   const unreadKey = createMemo(() => {
-    if (chatOrder() === "manual" || chatOrder() === "recent") {
+    if (chatOrder() === "manual" || chatOrder() === "recent" || chatOrder() === "name") {
       heldUnreadKey = "";
       return "";
     }
@@ -244,7 +244,7 @@ export function createSidebarDataStore(deps: {
   }
   let heldActivityKey = "";
   const activityKey = createMemo(() => {
-    if (chatOrder() === "manual") {
+    if (chatOrder() === "manual" || chatOrder() === "name") {
       heldActivityKey = "";
       return "";
     }
@@ -270,10 +270,17 @@ export function createSidebarDataStore(deps: {
     const activity = activityById();
     return [...items].sort((left, right) => (activity.get(right.id) ?? 0) - (activity.get(left.id) ?? 0));
   };
+  const nameCollator = createMemo(() => new Intl.Collator(currentText().locale(), { numeric: true }));
+  const itemName = (item: SidebarChatItem) => (item.kind === "agent" ? item.agent.name : item.channel.name);
+  const byName = (items: SidebarChatItem[]) => {
+    const collator = nameCollator();
+    return [...items].sort((left, right) => collator.compare(itemName(left), itemName(right)));
+  };
   const filteredChats = createChatItems(
     () => ({ channels: filteredChannels(), agents: filteredAgents() }),
     (items) => {
       if (chatOrder() === "recent") return byRecent(items);
+      if (chatOrder() === "name") return byName(items);
       if (chatOrder() !== "unread-first") return items;
       const recent = byRecent(items);
       return [

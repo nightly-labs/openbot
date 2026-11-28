@@ -633,6 +633,7 @@ export const messages = {
   "mobile.agent.home.sort.title": "Chats sorteren",
   "mobile.agent.home.sort.manual": "Handmatig",
   "mobile.agent.home.sort.recent": "Recente activiteit",
+  "mobile.agent.home.sort.name": "Naam",
   "mobile.agent.home.sort.unreadGroup": "Ongelezen in een groep",
   "mobile.agent.home.sort.unreadFirst": "Ongelezen eerst in mappen",
   "mobile.agent.route.appearance": "Uiterlijk",

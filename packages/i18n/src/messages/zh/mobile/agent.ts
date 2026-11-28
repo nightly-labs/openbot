@@ -597,6 +597,7 @@ export const messages = {
   "mobile.agent.home.sort.title": "排序聊天",
   "mobile.agent.home.sort.manual": "手动",
   "mobile.agent.home.sort.recent": "最近活动",
+  "mobile.agent.home.sort.name": "名称",
   "mobile.agent.home.sort.unreadGroup": "未读集中显示",
   "mobile.agent.home.sort.unreadFirst": "文件夹内未读优先",
   "mobile.agent.route.appearance": "外观",

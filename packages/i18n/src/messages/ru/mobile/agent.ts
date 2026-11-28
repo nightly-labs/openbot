@@ -685,6 +685,7 @@ export const messages = {
   "mobile.agent.home.sort.title": "Сортировка чатов",
   "mobile.agent.home.sort.manual": "Вручную",
   "mobile.agent.home.sort.recent": "Недавняя активность",
+  "mobile.agent.home.sort.name": "Название",
   "mobile.agent.home.sort.unreadGroup": "Непрочитанные в группе",
   "mobile.agent.home.sort.unreadFirst": "Непрочитанные первыми в папках",
   "mobile.agent.route.appearance": "Внешний вид",

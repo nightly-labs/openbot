@@ -37,6 +37,7 @@ export const messages = {
   "sidebar.order.title": "מיון צ'אטים",
   "sidebar.order.manual": "ידני",
   "sidebar.order.recent": "פעילות אחרונה",
+  "sidebar.order.name": "שם",
   "sidebar.order.unreadGroup": "לא נקראו בקבוצה",
   "sidebar.order.unreadFirst": "לא נקראו ראשונים בתיקיות",
   "sidebar.topbar.openSettings": "פתיחת ההגדרות של {name}",

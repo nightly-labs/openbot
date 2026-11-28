@@ -36,6 +36,7 @@ export const messages = {
   "sidebar.order.title": "Chats sorteren",
   "sidebar.order.manual": "Handmatig",
   "sidebar.order.recent": "Recente activiteit",
+  "sidebar.order.name": "Naam",
   "sidebar.order.unreadGroup": "Ongelezen in een groep",
   "sidebar.order.unreadFirst": "Ongelezen eerst in mappen",
   "sidebar.topbar.openSettings": "Instellingen voor {name} openen",

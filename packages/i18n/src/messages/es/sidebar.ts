@@ -33,6 +33,7 @@ export const messages = {
   "sidebar.order.title": "Ordenar chats",
   "sidebar.order.manual": "Manual",
   "sidebar.order.recent": "Actividad reciente",
+  "sidebar.order.name": "Nombre",
   "sidebar.order.unreadGroup": "No leídos en un grupo",
   "sidebar.order.unreadFirst": "No leídos primero en carpetas",
   "sidebar.topbar.openSettings": "Abrir ajustes de {name}",

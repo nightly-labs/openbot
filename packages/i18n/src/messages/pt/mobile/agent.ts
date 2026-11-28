@@ -640,6 +640,7 @@ export const messages = {
   "mobile.agent.home.sort.title": "Ordenar conversas",
   "mobile.agent.home.sort.manual": "Manual",
   "mobile.agent.home.sort.recent": "Atividade recente",
+  "mobile.agent.home.sort.name": "Nome",
   "mobile.agent.home.sort.unreadGroup": "Não lidas em um grupo",
   "mobile.agent.home.sort.unreadFirst": "Não lidas primeiro nas pastas",
   "mobile.agent.route.appearance": "Aparência",

@@ -33,6 +33,7 @@ export const messages = {
   "sidebar.order.title": "排序聊天",
   "sidebar.order.manual": "手动",
   "sidebar.order.recent": "最近活动",
+  "sidebar.order.name": "名称",
   "sidebar.order.unreadGroup": "未读集中显示",
   "sidebar.order.unreadFirst": "文件夹内未读优先",
   "sidebar.topbar.openSettings": "打开 {name} 的设置",

@@ -293,6 +293,11 @@ export const RecentActivity: Story = {
   decorators: [(Story) => <div style={{ width: "280px", height: "100vh" }}>{Story()}</div>],
 };
 
+export const SortedByName: Story = {
+  args: { chatOrder: "name", pinnedItems: pinnedOne },
+  decorators: [(Story) => <div style={{ width: "280px", height: "100vh" }}>{Story()}</div>],
+};
+
 export const UnreadGroup: Story = {
   args: { chatOrder: "unread-group", pinnedItems: pinnedOne },
   decorators: [(Story) => <div style={{ width: "280px", height: "100vh" }}>{Story()}</div>],

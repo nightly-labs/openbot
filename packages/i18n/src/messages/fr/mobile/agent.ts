@@ -646,6 +646,7 @@ export const messages = {
   "mobile.agent.home.sort.title": "Trier les discussions",
   "mobile.agent.home.sort.manual": "Manuel",
   "mobile.agent.home.sort.recent": "Activité récente",
+  "mobile.agent.home.sort.name": "Nom",
   "mobile.agent.home.sort.unreadGroup": "Non lues dans un groupe",
   "mobile.agent.home.sort.unreadFirst": "Non lues en tête des dossiers",
   "mobile.agent.route.appearance": "Apparence",

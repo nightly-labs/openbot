@@ -120,7 +120,7 @@ export const messages = {
   "settings.externalLinks.fallback.description": "链接已在默认浏览器中打开。",
   "settings.sendShortcut.title": "发送快捷键",
   "settings.sendShortcut.description": "选择在这台设备和浏览器上发送消息的按键。",
-  "settings.chatOrder.description": "选择此设备的侧栏如何排列聊天。选择手动或最近活动会关闭未读分组。",
+  "settings.chatOrder.description": "选择此设备的侧栏如何排列聊天。选择手动、最近活动或名称会关闭未读分组。",
   "settings.sendShortcut.enter": "按 Enter 发送",
   "settings.sendShortcut.modEnterMac": "按 ⌘Enter 发送",
   "settings.sendShortcut.modEnterWin": "按 Ctrl+Enter 发送",

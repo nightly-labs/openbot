@@ -124,7 +124,7 @@ export const messages = defineMessages("settings", {
   "settings.sendShortcut.title": "Send shortcut",
   "settings.sendShortcut.description": "Choose the keys that send a message on this device and browser.",
   "settings.chatOrder.description":
-    "Choose how the sidebar sorts chats on this device. Manual and Recent activity turn off the Unread group.",
+    "Choose how the sidebar sorts chats on this device. Manual, Recent activity and Name turn off the Unread group.",
   "settings.sendShortcut.enter": "Enter to send",
   "settings.sendShortcut.modEnterMac": "⌘Enter to send",
   "settings.sendShortcut.modEnterWin": "Ctrl+Enter to send",

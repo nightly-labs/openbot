@@ -130,7 +130,7 @@ export const messages = {
   "settings.sendShortcut.title": "Scorciatoia di invio",
   "settings.sendShortcut.description": "Scegli i tasti che inviano un messaggio su questo dispositivo e browser.",
   "settings.chatOrder.description":
-    "Scegli come la barra laterale ordina le chat su questo dispositivo. Manuale e Attività recente disattivano il gruppo Non lette.",
+    "Scegli come la barra laterale ordina le chat su questo dispositivo. Manuale, Attività recente e Nome disattivano il gruppo Non lette.",
   "settings.sendShortcut.enter": "Invio per inviare",
   "settings.sendShortcut.modEnterMac": "⌘Invio per inviare",
   "settings.sendShortcut.modEnterWin": "Ctrl+Invio per inviare",
