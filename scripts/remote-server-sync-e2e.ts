@@ -72,6 +72,7 @@ import {
   decodeRoutines,
   decodeSidebarPinsFromHost,
 } from "../src/main/remote-agent-decoding";
+import { addRemotePreviewUrls, parseRemoteAvatarUrl } from "../src/main/remote-server-urls";
 import type { RemoteWorkflowError } from "../src/main/remote-service-effects";
 import { SidebarPinStore } from "../src/main/sidebar-pin-store";
 import type { TeamApiBrowser } from "../src/main/team-api/dependencies";
@@ -81,6 +82,18 @@ const APP_VERSION = "0.0.0-e2e";
 const STEP_DEADLINE_MS = 30_000;
 const OWNER = { username: "owner-user", password: "owner-password-123" };
 const CHANNELS = CHANNELS_SYNC_COLLECTION.name;
+const PICTURE_ATTACHMENT = {
+  id: "sync-picture",
+  name: "picture.png",
+  size: 16,
+  kind: "image",
+  mimeType: "image/png",
+  previewKind: "image",
+  previewUrl: null,
+} as const;
+const PNG_PICTURE = new Uint8Array([
+  0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0, 0, 0, 13, 0x49, 0x48, 0x44, 0x52,
+]);
 
 delete process.env.ELECTRON_RENDERER_URL;
 
@@ -608,6 +621,9 @@ try {
           )
         ).id;
       const first = await createChannel("First room");
+      const picture = { mimeType: "image/png" as const, bytes: PNG_PICTURE };
+      await runCauseEffect(service.setAvatar(agent.id, picture));
+      await runCauseEffect(service.channels.setImage(first, picture));
       server = new TeamApiServer({
         store: team,
         agents: service,
@@ -702,7 +718,10 @@ try {
     const before = proxyListCalls();
     const reads = await Promise.all([1, 2, 3].map(() => readChannels(manager, serverId)));
     assert.equal(proxyListCalls(), before, "A read after the first sync made an HTTP list call.");
-    const host = await wire(CHANNEL_ROUTES.list, { method: "GET", token }, decodeChannelSummaries);
+    const host = addRemotePreviewUrls(
+      await wire(CHANNEL_ROUTES.list, { method: "GET", token }, decodeChannelSummaries),
+      serverId,
+    );
     for (const read of reads) assert.deepEqual(byId(read), byId(host), "The synced copy differs from the HTTP list.");
     const events = syncChangedSends(serverId);
     assert.ok(events > 0, "Main did not send agent:sync-changed to the window.");
@@ -713,6 +732,22 @@ try {
       sameAsHttp: true,
       syncChangedEvents: events,
     };
+  });
+
+  await step("Synced agents and channels point their pictures at the joined server", async () => {
+    const synced = await until(manager, () => manager.sync.agents.values(serverId));
+    const channels = await until(manager, () => manager.sync.channels.values(serverId));
+    const avatarUrl = synced.find((agent) => agent.id === agentId)?.avatarUrl ?? "";
+    const imageUrl = channels.find((channel) => channel.id === first)?.imageUrl ?? "";
+    assert.deepEqual(parseRemoteAvatarUrl(avatarUrl)?.serverId, serverId, `The synced agent photo is ${avatarUrl}.`);
+    assert.deepEqual(parseRemoteAvatarUrl(imageUrl)?.serverId, serverId, `The synced channel picture is ${imageUrl}.`);
+    const http = await runCauseEffect(manager.request(serverId, TEAM_API_ROUTES.agents.all, decodeAgentSummaries));
+    assert.equal(
+      avatarUrl,
+      http.find((agent) => agent.id === agentId)?.avatarUrl,
+      "The synced photo differs from HTTP.",
+    );
+    return { avatarUrl: avatarUrl.split("?")[0], imageUrl: imageUrl.split("?")[0] };
   });
 
   await step("A channel change on the host reaches the client", async () => {
@@ -936,7 +971,10 @@ try {
   await step(
     "agent-messages.v1: the latest conversation page equals the desktop HTTP page; a new message, an edit, a reaction and a delete arrive with no HTTP page call",
     async () => {
-      const question = conversationMessage("sync-u1", "user", "Sync question.");
+      const question = {
+        ...conversationMessage("sync-u1", "user", "Sync question."),
+        attachments: [{ ...PICTURE_ATTACHMENT }],
+      };
       const answer = conversationMessage("sync-a1", "assistant", "Sync answer.");
       writeAgentMessages([question, answer]);
       const pageEvents: ConversationPage[] = [];
@@ -982,6 +1020,11 @@ try {
       const final = conversationRead.synced(manager, serverId);
       assert.ok(final, "The conversation page is not synced.");
       assert.ok(!final.messages.some((message) => message.id === second.id), "The deleted message is still shown.");
+      const previewUrl = final.messages.find((message) => message.id === question.id)?.attachments?.[0]?.previewUrl;
+      assert.ok(
+        previewUrl?.startsWith(`openbot-remote-attachment://${serverId}/`),
+        `The synced attachment preview is ${previewUrl}.`,
+      );
       return {
         firstReadHttpCalls: opened.firstReadHttpCalls,
         sameAsHttp: opened.sameAsHttp,
