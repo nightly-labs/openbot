@@ -32,6 +32,7 @@ export interface UsageSample {
   previousTokens?: UsageTokens | null;
   costCounterId?: string;
   zeroCostUnpriced?: boolean;
+  listPriceFirst?: boolean;
 }
 
 export interface SkillLoadSample {
@@ -163,16 +164,15 @@ export class AgentUsage {
         );
         const occurredAt =
           sample.occurredAt ?? (turn ? requiredStringColumn(turn, "occurred_at") : new Date().toISOString());
-        const estimate =
-          reported ??
-          estimateUsageCost(
-            sample.provider,
-            sample.model,
-            delta,
-            sample.lastRequestInputTokens ?? null,
-            sample.smallestRequestInputTokens ?? null,
-            occurredAt,
-          );
+        const listed = estimateUsageCost(
+          sample.provider,
+          sample.model,
+          delta,
+          sample.lastRequestInputTokens ?? null,
+          sample.smallestRequestInputTokens ?? null,
+          occurredAt,
+        );
+        const estimate = sample.listPriceFirst && listed.cost !== null ? listed : (reported ?? listed);
         db.prepare("INSERT INTO agent_usage_records VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)").run(
           sample.agentId,
           digest,

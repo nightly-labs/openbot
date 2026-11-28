@@ -171,6 +171,7 @@ export function collectProviderUsage(
     tokens: acpTokens(value),
     reportedCost,
     zeroCostUnpriced: sessionCost,
+    listPriceFirst: session.provider === "deepseek",
   });
 }
 
