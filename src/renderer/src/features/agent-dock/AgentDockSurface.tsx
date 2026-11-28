@@ -187,10 +187,8 @@ export function AgentDockSurface() {
     shrinkTimer = undefined;
   };
 
-  const stripFeelKept = () => autoHide && edgeStrip;
-
   function syncExtent(settled = false) {
-    const withStrip = isTucked || stripFeelKept();
+    const withStrip = isTucked || stripOn();
     const body = withStrip && edgeStrip ? agentDockBody()?.getBoundingClientRect() : undefined;
     if (menuOpen()) menuWanted = false;
     const extent =
@@ -494,7 +492,7 @@ export function AgentDockSurface() {
             onShapeChange={
               SHAPED_WINDOW || FITTED_WINDOW
                 ? (parts) => {
-                    const keepRestShape = FITTED_WINDOW && tuckMoving && stripFeelKept() && dockShape !== null;
+                    const keepRestShape = FITTED_WINDOW && tuckMoving && stripOn() && dockShape !== null;
                     if (parts === null && keepRestShape) return;
                     if (parts !== null) tuckMoving = false;
                     dockShape = parts;

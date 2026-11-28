@@ -65,7 +65,13 @@ import { selectionColorProps } from "@/shared/lib/selection-color";
 import { useText } from "@/shared/lib/text";
 import { END_X, fieldDirectionStyle, layoutDirection, MIRROR_IN_RTL, textDirection } from "@/shared/lib/text-direction";
 import { editMentionDraft, insertMention, mentionDraft, mentionQuery } from "../model/chat-mentions";
-import { composerField, composerFieldParts, syncComposerField, typedComposerField } from "../model/composer-field";
+import {
+  composerField,
+  composerFieldParts,
+  shownComposerField,
+  syncComposerField,
+  typedComposerField,
+} from "../model/composer-field";
 import { applyMarkdownListEdit, markdownListReturn } from "../model/composer-lists";
 import { largePastedText } from "../model/composer-paste";
 import { createComposerSendGate } from "../model/composer-send";
@@ -354,6 +360,10 @@ export const ChatComposer = memo(function ChatComposer({
   useLayoutEffect(() => {
     if (fieldClears) inputRef.current?.clear();
   }, [fieldClears]);
+  const fieldBlank = syncedField.blank;
+  useLayoutEffect(() => {
+    if (fieldBlank) setField(shownComposerField);
+  }, [fieldBlank]);
   const insets = useSafeAreaInsets();
   const barWidth = useColumnWidth() - insets.left - insets.right;
   const lineHeight = 22 * fontScale;
