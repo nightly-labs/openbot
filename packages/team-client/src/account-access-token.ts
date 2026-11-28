@@ -209,8 +209,8 @@ export class AccountAccessTokens {
       rememberAccountBookmark(url, response);
       if (response.status === 404) return "unsupported";
       if (!response.ok) return null;
-      const value = await response.json();
-      return grantFrom(value, sentAt, this.#now(), response.headers.get("Date"));
+      const value = await response.json().catch(() => null);
+      return grantFrom(value, sentAt, this.#now(), response.headers.get("Date")) ?? "unsupported";
     } catch {
       return null;
     } finally {
