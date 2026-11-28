@@ -9,6 +9,7 @@ import { DEFAULT_TEAM_MEMBER_LIMIT } from "@openbot/contracts/input-limits";
 import { isAvatarColor } from "@openbot/contracts/ipc";
 import { isSignalHomeId } from "@openbot/contracts/ipc-host-signal-home";
 import type { MobileConnectHostBinding } from "@openbot/contracts/mobile-connect";
+import { INGRESS_TICKET_ROUTES, type IngressTicketRoute } from "@openbot/contracts/remote-control-plane";
 import { type DynamicRecord, isDynamicRecord, isOneOf, isString } from "@openbot/contracts/runtime-values";
 import type { RemoteAuthEvent } from "@openbot/contracts/signal-protocol/auth-events";
 import {
@@ -460,6 +461,43 @@ export type RemoteResumeClaims = Pick<
 >;
 
 export const REMOTE_RESUME_BATCH_LIMIT = 100;
+
+interface IngressRouteError {
+  error: string;
+}
+
+interface IngressTicketResults {
+  slack?: { ticket: string; teams: string[] } | IngressRouteError;
+  discord?: { ticket: string } | IngressRouteError;
+  telegram?: { ticket: string; chats: string[] } | IngressRouteError;
+  webhook?: { ticket: string; routes: string[] };
+}
+
+interface IngressRouteRow {
+  id: string;
+  parent_id: string;
+  linked_at: number;
+}
+
+const INGRESS_ROUTE_QUERIES: Record<IngressTicketRoute, string> = {
+  slack:
+    "SELECT team_id AS id, app_id AS parent_id, connected_at AS linked_at FROM slack_workspace_routes WHERE host_id = ? ORDER BY connected_at DESC LIMIT ?",
+  discord:
+    "SELECT guild_id AS id, '' AS parent_id, connected_at AS linked_at FROM discord_guild_routes WHERE host_id = ? ORDER BY connected_at DESC LIMIT ?",
+  telegram:
+    "SELECT chat_id AS id, bot_id AS parent_id, linked_at FROM telegram_chat_routes WHERE host_id = ? ORDER BY linked_at DESC LIMIT ?",
+  webhook: `SELECT route_id AS id, '' AS parent_id, connected_at AS linked_at FROM webhook_routes
+    WHERE host_id = ? AND revoked_at IS NULL
+      AND account_id = (SELECT owner_user_id FROM remote_hosts WHERE host_id = ?)
+    ORDER BY connected_at DESC LIMIT ?`,
+};
+
+function ingressRouteBindings(route: IngressTicketRoute, hostId: string): (string | number)[] {
+  if (route === "slack") return [hostId, SLACK_ROUTE_TEAMS_LIMIT];
+  if (route === "discord") return [hostId, DISCORD_ROUTE_GUILDS_LIMIT];
+  if (route === "telegram") return [hostId, TELEGRAM_ROUTE_CHATS_LIMIT];
+  return [hostId, hostId, WEBHOOK_ROUTES_LIMIT];
+}
 
 type RemoteResumeHostRow = Pick<RemoteHostRow, "host_id" | "owner_user_id" | "auth_epoch">;
 
@@ -3648,6 +3686,96 @@ export class RemoteControlPlane {
         }),
         chats: chats.map((chat) => chat.id),
       };
+    },
+    (operation) => operation.pipe(Effect.provide(this.#layer)),
+  ).bind(this);
+
+  readonly issueIngressTickets = Effect.fn("RemoteControlPlane.issueIngressTickets")(
+    function* (
+      this: RemoteControlPlane,
+      hostId: string,
+      machineToken: string,
+      wanted: ReadonlySet<IngressTicketRoute>,
+    ) {
+      const dependencies = yield* RemoteDependencies;
+      const host = yield* this.authenticateHost(hostId, machineToken);
+      const signal = dependencies.signal;
+      if (!signal) return yield* remoteSignalNotConfigured();
+      const routeSigner = dependencies.routeSigner;
+      const discordSigner = dependencies.discordRouteSigner;
+      const configured: Record<IngressTicketRoute, boolean> = {
+        slack: routeSigner !== null,
+        discord: discordSigner !== null,
+        telegram: routeSigner !== null && dependencies.telegram !== null,
+        webhook: true,
+      };
+      const reads = INGRESS_TICKET_ROUTES.filter((route) => wanted.has(route) && configured[route]);
+      const statements = reads.map((route) =>
+        dependencies.database.prepare(INGRESS_ROUTE_QUERIES[route]).bind(...ingressRouteBindings(route, hostId)),
+      );
+      const results =
+        statements.length === 0
+          ? []
+          : yield* remoteCall(() => dependencies.database.batch<IngressRouteRow>(statements));
+      const rowsOf = (route: IngressTicketRoute): IngressRouteRow[] => results[reads.indexOf(route)]?.results ?? [];
+      const now = dependencies.now();
+      const routes: IngressTicketResults = {};
+      if (wanted.has("slack"))
+        if (!routeSigner) routes.slack = { error: "slack_not_configured" };
+        else {
+          const teams = rowsOf("slack").map((row) => ({ id: row.id, appId: row.parent_id, linkedAt: row.linked_at }));
+          routes.slack = {
+            ticket: yield* routeSigner.issue({
+              audience: SLACK_ROUTE_AUDIENCE,
+              claims: { hid: hostId, teams } satisfies Omit<SlackRouteClaims, "aud" | "iat" | "exp">,
+              ttlSeconds: SLACK_ROUTE_TTL_SECONDS,
+              now,
+            }),
+            teams: teams.map((team) => team.id),
+          };
+        }
+      if (wanted.has("discord"))
+        if (!discordSigner) routes.discord = { error: "discord_not_configured" };
+        else {
+          const guilds = rowsOf("discord").map((row) => ({ id: row.id, linkedAt: row.linked_at }));
+          routes.discord = { ticket: yield* discordSigner.issue({ hostId, guilds, now }) };
+        }
+      if (wanted.has("telegram"))
+        if (!routeSigner || !dependencies.telegram) routes.telegram = { error: "telegram_not_configured" };
+        else {
+          const chats: TelegramRouteChat[] = rowsOf("telegram").map((row) => ({
+            id: row.id,
+            botId: row.parent_id,
+            linkedAt: row.linked_at,
+          }));
+          routes.telegram = {
+            ticket: yield* routeSigner.issue({
+              audience: TELEGRAM_ROUTE_AUDIENCE,
+              claims: { hid: hostId, chats } satisfies Omit<TelegramRouteClaims, "aud" | "iat" | "exp">,
+              ttlSeconds: TELEGRAM_ROUTE_TTL_SECONDS,
+              now,
+            }),
+            chats: chats.map((chat) => chat.id),
+          };
+        }
+      if (wanted.has("webhook")) {
+        const webhookRoutes = rowsOf("webhook").map((row) => ({ id: row.id, linkedAt: row.linked_at }));
+        routes.webhook = {
+          ticket: yield* dependencies.signer.issueWebhookRoute({ hostId, routes: webhookRoutes, now }),
+          routes: webhookRoutes.map((route) => route.id),
+        };
+      }
+      const issued = yield* dependencies.signer.issue({
+        sessionId: `host-${hostId}`,
+        hostId,
+        userId: host.owner_user_id,
+        membershipId: `${hostId}:host`,
+        role: "host",
+        authEpoch: host.auth_epoch,
+        sessionExpiresAt: PERSISTENT_SESSION_EXPIRES_AT,
+        now,
+      });
+      return { ...issued, signalUrl: signal.entryUrl, routes };
     },
     (operation) => operation.pipe(Effect.provide(this.#layer)),
   ).bind(this);
