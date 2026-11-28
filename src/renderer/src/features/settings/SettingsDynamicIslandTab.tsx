@@ -168,7 +168,7 @@ export function SettingsDynamicIslandTab(props: SettingsDynamicIslandTabProps) {
       <SettingsSection
         data-settings-row="settings.notch.size.title"
         title={i18n.t("settings.notch.size.title")}
-        description={linux() ? undefined : i18n.t("settings.notch.size.description")}
+        description={isMac() ? i18n.t("settings.notch.size.description") : undefined}
         actions={
           <Button
             type="button"
@@ -183,7 +183,7 @@ export function SettingsDynamicIslandTab(props: SettingsDynamicIslandTabProps) {
       >
         <ItemGroup class="settings-modal-card settings-dynamic-island-size">
           <div class="settings-dynamic-island-preview">
-            <Show when={!linux()}>
+            <Show when={isMac()}>
               <figure class="settings-dynamic-island-preview-display">
                 <PreviewFit widestWidth={widestBuiltInWidth()}>
                   <OpenBotDynamicIsland
@@ -216,7 +216,7 @@ export function SettingsDynamicIslandTab(props: SettingsDynamicIslandTabProps) {
                   onAction={() => undefined}
                 />
               </PreviewFit>
-              <Show when={!linux()}>
+              <Show when={isMac()}>
                 <figcaption class="settings-dynamic-island-preview-caption">
                   {i18n.t("settings.notch.size.previewIsland")}
                 </figcaption>

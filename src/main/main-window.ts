@@ -1015,12 +1015,12 @@ export function loadAgentDockRenderer(window: BrowserWindow): Promise<void> {
 }
 
 export function loadDynamicIslandRenderer(window: BrowserWindow, display: Display, variant: AppVariant): Promise<void> {
-  const notchDisplay = process.platform !== "linux";
-  const displayMode = notchDisplay && display.internal ? "notch" : "island";
+  const displayMode = process.platform === "darwin" && display.internal ? "notch" : "island";
   const developmentUrl = process.env.ELECTRON_RENDERER_URL;
   const url = helperRendererUrl(developmentUrl);
   url.searchParams.set("surface", "dynamic-island");
   url.searchParams.set("display", displayMode);
+  if (display.internal) url.searchParams.set("built-in", "true");
   url.searchParams.set("variant", variant);
   const notch = dynamicIslandNotchSizeForDisplay(display, process.platform);
   if (notch) {

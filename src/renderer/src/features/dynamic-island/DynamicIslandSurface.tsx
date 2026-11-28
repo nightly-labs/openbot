@@ -36,6 +36,7 @@ export function DynamicIslandSurface() {
   const { t } = useText();
   const query = new URLSearchParams(window.location.search);
   const displayMode = query.get("display") === "island" ? "island" : "notch";
+  const builtInDisplay = query.get("built-in") === "true";
   const variant = readAppVariant(query.get("variant"));
   const queryNotchWidth = query.get("notch-width");
   const initialNotchSize: DynamicIslandNotchSize | undefined =
@@ -314,6 +315,7 @@ export function DynamicIslandSurface() {
             presentation={presentation()}
             state={viewState()}
             displayMode={displayMode}
+            builtInDisplay={builtInDisplay}
             variant={variant}
             notchSize={displayMode === "notch" ? notchSize() : undefined}
             widthPercent={preference().widthPercent}
