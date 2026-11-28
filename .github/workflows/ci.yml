@@ -97,7 +97,7 @@ jobs:
           fi
           lane_unless desktop '^(apps/(auth-api|browser-extension|mobile|mobile-updates|site-router|status)|docker|remote)/'
           lane api '^(apps/(auth-api|site-router)|src/renderer|resources)/|^(apps/mobile/)?CHANGELOG\.md$'
-          lane remote '^(remote|scripts)/'
+          lane remote '^(remote|scripts)/|^src/main/team-webrtc-host-gateway\.ts$'
           lane storybook '^(src|apps/(auth-api|status)|\.storybook|resources|marketplace|build)/'
           lane schema '^(src/backend/|scripts/released-schema-fixtures\.ts$)'
           lane surfaces '^(apps/(browser-extension|mobile|mobile-updates|site-router|status)|remote|scripts)/'
@@ -283,6 +283,10 @@ jobs:
         if: ${{ !cancelled() }}
         run: bun run test:signal-handoff
 
+      - name: Run the host Signal home follow E2E test
+        if: ${{ !cancelled() }}
+        run: bun run test:host-signal-home-follow
+
       - name: Run the direct remote protocol E2E test
         if: ${{ !cancelled() }}
         run: bun run test:remote-protocol
@@ -320,6 +324,7 @@ jobs:
             .openbot-build/signal-security-e2e/
             .openbot-build/signal-cross-home/
             .openbot-build/signal-handoff/
+            .openbot-build/host-signal-home-follow-e2e/
             .openbot-build/remote-protocol-e2e/
             .openbot-build/d1-request-session-e2e/
             .openbot-build/account-access-token/

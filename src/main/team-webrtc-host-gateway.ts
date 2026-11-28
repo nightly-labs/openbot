@@ -136,6 +136,8 @@ export class TeamWebRtcHostGateway {
   #signalEnded = false;
   #signalHomed = false;
   #signalMoves = 0;
+  #signalHomeUnconfirmed = false;
+  #signalHomeChecks = 0;
   #signalRenewalRefused = false;
   #connecting: Fiber.Fiber<void, RemoteWorkflowError> | null = null;
   #signalRecovery: Fiber.Fiber<void> | null = null;
@@ -182,6 +184,7 @@ export class TeamWebRtcHostGateway {
     this.#signalHomed = ticketNamesSignalHome(input.ticket);
     this.#signalHome = ticketSignalHome(input.ticket);
     this.#signalMoves = 0;
+    this.#forgetSignalHomeDoubt();
     this.#signalRenewalRefused = false;
     this.#localApiPort = input.localApiPort;
     this.#startSignalHomeReturnCheck();
@@ -216,6 +219,7 @@ export class TeamWebRtcHostGateway {
       this.#signalUrl = null;
       this.#signalHome = null;
       this.#signalMoves = 0;
+      this.#forgetSignalHomeDoubt();
       this.#signalRenewalRefused = false;
       this.#stopSignalHomeReturnCheck();
       this.#cancelSignalHomeFollow();
@@ -264,6 +268,7 @@ export class TeamWebRtcHostGateway {
             }
             if (this.#signalUrl === signalUrlBefore) {
               logger.warn("Host Signal home change failed; the host keeps its Signal.");
+              if (this.#signalHomeUnconfirmed && !refused) this.#checkSignalHomeLater();
               return;
             }
             logger.warn("Host Signal home change failed; the host asks for another home.");
@@ -280,10 +285,26 @@ export class TeamWebRtcHostGateway {
     yield* Fiber.join(fiber);
   }).bind(this);
 
-  scheduleSignalHomeFollow(): void {
+  scheduleSignalHomeFollow(delayMs = SIGNAL_HOME_FOLLOW_DELAY_MS): void {
     this.#cancelSignalHomeFollow();
     if (!this.#hostId) return;
-    this.#signalHomeFollowTimer = setTimeout(this.#followSignalHomeNow, SIGNAL_HOME_FOLLOW_DELAY_MS);
+    this.#signalHomeFollowTimer = setTimeout(this.#followSignalHomeNow, delayMs);
+  }
+
+  #doubtSignalHome(): void {
+    this.#signalHomeUnconfirmed = true;
+  }
+
+  #forgetSignalHomeDoubt(): void {
+    this.#signalHomeUnconfirmed = false;
+    this.#signalHomeChecks = 0;
+  }
+
+  #checkSignalHomeLater(): void {
+    const delay = Math.min(SIGNAL_MOVE_AFTER_MS * 2 ** this.#signalHomeChecks, SIGNAL_MOVE_LIMIT_MS);
+    this.#signalHomeChecks += 1;
+    logger.info(`Host Signal home is not confirmed; the host checks it again in ${Math.round(delay / 1000)} s.`);
+    this.scheduleSignalHomeFollow(delay);
   }
 
   #cancelSignalHomeFollow(): void {
@@ -427,6 +448,10 @@ export class TeamWebRtcHostGateway {
     this.#signalMoves = 0;
     this.#cancelSignalMove();
     this.#cancelSignalLostReport();
+    if (this.#signalHomeUnconfirmed) {
+      logger.info("Host Signal socket is ready after a failed move; the host checks its home.");
+      this.scheduleSignalHomeFollow();
+    }
     if (this.#signalLostReported) {
       this.#signalLostReported = false;
       logger.info("Host Signal socket is ready again.");
@@ -504,6 +529,7 @@ export class TeamWebRtcHostGateway {
               return;
             }
             if (refused) return;
+            this.#doubtSignalHome();
             logger.warn(
               `Host Signal move failed; the host tries again in ${Math.round(this.#signalMoveDelay() / 1000)} s.`,
             );
@@ -545,8 +571,10 @@ export class TeamWebRtcHostGateway {
         Effect.catch(({ cause }) =>
           Effect.sync(() => {
             if (this.#hostId !== hostId) return;
-            this.#noteRenewalRefused(cause);
+            if (this.#noteRenewalRefused(cause)) return;
             logger.warn("Host Signal move after a drain notice failed; the host keeps its Signal.");
+            this.#doubtSignalHome();
+            this.#checkSignalHomeLater();
           }),
         ),
       ),
@@ -610,6 +638,7 @@ export class TeamWebRtcHostGateway {
     if (!renew) return;
     const bootstrap = yield* renew(hostId, failedSignalUrl);
     if (this.#hostId !== hostId) return;
+    this.#forgetSignalHomeDoubt();
     if (failedSignalUrl !== undefined && bootstrap.signalUrl === failedSignalUrl && !this.#signalEnded) return;
     if (onlyToMove && bootstrap.signalUrl === this.#signalUrl && !this.#signalEnded) return;
     if (keepsOpenPeers && !this.#signalEnded) {
