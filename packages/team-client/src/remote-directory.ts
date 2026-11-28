@@ -105,10 +105,41 @@ export class RemoteDirectoryError extends Schema.TaggedError<RemoteDirectoryErro
   message: Schema.String,
   code: Schema.NullOr(Schema.String),
   reference: Schema.NullOr(Schema.String),
+  retryAfterSeconds: Schema.optional(Schema.Number),
 }) {
-  constructor(status: number, message: string, code: string | null = null, reference: string | null = null) {
-    super({ status, message, code, reference: reference ?? referenceFrom("http", status, code) });
+  constructor(
+    status: number,
+    message: string,
+    code: string | null = null,
+    reference: string | null = null,
+    retryAfterSeconds?: number,
+  ) {
+    super({
+      status,
+      message,
+      code,
+      reference: reference ?? referenceFrom("http", status, code),
+      ...(retryAfterSeconds === undefined ? {} : { retryAfterSeconds }),
+    });
   }
+}
+
+export function inviteEmailRateLimitedText(retryAfterSeconds: number | undefined): string {
+  return retryAfterSeconds === undefined
+    ? sourceText("error.kind.rateLimit")
+    : sourceText("error.team.inviteEmailRateLimited", { count: Math.max(1, Math.ceil(retryAfterSeconds / 60)) });
+}
+
+function inviteEmailFailure(error: DirectoryFailure): DirectoryFailure {
+  return error instanceof RemoteDirectoryError && error.code === "email_delivery_rate_limited"
+    ? new RemoteDirectoryError(
+        error.status,
+        inviteEmailRateLimitedText(error.retryAfterSeconds),
+        error.code,
+        error.reference,
+        error.retryAfterSeconds,
+      )
+    : error;
 }
 class RemoteDirectoryOperationError extends Schema.TaggedError<RemoteDirectoryOperationError>()(
   "RemoteDirectoryOperationError",
@@ -335,7 +366,7 @@ export class RemoteTeamDirectoryClient {
         Effect.catch((error) =>
           this.revokeInvite(invite.inviteId).pipe(
             Effect.catch(() => Effect.void),
-            Effect.andThen(Effect.fail(error)),
+            Effect.andThen(Effect.fail(inviteEmailFailure(error))),
           ),
         ),
       );
@@ -653,7 +684,12 @@ export class RemoteTeamDirectoryClient {
           });
           rememberAccountBookmark(url, response);
           const value = yield* directoryIO(() => response.json()).pipe(Effect.catch(() => Effect.succeed(null)));
-          if (!response.ok) return yield* directoryError(response.status, value);
+          if (!response.ok)
+            return yield* directoryError(
+              response.status,
+              value,
+              parseRetryAfterSeconds(response.headers.get("Retry-After")),
+            );
           return value;
         }),
       ({ controller, timer }) =>
@@ -689,7 +725,20 @@ function decodeInvitePreview(value: unknown, expectedHostId: string): RemoteInvi
   };
 }
 
-function directoryError(status: number, value: unknown): RemoteDirectoryError {
+export function parseRetryAfterSeconds(value: string | null): number | undefined {
+  if (value === null) return undefined;
+  const trimmed = value.trim();
+  if (/^\d+$/u.test(trimmed)) {
+    const seconds = Number.parseInt(trimmed, 10);
+    return seconds > 0 ? seconds : undefined;
+  }
+  const retryAt = Date.parse(trimmed);
+  if (!Number.isFinite(retryAt)) return undefined;
+  const seconds = Math.ceil((retryAt - Date.now()) / 1_000);
+  return seconds > 0 ? seconds : undefined;
+}
+
+function directoryError(status: number, value: unknown, retryAfter?: number): RemoteDirectoryError {
   const body = isDynamicRecord(value) ? value.error : undefined;
   if (isString(body)) return new RemoteDirectoryError(status, body);
   if (!isDynamicRecord(body)) return new RemoteDirectoryError(status, sourceText("error.remote.serviceRequestFailed"));
@@ -700,7 +749,7 @@ function directoryError(status: number, value: unknown): RemoteDirectoryError {
     : isString(body.message)
       ? body.message
       : sourceText("error.remote.serviceRequestFailed");
-  return new RemoteDirectoryError(status, message, code, safeReference(body.reference));
+  return new RemoteDirectoryError(status, message, code, safeReference(body.reference), retryAfter);
 }
 
 function decodeMember(value: unknown): RemoteTeamMember {

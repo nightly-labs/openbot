@@ -19,6 +19,11 @@ export const messages = {
   "error.team.activeInviteLimit": "Bir ana makine en fazla {limit} etkin davete sahip olabilir.",
   "error.team.inviteInvalid": "Davet geçersiz veya süresi dolmuş.",
   "error.team.inviteEmailMismatch": "Bu davet farklı bir e-posta adresine ait.",
+  "error.team.inviteEmailRateLimited": {
+    one: "OpenBot şu anda daha fazla e-posta gönderemiyor. {count} dakika bekleyin, ardından daveti yeniden gönderin.",
+    other:
+      "OpenBot şu anda daha fazla e-posta gönderemiyor. {count} dakika bekleyin, ardından daveti yeniden gönderin.",
+  },
   "error.team.memberDisabled": "Bu ekip üyesi devre dışı bırakılmış.",
   "error.team.memberLimit": "Bir ana makine en fazla {limit} üyeye sahip olabilir.",
   "error.team.accountNotMember": "Bu OpenBot hesabı ekibin bir üyesi değil.",

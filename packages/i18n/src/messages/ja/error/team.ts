@@ -19,6 +19,9 @@ export const messages = {
   "error.team.activeInviteLimit": "1 つのホストで有効にできる招待は最大 {limit} 件です。",
   "error.team.inviteInvalid": "招待が無効か、期限が切れています。",
   "error.team.inviteEmailMismatch": "この招待は別のメールアドレス宛てです。",
+  "error.team.inviteEmailRateLimited": {
+    other: "OpenBot は現在これ以上メールを送信できません。{count} 分待ってから、もう一度招待を送信してください。",
+  },
   "error.team.memberDisabled": "このチームメンバーは無効になっています。",
   "error.team.memberLimit": "1 つのホストのメンバーは最大 {limit} 人です。",
   "error.team.accountNotMember": "この OpenBot アカウントはチームのメンバーではありません。",

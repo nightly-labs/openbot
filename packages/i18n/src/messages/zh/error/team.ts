@@ -19,6 +19,9 @@ export const messages = {
   "error.team.activeInviteLimit": "一台主机最多可有 {limit} 个有效邀请。",
   "error.team.inviteInvalid": "邀请无效或已过期。",
   "error.team.inviteEmailMismatch": "该邀请属于另一个邮箱地址。",
+  "error.team.inviteEmailRateLimited": {
+    other: "OpenBot 暂时无法发送更多邮件。请等待 {count} 分钟后再发送邀请。",
+  },
   "error.team.memberDisabled": "该团队成员已被禁用。",
   "error.team.memberLimit": "一台主机最多可有 {limit} 名成员。",
   "error.team.accountNotMember": "该 OpenBot 账号不是团队成员。",

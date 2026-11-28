@@ -18,6 +18,10 @@ export const messages = defineMessages("error.team", {
   "error.team.activeInviteLimit": "A host can have up to {limit} active invitations.",
   "error.team.inviteInvalid": "The invitation is invalid or expired.",
   "error.team.inviteEmailMismatch": "This invitation belongs to a different email address.",
+  "error.team.inviteEmailRateLimited": {
+    one: "OpenBot cannot send more email right now. Wait {count} minute, then send the invitation again.",
+    other: "OpenBot cannot send more email right now. Wait {count} minutes, then send the invitation again.",
+  },
   "error.team.memberDisabled": "This team member is disabled.",
   "error.team.memberLimit": "A host can have up to {limit} members.",
   "error.team.accountNotMember": "This OpenBot account is not a member of the team.",
