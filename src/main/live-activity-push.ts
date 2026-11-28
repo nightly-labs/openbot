@@ -153,7 +153,7 @@ export class LiveActivityPushService {
     const registration = this.#registrations.get(sessionId);
     if (!registration || !away(registration)) return false;
     if (registration.failures > 0) return false;
-    if (this.#now() >= (startedAt ?? registration.startedAt) + ACTIVITY_LIFETIME_MS) return false;
+    if (startedAt === null || this.#now() >= startedAt + ACTIVITY_LIFETIME_MS) return false;
     if (!presentationShows(this.#read(registration).presentation, subject)) return false;
     if (alert) {
       registration.alert = alert;

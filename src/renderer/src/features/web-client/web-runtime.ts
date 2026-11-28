@@ -366,6 +366,7 @@ interface WebOwnerTransfers {
   incoming(): Promise<OwnerTransfer[]>;
   accept(transferId: string): Promise<AcceptedOwnerTransfer>;
   decline(transferId: string): Promise<void>;
+  listedKey?(): string | null;
 }
 
 export interface WebWorkspaceRuntime {
@@ -1472,6 +1473,7 @@ export function createWebWorkspaceRuntime(
       incoming: () => runTeamEffect(directory.incomingOwnerTransfers()),
       accept: (transferId) => runTeamEffect(directory.acceptOwnerTransfer(transferId)),
       decline: (transferId) => runTeamEffect(directory.declineOwnerTransfer(transferId)),
+      listedKey: () => directory.listedOwnerTransfersKey(),
     },
     async removeOwnedHost(hostId) {
       const response = await accountFetch(`/api/browser/v2/remote/hosts/${encodeURIComponent(hostId)}`, {

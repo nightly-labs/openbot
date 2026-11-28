@@ -1378,6 +1378,7 @@ export const messages = {
   "mobile.server.planLimits.windowLeft": "{window} {percent}% over",
   "mobile.server.planLimits.resetsAt": "Herstelt {time}",
   "mobile.server.planLimits.empty": "Nog geen aanbieder heeft zijn limieten gemeld.",
+  "mobile.server.planLimits.notReported": "Geen gebruiksgegevens",
   "mobile.server.planLimits.more": "+{number}",
   "mobile.server.planLimits.window.limit": "Limiet",
   "mobile.server.planLimits.window.weekly": "Wekelijks",
