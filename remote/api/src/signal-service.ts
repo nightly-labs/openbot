@@ -8,7 +8,12 @@ import {
   isIngressQueueKey,
   type QueuedSignalMessage,
 } from "@openbot/contracts/signal-protocol/ingress-queue";
-import { INGRESS_ROUTES_CAPABILITY } from "@openbot/contracts/signal-protocol/messages";
+import {
+  INGRESS_ROUTES_CAPABILITY,
+  SIGNAL_GO_AWAY_CAPABILITY,
+  SIGNAL_GO_AWAY_WITHIN_MS_LIMIT,
+  SIGNAL_RESUME_FROM_CAPABILITY,
+} from "@openbot/contracts/signal-protocol/messages";
 import type { SlackRouteTeam } from "@openbot/contracts/signal-protocol/slack-route";
 import {
   TELEGRAM_CAPABILITY,
@@ -85,6 +90,7 @@ export interface RemoteTokenProvider {
   verifyResumeToken(token: string): Effect.Effect<RemoteTicketClaims, RemoteTokenError | RemoteTokenUnavailableError>;
   validateClaims(claims: RemoteTicketClaims): Effect.Effect<boolean, RemoteTokenUnavailableError>;
   issueResumeToken(claims: RemoteTicketClaims): Effect.Effect<string, RemoteTokenError>;
+  verifyContinuity?(token: string, ticket: RemoteTicketClaims): Effect.Effect<boolean>;
   iceServers(claims: RemoteTicketClaims): IceServer[];
   verifySlackRoute?(token: string, hostId: string): Effect.Effect<SlackRoute, RemoteTokenError>;
   validateSlackRoute?(hostId: string, teams: SlackRouteTeam[]): Effect.Effect<string[], RemoteTokenError>;
@@ -139,7 +145,26 @@ interface AuthenticatedPeer {
   webhookFormats: ReadonlySet<string>;
   githubRepositories: string[];
   watchRelay: boolean;
+  goAway: boolean;
   turnCredentials: { iceServers: IceServer[]; issuedAt: number } | null;
+}
+
+export interface SignalGoAwayWaves {
+  waveSize: number;
+  waveIntervalMs: number;
+  withinMs: number;
+}
+
+interface SignalDrain {
+  withinMs: number;
+  hostIds: Set<string>;
+  timers: Set<ReturnType<typeof setTimeout>>;
+}
+
+const CLIENT_GO_AWAY_WINDOW_MS = 5_000;
+
+function clientGoAwayWindow(drain: SignalDrain): number {
+  return Math.min(drain.withinMs, CLIENT_GO_AWAY_WINDOW_MS);
 }
 
 interface ActiveConnection {
@@ -435,6 +460,7 @@ export class SignalService {
   #sibling: SignalSibling | null = null;
   #draining = false;
   #lastRatePruneAt = 0;
+  #drain: SignalDrain | null = null;
   readonly #metrics: SignalMetrics = {
     acceptedConnections: 0,
     authenticationFailures: 0,
@@ -662,6 +688,8 @@ export class SignalService {
     this.#connectionDropTimers.clear();
     this.#peerExpirationTimers.clear();
     this.#helloTimers.clear();
+    for (const timer of this.#drain?.timers ?? []) clearTimeout(timer);
+    this.#drain?.timers.clear();
     for (const requestId of [...this.#pendingDeliveries.keys()]) this.#settleDelivery(requestId, null);
     for (const requestId of [...this.#pendingWatchRequests.keys()]) this.#settleWatch(requestId, "closed");
     this.#queue.close();
@@ -736,7 +764,7 @@ export class SignalService {
           connectionId: message.connectionId,
           resumeToken,
           iceServers: peer.turnCredentials.iceServers,
-          ...this.#capabilities(peer.peer),
+          ...this.#capabilities(peer),
         });
         return;
       }
@@ -811,7 +839,10 @@ export class SignalService {
       if (peer.peer === "host") {
         const hostSockets = this.#hosts.get(peer.claims.hostId);
         hostSockets?.delete(socket.id);
-        if (hostSockets?.size === 0) this.#hosts.delete(peer.claims.hostId);
+        if (hostSockets?.size === 0) {
+          this.#hosts.delete(peer.claims.hostId);
+          this.#sendClientsGoAway(peer.claims.hostId);
+        }
       }
       if (peer.peer === "ingress") {
         for (const route of peer.slackTeams) {
@@ -1549,8 +1580,62 @@ export class SignalService {
     }),
   );
 
-  #capabilities(peer: AuthenticatedPeer["peer"]): { capabilities?: string[] } {
-    if (peer !== "ingress") return {};
+  goAway(waves: SignalGoAwayWaves): { hosts: number; waves: number; withoutCapability: number } {
+    const withinMs = Math.min(Math.max(0, Math.floor(waves.withinMs)), SIGNAL_GO_AWAY_WITHIN_MS_LIMIT);
+    const drain = this.#drain ?? { withinMs, hostIds: new Set<string>(), timers: new Set() };
+    drain.withinMs = withinMs;
+    this.#drain = drain;
+    const hostIds: string[] = [];
+    let withoutCapability = 0;
+    for (const hostId of this.#hosts.keys()) {
+      if (drain.hostIds.has(hostId)) continue;
+      if (this.#currentHost(hostId)?.goAway) hostIds.push(hostId);
+      else withoutCapability += 1;
+    }
+    const waveSize = Math.max(1, Math.floor(waves.waveSize));
+    const waveCount = Math.ceil(hostIds.length / waveSize);
+    for (let wave = 0; wave < waveCount; wave += 1) {
+      const batch = hostIds.slice(wave * waveSize, (wave + 1) * waveSize);
+      for (const hostId of batch) drain.hostIds.add(hostId);
+      const send = () => {
+        for (const hostId of batch) this.#sendHostGoAway(hostId);
+      };
+      if (wave === 0) {
+        send();
+        continue;
+      }
+      const timer = setTimeout(() => {
+        drain.timers.delete(timer);
+        send();
+      }, wave * Math.max(0, waves.waveIntervalMs));
+      timer.unref?.();
+      drain.timers.add(timer);
+    }
+    return { hosts: hostIds.length, waves: waveCount, withoutCapability };
+  }
+
+  #sendHostGoAway(hostId: string): void {
+    const drain = this.#drain;
+    if (!drain) return;
+    drain.hostIds.add(hostId);
+    for (const socketId of this.#hosts.get(hostId) ?? []) {
+      const host = this.#peers.get(socketId);
+      if (host?.goAway) this.#send(host.socket, { type: "go-away", version: 1, withinMs: drain.withinMs });
+    }
+  }
+
+  #sendClientsGoAway(hostId: string): void {
+    const drain = this.#drain;
+    if (!drain?.hostIds.has(hostId)) return;
+    for (const peer of this.#peers.values()) {
+      if (peer.peer === "client" && peer.goAway && peer.claims.hostId === hostId)
+        this.#send(peer.socket, { type: "go-away", version: 1, withinMs: clientGoAwayWindow(drain) });
+    }
+  }
+
+  #capabilities(peer: AuthenticatedPeer): { capabilities?: string[] } {
+    if (peer.peer !== "ingress")
+      return peer.goAway ? { capabilities: [SIGNAL_GO_AWAY_CAPABILITY, SIGNAL_RESUME_FROM_CAPABILITY] } : {};
     const capabilities = [
       ...(this.#telegram ? [TELEGRAM_CAPABILITY] : []),
       ...(this.#queue.enabled ? [INGRESS_QUEUE_CAPABILITY] : []),
@@ -1756,7 +1841,20 @@ export class SignalService {
             if (!(yield* sibling.claimTicket(claims)))
               return yield* new RemoteTokenError({ message: "Ticket was already used." });
           }
-          return { claims, slackRoute, telegramRoute, discordRoute, webhookRoute, githubRoute, resumeToken };
+          const continued =
+            usedInitialTicket && message.peer === "client" && message.resumeFrom && tokens.verifyContinuity
+              ? yield* tokens.verifyContinuity(message.resumeFrom, claims)
+              : false;
+          return {
+            claims,
+            slackRoute,
+            telegramRoute,
+            discordRoute,
+            webhookRoute,
+            githubRoute,
+            resumeToken,
+            continued,
+          };
         }).pipe(Effect.result);
         if (Result.isFailure(authentication)) {
           const failure = authentication.failure;
@@ -1784,7 +1882,7 @@ export class SignalService {
           socket.close(1013, NOT_ENTRY_REASON);
           return;
         }
-        const { claims, slackRoute, telegramRoute, discordRoute, webhookRoute, githubRoute, resumeToken } =
+        const { claims, slackRoute, telegramRoute, discordRoute, webhookRoute, githubRoute, resumeToken, continued } =
           authentication.success;
         const replaced = message.peer === "client" ? this.#clientForSession(claims) : null;
         if (
@@ -1801,7 +1899,7 @@ export class SignalService {
           peer: message.peer,
           connectionId: null,
           releasedConnectionId: null,
-          resumed: !usedInitialTicket,
+          resumed: !usedInitialTicket || continued,
           multiplex: message.peer === "host" && message.multiplex === true,
           slackTeams: slackRoute.teams.map((team) => slackRouteKey(team.appId, team.id)),
           telegramChats: [],
@@ -1813,6 +1911,7 @@ export class SignalService {
             githubRepositoryKey(repository.installationId, repository.id),
           ),
           watchRelay: message.peer === "ingress" && message.watchRelay === true,
+          goAway: message.peer !== "ingress" && message.goAway === true,
           turnCredentials: null,
         };
         this.#peers.set(socket.id, peer);
@@ -1874,7 +1973,7 @@ export class SignalService {
             connectionId: null,
             resumeToken,
             iceServers: this.#tokens.iceServers(claims),
-            ...this.#capabilities("ingress"),
+            ...this.#capabilities(peer),
           });
           if (webhookRoute.routes.length > 0) {
             this.#send(socket, { type: "webhook-ready", version: 1 });
@@ -1911,9 +2010,11 @@ export class SignalService {
             connectionId: null,
             resumeToken,
             iceServers: this.#tokens.iceServers(claims),
+            ...this.#capabilities(peer),
           });
           this.#sendEndedHostSessions(peer);
           yield* this.#restoreWaitingClients(peer);
+          if (this.#drain) this.#sendHostGoAway(claims.hostId);
           return;
         }
         const host = this.#currentHost(claims.hostId);
@@ -1921,6 +2022,8 @@ export class SignalService {
           if (replaced && peer.resumed) peer.releasedConnectionId = replaced.releasedConnectionId;
           if (replaced && this.#peers.has(replaced.socket.id)) this.#replaceClientPeer(replaced);
           this.#send(socket, { type: "host-waiting", version: 1, resumeToken });
+          if (peer.goAway && this.#drain?.hostIds.has(claims.hostId))
+            this.#send(socket, { type: "go-away", version: 1, withinMs: clientGoAwayWindow(this.#drain) });
           return;
         }
         if (!host) {
@@ -1960,6 +2063,7 @@ export class SignalService {
           resumeToken,
           iceServers: this.#tokens.iceServers(claims),
           reconnectGraceMs: this.#reconnectGrace(host),
+          ...this.#capabilities(peer),
         });
         this.#send(host.socket, {
           type: "peer-ready",
@@ -2141,6 +2245,7 @@ export class SignalService {
           resumeToken,
           iceServers: this.#tokens.iceServers(client.claims),
           reconnectGraceMs: this.#reconnectGrace(host),
+          ...this.#capabilities(client),
         });
         this.#send(host.socket, {
           type: "peer-ready",

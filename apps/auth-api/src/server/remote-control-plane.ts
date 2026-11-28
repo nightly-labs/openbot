@@ -961,6 +961,84 @@ class DiscordRouteSigner {
   }).bind(this);
 }
 
+function lastBuilt<Input, Value>(
+  keyOf: (input: Input) => readonly (string | undefined)[],
+  build: (input: Input) => Value,
+): (input: Input) => Value {
+  let last: { key: readonly (string | undefined)[]; value: Value } | null = null;
+  return (input) => {
+    const key = keyOf(input);
+    if (last?.key.every((part, index) => part === key[index])) return last.value;
+    const value = build(input);
+    last = { key, value };
+    return value;
+  };
+}
+
+type RouteSignerBindings = Pick<
+  WorkerBindings,
+  | "REMOTE_TICKET_PUBLIC_JWKS"
+  | "SLACK_ROUTE_PRIVATE_JWK"
+  | "SLACK_ROUTE_KEY_ID"
+  | "DISCORD_ROUTE_PRIVATE_JWK"
+  | "DISCORD_ROUTE_KEY_ID"
+>;
+
+const sharedRouteSigner = lastBuilt(
+  (bindings: RouteSignerBindings) => [
+    bindings.SLACK_ROUTE_PRIVATE_JWK,
+    bindings.SLACK_ROUTE_KEY_ID,
+    bindings.REMOTE_TICKET_PUBLIC_JWKS,
+  ],
+  (bindings) =>
+    bindings.SLACK_ROUTE_PRIVATE_JWK && bindings.SLACK_ROUTE_KEY_ID && bindings.REMOTE_TICKET_PUBLIC_JWKS
+      ? new RouteSigner({
+          privateJwk: bindings.SLACK_ROUTE_PRIVATE_JWK,
+          publicJwks: bindings.REMOTE_TICKET_PUBLIC_JWKS,
+          keyId: bindings.SLACK_ROUTE_KEY_ID,
+        })
+      : null,
+);
+
+const sharedDiscordRouteSigner = lastBuilt(
+  (bindings: RouteSignerBindings) => [
+    bindings.DISCORD_ROUTE_PRIVATE_JWK,
+    bindings.DISCORD_ROUTE_KEY_ID,
+    bindings.REMOTE_TICKET_PUBLIC_JWKS,
+  ],
+  (bindings) =>
+    bindings.DISCORD_ROUTE_PRIVATE_JWK && bindings.DISCORD_ROUTE_KEY_ID && bindings.REMOTE_TICKET_PUBLIC_JWKS
+      ? new DiscordRouteSigner({
+          privateJwk: bindings.DISCORD_ROUTE_PRIVATE_JWK,
+          publicJwks: bindings.REMOTE_TICKET_PUBLIC_JWKS,
+          keyId: bindings.DISCORD_ROUTE_KEY_ID,
+        })
+      : null,
+);
+
+const sharedSignalPlan = lastBuilt(
+  (
+    bindings: Pick<
+      WorkerBindings,
+      "REMOTE_SIGNAL_URL" | "REMOTE_SIGNAL_HOMES" | "REMOTE_SIGNAL_HOME_LOCATIONS" | "REMOTE_SIGNAL_HOME_COUNTRIES"
+    >,
+  ) => [
+    bindings.REMOTE_SIGNAL_URL,
+    bindings.REMOTE_SIGNAL_HOMES,
+    bindings.REMOTE_SIGNAL_HOME_LOCATIONS,
+    bindings.REMOTE_SIGNAL_HOME_COUNTRIES,
+  ],
+  remoteSignalPlan,
+);
+
+const sharedWebhookUrls = lastBuilt(
+  (bindings: Pick<WorkerBindings, "REMOTE_AUTH_WEBHOOK_URL" | "REMOTE_AUTH_WEBHOOK_URLS">) => [
+    bindings.REMOTE_AUTH_WEBHOOK_URLS,
+    bindings.REMOTE_AUTH_WEBHOOK_URL,
+  ],
+  remoteAuthWebhookUrls,
+);
+
 const ticketSigners = new Map<string, { config: TicketSignerConfig; signer: RemoteTicketSigner }>();
 
 function sharedTicketSigner(config: TicketSignerConfig): RemoteTicketSigner {
@@ -1037,29 +1115,15 @@ export class RemoteControlPlane {
       publicJwks: bindings.REMOTE_TICKET_PUBLIC_JWKS,
       keyId: bindings.REMOTE_TICKET_KEY_ID,
     });
-    const routeSigner =
-      bindings.SLACK_ROUTE_PRIVATE_JWK && bindings.SLACK_ROUTE_KEY_ID
-        ? new RouteSigner({
-            privateJwk: bindings.SLACK_ROUTE_PRIVATE_JWK,
-            publicJwks: bindings.REMOTE_TICKET_PUBLIC_JWKS,
-            keyId: bindings.SLACK_ROUTE_KEY_ID,
-          })
-        : null;
-    const discordRouteSigner =
-      bindings.DISCORD_ROUTE_PRIVATE_JWK && bindings.DISCORD_ROUTE_KEY_ID
-        ? new DiscordRouteSigner({
-            privateJwk: bindings.DISCORD_ROUTE_PRIVATE_JWK,
-            publicJwks: bindings.REMOTE_TICKET_PUBLIC_JWKS,
-            keyId: bindings.DISCORD_ROUTE_KEY_ID,
-          })
-        : null;
+    const routeSigner = sharedRouteSigner(bindings);
+    const discordRouteSigner = sharedDiscordRouteSigner(bindings);
     const telegramBotId = bindings.TELEGRAM_BOT_ID?.trim();
     const telegramBotUsername = bindings.TELEGRAM_BOT_USERNAME?.trim();
     const telegram =
       telegramBotId && telegramBotUsername && TELEGRAM_BOT_ID_PATTERN.test(telegramBotId)
         ? { botId: telegramBotId, botUsername: telegramBotUsername }
         : null;
-    const webhookUrls = remoteAuthWebhookUrls(bindings);
+    const webhookUrls = sharedWebhookUrls(bindings);
     const webhookSecret = bindings.REMOTE_AUTH_WEBHOOK_SECRET?.trim() || null;
     const fetcher: RemoteFetch = options.fetch ?? ((input, init) => fetch(input, init));
     const now = options.now ?? Date.now;
@@ -1073,7 +1137,7 @@ export class RemoteControlPlane {
       now,
       schedule,
       fetch: fetcher,
-      signal: remoteSignalPlan(bindings),
+      signal: sharedSignalPlan(bindings),
       webhookUrls,
       webhookSecret,
       hostState:

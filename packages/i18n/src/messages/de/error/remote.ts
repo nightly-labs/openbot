@@ -17,6 +17,8 @@ export const messages = {
   "error.remote.testPanelFailed": "Der Host konnte das Testfenster nicht öffnen.",
   "error.remote.sessionCapacity": "Der Host hat bereits vier aktive Sitzungen.",
   "error.remote.linuxNeedsX11": "Remote-Desktop unter Linux benötigt eine X11-Sitzung. Wayland wird nicht unterstützt.",
+  "error.remote.macosUpdateRequired":
+    "Remote-Desktop benötigt auf dem Host macOS {version} oder neuer. Aktualisiere macOS auf dem Host und versuche es dann erneut.",
   "error.remote.runtimeMissing":
     "Die Sunshine- und Moonlight-Web-Laufzeit fehlt oder wird auf diesem Host nicht unterstützt. Installiere die vollständige OpenBot-Version auf einem Mac, einem Windows-x64-Host oder einem Linux-x64-Host und starte OpenBot neu.",
   "error.remote.testActive": "Ein Remote-Desktop-Test ist aktiv. Versuche es nach seinem Abschluss erneut.",

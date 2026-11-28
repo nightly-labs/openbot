@@ -276,6 +276,9 @@ jobs:
       - name: Run the Signal E2E test
         run: bun run test:signal
 
+      - name: Run the Signal cross-home E2E test
+        if: ${{ !cancelled() }}
+        run: bun run test:signal-cross-home
       - name: Run the Signal same-home handoff E2E test
         if: ${{ !cancelled() }}
         run: bun run test:signal-handoff
@@ -311,6 +314,7 @@ jobs:
           name: signal-security-e2e
           path: |
             .openbot-build/signal-security-e2e/
+            .openbot-build/signal-cross-home/
             .openbot-build/signal-handoff/
             .openbot-build/remote-protocol-e2e/
             .openbot-build/d1-request-session-e2e/
@@ -1569,6 +1573,18 @@ jobs:
           include-hidden-files: true
           if-no-files-found: error
           retention-days: 3
+
+      - name: Run the account Worker cost E2E test
+        run: bun run test:worker-cost
+
+      - name: Upload the account Worker cost report
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: worker-cost-report
+          path: .openbot-build/worker-cost/report.json
+          if-no-files-found: ignore
+          retention-days: 7
 
   storybook:
     name: Storybook build

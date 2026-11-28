@@ -25,6 +25,7 @@ export interface BridgeCommand {
     | "send"
     | "restart-ice"
     | "renew-host-signal"
+    | "move-signal"
     | "set-private-network"
     | "open-egress"
     | "close-egress"
@@ -68,6 +69,7 @@ interface MainBridgeMessage {
   remoteFingerprint?: string;
   iceServers?: RTCIceServer[];
   retryInMs?: number;
+  withinMs?: number;
 }
 
 interface PeerState {
@@ -246,6 +248,11 @@ async function handleCommand(command: BridgeCommand): Promise<void> {
       await restartIce(requirePeer(command.peerId));
     } else if (command.type === "renew-host-signal") {
       for (const state of peers.values()) if (state.role === "host" && !state.signalHost) replaceSignal(state);
+    } else if (command.type === "move-signal") {
+      const state = peers.get(command.peerId);
+      if (!command.signalUrl || !command.token || state?.role !== "host" || state.signalHost || state.closed)
+        throw new Error("The WebRTC connection command is invalid.");
+      moveSignal(state, command.signalUrl, command.token);
     } else if (command.type === "set-private-network") {
       const host = peers.get(command.peerId);
       if (host) setPrivateNetwork(host, command.privateNetwork === true);
@@ -345,7 +352,7 @@ function connectSignal(state: PeerState, prepared: WebSocket | null = null): voi
       version: SIGNAL_PROTOCOL_VERSION,
       peer: state.role,
       token: state.resumeToken ?? state.token,
-      ...(state.role === "host" ? { multiplex: true } : {}),
+      ...(state.role === "host" ? { multiplex: true, goAway: true } : {}),
       ...(state.waitForHost ? { waitForHost: true } : {}),
     };
     socket.send(JSON.stringify(hello));
@@ -421,6 +428,11 @@ async function handleSignal(state: PeerState, message: SignalServerMessage): Pro
   }
   if (message.type === "sessions-ended") {
     if (state.role === "host" && !state.signalHost) endSessions(state, message.sessionIds);
+    return;
+  }
+  if (message.type === "go-away") {
+    if (state.role === "host" && !state.signalHost)
+      post({ type: "signal-go-away", peerId: state.id, withinMs: message.withinMs });
     return;
   }
   if (message.type === "account-profile-changed") {
@@ -987,6 +999,15 @@ function replaceSignal(state: PeerState): void {
   state.socket = null;
   socket?.close(1000, "Network changed");
   connectSignal(state);
+}
+
+function moveSignal(host: PeerState, signalUrl: string, token: string): void {
+  for (const client of [...host.clients.values()])
+    if (client.channels.rpc?.readyState !== "open") disconnect(client.id);
+  host.signalUrl = signalUrl;
+  host.token = token;
+  host.resumeToken = null;
+  replaceSignal(host);
 }
 
 function markClientsUnconfirmed(host: PeerState): void {

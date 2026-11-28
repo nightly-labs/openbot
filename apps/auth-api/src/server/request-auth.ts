@@ -119,12 +119,12 @@ export function requestAuthService(): AuthService {
 
 export function requestCompanySignIn(): CompanySignInService {
   const bindings = requireWorkerBindings(env);
-  const remote = new RemoteControlPlane(bindings, { schedule });
+  const remote = lazyRemoteControlPlane(bindings);
   return new CompanySignInService(bindings, {
     flushSessionRevocations: () => Effect.sync(() => schedule(deliverPendingRemoteAuthEvents(bindings, Date.now()))),
     revokeMembership: (actorUserId, hostId, membershipId) =>
-      remote.changeMembership(actorUserId, { hostId, membershipId, revoke: true }).pipe(Effect.asVoid),
-    joinServer: (hostId, userId, options) => remote.joinByCompanySignIn(hostId, userId, options),
+      remote().changeMembership(actorUserId, { hostId, membershipId, revoke: true }).pipe(Effect.asVoid),
+    joinServer: (hostId, userId, options) => remote().joinByCompanySignIn(hostId, userId, options),
   });
 }
 
@@ -555,6 +555,14 @@ export function requestRemoteControlPlane(): RemoteControlPlane {
   return new RemoteControlPlane(requireWorkerBindings(env), { schedule });
 }
 
+function lazyRemoteControlPlane(bindings: WorkerBindings): () => RemoteControlPlane {
+  let remote: RemoteControlPlane | null = null;
+  return () => {
+    remote ??= new RemoteControlPlane(bindings, { schedule });
+    return remote;
+  };
+}
+
 export function requestWatchSessions(): WatchSessions {
   const bindings = requireWorkerBindings(env);
   const limiter = bindings.WATCH_TICKET_RATE_LIMITER;
@@ -578,12 +586,12 @@ export function requestHostedServerService(request?: Request): HostedServerServi
 
 function requestHostedBilling(developerKey: string | null = null) {
   const bindings = requireWorkerBindings(env);
-  const remote = new RemoteControlPlane(bindings, { schedule });
+  const remote = lazyRemoteControlPlane(bindings);
   return createHostedBilling(bindings, {
-    removeHost: (ownerUserId, hostId) => remote.deleteHost(ownerUserId, hostId),
+    removeHost: (ownerUserId, hostId) => remote().deleteHost(ownerUserId, hostId),
     developerKey,
-    planChanged: (hostId) => remote.planChanged(hostId),
-    licenseChanged: (userId) => remote.licenseChanged(userId),
+    planChanged: (hostId) => remote().planChanged(hostId),
+    licenseChanged: (userId) => remote().licenseChanged(userId),
     schedule,
   });
 }

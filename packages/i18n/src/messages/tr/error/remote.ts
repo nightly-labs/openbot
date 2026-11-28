@@ -16,6 +16,8 @@ export const messages = {
   "error.remote.testPanelFailed": "Ana makine test panelini açamadı.",
   "error.remote.sessionCapacity": "Ana makinede zaten dört etkin oturum var.",
   "error.remote.linuxNeedsX11": "Linux'ta uzak masaüstü bir X11 oturumuna ihtiyaç duyar. Wayland desteklenmez.",
+  "error.remote.macosUpdateRequired":
+    "Uzak masaüstü için ana bilgisayarda macOS {version} veya sonrası gerekir. Ana bilgisayarda macOS'i güncelleyin, sonra yeniden deneyin.",
   "error.remote.runtimeMissing":
     "Sunshine ve Moonlight Web çalışma zamanı eksik veya bu ana makinede desteklenmiyor. Mac, Windows x64 veya Linux x64 ana makinesine tam OpenBot sürümünü yükleyin, ardından OpenBot'u yeniden başlatın.",
   "error.remote.testActive": "Bir uzak masaüstü testi etkin. Bittiğinde tekrar deneyin.",
