@@ -49,6 +49,7 @@ export interface DeploymentRow {
   objects_deleted_at: number | null;
   activation_authorized_at: number | null;
   in_flight_uploads: number;
+  last_upload_claim_at: number | null;
   upload_claims: number;
   upload_bytes_claimed: number;
 }
