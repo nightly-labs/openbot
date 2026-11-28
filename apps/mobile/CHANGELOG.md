@@ -58,10 +58,13 @@ the [root changelog](../../CHANGELOG.md).
 - The app loads the code of a feature when it first uses it, not when it starts. A server change, such as a new agent state, now updates fewer of the screens that are under an open sheet or page, and a navigation no longer prepares the options of all screens again.
 - The agent list on the home screen and the iPad rail stays smooth with many agents. Before, a reply from one agent made all rows draw again.
 - A chat starts to load its messages when you tap its row, before the chat screen opens, so it opens with less wait.
-- When the app cannot connect to a server, it waits longer between the groups of attempts: 15 s, then
-  two times longer each time, up to 5 minutes. A refresh, a network change or a return to the
-  app tries again at once.
 - Long chats scroll and stream more smoothly. A new piece of a reply now updates only the reply that changes, not each message in the chat.
+- Plan limits now shows a connected Gemini account with "No usage reading", as the desktop app does. Gemini does not give its plan limit to other apps, so no bar shows for it. Before, Gemini was not in the list, and it was not clear why.
+- The app now signs account requests with a short access token that lasts about 10 minutes, not
+  with the sign-in token. The account service can then check most requests without a database read.
+  Sign-out, billing and the session list still use the sign-in token.
+- The app gets the server transfers that wait for you with the server list, and makes fewer calls
+  to the account service.
 
 ### Fixed
 
@@ -97,6 +100,29 @@ the [root changelog](../../CHANGELOG.md).
 - When many words of a reply come at once, they now fade in faster instead of showing without a fade.
 - At the end of a long reply, the rest of the text now comes in over a short time instead of in one jump.
 - A reply that you watch no longer shows all its text at once when the chat reconnects. When you go back to the app or to the chat, the reply continues from where it was.
+- When you change the provider, model or reasoning of an agent while it works, the app now saves the change, and the agent uses it from its next turn, as on the desktop app. The agent settings show the new choice at once. Before, the app said "Wait for the active turn and queue to finish before changing provider." and kept the settings open.
+- On an iPad in windowed mode, the button that opens the server list is now clear of the window controls in the top-left corner, so you can tap it again. Before, the window controls covered it when the chat list showed beside the chat.
+- The iPhone gets notifications for agent replies again when its Live Activity has ended or Live Activities are off, after you open the OpenBot app once. Before, the computer kept sending the replies to the old Live Activity for up to 8 hours, so nothing showed and no sound played until OpenBot restarted on the computer. The computer or server that runs the agents must also be on the new OpenBot version; the iPhone app does not need an update.
+- The connection status no longer shows a retry time that does not move while the app tries to reconnect. Before, it showed for example `Reconnecting · 1/5 · 0:03` for the whole attempt. Now it shows only the attempt number, and the countdown starts when the app waits for the next try.
+- On iPhone, when iOS cannot load a photo that you pick for a chat, the app now tells you to open
+  the photo in the Photos app until it shows fully and to try again. Before, the app still showed a
+  technical error, for example "Cannot load representation of type public.jpeg".
+- When you open the app again, a long approval request now loads the full request when the connection to the server is ready. Before, the card often said "Could not load the full request. You can deny it here." and showed "Try again", although the connection was ready a few seconds later.
+- When you tap "Try again" on an approval request that is closed, the app now tells you "Request closed". Before, the card went away with no message.
+- With a VPN or Tailscale on, the iPhone app now checks the connection about 1 second after the phone moves between Wi-Fi and mobile data, and reconnects when the old path stopped. Before, the app did not see the move, and a server could show as disconnected for many seconds (#17876).
+- On Android, dictation in a chat now continues until you tap Stop. Before, on some phones, dictation stopped after about 10 seconds with no message, and the words that you said after that did not get into the message.
+- Keep the message field steady while you type a long message. Before, the field could go blank or
+  jump to an older part of the text when you stopped typing.
+- Use less battery and data when a server is offline. The app now waits 15 seconds before the next
+  connection try, and doubles the wait up to 5 minutes. Before, each return to the app started 5
+  quick tries again. A refresh and a network change still try again at once.
+- Ask to wake only hosted servers. Before, the app also asked to wake your own servers when they
+  were offline, which could never work.
+- The plan limit rings at the top of the agent list show, for each provider, the account with the
+  most limit left. Before, a provider account with no limit left hid a second account of the same
+  provider that still had limit left.
+- Keep the connection to a server when its Signal machine stops or moves. Before, the app connected
+  again from the start and loaded the server again. The server must also be on the new version.
 
 ## [1.4.14.2] - 2026-11-27
 
