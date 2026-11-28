@@ -4851,10 +4851,12 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
   ): void {
     const joined = agentModelChoice(agent);
     const accountOnly = left !== undefined && left.provider === joined.provider && left.model === joined.model;
+    const providerChanged = left !== undefined && left.provider !== joined.provider;
     const name = (choice: AgentModelChoice, email: boolean) => {
       const model =
         this.#agentModels(choice).find((option) => option.provider === choice.provider && option.id === choice.model)
           ?.name ?? choice.model;
+      if (providerChanged) return `${providerLabel(choice.provider)} · ${model}`;
       if (!accountOnly) return model;
       const id = choice.providerAccountId ?? DEFAULT_PROVIDER_ACCOUNT_ID;
       const account = this.getStatus()
