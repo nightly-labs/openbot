@@ -3613,7 +3613,8 @@ export class TurnLifecycle {
     if (!childThreadId) return;
     const kind = getString(item, "kind");
     const starts = kind === "started" || kind === "interacted";
-    if (starts) this.#codexChildren.set(childThreadId, { agentId, threadId, turnId });
+    if (starts && (kind === "started" || !this.#codexChildren.has(childThreadId)))
+      this.#codexChildren.set(childThreadId, { agentId, threadId, turnId });
     const parent = this.#codexChildren.get(childThreadId) ?? { agentId, threadId, turnId };
     const snapshot = this.#conversation.ensureSnapshot(parent.agentId, parent.threadId);
     const id = `${parent.turnId}:subagents`;
