@@ -473,7 +473,16 @@ class Workflows extends Context.Service<Workflows, WorkflowsShape>()("openbot/ba
           step.status === "running" &&
           step.deliveryId !== null &&
           dependencies.delivery(step.deliveryId)?.status === "queued";
+        const waitingQuestion = (step: StoredWorkflowStep) => {
+          const run = step.runId ? runs.run(step.runId) : null;
+          const node = stepGraph(step, run)?.graph.nodes.find((candidate) => candidate.id === step.nodeId);
+          return node ? approvalQuestion(step, node, run) : "";
+        };
         const shownStep = (step: StoredWorkflowStep): WorkflowStep => {
+          if (step.status === "approval") {
+            const question = waitingQuestion(step);
+            return question ? { ...publicStep(step), question } : publicStep(step);
+          }
           if (!waitsInQueue(step)) return publicStep(step);
           queuedSteps.add(step.id);
           return { ...publicStep(step), waiting: true };
@@ -1244,7 +1253,7 @@ class Workflows extends Context.Service<Workflows, WorkflowsShape>()("openbot/ba
                   kind: "approval",
                   workflowId: step.workflowId,
                   workflowTitle: titleOf(step.workflowId),
-                  text: fillWorkflowTemplate(fieldText(node, "question"), templateValuesOf(step, run, "person")),
+                  text: approvalQuestion(step, node, run),
                 });
               }
               return;
@@ -1313,6 +1322,8 @@ class Workflows extends Context.Service<Workflows, WorkflowsShape>()("openbot/ba
           const found = stepGraph(step, run);
           return found ? templateValues(found.graph, step.nodeId, found.latest, reader) : new Map<string, string>();
         };
+        const approvalQuestion = (step: StoredWorkflowStep, node: WorkflowNode, run: StoredWorkflowRun | null) =>
+          fillWorkflowTemplate(fieldText(node, "question"), templateValuesOf(step, run, "person"));
         const fillOf = (step: StoredWorkflowStep, run: StoredWorkflowRun | null): GitHubOutputFill => {
           const values = new Map<TemplateReader, ReadonlyMap<string, string>>();
           return (text, reader) => {

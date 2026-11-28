@@ -674,6 +674,10 @@ export function WorkflowCanvas(props: WorkflowCanvasProps) {
     },
     status: statusOf,
     waiting: waitingOf,
+    question: (id) => {
+      const state = runStateOf(id);
+      return state?.status === "approval" ? state.step.question : undefined;
+    },
     progress: (id) => {
       const agentId = statusOf(id) === "running" && !waitingOf(id) ? runStateOf(id)?.step.agentId : null;
       return agentId ? props.agentProgress?.(agentId) : undefined;

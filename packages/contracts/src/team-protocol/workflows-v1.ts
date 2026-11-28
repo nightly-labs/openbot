@@ -183,7 +183,7 @@ const step = fields(
     startedAt: nullable(timestamp),
     endedAt: nullable(timestamp),
   },
-  { waiting: boolean },
+  { waiting: boolean, question: stepText },
 );
 const runDetail = fields({ run, steps: list(step, WORKFLOW_RUN_STEP_LIMIT) });
 const runPage = fields({

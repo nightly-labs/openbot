@@ -4,7 +4,7 @@ import { useText } from "../../text";
 import { AnswerProblems } from "./workflow-answer-parts";
 import { useBoard } from "./workflow-board";
 import { NameField } from "./workflow-name-field";
-import { Field, NodeShell, NodeToolbar, useLocked, useTextField } from "./workflow-node-parts";
+import { ClampedText, Field, NodeShell, NodeToolbar, useLocked, useTextField } from "./workflow-node-parts";
 
 interface Answer {
   kind: "approved" | "rejected";
@@ -29,6 +29,10 @@ export function ApprovalNode(props: { id: string; question?: string }) {
     t("workflow.approval.approvedAt", { time: format.date(at, { hour: "2-digit", minute: "2-digit" }) });
   const [locked, setLocked] = useLocked(() => props.id);
   const waiting = () => board.status(props.id) === "approval" && decision() === undefined;
+  const filledQuestion = () => {
+    const filled = waiting() ? board.question(props.id)?.trim() : undefined;
+    return filled && filled !== question().trim() ? filled : undefined;
+  };
   const decide = (approved: boolean) => {
     const sent: Answer = { kind: approved ? "approved" : "rejected", at: new Date(), step: board.step(props.id) };
     setAnswer(sent);
@@ -60,6 +64,14 @@ export function ApprovalNode(props: { id: string; question?: string }) {
         />
       </Field>
       <AnswerProblems id={props.id} />
+      <Show when={filledQuestion()} keyed>
+        {(filled) => (
+          <div class="wfn-alert">
+            <UserCheck class="wfn-alert-icon-first-line" aria-hidden="true" />
+            <ClampedText class="wfn-alert-clamp" value={filled} />
+          </div>
+        )}
+      </Show>
       <Show when={waiting()}>
         <div class="wfn-block-actions">
           <Button size="sm" onClick={() => decide(true)}>

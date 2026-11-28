@@ -107,7 +107,7 @@ export function WorkflowRunStepRow({
         {step && status === "approval" ? (
           <View className="mt-1 gap-3 rounded-2xl bg-control p-3">
             <Typography.Paragraph className="font-semibold" style={typeScale.body}>
-              {stepText(node, t)}
+              {step.question?.trim() || stepText(node, t)}
             </Typography.Paragraph>
             <View className="flex-row gap-2">
               <Button className="flex-1" variant="tertiary" isDisabled={busy} onPress={() => onDecide(step, false)}>

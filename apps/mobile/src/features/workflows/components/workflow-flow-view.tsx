@@ -73,7 +73,7 @@ export function FlowStepCard({
   const [size, setSize] = useState<{ width: number; height: number }>();
   const [pressed, setPressed] = useState(false);
   const label = stepLabel(node, agents, t);
-  const text = stepText(node, t);
+  const text = (status === "approval" && run?.step?.question?.trim()) || stepText(node, t);
   const actions = press?.kind === "menu" ? press.menu.actions(node) : press?.kind === "edit" ? press.actions : [];
   const hasMenu = actions.length > 0;
   const opens = (press?.kind === "open" && press.canOpen(node)) || press?.kind === "edit";
