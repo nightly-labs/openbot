@@ -91,13 +91,7 @@ export function ServerLibrary(props: ServerLibraryProps) {
       if (was === true && !loading) folders.reload();
     },
   );
-  const hostHasFolders = () => {
-    const current = props.server;
-    return (
-      current?.kind !== "remote" || current.compatibility?.capabilities.includes(LIBRARY_FOLDERS_CAPABILITY) === true
-    );
-  };
-  const foldersLoading = () => !folders.ready() && hostHasFolders();
+  const foldersLoading = () => !folders.ready() && serverSupportsCapability(props.server, LIBRARY_FOLDERS_CAPABILITY);
   const hasFolders = () => (folders.snapshot() || foldersLoading() ? "" : undefined);
   const canDelete = () => {
     const current = props.server;
