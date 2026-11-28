@@ -528,6 +528,15 @@ const SERVER_PLACES: readonly ServerPlaceEntry[] = [
     words: "parallel concurrent concurrency simultaneous simultaneously threads task tasks",
     foundWithoutServerWord: ["parallel", "concurrent", "concurrency", "simultaneous", "simultaneously"],
   },
+  {
+    title: "Hidden",
+    place:
+      "On a computer or in the browser at openbot.run/app: right-click the agent in the sidebar > Hide agent. The agent moves to Hidden (N), a collapsed group below the sidebar sections that shows only while an agent is hidden. To show it again, open Hidden, right-click the agent > Restore (or Restore to <section name>). On the phone app: touch and hold the agent > Hide. To show it again: Settings > Conversations > Hidden chats > Show.",
+    about:
+      "Takes an agent out of the sidebar list without deleting it, for example an agent that is not used now. It keeps its chats, files, memories and settings. On a current server it keeps working: it gets messages and its routines run. A server on an older version pauses it while it is hidden. On a computer or in the browser, only the owner or an admin of a joined server hides or restores an agent, for all members. On the phone app, the Hide of a member hides the agent only on that phone.",
+    words: "hide hidden hiding unhide archive archived restore declutter unused inactive",
+    foundWithoutServerWord: ["hide", "hidden", "hiding", "unhide", "archive"],
+  },
 ];
 
 const CHAT_PLACES: readonly SettingLinkEntry[] = [
