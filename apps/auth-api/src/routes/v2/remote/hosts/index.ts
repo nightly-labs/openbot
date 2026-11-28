@@ -17,7 +17,7 @@ export const Route = createFileRoute("/v2/remote/hosts/")({
           Effect.gen(function* () {
             const user = yield* requestUser(request);
             if (!user) return apiError(401, "unauthorized", "Sign in is required.");
-            return json({ hosts: yield* requestRemoteControlPlane().listHosts(user.id) });
+            return json(yield* requestRemoteControlPlane().listHostsWithTransfers(user));
           }),
           remoteControlPlaneErrorResponse,
         ),

@@ -1881,6 +1881,7 @@ export const messages = {
   "mobile.server.planLimits.windowLeft": "{window} متبقٍّ {percent}%",
   "mobile.server.planLimits.resetsAt": "يُعاد التعيين {time}",
   "mobile.server.planLimits.empty": "لم يُبلغ أي مزوّد عن حدوده بعد.",
+  "mobile.server.planLimits.notReported": "لا توجد قراءة للاستخدام",
   "mobile.server.planLimits.more": "+{number}",
   "mobile.server.planLimits.window.limit": "الحد",
   "mobile.server.planLimits.window.weekly": "أسبوعي",

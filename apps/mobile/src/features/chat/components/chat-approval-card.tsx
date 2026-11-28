@@ -93,7 +93,9 @@ export function ChatApprovalCard({
     loadWhole().then(
       () => setWholeFailed(true),
       (error: unknown) => {
-        if (wholeReadFailed(error)) setWholeFailed(true);
+        if (error instanceof InactiveRequestError)
+          showWarningAlert("turn", t("mobile.chat.approval.inactiveTitle"), error.message);
+        else setWholeFailed(true);
       },
     );
   }

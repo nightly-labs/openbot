@@ -1399,6 +1399,7 @@ export const messages = {
   "mobile.server.planLimits.windowLeft": "{window} %{percent} kaldı",
   "mobile.server.planLimits.resetsAt": "{time} tarihinde sıfırlanır",
   "mobile.server.planLimits.empty": "Henüz hiçbir sağlayıcı limitlerini bildirmedi.",
+  "mobile.server.planLimits.notReported": "Kullanım verisi yok",
   "mobile.server.planLimits.more": "+{number}",
   "mobile.server.planLimits.window.limit": "Limit",
   "mobile.server.planLimits.window.weekly": "Haftalık",

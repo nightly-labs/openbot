@@ -16,6 +16,8 @@ The architecture notes are in one file for each topic:
   - [Required verification](architecture/change-rules.md#required-verification)
 - [Team API compatibility](architecture/team-api.md)
   - [Team API compatibility boundary](architecture/team-api.md#team-api-compatibility-boundary)
+- [Signal restart](architecture/signal-restart.md)
+  - [Safety rules](architecture/signal-restart.md#safety-rules)
 - [Browser](architecture/browser.md)
   - [Browser client](architecture/browser.md#browser-client)
   - [Browser tool execution](architecture/browser.md#browser-tool-execution)

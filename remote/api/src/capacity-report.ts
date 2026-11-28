@@ -135,7 +135,7 @@ interface ReporterConfig {
   clientId: string;
   clientSecret: string;
   turnMetricsUrl: string;
-  signalMetricsUrl: string;
+  signalMetricsUrls: string[];
   signalMetricsToken: string;
   turnHost: string;
   intervalMilliseconds: number;
@@ -154,7 +154,10 @@ function readConfig(environment: Record<string, string | undefined>): ReporterCo
     clientId,
     clientSecret,
     turnMetricsUrl: environment.TURN_METRICS_URL ?? "http://127.0.0.1:9641/metrics",
-    signalMetricsUrl: environment.SIGNAL_METRICS_URL ?? "http://127.0.0.1:9642/metrics",
+    signalMetricsUrls: (environment.SIGNAL_METRICS_URL?.trim() || "http://127.0.0.1:9642/metrics")
+      .split(",")
+      .map((url) => url.trim())
+      .filter(Boolean),
     signalMetricsToken,
     turnHost,
     intervalMilliseconds: Number(environment.CAPACITY_REPORT_INTERVAL_MS) || SAMPLE_INTERVAL_MILLISECONDS,
@@ -171,9 +174,11 @@ const report = Effect.fn("CapacityReport.report")(function* (
     [
       readNetwork(config),
       request(config.turnMetricsUrl, "turn"),
-      request(config.signalMetricsUrl, "signal", {
-        headers: { Authorization: `Bearer ${config.signalMetricsToken}` },
-      }),
+      Effect.firstSuccessOf(
+        config.signalMetricsUrls.map((url) =>
+          request(url, "signal", { headers: { Authorization: `Bearer ${config.signalMetricsToken}` } }),
+        ),
+      ),
     ],
     { concurrency: "unbounded" },
   );

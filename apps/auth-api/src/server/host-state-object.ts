@@ -11,6 +11,8 @@ export interface HostStateCredential {
   machine_token_hash: string | null;
   device_public_key: string | null;
   signal_home: string | null;
+  signal_home_failed: string | null;
+  signal_home_failed_at: number | null;
 }
 
 export interface HostStateSession {

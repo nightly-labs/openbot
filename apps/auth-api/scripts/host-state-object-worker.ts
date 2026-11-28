@@ -295,7 +295,7 @@ async function run(
     case "minute-cron": {
       const result = await outcome(
         retryPendingHostStateInvalidations(
-          { DB: database, HOST_STATE: env.HOST_STATE, HOST_STATE_MODE: options.mode },
+          { DB: database, ...(env.HOST_STATE ? { HOST_STATE: env.HOST_STATE } : {}), HOST_STATE_MODE: options.mode },
           options.clock,
         ),
       );
@@ -304,7 +304,7 @@ async function run(
     case "host-state-retry": {
       const result = await outcome(
         deliverPendingRemoteAuthEvents(
-          { DB: database, HOST_STATE: env.HOST_STATE, HOST_STATE_MODE: options.mode },
+          { DB: database, ...(env.HOST_STATE ? { HOST_STATE: env.HOST_STATE } : {}), HOST_STATE_MODE: options.mode },
           options.clock,
         ),
       );
@@ -319,6 +319,7 @@ export default {
     const calls: D1Call[] = [];
     const count: D1Count = { rowsRead: 0 };
     const database = countedDatabase(env.DB, calls, count);
+    const hostState = hostStateBinding(env, body.options);
     const plane = new RemoteControlPlane(
       {
         DB: database,
@@ -326,6 +327,7 @@ export default {
         REMOTE_TICKET_PUBLIC_JWKS: env.REMOTE_TICKET_PUBLIC_JWKS,
         REMOTE_TICKET_KEY_ID: env.REMOTE_TICKET_KEY_ID,
         REMOTE_SIGNAL_URL: "wss://signal.probe.test",
+        ...(hostState ? { HOST_STATE: hostState } : {}),
         HOST_STATE_MODE: body.options.mode,
       },
       {

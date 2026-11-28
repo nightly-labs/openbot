@@ -10,7 +10,6 @@ import {
   json,
   remoteControlPlaneErrorResponse,
   requestRemoteControlPlane,
-  requestUser,
 } from "../../../../../server/request-auth";
 
 export const Route = createFileRoute("/v2/remote/sessions/$sessionId/ticket")({
@@ -19,23 +18,20 @@ export const Route = createFileRoute("/v2/remote/sessions/$sessionId/ticket")({
       POST: ({ request, params }) =>
         runApiResponse(
           Effect.gen(function* () {
-            const user = yield* requestUser(request, "replica");
-            if (!user) return apiError(401, "unauthorized", "Sign in is required.");
+            const token = bearerToken(request);
+            if (!token) return apiError(401, "unauthorized", "Sign in is required.");
+            const remote = requestRemoteControlPlane();
+            const signedIn = yield* remote.findSignedInSession({
+              authSessionHash: yield* sha256(token),
+              sessionId: params.sessionId,
+              boundToAuthSession: false,
+            });
+            if (!signedIn) return apiError(401, "unauthorized", "Sign in is required.");
             const body = yield* readJsonObject(request);
             if (!isString(body.clientPublicKey)) {
               return apiError(400, "invalid_remote_request", "The client public key is required.");
             }
-            const token = bearerToken(request);
-            const signedInTokenHash = token ? yield* sha256(token) : undefined;
-            return json(
-              yield* requestRemoteControlPlane().issueSessionTicket(
-                user.id,
-                params.sessionId,
-                body.clientPublicKey,
-                undefined,
-                signedInTokenHash,
-              ),
-            );
+            return json(yield* remote.issueSignedInSessionTicket(signedIn, body.clientPublicKey));
           }),
           remoteControlPlaneErrorResponse,
         ),

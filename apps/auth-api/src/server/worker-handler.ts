@@ -4,7 +4,7 @@ import { passkeyWalletHostResponse } from "../lib/near-sign-csp";
 import { OPENBOT_SECURITY_HEADERS, OPENBOT_SITE_URL } from "../lib/site-metadata";
 import { sendAccountActivitySnapshots } from "./account-activity";
 import { createAccountAnalytics, createAccountEventDelivery } from "./account-analytics";
-import { type AuthRetentionResult, pruneExpiredAuthData } from "./auth-data-retention";
+import { type AuthRetentionResult, pruneExpiredAuthData, pruneExpiredRateLimits } from "./auth-data-retention";
 import { BillingSales } from "./billing-sales";
 import { BillingService } from "./billing-service";
 import { captureBillingSnapshot } from "./billing-snapshots";
@@ -144,6 +144,9 @@ export function createWorkerHandler(
         if (hostingResult && Object.values(hostingResult).some(Boolean)) {
           console.info("Hosted server check completed.", hostingResult);
         }
+        yield* pruneExpiredRateLimits(bindings.DB, now).pipe(
+          Effect.catch(() => Effect.sync(() => console.warn("Rate limit retention failed."))),
+        );
         return isDailyRetentionRun(now) ? yield* prune(bindings.DB, now) : null;
       });
       const [retention, , sites] = await runApiEffect(
@@ -362,10 +365,10 @@ function tickHostedServers(
   bindings: RemoteAuthEventBindings & Partial<Pick<WorkerBindings, HostedServerTickBindingKey>>,
   now: number,
 ) {
-  let authEvents: Effect.Effect<void, RemoteFailure> | null = null;
+  const authEvents: Effect.Effect<void, RemoteFailure>[] = [];
   const remote = new RemoteControlPlane(bindings, {
     schedule: (delivery) => {
-      authEvents = delivery;
+      authEvents.push(delivery);
     },
   });
   const sends: Effect.Effect<void>[] = [];
@@ -383,8 +386,13 @@ function tickHostedServers(
         Effect.all(
           [
             ...sends,
-            (authEvents ?? Effect.void).pipe(
-              Effect.catch(() => Effect.sync(() => console.warn("Remote auth event delivery failed."))),
+            Effect.forEach(
+              authEvents,
+              (delivery) =>
+                delivery.pipe(
+                  Effect.catch(() => Effect.sync(() => console.warn("Remote auth event delivery failed."))),
+                ),
+              { discard: true },
             ),
           ],
           { concurrency: "unbounded", discard: true },

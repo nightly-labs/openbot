@@ -889,6 +889,8 @@ async function createMessagingServices({
     issueDiscordRoute: (hostId) => centralAuth.issueDiscordRoute(hostId).pipe(toRemoteWorkflowError),
     issueWebhookRoute: (hostId) => centralAuth.issueWebhookRoute(hostId).pipe(toRemoteWorkflowError),
     issueTelegramRoute: (hostId) => centralAuth.issueTelegramRoute(hostId).pipe(toRemoteWorkflowError),
+    issueIngressTickets: (hostId, routes) =>
+      centralAuth.issueIngressTickets(hostId, routes).pipe(toRemoteWorkflowError),
     issueGitHubRoute,
     queueKey: () => loadIngressQueueKey(join(app.getPath("userData"), INGRESS_QUEUE_KEY_FILE), secretCipher),
     resolveProxy: (url) =>

@@ -1,7 +1,7 @@
 import { Effect } from "effect";
 import type { HostState, HostStateCopy, HostStateFill, HostStateQuery, HostStateSnapshot } from "./host-state-object";
 
-export type HostStateMode = "off" | "write" | "read";
+type HostStateMode = "off" | "write" | "read";
 
 export const HOST_STATE_RECHECK_MS = 10 * 60_000;
 export const HOST_STATE_SIGN_IN_RECHECK_MS = 60_000;
@@ -16,7 +16,7 @@ export interface HostStateStore {
   invalidate(hostId: string): Effect.Effect<boolean>;
 }
 
-export function hostStateMode(value: string | undefined): HostStateMode {
+function hostStateMode(value: string | undefined): HostStateMode {
   const mode = value?.trim();
   return mode === "read" || mode === "write" ? mode : "off";
 }
