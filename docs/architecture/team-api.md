@@ -330,7 +330,8 @@ check also keeps an accepted token hash for 30 s in each Worker isolate, so a ro
 works for at most 30 s plus the replica lag. Host tickets, resume validation, money paths, writes, ticket
 consume, invitation redeem and owner transfer accept still read the primary: Signal trusts a resumed
 token until it expires, and after a restart it does not know the revocations that it had before.
-`apps/auth-api/scripts/host-replica-reads-e2e.ts` counts the queries for each check.
+The pool machine writes its `seen_at` only when the primary value is more than 60 s old, so a late
+replica does not add writes. `apps/auth-api/scripts/host-replica-reads-e2e.ts` counts the queries for each check.
 Session endings and access changes use a durable D1 outbox. Cloudflare sends each revocation to Signal
 immediately and retries failed deliveries from a scheduled task. This keeps reconnect validation local
 without losing revocations when Signal is temporarily unavailable.
