@@ -1,9 +1,17 @@
 import { tintRamp } from "@norbert_bodziony/bloub/plush";
 import type { BloubAvatarProfile } from "@openbot/ui/bloub-avatar";
-import planet from "./felt-card/planet.webp";
+import planet from "../../assets/felt-card/planet.webp";
 
-const BODIES = import.meta.glob<string>("./felt-card/felt/*.webp", { eager: true, query: "?url", import: "default" });
-const EYES = import.meta.glob<string>("./felt-card/eyes/*.webp", { eager: true, query: "?url", import: "default" });
+const BODIES = import.meta.glob<string>("../../assets/felt-card/felt/*.webp", {
+  eager: true,
+  query: "?url",
+  import: "default",
+});
+const EYES = import.meta.glob<string>("../../assets/felt-card/eyes/*.webp", {
+  eager: true,
+  query: "?url",
+  import: "default",
+});
 
 export interface FeltCardArt {
   planet: HTMLImageElement;
@@ -12,8 +20,8 @@ export interface FeltCardArt {
 }
 
 export async function loadFeltCardArt(profile: BloubAvatarProfile): Promise<FeltCardArt> {
-  const bodyUrl = BODIES[`./felt-card/felt/${profile.shape}.webp`];
-  const eyesUrl = EYES[`./felt-card/eyes/${profile.shape}-${profile.expression}.webp`];
+  const bodyUrl = BODIES[`../../assets/felt-card/felt/${profile.shape}.webp`];
+  const eyesUrl = EYES[`../../assets/felt-card/eyes/${profile.shape}-${profile.expression}.webp`];
   if (!bodyUrl || !eyesUrl) throw new Error(`The share card has no felt for ${profile.shape}.`);
   const [planetImage, grey, eyes] = await Promise.all([loadUrl(planet), loadUrl(bodyUrl), loadUrl(eyesUrl)]);
   return { planet: planetImage, body: tinted(grey, profile.color), eyes };
