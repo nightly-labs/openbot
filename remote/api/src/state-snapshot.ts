@@ -51,7 +51,7 @@ const decodeSealed = Schema.decodeUnknownOption(Schema.fromJsonString(SealedSnap
 
 export type SnapshotRefusal = "format" | "signature" | "signal" | "old" | "future";
 
-export class SnapshotFileError extends Schema.TaggedError<SnapshotFileError>()("SnapshotFileError", {
+class SnapshotFileError extends Schema.TaggedError<SnapshotFileError>()("SnapshotFileError", {
   message: Schema.String,
 }) {}
 

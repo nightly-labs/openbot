@@ -91,7 +91,7 @@ future.
 ## Auth event catch-up
 
 The account service keeps each delivered auth event for 24 hours (`remote_auth_events`, migration
-0079 adds `attempted_at`). Each delivery attempt sets `attempted_at`. A Signal reads the events
+0082 adds `attempted_at`). Each delivery attempt sets `attempted_at`. A Signal reads the events
 after a cursor `(attemptedAt, eventId)` with the signed route `POST /v2/remote/auth-events`
 (`verifyRemoteServiceRequest`, at most 500 rows for each page). An event that was never attempted is
 not returned: no Signal saw it, and the outbox delivers it later.
