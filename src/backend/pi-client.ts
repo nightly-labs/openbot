@@ -1202,7 +1202,14 @@ export class PiAgentClient extends EventEmitter<ClientEvents> implements AgentCl
           complete: true,
         }),
       );
-      if (Exit.isFailure(saved)) status = "failed";
+      if (Exit.isFailure(saved)) {
+        const failure = Cause.squash(saved.cause);
+        logger.warn("Pi could not save a finished turn to its history.", {
+          provider: this.provider,
+          status,
+          error: this.#redact(String(failure instanceof Error ? (failure.cause ?? failure) : failure)),
+        });
+      }
     }
     if (thread.turn === turn) thread.turn = null;
     this.#notify("turn/completed", thread, {
