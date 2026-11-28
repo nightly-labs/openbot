@@ -35,6 +35,21 @@ const setSkillEnabledSchema = z
   .strict();
 const uninstallSkillSchema = z.object({ agentId: targetAgentId, skillId: installedSkillId }).strict();
 
+const hasLocalChanges = (cause: unknown) =>
+  cause instanceof Error && cause.message === sourceText("error.skill.replaceModified");
+
+function userReplaceStep(ownAgent: boolean): string {
+  return [
+    "This skill has local changes, and only the user can replace them.",
+    ownAgent ? "Call openbot.show_setting with agent.skills." : "The user opens that agent's settings.",
+    "In Skills, the user selects Repair in the skill's menu, then Replace skill: when the user confirms, this installs the newest revision and discards the local changes.",
+    `Only an owner or admin can do this, in the desktop app or the web client${ownAgent ? "; the card has an Open button only in the user's own chat with you on a computer" : ""}.`,
+    "Do not retry install_local_skill, revise the skill again, or change the installed copy.",
+  ].join(" ");
+}
+
+const localChangesFailure = (text: string) => Effect.fail(new ToolOperationFailed({ cause: new Error(text) }));
+
 export interface UnreadableLocalSkill {
   skillId: string;
   error: string;
@@ -140,7 +155,15 @@ export const runLocalSkillTool = Effect.fn("SkillTools.run")(function* (
     }
     case "revise_skill": {
       const input = yield* toolStep(() => reviseSkillSchema.parse(args));
-      const skill = yield* api.revise({ agentId, ...input });
+      const skill = yield* api.revise({ agentId, ...input }).pipe(
+        Effect.catchIf(
+          (failure) => failure.cause instanceof Error && hasLocalChanges(failure.cause.cause),
+          () =>
+            localChangesFailure(
+              `Skill ${input.skillId} was saved as revision ${input.expectedRevision + 1}, but your installed copy was not replaced. ${userReplaceStep(true)}`,
+            ),
+        ),
+      );
       onChanged?.({ action: "revised", skillId: skill.id, revision: skill.version, skillName: skill.name });
       return skillToolDetail(skill);
     }
@@ -155,7 +178,15 @@ export const runLocalSkillTool = Effect.fn("SkillTools.run")(function* (
     case "install_local_skill": {
       const input = yield* toolStep(() => installLocalSkillSchema.parse(args));
       const target = yield* toolStep(() => targetAgent(input.agentId));
-      const skill = yield* api.install({ ...input, agentId: target });
+      const skill = yield* api.install({ ...input, agentId: target }).pipe(
+        Effect.catchIf(
+          (failure) => hasLocalChanges(failure.cause),
+          () =>
+            localChangesFailure(
+              `${userReplaceStep(target === agentId)} If the user needs revision ${input.revision} exactly, ask the user before they use Repair, because Repair installs the newest revision.`,
+            ),
+        ),
+      );
       onChanged?.({
         action: "installed",
         skillId: skill.skillId,

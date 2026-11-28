@@ -159,6 +159,14 @@ async function main(): Promise<void> {
       const revised = await run("caller", "revise_skill", { skillId, expectedRevision: 3, sourcePath: "drafts/v4" });
       assert.ok(Exit.isFailure(revised));
       assert.ok(String(revised.cause).includes("was saved as revision 4"));
+      assert.ok(
+        String(revised.cause).includes("Replace skill: when the user confirms, this installs the newest revision"),
+      );
+      const older = await run("caller", "install_local_skill", { skillId, revision: 3 });
+      assert.ok(Exit.isFailure(older));
+      assert.ok(
+        String(older.cause).includes("If the user needs revision 3 exactly, ask the user before they use Repair"),
+      );
       assert.equal((await Effect.runPromise(library.get(skillId))).version, 4);
       assert.equal(await readFile(join(callerWorkspace, ".claude/skills", SLUG, "SKILL.md"), "utf8"), edited);
       assert.equal(hash(await readFile(join(callerWorkspace, ".agents/skills", SLUG, "SKILL.md"), "utf8")), hash(V3));
