@@ -1798,6 +1798,7 @@ export const messages = defineMessages("mobile.server", {
   "mobile.server.planLimits.windowLeft": "{window} {percent}% left",
   "mobile.server.planLimits.resetsAt": "Resets {time}",
   "mobile.server.planLimits.empty": "No provider has reported its limits yet.",
+  "mobile.server.planLimits.notReported": "No usage reading",
   "mobile.server.planLimits.more": "+{number}",
   "mobile.server.planLimits.window.limit": "Limit",
   "mobile.server.planLimits.window.weekly": "Weekly",

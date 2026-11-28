@@ -14,7 +14,7 @@ import { forgetReferralCode, readReferralCode } from "@openbot/contracts/referra
 import { isBoolean, isDynamicRecord, isString } from "@openbot/contracts/runtime-values";
 import { formatLocale, resolveLocale } from "@openbot/i18n";
 import { sourceText } from "@openbot/i18n/source";
-import { rememberAccountBookmark } from "@openbot/team-client/account-bookmark";
+import { accountBookmarkHeaders, rememberAccountBookmark } from "@openbot/team-client/account-bookmark";
 import { markRemoteSync } from "@openbot/team-client/sync-profile";
 import { classifyFailure } from "@openbot/telemetry";
 import { NotificationObserver, Toaster, toast } from "@openbot/ui";
@@ -65,6 +65,18 @@ export { loadSavedLanguage } from "./web-language-preference";
 let workspaceImport: Promise<typeof WebWorkspace> | null = null;
 function accountRequestUrl(input: RequestInfo | URL): URL {
   return new URL(input instanceof Request ? input.url : input, window.location.origin);
+}
+
+function withAccountBookmark(
+  input: RequestInfo | URL,
+  url: URL,
+  init: RequestInit | undefined,
+): RequestInit | undefined {
+  const bookmark = Object.entries(accountBookmarkHeaders(url));
+  if (input instanceof Request || bookmark.length === 0) return init;
+  const headers = new Headers(init?.headers);
+  for (const [name, value] of bookmark) headers.set(name, value);
+  return { ...init, headers };
 }
 
 function loadWorkspace(): Promise<typeof WebWorkspace> {
@@ -282,8 +294,9 @@ function WebAppContent(props: { createRuntime?: WebRuntimeFactory }) {
   }
   const accountFetch: typeof fetch = async (input, init) => {
     const generation = sessionGeneration;
-    const response = await fetch(input, init);
-    rememberAccountBookmark(accountRequestUrl(input), response);
+    const url = accountRequestUrl(input);
+    const response = await fetch(input, withAccountBookmark(input, url, init));
+    rememberAccountBookmark(url, response);
     if (
       !disposed &&
       generation === sessionGeneration &&

@@ -1,4 +1,5 @@
 import { referenceFrom } from "@openbot/user-errors";
+import type { ExpoSpeechRecognitionErrorCode } from "expo-speech-recognition";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { AppState } from "react-native";
 import { type SharedValue, useSharedValue, withTiming } from "react-native-reanimated";
@@ -51,11 +52,23 @@ interface DictationSession {
   options: StartOptions | null;
   native: boolean;
   heard: boolean;
+  heardSinceRestart: boolean;
+  lastError: ExpoSpeechRecognitionErrorCode | null;
   fallback: "none" | "pending" | "used";
   listeningAt: number | null;
   stoppingAt: number | null;
   ending: "cancelled" | "permission_denied" | "operation_failed" | null;
   cutShort: boolean;
+}
+
+function continuesAfterRecognizerEnd(current: DictationSession, phase: DictationPhase): boolean {
+  return (
+    !isIOS &&
+    phase === "listening" &&
+    current.ending === null &&
+    current.heardSinceRestart &&
+    (current.lastError === null || current.lastError === "no-speech" || current.lastError === "speech-timeout")
+  );
 }
 
 function transcriptionOf(options: StartOptions | null): "cloud" | "local" | undefined {
@@ -188,6 +201,7 @@ function useSystemDictation({
         const current = session.current;
         if (owner !== id || !current?.native) return;
         current.heard = true;
+        current.heardSinceRestart = true;
         const result = { isFinal: event.isFinal, text: event.results[0]?.transcript ?? "" };
         if (isIOS && isRepeatedFinal(current.transcript, result)) return;
         current.transcript = applyDictationResult(current.transcript, result);
@@ -196,6 +210,7 @@ function useSystemDictation({
       speechRecognition.addListener("error", (event) => {
         const current = session.current;
         if (owner !== id || !current?.native) return;
+        current.lastError = event.error;
         if (
           current.options?.requiresOnDeviceRecognition &&
           current.fallback === "none" &&
@@ -218,7 +233,18 @@ function useSystemDictation({
         if (owner !== id || !current?.native) return;
         if (current.fallback === "pending" && current.options && phaseRef.current !== "stopping") {
           current.fallback = "used";
+          current.lastError = null;
           current.options = { ...current.options, requiresOnDeviceRecognition: false };
+          speechRecognition?.start(current.options);
+          return;
+        }
+        if (current.options && continuesAfterRecognizerEnd(current, phaseRef.current)) {
+          current.transcript = applyDictationResult(current.transcript, {
+            isFinal: true,
+            text: current.transcript.interim,
+          });
+          current.heardSinceRestart = false;
+          current.lastError = null;
           speechRecognition?.start(current.options);
           return;
         }
@@ -245,6 +271,8 @@ function useSystemDictation({
         options: null,
         native: false,
         heard: false,
+        heardSinceRestart: false,
+        lastError: null,
         fallback: "none",
         listeningAt: null,
         stoppingAt: null,

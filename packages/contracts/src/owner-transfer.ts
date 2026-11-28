@@ -1,5 +1,5 @@
 import { decodeRecord } from "./ipc-decoding";
-import { isNumber, isString } from "./runtime-values";
+import { isDynamicRecord, isNumber, isString } from "./runtime-values";
 
 export interface OwnerTransfer {
   transferId: string;
@@ -41,6 +41,16 @@ export function decodeIncomingOwnerTransfers(value: unknown): OwnerTransfer[] {
   const record = decodeRecord(value, "ownership transfers");
   if (!Array.isArray(record.transfers)) throw new Error("Invalid ownership transfers.");
   return record.transfers.map(decodeOwnerTransfer);
+}
+
+export function decodeListedOwnerTransfers(value: unknown): OwnerTransfer[] | null {
+  if (!isDynamicRecord(value) || !Array.isArray(value.pendingIncomingTransfers)) return null;
+  const listed = value.pendingIncomingTransfers;
+  try {
+    return listed.map(decodeOwnerTransfer);
+  } catch {
+    return null;
+  }
 }
 
 export function decodeAcceptedOwnerTransfer(value: unknown): AcceptedOwnerTransfer {

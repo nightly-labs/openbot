@@ -1523,6 +1523,7 @@ export const messages = {
   "mobile.server.planLimits.windowLeft": "{window}: осталось {percent}%",
   "mobile.server.planLimits.resetsAt": "Сброс: {time}",
   "mobile.server.planLimits.empty": "Ни один провайдер ещё не сообщил свои лимиты.",
+  "mobile.server.planLimits.notReported": "Нет данных об использовании",
   "mobile.server.planLimits.more": "+{number}",
   "mobile.server.planLimits.window.limit": "Лимит",
   "mobile.server.planLimits.window.weekly": "Неделя",
