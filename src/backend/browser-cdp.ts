@@ -108,6 +108,9 @@ import type { VaultCardSecret } from "./vault-items";
 export const SNAPSHOT_NAVIGATED_MESSAGE = "Page navigated during the browser snapshot. Take a fresh snapshot.";
 
 const ACTION_TIMEOUT_MS = 10_000;
+const SELECT_RELOAD_UNCONFIRMED = "The page reloaded after the select changed. Take a snapshot to check the selection.";
+const SELECT_RELOAD_OTHER_OPTION =
+  "The page reloaded after the select changed, and the select now shows another option. Call select_option again on the new page.";
 const WAIT_TIMEOUT_MS = 30_000;
 const BROWSER_LOCATION_DEFAULT_ACCURACY = 50;
 const PAGE_ANSWER_WAIT_MS = 2_000;
@@ -410,6 +413,15 @@ const RUN_DIALOG_EVENT = "-run-dialog";
 const DIALOG_CLOSED_ERROR = "This dialog is closed. A person answered it, or the page closed it. Read the tab again.";
 const DIALOG_FOR_PERSON_ERROR = "Only a person can answer this dialog in the tab. Ask the user to answer it.";
 
+function passedSelectValues(plan: DynamicRecord, enabledIndices: number[], desiredIndex: number): number[] {
+  if (plan.multiple === true || !isNumber(plan.selectedIndex)) return [];
+  const startIndex = plan.selectedIndex;
+  const cycleIndices = Array.isArray(plan.typeaheadCycleIndices) ? plan.typeaheadCycleIndices.filter(isNumber) : [];
+  const passed =
+    cycleIndices.length > 0 ? cycleIndices : enabledIndices.slice(0, Math.max(0, enabledIndices.indexOf(desiredIndex)));
+  return passed.filter((index) => index !== desiredIndex && index !== startIndex);
+}
+
 export class BrowserCdpEngine {
   readonly #contents: WebContents;
   #viewButton: "left" | "middle" | "right" | null = null;
@@ -423,6 +435,8 @@ export class BrowserCdpEngine {
   readonly #viewViewports: Array<{ width: number; height: number }> = [];
   #navigationGeneration = 0;
   #documentGeneration = 0;
+  #frameDocumentGeneration = 0;
+  #actionNote: string | undefined;
   #settleTimedOutDocument = -1;
   #emptyWaitedDocument = -1;
   readonly #cardScrub: CardValueScrub;
@@ -981,6 +995,7 @@ export class BrowserCdpEngine {
     contents.on("did-start-navigation", (details) => {
       if (details.isMainFrame) this.#navigationGeneration += 1;
       if (details.isMainFrame && !details.isSameDocument) this.#documentGeneration += 1;
+      if (!details.isSameDocument) this.#frameDocumentGeneration += 1;
       if (details.isMainFrame) {
         this.#targets.clear();
         this.#lastSnapshot = null;
@@ -1552,6 +1567,9 @@ export class BrowserCdpEngine {
     deadline?: number,
     onDispatch?: ActionDispatch,
   ): Effect.fn.Return<void, BrowserOperationError> {
+    let reload:
+      | { started: Effect.Effect<boolean>; follow: () => Effect.Effect<void, BrowserOperationError> }
+      | undefined;
     yield* this.#leaseEffect((send) =>
       Effect.gen({ self: this }, function* () {
         const resolved = yield* this.#resolveElementEffect(send, target, deadline);
@@ -1598,6 +1616,10 @@ export class BrowserCdpEngine {
             typeaheadCycleIndices,
             enabledIndices,
             labels: Array.from(this.options, option => option.label || option.text),
+            values: Array.from(this.options, option => option.value),
+            id: this.id,
+            name: this.name,
+            topFrame: window.top === window,
             center: { x: box.left + box.width / 2, y: box.top + box.height / 2 },
           };
         }`,
@@ -1616,8 +1638,39 @@ export class BrowserCdpEngine {
         }
         yield* browserSync(() => assertBeforeDeadline(deadline));
         onDispatch?.();
-        yield* send("DOM.focus", { backendNodeId: resolved.backendNodeId }, resolved.sessionId);
+        const documentGeneration = this.#documentGeneration;
+        const frameDocumentGeneration = this.#frameDocumentGeneration;
+        const optionValues = Array.isArray(plan.values) ? plan.values.filter(isString) : [];
+        const inTopFrame = plan.topFrame === true && resolved.sessionId === undefined;
         let selectNodeId = resolved.backendNodeId;
+        const selectGone = Effect.suspend(() =>
+          this.#callOnNode(send, selectNodeId, "function() { return this.isConnected; }", [], resolved.sessionId),
+        ).pipe(
+          Effect.map((connected) => connected !== true),
+          Effect.catch(() => Effect.succeed(true)),
+        );
+        const documentChanged = Effect.suspend(() =>
+          inTopFrame
+            ? Effect.succeed(this.#documentGeneration !== documentGeneration)
+            : this.#frameDocumentGeneration !== frameDocumentGeneration
+              ? selectGone
+              : Effect.succeed(false),
+        );
+        const reloadedSelect = {
+          id: isString(plan.id) ? plan.id : "",
+          name: isString(plan.name) ? plan.name : "",
+          multiple: plan.multiple,
+          inTopFrame,
+        };
+        const desiredValues = desiredIndices.map((index) => optionValues[index] ?? "");
+        const passedValues = passedSelectValues(plan, enabledIndices, firstDesiredIndex).map(
+          (index) => optionValues[index] ?? "",
+        );
+        reload = {
+          started: documentChanged,
+          follow: () => this.#confirmReloadedSelectEffect(send, reloadedSelect, desiredValues, passedValues, deadline),
+        };
+        yield* send("DOM.focus", { backendNodeId: resolved.backendNodeId }, resolved.sessionId);
         if (!plan.multiple) {
           const cycleIndices = Array.isArray(plan.typeaheadCycleIndices)
             ? plan.typeaheadCycleIndices.filter(isNumber)
@@ -1666,7 +1719,12 @@ export class BrowserCdpEngine {
                 yield* send("DOM.focus", { backendNodeId: selectNodeId }, resolved.sessionId);
                 continue;
               }
-              if (recordValue(state)?.selectedIndex === firstDesiredIndex || presses === cycleIndices.length) break;
+              if (
+                recordValue(state)?.selectedIndex === firstDesiredIndex ||
+                presses === cycleIndices.length ||
+                (yield* documentChanged)
+              )
+                break;
               yield* browserSync(() => assertBeforeDeadline(deadline));
               yield* dispatchTextKey(send, initial, resolved.sessionId);
               presses++;
@@ -1674,12 +1732,14 @@ export class BrowserCdpEngine {
           } else if (firstDesiredIndex !== selectedIndex) {
             yield* dispatchShortcut(send, "Home", resolved.sessionId);
             for (let index = 0; index < targetRank; index++) {
+              if (yield* documentChanged) break;
               yield* dispatchShortcut(send, "ArrowDown", resolved.sessionId);
             }
           }
         } else {
           const additiveModifiers = process.platform === "darwin" ? ["Meta"] : ["Control"];
           for (const [index, desiredIndex] of desiredIndices.entries()) {
+            if (yield* documentChanged) break;
             const optionNodeId = yield* this.#optionBackendNodeIdEffect(
               send,
               resolved.backendNodeId,
@@ -1713,6 +1773,7 @@ export class BrowserCdpEngine {
           selectedIndices.length !== desiredIndices.length ||
           selectedIndices.some((index, position) => index !== desiredIndices[position])
         ) {
+          if (yield* documentChanged) return "reloaded" as const;
           const unreachable =
             !plan.multiple && plan.desiredLabel === ""
               ? " An option with no label can only be reached by keyboard where a closed select honours arrow keys, which macOS does not."
@@ -1723,7 +1784,14 @@ export class BrowserCdpEngine {
             ),
           );
         }
-      }),
+      }).pipe(
+        Effect.catch((failure) =>
+          (reload?.started ?? Effect.succeed(false)).pipe(
+            Effect.flatMap((started) => (started ? Effect.succeed("reloaded" as const) : Effect.fail(failure))),
+          ),
+        ),
+        Effect.flatMap((outcome) => (outcome === "reloaded" && reload ? reload.follow() : Effect.void)),
+      ),
     );
   });
 
@@ -3779,6 +3847,59 @@ export class BrowserCdpEngine {
       return numberValue(recordValue(described.node)?.backendNodeId) || null;
     }).pipe(Effect.ensuring(send("Runtime.releaseObject", { objectId }, sessionId).pipe(Effect.ignore)));
   });
+
+  readonly #confirmReloadedSelectEffect = Effect.fn("BrowserCdp.confirmReloadedSelect")(function* (
+    this: BrowserCdpEngine,
+    send: SendCommand,
+    select: { id: string; name: string; multiple: boolean; inTopFrame: boolean },
+    desiredValues: string[],
+    passedValues: string[],
+    deadline: number | undefined,
+  ): Effect.fn.Return<void, BrowserOperationError> {
+    const loadTimeout = Math.max(1, (deadline ?? Date.now() + ACTION_TIMEOUT_MS) - Date.now());
+    yield* waitForLoading(this.#contents, loadTimeout).pipe(Effect.ignore);
+    if (this.#contents.isDestroyed()) return;
+    const selectedValues =
+      !select.inTopFrame || this.#contents.isLoading() || (select.id === "" && select.name === "")
+        ? null
+        : yield* Effect.gen(function* () {
+            const executionContextId = yield* automationContextId(send);
+            const found = yield* send("Runtime.callFunctionOn", {
+              executionContextId,
+              functionDeclaration: `function(id, name, multiple) {
+                const matches = Array.from(document.querySelectorAll('select')).filter(select =>
+                  select.multiple === multiple && (id !== '' ? select.id === id : select.name === name));
+                return matches.length === 1 ? Array.from(matches[0].selectedOptions, option => option.value) : null;
+              }`,
+              arguments: [{ value: select.id }, { value: select.name }, { value: select.multiple }],
+              returnByValue: true,
+            });
+            const value = recordValue(found.result)?.value;
+            return Array.isArray(value) ? value.filter(isString) : null;
+          }).pipe(Effect.catch(() => Effect.succeed(null)));
+    if (
+      selectedValues !== null &&
+      selectedValues.length === desiredValues.length &&
+      selectedValues.every((value, position) => value === desiredValues[position])
+    )
+      return;
+    const postedOnTheWay =
+      selectedValues !== null &&
+      selectedValues.length > 0 &&
+      (select.multiple
+        ? selectedValues.every((value) => desiredValues.includes(value))
+        : selectedValues.every((value) => passedValues.includes(value)));
+    if (postedOnTheWay) return yield* browserFailure(new Error(SELECT_RELOAD_OTHER_OPTION));
+    this.#actionNote = SELECT_RELOAD_UNCONFIRMED;
+  });
+
+  get actionNote(): string | undefined {
+    return this.#actionNote;
+  }
+
+  clearActionNote(): void {
+    this.#actionNote = undefined;
+  }
 
   readonly #optionBackendNodeIdEffect = Effect.fn("BrowserCdp.optionBackendNodeId")(function* (
     this: BrowserCdpEngine,

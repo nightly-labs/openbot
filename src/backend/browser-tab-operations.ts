@@ -320,6 +320,7 @@ export const readActionSnapshot: ActionResultReader<BrowserSnapshot> = (tab, kee
 export interface BrowserActionStatus extends BrowserPageStatus {
   tabId: string;
   revision: number;
+  note?: string;
   errors?: BrowserDiagnosticEntry[];
 }
 
@@ -337,7 +338,14 @@ export const readActionStatus: ActionResultReader<BrowserActionStatus> = Effect.
       message: tab.engine.scrubText(entry.message),
       ...(entry.url === undefined ? {} : { url: tab.engine.scrubText(entry.url) }),
     }));
-    return { tabId: tab.id, revision: tab.revision, ...page, ...(errors.length > 0 ? { errors } : {}) };
+    const note = tab.engine.actionNote;
+    return {
+      tabId: tab.id,
+      revision: tab.revision,
+      ...page,
+      ...(note ? { note } : {}),
+      ...(errors.length > 0 ? { errors } : {}),
+    };
   },
 );
 
@@ -431,6 +439,7 @@ export const runTabAction = Effect.fn("BrowserTab.action")(
                     Effect.catch(() => Effect.succeed(false)),
                   );
                 yield* browserSync(() => remainingTime(deadline, timeoutMessage));
+                tab.engine.clearActionNote();
                 yield* operation(tab, deadline, () => {
                   dispatched = true;
                 });
@@ -493,13 +502,17 @@ export const runTabAction = Effect.fn("BrowserTab.action")(
                 }),
               ),
             );
+            const detail = [
+              tab.engine.actionNote,
+              Date.now() >= deadline ? "Action completed; page settling exceeded the requested timeout." : undefined,
+            ]
+              .filter((part) => part !== undefined)
+              .join(" ");
             tab.diagnostics.action({
               action,
               ...(target ? { target: describeBrowserTarget(target) } : {}),
               outcome: "success",
-              ...(Date.now() >= deadline
-                ? { detail: "Action completed; page settling exceeded the requested timeout." }
-                : {}),
+              ...(detail ? { detail } : {}),
             });
             actionRecorded = true;
             return yield* readResult(tab, keepQueueBlocked, timeoutMessage);
