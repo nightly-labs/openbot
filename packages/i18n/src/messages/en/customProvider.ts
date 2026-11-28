@@ -116,6 +116,12 @@ export const messages = defineMessages("customProvider", {
   "customProvider.discovery.selectAll": "Select all",
   "customProvider.discovery.deselectAll": "Deselect all",
   "customProvider.discovery.noMatch": "No models match your search.",
+  "customProvider.discovery.unlisted": {
+    one: "{count} model is not in this list: {names}.",
+    other: "{count} models are not in this list: {names}.",
+  },
+  "customProvider.discovery.unlistedMore": { one: "{count} more", other: "{count} more" },
+  "customProvider.discovery.removeUnlisted": { one: "Remove {count} model", other: "Remove {count} models" },
 
   "customProvider.preset.title": "Add a provider or an agent",
   "customProvider.preset.description": "Choose a local model server, an endpoint, or an ACP agent.",

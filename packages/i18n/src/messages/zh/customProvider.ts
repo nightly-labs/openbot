@@ -114,6 +114,12 @@ export const messages = {
   "customProvider.discovery.selectAll": "全选",
   "customProvider.discovery.deselectAll": "取消全选",
   "customProvider.discovery.noMatch": "没有与搜索匹配的模型。",
+  "customProvider.discovery.unlisted": {
+    one: "有 {count} 个模型不在此列表中：{names}。",
+    other: "有 {count} 个模型不在此列表中：{names}。",
+  },
+  "customProvider.discovery.unlistedMore": { one: "另外 {count} 个", other: "另外 {count} 个" },
+  "customProvider.discovery.removeUnlisted": { one: "移除 {count} 个模型", other: "移除 {count} 个模型" },
 
   "customProvider.preset.title": "添加服务商或助手",
   "customProvider.preset.description": "选择本地模型服务器、端点或 ACP 助手。",

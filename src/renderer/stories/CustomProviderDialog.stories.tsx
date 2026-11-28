@@ -259,6 +259,18 @@ export const DiscoveryFoundValues: Story = {
   },
 };
 
+export const DiscoveryFoundUnlisted: Story = {
+  args: {
+    showFindResult: true,
+    draft: {
+      ...ollama,
+      models: [...localEndpoint.models, { id: "mistral-small:22b", name: "Mistral Small 22B" }],
+    },
+    onDiscoverModels: fn(),
+    discovery: { status: "found", models: discovered.slice(1) },
+  },
+};
+
 export const DiscoveryEmpty: Story = {
   args: { draft: ollama, onDiscoverModels: fn(), discovery: { status: "found", models: [] } },
 };

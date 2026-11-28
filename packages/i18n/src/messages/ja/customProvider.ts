@@ -117,6 +117,11 @@ export const messages = {
   "customProvider.discovery.selectAll": "すべて選択",
   "customProvider.discovery.deselectAll": "選択を解除",
   "customProvider.discovery.noMatch": "検索に一致するモデルはありません。",
+  "customProvider.discovery.unlisted": {
+    other: "{count} 個のモデルがこのリストにありません: {names}。",
+  },
+  "customProvider.discovery.unlistedMore": { other: "ほか {count} 個" },
+  "customProvider.discovery.removeUnlisted": { other: "{count} 個のモデルを削除" },
 
   "customProvider.preset.title": "プロバイダーまたはエージェントを追加",
   "customProvider.preset.description":

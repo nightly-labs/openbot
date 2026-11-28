@@ -116,6 +116,11 @@ export const messages = {
   "customProvider.discovery.selectAll": "모두 선택",
   "customProvider.discovery.deselectAll": "선택 해제",
   "customProvider.discovery.noMatch": "검색과 일치하는 모델이 없어요.",
+  "customProvider.discovery.unlisted": {
+    other: "모델 {count}개가 이 목록에 없어요: {names}.",
+  },
+  "customProvider.discovery.unlistedMore": { other: "외 {count}개" },
+  "customProvider.discovery.removeUnlisted": { other: "모델 {count}개 삭제" },
 
   "customProvider.preset.title": "제공자 또는 에이전트 추가",
   "customProvider.preset.description": "로컬 모델 서버, 엔드포인트, 또는 ACP 에이전트를 선택하세요.",
