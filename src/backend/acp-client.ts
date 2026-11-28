@@ -457,6 +457,12 @@ function endAnswerWait(turn: AcpTurn): void {
   Deferred.doneUnsafe(turn.answer, Effect.void);
 }
 
+function releaseUserWait(turn: AcpTurn): void {
+  if (!turn.userAnswered) return;
+  Deferred.doneUnsafe(turn.userAnswered, Effect.void);
+  turn.userAnswered = null;
+}
+
 function asksForStartModels(params: unknown): boolean {
   return isRecord(params) && params[START_MODELS_PARAM] === true;
 }
@@ -1382,6 +1388,7 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
         turn.stopped = true;
         turn.stop.abort();
         endAnswerWait(turn);
+        releaseUserWait(turn);
         const cancel = providerCall(() => this.#sessionConnection(thread).cancel({ sessionId: thread.id }));
         if (turn.unprompted) {
           turn.abandoned = true;
@@ -2848,6 +2855,7 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
         staleWake = this.#backgroundCommands(turn) === running;
         promptedAgain = true;
       }
+      this.#reportPromptUsage(thread, turn, response);
       if (
         this.#flavor.holdsTurnWhileAsking &&
         response.stopReason === "end_turn" &&
@@ -2859,7 +2867,6 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
         yield* Deferred.await(answered);
         if (thread.activeTurn !== turn || turn.completing) return;
       }
-      this.#reportPromptUsage(thread, turn, response);
       const emptyAnswerFailure =
         response.stopReason === "end_turn" && !turn.receivedOutput && !turn.answerOptional && !turn.stopped
           ? (this.#flavor.emptyAnswerFailure?.(turn, this.#label) ?? null)
@@ -4297,9 +4304,7 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
         Effect.sync(() => {
           turn.waitingOnUser -= 1;
           turn.lastActivityAt = Date.now();
-          if (turn.waitingOnUser > 0 || !turn.userAnswered) return;
-          Deferred.doneUnsafe(turn.userAnswered, Effect.void);
-          turn.userAnswered = null;
+          if (turn.waitingOnUser === 0) releaseUserWait(turn);
         }),
       ),
     );
