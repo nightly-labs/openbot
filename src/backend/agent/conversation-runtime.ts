@@ -551,6 +551,7 @@ export class ConversationRuntime {
   ): void {
     if (snapshot.threadId && this.#forgottenExecutionThreads.has(snapshot.threadId)) return;
     this.#dropDeletedMessages(snapshot);
+    if (snapshot.threadId) this.#store.database.keepNewMessagesLast(snapshot.threadId, snapshot.messages);
     sortConversationMessages(snapshot.messages);
     const digests = messageDigests();
     perfCount("conversation.emit");
@@ -899,6 +900,7 @@ export class ConversationRuntime {
       restorePreviousState,
       () => {
         if (!published) return;
+        sortConversationMessages(published.messages);
         const digests = messageDigests();
         this.#keepSnapshot(agentId, published, digests);
         this.publishConversation(published, conversationContentSignature(published, digests.json));
@@ -923,6 +925,7 @@ export class ConversationRuntime {
       undefined,
       () => {
         if (!published) return;
+        sortConversationMessages(published.messages);
         const digests = messageDigests();
         this.#setSnapshot(agentId, published, digests);
         this.publishConversation(published, conversationContentSignature(published, digests.json));

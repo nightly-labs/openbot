@@ -7,7 +7,12 @@ import { type DynamicRecord, isDynamicRecord, isString } from "@openbot/contract
 import { perfTimed } from "../perf-probe-hooks";
 import type { AgentRoster } from "./agent-roster";
 import { recordUsageMessage } from "./agent-usage";
-import { type DatabaseCore, deleteReceiptsOf, deleteThreadAttachments } from "./database-core";
+import {
+  type DatabaseCore,
+  deleteReceiptsOf,
+  deleteThreadAttachments,
+  type OrchestrationEventInput,
+} from "./database-core";
 import {
   databaseRow,
   databaseRows,
@@ -23,6 +28,8 @@ import {
   withoutDeletedMessages,
 } from "./deleted-thread-messages";
 import { currentConversationMessage } from "./legacy-conversation-message";
+import { keepNewMessagesLast } from "./new-messages-last";
+import { withTransaction } from "./sqlite-transaction";
 import { readOrderInputs, refreshChangedOrder, refreshThreadOrder } from "./thread-message-order";
 
 export function withoutQueuePositions(message: ConversationMessage): ConversationMessage {
@@ -65,9 +72,11 @@ export class ConversationWriter {
       messages: withoutDeletedMessages(this.#core.connection, threadId, written.messages),
     };
     const recovery = conversationRecoveryState(this.#core.connection, threadId, snapshot.activeTurnId);
-    const result = this.#core.dispatch(
+    const result = this.#dispatchKeepingNewMessagesLast(
+      threadId,
+      snapshot.messages,
       commandId,
-      [
+      () => [
         {
           aggregateType: "thread",
           aggregateId: threadId,
@@ -206,9 +215,11 @@ export class ConversationWriter {
     if (!threadId) return snapshot.revision;
     const message = snapshot.messages.find((candidate) => candidate.id === messageId);
     if (!message) return this.#threadRevision(threadId);
-    return this.#core.dispatch(
+    return this.#dispatchKeepingNewMessagesLast(
+      threadId,
+      [message],
       input.commandId ?? `conversation:${input.eventType}:${randomUUID()}`,
-      [
+      () => [
         {
           aggregateType: "thread",
           aggregateId: threadId,
@@ -295,9 +306,11 @@ export class ConversationWriter {
     if (isDeletedThreadMessage(this.#core.connection, input.threadId, input.message.id)) {
       return this.#threadRevision(input.threadId);
     }
-    const result = this.#core.dispatch(
+    const result = this.#dispatchKeepingNewMessagesLast(
+      input.threadId,
+      [input.message],
       input.commandId ?? `conversation:${input.eventType}:${randomUUID()}`,
-      [
+      () => [
         {
           aggregateType: "thread",
           aggregateId: input.threadId,
@@ -430,9 +443,11 @@ export class ConversationWriter {
     const deleted = deletedThreadMessageIds(this.#core.connection, input.threadId);
     for (const messageId of deletedMessageIds) deleted.add(messageId);
     const changedMessages = input.changedMessages.filter((message) => !deleted.has(message.id));
-    const result = this.#core.dispatch(
+    const result = this.#dispatchKeepingNewMessagesLast(
+      input.threadId,
+      changedMessages,
       input.commandId ?? `conversation:${input.eventType}:${randomUUID()}`,
-      [
+      () => [
         {
           aggregateType: "thread",
           aggregateId: input.threadId,
@@ -828,6 +843,20 @@ export class ConversationWriter {
         .get(threadId),
     );
     return revision ? requiredNumberColumn(revision, "last_event_sequence") : 0;
+  }
+
+  #dispatchKeepingNewMessagesLast<T>(
+    threadId: string,
+    messages: readonly ConversationMessage[],
+    commandId: string,
+    events: () => OrchestrationEventInput[],
+    project: (db: DatabaseSync, sequences: number[]) => T,
+  ): T {
+    const db = this.#core.connection;
+    return withTransaction(db, () => {
+      keepNewMessagesLast(db, threadId, messages);
+      return this.#core.dispatch(commandId, events(), project);
+    });
   }
 }
 
