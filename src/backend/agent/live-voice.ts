@@ -167,10 +167,10 @@ interface OpenUserLine {
 }
 
 interface DeliveryUpdates {
-  turnId: string | null;
-  skipEarlier: boolean;
+  readonly since: number;
   readonly ids: Set<string>;
   readonly texts: Set<string>;
+  readonly speech: Set<Fiber.Fiber<void>>;
 }
 
 interface LiveSession {
@@ -196,7 +196,6 @@ interface LiveSession {
   readonly answeredTurns: Set<string>;
   readonly speaking: Set<Fiber.Fiber<void>>;
   readonly updates: Map<string, DeliveryUpdates>;
-  readonly updateSpeech: Set<Fiber.Fiber<void>>;
 }
 
 interface SentAsk {
@@ -266,7 +265,6 @@ export class LiveVoice {
       answeredTurns: new Set(),
       speaking: new Set(),
       updates: new Map(),
-      updateSpeech: new Set(),
     };
     this.#sessions.set(session.id, session);
     relay.client.on("notification", session.onNotification);
@@ -366,7 +364,7 @@ export class LiveVoice {
 
   observe(event: AgentEvent): void {
     if (this.#sessions.size === 0) return;
-    if (event.type === "conversation") this.#sayUpdates(event.snapshot);
+    if (event.type === "conversation" && this.#asks.size > 0) this.#sayUpdates(event.snapshot);
     if (event.type === "queue-changed" || event.type === "turn-completed") this.#answerSettled();
     if (event.type !== "turn-completed" || event.status !== "completed" || event.quiet || event.continues) return;
     for (const session of this.#sessions.values()) {
@@ -468,6 +466,7 @@ export class LiveVoice {
     text: string,
     pending: OpenUserLine | null,
   ): Effect.Effect<void> {
+    const since = Date.now();
     const waits = this.#hooks.busy(session.agentId);
     const heard = session.heard.splice(0);
     const partial = takePartial(session, pending);
@@ -488,7 +487,7 @@ export class LiveVoice {
         onSuccess: (deliveryId) => {
           if (!this.#sessions.has(session.id)) return;
           session.lastAsk = { words: requestWords(text), userLines: session.userLines, deliveryId };
-          session.updates.set(deliveryId, { turnId: null, skipEarlier: waits, ids: new Set(), texts: new Set() });
+          session.updates.set(deliveryId, { since, ids: new Set(), texts: new Set(), speech: new Set() });
           const ask = this.#wait(session, request, deliveryId);
           if (waits && ask && this.#asks.has(ask)) this.#say(session, Effect.succeed(QUEUED_NOTICE), false);
         },
@@ -539,13 +538,11 @@ export class LiveVoice {
     for (const session of this.#sessions.values()) {
       if (session.agentId !== snapshot.agentId) continue;
       for (const [deliveryId, updates] of session.updates) {
-        updates.turnId ??= this.#hooks.turn(deliveryId);
-        if (!updates.turnId) continue;
-        const earlier = updates.skipEarlier;
-        updates.skipEarlier = false;
+        const turnId = this.#hooks.turn(deliveryId);
+        if (!turnId) continue;
         for (const message of snapshot.messages) {
           if (
-            message.turnId !== updates.turnId ||
+            message.turnId !== turnId ||
             message.author !== "assistant" ||
             message.itemType !== "commentary" ||
             message.status !== "completed" ||
@@ -554,18 +551,20 @@ export class LiveVoice {
           )
             continue;
           updates.ids.add(message.id);
-          if (!showsNarration(message.text, updates.texts) || earlier) continue;
-          const fiber = this.#say(session, this.#speech(session.agentId, message.text));
-          session.updateSpeech.add(fiber);
-          fiber.addObserver(() => session.updateSpeech.delete(fiber));
+          if (Date.parse(message.createdAt) < updates.since || !showsNarration(message.text, updates.texts)) continue;
+          const fiber = this.#say(session, Effect.succeed(speechTextFromMarkdown(this.#hooks.redact(message.text))));
+          updates.speech.add(fiber);
+          fiber.addObserver(() => updates.speech.delete(fiber));
         }
       }
     }
   }
 
   #dropUpdates(session: LiveSession, deliveryId: string): void {
+    const updates = session.updates.get(deliveryId);
+    if (!updates) return;
     session.updates.delete(deliveryId);
-    for (const fiber of session.updateSpeech) Effect.runFork(Fiber.interrupt(fiber));
+    for (const fiber of updates.speech) Effect.runFork(Fiber.interrupt(fiber));
   }
 
   #respond(session: LiveSession, requestId: AppServerRequest["id"], reply: LiveVoiceReply): void {
