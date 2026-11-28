@@ -17,6 +17,8 @@ export const messages = {
   "error.remote.testPanelFailed": "El host no pudo abrir el panel de prueba.",
   "error.remote.sessionCapacity": "El host ya tiene cuatro sesiones activas.",
   "error.remote.linuxNeedsX11": "El escritorio remoto en Linux necesita una sesión X11. Wayland no es compatible.",
+  "error.remote.macosUpdateRequired":
+    "El escritorio remoto necesita macOS {version} o posterior en el host. Actualiza macOS en el host y vuelve a intentarlo.",
   "error.remote.runtimeMissing":
     "El entorno de ejecución de Sunshine y Moonlight Web falta o no es compatible con este host. Instala la versión completa de OpenBot en un Mac, un host Windows x64 o un host Linux x64 y reinicia OpenBot.",
   "error.remote.testActive": "Hay una prueba de escritorio remoto activa. Inténtalo de nuevo cuando termine.",

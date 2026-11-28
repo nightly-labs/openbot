@@ -16,6 +16,8 @@ export const messages = {
   "error.remote.testPanelFailed": "Хосту не удалось открыть панель проверки.",
   "error.remote.sessionCapacity": "На хосте уже четыре активные сессии.",
   "error.remote.linuxNeedsX11": "Для удалённого рабочего стола в Linux нужна сессия X11. Wayland не поддерживается.",
+  "error.remote.macosUpdateRequired":
+    "Для удалённого рабочего стола на хосте нужна macOS {version} или новее. Обновите macOS на хосте и повторите попытку.",
   "error.remote.runtimeMissing":
     "Среда Sunshine и Moonlight Web отсутствует или не поддерживается на этом хосте. Установите полный релиз OpenBot на Mac, хост Windows x64 или хост Linux x64 и перезапустите OpenBot.",
   "error.remote.testActive": "Идёт проверка удалённого рабочего стола. Повторите попытку, когда она закончится.",
