@@ -74,6 +74,7 @@ export const messages = {
   "files.library.agents": "סוכנים",
   "files.library.allAgents": { one: "סוכן אחד", two: "שני הסוכנים", other: "כל {count} הסוכנים" },
   "files.library.folders": "תיקיות",
+  "files.library.loadingFolders": "טוען תיקיות",
   "files.library.workflows": "תהליכים",
   "files.library.workflowsOf": "תהליכים ב-{name}",
   "files.library.favorite": "{name} במועדפים",

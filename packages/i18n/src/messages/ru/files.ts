@@ -106,6 +106,7 @@ export const messages = {
     other: "Все агенты ({count})",
   },
   "files.library.folders": "Папки",
+  "files.library.loadingFolders": "Загрузка папок",
   "files.library.workflows": "Процессы",
   "files.library.workflowsOf": "Процессы в {name}",
   "files.library.favorite": "{name} в избранное",

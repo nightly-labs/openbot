@@ -168,6 +168,22 @@ function FolderStage(props: { initialLocation?: LibraryLocation; files?: readonl
 
 export const Folders: Story = { render: () => <FolderStage /> };
 
+export const FoldersLoading: Story = {
+  name: "Folders: loading",
+  render: () => (
+    <LibraryStage
+      args={{
+        ...libraryArgs(),
+        files: TEAM_FILES,
+        agents: TEAM_AGENTS,
+        folders: null,
+        foldersLoading: true,
+        onFolderAction: fn(),
+      }}
+    />
+  ),
+};
+
 export const FoldersAgent: Story = {
   name: "Folders: an agent",
   render: () => <FolderStage initialLocation={{ kind: "agent", agentId: "chief" }} />,

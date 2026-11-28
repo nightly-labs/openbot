@@ -93,6 +93,7 @@ export interface LibraryPageProps {
   onDeleteFiles?: BatchFileAction | undefined;
   onSaveFiles?: BatchFileAction | undefined;
   folders?: LibraryFoldersSnapshot | null | undefined;
+  foldersLoading?: boolean | undefined;
   onFolderAction?: ((action: LibraryFolderAction) => void) | undefined;
   canOrganize?: ((agentId: string) => boolean) | undefined;
   initialLocation?: LibraryLocation | undefined;
@@ -161,6 +162,8 @@ export function LibraryPage(props: LibraryPageProps) {
 
   const snapshot = createMemo(() => (props.onFolderAction ? (props.folders ?? null) : null));
   const folderMode = () => snapshot() !== null;
+  const foldersLoading = () => !folderMode() && props.foldersLoading === true && props.onFolderAction !== undefined;
+  const folderShell = () => folderMode() || foldersLoading();
   const folderList = () => snapshot()?.folders ?? NO_FOLDERS;
   const folderById = createMemo(() => new Map(folderList().map((folder) => [folder.id, folder])));
   const canCreateFolder = () => folderList().length < LIBRARY_FOLDER_LIMITS.folders;
@@ -426,7 +429,7 @@ export function LibraryPage(props: LibraryPageProps) {
   });
   const searchLabel = () =>
     place().kind === "all" ? t("files.library.search") : t("files.library.searchIn", { name: title() });
-  const listLabel = () => (folderMode() ? title() : t("files.library.title"));
+  const listLabel = () => (folderShell() ? title() : t("files.library.title"));
 
   function send(action: LibraryFolderAction): void {
     props.onFolderAction?.(action);
@@ -775,7 +778,7 @@ export function LibraryPage(props: LibraryPageProps) {
   });
   const newFolderPlace = () => {
     const at = place();
-    if (!canCreateFolder() || selecting()) return null;
+    if (!folderMode() || !canCreateFolder() || selecting()) return null;
     if (at.kind === "removed" || isWorkflowLocation(at)) return null;
     if (at.kind === "agent" || at.kind === "folder") {
       const parentId = at.kind === "folder" ? at.folderId : undefined;
@@ -1068,7 +1071,7 @@ export function LibraryPage(props: LibraryPageProps) {
           pictures.attach(element);
         }}
       >
-        <Show when={!folderMode()}>
+        <Show when={!folderShell()}>
           <header class="library-head">
             <h2 class="library-title">{t("files.library.title")}</h2>
             <div class="library-tools">
@@ -1325,7 +1328,7 @@ export function LibraryPage(props: LibraryPageProps) {
   );
 
   return (
-    <Show when={folderMode()} fallback={frame()}>
+    <Show when={folderShell()} fallback={frame()}>
       <div class="library-shell" ref={setShell}>
         <LibraryPathHead
           place={place()}
@@ -1362,6 +1365,7 @@ export function LibraryPage(props: LibraryPageProps) {
           {selectButtons()}
         </LibraryPathHead>
         <LibraryFolderTree
+          loading={foldersLoading()}
           agents={agents()}
           activeAgents={activeAgents()}
           folders={folderList()}

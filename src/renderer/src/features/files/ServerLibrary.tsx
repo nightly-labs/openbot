@@ -1,5 +1,6 @@
 import { agentAccessRank, canPreviewAttachment, type FilePreview, type ServerSummary } from "@openbot/contracts/ipc";
 import { AGENT_ACCESS_CAPABILITY } from "@openbot/contracts/team-protocol/agent-access-v1";
+import { LIBRARY_FOLDERS_CAPABILITY } from "@openbot/contracts/team-protocol/library-folders-v1";
 import { classifyFailure } from "@openbot/telemetry";
 import type { AgentProfile } from "@openbot/ui/data";
 import type { AttachmentMediaSource } from "@openbot/ui/features/conversation/AttachmentCards";
@@ -90,7 +91,8 @@ export function ServerLibrary(props: ServerLibraryProps) {
       if (was === true && !loading) folders.reload();
     },
   );
-  const hasFolders = () => (folders.snapshot() ? "" : undefined);
+  const foldersLoading = () => !folders.ready() && serverSupportsCapability(props.server, LIBRARY_FOLDERS_CAPABILITY);
+  const hasFolders = () => (folders.snapshot() || foldersLoading() ? "" : undefined);
   const canDelete = () => {
     const current = props.server;
     return current ? canManageStorage(current) : false;
@@ -144,30 +146,33 @@ export function ServerLibrary(props: ServerLibraryProps) {
   return (
     <div class="library-panel">
       <div class="library-panel-content" data-folders={hasFolders()} inert={viewing() !== null}>
-        <Show when={folders.ready()}>
-          <LibraryPage
-            files={storage.state.usage?.files ?? []}
-            agents={agents()}
-            loading={storage.scanState() === "scanning" && !storage.state.usage}
-            error={storage.error()}
-            onRetry={() => void storage.refresh(true)}
-            canDelete={canDelete()}
-            macWindowControls={macWindowControls()}
-            onOpen={(file, origin) => void open(file, origin)}
-            onAction={act}
-            onDeleteFiles={storage.deleteFiles}
-            onSaveFiles={storage.saveFiles}
-            folders={folders.snapshot()}
-            onFolderAction={folders.change}
-            canOrganize={canOrganize}
-            initialCollapsed={readLibraryCollapsedRows(props.serverId)}
-            onCollapsedChange={saveCollapsedRows}
-            initialFavorites={readLibraryFavorites(props.serverId)}
-            onFavoritesChange={saveFavorites}
-            mediaSource={props.mediaSource}
-            pictureUrl={thumbnailUrl}
-            opensFiles={props.opensFiles}
-          />
+        <Show when={props.serverId} keyed>
+          {(serverId) => (
+            <LibraryPage
+              files={storage.state.usage?.files ?? []}
+              agents={agents()}
+              loading={storage.scanState() === "scanning" && !storage.state.usage}
+              error={storage.error()}
+              onRetry={() => void storage.refresh(true)}
+              canDelete={canDelete()}
+              macWindowControls={macWindowControls()}
+              onOpen={(file, origin) => void open(file, origin)}
+              onAction={act}
+              onDeleteFiles={storage.deleteFiles}
+              onSaveFiles={storage.saveFiles}
+              folders={folders.snapshot()}
+              foldersLoading={foldersLoading()}
+              onFolderAction={folders.change}
+              canOrganize={canOrganize}
+              initialCollapsed={readLibraryCollapsedRows(serverId)}
+              onCollapsedChange={saveCollapsedRows}
+              initialFavorites={readLibraryFavorites(serverId)}
+              onFavoritesChange={saveFavorites}
+              mediaSource={props.mediaSource}
+              pictureUrl={thumbnailUrl}
+              opensFiles={props.opensFiles}
+            />
+          )}
         </Show>
       </div>
       <Show when={viewing()} keyed>
