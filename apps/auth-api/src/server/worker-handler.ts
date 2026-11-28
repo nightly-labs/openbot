@@ -4,7 +4,7 @@ import { passkeyWalletHostResponse } from "../lib/near-sign-csp";
 import { OPENBOT_SECURITY_HEADERS, OPENBOT_SITE_URL } from "../lib/site-metadata";
 import { sendAccountActivitySnapshots } from "./account-activity";
 import { createAccountAnalytics, createAccountEventDelivery } from "./account-analytics";
-import { type AuthRetentionResult, pruneExpiredAuthData } from "./auth-data-retention";
+import { type AuthRetentionResult, pruneExpiredAuthData, pruneExpiredRateLimits } from "./auth-data-retention";
 import { BillingSales } from "./billing-sales";
 import { BillingService } from "./billing-service";
 import { captureBillingSnapshot } from "./billing-snapshots";
@@ -140,6 +140,9 @@ export function createWorkerHandler(
         if (hostingResult && Object.values(hostingResult).some(Boolean)) {
           console.info("Hosted server check completed.", hostingResult);
         }
+        yield* pruneExpiredRateLimits(bindings.DB, now).pipe(
+          Effect.catch(() => Effect.sync(() => console.warn("Rate limit retention failed."))),
+        );
         return isDailyRetentionRun(now) ? yield* prune(bindings.DB, now) : null;
       });
       const [retention, , sites] = await runApiEffect(
