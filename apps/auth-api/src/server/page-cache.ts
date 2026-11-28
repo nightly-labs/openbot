@@ -1,4 +1,4 @@
-import { serverRequestLocale } from "../lib/request-locale";
+import { serverRequestLocale } from "../lib/request-locale-headers";
 import { siteUrlForPage } from "../lib/site-metadata";
 
 const PAGE_CACHE_NAME = "site-pages";
