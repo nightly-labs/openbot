@@ -857,27 +857,52 @@ export class RemoteControlPlane {
         existing.machine_token_hash !== providedMachineTokenHash ||
         LEGACY_SHA256_HEX_PATTERN.test(existing.machine_token_hash ?? "");
       if (!rotateCredential && existing) {
-        const metadata = yield* remoteCall(() =>
-          dependencies.database.batch([
-            dependencies.database
-              .prepare(
-                `UPDATE remote_hosts SET name = ?, device_public_key = ?, updated_at = ?
-             WHERE host_id = ? AND owner_user_id = ?`,
-              )
-              .bind(name, devicePublicKey, now, hostId, user.id),
-            dependencies.database
-              .prepare(
-                `INSERT INTO remote_memberships(
-               membership_id, host_id, user_id, role, status, created_at, updated_at
-             )
-             SELECT ?, host_id, ?, 'owner', 'active', ?, ?
-             FROM remote_hosts WHERE host_id = ? AND owner_user_id = ?
-             ON CONFLICT(host_id, user_id) DO UPDATE SET
-               role = 'owner', status = 'active', updated_at = excluded.updated_at`,
-              )
-              .bind(ownerMembershipId, user.id, now, now, hostId, user.id),
-          ]),
+        const current = yield* remoteCall(() =>
+          dependencies.database
+            .prepare(
+              `SELECT membership_id, host_id, user_id, role, status
+             FROM remote_memberships WHERE host_id = ? AND user_id = ? LIMIT 1`,
+            )
+            .bind(hostId, user.id)
+            .first<RemoteMembershipRow>(),
         );
+        const writes = [
+          ...(existing.name === name
+            ? []
+            : [
+                dependencies.database
+                  .prepare(
+                    `UPDATE remote_hosts SET name = ?, device_public_key = ?, updated_at = ?
+                 WHERE host_id = ? AND owner_user_id = ?`,
+                  )
+                  .bind(name, devicePublicKey, now, hostId, user.id),
+              ]),
+          ...(current?.role === "owner" && current.status === "active"
+            ? []
+            : [
+                dependencies.database
+                  .prepare(
+                    `INSERT INTO remote_memberships(
+                   membership_id, host_id, user_id, role, status, created_at, updated_at
+                 )
+                 SELECT ?, host_id, ?, 'owner', 'active', ?, ?
+                 FROM remote_hosts WHERE host_id = ? AND owner_user_id = ?
+                 ON CONFLICT(host_id, user_id) DO UPDATE SET
+                   role = 'owner', status = 'active', updated_at = excluded.updated_at`,
+                  )
+                  .bind(ownerMembershipId, user.id, now, now, hostId, user.id),
+              ]),
+        ];
+        if (writes.length === 0 && current) {
+          return {
+            hostId,
+            name,
+            membershipId: current.membership_id,
+            authEpoch: existing.auth_epoch,
+            machineToken: null,
+          };
+        }
+        const metadata = yield* remoteCall(() => dependencies.database.batch(writes));
         if (metadata.some((result) => (result.meta.changes ?? 0) !== 1)) {
           return yield* new RemoteControlPlaneError(
             403,
@@ -899,7 +924,7 @@ export class RemoteControlPlane {
         Effect.mapError((error) => (error instanceof RemoteControlPlaneError ? error : new RemoteOperationError({}))),
       );
       const membershipId = ownerMembershipId;
-      const [, ...registration] = yield* remoteCall(() =>
+      const [, hostWrite, , ...events] = yield* remoteCall(() =>
         dependencies.database.batch([
           dependencies.database
             .prepare(
@@ -931,7 +956,8 @@ export class RemoteControlPlane {
            SELECT ?, host_id, ?, 'owner', 'active', ?, ?
            FROM remote_hosts WHERE host_id = ? AND owner_user_id = ?
            ON CONFLICT(host_id, user_id) DO UPDATE SET
-             role = 'owner', status = 'active', updated_at = excluded.updated_at`,
+             role = 'owner', status = 'active', updated_at = excluded.updated_at
+           WHERE remote_memberships.role != 'owner' OR remote_memberships.status != 'active'`,
             )
             .bind(membershipId, user.id, now, now, hostId, user.id),
           this.#authEpochEventStatement(hostId, now, user.id),
@@ -940,7 +966,7 @@ export class RemoteControlPlane {
             : [this.#authEventStatement({ type: "account-servers-changed", userId: user.id }, now)]),
         ]),
       );
-      if (registration.some((result) => (result.meta.changes ?? 0) !== 1)) {
+      if ([hostWrite, ...events].some((result) => (result?.meta.changes ?? 0) !== 1)) {
         return yield* new RemoteControlPlaneError(403, "host_owner_mismatch", "This host belongs to another account.");
       }
       yield* this.#flushAuthEvents();
