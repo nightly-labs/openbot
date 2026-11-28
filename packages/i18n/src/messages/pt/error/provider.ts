@@ -411,6 +411,8 @@ export const messages = {
   "error.provider.hermesSignIn": "Entre com o Nous Portal ou execute `hermes setup` em um terminal para usar o Hermes.",
   "error.provider.hermesTurnFailed":
     "O Hermes não conseguiu terminar este turno. Se a resposta dele der um motivo, siga o que ela diz. Se não, um servidor MCP deste agente pode estar indisponível: verifique-o na Loja, Apps, e envie sua mensagem de novo.",
+  "error.provider.hermesProviderFailed":
+    "O Hermes não conseguiu terminar este turno porque o provedor do modelo retornou um erro. Siga a mensagem do provedor abaixo, ou escolha outro modelo para este agente, e envie sua mensagem de novo.\n{detail}",
   "error.provider.hermesRefused":
     "O Hermes recusou esta mensagem antes de começar. Envie-a de novo. Se o Hermes recusar todas as mensagens, reinicie o OpenBot no computador que executa este agente.",
   "error.provider.hermesConnectionLost":

@@ -4467,6 +4467,7 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
           this.#label,
           () => this.options.providerRefusalStatus?.(thread.id) ?? null,
           () => this.options.savedKeyShadowed?.() ?? false,
+          answer,
         ) ??
         detail;
       const causeCode = turn.failureCause ?? acpFailureCause(error, this.#flavor, message, answer);

@@ -406,6 +406,8 @@ export const messages = {
     "Hermes를 사용하려면 Nous Portal로 로그인하거나 터미널에서 `hermes setup`을 실행하세요.",
   "error.provider.hermesTurnFailed":
     "Hermes가 이번 턴을 완료하지 못했습니다. 응답에 이유가 있으면 그 안내를 따르세요. 없으면 이 에이전트의 MCP 서버를 사용할 수 없는 상태일 수 있습니다. 마켓플레이스, 앱에서 확인한 다음 메시지를 다시 보내세요.",
+  "error.provider.hermesProviderFailed":
+    "모델 제공자가 오류를 반환해서 Hermes가 이번 턴을 완료하지 못했습니다. 아래 제공자 메시지의 안내를 따르거나 이 에이전트에 다른 모델을 선택한 다음 메시지를 다시 보내세요.\n{detail}",
   "error.provider.hermesRefused":
     "Hermes가 시작하기 전에 이 메시지를 거부했습니다. 다시 보내세요. Hermes가 모든 메시지를 거부하면 이 에이전트를 실행하는 컴퓨터에서 OpenBot을 다시 시작하세요.",
   "error.provider.hermesConnectionLost":

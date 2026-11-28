@@ -81,6 +81,7 @@ export interface AcpFlavor {
     label: string,
     refusalStatus: () => number | null,
     savedKeyShadowed: () => boolean,
+    answer: string,
   ): string;
   failureCause?(error: unknown, answer: string): CauseCode | null;
   failureReport?: RegExp;
@@ -341,12 +342,31 @@ const HERMES_LOST_TURNS: NonNullable<AcpFlavor["lostTurns"]> = {
   discard: (sessionId) => ["sessions", "discard", sessionId, "--yes"],
 };
 
-function hermesTurnFailure(error: unknown, detail: string): string {
-  if (isRecord(error) && isRecord(error.data) && error.data.details === "admitted_turn_failed")
-    return sourceText("error.provider.hermesTurnFailed");
+function hermesTurnFailure(error: unknown, detail: string, redact: (text: string) => string, answer: string): string {
+  if (hermesAdmittedTurnFailed(error)) {
+    const reason = hermesProviderReason(error, answer);
+    return reason
+      ? sourceText("error.provider.hermesProviderFailed", { detail: shownFailureDetail(redact(reason)) })
+      : sourceText("error.provider.hermesTurnFailed");
+  }
   if (hermesGatewayLost(error)) return sourceText("error.provider.hermesConnectionLost");
   return hermesRefusal(error) ? sourceText("error.provider.hermesRefused") : detail;
 }
+
+const hermesFlavorTurnFailure: NonNullable<AcpFlavor["turnFailure"]> = (
+  error,
+  detail,
+  redact,
+  _log,
+  _model,
+  _endpoint,
+  _savedKey,
+  _providerKeyStored,
+  _label,
+  _refusalStatus,
+  _savedKeyShadowed,
+  answer,
+) => hermesTurnFailure(error, detail, redact, answer);
 
 function hermesGatewayLost(error: unknown): boolean {
   return (
@@ -407,12 +427,28 @@ const HERMES_FAILURE_REASONS: Readonly<Partial<Record<string, CauseCode>>> = {
 
 const HERMES_FAILURE_SUMMARY = /^\s*[^\n]+\n\nProvider said: ([^\n]+)/u;
 
+function hermesAdmittedTurnFailed(error: unknown): error is { data: DynamicRecord } {
+  return isRecord(error) && isRecord(error.data) && error.data.details === "admitted_turn_failed";
+}
+
+const HERMES_PROVIDER_SAID = /(?:^|\n)Provider said: ([^\n]+)/gu;
+
+function lastProviderSaid(text: string): string | null {
+  const said = [...text.matchAll(HERMES_PROVIDER_SAID)].at(-1)?.[1]?.trim();
+  return said || null;
+}
+
+function hermesProviderReason(error: { data: DynamicRecord }, answer: string): string | null {
+  const { message } = error.data;
+  return (typeof message === "string" ? lastProviderSaid(message) : null) ?? lastProviderSaid(answer);
+}
+
 function hermesFailureCause(error: unknown, answer: string): CauseCode | null {
-  if (!isRecord(error) || !isRecord(error.data) || error.data.details !== "admitted_turn_failed") return null;
-  const { failure_reason: reason, message } = error.data;
+  if (!hermesAdmittedTurnFailed(error)) return null;
+  const reason = error.data.failure_reason;
   const named = typeof reason === "string" ? HERMES_FAILURE_REASONS[reason] : undefined;
   if (named) return named;
-  const said = HERMES_FAILURE_SUMMARY.exec(typeof message === "string" && message ? message : answer)?.[1];
+  const said = hermesProviderReason(error, answer);
   const cause = said ? classifyFailure(said) : "unknown";
   return cause === "unknown" ? null : cause;
 }
@@ -438,7 +474,7 @@ export const HERMES_ACP_FLAVOR: AcpFlavor = {
   setsConfigOnlyOnChange: true,
   resendsAnswer: true,
   subagentTools: ["delegate_task"],
-  turnFailure: hermesTurnFailure,
+  turnFailure: hermesFlavorTurnFailure,
   failureCause: hermesFailureCause,
   failureReport: HERMES_FAILURE_SUMMARY,
   catalogAsMcpTools: true,
@@ -598,8 +634,20 @@ const CUSTOM_AGENT_FLAVORS: Readonly<Partial<Record<string, AcpFlavor>>> = {
     sessionProcessesBefore: HERMES_SESSION_MCP_SINCE,
     setsConfigOnlyOnChange: true,
     resendsAnswer: true,
-    turnFailure: (error, detail, _redact, _log, _model, _endpoint, _savedKey, _providerKeyStored, label) =>
-      customRefusal(error, hermesTurnFailure(error, detail), label),
+    turnFailure: (
+      error,
+      detail,
+      redact,
+      _log,
+      _model,
+      _endpoint,
+      _savedKey,
+      _providerKeyStored,
+      label,
+      _refusalStatus,
+      _savedKeyShadowed,
+      answer,
+    ) => customRefusal(error, hermesTurnFailure(error, detail, redact, answer), label),
     failureCause: (error, answer) => customFailureCause(error) ?? hermesFailureCause(error, answer),
     failureReport: HERMES_FAILURE_SUMMARY,
     catalogAsMcpTools: true,

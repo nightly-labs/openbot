@@ -383,6 +383,8 @@ export const messages = {
   "error.provider.hermesSignIn": "יש להתחבר עם Nous Portal, או להריץ `hermes setup` בטרמינל, כדי להשתמש ב-Hermes.",
   "error.provider.hermesTurnFailed":
     "Hermes לא הצליח לסיים את התור הזה. אם התשובה שלו מציינת סיבה, פעל לפיה. אם לא, ייתכן ששרת MCP של הסוכן הזה אינו זמין: בדוק אותו בחנות, אפליקציות, ואז שלח את ההודעה שוב.",
+  "error.provider.hermesProviderFailed":
+    "Hermes לא הצליח לסיים את התור הזה כי ספק המודל שלו החזיר שגיאה. פעל לפי הודעת הספק שלמטה, או בחר מודל אחר לסוכן הזה, ואז שלח את ההודעה שוב.\n{detail}",
   "error.provider.hermesRefused":
     "Hermes דחה את ההודעה הזו לפני שהתחילה. שלח אותה שוב. אם Hermes דוחה כל הודעה, הפעל מחדש את OpenBot במחשב שמריץ את הסוכן הזה.",
   "error.provider.hermesConnectionLost":

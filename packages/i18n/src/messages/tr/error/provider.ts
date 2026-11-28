@@ -413,6 +413,8 @@ export const messages = {
     "Hermes'i kullanmak için Nous Portal ile oturum açın veya bir terminalde `hermes setup` komutunu çalıştırın.",
   "error.provider.hermesTurnFailed":
     "Hermes bu turu bitiremedi. Yanıtı bir neden veriyorsa onu izleyin. Vermiyorsa bu ajanın bir MCP sunucusu kullanılamıyor olabilir: Pazaryeri, Uygulamalar bölümünden kontrol edin, sonra mesajınızı yeniden gönderin.",
+  "error.provider.hermesProviderFailed":
+    "Model sağlayıcısı bir hata döndürdüğü için Hermes bu turu bitiremedi. Aşağıdaki sağlayıcı mesajını izleyin veya bu ajan için başka bir model seçin, sonra mesajınızı yeniden gönderin.\n{detail}",
   "error.provider.hermesRefused":
     "Hermes bu mesajı başlamadan önce reddetti. Yeniden gönderin. Hermes her mesajı reddediyorsa bu ajanı çalıştıran bilgisayarda OpenBot'u yeniden başlatın.",
   "error.provider.hermesConnectionLost":
