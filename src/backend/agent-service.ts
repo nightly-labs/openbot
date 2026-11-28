@@ -1589,6 +1589,8 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
                     resetDelayMs,
                     spent,
                     failed.causeCode === "authentication",
+                    false,
+                    failed.causeCode === "usage_limit",
                   );
                 }
                 return Effect.void;
@@ -4274,6 +4276,10 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
     const leaving = Boolean(moved && input.leaveUsageLimit && (wasHeld || failingOver));
     const spentBalance =
       failingOver && previousChoice !== undefined && this.#usageLimits.isSpent(usageLimitOf(previousChoice));
+    const providerErrorSwitch =
+      failingOver &&
+      (spentBalance ||
+        !(previousChoice !== undefined && this.#usageLimits.isUsageLimitFailure(usageLimitOf(previousChoice))));
     const returnTo =
       leaving && previous && previousChoice
         ? (previous.usageLimitReturn ??
@@ -4282,7 +4288,7 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
             : {
                 ...previousChoice,
                 reasoningEffort: previous.reasoningEffort,
-                ...(failingOver ? { cause: "provider-error" as const } : {}),
+                ...(providerErrorSwitch ? { cause: "provider-error" as const } : {}),
                 ...(previous.fastMode ? { fastMode: true } : {}),
                 ...(previous.fastMode && previous.ultrafast ? { ultrafast: true } : {}),
               }))
@@ -4314,7 +4320,7 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
       this.#appendModelSwitchMarker(
         agent,
         leaving
-          ? failingOver
+          ? providerErrorSwitch
             ? "provider-error"
             : "usage-limit"
           : previous?.usageLimitReturn?.cause === "provider-error"
