@@ -1407,6 +1407,12 @@
       "detailSha256": "ac1e40265dca9338d5e59dd104c6da7227fb24e70c944a4467027a07ec9de65f"
     },
     {
+      "slug": "treg",
+      "version": "1.0.0",
+      "featured": false,
+      "detailSha256": "945af4afd3b35b43e5b43cd753bc8a368c98df285cd80806715ce94b0e8c9b29"
+    },
+    {
       "slug": "truthifi",
       "version": "1.0.0",
       "featured": false,

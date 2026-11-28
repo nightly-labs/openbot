@@ -62,7 +62,7 @@ const UPRIGHT_MARKS: Record<string, PluginMark> = {
   },
 };
 
-const DRAWN_LOGO_SLUGS = new Set(["aave", "canva", ...Object.keys(UPRIGHT_MARKS)]);
+const DRAWN_LOGO_SLUGS = new Set(["aave", "canva", "treg", ...Object.keys(UPRIGHT_MARKS)]);
 
 export function hasPluginLogo(slug: string): boolean {
   return DRAWN_LOGO_SLUGS.has(slug);
@@ -85,6 +85,18 @@ export function PluginLogo(props: PluginLogoProps) {
         </span>
       }
     >
+      <Match when={props.slug === "treg"}>
+        <svg
+          class={cx("plugin-logo", "plugin-logo-treg", props.class)}
+          viewBox="0 0 290 290"
+          fill="currentColor"
+          aria-hidden="true"
+          data-plugin="treg"
+        >
+          <rect width="140.5" height="140.5" rx="20" />
+          <rect x="149.5" y="149.5" width="140.5" height="140.5" rx="20" />
+        </svg>
+      </Match>
       <Match when={props.slug === "aave"}>
         <svg
           class={cx("plugin-logo", props.class)}

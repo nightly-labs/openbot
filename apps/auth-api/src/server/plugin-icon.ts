@@ -3,8 +3,14 @@ import { Effect, Result, Schema } from "effect";
 class PluginIconError extends Schema.TaggedError<PluginIconError>()("PluginIconError", {}) {}
 
 import { findPlugin } from "../lib/plugins";
+import tregIcon from "../lib/treg-icon.png?inline";
 
 const ICON_CACHE_CONTROL = "public, max-age=86400, stale-while-revalidate=604800";
+const ICON_HEADERS = {
+  "Cache-Control": ICON_CACHE_CONTROL,
+  "X-Content-Type-Options": "nosniff",
+  "Content-Security-Policy": "default-src 'none'; sandbox",
+};
 
 const notFound = () => new Response("Not found", { status: 404 });
 
@@ -26,6 +32,12 @@ function iconSource(slug: string, appId: string | null): string | null {
 export const pluginIconResponse = Effect.fn("PluginIcon.response")(function* (slug: string, appId: string | null) {
   const source = iconSource(slug, appId);
   if (!source) return notFound();
+
+  if (source === "https://openbot.run/plugins/icon/treg") {
+    const base64 = tregIcon.slice(tregIcon.indexOf(",") + 1);
+    const bytes = Uint8Array.from(atob(base64), (character) => character.charCodeAt(0));
+    return new Response(bytes, { headers: { ...ICON_HEADERS, "Content-Type": "image/png" } });
+  }
 
   let url: URL;
   try {
@@ -53,10 +65,8 @@ export const pluginIconResponse = Effect.fn("PluginIcon.response")(function* (sl
 
   return new Response(upstream.body, {
     headers: {
+      ...ICON_HEADERS,
       "Content-Type": contentType,
-      "Cache-Control": ICON_CACHE_CONTROL,
-      "X-Content-Type-Options": "nosniff",
-      "Content-Security-Policy": "default-src 'none'; sandbox",
     },
   });
 });

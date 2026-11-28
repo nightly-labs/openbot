@@ -9838,6 +9838,47 @@ const TRANSCRIPTAPI: MarketplacePluginDetail = {
   shareUrl: "https://openbot.run/plugins/transcriptapi",
 };
 
+const TREG: MarketplacePluginDetail = {
+  id: "plugin-treg",
+  slug: "treg",
+  name: "Treg",
+  tagline: "OpenRouter for agent tools",
+  description:
+    "Use Treg's catalog and your team's own tools from OpenBot. Research keywords and companies, generate an image or video, or publish a post through a connected account. Check the price before you call a tool.",
+  category: "automation",
+  creatorName: "Treg",
+  iconUrl: "https://openbot.run/plugins/icon/treg",
+  version: "1.0.0",
+  prompts: [
+    { id: "prompt-keywords", text: "Find a tool for monthly keyword search volume. What does one lookup cost?" },
+    { id: "prompt-team", text: "Which tools has my team connected to Treg?" },
+    { id: "prompt-web", text: "Use Treg to find the latest OpenBot release and link to its release notes." },
+  ],
+  apps: [
+    {
+      id: "app-treg-mcp",
+      name: "Treg",
+      description:
+        "Choose a Treg team to use its connected tools and the Treg catalog. Paid calls use that team's credits.",
+      iconUrl: "https://openbot.run/plugins/icon/treg",
+      server: {
+        name: "treg",
+        transport: "http",
+        url: "https://treg.to/mcp/",
+        auth: [{ id: "treg-oauth", kind: "link", label: "Sign in" }],
+      },
+    },
+  ],
+  websiteUrl: "https://treg.to",
+  privacyPolicyUrl: "https://treg.to/privacy",
+  termsUrl: "https://treg.to/terms",
+  skills: [],
+  installs: 0,
+  featured: false,
+  updatedAt: "2026-11-10T00:00:00.000Z",
+  shareUrl: "https://openbot.run/plugins/treg",
+};
+
 const TRUTHIFI: MarketplacePluginDetail = {
   id: "plugin-truthifi",
   slug: "truthifi",
@@ -11011,6 +11052,7 @@ export const MARKETPLACE_PLUGINS: MarketplacePluginDetail[] = [
   TINYFISH,
   TRADINGVIEW,
   TRANSCRIPTAPI,
+  TREG,
   TRUTHIFI,
   TURSO,
   TWILIO_DOCS,

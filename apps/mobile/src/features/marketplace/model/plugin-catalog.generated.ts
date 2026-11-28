@@ -7992,6 +7992,39 @@ export const MOBILE_PLUGINS: readonly MobilePlugin[] = [
     ],
   },
   {
+    slug: "treg",
+    name: "Treg",
+    tagline: "OpenRouter for agent tools",
+    description:
+      "Use Treg's catalog and your team's own tools from OpenBot. Research keywords and companies, generate an image or video, or publish a post through a connected account. Check the price before you call a tool.",
+    category: "automation",
+    creatorName: "Treg",
+    version: "1.0.0",
+    prompts: [
+      { id: "prompt-keywords", text: "Find a tool for monthly keyword search volume. What does one lookup cost?" },
+      { id: "prompt-team", text: "Which tools has my team connected to Treg?" },
+      { id: "prompt-web", text: "Use Treg to find the latest OpenBot release and link to its release notes." },
+    ],
+    websiteUrl: "https://treg.to",
+    privacyPolicyUrl: "https://treg.to/privacy",
+    termsUrl: "https://treg.to/terms",
+    featured: false,
+    apps: [
+      {
+        id: "app-treg-mcp",
+        name: "Treg",
+        description:
+          "Choose a Treg team to use its connected tools and the Treg catalog. Paid calls use that team's credits.",
+        server: {
+          name: "treg",
+          transport: "http",
+          url: "https://treg.to/mcp/",
+          auth: [{ id: "treg-oauth", kind: "link", label: "Sign in" }],
+        },
+      },
+    ],
+  },
+  {
     slug: "truthifi",
     name: "Truthifi",
     tagline: "Investment account insights",
