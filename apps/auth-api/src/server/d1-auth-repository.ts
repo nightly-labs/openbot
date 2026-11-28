@@ -51,6 +51,7 @@ interface HostBindingRow {
 }
 
 const SESSION_ACTIVITY_UPDATE_INTERVAL_MS = 60 * 60_000;
+export const DELETE_ACCOUNT_ACTIVE_DAYS_SQL = "DELETE FROM account_active_days WHERE account_id = ?";
 
 class AuthDatabase extends Context.Service<AuthDatabase, D1Database>()("auth-api/D1AuthRepository/Database") {}
 export class AuthStoreError extends Schema.TaggedError<AuthStoreError>()("AuthStoreError", {
@@ -77,6 +78,22 @@ const selectSessionRow = Effect.fn("D1AuthRepository.selectSessionRow")(function
   }
   return yield* storeCall(() => primaryD1(database).prepare(sql).bind(tokenHash, now).first<T>());
 });
+export const updateSessionActivity = Effect.fn("D1AuthRepository.updateSessionActivity")(function* (
+  database: D1Database,
+  tokenHash: string,
+  lastUsedAt: number,
+  now: number,
+): Effect.fn.Return<void, AuthStoreError> {
+  const activityCutoff = now - SESSION_ACTIVITY_UPDATE_INTERVAL_MS;
+  if (lastUsedAt > activityCutoff) return;
+  yield* storeCall(() =>
+    database
+      .prepare("UPDATE auth_sessions SET last_used_at = ? WHERE token_hash = ? AND last_used_at <= ?")
+      .bind(now, tokenHash, activityCutoff)
+      .run(),
+  );
+});
+
 export class D1AuthRepository implements AuthRepository {
   readonly #layer: Layer.Layer<AuthDatabase>;
   constructor(database: D1Database) {
@@ -475,9 +492,7 @@ export class D1AuthRepository implements AuthRepository {
       );
       if (!row) return yield* new AuthStoreError({ message: "User not found." });
       if (row.analytics_enabled === 0) {
-        yield* storeCall(() =>
-          database.prepare("DELETE FROM account_active_days WHERE account_id = ?").bind(userId).run(),
-        );
+        yield* storeCall(() => database.prepare(DELETE_ACCOUNT_ACTIVE_DAYS_SQL).bind(userId).run());
       }
       return mapUser(row);
     },
@@ -1146,15 +1161,7 @@ export class D1AuthRepository implements AuthRepository {
     lastUsedAt: number,
     now: number,
   ): Effect.fn.Return<void, AuthStoreError, AuthDatabase> {
-    const database = yield* AuthDatabase;
-    const activityCutoff = now - SESSION_ACTIVITY_UPDATE_INTERVAL_MS;
-    if (lastUsedAt > activityCutoff) return;
-    yield* storeCall(() =>
-      database
-        .prepare("UPDATE auth_sessions SET last_used_at = ? WHERE token_hash = ? AND last_used_at <= ?")
-        .bind(now, tokenHash, activityCutoff)
-        .run(),
-    );
+    yield* updateSessionActivity(yield* AuthDatabase, tokenHash, lastUsedAt, now);
   });
 
   readonly #upsertEmailUserEffect = Effect.fn("D1AuthRepository.upsertEmailUser")(function* (

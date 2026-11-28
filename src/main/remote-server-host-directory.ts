@@ -23,36 +23,43 @@ export function watchRemoteHostDirectory(options: {
   return () => clearInterval(timer);
 }
 
-const SERVER_CLAIM_REFRESH_INTERVAL_MS = 5_000;
+const SERVER_CLAIM_FIRST_REFRESH_MS = 5_000;
+const SERVER_CLAIM_MAX_REFRESH_MS = 60_000;
 const SERVER_CLAIM_MAX_WATCH_MS = 15 * 60_000;
 
 export function watchServerClaims(options: { serverIds(): readonly string[]; refresh(): void }): {
   add(expiresAt: number): void;
   stop(): void;
 } {
-  let timer: ReturnType<typeof setInterval> | undefined;
+  let timer: ReturnType<typeof setTimeout> | undefined;
   let known = new Set<string>();
   let claims = 0;
   let deadline = 0;
+  let delay = SERVER_CLAIM_FIRST_REFRESH_MS;
   const stop = () => {
-    clearInterval(timer);
+    clearTimeout(timer);
     timer = undefined;
     claims = 0;
   };
+  const schedule = () => {
+    timer = setTimeout(tick, delay);
+    timer.unref();
+    delay = Math.min(delay * 2, SERVER_CLAIM_MAX_REFRESH_MS);
+  };
   const tick = () => {
     const fresh = options.serverIds().filter((id) => !known.has(id)).length;
-    if (fresh >= claims || Date.now() >= deadline) stop();
-    else options.refresh();
+    if (fresh >= claims || Date.now() >= deadline) return stop();
+    options.refresh();
+    schedule();
   };
   return {
     add(expiresAt) {
-      if (!timer) {
-        known = new Set(options.serverIds());
-        timer = setInterval(tick, SERVER_CLAIM_REFRESH_INTERVAL_MS);
-        timer.unref();
-      }
+      if (!timer) known = new Set(options.serverIds());
+      clearTimeout(timer);
+      delay = SERVER_CLAIM_FIRST_REFRESH_MS;
       claims += 1;
       deadline = Math.max(deadline, Math.min(expiresAt, Date.now() + SERVER_CLAIM_MAX_WATCH_MS));
+      schedule();
     },
     stop,
   };

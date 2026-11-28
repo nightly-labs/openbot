@@ -1,7 +1,7 @@
-import { createHash, timingSafeEqual } from "node:crypto";
 import { SIGNAL_GO_AWAY_WITHIN_MS_LIMIT } from "@openbot/contracts/signal-protocol/messages";
 import type { Server } from "bun";
 import { z } from "zod";
+import { sameSecret } from "./same-secret";
 import type { SignalService } from "./signal-service";
 
 const GO_AWAY_BODY_BYTES_LIMIT = 1_024;
@@ -14,10 +14,6 @@ const goAwayRequestSchema = z
   })
   .strict();
 type GoAwayRequest = z.infer<typeof goAwayRequestSchema>;
-
-export function sameSecret(actual: string, expected: string): boolean {
-  return timingSafeEqual(createHash("sha256").update(actual).digest(), createHash("sha256").update(expected).digest());
-}
 
 export function goAwayRoute(signal: Pick<SignalService, "goAway">, adminToken: string | null) {
   return async (request: Request, server: Server<unknown>): Promise<Response> => {

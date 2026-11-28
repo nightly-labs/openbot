@@ -110,6 +110,46 @@ async function growingCooldown() {
   };
 }
 
+async function hostAwayBackoff() {
+  const firstOfAttempt = new Map<number, ReturnType<typeof settled<RemoteRecoveryStatus>>>();
+  const afterAttempt = (count: number) => {
+    const waiter = firstOfAttempt.get(count) ?? settled<RemoteRecoveryStatus>();
+    firstOfAttempt.set(count, waiter);
+    return waiter;
+  };
+  let attempts = 0;
+  let hostAway = true;
+  let lastSeconds = -1;
+  const recovery = createRemoteConnectionRecovery(
+    async () => {
+      attempts += 1;
+      if (hostAway) throw Object.assign(new Error("The host is offline."), { reference: "signal/host_unavailable" });
+      throw new Error("The host did not answer.");
+    },
+    () => {},
+    (status) => {
+      lastSeconds = status.remainingSeconds;
+      if (status.phase === "waiting" || status.phase === "cooldown") afterAttempt(attempts).resolve(status);
+    },
+  );
+  recovery.setActive(true);
+  const first = await afterAttempt(1).promise;
+  recovery.resetBackoff();
+  recovery.resume();
+  const afterReturn = { attempts, remainingSeconds: lastSeconds };
+  const second = await afterAttempt(2).promise;
+  hostAway = false;
+  recovery.refresh();
+  const ordinary = await afterAttempt(3).promise;
+  recovery.dispose();
+  return {
+    firstSeconds: first.remainingSeconds,
+    afterReturn,
+    secondSeconds: second.remainingSeconds,
+    ordinarySeconds: ordinary.remainingSeconds,
+  };
+}
+
 interface NativeNetworkState {
   type: string;
   isConnected: boolean;
@@ -234,6 +274,30 @@ async function networkScenarios() {
     { name: "Wi-Fi to mobile data", steps: [home, { type: "CELLULAR", address: "0.0.0.0" }], expected: "moved" },
     { name: "iOS VPN turns on", steps: [home, { type: "UNKNOWN", address: "192.168.1.20" }], expected: "changed" },
     { name: "Android VPN turns off", steps: [{ type: "VPN", address: "100.101.4.9" }, home], expected: "changed" },
+    {
+      name: "iOS VPN on, Wi-Fi to mobile data",
+      steps: [
+        { type: "UNKNOWN", address: "192.168.1.20" },
+        { type: "UNKNOWN", address: "0.0.0.0" },
+      ],
+      expected: "changed",
+    },
+    {
+      name: "iOS VPN on, mobile data to Wi-Fi",
+      steps: [
+        { type: "UNKNOWN", address: "0.0.0.0" },
+        { type: "UNKNOWN", address: "192.168.1.20" },
+      ],
+      expected: "changed",
+    },
+    {
+      name: "Android VPN on, same tunnel address",
+      steps: [
+        { type: "VPN", address: "100.101.4.9" },
+        { type: "VPN", address: "100.101.4.9" },
+      ],
+      expected: null,
+    },
     { name: "another Wi-Fi network", steps: [home, wifi("10.0.0.31")], expected: "moved" },
     { name: "signal strength only", steps: [home, home], expected: null },
     {
@@ -312,6 +376,29 @@ async function run() {
     growing,
   );
 
+  const away = await hostAwayBackoff();
+  const awayFirst = REMOTE_RETRY_COOLDOWN_MS / 1000;
+  check(
+    `an offline host waits about ${awayFirst} s before the second attempt`,
+    away.firstSeconds >= awayFirst && away.firstSeconds <= Math.ceil(awayFirst * (1 + JITTER)),
+    away,
+  );
+  check(
+    "a return to the app does not start a new burst for an offline host",
+    away.afterReturn.attempts === 1 && away.afterReturn.remainingSeconds >= awayFirst - 1,
+    away,
+  );
+  check(
+    `the wait for an offline host grows to about ${awayFirst * 2} s`,
+    away.secondSeconds >= awayFirst * 2 && away.secondSeconds <= Math.ceil(awayFirst * 2 * (1 + JITTER)),
+    away,
+  );
+  check(
+    "other failures keep the fast first retry",
+    away.ordinarySeconds <= Math.ceil(((REMOTE_RETRY_DELAYS_MS[0] ?? 0) * (1 + JITTER)) / 1000),
+    away,
+  );
+
   const network = await networkScenarios();
   for (const scenario of network) {
     const changes = scenario.events.map((event) => event.change);
@@ -339,6 +426,7 @@ async function run() {
     cooldownMs: REMOTE_RETRY_COOLDOWN_MS,
     cooldownMaxMs: REMOTE_RETRY_COOLDOWN_MAX_MS,
     growing,
+    hostAway: away,
     recovery: {
       attemptsAtMs: recovery.attempts.map(Math.round),
       gapsMs: gaps.map(Math.round),

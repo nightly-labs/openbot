@@ -279,6 +279,9 @@ jobs:
       - name: Run the Signal cross-home E2E test
         if: ${{ !cancelled() }}
         run: bun run test:signal-cross-home
+      - name: Run the Signal same-home handoff E2E test
+        if: ${{ !cancelled() }}
+        run: bun run test:signal-handoff
 
       - name: Run the direct remote protocol E2E test
         if: ${{ !cancelled() }}
@@ -287,6 +290,14 @@ jobs:
       - name: Run the account service server list E2E test
         if: ${{ !cancelled() }}
         run: bun run test:host-list-batch
+
+      - name: Run the owner transfer server list E2E test
+        if: ${{ !cancelled() }}
+        run: bun run test:owner-transfer-host-list
+
+      - name: Run the owner transfer server drop E2E test
+        if: ${{ !cancelled() }}
+        run: bun run test:owner-transfer-host-drop
 
       - name: Run the account service database replica E2E test
         if: ${{ !cancelled() }}
@@ -304,6 +315,7 @@ jobs:
           path: |
             .openbot-build/signal-security-e2e/
             .openbot-build/signal-cross-home/
+            .openbot-build/signal-handoff/
             .openbot-build/remote-protocol-e2e/
             .openbot-build/d1-request-session-e2e/
           if-no-files-found: ignore

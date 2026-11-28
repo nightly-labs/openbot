@@ -413,6 +413,7 @@ async function handleSignal(state: PeerState, message: SignalServerMessage): Pro
     message.type === "webhook-delivery" ||
     message.type === "github-ready" ||
     message.type === "github-delivery" ||
+    message.type === "ingress-routes-result" ||
     message.type === "telegram-delivery" ||
     message.type === "telegram-call-result" ||
     message.type === "queued-delivery" ||

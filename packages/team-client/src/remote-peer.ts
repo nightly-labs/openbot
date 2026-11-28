@@ -1284,7 +1284,8 @@ export function createRemoteTeamPeer(
         message.type === "webhook-ready" ||
         message.type === "webhook-delivery" ||
         message.type === "github-ready" ||
-        message.type === "github-delivery"
+        message.type === "github-delivery" ||
+        message.type === "ingress-routes-result"
       )
         return;
       if (message.type === "account-profile-changed") {

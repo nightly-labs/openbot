@@ -56,6 +56,7 @@ import {
   type RemoteTicketClaims,
   SIGNAL_TURN_CREDENTIAL_TTL_SECONDS,
 } from "./protocol";
+import type { TrustedResumeTokenEntry } from "./state-snapshot";
 
 const RESUME_AUDIENCE = "openbot-remote-resume";
 const RESUME_TTL_SECONDS = 10 * 60;
@@ -200,6 +201,7 @@ export class RemoteTokenService {
     string,
     { expiresAt: number; hostId: string; sessionId: string; authEpoch: number }
   >();
+  #trusted: ((entry: TrustedResumeTokenEntry) => void) | null = null;
 
   constructor(
     config: Pick<
@@ -518,18 +520,51 @@ export class RemoteTokenService {
   }
 
   #trustResumeToken(claims: RemoteTicketClaims): void {
+    const token = {
+      expiresAt: claims.exp,
+      hostId: claims.hostId,
+      sessionId: claims.sessionId,
+      authEpoch: claims.authEpoch,
+    };
+    this.#storeTrustedResumeToken(claims.jti, token);
+    this.#trusted?.([claims.jti, token]);
+  }
+
+  #storeTrustedResumeToken(jti: string, token: TrustedResumeTokenEntry[1]): void {
     this.#pruneTrustedResumeTokens();
     while (this.#trustedResumeTokens.size >= MAXIMUM_TRUSTED_RESUME_TOKENS) {
       const oldest = this.#trustedResumeTokens.keys().next().value;
       if (!oldest) break;
       this.#trustedResumeTokens.delete(oldest);
     }
-    this.#trustedResumeTokens.set(claims.jti, {
-      expiresAt: claims.exp,
-      hostId: claims.hostId,
-      sessionId: claims.sessionId,
-      authEpoch: claims.authEpoch,
-    });
+    this.#trustedResumeTokens.set(jti, token);
+  }
+
+  exportTrustedResumeTokens(): TrustedResumeTokenEntry[] {
+    this.#pruneTrustedResumeTokens();
+    return [...this.#trustedResumeTokens];
+  }
+
+  importTrustedResumeTokens(
+    entries: readonly TrustedResumeTokenEntry[],
+    refused: (entry: TrustedResumeTokenEntry[1]) => boolean,
+  ): number {
+    const nowSeconds = Math.floor(Date.now() / 1_000);
+    let imported = 0;
+    for (const [jti, token] of entries) {
+      if (token.expiresAt <= nowSeconds || refused(token) || this.#trustedResumeTokens.has(jti)) continue;
+      this.#storeTrustedResumeToken(jti, { ...token });
+      imported += 1;
+    }
+    return imported;
+  }
+
+  forgetTrustedResumeTokens(): void {
+    this.#trustedResumeTokens.clear();
+  }
+
+  onTrustedResumeToken(listener: ((entry: TrustedResumeTokenEntry) => void) | null): void {
+    this.#trusted = listener;
   }
 
   #pruneTrustedResumeTokens(nowSeconds = Math.floor(Date.now() / 1_000)): void {

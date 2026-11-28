@@ -1529,6 +1529,7 @@ export const messages = {
   "mobile.server.planLimits.windowLeft": "{window}: pozostało {percent}%",
   "mobile.server.planLimits.resetsAt": "Reset {time}",
   "mobile.server.planLimits.empty": "Żaden dostawca nie podał jeszcze swoich limitów.",
+  "mobile.server.planLimits.notReported": "Brak odczytu użycia",
   "mobile.server.planLimits.more": "+{number}",
   "mobile.server.planLimits.window.limit": "Limit",
   "mobile.server.planLimits.window.weekly": "Tydzień",

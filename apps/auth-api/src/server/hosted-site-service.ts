@@ -59,6 +59,13 @@ export const UNSYNCED_SITES_SQL = `SELECT id, hostname FROM hosted_sites
   ORDER BY updated_at, id LIMIT ${CLEANUP_BATCH_SIZE}`;
 export const PRUNE_SITE_CREATION_EVENTS_SQL = "DELETE FROM site_creation_events WHERE created_at < ?";
 export const PRUNE_SITE_OPERATION_RECEIPTS_SQL = "DELETE FROM site_operation_receipts WHERE created_at < ?";
+export const SUPERSEDE_ACTIVE_DEPLOYMENTS_SQL = `UPDATE site_deployments SET status = 'superseded'
+           WHERE site_id = ? AND id != ? AND status = 'active'
+             AND EXISTS (SELECT 1 FROM site_deployments WHERE id = ? AND status = 'activating')
+             AND EXISTS (
+               SELECT 1 FROM hosted_sites WHERE id = ? AND user_id = ? AND status = 'active'
+                 AND current_deployment_id = ?
+             )`;
 const CLEANUP_RUNTIME_BUDGET_MS = 20_000;
 
 export class HostedSiteService {
@@ -1000,15 +1007,7 @@ export class HostedSiteService {
             )
             .bind(crypto.randomUUID(), userId, site.id, now, deployment.id, site.id, userId, deployment.id),
           database
-            .prepare(
-              `UPDATE site_deployments SET status = 'superseded'
-           WHERE site_id = ? AND id != ? AND status = 'active'
-             AND EXISTS (SELECT 1 FROM site_deployments WHERE id = ? AND status = 'activating')
-             AND EXISTS (
-               SELECT 1 FROM hosted_sites WHERE id = ? AND user_id = ? AND status = 'active'
-                 AND current_deployment_id = ?
-             )`,
-            )
+            .prepare(SUPERSEDE_ACTIVE_DEPLOYMENTS_SQL)
             .bind(site.id, deployment.id, deployment.id, site.id, userId, deployment.id),
           database
             .prepare(

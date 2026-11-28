@@ -9,7 +9,6 @@ import { INPUT_LIMITS } from "@openbot/contracts/input-limits";
 import { TEAM_PROTOCOL_V2_MAX_FILE_BYTES } from "@openbot/contracts/team-protocol/v2";
 import { bytesToBase64 } from "@openbot/team-client/base64";
 import { MOBILE_ATTACHMENT_BYTES, type RemoteFileUpload } from "@openbot/team-client/remote-peer";
-import { CodedError } from "expo";
 import * as Crypto from "expo-crypto";
 import * as DocumentPicker from "expo-document-picker";
 import { Directory, File, Paths } from "expo-file-system";
@@ -220,7 +219,7 @@ export function useChatAttachments(
     try {
       return await ImagePicker.launchImageLibraryAsync(options);
     } catch (error) {
-      if (error instanceof CodedError && error.code === "ERR_FAILED_TO_READ_IMAGE")
+      if (error instanceof Error && "code" in error && error.code === "ERR_FAILED_TO_READ_IMAGE")
         throw new Error(t("mobile.chat.attachment.photoNotLoaded"));
       throw error;
     }
