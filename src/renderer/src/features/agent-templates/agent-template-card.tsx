@@ -4,22 +4,9 @@ import { bloubAvatarProfile } from "@openbot/ui/bloub-avatar";
 import { render } from "@solidjs/web";
 import { flush } from "solid-js";
 import { loadImage, loadSvg } from "../../avatar-canvas";
-import { feltCardArt } from "./felt-card-art";
-
-/*
- * The share card: the image X and other sites show for an `openbot.run/agents/<id>` link.
- *
- * It is drawn here, at publish time, because this is where the agent's avatar is. The Worker only
- * checks its size and stores it.
- *
- * The layout is the "Filcowe karty agentów" frame of the design file: a felt agent on a paper planet,
- * on black, with the name, the role and the site in a centred column on the right. The felt body
- * comes in the agent's shape and colour, and its eyes are a separate layer in the agent's expression.
- * An agent with a photo shows the photo, cut round, in place of the felt body.
- */
+import { loadFeltCardArt } from "./felt-card-art";
 
 const { width: WIDTH, height: HEIGHT } = AGENT_TEMPLATE_CARD;
-/** The felt body and its eyes share this square, as in the design file. */
 const BODY = { x: 0, y: 34, size: 510 };
 const PHOTO_SIZE = 300;
 const COLUMN = { x: 619, width: 518, centre: 317, bottom: 482 };
@@ -37,21 +24,21 @@ export async function renderAgentTemplateCard(preview: AgentTemplatePreview): Pr
   if (!context) throw new Error("The share card cannot be drawn.");
 
   const profile = bloubAvatarProfile(preview.avatarSeed, preview.avatarHue);
-  const art = feltCardArt(profile);
-  const [planet, body, eyes] = await Promise.all([
-    loadUrl(art.planet),
-    preview.avatarImage ? null : loadUrl(art.body),
-    preview.avatarImage ? null : loadUrl(art.eyes),
+  const [art] = await Promise.all([
+    loadFeltCardArt(profile),
     document.fonts.load(`800 ${NAME.size}px ${FONT}`),
     document.fonts.load(`500 ${ROLE.size}px ${FONT}`),
   ]);
 
   context.fillStyle = "#000000";
   context.fillRect(0, 0, WIDTH, HEIGHT);
-  drawCover(context, planet);
-  if (preview.avatarImage) await drawPhoto(context, preview.avatarImage);
-  if (body) context.drawImage(body, BODY.x, BODY.y, BODY.size, BODY.size);
-  if (eyes) context.drawImage(eyes, BODY.x, BODY.y, BODY.size, BODY.size);
+  drawCover(context, art.planet);
+  if (preview.avatarImage) {
+    await drawPhoto(context, preview.avatarImage);
+  } else {
+    context.drawImage(art.body, BODY.x, BODY.y, BODY.size, BODY.size);
+    context.drawImage(art.eyes, BODY.x, BODY.y, BODY.size, BODY.size);
+  }
   drawColumn(context, preview);
 
   const blob = await new Promise<Blob | null>((resolve) => canvas.toBlob(resolve, "image/png"));
@@ -59,14 +46,6 @@ export async function renderAgentTemplateCard(preview: AgentTemplatePreview): Pr
   return new Uint8Array(await blob.arrayBuffer());
 }
 
-async function loadUrl(url: string): Promise<HTMLImageElement> {
-  const image = new Image();
-  image.src = url;
-  await image.decode();
-  return image;
-}
-
-/** The planet fills the card and is cut at the centre, like a Figma "Fill" image. */
 function drawCover(context: CanvasRenderingContext2D, image: HTMLImageElement): void {
   const scale = Math.max(WIDTH / image.naturalWidth, HEIGHT / image.naturalHeight);
   const width = image.naturalWidth * scale;
@@ -101,8 +80,6 @@ async function drawPhoto(
   context.drawImage(image, cx - drawWidth / 2, cy - drawHeight / 2, drawWidth, drawHeight);
   context.restore();
 }
-
-/** The name, the role and the site, centred on the right and kept above the planet's ground. */
 function drawColumn(context: CanvasRenderingContext2D, preview: AgentTemplatePreview): void {
   const { x, width } = COLUMN;
   const centre = x + width / 2;
@@ -145,8 +122,6 @@ function drawColumn(context: CanvasRenderingContext2D, preview: AgentTemplatePre
   context.textAlign = "start";
   context.textBaseline = "alphabetic";
 }
-
-/** The largest size, down to a floor, at which the longest word of the name fits on one line. */
 function fittedNameSize(context: CanvasRenderingContext2D, name: string, width: number) {
   const longest = name
     .trim()
@@ -159,8 +134,6 @@ function fittedNameSize(context: CanvasRenderingContext2D, name: string, width: 
   }
   return size;
 }
-
-/** The app mark from `@openbot/brand`, with its CSS colours written onto the shapes. */
 export async function drawLogo(
   context: CanvasRenderingContext2D,
   x: number,
@@ -184,8 +157,6 @@ export async function drawLogo(
   }
   context.drawImage(await loadSvg(svg, size), x, y, size, size);
 }
-
-/** Lines that fit `width`, at most `max`; the last one ends in an ellipsis when text is left over. */
 function wrapLines(context: CanvasRenderingContext2D, text: string, width: number, max: number): string[] {
   const lines: string[] = [];
   let line = "";
@@ -206,8 +177,6 @@ function wrapLines(context: CanvasRenderingContext2D, text: string, width: numbe
   if (line && lines.length < max) lines.push(line);
   return lines.map((item) => (context.measureText(item).width > width ? ellipsize(context, item, width) : item));
 }
-
-/** Cuts at a word where it can, so the line does not end in half a word. */
 export function ellipsize(context: CanvasRenderingContext2D, text: string, width: number): string {
   let value = text;
   while (value && context.measureText(`${value}…`).width > width) {
