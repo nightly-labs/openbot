@@ -8,6 +8,8 @@ import { updateSpeechSettings } from "./speech-speed";
 const [pause, setPause] = createSignal<VoiceTurnPause>(DEFAULT_SPEECH_SETTINGS.turnPauseMs);
 let saved: VoiceTurnPause = DEFAULT_SPEECH_SETTINGS.turnPauseMs;
 let changes = 0;
+let known = false;
+let cycling: Promise<void> = Promise.resolve();
 
 export function voiceTurnPause(): VoiceTurnPause {
   return pause();
@@ -19,6 +21,7 @@ export function loadVoiceTurnPause(): Promise<void> {
     .voice.getSpeechSettings()
     .then(
       (settings) => {
+        known = true;
         if (changes !== before) return;
         saved = settings.turnPauseMs;
         setPause(settings.turnPauseMs);
@@ -29,11 +32,19 @@ export function loadVoiceTurnPause(): Promise<void> {
 
 export function showSavedVoiceTurnPause(next: VoiceTurnPause): void {
   changes += 1;
+  known = true;
   saved = next;
   setPause(next);
 }
 
 export function cycleVoiceTurnPause(): void {
+  cycling = cycling.then(async () => {
+    if (!known) await loadVoiceTurnPause();
+    changeVoiceTurnPause();
+  });
+}
+
+function changeVoiceTurnPause(): void {
   const next = nextVoiceTurnPause(pause());
   changes += 1;
   setPause(next);
