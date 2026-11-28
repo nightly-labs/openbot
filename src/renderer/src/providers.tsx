@@ -415,6 +415,7 @@ const Providers = createSimpleContext({
         connectWithCode: async (provider, accountId) => connection.connectAccountWithCode(provider, accountId),
         pasteCodeSignIn: pasteCodeSignInSupported(appInfo()?.platform ?? ""),
         windowsCodeSignIn: appInfo()?.platform === "win32",
+        computerPasteCodeSignIn: pasteCodeSignInSupported(appInfo()?.platform ?? ""),
         connectKey: (provider, accountId, key) =>
           apply(providersPort().connectProviderAccountKey({ provider, accountId, key })),
         cancel: async (provider, accountId) => {

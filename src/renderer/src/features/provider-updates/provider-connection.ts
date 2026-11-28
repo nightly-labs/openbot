@@ -563,6 +563,10 @@ export function createProviderConnection(options: ProviderConnectionOptions): Pr
   const route = (provider: AgentProviderId) => providerConnectRoute(provider, options.place());
   const signingIn = (provider: AgentProviderId) =>
     options.agentStatus().providers?.find((row) => row.id === provider)?.connectionState === "connecting";
+  const alternativeMethod = (provider: AgentProviderId): ProviderSignInMethod | null => {
+    const { alternative, addressWhileSigningIn } = route(provider);
+    return addressWhileSigningIn && signingIn(provider) ? "address" : alternative;
+  };
 
   return {
     connectKind: (provider) => {
@@ -571,9 +575,9 @@ export function createProviderConnection(options: ProviderConnectionOptions): Pr
       return connect === null ? null : "dialog";
     },
     alternativeKind: (provider) => {
-      const alternative = route(provider).alternative;
-      if (alternative === "address") return signingIn(provider) ? "address" : null;
-      return alternative === "code" ? "code" : alternative === "relay" ? "address" : null;
+      const alternative = alternativeMethod(provider);
+      if (alternative === "code") return "code";
+      return alternative === "address" || alternative === "relay" ? "address" : null;
     },
     provider: codeLoginProvider,
     state: codeLoginState,
@@ -584,7 +588,7 @@ export function createProviderConnection(options: ProviderConnectionOptions): Pr
       void startProviderCodeLogin(provider, relay ? "relay" : "host-page", null, accountId);
     },
     connectAccountWithCode: (provider, accountId) => void startProviderCodeLogin(provider, "code", null, accountId),
-    alternative: (provider, opener) => run(provider, route(provider).alternative, opener ?? null),
+    alternative: (provider, opener) => run(provider, alternativeMethod(provider), opener ?? null),
     mainlandChinaSite: (provider) =>
       route(provider).connect === "browser" && options.connectInMainlandChina
         ? (agentProviderDescriptor(provider).mainlandChinaSignInSite ?? null)
