@@ -46,6 +46,7 @@ const DEFAULT_LAYOUT: SidebarLayoutSnapshot = {
 
 const SIDEBAR_LAYOUT_FORMAT: VersionedJsonFormat<SidebarLayoutSnapshot> = {
   current: 2,
+  keepLastGood: true,
   releases: {
     1: (file) => {
       if (!isLegacyStoredSidebarLayout(file)) throw new Error("Invalid sidebar layout state.");
@@ -75,10 +76,11 @@ export class SidebarLayoutStore extends EventEmitter<SidebarLayoutStoreEvents> {
       yield* storedIO(() => mkdir(dirname(this.#path), { recursive: true, mode: 0o700 }));
       const loaded = yield* readVersionedJsonFile(this.#path, SIDEBAR_LAYOUT_FORMAT);
       this.#writePath = loaded.writePath;
+      const layout = loaded.value ?? structuredClone(DEFAULT_LAYOUT);
       this.#layout =
-        loaded.state === "damaged" || loaded.state === "missing"
-          ? { ...structuredClone(DEFAULT_LAYOUT), revision: yield* Clock.currentTimeMillis }
-          : (loaded.value ?? structuredClone(DEFAULT_LAYOUT));
+        loaded.state === "damaged" || loaded.state === "missing" || loaded.state === "restored"
+          ? { ...layout, revision: Math.max(layout.revision, yield* Clock.currentTimeMillis) }
+          : layout;
     });
   }
 

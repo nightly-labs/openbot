@@ -43,7 +43,7 @@ export class AtomicFileWriteError extends Schema.TaggedError<AtomicFileWriteErro
   cause: Schema.Defect(),
 }) {}
 
-const HELD_TARGET_WAITS_MS: readonly number[] = [10, 50, 100, 250, 500];
+export const HELD_TARGET_WAITS_MS: readonly number[] = [10, 50, 100, 250, 500];
 
 export function isHeldTargetError(cause: unknown): boolean {
   if (process.platform !== "win32") return false;
