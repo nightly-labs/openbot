@@ -66,6 +66,7 @@ import {
   type SubagentChange,
   type SubagentState,
   stopSubagents,
+  subagentFor,
 } from "./agent/subagent-updates";
 import { claudeBridgedToolName, DIRECT_BROWSER_TOOL_DEFINITIONS, visibleToolDefinitions } from "./agent/tool-catalog";
 import { TurnContext } from "./agent/turn-context";
@@ -434,6 +435,7 @@ interface ThreadRuntime {
   awaitsResultTurn: boolean;
   taskTurns: Map<string, string | typeof SUBAGENT_OWNED_TASK>;
   endedTaskTurns: (string | null)[];
+  endedTaskReports: { origin: string; text: string }[];
   subagentLimit: { resetsAt: number | null; text: string } | null;
   lastOutputAt: number;
   answered: boolean;
@@ -537,6 +539,18 @@ function lostBackgroundWorkNote(tasks: readonly ClaudeBackgroundTask[]): string 
   ].join("\n");
 }
 
+function endedBackgroundTaskReport(
+  subagents: SubagentState,
+  message: ClaudeStreamMessage,
+  taskId: string,
+): string | null {
+  if (subagentFor(subagents, message.tool_use_id ?? subagents.aliases.get(taskId))) return null;
+  const status = isString(message.status) ? message.status : "ended";
+  const summary = isString(message.summary) ? message.summary.trim() : "";
+  const output = isString(message.output_file) ? ` Its output is saved in ${message.output_file}.` : "";
+  return `Background task ${status}${summary ? `: ${summary}` : "."}${output}`;
+}
+
 function startedTaskOrigin(
   taskTurns: ReadonlyMap<string, string | typeof SUBAGENT_OWNED_TASK>,
   message: ClaudeStreamMessage,
@@ -574,6 +588,9 @@ interface ClaudeStreamMessage {
   rate_limit_info?: unknown;
   tasks?: unknown;
   task_id?: unknown;
+  tool_use_id?: unknown;
+  summary?: unknown;
+  output_file?: unknown;
   parent_task_id?: unknown;
   owned_by_subagent?: unknown;
   run_id?: unknown;
@@ -1776,6 +1793,7 @@ export class ClaudeAgentClient extends EventEmitter<ClientEvents> {
       awaitsResultTurn: false,
       taskTurns: new Map(),
       endedTaskTurns: [],
+      endedTaskReports: [],
       subagentLimit: null,
       lastOutputAt: Date.now(),
       answered: false,
@@ -1955,7 +1973,9 @@ export class ClaudeAgentClient extends EventEmitter<ClientEvents> {
     };
     const continues =
       unprompted && !runtime.endedTaskTurns.includes(null) ? runtime.endedTaskTurns.filter(isString) : [];
+    const taskReports = continues.length > 0 ? runtime.endedTaskReports : [];
     runtime.endedTaskTurns = [];
+    runtime.endedTaskReports = [];
     if (!unprompted) runtime.subagentLimit = null;
     runtime.activeTurn = turn;
     runtime.nextTurnId = null;
@@ -1970,6 +1990,7 @@ export class ClaudeAgentClient extends EventEmitter<ClientEvents> {
         turn: { id: turnId, status: "inProgress" },
         ...(unprompted ? { unprompted } : {}),
         ...(continues.length > 0 ? { continues } : {}),
+        ...(taskReports.length > 0 ? { taskReports } : {}),
       },
     });
     return turn;
@@ -1977,8 +1998,10 @@ export class ClaudeAgentClient extends EventEmitter<ClientEvents> {
 
   #noteEndedTask(runtime: ThreadRuntime, message: ClaudeStreamMessage, taskId: string, origin: string | null): void {
     const turn = runtime.activeTurn;
+    const report = endedBackgroundTaskReport(runtime.subagents, message, taskId);
     if (!turn) {
       runtime.endedTaskTurns.push(origin);
+      if (origin !== null && report !== null) runtime.endedTaskReports.push({ origin, text: report });
       if (isString(message.run_id))
         runtime.nextTurnId = claudeTaskTurnId(
           isString(message.session_id) ? message.session_id : runtime.id,
@@ -1988,7 +2011,7 @@ export class ClaudeAgentClient extends EventEmitter<ClientEvents> {
     } else if (turn.unprompted && origin !== turn.id)
       this.emit("notification", {
         method: "openbot/turn-continues",
-        params: { threadId: runtime.id, turnId: turn.id, continues: origin },
+        params: { threadId: runtime.id, turnId: turn.id, continues: origin, ...(report ? { report } : {}) },
       });
   }
 

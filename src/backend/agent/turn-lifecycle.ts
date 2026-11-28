@@ -413,6 +413,7 @@ export class TurnLifecycle {
       unprompted: boolean;
       reports: Map<string, string>;
       continues: readonly string[];
+      taskReports: Map<string, string[]>;
     }
   >();
   readonly #unreadReports = new Map<string, Map<string, string>>();
@@ -1185,10 +1186,14 @@ export class TurnLifecycle {
     agentId: string,
     turnId: string,
     snapshot: ConversationSnapshot,
-    unread: ReadonlyMap<string, string>,
+    running: {
+      reports: ReadonlyMap<string, string>;
+      continues: readonly string[];
+      taskReports: ReadonlyMap<string, readonly string[]>;
+    },
   ): { deliveries: DeliveryContext[]; continuations: Map<string, UsageLimitContinuation> } | null {
     const reports = new Map<string, string[]>();
-    for (const [subagentId, earlier] of unread) {
+    for (const [subagentId, earlier] of running.reports) {
       const subagent = snapshot.messages
         .find((message) => message.id === `${earlier}:subagents`)
         ?.subagents?.find((candidate) => candidate.id === subagentId);
@@ -1197,6 +1202,10 @@ export class TurnLifecycle {
       const report = subagent.status === "completed" ? text : (subagent.error ?? text);
       const line = `Background subagent "${subagent.title}" ${subagent.status}${report ? `: ${report}` : "."}`;
       reports.set(earlier, [...(reports.get(earlier) ?? []), this.#hooks.redactMcp(line)]);
+    }
+    for (const origin of new Set(running.continues)) {
+      const lines = (running.taskReports.get(origin) ?? []).map((line) => this.#hooks.redactMcp(line));
+      reports.set(origin, [...(reports.get(origin) ?? []), ...lines]);
     }
     const deliveries: DeliveryContext[] = [];
     const continuations = new Map<string, UsageLimitContinuation>();
@@ -1392,6 +1401,7 @@ export class TurnLifecycle {
           reports: new Map(),
           continues:
             unprompted && isRecord(params) && Array.isArray(params.continues) ? params.continues.filter(isString) : [],
+          taskReports: unprompted ? startedTaskReports(params) : new Map(),
         });
         this.#traces.begin(turnId, new Date().toISOString());
         const publicThreadId = this.#conversation.publicThreadId(agentId, threadId);
@@ -1635,6 +1645,10 @@ export class TurnLifecycle {
         if (!running) return;
         const origin = isRecord(params) && isString(params.continues) ? params.continues : null;
         running.continues = origin !== null && running.continues.length > 0 ? [...running.continues, origin] : [];
+        const report = getString(params, "report");
+        if (origin !== null && report !== null && running.continues.length > 0)
+          running.taskReports.set(origin, [...(running.taskReports.get(origin) ?? []), report]);
+        else if (running.continues.length === 0) running.taskReports.clear();
         if (origin !== null)
           this.#noteSelfStartedOrigins(turnId, [...(this.#selfStartedOrigins.get(turnId) ?? []), origin]);
         return;
@@ -2389,7 +2403,7 @@ export class TurnLifecycle {
       const requeue = repeatable && (!channelTurn || continuing);
       const resumed =
         limited && running?.unprompted === true && deliveries.length === 0 && !channelTurn && !routineSession
-          ? this.#backgroundWork(agentId, turnId, snapshot, running.reports)
+          ? this.#backgroundWork(agentId, turnId, snapshot, running)
           : null;
       const model = this.#hooks.turnModel(agentId, turnId);
       const failedKey = this.#usageLimits.failureKey(agentId, model);
@@ -3961,4 +3975,15 @@ function endedTaskReportNote(reason: string | null, fallback: string): string {
     "Evidence: none",
     "Unblock: The teammate's chat has the task result. Send the request again if you still need the answer.",
   ].join("\n");
+}
+
+function startedTaskReports(params: unknown): Map<string, string[]> {
+  const reports = new Map<string, string[]>();
+  const listed = isRecord(params) && Array.isArray(params.taskReports) ? params.taskReports : [];
+  for (const entry of listed) {
+    const origin = getString(entry, "origin");
+    const text = getString(entry, "text");
+    if (origin !== null && text !== null) reports.set(origin, [...(reports.get(origin) ?? []), text]);
+  }
+  return reports;
 }
