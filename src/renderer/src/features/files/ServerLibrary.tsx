@@ -91,7 +91,13 @@ export function ServerLibrary(props: ServerLibraryProps) {
       if (was === true && !loading) folders.reload();
     },
   );
-  const foldersLoading = () => !folders.ready() && serverSupportsCapability(props.server, LIBRARY_FOLDERS_CAPABILITY);
+  const hostHasFolders = () => {
+    const current = props.server;
+    return (
+      current?.kind !== "remote" || current.compatibility?.capabilities.includes(LIBRARY_FOLDERS_CAPABILITY) === true
+    );
+  };
+  const foldersLoading = () => !folders.ready() && hostHasFolders();
   const hasFolders = () => (folders.snapshot() || foldersLoading() ? "" : undefined);
   const canDelete = () => {
     const current = props.server;
@@ -146,30 +152,34 @@ export function ServerLibrary(props: ServerLibraryProps) {
   return (
     <div class="library-panel">
       <div class="library-panel-content" data-folders={hasFolders()} inert={viewing() !== null}>
-        <LibraryPage
-          files={storage.state.usage?.files ?? []}
-          agents={agents()}
-          loading={storage.scanState() === "scanning" && !storage.state.usage}
-          error={storage.error()}
-          onRetry={() => void storage.refresh(true)}
-          canDelete={canDelete()}
-          macWindowControls={macWindowControls()}
-          onOpen={(file, origin) => void open(file, origin)}
-          onAction={act}
-          onDeleteFiles={storage.deleteFiles}
-          onSaveFiles={storage.saveFiles}
-          folders={folders.snapshot()}
-          foldersLoading={foldersLoading()}
-          onFolderAction={folders.change}
-          canOrganize={canOrganize}
-          initialCollapsed={readLibraryCollapsedRows(props.serverId)}
-          onCollapsedChange={saveCollapsedRows}
-          initialFavorites={readLibraryFavorites(props.serverId)}
-          onFavoritesChange={saveFavorites}
-          mediaSource={props.mediaSource}
-          pictureUrl={thumbnailUrl}
-          opensFiles={props.opensFiles}
-        />
+        <Show when={props.serverId} keyed>
+          {(serverId) => (
+            <LibraryPage
+              files={storage.state.usage?.files ?? []}
+              agents={agents()}
+              loading={storage.scanState() === "scanning" && !storage.state.usage}
+              error={storage.error()}
+              onRetry={() => void storage.refresh(true)}
+              canDelete={canDelete()}
+              macWindowControls={macWindowControls()}
+              onOpen={(file, origin) => void open(file, origin)}
+              onAction={act}
+              onDeleteFiles={storage.deleteFiles}
+              onSaveFiles={storage.saveFiles}
+              folders={folders.snapshot()}
+              foldersLoading={foldersLoading()}
+              onFolderAction={folders.change}
+              canOrganize={canOrganize}
+              initialCollapsed={readLibraryCollapsedRows(serverId)}
+              onCollapsedChange={saveCollapsedRows}
+              initialFavorites={readLibraryFavorites(serverId)}
+              onFavoritesChange={saveFavorites}
+              mediaSource={props.mediaSource}
+              pictureUrl={thumbnailUrl}
+              opensFiles={props.opensFiles}
+            />
+          )}
+        </Show>
       </div>
       <Show when={viewing()} keyed>
         {(shown) => (
