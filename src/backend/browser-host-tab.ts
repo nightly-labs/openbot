@@ -56,6 +56,7 @@ export interface BrowserHostTab {
   pendingRestore?: (() => Effect.Effect<void, BrowserOperationError>) | undefined;
   sleeping?: { title: string; preview: BrowserPreview | null } | undefined;
   idleUnloadNoted?: Set<string>;
+  unsentText?: boolean;
   lastUsedAt: number;
   lastToolChat?: { threadId: string; at: number } | undefined;
   focusOnVisible: boolean;
