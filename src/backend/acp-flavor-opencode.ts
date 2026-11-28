@@ -24,6 +24,13 @@ function isOpenCodeTimeoutRetry(update: SessionUpdate): boolean {
   return isRecord(retry) && isRecord(retry.error) && /\btimed out\b/iu.test(String(retry.error.message ?? ""));
 }
 
+function openCodeFinishedCompaction(update: SessionUpdate): string | null {
+  if (update.sessionUpdate !== "session_info_update" || !isRecord(update._meta)) return null;
+  const compaction = update._meta["opencode/compaction"];
+  if (!isRecord(compaction) || compaction.status !== "completed") return null;
+  return typeof compaction.messageId === "string" && compaction.messageId ? compaction.messageId : null;
+}
+
 const OPENCODE_RETRY_TYPES: ReadonlyMap<string, boolean> = new Map([
   ["provider.internal", false],
   ["provider.timeout", false],
@@ -309,6 +316,7 @@ export const OPENCODE_ACP_FLAVOR: AcpFlavor = {
   reopenKeepsPrompts: true,
   modelRetryUpdate: isOpenCodeTimeoutRetry,
   retryUpdate: openCodeRetryUpdate,
+  finishedCompaction: openCodeFinishedCompaction,
   messagePerId: true,
   mcpServersPerDirectory: true,
   mcpConnectLimitMs: 30_000,

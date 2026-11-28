@@ -158,6 +158,8 @@ function keepNewest(turns: Set<string>, turnId: string): void {
   if (oldest !== undefined) turns.delete(oldest);
 }
 const SESSION_FAILURE_LIMIT = 2;
+const HANDOFF_COMPACTION_LIMIT = 3;
+const HANDOFF_PROGRESS_TOOL_CALLS = 3;
 const QUIET_END_MS = 30_000;
 const QUIET_END_MAX_MS = 2 * 60_000;
 const QUIET_REPEAT_POLL_MS = 1_000;
@@ -403,6 +405,8 @@ export class TurnLifecycle {
       carriedHistory: boolean;
       workedBesidesReaction: boolean;
       compacted: boolean;
+      handoffCompactions: number;
+      toolsSinceCompaction: Set<string>;
       startedBackgroundWork: boolean;
       narration: string | null;
       narrationStepKnown: boolean;
@@ -910,7 +914,24 @@ export class TurnLifecycle {
     this.#compactionDeadlines.set(threadId, timer);
   }
 
-  #stopCompactionLoop(agentId: string, threadId: string, turnId: string, client: AgentClient): void {
+  #countHandoffCompaction(agentId: string, threadId: string, client: AgentClient): void {
+    for (const [turnId, running] of this.#runningTurns) {
+      if (running.threadId !== threadId || running.client !== client) continue;
+      const progressed = running.toolsSinceCompaction.size >= HANDOFF_PROGRESS_TOOL_CALLS;
+      running.handoffCompactions = progressed ? 1 : running.handoffCompactions + 1;
+      running.toolsSinceCompaction = new Set();
+      if (running.handoffCompactions < HANDOFF_COMPACTION_LIMIT) continue;
+      this.#stopCompactionLoop(
+        agentId,
+        threadId,
+        turnId,
+        client,
+        sourceText("error.agent.compactionRepeatStopped", { provider: agentProviderName(client.provider) }),
+      );
+    }
+  }
+
+  #stopCompactionLoop(agentId: string, threadId: string, turnId: string, client: AgentClient, message: string): void {
     this.#clearCompactionDeadline(threadId);
     if (this.#compactionFailures.get(turnId)?.loop) return;
     logger.warn("A provider compacted again and again; OpenBot stops its turn.", { provider: client.provider });
@@ -925,7 +946,7 @@ export class TurnLifecycle {
       },
       false,
       client,
-      sourceText("error.agent.compactionLoopStopped", { provider: agentProviderName(client.provider) }),
+      message,
     );
     Effect.runFork(client.request("turn/interrupt", { threadId, turnId }, decodeRecordResponse).pipe(Effect.ignore));
   }
@@ -1381,6 +1402,8 @@ export class TurnLifecycle {
           carriedHistory: false,
           workedBesidesReaction: false,
           compacted: false,
+          handoffCompactions: 0,
+          toolsSinceCompaction: new Set(),
           startedBackgroundWork: false,
           narration: null,
           narrationStepKnown: false,
@@ -1498,7 +1521,13 @@ export class TurnLifecycle {
             !this.#compaction.isCompactionTurn(threadId, turnId)
           ) {
             if (this.#compaction.repeatsCompaction(threadId))
-              this.#stopCompactionLoop(agentId, threadId, turnId, source);
+              this.#stopCompactionLoop(
+                agentId,
+                threadId,
+                turnId,
+                source,
+                sourceText("error.agent.compactionLoopStopped", { provider: agentProviderName(source.provider) }),
+              );
             else this.#armCompactionDeadline(agentId, threadId, turnId, source);
           } else this.#clearCompactionDeadline(threadId);
           if (!this.#compaction.isCompactionTurn(threadId, turnId))
@@ -1667,6 +1696,8 @@ export class TurnLifecycle {
         if (status !== "running" && status !== "completed" && status !== "failed") return;
         if (source.compactsOnDemand === true && this.#compaction.requested(threadId)) return;
         this.#compaction.observeCompaction(threadId, status, "none");
+        if (status === "completed" && source.contextCompaction === "handoff" && getString(params, "compactionId"))
+          this.#countHandoffCompaction(agentId, threadId, source);
         return;
       }
       case "openbot/turn-progress": {
@@ -3456,9 +3487,11 @@ export class TurnLifecycle {
     if (usage) this.#hooks.emitToolUsage({ ...usage, agentId, turnId });
     if (yield* this.#images.handleItem(agentId, threadId, turnId, item, completed)) return;
     const toolProgress = toolProgressText(item, completed);
-    const openTools = this.#runningTurns.get(turnId)?.openTools;
+    const running = this.#runningTurns.get(turnId);
+    const openTools = running?.openTools;
     let lastToolClosed = false;
     if (openTools && isToolItem(item) && isString(item.id)) {
+      running.toolsSinceCompaction.add(item.id);
       if (completed) lastToolClosed = openTools.delete(item.id) && openTools.size === 0;
       else openTools.add(item.id);
     }

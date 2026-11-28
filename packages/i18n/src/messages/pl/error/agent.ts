@@ -118,6 +118,8 @@ export const messages = {
     "Połączenie przerwało się, gdy agent kompaktował kontekst, więc zadanie się zatrzymało. Sprawdź połączenie z internetem. Sprawdź też, czy {variable} w sekcji Zmienne w ustawieniach {provider} to adres API Twojej usługi modeli (często kończy się na /v1). Potem wyślij wiadomość.",
   "error.agent.compactionLoopStopped":
     "{provider} kompaktował kontekst raz za razem i za każdym razem był on zbyt pełny, aby kontynuować, więc OpenBot zatrzymał tę turę. Wyłącz serwery MCP lub użycie komputera, których ten agent nie potrzebuje, a potem wyślij wiadomość. Jeśli ty lub agent zmieniliście, kiedy {provider} kompaktuje, cofnij tę zmianę.",
+  "error.agent.compactionRepeatStopped":
+    "{provider} musiał wielokrotnie skracać ten czat w jednej turze, ponieważ plik lub wynik narzędzia nie mieści się w oknie kontekstu modelu. OpenBot zatrzymał tę turę. Poproś agenta o odczytanie mniejszej części pliku albo wybierz model z większym oknem kontekstu.",
   "error.agent.selectedGone": "Wybrany agent już nie istnieje.",
   "error.agent.profileEndpointsChanged": "Własne endpointy zmieniły się w trakcie generowania. Spróbuj ponownie.",
   "error.agent.profileInvalid": "Dostawca zwrócił nieprawidłowy profil. Spróbuj zmienić prompt.",

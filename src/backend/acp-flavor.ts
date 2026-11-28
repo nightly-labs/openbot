@@ -158,6 +158,7 @@ export interface AcpFlavor {
   replyEvent?: (method: string, params: DynamicRecord) => AcpReplyEvent | null;
   retryUpdate?: (update: SessionUpdate) => AcpRetryUpdate | null;
   modelRetryUpdate?: (update: SessionUpdate) => boolean;
+  finishedCompaction?: (update: SessionUpdate) => string | null;
   turnStallMs?: number;
   openToolStallMs?: number;
   subagentTools?: readonly string[];
