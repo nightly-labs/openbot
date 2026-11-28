@@ -377,6 +377,8 @@ export const messages = {
   "chat.message.attachment": "קובץ מצורף",
   "chat.message.showFull": "הצגת ההודעה המלאה",
   "chat.message.showLess": "הצגת פחות",
+  "chat.message.stoppedBeforeText": "הסוכן נעצר לפני שכתב תשובה. יש לשלוח הודעה כדי להמשיך.",
+  "chat.message.failedBeforeText": "התשובה נכשלה לפני שהסוכן כתב טקסט. יש לשלוח הודעה כדי לנסות שוב.",
   "chat.actions.userLabel": "פעולות בהודעת המשתמש",
   "chat.actions.label": "פעולות בהודעה של {name}",
   "chat.actions.addReaction": "הוספת תגובה",

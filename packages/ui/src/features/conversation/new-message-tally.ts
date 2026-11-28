@@ -1,4 +1,5 @@
 import { ROUTINE_QUIET_ANSWER_ITEM_TYPE } from "@openbot/contracts/ipc";
+import type { AppTextKey } from "@openbot/i18n";
 import type { AgentMessage } from "@openbot/ui/data";
 
 export interface TimelineRow {
@@ -48,12 +49,25 @@ export function countableTimelineMessage(message: AgentMessage): boolean {
   return true;
 }
 
+const EMPTY_ENDED_ANSWER_LABEL: Readonly<Record<string, AppTextKey>> = {
+  Stopped: "chat.message.stoppedBeforeText",
+  Failed: "chat.message.failedBeforeText",
+};
+
+export function emptyEndedAnswerLabel(message: AgentMessage): AppTextKey | undefined {
+  const label = message.status === undefined ? undefined : EMPTY_ENDED_ANSWER_LABEL[message.status];
+  return label && emptyAgentAnswer(message) ? label : undefined;
+}
+
 export function silentAgentAnswer(message: AgentMessage): boolean {
+  return !message.status && emptyAgentAnswer(message);
+}
+
+function emptyAgentAnswer(message: AgentMessage): boolean {
   return (
     message.author === "agent" &&
     (message.kind ?? "text") === "text" &&
     !message.streaming &&
-    !message.status &&
     !message.actionMarker &&
     !message.questionPrompt &&
     !message.imageGeneration &&

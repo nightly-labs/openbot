@@ -465,6 +465,9 @@ export const messages = {
   "chat.message.attachment": "Вложение",
   "chat.message.showFull": "Показать всё сообщение",
   "chat.message.showLess": "Свернуть",
+  "chat.message.stoppedBeforeText": "Агент остановился, не написав ответ. Отправьте сообщение, чтобы продолжить.",
+  "chat.message.failedBeforeText":
+    "Ответ не удался: агент не успел написать текст. Отправьте сообщение, чтобы повторить.",
   "chat.actions.userLabel": "Действия с сообщением пользователя",
   "chat.actions.label": "Действия с сообщением: {name}",
   "chat.actions.addReaction": "Добавить реакцию",

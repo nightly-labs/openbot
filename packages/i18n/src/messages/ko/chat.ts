@@ -361,6 +361,9 @@ export const messages = {
   "chat.message.attachment": "첨부 파일",
   "chat.message.showFull": "전체 메시지 보기",
   "chat.message.showLess": "간단히 보기",
+  "chat.message.stoppedBeforeText": "에이전트가 답변을 쓰기 전에 멈췄어요. 계속하려면 메시지를 보내세요.",
+  "chat.message.failedBeforeText":
+    "에이전트가 텍스트를 쓰기 전에 답변이 실패했어요. 다시 시도하려면 메시지를 보내세요.",
   "chat.actions.userLabel": "사용자 메시지 작업",
   "chat.actions.label": "{name} 메시지 작업",
   "chat.actions.addReaction": "반응 추가",

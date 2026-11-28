@@ -74,6 +74,7 @@ import {
   MessageMenuItems,
   type MessageMenuItemsProps,
 } from "@openbot/ui/features/conversation/MessageRendering";
+import { emptyEndedAnswerLabel } from "@openbot/ui/features/conversation/new-message-tally";
 import { type ChatBubbleStyle, ownMessageAuthor } from "@openbot/ui/features/conversation/own-bubble";
 import { QueuePanel } from "@openbot/ui/features/conversation/QueuePanel";
 import {
@@ -133,6 +134,7 @@ function shownInThread(message: AgentMessage): boolean {
     message.author === "you" ||
     message.streaming === true ||
     message.body.trim().length > 0 ||
+    emptyEndedAnswerLabel(message) !== undefined ||
     (message.attachments?.length ?? 0) > 0 ||
     message.imageGeneration !== undefined ||
     message.videoGeneration !== undefined ||
