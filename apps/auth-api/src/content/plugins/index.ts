@@ -17,6 +17,7 @@ import { HINDSIGHT_PLUGIN_GUIDE } from "./hindsight";
 import { HONCHO_PLUGIN_GUIDE } from "./honcho";
 import { HUGGINGFACE_PLUGIN_GUIDE } from "./huggingface";
 import { LINEAR_PLUGIN_GUIDE } from "./linear";
+import { MNEMOVERSE_PLUGIN_GUIDE } from "./mnemoverse";
 import { NEON_PLUGIN_GUIDE } from "./neon";
 import { NETLIFY_PLUGIN_GUIDE } from "./netlify";
 import { NOTION_PLUGIN_GUIDE } from "./notion";
@@ -48,6 +49,7 @@ const PLUGIN_GUIDES: Readonly<Record<string, PluginGuide>> = {
   cobrain: COBRAIN_PLUGIN_GUIDE,
   honcho: HONCHO_PLUGIN_GUIDE,
   hindsight: HINDSIGHT_PLUGIN_GUIDE,
+  mnemoverse: MNEMOVERSE_PLUGIN_GUIDE,
   composio: COMPOSIO_PLUGIN_GUIDE,
   context7: CONTEXT7_PLUGIN_GUIDE,
   figma: FIGMA_PLUGIN_GUIDE,

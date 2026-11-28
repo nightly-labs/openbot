@@ -99,6 +99,12 @@ export const PLUGIN_CATALOG_INDEX: PluginCatalogIndex = {
       detailSha256: "1e2cdabd40b600c6853d645cba552d619ce92ab196a3c52ad6493ed6f506e0a9",
     },
     {
+      slug: "mnemoverse",
+      version: "1.0.0",
+      featured: false,
+      detailSha256: "d631ac9ea0a6f49e5413a7094a88fd7178a1e238800c84f0a3b251db2a806a1e",
+    },
+    {
       slug: "figma",
       version: "1.1.0",
       featured: true,
@@ -2113,6 +2119,65 @@ export const PLUGIN_CATALOG_DETAILS: Record<string, PluginCatalogDetail> = {
     websiteUrl: "https://mem0.ai",
     privacyPolicyUrl: "https://mem0.ai/privacy",
     termsUrl: "https://mem0.ai/terms",
+    skills: [],
+  },
+  mnemoverse: {
+    slug: "mnemoverse",
+    name: "Mnemoverse",
+    tagline: "Memory you can rate and share",
+    description:
+      "Mnemoverse is hosted long-term memory for AI agents. An agent saves a preference or a decision and finds it later with a plain question. The same account works in ChatGPT, Claude, Cursor and VS Code. Rating a recalled memory as helpful or misleading re-ranks what comes back next. Shared rooms let several people's assistants read and write one memory. With OpenBot memory turned off in an agent's settings, Mnemoverse becomes that agent's only memory. Mnemoverse receives what an agent saves and the questions it searches with.",
+    category: "productivity",
+    creatorName: "Mnemoverse",
+    iconUrl: "https://mnemoverse.com/apple-touch-icon.png",
+    version: "1.0.0",
+    prompts: [
+      {
+        id: "prompt-recall",
+        text: "Before we start, check Mnemoverse for what I decided about this project last time.",
+      },
+      { id: "prompt-save", text: "Save each decision from this chat to Mnemoverse as a separate memory." },
+      {
+        id: "prompt-rate",
+        text: "In Mnemoverse, rate the memories you used in this chat: which helped and which were wrong.",
+      },
+    ],
+    apps: [
+      {
+        id: "app-mnemoverse-mcp",
+        name: "Mnemoverse",
+        description: "Save, search and rate memories in your Mnemoverse account.",
+        iconUrl: "https://mnemoverse.com/apple-touch-icon.png",
+        server: {
+          name: "mnemoverse",
+          transport: "http",
+          url: "https://mcp.mnemoverse.com/mcp",
+          auth: [
+            { id: "mnemoverse-oauth", kind: "link", label: "Sign in" },
+            {
+              id: "mnemoverse-key",
+              kind: "key",
+              label: "API key",
+              fields: [
+                {
+                  id: "api-key",
+                  label: "API key",
+                  header: "Authorization",
+                  prefix: "Bearer ",
+                  placeholder: "mk_live_…",
+                  hint: "Create a key at console.mnemoverse.com.",
+                },
+              ],
+              docsUrl: "https://mnemoverse.com/docs/api/remote-mcp-server",
+              docsLabel: "Get a key",
+            },
+          ],
+        },
+      },
+    ],
+    websiteUrl: "https://mnemoverse.com",
+    privacyPolicyUrl: "https://mnemoverse.com/privacy",
+    termsUrl: "https://mnemoverse.com/terms",
     skills: [],
   },
   figma: {

@@ -289,6 +289,16 @@ export const messages = {
   "marketplace.plugin.hindsight.prompt.reflect":
     "تأمل في ذكرياتي في Hindsight: ما الأنماط التي تراها في عملي خلال الشهر الماضي؟",
   "marketplace.plugin.hindsight.hint.apiKey": "أنشئ مفتاحًا في صفحة Connect في Hindsight Cloud.",
+  "marketplace.plugin.mnemoverse.tagline": "ذاكرة يمكنك تقييمها ومشاركتها",
+  "marketplace.plugin.mnemoverse.description":
+    "يمنح Mnemoverse الوكلاء ذاكرة طويلة المدى مستضافة. يحفظ الوكيل تفضيلًا أو قرارًا ويجده لاحقًا بسؤال بسيط. الحساب نفسه يعمل في ChatGPT وClaude وCursor وVS Code. تقييم ذكرى مسترجعة بأنها مفيدة أو مضللة يغيّر ترتيب ما يظهر في المرة التالية. تتيح الغرف المشتركة لمساعدي عدة أشخاص قراءة ذاكرة واحدة والكتابة فيها. عند إيقاف «ذاكرة OpenBot» في إعدادات الوكيل، يصبح Mnemoverse ذاكرته الوحيدة. يتلقى Mnemoverse ما يحفظه الوكيل والأسئلة التي يبحث بها.",
+  "marketplace.plugin.mnemoverse.app": "احفظ الذكريات وابحث فيها وقيّمها في حسابك في Mnemoverse.",
+  "marketplace.plugin.mnemoverse.prompt.recall":
+    "قبل أن نبدأ، ابحث في Mnemoverse عمّا تقرر بشأن هذا المشروع في المرة السابقة.",
+  "marketplace.plugin.mnemoverse.prompt.save": "احفظ كل قرار من هذه المحادثة في Mnemoverse كذكرى منفصلة.",
+  "marketplace.plugin.mnemoverse.prompt.rate":
+    "قيّم في Mnemoverse الذكريات التي استخدمتها في هذه المحادثة: أيها ساعد وأيها كان خاطئًا.",
+  "marketplace.plugin.mnemoverse.hint.apiKey": "أنشئ مفتاحًا في console.mnemoverse.com.",
   "marketplace.plugin.figma.tagline": "التصاميم والنماذج الأولية",
   "marketplace.plugin.figma.description":
     "يتيح Figma للوكلاء قراءة ملفات التصميم، وفحص المكونات والأنماط والمتغيرات، وتسليم مواصفات الإنتاج للمهندسين. يتصل بخادم MCP في تطبيق Figma المكتبي على هذا الحاسوب. يستطيع الخادم قراءة التصاميم فقط؛ ودعم الكتابة قيد التطوير.",

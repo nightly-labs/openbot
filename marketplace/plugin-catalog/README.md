@@ -215,6 +215,28 @@ the listing, for the same reasons as the Honcho workspace header.
 A self-hosted Hindsight serves the same tools at `http://localhost:8888/mcp`,
 with no key by default. Add it in the MCP servers settings.
 
+## Mnemoverse
+
+The listing connects to Mnemoverse's hosted MCP server at
+`https://mcp.mnemoverse.com/mcp`
+(<https://mnemoverse.com/docs/api/remote-mcp-server>). An `initialize` without a
+token answers 401 with a `Bearer` challenge and `resource_metadata`. The
+protected-resource metadata names `https://auth.mnemoverse.com/api/auth`, which
+publishes a `registration_endpoint`, `S256` and the `code` response type.
+Dynamic registration accepts loopback callbacks under RFC 8252, so OpenBot's
+`http://127.0.0.1:28417/mcp-auth` registers as a public client. The key flow
+sends `Authorization: Bearer mk_live_…`, a key from
+<https://console.mnemoverse.com>.
+
+The tools work on the signed-in account's memory, split by an optional `domain`.
+A shared room is also a `domain`: its address comes back from `memory_join_room`
+and `memory_list_rooms`, and the agent passes it to `memory_read` and
+`memory_write`.
+
+The npm package `@mnemoverse/mcp-memory-server` is a stdio server for the same
+hosted memory, keyed by `MNEMOVERSE_API_KEY`; add it in the MCP servers
+settings.
+
 ## Postiz
 
 The listing connects to Postiz's own MCP server at

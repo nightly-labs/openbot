@@ -279,6 +279,17 @@ export const messages = {
   "marketplace.plugin.hindsight.prompt.reflect":
     "Reflexiona sobre mis recuerdos de Hindsight: ¿qué patrones ves en mi trabajo del último mes?",
   "marketplace.plugin.hindsight.hint.apiKey": "Crea una clave en la página Connect de Hindsight Cloud.",
+  "marketplace.plugin.mnemoverse.tagline": "Memoria que puedes valorar y compartir",
+  "marketplace.plugin.mnemoverse.description":
+    "Mnemoverse da a los agentes una memoria a largo plazo alojada. Un agente guarda una preferencia o una decisión y la encuentra después con una pregunta sencilla. La misma cuenta funciona en ChatGPT, Claude, Cursor y VS Code. Valorar un recuerdo recuperado como útil o engañoso cambia el orden de lo que aparece la próxima vez. Las salas compartidas permiten que los asistentes de varias personas lean y escriban una misma memoria. Si desactivas «Memoria de OpenBot» en los ajustes de un agente, Mnemoverse pasa a ser su única memoria. Mnemoverse recibe lo que guarda un agente y las preguntas con las que busca.",
+  "marketplace.plugin.mnemoverse.app": "Guarda, busca y valora recuerdos en tu cuenta de Mnemoverse.",
+  "marketplace.plugin.mnemoverse.prompt.recall":
+    "Antes de empezar, busca en Mnemoverse qué se decidió sobre este proyecto la última vez.",
+  "marketplace.plugin.mnemoverse.prompt.save":
+    "Guarda en Mnemoverse cada decisión de este chat como un recuerdo aparte.",
+  "marketplace.plugin.mnemoverse.prompt.rate":
+    "En Mnemoverse, valora los recuerdos que usaste en este chat: cuáles ayudaron y cuáles estaban equivocados.",
+  "marketplace.plugin.mnemoverse.hint.apiKey": "Crea una clave en console.mnemoverse.com.",
   "marketplace.plugin.figma.tagline": "Diseños y prototipos",
   "marketplace.plugin.figma.description":
     "Figma permite a los agentes leer archivos de diseño, inspeccionar componentes, estilos y variables, y entregar especificaciones de producción a los ingenieros. Se conecta al servidor MCP de la aplicación de escritorio de Figma, en este equipo. El servidor solo puede leer diseños; la escritura está en desarrollo.",
