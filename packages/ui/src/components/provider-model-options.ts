@@ -18,7 +18,6 @@ import {
   isKnownAgentProvider,
 } from "@openbot/contracts/ipc";
 import type { AppTextKey, AppTranslate } from "@openbot/i18n";
-import { currentText } from "../text";
 
 const EFFORT_LABELS: Partial<Record<string, AppTextKey>> = {
   none: "provider.effort.none",
@@ -101,8 +100,8 @@ function modelTier(model: PickerModel): 0 | 1 {
 export function pickerModels(
   options: ClientAgentModelOption[],
   endpoints: readonly CustomProviderSummary[] = [],
+  t: AppTranslate,
 ): PickerModel[] {
-  const { t } = currentText();
   const byId = new Map(options.map((model) => [model.id, model]));
   const variants = new Map<string, { id: string; name: string }[]>();
   const variantIds = new Set<string>();
@@ -166,8 +165,15 @@ export function pickerModels(
         if (name.startsWith(`${service}: `)) name = name.slice(service.length + 2);
       }
       if (model.provider === "hermes") {
+        const namedCustomModel =
+          model.id.startsWith("custom:") && model.id !== `custom:${name}` && model.id.endsWith(`:${name}`);
+        const customLabel = namedCustomModel
+          ? /^Provider: (.+?)(?: • current)?$/u.exec(model.description)?.[1]?.trim()
+          : undefined;
         const provider = name.indexOf(" · ");
-        if (provider > 0) {
+        if (customLabel) {
+          service = customLabel;
+        } else if (provider > 0) {
           service = name.slice(0, provider);
           name = name.slice(provider + 3);
         }
@@ -268,10 +274,10 @@ export function providerOffersModels(
   status: AgentStatus,
   models: readonly ClientAgentModelOption[],
   provider: AgentProviderId,
+  t: AppTranslate,
   runtime?: ProviderRuntimeStatus,
 ): boolean {
   return (
-    !providerTurnedOff(status, provider) &&
-    providerUsable(providerAvailability(status, models, provider, currentText().t), runtime)
+    !providerTurnedOff(status, provider) && providerUsable(providerAvailability(status, models, provider, t), runtime)
   );
 }

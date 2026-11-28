@@ -523,7 +523,7 @@ export function ProviderModelPicker(props: ProviderModelPickerProps) {
   const selectedHasVariants = createMemo(
     () =>
       props.provider === "opencode" &&
-      pickerModels(railModelOptions(activeProvider())).some(
+      pickerModels(railModelOptions(activeProvider()), undefined, currentText().t).some(
         (model) =>
           model.variants.length > 0 &&
           (model.id === props.value || model.variants.some((variant) => variant.id === props.value)),
@@ -794,7 +794,9 @@ export function ProviderModelPicker(props: ProviderModelPickerProps) {
                   return id && id !== DEFAULT_PROVIDER_ACCOUNT_ID ? id : null;
                 };
                 const status = () => entryStatus(key);
-                const models = createMemo(() => pickerModels(entryModelOptions(key), props.customProviders));
+                const models = createMemo(() =>
+                  pickerModels(entryModelOptions(key), props.customProviders, currentText().t),
+                );
                 const endpointModelsElsewhere = () =>
                   provider !== CUSTOM_RAIL &&
                   railModelOptions(CUSTOM_RAIL).some((option) => option.provider === provider);
