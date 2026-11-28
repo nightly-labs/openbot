@@ -52,6 +52,7 @@ const FAILURE_KINDS: Partial<Record<string, McpFailureKind>> = {
   "error.backend.mcpCommandNotFound": "startup",
   "error.backend.mcpRemoteBridge": "startup",
   "error.backend.mcpServerUnreachable": "unreachable",
+  "error.backend.mcpServerCertificateUntrusted": "unreachable",
 };
 
 const FAILURE_LABELS = {

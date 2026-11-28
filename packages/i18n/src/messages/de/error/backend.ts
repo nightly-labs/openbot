@@ -394,6 +394,8 @@ export const messages = {
   "error.backend.mcpOAuthRenewalFailed":
     "OpenBot konnte die Anmeldung bei diesem MCP-Server gerade nicht erneuern. Die Anmeldung bleibt erhalten, und die nächste Anfrage versucht es erneut. Wenn dieser Fehler bleibt, kann sich der Nutzer in OpenBot vom Server abmelden und erneut anmelden.",
   "error.backend.mcpServerUnreachable": "OpenBot konnte den Server nicht erreichen. Prüfe die URL und dein Netzwerk.",
+  "error.backend.mcpServerCertificateUntrusted":
+    "OpenBot vertraut dem Sicherheitszertifikat dieses Servers nicht. Sorge dafür, dass der Computer, auf dem OpenBot läuft, ihm vertraut. Wenn du es nach dem Start von OpenBot als vertrauenswürdig markiert hast, beende OpenBot auf diesem Computer und öffne es erneut.",
   "error.backend.mcpLocalServerOff":
     "Unter {address} antwortet auf diesem Computer kein Server. Starte den Server oder schalte ihn in der App ein, die ihn ausführt, und versuche es dann erneut.",
   "error.backend.mcpServerBlocked":

@@ -383,6 +383,8 @@ export const messages = {
     "OpenBot は今この MCP サーバーのサインインを更新できませんでした。サインインは保持され、次のリクエストで再試行します。このエラーが続く場合、ユーザーは OpenBot でこのサーバーからサインアウトし、もう一度サインインできます。",
   "error.backend.mcpServerUnreachable":
     "OpenBot はサーバーに接続できませんでした。URL とネットワークを確認してください。",
+  "error.backend.mcpServerCertificateUntrusted":
+    "OpenBot はこのサーバーのセキュリティ証明書を信頼していません。OpenBot を実行しているコンピューターがこの証明書を信頼していることを確認してください。OpenBot の起動後に信頼した場合は、そのコンピューターで OpenBot を終了してから、もう一度開いてください。",
   "error.backend.mcpLocalServerOff":
     "このコンピューターの {address} で応答するサーバーがありません。サーバーを起動するか、サーバーを実行するアプリでオンにしてから、もう一度お試しください。",
   "error.backend.mcpServerBlocked":

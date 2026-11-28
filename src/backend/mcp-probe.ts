@@ -50,6 +50,7 @@ import {
   usableMcpServer,
 } from "./mcp-provider-shapes";
 import { redactMcpSecrets, redactMcpValues } from "./mcp-redaction";
+import { UNTRUSTED_CERTIFICATE_CODES } from "./tls-certificate-errors";
 
 const MCP_PROBE_TIMEOUT_MS = 30_000;
 
@@ -742,6 +743,8 @@ function describeConnectionFailure(error: unknown, url: string): string | null {
         return sourceText("error.backend.mcpLocalServerOff", { address: address.origin });
     }
     if (code === "EACCES" || code === "EPERM") return sourceText("error.backend.mcpServerBlocked");
+    if (code !== null && UNTRUSTED_CERTIFICATE_CODES.has(code))
+      return sourceText("error.backend.mcpServerCertificateUntrusted");
     if (isProtocolMismatch(current, code)) return sourceText("error.backend.mcpServerIncompatible");
   }
   return null;
