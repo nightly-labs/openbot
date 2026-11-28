@@ -2374,9 +2374,8 @@ export class TurnLifecycle {
             })
           : null;
       const carriesWork = this.#carriesWork(agentId, turnId, running);
-      const channelTask = this.#channelTask(snapshot.threadId, deliveries);
-      const channelTaskTurn = channelTurn && channelTask;
-      const waitsHere = !channelTaskTurn && deliveries.every(({ channelId }) => channelId === undefined);
+      const messagingTurn = channelTurn && this.#hooks.inMessagingLane(agentId, publicThreadId);
+      const waitsHere = (!channelTurn || messagingTurn) && deliveries.every(({ channelId }) => channelId === undefined);
       let continuing =
         limited && carriesWork && deliveries.length > 0 && (waitsHere || this.#hooks.mayContinueOnBackup(agentId));
       if (continuing) {
@@ -2388,13 +2387,14 @@ export class TurnLifecycle {
         }
       }
       const repeatable = limited && running !== undefined && (!running.acted || continuing) && deliveries.length > 0;
-      const requeue = repeatable && (!channelTaskTurn || continuing);
+      const requeue = repeatable && (!channelTurn || messagingTurn || continuing);
       const resumed =
         limited && running?.unprompted === true && deliveries.length === 0 && !channelTurn && !routineSession
           ? this.#backgroundWork(agentId, turnId, snapshot, running.reports)
           : null;
       const model = this.#hooks.turnModel(agentId, turnId);
       const failedKey = this.#usageLimits.failureKey(agentId, model);
+      const channelTask = this.#channelTask(snapshot.threadId, deliveries);
       const backupTakes = () =>
         ((mayRunAgain || failedAfterWork) && this.#hooks.mayFailOver(agentId)) ||
         (spentAfterWork && this.#hooks.mayContinueOnBackup(agentId));
