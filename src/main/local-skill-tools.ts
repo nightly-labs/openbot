@@ -38,6 +38,7 @@ export function localSkillTools(skills: SkillMarketplaceService): LocalSkillTool
               new ToolOperationFailed({
                 cause: new Error(
                   `Skill ${skill.id} was saved as revision ${skill.version}, but your installed copy was not replaced${failure.cause instanceof Error ? `: ${failure.cause.message}` : "."} Install revision ${skill.version} with install_local_skill. Do not revise it again.`,
+                  { cause: failure.cause },
                 ),
               }),
           ),

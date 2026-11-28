@@ -326,7 +326,11 @@ setting.
 the skill (`installedRevision` is not null), so the chat shows one "Revised skill" line. Other agents
 keep their revision until an explicit install. When the installed copy has changes that are not in
 the lock file, the install is refused and the tool error says that the revision was saved and the
-copy was kept; the agent installs it with `install_local_skill` and does not revise again.
+copy was kept. Only the user can replace the copy (Skills, Repair, then Replace skill, which installs
+the newest revision and discards the local changes), so the errors of `revise_skill` and
+`install_local_skill` send the agent to that step and not to a retry. The `install_local_skill` error
+also tells the agent to ask the user first when the user needs the requested revision exactly. The
+IPC `skills:local-revise` keeps the old text.
 
 There is no Undo control. Revisions are never deleted and a revision reaches only the agent that
 made it, so the user asks the agent to undo the change: the guidance tells it to read the revision

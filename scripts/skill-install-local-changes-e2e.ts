@@ -6,6 +6,7 @@ import type { AgentSummary } from "@openbot/contracts/ipc";
 import { sourceText } from "@openbot/i18n/source";
 import { Effect, Result } from "effect";
 import { zipSync } from "fflate";
+import { runLocalSkillTool } from "../src/backend/agent/skill-tools";
 import { CentralAuthManager } from "../src/main/central-auth-manager";
 import { LocalSkillLibrary } from "../src/main/local-skill-library";
 import { localSkillTools } from "../src/main/local-skill-tools";
@@ -288,6 +289,65 @@ await scenario("N An own skill with the same name and other files stays and name
   const kept = await readFile(ownFile, "utf8");
   assert.equal(kept, ownText);
   return { install, kept: kept === ownText ? "unchanged" : "changed" };
+});
+
+interface LocalSkillToolArguments {
+  agentId?: string;
+  skillId: string;
+  revision?: number;
+  expectedRevision?: number;
+  sourcePath?: string;
+}
+
+await scenario("O A refused replace sends the agent to the user's Repair step, not to a retry", async (context) => {
+  const edit = skillMarkdown("First.", "An edit that is not saved.");
+  await writeCopies(context, "SKILL.md", edit);
+  await writeFile(join(context.workspace, "source/SKILL.md"), skillMarkdown("First.", "Revision 2."));
+  const callTool = (sender: string, tool: string, args: LocalSkillToolArguments) =>
+    failure(runLocalSkillTool(context.tools, sender, tool, args, (agentId) => agentId ?? sender));
+  const revise = await callTool(AGENT_ID, "revise_skill", {
+    skillId: context.skillId,
+    expectedRevision: 1,
+    sourcePath: "source",
+  });
+  const install = await callTool(AGENT_ID, "install_local_skill", { skillId: context.skillId, revision: 2 });
+  const ownById = await callTool(AGENT_ID, "install_local_skill", {
+    agentId: AGENT_ID,
+    skillId: context.skillId,
+    revision: 2,
+  });
+  const older = await callTool(AGENT_ID, "install_local_skill", { skillId: context.skillId, revision: 1 });
+  const forOther = await callTool("agent-lead", "install_local_skill", {
+    agentId: AGENT_ID,
+    skillId: context.skillId,
+    revision: 2,
+  });
+  for (const text of [revise, install, ownById, older, forOther]) {
+    assert.ok(text !== null, "The tool fails.");
+    assert.ok(text.includes("This skill has local changes, and only the user can replace them."));
+    assert.ok(text.includes("Replace skill: when the user confirms, this installs the newest revision"));
+    assert.ok(!text.includes("Confirm replacement"), "The text does not ask the agent to confirm.");
+    assert.ok(!text.includes("with install_local_skill."), "The text does not send the agent to a retry.");
+  }
+  assert.ok(revise?.startsWith(`Skill ${context.skillId} was saved as revision 2,`), "The revision is saved.");
+  assert.ok(install !== null, "The install fails.");
+  assert.ok(install.startsWith("This skill has local changes"));
+  assert.ok(install.includes("show_setting with agent.skills"));
+  assert.ok(install.includes("If the user needs revision 2 exactly, ask the user before they use Repair"));
+  assert.ok(revise !== null, "The revise fails.");
+  assert.ok(!revise.includes("If the user needs revision"), "A revise saves the newest revision.");
+  assert.equal(ownById, install);
+  assert.ok(older?.includes("If the user needs revision 1 exactly, ask the user before they use Repair"));
+  assert.ok(forOther?.includes("that agent's settings") && !forOther.includes("show_setting"));
+  const missing = { skillId: context.skillId, revision: 9 };
+  const otherFailure = await callTool(AGENT_ID, "install_local_skill", missing);
+  const serviceFailure = await failure(context.tools.install({ agentId: AGENT_ID, ...missing }));
+  assert.ok(otherFailure !== null && otherFailure === serviceFailure, "Other failures keep their text.");
+  const after = await installedState(context);
+  assert.equal(after, "modified@1");
+  for (const folder of [".agents/skills", ".claude/skills"])
+    assert.equal(await readFile(join(context.workspace, folder, context.slug, "SKILL.md"), "utf8"), edit);
+  return { revise, install, older, forOther, otherFailure, after };
 });
 
 await mkdir(".openbot-build", { recursive: true });
