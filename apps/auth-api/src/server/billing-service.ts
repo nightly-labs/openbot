@@ -122,6 +122,7 @@ import {
 import { ViesClient } from "./vies-client";
 
 const WEBHOOK_EVENT_RETENTION_MS = 7 * 24 * 60 * 60_000;
+export const PRUNE_BILLING_WEBHOOK_EVENTS_SQL = "DELETE FROM billing_webhook_events WHERE received_at < ?";
 const WELCOME_EMAIL_CLAIM_PREFIX = "openbot_welcome_email:";
 const SERVER_ID_PATTERN = /^[A-Za-z0-9:_-]{1,128}$/u;
 const DISPUTE_DELETES_SERVER_MS = 30 * 24 * 60 * 60 * 1000;
@@ -1103,9 +1104,7 @@ export class BillingService {
         dependencies.database
           .prepare("INSERT OR IGNORE INTO billing_webhook_events(event_id, type, received_at) VALUES (?, ?, ?)")
           .bind(event.id, event.type, now),
-        dependencies.database
-          .prepare("DELETE FROM billing_webhook_events WHERE received_at < ?")
-          .bind(now - WEBHOOK_EVENT_RETENTION_MS),
+        dependencies.database.prepare(PRUNE_BILLING_WEBHOOK_EVENTS_SQL).bind(now - WEBHOOK_EVENT_RETENTION_MS),
       ]),
     );
   });
