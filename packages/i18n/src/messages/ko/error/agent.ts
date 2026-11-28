@@ -54,6 +54,10 @@ export const messages = {
   "error.agent.modelUnavailable": "선택한 에이전트 모델을 사용할 수 없어요.",
   "error.agent.modelProviderNotConnected":
     '선택한 에이전트 모델 "{model}"을(를) 사용할 수 없어요: {provider}에 연결되어 있지 않아요.',
+  "error.agent.modelProviderFailed":
+    '선택한 에이전트 모델 "{model}"을(를) 사용할 수 없어요. {provider}에 오류가 있어요: {detail}',
+  "error.agent.modelProviderFailedCheck":
+    '선택한 에이전트 모델 "{model}"을(를) 사용할 수 없어요. 서버 설정 > 제공자에서 {provider}을(를) 확인한 다음 다시 시도하세요. 마지막 오류: {detail}',
   "error.agent.modelProviderSignInRequired":
     '선택한 에이전트 모델 "{model}"을(를) 사용할 수 없어요: {provider}에 로그인해야 해요. {provider}에 로그인한 후 다시 시도하세요.',
   "error.agent.modelProviderNotInstalled":

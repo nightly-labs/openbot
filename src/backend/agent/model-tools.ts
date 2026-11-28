@@ -17,9 +17,10 @@ import {
   defaultProviderModel,
   sameAgentModelChoice,
 } from "@openbot/contracts/ipc";
-import { sourceText } from "@openbot/i18n/source";
+import { matchingSourceKeys, sourceText } from "@openbot/i18n/source";
 import type { AgentProvider } from "../agent-client";
 import { isEncodedModelOf } from "../encoded-model-id";
+import { shortenDiagnostic } from "../stderr-diagnostics";
 import { AgentSettingsRefused } from "./agent-settings-refused";
 import { providerLabel } from "./thread-items";
 
@@ -89,6 +90,7 @@ export function requireRunnableProvider(
 
 export function providerNotReadyText(model: string, provider: string, row: ProviderStatusRow | undefined): string {
   if (row?.off) return sourceText("error.agent.modelProviderNotConnected", { model, provider });
+  if (row?.state === "error" && row.message) return providerFailedText(model, provider, row.message);
   switch (row?.state) {
     case "sign-in-required":
       return sourceText("error.agent.modelProviderSignInRequired", { model, provider });
@@ -99,6 +101,13 @@ export function providerNotReadyText(model: string, provider: string, row: Provi
     default:
       return sourceText("error.agent.modelProviderNotConnected", { model, provider });
   }
+}
+
+function providerFailedText(model: string, provider: string, message: string): string {
+  const detail = shortenDiagnostic(message);
+  return matchingSourceKeys(message).length > 0
+    ? sourceText("error.agent.modelProviderFailed", { model, provider, detail })
+    : sourceText("error.agent.modelProviderFailedCheck", { model, provider, detail });
 }
 
 export function requireRunnableChange(
