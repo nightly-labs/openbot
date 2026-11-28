@@ -95,6 +95,9 @@ const LEGACY_SHA256_HEX_PATTERN = /^[a-f0-9]{64}$/u;
 const AUTH_EVENT_RETRY_MS = 60_000;
 const AUTH_EVENT_SEND_CONCURRENCY = 6;
 const AUTH_EVENT_CLAIM_MS = 2 * 60_000;
+export const REMOTE_AUTH_EVENT_DELIVERED = Number.MAX_SAFE_INTEGER;
+export const REMOTE_AUTH_EVENT_RETENTION_MS = 24 * 60 * 60_000;
+export const REMOTE_AUTH_EVENT_PAGE_LIMIT = 500;
 const MAX_OUTSTANDING_INVITES_PER_HOST = 50;
 const MAX_PERMANENT_INVITES_PER_HOST = 5;
 const MAX_TELEGRAM_LINK_CODES_PER_HOST = 10;
@@ -460,6 +463,22 @@ interface RemoteAuthEventRow {
   payload: string;
   attempts: number;
   pending_targets: string | null;
+}
+
+interface RemoteAuthEventPageRow {
+  event_id: string;
+  payload: string;
+  attempted_at: number;
+}
+
+export interface RemoteAuthEventCursor {
+  attemptedAt: number;
+  eventId: string;
+}
+
+export interface RemoteAuthEventPage {
+  events: { eventId: string; attemptedAt: number; payload: string }[];
+  more: boolean;
 }
 
 export type RemoteAuthEventBindings = Pick<
@@ -2513,6 +2532,36 @@ export class RemoteControlPlane {
     (operation) => operation.pipe(Effect.provide(this.#layer)),
   ).bind(this);
 
+  readonly authEventsAfter = Effect.fn("RemoteControlPlane.authEventsAfter")(
+    function* (
+      cursor: RemoteAuthEventCursor,
+      limit: number,
+    ): Effect.fn.Return<RemoteAuthEventPage, RemoteFailure, RemoteDependencies> {
+      const dependencies = yield* RemoteDependencies;
+      const pageLimit = Math.min(Math.max(1, Math.floor(limit)), REMOTE_AUTH_EVENT_PAGE_LIMIT);
+      const rows = yield* remoteCall(() =>
+        dependencies.database
+          .prepare(
+            `SELECT event_id, payload, attempted_at FROM remote_auth_events
+              WHERE (attempted_at, event_id) > (?, ?)
+              ORDER BY attempted_at, event_id LIMIT ?`,
+          )
+          .bind(cursor.attemptedAt, cursor.eventId, pageLimit + 1)
+          .all<RemoteAuthEventPageRow>(),
+      );
+      const page = rows.results ?? [];
+      return {
+        events: page.slice(0, pageLimit).map((row) => ({
+          eventId: row.event_id,
+          attemptedAt: row.attempted_at,
+          payload: row.payload,
+        })),
+        more: page.length > pageLimit,
+      };
+    },
+    (operation) => operation.pipe(Effect.provide(this.#layer)),
+  );
+
   readonly validateResumeClaimsBatch = Effect.fn("RemoteControlPlane.validateResumeClaimsBatch")(
     function* (
       this: RemoteControlPlane,
@@ -4199,11 +4248,11 @@ const deliverRemoteAuthEvents = Effect.fn("RemoteControlPlane.deliverAuthEvents"
   const result = yield* remoteCall(() =>
     input.database
       .prepare(
-        `UPDATE remote_auth_events SET next_attempt_at = ?
+        `UPDATE remote_auth_events SET next_attempt_at = ?, attempted_at = ?
          WHERE event_id IN (SELECT event_id FROM remote_auth_events WHERE next_attempt_at <= ? ORDER BY created_at LIMIT 50)
          RETURNING event_id, payload, attempts, pending_targets`,
       )
-      .bind(input.now + AUTH_EVENT_CLAIM_MS, input.now)
+      .bind(input.now + AUTH_EVENT_CLAIM_MS, input.now, input.now)
       .all<RemoteAuthEventRow>(),
   );
   const send = Effect.fn("RemoteControlPlane.sendAuthEvent")(function* (url: string, payload: string) {
@@ -4239,12 +4288,15 @@ const deliverRemoteAuthEvents = Effect.fn("RemoteControlPlane.deliverAuthEvents"
         );
         const failed = sent.filter((target) => Result.isFailure(target.delivery)).map((target) => target.url);
         if (failed.length === 0) {
-          const deleted = yield* Effect.result(
+          const delivered = yield* Effect.result(
             remoteCall(() =>
-              input.database.prepare("DELETE FROM remote_auth_events WHERE event_id = ?").bind(event.event_id).run(),
+              input.database
+                .prepare("UPDATE remote_auth_events SET next_attempt_at = ?, pending_targets = NULL WHERE event_id = ?")
+                .bind(REMOTE_AUTH_EVENT_DELIVERED, event.event_id)
+                .run(),
             ),
           );
-          if (Result.isSuccess(deleted)) return;
+          if (Result.isSuccess(delivered)) return;
         }
         const delay = Math.min(AUTH_EVENT_RETRY_MS * 2 ** Math.min(event.attempts, 6), 60 * 60_000);
         yield* remoteCall(() =>

@@ -461,6 +461,7 @@
     "test:voice-transcription": "bun scripts/voice-transcription-smoke.ts",
     "test:remote-desktop-runtime": "bun scripts/remote-desktop-runtime-smoke.ts",
     "test:signal": "bun scripts/signal-security-e2e.ts",
+    "test:signal-handoff": "bun scripts/signal-handoff-e2e.ts",
     "test:watch-sessions": "bun apps/auth-api/scripts/watch-sessions-e2e.ts",
     "test:watch-relay-host": "bun scripts/watch-relay-host-e2e.ts",
     "test:watch-crypto-interop": "bun scripts/watch-crypto-interop-e2e.ts",
