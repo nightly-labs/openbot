@@ -84,6 +84,7 @@ const env = { ...process.env, CI: "1", WRANGLER_SEND_METRICS: "false" };
 await run(WRANGLER, ["d1", "migrations", "apply", "openbot-auth", "--local", "--persist-to", state, "-c", config], {
   cwd: work,
   env,
+  maxBuffer: 64 * 1024 * 1024,
 });
 const proxy = await getPlatformProxy<{ DB: D1Database }>({
   configPath: config,

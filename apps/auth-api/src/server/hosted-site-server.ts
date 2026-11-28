@@ -12,6 +12,7 @@ import { accountLicense, getServerEntitlement, serverPlanEntitledSql } from "./b
 import { sha256 } from "./crypto";
 import { HOSTED_SITE_LIMITS, HostedSiteInputError } from "./hosted-site-contract";
 import { siteCall, siteFailure } from "./hosted-site-effects";
+import { replicaD1 } from "./observed-d1";
 
 export type HostedSiteScope =
   | { kind: "server"; userId: string; serverId: string }
@@ -223,6 +224,16 @@ export const adoptUnlinkedHostedSites = Effect.fn("HostedSites.adoptUnlinked")(f
   serverId: string,
   now: number,
 ) {
+  const unlinked = yield* siteCall(() =>
+    replicaD1(database)
+      .prepare(
+        `SELECT 1 FROM hosted_sites
+         WHERE user_id = ? AND status = 'active' AND expires_at > ? AND server_id IS NULL LIMIT 1`,
+      )
+      .bind(userId, now)
+      .first(),
+  );
+  if (!unlinked) return 0;
   const bucket = yield* resolveHostedSiteBucket(database, userId, serverId, now);
   const count = bucketSlotCountSql(bucket, userId, null, now);
   const result = yield* siteCall(() =>
