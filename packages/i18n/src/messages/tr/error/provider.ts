@@ -383,6 +383,8 @@ export const messages = {
     "Cursor, oturum bilgilerinizle sunucusuna bağlanamadı. İnternet bağlantınızı kontrol edin, ardından Cursor'da yeniden oturum açın.",
   "error.provider.cursorNoModels":
     'Cursor model listesini göndermedi. Cursor’a yeniden giriş yapmak için "Bağlan"ı seçin. Bu mesaj kalırsa Cursor planınızın modelleri içerdiğini kontrol edin.',
+  "error.provider.geminiNoModels":
+    'Gemini model listesini göndermedi. Google ile yeniden giriş yapmak için "Bağlan"ı seçin. Bu mesaj kalırsa Google hesabınızın Gemini kullanabildiğini kontrol edin.',
   "error.provider.clineArchivePath": "Cline arşivi beklenmeyen bir yola sahip.",
   "error.provider.clinePackageMismatch": "Cline paketi çalışma zamanı kataloğuyla eşleşmiyor.",
   "error.provider.clineChecksum": "Cline çalışma zamanı sağlama toplamı (checksum) eşleşmiyor.",

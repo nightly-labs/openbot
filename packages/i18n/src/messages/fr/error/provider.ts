@@ -398,6 +398,8 @@ export const messages = {
     "Cursor n’a pas pu se connecter à son serveur avec votre connexion. Vérifiez votre connexion Internet, puis reconnectez-vous à Cursor.",
   "error.provider.cursorNoModels":
     "Cursor n’a pas envoyé sa liste de modèles. Choisissez « Connecter » pour vous reconnecter à Cursor. Si ce message reste, vérifiez que votre forfait Cursor inclut des modèles.",
+  "error.provider.geminiNoModels":
+    "Gemini n’a pas envoyé sa liste de modèles. Choisissez « Connecter » pour vous reconnecter avec Google. Si ce message reste, vérifiez que votre compte Google peut utiliser Gemini.",
   "error.provider.clineArchivePath": "L’archive Cline contient un chemin inattendu.",
   "error.provider.clinePackageMismatch":
     "Le paquet Cline ne correspond pas au catalogue des environnements d’exécution.",

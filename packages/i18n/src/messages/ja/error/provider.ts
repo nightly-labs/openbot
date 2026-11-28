@@ -394,6 +394,8 @@ export const messages = {
     "Cursor がサインイン情報でサーバーに接続できませんでした。インターネット接続を確認してから、もう一度 Cursor にサインインしてください。",
   "error.provider.cursorNoModels":
     "Cursor からモデルの一覧が届きませんでした。「接続」を選んで、もう一度 Cursor にサインインしてください。このメッセージが消えない場合は、Cursor のプランでモデルを使えるか確認してください。",
+  "error.provider.geminiNoModels":
+    "Gemini からモデルの一覧が届きませんでした。「接続」を選んで、もう一度 Google でサインインしてください。このメッセージが消えない場合は、Google アカウントで Gemini を使えるか確認してください。",
   "error.provider.clineArchivePath": "Cline のアーカイブに予期しないパスがあります。",
   "error.provider.clinePackageMismatch": "Cline のパッケージがランタイムカタログと一致しません。",
   "error.provider.clineChecksum": "Cline ランタイムのチェックサムが一致しません。",

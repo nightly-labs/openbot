@@ -354,6 +354,8 @@ export const messages = {
     "تعذّر على Cursor الاتصال بخادمه باستخدام تسجيل دخولك. تحقّق من اتصالك بالإنترنت، ثم سجّل الدخول إلى Cursor مرة أخرى.",
   "error.provider.cursorNoModels":
     "لم يرسل Cursor قائمة النماذج. اختر «اتصال» لتسجيل الدخول إلى Cursor مرة أخرى. إذا بقيت هذه الرسالة، فتحقق من أن خطة Cursor تتضمن نماذج.",
+  "error.provider.geminiNoModels":
+    "لم يرسل Gemini قائمة النماذج. اختر «اتصال» لتسجيل الدخول باستخدام Google مرة أخرى. إذا بقيت هذه الرسالة، فتحقق من أن حسابك في Google يمكنه استخدام Gemini.",
   "error.provider.clineArchivePath": "يحتوي أرشيف Cline على مسار غير متوقع.",
   "error.provider.clinePackageMismatch": "لا تطابق حزمة Cline كتالوج بيئات التشغيل.",
   "error.provider.clineChecksum": "عدم تطابق المجموع الاختباري لبيئة تشغيل Cline.",

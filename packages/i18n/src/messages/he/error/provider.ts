@@ -357,6 +357,8 @@ export const messages = {
     "Cursor לא הצליח להתחבר לשרת שלו עם פרטי ההתחברות שלך. יש לבדוק את החיבור לאינטרנט ואז להתחבר שוב ל-Cursor.",
   "error.provider.cursorNoModels":
     'Cursor לא שלח את רשימת המודלים שלו. בחרו "חיבור" כדי להתחבר שוב ל-Cursor. אם ההודעה הזו נשארת, בדקו שהתוכנית שלכם ב-Cursor כוללת מודלים.',
+  "error.provider.geminiNoModels":
+    'Gemini לא שלח את רשימת המודלים שלו. בחרו "חיבור" כדי להתחבר שוב עם Google. אם ההודעה הזו נשארת, בדקו שחשבון Google שלכם יכול להשתמש ב-Gemini.',
   "error.provider.clineArchivePath": "בארכיון של Cline יש נתיב לא צפוי.",
   "error.provider.clinePackageMismatch": "החבילה של Cline אינה תואמת לקטלוג סביבות ההרצה.",
   "error.provider.clineChecksum": "סכום הביקורת של סביבת ההרצה של Cline אינו תואם.",

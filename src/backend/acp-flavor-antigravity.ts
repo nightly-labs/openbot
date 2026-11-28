@@ -469,4 +469,5 @@ export const ANTIGRAVITY_ACP_FLAVOR: AcpFlavor = {
   sessionProcesses: true,
   modelsLoadWithSession: true,
   keepModelsOnRefreshFailure: true,
+  noModelsAfterRetry: () => sourceText("error.provider.geminiNoModels"),
 };
