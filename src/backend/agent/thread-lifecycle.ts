@@ -230,6 +230,7 @@ export class ThreadLifecycle {
   readonly #routineThread: (threadId: string) => boolean;
   readonly #asksFirst: (agentId: string) => boolean;
   readonly #pendingHandoffs = new Map<string, string>();
+  readonly #imageCountDrops = new Set<string>();
   readonly #givenTurnContext = new Map<string, string>();
   readonly #handoffWrites = Semaphore.makeUnsafe(1);
   readonly #archiveRetries: CodexArchiveRetries;
@@ -1398,13 +1399,24 @@ export class ThreadLifecycle {
     this: ThreadLifecycle,
     agentId: string,
     externalThreadId: string,
+    reason?: "image-count",
   ) {
     const agent = this.#store.list().find((candidate) => candidate.id === agentId);
     if (!agent) return;
+    if (reason === "image-count")
+      this.#imageCountDrops.add(this.#conversation.publicThreadId(agentId, externalThreadId));
     yield* this.#releaseProviderSession(externalThreadId);
     this.retireProviderSession(agent, externalThreadId);
     this.#hooks.logRecovery(agentId, agent.provider, "replaced");
   }, Effect.uninterruptible).bind(this);
+
+  hasImageCountDrop(publicThreadId: string): boolean {
+    return this.#imageCountDrops.has(publicThreadId);
+  }
+
+  consumeImageCountDrop(publicThreadId: string): boolean {
+    return this.#imageCountDrops.delete(publicThreadId);
+  }
 
   rotatesSession(agentId: string, externalThreadId: string): boolean {
     const agent = this.#store.list().find((candidate) => candidate.id === agentId);
@@ -1679,10 +1691,11 @@ export class ThreadLifecycle {
     agentId: string,
     threadId: string,
   ) {
+    const omitImages = this.#imageCountDrops.has(threadId);
     if (this.#conversation.isExecutionThread(threadId) && !this.#conversation.isTaskThread(threadId)) return null;
     const sessions = this.#store.database.listProviderSessions(threadId);
     const branch = this.#conversation.isTaskThread(threadId) && this.#branchThread(threadId);
-    if (sessions.length < 1 && !branch && !this.#importedHistory(threadId)) return null;
+    if (sessions.length < 1 && !branch && !this.#importedHistory(threadId) && !omitImages) return null;
     const agentNames = agentNamesById(this.#store.list());
     const history = readHandoffHistory(this.#store.database, agentId, threadId, agentNames);
     const captures = new Map<string, Map<string, string> | null>();
@@ -1701,6 +1714,7 @@ export class ThreadLifecycle {
     return renderProviderHandoff(history, agentNames, steps, {
       branch,
       earlierChat: hasEarlierChat(this.#store.database, agentId, threadId, history.resetMessageId),
+      omitImages,
     });
   }).bind(this);
 }

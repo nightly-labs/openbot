@@ -2022,8 +2022,8 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
         scheduleDrain: (agentId) => this.#drain.scheduleDrain(agentId),
         steerAgentMessage: (recipientAgentId, deliveryId) =>
           this.#steerAgentMessage(recipientAgentId, deliveryId, false).pipe(Effect.asVoid),
-        dropRefusedSession: (agentId, externalThreadId) =>
-          this.#threads.dropRefusedProviderSession(agentId, externalThreadId),
+        dropRefusedSession: (agentId, externalThreadId, reason) =>
+          this.#threads.dropRefusedProviderSession(agentId, externalThreadId, reason),
         listAgents: () => this.listAgents(),
         redactMcp: (text) => this.#mcp.redact(text),
         ...(options.finishCheck === true

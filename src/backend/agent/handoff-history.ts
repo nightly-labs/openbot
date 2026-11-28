@@ -82,18 +82,26 @@ const BRANCH_NOTE =
   "This conversation is a branch: a copy of an earlier conversation up to one message. Workspace files were not rolled back, so they can include changes from after that message.";
 const NEW_CHAT_NOTE =
   "A new chat started. Messages from before it are not in your context. Do not bring them up yourself. When the user refers to earlier work, find it with openbot.history_search.";
+const OMIT_IMAGES_NOTE =
+  "Images from the previous session were omitted. They exceeded the model's image limit. Do not open those images again. Open at most one image in a step.";
 const NEW_CHAT_ONLY_HISTORY = [HANDOFF_START, NEW_CHAT_NOTE].join("\n\n");
 
 export function renderProviderHandoff(
   history: ReturnType<typeof readHandoffHistory>,
   names: ReadonlyMap<string, string>,
   steps: ReadonlyMap<string, string>,
-  options: { branch?: boolean; earlierChat?: boolean } = {},
+  options: { branch?: boolean; earlierChat?: boolean; omitImages?: boolean } = {},
 ): string | null {
-  if (!history.recent.length) return options.earlierChat ? `${NEW_CHAT_ONLY_HISTORY}\n\n${HANDOFF_END}` : null;
+  if (!history.recent.length)
+    return options.omitImages
+      ? [HANDOFF_START, OMIT_IMAGES_NOTE, HANDOFF_END].join("\n\n")
+      : options.earlierChat
+        ? `${NEW_CHAT_ONLY_HISTORY}\n\n${HANDOFF_END}`
+        : null;
   const header = [
     HANDOFF_START,
     "Previous conversation excerpts. Current profile and developer instructions take precedence. Do not repeat completed work.",
+    ...(options.omitImages ? [OMIT_IMAGES_NOTE] : []),
     ...(options.branch ? [BRANCH_NOTE] : []),
     ...(options.earlierChat ? [NEW_CHAT_NOTE] : []),
     "Omitted details remain available: discover openbot.history_search and openbot.history_read. They read all messages of each of your chats. Excerpts are not a complete summary.",
