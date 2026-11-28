@@ -269,6 +269,7 @@ import { Route as V2RemoteHostsHostIdDiscordDisconnectRouteImport } from './rout
 import { Route as V2RemoteHostsHostIdDiscordRouteRouteImport } from './routes/v2/remote/hosts/$hostId/discord-route'
 import { Route as V2RemoteHostsHostIdGithubRouteRouteImport } from './routes/v2/remote/hosts/$hostId/github-route'
 import { Route as V2RemoteHostsHostIdHiddenRouteImport } from './routes/v2/remote/hosts/$hostId/hidden'
+import { Route as V2RemoteHostsHostIdIngressTicketsRouteImport } from './routes/v2/remote/hosts/$hostId/ingress-tickets'
 import { Route as V2RemoteHostsHostIdInvitesRouteImport } from './routes/v2/remote/hosts/$hostId/invites'
 import { Route as V2RemoteHostsHostIdKeyHandoverRouteImport } from './routes/v2/remote/hosts/$hostId/key-handover'
 import { Route as V2RemoteHostsHostIdLiveActivityRouteImport } from './routes/v2/remote/hosts/$hostId/live-activity'
@@ -1651,6 +1652,12 @@ const V2RemoteHostsHostIdHiddenRoute =
     path: '/v2/remote/hosts/$hostId/hidden',
     getParentRoute: () => rootRouteImport,
   } as any)
+const V2RemoteHostsHostIdIngressTicketsRoute =
+  V2RemoteHostsHostIdIngressTicketsRouteImport.update({
+    id: '/v2/remote/hosts/$hostId/ingress-tickets',
+    path: '/v2/remote/hosts/$hostId/ingress-tickets',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 const V2RemoteHostsHostIdInvitesRoute =
   V2RemoteHostsHostIdInvitesRouteImport.update({
     id: '/v2/remote/hosts/$hostId/invites',
@@ -2115,6 +2122,7 @@ export interface FileRoutesByFullPath {
   '/v2/remote/hosts/$hostId/discord-route': typeof V2RemoteHostsHostIdDiscordRouteRoute
   '/v2/remote/hosts/$hostId/github-route': typeof V2RemoteHostsHostIdGithubRouteRoute
   '/v2/remote/hosts/$hostId/hidden': typeof V2RemoteHostsHostIdHiddenRoute
+  '/v2/remote/hosts/$hostId/ingress-tickets': typeof V2RemoteHostsHostIdIngressTicketsRoute
   '/v2/remote/hosts/$hostId/invites': typeof V2RemoteHostsHostIdInvitesRoute
   '/v2/remote/hosts/$hostId/key-handover': typeof V2RemoteHostsHostIdKeyHandoverRoute
   '/v2/remote/hosts/$hostId/live-activity': typeof V2RemoteHostsHostIdLiveActivityRoute
@@ -2408,6 +2416,7 @@ export interface FileRoutesByTo {
   '/v2/remote/hosts/$hostId/discord-route': typeof V2RemoteHostsHostIdDiscordRouteRoute
   '/v2/remote/hosts/$hostId/github-route': typeof V2RemoteHostsHostIdGithubRouteRoute
   '/v2/remote/hosts/$hostId/hidden': typeof V2RemoteHostsHostIdHiddenRoute
+  '/v2/remote/hosts/$hostId/ingress-tickets': typeof V2RemoteHostsHostIdIngressTicketsRoute
   '/v2/remote/hosts/$hostId/invites': typeof V2RemoteHostsHostIdInvitesRoute
   '/v2/remote/hosts/$hostId/key-handover': typeof V2RemoteHostsHostIdKeyHandoverRoute
   '/v2/remote/hosts/$hostId/live-activity': typeof V2RemoteHostsHostIdLiveActivityRoute
@@ -2706,6 +2715,7 @@ export interface FileRoutesById {
   '/v2/remote/hosts/$hostId/discord-route': typeof V2RemoteHostsHostIdDiscordRouteRoute
   '/v2/remote/hosts/$hostId/github-route': typeof V2RemoteHostsHostIdGithubRouteRoute
   '/v2/remote/hosts/$hostId/hidden': typeof V2RemoteHostsHostIdHiddenRoute
+  '/v2/remote/hosts/$hostId/ingress-tickets': typeof V2RemoteHostsHostIdIngressTicketsRoute
   '/v2/remote/hosts/$hostId/invites': typeof V2RemoteHostsHostIdInvitesRoute
   '/v2/remote/hosts/$hostId/key-handover': typeof V2RemoteHostsHostIdKeyHandoverRoute
   '/v2/remote/hosts/$hostId/live-activity': typeof V2RemoteHostsHostIdLiveActivityRoute
@@ -3001,6 +3011,7 @@ export interface FileRouteTypes {
     | '/v2/remote/hosts/$hostId/discord-route'
     | '/v2/remote/hosts/$hostId/github-route'
     | '/v2/remote/hosts/$hostId/hidden'
+    | '/v2/remote/hosts/$hostId/ingress-tickets'
     | '/v2/remote/hosts/$hostId/invites'
     | '/v2/remote/hosts/$hostId/key-handover'
     | '/v2/remote/hosts/$hostId/live-activity'
@@ -3294,6 +3305,7 @@ export interface FileRouteTypes {
     | '/v2/remote/hosts/$hostId/discord-route'
     | '/v2/remote/hosts/$hostId/github-route'
     | '/v2/remote/hosts/$hostId/hidden'
+    | '/v2/remote/hosts/$hostId/ingress-tickets'
     | '/v2/remote/hosts/$hostId/invites'
     | '/v2/remote/hosts/$hostId/key-handover'
     | '/v2/remote/hosts/$hostId/live-activity'
@@ -3591,6 +3603,7 @@ export interface FileRouteTypes {
     | '/v2/remote/hosts/$hostId/discord-route'
     | '/v2/remote/hosts/$hostId/github-route'
     | '/v2/remote/hosts/$hostId/hidden'
+    | '/v2/remote/hosts/$hostId/ingress-tickets'
     | '/v2/remote/hosts/$hostId/invites'
     | '/v2/remote/hosts/$hostId/key-handover'
     | '/v2/remote/hosts/$hostId/live-activity'
@@ -3794,6 +3807,7 @@ export interface RootRouteChildren {
   V2RemoteHostsHostIdDiscordRouteRoute: typeof V2RemoteHostsHostIdDiscordRouteRoute
   V2RemoteHostsHostIdGithubRouteRoute: typeof V2RemoteHostsHostIdGithubRouteRoute
   V2RemoteHostsHostIdHiddenRoute: typeof V2RemoteHostsHostIdHiddenRoute
+  V2RemoteHostsHostIdIngressTicketsRoute: typeof V2RemoteHostsHostIdIngressTicketsRoute
   V2RemoteHostsHostIdInvitesRoute: typeof V2RemoteHostsHostIdInvitesRoute
   V2RemoteHostsHostIdKeyHandoverRoute: typeof V2RemoteHostsHostIdKeyHandoverRoute
   V2RemoteHostsHostIdLiveActivityRoute: typeof V2RemoteHostsHostIdLiveActivityRoute
@@ -5654,6 +5668,13 @@ declare module '@tanstack/solid-router' {
       preLoaderRoute: typeof V2RemoteHostsHostIdHiddenRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/v2/remote/hosts/$hostId/ingress-tickets': {
+      id: '/v2/remote/hosts/$hostId/ingress-tickets'
+      path: '/v2/remote/hosts/$hostId/ingress-tickets'
+      fullPath: '/v2/remote/hosts/$hostId/ingress-tickets'
+      preLoaderRoute: typeof V2RemoteHostsHostIdIngressTicketsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/v2/remote/hosts/$hostId/invites': {
       id: '/v2/remote/hosts/$hostId/invites'
       path: '/v2/remote/hosts/$hostId/invites'
@@ -6403,6 +6424,8 @@ const rootRouteChildren: RootRouteChildren = {
   V2RemoteHostsHostIdDiscordRouteRoute: V2RemoteHostsHostIdDiscordRouteRoute,
   V2RemoteHostsHostIdGithubRouteRoute: V2RemoteHostsHostIdGithubRouteRoute,
   V2RemoteHostsHostIdHiddenRoute: V2RemoteHostsHostIdHiddenRoute,
+  V2RemoteHostsHostIdIngressTicketsRoute:
+    V2RemoteHostsHostIdIngressTicketsRoute,
   V2RemoteHostsHostIdInvitesRoute: V2RemoteHostsHostIdInvitesRoute,
   V2RemoteHostsHostIdKeyHandoverRoute: V2RemoteHostsHostIdKeyHandoverRoute,
   V2RemoteHostsHostIdLiveActivityRoute: V2RemoteHostsHostIdLiveActivityRoute,

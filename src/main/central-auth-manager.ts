@@ -41,8 +41,11 @@ import {
   type OwnerTransfer,
 } from "@openbot/contracts/owner-transfer";
 import {
+  decodeIngressTickets,
   decodeRemoteSession,
   decodeRemoteSessionTicket,
+  type IngressTicketRoute,
+  type IngressTickets,
   type RemoteSession,
   type RemoteSessionTicket,
 } from "@openbot/contracts/remote-control-plane";
@@ -788,6 +791,30 @@ export class CentralAuthManager extends EventEmitter<CentralAuthEvents> {
         `/v2/remote/hosts/${encodeURIComponent(hostId)}/ticket`,
         { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) },
         decodeRemoteSessionTicket,
+      );
+    },
+    (operation) => this.#owned(operation),
+  ).bind(this);
+
+  readonly issueIngressTickets = Effect.fn("CentralAuth.issueIngressTickets")(
+    function* (
+      this: CentralAuthManager,
+      hostId: string,
+      routes: readonly IngressTicketRoute[],
+    ): Effect.fn.Return<IngressTickets | "unsupported", CentralAuthOperationError, CentralAuthTransport> {
+      const machineToken = yield* this.#hostMachineToken(hostId);
+      return yield* this.#requestEffect(
+        `/v2/remote/hosts/${encodeURIComponent(hostId)}/ingress-tickets`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ machineToken, routes }),
+        },
+        (value) => decodeIngressTickets(value, routes),
+      ).pipe(
+        Effect.catch((failure) =>
+          isMissingRoute(failure.cause) ? Effect.succeed("unsupported" as const) : Effect.fail(failure),
+        ),
       );
     },
     (operation) => this.#owned(operation),
@@ -2799,6 +2826,12 @@ export function isFinalClientError(error: unknown): boolean {
     error.status < 500 &&
     error.status !== 408 &&
     error.status !== 429
+  );
+}
+
+function isMissingRoute(error: unknown): boolean {
+  return (
+    error instanceof AuthApiError && (error.status === 405 || (error.status === 404 && error.code === "auth_api_error"))
   );
 }
 
