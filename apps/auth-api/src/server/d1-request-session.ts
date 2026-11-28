@@ -2,8 +2,9 @@ import { AsyncLocalStorage } from "node:async_hooks";
 import { ACCOUNT_BOOKMARK_HEADER, isAccountBookmark, newerAccountBookmark } from "@openbot/contracts/account-bookmark";
 
 const READ_METHODS = new Set(["GET", "HEAD"]);
+const REFUSALS_TO_RECHECK = new Set([403, 404]);
 
-type RequestReads = "replica" | "primary";
+type RequestReads = "replica" | "primary" | "recheck";
 
 class D1RequestSession {
   readonly #sessions: D1DatabaseSession[] = [];
@@ -15,14 +16,18 @@ class D1RequestSession {
     readonly bookmark: D1SessionBookmark | null,
   ) {}
 
+  get readShared(): boolean {
+    return this.#shared !== null;
+  }
+
   target(): D1DatabaseSession {
     if (this.reads === "primary") return this.#track(this.source.withSession("first-primary"));
-    this.#shared ??= this.#track(this.source.withSession(this.bookmark ?? "first-primary"));
+    this.#shared ??= this.#track(this.source.withSession(this.#sharedStart()));
     return this.#shared;
   }
 
   replicaTarget(): D1DatabaseSession | null {
-    return this.reads === "replica" && this.bookmark !== null ? this.target() : null;
+    return this.reads === "primary" ? null : this.target();
   }
 
   latestBookmark(): D1SessionBookmark | null {
@@ -30,6 +35,11 @@ class D1RequestSession {
       (latest, session) => newerAccountBookmark(latest, session.getBookmark()),
       null,
     );
+  }
+
+  #sharedStart(): D1SessionConstraint | D1SessionBookmark {
+    if (this.reads === "recheck") return "first-primary";
+    return this.bookmark ?? "first-unconstrained";
   }
 
   #track(session: D1DatabaseSession): D1DatabaseSession {
@@ -61,10 +71,21 @@ export async function withD1RequestSession(
   handle: () => Promise<Response>,
 ): Promise<Response> {
   if (!source) return handle();
-  const reads: RequestReads = READ_METHODS.has(request.method) ? "replica" : "primary";
-  const session = new D1RequestSession(source, reads, reads === "replica" ? requestBookmark(request) : null);
-  const response = await requestSessions.run(session, handle);
-  const bookmark = session.latestBookmark();
+  if (!READ_METHODS.has(request.method)) {
+    const session = new D1RequestSession(source, "primary", null);
+    return withBookmark(request, await requestSessions.run(session, handle), session.latestBookmark());
+  }
+  const replica = new D1RequestSession(source, "replica", requestBookmark(request));
+  const response = await requestSessions.run(replica, handle);
+  if (!replica.readShared || !REFUSALS_TO_RECHECK.has(response.status))
+    return withBookmark(request, response, replica.latestBookmark());
+  await response.body?.cancel();
+  const recheck = new D1RequestSession(source, "recheck", null);
+  const confirmed = await requestSessions.run(recheck, handle);
+  return withBookmark(request, confirmed, newerAccountBookmark(replica.latestBookmark(), recheck.latestBookmark()));
+}
+
+function withBookmark(request: Request, response: Response, bookmark: D1SessionBookmark | null): Response {
   if (bookmark === null || response.status < 200 || !sentByAccountClient(request)) return response;
   const marked = new Response(response.body, response);
   marked.headers.set(ACCOUNT_BOOKMARK_HEADER, bookmark);

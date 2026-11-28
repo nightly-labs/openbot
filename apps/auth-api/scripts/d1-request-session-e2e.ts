@@ -8,7 +8,6 @@ import { accountBookmarkHeaders, rememberAccountBookmark } from "@openbot/team-c
 import { RemoteTeamDirectoryClient } from "@openbot/team-client/remote-directory";
 import { Effect, Schema } from "effect";
 import { CentralAuthTransport } from "../../../src/main/central-auth-effects";
-import { sessionReadsFor } from "../src/server/auth-service";
 import { D1AuthRepository } from "../src/server/d1-auth-repository";
 import { runApiEffect } from "../src/server/effect-runtime";
 import { observedD1 } from "../src/server/observed-d1";
@@ -173,7 +172,7 @@ const accountApp = (request: Request): Promise<Response> =>
     Effect.gen(function* () {
       const url = new URL(request.url);
       const token = request.headers.get("Authorization")?.replace(/^Bearer /u, "") ?? "";
-      const reads: SessionReads = url.searchParams.has("primary-session") ? "primary" : sessionReadsFor(request);
+      const reads: SessionReads = url.searchParams.has("primary-session") ? "primary" : "replica";
       const user = yield* repository.authenticate(token, NOW, reads);
       if (!user) return Response.json({ error: "unauthorized" }, { status: 401 });
       yield* Effect.yieldNow;
@@ -223,17 +222,23 @@ async function main() {
   const oldClient = await send("old-client-get", "/v1/me", { headers: auth });
   const oldBookmark = oldClient.headers.get(ACCOUNT_BOOKMARK_HEADER);
   check(
-    "a GET without a bookmark reads its first query from the primary, as before, and gets a bookmark back",
-    oldClient.status === 200 && oldBookmark !== null && onPrimary("old-client-get").length >= 1,
+    "a GET without a bookmark reads the replica and gets a bookmark back",
+    oldClient.status === 200 &&
+      oldBookmark !== null &&
+      replicated.sessions.includes("first-unconstrained") &&
+      routesOf("old-client-get").every((route) => route.instance === "replica"),
     { bookmark: oldBookmark, routes: routesOf("old-client-get") },
   );
 
   const write = await send("write", "/v1/me?name=New%20name", { method: "POST", headers: auth });
   const writeBookmark = write.headers.get(ACCOUNT_BOOKMARK_HEADER);
   check(
-    "a POST sends every statement to the primary and returns the bookmark of its write",
+    "a POST sends every write to the primary and returns the bookmark of its write",
     write.status === 200 &&
-      routesOf("write").every((route) => route.instance === "primary") &&
+      onPrimary("write", true).length >= 1 &&
+      routesOf("write")
+        .filter((route) => WRITE_SQL.test(route.sql.split(": ")[1] ?? ""))
+        .every((route) => route.instance === "primary") &&
       writeBookmark === replicated.primaryBookmark,
     { bookmark: writeBookmark, routes: routesOf("write") },
   );
@@ -266,7 +271,7 @@ async function main() {
   });
   check(
     "a GET with an invalid bookmark is served as a GET without a bookmark",
-    forged.status === 200 && replicated.sessions.includes("first-primary") && onPrimary("forged-bookmark").length >= 1,
+    forged.status === 200 && routesOf("forged-bookmark").every((route) => route.instance === "replica"),
     { routes: routesOf("forged-bookmark") },
   );
 

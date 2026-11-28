@@ -10,13 +10,7 @@ import { adminTokenMatches } from "./admin-token";
 import { AgentMarketplace, AgentMarketplaceError } from "./agent-marketplace";
 import { AgentTemplates } from "./agent-templates";
 import { type FcmRelaySender, sharedFcmSender } from "./android-notification-relay";
-import {
-  AuthOperationError,
-  AuthService,
-  AuthServiceError,
-  readStoreReviewSignIn,
-  sessionReadsFor,
-} from "./auth-service";
+import { AuthOperationError, AuthService, AuthServiceError, readStoreReviewSignIn } from "./auth-service";
 import { BillingError, type BillingService } from "./billing-service";
 import { cloudflareAccessAllows } from "./cloudflare-access";
 import { CompanySignInError, CompanySignInService } from "./company-sign-in";
@@ -494,7 +488,7 @@ export function marketplaceErrorResponse(error: unknown): Response {
   return skillErrorResponse(error);
 }
 
-export function requestUser(request: Request, reads: SessionReads = sessionReadsFor(request)) {
+export function requestUser(request: Request, reads: SessionReads = "replica") {
   const token = bearerToken(request);
   if (!token) return Effect.succeed(null);
   return requestAuthService().authenticate(token, reads);

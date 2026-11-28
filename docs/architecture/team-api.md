@@ -326,6 +326,16 @@ check also keeps an accepted token hash for 30 s in each Worker isolate, so a ro
 works for at most 30 s plus the replica lag. Host tickets, money paths, writes, ticket consume,
 invitation redeem and owner transfer accept still read the primary.
 `apps/auth-api/scripts/host-replica-reads-e2e.ts` counts the queries for each check.
+One rule in `apps/auth-api/src/server/d1-request-session.ts` sets the D1 session of each request. A GET
+or HEAD reads the replica: from the request bookmark when the client sends one, otherwise
+`first-unconstrained`. When that GET answers 403 or 404, the Worker runs it once more on a
+`first-primary` session and sends that answer, so a row that the replica does not have yet does not
+cause a refusal. Other methods use a `first-primary` session. In them, the bearer check of the session and the
+checks above read the replica first, and read the primary when the replica has no row. The own account
+(`/v1/me` and the browser session) without a bookmark, sign-in codes, host tickets, credit holds and
+charges, invitation and owner transfer accept, and Stripe webhook dedupe still read the primary.
+`apps/auth-api/scripts/d1-replica-reads-all-e2e.ts` counts primary and replica statements for each
+request type.
 Session endings and access changes use a durable D1 outbox. Cloudflare sends each revocation to Signal
 immediately and retries failed deliveries from a scheduled task. This keeps reconnect validation local
 without losing revocations when Signal is temporarily unavailable.
