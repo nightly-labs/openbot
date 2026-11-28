@@ -45,6 +45,7 @@ const MAX_BUFFERED_FRAME_BYTES = 4 * 1024 * 1024;
 const MAX_FRAMES_IN_FLIGHT = 4;
 const HELD_FRAME_DEADLINE_MS = 1_000;
 const MAX_UNACKNOWLEDGED_FRAMES = 120;
+const MAX_REMEMBERED_FRAMES = 4096;
 const MAX_ACK_MESSAGE_BYTES = 128;
 const MAX_DIALOG_ANSWER_BYTES = 256;
 
@@ -452,7 +453,7 @@ export class BrowserViewGateway {
     session.frameHeight = frame.height;
     if (session.rememberFrames) {
       session.frameSizes.set(frame.sequence, { width: frame.width, height: frame.height });
-      if (session.frameSizes.size > MAX_UNACKNOWLEDGED_FRAMES) {
+      if (session.frameSizes.size > MAX_REMEMBERED_FRAMES || framesInFlight(session) > MAX_UNACKNOWLEDGED_FRAMES) {
         this.#dispatch(this.#closeSession(session, "The live view fell too far behind."));
       }
     }
