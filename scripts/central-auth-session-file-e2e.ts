@@ -15,6 +15,7 @@ const HOST_ID = "00000000-0000-4000-8000-000000000001";
 
 let meHold: { seen: () => void; release: Promise<void> } | null = null;
 let meRevoked = false;
+let meRequests = 0;
 
 function holdMe() {
   let seen = () => {};
@@ -49,6 +50,7 @@ const server = createServer((request, response) => {
   }
   if (request.headers.authorization !== `Bearer ${SESSION_TOKEN}`) return answer(401, { error: "unauthorized" });
   if (request.url === "/v1/me") {
+    meRequests += 1;
     const me = () =>
       meRevoked
         ? answer(401, { error: "unauthorized" })
@@ -112,6 +114,28 @@ try {
   const profileFile = JSON.parse(Buffer.from(storedWithProfile, "base64").toString());
   assert.equal(profileFile.sessionToken, SESSION_TOKEN);
   assert.equal(profileFile.user.email, "a@example.com", "the start must store the profile");
+  assert.equal(
+    profileFile.apiUrl,
+    `http://127.0.0.1:${address && typeof address === "object" ? address.port : 0}`,
+    "the start must store the account server that issued the session",
+  );
+
+  const otherServerFile = Buffer.from(
+    JSON.stringify({ version: 2, sessionToken: SESSION_TOKEN, apiUrl: "https://elsewhere.example" }),
+  ).toString("base64");
+  await writeFile(storagePath, otherServerFile);
+  const meRequestsBefore = meRequests;
+  const moved = manager();
+  results.otherServerStart = (await runCauseEffect(moved.initialize())).status;
+  await runCauseEffect(moved.dispose());
+  assert.equal(results.otherServerStart, "signed_out", "a session from another account server must not sign in");
+  assert.equal(meRequests, meRequestsBefore, "the token must not go to another account server");
+  assert.equal(
+    await readFile(storagePath, "utf8"),
+    otherServerFile,
+    "the session file of another account server must stay on disk",
+  );
+  await writeFile(storagePath, storedWithProfile);
 
   let failWrites = false;
   const failing = manager({

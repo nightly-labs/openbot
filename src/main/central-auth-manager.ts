@@ -218,6 +218,7 @@ export class CentralAuthManager extends EventEmitter<CentralAuthEvents> {
   #state: CentralAuthState = { status: "loading" };
   #sessionToken: string | null = null;
   #storedSessionToken: string | null = null;
+  #storedSessionOrigin: string | null = null;
   #sessionUser: { token: string; user: CentralAuthUser } | null = null;
   #storedUserJson: string | null = null;
   readonly #teamHostTokens = new Map<string, string>();
@@ -1778,6 +1779,13 @@ export class CentralAuthManager extends EventEmitter<CentralAuthEvents> {
         keyringChanged ? { status: "signed_out", reason: "keyring_changed" } : { status: "signed_out" },
       );
     }
+    if (this.#sessionToken && this.#sessionIsFromAnotherServer()) {
+      logger.warn(
+        "The stored account session was issued by a different account server. The session was not sent to this account server and its file is kept.",
+      );
+      this.#forgetSession();
+      return this.#setState({ status: "signed_out" });
+    }
     const sessionToken = this.#sessionToken;
     const storedUser = this.#sessionUser?.token === sessionToken ? this.#sessionUser.user : null;
     if (storedUser && !this.#options.confirmSessionAtStart) {
@@ -2614,6 +2622,7 @@ export class CentralAuthManager extends EventEmitter<CentralAuthEvents> {
       const value = JSON.stringify({
         version: 2,
         sessionToken,
+        apiUrl: storedSessionOrigin(this.#options.apiUrl),
         teamHostTokens: Object.fromEntries(this.#teamHostTokens),
         ...(this.#mobileConnectLink ? { mobileConnectLink: this.#mobileConnectLink } : {}),
         ...(user ? { user } : {}),
@@ -2625,6 +2634,7 @@ export class CentralAuthManager extends EventEmitter<CentralAuthEvents> {
       yield* authCall(() => chmod(temporaryPath, 0o600));
       yield* authCall(() => rename(temporaryPath, this.#options.storagePath));
       this.#storedSessionToken = sessionToken;
+      this.#storedSessionOrigin = storedSessionOrigin(this.#options.apiUrl);
       this.#storedUserJson = user ? JSON.stringify(user) : null;
     }).pipe(
       Effect.catch((failure) => {
@@ -2651,6 +2661,7 @@ export class CentralAuthManager extends EventEmitter<CentralAuthEvents> {
       if (this.#storedSessionToken === sessionToken) return;
       yield* authCall(() => rm(this.#options.storagePath, { force: true }));
       this.#storedSessionToken = null;
+      this.#storedSessionOrigin = null;
     });
   }
 
@@ -2672,10 +2683,16 @@ export class CentralAuthManager extends EventEmitter<CentralAuthEvents> {
     );
   }
 
+  #sessionIsFromAnotherServer(): boolean {
+    const origin = storedSessionOrigin(this.#options.apiUrl);
+    return this.#storedSessionOrigin !== null && origin !== null && this.#storedSessionOrigin !== origin;
+  }
+
   #forgetSession(): void {
     this.#sessionToken = null;
     this.#sessionUser = null;
     this.#sessionAccountId = null;
+    this.#storedSessionOrigin = null;
     this.#teamHostTokens.clear();
     this.#mobileConnectLink = null;
   }
@@ -2683,6 +2700,7 @@ export class CentralAuthManager extends EventEmitter<CentralAuthEvents> {
   #restoreStoredSession(value: string): void {
     this.#sessionUser = null;
     this.#storedUserJson = null;
+    this.#storedSessionOrigin = null;
     if (!value.trimStart().startsWith("{")) {
       this.#sessionToken = value;
       this.#teamHostTokens.clear();
@@ -2694,6 +2712,7 @@ export class CentralAuthManager extends EventEmitter<CentralAuthEvents> {
       throw new Error("Invalid protected account session.");
     }
     this.#sessionToken = stored.sessionToken;
+    this.#storedSessionOrigin = storedSessionOrigin(stored.apiUrl);
     this.#teamHostTokens.clear();
     if (isDynamicRecord(stored.teamHostTokens)) {
       for (const [serverId, token] of Object.entries(stored.teamHostTokens)) {
@@ -2777,6 +2796,15 @@ export function readMobileConnectApiUrl(value: string | undefined, fallback: str
   const apiUrl = value ?? fallback;
   createMobileConnectUrl({ apiUrl, ticket: "x".repeat(32) });
   return new URL(apiUrl).origin;
+}
+
+function storedSessionOrigin(value: unknown): string | null {
+  if (!isString(value)) return null;
+  try {
+    return new URL(value).origin;
+  } catch {
+    return null;
+  }
 }
 
 export function isHostNotOnAccount(error: unknown): boolean {
