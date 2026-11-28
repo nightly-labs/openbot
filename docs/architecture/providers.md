@@ -406,6 +406,18 @@ Code names its models itself, OpenCode drops models that the stored key cannot u
 free tier when discovery fails, and a custom agent gets the full request timeout. A new provider
 adds its rule there, not in the catalog.
 
+Codex sets `declaredEfforts`: its list holds the only thinking levels that the model takes (#17443).
+An explicit empty list gives one fixed level: the listed default, else `none`. The picker then hides
+the control. A default that is not in a listed set becomes the first listed level. A missing list, or a
+list with no valid item, declares nothing: the picker keeps the fallback and OpenBot sends the saved
+level as before. Each `CodexAppServerClient` keeps its own complete catalog until the process restarts.
+In `thread/start`, `thread/resume` and
+`turn/start`, it changes a level that the model does not declare to the model default. A process whose
+catalog is not known yet lists the models once before its first such send. This covers chats, side
+questions, channel replies and workflow steps. The saved level does not change.
+`bun run test:codex-ollama-thinking` checks this with a fake app server. If an endpoint refuses a level
+that Codex lists, the model request still fails.
+
 ## Provider CLI updates
 
 The runtime manager offers the latest upstream release of each provider CLI. It checks at startup,

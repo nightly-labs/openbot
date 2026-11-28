@@ -1,6 +1,8 @@
 import {
   type AgentProviderId,
+  type AgentReasoningEffort,
   isAgentProvider,
+  isReasoningEffort,
   PROVIDER_USAGE_RESET_OUTCOMES,
   type ProviderUsageResetOutcome,
 } from "@openbot/contracts/ipc";
@@ -198,6 +200,7 @@ export interface ModelListResponse {
     displayName?: string;
     defaultReasoningEffort?: string;
     supportedReasoningEfforts?: Array<{ reasoningEffort?: string }>;
+    emptyReasoningEffortList?: true;
     reasoningEffortConfigurable?: boolean;
     hidden?: boolean;
     upgrade?: string;
@@ -238,6 +241,7 @@ export function decodeModelListResponse(value: unknown): ModelListResponse {
         : {}),
       ...(Array.isArray(item.supportedReasoningEfforts)
         ? {
+            ...(item.supportedReasoningEfforts.length === 0 ? { emptyReasoningEffortList: true as const } : {}),
             supportedReasoningEfforts: item.supportedReasoningEfforts
               .filter(isRecord)
               .flatMap((effort) =>
@@ -247,6 +251,23 @@ export function decodeModelListResponse(value: unknown): ModelListResponse {
         : {}),
     })),
   };
+}
+
+export interface DeclaredReasoningEfforts {
+  readonly efforts: AgentReasoningEffort[];
+  readonly fallback: AgentReasoningEffort;
+}
+
+export function declaredReasoningEfforts(model: ModelListResponse["data"][number]): DeclaredReasoningEfforts | null {
+  const listedDefault = isReasoningEffort(model.defaultReasoningEffort) ? model.defaultReasoningEffort : null;
+  if (model.emptyReasoningEffortList) {
+    const only = listedDefault ?? "none";
+    return { efforts: [only], fallback: only };
+  }
+  const efforts = (model.supportedReasoningEfforts ?? []).map((item) => item.reasoningEffort).filter(isReasoningEffort);
+  const [first] = efforts;
+  if (first === undefined) return null;
+  return { efforts, fallback: listedDefault !== null && efforts.includes(listedDefault) ? listedDefault : first };
 }
 
 export function decodeRecordResponse(value: unknown): DynamicRecord {

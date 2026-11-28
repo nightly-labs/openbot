@@ -8,7 +8,14 @@ import { sourceText } from "@openbot/i18n/source";
 import type { Effect } from "effect";
 import type { McpToolArguments } from "./mcp-probe";
 import type { RelayedMcpToolOutcome } from "./mcp-stdio-relay";
-import type { AppServerNotification, AppServerRequest, RequestId, ResponseDecoder, RpcError } from "./protocol";
+import type {
+  AppServerNotification,
+  AppServerRequest,
+  ModelListResponse,
+  RequestId,
+  ResponseDecoder,
+  RpcError,
+} from "./protocol";
 import type { ProviderClientOperationError } from "./provider-client-effects";
 import type { ReadProviderHistory } from "./provider-history";
 
@@ -80,6 +87,7 @@ export interface AgentClient {
     value: AgentSessionSettingValue,
   ): Effect.Effect<AgentSessionSettingsSnapshot, ProviderClientOperationError>;
   readUsageText?(model: string, prompt: string): Effect.Effect<string | null, ProviderClientOperationError>;
+  readModelCatalog?(timeoutMs: number): Effect.Effect<ModelListResponse, ProviderClientOperationError>;
   request<T>(
     method: string,
     params: unknown,
