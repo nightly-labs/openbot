@@ -251,6 +251,7 @@ interface AcpTurn {
   providerError: string | null;
   signInLost: boolean;
   failureCause: CauseCode | null;
+  stoppedByOpenBot: boolean;
   accountLink: string | null;
   accountVerification: boolean;
   sessionLost: boolean;
@@ -2669,6 +2670,7 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
       providerError: null,
       signInLost: false,
       failureCause: null,
+      stoppedByOpenBot: false,
       accountLink: null,
       accountVerification: false,
       sessionLost: false,
@@ -3189,6 +3191,7 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
         });
         thread.needsResume = true;
         turn.failureCause = "stalled";
+        turn.stoppedByOpenBot = true;
         return Result.fail(
           providerFailure(
             sourceText("error.agent.turnStalled", {
@@ -3919,6 +3922,7 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
     Effect.runFork(
       Effect.gen({ self: this }, function* () {
         turn.failureCause = "turn_limit";
+        turn.stoppedByOpenBot = true;
         yield* providerCall(() => this.#sessionConnection(thread).cancel({ sessionId: thread.id })).pipe(Effect.ignore);
         yield* this.#abandonTurn(
           thread,
@@ -3982,6 +3986,7 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
       if (turn.task) yield* Fiber.await(turn.task).pipe(Effect.timeoutOption(Math.min(ACP_STOP_GRACE_MS, limit)));
       if (thread.activeTurn !== turn || turn.completing || turn.stopped) return;
       turn.failureCause = "stalled";
+      turn.stoppedByOpenBot = true;
       yield* this.#abandonTurn(
         thread,
         turn,
@@ -4021,6 +4026,7 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
             turn.text.length > 0 || turn.reasoned || turn.toolNames.size > 0,
           ) ?? cause)
         : cause;
+    turn.stoppedByOpenBot = true;
     yield* providerCall(() => this.#sessionConnection(thread).cancel({ sessionId: thread.id })).pipe(Effect.ignore);
     yield* this.#abandonTurn(
       thread,
@@ -4477,6 +4483,7 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
           turnId: turn.id,
           message,
           causeCode,
+          ...(turn.stoppedByOpenBot ? { stoppedBy: "openbot" } : {}),
           ...(turn.accountLink ? { link: turn.accountLink } : {}),
         },
       });

@@ -1886,6 +1886,8 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
         orphanedDeliveryRecovery: (agentId) =>
           this.#mayRecoverOrphanedDeliveries(agentId) ? this.#recoverOrphanedDeliveries(agentId) : null,
         turnRestarting: (turnId) => this.#turn.forgetEnded(turnId),
+        stopNote: (threadId) => this.#turn.stopNote(threadId),
+        clearStopNote: (threadId, sent) => this.#turn.clearStopNote(threadId, sent),
         deliveriesStarting: (deliveryIds, start) => this.#turn.deliveriesStarting(deliveryIds, start),
         startRequestedNewChat: (agentId, queuedRuns) => this.#startRequestedNewChat(agentId, queuedRuns),
         dropRequestedNewChat: (agentId) => {
@@ -2283,8 +2285,14 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
         redactMcp: (text) => this.#mcp.redact(text),
         redactMcpForAgent: (text) => this.#mcp.redactForAgent(text),
         runsTurn: (agentId) => this.#runsTurn(agentId),
-        interrupt: (agentId, turnId, mayStop) =>
-          this.#interruptTurn(agentId, turnId, undefined, mayStop).pipe(toToolOperationFailed),
+        interrupt: (agentId, turnId, mayStop) => {
+          this.#turn.markAgentStop(turnId);
+          return this.#interruptTurn(agentId, turnId, undefined, mayStop).pipe(
+            Effect.tap((stopped) => (stopped ? Effect.void : Effect.sync(() => this.#turn.forgetOpenBotStop(turnId)))),
+            Effect.tapError(() => Effect.sync(() => this.#turn.forgetOpenBotStop(turnId))),
+            toToolOperationFailed,
+          );
+        },
         turnActivity: (agentId, turnId) => ({
           startedAt: turnId ? this.#turn.turnStartedAt(turnId) : null,
           lastEventAt: this.#turn.lastEventAt(agentId),
