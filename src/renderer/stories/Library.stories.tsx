@@ -193,6 +193,15 @@ export const FoldersWorkflow: Story = {
   ),
 };
 
+const OTHER_FILE_ROWS: readonly StoredFileRow[] = FILES_WORKFLOW_ROWS.slice(0, 2).map(
+  ({ workflow: _workflow, ...file }) => ({ ...file, id: `other-${file.id}` }),
+);
+
+export const FoldersOther: Story = {
+  name: "Folders: other files",
+  render: () => <FolderStage files={[...TEAM_FILES, ...OTHER_FILE_ROWS]} initialLocation={{ kind: "other" }} />,
+};
+
 export const LoadError: Story = {
   name: "Error",
   render: () => (

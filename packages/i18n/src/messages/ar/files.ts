@@ -107,6 +107,7 @@ export const messages = {
   },
   "files.library.allFiles": "كل الملفات",
   "files.library.removedAgents": "الوكلاء المحذوفون",
+  "files.library.otherFiles": "ملفات أخرى",
   "files.library.searchIn": "البحث في {name}",
   "files.library.empty": "لا توجد ملفات هنا",
   "files.library.recent": "الأحدث",

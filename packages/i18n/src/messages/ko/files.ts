@@ -58,6 +58,7 @@ export const messages = {
   "files.library.saveFailed": { other: "파일 {count}개를 다운로드할 수 없어요." },
   "files.library.allFiles": "모든 파일",
   "files.library.removedAgents": "삭제된 에이전트",
+  "files.library.otherFiles": "기타 파일",
   "files.library.searchIn": "{name}에서 검색",
   "files.library.empty": "여기에 파일이 없어요",
   "files.library.recent": "최근",

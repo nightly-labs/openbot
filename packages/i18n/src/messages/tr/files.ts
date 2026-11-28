@@ -61,6 +61,7 @@ export const messages = {
   "files.library.saveFailed": { one: "{count} dosya indirilemedi.", other: "{count} dosya indirilemedi." },
   "files.library.allFiles": "Tüm dosyalar",
   "files.library.removedAgents": "Silinen ajanlar",
+  "files.library.otherFiles": "Diğer dosyalar",
   "files.library.searchIn": "{name} içinde ara",
   "files.library.empty": "Burada dosya yok",
   "files.library.recent": "Son",

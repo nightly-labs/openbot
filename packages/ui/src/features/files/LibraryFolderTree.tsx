@@ -8,6 +8,7 @@ import {
   Clock3,
   DropdownMenu,
   Ellipsis,
+  File,
   Folder,
   FolderOpen,
   FolderPlus,
@@ -41,6 +42,7 @@ import {
   type LibraryWorkflowFolderRow,
   type LibraryWorkflowRow,
   type LibraryWorkflowTree,
+  OTHER_FILES,
   RECENT_FILES,
   REMOVED_AGENTS,
   sameLocation,
@@ -54,6 +56,7 @@ export interface LibraryCounts {
   recent: number;
   unsorted: number;
   removed: number;
+  other: number;
   agent: ReadonlyMap<string, number>;
   folder: ReadonlyMap<string, number>;
 }
@@ -86,6 +89,7 @@ interface LibraryFolderTreeProps {
   canCreate: boolean;
   canOrganize: (agentId: string) => boolean;
   removedFiles: boolean;
+  otherFiles: boolean;
   workflows: LibraryWorkflowTree;
   onSearch: (search: string) => void;
   onGo: (place: LibraryLocation) => void;
@@ -781,6 +785,20 @@ export function LibraryFolderTree(props: LibraryFolderTreeProps) {
                 off={props.dropOff(undefined)}
                 current={current(REMOVED_AGENTS)}
                 onGo={() => props.onGo(REMOVED_AGENTS)}
+              />
+            </li>
+          </ul>
+        </Show>
+        <Show when={props.otherFiles}>
+          <ul class="library-side-list">
+            <li>
+              <SideRow
+                icon={<File aria-hidden="true" />}
+                label={t("files.library.otherFiles")}
+                count={props.counts.other}
+                off={props.dropOff(undefined)}
+                current={current(OTHER_FILES)}
+                onGo={() => props.onGo(OTHER_FILES)}
               />
             </li>
           </ul>
