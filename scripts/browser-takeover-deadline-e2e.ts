@@ -118,6 +118,7 @@ const registry = new AttentionRegistry({
     beginTakeover: (tabId) =>
       Effect.sync(() => {
         browserLog.push(`begin:${tabId}`);
+        return false;
       }),
     endTakeover: (tabId) => {
       browserLog.push(`end:${tabId}`);
@@ -348,7 +349,7 @@ try {
                 candidate.ownerAgentId === params.ownerAgentId &&
                 candidate.ownerThreadId === params.threadId,
             ),
-          beginTakeover: () => Effect.void,
+          beginTakeover: () => Effect.succeed(false),
           endTakeover: () => {},
         },
         hostedSites: { prepareApproval: () => Effect.succeed(null), resolveApproval: () => Effect.void },
@@ -426,7 +427,7 @@ try {
       browser: {
         listTabs: () => tabs,
         toolCanUseTab: () => false,
-        beginTakeover: () => Effect.void,
+        beginTakeover: () => Effect.succeed(false),
         endTakeover: () => {},
       },
       hostedSites: { prepareApproval: () => Effect.succeed(null), resolveApproval: () => Effect.void },
@@ -519,6 +520,7 @@ try {
         beginTakeover: (tabId) =>
           Effect.sync(() => {
             limitedLog.push(`begin:${tabId}`);
+            return false;
           }),
         endTakeover: (tabId) => {
           limitedLog.push(`end:${tabId}`);
@@ -877,7 +879,7 @@ try {
                   return "submitted" as const;
                 }),
             })),
-          beginTakeover: () => Effect.void,
+          beginTakeover: () => Effect.succeed(false),
           endTakeover: () => {},
         },
         hostedSites: { prepareApproval: () => Effect.succeed(null), resolveApproval: () => Effect.void },
@@ -992,7 +994,7 @@ try {
                   return "submitted" as const;
                 }),
             })),
-          beginTakeover: () => Effect.void,
+          beginTakeover: () => Effect.succeed(false),
           endTakeover: () => {},
         },
         hostedSites: { prepareApproval: () => Effect.succeed(null), resolveApproval: () => Effect.void },
@@ -1118,7 +1120,7 @@ try {
                   ? Effect.fail(browserFailure("The secure field changed before OpenBot could enter the value."))
                   : Effect.succeed("submitted" as const),
             })),
-          beginTakeover: () => Effect.void,
+          beginTakeover: () => Effect.succeed(false),
           endTakeover: () => {},
         },
         hostedSites: { prepareApproval: () => Effect.succeed(null), resolveApproval: () => Effect.void },

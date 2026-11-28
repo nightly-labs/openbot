@@ -1498,9 +1498,13 @@ export class BrowserHost {
   readonly beginTakeover = Effect.fn("BrowserHost.beginTakeover")(function* (
     this: BrowserHost,
     tabId: string,
-  ): Effect.fn.Return<void, BrowserOperationError> {
+  ): Effect.fn.Return<boolean, BrowserOperationError> {
     const tab = this.#tabs.get(tabId);
     if (!tab) return yield* browserFailure(new Error(sourceText("error.backend.browserTabNotFound")));
+    const reloaded = yield* this.#leaveSilentPage(tabId);
+    if (reloaded) yield* this.#reloadPage(tabId).pipe(Effect.timeoutOption(CRASH_RELOAD_TIMEOUT_MS), Effect.ignore);
+    if (this.#tabs.get(tabId) !== tab || tab.closing)
+      return yield* browserFailure(new Error(sourceText("error.backend.browserTabNotFound")));
     tab.engine.invalidateReferences();
     this.#takeoverTabIds.add(tabId);
     this.#takeoverSignInTabIds.delete(tabId);
@@ -1520,6 +1524,7 @@ export class BrowserHost {
         }),
       ),
     );
+    return reloaded;
   }).bind(this);
 
   readonly takeUserControl = Effect.fn("BrowserHost.takeUserControl")(function* (

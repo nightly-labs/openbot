@@ -484,6 +484,7 @@ interface PendingBrowserTakeover {
   personCancelled?: true;
   vaultNotSaved?: true;
   secureInputFailed?: string;
+  pageReloaded?: true;
   params: DynamicToolCallParams;
   request: BrowserTakeoverRequest;
   resolve: (result: DynamicToolResult) => void;
@@ -536,7 +537,7 @@ export interface AttentionBrowserHost {
   prepareSecret?(params: DynamicToolCallParams): Effect.Effect<PreparedBrowserSecret, BrowserOperationError>;
   listTabs(): BrowserTab[];
   toolCanUseTab(params: DynamicToolCallParams, tabId: string): boolean;
-  beginTakeover(tabId: string): Effect.Effect<void, BrowserOperationError>;
+  beginTakeover(tabId: string): Effect.Effect<boolean, BrowserOperationError>;
   endTakeover(tabId: string, completed?: boolean): void;
   takeoverSignInArrived?(tabId: string): boolean;
 }
@@ -1255,7 +1256,8 @@ export class AttentionRegistry {
     if (input.decision === "submit" && pending.request.secret)
       pending.request.secret = { ...pending.request.secret, requiresReload: true };
     else delete pending.request.secret;
-    yield* this.#browser.beginTakeover(pending.request.tabId).pipe(toAttentionOperationFailed);
+    if (yield* this.#browser.beginTakeover(pending.request.tabId).pipe(toAttentionOperationFailed))
+      pending.pageReloaded = true;
     this.#emit({ type: "browser-takeover-requested", request: pending.request });
     this.#emitRuntimeSnapshot();
   }, Effect.uninterruptible);
@@ -1599,7 +1601,8 @@ export class AttentionRegistry {
           }
           pending.secret = secret;
           if (websiteUrl(secret.request.origin)?.protocol !== "http:") pending.request.secret = secret.request;
-        } else yield* this.#browser.beginTakeover(takeover.tabId).pipe(toAttentionOperationFailed);
+        } else if (yield* this.#browser.beginTakeover(takeover.tabId).pipe(toAttentionOperationFailed))
+          pending.pageReloaded = true;
       });
       const prepared = yield* Effect.result(prepare);
       if (Result.isSuccess(prepared)) {
@@ -2885,6 +2888,7 @@ export class AttentionRegistry {
         pending.vaultSkipped,
         signInMissing,
         pending.secureInputFailed,
+        pending.pageReloaded === true,
       );
       this.#sendLateAnswer(
         pending.request.agentId,
@@ -2901,6 +2905,7 @@ export class AttentionRegistry {
         signInMissing,
         pending.personCancelled === true,
         pending.secureInputFailed,
+        pending.pageReloaded === true,
       ),
     );
   }

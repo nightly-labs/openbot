@@ -68,7 +68,7 @@ const registry = new AttentionRegistry({
   browser: {
     listTabs: () => [tab],
     toolCanUseTab: () => true,
-    beginTakeover: () => Effect.void,
+    beginTakeover: () => Effect.succeed(false),
     endTakeover: (tabId) => endedTakeovers.push(tabId),
   },
   hostedSites: { prepareApproval: () => Effect.succeed(null), resolveApproval: () => Effect.void },

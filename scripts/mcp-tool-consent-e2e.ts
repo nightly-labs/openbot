@@ -228,7 +228,7 @@ class Rig {
       browser: {
         listTabs: () => [],
         toolCanUseTab: () => false,
-        beginTakeover: () => Effect.void,
+        beginTakeover: () => Effect.succeed(false),
         endTakeover: () => {},
       },
       hostedSites: { prepareApproval: () => Effect.succeed(null), resolveApproval: () => Effect.void },
