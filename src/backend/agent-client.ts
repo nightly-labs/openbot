@@ -30,6 +30,7 @@ export interface DiagnosticOrigin {
 
 export interface AgentClient {
   readonly provider: AgentProvider;
+  readonly acceptsAuthenticatedUserMeta?: boolean;
   readonly contextCompaction?: "events" | "request" | "native" | "handoff" | "unsupported";
   readonly compactsOnDemand?: boolean;
   promptCacheTtlMs?(externalThreadId: string): number | null;

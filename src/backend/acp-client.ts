@@ -50,6 +50,7 @@ import {
   OPENCODE_CHILD_UPDATE_METHOD,
   type OpenCodeLaunches,
 } from "./agent/acp-subagent-updates";
+import { acpUserMeta } from "./agent/acp-user-meta";
 import {
   BACKGROUND_WAKE_NOTE,
   isTurnContextBlock,
@@ -522,6 +523,7 @@ export interface AcpProviderOptions {
 }
 
 export class AcpAgentClient extends EventEmitter<ClientEvents> {
+  readonly acceptsAuthenticatedUserMeta = true;
   get contextCompaction(): "handoff" | "unsupported" {
     return this.#flavor.contextCompaction ?? "unsupported";
   }
@@ -1930,7 +1932,9 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
                     : additionalDirectories,
                 }
               : {};
-            const meta = this.#flavor.sessionMeta ? { _meta: this.#flavor.sessionMeta } : {};
+            const userMeta = acpUserMeta(getString(params, "openbotAuthenticatedUserId") ?? undefined);
+            const meta =
+              this.#flavor.sessionMeta || userMeta ? { _meta: { ...this.#flavor.sessionMeta, ...userMeta } } : {};
             let id: string;
             let configOptions: SessionConfigOption[];
             let currentModelId: string | null;
@@ -3132,12 +3136,20 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
     thread: AcpThread,
     turn: AcpTurn,
     prompt: ContentBlock[],
+    userId?: string,
   ): Effect.Effect<Result.Result<PromptResponse, ProviderClientOperationError>> {
     return Effect.suspend(() => {
       const answered = Deferred.makeUnsafe<void>();
       turn.lastPrompt = answered;
       return providerCall(() =>
-        this.#trackedPrompt(thread, this.#sessionConnection(thread).prompt({ sessionId: thread.id, prompt })),
+        this.#trackedPrompt(
+          thread,
+          this.#sessionConnection(thread).prompt({
+            sessionId: thread.id,
+            prompt,
+            ...(acpUserMeta(userId) ? { _meta: acpUserMeta(userId) } : {}),
+          }),
+        ),
       ).pipe(Effect.result, Effect.ensuring(Deferred.succeed(answered, undefined)));
     });
   }
@@ -3158,7 +3170,7 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
     prompt: ContentBlock[],
     params: unknown,
   ): Effect.fn.Return<Result.Result<PromptResponse, ProviderClientOperationError>> {
-    const send = this.#turnPrompt(thread, turn, prompt);
+    const send = this.#turnPrompt(thread, turn, prompt, getString(params, "openbotAuthenticatedUserId") ?? undefined);
     if (!this.#flavor.promptOpenForBackgroundTasks || !this.#supportsSessionResume) return yield* send;
     const limit = this.options.firstUpdateMs ?? ACP_FIRST_UPDATE_MS;
     const silent = Effect.sleep(limit).pipe(

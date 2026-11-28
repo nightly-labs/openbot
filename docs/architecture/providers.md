@@ -678,6 +678,14 @@ streamed messages, permissions, tool bridging, and cancellation. `grok-client.ts
 login and billing hooks. The OpenCode driver starts `opencode acp` on the runtime OpenBot pins and
 downloads, or on a CLI the user installed. Profile clients deny tool permissions.
 
+For an authenticated member's batch, ACP `session/new` and `session/prompt` may carry
+`_meta["openbot.dev/userId"]`, the stable OpenBot member ID. OpenBot sends it only if every
+message in that batch has the same identified member. It omits the field for mixed or unidentified
+batches and non-person deliveries. Existing agents can ignore it. A session can serve different
+members, so the session value does not identify later prompts. This metadata is not a signed
+assertion: an agent must trust the OpenBot process and must not treat the value alone as proof of
+authorization.
+
 OpenCode 2.x keeps the MCP servers of a session for its directory after `session/close`, so the
 stdio servers that each chat and subagent started stayed until OpenCode stopped (#9254). OpenBot
 starts each stdio server itself (`mcp-stdio-relay.ts`) and gives OpenCode a Streamable HTTP URL on
