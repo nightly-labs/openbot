@@ -1506,7 +1506,7 @@ export function ConversationTimeline() {
                 };
                 const stepsInRow = () =>
                   author().kind === "agent" && !message()?.questionPrompt && (Boolean(channel) || !showAgentSteps());
-                const actionsBeside = () => stepsInRow() || author().kind === "you";
+                const actionsBeside = () => author().kind === "you";
                 const stepsDisclosure = () => (
                   <Show when={turnSteps.stepsAbove(message()?.id)}>
                     {(steps) => (

@@ -960,7 +960,7 @@ export function AgentThreadView(props: AgentThreadViewProps) {
                           actions={messageActions(message())}
                           steps={stepsInRow() ? stepsDisclosure() : undefined}
                           actionTime={props.compactMessageActions === false}
-                          actionsBeside={stepsInRow() || author(message()).kind === "you"}
+                          actionsBeside={author(message()).kind === "you"}
                           menu={messageMenu(message())}
                           textAtOnce={plainActivity()}
                           data-chat-search-message={message().id}
