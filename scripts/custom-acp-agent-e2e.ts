@@ -5,6 +5,7 @@ import { join, resolve } from "node:path";
 import { CUSTOM_AGENT_DEFAULT_MODEL, isAgentModel } from "@openbot/contracts/ipc";
 import { Effect } from "effect";
 import { checkAcpAgent } from "../src/backend/acp-agent-check";
+import { mcpToolCallFallback } from "../src/backend/agent/mcp-tools";
 import { isMissingProviderSessionError } from "../src/backend/agent/thread-items";
 import type { AgentClient } from "../src/backend/agent-client";
 import { runCauseEffect } from "../src/backend/effect-boundary";
@@ -38,6 +39,7 @@ interface Report {
   restart?: { processesStopped: number; loadedSession: string | null | undefined; resumedReply: string };
   switch?: { missingSession: boolean };
   delete?: { refused: string };
+  hiddenMcpTools?: { agy: boolean; other: boolean };
 }
 
 const root = await mkdtemp(join(tmpdir(), "openbot-custom-agent-e2e-"));
@@ -267,6 +269,17 @@ try {
   assert.ok(deleted instanceof Error && /not saved now/.test(deleted.message), String(deleted));
   assert.match(await reply(client, alphaThread, "alpha/deep", "still here"), /still here$/);
   report.delete = { refused: deleted.message };
+
+  const agyExecutable = join(root, "bin", "agy");
+  await installFakeAgent(agyExecutable, "custom-acp");
+  await runCauseEffect(
+    store.save({ id: "gamma", name: "Gamma", command: agyExecutable, args: ["acp"], env: [], usagePrompt: null }),
+  );
+  const agy = mcpToolCallFallback(client, "gamma/default");
+  const other = mcpToolCallFallback(client, "alpha/deep");
+  assert.equal(agy, true, "A custom agent that runs agy runs hidden MCP tools through openbot.tool_call.");
+  assert.equal(other, false, "Another custom agent keeps its MCP tool guidance.");
+  report.hiddenMcpTools = { agy, other };
 
   report.passed = true;
 } finally {

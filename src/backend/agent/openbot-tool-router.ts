@@ -205,6 +205,7 @@ import {
   isMcpServerTool,
   type MarketplaceAppServer,
   marketplaceAppStatus,
+  mcpToolCallFallback,
   mcpToolCallResponse,
   searchSignIns,
 } from "./mcp-tools";
@@ -770,8 +771,9 @@ export class OpenBotToolRouter {
             if (params.tool === "tool_call") {
               const resolved = resolveDeferredTool(params, client.provider);
               if (!resolved) {
-                const mcpResult =
-                  client.provider === "antigravity" ? yield* this.#userMcpTool(client, request, params) : null;
+                const mcpResult = this.#runsHiddenMcpTools(client, params.threadId)
+                  ? yield* this.#userMcpTool(client, request, params)
+                  : null;
                 if (request.signal?.aborted || !client.running) return;
                 client.respond(
                   request.id,
@@ -1127,12 +1129,17 @@ export class OpenBotToolRouter {
     if (client.deferredMcpTools?.(threadId)) return DEFERRED_MCP_NOTE;
     if (client.provider === "opencode")
       return openCodeMcpServers(this.#mcpServers?.list() ?? []).length > 0 ? OPENCODE_DEFERRED_MCP_NOTE : null;
-    if (client.provider === "antigravity") {
+    if (this.#runsHiddenMcpTools(client, threadId)) {
       const agentId = this.#conversation.agentForThread(threadId);
       return agentId && (this.#mcpServers?.forAgent(agentId).length ?? 0) > 0 ? ANTIGRAVITY_DEFERRED_MCP_NOTE : null;
     }
     if (client.provider !== "codex") return null;
     return codexDeferredMcpServers(this.#mcpServers?.list() ?? []).length > 0 ? CODEX_DEFERRED_MCP_NOTE : null;
+  }
+
+  #runsHiddenMcpTools(client: AgentClient, threadId: string): boolean {
+    const agentId = this.#conversation.agentForThread(threadId);
+    return mcpToolCallFallback(client, agentId ? this.#store.get(agentId)?.model : undefined);
   }
 
   readonly #userMcpTool = Effect.fn("OpenBotToolRouter.userMcpTool")(function* (

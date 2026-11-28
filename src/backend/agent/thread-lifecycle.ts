@@ -76,7 +76,7 @@ import {
   unsentHandoff,
 } from "./handoff-history";
 import { decodeCapturedSteps, readCapturedSteps } from "./handoff-tool-steps";
-import { mcpFallbackRunsServer } from "./mcp-tools";
+import { mcpFallbackRunsServer, mcpToolCallFallback } from "./mcp-tools";
 import { isProviderTimeout } from "./provider-status";
 import { sessionSettingsIdentity } from "./session-settings";
 import { isArchivedThreadError, isMissingProviderSessionError, providerLabel } from "./thread-items";
@@ -1200,6 +1200,7 @@ export class ThreadLifecycle {
   ): DynamicRecord {
     const memoryEnabled = agentMemoryEnabled(agent);
     const memories = memoryEnabled ? this.#memories.essentialFor(agent.id) : [];
+    const mcpToolsByToolCall = mcpToolCallFallback(client, agent.model);
     const options = {
       computerUseInOwnChat,
       computerUseNotReady:
@@ -1233,7 +1234,7 @@ export class ThreadLifecycle {
           : client.provider === "opencode"
             ? openCodeMcpServers(mcpServers).map((config) => config.name)
             : // Antigravity 1.5 leaves the tools over its schema budget out (#7427). OpenBot runs the
-              client.provider === "antigravity"
+              mcpToolsByToolCall
               ? mcpServers
                   .filter((config) => mcpFallbackRunsServer(config, agent))
                   .map(
@@ -1241,6 +1242,7 @@ export class ThreadLifecycle {
                       client.sessionMcpServerName?.(config, agent.workspacePath) ?? providerMcpServerName(config.name),
                   )
               : [],
+      mcpToolsByToolCall,
       catalogAsMcpTools: client.catalogAsMcpTools?.(agent.model) === true,
       ...(client.provider === "antigravity" ? { toolCatalog: toolCatalogNames(client.provider) } : {}),
       instructionsFileName: instructionsFile.fileName,

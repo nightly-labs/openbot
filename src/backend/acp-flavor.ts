@@ -174,6 +174,7 @@ export interface AcpFlavor {
   mcpToolCallLimitMs?: number;
   mcpToolsFixedAtStart?: true;
   catalogAsMcpTools?: true;
+  toolCallRunsHiddenMcpTools?: true;
   contextCompaction?: "handoff";
   compactsItself?: true;
   reopenKeepsPrompts?: true;
@@ -584,8 +585,14 @@ const CUSTOM_ACP_FLAVOR: AcpFlavor = {
   failureCause: customFailureCause,
 };
 
+const CUSTOM_ANTIGRAVITY_FLAVOR: AcpFlavor = { ...CUSTOM_ACP_FLAVOR, toolCallRunsHiddenMcpTools: true };
+
 const CUSTOM_AGENT_FLAVORS: Readonly<Partial<Record<string, AcpFlavor>>> = {
   omp: OMP_ACP_FLAVOR,
+  agy: CUSTOM_ANTIGRAVITY_FLAVOR,
+  antigravity: CUSTOM_ANTIGRAVITY_FLAVOR,
+  "antigravity-acp": CUSTOM_ANTIGRAVITY_FLAVOR,
+  "agy-acp-server": CUSTOM_ANTIGRAVITY_FLAVOR,
   hermes: {
     ...CUSTOM_ACP_FLAVOR,
     sessionNotFound: (error, sessionId) => hermesSessionNotFound(error) ?? ompSessionNotFound(error, sessionId),
