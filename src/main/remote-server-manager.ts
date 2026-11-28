@@ -352,6 +352,7 @@ export class RemoteServerManager extends EventEmitter<RemoteServerEvents> {
   readonly #connectTrace: RemoteConnectTrace | null;
   readonly #accountReady: Effect.Effect<unknown, RemoteWorkflowError>;
   #muteExpiryTimer: ReturnType<typeof setTimeout> | null = null;
+  readonly #rejectedHostKeys = new Set<string>();
 
   constructor(
     path: string,
@@ -497,6 +498,7 @@ export class RemoteServerManager extends EventEmitter<RemoteServerEvents> {
         })
       : null;
     this.#webrtcTransport?.on("connected", (serverId) => {
+      this.#rejectedHostKeys.delete(serverId);
       this.#events.transportConnected(serverId);
       this.#events.markSeenOnline(serverId);
       this.#hostRestartAway.delete(serverId);
@@ -550,6 +552,11 @@ export class RemoteServerManager extends EventEmitter<RemoteServerEvents> {
       this.#emitChanged();
       this.#events.transportDisconnected(serverId);
       this.#events.scheduleReconnect(serverId);
+    });
+    this.#webrtcTransport?.on("hostKeyRejected", (serverId) => {
+      if (this.#rejectedHostKeys.has(serverId) || !this.#store.has(serverId)) return;
+      this.#rejectedHostKeys.add(serverId);
+      this.emit("directoryInvalidated");
     });
     this.#webrtcTransport?.on("connectFailed", (serverId, failure) => {
       if (!this.#store.has(serverId) || this.#connections.hasIssue(serverId)) return;

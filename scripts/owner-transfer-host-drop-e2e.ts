@@ -372,6 +372,28 @@ try {
     return detail;
   });
 
+  await step("a rejected host key lists the servers once until the host connects again", async () => {
+    resetCounts();
+    transport.emit("hostKeyRejected", HOST_ID);
+    transport.emit("hostKeyRejected", HOST_ID);
+    await waitFor(() => syncs >= 1, "host-list refresh after a rejected key");
+    await new Promise((done) => setTimeout(done, DROP_WINDOW_MS));
+    const firstEpisode = { hostListRequests: requestCount(HOST_LIST), directoryInvalidations: invalidations };
+    transport.emit("connected", HOST_ID);
+    transport.emit("hostKeyRejected", HOST_ID);
+    await waitFor(() => syncs >= 2, "host-list refresh after a new rejected key");
+    const detail = {
+      firstEpisode,
+      hostListRequests: requestCount(HOST_LIST),
+      directoryInvalidations: invalidations,
+    };
+    assert.equal(firstEpisode.hostListRequests, 1, "A repeated rejection listed the servers again.");
+    assert.equal(firstEpisode.directoryInvalidations, 1);
+    assert.equal(detail.hostListRequests, 2, "A rejection after a new connection did not list the servers.");
+    assert.equal(detail.directoryInvalidations, 2);
+    return detail;
+  });
+
   await step("the claim watch backs off from 5 s to 60 s and stops when the server appears", async () => {
     const watch = claimWatchDelays();
     assert.deepEqual(watch.delays, [5_000, 10_000, 20_000, 40_000, 60_000, 60_000, 60_000]);
