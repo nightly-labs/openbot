@@ -93,6 +93,7 @@ import {
   isImageCountDiagnostic,
   isPlanLimitDiagnostic,
   isUsageLimitDiagnostic,
+  isWorkspaceCreditsDiagnostic,
   providerResetDelayMs,
 } from "./provider-diagnostics";
 import type { ProviderRuntime } from "./provider-runtime";
@@ -279,6 +280,7 @@ export interface TurnHooks {
   backupReadyAt(agentId: string): number | null;
   backupsAtLimit(agentId: string): boolean;
   poolHasOtherAccount(agentId: string): boolean;
+  poolMovesOffAccount(agentId: string): boolean;
   mayContinueOnBackup(agentId: string): boolean;
   requeueChannelDelivery(deliveryId: string, continueWork?: boolean): Effect.Effect<boolean>;
   keepChannelDelivery(deliveryId: string): Effect.Effect<boolean>;
@@ -1804,6 +1806,18 @@ export class TurnLifecycle {
             severity: notification.method === "warning" ? ("warning" as const) : ("error" as const),
           };
           yield* this.#providers.refreshUsageAfterLimit(source);
+          if (
+            notification.method === "error" &&
+            source.provider === "codex" &&
+            error?.codexErrorInfo === "usageLimitExceeded" &&
+            !planLimit &&
+            isWorkspaceCreditsDiagnostic(message) &&
+            agentId &&
+            errorTurnId !== null &&
+            this.#runningTurns.has(errorTurnId) &&
+            this.#hooks.poolMovesOffAccount(agentId)
+          )
+            this.#markFailed(agentId, context.model, { message, context, quiet: true });
           if (
             notification.method === "error" &&
             agentId &&
