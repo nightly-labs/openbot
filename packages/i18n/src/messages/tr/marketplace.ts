@@ -294,15 +294,14 @@ export const messages = {
   "marketplace.plugin.figma.prompt.assets": "Pazarlama simgelerini uygulama paketi için 2x boyutunda dışa aktar.",
   "marketplace.plugin.paper.tagline": "HTML ve CSS üzerine kurulu tasarım tuvali",
   "marketplace.plugin.paper.description":
-    "Paper, ajanların Paper Desktop'ta açık olan tasarım dosyasını okuyup yazmasına olanak tanır: çizim yüzeylerini, seçimleri, hesaplanan stilleri, JSX'i ve token'ları inceler; çerçeveler, metinler ve stiller oluşturur veya değiştirir. Başlamadan önce Paper Desktop'u yükleyin, bir kez açın ve bir dosya açın. OpenBot, Paper Desktop'un yüklediği Paper CLI'yi başlatır. Paper anahtar gerektirmez. Yazma araçları açık dosyayı değiştirir, bu yüzden her yazmayı onaylamadan önce inceleyin.",
+    "Paper, ajanların Paper tasarım dosyalarınızı okuyup yazmasına olanak tanır: çizim yüzeylerini, seçimleri, hesaplanan stilleri, JSX'i ve token'ları inceler; çerçeveler, metinler ve stiller oluşturur veya değiştirir. Paper hesabınızla oturum açın. OpenBot, Paper'ın uzak MCP sunucusuna bağlanır; bu yüzden ajanlarınız bir sunucuda çalışsa bile Paper Desktop gerekmez. Paper bu sunucuyu erken erişim olarak sunar. Yazma araçları dosyanızı değiştirir, bu yüzden her yazmayı onaylamadan önce inceleyin.",
   "marketplace.plugin.paper.app":
-    "Açık Paper Desktop dosyasını, Paper CLI'nin aktardığı yerel MCP sunucusu üzerinden okur ve yazar. Bir dosyası açık Paper Desktop gerektirir.",
+    "Paper dosyalarınızı Paper'ın uzak MCP sunucusu üzerinden okur ve yazar. Her kullanıcı kendi Paper hesabıyla oturum açar.",
   "marketplace.plugin.paper.prompt.implement":
     "Seçili Paper çerçevesini bu kod tabanında, kod kurallarımıza uygun olarak uygula.",
   "marketplace.plugin.paper.prompt.codeToDesign":
     "Bu depodaki stilleri kullan ve Paper'da bir ayarlar sayfası tasarla.",
-  "marketplace.plugin.paper.prompt.tokens":
-    "Açık Paper dosyasındaki tasarım token'larını listele ve temamızla karşılaştır.",
+  "marketplace.plugin.paper.prompt.tokens": "Paper dosyamdaki tasarım token'larını listele ve temamızla karşılaştır.",
   "marketplace.plugin.higgsfield.tagline": "Yapay zekâ ile görsel, video ve ses",
   "marketplace.plugin.higgsfield.description":
     "Higgsfield, ajanların Seedance, Kling, Veo ve MiniMax Hailuo gibi Higgsfield modelleriyle görsel, video, karakter ve ses üretmesini, kredi bakiyesini kontrol etmesini ve Asset Library'ye göz atmasını sağlar. Sonuçlar kullanıcının Higgsfield Assets alanına kaydedilir. Her kullanıcı tarayıcıda kendi Higgsfield hesabına giriş yapar. Her üretim, sınırsız planda da o hesabın kredilerini standart ücretle kullanır.",

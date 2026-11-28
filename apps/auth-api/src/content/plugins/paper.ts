@@ -8,7 +8,7 @@ export const PAPER_PLUGIN_GUIDE: PluginGuide = {
     },
     {
       title: "Build layouts in Paper",
-      text: "The Paper MCP server can also write to the open file. The agent can generate a layout, make color tokens and a swatch, or add responsive breakpoints from the frames you selected. Review each write before you approve it, because it changes the file.",
+      text: "The Paper MCP server can also write to your file. The agent can generate a layout, make color tokens and a swatch, or add responsive breakpoints from the frames you selected. Review each write before you approve it, because it changes the file.",
     },
     {
       title: "Bring a design system from Figma",
@@ -21,14 +21,14 @@ export const PAPER_PLUGIN_GUIDE: PluginGuide = {
   ],
   faq: [
     {
-      question: "Does the Paper MCP server need an API key?",
+      question: "Does the Paper MCP server need an API key or Paper Desktop?",
       answer:
-        "No. Paper Desktop starts the MCP server in the background and installs the Paper CLI. OpenBot starts that CLI as a local relay to the open file. Install Paper Desktop, open it once, and open a file before you start.",
+        "No. OpenBot connects to the remote Paper MCP server, and you sign in with your Paper account. You do not need Paper Desktop, also when your agents run on a server. Paper calls the remote server early access.",
     },
     {
       question: "Which Paper file does the agent change?",
       answer:
-        "The Paper MCP server works on the file that is open in Paper Desktop. If changes do not appear, make sure that the correct file is open. To check, ask the agent to call the get_basic_info tool, which shows the file it sees.",
+        "The agent works on the Paper files of the account that you signed in with. If changes do not appear in the file that you expect, ask the agent which file it sees.",
     },
     {
       question: "Does Paper cost anything?",
@@ -38,7 +38,7 @@ export const PAPER_PLUGIN_GUIDE: PluginGuide = {
     {
       question: "The agent says it has no Paper tools. What do I do?",
       answer:
-        "Paper says that long agent sessions are the most common cause of problems. Start a new thread to make a new MCP connection. Also make sure that Paper Desktop is open with a file.",
+        "Paper says that long agent sessions are the most common cause of problems. Start a new thread to make a new MCP connection. If Paper says that your account setup is incomplete, complete the setup at app.paper.design, then sign in to Paper again in OpenBot.",
     },
   ],
   sources: [
@@ -46,5 +46,5 @@ export const PAPER_PLUGIN_GUIDE: PluginGuide = {
     { label: "Paper: support", url: "https://paper.design/docs/support" },
     { label: "Paper pricing", url: "https://paper.design/pricing" },
   ],
-  checkedAt: "2026-10-23",
+  checkedAt: "2026-11-28",
 };

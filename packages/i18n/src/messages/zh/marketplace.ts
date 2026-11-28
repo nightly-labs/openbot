@@ -254,12 +254,11 @@ export const messages = {
   "marketplace.plugin.figma.prompt.assets": "把营销图标按 2 倍导出，用于应用打包。",
   "marketplace.plugin.paper.tagline": "基于 HTML 与 CSS 的设计画布",
   "marketplace.plugin.paper.description":
-    "Paper 让助手读写 Paper Desktop 中打开的设计文件：检查画板、选区、计算样式、JSX 与 token，并创建或修改画框、文本和样式。请先安装 Paper Desktop，打开一次，并在开始前打开一个文件。OpenBot 会启动 Paper Desktop 安装的 Paper CLI。Paper 不需要密钥。写入类工具会改动当前文件，因此每次批准前请先核对。",
-  "marketplace.plugin.paper.app":
-    "通过 Paper CLI 转发的本地 MCP 服务器读写已打开的 Paper Desktop 文件。需要 Paper Desktop，并打开一个文件。",
+    "Paper 让助手读写你的 Paper 设计文件：检查画板、选区、计算样式、JSX 与 token，并创建或修改画框、文本和样式。请用你的 Paper 账号登录。OpenBot 连接 Paper 的远程 MCP 服务器，因此不需要 Paper Desktop，助手在服务器上运行时也一样。Paper 将这个服务器列为抢先体验。写入类工具会改动你的文件，因此每次批准前请先核对。",
+  "marketplace.plugin.paper.app": "通过 Paper 的远程 MCP 服务器读写你的 Paper 文件。每位用户用自己的 Paper 账号登录。",
   "marketplace.plugin.paper.prompt.implement": "按我们的代码规范，在这个代码库里实现选中的 Paper 画框。",
   "marketplace.plugin.paper.prompt.codeToDesign": "用这个仓库里的样式，在 Paper 中设计一个设置页面。",
-  "marketplace.plugin.paper.prompt.tokens": "列出打开的 Paper 文件中的设计 token，并与我们的主题对比。",
+  "marketplace.plugin.paper.prompt.tokens": "列出我的 Paper 文件中的设计 token，并与我们的主题对比。",
   "marketplace.plugin.higgsfield.tagline": "AI 图片、视频和音频",
   "marketplace.plugin.higgsfield.description":
     "Higgsfield 让助手使用 Seedance、Kling、Veo 和 MiniMax Hailuo 等 Higgsfield 模型生成图片、视频、角色和音频，查看积分余额，并浏览 Asset Library。结果保存到用户的 Higgsfield Assets。每个用户在浏览器中登录自己的 Higgsfield 账户。每次生成都按标准费率消耗该账户的积分，无限套餐也一样。",

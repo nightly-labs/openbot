@@ -298,15 +298,15 @@ export const messages = {
   "marketplace.plugin.figma.prompt.assets": "Wyeksportuj ikony marketingowe w 2x do pakietu aplikacji.",
   "marketplace.plugin.paper.tagline": "Płótno projektowe oparte na HTML i CSS",
   "marketplace.plugin.paper.description":
-    "Paper pozwala agentom czytać i zapisywać plik projektu otwarty w Paper Desktop: sprawdzać plansze, zaznaczenia, obliczone style, JSX i tokeny oraz tworzyć lub zmieniać ramki, tekst i style. Zainstaluj Paper Desktop, otwórz go raz i otwórz plik przed rozpoczęciem. OpenBot uruchamia Paper CLI instalowane przez Paper Desktop. Paper nie wymaga klucza. Narzędzia zapisu zmieniają otwarty plik, więc sprawdź każdy zapis, zanim go zatwierdzisz.",
+    "Paper pozwala agentom czytać i zapisywać Twoje pliki projektów Paper: sprawdzać plansze, zaznaczenia, obliczone style, JSX i tokeny oraz tworzyć lub zmieniać ramki, tekst i style. Zaloguj się kontem Paper. OpenBot łączy się ze zdalnym serwerem MCP Paper, więc nie potrzebujesz Paper Desktop, także gdy Twoi agenci działają na serwerze. Paper określa ten serwer jako wczesny dostęp. Narzędzia zapisu zmieniają Twój plik, więc sprawdź każdy zapis, zanim go zatwierdzisz.",
   "marketplace.plugin.paper.app":
-    "Czyta i zapisuje otwarty plik Paper Desktop przez lokalny serwer MCP przekazywany przez Paper CLI. Wymaga Paper Desktop z otwartym plikiem.",
+    "Czyta i zapisuje Twoje pliki Paper przez zdalny serwer MCP Paper. Każdy użytkownik loguje się własnym kontem Paper.",
   "marketplace.plugin.paper.prompt.implement":
     "Zaimplementuj zaznaczoną ramkę Paper w tym kodzie zgodnie z naszymi konwencjami.",
   "marketplace.plugin.paper.prompt.codeToDesign":
     "Użyj stylów z tego repozytorium i zaprojektuj stronę ustawień w Paper.",
   "marketplace.plugin.paper.prompt.tokens":
-    "Wypisz tokeny projektu z otwartego pliku Paper i porównaj je z naszym motywem.",
+    "Wypisz tokeny projektu z mojego pliku Paper i porównaj je z naszym motywem.",
   "marketplace.plugin.higgsfield.tagline": "Obrazy, wideo i audio z AI",
   "marketplace.plugin.higgsfield.description":
     "Higgsfield pozwala agentom generować obrazy, wideo, postacie i audio modelami Higgsfield, takimi jak Seedance, Kling, Veo i MiniMax Hailuo, sprawdzać saldo kredytów i przeglądać Asset Library. Wyniki są zapisywane w Assets Higgsfield użytkownika. Każdy użytkownik loguje się do własnego konta Higgsfield w przeglądarce. Każde generowanie zużywa kredyty tego konta według standardowych stawek, także w planie bez limitu.",

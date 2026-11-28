@@ -288,15 +288,14 @@ export const messages = defineMessages("marketplace", {
   "marketplace.plugin.figma.prompt.assets": "Extract the marketing icons at 2x for the app bundle.",
   "marketplace.plugin.paper.tagline": "Design canvas built on HTML and CSS",
   "marketplace.plugin.paper.description":
-    "Paper lets agents read and write the design file that is open in Paper Desktop: inspect artboards, selections, computed styles, JSX and tokens, and create or change frames, text and styles. Install Paper Desktop, open it once, and open a file before you start. OpenBot starts the Paper CLI that Paper Desktop installs. Paper needs no key. Write tools change the open file, so review each write before you approve it.",
+    "Paper lets agents read and write your Paper design files: inspect artboards, selections, computed styles, JSX and tokens, and create or change frames, text and styles. Sign in with your Paper account. OpenBot connects to the remote Paper MCP server, so you do not need Paper Desktop, also when your agents run on a server. Paper calls this server early access. Write tools change your file, so review each write before you approve it.",
   "marketplace.plugin.paper.app":
-    "Reads and writes the open Paper Desktop file, over the local MCP server that the Paper CLI relays. Needs Paper Desktop with a file open.",
+    "Reads and writes your Paper files, over the remote Paper MCP server. Each user signs in to their own Paper account.",
   "marketplace.plugin.paper.prompt.implement":
     "Implement the selected Paper frame in this codebase, with our code conventions.",
   "marketplace.plugin.paper.prompt.codeToDesign":
     "Use the styles in this repository and design a settings page in Paper.",
-  "marketplace.plugin.paper.prompt.tokens":
-    "List the design tokens in the open Paper file and compare them with our theme.",
+  "marketplace.plugin.paper.prompt.tokens": "List the design tokens in my Paper file and compare them with our theme.",
   "marketplace.plugin.higgsfield.tagline": "AI images, videos and audio",
   "marketplace.plugin.higgsfield.description":
     "Higgsfield lets agents generate images, videos, characters and audio with Higgsfield models such as Seedance, Kling, Veo and MiniMax Hailuo, check the credit balance, and browse the Asset Library. Results are saved to the user's Higgsfield Assets. Each user signs in to their own Higgsfield account through the browser. Every generation uses credits of that account at standard rates, also on an unlimited plan.",
