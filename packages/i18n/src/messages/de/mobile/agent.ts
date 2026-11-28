@@ -386,6 +386,8 @@ export const messages = {
   "mobile.agent.backupModels.moveDown": "{model} nach unten",
   "mobile.agent.backupModels.remove": "{model} entfernen",
   "mobile.agent.backupModels.unavailable": "Gerade nicht verfügbar · übersprungen",
+  "mobile.agent.backupModels.workspaceOnly":
+    "Übersprungen mit „Nur Arbeitsbereich“ · ändere die „Berechtigungen“, um es zu nutzen",
   "mobile.agent.backupModels.withAccount": "{model} · {account}",
   "mobile.agent.backupModels.withProvider": "{model} · {provider}",
   "mobile.agent.backupModels.note":

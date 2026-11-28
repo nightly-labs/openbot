@@ -90,6 +90,7 @@ export const messages = {
   "agentSettings.backupModels.remove": "{model} 삭제",
   "agentSettings.backupModels.limited": "사용 한도 도달 · 건너뜀",
   "agentSettings.backupModels.unavailable": "지금 사용할 수 없음 · 건너뜀",
+  "agentSettings.backupModels.workspaceOnly": "'워크스페이스만'에서는 건너뜀 · 사용하려면 '권한'을 바꾸세요",
   "agentSettings.backupModels.withAccount": "{model} · {account}",
   "agentSettings.backupModels.withProvider": "{model} · {provider}",
   "agentSettings.backupModels.note":

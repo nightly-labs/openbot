@@ -5,6 +5,7 @@ import {
   type ClientAgentModelOption,
   sameAgentModelChoice,
   type UpdateAgentInput,
+  workspaceAccessEnforced,
 } from "@openbot/contracts/ipc";
 import type { AgentProfile } from "@openbot/ui/data";
 import {
@@ -21,7 +22,7 @@ import { useServers } from "../servers/servers-context";
 
 type UsageLimitAgent = Pick<
   AgentProfile,
-  "id" | "name" | "provider" | "model" | "providerAccountId" | "reasoningEffort" | "backupModels"
+  "id" | "name" | "provider" | "model" | "providerAccountId" | "reasoningEffort" | "backupModels" | "access"
 >;
 
 export interface UsageLimitAskSource {
@@ -48,6 +49,7 @@ export function usageLimitAskFrom(source: UsageLimitAskSource) {
     const choices: BackupModelSource = {
       modelOptions: source.modelOptions(),
       providers: source.providers(),
+      workspaceOnly: workspaceAccessEnforced(agent),
       limited: source.limited,
     };
     const options = usageLimitAskOptions({ ...agent, provider }, agent.backupModels, choices);

@@ -117,6 +117,8 @@ export const messages = {
   "agentSettings.backupModels.remove": "Убрать {model}",
   "agentSettings.backupModels.limited": "Лимит использования исчерпан · пропущена",
   "agentSettings.backupModels.unavailable": "Сейчас недоступна · пропущена",
+  "agentSettings.backupModels.workspaceOnly":
+    "Пропускается в режиме «Рабочее пространство» · измените «Доступ», чтобы использовать",
   "agentSettings.backupModels.withAccount": "{model} · {account}",
   "agentSettings.backupModels.withProvider": "{model} · {provider}",
   "agentSettings.backupModels.note":

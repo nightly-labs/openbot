@@ -100,6 +100,7 @@ export const messages = {
   "agentSettings.backupModels.remove": "הסרת {model}",
   "agentSettings.backupModels.limited": "מגבלת השימוש הושגה · מדולג",
   "agentSettings.backupModels.unavailable": "אינו זמין כעת · מדולג",
+  "agentSettings.backupModels.workspaceOnly": "מדולג עם „סביבת עבודה בלבד” · שנו את „הרשאות” כדי להשתמש בו",
   "agentSettings.backupModels.withAccount": "{model} · {account}",
   "agentSettings.backupModels.withProvider": "{model} · {provider}",
   "agentSettings.backupModels.note":

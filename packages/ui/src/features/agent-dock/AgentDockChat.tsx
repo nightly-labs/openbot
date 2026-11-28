@@ -556,7 +556,10 @@ export function AgentDockChat(props: {
                         resetsAt={current().resetsAt}
                         options={current().options}
                         rememberable={current().rememberable}
-                        onSend={(option, remember) => sendOnBackup(current(), option, remember)}
+                        onSend={async (option, remember) => {
+                          const picked = current().options.find((entry) => entry.key === option.key);
+                          if (picked) await sendOnBackup(current(), picked, remember);
+                        }}
                         onWait={() => props.answers?.usageLimitWait(current())}
                       />
                     </div>

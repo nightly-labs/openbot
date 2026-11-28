@@ -9,7 +9,13 @@ import { sourceText } from "@openbot/i18n/source";
 import { createOpenBotLogger } from "@openbot/logging";
 import { Effect } from "effect";
 import type { DynamicToolCallParams } from "../protocol";
-import { agentReasoningEffort, requestedRuntime, requestedToolModel, requireRunnableChange } from "./model-tools";
+import {
+  agentReasoningEffort,
+  requestedRuntime,
+  requestedToolModel,
+  requireRunnableChange,
+  skippedBackupModels,
+} from "./model-tools";
 import type { OpenBotToolRouterHooks } from "./openbot-tool-router";
 import {
   profileToolErrorMessage,
@@ -31,6 +37,7 @@ function agentSettings(agent: AgentSummary, models: AgentModelOption[]) {
     ...agentReasoningEffort(agent, models),
     ...(agent.pendingRuntime ? { pendingRuntime: agent.pendingRuntime } : {}),
     access: workspaceAccessEnforced(agent) ? "workspace" : "full",
+    ...skippedBackupModels(agent),
     computerUse: agentComputerUseEnabled(agent),
     notifications: agent.notifications,
   };

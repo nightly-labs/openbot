@@ -96,6 +96,8 @@ export const messages = {
   "agentSettings.backupModels.remove": "{model} entfernen",
   "agentSettings.backupModels.limited": "Nutzungslimit erreicht · übersprungen",
   "agentSettings.backupModels.unavailable": "Gerade nicht verfügbar · übersprungen",
+  "agentSettings.backupModels.workspaceOnly":
+    "Übersprungen mit „Nur Arbeitsbereich“ · ändere „Zugriff“, um es zu nutzen",
   "agentSettings.backupModels.withAccount": "{model} · {account}",
   "agentSettings.backupModels.withProvider": "{model} · {provider}",
   "agentSettings.backupModels.note":

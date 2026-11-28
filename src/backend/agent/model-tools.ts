@@ -16,10 +16,12 @@ import {
   DEFAULT_PROVIDER_ACCOUNT_ID,
   defaultProviderModel,
   sameAgentModelChoice,
+  workspaceAccessEnforced,
 } from "@openbot/contracts/ipc";
 import { sourceText } from "@openbot/i18n/source";
 import type { AgentProvider } from "../agent-client";
 import { isEncodedModelOf } from "../encoded-model-id";
+import { workspaceOnlyUnavailable } from "../process-confinement";
 import { AgentSettingsRefused } from "./agent-settings-refused";
 import { providerLabel } from "./thread-items";
 
@@ -330,20 +332,38 @@ export function listModelsPayload(
   };
 }
 
-export function agentAccountSetup(agent: AgentSummary) {
-  const choice = (model: AgentModelChoice) => ({
+function toolModelChoice(model: AgentModelChoice) {
+  return {
     provider: model.provider,
     model: model.model,
     providerAccountId: model.providerAccountId ?? DEFAULT_PROVIDER_ACCOUNT_ID,
-  });
+  };
+}
+
+export function skippedBackupModels(agent: AgentSummary) {
+  const skipped = workspaceAccessEnforced(agent)
+    ? (agent.backupModels?.order ?? []).filter((backup) => workspaceOnlyUnavailable(backup.provider))
+    : [];
+  return skipped.length > 0
+    ? {
+        skippedBackupModels: {
+          models: skipped.map(toolModelChoice),
+          reason: sourceText("error.agent.workspaceOnlyMacOnly"),
+        },
+      }
+    : {};
+}
+
+export function agentAccountSetup(agent: AgentSummary) {
   return {
     providerAccountId: agent.providerAccountId ?? DEFAULT_PROVIDER_ACCOUNT_ID,
     backupModels: agent.backupModels
-      ? { automatic: agent.backupModels.automatic, order: agent.backupModels.order.map(choice) }
+      ? { automatic: agent.backupModels.automatic, order: agent.backupModels.order.map(toolModelChoice) }
       : null,
+    ...skippedBackupModels(agent),
     usageLimitReturn: agent.usageLimitReturn
       ? {
-          ...choice(agent.usageLimitReturn),
+          ...toolModelChoice(agent.usageLimitReturn),
           reasoningEffort: agent.usageLimitReturn.reasoningEffort,
           ...(agent.usageLimitReturn.cause === "provider-error" ? { cause: "provider-error" } : {}),
         }

@@ -95,6 +95,7 @@ export const messages = {
   "agentSettings.backupModels.remove": "Remover {model}",
   "agentSettings.backupModels.limited": "Limite de uso atingido · ignorado",
   "agentSettings.backupModels.unavailable": "Indisponível agora · ignorado",
+  "agentSettings.backupModels.workspaceOnly": "Ignorado com “Espaço de trabalho” · altere “Permissões” para usá-lo",
   "agentSettings.backupModels.withAccount": "{model} · {account}",
   "agentSettings.backupModels.withProvider": "{model} · {provider}",
   "agentSettings.backupModels.note":

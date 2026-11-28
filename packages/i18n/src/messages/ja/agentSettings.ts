@@ -90,6 +90,7 @@ export const messages = {
   "agentSettings.backupModels.remove": "{model} を削除",
   "agentSettings.backupModels.limited": "使用量の上限に達しました · スキップ",
   "agentSettings.backupModels.unavailable": "現在使用できません · スキップ",
+  "agentSettings.backupModels.workspaceOnly": "「ワークスペースのみ」ではスキップ · 使うには「権限」を変更",
   "agentSettings.backupModels.withAccount": "{model} · {account}",
   "agentSettings.backupModels.withProvider": "{model} · {provider}",
   "agentSettings.backupModels.note":

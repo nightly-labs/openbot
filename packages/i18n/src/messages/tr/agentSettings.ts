@@ -96,6 +96,8 @@ export const messages = {
   "agentSettings.backupModels.remove": "{model} modelini kaldır",
   "agentSettings.backupModels.limited": "Kullanım sınırına ulaşıldı · atlandı",
   "agentSettings.backupModels.unavailable": "Şu an uygun değil · atlandı",
+  "agentSettings.backupModels.workspaceOnly":
+    '"Yalnızca çalışma alanı" ile atlanır · kullanmak için "İzinler"i değiştirin',
   "agentSettings.backupModels.withAccount": "{model} · {account}",
   "agentSettings.backupModels.withProvider": "{model} · {provider}",
   "agentSettings.backupModels.note":
