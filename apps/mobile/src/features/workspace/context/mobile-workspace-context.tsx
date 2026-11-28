@@ -1696,6 +1696,7 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
   const wakeSelectedServer = useCallback(
     (hostId: string) => {
       if (!foregroundRef.current || hostId !== activeServerIdRef.current) return;
+      if (serversRef.current.find((server) => server.id === hostId)?.hosted !== true) return;
       void runTeamEffect(wakeHostedServer(hostId)).then((waking) => {
         if (!waking || hostId !== activeServerIdRef.current) return;
         hostedServerStarting(hostId);
