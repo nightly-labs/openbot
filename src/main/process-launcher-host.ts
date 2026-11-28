@@ -1,4 +1,5 @@
-import { type ChildProcess, spawn } from "node:child_process";
+import { type ChildProcess, execFile, spawn } from "node:child_process";
+import { win32 } from "node:path";
 import {
   isProcessLauncherRequest,
   type ProcessLauncherEvent,
@@ -8,6 +9,7 @@ import {
 type Send = (event: ProcessLauncherEvent) => void;
 
 const children = new Map<number, ChildProcess>();
+const stopSignals = new Map<number, NodeJS.Signals>();
 
 function errorCode(error: unknown): string | null {
   return typeof error === "object" && error !== null && "code" in error && typeof error.code === "string"
@@ -50,8 +52,30 @@ function start(request: Extract<ProcessLauncherRequest, { kind: "spawn" }>, send
   );
   child.on("close", (code, signal) => {
     children.delete(id);
-    send({ kind: "exit", id, code, signal });
+    const stopSignal = stopSignals.get(id) ?? null;
+    stopSignals.delete(id);
+    if (signal || !stopSignal) send({ kind: "exit", id, code, signal });
+    else send({ kind: "exit", id, code: null, signal: stopSignal });
   });
+}
+
+function stop(id: number, signal: NodeJS.Signals): void {
+  const child = children.get(id);
+  if (!child || child.exitCode !== null || child.signalCode !== null) return;
+  if (process.platform !== "win32" || child.pid === undefined) {
+    child.kill(signal);
+    return;
+  }
+  if (stopSignals.has(id)) return;
+  stopSignals.set(id, signal);
+  execFile(
+    win32.join(process.env.SystemRoot ?? "C:\\Windows", "System32", "taskkill.exe"),
+    ["/pid", String(child.pid), "/T", "/F"],
+    { windowsHide: true },
+    () => {
+      if (child.exitCode === null && child.signalCode === null) child.kill(signal);
+    },
+  );
 }
 
 function accept(message: unknown, send: Send): void {
@@ -67,7 +91,7 @@ function accept(message: unknown, send: Send): void {
       children.get(message.id)?.stdin?.end();
       return;
     case "kill":
-      children.get(message.id)?.kill(message.signal);
+      stop(message.id, message.signal);
       return;
   }
 }

@@ -1,3 +1,4 @@
+import type { ChildProcess } from "node:child_process";
 import { appendFile, mkdir, rename, stat } from "node:fs/promises";
 import { join } from "node:path";
 import type { Readable } from "node:stream";
@@ -5,6 +6,7 @@ import { StringDecoder } from "node:string_decoder";
 import { redactText } from "@openbot/logging";
 import { Deferred, Effect } from "effect";
 import { perfCount } from "../backend/perf-probe-hooks";
+import { stopWindowsProcessTree } from "../backend/windows-process-tree";
 import { desktopCall, desktopFailure, type RemoteDesktopOperationError } from "./remote-desktop-effects";
 
 const MAX_LOG_BYTES = 1024 * 1024;
@@ -85,20 +87,13 @@ const writeDiagnosticEffect = Effect.fn("RemoteDesktop.writeDiagnostic")(functio
   yield* desktopCall(() => appendFile(path, clean, { encoding: "utf8", mode: 0o600 }));
 });
 
-interface ManagedChildProcess {
-  exitCode: number | null;
-  signalCode: NodeJS.Signals | null;
-  killed: boolean;
-  kill(signal?: NodeJS.Signals): boolean;
-  once(event: string, listener: (...args: unknown[]) => unknown): unknown;
-  removeListener?(event: string, listener: (...args: unknown[]) => unknown): unknown;
-}
-
 export const stopRemoteProcess = Effect.fn("RemoteDesktop.stopProcess")(function* (
-  child: ManagedChildProcess,
+  child: ChildProcess,
   graceMs = 2_000,
 ) {
   if (child.exitCode !== null || child.signalCode !== null || child.killed) return;
+  if (process.platform === "win32")
+    return yield* stopWindowsProcessTree(child).pipe(Effect.mapError(({ cause }) => desktopFailure(cause)));
   yield* Effect.callback<void, RemoteDesktopOperationError>((resume) => {
     let complete = false;
     const finish = () => {

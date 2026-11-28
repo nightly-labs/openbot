@@ -2110,7 +2110,9 @@ export async function createApplicationServices({
   const providerTempDirectory = join(app.getPath("userData"), "provider-temp");
   const processLauncher = process.platform === "win32" ? new ProcessLauncher() : null;
   if (processLauncher)
-    teardown.push(TEARDOWN_ORDER.processLauncher, "the process launcher", () => processLauncher.dispose());
+    teardown.push(TEARDOWN_ORDER.processLauncher, "the process launcher", () =>
+      Effect.runPromise(processLauncher.dispose()),
+    );
   performance.mark("openbot:services.computer-use");
   if (process.platform === "win32") await Effect.runPromise(sweepProviderTemp(providerTempDirectory));
   const agentApiKeys = new AgentApiKeys(join(app.getPath("userData"), "agent-api-keys"), vault.items);
