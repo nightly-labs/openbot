@@ -917,6 +917,7 @@ export class TurnLifecycle {
   #countHandoffCompaction(agentId: string, threadId: string, client: AgentClient): void {
     for (const [turnId, running] of this.#runningTurns) {
       if (running.threadId !== threadId || running.client !== client) continue;
+      if (this.#compaction.isCompactionTurn(threadId, turnId)) continue;
       const progressed = running.toolsSinceCompaction.size >= HANDOFF_PROGRESS_TOOL_CALLS;
       running.handoffCompactions = progressed ? 1 : running.handoffCompactions + 1;
       running.toolsSinceCompaction = new Set();
