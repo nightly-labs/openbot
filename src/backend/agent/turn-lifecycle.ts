@@ -1246,19 +1246,32 @@ export class TurnLifecycle {
     }
   }
 
+  #failureFlags(failover: HeldProviderError) {
+    const resetDelayMs = providerResetDelayMs(failover.message);
+    const { causeCode, provider } = failover.context;
+    return {
+      resetDelayMs,
+      spent: failover.quiet === true && resetDelayMs === null && isBalanceDiagnostic(failover.message),
+      refused: causeCode === "authentication",
+      notOffered: causeCode === "model_not_found" && provider === "claude",
+    };
+  }
+
+  #spentWindowReset(agentId: string, model: string | null, failover: HeldProviderError): Effect.Effect<number | null> {
+    const { spent, refused, notOffered } = this.#failureFlags(failover);
+    return spent && !refused && !notOffered ? this.#usageLimits.spentWindowReset(agentId, model) : Effect.succeed(null);
+  }
+
   readonly #markFailed = Effect.fn("TurnLifecycle.markFailed")(function* (
     this: TurnLifecycle,
     agentId: string,
     model: string | null,
     failover: HeldProviderError,
+    windowReset: number | null,
   ) {
-    const resetDelayMs = providerResetDelayMs(failover.message);
-    const spent = failover.quiet === true && resetDelayMs === null && isBalanceDiagnostic(failover.message);
-    const windowReset = spent ? yield* this.#usageLimits.spentWindowReset(agentId, model) : null;
     if (windowReset !== null) return yield* this.#usageLimits.reached(agentId, windowReset, model);
-    const { causeCode, provider } = failover.context;
-    const notOffered = causeCode === "model_not_found" && provider === "claude";
-    this.#usageLimits.failed(agentId, model, resetDelayMs, spent, causeCode === "authentication", notOffered);
+    const { resetDelayMs, spent, refused, notOffered } = this.#failureFlags(failover);
+    this.#usageLimits.failed(agentId, model, resetDelayMs, spent, refused, notOffered);
   });
 
   #noteEvent(params: unknown): { threadId: string | null; agentId: string | undefined } {
@@ -1892,7 +1905,7 @@ export class TurnLifecycle {
           !isRefusedGeminiToken(source.provider, message) &&
           this.#hooks.poolHasOtherAccount(agentId)
         )
-          yield* this.#markFailed(agentId, context.model, { message, context });
+          yield* this.#markFailed(agentId, context.model, { message, context }, null);
         if (
           notification.method === "error" &&
           agentId &&
@@ -2522,6 +2535,8 @@ export class TurnLifecycle {
           const failed = this.#failoverRetries.get(delivery.id) ?? new Set<string>();
           this.#failoverRetries.set(delivery.id, failed.add(failedKey));
         }
+        const marksFailure = failedOver || (channelRunsAgain && backupTakes());
+        const windowReset = marksFailure ? yield* this.#spentWindowReset(agentId, model, failover) : null;
         yield* this.#requeueTurn(
           agentId,
           threadId,
@@ -2531,7 +2546,7 @@ export class TurnLifecycle {
           (failedOver && mayContinue) || (runsAgainHere && !mayRunAgain) ? yield* continuedWork : undefined,
           running?.failureReports,
         );
-        if (failedOver || (channelRunsAgain && backupTakes())) yield* this.#markFailed(agentId, model, failover);
+        if (marksFailure) yield* this.#markFailed(agentId, model, failover, windowReset);
         if (failingSession) yield* this.#dropFailingSession(agentId, threadId, running.client.provider);
         this.#hooks.scheduleDrain(agentId);
         return;
@@ -2541,7 +2556,7 @@ export class TurnLifecycle {
         failedKey !== null &&
         ((mayRunAgain && taskTurn && this.#hooks.mayFailOver(agentId)) || (channelTask && backupTakes()))
       )
-        yield* this.#markFailed(agentId, model, failover);
+        yield* this.#markFailed(agentId, model, failover, yield* this.#spentWindowReset(agentId, model, failover));
       if (failover) this.#showFailoverError(agentId, threadId, failover, status === "failed" && !limited);
       if (compactionFailure && compactionContinuation)
         this.#hooks.emitFailure?.({ code: "agent_error", agentId, ...compactionFailure.context });
