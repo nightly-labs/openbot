@@ -42,6 +42,7 @@ import {
   type FetchImplementation,
   type JSONWebKeySet,
   type JWTVerifyGetKey,
+  errors as joseErrors,
   jwtVerify,
   type RemoteJWKSet,
   SignJWT,
@@ -139,9 +140,17 @@ const telegramRouteClaimsSchema = z.object({
 });
 const SLACK_SIGNATURE_TOLERANCE_SECONDS = 5 * 60;
 
+const RemoteTokenFailureReason = Schema.Literals(["expired", "inactive"]);
+
 export class RemoteTokenError extends Schema.TaggedError<RemoteTokenError>()("RemoteTokenError", {
   message: Schema.String,
+  reason: Schema.optionalKey(RemoteTokenFailureReason),
 }) {}
+
+class RemoteSessionExpiredError extends Error {}
+
+const isExpiry = (error: unknown) =>
+  error instanceof joseErrors.JWTExpired || error instanceof RemoteSessionExpiredError;
 
 export class RemoteTokenUnavailableError extends Schema.TaggedError<RemoteTokenUnavailableError>()(
   "RemoteTokenUnavailableError",
@@ -157,6 +166,7 @@ export class RemoteTokenUnavailableError extends Schema.TaggedError<RemoteTokenU
 const tokenError = (error: unknown) =>
   new RemoteTokenError({
     message: error instanceof Error ? error.message : "Remote token operation failed.",
+    ...(isExpiry(error) ? { reason: "expired" as const } : {}),
   });
 const tokenCall = <A>(operation: () => Promise<A>) => Effect.tryPromise({ try: operation, catch: tokenError });
 const tokenDecode = <A>(operation: () => A) => Effect.try({ try: operation, catch: tokenError });
@@ -425,7 +435,7 @@ export class RemoteTokenService {
         );
         if (this.#trustedResumeTokens.has(claims.jti)) return claims;
         if (!(yield* this.validateClaims(claims)))
-          return yield* new RemoteTokenError({ message: "The remote session is not active." });
+          return yield* new RemoteTokenError({ message: "The remote session is not active.", reason: "inactive" });
         this.#trustResumeToken(claims);
         return claims;
       }).pipe(Effect.result);
@@ -711,7 +721,8 @@ function decodeTicketClaims(value: unknown, now: Date, signalId: string | null):
   ) {
     throw new Error("Unsupported protocol range.");
   }
-  if (claims.sessionExpiresAt <= Math.floor(now.getTime() / 1_000)) throw new Error("The remote session expired.");
+  if (claims.sessionExpiresAt <= Math.floor(now.getTime() / 1_000))
+    throw new RemoteSessionExpiredError("The remote session expired.");
   return claims;
 }
 

@@ -654,6 +654,18 @@ async function metricShows(port: number, sample: string): Promise<string> {
   throw new Error(`metric: ${lines.join(", ") || "absent"}`);
 }
 
+async function authFailureReasons(port: number): Promise<Map<string, number>> {
+  const page = await fetch(`http://127.0.0.1:${port}/metrics`, {
+    headers: { Authorization: `Bearer ${METRICS_TOKEN}` },
+  }).then((response) => response.text());
+  const reasons = new Map<string, number>();
+  for (const match of page.matchAll(/^openbot_remote_auth_failure_reasons_total\{reason="([a-z]+)"\} (\d+)$/gm)) {
+    const [, reason, value] = match;
+    if (reason && value) reasons.set(reason, Number(value));
+  }
+  return reasons;
+}
+
 async function helloFails(name: string, ticket: string) {
   await check(name, async () => {
     const peer = await connect(signalUrl);
@@ -1520,6 +1532,7 @@ try {
   watchHost.peer.socket.close();
   silentHost.peer.socket.close();
 
+  const reasonsBeforeRefusedTickets = await authFailureReasons(healthPort);
   await helloFails("A ticket signed by another key is refused", await remoteTicket({}, foreignKey));
   await helloFails(
     "A ticket of an expired remote session is refused",
@@ -1532,6 +1545,13 @@ try {
       protocolMaximum: REMOTE_TICKET_PROTOCOL_VERSION + 1,
     }),
   );
+  await check("/metrics counts each refused ticket by its reason", async () => {
+    const after = await authFailureReasons(healthPort);
+    const growth = (reason: string) => (after.get(reason) ?? 0) - (reasonsBeforeRefusedTickets.get(reason) ?? 0);
+    expect(growth("invalid") === 2, `invalid grew by ${growth("invalid")}, not 2.`);
+    expect(growth("expired") === 1, `expired grew by ${growth("expired")}, not 1.`);
+    return `invalid +${growth("invalid")}, expired +${growth("expired")}`;
+  });
   await check("A session that the account service cannot check is closed with 1013 and no error", async () => {
     const peer = await connect(signalUrl);
     peer.socket.send(
