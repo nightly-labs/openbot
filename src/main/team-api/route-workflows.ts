@@ -170,12 +170,16 @@ function fitted<A>(value: A): A {
   return value;
 }
 
+function blankStep({ question: _question, ...step }: WorkflowStep): WorkflowStep {
+  return { ...step, output: null, error: null };
+}
+
 function trimmed<A>(whole: A, lists: readonly WorkflowStep[][]): A {
   let bytes = bytesOf(whole);
   for (const steps of lists)
     for (const [index, step] of steps.entries()) {
       if (bytes <= WEBRTC_FRAME_BODY_BUDGET) return whole;
-      const blank: WorkflowStep = { ...step, output: null, error: null, question: undefined };
+      const blank = blankStep(step);
       bytes -= bytesOf(step) - bytesOf(blank);
       steps[index] = blank;
     }
