@@ -41,6 +41,8 @@ const { VaultStore } = await import("../src/main/vault-store");
 
 const RELAY_ORIGIN = "https://signal.example.test";
 const CALL_MARK = "WEBHOOK-CALL";
+const ADMIN = { id: "admin-remote", name: "Ada" };
+const MEMBER = { id: "member-remote", name: "Sam" };
 
 const FAKE_CODEX = `#!/usr/bin/env node
 const { appendFileSync } = require("node:fs");
@@ -268,6 +270,8 @@ const agents = new AgentService({
   offProviders: AGENT_PROVIDERS.filter((provider) => provider !== "codex"),
   agentApiKeys: apiKeys,
   webhookRoutines: () => agentWebhookRoutineWriter(events),
+  channelRemotePerson: (personId) => personId === ADMIN.id || personId === MEMBER.id,
+  personCanAdminister: (personId) => personId !== MEMBER.id,
 });
 const events = new HostEventsService({
   routines: agents.routineRecords,
@@ -293,9 +297,9 @@ const events = new HostEventsService({
 const agentEvents: AgentEvent[] = [];
 agents.on("event", (event) => agentEvents.push(event));
 
-async function callTool(name: string, agentId: string, args: WebhookToolArgs) {
+async function callTool(name: string, agentId: string, args: WebhookToolArgs, sender?: typeof MEMBER) {
   const receipt = await runCauseEffect(
-    agents.sendMessage({ agentId, text: `${CALL_MARK} <<ARGS${JSON.stringify(args)}ARGS>>` }),
+    agents.sendMessage({ agentId, text: `${CALL_MARK} <<ARGS${JSON.stringify(args)}ARGS>>` }, sender),
   );
   const deliveryId = receipt.deliveries[0]?.id;
   assert.ok(deliveryId, `${name}: no delivery`);
@@ -433,6 +437,61 @@ try {
       fromRunText.includes("Only a person's message") &&
       !afterRun.some((item) => item.name === "From a run"),
   );
+
+  const fromAdmin = await callTool(
+    "admin create",
+    agent.id,
+    { name: "Admin builds", instruction: "Report the failed build.", eventType: "build.failed" },
+    ADMIN,
+  );
+  pass(
+    "A server admin's message creates a webhook routine with the chat card",
+    fromAdmin.entry.result?.success === true && fromAdmin.body?.secret?.includes("card in this chat") === true,
+    fromAdmin.text,
+  );
+  const adminRoutineId = fromAdmin.body?.routineId ?? "";
+  const fromMember = await callTool(
+    "member create",
+    agent.id,
+    { name: "Member builds", instruction: "Never." },
+    MEMBER,
+  );
+  const memberUpdate = await callTool(
+    "member update",
+    agent.id,
+    { __tool: "update_webhook_routine", routineId: adminRoutineId, instruction: "Changed by a member." },
+    MEMBER,
+  );
+  const memberDelete = await callTool(
+    "member delete",
+    agent.id,
+    { __tool: "delete_routine", routineId: adminRoutineId },
+    MEMBER,
+  );
+  const afterMember = await Effect.runPromise(events.listRoutines({ owner }));
+  const adminRoutine = afterMember.find((item) => item.id === adminRoutineId);
+  pass(
+    "A server member's message cannot create, change or delete a webhook routine",
+    [fromMember, memberUpdate, memberDelete].every((call) => call.entry.result?.success === false) &&
+      !afterMember.some((item) => item.name === "Member builds") &&
+      adminRoutine?.instruction === "Report the failed build.",
+    `${fromMember.text} ${memberUpdate.text} ${memberDelete.text}`,
+  );
+  pass(
+    "The member refusal names the cause and the next step, and says not to retry",
+    [fromMember, memberUpdate, memberDelete].every(
+      (call) =>
+        call.body?.error?.includes("not an owner or admin") === true &&
+        call.body.error.includes("ask an owner or admin") &&
+        call.body.error.includes("Do not retry"),
+    ),
+    fromMember.text,
+  );
+  const ownerDelete = await callTool("admin routine delete", agent.id, {
+    __tool: "delete_routine",
+    routineId: adminRoutineId,
+  });
+  pass("The owner deletes the admin's routine", ownerDelete.entry.result?.success === true, ownerDelete.text);
 
   const { secret } = await Effect.runPromise(events.rotateSecret({ owner, id: result.routineId }));
   const routeId = new URL(result.url ?? "").pathname.split("/").at(-1) ?? "";

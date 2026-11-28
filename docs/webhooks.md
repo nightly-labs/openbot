@@ -36,7 +36,10 @@ button.
 To change the event type or the filters from the chat, ask the agent: it calls
 `openbot.update_webhook_routine`. You can also change them on the card and press **Save**. The URL
 and the secret stay the same. Only a person's message can start these tools: a routine run or
-another agent's message cannot make or change a webhook routine.
+another agent's message cannot make or change a webhook routine. On a server, the message must come
+from the owner or an admin, as in the routine settings; a member's message cannot. A message in a
+thread that the agent started, in a channel or in a chat app cannot start them either. The agent
+gets the cause and the next step for the person, and does not try again.
 
 To replace the secret, make a new one in the routine editor and update the sender. The old secret
 stops working immediately. A secret has the format `whsec_<44 base64 characters>`, as the
