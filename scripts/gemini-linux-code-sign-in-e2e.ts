@@ -77,20 +77,20 @@ try {
   report.accounts = {
     linuxComputer: accountCodeSignInOffered(
       "antigravity",
-      accountActions({ pasteCodeSignIn: true, windowsCodeSignIn: false, computerPasteCodeSignIn: true }),
+      accountActions({ pasteCodeSignIn: true, windowsCodeSignIn: false, local: true }),
     ),
     macComputer: accountCodeSignInOffered(
       "antigravity",
-      accountActions({ pasteCodeSignIn: false, windowsCodeSignIn: false, computerPasteCodeSignIn: false }),
+      accountActions({ pasteCodeSignIn: false, windowsCodeSignIn: false, local: true }),
     ),
     windowsComputer: accountCodeSignInOffered(
       "antigravity",
-      accountActions({ pasteCodeSignIn: false, windowsCodeSignIn: true, computerPasteCodeSignIn: false }),
+      accountActions({ pasteCodeSignIn: false, windowsCodeSignIn: true, local: true }),
     ),
     joinedServer: accountCodeSignInOffered("antigravity", accountActions({ pasteCodeSignIn: true })),
     claudeWindowsComputer: accountCodeSignInOffered(
       "claude",
-      accountActions({ pasteCodeSignIn: false, windowsCodeSignIn: true, computerPasteCodeSignIn: false }),
+      accountActions({ pasteCodeSignIn: false, windowsCodeSignIn: true, local: true }),
     ),
   };
   assert.deepEqual(report.accounts, {

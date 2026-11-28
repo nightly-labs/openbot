@@ -408,15 +408,13 @@ const Providers = createSimpleContext({
         const status = await request;
         if (activeServer()?.id === serverId) flush(() => applyAgentStatus(status));
       };
-      const computerPasteCodeSignIn = pasteCodeSignInSupported(appInfo()?.platform ?? "");
       return {
         connect: async (provider, accountId) => {
           await providersPort().connectProviderAccount({ provider, accountId });
         },
         connectWithCode: async (provider, accountId) => connection.connectAccountWithCode(provider, accountId),
-        pasteCodeSignIn: computerPasteCodeSignIn,
+        pasteCodeSignIn: pasteCodeSignInSupported(appInfo()?.platform ?? ""),
         windowsCodeSignIn: appInfo()?.platform === "win32",
-        computerPasteCodeSignIn,
         connectKey: (provider, accountId, key) =>
           apply(providersPort().connectProviderAccountKey({ provider, accountId, key })),
         cancel: async (provider, accountId) => {

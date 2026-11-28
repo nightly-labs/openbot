@@ -21,7 +21,6 @@ export interface ProviderAccountActions {
   connectWithCode?: ((provider: AgentProviderId, accountId: string | null) => Promise<void>) | undefined;
   pasteCodeSignIn?: boolean | undefined;
   windowsCodeSignIn?: boolean | undefined;
-  computerPasteCodeSignIn?: boolean | undefined;
   cancel: (provider: AgentProviderId, accountId: string) => Promise<void>;
   rename: (provider: AgentProviderId, accountId: string, label: string | null) => Promise<void>;
   remove: (provider: AgentProviderId, accountId: string) => Promise<void>;
@@ -97,7 +96,7 @@ export function accountCodeSignInOffered(provider: string, actions: ProviderAcco
     codeSignIn === "device" ||
     (codeSignIn === "paste" && actions.pasteCodeSignIn === true) ||
     (descriptor.windowsCodeSignIn === "paste" && actions.windowsCodeSignIn === true) ||
-    (descriptor.localCodeSignIn === "paste" && actions.computerPasteCodeSignIn === true)
+    (descriptor.localCodeSignIn === "paste" && actions.local === true && actions.pasteCodeSignIn === true)
   );
 }
 
