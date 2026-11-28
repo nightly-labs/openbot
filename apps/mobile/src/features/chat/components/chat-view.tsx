@@ -1234,7 +1234,6 @@ export function ChatView({
                 serverName={server?.name ?? ""}
                 onRespondApproval={respondToApproval}
                 readsWholeApprovals={workspace().readsWholeApprovals(target.serverId)}
-                serverConnected={server?.state === "online"}
                 onLoadWholeApproval={loadWholeApproval}
                 foreground={foreground}
                 messages={messages}

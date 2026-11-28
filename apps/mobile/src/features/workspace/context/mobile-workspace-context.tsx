@@ -2356,13 +2356,21 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
         hasCapability(serverCapabilities.current, serverId, PENDING_APPROVAL_CAPABILITY),
       readWholeApproval: async (serverId, approval) => {
         if (!hasCapability(serverCapabilities.current, serverId, PENDING_APPROVAL_CAPABILITY)) return;
-        const whole = await runTeamRequest(
-          readPendingApproval(teamApi(serverId), { agentId: approval.agentId, requestId: approval.requestId }),
-        ).catch((error: unknown) => {
-          if (error instanceof InactiveRequestError)
-            liveState.update("approvalRequests", (current) => dropApproval(current, serverId, approval.requestId));
-          throw error;
-        });
+        const read = () =>
+          runTeamRequest(
+            readPendingApproval(teamApi(serverId), { agentId: approval.agentId, requestId: approval.requestId }),
+          );
+        const whole = await read()
+          .catch(async (error: unknown) => {
+            if (!(error instanceof Error) || !isConnectionStop(error)) throw error;
+            await connectionWaits.whenOnlineAgain(serverId);
+            return read();
+          })
+          .catch((error: unknown) => {
+            if (error instanceof InactiveRequestError)
+              liveState.update("approvalRequests", (current) => dropApproval(current, serverId, approval.requestId));
+            throw error;
+          });
         liveState.update("approvalRequests", (current) => {
           const previous = current[serverId];
           if (!previous) return current;
@@ -2945,6 +2953,7 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
     applyHostColors,
     pushSidebarPins,
     preferenceStore,
+    connectionWaits,
   ]);
 
   const activeServer = useMemo(

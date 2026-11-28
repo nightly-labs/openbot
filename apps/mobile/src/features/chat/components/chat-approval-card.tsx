@@ -35,7 +35,6 @@ export function ChatApprovalCard({
   showAgentName,
   serverName,
   canAnswer,
-  connected,
   respond,
   readsWhole,
   loadWhole,
@@ -45,7 +44,6 @@ export function ChatApprovalCard({
   showAgentName: boolean;
   serverName: string;
   canAnswer: boolean;
-  connected: boolean;
   respond: (decision: ApprovalDecision) => Promise<void>;
   readsWhole: boolean;
   loadWhole: () => Promise<void>;
@@ -61,7 +59,6 @@ export function ChatApprovalCard({
   const disabled = !canAnswer || pending !== null;
   const report = feedbackApproval(approval);
   const reading = partial && readsWhole && canAnswer;
-  const canRead = reading && connected;
   const phoneReport = report?.phone === true;
   const { agentId, requestId } = approval;
   const phone = useMemo(
@@ -76,7 +73,7 @@ export function ChatApprovalCard({
   const loadWholeRef = useRef(loadWhole);
   loadWholeRef.current = loadWhole;
   useEffect(() => {
-    if (!canRead) return;
+    if (!reading) return;
     let current = true;
     setWholeFailed(false);
     loadWholeRef.current().then(
@@ -90,7 +87,7 @@ export function ChatApprovalCard({
     return () => {
       current = false;
     };
-  }, [canRead]);
+  }, [reading]);
   function retryWhole() {
     setWholeFailed(false);
     loadWhole().then(
@@ -116,7 +113,7 @@ export function ChatApprovalCard({
       ? t("mobile.chat.approval.partial", names)
       : !reading
         ? null
-        : wholeFailed && connected
+        : wholeFailed
           ? t("mobile.chat.approval.loadFailed")
           : t("mobile.chat.approval.loading")
     : report
@@ -313,7 +310,7 @@ export function ChatApprovalCard({
           <Button.Label className="font-sans font-semibold">{declineLabel}</Button.Label>
         </Button>
         {report ? acceptButton() : null}
-        {canRead && wholeFailed ? (
+        {reading && wholeFailed ? (
           <Button
             size="sm"
             variant="tertiary"

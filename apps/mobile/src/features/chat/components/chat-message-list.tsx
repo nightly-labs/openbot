@@ -256,7 +256,6 @@ interface ChatMessageListProps {
   serverName?: string;
   onRespondApproval?: (approval: PendingApproval, decision: ApprovalDecision) => Promise<void>;
   readsWholeApprovals?: boolean;
-  serverConnected?: boolean;
   onLoadWholeApproval?: (approval: PendingApproval) => Promise<void>;
   foreground: ViewStyle["backgroundColor"];
   historyState: "ready" | "connecting" | "waiting" | "loading" | "error";
@@ -1446,7 +1445,6 @@ export const ChatMessageList = memo(function ChatMessageList({
   serverName = "",
   onRespondApproval,
   readsWholeApprovals = false,
-  serverConnected = false,
   onLoadWholeApproval,
   foreground,
   historyState,
@@ -2208,7 +2206,6 @@ export const ChatMessageList = memo(function ChatMessageList({
               showAgentName={target.kind === "channel"}
               serverName={serverName}
               canAnswer={canSend}
-              connected={serverConnected}
               respond={(decision) => onRespondApproval(approval, decision)}
               readsWhole={readsWholeApprovals && onLoadWholeApproval !== undefined}
               loadWhole={() => onLoadWholeApproval?.(approval) ?? Promise.resolve()}

@@ -700,7 +700,6 @@ function AgentTaskChat({
           serverName={server?.name ?? ""}
           onRespondApproval={respondToListApproval}
           readsWholeApprovals={wholeApprovals}
-          serverConnected={server?.state === "online"}
           onLoadWholeApproval={loadWholeListApproval}
           foreground={foreground}
           messages={messages}
