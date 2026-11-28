@@ -155,6 +155,7 @@ export default {
   async fetch(request: Request, env: ProbeEnv): Promise<Response> {
     const body = await request.json<{ options: ProbeOptions; request: ProbeRequest }>();
     const calls: D1Call[] = [];
+    const hostState = hostStateBinding(env, body.options);
     const plane = new RemoteControlPlane(
       {
         DB: countedDatabase(env.DB, calls),
@@ -162,7 +163,7 @@ export default {
         REMOTE_TICKET_PUBLIC_JWKS: env.REMOTE_TICKET_PUBLIC_JWKS,
         REMOTE_TICKET_KEY_ID: env.REMOTE_TICKET_KEY_ID,
         REMOTE_SIGNAL_URL: "wss://signal.probe.test",
-        HOST_STATE: hostStateBinding(env, body.options),
+        ...(hostState ? { HOST_STATE: hostState } : {}),
         HOST_STATE_MODE: body.options.mode,
       },
       {
