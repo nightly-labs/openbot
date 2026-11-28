@@ -26,6 +26,7 @@ import type {
   AgentModelOption,
   AgentNewChatSettings,
   AgentNotificationLevelsSnapshot,
+  AgentPendingRuntime,
   AgentPlanCardSettings,
   AgentProviderId,
   AgentReasoningEffort,
@@ -292,6 +293,7 @@ export interface MobileAgent {
   foreignProvider?: ForeignProviderId | undefined;
   model?: AgentModelId;
   reasoningEffort?: AgentReasoningEffort;
+  pendingRuntime?: AgentPendingRuntime | undefined;
   notifications?: boolean;
   workspacePath?: string;
   id: string;

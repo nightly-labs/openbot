@@ -8,6 +8,7 @@ import type { DiscordApi } from "./discord-api";
 import { DiscordGateway } from "./discord-gateway";
 import { SignalEntry } from "./entry";
 import type { RouteWake } from "./ingress-queue";
+import { makeResumeBatcher } from "./resume-batch";
 import { SignalService } from "./signal-service";
 import { TelegramBotApi } from "./telegram";
 import {
@@ -31,9 +32,13 @@ class ControlPlaneError extends Schema.TaggedError<ControlPlaneError>()("Control
 
 const RESUME_CHECK_CONCURRENCY = 64;
 const RESUME_CHECK_DEADLINE = "7 seconds";
+const RESUME_BATCH_WAIT = "25 millis";
+const RESUME_BATCH_CONCURRENCY = 8;
+const RESUME_BATCH_RETRY_AFTER_MILLISECONDS = 10 * 60_000;
 const HOST_WAKE_DEADLINE_MILLISECONDS = 10_000;
 
 const ResumeValidation = Schema.Struct({ valid: Schema.Boolean });
+const ResumeBatchValidation = Schema.Struct({ valid: Schema.Array(Schema.Boolean) });
 const SlackValidation = Schema.Struct({ teams: Schema.Array(Schema.String) });
 const TelegramValidation = Schema.Struct({
   chats: Schema.Array(Schema.Struct({ id: Schema.String, botId: Schema.String, linkedAt: Schema.Int })),
@@ -81,219 +86,258 @@ class ControlPlane extends Context.Service<
     reconcileDiscordGuilds(guildIds: string[], before: number): Effect.Effect<void, ControlPlaneError>;
   }
 >()("@openbot/remote-api/ControlPlane") {
-  static layer = Layer.sync(ControlPlane, () => {
-    const ask = Effect.fn("ControlPlane.request")((path: string, payload: unknown, timeoutMilliseconds = 5_000) =>
-      Effect.tryPromise({
-        try: (signal) => {
-          const body = JSON.stringify(payload);
-          const timestamp = Math.floor(Date.now() / 1_000).toString();
-          return fetch(new URL(path, config.controlPlaneUrl), {
-            method: "POST",
-            headers: {
-              "Content-Type": "application/json",
-              "OpenBot-Timestamp": timestamp,
-              "OpenBot-Signature": signServiceRequest(body, timestamp, config.authWebhookSecret),
-            },
-            body,
-            signal: AbortSignal.any([signal, AbortSignal.timeout(timeoutMilliseconds)]),
-          });
-        },
-        catch: () => new ControlPlaneError({ message: "The account service request failed." }),
-      }),
-    );
-    const readJson = (response: Response) =>
-      Effect.tryPromise({
-        try: () => response.json(),
-        catch: () => new ControlPlaneError({ message: "The account service response is invalid." }),
+  static layer = Layer.effect(
+    ControlPlane,
+    Effect.gen(function* () {
+      const scope = yield* Effect.scope;
+      const ask = Effect.fn("ControlPlane.request")((path: string, payload: unknown, timeoutMilliseconds = 5_000) =>
+        Effect.tryPromise({
+          try: (signal) => {
+            const body = JSON.stringify(payload);
+            const timestamp = Math.floor(Date.now() / 1_000).toString();
+            return fetch(new URL(path, config.controlPlaneUrl), {
+              method: "POST",
+              headers: {
+                "Content-Type": "application/json",
+                "OpenBot-Timestamp": timestamp,
+                "OpenBot-Signature": signServiceRequest(body, timestamp, config.authWebhookSecret),
+              },
+              body,
+              signal: AbortSignal.any([signal, AbortSignal.timeout(timeoutMilliseconds)]),
+            });
+          },
+          catch: () => new ControlPlaneError({ message: "The account service request failed." }),
+        }),
+      );
+      const readJson = (response: Response) =>
+        Effect.tryPromise({
+          try: () => response.json(),
+          catch: () => new ControlPlaneError({ message: "The account service response is invalid." }),
+        });
+      const releaseResponse = (response: Response) => {
+        const body = response.body;
+        return body
+          ? Effect.tryPromise({ try: () => body.cancel(), catch: () => undefined }).pipe(
+              Effect.catch(() => Effect.void),
+            )
+          : Effect.void;
+      };
+      const resumeChecks = Semaphore.makeUnsafe(RESUME_CHECK_CONCURRENCY);
+      const unavailable = () => new ControlPlaneError({ message: "The account service is unavailable." });
+      const invalidAnswer = () => new ControlPlaneError({ message: "The account service response is invalid." });
+      const validateOne = (claims: import("./protocol").RemoteTicketClaims) =>
+        Effect.acquireUseRelease(
+          ask("/v2/remote/resume/validate", claims),
+          (response) =>
+            Effect.gen(function* () {
+              if (response.status >= 500 || response.status === 429) return yield* unavailable();
+              if (!response.ok) return false;
+              const result = yield* readJson(response).pipe(
+                Effect.flatMap(Schema.decodeUnknownEffect(ResumeValidation)),
+                Effect.mapError(invalidAnswer),
+              );
+              return result.valid;
+            }),
+          releaseResponse,
+        ).pipe(resumeChecks.withPermit);
+      let batchUnsupportedUntil = 0;
+      const validateBatch = (claims: readonly import("./protocol").RemoteTicketClaims[]) =>
+        Date.now() < batchUnsupportedUntil
+          ? Effect.succeed("unsupported" as const)
+          : Effect.acquireUseRelease(
+              ask("/v2/remote/resume/validate-batch", { claims }),
+              (response) =>
+                Effect.gen(function* () {
+                  if (response.status >= 500 || response.status === 429) return yield* unavailable();
+                  if (response.status === 404 || response.status === 405)
+                    batchUnsupportedUntil = Date.now() + RESUME_BATCH_RETRY_AFTER_MILLISECONDS;
+                  if (!response.ok) return "unsupported" as const;
+                  const result = yield* readJson(response).pipe(
+                    Effect.flatMap(Schema.decodeUnknownEffect(ResumeBatchValidation)),
+                    Effect.mapError(invalidAnswer),
+                  );
+                  if (result.valid.length !== claims.length) return yield* invalidAnswer();
+                  return { valid: result.valid };
+                }),
+              releaseResponse,
+            );
+      const validateInBatch = makeResumeBatcher({
+        scope,
+        wait: RESUME_BATCH_WAIT,
+        concurrency: RESUME_BATCH_CONCURRENCY,
+        batch: validateBatch,
+        single: validateOne,
       });
-    const releaseResponse = (response: Response) => {
-      const body = response.body;
-      return body
-        ? Effect.tryPromise({ try: () => body.cancel(), catch: () => undefined }).pipe(Effect.catch(() => Effect.void))
-        : Effect.void;
-    };
-    const resumeChecks = Semaphore.makeUnsafe(RESUME_CHECK_CONCURRENCY);
-    return ControlPlane.of({
-      validateResume: Effect.fn("ControlPlane.validateResume")(
-        (claims) =>
+      return ControlPlane.of({
+        validateResume: Effect.fn("ControlPlane.validateResume")(
+          (claims) => validateInBatch(claims),
+          Effect.timeoutOrElse({
+            duration: RESUME_CHECK_DEADLINE,
+            orElse: () => Effect.fail(unavailable()),
+          }),
+        ),
+        validateSlackRoute: Effect.fn("ControlPlane.validateSlackRoute")((hostId, teams) =>
           Effect.acquireUseRelease(
-            ask("/v2/remote/resume/validate", claims),
+            ask("/v2/remote/slack-route/validate", { hostId, teams }),
             (response) =>
               Effect.gen(function* () {
-                if (response.status >= 500 || response.status === 429)
-                  return yield* new ControlPlaneError({ message: "The account service is unavailable." });
-                if (!response.ok) return false;
+                if (!response.ok)
+                  return yield* new ControlPlaneError({
+                    message: "The account service did not confirm the Slack route.",
+                  });
                 const result = yield* readJson(response).pipe(
-                  Effect.flatMap(Schema.decodeUnknownEffect(ResumeValidation)),
+                  Effect.flatMap(Schema.decodeUnknownEffect(SlackValidation)),
                   Effect.mapError(() => new ControlPlaneError({ message: "The account service response is invalid." })),
                 );
-                return result.valid;
+                return [...result.teams];
               }),
             releaseResponse,
           ),
-        resumeChecks.withPermit,
-        Effect.timeoutOrElse({
-          duration: RESUME_CHECK_DEADLINE,
-          orElse: () => Effect.fail(new ControlPlaneError({ message: "The account service is unavailable." })),
-        }),
-      ),
-      validateSlackRoute: Effect.fn("ControlPlane.validateSlackRoute")((hostId, teams) =>
-        Effect.acquireUseRelease(
-          ask("/v2/remote/slack-route/validate", { hostId, teams }),
-          (response) =>
-            Effect.gen(function* () {
-              if (!response.ok)
-                return yield* new ControlPlaneError({
-                  message: "The account service did not confirm the Slack route.",
-                });
-              const result = yield* readJson(response).pipe(
-                Effect.flatMap(Schema.decodeUnknownEffect(SlackValidation)),
-                Effect.mapError(() => new ControlPlaneError({ message: "The account service response is invalid." })),
-              );
-              return [...result.teams];
+        ),
+        validateDiscordRoute: Effect.fn("ControlPlane.validateDiscordRoute")((hostId, guilds) =>
+          Effect.acquireUseRelease(
+            ask("/v2/remote/discord-route/validate", { hostId, guilds }),
+            (response) =>
+              Effect.gen(function* () {
+                if (!response.ok)
+                  return yield* new ControlPlaneError({
+                    message: "The account service did not confirm the Discord route.",
+                  });
+                const result = yield* readJson(response).pipe(
+                  Effect.flatMap(Schema.decodeUnknownEffect(DiscordValidation)),
+                  Effect.mapError(() => new ControlPlaneError({ message: "The account service response is invalid." })),
+                );
+                return [...result.guilds];
+              }),
+            releaseResponse,
+          ),
+        ),
+        validateWebhookRoute: Effect.fn("ControlPlane.validateWebhookRoute")((hostId, routes) =>
+          Effect.acquireUseRelease(
+            ask("/v2/remote/webhook-route/validate", { hostId, routes }),
+            (response) =>
+              Effect.gen(function* () {
+                if (!response.ok)
+                  return yield* new ControlPlaneError({
+                    message: "The account service did not confirm the webhook route.",
+                  });
+                const result = yield* readJson(response).pipe(
+                  Effect.flatMap(Schema.decodeUnknownEffect(WebhookValidation)),
+                  Effect.mapError(() => new ControlPlaneError({ message: "The account service response is invalid." })),
+                );
+                return [...result.routes];
+              }),
+            releaseResponse,
+          ),
+        ),
+        reconcileDiscordGuilds: Effect.fn("ControlPlane.reconcileDiscordGuilds")((guildIds, before) =>
+          Effect.acquireUseRelease(
+            ask("/v2/remote/discord-route/reconcile", { guilds: guildIds, before }),
+            (response) =>
+              response.ok
+                ? Effect.void
+                : Effect.fail(
+                    new ControlPlaneError({ message: "The account service did not reconcile the Discord guilds." }),
+                  ),
+            releaseResponse,
+          ),
+        ),
+        routeWake: Effect.fn("ControlPlane.routeWake")((route, wake) =>
+          Effect.acquireUseRelease(
+            ask("/v2/remote/route-wake", { route, wake }, 30_000),
+            (response) =>
+              Effect.gen(function* () {
+                if (response.status === 404) return { hostId: null, state: "not_hosted" as const };
+                if (!response.ok)
+                  return yield* new ControlPlaneError({
+                    message: "The account service did not answer the route wake.",
+                  });
+                return yield* readJson(response).pipe(
+                  Effect.flatMap(Schema.decodeUnknownEffect(RouteWakeAnswer)),
+                  Effect.mapError(() => new ControlPlaneError({ message: "The account service response is invalid." })),
+                );
+              }),
+            releaseResponse,
+          ),
+        ),
+        hostWake: Effect.fn("ControlPlane.hostWake")((hostId) =>
+          Effect.acquireUseRelease(
+            ask("/v2/remote/host-wake", { hostId, wake: true }, HOST_WAKE_DEADLINE_MILLISECONDS),
+            (response) =>
+              Effect.gen(function* () {
+                if (response.status === 404) return { hostId: null, state: "not_hosted" as const };
+                if (!response.ok)
+                  return yield* new ControlPlaneError({ message: "The account service did not answer the host wake." });
+                return yield* readJson(response).pipe(
+                  Effect.flatMap(Schema.decodeUnknownEffect(RouteWakeAnswer)),
+                  Effect.mapError(() => new ControlPlaneError({ message: "The account service response is invalid." })),
+                );
+              }),
+            releaseResponse,
+          ),
+        ),
+        supportsRouteWake: Effect.fn("ControlPlane.supportsRouteWake")(() =>
+          Effect.acquireUseRelease(
+            ask("/v2/remote/route-wake", { route: { platform: "slack", appId: "A0", teamId: "T0" }, wake: false }),
+            (response) => Effect.succeed(response.ok),
+            releaseResponse,
+          ).pipe(Effect.catch(() => Effect.succeed(false))),
+        ),
+        discordGuildRemoved: Effect.fn("ControlPlane.discordGuildRemoved")((guildId) =>
+          Effect.acquireUseRelease(
+            ask("/v2/remote/discord-route/removed", { guildId }),
+            (response) =>
+              response.ok
+                ? Effect.void
+                : Effect.fail(
+                    new ControlPlaneError({ message: "The account service did not unlink the Discord guild." }),
+                  ),
+            releaseResponse,
+          ),
+        ),
+        validateTelegramRoute: Effect.fn("ControlPlane.validateTelegramRoute")((hostId, chats) =>
+          Effect.acquireUseRelease(
+            ask("/v2/remote/telegram-route/validate", {
+              hostId,
+              chats: chats.map(({ id, botId, linkedAt }) => ({ id, botId, linkedAt })),
             }),
-          releaseResponse,
+            (response) =>
+              Effect.gen(function* () {
+                if (!response.ok)
+                  return yield* new ControlPlaneError({
+                    message: "The account service did not confirm the Telegram route.",
+                  });
+                const result = yield* readJson(response).pipe(
+                  Effect.flatMap(Schema.decodeUnknownEffect(TelegramValidation)),
+                  Effect.mapError(() => new ControlPlaneError({ message: "The account service response is invalid." })),
+                );
+                return [...result.chats];
+              }),
+            releaseResponse,
+          ),
         ),
-      ),
-      validateDiscordRoute: Effect.fn("ControlPlane.validateDiscordRoute")((hostId, guilds) =>
-        Effect.acquireUseRelease(
-          ask("/v2/remote/discord-route/validate", { hostId, guilds }),
-          (response) =>
-            Effect.gen(function* () {
-              if (!response.ok)
-                return yield* new ControlPlaneError({
-                  message: "The account service did not confirm the Discord route.",
-                });
-              const result = yield* readJson(response).pipe(
-                Effect.flatMap(Schema.decodeUnknownEffect(DiscordValidation)),
-                Effect.mapError(() => new ControlPlaneError({ message: "The account service response is invalid." })),
-              );
-              return [...result.guilds];
-            }),
-          releaseResponse,
+        linkTelegramChat: Effect.fn("ControlPlane.linkTelegramChat")((botId, chatId, code) =>
+          Effect.acquireUseRelease(
+            ask("/v2/remote/telegram-route/link", { botId, chatId, code }),
+            (response) =>
+              Effect.gen(function* () {
+                if (response.status === 404 || response.status === 409) return null;
+                if (!response.ok)
+                  return yield* new ControlPlaneError({
+                    message: "The account service did not link the Telegram chat.",
+                  });
+                const result = yield* readJson(response).pipe(
+                  Effect.flatMap(Schema.decodeUnknownEffect(TelegramLink)),
+                  Effect.mapError(() => new ControlPlaneError({ message: "The account service response is invalid." })),
+                );
+                return { hostId: result.hostId, linkedAt: result.linkedAt };
+              }),
+            releaseResponse,
+          ),
         ),
-      ),
-      validateWebhookRoute: Effect.fn("ControlPlane.validateWebhookRoute")((hostId, routes) =>
-        Effect.acquireUseRelease(
-          ask("/v2/remote/webhook-route/validate", { hostId, routes }),
-          (response) =>
-            Effect.gen(function* () {
-              if (!response.ok)
-                return yield* new ControlPlaneError({
-                  message: "The account service did not confirm the webhook route.",
-                });
-              const result = yield* readJson(response).pipe(
-                Effect.flatMap(Schema.decodeUnknownEffect(WebhookValidation)),
-                Effect.mapError(() => new ControlPlaneError({ message: "The account service response is invalid." })),
-              );
-              return [...result.routes];
-            }),
-          releaseResponse,
-        ),
-      ),
-      reconcileDiscordGuilds: Effect.fn("ControlPlane.reconcileDiscordGuilds")((guildIds, before) =>
-        Effect.acquireUseRelease(
-          ask("/v2/remote/discord-route/reconcile", { guilds: guildIds, before }),
-          (response) =>
-            response.ok
-              ? Effect.void
-              : Effect.fail(
-                  new ControlPlaneError({ message: "The account service did not reconcile the Discord guilds." }),
-                ),
-          releaseResponse,
-        ),
-      ),
-      routeWake: Effect.fn("ControlPlane.routeWake")((route, wake) =>
-        Effect.acquireUseRelease(
-          ask("/v2/remote/route-wake", { route, wake }, 30_000),
-          (response) =>
-            Effect.gen(function* () {
-              if (response.status === 404) return { hostId: null, state: "not_hosted" as const };
-              if (!response.ok)
-                return yield* new ControlPlaneError({ message: "The account service did not answer the route wake." });
-              return yield* readJson(response).pipe(
-                Effect.flatMap(Schema.decodeUnknownEffect(RouteWakeAnswer)),
-                Effect.mapError(() => new ControlPlaneError({ message: "The account service response is invalid." })),
-              );
-            }),
-          releaseResponse,
-        ),
-      ),
-      hostWake: Effect.fn("ControlPlane.hostWake")((hostId) =>
-        Effect.acquireUseRelease(
-          ask("/v2/remote/host-wake", { hostId, wake: true }, HOST_WAKE_DEADLINE_MILLISECONDS),
-          (response) =>
-            Effect.gen(function* () {
-              if (response.status === 404) return { hostId: null, state: "not_hosted" as const };
-              if (!response.ok)
-                return yield* new ControlPlaneError({ message: "The account service did not answer the host wake." });
-              return yield* readJson(response).pipe(
-                Effect.flatMap(Schema.decodeUnknownEffect(RouteWakeAnswer)),
-                Effect.mapError(() => new ControlPlaneError({ message: "The account service response is invalid." })),
-              );
-            }),
-          releaseResponse,
-        ),
-      ),
-      supportsRouteWake: Effect.fn("ControlPlane.supportsRouteWake")(() =>
-        Effect.acquireUseRelease(
-          ask("/v2/remote/route-wake", { route: { platform: "slack", appId: "A0", teamId: "T0" }, wake: false }),
-          (response) => Effect.succeed(response.ok),
-          releaseResponse,
-        ).pipe(Effect.catch(() => Effect.succeed(false))),
-      ),
-      discordGuildRemoved: Effect.fn("ControlPlane.discordGuildRemoved")((guildId) =>
-        Effect.acquireUseRelease(
-          ask("/v2/remote/discord-route/removed", { guildId }),
-          (response) =>
-            response.ok
-              ? Effect.void
-              : Effect.fail(
-                  new ControlPlaneError({ message: "The account service did not unlink the Discord guild." }),
-                ),
-          releaseResponse,
-        ),
-      ),
-      validateTelegramRoute: Effect.fn("ControlPlane.validateTelegramRoute")((hostId, chats) =>
-        Effect.acquireUseRelease(
-          ask("/v2/remote/telegram-route/validate", {
-            hostId,
-            chats: chats.map(({ id, botId, linkedAt }) => ({ id, botId, linkedAt })),
-          }),
-          (response) =>
-            Effect.gen(function* () {
-              if (!response.ok)
-                return yield* new ControlPlaneError({
-                  message: "The account service did not confirm the Telegram route.",
-                });
-              const result = yield* readJson(response).pipe(
-                Effect.flatMap(Schema.decodeUnknownEffect(TelegramValidation)),
-                Effect.mapError(() => new ControlPlaneError({ message: "The account service response is invalid." })),
-              );
-              return [...result.chats];
-            }),
-          releaseResponse,
-        ),
-      ),
-      linkTelegramChat: Effect.fn("ControlPlane.linkTelegramChat")((botId, chatId, code) =>
-        Effect.acquireUseRelease(
-          ask("/v2/remote/telegram-route/link", { botId, chatId, code }),
-          (response) =>
-            Effect.gen(function* () {
-              if (response.status === 404 || response.status === 409) return null;
-              if (!response.ok)
-                return yield* new ControlPlaneError({ message: "The account service did not link the Telegram chat." });
-              const result = yield* readJson(response).pipe(
-                Effect.flatMap(Schema.decodeUnknownEffect(TelegramLink)),
-                Effect.mapError(() => new ControlPlaneError({ message: "The account service response is invalid." })),
-              );
-              return { hostId: result.hostId, linkedAt: result.linkedAt };
-            }),
-          releaseResponse,
-        ),
-      ),
-    });
-  });
+      });
+    }),
+  );
 }
 
 const controlPlane = ManagedRuntime.make(ControlPlane.layer);

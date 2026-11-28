@@ -384,11 +384,12 @@ Removing those paths needs the 60-day support window.
 
 ## Check
 
-CI runs `test:sync`, `test:sync-log` and `test:remote-sync` (the desktop with a joined server) in
-the Team API routes E2E job when desktop code changes. `test:web-sync` and `test:extension-sync`
-need a dev stack and run only by hand. `test:team-webrtc-wire-parity` decodes valid and invalid sync
-messages as WebRTC frames (client messages in `event-control` frames, host messages in `event`
-frames) and with the `sync-v1.ts` decoders, and fails when one is accepted or refused incorrectly.
+CI runs `test:sync`, `test:sync-log`, `test:remote-sync` (the desktop with a joined server) and
+`test:remote-sync-webrtc` (the same over the WebRTC transport) in the Team API routes E2E job when
+desktop code changes. `test:web-sync` and `test:extension-sync` need a dev stack and run only by
+hand. `test:team-webrtc-wire-parity` decodes valid and invalid sync messages as WebRTC frames
+(client messages in `event-control` frames, host messages in `event` frames) and with the
+`sync-v1.ts` decoders, and fails when one is accepted or refused incorrectly.
 The `event` frame decoder accepts any JSON payload: only `decodeSyncServerMessage` refuses an
 invalid host message.
 
@@ -416,3 +417,12 @@ pages from the logs, the meta collections and the references, and compares them 
 pages: at first, after a new message, a reaction, a turn start and end, a read mark and a quoted
 reply to a message outside the window, and for an older agent page with its references. The
 report is `.openbot-build/sync/log-report.json`.
+
+`bun run test:remote-sync-webrtc` (`scripts/remote-server-sync-webrtc-e2e.ts`) joins a host with
+`RemoteServerManager` over the `webrtc-v2` transport. Two loopback bridges carry the data channel
+frames in memory to a real `TeamWebRtcHostPeer`, with the end-to-end authentication. The check
+counts the sync `event-control` and `event` frames and the host HTTP calls. It checks the first
+channel sync, a live change, a drop and a reconnect that gets only the diff, a lost sync event frame
+that causes `event-reset` and a resubscribe, and the `agent-messages.v1` log before and after a
+reconnect. It does not run ICE, DTLS or Signal. The report is
+`.openbot-build/remote-server-sync-webrtc-e2e/report.json`.

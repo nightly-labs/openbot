@@ -299,6 +299,11 @@ export function createRendererForwarders({
     if (serverId === LOCAL_SERVER_ID) return getAgentService()?.listAgents() ?? [];
     const remoteManager = getRemoteServerManager();
     if (!remoteManager) return [];
+    const synced = remoteManager.sync.agents.values(serverId);
+    if (synced) {
+      remoteAgents.set(serverId, synced);
+      return synced;
+    }
     return runCauseEffect(remoteManager.request(serverId, TEAM_API_ROUTES.agents.all, decodeAgentSummaries)).then(
       (agents) => {
         remoteAgents.set(serverId, agents);

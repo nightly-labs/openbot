@@ -87,7 +87,13 @@ const BURST_HOST_PREFIX = "host-burst-e2e-";
 const BURST_PEERS = 100;
 const BURST_CHECK_MILLISECONDS = 300;
 const RESUME_CHECK_CONCURRENCY = 64;
+const RESUME_BATCH_LIMIT = 100;
+const SIGNAL_START_CLOCK_SKEW_MILLISECONDS = 60_000;
+const FRESH_HOST_ID = "host-fresh-e2e";
+const OLD_HOST_ID = "host-old-e2e";
 const burstChecks = { active: 0, maximum: 0 };
+const resumeBatches: number[] = [];
+let resumeBatchSupported = true;
 const LIVE_RELAYS = ["127.0.0.1", "localhost"];
 const DOWN_RELAY = "turn-down.invalid";
 const RELAY_HOST_IDS = Array.from({ length: 12 }, (_, index) => `host-relay-e2e-${index}`);
@@ -215,7 +221,8 @@ function hmac(secret: string, text: string, encoding: "hex" | "base64url") {
   return createHmac("sha256", secret).update(text).digest(encoding);
 }
 
-const controlPlaneCalls: Array<{ path: string; signed: boolean }> = [];
+const controlPlaneCalls: Array<{ path: string; signed: boolean; hostIds: string[] }> = [];
+const callsFor = (hostId: string) => controlPlaneCalls.filter((call) => call.hostIds.includes(hostId));
 const routeWakes: Array<{ chatId: string; wake: boolean }> = [];
 const botApiCalls: Array<{ method: string; body: string; chatId: number | null }> = [];
 const SLEEPING_WEBHOOK_ROUTES: Record<string, string> = {
@@ -245,13 +252,26 @@ function startControlPlane(port: number): Promise<Server> {
       signature === hmac(AUTH_WEBHOOK_SECRET, `${timestamp}.${body}`, "base64url") &&
       Math.abs(Date.now() / 1_000 - Number(timestamp)) < 300;
     const path = request.url ?? "";
-    controlPlaneCalls.push({ path, signed });
     const payload = body ? JSON.parse(body) : {};
+    const claims: Array<{ hostId: string }> = Array.isArray(payload.claims) ? payload.claims : [];
+    controlPlaneCalls.push({
+      path,
+      signed,
+      hostIds: typeof payload.hostId === "string" ? [payload.hostId] : claims.map((claim) => String(claim.hostId)),
+    });
     const answer = (status: number, value?: unknown) => {
       response.writeHead(status, { "Content-Type": "application/json" });
       response.end(value === undefined ? "" : JSON.stringify(value));
     };
     if (!signed) return answer(401);
+    if (path === "/v2/remote/resume/validate-batch") {
+      if (!resumeBatchSupported) return answer(404);
+      resumeBatches.push(claims.length);
+      if (claims.some((claim) => claim.hostId === UNAVAILABLE_HOST_ID)) return answer(503);
+      if (claims.some((claim) => String(claim.hostId).startsWith(BURST_HOST_PREFIX)))
+        await new Promise((wake) => setTimeout(wake, BURST_CHECK_MILLISECONDS));
+      return answer(200, { valid: claims.map((claim) => claim.hostId !== INACTIVE_HOST_ID) });
+    }
     if (path === "/v2/remote/resume/validate") {
       if (payload.hostId === UNAVAILABLE_HOST_ID) return answer(503);
       if (String(payload.hostId).startsWith(BURST_HOST_PREFIX)) {
@@ -318,12 +338,12 @@ const { privateKey, publicKey } = generateKeyPairSync("ec", { namedCurve: "P-256
 const { privateKey: foreignKey } = generateKeyPairSync("ec", { namedCurve: "P-256" });
 const publicJwk = { ...(await exportJWK(publicKey)), kid: "e2e-1", alg: "ES256", use: "sig" };
 
-async function sign(claims: JWTPayload, audience: string, key = privateKey) {
+async function sign(claims: JWTPayload, audience: string, key = privateKey, issuedAt?: number) {
   const now = Math.floor(Date.now() / 1_000);
   return new SignJWT(claims)
     .setProtectedHeader({ alg: "ES256", kid: "e2e-1" })
     .setAudience(audience)
-    .setIssuedAt(now - 5)
+    .setIssuedAt(issuedAt ?? now - 5)
     .setExpirationTime(now + 300)
     .sign(key);
 }
@@ -336,6 +356,7 @@ function remoteTicket(
     >
   > = {},
   key = privateKey,
+  issuedAt?: number,
 ) {
   const now = Math.floor(Date.now() / 1_000);
   return sign(
@@ -354,6 +375,7 @@ function remoteTicket(
     },
     REMOTE_TICKET_AUDIENCE,
     key,
+    issuedAt,
   );
 }
 
@@ -495,6 +517,7 @@ const controlPlane = await startControlPlane(controlPlanePort);
 const botApi = await startBotApi(botApiPort);
 const turnServer = await startTurnServer();
 const serviceOutput: string[] = [];
+const ISSUED_BEFORE_START = Math.floor(Date.now() / 1_000) - 5;
 const child = spawn("bun", [resolve(ROOT, "remote/api/src/index.ts")], {
   cwd: resolve(ROOT, "remote/api"),
   env: {
@@ -519,7 +542,7 @@ const child = spawn("bun", [resolve(ROOT, "remote/api/src/index.ts")], {
     TELEGRAM_BOT_TOKENS: BOT_TOKEN,
     TELEGRAM_WEBHOOK_SECRET,
     TELEGRAM_TEST_API_ORIGIN: `http://127.0.0.1:${botApiPort}`,
-    REMOTE_MAX_CONNECTIONS_PER_IP: String(BURST_PEERS * 2),
+    REMOTE_MAX_CONNECTIONS_PER_IP: String(BURST_PEERS * 3),
     REMOTE_MAX_MESSAGES_PER_MINUTE: String(BURST_PEERS * 20),
   },
   stdio: ["ignore", "pipe", "pipe"],
@@ -643,6 +666,7 @@ async function helloFails(name: string, ticket: string) {
 
 try {
   await waitForReady(`${base}/health/ready`, child);
+  const signalReadyAt = Date.now();
   logger.info(`Signal is ready on port ${signalPort}.`);
 
   const ingress = await connect(signalUrl);
@@ -1515,7 +1539,11 @@ try {
         type: "hello",
         version: 1,
         peer: "host",
-        token: await remoteTicket({ hostId: UNAVAILABLE_HOST_ID, membershipId: `${UNAVAILABLE_HOST_ID}:host` }),
+        token: await remoteTicket(
+          { hostId: UNAVAILABLE_HOST_ID, membershipId: `${UNAVAILABLE_HOST_ID}:host` },
+          privateKey,
+          ISSUED_BEFORE_START,
+        ),
       }),
     );
     const code = await withDeadline(peer.closed, "close after an unchecked hello");
@@ -1538,7 +1566,11 @@ try {
         type: "hello",
         version: 1,
         peer: "host",
-        token: await remoteTicket({ hostId: UNAVAILABLE_HOST_ID, membershipId: `${UNAVAILABLE_HOST_ID}:host` }),
+        token: await remoteTicket(
+          { hostId: UNAVAILABLE_HOST_ID, membershipId: `${UNAVAILABLE_HOST_ID}:host` },
+          privateKey,
+          ISSUED_BEFORE_START,
+        ),
       }),
     );
     const code = await withDeadline(peer.closed, "close after a revoked unchecked hello");
@@ -1556,7 +1588,11 @@ try {
         type: "hello",
         version: 1,
         peer: "host",
-        token: await remoteTicket({ hostId: INACTIVE_HOST_ID, membershipId: `${INACTIVE_HOST_ID}:host` }),
+        token: await remoteTicket(
+          { hostId: INACTIVE_HOST_ID, membershipId: `${INACTIVE_HOST_ID}:host` },
+          privateKey,
+          ISSUED_BEFORE_START,
+        ),
       }),
     );
     const code = await withDeadline(peer.closed, "close after an inactive hello");
@@ -1567,31 +1603,66 @@ try {
     );
     return `closed with ${code} and an authentication_required error`;
   });
-  await check(
-    `A burst of hellos sends at most ${RESUME_CHECK_CONCURRENCY} account service checks at a time`,
-    async () => {
-      const tickets = await Promise.all(
-        Array.from({ length: BURST_PEERS }, (_, index) => {
-          const hostId = `${BURST_HOST_PREFIX}${index}`;
-          return remoteTicket({ hostId, membershipId: `${hostId}:host`, userId: `owner-burst-${index}` });
-        }),
-      );
-      const peers = await Promise.all(tickets.map(() => connect(signalUrl)));
-      try {
-        for (const [index, peer] of peers.entries()) {
-          peer.socket.send(JSON.stringify({ type: "hello", version: 1, peer: "host", token: tickets[index] }));
-        }
-        await Promise.all(
-          peers.map((peer) => peer.next((frame) => frame.includes('"type":"ready"'), "ready after a burst hello")),
+  const burst = async (prefix: string) => {
+    const tickets = await Promise.all(
+      Array.from({ length: BURST_PEERS }, (_, index) => {
+        const hostId = `${prefix}${index}`;
+        return remoteTicket(
+          { hostId, membershipId: `${hostId}:host`, userId: `owner-${hostId}` },
+          privateKey,
+          ISSUED_BEFORE_START,
         );
-        expect(
-          burstChecks.maximum === RESUME_CHECK_CONCURRENCY,
-          `${burstChecks.maximum} checks at a time, expected ${RESUME_CHECK_CONCURRENCY}`,
-        );
-        return `${BURST_PEERS} peers ready; at most ${burstChecks.maximum} checks at a time`;
-      } finally {
-        for (const peer of peers) peer.socket.close();
+      }),
+    );
+    const peers = await Promise.all(tickets.map(() => connect(signalUrl)));
+    try {
+      for (const [index, peer] of peers.entries()) {
+        peer.socket.send(JSON.stringify({ type: "hello", version: 1, peer: "host", token: tickets[index] }));
       }
+      await Promise.all(
+        peers.map((peer) => peer.next((frame) => frame.includes('"type":"ready"'), "ready after a burst hello")),
+      );
+    } finally {
+      for (const peer of peers) peer.socket.close();
+      await Promise.all(peers.map((peer) => peer.closed));
+    }
+    return controlPlaneCalls.filter((call) => call.hostIds.some((hostId) => hostId.startsWith(prefix)));
+  };
+  await check(
+    `A burst of ${BURST_PEERS} hellos after a Signal start sends a few account service batch requests`,
+    async () => {
+      const batchesBefore = resumeBatches.length;
+      const calls = await burst(`${BURST_HOST_PREFIX}batch-`);
+      const batches = calls.filter((call) => call.path === "/v2/remote/resume/validate-batch");
+      const single = calls.filter((call) => call.path === "/v2/remote/resume/validate");
+      const sizes = resumeBatches.slice(batchesBefore);
+      expect(single.length === 0, `${single.length} single checks`);
+      expect(
+        batches.length >= 1 && batches.length <= 3,
+        `${batches.length} batch requests, expected 1 to 3 for ${BURST_PEERS} peers`,
+      );
+      expect(
+        sizes.every((size) => size <= RESUME_BATCH_LIMIT) && sizes.reduce((sum, size) => sum + size, 0) === BURST_PEERS,
+        `batch sizes: ${sizes.join(", ")}`,
+      );
+      return `${BURST_PEERS} peers ready with ${batches.length} batch requests (sizes ${sizes.join(", ")}) and no single check`;
+    },
+  );
+  await check(
+    `With no batch route, a burst of hellos sends at most ${RESUME_CHECK_CONCURRENCY} single checks at a time`,
+    async () => {
+      resumeBatchSupported = false;
+      burstChecks.maximum = 0;
+      const calls = await burst(`${BURST_HOST_PREFIX}single-`);
+      const batches = calls.filter((call) => call.path === "/v2/remote/resume/validate-batch");
+      const single = calls.filter((call) => call.path === "/v2/remote/resume/validate");
+      expect(batches.length === 1, `${batches.length} refused batch requests, expected 1`);
+      expect(single.length === BURST_PEERS, `${single.length} single checks, expected ${BURST_PEERS}`);
+      expect(
+        burstChecks.maximum === RESUME_CHECK_CONCURRENCY,
+        `${burstChecks.maximum} checks at a time, expected ${RESUME_CHECK_CONCURRENCY}`,
+      );
+      return `${BURST_PEERS} peers ready after one 404; ${single.length} single checks, at most ${burstChecks.maximum} at a time`;
     },
   );
   await check("An ingress hello without a route ticket is refused", async () => {
@@ -1637,6 +1708,51 @@ try {
     expect(second !== "" && firstRefresh === second, "Signal made new TURN credentials for each turn-refresh.");
     return "both answers have the same TURN username";
   });
+
+  await check(
+    "After the clock skew margin, only tickets and route tickets issued before the Signal start are checked",
+    async () => {
+      await new Promise((wake) =>
+        setTimeout(wake, Math.max(0, signalReadyAt + SIGNAL_START_CLOCK_SKEW_MILLISECONDS + 8_000 - Date.now())),
+      );
+      const hello = async (hostId: string, issuedAt?: number) =>
+        JSON.stringify({
+          type: "hello",
+          version: 1,
+          peer: "ingress",
+          token: await remoteTicket({ hostId, membershipId: `${hostId}:host` }, privateKey, issuedAt),
+          webhookRoute: await sign(
+            { hid: hostId, routes: [{ id: `route-${hostId}`, linkedAt: 1_000 }] },
+            WEBHOOK_ROUTE_AUDIENCE,
+            privateKey,
+            issuedAt,
+          ),
+        });
+      const peers: Peer[] = [];
+      try {
+        for (const [hostId, issuedAt] of [
+          [FRESH_HOST_ID, undefined],
+          [OLD_HOST_ID, ISSUED_BEFORE_START],
+        ] as const) {
+          const peer = await connect(signalUrl);
+          peers.push(peer);
+          peer.socket.send(await hello(hostId, issuedAt));
+          await peer.next((frame) => frame.includes('"type":"ready"'), `ingress ready for ${hostId}`);
+        }
+      } finally {
+        for (const peer of peers) peer.socket.close();
+      }
+      const fresh = callsFor(FRESH_HOST_ID).map((call) => call.path);
+      const old = callsFor(OLD_HOST_ID).map((call) => call.path);
+      expect(fresh.length === 0, `new tickets: ${fresh.join(", ")}`);
+      expect(
+        old.some((path) => path.startsWith("/v2/remote/resume/validate")) &&
+          old.includes("/v2/remote/webhook-route/validate"),
+        `old tickets: ${old.join(", ")}`,
+      );
+      return `${Math.round((Date.now() - signalReadyAt) / 1_000)} s after the start: new tickets no check; old tickets ${old.join(", ")}`;
+    },
+  );
 
   await check("Signal signs each request to the account service", async () => {
     expect(controlPlaneCalls.length > 0, "Signal made no account service request.");

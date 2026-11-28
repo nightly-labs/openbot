@@ -6,6 +6,7 @@ import {
   foreignProvider,
   isAgentMarketplaceSource,
   isAgentModel,
+  isAgentPendingRuntime,
   isAgentProvider,
   isAgentProviderRef,
   isAvatarHue,
@@ -27,7 +28,14 @@ export type RemoteAgent = Pick<
   Partial<
     Pick<
       AgentSummary,
-      "provider" | "model" | "reasoningEffort" | "avatarUrl" | "notifications" | "workspacePath" | "marketplaceSource"
+      | "provider"
+      | "model"
+      | "reasoningEffort"
+      | "pendingRuntime"
+      | "avatarUrl"
+      | "notifications"
+      | "workspacePath"
+      | "marketplaceSource"
     >
   > & { foreignProvider?: ForeignProviderId | undefined };
 
@@ -45,6 +53,7 @@ export function projectAgent(serverId: string, agent: RemoteAgent, avatarColor: 
     foreignProvider: agent.foreignProvider,
     model: agent.model,
     reasoningEffort: agent.reasoningEffort,
+    pendingRuntime: agent.pendingRuntime,
     notifications: agent.notifications,
     workspacePath: agent.workspacePath,
     avatarUrl: agent.avatarUrl ?? null,
@@ -89,6 +98,7 @@ export function decodeAgent(value: unknown): RemoteAgent {
     foreignProvider: isAgentProviderRef(value.provider) ? foreignProvider(value.provider) : undefined,
     model: isAgentModel(value.model) ? value.model : undefined,
     reasoningEffort: isReasoningEffort(value.reasoningEffort) ? value.reasoningEffort : undefined,
+    pendingRuntime: isAgentPendingRuntime(value.pendingRuntime) ? value.pendingRuntime : undefined,
     notifications: isBoolean(value.notifications) ? value.notifications : undefined,
     workspacePath: isString(value.workspacePath) && value.workspacePath ? value.workspacePath : undefined,
     avatarUrl: isString(value.avatarUrl) ? value.avatarUrl : null,
