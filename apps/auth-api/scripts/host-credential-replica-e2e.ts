@@ -3,6 +3,7 @@ import { mkdir, readdir, readFile, writeFile } from "node:fs/promises";
 import { join, resolve } from "node:path";
 import { DatabaseSync } from "node:sqlite";
 import { Effect, Exit } from "effect";
+import { HostCredentialCache } from "../src/server/host-credential-cache";
 import { RemoteControlPlane } from "../src/server/remote-control-plane";
 import { sqliteD1 } from "./sqlite-d1";
 
@@ -106,7 +107,10 @@ async function scenario() {
   const primary = await migratedDatabase();
   const replica = await migratedDatabase();
   const reads: string[] = [];
-  const plane = new RemoteControlPlane({ DB: withStaleReplica(primary, replica, reads), ...ticketKeys });
+  const plane = new RemoteControlPlane(
+    { DB: withStaleReplica(primary, replica, reads), ...ticketKeys },
+    { hostCredentials: new HostCredentialCache() },
+  );
   const readsFor = async (hostId: string, token: string) => {
     reads.length = 0;
     const accepted = await credentialAccepted(plane, hostId, token);
@@ -154,7 +158,10 @@ async function scenario() {
   const cleared = await readsFor("cleared", "");
   check("a host with no token refuses an empty token", !cleared.accepted, cleared);
 
-  const full = new RemoteControlPlane({ DB: withStaleReplica(primary, replica, reads), ...ticketKeys });
+  const full = new RemoteControlPlane(
+    { DB: withStaleReplica(primary, replica, reads), ...ticketKeys },
+    { hostCredentials: new HostCredentialCache() },
+  );
   reads.length = 0;
   const authenticated = await Effect.runPromiseExit(full.authenticateHost("rotated", "token-after"));
   check("authenticateHost still reads only the primary", Exit.isSuccess(authenticated) && reads.join() === "primary", {
@@ -177,11 +184,14 @@ async function scenario() {
     { tableReads: [...tableReads] },
   );
 
-  const signalPlane = new RemoteControlPlane({
-    DB: withStaleReplica(primary, replica, reads),
-    REMOTE_SIGNAL_URL: "wss://signal.test",
-    ...ticketKeys,
-  });
+  const signalPlane = new RemoteControlPlane(
+    {
+      DB: withStaleReplica(primary, replica, reads),
+      REMOTE_SIGNAL_URL: "wss://signal.test",
+      ...ticketKeys,
+    },
+    { hostCredentials: new HostCredentialCache() },
+  );
   const hostTicketReads = async (
     hostId: string,
     token: string,
@@ -220,10 +230,10 @@ async function scenario() {
   tableReads.length = 0;
   const webhook = await Effect.runPromiseExit(full.issueWebhookRoute("synced", "token-synced"));
   check(
-    "a webhook route ticket uses the owner on the primary after an owner transfer",
+    "a webhook route ticket uses the owner on the primary after an owner transfer and the cached credential",
     Exit.isSuccess(webhook) &&
       webhook.value.routes.join() === "route-new-owner" &&
-      tableReads.join() === "replica:remote_hosts,primary:webhook_routes",
+      tableReads.join() === "primary:webhook_routes",
     { routes: Exit.isSuccess(webhook) ? webhook.value.routes : null, tableReads: [...tableReads] },
   );
 }

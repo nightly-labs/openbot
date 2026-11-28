@@ -19,7 +19,7 @@ export const Route = createFileRoute("/v1/me/credits/")({
             const user = yield* requestUser(request);
             if (!user) return apiError(401, "unauthorized", "Sign in is required.");
             const billing = requestBillingService();
-            return json(billing ? yield* billing.credits.getState(user.id) : CREDITS_UNAVAILABLE_STATE);
+            return json(billing ? yield* billing.credits.getState(user.id, "replica") : CREDITS_UNAVAILABLE_STATE);
           }),
           billingErrorResponse,
         ),

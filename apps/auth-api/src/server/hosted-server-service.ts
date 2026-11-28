@@ -67,6 +67,7 @@ import {
   type StoredArchive,
 } from "./hosted-archive-restore";
 import { createHostedPoolAlert, type HostedPoolAlert } from "./hosted-pool-alert";
+import { primaryD1, replicaD1 } from "./observed-d1";
 import type { RemoteFailure } from "./remote-control-plane";
 import { PERSISTENT_SESSION_EXPIRES_AT } from "./session-policy";
 import { priceHasCurrency } from "./stripe-client";
@@ -1177,18 +1178,22 @@ export class HostedServerService {
       if (!isString(token) || token.length < 32 || token.length > 128) return yield* invalidPoolToken();
       const tokenHash = yield* sha256(token).pipe(Effect.mapError(hostedFailure));
       const now = dependencies.now();
-      const machine = yield* hostedCall(() =>
-        dependencies.database
-          .prepare("SELECT assign_token_hash, seen_at FROM operator_hosts WHERE host_id = ? AND removed_at IS NULL")
-          .bind(hostId)
-          .first<{ assign_token_hash: string | null; seen_at: number | null }>(),
-      );
+      const operatorHost = (database: D1Database) =>
+        hostedCall(() =>
+          database
+            .prepare("SELECT assign_token_hash, seen_at FROM operator_hosts WHERE host_id = ? AND removed_at IS NULL")
+            .bind(hostId)
+            .first<{ assign_token_hash: string | null; seen_at: number | null }>(),
+        );
       const encoder = new TextEncoder();
-      if (
-        !machine?.assign_token_hash ||
-        !constantTimeEqual(encoder.encode(machine.assign_token_hash), encoder.encode(tokenHash))
-      )
-        return yield* invalidPoolToken();
+      const assigned = (candidate: { assign_token_hash: string | null } | null) =>
+        Boolean(
+          candidate?.assign_token_hash &&
+            constantTimeEqual(encoder.encode(candidate.assign_token_hash), encoder.encode(tokenHash)),
+        );
+      const replica = yield* operatorHost(replicaD1(dependencies.database));
+      const machine = assigned(replica) ? replica : yield* operatorHost(primaryD1(dependencies.database));
+      if (!machine || !assigned(machine)) return yield* invalidPoolToken();
       if (machine.seen_at === null || machine.seen_at <= now - POOL_SEEN_WRITE_AFTER_MS) {
         yield* hostedCall(() =>
           dependencies.database

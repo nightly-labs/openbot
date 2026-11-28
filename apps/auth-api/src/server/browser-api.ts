@@ -563,7 +563,7 @@ const handleCredits = Effect.fn("BrowserApi.handleCredits")(function* (
 ) {
   const billing = services.billing();
   if (path === "v1/me/credits" && request.method === "GET")
-    return json(billing ? yield* billing.credits.getState(user.id) : CREDITS_UNAVAILABLE_STATE);
+    return json(billing ? yield* billing.credits.getState(user.id, "replica") : CREDITS_UNAVAILABLE_STATE);
   if (path === "v1/me/credits/activity" && request.method === "GET")
     return json(billing ? yield* billing.credits.activity(user.id) : EMPTY_CREDIT_ACTIVITY);
   if (request.method !== "POST") return null;

@@ -43,6 +43,7 @@ import {
   welcomeTenthsSql,
 } from "./credit-grants";
 import { availableTenthsSql, overdueGrantTenthsSql, paidTenthsSql } from "./credit-spending";
+import { replicaD1 } from "./observed-d1";
 import {
   EARLY_START_METADATA,
   isBillingCurrency,
@@ -197,6 +198,7 @@ export class CreditService {
   readonly getState = Effect.fn("CreditService.getState")(function* (
     this: CreditService,
     userId: string,
+    serverReads: "request" | "replica" = "request",
   ): Effect.fn.Return<CreditsState, Failure> {
     const locked = yield* this.#lockedCurrency(userId);
     const prices = yield* this.#prices().pipe(Effect.orElseSucceed(() => new Map<string, StripePrice>()));
@@ -224,8 +226,9 @@ export class CreditService {
         .first<WalletRow>(),
     );
     const balanceTenths = Math.max(0, personal?.balance_tenths ?? 0);
+    const serverDatabase = serverReads === "replica" ? replicaD1(this.#database) : this.#database;
     const rows = yield* billingCall(() =>
-      this.#database
+      serverDatabase
         .prepare(
           `SELECT h.host_id AS server_id, h.name AS name,
                   CASE WHEN h.owner_user_id = ?1 THEN 'owner' ELSE m.role END AS role,
