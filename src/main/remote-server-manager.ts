@@ -295,7 +295,6 @@ const REMOTE_DESKTOP_SESSION_HTTP_TIMEOUT_MS = 60_000;
 export const AGENT_IMPORT_UPLOAD_TIMEOUT_MS = TEAM_WEBRTC_REMOTE_REQUEST_TIMEOUT_MILLISECONDS;
 const INSTANCE_TRANSFER_PART_TIMEOUT_MS = 3 * 60_000;
 const HOST_RESTART_RETRY_MS = 30 * 60_000;
-const DROP_RECHECK_SPREAD_MS = 30_000;
 const REMOTE_PICTURES_DIRECTORY = "remote-pictures";
 export class RemoteServerManager extends EventEmitter<RemoteServerEvents> {
   readonly #scope = Scope.makeUnsafe();
@@ -353,7 +352,7 @@ export class RemoteServerManager extends EventEmitter<RemoteServerEvents> {
   readonly #connectTrace: RemoteConnectTrace | null;
   readonly #accountReady: Effect.Effect<unknown, RemoteWorkflowError>;
   #muteExpiryTimer: ReturnType<typeof setTimeout> | null = null;
-  #dropRecheckTimer: ReturnType<typeof setTimeout> | null = null;
+  readonly #rejectedHostKeys = new Set<string>();
 
   constructor(
     path: string,
@@ -499,6 +498,7 @@ export class RemoteServerManager extends EventEmitter<RemoteServerEvents> {
         })
       : null;
     this.#webrtcTransport?.on("connected", (serverId) => {
+      this.#rejectedHostKeys.delete(serverId);
       this.#events.transportConnected(serverId);
       this.#events.markSeenOnline(serverId);
       this.#hostRestartAway.delete(serverId);
@@ -550,9 +550,13 @@ export class RemoteServerManager extends EventEmitter<RemoteServerEvents> {
       if (!this.#events.isReconnectSuspended(serverId)) this.#connections.setState(serverId, "offline");
       this.#presence.markOffline(serverId);
       this.#emitChanged();
-      const firstDrop = this.#events.transportDisconnected(serverId);
+      this.#events.transportDisconnected(serverId);
       this.#events.scheduleReconnect(serverId);
-      if (wasOnline && firstDrop) this.#scheduleDropRecheck();
+    });
+    this.#webrtcTransport?.on("hostKeyRejected", (serverId) => {
+      if (this.#rejectedHostKeys.has(serverId) || !this.#store.has(serverId)) return;
+      this.#rejectedHostKeys.add(serverId);
+      this.emit("directoryInvalidated");
     });
     this.#webrtcTransport?.on("connectFailed", (serverId, failure) => {
       if (!this.#store.has(serverId) || this.#connections.hasIssue(serverId)) return;
@@ -1018,15 +1022,6 @@ export class RemoteServerManager extends EventEmitter<RemoteServerEvents> {
     },
     (operation) => this.#owned(operation),
   ).bind(this);
-
-  #scheduleDropRecheck(): void {
-    if (this.#dropRecheckTimer || this.#stopping) return;
-    this.#dropRecheckTimer = setTimeout(() => {
-      this.#dropRecheckTimer = null;
-      if (!this.#stopping) this.emit("directoryInvalidated");
-    }, Math.random() * DROP_RECHECK_SPREAD_MS);
-    this.#dropRecheckTimer.unref?.();
-  }
 
   #scheduleMuteExpiry(): void {
     if (this.#muteExpiryTimer) clearTimeout(this.#muteExpiryTimer);
@@ -2697,8 +2692,6 @@ export class RemoteServerManager extends EventEmitter<RemoteServerEvents> {
     this.#stopping = done;
     return yield* Effect.gen({ self: this }, function* () {
       for (const serverId of [...this.#hostedStartAt.keys()]) this.#clearHostedStart(serverId);
-      if (this.#dropRecheckTimer) clearTimeout(this.#dropRecheckTimer);
-      this.#dropRecheckTimer = null;
       this.#focusUse.dispose();
       this.#computerActivity?.dispose();
       yield* this.#events.stop();

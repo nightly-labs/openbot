@@ -551,6 +551,8 @@
     "test:d1-replica-reads": "bun apps/auth-api/scripts/d1-replica-reads-e2e.ts",
     "test:d1-request-session": "bun apps/auth-api/scripts/d1-request-session-e2e.ts",
     "test:host-list-batch": "bun apps/auth-api/scripts/host-list-batch-e2e.ts",
+    "test:owner-transfer-host-list": "bun apps/auth-api/scripts/owner-transfer-host-list-e2e.ts",
+    "test:owner-transfer-host-drop": "bun scripts/owner-transfer-host-drop-e2e.ts",
     "test:account-activity-reporter": "bun scripts/account-activity-reporter-e2e.ts",
     "test:smtp-stall": "bun apps/auth-api/scripts/smtp-stall-e2e.ts",
     "test:vies-check": "bun apps/auth-api/scripts/vies-check-e2e.ts",

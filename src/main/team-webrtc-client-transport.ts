@@ -82,6 +82,7 @@ interface TeamWebRtcClientTransportEvents {
   path: [hostId: string, path: "p2p" | "relay"];
   error: [hostId: string, code: string, message: string];
   connectFailed: [hostId: string, failure: unknown];
+  hostKeyRejected: [hostId: string];
   desktopData: [hostId: string, data: string | ArrayBuffer];
 }
 
@@ -1411,6 +1412,7 @@ export class TeamWebRtcClientTransport extends EventEmitter<TeamWebRtcClientTran
           ),
         ))
       ) {
+        this.emit("hostKeyRejected", hostId);
         return yield* new RemoteWorkflowError({ cause: new Error("The host device signature is invalid.") });
       }
       authentication.completed = true;
