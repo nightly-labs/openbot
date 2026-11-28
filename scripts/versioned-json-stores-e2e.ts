@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { randomUUID } from "node:crypto";
-import { mkdir, mkdtemp, readdir, readFile, rm, writeFile } from "node:fs/promises";
+import { chmod, mkdir, mkdtemp, readdir, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { basename, dirname, join, resolve } from "node:path";
 import { SIDEBAR_PEOPLE_SECTION_ID, SIDEBAR_UNASSIGNED_SECTION_ID } from "@openbot/contracts/ipc";
@@ -10,7 +10,7 @@ import { readBrowserState } from "../src/backend/browser-state";
 import { LibraryFoldersStore } from "../src/backend/library-folders-store";
 import { SidebarLayoutStore } from "../src/backend/sidebar-layout-store";
 import { UserBrowsingLog } from "../src/backend/user-browsing-log";
-import { versionedJsonFallbackPath } from "../src/backend/versioned-json-store";
+import { versionedJsonFallbackPath, versionedJsonLastGoodPath } from "../src/backend/versioned-json-store";
 
 const OUT = resolve(import.meta.dirname, "../.openbot-build/versioned-json-stores-e2e");
 const FUTURE_VERSION = 99;
@@ -23,6 +23,7 @@ interface OpenStore {
 interface StoreCase {
   name: string;
   current: number;
+  keepsLastGood: boolean;
   released: { version: number; file: unknown; marker: readonly string[] }[];
   open(path: string): Promise<OpenStore>;
 }
@@ -32,6 +33,8 @@ interface StoreReport {
   released: { version: number; loaded: readonly string[]; writtenVersion: number | null }[];
   future: { bytesUnchanged: boolean; fallback: string; fallbackVersion: number | null; reloaded: readonly string[] };
   damaged: { contents: string; setAside: string; bytesKept: boolean; startedEmpty: boolean }[];
+  lastGood: boolean;
+  restored: { damage: string; loaded: readonly string[]; savedTo: string }[];
 }
 
 const run = <A, E>(effect: Effect.Effect<A, E>): Promise<A> => Effect.runPromise(effect);
@@ -55,6 +58,7 @@ const STORES: StoreCase[] = [
   {
     name: "sidebar layout",
     current: 2,
+    keepsLastGood: true,
     released: [
       { version: 1, file: sidebarFile(1), marker: ["Released"] },
       { version: 2, file: sidebarFile(2), marker: ["Released"] },
@@ -73,6 +77,7 @@ const STORES: StoreCase[] = [
   {
     name: "library folders",
     current: 1,
+    keepsLastGood: false,
     released: [
       {
         version: 1,
@@ -104,6 +109,7 @@ const STORES: StoreCase[] = [
   {
     name: "user browsing log",
     current: 1,
+    keepsLastGood: false,
     released: [
       {
         version: 1,
@@ -132,6 +138,7 @@ const STORES: StoreCase[] = [
   {
     name: "memory review cursors",
     current: 1,
+    keepsLastGood: false,
     released: [
       {
         version: 1,
@@ -172,6 +179,8 @@ async function caseFor(root: string, store: StoreCase): Promise<StoreReport> {
     released: [],
     future: { bytesUnchanged: false, fallback: "", fallbackVersion: null, reloaded: [] },
     damaged: [],
+    lastGood: false,
+    restored: [],
   };
 
   for (const released of store.released) {
@@ -184,6 +193,11 @@ async function caseFor(root: string, store: StoreCase): Promise<StoreReport> {
     const writtenVersion = await version(path);
     assert.equal(writtenVersion, store.current, `${store.name}: a change did not write version ${store.current}`);
     assert.equal(await bytes(versionedJsonFallbackPath(path, store.current)), null, `${store.name}: a fallback file`);
+    const copy = await bytes(versionedJsonLastGoodPath(path));
+    if (store.keepsLastGood) {
+      assert.equal(copy?.toString("utf8"), `${JSON.stringify(released.file)}\n`, `${store.name}: no last good copy`);
+    } else assert.equal(copy, null, `${store.name}: a last good copy of a store that does not keep one`);
+    report.lastGood = copy !== null;
     report.released.push({ version: released.version, loaded, writtenVersion });
   }
 
@@ -212,7 +226,59 @@ async function caseFor(root: string, store: StoreCase): Promise<StoreReport> {
     await opened.change("After damage");
     return empty;
   });
+  if (store.keepsLastGood) report.restored = await restoredCases(directory, store);
   return report;
+}
+
+const DAMAGE: { name: string; apply(path: string): Promise<void> }[] = [
+  { name: "half written", apply: (path) => writeFile(path, '{"version": 2, "revision": 4, "sec') },
+  { name: "emptied", apply: (path) => writeFile(path, "") },
+  { name: "filled with NUL bytes", apply: (path) => writeFile(path, Buffer.alloc(64)) },
+  { name: "missing", apply: (path) => rm(path) },
+  { name: "unreadable", apply: (path) => chmod(path, 0o000) },
+];
+
+async function restoredCases(directory: string, store: StoreCase): Promise<StoreReport["restored"]> {
+  const released = store.released.at(-1);
+  assert.ok(released, `${store.name}: no released file`);
+  const results: StoreReport["restored"] = [];
+  for (const [index, damage] of DAMAGE.entries()) {
+    if (damage.name === "unreadable" && (process.platform === "win32" || process.getuid?.() === 0)) continue;
+    const path = join(directory, `restored-${index}.json`);
+    await writeFile(path, `${JSON.stringify(released.file)}\n`);
+    const first = await store.open(path);
+    await first.change("Before damage");
+    await damage.apply(path);
+    const held = damage.name === "unreadable" ? await bytes(versionedJsonFallbackPath(path, store.current)) : null;
+    const reopened = await store.open(path);
+    const loaded = [...reopened.marker()];
+    assert.deepEqual(loaded, released.marker, `${store.name} (${damage.name}): the last good copy did not load`);
+    await reopened.change("After damage");
+    const fallback = versionedJsonFallbackPath(path, store.current);
+    const savedTo = damage.name === "unreadable" ? fallback : path;
+    assert.equal(
+      await version(savedTo),
+      store.current,
+      `${store.name} (${damage.name}): no save in ${basename(savedTo)}`,
+    );
+    if (damage.name === "unreadable") {
+      assert.equal(held, null, `${store.name}: a fallback file before the read`);
+      await chmod(path, 0o600);
+      assert.ok(
+        (await bytes(path))?.toString("utf8").includes("Before damage"),
+        `${store.name}: the held file changed`,
+      );
+    } else assert.equal(await bytes(fallback), null, `${store.name} (${damage.name}): the saves went to a fallback`);
+    results.push({ damage: damage.name, loaded, savedTo: basename(savedTo) });
+  }
+
+  const both = join(directory, "restored-both-damaged.json");
+  await writeFile(both, "{");
+  await writeFile(versionedJsonLastGoodPath(both), "{");
+  const empty = await store.open(both);
+  assert.deepEqual(empty.marker(), [], `${store.name}: a damaged last good copy did not start empty`);
+  results.push({ damage: "file and last good copy damaged", loaded: [], savedTo: basename(both) });
+  return results;
 }
 
 const DAMAGED_FILES = ['{"version": 1, "cut off', "[1, 2]", '{"data": {}}', '{"version": 0}'];
@@ -245,6 +311,8 @@ async function browserCase(root: string): Promise<StoreReport> {
     released: [],
     future: { bytesUnchanged: false, fallback: "", fallbackVersion: null, reloaded: [] },
     damaged: [],
+    lastGood: false,
+    restored: [],
   };
   for (const released of [1, 2]) {
     const path = join(directory, `released-v${released}.json`);

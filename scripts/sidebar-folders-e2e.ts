@@ -462,6 +462,40 @@ try {
     return { reset: reset.revision, changed: changed.revision };
   });
 
+  await step(
+    "store: a layout restored after a damaged file keeps its folders and a revision above clients",
+    async () => {
+      const path = join(root, "restored", "sidebar-layout.json");
+      mkdirSync(join(root, "restored"), { recursive: true });
+      const work = randomUUID();
+      const agentId = randomUUID();
+      const file = {
+        version: 2,
+        revision: 26,
+        sections: [{ id: work, name: "Work" }],
+        order: [SIDEBAR_PEOPLE_SECTION_ID, work, SIDEBAR_UNASSIGNED_SECTION_ID],
+        agentAssignments: { [agentId]: work },
+        agentOrder: [agentId],
+      };
+      writeFileSync(path, JSON.stringify(file));
+      const store = new SidebarLayoutStore(path);
+      await runCauseEffect(store.initialize());
+      const seen = await runCauseEffect(store.mutate({ type: "create", name: "Later" }, new Set([agentId])));
+      writeFileSync(path, '{"version": 2, "revision": 28, "sec');
+      const restored = new SidebarLayoutStore(path);
+      await runCauseEffect(restored.initialize());
+      const layout = restored.getSnapshot();
+      assert.deepEqual(
+        layout.sections.map((section) => section.name),
+        ["Work"],
+        "The folders did not come back.",
+      );
+      assert.equal(layout.agentAssignments[agentId], work, "A chat lost its folder.");
+      assert.ok(layout.revision > seen.revision, `The restored layout went back to revision ${layout.revision}.`);
+      return { seen: seen.revision, restored: layout.revision };
+    },
+  );
+
   host = await startHost();
 
   const setup = await step(
