@@ -31,6 +31,7 @@ const home = join(root, "home");
 const turnLog = join(root, "claude-turns.jsonl");
 const failingFile = join(root, "failing.json");
 const refusedModelsFile = join(root, "refused-models.json");
+const usageWindowFile = join(root, "usage-window-end");
 const claudeExecutable = join(root, "claude");
 const codexExecutable = join(root, "codex");
 const codexLog = join(root, "codex-turns.jsonl");
@@ -272,6 +273,7 @@ if (process.argv.includes("--version")) { console.log("codex-cli 0.160.1"); proc
 const threads = new Map();
 const active = new Map();
 let reset = false;
+let balanceOnly = false;
 const write = (message) => process.stdout.write(JSON.stringify(message) + "\\n");
 const config = { config: { mcp_servers: {} }, layers: [{ name: { type: "user", file: "/fake/.codex/config.toml", profile: null }, version: "1", config: { mcp_servers: {} } }] };
 const answer = (request) => {
@@ -281,7 +283,12 @@ const answer = (request) => {
   switch (request.method) {
     case "initialize": return reply({});
     case "account/read": return reply({ account: { type: "chatgpt", email: "codex@example.com" } });
-    case "account/rateLimits/read": return reply({ rateLimits: { limitId: "codex", primary: { usedPercent: reset ? 0 : 100, windowDurationMins: 300, resetsAt: Math.floor(Date.now() / 1000) + 3600 }, secondary: null }, rateLimitsByLimitId: null });
+    case "account/rateLimits/read": {
+      const now = Math.floor(Date.now() / 1000);
+      const windowEnd = Number(fs.readFileSync(${JSON.stringify(usageWindowFile)}, "utf8")) || null;
+      const full = windowEnd === null ? !reset && !balanceOnly : now < windowEnd;
+      return reply({ rateLimits: { limitId: "codex", primary: { usedPercent: full ? 100 : 0, windowDurationMins: 300, resetsAt: windowEnd ?? now + 3600 }, secondary: null }, rateLimitsByLimitId: null });
+    }
     case "account/rateLimitResetCredit/consume": reset = true; return reply({ outcome: "reset" });
     case "model/list": return reply({ data: [{ model: ${JSON.stringify(CODEX_MODEL)}, displayName: "Codex" }] });
     case "plugin/list": return reply({ marketplaces: [] });
@@ -307,6 +314,7 @@ const answer = (request) => {
       const current = input.split("--- current message ---").at(-1);
       turn.input = current;
       const limited = current.includes("usage-") && !reset;
+      if (limited) balanceOnly = current.includes("usage-spent");
       const caseId = /case:([a-z-]+)/.exec(current)?.[1] ?? "no-case";
       fs.appendFileSync(${JSON.stringify(codexLog)}, JSON.stringify({ model: params.model, threadId: thread.id, turnId: turn.id, input, limited }) + "\\n");
       reply({ turn });
@@ -329,7 +337,9 @@ const answer = (request) => {
         if (limited) {
           const error = current.includes("usage-spent")
             ? { message: "Your credit balance is too low to continue.", codexErrorInfo: "usageLimitExceeded" }
-            : { message: "You've hit your usage limit. Try again later.", codexErrorInfo: "usageLimitExceeded" };
+            : current.includes("usage-window-balance")
+              ? { message: "API error (status 402 Payment Required): Grok Build usage balance exhausted" }
+              : { message: "You've hit your usage limit. Try again later.", codexErrorInfo: "usageLimitExceeded" };
           turn.error = error;
           write({ method: "error", params: { threadId: thread.id, turnId: turn.id, error, willRetry: false } });
           finish("failed");
@@ -558,6 +568,7 @@ interface CodexTurn {
 await writeFile(claudeExecutable, STAND_IN_CLAUDE, { mode: 0o755 });
 await writeFile(codexExecutable, STAND_IN_CODEX, { mode: 0o755 });
 failing([]);
+writeFileSync(usageWindowFile, "");
 const database = new OpenBotDatabase(userData);
 const clients: ClaudeStandIn[] = [];
 const events: AgentEvent[] = [];
@@ -1258,6 +1269,35 @@ try {
       "The note names the spent model, the backup, and what to do.",
     );
     return { notes };
+  });
+
+  await check("a balance-worded limit with a full usage window goes back at the reset", async () => {
+    await restart();
+    const agent = await createCodex("Window balance", automaticBackups);
+    writeFileSync(usageWindowFile, String(Math.floor(Date.now() / 1000) + 5));
+    try {
+      const outcome = await send(agent.id, "usage-empty usage-window-balance case:window-balance");
+      assert.equal(outcome.status, "completed", `The task completes on its backup: ${outcome.error}`);
+      const moved = agentOf(agent.id);
+      assert.equal(moved.provider, "claude", "The agent is on its backup model.");
+      assert.equal(moved.usageLimitReturn?.provider, "codex", "The agent keeps its own model to go back to.");
+      const notes = await markers(agent.id, MODEL_SWITCH_ITEM_TYPES["usage-limit"]);
+      assert.deepEqual(
+        notes,
+        [sourceText("status.agent.modelSwitchedForLimit", { model: modelName(moved.model) })],
+        "The note names a usage limit, not an empty balance.",
+      );
+      await waitFor("the agent to go back after the reset", () => agentOf(agent.id).provider === "codex", 90_000);
+      const own =
+        service.listModels().find((option) => option.provider === "codex" && option.id === CODEX_MODEL)?.name ??
+        CODEX_MODEL;
+      const ended = await markers(agent.id, MODEL_SWITCH_ITEM_TYPES["usage-limit-ended"]);
+      assert.deepEqual(ended, [sourceText("status.agent.modelReturnedAfterLimit", { model: own })]);
+      assert.equal(agentOf(agent.id).usageLimitReturn, undefined, "Nothing is left to go back to.");
+      return { notes, ended };
+    } finally {
+      writeFileSync(usageWindowFile, "");
+    }
   });
 
   await check("without a backup, a spent balance shows its reason in the chat", async () => {
