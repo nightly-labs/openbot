@@ -26,13 +26,6 @@ BEGIN
   VALUES ('session', OLD.id, CAST((julianday('now') - 2440587.5) * 86400000 AS INTEGER));
 END;
 
-CREATE TRIGGER auth_session_changes_mobile_insert
-AFTER INSERT ON mobile_auth_sessions
-BEGIN
-  INSERT INTO auth_session_changes(kind, subject_id, changed_at)
-  VALUES ('session', NEW.session_id, CAST((julianday('now') - 2440587.5) * 86400000 AS INTEGER));
-END;
-
 CREATE TRIGGER auth_session_changes_mobile_delete
 AFTER DELETE ON mobile_auth_sessions
 WHEN EXISTS (

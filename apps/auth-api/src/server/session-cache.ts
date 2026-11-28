@@ -3,9 +3,9 @@ import { sha256 } from "./crypto";
 import { primaryD1 } from "./observed-d1";
 import type { AuthUser } from "./types";
 
-export const SESSION_CACHE_TTL_MS = 10 * 60_000;
-export const SESSION_CHANGES_POLL_MS = 30_000;
-export const SESSION_CHANGES_WINDOW_MS = 15 * 60_000;
+const SESSION_CACHE_TTL_MS = 10 * 60_000;
+const SESSION_CHANGES_POLL_MS = 30_000;
+const SESSION_CHANGES_WINDOW_MS = 15 * 60_000;
 export const SESSION_CHANGES_RETENTION_MS = 60 * 60_000;
 
 const CACHE_NAME = "auth-sessions";

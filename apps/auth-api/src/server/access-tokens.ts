@@ -1,8 +1,8 @@
 import { Effect, Schema } from "effect";
 import { decodeBase64Url, deriveSecret, encodeBase64Url, importHmacSha256Key } from "./crypto";
 
-export const ACCESS_TOKEN_PREFIX = "oba1.";
-export const ACCESS_TOKEN_LIFETIME_MS = 10 * 60_000;
+const ACCESS_TOKEN_PREFIX = "oba1.";
+const ACCESS_TOKEN_LIFETIME_MS = 10 * 60_000;
 export const ACCESS_TOKEN_ROUTE = "/v1/auth/access-token";
 const ACCESS_TOKEN_KEY_LABEL = "openbot/auth-access-token/v1";
 const ACCESS_TOKEN_MAX_LENGTH = 512;

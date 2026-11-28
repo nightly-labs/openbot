@@ -95,7 +95,7 @@ describe("auth session changes migration", () => {
     });
   });
 
-  it("records a phone sign-in and a phone sign-out of a live session only", () => {
+  it("records a phone sign-out of a live session only, and not a phone sign-in", () => {
     const database = migrated();
     database.exec(`
       INSERT INTO mobile_auth_sessions(session_id, user_id, device_id, device_name, platform, created_at)
@@ -104,10 +104,12 @@ describe("auth session changes migration", () => {
       DELETE FROM mobile_auth_sessions WHERE session_id = 'old-phone';
     `);
 
-    expect(changes(database)).toEqual([
-      { kind: "session", subject_id: "desktop" },
-      { kind: "session", subject_id: "phone" },
-    ]);
+    expect(changes(database)).toEqual([{ kind: "session", subject_id: "phone" }]);
+    database.exec(`
+      INSERT INTO mobile_auth_sessions(session_id, user_id, device_id, device_name, platform, created_at)
+      VALUES ('old-phone', 'member', 'device-5', 'Pixel', 'android', 60);
+    `);
+    expect(changes(database)).toEqual([{ kind: "session", subject_id: "phone" }]);
   });
 
   it("records a changed profile field and an account delete, and skips an update that changes nothing", () => {
