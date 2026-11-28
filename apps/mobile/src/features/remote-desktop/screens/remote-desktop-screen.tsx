@@ -200,7 +200,6 @@ export function RemoteDesktopScreen() {
       try {
         const host = await readRemoteDesktopHost(connection);
         if (!current()) return;
-        if (!host.ready) return setPhase({ type: "failed", message: t("mobile.server.remoteDesktop.notReady") });
         const session = await startRemoteDesktopSession(connection);
         if (!current()) {
           await endRemoteDesktopSession(connection, session.id).catch(() => undefined);
