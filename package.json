@@ -463,6 +463,7 @@
     "test:signal": "bun scripts/signal-security-e2e.ts",
     "test:signal-cross-home": "bun scripts/signal-cross-home-e2e.ts",
     "test:signal-handoff": "bun scripts/signal-handoff-e2e.ts",
+    "test:host-signal-home-follow": "bun --preload ./scripts/team-api-routes-e2e-electron.mjs scripts/host-signal-home-follow-e2e.ts",
     "test:watch-sessions": "bun apps/auth-api/scripts/watch-sessions-e2e.ts",
     "test:watch-relay-host": "bun scripts/watch-relay-host-e2e.ts",
     "test:watch-crypto-interop": "bun scripts/watch-crypto-interop-e2e.ts",

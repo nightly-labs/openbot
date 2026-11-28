@@ -13,6 +13,9 @@ plugin({
       exports: {
         ipcMain: { handle: unavailable("ipcMain.handle"), removeHandler: unavailable("ipcMain.removeHandler") },
         shell: { openExternal: unavailable("shell.openExternal") },
+        BrowserWindow: unavailable("BrowserWindow"),
+        MessageChannelMain: unavailable("MessageChannelMain"),
+        webContents: { fromId: unavailable("webContents.fromId") },
       },
       loader: "object",
     }));
