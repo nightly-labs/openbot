@@ -47,6 +47,7 @@ import type {
 } from "../routine-store";
 import type { RoutineDueSource, RoutineTimer } from "../routine-timer";
 import { WorkflowRunStore } from "../workflows/workflow-run-store";
+import { feedsWorkingStep } from "../workflows/workflow-walk";
 import {
   type ConversationRuntime,
   type ConversationTransaction,
@@ -236,6 +237,21 @@ export class RoutineScheduler implements RoutineDueSource {
     return sender?.kind === "routine" ? this.#workflowRuns.handoffSource(sender.runId) : null;
   }
 
+  workflowStepFeedsWork(deliveryId: string): boolean {
+    const delivery = this.#mailbox.getDelivery(deliveryId)?.delivery;
+    if (delivery?.sender.kind !== "routine") return false;
+    const run = this.#workflowRuns.run(delivery.sender.runId);
+    if (!run) return false;
+    const step = this.#workflowRuns
+      .agentStepsOf(run.id, delivery.recipientAgentId)
+      .find(
+        (candidate) =>
+          candidate.deliveryId === deliveryId ||
+          this.#mailbox.deliveryForKey(`workflow-step:${candidate.id}`)?.delivery.id === deliveryId,
+      );
+    return step !== undefined && feedsWorkingStep(run.graph, step.nodeId);
+  }
+
   timezoneForDelivery(deliveryId: string): string {
     const run = this.#routines.runForDelivery(deliveryId);
     if (run) return this.#routines.getRecord(run.agentId, run.routineId)?.timezone || this.#timezone();
@@ -272,7 +288,8 @@ export class RoutineScheduler implements RoutineDueSource {
 
   quietRunForDelivery(deliveryId: string): boolean {
     const run = this.#routines.runForDelivery(deliveryId) ?? this.linkedRunForDelivery(deliveryId);
-    return run === null ? this.workflowRunSource(deliveryId) !== null : quietRoutineRun(run);
+    if (run !== null) return quietRoutineRun(run);
+    return this.workflowRunSource(deliveryId) !== null && !this.workflowStepFeedsWork(deliveryId);
   }
 
   retriesAfterRestart(deliveryId: string): boolean {

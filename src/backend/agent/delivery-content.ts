@@ -110,6 +110,7 @@ export interface DeliveryPromptSources {
   routineRun: Pick<RoutineRun, "kind" | "source" | "agentId"> | null;
   skippedRoutineRuns?: SkippedRoutineRuns | null;
   workflowRunSource?: WorkflowRunSource | null;
+  workflowStepFeedsWork?: boolean;
   routineTimezone?: string | undefined;
   wokenWaits?: readonly AgentWait[];
   continuesWait?: boolean;
@@ -566,10 +567,12 @@ export function deliveryPromptInput(context: DeliveryContext, sources: DeliveryP
       "A task can tell you to remind the user or to send the user a message. When it names no other place, write that message as your final answer. OpenBot shows your final answer to the user in this chat. openbot.send_message sends to other agents, not to the user.",
       testRun
         ? "This is a manual Test run. Report the action and result even when a normal scheduled run would suppress a notification because there is no change."
-        : sources.skippedRoutineRuns
-          ? `This is a ${runKind}. Report the skipped runs also when the task has nothing new: do not call the ${ROUTINE_NO_UPDATE_TOOL} tool in this run.`
-          : `This is a ${runKind}. Follow the notification conditions in the routine task. When they give nothing to report, call the ${ROUTINE_NO_UPDATE_TOOL} tool and write no text, also none before it. A requested reminder or message is a report, also when there is no new information. Do not call ${ROUTINE_NO_UPDATE_TOOL} for it unless the notification conditions of the task say to send nothing.`,
-      ...(testRun || run?.source === "script"
+        : sources.workflowStepFeedsWork
+          ? `This is a ${runKind}. A later workflow step reads your answer: always write your full result as your final answer, also when it has nothing new, and do not call the ${ROUTINE_NO_UPDATE_TOOL} tool.`
+          : sources.skippedRoutineRuns
+            ? `This is a ${runKind}. Report the skipped runs also when the task has nothing new: do not call the ${ROUTINE_NO_UPDATE_TOOL} tool in this run.`
+            : `This is a ${runKind}. Follow the notification conditions in the routine task. When they give nothing to report, call the ${ROUTINE_NO_UPDATE_TOOL} tool and write no text, also none before it. A requested reminder or message is a report, also when there is no new information. Do not call ${ROUTINE_NO_UPDATE_TOOL} for it unless the notification conditions of the task say to send nothing.`,
+      ...(testRun || run?.source === "script" || sources.workflowStepFeedsWork
         ? []
         : [
             `A stop that the user asked for is not a failure. When the user paused this routine, or asked to stop or skip this run, and did not turn it on again, do not do the task and do not call the ${ROUTINE_REPORT_FAILURE_TOOL} tool: call the ${ROUTINE_NO_UPDATE_TOOL} tool instead of a written answer.`,

@@ -160,6 +160,14 @@ export function soloInputs(
   });
 }
 
+export function feedsWorkingStep(graph: WorkflowGraph, nodeId: string): boolean {
+  const kinds = new Map(graph.nodes.map((node) => [node.id, node.kind]));
+  return graph.edges.some((edge) => {
+    const reader = kinds.get(edge.to);
+    return edge.from === nodeId && edge.type === "text" && (reader === "agent" || reader === "llm");
+  });
+}
+
 function textEdges(
   kinds: ReadonlyMap<string, WorkflowNode["kind"]>,
   edges: readonly WorkflowEdge[],

@@ -328,6 +328,8 @@ export class QueueControls {
               skippedRoutineRuns: routineRun ? this.#routines.skippedBefore(routineRun) : null,
               workflowRunSource:
                 context.delivery.sender.kind === "routine" ? this.#routines.workflowRunSource(input.deliveryId) : null,
+              workflowStepFeedsWork:
+                context.delivery.sender.kind === "routine" && this.#routines.workflowStepFeedsWork(input.deliveryId),
               wokenWaits: context.delivery.sender.kind === "routine" ? this.#routines.wokenWaits(input.deliveryId) : [],
               continuesWait:
                 context.delivery.sender.kind === "routine" && this.#routines.continuesWait(input.deliveryId),
