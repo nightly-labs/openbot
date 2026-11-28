@@ -1231,9 +1231,8 @@ export class DrainScheduler {
           }
           const modelLimited = error instanceof ProviderModelLimitedError;
           if (
-            (error instanceof ProviderModelNotOfferedError || modelLimited) &&
+            (modelLimited || (error instanceof ProviderModelNotOfferedError && !messagingDelivery)) &&
             !channelDelivery &&
-            !messagingDelivery &&
             this.#hooks.mayFailOver(delivery.recipientAgentId)
           ) {
             if (modelLimited) {
@@ -1324,7 +1323,7 @@ export class DrainScheduler {
               ? sourceText(stoppedKey, { provider: providerLabel(providerForAgent(recipient)) })
               : null;
           const reason = threadInUse ? sourceText("error.provider.codexThreadInUse") : (stoppedReason ?? detail);
-          if (!messagingDelivery && isPlanLimitDiagnostic(reason)) {
+          if (isPlanLimitDiagnostic(reason)) {
             if (!channelDelivery) {
               for (const item of batch)
                 yield* this.#mailbox.restoreQueued(item.delivery.id).pipe(toDeliveryStartFailed);
