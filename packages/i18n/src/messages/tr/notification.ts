@@ -32,4 +32,5 @@ export const messages = {
   "notification.welcome": "Bir ajanın size ihtiyacı olduğunda OpenBot burada bildirecektir.",
   "notification.toast.region": "Bildirimler",
   "notification.toast.close": "Bildirimi kapat",
+  "notification.toast.dismissAll": "Tümünü kapat",
 } as const satisfies PartialTranslation<typeof source>;

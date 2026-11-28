@@ -1727,6 +1727,16 @@ html.ui-textarea-resizing {
   --border-radius: var(--openbot-radius-card);
 }
 
+.ui-toast-dismiss-all {
+  position: fixed;
+  z-index: var(--openbot-layer-toast);
+  -webkit-app-region: no-drag;
+}
+
+.ui-toast-dismiss-all ~ section .ui-toaster[data-y-position="top"][data-x-position="right"] {
+  top: calc(var(--offset-top) + var(--openbot-control-xs) + var(--openbot-space-2));
+}
+
 .ui-toaster [data-sonner-toast][data-styled="true"] {
   --ui-toast-tone: transparent;
   --ui-toast-motion-duration: var(--openbot-duration-toast-enter);

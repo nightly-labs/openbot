@@ -24,4 +24,5 @@ export const messages = {
   "notification.welcome": "에이전트가 도움을 필요로 하면 OpenBot이 여기서 알려드려요.",
   "notification.toast.region": "알림",
   "notification.toast.close": "알림 닫기",
+  "notification.toast.dismissAll": "모두 닫기",
 } as const satisfies PartialTranslation<typeof source>;

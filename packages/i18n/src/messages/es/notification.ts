@@ -33,4 +33,5 @@ export const messages = {
   "notification.welcome": "OpenBot te avisará aquí cuando un agente te necesite.",
   "notification.toast.region": "Notificaciones",
   "notification.toast.close": "Cerrar notificación",
+  "notification.toast.dismissAll": "Cerrar todo",
 } as const satisfies PartialTranslation<typeof source>;

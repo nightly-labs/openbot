@@ -27,4 +27,5 @@ export const messages = {
   "notification.welcome": "エージェントが対応を必要とするときは、ここでお知らせします。",
   "notification.toast.region": "通知",
   "notification.toast.close": "通知を閉じる",
+  "notification.toast.dismissAll": "すべて閉じる",
 } as const satisfies PartialTranslation<typeof source>;
