@@ -490,6 +490,11 @@ export type SpeechSpeed = (typeof SPEECH_SPEEDS)[number];
 export const VOICE_TURN_PAUSES = [1_500, 2_000, 3_000, 5_000] as const;
 export type VoiceTurnPause = (typeof VOICE_TURN_PAUSES)[number];
 
+export function nextVoiceTurnPause(pause: VoiceTurnPause): VoiceTurnPause {
+  const index = VOICE_TURN_PAUSES.indexOf(pause);
+  return VOICE_TURN_PAUSES[(index + 1) % VOICE_TURN_PAUSES.length] ?? VOICE_TURN_PAUSES[0];
+}
+
 const SPEECH_SPEED_CYCLE: readonly SpeechSpeed[] = [
   ...SPEECH_SPEEDS.filter((speed) => speed >= 1),
   ...SPEECH_SPEEDS.filter((speed) => speed < 1),

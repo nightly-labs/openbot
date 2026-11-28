@@ -26,6 +26,7 @@ import { createEffect, createStore } from "solid-js";
 import { desktopAnalytics } from "../../analytics";
 import { readAloud, stopSpeech } from "../speech/speech-playback";
 import { changeSpeechSpeed, speechSpeed, updateSpeechSettings } from "../speech/speech-speed";
+import { showSavedVoiceTurnPause } from "../speech/speech-turn-pause";
 import { voicePort } from "./voice-port";
 
 interface SettingsVoiceState {
@@ -254,7 +255,9 @@ export function createSettingsVoiceStore(active: () => boolean) {
   }
 
   function setTurnPause(turnPauseMs: VoiceTurnPause): void {
-    void saveSpeech({ turnPauseMs });
+    void saveSpeech({ turnPauseMs }).then((saved) => {
+      if (saved) showSavedVoiceTurnPause(turnPauseMs);
+    });
   }
 
   function supertonicMissing(): boolean {

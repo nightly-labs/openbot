@@ -49,6 +49,7 @@ import { serverCanAdminister, serverCanManageMcp, serverSupportsCapability } fro
 import { codexLiveAccess } from "../speech/codex-live-access";
 import { speechPort } from "../speech/speech-port";
 import { cycleSpeechSpeed, speechSpeed } from "../speech/speech-speed";
+import { cycleVoiceTurnPause, voiceTurnPause } from "../speech/speech-turn-pause";
 import { openedAttachmentUrl } from "./attachment-preview";
 import { ConversationSideThread } from "./ConversationSideThread";
 import { isChatVisualAppShortcut } from "./chat-visual-shortcuts";
@@ -148,6 +149,8 @@ function VoiceConversation(paneProps: VoicePillPresence & { kind: VoiceConversat
   const transcribed = kind === "transcribed";
   const replySpeed = () => (transcribed ? speechSpeed() : undefined);
   const cycleSpeed = transcribed ? cycleSpeechSpeed : undefined;
+  const turnPause = () => (transcribed ? voiceTurnPause() : undefined);
+  const cycleTurnPause = transcribed ? cycleVoiceTurnPause : undefined;
   const pillAgent = () => (channel ? channel.voiceAgent() : props.agent);
   return (
     <Show when={pillAgent()}>
@@ -171,6 +174,8 @@ function VoiceConversation(paneProps: VoicePillPresence & { kind: VoiceConversat
           onEnd={endVoiceConversation}
           speed={replySpeed()}
           onCycleSpeed={cycleSpeed}
+          turnPauseMs={turnPause()}
+          onCycleTurnPause={cycleTurnPause}
           open={paneProps.open}
           onClosed={paneProps.onClosed}
         />

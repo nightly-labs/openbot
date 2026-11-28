@@ -114,6 +114,7 @@
   gap: var(--openbot-space-1);
   padding-inline: var(--openbot-space-4);
   pointer-events: none;
+  container: voice-pill-dock / inline-size;
 }
 
 .voice-pill-blur {
@@ -292,6 +293,21 @@
   padding-inline: var(--openbot-space-1-5);
   font-size: var(--openbot-text-sm);
   font-variant-numeric: tabular-nums;
+}
+
+.voice-pill-pause {
+  display: flex;
+  max-width: calc(var(--openbot-control-md) * 2 * (1 - var(--voice-pill-push-share)));
+  flex: 0 0 auto;
+  margin-inline-start: calc(var(--openbot-space-2) * -1 * var(--voice-pill-push-share));
+  overflow: hidden;
+  opacity: clamp(0, 1 - var(--voice-pill-push, 0) * 2, 1);
+}
+
+@container voice-pill-dock (width < 420px) {
+  .voice-pill-pause {
+    display: none;
+  }
 }
 
 .voice-pill-talk-slot {

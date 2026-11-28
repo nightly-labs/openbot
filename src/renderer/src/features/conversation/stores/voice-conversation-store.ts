@@ -1,6 +1,5 @@
 import {
   type ConversationMessage,
-  DEFAULT_SPEECH_SETTINGS,
   LOCAL_SERVER_ID,
   SPEECH_MODEL,
   type SpeechModelStatus,
@@ -23,6 +22,7 @@ import {
   noteDictatedMessage,
   onDictatedReplyEnd,
 } from "../../speech/speech-replies";
+import { loadVoiceTurnPause, voiceTurnPause } from "../../speech/speech-turn-pause";
 import { EMPTY_DRAFT } from "../composer-draft";
 import type { ConversationRuntime } from "../conversation-runtime";
 import type { ComposerDraft, ConversationTarget } from "../conversation-types";
@@ -132,7 +132,6 @@ export function createVoiceConversation(deps: VoiceConversationDeps) {
   let livePreview = false;
   let streamed = false;
   let cloud = false;
-  let turnEndSilenceMs: number = DEFAULT_SPEECH_SETTINGS.turnPauseMs;
   let step: VoiceConversationStep = "starting";
   let muted = false;
   let online = true;
@@ -258,16 +257,12 @@ export function createVoiceConversation(deps: VoiceConversationDeps) {
     try {
       const speech = speechPort().voice;
       downloadListeners.push(speech.onSpeechModelStatus(showDownload), deps.voice.onModelStatus(showDownload));
-      const [server, turnPauseMs, plannedSettings, dictationStatuses] = await Promise.all([
+      const [server, plannedSettings, dictationStatuses] = await Promise.all([
         speech.getServer(),
-        speech.getSpeechSettings().then(
-          (speechSettings) => speechSettings.turnPauseMs,
-          () => DEFAULT_SPEECH_SETTINGS.turnPauseMs,
-        ),
         deps.voice.getSettings(),
         speech.getModelStatuses().catch(() => null),
+        loadVoiceTurnPause(),
       ]);
-      turnEndSilenceMs = turnPauseMs;
       const speechModel = server?.routes.speech ? null : await speech.getSpeechModelStatus();
       planDownloads(speechModel, server?.routes.dictation ? null : plannedSettings.modelId, dictationStatuses);
       if (speechModel && speechModel.phase !== "ready") {
@@ -501,6 +496,7 @@ export function createVoiceConversation(deps: VoiceConversationDeps) {
     let shown = 0;
     let loudFor = 0;
     let quietFor = 0;
+    let quietLimit = voiceTurnPause();
     let silentFor = 0;
     current.timers.push(
       setInterval(() => {
@@ -547,8 +543,9 @@ export function createVoiceConversation(deps: VoiceConversationDeps) {
           }
         } else {
           loudFor = 0;
+          if (quietFor === 0) quietLimit = voiceTurnPause();
           quietFor += LEVEL_INTERVAL_MS;
-          if (current.spoke && quietFor >= turnEndSilenceMs && !pushToTalk) endTurn(current);
+          if (current.spoke && quietFor >= quietLimit && !pushToTalk) endTurn(current);
         }
         if (held && !pushToTalk && heldAt !== undefined && current.spoke && performance.now() - heldAt >= HOLD_WORDS_MS)
           checkHeldWords(current);

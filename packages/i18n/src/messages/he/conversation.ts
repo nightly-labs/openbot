@@ -154,6 +154,7 @@ export const messages = {
   "conversation.voice.talkMode": "אופן הדיבור",
   "conversation.voice.talkMode.open": "מיקרופון פתוח",
   "conversation.voice.talkMode.push": "לחיצה לדיבור",
+  "conversation.voice.pauseLabel": "השהיה לפני שליחה: {seconds} שנ'",
   "conversation.voice.holdToTalk": "יש להחזיק כדי לדבר",
   "conversation.voice.downloading": "מתכונן {progress}%",
   "conversation.voice.spaceKey": "רווח",

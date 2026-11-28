@@ -156,6 +156,7 @@ export const messages = {
   "conversation.voice.talkMode": "Sprechweise",
   "conversation.voice.talkMode.open": "Offenes Mikrofon",
   "conversation.voice.talkMode.push": "Push-to-Talk",
+  "conversation.voice.pauseLabel": "Pause vor dem Senden: {seconds} s",
   "conversation.voice.holdToTalk": "Zum Sprechen gedrückt halten",
   "conversation.voice.downloading": "Wird vorbereitet {progress}%",
   "conversation.voice.spaceKey": "Leertaste",

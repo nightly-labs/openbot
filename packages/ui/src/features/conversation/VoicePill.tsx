@@ -85,6 +85,8 @@ export interface VoicePillProps {
   onEnd: () => void;
   speed?: number | undefined;
   onCycleSpeed?: (() => void) | undefined;
+  turnPauseMs?: number | undefined;
+  onCycleTurnPause?: (() => void) | undefined;
   open?: boolean | undefined;
   onClosed?: (() => void) | undefined;
 }
@@ -92,6 +94,7 @@ export interface VoicePillProps {
 export function VoicePill(props: VoicePillProps) {
   const { t, format } = useText();
   const speed = () => format.number(props.speed ?? 1);
+  const pauseSeconds = () => format.number((props.turnPauseMs ?? 0) / 1_000);
   const push = () => props.talkMode === "push";
   const downloadProgress = () => (props.phase === "starting" ? (props.downloadProgress ?? null) : null);
   const downloading = () => downloadProgress() !== null;
@@ -383,6 +386,20 @@ export function VoicePill(props: VoicePillProps) {
             </For>
           </SlidingTabs.List>
         </SlidingTabs.Root>
+        <Show when={props.onCycleTurnPause}>
+          {(cycleTurnPause) => (
+            <div class="voice-pill-pause" inert={push() ? true : undefined}>
+              <PillAction
+                text={t("settings.voice.pause.title")}
+                label={t("conversation.voice.pauseLabel", { seconds: pauseSeconds() })}
+                class="voice-pill-speed"
+                onClick={() => cycleTurnPause()()}
+              >
+                {t("settings.voice.pause.seconds", { seconds: pauseSeconds() })}
+              </PillAction>
+            </div>
+          )}
+        </Show>
         <Show when={props.onCycleSpeed}>
           {(cycleSpeed) => (
             <PillAction

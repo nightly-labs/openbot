@@ -156,6 +156,7 @@ export const messages = {
   "conversation.voice.talkMode": "Способ разговора",
   "conversation.voice.talkMode.open": "Открытый микрофон",
   "conversation.voice.talkMode.push": "Нажать и говорить",
+  "conversation.voice.pauseLabel": "Пауза перед отправкой: {seconds} с",
   "conversation.voice.holdToTalk": "Удерживайте, чтобы говорить",
   "conversation.voice.downloading": "Подготовка {progress}%",
   "conversation.voice.spaceKey": "Пробел",
