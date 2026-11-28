@@ -262,6 +262,9 @@ const MAX_ACTIVE_DOWNLOADS = 4;
 const MAX_DOWNLOAD_BYTES = 2 * 1024 * 1024 * 1024;
 const DOWNLOAD_TOO_LARGE =
   "Download stopped: the file is larger than 2 GiB, the download limit of this browser. No file was saved. The user can download it in their own web browser.";
+const DOWNLOAD_STALL_MS = 5 * 60_000;
+const DOWNLOAD_STALLED =
+  "Download stopped: the site sent no data for several minutes. No file was saved. Try again. When it stops again, the user can download it in their own web browser.";
 const MAX_DOWNLOAD_NOTES = 20;
 
 interface BrowserDownloadNote {
@@ -568,6 +571,8 @@ export class BrowserHost {
   readonly #reservedDownloadPaths = new Set<string>();
   #downloadNotes: BrowserDownloadNote[] = [];
   #activeDownloads = 0;
+  readonly #downloadStallMs: number;
+  readonly #downloadStallTimers = new Set<NodeJS.Timeout>();
   readonly #recorder: BrowserRecorder;
   readonly #locations = new BrowserLocationRequests((tabId) => {
     const tab = this.#tabs.get(tabId);
@@ -635,6 +640,7 @@ export class BrowserHost {
       siteMemories?: (agentId: string, hostname: string) => BrowserSiteMemory[];
       userBrowsing?: BrowserUserBrowsing;
       hideFromWindowSwitchers?: (window: BaseWindow) => void;
+      downloadStallMs?: number;
     } = {},
   ) {
     this.#window = window;
@@ -665,6 +671,7 @@ export class BrowserHost {
     this.#hideFromWindowSwitchers = options.hideFromWindowSwitchers ?? (() => {});
     this.#webPreferences = browserWebPreferences(options.pagePreload);
     this.#downloadsRoot = downloadsRoot;
+    this.#downloadStallMs = options.downloadStallMs ?? DOWNLOAD_STALL_MS;
     this.#statePath = statePath;
     this.#stateWritePath = statePath;
     this.#session = session.fromPartition("persist:openbot-browser", { cache: true });
@@ -3394,6 +3401,8 @@ export class BrowserHost {
     const done = Deferred.makeUnsafe<void, BrowserOperationError>();
     this.#destroying = done;
     clearInterval(this.#idleTabSweep);
+    for (const timer of this.#downloadStallTimers) clearTimeout(timer);
+    this.#downloadStallTimers.clear();
     this.#closeBackgroundWindow();
     const result = yield* Effect.exit(
       Effect.gen({ self: this }, function* () {
@@ -3897,13 +3906,49 @@ export class BrowserHost {
       item.setSavePath(downloadPath);
       this.#activeDownloads += 1;
       noteDownload(`started. The file saves at ${downloadPath}. A later browser tool result says when it is complete.`);
+      let stallBytes = item.getReceivedBytes();
+      let lastProgressAt = Date.now();
+      let stallTimer: NodeJS.Timeout | undefined;
+      const stopStallTimer = () => {
+        if (!stallTimer) return;
+        clearTimeout(stallTimer);
+        this.#downloadStallTimers.delete(stallTimer);
+        stallTimer = undefined;
+      };
+      const noteProgress = () => {
+        const received = item.getReceivedBytes();
+        if (received <= stallBytes) return;
+        stallBytes = received;
+        lastProgressAt = Date.now();
+      };
+      const checkStall = () => {
+        stopStallTimer();
+        if (this.#destroying) return;
+        noteProgress();
+        const remainingMs = lastProgressAt + this.#downloadStallMs - Date.now();
+        if (remainingMs > 0) {
+          watchStall(remainingMs);
+          return;
+        }
+        logger.warn("Browser download stopped after it received no data", { stallMs: this.#downloadStallMs });
+        item.cancel();
+        stopped(DOWNLOAD_STALLED);
+      };
+      const watchStall = (delayMs: number) => {
+        stallTimer = setTimeout(checkStall, delayMs);
+        stallTimer.unref();
+        this.#downloadStallTimers.add(stallTimer);
+      };
+      watchStall(this.#downloadStallMs);
       item.on("updated", () => {
+        noteProgress();
         if (item.getState() !== "progressing" || item.getReceivedBytes() <= MAX_DOWNLOAD_BYTES) return;
         logger.warn("Browser download stopped at the size limit", { limitBytes: MAX_DOWNLOAD_BYTES });
         item.cancel();
         stopped(DOWNLOAD_TOO_LARGE);
       });
       item.once("done", (_doneEvent, state) => {
+        stopStallTimer();
         this.#activeDownloads -= 1;
         this.#reservedDownloadPaths.delete(downloadPath);
         if (state === "interrupted") stopped("Download failed before the file was complete. Try again.");
