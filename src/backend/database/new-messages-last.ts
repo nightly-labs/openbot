@@ -1,6 +1,12 @@
 import type { DatabaseSync } from "node:sqlite";
 import type { ConversationMessage } from "@openbot/contracts/ipc";
-import { databaseRow, databaseRows, optionalStringColumn, requiredStringColumn } from "./database-rows";
+import {
+  databaseRow,
+  databaseRows,
+  optionalStringColumn,
+  requiredNumberColumn,
+  requiredStringColumn,
+} from "./database-rows";
 import { cachedStatement } from "./statement-cache";
 
 export function keepNewMessagesLast(
@@ -25,8 +31,9 @@ export function keepNewMessagesLast(
   const moving: ConversationMessage[] = [];
   for (const message of messages) {
     const savedFuture = futureTimes.get(message.id);
-    if (savedFuture !== undefined) {
-      if (message.createdAt < savedFuture) message.createdAt = savedFuture;
+    const steeredNow = message.steered === true && savedFuture?.steered === false;
+    if (savedFuture !== undefined && !steeredNow) {
+      if (message.createdAt < savedFuture.time) message.createdAt = savedFuture.time;
       continue;
     }
     if (message.createdAt >= newestSaved || (newestPast !== null && message.createdAt <= newestPast)) continue;
@@ -81,12 +88,22 @@ function newestSavedTimeUntil(db: DatabaseSync, threadId: string, hostTime: stri
   return row ? optionalStringColumn(row, "time") : null;
 }
 
-function savedFutureTimes(db: DatabaseSync, threadId: string, hostTime: string): Map<string, string> {
+function savedFutureTimes(
+  db: DatabaseSync,
+  threadId: string,
+  hostTime: string,
+): Map<string, { time: string; steered: boolean }> {
   const rows = databaseRows(
     cachedStatement(
       db,
-      "SELECT message_id, created_at FROM projection_thread_messages WHERE thread_id = ? AND created_at > ?",
+      `SELECT message_id, created_at, json_extract(message_json, '$.steered') IS 1 AS steered
+       FROM projection_thread_messages WHERE thread_id = ? AND created_at > ?`,
     ).all(threadId, hostTime),
   );
-  return new Map(rows.map((row) => [requiredStringColumn(row, "message_id"), requiredStringColumn(row, "created_at")]));
+  return new Map(
+    rows.map((row) => [
+      requiredStringColumn(row, "message_id"),
+      { time: requiredStringColumn(row, "created_at"), steered: requiredNumberColumn(row, "steered") === 1 },
+    ]),
+  );
 }

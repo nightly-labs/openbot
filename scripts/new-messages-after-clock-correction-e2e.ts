@@ -24,6 +24,7 @@ type CaseName =
   | "clock-caught-up"
   | "normal-clock"
   | "steer-requeued"
+  | "steer-after-correction"
   | "older-history";
 
 interface CaseReport {
@@ -49,6 +50,13 @@ function futureTurns(now: number): ConversationMessage[] {
       message(`future-reply-${index}`, `future-turn-${index}`, "assistant", at + 1),
     ];
   }).flat();
+}
+
+function savedTime(database: OpenBotDatabase, threadId: string, messageId: string): string {
+  const row = database.connection
+    .prepare("SELECT created_at FROM projection_thread_messages WHERE thread_id = ? AND message_id = ?")
+    .get(threadId, messageId);
+  return String(row?.created_at ?? "");
 }
 
 async function runCase(name: CaseName, result: CaseReport): Promise<void> {
@@ -108,6 +116,19 @@ async function runCase(name: CaseName, result: CaseReport): Promise<void> {
       conversation.emitConversation(held);
     }
 
+    const steerTimes: string[] = [];
+    if (name === "steer-after-correction") {
+      const promptIndex = () => held.messages.findIndex((candidate) => candidate.id === prompt.id);
+      held.messages.push(message("running-part", "running-turn", "assistant", Date.now()));
+      conversation.emitConversation(held);
+      const steeredAt = Date.now();
+      for (let update = 0; update < 2; update++) {
+        held.messages[promptIndex()] = { ...delivered(steeredAt), steered: true };
+        conversation.emitConversation(held);
+        steerTimes.push(savedTime(database, threadId, prompt.id));
+      }
+    }
+
     if (name === "clock-caught-up") {
       database.connection
         .prepare(
@@ -140,7 +161,13 @@ async function runCase(name: CaseName, result: CaseReport): Promise<void> {
       }),
     );
 
-    if (name === "older-history") {
+    if (name === "steer-after-correction") {
+      assert.ok(
+        (steerTimes[0] ?? "") > savedTime(database, threadId, "running-part"),
+        "a steered prompt moves after the turn parts saved before the steer",
+      );
+      assert.equal(steerTimes[1], steerTimes[0], "a second update of the same steer keeps its time");
+    } else if (name === "older-history") {
       assert.equal(stored.get(history.id), history.createdAt, "older history keeps its own time");
       assert.ok(!result.latestPageTail.includes(history.id), "older history is not moved to the end");
     } else if (name === "steer-requeued") {
@@ -181,6 +208,7 @@ const names: CaseName[] = [
   "clock-caught-up",
   "normal-clock",
   "steer-requeued",
+  "steer-after-correction",
   "older-history",
 ];
 for (const name of names) {
