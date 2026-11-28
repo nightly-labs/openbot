@@ -35,7 +35,7 @@ const AgentTasks = createSimpleContext({
       archivedPageable: () => local() || activeServerSupportsCapability(AGENT_ARCHIVED_THREADS_CAPABILITY),
       reloadKey: () => {
         const server = activeServer();
-        return `${server?.id ?? ""}:${server?.state ?? ""}:${agentStatus().phase}`;
+        return `${server?.id ?? ""}:${server?.state ?? ""}:${server?.connectionSequence ?? 0}:${agentStatus().phase}`;
       },
     });
   },

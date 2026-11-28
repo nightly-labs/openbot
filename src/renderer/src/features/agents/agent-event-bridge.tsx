@@ -643,6 +643,10 @@ export function AgentEventBridge() {
   }
 
   function reloadSyncedCollection(serverId: string, name: string): void {
+    if (name === "agent-tasks") {
+      agentTasks.reload();
+      return;
+    }
     const agent = agentsPort().agent;
     const synced = parseSyncName(name);
     if (synced?.base === ROUTINES_SYNC_COLLECTION.name && synced.param !== null)

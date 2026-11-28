@@ -13,6 +13,14 @@ import {
 } from "@openbot/contracts/ipc";
 import { isString } from "@openbot/contracts/runtime-values";
 import { TEAM_API_ROUTES } from "@openbot/contracts/team-api-routes";
+import {
+  TEAM_APP_VERSION_HEADER,
+  TEAM_CAPABILITIES_HEADER,
+  TEAM_PROTOCOL_V9,
+  TEAM_PROTOCOL_VERSION_HEADER,
+  teamCapabilitiesForProtocol,
+} from "@openbot/contracts/team-protocol";
+import { AGENT_THREADS_ROUTES } from "@openbot/contracts/team-protocol/agent-threads-v1";
 import { CHANNEL_ROUTES } from "@openbot/contracts/team-protocol/channels-v1";
 import { CHANNELS_SYNC_COLLECTION } from "@openbot/contracts/team-protocol/sync-collections";
 import { AGENT_MESSAGES_SYNC_LOG } from "@openbot/contracts/team-protocol/sync-logs";
@@ -31,6 +39,7 @@ import { Effect } from "effect";
 import type { AgentBrowserHost } from "../src/backend/agent/turn-lifecycle";
 import { AgentService } from "../src/backend/agent-service";
 import { AgentStore } from "../src/backend/agent-store";
+import { AgentThreadStore } from "../src/backend/agent-threads/agent-thread-store";
 import { runCauseEffect } from "../src/backend/effect-boundary";
 import { MailboxStore } from "../src/backend/mailbox-store";
 import { OpenBotDatabase } from "../src/backend/openbot-database";
@@ -511,6 +520,7 @@ try {
       server = new TeamApiServer({
         store: team,
         agents: service,
+        agentTasks: service,
         mailbox,
         browser: teamBrowser,
         sidebarLayout: sidebar,
@@ -641,6 +651,50 @@ try {
   const listCalls = () => httpCallCount(hostPort, "GET", CHANNEL_ROUTES.list);
   const hostList = () => runCauseEffect(client.request(serverId, CHANNEL_ROUTES.list, decodeChannelSummaries));
 
+  await step("A thread rename reaches the remote event stream and both host title records", async () => {
+    const threads = new AgentThreadStore(database);
+    const thread = threads.create({ agentId, title: "Original", origin: "user", titleSource: "auto" });
+    const rows = database.connection.prepare(`
+      SELECT a.title AS taskTitle, t.title AS threadTitle, a.last_event_sequence AS taskSequence,
+             t.last_event_sequence AS threadSequence FROM projection_agent_threads a
+      JOIN projection_threads t USING (thread_id) WHERE thread_id = ?
+    `);
+    const readTitle = (title: string) => {
+      const row = rows.get(thread.threadId);
+      assert.equal(row?.taskTitle, title);
+      assert.equal(row?.threadTitle, title);
+      assert.equal(row?.threadSequence, row?.taskSequence);
+      return row?.threadSequence;
+    };
+    threads.retitle(thread.threadId, "Automatic");
+    const automatic = readTitle("Automatic");
+    let receivedTitle: string | undefined;
+    client.on("agent", (from, event) => {
+      if (from === serverId && event.type === "agent-tasks-changed" && event.snapshot.agentId === agentId)
+        receivedTitle = event.snapshot.tasks.find((task) => task.id === thread.taskId)?.title;
+    });
+    const title = "Manual title";
+    const writer = await runCauseEffect(team.login(OWNER.username, OWNER.password));
+    const response = await fetch(`http://127.0.0.1:${hostPort}${AGENT_THREADS_ROUTES.rename}`, {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${writer.sessionToken}`,
+        "Content-Type": "application/json",
+        [TEAM_APP_VERSION_HEADER]: APP_VERSION,
+        [TEAM_PROTOCOL_VERSION_HEADER]: String(TEAM_PROTOCOL_V9),
+        [TEAM_CAPABILITIES_HEADER]: teamCapabilitiesForProtocol(TEAM_PROTOCOL_V9).join(","),
+      },
+      body: JSON.stringify({ agentId, taskId: thread.taskId, title }),
+    });
+    assert.equal(response.status, 200);
+    await until(client, () => (receivedTitle === title ? true : null));
+    const manual = readTitle(title);
+    assert.ok(Number(manual) > Number(automatic));
+    threads.retitle(thread.threadId, "Later automatic title");
+    assert.equal(readTitle(title), manual);
+    return { receivedTitle, manual, automatic };
+  });
+
   await step("The first sync arrives as WebRTC event frames, and a read makes no HTTP list call", async () => {
     const synced = await until(client, () => client.sync.channels.values(serverId));
     assert.deepEqual(ids(synced), [first], "The first sync does not hold the host channel.");
@@ -705,6 +759,10 @@ try {
   );
 
   await step("A lost sync event frame causes event-reset, and the resubscribe delivers the lost change", async () => {
+    let taskListsInvalidated = false;
+    client.on("syncChanged", (from, name) => {
+      if (from === serverId && name === "agent-tasks") taskListsInvalidated = true;
+    });
     const resetsBefore = resets();
     const framesBefore = loopback.counts.eventResets;
     received.length = 0;
@@ -728,6 +786,7 @@ try {
     });
     assert.ok(loopback.counts.eventResets > framesBefore, "The host did not send event-reset.");
     assert.ok(resets() > resetsBefore, "The client transport did not report event-reset.");
+    assert.ok(taskListsInvalidated, "The reset did not invalidate the cached thread lists.");
     assert.ok(receivedAtReset !== null, "The client got no event-reset.");
     assert.ok(
       channelUpserts(received.slice(receivedAtReset)).keys.includes(lost),
