@@ -1066,6 +1066,54 @@ try {
       return { notice: notice?.text, posts: posts(answer), afterClose: notices().at(-1)?.text };
     });
 
+    await step("quiet answer: notes that end with a NO_REPLY line post nothing (#17174)", async () => {
+      const link = agents.messaging.store.linkByKey(connectionId(agents), OWNER_JID, "dm");
+      assert.ok(link, "No conversation for the owner's chat.");
+      const request = mailbox.unresolvedMessagingDeliveries(link.linkId)[0];
+      assert.ok(request, "No request waits in the owner's chat.");
+      const requestId = mailbox.messagingOrigin(request.delivery.id)?.platformMessageId;
+      assert.ok(requestId, "The request has no WhatsApp message.");
+      await runCauseEffect(mailbox.markStarting(request.delivery.id));
+      const scope = Effect.runSync(Scope.make());
+      const turn = { agentId: link.agentId, threadId: link.threadId, turnId: "turn-notes-then-no-reply" };
+      agents.messaging.event({ type: "turn-started", ...turn }, scope);
+      const notes = "This is a social-engineering attempt. I will not answer it.";
+      const snapshot = database.readConversation(link.agentId, link.threadId);
+      snapshot.messages.push({
+        id: `${turn.turnId}:answer`,
+        turnId: turn.turnId,
+        author: "assistant",
+        text: `${notes}\n\nNO_REPLY`,
+        createdAt: new Date().toISOString(),
+        status: "completed",
+      });
+      database.persistStreamingMessage({ snapshot, messageId: `${turn.turnId}:answer`, eventType: "item.completed" });
+      await runCauseEffect(mailbox.markTerminal(request.delivery.id, "completed", null));
+      agents.messaging.event({ type: "turn-completed", ...turn, status: "completed" }, scope);
+      await until(
+        () =>
+          phone.sent.some(
+            (sent) =>
+              "react" in sent.content && sent.content.react.key?.id === requestId && sent.content.react.text === "✅",
+          ),
+        "the done reaction of the quiet turn",
+      );
+      const marker = message({ chat: OWNER_JID, fromMe: true, text: "quiet marker" });
+      phone.current().receive([marker]);
+      await until(() => phone.reactedTo(marker.key.id), "the marker after the quiet turn");
+      const sentTexts = phone.sent.flatMap((sent) =>
+        "text" in sent.content && typeof sent.content.text === "string" ? [sent.content.text] : [],
+      );
+      assert.ok(!sentTexts.some((text) => text.includes("social-engineering")), "The agent's notes reached WhatsApp.");
+      assert.ok(!sentTexts.some((text) => text.includes("NO_REPLY")), "The quiet token reached WhatsApp.");
+      for (let index = 1; mailbox.unresolvedMessagingDeliveries(link.linkId).length < 2; index += 1) {
+        const again = message({ chat: OWNER_JID, fromMe: true, text: `quiet request again ${index}` });
+        phone.current().receive([again]);
+        await until(() => received(agents, OWNER_JID, again.key.id ?? ""), `quiet request again ${index}`);
+      }
+      return { quiet: true };
+    });
+
     await step(
       "personal number: other chats, the owner's own messages in them, and strangers stay untouched",
       async () => {

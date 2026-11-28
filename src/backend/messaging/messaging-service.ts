@@ -2508,7 +2508,11 @@ function roleName(name: string): string {
 }
 
 function isQuietAnswer(answer: string): boolean {
-  return answer.trim().replace(/^[`*_"']+|[`*_"'.]+$/g, "") === QUIET_ANSWER;
+  return isQuietLine(answer) || isQuietLine(answer.trim().split("\n").at(-1) ?? "");
+}
+
+function isQuietLine(text: string): boolean {
+  return text.trim().replace(/^[`*_"']+|[`*_"'.]+$/g, "") === QUIET_ANSWER;
 }
 
 function token(): string {

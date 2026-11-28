@@ -376,6 +376,7 @@ interface ActiveTurn {
   publishedText: string;
   lastNarration: { id: string; text: string } | null;
   narrationCount: number;
+  thinkingBoundary: boolean;
   stopHookBlocked: boolean;
   thinking: string;
   thinkingStarted: boolean;
@@ -1924,6 +1925,7 @@ export class ClaudeAgentClient extends EventEmitter<ClientEvents> {
       publishedText: "",
       lastNarration: null,
       narrationCount: 0,
+      thinkingBoundary: false,
       stopHookBlocked: false,
       thinking: "",
       thinkingStarted: false,
@@ -2319,6 +2321,14 @@ export class ClaudeAgentClient extends EventEmitter<ClientEvents> {
         block.type === "thinking"
       ) {
         this.#streamThinkingBlock(runtime, event.index, true);
+        this.#markThinkingBoundary(runtime);
+      } else if (
+        isRecord(event) &&
+        event.type === "content_block_start" &&
+        isRecord(block) &&
+        block.type === "redacted_thinking"
+      ) {
+        this.#markThinkingBoundary(runtime);
       } else if (
         isRecord(event) &&
         event.type === "content_block_start" &&
@@ -2329,6 +2339,7 @@ export class ClaudeAgentClient extends EventEmitter<ClientEvents> {
       } else if (event && isRecord(event) && event.type === "content_block_delta" && isRecord(delta)) {
         if (delta.type === "text_delta" && isString(delta.text)) {
           this.#outputTurn(runtime);
+          this.#closeThinkingBoundary(runtime);
           this.#bufferText(runtime, delta.text);
         } else if (delta.type === "thinking_delta" && isString(delta.thinking)) {
           this.#outputTurn(runtime);
@@ -2819,11 +2830,22 @@ export class ClaudeAgentClient extends EventEmitter<ClientEvents> {
     this.#flushNarration(runtime);
   }
 
-  #flushNarration(runtime: ThreadRuntime): void {
+  #markThinkingBoundary(runtime: ThreadRuntime): void {
+    if (runtime.activeTurn) runtime.activeTurn.thinkingBoundary = true;
+  }
+
+  #closeThinkingBoundary(runtime: ThreadRuntime): void {
+    const turn = runtime.activeTurn;
+    if (!turn?.thinkingBoundary) return;
+    turn.thinkingBoundary = false;
+    this.#flushNarration(runtime, ":aside");
+  }
+
+  #flushNarration(runtime: ThreadRuntime, idSuffix = ""): void {
     const turn = runtime.activeTurn;
     if (!turn?.text) return;
     const text = turn.text;
-    const id = `${turn.id}:narration:${turn.narrationCount}`;
+    const id = `${turn.id}:narration:${turn.narrationCount}${idSuffix}`;
     this.emit("notification", {
       method: "item/completed",
       params: {
