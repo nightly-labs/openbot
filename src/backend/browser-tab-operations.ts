@@ -390,6 +390,7 @@ export const runTabAction = Effect.fn("BrowserTab.action")(
       tab: BrowserHostTab,
       deadline: number,
       markDispatched: () => void,
+      keepPageLoading: () => void,
     ) => Effect.Effect<void, BrowserOperationError>,
     readResult: ActionResultReader<A>,
     timeoutMs = 10_000,
@@ -419,6 +420,7 @@ export const runTabAction = Effect.fn("BrowserTab.action")(
           let actionRecorded = false;
           let dispatched = false;
           let cancellationConfirmed = false;
+          let pageKeepsLoading = false;
           let stalledSettle: Fiber.Fiber<void, BrowserOperationError> | undefined;
           const completion = yield* Effect.forkIn(
             Effect.gen(function* () {
@@ -431,9 +433,16 @@ export const runTabAction = Effect.fn("BrowserTab.action")(
                     Effect.catch(() => Effect.succeed(false)),
                   );
                 yield* browserSync(() => remainingTime(deadline, timeoutMessage));
-                yield* operation(tab, deadline, () => {
-                  dispatched = true;
-                });
+                yield* operation(
+                  tab,
+                  deadline,
+                  () => {
+                    dispatched = true;
+                  },
+                  () => {
+                    pageKeepsLoading = true;
+                  },
+                );
               }).pipe(
                 Effect.ensuring(
                   Effect.suspend(() =>
@@ -452,7 +461,13 @@ export const runTabAction = Effect.fn("BrowserTab.action")(
           keepQueueBlocked(
             Effect.gen(function* () {
               if (!cancellationConfirmed) yield* Fiber.await(completion);
-              if (!dialogReturned && !tab.closing && !tab.contents.isDestroyed() && tab.contents.isLoading())
+              if (
+                !pageKeepsLoading &&
+                !dialogReturned &&
+                !tab.closing &&
+                !tab.contents.isDestroyed() &&
+                tab.contents.isLoading()
+              )
                 yield* tab.engine.stopLoading().pipe(Effect.ignore);
               if (stalledSettle) yield* unwindStalledOperation(tab, stalledSettle);
             }),
@@ -473,33 +488,37 @@ export const runTabAction = Effect.fn("BrowserTab.action")(
                 }),
               ),
             );
-            const settleTimeout = Math.max(1, deadline - Date.now());
-            const settle = yield* Effect.forkIn(tab.engine.settle(settleTimeout), tab.scope, {
-              startImmediately: true,
-            });
-            yield* withTimeout(Fiber.join(settle), settleTimeout, timeoutMessage).pipe(
-              Effect.onInterrupt(() =>
-                Effect.sync(() => {
-                  if (tab.engine.cancelPendingCommands()) settle.interruptUnsafe();
-                  stalledSettle = settle;
-                }),
-              ),
-              Effect.catch((error) =>
-                Effect.gen(function* () {
-                  const cause = error instanceof TimeoutError ? error : error.cause;
-                  if (!isTimeoutError(cause)) return yield* browserFailure(cause);
-                  stalledSettle = settle;
-                  if (tab.contents.isLoading()) yield* tab.engine.stopLoading().pipe(Effect.ignore);
-                }),
-              ),
-            );
+            if (!pageKeepsLoading) {
+              const settleTimeout = Math.max(1, deadline - Date.now());
+              const settle = yield* Effect.forkIn(tab.engine.settle(settleTimeout), tab.scope, {
+                startImmediately: true,
+              });
+              yield* withTimeout(Fiber.join(settle), settleTimeout, timeoutMessage).pipe(
+                Effect.onInterrupt(() =>
+                  Effect.sync(() => {
+                    if (tab.engine.cancelPendingCommands()) settle.interruptUnsafe();
+                    stalledSettle = settle;
+                  }),
+                ),
+                Effect.catch((error) =>
+                  Effect.gen(function* () {
+                    const cause = error instanceof TimeoutError ? error : error.cause;
+                    if (!isTimeoutError(cause)) return yield* browserFailure(cause);
+                    stalledSettle = settle;
+                    if (tab.contents.isLoading()) yield* tab.engine.stopLoading().pipe(Effect.ignore);
+                  }),
+                ),
+              );
+            }
             tab.diagnostics.action({
               action,
               ...(target ? { target: describeBrowserTarget(target) } : {}),
               outcome: "success",
-              ...(Date.now() >= deadline
-                ? { detail: "Action completed; page settling exceeded the requested timeout." }
-                : {}),
+              ...(pageKeepsLoading
+                ? { detail: "Action completed; the page arrived and still loads after the requested timeout." }
+                : Date.now() >= deadline
+                  ? { detail: "Action completed; page settling exceeded the requested timeout." }
+                  : {}),
             });
             actionRecorded = true;
             return yield* readResult(tab, keepQueueBlocked, timeoutMessage);

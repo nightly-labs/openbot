@@ -1739,7 +1739,10 @@ async function main(): Promise<void> {
       url: `${origin}/stalled-document`,
       timeoutMs: 500,
     });
-    if (stalledNavigation.success) throw new Error("V2 stalled navigation did not time out.");
+    if (!stalledNavigation.success || toolTextPayload(stalledNavigation)?.loading !== true)
+      throw new Error(
+        `V2 navigation to a committed document that still loads did not return it as loading: ${toolError(stalledNavigation)}`,
+      );
     const stalledSnapshotStartedAt = Date.now();
     const stalledSnapshot = await callBrowserTool(browser, "snapshot", { tabId: stalledTab.id });
     const stalledSnapshotMs = Date.now() - stalledSnapshotStartedAt;
@@ -1786,7 +1789,7 @@ async function main(): Promise<void> {
     }
     const timedNavigation = await callBrowserTool(browser, "navigate", {
       tabId: waitTab.id,
-      url: `${origin}/slow-document?serialized`,
+      url: `${origin}/stalled-image?uncommitted-navigation`,
       timeoutMs: 10,
     });
     if (timedNavigation.success || !toolError(timedNavigation).includes("timed out")) {

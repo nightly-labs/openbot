@@ -1101,6 +1101,7 @@ export class BrowserHost {
           tab.contents,
           () => tab.contents.loadURL(normalizedUrl, browserLoadOptions()),
           firstLoadTimeoutMs,
+          "keep",
         ).pipe(
           Effect.catchIf(isCommittedNavigationTimeout, () => Effect.void),
           Effect.ensuring(Effect.sync(() => (tab.opening = false))),
@@ -3177,32 +3178,28 @@ export class BrowserHost {
       tabId,
       "navigate",
       undefined,
-      (tab, deadline) =>
+      (tab, deadline, _markDispatched, keepPageLoading) =>
         Effect.gen({ self: this }, function* () {
           const operationTimeout = yield* browserSync(() => remainingTime(deadline, "Browser navigate timed out."));
+          const loadKeepingCommittedPage = (initiate: () => boolean | Promise<unknown>) =>
+            navigateAndWait(tab.contents, initiate, operationTimeout, "keep").pipe(
+              Effect.catchIf(isCommittedNavigationTimeout, () => Effect.sync(keepPageLoading)),
+            );
           if (url) {
             const normalizedUrl = yield* browserSync(() => normalizeBrowserUrl(url));
             tab.requestedUrl = normalizedUrl;
-            yield* navigateAndWait(
-              tab.contents,
-              () => tab.contents.loadURL(normalizedUrl, browserLoadOptions()),
-              operationTimeout,
-            ).pipe(
+            yield* loadKeepingCommittedPage(() => tab.contents.loadURL(normalizedUrl, browserLoadOptions())).pipe(
               Effect.catch((failure) =>
                 this.#loadFailure(tab, failure, normalizedUrl).pipe(Effect.flatMap(Effect.fail)),
               ),
             );
           } else if (direction === "reload") {
-            yield* navigateAndWait(
-              tab.contents,
-              () => {
-                tab.contents.reloadIgnoringCache();
-                return true;
-              },
-              operationTimeout,
-            );
+            yield* loadKeepingCommittedPage(() => {
+              tab.contents.reloadIgnoringCache();
+              return true;
+            });
           } else if (direction) {
-            yield* navigateAndWait(tab.contents, () => navigateHistory(tab.contents, direction), operationTimeout);
+            yield* loadKeepingCommittedPage(() => navigateHistory(tab.contents, direction));
           }
         }),
       readResult,
@@ -4811,6 +4808,7 @@ export class BrowserHost {
       tab: BrowserHostTab,
       deadline: number,
       markDispatched: () => void,
+      keepPageLoading: () => void,
     ) => Effect.Effect<void, BrowserOperationError>,
     readResult: ActionResultReader<A>,
     timeoutMs?: number,
