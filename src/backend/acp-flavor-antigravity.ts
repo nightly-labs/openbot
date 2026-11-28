@@ -466,6 +466,7 @@ export const ANTIGRAVITY_ACP_FLAVOR: AcpFlavor = {
   selfWakeTools: /\b(?:start|invoke)_subagent\b|^(?:Run(?:ning)? )?schedule\??$/u,
   contextCompaction: "handoff",
   closeKeepsSession: true,
+  reopenKeepsPrompts: true,
   sessionProcesses: true,
   modelsLoadWithSession: true,
   keepModelsOnRefreshFailure: true,
