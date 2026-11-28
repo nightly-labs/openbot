@@ -2840,7 +2840,10 @@ export class RemoteControlPlane {
       },
     ) {
       const dependencies = yield* RemoteDependencies;
-      const host = yield* this.authenticateHost(hostId, machineToken);
+      const host =
+        placement.signalHome === false
+          ? yield* this.#authenticateHostReplicaFirst(hostId, machineToken)
+          : yield* this.authenticateHost(hostId, machineToken);
       const signal = dependencies.signal;
       if (!signal) return yield* remoteSignalNotConfigured();
       if (placement.signalHome === null && host.signal_home !== null)
@@ -3539,18 +3542,27 @@ export class RemoteControlPlane {
       hostId: string,
       machineToken: string,
     ): Effect.fn.Return<void, RemoteFailure, RemoteDependencies> {
-      const provided = yield* sha256(machineToken).pipe(
-        Effect.mapError((error) => (error instanceof RemoteControlPlaneError ? error : new RemoteOperationError({}))),
-      );
-      const replica = yield* this.#host(hostId, "replica");
-      if (replica && machineTokenMatches(replica, provided)) return;
-      const host = yield* this.#host(hostId, "primary");
-      if (!host || !machineTokenMatches(host, provided)) {
-        return yield* new RemoteControlPlaneError(401, "host_unauthorized", "The host credential is invalid.");
-      }
+      yield* this.#authenticateHostReplicaFirst(hostId, machineToken);
     },
     (operation) => operation.pipe(Effect.provide(this.#layer)),
   ).bind(this);
+
+  readonly #authenticateHostReplicaFirst = Effect.fn("RemoteControlPlane.authenticateHostReplicaFirst")(function* (
+    this: RemoteControlPlane,
+    hostId: string,
+    machineToken: string,
+  ): Effect.fn.Return<RemoteHostRow, RemoteFailure, RemoteDependencies> {
+    const provided = yield* sha256(machineToken).pipe(
+      Effect.mapError((error) => (error instanceof RemoteControlPlaneError ? error : new RemoteOperationError({}))),
+    );
+    const replica = yield* this.#host(hostId, "replica");
+    if (replica && machineTokenMatches(replica, provided)) return replica;
+    const host = yield* this.#host(hostId, "primary");
+    if (!host || !machineTokenMatches(host, provided)) {
+      return yield* new RemoteControlPlaneError(401, "host_unauthorized", "The host credential is invalid.");
+    }
+    return host;
+  });
 
   readonly sessionOpen = Effect.fn("RemoteControlPlane.sessionOpen")(
     function* (

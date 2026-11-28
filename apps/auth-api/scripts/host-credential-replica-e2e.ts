@@ -3,6 +3,7 @@ import { mkdir, readdir, readFile, writeFile } from "node:fs/promises";
 import { join, resolve } from "node:path";
 import { DatabaseSync } from "node:sqlite";
 import { Effect, Exit } from "effect";
+import { decodeJwt } from "jose";
 import { RemoteControlPlane } from "../src/server/remote-control-plane";
 import { sqliteD1 } from "./sqlite-d1";
 
@@ -102,6 +103,11 @@ async function credentialAccepted(plane: RemoteControlPlane, hostId: string, tok
   return Exit.isSuccess(exit);
 }
 
+function ticketAuthEpoch(ticket: string): number | null {
+  const { authEpoch } = decodeJwt(ticket);
+  return typeof authEpoch === "number" ? authEpoch : null;
+}
+
 async function scenario() {
   const primary = await migratedDatabase();
   const replica = await migratedDatabase();
@@ -175,6 +181,73 @@ async function scenario() {
     "a Slack route ticket with a wrong token is refused and reads no routes",
     Exit.isFailure(refusedSlack) && tableReads.join() === "replica:remote_hosts,primary:remote_hosts",
     { tableReads: [...tableReads] },
+  );
+
+  const signalPlane = new RemoteControlPlane({
+    DB: withStaleReplica(primary, replica, reads),
+    REMOTE_SIGNAL_URL: "wss://signal.test",
+    ...ticketKeys,
+  });
+  const hostTicketReads = async (
+    hostId: string,
+    token: string,
+    signalHome: boolean | null,
+  ): Promise<{ accepted: boolean; reads: string[]; signalUrl: string | null }> => {
+    reads.length = 0;
+    const exit = await Effect.runPromiseExit(
+      signalPlane.issueHostTicket(hostId, token, { signalHome, failedSignalUrl: null }),
+    );
+    return {
+      accepted: Exit.isSuccess(exit),
+      reads: [...reads],
+      signalUrl: Exit.isSuccess(exit) ? exit.value.signalUrl : null,
+    };
+  };
+
+  const ingress = await hostTicketReads("synced", "token-synced", false);
+  check(
+    "an ingress host ticket checks the credential with one replica read",
+    ingress.accepted && ingress.reads.join() === "replica" && ingress.signalUrl === "wss://signal.test",
+    ingress,
+  );
+
+  const ingressRotated = await hostTicketReads("rotated", "token-after", false);
+  check(
+    "an ingress host ticket with a token that the replica does not have yet is issued from the primary",
+    ingressRotated.accepted && ingressRotated.reads.join() === "replica,primary",
+    ingressRotated,
+  );
+
+  const ingressWrong = await hostTicketReads("synced", "token-wrong", false);
+  check(
+    "an ingress host ticket with a wrong token is refused after the primary read",
+    !ingressWrong.accepted && ingressWrong.reads.join() === "replica,primary",
+    ingressWrong,
+  );
+
+  primary.prepare("UPDATE remote_hosts SET auth_epoch = 2 WHERE host_id = 'rotated'").run();
+  const stale = await Effect.runPromiseExit(
+    signalPlane.issueHostTicket("rotated", "token-before", { signalHome: false, failedSignalUrl: null }),
+  );
+  const staleEpoch = Exit.isSuccess(stale) ? ticketAuthEpoch(stale.value.ticket) : null;
+  check(
+    "an ingress host ticket from a stale replica keeps the old auth epoch, so Signal refuses it after the credential change",
+    staleEpoch === 1,
+    { staleEpoch },
+  );
+
+  const placed = await hostTicketReads("synced", "token-synced", true);
+  check(
+    "a host ticket that asks for a Signal home still checks the credential on the primary",
+    placed.accepted && placed.reads[0] === "primary" && !placed.reads.includes("replica"),
+    placed,
+  );
+
+  const legacy = await hostTicketReads("synced", "token-synced", null);
+  check(
+    "a host ticket from an older desktop still checks the credential on the primary",
+    legacy.accepted && legacy.reads[0] === "primary" && !legacy.reads.includes("replica"),
+    legacy,
   );
 
   primary.prepare("UPDATE remote_hosts SET owner_user_id = 'next-owner' WHERE host_id = 'synced'").run();

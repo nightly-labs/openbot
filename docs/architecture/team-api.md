@@ -296,8 +296,15 @@ Cloudflare issues short ES256 connection tickets and stores the logical session.
 10-minute resume token, so a short Signal update does not end an active WebRTC connection. Signal
 validates a trusted, non-expired resume token locally. After a Signal restart, the first use of a token
 checks the durable control plane once. A connection ticket is checked the same way when it was issued
-before the Signal start (with 60 s for clock skew), because Signal forgot the revocations from before
-its restart. Tickets issued after the start get no extra check. An expired token also needs one
+before the Signal start (with 5 s for clock skew), because Signal forgot the revocations from before
+its restart. Tickets issued after the start get no extra check. The Signal homes and Cloudflare use
+NTP, and the homes were less than 1 ms off on 2026-11-28. The old 60 s margin also covered the
+tickets of desktops that connected again in the first minute, so after a restart Signal sent one
+account service request for each route ticket. The desktop ingress connection
+(`signalHome: false`) gets its host ticket after a credential check on the D1 read replica first,
+and on the primary only when the replica does not match. A replica that has not yet seen a
+credential change gives a ticket with the old auth epoch, which Signal refuses after the
+revocation event. An expired token also needs one
 durable check before Signal issues a replacement. Later reconnects use the in-memory trust cache.
 This is not a heartbeat. Signal collects these checks for 25 ms and sends up to 100 of them in one
 signed `/v2/remote/resume/validate-batch` request, which reads D1 with one host query and one
