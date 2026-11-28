@@ -5,6 +5,10 @@ import { Effect } from "effect";
 import { type AccountAnalytics, NO_ACCOUNT_ANALYTICS } from "./account-analytics";
 import { type BillingError, type BillingOperationError, billingCall } from "./billing-errors";
 
+export function welcomeGrantId(userId: string): string {
+  return `${WELCOME_SOURCE}:${userId}`;
+}
+
 export function welcomeTenthsSql(column: WalletColumn, idParam: string): string {
   return `MAX(0, (SELECT COALESCE(SUM(remaining_tenths), 0) FROM credit_grants
       WHERE ${column} = ${idParam} AND scope = 'welcome' AND status = 'active')
@@ -246,7 +250,7 @@ export class CreditGrants {
     this: CreditGrants,
     userId: string,
   ): Effect.fn.Return<boolean, Failure> {
-    const grantId = `${WELCOME_SOURCE}:${userId}`;
+    const grantId = welcomeGrantId(userId);
     const known = yield* billingCall(() =>
       this.#database
         .prepare(
@@ -258,6 +262,14 @@ export class CreditGrants {
         .first<{ closed: number }>(),
     );
     if (known?.closed) return false;
+    return yield* this.issueWelcome(userId);
+  }).bind(this);
+
+  readonly issueWelcome = Effect.fn("CreditGrants.issueWelcome")(function* (
+    this: CreditGrants,
+    userId: string,
+  ): Effect.fn.Return<boolean, Failure> {
+    const grantId = welcomeGrantId(userId);
     const now = this.#now();
     const [inserted] = yield* billingCall(() =>
       this.#database.batch([

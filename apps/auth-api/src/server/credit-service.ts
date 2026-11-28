@@ -40,6 +40,7 @@ import {
   creditExpiring,
   expiringGrantsSql,
   moveGrantsSql,
+  welcomeGrantId,
   welcomeTenthsSql,
 } from "./credit-grants";
 import { availableTenthsSql, overdueGrantTenthsSql, paidTenthsSql } from "./credit-spending";
@@ -99,11 +100,16 @@ interface ServerRow {
   expiring_at: number | null;
 }
 
+interface LockedCurrencyRow {
+  currency: string;
+}
+
 interface WalletRow {
   balance_tenths: number;
   welcome_tenths: number;
   expiring_tenths: number;
   expiring_at: number | null;
+  welcome_issued: number;
 }
 
 interface PurchaseRow {
@@ -198,7 +204,26 @@ export class CreditService {
     this: CreditService,
     userId: string,
   ): Effect.fn.Return<CreditsState, Failure> {
-    const locked = yield* this.#lockedCurrency(userId);
+    const now = this.#now();
+    const [lockedRows, personalRows, rows] = yield* billingCall(() =>
+      this.#database.batch<LockedCurrencyRow | WalletRow | ServerRow>([
+        lockedCurrencyStatement(this.#database, userId),
+        personalWalletStatement(this.#database, userId, now),
+        this.#database
+          .prepare(
+            `SELECT h.host_id AS server_id, h.name AS name,
+                    CASE WHEN h.owner_user_id = ?1 THEN 'owner' ELSE m.role END AS role,
+                    ${availableTenthsSql("server_id", "h.host_id")} AS balance_tenths,
+                    ${expiringGrantsSql("server_id", "h.host_id", "?2")}
+               FROM remote_hosts h
+               JOIN remote_memberships m ON m.host_id = h.host_id AND m.user_id = ?1 AND m.status = 'active'
+              ORDER BY h.owner_user_id = ?1 DESC, h.name COLLATE NOCASE, h.host_id`,
+          )
+          .bind(userId, now),
+      ]),
+    );
+    const lockedRow = lockedRows?.results[0];
+    const locked = lockedRow && "currency" in lockedRow ? lockedCurrencyOf(lockedRow) : null;
     const prices = yield* this.#prices().pipe(Effect.orElseSucceed(() => new Map<string, StripePrice>()));
     const currencies = BILLING_CURRENCIES.filter(
       (currency) =>
@@ -209,36 +234,14 @@ export class CreditService {
         }),
     );
     const currency = locked ?? (currencies.includes("eur") ? "eur" : (currencies[0] ?? "eur"));
-    yield* new CreditGrants({ database: this.#database, now: this.#now, analytics: this.#analytics })
-      .welcome(userId)
-      .pipe(Effect.orElseSucceed(() => false));
-    const now = this.#now();
-    const personal = yield* billingCall(() =>
-      this.#database
-        .prepare(
-          `SELECT ${availableTenthsSql("user_id", "?1")} AS balance_tenths,
-                  ${welcomeTenthsSql("user_id", "?1")} AS welcome_tenths,
-                  ${expiringGrantsSql("user_id", "?1", "?2")}`,
-        )
-        .bind(userId, now)
-        .first<WalletRow>(),
-    );
+    const batchedPersonal = personalRows?.results[0];
+    const personal =
+      batchedPersonal && "welcome_issued" in batchedPersonal && batchedPersonal.welcome_issued === 1
+        ? batchedPersonal
+        : yield* this.#personalAfterWelcome(userId);
     const balanceTenths = Math.max(0, personal?.balance_tenths ?? 0);
-    const rows = yield* billingCall(() =>
-      this.#database
-        .prepare(
-          `SELECT h.host_id AS server_id, h.name AS name,
-                  CASE WHEN h.owner_user_id = ?1 THEN 'owner' ELSE m.role END AS role,
-                  ${availableTenthsSql("server_id", "h.host_id")} AS balance_tenths,
-                  ${expiringGrantsSql("server_id", "h.host_id", "?2")}
-             FROM remote_hosts h
-             JOIN remote_memberships m ON m.host_id = h.host_id AND m.user_id = ?1 AND m.status = 'active'
-            ORDER BY h.owner_user_id = ?1 DESC, h.name COLLATE NOCASE, h.host_id`,
-        )
-        .bind(userId, now)
-        .all<ServerRow>(),
-    );
-    const servers: CreditServerWallet[] = rows.results.flatMap((row) => {
+    const servers: CreditServerWallet[] = (rows?.results ?? []).flatMap((row) => {
+      if (!("server_id" in row)) return [];
       if (!isOneOf(SERVER_ROLES, row.role)) return [];
       const walletTenths = Math.max(0, row.balance_tenths);
       const wallet: CreditServerWallet = {
@@ -714,18 +717,18 @@ export class CreditService {
     this: CreditService,
     userId: string,
   ): Effect.fn.Return<BillingCurrency | null, Failure> {
-    const row = yield* billingCall(() =>
-      this.#database
-        .prepare(
-          `SELECT currency FROM billing_subscriptions WHERE user_id = ?1 AND status IN ${OPEN_STATUSES_SQL}
-           UNION ALL
-           SELECT currency FROM licenses WHERE user_id = ?1 AND status IN ${OPEN_STATUSES_SQL}
-           LIMIT 1`,
-        )
-        .bind(userId)
-        .first<{ currency: string }>(),
-    );
-    return row && isBillingCurrency(row.currency) ? row.currency : null;
+    const row = yield* billingCall(() => lockedCurrencyStatement(this.#database, userId).first<LockedCurrencyRow>());
+    return row ? lockedCurrencyOf(row) : null;
+  });
+
+  readonly #personalAfterWelcome = Effect.fn("CreditService.personalAfterWelcome")(function* (
+    this: CreditService,
+    userId: string,
+  ): Effect.fn.Return<WalletRow | null, Failure> {
+    yield* new CreditGrants({ database: this.#database, now: this.#now, analytics: this.#analytics })
+      .issueWelcome(userId)
+      .pipe(Effect.orElseSucceed(() => false));
+    return yield* billingCall(() => personalWalletStatement(this.#database, userId, this.#now()).first<WalletRow>());
   });
 
   readonly #prices = Effect.fn("CreditService.prices")(function* (
@@ -744,6 +747,32 @@ export class CreditService {
     <T>(call: () => Effect.Effect<T, StripeRequestError | StripeTransportError>) =>
       stripeRequest(call).pipe(Effect.mapError(stripeFailure)),
   );
+}
+
+function lockedCurrencyStatement(database: D1Database, userId: string): D1PreparedStatement {
+  return database
+    .prepare(
+      `SELECT currency FROM billing_subscriptions WHERE user_id = ?1 AND status IN ${OPEN_STATUSES_SQL}
+       UNION ALL
+       SELECT currency FROM licenses WHERE user_id = ?1 AND status IN ${OPEN_STATUSES_SQL}
+       LIMIT 1`,
+    )
+    .bind(userId);
+}
+
+function lockedCurrencyOf(row: LockedCurrencyRow): BillingCurrency | null {
+  return isBillingCurrency(row.currency) ? row.currency : null;
+}
+
+function personalWalletStatement(database: D1Database, userId: string, now: number): D1PreparedStatement {
+  return database
+    .prepare(
+      `SELECT ${availableTenthsSql("user_id", "?1")} AS balance_tenths,
+              ${welcomeTenthsSql("user_id", "?1")} AS welcome_tenths,
+              ${expiringGrantsSql("user_id", "?1", "?2")},
+              EXISTS (SELECT 1 FROM credit_grants WHERE grant_id = ?3) AS welcome_issued`,
+    )
+    .bind(userId, now, welcomeGrantId(userId));
 }
 
 function unavailable(): Effect.Effect<never, BillingError> {
