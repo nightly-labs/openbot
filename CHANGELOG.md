@@ -6,6 +6,27 @@ All notable changes to OpenBot will be documented here. The project follows
 
 ## [Unreleased]
 
+## [0.81.1] - 2026-11-28
+
+### Added
+
+- Show a pace mark on each usage ring in the side rail. The mark shows how much of the limit you would have left if you used it evenly until the reset. When the ring stops before the mark, you use the limit faster than the pace.
+
+### Changed
+
+- On a joined server, the desktop app no longer reads the full agent list from the server at the end of each agent turn. It uses the synced agent list for the notification.
+
+### Fixed
+
+- Servers and apps connect again within seconds after a Signal update. Before, a Signal update could
+  keep a server offline for about 5 minutes, because each server that reconnected sent its own
+  check to the account service at the same time.
+- The Chrome extension no longer opens a server that you hid. When it starts, it opens the server that you used last when it is not hidden, or else the first server that is not hidden, as the web client does. You can still open a hidden server from the server menu.
+- Web terminals in the agent browser, such as the Proxmox console, show text at its normal size again. Before, the letters were very small inside wide cells. OpenBot now uses Electron 45.3.4.
+- After you send /compact to a Claude agent, the chat no longer shows the error "Claude ended the turn with no answer". The chat shows only "Context compacted".
+- A Gemini turn that used OpenBot's tools no longer shows as failed with "Gemini ran this message without OpenBot's tools". This could occur when Gemini loaded OpenBot's tools slowly, for example with many apps connected. The next messages of the chat also complete. On a joined server, the server must also have this version.
+- Agent photos, channel pictures and image attachment previews of a joined server show again in the desktop app.
+
 ## [0.81.0] - 2026-11-27
 
 ### Added
